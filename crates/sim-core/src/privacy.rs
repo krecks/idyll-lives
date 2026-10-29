@@ -169,7 +169,8 @@ fn lives_on(w: &World, s: &Sim, plot: Option<u32>) -> bool {
 }
 
 /// Whether `sim` of this world can go to the interaction `i` of `o`: a resident of the home
-/// (`plot`), with a slot of that use free, and their age and standing enough for the use itself.
+/// (`plot`), with a slot of that use free, their age and standing enough for the use itself, and
+/// the place open to them.
 fn goes_to(w: &World, o: &ObjectInstance, sim: u32, plot: Option<u32>, i: usize) -> bool {
     let s = match w.sims.get(sim as usize) {
         Some(s) if s.here() && s.carried_by.is_none() => s,
@@ -177,7 +178,10 @@ fn goes_to(w: &World, o: &ObjectInstance, sim: u32, plot: Option<u32>, i: usize)
     };
     let Some(def) = w.content.objects.get(o.def) else { return false };
     let Some(inter) = def.interactions.get(i) else { return false };
-    lives_on(w, s, plot) && o.can_use_for(sim, def, i) && crate::world::unfit(&w.content, s.age, inter).is_none()
+    lives_on(w, s, plot)
+        && o.can_use_for(sim, def, i)
+        && o.allows(inter, sim)
+        && crate::world::unfit(&w.content, s.age, inter).is_none()
 }
 
 /// Whether `b` is a child of `a` (a little one sleeps in their parents' room, not a box of their own).
@@ -199,7 +203,10 @@ pub(crate) fn claimed_places(content: &Content, lot: &Lot, claimed: &[u16], obje
         let Ok(k) = claimed.binary_search(&room) else {
             continue;
         };
-        if content.objects[o.def].interactions.iter().any(|i| offers_place(content, i)) {
+        let Some(def) = content.objects.get(o.def) else {
+            continue;
+        };
+        if def.interactions.iter().any(|i| offers_place(content, i)) {
             out[k].1.push(i as u32);
         }
     }
@@ -213,7 +220,8 @@ pub(crate) fn claimed_places(content: &Content, lot: &Lot, claimed: &[u16], obje
 ///   back in), and the partner who shares it with them: their bed is here, so the room is theirs
 ///   too, even while they're out of it;
 /// - the children of whoever lies here, if a bed here is free for them;
-/// - whoever can mind a crib here, whether or not the baby is in it; and
+/// - whoever can mind a crib here, whether or not the baby is in it (any adult of this home, a
+///   lodger included); and
 /// - when nobody lies here yet (nobody has gone to bed, or the crib's empty), whoever of this
 ///   home the place itself allows.
 ///
@@ -226,11 +234,15 @@ fn room_claimants(w: &World, room: u16) -> Vec<u32> {
         return out;
     };
     for &oi in &w.claimed_places[k].1 {
-        let o = &w.objects[oi as usize];
+        let Some(o) = w.objects.get(oi as usize) else {
+            continue;
+        };
         if o.broken() {
             continue;
         }
-        let def = &w.content.objects[o.def];
+        let Some(def) = w.content.objects.get(o.def) else {
+            continue;
+        };
         let plot = w.plot_at(o.x, o.z);
         // Whoever of this home lies on it now has a place here, slot or no slot (they got up, and
         // want back in).
@@ -292,7 +304,7 @@ fn mix(h: &mut u64, v: u64) {
 /// (`room_claimants`).
 fn presence_hash(w: &World) -> u64 {
     let mut h = 0xcbf2_9ce4_8422_2325;
-    mix(&mut h, w.relationships.version() as u64);
+    mix(&mut h, w.relationships.version());
     for s in &w.sims {
         mix(&mut h, s.id as u64);
         mix(&mut h, s.age.to_bits() as u64);
@@ -306,8 +318,8 @@ fn presence_hash(w: &World) -> u64 {
     h
 }
 
-/// A claimed room's place objects and who lies in them, over `presence_hash`: the same number means
-/// the same people have a place there (`World::claimants_cache`).
+/// A claimed room's place objects, their state and who lies in them, over `presence_hash`: the
+/// same number means the same people have a place there (`World::claimants_cache`).
 fn room_hash(w: &World, room: u16, presence: u64) -> u64 {
     let mut h = presence;
     mix(&mut h, room as u64);
@@ -315,9 +327,15 @@ fn room_hash(w: &World, room: u16, presence: u64) -> u64 {
         return h;
     };
     for &oi in &w.claimed_places[k].1 {
-        let o = &w.objects[oi as usize];
+        let Some(o) = w.objects.get(oi as usize) else {
+            continue;
+        };
         mix(&mut h, oi as u64);
         mix(&mut h, o.broken() as u64);
+        mix(&mut h, o.open as u64);
+        mix(&mut h, o.ripe() as u64);
+        mix(&mut h, o.run.map_or(0, |m| if m > 0.0 { 1 } else { 2 }));
+        mix(&mut h, o.closed_users);
         let mut n = 0;
         for u in o.users() {
             mix(&mut h, u as u64);

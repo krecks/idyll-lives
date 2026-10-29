@@ -949,9 +949,9 @@ pub struct RoomKind {
     /// others wait outside or go elsewhere, and its doors stay shut to them.
     pub private: bool,
     /// A private room of this kind is its people's own (content `claimed`: a bedroom): whoever has
-    /// a place in it — somewhere to lie, or a baby's place and the care of it — comes and goes,
-    /// and its door keeps everyone else out (`privacy.rs`). Only with `private`, which is what
-    /// keeps the door shut at all.
+    /// a place in it — somewhere to lie, or a baby's place and the care of it, with their partner
+    /// and children — comes and goes, and its door keeps everyone else out (`privacy.rs`). Only
+    /// with `private`, which is what keeps the door shut at all, and never a passage.
     pub claimed: bool,
 }
 
@@ -4049,6 +4049,11 @@ impl Content {
             .iter()
             .map(|k| {
                 let ctx = format!("room kind '{}'", k.id);
+                if k.claimed && k.passage {
+                    return Err(Error::new(format!(
+                        "{ctx}: a 'claimed' room is somebody's own: it can't be a passage (see privacy.rs)"
+                    )));
+                }
                 if k.claimed && !k.private {
                     return Err(Error::new(format!(
                         "{ctx}: a 'claimed' room is one kept shut: it needs 'private' too (see privacy.rs)"

@@ -592,7 +592,7 @@ pub struct Relationships {
     /// time was a tenth of a big town's tick). Partners change through `set_partners`.
     partner: Vec<Option<u32>>,
     /// Bumped when a family link or a partnership changes (`World::claimants_cache` reads it).
-    version: u32,
+    version: u64,
 }
 
 impl Relationships {
@@ -601,7 +601,7 @@ impl Relationships {
     }
 
     /// Bumped when a family link or a partnership changes.
-    pub fn version(&self) -> u32 {
+    pub fn version(&self) -> u64 {
         self.version
     }
 

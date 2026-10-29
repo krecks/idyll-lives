@@ -27,7 +27,12 @@ fn home_with(bed_in_bedroom: bool, walled: bool) -> World {
     home_full(bed_in_bedroom, walled, false)
 }
 
-/// `home_with`, and with a baby in a crib in the bedroom (`baby`).
+/// `home`, with a baby in a crib in the bedroom.
+fn home_with_baby() -> World {
+    home_full(true, true, true)
+}
+
+/// `home` or `home_with`, with or without a baby in a crib in the bedroom (`baby`).
 fn home_full(bed_in_bedroom: bool, walled: bool, baby: bool) -> World {
     let (house, front) = if walled { ("[1,1,20,1],[20,1,20,13],[20,13,1,13],[1,13,1,1],", r#"{"x":11,"z":13,"axis":"x"},"#) } else { ("", "") };
     let bed = if bed_in_bedroom { r#"{"def":"bed","x":10,"z":3}"# } else { r#"{"def":"bed","x":16,"z":14}"# };
@@ -489,17 +494,18 @@ fn the_crib_in_a_bedroom_opens_its_door_to_whoever_minds_the_baby() {
 /// just when the crib is empty.
 #[test]
 fn a_minder_goes_in_to_the_baby_in_the_crib() {
-    let mut w = home_full(true, true, true);
+    let mut w = home_with_baby();
     let (_, bedroom) = rooms(&w);
     let crib = w.objects.iter().position(|o| w.content.objects[o.def].id == "crib").expect("the crib");
+    let baby = w.sims.iter().position(|s| s.name == "Cleo").expect("Cleo") as u32;
     for _ in 0..ticks(60.0) {
         w.tick_once();
-        if w.objects[crib].users().any(|u| u == 3) {
+        if w.objects[crib].users().any(|u| u == baby) {
             break;
         }
     }
-    assert!(w.objects[crib].users().any(|u| u == 3), "the baby lies in the crib");
-    let bed = 2;
+    assert!(w.objects[crib].users().any(|u| u == baby), "the baby lies in the crib");
+    let bed = w.objects.iter().position(|o| w.content.objects[o.def].id == "bed").expect("the bed") as u32;
     w.apply(Command::Use { sim: 0, object: bed, interaction: interaction(&w, bed, "sleep") }).unwrap();
     for _ in 0..ticks(60.0) {
         if using(&w, 0).is_some() {
@@ -549,9 +555,11 @@ fn a_shipped_bedroom_is_claimed_and_a_bathroom_never_is() {
     assert!(w.content.room_kinds.iter().all(|k| !k.claimed || k.private), "every claimed room is one kept shut");
 
     let mut content: serde_json::Value = serde_json::from_str(&common::content()).unwrap();
-    let kinds = content["roomKinds"].as_array_mut().unwrap();
-    let living = kinds.iter_mut().find(|k| k["id"] == "living").expect("the living room's kind is in the content");
-    living["claimed"] = serde_json::json!(true);
+    {
+        let kinds = content["roomKinds"].as_array_mut().unwrap();
+        let living = kinds.iter_mut().find(|k| k["id"] == "living").expect("the living room's kind is in the content");
+        living["claimed"] = serde_json::json!(true);
+    }
     let lot = serde_json::json!({
         "width": 6, "depth": 6,
         "plots": [{"name": "Home", "x": 0, "z": 0, "w": 6, "d": 6, "entry": [3.5, 5.5]}],
@@ -563,6 +571,18 @@ fn a_shipped_bedroom_is_claimed_and_a_bathroom_never_is() {
         .expect("a claimed room must be private")
         .to_string();
     assert!(err.contains("claimed"), "{err}");
+
+    {
+        let kinds = content["roomKinds"].as_array_mut().unwrap();
+        let living = kinds.iter_mut().find(|k| k["id"] == "living").expect("the living room's kind is in the content");
+        living["private"] = serde_json::json!(true);
+        living["passage"] = serde_json::json!(true);
+    }
+    let err = World::from_json(&content.to_string(), &lot.to_string(), 1)
+        .err()
+        .expect("a claimed room can't be a passage")
+        .to_string();
+    assert!(err.contains("passage"), "{err}");
 }
 
 /// The other half of the bed has the run of the room they slept in, whether they're in it or not:
