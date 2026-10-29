@@ -214,24 +214,60 @@ fn sleepers(w: &World, h: usize) -> Vec<usize> {
     members(w, h).into_iter().filter(|&i| !w.content.life.baby(w.sims[i].age)).collect()
 }
 
-/// Beds (sleeping places) in the home on `plot`, broken ones too (whoever lives there fixes
-/// them; a house whose only bed broke while empty would otherwise never be lived in again).
-fn beds(w: &World, plot: u32) -> usize {
-    let sleep = w.content.day_rhythm.sleep_tags;
-    w.objects
-        .iter()
-        .zip(&w.object_plot)
-        .filter(|(_, p)| **p == Some(plot))
-        .filter(|(o, _)| w.content.objects[o.def].interactions.iter().any(|it| it.tags & sleep != 0))
-        .map(|(o, _)| usize::from(w.content.objects[o.def].slots))
-        .sum()
+/// Bed places in the home on `plot`, broken ones too (whoever lives there fixes them; a house
+/// whose only bed broke while empty would otherwise never be lived in again): one for each bed
+/// and each bunk of a bed for two apart, and the couple's beds (a double bed: somewhere to try
+/// for a baby, `privacy::couples_bed`), whose other half is only a partner's.
+#[derive(Clone, Copy)]
+struct Beds {
+    /// A place for anyone: a bed, a bunk, or a couple's bed slept in alone.
+    places: usize,
+    /// Couple's beds, each a place more for a couple.
+    couples: usize,
 }
 
-/// Whether household `h`'s home has a bed and room for `more` residents.
-fn has_room(w: &World, h: usize, more: usize) -> bool {
+impl Beds {
+    /// Places for `pairs` couples and everyone else on their own.
+    fn for_pairs(self, pairs: usize) -> usize {
+        self.places + self.couples.min(pairs)
+    }
+
+    /// The most who could sleep here: couples in every couple's bed.
+    fn most(self) -> usize {
+        self.places + self.couples
+    }
+}
+
+fn beds(w: &World, plot: u32) -> Beds {
+    let sleep = w.content.day_rhythm.sleep_tags;
+    let mut beds = Beds { places: 0, couples: 0 };
+    for (o, _) in w.objects.iter().zip(&w.object_plot).filter(|(_, p)| **p == Some(plot)) {
+        let def = &w.content.objects[o.def];
+        if !def.interactions.iter().any(|it| it.tags & sleep != 0) {
+            continue;
+        }
+        if crate::privacy::couples_bed(def) {
+            beds.places += 1;
+            beds.couples += usize::from(def.slots) - 1;
+        } else {
+            beds.places += usize::from(def.slots);
+        }
+    }
+    beds
+}
+
+/// Couples among `sims` (both of them in it).
+fn pairs(w: &World, sims: &[usize]) -> usize {
+    sims.iter().filter(|&&a| w.relationships.partner_of(a).is_some_and(|b| b > a && sims.contains(&b))).count()
+}
+
+/// Whether household `h`'s home has a bed and room for one more resident, the partner of one of
+/// them moving in.
+fn has_room_for_partner(w: &World, h: usize) -> bool {
     let Some(plot) = w.households[h].plot else { return false };
-    let n = members(w, h).len() + more;
-    n <= w.content.rules.max_household && beds(w, plot) >= n
+    let members = members(w, h);
+    let n = members.len() + 1;
+    n <= w.content.rules.max_household && beds(w, plot).for_pairs(pairs(w, &members) + 1) >= n
 }
 
 /// Whether a resident's household lets them move on their own (the player can say no). Being
@@ -241,7 +277,8 @@ fn may_move(w: &World, i: usize) -> bool {
     s.here() && s.adult(&w.content) && (w.player_moves || !w.households[s.household as usize].player)
 }
 
-/// A house nobody lives in (not a park, not the player's home), with beds for `n`.
+/// A house nobody lives in (not a park, not the player's home), with beds for `n`: one, or two
+/// partners.
 fn vacant_plot(w: &World, n: usize) -> Option<u32> {
     w.plots
         .iter()
@@ -249,7 +286,7 @@ fn vacant_plot(w: &World, n: usize) -> Option<u32> {
         .filter(|p| {
             !w.households.iter().enumerate().any(|(h, hh)| hh.plot == Some(p.id) && (hh.player || !members(w, h).is_empty()))
         })
-        .find(|p| beds(w, p.id) >= n)
+        .find(|p| beds(w, p.id).for_pairs(n / 2) >= n)
         .map(|p| p.id)
 }
 
@@ -318,8 +355,8 @@ fn moving(w: &mut World, rules: &crate::content::MovingRules) {
                 continue;
             }
             let (ha, hb) = (w.sims[a].household as usize, w.sims[b].household as usize);
-            let into_b = has_room(w, hb, 1);
-            let into_a = has_room(w, ha, 1);
+            let into_b = has_room_for_partner(w, hb);
+            let into_a = has_room_for_partner(w, ha);
             // The player's home first, else the one from the fuller home moves.
             let mover = match (into_a, into_b) {
                 (true, true) if w.households[ha].player => Some(b),
@@ -384,7 +421,7 @@ fn moving(w: &mut World, rules: &crate::content::MovingRules) {
 fn newcomers(w: &mut World, rules: &crate::content::NewcomerRules) {
     for p in 0..w.plots.len() as u32 {
         if w.plots[p as usize].public
-            || beds(w, p) == 0
+            || beds(w, p).most() == 0
             || w.households.iter().enumerate().any(|(h, hh)| hh.plot == Some(p) && (hh.player || !members(w, h).is_empty()))
         {
             continue;
@@ -400,17 +437,21 @@ fn pick<'a, T>(rng: &mut crate::rng::Rng, list: &'a [T]) -> Option<&'a T> {
 }
 
 /// A new household moves into the house on `plot`: a single, a couple (sometimes with a grown
-/// child) or two siblings, sized to its beds, with names, traits, perks and ages from content
-/// and an appearance seed (`{"seed": n}`, expanded into a look by the web).
+/// child) or siblings, sized to its beds (only a couple shares a couple's bed), with names,
+/// traits, perks and ages from content and an appearance seed (`{"seed": n}`, expanded into a
+/// look by the web). Never strangers: only those who belong together share a bedroom
+/// (`privacy::room_claimants`).
 pub fn arrive(w: &mut World, plot: u32) -> bool {
     let content = &w.content;
-    let most = beds(w, plot).min(content.rules.max_household).max(1);
+    let beds = beds(w, plot);
+    let most = beds.most().min(content.rules.max_household).max(1);
     let here = w.sims.iter().filter(|s| s.here()).count();
     if here >= crate::world::MAX_SIMS || content.genders.is_empty() {
         return false;
     }
     let size = (1 + (w.rng.next_u32() as usize) % most).min(crate::world::MAX_SIMS - here);
     let couple = size >= 2 && w.rng.next_f32() < 0.6;
+    let size = size.min(beds.for_pairs(usize::from(couple))).max(1);
     // Everyone who moves in is grown up (the first stages are a baby's and a child's).
     let adult = content.life.stages.iter().find(|s| s.adult).map_or(18.0, |s| s.from);
     let [lo, hi] = content.life.start_age;
@@ -460,8 +501,12 @@ pub fn arrive(w: &mut World, plot: u32) -> bool {
             bonds.push((2, 0, "parent"));
             bonds.push((2, 1, "parent"));
         }
-    } else if size >= 2 && w.rng.next_f32() < 0.4 {
-        bonds.push((0, 1, "siblings"));
+    } else {
+        for b in 1..size {
+            for a in 0..b {
+                bonds.push((a, b, "siblings"));
+            }
+        }
     }
     let h = household_for(w, plot, &surname);
     w.households[h].funds = w.content.starting_funds;
@@ -552,7 +597,7 @@ pub(crate) fn cribs_for_babies(w: &mut World, h: usize) {
 
 /// The player's household starts in a home with fewer bed places than people past the crib:
 /// tell them once, for each resident without a bed (on the game's first step, so it's news to the
-/// view, not the story so far). The simulation's fallback is unchanged: they share a bed or sleep
+/// view, not the story so far). The simulation's fallback is unchanged: they share a bed (only a partner, in a couple's bed) or sleep
 /// on the floor until the player buys one.
 pub(crate) fn notify_missing_beds(w: &mut World, h: usize) {
     let sleep = w.content.day_rhythm.sleep_tags;
@@ -560,7 +605,8 @@ pub(crate) fn notify_missing_beds(w: &mut World, h: usize) {
         return;
     }
     let Some(plot) = w.households[h].plot else { return };
-    for &i in sleepers(w, h).iter().skip(beds(w, plot)) {
+    let sleepers = sleepers(w, h);
+    for &i in sleepers.iter().skip(beds(w, plot).for_pairs(pairs(w, &sleepers))) {
         w.events.push(w.tick, EventKind::NoBed, i, i, None);
     }
 }
@@ -574,7 +620,8 @@ pub(crate) fn bed_for_child(w: &mut World, i: usize) {
     let h = w.sims[i].household as usize;
     let sleep = w.content.day_rhythm.sleep_tags;
     let Some(plot) = w.households[h].plot.filter(|_| sleep != 0) else { return };
-    if beds(w, plot) >= sleepers(w, h).len() {
+    let sleepers = sleepers(w, h);
+    if beds(w, plot).for_pairs(pairs(w, &sleepers)) >= sleepers.len() {
         return;
     }
     if w.households[h].player {

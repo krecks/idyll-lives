@@ -40,19 +40,25 @@
   const residents = $derived(residentsOf(services.content, household));
   /**
    * Sleeping places in the house as it would be furnished for this household (empty lot: unknown),
-   * counted as the simulation counts them (sim-core `lifecycle::beds`): a slot on anything with a sleep interaction.
+   * counted as the simulation counts them (sim-core `lifecycle::beds`): a slot on anything with a sleep interaction, but a
+   * couple's bed (one where partners try for a baby) is a place for one unless one of the household's couples sleeps in it.
    */
   const bedPlaces = $derived.by(() => {
     const sleep = services.content.sleepTags;
     if (!templates || !selected || lot === 'empty' || !sleep.length) return null;
     const fitted = houseTemplate(templates, selected.template, residents);
     if (!fitted) return null;
-    return [fitted, fitted.upper, fitted.basement]
-      .flatMap((floor) => floor?.objects ?? [])
-      .reduce((n, o) => {
-        const def = services.content.object(o.def);
-        return n + (def && services.content.offersTags(def, sleep) ? (def.slots ?? 1) : 0);
-      }, 0);
+    let [places, couples] = [0, 0];
+    for (const o of [fitted, fitted.upper, fitted.basement].flatMap((floor) => floor?.objects ?? [])) {
+      const def = services.content.object(o.def);
+      if (!def || !services.content.offersTags(def, sleep)) continue;
+      const slots = def.slots ?? 1;
+      if (slots > 1 && def.interactions.some((i) => i.conceive)) {
+        places += 1;
+        couples += slots - 1;
+      } else places += slots;
+    }
+    return places + Math.min(couples, residents.couples);
   });
   const sleepers = $derived(sleepersOf(residents));
   const shortage = $derived(bedPlaces !== null && sleepers > bedPlaces ? { beds: bedPlaces, sleepers } : null);

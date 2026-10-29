@@ -110,13 +110,19 @@ renderer keeps its door shut to everyone but the one going through it.
 ## A bedroom is its sleepers' own (0.5.x)
 
 A room of a `claimed` kind (content `roomKinds[].claimed`, `private` as well; the bedroom) belongs
-to the people who sleep in it. Its door is kept shut while someone is in it, and the rest of the
-household, guests included, wait outside or go elsewhere. Those with a place go in and out: whoever
-lies in one of its beds (or got up in the night and wants back in), their partner, their children
-if a bed here is free, and whoever minds a crib in it. A lodger with no bed here is not one of
-them, though they may go in to mind the crib. The bathroom is never claimed: nobody has a place
-in it, so it shuts for whomever is in there. Code: `privacy.rs` (`Shut::claimants`,
-`World::claimants_cache`).
+to the people who sleep in it, and only those who belong together share one. Its door is kept
+shut while someone is in it, and the rest of the household, guests included, wait outside or go
+elsewhere. Those with a place go in and out: whoever lies in one of its beds, and their partner,
+parents, children, brothers and sisters with somewhere there to lie. The other half of a couple's
+bed is the partner's (Mummy and Daddy share a bed, and sometimes a child does for the night); a
+bunk bed is a bed for each. Whoever minds a crib in there goes in to the baby, a lodger too; being
+sent to a bed doesn't make anyone else one of them. Walking through a bedroom to a room beyond is
+allowed. Newcomers are never strangers (a single, a couple, perhaps with a grown child, or
+siblings), and bed places count a couple's bed as one unless a couple sleeps in it. The bathroom
+is never claimed: nobody has a place in it, so it shuts for whomever is in there. Residents don't
+have beds of their own yet: before anyone lies down, a free bed in the room is a place for any of
+the household. Code: `privacy.rs` (`Shut::claimants`, `World::claimants_cache`),
+`lifecycle.rs` (`Beds`).
 
 ## Opinions and wishes
 

@@ -159,6 +159,13 @@ fn newcomers_are_grown_up() {
         for &i in &members {
             assert!(w.sims[i].adult(&w.content), "seed {seed}: {} moved in at {}", w.sims[i].name, w.sims[i].age);
         }
+        // Never strangers: only those who belong together share a bedroom.
+        for (k, &a) in members.iter().enumerate() {
+            for &b in &members[k + 1..] {
+                let rel = w.relationships.get(a, b);
+                assert!(rel.partners || !w.relationships.kin(a, b).is_none(), "seed {seed}: {} and {} are strangers", w.sims[a].name, w.sims[b].name);
+            }
+        }
         families += usize::from(members.len() == 3 && w.relationships.get(members[0], members[1]).partners);
     }
     assert!(families > 0, "no couple moved in with a grown child");

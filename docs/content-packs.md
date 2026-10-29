@@ -684,7 +684,7 @@ A bedroom marks its door as its sleepers' own too:
 
 ```json
 {"id": "bedroom", "label": "Bedroom", "icon": "icon.category.bedroom", "tags": ["sleep"],
- "essentials": [["sleep"]], "size": [3, 6], "exclusive": true, "private": true, "claimed": true}
+ "essentials": [["sleep"]], "size": [6, 12], "exclusive": true, "private": true, "claimed": true}
 ```
 
 `essentials`: tag groups something in the room must offer for full function; `size`:
@@ -697,10 +697,14 @@ after its `graceMinutes` and the toilet counts as taken (`anotherRoom`). Not a r
 doors shut (snapshot `shuts`). Code: `crates/sim-core/src/privacy.rs`.
 
 `claimed`: the room is its sleepers' own (a bedroom; an error unless `private` too, and it can't
-be a `passage`). Its door is open to whoever has a place in it — whoever lies in one of its beds
-(or got up and wants back in), their partner, their children if a bed here is free, and whoever
-minds a crib in it — and keeps everyone else, guests included, out while someone is in it. The
-bathroom is never claimed.
+be a `passage`). Only those who belong together share it: while someone lies in one of its beds,
+its door is open to them and to their partner, parents, children, brothers and sisters with
+somewhere here to lie (a bed nobody's in, a bunk's other bunk; the other half of a couple's bed,
+one with a `conceive` use, only for the partner or a child of whoever lies in it), and to whoever
+minds a crib in it, and keeps everyone else, guests included, out. Before anyone lies down it's
+open to whoever has a bed there. Walking through it to a room beyond is allowed; going in isn't.
+Bed places count the same way: a couple's bed is a place for one, or for a couple. The bathroom
+is never claimed.
 
 **Scoring** (`roomRules`, an object, so a pack can change single keys): `weights` of size, light,
 decor, cleanliness and function; `windowTiles` and `lampTiles` (tiles one window or lamp lights

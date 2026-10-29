@@ -660,3 +660,126 @@ fn a_lodger_has_no_place_in_the_couples_bedroom_when_one_of_them_is_out_of_bed()
     assert!(!in_room, "and never went in: the empty half of their bed is not his place in their room");
     common::check(&w);
 }
+
+/// Sends resident `i` to `object`'s sleep and reports whether they waited at a door on the way
+/// (`kept_out`), and whether they got there and lay down.
+fn sent_to_bed(w: &mut World, i: usize, object: u32, minutes: f32) -> (bool, bool) {
+    w.apply(Command::Use { sim: i as u32, object, interaction: interaction(w, object, "sleep") }).unwrap();
+    let mut waited = false;
+    for _ in 0..ticks(minutes) {
+        w.tick_once();
+        waited |= w.sims[i].kept_out();
+        if using(w, i).is_some() {
+            return (waited, true);
+        }
+    }
+    (waited, false)
+}
+
+/// Ada asleep in the couple's bed, Ben up and down the hall.
+fn ada_asleep_ben_up(w: &mut World) {
+    let bed = 2;
+    assert_eq!(sent_to_bed(w, 0, bed, 60.0), (false, true), "Ada goes to bed");
+    send_down(w, 1);
+}
+
+/// Being sent to a bed is not lying in it: Gus, ordered into the free half of the couple's bed, is
+/// no more one of the room's own on his way there than before. He waits at their door, as he would
+/// at the bathroom's.
+#[test]
+fn a_lodger_sent_to_the_couples_bed_waits_at_their_door() {
+    let mut w = home(true);
+    let (_, bedroom) = rooms(&w);
+    ada_asleep_ben_up(&mut w);
+    let (waited, lay) = sent_to_bed(&mut w, 2, 2, 30.0);
+    assert!(waited, "Gus waited outside their door");
+    assert!(!lay && room_of(&w, 2) != bedroom, "and never went in to their bed");
+    common::check(&w);
+}
+
+/// Family share a bedroom, but the other half of a couple's bed is only a partner's (or a child's
+/// for the night): Ada's brother waits at the door for that, and goes straight in to a bunk of his
+/// own in there.
+#[test]
+fn a_brother_has_a_bunk_in_the_bedroom_but_not_the_other_half_of_the_couples_bed() {
+    let siblings = |w: &mut World| {
+        let preset = w.content.bond_presets["siblings"];
+        w.relationships.bond(0, 2, &preset);
+    };
+    let mut w = home(true);
+    let (_, bedroom) = rooms(&w);
+    siblings(&mut w);
+    ada_asleep_ben_up(&mut w);
+    let (waited, lay) = sent_to_bed(&mut w, 2, 2, 30.0);
+    assert!(waited && !lay, "Gus kept out of the couple's bed");
+
+    let mut w = home(true);
+    siblings(&mut w);
+    common::buy(&mut w, "bedBunk", 13, 3);
+    let bunk = w.objects.len() as u32 - 1;
+    assert_eq!(w.lot.room_at(13, 3), bedroom, "the bunk bed stands in the bedroom");
+    assert_eq!(sent_to_bed(&mut w, 0, bunk, 60.0), (false, true), "Ada goes to bed in a bunk");
+    let (waited, lay) = sent_to_bed(&mut w, 2, bunk, 60.0);
+    assert!(!waited && lay, "her brother goes straight in to the other bunk (waited {waited}, lay {lay})");
+    assert_eq!(room_of(&w, 2), bedroom);
+
+    // A lodger is nobody's family: the other bunk is no place of his.
+    let mut w = home(true);
+    common::buy(&mut w, "bedBunk", 13, 3);
+    let bunk = w.objects.len() as u32 - 1;
+    assert_eq!(sent_to_bed(&mut w, 0, bunk, 60.0), (false, true));
+    let (waited, lay) = sent_to_bed(&mut w, 2, bunk, 30.0);
+    assert!(waited && !lay, "Gus waits outside");
+    common::check(&w);
+}
+
+/// A bedroom with a room beyond it (a study only through the bedroom): someone asleep in there
+/// keeps out whoever goes into the bedroom, not whoever walks through it to the study.
+#[test]
+fn whoever_walks_through_a_bedroom_to_the_room_beyond_goes_on() {
+    let lot = r#"{"width":16,"depth":13,
+        "plots":[{"name":"Home","x":0,"z":0,"w":16,"d":13,"entry":[7.5,12.5]}],
+        "households":[{"name":"Player","plot":0,"player":true}],
+        "walls":[[1,1,15,1],[15,1,15,11],[15,11,1,11],[1,11,1,1],[8,1,8,6],[1,6,15,6]],
+        "doors":[{"x":7,"z":11,"axis":"x"},{"x":4,"z":6,"axis":"x"},{"x":8,"z":3,"axis":"z"}],
+        "objects":[{"def":"bed","x":2,"z":2}],
+        "sims":[{"name":"Ada","age":30,"x":5.5,"z":8.5,"traits":["cheerful"]},
+                {"name":"Gus","age":45,"x":10.5,"z":8.5,"traits":["cheerful"]}]}"#;
+    let mut w = World::from_json(&common::content(), lot, 4).unwrap();
+    w.autonomy = false;
+    for s in w.sims.iter_mut() {
+        s.job = None;
+        s.job_search_from = u32::MAX;
+    }
+    let (bedroom, study) = (w.lot.room_at(3, 3), w.lot.room_at(11, 3));
+    assert_ne!(bedroom, study);
+    assert_eq!(sent_to_bed(&mut w, 0, 0, 60.0), (false, true), "Ada goes to bed");
+    assert_eq!(room_of(&w, 0), bedroom);
+    assert_eq!(row(&w, 0)[snapshot::sim::SHUTS], 1.0, "she keeps the bedroom shut");
+    w.apply(Command::MoveTo { sim: 1, x: 11.5, z: 3.5 }).unwrap();
+    let mut through = false;
+    for _ in 0..ticks(30.0) {
+        w.tick_once();
+        assert!(!w.sims[1].kept_out(), "Gus waited at the bedroom's door on his way to the study");
+        if room_of(&w, 1) == study {
+            through = true;
+            break;
+        }
+    }
+    assert!(through, "Gus walked through to the study");
+    // Into the bedroom itself, he waits.
+    w.apply(Command::MoveTo { sim: 1, x: 5.5, z: 8.5 }).unwrap();
+    for _ in 0..ticks(30.0) {
+        w.tick_once();
+    }
+    w.apply(Command::MoveTo { sim: 1, x: 3.5, z: 4.5 }).unwrap();
+    let (mut waited, mut went_in) = (false, false);
+    for _ in 0..ticks(20.0) {
+        w.tick_once();
+        waited |= w.sims[1].kept_out();
+        went_in |= room_of(&w, 1) == bedroom;
+    }
+    assert!(waited && !went_in, "kept out of the bedroom itself (waited {waited}, in {went_in})");
+    assert!(using(&w, 0).is_some(), "Ada sleeps on");
+    common::check(&w);
+}
