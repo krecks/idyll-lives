@@ -28,8 +28,8 @@
     "@fontsource-variable/inter": "^5.3.0",
     "@huggingface/tokenizers": "0.2.0",
     "meshoptimizer": "1.3.0",
-    "onnxruntime-web": "1.30.0",
-    "playcanvas": "2.23.0"
+    "onnxruntime-web": "1.31.1",
+    "playcanvas": "2.23.3"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.1",
@@ -39,16 +39,16 @@
     "@tsconfig/svelte": "^5.0.8",
     "binaryen": "132.0.0",
     "bun-types": "^1.4.4",
-    "eslint": "^10.12.0",
+    "eslint": "^10.13.0",
     "eslint-plugin-svelte": "^3.23.1",
     "ktx2-encoder": "0.6.0",
     "sharp": "^0.35.5",
-    "svelte": "^5.57.2",
-    "svelte-check": "^4.7.6",
-    "svelte-eslint-parser": "^1.9.0",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.7",
+    "svelte-eslint-parser": "^1.10.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.71.1",
-    "vite": "^8.3.4"
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.3.5"
   },
-  "packageManager": "bun@1.4.3"
+  "packageManager": "bun@1.4.4"
 }

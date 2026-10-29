@@ -546,7 +546,7 @@ Unlike the art above, these come with their own licences: the model under the **
 
 Our own code reads the text plain for the model and phonemizes it only for the mouth shapes: `crates/voice/src/g2p.rs` ports the English rules of Misaki (Apache-2.0); no espeak-ng code is used. Pitch, size and the 24 kHz resampling are done around the model in `crates/voice/src/dsp.rs` and `resample.rs` (our own TD-PSOLA and resampler); the model's starting noise comes from our own hash in `web/src/voice/supertonic.ts`.
 
-The model runs with **ONNX Runtime Web** 1.30.0 (`onnxruntime-web`, its WebGPU build `ort-wasm-simd-threaded.asyncify.wasm`, bundled with the game), © Microsoft Corporation, MIT licence: https://github.com/microsoft/onnxruntime.
+The model runs with **ONNX Runtime Web** 1.31.1 (`onnxruntime-web`, its WebGPU build `ort-wasm-simd-threaded.asyncify.wasm`, bundled with the game), © Microsoft Corporation, MIT licence: https://github.com/microsoft/onnxruntime.
 
 ## The language model for residents' lines
 
