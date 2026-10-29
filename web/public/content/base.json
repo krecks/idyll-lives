@@ -770,6 +770,7 @@
       "label": "Happy",
       "icon": "icon.emotion.happy",
       "effects": {
+        "walkSpeed": 1.05,
         "tagPreference": {
           "friendly": 1.3
         }
@@ -793,6 +794,7 @@
       "label": "Angry",
       "icon": "icon.emotion.angry",
       "effects": {
+        "walkSpeed": 1.08,
         "tagPreference": {
           "mean": 3.5,
           "friendly": 0.5,
@@ -809,6 +811,7 @@
       "label": "Sad",
       "icon": "icon.emotion.sad",
       "effects": {
+        "walkSpeed": 0.88,
         "tagPreference": {
           "friendly": 1.3,
           "romantic": 0.5,
@@ -824,6 +827,7 @@
       "label": "Embarrassed",
       "icon": "icon.emotion.embarrassed",
       "effects": {
+        "walkSpeed": 0.95,
         "tagPreference": {
           "social": 0.6
         }
@@ -844,6 +848,7 @@
       "label": "Inspired",
       "icon": "icon.emotion.inspired",
       "effects": {
+        "walkSpeed": 1.03,
         "tagPreference": {
           "creative": 1.5
         }
@@ -854,6 +859,7 @@
       "label": "Energized",
       "icon": "icon.emotion.energized",
       "effects": {
+        "walkSpeed": 1.08,
         "tagPreference": {
           "fitness": 1.5,
           "rest": 0.8
@@ -865,6 +871,7 @@
       "label": "Relaxed",
       "icon": "icon.emotion.relaxed",
       "effects": {
+        "walkSpeed": 0.95,
         "tagPreference": {
           "rest": 1.4,
           "lounge": 1.4,
@@ -1687,7 +1694,7 @@
         "feeling": "awkward"
       }
     },
-    {"id": "tryForBaby", "label": "Try for a baby", "category": "romantic", "icon": "icon.bubble.love", "minutes": 30, "animation": "kiss",
+    {"id": "tryForBaby", "label": "Try for a baby", "category": "romantic", "icon": "icon.bubble.love", "minutes": 3, "animation": "kiss",
      "tags": ["social", "romantic", "touch"], "distance": 0.5, "prefer": "romance", "autonomyWeight": 1.5,
      "requires": {"partners": true, "minRomance": 50}, "acceptance": {"base": 0.4, "romance": 0.006, "mood": 0.2},
      "needs": {"social": 0.2, "fun": 0.1}, "targetNeeds": {"social": 0.2, "fun": 0.1},
@@ -1742,7 +1749,8 @@
       "sleep",
       "bathroom",
       "hygiene",
-      "nap"
+      "nap",
+      "intimate"
     ],
     "guestTags": [
       "bathroom"
@@ -2377,8 +2385,16 @@
     "mix",
     "phoneScreen",
     "feed",
-    "change"
+    "change",
+    "buy",
+    "sell"
   ],
+  "service": {
+    "$comment": "The town's vendors and shopkeepers (sim-core staff.rs): posts whose servers stand within `share` metres of each other share one, a customer waits `waitMinutes` for the server at most, and the server is shown doing `anim` while serving.",
+    "share": 2.0,
+    "waitMinutes": 20,
+    "anim": "sell"
+  },
   "objects": [
     {
       "id": "fridge",
@@ -2392,6 +2408,9 @@
         1,
         1
       ],
+      "sounds": {
+        "fetch": "fridgeDoor"
+      },
       "interactions": [
         {
           "id": "snack",
@@ -2464,6 +2483,7 @@
           "id": "coldDrink",
           "label": "Pour a cold drink",
           "anim": "drink",
+          "sound": "fridgeDoor",
           "minutes": 5,
           "effects": {
             "comfort": 0.05,
@@ -2561,7 +2581,8 @@
             "rest",
             "nap"
           ]
-        }
+        },
+        {"id": "tryForBaby", "label": "Try for a baby", "anim": "nap", "minutes": 30, "pose": "lie", "partner": true, "conceive": true, "autonomous": false, "stages": ["youngAdult", "adult"], "effects": {"social": 0.05, "comfort": 0.1}, "tags": ["romantic", "intimate"]}
       ],
       "price": 750,
       "category": "bedroom",
@@ -3044,6 +3065,7 @@
           "id": "run",
           "label": "Go for a run",
           "anim": "run",
+          "sound": "treadmill",
           "minutes": 60,
           "effects": {
             "fun": 0.1,
@@ -3111,14 +3133,18 @@
       "name": "Chess table",
       "model": "model.chessTable",
       "footprint": [
-        1,
+        2,
         1
       ],
-      "approach": "behind",
+      "slots": 2,
+      "places": [
+        { "at": [-0.66, 0], "facing": 90 },
+        { "at": [0.66, 0], "facing": -90 }
+      ],
       "price": 350,
       "category": "hobbies",
       "group": "games",
-      "description": "Builds Intelligence and Perception.",
+      "description": "A game laid out between two chairs: play someone at home, or practise alone. Builds Intelligence and Perception.",
       "interactions": [
         {
           "id": "chess",
@@ -3136,6 +3162,27 @@
           "skills": {
             "intelligence": 0.18,
             "perception": 0.06
+          }
+        },
+        {
+          "id": "play",
+          "label": "Play chess",
+          "anim": "play",
+          "minutes": 45,
+          "pose": "sit",
+          "partner": true,
+          "alone": "chess",
+          "effects": {
+            "fun": 0.35,
+            "social": 0.08
+          },
+          "tags": [
+            "training",
+            "entertainment"
+          ],
+          "skills": {
+            "intelligence": 0.12,
+            "perception": 0.04
           }
         }
       ]
@@ -3351,6 +3398,7 @@
           "id": "tinker",
           "label": "Tinker",
           "anim": "tinker",
+          "sound": "tools",
           "minutes": 60,
           "effects": {
             "fun": 0.15,
@@ -3521,7 +3569,7 @@
       "interactions": [
         {"id": "lie", "label": "Lie in the crib", "anim": "sleep", "minutes": 720, "pose": "lie", "baby": true, "autonomous": false,
          "effects": {"energy": 1.0, "comfort": 0.75}, "tags": ["rest"]},
-        {"id": "feed", "label": "Feed the baby", "anim": "cuddle", "minutes": 15, "care": {"hunger": 0.8, "social": 0.1}, "tags": ["care"]},
+        {"id": "feed", "label": "Feed the baby", "anim": "cuddle", "holds": "babyBottle", "minutes": 15, "care": {"hunger": 0.8, "social": 0.1}, "tags": ["care"]},
         {"id": "change", "label": "Change the baby", "anim": "change", "minutes": 10, "care": {"bladder": 1.0, "hygiene": 0.7}, "tags": ["care", "chores"], "atSlot": true},
         {"id": "play", "label": "Play with the baby", "anim": "play", "minutes": 20, "effects": {"fun": 0.2, "social": 0.15}, "care": {"fun": 0.6, "social": 0.5}, "tags": ["care", "social"]},
         {"id": "cuddle", "label": "Cuddle the baby", "anim": "cuddle", "minutes": 15, "effects": {"social": 0.1}, "care": {"comfort": 0.5, "social": 0.15}, "tags": ["care", "social"]}
@@ -3805,7 +3853,7 @@
     {"id": "grubby", "need": "hygiene", "feeling": "grubby", "cooldownHours": 3, "graceMinutes": 60}
   ],
   "roomKinds": [
-    {"id": "bathroom", "icon": "icon.category.bathroom", "label": "Bathroom", "tags": ["bathroom"], "essentials": [["bathroom"], ["hygiene"]], "size": [3, 6], "exclusive": true},
+    {"id": "bathroom", "icon": "icon.category.bathroom", "label": "Bathroom", "tags": ["bathroom"], "essentials": [["bathroom"], ["hygiene"]], "size": [3, 6], "exclusive": true, "private": true},
     {"id": "kitchen", "icon": "icon.category.kitchen", "label": "Kitchen", "tags": ["cooking"], "essentials": [["cooking"]], "size": [6, 12], "exclusive": true},
     {"id": "bedroom", "icon": "icon.category.bedroom", "label": "Bedroom", "tags": ["sleep"], "essentials": [["sleep"]], "size": [6, 12], "exclusive": true},
     {"id": "living", "icon": "icon.category.living", "label": "Living room", "tags": ["lounge", "entertainment", "screen"], "size": [9, 20]},
@@ -4159,6 +4207,21 @@
       "radius": 0.13
     },
     {
+      "id": "babyBottle",
+      "label": "Baby's bottle",
+      "model": "tool.babyBottle",
+      "hold": "hand",
+      "radius": 0.03
+    },
+    {
+      "id": "cakeSlice",
+      "label": "Slice of cake",
+      "model": "item.cakeSlice",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.13
+    },
+    {
       "id": "sandwich",
       "label": "Sandwich",
       "model": "item.sandwich",
@@ -4230,37 +4293,37 @@
     {
       "id": "iceCreamCone",
       "label": "Ice cream",
-      "model": "item.iceCream",
+      "model": "item.iceCreamCup",
       "hold": "hand",
-      "radius": 0.08
+      "radius": 0.05
     },
     {
       "id": "hotDog",
       "label": "Hot dog",
-      "model": "item.takeout",
+      "model": "item.hotDog",
       "hold": "hand",
-      "radius": 0.13
+      "radius": 0.1
     },
     {
       "id": "crisps",
-      "label": "Snack",
-      "model": "item.treatPlate",
+      "label": "Crisps",
+      "model": "item.crisps",
       "hold": "hand",
-      "radius": 0.1
+      "radius": 0.11
     },
     {
       "id": "fruit",
       "label": "Piece of fruit",
-      "model": "item.treatPlate",
+      "model": "item.apple",
       "hold": "hand",
-      "radius": 0.1
+      "radius": 0.045
     },
     {
       "id": "pastry",
       "label": "Pastry",
-      "model": "item.treatPlate",
+      "model": "item.pastryBag",
       "hold": "hand",
-      "radius": 0.1
+      "radius": 0.07
     },
     {
       "id": "shopSandwich",
@@ -4651,8 +4714,7 @@
             "oven"
           ],
           "minutes": 25,
-          "anim": "bake",
-          "sound": "none"
+          "anim": "bake"
         }
       ]
     },
@@ -4702,8 +4764,7 @@
             "oven"
           ],
           "minutes": 35,
-          "anim": "bake",
-          "sound": "none"
+          "anim": "bake"
         }
       ]
     },
@@ -4752,8 +4813,7 @@
             "oven"
           ],
           "minutes": 30,
-          "anim": "bake",
-          "sound": "none"
+          "anim": "bake"
         }
       ]
     },

@@ -54,16 +54,21 @@ import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
 import { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOG_BACK, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PUSH_ONLY, RIDES, RUN_MAX_RATE, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, STRADDLED, STRUM, STRUM_SHORT, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT } from './actions';
+import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, withCutlery } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { FLOOR_SITS } from './clips/seated';
+import { HANDED } from './clips/serve';
 import { type BodyData, type CharacterSet, type Clip, loadCharacterSet, loadStage } from './data';
+import { BEARING_FLOATS, bearing } from './bodyLanguage';
+import { gaitFor } from './gait';
+import { TURN_FADE, isTurn, turnClipIn, turnDone, turnOnSpot, turnYaw } from './turns';
 import { ASLEEP, COLD, EXPRESSIONS, FRIENDLY, HUG, KISS, LAUGH, MOOD_COLD, MOOD_WARM, NONE, RELAX_ARMS, SOCIAL_FACES, STANCE, type StageDirection } from './expressions';
 import { FACE_KEYS, type Face, FaceMixer, NEUTRAL } from './face';
 import { type OutfitParams, SHELL_BITS, WEARS, type Wear, outfitFor, writeOutfit } from './outfit';
 import { cradled, cuddlePose, onPad, writeCradle } from './cuddles';
 import { lyingPose, measureLegs, measureSit, outfitFit, type PoseKit } from './measure';
-import { palmAt, placeFrame, placeProp } from './props';
+import { type Hands, palmAt, placeFrame, placeHand, placeProp } from './props';
+import { rimOf } from './clips/shot';
 import { DETAIL_PX, FACE_PARTS, LOD_FAR_PX, LOD_NEAR_PX, MORPH_PX, type PartMesh, Range, YOUNG_STAGES, shellBit, skinChunks } from './parts';
 import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, sampleClip, skin } from './pose';
 import { BABBLE, compose, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clamp, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, hash, lerp, lerpAngle, lieBack, lieCentre, multiply, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
@@ -88,6 +93,18 @@ const UPPER_FADE_RATE = 4;
 /** How fast a rise cut short (`SimRig.riseK`) finishes its step off the seat (per second: a quarter of a second, less
  * when the action runs fast). */
 const RISE_CATCH_UP = 4;
+
+/**
+ * Whether what changes hands at a vendor's (`clips/serve.ts`) is in this one's hands now: the vendor's (serving, `sell`)
+ * between picking it up and handing it over, the customer's (`buy`) once it's handed over; anything else always.
+ */
+function handedYet(rig: SimRig, tag: string): boolean {
+  const cur = rig.cur;
+  const window = HANDED[cur.key];
+  if (!window || !cur.clip) return tag !== 'sell';
+  const at = cur.time / cur.clip.duration;
+  return at >= window[0] && at < window[1];
+}
 
 /** `q` / `p` = the player's pose: its clip sampled at its time, or the pose it holds (`Player.frozen`). A player
  * with neither (a rig that has not been given a clip yet) leaves `q` / `p` as they were. */
@@ -195,6 +212,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** Per Sim row: what it holds of the object it uses (content `held`), in the left and the right hand (or both). */
   private readonly leftProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
   private readonly rightProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
+  /** Per Sim row: the prop in their hand for what they do (`ACTIONS[tag].prop`: a book, a cup, a phone). */
+  private readonly handProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
+  /** Scratch for `writeHand`: the hands as just posed. */
+  private readonly hands: Hands = { palms: new Float32Array(6), quats: new Float32Array(8), head: new Float32Array(3), yaw: 0, floorY: 0, scale: 1, size: 1 };
   /** Scratch for `writeHeld`: a frame's axes and origin (x, y, z each). */
   private readonly frame3 = new Float32Array(12);
   /**
@@ -263,6 +284,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   updateMs = 0;
   /** Emotion id per snapshot emotion code - 1 (content `emotions`). */
   private emotionIds: readonly string[] = [];
+  /** Scratch: how free a body is for its body language this frame (`bodyLanguage`). */
+  private readonly freedom = { posture: 0, arms: 0, head: 0 };
   /** Stage directions per Sim row (character creator / portraits only; empty in game). */
   readonly directions: (StageDirection | null)[] = [];
   /** Selected Sim (selection ring), or null. */
@@ -554,6 +577,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         approach: 0,
         feetUp: false,
         feet: new Float32Array(4),
+        bearing: new Float32Array(BEARING_FLOATS),
+        turnKey: '',
+        turnDeg: 0,
+        turnFrom: 0,
+        turnBy: 0,
+        turnStarted: false,
         cuddleT: -1,
         cuddleOut: -1,
         cuddleMin: 0,
@@ -561,6 +590,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         cuddleBaby: -1,
         reachW: 0,
         holdW: 0,
+        feeding: false,
+        plate: '',
         liftW: 0,
         cuddleStep: 0,
         carryT: -1,
@@ -588,6 +619,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         fromBed: false,
         lieX: 0,
         lieZ: 0,
+        lieFwd: 0,
         lieYaw: 0,
         sideYaw: NaN,
         sideOut: 0,
@@ -847,6 +879,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.writeProp(this.toolProp, i, null);
       this.writeProp(this.leftProp, i, null);
       this.writeProp(this.rightProp, i, null);
+      this.writeProp(this.handProp, i, null);
     }
     // Props built without their files are built (and their files tried) afresh in the next session.
     this.props.dropFailed();
@@ -869,7 +902,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** Per frame: a prop nobody holds or works with isn't drawn (no draw call for its empty instances). */
   private readonly showProp = (p: P | null, key: string): void => {
     if (!p) return;
-    const used = this.heldProp.includes(key) || this.toolProp.includes(key) || this.leftProp.includes(key) || this.rightProp.includes(key);
+    const used = this.heldProp.includes(key) || this.toolProp.includes(key) || this.leftProp.includes(key) || this.rightProp.includes(key) || this.handProp.includes(key);
     // (The `stress` ghosts' rigs are in `sims` already, in the rows after the residents'.)
     this.view.showProp(p, used ? Math.min(this.sims.length, MAX_CHARACTERS) : 0);
   };
@@ -975,6 +1008,96 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     return top ? clamp((top[1] * Math.min(1, rig.scale) / rig.scale - GUITAR.short) / (GUITAR.long - GUITAR.short), 0, 1) : 1;
   }
 
+  /**
+   * The prop in a Sim's hand for what they do (`ACTIONS[tag].prop`: a book, a cup, a phone, a cue; `plate`: what they
+   * eat); none while walking, talking (`busy`), lying, sitting down or getting up.
+   */
+  private handPropOf(rig: SimRig, pose: number, busy: boolean, tag: string, plate: string): HandProp | null {
+    const act = ACTIONS[tag]?.prop;
+    const still = !busy && rig.tagKnown && rig.walkT < 0 && pose !== Pose.Lie && !RISING.has(rig.cur.key);
+    return still && act ? (typeof act === 'function' ? act(rig.useDef, plate, pose === Pose.Sit) : act) : null;
+  }
+
+  /** Prop `p` (`handPropOf`) in Sim row `i`'s hand, placed by the hands as just posed; not outside the clips it is held in. */
+  private writeHand(rig: SimRig, i: number, p: HandProp | null): void {
+    const shown = p && this.handShown(rig, p) ? p : null;
+    if (shown?.rest && rig.useId >= 0) this.restTaken.add(rig.useId);
+    if (shown?.feeds) {
+      // (Thrown out a metre or so in front of them.)
+      const k = this.seedCount++ * 3;
+      this.seed[k] = rig.x + Math.sin(rig.yaw) * 1.1;
+      this.seed[k + 1] = rig.z + Math.cos(rig.yaw) * 1.1;
+      this.seed[k + 2] = i;
+    }
+    const m = this.writeProp(this.handProp, i, shown?.key ?? null);
+    if (!m || !shown || !this.set) return;
+    const B = this.set.bone;
+    const h = this.hands;
+    const q = this.scratch.worldQ;
+    const t = this.scratch.worldT;
+    palmAt(this.scratch, rig, B.hand_r, 1, this.palm);
+    h.palms.set(this.palm, 0);
+    palmAt(this.scratch, rig, B.hand_l, -1, this.palm);
+    h.palms.set(this.palm, 3);
+    for (let k = 0; k < 4; k++) {
+      h.quats[k] = q[B.hand_r * 4 + k];
+      h.quats[4 + k] = q[B.hand_l * 4 + k];
+    }
+    for (let k = 0; k < 3; k++) h.head[k] = t[B.Head * 3 + k];
+    h.yaw = rig.yaw;
+    h.floorY = rig.floorY;
+    h.scale = rig.scale;
+    h.size = Math.min(1, rig.scale);
+    h.ball = shown.grip === 'ball' ? this.ballRound(rig) : undefined;
+    h.headQ = this.headQ;
+    for (let k = 0; k < 4; k++) this.headQ[k] = q[B.Head * 4 + k];
+    // (The baby fed: their mouth, a little up from the head joint as last posed; they're posed after the one holding them.)
+    const baby = shown.grip === 'aim' ? rig.cuddleBaby : -1;
+    if (baby >= 0 && this.headJoints[baby * 3 + 1] !== 0) {
+      for (let k = 0; k < 3; k++) this.aimAt[k] = this.headJoints[baby * 3 + k];
+      this.aimAt[1] += 0.03 * (this.sims[baby]?.scale ?? 1);
+      h.aim = this.aimAt;
+    } else h.aim = undefined;
+    placeHand(m, i, shown, h);
+  }
+
+  /**
+   * The basketball's round (props.ts `Hands.ball`): the shot clip playing and how far into it, the rim of the hoop they
+   * shoot at (its middle, out in front of the hoop's), and where they stand.
+   */
+  private ballRound(rig: SimRig): Hands['ball'] {
+    const rim = rimOf(rig.cur.key);
+    const obj = rig.useObj;
+    if (!rim || !obj || !rig.cur.clip) return undefined;
+    const d = rig.cur.clip.duration;
+    const f = (obj.rot * Math.PI) / 2;
+    const b = this.ballScratch;
+    b.rim[0] = obj.cx + Math.sin(f) * rim.z;
+    b.rim[1] = rig.floorY + rim.y;
+    b.rim[2] = obj.cz + Math.cos(f) * rim.z;
+    b.feet[0] = rig.x;
+    b.feet[1] = rig.z;
+    b.clip = rig.cur.key;
+    b.t = ((rig.cur.time % d) + d) % d;
+    return b;
+  }
+  private readonly ballScratch = { clip: '', t: 0, rim: new Float32Array(3), feet: new Float32Array(2) };
+  private readonly headQ = new Float32Array(4);
+  private readonly aimAt = new Float32Array(3);
+  /** Each row's head joint as last posed (x, y, z): where a baby fed from a bottle has their mouth. */
+  private readonly headJoints = new Float32Array(MAX_CHARACTERS * 3);
+
+  /** Whether prop `p` is in the hand now: while one of its clips plays (or, seated, its upper layer), in its `during`. */
+  private handShown(rig: SimRig, p: HandProp): boolean {
+    if (!p.clips) return true;
+    const on = p.clips.includes(rig.cur.key) ? rig.cur : rig.upperW > 0.5 && p.clips.includes(rig.upper.key) ? rig.upper : null;
+    if (!on?.clip) return false;
+    if (!p.during) return true;
+    const d = on.clip.duration;
+    const f = on.clip.loop ? (((on.time % d) + d) % d) / d : on.time / d;
+    return p.during.some(([a, b]) => f >= a && f <= b);
+  }
+
   /** Sim row `i` draws prop `key` (null: none) in `slot`; the old one's matrix is cleared. */
   private writeProp(slot: (string | null)[], i: number, key: string | null): Float32Array | null {
     const old = slot[i];
@@ -984,16 +1107,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   }
 
   /**
-   * What Sim row `i` carries (`item`, from the snapshot's `held`): on the right palm, or held in
-   * front between both palms (content `hold`), level and facing the way they face.
+   * What Sim row `i` carries (`item`, from the snapshot's `held`): on the right palm (`side` -1: the left, a plate
+   * eaten from with a fork), or held in front between both palms (content `hold`), level and facing the way they face.
    */
-  private writeCarried(rig: SimRig, i: number, item: ItemDef | undefined): void {
+  private writeCarried(rig: SimRig, i: number, item: ItemDef | undefined, side: 1 | -1 = 1): void {
     const key = item ? (item.model ?? `item.${item.id}`) : null;
     const m = this.writeProp(this.heldProp, i, key);
     if (!m || !item || !this.set) return;
     const B = this.set.bone;
     const palm = this.palm;
-    palmAt(this.scratch, rig, B.hand_r, 1, palm);
+    palmAt(this.scratch, rig, side > 0 || item.hold === 'both' ? B.hand_r : B.hand_l, side > 0 || item.hold === 'both' ? 1 : -1, palm);
     let x = palm[0];
     let y = palm[1];
     let z = palm[2];
@@ -1285,6 +1408,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
    */
   /** `storey`: the storey in view; residents above it (or, viewing the basement, not in it) aren't drawn. */
   update(frame: FrameState, inView: (x: number, z: number) => boolean, shadows: Float32Array, storey = Infinity): void {
+    this.restTaken.clear();
+    this.seedCount = 0;
     const set = this.set;
     if (!set) return;
     const started = performance.now();
@@ -1309,7 +1434,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (gameSpeed === 0 && this.debugRate === null) dt = 0;
     this.clock += dt;
     const time = this.clock;
-    const count = Math.min(curr[layout.header.simCount], MAX_CHARACTERS);
+    // The residents, then the town's vendors and shopkeepers (sim-core `staff.rs`), in rows of the same layout.
+    const count = Math.min(curr[layout.header.simCount] + (layout.header.staffCount === undefined ? 0 : curr[layout.header.staffCount]), MAX_CHARACTERS);
     const H = layout.headerLen;
     const S = layout.simStride;
     const k = layout.sim;
@@ -1393,6 +1519,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         this.writeProp(this.toolProp, i, null);
         this.writeProp(this.leftProp, i, null);
         this.writeProp(this.rightProp, i, null);
+        this.writeProp(this.handProp, i, null);
         continue;
       }
       const dir = (rig.dir = this.directions[i] ?? null);
@@ -1472,6 +1599,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       if (edge) faceYaw = rig.sideYaw;
       else if (pose === Pose.Lie && !Number.isNaN(rig.sideYaw) && rig.cur.key === 'lie' && rig.prev.key === 'sitDown' && rig.w < 1) turned = lerpAngle(rig.sideYaw, tyaw, smooth(rig.w));
       else if (pose === Pose.Stand && rig.fromBed && rig.cur.key === 'standUp' && rig.w < 1) turned = lerpAngle(rig.lieYaw, tyaw, smooth(rig.w));
+      // (And on the frame they get up, before `choose` starts it: turned already, the lying body would swing round by
+      // that frame's turn and back.)
+      else if (pose === Pose.Stand && rig.lastPose === Pose.Lie && rig.bed && !rig.upperBunk && !moving && !appeared) turned = rig.lieYaw;
       // A bed lain on across (`BEDS` `across`): turned a quarter, feet to its right.
       rig.lieAcross = pose === Pose.Lie && !!BEDS[(useObj ?? this.objectAt(rig.x, rig.z))?.def ?? '']?.across;
       if (rig.lieAcross) faceYaw = wrapAngle(tyaw + Math.PI / 2);
@@ -1525,7 +1655,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // Walkers turn as quickly as the game runs (up to 10x): sped up, the corners of their way come sooner.
       const turn = moving ? clamp(gameRate, 1, 10) : 1;
       const maxTurn = (moving ? 9 : 6) * dt * turn;
-      rig.yaw = dir ? wrapAngle(faceYaw) : turned !== null ? wrapAngle(turned) : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
+      // Standing free, a wide turn steps round (`turnOnSpot`): the yaw follows the turn clip's steps. (To the way the
+      // snapshot turns them, not the way the frames between snapshots have got to: sized for the whole turn.)
+      const goal = faceYaw === tyaw ? curr[o + k.yaw] : faceYaw;
+      const onSpot = dir || turned !== null ? null : turnOnSpot(set, rig, this.standsFree(rig, i, pose, moving, social, useObj, appeared), goal, rig.body.stage === 'child');
+      rig.yaw = dir ? wrapAngle(faceYaw) : turned !== null ? wrapAngle(turned) : onSpot !== null ? onSpot : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
       rig.visible = true;
       this.visible[i] = 1;
       rig.tx = cx;
@@ -1533,10 +1667,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
       // What it carries (`items` index + 1), and the arms that carry it.
       const held = k.held !== undefined ? curr[o + k.held] | 0 : 0;
-      const item = held > 0 && layout.items ? this.content?.item(layout.items[held - 1] ?? '') : undefined;
+      // (Not an item drawn as the prop in the hand: `PROP_ITEMS`.)
+      const heldId = held > 0 && layout.items ? (layout.items[held - 1] ?? '') : '';
+      const item = heldId && !PROP_ITEMS.has(heldId) ? this.content?.item(heldId) : undefined;
       // (Working at a station, what they carry is put down: `SET_DOWN`.)
       const setDown = item && !moving && useObj && k.recipe !== undefined && curr[o + k.recipe] > 0 ? SET_DOWN[tag] : undefined;
       const carry = item && !setDown ? (item.hold === 'both' ? 'carry' : 'carryOne') : '';
+      // What they eat (`items` index + 1): a plate on the table wants a fork (`ACTIONS.eat`).
+      const plateAt = k.plate !== undefined ? curr[o + k.plate] | 0 : 0;
+      const plate = plateAt > 0 && layout.items ? (layout.items[plateAt - 1] ?? '') : '';
+      rig.feeding = plate === 'babyBottle';
+      rig.plate = plate;
 
       // Activity → clip.
       rig.useId = usingId;
@@ -1549,6 +1690,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       advance(rig.prev, GAITS.has(rig.prev.key) || rig.prev.key === 'jog' ? dt : step);
       advance(rig.upper, step);
       advance(rig.upperPrev, step);
+      if (rig.turnKey && rig.turnStarted) rig.yaw = turnYaw(rig);
       // Carrying while walking: the arms bob in step with the feet.
       if (rig.cur.clip && GAITS.has(rig.cur.key) && rig.upper.clip && rig.upper.key.startsWith('carry')) rig.upper.time = (rig.cur.time / rig.cur.clip.duration) * rig.upper.clip.duration;
       rig.w = Math.min(1, rig.w + dt * rig.fadeRate * Math.max(1, animRate));
@@ -1665,13 +1807,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.writeSit(rig, i);
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) writeCradle(set.bone, this.scratch.worldT, this.cradle, i, rig);
       this.writeBlanket(rig, i, pose, dt, appeared);
+      // (A plate held while eating it with a fork: on the left palm, the fork in the right hand.)
+      const inHand = this.handPropOf(rig, pose, moving || !!social, tag, plate);
       if (setDown) this.writeSetDown(rig, i, setDown === 'top' ? item : undefined, tag, useObj);
-      else this.writeCarried(rig, i, item);
+      else this.writeCarried(rig, i, handedYet(rig, tag) ? item : undefined, inHand?.grip === 'bite' && inHand.hand !== 'l' ? -1 : 1);
       this.writeHeld(rig, i, pose, moving);
       this.writeTool(rig, i, moving ? '' : tag, useObj);
+      this.writeHand(rig, i, inHand);
 
       // Head top (speech bubbles, selection marker): a little above the head joint.
       const hs = rig.scale * rig.head;
+      this.headJoints.set(this.headTmp, i * 3);
       this.heads[i * 3] = this.headTmp[0];
       this.heads[i * 3 + 1] = this.headTmp[1] + (rig.body.headAbove + HEAD_MARGIN) * hs;
       this.heads[i * 3 + 2] = this.headTmp[2];
@@ -1741,7 +1887,6 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     fresh: boolean,
   ): void {
     const pair = partner ? Math.min(i, partner.id) : i;
-    const set = this.set!;
     const known = useObj !== undefined;
     const act = ACTIONS[tag];
     rig.tag = tag;
@@ -1872,20 +2017,22 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       }
       if (!social) {
         const up = known ? (typeof act?.upper === 'function' ? act.upper(rig.useDef) : act?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
-        // Eating / drinking now and then; holding a book or phone throughout.
-        if (up === 'eat' || up === 'drink') upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? up : '';
+        // Eating / drinking now and then (between sips the cup held: `between`); holding a book or phone throughout.
+        if (up === 'eat' || up === 'drink') {
+          // (With cutlery, the bite stops a fork's length off the mouth: `eatFork`.)
+          const bite = up === 'eat' && withCutlery(rig.plate) ? 'eatFork' : up;
+          upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? bite : known ? (act?.between ?? '') : '';
+        }
         else if (up) upper = up;
       }
     } else if (moving) {
       // Walking, the cycle matched to the ground speed; faster than the walk can step (a sped-up
       // game, short legs), jogging along, and faster than that running (`GEARS`): the slowest gait
       // that needn't go faster than its pace, a slower one than now only well within it.
-      const legs = rig.body.pelvisScale * rig.scale;
-      const now = GEARS.indexOf(rig.cur.key);
-      let gear = 0;
-      while (gear < GEARS.length - 1 && set.clips.has(GEARS[gear + 1]) && rig.speed / (set.clips.get(GEARS[gear])!.speed * legs) > GAIT_MAX_RATE * (gear < now ? JOG_BACK : 1)) gear++;
-      key = GEARS[gear];
-      rate = clamp(rig.speed / (set.clips.get(key)!.speed * legs), 0.35, gear === GEARS.length - 1 ? RUN_MAX_RATE : GAIT_MAX_RATE);
+      // (The run's beat quicker on shorter legs: `runMaxRate`.)
+      const gait = gaitFor(rig.speed, rig.body.pelvisScale * rig.scale, GEARS.indexOf(rig.cur.key), this.gaitSpeed);
+      key = GEARS[gait.gear];
+      rate = gait.rate;
       fade = GAITS.has(rig.cur.key) ? 0.3 : 0.2;
       hands = HANDS.relaxed;
       rig.useObj = null;
@@ -2032,6 +2179,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       }
     }
     if (!inside && rig.inside) this.stepOut(rig, fresh);
+    // Turning on the spot (`turnOnSpot`): its clip on the legs and body until it has played, then what they do. The
+    // step towards a thing or a partner waits for it (stepping forward while turning would swing the body round).
+    if (rig.turnKey && turnDone(rig)) rig.turnKey = '';
+    if (rig.turnKey) {
+      key = rig.turnKey;
+      fade = TURN_FADE;
+      rate = 1;
+      repeat = false;
+      reach = rig.approach;
+    }
     rig.approach += (reach - rig.approach) * Math.min(1, step * reachRate);
     const dir = rig.dir;
     if (dir?.clip) {
@@ -2057,12 +2214,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       upper = '';
       frame = this.bedFrame(rig.bed!);
     } else if (down) rig.upperBunk = false;
+    // (Getting up out of bed this frame: `lieFwd`.)
+    let outOfBed = false;
     if (climbDown) {
       // (Not standing up as from another bed.)
     } else if (!moving && pose === Pose.Stand && (rig.lastPose === Pose.Sit || rig.lastPose === Pose.Lie) && rig.cur.key !== up && !this.force) {
       // Rising from a seat (or sitting up out of bed: the crossfade from lying leans the Sim up).
       key = up;
       rig.fromBed = rig.lastPose === Pose.Lie && !!rig.bed;
+      outOfBed = rig.fromBed;
       if (rig.fromBed) fade = 0.9;
       // (Off a seat: rising where it is, then stepping off to the tile: `riseX`.)
       rig.rising = rig.lastPose === Pose.Sit;
@@ -2119,7 +2279,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     } else if (cur.key === key && repeat && done && !cur.clip!.loop) {
       // Repeated one-shots (fights).
       this.start(rig, key, 0.3, rate, repeat, rootY, rootFwd, pitch);
-    } else if (cur.key !== key) {
+    } else if (cur.key !== key || (key === rig.turnKey && !rig.turnStarted)) {
+      // (A new turn starts its clip afresh, even over the end of the same one.)
       rig.stepTime = 0;
       this.start(rig, key, fade, rate, repeat, rootY, rootFwd, pitch);
     } else {
@@ -2129,6 +2290,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       cur.rootPitch = pitch;
     }
     rig.cur.frame = frame;
+    if (key === rig.turnKey) rig.turnStarted = true;
     // A ride in time with its loop (`RIDES` `sync`: the swing's pumping legs).
     if (pose === Pose.Sit && key === rig.cur.key && rig.useId >= 0 && RIDES[rig.useDef]?.sync) {
       const phase = this.loopOf?.(rig.useId);
@@ -2137,7 +2299,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // (Down the bunk's ladder from lying: the lying body fading out lies where it lay, in the bed's frame.)
     if (frame && LYING.has(rig.prev.key) && rig.lastPose === Pose.Lie) rig.prev.frame = frame;
 
-    if (rig.fromBed && LYING.has(rig.prev.key)) rig.prev.rootFwd = (rig.lieX - rig.x) * fx + (rig.lieZ - rig.z) * fz + lieCentre(rig) + rig.bedFwd;
+    // The lying body fading out lies where it lay as the Sim moves off the bed: its root as it was when they got up
+    // (`lieFwd`: the lie's, or a held pose's where a lie still fading in was cut short; the lie's alone would move
+    // that one 7 cm in a frame, `blend.test.ts`).
+    if (rig.fromBed && LYING.has(rig.prev.key)) {
+      if (outOfBed) rig.lieFwd = rig.prev.rootFwd;
+      rig.prev.rootFwd = (rig.lieX - rig.x) * fx + (rig.lieZ - rig.z) * fz + rig.lieFwd;
+    }
 
     // Upper-body layer.
     if (upper) {
@@ -2435,9 +2603,60 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     rig.outT = k < 1 ? rig.outT + step : -1;
   }
 
+  /**
+   * Body language for the Sim's emotion (`bodyLanguage.ts`), as far as what they do leaves the body free: standing
+   * free or walking, all of it (but the arms, carrying); using a thing standing (its clips' hands on it), inside one,
+   * in a hug, a kiss, a fight or a cuddle, the head only; seated, the head and, sat plainly, some of the back; lying, a
+   * baby or directed (the creator, portraits), none.
+   */
+  private bodyLanguage(rig: SimRig, i: number, social: number, pose: number, moving: boolean, refused: boolean, dt: number): void {
+    const B = this.set!.bone;
+    const free = this.freedom;
+    const key = rig.cur.key;
+    free.posture = free.arms = 0;
+    free.head = 1;
+    if (rig.dir || rig.body.stage === 'baby' || pose === Pose.Lie || this.force) free.head = 0;
+    else if (pose === Pose.Sit) free.posture = key === 'sit' || key === 'sitTalk' ? 0.3 : 0;
+    else if (!(
+      social === Anim.Hug ||
+      social === Anim.Kiss ||
+      social === Anim.Fight ||
+      refused ||
+      rig.cuddleT >= 0 ||
+      rig.liftW > 0 ||
+      this.heldBy[i] >= 0 ||
+      rig.inside ||
+      (!moving && !!rig.useSeq?.includes(key))
+    )) {
+      free.posture = 1;
+      free.arms = rig.upperW > 0.05 ? 0 : 1;
+    }
+    const walking = key === 'walk' && rig.cur.clip;
+    bearing(rig.bearing, this.emotionIds[rig.emotion - 1] ?? '', free, walking ? (rig.cur.time / rig.cur.clip!.duration) % 1 : 0, walking ? smooth(rig.w) : 0, dt, this.add, B);
+  }
+
+  /**
+   * Standing free this frame, so that a wide turn can step round (`turnOnSpot`): on their feet and still, not walked
+   * in, inside a thing, up on one, getting up or climbing down, nor holding or lifting a baby or in an embrace or a
+   * fight (those place the body themselves); a baby never.
+   */
+  private standsFree(rig: SimRig, i: number, pose: number, moving: boolean, social: number, useObj: PlacedObject | null | undefined, appeared: boolean): boolean {
+    if (pose !== Pose.Stand || moving || appeared || this.force || rig.body.stage === 'baby' || this.heldBy[i] >= 0) return false;
+    if (rig.walkT >= 0 || rig.inside || rig.outT >= 0 || useObj?.stand || rig.rising || rig.fromBed || rig.riseK < 1) return false;
+    if (rig.cuddleT >= 0 || rig.liftW > 0 || !Number.isNaN(rig.faceX)) return false;
+    if (social === Anim.Hug || social === Anim.Kiss || social === Anim.Fight) return false;
+    // (Getting up, or down the bunk's ladder, until its clip is done: `choose` keeps it.)
+    if (rig.lastPose !== Pose.Stand || RISING.has(rig.cur.key) || rig.cur.key.startsWith('bunk')) return false;
+    return true;
+  }
+
+  /** A gait clip's ground speed at rate 1 on the reference legs (`gaitFor`), undefined for one the set doesn't have. */
+  private readonly gaitSpeed = (key: string): number | undefined => this.set?.clips.get(key)?.speed;
+
   private clip(key: string): Clip {
     const set = this.set!;
-    return set.clips.get(key) ?? set.clips.get('idle')!;
+    // (Turns on the spot are baked the first time they're played: `turnClipIn`.)
+    return set.clips.get(key) ?? turnClipIn(set, key) ?? set.clips.get('idle')!;
   }
 
   /** Length (s) of the clip played for `key` (0 before the set has loaded). */
@@ -2470,6 +2689,14 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   /** How far each chair pulled up to a table is drawn pulled in now (m, along its facing), by seat id (`TUCK`). */
   readonly pulled = new Map<number, number>();
+  /** The objects whose prop drawn at rest is in someone's hand now (`REST_PROPS`, `HandProp.rest`): the phone box's receiver. */
+  readonly restTaken = new Set<number>();
+  /**
+   * Where seed is being scattered now (`HandProp.feeds`: a bag of seed on the park bench), for the birds (birds.ts): the
+   * ground in front of each feeder (x, z) and the feeder's row, `seedCount` of them.
+   */
+  readonly seed = new Float32Array(MAX_CHARACTERS * 3);
+  seedCount = 0;
 
   /**
    * Seated on a chair that faces a table (`tables`): how far it is pulled in now (m), easing in once they
@@ -2663,6 +2890,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     }
     // (A refused hug or kiss plays its own clips, `REFUSED`: nobody leans in or holds anyone.)
     const refused = rig.cur.key === 'refuse' || rig.cur.key === 'rebuffed';
+    if (this.force !== 'rest') this.bodyLanguage(rig, i, social, pose, moving, refused, dt);
     switch (social) {
       case Anim.Flirt:
         // A head tilt and a sway of the hips for the one listening (the flirt's own clip has its own).
@@ -3260,7 +3488,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private stance(rig: SimRig, pose: number, moving: boolean, dt: number): void {
     const B = this.set!.bone;
     const standing = pose === Pose.Stand && !moving && (!this.force || this.forceStance);
-    const arms = standing && rig.skirt && RELAX_ARMS.has(rig.cur.key) && !(rig.upperW > 0.05) && rig.cuddleT < 0 ? 1 : 0;
+    const arms = standing && rig.skirt && (RELAX_ARMS.has(rig.cur.key) || isTurn(rig.cur.key)) && !(rig.upperW > 0.05) && rig.cuddleT < 0 ? 1 : 0;
     rig.relaxArms += (arms - rig.relaxArms) * (rig.dir?.still ? 1 : Math.min(1, dt * 5));
     const a = smooth(clamp(rig.relaxArms, 0, 1));
     if (a > 1e-3) {

@@ -3,13 +3,16 @@
  * - ambience by the game clock: a soft outdoor bed, crickets at night, and by day a few neighbourhood
  *   birds of different species, each with its own song, singing in bouts (most in the dawn chorus);
  * - things in use on the lot being looked at: a sizzling pan, a shower, a tap, washing up, a bath, the
- *   washing machine and the dryer, the dishwasher being loaded, a TV, music, drums. One loop per kind
- *   of sound, louder the more residents make it, placed left or right like voices; the water sounds
- *   are made in `water.ts`. What a use sounds like comes from the thing (content `sound` and
- *   `sounds`), else from its animation (`ACTION_SOUNDS`);
- * - things that sound by themselves (content `ambient`: a fountain), while their lot is looked at;
- * - sounds as something happens: a toilet's flush as its use ends (content `endSound`), a
- *   visitor's knock at the front door.
+ *   washing machine and the dryer, the dishwasher being loaded, a TV, music, drums, and the machines,
+ *   games and tools of `things.ts` (a treadmill, a blender, darts, a cello...). One loop per kind of
+ *   sound, louder the more residents make it, placed left or right like voices; the water sounds are
+ *   made in `water.ts`, the things' in `things.ts`. What a use sounds like comes from the thing
+ *   (content `sound` and `sounds`), else from its animation (`ACTION_SOUNDS`);
+ * - things that sound by themselves (content `ambient`: a fountain; a machine running on its own, its
+ *   `runs.sound`: the washer loaded, nobody at it), while their lot is looked at, some only while a use
+ *   under them sounds (`ambientWhile`: a cooker hood over a hob in use);
+ * - sounds as something happens: a fridge door as its use starts (a `sound` played once), a toilet's
+ *   flush as its use ends (content `endSound`), a visitor's knock at the front door.
  *
  * Presentation only. Reads the snapshot about ten times a second; residents the renderer doesn't
  * draw (other lots, at work) make no sound.
@@ -22,7 +25,8 @@ import { birdActivity, STOREY_HEIGHT, type Renderer, type ViewRect } from '../re
 import { game } from '../ui/state.svelte';
 import { songSamples, SPECIES, VERSIONS, type Species, type Voice } from './birdsong';
 import { audioContext, bus, updateVolumes } from './mixer';
-import { ONCE, WATER, type Stereo, type WaterKind } from './water';
+import { MADE, ONCE_THINGS, type MadeKind } from './things';
+import { ONCE, WATER, type Stereo } from './water';
 import type { SoundReply, SoundRequest } from './water.worker';
 
 const TICK_MS = 100;
@@ -33,9 +37,12 @@ const FADE = 0.4;
 /** Seconds a bath runs before the water's turned off and the bather settles in. */
 const BATH_FILL = 7;
 
-/** A sound played once (`ONCE`), not looped. */
-type OnceKind = (typeof ONCE)[number];
-export type LoopKind = 'sizzle' | 'chop' | Exclude<WaterKind, OnceKind> | 'tv' | 'music' | 'drums';
+/** A sound played once (`ONCE`, `ONCE_THINGS`), not looped. */
+type OnceKind = (typeof ONCE)[number] | (typeof ONCE_THINGS)[number];
+const ONCE_KINDS: readonly string[] = [...ONCE, ...ONCE_THINGS];
+export type LoopKind = 'sizzle' | 'chop' | Exclude<MadeKind, OnceKind> | 'tv' | 'music' | 'drums';
+/** A world sound: a loop, or one played once (as a use starts, when it's a use's sound). */
+export type SoundKind = LoopKind | OnceKind;
 
 /** What each action sounds like (content animation tags; unknown tags are silent; see also `soundOf`). */
 const ACTION_SOUNDS: Record<string, LoopKind> = {
@@ -51,12 +58,14 @@ const ACTION_SOUNDS: Record<string, LoopKind> = {
   music: 'music',
   listen: 'music',
   dance: 'music',
+  // A cooking step in an oven: its fan (a pizza oven's fire, a microwave's hum: by the object's `sounds`).
+  bake: 'ovenFan',
 };
 
 interface LoopDef {
-  /** The raw sound, made here; or one of the water sounds, made off the main thread. */
+  /** The raw sound, made here; or one of the water's or the things' sounds, made off the main thread. */
   make?: (ac: AudioContext) => AudioBuffer;
-  water?: WaterKind;
+  made?: MadeKind;
   /** A filter on the way out (shapes the raw buffer into the sound). */
   filter?: { type: BiquadFilterType; frequency: number; q: number };
   level: number;
@@ -67,22 +76,48 @@ interface LoopDef {
 const LOOPS: Record<LoopKind, LoopDef> = {
   sizzle: { make: sizzleBuffer, filter: { type: 'highpass', frequency: 1800, q: 0.5 }, level: 0.22 },
   chop: { make: chopBuffer, filter: { type: 'bandpass', frequency: 1400, q: 0.8 }, level: 0.3 },
-  shower: { water: 'shower', level: 0.28, drift: 0.04 },
-  tap: { water: 'tap', level: 0.22, drift: 0.04 },
-  washUp: { water: 'washUp', level: 0.24, drift: 0.03 },
-  bathFill: { water: 'bathFill', level: 0.26, drift: 0.04 },
-  bathSoak: { water: 'bathSoak', level: 0.35, drift: 0.03 },
-  washer: { water: 'washer', level: 0.2, drift: 0.02 },
-  dryer: { water: 'dryer', level: 0.18, drift: 0.02 },
-  crockery: { water: 'crockery', level: 0.35 },
-  fountain: { water: 'fountain', level: 0.2, drift: 0.03 },
+  shower: { made: 'shower', level: 0.28, drift: 0.04 },
+  tap: { made: 'tap', level: 0.22, drift: 0.04 },
+  washUp: { made: 'washUp', level: 0.24, drift: 0.03 },
+  bathFill: { made: 'bathFill', level: 0.26, drift: 0.04 },
+  bathSoak: { made: 'bathSoak', level: 0.35, drift: 0.03 },
+  washer: { made: 'washer', level: 0.2, drift: 0.02 },
+  dryer: { made: 'dryer', level: 0.18, drift: 0.02 },
+  dishwasher: { made: 'dishwasher', level: 0.16, drift: 0.02 },
+  crockery: { made: 'crockery', level: 0.35 },
+  fountain: { made: 'fountain', level: 0.2, drift: 0.03 },
   tv: { make: murmurBuffer, filter: { type: 'bandpass', frequency: 700, q: 1.1 }, level: 0.35 },
   music: { make: musicBuffer, filter: { type: 'lowpass', frequency: 2600, q: 0.7 }, level: 0.16 },
   drums: { make: drumsBuffer, filter: { type: 'lowpass', frequency: 7000, q: 0.7 }, level: 0.2 },
+  treadmill: { made: 'treadmill', level: 0.21, drift: 0.02 },
+  bike: { made: 'bike', level: 0.2, drift: 0.04 },
+  tools: { made: 'tools', level: 0.27 },
+  bikeTools: { made: 'bikeTools', level: 0.27 },
+  pool: { made: 'pool', level: 0.27 },
+  foosball: { made: 'foosball', level: 0.27 },
+  pingPong: { made: 'pingPong', level: 0.27 },
+  darts: { made: 'darts', level: 0.27 },
+  arcade: { made: 'arcade', level: 0.25 },
+  sewing: { made: 'sewing', level: 0.33 },
+  potteryWheel: { made: 'potteryWheel', level: 0.15, drift: 0.02 },
+  bubbling: { made: 'bubbling', level: 0.25, drift: 0.04 },
+  espresso: { made: 'espresso', level: 0.195 },
+  blender: { made: 'blender', level: 0.28, drift: 0.03 },
+  mixer: { made: 'mixer', level: 0.22, drift: 0.02 },
+  microwave: { made: 'microwave', level: 0.24 },
+  toaster: { made: 'toaster', level: 0.37 },
+  ovenFan: { made: 'ovenFan', level: 0.275 },
+  hood: { made: 'hood', level: 0.23, drift: 0.02 },
+  fire: { made: 'fire', level: 0.21, drift: 0.04 },
+  basketball: { made: 'basketball', level: 0.27 },
+  singing: { made: 'singing', level: 0.26 },
+  cello: { made: 'cello', level: 0.29 },
+  punchBag: { made: 'punchBag', level: 0.33 },
+  smash: { made: 'smash', level: 0.33 },
 };
 
 /** Levels of the sounds played once. */
-const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3 };
+const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3, fridgeDoor: 0.27, binLid: 0.29, vendSnack: 0.25, vendCan: 0.25, phoneBox: 0.23, hangUp: 0.23, ping: 0.21, toastPop: 0.27, pour: 0.21 };
 
 /** Content `sound` that silences a use whose animation would otherwise make one (toast isn't fried). */
 const SILENT = 'none';
@@ -91,15 +126,15 @@ const SILENT = 'none';
  * What a resident's action sounds like, by what they use: the use's own `sound` (not a recipe's,
  * whose steps sound by where they're done), else the cooking step's (`recipe`: the snapshot's,
  * index + 1; a bake), else the object's for that animation (`sounds`: an oven's `stir` is silent),
- * else by the animation (`ACTION_SOUNDS`), with washing by what's washed. `def` and `interaction`
- * are the snapshot's (-1: none).
+ * else by the animation (`ACTION_SOUNDS`), with washing by what's washed. A sound played once (a
+ * fridge door) is played as the action starts. `def` and `interaction` are the snapshot's (-1: none).
  */
-export function soundOf(content: Content, tag: string, def: number, interaction: number, recipe = 0): LoopKind | undefined {
+export function soundOf(content: Content, tag: string, def: number, interaction: number, recipe = 0): SoundKind | undefined {
   const object = def >= 0 ? content.objectList[def] : undefined;
   const use = interaction >= 0 ? object?.interactions[interaction] : undefined;
   const step = recipe > 0 ? content.recipes[recipe - 1]?.steps.find((s) => s.anim === tag && s.sound !== undefined) : undefined;
   const own = (use?.recipe ? undefined : use?.sound) ?? step?.sound ?? object?.sounds?.[tag];
-  if (own !== undefined) return loopKind(own);
+  if (own !== undefined) return soundKind(own);
   if (tag === 'wash') {
     // Clearing away after a meal washes up at the sink without an interaction of its own; at a
     // dishwasher (no washing interaction) it's loaded without a sound.
@@ -114,13 +149,17 @@ export function soundOf(content: Content, tag: string, def: number, interaction:
 /** The sound played once as the use ends (content `endSound`: a toilet's flush), if any. */
 export function endSoundOf(content: Content, def: number, interaction: number): OnceKind | undefined {
   const key = def >= 0 && interaction >= 0 ? content.objectList[def]?.interactions[interaction]?.endSound : undefined;
-  return key === undefined ? undefined : (ONCE as readonly string[]).includes(key) ? (key as OnceKind) : unknownSound(key);
+  return key === undefined ? undefined : isOnce(key) ? key : unknownSound(key);
 }
 
-/** A content sound key as a loop (`none`: silence); unknown keys are silent (and said once). */
-function loopKind(key: string): LoopKind | undefined {
+/** A content sound key as a world sound (`none`: silence); unknown keys are silent (and said once). */
+function soundKind(key: string): SoundKind | undefined {
   if (key === SILENT) return undefined;
-  return key in LOOPS ? (key as LoopKind) : unknownSound(key);
+  return key in LOOPS || isOnce(key) ? (key as SoundKind) : unknownSound(key);
+}
+
+function isOnce(key: string): key is OnceKind {
+  return ONCE_KINDS.includes(key);
 }
 
 const unknown = new Set<string>();
@@ -142,6 +181,8 @@ interface Ambient {
   x: number;
   y: number;
   z: number;
+  /** Only while a use under it (on these tiles, rows as the world's) sounds like this (content `ambientWhile`); and whether one does now. */
+  while?: { kind: SoundKind; tiles: Tiles; on: boolean };
 }
 
 interface Loop {
@@ -163,10 +204,16 @@ export class WorldSound {
   private readonly bathers = new Map<number, number>();
   /** Residents in a use with an `endSound` (by id): the use (`def:interaction`) and the sound. */
   private readonly ending = new Map<number, { use: number; kind: OnceKind }>();
+  /** What each resident was doing (by id: the object, use and animation), to play a sound once as something starts. */
+  private readonly doing = new Map<number, string>();
   /** Things sounding by themselves on the lot in view. */
   private ambient: Ambient[] = [];
+  /** The sounds played once by the things on the lot in view: made before they're wanted. */
+  private onceHere = new Set<OnceKind>();
   /** The definitions (index into `content.objectList`) of the world's objects, by their stable id. */
   private readonly defOf = new Map<number, number>();
+  /** The world's objects' tiles, by their stable id. */
+  private readonly tilesOf = new Map<number, Tiles>();
   /** What sounded on the last update (`playing`). */
   private heard: Heard = { loops: {}, once: [] };
   private readonly head = { x: 0, y: 0, z: 0 };
@@ -184,20 +231,29 @@ export class WorldSound {
   /** The world's objects, and the lot in view (`view`; null: none): the ones there that sound by themselves. */
   setWorld(world: WorldStructure, view: ViewRect | null): void {
     this.ambient = [];
+    this.onceHere = new Set();
     this.defOf.clear();
+    this.tilesOf.clear();
     const index = new Map(this.content.objectList.map((o, i) => [o.id, i]));
-    for (const o of world.objects) this.defOf.set(o.id, index.get(o.def) ?? -1);
+    for (const o of world.objects) {
+      this.defOf.set(o.id, index.get(o.def) ?? -1);
+      this.tilesOf.set(o.id, { x: o.x, z: o.z, w: o.w, d: o.d });
+    }
     if (!view) return;
     for (const o of world.objects) {
-      const key = this.content.object(o.def)?.ambient;
-      const kind = key === undefined ? undefined : loopKind(key);
-      // Broken (worn out), it's still.
-      if (!kind || (o.wear ?? 0) >= 1) continue;
+      const def = this.content.object(o.def);
       const storey = storeyOfRow(world, o.z);
       const x = o.x + o.w / 2;
       const z = o.z - storeyRow(world, storey) + o.d / 2;
-      if (x < view.x || x > view.x + view.w || z < view.z || z > view.z + view.d) continue;
-      this.ambient.push({ kind, x, y: storey * STOREY_HEIGHT + 0.6, z });
+      if (!def || x < view.x || x > view.x + view.w || z < view.z || z > view.z + view.d) continue;
+      for (const key of [...Object.values(def.sounds ?? {}), ...def.interactions.flatMap((i) => [i.sound, i.endSound])]) if (key !== undefined && isOnce(key)) this.onceHere.add(key);
+      const key = def.ambient ?? (o.running ? def.runs?.sound : undefined);
+      const kind = key === undefined ? undefined : soundKind(key);
+      // Broken (worn out), it's still.
+      if (!kind || isOnce(kind) || (o.wear ?? 0) >= 1) continue;
+      const under = def.ambientWhile === undefined ? undefined : soundKind(def.ambientWhile);
+      const tiles = { x: o.x, z: o.z, w: o.w, d: o.d };
+      this.ambient.push({ kind, x, y: storey * STOREY_HEIGHT + (under ? 1.8 : 0.6), z, while: under && { kind: under, tiles, on: false } });
     }
   }
 
@@ -239,6 +295,8 @@ export class WorldSound {
     const bathing = new Set<number>();
     const once: Heard['once'] = [];
     const here = new Set<number>();
+    for (const kind of this.onceHere) this.made.sound(kind, ac.sampleRate);
+    for (const a of this.ambient) if (a.while) a.while.on = false;
     for (let i = 0; i < count; i++) {
       const o = layout.headerLen + i * layout.simStride;
       const action = curr[o + k.action];
@@ -260,9 +318,21 @@ export class WorldSound {
       if (end) {
         this.ending.set(id, { use, kind: end });
         // Made while the use lasts, so it's there as it ends.
-        this.made.water(end, ac.sampleRate);
+        this.made.sound(end, ac.sampleRate);
       }
-      if (!tag || !this.renderer.simHead(i, this.head)) continue;
+      const drawn = tag !== undefined && this.renderer.simHead(i, this.head);
+      let kind = tag === undefined ? undefined : soundOf(this.content, tag, def, interaction, k.recipe === undefined ? 0 : curr[o + k.recipe]);
+      // A sound played once as they start something (a fridge door): heard if they're drawn, once it's made.
+      const doing = tag === undefined ? '' : `${object}:${interaction}:${tag}`;
+      const before = this.doing.get(id);
+      if (before !== doing) {
+        if (before === undefined || !kind || !isOnce(kind) || !drawn || quiet) this.doing.set(id, doing);
+        else if (!paused && this.once(ac, out, kind, this.panAt())) {
+          this.doing.set(id, doing);
+          once.push({ kind, at: now });
+        }
+      }
+      if (!tag || !drawn) continue;
       const pan = this.panAt();
       if (tag === 'knock') {
         seen.add(id);
@@ -271,8 +341,10 @@ export class WorldSound {
         if (now >= next) this.knocking.set(id, now + 2600 + Math.random() * 1200);
         continue;
       }
-      let kind = soundOf(this.content, tag, def, interaction, k.recipe === undefined ? 0 : curr[o + k.recipe]);
-      if (!kind) continue;
+      if (!kind || isOnce(kind)) continue;
+      // A cooker hood over a hob in use draws the steam off.
+      const tiles = this.tilesOf.get(object);
+      for (const a of this.ambient) if (a.while && a.while.kind === kind && tiles && overlaps(a.while.tiles, tiles)) a.while.on = true;
       if (kind === 'bathFill') {
         // The bath runs while they get in, then it's just the water lapping.
         bathing.add(id);
@@ -288,7 +360,10 @@ export class WorldSound {
     // Things sounding by themselves, unless the town is shown instead of the lot.
     if (!game.townOpen) {
       for (const a of this.ambient) {
-        Object.assign(this.head, a);
+        if (a.while && !a.while.on) continue;
+        this.head.x = a.x;
+        this.head.y = a.y;
+        this.head.z = a.z;
         const u = users.get(a.kind) ?? { n: 0, pan: 0 };
         u.pan = (u.pan * u.n + this.panAt()) / (u.n + 1);
         u.n++;
@@ -296,6 +371,7 @@ export class WorldSound {
       }
     }
     for (const id of this.ending.keys()) if (!here.has(id)) this.ending.delete(id);
+    for (const id of this.doing.keys()) if (!here.has(id)) this.doing.delete(id);
     this.heard = { loops: Object.fromEntries([...users].map(([kind, u]) => [kind, u.n])), once: [...this.heard.once.filter((s) => now - s.at < 10_000), ...once] };
     for (const id of this.knocking.keys()) if (!seen.has(id)) this.knocking.delete(id);
     for (const id of this.bathers.keys()) if (!bathing.has(id)) this.bathers.delete(id);
@@ -306,8 +382,8 @@ export class WorldSound {
       let loop = this.loops.get(kind);
       if (!loop && target === 0) continue;
       if (!loop) {
-        const made = def.water ? this.made.water(def.water, ac.sampleRate) : def.make;
-        // Water still being made: it starts when it's ready.
+        const made = def.made ? this.made.sound(def.made, ac.sampleRate) : def.make;
+        // Still being made: it starts when it's ready.
         if (!made) continue;
         loop = this.loop(ac, out, made, def.filter);
         this.loops.set(kind, loop);
@@ -321,7 +397,7 @@ export class WorldSound {
 
   /** Plays a sound once at `pan`; false while it's still being made. */
   private once(ac: AudioContext, out: AudioNode, kind: OnceKind, pan: number): boolean {
-    const made = this.made.water(kind, ac.sampleRate);
+    const made = this.made.sound(kind, ac.sampleRate);
     if (!made) return false;
     const source = ac.createBufferSource();
     source.buffer = made;
@@ -391,28 +467,33 @@ export class WorldSound {
 
 /**
  * Sounds that take a moment to make, made by a worker as audio buffers: the water sounds (the one
- * first wanted, then the rest one after another) and the birds' songs (each when first wanted).
- * Made on the spot if workers aren't available.
+ * first wanted, then the rest one after another), the things' sounds and the birds' songs (each
+ * when first wanted). Made on the spot if workers aren't available.
  */
 class WorkerSounds {
   private worker: Worker | null = null;
   private rate = 0;
-  private readonly ready = new Map<WaterKind, AudioBuffer>();
+  private readonly ready = new Map<MadeKind, AudioBuffer>();
   private waterAsked = false;
+  /** The things' sounds asked for. */
+  private readonly asked = new Set<MadeKind>();
   /** Bird songs by `songKey`: made, or asked for (null). */
   private readonly songs = new Map<string, AudioBuffer | null>();
 
-  /** The water sound at the sample rate, or null while it's still being made. */
-  water(kind: WaterKind, rate: number): AudioBuffer | null {
+  /** The sound at the sample rate, or null while it's still being made. */
+  sound(kind: MadeKind, rate: number): AudioBuffer | null {
     this.at(rate);
     let b = this.ready.get(kind);
     if (!b && !this.worker) {
-      b = stereoBuffer(WATER[kind](rate), rate);
+      b = stereoBuffer(MADE[kind](rate), rate);
       this.ready.set(kind, b);
-    } else if (!b && !this.waterAsked) {
+    } else if (!b && kind in WATER && !this.waterAsked) {
       this.waterAsked = true;
-      const kinds = Object.keys(WATER) as WaterKind[];
+      const kinds = Object.keys(WATER) as MadeKind[];
       for (const k of [kind, ...kinds.filter((k) => k !== kind)]) this.worker!.postMessage({ kind: k, rate } satisfies SoundRequest);
+    } else if (!b && !(kind in WATER) && !this.asked.has(kind)) {
+      this.asked.add(kind);
+      this.worker!.postMessage({ kind, rate } satisfies SoundRequest);
     }
     return b ?? null;
   }
@@ -444,6 +525,7 @@ class WorkerSounds {
     this.ready.clear();
     this.songs.clear();
     this.waterAsked = false;
+    this.asked.clear();
     if (this.worker) return;
     try {
       this.worker = new Worker(new URL('./water.worker.ts', import.meta.url), { type: 'module' });
@@ -473,6 +555,19 @@ function monoBuffer(samples: Float32Array, rate: number): AudioBuffer {
   const b = new AudioBuffer({ numberOfChannels: 1, length: samples.length, sampleRate: rate });
   b.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
   return b;
+}
+
+/** An object's tiles (rows as the world's, so storeys apart don't overlap). */
+interface Tiles {
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+}
+
+/** Whether two sets of tiles overlap. */
+function overlaps(a: Tiles, b: Tiles): boolean {
+  return a.x < b.x + b.w && b.x < a.x + a.w && a.z < b.z + b.d && b.z < a.z + a.d;
 }
 
 function fadeTo(param: GainNode, value: number, t: number): void {

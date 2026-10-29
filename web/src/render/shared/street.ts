@@ -748,14 +748,18 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
       for (const [x0, z0, x1, z1] of lines) edgeRun(style, props, plants.hedge, x0, z0, x1, z1, blocked);
     }
 
-    // Flower beds along the house front, either side of the porch.
-    const door = L.door ?? -1e9;
+    // Flower beds along the house front, either side of the porch (one along all of it when no path
+    // leads to a door).
+    const door = L.door;
     const depth = 0.85;
     const bedRect = (a: number, b: number): Rect => ({ x: a, z: Math.min(frontWall, frontWall + front * depth), w: b - a, d: depth });
-    const runs: [number, number][] = [
-      [h.x0 + 0.1, door - 1.3],
-      [door + 1.3, h.x1 - 0.1],
-    ];
+    const runs: [number, number][] =
+      door === null
+        ? [[h.x0 + 0.1, h.x1 - 0.1]]
+        : [
+            [h.x0 + 0.1, door - 1.3],
+            [door + 1.3, h.x1 - 0.1],
+          ];
     for (const [a0, a1] of runs) {
       if (a1 - a0 < 1.2) continue;
       const r = bedRect(a0, a1);

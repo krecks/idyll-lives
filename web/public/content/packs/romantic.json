@@ -44,6 +44,7 @@
     {
       "id": "romantic.heartTub",
       "name": "Heart-shaped petal tub",
+      "private": true,
       "model": "model.romantic.heartTub",
       "footprint": [2, 2],
       "price": 2800,
@@ -104,6 +105,7 @@
     {
       "id": "romantic.vanity",
       "name": "Rose-gold vanity",
+      "private": true,
       "model": "model.romantic.vanity",
       "seat": { "height": 0.44, "forward": 0.17, "facing": "back" },
       "footprint": [1, 1],

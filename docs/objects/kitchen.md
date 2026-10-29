@@ -108,10 +108,10 @@ for when there's nothing else to do, and a cook on the way to the fridge still h
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `coffeeMachine` Coffee machine | 1x1 · floor | espresso:drink pour:fetch | kitchen / appliances | Cabinet, Worktop, Machine | Use | Provides `coffee`; `brew`: a cup slides under the spout and a thin coffee stream grows for espresso and pour. Every *Have a coffee* at a table or chair on the lot is poured here first (`pour`, 2 minutes, not chosen on its own; G-67). |
+| `coffeeMachine` Coffee machine | 1x1 · floor | espresso:drink pour:fetch | kitchen / appliances | Cabinet, Worktop, Machine | Use | Provides `coffee`; `brew`: a cup slides under the spout and a thin coffee stream grows for espresso and pour. Every *Have a coffee* at a table or chair on the lot is fetched here first (`pour`, 5 minutes served or 2 helped yourself, not chosen on its own; G-67): poured at home (*Pour a coffee to take to a table*, 2 minutes), made by the barista at a café in town from 7:00 to 19:00 (*Order a coffee to take to a table*, `staff`, I-community-09; `brew` a second into it). |
 | `breakfastCounter` Breakfast counter | 1x1 · floor | toast:cook smoothie:cook | kitchen / appliances | Counter, Toaster, Blender | Use | `toast_down`: the toaster's carriage (lever and toast, one part) slides 5 cm down for toast and pops up at the end. `blend` for smoothie: the blender lid lifts. L `blades`: the smoothie under the lid swirls while it blends (E1). Its 0.95 m top is a `counter` (counter stools tuck under it). |
-| `dishwasher` Dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | A 60 cm dishwasher beside a 40 cm cupboard under one worktop (G-32). `door_open`: its door drops 85° and the lower rack slides out 30 cm for dishes and for clearing away at it (the `wash` tag), open for the whole loading. Only with dirty dishes (`workOn`). |
-| `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean | kitchen / appliances | Body, Handle, Panel | Use | A slimline 45 cm dishwasher beside a 55 cm stack of three drawers (G-32). `door_open`, as the dishwasher. Only with dirty dishes (`workOn`). |
+| `dishwasher` Dishwasher | 1x1 · floor | dishes:clean unload:clean | kitchen / appliances | Body, Handle, Panel | Use | A 60 cm dishwasher beside a 40 cm cupboard under one worktop (G-32). `door_open`: its door drops 85° and the lower rack slides out 30 cm for dishes and for clearing away at it (the `wash` tag), open for the whole loading. Only with dirty dishes (`workOn`). What's washed up at it goes in its rack (12) and it runs on its own, 90 minutes with its sound, once full or once the washing up is done with it a third full; then *Empty the dishwasher* (5 minutes) puts the clean things away (0.5.0, `rack`). |
+| `dishwasherCompact` Stainless dishwasher | 1x1 · floor | dishes:clean unload:clean | kitchen / appliances | Body, Handle, Panel | Use | A slimline 45 cm dishwasher beside a 55 cm stack of three drawers (G-32). `door_open`, as the dishwasher. Only with dirty dishes (`workOn`). Its rack holds 8, and it runs 75 minutes; *Load the dishwasher* (was "Run the dishwasher") and *Empty the dishwasher* as the dishwasher's (0.5.0). |
 
 **In play** (signed off 2026-10-16):
 - The dishwashers' doors drop 0.44 m into the tile in front: the loader stands 15 cm further back while using either
@@ -158,7 +158,7 @@ for when there's nothing else to do, and a cook on the way to the fridge still h
 | `wallCabinet` Wall cabinets | 1x1 · wall | — | kitchen / counters | Cabinet, Handles | Use | `doors_open`: both doors swing open 100° in 0.8 s onto plates, bowls and mugs while clean things are put away (a `cupboard` station, `fetch`, `hold` 1.5 s). |
 | `wallCabinetGlass` Glazed wall cabinet | 1x1 · wall | — | kitchen / counters | Cabinet, Handles | Use | Glass doors (`glass` finish). `door_open`: the right door opens as the wall cabinet's (each glazed door costs two draws). |
 | `wallCabinetCorner` Wall cabinet with end shelves | 1x1 · wall | — | kitchen / counters | Cabinet, Handles | Use | `door_open`: the door opens as the wall cabinet's. |
-| `rangeHood` Cooker hood | 1x1 · wall | — | kitchen / counters | Hood, Trim | Static | Static. |
+| `rangeHood` Cooker hood | 1x1 · wall | — | kitchen / counters | Hood, Trim | Static | Static. Its fan hums while the hob under it is in use (`ambientWhile`, Q-19). |
 | `spiceRack` Spice rack | 1x1 · wall | — | kitchen / counters | Rack | Static | Static. Decor by decision (Q-19: kind marked decor). |
 | `potRail` Pot rail | 1x1 · wall | — | kitchen / counters | Rail, Pots | Static | Static. Decor by decision (Q-19: kind marked decor). |
 | `kitchenShelfWall` Kitchen wall shelves | 1x1 · wall | — | kitchen / counters | Shelves, Brackets | Static | Static. Decor by decision (Q-19: kind marked decor). |
@@ -281,7 +281,7 @@ for when there's nothing else to do, and a cook on the way to the fridge still h
 | `sideboard` Walnut sideboard | 2x1 · floor | — | kitchen / cabinets | Body, Top, Handles | Use | `door_open`: the second fluted door swings open 100° in 0.9 s onto shelved plates and bowls while clean things are put away (a `cupboard` station, `fetch`, `hold` 1.5 s). |
 | `buffet` Painted buffet | 2x1 · floor | — | kitchen / cabinets | Body, Top, Handles | Use | `door_open`: the wide middle door swings open, as the sideboard's. |
 | `chinaCabinet` China cabinet | 1x1 · floor | — | kitchen / cabinets | Body, Top, Handles | Use | Glass doors. `door_open`: the left glazed door swings open onto its plates, as the sideboard's. |
-| `barCart` Bar cart | 1x1 · floor | mix:drink | kitchen / cabinets | Frame, Trays | Use | `shake`: the cocktail shaker lifts 10 cm and tips 30° for mix. |
+| `barCart` Bar cart | 1x1 · floor | mix:drink | kitchen / cabinets | Frame, Trays | Use | `shake`: the cocktail shaker is taken off the cart for mix and shaken in both hands (`shake` clip, held.py `tool.shaker`; G-70, I-kitchen-13: it lifted 10 cm and tipped 30° on its own). |
 
 **In play** (signed off 2026-10-16):
 - The sideboard's, buffet's and china cabinet's door opens when clean dishes are put away in them (a snack's plate

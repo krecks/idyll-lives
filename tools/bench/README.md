@@ -85,6 +85,23 @@ answer 200 (a missing or linked wasm package otherwise gives pictures of an empt
 - **Skills.** `--skills cooking=5,creativity=3` sets the resident's skills each time the state opens
   (`Command::SetSkill`, debug only, as `addFunds`; an id the content doesn't have stops the run).
   Records carry them (`skills`).
+- **Needs and bonds.** `--needs bladder=0.1,all=0.6` sets needs (`Command::SetNeed`; `all` first, then the
+  rest) and `--bond 0:1:friendship=60/romance=40/chemistry=0.5/partners` how two residents stand with each
+  other, both ways (`Command::SetBond`; several with commas), each time the state opens, for the residents
+  of `--sims`. Both debug only, as `setSkill`. Only grown-ups who aren't family can be set in love or partners
+  (the game lets nobody else court): in `review-stage` everyone is family; `crowded-garden`'s Ada and Ben aren't.
+- **Two or more residents.** `--sims 0,1` (instead of `--sim`): each does the use, a moment after the one
+  before, and the pictures wait until they all are at it (the seesaw, ping-pong, two at a pool table, the
+  climbing frame). The first is the one watched and framed (`before`, `after`); the others are in each
+  picture's info and the record's `others`, and `together` says whether they all got to it. All go back to
+  where they started.
+- **Socials and the phone.** `--social chat,joke --sims 0,1`: no object; the first starts each social
+  (content `socials` id) with the second, the state opened afresh for each; `--phone call,text --sims 0,1`
+  each phone action (`phone.actions`) with the second as the contact (`browse` with nobody). Under way when
+  they're talking with the other (the snapshot's `partner`) or the phone's animation plays; then `--shots`
+  pictures following the first, the camera on them before it starts. One record each (`social` or `phone`,
+  `outcome`, `startedAfter` in s, `with`, `others`); a refusal is `refused: <the game's toast>` at once. Nobody phones someone
+  on the same lot ("right here"): in `bathroom-check` resident 1 lives in another house.
 - **Waiting.** For every loading screen ("Moving in", "Getting ready", "Drawing portraits", "Building the
   world", "Warming up") before each buy and each picture; `goto` times out at 90 s. A use's cap (`--wait`,
   60 s) counts from when it is sent; a use nobody takes on (nothing in the resident's queue for 4 s: a
@@ -137,6 +154,9 @@ bun tools/bench/check.mjs play --port 5227 --state review-stage --objects office
 bun tools/bench/check.mjs play --port 5227 --state review-stage --objects cafeChair --use coffee --with cafeTable@10,13,0
 bun tools/bench/check.mjs play --port 5227 --state review-stage --use-existing crib --sim 4 --name crib-elder
 bun tools/bench/check.mjs play --port 5227 --state review-stage --objects chefStove --skills cooking=5
+bun tools/bench/check.mjs play --port 5227 --state crowded-garden --use-existing seesaw --sims 2,3 --name seesaw   # Dee and Fin (9, 7): a seesaw is a child's
+bun tools/bench/check.mjs play --port 5227 --state crowded-garden --social chat,hug,kiss --sims 0,1 --bond 0:1:friendship=80/romance=70/partners
+bun tools/bench/check.mjs play --port 5227 --state bathroom-check --phone call,text --sims 0,1 --bond 0:1:friendship=50 --needs all=0.6
 bun tools/bench/check.mjs play --port 5227 --state review-garden --use-existing garden.tomatoes,raisedBed --use harvest
 bun tools/bench/check.mjs play --port 5227 --state review-stage-night --objects telescope@10,22,0,lamp
 bun tools/bench/check.mjs play --port 5227 --object toiletClassic --at 23,14,0 --use use --shots 6 --every 500
@@ -182,6 +202,8 @@ The simulation's tests write these with `DUMP_STATES=1 cargo test -p sim-core --
 | `needy-check` | The same with free will on and low needs (bladder 0.05, hunger 0.2, energy 0.25, hygiene 0.3, the rest 0.5): they go to the toilet, then eat, wash and sleep on their own. |
 | `office-night` | `bathroom-check` at 21:30: lamps lit, night lighting. |
 | `town-things` | A public lot ("Town things", plot 1: `__showPlot(1)`) with every community thing in rows by group (street, playground, stalls, farm; the shops against a wall at the back), all facing the street, beside a home with a small house. Resident 0 stands at the lot's front, free will off, needs at 0.8. |
+| `town-street`, `town-street-night` | `town-things` with a street along the front of both lots (`world.meta.streets`, as a generated town's: the road, the pavements and their props), the lots 6 tiles back; `-night` at 22:00, the street lamps and windows lit. |
+| `vendors-park`, `vendors-market`, `vendors-cafe`, `vendors-grocer`, `vendors-bakery` | A town place (`houses.json` `parks`) on plot 1 (`__showPlot(1)`) beside an empty home lot, 11:30 on day 1: everyone serving there at work (sim-core `staff.rs`; the hot dog stand from 11:00). Ada (0) and Bo (1) at the home's front, free will off, $500. `-night`: the same at 21:30, everyone gone home and the posts closed (`public_places.rs` `vendor_states_for_play`). |
 | `review-stage` | For looking at one thing after another (`play --objects`): an empty 32 × 32 home lot, the street at z = 0, with one walled room from `(4, 6)` to `(16, 18)` (12 × 12 tiles; the door at `x = 5` in the front wall, windows at `z = 14, 15` in the left wall; a crib at `(13, 6)`; along the right wall, facing −x, a counter at `(15, 7)` for things on a top, a fridge at `(15, 8)` and a coffee machine at `(15, 9)`, so cooking at a stove bought and coffee at a table need nothing more) and a garden behind it. One resident per life stage, ids 0–5: adult (40), young adult (22), teen (15), child (8), elder (70), baby (0.5, in the crib); all but the baby in the front yard from `(20.5, 3.5)`. Saturday 10:00, free will off, every need at 0.5 (a use that fills one lasts), $1,000,000. Free spots for a thing of footprint `w × d` (as `play` places them by default, on every `review-*` state; all checked with the kitchen in, 2026-10-21): **floor** in the middle `(10 − ⌊w/2⌋, 12 − ⌊d/2⌋, 0)` (also rugs and ceiling things); **back wall** inside `(10 − ⌊w/2⌋, 18 − d, 2)` (wall things, and floor things that fill a wall or stand against one: fridges, wall beds, wardrobes, a wall-hung toilet); **windows** `(4, 14, 1)` (curtains); **left wall** `(4, 8–12, 1)`; **right wall** `(16 − d, 10–16, 3)`; **front wall** `(7–12, 6, 0)`; **back wall outside** `(4–15, 18, 0)`; **garden** `(10 − ⌊w/2⌋, 22, 0)` (outdoor things, up to 6 × 6; free from z = 19 to 31, and x = 18 to 31 beside the room). The kitchen at `(15, 7–9, 3)` and the crib are outside them all. |
 | `review-stage-night` | `review-stage` at 22:00 on the same Saturday (the clock set, not run, so nobody ages): night lighting by the sim's own clock (`play` sets no `--hour` on a `*-night` state). The lamps as the game leaves them: with free will off nobody switches one, and a lamp bought comes on. For stargazing, lamps, night clips. |
 | `review-baby` | `review-stage` with a dining table for six (`tableDining4`) at `(8, 12)` and the high chair pulled up to its front at `(8, 13, 2)`, Eve's (5) hunger and bladder at 0.25: Ada's (0) *Feed the baby* at the crib carries Eve to the high chair and feeds her there (by day), *Change the baby* is at the crib's changing table (G-66). |
@@ -189,8 +211,9 @@ The simulation's tests write these with `DUMP_STATES=1 cargo test -p sim-core --
 | `crowded-garden` | A 22 × 26 home lot with one walled room at the front (doors front and back) and its back garden from `(5, 14)` to `(15, 22)` packed with garden things at random, every way round (crops, plants, beds, trees, seats, the fire pit, a picnic table, swings: only what buying allowed). Ada (0), Ben (1), Dee (2, child) and Fin (3, child) in the front yard, Saturday 12:00, free will off, needs at 0.5. The first `sunLounger`, at `(10, 16)` facing −z, has both sides shut in and only its foot free (I-garden-01): `--use-existing sunLounger`. |
 | `review-resized` | `crowded-garden`'s house and household with things that have moving parts bought resized (`Command::Buy` with `size` and `tall`), each against a wall of the room: a `fridge` at `(4, 10, 2)` 200 × 100 cm and 30 cm taller, a `toilet` at `(7, 10, 2)` 25 cm taller, a `filingCabinet` at `(13, 10, 2)` 40 cm taller, a `laundryWasher` at `(16, 10, 2)` 200 × 100 cm and 20 cm taller, a `wallBed` at `(12, 3, 0)` 300 × 300 cm and 30 cm taller; needs at 0.5. For their clips with a resize (A-systems-01; resizing is off in Buy mode): `--use-existing fridge,toilet,filingCabinet,laundryWasher,wallBed`. `review-resized-base`: the same at their own size. |
 
-The game's own Free will setting (on by default) is applied to the player's household as the page opens,
-over what the state says: send `setAutonomy` off (`check.mjs` does), or turn it off in Settings. Other
+A state keeps its own free will as the page opens (`?state=`: the game's Free will setting is sent only once it's
+changed). Needs and how two residents stand with each other: `__send({type: 'setNeed', sim, need, value})` (`need`
+`all` for every one) and `__send({type: 'setBond', a, b, friendship?, romance?, chemistry?, partners?})`. Other
 states the tests write: `wants-asking` (its resident is asking to buy something and doesn't take a `use`),
 `group-talk`, `basement`, `water-sounds` and more (`grep -rn dump_state crates/sim-core/tests`).
 
@@ -199,14 +222,15 @@ states the tests write: `wants-asking` (its resident is asking to buy something 
 | Hook | Does |
 |---|---|
 | `__sims()` | Every resident as the newest snapshot shows them: `x`, `z`, `storey`, `yaw`, `pose` (`stand`, `sit`, `lie`), `moving`, the `object` they use or walk to (`__world().objects` id), its `def` and `interaction` ids, `using` (at it, not walking), `action` (the animation), `held`, `recipe`, `partner`, `needs` by id (the player's household and the inspected), `doing` and `queue` (as the resident's panel). Wait on it rather than timing screenshots: `page.waitForFunction(() => __sims()[0].using && __sims()[0].pose === 'sit')`. |
-| `__world()` | The lot as drawn: objects, walls, plots. |
+| `__world()` | The lot as drawn: objects (a lamp's or a fire's with `off`), walls, plots, `meta` (the streets). |
 | `__send(command)` | Any simulation command (`web/src/core/protocol.ts`): `buy`, `use`, `setAutonomy`, `setSpeed`, `cancel`, `adopt`… |
 | `__addFunds(amount)` | Money for the player's household (negative takes it away); for long sessions, where buys start failing ("not bought"). |
 | `__camera(pose?)` | Reads the camera's pose; with a (partial) pose `{alpha, beta, radius, target: [x, y, z]}` or `{y}` (the height it looks at) puts it there. Stops the camera watching on its own. |
-| `__controls.follow(id, view?)` | The camera follows a resident; `view` `{radius, beta, alpha, y}` also zooms and aims (a dartboard above the resident: `y: 1.6`). `follow(null)` stops. The rest of `__controls` is the HUD's controls. |
+| `__controls.follow(id, view?)` | The camera follows a resident; `view` `{radius, beta, alpha, y}` also zooms and aims (a dartboard above the resident: `y: 1.6`). `follow(null)` stops, the view staying on the lot it shows (the game's own Follow goes back home). The rest of `__controls` is the HUD's controls. |
 | `__content` | The game's content: `__content.object('<id>').interactions` for interaction indices. |
-| `__renderer`, `__scene` | The renderer, whose `RendererDebugHooks` (web/src/render/types.ts) the tools use: `objectClips(id)` (the clips playing on an object), `objectMotions(id)`, `objectPoints(id)` (its vertices as drawn), `cameraInfo()` (lens and limits); and the engine's scene, for the console only. |
+| `__renderer`, `__scene` | The renderer, whose `RendererDebugHooks` (web/src/render/types.ts) the tools use: `objectClips(id)` (the clips playing on an object), `objectMotions(id)`, `objectPoints(id)` (its vertices as drawn), `cameraInfo()` (lens and limits), `keepRoof(true)` (the roof stays on however close the camera comes: the game hides it under 15 m; it shows with walls up only, and `__camera` hands back the walls the watching camera found, so put the camera first and the walls up after); and the engine's scene, for the console only. |
 | `__showPlot(i)`, `__items()`, `__crash(what)` | Look at another lot; the food and dishes about; fail on purpose. |
+| `hud=0` (URL) | The interface hidden (the top bar, the household strip, what's over the world, toasts), on any page: pictures of the world alone. |
 
 ## Sharing one machine with other sessions
 

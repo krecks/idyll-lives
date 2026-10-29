@@ -48,7 +48,15 @@
 //! piles up (`households[].laundry`: loads dirty and washed; absent: one of each); 31 = the
 //! outfit a resident changed into (`sims[].outfit`; older files: 0, the creator's); 32 = the
 //! day a pupil last went to school or missed it (`sims[].schoolDay`; older files: today once
-//! school has begun, so a load never costs a missed day). Older files load. Saves
+//! school has begun, so a load never costs a missed day); 33 = machines run on their own
+//! (`objects[].run`: game minutes left, 0 done with the load in it; absent: empty; in an older
+//! file the washing out on a line is done, dry) and dried washing waits to be folded (a third
+//! number in `households[].laundry`; absent: none), the dirty things in a dishwasher's rack waiting
+//! for it to run (`objects[].rack`; absent: none); and the home chess table is 2 × 1 (it
+//! was 1 × 1): an older file's goes over the tile it stood on where it fits, else at a free spot
+//! at home, else it is sold back (`migrate_32_grown`); and an older file's posts in town (content
+//! `staff`) with their back to a wall move a tile out from it, where there's room, for their server
+//! (`World::nudge_post`). Older files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
 
@@ -66,7 +74,7 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 32;
+pub const SAVE_VERSION: u32 = 33;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -293,6 +301,14 @@ pub struct ObjectSave {
     /// A lamp switched off (absent before v28, or on).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub off: bool,
+    /// A machine's run (see `ObjectInstance::run`): game minutes left while it runs, 0 done
+    /// with its load in it (absent before v33, or empty).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run: Option<f32>,
+    /// The dirty things in a dishwasher's rack (see `ObjectInstance::rack`; absent before v33,
+    /// or none).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub rack: u8,
 }
 
 fn is_level(tall: &i16) -> bool {
@@ -608,10 +624,11 @@ pub struct HouseholdSave {
     /// The day a babysitter was booked for (absent: none).
     #[serde(default, rename = "sitterDay", skip_serializing_if = "Option::is_none")]
     pub sitter_day: Option<u32>,
-    /// Loads of washing waiting: dirty, and washed to dry (see `Household::laundry`; absent
-    /// before v30: one of each).
+    /// Loads of washing waiting: dirty, washed to dry, and dried to fold (see
+    /// `Household::laundry`; absent before v30: one dirty and one washed; before v33 without
+    /// the dried).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub laundry: Option<[f32; 2]>,
+    pub laundry: Option<Vec<f32>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -664,6 +681,8 @@ impl World {
                 open: o.open,
                 growth: content.objects[o.def].grows.is_some().then_some(o.growth),
                 off: o.off && content.objects[o.def].switch,
+                run: o.run.filter(|_| content.objects[o.def].runs.is_some()),
+                rack: o.rack.min(content.objects[o.def].rack),
             })
             .collect();
         let sims = self
@@ -822,7 +841,8 @@ impl World {
                     routines: h.routines.iter().map(|r| routine_save(content, r)).collect(),
                     expecting: h.expecting,
                     sitter_day: h.sitter_day,
-                    laundry: Some(h.laundry),
+                    // (With a load taken up for a use under way: the use starts again on load.)
+                    laundry: Some(crate::machines::with_taken(h.laundry, self.sims.iter().filter(|s| s.household == h.id).map(|s| s.taken), content.laundry.map_or(1.0, |l| l.most)).to_vec()),
                 })
                 .collect(),
             plots: self
@@ -978,7 +998,7 @@ impl World {
                 routines: Vec::new(),
                 expecting: None,
                 sitter_day: None,
-                laundry: [crate::world::LAUNDRY_AT_START; 2],
+                laundry: crate::world::LAUNDRY_START,
             }]
         } else {
             save.households
@@ -1000,7 +1020,9 @@ impl World {
                         .collect(),
                     expecting: h.expecting,
                     sitter_day: h.sitter_day,
-                    laundry: h.laundry.map_or([crate::world::LAUNDRY_AT_START; 2], |l| l.map(|v| finite(v, 0.0).max(0.0))),
+                    laundry: h.laundry.as_ref().map_or(crate::world::LAUNDRY_START, |l| {
+                        std::array::from_fn(|k| finite(l.get(k).copied().unwrap_or(0.0), 0.0).max(0.0))
+                    }),
                 })
                 .collect()
         };
@@ -1017,12 +1039,23 @@ impl World {
         let mut used = HashSet::new();
         let on_top = |o: &ObjectSave| world.content.object_index(&o.def).is_some_and(|d| world.content.objects[d].layer == crate::content::Layer::Surface);
         let tops: Vec<bool> = save.objects.iter().map(on_top).collect();
-        let order: Vec<usize> = (0..tops.len()).filter(|&i| !tops[i]).chain((0..tops.len()).filter(|&i| tops[i])).collect();
+        // (v33: kinds that grew go in once everything else stands, where they now fit: `migrate_32_grown`.)
+        let grown: Vec<bool> = save.objects.iter().map(|o| grown_since_32(save.version, o)).collect();
+        // (v33: the town's posts go in after the rest, so one with its back to a wall can move out
+        // from it where there's room: `migrate_32_post`.)
+        let posts: Vec<bool> = (0..tops.len()).map(|i| !tops[i] && !grown[i] && post_since_32(&world.content, save, i, &tops)).collect();
+        let order: Vec<usize> = (0..tops.len())
+            .filter(|&i| !tops[i] && !grown[i] && !posts[i])
+            .chain((0..tops.len()).filter(|&i| posts[i]))
+            .chain((0..tops.len()).filter(|&i| grown[i]))
+            .chain((0..tops.len()).filter(|&i| tops[i]))
+            .collect();
         for i in order {
             let o = &save.objects[i];
             // (A corrupt save's second use of an id gets a fresh one.)
             let keep = o.id.filter(|s| !used.contains(s));
             let placed = match world.content.object_index(&o.def) {
+                Some(def) if grown[i] => migrate_32_grown(&mut world, def, o, keep),
                 Some(def) => {
                     let value = o
                         .value
@@ -1050,6 +1083,16 @@ impl World {
                 obj.open = o.open;
                 obj.off = o.off && world.content.objects[obj.def].switch;
                 obj.growth = finite(o.growth.unwrap_or(1.0), 1.0).clamp(-1.0, 1.0);
+                let runs = world.content.objects[obj.def].runs;
+                obj.run = match o.run {
+                    Some(m) => runs.map(|full| finite(m, 0.0).clamp(0.0, full)),
+                    // Before v33 nothing ran on its own: washing left out on the line (open) is
+                    // dry by now, ready to take in.
+                    None if save.version < 33 && obj.open => runs.map(|_| 0.0),
+                    None => None,
+                };
+                obj.rack = o.rack.min(world.content.objects[obj.def].rack);
+                let id = if posts[i] { world.nudge_post(id) } else { id };
                 used.extend(keep);
                 object_ids.insert(i as u32, id);
             }
@@ -1876,6 +1919,53 @@ fn resolve_refs(content: &Content, e: &mut social::SocialEvent, refs: &serde_jso
         e.goal = Some(g);
     }
     Some(())
+}
+
+/// Kinds whose footprint grew in save version 33: the home chess table, 1 × 1 to 2 × 1 (a chair
+/// at each end, M-hobbies-11).
+const GROWN_IN_33: [&str; 1] = ["chessTable"];
+
+/// Whether a saved object is one of `GROWN_IN_33` from an older file, at its kind's old size (a
+/// resized one keeps its own size and loads as any).
+fn grown_since_32(version: u32, o: &ObjectSave) -> bool {
+    version < 33 && o.size.is_none() && GROWN_IN_33.contains(&o.def.as_str())
+}
+
+/// Whether saved object `i` is one of the town's posts (content `staff`) from a file older than
+/// v33, with nothing standing on it: placed after the rest, it may move out from a wall
+/// (`World::nudge_post`).
+fn post_since_32(content: &Content, save: &SaveFile, i: usize, tops: &[bool]) -> bool {
+    let o = &save.objects[i];
+    let Some(def) = content.object_index(&o.def) else { return false };
+    let d = &content.objects[def];
+    if save.version >= 33 || d.staff.is_none() {
+        return false;
+    }
+    // (Anything on its top stays where it was saved: so does the post.)
+    let (w, dd) = if o.rot.is_multiple_of(2) { (d.footprint[0], d.footprint[1]) } else { (d.footprint[1], d.footprint[0]) };
+    let under = |t: &ObjectSave| t.x >= o.x && t.x < o.x + w as i32 && t.z >= o.z && t.z < o.z + dd as i32;
+    !save.objects.iter().enumerate().any(|(j, t)| tops[j] && under(t))
+}
+
+/// v32 to v33: a thing whose kind grew (`grown_since_32`) goes over the tile it stood on where it
+/// now fits and blocks nothing, else at its home's first good free spot (`World::place_grown`);
+/// with no room for it anywhere there, it is sold back to the household living on its plot for
+/// what it was worth, and left out. Never placed overlapping anything, nor shutting anyone or
+/// anything off.
+fn migrate_32_grown(world: &mut World, def: usize, o: &ObjectSave, keep: Option<u32>) -> Result<u32, crate::Error> {
+    let value = o.value.unwrap_or(world.content.objects[def].price.unwrap_or(0));
+    let colors = crate::world::parse_colors(&o.colors, o.color.as_deref());
+    if let Some(id) = world.place_grown(def, o.x, o.z, o.rot, colors, o.quality, value) {
+        if let Some(stable) = keep {
+            world.objects[id as usize].stable = stable;
+        }
+        return Ok(id);
+    }
+    let plot = world.plot_at(o.x, o.z);
+    if let Some(h) = world.households.iter_mut().find(|h| plot.is_some() && h.plot == plot) {
+        h.funds += value;
+    }
+    Err(crate::Error::new(format!("no room for the {} any more", world.content.objects[def].name.to_lowercase())))
 }
 
 /// Events from before content ids were saved name content by index. The one change since: the

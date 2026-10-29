@@ -12,7 +12,7 @@
 
 export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk' | 'mirror' | 'mirror-still';
 
-export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders'] as const;
+export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders'] as const;
 export type BenchDiag = (typeof BENCH_DIAGS)[number];
 
 export interface BenchFlags {

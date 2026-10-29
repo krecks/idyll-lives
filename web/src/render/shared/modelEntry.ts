@@ -101,6 +101,7 @@ interface MotionsEntry {
   night?: string;
   growth?: string;
   ride?: string;
+  running?: string;
   clock?: ClockClips;
 }
 
@@ -131,6 +132,8 @@ export interface Motions {
   growth?: string;
   /** The clip whose (first) part carries the residents sitting or lying on the object: a rocking chair's seat, a swing. */
   ride?: string;
+  /** The clip that goes round while the object runs on its own, nobody at it (a washer's drum; content `runs`, the sim's `running`). */
+  running?: string;
   /** A clock's hands, set from the game's time (`ClockClips`). */
   clock?: ClockClips;
 }
@@ -195,8 +198,8 @@ export function motionsOf(entry: ModelEntry | undefined): Motions | undefined {
   );
   const loops = m.loops ?? {};
   const clock = m.clock?.hour || m.clock?.minute ? m.clock : undefined;
-  return Object.keys(uses).length || Object.keys(loops).length || m.open || m.idle || m.night || m.growth || clock
-    ? { uses, loops, open: m.open, idle: m.idle, night: m.night, growth: m.growth, ride: m.ride, clock }
+  return Object.keys(uses).length || Object.keys(loops).length || m.open || m.idle || m.night || m.growth || m.running || clock
+    ? { uses, loops, open: m.open, idle: m.idle, night: m.night, growth: m.growth, ride: m.ride, running: m.running, clock }
     : undefined;
 }
 

@@ -46,7 +46,8 @@
             "rest",
             "nap"
           ]
-        }
+        },
+        {"id": "tryForBaby", "label": "Try for a baby", "anim": "nap", "minutes": 30, "pose": "lie", "partner": true, "conceive": true, "autonomous": false, "stages": ["youngAdult", "adult"], "effects": {"social": 0.05, "comfort": 0.1}, "tags": ["romantic", "intimate"]}
       ]
     },
     {
@@ -94,7 +95,8 @@
             "rest",
             "nap"
           ]
-        }
+        },
+        {"id": "tryForBaby", "label": "Try for a baby", "anim": "nap", "minutes": 30, "pose": "lie", "partner": true, "conceive": true, "autonomous": false, "stages": ["youngAdult", "adult"], "effects": {"social": 0.05, "comfort": 0.1}, "tags": ["romantic", "intimate"]}
       ]
     },
     {
@@ -143,7 +145,8 @@
             "rest",
             "nap"
           ]
-        }
+        },
+        {"id": "tryForBaby", "label": "Try for a baby", "anim": "nap", "minutes": 30, "pose": "lie", "partner": true, "conceive": true, "autonomous": false, "stages": ["youngAdult", "adult"], "effects": {"social": 0.05, "comfort": 0.1}, "tags": ["romantic", "intimate"]}
       ]
     },
     {
@@ -264,6 +267,7 @@
     {
       "id": "nightstandDrawers",
       "name": "Three-drawer nightstand",
+      "private": true,
       "model": "model.nightstandDrawers",
       "footprint": [
         1,
@@ -308,6 +312,7 @@
     {
       "id": "chestOfDrawers",
       "name": "Tall chest of drawers",
+      "private": true,
       "model": "model.chestOfDrawers",
       "footprint": [
         1,
@@ -350,6 +355,7 @@
     {
       "id": "dresserLow",
       "name": "Low dresser",
+      "private": true,
       "model": "model.dresserLow",
       "footprint": [
         2,
@@ -392,6 +398,7 @@
     {
       "id": "wardrobeSingle",
       "name": "Single wardrobe",
+      "private": true,
       "model": "model.wardrobeSingle",
       "footprint": [
         1,
@@ -422,6 +429,7 @@
     {
       "id": "armoire",
       "name": "Armoire",
+      "private": true,
       "model": "model.armoire",
       "footprint": [
         2,
@@ -453,6 +461,7 @@
     {
       "id": "cedarChest",
       "name": "Blanket chest",
+      "private": true,
       "model": "model.cedarChest",
       "footprint": [
         1,

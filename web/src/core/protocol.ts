@@ -14,6 +14,8 @@ export type Command =
   | { type: 'addFunds'; household: number; amount: number }
   /** Tests and `?debug` only (`check.mjs play --skills`): a resident's skill set to a level. */
   | { type: 'setSkill'; sim: number; skill: string; level: number }
+  | { type: 'setNeed'; sim: number; need: string; value: number }
+  | { type: 'setBond'; a: number; b: number; friendship?: number; romance?: number; chemistry?: number; partners?: boolean }
   | { type: 'adopt'; household: number; child: boolean }
   /** "Skip quiet hours": time-lapse while the player's household sleeps or is at work. */
   | { type: 'setAutoFast'; enabled: boolean }
@@ -337,6 +339,8 @@ export interface ObjectPlacement {
   open?: boolean;
   /** A crop's stage (content `grows`): 0 planted, 1 growing, 2 ripe, 3 picked; absent for other things. */
   growth?: number;
+  /** A machine running on its own (content `runs`: the washer's drum turning, its sound); sim-core `ObjectInstance::run`. */
+  running?: boolean;
   /** What the quick fix costs (worn things). */
   repairCost?: number;
 }
@@ -505,6 +509,19 @@ export interface WorldStructure {
   /** Presentation data carried by the simulation unchanged (see `game/town.ts`). */
   meta: WorldMeta | null;
   meshes: { walls: MeshArrays; wallsLow: MeshArrays; floors: MeshArrays };
+  /**
+   * The town's vendors and shopkeepers (sim-core `staff.rs`), in their snapshot rows' order (after the
+   * residents'): what each looks like (`seed`) and the posts they serve at (stable object ids). Absent: none.
+   */
+  staff?: StaffInfo[];
+  /** The servers as residents for the renderer (rows `sims.length + k`), given their looks by the session (`game/staff.ts`). */
+  staffSims?: SimInfo[];
+}
+
+/** One of the town's servers (`WorldStructure.staff`). */
+export interface StaffInfo {
+  seed: number;
+  posts: number[];
 }
 
 export interface ActionView {

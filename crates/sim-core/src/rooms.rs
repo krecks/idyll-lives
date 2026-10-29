@@ -487,8 +487,14 @@ pub(crate) fn opinions(w: &mut World) {
                     })
                     .map(|(o, _)| o)
                     .collect();
+                // (Taken, or in a room someone else keeps shut: the bathroom with someone in it.)
+                let here = w.lot.room_at(x, z);
+                let shut = |o: &crate::world::ObjectInstance| {
+                    let room = crate::privacy::room_of_object(&w.content, &w.lot, o);
+                    room != here && crate::privacy::shut_to(&w.shut, me, None, room)
+                };
                 let busy = !fillers.is_empty()
-                    && fillers.iter().all(|o| o.users().any(|u| u != me) && !o.has_free_slot(w.content.objects[o.def].slots));
+                    && fillers.iter().all(|o| (o.users().any(|u| u != me) && !o.has_free_slot(w.content.objects[o.def].slots)) || shut(o));
                 if busy {
                     // Once is bad luck; again on another day this week, they'd like a second one.
                     let again = waited.is_some_and(|d| d < today && today <= d + WAIT_REPEAT_DAYS);

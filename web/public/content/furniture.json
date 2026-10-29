@@ -3,6 +3,29 @@
   "tags": [
     "toys"
   ],
+  "items": [
+    {
+      "id": "washingBasket",
+      "label": "Basket of washing",
+      "model": "item.washingBasket",
+      "hold": "both",
+      "radius": 0.25
+    },
+    {
+      "id": "washingArmful",
+      "label": "Armful of dry washing",
+      "model": "item.washingArmful",
+      "hold": "both",
+      "radius": 0.2
+    },
+    {
+      "id": "washingPiece",
+      "label": "Washing to fold",
+      "model": "item.washingPiece",
+      "hold": "both",
+      "radius": 0.15
+    }
+  ],
   "feelings": [
     {
       "id": "home.homeCooked",
@@ -159,6 +182,9 @@
       "category": "kitchen",
       "group": "appliances",
       "description": "A small fridge for a small kitchen (or a bedroom corner): snacks and simple meals, but no room for a gourmet spread.",
+      "sounds": {
+        "fetch": "fridgeDoor"
+      },
       "interactions": [
         {
           "id": "snack",
@@ -196,6 +222,7 @@
           "id": "coldDrink",
           "label": "Get a cold drink",
           "anim": "drink",
+          "sound": "fridgeDoor",
           "minutes": 5,
           "effects": {
             "comfort": 0.05,
@@ -224,6 +251,9 @@
       "fillsWall": true,
       "group": "appliances",
       "description": "A tall counter-depth fridge-freezer, the freezer below and a water dispenser in the door. Plenty of fresh food: bigger snacks, fuller meals and a cold drink.",
+      "sounds": {
+        "fetch": "fridgeDoor"
+      },
       "interactions": [
         {
           "id": "snack",
@@ -297,6 +327,7 @@
           "id": "coldDrink",
           "label": "Pour a cold drink",
           "anim": "drink",
+          "sound": "fridgeDoor",
           "minutes": 5,
           "effects": {
             "comfort": 0.05,
@@ -455,14 +486,16 @@
       "group": "appliances",
       "description": "A counter with a microwave on top: hot leftovers in a few minutes, no skill needed.",
       "sounds": {
-        "stir": "none"
+        "stir": "none",
+        "bake": "microwave"
       },
       "interactions": [
         {
           "id": "reheat",
           "label": "Heat up leftovers",
           "anim": "cook",
-          "sound": "none",
+          "sound": "microwave",
+          "endSound": "ping",
           "minutes": 4,
           "eat": {
             "item": "leftovers",
@@ -489,19 +522,22 @@
       "price": 260,
       "category": "kitchen",
       "group": "appliances",
-      "description": "A counter with a bean-to-cup machine. A fresh coffee perks residents up and slows their tiredness for a few hours. A coffee had at a table nearby is poured here first.",
+      "description": "A counter with a bean-to-cup machine. A fresh coffee perks residents up and slows their tiredness for a few hours. A coffee had at a table nearby is poured here first; at a café in town the barista makes it, from 7:00 to 19:00.",
+      "staff": { "at": [0, -0.85], "hours": [7, 19] },
       "interactions": [
         {
           "id": "pour",
-          "label": "Pour a coffee to take to a table",
+          "label": "Order a coffee to take to a table",
+          "selfServe": { "label": "Pour a coffee to take to a table", "anim": "fetch", "minutes": 2 },
           "stages": [
             "teen",
             "youngAdult",
             "adult",
             "elder"
           ],
-          "anim": "fetch",
-          "minutes": 2,
+          "anim": "buy",
+          "sound": "pour",
+          "minutes": 5,
           "autonomous": false,
           "tags": [
             "food"
@@ -517,6 +553,7 @@
             "elder"
           ],
           "anim": "drink",
+          "sound": "espresso",
           "minutes": 10,
           "effects": {
             "energy": 0.1,
@@ -562,7 +599,8 @@
           "id": "toast",
           "label": "Make toast",
           "anim": "cook",
-          "sound": "none",
+          "sound": "toaster",
+          "endSound": "toastPop",
           "minutes": 4,
           "eat": {
             "item": "toast",
@@ -579,7 +617,7 @@
           "id": "smoothie",
           "label": "Blend a smoothie",
           "anim": "cook",
-          "sound": "none",
+          "sound": "blender",
           "minutes": 3,
           "eat": {
             "item": "smoothie",
@@ -609,11 +647,16 @@
       "price": 480,
       "category": "kitchen",
       "group": "appliances",
-      "description": "Built in under the worktop. Loading it is a quick, satisfying chore (the tidy love it).",
+      "description": "Built in under the worktop. The washing up goes in and waits; once it's full, or the washing up is done, it washes by itself, and someone puts the clean things away. Loading it is a quick, satisfying chore (the tidy love it).",
       "sounds": {
         "clean": "crockery",
         "wash": "crockery"
       },
+      "runs": {
+        "minutes": 90,
+        "sound": "dishwasher"
+      },
+      "rack": 12,
       "interactions": [
         {
           "id": "dishes",
@@ -630,6 +673,20 @@
             "cleaning"
           ],
           "autonomous": false
+        },
+        {
+          "id": "unload",
+          "label": "Empty the dishwasher",
+          "unloads": true,
+          "anim": "clean",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.04
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ]
         }
       ]
     },
@@ -826,6 +883,8 @@
       "layer": "wall",
       "decor": 0.15,
       "description": "A chimney hood for the wall above the stove.",
+      "ambient": "hood",
+      "ambientWhile": "sizzle",
       "interactions": []
     },
     {
@@ -2214,7 +2273,8 @@
             "rest",
             "nap"
           ]
-        }
+        },
+        {"id": "tryForBaby", "label": "Try for a baby", "anim": "nap", "minutes": 30, "pose": "lie", "partner": true, "conceive": true, "autonomous": false, "stages": ["youngAdult", "adult"], "effects": {"social": 0.05, "comfort": 0.1}, "tags": ["romantic", "intimate"]}
       ]
     },
     {
@@ -2272,6 +2332,7 @@
     {
       "id": "dresser",
       "name": "Chest of drawers",
+      "private": true,
       "model": "model.dresser",
       "footprint": [
         2,
@@ -2314,6 +2375,7 @@
     {
       "id": "wardrobe",
       "name": "Wardrobe",
+      "private": true,
       "model": "model.wardrobe",
       "footprint": [
         2,
@@ -2751,18 +2813,39 @@
       "price": 520,
       "category": "bathroom",
       "group": "laundry",
-      "description": "Clean clothes help a little with hygiene, and the tidy love doing the laundry.",
+      "description": "Load it and it washes by itself; take the washing out when it's done. Clean clothes help a little with hygiene, and the tidy love doing the laundry.",
+      "runs": {
+        "minutes": 60,
+        "sound": "washer"
+      },
       "interactions": [
         {
           "id": "laundry",
-          "label": "Do the laundry",
+          "label": "Load the washing",
           "workOn": "laundry",
+          "loads": true,
+          "brings": "washingBasket",
           "anim": "clean",
-          "sound": "washer",
-          "minutes": 30,
+          "minutes": 5,
           "effects": {
-            "hygiene": 0.12,
-            "comfort": 0.05
+            "hygiene": 0.06,
+            "comfort": 0.02
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ]
+        },
+        {
+          "id": "unload",
+          "label": "Take out the washing",
+          "unloads": true,
+          "makes": "washed",
+          "anim": "clean",
+          "minutes": 5,
+          "effects": {
+            "hygiene": 0.06,
+            "comfort": 0.03
           },
           "tags": [
             "chores",
@@ -2782,18 +2865,38 @@
       "price": 420,
       "category": "bathroom",
       "group": "laundry",
-      "description": "Warm, fresh laundry to fold.",
+      "description": "Warm, fresh laundry: load the wet washing and it tumbles dry by itself, ready to fold.",
+      "runs": {
+        "minutes": 45,
+        "sound": "dryer"
+      },
       "interactions": [
         {
           "id": "laundry",
-          "label": "Fold the laundry",
+          "label": "Load the dryer",
           "workOn": "washed",
+          "loads": true,
+          "brings": "washingBasket",
           "anim": "clean",
-          "sound": "dryer",
-          "minutes": 20,
+          "minutes": 5,
           "effects": {
-            "comfort": 0.08,
-            "fun": 0.03
+            "comfort": 0.03
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ]
+        },
+        {
+          "id": "unload",
+          "label": "Take out the dry laundry",
+          "unloads": true,
+          "makes": "dried",
+          "anim": "clean",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.03,
+            "fun": 0.01
           },
           "tags": [
             "chores",
@@ -3603,6 +3706,7 @@
           "id": "pool",
           "label": "Shoot pool",
           "anim": "play",
+          "sound": "pool",
           "minutes": 30,
           "partner": true,
           "alone": "trickShots",
@@ -3623,6 +3727,7 @@
           "id": "trickShots",
           "label": "Practise trick shots",
           "anim": "play",
+          "sound": "pool",
           "minutes": 60,
           "effects": {
             "fun": 0.15
@@ -3660,6 +3765,7 @@
           "id": "foosball",
           "label": "Play foosball",
           "anim": "play",
+          "sound": "foosball",
           "minutes": 20,
           "partner": true,
           "alone": "practise",
@@ -3680,6 +3786,7 @@
           "id": "practise",
           "label": "Practise foosball",
           "anim": "play",
+          "sound": "foosball",
           "minutes": 15,
           "autonomous": false,
           "effects": {
@@ -3714,6 +3821,7 @@
           "id": "darts",
           "label": "Throw darts",
           "anim": "play",
+          "sound": "darts",
           "minutes": 15,
           "effects": {
             "fun": 0.3
@@ -3747,6 +3855,7 @@
           "id": "sew",
           "label": "Sew",
           "anim": "tinker",
+          "sound": "sewing",
           "minutes": 60,
           "pose": "sit",
           "effects": {
@@ -3765,6 +3874,7 @@
           "id": "mend",
           "label": "Mend clothes",
           "anim": "tinker",
+          "sound": "sewing",
           "minutes": 30,
           "pose": "sit",
           "effects": {
@@ -3796,6 +3906,7 @@
           "id": "experiment",
           "label": "Do experiments",
           "anim": "tinker",
+          "sound": "bubbling",
           "minutes": 60,
           "effects": {
             "fun": 0.2
@@ -3836,6 +3947,7 @@
           "id": "cycle",
           "label": "Cycle",
           "anim": "exercise",
+          "sound": "bike",
           "minutes": 45,
           "pose": "sit",
           "effects": {
@@ -4411,6 +4523,7 @@
           "id": "relax",
           "label": "Warm up by the fire",
           "anim": "relax",
+          "sound": "fire",
           "minutes": 30,
           "pose": "sit",
           "effects": {
@@ -4805,6 +4918,7 @@
           "id": "relax",
           "label": "Warm up by the fire",
           "anim": "relax",
+          "sound": "fire",
           "minutes": 30,
           "seatNear": 3,
           "seatFacing": "around",
@@ -5216,6 +5330,7 @@
           "id": "tuneUp",
           "label": "Tune up the bike",
           "anim": "tinker",
+          "sound": "bikeTools",
           "minutes": 30,
           "effects": {
             "fun": 0.08

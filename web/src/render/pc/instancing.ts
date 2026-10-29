@@ -75,6 +75,8 @@ export class Instances {
   private capacity = 0;
   private readonly cull: boolean;
   private readonly box = new pc.BoundingBox();
+  /** The entity's `_aabbVer` the world box was last worked out at (-1: work it out again, the box changed). */
+  private worldVer = -1;
   private readonly lo = new pc.Vec3();
   private readonly hi = new pc.Vec3();
 
@@ -138,6 +140,8 @@ export class Instances {
     const buffer = new pc.VertexBuffer(this.device, this.format, capacity, { usage: pc.BUFFER_DYNAMIC });
     const data = new Float32Array(buffer.lock() as ArrayBuffer);
     data.set(this.data.subarray(0, Math.min(this.data.length, data.length)));
+    // Made on the GPU now, whole: a draw before the first `update` (the warm-up's) has its buffer.
+    buffer.unlock();
     this.buffer?.destroy();
     this.buffer = buffer;
     this.data = data;
@@ -232,7 +236,20 @@ export class Instances {
       hi.set(0, 0, 0);
     }
     this.box.setMinMax(lo, hi);
-    this.meshInstance.setCustomAabb(this.box);
+    this.worldVer = -1;
+    // The world box is worked out again only when the box or the entity's place changes: for a custom box
+    // PlayCanvas does it every frame, 0.08 ms a frame on Low and 0.19 ms with its woods in squares (518 draws).
+    // SAFETY: a mesh instance asks `_updateAabbFunc` for its world box, and a node's `_aabbVer` moves
+    // whenever its world transform does (tools/render/check_chunks.ts).
+    const mi = this.meshInstance as unknown as { _updateAabbFunc: ((out: pc.BoundingBox) => pc.BoundingBox) | null };
+    mi._updateAabbFunc ??= (out) => {
+      const ver = (this.entity as unknown as { _aabbVer: number })._aabbVer;
+      if (ver !== this.worldVer) {
+        out.setFromTransformedAabb(this.box, this.entity.getWorldTransform());
+        this.worldVer = ver;
+      }
+      return out;
+    };
   }
 
   /** Stops drawing and lets go of the buffer (the mesh and material are the template's). */

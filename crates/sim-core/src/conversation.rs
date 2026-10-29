@@ -78,6 +78,12 @@ pub fn duration(s: &SocialDef, success: bool) -> f32 {
     }
 }
 
+/// Whether two can court at all: both grown up and not family (`rel` between them; attraction is
+/// each social's and spark's own). Free will, the player's socials and `SetBond` keep to it alike.
+pub(crate) fn may_court(grown_ups: bool, rel: &social::Relationship) -> bool {
+    grown_ups && rel.kin.is_none()
+}
+
 /// Whether `actor` can start `s` with `target` (relationship requirements, both their life
 /// stages and attraction).
 pub fn social_allowed(
@@ -95,7 +101,7 @@ pub fn social_allowed(
         && s.requires.allows(rel)
         && stage_in(s.stages, stage(actor))
         && stage_in(s.target_stages, stage(target))
-        && (!romantic || (grown_ups && actor.attracted_to(target) && rel.kin.is_none()))
+        && (!romantic || (may_court(grown_ups, rel) && actor.attracted_to(target)))
 }
 
 /// Probability that `target` responds well to `actor` doing `s`.
@@ -810,6 +816,11 @@ fn meet<'a>(
     let (mut mine, middle) = halfway(sims[i].pos, &all);
     match way(sims, t, middle) {
         Some(waypoints) => {
+            // What `t` was still at (back on the sofa after listening in, say) ends as they set
+            // off: its slot freed (else the seat stays theirs while they walk away).
+            if sims[t].current.is_some() {
+                end_activity(&mut sims[t], content, objects);
+            }
             let goal = *waypoints.last().unwrap_or(&sims[t].pos);
             let task = Task { kind: TaskKind::MoveTo { x: goal[0], z: goal[1] }, directed: false, routine: false };
             sims[t].current = Some(Activity { task, phase: Phase::Routing { waypoints, next: 0 }, tags: 0 });
@@ -962,9 +973,10 @@ pub(crate) fn outcome(
 
     match o.effect {
         Effect::None => {}
+        // (Off to bed together, where the content has beds for it: `privacy::after_step`.)
         Effect::Conceive => {
             if success {
-                sims[a].conceived = Some(t as u32);
+                sims[a].to_bed = Some(t as u32);
             }
         }
         Effect::Kiss => {

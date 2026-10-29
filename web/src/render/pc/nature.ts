@@ -34,6 +34,7 @@ import { grassField, type GrassQuality } from '../shared/grass';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
 import { groupInstances, hideLawn, LandscapeLayout, lawnLayer, lawnMask, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnLayer, type LawnMask } from '../shared/nature';
+import type { BenchDiag } from '../../debug/benchFlags';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
 export { decorPlants, natureDecor, type PlantPlacement } from '../shared/nature';
@@ -60,6 +61,21 @@ export interface NatureRebuild extends NatureResult {
   discard: () => void;
 }
 
+/**
+ * The landscape's plants by kind (`Landscape.parts`, for `?diag=nowoods,nofarwoods,noflowers,nograss`):
+ * the woods near the town (the full models), the woods further out (their far versions), the lawn's
+ * flowers and its grass.
+ */
+export type NaturePart = 'woods' | 'farWoods' | 'flowers' | 'grass';
+
+/** The `?diag=` names that leave out each part. */
+export const NATURE_DIAGS = [
+  ['nowoods', 'woods'],
+  ['nofarwoods', 'farWoods'],
+  ['noflowers', 'flowers'],
+  ['nograss', 'grass'],
+] as const satisfies readonly (readonly [BenchDiag, NaturePart])[];
+
 /** Draws the country roads (`pc/roads.ts`): their entities, under `parent`. */
 export type RoadBuilder = (roads: CountryRoads, parent: pc.Entity) => pc.Entity[];
 
@@ -81,8 +97,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private waterMaterial: { material: pc.StandardMaterial; lib: MaterialLibrary } | null = null;
 
   /** `grassQuality`: how the grass is drawn (the preset's, `QualitySettings.grass`). */
-  constructor(world: WorldStructure, lawnDensity: number, lawnLod: 0 | 1, private readonly grassQuality: GrassQuality) {
-    super(world, (land, w, name) => new CountryRoads(land, w, name), lawnDensity, lawnLod);
+  constructor(world: WorldStructure, lawnDensity: number, lawnLod: 0 | 1, woodsCell: number, private readonly grassQuality: GrassQuality) {
+    super(world, (land, w, name) => new CountryRoads(land, w, name), lawnDensity, lawnLod, woodsCell);
   }
 
   async build(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder): Promise<NatureResult> {
@@ -114,9 +130,9 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     const stale = this.batches.filter((b) => b.again && b.built.failed?.includes(url));
     if (!stale.length) return null;
     const fresh: Batch[] = [];
-    for (const { again, casts } of stale) {
+    for (const { again, casts, part } of stale) {
       const { key, matrices, lod, cell } = again!;
-      fresh.push(batch(again!, casts, await instanced(app, parent, assets, key, matrices, lod, cell, pace)));
+      fresh.push(batch(again!, casts, part, await instanced(app, parent, assets, key, matrices, lod, cell, pace)));
     }
     const replaced = gather(stale).draws;
     const commit = () => {
@@ -148,6 +164,14 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.batches = [];
     this.others = [];
     this.lawn = [];
+  }
+
+  /** Each of its plants' draws by kind (see `NaturePart`); the terrain, the water and the roads aren't in it. */
+  parts(): Map<pc.Entity, NaturePart> {
+    const out = new Map<pc.Entity, NaturePart>();
+    for (const b of this.batches) for (const e of gather([b]).draws) out.set(e, b.part);
+    for (const d of this.grass?.draws ?? []) out.set(d.entity, 'grass');
+    return out;
   }
 
   /** Each frame: the grass near the eye (game space) in view of the camera (`Grass.frame`). */
@@ -254,7 +278,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     ] as const) {
       for (const [key, list] of bucket) {
         const lod = casts ? 0 : 1;
-        this.batches.push(batch({ key, matrices: list, lod, cell: sector }, casts, await instanced(app, parent, assets, key, list, lod, sector, pace)));
+        this.batches.push(batch({ key, matrices: list, lod, cell: sector }, casts, casts ? 'woods' : 'farWoods', await instanced(app, parent, assets, key, list, lod, sector, pace)));
       }
     }
   }
@@ -265,7 +289,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     for (const { key, matrices, tiles } of await this.lawns(world, pace)) {
       const lod = this.lawnLod;
       const built = await instanced(app, parent, assets, key, matrices, lod, undefined, pace);
-      this.batches.push(batch({ key, matrices, lod, tiles }, false, built));
+      this.batches.push(batch({ key, matrices, lod, tiles }, false, 'flowers', built));
       this.lawn.push(...lawnLayers(built, matrices, tiles));
     }
     this.refreshLawn(world);
@@ -315,6 +339,7 @@ interface Batch {
   built: Instanced;
   /** Its parts drawn whole cast shadows (the woods near the town). */
   casts: boolean;
+  part: Exclude<NaturePart, 'grass'>;
   /** What it was built from, kept only while it's built without a file (`built.failed`), to build it again when that comes (`rebuild`). */
   again?: BatchSource;
 }
@@ -330,8 +355,8 @@ interface BatchSource {
 }
 
 /** A batch of plants built from `source`, which it keeps only if it was built without a file (all of them are several MB a landscape). */
-function batch(source: BatchSource, casts: boolean, built: Instanced): Batch {
-  return { built, casts, ...(built.failed ? { again: source } : {}) };
+function batch(source: BatchSource, casts: boolean, part: Batch['part'], built: Instanced): Batch {
+  return { built, casts, part, ...(built.failed ? { again: source } : {}) };
 }
 
 /** The draws of `batches`: which cast shadows, and which are drawn only in the game or only in the menus' town (see `NatureResult`). */

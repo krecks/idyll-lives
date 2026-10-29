@@ -1,6 +1,8 @@
 # The things residents carry and cook with: the models of content `items` (`item.*`: a bag of shopping, a
-# prep bowl, a pot of stew, plates of food, dirty plates and pans) and the props drawn on a station's top
-# while a resident cooks there (`tool.*`: the chopping board, the pan, food on the grill). Notes: held.md.
+# prep bowl, a pot of stew, plates of food, dirty plates and pans, the food bought in town), the props drawn on a
+# station's top while a resident cooks there (`tool.*`: the chopping board, the pan, food on the grill) and the props
+# in a resident's hands while they use a thing (`tool.*`: a book, a cup, cutlery, a phone, a cue; actions.ts
+# `PROPS`). Notes: held.md.
 #
 # Each is drawn as the old part was (characters.ts `writeCarried`, `writeTool`; items.ts): its origin at
 # the middle of its base, front +Z in the game, lifted onto the palms, the top it stands on or the station.
@@ -124,6 +126,82 @@ M = G.Palette(
     cheese_brown=('#C98A3E', 'satin'),  # browned spots on a baked pizza
     straw_stripe=('#D9484A', 'satin'),
     wire=('#9EA4AA', 'metal'),         # the noodle pail's wire handle
+    # props in hand (G-70): what residents hold while they use a thing
+    mug=('#E8E2D6', 'gloss'),
+    mug_band=('#4F7A9A', 'gloss'),
+    coffee=('#4A2E1E', 'gloss'),
+    crema=('#B88A5A', 'satin'),
+    juice=('#F0A23A', 'satin'),        # an orange drink, seen through the glass
+    ice=('#E9F1F2', 'gloss'),
+    wine=('#6E1A2A', 'gloss'),
+    can=('#C8302A', 'gloss'),
+    can_band=('#F2F0EA', 'gloss'),
+    can_top=('#C9CED4', 'metal'),
+    phone=('#2A2C30', 'satin'),
+    screen=('#141A22', 'gloss'),
+    screen_lit=('#3C5A7A', 'gloss'),
+    cover=('#7A2E2A', 'satin'),        # a cloth-bound book's boards
+    page=('#F2EEE2', 'matte'),
+    page_edge=('#E2DCCB', 'matte'),
+    print=('#9A968C', 'matte'),        # the lines of type, a grey band each
+    brass=('#C9A54A', 'metal'),
+    seed=('#B8964E', 'matte'),
+    dart_flight=('#2E6FB8', 'satin'),
+    dart_shaft=('#1E1E1E', 'satin'),
+    cue=('#D9B98A', 'satin'),
+    cue_butt=('#3B2A20', 'satin'),
+    cue_wrap=('#141414', 'satin'),
+    pearl=('#EDE6D6', 'gloss'),
+    cue_tip=('#3E8EDE', 'matte'),      # chalked
+    rubber=('#C8322A', 'satin'),       # a ping-pong bat's faces, red over black
+    rubber_black=('#1E1E1E', 'satin'),
+    blade=('#C9A06A', 'satin'),
+    chrome=('#D0D3D6', 'chrome'),
+    # the food from town (review M-held-03)
+    cup_paper=('#F4F1EA', 'matte'),
+    cup_stripe=('#E58FA8', 'matte'),
+    paddle=('#D8BE8E', 'matte'),       # a wooden ice cream spoon
+    mustard=('#E2B02A', 'satin'),
+    ketchup=('#B8281E', 'satin'),
+    foil=('#C9CED4', 'metal'),         # a crisp packet's silvered inside
+    packet=('#2F5FA8', 'gloss'),
+    packet_band=('#F2C230', 'gloss'),
+    crisp=('#E8C46A', 'matte'),
+    apple=('#B8282A', 'gloss'),
+    apple_blush=('#D8A23A', 'gloss'),
+    stalk=('#5A3A22', 'matte'),
+    bag_white=('#F2EEE4', 'matte'),
+    # props in hand, the rest of G-70
+    can_green=('#3F8A4A', 'satin'),    # a plastic watering can
+    rose=('#2E6A38', 'satin'),
+    pruner=('#C8322A', 'satin'),       # secateurs' red grips
+    bristle=('#2A2420', 'matte'),
+    paint_blue=('#3A6EB8', 'satin'),
+    handle_wood=('#B8874E', 'satin'),
+    chalk=('#F4F2EA', 'matte'),
+    bottle=('#CFE3EC', 'gloss'),       # a baby's bottle, the milk seen through it
+    milk=('#F7F4EC', 'satin'),
+    bottle_ring=('#7FB2D8', 'satin'),
+    teat=('#E2B88A', 'satin'),
+    card=('#F6F3EA', 'matte'),
+    card_sky=('#6EA7D8', 'matte'),
+    card_sea=('#2F6E9E', 'matte'),
+    card_sand=('#E2C68A', 'matte'),
+    ball=('#D2652A', 'matte'),         # a basketball's pebbled leather
+    ball_seam=('#2A1E18', 'matte'),
+    sponge=('#E8C88A', 'matte'),       # a slice of layer cake
+    sponge_crumb=('#D9B272', 'matte'),
+    cake_icing=('#FBF4EA', 'satin'),
+    cake_jam=('#B8283A', 'satin'),
+    cake_berry=('#C42A30', 'gloss'),
+    fork=('#E4E8EC', 'chrome'),        # a polished fork, bright to be seen in a hand
+    pen=('#1F3F7A', 'gloss'),          # a ballpoint's barrel
+    pencil=('#E8B830', 'satin'),       # a pencil's yellow paint
+    pencil_wood=('#D9B488', 'matte'),
+    graphite=('#3A3A3A', 'satin'),
+    marker=('#F2F0EA', 'satin'),       # a whiteboard marker's body
+    marker_cap=('#2A5FB8', 'satin'),
+    handset=('#1E2120', 'satin'),      # the phone box's receiver (street_furniture.py `phoneBooth`'s `dark`)
 )
 
 # Built in the game's axes (x, height, depth; front +depth), as the old parts are.
@@ -892,6 +970,25 @@ def _knife(name, at, yaw, pitch=0.0):
     return F.extrude(name, o, 0.0022, (at[0], at[1] + 0.0011, at[2]), M.steel, plane='top', rot=(0, pitch, yaw))
 
 
+def cakeSlice():
+    """A plate with a slice of the café's layer cake: two sponge layers with jam and cream between, white icing over
+    the top and its round back, a strawberry on it."""
+    plate()
+    apex, R, A = (-0.012, 0.055), 0.115, 20
+    wedge = [apex] + arc(R, A, apex, 3)
+    y = WELL
+    for name, h, top, side in (('sponge0', 0.03, M.sponge, M.sponge_crumb), ('jam', 0.004, M.cake_jam, M.cake_jam),
+                               ('cream', 0.006, M.cake_icing, M.cake_icing), ('sponge1', 0.03, M.sponge, M.sponge_crumb)):
+        prism(name, wedge, y, y + h, top, side)
+        y += h
+    prism('icing', wedge, y, y + 0.005, M.cake_icing, M.cake_icing, sides=[M.sponge_crumb] + [M.cake_icing] * (len(wedge) - 2)
+          + [M.sponge_crumb])
+    back = arc(R, A, apex, 3)
+    lathe('berry', [(0, 0), (0.011, 0.002), (0.013, 0.012), (0.009, 0.022), (0, 0.026)], M.cake_berry,
+          at=(back[1][0] * 0.45 + apex[0] * 0.55, y + 0.005, back[1][1] * 0.45 + apex[1] * 0.55), segments=8)
+    return done('cakeSlice')
+
+
 def plateDirty():
     """A plate after the meal: a smear of gravy, a streak of sauce, crumbs, a pea left over, and the knife and
     fork laid side by side."""
@@ -1228,9 +1325,435 @@ def mixingBowl():
     return done('mixingBowl')
 
 
-def I(id, build, size, key, centre=(0.0, 0.0), code=False):
+# --- props in hand (G-70): drawn in a resident's hands while they use a thing ---------------------------------------
+# Each is built as it lies or stands on a table, in the game's axes, its origin where characters.ts holds it from
+# (actions.ts `HAND_PROPS`): the middle of its base for the cups and the bag, the butt of a cue, the middle of a
+# grip for the rest. What is held along its length (cutlery, a dart, a cue, a bat) points to the front (+depth).
+def mug():
+    """A glazed mug 8 cm across and 9.5 cm high, a blue band round it, its handle to the right (+x, the side of the
+    hand that holds it), coffee in it with a little crema."""
+    lathe('mug', [(0, 0), (0.037, 0), (0.0405, 0.004), (0.041, 0.06), (0.041, 0.072), (0.041, 0.092), (0.0395, 0.095),
+                  (0.0365, 0.0935), (0.036, 0.082), (0.03, 0.0822), (0, 0.0824)],
+          [M.mug, M.mug, M.mug, M.mug_band, M.mug, M.mug, M.mug, M.mug, M.coffee, M.crema], segments=18)
+    path = G.kit.fillet([(0.038, 0.078, 0.0), (0.066, 0.074, 0.0), (0.066, 0.03, 0.0), (0.038, 0.024, 0.0)], 0.012,
+                        steps=3)
+    F.sweep('handle', path, None, M.mug, profile=G.rounded_rect(0.007, 0.012, 0.003, corner=1))
+    return done('mug')
+
+
+def glass():
+    """A tumbler 7 cm across and 11 cm high of something orange and cold, two cubes of ice at the top."""
+    lathe('glass', [(0, 0), (0.03, 0), (0.0315, 0.006), (0.0325, 0.012), (0.035, 0.09), (0.0355, 0.11),
+                    (0.0335, 0.1105), (0.033, 0.092), (0, 0.092)],
+          [M.glass, M.glass, M.glass, M.juice, M.glass, M.glass, M.glass, M.juice], segments=18)
+    for i, (x, z, yaw) in enumerate(((-0.01, 0.006, 20), (0.012, -0.008, 65))):
+        box(f'ice{i}', 0.016, 0.012, 0.016, (x, 0.094, z), M.ice, yaw=yaw, tilt=(8, -6), bevel=0.002)
+    return done('glass')
+
+
+def wineGlass():
+    """A stemmed glass of red wine, 19 cm high: a round foot, a stem, a bowl filled to its widest (the wine seen
+    through the glass)."""
+    lathe('glass', [(0, 0), (0.034, 0), (0.0345, 0.003), (0.008, 0.007), (0.004, 0.02), (0.004, 0.078), (0.012, 0.088),
+                    (0.034, 0.112), (0.0415, 0.14), (0.039, 0.172), (0.036, 0.19), (0.0345, 0.19), (0.0375, 0.172),
+                    (0.0395, 0.142), (0, 0.142)],
+          [M.glass] * 6 + [M.wine, M.wine, M.glass, M.glass, M.glass, M.glass, M.glass, M.wine], segments=18)
+    return done('wineGlass')
+
+
+def can():
+    """A 330 ml can of soda, 6.6 cm across and 12 cm high: red with a white band, its top and bottom pressed in,
+    a ring pull."""
+    lathe('can', [(0, 0.003), (0.024, 0.0), (0.031, 0.004), (0.033, 0.012), (0.033, 0.05), (0.033, 0.075),
+                  (0.033, 0.108), (0.0285, 0.118), (0.027, 0.1205), (0.0255, 0.1195), (0.0245, 0.117), (0, 0.117)],
+          [M.can_top, M.can_top, M.can, M.can, M.can_band, M.can, M.can_top, M.can_top, M.can_top, M.can_top,
+           M.can_top], segments=18)
+    F.extrude('pull', [(-0.006, -0.004), (0.006, -0.004), (0.008, 0.008), (0.0, 0.014), (-0.008, 0.008)], 0.0012,
+              (0.0, 0.1178, 0.006), M.can_top, plane='top', holes=[[(-0.003, 0.004), (0.003, 0.004), (0.0, 0.009)]])
+    return done('can')
+
+
+def _tines(n, half, length, step, neck):
+    """A fork's head outline (u along it, v across) from its neck (u 0, `neck` each side) to the tips (u `length`),
+    `n` tines across `half` each side, split down to `step`."""
+    gap = 2 * half / (2 * n - 1)
+    pts = [(0.0, -neck), (0.014, -half)]
+    for k in range(n):
+        a = -half + 2 * k * gap
+        pts += [(length, a), (length, a + gap)]
+        if k < n - 1:
+            pts += [(step, a + gap), (step, a + 2 * gap)]
+    return pts + [(0.014, half), (0.0, neck)]
+
+
+def _along(name, outline, t, y, shift, material):
+    """A flat piece lying along the depth (u to the front, v across), `t` thick with its underside at `y`, moved
+    `shift` along the depth."""
+    return F.extrude(name, [(v, u + shift) for u, v in outline], t, (0.0, y + t / 2, 0.0), material, plane='top')
+
+
+def fork():
+    """A polished dinner fork, 20 cm long, lying flat, its tines to the front (+depth) and held at the origin, 7.7 cm
+    from the handle's end: a handle widening to 1.5 cm at its end, 3 mm thick, a neck, four tines 2.6 cm across. A
+    dinner fork's size, not a dessert fork's, and polished: it is seen from the game camera."""
+    handle = [(-0.15, 0.0), (-0.145, -0.0075), (-0.05, -0.0048), (0.0, -0.003), (0.0, 0.003), (-0.05, 0.0048),
+              (-0.145, 0.0075)]
+    _along('handle', handle, 0.003, 0.0, 0.073, M.fork)
+    _along('head', _tines(4, 0.013, 0.05, 0.028, 0.003), 0.0026, 0.0002, 0.073, M.fork)
+    return done('fork')
+
+
+def spoon():
+    """A steel dessert spoon, 17 cm long, lying flat, its bowl to the front (+depth) and held at the origin, 6 cm
+    from the handle's end."""
+    handle = [(-0.12, 0.0), (-0.115, -0.0062), (-0.05, -0.0045), (0.0, -0.0028), (0.0, 0.0028), (-0.05, 0.0045),
+              (-0.115, 0.0062)]
+    _along('handle', handle, 0.0024, 0.0, 0.06, M.steel)
+    G.sphere('bowl', 1.0, at=F.at(0.0, 0.0055, 0.082), material=M.steel, scale=(0.017, 0.025, 0.0055), segments=10,
+             rings=6)
+    return done('spoon')
+
+
+def chopsticks():
+    """A pair of tapering wooden chopsticks, 23 cm long, side by side, their tips to the front (+depth), held from
+    the origin."""
+    for i, dx in enumerate((-0.006, 0.006)):
+        F.sweep(f'chopstick{i}', [(dx * 1.6, 0.0035, -0.06), (dx * 0.5, 0.0035, 0.17)], None, M.chopstick,
+                profile=[(-0.0035, -0.0035), (0.0035, -0.0035), (0.0035, 0.0035), (-0.0035, 0.0035)], scale=[1.0, 0.5])
+    return done('chopsticks')
+
+
+def phone():
+    """A smartphone 7.2 by 14.8 cm and 8 mm thick, lying on its back, its screen up and its top to the front
+    (+depth): a dark rounded body, the glass, a camera at the back."""
+    F.extrude('body', G.rounded_rect(0.072, 0.148, 0.009, corner=3), 0.0075, (0, 0.00375, 0), M.phone, plane='top',
+              bevel=0.002, bevel_segments=1)
+    F.extrude('screen', G.rounded_rect(0.066, 0.14, 0.007, corner=3), 0.0008, (0, 0.0078, 0), M.screen, plane='top')
+    F.extrude('glow', G.rounded_rect(0.058, 0.118, 0.003, corner=2), 0.0004, (0, 0.0083, -0.002), M.screen_lit,
+              plane='top')
+    F.extrude('camera', G.rounded_rect(0.022, 0.022, 0.005, corner=2), 0.0016, (-0.018, -0.0006, 0.054), M.phone,
+              plane='top')
+    return done('phone')
+
+
+def book():
+    """An open cloth-bound book, 30 cm across and 22 cm from the foot of its pages to their head (+depth), lying on
+    its boards: the pages rising from the spine and curving down to the fore-edges, lines of type in grey bands."""
+    for s in (-1, 1):
+        box(f'board{s}', 0.152, 0.0032, 0.224, (s * 0.076, 0.0016, 0.0), M.cover, tilt=(0, -s * 3), bevel=0.0008)
+        prof = [(0.0, 0.004), (0.002, 0.022), (0.03, 0.027), (0.08, 0.026), (0.125, 0.021), (0.146, 0.014),
+                (0.148, 0.006), (0.146, 0.004)]
+        F.extrude(f'pages{s}', [(s * u, v) for u, v in prof], 0.214, (0, 0, 0), M.page_edge, plane='front')
+        # the open page's face: a thin sheet over the block, the type on it
+        top = [(s * u, v + 0.0006) for u, v in prof[1:6]]
+        F.sweep(f'sheet{s}', [(x, y, 0.0) for x, y in top], None, M.page,
+                profile=[(-0.0003, -0.107), (0.0003, -0.107), (0.0003, 0.107), (-0.0003, 0.107)], up=(0, 0, 1))
+        for k in range(7):
+            z = -0.075 + 0.025 * k
+            F.sweep(f'type{s}{k}', [(x, y + 0.0005, z) for x, y in top[1:4]], None, M.print,
+                    profile=[(-0.0003, -0.006), (0.0003, -0.006), (0.0003, 0.006), (-0.0003, 0.006)], up=(0, 0, 1))
+    return done('book')
+
+
+def fountainCoin():
+    """A coin for the fountain, 2.3 cm across: a milled rim and a raised face."""
+    lathe('coin', [(0, 0), (0.0115, 0), (0.0117, 0.0011), (0.0115, 0.0022), (0.0098, 0.0022), (0.0096, 0.0018),
+                   (0, 0.0019)], M.brass, segments=14)
+    return done('coin')
+
+
+def seedBag():
+    """A small paper bag of bird seed, 8 cm wide and 12 cm high, its top rolled open over the seed."""
+    rings = [_bag_ring(0.0, 0.04, 0.025, 0.012), _bag_ring(0.085, 0.041, 0.026, 0.012),
+             _bag_ring(0.1, 0.043, 0.028, 0.006), _bag_ring(0.108, 0.04, 0.025, 0.004)]
+    G.loft('bag', [[F.at(*p) for p in r] for r in rings], material=M.kraft, angle=30)
+    mound = lathe('seed', [(0, 0), (0.038, 0), (0.028, 0.007), (0, 0.011)], M.seed, at=(0, 0.1075, 0), segments=10,
+                  scale=(1, 0.6))
+    G.jitter(mound, 0.002, size=0.006, seed=3.1)
+    return done('seedBag')
+
+
+def dart():
+    """A steel dart, 15 cm long, lying along the depth, its point to the front (+depth), held by the barrel at the
+    origin: a knurled barrel, a black shaft and three blue flights."""
+    lathe('barrel', [(0, -0.02), (0.0035, -0.019), (0.0042, -0.012), (0.0046, 0.0), (0.0042, 0.014), (0.0032, 0.022),
+                     (0.0011, 0.026), (0.0006, 0.06), (0, 0.064)],
+          [M.steel] * 8, at=(0, 0.0046, 0), segments=8, rot=(90, 0, 0), wave=(8, {3: 0.06}))
+    F.sweep('shaft', [(0, 0.0046, -0.02), (0, 0.0046, -0.065)], 0.0021, M.dart_shaft, verts=6)
+    for k in range(3):
+        a = math.radians(90 + 120 * k)
+        F.extrude(f'flight{k}', [(0.0, 0.0), (0.0, 0.004), (0.017, 0.016), (0.03, 0.016), (0.036, 0.0)], 0.0008,
+                  (0.0, 0.0046, -0.09), M.dart_flight, plane='side', rot=(0, math.degrees(a), 0))
+    return done('dart')
+
+
+CUE = 1.47
+
+
+def cue():
+    """A pool cue, 1.47 m, lying along the depth from its butt at the origin to its tip at the front: a wrapped
+    butt, a joint, a tapering maple shaft, a white ferrule and a chalked tip (as the pool table's was)."""
+    def along(t):
+        return (0.0, 0.014, CUE * t)
+    F.sweep('cue_butt', [along(0), along(0.3)], 0.014, M.cue_butt, verts=8, scale=[1.0, 0.86])
+    F.sweep('cue_wrap', [along(0.06), along(0.2)], 0.0142, M.cue_wrap, verts=8, scale=[1.0, 0.95])
+    F.sweep('cue_joint', [along(0.3), along(0.32)], 0.0122, M.pearl, verts=8)
+    F.sweep('cue_shaft', [(0.0, 0.014, CUE * 0.32), (0.0, 0.014, CUE * 0.99)], 0.0118, M.cue, verts=8,
+            scale=[1.0, 0.55])
+    F.sweep('cue_ferrule', [(0.0, 0.014, CUE * 0.99), (0.0, 0.014, CUE * 0.997)], 0.0066, M.pearl, verts=8)
+    F.sphere('cue_tip', 0.0064, (0.0, 0.014, CUE * 0.997), M.cue_tip, segments=8, rings=4)
+    return done('cue')
+
+
+def bat():
+    """A ping-pong bat lying on its back, its blade to the front (+depth) and its handle at the origin, where it is
+    held: a wooden blade 15 by 16 cm, red rubber on top and black underneath, a flared handle."""
+    for name, y, h, m in (('rubber_back', 0.0, 0.002, M.rubber_black), ('blade', 0.002, 0.006, M.blade),
+                          ('rubber', 0.008, 0.002, M.rubber)):
+        disc(name, 0.15, h, (0.0, y, 0.122), m, verts=20, depth=0.158)
+    F.sweep('handle', [(0.0, 0.005, 0.05), (0.0, 0.005, 0.0), (0.0, 0.005, -0.048)], None, M.blade,
+            profile=G.rounded_rect(0.024, 0.016, 0.007, corner=2), up=(0, 0, 1), scale=[0.85, 1.0, 1.2])
+    return done('bat')
+
+
+def shaker():
+    """A three-piece cocktail shaker, 22 cm high, the bar cart's (dining.py `barCart`, hidden while it is in a
+    hand): a tapering chrome tin, the strainer and its cap."""
+    lathe('shaker', [(0, 0), (0.034, 0), (0.036, 0.004), (0.04, 0.12), (0.042, 0.124), (0.037, 0.13), (0.03, 0.17),
+                     (0.032, 0.174), (0.018, 0.2), (0.012, 0.212), (0.014, 0.215), (0, 0.22)], M.chrome, segments=16)
+    return done('shaker')
+
+
+def wateringCan():
+    """A plastic watering can, 5 litres: a round body 15 cm across and 19 cm high, a hoop handle over the top from
+    back to front, held at its middle 26 cm up, and a spout rising forward (+depth) to a rose 30 cm out."""
+    lathe('can_body', [(0, 0), (0.07, 0), (0.075, 0.008), (0.076, 0.16), (0.07, 0.185), (0.045, 0.192), (0, 0.192)],
+          M.can_green, segments=14)
+    F.sweep('can_handle', [(0, 0.17, -0.06), (0, 0.24, -0.045), (0, 0.262, 0.0), (0, 0.24, 0.045), (0, 0.18, 0.06)],
+            0.011, M.can_green, verts=6, resolution=2)
+    F.sweep('can_spout', [(0, 0.03, 0.065), (0, 0.11, 0.17), (0, 0.2, 0.27)], 0.011, M.can_green, verts=6,
+            scale=[1.2, 1.0, 0.85])
+    lathe('can_rose', [(0, 0), (0.012, 0), (0.028, 0.03), (0.028, 0.036), (0, 0.036)], M.rose, at=(0, 0.2, 0.27),
+          segments=10, rot=(-55, 0, 0))
+    return done('wateringCan')
+
+
+def secateurs():
+    """A pair of bypass secateurs, 21 cm long, lying flat, closed, the blades to the front (+depth) and held at the
+    origin, the middle of the red grips: the curved cutting blade over the hooked anvil, the pivot bolt, the spring
+    between the grips."""
+    for side in (-1, 1):
+        F.sweep(f'grip{side}', [(side * 0.004, 0.009, -0.075), (side * 0.016, 0.009, -0.02),
+                                (side * 0.009, 0.009, 0.03)], None, M.pruner,
+                profile=G.rounded_rect(0.016, 0.012, 0.005, corner=1), up=(0, 1, 0), resolution=2)
+    F.extrude('blade', [(-0.009, 0.03), (0.006, 0.03), (0.01, 0.06), (0.004, 0.095), (-0.002, 0.098),
+                        (-0.004, 0.07)], 0.0028, (0, 0.0135, 0), M.steel, plane='top')
+    F.extrude('anvil', [(0.009, 0.03), (-0.004, 0.03), (-0.01, 0.06), (-0.006, 0.085), (0.0, 0.08),
+                        (0.004, 0.06)], 0.004, (0, 0.007, 0), M.iron, plane='top')
+    disc('bolt', 0.012, 0.016, (0, 0.003, 0.034), M.steel, verts=8)
+    return done('secateurs')
+
+
+def paintbrush():
+    """An artist's brush, 24 cm long, lying along the depth, its bristles to the front (+depth), held at the origin
+    6 cm behind the ferrule: a lacquered wooden handle swelling and tapering, a steel ferrule, bristles dipped in
+    blue."""
+    lathe('brush_handle', [(0, -0.17), (0.0025, -0.168), (0.0042, -0.1), (0.0048, -0.04), (0.004, 0.0),
+                           (0.0036, 0.04), (0, 0.042)], M.handle_wood, at=(0, 0.005, 0), segments=8, rot=(90, 0, 0))
+    lathe('brush_ferrule', [(0, 0.04), (0.0037, 0.04), (0.0042, 0.058), (0.0036, 0.062), (0, 0.062)], M.steel,
+          at=(0, 0.005, 0), segments=8, rot=(90, 0, 0))
+    lathe('brush_tip', [(0, 0.062), (0.0036, 0.062), (0.0042, 0.07), (0.0028, 0.078), (0.0002, 0.084), (0, 0.084)],
+          [M.bristle, M.bristle, M.paint_blue, M.paint_blue, M.paint_blue], at=(0, 0.005, 0), segments=8,
+          rot=(90, 0, 0))
+    return done('paintbrush')
+
+
+def chalk():
+    """A stick of white chalk, 8 cm long and 1 cm across, lying along the depth, held at its middle, its tip
+    worn down at the front."""
+    F.sweep('chalk', [(0, 0.005, -0.042), (0, 0.005, 0.03), (0, 0.005, 0.042)], 0.005, M.chalk, verts=8,
+            scale=[1.0, 1.0, 0.55])
+    return done('chalk')
+
+
+def babyBottle():
+    """A baby's bottle, 17 cm with its teat, standing: a clear body two thirds full of milk, a blue screw ring, a
+    honey-coloured teat."""
+    lathe('bottle', [(0, 0), (0.027, 0), (0.029, 0.006), (0.029, 0.08), (0.029, 0.11), (0.026, 0.118),
+                     (0.026, 0.122), (0, 0.122)],
+          [M.milk, M.milk, M.milk, M.bottle, M.bottle, M.bottle, M.bottle], segments=14)
+    lathe('ring', [(0, 0.118), (0.0285, 0.118), (0.0295, 0.124), (0.0285, 0.138), (0.012, 0.139), (0, 0.139)],
+          M.bottle_ring, segments=14)
+    lathe('teat', [(0, 0.138), (0.012, 0.138), (0.011, 0.148), (0.006, 0.155), (0.0045, 0.165), (0.003, 0.17),
+                   (0, 0.171)], M.teat, segments=10)
+    return done('babyBottle')
+
+
+def postcard():
+    """A postcard, 14.8 by 10.5 cm, lying flat, picture up and its long side across, held at the middle of its back
+    (near) edge at the origin, the card reaching to the front: a seaside view in bands (sky, sea, sand)."""
+    box('card', 0.148, 0.0008, 0.105, (0, 0.0004, 0.0525), M.card)
+    for name, z, d, m in (('sky', 0.078, 0.045, M.card_sky), ('sea', 0.047, 0.017, M.card_sea),
+                          ('sand', 0.026, 0.026, M.card_sand)):
+        box(name, 0.136, 0.0004, d, (0, 0.001, z), m)
+    return done('postcard')
+
+
+def receiver():
+    """The phone box's receiver, 21 cm, lying on its cups: a black bar along the depth, the earpiece's cup at the front
+    (+depth) and the mouthpiece's at the back, both turned down; held at the middle of its bar. Drawn on the box's hook
+    at rest by code (actions.ts `REST_PROPS`), in the caller's hand while they call."""
+    F.sweep('handset_bar', [(0, 0.04, -0.075), (0, 0.048, 0.0), (0, 0.04, 0.075)], None, M.handset,
+            profile=G.rounded_rect(0.036, 0.022, 0.008, corner=1), up=(0, 0, 1), resolution=2)
+    for name, z in (('earpiece', 0.08), ('mouthpiece', -0.08)):
+        lathe(name, [(0, 0), (0.024, 0), (0.026, 0.006), (0.022, 0.03), (0.012, 0.042), (0, 0.044)], M.handset,
+              at=(0, 0, z), segments=12)
+    return done('receiver')
+
+
+def pen():
+    """A ballpoint pen, 14 cm, lying along the depth, its point to the front (+depth), held at the origin 3.5 cm behind
+    the point: a navy barrel, a chrome cone and point, a clip at its back end."""
+    lathe('pen', [(0, -0.105), (0.0042, -0.104), (0.0045, -0.09), (0.0045, 0.0), (0.0040, 0.012), (0, 0.013)],
+          M.pen, at=(0, 0.0045, 0), segments=8, rot=(90, 0, 0))
+    lathe('pen_tip', [(0, 0.012), (0.004, 0.012), (0.0012, 0.032), (0.0004, 0.035), (0, 0.0352)], M.chrome,
+          at=(0, 0.0045, 0), segments=8, rot=(90, 0, 0))
+    F.box('pen_clip', 0.0018, 0.002, 0.045, (0, 0.0095, -0.08), M.chrome)
+    return done('pen')
+
+
+def pencil():
+    """A yellow pencil, 17 cm, six-sided, lying along the depth, sharpened to the front (+depth), held at the origin
+    3.5 cm behind the point: the painted shaft, the bare wood cone, the lead."""
+    lathe('pencil', [(0, -0.135), (0.0038, -0.135), (0.0038, 0.0), (0, 0.0)], M.pencil, at=(0, 0.0038, 0), segments=6,
+          rot=(90, 0, 0))
+    lathe('pencil_cone', [(0, 0.0), (0.0038, 0.0), (0.0012, 0.026), (0, 0.026)], M.pencil_wood, at=(0, 0.0038, 0),
+          segments=6, rot=(90, 0, 0))
+    lathe('pencil_lead', [(0, 0.026), (0.0012, 0.026), (0, 0.035)], M.graphite, at=(0, 0.0038, 0), segments=6,
+          rot=(90, 0, 0))
+    return done('pencil')
+
+
+def marker():
+    """A whiteboard marker, 13.5 cm and 1.8 cm across, lying along the depth, its felt tip to the front (+depth),
+    held at the origin 4 cm behind it, its blue cap pushed onto the back end."""
+    lathe('marker', [(0, -0.1), (0.009, -0.1), (0.009, 0.0), (0.006, 0.012), (0, 0.012)], M.marker, at=(0, 0.009, 0),
+          segments=10, rot=(90, 0, 0))
+    lathe('marker_cap', [(0, -0.12), (0.0095, -0.12), (0.0095, -0.072), (0, -0.072)], M.marker_cap, at=(0, 0.009, 0),
+          segments=10, rot=(90, 0, 0))
+    lathe('marker_tip', [(0, 0.012), (0.0032, 0.012), (0.0032, 0.028), (0.002, 0.034), (0, 0.035)], M.marker_cap,
+          at=(0, 0.009, 0), segments=8, rot=(90, 0, 0))
+    return done('marker')
+
+
+def basketball():
+    """A basketball, 24 cm across, standing on the table: pebbled orange leather and the black seams, one round its
+    middle, one over the top and two curving either side."""
+    ball('ball', 0.12, (0, 0.1254, 0), M.ball, seg=16, rings=10)
+    F.sweep('seam_round', [(0.1232 * math.cos(math.radians(a)), 0.1254, 0.1232 * math.sin(math.radians(a)))
+                           for a in range(0, 360, 30)], 0.0026, M.ball_seam, verts=4, closed=True)
+    F.sweep('seam_over', [(0.0, 0.1254 + 0.1232 * math.sin(math.radians(a)), 0.1232 * math.cos(math.radians(a)))
+                          for a in range(0, 360, 30)], 0.0026, M.ball_seam, verts=4, closed=True)
+    for side in (-1, 1):
+        pts = []
+        for a in range(0, 360, 30):
+            r = math.radians(a)
+            # a ring cut 7 cm in from the side, bowed in the middle (the ball's curved seams)
+            x, y, z = side * 0.085, 0.085 * math.sin(r), 0.085 * math.cos(r)
+            n = math.sqrt(x * x + y * y + z * z)
+            pts.append((x / n * 0.1232, 0.1254 + y / n * 0.1232, z / n * 0.1232))
+        F.sweep(f'seam_side{side}', pts, 0.0026, M.ball_seam, verts=4, closed=True)
+    return done('basketball')
+
+
+# --- the food from town (review M-held-03): each in what it is sold in ------------------------------------------------
+def iceCreamCup():
+    """A paper cup of ice cream from the cart, 9 cm across at its top: pink-striped card, two scoops (strawberry on
+    vanilla), each with a scoop's ragged lip, a flat wooden spoon stuck in."""
+    lathe('cup', [(0, 0), (0.031, 0), (0.0315, 0.003), (0.045, 0.058), (0.0465, 0.06), (0.0435, 0.06), (0, 0.05)],
+          [M.cup_paper, M.cup_paper, M.cup_stripe, M.cup_paper, M.cup_paper, M.vanilla], segments=18,
+          wave=(9, {3: 0.02}))
+    for i, (x, y, z, m, s) in enumerate(((-0.006, 0.05, 0.004, M.vanilla, 1.0), (0.008, 0.074, -0.004, M.strawberry,
+                                                                                   0.85))):
+        sc = lathe(f'scoop{i}', [(0, 0), (0.03 * s, 0), (0.034 * s, 0.006 * s), (0.032 * s, 0.022 * s),
+                                 (0.02 * s, 0.038 * s), (0, 0.043 * s)], m,
+                   at=(x, y, z), segments=10, wave=(5, {2: 0.12}), rot=(0, 0, 30 * i))
+        G.jitter(sc, 0.0012, size=0.01, seed=2.3 + i)
+    F.extrude('paddle', [(-0.004, 0.0), (0.004, 0.0), (0.0055, 0.06), (0.004, 0.075), (-0.004, 0.075),
+                         (-0.0055, 0.06)], 0.0018, (0.024, 0.062, 0.014), M.paddle, plane='front', rot=(-12, 30, -28))
+    return done('iceCreamCup')
+
+
+def hotDog():
+    """A hot dog in its bun on a paper boat, 19 cm long: the bun split along its top, the sausage in it longer than
+    the bun, mustard piped along it in a zigzag and a line of ketchup."""
+    def ring(y, hw, hd):
+        return [(x, y, z) for x, z in rrect(hw, hd, n=12, square=6)]
+    loft('boat', [ring(0.0, 0.092, 0.032), ring(0.022, 0.1, 0.04), ring(0.022, 0.097, 0.037), ring(0.004, 0.089,
+                                                                                                    0.029)],
+         M.cup_paper, angle=30)
+    for s in (-1, 1):
+        half = lathe(f'bun{s}', [(0, -0.075), (0.012, -0.072), (0.018, -0.055), (0.019, 0.0), (0.018, 0.055),
+                                 (0.012, 0.072), (0, 0.075)], [M.bun] * 6, at=(0, 0.0, 0), segments=10,
+                     rot=(0, 90, 0), scale=(0.9, 1.25))
+        half.location = F.at(0.0, 0.022, s * 0.015)
+        half.rotation_euler = (math.radians(s * 14), math.radians(90), 0)
+    roll('sausage', 0.0115, 0.19, M.sausage, (0.0, 0.034, 0.0), segments=10, bend=-0.004)
+    pts = [(-0.075 + 0.015 * k, 0.047, 0.006 * (1 if k % 2 else -1)) for k in range(11)]
+    F.sweep('mustard', pts, 0.0028, M.mustard, verts=5, resolution=2)
+    F.sweep('ketchup', [(-0.07, 0.0455, 0.0045), (0.0, 0.046, 0.0055), (0.07, 0.0455, 0.0045)], 0.0022, M.ketchup,
+            verts=5, resolution=2)
+    return done('hotDog')
+
+
+def crisps():
+    """A packet of crisps from the machine, 13 by 18 cm, lying on its back, its top torn open (+depth) and the
+    silvered inside showing, a few crisps spilt out in front: blue with a yellow band, crimped seals."""
+    F.soft('packet', 0.13, 0.026, 0.16, (0, 0.013, -0.01), M.packet, round=0.01, puff=0.008, flat=2, round_segments=1)
+    F.soft('band', 0.132, 0.03, 0.04, (0, 0.013, -0.02), M.packet_band, round=0.01, puff=0.0085, flat=2,
+           round_segments=1)
+    for z in (-0.095, 0.075):
+        box(f'seal{z}', 0.128, 0.004, 0.014, (0, 0.016, z), M.packet if z < 0 else M.foil, bevel=0.001)
+    lathe('mouth', [(0, 0), (0.06, 0), (0.06, 0.006), (0, 0.006)], M.foil, at=(0, 0.024, 0.068), segments=12,
+          scale=(1, 0.22), rot=(-70, 0, 0))
+    for i, (x, z, a) in enumerate(((-0.03, 0.095, 10), (0.01, 0.1, 50), (0.035, 0.09, 80), (0.0, 0.08, 130),
+                                   (-0.012, 0.106, 170))):
+        coin(f'crisp{i}', 0.03, 0.0015, (x, 0.004 + 0.012 * (i % 2), z), M.crisp, segments=8, cup=1.6,
+             tilt=(a / 6, a / 8))
+    return done('crisps')
+
+
+def apple():
+    """An apple from the stall, 7.5 cm across: red with a yellow blush, a dimple at the stalk and the eye, its
+    stalk and a leaf."""
+    a = lathe('apple', [(0, 0.006), (0.014, 0.0), (0.03, 0.01), (0.037, 0.03), (0.0365, 0.045), (0.031, 0.06),
+                        (0.016, 0.068), (0.006, 0.063), (0, 0.058)],
+              [M.apple_blush, M.apple, M.apple, M.apple, M.apple, M.apple, M.apple_blush, M.apple_blush], segments=14,
+              wave=(5, {2: 0.025, 3: 0.02}))
+    G.jitter(a, 0.0008, size=0.02, seed=1.7)
+    F.sweep('stalk', [(0.0, 0.06, 0.0), (0.002, 0.072, 0.001), (0.005, 0.08, 0.003)], 0.0017, M.stalk, verts=5)
+    leaf('leaf', (0.012, 0.072, 0.004), 0.034, 0.016, 30, M.leaf, tilt=-20)
+    return done('apple')
+
+
+def pastryBag():
+    """A pastry from the bakery in a white paper bag, 12 cm wide and 17 cm high, its top folded open and a croissant
+    poking out of it."""
+    rings = [_bag_ring(0.0, 0.06, 0.03, 0.016), _bag_ring(0.13, 0.061, 0.031, 0.016),
+             _bag_ring(0.155, 0.064, 0.036, 0.008), _bag_ring(0.165, 0.06, 0.03, 0.004)]
+    G.loft('bag', [[F.at(*p) for p in r] for r in rings], material=M.bag_white, angle=30)
+    # the croissant: a crescent of lobes standing up out of the bag, its tips curling down to the front
+    for i, t in enumerate((-1.0, -0.5, 0.0, 0.5, 1.0)):
+        r = 0.022 * (1 - 0.35 * abs(t))
+        lump(f'lobe{i}', r, (0.032 * t, 0.12 + 0.03 * (1 - t * t), 0.008 * t * t), M.pastry_baked,
+             scale=(0.8, 1.1, 0.95), seed=4.0 + i, noise=0.12)
+    return done('pastryBag')
+
+
+def I(id, build, size, key, centre=(0.0, 0.0), code=False, tolerance=0.02):
+    # (`tolerance`: a thing a centimetre across measures to the millimetre, not the 2 %.)
     return G.Model(id, build, size=size, key=key, centre=centre, code=code,
-                   tolerance=3 if os.environ.get('HELD_MEASURE') else 0.02)
+                   tolerance=3 if os.environ.get('HELD_MEASURE') else tolerance)
 
 
 FAMILY = G.Family(
@@ -1251,6 +1774,7 @@ FAMILY = G.Family(
         I('pizzaSlice', pizzaSlice, (0.288, 0.031, 0.288), 'item.pizzaSlice'),
         I('treatPlate', treatPlate, (0.288, 0.072, 0.288), 'item.treatPlate'),
         I('pieSlice', pieSlice, (0.288, 0.059, 0.288), 'item.pieSlice'),
+        I('cakeSlice', cakeSlice, (0.288, 0.11, 0.285), 'item.cakeSlice'),
         I('sandwich', sandwich, (0.288, 0.064, 0.288), 'item.sandwich'),
         I('plateDirty', plateDirty, (0.288, 0.017, 0.288), 'item.plateDirty'),
         I('iceCream', iceCream, (0.176, 0.101, 0.124), 'item.iceCream', centre=(0.0258, 0.0)),
@@ -1267,9 +1791,43 @@ FAMILY = G.Family(
         I('pan', pan, (0.28, 0.061, 0.395), 'tool.pan', centre=(0.0, 0.0575)),
         I('grillFood', grillFood, (0.29, 0.045, 0.135), 'tool.grillFood', centre=(-0.015, -0.005)),
         I('mixingBowl', mixingBowl, (0.26, 0.273, 0.266), 'tool.mixingBowl', centre=(0.0, 0.0029), code=True),
+        # props in hand (G-70: actions.ts `HAND_PROPS`)
+        I('mug', mug, (0.11, 0.095, 0.081), 'tool.mug', centre=(0.0142, 0.0), code=True),
+        I('glass', glass, (0.071, 0.111, 0.07), 'tool.glass', code=True),
+        I('wineGlass', wineGlass, (0.083, 0.19, 0.082), 'tool.wineGlass', code=True),
+        I('can', can, (0.066, 0.12, 0.065), 'tool.can', code=True),
+        I('fork', fork, (0.026, 0.003, 0.2), 'tool.fork', centre=(0.0, 0.023), code=True, tolerance=0.1),
+        I('spoon', spoon, (0.032, 0.011, 0.167), 'tool.spoon', centre=(0.0, 0.0235), code=True),
+        I('chopsticks', chopsticks, (0.026, 0.007, 0.23), 'tool.chopsticks', centre=(0.0, 0.055), code=True),
+        I('phone', phone, (0.072, 0.0099, 0.148), 'tool.phone', code=True),
+        I('book', book, (0.304, 0.032, 0.224), 'tool.book', code=True),
+        I('coin', fountainCoin, (0.023, 0.0022, 0.023), 'tool.coin', code=True),
+        I('seedBag', seedBag, (0.086, 0.119, 0.056), 'tool.seedBag', code=True),
+        I('dart', dart, (0.024, 0.028, 0.154), 'tool.dart', centre=(-0.0038, -0.013), code=True),
+        I('cue', cue, (0.028, 0.028, 1.472), 'tool.cue', centre=(0.0, 0.736), code=True),
+        I('bat', bat, (0.15, 0.029, 0.249), 'tool.bat', centre=(0.0, 0.0765), code=True),
+        I('shaker', shaker, (0.084, 0.22, 0.084), 'tool.shaker', code=True),
+        I('wateringCan', wateringCan, (0.152, 0.273, 0.351), 'tool.wateringCan', centre=(0.0, 0.1012), code=True),
+        I('secateurs', secateurs, (0.048, 0.016, 0.175), 'tool.secateurs', centre=(0.0, 0.0105), code=True),
+        I('paintbrush', paintbrush, (0.0096, 0.0096, 0.254), 'tool.paintbrush', centre=(0.0, -0.043), code=True),
+        I('chalk', chalk, (0.01, 0.01, 0.084), 'tool.chalk', code=True),
+        I('babyBottle', babyBottle, (0.059, 0.171, 0.058), 'tool.babyBottle', code=True),
+        I('postcard', postcard, (0.148, 0.0012, 0.105), 'tool.postcard', centre=(0.0, 0.0525), code=True),
+        I('receiver', receiver, (0.052, 0.066, 0.212), 'tool.receiver', code=True),
+        I('pen', pen, (0.009, 0.010, 0.14), 'tool.pen', centre=(0.0, -0.0349), code=True, tolerance=0.1),
+        I('pencil', pencil, (0.008, 0.007, 0.17), 'tool.pencil', centre=(0.0, -0.05), code=True, tolerance=0.1),
+        I('marker', marker, (0.019, 0.018, 0.155), 'tool.marker', centre=(0.0, -0.0425), code=True, tolerance=0.1),
+        I('basketball', basketball, (0.252, 0.251, 0.252), 'tool.basketball', code=True),
+        # the food from town (review M-held-03)
+        I('iceCreamCup', iceCreamCup, (0.093, 0.128, 0.092), 'item.iceCreamCup'),
+        I('hotDog', hotDog, (0.2, 0.05, 0.098), 'item.hotDog'),
+        I('crisps', crisps, (0.132, 0.049, 0.223), 'item.crisps', centre=(0.0, 0.0093)),
+        I('apple', apple, (0.074, 0.081, 0.073), 'item.apple'),
+        I('pastryBag', pastryBag, (0.128, 0.198, 0.072), 'item.pastryBag'),
     ],
     comment='Blender-built things residents carry and cook with (tools/art/blender/families/held.py): the '
-            'models of content `items` and the props drawn on a station while cooking. Listed in the base '
+            'models of content `items`, the props drawn on a station while cooking and those in the hands '
+            'while a thing is used. Listed in the base '
             'manifest\'s packs. The materials map onto the game\'s finishes, so each costs one draw call '
             '(the wooden boards two).',
 )

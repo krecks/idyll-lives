@@ -277,10 +277,12 @@ class PartGroups {
 
   addPart(part: PrimitivePart, lod: 0 | 1, index: number): void {
     const { alpha, group } = this.finish(part.material ?? DEFAULT_FINISH);
-    const box = partBox(part);
+    const data = partData(part, lod, index, alpha);
+    // (The bounds of the mesh drawn: exact.)
+    const box = dataBox(data.positions);
     this.height = Math.max(this.height, box.hi[1]);
     this.bottom = Math.min(this.bottom, box.lo[1]);
-    this.add(partData(part, lod, index, alpha), part.tint ?? null, group, part.bone ?? null);
+    this.add(data, part.tint ?? null, group, part.bone ?? null);
   }
 
   add(data: VData, tint: TintSlot | null, finish: string, bone: BoneName | null): void {

@@ -142,7 +142,7 @@
       "motions": {
         "uses": {
           "laundry": "door_open",
-          "fold": "door_open"
+          "unload": "door_open"
         },
         "hold": 2.5
       },

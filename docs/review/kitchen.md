@@ -449,8 +449,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `web/public/content/furniture.json:768` (`rangeHood`), `web/public/content/catalog2/kitchen.json:967` (`spiceRack`), `:983` (`potRail`), `:999` (`kitchenShelfWall`): no use, no station; not `decor` kinds in `docs/review/reference.json`
 - **Evidence:** `kitchen/sheets/obj-rangeHood.png`, `obj-spiceRack.png`, `obj-potRail.png`, `obj-kitchenShelfWall.png`. The hood has a light strip and a filter but stays dark and silent while someone cooks on the hob under it; the spice rack, the pot rail's pans and the shelves' jars are never reached for, though the recipes take a pan and the cook stirs one. Owner default: decor stays decor. Decide whether the hood comes on (its light and a fan's hum) while the hob below is in use, and whether the rack, rail and shelves become optional recipe stations (a spice taken during the Cook step), or stay decor (then mark their kinds `decor` in `reference.json`).
-- **Status:** fixed (198e90d9) for the spice rack, pot rail and shelves (decor, Q-19); the hood's light and hum later
-- **After:** Their kinds are `decor` in `reference.json`: `cargo review uses` no longer flags them. The range hood keeps its flag until its light and hum come with the hob (polish, code).
+- **Status:** fixed (198e90d9) for the spice rack, pot rail and shelves (decor, Q-19); the hood's hum (2df2d432, c3c6a5b1); its light later
+- **After:** Their kinds are `decor` in `reference.json`: `cargo review uses` no longer flags them. The range hood hums while the hob under it is in use (`ambient: hood`, `ambientWhile: sizzle`: a fan's rush, its blades' whine and a 100 Hz motor hum), heard with the pan on `review-stage` from the first stir to the last (`bench-results/review/fixes/sounds/sounds.log`). Its light doesn't come on yet, and it keeps its flag (no use).
 - **Source:** wave: kitchen (I1)
 
 ### I-kitchen-10 — Breakfast and dinner at a dining set come from nowhere
@@ -494,7 +494,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/public/assets/packs/dining/manifest.json:853` (`barCart` motions: `mix → shake`, the shaker part rising 10 cm and tipping 30°); `web/public/content/catalog2/dining.json:845` (`mix`: `anim: drink`)
 - **Evidence:** `kitchen/play/c4/barCart-mix-01.png`, `kitchen/clips/clips-barCart-all-t99.png`: the resident stands half a metre off, sipping at nothing with the drink clip, while the shaker rises off the cart's top and tips towards them on its own. Shaking a cocktail is both hands on the shaker. The game already draws an object's part in the hands (`held`: the barbell); a shaking clip and the shaker held would fix it. Props in hand are new behaviour (§9 decision 3): `code`. Related: I-held-01 (held ledger).
-- **Status:** later (G-70, props in hand: new behaviour, owner decision 3)
+- **Status:** fixed (b98bc6af, 8f2996de)
+- **After:** the cart's shaker is squashed away for `mix` (0.2 s, the whole use; no `hold`) and the resident shakes the same shaker (`tool.shaker`) in both hands before the chest, eight hard shakes a loop (`shake` clip, `PROPS.shaker` `line` grip); the mocktail cart's the same. `fixes/props/pairs2.png` (`shake-t1`), in play `pairs3.png` (`after-play/after-barCart-mix-01.png` against `before-play/before-barCart-mix-01.png`).
 - **Source:** wave: kitchen
 
 ### I-kitchen-14 — Counter and bar stools take both heights

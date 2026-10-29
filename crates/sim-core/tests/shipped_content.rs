@@ -142,10 +142,12 @@ fn a_thousand_jobs_with_grades_and_skills() {
 #[test]
 fn sims_sleep_at_night_and_are_up_by_day() {
     // Several games (one game's six samples hang on chance: an afternoon in bed is allowed).
+    // Sixteen of them: with eight the day count sat a sample or two over the line (33 of 48
+    // before G-72), and any change to who goes where tipped it.
     let content = content();
     let mut asleep_at_night = 0;
     let mut awake_by_day = 0;
-    let seeds = 1..=8;
+    let seeds = 1..=16;
     for seed in seeds.clone() {
         let mut world = World::from_json(&content, &starter_with_household(), seed).unwrap();
         // Three days; sample 03:00 and 15:00 each day.

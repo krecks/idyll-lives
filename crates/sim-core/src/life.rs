@@ -175,16 +175,12 @@ pub(crate) fn update(w: &mut World) {
         // Interactions started this tick are paid from the Sim's own household (guests too).
         let spend = std::mem::take(&mut w.sims[i].pending_spend);
         w.households[w.sims[i].household as usize].funds -= spend;
-        // A load of washing washed (it waits to be dried), or dried and folded.
+        // A load of washing taken up (put in the washer, the dryer, hung out, folded), or one
+        // left to work on next (taken out washed, or dry).
         let worked = std::mem::take(&mut w.sims[i].worked);
-        let laundry = &mut w.households[w.sims[i].household as usize].laundry;
-        if worked & crate::content::WorkOn::Laundry.bit() != 0 && laundry[0] >= 1.0 {
-            laundry[0] -= 1.0;
-            laundry[1] = (laundry[1] + 1.0).min(w.content.laundry.map_or(1.0, |l| l.most));
-        }
-        if worked & crate::content::WorkOn::Washed.bit() != 0 {
-            laundry[1] = (laundry[1] - 1.0).max(0.0);
-        }
+        let made = std::mem::take(&mut w.sims[i].made);
+        let most = w.content.laundry.map_or(1.0, |l| l.most);
+        crate::machines::settle(&mut w.households[w.sims[i].household as usize].laundry, worked, made, most);
         if let Some(transition) = w.sims[i].transition.take() {
             apply_transition(w, i, transition);
         }
@@ -1033,7 +1029,7 @@ pub(crate) fn farewell(w: &World, i: usize, plot: u32) -> Option<(usize, usize)>
         return None;
     }
     let household = w.households.iter().position(|h| h.plot == Some(plot))?;
-    let reach = crate::world::WALK_SPEED * guest.mods.walk_speed / MINUTES_PER_TICK * rules.farewell_minutes;
+    let reach = crate::world::WALK_SPEED * guest.walk_speed(content) / MINUTES_PER_TICK * rules.farewell_minutes;
     w.sims
         .iter()
         .enumerate()

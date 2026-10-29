@@ -148,8 +148,9 @@ Notes: the lead "curtains off-centre on the stage window" is closed. The stage's
 - **Fix class:** motion
 - **Where:** `tools/art/blender/families/decor.py:8-9` ("the grandfather clock's trunk door and pendulum are still, so the hands keep it within 4 draw calls") and `:374`
 - **Evidence:** `decor/clips/clips-grandfatherClock-all-t99.png`: the hands turn with the game's time, the pendulum (behind the glazed trunk door) never swings; a running longcase clock's pendulum swings all the time (about 1 s a beat). The model's own docstring says the door opens to wind it, but no clip does (`motions` has only `clock`). The draw-call budget is the reason given; a pendulum swing is one more rotating part.
-- **Status:** fixed in part (abfc32d9): the pendulum; the trunk door stays still (a fifth draw would be over the budget)
+- **Status:** fixed in part (abfc32d9): the pendulum; the trunk door: won't fix (F2, 2026-10-26: a fifth draw fails the gate, and no use opens it)
 - **After:** the pendulum is its own part and swings ±4°, a beat each 0.8 s, all the time near the camera (`pendulum`, `idle`, `G.rock`), seen through the door's window (`fixes/motions/g1718/views/clock-t0.4.png`). The draw it takes comes from the case: polished satin walnut, not the textured wood (4 draws). The trunk door doesn't open: a fifth draw would be over the budget, and the clock is wound at its dial (the docstring no longer says the door opens to wind it).
+  Looked at again (2026-10-26, F2, §9.2) and left shut: `cargo check-glb model.grandfatherClock` counts 4 draws (the body, the two hands, the pendulum), the most the gate passes, and the door can't share a part (each hand is held by the game's time, the pendulum swings on its own, and a door joined to one would move with it); nor does a use want it open: *Wind the clock* winds an eight-day movement with a crank through the dial's holes, and a longcase's trunk door is opened only to start or regulate the pendulum.
 - **Source:** wave: decor
 
 ### M-decor-01 — The bronze horse reads as dark wood

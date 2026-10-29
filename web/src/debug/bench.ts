@@ -15,7 +15,8 @@
  * - `secs=20` measured after `warmup=5`; `cap=0` frames per second at most (0: every frame shown).
  * - `hud=0` hides the interface; `gpu=0` doesn't time the GPU; `label=…` is kept with the result.
  * - `diag=noshadows,noaa,nonature,nolamps,nomirrors,noglass,nonight,freeze`: features
- *   left out (to measure what each costs); `freeze` stops time for screenshots (`at=<s>` along the path);
+ *   left out (to measure what each costs; `nowoods`, `nofarwoods`, `noflowers` and `nograss` leave out
+ *   one part of the nature); `freeze` stops time for screenshots (`at=<s>` along the path);
  *   `shaders` logs every shader and pipeline made (the warm-up should leave none for play).
  *
  * The result lands in `window.__benchResult` (with the dev server also in `bench-results/`) and in
@@ -109,6 +110,14 @@ declare global {
   }
 }
 
+/** The game's interface hidden (`hud=0`): the top bar and the household strip, what's over the world, the toasts. */
+const HUD_HIDDEN = '.hud-root, .world-overlay, .toast-layer { display: none !important; }';
+
+/** `hud=0` on a page that isn't the benchmark's (`?state=…&debug&hud=0`: pictures of the world for checks): the interface hidden. */
+export function hideHud(): void {
+  document.head.append(Object.assign(document.createElement('style'), { textContent: HUD_HIDDEN }));
+}
+
 /** Before start-up reads them: the benchmark's settings, for this page only. */
 export function prepareBench(): void {
   const b = BENCH!;
@@ -118,7 +127,7 @@ export function prepareBench(): void {
   if (b.res !== 'auto') settings.resolution = b.res;
   Object.assign(settings, { directorDelay: 0, autosaveMinutes: 0, fpsCap: b.cap, autoSlow: false, voices: false, showFps: false, reducedMotion: false });
   const css: string[] = [];
-  if (!b.hud) css.push('.hud-root, .world-overlay, .toast-layer { display: none !important; }');
+  if (!b.hud) css.push(HUD_HIDDEN);
   if (b.diag.has('noglass')) css.push('* { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }');
   if (css.length) document.head.append(Object.assign(document.createElement('style'), { textContent: css.join('\n') }));
 }

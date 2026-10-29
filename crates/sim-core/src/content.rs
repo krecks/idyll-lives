@@ -213,6 +213,37 @@ pub struct Interaction {
     /// same object, by id; index into its `interactions`): trick shots at the pool table, a
     /// chess problem. Without one the order is refused.
     pub alone: Option<usize>,
+    /// Puts a load in the object, which then runs on its own (content `loads`, on an object that
+    /// `runs`: the washing put in the washer): only while it's empty, and it runs once the use
+    /// ends (see `machines.rs`).
+    pub loads: bool,
+    /// Takes the load out once the run is done (content `unloads`): only then, and it's empty
+    /// again as the use ends.
+    pub unloads: bool,
+    /// Leaves the household a load to work on next (content `makes`: the wet washing taken out
+    /// of the washer, to dry; the dry washing off the line, to fold), as the use ends; then on
+    /// with it to the nearest thing that works on it (`machines::carry_on`).
+    pub makes: Option<WorkOn>,
+    /// Carried in the arms on the way to it (content `brings`, an item; index into
+    /// `Content::items`): the basket of wet washing to the dryer. Only shown (the snapshot's
+    /// `held`): nothing is put down.
+    pub brings: Option<usize>,
+    /// Held in the hands while it's done (content `holds`, an item): a shirt being folded.
+    /// Only shown, as `brings`.
+    pub holds: Option<usize>,
+    /// Done behind a shut door (content `private`; see `privacy.rs`): while it lasts the room
+    /// it's done in is kept shut, and others wait outside it or go elsewhere.
+    pub private: bool,
+    /// Where partners try for a baby (content `conceive`: a double bed's *Try for a baby*): a
+    /// game for two (`partner`) done behind a shut door (`private`), started only by the social
+    /// whose success has the `conceive` effect, with the one it was with. A baby may come of it
+    /// once it has run its time (`lifecycle::conceive`).
+    pub conceive: bool,
+    /// Sold by someone at the object (content `selfServe`, the label and anim for where nobody
+    /// serves): on a public lot whose `staff` has a server, they order, are handed it and pay,
+    /// and it's closed outside the post's hours; elsewhere (a household's own cart) they help
+    /// themselves, as the `selfServe` label says (`staff.rs`).
+    pub served: Option<crate::staff::SelfServe>,
 }
 
 /// Something a use works on (content `workOn`), which must be there for it to start.
@@ -224,12 +255,15 @@ pub enum WorkOn {
     /// A load of the household's dirty washing (`Household::laundry`, content `laundry`): the
     /// use washes it, and it waits to be dried (`Washed`).
     Laundry,
-    /// A load the household washed (`Household::washed`): the use dries and folds it.
+    /// A load the household washed, wet (`Household::laundry[1]`): the use dries it (a dryer, a
+    /// washing line).
     Washed,
+    /// A load dried (`Household::laundry[2]`): the use folds it.
+    Dried,
 }
 
 impl WorkOn {
-    pub const ALL: [WorkOn; 3] = [WorkOn::Dishes, WorkOn::Laundry, WorkOn::Washed];
+    pub const ALL: [WorkOn; 4] = [WorkOn::Dishes, WorkOn::Laundry, WorkOn::Washed, WorkOn::Dried];
 
     /// Its bit in a mask of what there is to work on (`world::work_waiting`).
     pub fn bit(self) -> u8 {
@@ -242,6 +276,18 @@ impl WorkOn {
             WorkOn::Dishes => "there are no dishes to wash",
             WorkOn::Laundry => "there's no washing to do",
             WorkOn::Washed => "there's no washed laundry to dry",
+            WorkOn::Dried => "there's no dry laundry to fold",
+        }
+    }
+
+    /// Which of a household's loads of washing it is (`Household::laundry`): dirty, washed,
+    /// dried. None for the dishes.
+    pub fn load(self) -> Option<usize> {
+        match self {
+            WorkOn::Dishes => None,
+            WorkOn::Laundry => Some(0),
+            WorkOn::Washed => Some(1),
+            WorkOn::Dried => Some(2),
         }
     }
 }
@@ -258,7 +304,8 @@ pub fn in_hours(window: [f32; 2], hour: f32) -> bool {
 pub struct LaundryRules {
     /// Loads of washing each resident at home makes a day.
     pub per_day: f32,
-    /// Most loads that pile up (dirty, and washed waiting to dry, each).
+    /// Most loads that pile up (dirty, washed waiting to dry, and dried waiting to be folded,
+    /// each).
     pub most: f32,
 }
 
@@ -304,11 +351,26 @@ impl Interaction {
 
     /// Whether finishing after `elapsed` minutes earns the feeling.
     pub fn earns_feeling(&self, elapsed: f32, skills: &[f32; MAX_SKILLS]) -> Option<usize> {
+        self.earns_feeling_over(self.minutes, elapsed, skills)
+    }
+
+    /// Whether finishing after `elapsed` of `minutes` earns the feeling.
+    pub fn earns_feeling_over(&self, minutes: f32, elapsed: f32, skills: &[f32; MAX_SKILLS]) -> Option<usize> {
         let skilled = self
             .skill
             .is_none_or(|s| skills[s].floor() >= self.feeling_min_skill);
         self.feeling
-            .filter(|_| skilled && elapsed >= self.minutes * 0.5)
+            .filter(|_| skilled && elapsed >= minutes * 0.5)
+    }
+
+    /// How long this takes at an object where `served` (someone serves at it), or where nobody
+    /// does: a sold use's own `minutes` are the ordering, the hand-over and the paying; helping
+    /// oneself where there's nobody to serve is `selfServe.minutes` (a coffee poured at home).
+    pub fn minutes_where(&self, served: bool) -> f32 {
+        if served {
+            return self.minutes;
+        }
+        self.served.as_ref().and_then(|s| s.minutes).unwrap_or(self.minutes)
     }
 }
 
@@ -336,6 +398,9 @@ pub struct ObjectDef {
     pub places: Vec<SlotPlace>,
     /// Can only be placed outdoors (trees, flower beds, ponds).
     pub outdoors: bool,
+    /// The household's own (content `private`: a wardrobe, a dresser, a bath): a visitor uses none
+    /// of it, chosen or told (`world::guest_may`).
+    pub private: bool,
     /// A flight of stairs up to the storey above (one tile wide, climbed from the front; see
     /// `path::Stair`). Residents walk on it instead of around it.
     pub stairs: bool,
@@ -396,6 +461,15 @@ pub struct ObjectDef {
     /// file), picked by interactions that leave it "picked", then fallow, planted again and
     /// growing (see `ObjectInstance::growth`).
     pub grows: Option<Growth>,
+    /// A machine that runs on its own (content `runs`: `{"minutes": 60}`): loaded by a use that
+    /// `loads`, it runs this many game minutes with nobody at it, then waits, done, for a use
+    /// that `unloads` it (see `machines.rs`, `ObjectInstance::run`).
+    pub runs: Option<f32>,
+    /// A machine filled a dirty thing at a time (content `rack`: how many fill it; a
+    /// dishwasher): what's washed up at it goes in and waits (`ObjectInstance::rack`), and it runs
+    /// once full, or once the washing up is done with it a third full (`machines::rack_in`). 0:
+    /// none (a sink washes up there and then).
+    pub rack: u8,
     /// Things on a wall: it belongs over a window (content `overWindow`: curtains, blinds), so
     /// its back may be on a window as well as on a plain wall. Everything else on a wall needs
     /// plain wall behind it.
@@ -427,6 +501,9 @@ pub struct ObjectDef {
     /// a lamp at head height (`head_height`), furniture may stand there and nobody walks there
     /// (`ObjectInstance::overhang_tiles`).
     pub overhang: Vec<(i32, i32)>,
+    /// Someone serves here on a public lot (content `staff`): where they stand behind it and the
+    /// hours it's open (`staff.rs`).
+    pub staff: Option<crate::staff::Post>,
 }
 
 impl ObjectDef {
@@ -868,6 +945,9 @@ pub struct RoomKind {
     /// Else (no kind's tags offered in it), a room is of this kind if people pass through it:
     /// two doors or more, or stairs (a hallway).
     pub passage: bool,
+    /// Kept shut while someone is in it (content `private`: a bathroom; see `privacy.rs`):
+    /// others wait outside or go elsewhere, and its doors stay shut to them.
+    pub private: bool,
 }
 
 /// How rooms are scored (content `roomRules`; see `rooms.rs`).
@@ -1562,6 +1642,9 @@ pub struct Content {
     pub cuddle_anim: Option<usize>,
     /// Whether any feeling has `effects` (Sims then fold them into their modifiers).
     pub buff_feelings: bool,
+    /// Whether any object has a use for trying for a baby (`Interaction::conceive`): then the
+    /// social of the `conceive` effect goes on in bed, and needs one (`privacy.rs`).
+    pub conceive_beds: bool,
     /// What routine blocks can be for, how plans steer residents, and life goals.
     pub activities: Vec<crate::planner::ActivityDef>,
     pub planner: crate::planner::PlannerRules,
@@ -1574,6 +1657,8 @@ pub struct Content {
     /// Everyone's smartphone: who has one and what they do with it (content `phone`; see
     /// `phone.rs`).
     pub phone: crate::phone::PhoneRules,
+    /// How the town's vendors serve (content `service`; see `staff.rs`).
+    pub service: crate::staff::ServiceRules,
     /// How dirty washing piles up (content `laundry`; None: it never does, and nothing works
     /// on it).
     pub laundry: Option<LaundryRules>,
@@ -1674,6 +1759,8 @@ struct ContentFile {
     recipes: Vec<crate::cooking::RecipeRaw>,
     #[serde(default)]
     phone: crate::phone::PhoneRaw,
+    #[serde(default)]
+    service: Option<crate::staff::ServiceRaw>,
     #[serde(default)]
     laundry: Option<LaundryRaw>,
 }
@@ -2034,6 +2121,8 @@ struct RoomKindRaw {
     exclusive: bool,
     #[serde(default)]
     passage: bool,
+    #[serde(default)]
+    private: bool,
 }
 
 #[derive(Deserialize, Default)]
@@ -2263,6 +2352,9 @@ struct ObjectRaw {
     places: Vec<PlaceRaw>,
     #[serde(default)]
     outdoors: bool,
+    /// The household's own (see `ObjectDef::private`).
+    #[serde(default)]
+    private: bool,
     #[serde(default)]
     stairs: bool,
     /// Buy catalog category (decides free rotation, see `objectRules.freeRotation`).
@@ -2307,6 +2399,12 @@ struct ObjectRaw {
     /// A crop that grows (see `ObjectDef::grows`).
     #[serde(default)]
     grows: Option<GrowsRaw>,
+    /// A machine that runs on its own (see `ObjectDef::runs`).
+    #[serde(default)]
+    runs: Option<RunsRaw>,
+    /// How many dirty things fill it (see `ObjectDef::rack`).
+    #[serde(default)]
+    rack: u8,
     #[serde(default, rename = "overWindow")]
     over_window: bool,
     #[serde(default, rename = "fillsWall")]
@@ -2329,6 +2427,9 @@ struct ObjectRaw {
     footstool: bool,
     #[serde(default)]
     overhang: Vec<[i32; 2]>,
+    /// Someone serves here on a public lot (see `ObjectDef::staff`).
+    #[serde(default)]
+    staff: Option<crate::staff::PostRaw>,
 }
 
 /// A slot's place: `{"at": [-0.3, 0.7], "facing": 180}` (m off the middle, to its right and front;
@@ -2346,6 +2447,12 @@ struct GrowsRaw {
     days: f32,
     #[serde(default = "half_a_day")]
     fallow: f32,
+}
+
+/// An object's `runs`: `{"minutes": 60}` (and, for the renderer, the `sound` it makes running).
+#[derive(Deserialize)]
+struct RunsRaw {
+    minutes: f32,
 }
 
 fn half_a_day() -> f32 {
@@ -2493,6 +2600,31 @@ struct InteractionRaw {
     /// The use done instead with nobody to play (see `Interaction::alone`).
     #[serde(default)]
     alone: Option<String>,
+    /// Loads the machine (see `Interaction::loads`).
+    #[serde(default)]
+    loads: bool,
+    /// Empties the machine once it's done (see `Interaction::unloads`).
+    #[serde(default)]
+    unloads: bool,
+    /// A load it leaves to work on next (see `Interaction::makes`).
+    #[serde(default)]
+    makes: Option<WorkOn>,
+    /// An item carried to it (see `Interaction::brings`).
+    #[serde(default)]
+    brings: Option<String>,
+    /// An item held while it's done (see `Interaction::holds`).
+    #[serde(default)]
+    holds: Option<String>,
+    /// Done behind a shut door (see `Interaction::private`).
+    #[serde(default)]
+    private: bool,
+    /// Where partners try for a baby (see `Interaction::conceive`).
+    #[serde(default)]
+    conceive: bool,
+    /// Sold by someone at the object, and how it's done where nobody serves (see
+    /// `Interaction::served`).
+    #[serde(default)]
+    self_serve: Option<crate::staff::SelfServeRaw>,
 }
 
 /// Content `laundry` (see `LaundryRules`).
@@ -2972,6 +3104,12 @@ impl Content {
                 if it.carried && (it.care.values().all(|&g| g <= 0.0) || !obj.interactions.iter().any(|i| i.baby)) {
                     return Err(Error::new(format!("{ctx}: `carried` is for a baby's care (`care`) where a baby has a place (`baby`)")));
                 }
+                // An item only shown in the arms (`brings`, `holds`).
+                let shown_item = |id: &Option<String>, key: &str| -> Result<Option<usize>, Error> {
+                    id.as_ref()
+                        .map(|id| items.iter().position(|i| &i.id == id).ok_or_else(|| Error::new(format!("{ctx}: {key}: unknown item '{id}'"))))
+                        .transpose()
+                };
                 let after = match it.after.as_deref() {
                     Some(t) => 1 << lookup(&tag_index, t, &ctx, "tag")?,
                     None => 0,
@@ -3096,6 +3234,14 @@ impl Content {
                     work_on: it.work_on,
                     partner: it.partner,
                     alone: None,
+                    loads: it.loads,
+                    unloads: it.unloads,
+                    makes: it.makes,
+                    brings: shown_item(&it.brings, "brings")?,
+                    holds: shown_item(&it.holds, "holds")?,
+                    private: it.private || it.conceive,
+                    conceive: it.conceive,
+                    served: it.self_serve.as_ref().map(|r| crate::staff::self_serve(r, &anim_index, &ctx)).transpose()?,
                 });
                 // A game for two: at an object with two places, one each, used there as any use.
                 if it.partner
@@ -3114,6 +3260,12 @@ impl Content {
                         "{ctx}: a game for two (`partner`) is played at an object with two places (`slots`: 2), one each (no whole, inside, seatNear, recipe, eat, yields, carried or needsTable)"
                     )));
                 }
+                // Trying for a baby: two in a bed, started by the social, nothing else.
+                if it.conceive && (!it.partner || it.autonomous || it.pose != Pose::Lie || it.alone.is_some()) {
+                    return Err(Error::new(format!(
+                        "{ctx}: `conceive` is a use for two lying down (`partner`, `\"pose\": \"lie\"`), not chosen on its own (`\"autonomous\": false`), with no `alone`"
+                    )));
+                }
                 if it.alone.is_some() && !it.partner {
                     return Err(Error::new(format!("{ctx}: `alone` is what's done with nobody to play: it needs `partner`")));
                 }
@@ -3128,8 +3280,24 @@ impl Content {
                 {
                     return Err(Error::new(format!("{ctx}: `hours` is [from, to], two different hours of the day (0 to 24)")));
                 }
-                if matches!(it.work_on, Some(WorkOn::Laundry | WorkOn::Washed)) && raw.laundry.is_none() {
+                if matches!(it.work_on, Some(WorkOn::Laundry | WorkOn::Washed | WorkOn::Dried)) && raw.laundry.is_none() {
                     return Err(Error::new(format!("{ctx}: `workOn` laundry needs content `laundry` (how the washing piles up)")));
+                }
+                match it.makes {
+                    Some(WorkOn::Dishes) => return Err(Error::new(format!("{ctx}: `makes` is a load of washing: laundry, washed or dried"))),
+                    Some(_) if raw.laundry.is_none() => {
+                        return Err(Error::new(format!("{ctx}: `makes` needs content `laundry` (how the washing piles up)")));
+                    }
+                    _ => {}
+                }
+                if obj.rack > 0 && it.loads {
+                    return Err(Error::new(format!("{ctx}: a machine with a `rack` is filled by washing up at it, not by a use that `loads`")));
+                }
+                if (it.loads || it.unloads) && obj.runs.is_none() {
+                    return Err(Error::new(format!("{ctx}: `loads` and `unloads` are a machine's: give the object `runs`")));
+                }
+                if it.loads && it.unloads {
+                    return Err(Error::new(format!("{ctx}: a use `loads` the machine or `unloads` it, not both")));
                 }
                 if it.close_after
                     && (it.leaves != Some(OpenState::Open)
@@ -3305,6 +3473,17 @@ impl Content {
                     return Err(Error::new(format!("object '{}': a place is more than {PLACE_REACH} m off its footprint", obj.id)));
                 }
             }
+            // Things on a wall hang square to it; things on a surface always turn.
+            let turns = obj.free_rotation.unwrap_or_else(|| {
+                layer == Layer::Surface
+                    || layer != Layer::Wall
+                        && obj.footprint == [1, 1]
+                        && obj.category.as_ref().is_some_and(|c| raw.object_rules.free_rotation.iter().flatten().any(|f| f == c))
+            });
+            // (Its shade's tiles turn with it in quarter turns: turned between, it would hang over one not kept for it.)
+            if turns && !obj.overhang.is_empty() {
+                return Err(Error::new(format!("object '{}': `overhang` turns in quarter turns only (`freeRotation`: false)", obj.id)));
+            }
             objects.push(ObjectDef {
                 id: obj.id.clone(),
                 name: obj.name.clone(),
@@ -3314,16 +3493,9 @@ impl Content {
                 slots: obj.slots,
                 places: obj.places.iter().map(|p| SlotPlace { at: p.at, facing: p.facing.to_radians() }).collect(),
                 outdoors: obj.outdoors,
+                private: obj.private,
                 stairs: obj.stairs,
-                // Things on a wall hang square to it; things on a surface always turn.
-                turns: obj.free_rotation.unwrap_or_else(|| {
-                    layer == Layer::Surface
-                        || layer != Layer::Wall
-                        && obj.footprint == [1, 1]
-                        && obj.category.as_ref().is_some_and(|c| {
-                            raw.object_rules.free_rotation.iter().flatten().any(|f| f == c)
-                        })
-                }),
+                turns,
                 decor: obj
                     .decor
                     .or_else(|| {
@@ -3359,6 +3531,18 @@ impl Content {
                 stations,
                 stores: obj.stores,
                 group: obj.group.clone().unwrap_or_default(),
+                runs: match &obj.runs {
+                    Some(r) if r.minutes > 0.0 && r.minutes.is_finite() => Some(r.minutes),
+                    Some(_) => return Err(Error::new(format!("object '{}': `runs` needs minutes > 0", obj.id))),
+                    None => None,
+                },
+                rack: match obj.rack {
+                    0 => 0,
+                    _ if obj.runs.is_none() || !obj.stations.iter().any(|s| s == "dishes") => {
+                        return Err(Error::new(format!("object '{}': a `rack` is a machine's that is washed up at: give it `runs` and the `dishes` station", obj.id)));
+                    }
+                    n => n,
+                },
                 grows: match &obj.grows {
                     Some(g) if g.days > 0.0 && g.fallow >= 0.0 => Some(Growth { days: g.days, fallow_days: g.fallow }),
                     Some(_) => {
@@ -3374,6 +3558,7 @@ impl Content {
                 reach: obj.reach.max(0.0),
                 footstool: obj.footstool,
                 overhang: obj.overhang.iter().map(|&[r, f]| (r, f)).collect(),
+                staff: obj.staff.as_ref().map(|r| crate::staff::post(r, obj.footprint, &obj.id)).transpose()?,
             });
         }
 
@@ -3865,6 +4050,7 @@ impl Content {
                     size: k.size.unwrap_or([4.0, 9.0]),
                     exclusive: k.exclusive,
                     passage: k.passage,
+                    private: k.private,
                 })
             })
             .collect::<Result<_, Error>>()?;
@@ -4066,11 +4252,14 @@ impl Content {
             .collect();
 
         let buff_feelings = feelings.iter().any(|m| m.effects.is_some());
+        let conceive_beds = objects.iter().any(|o: &ObjectDef| o.interactions.iter().any(|i| i.conceive));
         let talk_anim = anim_index(TALK_ANIM);
         let cuddle_anim = anim_index("cuddle");
         let (activities, planner, goals) =
             crate::planner::parse(&raw.activities, &raw.planner, &raw.goals, &tag_index, &feelings)?;
         let phone = crate::phone::parse(&raw.phone, &ix, &animations, &life.stages)?;
+        let service = crate::staff::rules(raw.service.as_ref(), &anim_index)?;
+        crate::staff::validate(&objects)?;
         let laundry = match &raw.laundry {
             Some(l) if l.per_day > 0.0 && l.per_day.is_finite() && l.most >= 1.0 && l.most.is_finite() => Some(LaundryRules { per_day: l.per_day, most: l.most }),
             Some(_) => return Err(Error::new("laundry: `perDay` above 0 and `most` at least 1 (loads)")),
@@ -4112,6 +4301,7 @@ impl Content {
             talk_anim,
             cuddle_anim,
             buff_feelings,
+            conceive_beds,
             activities,
             planner,
             goals,
@@ -4119,6 +4309,7 @@ impl Content {
             items,
             recipes,
             phone,
+            service,
             laundry,
             object_index,
         })
@@ -4532,6 +4723,11 @@ mod tests {
         refused(&|c| c["objects"][0]["interactions"][0]["hours"] = json!([20, 25]), "fridge.snack: `hours`");
         refused(&|c| c["objects"][0]["interactions"][0]["workOn"] = json!("laundry"), "fridge.snack: `workOn` laundry needs content `laundry`");
         refused(&|c| c["laundry"] = json!({"perDay": 0, "most": 4}), "laundry: `perDay` above 0");
+        // Sold by someone: at an object someone serves at, standing near it (`staff.rs`).
+        refused(&|c| c["objects"][0]["interactions"][0]["selfServe"] = json!({"label": "Take one"}), "`selfServe` is for something sold, at an object with `staff`");
+        refused(&|c| c["objects"][0]["staff"] = json!({"at": [0, -3], "hours": [8, 18]}), "object 'fridge': `staff.at` is more than 1.5 m off its footprint");
+        refused(&|c| c["objects"][0]["staff"] = json!({"at": [0, -0.8], "hours": [8, 8]}), "object 'fridge': `staff.hours`");
+        refused(&|c| c["service"] = json!({"waitMinutes": 0}), "service: `share` at least 0 and `waitMinutes` above 0");
         // A game for two: two places, and its use for one another of the object's, alike.
         refused(&|c| c["objects"][1]["interactions"][0]["partner"] = json!(true), "tv.watch: a game for two (`partner`) is played at an object with two places");
         refused(&|c| c["objects"][1]["interactions"][0]["alone"] = json!("watch"), "tv.watch: `alone` is what's done with nobody to play: it needs `partner`");

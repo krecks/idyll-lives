@@ -94,6 +94,19 @@ With the essential at home but busy (a crowded bathroom), nothing happens unless
 sets `crowdedGraceMinutes`: the first version fired then too, and residents let needs sit at
 0 so often (an AI gap, see PLAN.md) that accidents drowned out the story.
 
+## The bathroom door (0.5.0, G-72)
+
+A bathroom is kept shut while someone is in it (content `roomKinds[].private`; `privacy.rs`).
+Nobody else goes in: someone on their way to the toilet stops short of the door and waits there,
+standing, and goes in once it's free; after an hour they give up. Free will doesn't choose
+anything in a bathroom someone else is in unless a need is about to run out (they'd rather wait
+at the door than go without). Kept out at the door counts as having nothing for the need: with
+the bladder empty, the accident comes after its `graceMinutes` (45), and the toilet behind the
+shut door counts as taken for the "A second bathroom" wish below. Not a room that is two kinds
+at once (a toilet beside the bed with no wall between), one with a door to the outside (a cabin
+with its toilet in the open: that door is the front door), or anything on a public place. The
+renderer keeps its door shut to everyone but the one going through it.
+
 ## Opinions and wishes
 
 Once an hour each awake resident at home forms an opinion of the room they're in
@@ -110,8 +123,8 @@ Once an hour each awake resident at home forms an opinion of the room they're in
   - cleanliness → "A tidier kitchen" (nothing to buy: someone should tidy up),
   - function → "Everything a kitchen needs" (*Find in catalog*: its essentials).
 - A broken object at home → "The shower fixed" (Repair: the paid quick fix) and a thought.
-- Finding the toilet taken while badly needing it (below 0.15) on two different days within a
-  week → "A second bathroom" (Build). The accident names the room it asks for
+- Finding the toilet taken while badly needing it (below 0.15), or behind the shut door of the
+  bathroom someone else is in, on two different days within a week → "A second bathroom" (Build). The accident names the room it asks for
   (`anotherRoom` on `wetSelf`). Over 30 days, households with one bathroom wish for a second
   one: 0 of 38 living alone, 8 of 43 couples, 16 of 24 threesomes, 2 of 3 foursomes.
 - Catalog wishes for a room offer only what belongs indoors (houseplants yes, lanterns and

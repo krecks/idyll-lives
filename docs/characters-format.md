@@ -383,8 +383,20 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
   tips on the palm, the thumb across them); the runtime opens the hands towards the rest (open) pose
   per activity.
 - Clips start from the relaxed stance (feet under the hips, upright, arms hanging loose); the
-  runtime adds no stance corrections of its own (only the arms a little out over a skirt and an
-  elder's stoop), so a clip looks in game as it was authored.
+  runtime adds no stance corrections of its own (only the arms a little out over a skirt, an
+  elder's stoop and the body language below), so a clip looks in game as it was authored.
+- Body language (`characters/bodyLanguage.ts`): a layer over every clip for the emotion the face shows, by emotion
+  id (`BEARINGS`): the back bent or held up, the head bowed or raised, the shoulders dropped or drawn up, the arms
+  held in or loose, the elbows bent, the walk's arm swing smaller or larger (sad: the head 12° down, the back 8°, a
+  swing under half the clip's; happy: up straight, the swing 30 % larger; angry: upright, the arms in and the elbows
+  bent 16°). Standing free or walking it takes all of it (but the arms while carrying); using a thing standing,
+  inside one, in a hug, kiss, fight or cuddle only the head; seated the head and, sat plainly, a third of the back;
+  lying, a baby or under stage directions (the creator, portraits) none. It eases in over about a second. The pace
+  is sim-core's: an emotion's `walkSpeed` (content `emotions`), the walk matched to it as to any.
+- Turning on the spot (`characters/turns.ts`): standing free, a turn of 35° or more steps round with a turn clip
+  (`turnR90`, `turnL180Child`, …: below), the Sim's yaw following the clip's steps (`turnShare`) so a planted foot
+  stays put; smaller turns pivot on the feet. Not while walked in, inside or up on a thing, getting up, holding or
+  lifting a baby, or in a hug, kiss or fight.
 - Seated clips share `sit`'s pelvis. The runtime fits it to each body and seat: the pelvis joint
   goes `seatDrop` above the seat's surface and at the seat's forward offset (`SEATS`, from
   characters/furniture.json, or the content's `seat`). It fits the legs too (`characters/seatFit.ts`, shared with
@@ -411,7 +423,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | walk | yes | 1.1 (1.1 m/s) | moving (played at the ground speed) |
 | jog | yes | 0.7 | running on the spot, treadmills, exercise |
 | jogAlong | yes | 0.7 (2.5 m/s) | moving fast: the jog's pose given a stride, the hips 6 cm lower (the knees bent through the stance), played at the ground speed when the walk would need more than 3× its own pace (`GAIT_MAX_RATE`); back to walking below 0.8 of that (`JOG_BACK`) |
-| runAlong | yes | 0.6 (5.8 m/s) | moving faster still (game speed 3 and up, children from 2): a run with a 3.5 m stride, each foot down a sixth of the time, played at the ground speed when the jog would need more than 3×, up to 4× (`RUN_MAX_RATE`); back to the jog below 0.8 of the switch |
+| runAlong | yes | 0.6 (5.8 m/s) | moving faster still (game speed 3 and up, children from 2): a run with a 3.5 m stride, each foot down a sixth of the time, played at the ground speed when the jog would need more than 3×, up to 4× (`RUN_MAX_RATE`) on a grown-up's legs and quicker on shorter ones, as the square root of their length (`gait.ts` `runMaxRate`: 5.3–5.4× on a child's, so no stage's feet slide at speed 3); back to the jog below 0.8 of the switch |
 | sit | yes | 1.67 | seated |
 | sitTalk | yes | 2.93 | seated in a conversation |
 | sitDown | no | 1.33 | sitting down, and onto the edge of a bed before lying down |
@@ -423,15 +435,20 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | sitHandsFar | yes | 1.67 | the same reaching further out, leaning in more: at a desk or table a chair can't be pulled in to far enough (drawer pedestals where the knees go: `TUCK`) |
 | interact | no | 2.0 | reaching to use something |
 | pickUp | no | 0.87 | lifting, serving, fetching |
+| buy, sell | no | 5.0 | at a vendor's (`clips/serve.ts`, sim-core `staff.rs`): the customer orders pointing at it, waits, takes it in the right hand and pays with the left; the vendor behind listens and nods, turns and reaches down into the goods, holds it out over the top and hands it over, takes the money and puts it away. Played together from the moment the vendor serves; what changes hands is drawn on the vendor's right palm between picking it up and handing it over (0.42–0.62 of the clip), on the customer's from then on (`HANDED`) |
 | spell | yes | 2.1 | hands busy at a counter (cook, wash, paint, tinker) |
 | chop, stir, flip | yes | 1.6, 2.0, 2.0 | the cooking steps of those names |
-| eat, drink | no | 1.33, 2.0 | eating and sips (standing, and now and then as the seated upper body) |
+| eat, drink | no | 1.33, 2.0 | eating and sips (standing, and now and then as the seated upper body); the fork, spoon or chopsticks and the cup are drawn in the hand (`ACTIONS.eat`, `ACTIONS.drink` `prop`) |
+| holdCup | yes | 2.5 | the cup held before the chest between sips (standing, and as the seated upper body: `ACTIONS.drink` `between`) |
+| toss | no | 3.2 | a wish at the town fountain (`ACTIONS.look`): the coin looked at in the palm, held to the chest, the arm back and an underarm toss over the rim (the coin in the hand until 0.63 of it), the follow-through |
+| scatter | yes | 3 | feeding the pigeons on the park bench (`ACTIONS.feed`, the seated upper body): the bag of seed on the left palm over the lap, the right hand dipping in and flinging a pinch ahead |
+| shake | yes | 2 | a cocktail shaken at the bar cart and the mocktail cart (`ACTIONS.drink`): the shaker before the chest, the right hand round its tin and the left over its cap, eight hard shakes along its line and a look at it |
 | carry, carryOne | yes | 1.1 | the upper body while carrying something in both hands / on the right palm (`held`, content `hold`) |
 | lie | yes | 2.4 | lying (turned flat by the runtime, played at a third of the speed) |
 | babyLieAsleep, babyLieAwake | yes | 9, 6 | a baby lying in the crib, asleep (still, quick breaths, a twitch) or awake (kicking, waving, turning the head); legs drawn up, hands by the head; turned flat like `lie`, played at full speed |
 | foldArms | yes | 2.5 | watching, relaxing, idle variations; unamused at a joke that fell flat, unmoved by an apology or a compliment |
 | yes / no | no / yes | 2.5 | listening, arguing |
-| phone, lantern | yes | 2.93, 2.5 | a call, the phone at the ear; reading (a book at the chest) |
+| phone, lantern | yes | 2.93, 2.5 | a call, the phone at the ear (the palm over the ear, the fingers up the side of the head); reading (an open book across both palms at the chest) |
 | phoneText | yes | 3.0 | texting and scrolling (`ACTIONS.phoneScreen`, content `phone.actions[].anim`): the phone held in both hands before the chest, the head bowed over it, the thumbs tapping and swiping; the upper body of it seated |
 | compliment, deepTalk, flirt, sweetTalk, argue, insult, apologize, joke, introduce, askPartner, breakUp, prank | yes | 3, 4, 3.2, 3.4, 2.2, 2.4, 3.4, 2.8, 3, 3.2, 3, 2.6 | the socials' own gestures on a speaker's turn (`GESTURES`, `clips/social.ts`): an open hand offered and two claps; the fingertips together, then the chin on the hand; a hand in the hair, the other on the hip; the hands clasped at the heart, a reach to the other's arm; palms up, then a chopping hand; a dismissive flick; a hand on the heart, then open palms; the story told with the hands, then the arms thrown wide; a hand to the chest, then held out to shake; hands clasped low, then held out; a hand to the brow, then both sweeping apart; a creep, "boo!" with clawed hands, a laugh |
 | laugh, shrug, rebuffed, refuse | yes | 2, 2.4, 2.6, 2.4 | how a social is taken (`GESTURES`, `REFUSED`): laughing at a joke that landed (the head back, a hand on the belly, bent over once); a teller's shrug at a joke that fell flat; turned down (the shoulders dropped, the head bowed aside, a hand to the neck); turning down a hug or a kiss (leaning away, the head turned aside, a hand up, palm out, a step back) |
@@ -449,8 +466,8 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | fountainDrink181, 163, 147, 129, 112 | yes | 3 | bent over a drinking fountain's spout, sipping from its water (a size per height, in cm; the smaller two on tiptoe at the water's falling end); `STEP_IN` steps them up to it |
 | climb172a, 147a, 112a; climb172b, 147b, 112b | yes | 13 | a round on the climbing frame: up its rope net three ropes, hands and feet in turn, over the edge onto the deck, ducking under the roof across it to the fireman's pole, round the pole and down it (hands and legs round it), and back round to the net; a size per height (cm), and one per lane of the net (`a`, `b`: the second waits on the deck for the first to slide; one stepping in while someone goes round waits at their lane until that round is back at its start, so the two stay in step: `inTurn`) |
 | dartThrow | yes | 7.2 | darts (`ACTIONS.play` at the `dartboard`): side-on at the line, three throws (aim, the forearm back, through, the hand following to the board), a step back to read the score and in again; the first dart goes as the board's darts grow in |
-| pingPong | yes | 1.8 | table tennis (`ACTIONS.play` at the `pingPongTable`): the ready stance, a forehand and a backhand, the bat mimed in a closed hand |
-| poolShot172, 147, 112 | yes | 8 | the pool table (`STEP_IN`, a lane each for two): bent over the long rail as far as the height needs, the left hand bridging on the cloth, two practice strokes and the shot, then up to chalk the cue (mimed); a size per height (cm) |
+| pingPong | yes | 1.8 | table tennis (`ACTIONS.play` at the `pingPongTable`): the ready stance, a forehand and a backhand, the bat in the closed right hand |
+| poolShot172, 147, 112 | yes | 8 | the pool table (`STEP_IN`, a lane each for two): bent over the long rail as far as the height needs, the left hand bridging on the cloth, two practice strokes and the shot, then up to chalk the cue held upright; the cue in the hands (`placeHand` `cue`); a size per height (cm) |
 | foosball172, 147, 112 | yes | 3.2 | the foosball table (`STEP_IN`, a pair of rods each for two): hands on two handles, the wrists turning the rods (the right in time with the table's moving rods) and sliding them; a size per height |
 | smashPlate172, 147, 112 | yes | 3.4 | the plate-smash bin (`STEP_IN`): a plate taken from the stack (mimed), up over the right shoulder and thrown overarm down into the crate; a size per height |
 | boulder172, 147, 112 | yes | 16 | the bouldering wall (`STEP_IN`, up on its crash mat): hands to the start holds, the feet onto the low ones, up the wall's holds hand and foot in turn to the top, a drop to the mat onto bent knees; the route scaled to the size and put on the model's nearest holds |
@@ -475,6 +492,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | plateHold177, 147, 112 | yes | 3 | stood on the vibration plate (`GRIPPED`): both hands on its grips (fore-and-aft bars 0.26 m either side, 0.96 m over the deck, 0.12 m ahead), the weight shifting a little; the plate's buzz on top (`activityPose`); a size per height |
 | lieCurl | yes | 2.4 | dozing on a bed too short to lie on flat (`CURLED_BEDS`: the window seat): curled up on the left side facing the room, the knees drawn up, the head on the pillow on the left forearm; turned flat like `lie` |
 | lieSide | yes | 2.4 | lying at full length on the right side (`SIDE_BEDS`: the daybed): the back to the object's back rail, the legs along the mattress, the right one straight and the left a little over it, the right forearm under the cheek on the pillow, the left hand in front of the chest; turned flat like `lie` |
+| turnR30 … turnR180, turnL30 … turnL180 (every 5°), and each `…Child` | no | 0.8 (up to 90°), 1.1 (to 150°), 1.4 | turning on the spot (`turns.ts`), made in the turning body's frame: the foot on the side of the turn steps out on a low arc and the other follows (two steps, three, four for an about-turn), each planted foot turned back against the body's turn so it stays put on the floor, the hips midway between the ways the feet face, the head ahead into the turn. The feet are placed for hips a little wider for their legs than the reference's, a child's size for theirs (`TURN_HIPS`). Baked the first time a resident turns that far (`turnDef`, about a millisecond); the runtime plays the nearest size and turns by the turn itself |
 
 ### Checking clips
 
@@ -482,7 +500,8 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 [--update-baseline]` bakes the clips as the runtime does and checks loop flags, NaNs, loop seams,
 lengths, sliding feet, the seated pelvis and feet (with the runtime's leg fit, `seatFit.ts`: on a 0.45 m seat, a
 child's on the kids' chair, and the knees clear of every deep seat's `front`), the floor sits' knees and ankles
-against the floor, `lie` and the baby's clips (the list is in its header). The default is the reference: `male` at
+against the floor, `lie` and the baby's clips, and the turns on the spot, every size each way, a foot on the floor
+staying put as the clip's share of the turn turns the body (the list is in its header). The default is the reference: `male` at
 `youngAdult`, plus `baby` for the baby's clips.
 Each body and stage plays the clips on its own skeleton (`restT`, the pelvis motion and ground
 speed scaled by `pelvisScale`, `walk`'s hip roll), the sized clips at the size its height picks,

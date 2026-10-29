@@ -30,7 +30,7 @@ import { shadowOnlyLayer } from './layers';
 import { MaterialLibrary } from './materials';
 import { buildModel, disposeTemplate, glowByInstance, type MirrorSurface, type ModelTemplate } from './models';
 import type { GrassPusher } from './grass';
-import { installNature, Landscape, setWind, Sky, windStill, type RoadBuilder } from './nature';
+import { installNature, Landscape, NATURE_DIAGS, setWind, Sky, windStill, type RoadBuilder } from './nature';
 import { ObjectMotion, writeInstance, type MovingObject, type PopTarget } from './objectMotion';
 import { ObjectShadows, type ShadowSource } from './objectShadows';
 import { toGame } from './space';
@@ -42,7 +42,8 @@ import { colorsKey, objectCentre, storeyShown, type ItemPlacement, type ObjectPl
 import type { FrameState } from '../../core/bridge';
 import type { Lighting } from '../shared/environment';
 import { LOOK as CUT } from '../shared/geometry';
-import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
+import { compose, multiply, quatYawPitchRoll, type Quat } from '../shared/math';
+import { REST_PROPS } from '../shared/characters/actions';
 import { motionsOf, paintColors, painted, placementVariation, standInOf, type Motions } from '../shared/modelEntry';
 import { restPoses, slotOf } from '../shared/objectMotion';
 import type { TableRoom } from '../shared/tableTuck';
@@ -115,6 +116,15 @@ export interface PlacedObject {
   built?: { template: ModelTemplate; motions?: Motions };
 }
 
+/** One kind of prop drawn on objects at rest (`REST_PROPS`): its draws, each object's matrix there, and which is taken now. */
+interface RestProps {
+  draws: Instances[];
+  matrices: Float32Array;
+  rest: Float32Array;
+  ids: number[];
+  taken: boolean[];
+}
+
 /** A mirror's glass on an instance (`mirrors.ts` draws the reflections): its faces, and the buffer and index of the matrix it moves with. */
 export interface MirrorInstance {
   surfaces: MirrorSurface[];
@@ -182,6 +192,10 @@ export class LotContents {
   private seatTurns = new Map<number, number>();
   private pulledIn = new Map<number, { by: number; saved: { target: PopTarget; matrix: Float32Array }[] }>();
   private readonly wallItemsHidden = new Map<number, Float32Array>();
+  /** Props drawn on objects at rest (`REST_PROPS`: the phone box's receiver on its hook), by prop key, and the ones in a hand now. */
+  private readonly restProps = new Map<string, RestProps>();
+  private restTaken: ReadonlySet<number> = new Set();
+  private restTicket = 0;
   /** Whether a moving part casts the sun's shadow (then its moves draw the shadows again). */
   private movingPartsCast = false;
   private glows: Glow[] = [];
@@ -257,7 +271,7 @@ export class LotContents {
     const ticket = ++this.natureTicket[layer];
     let set = this.natures.get(key);
     if (!set) {
-      const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod, this.quality.grass);
+      const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod, this.quality.woodsCell, this.quality.grass);
       const created: NatureSet = { key, landscape, draws: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve(), refreshing: Promise.resolve() };
       created.ready = landscape.build(this.app, this.root, this.deps.assets, world, () => this.hooks.pace(), buildRoads).then((nature) => {
         perfTime('nature: meshes', () => {
@@ -319,8 +333,11 @@ export class LotContents {
     const town = n.users.has('town');
     const townLayer = this.townLayer ?? pc.LAYERID_WORLD;
     const casters = new Set(this.quality.landscapeShadows ? n.casters : []);
-    // `?diag=nonature`: without the woods, rocks and lawn (the terrain, water and roads stay).
+    // `?diag=nonature`: without the woods, rocks and lawn (the terrain, water and roads stay); `nowoods`,
+    // `nofarwoods`, `noflowers` and `nograss` leave out one part of them (`NaturePart`).
     const plantsOff = this.diag.has('nonature');
+    const partsOff = new Set(NATURE_DIAGS.filter(([diag]) => this.diag.has(diag)).map(([, part]) => part));
+    const parts = partsOff.size ? n.landscape.parts() : null;
     for (const e of n.draws) {
       const render = e.render;
       const plant = !!render?.meshInstances[0]?.instancingData;
@@ -345,7 +362,8 @@ export class LotContents {
         on = world && casts;
         first = this.shadowLayer.id;
       }
-      e.enabled = on && !(plant && plantsOff);
+      const part = parts?.get(e);
+      e.enabled = on && !(plant && plantsOff) && !(part && partsOff.has(part));
       if (render) {
         const layers = render.layers;
         if (layers.length !== (second < 0 ? 1 : 2) || layers[0] !== first || (second >= 0 && layers[1] !== second)) render.layers = second < 0 ? [first] : [first, second];
@@ -659,7 +677,7 @@ export class LotContents {
           // A lamp's fan turns while it's on; a fire's flames (its uses' clips) burn while it's lit.
           const light = def?.light;
           const burns = light?.fire ? [...new Set(Object.values(motions.uses).flatMap((clips) => clips.map((c) => c.clip)))] : undefined;
-          moving.push({ id: o.id, target: pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth, slotOf: slotOf(o, def), lamp: !!light && light.switch !== false, burns });
+          moving.push({ id: o.id, target: pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth, running: !!o.running, slotOf: slotOf(o, def), lamp: !!light && light.switch !== false, burns });
         }
         // Mirrors on a moving part (a mirror cabinet's door) follow that part's buffer.
         for (const [part, surfaces] of Map.groupBy(template.mirrors ?? [], (s) => s.part ?? -1)) {
@@ -722,6 +740,7 @@ export class LotContents {
     this.mirrors = mirrors;
     this.motion.set(moving);
     this.buildContactShadows(shown);
+    void this.buildRestProps(shown);
     // What replaces the boxes of files that came is placed now: they're hidden (and go after the build).
     this.templates.hideStale();
     this.pullUpChairs(world);
@@ -763,6 +782,80 @@ export class LotContents {
     for (const p of this.placed) {
       const i = index.get(p.id);
       if (i !== undefined) p.shadow = { meshes: [draw], matrices: blobs, index: i };
+    }
+  }
+
+  /**
+   * The props drawn on objects at rest (`REST_PROPS`): one instanced draw per mesh of each prop's model, each on its
+   * object as placed (at `at`, turned by `turn`, in the object's own frame); `takeRestProps` hides those in a hand.
+   */
+  private async buildRestProps(shown: readonly ObjectPlacement[]): Promise<void> {
+    const ticket = ++this.restTicket;
+    this.dropRestProps();
+    const byKey = new Map<string, ObjectPlacement[]>();
+    for (const o of shown) {
+      const rest = REST_PROPS[o.def];
+      if (!rest) continue;
+      const list = byKey.get(rest.key);
+      if (list) list.push(o);
+      else byKey.set(rest.key, [o]);
+    }
+    // (Asked for while the build runs, so its templates count as the world's.)
+    const loads = [...byKey].map(([key, list]) => {
+      const entry = this.deps.assets.get(key, 'model');
+      return entry ? ([key, list, this.template(`rest:${key}`, () => buildModel(this.app, key, entry, [1, 1]))] as const) : null;
+    });
+    for (const load of loads) {
+      if (!load) continue;
+      const [key, list, pending] = load;
+      const template = await pending;
+      if (ticket !== this.restTicket) return;
+      const matrices = new Float32Array(list.length * 16);
+      const local = new Float32Array(16);
+      const out = new Float32Array(16);
+      list.forEach((o, i) => {
+        const pop = this.placed.find((p) => p.id === o.id)?.pop;
+        const rest = REST_PROPS[o.def];
+        if (!pop || !rest) return;
+        const D = Math.PI / 180;
+        compose(1, 1, 1, quatYawPitchRoll(rest.turn[1] * D, rest.turn[0] * D, rest.turn[2] * D, this.qTmp), rest.at[0], rest.at[1], rest.at[2], local);
+        multiply(local, pop.matrices.subarray(pop.index * 16, pop.index * 16 + 16), out);
+        matrices.set(out, i * 16);
+      });
+      const draws = template.meshes.map((m) => {
+        const draw = new Instances(this.app.graphicsDevice, this.root, m.mesh, m.material, { name: `rest:${key}`, castShadows: true, receiveShadows: true, capacity: list.length });
+        draw.setMatrices(matrices, list.length);
+        draw.update();
+        return draw;
+      });
+      this.restProps.set(key, { draws, matrices, rest: matrices.slice(), ids: list.map((o) => o.id), taken: list.map(() => false) });
+    }
+    this.takeRestProps(this.restTaken);
+  }
+
+  private dropRestProps(): void {
+    for (const r of this.restProps.values()) for (const draw of r.draws) draw.destroy();
+    this.restProps.clear();
+  }
+
+  /** Hides the props drawn at rest on the objects in `taken` (in a resident's hand: `Residents.restTaken`), shows the rest again. */
+  takeRestProps(taken: ReadonlySet<number>): void {
+    this.restTaken = taken;
+    for (const r of this.restProps.values()) {
+      let changed = false;
+      r.ids.forEach((id, i) => {
+        const now = taken.has(id);
+        if (now === r.taken[i]) return;
+        r.taken[i] = now;
+        changed = true;
+        if (now) r.matrices.fill(0, i * 16, i * 16 + 16);
+        else r.matrices.set(r.rest.subarray(i * 16, i * 16 + 16), i * 16);
+      });
+      if (!changed) continue;
+      for (const draw of r.draws) {
+        draw.setMatrices(r.matrices, r.ids.length);
+        draw.update();
+      }
     }
   }
 
@@ -843,6 +936,8 @@ export class LotContents {
 
   /** The lot's things go (the session ended): the templates built without their files are built afresh next time. */
   clear(): void {
+    this.restTicket++;
+    this.dropRestProps();
     for (const d of this.modelDraws.values()) {
       for (const draw of [...d.draws, ...d.glows]) {
         draw.setCount(0);
@@ -1084,6 +1179,8 @@ export class LotContents {
   }
 
   dispose(): void {
+    this.restTicket++;
+    this.dropRestProps();
     this.clear();
     for (const n of this.natures.values()) n.landscape.dispose();
     this.natures.clear();

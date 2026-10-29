@@ -25,7 +25,8 @@
  * where sim-core lets that stage take the place (a baby only lies in a crib; children and teens
  * don't care for a baby, flirt or kiss), with the game's look for it (stoop, grey hair); with
  * `strip`, the rows are a man and a woman at that stage. `?renderer=webgl` draws with WebGL2 (default
- * WebGPU); `?ground=0` leaves the floor out (e.g. to compare diag views).
+ * WebGPU); `?ground=0` leaves the floor out (e.g. to compare diag views); `?plate=mealPlate` (a content item) is what
+ * every station eats (the fork, spoon or chopsticks for it).
  */
 
 import { createStage } from './pcStage';
@@ -67,6 +68,8 @@ interface Station {
   stage?: string;
   /** Carries this item (content `items` id). */
   held?: string;
+  /** Eats this (content `items` id): the cutlery for it (`?plate=` for every station). */
+  plate?: string;
   /** Walks to and fro across the cell. */
   walk?: boolean;
   /** A baby lies (awake, or 'asleep') in the object's first slot (a crib); the station's Sim sees to them from the front. */
@@ -178,6 +181,30 @@ const STATIONS: Station[] = [
   { label: 'eat (fridge)', def: 'fridge', tag: 'eat' },
   { label: 'drink (espresso)', def: 'foodie.espressoBar', tag: 'drink', female: true },
   { label: 'eat seated', def: 'romantic.candlelitTable', tag: 'eat', pose: P.Sit },
+  // Props in hand (G-70): a fork, a cup at the table, a can, wine, a shaker, a coin, seed for the birds
+  { label: 'eat with a fork', def: 'diningChair', tag: 'eat', pose: P.Sit, plate: 'mealPlate' },
+  { label: 'ice cream with a spoon', def: 'diningChair', tag: 'eat', pose: P.Sit, plate: 'iceCream', stage: 'child' },
+  { label: 'coffee seated', def: 'diningChair', tag: 'drink', pose: P.Sit, female: true },
+  { label: 'coffee standing', def: 'coffeeMachine', tag: 'drink' },
+  { label: 'cold drink', def: 'fridge', tag: 'drink', female: true },
+  { label: 'wine', def: 'wineFridge', tag: 'drink' },
+  { label: 'shake a cocktail', def: 'barCart', tag: 'drink', female: true },
+  { label: 'wish at the fountain', def: 'fountainTown', tag: 'look' },
+  { label: 'feed the birds', def: 'parkBench', tag: 'feed', pose: P.Sit, female: true },
+  // The rest of G-70: the tools, the post box's card, the basketball, the café's cake, the baby's bottle
+  { label: 'water the plant', def: 'plant', tag: 'water', female: true },
+  { label: 'water the flowers', def: 'planterBox', tag: 'water' },
+  { label: 'trim the shrub', def: 'bush', tag: 'prune' },
+  { label: 'paint with a brush', def: 'kidsEasel', tag: 'paint', stage: 'child' },
+  { label: 'draw with chalk', def: 'kidsChalkboard', tag: 'paint', stage: 'child', female: true },
+  { label: 'post a card', def: 'postBox', tag: 'write', female: true },
+  { label: 'write with a pen', def: 'deskWriting', tag: 'write', pose: P.Sit },
+  { label: 'homework with a pencil', def: 'kidsDesk', tag: 'write', pose: P.Sit, stage: 'child', female: true },
+  { label: 'plan on the whiteboard', def: 'whiteboard', tag: 'paint', female: true },
+  { label: 'call from the phone box', def: 'phoneBooth', tag: 'phone' },
+  { label: 'shoot hoops', def: 'basketballHoop', tag: 'exercise' },
+  { label: 'cake at the café', def: 'cafeChair', tag: 'eat', pose: P.Sit, held: 'cakeSlice', plate: 'cakeSlice', female: true },
+  { label: 'bottle feed', def: 'crib', script: CUDDLING, baby: true, plate: 'babyBottle' },
   // Seated
   { label: 'relax recliner', def: 'couchPotato.recliner', tag: 'relax', pose: P.Sit },
   { label: 'bath', def: 'whirlpoolTub', tag: 'bath', pose: P.Sit, female: true },
@@ -489,7 +516,8 @@ if (strip) {
   characters.force = forced;
 }
 
-const FIELDS = ['id', 'x', 'z', 'yaw', 'pose', 'moving', 'social', 'outcome', 'partner', 'anim', 'emotion', 'role', 'away', 'object', 'action', 'mood', 'held'] as const;
+const FIELDS = ['id', 'x', 'z', 'yaw', 'pose', 'moving', 'social', 'outcome', 'partner', 'anim', 'emotion', 'role', 'away', 'object', 'action', 'mood', 'held', 'plate'] as const;
+const plateParam = params.get('plate');
 const items = content.items.map((it) => it.id);
 const HEADER_LEN = 6;
 const STRIDE = FIELDS.length;
@@ -549,6 +577,8 @@ function writeSnapshot(): void {
       snap[o + k.moving] = 1;
     }
     snap[o + k.held!] = s.held && !a.baby ? items.indexOf(s.held) + 1 : 0;
+    const plate = s.plate ?? plateParam;
+    snap[o + k.plate!] = plate && !a.baby ? items.indexOf(plate) + 1 : 0;
     const social = s.social ? SOCIAL[s.social] : 0;
     snap[o + k.social] = social ? 1 : 0;
     snap[o + k.anim] = social;

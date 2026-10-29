@@ -341,6 +341,8 @@ export interface ObjectBackgroundClips {
   clock?: { hour?: string; minute?: string };
   /** Held open while the object is open. */
   open?: string;
+  /** Round and round while the object runs on its own (content `runs`). */
+  running?: string;
 }
 
 /**
@@ -356,6 +358,8 @@ export interface RendererDebugHooks {
   objectPoints(id: number, max?: number): Float32Array | null;
   /** The game camera's lens and limits. */
   cameraInfo(): { fov: number; radius: readonly [number, number]; beta: readonly [number, number] };
+  /** Keeps the viewed lot's roof on however close the camera comes (walls up), to look at it close up; false: as the game hides it. */
+  keepRoof(on: boolean): void;
 }
 
 export interface Renderer {

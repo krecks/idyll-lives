@@ -1,8 +1,8 @@
 /**
  * Water for the sounds of the world (`world.ts`), synthesised (no sound files): a shower, a tap
  * running into a basin, washing up, a bath filling and someone soaking in it, a washing machine,
- * a fountain and a toilet's flush; and, made from the same parts, a tumble dryer and a dishwasher
- * being loaded.
+ * a fountain and a toilet's flush; and, made from the same parts, a tumble dryer and a dishwasher,
+ * running and being loaded.
  *
  * Each is a stereo loop several seconds long, made once and played on repeat, so it costs nothing
  * while playing. Running water is mostly two things, and both are built here:
@@ -32,6 +32,7 @@ export const WATER = {
   bathSoak: bathSoakSound,
   washer: washerSound,
   dryer: dryerSound,
+  dishwasher: dishwasherSound,
   crockery: crockerySound,
   fountain: fountainSound,
   flush: flushSound,
@@ -238,6 +239,45 @@ export function dryerSound(rate: number): Stereo {
   return finish(out, 0.14);
 }
 
+/** A dishwasher running: the spray arm going round, its jets sweeping over the racks and the door (a hiss that swells as they pass, about once a second), the pump's hum, the water gurgling in the sump. */
+export function dishwasherSound(rate: number): Stereo {
+  const r = random(21);
+  const out = track(rate, 12);
+  const n = out.left.length;
+  const hum = new Biquad(rate).set('lowpass', 400, 0.7);
+  const wobble = wander(r, n, rate, 0.3);
+  let phase = 0;
+  let arm = r() * 2 * Math.PI;
+  const shared = new Pink(r);
+  for (const [c, ch] of [out.left, out.right].entries()) {
+    const own = new Pink(r);
+    const spray = new Biquad(rate).set('bandpass', 1900, 0.5);
+    const sprayHp = new Biquad(rate).set('highpass', 500, 0.6);
+    const gurgle = new Biquad(rate).set('bandpass', 260, 1.2);
+    for (let i = 0; i < n; i++) {
+      if (c === 0) {
+        phase += (2 * Math.PI * 100 * (1 + 0.006 * wobble[i])) / rate;
+        arm += (2 * Math.PI * 0.95) / rate;
+      }
+      const saw = Math.sin(phase) + 0.5 * Math.sin(2 * phase) + 0.25 * Math.sin(3 * phase);
+      // The jets nearer one side as the arm turns.
+      const pass = 0.55 + 0.45 * Math.sin(arm + (c ? 0.6 : 0));
+      const noise = 0.7 * shared.next() + 0.3 * own.next();
+      ch[i] = hum.run(saw) * 0.02 + sprayHp.run(spray.run(noise)) * 0.6 * pass + gurgle.run(noise) * 0.25 * (0.6 + 0.4 * wobble[i]);
+    }
+  }
+  // Now and then a jet catches a plate's edge or a cup: a short splash.
+  for (let t = 0.5 + r(); t < out.seconds - 0.4; t += 0.9 + r() * 1.6) slosh(out, rate, r, t, 0.2 + r() * 0.15, 0.4 + 0.3 * r(), (r() - 0.5) * 0.3, 1400 + r() * 900);
+  // Shut in, behind the door and the worktop: the highs muffled.
+  for (const [c, ch] of [out.left, out.right].entries()) {
+    const lp = new Biquad(rate).set('lowpass', 2600, 0.7);
+    const hp = new Biquad(rate).set('highpass', 90, 0.7);
+    for (let i = 0; i < ch.length; i++) ch[i] = hp.run(lp.run(ch[i]));
+    room(ch, rate, c ? [3.7, 6.1, 8.3, 10.9] : [4.1, 5.9, 8.9, 10.3], 0.55, 0.3, 0.2);
+  }
+  return finish(out, 0.13);
+}
+
 /** Loading a dishwasher: plates and mugs set into the rack, a handful of cutlery dropped in the basket, a rack rolled out or in; no water. */
 export function crockerySound(rate: number): Stereo {
   const r = random(20);
@@ -329,7 +369,7 @@ export function flushSound(rate: number): Stereo {
 
 // Building blocks.
 
-interface Track extends Stereo {
+export interface Track extends Stereo {
   rate: number;
   /** Seconds in the loop, and seconds after it made to fade into its start. */
   seconds: number;
@@ -337,7 +377,7 @@ interface Track extends Stereo {
 }
 
 /** Room for a loop of `seconds`, plus a little more to cross-fade into its start (none for a sound played once). */
-function track(rate: number, seconds: number, overlap = 0.6): Track {
+export function track(rate: number, seconds: number, overlap = 0.6): Track {
   const n = Math.round((seconds + overlap) * rate);
   return { left: new Float32Array(n), right: new Float32Array(n), rate, seconds: seconds + overlap, overlap };
 }
@@ -346,7 +386,7 @@ function track(rate: number, seconds: number, overlap = 0.6): Track {
  * Water running into water: the jet's rush (pink noise in a band, its centre and level burbling)
  * with a faint fizz above, bubbles in a range of sizes, and a low rumble in the water below.
  */
-function stream(out: Track, r: () => number, o: { centre: number; q: number; bubbles: number; gurgle: number; low: number; high: number; rumble: number }): void {
+export function stream(out: Track, r: () => number, o: { centre: number; q: number; bubbles: number; gurgle: number; low: number; high: number; rumble: number }): void {
   const { rate } = out;
   const n = out.left.length;
   // The burble: fast, uneven wobbles in the stream.
@@ -377,7 +417,7 @@ function stream(out: Track, r: () => number, o: { centre: number; q: number; bub
 }
 
 /** One air bubble ringing: a sine at `f0` (Hz) dying away quickly, its pitch rising by `rise` as it goes. */
-function bubble(d: Float32Array, rate: number, at: number, f0: number, amp: number, rise: number): void {
+export function bubble(d: Float32Array, rate: number, at: number, f0: number, amp: number, rise: number): void {
   const damp = 0.043 * f0 + 0.0014 * f0 ** 1.5;
   const start = Math.round(at * rate);
   const len = Math.min(d.length - start, Math.round((4.5 / damp) * rate));
@@ -401,7 +441,7 @@ function bubble(d: Float32Array, rate: number, at: number, f0: number, amp: numb
 }
 
 /** A very short click. */
-function tick(d: Float32Array, rate: number, at: number, amp: number): void {
+export function tick(d: Float32Array, rate: number, at: number, amp: number): void {
   const start = Math.round(at * rate);
   const len = Math.min(d.length - start, Math.round(0.0015 * rate));
   let s = (start * 2654435761) >>> 0;
@@ -412,7 +452,7 @@ function tick(d: Float32Array, rate: number, at: number, amp: number): void {
 }
 
 /** Water lapping or swished about: a swell of low, filtered noise with a few big bubbles in it. */
-function slosh(out: Track, rate: number, r: () => number, at: number, seconds: number, amp: number, pan: number, cutoff: number): void {
+export function slosh(out: Track, rate: number, r: () => number, at: number, seconds: number, amp: number, pan: number, cutoff: number): void {
   const start = Math.round(at * rate);
   const len = Math.min(out.left.length - start, Math.round(seconds * 1.6 * rate));
   if (len <= 0) return;
@@ -438,7 +478,7 @@ function slosh(out: Track, rate: number, r: () => number, at: number, seconds: n
 }
 
 /** A dish or a fork knocking another: a few inharmonic partials ringing out after a click; under water, duller and shorter. */
-function clink(out: Track, rate: number, at: number, f0: number, amp: number, pan: number, ratios: number[], ring: number, under: boolean): void {
+export function clink(out: Track, rate: number, at: number, f0: number, amp: number, pan: number, ratios: number[], ring: number, under: boolean): void {
   const start = Math.round(at * rate);
   const [l, rr] = gains(pan);
   let s = (start * 40503 + 7) >>> 0;
@@ -460,7 +500,7 @@ function clink(out: Track, rate: number, at: number, f0: number, amp: number, pa
 }
 
 /** A soft, low thud (wet washing landing in the drum). */
-function thud(out: Track, rate: number, at: number, amp: number): void {
+export function thud(out: Track, rate: number, at: number, amp: number): void {
   const start = Math.round(at * rate);
   const len = Math.min(out.left.length - start, Math.round(0.25 * rate));
   let phase = 0;
@@ -493,13 +533,13 @@ function roll(out: Track, rate: number, r: () => number, at: number, seconds: nu
 }
 
 /** 0 before `a`, 1 after `b`, a smooth step between. */
-function ramp(a: number, b: number, x: number): number {
+export function ramp(a: number, b: number, x: number): number {
   const u = Math.max(0, Math.min(1, (x - a) / (b - a)));
   return u * u * (3 - 2 * u);
 }
 
 /** Left and right levels for `pan` from -1 (left) to 1 (right), keeping the loudness. */
-function gains(pan: number): [number, number] {
+export function gains(pan: number): [number, number] {
   const a = ((Math.max(-1, Math.min(1, pan)) + 1) * Math.PI) / 4;
   return [Math.cos(a), Math.sin(a)];
 }
@@ -508,7 +548,7 @@ function gains(pan: number): [number, number] {
  * A small room: four damped echoes going round (delays in ms) and a diffuser, mixed in at `wet`.
  * Different delays per channel make it wide.
  */
-function room(d: Float32Array, rate: number, delays: number[], feedback: number, damping: number, wet: number): void {
+export function room(d: Float32Array, rate: number, delays: number[], feedback: number, damping: number, wet: number): void {
   const combs = delays.map((ms) => ({ buf: new Float32Array(Math.round((ms / 1000) * rate)), i: 0, lp: 0 }));
   const passes = [5.1, 1.7].map((ms) => ({ buf: new Float32Array(Math.round((ms / 1000) * rate)), i: 0 }));
   for (let j = 0; j < d.length; j++) {
@@ -538,12 +578,15 @@ function room(d: Float32Array, rate: number, delays: number[], feedback: number,
  * a seam or a dip), cuts the overlap off, then sets the level: to an average of `rms`, or with 0 to a
  * peak of `peak`; any peaks over 0.7 are rounded off.
  */
-function finish(t: Track, rms: number, peak = 1): Stereo {
+export function finish(t: Track, rms: number, peak = 1): Stereo {
+  return setLevel(fold(t), rms, peak);
+}
+
+/** The loop's overlap folded into its start and cut off (`finish` without the level). */
+export function fold(t: Track): Stereo {
   const f = Math.round(t.overlap * t.rate);
   const n = t.left.length - f;
   const result: Stereo = { left: new Float32Array(n), right: new Float32Array(n) };
-  let sum = 0;
-  let top = 0;
   for (const [src, dst] of [
     [t.left, result.left],
     [t.right, result.right],
@@ -553,9 +596,19 @@ function finish(t: Track, rms: number, peak = 1): Stereo {
       const x = i / f;
       dst[i] = src[i] * Math.sin((x * Math.PI) / 2) + src[n + i] * Math.cos((x * Math.PI) / 2);
     }
+  }
+  return result;
+}
+
+/** Sets the level, as `finish`. */
+export function setLevel(result: Stereo, rms: number, peak = 1): Stereo {
+  const n = result.left.length;
+  let sum = 0;
+  let top = 0;
+  for (const d of [result.left, result.right]) {
     for (let i = 0; i < n; i++) {
-      sum += dst[i] * dst[i];
-      top = Math.max(top, Math.abs(dst[i]));
+      sum += d[i] * d[i];
+      top = Math.max(top, Math.abs(d[i]));
     }
   }
   const scale = rms > 0 ? rms / Math.sqrt(sum / (2 * n) || 1) : peak / (top || 1);
@@ -570,7 +623,7 @@ function finish(t: Track, rms: number, peak = 1): Stereo {
 }
 
 /** Slow random wandering around 0 (about ±1), changing over roughly `tau` seconds. */
-function wander(r: () => number, n: number, rate: number, tau: number): Float32Array {
+export function wander(r: () => number, n: number, rate: number, tau: number): Float32Array {
   const out = new Float32Array(n);
   const k = 1 / (tau * rate);
   const step = Math.sqrt(2 * k) * Math.sqrt(3);
@@ -586,7 +639,7 @@ function wander(r: () => number, n: number, rate: number, tau: number): Float32A
 }
 
 /** Pink noise (equal energy per octave, like most of nature's noises), about ±1. */
-class Pink {
+export class Pink {
   private b0 = 0;
   private b1 = 0;
   private b2 = 0;
@@ -646,7 +699,7 @@ export class Biquad {
 }
 
 /** A small seeded generator, so the sounds are the same every time. */
-function random(seed: number): () => number {
+export function random(seed: number): () => number {
   let s = seed >>> 0 || 1;
   return () => {
     s ^= s << 13;

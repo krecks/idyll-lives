@@ -8,6 +8,8 @@ export interface SnapshotLayout {
   headerLen: number;
   simStride: number;
   maxSims: number;
+  /** Most servers' rows after the residents' (missing in older layouts). */
+  maxStaff?: number;
   ticksPerSecond: number;
   header: {
     tick: number;
@@ -22,6 +24,11 @@ export interface SnapshotLayout {
     majorEvent?: number;
     /** Food and dishes changed (`Items::version` modulo 2^24; missing in older layouts). */
     itemsVersion?: number;
+    /**
+     * The town's vendors and shopkeepers (sim-core `staff.rs`): as many rows as this right after the residents',
+     * each laid out as a resident's, `away` while off work (missing in older layouts: none).
+     */
+    staffCount?: number;
   };
   sim: {
     id: number;
@@ -70,6 +77,14 @@ export interface SnapshotLayout {
     carry?: number;
     /** How far through what they do at `object` they are, 0..1 (a use's minutes, a recipe step's), while at it; else -1 (missing in older layouts). */
     progress?: number;
+    /** What they eat while eating (on the table in front of them or in their hands): index into `items` + 1, 0 = nothing (missing in older layouts). */
+    plate?: number;
+    /**
+     * 1 while the room they're in is kept shut on their account (a bathroom they're in, the bedroom
+     * they try for a baby in; sim-core `privacy.rs`), else 0: its doors stay shut to anyone but
+     * whoever goes through them (missing in older layouts).
+     */
+    shuts?: number;
   };
   /** Animation tags from content (`animations` in base.json), named by `sim.action`. */
   actions: string[];

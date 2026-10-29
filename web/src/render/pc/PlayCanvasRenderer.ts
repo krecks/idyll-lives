@@ -63,8 +63,8 @@ import { Thumbnails } from './thumbnail';
 import { benchDiag } from '../../debug/benchFlags';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
-import { GameCameraRig } from '../shared/cameraRig';
-import { DOOR_SWING, ease, goingThrough } from '../shared/doors';
+import { GameCameraRig, keepUp } from '../shared/cameraRig';
+import { DOOR_SWING, ease, goingThrough, shutDefs } from '../shared/doors';
 import { createLighting, lightingAt, type RGB } from '../shared/environment';
 import { GAME_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
@@ -270,6 +270,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The shading the materials are drawn in (`shaders/softLook.ts`); the setting's at start. */
   private shading: Shading = shadingFromSettings();
   private wallMode: WallMode = 'down';
+  /** Something for a wall is in hand: the walls stand whatever `wallMode` says (`placing.ts`). */
+  private wallsRaised = false;
   /** The cutaway's look bits last given to the walls (-1: none yet). */
   private cutLook = -1;
 
@@ -323,6 +325,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private lotEntities: { entity: pc.Entity; storey?: number }[] = [];
   private roofs: pc.Entity[] = [];
   private roofShown = false;
+  /** A check keeps the roof on close up (`keepRoof`). */
+  private roofKept = false;
   /** The simulation's plain walls, when the house builder can't read the layout (walls up, and the low ones). */
   private walls: pc.Entity | null = null;
   private wallsLow: pc.Entity | null = null;
@@ -356,6 +360,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly darkRooms = new Set<number>();
   private readonly awakeRooms = new Set<number>();
   private readonly occupiedRooms = new Set<number>();
+  /** Rooms the simulation keeps shut this frame (someone in the bathroom: snapshot `shuts`). */
+  private readonly shutRooms = new Set<number>();
+  /** Object kinds that make a room one that can be kept shut (`shutDefs`). */
+  private shutDefs: ReadonlySet<string> = new Set();
   private readonly movers: number[] = [];
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
   private readonly neighboursUp: boolean[] = [];
@@ -383,6 +391,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private lastFrame: FrameState | null = null;
   private readonly markerHead = { x: 0, y: 0, z: 0 };
   private followIndex: number | null = null;
+  /** Whether the camera has caught up with the resident it follows (`keepUp`: then it stays near them). */
+  private followCaught = false;
   private readonly followHead = { x: 0, y: 0, z: 0 };
   private framedView = '';
   private readonly simInView = (x: number, z: number) => !this.diag.has('nosims') && this.inView(x, z, SIM_VIEW_MARGIN);
@@ -511,7 +521,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // The viewed lot's house and the street round it (`house.ts`, `street.ts`).
     this.house = new HouseBuilder(this.app);
     const c = this.deps.content;
-    this.house.setLooks({ coverings: c.wallCoverings, floors: c.floorCoverings, doors: c.doorStyles, windows: c.windowStyles, roofs: c.roofStyles, roofColors: c.roofColors });
+    this.shutDefs = shutDefs(c);
+    this.house.setLooks({ coverings: c.wallCoverings, floors: c.floorCoverings, doors: c.doorStyles, windows: c.windowStyles, roofs: c.roofStyles, roofColors: c.roofColors, shuts: this.shutDefs });
     // Public places seen from another lot show their things in the open (as the overview does).
     this.street = new Street(this.app, this.root, this.deps.assets, this.house, {
       lived: true,
@@ -543,7 +554,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     };
     this.held = new HeldFrames(this.app, this.camera.camera, this.sun, mq.holdStillFrames);
     // (placing things, `placing.ts`; after the lamps, whose lights light the thing in hand.)
-    this.placing = new Placing(this.app, this.root, this.storeyLayer, this.camera.camera, this.deps, this.lot, { storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), town: () => this.townMode, shadowsMoved: () => this.sunShadows.moved() });
+    this.placing = new Placing(this.app, this.root, this.storeyLayer, this.camera.camera, this.deps, this.lot, { storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), town: () => this.townMode, shadowsMoved: () => this.sunShadows.moved(), raiseWalls: (on) => this.raiseWalls(on) });
     // A file that failed has come: the thing in hand and the landscape's plants are built with it now, the rest
     // once the files settle (`shared/modelRefresh.ts`, held while the town streams: `holdModelRefresh`).
     this.unlistenFiles = onModelFileArrived(this.app, (url) => {
@@ -735,6 +746,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   followSim(index: number | null): void {
+    if (index !== this.followIndex) this.followCaught = false;
     this.followIndex = index;
   }
 
@@ -769,6 +781,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const k = 1 - Math.exp(-dt / 0.5);
     t.x += (this.followHead.x - t.x) * k;
     t.z += (this.followHead.z - t.z) * k;
+    // (Never far behind them once caught up, however fast the game runs: at speed 4 the easing alone trails by 22 m.)
+    this.followCaught = keepUp(t, this.followHead.x, this.followHead.z, this.followCaught);
   }
 
   setLeftDragCamera(on: boolean): void {
@@ -889,7 +903,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.lotParts.key,
       world.plots.map((p) => [p.house, p.roof]),
       world.households.find((h) => h.player)?.plot,
-      houseObjectKey(world, view, (def) => !!this.deps.content.object(def)?.stairs),
+      houseObjectKey(world, view, (def) => !!this.deps.content.object(def)?.stairs, this.shutDefs),
     ]);
   }
 
@@ -949,7 +963,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    */
   private async buildSims(world: WorldStructure): Promise<void> {
     this.characters.setTables(this.lot.tables);
-    await this.characters.build(world, 'residents');
+    // (The town's vendors and shopkeepers after the residents: `game/staff.ts`.)
+    await this.characters.build(world.staffSims?.length ? { ...world, sims: [...world.sims, ...world.staffSims] } : world, 'residents');
     const v = this.view;
     const key = v ? `${v.x},${v.z},${v.w},${v.d}` : '';
     const framing = !!v && key !== this.framedView;
@@ -1301,6 +1316,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.darkRooms.clear();
     this.awakeRooms.clear();
     this.occupiedRooms.clear();
+    this.shutRooms.clear();
   }
 
   /** Takes down the lot layer (it's built again for the next lot). */
@@ -1321,9 +1337,24 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return this.lib.surface(key, { doubleSided: true });
   }
 
-  /** Walls up, cut away or down: the cutaway state the wall materials read, the roofs, and the fallback's full or low walls. */
+  /** The walls as drawn: up while something for a wall is in hand, else as the player has them. */
+  private get shownWallMode(): WallMode {
+    return this.wallsRaised ? 'up' : this.wallMode;
+  }
+
+  /** Something for a wall in hand (`on`) or not: the walls stand meanwhile, so what hangs on them hangs on them. */
+  private raiseWalls(on: boolean): void {
+    if (on === this.wallsRaised) return;
+    this.wallsRaised = on;
+    this.applyWallMode();
+  }
+
+  /**
+   * Walls up, cut away or down (as shown: `shownWallMode`): the cutaway state the wall materials
+   * read, the roofs (the player's walls up only), and the fallback's full or low walls.
+   */
   private applyWallMode(): void {
-    const mode = this.wallMode;
+    const mode = this.shownWallMode;
     if (this.walls) this.walls.enabled = mode === 'up';
     if (this.wallsLow) this.wallsLow.enabled = mode !== 'up';
     this.roofShown = this.roofVisible();
@@ -1334,9 +1365,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.updateCutaway();
   }
 
-  /** The viewed lot's roof: only with walls up, and not when zoomed in (it would fill the view). */
+  /** The viewed lot's roof: only with walls up, and not when zoomed in (it would fill the view), unless a check keeps it (`keepRoof`). */
   private roofVisible(): boolean {
-    return this.wallMode === 'up' && this.orbit.radius > ROOF_MIN_DISTANCE;
+    return this.wallMode === 'up' && (this.roofKept || this.orbit.radius > ROOF_MIN_DISTANCE);
+  }
+
+  keepRoof(on: boolean): void {
+    this.roofKept = on;
   }
 
   /**
@@ -1360,7 +1395,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** Cutaway: walls facing the camera drop when the view direction crosses a quadrant. */
   private updateCutaway(): void {
     let bits = 0;
-    if (this.wallMode === 'cutaway') {
+    if (this.shownWallMode === 'cutaway') {
       // Camera looks from its position towards the target: direction -(cos a, sin a) in xz.
       const dx = -Math.cos(this.orbit.alpha);
       const dz = -Math.sin(this.orbit.alpha);
@@ -1371,7 +1406,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     if (bits === this.cutLook) return;
     this.cutLook = bits;
-    this.placing.cutWallItems(bits, this.wallMode === 'down'); // (things on the walls go with them: but the one in hand, and none while something for a wall is.)
+    this.placing.cutWallItems(bits, this.shownWallMode === 'down'); // (things on the walls go with them, but the one in hand.)
     this.lib.wallCut.look.set(bits & 1 ? 1 : 0, bits & 2 ? 1 : 0, bits & 4 ? 1 : 0, bits & 8 ? 1 : 0);
   }
 
@@ -1384,10 +1419,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const dark = this.darkRooms;
     const awake = this.awakeRooms;
     const occupied = this.occupiedRooms;
+    const shut = this.shutRooms;
     const movers = this.movers;
     dark.clear();
     awake.clear();
     occupied.clear();
+    shut.clear();
     movers.length = 0;
     const world = this.lastWorld;
     if (!world) return;
@@ -1428,6 +1465,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const room = x >= 0 && z >= 0 && x < W && z < world.depth ? world.rooms[z * W + x] : 0;
       if (room) {
         occupied.add(room);
+        // (An older layout without `shuts`: a bathroom with anyone in it, as before.)
+        if (k.shuts === undefined || curr[o + k.shuts] !== 0) shut.add(room);
         if (asleep) dark.add(room);
         else if (!baby) awake.add(room);
       }
@@ -1454,9 +1493,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   /**
-   * Front doors and gates stand shut, and a bathroom's door while someone is in there; each opens
-   * only for someone going through it (`goingThrough`: not for someone walking past), and swings
-   * back once they're through. `rate`: how fast the game runs (`GAME_RATE`).
+   * Front doors and gates stand shut, and the doors of a room the simulation keeps shut (someone
+   * in the bathroom: nobody else goes in, they wait outside); each opens only for someone going
+   * through it (`goingThrough`: not for someone walking past, nor someone waiting outside), and
+   * swings back once they're through. `rate`: how fast the game runs (`GAME_RATE`).
    */
   private swingDoors(rate: number): void {
     if (!this.doors.length && !this.gates.length) return;
@@ -1478,7 +1518,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const { leaf } = door;
       // (Both in lot rows: the storey is in the row.)
       const going = goingThrough(movers, leaf.axis, leaf.centre, door.open === 1) !== 0;
-      const engaged = leaf.bath !== 0 && this.occupiedRooms.has(leaf.bath);
+      const engaged = leaf.shuts.some((r) => this.shutRooms.has(r));
       const target = going || !(leaf.front || engaged) ? 1 : 0;
       const open = door.open < 0 ? target : target > door.open ? Math.min(target, door.open + step) : Math.max(target, door.open - step);
       if (open === door.open) continue;
@@ -1532,10 +1572,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    */
   private updateSims(frame: FrameState): void {
     const { curr, layout } = frame;
-    const count = (this.simCount = Math.min(curr[layout.header.simCount], MAX_CHARACTERS));
+    this.simCount = Math.min(curr[layout.header.simCount], MAX_CHARACTERS);
+    // (With the vendors and shopkeepers drawn after them.)
+    const count = Math.min(this.simCount + (layout.header.staffCount === undefined ? 0 : curr[layout.header.staffCount]), MAX_CHARACTERS);
     const shadows = this.simShadowMatrices;
     this.characters.update(frame, this.simInView, shadows, this.storey);
     this.lot.pullChairs(this.characters.pulled, this.placing.held); // (not the one in hand.)
+    this.lot.takeRestProps(this.characters.restTaken);
     if (this.characters.posed && this.quality.characterShadows) this.sunShadows.moved(false);
     const blobs = this.simShadow;
     blobs.setCount(count);
@@ -2096,8 +2139,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The sun's shadow map's target (null: none made, or the sun casts none). */
   private shadowTarget(): pc.RenderTarget | null {
     const light = this.sun?.light;
-    // SAFETY: a light component's scene light (`LightComponent.light`) and its `shadowMap` are PlayCanvas 2.23's.
-    const map = light?.castShadows ? (light as unknown as { light?: { shadowMap?: { renderTargets: pc.RenderTarget[] } | null } }).light?.shadowMap : null;
+    // (PlayCanvas types the scene light's `shadowMap` as any: a `ShadowMap`, null before the first shadow pass.)
+    const map: { renderTargets: pc.RenderTarget[] } | null = light?.castShadows ? light.light.shadowMap : null;
     return map?.renderTargets[0] ?? null;
   }
 
@@ -2163,7 +2206,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       passes,
       scene: {
         ...scene,
-        textures: (d as unknown as { textures?: Set<unknown> }).textures?.size ?? 0,
+        textures: d.textures.size,
         lights: scene.lights,
         residents: this.simCount,
         residentsDrawn: this.residentsDrawn(),

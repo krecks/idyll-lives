@@ -40,6 +40,7 @@
           "id": "ride",
           "label": "Ride a virtual route",
           "anim": "exercise",
+          "sound": "bike",
           "minutes": 45,
           "pose": "sit",
           "autonomous": true,
@@ -88,8 +89,8 @@
       "freeRotation": true,
       "slots": 2,
       "places": [
-        { "at": [-0.45, 1], "facing": 156 },
-        { "at": [0.45, 1], "facing": -156 }
+        { "at": [-0.45, 2.2], "facing": 168 },
+        { "at": [0.45, 2.2], "facing": -168 }
       ],
       "description": "A weighted hoop for the driveway. Shooting around is fun and, with a friend, a little social too.",
       "interactions": [
@@ -120,7 +121,7 @@
           "id": "blend",
           "label": "Blend a power smoothie",
           "anim": "cook",
-          "sound": "none",
+          "sound": "blender",
           "minutes": 4,
           "eat": { "item": "smoothie", "minutes": 6 },
           "pose": "stand",

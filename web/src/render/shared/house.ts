@@ -134,6 +134,12 @@ export interface HouseLooks {
   windows: readonly WindowStyleDef[];
   roofs?: readonly RoofStyleDef[];
   roofColors?: readonly RoofColorDef[];
+  /**
+   * Object kinds that make a room one the simulation may keep shut (sim-core `privacy.rs`): what
+   * makes it a bathroom, a double bed with a use done behind a shut door. Their rooms' doors
+   * swing (`DoorLeaf.shuts`). Absent: the bathroom things by id (`BATH`).
+   */
+  shuts?: ReadonlySet<string>;
 }
 
 /** A roof's shape: gable, hip or flat, and the pitch (rise per run) of pitched ones. */
@@ -332,7 +338,7 @@ export interface HousePlan {
   shrubs: [number, number, number, number][];
   trees: [number, number, number, number][];
   surfaces: HouseSurfaces;
-  /** Door leaves that swing shut (front doors, bathroom doors); the rest stand open. */
+  /** Door leaves that swing shut (front doors, the doors of rooms that can be kept shut); the rest stand open. */
   doors: DoorPlan[];
 }
 
@@ -351,8 +357,11 @@ export interface DoorLeaf<M> {
   opens: number;
   /** A front door (outdoors on one side): shut unless someone comes through. */
   front: boolean;
-  /** The bathroom it opens into (0: none): shut while someone is in there. */
-  bath: number;
+  /**
+   * The rooms either side the simulation may keep shut (a bathroom, a bedroom with a double bed;
+   * `HouseLooks.shuts`): shut while it keeps one shut (snapshot `shuts`: someone in the bathroom).
+   */
+  shuts: number[];
   /** A leaf that slides into the wall instead (it could swing only a little way open): how far, open. */
   slide?: [number, number];
 }
@@ -361,7 +370,7 @@ export interface DoorLeaf<M> {
 export type DoorPlan = Omit<DoorLeaf<never>, 'meshes'> & { parts: HousePart[]; pivot: [number, number] };
 
 /** What a doorway needs to know of a leaf that swings, before its meshes exist. */
-type SwingSpec = Omit<DoorLeaf<never>, 'meshes' | 'bath'> & { hinge: [number, number]; rooms: [number, number] };
+type SwingSpec = Omit<DoorLeaf<never>, 'meshes' | 'shuts'> & { hinge: [number, number]; rooms: [number, number] };
 
 /**
  * Where coverings lie in the viewed house, for Build mode's previews: each wall face
@@ -445,18 +454,19 @@ const ROOM_KIND_DEFS = new Set([...BATH, ...KITCHEN, ...BEDROOM, ...LIVING]);
 
 /**
  * The objects `HousePlanner.build` depends on, as a key: room-kind furniture, and
+ * the things that make a room one that can be kept shut (`shuts`: its doors swing), and
  * whatever stands on the lot's tree spots; on a lot that isn't the player's home (it gets a
  * garden border around its furniture) every object. Other objects can change without
  * rebuilding the house. Stairs (`stairs`) on any storey of the lot in view count too: their
  * stairwells open the floor above.
  */
-export function houseObjectKey(world: WorldStructure, view: ViewRect | null, stairs: (def: string) => boolean = () => false): string {
+export function houseObjectKey(world: WorldStructure, view: ViewRect | null, stairs: (def: string) => boolean = () => false, shuts?: ReadonlySet<string>): string {
   const D = world.storeyDepth ?? world.depth;
   const flights = world.objects.filter((o) => stairs(o.def) && (!view || (o.x >= view.x && o.z % D >= view.z && o.x < view.x + view.w && o.z % D < view.z + view.d)));
-  return `${houseObjectKeyOf(world, view)}|${flights.map((o) => `${o.x},${o.z},${o.rot}`).join(';')}`;
+  return `${houseObjectKeyOf(world, view, shuts)}|${flights.map((o) => `${o.x},${o.z},${o.rot}`).join(';')}`;
 }
 
-function houseObjectKeyOf(world: WorldStructure, view: ViewRect | null): string {
+function houseObjectKeyOf(world: WorldStructure, view: ViewRect | null, shuts?: ReadonlySet<string>): string {
   const inView = (x: number, z: number) => !view || (x >= view.x && z >= view.z && x < view.x + view.w && z < view.z + view.d);
   const homeId = world.households?.find((h) => h.player)?.plot;
   const home = homeId == null ? undefined : world.plots?.[homeId];
@@ -470,7 +480,7 @@ function houseObjectKeyOf(world: WorldStructure, view: ViewRect | null): string 
       ]
     : [];
   const matters = (o: WorldStructure['objects'][number]) =>
-    !isHome || ROOM_KIND_DEFS.has(o.def) || spots.some(([sx, sz]) => sx >= o.x && sx < o.x + o.w && sz >= o.z && sz < o.z + o.d);
+    !isHome || ROOM_KIND_DEFS.has(o.def) || !!shuts?.has(o.def) || spots.some(([sx, sz]) => sx >= o.x && sx < o.x + o.w && sz >= o.z && sz < o.z + o.d);
   return world.objects
     .filter((o) => inView(o.x, o.z) && matters(o))
     .map((o) => `${o.def}@${o.x},${o.z},${o.w},${o.d}`)
@@ -764,13 +774,16 @@ export class HousePlanner {
     // wood panelling.
     const covered = new Map<WallCoveringDef['finish'], Geo>((Object.keys(FINISH_MATERIALS) as WallCoveringDef['finish'][]).map((f) => [f, new Geo()]));
     const doorWood = covered.get('wood')!;
-    // Front doors and bathroom doors move (each leaf its own meshes; a preview draws them at
-    // rest); the others stand open.
-    const swinging: { spec: SwingSpec & { bath: number }; trim: Geo; wood: Geo; glass: Geo }[] = [];
-    const bathOf = (rooms: [number, number]) => rooms.find((r) => r && kinds.get(r) === 'bath') ?? 0;
-    const moves = (front: boolean, rooms: [number, number]) => front || bathOf(rooms) !== 0;
+    // Front doors move, and the doors of rooms the simulation may keep shut (a bathroom, a bedroom
+    // with a double bed; each leaf its own meshes; a preview draws them at rest); the others stand
+    // open.
+    const swinging: { spec: SwingSpec & { shuts: number[] }; trim: Geo; wood: Geo; glass: Geo }[] = [];
+    const shutDefs = this.looks.shuts;
+    const shuttable = (r: number) => !!r && (shutDefs ? [...(roomDefs.get(r) ?? [])].some((d) => shutDefs.has(d)) : kinds.get(r) === 'bath');
+    const shutsOf = (rooms: [number, number]) => rooms.filter(shuttable);
+    const moves = (front: boolean, rooms: [number, number]) => front || shutsOf(rooms).length > 0;
     const swing = (spec: SwingSpec) => {
-      const leaf = { spec: { ...spec, bath: bathOf(spec.rooms) }, trim: new Geo().color(TRIM), wood: new Geo(), glass: new Geo() };
+      const leaf = { spec: { ...spec, shuts: shutsOf(spec.rooms) }, trim: new Geo().color(TRIM), wood: new Geo(), glass: new Geo() };
       swinging.push(leaf);
       return leaf;
     };

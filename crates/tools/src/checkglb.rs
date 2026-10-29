@@ -718,8 +718,8 @@ fn uses(motions: &J) -> Vec<(String, J)> {
 }
 
 /// {clip: what plays it} for an entry's `motions` (in the order they're first named): `uses`, `loops`,
-/// `open`, `idle`, `night`, `growth`, `ride` (the clip whose part carries its users) and `clock` (`hour`,
-/// `minute`: hands set by the time).
+/// `open`, `idle`, `night`, `growth`, `ride` (the clip whose part carries its users), `running` (round and
+/// round while a machine runs on its own) and `clock` (`hour`, `minute`: hands set by the time).
 fn played(motions: &J) -> R<Vec<(J, String)>> {
     let mut out: Vec<(J, String)> = Vec::new();
     let mut add = |clip: &J, by: String| {
@@ -733,7 +733,7 @@ fn played(motions: &J) -> R<Vec<(J, String)>> {
     for (name, clip) in motions.get("loops").filter(|l| l.truthy()).and_then(J::entries).unwrap_or(&[]) {
         add(clip, format!("loop {}", repr_str(name)));
     }
-    for kind in ["open", "idle", "night", "growth", "ride"] {
+    for kind in ["open", "idle", "night", "growth", "ride", "running"] {
         if let Some(clip) = motions.get(kind).filter(|c| c.truthy()) {
             add(clip, kind.into());
         }
@@ -748,14 +748,16 @@ fn played(motions: &J) -> R<Vec<(J, String)>> {
 }
 
 /// The clips of `motions` that go round, or from rest to rest (and so must end where they start): loops,
-/// `idle`, a use's clip that repeats (`every`) and a clock's hands (a whole turn). As dict keys.
+/// `idle`, `running`, a use's clip that repeats (`every`) and a clock's hands (a whole turn). As dict keys.
 fn loops(motions: &J) -> R<HashSet<String>> {
     let mut out = HashSet::new();
     for (_, clip) in motions.get("loops").filter(|l| l.truthy()).and_then(J::entries).unwrap_or(&[]) {
         out.insert(clip.key());
     }
-    if let Some(idle) = motions.get("idle").filter(|c| c.truthy()) {
-        out.insert(idle.key());
+    for kind in ["idle", "running"] {
+        if let Some(clip) = motions.get(kind).filter(|c| c.truthy()) {
+            out.insert(clip.key());
+        }
     }
     for (_, u) in uses(motions) {
         if u.get("every").is_some_and(J::truthy) {
@@ -1449,7 +1451,17 @@ fn content_warnings(facts: Option<&Facts>, lo: &[Num; 3], (slo, shi): &Bounds, s
         let (w, d) = foot(f)?;
         let half = |n: Num| (n / Num::I(2)).f();
         let (nw, nd) = (((-w) / Num::I(2)).f(), ((-d) / Num::I(2)).f());
-        let over = [nw - slo[0].f(), shi[0].f() - half(w), nd - slo[2].f(), shi[2].f() - half(d)].into_iter().reduce(|m, v| if v > m { v } else { m }).unwrap();
+        // The tiles beside its own it reaches over at head height (content `overhang`, `[right, front]`: an arc
+        // lamp's shade over the next tile) are its too, at rest.
+        let (mut xlo, mut xhi, mut zlo, mut zhi) = (nw, half(w), nd, half(d));
+        for t in f.object.get("overhang").and_then(J::list).unwrap_or(&[]) {
+            let (r, fw) = (t.at(0).and_then(J::num).map_or(0.0, Num::f), t.at(1).and_then(J::num).map_or(0.0, Num::f));
+            xlo = xlo.min(r - 0.5);
+            xhi = xhi.max(r + 0.5);
+            zlo = zlo.min(fw - 0.5);
+            zhi = zhi.max(fw + 0.5);
+        }
+        let over = [xlo - slo[0].f(), shi[0].f() - xhi, zlo - slo[2].f(), shi[2].f() - zhi].into_iter().reduce(|m, v| if v > m { v } else { m }).unwrap();
         if over > OVERHANG {
             warnings.push(format!(
                 "reaches {} cm past its {} x {} footprint (x {} to {}, depth {} to {}): it overlaps what stands next to it",

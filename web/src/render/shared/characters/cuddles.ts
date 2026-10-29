@@ -133,6 +133,13 @@ export function cuddlePose(add: Additive, B: Record<string, number>, rig: SimRig
     addRotation(add, B.lowerarm_r, 1, 0, 0, -1.0 * h);
     addRotation(add, B.lowerarm_l, 0, 1, 0, 1.1 * h);
     addRotation(add, B.lowerarm_r, 0, 1, 0, -1.1 * h);
+    // Feeding from a bottle: the right forearm up off the legs, the bottle in the hand over the baby (the teat towards
+    // their head, not quite at the mouth: the arms are posed, not reached with IK).
+    if (rig.feeding) {
+      addRotation(add, B.upperarm_r, 1, 0, 0, -0.35 * h);
+      addRotation(add, B.lowerarm_r, 1, 0, 0, -0.4 * h);
+      addRotation(add, B.lowerarm_r, 0, 1, 0, -0.5 * h);
+    }
     // Looking down at the baby (the head on the left).
     addRotation(add, B.neck_01, 1, 0, 0, 0.15 * h);
     addRotation(add, B.Head, 1, 0, 0, 0.3 * h);

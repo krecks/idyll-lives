@@ -993,7 +993,8 @@ fn task_view(world: &World, task: &Task, phase: Option<&Phase>, held: Option<cra
     let (label, object, target, minutes) = match task.kind {
         TaskKind::Use { object, interaction } => {
             let inter = &content.objects[world.objects[object as usize].def].interactions[interaction];
-            (inter.label.clone(), world.stable_of(object), None, inter.minutes)
+            let served = world.staff.server_of(object).is_some();
+            (inter.label.clone(), world.stable_of(object), None, inter.minutes_where(served))
         }
         TaskKind::MoveTo { .. } => ("Go here".to_owned(), None, None, 1.0),
         TaskKind::Social { target, social } => {
@@ -1268,6 +1269,17 @@ struct StructureView<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     floors: Option<Vec<[u16; 3]>>,
     meta: &'a serde_json::Value,
+    /// The town's servers (`staff.rs`), in their snapshot rows' order (after the residents').
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    staff: Vec<StaffView>,
+}
+
+/// One of the town's servers: what they look like (`seed`, the renderer makes the look) and the
+/// posts they serve at (stable object ids).
+#[derive(Serialize)]
+struct StaffView {
+    seed: u32,
+    posts: Vec<u32>,
 }
 
 /// A diagonal wall across tile `(x, z)`: `dp` (`/`) from `(x, z)` to `(x + 1, z + 1)`, `dn`
@@ -1469,6 +1481,10 @@ struct ObjectView<'a> {
     /// A crop's stage (`GrowthStage`: 0 planted, 1 growing, 2 ripe, 3 picked); none for other things.
     #[serde(skip_serializing_if = "Option::is_none")]
     growth: Option<u8>,
+    /// A machine running on its own (content `runs`: the drum turning, its sound); see
+    /// `ObjectInstance::run`.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    running: bool,
     w: i32,
     d: i32,
     quality: u8,
@@ -1692,6 +1708,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                 wear: o.wear,
                 open: o.open,
                 growth: world.content.objects[o.def].grows.is_some().then(|| o.growth_stage() as u8),
+                running: o.running(),
                 w,
                 d,
                 quality: o.quality,
@@ -1789,6 +1806,12 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                 .collect()
         }),
         meta: &world.meta,
+        staff: crate::staff::plan(world)
+            .servers
+            .iter()
+            .take(crate::staff::MAX_STAFF)
+            .map(|s| StaffView { seed: s.seed, posts: s.posts.iter().map(|&o| world.objects[o as usize].stable).collect() })
+            .collect(),
     })
     .expect("structure serializes")
 }

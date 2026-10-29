@@ -91,23 +91,40 @@ function eyepiecePose(fit: Fit): (p: number) => PoseSpec {
 }
 
 /**
- * The fruit trees' picked fruit (`trees.py`; each tree's `pick` clip shrinks it away 1.6 s into the use,
- * `PICK_DELAY` there, as the hand closes on it): m to the picker's right (facing the tree), up and to the
- * front of the trunk. The apple hangs under the crown's front, the lemon in the potted tree's crown.
+ * The fruit trees' picked fruit (`trees.py`; the apple tree's `pick` clip shrinks its apple away 1.6 s into the
+ * use, `PICK_DELAY` there, as the hand closes on it; the lemons all go once picked, `ripen`): m to the picker's
+ * right (facing the tree), up (where the hand closes on it, `GRIP` over its bottom) and to the front of the trunk,
+ * for each size of picker (`SHARES_177`: a grown-up, a teen, a child). The apple hangs from a low bough under the
+ * crown's front, its bottom 1.28 m up (`PICKED`), low enough for a child on tiptoe; the lemon on the potted tree's
+ * crown 1.62 m up, a child's lower one, 1.2 m up, on its underside (`lemon_tree`). The hand closes a little over
+ * the fruit's bottom, so a resident a little shorter than their size (a child of 1.07 m on the 1.12 m clip) still
+ * has it in hand.
  */
-const FRUIT = { apple: [0.05, 1.84, 0.7], lemon: [-0.1, 1.62, 0.6] } as const;
+const GRIP = { apple: 0.15, lemon: 0.13 };
+const FRUIT = {
+  apple: [[-0.06, 1.13 + GRIP.apple, 0.62], [-0.06, 1.13 + GRIP.apple, 0.62], [-0.06, 1.13 + GRIP.apple, 0.62]],
+  lemon: [[-0.1, 1.62 + GRIP.lemon, 0.6], [-0.15, 1.42 + GRIP.lemon, 0.57], [0.12, 1.1 + GRIP.lemon, 0.4]],
+} as const;
+/**
+ * The apples "Pick the apples" reaches up to, a size's each on the low boughs (`HARVEST` in `trees.py`: their bottoms
+ * 1.8, 1.5 and 1.24 m up), from the tile in front, 1 m out from the trunk, where the harvest is stood (not stepped in).
+ */
+const HARVEST_APPLE = [[0.16, 1.75 + GRIP.apple, 0.62], [0.3, 1.45 + GRIP.apple, 0.62], [0.24, 1.12 + GRIP.apple, 0.78]] as const;
 
-/** The pickers (`SHARES_177`: a grown-up, a teen, a child), and the feet's distance from the trunk for each (the shorter nearer, the fruit nearer overhead). */
+/** The pickers, and the feet's distance from the trunk for each (the shorter nearer, the fruit nearer overhead). */
 type PickFit = Fit & { fruit: readonly [x: number, y: number, z: number] };
-export const PICK_APPLE: Size<PickFit>[] = sizes('pickApple', SHARES_177, (s) => ({ s, to: s > 0.9 ? 1 : 0.78, fruit: FRUIT.apple }));
-export const PICK_LEMON: Size<PickFit>[] = sizes('pickLemon', SHARES_177, (s) => ({ s, to: s > 0.9 ? 0.95 : s > 0.7 ? 0.88 : 0.85, fruit: FRUIT.lemon }));
+const sizeOf = (s: number) => (s > 0.9 ? 0 : s > 0.7 ? 1 : 2);
+export const PICK_APPLE: Size<PickFit>[] = sizes('pickApple', SHARES_177, (s) => ({ s, to: s > 0.9 ? 1.02 : s > 0.7 ? 0.95 : 0.72, fruit: FRUIT.apple[sizeOf(s)] }));
+export const PICK_LEMON: Size<PickFit>[] = sizes('pickLemon', SHARES_177, (s) => ({ s, to: s > 0.9 ? 0.95 : s > 0.7 ? 0.88 : 0.6, fruit: FRUIT.lemon[sizeOf(s)] }));
+/** Picking the apples (the apple tree's harvest), a size each (`harvest` in `actions.ts` picks it by height). */
+export const PICK_HIGH: Size<PickFit>[] = sizes('pickHigh', SHARES_177, (s) => ({ s, to: 1, fruit: HARVEST_APPLE[sizeOf(s)] }));
 /** The picking clip's length (s), and when (shares of it) the hand reaches the fruit, twists it off and is down with it. */
 const PICK_S = 3.3;
 const PICK_AT = { reach: 0.42, twist: 0.6, down: 0.82 };
 
 /**
  * Standing to reach up: on tiptoe by `tip` (m, the clip's), the chest lifting and leaning back `back`
- * degrees, the head tipped back `look` degrees to the hand.
+ * degrees, the head tipped back `look` degrees to the hand (forward, if less than 0).
  */
 function reachBody(tip: number, back: number, look: number, p: number): PoseSpec {
   const body = stand({ breath: p, lean: -back, shift: 0.25, head: [-look, 4, 0] });
@@ -121,27 +138,39 @@ function reachBody(tip: number, back: number, look: number, p: number): PoseSpec
 }
 
 /**
- * Picking fruit from a tree: a look up at it, the right hand up to it (on tiptoe if it is high for them,
- * as far as they reach if out of it), the left steadying the bough above; a twist off, and down to the
- * chest with it (the `eat` clip follows).
+ * Reaching for fruit at `at` (the clip's frame), found while baking: how high on tiptoe (enough for the right
+ * shoulder to come within reach of it, at most 0.1 m), how far to lean back (for fruit over the shoulder) and to
+ * look up at it from the eyes (down, at fruit below them).
+ */
+function reachFor(at: Vec): () => { tip: number; back: number; look: number } {
+  let found: { tip: number; back: number; look: number } | null = null;
+  return () => {
+    if (found) return found;
+    const ref = reference();
+    const eye = ref.joint('eye_r');
+    const look = (Math.atan2(at[1] - eye[1], at[2] - eye[2]) * 180) / Math.PI;
+    const back = 8 * Math.min(1, Math.max(0, (at[1] - ref.joint('upperarm_r')[1]) / 0.3));
+    const arm = len(sub(ref.joint('upperarm_r'), ref.joint('lowerarm_r'))) + len(sub(ref.joint('lowerarm_r'), ref.joint('hand_r'))) + 0.06;
+    const shoulder = pointOn(reachBody(0, back, look, 0), 'upperarm_r', [0, 0, 0]);
+    found = { tip: Math.min(0.1, Math.max(0, len(sub(at, shoulder)) - arm * 0.96)), back, look };
+    return found;
+  };
+}
+
+/**
+ * Picking fruit from a tree: a look at it, the right hand up to it (on tiptoe if it is high for them, as far
+ * as they reach if out of it), the left steadying the bough above; a twist off, and down to the chest with it
+ * (the `eat` clip follows).
  */
 function pickKeys(fit: PickFit): [number, () => PoseSpec, 'smooth'?][] {
   const { s, to, fruit } = fit;
   const at: Vec = [fruit[0] / s, fruit[1] / s, (to - fruit[2]) / s];
-  const bough: Vec = [at[0] - 0.16, at[1] + 0.1, at[2] - 0.03];
-  // How high on tiptoe (found while baking): enough for the right shoulder to come within reach of the fruit.
-  let tip = -1;
-  const lift = () => {
-    if (tip >= 0) return tip;
-    const ref = reference();
-    const arm = len(sub(ref.joint('upperarm_r'), ref.joint('lowerarm_r'))) + len(sub(ref.joint('lowerarm_r'), ref.joint('hand_r'))) + 0.06;
-    const shoulder = pointOn(reachBody(0, 8, 30, 0), 'upperarm_r', [0, 0, 0]);
-    tip = Math.min(0.1, Math.max(0, len(sub(at, shoulder)) - arm * 0.96));
-    return tip;
-  };
+  const bough: Vec = [at[0] - 0.16, at[1] + 0.2, at[2] - 0.03];
+  const reach = reachFor(at);
   const rest = () => ({ ...stand(), ...hangArms() });
   const up = (t: number, twist: number, k = 1) => {
-    const body = reachBody(lift() * k, 8 * k, 30 + 10 * k, t);
+    const { tip, back, look } = reach();
+    const body = reachBody(tip * k, back * k, look + 10 * k, t);
     return {
       ...body,
       ...armIK('r', [at[0], at[1] - 0.03 * (1 - k), at[2]], body, { palm: true, pole: [0.7, -0.4, -0.6], pronate: -40 + 70 * twist, hand: wrist('r', -25 + 15 * twist, 0, 0) }),
@@ -154,7 +183,7 @@ function pickKeys(fit: PickFit): [number, () => PoseSpec, 'smooth'?][] {
   };
   return [
     [0, rest],
-    [0.12, () => ({ ...stand({ breath: 0.12, shift: 0.2, head: [-30, 4, 0] }), ...hangArms() }), 'smooth'],
+    [0.12, () => ({ ...stand({ breath: 0.12, shift: 0.2, head: [-reach().look, 4, 0] }), ...hangArms() }), 'smooth'],
     [0.3, () => up(0.3, 0, 0.6), 'smooth'],
     [PICK_AT.reach, () => up(PICK_AT.reach, 0), 'smooth'],
     [0.5, () => up(0.5, 1), 'smooth'],
@@ -163,6 +192,79 @@ function pickKeys(fit: PickFit): [number, () => PoseSpec, 'smooth'?][] {
     [PICK_AT.down, () => down(PICK_AT.down, 1), 'smooth'],
     [1, () => down(1, 0.6), 'smooth'],
   ];
+}
+
+/**
+ * Picking the apples (the apple tree's harvest), twice a loop: a look up, the right hand up to an apple on the low
+ * boughs (on tiptoe if it is high for them), a twist off and down with it to the left hand holding the gathered ones
+ * at the hip.
+ */
+function pickHighPose(fit: PickFit): (p: number) => PoseSpec {
+  const { s, to, fruit } = fit;
+  const at: Vec = [fruit[0] / s, fruit[1] / s, (to - fruit[2]) / s];
+  const from: Vec = [0.14, 1.18, 0.3];
+  const reach = reachFor(at);
+  return (p) => {
+    const { tip, back, look } = reach();
+    const n = (p * 2) % 1;
+    const k = bump(n, 0.04, 0.5, 0.16);
+    const twist = bump(n, 0.36, 0.5, 0.05);
+    const body = reachBody(tip * k, back * 0.5 * k, 14 + (look - 14) * k, p);
+    return {
+      ...body,
+      ...armIK('l', [-0.12, 0.98, 0.22], body, { pole: [-0.5, -0.8, -0.5], pronate: -30, hand: wrist('l', 30, 0) }),
+      ...armIK('r', lerpV(from, at, k), body, { palm: true, pole: [0.7, -0.4, -0.6], pronate: 40 + 60 * twist, hand: wrist('r', 10 + 20 * twist, 0) }),
+    };
+  };
+}
+
+/**
+ * Tending the climbing roses on the rose-arbour swing (`romantic.roseArbourSwing`, `pack_romantic.py`): from in front
+ * of a front post (`STEP_IN`'s lanes, 0.75 m out, a child 0.58), the bloom cut there (`BLOOM`, its stem 1.15 m up and
+ * 0.35 m out, `cut` shrinks it away) reached and snipped off twice a loop, as the apples are picked (`pickHighPose`),
+ * the cut ones held at the hip.
+ */
+export const CUT_ROSE: Size<PickFit>[] = sizes('cutRose', SHARES_177, (s) =>
+  s > 0.7 ? { s, to: 0.75, fruit: [0, 1.15 + GRIP.lemon, 0.35] } : { s, to: 0.58, fruit: [0, 1.15 + 0.05, 0.35] },
+);
+
+/**
+ * The cookbook lectern (`foodie.cookbookLectern`, `pack_foodie.py`): its open cookbook on the desk sloping 25° to the
+ * front, the pages' lower corners 1.02 m up and 0.12 m out from the middle, 0.17 m either side (`BOOK`); the reader
+ * stands at its place, 0.52 m out (content `places`).
+ */
+const BOOK = { x: 0.17, y: 1.02, z: 0.12, mid: [0, 1.09, -0.01] as Vec };
+export const LECTERN: Size[] = sizes('readLectern', SHARES_177, (s) => ({ s, to: 0.52 }));
+const LECTERN_S = 6;
+
+/**
+ * Reading at the lectern: leaning in a little, the hands resting on the book's lower corners, the head bowed to the
+ * page; once a loop the left hand lifts the page on its side and lays it over to the right (the model's `page` turns
+ * it as the reading starts), and goes back to its corner.
+ */
+function lecternPose(fit: Fit): (p: number) => PoseSpec {
+  const { s, to } = fit;
+  const o = (x: number, y: number, z: number): Vec => [x / s, y / s, (to - z) / s];
+  const left = o(-BOOK.x, BOOK.y, BOOK.z);
+  const right = o(BOOK.x, BOOK.y, BOOK.z);
+  const over = o(0.0, BOOK.y + 0.16, BOOK.z - 0.08);
+  const across = o(0.12, BOOK.y + 0.05, BOOK.z - 0.04);
+  const mid = o(BOOK.mid[0], BOOK.mid[1], BOOK.mid[2]);
+  const look = reachFor(mid);
+  return (p) => {
+    const t = p * LECTERN_S;
+    // The page turn: up off the corner, over the spine, down on the right, back to the corner.
+    const lift = bump(t, 0.3, 1.5, 0.35);
+    const lay = bump(t, 0.7, 1.9, 0.4);
+    const l = lerpV(lerpV(left, over, lift), across, lay * (1 - 0.5 * lift));
+    const { look: down } = look();
+    const body = reachBody(0, -8, down + 6 * lift, p);
+    return {
+      ...body,
+      ...armIK('l', l, body, { palm: true, pole: [-0.7, -0.6, -0.3], pronate: 80 - 40 * lift, hand: wrist('l', -15 + 25 * lift, 0) }),
+      ...armIK('r', right, body, { palm: true, pole: [0.7, -0.6, -0.3], pronate: 80, hand: wrist('r', -15, 0) }),
+    };
+  };
 }
 
 /**
@@ -366,6 +468,8 @@ export function useClips(): ClipDef[] {
   return [
     ...EYEPIECE.map(({ clip, fit }) => cycle(clip, { seconds: 6, loop: true }, eyepiecePose(fit))),
     ...[...PICK_APPLE, ...PICK_LEMON].map(({ clip: name, fit }) => clip(name, { seconds: PICK_S, loop: false }, pickKeys(fit))),
+    ...[...PICK_HIGH, ...CUT_ROSE].map(({ clip: name, fit }) => cycle(name, { seconds: 3.2, loop: true }, pickHighPose(fit))),
+    ...LECTERN.map(({ clip: name, fit }) => cycle(name, { seconds: LECTERN_S, loop: true }, lecternPose(fit))),
     cycle('shower', { seconds: SHOWER_S, loop: true, hands: 'open' }, showerPose(SHOWER_TURN, 0)),
     cycle('showerChild', { seconds: SHOWER_S, loop: true, hands: 'open' }, showerPose(0, SHOWER_TWIST)),
     cycle('strum', { seconds: 2, loop: true }, strumPose(GUITAR_REACH.long)),

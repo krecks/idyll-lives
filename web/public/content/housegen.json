@@ -222,7 +222,8 @@
       "furniture": [
         { "one": ["laundryWasher"] },
         { "one": ["laundryDryer"], "chance": 0.4 },
-        { "one": ["laundryBasket", "laundryHamper", "bathCabinetTall"], "chance": 0.5 }
+        { "one": ["laundryBasket"], "chance": 0.95 },
+        { "one": ["laundryHamper", "bathCabinetTall"], "chance": 0.3 }
       ],
       "wall": [{ "one": ["wallCabinet", "kitchenShelfWall"], "chance": 0.5 }],
       "ceiling": [{ "one": ["ceilingLight"], "chance": 0.5 }]
@@ -346,11 +347,12 @@
   "$lights": "Every room gets lights enough for all of it at night (a lamp lights its `light.tiles`, else `roomRules.lampTiles` in base.json; lamps already in it count): more from the ceiling, as few as do it and spread evenly over the room, all of the kind among the room's own `ceiling` lights (else these: the upstairs hall, the basement's) that takes fewest, so a big room gets a chandelier rather than a ceiling full of small lights.",
   "lights": ["ceilingLight", "ceilingPendant"],
 
-  "$garden": "Things outside the house: tables with chairs round them (`sets`, as a room's `dining`), then a few things.",
+  "$garden": "Things outside the house: first the washing line (`washingLine`) for a home with a washer and nothing to dry the washing in (a thing whose use leaves a washed load, content `makes`, and none that works on one, `workOn`: no dryer), on the lawn behind or beside the house with a clear tile all round, by the garden door if it fits; then tables with chairs round them (`sets`, as a room's `dining`), then a few things.",
   "garden": {
     "sets": [{ "tables": ["patioTableRound", "patioTable4"], "chairs": ["patioChair"], "seats": [2, 4], "chance": 0.45 }],
     "objects": ["plant", "flowerbed", "flowerbed", "bush", "bush", "tree", "pine", "bench", "grill", "gardenChair", "sunLounger", "lampPost", "firePit", "swingSet", "planterBox", "birdFeederPole", "birdhouse", "adirondackChair", "benchGarden3", "parasol", "raisedBed", "compostBin", "rainBarrel", "sundial", "firewoodStack"],
-    "count": [2, 6]
+    "count": [2, 6],
+    "washingLine": "clothesline"
   },
 
   "$residents": "A house is laid out the same whoever lives there; its furniture is for them. The biggest bedrooms first: a couple's gets a bed for two (`beds.couple`), an adult's any bed, a child's a child's bed (`beds.child`) and things from `childRoom`. Short of bedrooms, children share one (two child's beds, else a bunk bed), then adults (two `beds.single`; a `bunk` bed if they don't fit). A bedroom nobody sleeps in, and a playroom in a home without children, become a spare room by weight from `spareRoom` (`guest`: a bedroom with a single bed; else a room kind). Things of the `kidsOnly` content categories and groups (toys, kids' furniture, cribs) are only in homes with children. Garden doors and the rest of the layout don't change.",

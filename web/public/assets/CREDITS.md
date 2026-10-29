@@ -245,10 +245,11 @@ it is used: the bed's head section rises, the pod's hood swings over, the quilt'
 plate's deck shakes and the tablet tilts up.
 
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
-`laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
+`laundryBasket.glb`, `bathMat.glb`, and the things carried doing the laundry, `washingBasket.glb`, `washingArmful.glb` and
+`washingPiece.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and
-the dryer open their door and turn their drum while a resident does the laundry; the rail, ladder, basket and mat
-are still.
+the dryer open their door while a resident loads or empties them and turn their drum while they run; the rail,
+ladder, basket and mat are still.
 
 The hobby models (`models/hobbies/piano.glb`, `ukulele.glb`, `guitarElectric.glb`, `keyboardDigital.glb`,
 `drumKit.glb`, `guitarAcoustic.glb`, `chessTable.glb`, `poolTable.glb`, `foosball.glb`, `dartboard.glb`,
@@ -286,7 +287,7 @@ The play and yard things (`models/yard/sandbox.glb`, `bikeRack.glb`, `raisedBed.
 `.far.glb`, override pack `packs/yard/manifest.json`) are built in Blender by `tools/art/blender/families/yard.py`
 on `gamekit` and exported as `.glb` (glTF, original, CC0). A sand castle grows in the sandpit, the bike lifts and
 turns its back wheel, the raised bed's crop grows and is picked, the shed's and the greenhouse's doors open, the
-compost bin's lid lifts and the washing goes out on the line.
+compost bin's lid lifts and the washing goes out on the line a line at a time.
 
 The grills and the fire pit (`models/outdoor/grill.glb`, `grillStation.glb`, `firePit.glb`, same pack and family)
 are built the same way (glTF, original, CC0). The grill's lid and the station's hood swing up while residents cook,
@@ -493,10 +494,15 @@ cassette door tips open, and the electric fire's flames grow while a resident wa
 
 The things residents carry and cook with (`models/held/*.glb`: the bag of shopping, the prep bowl, the stew pot and
 the dirty pot, the tasting board, the grill platter and the dirty platter, the pizza, the baking tray and the dirty
-tray, the pie and the dirty pie dish, the plates of stew, pizza, treats, pie, a sandwich and toast, the dirty plate, the
+tray, the pie and the dirty pie dish, the plates of stew, pizza, treats, pie, cake, a sandwich and toast, the dirty plate, the
 dirty tasting board and pizza board, the bowl of ice cream and the dirty bowl, the smoothie, the noodle pail and the
-takeaway box, and the chopping board, the
-pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks; override pack
+takeaway box, the food bought in town (a paper cup of ice cream, a hot dog on its paper boat, a packet of crisps, an
+apple, a pastry in a paper bag), the chopping board, the
+pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks, and what residents hold
+while they use a thing (a book, a mug, a tumbler, a wine glass, a can, a fork, a spoon, chopsticks, a phone, a coin,
+a bag of bird seed, a dart, a pool cue, a ping-pong bat, a cocktail shaker, a watering can, secateurs, a paintbrush,
+chalk, a baby's bottle, a postcard, a basketball, a pen, a pencil, a whiteboard marker and the phone box's receiver);
+override pack
 `packs/held/manifest.json`, over the `item.*` and `tool.*` keys) are built in Blender by
 `tools/art/blender/families/held.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They are still.
 

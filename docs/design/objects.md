@@ -324,6 +324,12 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   ```json
   "motions": { "idle": "blades_turn" }
   ```
+- **Running on its own:** `running` names a clip that goes round while the object runs on its own (content `runs`:
+  a washer loaded, its drum turning), nobody at it, from rest to rest like a loop, finishing its round when the run
+  ends. The sim says when (the placement's `running`); its sound is the object's `runs.sound`.
+  ```json
+  "motions": { "uses": { "laundry": "door_open", "unload": "door_open" }, "hold": 2.5, "running": "drum_spin" }
+  ```
 - **Clocks:** `clock` names a clock's hands: `hour` a clip turning its hand once round in 12 hours,
   `minute` one turning its hand once round in an hour (each a whole turn from rest, any length:
   `G.spin`), and `at` the time the hands show at rest, in minutes past twelve (the catalogue picture's
@@ -405,7 +411,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   middle, or the `centre` it gives; `tools/art/blender/centres.json`, which the build writes for the gate
   only) by over 2 cm at rest (not its far version), one that reaches over 1 cm into the wall, one
   indoors (on the floor, a wall or the ceiling, without `vary`) that reaches over 2 cm past its
-  footprint at rest, or whose part that goes round (a loop or ambient spin: a fan's blades) sweeps
+  footprint at rest (and the tiles it reaches over, content `overhang`: the arc lamp's shade), or whose part that goes round (a loop or ambient spin: a fan's blades) sweeps
   over 1 cm past it, a thing on a top that reaches more than 10 % past its content `radius` from its
   origin (its farthest vertex, as it shows), and a floor model or moving part lower than the floor
   drawn over it; each against every content object that draws the model. Functional heights (warnings

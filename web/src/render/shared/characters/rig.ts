@@ -18,8 +18,8 @@ import type { Placement } from './pose';
 import { type Bed, LIE_BACK, LIE_CENTRE, type PlacedObject } from './seats';
 import { EMBRACE } from './socials';
 
-/** Rows in the pose texture (= Sim capacity). */
-export const MAX_CHARACTERS = 64;
+/** Rows in the pose texture: the town's residents (sim-core `MAX_SIMS`, 64), then its vendors and shopkeepers (`staff::MAX_STAFF`, 32). */
+export const MAX_CHARACTERS = 96;
 /** How far the feet reach past the slot centre for a lying Sim, and their back's height above the feet line: babies (much smaller) lie centred in the crib, on the mattress. */
 export function lieCentre(rig: SimRig): number {
   // (A smaller body than its family's base body, a child's, lies with its head where a grown-up's would be, on the pillow.)
@@ -172,6 +172,17 @@ export interface SimRig {
    */
   feetUp: boolean;
   feet: Float32Array;
+  /** Body language (`bodyLanguage.ts` `bearing`): the bearing it has eased to, and how free the body is for it. */
+  bearing: Float32Array;
+  /**
+   * Turning on the spot (`turns.ts`): the turn clip playing ('' none), its size (deg), the yaw it started from and
+   * the turn it makes (rad), and whether `choose` has started its clip.
+   */
+  turnKey: string;
+  turnDeg: number;
+  turnFrom: number;
+  turnBy: number;
+  turnStarted: boolean;
   /**
    * A cuddle (`CUDDLE`): seconds since it began (-1: not cuddling) and since laying the baby back
    * down began (-1: not yet), game minutes so far, the pace of picking up / putting back, and the
@@ -186,6 +197,10 @@ export interface SimRig {
   reachW: number;
   holdW: number;
   liftW: number;
+  /** Feeding the baby from a bottle (what the use holds, `PROP_ITEMS`): the right hand off their legs, the bottle at their mouth. */
+  feeding: boolean;
+  /** What they eat (content `items` id, '' none: the snapshot's `plate`): with cutlery, the bite is `eatFork`. */
+  plate: string;
   /** Where the feet step in towards the crib (m, along the facing). */
   cuddleStep: number;
   /**
@@ -237,6 +252,11 @@ export interface SimRig {
   fromBed: boolean;
   lieX: number;
   lieZ: number;
+  /**
+   * Getting out of bed: the root the lying body fading out had there (forward of `lieX`, `lieZ`), the lie's or, a lie
+   * still fading in cut short, that of the pose held where the fade had got to (`hold`).
+   */
+  lieFwd: number;
   /** The way they lay (kept while lying), for turning out of bed to the side sim-core turned them (`outOfBed`). */
   lieYaw: number;
   /**

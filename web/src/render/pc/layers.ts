@@ -68,11 +68,12 @@ export function overLayer(app: pc.AppBase, camera: pc.CameraComponent): pc.Layer
       if (light.layers.includes(pc.LAYERID_WORLD) && !light.layers.includes(made.id)) light.layers = [...light.layers, made.id];
     }
     const clear = { depth: 1, flags: pc.CLEARFLAG_DEPTH };
-    // SAFETY: both of PlayCanvas's devices have `clear(options)` (the renderer's own clears go through
-    // it: `Renderer.clear`), inside the pass being drawn; the base class doesn't declare it.
-    const device = app.graphicsDevice as unknown as { clear(options: typeof clear): void };
+    // Both of PlayCanvas's devices have `clear(options)` (the renderer's own clears go through it:
+    // `Renderer.clear`), inside the pass being drawn; the base class doesn't declare it.
+    const device = app.graphicsDevice;
     app.scene.on(pc.EVENT_PRERENDER_LAYER, (_camera: pc.CameraComponent, drawn: pc.Layer, transparent: boolean) => {
-      if (drawn === made && !transparent && made.meshInstances.length) device.clear(clear);
+      if (drawn !== made || transparent || !made.meshInstances.length) return;
+      if (device instanceof pc.WebglGraphicsDevice || device instanceof pc.WebgpuGraphicsDevice) device.clear(clear);
     });
     overLayers.set(app, made);
   }

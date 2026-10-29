@@ -687,7 +687,6 @@ From the coordinator's notes and each wave's `review-log.md`, deduplicated; the 
 - A flag for an odd sound for the kind (a sizzle away from a hob) would have found I-packs-19 at once.
 
 **`tools/bench/check.mjs play`**
-- One resident per object. Wanted: `--sims a,b` for pairs (the seesaw, ping-pong, the climbing frame, two at a pool table), and a social and phone mode (the cross-cutting wave wrote its own scenes).
 - `--use ripe`, for every `when: ripe` use (the veggie bed's is `pickSnack`), and the growth stage in the record.
 - It records clips only on the object used, not on the helpers a recipe walks to; it can't follow a whole recipe.
 - Picture names leave out the helper, so one chair tried at several desks overwrites itself.
@@ -714,15 +713,6 @@ From the coordinator's notes and each wave's `review-log.md`, deduplicated; the 
 **The gallery and previews**
 - The gallery stands tabletop things on the ground and draws the range hood on the floor.
 - Previews draw glass opaque, and ids used in two families overwrite each other's (E1).
-
-**Debug states and commands**
-- No command sets a relationship or a need; the cross-cutting wave hand-edited states with a scratch Python script, which the project's rules want in Rust (`DUMP_STATES` tests).
-- Free will runs for a moment as a page opens.
-- No state has the street (`world.meta` is null; only `?bench=village` shows it), and there is no night state of a town lot.
-- `__world().objects` doesn't carry a lamp's `off`.
-- `__controls.follow(null)` sends the view back to the home lot.
-- `hud=0` doesn't hide the top bar.
-- The roof hides when the camera is close.
 
 **Known before the review** ([docs/review/README.md](review/README.md) "Tooling")
 - The lamp build checks only the light's height, not `at` (`lighting.py:94`).
@@ -898,28 +888,28 @@ Planned separately, after this review (§11.1).
 
 | Finding | Sev. | What is left | What it would take |
 |---|---|---|---|
-| M-hobbies-11 (open) | S3 | The home chess table has one chair, so chess at home stays *Practise chess* (Q-16). | A 1 × 2 table with a chair at each end, as the park's; `slots: 2`, `places` facing each other, a *Play chess* use with `partner` and `alone: chess`. M. |
-| I-garden-12 (later) | S3 | Only the apple tree's front apple hangs within reach; *Pick the apples* reaches into the air under the crown. | The crown's middle down to about 2.6 m, or six to eight apples on low twigs at 1.4–1.9 m; recorded in `tools/art/blender/families/trees.md`. With it, low fruit for a child (I-garden-11). M. |
+| M-hobbies-11 (fixed in 0.5.0, f2f5ccfc) | S3 | The home chess table has one chair, so chess at home stays *Practise chess* (Q-16). | A 1 × 2 table with a chair at each end, as the park's; `slots: 2`, `places` facing each other, a *Play chess* use with `partner` and `alone: chess`. M. |
+| I-garden-12 (fixed in 0.5.0, 3f480b8c) | S3 | Only the apple tree's front apple hangs within reach; *Pick the apples* reaches into the air under the crown. | The crown's middle down to about 2.6 m, or six to eight apples on low twigs at 1.4–1.9 m; recorded in `tools/art/blender/families/trees.md`. With it, low fruit for a child (I-garden-11). M. |
 | M-held-03 (in part) | S3 | Crisps, the stall's fruit and the pastry come on the treat plate. | A cone or paper cup, a hot dog in its bun, a crisp packet, an apple and a pastry in a paper bag; recorded in `held.md`. M. |
 | M-lighting-06 (in part) | S3 | The sim lets a shade reach over the next tile (`overhang`); the arc lamp's model still stops at its own. | Rebuild `lampFloorArc` reaching over the next tile, then `overhang: [[0, 1]]`, its `light.at`, and build mode's and `housegen.ts`'s placing; recorded in `lighting.md`. M. |
 | A-outdoor-01 (fixed) | S2 | The hot tub's cover folds back as one part, squashed about its back edge, not in two halves. | Two halves are a fourth draw call, as the shower's door was (Q-05). S once the draw is allowed. |
 | A-outdoor-02 (in part) | S3 | The washing comes down onto the line all together, not piece by piece. | A part per line takes the model to five draws: a rebuild that keeps the still body to one finish. M. |
 | A-decor-01 (in part) | S3 | The grandfather clock's trunk door never opens. | A fifth draw call; the clock is wound at its dial, so it can stay shut. |
 | I-kids-01 (fixed) | — | The high chair's tray doesn't slide out for the baby. | A tray clip in `kids.py`. S. |
-| I-community-09 (in part) | — | The bakery case's sliding door is on the baker's side. | With vendors (§9.3). |
+| I-community-09 (fixed, 0.5.0) | — | The bakery case's sliding door is on the baker's side. | The baker uses it (`feat/vendors`). |
 | I-tabletop-01 (fixed) | — | The kettle's lid, the bread bin's roll-top and the laptop's lid have uses since G-63 but no clip. | A clip each in `tabletop.py`. S. |
 
 ### 9.3 Small leftovers
 
 | Finding | Sev. | What is left | What it would take |
 |---|---|---|---|
-| I-packs-12 (open) | S3 | The bonsai, the roses on the arbour, the lectern and the streetball hoop are worked from the object's edge. | Possible now with G-62: `places` on each; a reading hand pose at the lectern (a clip). S–M. |
-| I-garden-11 (open) | S3 | A child can't reach the fruit it picks. | The owner's decision (§11.3 c). |
+| I-packs-12 (fixed in 0.5.0, f679389b) | S3 | The bonsai, the roses on the arbour, the lectern and the streetball hoop are worked from the object's edge. | Possible now with G-62: `places` on each; a reading hand pose at the lectern (a clip). S–M. |
+| I-garden-11 (fixed in 0.5.0, 3f480b8c) | S3 | A child can't reach the fruit it picks. | The owner's decision (§11.3 c). |
 | I-bathroom-07 (in part) | S3 | The resident stands at the washer for its 30 minutes and folds at the dryer with empty hands. | A timed machine (load it, it runs on its own, unload it) and a fold at the basket: new behaviour. M. |
-| I-community-09 (in part) | S2 | Nobody serves in town: the food is self-serve. | Vendors and shopkeepers (Q-17, later). L. |
-| I-bathroom-04 (in part) | S3 | About thirty uses still have no sound: the treadmill and bikes, the workbench, the ball games and darts, the arcade, the sewing machine, the pottery wheel, the coffee machines, the blender's motor, the microwave, the toaster, an oven's fan, the pizza oven, the fridge door, the bin lid, the vending machines, the phone box, the basketball, singing, a bowed cello, the punch bag and the smash bin. | New synthesised sounds (art), keyed by `sound`; the headed listening check G-53 left. M. |
+| I-community-09 (fixed, 0.5.0) | S2 | Nobody serves in town: the food is self-serve. | Vendors and shopkeepers serve during their hours (`staff.rs`, `feat/vendors`); self-serve stays on a household's own lot. |
+| I-bathroom-04 (fixed) | S3 | About thirty uses still have no sound: the treadmill and bikes, the workbench, the ball games and darts, the arcade, the sewing machine, the pottery wheel, the coffee machines, the blender's motor, the microwave, the toaster, an oven's fan, the pizza oven, the fridge door, the bin lid, the vending machines, the phone box, the basketball, singing, a bowed cello, the punch bag and the smash bin. | New synthesised sounds (art), keyed by `sound`; the headed listening check G-53 left. M. |
 | A-residents-03 (in part) | S3 | Feet slide 56–78 % of the way at speeds 4 and 5. | Won't fix: no gait steps at 45–90 m/s without strobing. |
-| M-lighting-08 (fixed) | S3 | On Low the four forward lamps aren't kept to their room, nor are tiles split by a diagonal wall. | The same room mask in the forward lights' shader (§11.3 e). M. |
+| M-lighting-08 (fixed) | S3 | On Low the four forward lamps aren't kept to their room, nor are tiles split by a diagonal wall. | The same room mask in the forward lights' shader (§11.3 e). M. Done for 0.5.0: the mask on every preset, a room per half of a split tile. |
 | I-kitchen-09 (fixed) | S3 | The range hood's light and hum while the hob below is in use. | Later, as polish (Q-19). S. |
 | I-garden-08 (fixed) | S3 | No flower can be cut for a vase. | Later, with a vase to put them in (Q-18). M. |
 
@@ -949,7 +939,7 @@ The 11 the review's headless harness couldn't reach were checked afterwards with
 | A-systems-01 | closed (not reproduced) | Resized fridge, toilet, filing cabinet, washer and wall bed: every part moves on its new hinge (since 94381476). Left: a stretched door, drawers' original travel. Resizing (`RESIZING`, `buildmode.ts`) can be switched back on as far as moving parts go; which objects look right resized is the owner's call. |
 | A-town-01 | fixed (4746eecf) | The colour studio and the catalog pictures ran the wind with reduce motion on; they follow it now, and the system setting takes effect at once. |
 | I-garden-01 | fixed (e780cf3a, bd2125aa) | In 15 of 67 packed gardens a told use was dropped: the resident tried one tile only. They now walk to the first use tile there is a way to (`crowded-garden` state). |
-| M-houses-01 | closed (by design) | `cutWallItems` shows every wall thing while one is held, "as what may be in its way". Showing only those on the wall under the held one would be a design change. |
+| M-houses-01 | closed (by design) | `cutWallItems` shows every wall thing while one is held, "as what may be in its way". Showing only those on the wall under the held one would be a design change. Fixed for 0.5.0: the walls stand while one is held. |
 | M-living-02 | fixed (5b1e7152) | The ground dug away over a basement also hid models in the shared plain finish: the stairs lost their top 0.5 m. Only the landscape is dug now. |
 | M-town-03 | closed (not reproduced) | 15 loads on both backends and every preset: 0.000 % of pixels off by more than 2. |
 | M-town-08 | fixed (51f1f4f7) | The siding drew with the sidewalk's planar-UV shader (same defines); the vertex plugin now sets its own. |
@@ -1169,7 +1159,7 @@ Balance after the last fix (`sweep-sim`, 180 days): median weekly savings $407, 
 - **Brushing teeth gives less hygiene** (`content`): at 0.05 the busy soak's town had no birth in 120 hours; 0.03 (under washing hands' rate) passes. *Recommendation:* accept; the soak's threshold is the real question, with (b)'s baby chance.
 - **Feet slide at speeds 4 and 5** (A-residents-03): won't fix, as no gait steps at 45–90 m/s without strobing. *Recommendation:* accept.
 - **The draw budget over moving parts:** the hot tub's cover folds as one squashed part, the washing comes down in one piece, the grandfather clock's trunk door stays shut, all to stay within four draws (§9.2). *Recommendation:* accept now; allow a fourth draw for the hot tub's cover with its next rebuild, as for the shower (Q-05).
-- **Town food is self-serve:** nobody serves, so the labels and descriptions say tin, honesty box, tongs or self-service till (G-67, Q-17). *Recommendation:* accept until vendors.
+- **Town food is self-serve:** nobody serves, so the labels and descriptions say tin, honesty box, tongs or self-service till (G-67, Q-17). *Recommendation:* accept until vendors. *Since 0.5.0:* vendors and shopkeepers serve (I-community-09); the self-serve labels stay for a household's own cart.
 - **Games for two without a partner:** the seesaw, ping-pong and park chess are refused with nobody free; pool and foosball are practised alone; the home chess table stays a game for one (M-hobbies-11). *Recommendation:* accept.
 - **Harvests go to the fridge** (G-68 read with Q-18): crops still replant themselves; "Pick an apple" and the nature lover's veggie bed stay nibbles eaten on the spot, as does a harvest with no fridge. *Recommendation:* accept.
 - **The high chair by day only:** night feeds stay at the crib, in the arms. *Recommendation:* accept.
@@ -1178,7 +1168,7 @@ Balance after the last fix (`sweep-sim`, 180 days): median weekly savings $407, 
 - **Some narrow-drive houses lose their garage** (G-58: a garage now needs 3 m inside). *Recommendation:* accept.
 - **A meal nobody needs** scores a tenth (`UNWANTED_MEAL`, I-systems-12): it is cooked only with nothing else to do. *Recommendation:* accept.
 - **The lamps don't light the ground:** the clustered lamps lighting the terrain cost 1.5 ms on Medium, so garden and street lamps cast pools instead (G-60). *Recommendation:* accept.
-- **Silence over a wrong sound:** toast, the blender, the microwave and baking are silent until their sounds are made (G-53). *Recommendation:* accept.
+- **Silence over a wrong sound:** toast, the blender, the microwave and baking are silent until their sounds are made (G-53). *Recommendation:* accept. (Made since: I-bathroom-04.)
 - **A hang-out cancelled half way loses its load** and leaves the line empty (the washing is claimed as the use starts, so no two uses take one load). *Recommendation:* accept; small.
 
 **(g) A save and load drops each pupil's grade by 6** (found by the smoke test; not from this review: `main` has it too). `Sim::school_day` (`world.rs`) isn't saved, so after a load `schedule_school` (`life.rs`) counts the day as missed and takes off `base.json`'s missed-day points. *Recommendation:* fix it before the merge: save `school_day` (version 32, absent: today, so an old save doesn't lose a day either) with a test. **Done:** `sims[].schoolDay`, `SAVE_VERSION` 32, `children::a_save_and_load_after_school_costs_no_missed_day`.

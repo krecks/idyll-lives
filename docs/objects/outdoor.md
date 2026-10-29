@@ -58,7 +58,7 @@ none.
 | `hammock` Hammock | 1x3 · floor | swing:relax doze:nap | outdoor / seating | Frame, Fabric, Stripes | Loop (E1) | `sway`: swings ±8° while lain in (E1). A 2.8 m stand, a 1.96 m bed: lain in at full length. |
 | `porchSwing` Porch swing | 2x1 · floor | swing:relax | outdoor / seating | Seat, Frame, Chains, Cushion | Loop (E1) | `swing`: the seat swings ±10° while sat in (E1). Its cushion's top at 0.52 m. |
 | `swingSet` Swing set | 2x2 · floor | swing:play | outdoor / play | Frame, Seats | Loop (E1) | `swing`: the seat swings while played (E1). Both hands on the chains, the legs pumping in time with it (`rideSwing172`/`147`/`112`). |
-| `hotTubCedar` Cedar hot tub | 2x2 · floor | soak:bath coverOn:fetch | outdoor / seating | Cedar, Cover | Use + Loop | `cover_off`: the cover folds back on its seam and hangs behind the tub, as on a lifter, for soak and stays off (C1) until "Put the cover on" (`coverOn`); `bubbles`: the water bubbles while soaking (E1). |
+| `hotTubCedar` Cedar hot tub | 2x2 · floor | soak:bath coverOn:fetch | outdoor / seating | Cedar, Cover | Use + Loop | `cover_off`: the cover's front half folds back over its back half on the seam and the two hang behind the tub, as on a lifter (4 draws), for soak and stays off (C1) until "Put the cover on" (`coverOn`); `bubbles`: the water bubbles while soaking (E1). |
 
 **In play** (signed off 2026-10-17):
 - Each checked in four facings: the lounger's back lowers for sunbathe and doze and comes up after; the hammock's
@@ -109,7 +109,7 @@ none.
 | `greenhouse` Greenhouse | 2x3 · floor | tend:tend harvest:harvest | outdoor / yard | Frame, Wall | Use | `door_open`: the glass door swings 70° and the roof vent lifts 25° for tend and harvest, worked from the path down its middle (`inside`). 4 draws (plain, glass, door, vent), as the nature lover's glasshouse. Far version. |
 | `compostBin` Compost bin | 1x1 · floor | compost:tend | outdoor / yard | Bin | Use | `lid_open`: the slatted lid lifts 75° for compost; `hold` 2 s. Far version. |
 | `rainBarrel` Rain barrel | 1x1 · floor | — | outdoor / yard | Barrel | Static | Static: ribbed barrel, brass tap, the downpipe into its lid. Far version. Static: ribbed barrel with a lid and its inlet, brass tap; no downpipe (Q-06). |
-| `clothesline` Washing line | 3x1 · floor | washing:clean takeIn:clean | outdoor / yard | Posts, Washing | Use + Open | `washing`: the washing comes down from the line along the 20-minute hang-out (`over`), goes up again along the take-in, and is the `open` clip (C1): it stays out until taken in. The line is out (or in) once the use is done (content `gradual`, G-50). One part for all nine pieces: they come down together, not one by one. Far version (washing in). Hanging out takes a washed load (`workOn`). |
+| `clothesline` Washing line | 3x1 · floor | washing:clean takeIn:clean | outdoor / yard | Posts, Washing | Use + Open | `washing`: the washing comes down onto the line a line at a time along the 20-minute hang-out (`over`; a part a line, the front line first), goes up again the other way along the take-in, and is the `open` clip (C1): it stays out until taken in. The line is out (or in) once the use is done (content `gradual`, G-50). The still body is one finish (satin) so the three lines of washing fit in four draws (A-outdoor-02, 0.5.0). Far version (washing in). Hanging out takes a washed load (`workOn`, 7:00 to 19:00, the basket carried there) and the washing dries in 3 hours (content `runs`); taken in after, it leaves a dry load, carried to the laundry basket to fold. A generated home with a washer and no dryer gets one in its garden (`housegen.json` `garden.washingLine`: on the lawn behind or beside the house, a clear tile all round). |
 | `firewoodStack` Log store | 1x1 · floor | — | outdoor / yard | Shelter | Static | Static: the iron rack under a pent iron roof, logs ends out. Far version. |
 
 **In play** (signed off 2026-10-17):
@@ -168,7 +168,7 @@ These six have no group code of their own.
 - Checked in the north yard in four facings with their uses: pat the gnome, watch the birds, listen to the water and
   make a wish, water and smell the planter. The lantern and boulders are still; nothing floats or sinks.
 - Since 2026-10-21 (review A-outdoor-03) the fountain's water moves (`flow`, ambient:
-  `fixes/motions/g1718/views/fountain-t0.6.png`); it still makes no sound (G-53).
+  `fixes/motions/g1718/views/fountain-t0.6.png`); its water is heard by itself (`ambient: fountain`, G-53).
 - Colours checked by day in two facings with test colours far from the defaults, at night on WebGPU and on Low
   WebGL2, and in the colour studio. Every colour lands on the part its label names.
 - The gnome's Tunic takes in its sleeves; its boots sit wholly inside the tunic bell, so only the belt is named.

@@ -1,12 +1,14 @@
 /**
  * Shooting hoops (`basketballHoop`, characters.ts `STEP_IN`: out on the court, a lane each for two): from
- * `SHOT.to` m out from the hoop's middle, its rim 2.94 m up and 0.27 m out (`playground.py` `RIM`). A round of
+ * `SHOT.to` m out from the hoop's middle, its rim 2.94 m up and 0.27 m out (`playground.py` `RIM`); and at the
+ * streetball hoop (`energetic.streetballHoop`, `STREET_SHOT`), its rim 2.4 m up and 0.22 m out
+ * (`pack_energetic.py` `RIM`), from 2.2 m out, where its two players stand (content `places`). A round of
  * a few dribbles, the ball gathered to the chest, the dip and a jump shot, the right hand under the ball and the
  * left at its side, let go at the top with the wrist flicked through, a landing on bent knees and the follow-through
  * held while the ball drops in, a look up at it. A child heaves it up two-handed from the chest instead, with
  * a little hop. In sizes like the street's (`street.ts`): the rim's height and distance divided by the size give
- * the clip's, which set where the arms point and where the head looks. The ball is mimed (props in hand are a
- * later item); its net swishes 1.4 s into the use and every 3.2 s after (`HOOP` in `playground.py`), the
+ * the clip's, which set where the arms point and where the head looks. The ball goes with the round (`ballAt`): bounced
+ * on the dribbles, in both hands from the gather, in an arc to the rim and back; its net swishes 1.4 s into the use and every 3.2 s after (`HOOP` in `playground.py`), the
  * round's length.
  */
 
@@ -16,11 +18,13 @@ import { TAU } from './idle';
 import { wrist } from './ik';
 import { SHARES_177, sizes, type Fit, type Size } from './street';
 
-/** The rim's height and how far out it is from the hoop's middle (m). */
+/** The rim's height and how far out it is from the hoop's middle (m): the park's hoop and the streetball hoop. */
 const RIM = { y: 2.94, z: 0.27 };
-type ShotFit = Fit & { push: boolean };
+const STREET_RIM = { y: 2.4, z: 0.22 };
+type ShotFit = Fit & { push: boolean; rim: { y: number; z: number } };
 /** Three sizes; the smallest shoots two-handed from the chest. */
-export const SHOT: Size<ShotFit>[] = sizes('hoopShot', SHARES_177, (s) => ({ s, to: 2.5, push: s < 0.7 }));
+export const SHOT: Size<ShotFit>[] = sizes('hoopShot', SHARES_177, (s) => ({ s, to: 2.5, push: s < 0.7, rim: RIM }));
+export const STREET_SHOT: Size<ShotFit>[] = sizes('streetShot', SHARES_177, (s) => ({ s, to: 2.2, push: s < 0.7, rim: STREET_RIM }));
 const SHOT_S = 3.2;
 /** When (s into the round) the ball is gathered, the dip, the jump, the release and the landing. */
 const T = { gather: 1.05, dip: 1.35, jump: 1.55, release: 1.72, land: 1.95, settle: 2.3 };
@@ -33,7 +37,7 @@ const T = { gather: 1.05, dip: 1.35, jump: 1.55, release: 1.72, land: 1.95, sett
 function shotPose(fit: ShotFit): (p: number) => PoseSpec {
   const { s, to, push } = fit;
   // The rim from the eyes' place, in the clip's frame: its height and how far ahead.
-  const rim: Vec = [0, RIM.y / s, (to - RIM.z) / s];
+  const rim: Vec = [0, fit.rim.y / s, (to - fit.rim.z) / s];
   const aim = (Math.atan2(rim[1] - 1.6, rim[2]) * 180) / Math.PI;
   // The pelvis: low for the dip, up off the floor in the jump (a child's hop smaller), and the knees bent on landing.
   const up = push ? 0.06 : 0.13;
@@ -80,6 +84,93 @@ function shotPose(fit: ShotFit): (p: number) => PoseSpec {
   };
 }
 
+/** The basketball's radius (m; held.py `basketball`, its middle that far up from its origin). */
+export const BALL_R = 0.1254;
+/** The round's fits by clip, for the ball's path (`ballAt`). */
+const FITS = new Map([...SHOT, ...STREET_SHOT].map(({ clip, fit }) => [clip, fit]));
+/** The rim (its height and how far out from the hoop's middle, m) of clip `clip`'s round, if it is one. */
+export function rimOf(clip: string): { y: number; z: number } | undefined {
+  return FITS.get(clip)?.rim;
+}
+/** When (s into the round) the ball reaches the rim, and the floor under it after dropping through the net. */
+const RIM_AT = T.release + 0.5;
+const DOWN_AT = RIM_AT + 0.28;
+
+function ease(u: number): number {
+  const v = Math.min(1, Math.max(0, u));
+  return v * v * (3 - 2 * v);
+}
+
+/**
+ * Where the basketball's middle is `t` s into a round of clip `clip` at the hoop, into `out` (x, y, z): bounced under
+ * the right palm on the dribbles (to the floor and back up to the hand every 0.3 s), taken into both hands at the
+ * gather and held up to the set point, then let go in an arc to the rim (`rim`: its middle, in the world), down through
+ * the net to the floor and back to the hand in two bounces for the next round. `palms`: the right's, then the left's,
+ * as just posed; `feet` (x, z) and `yaw` the shooter's; `floor` the floor's height; `scale` the body's, `size` the
+ * ball's (the hands'). False for a clip that isn't a round at a hoop.
+ */
+export function ballAt(clip: string, t: number, palms: Float32Array, rim: ArrayLike<number>, feet: ArrayLike<number>, yaw: number, floor: number, scale: number, size: number, out: Float32Array): boolean {
+  const fit = FITS.get(clip);
+  if (!fit) return false;
+  const r = BALL_R * size;
+  const fx = Math.sin(yaw);
+  const fz = Math.cos(yaw);
+  // Under the right palm; between the two, a little up from them (the right hand under the ball, the left at its side).
+  const under = (y: number): void => {
+    out[0] = palms[0];
+    out[1] = y;
+    out[2] = palms[2];
+  };
+  const held = (o: Float32Array, k: number): void => {
+    o[k] = (palms[0] + palms[3]) / 2;
+    o[k + 1] = (palms[1] + palms[4]) / 2 + 0.8 * r;
+    o[k + 2] = (palms[2] + palms[5]) / 2;
+  };
+  const low = floor + r;
+  if (t < T.gather - 0.15) {
+    // To the floor and back: at the hand on the hand's top, on the floor half way.
+    under(low + (palms[1] - r - low) * Math.abs(Math.cos((Math.PI * t) / 0.3)));
+    return true;
+  }
+  if (t < T.release) {
+    // From under the right hand into both, gathered to the chest, up to the set point.
+    const w = ease((t - (T.gather - 0.15)) / 0.25);
+    held(out, 0);
+    out[0] = palms[0] + (out[0] - palms[0]) * w;
+    out[1] = palms[1] - r + (out[1] - (palms[1] - r)) * w;
+    out[2] = palms[2] + (out[2] - palms[2]) * w;
+    return true;
+  }
+  if (t < RIM_AT) {
+    // Let go from the set point (the clip's hands there, on this body) in an arc to the rim, a little over it.
+    const set = fit.push ? [0, 1.28, 0.32] : [0.04, 1.77, 0.19];
+    const sx = feet[0] + (fz * set[0] + fx * set[2]) * scale;
+    const sy = floor + set[1] * scale + 0.8 * r;
+    const sz = feet[1] + (-fx * set[0] + fz * set[2]) * scale;
+    const u = (t - T.release) / (RIM_AT - T.release);
+    out[0] = sx + (rim[0] - sx) * u;
+    out[2] = sz + (rim[2] - sz) * u;
+    out[1] = sy + (rim[1] + r * 0.3 - sy) * u + 4 * 0.55 * u * (1 - u);
+    return true;
+  }
+  if (t < DOWN_AT) {
+    // Through the net, down to the floor under the rim.
+    const u = (t - RIM_AT) / (DOWN_AT - RIM_AT);
+    out[0] = rim[0];
+    out[2] = rim[2];
+    out[1] = rim[1] + r * 0.3 + (low - rim[1] - r * 0.3) * u * u;
+    return true;
+  }
+  // Back to the shooter in two bounces, up into the right hand for the next round's first dribble.
+  const u = (t - DOWN_AT) / (SHOT_S - DOWN_AT);
+  const bounce = 0.45 * Math.abs(Math.sin(2 * Math.PI * Math.min(u, 0.75) / 0.75)) * (1 - u);
+  const lift = ease((u - 0.75) / 0.25);
+  out[0] = rim[0] + (palms[0] - rim[0]) * ease(u);
+  out[2] = rim[2] + (palms[2] - rim[2]) * ease(u);
+  out[1] = low + bounce + (palms[1] - r - low) * lift;
+  return true;
+}
+
 export function shotClips(): ClipDef[] {
-  return SHOT.map(({ clip, fit }) => cycle(clip, { seconds: SHOT_S, loop: true }, shotPose(fit)));
+  return [...SHOT, ...STREET_SHOT].map(({ clip, fit }) => cycle(clip, { seconds: SHOT_S, loop: true }, shotPose(fit)));
 }

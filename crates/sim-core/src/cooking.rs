@@ -658,7 +658,8 @@ fn find_station(
         if def.stations & mask == 0 || def.reach > reach || obj.broken() || access(ctx, sim, ctx.object_plot[o as usize]) != Access::Full {
             continue;
         }
-        if !obj.can_use(sim.id, def.slots) {
+        // (A machine running, or done with its load still in it: not till it's emptied.)
+        if !obj.can_use(sim.id, def.slots) || obj.run.is_some() {
             busy = true;
             continue;
         }
@@ -1783,9 +1784,15 @@ pub(crate) fn step_done(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance]
                 sim.held = None;
             }
             if stage == 2 {
-                sim.held = None;
+                let n = sim.held.take().map_or(0, |h| h.servings.max(1));
                 if let Some(o) = station {
                     wear(sim, content, objects, o);
+                    // Into a dishwasher's rack: put away when it's emptied, not now.
+                    if content.objects[objects[o as usize].def].rack > 0 {
+                        let more = items.list.iter().any(|it| it.household == sim.household && it.to_clear(content) && washed(content, it.def).is_some());
+                        crate::machines::rack_in(sim, content, &mut objects[o as usize], n, more);
+                        return end_activity(sim, content, objects);
+                    }
                 }
             }
             let next = Task { kind: TaskKind::Dishes { item, station: None, stage: stage + 1, scraps: 0 }, ..task };

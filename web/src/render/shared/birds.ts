@@ -23,6 +23,9 @@
  *   pecking, looking up; never on paths, patios, in rooms or under furniture.
  * - Wary: a resident within a few metres, or the camera diving close, sends them up into the
  *   nearest plant away from it; they keep off the lawn for a while after.
+ * - Fed: seed scattered from a bench (`BirdFrame.seed`) brings the ground birds within 25 m down round it,
+ *   a few at a time; they work towards it, peck more and stay while it's thrown, and don't mind the one
+ *   throwing it (someone else coming close still sends them up).
  * - The day: busiest at dawn and early evening, quieter at midday (`birdActivity`, as the songs
  *   heard); at dusk each flies home to roost (head turned back into its feathers, puffed up) and
  *   wakes at first light.
@@ -254,6 +257,9 @@ export interface BirdFrame {
   residents: Float32Array;
   residentCount: number;
   visible: Uint8Array;
+  /** Seed being scattered: where it lands (x, z) and the row of the resident throwing it, three each; how many. */
+  seed: Float32Array;
+  seedCount: number;
   /** Reduce motion. */
   calm: boolean;
   /** The viewed house's roof is drawn (doves may sit on its ridge). */
@@ -511,6 +517,9 @@ export class Birds<L extends BirdLook = BirdLook> {
   /** Residents outdoors on the ground this frame (x, z each) and how many: they scare the birds near them. */
   private threats = new Float32Array(0);
   private threatCount = 0;
+  /** This frame's seed (`BirdFrame.seed`). */
+  private seed: Float32Array = new Float32Array(0);
+  private seedCount = 0;
   /** Which perches of a plant are taken (`occupy`). */
   private taken = new Uint8Array(32);
   /**
@@ -643,6 +652,8 @@ export class Birds<L extends BirdLook = BirdLook> {
     this.calm = f.calm;
     this.eye = f.camera;
     this.roofOn = f.roof;
+    this.seed = f.seed;
+    this.seedCount = f.seedCount;
     this.findThreats(f);
     let moved = false;
     for (const b of this.birds) {
@@ -990,8 +1001,15 @@ export class Birds<L extends BirdLook = BirdLook> {
   /** On the lawn: home when its time's up (or soon after its partner left). */
   private onLawn(b: Bird, now: number): void {
     const mate = this.leader(b);
+    // While seed is thrown close by, it stays; nearby on the lawn, it goes over to it rather than home.
+    const seed = this.seedNear(b, 12);
+    if (seed >= 0 && (this.seed[seed * 3] - b.x) ** 2 + (this.seed[seed * 3 + 1] - b.z) ** 2 < 2.5 * 2.5) {
+      b.leaveAt = Math.max(b.leaveAt, now + 2 + rnd() * 4);
+      return;
+    }
     if (mate && mate.state !== 'ground') b.leaveAt = Math.min(b.leaveAt, now + 0.5 + rnd());
     if (now < b.leaveAt) return;
+    if (seed >= 0 && this.flyToSeed(b, seed)) return;
     if (mate && mate.plant >= 0) this.flyTo(b, mate.plant, this.nearPerch(mate.plant, mate.perch, b), 1);
     else this.flyHome(b);
   }
@@ -1001,8 +1019,12 @@ export class Birds<L extends BirdLook = BirdLook> {
     if (b.singUntil > now || b.preenUntil > now) return;
     const mate = this.leader(b);
     if (mate && (mate.plant !== b.plant || mate.state === 'ground') && b.nextFly > now + 1.5) b.nextFly = now + 0.4 + rnd() * 1.2;
+    // Seed thrown nearby: down to it before long, a few at a time.
+    const seed = this.seedNear(b, 25);
+    if (seed >= 0 && b.nextFly > now + 8) b.nextFly = now + 0.5 + rnd() * 7;
     if (now >= b.nextFly) {
       b.nextFly = now + between(rnd, b.sp.fly) / (0.4 + this.busy);
+      if (seed >= 0 && this.flyToSeed(b, seed)) return;
       if (mate) this.followMate(b, mate);
       else this.flyOff(b);
       return;
@@ -1035,7 +1057,7 @@ export class Birds<L extends BirdLook = BirdLook> {
     if (this.threats.length < f.residentCount * 2) this.threats = new Float32Array(f.residentCount * 2);
     let n = 0;
     for (let i = 0; i < f.residentCount; i++) {
-      if (!f.visible[i]) continue;
+      if (!f.visible[i] || this.feeding(i)) continue;
       const hx = f.residents[i * 3];
       const hz = f.residents[i * 3 + 2];
       if (f.residents[i * 3 + 1] > THREAT_HEIGHT || this.topAt(hx, hz) > 0) continue;
@@ -1044,6 +1066,40 @@ export class Birds<L extends BirdLook = BirdLook> {
       n++;
     }
     this.threatCount = n;
+  }
+
+  /** Whether resident row `i` is throwing seed now (not a threat). */
+  private feeding(i: number): boolean {
+    for (let k = 0; k < this.seedCount; k++) if (this.seed[k * 3 + 2] === i) return true;
+    return false;
+  }
+
+  /** The seed nearest a bird within `range` m (its index in `seed`), -1 for none; only for the ground birds, not when wary. */
+  private seedNear(b: Bird, range: number): number {
+    if (b.sp.ground <= 0 || b.waryUntil > this.clock) return -1;
+    let pick = -1;
+    let best = range * range;
+    for (let k = 0; k < this.seedCount; k++) {
+      const d = (this.seed[k * 3] - b.x) ** 2 + (this.seed[k * 3 + 1] - b.z) ** 2;
+      if (d < best) [best, pick] = [d, k];
+    }
+    return pick;
+  }
+
+  /** Down to the seed (`seed[k]`): a spot of lawn round where it lands. False if there's none. */
+  private flyToSeed(b: Bird, k: number): boolean {
+    const sx = this.seed[k * 3];
+    const sz = this.seed[k * 3 + 1];
+    for (let n = 0; n < 12; n++) {
+      const a = rnd() * Math.PI * 2;
+      const r = 0.35 + rnd() * 1.0;
+      const x = sx + Math.cos(a) * r;
+      const z = sz + Math.sin(a) * r;
+      if (!this.lawn(x, z)) continue;
+      this.flyDown(b, x, z, 1);
+      return b.state === 'fly';
+    }
+    return false;
   }
 
   /** A resident or the camera close: up into the nearest plant away from them. True if it fled. */
@@ -1562,8 +1618,12 @@ export class Birds<L extends BirdLook = BirdLook> {
       this.flick(b, now);
       return;
     }
-    // Next: a peck or two, or a move.
-    if (rnd() < gait.pecks) {
+    // Next: a peck or two, or a move (by the seed, more pecks, and moves towards it).
+    const seed = this.seedNear(b, 6);
+    const sx = seed >= 0 ? this.seed[seed * 3] : 0;
+    const sz = seed >= 0 ? this.seed[seed * 3 + 1] : 0;
+    const toSeed = seed >= 0 ? Math.hypot(sx - b.x, sz - b.z) : Infinity;
+    if (rnd() < (toSeed < 1.4 ? 0.8 : gait.pecks)) {
       b.peck = 0;
       b.steps = 1 + Math.floor(rnd() * gait.peckMax);
       b.nextStep = now + 0.3 + rnd() * 0.6;
@@ -1575,6 +1635,7 @@ export class Birds<L extends BirdLook = BirdLook> {
     const away = Math.hypot(b.x - home.x, b.z - home.z);
     let dir = b.yaw + (rnd() - 0.5) * 2.2;
     if (away > home.radius + 6) dir = Math.atan2(home.x - b.x, home.z - b.z) + (rnd() - 0.5);
+    if (toSeed < Infinity && toSeed > 0.6) dir = Math.atan2(sx - b.x, sz - b.z) + (rnd() - 0.5) * 0.8;
     for (let k = 0; k < 6; k++) {
       const tx = b.x + Math.sin(dir) * hops * gait.stride;
       const tz = b.z + Math.cos(dir) * hops * gait.stride;

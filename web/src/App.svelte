@@ -88,6 +88,8 @@
     // `?bench=<scene>`: the benchmark's settings (for this page only) before anything reads them.
     const bench = BENCH ? await import('./debug/bench') : null;
     bench?.prepareBench();
+    // (`hud=0` on any debug page: the world without the interface, for checks' pictures.)
+    if (!BENCH && new URLSearchParams(location.search).get('hud') === '0') (await import('./debug/bench')).hideHud();
     let data: Awaited<ReturnType<typeof loadGameData>>;
     try {
       step('Loading game data', 0.05);

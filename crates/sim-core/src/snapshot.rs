@@ -7,10 +7,12 @@ use crate::Content;
 use crate::world::{Activity, MAX_SIMS, Phase, Sim, Task, TaskKind, World};
 use crate::{TICKS_PER_SECOND, clock};
 
-pub const HEADER_LEN: usize = 9;
-/// Floats per Sim (all 30 used).
-pub const SIM_STRIDE: usize = 30;
-pub const CAPACITY: usize = HEADER_LEN + MAX_SIMS * SIM_STRIDE;
+pub const HEADER_LEN: usize = 10;
+/// Floats per Sim (all 32 used).
+pub const SIM_STRIDE: usize = 32;
+/// The residents' rows, then the town's servers' (`header::STAFF_COUNT`, `staff.rs`), in the same
+/// layout.
+pub const CAPACITY: usize = HEADER_LEN + (MAX_SIMS + crate::staff::MAX_STAFF) * SIM_STRIDE;
 
 pub mod header {
     /// Tick counter modulo 2^24 (exact in f32); only used to detect change.
@@ -26,6 +28,12 @@ pub mod header {
     pub const MAJOR_EVENT: usize = 7;
     /// `Items::version` modulo 2^24: food and dishes changed (fetch `items` again).
     pub const ITEMS_VERSION: usize = 8;
+    /// Servers at the town's stalls and counters (`staff.rs`): as many rows as this right after
+    /// the residents' (`SIM_COUNT` of them), each laid out as a resident's (`sim`). A row's `ID`
+    /// is its row; `AWAY` is 1 while they're off work (closed); `ACTION` is `service.anim`
+    /// while they serve someone, with `HELD` what they hand over and `PROGRESS` how far the
+    /// customer's use is; `OBJECT` is -1 (they stand behind it, not at it).
+    pub const STAFF_COUNT: usize = 9;
 }
 
 pub mod sim {
@@ -102,6 +110,13 @@ pub mod sim {
     /// recipe step's), while at it; else -1. The renderer plays a clip along with it (the washing
     /// hung out piece by piece, a crop picked).
     pub const PROGRESS: usize = 29;
+    /// What they eat while eating, on the table in front of them or in their hands: index into
+    /// `Content::items` + 1, else 0. The renderer puts cutlery in the hands for a plate that wants it.
+    pub const PLATE: usize = 30;
+    /// 1 while the room they're in is kept shut on their account (a bathroom they're in, the
+    /// bedroom they try for a baby in; `privacy.rs`), else 0: the renderer keeps its doors shut
+    /// to anyone but whoever goes through them (nobody else goes in).
+    pub const SHUTS: usize = 31;
 }
 
 /// How far ahead along their way `sim::AHEAD_X` looks, in metres.
@@ -109,9 +124,9 @@ pub const AHEAD: f32 = 1.5;
 
 // Every field fits in a Sim's row.
 const _: () = assert!(
-    sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE && sim::PROGRESS < SIM_STRIDE && sim::CARRY < SIM_STRIDE
+    sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE && sim::PROGRESS < SIM_STRIDE && sim::CARRY < SIM_STRIDE && sim::PLATE < SIM_STRIDE && sim::SHUTS < SIM_STRIDE
 );
-const _: () = assert!(header::ITEMS_VERSION < HEADER_LEN);
+const _: () = assert!(header::ITEMS_VERSION < HEADER_LEN && header::STAFF_COUNT < HEADER_LEN);
 
 /// What a Sim does for the snapshot; see `sim::OBJECT`, `sim::ACTION`, `sim::OBJECT_DEF` and
 /// `sim::INTERACTION`.
@@ -131,6 +146,14 @@ impl Doing {
         let object = object.and_then(|o| world.stable_of(o)).map_or(-1.0, |s| s as f32);
         Doing { object, action: anim.map_or(-1.0, |a| a as f32), ..Doing::NOTHING }
     }
+}
+
+/// What `s` eats while at it (`sim::PLATE`): the plate on the table in front of them, else what they hold.
+fn eating(world: &World, s: &Sim) -> Option<usize> {
+    let Some(Activity { task: Task { kind: TaskKind::Eat { plate, .. }, .. }, phase: Phase::Using { .. }, .. }) = s.current() else {
+        return None;
+    };
+    plate.and_then(|p| world.items.get(p)).map(|it| it.def).or(s.held.map(|h| h.def))
 }
 
 fn doing(world: &World, s: &Sim) -> Doing {
@@ -242,9 +265,14 @@ fn doing(world: &World, s: &Sim) -> Doing {
     let inter = &world.content.objects[obj.def].interactions[*interaction];
     // A baby lying awake in the crib isn't shown asleep; nor anyone waiting at a game for two for
     // the one they play with as playing (`partners::hold`: a seesaw doesn't rock with one).
+    // At a post: waiting for its server, standing; where nobody serves, helping themselves
+    // (`staff.rs`).
+    let server = inter.served.as_ref().and_then(|_| world.staff.server_of(*object));
     let action = match phase {
         Phase::Using { .. } if inter.baby_bed() && s.awake_in_crib(&world.content, clock::hour(world.tick)) => None,
         Phase::Using { elapsed } if inter.partner && (s.partner_wait > 0 || *elapsed == 0.0) => None,
+        Phase::Using { .. } if server.is_some() && !s.being_served => None,
+        Phase::Using { .. } if server.is_none() && inter.served.is_some() => inter.served.as_ref().and_then(|f| f.anim).or(inter.anim),
         Phase::Using { .. } => inter.anim,
         _ => None,
     };
@@ -269,7 +297,7 @@ fn progress(world: &World, s: &Sim) -> f32 {
             .objects
             .get(object as usize)
             .and_then(|o| world.content.objects[o.def].interactions.get(interaction))
-            .map_or(0.0, |i| i.minutes),
+            .map_or(0.0, |i| i.minutes_where(world.staff.server_of(object).is_some())),
         TaskKind::Cook { minutes, .. } => f32::from(minutes),
         _ => return -1.0,
     };
@@ -277,11 +305,15 @@ fn progress(world: &World, s: &Sim) -> f32 {
 }
 
 /// The waypoint a Sim walks to and where their way is `AHEAD` metres on (`sim::WAY_X`,
-/// `sim::AHEAD_X`), both where they stand when they aren't walking.
+/// `sim::AHEAD_X`), both where they stand when they aren't walking (waiting outside a room kept
+/// shut too: its door doesn't open for them).
 fn way_ahead(world: &World, s: &Sim) -> ([f32; 2], [f32; 2]) {
     let Some(Activity { phase: Phase::Routing { waypoints, next }, .. }) = s.current() else {
         return (s.pos, s.pos);
     };
+    if s.kept_out() {
+        return (s.pos, s.pos);
+    }
     let storey = world.storey_of(s.pos[1].floor() as i32);
     let Some(&way) = waypoints.get(*next).filter(|wp| world.storey_of(wp[1].floor() as i32) == storey) else {
         return (s.pos, s.pos);
@@ -302,6 +334,21 @@ fn way_ahead(world: &World, s: &Sim) -> ([f32; 2], [f32; 2]) {
     (way, at)
 }
 
+/// What a resident carries for a use without having it (content `brings`, `holds`; an item
+/// index): the basket of washing in the arms on the way to the dryer, a shirt in the hands while
+/// folding. Only shown.
+fn shown_held(world: &World, s: &crate::world::Sim) -> Option<usize> {
+    let a = s.current()?;
+    let TaskKind::Use { object, interaction } = a.task.kind else { return None };
+    let o = world.objects.get(object as usize)?;
+    let inter = world.content.objects[o.def].interactions.get(interaction)?;
+    match a.phase {
+        Phase::Routing { .. } => inter.brings,
+        Phase::Using { .. } => inter.holds,
+        _ => None,
+    }
+}
+
 /// Writes the snapshot into `out`, which must hold at least `CAPACITY` floats.
 pub fn write(world: &World, out: &mut [f32]) {
     out[header::TICK] = (world.tick % (1 << 24)) as f32;
@@ -318,6 +365,8 @@ pub fn write(world: &World, out: &mut [f32]) {
         .find(|e| e.kind.importance() >= 2)
         .map_or(0.0, |e| (e.id % (1 << 24)) as f32);
     out[header::ITEMS_VERSION] = (world.items.version % (1 << 24)) as f32;
+    let staff = &world.staff.servers[..world.staff.servers.len().min(crate::staff::MAX_STAFF)];
+    out[header::STAFF_COUNT] = staff.len() as f32;
     for (i, s) in world.sims.iter().enumerate() {
         let o = &mut out[HEADER_LEN + i * SIM_STRIDE..HEADER_LEN + (i + 1) * SIM_STRIDE];
         o[sim::ID] = s.id as f32;
@@ -343,7 +392,8 @@ pub fn write(world: &World, out: &mut [f32]) {
         o[sim::THOUGHT] = thought.map_or(0.0, |t| t.kind as u8 as f32);
         o[sim::THOUGHT_SUBJECT] = thought.map_or(0.0, |t| t.subject as f32);
         o[sim::HEIGHT] = world.sim_height(s);
-        o[sim::HELD] = s.held.map_or(0.0, |h| h.def as f32 + 1.0);
+        // Being served: what they're handed (the renderer shows it once it's theirs).
+        o[sim::HELD] = s.held.map(|h| h.def).or_else(|| shown_held(world, s)).or_else(|| serving(world, s)).map_or(0.0, |d| d as f32 + 1.0);
         o[sim::RECIPE] = match s.current().map(|a| a.task.kind) {
             Some(TaskKind::Cook { recipe, .. }) => recipe as f32 + 1.0,
             _ => 0.0,
@@ -357,6 +407,9 @@ pub fn write(world: &World, out: &mut [f32]) {
         [o[sim::AHEAD_X], o[sim::AHEAD_Z]] = ahead;
         o[sim::CARRY] = crate::carry::carrying(s).map_or(0.0, |b| b as f32 + 1.0);
         o[sim::PROGRESS] = progress(world, s);
+        // (Or what a use holds in the hands, a slice of cake at the café: eaten with a fork.)
+        o[sim::PLATE] = eating(world, s).or_else(|| shown_held(world, s)).map_or(0.0, |d| d as f32 + 1.0);
+        o[sim::SHUTS] = crate::privacy::keeps_shut(world, s.id) as u8 as f32;
     }
     // Conversations: write the shared state into every participant's row.
     for (i, s) in world.sims.iter().enumerate() {
@@ -388,6 +441,57 @@ pub fn write(world: &World, out: &mut [f32]) {
             o[sim::ACTION] = talk;
         }
     }
+    write_staff(world, out);
+}
+
+/// The servers' rows, after the residents' (`header::STAFF_COUNT`).
+fn write_staff(world: &World, out: &mut [f32]) {
+    let first = world.sims.len();
+    for (k, server) in world.staff.servers.iter().take(crate::staff::MAX_STAFF).enumerate() {
+        let row = first + k;
+        let o = &mut out[HEADER_LEN + row * SIM_STRIDE..HEADER_LEN + (row + 1) * SIM_STRIDE];
+        o.fill(0.0);
+        o[sim::ID] = row as f32;
+        o[sim::X] = server.pos[0];
+        o[sim::Z] = server.pos[1];
+        o[sim::YAW] = server.yaw;
+        o[sim::MOVING] = server.moving as u8 as f32;
+        o[sim::PARTNER] = -1.0;
+        o[sim::AWAY] = (!server.present) as u8 as f32;
+        o[sim::OBJECT] = -1.0;
+        o[sim::OBJECT_DEF] = -1.0;
+        o[sim::INTERACTION] = -1.0;
+        o[sim::ACTION] = -1.0;
+        o[sim::PROGRESS] = -1.0;
+        o[sim::MOOD] = 0.75;
+        [o[sim::WAY_X], o[sim::WAY_Z]] = server.pos;
+        [o[sim::AHEAD_X], o[sim::AHEAD_Z]] = server.pos;
+        // Serving: the customer's use as it goes, and what they hand over.
+        if let Some(c) = server.serving.and_then(|c| world.sims.get(c as usize))
+            && let Some(inter) = served_use(world, c)
+        {
+            o[sim::ACTION] = world.content.service.anim.map_or(-1.0, |a| a as f32);
+            o[sim::PROGRESS] = progress(world, c);
+            o[sim::HELD] = crate::staff::handed(&world.content, inter).map_or(0.0, |i| i as f32 + 1.0);
+        }
+    }
+}
+
+/// The use a resident is being served at a post (`staff.rs`), if they are.
+fn served_use<'a>(world: &'a World, s: &Sim) -> Option<&'a crate::content::Interaction> {
+    if !s.being_served {
+        return None;
+    }
+    let Some(Activity { task: Task { kind: TaskKind::Use { object, interaction }, .. }, phase: Phase::Using { .. }, .. }) = s.current() else {
+        return None;
+    };
+    let o = world.objects.get(*object as usize)?;
+    world.content.objects[o.def].interactions.get(*interaction).filter(|i| i.served.is_some())
+}
+
+/// What a resident being served at a post is handed (`staff::handed`).
+fn serving(world: &World, s: &Sim) -> Option<usize> {
+    crate::staff::handed(&world.content, served_use(world, s)?)
 }
 
 /// The layout for the web side. `actions` (the content's animation tags) names the values
@@ -398,13 +502,14 @@ pub fn layout_json(content: &Content) -> String {
         "headerLen": HEADER_LEN,
         "simStride": SIM_STRIDE,
         "maxSims": MAX_SIMS,
+        "maxStaff": crate::staff::MAX_STAFF,
         "ticksPerSecond": TICKS_PER_SECOND,
         "header": {
             "tick": header::TICK, "day": header::DAY, "minute": header::MINUTE,
             "speed": header::SPEED, "simCount": header::SIM_COUNT,
             "structureVersion": header::STRUCTURE_VERSION,
             "calm": header::CALM, "majorEvent": header::MAJOR_EVENT,
-            "itemsVersion": header::ITEMS_VERSION,
+            "itemsVersion": header::ITEMS_VERSION, "staffCount": header::STAFF_COUNT,
         },
         "sim": {
             "id": sim::ID, "x": sim::X, "z": sim::Z, "yaw": sim::YAW,
@@ -416,7 +521,8 @@ pub fn layout_json(content: &Content) -> String {
             "held": sim::HELD, "recipe": sim::RECIPE, "call": sim::CALL,
             "wayX": sim::WAY_X, "wayZ": sim::WAY_Z, "aheadX": sim::AHEAD_X, "aheadZ": sim::AHEAD_Z,
             "carry": sim::CARRY,
-            "progress": sim::PROGRESS,
+            "progress": sim::PROGRESS, "plate": sim::PLATE,
+            "shuts": sim::SHUTS,
         },
         "actions": content.animations,
         "items": content.items.iter().map(|i| &i.id).collect::<Vec<_>>(),

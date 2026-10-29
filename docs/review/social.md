@@ -24,13 +24,13 @@ Label, animation and minutes from content.
 | `sweetTalk` Sweet talk (flirt, 20 min) | n/a | I-social-03 | OK | I-social-03 S3 clip | `social/sheets/romance.png` |
 | `kiss` Kiss (kiss, 4 min) | n/a | A-social-01 | I-social-02 | A-social-01 S2 code (confirmed and widened: the arms hang at the sides); I-social-02 S2 code (a refused kiss: nothing happens) | `social/sheets/romance.png`, `social/pairs/fail-kiss-ya-adult-01.png` |
 | `askPartner` Ask to be partners (talk, 10 min) | n/a | OK | I-social-03 | I-social-03 S3 clip | `social/sheets/romance.png` |
-| `breakUp` Break up (argue, 10 min) | n/a | A-residents-07 | I-social-03 | I-social-03 S3 clip; A-residents-07 S2 code (residents ledger: no body language) | `social/pairs/breakUp-adult-ya-01.png` |
-| `insult` Insult (argue, 5 min) | n/a | A-residents-07 | I-social-03 | I-social-03 S3 clip; A-residents-07 S2 code (residents ledger) | `social/sheets/talks.png` |
-| `argue` Argue (argue, 20 min) | n/a | A-residents-07 | OK | A-residents-07 S2 code (residents ledger: a faster talk, head shakes and a slight lean; no anger in the body) | `social/sheets/talks.png` |
+| `breakUp` Break up (argue, 10 min) | n/a | OK | I-social-03 | I-social-03 S3 clip; A-residents-07 S2 code (residents ledger: no body language; fixed 240be09b) | `social/pairs/breakUp-adult-ya-01.png` |
+| `insult` Insult (argue, 5 min) | n/a | OK | I-social-03 | I-social-03 S3 clip; A-residents-07 S2 code (residents ledger; fixed 240be09b) | `social/sheets/talks.png` |
+| `argue` Argue (argue, 20 min) | n/a | OK | OK | A-residents-07 S2 code (residents ledger: a faster talk, head shakes and a slight lean; no anger in the body; fixed 240be09b: an angry resident's body, upright, the arms in, the elbows bent) | `social/sheets/talks.png` |
 | `prank` Prank (laugh, 8 min) | n/a | OK | I-social-03 | I-social-03 S3 clip (the joke's laugh; no prank is played) | `social/sheets/fights.png` |
 | `fight` Start a fight (fight, 8 min) | n/a | A-social-03 | A-social-03 | A-social-03 S2 clip (punches at the attacker's own height, over a child's head); I-systems-04 S2 code (systems ledger, widened: anyone may fight a child) | `social/sheets/fights.png` |
 | `apologize` Apologize (talk, 10 min) | n/a | OK | I-social-03 | I-social-03 S3 clip | `social/pairs/apologize-teen-ya-01.png` |
-| `tryForBaby` Try for a baby (kiss, 30 min) | n/a | A-social-01 | I-social-05 | A-social-01 S2 code (confirmed); I-social-05 S3 decision (a 30-minute standing kiss wherever the two meet) | `social/pairs/tryForBaby-adult-ya-01.png` |
+| `tryForBaby` Try for a baby (kiss, 30 min) | n/a | A-social-01 | I-social-05 | A-social-01 S2 code (confirmed); I-social-05 S3 decision (fixed 33a9ded1, 9987714b: a 3-minute ask, then 30 minutes in a double bed behind a shut door) | `social/pairs/tryForBaby-adult-ya-01.png`; after `fixes/privacy/3-bed-inside.png` |
 | `goodbyeHug` Hug goodbye (hug, 3 min) | n/a | OK | OK | A-social-02 S3 code (seeded; not seen: the housemate stays 1.2 m off) | `social/sheets/goodbye.png`, `social/pairs/goodbyeHug-adult-child-01.png` |
 | `goodbye` Say goodbye (wave, 3 min) | n/a | OK | OK | | `social/sheets/goodbye.png`, `social/pairs/goodbye-adult-elder-01.png` |
 
@@ -98,7 +98,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** code
 - **Where:** `web/src/render/babylon/characters.ts:530` (`ACTIONS.phone`), `web/src/render/shared/characters/clips/idle.ts:132` (`phonePose`)
 - **Evidence:** The rubric records that no phone, book, cup or cutlery prop exists today. Props in hand are new behaviour: filed as `code` only, planned separately (§9, decision 3). Cross-cutting wave: every phone action, at every stage that may use one, holds an empty hand to the ear (`social/sheets/phone.png`, `social/scenes/phone-text-01.png`, `social/scenes/phone-call-01.png`); the same at the objects that use `phone` (the video-call nook, the shortwave radio, `systems/sheets/act-phone-meditate-idle.png`). The phone booth is the one place a receiver is there (its model).
-- **Status:** later (G-70, props in hand: new behaviour, owner decision 3); was confirmed
+- **Status:** fixed (b98bc6af; the phone box 2026-10-28): a mobile in the hand for every call and text; in the phone box the receiver is taken off its hook and held to the ear, drawn on the hook by code (`REST_PROPS`: a part of its own would be the box's fifth draw call); was confirmed
+- **After:** the phone at the ear (`PROPS.phoneEar`; the `phone` clip's palm now over the ear, the fingers up the side of the head) and in both hands before the chest for texting (`PROPS.phoneHeld`, its screen to the eyes), standing and seated; none at the video-call nook, the party booth, the shortwave radio or the phone box: `fixes/props/pairs1.png` (`call-t1.5`, `text-t1.5`), every stage `stages/*.png`. Calls from the phone menu weren't played in a house (the check house's residents have nobody in their phones); the pose bench plays the same clips and props.
 - **Source:** `plan/authenticity-review.md` §3.3 (I7) and §9 (decision 3); wave: cross-cutting
 
 ### I-social-02 — Success and failure look the same: a refused hug or kiss is two people standing still, and a bad joke is laughed at
@@ -152,7 +153,8 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Fix class:** decision
 - **Where:** `web/public/content/base.json:1678` (`tryForBaby`: `animation: kiss`, 30 minutes, no place)
 - **Evidence:** `social/pairs/tryForBaby-adult-ya-01.png`: Ada and Ben stand kissing in the front garden for half an hour, the children a few metres off. Trying for a baby needs a place and privacy (a bed, a closed door). For the owner: keep it a kiss (the game's tone), or make it a use of a double bed behind a door, which is new behaviour (`code`).
-- **Status:** later (G-72; Q-21: kept as it is until the privacy flag, then moved to a bed)
+- **Status:** fixed (33a9ded1, 9987714b, 87d003ec; G-72, Q-21: moved to a bed with the privacy flag)
+- **After:** *Try for a baby* is a 3-minute ask (the kiss); when it goes well the two go to a double bed at home that nobody else is on, in a room with a door and nobody else in it, and lie under the covers for 30 minutes (someone else in the room as they get there: they don't) (the double beds' *Try for a baby*, content `conceive`: a game for two done behind a shut door), the bedroom kept shut meanwhile: anyone else on their way in waits outside. A baby may come of it once they've lain there their time. Without such a bed free the social isn't chosen, and the player's ask is refused ("Ada and Ben have nowhere private to try for a baby: a double bed in a room of its own"); it isn't in the bed's menu. Tests: `tests/privacy.rs` (`trying_for_a_baby_is_in_a_double_bed_behind_a_shut_door`, `no_trying_for_a_baby_without_a_bed_behind_a_door`, `with_free_will_partners_try_for_a_baby_in_bed`, `not_with_someone_else_in_the_bedroom`). In play on `privacy-check` (headless): the two under the quilt with the bedroom door shut, Gus waiting outside it (`bench-results/review/fixes/privacy/3-bed-inside.png`, `4-gus-*.png`).
 - **Source:** wave: cross-cutting
 
 ### I-social-06 — Nobody ever talks seated: a social stands both of them up

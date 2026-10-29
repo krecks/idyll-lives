@@ -16,7 +16,8 @@
  *   matrix, PlayCanvas's own for instanced draws) are the skinned ones everything after reads: the
  *   lamps' rooms, basements, the fog, the diag views.
  * - Rows a pass leaves out (`game_simShown`, 16 bits a component: `residentRowFilter`, all of them but
- *   in a mirror's reflection, which draws only the residents its glass shows) scale to nothing.
+ *   in a mirror's reflection, which draws only the residents its glass shows) scale to nothing. It covers
+ *   the first 64 rows; the rows past them (the town's servers in a full town) always draw.
  * - Before skinning (`getLocalPosition`, `vsLocal`): the face morphs (`GAME_SIM_MORPH`: the set's
  *   morph texture `game_simMorphs`, its block per vertex in `game_simMorph`, the row's (channel,
  *   weight) pairs), position and normal (`normalCoreVS`'s `getLocalNormal` wrapped,
@@ -141,6 +142,8 @@ const VS_GLSL = {
 	uniform vec4 game_simShown;
 	float gameSimShown() {
 		int row = int(game_simRow + 0.5);
+		// (The filter covers the first 64 rows, the residents'; rows past them, servers in a full town, always draw.)
+		if (row >= 64) return 1.0;
 		float bits = floor(game_simShown[row / 16] / exp2(float(row % 16)));
 		return bits - 2.0 * floor(bits * 0.5);
 	}
@@ -220,7 +223,9 @@ const VS_WGSL = {
 	uniform game_simShown: vec4f;
 	fn gameSimShown() -> f32 {
 		let row = i32(game_simRow + 0.5);
-		let bits = floor(uniform.game_simShown[row / 16] / exp2(f32(row % 16)));
+		// (The filter covers the first 64 rows, the residents'; rows past them, servers in a full town, always draw.)
+		if (row >= 64) { return 1.0; }
+		let bits = floor(uniform.game_simShown[min(row, 63) / 16] / exp2(f32(row % 16)));
 		return bits - 2.0 * floor(bits * 0.5);
 	}
 	#ifdef GAME_SIM_MORPH

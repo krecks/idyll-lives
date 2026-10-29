@@ -3,7 +3,7 @@
  * its appearance and face morph texels: `shared/characters/layout.ts`), sampled texel by texel by the
  * character shader (`shaders/character.ts`).
  *
- * Each frame only the band of rows that changed goes to the GPU (`uploadRows`): a few of the 64
+ * Each frame only the band of rows that changed goes to the GPU (`uploadRows`): a few of the 96
  * rows most frames, none while the game is paused. PlayCanvas's own `lock`/`unlock` (and `upload`)
  * sends the whole level, and its `write` exists only on WebGL2, makes a pixel buffer each call and
  * waits on a fence. So, per backend:
@@ -27,15 +27,6 @@ import * as pc from './engine';
  */
 interface WebgpuDeviceInternals {
   wgpu: GPUDevice;
-}
-interface WebglDeviceInternals {
-  gl: WebGL2RenderingContext;
-  setTexture(texture: pc.Texture, unit: number): void;
-  activeTexture(unit: number): void;
-  bindTexture(texture: pc.Texture): void;
-  setUnpackFlipY(on: boolean): void;
-  setUnpackPremultiplyAlpha(on: boolean): void;
-  setUnpackAlignment(alignment: number): void;
 }
 interface TextureInternals {
   impl: { gpuTexture?: GPUTexture | null; _glTexture?: WebGLTexture | null };
@@ -112,8 +103,8 @@ export class PoseTexture {
       (device as unknown as WebgpuDeviceInternals).wgpu.queue.writeTexture(dest, this.data, layout, size);
       return;
     }
-    const gl = device as unknown as WebglDeviceInternals;
-    if (!texture.impl._glTexture) return;
+    if (!(device instanceof pc.WebglGraphicsDevice) || !texture.impl._glTexture) return;
+    const gl = device;
     gl.activeTexture(0);
     gl.bindTexture(texture);
     gl.setUnpackFlipY(false);

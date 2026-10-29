@@ -39,7 +39,7 @@ Yard keeps G.jitter out (it gives other numbers in each Blender process: outdoor
 | `shedSmall` | the ledged and braced door with black T-hinges and a latch, hinged on the left: `door_open` swings it 100° out (1 s) for the whole of pottering | `potter` |
 | `greenhouse` | the glass door, hinged on its left post, and the roof vent on the left slope, hinged at the ridge: `door_open` swings the door 70° out and lifts the vent 25° (0.9 s), one clip on both | `tend`, `harvest` |
 | `compostBin` | the slatted lid, hinged along the back: `lid_open` lifts it 75° (0.8 s), back down after `hold` 2 s | `compost` |
-| `clothesline` | the washing (towels, a sheet, shirts, jeans, socks, pegs), origin on the line: `washing` lets it down (1.5 s). It is the `open` clip too: hanging the washing out leaves the line open (content `leaves`), so the washing stays out until it is taken in | `washing`; `open` |
+| `clothesline` | the washing (towels, a sheet, shirts, jeans, socks, pegs), a part a line (`washing_a` front, `washing_b`, `washing_c` back), each with its origin on its line: `washing` lets them down one after another (1.5 s, half a second each, `G.grow_in_turn`), so played along with the hang-out they come a line at a time. It is the `open` clip too: hanging the washing out leaves the line open (content `leaves`), so the washing stays out until it is taken in | `washing`; `open` |
 
 The rain barrel and the log store are still.
 
@@ -66,7 +66,7 @@ The rain barrel and the log store are still.
 - **The rain barrel**: a ribbed green barrel with two hoops and a lid with its inlet, a brass tap and lever, in the
   middle of its tile. No downpipe (Q-06, 2026-10-21): a free-standing barrel's pipe ended in mid-air at 2.1 m, and
   0.7 m under the eaves against a wall.
-- **The washing line**: two galvanised T-posts with braces and the three lines; a wicker basket of folded washing.
+- **The washing line**: two grey T-posts with braces and the three lines; a wicker basket of folded washing.
 - **The log store**: the black iron rack (the old part's) under a pent roof of iron sheet (the "Shelter"),
   stacked with logs in brick bond, their pale ends to the front.
 
@@ -75,7 +75,10 @@ The rain barrel and the log store are still.
   are a white material in the glass finish (`glass_bar`), so each stays one draw yet shows an edge; the door has
   no handle (a metal one would be a second draw on it), as the nature lover's glasshouse. Its plants are plain
   satin (a foliage draw would make 5). `check-glb` warns of the 4.
-- The washing is all fabric, its pegs too (a plain peg would be a second draw on the part).
+- The washing is all fabric, its pegs too (a plain peg would be a second draw on a part). Since 0.5.0
+  (A-outdoor-02) each line's washing is a part of its own, a draw each, so the still body is one finish to stay
+  within four: the posts (were metal), the lines and the basket by the post (was fabric) are satin. `check-glb`
+  warns of the 4.
 - The compost bin's lid has a wooden grip, not metal: not furniture hardware, and metal would be a fourth draw.
 
 **Grown from nothing**: the washing is 6 mm thick and its pegs 12 mm, inside the 16 mm line: flattened onto the
@@ -94,7 +97,7 @@ built, then dropped: the gate warned the models stood 7 cm off the old parts' ce
 | greenhouse | 1.81 × 2.43 × 2.84 | 6980 | 2380 | 4 | Frame, Wall |
 | compostBin | 0.84 × 0.78 × 0.79 | 2148 | 484 | 3 | Bin |
 | rainBarrel | 0.60 × 0.97 × 0.69 | 1744 | 536 | 1 | Barrel |
-| clothesline | 2.76 × 1.82 × 0.76 | 2812 | 940 | 3 | Posts, Washing |
+| clothesline | 2.76 × 1.82 × 0.76 | 2812 | 940 | 4 | Posts, Washing |
 | firewoodStack | 1.00 × 1.10 × 0.38 | 3320 | 1316 | 2 | Shelter |
 
 `check-glb`: 0 failed; one warning, the greenhouse's 4 draws. Khronos validator: 0 errors, 0 warnings on every

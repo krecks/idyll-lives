@@ -135,6 +135,12 @@ pub struct ObjectInstance {
     /// A lamp (or a fire) switched off (see `lights.rs`); bought off, on with a lot or a house's
     /// file. Meaningless for other things.
     pub off: bool,
+    /// A machine's run (its kind `runs`; see `machines.rs`): None empty, the game minutes left
+    /// while it runs on its own, 0 done with the load still in it.
+    pub run: Option<f32>,
+    /// The dirty things washed up at it that wait in it to be washed (its kind's `rack`, a
+    /// dishwasher; `machines::rack_in`): they're washed when it runs, put away when it's emptied.
+    pub rack: u8,
     /// Residents whose current use needs it closed (bits by sim id), so opening it under them is
     /// refused (`allows`). Derived from their tasks: set when the use reserves a slot, cleared
     /// when it ends; not saved (a reloaded use starts again and sets it).
@@ -179,6 +185,9 @@ impl ObjectInstance {
     pub fn allows(&self, inter: &crate::content::Interaction, me: u32) -> bool {
         self.fits(inter)
             && (!inter.ripe || self.ripe())
+            && (!inter.loads || self.run.is_none())
+            && (inter.work_on != Some(crate::content::WorkOn::Dishes) || self.run.is_none())
+            && (!inter.unloads || self.done())
             && (inter.leaves != Some(false) || self.users().all(|u| u == me))
             && (inter.leaves != Some(true) || self.closed_users & !(1 << me) == 0)
     }
@@ -193,6 +202,16 @@ impl ObjectInstance {
     /// Whether it's open or closed as `inter` wants (`when`).
     fn fits(&self, inter: &crate::content::Interaction) -> bool {
         inter.when.is_none_or(|w| w == self.open)
+    }
+
+    /// A machine running on its own (see `run`).
+    pub fn running(&self) -> bool {
+        self.run.is_some_and(|m| m > 0.0)
+    }
+
+    /// A machine done, its load still in it (see `run`).
+    pub fn done(&self) -> bool {
+        self.run.is_some_and(|m| m <= 0.0)
     }
 
     /// Its crop is ripe (see `growth`).
@@ -351,9 +370,10 @@ impl ObjectInstance {
     }
 
     /// Takes on the state `old`, this object before it was lifted out and placed again, had: its
-    /// stable id, turn, wear, open or closed, on or off, and crop.
+    /// stable id, turn, wear, open or closed, on or off, crop, and a machine's run.
     pub(crate) fn carry_state(&mut self, old: &ObjectInstance) {
-        (self.stable, self.turn, self.wear, self.open, self.off, self.growth) = (old.stable, old.turn, old.wear, old.open, old.off, old.growth);
+        (self.stable, self.turn, self.wear, self.open, self.off, self.growth, self.run, self.rack) =
+            (old.stable, old.turn, old.wear, old.open, old.off, old.growth, old.run, old.rack);
     }
 
     pub(crate) fn release(&mut self, sim: u32) {
@@ -783,6 +803,13 @@ pub struct Sim {
     /// What they took up to work on this tick (`WorkOn` bits: a load of washing), settled with
     /// the household by `life::update`.
     pub(crate) worked: u8,
+    /// Loads of washing they left to work on next this tick (`WorkOn` bits: the wet washing out
+    /// of the washer; `Interaction::makes`), settled with `worked`.
+    pub(crate) made: u8,
+    /// The load of washing taken up for the use they're at (`WorkOn` bits): given back if the use
+    /// doesn't get done (cancelled, called away: `end_activity`), none once it is
+    /// (`machines::use_done`). Not saved: a save gives it back (a reloaded use starts again).
+    pub(crate) taken: u8,
     pub pos: [f32; 2],
     pub yaw: f32,
     pub pose: Pose,
@@ -849,6 +876,11 @@ pub struct Sim {
     /// Ticks they've waited at their place for the one they play with to get to theirs (see
     /// `partners::hold`; 0: not waiting). Not saved.
     pub(crate) partner_wait: u32,
+    /// At a post's front, being served by its server now (set as each tick starts,
+    /// `staff::update`). Not saved.
+    pub(crate) being_served: bool,
+    /// Ticks they've waited at a post for its server (`staff::hold`). Not saved.
+    pub(crate) serve_wait: u32,
     /// Found nobody to play a game for two with they chose: none chosen again until this tick
     /// (`partners::alone`). Not saved.
     pub(crate) alone_until: u64,
@@ -880,6 +912,12 @@ pub struct Sim {
     pub(crate) mess: Option<(i32, i32, f32)>,
     /// Conceived with this partner this tick (the life cycle decides; see `lifecycle::conceive`).
     pub(crate) conceived: Option<u32>,
+    /// Their *Try for a baby* with this partner went well this tick: the two go to bed
+    /// (`privacy::after_step`). Not saved.
+    pub(crate) to_bed: Option<u32>,
+    /// Ticks they've stood outside a room kept shut by someone in it, on their way in (a
+    /// bathroom in use; `privacy.rs`), 0 while not. Not saved: after a load they set off again.
+    pub(crate) kept_out: u32,
     /// Care given this tick: the baby it's for and what it fills (applied after the step).
     pub(crate) care_out: Option<(u32, [f32; MAX_NEEDS])>,
     /// A baby lifted out of their place or put in one this tick (applied after the step,
@@ -936,14 +974,21 @@ impl Sim {
         (self.pos[0].floor() as i32, self.pos[1].floor() as i32)
     }
 
+    /// Walking: on their way somewhere, and not waiting outside a room kept shut (`kept_out`).
     pub fn is_moving(&self) -> bool {
-        matches!(
-            self.current,
-            Some(Activity {
-                phase: Phase::Routing { .. },
-                ..
-            })
-        )
+        self.kept_out == 0
+            && matches!(
+                self.current,
+                Some(Activity {
+                    phase: Phase::Routing { .. },
+                    ..
+                })
+            )
+    }
+
+    /// Waiting outside a room kept shut by someone in it (a bathroom in use; `privacy.rs`).
+    pub fn kept_out(&self) -> bool {
+        self.kept_out > 0
     }
 
     pub fn current(&self) -> Option<&Activity> {
@@ -1021,6 +1066,13 @@ impl Sim {
 
     pub fn emotion(&self, content: &Content) -> Option<usize> {
         social::dominant_emotion(&self.feelings, &content.feelings)
+    }
+
+    /// How fast they walk, as a share of `WALK_SPEED`: their traits' and life stage's (`mods`)
+    /// times their emotion's (content `emotions` `walkSpeed`: slower sad, quicker angry or
+    /// energised; the renderer's body language shows the rest).
+    pub fn walk_speed(&self, content: &Content) -> f32 {
+        self.mods.walk_speed * self.emotion(content).map_or(1.0, |e| content.emotions[e].mods.walk_speed)
     }
 
     /// Recomputes `mods` when the set of active feelings with effects has changed.
@@ -1259,14 +1311,17 @@ pub struct Household {
     pub expecting: Option<Expecting>,
     /// The day a babysitter was booked for (see `life::childcare`).
     pub sitter_day: Option<u32>,
-    /// Loads of washing waiting: dirty (piling up as content `laundry` says), and washed, to
-    /// dry and fold (`content::WorkOn`).
-    pub laundry: [f32; 2],
+    /// Loads of washing waiting: dirty (piling up as content `laundry` says), washed, to dry,
+    /// and dried, to fold (`content::WorkOn::load`).
+    pub laundry: [f32; 3],
 }
 
 /// Loads of washing a new household has waiting, dirty and washed (one of each: there's always
-/// a bag of washing on moving in).
+/// a bag of washing on moving in); none dry yet.
 pub const LAUNDRY_AT_START: f32 = 1.0;
+
+/// A new household's washing waiting (`Household::laundry`).
+pub const LAUNDRY_START: [f32; 3] = [LAUNDRY_AT_START, LAUNDRY_AT_START, 0.0];
 
 /// A household expecting a baby: the parents and the day it's due.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -1391,6 +1446,12 @@ pub struct World {
     /// not when only objects, residents or households do: views can then leave the lot out.
     pub(crate) lot_version: u32,
     pub(crate) briefs: Vec<SimBrief>,
+    /// Rooms kept shut as the tick's step started (`privacy::refresh`), kept from tick to tick
+    /// like `briefs`.
+    pub(crate) shut: Vec<crate::privacy::Shut>,
+    /// The rooms kept shut while anyone is in them (`privacy::private_room`), sorted; found
+    /// with the rooms (`refresh_rooms`).
+    pub(crate) private_rooms: Vec<u16>,
     /// What each household has to work on as the tick's step started (`work_waiting`), kept
     /// from tick to tick like `briefs`.
     work: Vec<u8>,
@@ -1444,6 +1505,8 @@ pub struct World {
     pub(crate) lights_version: u32,
     /// What residents switching lights saw last (see `lights::update`).
     pub(crate) light_watch: crate::lights::Watch,
+    /// Who serves at the town's stalls and counters (see `staff.rs`); not saved.
+    pub staff: crate::staff::Staff,
 }
 
 /// Read-only context for one Sim's update.
@@ -1475,9 +1538,21 @@ pub(crate) struct Ctx<'a> {
     pub tick: u64,
     /// What each household has to work on (`work_waiting`), by household.
     pub work: &'a [u8],
+    /// Rooms kept shut now, and by whom (`privacy::refresh`).
+    pub shut: &'a [crate::privacy::Shut],
+    /// Every room and garden with its scores (`World::rooms`).
+    pub rooms: &'a [crate::rooms::RoomInfo],
+    /// Who serves at the town's stalls and counters (`World::staff`).
+    pub staff: &'a crate::staff::Staff,
 }
 
 impl Ctx<'_> {
+    /// Whether someone serves at object `object`: a sold use's minutes are then the ordering, the
+    /// hand-over and the paying (`Interaction::minutes_where`).
+    pub(crate) fn served(&self, object: u32) -> bool {
+        self.staff.server_of(object).is_some()
+    }
+
     /// Score of the room or garden at a point (`roomRules.away` off the plots and off the lot).
     pub(crate) fn room_at(&self, pos: [f32; 2]) -> f32 {
         let (x, z) = (pos[0].floor() as i32, pos[1].floor() as i32);
@@ -1558,7 +1633,7 @@ impl World {
                 routines: Vec::new(),
                 expecting: None,
                 sitter_day: None,
-                laundry: [LAUNDRY_AT_START; 2],
+                laundry: LAUNDRY_START,
             }]
         } else {
             lot_file
@@ -1575,7 +1650,7 @@ impl World {
                     routines: Vec::new(),
                     expecting: None,
                     sitter_day: None,
-                    laundry: [LAUNDRY_AT_START; 2],
+                    laundry: LAUNDRY_START,
                 })
                 .collect()
         };
@@ -1651,6 +1726,8 @@ impl World {
             reach_version: 0,
             lot_version: 1,
             briefs: Vec::new(),
+            shut: Vec::new(),
+            private_rooms: Vec::new(),
             work: Vec::new(),
             exits: Vec::new(),
             meta: serde_json::Value::Null,
@@ -1674,6 +1751,7 @@ impl World {
             watched: Vec::new(),
             lights_version: 0,
             light_watch: Default::default(),
+            staff: Default::default(),
         }
     }
 
@@ -1785,6 +1863,8 @@ impl World {
             // A crop comes ripe with a lot (bought, it is just planted: `buy_at`).
             growth: 1.0,
             off: false,
+            run: None,
+            rack: 0,
         };
         let d = &self.content.objects[def];
         let name = &d.id;
@@ -2108,6 +2188,8 @@ impl World {
             buffs: Vec::new(),
             pending_spend: 0,
             worked: 0,
+            made: 0,
+            taken: 0,
             pos: [*x, *z],
             yaw: 0.0,
             pose: Pose::Stand,
@@ -2134,6 +2216,8 @@ impl World {
             wants_partner: false,
             joins: None,
             partner_wait: 0,
+            being_served: false,
+            serve_wait: 0,
             alone_until: 0,
             household: spawn.household,
             job,
@@ -2155,6 +2239,8 @@ impl World {
             carried_by: None,
             night_woken: 0,
             conceived: None,
+            to_bed: None,
+            kept_out: 0,
             news: None,
             accident_at: [0; crate::content::MAX_ACCIDENTS],
             empty_since: [0; crate::content::MAX_ACCIDENTS],
@@ -2480,6 +2566,10 @@ impl World {
     fn apply_messes(&mut self) {
         for i in 0..self.sims.len() {
             if let Some(partner) = self.sims[i].conceived.take() {
+                // (Both done trying at once: one chance, not two.)
+                if let Some(p) = self.sims.get_mut(partner as usize).filter(|p| p.conceived == Some(i as u32)) {
+                    p.conceived = None;
+                }
                 crate::lifecycle::conceive(self, i, partner as usize);
             }
             if let Some((baby, gains)) = self.sims[i].care_out.take()
@@ -2734,6 +2824,7 @@ impl World {
         self.map_plots();
         let (rooms, cells) = crate::rooms::compute(self);
         self.rooms = rooms;
+        self.private_rooms = crate::privacy::private_rooms(&self.content, &self.plots, &self.rooms, &self.lot);
         self.rooms_version = self.room_layout_version;
         self.rooms_dirty = false;
         self.rooms_rescore = false;
@@ -2797,6 +2888,7 @@ impl World {
         let tick = self.tick;
 
         crate::partners::refresh(self);
+        crate::staff::update(self);
         let mut briefs = std::mem::take(&mut self.briefs);
         briefs.clear();
         for s in &self.sims {
@@ -2837,6 +2929,7 @@ impl World {
             }
         }
         self.briefs = briefs;
+        crate::privacy::refresh(self);
         crate::lod::plan(self);
         let hour = crate::clock::hour(tick);
         let mut work = std::mem::take(&mut self.work);
@@ -2864,6 +2957,9 @@ impl World {
                 stairs,
                 reach,
                 nav_version,
+                shut,
+                rooms,
+                staff,
                 ..
             } = self;
             let ctx = Ctx {
@@ -2887,6 +2983,9 @@ impl World {
                 minute: crate::clock::minute_of_day(tick),
                 tick,
                 work: &work,
+                shut,
+                rooms,
+                staff,
             };
             // (In lots nobody watches, only those whose turn it is; see `lod.rs`.)
             for sim in sims.iter_mut().filter(|s| s.here() && s.steps > 0) {
@@ -2900,6 +2999,7 @@ impl World {
         crate::carry::after_step(self);
         self.wake_for_crying_babies();
         conversation::update(self);
+        crate::privacy::after_step(self);
         crate::phone::update(self);
         crate::life::update(self);
         crate::lifecycle::update(self);
@@ -2921,6 +3021,9 @@ impl World {
         }
         if tick.is_multiple_of(GROWTH_STEP_MINUTES * TICKS_PER_MINUTE) {
             self.grow(GROWTH_STEP_MINUTES as f32);
+        }
+        if tick.is_multiple_of(crate::machines::STEP_MINUTES * TICKS_PER_MINUTE) {
+            crate::machines::run(self, crate::machines::STEP_MINUTES as f32);
         }
     }
 
@@ -3105,7 +3208,7 @@ impl World {
         work.clear();
         work.extend(self.households.iter().map(|h| {
             let has = |kind: WorkOn, loads: f32| if loads >= 1.0 { kind.bit() } else { 0 };
-            has(WorkOn::Laundry, h.laundry[0]) | has(WorkOn::Washed, h.laundry[1])
+            has(WorkOn::Laundry, h.laundry[0]) | has(WorkOn::Washed, h.laundry[1]) | has(WorkOn::Dried, h.laundry[2])
         }));
         for it in self.items.list.iter().filter(|it| it.to_clear(&self.content)) {
             if let Some(w) = work.get_mut(it.household as usize) {
@@ -3146,6 +3249,8 @@ impl World {
                 | Command::SetPlayerMoves { .. }
                 | Command::AddFunds { .. }
                 | Command::SetSkill { .. }
+                | Command::SetNeed { .. }
+                | Command::SetBond { .. }
                 | Command::SetAutonomy { .. }
                 | Command::SetAutoFast { .. }
                 | Command::SetRoutines { .. }
@@ -3277,6 +3382,61 @@ impl World {
                 let h = self.households.get_mut(household as usize).ok_or_else(|| Error::new(format!("unknown household {household}")))?;
                 h.funds = (h.funds + amount).max(0);
             }
+            Command::SetNeed { sim, need, value } => {
+                self.sim(sim)?;
+                let n = self.content.needs.len();
+                let which: Vec<usize> = if need == "all" {
+                    (0..n).collect()
+                } else {
+                    vec![self.content.needs.iter().position(|d| d.id == need).ok_or_else(|| Error::new(format!("unknown need '{need}'")))?]
+                };
+                let value = if value.is_finite() { value.clamp(0.0, 1.0) } else { 0.5 };
+                let sim = &mut self.sims[sim as usize];
+                for k in which {
+                    sim.needs[k] = value;
+                }
+                sim.planner.recheck = true;
+            }
+            Command::SetBond { a, b, friendship, romance, chemistry, partners } => {
+                self.sim(a)?;
+                self.sim(b)?;
+                if a == b {
+                    return Err(Error::new("a bond is between two residents"));
+                }
+                let (a, b) = (a as usize, b as usize);
+                // (Only those who may court: the game can't get anyone else there, so a check can't either.)
+                let grown_ups = self.sims[a].adult(&self.content) && self.sims[b].adult(&self.content);
+                if !conversation::may_court(grown_ups, self.relationships.get(a, b)) && (romance.is_some_and(|f| f > 0.0) || partners == Some(true)) {
+                    return Err(Error::new("only grown-ups who aren't family can be partners or in love"));
+                }
+                let r = &mut self.relationships;
+                for (x, y) in [(a, b), (b, a)] {
+                    let rel = r.get_mut(x, y);
+                    rel.met = true;
+                    if let Some(f) = friendship.filter(|f| f.is_finite()) {
+                        rel.friendship = f.clamp(-100.0, 100.0);
+                    }
+                    if let Some(f) = romance.filter(|f| f.is_finite()) {
+                        rel.romance = f.clamp(-100.0, 100.0);
+                    }
+                }
+                if let Some(c) = chemistry.filter(|c| c.is_finite()) {
+                    r.set_chemistry(a, b, c);
+                }
+                if let Some(p) = partners {
+                    // (One partner each: a new one ends what either had.)
+                    if p {
+                        for x in [a, b] {
+                            if let Some(old) = r.partner_of(x).filter(|&o| o != a && o != b) {
+                                r.set_partners(x, old, false);
+                            }
+                        }
+                    }
+                    r.set_partners(a, b, p);
+                }
+                self.sims[a].planner.recheck = true;
+                self.sims[b].planner.recheck = true;
+            }
             Command::SetSkill { sim, skill, level } => {
                 self.sim(sim)?;
                 let s = self.content.skill_index(&skill).ok_or_else(|| Error::new(format!("unknown skill '{skill}'")))?;
@@ -3312,6 +3472,8 @@ impl World {
                 object,
                 interaction,
             } => {
+                // (Who serves where, as the objects are now: `staff::closed`.)
+                crate::staff::refresh(self);
                 let obj = &self.objects[object as usize];
                 let Some(inter) = self.content.objects[obj.def].interactions.get(interaction)
                 else {
@@ -3325,6 +3487,10 @@ impl World {
                         self.content.objects[obj.def].name
                     )));
                 }
+                // Trying for a baby is asked of a partner (the social), not done at the bed alone.
+                if inter.conceive {
+                    return Err(Error::new(format!("{} is asked of a partner: click them", inter.label)));
+                }
                 if let Some(required) = missing_requirement(&self.content, &self.object_plot, None, &self.objects, object, inter) {
                     return Err(Error::new(format!(
                         "{} needs a working object on this lot that provides {required}",
@@ -3337,6 +3503,12 @@ impl World {
                         Some(w) if w != obj.open && obj.open => format!("the {name} is already open"),
                         Some(w) if w != obj.open => format!("the {name} is closed"),
                         _ if inter.ripe && !obj.ripe() => format!("the {name} isn't ripe yet"),
+                        _ if (inter.loads || inter.unloads || inter.work_on == Some(crate::content::WorkOn::Dishes)) && obj.running() => {
+                            format!("the {name} is still running")
+                        }
+                        _ if inter.work_on == Some(crate::content::WorkOn::Dishes) && obj.done() => format!("the {name} is done: empty it first"),
+                        _ if inter.loads && obj.done() => format!("the {name} is done: take the washing out first"),
+                        _ if inter.unloads && obj.run.is_none() => format!("there's nothing in the {name}"),
                         _ => format!("someone is using the {name}"),
                     }));
                 }
@@ -3368,7 +3540,10 @@ impl World {
                 if allowed == Access::None {
                     return Err(Error::new(format!("the {thing} isn't {}'s to use", s.name)));
                 }
-                if allowed == Access::Guest && !guest_may(&self.content, inter) {
+                if allowed == Access::Guest && self.content.objects[obj.def].private {
+                    return Err(Error::new(format!("{} is a guest there, and the {thing} is the household's own", s.name)));
+                }
+                if allowed == Access::Guest && !guest_may(&self.content, &self.content.objects[obj.def], inter) {
                     return Err(Error::new(format!("{} is a guest there, and guests don't {}", s.name, inter.label.to_lowercase())));
                 }
                 // Who may use what, as free will keeps it: wine and the stove not for a child,
@@ -3395,6 +3570,18 @@ impl World {
                         Unmet::Sky => format!("{} can only {label} under open sky: the {thing} has to stand outside", s.name),
                         Unmet::Nothing(w) => format!("{}: {}", inter.label, w.none()),
                     }));
+                }
+                // Sold at a post outside its hours (or a coffee from a café that's shut): closed.
+                // (As `closed_at`: the objects on its plot, none off the plots.)
+                let plot = self.object_plot.get(object as usize).copied().flatten();
+                let on: Vec<u32> = match plot {
+                    Some(p) => self.objects.iter().filter(|o| self.object_plot.get(o.id as usize).copied().flatten() == Some(p)).map(|o| o.id).collect(),
+                    None => Vec::new(),
+                };
+                if let Some(post) = crate::staff::closed(&self.content, &self.staff, &self.objects, &on, object, inter, crate::clock::hour(self.tick)) {
+                    let name = self.content.objects[self.objects[post as usize].def].name.to_lowercase();
+                    let opens = crate::staff::opens(&self.content, &self.objects, post).map_or(String::new(), |h| format!(": it opens at {}", clock_time(h)));
+                    return Err(Error::new(format!("the {name} is closed{opens}")));
                 }
                 // A game for two: its places free (or one taken by someone there for the same
                 // game, to play along with), and someone free to play, or a use for one to do
@@ -3487,6 +3674,13 @@ impl World {
                         "{} isn't possible right now",
                         def.label
                     )));
+                }
+                // Trying for a baby needs a bed behind a shut door (`privacy.rs`).
+                if def.success.effect == social::Effect::Conceive
+                    && crate::privacy::beds_in_content(&self.content)
+                    && crate::privacy::bed_in_world(self, sim as usize, target as usize).is_none()
+                {
+                    return Err(Error::new(format!("{} and {} have nowhere private to try for a baby: a double bed in a room of its own", a.name, t.name)));
                 }
                 // Walking over to someone out of the house (in the park, say).
                 let (tx, tz) = t.tile();
@@ -3927,7 +4121,8 @@ fn step_sim(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
         }
         // When home has something for it (it's busy, or they got caught up in something), only
         // if the content says so; without (no toilet, no bed), after a short while.
-        let grace = if home_fills(sim, ctx, objects, def.need) { def.crowded_grace_ticks } else { Some(def.grace_ticks) };
+        // (Kept out of a room someone is in, the bathroom, is as good as nothing.)
+        let grace = if home_fills(sim, ctx, objects, def.need) && !sim.kept_out() { def.crowded_grace_ticks } else { Some(def.grace_ticks) };
         let Some(grace) = grace else { continue };
         if ctx.tick < sim.accident_at[a] || ctx.tick < sim.empty_since[a] + grace {
             continue;
@@ -4052,11 +4247,12 @@ pub(crate) fn access(ctx: &Ctx, sim: &Sim, plot: Option<u32>) -> Access {
     access_in(ctx.households, ctx.plots, sim, plot)
 }
 
-/// Whether a guest may use `inter` at the host's: nothing private (sleeping, washing; the
-/// toilet is fine), no cooking and no caring for the host's baby.
-pub(crate) fn guest_may(content: &Content, inter: &crate::content::Interaction) -> bool {
+/// Whether a guest may use `inter` of `def` at the host's: nothing private (sleeping, washing;
+/// the toilet is fine), nothing that's the household's own (`ObjectDef::private`: a wardrobe,
+/// the bath cabinet), no cooking and no caring for the host's baby.
+pub(crate) fn guest_may(content: &Content, def: &crate::content::ObjectDef, inter: &crate::content::Interaction) -> bool {
     let rules = &content.social_rules;
-    inter.tags & rules.busy_tags & !rules.guest_tags == 0 && inter.recipe.is_none() && !inter.cares()
+    !def.private && inter.tags & rules.busy_tags & !rules.guest_tags == 0 && inter.recipe.is_none() && !inter.cares()
 }
 
 /// Why someone may not take an interaction at their age, wherever it is (see `unfit`).
@@ -4119,7 +4315,8 @@ fn clock_time(hour: f32) -> String {
 
 /// `unmet` for `sim` during a step.
 fn conditions_met(ctx: &Ctx, sim: &Sim, obj: &ObjectInstance, inter: &crate::content::Interaction) -> bool {
-    let work = ctx.work.get(sim.household as usize).copied().unwrap_or(0);
+    // (With what they've just made too: the washing taken out, carried on to dry.)
+    let work = ctx.work.get(sim.household as usize).copied().unwrap_or(0) | sim.made;
     unmet(ctx.nav.lot, ctx.hour, obj, ctx.content, inter, work).is_none()
 }
 
@@ -4241,6 +4438,19 @@ fn missing_requirement<'a>(
 fn requirements_met(ctx: &Ctx, sim: &Sim, objects: &[ObjectInstance], object: u32, inter: &crate::content::Interaction) -> bool {
     missing_requirement(ctx.content, ctx.object_plot, Some(ctx.index), objects, object, inter).is_none()
         && conditions_met(ctx, sim, &objects[object as usize], inter)
+        && !closed_now(ctx, objects, object, inter)
+}
+
+/// Whether it's sold at a post that's closed now, or needs fetching from one (`staff::closed`).
+fn closed_now(ctx: &Ctx, objects: &[ObjectInstance], object: u32, inter: &crate::content::Interaction) -> bool {
+    closed_at(ctx, objects, object, inter, ctx.hour)
+}
+
+/// `closed_now` at `hour` of the day.
+fn closed_at(ctx: &Ctx, objects: &[ObjectInstance], object: u32, inter: &crate::content::Interaction, hour: f32) -> bool {
+    let plot = ctx.object_plot.get(object as usize).copied().flatten();
+    let on = plot.map_or(&[][..], |p| ctx.index.on(p));
+    crate::staff::closed(ctx.content, ctx.staff, objects, on, object, inter, hour).is_some()
 }
 
 /// What a Sim chooses to do on their own. `from_seat`: sitting, only a word with someone sitting
@@ -4298,7 +4508,7 @@ fn pick_autonomous(
     // home has something for; and all needs home has something for (what they look ahead to).
     let low = content.autonomy.urgent_below;
     let short: u32 = (0..content.needs.len()).filter(|&n| !content.needs[n].room && needs[n] < low).fold(0, |m, n| m | 1 << n);
-    let walk_per_minute = WALK_SPEED * sim.mods.walk_speed / MINUTES_PER_TICK;
+    let walk_per_minute = WALK_SPEED * sim.walk_speed(content) / MINUTES_PER_TICK;
     let urgent = urgent_needs(sim, ctx, objects);
     let fillable = home_needs(sim, ctx, objects, (0..content.needs.len()).filter(|&n| !content.needs[n].room).fold(0, |m, n| m | 1 << n), false);
     // How far away the nearest thing for each need is, and how long until they leave for work
@@ -4351,6 +4561,9 @@ fn pick_autonomous(
         let (fx, fz) = ctx.index.links.approach_of(obj.id).unwrap_or_else(|| obj.front_tile(content));
         let distance = ctx.nav.stairs.distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos);
         let at_table = ctx.index.links.table_of(obj.id).is_some();
+        // In a room someone keeps shut (a bathroom in use): only for a need about to run out
+        // (they'll wait at the door), else something else or somewhere else.
+        let shut_away = crate::privacy::shut_away(ctx, sim, (fx, fz));
         // Nicer rooms draw residents, the more so the less they like their surroundings.
         let place = 1.0
             + content.room_rules.preference
@@ -4373,6 +4586,9 @@ fn pick_autonomous(
                 || !obj.can_use_for(sim.id, &content.objects[obj.def], i)
                 || (inter.partner && !(crate::partners::may_take(obj, &content.objects[obj.def], i, sim.id, None, |_| false) && crate::partners::free_near(ctx, sim, obj, inter)))
             {
+                continue;
+            }
+            if shut_away && inter.fills() & short == 0 {
                 continue;
             }
             // Costing a need about to run out, or planned with one it doesn't fill: it would stop
@@ -4399,7 +4615,7 @@ fn pick_autonomous(
                 || (woken && inter.tags & rest != 0)
                 || (rested && inter.tags & rhythm.sleep_tags != 0)
                 || (napped && !exhausted && inter.tags & rhythm.nap_tags != 0)
-                || (allowed == Access::Guest && inter.tags & content.social_rules.busy_tags & !content.social_rules.guest_tags != 0)
+                || (allowed == Access::Guest && !guest_may(content, &content.objects[obj.def], inter))
                 || !affordable(inter.cost, funds)
             {
                 continue;
@@ -4407,7 +4623,7 @@ fn pick_autonomous(
             let sleep = inter.tags & rhythm.sleep_tags != 0;
             let fills = inter.fills();
             let there = distance / walk_per_minute;
-            let minutes = inter.minutes + there;
+            let minutes = inter.minutes_where(ctx.served(obj.id)) + there;
             // A chosen use that would stop at once for an urgent need (`use_object`), then get
             // chosen again: don't choose it at all.
             if !sleep && breaks_off(sim, content, urgent, fills, minutes, inter, low) && !crate::planner::planned_now(content, sim, inter) {
@@ -4443,6 +4659,10 @@ fn pick_autonomous(
             } + care;
             if inter.trains_skills() && allowed == Access::Full {
                 s += training_interest(sim, content, inter) * boost / (1.0 + distance * 0.08);
+            }
+            // The washing waiting at home, the more the keener; a machine done, to be emptied.
+            if allowed == Access::Full {
+                s += crate::machines::pull(ctx.households[sim.household as usize].laundry, content, obj, inter) / (1.0 + distance * 0.08);
             }
             // The plan: a block's activity is the favourite (even with full needs); goals.
             let (plan, floor) = crate::planner::object_factor(content, sim, inter, night);
@@ -4506,7 +4726,7 @@ fn pick_autonomous(
             _ => 0.0,
         };
         // Two singles who like the look of each other: a spark before there's any romance.
-        let spark = if grown_ups && attracted && rel.met && !ctx.briefs[me].partnered && !other.partnered && rel.kin.is_none() {
+        let spark = if conversation::may_court(grown_ups, rel) && attracted && rel.met && !ctx.briefs[me].partnered && !other.partnered {
             content.social_rules.single_spark
         } else {
             0.0
@@ -4519,11 +4739,14 @@ fn pick_autonomous(
                 continue;
             }
             // Romance only between grown-ups who aren't family.
-            if s.tags & content.social_rules.romantic_tags != 0 && (!attracted || !grown_ups || !rel.kin.is_none()) {
+            if s.tags & content.social_rules.romantic_tags != 0 && (!attracted || !conversation::may_court(grown_ups, rel)) {
                 continue;
             }
-            // Trying for a baby only where one could come of it.
-            if s.success.effect == crate::social::Effect::Conceive && !could_conceive(ctx, me, j) {
+            // Trying for a baby only where one could come of it, and with a bed behind a shut door
+            // for it (where the content has beds for it: `privacy.rs`).
+            if s.success.effect == crate::social::Effect::Conceive
+                && (!could_conceive(ctx, me, j) || (crate::privacy::beds_in_content(content) && crate::privacy::bed_in_step(ctx, objects, me, j).is_none()))
+            {
                 continue;
             }
             let romantic = s.tags & content.social_rules.romantic_tags != 0;
@@ -4803,7 +5026,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
     // on, however it was chosen (`unfit`, `unmet`; an order was refused already).
     if let TaskKind::Use { object, interaction } = task.kind
         && let Some(o) = objects.get(object as usize)
-        && content.objects[o.def].interactions.get(interaction).is_some_and(|i| unfit(content, sim.age, i).is_some() || !conditions_met(ctx, sim, o, i))
+        && content.objects[o.def].interactions.get(interaction).is_some_and(|i| unfit(content, sim.age, i).is_some() || !conditions_met(ctx, sim, o, i) || closed_now(ctx, objects, object, i))
     {
         return;
     }
@@ -4860,7 +5083,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
             // may (washing hands at the host's sink after the toilet is fine).
             let plot = ctx.object_plot.get(object as usize).copied().flatten();
             let allowed = if task.directed { order_access(ctx.households, ctx.plots, sim, plot) } else { access(ctx, sim, plot) };
-            if allowed == Access::None || (allowed == Access::Guest && task.directed && !guest_may(content, inter)) {
+            if allowed == Access::None || (allowed == Access::Guest && task.directed && !guest_may(content, &content.objects[obj.def], inter)) {
                 return;
             }
             if inter.needs_table && ctx.index.links.table_of(object).is_none() {
@@ -5094,6 +5317,7 @@ fn start_task(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstanc
         sim.wants_partner = joins.is_none();
         sim.partner_wait = 0;
     }
+    sim.serve_wait = 0;
     sim.pose = Pose::Stand;
     sim.current = Some(Activity {
         task,
@@ -5262,7 +5486,13 @@ pub(crate) fn route(
 
 fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut crate::items::Items, rng: &mut Rng, ticks: u32) {
     let content = ctx.content;
+    // (Before `current` is borrowed: how fast they walk, `walk_speed`.)
+    let walk = sim.walk_speed(content);
     let minutes = MINUTES_PER_TICK * ticks as f32;
+    // On their way into a room someone keeps shut (a bathroom in use): they wait outside.
+    if crate::privacy::wait_outside(sim, ctx, objects, ticks) {
+        return;
+    }
     let Some(act) = sim.current.as_mut() else {
         return;
     };
@@ -5281,7 +5511,7 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
             return crate::cooking::queued(sim, ctx, objects, items, waited);
         }
         Phase::Routing { waypoints, next } => {
-            let per_tick = WALK_SPEED * sim.mods.walk_speed;
+            let per_tick = WALK_SPEED * walk;
             let mut budget = per_tick * ticks as f32;
             while budget > 0.0 && *next < waypoints.len() {
                 let wp = waypoints[*next];
@@ -5321,6 +5551,29 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
             false
         }
         Phase::Using { elapsed } => {
+            // Done behind a shut door (`privacy.rs`): with someone else in the room as they get
+            // there, not at all.
+            if *elapsed == 0.0
+                && let TaskKind::Use { object, interaction } = act.task.kind
+                && content.objects[objects[object as usize].def].interactions.get(interaction).is_some_and(|i| i.private)
+                && crate::privacy::overlooked(ctx, objects, sim.id, (object, interaction))
+            {
+                return end_activity(sim, content, objects);
+            }
+            // Sold at a post: not begun until its server serves them (`staff::hold`).
+            if let TaskKind::Use { object, interaction } = act.task.kind
+                && let Some(inter) = content.objects[objects[object as usize].def].interactions.get(interaction)
+            {
+                match crate::staff::hold(ctx, sim.being_served, &mut sim.serve_wait, object, inter, ticks) {
+                    None | Some(crate::staff::Hold::Serve) => {}
+                    Some(crate::staff::Hold::Wait) => return,
+                    // (Not served: the money paid on arrival back.)
+                    Some(crate::staff::Hold::GiveUp) => {
+                        sim.pending_spend -= inter.cost.max(0);
+                        return end_activity(sim, content, objects);
+                    }
+                }
+            }
             // A game for two: not begun until the one they play with is at their place too, and
             // over once they've stopped (`partners::hold`).
             let mut over = false;
@@ -5354,7 +5607,12 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                 } => {
                     let urgent = urgent_needs(sim, ctx, objects);
                     let done = over || use_object(sim, ctx, &objects[object as usize], interaction, elapsed, minutes, urgent);
-                    given_up = done && first && content.objects[objects[object as usize].def].interactions.get(interaction).is_some_and(|i| elapsed < i.minutes);
+                    // Tried for a baby for its time, the other one still with them: a baby may come.
+                    if done && !over && content.objects[objects[object as usize].def].interactions.get(interaction).is_some_and(|i| i.conceive && elapsed >= i.minutes) {
+                        sim.conceived = objects[object as usize].users().find(|&u| u != sim.id && ctx.briefs.get(u as usize).is_some_and(|b| b.game.is_some_and(|g| g.0 == object && g.1 == interaction)));
+                    }
+                    let taken = content.objects[objects[object as usize].def].interactions.get(interaction).map_or(0.0, |i| i.minutes_where(ctx.served(object)));
+                    given_up = done && first && elapsed < taken;
                     // Every finished use wears it a little, by how much of a full use it was (a
                     // nap cut short when they're rested is a fraction); better quality wears slower.
                     if done {
@@ -5362,7 +5620,7 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                         let def = &content.objects[o.def];
                         let rules = &content.object_rules;
                         let was = o.broken();
-                        let share = def.interactions.get(interaction).map_or(1.0, |it| (elapsed / it.minutes.max(1.0)).min(1.0));
+                        let share = def.interactions.get(interaction).map_or(1.0, |it| (elapsed / it.minutes_where(ctx.served(object)).max(1.0)).min(1.0));
                         let wear = def.wear_per_use * share * (1.0 - rules.wear_per_quality * f32::from(o.quality));
                         o.wear = (o.wear + wear.max(0.0)).min(1.0);
                         // Weeded and watered: the crop comes on (only while it grows).
@@ -5470,6 +5728,9 @@ fn progress(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mu
                     if sim.current.is_some() {
                         return;
                     }
+                } else if let Some(made) = inter.makes.filter(|_| !given_up && inter.after == 0) {
+                    // The washing taken out: on with it to the dryer or the line, or to fold it.
+                    sim.follow_up = crate::machines::carry_on(sim, ctx, objects, object, made);
                 } else if inter.carried {
                     // Fed in the high chair: back to the crib in the arms.
                     sim.follow_up = crate::carry::carry_back(sim, task, ctx, objects, object);
@@ -5514,6 +5775,8 @@ fn use_object(
 ) -> bool {
     let content = ctx.content;
     let inter = &content.objects[obj.def].interactions[interaction];
+    // Helping oneself where nobody serves is quicker than being served (`minutes_where`).
+    let total = inter.minutes_where(ctx.served(obj.id));
     // Quality and skill scale what the Sim gets out of it (not what it costs).
     let boost = quality_boost(content, inter, obj.quality) * inter.skill_factor(&content.skill_rules, &sim.skills);
     let rhythm = &content.day_rhythm;
@@ -5524,7 +5787,7 @@ fn use_object(
     if inter.cares()
         && let Some(baby) = obj.users().find(|&u| u != sim.id)
     {
-        let per_tick = inter.care.map(|g| g / inter.minutes * minutes);
+        let per_tick = inter.care.map(|g| g / total * minutes);
         sim.care_out = Some((baby, per_tick));
     }
     let (mut any_gain, mut satisfied, mut urgent, mut wakes) = (false, true, false, false);
@@ -5583,7 +5846,7 @@ fn use_object(
         // toilet halfway through a film, not off the toilet for a bite to eat).
         let planned = crate::planner::planned_now(content, sim, inter);
         let chosen = sim.current.as_ref().is_some_and(|a| !a.task.directed && !a.task.routine);
-        let left = inter.minutes - elapsed;
+        let left = total - elapsed;
         let drained = emptying
             || (urgent && planned)
             || (chosen && breaks_off(sim, content, pressing, fills, left, inter, low));
@@ -5596,10 +5859,11 @@ fn use_object(
             && access(ctx, sim, ctx.object_plot[obj.id as usize]) == Access::Full
             && training_interest(sim, content, inter) > MIN_AUTONOMY_SCORE;
         // A job that changes the thing as the hands go (hanging out the washing, a harvest) goes on to
-        // its end, and clothes are changed all the way, whatever it does for comfort.
+        // its end, and clothes are changed all the way, whatever it does for comfort; so does
+        // loading a machine or emptying it, or anything that leaves a load to work on next.
         // So does a game for two: one stopping would end it for the other.
-        let job = inter.gradual || inter.picks || inter.changes_outfit || inter.partner;
-        elapsed >= inter.minutes || (any_gain && satisfied && !planned && !routine && !practising && !job) || drained
+        let job = inter.gradual || inter.picks || inter.changes_outfit || inter.partner || inter.loads || inter.unloads || inter.makes.is_some();
+        elapsed >= total || (any_gain && satisfied && !planned && !routine && !practising && !job) || drained
     };
     // Halfway through changing: in the next outfit, which views draw (a change of looks).
     let half = inter.minutes * 0.5;
@@ -5617,7 +5881,7 @@ fn use_object(
         let (fx, fz) = ctx.index.links.approach_of(obj.id).unwrap_or_else(|| obj.front_tile(content));
         sim.mess = Some((fx, fz, inter.dirt));
     }
-    if done && let Some(m) = inter.earns_feeling(elapsed, &sim.skills) {
+    if done && let Some(m) = inter.earns_feeling_over(total, elapsed, &sim.skills) {
         social::add_feeling(&mut sim.feelings, m, &content.feelings, ctx.tick);
     }
     done
@@ -5634,8 +5898,13 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
     {
         // Nor is something opened that someone opened on the way, or closed on someone in it.
         let inter = &content.objects[objects[object as usize].def].interactions[interaction];
+        // (Sold at a post that closed since they set off: served still at last orders, `staff::LAST_ORDERS`.)
+        let late = (ctx.hour - crate::staff::LAST_ORDERS).rem_euclid(24.0);
+        let met = missing_requirement(content, ctx.object_plot, Some(ctx.index), objects, object, inter).is_none()
+            && conditions_met(ctx, sim, &objects[object as usize], inter)
+            && (!closed_at(ctx, objects, object, inter, ctx.hour) || !closed_at(ctx, objects, object, inter, late));
         if objects[object as usize].broken()
-            || !requirements_met(ctx, sim, objects, object, inter)
+            || !met
             || !objects[object as usize].allows(inter, sim.id)
         {
             // (An order to close it on someone who got there first: the player is told.)
@@ -5653,9 +5922,13 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
             return;
         }
         sim.pending_spend += cost.max(0);
-        // A load of washing taken up as the use starts (`life::update` settles it).
+        // A load of washing taken up as the use starts (`life::update` settles it); given back if
+        // the use doesn't get done.
         if let Some(w) = inter.work_on {
             sim.worked |= w.bit();
+            if w.load().is_some() {
+                sim.taken = w.bit();
+            }
         }
     }
     let Some(act) = sim.current.as_mut() else {
@@ -5778,7 +6051,7 @@ fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], items: &mut 
 
 /// A use done that changed the object as the hands went (`Interaction::gradual`, a crop's
 /// `picks`): now it is so. The washing is out on the line (or in); the crop is picked, and lies
-/// fallow, then grows again.
+/// fallow, then grows again; a machine loaded runs, one emptied is empty (`machines::use_done`).
 fn leaves_at_end(sim: &mut Sim, content: &Content, o: &mut ObjectInstance, interaction: usize) {
     let Some(inter) = content.objects[o.def].interactions.get(interaction) else {
         return;
@@ -5793,6 +6066,7 @@ fn leaves_at_end(sim: &mut Sim, content: &Content, o: &mut ObjectInstance, inter
         o.growth = -1.0;
         sim.reshaped = true;
     }
+    crate::machines::use_done(sim, content, o, inter);
 }
 
 /// Just before they leave for work or school (`DayRhythm::ready_minutes`): what they do out of
@@ -6008,7 +6282,7 @@ fn follow_up(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], object: u32, tags
 
 /// The nearest working object on `plot` (but `except`) with an interaction that `fits`, one
 /// they may use and can get to, as a routine task.
-fn nearest(
+pub(crate) fn nearest(
     sim: &Sim,
     ctx: &Ctx,
     objects: &[ObjectInstance],
@@ -6030,6 +6304,7 @@ fn nearest(
         .map(|&o| &objects[o as usize])
         .filter(|o| Some(o.id) != except && ctx.object_plot[o.id as usize] == plot)
         .filter(|o| !o.broken() && o.has_free_slot(content.objects[o.def].slots))
+        .filter(|o| !(sim.visiting.is_some() && content.objects[o.def].private))
         .filter_map(|o| {
             let def = &content.objects[o.def];
             let i = (0..def.interactions.len()).find(|&i| {
@@ -6094,6 +6369,7 @@ fn accident(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], a: usize) 
 /// (`cooking::after_step`).
 pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) {
     sim.join_spot = None;
+    sim.kept_out = 0;
     // A talk from the seat over: back to what they sat down to do, still sitting.
     if let Some(paused) = sim.paused.take() {
         if matches!(sim.current.as_ref().map(|a| a.task.kind), Some(TaskKind::Social { .. } | TaskKind::Join { .. })) {
@@ -6109,6 +6385,8 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
             sim.pos = [fx as f32 + 0.5, fz as f32 + 0.5];
         }
     }
+    // A load of washing taken up for a use that didn't get done goes back on its pile.
+    sim.made |= std::mem::take(&mut sim.taken);
     let held = sim.current.take().and_then(|act| held_object(act.task.kind));
     if let Some(o) = held.map(|o| o as usize).filter(|&o| o < objects.len()) {
         // Up from the upper bunk (its second slot, see `ObjectInstance::slot_position`): down its ladder first.
