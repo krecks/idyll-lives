@@ -134,7 +134,8 @@ pub fn shift_pay(content: &Content, job: &Job, skills: &[f32; MAX_SKILLS]) -> i6
     let level = &content.careers[job.career].levels[job.level];
     let standard = level.days.count_ones().max(1) as i64;
     let actual = work_days(content, job, skills).count_ones().max(1) as i64;
-    (level.pay * standard + actual / 2) / actual
+    // Saturating like the promotion bonus: content's pay must not panic the week's sum.
+    level.pay.saturating_mul(standard).saturating_add(actual / 2) / actual
 }
 
 /// Whether a Sim with `skills` may take `level` (probation allows a small shortfall).
@@ -841,7 +842,8 @@ fn at_work(w: &mut World, i: usize) {
     households[sim.household as usize].funds += shift_pay(content, &job, &sim.skills);
     let rules = &content.career_rules;
     let fit = skill_fit(level, &sim.skills).clamp(-3.0, 3.0);
-    let job = sim.job.as_mut().expect("checked above");
+    // Still a job: it was there above, and nothing since takes it away.
+    let Some(job) = sim.job.as_mut() else { return };
     job.shifts += 1;
     job.missed = job.missed.saturating_sub(1);
     job.satisfaction = job.satisfaction * 0.8 + job.shift_mood * 0.2;
@@ -855,13 +857,18 @@ fn at_work(w: &mut World, i: usize) {
         && let Some(next) = career.levels.get(job.level + 1)
         && skill_fit(next, &sim.skills) >= 0.0
     {
+        // A promotion pays a one-off bonus of half a week at the new grade, rounded up.
+        // Saturating: a content pack's pay can be near `i64::MAX`, and a promotion must not panic.
+        let shifts_a_week = next.days.count_ones().max(1) as i64;
+        let bonus = next.pay.saturating_mul(shifts_a_week).saturating_add(1) / 2;
+        households[sim.household as usize].funds += bonus;
         job.level += 1;
         job.performance = 0.0;
         sim.planner.recheck = true;
         if let Some(m) = rules.promotion_feeling {
             social::add_feeling(&mut sim.feelings, m, &content.feelings, tick);
         }
-        events.push(tick, EventKind::Promoted, i, i, None);
+        events.push_promotion(tick, i, job.career, job.level, bonus);
     }
     sim.queue.push_back(Task {
         kind: TaskKind::GoHome,
@@ -1119,13 +1126,15 @@ mod tests {
         assert!(w.sims[0].away_until.is_some(), "should be at work at 10:00");
         until_hour(&mut w, 2, 14.5);
         assert!(w.sims[0].away_until.is_none());
-        assert_eq!(w.households[0].funds, 700, "paid for day 1 and day 2");
+        assert_eq!(w.households[0].funds, 1400, "two shifts plus half a week's promotion bonus");
         until_hour(&mut w, 2, 16.0);
         let home = w.plot_at(w.sims[0].tile().0, w.sims[0].tile().1);
         assert_eq!(home, Some(0), "walked back home");
         // 60 performance per shift at neutral mood -> promoted after two shifts.
         assert_eq!(w.sims[0].job.as_ref().unwrap().level, 1);
         assert!(w.events.iter().any(|e| e.kind == EventKind::Promoted));
+        let promoted = w.events.iter().find(|e| e.kind == EventKind::Promoted).unwrap();
+        assert_eq!(promoted.pay, Some(700), "half a week at the new grade");
     }
 
     #[test]
