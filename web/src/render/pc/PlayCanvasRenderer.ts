@@ -63,7 +63,7 @@ import { Thumbnails } from './thumbnail';
 import { benchDiag } from '../../debug/benchFlags';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
-import { GameCameraRig } from '../shared/cameraRig';
+import { GameCameraRig, keepUp } from '../shared/cameraRig';
 import { DOOR_SWING, ease, goingThrough, shutDefs } from '../shared/doors';
 import { createLighting, lightingAt, type RGB } from '../shared/environment';
 import { GAME_RATE } from '../shared/gameSpeed';
@@ -389,6 +389,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private lastFrame: FrameState | null = null;
   private readonly markerHead = { x: 0, y: 0, z: 0 };
   private followIndex: number | null = null;
+  /** Whether the camera has caught up with the resident it follows (`keepUp`: then it stays near them). */
+  private followCaught = false;
   private readonly followHead = { x: 0, y: 0, z: 0 };
   private framedView = '';
   private readonly simInView = (x: number, z: number) => !this.diag.has('nosims') && this.inView(x, z, SIM_VIEW_MARGIN);
@@ -742,6 +744,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   followSim(index: number | null): void {
+    if (index !== this.followIndex) this.followCaught = false;
     this.followIndex = index;
   }
 
@@ -776,6 +779,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const k = 1 - Math.exp(-dt / 0.5);
     t.x += (this.followHead.x - t.x) * k;
     t.z += (this.followHead.z - t.z) * k;
+    // (Never far behind them once caught up, however fast the game runs: at speed 4 the easing alone trails by 22 m.)
+    this.followCaught = keepUp(t, this.followHead.x, this.followHead.z, this.followCaught);
   }
 
   setLeftDragCamera(on: boolean): void {
