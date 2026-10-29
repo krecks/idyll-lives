@@ -444,6 +444,9 @@ export interface RoomKindDef {
   passage?: boolean;
   /** Kept shut while someone is in it (a bathroom): others wait outside (sim-core `privacy.rs`). */
   private?: boolean;
+  /** A private room that's its people's own (a bedroom): whoever has a place in it comes and goes,
+   * its door keeps the rest of the household out (sim-core `privacy.rs`). */
+  claimed?: boolean;
 }
 
 /** A roof style (Build mode's Roof tool): the shape and, for pitched roofs, the pitch in degrees. */

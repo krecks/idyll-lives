@@ -2,6 +2,13 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+- **Bedrooms are their sleepers' own:** a bedroom's door is open to whoever has a place in it — the people whose bed it is, their partner, their children if a bed is free, and whoever minds a crib in there — and keeps the rest of the household, and guests, out while someone is in it. A lodger with no bed of their own in the room waits outside like anyone else.
+
+### Also
+- **Saves:** unchanged (format 33).
+
 ## 0.5.1 — 2026-10-29
 
 **Play it in your browser:** https://krecks.github.io/idyll-lives/

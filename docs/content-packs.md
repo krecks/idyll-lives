@@ -680,6 +680,13 @@ How the house shows up in residents' lives (see `docs/design/house-matters.md`).
  "essentials": [["bathroom"], ["hygiene"]], "size": [3, 6], "exclusive": true, "private": true}
 ```
 
+A bedroom marks its door as its sleepers' own too:
+
+```json
+{"id": "bedroom", "label": "Bedroom", "icon": "icon.category.bedroom", "tags": ["sleep"],
+ "essentials": [["sleep"]], "size": [3, 6], "exclusive": true, "private": true, "claimed": true}
+```
+
 `essentials`: tag groups something in the room must offer for full function; `size`:
 `[cramped, comfortable]` in tiles; `exclusive`: can't share a room with another exclusive kind
 (a bed in the kitchen); `private`: kept shut while someone is in it. Nobody else goes in: someone
@@ -688,6 +695,11 @@ doesn't choose what's in it unless a need is about to run out, and kept out the 
 after its `graceMinutes` and the toilet counts as taken (`anotherRoom`). Not a room of two kinds
 (`mixed`), one with a door to the outside, or one on a public place. The renderer keeps its
 doors shut (snapshot `shuts`). Code: `crates/sim-core/src/privacy.rs`.
+
+`claimed`: the room is its sleepers' own (a bedroom; an error unless `private` too). Whoever has
+a place in it comes and goes: whoever lies in one of its beds (or got up and wants back in), their
+partner, their children if a bed here is free, and whoever minds a crib in it. Its door keeps the
+rest of the household, and guests, out while someone is in it; the bathroom is never claimed.
 
 **Scoring** (`roomRules`, an object, so a pack can change single keys): `weights` of size, light,
 decor, cleanliness and function; `windowTiles` and `lampTiles` (tiles one window or lamp lights
