@@ -246,13 +246,19 @@ pub fn sockets(family: &str, stage: &str, lod: bool) -> impl Fn(V3) -> V3 {
             }
             // (0 above and below the eye, 1 beside it.)
             let across = q.x * q.x / (q.x * q.x + q.y * q.y + 0.1);
-            let deep = if lod { SOCKET_LOD } else { over + (side - over) * across };
+            let deep = if lod {
+                SOCKET_LOD
+            } else {
+                over + (side - over) * across
+            };
             let wide = SOCKET_WIDE[usize::from(q.x * e.x > 0.0)];
             let d = ((q.x / wide).hypot(q.y) - r0).max(0.0);
             let mut floor = deep + (cv + (ch - cv) * across) * d * d + c4 * d.powi(4);
             if !lod {
                 let rho = q.x.hypot(q.y);
-                floor = floor.min((1.0 - rho * rho).max(0.0).sqrt() - SLOT[0] + SLOT[1] * (rho - 1.0).max(0.0));
+                floor = floor.min(
+                    (1.0 - rho * rho).max(0.0).sqrt() - SLOT[0] + SLOT[1] * (rho - 1.0).max(0.0),
+                );
             }
             z = smin(z, e.z + r * floor, SOCKET_SOFT * r);
         }
@@ -311,7 +317,13 @@ fn grid_faces(ids: &[Vec<Option<usize>>], coarse: bool) -> Vec<Vec<usize>> {
     let (nr, nc) = (ROWS.len() - 1, COLS.len());
     let keep_r = |r: usize| !coarse || coarse_row(r);
     let keep_c = |c: usize| !coarse || coarse_col(c);
-    let vert = |r: usize, c: usize| if keep_r(r) && keep_c(c) { ids[r][c] } else { None };
+    let vert = |r: usize, c: usize| {
+        if keep_r(r) && keep_c(c) {
+            ids[r][c]
+        } else {
+            None
+        }
+    };
     // Union-find over the cells (cell k = r * nc + c).
     let mut parent: Vec<usize> = (0..nr * nc).collect();
     fn root(p: &mut [usize], mut k: usize) -> usize {
@@ -354,11 +366,20 @@ fn grid_faces(ids: &[Vec<Option<usize>>], coarse: bool) -> Vec<Vec<usize>> {
         let cs: Vec<usize> = cells.iter().map(|q| q.1).collect();
         let c0 = *cs.iter().min().unwrap();
         let c1 = cs.iter().max().unwrap() + 1;
-        assert_eq!(cells.len(), (r1 - r0) * (c1 - c0), "head cage: a face that is not a rectangle of cells");
+        assert_eq!(
+            cells.len(),
+            (r1 - r0) * (c1 - c0),
+            "head cage: a face that is not a rectangle of cells"
+        );
         if (r0..r1).contains(&TIP) && ears.contains(&c0) {
             continue;
         }
-        assert!([(r0, c0), (r0, c1), (r1, c0), (r1, c1)].iter().all(|&(r, c)| vert(r, c % nc).is_some()), "head cage: a face without its corners");
+        assert!(
+            [(r0, c0), (r0, c1), (r1, c0), (r1, c1)]
+                .iter()
+                .all(|&(r, c)| vert(r, c % nc).is_some()),
+            "head cage: a face without its corners"
+        );
         let c1w = c1 % nc;
         let mut f = Vec::new();
         f.extend((c0..c1).filter_map(|c| vert(r0, c)));
@@ -380,13 +401,23 @@ fn features(family: &str, stage: &str) -> Vec<Vec<V3>> {
     let young = 1.0 - 0.55 * yg;
     let n = nose(family) * young * hh * (if stage == "elder" { 1.1 } else { 1.0 });
     for (r, deg, [ox, oy, oz]) in NOSE {
-        for sx in if deg == 0.0 { vec![1.0] } else { vec![1.0, -1.0] } {
+        for sx in if deg == 0.0 {
+            vec![1.0]
+        } else {
+            vec![1.0, -1.0]
+        } {
             dd[r][col_of(sx * deg)] += v3(sx * ox, oy, oz) * n;
         }
     }
     // The upper lip rounded forward over the teeth (so it faces ahead under the nose), with the
     // philtrum, a soft groove, down its middle.
-    for (deg, k) in [(0.0, 0.08), (7.0, 0.16), (-7.0, 0.16), (14.0, 0.1), (-14.0, 0.1)] {
+    for (deg, k) in [
+        (0.0, 0.08),
+        (7.0, 0.16),
+        (-7.0, 0.16),
+        (14.0, 0.1),
+        (-14.0, 0.1),
+    ] {
         dd[LIP][col_of(deg)] += z * k * n;
     }
     let bw = brow(family) * (1.0 - 0.6 * yg) * hh;
@@ -424,7 +455,9 @@ pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
                 .collect()
         })
         .collect();
-    let exists: Vec<Vec<bool>> = (0..ROWS.len()).map(|r| (0..COLS.len()).map(|c| at(r, c)).collect()).collect();
+    let exists: Vec<Vec<bool>> = (0..ROWS.len())
+        .map(|r| (0..COLS.len()).map(|c| at(r, c)).collect())
+        .collect();
     let mut ids: Vec<Vec<Option<usize>>> = vec![vec![None; COLS.len()]; ROWS.len()];
     let dd = features(family, stage);
     for r in 0..ROWS.len() {
@@ -444,7 +477,16 @@ pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
             } else {
                 0.0
             };
-            ids[r][c] = Some(cage.add(grid[r][c], w.clone(), "head", Some(dd[r][c]), Tags { blush, ..Default::default() }));
+            ids[r][c] = Some(cage.add(
+                grid[r][c],
+                w.clone(),
+                "head",
+                Some(dd[r][c]),
+                Tags {
+                    blush,
+                    ..Default::default()
+                },
+            ));
         }
     }
     for fc in grid_faces(&ids, false) {
@@ -453,7 +495,12 @@ pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
     for fc in grid_faces(&ids, true) {
         cage.lod_face(&fc);
     }
-    let ring = |r: usize| -> Vec<usize> { (0..COLS.len()).filter(|&c| coarse_col(c)).map(|c| ids[r][c].expect("ring")).collect() };
+    let ring = |r: usize| -> Vec<usize> {
+        (0..COLS.len())
+            .filter(|&c| coarse_col(c))
+            .map(|c| ids[r][c].expect("ring"))
+            .collect()
+    };
     let id = |r: usize, deg: f64| ids[r][col_of(deg)].expect("vertex");
     // Ears: from the face left open between columns 92 and 122 (and -122 .. -92), from the nose tip's
     // row to the eyes'. The smooth head has a low dome there (the skull the hair fits over); the ear
@@ -467,7 +514,11 @@ pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
         let (mut base, mut offs) = (Vec::new(), Vec::new());
         for (i, &q0) in p.iter().enumerate() {
             let top = i >= 2;
-            let front = if sx > 0.0 { i == 0 || i == 3 } else { i == 1 || i == 2 };
+            let front = if sx > 0.0 {
+                i == 0 || i == 3
+            } else {
+                i == 1 || i == 2
+            };
             let bpt = m + (q0 - m) * 0.6 + out * 0.012 * hh;
             let mut q = m + (q0 - m).component_mul(&v3(0.6, 1.0, 0.55));
             q += out * (0.04 + 0.015 * yg) * hh * (if front { 0.7 } else { 1.0 });
@@ -476,8 +527,13 @@ pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
             base.push(bpt);
             offs.push(q - bpt);
         }
-        let tags = Tags { blush: 0.35, ..Default::default() };
-        let e: Vec<usize> = (0..4).map(|i| cage.add(base[i], w.clone(), "ear", Some(offs[i]), tags)).collect();
+        let tags = Tags {
+            blush: 0.35,
+            ..Default::default()
+        };
+        let e: Vec<usize> = (0..4)
+            .map(|i| cage.add(base[i], w.clone(), "ear", Some(offs[i]), tags))
+            .collect();
         cage.band(&lp, &e, &[]);
         cage.cap(&e);
     }
@@ -488,7 +544,13 @@ pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
     for (el, az) in [(80.0, 0.0), (90.0, 0.0), (80.0, PI)] {
         let e = radians(el);
         let d = v3(f64::cos(e) * f64::sin(az), e.sin(), e.cos() * f64::cos(az));
-        mid.push(cage.add(cast(&f, o, d) * hh + origin, w.clone(), "head", None, Tags::default()));
+        mid.push(cage.add(
+            cast(&f, o, d) * hh + origin,
+            w.clone(),
+            "head",
+            None,
+            Tags::default(),
+        ));
     }
     let right = [top[1], top[2], top[3], top[4], top[5]];
     let left = [top[11], top[10], top[9], top[8], top[7]];
@@ -562,7 +624,8 @@ impl HeadFrame {
             ws[j] = w;
             wv[j] = w * side;
         }
-        let mut s = super::np::pairwise_sum(&wv[..nb.len()]) / super::np::pairwise_sum(&ws[..nb.len()]);
+        let mut s =
+            super::np::pairwise_sum(&wv[..nb.len()]) / super::np::pairwise_sum(&ws[..nb.len()]);
         // Farther off, the distance to the nearest sample, with that sign (blended, so still smooth).
         let t = clip((d0 - sigma) / (2.0 * sigma), 0.0, 1.0) * clip(s.abs() / sigma, 0.0, 1.0);
         let t = t * t * (3.0 - 2.0 * t);
@@ -582,15 +645,27 @@ impl HeadFrame {
         let q = (p.x.abs() / self.hh, (p.y - self.chin_y) / self.hh);
         let (a, b) = ((0.08, 0.31), (0.135, 0.15));
         let ab = (b.0 - a.0, b.1 - a.1);
-        let t = clip(((q.0 - a.0) * ab.0 + (q.1 - a.1) * ab.1) / (ab.0 * ab.0 + ab.1 * ab.1), 0.0, 1.0);
+        let t = clip(
+            ((q.0 - a.0) * ab.0 + (q.1 - a.1) * ab.1) / (ab.0 * ab.0 + ab.1 * ab.1),
+            0.0,
+            1.0,
+        );
         let d = (q.0 - a.0 - t * ab.0).hypot(q.1 - a.1 - t * ab.1);
-        let front = clip((p.z - self.mouth.z + 0.1 * self.hh) / (0.05 * self.hh), 0.0, 1.0);
+        let front = clip(
+            (p.z - self.mouth.z + 0.1 * self.hh) / (0.05 * self.hh),
+            0.0,
+            1.0,
+        );
         (-(d / FOLD_WIDTH).powi(2)).exp() * front
     }
 
     /// Scalp weight (0..1) of a point: 1 well above the hairline, 0 on the face and neck.
     pub fn scalp(&self, p: V3) -> f64 {
-        clip((p.y - hairline_y(self, p)) / (0.06 * self.hh) + 0.5, 0.0, 1.0)
+        clip(
+            (p.y - hairline_y(self, p)) / (0.06 * self.hh) + 0.5,
+            0.0,
+            1.0,
+        )
     }
 }
 
@@ -599,8 +674,16 @@ pub fn hairline_y(h: &HeadFrame, p: V3) -> f64 {
     // 0 = front, pi = back.
     let a = (p.x - h.centre[0]).atan2(p.z - h.centre[2]);
     let t = a.abs() / PI;
-    let (front, side, back) = (h.chin_y + 0.74 * h.hh, h.chin_y + 0.56 * h.hh, h.chin_y + 0.18 * h.hh);
-    if t < 0.5 { front + (side - front) * (t / 0.5).powf(1.5) } else { side + (back - side) * ((t - 0.5) / 0.5) }
+    let (front, side, back) = (
+        h.chin_y + 0.74 * h.hh,
+        h.chin_y + 0.56 * h.hh,
+        h.chin_y + 0.18 * h.hh,
+    );
+    if t < 0.5 {
+        front + (side - front) * (t / 0.5).powf(1.5)
+    } else {
+        side + (back - side) * ((t - 0.5) / 0.5)
+    }
 }
 
 /// The largest z where the vertical line (x, y) crosses triangles; `miss` where none does.
@@ -649,10 +732,16 @@ fn make_head_frame(family: &str, stage: &str) -> HeadFrame {
     let cran = &srf.cranium;
     let zmin = cran.iter().map(|p| p.z).fold(f64::INFINITY, f64::min);
     let zmax = cran.iter().map(|p| p.z).fold(f64::NEG_INFINITY, f64::max);
-    let xmax = cran.iter().map(|p| p.x.abs()).fold(f64::NEG_INFINITY, f64::max);
+    let xmax = cran
+        .iter()
+        .map(|p| p.x.abs())
+        .fold(f64::NEG_INFINITY, f64::max);
     let centre = v3(0.0, chin_y + 0.56 * hh, (zmin + zmax) / 2.0);
     let radii = v3(xmax, hgt - centre[1], (zmax - zmin) / 2.0);
-    let k = cran.iter().map(|p| (p - centre).component_div(&radii).norm()).fold(f64::NEG_INFINITY, f64::max);
+    let k = cran
+        .iter()
+        .map(|p| (p - centre).component_div(&radii).norm())
+        .fold(f64::NEG_INFINITY, f64::max);
     let radii = (radii * k.max(1.0)).component_mul(&v3(1.05, 1.03, 1.12));
     let samples = srf.head_samples.clone();
     let tree = KdTree::new(&samples);
@@ -688,10 +777,13 @@ fn make_head_frame(family: &str, stage: &str) -> HeadFrame {
         floor_y,
     };
     let a = linspace_open(0.0, 2.0 * PI, 8);
-    let rim: Vec<f64> = a.iter().map(|&a| {
-        let p = eyes[1] + v3(a.cos(), a.sin(), 0.0) * 1.45 * eye_r;
-        h.surface_z(p.x, p.y)
-    }).collect();
+    let rim: Vec<f64> = a
+        .iter()
+        .map(|&a| {
+            let p = eyes[1] + v3(a.cos(), a.sin(), 0.0) * 1.45 * eye_r;
+            h.surface_z(p.x, p.y)
+        })
+        .collect();
     h.face_z = mean(&rim);
     let my = chin_y + 0.2 * hh;
     h.mouth = v3(0.0, my, h.surface_z(0.0, my));
@@ -714,7 +806,11 @@ fn make_head_frame(family: &str, stage: &str) -> HeadFrame {
         pts.push(ray(&h, v3(centre[0], y, centre[2]), d));
     }
     h.hairline = pts;
-    h.chin = ray(&h, v3(0.0, chin_y + 0.03 * hh, centre[2]), v3(0.0, -0.45, 1.0) / 0.45f64.hypot(1.0));
+    h.chin = ray(
+        &h,
+        v3(0.0, chin_y + 0.03 * hh, centre[2]),
+        v3(0.0, -0.45, 1.0) / 0.45f64.hypot(1.0),
+    );
     h
 }
 

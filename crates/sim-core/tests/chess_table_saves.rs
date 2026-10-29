@@ -12,18 +12,32 @@ use sim_core::World;
 fn tiles(w: &World, i: usize) -> Vec<(i32, i32)> {
     let o = &w.objects[i];
     let [fw, fd] = o.footprint;
-    let (tw, td) = if o.rot.is_multiple_of(2) { (fw, fd) } else { (fd, fw) };
-    (0..td as i32).flat_map(|dz| (0..tw as i32).map(move |dx| (o.x + dx, o.z + dz))).collect()
+    let (tw, td) = if o.rot.is_multiple_of(2) {
+        (fw, fd)
+    } else {
+        (fd, fw)
+    };
+    (0..td as i32)
+        .flat_map(|dz| (0..tw as i32).map(move |dx| (o.x + dx, o.z + dz)))
+        .collect()
 }
 
 /// No two things on the floor share a tile (the wall and ceiling layers and things on tops aside).
 fn no_overlap(w: &World) {
     let floor: Vec<usize> = (0..w.objects.len())
-        .filter(|&i| matches!(w.content.objects[w.objects[i].def].layer, sim_core::content::Layer::Floor))
+        .filter(|&i| {
+            matches!(
+                w.content.objects[w.objects[i].def].layer,
+                sim_core::content::Layer::Floor
+            )
+        })
         .collect();
     for (k, &a) in floor.iter().enumerate() {
         for &b in &floor[k + 1..] {
-            let shared: Vec<_> = tiles(w, a).into_iter().filter(|t| tiles(w, b).contains(t)).collect();
+            let shared: Vec<_> = tiles(w, a)
+                .into_iter()
+                .filter(|t| tiles(w, b).contains(t))
+                .collect();
             assert!(shared.is_empty(), "objects {a} and {b} share {shared:?}");
         }
     }
@@ -40,7 +54,8 @@ fn load_v32(w: &World, content: &str, x: i32, z: i32, rot: u8, value: i64, first
     let mut saved: Value = serde_json::from_str(&w.save_json()).unwrap();
     saved["version"] = 32.into();
     let next = saved["nextObjectId"].as_u64().unwrap_or(100);
-    let table = json!({"id": next, "def": "chessTable", "x": x, "z": z, "rot": rot, "value": value});
+    let table =
+        json!({"id": next, "def": "chessTable", "x": x, "z": z, "rot": rot, "value": value});
     let objects = saved["objects"].as_array_mut().unwrap();
     if first {
         objects.insert(0, table);
@@ -53,7 +68,9 @@ fn load_v32(w: &World, content: &str, x: i32, z: i32, rot: u8, value: i64, first
 
 fn chess_tables(w: &World) -> Vec<usize> {
     let def = w.content.object_index("chessTable").unwrap();
-    (0..w.objects.len()).filter(|&i| w.objects[i].def == def).collect()
+    (0..w.objects.len())
+        .filter(|&i| w.objects[i].def == def)
+        .collect()
 }
 
 #[test]
@@ -66,20 +83,45 @@ fn an_old_chess_table_against_another_thing_moves_over_to_fit() {
     let tables = chess_tables(&back);
     assert_eq!(tables.len(), 1, "the table is kept");
     let t = tables[0];
-    assert!(tiles(&back, t).contains(&(5, 3)), "still over the tile it stood on: {:?}", tiles(&back, t));
-    assert_eq!(back.objects.len(), w.objects.len() + 1, "nothing else is left out");
+    assert!(
+        tiles(&back, t).contains(&(5, 3)),
+        "still over the tile it stood on: {:?}",
+        tiles(&back, t)
+    );
+    assert_eq!(
+        back.objects.len(),
+        w.objects.len() + 1,
+        "nothing else is left out"
+    );
     assert_eq!(back.households[0].funds, funds, "nothing sold");
     no_overlap(&back);
     common::check(&back);
     // Saved again (v33), it stays where it went.
     let again = World::from_save_json(&content, &back.save_json()).unwrap();
     let t2 = chess_tables(&again)[0];
-    assert_eq!((again.objects[t2].x, again.objects[t2].z, again.objects[t2].rot), (back.objects[t].x, back.objects[t].z, back.objects[t].rot));
+    assert_eq!(
+        (
+            again.objects[t2].x,
+            again.objects[t2].z,
+            again.objects[t2].rot
+        ),
+        (back.objects[t].x, back.objects[t].z, back.objects[t].rot)
+    );
     // First in the file, it still goes in after the bookshelf, which keeps its place.
     let first = load_v32(&w, &content, 5, 3, 0, 300, true);
-    assert_eq!(first.objects.len(), w.objects.len() + 1, "nothing else is left out");
+    assert_eq!(
+        first.objects.len(),
+        w.objects.len() + 1,
+        "nothing else is left out"
+    );
     let shelf = first.content.object_index("bookshelf").unwrap();
-    assert!(first.objects.iter().any(|o| o.def == shelf && (o.x, o.z) == (6, 3)), "the bookshelf where it was");
+    assert!(
+        first
+            .objects
+            .iter()
+            .any(|o| o.def == shelf && (o.x, o.z) == (6, 3)),
+        "the bookshelf where it was"
+    );
     no_overlap(&first);
 }
 
@@ -89,8 +131,16 @@ fn an_old_chess_table_against_a_wall_moves_in_from_it() {
     // The house's last column inside its right-hand wall (x 18; the wall runs along x = 19).
     let back = load_v32_with_table(&w, &content, 18, 6, 0, 300);
     let t = chess_tables(&back)[0];
-    assert!(tiles(&back, t).contains(&(18, 6)), "still over the tile it stood on: {:?}", tiles(&back, t));
-    assert!(tiles(&back, t).iter().all(|&(x, _)| x < 19), "inside the wall: {:?}", tiles(&back, t));
+    assert!(
+        tiles(&back, t).contains(&(18, 6)),
+        "still over the tile it stood on: {:?}",
+        tiles(&back, t)
+    );
+    assert!(
+        tiles(&back, t).iter().all(|&(x, _)| x < 19),
+        "inside the wall: {:?}",
+        tiles(&back, t)
+    );
     no_overlap(&back);
     common::check(&back);
 }
@@ -109,7 +159,10 @@ fn an_old_chess_table_with_no_room_for_it_is_sold_back() {
     let w = World::from_json(&content, &lot.to_string(), 5).unwrap();
     let back = load_v32_with_table(&w, &content, 0, 0, 0, 300);
     assert!(chess_tables(&back).is_empty(), "no room: left out");
-    assert_eq!(back.households[0].funds, 1300, "sold back for what it was worth");
+    assert_eq!(
+        back.households[0].funds, 1300,
+        "sold back for what it was worth"
+    );
 }
 
 #[test]
@@ -118,5 +171,12 @@ fn a_chess_table_from_this_version_loads_where_it_was() {
     common::buy(&mut w, "chessTable", 8, 6);
     let back = World::from_save_json(&content, &w.save_json()).unwrap();
     let t = chess_tables(&back)[0];
-    assert_eq!((back.objects[t].x, back.objects[t].z, back.objects[t].footprint), (8, 6, [2, 1]));
+    assert_eq!(
+        (
+            back.objects[t].x,
+            back.objects[t].z,
+            back.objects[t].footprint
+        ),
+        (8, 6, [2, 1])
+    );
 }

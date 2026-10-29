@@ -55,7 +55,9 @@ pub fn switchable(world: &World, def: usize) -> bool {
 
 /// Switches one lamp; false if it was so already (or isn't a lamp).
 pub(crate) fn set(world: &mut World, object: u32, on: bool) -> bool {
-    let Some(o) = world.objects.get(object as usize) else { return false };
+    let Some(o) = world.objects.get(object as usize) else {
+        return false;
+    };
     if !switchable(world, o.def) || o.off != on {
         return false;
     }
@@ -66,7 +68,12 @@ pub(crate) fn set(world: &mut World, object: u32, on: bool) -> bool {
 
 /// The lamps that are off (object ids), for the renderer.
 pub fn lamps_off(world: &World) -> Vec<u32> {
-    world.objects.iter().filter(|o| o.off && switchable(world, o.def)).map(|o| o.stable).collect()
+    world
+        .objects
+        .iter()
+        .filter(|o| o.off && switchable(world, o.def))
+        .map(|o| o.stable)
+        .collect()
 }
 
 /// The residents' rule (see the module notes); runs every `EVERY` ticks.
@@ -78,7 +85,9 @@ pub(crate) fn update(world: &mut World) {
     let mut awake: Vec<u16> = world
         .sims
         .iter()
-        .filter(|s| s.here() && s.away_until.is_none() && !content.life.baby(s.age) && !s.asleep(content))
+        .filter(|s| {
+            s.here() && s.away_until.is_none() && !content.life.baby(s.age) && !s.asleep(content)
+        })
         .map(|s| {
             let (x, z) = s.tile();
             world.lot.room_at(x, z)
@@ -91,8 +100,17 @@ pub(crate) fn update(world: &mut World) {
     let lot_version = world.lot_version();
     let mut watch = std::mem::take(&mut world.light_watch);
     if watch.primed && watch.lot_version == lot_version && world.autonomy {
-        let came: Vec<u16> = awake.iter().copied().filter(|r| !watch.dark && dark || watch.awake.binary_search(r).is_err()).collect();
-        let left: Vec<u16> = watch.awake.iter().copied().filter(|r| awake.binary_search(r).is_err()).collect();
+        let came: Vec<u16> = awake
+            .iter()
+            .copied()
+            .filter(|r| !watch.dark && dark || watch.awake.binary_search(r).is_err())
+            .collect();
+        let left: Vec<u16> = watch
+            .awake
+            .iter()
+            .copied()
+            .filter(|r| awake.binary_search(r).is_err())
+            .collect();
         for room in came {
             if room_dark(world, room, dark) {
                 switch_room(world, room, true);
@@ -104,7 +122,12 @@ pub(crate) fn update(world: &mut World) {
     }
     // Morning: the fires left burning have burnt down.
     if watch.primed && watch.dark && !dark {
-        let fires: Vec<u32> = world.objects.iter().filter(|o| !o.off && world.content.objects[o.def].fire).map(|o| o.id).collect();
+        let fires: Vec<u32> = world
+            .objects
+            .iter()
+            .filter(|o| !o.off && world.content.objects[o.def].fire)
+            .map(|o| o.id)
+            .collect();
         for id in fires {
             set(world, id, false);
         }
@@ -119,8 +142,12 @@ pub(crate) fn update(world: &mut World) {
 /// Whether `room` is dark: it is night (or the room is in the basement, or has no windows) and
 /// none of its lamps is on (a fire burning there isn't lit for its light).
 fn room_dark(world: &World, room: u16, night: bool) -> bool {
-    let mut lamps = lamps_in(world, room).filter(|&id| !world.content.objects[world.objects[id as usize].def].fire).peekable();
-    let Some(&first) = lamps.peek() else { return false };
+    let mut lamps = lamps_in(world, room)
+        .filter(|&id| !world.content.objects[world.objects[id as usize].def].fire)
+        .peekable();
+    let Some(&first) = lamps.peek() else {
+        return false;
+    };
     let o = &world.objects[first as usize];
     let below = world.stairs.storey(o.z) < 0;
     (night || below || windowless(world, room)) && lamps.all(|id| world.objects[id as usize].off)
@@ -128,25 +155,41 @@ fn room_dark(world: &World, room: u16, night: bool) -> bool {
 
 /// Whether `room` has no window (to outdoors or to another room): daylight doesn't reach it.
 pub fn windowless(world: &World, room: u16) -> bool {
-    world.rooms().iter().find(|r| !r.garden && r.id == room).is_some_and(|r| r.windows == 0)
+    world
+        .rooms()
+        .iter()
+        .find(|r| !r.garden && r.id == room)
+        .is_some_and(|r| r.windows == 0)
 }
 
 /// The switchable lamps standing in `room`.
 fn lamps_in(world: &World, room: u16) -> impl Iterator<Item = u32> + '_ {
-    world.objects.iter().filter(move |o| switchable(world, o.def) && {
-        let [x, z] = o.centre(&world.content);
-        world.lot.room_at(x.floor() as i32, z.floor() as i32) == room
-    }).map(|o| o.id)
+    world
+        .objects
+        .iter()
+        .filter(move |o| {
+            switchable(world, o.def) && {
+                let [x, z] = o.centre(&world.content);
+                world.lot.room_at(x.floor() as i32, z.floor() as i32) == room
+            }
+        })
+        .map(|o| o.id)
 }
 
 /// A resident switches every lamp in `room`, unless the household living there has free will off
 /// (and puts out a fire there, but doesn't light one).
 fn switch_room(world: &mut World, room: u16, on: bool) {
-    let lamps: Vec<u32> = lamps_in(world, room).filter(|&id| !on || !world.content.objects[world.objects[id as usize].def].fire).collect();
+    let lamps: Vec<u32> = lamps_in(world, room)
+        .filter(|&id| !on || !world.content.objects[world.objects[id as usize].def].fire)
+        .collect();
     let Some(&first) = lamps.first() else { return };
     let o = &world.objects[first as usize];
     let plot = world.plot_at(o.x, o.z);
-    if world.households.iter().any(|h| h.plot.is_some() && h.plot == plot && !h.free_will) {
+    if world
+        .households
+        .iter()
+        .any(|h| h.plot.is_some() && h.plot == plot && !h.free_will)
+    {
         return;
     }
     for id in lamps {

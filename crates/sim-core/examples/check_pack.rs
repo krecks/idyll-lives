@@ -55,7 +55,10 @@ fn run() -> Result<bool, String> {
         .unwrap_or_default();
     let mut files = vec![("base.json".to_owned(), base)];
     // (Not the file being checked if base.json already includes it, like furniture.json.)
-    for name in includes.iter().filter(|n| !n.starts_with("packs/") && !path.ends_with(n.as_str())) {
+    for name in includes
+        .iter()
+        .filter(|n| !n.starts_with("packs/") && !path.ends_with(n.as_str()))
+    {
         files.push((name.clone(), read(name)?));
     }
     files.push((path.clone(), pack_text.clone()));
@@ -109,7 +112,12 @@ fn check_object(merged: &str, content: &Content, id: &str) -> bool {
     });
     // Things on a wall or the ceiling hang in a room (its back wall runs behind them).
     if matches!(def.layer, Layer::Wall | Layer::Ceiling) {
-        lot["walls"] = json!([[3, 4, 11, 4], [3, 11, 11, 11], [3, 4, 3, 11], [11, 4, 11, 11]]);
+        lot["walls"] = json!([
+            [3, 4, 11, 4],
+            [3, 11, 11, 11],
+            [3, 4, 3, 11],
+            [11, 4, 11, 11]
+        ]);
         lot["doors"] = json!([{"x": 6, "z": 11, "axis": "x"}]);
     }
     let lot = lot.to_string();

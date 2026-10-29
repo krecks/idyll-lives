@@ -21,8 +21,13 @@ use serde::Deserialize;
 
 use crate::Error;
 use crate::content::{Content, MAX_NEEDS, Pose, TagMask};
-use crate::social::{self, Acceptance, EventKind, Indices, Outcome, OutcomeRaw, Prefer, Requirements};
-use crate::world::{Access, Activity, Ctx, ObjectInstance, Phase, Sim, Task, TaskKind, World, access, end_activity, prefer_factor, walk_route};
+use crate::social::{
+    self, Acceptance, EventKind, Indices, Outcome, OutcomeRaw, Prefer, Requirements,
+};
+use crate::world::{
+    Access, Activity, Ctx, ObjectInstance, Phase, Sim, Task, TaskKind, World, access, end_activity,
+    prefer_factor, walk_route,
+};
 
 /// After a yes, who goes where (`phone.actions[].meet`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -171,7 +176,12 @@ fn one() -> f32 {
 }
 
 /// Phone rules from content (`stages`: content `life.stages`, for `fromStage`).
-pub(crate) fn parse(raw: &PhoneRaw, ix: &Indices, animations: &[String], stages: &[crate::content::LifeStage]) -> Result<PhoneRules, Error> {
+pub(crate) fn parse(
+    raw: &PhoneRaw,
+    ix: &Indices,
+    animations: &[String],
+    stages: &[crate::content::LifeStage],
+) -> Result<PhoneRules, Error> {
     let from_age = match &raw.from_stage {
         Some(id) => stages
             .iter()
@@ -182,17 +192,22 @@ pub(crate) fn parse(raw: &PhoneRaw, ix: &Indices, animations: &[String], stages:
         None => stages.iter().find(|s| !s.baby).map_or(0.0, |s| s.from),
     };
     let tag = |a: &str, ctx: &str| {
-        animations
-            .iter()
-            .position(|x| x == a)
-            .ok_or_else(|| Error::new(format!("{ctx}.anim: unknown anim '{a}' (declare it in \"animations\")")))
+        animations.iter().position(|x| x == a).ok_or_else(|| {
+            Error::new(format!(
+                "{ctx}.anim: unknown anim '{a}' (declare it in \"animations\")"
+            ))
+        })
     };
     let anim = match &raw.anim {
         Some(a) => Some(tag(a, "phone")?),
         None => animations.iter().position(|x| x == "phone"),
     };
     // (Seat tags content doesn't have are left out.)
-    let mask = |tags: &[String]| tags.iter().filter_map(|t| ix.tags.get(t.as_str())).fold(0, |m: TagMask, i| m | (1 << i));
+    let mask = |tags: &[String]| {
+        tags.iter()
+            .filter_map(|t| ix.tags.get(t.as_str()))
+            .fold(0, |m: TagMask, i| m | (1 << i))
+    };
     let mut actions = Vec::with_capacity(raw.actions.len());
     for a in &raw.actions {
         let ctx = format!("phone.{}", a.id);
@@ -208,7 +223,9 @@ pub(crate) fn parse(raw: &PhoneRaw, ix: &Indices, animations: &[String], stages:
         let success = social::parse_outcome(&a.success, ix, &ctx)?;
         let failure = social::parse_outcome(&a.failure, ix, &ctx)?;
         if success.effect != social::Effect::None || failure.effect != social::Effect::None {
-            return Err(Error::new(format!("{ctx}: phone outcomes have no `effect` (see `meet`)")));
+            return Err(Error::new(format!(
+                "{ctx}: phone outcomes have no `effect` (see `meet`)"
+            )));
         }
         actions.push(PhoneAction {
             id: a.id.clone(),
@@ -236,8 +253,19 @@ pub(crate) fn parse(raw: &PhoneRaw, ix: &Indices, animations: &[String], stages:
     Ok(PhoneRules {
         from_age,
         anim,
-        seat_tags: mask(&raw.seat_tags.clone().unwrap_or_else(|| vec!["lounge".into()])),
-        seat_avoid: mask(&raw.seat_avoid.clone().unwrap_or_else(|| vec!["spa".into(), "hygiene".into(), "bathroom".into(), "sleep".into()])),
+        seat_tags: mask(
+            &raw.seat_tags
+                .clone()
+                .unwrap_or_else(|| vec!["lounge".into()]),
+        ),
+        seat_avoid: mask(&raw.seat_avoid.clone().unwrap_or_else(|| {
+            vec![
+                "spa".into(),
+                "hygiene".into(),
+                "bathroom".into(),
+                "sleep".into(),
+            ]
+        })),
         seat_range: raw.seat_range.unwrap_or(5.0).max(0.0),
         no_answer_minutes: raw.no_answer_minutes.unwrap_or(3.0).max(1.0),
         actions,
@@ -290,7 +318,11 @@ pub fn status(w: &World, contact: usize) -> Option<&'static str> {
     if t.asleep(content) {
         Some(why::ASLEEP)
     } else if t.away_until.is_some() {
-        Some(if t.job.is_some() { why::AT_WORK } else { why::AT_SCHOOL })
+        Some(if t.job.is_some() {
+            why::AT_WORK
+        } else {
+            why::AT_SCHOOL
+        })
     } else if on_a_call(t) {
         Some(why::ON_THE_PHONE)
     } else if !t.available_for_social(content) {
@@ -303,7 +335,12 @@ pub fn status(w: &World, contact: usize) -> Option<&'static str> {
 /// What keeps `contact` from `me`'s phone: `status`, or being right here (on the same lot:
 /// they'd talk face to face).
 pub fn status_for(w: &World, me: usize, contact: usize) -> Option<&'static str> {
-    let on = |i: usize| w.sims.get(i).filter(|s| s.here() && s.away_until.is_none()).and_then(|s| w.plot_at(s.tile().0, s.tile().1));
+    let on = |i: usize| {
+        w.sims
+            .get(i)
+            .filter(|s| s.here() && s.away_until.is_none())
+            .and_then(|s| w.plot_at(s.tile().0, s.tile().1))
+    };
     match (on(me), on(contact)) {
         (Some(a), Some(b)) if a == b && me != contact => Some(why::RIGHT_HERE),
         _ => status(w, contact),
@@ -312,7 +349,15 @@ pub fn status_for(w: &World, me: usize, contact: usize) -> Option<&'static str> 
 
 /// On the phone with someone.
 fn on_a_call(s: &Sim) -> bool {
-    s.current().is_some_and(|a| matches!(a.task.kind, TaskKind::Phone { contact: Some(_), .. }))
+    s.current().is_some_and(|a| {
+        matches!(
+            a.task.kind,
+            TaskKind::Phone {
+                contact: Some(_),
+                ..
+            }
+        )
+    })
 }
 
 /// Why `me` can't use the phone at all right now (too young, at work or school, gone).
@@ -321,7 +366,11 @@ pub fn unusable(w: &World, me: usize) -> Option<&'static str> {
     if !has_phone(&w.content, s.age) {
         Some(why::TOO_YOUNG)
     } else if s.away_until.is_some() {
-        Some(if s.job.is_some() { why::AT_WORK } else { why::AT_SCHOOL })
+        Some(if s.job.is_some() {
+            why::AT_WORK
+        } else {
+            why::AT_SCHOOL
+        })
     } else {
         None
     }
@@ -335,7 +384,10 @@ pub fn why_not(w: &World, me: usize, contact: usize, action: usize) -> Option<&'
     if !act.contact {
         return None;
     }
-    let (Some(s), Some(t)) = (w.sims.get(me), w.sims.get(contact).filter(|t| t.here() && contact != me)) else {
+    let (Some(s), Some(t)) = (
+        w.sims.get(me),
+        w.sims.get(contact).filter(|t| t.here() && contact != me),
+    ) else {
         return Some(why::GONE);
     };
     if !has_phone(content, t.age) {
@@ -343,7 +395,11 @@ pub fn why_not(w: &World, me: usize, contact: usize, action: usize) -> Option<&'
     }
     let rel = w.relationships.get(me, contact);
     if !act.requires.allows(rel) {
-        return Some(if rel.met { why::NOT_CLOSE } else { why::NOT_MET });
+        return Some(if rel.met {
+            why::NOT_CLOSE
+        } else {
+            why::NOT_MET
+        });
     }
     if let Some(busy) = status_for(w, me, contact)
         && (busy == why::ASLEEP || busy == why::RIGHT_HERE || !act.message)
@@ -394,7 +450,12 @@ pub fn why_not(w: &World, me: usize, contact: usize, action: usize) -> Option<&'
 /// theirs would leave a baby home alone (`life::homebound`). The command handler
 /// (`check_order`) and the UI (`view.rs`) both ask this, so a button is greyed out exactly when
 /// pressing it would be refused.
-pub fn refusal(w: &World, me: usize, action: usize, contact: Option<usize>) -> Option<&'static str> {
+pub fn refusal(
+    w: &World,
+    me: usize,
+    action: usize,
+    contact: Option<usize>,
+) -> Option<&'static str> {
     let act = w.content.phone.actions.get(action)?;
     if let Some(off) = unusable(w, me) {
         return Some(off);
@@ -413,7 +474,12 @@ pub fn refusal(w: &World, me: usize, action: usize, contact: Option<usize>) -> O
 /// Checks a player's phone order: the action exists and takes a contact (a resident other
 /// than `me`) if and only if it needs one, and it isn't refused right now (`refusal`).
 /// Whether the contact is still free when the phone comes out is decided then (`update`).
-pub(crate) fn check_order(w: &World, me: usize, action: usize, contact: Option<u32>) -> Result<(), Error> {
+pub(crate) fn check_order(
+    w: &World,
+    me: usize,
+    action: usize,
+    contact: Option<u32>,
+) -> Result<(), Error> {
     let act = w
         .content
         .phone
@@ -421,15 +487,32 @@ pub(crate) fn check_order(w: &World, me: usize, action: usize, contact: Option<u
         .get(action)
         .ok_or_else(|| Error::new(format!("unknown phone action {action}")))?;
     if let Some(why) = unusable(w, me) {
-        return Err(Error::new(format!("{}: {}", w.sims[me].name, why.to_lowercase())));
+        return Err(Error::new(format!(
+            "{}: {}",
+            w.sims[me].name,
+            why.to_lowercase()
+        )));
     }
     let contact = match (act.contact, contact) {
         (false, None) => None,
-        (false, Some(_)) => return Err(Error::new(format!("{} is just for {}", act.label, w.sims[me].name))),
-        (true, None) => return Err(Error::new(format!("{} needs someone to contact", act.label))),
+        (false, Some(_)) => {
+            return Err(Error::new(format!(
+                "{} is just for {}",
+                act.label, w.sims[me].name
+            )));
+        }
+        (true, None) => {
+            return Err(Error::new(format!(
+                "{} needs someone to contact",
+                act.label
+            )));
+        }
         (true, Some(c)) => {
             let c = c as usize;
-            w.sims.get(c).filter(|t| t.here() && c != me).ok_or_else(|| Error::new(format!("unknown resident {c}")))?;
+            w.sims
+                .get(c)
+                .filter(|t| t.here() && c != me)
+                .ok_or_else(|| Error::new(format!("unknown resident {c}")))?;
             Some(c)
         }
     };
@@ -439,7 +522,11 @@ pub(crate) fn check_order(w: &World, me: usize, action: usize, contact: Option<u
         Some(crate::life::NO_SITTER) => crate::life::check_cover(w, me),
         Some(why) => {
             let who = contact.map_or_else(String::new, |c| format!(" · {}", w.sims[c].name));
-            Err(Error::new(format!("{}{who}: {}", act.label, why.to_lowercase())))
+            Err(Error::new(format!(
+                "{}{who}: {}",
+                act.label,
+                why.to_lowercase()
+            )))
         }
     }
 }
@@ -450,33 +537,70 @@ pub(crate) fn check_order(w: &World, me: usize, action: usize, contact: Option<u
 /// standing where they are.
 pub(crate) fn start(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance]) {
     let content = ctx.content;
-    let TaskKind::Phone { action, contact, .. } = task.kind else { return };
-    let Some(act) = content.phone.actions.get(action) else { return };
+    let TaskKind::Phone {
+        action, contact, ..
+    } = task.kind
+    else {
+        return;
+    };
+    let Some(act) = content.phone.actions.get(action) else {
+        return;
+    };
     if !has_phone(content, sim.age) {
         return;
     }
-    let task = Task { kind: TaskKind::Phone { action, contact, seat: None, answer: Answer::Pending }, ..task };
+    let task = Task {
+        kind: TaskKind::Phone {
+            action,
+            contact,
+            seat: None,
+            answer: Answer::Pending,
+        },
+        ..task
+    };
     if let Some(seat) = seat_near(sim, ctx, objects) {
         let o = &objects[seat as usize];
         let def = &content.objects[o.def];
         let footstool = crate::world::footstool_slots(content, objects, seat);
-        let slot = o.pick_slot(sim.id, 0..def.slots as usize, Some((def, sim.pos)), footstool);
+        let slot = o.pick_slot(
+            sim.id,
+            0..def.slots as usize,
+            Some((def, sim.pos)),
+            footstool,
+        );
         let (fx, fz) = slot
             .and_then(|k| crate::surface::seat_approach(content, &ctx.nav, o, k, sim.pos))
             .or_else(|| ctx.index.links.approach_of(seat))
             .unwrap_or_else(|| o.front_tile(content));
-        if let Some(waypoints) = walk_route(ctx, sim, (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5]) {
+        if let Some(waypoints) = walk_route(ctx, sim, (fx, fz), [fx as f32 + 0.5, fz as f32 + 0.5])
+        {
             let o = &mut objects[seat as usize];
             if o.reserve_seat(sim.id, &content.objects[o.def], sim.pos, footstool) {
-                let task = Task { kind: TaskKind::Phone { action, contact, seat: Some(seat), answer: Answer::Pending }, ..task };
+                let task = Task {
+                    kind: TaskKind::Phone {
+                        action,
+                        contact,
+                        seat: Some(seat),
+                        answer: Answer::Pending,
+                    },
+                    ..task
+                };
                 sim.pose = Pose::Stand;
-                sim.current = Some(Activity { task, phase: Phase::Routing { waypoints, next: 0 }, tags: act.tags });
+                sim.current = Some(Activity {
+                    task,
+                    phase: Phase::Routing { waypoints, next: 0 },
+                    tags: act.tags,
+                });
                 return;
             }
         }
     }
     sim.pose = Pose::Stand;
-    sim.current = Some(Activity { task, phase: Phase::Using { elapsed: 0.0 }, tags: act.tags });
+    sim.current = Some(Activity {
+        task,
+        phase: Phase::Using { elapsed: 0.0 },
+        tags: act.tags,
+    });
 }
 
 /// The nearest free seat within `seat_range` that they may sit on here.
@@ -488,19 +612,37 @@ fn seat_near(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
     }
     let usable = match sim.visiting {
         Some(visit) => ctx.index.on(visit.plot),
-        None => ctx.index.usable_from(ctx.households[sim.household as usize].plot),
+        None => ctx
+            .index
+            .usable_from(ctx.households[sim.household as usize].plot),
     };
     usable
         .iter()
         .map(|&o| &objects[o as usize])
         .filter(|o| {
             let def = &content.objects[o.def];
-            !o.broken() && o.can_use(sim.id, def.slots) && o.sits(def, content.life.stage(sim.age), rules.seat_tags, rules.seat_avoid)
+            !o.broken()
+                && o.can_use(sim.id, def.slots)
+                && o.sits(
+                    def,
+                    content.life.stage(sim.age),
+                    rules.seat_tags,
+                    rules.seat_avoid,
+                )
         })
         .filter(|o| access(ctx, sim, ctx.object_plot[o.id as usize]) != Access::None)
         .map(|o| {
-            let (fx, fz) = ctx.index.links.approach_of(o.id).unwrap_or_else(|| o.front_tile(content));
-            (o.id, ctx.nav.stairs.distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos))
+            let (fx, fz) = ctx
+                .index
+                .links
+                .approach_of(o.id)
+                .unwrap_or_else(|| o.front_tile(content));
+            (
+                o.id,
+                ctx.nav
+                    .stairs
+                    .distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos),
+            )
         })
         .filter(|&(_, d)| d <= rules.seat_range)
         .min_by(|a, b| a.1.total_cmp(&b.1))
@@ -509,7 +651,9 @@ fn seat_near(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
 
 /// At the seat: sit down with the phone.
 pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) {
-    let Some(TaskKind::Phone { seat, .. }) = sim.current.as_ref().map(|a| a.task.kind) else { return };
+    let Some(TaskKind::Phone { seat, .. }) = sim.current.as_ref().map(|a| a.task.kind) else {
+        return;
+    };
     if let Some(o) = seat.map(|s| &objects[s as usize]) {
         // They stand back up where they came from (see `end_activity`).
         sim.seated_from = Some(sim.tile());
@@ -525,9 +669,25 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) {
 
 /// A tick on the phone (`minutes` long; more when catching up on a turn, see `lod.rs`): needs
 /// fill while connected. Returns whether they're done (the ending is applied after the step).
-pub(crate) fn using(sim: &mut Sim, content: &Content, task: Task, elapsed: f32, minutes: f32) -> bool {
-    let TaskKind::Phone { action, contact, answer, .. } = task.kind else { return true };
-    let Some(act) = content.phone.actions.get(action) else { return true };
+pub(crate) fn using(
+    sim: &mut Sim,
+    content: &Content,
+    task: Task,
+    elapsed: f32,
+    minutes: f32,
+) -> bool {
+    let TaskKind::Phone {
+        action,
+        contact,
+        answer,
+        ..
+    } = task.kind
+    else {
+        return true;
+    };
+    let Some(act) = content.phone.actions.get(action) else {
+        return true;
+    };
     // With someone: once it's decided whether they answer (`update`).
     if contact.is_some() && answer == Answer::Pending {
         return false;
@@ -536,17 +696,25 @@ pub(crate) fn using(sim: &mut Sim, content: &Content, task: Task, elapsed: f32, 
     if connected {
         for (n, g) in act.gains.iter().enumerate().take(content.needs.len()) {
             if *g != 0.0 {
-                sim.needs[n] = (sim.needs[n] + g / act.minutes * minutes * sim.mods.need_gain[n]).clamp(0.0, 1.0);
+                sim.needs[n] = (sim.needs[n] + g / act.minutes * minutes * sim.mods.need_gain[n])
+                    .clamp(0.0, 1.0);
             }
         }
     }
     // Scrolling stops once fun is full, like any pastime.
     let full = contact.is_none()
-        && (0..content.needs.len()).filter(|&n| act.gains[n] > 0.0).all(|n| sim.needs[n] >= 0.999)
+        && (0..content.needs.len())
+            .filter(|&n| act.gains[n] > 0.0)
+            .all(|n| sim.needs[n] >= 0.999)
         && act.gains.iter().any(|&g| g > 0.0);
     let done = elapsed >= length(content, action, answer) || full;
     if done {
-        sim.hung_up = Some(HungUp { action, contact, answer, directed: task.directed });
+        sim.hung_up = Some(HungUp {
+            action,
+            contact,
+            answer,
+            directed: task.directed,
+        });
     }
     done
 }
@@ -560,8 +728,21 @@ pub(crate) fn update(w: &mut World) {
     }
     let tick = w.tick;
     for i in 0..w.sims.len() {
-        let Some(Activity { task: Task { kind: TaskKind::Phone { action, contact: Some(c), answer: Answer::Pending, .. }, .. }, phase: Phase::Using { .. }, .. }) =
-            w.sims[i].current.as_ref()
+        let Some(Activity {
+            task:
+                Task {
+                    kind:
+                        TaskKind::Phone {
+                            action,
+                            contact: Some(c),
+                            answer: Answer::Pending,
+                            ..
+                        },
+                    ..
+                },
+            phase: Phase::Using { .. },
+            ..
+        }) = w.sims[i].current.as_ref()
         else {
             continue;
         };
@@ -570,35 +751,99 @@ pub(crate) fn update(w: &mut World) {
             Answer::NoAnswer
         } else {
             let act = &w.content.phone.actions[action];
-            let chance = crate::conversation::accepts(&w.content, &w.relationships, &w.sims[i], &w.sims[c], &act.acceptance, act.tags);
-            if w.rng.next_f32() < chance { Answer::Yes } else { Answer::No }
+            let chance = crate::conversation::accepts(
+                &w.content,
+                &w.relationships,
+                &w.sims[i],
+                &w.sims[c],
+                &act.acceptance,
+                act.tags,
+            );
+            if w.rng.next_f32() < chance {
+                Answer::Yes
+            } else {
+                Answer::No
+            }
         };
-        if let Some(Activity { task: Task { kind: TaskKind::Phone { answer: a, .. }, .. }, .. }) = w.sims[i].current.as_mut() {
+        if let Some(Activity {
+            task:
+                Task {
+                    kind: TaskKind::Phone { answer: a, .. },
+                    ..
+                },
+            ..
+        }) = w.sims[i].current.as_mut()
+        {
             *a = answer;
         }
     }
     for i in 0..w.sims.len() {
-        let Some(h) = w.sims[i].hung_up.take() else { continue };
-        let Some(c) = h.contact.map(|c| c as usize).filter(|&c| c != i && w.sims.get(c).is_some_and(Sim::here)) else {
+        let Some(h) = w.sims[i].hung_up.take() else {
             continue;
         };
-        let World { content, sims, objects, relationships, events, rng, households, .. } = &mut *w;
+        let Some(c) = h
+            .contact
+            .map(|c| c as usize)
+            .filter(|&c| c != i && w.sims.get(c).is_some_and(Sim::here))
+        else {
+            continue;
+        };
+        let World {
+            content,
+            sims,
+            objects,
+            relationships,
+            events,
+            rng,
+            households,
+            ..
+        } = &mut *w;
         let act = &content.phone.actions[h.action];
         match h.answer {
             Answer::Yes => {
-                crate::conversation::outcome(content, relationships, events, rng, sims, i, c, &act.success, act.tags, true, tick);
+                crate::conversation::outcome(
+                    content,
+                    relationships,
+                    events,
+                    rng,
+                    sims,
+                    i,
+                    c,
+                    &act.success,
+                    act.tags,
+                    true,
+                    tick,
+                );
                 let t = &mut sims[c];
-                for (n, g) in act.contact_gains.iter().enumerate().take(content.needs.len()) {
+                for (n, g) in act
+                    .contact_gains
+                    .iter()
+                    .enumerate()
+                    .take(content.needs.len())
+                {
                     t.needs[n] = (t.needs[n] + g * t.mods.need_gain[n]).clamp(0.0, 1.0);
                 }
             }
-            Answer::No => crate::conversation::outcome(content, relationships, events, rng, sims, i, c, &act.failure, act.tags, false, tick),
+            Answer::No => crate::conversation::outcome(
+                content,
+                relationships,
+                events,
+                rng,
+                sims,
+                i,
+                c,
+                &act.failure,
+                act.tags,
+                false,
+                tick,
+            ),
             Answer::NoAnswer | Answer::Pending => continue,
         }
         let Some(meet) = act.meet else { continue };
         // Invitations are news for the player's household only (across a whole town they would
         // crowd out everything else).
-        let ours = households[sims[i].household as usize].player || households[sims[c].household as usize].player;
+        let ours = households[sims[i].household as usize].player
+            || households[sims[c].household as usize].player;
         if h.answer == Answer::No {
             if ours {
                 events.push(tick, EventKind::Declined, i, c, None);
@@ -608,20 +853,32 @@ pub(crate) fn update(w: &mut World) {
         match meet {
             // The contact sets off for the caller's home (dropping what they chose themselves).
             Meet::Here => {
-                let Some(home) = households[sims[i].household as usize].plot else { continue };
+                let Some(home) = households[sims[i].household as usize].plot else {
+                    continue;
+                };
                 let t = &mut sims[c];
                 if t.current.as_ref().is_some_and(|a| !a.task.directed) {
                     end_activity(t, content, objects);
                 }
-                t.queue.push_front(Task { kind: TaskKind::Visit { plot: home }, directed: false, routine: false });
+                t.queue.push_front(Task {
+                    kind: TaskKind::Visit { plot: home },
+                    directed: false,
+                    routine: false,
+                });
                 if ours {
                     events.push(tick, EventKind::Invited, i, c, None);
                 }
             }
             // Over to theirs.
             Meet::There => {
-                let Some(home) = households[sims[c].household as usize].plot else { continue };
-                sims[i].queue.push_front(Task { kind: TaskKind::Visit { plot: home }, directed: h.directed, routine: false });
+                let Some(home) = households[sims[c].household as usize].plot else {
+                    continue;
+                };
+                sims[i].queue.push_front(Task {
+                    kind: TaskKind::Visit { plot: home },
+                    directed: h.directed,
+                    routine: false,
+                });
             }
         }
     }
@@ -632,7 +889,12 @@ pub(crate) fn update(w: &mut World) {
 /// What the phone offers `sim` right now, scored like everything else in `pick_autonomous`
 /// (`feel`: traits, emotion and the time of day): `(score, action, contact)`. Talking with
 /// people in the same place is for face to face; meeting up is scored like a visit.
-pub(crate) fn candidates(sim: &Sim, ctx: &Ctx, felt: &[f32], feel: &dyn Fn(TagMask) -> f32) -> Vec<(f32, usize, Option<u32>)> {
+pub(crate) fn candidates(
+    sim: &Sim,
+    ctx: &Ctx,
+    felt: &[f32],
+    feel: &dyn Fn(TagMask) -> f32,
+) -> Vec<(f32, usize, Option<u32>)> {
     let content = ctx.content;
     let mut out = Vec::new();
     // (Guests spend their time with their hosts.)
@@ -646,11 +908,20 @@ pub(crate) fn candidates(sim: &Sim, ctx: &Ctx, felt: &[f32], feel: &dyn Fn(TagMa
     let visits = &content.visits;
     let visiting_hours = (visits.earliest_hour..visits.latest_hour).contains(&ctx.hour);
     let mut soon = None;
-    for (a, act) in content.phone.actions.iter().enumerate().filter(|(_, a)| a.autonomous) {
+    for (a, act) in content
+        .phone
+        .actions
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| a.autonomous)
+    {
         if !act.contact {
             // Scrolling: a pastime like any other (a planned block for it counts).
             let (plan, floor) = crate::planner::tags_factor(content, sim, act.tags);
-            let s = (crate::ai::score_felt(needs, felt, &act.gains, 0.0) * act.autonomy_weight).max(floor) * feel(act.tags) * plan;
+            let s = (crate::ai::score_felt(needs, felt, &act.gains, 0.0) * act.autonomy_weight)
+                .max(floor)
+                * feel(act.tags)
+                * plan;
             out.push((s, a, None));
             continue;
         }
@@ -658,7 +929,11 @@ pub(crate) fn candidates(sim: &Sim, ctx: &Ctx, felt: &[f32], feel: &dyn Fn(TagMa
             continue;
         }
         for (j, other) in ctx.briefs.iter().enumerate() {
-            if j == me || !other.here || !has_phone(content, other.age) || (other.plot == here && !other.away) {
+            if j == me
+                || !other.here
+                || !has_phone(content, other.age)
+                || (other.plot == here && !other.away)
+            {
                 continue;
             }
             // A call needs them free; a message, awake (asleep, they're neither).
@@ -674,13 +949,25 @@ pub(crate) fn candidates(sim: &Sim, ctx: &Ctx, felt: &[f32], feel: &dyn Fn(TagMa
                     let ok = match meet {
                         Meet::Here => here == household.plot && other.household != sim.household,
                         // (Not leaving a baby home alone: `life::minding_baby`.)
-                        Meet::There => their_home.is_some() && other.plot == their_home && other.household != sim.household && !crate::life::minding_baby(sim, ctx),
+                        Meet::There => {
+                            their_home.is_some()
+                                && other.plot == their_home
+                                && other.household != sim.household
+                                && !crate::life::minding_baby(sim, ctx)
+                        }
                     };
                     if !ok || rel.friendship < visits.min_friendship {
                         continue;
                     }
                     let soon = *soon.get_or_insert_with(|| {
-                        crate::planner::plans_soon(content, sim, &household.routines, ctx.day, ctx.minute, visits.hours * 60.0)
+                        crate::planner::plans_soon(
+                            content,
+                            sim,
+                            &household.routines,
+                            ctx.day,
+                            ctx.minute,
+                            visits.hours * 60.0,
+                        )
                     });
                     // Who travels doesn't matter much on the phone: like a visit next door.
                     crate::ai::score_felt(needs, felt, &visits.gains, 0.0)
@@ -694,7 +981,14 @@ pub(crate) fn candidates(sim: &Sim, ctx: &Ctx, felt: &[f32], feel: &dyn Fn(TagMa
                 * act.autonomy_weight
                 * prefer_factor(act.prefer, rel, ctx.rels.chemistry(me, j), 0.0)
                 * feel(act.tags)
-                * crate::planner::social_factor(content, sim, false, friendly, rel.friendship, false);
+                * crate::planner::social_factor(
+                    content,
+                    sim,
+                    false,
+                    friendly,
+                    rel.friendship,
+                    false,
+                );
             out.push((s, a, Some(j as u32)));
         }
     }
@@ -703,7 +997,9 @@ pub(crate) fn candidates(sim: &Sim, ctx: &Ctx, felt: &[f32], feel: &dyn Fn(TagMa
 
 /// How long a phone action lasts, as it went: a no is a short call; nobody answering, a few rings.
 pub(crate) fn length(content: &Content, action: usize, answer: Answer) -> f32 {
-    let Some(act) = content.phone.actions.get(action) else { return 1.0 };
+    let Some(act) = content.phone.actions.get(action) else {
+        return 1.0;
+    };
     match answer {
         Answer::No => act.minutes * crate::conversation::FAILURE_LENGTH,
         Answer::NoAnswer => content.phone.no_answer_minutes.min(act.minutes),

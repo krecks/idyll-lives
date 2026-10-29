@@ -21,13 +21,17 @@ const BED: usize = 2;
 
 fn kind(w: &World, x: i32, z: i32) -> String {
     let r = w.room_at_tile(x, z).unwrap();
-    r.kind.map_or("none".into(), |k| w.content.room_kinds[k].id.clone())
+    r.kind
+        .map_or("none".into(), |k| w.content.room_kinds[k].id.clone())
 }
 
 /// What `sim` is doing: the object and interaction id, while using one.
 fn doing(w: &World, sim: usize) -> Option<(usize, String)> {
     match w.sims[sim].current()?.task.kind {
-        TaskKind::Use { object, interaction } => {
+        TaskKind::Use {
+            object,
+            interaction,
+        } => {
             let def = &w.content.objects[w.objects[object as usize].def];
             Some((object as usize, def.interactions[interaction].id.clone()))
         }
@@ -45,7 +49,12 @@ fn bedtime(town: &str) -> World {
     let n = w.content.needs.len();
     for s in &mut w.sims {
         s.needs[..n].fill(1.0);
-        let energy = w.content.needs.iter().position(|n| n.id == "energy").unwrap();
+        let energy = w
+            .content
+            .needs
+            .iter()
+            .position(|n| n.id == "energy")
+            .unwrap();
         s.needs[energy] = 0.25;
     }
     w
@@ -54,13 +63,25 @@ fn bedtime(town: &str) -> World {
 #[test]
 fn the_sofa_bed_keeps_the_living_room_a_living_room() {
     let w = World::from_json(&common::content(), TOWN, 1).unwrap();
-    assert_eq!(kind(&w, 3, 3), "living", "a sofa bed is a sofa that folds out");
+    assert_eq!(
+        kind(&w, 3, 3),
+        "living",
+        "a sofa bed is a sofa that folds out"
+    );
     assert!(!w.room_at_tile(3, 3).unwrap().mixed, "not a bedroom too");
     assert_eq!(kind(&w, 12, 3), "bedroom");
     let def = &w.content.objects[w.objects[SOFA_BED].def];
-    let sleep = def.interactions.iter().find(|i| i.id == "sleep").expect("a night on the sofa bed");
+    let sleep = def
+        .interactions
+        .iter()
+        .find(|i| i.id == "sleep")
+        .expect("a night on the sofa bed");
     assert!(sleep.spare && sleep.tags & w.content.day_rhythm.sleep_tags != 0);
-    assert_eq!(def.tags & w.content.day_rhythm.sleep_tags, 0, "its night doesn't count towards the room");
+    assert_eq!(
+        def.tags & w.content.day_rhythm.sleep_tags,
+        0,
+        "its night doesn't count towards the room"
+    );
 }
 
 #[test]
@@ -78,8 +99,14 @@ fn whoever_has_no_bed_sleeps_the_night_on_the_sofa_bed() {
             }
         }
     }
-    let places: Vec<usize> = slept.iter().map(|p| p.as_ref().expect("both asleep by 2 am").0).collect();
-    assert!(places.contains(&BED) && places.contains(&SOFA_BED), "one in the bed, the other on the sofa bed: {places:?}");
+    let places: Vec<usize> = slept
+        .iter()
+        .map(|p| p.as_ref().expect("both asleep by 2 am").0)
+        .collect();
+    assert!(
+        places.contains(&BED) && places.contains(&SOFA_BED),
+        "one in the bed, the other on the sofa bed: {places:?}"
+    );
     assert!(w.objects[SOFA_BED].open, "pulled out for the night");
     assert_eq!(kind(&w, 3, 3), "living", "still the living room, slept in");
 }
@@ -89,17 +116,30 @@ fn nobody_takes_the_sofa_bed_with_a_bed_free() {
     // Two single beds in the bedroom, for two sisters (only those who belong together share a
     // bedroom): the sofa bed stays a sofa.
     let town = TOWN
-        .replace(r#"{"def":"bedSingle","x":12,"z":2}"#, r#"{"def":"bedSingle","x":12,"z":2},{"def":"bedSingle","x":14,"z":2}"#)
-        .replace(r#""x":7.5,"z":5.5}]}"#, r#""x":7.5,"z":5.5}],"relationships":[{"a":0,"b":1,"preset":"siblings"}]}"#);
+        .replace(
+            r#"{"def":"bedSingle","x":12,"z":2}"#,
+            r#"{"def":"bedSingle","x":12,"z":2},{"def":"bedSingle","x":14,"z":2}"#,
+        )
+        .replace(
+            r#""x":7.5,"z":5.5}]}"#,
+            r#""x":7.5,"z":5.5}],"relationships":[{"a":0,"b":1,"preset":"siblings"}]}"#,
+        );
     let mut w = bedtime(&town);
     let night = clock::tick_at(2, 2.0 * 60.0).unwrap();
     while w.tick < night {
         w.tick_once();
         for s in 0..2 {
-            assert!(doing(&w, s).is_none_or(|(o, id)| o != SOFA_BED || id != "sleep"), "{} on the sofa bed with a bed free", w.sims[s].name);
+            assert!(
+                doing(&w, s).is_none_or(|(o, id)| o != SOFA_BED || id != "sleep"),
+                "{} on the sofa bed with a bed free",
+                w.sims[s].name
+            );
         }
     }
-    assert!((0..2).all(|s| doing(&w, s).is_some_and(|(o, id)| o != SOFA_BED && id == "sleep")), "both in the beds");
+    assert!(
+        (0..2).all(|s| doing(&w, s).is_some_and(|(o, id)| o != SOFA_BED && id == "sleep")),
+        "both in the beds"
+    );
 }
 
 #[test]
@@ -111,6 +151,9 @@ fn spare_is_for_a_night_s_sleep() {
           {"id":"sofa","name":"Sofa","price":10,"interactions":[
             {"id":"sit","label":"Sit","minutes":30,"pose":"sit","tags":["lounge"],"spare":true}]}]}"#;
     let town = r#"{"width":4,"depth":4,"plots":[],"households":[],"sims":[]}"#;
-    let err = World::from_json(content, town, 1).err().expect("refused").to_string();
+    let err = World::from_json(content, town, 1)
+        .err()
+        .expect("refused")
+        .to_string();
     assert!(err.contains("sofa.sit") && err.contains("spare"), "{err}");
 }

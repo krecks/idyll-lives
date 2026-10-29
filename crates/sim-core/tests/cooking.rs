@@ -66,7 +66,13 @@ const CONTENT: &str = r#"{
 fn town(objects: &str, sims: usize) -> String {
     let names = ["Ada", "Ben", "Cleo", "Dev"];
     let sims: Vec<String> = (0..sims)
-        .map(|i| format!(r#"{{"name":"{}","household":0,"x":{}.5,"z":6.5}}"#, names[i], 4 + i))
+        .map(|i| {
+            format!(
+                r#"{{"name":"{}","household":0,"x":{}.5,"z":6.5}}"#,
+                names[i],
+                4 + i
+            )
+        })
         .collect();
     format!(
         r#"{{"width":16,"depth":16,
@@ -111,16 +117,27 @@ fn ticks(w: &mut World, minutes: f32) {
 }
 
 fn interaction(w: &World, object: u32, id: &str) -> usize {
-    w.content.objects[w.objects[object as usize].def].interactions.iter().position(|i| i.id == id).unwrap()
+    w.content.objects[w.objects[object as usize].def]
+        .interactions
+        .iter()
+        .position(|i| i.id == id)
+        .unwrap()
 }
 
 fn order(w: &mut World, sim: u32, object: u32, id: &str) {
     let interaction = interaction(w, object, id);
-    w.apply(Command::Use { sim, object, interaction }).unwrap();
+    w.apply(Command::Use {
+        sim,
+        object,
+        interaction,
+    })
+    .unwrap();
 }
 
 fn cooking(w: &World, sim: usize) -> bool {
-    w.sims[sim].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Cook { .. }))
+    w.sims[sim]
+        .current()
+        .is_some_and(|a| matches!(a.task.kind, TaskKind::Cook { .. }))
 }
 
 /// The snapshot's columns for a resident.
@@ -148,24 +165,57 @@ fn a_meal_goes_from_the_fridge_to_the_counter_to_the_stove_and_is_served() {
         let r = row(&w, 0);
         let object = r[snapshot::sim::OBJECT];
         if cooking(&w, 0) {
-            assert_eq!(r[snapshot::sim::RECIPE], w.content.recipe_index("meal").unwrap() as f32 + 1.0);
+            assert_eq!(
+                r[snapshot::sim::RECIPE],
+                w.content.recipe_index("meal").unwrap() as f32 + 1.0
+            );
             if object >= 0.0 && stations.last() != Some(&(object as u32)) {
                 stations.push(object as u32);
             }
             if w.sims[0].is_moving() {
                 held_between.push(w.sims[0].held.map(|h| w.content.items[h.def].id.clone()));
-                assert_eq!(r[snapshot::sim::HELD], w.sims[0].held.map_or(0.0, |h| h.def as f32 + 1.0));
+                assert_eq!(
+                    r[snapshot::sim::HELD],
+                    w.sims[0].held.map_or(0.0, |h| h.def as f32 + 1.0)
+                );
             }
         }
     }
-    assert_eq!(stations, [FRIDGE, COUNTER, STOVE, TABLE], "fridge, counter, the stove that was clicked, then the table");
-    assert!(held_between.contains(&Some("ingredients".into())), "carried the ingredients: {held_between:?}");
-    assert!(held_between.contains(&Some("prepBowl".into())), "carried the prepped bowl: {held_between:?}");
-    assert!(held_between.contains(&Some("mealPot".into())), "carried the dish to the table: {held_between:?}");
+    assert_eq!(
+        stations,
+        [FRIDGE, COUNTER, STOVE, TABLE],
+        "fridge, counter, the stove that was clicked, then the table"
+    );
+    assert!(
+        held_between.contains(&Some("ingredients".into())),
+        "carried the ingredients: {held_between:?}"
+    );
+    assert!(
+        held_between.contains(&Some("prepBowl".into())),
+        "carried the prepped bowl: {held_between:?}"
+    );
+    assert!(
+        held_between.contains(&Some("mealPot".into())),
+        "carried the dish to the table: {held_between:?}"
+    );
     // Paid once, for a serving each (two at home).
-    assert_eq!(funds - w.households[0].funds, 6, "3 a serving, two servings");
-    let pot = w.items.list.iter().find(|it| it.def == item_def(&w, "mealPot")).expect("a pot of food");
-    assert_eq!(sim_core::items::holder(&w.content, &w.objects, &pot.at), Some(TABLE), "served on the dining table: {:?}", pot.at);
+    assert_eq!(
+        funds - w.households[0].funds,
+        6,
+        "3 a serving, two servings"
+    );
+    let pot = w
+        .items
+        .list
+        .iter()
+        .find(|it| it.def == item_def(&w, "mealPot"))
+        .expect("a pot of food");
+    assert_eq!(
+        sim_core::items::holder(&w.content, &w.objects, &pot.at),
+        Some(TABLE),
+        "served on the dining table: {:?}",
+        pot.at
+    );
     assert_eq!(pot.servings, 2);
     assert!(!cooking(&w, 0));
 }
@@ -181,7 +231,11 @@ fn clicking_one_of_two_stoves_starts_at_the_fridge_and_cooks_at_that_stove() {
     for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
         if let Some(a) = w.sims[0].current()
-            && let TaskKind::Cook { step, station: Some(s), .. } = a.task.kind
+            && let TaskKind::Cook {
+                step,
+                station: Some(s),
+                ..
+            } = a.task.kind
         {
             first.get_or_insert(s);
             if step == 2 {
@@ -190,7 +244,11 @@ fn clicking_one_of_two_stoves_starts_at_the_fridge_and_cooks_at_that_stove() {
         }
     }
     assert_eq!(first, Some(FRIDGE), "the ingredients first");
-    assert_eq!(cooked_at, Some(far), "the stove that was clicked, not the nearer one");
+    assert_eq!(
+        cooked_at,
+        Some(far),
+        "the stove that was clicked, not the nearer one"
+    );
 }
 
 #[test]
@@ -201,7 +259,12 @@ fn the_household_sits_down_to_dinner_and_the_plates_get_washed() {
     }
     ticks(&mut w, 240.0);
     for s in &w.sims {
-        assert!(s.needs[0] > 0.5, "{} is still hungry: {}", s.name, s.needs[0]);
+        assert!(
+            s.needs[0] > 0.5,
+            "{} is still hungry: {}",
+            s.name,
+            s.needs[0]
+        );
     }
     assert!(
         !w.events.iter().any(|e| e.kind == EventKind::Accident),
@@ -215,14 +278,21 @@ fn the_household_sits_down_to_dinner_and_the_plates_get_washed() {
 #[test]
 fn a_dishwasher_does_the_washing_up_too() {
     // No sink: only the dishwasher washes up.
-    let kitchen = KITCHEN.replace(r#"{"def":"sink","x":6,"z":1,"rot":0}"#, r#"{"def":"dishwasher","x":6,"z":1,"rot":0}"#);
+    let kitchen = KITCHEN.replace(
+        r#"{"def":"sink","x":6,"z":1,"rot":0}"#,
+        r#"{"def":"dishwasher","x":6,"z":1,"rot":0}"#,
+    );
     let mut w = world_with(&kitchen, 2, true);
     let plate = item_def(&w, "plateDirty");
     for x in [2, 3] {
         w.items.add(sim_core::items::ItemInstance {
             id: 0,
             def: plate,
-            at: ItemAt::Surface { x, z: 5, offset: [0, 0] },
+            at: ItemAt::Surface {
+                x,
+                z: 5,
+                offset: [0, 0],
+            },
             servings: 0,
             quality: 1.0,
             made_at: 0,
@@ -236,10 +306,22 @@ fn a_dishwasher_does_the_washing_up_too() {
     for _ in 0..(120.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
         for (i, s) in w.sims.iter().enumerate() {
-            if s.current().is_some_and(|a| matches!(a.task.kind, TaskKind::Dishes { station: Some(SINK), .. }) && matches!(a.phase, Phase::Using { .. })) {
+            if s.current().is_some_and(|a| {
+                matches!(
+                    a.task.kind,
+                    TaskKind::Dishes {
+                        station: Some(SINK),
+                        ..
+                    }
+                ) && matches!(a.phase, Phase::Using { .. })
+            }) {
                 washing = true;
                 // The renderer tells a dishwasher from a sink by it (its door, its sound).
-                assert_eq!(row(&w, i)[snapshot::sim::OBJECT_DEF], dishwasher, "the station's kind");
+                assert_eq!(
+                    row(&w, i)[snapshot::sim::OBJECT_DEF],
+                    dishwasher,
+                    "the station's kind"
+                );
             }
         }
     }
@@ -257,7 +339,8 @@ fn a_step_has_its_own_animation_at_some_stations() {
             r#"{"label":"Cook","at":["stove","microwave"],"minutes":20,"anim":"stir","animAt":{"microwave":"bake"},"optional":true}"#,
         )
         .replace(r#"{"id":"dishwasher","#, r#"{"id":"microwave","name":"Microwave","price":100,"stations":["microwave"]},{"id":"dishwasher","#);
-    let anim = |w: &World, name: &str| w.content.animations.iter().position(|a| a == name).unwrap() as f32;
+    let anim =
+        |w: &World, name: &str| w.content.animations.iter().position(|a| a == name).unwrap() as f32;
     let seen = |kitchen: &str| {
         let mut w = World::from_json(&content, &town(kitchen, 1), 3).unwrap();
         w.autonomy = false;
@@ -268,7 +351,10 @@ fn a_step_has_its_own_animation_at_some_stations() {
         for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
             w.tick_once();
             let r = row(&w, 0);
-            if r[snapshot::sim::OBJECT] == cooker && r[snapshot::sim::ACTION] >= 0.0 && !seen.contains(&r[snapshot::sim::ACTION]) {
+            if r[snapshot::sim::OBJECT] == cooker
+                && r[snapshot::sim::ACTION] >= 0.0
+                && !seen.contains(&r[snapshot::sim::ACTION])
+            {
                 seen.push(r[snapshot::sim::ACTION]);
             }
         }
@@ -279,7 +365,10 @@ fn a_step_has_its_own_animation_at_some_stations() {
     let (stove, _, stir) = seen(KITCHEN);
     assert_eq!(stove, [stir], "stirred on the hob");
     // `animAt` names one of the step's stations.
-    let bad = content.replace(r#""animAt":{"microwave":"bake"}"#, r#""animAt":{"grill":"bake"}"#);
+    let bad = content.replace(
+        r#""animAt":{"microwave":"bake"}"#,
+        r#""animAt":{"grill":"bake"}"#,
+    );
     assert!(World::from_json(&bad, &town(KITCHEN, 1), 3).is_err());
 }
 
@@ -296,7 +385,11 @@ fn without_a_stove_a_gourmet_meal_is_never_made_but_a_simple_one_is() {
         w.tick_once();
         for s in &w.sims {
             if let Some(TaskKind::Cook { recipe, .. }) = s.current().map(|a| a.task.kind) {
-                assert_ne!(recipe, gourmet, "{} cooks a gourmet meal without a stove", s.name);
+                assert_ne!(
+                    recipe, gourmet,
+                    "{} cooks a gourmet meal without a stove",
+                    s.name
+                );
             }
         }
     }
@@ -307,18 +400,33 @@ fn without_a_stove_a_gourmet_meal_is_never_made_but_a_simple_one_is() {
     ticks(&mut w, 5.0);
     assert!(!cooking(&w, 0) && w.sims[0].held.is_none());
     assert_eq!(w.households[0].funds, funds, "nothing was bought");
-    assert!(w.sims[0].planner.thought.is_some_and(|t| t.kind == sim_core::planner::ThoughtKind::NoPlace));
+    assert!(
+        w.sims[0]
+            .planner
+            .thought
+            .is_some_and(|t| t.kind == sim_core::planner::ThoughtKind::NoPlace)
+    );
     // A simple meal is made all the same (on the counter, no stove).
     order(&mut w, 0, FRIDGE, "meal");
     ticks(&mut w, 60.0);
-    assert!(w.items.list.iter().any(|it| it.def == item_def(&w, "mealPot")), "{:?}", w.items.list);
+    assert!(
+        w.items
+            .list
+            .iter()
+            .any(|it| it.def == item_def(&w, "mealPot")),
+        "{:?}",
+        w.items.list
+    );
 }
 
 /// The kitchen content with a TV to pass the time, hunger urgent below 0.1, and takeout as the
 /// shipped content has it: only when home has nothing for hunger.
 fn with_a_tv() -> String {
     let mut c: serde_json::Value = serde_json::from_str(CONTENT).unwrap();
-    c["accidents"][0].as_object_mut().unwrap().remove("crowdedGraceMinutes");
+    c["accidents"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("crowdedGraceMinutes");
     c["autonomy"] = json!({"urgent": ["hunger"], "urgentBelow": 0.1});
     c["objects"].as_array_mut().unwrap().push(json!({"id": "tv", "name": "TV", "price": 200, "interactions": [
         {"id": "watch", "label": "Watch TV", "minutes": 60, "effects": {"fun": 0.5}, "tags": ["lounge"]}]}));
@@ -347,18 +455,45 @@ fn a_stove_without_a_fridge_is_no_food_at_home() {
             _ => {}
         }
     }
-    assert_eq!(w.events.iter().filter(|e| e.kind == EventKind::Accident).count(), 1, "Ada ordered takeout");
-    assert!(w.sims[0].needs[0] > 0.5, "and isn't hungry any more: {}", w.sims[0].needs[0]);
-    assert!(cut_short <= 1, "Ada got up from the TV at once {cut_short} times");
+    assert_eq!(
+        w.events
+            .iter()
+            .filter(|e| e.kind == EventKind::Accident)
+            .count(),
+        1,
+        "Ada ordered takeout"
+    );
+    assert!(
+        w.sims[0].needs[0] > 0.5,
+        "and isn't hungry any more: {}",
+        w.sims[0].needs[0]
+    );
+    assert!(
+        cut_short <= 1,
+        "Ada got up from the TV at once {cut_short} times"
+    );
 }
 
 #[test]
 fn a_kitchen_with_only_a_fridge_keeps_the_leftovers_in_it() {
-    let mut w = world_with(r#"{"def":"fridge","x":1,"z":1,"rot":0},{"def":"sink","x":6,"z":1,"rot":0}"#, 3, false);
+    let mut w = world_with(
+        r#"{"def":"fridge","x":1,"z":1,"rot":0},{"def":"sink","x":6,"z":1,"rot":0}"#,
+        3,
+        false,
+    );
     order(&mut w, 0, 0, "meal");
     ticks(&mut w, 50.0);
-    let pot = w.items.list.iter().find(|it| it.servings > 0).expect("a meal");
-    assert!(matches!(pot.at, ItemAt::Stored { x: 1, z: 1 }), "in the fridge: {:?}", pot.at);
+    let pot = w
+        .items
+        .list
+        .iter()
+        .find(|it| it.servings > 0)
+        .expect("a meal");
+    assert!(
+        matches!(pot.at, ItemAt::Stored { x: 1, z: 1 }),
+        "in the fridge: {:?}",
+        pot.at
+    );
     assert_eq!(pot.servings, 3);
     // Made at the fridge (both later steps done there), a little plainer.
     assert!(pot.quality < 1.0);
@@ -376,7 +511,12 @@ fn a_busy_stove_means_waiting_or_the_other_stove() {
     let mut used = None;
     for _ in 0..(40.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
-        if let Some(TaskKind::Cook { step: 2, station: Some(s), .. }) = w.sims[0].current().map(|a| a.task.kind) {
+        if let Some(TaskKind::Cook {
+            step: 2,
+            station: Some(s),
+            ..
+        }) = w.sims[0].current().map(|a| a.task.kind)
+        {
             used = Some(s);
         }
     }
@@ -391,10 +531,15 @@ fn a_busy_stove_means_waiting_or_the_other_stove() {
     let mut queued = false;
     for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
-        queued |= w.sims[0].current().is_some_and(|a| matches!(a.phase, Phase::Queued { .. }));
+        queued |= w.sims[0]
+            .current()
+            .is_some_and(|a| matches!(a.phase, Phase::Queued { .. }));
     }
     assert!(queued, "waited for the stove");
-    assert!(w.items.list.iter().any(|it| it.servings > 0), "and made dinner in the end");
+    assert!(
+        w.items.list.iter().any(|it| it.servings > 0),
+        "and made dinner in the end"
+    );
 }
 
 #[test]
@@ -406,7 +551,14 @@ fn a_cook_waiting_for_a_busy_counter_steps_aside_off_the_fridge() {
     order(&mut w, 1, FRIDGE, "gourmet");
     for _ in 0..(10.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
-        if matches!(w.sims[1].current().map(|a| a.task.kind), Some(TaskKind::Cook { step: 1, station: Some(COUNTER), .. })) {
+        if matches!(
+            w.sims[1].current().map(|a| a.task.kind),
+            Some(TaskKind::Cook {
+                step: 1,
+                station: Some(COUNTER),
+                ..
+            })
+        ) {
             break;
         }
     }
@@ -416,10 +568,16 @@ fn a_cook_waiting_for_a_busy_counter_steps_aside_off_the_fridge() {
     for _ in 0..(15.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
         common::check(&w);
-        if w.sims[0].current().is_some_and(|a| matches!(a.phase, Phase::Queued { .. })) {
+        if w.sims[0]
+            .current()
+            .is_some_and(|a| matches!(a.phase, Phase::Queued { .. }))
+        {
             waited += 1;
             let t = w.sims[0].tile();
-            assert!(!fronts.contains(&t), "Ada waits at {t:?}, where a station is used from");
+            assert!(
+                !fronts.contains(&t),
+                "Ada waits at {t:?}, where a station is used from"
+            );
             assert_ne!(t, w.sims[1].tile(), "and not where Ben stands");
         }
     }
@@ -435,7 +593,10 @@ fn a_recipe_given_up_after_paying_gives_the_money_back() {
     let mut paid = false;
     for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
-        if let Some(TaskKind::Cook { step: 1, servings, .. }) = w.sims[0].current().map(|a| a.task.kind) {
+        if let Some(TaskKind::Cook {
+            step: 1, servings, ..
+        }) = w.sims[0].current().map(|a| a.task.kind)
+        {
             paid |= servings > 0 && w.households[0].funds < funds;
             w.objects[STOVE as usize].wear = 1.0;
         }
@@ -444,9 +605,15 @@ fn a_recipe_given_up_after_paying_gives_the_money_back() {
         }
     }
     assert!(paid, "the ingredients were bought");
-    assert!(!cooking(&w, 0) && w.items.list.iter().all(|it| it.servings == 0), "given up: nothing was made");
+    assert!(
+        !cooking(&w, 0) && w.items.list.iter().all(|it| it.servings == 0),
+        "given up: nothing was made"
+    );
     ticks(&mut w, 1.0);
-    assert_eq!(w.households[0].funds, funds, "the money for the ingredients is back");
+    assert_eq!(
+        w.households[0].funds, funds,
+        "the money for the ingredients is back"
+    );
 }
 
 #[test]
@@ -457,8 +624,15 @@ fn a_stove_that_broke_on_the_way_is_left_for_the_other_one() {
     let (mut broke, mut used) = (None, None);
     for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
-        let Some(a) = w.sims[0].current() else { continue };
-        if let TaskKind::Cook { step: 2, station: Some(s), .. } = a.task.kind {
+        let Some(a) = w.sims[0].current() else {
+            continue;
+        };
+        if let TaskKind::Cook {
+            step: 2,
+            station: Some(s),
+            ..
+        } = a.task.kind
+        {
             // On the way to the stove, someone else wears it out.
             if broke.is_none() && matches!(a.phase, Phase::Routing { .. }) {
                 w.objects[s as usize].wear = 1.0;
@@ -471,8 +645,14 @@ fn a_stove_that_broke_on_the_way_is_left_for_the_other_one() {
         }
     }
     let broke = broke.expect("went to a stove");
-    assert!(used.is_some_and(|s| s != broke), "cooked at the other stove: {used:?}");
-    assert!(w.items.list.iter().any(|it| it.servings > 0), "and dinner was made");
+    assert!(
+        used.is_some_and(|s| s != broke),
+        "cooked at the other stove: {used:?}"
+    );
+    assert!(
+        w.items.list.iter().any(|it| it.servings > 0),
+        "and dinner was made"
+    );
 }
 
 #[test]
@@ -480,17 +660,27 @@ fn cancelling_after_the_fridge_drops_the_ingredients_and_frees_the_counter() {
     let mut w = world_with(KITCHEN, 1, false);
     let funds = w.households[0].funds;
     order(&mut w, 0, STOVE, "cook");
-    while !w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Cook { step: 1, .. })) {
+    while !w.sims[0]
+        .current()
+        .is_some_and(|a| matches!(a.task.kind, TaskKind::Cook { step: 1, .. }))
+    {
         w.tick_once();
     }
     assert!(w.sims[0].held.is_some(), "holds the ingredients");
-    assert!(w.objects[COUNTER as usize].in_use(), "the counter is theirs");
+    assert!(
+        w.objects[COUNTER as usize].in_use(),
+        "the counter is theirs"
+    );
     w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
     ticks(&mut w, 1.0);
     assert!(w.sims[0].held.is_none(), "the ingredients are gone");
     assert!(!w.objects[COUNTER as usize].in_use());
     assert!(w.items.list.is_empty(), "no food: {:?}", w.items.list);
-    assert_eq!(funds - w.households[0].funds, 3, "the ingredients were bought");
+    assert_eq!(
+        funds - w.households[0].funds,
+        3,
+        "the ingredients were bought"
+    );
 }
 
 #[test]
@@ -498,7 +688,12 @@ fn food_goes_off_and_makes_a_mess() {
     let mut w = world_with(KITCHEN, 1, false);
     order(&mut w, 0, STOVE, "cook");
     ticks(&mut w, 50.0);
-    let pot = w.items.list.iter().position(|it| it.servings > 0).expect("dinner");
+    let pot = w
+        .items
+        .list
+        .iter()
+        .position(|it| it.servings > 0)
+        .expect("dinner");
     assert!(w.items.list[pot].edible());
     let (x, z) = w.items.list[pot].at.tile();
     let dirt = w.dirt[w.lot.tile_index(x, z)];
@@ -507,7 +702,10 @@ fn food_goes_off_and_makes_a_mess() {
     ticks(&mut w, 30.0);
     let it = &w.items.list[pot];
     assert!(it.spoiled && !it.edible(), "gone off: {it:?}");
-    assert!(w.dirt[w.lot.tile_index(x, z)] > dirt, "and the counter's getting dirty");
+    assert!(
+        w.dirt[w.lot.tile_index(x, z)] > dirt,
+        "and the counter's getting dirty"
+    );
 }
 
 #[test]
@@ -515,7 +713,12 @@ fn a_barbecue_is_served_outdoors() {
     let mut w = world_with(KITCHEN, 1, false);
     order(&mut w, 0, GRILL, "cook");
     ticks(&mut w, 60.0);
-    let platter = w.items.list.iter().find(|it| it.def == item_def(&w, "grillPlatter")).expect("a barbecue");
+    let platter = w
+        .items
+        .list
+        .iter()
+        .find(|it| it.def == item_def(&w, "grillPlatter"))
+        .expect("a barbecue");
     let host = sim_core::items::holder(&w.content, &w.objects, &platter.at);
     assert_eq!(host, Some(PICNIC), "on the picnic table: {:?}", platter.at);
 }
@@ -528,8 +731,19 @@ fn dinner_on_the_table() -> (World, u32) {
     ticks(&mut w, 50.0);
     let table = 3;
     assert_eq!(w.content.objects[w.objects[table].def].id, "table");
-    let pot = w.items.list.iter().find(|it| it.servings > 0).expect("dinner").clone();
-    assert_eq!(sim_core::items::holder(&w.content, &w.objects, &pot.at), Some(table as u32), "{:?}", pot.at);
+    let pot = w
+        .items
+        .list
+        .iter()
+        .find(|it| it.servings > 0)
+        .expect("dinner")
+        .clone();
+    assert_eq!(
+        sim_core::items::holder(&w.content, &w.objects, &pot.at),
+        Some(table as u32),
+        "{:?}",
+        pot.at
+    );
     (w, pot.id)
 }
 
@@ -538,14 +752,32 @@ fn food_moves_with_its_table_goes_when_it_is_sold_and_comes_back_on_undo() {
     let (mut w, pot) = dinner_on_the_table();
     let table = 3;
     let before = w.items.get(pot).unwrap().at;
-    w.apply(Command::MoveObject { household: 0, object: table, x: 2, z: 3, rot: 0, turn: None, offset: None, size: None, tall: None }).unwrap();
+    w.apply(Command::MoveObject {
+        household: 0,
+        object: table,
+        x: 2,
+        z: 3,
+        rot: 0,
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .unwrap();
     let moved = w.items.get(pot).expect("still there").at;
     let host = sim_core::items::holder(&w.content, &w.objects, &moved).expect("on something");
-    assert_eq!(w.content.objects[w.objects[host as usize].def].id, "table", "on the table where it went: {moved:?}");
+    assert_eq!(
+        w.content.objects[w.objects[host as usize].def].id, "table",
+        "on the table where it went: {moved:?}"
+    );
     assert_ne!(moved, before);
     w.apply(Command::Undo { household: 0 }).unwrap();
     assert_eq!(w.items.get(pot).unwrap().at, before, "undo puts it back");
-    w.apply(Command::Sell { household: 0, object: table }).unwrap();
+    w.apply(Command::Sell {
+        household: 0,
+        object: table,
+    })
+    .unwrap();
     assert!(w.items.get(pot).is_none(), "sold with the table");
     w.apply(Command::Undo { household: 0 }).unwrap();
     assert_eq!(w.items.get(pot).unwrap().at, before, "and back with it");
@@ -555,7 +787,10 @@ fn food_moves_with_its_table_goes_when_it_is_sold_and_comes_back_on_undo() {
 fn saving_mid_recipe_and_with_food_about_keeps_it_all() {
     let mut w = world_with(KITCHEN, 2, false);
     order(&mut w, 0, STOVE, "cook");
-    while !w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Cook { step: 1, .. })) {
+    while !w.sims[0]
+        .current()
+        .is_some_and(|a| matches!(a.task.kind, TaskKind::Cook { step: 1, .. }))
+    {
         w.tick_once();
     }
     let json = w.save_json();
@@ -567,13 +802,21 @@ fn saving_mid_recipe_and_with_food_about_keeps_it_all() {
     let funds = loaded.households[0].funds;
     ticks(&mut loaded, 50.0);
     assert_eq!(loaded.households[0].funds, funds, "paid for already");
-    assert!(loaded.items.list.iter().any(|it| it.servings == 2), "{:?}", loaded.items.list);
+    assert!(
+        loaded.items.list.iter().any(|it| it.servings == 2),
+        "{:?}",
+        loaded.items.list
+    );
     // With food and dirty dishes about.
     let plate = item_def(&loaded, "plateDirty");
     loaded.items.add(sim_core::items::ItemInstance {
         id: 0,
         def: plate,
-        at: ItemAt::Floor { x: 5, z: 6, offset: [10, -20] },
+        at: ItemAt::Floor {
+            x: 5,
+            z: 6,
+            offset: [10, -20],
+        },
         servings: 0,
         quality: 1.0,
         made_at: loaded.tick,
@@ -583,7 +826,10 @@ fn saving_mid_recipe_and_with_food_about_keeps_it_all() {
     });
     let json = loaded.save_json();
     let again = World::from_save_json(CONTENT, &json).unwrap();
-    assert_eq!((&again.items.list, again.items.next_id), (&loaded.items.list, loaded.items.next_id));
+    assert_eq!(
+        (&again.items.list, again.items.next_id),
+        (&loaded.items.list, loaded.items.next_id)
+    );
     assert_eq!(again.save_json(), json);
 }
 
@@ -623,15 +869,29 @@ fn the_snapshot_says_what_is_carried_cooked_and_when_food_changes() {
         w.tick_once();
         let r = row(&w, 0);
         saw.0 |= r[snapshot::sim::HELD] == item_def(&w, "ingredients") as f32 + 1.0;
-        saw.1 |= r[snapshot::sim::RECIPE] == 1.0 && r[snapshot::sim::ACTION] == w.content.animations.iter().position(|a| a == "stir").unwrap() as f32;
+        saw.1 |= r[snapshot::sim::RECIPE] == 1.0
+            && r[snapshot::sim::ACTION]
+                == w.content
+                    .animations
+                    .iter()
+                    .position(|a| a == "stir")
+                    .unwrap() as f32;
     }
     assert!(saw.0, "carrying the ingredients");
     assert!(saw.1, "stirring the meal");
     snapshot::write(&w, &mut buf);
-    assert_ne!(buf[snapshot::header::ITEMS_VERSION], version, "dinner's served: the items changed");
-    let layout: serde_json::Value = serde_json::from_str(&snapshot::layout_json(&w.content)).unwrap();
+    assert_ne!(
+        buf[snapshot::header::ITEMS_VERSION],
+        version,
+        "dinner's served: the items changed"
+    );
+    let layout: serde_json::Value =
+        serde_json::from_str(&snapshot::layout_json(&w.content)).unwrap();
     assert_eq!(layout["sim"]["held"], snapshot::sim::HELD);
-    assert_eq!(layout["header"]["itemsVersion"], snapshot::header::ITEMS_VERSION);
+    assert_eq!(
+        layout["header"]["itemsVersion"],
+        snapshot::header::ITEMS_VERSION
+    );
     let items: serde_json::Value = serde_json::from_str(&sim_core::view::items_json(&w)).unwrap();
     assert_eq!(items[0]["def"], "mealPot");
     assert_eq!(items[0]["y"], 0.75, "on the dining table");
@@ -644,11 +904,25 @@ fn the_player_can_have_a_resident_eat_or_clear_away_food() {
     ticks(&mut w, 50.0);
     let pot = w.items.list.iter().find(|it| it.servings > 0).unwrap().id;
     w.sims[1].needs[0] = 0.3;
-    w.apply(Command::UseItem { sim: 1, item: pot, action: sim_core::command::ItemAction::Eat }).unwrap();
+    w.apply(Command::UseItem {
+        sim: 1,
+        item: pot,
+        action: sim_core::command::ItemAction::Eat,
+    })
+    .unwrap();
     ticks(&mut w, 40.0);
     assert!(w.sims[1].needs[0] > 0.8, "ate: {}", w.sims[1].needs[0]);
-    assert_eq!(w.items.get(pot).map(|it| it.servings), Some(1), "one serving left");
-    w.apply(Command::UseItem { sim: 1, item: pot, action: sim_core::command::ItemAction::Clear }).unwrap();
+    assert_eq!(
+        w.items.get(pot).map(|it| it.servings),
+        Some(1),
+        "one serving left"
+    );
+    w.apply(Command::UseItem {
+        sim: 1,
+        item: pot,
+        action: sim_core::command::ItemAction::Clear,
+    })
+    .unwrap();
     ticks(&mut w, 40.0);
     assert!(w.items.get(pot).is_none(), "cleared away");
 }
@@ -661,7 +935,15 @@ fn step_minutes(w: &mut World, object: u32, id: &str) -> Vec<(u8, u32, u16)> {
         w.tick_once();
         common::check(w);
         if let Some(a) = w.sims[0].current()
-            && let (TaskKind::Cook { step, station: Some(s), minutes, .. }, Phase::Using { .. }) = (a.task.kind, &a.phase)
+            && let (
+                TaskKind::Cook {
+                    step,
+                    station: Some(s),
+                    minutes,
+                    ..
+                },
+                Phase::Using { .. },
+            ) = (a.task.kind, &a.phase)
             && steps.last().is_none_or(|l| l.0 != step)
         {
             steps.push((step, s, minutes));
@@ -675,56 +957,118 @@ fn without_a_counter_the_chopping_happens_at_the_stove_not_the_fridge() {
     // The shipped meal: ingredients 3 min, prep 10 (optional), cook 20.
     let content = common::content();
     let all: serde_json::Value = serde_json::from_str(&content).unwrap();
-    let meal = all["recipes"].as_array().unwrap().iter().find(|r| r["id"] == "meal").unwrap();
-    let minutes: Vec<f64> = meal["steps"].as_array().unwrap().iter().map(|s| s["minutes"].as_f64().unwrap()).collect();
+    let meal = all["recipes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["id"] == "meal")
+        .unwrap();
+    let minutes: Vec<f64> = meal["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["minutes"].as_f64().unwrap())
+        .collect();
     assert_eq!(minutes, [3.0, 10.0, 20.0]);
     let traits = format!(r#""household":0,"traits":[{}]"#, all["traits"][0]["id"]);
     let world = |objects: &str| {
-        let mut w = World::from_json(&content, &town(objects, 1).replace(r#""household":0"#, &traits), 3).unwrap();
+        let mut w = World::from_json(
+            &content,
+            &town(objects, 1).replace(r#""household":0"#, &traits),
+            3,
+        )
+        .unwrap();
         w.autonomy = false;
         w.sims[0].needs = [1.0; 8];
         w
     };
     // Fridge and stove, no counter: a quick trip to the fridge, then chopping and cooking at the stove.
-    let mut w = world(r#"{"def":"fridge","x":1,"z":1,"rot":0},{"def":"stoveGas","x":3,"z":1,"rot":0}"#);
+    let mut w =
+        world(r#"{"def":"fridge","x":1,"z":1,"rot":0},{"def":"stoveGas","x":3,"z":1,"rot":0}"#);
     assert_eq!(step_minutes(&mut w, 1, "cook"), [(0, 0, 3), (2, 1, 30)]);
-    assert!(w.items.list.iter().any(|it| it.servings > 0), "dinner's made: {:?}", w.items.list);
+    assert!(
+        w.items.list.iter().any(|it| it.servings > 0),
+        "dinner's made: {:?}",
+        w.items.list
+    );
     // With a counter, each step at its own station.
     let mut w = world(
         r#"{"def":"fridge","x":1,"z":1,"rot":0},{"def":"counter","x":2,"z":1,"rot":0},{"def":"stoveGas","x":3,"z":1,"rot":0}"#,
     );
-    assert_eq!(step_minutes(&mut w, 2, "cook"), [(0, 0, 3), (1, 1, 10), (2, 2, 20)]);
+    assert_eq!(
+        step_minutes(&mut w, 2, "cook"),
+        [(0, 0, 3), (1, 1, 10), (2, 2, 20)]
+    );
     // Only a fridge: the whole meal is made there.
     let mut w = world(r#"{"def":"fridge","x":1,"z":1,"rot":0}"#);
     assert_eq!(step_minutes(&mut w, 0, "meal"), [(0, 0, 33)]);
-    assert!(w.items.list.iter().any(|it| it.servings > 0), "dinner's made: {:?}", w.items.list);
+    assert!(
+        w.items.list.iter().any(|it| it.servings > 0),
+        "dinner's made: {:?}",
+        w.items.list
+    );
 }
 
 #[test]
 fn the_last_serving_from_the_fridge_brings_the_empty_pot_out_to_be_washed() {
     use sim_core::command::ItemAction;
     for (objects, on_counter) in [
-        (r#"{"def":"fridge","x":1,"z":1,"rot":0},{"def":"counter","x":2,"z":1,"rot":0},{"def":"sink","x":6,"z":1,"rot":0}"#, true),
-        (r#"{"def":"fridge","x":1,"z":1,"rot":0},{"def":"sink","x":6,"z":1,"rot":0}"#, false),
+        (
+            r#"{"def":"fridge","x":1,"z":1,"rot":0},{"def":"counter","x":2,"z":1,"rot":0},{"def":"sink","x":6,"z":1,"rot":0}"#,
+            true,
+        ),
+        (
+            r#"{"def":"fridge","x":1,"z":1,"rot":0},{"def":"sink","x":6,"z":1,"rot":0}"#,
+            false,
+        ),
     ] {
         let mut w = world_with(objects, 1, false);
         order(&mut w, 0, FRIDGE, "meal");
         ticks(&mut w, 50.0);
         // Leftovers in the fridge, one serving left.
-        let pot = w.items.list.iter_mut().find(|it| it.servings > 0).expect("a meal");
+        let pot = w
+            .items
+            .list
+            .iter_mut()
+            .find(|it| it.servings > 0)
+            .expect("a meal");
         let id = pot.id;
         pot.at = ItemAt::Stored { x: 1, z: 1 };
         pot.servings = 1;
         w.sims[0].needs[0] = 0.3;
-        w.apply(Command::UseItem { sim: 0, item: id, action: ItemAction::Eat }).unwrap();
+        w.apply(Command::UseItem {
+            sim: 0,
+            item: id,
+            action: ItemAction::Eat,
+        })
+        .unwrap();
         ticks(&mut w, 40.0);
         let dirty = item_def(&w, "potDirty");
-        let pot = w.items.list.iter().find(|it| it.def == dirty).expect("the empty pot, to be washed up");
-        assert!(!matches!(pot.at, ItemAt::Stored { .. }), "not left in the fridge: {:?}", pot.at);
-        assert_eq!(matches!(pot.at, ItemAt::Surface { .. }), on_counter, "on the counter if there is one: {:?}", pot.at);
+        let pot = w
+            .items
+            .list
+            .iter()
+            .find(|it| it.def == dirty)
+            .expect("the empty pot, to be washed up");
+        assert!(
+            !matches!(pot.at, ItemAt::Stored { .. }),
+            "not left in the fridge: {:?}",
+            pot.at
+        );
+        assert_eq!(
+            matches!(pot.at, ItemAt::Surface { .. }),
+            on_counter,
+            "on the counter if there is one: {:?}",
+            pot.at
+        );
         // Out where it can be seen, and cleared away.
         let pot = pot.id;
-        w.apply(Command::UseItem { sim: 0, item: pot, action: ItemAction::Clear }).unwrap();
+        w.apply(Command::UseItem {
+            sim: 0,
+            item: pot,
+            action: ItemAction::Clear,
+        })
+        .unwrap();
         ticks(&mut w, 30.0);
         assert!(w.items.get(pot).is_none(), "washed up");
     }
@@ -748,7 +1092,11 @@ fn split_house(kitchen: &str) -> World {
     for s in &mut w.sims {
         s.needs = [1.0; 8];
     }
-    assert_ne!(w.lot.room_at(5, 2), w.lot.room_at(6, 2), "the wall makes two rooms");
+    assert_ne!(
+        w.lot.room_at(5, 2),
+        w.lot.room_at(6, 2),
+        "the wall makes two rooms"
+    );
     w
 }
 
@@ -757,19 +1105,42 @@ fn cooks_put_the_food_down_in_the_kitchen_not_through_the_wall() {
     // A counter across the kitchen, further than the vanity next door (and than a nightstand by
     // the stove, if there is one): the food goes on the counter.
     let kitchen = r#"{"def":"fridge","x":2,"z":2,"rot":0},{"def":"stove","x":4,"z":2,"rot":0},{"def":"counter","x":2,"z":6,"rot":0}"#;
-    for objects in [kitchen.to_string(), format!(r#"{kitchen},{{"def":"nightstand","x":5,"z":2,"rot":0}}"#)] {
+    for objects in [
+        kitchen.to_string(),
+        format!(r#"{kitchen},{{"def":"nightstand","x":5,"z":2,"rot":0}}"#),
+    ] {
         let mut w = split_house(&objects);
         order(&mut w, 0, 1, "cook");
         ticks(&mut w, 60.0);
-        let pot = w.items.list.iter().find(|it| it.servings > 0).expect("dinner");
-        assert_eq!(sim_core::items::holder(&w.content, &w.objects, &pot.at), Some(2), "on the kitchen counter: {:?}", pot.at);
+        let pot = w
+            .items
+            .list
+            .iter()
+            .find(|it| it.servings > 0)
+            .expect("dinner");
+        assert_eq!(
+            sim_core::items::holder(&w.content, &w.objects, &pot.at),
+            Some(2),
+            "on the kitchen counter: {:?}",
+            pot.at
+        );
     }
     // Nowhere to put it in the kitchen: in the fridge, not next door.
-    let mut w = split_house(r#"{"def":"fridge","x":2,"z":2,"rot":0},{"def":"stove","x":4,"z":2,"rot":0}"#);
+    let mut w =
+        split_house(r#"{"def":"fridge","x":2,"z":2,"rot":0},{"def":"stove","x":4,"z":2,"rot":0}"#);
     order(&mut w, 0, 1, "cook");
     ticks(&mut w, 60.0);
-    let pot = w.items.list.iter().find(|it| it.servings > 0).expect("dinner");
-    assert!(matches!(pot.at, ItemAt::Stored { x: 2, z: 2 }), "in the kitchen fridge: {:?}", pot.at);
+    let pot = w
+        .items
+        .list
+        .iter()
+        .find(|it| it.servings > 0)
+        .expect("dinner");
+    assert!(
+        matches!(pot.at, ItemAt::Stored { x: 2, z: 2 }),
+        "in the kitchen fridge: {:?}",
+        pot.at
+    );
 }
 
 #[test]
@@ -778,13 +1149,24 @@ fn the_dish_is_carried_to_the_table_put_down_there_and_eaten_at_it() {
     order(&mut w, 0, STOVE, "cook");
     let serve = w.content.animations.iter().position(|a| a == "serve");
     let (mut carried, mut put_down) = (false, false);
-    while cooking(&w, 0) || w.items.list.iter().all(|it| it.def != item_def(&w, "mealPot")) {
+    while cooking(&w, 0)
+        || w.items
+            .list
+            .iter()
+            .all(|it| it.def != item_def(&w, "mealPot"))
+    {
         w.tick_once();
         common::check(&w);
         let held = w.sims[0].held.map(|h| w.content.items[h.def].id.clone());
         if w.sims[0].is_moving() && held.as_deref() == Some("mealPot") {
             carried = true;
-            assert!(w.items.list.iter().all(|it| it.def != item_def(&w, "mealPot")), "in hand, not on a top too");
+            assert!(
+                w.items
+                    .list
+                    .iter()
+                    .all(|it| it.def != item_def(&w, "mealPot")),
+                "in hand, not on a top too"
+            );
         }
         let r = row(&w, 0);
         put_down |= r[snapshot::sim::OBJECT] == w.objects[TABLE as usize].stable as f32
@@ -793,8 +1175,18 @@ fn the_dish_is_carried_to_the_table_put_down_there_and_eaten_at_it() {
     }
     assert!(carried, "the pot is carried from the stove");
     assert!(put_down, "and put down at the table");
-    let pot = w.items.list.iter().find(|it| it.def == item_def(&w, "mealPot")).unwrap();
-    assert_eq!(sim_core::items::holder(&w.content, &w.objects, &pot.at), Some(TABLE), "{:?}", pot.at);
+    let pot = w
+        .items
+        .list
+        .iter()
+        .find(|it| it.def == item_def(&w, "mealPot"))
+        .unwrap();
+    assert_eq!(
+        sim_core::items::holder(&w.content, &w.objects, &pot.at),
+        Some(TABLE),
+        "{:?}",
+        pot.at
+    );
     // Hungry, the two sit down to it at that table.
     for s in &mut w.sims {
         s.needs[0] = 0.2;
@@ -804,7 +1196,15 @@ fn the_dish_is_carried_to_the_table_put_down_there_and_eaten_at_it() {
     for _ in 0..(40.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
         for (i, seated) in at_table.iter_mut().enumerate() {
-            *seated |= w.sims[i].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { seat: Some(TABLE), .. }) && matches!(a.phase, Phase::Using { .. }));
+            *seated |= w.sims[i].current().is_some_and(|a| {
+                matches!(
+                    a.task.kind,
+                    TaskKind::Eat {
+                        seat: Some(TABLE),
+                        ..
+                    }
+                ) && matches!(a.phase, Phase::Using { .. })
+            });
         }
     }
     assert_eq!(at_table, [true, true], "both eat at the table");
@@ -814,7 +1214,11 @@ fn the_dish_is_carried_to_the_table_put_down_there_and_eaten_at_it() {
 fn a_dish_on_its_way_to_the_table_survives_a_save_and_is_served_once() {
     let mut w = world_with(KITCHEN, 2, false);
     order(&mut w, 0, STOVE, "cook");
-    while !(w.sims[0].is_moving() && w.sims[0].held.is_some_and(|h| h.def == item_def(&w, "mealPot"))) {
+    while !(w.sims[0].is_moving()
+        && w.sims[0]
+            .held
+            .is_some_and(|h| h.def == item_def(&w, "mealPot")))
+    {
         w.tick_once();
         assert!(w.tick < 200 * 60 * 4, "never carried");
     }
@@ -822,9 +1226,17 @@ fn a_dish_on_its_way_to_the_table_survives_a_save_and_is_served_once() {
     let mut loaded = World::from_save_json(CONTENT, &json).unwrap();
     common::check(&loaded);
     ticks(&mut loaded, 10.0);
-    let pots: Vec<_> = loaded.items.list.iter().filter(|it| it.def == item_def(&loaded, "mealPot")).collect();
+    let pots: Vec<_> = loaded
+        .items
+        .list
+        .iter()
+        .filter(|it| it.def == item_def(&loaded, "mealPot"))
+        .collect();
     assert_eq!(pots.len(), 1, "one pot: {:?}", loaded.items.list);
-    assert_eq!(sim_core::items::holder(&loaded.content, &loaded.objects, &pots[0].at), Some(TABLE));
+    assert_eq!(
+        sim_core::items::holder(&loaded.content, &loaded.objects, &pots[0].at),
+        Some(TABLE)
+    );
     assert!(loaded.sims[0].held.is_none());
 }
 
@@ -837,7 +1249,12 @@ fn a_household_that_has_eaten_cooks_no_meal_nobody_needs() {
     for _ in 0..(90.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
         for &i in &home {
-            assert!(!cooking(&w, i), "{} cooks for a household that has eaten at {}", w.sims[i].name, sim_core::clock::hour(w.tick));
+            assert!(
+                !cooking(&w, i),
+                "{} cooks for a household that has eaten at {}",
+                w.sims[i].name,
+                sim_core::clock::hour(w.tick)
+            );
         }
     }
 }
@@ -859,22 +1276,58 @@ fn two_at_the_table_talk_over_the_meal_and_eat_up_after() {
         s.needs = [1.0; 8];
         s.needs[0] = 0.3;
     }
-    let social = w.content.needs.iter().position(|n| n.id == "social").unwrap();
+    let social = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "social")
+        .unwrap();
     w.relationships.get_mut(0, 1).friendship = 60.0;
     w.relationships.get_mut(1, 0).friendship = 60.0;
     w.relationships.get_mut(0, 1).met = true;
     w.relationships.get_mut(1, 0).met = true;
-    let table = w.objects.iter().find(|o| w.content.objects[o.def].id == "table").unwrap().id;
+    let table = w
+        .objects
+        .iter()
+        .find(|o| w.content.objects[o.def].id == "table")
+        .unwrap()
+        .id;
     let def = item_def(&w, "mealPot");
     let radius = w.content.items[def].radius;
     let occupied = w.items.occupancy(&w.content);
     let centre = w.objects[table as usize].centre(&w.content);
-    let spot = sim_core::surface::free_surface_spot_near(&w.content, &w.objects, &[table], centre, 3.0, 0, radius, &occupied).unwrap();
+    let spot = sim_core::surface::free_surface_spot_near(
+        &w.content,
+        &w.objects,
+        &[table],
+        centre,
+        3.0,
+        0,
+        radius,
+        &occupied,
+    )
+    .unwrap();
     let recipe = w.content.recipes.iter().position(|r| r.id == "meal");
-    w.items.add(sim_core::items::ItemInstance { id: 0, def, at: ItemAt::on(&spot), servings: 2, quality: 1.0, made_at: 0, household: 0, spoiled: false, recipe });
+    w.items.add(sim_core::items::ItemInstance {
+        id: 0,
+        def,
+        at: ItemAt::on(&spot),
+        servings: 2,
+        quality: 1.0,
+        made_at: 0,
+        household: 0,
+        spoiled: false,
+        recipe,
+    });
     // (Sitting down to it of their own accord: the player's orders aren't interrupted.)
     w.autonomy = true;
-    let eating = |w: &World, x: usize| w.sims[x].pose == sim_core::content::Pose::Sit && matches!(w.sims[x].current().map(|a| a.task.kind), Some(TaskKind::Eat { .. }));
+    let eating = |w: &World, x: usize| {
+        w.sims[x].pose == sim_core::content::Pose::Sit
+            && matches!(
+                w.sims[x].current().map(|a| a.task.kind),
+                Some(TaskKind::Eat { .. })
+            )
+    };
     let mut seated = false;
     for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
@@ -883,30 +1336,66 @@ fn two_at_the_table_talk_over_the_meal_and_eat_up_after() {
             break;
         }
     }
-    assert!(seated, "both sat down to eat: {:?} / {:?}", w.sims[0].current().map(|a| a.task.kind), w.sims[1].current().map(|a| a.task.kind));
+    assert!(
+        seated,
+        "both sat down to eat: {:?} / {:?}",
+        w.sims[0].current().map(|a| a.task.kind),
+        w.sims[1].current().map(|a| a.task.kind)
+    );
     w.sims[0].needs[social] = 0.25;
     let seats = [w.sims[0].pos, w.sims[1].pos];
     let mut talked = None;
     for _ in 0..(45.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
         common::check(&w);
-        talked = (0..2).find_map(|x| w.sims[x].conversation(&w.content).filter(|t| t.0 as usize == 1 - x).map(|t| t.1));
+        talked = (0..2).find_map(|x| {
+            w.sims[x]
+                .conversation(&w.content)
+                .filter(|t| t.0 as usize == 1 - x)
+                .map(|t| t.1)
+        });
         if talked.is_some() {
             break;
         }
     }
-    let social = talked.unwrap_or_else(|| panic!("nobody talked over the meal: {:?} / {:?} ({:?})", w.sims[0].current().map(|a| (a.task.kind, a.task.directed, &a.phase)), w.sims[1].current().map(|a| a.task.kind), w.sims[0].needs));
-    assert_eq!(w.content.socials[social].id, "chat", "nothing to get up from the meal for");
+    let social = talked.unwrap_or_else(|| {
+        panic!(
+            "nobody talked over the meal: {:?} / {:?} ({:?})",
+            w.sims[0]
+                .current()
+                .map(|a| (a.task.kind, a.task.directed, &a.phase)),
+            w.sims[1].current().map(|a| a.task.kind),
+            w.sims[0].needs
+        )
+    });
+    assert_eq!(
+        w.content.socials[social].id, "chat",
+        "nothing to get up from the meal for"
+    );
     for _ in 0..(5.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
         for (sim, seat) in w.sims.iter().zip(&seats) {
-            assert_eq!(sim.pose, sim_core::content::Pose::Sit, "{} got up from the meal", sim.name);
-            assert!((sim.pos[0] - seat[0]).hypot(sim.pos[1] - seat[1]) < 0.05, "{} left the seat", sim.name);
+            assert_eq!(
+                sim.pose,
+                sim_core::content::Pose::Sit,
+                "{} got up from the meal",
+                sim.name
+            );
+            assert!(
+                (sim.pos[0] - seat[0]).hypot(sim.pos[1] - seat[1]) < 0.05,
+                "{} left the seat",
+                sim.name
+            );
         }
     }
     // The talk over, they eat up.
     ticks(&mut w, 60.0);
     for s in &w.sims {
-        assert!(s.needs[0] > 0.8, "{} didn't finish the meal: {}", s.name, s.needs[0]);
+        assert!(
+            s.needs[0] > 0.8,
+            "{} didn't finish the meal: {}",
+            s.name,
+            s.needs[0]
+        );
     }
 }

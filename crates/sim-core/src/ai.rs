@@ -115,14 +115,24 @@ pub fn score_felt(needs: &[f32], weights: &[f32], gains: &[f32; MAX_NEEDS], dist
 /// Picks among the best candidates with weighted randomness, so Sims are not robotic.
 /// `candidates` are `(score, payload)`; returns the chosen payload.
 pub fn choose<T: Copy>(candidates: &mut [(f32, T)], roll: f32, top_n: usize) -> Option<T> {
-    debug_assert!(candidates.iter().all(|c| c.0.is_finite()), "a choice scored {:?}", candidates.iter().find(|c| !c.0.is_finite()).map(|c| c.0));
+    debug_assert!(
+        candidates.iter().all(|c| c.0.is_finite()),
+        "a choice scored {:?}",
+        candidates.iter().find(|c| !c.0.is_finite()).map(|c| c.0)
+    );
     pick(candidates, roll, top_n)
 }
 
 /// `choose`, leaving out scores that aren't numbers (NaN or infinity would make the pick the
 /// last of the best every time).
 fn pick<T: Copy>(candidates: &mut [(f32, T)], roll: f32, top_n: usize) -> Option<T> {
-    let score = |c: &(f32, T)| if c.0.is_finite() { c.0 } else { f32::NEG_INFINITY };
+    let score = |c: &(f32, T)| {
+        if c.0.is_finite() {
+            c.0
+        } else {
+            f32::NEG_INFINITY
+        }
+    };
     candidates.sort_unstable_by(|a, b| score(b).total_cmp(&score(a)));
     let scored = candidates.iter().take_while(|c| c.0.is_finite()).count();
     let top = &candidates[..scored.min(top_n)];
@@ -226,14 +236,32 @@ mod tests {
 
     #[test]
     fn below_comfortable_weighs_more() {
-        let need = |comfortable| NeedDef { id: "n".into(), label: "n".into(), decay_per_minute: 0.0, room: false, comfortable };
+        let need = |comfortable| NeedDef {
+            id: "n".into(),
+            label: "n".into(),
+            decay_per_minute: 0.0,
+            room: false,
+            comfortable,
+        };
         let defs = [need(0.6), need(0.0)];
-        let rules = AutonomyRules { comfort_boost: 2.0, ..Default::default() };
+        let rules = AutonomyRules {
+            comfort_boost: 2.0,
+            ..Default::default()
+        };
         let w = felt(&[0.45, 0.45], &defs, &rules);
-        assert!((w[0] - need_weight(0.45) * 3.0).abs() < 1e-5, "well below comfortable: three times the weight");
-        assert!((w[1] - need_weight(0.45)).abs() < 1e-5, "no comfortable level: as before");
+        assert!(
+            (w[0] - need_weight(0.45) * 3.0).abs() < 1e-5,
+            "well below comfortable: three times the weight"
+        );
+        assert!(
+            (w[1] - need_weight(0.45)).abs() < 1e-5,
+            "no comfortable level: as before"
+        );
         let eased = felt(&[0.55, 0.55], &defs, &rules);
-        assert!(eased[0] > eased[1] && eased[0] < need_weight(0.55) * 3.0, "eased in just below it");
+        assert!(
+            eased[0] > eased[1] && eased[0] < need_weight(0.55) * 3.0,
+            "eased in just below it"
+        );
     }
 
     #[test]
@@ -247,7 +275,12 @@ mod tests {
     #[test]
     fn a_score_that_isnt_a_number_never_wins() {
         for roll in [0.0, 0.5, 0.99] {
-            let mut c = [(f32::NAN, 'n'), (1.0, 'a'), (f32::INFINITY, 'i'), (0.5, 'b')];
+            let mut c = [
+                (f32::NAN, 'n'),
+                (1.0, 'a'),
+                (f32::INFINITY, 'i'),
+                (0.5, 'b'),
+            ];
             let got = pick(&mut c, roll, 3);
             assert!(matches!(got, Some('a' | 'b')), "roll {roll}: {got:?}");
         }

@@ -89,7 +89,13 @@ fn fields(buf: &[u8]) -> Result<Vec<Field<'_>>, String> {
             }
             other => return Err(format!("protobuf: wire type {other} not supported")),
         };
-        out.push(Field { number, wire, varint, payload, bytes: &buf[start..at] });
+        out.push(Field {
+            number,
+            wire,
+            varint,
+            payload,
+            bytes: &buf[start..at],
+        });
     }
     Ok(out)
 }
@@ -182,15 +188,32 @@ fn read_tensor(buf: &[u8]) -> Result<Tensor, String> {
                     floats.push(f32::from_le_bytes(*c));
                 }
             }
-            (4, 5) => floats.push(f32::from_le_bytes([f.payload[0], f.payload[1], f.payload[2], f.payload[3]])),
+            (4, 5) => floats.push(f32::from_le_bytes([
+                f.payload[0],
+                f.payload[1],
+                f.payload[2],
+                f.payload[3],
+            ])),
             // External data: left alone.
-            (13, _) | (14, _) => return Ok(Tensor { name, ty: -1, values: None }),
+            (13, _) | (14, _) => {
+                return Ok(Tensor {
+                    name,
+                    ty: -1,
+                    values: None,
+                });
+            }
             _ => {}
         }
     }
     let values = if ty as u64 == FLOAT {
         match raw {
-            Some(r) => Some(r.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect()),
+            Some(r) => Some(
+                r.as_chunks::<4>()
+                    .0
+                    .iter()
+                    .map(|c| f32::from_le_bytes(*c))
+                    .collect(),
+            ),
             None => Some(floats),
         }
     } else {

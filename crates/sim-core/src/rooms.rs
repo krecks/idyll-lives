@@ -28,7 +28,9 @@ impl RoomScores {
     /// The weakest factor (index into `factors`).
     pub fn weakest(&self) -> usize {
         let f = self.factors();
-        (0..f.len()).min_by(|&a, &b| f[a].total_cmp(&f[b])).unwrap_or(0)
+        (0..f.len())
+            .min_by(|&a, &b| f[a].total_cmp(&f[b]))
+            .unwrap_or(0)
     }
 }
 
@@ -130,7 +132,12 @@ impl RoomTiles {
             }
         }
         let stale = vec![false; cells.len()];
-        Self { cells, scored, of_tile, stale }
+        Self {
+            cells,
+            scored,
+            of_tile,
+            stale,
+        }
     }
 
     /// Tile `i`'s dirt changed.
@@ -143,12 +150,20 @@ impl RoomTiles {
     }
 
     /// Scores cleanliness again where there was a mess, and updates the score per tile.
-    pub fn rescore(&mut self, w: &mut [RoomInfo], rules: &crate::content::RoomRules, dirt: &[f32], room_score: &mut [f32]) {
+    pub fn rescore(
+        &mut self,
+        w: &mut [RoomInfo],
+        rules: &crate::content::RoomRules,
+        dirt: &[f32],
+        room_score: &mut [f32],
+    ) {
         for (r, room) in w.iter_mut().enumerate() {
             if !std::mem::take(&mut self.stale[r]) {
                 continue;
             }
-            let sum = self.cells[r].iter().fold(0.0, |s, &(i, weight)| s + dirt.get(i as usize).copied().unwrap_or(0.0) * weight);
+            let sum = self.cells[r].iter().fold(0.0, |s, &(i, weight)| {
+                s + dirt.get(i as usize).copied().unwrap_or(0.0) * weight
+            });
             score_dirt(room, sum, rules);
             for &i in &self.scored[r] {
                 room_score[i as usize] = room.scores.overall;
@@ -160,7 +175,12 @@ impl RoomTiles {
 /// Weighted overall score (content `roomRules.weights`).
 fn overall(s: &RoomScores, rules: &crate::content::RoomRules) -> f32 {
     let total: f32 = rules.weights.iter().sum::<f32>().max(1e-6);
-    s.factors().iter().zip(rules.weights).map(|(f, w)| f * w).sum::<f32>() / total
+    s.factors()
+        .iter()
+        .zip(rules.weights)
+        .map(|(f, w)| f * w)
+        .sum::<f32>()
+        / total
 }
 
 /// Cleanliness from the room's summed dirt, and the overall score with it.
@@ -192,7 +212,11 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
         acc.cells.push((i as u32, weight));
     };
     let parts = |[r0, r1]: [u16; 2]| -> [(u16, f32); 2] {
-        if r0 == r1 { [(r0, 1.0), (OUTDOORS, 0.0)] } else { [(r0, 0.5), (r1, 0.5)] }
+        if r0 == r1 {
+            [(r0, 1.0), (OUTDOORS, 0.0)]
+        } else {
+            [(r0, 0.5), (r1, 0.5)]
+        }
     };
     for z in 0..lot.depth as i32 {
         for x in 0..lot.width as i32 {
@@ -220,7 +244,11 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
                 let [r0, r1] = halves[i];
                 // A tile split by a diagonal wall: each half counts half.
                 let half = |r: u16| if r == OUTDOORS { 0.5 } else { 0.0 };
-                let outdoor = if r0 == r1 { 2.0 * half(r0) } else { half(r0) + half(r1) };
+                let outdoor = if r0 == r1 {
+                    2.0 * half(r0)
+                } else {
+                    half(r0) + half(r1)
+                };
                 if outdoor > 0.0 {
                     add(&mut gardens[pi], x, z, i, outdoor);
                 }
@@ -234,7 +262,9 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
         if r == OUTDOORS {
             return;
         }
-        let Some(acc) = rooms.get_mut(r as usize) else { return };
+        let Some(acc) = rooms.get_mut(r as usize) else {
+            return;
+        };
         if across == OUTDOORS && matches!(edge, Edge::Wall | Edge::Window) && w.storey_of(z) >= 0 {
             acc.outside = true;
         }
@@ -251,7 +281,13 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
         }
     };
     let (w_, d_) = (lot.width as i32, lot.depth as i32);
-    let room = |x: i32, z: i32| if lot.in_bounds(x, z) { lot.room_at(x, z) } else { OUTDOORS };
+    let room = |x: i32, z: i32| {
+        if lot.in_bounds(x, z) {
+            lot.room_at(x, z)
+        } else {
+            OUTDOORS
+        }
+    };
     for z in 0..=d_ {
         for x in 0..w_ {
             let e = lot.h_edge(x as usize, z as usize);
@@ -291,10 +327,14 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
         let def = &content.objects[o.def];
         let r = room(o.x, o.z);
         let acc = if r == OUTDOORS {
-            let Some(plot) = w.plot_at(o.x, o.z) else { continue };
+            let Some(plot) = w.plot_at(o.x, o.z) else {
+                continue;
+            };
             &mut gardens[plot as usize]
         } else {
-            let Some(acc) = rooms.get_mut(r as usize) else { continue };
+            let Some(acc) = rooms.get_mut(r as usize) else {
+                continue;
+            };
             acc
         };
         acc.decor += def.decor * content.object_rules.quality_factor(o.quality);
@@ -313,8 +353,14 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
         let kinds = &content.room_kinds;
         // By what's done there, else whether it's a way through.
         let passage = a.doors >= 2 || a.stairs;
-        let kind = kinds.iter().position(|k| a.tags & k.tags != 0).or_else(|| kinds.iter().position(|k| k.passage).filter(|_| passage));
-        let exclusive = kinds.iter().filter(|k| k.exclusive && a.tags & k.tags != 0).count();
+        let kind = kinds
+            .iter()
+            .position(|k| a.tags & k.tags != 0)
+            .or_else(|| kinds.iter().position(|k| k.passage).filter(|_| passage));
+        let exclusive = kinds
+            .iter()
+            .filter(|k| k.exclusive && a.tags & k.tags != 0)
+            .count();
         let missing = kind.and_then(|k| kinds[k].essentials.iter().position(|&e| a.tags & e == 0));
         let [cramped, comfy] = kind.map_or([4.0, 9.0], |k| kinds[k].size);
         let size = if a.tiles < cramped {
@@ -336,7 +382,14 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             (Some(_), false, Some(_)) => 0.7,
             _ => 1.0,
         };
-        let scores = RoomScores { size, light: (day + night) / 2.0, decor, clean: 1.0, function, overall: 0.0 };
+        let scores = RoomScores {
+            size,
+            light: (day + night) / 2.0,
+            decor,
+            clean: 1.0,
+            function,
+            overall: 0.0,
+        };
         let mut room = RoomInfo {
             id,
             plot: w.plot_at(a.first.0, a.first.1),
@@ -360,10 +413,21 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
         score_dirt(&mut room, a.dirt, rules);
         out.push((room, a.cells));
     }
-    for (plot, a) in gardens.into_iter().enumerate().filter(|(_, a)| a.tiles > 0.0) {
+    for (plot, a) in gardens
+        .into_iter()
+        .enumerate()
+        .filter(|(_, a)| a.tiles > 0.0)
+    {
         let plot = plot as u32;
         let decor = (a.decor / (a.tiles * rules.garden_decor_per_tile)).min(1.0);
-        let scores = RoomScores { size: 1.0, light: 1.0, decor, clean: 1.0, function: 1.0, overall: 0.0 };
+        let scores = RoomScores {
+            size: 1.0,
+            light: 1.0,
+            decor,
+            clean: 1.0,
+            function: 1.0,
+            overall: 0.0,
+        };
         let mut garden = RoomInfo {
             id: OUTDOORS,
             plot: Some(plot),
@@ -395,7 +459,11 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
 /// Thought subject for a room: its kind (garden 0, kind + 1, or 63 for a room nothing marks)
 /// times 8 plus a factor (`FACTORS`).
 pub fn room_subject(room: &RoomInfo, factor: usize) -> usize {
-    let kind = if room.garden { 0 } else { room.kind.map_or(63, |k| k + 1) };
+    let kind = if room.garden {
+        0
+    } else {
+        room.kind.map_or(63, |k| k + 1)
+    };
     kind * 8 + factor.min(7)
 }
 
@@ -404,14 +472,19 @@ pub fn room_subject(room: &RoomInfo, factor: usize) -> usize {
 /// and a busy essential they had to wait for (another bathroom). Wishes come true once the
 /// room is better, the thing is fixed, or there is another room of that kind.
 pub(crate) fn opinions(w: &mut World) {
-    use crate::planner::{HomeWish, MAX_HOME_WISHES, ThoughtKind, WAIT_FORGET_DAYS, WAIT_REPEAT_DAYS, think};
+    use crate::planner::{
+        HomeWish, MAX_HOME_WISHES, ThoughtKind, WAIT_FORGET_DAYS, WAIT_REPEAT_DAYS, think,
+    };
     let tick = w.tick;
     let today = crate::clock::day(tick);
     for i in 0..w.sims.len() {
         let s = &w.sims[i];
-        let Some(home) = w.households[s.household as usize].plot.filter(|_| s.here()) else { continue };
+        let Some(home) = w.households[s.household as usize].plot.filter(|_| s.here()) else {
+            continue;
+        };
         let (x, z) = s.tile();
-        let at_home = s.away_until.is_none() && !s.asleep(&w.content) && w.plot_at(x, z) == Some(home);
+        let at_home =
+            s.away_until.is_none() && !s.asleep(&w.content) && w.plot_at(x, z) == Some(home);
         let rooms: Vec<&RoomInfo> = w.rooms.iter().filter(|r| r.plot == Some(home)).collect();
         let broken: Vec<usize> = w
             .objects
@@ -422,7 +495,9 @@ pub(crate) fn opinions(w: &mut World) {
             .collect();
         // Wishes that came true.
         let good = |kind: Option<usize>, garden: bool, factor: u8| {
-            rooms.iter().any(|r| r.garden == garden && r.kind == kind && r.scores.factors()[factor as usize] >= 0.6)
+            rooms.iter().any(|r| {
+                r.garden == garden && r.kind == kind && r.scores.factors()[factor as usize] >= 0.6
+            })
         };
         let kept: Vec<HomeWish> = w.sims[i]
             .planner
@@ -430,11 +505,21 @@ pub(crate) fn opinions(w: &mut World) {
             .iter()
             .copied()
             .filter(|wish| match *wish {
-                HomeWish::Room { kind, garden, factor } => !good(kind, garden, factor),
+                HomeWish::Room {
+                    kind,
+                    garden,
+                    factor,
+                } => !good(kind, garden, factor),
                 HomeWish::Fix { def } => broken.contains(&def),
                 HomeWish::Another { kind } => {
-                    rooms.iter().filter(|r| !r.garden && r.kind == Some(kind)).count() < 2
-                        && s.planner.waited_day.is_some_and(|d| today <= d + WAIT_FORGET_DAYS)
+                    rooms
+                        .iter()
+                        .filter(|r| !r.garden && r.kind == Some(kind))
+                        .count()
+                        < 2
+                        && s.planner
+                            .waited_day
+                            .is_some_and(|d| today <= d + WAIT_FORGET_DAYS)
                 }
             })
             .collect();
@@ -454,7 +539,11 @@ pub(crate) fn opinions(w: &mut World) {
                     let factor = s.weakest();
                     thought = Some((ThoughtKind::RoomDisliked, room_subject(room, factor)));
                     feeling = rules.dislike_feeling;
-                    let wish = HomeWish::Room { kind: room.kind, garden: room.garden, factor: factor as u8 };
+                    let wish = HomeWish::Room {
+                        kind: room.kind,
+                        garden: room.garden,
+                        factor: factor as u8,
+                    };
                     if !wishes.contains(&wish) {
                         wishes.push(wish);
                     }
@@ -471,8 +560,13 @@ pub(crate) fn opinions(w: &mut World) {
             // Badly needing what's taken (the toilet): another room for it, where content asks.
             let me = i as u32;
             for acc in &w.content.accidents {
-                let Some(kind) = acc.another_room else { continue };
-                let have = rooms.iter().filter(|r| !r.garden && r.kind == Some(kind)).count();
+                let Some(kind) = acc.another_room else {
+                    continue;
+                };
+                let have = rooms
+                    .iter()
+                    .filter(|r| !r.garden && r.kind == Some(kind))
+                    .count();
                 if w.sims[i].needs[acc.need] >= 0.15 || have >= 2 {
                     continue;
                 }
@@ -483,7 +577,10 @@ pub(crate) fn opinions(w: &mut World) {
                     .filter(|(o, p)| {
                         **p == Some(home)
                             && !o.broken()
-                            && w.content.objects[o.def].interactions.iter().any(|it| it.autonomous && it.total_gain[acc.need] > 0.0)
+                            && w.content.objects[o.def]
+                                .interactions
+                                .iter()
+                                .any(|it| it.autonomous && it.total_gain[acc.need] > 0.0)
                     })
                     .map(|(o, _)| o)
                     .collect();
@@ -494,7 +591,11 @@ pub(crate) fn opinions(w: &mut World) {
                     room != here && crate::privacy::shut_to(&w.shut, me, None, room)
                 };
                 let busy = !fillers.is_empty()
-                    && fillers.iter().all(|o| (o.users().any(|u| u != me) && !o.has_free_slot(w.content.objects[o.def].slots)) || shut(o));
+                    && fillers.iter().all(|o| {
+                        (o.users().any(|u| u != me)
+                            && !o.has_free_slot(w.content.objects[o.def].slots))
+                            || shut(o)
+                    });
                 if busy {
                     // Once is bad luck; again on another day this week, they'd like a second one.
                     let again = waited.is_some_and(|d| d < today && today <= d + WAIT_REPEAT_DAYS);

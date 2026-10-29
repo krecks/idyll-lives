@@ -59,9 +59,19 @@ SOFTWARE.
 
 /// A shipped or adapted work with no npm package to read the licence from: its name, licence, where
 /// it comes from, and its texts as published, kept in crates/tools/texts/.
-type Kept = (&'static str, &'static str, &'static str, &'static [&'static str]);
+type Kept = (
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static [&'static str],
+);
 
-const KEPT: [Kept; 1] = [("Basis Universal transcoder (decoders/basis/, PlayCanvas's build)", "Apache-2.0", "https://github.com/BinomialLLC/basis_universal", &["basis_universal-LICENSE"])];
+const KEPT: [Kept; 1] = [(
+    "Basis Universal transcoder (decoders/basis/, PlayCanvas's build)",
+    "Apache-2.0",
+    "https://github.com/BinomialLLC/basis_universal",
+    &["basis_universal-LICENSE"],
+)];
 
 /// Others' code rewritten into the game's own. Babylon.js: the renderer's camera controls, matrix
 /// maths, mesh builders, particles, image processing and a few shader formulas were ported from
@@ -74,7 +84,12 @@ const ADAPTED: [Kept; 2] = [
         "https://github.com/BabylonJS/Babylon.js",
         &["Babylon.js-LICENSE", "Babylon.js-NOTICE"],
     ),
-    ("TalkingHead's emoji expressions, adapted for the residents' faces (render/shared/characters/face.ts)", "MIT", "https://github.com/met4citizen/TalkingHead", &["TalkingHead-LICENSE"]),
+    (
+        "TalkingHead's emoji expressions, adapted for the residents' faces (render/shared/characters/face.ts)",
+        "MIT",
+        "https://github.com/met4citizen/TalkingHead",
+        &["TalkingHead-LICENSE"],
+    ),
 ];
 
 /// The files that hold code ported from Babylon.js, each with a header that says so and where its
@@ -101,9 +116,24 @@ const BABYLON_PORTED: [&str; 16] = [
 
 /// The model and dictionary licences, fetched next to what they cover.
 const DATA: [(&str, &str, &str, &str); 3] = [
-    ("Supertonic 3 voice model (voice/supertonic-3/)", "BigScience OpenRAIL-M", "https://huggingface.co/Supertone/supertonic-3", "web/public/voice/supertonic-3/LICENSE.txt"),
-    ("Misaki US English dictionaries (voice/en-us.lexz)", "Apache-2.0", "https://github.com/hexgrad/misaki", "web/public/voice/misaki-LICENSE.txt"),
-    ("LFM2.5-350M language model (llm/lfm2.5-350m/)", "LFM Open License v1.0", "https://huggingface.co/LiquidAI/LFM2.5-350M", "web/public/llm/lfm2.5-350m/LICENSE.txt"),
+    (
+        "Supertonic 3 voice model (voice/supertonic-3/)",
+        "BigScience OpenRAIL-M",
+        "https://huggingface.co/Supertone/supertonic-3",
+        "web/public/voice/supertonic-3/LICENSE.txt",
+    ),
+    (
+        "Misaki US English dictionaries (voice/en-us.lexz)",
+        "Apache-2.0",
+        "https://github.com/hexgrad/misaki",
+        "web/public/voice/misaki-LICENSE.txt",
+    ),
+    (
+        "LFM2.5-350M language model (llm/lfm2.5-350m/)",
+        "LFM Open License v1.0",
+        "https://huggingface.co/LiquidAI/LFM2.5-350M",
+        "web/public/llm/lfm2.5-350m/LICENSE.txt",
+    ),
 ];
 
 /// The licence file names: `LICENSE`, `LICENCE`, `COPYING`, `UNLICENSE`, `NOTICE`, and their `-`/`_`/`.`
@@ -116,7 +146,13 @@ fn license_file_re() -> Regex {
 fn collate(a: &str, b: &str) -> std::cmp::Ordering {
     let key = |s: &str| -> Vec<u16> {
         s.chars()
-            .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() as u16 + 1 } else { c as u16 })
+            .map(|c| {
+                if c.is_ascii_alphanumeric() {
+                    c.to_ascii_lowercase() as u16 + 1
+                } else {
+                    c as u16
+                }
+            })
             .collect()
     };
     key(a).cmp(&key(b)).then_with(|| a.cmp(b))
@@ -138,27 +174,64 @@ fn license_files(dir: &Path) -> Vec<(String, String)> {
         .filter(|f| re.is_match(f) && dir.join(f).is_file())
         .collect();
     names.sort();
-    names.into_iter().filter_map(|f| text_of(&dir.join(&f)).ok().map(|t| (f, t))).collect()
+    names
+        .into_iter()
+        .filter_map(|f| text_of(&dir.join(&f)).ok().map(|t| (f, t)))
+        .collect()
 }
 
 /// An npm package's entry, from its `package.json`.
 fn npm_package(dir: &Path) -> Result<Package, String> {
     let manifest = dir.join("package.json");
     let text = text_of(&manifest)?;
-    let pkg: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", manifest.display()))?;
+    let pkg: serde_json::Value =
+        serde_json::from_str(&text).map_err(|e| format!("{}: {e}", manifest.display()))?;
     let license = match &pkg["license"] {
         serde_json::Value::String(s) => s.clone(),
-        serde_json::Value::Object(o) => o.get("type").and_then(|t| t.as_str()).map(str::to_string).unwrap_or_else(|| {
-            pkg["licenses"].as_array().map(|l| l.iter().filter_map(|v| v["type"].as_str()).collect::<Vec<_>>().join(" OR ")).unwrap_or_default()
-        }),
-        _ => pkg["licenses"].as_array().map(|l| l.iter().filter_map(|v| v["type"].as_str()).collect::<Vec<_>>().join(" OR ")).unwrap_or_default(),
+        serde_json::Value::Object(o) => o
+            .get("type")
+            .and_then(|t| t.as_str())
+            .map(str::to_string)
+            .unwrap_or_else(|| {
+                pkg["licenses"]
+                    .as_array()
+                    .map(|l| {
+                        l.iter()
+                            .filter_map(|v| v["type"].as_str())
+                            .collect::<Vec<_>>()
+                            .join(" OR ")
+                    })
+                    .unwrap_or_default()
+            }),
+        _ => pkg["licenses"]
+            .as_array()
+            .map(|l| {
+                l.iter()
+                    .filter_map(|v| v["type"].as_str())
+                    .collect::<Vec<_>>()
+                    .join(" OR ")
+            })
+            .unwrap_or_default(),
     };
-    let license = if license.is_empty() { "unknown".to_string() } else { license };
+    let license = if license.is_empty() {
+        "unknown".to_string()
+    } else {
+        license
+    };
     let repo = match &pkg["repository"] {
         serde_json::Value::String(s) => Some(s.clone()),
         other => other["url"].as_str().map(str::to_string),
     };
-    let raw = pkg["homepage"].as_str().map(str::to_string).or(repo).unwrap_or_else(|| format!("https://www.npmjs.com/package/{}", pkg["name"].as_str().unwrap_or("")));
+    let raw = pkg["homepage"]
+        .as_str()
+        .map(str::to_string)
+        .or(repo)
+        .unwrap_or_else(|| {
+            format!(
+                "https://www.npmjs.com/package/{}",
+                pkg["name"].as_str().unwrap_or("")
+            )
+        });
     let url = github_url(&raw);
     let files = license_files(dir);
     let name = pkg["name"].as_str().unwrap_or("").to_string();
@@ -166,13 +239,22 @@ fn npm_package(dir: &Path) -> Result<Package, String> {
         // Packages whose npm release has no licence file: the text from their repository.
         // ONNX Runtime: https://github.com/microsoft/onnxruntime/blob/main/LICENSE
         match name.as_str() {
-            "onnxruntime-web" | "onnxruntime-common" => vec![("LICENSE (github.com/microsoft/onnxruntime)".to_string(), mit("Copyright (c) Microsoft Corporation"))],
+            "onnxruntime-web" | "onnxruntime-common" => vec![(
+                "LICENSE (github.com/microsoft/onnxruntime)".to_string(),
+                mit("Copyright (c) Microsoft Corporation"),
+            )],
             _ => Vec::new(),
         }
     } else {
         files
     };
-    Ok(Package { name, version: pkg["version"].as_str().unwrap_or("").to_string(), license, url, files })
+    Ok(Package {
+        name,
+        version: pkg["version"].as_str().unwrap_or("").to_string(),
+        license,
+        url,
+        files,
+    })
 }
 
 /// `github:user/repo`, `user/repo`, `git+https://…` and `….git` as a link.
@@ -186,15 +268,29 @@ fn github_url(raw: &str) -> String {
 /// The crates (not ours) that sim-wasm and voice-wasm depend on, as built for wasm32.
 fn rust_crates(root: &Path) -> Result<Vec<Package>, String> {
     let out = std::process::Command::new("cargo")
-        .args(["metadata", "--format-version", "1", "--locked", "--offline", "--filter-platform", "wasm32-unknown-unknown"])
+        .args([
+            "metadata",
+            "--format-version",
+            "1",
+            "--locked",
+            "--offline",
+            "--filter-platform",
+            "wasm32-unknown-unknown",
+        ])
         .current_dir(root)
         .output()
         .map_err(|e| format!("cargo metadata: {e}"))?;
     if !out.status.success() {
-        return Err(format!("cargo metadata: {}", String::from_utf8_lossy(&out.stderr).trim()));
+        return Err(format!(
+            "cargo metadata: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
     }
-    let meta: serde_json::Value = serde_json::from_slice(&out.stdout).map_err(|e| format!("cargo metadata: {e}"))?;
-    let packages = meta["packages"].as_array().ok_or("cargo metadata: no packages")?;
+    let meta: serde_json::Value =
+        serde_json::from_slice(&out.stdout).map_err(|e| format!("cargo metadata: {e}"))?;
+    let packages = meta["packages"]
+        .as_array()
+        .ok_or("cargo metadata: no packages")?;
     let mut by_id: HashMap<&str, &serde_json::Value> = HashMap::new();
     for p in packages {
         if let Some(id) = p["id"].as_str() {
@@ -202,12 +298,20 @@ fn rust_crates(root: &Path) -> Result<Vec<Package>, String> {
         }
     }
     let mut nodes: HashMap<&str, &serde_json::Value> = HashMap::new();
-    for n in meta["resolve"]["nodes"].as_array().map(Vec::as_slice).unwrap_or_default() {
+    for n in meta["resolve"]["nodes"]
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+    {
         if let Some(id) = n["id"].as_str() {
             nodes.insert(id, n);
         }
     }
-    let mut stack: Vec<String> = packages.iter().filter(|p| matches!(p["name"].as_str(), Some("sim-wasm" | "voice-wasm"))).filter_map(|p| p["id"].as_str().map(str::to_string)).collect();
+    let mut stack: Vec<String> = packages
+        .iter()
+        .filter(|p| matches!(p["name"].as_str(), Some("sim-wasm" | "voice-wasm")))
+        .filter_map(|p| p["id"].as_str().map(str::to_string))
+        .collect();
     if stack.len() != 2 {
         return Err("sim-wasm or voice-wasm missing from cargo metadata".into());
     }
@@ -218,9 +322,14 @@ fn rust_crates(root: &Path) -> Result<Vec<Package>, String> {
         }
         seen.push(id.clone());
         // Normal dependencies (proc macros included); not build scripts' or tests'.
-        let deps = nodes.get(id.as_str()).map(|n| n["deps"].as_array().cloned().unwrap_or_default()).unwrap_or_default();
+        let deps = nodes
+            .get(id.as_str())
+            .map(|n| n["deps"].as_array().cloned().unwrap_or_default())
+            .unwrap_or_default();
         for dep in deps {
-            let normal = dep["dep_kinds"].as_array().is_some_and(|k| k.iter().any(|kind| kind["kind"].is_null()));
+            let normal = dep["dep_kinds"]
+                .as_array()
+                .is_some_and(|k| k.iter().any(|kind| kind["kind"].is_null()));
             if let Some(pkg) = dep["pkg"].as_str().filter(|_| normal) {
                 stack.push(pkg.to_string());
             }
@@ -228,17 +337,25 @@ fn rust_crates(root: &Path) -> Result<Vec<Package>, String> {
     }
     let mut out = Vec::new();
     for id in &seen {
-        let Some(p) = by_id.get(id.as_str()) else { continue };
+        let Some(p) = by_id.get(id.as_str()) else {
+            continue;
+        };
         if p["source"].is_null() {
             continue;
         }
         let name = p["name"].as_str().unwrap_or("").to_string();
         let manifest = p["manifest_path"].as_str().unwrap_or("");
-        let dir = manifest.strip_suffix("/Cargo.toml").or_else(|| manifest.strip_suffix("\\Cargo.toml")).unwrap_or(manifest);
+        let dir = manifest
+            .strip_suffix("/Cargo.toml")
+            .or_else(|| manifest.strip_suffix("\\Cargo.toml"))
+            .unwrap_or(manifest);
         out.push(Package {
             version: p["version"].as_str().unwrap_or("").to_string(),
             license: p["license"].as_str().unwrap_or("unknown").to_string(),
-            url: p["repository"].as_str().map(str::to_string).unwrap_or_else(|| format!("https://crates.io/crates/{name}")),
+            url: p["repository"]
+                .as_str()
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("https://crates.io/crates/{name}")),
             files: license_files(Path::new(dir)),
             name,
         });
@@ -250,8 +367,17 @@ fn rust_crates(root: &Path) -> Result<Vec<Package>, String> {
 /// One of the kept works, its texts from `crates/tools/texts/`.
 fn kept(root: &Path, (name, license, url, files): Kept) -> Result<Package, String> {
     let dir = root.join("crates").join("tools").join("texts");
-    let files = files.iter().map(|file| Ok((file.to_string(), text_of(&dir.join(file))?))).collect::<Result<_, String>>()?;
-    Ok(Package { name: name.to_string(), version: String::new(), license: license.to_string(), url: url.to_string(), files })
+    let files = files
+        .iter()
+        .map(|file| Ok((file.to_string(), text_of(&dir.join(file))?)))
+        .collect::<Result<_, String>>()?;
+    Ok(Package {
+        name: name.to_string(),
+        version: String::new(),
+        license: license.to_string(),
+        url: url.to_string(),
+        files,
+    })
 }
 
 /// A licence text, printed once however many packages share it.
@@ -263,7 +389,10 @@ struct Text {
 
 /// The file's text, and what it lists. `package_dirs`: the npm packages the bundles hold; `header`:
 /// the first lines. Fails if something has no licence text at all.
-pub fn third_party_licenses(package_dirs: &[String], header: &str) -> Result<(String, (usize, usize, usize)), String> {
+pub fn third_party_licenses(
+    package_dirs: &[String],
+    header: &str,
+) -> Result<(String, (usize, usize, usize)), String> {
     let root = repo_root();
     let web = root.join("web");
     let mut dirs: Vec<PathBuf> = Vec::new();
@@ -281,11 +410,19 @@ pub fn third_party_licenses(package_dirs: &[String], header: &str) -> Result<(St
     let rust = rust_crates(&root)?;
 
     let as_is = |name: &str, files: &str| -> Result<Package, String> {
-        let dir = std::fs::canonicalize(web.join("node_modules").join(name)).map_err(|e| format!("web/node_modules/{name}: {e}"))?;
+        let dir = std::fs::canonicalize(web.join("node_modules").join(name))
+            .map_err(|e| format!("web/node_modules/{name}: {e}"))?;
         let pkg = npm_package(&dir)?;
-        Ok(Package { name: format!("{name} {} ({files})", pkg.version), version: String::new(), ..pkg })
+        Ok(Package {
+            name: format!("{name} {} ({files})", pkg.version),
+            version: String::new(),
+            ..pkg
+        })
     };
-    let mut shipped = vec![as_is("@fontsource-variable/inter", "the Inter font: assets/inter-*.woff2, its licence also in assets/inter-LICENSE.txt")?];
+    let mut shipped = vec![as_is(
+        "@fontsource-variable/inter",
+        "the Inter font: assets/inter-*.woff2, its licence also in assets/inter-LICENSE.txt",
+    )?];
     for k in KEPT {
         shipped.push(kept(&root, k)?);
     }
@@ -293,46 +430,84 @@ pub fn third_party_licenses(package_dirs: &[String], header: &str) -> Result<(St
     for (name, license, url, file) in DATA {
         let path = root.join(file);
         if !path.is_file() {
-            return Err(format!("{file} missing (run cargo fetch-voice and cargo fetch-llm)"));
+            return Err(format!(
+                "{file} missing (run cargo fetch-voice and cargo fetch-llm)"
+            ));
         }
         let short = file.rsplit('/').next().unwrap_or(file).to_string();
-        data.push(Package { name: name.to_string(), version: String::new(), license: license.to_string(), url: url.to_string(), files: vec![(short, text_of(&path)?)] });
+        data.push(Package {
+            name: name.to_string(),
+            version: String::new(),
+            license: license.to_string(),
+            url: url.to_string(),
+            files: vec![(short, text_of(&path)?)],
+        });
     }
 
     let mut texts: Vec<Text> = Vec::new();
     let mut index: HashMap<String, usize> = HashMap::new();
     let mut out: Vec<String> = vec![header.trim().to_string(), String::new()];
-    let mut section = |out: &mut Vec<String>, title: &str, list: &[Package]| -> Result<(), String> {
-        out.push(format!("== {title} =="));
-        out.push(String::new());
-        for p in list {
-            if p.files.is_empty() {
-                return Err(format!("no licence text for {} {}", p.name, p.version));
+    let mut section =
+        |out: &mut Vec<String>, title: &str, list: &[Package]| -> Result<(), String> {
+            out.push(format!("== {title} =="));
+            out.push(String::new());
+            for p in list {
+                if p.files.is_empty() {
+                    return Err(format!("no licence text for {} {}", p.name, p.version));
+                }
+                let mut refs = Vec::new();
+                for (file, text) in &p.files {
+                    let key = format!("{:x}", Sha256::digest(normalize(text).as_bytes()));
+                    let n = *index.entry(key).or_insert_with(|| {
+                        texts.push(Text {
+                            n: texts.len() + 1,
+                            text: text.clone(),
+                            users: Vec::new(),
+                        });
+                        texts.len() - 1
+                    });
+                    let t = &mut texts[n];
+                    let user = format!("{} {}", p.name, p.version);
+                    t.users.push(user.trim().to_string());
+                    refs.push(format!("[{}] {file}", t.n));
+                }
+                out.push(format!(
+                    "{}{}: {}, {}",
+                    p.name,
+                    if p.version.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" {}", p.version)
+                    },
+                    p.license,
+                    p.url
+                ));
+                out.push(format!("  licence text: {}", refs.join(", ")));
             }
-            let mut refs = Vec::new();
-            for (file, text) in &p.files {
-                let key = format!("{:x}", Sha256::digest(normalize(text).as_bytes()));
-                let n = *index.entry(key).or_insert_with(|| {
-                    texts.push(Text { n: texts.len() + 1, text: text.clone(), users: Vec::new() });
-                    texts.len() - 1
-                });
-                let t = &mut texts[n];
-                let user = format!("{} {}", p.name, p.version);
-                t.users.push(user.trim().to_string());
-                refs.push(format!("[{}] {file}", t.n));
-            }
-            out.push(format!("{}{}: {}, {}", p.name, if p.version.is_empty() { String::new() } else { format!(" {}", p.version) }, p.license, p.url));
-            out.push(format!("  licence text: {}", refs.join(", ")));
-        }
-        out.push(String::new());
-        Ok(())
-    };
-    section(&mut out, "JavaScript bundled into assets/*.js (npm packages)", &npm)?;
-    section(&mut out, "Rust crates compiled into assets/sim_wasm_bg-*.wasm and voice_wasm_bg-*.wasm", &rust)?;
+            out.push(String::new());
+            Ok(())
+        };
+    section(
+        &mut out,
+        "JavaScript bundled into assets/*.js (npm packages)",
+        &npm,
+    )?;
+    section(
+        &mut out,
+        "Rust crates compiled into assets/sim_wasm_bg-*.wasm and voice_wasm_bg-*.wasm",
+        &rust,
+    )?;
     section(&mut out, "Files shipped as they are", &shipped)?;
-    let adapted: Vec<Package> = ADAPTED.into_iter().map(|k| kept(&root, k)).collect::<Result<_, _>>()?;
+    let adapted: Vec<Package> = ADAPTED
+        .into_iter()
+        .map(|k| kept(&root, k))
+        .collect::<Result<_, _>>()?;
     section(&mut out, "Adapted into the game's own code", &adapted)?;
-    section(&mut out, "Voice model, dictionary and language model (the copies next to them are the same texts)", &data)?;
+    section(
+        &mut out,
+        "Voice model, dictionary and language model (the copies next to them are the same texts)",
+        &data,
+    )?;
     out.push("== Licence texts ==".to_string());
     out.push(String::new());
     for t in &texts {
@@ -372,7 +547,9 @@ pub fn main_with(args: &[String]) -> i32 {
                 i += 2;
             }
             other => {
-                eprintln!("usage: cargo licenses --header <text> --out <file> [--package <dir>…] (not {other})");
+                eprintln!(
+                    "usage: cargo licenses --header <text> --out <file> [--package <dir>…] (not {other})"
+                );
                 return 2;
             }
         }
@@ -386,7 +563,9 @@ pub fn main_with(args: &[String]) -> i32 {
         Ok(counts)
     }) {
         Ok((npm, rust, texts)) => {
-            println!("THIRD-PARTY-LICENSES.txt: {npm} npm packages, {rust} Rust crates, {texts} licence texts");
+            println!(
+                "THIRD-PARTY-LICENSES.txt: {npm} npm packages, {rust} Rust crates, {texts} licence texts"
+            );
             0
         }
         Err(e) => {
@@ -404,14 +583,25 @@ mod tests {
     fn urls_are_links() {
         assert_eq!(github_url("github:foo/bar"), "https://github.com/foo/bar");
         assert_eq!(github_url("foo/bar"), "https://github.com/foo/bar");
-        assert_eq!(github_url("git+https://github.com/foo/bar.git"), "https://github.com/foo/bar");
+        assert_eq!(
+            github_url("git+https://github.com/foo/bar.git"),
+            "https://github.com/foo/bar"
+        );
         assert_eq!(github_url("https://example.com/x"), "https://example.com/x");
     }
 
     #[test]
     fn licence_files_are_recognised() {
         let re = license_file_re();
-        for name in ["LICENSE", "LICENSE.md", "licence", "COPYING", "UNLICENSE", "NOTICE.txt", "LICENSE-MIT"] {
+        for name in [
+            "LICENSE",
+            "LICENSE.md",
+            "licence",
+            "COPYING",
+            "UNLICENSE",
+            "NOTICE.txt",
+            "LICENSE-MIT",
+        ] {
             assert!(re.is_match(name), "{name}");
         }
         for name in ["package.json", "readme.md", "licensing"] {
@@ -427,9 +617,26 @@ mod tests {
     /// The order `localeCompare` gives: `@` and `-` before letters, whatever the case.
     #[test]
     fn names_collate_as_locale_compare_does() {
-        let mut names = vec!["svelte", "@huggingface/tokenizers", "onnxruntime-web", "@fontsource-variable/inter", "binaryen", "playcanvas"];
+        let mut names = vec![
+            "svelte",
+            "@huggingface/tokenizers",
+            "onnxruntime-web",
+            "@fontsource-variable/inter",
+            "binaryen",
+            "playcanvas",
+        ];
         names.sort_by(|a, b| collate(a, b));
-        assert_eq!(names, ["@fontsource-variable/inter", "@huggingface/tokenizers", "binaryen", "onnxruntime-web", "playcanvas", "svelte"]);
+        assert_eq!(
+            names,
+            [
+                "@fontsource-variable/inter",
+                "@huggingface/tokenizers",
+                "binaryen",
+                "onnxruntime-web",
+                "playcanvas",
+                "svelte"
+            ]
+        );
     }
 
     /// Every kept text is there; Babylon.js's are the Apache License 2.0 and its notice.
@@ -438,12 +645,23 @@ mod tests {
         let root = repo_root();
         for k in KEPT.into_iter().chain(ADAPTED) {
             let p = kept(&root, k).unwrap_or_else(|e| panic!("{}: {e}", k.0));
-            assert!(p.files.iter().all(|(_, text)| !text.trim().is_empty()), "{}", p.name);
+            assert!(
+                p.files.iter().all(|(_, text)| !text.trim().is_empty()),
+                "{}",
+                p.name
+            );
         }
         let babylon = kept(&root, ADAPTED[0]).expect("Babylon.js texts");
         assert!(babylon.name.starts_with("Babylon.js"));
-        assert!(babylon.files[0].1.contains("Apache License") && babylon.files[0].1.contains("Version 2.0, January 2004"));
-        assert!(babylon.files[1].1.contains("Copyright 2023 The Babylon.js team"));
+        assert!(
+            babylon.files[0].1.contains("Apache License")
+                && babylon.files[0].1.contains("Version 2.0, January 2004")
+        );
+        assert!(
+            babylon.files[1]
+                .1
+                .contains("Copyright 2023 The Babylon.js team")
+        );
     }
 
     /// The files with code ported from Babylon.js say so in a header, and no other file does.
@@ -454,7 +672,10 @@ mod tests {
                 let path = entry.path();
                 if path.is_dir() {
                     walk(&path, out);
-                } else if path.extension().is_some_and(|e| e == "ts" || e == "rs" || e == "svelte") {
+                } else if path
+                    .extension()
+                    .is_some_and(|e| e == "ts" || e == "rs" || e == "svelte")
+                {
                     out.push(path);
                 }
             }
@@ -466,10 +687,21 @@ mod tests {
         let marker = ["crates/tools/texts/", "Babylon.js-LICENSE"].concat();
         let mut credited: Vec<String> = files
             .iter()
-            .filter(|path| std::fs::read_to_string(path).is_ok_and(|text| text.lines().take(12).any(|line| line.contains(&marker))))
-            .map(|path| path.strip_prefix(&root).unwrap_or(path).to_string_lossy().replace('\\', "/"))
+            .filter(|path| {
+                std::fs::read_to_string(path)
+                    .is_ok_and(|text| text.lines().take(12).any(|line| line.contains(&marker)))
+            })
+            .map(|path| {
+                path.strip_prefix(&root)
+                    .unwrap_or(path)
+                    .to_string_lossy()
+                    .replace('\\', "/")
+            })
             .collect();
         credited.sort();
-        assert_eq!(credited, BABYLON_PORTED, "BABYLON_PORTED and the files' headers differ");
+        assert_eq!(
+            credited, BABYLON_PORTED,
+            "BABYLON_PORTED and the files' headers differ"
+        );
     }
 }

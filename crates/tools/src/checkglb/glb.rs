@@ -17,7 +17,12 @@ pub fn index<'a>(l: &'a J, i: &J) -> R<&'a J> {
     let i = match i {
         J::Int(i) => *i,
         J::Bool(b) => *b as i64,
-        other => return Err(format!("list indices must be integers or slices, not {}", type_name(other))),
+        other => {
+            return Err(format!(
+                "list indices must be integers or slices, not {}",
+                type_name(other)
+            ));
+        }
     };
     l.at(i).ok_or_else(|| "list index out of range".into())
 }
@@ -45,7 +50,10 @@ pub fn int(d: &J, k: &str, default: i64) -> R<i64> {
         None => Ok(default),
         Some(J::Int(i)) => Ok(*i),
         Some(J::Bool(b)) => Ok(*b as i64),
-        Some(other) => Err(format!("unsupported operand type(s) for +: 'int' and '{}'", type_name(other))),
+        Some(other) => Err(format!(
+            "unsupported operand type(s) for +: 'int' and '{}'",
+            type_name(other)
+        )),
     }
 }
 
@@ -78,7 +86,10 @@ pub fn parse_glb(data: &[u8]) -> R<Glb> {
         })
     };
     if data.len() < 12 {
-        return Err(format!("unpack_from requires a buffer of at least 12 bytes for unpacking 12 bytes at offset 0 (actual buffer size is {})", data.len()));
+        return Err(format!(
+            "unpack_from requires a buffer of at least 12 bytes for unpacking 12 bytes at offset 0 (actual buffer size is {})",
+            data.len()
+        ));
     }
     if &data[..4] != b"glTF" || word(4)? != 2 {
         return Err("not a glTF 2.0 binary".into());
@@ -94,15 +105,25 @@ pub fn parse_glb(data: &[u8]) -> R<Glb> {
         }
         off += 8 + n;
     }
-    Ok(Glb { gltf: gltf.ok_or("'NoneType' object has no attribute 'get'")?, bin, size: data.len() })
+    Ok(Glb {
+        gltf: gltf.ok_or("'NoneType' object has no attribute 'get'")?,
+        bin,
+        size: data.len(),
+    })
 }
 
 /// (width, height) of a PNG or JPEG, or None.
 pub fn image_size(blob: &[u8]) -> Option<(u32, u32)> {
-    let be16 = |i: usize| blob.get(i..i + 2).map(|b| u16::from_be_bytes([b[0], b[1]]) as usize);
+    let be16 = |i: usize| {
+        blob.get(i..i + 2)
+            .map(|b| u16::from_be_bytes([b[0], b[1]]) as usize)
+    };
     if blob.starts_with(b"\x89PNG\r\n\x1a\n") {
         let b = blob.get(16..24)?;
-        return Some((u32::from_be_bytes(b[..4].try_into().unwrap()), u32::from_be_bytes(b[4..].try_into().unwrap())));
+        return Some((
+            u32::from_be_bytes(b[..4].try_into().unwrap()),
+            u32::from_be_bytes(b[4..].try_into().unwrap()),
+        ));
     }
     if blob.starts_with(b"\xff\xd8") {
         let mut i = 2;
@@ -131,13 +152,20 @@ fn clip_width(acc: &J) -> R<usize> {
 
 fn bytes(bin: &[u8], at: i64, len: usize) -> R<&[u8]> {
     if at < 0 || at as usize + len > bin.len() {
-        return Err(format!("unpack_from requires a buffer of at least {} bytes for unpacking {len} bytes at offset {at} (actual buffer size is {})", at + len as i64, bin.len()));
+        return Err(format!(
+            "unpack_from requires a buffer of at least {} bytes for unpacking {len} bytes at offset {at} (actual buffer size is {})",
+            at + len as i64,
+            bin.len()
+        ));
     }
     Ok(&bin[at as usize..at as usize + len])
 }
 
 fn floats(bin: &[u8], at: i64, n: usize) -> R<Vec<f64>> {
-    Ok(bytes(bin, at, 4 * n)?.chunks(4).map(|b| f32::from_le_bytes(b.try_into().unwrap()) as f64).collect())
+    Ok(bytes(bin, at, 4 * n)?
+        .chunks(4)
+        .map(|b| f32::from_le_bytes(b.try_into().unwrap()) as f64)
+        .collect())
 }
 
 /// The first (or `last`) element of a float accessor (a clip's first or last key); None if it isn't floats.
@@ -148,8 +176,16 @@ pub fn first_value(g: &Glb, accessor: &J, last: bool) -> R<Option<Vec<f64>>> {
     }
     let view = item(&g.gltf, "bufferViews", key(acc, "bufferView")?)?;
     let n = clip_width(acc)?;
-    let at = if last { (count(acc)? - 1) * stride(view, 4 * n as i64)? } else { 0 };
-    Ok(Some(floats(&g.bin, int(view, "byteOffset", 0)? + int(acc, "byteOffset", 0)? + at, n)?))
+    let at = if last {
+        (count(acc)? - 1) * stride(view, 4 * n as i64)?
+    } else {
+        0
+    };
+    Ok(Some(floats(
+        &g.bin,
+        int(view, "byteOffset", 0)? + int(acc, "byteOffset", 0)? + at,
+        n,
+    )?))
 }
 
 /// Every element of a float accessor (a clip's keys).
@@ -160,7 +196,9 @@ pub fn values(g: &Glb, accessor: &J) -> R<Vec<Vec<f64>>> {
     let stride = stride(view, 4 * n as i64)?;
     let at = int(view, "byteOffset", 0)? + int(acc, "byteOffset", 0)?;
     let count = count(acc)?;
-    (0..count.max(0)).map(|k| floats(&g.bin, at + k * stride, n)).collect()
+    (0..count.max(0))
+        .map(|k| floats(&g.bin, at + k * stride, n))
+        .collect()
 }
 
 /// Every element of an accessor (floats, or integers read as the spec says: normalised if flagged), or
@@ -210,7 +248,13 @@ pub fn accessor(g: &Glb, index: &J) -> R<Option<Vec<Vec<Num>>>> {
                 5123 => Num::I(u16::from_le_bytes(c.try_into().unwrap()) as i64),
                 _ => Num::I(u32::from_le_bytes(c.try_into().unwrap()) as i64),
             })
-            .map(|v| if normalized { Num::F((v.f() / top.unwrap()).max(-1.0)) } else { v })
+            .map(|v| {
+                if normalized {
+                    Num::F((v.f() / top.unwrap()).max(-1.0))
+                } else {
+                    v
+                }
+            })
             .collect();
         out.push(e);
     }
@@ -248,12 +292,21 @@ pub(crate) mod tests {
 
     #[test]
     fn reads_a_glb() {
-        let data = glb(r#"{"asset": {"version": "2.0"}, "nodes": [{"name": "a"}]}"#, &[1, 2, 3]);
+        let data = glb(
+            r#"{"asset": {"version": "2.0"}, "nodes": [{"name": "a"}]}"#,
+            &[1, 2, 3],
+        );
         let g = parse_glb(&data).unwrap();
         assert_eq!(g.size, data.len());
         assert_eq!(g.bin, vec![1, 2, 3, 0]);
-        assert_eq!(g.gltf.get("nodes").unwrap().at(0).unwrap().get("name"), Some(&J::Str("a".into())));
-        assert_eq!(parse_glb(b"glTF\x01\0\0\0\0\0\0\0").err().unwrap(), "not a glTF 2.0 binary");
+        assert_eq!(
+            g.gltf.get("nodes").unwrap().at(0).unwrap().get("name"),
+            Some(&J::Str("a".into()))
+        );
+        assert_eq!(
+            parse_glb(b"glTF\x01\0\0\0\0\0\0\0").err().unwrap(),
+            "not a glTF 2.0 binary"
+        );
         assert!(parse_glb(b"PK\x03\x04\0\0\0\0\0\0\0\0").is_err());
     }
 
@@ -267,11 +320,15 @@ pub(crate) mod tests {
         // A JPEG: SOI, an APP0 segment of 16 bytes, then SOF0 (precision, height, width).
         let mut jpg = vec![0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10];
         jpg.extend([0u8; 14]);
-        jpg.extend([0xFF, 0xC0, 0x00, 0x11, 0x08, 0x01, 0x80, 0x02, 0x00, 0x03, 0x01, 0x22, 0x00]);
+        jpg.extend([
+            0xFF, 0xC0, 0x00, 0x11, 0x08, 0x01, 0x80, 0x02, 0x00, 0x03, 0x01, 0x22, 0x00,
+        ]);
         assert_eq!(image_size(&jpg), Some((512, 384)));
         // DHT (C4) is no frame header: skipped.
         let mut dht = vec![0xFF, 0xD8, 0xFF, 0xC4, 0x00, 0x04, 0x00, 0x00];
-        dht.extend([0xFF, 0xC2, 0x00, 0x11, 0x08, 0x00, 0x10, 0x00, 0x20, 0x03, 0x01]);
+        dht.extend([
+            0xFF, 0xC2, 0x00, 0x11, 0x08, 0x00, 0x10, 0x00, 0x20, 0x03, 0x01,
+        ]);
         assert_eq!(image_size(&dht), Some((32, 16)));
         assert_eq!(image_size(b"GIF89a....."), None);
     }
@@ -303,7 +360,10 @@ pub(crate) mod tests {
             {"componentType": 5126, "type": "SCALAR", "count": 1}]}"#;
         let g = parse_glb(&glb(json, &bin)).unwrap();
         let read = |i: i64| accessor(&g, &J::Int(i)).unwrap();
-        assert_eq!(read(0), Some(vec![vec![Num::F(1.5), Num::F(-2.0), Num::F(0.25)]]));
+        assert_eq!(
+            read(0),
+            Some(vec![vec![Num::F(1.5), Num::F(-2.0), Num::F(0.25)]])
+        );
         // -32768 / 32767 is under -1: clamped, as the spec says.
         assert_eq!(read(1), Some(vec![vec![Num::F(1.0), Num::F(-1.0)]]));
         assert_eq!(read(2), Some(vec![vec![Num::F(1.0), Num::F(0.0)]]));
@@ -312,7 +372,14 @@ pub(crate) mod tests {
         assert_eq!(read(5), None, "compressed");
         assert_eq!(read(6), None, "no buffer view");
         assert_eq!(values(&g, &J::Int(0)).unwrap(), vec![vec![1.5, -2.0, 0.25]]);
-        assert_eq!(first_value(&g, &J::Int(0), true).unwrap(), Some(vec![1.5, -2.0, 0.25]));
-        assert_eq!(first_value(&g, &J::Int(1), false).unwrap(), None, "not floats");
+        assert_eq!(
+            first_value(&g, &J::Int(0), true).unwrap(),
+            Some(vec![1.5, -2.0, 0.25])
+        );
+        assert_eq!(
+            first_value(&g, &J::Int(1), false).unwrap(),
+            None,
+            "not floats"
+        );
     }
 }

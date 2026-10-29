@@ -48,16 +48,35 @@ fn days(w: &mut World, d: u32) {
 
 #[test]
 fn partners_move_in_together_where_there_is_room() {
-    let mut w = World::from_json(CONTENT, &town("", r#",{"a":0,"b":1,"preset":"partners"}"#), 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    let mut w = World::from_json(
+        CONTENT,
+        &town("", r#",{"a":0,"b":1,"preset":"partners"}"#),
+        1,
+    )
+    .unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     days(&mut w, 1);
     // Next door is full (two in one bed); the player's double bed has room: Cy moves in.
     assert_eq!(w.sims[1].household, 0, "Cy moved in with Ada");
-    let moved = w.events.iter().find(|e| e.kind == EventKind::MovedInWith).unwrap();
+    let moved = w
+        .events
+        .iter()
+        .find(|e| e.kind == EventKind::MovedInWith)
+        .unwrap();
     assert_eq!((moved.a, moved.b), (1, 0));
-    assert_eq!(w.households[0].funds, 1500, "with half of his household's money");
+    assert_eq!(
+        w.households[0].funds, 1500,
+        "with half of his household's money"
+    );
     assert_eq!(w.households[1].funds, 500);
-    assert!(w.plots[0].contains(w.sims[1].pos[0] as i32, w.sims[1].pos[1] as i32), "at his new home");
+    assert!(
+        w.plots[0].contains(w.sims[1].pos[0] as i32, w.sims[1].pos[1] as i32),
+        "at his new home"
+    );
     // Saved in their new home.
     let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     assert_eq!(loaded.sims[1].household, 0);
@@ -65,10 +84,18 @@ fn partners_move_in_together_where_there_is_room() {
 
 #[test]
 fn the_player_can_keep_their_household_as_it_is() {
-    let mut w = World::from_json(CONTENT, &town("", r#",{"a":0,"b":1,"preset":"partners"}"#), 1).unwrap();
+    let mut w = World::from_json(
+        CONTENT,
+        &town("", r#",{"a":0,"b":1,"preset":"partners"}"#),
+        1,
+    )
+    .unwrap();
     w.apply(Command::SetPlayerMoves { enabled: false }).unwrap();
     days(&mut w, 3);
-    assert_eq!(w.sims[1].household, 1, "nobody moves in or out of the player's home");
+    assert_eq!(
+        w.sims[1].household, 1,
+        "nobody moves in or out of the player's home"
+    );
     let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     assert!(!loaded.player_moves);
 }
@@ -77,12 +104,21 @@ fn the_player_can_keep_their_household_as_it_is() {
 fn grown_children_move_into_a_house_of_their_own_or_leave_town() {
     // Eve (25, working) lives next door with her mother Di.
     let eve = r#",{"name":"Eve","x":16.5,"z":5.5,"age":25,"household":1,"job":{"career":"press.print","level":0}}"#;
-    let mut w = World::from_json(CONTENT, &town(eve, r#",{"a":3,"b":2,"preset":"parent"}"#), 1).unwrap();
+    let mut w = World::from_json(
+        CONTENT,
+        &town(eve, r#",{"a":3,"b":2,"preset":"parent"}"#),
+        1,
+    )
+    .unwrap();
     days(&mut w, 1);
     let h = w.sims[3].household as usize;
     assert_eq!(w.households[h].plot, Some(2), "the house that was for sale");
     assert_eq!(w.households[h].name, "Neighbours", "the family name");
-    assert!(w.events.iter().any(|e| e.kind == EventKind::MovedOut && e.a == 3));
+    assert!(
+        w.events
+            .iter()
+            .any(|e| e.kind == EventKind::MovedOut && e.a == 3)
+    );
 
     // With no house free, a grown child of 30 leaves town instead.
     let fin = r#",{"name":"Fin","x":16.5,"z":5.5,"age":31,"household":1,"job":{"career":"press.print","level":0}},
@@ -94,7 +130,11 @@ fn grown_children_move_into_a_house_of_their_own_or_leave_town() {
     let mut w = World::from_json(CONTENT, &src, 1).unwrap();
     days(&mut w, 1);
     assert!(!w.sims[3].here(), "Fin left town");
-    assert!(w.events.iter().any(|e| e.kind == EventKind::MovedAway && e.a == 3));
+    assert!(
+        w.events
+            .iter()
+            .any(|e| e.kind == EventKind::MovedAway && e.a == 3)
+    );
 }
 
 #[test]
@@ -113,24 +153,48 @@ fn newcomers_move_into_vacant_houses() {
     // Someone left town before: a newcomer takes the slot.
     w.depart(0, sim_core::world::GoneWhy::MovedAway);
     days(&mut w, 1);
-    let h = w.households.iter().position(|h| h.plot == Some(2)).expect("a household for the house that was for sale");
-    let members: Vec<usize> = (0..w.sims.len()).filter(|&i| w.sims[i].here() && w.sims[i].household as usize == h).collect();
+    let h = w
+        .households
+        .iter()
+        .position(|h| h.plot == Some(2))
+        .expect("a household for the house that was for sale");
+    let members: Vec<usize> = (0..w.sims.len())
+        .filter(|&i| w.sims[i].here() && w.sims[i].household as usize == h)
+        .collect();
     assert_eq!(members.len(), 1, "one bed, one newcomer");
     let s = &w.sims[members[0]];
     assert_eq!(members[0], 0, "in the slot someone left");
     assert!(["Ana", "Ben", "Cleo", "Dev"].contains(&s.name.as_str()));
     assert!(["Moss", "Reed"].contains(&w.households[h].name.as_str()));
-    assert!(s.appearance["seed"].is_u64(), "an appearance seed for the web");
-    assert!(!(s.traits.contains(&"neat".into()) && s.traits.contains(&"slob".into())), "no clashing traits");
+    assert!(
+        s.appearance["seed"].is_u64(),
+        "an appearance seed for the web"
+    );
+    assert!(
+        !(s.traits.contains(&"neat".into()) && s.traits.contains(&"slob".into())),
+        "no clashing traits"
+    );
     assert_eq!(w.households[h].funds, 1000);
-    assert!(w.events.iter().any(|e| e.kind == EventKind::MovedIn && e.a == 0));
+    assert!(
+        w.events
+            .iter()
+            .any(|e| e.kind == EventKind::MovedIn && e.a == 0)
+    );
     // The player's home is never given away, even empty.
     w.depart(1, sim_core::world::GoneWhy::MovedAway);
     w.depart(2, sim_core::world::GoneWhy::MovedAway);
     let player_plot = w.households[0].plot;
     days(&mut w, 3);
-    assert!(w.sims.iter().filter(|s| s.here()).all(|s| w.households[s.household as usize].plot != player_plot || s.household == 0));
-    assert!(!w.sims.iter().any(|s| s.here() && s.household == 0), "nobody moved into the player's home");
+    assert!(
+        w.sims
+            .iter()
+            .filter(|s| s.here())
+            .all(|s| w.households[s.household as usize].plot != player_plot || s.household == 0)
+    );
+    assert!(
+        !w.sims.iter().any(|s| s.here() && s.household == 0),
+        "nobody moved into the player's home"
+    );
 }
 
 /// A couple moving in with their grown child bring a grown-up, not a baby (with life stages
@@ -149,24 +213,40 @@ fn newcomers_are_grown_up() {
                "genders":[{"id":"female","label":"Female"},{"id":"male","label":"Male"}],"#,
         );
     // Three beds in the house for sale: room for a couple and a child.
-    let town = town("", "").replace(r#"{"def":"bed","x":22,"z":2}"#, r#"{"def":"double","x":22,"z":2},{"def":"bed","x":26,"z":2}"#);
+    let town = town("", "").replace(
+        r#"{"def":"bed","x":22,"z":2}"#,
+        r#"{"def":"double","x":22,"z":2},{"def":"bed","x":26,"z":2}"#,
+    );
     let mut families = 0;
     for seed in 1..=40 {
         let mut w = World::from_json(&content, &town, seed).unwrap();
         assert!(sim_core::lifecycle::arrive(&mut w, 2));
         let h = w.households.iter().position(|h| h.plot == Some(2)).unwrap();
-        let members: Vec<usize> = (0..w.sims.len()).filter(|&i| w.sims[i].here() && w.sims[i].household as usize == h).collect();
+        let members: Vec<usize> = (0..w.sims.len())
+            .filter(|&i| w.sims[i].here() && w.sims[i].household as usize == h)
+            .collect();
         for &i in &members {
-            assert!(w.sims[i].adult(&w.content), "seed {seed}: {} moved in at {}", w.sims[i].name, w.sims[i].age);
+            assert!(
+                w.sims[i].adult(&w.content),
+                "seed {seed}: {} moved in at {}",
+                w.sims[i].name,
+                w.sims[i].age
+            );
         }
         // Never strangers: only those who belong together share a bedroom.
         for (k, &a) in members.iter().enumerate() {
             for &b in &members[k + 1..] {
                 let rel = w.relationships.get(a, b);
-                assert!(rel.partners || !w.relationships.kin(a, b).is_none(), "seed {seed}: {} and {} are strangers", w.sims[a].name, w.sims[b].name);
+                assert!(
+                    rel.partners || !w.relationships.kin(a, b).is_none(),
+                    "seed {seed}: {} and {} are strangers",
+                    w.sims[a].name,
+                    w.sims[b].name
+                );
             }
         }
-        families += usize::from(members.len() == 3 && w.relationships.get(members[0], members[1]).partners);
+        families +=
+            usize::from(members.len() == 3 && w.relationships.get(members[0], members[1]).partners);
     }
     assert!(families > 0, "no couple moved in with a grown child");
 }

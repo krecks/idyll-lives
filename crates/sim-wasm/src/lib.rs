@@ -3,7 +3,9 @@
 // SIMD comes from `.cargo/config.toml`'s rustflags, which a `RUSTFLAGS` in the environment replaces
 // rather than adds to: such a build stops here instead of shipping a slower wasm without it.
 #[cfg(all(target_arch = "wasm32", not(target_feature = "simd128")))]
-compile_error!("the wasm needs SIMD: a RUSTFLAGS in the environment replaces .cargo/config.toml's `-C target-feature=+simd128`, so add it there too");
+compile_error!(
+    "the wasm needs SIMD: a RUSTFLAGS in the environment replaces .cargo/config.toml's `-C target-feature=+simd128`, so add it there too"
+);
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -100,7 +102,9 @@ fn save_problem(content_json: &str, save_json: &str, error: &str) -> Option<Save
     let version = serde_json::from_str::<serde_json::Value>(save_json)
         .ok()
         .and_then(|v| v.get("version").and_then(serde_json::Value::as_u64));
-    let damaged = ["invalid JSON", "corrupt", "saved "].iter().any(|start| error.starts_with(start));
+    let damaged = ["invalid JSON", "corrupt", "saved "]
+        .iter()
+        .any(|start| error.starts_with(start));
     Some(match version {
         Some(v) if v > u64::from(SAVE_VERSION) => SaveProblem::TooNew,
         Some(v) if v < OLDEST_SAVE_VERSION => SaveProblem::TooOld,
@@ -201,7 +205,9 @@ impl Game {
 
     /// The household's home as a blueprint (JSON; see `sim_core::blueprint`).
     pub fn blueprint(&self, household: u32) -> Result<String, JsError> {
-        self.world.blueprint_json(household).map_err(|e| JsError::new(&e.to_string()))
+        self.world
+            .blueprint_json(household)
+            .map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// The whole story log, oldest first (JSON).
@@ -242,7 +248,8 @@ impl Game {
 
     /// The lamps switched off (JSON array of object ids; see `sim_core::lights`).
     pub fn lamps_off(&self) -> String {
-        serde_json::to_string(&sim_core::lights::lamps_off(&self.world)).unwrap_or_else(|_| "[]".into())
+        serde_json::to_string(&sim_core::lights::lamps_off(&self.world))
+            .unwrap_or_else(|_| "[]".into())
     }
 
     /// Bumped whenever a lamp is switched on or off (see `lampsOff`).
@@ -337,20 +344,29 @@ mod tests {
         let read = |name: &str| std::fs::read_to_string(dir.join(name)).unwrap();
         let base = read("base.json");
         let v: serde_json::Value = serde_json::from_str(&base).unwrap();
-        let parts: Vec<String> =
-            v["include"].as_array().unwrap().iter().map(|n| read(n.as_str().unwrap())).collect();
+        let parts: Vec<String> = v["include"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|n| read(n.as_str().unwrap()))
+            .collect();
         let parts: Vec<&str> = parts.iter().map(String::as_str).collect();
         sim_core::merge_content(&base, &parts).unwrap()
     }
 
     /// Saves written by released builds: 0.1.0 (version 17) and the live site's d7c506e (19).
     fn old_save(name: &str) -> String {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves").join(name);
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/saves")
+            .join(name);
         std::fs::read_to_string(path).unwrap()
     }
 
     fn problem(content: &str, save: &str) -> Option<SaveProblem> {
-        load_save(content, save).err().expect("the save is refused").problem
+        load_save(content, save)
+            .err()
+            .expect("the save is refused")
+            .problem
     }
 
     #[test]
@@ -359,7 +375,11 @@ mod tests {
         for name in ["v0.1.0-day5.json", "d7c506e-day5.json"] {
             let world = load_save(&content, &old_save(name))
                 .unwrap_or_else(|e| panic!("{name}: {}", e.message));
-            assert!(world.sims.len() > 10, "{name}: {} residents", world.sims.len());
+            assert!(
+                world.sims.len() > 10,
+                "{name}: {} residents",
+                world.sims.len()
+            );
         }
     }
 
@@ -370,25 +390,55 @@ mod tests {
         assert!(good.starts_with("{\"version\":17,"));
         let with_version =
             |v: &str| good.replacen("\"version\":17", &format!("\"version\":{v}"), 1);
-        assert_eq!(problem(&content, &with_version("999")), Some(SaveProblem::TooNew));
+        assert_eq!(
+            problem(&content, &with_version("999")),
+            Some(SaveProblem::TooNew)
+        );
         let next = (SAVE_VERSION + 1).to_string();
-        assert_eq!(problem(&content, &with_version(&next)), Some(SaveProblem::TooNew));
-        assert_eq!(problem(&content, &with_version("0")), Some(SaveProblem::TooOld));
-        assert_eq!(problem(&content, "garbage, not a save"), Some(SaveProblem::Corrupt));
+        assert_eq!(
+            problem(&content, &with_version(&next)),
+            Some(SaveProblem::TooNew)
+        );
+        assert_eq!(
+            problem(&content, &with_version("0")),
+            Some(SaveProblem::TooOld)
+        );
+        assert_eq!(
+            problem(&content, "garbage, not a save"),
+            Some(SaveProblem::Corrupt)
+        );
         assert_eq!(problem(&content, ""), Some(SaveProblem::Corrupt));
         assert_eq!(problem(&content, &good[..5000]), Some(SaveProblem::Corrupt));
-        assert_eq!(problem(&content, "{\"version\":17}"), Some(SaveProblem::Corrupt));
-        assert_eq!(problem(&content, &with_version("-3")), Some(SaveProblem::Corrupt));
-        assert_eq!(problem(&content, &with_version("\"17\"")), Some(SaveProblem::Corrupt));
+        assert_eq!(
+            problem(&content, "{\"version\":17}"),
+            Some(SaveProblem::Corrupt)
+        );
+        assert_eq!(
+            problem(&content, &with_version("-3")),
+            Some(SaveProblem::Corrupt)
+        );
+        assert_eq!(
+            problem(&content, &with_version("\"17\"")),
+            Some(SaveProblem::Corrupt)
+        );
         // A whole save this version fails to load (here a trait it doesn't know) isn't damaged: kept.
         let mut odd: serde_json::Value = serde_json::from_str(&good).unwrap();
         odd["sims"][0]["traits"] = serde_json::json!(["noSuchTrait"]);
-        assert_eq!(problem(&content, &odd.to_string()), Some(SaveProblem::Failed));
-        assert_eq!(load_save(&content, &odd.to_string()).err().unwrap().kind(), "failed");
+        assert_eq!(
+            problem(&content, &odd.to_string()),
+            Some(SaveProblem::Failed)
+        );
+        assert_eq!(
+            load_save(&content, &odd.to_string()).err().unwrap().kind(),
+            "failed"
+        );
         // The loader's own checks say damaged: removed.
         let mut odd: serde_json::Value = serde_json::from_str(&good).unwrap();
         odd["households"][0]["plot"] = serde_json::json!(999);
-        assert_eq!(problem(&content, &odd.to_string()), Some(SaveProblem::Corrupt));
+        assert_eq!(
+            problem(&content, &odd.to_string()),
+            Some(SaveProblem::Corrupt)
+        );
         // The game's own data failing isn't the save's fault (it mustn't be removed for that).
         assert_eq!(problem("{", &good), None);
         assert_eq!(problem("{", &with_version("999")), None);

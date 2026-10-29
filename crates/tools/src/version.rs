@@ -12,7 +12,8 @@ use std::path::Path;
 
 /// `([workspace.package] ... version = "...")` in Cargo.toml.
 fn section_re() -> Regex {
-    Regex::new(r#"(?s)(\[workspace\.package\][^\[]*?\nversion = ")([^"]+)(")"#).expect("valid regex")
+    Regex::new(r#"(?s)(\[workspace\.package\][^\[]*?\nversion = ")([^"]+)(")"#)
+        .expect("valid regex")
 }
 
 pub fn main_with(args: &[String]) -> i32 {
@@ -35,12 +36,19 @@ fn run(next: Option<&str>) -> Result<i32, String> {
     let cargo_path = root.join("Cargo.toml");
     let lock_path = root.join("Cargo.lock");
     let pkg_text = read(&pkg_path)?;
-    let pkg: serde_json::Value = serde_json::from_str(&pkg_text).map_err(|e| format!("web/package.json: {e}"))?;
-    let pkg_version = pkg["version"].as_str().ok_or("web/package.json: no version")?.to_string();
+    let pkg: serde_json::Value =
+        serde_json::from_str(&pkg_text).map_err(|e| format!("web/package.json: {e}"))?;
+    let pkg_version = pkg["version"]
+        .as_str()
+        .ok_or("web/package.json: no version")?
+        .to_string();
     let cargo = read(&cargo_path)?;
     let lock = read(&lock_path)?;
     let section = section_re();
-    let cargo_version = section.captures(&cargo).map(|c| c[2].to_string()).ok_or("No [workspace.package] version in Cargo.toml")?;
+    let cargo_version = section
+        .captures(&cargo)
+        .map(|c| c[2].to_string())
+        .ok_or("No [workspace.package] version in Cargo.toml")?;
 
     // The workspace's crates (all take the workspace version) and their entries in Cargo.lock.
     let members = member_names(&root, &cargo)?;
@@ -51,28 +59,52 @@ fn run(next: Option<&str>) -> Result<i32, String> {
     }
 
     let Some(next) = next else {
-        let stale: Vec<&(String, Option<String>)> = lock_versions.iter().filter(|(_, v)| v.as_deref() != Some(&cargo_version)).collect();
+        let stale: Vec<&(String, Option<String>)> = lock_versions
+            .iter()
+            .filter(|(_, v)| v.as_deref() != Some(&cargo_version))
+            .collect();
         if pkg_version != cargo_version || !stale.is_empty() {
-            let listed: Vec<String> = lock_versions.iter().map(|(n, v)| format!("{n} {}", v.as_deref().unwrap_or("?"))).collect();
-            eprintln!("Version mismatch: web/package.json {pkg_version}, Cargo.toml {cargo_version}, Cargo.lock {}", listed.join(", "));
+            let listed: Vec<String> = lock_versions
+                .iter()
+                .map(|(n, v)| format!("{n} {}", v.as_deref().unwrap_or("?")))
+                .collect();
+            eprintln!(
+                "Version mismatch: web/package.json {pkg_version}, Cargo.toml {cargo_version}, Cargo.lock {}",
+                listed.join(", ")
+            );
             return Ok(1);
         }
         println!("{pkg_version}");
         return Ok(0);
     };
-    if !Regex::new(r"^\d+\.\d+\.\d+(-[\w.]+)?$").expect("valid regex").is_match(next) {
+    if !Regex::new(r"^\d+\.\d+\.\d+(-[\w.]+)?$")
+        .expect("valid regex")
+        .is_match(next)
+    {
         return Err(format!("Not a version: {next}"));
     }
     // Only the version line changes: the file keeps its formatting (it is JSON.stringify's own).
-    let pkg_next = replace_once(&pkg_text, &Regex::new(r#"(?m)^(\s*"version":\s*")([^"]*)(")"#).expect("valid regex"), next)?;
+    let pkg_next = replace_once(
+        &pkg_text,
+        &Regex::new(r#"(?m)^(\s*"version":\s*")([^"]*)(")"#).expect("valid regex"),
+        next,
+    )?;
     std::fs::write(&pkg_path, pkg_next).map_err(|e| format!("{}: {e}", pkg_path.display()))?;
-    std::fs::write(&cargo_path, section.replace(&cargo, format!("${{1}}{next}${{3}}")).to_string()).map_err(|e| format!("{}: {e}", cargo_path.display()))?;
+    std::fs::write(
+        &cargo_path,
+        section
+            .replace(&cargo, format!("${{1}}{next}${{3}}"))
+            .to_string(),
+    )
+    .map_err(|e| format!("{}: {e}", cargo_path.display()))?;
     let mut next_lock = lock;
     for (name, v) in &lock_versions {
         if v.is_none() {
             return Err(format!("No {name} in Cargo.lock"));
         }
-        next_lock = entry_re(name).replace(&next_lock, format!("${{1}}{next}${{3}}")).to_string();
+        next_lock = entry_re(name)
+            .replace(&next_lock, format!("${{1}}{next}${{3}}"))
+            .to_string();
     }
     std::fs::write(&lock_path, next_lock).map_err(|e| format!("{}: {e}", lock_path.display()))?;
     println!("Version set to {next} (web/package.json, Cargo.toml, Cargo.lock).");
@@ -87,14 +119,21 @@ fn member_names(root: &Path, cargo: &str) -> Result<Vec<String>, String> {
     for m in member.captures_iter(cargo) {
         let manifest = root.join("crates").join(&m[1]).join("Cargo.toml");
         let text = read(&manifest)?;
-        let n = name.captures(&text).map(|c| c[1].to_string()).ok_or_else(|| format!("{}: no name", manifest.display()))?;
+        let n = name
+            .captures(&text)
+            .map(|c| c[1].to_string())
+            .ok_or_else(|| format!("{}: no name", manifest.display()))?;
         out.push(n);
     }
     Ok(out)
 }
 
 fn entry_re(name: &str) -> Regex {
-    Regex::new(&format!(r#"(\[\[package\]\]\nname = "{}"\nversion = ")([^"]+)(")"#, regex::escape(name))).expect("valid regex")
+    Regex::new(&format!(
+        r#"(\[\[package\]\]\nname = "{}"\nversion = ")([^"]+)(")"#,
+        regex::escape(name)
+    ))
+    .expect("valid regex")
 }
 
 fn replace_once(text: &str, re: &Regex, next: &str) -> Result<String, String> {

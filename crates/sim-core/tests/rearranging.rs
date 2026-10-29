@@ -18,41 +18,93 @@ fn town(seed: u64) -> World {
     for h in &mut w.households {
         h.funds = 10_000_000;
     }
-    let home = w.households.iter().find(|h| h.player).and_then(|h| h.plot).unwrap();
+    let home = w
+        .households
+        .iter()
+        .find(|h| h.player)
+        .and_then(|h| h.plot)
+        .unwrap();
     common::look_at(&mut w, home);
     w
 }
 
 /// Things on `plot` that can be sold or moved (they have a price).
 fn owned(w: &World, plot: u32) -> Vec<u32> {
-    w.objects.iter().filter(|o| w.content.objects[o.def].price.is_some() && w.plot_at(o.x, o.z) == Some(plot)).map(|o| o.id).collect()
+    w.objects
+        .iter()
+        .filter(|o| w.content.objects[o.def].price.is_some() && w.plot_at(o.x, o.z) == Some(plot))
+        .map(|o| o.id)
+        .collect()
 }
 
 fn move_to(household: u32, object: u32, x: i32, z: i32, rot: u8) -> Command {
-    Command::MoveObject { household, object, x, z, rot, turn: None, offset: None, size: None, tall: None }
+    Command::MoveObject {
+        household,
+        object,
+        x,
+        z,
+        rot,
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    }
 }
 
 /// One random edit of a random household's home (mostly the player's), sometimes undone or
 /// undone and made again. Edits that don't fit are refused; that's fine.
 fn edit(w: &mut World, rng: &mut common::Lcg) {
-    let homes: Vec<(u32, u32)> = w.households.iter().filter_map(|h| Some((h.id, h.plot?))).collect();
-    let (household, plot) = if rng.below(3) > 0 { homes[0] } else { homes[rng.below(homes.len())] };
+    let homes: Vec<(u32, u32)> = w
+        .households
+        .iter()
+        .filter_map(|h| Some((h.id, h.plot?)))
+        .collect();
+    let (household, plot) = if rng.below(3) > 0 {
+        homes[0]
+    } else {
+        homes[rng.below(homes.len())]
+    };
     let things = owned(w, plot);
     let any = |rng: &mut common::Lcg| things[rng.below(things.len())];
     let _ = match rng.below(5) {
-        0 if !things.is_empty() => w.apply(Command::Sell { household, object: any(rng) }),
+        0 if !things.is_empty() => w.apply(Command::Sell {
+            household,
+            object: any(rng),
+        }),
         1 | 2 if !things.is_empty() => {
             let o = &w.objects[any(rng) as usize];
             let (id, x, z, rot) = (o.id, o.x, o.z, rng.below(4) as u8);
             // Turned where it stands, or somewhere else at home.
             let p = &w.plots[plot as usize];
-            let (x, z) = if rng.below(2) == 0 { (x, z) } else { (p.x + rng.below(p.w as usize) as i32, p.z + rng.below(p.d as usize) as i32) };
+            let (x, z) = if rng.below(2) == 0 {
+                (x, z)
+            } else {
+                (
+                    p.x + rng.below(p.w as usize) as i32,
+                    p.z + rng.below(p.d as usize) as i32,
+                )
+            };
             w.apply(move_to(household, id, x, z, rot))
         }
         _ => {
-            let defs: Vec<&str> = w.content.objects.iter().filter(|d| d.price.is_some() && !d.stairs).map(|d| d.id.as_str()).collect();
+            let defs: Vec<&str> = w
+                .content
+                .objects
+                .iter()
+                .filter(|d| d.price.is_some() && !d.stairs)
+                .map(|d| d.id.as_str())
+                .collect();
             let def = defs[rng.below(defs.len())].to_string();
-            w.apply(Command::Buy { household, object: def, at: None, colors: Default::default(), turn: None, offset: None, size: None, tall: None })
+            w.apply(Command::Buy {
+                household,
+                object: def,
+                at: None,
+                colors: Default::default(),
+                turn: None,
+                offset: None,
+                size: None,
+                tall: None,
+            })
         }
     };
     match rng.below(10) {
@@ -96,9 +148,19 @@ fn rearranging_homes_for_two_days_breaks_nothing() {
 fn the_same_move_sent_twice_moves_nothing_else() {
     let mut w = town(7);
     let mut rng = common::Lcg::new(7);
-    let (household, plot) = w.households.iter().find(|h| h.player).map(|h| (h.id, h.plot.unwrap())).unwrap();
+    let (household, plot) = w
+        .households
+        .iter()
+        .find(|h| h.player)
+        .map(|h| (h.id, h.plot.unwrap()))
+        .unwrap();
     let layout = |w: &World, but: (i32, i32)| {
-        let mut all: Vec<(usize, i32, i32, u8)> = w.objects.iter().filter(|o| (o.x, o.z) != but).map(|o| (o.def, o.x, o.z, o.rot)).collect();
+        let mut all: Vec<(usize, i32, i32, u8)> = w
+            .objects
+            .iter()
+            .filter(|o| (o.x, o.z) != but)
+            .map(|o| (o.def, o.x, o.z, o.rot))
+            .collect();
         all.sort_unstable();
         all
     };

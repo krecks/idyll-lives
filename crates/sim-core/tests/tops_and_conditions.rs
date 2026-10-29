@@ -60,12 +60,23 @@ fn world() -> World {
 
 /// The `n`th object of kind `def`.
 fn object(w: &World, def: &str, n: usize) -> u32 {
-    w.objects.iter().filter(|o| w.content.objects[o.def].id == def).nth(n).unwrap_or_else(|| panic!("no {def} {n}")).id
+    w.objects
+        .iter()
+        .filter(|o| w.content.objects[o.def].id == def)
+        .nth(n)
+        .unwrap_or_else(|| panic!("no {def} {n}"))
+        .id
 }
 
 fn order(w: &mut World, def: &str, n: usize) -> Result<(), String> {
     let object = w.objects[object(w, def, n) as usize].stable;
-    w.apply(Command::Use { sim: 0, object, interaction: 0 }).map(|_| ()).map_err(|e| e.to_string())
+    w.apply(Command::Use {
+        sim: 0,
+        object,
+        interaction: 0,
+    })
+    .map(|_| ())
+    .map_err(|e| e.to_string())
 }
 
 /// Ticks until Ada is using `def` (or `minutes` pass): whether she got to it.
@@ -84,7 +95,9 @@ fn until_using(w: &mut World, def: &str, minutes: f32) -> bool {
 fn using(w: &World) -> Option<String> {
     let a = w.sims[0].current()?;
     match (a.task.kind, &a.phase) {
-        (TaskKind::Use { object, .. }, Phase::Using { .. }) => Some(w.content.objects[w.objects[object as usize].def].id.clone()),
+        (TaskKind::Use { object, .. }, Phase::Using { .. }) => {
+            Some(w.content.objects[w.objects[object as usize].def].id.clone())
+        }
         _ => None,
     }
 }
@@ -95,10 +108,23 @@ fn tile(p: [f32; 2]) -> (i32, i32) {
 
 #[test]
 fn things_on_tops_load_with_uses_but_are_not_lain_on_or_stood_in() {
-    for (bad, why) in [(r#""pose":"lie""#, "standing or sitting"), (r#""inside":true"#, "standing or sitting"), (r#""needsTable":true"#, "standing or sitting")] {
-        let content = CONTENT.replace(r#""minutes":8,"effects":{"comfort":0.3}"#, &format!(r#""minutes":8,{bad},"effects":{{"comfort":0.3}}"#));
-        let err = Content::from_json(&content).map(|_| ()).unwrap_err().to_string();
-        assert!(err.contains("kettle.tea") && err.contains(why), "{bad}: {err}");
+    for (bad, why) in [
+        (r#""pose":"lie""#, "standing or sitting"),
+        (r#""inside":true"#, "standing or sitting"),
+        (r#""needsTable":true"#, "standing or sitting"),
+    ] {
+        let content = CONTENT.replace(
+            r#""minutes":8,"effects":{"comfort":0.3}"#,
+            &format!(r#""minutes":8,{bad},"effects":{{"comfort":0.3}}"#),
+        );
+        let err = Content::from_json(&content)
+            .map(|_| ())
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("kettle.tea") && err.contains(why),
+            "{bad}: {err}"
+        );
     }
     let w = world();
     let kettle = &w.content.objects[w.objects[object(&w, "kettle", 0) as usize].def];
@@ -118,7 +144,11 @@ fn a_kettle_on_the_counter_is_used_standing_in_front_of_the_counter() {
     assert_eq!(tile(ada.pos), (2, 2), "in front of the counter");
     assert_eq!(ada.pose, Pose::Stand);
     // Facing the kettle (towards -z).
-    assert!((ada.yaw.cos() + 1.0).abs() < 0.05, "facing the kettle: yaw {}", ada.yaw);
+    assert!(
+        (ada.yaw.cos() + 1.0).abs() < 0.05,
+        "facing the kettle: yaw {}",
+        ada.yaw
+    );
     let before = w.sims[0].needs[2];
     for _ in 0..(10.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
@@ -131,10 +161,32 @@ fn a_kettle_on_the_counter_is_used_standing_in_front_of_the_counter() {
 fn with_the_front_taken_it_is_used_from_beside_the_top() {
     let mut w = world();
     // A chair in front of the counter: the kettle is used from the side.
-    w.apply(Command::Buy { household: 0, object: "chair".into(), at: Some([2, 2, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
+    w.apply(Command::Buy {
+        household: 0,
+        object: "chair".into(),
+        at: Some([2, 2, 0]),
+        colors: Default::default(),
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .unwrap();
     let kettle = object(&w, "kettle", 0);
-    let links = sim_core::surface::Links::new(&w.content, &w.objects, &sim_core::path::NavGrid { lot: &w.lot, blocked: w.blocked(), stairs: w.stair_map() });
-    assert_eq!(links.approach_of(kettle), Some((1, 1)), "beside the counter");
+    let links = sim_core::surface::Links::new(
+        &w.content,
+        &w.objects,
+        &sim_core::path::NavGrid {
+            lot: &w.lot,
+            blocked: w.blocked(),
+            stairs: w.stair_map(),
+        },
+    );
+    assert_eq!(
+        links.approach_of(kettle),
+        Some((1, 1)),
+        "beside the counter"
+    );
     order(&mut w, "kettle", 0).unwrap();
     assert!(until_using(&mut w, "kettle", 30.0));
     assert_eq!(tile(w.sims[0].pos), (1, 1));
@@ -149,23 +201,37 @@ fn a_laptop_on_a_desk_is_used_sitting_at_it_or_standing_without_a_chair() {
     let ada = &w.sims[0];
     assert_eq!(ada.use_seat, Some(chair), "on the desk chair");
     assert_eq!(ada.pose, Pose::Sit);
-    assert_eq!(ada.pos, w.objects[chair as usize].slot_position(&w.content, 0));
+    assert_eq!(
+        ada.pos,
+        w.objects[chair as usize].slot_position(&w.content, 0)
+    );
     // Done: up off the chair, and the chair is free again.
     for _ in 0..(50.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
         common::check(&w);
     }
     assert!(using(&w).is_none());
-    assert!(w.objects[chair as usize].users().next().is_none(), "the chair is free");
+    assert!(
+        w.objects[chair as usize].users().next().is_none(),
+        "the chair is free"
+    );
 
     // With the chair sold: standing at the desk, beside it (the front is free now).
     let mut w = world();
     let chair = w.objects[object(&w, "chair", 0) as usize].stable;
-    w.apply(Command::Sell { household: 0, object: chair }).unwrap();
+    w.apply(Command::Sell {
+        household: 0,
+        object: chair,
+    })
+    .unwrap();
     order(&mut w, "laptop", 0).unwrap();
     assert!(until_using(&mut w, "laptop", 30.0));
     let ada = &w.sims[0];
-    assert_eq!((ada.use_seat, ada.pose), (None, Pose::Stand), "standing at the desk");
+    assert_eq!(
+        (ada.use_seat, ada.pose),
+        (None, Pose::Stand),
+        "standing at the desk"
+    );
     assert_eq!(tile(ada.pos), (5, 2), "in front of the desk");
 }
 
@@ -174,10 +240,24 @@ fn at_a_top_with_chairs_all_round_they_sit_down_to_use_it() {
     let mut w = world();
     // The desk between two counters, its chair in front, the wall behind: no side free.
     let buy = |w: &mut World, def: &str, x: i32, z: i32| {
-        w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
+        w.apply(Command::Buy {
+            household: 0,
+            object: def.into(),
+            at: Some([x, z, 0]),
+            colors: Default::default(),
+            turn: None,
+            offset: None,
+            size: None,
+            tall: None,
+        })
+        .unwrap();
     };
     let laptop = w.objects[object(&w, "laptop", 0) as usize].stable;
-    w.apply(Command::Sell { household: 0, object: laptop }).unwrap();
+    w.apply(Command::Sell {
+        household: 0,
+        object: laptop,
+    })
+    .unwrap();
     buy(&mut w, "counter", 4, 1);
     buy(&mut w, "counter", 6, 1);
     buy(&mut w, "kettle", 5, 1);
@@ -186,7 +266,11 @@ fn at_a_top_with_chairs_all_round_they_sit_down_to_use_it() {
     assert_eq!(w.objects[kettle as usize].x, 5);
     order(&mut w, "kettle", 1).unwrap();
     assert!(until_using(&mut w, "kettle", 30.0));
-    assert_eq!((w.sims[0].use_seat, w.sims[0].pose), (Some(chair), Pose::Sit), "sat at the desk for it");
+    assert_eq!(
+        (w.sims[0].use_seat, w.sims[0].pose),
+        (Some(chair), Pose::Sit),
+        "sat at the desk for it"
+    );
 }
 
 #[test]
@@ -207,11 +291,50 @@ fn free_will_uses_things_on_tops() {
 fn a_thing_on_a_top_nobody_can_reach_may_still_be_put_there() {
     let mut w = world();
     // A table boxed in by the walls and two dressers: a book on it is a way nobody needs.
-    w.apply(Command::Buy { household: 0, object: "desk".into(), at: Some([8, 1, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
-    w.apply(Command::Buy { household: 0, object: "counter".into(), at: Some([8, 2, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
-    w.apply(Command::Buy { household: 0, object: "counter".into(), at: Some([7, 1, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
-    w.apply(Command::Buy { household: 0, object: "kettle".into(), at: Some([8, 1, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None })
-        .expect("a kettle can go on a top nobody can get to");
+    w.apply(Command::Buy {
+        household: 0,
+        object: "desk".into(),
+        at: Some([8, 1, 0]),
+        colors: Default::default(),
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .unwrap();
+    w.apply(Command::Buy {
+        household: 0,
+        object: "counter".into(),
+        at: Some([8, 2, 0]),
+        colors: Default::default(),
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .unwrap();
+    w.apply(Command::Buy {
+        household: 0,
+        object: "counter".into(),
+        at: Some([7, 1, 0]),
+        colors: Default::default(),
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .unwrap();
+    w.apply(Command::Buy {
+        household: 0,
+        object: "kettle".into(),
+        at: Some([8, 1, 0]),
+        colors: Default::default(),
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .expect("a kettle can go on a top nobody can get to");
 }
 
 #[test]
@@ -219,12 +342,18 @@ fn stargazing_is_after_dark_under_open_sky() {
     let mut w = world();
     // At noon: not yet, indoors or out.
     let err = order(&mut w, "telescope", 1).unwrap_err();
-    assert!(err.contains("Ada can only stargaze from 20:00 to 5:00"), "{err}");
+    assert!(
+        err.contains("Ada can only stargaze from 20:00 to 5:00"),
+        "{err}"
+    );
     // At night: not indoors.
     w.tick = clock::tick_at(1, 22.0 * 60.0).unwrap();
     let err = order(&mut w, "telescope", 0).unwrap_err();
     assert!(err.contains("under open sky"), "{err}");
-    assert!(w.sims[0].queue().next().is_none(), "nothing refused was queued");
+    assert!(
+        w.sims[0].queue().next().is_none(),
+        "nothing refused was queued"
+    );
     // Outside, after dark (and past midnight too): yes.
     order(&mut w, "telescope", 1).unwrap();
     assert!(until_using(&mut w, "telescope", 30.0));
@@ -247,7 +376,11 @@ fn free_will_stargazes_only_at_night() {
         w.tick = clock::tick_at(1, hour * 60.0).unwrap();
         // (Not the laptop instead.)
         let laptop = w.objects[object(&w, "laptop", 0) as usize].stable;
-        w.apply(Command::Sell { household: 0, object: laptop }).unwrap();
+        w.apply(Command::Sell {
+            household: 0,
+            object: laptop,
+        })
+        .unwrap();
         w.sims[0].needs[..3].copy_from_slice(&[1.0, 0.1, 1.0]);
         let mut stargazed = None;
         for _ in 0..(90.0 / sim_core::MINUTES_PER_TICK) as u32 {
@@ -255,7 +388,9 @@ fn free_will_stargazes_only_at_night() {
             common::check(&w);
             if using(&w).as_deref() == Some("telescope") {
                 let a = w.sims[0].current().unwrap();
-                let TaskKind::Use { object, .. } = a.task.kind else { unreachable!() };
+                let TaskKind::Use { object, .. } = a.task.kind else {
+                    unreachable!()
+                };
                 stargazed = Some(object);
             }
         }
@@ -270,26 +405,55 @@ fn free_will_stargazes_only_at_night() {
 fn bad_hours_are_refused_at_load() {
     for hours in ["[5,5]", "[25,3]", "[-1,4]"] {
         let content = CONTENT.replace(r#""hours":[20,5]"#, &format!(r#""hours":{hours}"#));
-        let err = Content::from_json(&content).map(|_| ()).unwrap_err().to_string();
-        assert!(err.contains("telescope.stargaze") && err.contains("hours"), "{hours}: {err}");
+        let err = Content::from_json(&content)
+            .map(|_| ())
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("telescope.stargaze") && err.contains("hours"),
+            "{hours}: {err}"
+        );
     }
     let content = CONTENT.replace(r#""workOn":"dishes""#, r#""workOn":"socks""#);
     assert!(Content::from_json(&content).is_err(), "an unknown workOn");
     let content = CONTENT.replace(r#""laundry":{"perDay":0.5,"most":3},"#, "");
-    let err = Content::from_json(&content).map(|_| ()).unwrap_err().to_string();
-    assert!(err.contains("washer.laundry") && err.contains("laundry"), "{err}");
+    let err = Content::from_json(&content)
+        .map(|_| ())
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("washer.laundry") && err.contains("laundry"),
+        "{err}"
+    );
 }
 
 fn dirty_plate(w: &mut World) -> u32 {
     let def = w.content.item_index("plateDirty").unwrap();
-    w.items.add(ItemInstance { id: 0, def, at: ItemAt::Floor { x: 3, z: 3, offset: [0, 0] }, servings: 0, quality: 1.0, made_at: w.tick, household: 0, spoiled: false, recipe: None })
+    w.items.add(ItemInstance {
+        id: 0,
+        def,
+        at: ItemAt::Floor {
+            x: 3,
+            z: 3,
+            offset: [0, 0],
+        },
+        servings: 0,
+        quality: 1.0,
+        made_at: w.tick,
+        household: 0,
+        spoiled: false,
+        recipe: None,
+    })
 }
 
 #[test]
 fn washing_up_needs_dishes_to_wash() {
     let mut w = world();
     let err = order(&mut w, "sink", 0).unwrap_err();
-    assert!(err.contains("Wash the dishes: there are no dishes to wash"), "{err}");
+    assert!(
+        err.contains("Wash the dishes: there are no dishes to wash"),
+        "{err}"
+    );
     dirty_plate(&mut w);
     order(&mut w, "sink", 0).unwrap();
     assert!(until_using(&mut w, "sink", 30.0));
@@ -298,7 +462,11 @@ fn washing_up_needs_dishes_to_wash() {
 #[test]
 fn the_laundry_is_washed_then_dried_and_piles_up_again() {
     let mut w = world();
-    assert_eq!(w.households[0].laundry, [1.0, 1.0, 0.0], "a load dirty and one washed to start with");
+    assert_eq!(
+        w.households[0].laundry,
+        [1.0, 1.0, 0.0],
+        "a load dirty and one washed to start with"
+    );
     // Fold the washed load...
     order(&mut w, "dryer", 0).unwrap();
     assert!(until_using(&mut w, "dryer", 30.0));
@@ -313,12 +481,22 @@ fn the_laundry_is_washed_then_dried_and_piles_up_again() {
     order(&mut w, "washer", 0).unwrap();
     assert!(until_using(&mut w, "washer", 30.0));
     w.tick_once();
-    assert!(w.households[0].laundry[0] < 0.1, "taken up to wash: {:?}", w.households[0].laundry);
+    assert!(
+        w.households[0].laundry[0] < 0.1,
+        "taken up to wash: {:?}",
+        w.households[0].laundry
+    );
     // Washed once the use is done (content `makes`), and carried on to the dryer.
-    assert!(until_using(&mut w, "dryer", 35.0), "on to the dryer with it");
+    assert!(
+        until_using(&mut w, "dryer", 35.0),
+        "on to the dryer with it"
+    );
     w.tick_once();
     let [dirty, washed, _] = w.households[0].laundry;
-    assert!(dirty < 0.1 && washed == 0.0, "washed and taken up to dry: {dirty}, {washed}");
+    assert!(
+        dirty < 0.1 && washed == 0.0,
+        "washed and taken up to dry: {dirty}, {washed}"
+    );
     for _ in 0..(25.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
     }
@@ -328,7 +506,11 @@ fn the_laundry_is_washed_then_dried_and_piles_up_again() {
     for _ in 0..(2.0 * 1440.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
     }
-    assert!(w.households[0].laundry[0] >= 1.0, "{:?}", w.households[0].laundry);
+    assert!(
+        w.households[0].laundry[0] >= 1.0,
+        "{:?}",
+        w.households[0].laundry
+    );
     order(&mut w, "washer", 0).unwrap();
     // Saved and loaded, the washing waiting is kept; a save from before it starts with a load of each.
     let saved = w.save_json();
@@ -336,7 +518,10 @@ fn the_laundry_is_washed_then_dried_and_piles_up_again() {
     assert_eq!(loaded.households[0].laundry, w.households[0].laundry);
     let mut old: serde_json::Value = serde_json::from_str(&saved).unwrap();
     old["version"] = 29.into();
-    old["households"][0].as_object_mut().unwrap().remove("laundry");
+    old["households"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("laundry");
     let loaded = World::from_save_json(CONTENT, &old.to_string()).unwrap();
     assert_eq!(loaded.households[0].laundry, [1.0, 1.0, 0.0]);
 }
@@ -351,7 +536,10 @@ fn free_will_does_no_chore_with_nothing_to_work_on() {
         w.sims[0].needs[2] = w.sims[0].needs[2].min(0.3);
         w.tick_once();
         let u = using(&w);
-        assert!(u.as_deref() != Some("washer") && u.as_deref() != Some("dryer"), "nothing to wash: {u:?}");
+        assert!(
+            u.as_deref() != Some("washer") && u.as_deref() != Some("dryer"),
+            "nothing to wash: {u:?}"
+        );
     }
     // With washing to do, she does it.
     w.households[0].laundry = [2.0, 0.0, 0.0];
@@ -372,12 +560,25 @@ fn coffee_is_for_teens_and_up() {
     let stage = |id: &str| content.life.stages.iter().position(|s| s.id == id).unwrap();
     let mut coffees = 0;
     for o in &content.objects {
-        for i in o.interactions.iter().filter(|i| ["coffee", "espresso", "latte"].iter().any(|c| i.label.to_lowercase().contains(c))) {
+        for i in o.interactions.iter().filter(|i| {
+            ["coffee", "espresso", "latte"]
+                .iter()
+                .any(|c| i.label.to_lowercase().contains(c))
+        }) {
             coffees += 1;
-            assert!(!i.for_stage(stage("child")), "{}.{}: a child's coffee", o.id, i.id);
-            assert!(i.for_stage(stage("teen")) && i.for_stage(stage("adult")), "{}.{}", o.id, i.id);
+            assert!(
+                !i.for_stage(stage("child")),
+                "{}.{}: a child's coffee",
+                o.id,
+                i.id
+            );
+            assert!(
+                i.for_stage(stage("teen")) && i.for_stage(stage("adult")),
+                "{}.{}",
+                o.id,
+                i.id
+            );
         }
     }
     assert!(coffees >= 20, "{coffees} coffees");
 }
-

@@ -17,7 +17,12 @@ use sim_core::world::{MAX_SIMS, Phase, TaskKind};
 use sim_core::{MINUTES_PER_TICK, World, clock};
 
 const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
-const LAYOUT: Layout = Layout { columns: 9, streets: 2, yards: true, max_residents: MAX_SIMS };
+const LAYOUT: Layout = Layout {
+    columns: 9,
+    streets: 2,
+    yards: true,
+    max_residents: MAX_SIMS,
+};
 
 /// The big town, looked at like the game does: the player's home is in view. With `lod` off,
 /// everyone is updated at full detail anyway.
@@ -26,7 +31,12 @@ fn big_town(seed: u64, lod: bool) -> World {
     let town = common::town_with(&content, seed, 2, LAYOUT);
     let mut w = World::from_json(&content, &town, seed as u32).expect("the big town loads");
     w.lod = lod;
-    let home = w.households.iter().find(|h| h.player).and_then(|h| h.plot).expect("the player has a home");
+    let home = w
+        .households
+        .iter()
+        .find(|h| h.player)
+        .and_then(|h| h.plot)
+        .expect("the player has a home");
     common::look_at(&mut w, home);
     w
 }
@@ -62,8 +72,15 @@ impl Outcome {
         for share in self.time.values_mut() {
             *share /= self.samples as f64;
         }
-        self.skills = here.iter().map(|s| s.skills.iter().sum::<f32>() as f64).sum::<f64>() / here.len() as f64;
-        let jobs: Vec<usize> = here.iter().filter_map(|s| s.job.as_ref().map(|j| j.level)).collect();
+        self.skills = here
+            .iter()
+            .map(|s| s.skills.iter().sum::<f32>() as f64)
+            .sum::<f64>()
+            / here.len() as f64;
+        let jobs: Vec<usize> = here
+            .iter()
+            .filter_map(|s| s.job.as_ref().map(|j| j.level))
+            .collect();
         self.working = jobs.len() as f64;
         self.grade = jobs.iter().sum::<usize>() as f64 / jobs.len().max(1) as f64;
         let mut funds: Vec<i64> = w.households.iter().map(|h| h.funds).collect();
@@ -75,7 +92,10 @@ impl Outcome {
             .flat_map(|a| (0..n).map(move |b| (a, b)))
             .filter(|&(a, b)| a != b && w.relationships.get(a, b).friendship >= 50.0)
             .count() as f64;
-        self.couples = ((0..n).filter(|&a| w.relationships.partner_of(a).is_some()).count() / 2) as f64;
+        self.couples = ((0..n)
+            .filter(|&a| w.relationships.partner_of(a).is_some())
+            .count()
+            / 2) as f64;
     }
 
     /// The mean of several runs.
@@ -120,9 +140,17 @@ impl Outcome {
             self.friends,
             self.couples,
         );
-        let story: Vec<String> = self.story.iter().map(|(k, n)| format!("{k} {n:.1}")).collect();
+        let story: Vec<String> = self
+            .story
+            .iter()
+            .map(|(k, n)| format!("{k} {n:.1}"))
+            .collect();
         eprintln!("{label}: story {}", story.join(", "));
-        let time: Vec<String> = self.time.iter().map(|(k, s)| format!("{k} {:.1}%", 100.0 * s)).collect();
+        let time: Vec<String> = self
+            .time
+            .iter()
+            .map(|(k, s)| format!("{k} {:.1}%", 100.0 * s))
+            .collect();
         eprintln!("{label}: time {}", time.join(", "));
     }
 }
@@ -179,16 +207,26 @@ fn doing(w: &World, s: &sim_core::world::Sim) -> &'static str {
 
 /// Everyone on `plot` who isn't using something stands where they can (on the right storey).
 fn sensible_on(w: &World, plot: u32) {
-    let nav = NavGrid { lot: &w.lot, blocked: w.blocked(), stairs: w.stair_map() };
+    let nav = NavGrid {
+        lot: &w.lot,
+        blocked: w.blocked(),
+        stairs: w.stair_map(),
+    };
     for s in &w.sims {
         let (x, z) = s.tile();
         if !s.here() || s.away_until.is_some() || w.plot_at(x, z) != Some(plot) {
             continue;
         }
         // (Walkable on the storey they're on: upstairs that's inside a room, or on the stairs.)
-        let using = s.current().is_some_and(|a| matches!(a.phase, Phase::Using { .. }));
+        let using = s
+            .current()
+            .is_some_and(|a| matches!(a.phase, Phase::Using { .. }));
         if !using {
-            assert!(nav.tile_free(x, z), "{} stands somewhere nobody can at {x},{z}", s.name);
+            assert!(
+                nav.tile_free(x, z),
+                "{} stands somewhere nobody can at {x},{z}",
+                s.name
+            );
         }
     }
 }
@@ -202,7 +240,11 @@ fn a_big_town_keeps_going() {
     run(&mut w, 6, &mut out);
     // Most of the town is at lower detail; people got on with their day.
     let full = (0..w.sims.len()).filter(|&i| w.full_detail(i)).count();
-    assert!(full < w.sims.len() / 2, "{full} of {} at full detail", w.sims.len());
+    assert!(
+        full < w.sims.len() / 2,
+        "{full} of {} at full detail",
+        w.sims.len()
+    );
     assert!(w.sims.iter().any(|s| s.current().is_some()));
     assert!(out.needs / out.samples as f64 > 0.4);
     // Looking at another lot: whoever is there catches up at once and stands somewhere
@@ -219,9 +261,15 @@ fn a_big_town_keeps_going() {
 #[ignore = "long: run with --release -- --ignored --nocapture"]
 fn big_town_speed() {
     // `BIG_TOWN_DAYS=30` for a longer run; `BIG_TOWN_LOD=0` or `1` for only one of them.
-    let days = std::env::var("BIG_TOWN_DAYS").ok().and_then(|d| d.parse().ok()).unwrap_or(7);
+    let days = std::env::var("BIG_TOWN_DAYS")
+        .ok()
+        .and_then(|d| d.parse().ok())
+        .unwrap_or(7);
     let only = std::env::var("BIG_TOWN_LOD").ok();
-    for lod in [false, true].into_iter().filter(|&l| only.as_deref().is_none_or(|o| o == if l { "1" } else { "0" })) {
+    for lod in [false, true].into_iter().filter(|&l| {
+        only.as_deref()
+            .is_none_or(|o| o == if l { "1" } else { "0" })
+    }) {
         let mut w = big_town(7, lod);
         let mut out = Outcome::default();
         let end = clock::tick_at(days + 1, 8.0 * 60.0).unwrap();
@@ -249,7 +297,10 @@ fn big_town_speed() {
 #[test]
 #[ignore = "long: run with --release -- --ignored --nocapture"]
 fn lower_detail_keeps_the_story() {
-    let days = std::env::var("BIG_TOWN_DAYS").ok().and_then(|d| d.parse().ok()).unwrap_or(14);
+    let days = std::env::var("BIG_TOWN_DAYS")
+        .ok()
+        .and_then(|d| d.parse().ok())
+        .unwrap_or(14);
     // `BIG_TOWN_SEEDS=1,2,3` for other towns (more towns, less noise).
     let seeds: Vec<u64> = std::env::var("BIG_TOWN_SEEDS")
         .ok()
@@ -270,20 +321,49 @@ fn lower_detail_keeps_the_story() {
             runs.push(out);
         }
         let label = if lod { "lower detail" } else { "full detail" };
-        eprintln!("{label}: {:.0} ticks/s over {} towns of {days} days", ticks as f64 / secs, seeds.len());
+        eprintln!(
+            "{label}: {:.0} ticks/s over {} towns of {days} days",
+            ticks as f64 / secs,
+            seeds.len()
+        );
         let mean = Outcome::mean(&runs);
         mean.print(label);
         means.push(mean);
     }
     let (full, lower) = (&means[0], &means[1]);
     let near = |a: f64, b: f64, by: f64| (a - b).abs() <= by * a.abs().max(b.abs()).max(1.0);
-    assert!((full.needs - lower.needs).abs() < 0.02, "needs {:.3} vs {:.3}", full.needs, lower.needs);
-    assert!(near(full.skills, lower.skills, 0.1), "skills {:.2} vs {:.2}", full.skills, lower.skills);
-    assert!(near(full.funds_total, lower.funds_total, 0.1), "money {:.0} vs {:.0}", full.funds_total, lower.funds_total);
-    assert!(near(full.friends, lower.friends, 0.25), "friendships {:.1} vs {:.1}", full.friends, lower.friends);
+    assert!(
+        (full.needs - lower.needs).abs() < 0.02,
+        "needs {:.3} vs {:.3}",
+        full.needs,
+        lower.needs
+    );
+    assert!(
+        near(full.skills, lower.skills, 0.1),
+        "skills {:.2} vs {:.2}",
+        full.skills,
+        lower.skills
+    );
+    assert!(
+        near(full.funds_total, lower.funds_total, 0.1),
+        "money {:.0} vs {:.0}",
+        full.funds_total,
+        lower.funds_total
+    );
+    assert!(
+        near(full.friends, lower.friends, 0.25),
+        "friendships {:.1} vs {:.1}",
+        full.friends,
+        lower.friends
+    );
     // Days are spent the same way.
     for (what, share) in &full.time {
         let other = lower.time.get(what).copied().unwrap_or(0.0);
-        assert!((share - other).abs() < 0.015, "{what}: {:.1}% vs {:.1}%", 100.0 * share, 100.0 * other);
+        assert!(
+            (share - other).abs() < 0.015,
+            "{what}: {:.1}% vs {:.1}%",
+            100.0 * share,
+            100.0 * other
+        );
     }
 }

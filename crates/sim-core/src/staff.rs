@@ -79,7 +79,11 @@ pub struct ServiceRules {
 
 impl Default for ServiceRules {
     fn default() -> Self {
-        Self { share: 0.0, wait_minutes: 20.0, anim: None }
+        Self {
+            share: 0.0,
+            wait_minutes: 20.0,
+            anim: None,
+        }
     }
 }
 
@@ -113,38 +117,80 @@ pub(crate) struct ServiceRaw {
 pub(crate) fn post(raw: &PostRaw, footprint: [u8; 2], id: &str) -> Result<Post, Error> {
     let half = footprint.map(|f| f as f32 / 2.0 + 1.5);
     if (0..2).any(|k| !raw.at[k].is_finite() || raw.at[k].abs() > half[k]) {
-        return Err(Error::new(format!("object '{id}': `staff.at` is more than 1.5 m off its footprint")));
+        return Err(Error::new(format!(
+            "object '{id}': `staff.at` is more than 1.5 m off its footprint"
+        )));
     }
     if !raw.hours.iter().all(|h| (0.0..=24.0).contains(h)) || raw.hours[0] == raw.hours[1] {
-        return Err(Error::new(format!("object '{id}': `staff.hours` is [from, to], two different hours of the day (0 to 24)")));
+        return Err(Error::new(format!(
+            "object '{id}': `staff.hours` is [from, to], two different hours of the day (0 to 24)"
+        )));
     }
-    Ok(Post { at: raw.at, hours: raw.hours })
+    Ok(Post {
+        at: raw.at,
+        hours: raw.hours,
+    })
 }
 
 /// An interaction's `selfServe`, checked.
-pub(crate) fn self_serve(raw: &SelfServeRaw, anim_index: &dyn Fn(&str) -> Option<usize>, ctx: &str) -> Result<SelfServe, Error> {
+pub(crate) fn self_serve(
+    raw: &SelfServeRaw,
+    anim_index: &dyn Fn(&str) -> Option<usize>,
+    ctx: &str,
+) -> Result<SelfServe, Error> {
     let anim = match raw.anim.as_deref() {
-        Some(a) => Some(anim_index(a).ok_or_else(|| Error::new(format!("{ctx}: selfServe: unknown anim '{a}' (declare it in \"animations\")")))?),
+        Some(a) => Some(anim_index(a).ok_or_else(|| {
+            Error::new(format!(
+                "{ctx}: selfServe: unknown anim '{a}' (declare it in \"animations\")"
+            ))
+        })?),
         None => None,
     };
     if raw.minutes.is_some_and(|m| !(m.is_finite() && m > 0.0)) {
-        return Err(Error::new(format!("{ctx}: selfServe: `minutes` must be above 0")));
+        return Err(Error::new(format!(
+            "{ctx}: selfServe: `minutes` must be above 0"
+        )));
     }
-    Ok(SelfServe { label: raw.label.clone(), anim, minutes: raw.minutes })
+    Ok(SelfServe {
+        label: raw.label.clone(),
+        anim,
+        minutes: raw.minutes,
+    })
 }
 
 /// Content `service`, checked.
-pub(crate) fn rules(raw: Option<&ServiceRaw>, anim_index: &dyn Fn(&str) -> Option<usize>) -> Result<ServiceRules, Error> {
-    let Some(raw) = raw else { return Ok(ServiceRules::default()) };
+pub(crate) fn rules(
+    raw: Option<&ServiceRaw>,
+    anim_index: &dyn Fn(&str) -> Option<usize>,
+) -> Result<ServiceRules, Error> {
+    let Some(raw) = raw else {
+        return Ok(ServiceRules::default());
+    };
     let anim = match raw.anim.as_deref() {
-        Some(a) => Some(anim_index(a).ok_or_else(|| Error::new(format!("service: unknown anim '{a}' (declare it in \"animations\")")))?),
+        Some(a) => Some(anim_index(a).ok_or_else(|| {
+            Error::new(format!(
+                "service: unknown anim '{a}' (declare it in \"animations\")"
+            ))
+        })?),
         None => None,
     };
-    let wait_minutes = raw.wait_minutes.unwrap_or(ServiceRules::default().wait_minutes);
-    if !(raw.share.is_finite() && raw.share >= 0.0 && wait_minutes.is_finite() && wait_minutes > 0.0) {
-        return Err(Error::new("service: `share` at least 0 and `waitMinutes` above 0"));
+    let wait_minutes = raw
+        .wait_minutes
+        .unwrap_or(ServiceRules::default().wait_minutes);
+    if !(raw.share.is_finite()
+        && raw.share >= 0.0
+        && wait_minutes.is_finite()
+        && wait_minutes > 0.0)
+    {
+        return Err(Error::new(
+            "service: `share` at least 0 and `waitMinutes` above 0",
+        ));
     }
-    Ok(ServiceRules { share: raw.share, wait_minutes, anim })
+    Ok(ServiceRules {
+        share: raw.share,
+        wait_minutes,
+        anim,
+    })
 }
 
 /// Every sold use is at an object someone can serve at.
@@ -153,7 +199,10 @@ pub(crate) fn validate(objects: &[ObjectDef]) -> Result<(), Error> {
         if o.staff.is_none()
             && let Some(i) = o.interactions.iter().find(|i| i.served.is_some())
         {
-            return Err(Error::new(format!("object '{}' interaction '{}': `selfServe` is for something sold, at an object with `staff`", o.id, i.id)));
+            return Err(Error::new(format!(
+                "object '{}' interaction '{}': `selfServe` is for something sold, at an object with `staff`",
+                o.id, i.id
+            )));
         }
     }
     Ok(())
@@ -193,18 +242,27 @@ pub struct Staff {
 impl Staff {
     /// The server who serves at object `object` (an index), if anyone does.
     pub fn server_of(&self, object: u32) -> Option<usize> {
-        self.of.get(object as usize).copied().flatten().map(usize::from)
+        self.of
+            .get(object as usize)
+            .copied()
+            .flatten()
+            .map(usize::from)
     }
 
     /// Whether any of server `s`'s posts is open at `hour`.
     pub fn open(&self, content: &Content, objects: &[ObjectInstance], s: usize, hour: f32) -> bool {
-        self.servers[s].posts.iter().any(|&o| post_open(content, &objects[o as usize], hour))
+        self.servers[s]
+            .posts
+            .iter()
+            .any(|&o| post_open(content, &objects[o as usize], hour))
     }
 }
 
 /// Whether the post `o` is open at `hour` (its kind's `staff.hours`).
 fn post_open(content: &Content, o: &ObjectInstance, hour: f32) -> bool {
-    content.objects[o.def].staff.is_some_and(|p| in_hours(p.hours, hour))
+    content.objects[o.def]
+        .staff
+        .is_some_and(|p| in_hours(p.hours, hour))
 }
 
 /// Where the server of post `o` stands, and which way they face (the way it faces: over it, to the
@@ -213,11 +271,21 @@ pub fn place(content: &Content, o: &ObjectInstance) -> Option<([f32; 2], f32)> {
     let def = &content.objects[o.def];
     let post = def.staff?;
     let (w, d) = o.size(content);
-    let c = [o.x as f32 + w as f32 / 2.0 + o.offset[0] as f32 / 100.0, o.z as f32 + d as f32 / 2.0 + o.offset[1] as f32 / 100.0];
+    let c = [
+        o.x as f32 + w as f32 / 2.0 + o.offset[0] as f32 / 100.0,
+        o.z as f32 + d as f32 / 2.0 + o.offset[1] as f32 / 100.0,
+    ];
     // Moved out with its size, as a slot's place.
-    let [x, z] = [0, 1].map(|k| post.at[k] * o.extent[k] as f32 / 100.0 / def.footprint[k].max(1) as f32);
+    let [x, z] =
+        [0, 1].map(|k| post.at[k] * o.extent[k] as f32 / 100.0 / def.footprint[k].max(1) as f32);
     let a = o.angle();
-    Some(([c[0] + a.cos() * x + a.sin() * z, c[1] - a.sin() * x + a.cos() * z], crate::world::wrap_angle(a)))
+    Some((
+        [
+            c[0] + a.cos() * x + a.sin() * z,
+            c[1] - a.sin() * x + a.cos() * z,
+        ],
+        crate::world::wrap_angle(a),
+    ))
 }
 
 /// Finds the town's posts and their servers again if the objects or the walls changed.
@@ -228,7 +296,12 @@ pub(crate) fn refresh(w: &mut World) {
     let mut staff = plan(w);
     // Someone already at work carries on where they are (an object placed elsewhere on the lot).
     for s in &mut staff.servers {
-        if let Some(was) = w.staff.servers.iter().find(|p| p.seed == s.seed && p.present) {
+        if let Some(was) = w
+            .staff
+            .servers
+            .iter()
+            .find(|p| p.seed == s.seed && p.present)
+        {
             (s.pos, s.yaw, s.present) = (was.pos, was.yaw, true);
         }
     }
@@ -244,7 +317,9 @@ pub fn plan(w: &World) -> Staff {
     // with no wall between it and the post.
     let mut posts: Vec<(u32, u32, [f32; 2])> = Vec::new();
     for o in &w.objects {
-        let Some(plot) = w.object_plot.get(o.id as usize).copied().flatten() else { continue };
+        let Some(plot) = w.object_plot.get(o.id as usize).copied().flatten() else {
+            continue;
+        };
         if let Some(at) = room_behind(w, &nav, o, plot) {
             posts.push((o.id, plot, at));
         }
@@ -256,10 +331,15 @@ pub fn plan(w: &World) -> Staff {
     for i in 0..posts.len() {
         for j in 0..i {
             let (a, b) = (posts[i], posts[j]);
-            let near = a.1 == b.1 && (a.2[0] - b.2[0]).hypot(a.2[1] - b.2[1]) <= share && nav.line_walkable(a.2, b.2);
+            let near = a.1 == b.1
+                && (a.2[0] - b.2[0]).hypot(a.2[1] - b.2[1]) <= share
+                && nav.line_walkable(a.2, b.2);
             if near && group[i] != group[j] {
                 let (from, to) = (group[i].max(group[j]), group[i].min(group[j]));
-                group.iter_mut().filter(|g| **g == from).for_each(|g| *g = to);
+                group
+                    .iter_mut()
+                    .filter(|g| **g == from)
+                    .for_each(|g| *g = to);
             }
         }
     }
@@ -272,7 +352,17 @@ pub fn plan(w: &World) -> Staff {
             None if servers.len() < MAX_STAFF => {
                 let first = &w.objects[posts[lead].0 as usize];
                 let (pos, yaw) = place(content, first).unwrap_or(([0.0; 2], 0.0));
-                servers.push(Server { posts: vec![posts[lead].0], at: 0, pos, yaw, moving: false, present: false, serving: None, queue: Vec::new(), seed: first.stable });
+                servers.push(Server {
+                    posts: vec![posts[lead].0],
+                    at: 0,
+                    pos,
+                    yaw,
+                    moving: false,
+                    present: false,
+                    serving: None,
+                    queue: Vec::new(),
+                    seed: first.stable,
+                });
                 servers.len() - 1
             }
             None => continue,
@@ -282,13 +372,22 @@ pub fn plan(w: &World) -> Staff {
         }
         of[o as usize] = Some(k as u16);
     }
-    Staff { built: Some(w.nav_version), servers, of }
+    Staff {
+        built: Some(w.nav_version),
+        servers,
+        of,
+    }
 }
 
 /// Where the server of `o`, a post on `plot`, stands, if there's room for them: a public lot, their
 /// place on a free tile of that lot, beside one of its tiles across an edge with no wall. None:
 /// nobody serves at it (against a wall, or a household's own).
-pub(crate) fn room_behind(w: &World, nav: &crate::path::NavGrid, o: &ObjectInstance, plot: u32) -> Option<[f32; 2]> {
+pub(crate) fn room_behind(
+    w: &World,
+    nav: &crate::path::NavGrid,
+    o: &ObjectInstance,
+    plot: u32,
+) -> Option<[f32; 2]> {
     if !w.plots[plot as usize].public {
         return None;
     }
@@ -297,34 +396,82 @@ pub(crate) fn room_behind(w: &World, nav: &crate::path::NavGrid, o: &ObjectInsta
     if !nav.tile_free(x, z) || w.plot_at(x, z) != Some(plot) {
         return None;
     }
-    let beside = o.tiles(&w.content).any(|(tx, tz)| (tx - x).abs() + (tz - z).abs() == 1 && nav.lot.edge_walkable(tx, tz, x, z));
+    let beside = o.tiles(&w.content).any(|(tx, tz)| {
+        (tx - x).abs() + (tz - z).abs() == 1 && nav.lot.edge_walkable(tx, tz, x, z)
+    });
     beside.then_some(at)
 }
 
 /// The served use a resident is at (object, interaction), standing at the front of a post with a
 /// server, if that's what they're doing.
-fn at_post(content: &Content, staff: &Staff, objects: &[ObjectInstance], a: &Activity) -> Option<(u32, usize)> {
-    let Activity { task: Task { kind: TaskKind::Use { object, interaction }, .. }, phase: Phase::Using { .. }, .. } = a else {
+fn at_post(
+    content: &Content,
+    staff: &Staff,
+    objects: &[ObjectInstance],
+    a: &Activity,
+) -> Option<(u32, usize)> {
+    let Activity {
+        task:
+            Task {
+                kind:
+                    TaskKind::Use {
+                        object,
+                        interaction,
+                    },
+                ..
+            },
+        phase: Phase::Using { .. },
+        ..
+    } = a
+    else {
         return None;
     };
     let o = objects.get(*object as usize)?;
-    content.objects[o.def].interactions.get(*interaction)?.served.as_ref()?;
+    content.objects[o.def]
+        .interactions
+        .get(*interaction)?
+        .served
+        .as_ref()?;
     staff.server_of(*object).map(|k| (*object, k))
 }
 
 /// The server of the post a resident is on their way to buy at, if that's what they're doing.
-fn heading_to(content: &Content, staff: &Staff, objects: &[ObjectInstance], a: &Activity) -> Option<usize> {
-    let Activity { task: Task { kind: TaskKind::Use { object, interaction }, .. }, phase: Phase::Routing { .. }, .. } = a else {
+fn heading_to(
+    content: &Content,
+    staff: &Staff,
+    objects: &[ObjectInstance],
+    a: &Activity,
+) -> Option<usize> {
+    let Activity {
+        task:
+            Task {
+                kind:
+                    TaskKind::Use {
+                        object,
+                        interaction,
+                    },
+                ..
+            },
+        phase: Phase::Routing { .. },
+        ..
+    } = a
+    else {
         return None;
     };
     let o = objects.get(*object as usize)?;
-    content.objects[o.def].interactions.get(*interaction)?.served.as_ref()?;
+    content.objects[o.def]
+        .interactions
+        .get(*interaction)?
+        .served
+        .as_ref()?;
     staff.server_of(*object)
 }
 
 /// Whether any of `posts` is open at `hour`.
 fn staff_open(content: &Content, objects: &[ObjectInstance], posts: &[u32], hour: f32) -> bool {
-    posts.iter().any(|&o| post_open(content, &objects[o as usize], hour))
+    posts
+        .iter()
+        .any(|&o| post_open(content, &objects[o as usize], hour))
 }
 
 /// As a tick starts, before residents step: who's at work, who they serve next, and their steps
@@ -332,14 +479,22 @@ fn staff_open(content: &Content, objects: &[ObjectInstance], posts: &[u32], hour
 pub(crate) fn update(w: &mut World) {
     refresh(w);
     let hour = crate::clock::hour(w.tick);
-    let World { content, objects, sims, staff, .. } = w;
+    let World {
+        content,
+        objects,
+        sims,
+        staff,
+        ..
+    } = w;
     // Those at a post's front, waiting or being served, by server; and servers someone is on their
     // way to (last orders).
     let mut waiting: Vec<(usize, u32)> = Vec::new();
     let mut coming = vec![false; staff.servers.len()];
     for s in sims.iter_mut() {
         s.being_served = false;
-        let Some(a) = s.current.as_ref().filter(|_| s.here()) else { continue };
+        let Some(a) = s.current.as_ref().filter(|_| s.here()) else {
+            continue;
+        };
         if let Some((_, k)) = at_post(content, staff, objects, a) {
             waiting.push((k, s.id));
         } else if let Some(k) = heading_to(content, staff, objects, a) {
@@ -347,17 +502,27 @@ pub(crate) fn update(w: &mut World) {
         }
     }
     let late = (hour - LAST_ORDERS).rem_euclid(24.0);
-    let open: Vec<bool> = (0..staff.servers.len()).map(|k| staff.open(content, objects, k, hour)).collect();
+    let open: Vec<bool> = (0..staff.servers.len())
+        .map(|k| staff.open(content, objects, k, hour))
+        .collect();
     for (k, server) in staff.servers.iter_mut().enumerate() {
         let here = |c: u32| waiting.contains(&(k, c));
         server.serving = server.serving.filter(|&c| here(c));
-        server.queue.retain(|&c| here(c) && server.serving != Some(c));
-        for &(_, c) in waiting.iter().filter(|&&(s, c)| s == k && server.serving != Some(c)) {
+        server
+            .queue
+            .retain(|&c| here(c) && server.serving != Some(c));
+        for &(_, c) in waiting
+            .iter()
+            .filter(|&&(s, c)| s == k && server.serving != Some(c))
+        {
             if !server.queue.contains(&c) {
                 server.queue.push(c);
             }
         }
-        let present = open[k] || server.serving.is_some() || !server.queue.is_empty() || (coming[k] && staff_open(content, objects, &server.posts, late));
+        let present = open[k]
+            || server.serving.is_some()
+            || !server.queue.is_empty()
+            || (coming[k] && staff_open(content, objects, &server.posts, late));
         if !present {
             // Gone home: back at the first post when they come in again.
             if server.present {
@@ -376,18 +541,30 @@ pub(crate) fn update(w: &mut World) {
         }
         // Over to the post their customer is at.
         if let Some(c) = server.serving
-            && let Some(Activity { task: Task { kind: TaskKind::Use { object, .. }, .. }, .. }) = sims[c as usize].current.as_ref()
+            && let Some(Activity {
+                task:
+                    Task {
+                        kind: TaskKind::Use { object, .. },
+                        ..
+                    },
+                ..
+            }) = sims[c as usize].current.as_ref()
             && let Some(i) = server.posts.iter().position(|p| p == object)
         {
             server.at = i;
         }
-        let Some((to, yaw)) = place(content, &objects[server.posts[server.at] as usize]) else { continue };
+        let Some((to, yaw)) = place(content, &objects[server.posts[server.at] as usize]) else {
+            continue;
+        };
         let (dx, dz) = (to[0] - server.pos[0], to[1] - server.pos[1]);
         let dist = dx.hypot(dz);
         if dist <= WALK_SPEED {
             (server.pos, server.yaw, server.moving) = (to, yaw, false);
         } else {
-            server.pos = [server.pos[0] + dx / dist * WALK_SPEED, server.pos[1] + dz / dist * WALK_SPEED];
+            server.pos = [
+                server.pos[0] + dx / dist * WALK_SPEED,
+                server.pos[1] + dz / dist * WALK_SPEED,
+            ];
             (server.yaw, server.moving) = (dx.atan2(dz), true);
         }
         if let Some(c) = server.serving.filter(|_| !server.moving) {
@@ -413,7 +590,14 @@ pub(crate) enum Hold {
 
 /// For a resident using `inter` at `object`: whether they're served, wait or give up (None: nobody
 /// serves there, the use runs as any other). `waited`: ticks they've waited so far.
-pub(crate) fn hold(ctx: &Ctx, served: bool, waited: &mut u32, object: u32, inter: &Interaction, ticks: u32) -> Option<Hold> {
+pub(crate) fn hold(
+    ctx: &Ctx,
+    served: bool,
+    waited: &mut u32,
+    object: u32,
+    inter: &Interaction,
+    ticks: u32,
+) -> Option<Hold> {
     inter.served.as_ref()?;
     let k = ctx.staff.server_of(object)?;
     if served {
@@ -422,13 +606,25 @@ pub(crate) fn hold(ctx: &Ctx, served: bool, waited: &mut u32, object: u32, inter
     }
     *waited += ticks;
     let limit = (ctx.content.service.wait_minutes * crate::TICKS_PER_MINUTE as f32) as u32;
-    Some(if *waited > limit || !ctx.staff.servers[k].present { Hold::GiveUp } else { Hold::Wait })
+    Some(if *waited > limit || !ctx.staff.servers[k].present {
+        Hold::GiveUp
+    } else {
+        Hold::Wait
+    })
 }
 
 /// The closed post that keeps `inter` at `object` from being started now, if any: the object
 /// itself, where it's sold outside its post's hours; or, for what it needs fetched (a café table's
 /// coffee), the nearest of the posts it's sold at, all of them closed.
-pub(crate) fn closed(content: &Content, staff: &Staff, objects: &[ObjectInstance], on_plot: &[u32], object: u32, inter: &Interaction, hour: f32) -> Option<u32> {
+pub(crate) fn closed(
+    content: &Content,
+    staff: &Staff,
+    objects: &[ObjectInstance],
+    on_plot: &[u32],
+    object: u32,
+    inter: &Interaction,
+    hour: f32,
+) -> Option<u32> {
     if inter.served.is_some() && staff.server_of(object).is_some() {
         return (!post_open(content, &objects[object as usize], hour)).then_some(object);
     }
@@ -439,7 +635,9 @@ pub(crate) fn closed(content: &Content, staff: &Staff, objects: &[ObjectInstance
     for &o in on_plot.iter().filter(|&&o| o != object) {
         let obj = &objects[o as usize];
         let def = &content.objects[obj.def];
-        let Some(i) = def.interactions.iter().find(|i| i.id == fetch) else { continue };
+        let Some(i) = def.interactions.iter().find(|i| i.id == fetch) else {
+            continue;
+        };
         if def.provides & inter.requires != inter.requires || obj.broken() {
             continue;
         }
@@ -453,7 +651,9 @@ pub(crate) fn closed(content: &Content, staff: &Staff, objects: &[ObjectInstance
 
 /// When post `object` opens next, as the hour of the day (for the player's refused order).
 pub(crate) fn opens(content: &Content, objects: &[ObjectInstance], object: u32) -> Option<f32> {
-    content.objects[objects.get(object as usize)?.def].staff.map(|p| p.hours[0])
+    content.objects[objects.get(object as usize)?.def]
+        .staff
+        .map(|p| p.hours[0])
 }
 
 /// The item a customer is handed while served at a post (the food they then eat), as the snapshot

@@ -4,8 +4,8 @@
 
 mod common;
 
-use sim_core::world::TaskKind;
 use sim_core::social::EventKind;
+use sim_core::world::TaskKind;
 use sim_core::{Command, World, clock, life};
 
 /// One house plot: a double bed, a futon and a sofa, the resident by the bed.
@@ -29,7 +29,11 @@ fn need(w: &World, id: &str) -> usize {
 
 fn interaction(w: &World, object: u32, id: &str) -> usize {
     let def = w.objects[object as usize].def;
-    w.content.objects[def].interactions.iter().position(|i| i.id == id).unwrap()
+    w.content.objects[def]
+        .interactions
+        .iter()
+        .position(|i| i.id == id)
+        .unwrap()
 }
 
 fn until(w: &mut World, day: u32, hour: f32) {
@@ -50,9 +54,15 @@ fn rested_but(w: &mut World, energy: f32) {
 /// What they're using, if anything: `(object, interaction id)`.
 fn using(w: &World) -> Option<(u32, String)> {
     w.sims[0].current().and_then(|a| match a.task.kind {
-        TaskKind::Use { object, interaction } => {
+        TaskKind::Use {
+            object,
+            interaction,
+        } => {
             let def = w.objects[object as usize].def;
-            Some((object, w.content.objects[def].interactions[interaction].id.clone()))
+            Some((
+                object,
+                w.content.objects[def].interactions[interaction].id.clone(),
+            ))
         }
         _ => None,
     })
@@ -67,7 +77,12 @@ fn night(object: u32, quality: u8, energy: f32, bedtime: f32) -> f32 {
     until(&mut w, 1, bedtime);
     rested_but(&mut w, energy);
     let sleep = interaction(&w, object, "sleep");
-    w.apply(Command::Use { sim: 0, object, interaction: sleep }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object,
+        interaction: sleep,
+    })
+    .unwrap();
     let mut slept = false;
     let end = clock::tick_at(2, 14.0 * 60.0).unwrap();
     while w.tick < end {
@@ -85,22 +100,37 @@ fn night(object: u32, quality: u8, energy: f32, bedtime: f32) -> f32 {
 fn tired_out_they_sleep_about_eight_hours_less_on_a_better_bed() {
     // To bed late and worn out: they get up once rested.
     let standard = night(BED, 0, 0.0, 23.5);
-    assert!((7.0..=8.0).contains(&standard), "up at {standard:.2} after a night from empty (8 h ±30 min)");
+    assert!(
+        (7.0..=8.0).contains(&standard),
+        "up at {standard:.2} after a night from empty (8 h ±30 min)"
+    );
     let best = night(BED, 3, 0.0, 23.5);
-    assert!(best < standard - 0.5, "a 3-star bed: up at {best:.2}, not {standard:.2}");
+    assert!(
+        best < standard - 0.5,
+        "a 3-star bed: up at {best:.2}, not {standard:.2}"
+    );
     assert!(best >= 6.4, "but not before morning ({best:.2})");
     let futon = night(FUTON, 0, 0.0, 23.5);
-    assert!(futon > standard + 0.5, "a futon: up at {futon:.2}, not {standard:.2}");
+    assert!(
+        futon > standard + 0.5,
+        "a futon: up at {futon:.2}, not {standard:.2}"
+    );
     assert!(futon < 9.5, "about 9 hours on a futon ({futon:.2})");
     // To bed at the usual time worn out: about 8 hours.
     let usual = night(BED, 0, 0.0, 22.5);
-    assert!((6.0..=7.0).contains(&usual), "up at {usual:.2} after going to bed at 22:30");
+    assert!(
+        (6.0..=7.0).contains(&usual),
+        "up at {usual:.2} after going to bed at 22:30"
+    );
 }
 
 #[test]
 fn not_very_tired_they_still_sleep_until_near_morning() {
     let up = night(BED, 0, 0.7, 22.5);
-    assert!((6.4..=7.0).contains(&up), "rested by 1 am, up at {up:.2} (not in the middle of the night)");
+    assert!(
+        (6.4..=7.0).contains(&up),
+        "rested by 1 am, up at {up:.2} (not in the middle of the night)"
+    );
 }
 
 #[test]
@@ -117,7 +147,10 @@ fn exhausted_in_the_evening_they_go_to_bed_not_for_a_nap() {
             chose = using(&w);
         }
         let (object, id) = chose.expect("they pick something within the hour");
-        assert_eq!(id, "sleep", "seed {seed}: worn out at 18:00 they pick {id} on object {object}");
+        assert_eq!(
+            id, "sleep",
+            "seed {seed}: worn out at 18:00 they pick {id} on object {object}"
+        );
     }
 }
 
@@ -128,9 +161,18 @@ fn a_nap_is_not_followed_by_another() {
     until(&mut w, 1, 13.0);
     rested_but(&mut w, 0.35);
     let nap = interaction(&w, BED, "nap");
-    w.apply(Command::Use { sim: 0, object: BED, interaction: nap }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: BED,
+        interaction: nap,
+    })
+    .unwrap();
     let naps = w.content.day_rhythm.nap_tags;
-    let napping = |w: &World| w.sims[0].current().is_some_and(|a| a.tags & naps != 0 && matches!(a.task.kind, TaskKind::Use { .. }));
+    let napping = |w: &World| {
+        w.sims[0]
+            .current()
+            .is_some_and(|a| a.tags & naps != 0 && matches!(a.task.kind, TaskKind::Use { .. }))
+    };
     while !napping(&w) {
         w.tick_once();
     }
@@ -148,7 +190,11 @@ fn a_nap_is_not_followed_by_another() {
     while w.tick < end {
         w.sims[0].needs[e] = w.sims[0].needs[e].min(0.4);
         w.tick_once();
-        assert!(!napping(&w), "another nap at {:.2}, after one that ended at {woke:.2}", clock::hour(w.tick));
+        assert!(
+            !napping(&w),
+            "another nap at {:.2}, after one that ended at {woke:.2}",
+            clock::hour(w.tick)
+        );
     }
 }
 
@@ -156,17 +202,33 @@ fn a_nap_is_not_followed_by_another() {
 fn a_late_night_doesnt_make_them_miss_work() {
     let mut w = world();
     w.autonomy = false;
-    w.apply(Command::JoinCareer { sim: 0, career: 0, level: 0 }).unwrap();
+    w.apply(Command::JoinCareer {
+        sim: 0,
+        career: 0,
+        level: 0,
+    })
+    .unwrap();
     // To bed worn out at 1 am: rested only mid-morning, but work comes first.
     until(&mut w, 2, 1.0);
     rested_but(&mut w, 0.0);
     let sleep = interaction(&w, BED, "sleep");
-    w.apply(Command::Use { sim: 0, object: BED, interaction: sleep }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: BED,
+        interaction: sleep,
+    })
+    .unwrap();
     let job = w.sims[0].job.clone().unwrap();
-    let (leave, start, _) = life::shift_today(&w.content, &job, &w.sims[0].skills, w.tick).expect("a workday");
+    let (leave, start, _) =
+        life::shift_today(&w.content, &job, &w.sims[0].skills, w.tick).expect("a workday");
     while w.tick < start {
         w.tick_once();
     }
-    assert!(w.sims[0].away_until.is_some(), "at work by {:.2} (left at {:.2})", clock::hour(start), clock::hour(leave));
+    assert!(
+        w.sims[0].away_until.is_some(),
+        "at work by {:.2} (left at {:.2})",
+        clock::hour(start),
+        clock::hour(leave)
+    );
     assert!(w.events.iter().all(|e| e.kind != EventKind::MissedWork));
 }
