@@ -114,9 +114,9 @@ pub enum Command {
         value: f32,
     },
     /// Sets how residents `a` and `b` stand with each other, both ways: friendship and romance
-    /// (-100..100), chemistry (-1..1), partners; what's left out stays. They've met. Family can't be
-    /// set in love or partners. For tests and checks in the browser (`check.mjs play --bond`); no menu
-    /// sends it.
+    /// (-100..100), chemistry (-1..1), partners; what's left out stays. They've met. Only grown-ups
+    /// who aren't family can be set in love or partners. For tests and checks in the browser
+    /// (`check.mjs play --bond`); no menu sends it.
     SetBond {
         a: u32,
         b: u32,

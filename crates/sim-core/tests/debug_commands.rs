@@ -1,7 +1,7 @@
 //! The commands for checks (`?debug`'s `__send`, `tools/bench/check.mjs`; no menu sends them): a
 //! resident's need set, one need or all of them; how two residents stand with each other set both
-//! ways, partners included (one partner each), never courting within a family. Bad input is refused or
-//! kept in range.
+//! ways, partners included (one partner each), courting only between grown-ups who aren't family. Bad
+//! input is refused or kept in range.
 
 mod common;
 
@@ -64,4 +64,14 @@ fn set_bond_keeps_family_out_of_romance() {
     // Fond of each other, or falling out, is up to them.
     w.apply(Command::SetBond { a: 2, b: 1, friendship: Some(-30.0), romance: Some(0.0), chemistry: None, partners: Some(false) }).unwrap();
     assert_eq!(w.relationships.get(1, 2).friendship, -30.0);
+}
+
+#[test]
+fn set_bond_keeps_children_out_of_romance() {
+    let mut w = world();
+    w.sims[2].age = 8.0;
+    assert!(w.apply(Command::SetBond { a: 0, b: 2, friendship: None, romance: Some(40.0), chemistry: None, partners: None }).is_err());
+    assert!(w.apply(Command::SetBond { a: 2, b: 0, friendship: None, romance: None, chemistry: None, partners: Some(true) }).is_err());
+    w.apply(Command::SetBond { a: 0, b: 2, friendship: Some(60.0), romance: None, chemistry: None, partners: None }).unwrap();
+    assert_eq!(w.relationships.get(2, 0).friendship, 60.0);
 }

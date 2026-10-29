@@ -3404,9 +3404,10 @@ impl World {
                     return Err(Error::new("a bond is between two residents"));
                 }
                 let (a, b) = (a as usize, b as usize);
-                // (Family never court: the game can't get there, so a check can't either.)
-                if !self.relationships.get(a, b).kin.is_none() && (romance.is_some_and(|f| f > 0.0) || partners == Some(true)) {
-                    return Err(Error::new("family can't be partners or in love"));
+                // (Only those who may court: the game can't get anyone else there, so a check can't either.)
+                let grown_ups = self.sims[a].adult(&self.content) && self.sims[b].adult(&self.content);
+                if !conversation::may_court(grown_ups, self.relationships.get(a, b)) && (romance.is_some_and(|f| f > 0.0) || partners == Some(true)) {
+                    return Err(Error::new("only grown-ups who aren't family can be partners or in love"));
                 }
                 let r = &mut self.relationships;
                 for (x, y) in [(a, b), (b, a)] {
@@ -4720,7 +4721,7 @@ fn pick_autonomous(
             _ => 0.0,
         };
         // Two singles who like the look of each other: a spark before there's any romance.
-        let spark = if grown_ups && attracted && rel.met && !ctx.briefs[me].partnered && !other.partnered && rel.kin.is_none() {
+        let spark = if conversation::may_court(grown_ups, rel) && attracted && rel.met && !ctx.briefs[me].partnered && !other.partnered {
             content.social_rules.single_spark
         } else {
             0.0
@@ -4733,7 +4734,7 @@ fn pick_autonomous(
                 continue;
             }
             // Romance only between grown-ups who aren't family.
-            if s.tags & content.social_rules.romantic_tags != 0 && (!attracted || !grown_ups || !rel.kin.is_none()) {
+            if s.tags & content.social_rules.romantic_tags != 0 && (!attracted || !conversation::may_court(grown_ups, rel)) {
                 continue;
             }
             // Trying for a baby only where one could come of it, and with a bed behind a shut door

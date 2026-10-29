@@ -88,8 +88,8 @@ answer 200 (a missing or linked wasm package otherwise gives pictures of an empt
 - **Needs and bonds.** `--needs bladder=0.1,all=0.6` sets needs (`Command::SetNeed`; `all` first, then the
   rest) and `--bond 0:1:friendship=60/romance=40/chemistry=0.5/partners` how two residents stand with each
   other, both ways (`Command::SetBond`; several with commas), each time the state opens, for the residents
-  of `--sims`. Both debug only, as `setSkill`. Family can't be set in love or partners (the game refuses a
-  kiss between them anyway): in `review-stage` everyone is family; `crowded-garden`'s Ada and Ben aren't.
+  of `--sims`. Both debug only, as `setSkill`. Only grown-ups who aren't family can be set in love or partners
+  (the game lets nobody else court): in `review-stage` everyone is family; `crowded-garden`'s Ada and Ben aren't.
 - **Two or more residents.** `--sims 0,1` (instead of `--sim`): each does the use, a moment after the one
   before, and the pictures wait until they all are at it (the seesaw, ping-pong, two at a pool table, the
   climbing frame). The first is the one watched and framed (`before`, `after`); the others are in each
@@ -100,7 +100,7 @@ answer 200 (a missing or linked wasm package otherwise gives pictures of an empt
   each phone action (`phone.actions`) with the second as the contact (`browse` with nobody). Under way when
   they're talking with the other (the snapshot's `partner`) or the phone's animation plays; then `--shots`
   pictures following the first, the camera on them before it starts. One record each (`social` or `phone`,
-  `outcome`, `with`, `others`); a refusal is `refused: <the game's toast>` at once. Nobody phones someone
+  `outcome`, `startedAfter` in s, `with`, `others`); a refusal is `refused: <the game's toast>` at once. Nobody phones someone
   on the same lot ("right here"): in `bathroom-check` resident 1 lives in another house.
 - **Waiting.** For every loading screen ("Moving in", "Getting ready", "Drawing portraits", "Building the
   world", "Warming up") before each buy and each picture; `goto` times out at 90 s. A use's cap (`--wait`,
