@@ -625,18 +625,18 @@ fn staff_are_not_residents_and_cost_nothing_but_what_is_bought() {
         let funds = w.households[0].funds;
         w.tick_once();
         paid += funds - w.households[0].funds;
-        for s in 0..2 {
+        for (s, was) in was.iter_mut().enumerate() {
             // A use paid for as it starts (on arrival).
             let now = w.sims[s].current().and_then(|a| match (a.task.kind, &a.phase) {
                 (TaskKind::Use { object, interaction }, Phase::Using { .. }) => Some((object, interaction)),
                 _ => None,
             });
             if let Some((o, i)) = now
-                && was[s] != now
+                && *was != now
             {
                 bought += w.content.objects[w.objects[o as usize].def].interactions[i].cost;
             }
-            was[s] = now;
+            *was = now;
         }
     }
     assert_eq!(w.sims.len(), 2, "nobody moved in");
@@ -663,8 +663,8 @@ fn a_customer_who_waits_too_long_gives_up_and_is_paid_back() {
     let mut ate = [false; 2];
     for _ in 0..40 * TICKS_PER_MINUTE {
         w.tick_once();
-        for s in 0..2 {
-            ate[s] |= w.sims[s].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { .. }));
+        for (s, ate) in ate.iter_mut().enumerate() {
+            *ate |= w.sims[s].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { .. }));
         }
     }
     assert_eq!(ate.iter().filter(|&&a| a).count(), 1, "one of them was served ({ate:?})");

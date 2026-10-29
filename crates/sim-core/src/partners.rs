@@ -162,6 +162,7 @@ pub(crate) fn free_now(content: &Content, s: &Sim, tick: u64) -> bool {
 /// Whether resident `j` is free to play `inter` at an object on `plot` with `a` now (`free_now`,
 /// there, its age for them, allowed to use it, not on bad terms), able to get to it (`front`:
 /// the tile it's used from; while the walkable regions are known).
+#[allow(clippy::too_many_arguments)]
 fn free_for(world: &World, j: usize, a: usize, plot: Option<u32>, at: [f32; 2], front: (i32, i32), def: &ObjectDef, inter: &Interaction) -> bool {
     let content = &world.content;
     let s = &world.sims[j];

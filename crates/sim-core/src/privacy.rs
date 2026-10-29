@@ -255,6 +255,7 @@ pub(crate) fn beds_in_content(content: &Content) -> bool {
 /// use for it (`Interaction::conceive`), nobody else on it, in a room indoors with a door,
 /// kept shut by nobody and with nobody else in it (`others_in`: whether someone but the two,
 /// and babies, is in a room); the nearest to `from`. None: nowhere.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn bed_for(
     content: &Content,
     lot: &Lot,
