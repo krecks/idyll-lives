@@ -1371,32 +1371,28 @@ fn ask_to_buy(w: &mut World, i: usize, day: u32) {
     w.events.push_object(tick, EventKind::WantsToBuy, i, object, Some(price));
 }
 
-/// Buys `object` for resident `i`'s home: in place of the cheaper one it replaces if there is
-/// one (sold, the new one where it stood if there's no other room), else at a free spot.
+/// Buys `object` for resident `i`'s home: over the cheaper one it replaces, if there is one, in
+/// the place that one stood (their old bed goes, sold, and the new one stands where it stood, so
+/// the room they know stays as it was). Only where they can't be swapped there does the old one
+/// go and the new one find a free spot somewhere else.
 pub(crate) fn buy_wanted(w: &mut World, i: usize, object: usize) -> Result<u32, Error> {
     let h = w.sims[i].household;
     let id = w.content.objects[object].id.clone();
     let old = replaces(w, h as usize, object);
-    let bought = match w.buy_at(h, &id, None, Default::default(), Default::default()) {
-        Ok(new) => {
-            // The old one goes (ids after it shift down).
-            match old {
-                Some(o) if w.sell(h, o).is_ok() && o < new => Ok(new - 1),
-                _ => Ok(new),
-            }
-        }
-        Err(e) => match old {
-            Some(o) => swap_in(w, h, o, &id).ok_or(e),
-            None => Err(e),
-        },
+    // Their own thing goes first, and where it stood: not a new bed into some free corner.
+    let bought = match old.and_then(|o| swap_in(w, h, o, &id)) {
+        Some(new) => Ok(new),
+        None => at_a_free_spot(w, h, object, &id),
     }?;
     w.events.push_object(w.tick, EventKind::Bought, i, object, None);
     w.sims[i].planner.recheck = true;
     Ok(bought)
 }
 
-/// No free spot: sells `old` and puts `id` where it stood (or anywhere now free). If even that
-/// doesn't fit, `old` goes back as it was. Only for something nothing stands on and nobody uses.
+/// Swaps `old` out for `id`: `old` is sold and `id` bought over the tiles it stood on, so the new
+/// thing stands in the old one's place. If it won't go there, it's put anywhere now free; if even
+/// that doesn't fit, `old` goes back as it was. Only for something nothing stands on and nobody
+/// uses.
 fn swap_in(w: &mut World, h: u32, old: u32, id: &str) -> Option<u32> {
     let o = w.objects.get(old as usize)?.clone();
     if o.users.iter().any(Option::is_some) || !crate::surface::riders(&w.content, &w.objects, old).is_empty() {
@@ -1416,6 +1412,20 @@ fn swap_in(w: &mut World, h: u32, old: u32, id: &str) -> Option<u32> {
     let _ = w.replace_at_home(plot, &o, o.x, o.z, o.rot, Layout::of(&o));
     w.households[hh].funds -= refund;
     None
+}
+
+/// The new one goes where there's room rather than over their old one: buys `id` at any free spot
+/// and then sells what it replaces, if the household has one. Returns the new object's id (the
+/// old one going shifts the ids after it down). Called when swapping them in their own place can't
+/// be done, and when there's nothing at home to take the place of.
+fn at_a_free_spot(w: &mut World, h: u32, object: usize, id: &str) -> Result<u32, Error> {
+    let old = replaces(w, h as usize, object);
+    let new = w.buy_at(h, id, None, Default::default(), Default::default())?;
+    // The old one goes too (ids after it shift down).
+    match old {
+        Some(o) if w.sell(h, o).is_ok() && o < new => Ok(new - 1),
+        _ => Ok(new),
+    }
 }
 
 /// The player says yes to what resident `i` asked for: it's bought (their goal is reached).

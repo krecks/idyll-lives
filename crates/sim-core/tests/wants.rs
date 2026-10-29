@@ -238,6 +238,16 @@ const STREET: &str = r#"{"width":24,"depth":10,
                {"def":"fridge","x":13,"z":1,"rot":0},{"def":"bed","x":16,"z":1,"rot":0}],
     "sims":[{"name":"Ada","household":0,"x":6.5,"z":6.5},{"name":"Ned","household":1,"x":18.5,"z":6.5}]}"#;
 
+/// The same two homes, the beds hemmed in: fridges stand beside them, so nothing wider than the
+/// bed itself has room where the bed stands.
+const HEMMED: &str = r#"{"width":24,"depth":10,
+    "plots":[{"name":"Home","x":0,"z":0,"w":12,"d":10,"entry":[6.5,9.5]},{"name":"Next door","x":12,"z":0,"w":12,"d":10,"entry":[18.5,9.5]}],
+    "households":[{"name":"Player","plot":0,"player":true,"funds":50000},{"name":"Neighbours","plot":1,"funds":50000}],
+    "objects":[{"def":"fridge","x":1,"z":1,"rot":0},{"def":"bed","x":4,"z":1,"rot":0},
+               {"def":"fridge","x":5,"z":1,"rot":0},{"def":"fridge","x":5,"z":2,"rot":0},
+               {"def":"fridge","x":13,"z":1,"rot":0},{"def":"bed","x":16,"z":1,"rot":0}],
+    "sims":[{"name":"Ada","household":0,"x":6.5,"z":6.5},{"name":"Ned","household":1,"x":18.5,"z":6.5}]}"#;
+
 /// What's at home for household `h`, by object type id (sorted).
 fn at_home(w: &World, h: usize) -> Vec<&str> {
     let plot = w.households[h].plot;
@@ -250,16 +260,58 @@ fn at_home(w: &World, h: usize) -> Vec<&str> {
 /// morning review.
 fn both_buy(id: &str) -> World {
     let mut w = World::from_json(CATALOG, STREET, 9).unwrap();
-    for i in 0..2 {
-        apply(&mut w, json!({"type": "addGoal", "sim": i, "goal": {"def": "own", "object": id}})).unwrap();
-    }
-    review(&mut w);
-    assert!(w.sims[0].planner.purchase.is_some_and(|p| p.open), "Ada asks for the {id}");
-    apply(&mut w, json!({"type": "acceptPurchase", "sim": 0})).unwrap();
-    for h in 0..2 {
-        assert!(planner::has_at_home(&w, h, w.content.object_index(id).unwrap()), "household {h} bought the {id}");
-    }
+    buy_both(&mut w, id);
     w
+}
+
+/// The same, on a world the test set up first: Ada says yes to her request, Ned buys for himself.
+fn buy_both(w: &mut World, id: &str) {
+    for i in 0..2 {
+        apply(w, json!({"type": "addGoal", "sim": i, "goal": {"def": "own", "object": id}})).unwrap();
+    }
+    review(w);
+    assert!(w.sims[0].planner.purchase.is_some_and(|p| p.open), "Ada asks for the {id}");
+    apply(w, json!({"type": "acceptPurchase", "sim": 0})).unwrap();
+    for h in 0..2 {
+        assert!(planner::has_at_home(w, h, w.content.object_index(id).unwrap()), "household {h} bought the {id}");
+    }
+}
+
+/// Where the object of type `id` at home for household `h` stands (its tile and how it's turned),
+/// if they have one.
+fn standing(w: &World, h: usize, id: &str) -> Option<(i32, i32, u8)> {
+    let plot = w.households[h].plot?;
+    let o = w.objects.iter().find(|o| w.plot_at(o.x, o.z) == Some(plot) && w.content.objects[o.def].id == id)?;
+    Some((o.x, o.z, o.rot))
+}
+
+#[test]
+fn the_new_one_stands_where_the_old_one_stood() {
+    // A swap, not a new thing in some free corner of the home: what they had goes, and the new one
+    // takes its place, so the room they know stays as it was (the bed they slept in stays in the
+    // corner it has always lain in).
+    let mut w = World::from_json(CATALOG, STREET, 9).unwrap();
+    let had: Vec<(i32, i32, u8)> = (0..2).map(|h| standing(&w, h, "bed").expect("a bed at home")).collect();
+    buy_both(&mut w, "bedDouble");
+    for (h, stood) in had.iter().enumerate() {
+        assert_eq!(at_home(&w, h), ["bedDouble", "fridge"], "household {h} sold the old bed");
+        assert_eq!(standing(&w, h, "bedDouble"), Some(*stood), "household {h}: the new bed stands where the old one stood");
+    }
+}
+
+#[test]
+fn a_bigger_one_that_wont_fit_their_spot_goes_its_own_way() {
+    // There's no room for it over the tiles the old one had: then, and only then, the old one is
+    // sold and the new one finds a free spot somewhere else.
+    let mut w = World::from_json(CATALOG, HEMMED, 9).unwrap();
+    let had = standing(&w, 0, "bed").expect("a bed at home");
+    apply(&mut w, json!({"type": "addGoal", "sim": 0, "goal": {"def": "own", "object": "bedDouble"}})).unwrap();
+    review(&mut w);
+    apply(&mut w, json!({"type": "acceptPurchase", "sim": 0})).unwrap();
+    let home = at_home(&w, 0);
+    assert!(home.contains(&"bedDouble"), "the new bed came in: {home:?}");
+    assert!(!home.contains(&"bed"), "and the old one was sold: {home:?}");
+    assert_ne!(standing(&w, 0, "bedDouble"), Some(had), "where there was room for it, elsewhere");
 }
 
 #[test]
