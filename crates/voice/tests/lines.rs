@@ -28,7 +28,11 @@ fn content_files() -> Vec<(String, Value)> {
     let base = read_json(&content_dir().join("base.json"));
     let includes: Vec<String> = base["include"]
         .as_array()
-        .map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(str::to_owned))
+                .collect()
+        })
         .unwrap_or_default();
     let mut files = vec![("base.json".to_owned(), base)];
     for name in includes {
@@ -40,7 +44,10 @@ fn content_files() -> Vec<(String, Value)> {
 
 /// The English line files: the language file first, then packs' `voice.en`.
 fn line_files() -> Vec<(String, Value)> {
-    let mut out = vec![("voice/en.json".to_owned(), read_json(&content_dir().join("voice/en.json")))];
+    let mut out = vec![(
+        "voice/en.json".to_owned(),
+        read_json(&content_dir().join("voice/en.json")),
+    )];
     for (name, file) in content_files() {
         if let Some(v) = file.get("voice").and_then(|v| v.get("en")) {
             out.push((format!("{name} voice.en"), v.clone()));
@@ -75,12 +82,21 @@ fn g2p() -> Option<G2p> {
     let path = content_dir().join("../voice/en-us.lexz");
     let Ok(file) = std::fs::File::open(&path) else {
         // CI must test the phonemizer: there a missing dictionary fails instead of skipping.
-        assert!(std::env::var_os("CI").is_none(), "{} missing in CI (run `node tools/voice/fetch.mjs` first)", path.display());
-        eprintln!("skipped: {} missing (run `node tools/voice/fetch.mjs`)", path.display());
+        assert!(
+            std::env::var_os("CI").is_none(),
+            "{} missing in CI (run `node tools/voice/fetch.mjs` first)",
+            path.display()
+        );
+        eprintln!(
+            "skipped: {} missing (run `node tools/voice/fetch.mjs`)",
+            path.display()
+        );
         return None;
     };
     let mut tsv = String::new();
-    flate2::read::GzDecoder::new(file).read_to_string(&mut tsv).unwrap();
+    flate2::read::GzDecoder::new(file)
+        .read_to_string(&mut tsv)
+        .unwrap();
     Some(G2p::new(Lexicon::parse(&tsv)))
 }
 
@@ -98,7 +114,10 @@ fn every_line_phonemizes_from_the_dictionary() {
         let text = text.replace("{me}", "Anna").replace("{name}", "Ben");
         let unknown = g2p.unknown_words(&text);
         if !unknown.is_empty() {
-            wrong.push(format!("{at}: {text}\n  not in the dictionary: {}", unknown.join(", ")));
+            wrong.push(format!(
+                "{at}: {text}\n  not in the dictionary: {}",
+                unknown.join(", ")
+            ));
             continue;
         }
         let ps = g2p.phonemize(&text);
@@ -106,7 +125,13 @@ fn every_line_phonemizes_from_the_dictionary() {
             wrong.push(format!("{at}: {text}\n  no vowel: {ps:?}"));
         }
     }
-    assert!(wrong.is_empty(), "{} of {} lines:\n{}", wrong.len(), all.len(), wrong.join("\n"));
+    assert!(
+        wrong.is_empty(),
+        "{} of {} lines:\n{}",
+        wrong.len(),
+        all.len(),
+        wrong.join("\n")
+    );
 }
 
 #[test]
@@ -119,12 +144,22 @@ fn every_line_reads_as_plain_text() {
     for (at, text) in &all {
         let plain = plain_text(&text.replace("{me}", "Anna").replace("{name}", "Ben"));
         if !plain.chars().any(char::is_alphanumeric) {
-            wrong.push(format!("{at}: {text}\n  nothing for the model to read: {plain:?}"));
+            wrong.push(format!(
+                "{at}: {text}\n  nothing for the model to read: {plain:?}"
+            ));
         } else if plain.contains("](/") {
-            wrong.push(format!("{at}: {text}\n  a pronunciation mark the model would read aloud: {plain:?}"));
+            wrong.push(format!(
+                "{at}: {text}\n  a pronunciation mark the model would read aloud: {plain:?}"
+            ));
         }
     }
-    assert!(wrong.is_empty(), "{} of {} lines:\n{}", wrong.len(), all.len(), wrong.join("\n"));
+    assert!(
+        wrong.is_empty(),
+        "{} of {} lines:\n{}",
+        wrong.len(),
+        all.len(),
+        wrong.join("\n")
+    );
 }
 
 #[test]
@@ -159,15 +194,30 @@ struct Ids {
 }
 
 fn ids() -> Ids {
-    let mut ids = Ids { socials: BTreeSet::new(), emotions: BTreeSet::new(), animations: BTreeSet::new(), objects: HashMap::new() };
-    let list = |v: &Value, key: &str| -> Vec<Value> { v.get(key).and_then(Value::as_array).cloned().unwrap_or_default() };
+    let mut ids = Ids {
+        socials: BTreeSet::new(),
+        emotions: BTreeSet::new(),
+        animations: BTreeSet::new(),
+        objects: HashMap::new(),
+    };
+    let list = |v: &Value, key: &str| -> Vec<Value> {
+        v.get(key)
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+    };
     let id = |v: &Value| v["id"].as_str().unwrap_or_default().to_owned();
     for (_, file) in content_files() {
         ids.socials.extend(list(&file, "socials").iter().map(id));
         ids.emotions.extend(list(&file, "emotions").iter().map(id));
-        ids.animations.extend(list(&file, "animations").iter().filter_map(|a| a.as_str().map(str::to_owned)));
+        ids.animations.extend(
+            list(&file, "animations")
+                .iter()
+                .filter_map(|a| a.as_str().map(str::to_owned)),
+        );
         for o in list(&file, "objects") {
-            ids.objects.insert(id(&o), list(&o, "interactions").iter().map(id).collect());
+            ids.objects
+                .insert(id(&o), list(&o, "interactions").iter().map(id).collect());
         }
     }
     ids
@@ -176,11 +226,24 @@ fn ids() -> Ids {
 #[test]
 fn keys_name_content_that_exists() {
     let ids = ids();
-    let thoughts = ["skipped", "noPlace", "kept", "goal", "roomLoved", "roomDisliked", "broken", "accident", "crying"];
+    let thoughts = [
+        "skipped",
+        "noPlace",
+        "kept",
+        "goal",
+        "roomLoved",
+        "roomDisliked",
+        "broken",
+        "accident",
+        "crying",
+    ];
     let interactions: BTreeSet<&String> = ids.objects.values().flatten().collect();
     let mut wrong = Vec::new();
     let keys = |v: &Value, section: &str| -> Vec<(String, Value)> {
-        v.get(section).and_then(Value::as_object).map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default()
+        v.get(section)
+            .and_then(Value::as_object)
+            .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+            .unwrap_or_default()
     };
     let mut tone = |at: &str, v: &Value| {
         if let Some(t) = v.get("tone")

@@ -26,7 +26,10 @@ pub struct Report {
 impl Report {
     fn note(&mut self, kind: &str, at: &str, part: &str, d: f64) {
         self.rows.push((part.to_string(), kind.to_string(), d));
-        let e = self.max.entry(kind.to_string()).or_insert((0.0, String::new()));
+        let e = self
+            .max
+            .entry(kind.to_string())
+            .or_insert((0.0, String::new()));
         if d > e.0 || e.1.is_empty() {
             *e = (d.max(e.0), at.to_string());
         }
@@ -43,7 +46,12 @@ fn le<const N: usize>(buf: &[u8], at: usize, n: usize, what: &str) -> Option<Vec
         eprintln!("{what}: out of the file");
         return None;
     }
-    Some(buf[at..end].chunks(N).map(|c| c.try_into().unwrap()).collect())
+    Some(
+        buf[at..end]
+            .chunks(N)
+            .map(|c| c.try_into().unwrap())
+            .collect(),
+    )
 }
 
 /// rig.json, recursively: same keys, lengths, strings and ints; floats within REL_TOL.
@@ -76,7 +84,11 @@ fn cmp_json(a: &JValue, b: &JValue, path: &str, r: &mut Report, worst: &mut (f64
             }
         }
         (JValue::Float(x), JValue::Float(y)) => {
-            let rel = if x == y { 0.0 } else { (x - y).abs() / x.abs().max(y.abs()) };
+            let rel = if x == y {
+                0.0
+            } else {
+                (x - y).abs() / x.abs().max(y.abs())
+            };
             if rel > worst.0 {
                 *worst = (rel, path.to_string());
             }
@@ -94,7 +106,10 @@ fn cmp_json(a: &JValue, b: &JValue, path: &str, r: &mut Report, worst: &mut (f64
 
 /// The largest |a - b| of two arrays of numbers.
 fn max_abs(a: &[f64], b: &[f64]) -> f64 {
-    a.iter().zip(b).map(|(x, y)| (x - y).abs()).fold(0.0, f64::max)
+    a.iter()
+        .zip(b)
+        .map(|(x, y)| (x - y).abs())
+        .fold(0.0, f64::max)
 }
 
 fn as_i16(v: &[[u8; 2]]) -> Vec<f64> {
@@ -131,28 +146,48 @@ fn cmp_part(r: &mut Report, label: &str, ea: &JValue, eb: &JValue, ba: &[u8], bb
     let n = ea.at("vertices").usize();
     let ni = ea.at("indices").usize();
     if n != eb.at("vertices").usize() || ni != eb.at("indices").usize() {
-        r.fail(format!("{label}: topology differs ({n} / {ni} vs {} / {})", eb.at("vertices").usize(), eb.at("indices").usize()));
+        r.fail(format!(
+            "{label}: topology differs ({n} / {ni} vs {} / {})",
+            eb.at("vertices").usize(),
+            eb.at("indices").usize()
+        ));
         return;
     }
     let get = |e: &JValue, k: &str| e.at(k).usize();
-    let (Some(pa), Some(pb)) = (le::<4>(ba, get(ea, "positions"), n * 3, label), le::<4>(bb, get(eb, "positions"), n * 3, label)) else {
+    let (Some(pa), Some(pb)) = (
+        le::<4>(ba, get(ea, "positions"), n * 3, label),
+        le::<4>(bb, get(eb, "positions"), n * 3, label),
+    ) else {
         r.fail(format!("{label}: positions out of range"));
         return;
     };
-    let f = |v: &[[u8; 4]]| -> Vec<f64> { v.iter().map(|c| f32::from_le_bytes(*c) as f64).collect() };
+    let f =
+        |v: &[[u8; 4]]| -> Vec<f64> { v.iter().map(|c| f32::from_le_bytes(*c) as f64).collect() };
     let d = max_abs(&f(&pa), &f(&pb));
     r.note("positions (m)", label, label, d);
     if d > POS_TOL {
         r.fail(format!("{label}: positions differ by {d:.3e} m"));
     }
-    for (k, kind) in [("normals", "normals i16"), ("fields", "fields i16"), ("tone", "tone i16")] {
-        match (le::<2>(ba, get(ea, k), n * 4, label), le::<2>(bb, get(eb, k), n * 4, label)) {
+    for (k, kind) in [
+        ("normals", "normals i16"),
+        ("fields", "fields i16"),
+        ("tone", "tone i16"),
+    ] {
+        match (
+            le::<2>(ba, get(ea, k), n * 4, label),
+            le::<2>(bb, get(eb, k), n * 4, label),
+        ) {
             (Some(x), Some(y)) => quantised(r, kind, label, &as_i16(&x), &as_i16(&y)),
             _ => r.fail(format!("{label}: {k} out of range")),
         }
     }
     // Weights as joint -> weight maps.
-    let (ja, wa, jb, wb) = (le::<4>(ba, get(ea, "joints"), n, label), le::<4>(ba, get(ea, "weights"), n, label), le::<4>(bb, get(eb, "joints"), n, label), le::<4>(bb, get(eb, "weights"), n, label));
+    let (ja, wa, jb, wb) = (
+        le::<4>(ba, get(ea, "joints"), n, label),
+        le::<4>(ba, get(ea, "weights"), n, label),
+        le::<4>(bb, get(eb, "joints"), n, label),
+        le::<4>(bb, get(eb, "weights"), n, label),
+    );
     if let (Some(ja), Some(wa), Some(jb), Some(wb)) = (ja, wa, jb, wb) {
         let mut d = 0.0f64;
         for v in 0..n {
@@ -172,7 +207,10 @@ fn cmp_part(r: &mut Report, label: &str, ea: &JValue, eb: &JValue, ba: &[u8], bb
     } else {
         r.fail(format!("{label}: joints / weights out of range"));
     }
-    match (le::<2>(ba, get(ea, "index"), ni, label), le::<2>(bb, get(eb, "index"), ni, label)) {
+    match (
+        le::<2>(ba, get(ea, "index"), ni, label),
+        le::<2>(bb, get(eb, "index"), ni, label),
+    ) {
         (Some(x), Some(y)) => exact(r, "index", label, &as_u16(&x), &as_u16(&y)),
         _ => r.fail(format!("{label}: index out of range")),
     }
@@ -183,25 +221,45 @@ fn cmp_part(r: &mut Report, label: &str, ea: &JValue, eb: &JValue, ba: &[u8], bb
             let ra: Vec<usize> = ma.at("ranges").arr().iter().map(JValue::usize).collect();
             let rb: Vec<usize> = mb.at("ranges").arr().iter().map(JValue::usize).collect();
             if ca != cb || ra != rb {
-                r.fail(format!("{label}: morph topology differs (count {ca} vs {cb}, {} vs {} entries)", ra.last().unwrap_or(&0), rb.last().unwrap_or(&0)));
+                r.fail(format!(
+                    "{label}: morph topology differs (count {ca} vs {cb}, {} vs {} entries)",
+                    ra.last().unwrap_or(&0),
+                    rb.last().unwrap_or(&0)
+                ));
                 return;
             }
             let e = *ra.last().unwrap_or(&0);
             let g = |m: &JValue, k: &str| m.at(k).usize();
-            match (le::<2>(ba, g(ma, "morphVerts"), ca, label), le::<2>(bb, g(mb, "morphVerts"), ca, label)) {
+            match (
+                le::<2>(ba, g(ma, "morphVerts"), ca, label),
+                le::<2>(bb, g(mb, "morphVerts"), ca, label),
+            ) {
                 (Some(x), Some(y)) => exact(r, "morphVerts", label, &as_u16(&x), &as_u16(&y)),
                 _ => r.fail(format!("{label}: morphVerts out of range")),
             }
-            match (le::<2>(ba, g(ma, "morphSlots"), e, label), le::<2>(bb, g(mb, "morphSlots"), e, label)) {
+            match (
+                le::<2>(ba, g(ma, "morphSlots"), e, label),
+                le::<2>(bb, g(mb, "morphSlots"), e, label),
+            ) {
                 (Some(x), Some(y)) => exact(r, "morphSlots", label, &as_u16(&x), &as_u16(&y)),
                 _ => r.fail(format!("{label}: morphSlots out of range")),
             }
-            match (le::<2>(ba, g(ma, "morphPositions"), e * 4, label), le::<2>(bb, g(mb, "morphPositions"), e * 4, label)) {
-                (Some(x), Some(y)) => quantised(r, "morphPositions i16", label, &as_i16(&x), &as_i16(&y)),
+            match (
+                le::<2>(ba, g(ma, "morphPositions"), e * 4, label),
+                le::<2>(bb, g(mb, "morphPositions"), e * 4, label),
+            ) {
+                (Some(x), Some(y)) => {
+                    quantised(r, "morphPositions i16", label, &as_i16(&x), &as_i16(&y))
+                }
                 _ => r.fail(format!("{label}: morphPositions out of range")),
             }
-            match (le::<1>(ba, g(ma, "morphNormals"), e * 4, label), le::<1>(bb, g(mb, "morphNormals"), e * 4, label)) {
-                (Some(x), Some(y)) => quantised(r, "morphNormals i8", label, &as_i8(&x), &as_i8(&y)),
+            match (
+                le::<1>(ba, g(ma, "morphNormals"), e * 4, label),
+                le::<1>(bb, g(mb, "morphNormals"), e * 4, label),
+            ) {
+                (Some(x), Some(y)) => {
+                    quantised(r, "morphNormals i8", label, &as_i8(&x), &as_i8(&y))
+                }
                 _ => r.fail(format!("{label}: morphNormals out of range")),
             }
         }
@@ -209,20 +267,35 @@ fn cmp_part(r: &mut Report, label: &str, ea: &JValue, eb: &JValue, ba: &[u8], bb
     }
 }
 
-fn cmp_stage_part(r: &mut Report, label: &str, n: usize, ea: &JValue, eb: &JValue, ba: &[u8], bb: &[u8]) {
+fn cmp_stage_part(
+    r: &mut Report,
+    label: &str,
+    n: usize,
+    ea: &JValue,
+    eb: &JValue,
+    ba: &[u8],
+    bb: &[u8],
+) {
     let get = |e: &JValue, k: &str| e.at(k).usize();
-    match (le::<2>(ba, get(ea, "positions"), n * 4, label), le::<2>(bb, get(eb, "positions"), n * 4, label)) {
+    match (
+        le::<2>(ba, get(ea, "positions"), n * 4, label),
+        le::<2>(bb, get(eb, "positions"), n * 4, label),
+    ) {
         (Some(x), Some(y)) => quantised(r, "stage positions i16", label, &as_i16(&x), &as_i16(&y)),
         _ => r.fail(format!("{label}: stage positions out of range")),
     }
-    match (le::<1>(ba, get(ea, "normals"), n * 4, label), le::<1>(bb, get(eb, "normals"), n * 4, label)) {
+    match (
+        le::<1>(ba, get(ea, "normals"), n * 4, label),
+        le::<1>(bb, get(eb, "normals"), n * 4, label),
+    ) {
         (Some(x), Some(y)) => quantised(r, "stage normals i8", label, &as_i8(&x), &as_i8(&y)),
         _ => r.fail(format!("{label}: stage normals out of range")),
     }
 }
 
 fn load(dir: &Path) -> Result<JValue, String> {
-    let s = std::fs::read_to_string(dir.join("rig.json")).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let s = std::fs::read_to_string(dir.join("rig.json"))
+        .map_err(|e| format!("{}: {e}", dir.display()))?;
     JValue::parse(&s).map_err(|e| format!("{}: rig.json: {e}", dir.display()))
 }
 
@@ -236,20 +309,43 @@ pub fn diff(a: &Path, b: &Path) -> Result<Report, String> {
     if ra.at("bones") != rb.at("bones") {
         r.fail("bones differ".into());
     }
-    let read = |dir: &Path, f: &str| std::fs::read(dir.join(f)).map_err(|e| format!("{}: {e}", dir.join(f).display()));
+    let read = |dir: &Path, f: &str| {
+        std::fs::read(dir.join(f)).map_err(|e| format!("{}: {e}", dir.join(f).display()))
+    };
     for (fam, body_a) in ra.at("bodies").obj() {
-        let Some(body_b) = rb.at("bodies").get(fam) else { continue };
-        let (ba, bb) = (read(a, body_a.at("mesh").str())?, read(b, body_b.at("mesh").str())?);
+        let Some(body_b) = rb.at("bodies").get(fam) else {
+            continue;
+        };
+        let (ba, bb) = (
+            read(a, body_a.at("mesh").str())?,
+            read(b, body_b.at("mesh").str())?,
+        );
         for (name, ea) in body_a.at("parts").obj() {
-            let Some(eb) = body_b.at("parts").get(name) else { continue };
+            let Some(eb) = body_b.at("parts").get(name) else {
+                continue;
+            };
             cmp_part(&mut r, &format!("{fam}:{name}"), ea, eb, &ba, &bb);
         }
         for (stage, sa) in body_a.at("stages").obj() {
-            let Some(sb) = body_b.at("stages").get(stage) else { continue };
+            let Some(sb) = body_b.at("stages").get(stage) else {
+                continue;
+            };
             let (ba, bb) = (read(a, sa.at("mesh").str())?, read(b, sb.at("mesh").str())?);
             for (name, ea) in sa.at("parts").obj() {
-                let (Some(eb), Some(base)) = (sb.at("parts").get(name), body_a.at("parts").get(name)) else { continue };
-                cmp_stage_part(&mut r, &format!("{fam}.{stage}:{name}"), base.at("vertices").usize(), ea, eb, &ba, &bb);
+                let (Some(eb), Some(base)) =
+                    (sb.at("parts").get(name), body_a.at("parts").get(name))
+                else {
+                    continue;
+                };
+                cmp_stage_part(
+                    &mut r,
+                    &format!("{fam}.{stage}:{name}"),
+                    base.at("vertices").usize(),
+                    ea,
+                    eb,
+                    &ba,
+                    &bb,
+                );
             }
         }
     }

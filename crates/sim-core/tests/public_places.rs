@@ -78,13 +78,24 @@ fn stamp(content: &Value, place: &Value, (w, d): (i64, i64), x0: i64, rotated: b
             }
         })
         .collect();
-    let e = place["entry"].as_array().map_or([w as f64 / 2.0, 1.5], |e| [e[0].as_f64().unwrap(), e[1].as_f64().unwrap()]);
-    let entry = if rotated { [(x0 + w) as f64 - e[0], d as f64 - e[1]] } else { [x0 as f64 + e[0], e[1]] };
+    let e = place["entry"]
+        .as_array()
+        .map_or([w as f64 / 2.0, 1.5], |e| {
+            [e[0].as_f64().unwrap(), e[1].as_f64().unwrap()]
+        });
+    let entry = if rotated {
+        [(x0 + w) as f64 - e[0], d as f64 - e[1]]
+    } else {
+        [x0 as f64 + e[0], e[1]]
+    };
     (walls, doors, windows, objects, entry)
 }
 
 fn plot_size(houses: &Value) -> (i64, i64) {
-    (houses["plot"]["width"].as_i64().unwrap(), houses["plot"]["depth"].as_i64().unwrap())
+    (
+        houses["plot"]["width"].as_i64().unwrap(),
+        houses["plot"]["depth"].as_i64().unwrap(),
+    )
 }
 
 /// Every place, on either side of the street, loads with all its things where the layout put
@@ -96,25 +107,47 @@ fn every_public_place_loads_on_either_side_of_the_street() {
     let houses = houses();
     let (w, d) = plot_size(&houses);
     let places = houses["parks"].as_array().unwrap();
-    assert!(places.len() >= 6, "the park, the playground, the market, the café and two shops");
-    assert!(places.iter().any(|p| p["kind"] == "shop" && p["walls"].is_array()), "shops are shells with walls");
+    assert!(
+        places.len() >= 6,
+        "the park, the playground, the market, the café and two shops"
+    );
+    assert!(
+        places
+            .iter()
+            .any(|p| p["kind"] == "shop" && p["walls"].is_array()),
+        "shops are shells with walls"
+    );
     for place in places {
         for rotated in [false, true] {
             let id = format!("{}{}", place["id"], if rotated { " (turned)" } else { "" });
-            let (walls, doors, windows, objects, entry) = stamp(&content, place, (w, d), 0, rotated);
+            let (walls, doors, windows, objects, entry) =
+                stamp(&content, place, (w, d), 0, rotated);
             let lot = json!({
                 "width": w, "depth": d, "walls": walls, "doors": doors, "windows": windows, "objects": objects,
                 "plots": [{"name": place["name"], "x": 0, "z": 0, "w": w, "d": d, "public": true, "entry": entry}],
             });
-            let world = World::from_json(&merged, &lot.to_string(), 1).unwrap_or_else(|e| panic!("{id}: {e}"));
+            let world = World::from_json(&merged, &lot.to_string(), 1)
+                .unwrap_or_else(|e| panic!("{id}: {e}"));
             assert_eq!(world.objects.len(), objects.len(), "{id}");
             for (o, raw) in world.objects.iter().zip(&objects) {
-                assert_eq!(o.turn as i64, raw["turn"].as_i64().unwrap(), "{id}: {} keeps its turn", raw["def"]);
+                assert_eq!(
+                    o.turn as i64,
+                    raw["turn"].as_i64().unwrap(),
+                    "{id}: {} keeps its turn",
+                    raw["def"]
+                );
             }
             // Everything someone can use is within reach of the street (through the shop door).
-            let nav = NavGrid { lot: &world.lot, blocked: world.blocked(), stairs: world.stair_map() };
+            let nav = NavGrid {
+                lot: &world.lot,
+                blocked: world.blocked(),
+                stairs: world.stair_map(),
+            };
             let start = (entry[0].floor() as i32, entry[1].floor() as i32);
-            assert!(nav.tile_free(start.0, start.1), "{id}: visitors arrive on a free tile");
+            assert!(
+                nav.tile_free(start.0, start.1),
+                "{id}: visitors arrive on a free tile"
+            );
             let mut seen = BTreeSet::from([start]);
             let mut open = VecDeque::from([start]);
             while let Some((x, z)) = open.pop_front() {
@@ -131,11 +164,21 @@ fn every_public_place_loads_on_either_side_of_the_street() {
                 }
                 let reached = if def.approach == Approach::Around {
                     let (ow, od) = o.size(&world.content);
-                    (o.x..o.x + ow).flat_map(|x| (o.z..o.z + od).map(move |z| (x, z))).any(|(x, z)| [(x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1)].iter().any(|t| seen.contains(t)))
+                    (o.x..o.x + ow)
+                        .flat_map(|x| (o.z..o.z + od).map(move |z| (x, z)))
+                        .any(|(x, z)| {
+                            [(x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1)]
+                                .iter()
+                                .any(|t| seen.contains(t))
+                        })
                 } else {
                     seen.contains(&o.front_tile(&world.content))
                 };
-                assert!(reached, "{id}: nobody can get to the {} at {},{}", def.id, o.x, o.z);
+                assert!(
+                    reached,
+                    "{id}: nobody can get to the {} at {},{}",
+                    def.id, o.x, o.z
+                );
             }
         }
     }
@@ -152,11 +195,20 @@ fn houses_and_places_use_known_things() {
         .unwrap()
         .iter()
         .flat_map(|h| [&h["objects"], &h["upper"]["objects"]])
-        .chain(houses["parks"].as_array().unwrap().iter().map(|p| &p["objects"]));
+        .chain(
+            houses["parks"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|p| &p["objects"]),
+        );
     let mut n = 0;
     for o in lists.flat_map(|l| l.as_array().into_iter().flatten()) {
         let def = o["def"].as_str().unwrap();
-        assert!(content.object_index(def).is_some(), "unknown object '{def}' in houses.json");
+        assert!(
+            content.object_index(def).is_some(),
+            "unknown object '{def}' in houses.json"
+        );
         n += 1;
     }
     assert!(n > 200, "{n} things");
@@ -186,7 +238,12 @@ fn town_beside_edited(id: &str, n: usize, edit: impl Fn(&mut Value)) -> (World, 
     let content: Value = serde_json::from_str(&merged).unwrap();
     let houses = houses();
     let (w, d) = plot_size(&houses);
-    let market = houses["parks"].as_array().unwrap().iter().find(|p| p["id"] == id).unwrap_or_else(|| panic!("a place '{id}'"));
+    let market = houses["parks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == id)
+        .unwrap_or_else(|| panic!("a place '{id}'"));
     let (walls, doors, windows, objects, entry) = stamp(&content, market, (w, d), w, false);
     let sims: Vec<Value> = ["Ada", "Bo", "Cy"][..n]
         .iter()
@@ -205,11 +262,19 @@ fn town_beside_edited(id: &str, n: usize, edit: impl Fn(&mut Value)) -> (World, 
 }
 
 fn object(w: &World, id: &str) -> u32 {
-    w.objects.iter().find(|o| w.content.objects[o.def].id == id).unwrap_or_else(|| panic!("a {id}")).id
+    w.objects
+        .iter()
+        .find(|o| w.content.objects[o.def].id == id)
+        .unwrap_or_else(|| panic!("a {id}"))
+        .id
 }
 
 fn interaction(w: &World, object: u32, id: &str) -> usize {
-    w.content.objects[w.objects[object as usize].def].interactions.iter().position(|i| i.id == id).unwrap()
+    w.content.objects[w.objects[object as usize].def]
+        .interactions
+        .iter()
+        .position(|i| i.id == id)
+        .unwrap()
 }
 
 fn minutes(w: &mut World, n: u32) {
@@ -222,32 +287,65 @@ fn minutes(w: &mut World, n: u32) {
 fn residents_buy_a_snack_and_sit_on_a_bench_at_the_market() {
     let (mut w, market) = market_town();
     w.autonomy = false;
-    let hunger = w.content.needs.iter().position(|n| n.id == "hunger").unwrap();
-    let comfort = w.content.needs.iter().position(|n| n.id == "comfort").unwrap();
+    let hunger = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "hunger")
+        .unwrap();
+    let comfort = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "comfort")
+        .unwrap();
     w.sims[0].needs[hunger] = 0.2;
     let machine = object(&w, "vendingSnack");
     let at = &w.objects[machine as usize];
     assert_eq!(w.plot_at(at.x, at.z), Some(market));
     let funds = w.households[0].funds;
-    w.apply(Command::Use { sim: 0, object: machine, interaction: interaction(&w, machine, "snack") }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: machine,
+        interaction: interaction(&w, machine, "snack"),
+    })
+    .unwrap();
     // Fetched from the machine, then eaten sitting down (a bench), not at the machine.
     let mut seated = None;
     for _ in 0..60 {
         minutes(&mut w, 1);
         if let Some(a) = w.sims[0].current()
-            && let (TaskKind::Eat { seat: Some(seat), .. }, Phase::Using { .. }) = (a.task.kind, &a.phase)
+            && let (
+                TaskKind::Eat {
+                    seat: Some(seat), ..
+                },
+                Phase::Using { .. },
+            ) = (a.task.kind, &a.phase)
         {
             seated = Some(seat);
         }
     }
     let seat = seated.expect("eaten sitting down");
-    assert_eq!(w.plot_at(w.objects[seat as usize].x, w.objects[seat as usize].z), Some(market), "at the market");
-    assert!(w.sims[0].needs[hunger] > 0.4, "a snack from the machine: hunger {}", w.sims[0].needs[hunger]);
+    assert_eq!(
+        w.plot_at(w.objects[seat as usize].x, w.objects[seat as usize].z),
+        Some(market),
+        "at the market"
+    );
+    assert!(
+        w.sims[0].needs[hunger] > 0.4,
+        "a snack from the machine: hunger {}",
+        w.sims[0].needs[hunger]
+    );
     assert_eq!(w.households[0].funds, funds - 4, "and it cost four dollars");
 
     w.sims[0].needs[comfort] = 0.2;
     let bench = object(&w, "parkBench");
-    w.apply(Command::Use { sim: 0, object: bench, interaction: interaction(&w, bench, "sit") }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: bench,
+        interaction: interaction(&w, bench, "sit"),
+    })
+    .unwrap();
     let mut sat = false;
     for _ in 0..30 {
         minutes(&mut w, 1);
@@ -256,20 +354,32 @@ fn residents_buy_a_snack_and_sit_on_a_bench_at_the_market() {
         });
     }
     assert!(sat, "Ada sat down on the bench");
-    assert!(w.sims[0].needs[comfort] > 0.25, "and rested there: comfort {}", w.sims[0].needs[comfort]);
+    assert!(
+        w.sims[0].needs[comfort] > 0.25,
+        "and rested there: comfort {}",
+        w.sims[0].needs[comfort]
+    );
 }
 
 #[test]
 fn hungry_residents_with_an_empty_house_eat_out() {
     let (mut w, market) = market_town();
-    let hunger = w.content.needs.iter().position(|n| n.id == "hunger").unwrap();
+    let hunger = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "hunger")
+        .unwrap();
     w.sims[0].needs[hunger] = 0.15;
     let funds = w.households[0].funds;
     let mut ate_out = false;
     for _ in 0..180 {
         minutes(&mut w, 1);
         ate_out |= w.sims[0].current().is_some_and(|a| match a.task.kind {
-            TaskKind::Use { object, interaction } => {
+            TaskKind::Use {
+                object,
+                interaction,
+            } => {
                 let o = &w.objects[object as usize];
                 w.plot_at(o.x, o.z) == Some(market)
                     && w.content.objects[o.def].interactions[interaction].total_gain[hunger] > 0.0
@@ -279,7 +389,11 @@ fn hungry_residents_with_an_empty_house_eat_out() {
     }
     assert!(ate_out, "Ada went out for something to eat");
     assert!(w.households[0].funds < funds, "and paid for it");
-    assert!(w.sims[0].needs[hunger] > 0.3, "and isn't hungry any more: {}", w.sims[0].needs[hunger]);
+    assert!(
+        w.sims[0].needs[hunger] > 0.3,
+        "and isn't hungry any more: {}",
+        w.sims[0].needs[hunger]
+    );
 }
 
 /// At the café the chairs pull up to the little tables: coffee is served there (and paid for).
@@ -295,16 +409,26 @@ fn a_coffee_at_a_cafe_table() {
         .id;
     let funds = w.households[0].funds;
     let machine = object(&w, "coffeeMachine");
-    w.apply(Command::Use { sim: 0, object: chair, interaction: interaction(&w, chair, "coffee") }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: chair,
+        interaction: interaction(&w, chair, "coffee"),
+    })
+    .unwrap();
     // Poured at the café's machine first, then had at the table.
     let (mut poured, mut sat) = (None, None);
     for m in 0..50 {
         minutes(&mut w, 1);
         if let Some(a) = w.sims[0].current()
             && matches!(a.phase, Phase::Using { .. })
-            && let TaskKind::Use { object, interaction: i } = a.task.kind
+            && let TaskKind::Use {
+                object,
+                interaction: i,
+            } = a.task.kind
         {
-            if object == machine && w.content.objects[w.objects[machine as usize].def].interactions[i].id == "pour" {
+            if object == machine
+                && w.content.objects[w.objects[machine as usize].def].interactions[i].id == "pour"
+            {
                 poured.get_or_insert(m);
             }
             if object == chair {
@@ -312,7 +436,10 @@ fn a_coffee_at_a_cafe_table() {
             }
         }
     }
-    let (poured, sat) = (poured.expect("the coffee poured at the machine"), sat.expect("Ada sat down at a café table"));
+    let (poured, sat) = (
+        poured.expect("the coffee poured at the machine"),
+        sat.expect("Ada sat down at a café table"),
+    );
     assert!(poured < sat, "poured first ({poured}), then sat ({sat})");
     assert_eq!(w.households[0].funds, funds - 4, "and paid for her coffee");
 }
@@ -323,7 +450,12 @@ fn a_coffee_at_a_cafe_table() {
 fn cake_and_a_pastry_from_the_case_at_a_cafe_table() {
     let (mut w, cafe) = town_beside("cafe");
     w.autonomy = false;
-    let hunger = w.content.needs.iter().position(|n| n.id == "hunger").unwrap();
+    let hunger = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "hunger")
+        .unwrap();
     let case = object(&w, "bakeryCase");
     let chair = w
         .objects
@@ -332,31 +464,67 @@ fn cake_and_a_pastry_from_the_case_at_a_cafe_table() {
         .expect("café chairs")
         .id;
     let take = interaction(&w, case, "takeCake");
-    w.apply(Command::Use { sim: 0, object: chair, interaction: interaction(&w, chair, "cake") }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: chair,
+        interaction: interaction(&w, chair, "cake"),
+    })
+    .unwrap();
     let (mut took, mut ate) = (false, false);
     for _ in 0..50 {
         minutes(&mut w, 1);
-        let at = w.sims[0].current().filter(|a| matches!(a.phase, Phase::Using { .. })).map(|a| a.task.kind);
+        let at = w.sims[0]
+            .current()
+            .filter(|a| matches!(a.phase, Phase::Using { .. }))
+            .map(|a| a.task.kind);
         took |= matches!(at, Some(TaskKind::Use { object, interaction }) if object == case && interaction == take);
         ate |= took && matches!(at, Some(TaskKind::Use { object, .. }) if object == chair);
     }
-    assert!(took && ate, "the cake taken from the case ({took}), then eaten at the table ({ate})");
+    assert!(
+        took && ate,
+        "the cake taken from the case ({took}), then eaten at the table ({ate})"
+    );
 
     w.sims[0].needs[hunger] = 0.2;
-    w.apply(Command::Use { sim: 0, object: case, interaction: interaction(&w, case, "pastry") }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: case,
+        interaction: interaction(&w, case, "pastry"),
+    })
+    .unwrap();
     let mut plate_kept = None;
     for _ in 0..60 {
         minutes(&mut w, 1);
         if let Some(a) = w.sims[0].current()
-            && let (TaskKind::Eat { seat: Some(seat), plate: Some(p), .. }, Phase::Using { elapsed }) = (a.task.kind, &a.phase)
+            && let (
+                TaskKind::Eat {
+                    seat: Some(seat),
+                    plate: Some(p),
+                    ..
+                },
+                Phase::Using { elapsed },
+            ) = (a.task.kind, &a.phase)
         {
-            assert!(w.items.get(p).is_some(), "the plate stays on the table while it's eaten ({elapsed} minutes in)");
-            assert_eq!(w.plot_at(w.objects[seat as usize].x, w.objects[seat as usize].z), Some(cafe));
+            assert!(
+                w.items.get(p).is_some(),
+                "the plate stays on the table while it's eaten ({elapsed} minutes in)"
+            );
+            assert_eq!(
+                w.plot_at(w.objects[seat as usize].x, w.objects[seat as usize].z),
+                Some(cafe)
+            );
             plate_kept = Some(*elapsed);
         }
     }
-    assert!(plate_kept.is_some_and(|e| e > 7.0), "eaten at a table to the end: {plate_kept:?}");
-    assert!(w.sims[0].needs[hunger] > 0.45, "hunger {}", w.sims[0].needs[hunger]);
+    assert!(
+        plate_kept.is_some_and(|e| e > 7.0),
+        "eaten at a table to the end: {plate_kept:?}"
+    );
+    assert!(
+        w.sims[0].needs[hunger] > 0.45,
+        "hunger {}",
+        w.sims[0].needs[hunger]
+    );
 }
 
 // ---- Vendors and shopkeepers (I-community-09, Q-17; `staff.rs`) ---------------------------------
@@ -374,7 +542,10 @@ fn staff_row(w: &World, k: usize) -> (Vec<f32>, Vec<f32>) {
     let mut out = vec![0.0; snapshot::CAPACITY];
     snapshot::write(w, &mut out);
     let row = HEADER_LEN + (w.sims.len() + k) * SIM_STRIDE;
-    (out[..HEADER_LEN].to_vec(), out[row..row + SIM_STRIDE].to_vec())
+    (
+        out[..HEADER_LEN].to_vec(),
+        out[row..row + SIM_STRIDE].to_vec(),
+    )
 }
 
 /// Resident `s`'s row of the snapshot.
@@ -402,7 +573,8 @@ fn every_post_in_town_has_someone_behind_it() {
         let mut counts = vec![];
         for rotated in [false, true] {
             let id = format!("{}{}", place["id"], if rotated { " (turned)" } else { "" });
-            let (walls, doors, windows, objects, entry) = stamp(&content, place, (w, d), 0, rotated);
+            let (walls, doors, windows, objects, entry) =
+                stamp(&content, place, (w, d), 0, rotated);
             let lot = json!({
                 "width": w, "depth": d, "walls": walls, "doors": doors, "windows": windows, "objects": objects,
                 "plots": [{"name": place["name"], "x": 0, "z": 0, "w": w, "d": d, "public": true, "entry": entry}],
@@ -414,29 +586,50 @@ fn every_post_in_town_has_someone_behind_it() {
                 if def.staff.is_none() {
                     continue;
                 }
-                let k = staff.server_of(o.id).unwrap_or_else(|| panic!("{id}: nobody serves at the {} at {},{}", def.id, o.x, o.z));
+                let k = staff.server_of(o.id).unwrap_or_else(|| {
+                    panic!("{id}: nobody serves at the {} at {},{}", def.id, o.x, o.z)
+                });
                 // Behind it: on the side away from its front, where customers stand.
                 let (at, _) = sim_core::staff::place(&world.content, o).unwrap();
                 let c = o.centre(&world.content);
                 let front = [o.yaw().sin(), o.yaw().cos()];
                 let behind = (at[0] - c[0]) * front[0] + (at[1] - c[1]) * front[1];
-                assert!(behind < -0.5, "{id}: the {}'s server stands behind it ({behind})", def.id);
+                assert!(
+                    behind < -0.5,
+                    "{id}: the {}'s server stands behind it ({behind})",
+                    def.id
+                );
                 assert!(staff.servers[k].posts.contains(&o.id));
             }
             counts.push(staff.servers.len());
         }
-        assert_eq!(counts[0], counts[1], "{}: as many servers on either side", place["id"]);
+        assert_eq!(
+            counts[0], counts[1],
+            "{}: as many servers on either side",
+            place["id"]
+        );
         most += counts[0];
         eprintln!("{}: {} servers", place["id"], counts[0]);
     }
-    assert!(most <= sim_core::staff::MAX_STAFF, "{most} servers in a town with every place");
+    assert!(
+        most <= sim_core::staff::MAX_STAFF,
+        "{most} servers in a town with every place"
+    );
     // The café's counter and coffee machine share a barista; the bakery has two at its counter.
     let (cafe, _) = town_beside("cafe");
     let staff = sim_core::staff::plan(&cafe);
     let (counter, machine) = (object(&cafe, "shopCounter"), object(&cafe, "coffeeMachine"));
-    assert_eq!(staff.server_of(counter), staff.server_of(machine), "the café's counter and machine share a server");
+    assert_eq!(
+        staff.server_of(counter),
+        staff.server_of(machine),
+        "the café's counter and machine share a server"
+    );
     let (bakery, _) = town_beside("bakery");
-    assert_eq!(sim_core::staff::plan(&bakery).servers.len(), 2, "two behind the bakery's counter");
+    assert_eq!(
+        sim_core::staff::plan(&bakery).servers.len(),
+        2,
+        "two behind the bakery's counter"
+    );
 }
 
 /// In the park at 10:30 the ice cream seller is there: Ada orders, is served (the seller shown
@@ -447,17 +640,36 @@ fn a_vendor_serves_an_ice_cream() {
     w.autonomy = false;
     until(&mut w, 10.5);
     let cart = object(&w, "iceCreamCart");
-    assert_eq!(w.plot_at(w.objects[cart as usize].x, w.objects[cart as usize].z), Some(park));
+    assert_eq!(
+        w.plot_at(w.objects[cart as usize].x, w.objects[cart as usize].z),
+        Some(park)
+    );
     let k = w.staff.server_of(cart).expect("someone sells ice cream");
     let (head, row) = staff_row(&w, k);
     assert!(head[header::STAFF_COUNT] as usize > k);
     assert_eq!(row[sim::AWAY], 0.0, "at work at 10:30");
     let funds = w.households[0].funds;
-    let hunger = w.content.needs.iter().position(|n| n.id == "hunger").unwrap();
+    let hunger = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "hunger")
+        .unwrap();
     w.sims[0].needs[hunger] = 0.3;
-    w.apply(Command::Use { sim: 0, object: cart, interaction: interaction(&w, cart, "iceCream") }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: cart,
+        interaction: interaction(&w, cart, "iceCream"),
+    })
+    .unwrap();
     let (sell, buy) = (anim(&w, "sell"), anim(&w, "buy"));
-    let cone = w.content.items.iter().position(|i| i.id == "iceCreamCone").unwrap() as f32 + 1.0;
+    let cone = w
+        .content
+        .items
+        .iter()
+        .position(|i| i.id == "iceCreamCone")
+        .unwrap() as f32
+        + 1.0;
     let (mut served, mut handed, mut ate) = (false, false, false);
     for _ in 0..40 * TICKS_PER_MINUTE {
         w.tick_once();
@@ -466,14 +678,27 @@ fn a_vendor_serves_an_ice_cream() {
             served = true;
             assert_eq!(w.staff.servers[k].serving, Some(0), "serving Ada");
             handed |= row[sim::HELD] == cone;
-            assert_eq!(sim_row(&w, 0)[sim::ACTION], buy, "Ada buying while she's served");
+            assert_eq!(
+                sim_row(&w, 0)[sim::ACTION],
+                buy,
+                "Ada buying while she's served"
+            );
         }
-        ate |= w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { .. }));
+        ate |= w.sims[0]
+            .current()
+            .is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { .. }));
     }
-    assert!(served && handed, "the seller served Ada ({served}) and handed her a cone ({handed})");
+    assert!(
+        served && handed,
+        "the seller served Ada ({served}) and handed her a cone ({handed})"
+    );
     assert!(ate, "and she ate it");
     assert_eq!(w.households[0].funds, funds - 4, "paid once, four dollars");
-    assert!(w.sims[0].needs[hunger] > 0.4, "hunger {}", w.sims[0].needs[hunger]);
+    assert!(
+        w.sims[0].needs[hunger] > 0.4,
+        "hunger {}",
+        w.sims[0].needs[hunger]
+    );
 }
 
 /// Before the cart opens (10:00) and after it closes (20:00) nobody's there: the order is refused,
@@ -482,25 +707,57 @@ fn a_vendor_serves_an_ice_cream() {
 fn off_shift_the_cart_is_closed() {
     let (mut w, _) = town_beside("market");
     let cart = object(&w, "iceCreamCart");
-    let err = w.apply(Command::Use { sim: 0, object: cart, interaction: interaction(&w, cart, "iceCream") }).unwrap_err();
-    assert!(err.to_string().contains("closed: it opens at 10:00"), "{err}");
+    let err = w
+        .apply(Command::Use {
+            sim: 0,
+            object: cart,
+            interaction: interaction(&w, cart, "iceCream"),
+        })
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("closed: it opens at 10:00"),
+        "{err}"
+    );
     minutes(&mut w, 1);
     let k = w.staff.server_of(cart).expect("a post");
-    assert_eq!(staff_row(&w, k).1[sim::AWAY], 1.0, "nobody at the cart at 8:00");
+    assert_eq!(
+        staff_row(&w, k).1[sim::AWAY],
+        1.0,
+        "nobody at the cart at 8:00"
+    );
     until(&mut w, 21.5);
     assert_eq!(staff_row(&w, k).1[sim::AWAY], 1.0, "nor at 21:30");
-    assert!(w.apply(Command::Use { sim: 0, object: cart, interaction: interaction(&w, cart, "iceCream") }).is_err());
+    assert!(
+        w.apply(Command::Use {
+            sim: 0,
+            object: cart,
+            interaction: interaction(&w, cart, "iceCream")
+        })
+        .is_err()
+    );
     // Free will looks elsewhere.
-    let hunger = w.content.needs.iter().position(|n| n.id == "hunger").unwrap();
+    let hunger = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "hunger")
+        .unwrap();
     w.sims[0].needs[hunger] = 0.15;
     let mut at_cart = false;
     for _ in 0..90 {
         minutes(&mut w, 1);
-        at_cart |= w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Use { object, .. } if object == cart));
+        at_cart |= w.sims[0]
+            .current()
+            .is_some_and(|a| matches!(a.task.kind, TaskKind::Use { object, .. } if object == cart));
     }
     assert!(!at_cart, "nobody goes to a closed cart");
     let machine = object(&w, "vendingSnack");
-    w.apply(Command::Use { sim: 0, object: machine, interaction: interaction(&w, machine, "snack") }).expect("machines sell all night");
+    w.apply(Command::Use {
+        sim: 0,
+        object: machine,
+        interaction: interaction(&w, machine, "snack"),
+    })
+    .expect("machines sell all night");
 }
 
 /// At the café the barista keeps the counter and the coffee machine: a coffee ordered steps them
@@ -512,11 +769,28 @@ fn the_barista_steps_over_to_the_machine_and_the_cafe_closes() {
     minutes(&mut w, 1);
     let (counter, machine) = (object(&w, "shopCounter"), object(&w, "coffeeMachine"));
     let k = w.staff.server_of(machine).unwrap();
-    let home = sim_core::staff::place(&w.content, &w.objects[counter as usize]).unwrap().0;
-    assert_eq!(w.staff.servers[k].pos, home, "at the counter when the café opens");
-    let chair = w.objects.iter().find(|o| w.content.objects[o.def].id == "cafeChair" && w.plot_at(o.x, o.z) == Some(cafe)).unwrap().id;
-    w.apply(Command::Use { sim: 0, object: chair, interaction: interaction(&w, chair, "coffee") }).unwrap();
-    let to = sim_core::staff::place(&w.content, &w.objects[machine as usize]).unwrap().0;
+    let home = sim_core::staff::place(&w.content, &w.objects[counter as usize])
+        .unwrap()
+        .0;
+    assert_eq!(
+        w.staff.servers[k].pos, home,
+        "at the counter when the café opens"
+    );
+    let chair = w
+        .objects
+        .iter()
+        .find(|o| w.content.objects[o.def].id == "cafeChair" && w.plot_at(o.x, o.z) == Some(cafe))
+        .unwrap()
+        .id;
+    w.apply(Command::Use {
+        sim: 0,
+        object: chair,
+        interaction: interaction(&w, chair, "coffee"),
+    })
+    .unwrap();
+    let to = sim_core::staff::place(&w.content, &w.objects[machine as usize])
+        .unwrap()
+        .0;
     let mut stepped = false;
     for _ in 0..30 * TICKS_PER_MINUTE {
         w.tick_once();
@@ -524,8 +798,17 @@ fn the_barista_steps_over_to_the_machine_and_the_cafe_closes() {
     }
     assert!(stepped, "the barista served Ada's coffee at the machine");
     until(&mut w, 19.5);
-    let err = w.apply(Command::Use { sim: 0, object: chair, interaction: interaction(&w, chair, "coffee") }).unwrap_err();
-    assert!(err.to_string().contains("coffee machine is closed"), "{err}");
+    let err = w
+        .apply(Command::Use {
+            sim: 0,
+            object: chair,
+            interaction: interaction(&w, chair, "coffee"),
+        })
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("coffee machine is closed"),
+        "{err}"
+    );
 }
 
 /// Two at a market stall at once: its stallholder serves one, then the other.
@@ -533,10 +816,22 @@ fn the_barista_steps_over_to_the_machine_and_the_cafe_closes() {
 fn two_customers_are_served_in_turn() {
     let (mut w, market) = town_beside_with("market", 2);
     w.autonomy = false;
-    let stall = w.objects.iter().find(|o| w.content.objects[o.def].id == "marketStall" && w.plot_at(o.x, o.z) == Some(market)).unwrap().id;
+    let stall = w
+        .objects
+        .iter()
+        .find(|o| {
+            w.content.objects[o.def].id == "marketStall" && w.plot_at(o.x, o.z) == Some(market)
+        })
+        .unwrap()
+        .id;
     let fruit = interaction(&w, stall, "fruit");
     for s in [0, 1] {
-        w.apply(Command::Use { sim: s, object: stall, interaction: fruit }).unwrap();
+        w.apply(Command::Use {
+            sim: s,
+            object: stall,
+            interaction: fruit,
+        })
+        .unwrap();
     }
     minutes(&mut w, 1);
     let k = w.staff.server_of(stall).unwrap();
@@ -550,10 +845,14 @@ fn two_customers_are_served_in_turn() {
         }
         let buying = (0..2)
             .filter(|&s| {
-                w.sims[s].current().is_some_and(|a| match (a.task.kind, &a.phase) {
-                    (TaskKind::Use { object, .. }, Phase::Using { elapsed }) => object == stall && *elapsed > 0.0,
-                    _ => false,
-                })
+                w.sims[s]
+                    .current()
+                    .is_some_and(|a| match (a.task.kind, &a.phase) {
+                        (TaskKind::Use { object, .. }, Phase::Using { elapsed }) => {
+                            object == stall && *elapsed > 0.0
+                        }
+                        _ => false,
+                    })
             })
             .count();
         assert!(buying <= 1, "one served at a time");
@@ -569,21 +868,40 @@ fn a_cart_at_home_is_self_serve() {
     let (mut w, _) = town_beside("park");
     w.autonomy = false;
     w.households[0].funds = 5000;
-    let buy: Command = serde_json::from_value(json!({"type": "buy", "household": 0, "object": "iceCreamCart"})).unwrap();
+    let buy: Command =
+        serde_json::from_value(json!({"type": "buy", "household": 0, "object": "iceCreamCart"}))
+            .unwrap();
     w.apply(buy).unwrap();
-    let cart = w.objects.iter().find(|o| w.content.objects[o.def].id == "iceCreamCart" && w.plot_at(o.x, o.z) == Some(0)).unwrap().id;
+    let cart = w
+        .objects
+        .iter()
+        .find(|o| w.content.objects[o.def].id == "iceCreamCart" && w.plot_at(o.x, o.z) == Some(0))
+        .unwrap()
+        .id;
     until(&mut w, 22.0);
     assert!(w.staff.server_of(cart).is_none(), "nobody serves at home");
     let take = interaction(&w, cart, "iceCream");
-    w.apply(Command::Use { sim: 0, object: cart, interaction: take }).expect("open all hours at home");
+    w.apply(Command::Use {
+        sim: 0,
+        object: cart,
+        interaction: take,
+    })
+    .expect("open all hours at home");
     let fetch = anim(&w, "fetch");
     let (mut helped, mut longest) = (false, 0.0f32);
     for _ in 0..20 * TICKS_PER_MINUTE {
         w.tick_once();
         let row = sim_row(&w, 0);
-        helped |= row[sim::OBJECT] == w.objects[cart as usize].stable as f32 && row[sim::ACTION] == fetch;
+        helped |=
+            row[sim::OBJECT] == w.objects[cart as usize].stable as f32 && row[sim::ACTION] == fetch;
         if let Some(a) = w.sims[0].current()
-            && let (TaskKind::Use { object, interaction }, Phase::Using { elapsed }) = (a.task.kind, &a.phase)
+            && let (
+                TaskKind::Use {
+                    object,
+                    interaction,
+                },
+                Phase::Using { elapsed },
+            ) = (a.task.kind, &a.phase)
             && object == cart
             && interaction == take
         {
@@ -591,7 +909,10 @@ fn a_cart_at_home_is_self_serve() {
         }
     }
     assert!(helped, "she took one from the freezer herself");
-    assert!(longest > 1.5 && longest < 3.0, "helped herself in its own two minutes, not the sold five ({longest})");
+    assert!(
+        longest > 1.5 && longest < 3.0,
+        "helped herself in its own two minutes, not the sold five ({longest})"
+    );
 }
 
 /// States to look at the vendors with (`DUMP_STATES=1`; tools/bench/README.md): each town place beside an empty
@@ -603,11 +924,17 @@ fn vendor_states_for_play() {
         let (mut w, _) = town_beside_with(id, 2);
         w.autonomy = false;
         until(&mut w, 11.5);
-        assert!(!w.staff.servers.is_empty() && w.staff.servers.iter().all(|s| s.present), "{id}: everyone at work at 11:30");
+        assert!(
+            !w.staff.servers.is_empty() && w.staff.servers.iter().all(|s| s.present),
+            "{id}: everyone at work at 11:30"
+        );
         common::dump_state(&w, &format!("vendors-{id}"));
         // And at 21:30, everything closed but the hot dog stand (till 21:00: closed too) and the machines.
         until(&mut w, 21.5);
-        assert!(w.staff.servers.iter().all(|s| !s.present), "{id}: everyone gone home at 21:30");
+        assert!(
+            w.staff.servers.iter().all(|s| !s.present),
+            "{id}: everyone gone home at 21:30"
+        );
         common::dump_state(&w, &format!("vendors-{id}-night"));
     }
 }
@@ -627,10 +954,18 @@ fn staff_are_not_residents_and_cost_nothing_but_what_is_bought() {
         paid += funds - w.households[0].funds;
         for (s, was) in was.iter_mut().enumerate() {
             // A use paid for as it starts (on arrival).
-            let now = w.sims[s].current().and_then(|a| match (a.task.kind, &a.phase) {
-                (TaskKind::Use { object, interaction }, Phase::Using { .. }) => Some((object, interaction)),
-                _ => None,
-            });
+            let now = w.sims[s]
+                .current()
+                .and_then(|a| match (a.task.kind, &a.phase) {
+                    (
+                        TaskKind::Use {
+                            object,
+                            interaction,
+                        },
+                        Phase::Using { .. },
+                    ) => Some((object, interaction)),
+                    _ => None,
+                });
             if let Some((o, i)) = now
                 && *was != now
             {
@@ -645,30 +980,56 @@ fn staff_are_not_residents_and_cost_nothing_but_what_is_bought() {
     assert!(!w.staff.servers.is_empty());
     eprintln!("bought {bought}, paid {paid}");
     assert!(bought > 0, "they bought something in a day");
-    assert!(paid > 0 && paid <= bought, "they paid for what they bought (less any given up), and nothing for the staff");
+    assert!(
+        paid > 0 && paid <= bought,
+        "they paid for what they bought (less any given up), and nothing for the staff"
+    );
 }
 
 /// Bo, waiting behind Ada at the stall longer than `service.waitMinutes` (here a few seconds), gives up
 /// and gets his money back; Ada is served and pays.
 #[test]
 fn a_customer_who_waits_too_long_gives_up_and_is_paid_back() {
-    let (mut w, market) = town_beside_edited("market", 2, |c| c["service"]["waitMinutes"] = json!(0.2));
+    let (mut w, market) =
+        town_beside_edited("market", 2, |c| c["service"]["waitMinutes"] = json!(0.2));
     w.autonomy = false;
-    let stall = w.objects.iter().find(|o| w.content.objects[o.def].id == "marketStall" && w.plot_at(o.x, o.z) == Some(market)).unwrap().id;
+    let stall = w
+        .objects
+        .iter()
+        .find(|o| {
+            w.content.objects[o.def].id == "marketStall" && w.plot_at(o.x, o.z) == Some(market)
+        })
+        .unwrap()
+        .id;
     let fruit = interaction(&w, stall, "fruit");
     let funds = w.households[0].funds;
     for s in [0, 1] {
-        w.apply(Command::Use { sim: s, object: stall, interaction: fruit }).unwrap();
+        w.apply(Command::Use {
+            sim: s,
+            object: stall,
+            interaction: fruit,
+        })
+        .unwrap();
     }
     let mut ate = [false; 2];
     for _ in 0..40 * TICKS_PER_MINUTE {
         w.tick_once();
         for (s, ate) in ate.iter_mut().enumerate() {
-            *ate |= w.sims[s].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { .. }));
+            *ate |= w.sims[s]
+                .current()
+                .is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { .. }));
         }
     }
-    assert_eq!(ate.iter().filter(|&&a| a).count(), 1, "one of them was served ({ate:?})");
-    assert_eq!(w.households[0].funds, funds - 5, "the other paid nothing in the end");
+    assert_eq!(
+        ate.iter().filter(|&&a| a).count(),
+        1,
+        "one of them was served ({ate:?})"
+    );
+    assert_eq!(
+        w.households[0].funds,
+        funds - 5,
+        "the other paid nothing in the end"
+    );
 }
 
 /// Last orders: Ada sets off for the ice cream cart a minute before it closes (20:00) and gets there
@@ -680,14 +1041,25 @@ fn last_orders_at_closing_time() {
     until(&mut w, 19.0 + 59.0 / 60.0);
     let cart = object(&w, "iceCreamCart");
     let k = w.staff.server_of(cart).unwrap();
-    w.apply(Command::Use { sim: 0, object: cart, interaction: interaction(&w, cart, "iceCream") }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: cart,
+        interaction: interaction(&w, cart, "iceCream"),
+    })
+    .unwrap();
     let (mut served_after, mut ate) = (false, false);
     for _ in 0..30 * TICKS_PER_MINUTE {
         w.tick_once();
-        served_after |= sim_core::clock::hour(w.tick) >= 20.0 && w.staff.servers[k].serving == Some(0);
-        ate |= w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { .. }));
+        served_after |=
+            sim_core::clock::hour(w.tick) >= 20.0 && w.staff.servers[k].serving == Some(0);
+        ate |= w.sims[0]
+            .current()
+            .is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { .. }));
     }
-    assert!(served_after && ate, "served after 20:00 ({served_after}) and ate it ({ate})");
+    assert!(
+        served_after && ate,
+        "served after 20:00 ({served_after}) and ate it ({ate})"
+    );
     assert!(!w.staff.servers[k].present, "and the seller went home");
 }
 
@@ -706,7 +1078,10 @@ fn an_older_towns_counters_move_out_from_the_wall_for_their_server() {
         let mut back = 0;
         for o in old["objects"].as_array_mut().unwrap() {
             let id = o["def"].as_str().unwrap();
-            if ["shopCounter", "coffeeMachine", "bakeryCase"].contains(&id) && o["rot"] == 2 && o["z"] == 11 {
+            if ["shopCounter", "coffeeMachine", "bakeryCase"].contains(&id)
+                && o["rot"] == 2
+                && o["z"] == 11
+            {
                 o["z"] = json!(12);
                 back += 1;
             }
@@ -722,26 +1097,58 @@ fn an_older_towns_counters_move_out_from_the_wall_for_their_server() {
                 "plots": [{"name": place["name"], "x": 0, "z": 0, "w": w, "d": d, "public": true, "entry": entry}],
             });
             let world = World::from_json(&merged, &lot.to_string(), 1).unwrap();
-            let posts = |w: &World| w.objects.iter().filter(|o| w.content.objects[o.def].staff.is_some()).count();
+            let posts = |w: &World| {
+                w.objects
+                    .iter()
+                    .filter(|o| w.content.objects[o.def].staff.is_some())
+                    .count()
+            };
             let served = |w: &World| {
                 let staff = sim_core::staff::plan(w);
-                w.objects.iter().filter(|o| w.content.objects[o.def].staff.is_some() && staff.server_of(o.id).is_some()).count()
+                w.objects
+                    .iter()
+                    .filter(|o| {
+                        w.content.objects[o.def].staff.is_some() && staff.server_of(o.id).is_some()
+                    })
+                    .count()
             };
-            assert!(served(&world) < posts(&world), "{id}: the old layout leaves a post with nobody behind it");
+            assert!(
+                served(&world) < posts(&world),
+                "{id}: the old layout leaves a post with nobody behind it"
+            );
             let mut save: Value = serde_json::from_str(&world.save_json()).unwrap();
             // As saved by 0.4.2.
             save["version"] = json!(32);
             let loaded = World::from_save_json(&merged, &save.to_string()).unwrap();
-            assert_eq!(loaded.objects.len(), world.objects.len(), "{id}: nothing left out");
-            assert_eq!(served(&loaded), posts(&loaded), "{id}: every post has its server");
+            assert_eq!(
+                loaded.objects.len(),
+                world.objects.len(),
+                "{id}: nothing left out"
+            );
+            assert_eq!(
+                served(&loaded),
+                posts(&loaded),
+                "{id}: every post has its server"
+            );
             let stables = |w: &World| w.objects.iter().map(|o| o.stable).collect::<BTreeSet<_>>();
-            assert_eq!(stables(&loaded), stables(&world), "{id}: the same things, by id");
+            assert_eq!(
+                stables(&loaded),
+                stables(&world),
+                "{id}: the same things, by id"
+            );
             moved += back;
             // Saved since: left as it is.
             save["version"] = json!(33);
             let kept = World::from_save_json(&merged, &save.to_string()).unwrap();
-            assert_eq!(served(&kept), served(&world), "{id}: a v33 save is left as it was");
+            assert_eq!(
+                served(&kept),
+                served(&world),
+                "{id}: a v33 save is left as it was"
+            );
         }
     }
-    assert!(moved >= 6, "the café's and the bakery's (both sides of the street): {moved}");
+    assert!(
+        moved >= 6,
+        "the café's and the bakery's (both sides of the street): {moved}"
+    );
 }

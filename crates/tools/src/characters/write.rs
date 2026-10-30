@@ -50,8 +50,12 @@ pub fn pack_morph(n: usize, deltas: &Deltas, channels: &[&str]) -> Option<Morph>
     let mut moved = vec![false; n];
     let mut used: Vec<(&str, Vec<bool>)> = Vec::new();
     for &c in channels {
-        let Some((dp, dn)) = deltas.get(c) else { continue };
-        let m: Vec<bool> = (0..n).map(|i| dp[i].abs().max() > MORPH_EPS || dn[i].abs().max() > MORPH_EPS * 100.0).collect();
+        let Some((dp, dn)) = deltas.get(c) else {
+            continue;
+        };
+        let m: Vec<bool> = (0..n)
+            .map(|i| dp[i].abs().max() > MORPH_EPS || dn[i].abs().max() > MORPH_EPS * 100.0)
+            .collect();
         if m.iter().any(|&v| v) {
             for (a, &b) in moved.iter_mut().zip(&m) {
                 *a |= b;
@@ -81,7 +85,13 @@ pub fn pack_morph(n: usize, deltas: &Deltas, channels: &[&str]) -> Option<Morph>
             None => ranges.push(*ranges.last().unwrap()),
         }
     }
-    Some(Morph { verts, slots, dpos, dnor, ranges })
+    Some(Morph {
+        verts,
+        slots,
+        dpos,
+        dnor,
+        ranges,
+    })
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -135,7 +145,9 @@ impl Blob {
 }
 
 fn i16s(v: impl IntoIterator<Item = f64>) -> Vec<u8> {
-    v.into_iter().flat_map(|x| (x as i16).to_le_bytes()).collect()
+    v.into_iter()
+        .flat_map(|x| (x as i16).to_le_bytes())
+        .collect()
 }
 
 fn q(x: f64, scale: f64, lim: f64) -> f64 {
@@ -158,29 +170,88 @@ pub fn write_parts(path: &Path, parts: &[(String, Mesh)]) -> io::Result<OMap<Par
             js.push(j);
             wq.push(q);
         }
-        let positions = blob.add(part.pos.iter().flat_map(|p| [p.x as f32, p.y as f32, p.z as f32]).flat_map(f32::to_le_bytes));
+        let positions = blob.add(
+            part.pos
+                .iter()
+                .flat_map(|p| [p.x as f32, p.y as f32, p.z as f32])
+                .flat_map(f32::to_le_bytes),
+        );
         let normals = blob.add(i16s(part.nor.iter().flat_map(|nv| {
             let u = unit(nv);
-            [(u.x * 32767.0).round_ties_even(), (u.y * 32767.0).round_ties_even(), (u.z * 32767.0).round_ties_even(), 0.0]
+            [
+                (u.x * 32767.0).round_ties_even(),
+                (u.y * 32767.0).round_ties_even(),
+                (u.z * 32767.0).round_ties_even(),
+                0.0,
+            ]
         })));
         let joints = blob.add(js.iter().flat_map(|j| j.map(|v| v as u8)));
         let weights = blob.add(wq.iter().flat_map(|w| w.map(|v| v as u8)));
         let zeros = vec![[0.0; 4]; n];
-        let f = if part.fields.is_empty() { &zeros } else { &part.fields };
-        let fields = blob.add(i16s(f.iter().flat_map(|v| v.map(|x| q(x, FIELD_SCALE, 32767.0)))));
-        let t = if part.tone.is_empty() { &zeros } else { &part.tone };
-        let tone = blob.add(i16s(t.iter().flat_map(|v| v.map(|x| q(x, TONE_SCALE, 32767.0)))));
+        let f = if part.fields.is_empty() {
+            &zeros
+        } else {
+            &part.fields
+        };
+        let fields = blob.add(i16s(
+            f.iter().flat_map(|v| v.map(|x| q(x, FIELD_SCALE, 32767.0))),
+        ));
+        let t = if part.tone.is_empty() {
+            &zeros
+        } else {
+            &part.tone
+        };
+        let tone = blob.add(i16s(
+            t.iter().flat_map(|v| v.map(|x| q(x, TONE_SCALE, 32767.0))),
+        ));
         // Clockwise, the game's front faces.
-        let index = blob.add(part.idx.chunks(3).flat_map(|t| [t[0], t[2], t[1]]).flat_map(|i| (i as u16).to_le_bytes()));
+        let index = blob.add(
+            part.idx
+                .chunks(3)
+                .flat_map(|t| [t[0], t[2], t[1]])
+                .flat_map(|i| (i as u16).to_le_bytes()),
+        );
         let morph = part.morph.as_ref().map(|m| {
             let morph_verts = blob.add(m.verts.iter().flat_map(|&v| (v as u16).to_le_bytes()));
             let morph_slots = blob.add(m.slots.iter().flat_map(|&v| (v as u16).to_le_bytes()));
-            let morph_positions = blob.add(i16s(m.dpos.iter().flat_map(|d| [q(d.x, MORPH_SCALE, 32767.0), q(d.y, MORPH_SCALE, 32767.0), q(d.z, MORPH_SCALE, 32767.0), 0.0])));
-            let morph_normals = blob.add(m.dnor.iter().flat_map(|d| [q(d.x, NORMAL_SCALE, 127.0), q(d.y, NORMAL_SCALE, 127.0), q(d.z, NORMAL_SCALE, 127.0), 0.0]).map(|x| x as i8 as u8));
-            MorphEntry { count: m.verts.len(), ranges: m.ranges.clone(), morph_verts, morph_slots, morph_positions, morph_normals }
+            let morph_positions = blob.add(i16s(m.dpos.iter().flat_map(|d| {
+                [
+                    q(d.x, MORPH_SCALE, 32767.0),
+                    q(d.y, MORPH_SCALE, 32767.0),
+                    q(d.z, MORPH_SCALE, 32767.0),
+                    0.0,
+                ]
+            })));
+            let morph_normals = blob.add(
+                m.dnor
+                    .iter()
+                    .flat_map(|d| {
+                        [
+                            q(d.x, NORMAL_SCALE, 127.0),
+                            q(d.y, NORMAL_SCALE, 127.0),
+                            q(d.z, NORMAL_SCALE, 127.0),
+                            0.0,
+                        ]
+                    })
+                    .map(|x| x as i8 as u8),
+            );
+            MorphEntry {
+                count: m.verts.len(),
+                ranges: m.ranges.clone(),
+                morph_verts,
+                morph_slots,
+                morph_positions,
+                morph_normals,
+            }
         });
-        let mn = part.pos.iter().fold(V3::repeat(f64::INFINITY), |a, p| a.inf(p));
-        let mx = part.pos.iter().fold(V3::repeat(f64::NEG_INFINITY), |a, p| a.sup(p));
+        let mn = part
+            .pos
+            .iter()
+            .fold(V3::repeat(f64::INFINITY), |a, p| a.inf(p));
+        let mx = part
+            .pos
+            .iter()
+            .fold(V3::repeat(f64::NEG_INFINITY), |a, p| a.sup(p));
         table.insert(
             name.clone(),
             PartEntry {
@@ -204,7 +275,11 @@ pub fn write_parts(path: &Path, parts: &[(String, Mesh)]) -> io::Result<OMap<Par
 }
 
 /// A life stage: per part, int16 position deltas from the base (x STAGE_SCALE) and int8 normals.
-pub fn write_stage(path: &Path, base: &[(String, Mesh)], stage: &[(String, Mesh)]) -> io::Result<OMap<StagePart>> {
+pub fn write_stage(
+    path: &Path,
+    base: &[(String, Mesh)],
+    stage: &[(String, Mesh)],
+) -> io::Result<OMap<StagePart>> {
     let mut blob = Blob(Vec::new());
     let mut table = OMap::new();
     for (name, part) in stage {
@@ -212,12 +287,27 @@ pub fn write_stage(path: &Path, base: &[(String, Mesh)], stage: &[(String, Mesh)
         assert_eq!(part.pos.len(), b.pos.len(), "{name}");
         let positions = blob.add(i16s(part.pos.iter().zip(&b.pos).flat_map(|(p, q0)| {
             let d = p - q0;
-            [q(d.x, STAGE_SCALE, 32767.0), q(d.y, STAGE_SCALE, 32767.0), q(d.z, STAGE_SCALE, 32767.0), 0.0]
+            [
+                q(d.x, STAGE_SCALE, 32767.0),
+                q(d.y, STAGE_SCALE, 32767.0),
+                q(d.z, STAGE_SCALE, 32767.0),
+                0.0,
+            ]
         })));
-        let normals = blob.add(part.nor.iter().flat_map(|nv| {
-            let u = unit(nv);
-            [(u.x * 127.0).round_ties_even(), (u.y * 127.0).round_ties_even(), (u.z * 127.0).round_ties_even(), 0.0]
-        }).map(|x| x as i8 as u8));
+        let normals = blob.add(
+            part.nor
+                .iter()
+                .flat_map(|nv| {
+                    let u = unit(nv);
+                    [
+                        (u.x * 127.0).round_ties_even(),
+                        (u.y * 127.0).round_ties_even(),
+                        (u.z * 127.0).round_ties_even(),
+                        0.0,
+                    ]
+                })
+                .map(|x| x as i8 as u8),
+        );
         table.insert(name.clone(), StagePart { positions, normals });
     }
     std::fs::write(path, &blob.0)?;

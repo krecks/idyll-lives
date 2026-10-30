@@ -92,7 +92,9 @@ mod tests {
     const SR: f64 = 24_000.0;
 
     fn sine(freq: f64, n: usize) -> Vec<f32> {
-        (0..n).map(|i| (2.0 * std::f64::consts::PI * freq * i as f64 / SR).sin() as f32 * 0.5).collect()
+        (0..n)
+            .map(|i| (2.0 * std::f64::consts::PI * freq * i as f64 / SR).sin() as f32 * 0.5)
+            .collect()
     }
 
     /// Amplitude of `freq` in `x` (a single-bin DFT over the middle, away from the edges).
@@ -122,8 +124,15 @@ mod tests {
         for depth in [0.82f32, 0.9, 1.1, 1.15] {
             let y = resample(&x, depth);
             let moved = 1000.0 * depth as f64;
-            assert!((level(&y, moved) - 0.5).abs() < 0.01, "depth {depth}: {}", level(&y, moved));
-            assert!(level(&y, 1000.0) < 0.01, "depth {depth}: old frequency left");
+            assert!(
+                (level(&y, moved) - 0.5).abs() < 0.01,
+                "depth {depth}: {}",
+                level(&y, moved)
+            );
+            assert!(
+                level(&y, 1000.0) < 0.01,
+                "depth {depth}: old frequency left"
+            );
         }
     }
 
@@ -134,7 +143,11 @@ mod tests {
         let x = sine(11_500.0, 24_000);
         let y = resample(&x, 1.15);
         let folded = SR - 11_500.0 * 1.15;
-        assert!(level(&y, folded) < 0.5 * 1e-3, "aliased: {}", level(&y, folded));
+        assert!(
+            level(&y, folded) < 0.5 * 1e-3,
+            "aliased: {}",
+            level(&y, folded)
+        );
         // And speech-band content passes unchanged.
         let y = resample(&sine(3000.0, 24_000), 1.15);
         assert!((level(&y, 3450.0) - 0.5).abs() < 0.01);
@@ -142,7 +155,9 @@ mod tests {
 
     #[test]
     fn deterministic() {
-        let x: Vec<f32> = (0..5000).map(|i| ((i * 7919 % 1000) as f32 / 500.0) - 1.0).collect();
+        let x: Vec<f32> = (0..5000)
+            .map(|i| ((i * 7919 % 1000) as f32 / 500.0) - 1.0)
+            .collect();
         assert_eq!(resample(&x, 0.85), resample(&x, 0.85));
     }
 }

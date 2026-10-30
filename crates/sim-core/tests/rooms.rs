@@ -43,7 +43,8 @@ fn room(w: &World, x: i32, z: i32) -> &sim_core::rooms::RoomInfo {
 }
 
 fn kind(w: &World, r: &sim_core::rooms::RoomInfo) -> String {
-    r.kind.map_or("none".into(), |k| w.content.room_kinds[k].id.clone())
+    r.kind
+        .map_or("none".into(), |k| w.content.room_kinds[k].id.clone())
 }
 
 #[test]
@@ -54,15 +55,24 @@ fn rooms_get_a_kind_and_scores() {
     let bath = room(&w, 1, 1);
     assert_eq!(kind(&w, bath), "bathroom");
     assert_eq!((bath.tiles, bath.windows, bath.doors), (4.0, 1, 1));
-    assert!((bath.scores.size - (0.5 + 0.5 / 3.0)).abs() < 1e-4, "4 tiles between cramped 3 and comfortable 6");
-    assert!((bath.scores.light - 0.5).abs() < 1e-4, "full daylight from one window, no lamp at night");
+    assert!(
+        (bath.scores.size - (0.5 + 0.5 / 3.0)).abs() < 1e-4,
+        "4 tiles between cramped 3 and comfortable 6"
+    );
+    assert!(
+        (bath.scores.light - 0.5).abs() < 1e-4,
+        "full daylight from one window, no lamp at night"
+    );
     assert_eq!((bath.scores.function, bath.scores.clean), (1.0, 1.0));
 
     let living = room(&w, 7, 2);
     assert_eq!(kind(&w, living), "living");
     assert_eq!((living.tiles, living.windows, living.lamps), (20.0, 3, 1));
     assert!((living.scores.light - (0.9 + 0.5) / 2.0).abs() < 1e-4);
-    assert!((living.scores.decor - (1.0 / (20.0 * 0.125)) * 0.8).abs() < 1e-4, "the lamp is decor too");
+    assert!(
+        (living.scores.decor - (1.0 / (20.0 * 0.125)) * 0.8).abs() < 1e-4,
+        "the lamp is decor too"
+    );
 
     let mixed = room(&w, 12, 2);
     assert_eq!(kind(&w, mixed), "bathroom", "the first kind that fits");
@@ -90,9 +100,17 @@ fn a_room_people_pass_through_is_a_hallway() {
         "objects":[{"def":"lamp","x":1,"z":1},{"def":"sofa","x":4,"z":2}]}"#;
     let w = World::from_json(&content, town, 1).unwrap();
     let hall = room(&w, 1, 3);
-    assert_eq!(kind(&w, hall), "hall", "nothing in it says what it is for, and it has two doors");
+    assert_eq!(
+        kind(&w, hall),
+        "hall",
+        "nothing in it says what it is for, and it has two doors"
+    );
     assert_eq!(hall.scores.function, 1.0);
-    assert_eq!(kind(&w, room(&w, 4, 3)), "living", "a room something in is for is that, doors or not");
+    assert_eq!(
+        kind(&w, room(&w, 4, 3)),
+        "living",
+        "a room something in is for is that, doors or not"
+    );
     assert_eq!(kind(&w, room(&w, 9, 2)), "none", "one door: a spare room");
 }
 
@@ -101,19 +119,35 @@ fn scores_follow_the_house_as_it_changes() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     let before = room(&w, 1, 1).scores;
     // A floor covering is decor.
-    let tiles = (1..3).flat_map(|x| (1..3).map(move |z| FloorPaint { x, z, covering: 1 })).collect();
-    w.apply(Command::PaintFloor { household: 0, tiles }).unwrap();
+    let tiles = (1..3)
+        .flat_map(|x| (1..3).map(move |z| FloorPaint { x, z, covering: 1 }))
+        .collect();
+    w.apply(Command::PaintFloor {
+        household: 0,
+        tiles,
+    })
+    .unwrap();
     assert!(room(&w, 1, 1).scores.decor > before.decor);
 
     // Without the sink, the bathroom misses somewhere to wash.
-    w.apply(Command::Sell { household: 0, object: 1 }).unwrap();
+    w.apply(Command::Sell {
+        household: 0,
+        object: 1,
+    })
+    .unwrap();
     let bath = room(&w, 1, 1);
     assert_eq!(bath.missing, Some(1));
     assert_eq!(bath.scores.function, 0.7);
 
     // Splitting the living room: two smaller rooms, one with the window on the right.
-    let edits = (1..5).map(|z| EdgeEdit::new(EdgeAxis::V, 9, z, EdgeKind::Wall)).collect();
-    w.apply(Command::Build { household: 0, edits }).unwrap();
+    let edits = (1..5)
+        .map(|z| EdgeEdit::new(EdgeAxis::V, 9, z, EdgeKind::Wall))
+        .collect();
+    w.apply(Command::Build {
+        household: 0,
+        edits,
+    })
+    .unwrap();
     assert_eq!(room(&w, 9, 3).tiles, 4.0);
     assert_eq!(room(&w, 9, 3).windows, 1);
     assert_eq!(room(&w, 7, 2).tiles, 16.0);
@@ -144,22 +178,57 @@ const CLOSET: &str = r#"{"width":12,"depth":10,
 fn a_room_with_no_outside_wall_is_lit_by_its_lamps() {
     let mut w = World::from_json(CONTENT, CLOSET, 1).unwrap();
     let closet = room(&w, 3, 2);
-    assert_eq!((closet.tiles, closet.windows, closet.lamps, closet.outside), (4.0, 0, 1, false));
-    assert!((closet.scores.light - 1.0).abs() < 1e-4, "one lamp for 4 tiles, by day too: {}", closet.scores.light);
+    assert_eq!(
+        (closet.tiles, closet.windows, closet.lamps, closet.outside),
+        (4.0, 0, 1, false)
+    );
+    assert!(
+        (closet.scores.light - 1.0).abs() < 1e-4,
+        "one lamp for 4 tiles, by day too: {}",
+        closet.scores.light
+    );
     let ring = room(&w, 1, 1);
-    assert_eq!((ring.tiles, ring.windows, ring.lamps, ring.outside), (31.0, 0, 1, true));
-    assert!((ring.scores.light - 0.5 * 10.0 / 31.0).abs() < 1e-4, "no daylight: {}", ring.scores.light);
+    assert_eq!(
+        (ring.tiles, ring.windows, ring.lamps, ring.outside),
+        (31.0, 0, 1, true)
+    );
+    assert!(
+        (ring.scores.light - 0.5 * 10.0 / 31.0).abs() < 1e-4,
+        "no daylight: {}",
+        ring.scores.light
+    );
 
     // Without its lamp the closet is dark.
-    w.apply(Command::Sell { household: 0, object: 0 }).unwrap();
+    w.apply(Command::Sell {
+        household: 0,
+        object: 0,
+    })
+    .unwrap();
     assert_eq!(room(&w, 3, 2).scores.light, 0.0);
     // With a window the ring gets daylight.
-    w.apply(Command::Build { household: 0, edits: vec![EdgeEdit::new(EdgeAxis::H, 6, 1, EdgeKind::Window)] }).unwrap();
+    w.apply(Command::Build {
+        household: 0,
+        edits: vec![EdgeEdit::new(EdgeAxis::H, 6, 1, EdgeKind::Window)],
+    })
+    .unwrap();
     let ring = room(&w, 1, 1);
-    assert!((ring.scores.light - 0.5 * (6.0 + 10.0) / 31.0).abs() < 1e-4, "{}", ring.scores.light);
+    assert!(
+        (ring.scores.light - 0.5 * (6.0 + 10.0) / 31.0).abs() < 1e-4,
+        "{}",
+        ring.scores.light
+    );
     // Moving a closet wall onto the outside wall makes it an outside room (dark by day).
-    let edits = vec![EdgeEdit::new(EdgeAxis::H, 3, 2, EdgeKind::Open), EdgeEdit::new(EdgeAxis::H, 4, 2, EdgeKind::Open), EdgeEdit::new(EdgeAxis::V, 3, 1, EdgeKind::Wall), EdgeEdit::new(EdgeAxis::V, 5, 1, EdgeKind::Wall)];
-    w.apply(Command::Build { household: 0, edits }).unwrap();
+    let edits = vec![
+        EdgeEdit::new(EdgeAxis::H, 3, 2, EdgeKind::Open),
+        EdgeEdit::new(EdgeAxis::H, 4, 2, EdgeKind::Open),
+        EdgeEdit::new(EdgeAxis::V, 3, 1, EdgeKind::Wall),
+        EdgeEdit::new(EdgeAxis::V, 5, 1, EdgeKind::Wall),
+    ];
+    w.apply(Command::Build {
+        household: 0,
+        edits,
+    })
+    .unwrap();
     let closet = room(&w, 3, 1);
     assert_eq!((closet.tiles, closet.outside), (6.0, true));
 }
@@ -174,7 +243,10 @@ fn lamps_light_as_much_floor_as_they_say() {
         let living = room(&w, 7, 2);
         assert_eq!((living.lamps, living.lit), (1, lit), "{def}");
         let night = (lit / 20.0).min(1.0);
-        assert!((living.scores.light - (0.9 + night) / 2.0).abs() < 1e-4, "{def}: three windows by day, the {def} at night");
+        assert!(
+            (living.scores.light - (0.9 + night) / 2.0).abs() < 1e-4,
+            "{def}: three windows by day, the {def} at night"
+        );
     }
 }
 
@@ -183,7 +255,18 @@ fn lamps_light_as_much_floor_as_they_say() {
 #[test]
 fn lamps_keep_out_of_doorways() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-    let buy = |w: &mut World, x: i32, z: i32, rot: i32| w.apply(Command::Buy { household: 0, object: "lamp".into(), at: Some([x, z, rot]), colors: Default::default(), turn: None, offset: None, size: None, tall: None });
+    let buy = |w: &mut World, x: i32, z: i32, rot: i32| {
+        w.apply(Command::Buy {
+            household: 0,
+            object: "lamp".into(),
+            at: Some([x, z, rot]),
+            colors: Default::default(),
+            turn: None,
+            offset: None,
+            size: None,
+            tall: None,
+        })
+    };
     // The living room's door is on its bottom wall at x 6: (6, 4) inside, (6, 5) outside.
     for (x, z, rot) in [(6, 4, 2), (6, 5, 0)] {
         let err = buy(&mut w, x, z, rot).unwrap_err().to_string();
@@ -191,10 +274,33 @@ fn lamps_keep_out_of_doorways() {
     }
     buy(&mut w, 8, 4, 2).expect("further along the wall is fine");
     // Nor moved there.
-    let lamp = w.objects.iter().position(|o| w.content.objects[o.def].id == "lamp" && (o.x, o.z) == (5, 1)).unwrap() as u32;
-    let to = |x, z| Command::MoveObject { household: 0, object: lamp, x, z, rot: 2, turn: None, offset: None, size: None, tall: None };
-    assert!(w.apply(to(6, 4)).unwrap_err().to_string().contains("doorway"));
-    assert_eq!((w.objects[lamp as usize].x, w.objects[lamp as usize].z), (5, 1), "it stays put");
+    let lamp = w
+        .objects
+        .iter()
+        .position(|o| w.content.objects[o.def].id == "lamp" && (o.x, o.z) == (5, 1))
+        .unwrap() as u32;
+    let to = |x, z| Command::MoveObject {
+        household: 0,
+        object: lamp,
+        x,
+        z,
+        rot: 2,
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    };
+    assert!(
+        w.apply(to(6, 4))
+            .unwrap_err()
+            .to_string()
+            .contains("doorway")
+    );
+    assert_eq!(
+        (w.objects[lamp as usize].x, w.objects[lamp as usize].z),
+        (5, 1),
+        "it stays put"
+    );
     w.apply(to(9, 4)).expect("into a corner");
 }
 
@@ -235,19 +341,29 @@ fn two_rooms(seed: u32) -> World {
 #[test]
 fn surroundings_follow_the_room_and_draw_residents_to_nicer_ones() {
     let w = two_rooms(1);
-    let (good, bad) = (room(&w, 3, 3).scores.overall, room(&w, 15, 3).scores.overall);
+    let (good, bad) = (
+        room(&w, 3, 3).scores.overall,
+        room(&w, 15, 3).scores.overall,
+    );
     assert!(good > 0.7 && bad < 0.4, "good {good}, bad {bad}");
 
     // Sitting in the bright room for four hours lifts the need towards its score.
     let mut w = two_rooms(1);
     w.sims[0].pos = [3.5, 3.5];
     w.sims[0].needs[1] = 0.2;
-    w.apply(sim_core::Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(sim_core::Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     for _ in 0..4 * 60 * 20 {
         w.tick_once();
     }
     let need = w.sims[0].needs[1];
-    assert!((need - good).abs() < 0.15, "surroundings {need} near the room's {good}");
+    assert!(
+        (need - good).abs() < 0.15,
+        "surroundings {need} near the room's {good}"
+    );
 
     // Low on comfort and in poor surroundings, Ada mostly picks the sofa in the nicer room.
     let (mut nice, mut grim) = (0, 0);
@@ -290,9 +406,18 @@ const KITCHEN: &str = r#"{"width":12,"depth":10,
 #[test]
 fn using_things_makes_a_mess_and_residents_tidy_it_up() {
     let mut w = World::from_json(MESS_CONTENT, KITCHEN, 3).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     // Cooking leaves a mess in front of the fridge (and a little around it).
-    w.apply(Command::Use { sim: 0, object: 0, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: 0,
+        interaction: 0,
+    })
+    .unwrap();
     for _ in 0..45 * 20 {
         w.tick_once();
     }
@@ -309,7 +434,11 @@ fn using_things_makes_a_mess_and_residents_tidy_it_up() {
     assert!((loaded.dirt[front] - 0.3).abs() < 0.01);
 
     // With free will, the neat resident tidies it up.
-    w.apply(Command::SetAutonomy { enabled: true, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: true,
+        household: None,
+    })
+    .unwrap();
     w.sims[0].needs[0] = 1.0;
     let mut tidied = false;
     for _ in 0..3 * 60 * 20 {
@@ -335,7 +464,12 @@ fn two_tidy_residents_dont_both_go_for_the_same_mess() {
         s.needs[0] = 1.0;
     }
     // Bo is a step away first; Ada sets off for the worst of it before he's free.
-    w.apply(Command::MoveTo { sim: 1, x: 10.5, z: 8.5 }).unwrap();
+    w.apply(Command::MoveTo {
+        sim: 1,
+        x: 10.5,
+        z: 8.5,
+    })
+    .unwrap();
     let cleaning = |w: &World, i: usize| match w.sims[i].current().map(|a| a.task.kind) {
         Some(sim_core::world::TaskKind::Clean { x, z }) => Some((x, z)),
         _ => None,
@@ -345,5 +479,10 @@ fn two_tidy_residents_dont_both_go_for_the_same_mess() {
         let (a, b) = (cleaning(&w, 0), cleaning(&w, 1));
         assert!(a.is_none() || a != b, "both went for the mess at {a:?}");
     }
-    assert!(w.dirt[worst] < 0.5 && w.dirt[other] < 0.1, "both tidied: {:.2} {:.2}", w.dirt[worst], w.dirt[other]);
+    assert!(
+        w.dirt[worst] < 0.5 && w.dirt[other] < 0.1,
+        "both tidied: {:.2} {:.2}",
+        w.dirt[worst],
+        w.dirt[other]
+    );
 }

@@ -2,10 +2,30 @@
 //! cardinals, ordinals, years and simple decimals.
 
 const ONES: [&str; 20] = [
-    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
-    "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
 ];
-const TENS: [&str; 10] = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+const TENS: [&str; 10] = [
+    "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+];
 const SCALES: [(u64, &str); 4] = [
     (1_000_000_000_000, "trillion"),
     (1_000_000_000, "billion"),
@@ -20,12 +40,20 @@ pub fn cardinal(n: u64) -> String {
     }
     if n < 100 {
         let (t, o) = (n / 10, n % 10);
-        return if o == 0 { TENS[t as usize].to_owned() } else { format!("{}-{}", TENS[t as usize], ONES[o as usize]) };
+        return if o == 0 {
+            TENS[t as usize].to_owned()
+        } else {
+            format!("{}-{}", TENS[t as usize], ONES[o as usize])
+        };
     }
     if n < 1000 {
         let (h, rest) = (n / 100, n % 100);
         let head = format!("{} hundred", ONES[h as usize]);
-        return if rest == 0 { head } else { format!("{head} and {}", cardinal(rest)) };
+        return if rest == 0 {
+            head
+        } else {
+            format!("{head} and {}", cardinal(rest))
+        };
     }
     for (scale, name) in SCALES {
         if n >= scale {

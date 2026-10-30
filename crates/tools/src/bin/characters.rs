@@ -19,10 +19,18 @@ fn main() -> ExitCode {
                 eprintln!("build: {e}");
                 return ExitCode::FAILURE;
             }
-            if check::check(&out) { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+            if check::check(&out) {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            }
         }
         Some("check") => {
-            if check::check(&dir(1)) { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+            if check::check(&dir(1)) {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            }
         }
         Some("diff") => {
             let verbose = args.iter().any(|a| a == "-v");
@@ -34,7 +42,11 @@ fn main() -> ExitCode {
             match diff::diff(a.as_ref(), b.as_ref()) {
                 Ok(r) => {
                     diff::print(&r, verbose);
-                    if r.failures.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+                    if r.failures.is_empty() {
+                        ExitCode::SUCCESS
+                    } else {
+                        ExitCode::FAILURE
+                    }
                 }
                 Err(e) => {
                     eprintln!("diff: {e}");

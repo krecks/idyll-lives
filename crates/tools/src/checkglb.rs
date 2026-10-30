@@ -23,7 +23,10 @@ mod json;
 mod py;
 
 use glb::{Glb, R, accessor, first_value, image_size, index, item, key, parse_glb, values};
-use py::{J, Num, dist, dirname, fixed, hypot, join, normpath, percent, relpath, repr, repr_str, signed, str_of};
+use py::{
+    J, Num, dirname, dist, fixed, hypot, join, normpath, percent, relpath, repr, repr_str, signed,
+    str_of,
+};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::f64::consts::PI;
 
@@ -32,11 +35,24 @@ pub use py::repr_str as py_repr_str;
 /// Triangles at full detail by the model's largest side (m): (up to, target, most). About the
 /// primitive parts' median and 90th percentile in each class, so a model costs what the
 /// primitive models cost today (docs/design/objects.md, "Budgets").
-const TRIANGLES: [(f64, i64, i64); 4] = [(0.35, 1500, 3000), (1.0, 4000, 8000), (2.5, 8000, 16000), (f64::INFINITY, 12000, 24000)];
+const TRIANGLES: [(f64, i64, i64); 4] = [
+    (0.35, 1500, 3000),
+    (1.0, 4000, 8000),
+    (2.5, 8000, 16000),
+    (f64::INFINITY, 12000, 24000),
+];
 /// Draw calls per model (each its own in the sun's shadow map too): aim for 1-3.
 const DRAWS: (usize, usize) = (3, 4);
 /// Extensions the game's loader can read (no Draco: its decoder isn't shipped).
-const EXTENSIONS: [&str; 7] = ["KHR_materials_emissive_strength", "KHR_mesh_quantization", "KHR_texture_transform", "KHR_texture_basisu", "EXT_meshopt_compression", "KHR_materials_ior", "KHR_materials_specular"];
+const EXTENSIONS: [&str; 7] = [
+    "KHR_materials_emissive_strength",
+    "KHR_mesh_quantization",
+    "KHR_texture_transform",
+    "KHR_texture_basisu",
+    "EXT_meshopt_compression",
+    "KHR_materials_ior",
+    "KHR_materials_specular",
+];
 /// Largest texture side (px).
 const TEXTURE_MAX: u32 = 1024;
 /// The wall's face lies this far into a footprint's back tile (m): a wall-standing thing's back is there.
@@ -92,7 +108,10 @@ impl Paths {
             here: normpath(&join(&root, "tools/art/blender")),
             assets: normpath(&join(&root, "web/public/assets")),
             content: normpath(&join(&root, "web/public/content")),
-            furniture: normpath(&join(&root, "web/src/render/shared/characters/furniture.json")),
+            furniture: normpath(&join(
+                &root,
+                "web/src/render/shared/characters/furniture.json",
+            )),
             centres: normpath(&join(&root, "tools/art/blender/centres.json")),
         }
     }
@@ -128,7 +147,14 @@ pub fn centres_text(centres: &BTreeMap<String, [f64; 2]>) -> String {
     let round4 = |v: f64| format!("{v:.4}").parse::<f64>().unwrap() + 0.0;
     let lines: Vec<String> = centres
         .iter()
-        .map(|(key, c)| format!("  {}: [{}, {}]", py::json_str(key), py::float_repr(round4(c[0])), py::float_repr(round4(c[1]))))
+        .map(|(key, c)| {
+            format!(
+                "  {}: [{}, {}]",
+                py::json_str(key),
+                py::float_repr(round4(c[0])),
+                py::float_repr(round4(c[1]))
+            )
+        })
         .collect();
     format!("{{\n{}\n}}\n", lines.join(",\n"))
 }
@@ -136,17 +162,36 @@ pub fn centres_text(centres: &BTreeMap<String, [f64; 2]>) -> String {
 /// [(path, manifest)] for a manifest and the packs it lists, depth first, in order. A manifest that can't
 /// be read, or packs nested more than 20 deep (a pack listing itself), is an error naming it.
 pub fn manifests(paths: &Paths, path: &str) -> Result<Vec<(String, J)>, String> {
-    fn stack(paths: &Paths, path: &str, depth: usize, out: &mut Vec<(String, J)>) -> Result<(), String> {
+    fn stack(
+        paths: &Paths,
+        path: &str,
+        depth: usize,
+        out: &mut Vec<(String, J)>,
+    ) -> Result<(), String> {
         let name = || relpath(&normpath(path), &dirname(&paths.assets));
         if depth > 20 {
             return Err(format!("{}: packs nested too deep", name()));
         }
         let m = read_json(path).map_err(|e| format!("{}: {e}", name()))?;
-        let packs: Vec<J> = m.get("packs").and_then(J::list).map(|l| l.to_vec()).unwrap_or_default();
+        let packs: Vec<J> = m
+            .get("packs")
+            .and_then(J::list)
+            .map(|l| l.to_vec())
+            .unwrap_or_default();
         out.push((path.to_string(), m));
         for pack in packs {
-            let pack = pack.str().ok_or_else(|| format!("expected str, bytes or os.PathLike object, not {}", glb::type_name(&pack)))?;
-            stack(paths, &normpath(&join(&dirname(path), pack)), depth + 1, out)?;
+            let pack = pack.str().ok_or_else(|| {
+                format!(
+                    "expected str, bytes or os.PathLike object, not {}",
+                    glb::type_name(&pack)
+                )
+            })?;
+            stack(
+                paths,
+                &normpath(&join(&dirname(path), pack)),
+                depth + 1,
+                out,
+            )?;
         }
         Ok(())
     }
@@ -171,19 +216,41 @@ pub struct Content {
 /// Reads the content; a file that can't be read is an error naming it.
 pub fn content(paths: &Paths) -> Result<Content, String> {
     let read = |name: &str| -> Result<J, String> {
-        let data = read_json(&join(&paths.content, name)).map_err(|e| format!("web/public/content/{name}: {e}"))?;
+        let data = read_json(&join(&paths.content, name))
+            .map_err(|e| format!("web/public/content/{name}: {e}"))?;
         match data {
             J::Obj(_) => Ok(data),
-            _ => Err(format!("web/public/content/{name}: a content file is a JSON object")),
+            _ => Err(format!(
+                "web/public/content/{name}: a content file is a JSON object"
+            )),
         }
     };
     let base = read("base.json")?;
     let mut files = vec![base.clone()];
     for name in base.get("include").and_then(J::list).unwrap_or(&[]) {
-        files.push(read(name.str().ok_or("expected str, bytes or os.PathLike object")?)?);
+        files.push(read(
+            name.str()
+                .ok_or("expected str, bytes or os.PathLike object")?,
+        )?);
     }
-    let all = |k: &str| -> Vec<J> { files.iter().flat_map(|f| f.get(k).filter(|v| v.truthy()).and_then(J::list).unwrap_or(&[]).iter().cloned()).collect() };
-    Ok(Content { objects: all("objects"), items: all("items"), categories: all("buyCategories") })
+    let all = |k: &str| -> Vec<J> {
+        files
+            .iter()
+            .flat_map(|f| {
+                f.get(k)
+                    .filter(|v| v.truthy())
+                    .and_then(J::list)
+                    .unwrap_or(&[])
+                    .iter()
+                    .cloned()
+            })
+            .collect()
+    };
+    Ok(Content {
+        objects: all("objects"),
+        items: all("items"),
+        categories: all("buyCategories"),
+    })
 }
 
 /// The model a content object (`prefix` model) or item (item) draws, as the renderer picks it
@@ -199,7 +266,10 @@ fn model_key(d: &J, prefix: &str) -> R<String> {
 /// (`model_key`). The game's own models (the rock, the marker, the street's) are drawn by code and aren't here.
 fn content_keys(defs: &Content) -> R<BTreeMap<String, String>> {
     let mut keys = BTreeMap::new();
-    for (kind, prefix, found) in [("object", "model", &defs.objects), ("item", "item", &defs.items)] {
+    for (kind, prefix, found) in [
+        ("object", "model", &defs.objects),
+        ("item", "item", &defs.items),
+    ] {
         for d in found {
             let what = format!("{kind} {}", str_of(key(d, "id")?));
             keys.entry(model_key(d, prefix)?).or_insert(what);
@@ -211,9 +281,17 @@ fn content_keys(defs: &Content) -> R<BTreeMap<String, String>> {
 /// The model keys a build may write (gamekit/manifest.py `known_keys`, without a pack of its own): every
 /// content object's and item's model, and every model entry of the manifests.
 pub fn known_keys(paths: &Paths) -> Result<BTreeSet<String>, String> {
-    let mut known: BTreeSet<String> = content_keys(&content(paths)?)?.into_keys().filter(|k| !k.is_empty()).collect();
+    let mut known: BTreeSet<String> = content_keys(&content(paths)?)?
+        .into_keys()
+        .filter(|k| !k.is_empty())
+        .collect();
     for (_path, m) in asset_manifests(paths)? {
-        for (k, e) in m.get("entries").filter(|e| e.truthy()).and_then(J::entries).unwrap_or(&[]) {
+        for (k, e) in m
+            .get("entries")
+            .filter(|e| e.truthy())
+            .and_then(J::entries)
+            .unwrap_or(&[])
+        {
             if e.get("type") == Some(&J::Str("model".into())) {
                 known.insert(k.clone());
             }
@@ -243,19 +321,49 @@ fn content_objects(defs: &Content) -> R<HashMap<String, Vec<Facts>>> {
     for o in &defs.objects {
         let category = o.get("category").unwrap_or(&J::Null);
         // {c.get('id'): c}: the last with that id.
-        let c = defs.categories.iter().rev().find(|c| c.get("id").unwrap_or(&J::Null) == category).unwrap_or(&none);
+        let c = defs
+            .categories
+            .iter()
+            .rev()
+            .find(|c| c.get("id").unwrap_or(&J::Null) == category)
+            .unwrap_or(&none);
         let group_id = o.get("group").unwrap_or(&J::Null);
-        let groups = c.get("groups").filter(|g| g.truthy()).and_then(J::list).unwrap_or(&[]);
-        let group = groups.iter().find(|g| g.get("id").unwrap_or(&J::Null) == group_id).unwrap_or(&none);
-        let outside = group.get("outside").or(c.get("outside")).map(J::truthy).unwrap_or(false);
+        let groups = c
+            .get("groups")
+            .filter(|g| g.truthy())
+            .and_then(J::list)
+            .unwrap_or(&[]);
+        let group = groups
+            .iter()
+            .find(|g| g.get("id").unwrap_or(&J::Null) == group_id)
+            .unwrap_or(&none);
+        let outside = group
+            .get("outside")
+            .or(c.get("outside"))
+            .map(J::truthy)
+            .unwrap_or(false);
         let r = match o.get("radius") {
             None => 0.12,
-            Some(r) => r.num().ok_or_else(|| format!("'<' not supported between instances of '{}' and 'float'", glb::type_name(r)))?.f(),
+            Some(r) => r
+                .num()
+                .ok_or_else(|| {
+                    format!(
+                        "'<' not supported between instances of '{}' and 'float'",
+                        glb::type_name(r)
+                    )
+                })?
+                .f(),
         };
-        let radius = { let m = if r < 0.45 { r } else { 0.45 }; if m > 0.02 { m } else { 0.02 } };
+        let radius = {
+            let m = if r < 0.45 { r } else { 0.45 };
+            if m > 0.02 { m } else { 0.02 }
+        };
         out.entry(model_key(o, "model")?).or_default().push(Facts {
             id: key(o, "id")?.clone(),
-            footprint: o.get("footprint").cloned().unwrap_or(J::Arr(vec![J::Int(1), J::Int(1)])),
+            footprint: o
+                .get("footprint")
+                .cloned()
+                .unwrap_or(J::Arr(vec![J::Int(1), J::Int(1)])),
             layer: o.get("layer").cloned().unwrap_or(J::Str("floor".into())),
             outside,
             stairs: o.get("stairs").is_some_and(J::truthy),
@@ -275,7 +383,9 @@ struct Finishes {
 
 impl Finishes {
     fn see_through(&self, finish: Option<&J>) -> bool {
-        finish.and_then(J::str).is_some_and(|f| self.see_through.contains(f))
+        finish
+            .and_then(J::str)
+            .is_some_and(|f| self.see_through.contains(f))
     }
 }
 
@@ -299,11 +409,20 @@ fn applied(m: &Matrix, v: &[Num]) -> [f64; 3] {
 }
 
 fn nums(v: &J, what: usize) -> R<Vec<Num>> {
-    let l = v.list().ok_or_else(|| format!("cannot unpack non-iterable {} object", glb::type_name(v)))?;
+    let l = v
+        .list()
+        .ok_or_else(|| format!("cannot unpack non-iterable {} object", glb::type_name(v)))?;
     let out: Option<Vec<Num>> = l.iter().map(J::num).collect();
     let out = out.ok_or("unsupported operand type(s)")?;
     if out.len() != what && what != 0 {
-        return Err(if out.len() > what { format!("too many values to unpack (expected {what})") } else { format!("not enough values to unpack (expected {what}, got {})", out.len()) });
+        return Err(if out.len() > what {
+            format!("too many values to unpack (expected {what})")
+        } else {
+            format!(
+                "not enough values to unpack (expected {what}, got {})",
+                out.len()
+            )
+        });
     }
     Ok(out)
 }
@@ -348,47 +467,99 @@ type Pose = HashMap<(usize, &'static str), Vec<Num>>;
 
 /// The mesh nodes of the default scene (`Placed`), their parts where `pose` puts them; `worlds`, if given,
 /// gets every node's world matrix.
-fn node_matrices(gltf: &J, pose: Option<&Pose>, worlds: Option<&mut HashMap<usize, Matrix>>) -> R<Vec<Placed>> {
+fn node_matrices(
+    gltf: &J,
+    pose: Option<&Pose>,
+    worlds: Option<&mut HashMap<usize, Matrix>>,
+) -> R<Vec<Placed>> {
     placed_in(gltf, &moved_nodes(gltf)?, pose, worlds)
 }
 
 /// `node_matrices` with `parts` as the nodes that are parts (`Placed::part`: the nearest of them above a mesh,
 /// or its own node), in place of the nodes the animations move (a bird's, by name).
-fn placed_in(gltf: &J, parts: &HashSet<usize>, pose: Option<&Pose>, mut worlds: Option<&mut HashMap<usize, Matrix>>) -> R<Vec<Placed>> {
+fn placed_in(
+    gltf: &J,
+    parts: &HashSet<usize>,
+    pose: Option<&Pose>,
+    mut worlds: Option<&mut HashMap<usize, Matrix>>,
+) -> R<Vec<Placed>> {
     let empty = J::Arr(Vec::new());
     let nodes = gltf.get("nodes").unwrap_or(&empty);
-    let scenes = gltf.get("scenes").cloned().unwrap_or(J::Arr(vec![J::Obj(Vec::new())]));
+    let scenes = gltf
+        .get("scenes")
+        .cloned()
+        .unwrap_or(J::Arr(vec![J::Obj(Vec::new())]));
     let scene = index(&scenes, gltf.get("scene").unwrap_or(&J::Int(0)))?;
 
     fn local(n: &J, i: usize, pose: Option<&Pose>) -> R<Matrix> {
         if let Some(m) = n.get("matrix") {
             let m = nums(m, 0)?;
-            return m.get(..16).and_then(|m| m.try_into().ok()).ok_or_else(|| "list index out of range".into());
+            return m
+                .get(..16)
+                .and_then(|m| m.try_into().ok())
+                .ok_or_else(|| "list index out of range".into());
         }
         let (z, o) = (Num::I(0), Num::I(1));
-        let t = match (pose.and_then(|p| p.get(&(i, "translation"))), n.get("translation")) {
+        let t = match (
+            pose.and_then(|p| p.get(&(i, "translation"))),
+            n.get("translation"),
+        ) {
             (Some(t), _) if t.len() == 3 => t.clone(),
             (_, Some(t)) => nums(t, 3)?,
             _ => vec![z, z, z],
         };
-        let q = match (pose.and_then(|p| p.get(&(i, "rotation"))), n.get("rotation")) {
+        let q = match (
+            pose.and_then(|p| p.get(&(i, "rotation"))),
+            n.get("rotation"),
+        ) {
             (Some(q), _) if q.len() == 4 => q.clone(),
             (_, Some(q)) => nums(q, 4)?,
             _ => vec![z, z, z, o],
         };
         let s = match pose.and_then(|p| p.get(&(i, "scale"))) {
-            Some(s) if s.len() != 3 => return Err(format!("too many values to unpack (expected 3, got {})", s.len())),
+            Some(s) if s.len() != 3 => {
+                return Err(format!(
+                    "too many values to unpack (expected 3, got {})",
+                    s.len()
+                ));
+            }
             Some(s) => s.clone(),
-            None => match n.get("scale") { Some(s) => nums(s, 3)?, None => vec![o, o, o] },
+            None => match n.get("scale") {
+                Some(s) => nums(s, 3)?,
+                None => vec![o, o, o],
+            },
         };
         let (qx, qy, qz, qw) = (q[0], q[1], q[2], q[3]);
         let two = Num::I(2);
         let r = [
-            o - two * (qy * qy + qz * qz), two * (qx * qy + qz * qw), two * (qx * qz - qy * qw),
-            two * (qx * qy - qz * qw), o - two * (qx * qx + qz * qz), two * (qy * qz + qx * qw),
-            two * (qx * qz + qy * qw), two * (qy * qz - qx * qw), o - two * (qx * qx + qy * qy),
+            o - two * (qy * qy + qz * qz),
+            two * (qx * qy + qz * qw),
+            two * (qx * qz - qy * qw),
+            two * (qx * qy - qz * qw),
+            o - two * (qx * qx + qz * qz),
+            two * (qy * qz + qx * qw),
+            two * (qx * qz + qy * qw),
+            two * (qy * qz - qx * qw),
+            o - two * (qx * qx + qy * qy),
         ];
-        Ok([r[0] * s[0], r[1] * s[0], r[2] * s[0], z, r[3] * s[1], r[4] * s[1], r[5] * s[1], z, r[6] * s[2], r[7] * s[2], r[8] * s[2], z, t[0], t[1], t[2], o])
+        Ok([
+            r[0] * s[0],
+            r[1] * s[0],
+            r[2] * s[0],
+            z,
+            r[3] * s[1],
+            r[4] * s[1],
+            r[5] * s[1],
+            z,
+            r[6] * s[2],
+            r[7] * s[2],
+            r[8] * s[2],
+            z,
+            t[0],
+            t[1],
+            t[2],
+            o,
+        ])
     }
 
     fn mul(a: &Matrix, b: &Matrix) -> Matrix {
@@ -406,7 +577,17 @@ fn placed_in(gltf: &J, parts: &HashSet<usize>, pose: Option<&Pose>, mut worlds: 
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn walk(nodes: &J, i: usize, parent: &Matrix, part: Option<usize>, pose: Option<&Pose>, parts: &HashSet<usize>, worlds: &mut Option<&mut HashMap<usize, Matrix>>, out: &mut Vec<Placed>, depth: usize) -> R<()> {
+    fn walk(
+        nodes: &J,
+        i: usize,
+        parent: &Matrix,
+        part: Option<usize>,
+        pose: Option<&Pose>,
+        parts: &HashSet<usize>,
+        worlds: &mut Option<&mut HashMap<usize, Matrix>>,
+        out: &mut Vec<Placed>,
+        depth: usize,
+    ) -> R<()> {
         if depth > 990 {
             return Err("maximum recursion depth exceeded".into());
         }
@@ -417,17 +598,42 @@ fn placed_in(gltf: &J, parts: &HashSet<usize>, pose: Option<&Pose>, mut worlds: 
         }
         let part = if parts.contains(&i) { Some(i) } else { part };
         if let Some(mesh) = n.get("mesh") {
-            out.push(Placed { mesh: mesh.clone(), m, part, node: i });
+            out.push(Placed {
+                mesh: mesh.clone(),
+                m,
+                part,
+                node: i,
+            });
         }
         for c in n.get("children").and_then(J::list).unwrap_or(&[]) {
-            walk(nodes, node_index(nodes, c)?, &m, part, pose, parts, worlds, out, depth + 1)?;
+            walk(
+                nodes,
+                node_index(nodes, c)?,
+                &m,
+                part,
+                pose,
+                parts,
+                worlds,
+                out,
+                depth + 1,
+            )?;
         }
         Ok(())
     }
 
     let mut out = Vec::new();
     for i in scene.get("nodes").and_then(J::list).unwrap_or(&[]) {
-        walk(nodes, node_index(nodes, i)?, &IDENTITY, None, pose, parts, &mut worlds, &mut out, 0)?;
+        walk(
+            nodes,
+            node_index(nodes, i)?,
+            &IDENTITY,
+            None,
+            pose,
+            parts,
+            &mut worlds,
+            &mut out,
+            0,
+        )?;
     }
     Ok(out)
 }
@@ -457,13 +663,24 @@ fn json_number(v: &J) -> Option<f64> {
 /// What is wrong with a bird entry's `bird` itself (`BIRD_KEYS`): no file needed.
 fn bird_fields(bird: &J) -> Vec<String> {
     let Some(fields) = bird.entries() else {
-        return vec![format!("`bird` is {{\"length\", \"wingspan\", ...}} (metres), not {}", repr(bird))];
+        return vec![format!(
+            "`bird` is {{\"length\", \"wingspan\", ...}} (metres), not {}",
+            repr(bird)
+        )];
     };
     let mut errors = Vec::new();
-    let mut unknown: Vec<&str> = fields.iter().map(|(k, _)| k.as_str()).filter(|k| !BIRD_KEYS.contains(k)).collect();
+    let mut unknown: Vec<&str> = fields
+        .iter()
+        .map(|(k, _)| k.as_str())
+        .filter(|k| !BIRD_KEYS.contains(k))
+        .collect();
     unknown.sort();
     if !unknown.is_empty() {
-        errors.push(format!("`bird`: unknown {} (it takes {})", unknown.join(", "), BIRD_KEYS.join(", ")));
+        errors.push(format!(
+            "`bird`: unknown {} (it takes {})",
+            unknown.join(", "),
+            BIRD_KEYS.join(", ")
+        ));
     }
     for k in BIRD_KEYS {
         let Some(v) = bird.get(k) else {
@@ -478,7 +695,11 @@ fn bird_fields(bird: &J) -> Vec<String> {
             _ => false,
         };
         if !ok {
-            let what = if k == "pitch" { "angle (degrees, -90 to 90)" } else { "length (metres, over 0)" };
+            let what = if k == "pitch" {
+                "angle (degrees, -90 to 90)"
+            } else {
+                "length (metres, over 0)"
+            };
             errors.push(format!("`bird.{k}` {} is no {what}", repr(v)));
         }
     }
@@ -495,14 +716,27 @@ struct BirdParts {
 
 fn bird_parts(g: &Glb) -> R<BirdParts> {
     let nodes = g.gltf.get("nodes").and_then(J::list).unwrap_or(&[]);
-    let name = |i: usize| nodes.get(i).and_then(|n| n.get("name")).and_then(J::str).unwrap_or("");
-    let mut parts = BirdParts { names: BTreeSet::new(), points: HashMap::new(), flat: Vec::new() };
+    let name = |i: usize| {
+        nodes
+            .get(i)
+            .and_then(|n| n.get("name"))
+            .and_then(J::str)
+            .unwrap_or("")
+    };
+    let mut parts = BirdParts {
+        names: BTreeSet::new(),
+        points: HashMap::new(),
+        flat: Vec::new(),
+    };
     let mut named = HashSet::new();
     for (i, n) in nodes.iter().enumerate() {
         if BIRD_PARTS.contains(&name(i)) {
             named.insert(i);
             parts.names.insert(name(i).to_string());
-            if n.get("scale").and_then(J::list).is_some_and(|s| s.iter().any(|v| json_number(v).is_some_and(|v| v.abs() < 1e-6))) {
+            if n.get("scale").and_then(J::list).is_some_and(|s| {
+                s.iter()
+                    .any(|v| json_number(v).is_some_and(|v| v.abs() < 1e-6))
+            }) {
                 parts.flat.push(name(i).to_string());
             }
         }
@@ -526,9 +760,17 @@ fn bird_parts(g: &Glb) -> R<BirdParts> {
 /// and its body's middle within its height. `dims` is the file's size (game width, height, depth).
 fn bird_errors(bird: &J, parts: &BirdParts, dims: [f64; 3]) -> Vec<String> {
     let mut errors = Vec::new();
-    let missing: Vec<&str> = BIRD_PARTS.iter().copied().filter(|p| !parts.names.contains(*p)).collect();
+    let missing: Vec<&str> = BIRD_PARTS
+        .iter()
+        .copied()
+        .filter(|p| !parts.names.contains(*p))
+        .collect();
     if !missing.is_empty() {
-        errors.push(format!("a bird's parts are nodes named {}: it has no {}", BIRD_PARTS.join(", "), missing.join(", ")));
+        errors.push(format!(
+            "a bird's parts are nodes named {}: it has no {}",
+            BIRD_PARTS.join(", "),
+            missing.join(", ")
+        ));
     }
     for name in &parts.flat {
         errors.push(format!("{name} is saved at scale 0: the renderer bakes each part as the file has it (the wings spread, at scale 1) and hides them itself"));
@@ -537,27 +779,49 @@ fn bird_errors(bird: &J, parts: &BirdParts, dims: [f64; 3]) -> Vec<String> {
     let off = |got: f64, want: f64| (got - want).abs() > BIRD_FIT * want;
     let (span, length) = (wanted("wingspan"), wanted("length"));
     if off(dims[0], span) {
-        errors.push(format!("{} m across its spread wings, its `bird.wingspan` says {} m (within {})", fixed(dims[0], 3), fixed(span, 3), percent(BIRD_FIT)));
+        errors.push(format!(
+            "{} m across its spread wings, its `bird.wingspan` says {} m (within {})",
+            fixed(dims[0], 3),
+            fixed(span, 3),
+            percent(BIRD_FIT)
+        ));
     }
     let (head, tail) = (parts.points.get("head"), parts.points.get("tail"));
     if let (Some(head), Some(tail)) = (head, tail) {
-        let far = head.iter().flat_map(|a| tail.iter().map(move |b| dist(a, b))).fold(0.0, f64::max);
+        let far = head
+            .iter()
+            .flat_map(|a| tail.iter().map(move |b| dist(a, b)))
+            .fold(0.0, f64::max);
         if off(far, length) {
-            errors.push(format!("{} m from bill to tail tip, its `bird.length` says {} m (within {})", fixed(far, 3), fixed(length, 3), percent(BIRD_FIT)));
+            errors.push(format!(
+                "{} m from bill to tail tip, its `bird.length` says {} m (within {})",
+                fixed(far, 3),
+                fixed(length, 3),
+                percent(BIRD_FIT)
+            ));
         }
     }
-    for (name, side, where_) in [("wing.L", -1.0, "its left, game -x (glTF +x)"), ("wing.R", 1.0, "its right, game +x (glTF -x)")] {
+    for (name, side, where_) in [
+        ("wing.L", -1.0, "its left, game -x (glTF +x)"),
+        ("wing.R", 1.0, "its right, game +x (glTF -x)"),
+    ] {
         if let Some(points) = parts.points.get(name).filter(|p| !p.is_empty()) {
             let mid = points.iter().map(|p| p[0]).sum::<f64>() / points.len() as f64;
             if mid * side <= 0.0 {
-                errors.push(format!("{name} reaches out the wrong way: a bird's {name} is spread to {where_}"));
+                errors.push(format!(
+                    "{name} reaches out the wrong way: a bird's {name} is spread to {where_}"
+                ));
             }
         }
     }
     if let Some(h) = bird.get("perchHeight").and_then(json_number)
         && h > dims[1]
     {
-        errors.push(format!("`bird.perchHeight` {} m is over the bird's height, {} m", fixed(h, 3), fixed(dims[1], 3)));
+        errors.push(format!(
+            "`bird.perchHeight` {} m is over the bird's height, {} m",
+            fixed(h, 3),
+            fixed(dims[1], 3)
+        ));
     }
     errors
 }
@@ -566,7 +830,10 @@ fn bird_errors(bird: &J, parts: &BirdParts, dims: [f64; 3]) -> Vec<String> {
 /// metres, before the entry's `scale`) against the model's box (`lo`, `hi`, game axes, at rest, scaled by `scale`).
 fn perch_errors(perches: &J, lo: [f64; 3], hi: [f64; 3], scale: f64) -> Vec<String> {
     let Some(list) = perches.list() else {
-        return vec![format!("`perches` is a list of [x, y, z] (metres), not {}", repr(perches))];
+        return vec![format!(
+            "`perches` is a list of [x, y, z] (metres), not {}",
+            repr(perches)
+        )];
     };
     if list.is_empty() {
         return vec!["`perches` is empty: leave it out".into()];
@@ -574,18 +841,32 @@ fn perch_errors(perches: &J, lo: [f64; 3], hi: [f64; 3], scale: f64) -> Vec<Stri
     let mut errors = Vec::new();
     let mut outside = Vec::new();
     for (i, p) in list.iter().enumerate() {
-        let xyz: Vec<f64> = p.list().unwrap_or(&[]).iter().filter_map(json_number).collect();
+        let xyz: Vec<f64> = p
+            .list()
+            .unwrap_or(&[])
+            .iter()
+            .filter_map(json_number)
+            .collect();
         if xyz.len() != 3 || p.list().is_none_or(|l| l.len() != 3) {
             errors.push(format!("`perches` {i}: {} is no [x, y, z]", repr(p)));
             continue;
         }
-        if (0..3).any(|k| xyz[k] * scale < lo[k] - PERCH_OUT || xyz[k] * scale > hi[k] + PERCH_OUT) {
+        if (0..3).any(|k| xyz[k] * scale < lo[k] - PERCH_OUT || xyz[k] * scale > hi[k] + PERCH_OUT)
+        {
             outside.push(i);
         }
     }
     if let Some(&first) = outside.first() {
-        let box_ = (0..3).map(|k| format!("{} to {}", fixed(lo[k] / scale, 2), fixed(hi[k] / scale, 2))).collect::<Vec<_>>().join(", ");
-        errors.push(format!("{} of {} perches outside the model (the first, {first}: {}; its box x, y, z: {box_})", outside.len(), list.len(), repr(&list[first])));
+        let box_ = (0..3)
+            .map(|k| format!("{} to {}", fixed(lo[k] / scale, 2), fixed(hi[k] / scale, 2)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        errors.push(format!(
+            "{} of {} perches outside the model (the first, {first}: {}; its box x, y, z: {box_})",
+            outside.len(),
+            list.len(),
+            repr(&list[first])
+        ));
     }
     errors
 }
@@ -598,7 +879,11 @@ fn habitat_errors(entry: &J) -> Vec<String> {
     };
     let mut errors = Vec::new();
     if !habitat.str().is_some_and(|h| HABITATS.contains(&h)) {
-        errors.push(format!("`habitat` {} is none of {}", repr(habitat), HABITATS.join(", ")));
+        errors.push(format!(
+            "`habitat` {} is none of {}",
+            repr(habitat),
+            HABITATS.join(", ")
+        ));
     }
     if entry.get("perches").is_none() {
         errors.push("`habitat` without `perches`: it says what the perches are on".into());
@@ -608,7 +893,9 @@ fn habitat_errors(entry: &J) -> Vec<String> {
 
 /// The primitives of a mesh (`gltf['meshes'][i]['primitives']`).
 fn primitives<'a>(gltf: &'a J, mesh: &J) -> R<&'a [J]> {
-    Ok(key(item(gltf, "meshes", mesh)?, "primitives")?.list().unwrap_or(&[]))
+    Ok(key(item(gltf, "meshes", mesh)?, "primitives")?
+        .list()
+        .unwrap_or(&[]))
 }
 
 /// The positions of a primitive: every vertex, or where they can't be read here (compressed), its box's corners.
@@ -633,9 +920,15 @@ fn positions(g: &Glb, prim: &J) -> R<Vec<Vec<Num>>> {
 /// the model's creases (gamekit/shade.py) and multiplies it into the part's colour, so a colour in it would tint
 /// the part. One it can't read here (compressed) passes.
 fn coloured(g: &Glb, prim: &J) -> R<bool> {
-    let Some(index) = key(prim, "attributes")?.get("COLOR_0") else { return Ok(false) };
-    let Some(rows) = accessor(g, index)? else { return Ok(false) };
-    Ok(rows.iter().any(|v| v.len() >= 3 && ((v[0].f() - v[1].f()).abs() > 0.01 || (v[0].f() - v[2].f()).abs() > 0.01)))
+    let Some(index) = key(prim, "attributes")?.get("COLOR_0") else {
+        return Ok(false);
+    };
+    let Some(rows) = accessor(g, index)? else {
+        return Ok(false);
+    };
+    Ok(rows.iter().any(|v| {
+        v.len() >= 3 && ((v[0].f() - v[1].f()).abs() > 0.01 || (v[0].f() - v[2].f()).abs() > 0.01)
+    }))
 }
 
 /// An accessor's `min` and `max`.
@@ -655,19 +948,31 @@ fn sampler<'a>(a: &'a J, c: &J) -> R<&'a J> {
 
 /// Whether a sampler moves at an even speed (each key as far on from the last, per second).
 fn even(g: &Glb, sampler: &J) -> R<bool> {
-    let times: Vec<f64> = values(g, key(sampler, "input")?)?.iter().map(|t| t[0]).collect();
+    let times: Vec<f64> = values(g, key(sampler, "input")?)?
+        .iter()
+        .map(|t| t[0])
+        .collect();
     let keys = values(g, key(sampler, "output")?)?;
     if keys.len() < 3 {
         return Ok(false);
     }
-    let (t0, t1) = (*times.first().ok_or("list index out of range")?, *times.last().unwrap());
+    let (t0, t1) = (
+        *times.first().ok_or("list index out of range")?,
+        *times.last().unwrap(),
+    );
     if t1 <= t0 {
         return Ok(false);
     }
-    let rate: Vec<f64> = keys[0].iter().zip(keys.last().unwrap()).map(|(a, b)| (b - a) / (t1 - t0)).collect();
+    let rate: Vec<f64> = keys[0]
+        .iter()
+        .zip(keys.last().unwrap())
+        .map(|(a, b)| (b - a) / (t1 - t0))
+        .collect();
     for (k, t) in keys.iter().zip(&times) {
         for i in 0..rate.len() {
-            if (k.get(i).ok_or("tuple index out of range")? - keys[0][i] - rate[i] * (t - t0)).abs() > 1e-3 {
+            if (k.get(i).ok_or("tuple index out of range")? - keys[0][i] - rate[i] * (t - t0)).abs()
+                > 1e-3
+            {
                 return Ok(false);
             }
         }
@@ -682,7 +987,9 @@ fn named_finish(name: &str) -> Option<J> {
     let mut s = String::with_capacity(name.len());
     let mut rest = name;
     while !rest.is_empty() {
-        let slot = ["#body", "#skin", "#hair"].iter().find(|w| rest.starts_with(**w));
+        let slot = ["#body", "#skin", "#hair"]
+            .iter()
+            .find(|w| rest.starts_with(**w));
         if let Some(w) = slot {
             let after = &rest[w.len()..];
             if after.is_empty() || after.starts_with('@') || after == "\n" {
@@ -697,21 +1004,43 @@ fn named_finish(name: &str) -> Option<J> {
     let (head, tail) = s.rsplit_once('@')?;
     // tail.isalpha() and tail.islower(): letters, some cased, none upper (or title) case.
     let title = |c: char| matches!(c as u32, 0x1c5 | 0x1c8 | 0x1cb | 0x1f2 | 0x1f88..=0x1f8f | 0x1f98..=0x1f9f | 0x1fa8..=0x1faf | 0x1fbc | 0x1fcc | 0x1ffc);
-    let lower = !tail.is_empty() && tail.chars().all(char::is_alphabetic) && tail.chars().any(char::is_lowercase) && !tail.chars().any(|c| c.is_uppercase() || title(c));
-    if !head.is_empty() && lower { Some(J::Obj(vec![("finish".into(), J::Str(format!("material.finish.{tail}")))])) } else { None }
+    let lower = !tail.is_empty()
+        && tail.chars().all(char::is_alphabetic)
+        && tail.chars().any(char::is_lowercase)
+        && !tail.chars().any(|c| c.is_uppercase() || title(c));
+    if !head.is_empty() && lower {
+        Some(J::Obj(vec![(
+            "finish".into(),
+            J::Str(format!("material.finish.{tail}")),
+        )]))
+    } else {
+        None
+    }
 }
 
 /// [(use, {clip, hold, delay, every, slot, out, over})] for each clip an entry's `motions.uses` plays (a clip,
 /// {clip, ...} or a list of them).
 fn uses(motions: &J) -> Vec<(String, J)> {
     let mut out = Vec::new();
-    for (name, value) in motions.get("uses").filter(|u| u.truthy()).and_then(J::entries).unwrap_or(&[]) {
+    for (name, value) in motions
+        .get("uses")
+        .filter(|u| u.truthy())
+        .and_then(J::entries)
+        .unwrap_or(&[])
+    {
         let list = match value {
             J::Arr(l) => l.clone(),
             v => vec![v.clone()],
         };
         for u in list {
-            out.push((name.clone(), if matches!(u, J::Obj(_)) { u } else { J::Obj(vec![("clip".into(), u)]) }));
+            out.push((
+                name.clone(),
+                if matches!(u, J::Obj(_)) {
+                    u
+                } else {
+                    J::Obj(vec![("clip".into(), u)])
+                },
+            ));
         }
     }
     out
@@ -730,7 +1059,12 @@ fn played(motions: &J) -> R<Vec<(J, String)>> {
     for (name, u) in uses(motions) {
         add(key(&u, "clip")?, format!("use {}", repr_str(&name)));
     }
-    for (name, clip) in motions.get("loops").filter(|l| l.truthy()).and_then(J::entries).unwrap_or(&[]) {
+    for (name, clip) in motions
+        .get("loops")
+        .filter(|l| l.truthy())
+        .and_then(J::entries)
+        .unwrap_or(&[])
+    {
         add(clip, format!("loop {}", repr_str(name)));
     }
     for kind in ["open", "idle", "night", "growth", "ride", "running"] {
@@ -751,7 +1085,12 @@ fn played(motions: &J) -> R<Vec<(J, String)>> {
 /// `idle`, `running`, a use's clip that repeats (`every`) and a clock's hands (a whole turn). As dict keys.
 fn loops(motions: &J) -> R<HashSet<String>> {
     let mut out = HashSet::new();
-    for (_, clip) in motions.get("loops").filter(|l| l.truthy()).and_then(J::entries).unwrap_or(&[]) {
+    for (_, clip) in motions
+        .get("loops")
+        .filter(|l| l.truthy())
+        .and_then(J::entries)
+        .unwrap_or(&[])
+    {
         out.insert(clip.key());
     }
     for kind in ["idle", "running"] {
@@ -784,42 +1123,71 @@ fn motions_errors(motions: &J) -> Vec<String> {
             if let Some(v) = u.get(k)
                 && !v.num().is_some_and(|n| n.f() >= 0.0)
             {
-                errors.push(format!("`motions.uses` {name}: {k} {} is no number of seconds", repr(v)));
+                errors.push(format!(
+                    "`motions.uses` {name}: {k} {} is no number of seconds",
+                    repr(v)
+                ));
             }
         }
         for k in ["every", "out"] {
             if let Some(v) = u.get(k)
                 && !v.num().is_some_and(|n| n.f() > 0.0)
             {
-                errors.push(format!("`motions.uses` {name}: {k} {} is no number of seconds above 0", repr(v)));
+                errors.push(format!(
+                    "`motions.uses` {name}: {k} {} is no number of seconds above 0",
+                    repr(v)
+                ));
             }
         }
         if let Some(over) = u.get("over")
             && !matches!(over, J::Int(1 | -1))
         {
-            errors.push(format!("`motions.uses` {name}: over {} is neither 1 nor -1", repr(over)));
+            errors.push(format!(
+                "`motions.uses` {name}: over {} is neither 1 nor -1",
+                repr(over)
+            ));
         }
         // (An int, not a bool.)
         if let Some(slot) = u.get("slot")
             && !matches!(slot, J::Int(i) if *i >= 0)
         {
-            errors.push(format!("`motions.uses` {name}: slot {} is no slot (0, 1, ...)", repr(slot)));
+            errors.push(format!(
+                "`motions.uses` {name}: slot {} is no slot (0, 1, ...)",
+                repr(slot)
+            ));
         }
-        let mut unknown: Vec<&str> = u.entries().unwrap_or(&[]).iter().map(|(k, _)| k.as_str()).filter(|k| !["clip", "hold", "delay", "every", "slot", "out", "over"].contains(k)).collect();
+        let mut unknown: Vec<&str> = u
+            .entries()
+            .unwrap_or(&[])
+            .iter()
+            .map(|(k, _)| k.as_str())
+            .filter(|k| !["clip", "hold", "delay", "every", "slot", "out", "over"].contains(k))
+            .collect();
         unknown.sort();
         if !unknown.is_empty() {
-            errors.push(format!("`motions.uses` {name}: unknown {}", unknown.join(", ")));
+            errors.push(format!(
+                "`motions.uses` {name}: unknown {}",
+                unknown.join(", ")
+            ));
         }
     }
     if let Some(clock) = motions.opt("clock") {
         let named = |h: &str| clock.get(h).is_some_and(J::truthy);
-        let odd = clock.entries().is_some_and(|e| e.iter().any(|(k, _)| !["hour", "minute", "at"].contains(&k.as_str())));
+        let odd = clock.entries().is_some_and(|e| {
+            e.iter()
+                .any(|(k, _)| !["hour", "minute", "at"].contains(&k.as_str()))
+        });
         if !matches!(clock, J::Obj(_)) || !(named("hour") || named("minute")) || odd {
-            errors.push("`motions.clock` names its hands' clips: {\"hour\", \"minute\", \"at\"}".into());
+            errors.push(
+                "`motions.clock` names its hands' clips: {\"hour\", \"minute\", \"at\"}".into(),
+            );
         } else if let Some(at) = clock.get("at")
             && at.num().is_none()
         {
-            errors.push(format!("`motions.clock.at` {} is no time (minutes past twelve)", repr(at)));
+            errors.push(format!(
+                "`motions.clock.at` {} is no time (minutes past twelve)",
+                repr(at)
+            ));
         }
     }
     errors
@@ -829,7 +1197,12 @@ fn motions_errors(motions: &J) -> Vec<String> {
 fn qmul(a: [f64; 4], b: [f64; 4]) -> [f64; 4] {
     let [ax, ay, az, aw] = a;
     let [bx, by, bz, bw] = b;
-    [aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx, aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz]
+    [
+        aw * bx + ax * bw + ay * bz - az * by,
+        aw * by - ax * bz + ay * bw + az * bx,
+        aw * bz + ax * by - ay * bx + az * bw,
+        aw * bw - ax * bx - ay * by - az * bz,
+    ]
 }
 
 /// [(clip, node, axis)]: the parts a clip that goes round (`loops`: a loop, `idle`, a clock's hand) turns one
@@ -851,7 +1224,11 @@ fn turning(g: &Glb, motions: &J) -> R<Vec<(String, usize, [f64; 3])>> {
             }
             let node = target_node(node.unwrap());
             let keys = values(g, key(sampler(a, c)?, "output")?)?;
-            let q = |k: &Vec<f64>| -> R<[f64; 4]> { k.get(..4).and_then(|k| k.try_into().ok()).ok_or_else(|| "not enough values to unpack (expected 4)".into()) };
+            let q = |k: &Vec<f64>| -> R<[f64; 4]> {
+                k.get(..4)
+                    .and_then(|k| k.try_into().ok())
+                    .ok_or_else(|| "not enough values to unpack (expected 4)".into())
+            };
             // Each step from one key to the next, in the part's own frame: a turn about one axis, one way.
             let mut steps = Vec::new();
             for (p, k) in keys.iter().zip(keys.iter().skip(1)) {
@@ -910,14 +1287,24 @@ fn swept(g: &Glb, motions: &J) -> R<Vec<Swept>> {
         let (mut below, mut todo) = (HashSet::new(), vec![node]);
         while let Some(i) = todo.pop() {
             below.insert(i);
-            for c in nodes.at(i as i64).ok_or("list index out of range")?.get("children").and_then(J::list).unwrap_or(&[]) {
+            for c in nodes
+                .at(i as i64)
+                .ok_or("list index out of range")?
+                .get("children")
+                .and_then(J::list)
+                .unwrap_or(&[])
+            {
                 todo.push(node_index(nodes, c)?);
             }
         }
         let Some(w) = worlds.get(&node) else { continue };
         let w: Vec<f64> = w.iter().map(|v| v.f()).collect();
         let pivot = [w[12], w[13], w[14]];
-        let a = [w[0] * axis[0] + w[4] * axis[1] + w[8] * axis[2], w[1] * axis[0] + w[5] * axis[1] + w[9] * axis[2], w[2] * axis[0] + w[6] * axis[1] + w[10] * axis[2]];
+        let a = [
+            w[0] * axis[0] + w[4] * axis[1] + w[8] * axis[2],
+            w[1] * axis[0] + w[5] * axis[1] + w[9] * axis[2],
+            w[2] * axis[0] + w[6] * axis[1] + w[10] * axis[2],
+        ];
         let n = hypot(&a);
         let a = a.map(|v| v / n);
         // A circle round the axis reaches r * sqrt(1 - a_k^2) either side of its centre along axis k.
@@ -951,7 +1338,13 @@ fn swept(g: &Glb, motions: &J) -> R<Vec<Swept>> {
         }
         if lo[0] <= hi[0] {
             // glTF x -> game -x
-            out.push(Swept { clip, name: node_name(nodes, node), x: (-hi[0], -lo[0]), z: (lo[2], hi[2]), radius });
+            out.push(Swept {
+                clip,
+                name: node_name(nodes, node),
+                x: (-hi[0], -lo[0]),
+                z: (lo[2], hi[2]),
+                radius,
+            });
         }
     }
     Ok(out)
@@ -980,7 +1373,10 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
             let (path, node) = (target.get("path"), target.opt("node"));
             let at_rest = path.and_then(J::str).and_then(rest);
             if at_rest.is_none() || node.is_none() {
-                errors.push(format!("clip {name} animates {} (only a node's rotation, translation or scale)", path.map(str_of).unwrap_or("None".into())));
+                errors.push(format!(
+                    "clip {name} animates {} (only a node's rotation, translation or scale)",
+                    path.map(str_of).unwrap_or("None".into())
+                ));
                 continue;
             }
             let path = path.and_then(J::str).unwrap();
@@ -1020,24 +1416,37 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
     plays.sort_by_key(|(clip, _)| clip.key());
     for (clip, by) in &plays {
         if !names.contains(&clip.key()) {
-            errors.push(format!("`motions` plays {} ({by}), which is no clip of the file", repr(clip)));
+            errors.push(format!(
+                "`motions` plays {} ({by}), which is no clip of the file",
+                repr(clip)
+            ));
         }
     }
     let played_keys: HashSet<String> = plays.iter().map(|(c, _)| c.key()).collect();
     for name in names.iter().filter(|n| !played_keys.contains(*n)) {
-        warnings.push(format!("clip {} plays for no use (name it in the entry's `motions`)", repr_str(name)));
+        warnings.push(format!(
+            "clip {} plays for no use (name it in the entry's `motions`)",
+            repr_str(name)
+        ));
     }
     // A use's clip plays as the use starts: one much longer than about 1 s reads as slow. Loops, ambient,
     // night, open and growth clips keep their own pace (a merry-go-round's round, a clock's minute).
     let going = loops(motions)?;
-    let by_use: HashSet<String> = plays.iter().filter(|(_, by)| by.starts_with("use ")).map(|(c, _)| c.key()).filter(|c| !going.contains(c)).collect();
+    let by_use: HashSet<String> = plays
+        .iter()
+        .filter(|(_, by)| by.starts_with("use "))
+        .map(|(c, _)| c.key())
+        .filter(|c| !going.contains(c))
+        .collect();
     for a in animations {
         if !by_use.contains(&clip_name(a).key()) {
             continue;
         }
         let mut length: Option<f64> = None;
         for s in key(a, "samplers")?.list().unwrap_or(&[]) {
-            let last = first_value(g, key(s, "input")?, true)?.map(|v| v[0]).unwrap_or(0.0);
+            let last = first_value(g, key(s, "input")?, true)?
+                .map(|v| v[0])
+                .unwrap_or(0.0);
             if length.is_none_or(|l| last > l) {
                 length = Some(last);
             }
@@ -1062,7 +1471,11 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
         for c in key(a, "channels")?.list().unwrap_or(&[]) {
             let s = sampler(a, c)?;
             let out = key(s, "output")?;
-            let (Some(first), Some(last)) = (first_value(g, out, false)?, first_value(g, out, true)?) else { continue };
+            let (Some(first), Some(last)) =
+                (first_value(g, out, false)?, first_value(g, out, true)?)
+            else {
+                continue;
+            };
             let target = key(c, "target")?;
             let node = node_name(nodes, node_index(nodes, key(target, "node")?)?);
             let clip = repr(key(a, "name")?);
@@ -1083,8 +1496,16 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
                     continue;
                 }
             } else {
-                let diffs: Vec<f64> = first.iter().zip(&last).map(|(x, y)| (x - y).abs()).collect();
-                let most = diffs.iter().cloned().reduce(|m, d| if d > m { d } else { m }).ok_or("max() iterable argument is empty")?;
+                let diffs: Vec<f64> = first
+                    .iter()
+                    .zip(&last)
+                    .map(|(x, y)| (x - y).abs())
+                    .collect();
+                let most = diffs
+                    .iter()
+                    .cloned()
+                    .reduce(|m, d| if d > m { d } else { m })
+                    .ok_or("max() iterable argument is empty")?;
                 if most <= 1e-3 {
                     continue;
                 }
@@ -1110,7 +1531,11 @@ fn grown(g: &Glb, held: &[Option<J>]) -> R<Pose> {
     let empty = J::Arr(Vec::new());
     let nodes = g.gltf.get("nodes").unwrap_or(&empty);
     let mut out: Pose = HashMap::new();
-    let abs_sum = |k: &[Num]| k.iter().fold(Num::I(0), |s, v| s + if v.f() < 0.0 { -*v } else { *v }).f();
+    let abs_sum = |k: &[Num]| {
+        k.iter()
+            .fold(Num::I(0), |s, v| s + if v.f() < 0.0 { -*v } else { *v })
+            .f()
+    };
     for a in g.gltf.get("animations").and_then(J::list).unwrap_or(&[]) {
         if held.contains(&a.opt("name").cloned()) {
             continue;
@@ -1126,7 +1551,10 @@ fn grown(g: &Glb, held: &[Option<J>]) -> R<Pose> {
                 Some(s) => nums(s, 0)?,
                 None => vec![Num::I(1); 3],
             };
-            let keys: Vec<Vec<Num>> = values(g, key(sampler(a, c)?, "output")?)?.into_iter().map(|k| k.into_iter().map(Num::F).collect()).collect();
+            let keys: Vec<Vec<Num>> = values(g, key(sampler(a, c)?, "output")?)?
+                .into_iter()
+                .map(|k| k.into_iter().map(Num::F).collect())
+                .collect();
             let mut best: Option<&Vec<Num>> = None;
             for k in &keys {
                 if best.is_none_or(|b| abs_sum(k) > abs_sum(b)) {
@@ -1134,7 +1562,14 @@ fn grown(g: &Glb, held: &[Option<J>]) -> R<Pose> {
                 }
             }
             let best = best.ok_or("max() iterable argument is empty")?;
-            if best.iter().zip(&rest).any(|(b, r)| b.f().abs() > 1.5 * r.f().abs() + 1e-6) && out.get(&(node, "scale")).is_none_or(|have| abs_sum(best) > abs_sum(have)) {
+            if best
+                .iter()
+                .zip(&rest)
+                .any(|(b, r)| b.f().abs() > 1.5 * r.f().abs() + 1e-6)
+                && out
+                    .get(&(node, "scale"))
+                    .is_none_or(|have| abs_sum(best) > abs_sum(have))
+            {
                 out.insert((node, "scale"), best.clone());
             }
         }
@@ -1163,7 +1598,10 @@ fn bounds(gltf: &J, pose: &Pose) -> R<(Bounds, PartBounds)> {
             }
         };
         for prim in primitives(gltf, &p.mesh)? {
-            let (bl, bh) = box_of(index(&accessors, key(key(prim, "attributes")?, "POSITION")?)?)?;
+            let (bl, bh) = box_of(index(
+                &accessors,
+                key(key(prim, "attributes")?, "POSITION")?,
+            )?)?;
             for cx in [bl[0], bh[0]] {
                 for cy in [bl[1], bh[1]] {
                     for cz in [bl[2], bh[2]] {
@@ -1220,10 +1658,18 @@ struct Tri {
 
 /// Every face the line through p along d crosses (Möller-Trumbore), in the order given: (how far along d,
 /// negative behind p; the face's normal).
-fn hits<'a>(p: &'a [f64; 3], d: &'a [f64; 3], faces: impl IntoIterator<Item = &'a Tri>) -> impl Iterator<Item = (f64, &'a [f64; 3])> {
+fn hits<'a>(
+    p: &'a [f64; 3],
+    d: &'a [f64; 3],
+    faces: impl IntoIterator<Item = &'a Tri>,
+) -> impl Iterator<Item = (f64, &'a [f64; 3])> {
     faces.into_iter().filter_map(move |f| {
         let (a, e1, e2) = (&f.a, &f.e1, &f.e2);
-        let h = [d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0]];
+        let h = [
+            d[1] * e2[2] - d[2] * e2[1],
+            d[2] * e2[0] - d[0] * e2[2],
+            d[0] * e2[1] - d[1] * e2[0],
+        ];
         let det = e1[0] * h[0] + e1[1] * h[1] + e1[2] * h[2];
         if det.abs() < 1e-12 {
             return None;
@@ -1234,7 +1680,11 @@ fn hits<'a>(p: &'a [f64; 3], d: &'a [f64; 3], faces: impl IntoIterator<Item = &'
         if u < 0.0 || u > 1.0 {
             return None;
         }
-        let q = [s[1] * e1[2] - s[2] * e1[1], s[2] * e1[0] - s[0] * e1[2], s[0] * e1[1] - s[1] * e1[0]];
+        let q = [
+            s[1] * e1[2] - s[2] * e1[1],
+            s[2] * e1[0] - s[0] * e1[2],
+            s[0] * e1[1] - s[1] * e1[0],
+        ];
         let v = (d[0] * q[0] + d[1] * q[1] + d[2] * q[2]) / det;
         if v < 0.0 || u + v > 1.0 {
             return None;
@@ -1250,7 +1700,10 @@ fn cast(p: &[f64; 3], d: &[f64; 3], faces: &[&Tri]) -> [(f64, bool); 2] {
     for (t, nrm) in hits(p, d, faces.iter().copied()) {
         let (slot, way) = if t > 0.0 { (0, 1.0) } else { (1, -1.0) };
         if 1e-4 < t.abs() && t.abs() < near[slot].0 {
-            near[slot] = (t.abs(), (nrm[0] * d[0] + nrm[1] * d[1] + nrm[2] * d[2]) * way > 0.0);
+            near[slot] = (
+                t.abs(),
+                (nrm[0] * d[0] + nrm[1] * d[1] + nrm[2] * d[2]) * way > 0.0,
+            );
         }
     }
     near
@@ -1258,37 +1711,70 @@ fn cast(p: &[f64; 3], d: &[f64; 3], faces: &[&Tri]) -> [(f64, bool); 2] {
 
 /// The triangles of the placed meshes' primitives that `keep` keeps (by their material index), with the node
 /// each belongs to and its normal from the winding; None if some positions can't be read here (compressed).
-fn triangles(g: &Glb, placed: &[Placed], keep: &dyn Fn(Option<&J>) -> R<bool>) -> R<Option<Vec<Tri>>> {
-    let det = |m: &[f64]| m[0] * (m[5] * m[10] - m[9] * m[6]) - m[4] * (m[1] * m[10] - m[9] * m[2]) + m[8] * (m[1] * m[6] - m[5] * m[2]);
+fn triangles(
+    g: &Glb,
+    placed: &[Placed],
+    keep: &dyn Fn(Option<&J>) -> R<bool>,
+) -> R<Option<Vec<Tri>>> {
+    let det = |m: &[f64]| {
+        m[0] * (m[5] * m[10] - m[9] * m[6]) - m[4] * (m[1] * m[10] - m[9] * m[2])
+            + m[8] * (m[1] * m[6] - m[5] * m[2])
+    };
     let mut tris = Vec::new();
     for p in placed {
         let mf: Vec<f64> = p.m.iter().map(|v| v.f()).collect();
         let sign = if det(&mf) >= 0.0 { 1.0 } else { -1.0 };
         for prim in primitives(&g.gltf, &p.mesh)? {
-            let triangles = prim.get("mode").is_none_or(|m| m.num().is_some_and(|n| n.f() == 4.0));
+            let triangles = prim
+                .get("mode")
+                .is_none_or(|m| m.num().is_some_and(|n| n.f() == 4.0));
             if !triangles || !keep(prim.opt("material"))? {
                 continue;
             }
             let pos = accessor(g, key(key(prim, "attributes")?, "POSITION")?)?;
             let idx = match prim.get("indices") {
                 Some(i) => accessor(g, i)?,
-                None => Some((0..pos.as_ref().map_or(0, |p| p.len())).map(|k| vec![Num::I(k as i64)]).collect()),
+                None => Some(
+                    (0..pos.as_ref().map_or(0, |p| p.len()))
+                        .map(|k| vec![Num::I(k as i64)])
+                        .collect(),
+                ),
             };
-            let (Some(pos), Some(idx)) = (pos, idx) else { return Ok(None) };
+            let (Some(pos), Some(idx)) = (pos, idx) else {
+                return Ok(None);
+            };
             let world: Vec<[f64; 3]> = pos.iter().map(|v| applied(&p.m, v)).collect();
             let corner = |k: usize| -> R<[f64; 3]> {
                 let i = idx[k][0];
-                let i = match i { Num::I(i) => i, Num::F(_) => return Err("list indices must be integers or slices, not float".into()) };
+                let i = match i {
+                    Num::I(i) => i,
+                    Num::F(_) => {
+                        return Err("list indices must be integers or slices, not float".into());
+                    }
+                };
                 let i = if i < 0 { i + world.len() as i64 } else { i };
-                world.get(i as usize).copied().ok_or_else(|| "list index out of range".into())
+                world
+                    .get(i as usize)
+                    .copied()
+                    .ok_or_else(|| "list index out of range".into())
             };
             let mut k = 0;
             while k + 2 < idx.len() {
                 let (a, b, c) = (corner(k)?, corner(k + 1)?, corner(k + 2)?);
                 let e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
                 let e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-                let nrm = [sign * (e1[1] * e2[2] - e1[2] * e2[1]), sign * (e1[2] * e2[0] - e1[0] * e2[2]), sign * (e1[0] * e2[1] - e1[1] * e2[0])];
-                tris.push(Tri { node: p.node, a, e1, e2, nrm });
+                let nrm = [
+                    sign * (e1[1] * e2[2] - e1[2] * e2[1]),
+                    sign * (e1[2] * e2[0] - e1[0] * e2[2]),
+                    sign * (e1[0] * e2[1] - e1[1] * e2[0]),
+                ];
+                tris.push(Tri {
+                    node: p.node,
+                    a,
+                    e1,
+                    e2,
+                    nrm,
+                });
                 k += 3;
             }
         }
@@ -1307,8 +1793,14 @@ fn flattened_in_view(g: &Glb, opaque: &dyn Fn(Option<&J>) -> R<bool>) -> R<Vec<(
     let mut flat: BTreeMap<usize, usize> = BTreeMap::new();
     for i in moved_nodes(&g.gltf)? {
         let n = nodes.at(i as i64).ok_or("list index out of range")?;
-        let scale = match n.get("scale") { Some(s) => nums(s, 0)?, None => vec![Num::I(1); 3] };
-        let smallest = scale.iter().map(|v| v.f().abs()).fold(f64::INFINITY, |m, v| if v < m { v } else { m });
+        let scale = match n.get("scale") {
+            Some(s) => nums(s, 0)?,
+            None => vec![Num::I(1); 3],
+        };
+        let smallest = scale
+            .iter()
+            .map(|v| v.f().abs())
+            .fold(f64::INFINITY, |m, v| if v < m { v } else { m });
         if n.has("mesh") && smallest < 0.01 {
             if scale.len() < 3 {
                 return Err("list index out of range".into());
@@ -1327,11 +1819,15 @@ fn flattened_in_view(g: &Glb, opaque: &dyn Fn(Option<&J>) -> R<bool>) -> R<Vec<(
     }
     let placed = node_matrices(&g.gltf, None, None)?;
     // Every opaque triangle of the model at rest, with the node it belongs to.
-    let Some(tris) = triangles(g, &placed, opaque)? else { return Ok(Vec::new()) };
+    let Some(tris) = triangles(g, &placed, opaque)? else {
+        return Ok(Vec::new());
+    };
 
     let mut out = Vec::new();
     for (&node, &axis) in &flat {
-        let Some(p) = placed.iter().find(|p| p.node == node) else { return Err("StopIteration".into()) };
+        let Some(p) = placed.iter().find(|p| p.node == node) else {
+            return Err("StopIteration".into());
+        };
         let m: Vec<f64> = p.m.iter().map(|v| v.f()).collect();
         let d = [m[axis * 4], m[axis * 4 + 1], m[axis * 4 + 2]];
         let length = (0.0 + d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
@@ -1339,7 +1835,9 @@ fn flattened_in_view(g: &Glb, opaque: &dyn Fn(Option<&J>) -> R<bool>) -> R<Vec<(
         let d = d.map(|v| v / length);
         let mut points = Vec::new();
         for prim in primitives(&g.gltf, key(nodes.at(node as i64).unwrap(), "mesh")?)? {
-            let Some(pos) = accessor(g, key(key(prim, "attributes")?, "POSITION")?)? else { return Ok(out) };
+            let Some(pos) = accessor(g, key(key(prim, "attributes")?, "POSITION")?)? else {
+                return Ok(out);
+            };
             points.extend(pos.iter().map(|v| applied(&p.m, v)));
         }
         if points.is_empty() {
@@ -1347,25 +1845,53 @@ fn flattened_in_view(g: &Glb, opaque: &dyn Fn(Option<&J>) -> R<bool>) -> R<Vec<(
         }
         // Its flat shape's two sides (across its plane, along its own main lines): one under 3 cm across, or
         // a sliver under 1 cm (a stream's end, a painting's edge before it spreads), hardly shows.
-        let u0 = if d[1].abs() < 0.9 { [0.0, 1.0, 0.0] } else { [1.0, 0.0, 0.0] };
+        let u0 = if d[1].abs() < 0.9 {
+            [0.0, 1.0, 0.0]
+        } else {
+            [1.0, 0.0, 0.0]
+        };
         let along = 0.0 + u0[0] * d[0] + u0[1] * d[1] + u0[2] * d[2];
-        let u = [u0[0] - d[0] * along, u0[1] - d[1] * along, u0[2] - d[2] * along];
+        let u = [
+            u0[0] - d[0] * along,
+            u0[1] - d[1] * along,
+            u0[2] - d[2] * along,
+        ];
         let ul = (0.0 + u[0] * u[0] + u[1] * u[1] + u[2] * u[2]).sqrt();
         let u = u.map(|v| v / ul);
-        let w = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]];
-        let flat2: Vec<[f64; 2]> = points.iter().map(|q| [0.0 + q[0] * u[0] + q[1] * u[1] + q[2] * u[2], 0.0 + q[0] * w[0] + q[1] * w[1] + q[2] * w[2]]).collect();
+        let w = [
+            d[1] * u[2] - d[2] * u[1],
+            d[2] * u[0] - d[0] * u[2],
+            d[0] * u[1] - d[1] * u[0],
+        ];
+        let flat2: Vec<[f64; 2]> = points
+            .iter()
+            .map(|q| {
+                [
+                    0.0 + q[0] * u[0] + q[1] * u[1] + q[2] * u[2],
+                    0.0 + q[0] * w[0] + q[1] * w[1] + q[2] * w[2],
+                ]
+            })
+            .collect();
         let count = flat2.len() as f64;
-        let mu = [flat2.iter().fold(0.0, |s, c| s + c[0]) / count, flat2.iter().fold(0.0, |s, c| s + c[1]) / count];
+        let mu = [
+            flat2.iter().fold(0.0, |s, c| s + c[0]) / count,
+            flat2.iter().fold(0.0, |s, c| s + c[1]) / count,
+        ];
         let cxx = flat2.iter().fold(0.0, |s, c| s + square(c[0] - mu[0]));
         let cyy = flat2.iter().fold(0.0, |s, c| s + square(c[1] - mu[1]));
-        let cxy = flat2.iter().fold(0.0, |s, c| s + (c[0] - mu[0]) * (c[1] - mu[1]));
+        let cxy = flat2
+            .iter()
+            .fold(0.0, |s, c| s + (c[0] - mu[0]) * (c[1] - mu[1]));
         let angle = 0.5 * (2.0 * cxy).atan2(cxx - cyy);
         let axes = [(angle.cos(), angle.sin()), (-angle.sin(), angle.cos())];
         let mut side: Vec<f64> = axes
             .iter()
             .map(|a| {
                 let along = flat2.iter().map(|c| c[0] * a.0 + c[1] * a.1);
-                let hi = along.clone().reduce(|m, v| if v > m { v } else { m }).unwrap();
+                let hi = along
+                    .clone()
+                    .reduce(|m, v| if v > m { v } else { m })
+                    .unwrap();
                 let lo = along.reduce(|m, v| if v < m { v } else { m }).unwrap();
                 hi - lo
             })
@@ -1403,14 +1929,25 @@ fn flattened_in_view(g: &Glb, opaque: &dyn Fn(Option<&J>) -> R<bool>) -> R<Vec<(
 fn override_of(overrides: &J, name: &str) -> J {
     match overrides.get(name) {
         Some(ov) => ov.clone(),
-        None => named_finish(name).or_else(|| overrides.get("*").cloned()).unwrap_or(J::Null),
+        None => named_finish(name)
+            .or_else(|| overrides.get("*").cloned())
+            .unwrap_or(J::Null),
     }
 }
 
 /// Warnings for a model (at rest `lo`; as it shows, its parts where `pose` puts them: `slo`, `shi`,
 /// `sparts`) against one content object's facts (None: none, a floor thing).
 #[allow(clippy::too_many_arguments)]
-fn content_warnings(facts: Option<&Facts>, lo: &[Num; 3], (slo, shi): &Bounds, sparts: &[(Option<usize>, Bounds)], scale: Num, g: &Glb, pose: &Pose, entry: &J) -> R<Vec<String>> {
+fn content_warnings(
+    facts: Option<&Facts>,
+    lo: &[Num; 3],
+    (slo, shi): &Bounds,
+    sparts: &[(Option<usize>, Bounds)],
+    scale: Num,
+    g: &Glb,
+    pose: &Pose,
+    entry: &J,
+) -> R<Vec<String>> {
     let mut warnings = Vec::new();
     let floor = J::Str("floor".into());
     let layer = facts.map(|f| &f.layer).unwrap_or(&floor);
@@ -1426,7 +1963,12 @@ fn content_warnings(facts: Option<&Facts>, lo: &[Num; 3], (slo, shi): &Bounds, s
     if let Some(f) = facts
         && (is("wall") || (is("floor") && !f.outside && !f.stairs))
     {
-        let depth = f.footprint.at(1).ok_or("list index out of range")?.num().ok_or("bad operand type for unary -")?;
+        let depth = f
+            .footprint
+            .at(1)
+            .ok_or("list index out of range")?
+            .num()
+            .ok_or("bad operand type for unary -")?;
         let face = ((-depth) / Num::I(2)).f() + WALL;
         if slo[2].f() < face - 0.01 {
             warnings.push(format!(
@@ -1455,13 +1997,24 @@ fn content_warnings(facts: Option<&Facts>, lo: &[Num; 3], (slo, shi): &Bounds, s
         // lamp's shade over the next tile) are its too, at rest.
         let (mut xlo, mut xhi, mut zlo, mut zhi) = (nw, half(w), nd, half(d));
         for t in f.object.get("overhang").and_then(J::list).unwrap_or(&[]) {
-            let (r, fw) = (t.at(0).and_then(J::num).map_or(0.0, Num::f), t.at(1).and_then(J::num).map_or(0.0, Num::f));
+            let (r, fw) = (
+                t.at(0).and_then(J::num).map_or(0.0, Num::f),
+                t.at(1).and_then(J::num).map_or(0.0, Num::f),
+            );
             xlo = xlo.min(r - 0.5);
             xhi = xhi.max(r + 0.5);
             zlo = zlo.min(fw - 0.5);
             zhi = zhi.max(fw + 0.5);
         }
-        let over = [xlo - slo[0].f(), shi[0].f() - xhi, zlo - slo[2].f(), shi[2].f() - zhi].into_iter().reduce(|m, v| if v > m { v } else { m }).unwrap();
+        let over = [
+            xlo - slo[0].f(),
+            shi[0].f() - xhi,
+            zlo - slo[2].f(),
+            shi[2].f() - zhi,
+        ]
+        .into_iter()
+        .reduce(|m, v| if v > m { v } else { m })
+        .unwrap();
         if over > OVERHANG {
             warnings.push(format!(
                 "reaches {} cm past its {} x {} footprint (x {} to {}, depth {} to {}): it overlaps what stands next to it",
@@ -1476,10 +2029,22 @@ fn content_warnings(facts: Option<&Facts>, lo: &[Num; 3], (slo, shi): &Bounds, s
         }
         // A part that goes round (a fan's blades) sweeps a whole circle about its pivot, not just its rest pose.
         let none = J::Obj(Vec::new());
-        for s in swept(g, entry.get("motions").filter(|m| m.truthy()).unwrap_or(&none))? {
+        for s in swept(
+            g,
+            entry.get("motions").filter(|m| m.truthy()).unwrap_or(&none),
+        )? {
             let sc = scale.f();
-            let (xlo, xhi, zlo, zhi, radius) = (s.x.0 * sc, s.x.1 * sc, s.z.0 * sc, s.z.1 * sc, s.radius * sc);
-            let over = [nw - xlo, xhi - half(w), nd - zlo, zhi - half(d)].into_iter().reduce(|m, v| if v > m { v } else { m }).unwrap();
+            let (xlo, xhi, zlo, zhi, radius) = (
+                s.x.0 * sc,
+                s.x.1 * sc,
+                s.z.0 * sc,
+                s.z.1 * sc,
+                s.radius * sc,
+            );
+            let over = [nw - xlo, xhi - half(w), nd - zlo, zhi - half(d)]
+                .into_iter()
+                .reduce(|m, v| if v > m { v } else { m })
+                .unwrap();
             if over > SWEEP {
                 warnings.push(format!(
                     "turning ({}), {} sweeps {} cm past its {} x {} footprint (x {} to {}, depth {} to {}; {} m from its axis): it overlaps what stands next to it (keep its axis on the middle, or make it smaller)",
@@ -1561,15 +2126,24 @@ pub struct Furniture {
 impl Furniture {
     /// Reads `paths.furniture`; a file that can't be read is an error naming it.
     pub fn read(paths: &Paths) -> Result<Furniture, String> {
-        let f = read_json(&paths.furniture).map_err(|e| format!("{}: {e}", relpath(&paths.furniture, &repo_root())))?;
+        let f = read_json(&paths.furniture)
+            .map_err(|e| format!("{}: {e}", relpath(&paths.furniture, &repo_root())))?;
         let part = |k: &str| f.get(k).cloned().unwrap_or(J::Obj(Vec::new()));
-        Ok(Furniture { seats: part("seats"), default_seat: part("defaultSeat"), beds: part("beds"), default_bed: part("defaultBed"), bunks: part("bunks") })
+        Ok(Furniture {
+            seats: part("seats"),
+            default_seat: part("defaultSeat"),
+            beds: part("beds"),
+            default_bed: part("defaultBed"),
+            bunks: part("bunks"),
+        })
     }
 }
 
 /// A number of the content's (`d[k]`), or `default`.
 fn number(d: Option<&J>, k: &str, default: f64) -> f64 {
-    d.and_then(|d| d.get(k)).and_then(J::num).map_or(default, Num::f)
+    d.and_then(|d| d.get(k))
+        .and_then(J::num)
+        .map_or(default, Num::f)
 }
 
 /// A model as the game draws it, its parts where a pose puts them, to measure heights on: its faces (hidden
@@ -1587,7 +2161,10 @@ impl Sampler {
         let overrides = entry.get("materials").unwrap_or(&no_overrides);
         let shown = |i: Option<&J>| -> R<bool> {
             let name = match i {
-                Some(i) => index(&J::Arr(materials.to_vec()), i)?.get("name").map(J::key).unwrap_or_default(),
+                Some(i) => index(&J::Arr(materials.to_vec()), i)?
+                    .get("name")
+                    .map(J::key)
+                    .unwrap_or_default(),
                 None => String::new(),
             };
             let ov = override_of(overrides, &name);
@@ -1597,13 +2174,20 @@ impl Sampler {
         let placed: Vec<Placed> = node_matrices(&g.gltf, pose, None)?
             .into_iter()
             .filter(|p| {
-                let axis = |k: usize| hypot(&[p.m[k * 4].f(), p.m[k * 4 + 1].f(), p.m[k * 4 + 2].f()]);
-                let (short, long) = (0..3).map(axis).fold((f64::INFINITY, 0.0f64), |(s, l), a| (s.min(a), l.max(a)));
+                let axis =
+                    |k: usize| hypot(&[p.m[k * 4].f(), p.m[k * 4 + 1].f(), p.m[k * 4 + 2].f()]);
+                let (short, long) = (0..3)
+                    .map(axis)
+                    .fold((f64::INFINITY, 0.0f64), |(s, l), a| (s.min(a), l.max(a)));
                 short >= 0.01 * long
             })
             .collect();
         let fit = entry.get("fit").is_some_and(J::truthy);
-        let scale = if fit { 1.0 } else { entry.get("scale").and_then(J::num).map_or(1.0, Num::f) };
+        let scale = if fit {
+            1.0
+        } else {
+            entry.get("scale").and_then(J::num).map_or(1.0, Num::f)
+        };
         Ok(triangles(g, &placed, &shown)?.map(|tris| Sampler { tris, scale }))
     }
 
@@ -1612,7 +2196,10 @@ impl Sampler {
     fn line(&self, x: f64, z: f64, up: bool) -> Vec<f64> {
         // glTF x -> game -x; the game's model is the file's times `scale`.
         let (p, d) = ([-x / self.scale, 0.0, z / self.scale], [0.0, -1.0, 0.0]);
-        hits(&p, &d, &self.tris).filter(|(_, n)| !up || n[1] > 0.0).map(|(t, _)| -t * self.scale).collect()
+        hits(&p, &d, &self.tris)
+            .filter(|(_, n)| !up || n[1] > 0.0)
+            .map(|(t, _)| -t * self.scale)
+            .collect()
     }
 
     /// The top (m) at (x, depth) nearest `near`: of the faces looking up there, the one nearest that height (what
@@ -1625,13 +2212,21 @@ impl Sampler {
     /// `top`, nearest the range `[lo, hi]` (of those in it, nearest its middle).
     fn top_in(&self, x: f64, z: f64, [lo, hi]: [f64; 2]) -> Option<f64> {
         let off = |h: f64| ((lo - h).max(h - hi).max(0.0), (h - (lo + hi) / 2.0).abs());
-        self.tops_at(x, z).into_iter().min_by(|a, b| off(*a).partial_cmp(&off(*b)).unwrap_or(std::cmp::Ordering::Equal))
+        self.tops_at(x, z).into_iter().min_by(|a, b| {
+            off(*a)
+                .partial_cmp(&off(*b))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     /// The heights `top` chooses from at (x, depth): the faces looking up, or every face if none does.
     fn tops_at(&self, x: f64, z: f64) -> Vec<f64> {
         let found = self.line(x, z, true);
-        if found.is_empty() { self.line(x, z, false) } else { found }
+        if found.is_empty() {
+            self.line(x, z, false)
+        } else {
+            found
+        }
     }
 
     /// Where a seat ends in front (m forward of the footprint's middle): from the hips' point (x, depth) forward a
@@ -1667,7 +2262,12 @@ impl Sampler {
     fn extent(&self) -> Option<([f64; 3], [f64; 3])> {
         let mut corners = self.tris.iter().flat_map(|t| self.corners(t));
         let first = corners.next()?;
-        Some(corners.fold((first, first), |(lo, hi), c| ([0, 1, 2].map(|k| lo[k].min(c[k])), [0, 1, 2].map(|k| hi[k].max(c[k])))))
+        Some(corners.fold((first, first), |(lo, hi), c| {
+            (
+                [0, 1, 2].map(|k| lo[k].min(c[k])),
+                [0, 1, 2].map(|k| hi[k].max(c[k])),
+            )
+        }))
     }
 
     /// How high it reaches (m) without what stands beside its top `top` higher than it (a dining set's chairs'
@@ -1676,7 +2276,9 @@ impl Sampler {
     /// None: no face looks up there.
     fn height_by(&self, top: f64) -> Option<f64> {
         const OVER_TOP: f64 = 0.02;
-        let flat_at = |t: &Tri, c: &[[f64; 3]; 3]| t.nrm[1] > 0.9 * hypot(&t.nrm) && c.iter().all(|v| (v[1] - top).abs() <= 0.01);
+        let flat_at = |t: &Tri, c: &[[f64; 3]; 3]| {
+            t.nrm[1] > 0.9 * hypot(&t.nrm) && c.iter().all(|v| (v[1] - top).abs() <= 0.01)
+        };
         let mut area: Option<([f64; 2], [f64; 2])> = None;
         for t in &self.tris {
             let c = self.corners(t);
@@ -1690,7 +2292,10 @@ impl Sampler {
         }
         let (lo, hi) = area?;
         let over = |c: &[[f64; 3]; 3]| {
-            let (x, z) = ((c[0][0] + c[1][0] + c[2][0]) / 3.0, (c[0][2] + c[1][2] + c[2][2]) / 3.0);
+            let (x, z) = (
+                (c[0][0] + c[1][0] + c[2][0]) / 3.0,
+                (c[0][2] + c[1][2] + c[2][2]) / 3.0,
+            );
             lo[0] <= x && x <= hi[0] && lo[1] <= z && z <= hi[1]
         };
         self.tris
@@ -1708,7 +2313,11 @@ impl Sampler {
         let (lo, hi) = self.extent()?;
         let x = (lo[0] + hi[0]) / 2.0;
         let mut found: Vec<f64> = (0..=((hi[2] - lo[2]) * 100.0) as usize)
-            .filter_map(|k| self.line(x, lo[2] + k as f64 / 100.0, true).into_iter().reduce(f64::max))
+            .filter_map(|k| {
+                self.line(x, lo[2] + k as f64 / 100.0, true)
+                    .into_iter()
+                    .reduce(f64::max)
+            })
             .filter(|h| *h >= 0.02)
             .collect();
         found.sort_by(f64::total_cmp);
@@ -1723,13 +2332,32 @@ fn open_pose(g: &Glb, clip: &J) -> R<Pose> {
     let empty = J::Arr(Vec::new());
     let nodes = g.gltf.get("nodes").unwrap_or(&empty);
     let mut pose: Pose = HashMap::new();
-    for a in g.gltf.get("animations").and_then(J::list).unwrap_or(&[]).iter().filter(|a| a.get("name") == Some(clip)) {
+    for a in g
+        .gltf
+        .get("animations")
+        .and_then(J::list)
+        .unwrap_or(&[])
+        .iter()
+        .filter(|a| a.get("name") == Some(clip))
+    {
         for c in key(a, "channels")?.list().unwrap_or(&[]) {
             let target = key(c, "target")?;
-            let (Some(node), Some(path)) = (target.opt("node"), target.get("path").and_then(J::str)) else { continue };
-            let Some(path) = ["translation", "rotation", "scale"].into_iter().find(|p| *p == path) else { continue };
+            let (Some(node), Some(path)) =
+                (target.opt("node"), target.get("path").and_then(J::str))
+            else {
+                continue;
+            };
+            let Some(path) = ["translation", "rotation", "scale"]
+                .into_iter()
+                .find(|p| *p == path)
+            else {
+                continue;
+            };
             if let Some(last) = first_value(g, key(sampler(a, c)?, "output")?, true)? {
-                pose.insert((node_index(nodes, node)?, path), last.into_iter().map(Num::F).collect());
+                pose.insert(
+                    (node_index(nodes, node)?, path),
+                    last.into_iter().map(Num::F).collect(),
+                );
             }
         }
     }
@@ -1759,7 +2387,11 @@ impl Height {
     /// How far (m) the model is from it (for a light, how far outside the lamp it shines from); None: nothing there.
     pub fn off(&self) -> Option<f64> {
         if let Some((lo, hi)) = self.span {
-            return Some(if self.expected < lo { lo - self.expected } else { f64::max(0.0, self.expected - hi) });
+            return Some(if self.expected < lo {
+                lo - self.expected
+            } else {
+                f64::max(0.0, self.expected - hi)
+            });
         }
         self.mesh.map(|m| (m - self.expected).abs())
     }
@@ -1772,7 +2404,11 @@ impl Height {
     /// The gate's warnings about it: the model off it, and a second source that says otherwise.
     fn warnings(&self) -> Vec<String> {
         let mut out = Vec::new();
-        let open = self.open.as_ref().map(|c| format!(", held open ({})", repr_str(c))).unwrap_or_default();
+        let open = self
+            .open
+            .as_ref()
+            .map(|c| format!(", held open ({})", repr_str(c)))
+            .unwrap_or_default();
         let at = format!("x {}, depth {}", fixed(self.at[0], 2), fixed(self.at[1], 2));
         if self.what == "seat front" {
             if self.off().is_none_or(|off| off > FRONT_OFF) {
@@ -1792,7 +2428,14 @@ impl Height {
         }
         if !self.fits() {
             out.push(match (self.mesh, self.span) {
-                (_, Some((lo, hi))) => format!("{} {} m ({}), outside the lamp there (its model {} to {} m at {at})", self.what, fixed(self.expected, 2), self.source, fixed(lo, 2), fixed(hi, 2)),
+                (_, Some((lo, hi))) => format!(
+                    "{} {} m ({}), outside the lamp there (its model {} to {} m at {at})",
+                    self.what,
+                    fixed(self.expected, 2),
+                    self.source,
+                    fixed(lo, 2),
+                    fixed(hi, 2)
+                ),
                 (Some(m), _) => format!(
                     "{} {} m ({}{open}), the model {} m there ({at}): {} cm {}",
                     self.what,
@@ -1802,7 +2445,12 @@ impl Height {
                     fixed((m - self.expected).abs() * 100.0, 1),
                     if m < self.expected { "lower" } else { "higher" }
                 ),
-                (None, None) => format!("{} {} m ({}{open}): no model under it ({at})", self.what, fixed(self.expected, 2), self.source),
+                (None, None) => format!(
+                    "{} {} m ({}{open}): no model under it ({at})",
+                    self.what,
+                    fixed(self.expected, 2),
+                    self.source
+                ),
             });
         }
         if let Some(d) = &self.disagrees {
@@ -1831,15 +2479,29 @@ fn slot_points(object: &J, fwd: f64) -> Vec<[f64; 2]> {
         return places
             .iter()
             .map(|p| {
-                let at = |k| p.get("at").and_then(|a| a.at(k)).and_then(J::num).map_or(0.0, Num::f);
+                let at = |k| {
+                    p.get("at")
+                        .and_then(|a| a.at(k))
+                        .and_then(J::num)
+                        .map_or(0.0, Num::f)
+                };
                 let facing = number(Some(p), "facing", 0.0).to_radians();
                 [at(0) + facing.sin() * fwd, at(1) + facing.cos() * fwd]
             })
             .collect();
     }
-    let n = object.get("slots").and_then(J::num).map_or(1, |n| n.f().max(1.0) as usize);
-    let width = object.get("footprint").and_then(|f| f.at(0)).and_then(J::num).map_or(1.0, Num::f);
-    (0..n).map(|k| [(k as f64 - (n as f64 - 1.0) / 2.0) * width / n as f64, fwd]).collect()
+    let n = object
+        .get("slots")
+        .and_then(J::num)
+        .map_or(1, |n| n.f().max(1.0) as usize);
+    let width = object
+        .get("footprint")
+        .and_then(|f| f.at(0))
+        .and_then(J::num)
+        .map_or(1.0, Num::f);
+    (0..n)
+        .map(|k| [(k as f64 - (n as f64 - 1.0) / 2.0) * width / n as f64, fwd])
+        .collect()
 }
 
 /// The seat of content object `object` (furniture.json `seats`, else the content's `seat`, else `defaultSeat` for
@@ -1849,18 +2511,43 @@ fn seat_of(object: &J, furniture: &Furniture) -> Option<Seat> {
     let id = object.get("id").map(J::key).unwrap_or_default();
     let own = object.opt("seat");
     let table = furniture.seats.get(&id);
-    let sits = || object.get("interactions").and_then(J::list).unwrap_or(&[]).iter().any(|i| i.get("pose").is_some_and(|p| p.key() == "sit"));
+    let sits = || {
+        object
+            .get("interactions")
+            .and_then(J::list)
+            .unwrap_or(&[])
+            .iter()
+            .any(|i| i.get("pose").is_some_and(|p| p.key() == "sit"))
+    };
     if own.is_none() && table.is_none() && !sits() {
         return None;
     }
     let (seat, source) = match (table, own) {
-        (Some(t), _) => ((number(Some(t), "h", 0.45), number(Some(t), "fwd", 0.0)), "furniture.json `seats`"),
-        (None, Some(o)) => ((number(Some(o), "height", 0.45), number(Some(o), "forward", 0.0)), "content `seat`"),
-        (None, None) => ((number(Some(&furniture.default_seat), "h", 0.45), number(Some(&furniture.default_seat), "fwd", 0.0)), "furniture.json `defaultSeat`"),
+        (Some(t), _) => (
+            (number(Some(t), "h", 0.45), number(Some(t), "fwd", 0.0)),
+            "furniture.json `seats`",
+        ),
+        (None, Some(o)) => (
+            (
+                number(Some(o), "height", 0.45),
+                number(Some(o), "forward", 0.0),
+            ),
+            "content `seat`",
+        ),
+        (None, None) => (
+            (
+                number(Some(&furniture.default_seat), "h", 0.45),
+                number(Some(&furniture.default_seat), "fwd", 0.0),
+            ),
+            "furniture.json `defaultSeat`",
+        ),
     };
     let disagrees = match (table, own) {
         (Some(_), Some(o)) => {
-            let theirs = (number(Some(o), "height", 0.0), number(Some(o), "forward", 0.0));
+            let theirs = (
+                number(Some(o), "height", 0.0),
+                number(Some(o), "forward", 0.0),
+            );
             ((theirs.0 - seat.0).abs() > SAME || (theirs.1 - seat.1).abs() > SAME).then(|| {
                 format!(
                     "content `seat` says {} m, {} forward; furniture.json `seats` says {} m, {} forward (furniture.json wins: characters.ts `seatOf`)",
@@ -1873,13 +2560,25 @@ fn seat_of(object: &J, furniture: &Furniture) -> Option<Seat> {
         }
         _ => None,
     };
-    let along = table.and_then(|t| t.get("along")).and_then(J::num).map(Num::f);
+    let along = table
+        .and_then(|t| t.get("along"))
+        .and_then(J::num)
+        .map(Num::f);
     let points = match along {
         Some(a) => vec![[a * seat.1, 0.0]],
         None => slot_points(object, seat.1),
     };
-    let front = table.and_then(|t| t.get("front")).and_then(J::num).map(Num::f);
-    Some(Seat { h: seat.0, source, disagrees, points, front })
+    let front = table
+        .and_then(|t| t.get("front"))
+        .and_then(J::num)
+        .map(Num::f);
+    Some(Seat {
+        h: seat.0,
+        source,
+        disagrees,
+        points,
+        front,
+    })
 }
 
 /// The functional heights of content object `object` (`Facts::object`) drawn by the model `g` (its `entry`):
@@ -1889,12 +2588,26 @@ fn seat_of(object: &J, furniture: &Furniture) -> Option<Seat> {
 ///   low point), `fwd` forward, at each slot (in the middle for one lain on across, but a baby's at its slot), held open if it opens;
 ///   with `every_slot` false at slot 0 only (`cargo review sizes`: a crib's slot 1 is its changing table);
 /// - its lamp's light (content `light`, only with an `at`: the shade).
-fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bool) -> R<Vec<Height>> {
+fn heights(
+    g: &Glb,
+    entry: &J,
+    object: &J,
+    furniture: &Furniture,
+    every_slot: bool,
+) -> R<Vec<Height>> {
     let mut out = Vec::new();
     let id = object.get("id").map(J::key).unwrap_or_default();
-    let poses: HashSet<String> = object.get("interactions").and_then(J::list).unwrap_or(&[]).iter().filter_map(|i| i.get("pose").map(J::key)).collect();
+    let poses: HashSet<String> = object
+        .get("interactions")
+        .and_then(J::list)
+        .unwrap_or(&[])
+        .iter()
+        .filter_map(|i| i.get("pose").map(J::key))
+        .collect();
     let seat = seat_of(object, furniture);
-    let lain = furniture.beds.get(&id).is_some() || furniture.bunks.get(&id).is_some() || poses.contains("lie");
+    let lain = furniture.beds.get(&id).is_some()
+        || furniture.bunks.get(&id).is_some()
+        || poses.contains("lie");
     let lamp = object.opt("light").is_some_and(|l| l.opt("at").is_some());
     if !(seat.is_some() || lain || lamp || object.opt("surface").is_some()) {
         return Ok(out);
@@ -1914,9 +2627,24 @@ fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bo
         }
         best.unwrap_or(([0.0, 0.0], None))
     };
-    let mut height = |what: &'static str, expected: f64, source: String, points: &[[f64; 2]], s: &Sampler, open: Option<String>, disagrees: Option<String>| {
+    let mut height = |what: &'static str,
+                      expected: f64,
+                      source: String,
+                      points: &[[f64; 2]],
+                      s: &Sampler,
+                      open: Option<String>,
+                      disagrees: Option<String>| {
         let (at, mesh) = worst(s, points, expected);
-        out.push(Height { what, expected, source, at, open, mesh, span: None, disagrees });
+        out.push(Height {
+            what,
+            expected,
+            source,
+            at,
+            open,
+            mesh,
+            span: None,
+            disagrees,
+        });
     };
 
     // Seated (not on the ground: against a tree's trunk, nothing of the model's is sat on).
@@ -1925,7 +2653,15 @@ fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bo
         && let Some(s) = &rest
         && seat.h > GROUND
     {
-        height("seat", seat.h, seat.source.into(), &seat.points, s, None, seat.disagrees);
+        height(
+            "seat",
+            seat.h,
+            seat.source.into(),
+            &seat.points,
+            s,
+            None,
+            seat.disagrees,
+        );
         // Where its top ends in front (the shins clear of a deep cushion: characters.ts `perch`), the worst point.
         if let Some(front) = seat.front {
             let mut worst: Option<([f64; 2], Option<f64>)> = None;
@@ -1937,7 +2673,16 @@ fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bo
                 }
             }
             let (at, mesh) = worst.unwrap_or(([0.0, 0.0], None));
-            seat_front = Some(Height { what: "seat front", expected: front, source: "furniture.json `seats`".into(), at, open: None, mesh, span: None, disagrees: None });
+            seat_front = Some(Height {
+                what: "seat front",
+                expected: front,
+                source: "furniture.json `seats`".into(),
+                at,
+                open: None,
+                mesh,
+                span: None,
+                disagrees: None,
+            });
         }
     }
 
@@ -1949,7 +2694,15 @@ fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bo
             Some([x, z, ..]) => [x.num().map_or(0.0, Num::f), z.num().map_or(0.0, Num::f)],
             _ => [0.0, 0.0],
         };
-        height("surface", number(Some(top), "height", 0.0), "content `surface`".into(), &[point], s, None, None);
+        height(
+            "surface",
+            number(Some(top), "height", 0.0),
+            "content `surface`".into(),
+            &[point],
+            s,
+            None,
+            None,
+        );
     }
 
     // Lain on: held open if it opens (a sofa bed's mattress pulled out, a wall bed folded down).
@@ -1957,7 +2710,12 @@ fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bo
     let bunk = furniture.bunks.get(&id).and_then(J::list);
     if lain {
         let none = J::Obj(Vec::new());
-        let open = entry.get("motions").filter(|m| m.truthy()).unwrap_or(&none).opt("open").cloned();
+        let open = entry
+            .get("motions")
+            .filter(|m| m.truthy())
+            .unwrap_or(&none)
+            .opt("open")
+            .cloned();
         let opened = match &open {
             Some(clip) => Sampler::new(g, entry, Some(&open_pose(g, clip)?))?,
             None => None,
@@ -1971,21 +2729,42 @@ fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bo
             let open = open.map(|c| c.key());
             if let Some(tops) = bunk {
                 for (what, h) in ["lower bunk", "upper bunk"].into_iter().zip(tops) {
-                    height(what, h.num().map_or(0.0, Num::f), "furniture.json `bunks`".into(), &[[0.0, fwd]], s, open.clone(), None);
+                    height(
+                        what,
+                        h.num().map_or(0.0, Num::f),
+                        "furniture.json `bunks`".into(),
+                        &[[0.0, fwd]],
+                        s,
+                        open.clone(),
+                        None,
+                    );
                 }
             } else {
                 let sling = bed.and_then(|b| b.get("sling"));
                 let (h, source) = match (bed, sling) {
-                    (Some(_), Some(sl)) => (number(Some(sl), "low", 0.5), "furniture.json `beds`, its sling's low point"),
+                    (Some(_), Some(sl)) => (
+                        number(Some(sl), "low", 0.5),
+                        "furniture.json `beds`, its sling's low point",
+                    ),
                     (Some(b), None) => (number(Some(b), "h", 0.5), "furniture.json `beds`"),
-                    (None, _) => (number(Some(&furniture.default_bed), "h", 0.5), "furniture.json `defaultBed`"),
+                    (None, _) => (
+                        number(Some(&furniture.default_bed), "h", 0.5),
+                        "furniture.json `defaultBed`",
+                    ),
                 };
                 // (A baby lies at its slot, on its back along the bed, even on one lain on across: characters.ts.)
-                let baby = object.get("interactions").and_then(J::list).is_some_and(|l| l.iter().any(|i| i.get("baby").is_some_and(J::truthy)));
+                let baby = object
+                    .get("interactions")
+                    .and_then(J::list)
+                    .is_some_and(|l| l.iter().any(|i| i.get("baby").is_some_and(J::truthy)));
                 let across = !baby && bed.and_then(|b| b.get("across")).is_some_and(J::truthy);
                 let slots = slot_points(object, fwd);
                 let n = if every_slot { slots.len() } else { 1 };
-                let points: Vec<[f64; 2]> = if across { vec![[0.0, fwd]] } else { slots.into_iter().take(n).collect() };
+                let points: Vec<[f64; 2]> = if across {
+                    vec![[0.0, fwd]]
+                } else {
+                    slots.into_iter().take(n).collect()
+                };
                 height("mattress", h, source.into(), &points, s, open, None);
             }
         }
@@ -1998,7 +2777,16 @@ fn heights(g: &Glb, entry: &J, object: &J, furniture: &Furniture, every_slot: bo
     {
         let at = [x.num().map_or(0.0, Num::f), z.num().map_or(0.0, Num::f)];
         let span = s.span(at[0], at[1]);
-        out.push(Height { what: "light", expected: number(Some(light), "height", 1.55), source: "content `light`".into(), at, open: None, mesh: None, span, disagrees: None });
+        out.push(Height {
+            what: "light",
+            expected: number(Some(light), "height", 1.55),
+            source: "content `light`".into(),
+            at,
+            open: None,
+            mesh: None,
+            span,
+            disagrees: None,
+        });
     }
     out.extend(seat_front);
     Ok(out)
@@ -2017,32 +2805,64 @@ struct Info {
 }
 
 fn dims_text(dims: &[Num; 3]) -> String {
-    dims.iter().map(|d| fixed(d.f(), 2)).collect::<Vec<_>>().join(" x ")
+    dims.iter()
+        .map(|d| fixed(d.f(), 2))
+        .collect::<Vec<_>>()
+        .join(" x ")
 }
 
 /// (errors, warnings, summary) for one model entry and its file (and its far version's, at `far`);
 /// `facts`: those of each content object that draws it (`content_objects`); `centre`: where it's built
 /// centred (centres.json; None: not built here, not checked).
-fn check(fin: &Finishes, entry: &J, path: &str, far: Option<&str>, facts: Option<&Vec<Facts>>, centre: Option<&J>, furniture: Option<&Furniture>) -> R<(Vec<String>, Vec<String>, String)> {
+fn check(
+    fin: &Finishes,
+    entry: &J,
+    path: &str,
+    far: Option<&str>,
+    facts: Option<&Vec<Facts>>,
+    centre: Option<&J>,
+    furniture: Option<&Furniture>,
+) -> R<(Vec<String>, Vec<String>, String)> {
     let (mut errors, mut warnings, info) = check_file(fin, entry, path, facts, centre, furniture)?;
-    let mut summary = format!("{:>6} KB {:>6} tris {} draws {:>2} materials  {} m", fixed(info.size as f64 / 1024.0, 1), info.tris, info.draws, info.materials, dims_text(&info.dims));
+    let mut summary = format!(
+        "{:>6} KB {:>6} tris {} draws {:>2} materials  {} m",
+        fixed(info.size as f64 / 1024.0, 1),
+        info.tris,
+        info.draws,
+        info.materials,
+        dims_text(&info.dims)
+    );
     if info.clips > 0 {
         summary += &format!("  {} moving parts, {} clips", info.moving, info.clips);
     }
     if let Some(far) = far {
         // Its far version (`far`): the same model, still, with far fewer triangles.
         // (Without what the full model is checked for: its clips, colours and centre, a bird's parts and the perches.)
-        let far_entry = J::Obj(entry.entries().unwrap_or(&[]).iter().filter(|(k, _)| !["motions", "paint", "perches", "habitat", "bird"].contains(&k.as_str())).cloned().collect());
-        let (mut far_errors, mut far_warnings, far_info) = match check_file(fin, &far_entry, far, None, None, None) {
-            Ok((e, w, i)) => (e, w, Some(i)),
-            Err(err) => (vec![format!("cannot read {far}: {err}")], Vec::new(), None),
-        };
+        let far_entry = J::Obj(
+            entry
+                .entries()
+                .unwrap_or(&[])
+                .iter()
+                .filter(|(k, _)| {
+                    !["motions", "paint", "perches", "habitat", "bird"].contains(&k.as_str())
+                })
+                .cloned()
+                .collect(),
+        );
+        let (mut far_errors, mut far_warnings, far_info) =
+            match check_file(fin, &far_entry, far, None, None, None) {
+                Ok((e, w, i)) => (e, w, Some(i)),
+                Err(err) => (vec![format!("cannot read {far}: {err}")], Vec::new(), None),
+            };
         if let Some(fi) = far_info {
             if fi.clips > 0 {
                 far_errors.push("has clips: a far version stands still".into());
             }
             if fi.tris as f64 > info.tris as f64 / 2.0 {
-                far_warnings.push(format!("{} triangles, over half the full model's {} (aim for a quarter)", fi.tris, info.tris));
+                far_warnings.push(format!(
+                    "{} triangles, over half the full model's {} (aim for a quarter)",
+                    fi.tris, info.tris
+                ));
             }
             // It stands where the model stands: decimating can drop the lowest points and lift it off the floor.
             let off = fi.lo[1] - info.lo[1];
@@ -2052,8 +2872,17 @@ fn check(fin: &Finishes, entry: &J, path: &str, far: Option<&str>, facts: Option
                     signed((off * Num::I(100)).f(), 1)
                 ));
             }
-            if fi.dims.iter().zip(&info.dims).any(|(a, b)| (a.f() - b.f()).abs() > f64::max(0.05 * b.f(), 0.02)) {
-                far_warnings.push(format!("{} m, the full model {} m", dims_text(&fi.dims), dims_text(&info.dims)));
+            if fi
+                .dims
+                .iter()
+                .zip(&info.dims)
+                .any(|(a, b)| (a.f() - b.f()).abs() > f64::max(0.05 * b.f(), 0.02))
+            {
+                far_warnings.push(format!(
+                    "{} m, the full model {} m",
+                    dims_text(&fi.dims),
+                    dims_text(&info.dims)
+                ));
             }
             summary += &format!("  (far: {} tris)", fi.tris);
         }
@@ -2066,14 +2895,30 @@ fn check(fin: &Finishes, entry: &J, path: &str, far: Option<&str>, facts: Option
 
 /// (errors, warnings, numbers) for one model entry and a file of it; `facts`: those of each content object
 /// that draws it (`content_objects`), each checked; `centre`: where it's built centred (centres.json), or None.
-fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>, centre: Option<&J>, furniture: Option<&Furniture>) -> R<(Vec<String>, Vec<String>, Info)> {
+fn check_file(
+    fin: &Finishes,
+    entry: &J,
+    path: &str,
+    facts: Option<&Vec<Facts>>,
+    centre: Option<&J>,
+    furniture: Option<&Furniture>,
+) -> R<(Vec<String>, Vec<String>, Info)> {
     let (mut errors, mut warnings) = (Vec::new(), Vec::new());
     let data = std::fs::read(path).map_err(|e| py::os_error(&e, path))?;
     let g = parse_glb(&data)?;
     let gltf = &g.gltf;
     let empty = J::Arr(Vec::new());
-    let required: BTreeSet<String> = gltf.get("extensionsRequired").and_then(J::list).unwrap_or(&[]).iter().map(J::key).collect();
-    for ext in required.iter().filter(|e| !EXTENSIONS.contains(&e.as_str())) {
+    let required: BTreeSet<String> = gltf
+        .get("extensionsRequired")
+        .and_then(J::list)
+        .unwrap_or(&[])
+        .iter()
+        .map(J::key)
+        .collect();
+    for ext in required
+        .iter()
+        .filter(|e| !EXTENSIONS.contains(&e.as_str()))
+    {
         errors.push(format!("requires {ext}, which the game cannot read"));
     }
     if gltf.get("skins").is_some_and(J::truthy) {
@@ -2090,7 +2935,9 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
         }
     }
     if morphs {
-        errors.push("has morph targets: placed things are drawn as thin instances, without them".into());
+        errors.push(
+            "has morph targets: placed things are drawn as thin instances, without them".into(),
+        );
     }
     if gltf.get("cameras").is_some_and(J::truthy) {
         warnings.push("has cameras; the game drops them".into());
@@ -2100,18 +2947,35 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
     warnings.extend(clip_warnings);
     // The parts the player may colour (`paint`: a material's name, or {material, label}): materials of the file.
     let materials = gltf.get("materials").and_then(J::list).unwrap_or(&[]);
-    let names: Vec<J> = materials.iter().map(|m| m.get("name").cloned().unwrap_or(J::Str(String::new()))).collect();
+    let names: Vec<J> = materials
+        .iter()
+        .map(|m| m.get("name").cloned().unwrap_or(J::Str(String::new())))
+        .collect();
     for slot in entry.get("paint").and_then(J::list).unwrap_or(&[]) {
-        let name = if matches!(slot, J::Obj(_)) { slot.get("material").cloned().unwrap_or(J::Null) } else { slot.clone() };
+        let name = if matches!(slot, J::Obj(_)) {
+            slot.get("material").cloned().unwrap_or(J::Null)
+        } else {
+            slot.clone()
+        };
         if matches!(slot, J::Obj(_)) && !slot.get("label").is_some_and(J::truthy) {
             errors.push(format!("`paint` part {} has no label", repr(&name)));
         }
         if !names.contains(&name) {
-            errors.push(format!("`paint` names {}, which is no material of the file", repr(&name)));
+            errors.push(format!(
+                "`paint` names {}, which is no material of the file",
+                repr(&name)
+            ));
         }
     }
-    if gltf.get("extensionsUsed").and_then(J::list).unwrap_or(&[]).contains(&J::Str("KHR_lights_punctual".into())) {
-        warnings.push("has lights; the game drops them (a lamp's light is the content's `light`)".into());
+    if gltf
+        .get("extensionsUsed")
+        .and_then(J::list)
+        .unwrap_or(&[])
+        .contains(&J::Str("KHR_lights_punctual".into()))
+    {
+        warnings.push(
+            "has lights; the game drops them (a lamp's light is the content's `light`)".into(),
+        );
     }
 
     let accessors = gltf.get("accessors").unwrap_or(&empty);
@@ -2122,10 +2986,19 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
     for (name, ov) in overrides.entries().unwrap_or(&[]) {
         let mirror = ov.opt("mirror");
         let truthy = mirror.is_some_and(J::truthy);
-        if !matches!(mirror.and_then(J::str), None | Some("front") | Some("back")) || mirror.is_some_and(|m| m.str().is_none()) {
-            errors.push(format!("material {}: `mirror` is front or back, not {}", repr_str(name), repr(mirror.unwrap())));
+        if !matches!(mirror.and_then(J::str), None | Some("front") | Some("back"))
+            || mirror.is_some_and(|m| m.str().is_none())
+        {
+            errors.push(format!(
+                "material {}: `mirror` is front or back, not {}",
+                repr_str(name),
+                repr(mirror.unwrap())
+            ));
         } else if truthy && !names.contains(&J::Str(name.clone())) {
-            errors.push(format!("material {} is mirror glass, but no material of the file", repr_str(name)));
+            errors.push(format!(
+                "material {} is mirror glass, but no material of the file",
+                repr_str(name)
+            ));
         } else if truthy && fin.see_through(ov.opt("finish")) {
             warnings.push(format!(
                 "mirror glass {} is see-through ({}): where nothing reflects (Medium, Low) it shows what is behind it; map it to gloss",
@@ -2134,16 +3007,31 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
             ));
         }
         if let Some(glow) = ov.opt("glow") {
-            let ok = glow.str().is_some_and(|s| s.chars().count() == 7 && s.starts_with('#') && s.chars().skip(1).all(|c| c.is_ascii_hexdigit()));
+            let ok = glow.str().is_some_and(|s| {
+                s.chars().count() == 7
+                    && s.starts_with('#')
+                    && s.chars().skip(1).all(|c| c.is_ascii_hexdigit())
+            });
             if !ok {
-                errors.push(format!("material {}: `glow` is a colour, #rrggbb, not {}", repr_str(name), repr(glow)));
+                errors.push(format!(
+                    "material {}: `glow` is a colour, #rrggbb, not {}",
+                    repr_str(name),
+                    repr(glow)
+                ));
             }
         }
         if let Some(screen) = ov.get("screen") {
             if !matches!(screen, J::Bool(_)) {
-                errors.push(format!("material {}: `screen` is true or false, not {}", repr_str(name), repr(screen)));
+                errors.push(format!(
+                    "material {}: `screen` is true or false, not {}",
+                    repr_str(name),
+                    repr(screen)
+                ));
             } else if screen.truthy() && ov.opt("glow").is_none() {
-                errors.push(format!("material {}: `screen` needs a `glow` colour", repr_str(name)));
+                errors.push(format!(
+                    "material {}: `screen` needs a `glow` colour",
+                    repr_str(name)
+                ));
             }
         }
     }
@@ -2156,7 +3044,10 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
     // Draw calls: one per finish group, the still body's and each moving part's apart.
     for p in node_matrices(gltf, None, None)? {
         for prim in primitives(gltf, &p.mesh)? {
-            if !prim.get("mode").is_none_or(|m| m.num().is_some_and(|n| n.f() == 4.0)) {
+            if !prim
+                .get("mode")
+                .is_none_or(|m| m.num().is_some_and(|n| n.f() == 4.0))
+            {
                 errors.push("a primitive that is not triangles".into());
                 continue;
             }
@@ -2190,7 +3081,9 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
             let ov = override_of(overrides, &name);
             let ov_on = ov.truthy();
             if ov_on && ov.get("mirror").is_some_and(J::truthy) {
-                let ((glo, ghi), part) = glass.entry(name.clone()).or_insert((([inf; 3], [ninf; 3]), p.part));
+                let ((glo, ghi), part) = glass
+                    .entry(name.clone())
+                    .or_insert((([inf; 3], [ninf; 3]), p.part));
                 let (bl, bh) = box_of(pos)?;
                 for k in 0..3 {
                     let mut l = Num::I(0);
@@ -2204,13 +3097,24 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
                     ghi[k] = py::max(ghi[k], h + p.m[12 + k]);
                 }
                 if *part != p.part {
-                    errors.push(format!("mirror glass {} is on two parts: one material per mirror", repr_str(&name)));
+                    errors.push(format!(
+                        "mirror glass {} is on two parts: one material per mirror",
+                        repr_str(&name)
+                    ));
                 }
             }
             let pbr = mat.get("pbrMetallicRoughness");
-            let textured = ["baseColorTexture", "metallicRoughnessTexture"].iter().any(|k| pbr.is_some_and(|p| p.has(k)))
-                || ["normalTexture", "occlusionTexture", "emissiveTexture"].iter().any(|k| mat.has(k));
-            let finish = if ov_on { ov.get("finish").filter(|f| f.truthy()) } else { None };
+            let textured = ["baseColorTexture", "metallicRoughnessTexture"]
+                .iter()
+                .any(|k| pbr.is_some_and(|p| p.has(k)))
+                || ["normalTexture", "occlusionTexture", "emissiveTexture"]
+                    .iter()
+                    .any(|k| mat.has(k));
+            let finish = if ov_on {
+                ov.get("finish").filter(|f| f.truthy())
+            } else {
+                None
+            };
             if key(prim, "attributes")?.has("TEXCOORD_0") && (!textured || finish.is_some()) {
                 flags.entry("uvs").or_default().insert(name.clone());
             }
@@ -2223,9 +3127,19 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
             if let Some(finish) = finish {
                 let f = finish.key();
                 if !fin.plain.contains_key(&f) {
-                    errors.push(format!("material {} maps to {f}, which is no finish in the manifests", repr_str(&name)));
+                    errors.push(format!(
+                        "material {} maps to {f}, which is no finish in the manifests",
+                        repr_str(&name)
+                    ));
                 }
-                groups.insert((p.part, if fin.plain.get(&f) == Some(&true) { "plain".into() } else { f }));
+                groups.insert((
+                    p.part,
+                    if fin.plain.get(&f) == Some(&true) {
+                        "plain".into()
+                    } else {
+                        f
+                    },
+                ));
                 continue;
             }
             groups.insert((p.part, format!("file:{name}")));
@@ -2236,7 +3150,11 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
             if mat.get("alphaMode") == Some(&J::Str("BLEND".into())) {
                 flags.entry("blend").or_default().insert(name.clone());
             }
-            if mat.get("emissiveFactor").map(|e| e.list().unwrap_or(&[]).iter().any(J::truthy)).unwrap_or(false) {
+            if mat
+                .get("emissiveFactor")
+                .map(|e| e.list().unwrap_or(&[]).iter().any(J::truthy))
+                .unwrap_or(false)
+            {
                 flags.entry("emissive").or_default().insert(name.clone());
             }
         }
@@ -2244,7 +3162,11 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
     for (name, ((glo, ghi), _part)) in &glass {
         // (not `size`: that is the file's, for the summary)
         let mut extent: Vec<Num> = (0..3).map(|k| ghi[k] - glo[k]).collect();
-        extent.sort_by(|a, b| a.f().partial_cmp(&b.f()).unwrap_or(std::cmp::Ordering::Equal));
+        extent.sort_by(|a, b| {
+            a.f()
+                .partial_cmp(&b.f())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         if extent[0].f() > 0.1 * extent[1].f() {
             warnings.push(format!(
                 "mirror glass {} isn't flat ({} cm thick, {} cm across): the reflection lies on its box's thinnest side",
@@ -2255,14 +3177,26 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
         }
     }
     for (flag, text) in [
-        ("unmapped", "not mapped to a finish in the entry's `materials` (each its own draw call and look)"),
+        (
+            "unmapped",
+            "not mapped to a finish in the entry's `materials` (each its own draw call and look)",
+        ),
         ("double", "double-sided (every back face drawn too)"),
-        ("blend", "see-through (BLEND: drawn after everything else, unsorted between instances)"),
-        ("emissive", "glowing by day too (emissive; map it to a finish, the lamp lights it at night)"),
+        (
+            "blend",
+            "see-through (BLEND: drawn after everything else, unsorted between instances)",
+        ),
+        (
+            "emissive",
+            "glowing by day too (emissive; map it to a finish, the lamp lights it at night)",
+        ),
         ("uvs", "carrying UVs nothing reads (export without them)"),
     ] {
         if let Some(names) = flags.get(flag).filter(|n| !n.is_empty()) {
-            warnings.push(format!("materials {text}: {}", names.iter().cloned().collect::<Vec<_>>().join(", ")));
+            warnings.push(format!(
+                "materials {text}: {}",
+                names.iter().cloned().collect::<Vec<_>>().join(", ")
+            ));
         }
     }
     if let Some(names) = flags.get("coloured").filter(|n| !n.is_empty()) {
@@ -2272,7 +3206,15 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
 
     // Units and origin: on the floor, centred on the footprint (models.ts lines files up by neither).
     let fit = entry.get("fit").is_some_and(J::truthy);
-    let scale = if fit { Num::I(1) } else { entry.get("scale").map(|s| s.num().ok_or("can't multiply sequence by non-int")).transpose()?.unwrap_or(Num::I(1)) };
+    let scale = if fit {
+        Num::I(1)
+    } else {
+        entry
+            .get("scale")
+            .map(|s| s.num().ok_or("can't multiply sequence by non-int"))
+            .transpose()?
+            .unwrap_or(Num::I(1))
+    };
     let lo = lo.map(|v| v * scale);
     let hi = hi.map(|v| v * scale);
     let dims = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
@@ -2280,24 +3222,50 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
     // is compared with the content (the footprint, the wall, what the floor hides, a top's disc).
     let none = J::Obj(Vec::new());
     let motions = entry.get("motions").filter(|m| m.truthy()).unwrap_or(&none);
-    let pose = grown(&g, &[motions.opt("open").cloned(), motions.opt("night").cloned()])?;
+    let pose = grown(
+        &g,
+        &[motions.opt("open").cloned(), motions.opt("night").cloned()],
+    )?;
     let ((slo, shi), sparts) = bounds(gltf, &pose)?;
     let (slo, shi) = (slo.map(|v| v * scale), shi.map(|v| v * scale));
     if !fit && !entry.get("offset").is_some_and(J::truthy) {
         // On the floor (y = 0). A model the game sinks may reach below it by its `sink` (the woods' rock, the marker).
-        let sink = entry.get("sink").map(|s| s.num().ok_or("unsupported operand type(s) for -")).transpose()?.unwrap_or(Num::I(0));
+        let sink = entry
+            .get("sink")
+            .map(|s| s.num().ok_or("unsupported operand type(s) for -"))
+            .transpose()?
+            .unwrap_or(Num::I(0));
         if lo[1].f() < (Num::F(-0.005) - sink).f() {
-            errors.push(format!("reaches {} cm below the floor (origin on the floor, y = 0)", fixed((-lo[1] * Num::I(100)).f(), 1)));
+            errors.push(format!(
+                "reaches {} cm below the floor (origin on the floor, y = 0)",
+                fixed((-lo[1] * Num::I(100)).f(), 1)
+            ));
         } else if lo[1].f() > 0.005 {
-            warnings.push(format!("floats {} cm above its origin (fine only on a wall or ceiling)", fixed((lo[1] * Num::I(100)).f(), 1)));
+            warnings.push(format!(
+                "floats {} cm above its origin (fine only on a wall or ceiling)",
+                fixed((lo[1] * Num::I(100)).f(), 1)
+            ));
         }
         // Centred where its `Model` says (centres.json, which the build writes: the middle, or its `centre`, a
         // fridge against the wall, a wall bed at the back of its tiles), at rest as `G.settle` centres it (grown,
         // the dartboard's darts and the unrolled yoga mat reach forward). A file not built here isn't checked.
         if let Some(centre) = centre.filter(|c| **c != J::Null) {
-            let at = (((lo[0] + hi[0]) / Num::I(2)).f(), ((lo[2] + hi[2]) / Num::I(2)).f());
-            let c0 = centre.at(0).ok_or("list index out of range")?.num().ok_or("unsupported operand type(s) for -")?.f();
-            let c1 = centre.at(1).ok_or("list index out of range")?.num().ok_or("unsupported operand type(s) for -")?.f();
+            let at = (
+                ((lo[0] + hi[0]) / Num::I(2)).f(),
+                ((lo[2] + hi[2]) / Num::I(2)).f(),
+            );
+            let c0 = centre
+                .at(0)
+                .ok_or("list index out of range")?
+                .num()
+                .ok_or("unsupported operand type(s) for -")?
+                .f();
+            let c1 = centre
+                .at(1)
+                .ok_or("list index out of range")?
+                .num()
+                .ok_or("unsupported operand type(s) for -")?
+                .f();
             if f64::max((at.0 - c0).abs(), (at.1 - c1).abs()) > OFF_CENTRE {
                 warnings.push(format!(
                     "centred on (x {}, depth {}), its Model's `centre` is ({}, {}) (centres.json): rebuild it, or `cargo art --centres` if the Model changed",
@@ -2317,12 +3285,21 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
         let many = facts.is_some_and(|f| f.len() > 1);
         for fact in each {
             // Its functional heights against the model (`heights`: warnings only).
-            let mut found = content_warnings(fact, &lo, &(slo, shi), &sparts, scale, &g, &pose, entry)?;
+            let mut found =
+                content_warnings(fact, &lo, &(slo, shi), &sparts, scale, &g, &pose, entry)?;
             if let (Some(f), Some(furniture)) = (fact, furniture) {
-                found.extend(heights(&g, entry, &f.object, furniture, true)?.iter().flat_map(Height::warnings));
+                found.extend(
+                    heights(&g, entry, &f.object, furniture, true)?
+                        .iter()
+                        .flat_map(Height::warnings),
+                );
             }
             for w in found {
-                let w = if many { format!("{w} (object {})", str_of(&fact.unwrap().id)) } else { w };
+                let w = if many {
+                    format!("{w} (object {})", str_of(&fact.unwrap().id))
+                } else {
+                    w
+                };
                 if seen.insert(w.clone()) {
                     warnings.push(w);
                 }
@@ -2339,10 +3316,12 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
         if ov.truthy() && ov.get("hide").is_some_and(J::truthy) {
             return Ok(false);
         }
-        Ok(match ov.get("finish").filter(|f| ov.truthy() && f.truthy()) {
-            Some(f) => !fin.see_through(Some(f)),
-            None => mat.get("alphaMode") != Some(&J::Str("BLEND".into())),
-        })
+        Ok(
+            match ov.get("finish").filter(|f| ov.truthy() && f.truthy()) {
+                Some(f) => !fin.see_through(Some(f)),
+                None => mat.get("alphaMode") != Some(&J::Str("BLEND".into())),
+            },
+        )
     };
     for (name, share) in flattened_in_view(&g, &opaque)? {
         warnings.push(format!(
@@ -2361,29 +3340,65 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
         errors.extend(fields);
     }
     if let Some(perches) = entry.get("perches") {
-        errors.extend(perch_errors(perches, lo.map(|v| v.f()), hi.map(|v| v.f()), scale.f()));
+        errors.extend(perch_errors(
+            perches,
+            lo.map(|v| v.f()),
+            hi.map(|v| v.f()),
+            scale.f(),
+        ));
     }
     errors.extend(habitat_errors(entry));
 
     // Budgets.
-    let side = dims.iter().copied().reduce(|m, v| if v.f() > m.f() { v } else { m }).unwrap();
-    let (target, most) = TRIANGLES.iter().find(|(up, _, _)| side.f() <= *up).map(|(_, t, m)| (*t, *m)).ok_or("StopIteration")?;
+    let side = dims
+        .iter()
+        .copied()
+        .reduce(|m, v| if v.f() > m.f() { v } else { m })
+        .unwrap();
+    let (target, most) = TRIANGLES
+        .iter()
+        .find(|(up, _, _)| side.f() <= *up)
+        .map(|(_, t, m)| (*t, *m))
+        .ok_or("StopIteration")?;
     if tris > most {
-        errors.push(format!("{tris} triangles, at most {most} for a model {} m across (aim for {target})", fixed(side.f(), 2)));
+        errors.push(format!(
+            "{tris} triangles, at most {most} for a model {} m across (aim for {target})",
+            fixed(side.f(), 2)
+        ));
     } else if tris > target {
-        warnings.push(format!("{tris} triangles, aim for {target} for a model {} m across (at most {most})", fixed(side.f(), 2)));
+        warnings.push(format!(
+            "{tris} triangles, aim for {target} for a model {} m across (at most {most})",
+            fixed(side.f(), 2)
+        ));
     }
     if groups.len() > DRAWS.1 {
-        errors.push(format!("{} draw calls, at most {} (one per finish group: map materials to finishes)", groups.len(), DRAWS.1));
+        errors.push(format!(
+            "{} draw calls, at most {} (one per finish group: map materials to finishes)",
+            groups.len(),
+            DRAWS.1
+        ));
     } else if groups.len() > DRAWS.0 {
-        warnings.push(format!("{} draw calls, aim for {} at most", groups.len(), DRAWS.0));
+        warnings.push(format!(
+            "{} draw calls, aim for {} at most",
+            groups.len(),
+            DRAWS.0
+        ));
     }
-    for (i, img) in gltf.get("images").and_then(J::list).unwrap_or(&[]).iter().enumerate() {
+    for (i, img) in gltf
+        .get("images")
+        .and_then(J::list)
+        .unwrap_or(&[])
+        .iter()
+        .enumerate()
+    {
         let wh = match img.get("bufferView") {
             Some(v) => {
                 let view = item(gltf, "bufferViews", v)?;
                 let start = glb::int(view, "byteOffset", 0)?.max(0) as usize;
-                let len = key(view, "byteLength")?.num().map_or(0, |n| n.f() as i64).max(0) as usize;
+                let len = key(view, "byteLength")?
+                    .num()
+                    .map_or(0, |n| n.f() as i64)
+                    .max(0) as usize;
                 image_size(&g.bin[start.min(g.bin.len())..(start + len).min(g.bin.len())])
             }
             None => None,
@@ -2391,10 +3406,18 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
         if let Some((w, h)) = wh
             && w.max(h) > TEXTURE_MAX
         {
-            errors.push(format!("texture {i} is {w}x{h}, at most {TEXTURE_MAX} px a side"));
+            errors.push(format!(
+                "texture {i} is {w}x{h}, at most {TEXTURE_MAX} px a side"
+            ));
         }
-        let label = img.get("name").or(img.get("uri")).map(str_of).unwrap_or("embedded".into());
-        warnings.push(format!("texture {i} ({label}): a texture of its own, prefer the game's finishes"));
+        let label = img
+            .get("name")
+            .or(img.get("uri"))
+            .map(str_of)
+            .unwrap_or("embedded".into());
+        warnings.push(format!(
+            "texture {i} ({label}): a texture of its own, prefer the game's finishes"
+        ));
     }
 
     let info = Info {
@@ -2404,7 +3427,10 @@ fn check_file(fin: &Finishes, entry: &J, path: &str, facts: Option<&Vec<Facts>>,
         materials: materials.len(),
         dims,
         lo,
-        clips: gltf.get("animations").and_then(J::list).map_or(0, |a| a.len()),
+        clips: gltf
+            .get("animations")
+            .and_then(J::list)
+            .map_or(0, |a| a.len()),
         moving: moved_nodes(gltf)?.len(),
     };
     Ok((errors, warnings, info))
@@ -2420,20 +3446,37 @@ pub struct Report {
 /// Runs the gate over `keys` (every model if none), as check_glb.py's `main` did, into a report.
 pub fn gate(paths: &Paths, keys: &[String]) -> Report {
     let mut text = String::new();
-    let fail = |text: String| Report { text, checked: Vec::new(), failed: 1 };
+    let fail = |text: String| Report {
+        text,
+        checked: Vec::new(),
+        failed: 1,
+    };
     let read = || -> Result<_, String> {
         let stack = asset_manifests(paths)?;
         let defs = content(paths)?;
-        Ok((stack, content_objects(&defs)?, content_keys(&defs)?, Furniture::read(paths)?))
+        Ok((
+            stack,
+            content_objects(&defs)?,
+            content_keys(&defs)?,
+            Furniture::read(paths)?,
+        ))
     };
     let (stack, facts, named, furniture) = match read() {
         Ok(r) => r,
-        Err(err) => return fail(format!("FAIL content and manifests\n       error: cannot read them: {err}\n")),
+        Err(err) => {
+            return fail(format!(
+                "FAIL content and manifests\n       error: cannot read them: {err}\n"
+            ));
+        }
     };
     let (entries, fin) = model_entries(&stack);
     let centres = match read_centres(&paths.centres) {
         Ok(c) => c,
-        Err(err) => return fail(format!("FAIL centres.json\n       error: cannot read it: {err}\n")),
+        Err(err) => {
+            return fail(format!(
+                "FAIL centres.json\n       error: cannot read it: {err}\n"
+            ));
+        }
     };
     let mut failed = 0;
     let mut checked = Vec::new();
@@ -2447,12 +3490,21 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
         if !wanted(k) {
             continue;
         }
-        let what = named.get(k).map(String::as_str).unwrap_or("the command line");
-        let url = entries.get(k).and_then(|(e, _)| e.get("url")).is_some_and(J::truthy);
+        let what = named
+            .get(k)
+            .map(String::as_str)
+            .unwrap_or("the command line");
+        let url = entries
+            .get(k)
+            .and_then(|(e, _)| e.get("url"))
+            .is_some_and(J::truthy);
         if k.is_empty() {
             problems.insert(k.clone(), format!("{what} has an empty `model`: the game looks up \"\" and draws a box (leave it out to draw model.<id>)"));
         } else if !entries.contains_key(k) {
-            problems.insert(k.clone(), format!("{what} names it, but no manifest has a model entry {k}"));
+            problems.insert(
+                k.clone(),
+                format!("{what} names it, but no manifest has a model entry {k}"),
+            );
         } else if !url {
             problems.insert(k.clone(), format!("{what} names it, but its entry has no `url` once the packs are stacked (is its pack in the base manifest's `packs`?)"));
         }
@@ -2463,24 +3515,55 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
             && !url.contains("://")
             && wanted(k)
         {
-            problems.insert(k.clone(), format!("its file {url} is no .glb: the game's models are glTF binaries"));
+            problems.insert(
+                k.clone(),
+                format!("its file {url} is no .glb: the game's models are glTF binaries"),
+            );
         }
     }
     for (k, problem) in &problems {
         failed += 1;
-        text += &format!("FAIL {}\n       error: {problem}\n", if k.is_empty() { "(empty model)" } else { k });
+        text += &format!(
+            "FAIL {}\n       error: {problem}\n",
+            if k.is_empty() { "(empty model)" } else { k }
+        );
     }
     for (k, (entry, manifest)) in &entries {
-        let url = entry.get("url").filter(|u| u.truthy()).map(J::key).unwrap_or_default();
+        let url = entry
+            .get("url")
+            .filter(|u| u.truthy())
+            .map(J::key)
+            .unwrap_or_default();
         if !wanted(k) || problems.contains_key(k) || url.is_empty() || url.contains("://") {
             continue;
         }
         let path = normpath(&join(&dirname(manifest), &url));
-        let far = entry.get("far").filter(|f| f.truthy()).map(|f| normpath(&join(&dirname(manifest), &f.key())));
-        let (errors, warnings, summary) = check(&fin, entry, &path, far.as_deref(), facts.get(k), centres.get(k), Some(&furniture)).unwrap_or_else(|err| (vec![format!("cannot read {path}: {err}")], Vec::new(), String::new()));
+        let far = entry
+            .get("far")
+            .filter(|f| f.truthy())
+            .map(|f| normpath(&join(&dirname(manifest), &f.key())));
+        let (errors, warnings, summary) = check(
+            &fin,
+            entry,
+            &path,
+            far.as_deref(),
+            facts.get(k),
+            centres.get(k),
+            Some(&furniture),
+        )
+        .unwrap_or_else(|err| {
+            (
+                vec![format!("cannot read {path}: {err}")],
+                Vec::new(),
+                String::new(),
+            )
+        });
         failed += !errors.is_empty() as usize;
         checked.push(k.clone());
-        text += &format!("{} {k:28} {summary}\n", if errors.is_empty() { "ok  " } else { "FAIL" });
+        text += &format!(
+            "{} {k:28} {summary}\n",
+            if errors.is_empty() { "ok  " } else { "FAIL" }
+        );
         for e in errors {
             text += &format!("       error: {e}\n");
         }
@@ -2493,15 +3576,27 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
         text += &format!(" ({} without a file it can read)", problems.len());
     }
     text += "\n";
-    Report { text, checked, failed }
+    Report {
+        text,
+        checked,
+        failed,
+    }
 }
 
 /// The model entries of the manifests once stacked ({key: (entry, the manifest it's in)}), and their finishes.
 fn model_entries(stack: &[(String, J)]) -> (BTreeMap<String, (J, String)>, Finishes) {
     let mut entries: BTreeMap<String, (J, String)> = BTreeMap::new();
-    let mut fin = Finishes { plain: HashMap::new(), see_through: HashSet::new() };
+    let mut fin = Finishes {
+        plain: HashMap::new(),
+        see_through: HashSet::new(),
+    };
     for (path, m) in stack {
-        for (k, entry) in m.get("entries").filter(|e| e.truthy()).and_then(J::entries).unwrap_or(&[]) {
+        for (k, entry) in m
+            .get("entries")
+            .filter(|e| e.truthy())
+            .and_then(J::entries)
+            .unwrap_or(&[])
+        {
             let kind = entry.get("type");
             if kind == Some(&J::Str("model".into())) {
                 // A pack's entry replaces the entry, keeping its `vary` unless it gives its own
@@ -2519,9 +3614,13 @@ fn model_entries(stack: &[(String, J)]) -> (BTreeMap<String, (J, String)>, Finis
                     }
                 }
                 entries.insert(k.clone(), (entry, path.clone()));
-            } else if kind == Some(&J::Str("material".into())) && k.starts_with("material.finish.") {
+            } else if kind == Some(&J::Str("material".into())) && k.starts_with("material.finish.")
+            {
                 let alpha = entry.get("alpha").and_then(J::num).map_or(1.0, |a| a.f());
-                fin.plain.insert(k.clone(), !entry.get("texture").is_some_and(J::truthy) && alpha >= 1.0);
+                fin.plain.insert(
+                    k.clone(),
+                    !entry.get("texture").is_some_and(J::truthy) && alpha >= 1.0,
+                );
                 if alpha < 1.0 {
                     fin.see_through.insert(k.clone());
                 }
@@ -2567,38 +3666,76 @@ pub struct Measure {
 /// lower than the worktop round it, which has no top under it. (Where, how high); None: no face looks up there.
 fn top_near(s: &Sampler, range: [f64; 2], seats: &[[f64; 2]]) -> Option<([f64; 2], f64)> {
     // (line, the face nearest the range there, every face there).
-    let on = |lines: Vec<[f64; 2]>| -> Vec<([f64; 2], f64, Vec<f64>)> { lines.iter().filter_map(|p| Some((*p, s.top_in(p[0], p[1], range)?, s.tops_at(p[0], p[1])))).collect() };
+    let on = |lines: Vec<[f64; 2]>| -> Vec<([f64; 2], f64, Vec<f64>)> {
+        lines
+            .iter()
+            .filter_map(|p| Some((*p, s.top_in(p[0], p[1], range)?, s.tops_at(p[0], p[1]))))
+            .collect()
+    };
     let mut found = on(top_lines(s, seats));
     if found.is_empty() {
         found = on(top_lines(s, &[]));
     }
-    let stands = |(_, h, faces): &([f64; 2], f64, Vec<f64>)| faces.iter().any(|q| *q <= h - 0.02 && found.iter().any(|(_, other, _)| (other - q).abs() <= 0.01));
-    found.iter().filter(|f| !stands(f)).map(|(p, h, _)| (*p, *h)).max_by(|a, b| a.1.total_cmp(&b.1))
+    let stands = |(_, h, faces): &([f64; 2], f64, Vec<f64>)| {
+        faces
+            .iter()
+            .any(|q| *q <= h - 0.02 && found.iter().any(|(_, other, _)| (other - q).abs() <= 0.01))
+    };
+    found
+        .iter()
+        .filter(|f| !stands(f))
+        .map(|(p, h, _)| (*p, *h))
+        .max_by(|a, b| a.1.total_cmp(&b.1))
 }
 
 /// The vertical lines `top_near` looks along, those within `SEAT_CLEAR` of `seats` left out (m, game axes;
 /// across, then front to back).
 fn top_lines(s: &Sampler, seats: &[[f64; 2]]) -> Vec<[f64; 2]> {
     const SEAT_CLEAR: f64 = 0.3;
-    let Some((lo, hi)) = s.extent() else { return Vec::new() };
+    let Some((lo, hi)) = s.extent() else {
+        return Vec::new();
+    };
     let mid = [(lo[0] + hi[0]) / 2.0, (lo[2] + hi[2]) / 2.0];
     let quarter = [(hi[0] - lo[0]) / 4.0, (hi[2] - lo[2]) / 4.0];
-    let grid = [-1.0, 0.0, 1.0].iter().flat_map(|i| [-1.0, 0.0, 1.0].map(|k| [mid[0] + i * quarter[0], mid[1] + k * quarter[1]]));
-    grid.filter(|p| seats.iter().all(|s| dist(p, s) >= SEAT_CLEAR)).collect()
+    let grid = [-1.0, 0.0, 1.0]
+        .iter()
+        .flat_map(|i| [-1.0, 0.0, 1.0].map(|k| [mid[0] + i * quarter[0], mid[1] + k * quarter[1]]));
+    grid.filter(|p| seats.iter().all(|s| dist(p, s) >= SEAT_CLEAR))
+        .collect()
 }
 
 /// Measures content object `f` drawn by the model `m` (its `key`) for `cargo review sizes`; `top` is its kind's
 /// top range.
-fn measure(key: &str, m: &Model, f: &Facts, furniture: &Furniture, top: Option<[f64; 2]>) -> R<Measure> {
-    let mut out = Measure { model: key.into(), size: m.size, heights: heights(&m.file, &m.entry, &f.object, furniture, false)?, ..Measure::default() };
-    let seats = seat_of(&f.object, furniture).map(|s| s.points).unwrap_or_default();
+fn measure(
+    key: &str,
+    m: &Model,
+    f: &Facts,
+    furniture: &Furniture,
+    top: Option<[f64; 2]>,
+) -> R<Measure> {
+    let mut out = Measure {
+        model: key.into(),
+        size: m.size,
+        heights: heights(&m.file, &m.entry, &f.object, furniture, false)?,
+        ..Measure::default()
+    };
+    let seats = seat_of(&f.object, furniture)
+        .map(|s| s.points)
+        .unwrap_or_default();
     let top = top.filter(|_| f.object.opt("surface").is_none());
     if top.is_none() && seats.is_empty() && !f.stairs {
         return Ok(out);
     }
-    let Some(s) = Sampler::new(&m.file, &m.entry, None)? else { return Ok(out) };
+    let Some(s) = Sampler::new(&m.file, &m.entry, None)? else {
+        return Ok(out);
+    };
     out.top = top.and_then(|range| top_near(&s, range, &seats));
-    let on = out.heights.iter().find(|h| h.what == "surface").and_then(|h| h.mesh).or(out.top.map(|(_, h)| h));
+    let on = out
+        .heights
+        .iter()
+        .find(|h| h.what == "surface")
+        .and_then(|h| h.mesh)
+        .or(out.top.map(|(_, h)| h));
     if !seats.is_empty()
         && let Some(on) = on
     {
@@ -2622,8 +3759,16 @@ fn model(entry: &J, path: &str) -> R<Model> {
     let file = parse_glb(&std::fs::read(path).map_err(|e| py::os_error(&e, path))?)?;
     let ((lo, hi), _) = bounds(&file.gltf, &HashMap::new())?;
     let fit = entry.get("fit").is_some_and(J::truthy);
-    let scale = if fit { 1.0 } else { entry.get("scale").and_then(J::num).map_or(1.0, Num::f) };
-    Ok(Model { size: [0, 1, 2].map(|k| (hi[k].f() - lo[k].f()) * scale), file, entry: entry.clone() })
+    let scale = if fit {
+        1.0
+    } else {
+        entry.get("scale").and_then(J::num).map_or(1.0, Num::f)
+    };
+    Ok(Model {
+        size: [0, 1, 2].map(|k| (hi[k].f() - lo[k].f()) * scale),
+        file,
+        entry: entry.clone(),
+    })
 }
 
 /// Measures every model and content object (`Measures`), for `cargo review sizes`; `tops`: {object id: its
@@ -2636,9 +3781,16 @@ pub fn measures(paths: &Paths, tops: &BTreeMap<String, [f64; 2]>) -> Result<Meas
     let (entries, _) = model_entries(&stack);
     let mut read: BTreeMap<String, Result<Model, String>> = BTreeMap::new();
     for (k, (entry, manifest)) in &entries {
-        let url = entry.get("url").filter(|u| u.truthy()).map(J::key).unwrap_or_default();
+        let url = entry
+            .get("url")
+            .filter(|u| u.truthy())
+            .map(J::key)
+            .unwrap_or_default();
         let found = if url.is_empty() || url.contains("://") {
-            Err(format!("its entry has no file here ({})", if url.is_empty() { "no `url`" } else { &url }))
+            Err(format!(
+                "its entry has no file here ({})",
+                if url.is_empty() { "no `url`" } else { &url }
+            ))
         } else {
             let path = normpath(&join(&dirname(manifest), &url));
             model(entry, &path).map_err(|e| format!("cannot read {path}: {e}"))
@@ -2656,7 +3808,10 @@ pub fn measures(paths: &Paths, tops: &BTreeMap<String, [f64; 2]>) -> Result<Meas
             objects.insert(str_of(&f.id), measured);
         }
     }
-    let models = read.into_iter().map(|(k, m)| (k, m.map(|m| m.size))).collect();
+    let models = read
+        .into_iter()
+        .map(|(k, m)| (k, m.map(|m| m.size)))
+        .collect();
     Ok(Measures { models, objects })
 }
 
@@ -2680,14 +3835,19 @@ pub fn main(args: &[String]) -> i32 {
             }
         };
     }
-    let keys: Vec<String> = args.iter().filter(|a| a.starts_with("model.") || a.starts_with("item.") || a.starts_with("tool.")).cloned().collect();
+    let keys: Vec<String> = args
+        .iter()
+        .filter(|a| a.starts_with("model.") || a.starts_with("item.") || a.starts_with("tool."))
+        .cloned()
+        .collect();
     let report = gate(&paths, &keys);
     print!("{}", report.text);
     let mut code = if report.failed > 0 { 1 } else { 0 };
     if args.iter().any(|a| a == "--preview") && !report.checked.is_empty() {
         // Re-imports each file in Blender and renders it to previews/<family>/rt_<name>.png, so export problems show.
         let review = join(&paths.here, "gamekit/review.py");
-        let ok = crate::art::blender().map(|exe| crate::art::echo(&crate::art::run(&exe, &review, &report.checked)));
+        let ok = crate::art::blender()
+            .map(|exe| crate::art::echo(&crate::art::run(&exe, &review, &report.checked)));
         match ok {
             Ok(true) => {}
             Ok(false) => code = 1,
@@ -2710,7 +3870,10 @@ mod tests {
         c.insert("model.b".to_string(), [0.0, -0.068_96]);
         c.insert("model.a".to_string(), [-0.000_01, 1.234_56]);
         c.insert("model.c".to_string(), [0.5, 2.0]);
-        assert_eq!(centres_text(&c), "{\n  \"model.a\": [0.0, 1.2346],\n  \"model.b\": [0.0, -0.069],\n  \"model.c\": [0.5, 2.0]\n}\n");
+        assert_eq!(
+            centres_text(&c),
+            "{\n  \"model.a\": [0.0, 1.2346],\n  \"model.b\": [0.0, -0.069],\n  \"model.c\": [0.5, 2.0]\n}\n"
+        );
     }
 
     #[test]
@@ -2718,7 +3881,20 @@ mod tests {
         let paths = Paths::repo();
         let text = std::fs::read_to_string(&paths.centres).unwrap();
         let read = read_centres(&paths.centres).unwrap();
-        let c: BTreeMap<String, [f64; 2]> = read.entries().unwrap().iter().map(|(k, v)| (k.clone(), [v.at(0).unwrap().num().unwrap().f(), v.at(1).unwrap().num().unwrap().f()])).collect();
+        let c: BTreeMap<String, [f64; 2]> = read
+            .entries()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    [
+                        v.at(0).unwrap().num().unwrap().f(),
+                        v.at(1).unwrap().num().unwrap().f(),
+                    ],
+                )
+            })
+            .collect();
         assert_eq!(c.len(), read.entries().unwrap().len(), "a key twice");
         assert_eq!(centres_text(&c), text);
     }
@@ -2726,11 +3902,27 @@ mod tests {
     #[test]
     fn named_finishes() {
         let finish = |n: &str| named_finish(n).map(|f| f.get("finish").unwrap().key());
-        assert_eq!(finish("stone@matte").as_deref(), Some("material.finish.matte"));
-        assert_eq!(finish("tunic@fabric#body").as_deref(), Some("material.finish.fabric"));
-        assert_eq!(finish("tunic#body@fabric").as_deref(), Some("material.finish.fabric"));
-        assert_eq!(finish("tunic#bodyx@fabric").as_deref(), Some("material.finish.fabric"));
-        assert_eq!(finish("a@b#bodyx"), None, "only a slot before @ or at the end goes");
+        assert_eq!(
+            finish("stone@matte").as_deref(),
+            Some("material.finish.matte")
+        );
+        assert_eq!(
+            finish("tunic@fabric#body").as_deref(),
+            Some("material.finish.fabric")
+        );
+        assert_eq!(
+            finish("tunic#body@fabric").as_deref(),
+            Some("material.finish.fabric")
+        );
+        assert_eq!(
+            finish("tunic#bodyx@fabric").as_deref(),
+            Some("material.finish.fabric")
+        );
+        assert_eq!(
+            finish("a@b#bodyx"),
+            None,
+            "only a slot before @ or at the end goes"
+        );
         assert_eq!(finish("x@matte#hair#skin"), None);
         assert_eq!(finish("x@mätte").as_deref(), Some("material.finish.mätte"));
         assert_eq!(finish("@matte"), None);
@@ -2741,7 +3933,11 @@ mod tests {
 
     /// One triangle whose vertex colour is `colour` at each corner (normalised u16 RGBA, as Blender writes it).
     fn shaded(colour: [u16; 4]) -> Glb {
-        let mut bin: Vec<u8> = [[0f32, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]].iter().flatten().flat_map(|c| c.to_le_bytes()).collect();
+        let mut bin: Vec<u8> = [[0f32, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
+            .iter()
+            .flatten()
+            .flat_map(|c| c.to_le_bytes())
+            .collect();
         for _ in 0..3 {
             bin.extend(colour.iter().flat_map(|c| c.to_le_bytes()));
         }
@@ -2755,7 +3951,13 @@ mod tests {
 
     #[test]
     fn baked_shading_is_grey() {
-        let prim = |g: &Glb| key(item(&g.gltf, "meshes", &J::Int(0)).unwrap(), "primitives").unwrap().list().unwrap()[0].clone();
+        let prim = |g: &Glb| {
+            key(item(&g.gltf, "meshes", &J::Int(0)).unwrap(), "primitives")
+                .unwrap()
+                .list()
+                .unwrap()[0]
+                .clone()
+        };
         let grey = shaded([40000, 40000, 40000, 65535]);
         assert!(!coloured(&grey, &prim(&grey)).unwrap());
         let tinted = shaded([40000, 20000, 40000, 65535]);
@@ -2772,7 +3974,11 @@ mod tests {
             }
         }
         bin.extend([0u16, 1, 2, 0, 2, 3].iter().flat_map(|i| i.to_le_bytes()));
-        bin.extend([0f32, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.6].iter().flat_map(|c| c.to_le_bytes()));
+        bin.extend(
+            [0f32, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.6]
+                .iter()
+                .flat_map(|c| c.to_le_bytes()),
+        );
         let json = r#"{"asset": {"version": "2.0"}, "scenes": [{"nodes": [0, 1]}],
             "nodes": [{"name": "seat", "mesh": 0}, {"name": "mattress", "mesh": 1}],
             "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "indices": 2}]}, {"primitives": [{"attributes": {"POSITION": 1}, "indices": 2}]}],
@@ -2789,15 +3995,32 @@ mod tests {
     #[test]
     fn the_sampler_reads_game_axes_and_the_open_pose() {
         let g = sofa_bed();
-        let rest = Sampler::new(&g, &J::Obj(Vec::new()), None).unwrap().unwrap();
+        let rest = Sampler::new(&g, &J::Obj(Vec::new()), None)
+            .unwrap()
+            .unwrap();
         // glTF x -> game -x: the seat reaches game x 0.5, not -0.5.
         assert!((rest.top(0.3, 0.0, 0.45).unwrap() - 0.41).abs() < 1e-6);
-        assert_eq!(rest.top(-0.3, 0.0, 0.41).map(|h| (h * 100.0).round()), Some(40.0), "only the mattress under it there");
+        assert_eq!(
+            rest.top(-0.3, 0.0, 0.41).map(|h| (h * 100.0).round()),
+            Some(40.0),
+            "only the mattress under it there"
+        );
         assert_eq!(rest.top(0.0, 0.8, 0.4), None, "nothing in front at rest");
-        let open = Sampler::new(&g, &J::Obj(Vec::new()), Some(&open_pose(&g, &J::Str("bed_out".into())).unwrap())).unwrap().unwrap();
-        assert!((open.top(0.0, 0.8, 0.44).unwrap() - 0.40).abs() < 1e-6, "pulled out");
+        let open = Sampler::new(
+            &g,
+            &J::Obj(Vec::new()),
+            Some(&open_pose(&g, &J::Str("bed_out".into())).unwrap()),
+        )
+        .unwrap()
+        .unwrap();
+        assert!(
+            (open.top(0.0, 0.8, 0.44).unwrap() - 0.40).abs() < 1e-6,
+            "pulled out"
+        );
         // Scaled: the game's model is the file's times `scale`.
-        let big = Sampler::new(&g, &json::loads_text(br#"{"scale": 2}"#).unwrap(), None).unwrap().unwrap();
+        let big = Sampler::new(&g, &json::loads_text(br#"{"scale": 2}"#).unwrap(), None)
+            .unwrap()
+            .unwrap();
         assert!((big.top(0.6, 0.0, 0.85).unwrap() - 0.82).abs() < 1e-6);
     }
 
@@ -2815,17 +4038,30 @@ mod tests {
         let entry = json::loads_text(br#"{"motions": {"open": "bed_out"}}"#).unwrap();
         let found = heights(&g, &entry, &object, &furniture, true).unwrap();
         let warnings: Vec<String> = found.iter().flat_map(Height::warnings).collect();
-        assert_eq!(warnings, [
-            "seat 0.44 m (furniture.json `seats`), the model 0.410 m there (x 0.00, depth 0.00): 3.0 cm lower",
-            "seat: content `seat` says 0.41 m, 0.08 forward; furniture.json `seats` says 0.44 m, 0.000 forward (furniture.json wins: characters.ts `seatOf`)",
-        ]);
+        assert_eq!(
+            warnings,
+            [
+                "seat 0.44 m (furniture.json `seats`), the model 0.410 m there (x 0.00, depth 0.00): 3.0 cm lower",
+                "seat: content `seat` says 0.41 m, 0.08 forward; furniture.json `seats` says 0.44 m, 0.000 forward (furniture.json wins: characters.ts `seatOf`)",
+            ]
+        );
         let mattress = found.iter().find(|h| h.what == "mattress").unwrap();
-        assert_eq!((mattress.open.as_deref(), mattress.at), (Some("bed_out"), [0.0, 0.6]));
+        assert_eq!(
+            (mattress.open.as_deref(), mattress.at),
+            (Some("bed_out"), [0.0, 0.6])
+        );
         assert!(mattress.fits());
         // Not held open (no `motions.open`): nothing under the sleepers in front.
         let shut = heights(&g, &J::Obj(Vec::new()), &object, &furniture, true).unwrap();
-        let shut: Vec<String> = shut.iter().filter(|h| h.what == "mattress").flat_map(Height::warnings).collect();
-        assert_eq!(shut, ["mattress 0.40 m (furniture.json `beds`): no model under it (x 0.00, depth 0.60)"]);
+        let shut: Vec<String> = shut
+            .iter()
+            .filter(|h| h.what == "mattress")
+            .flat_map(Height::warnings)
+            .collect();
+        assert_eq!(
+            shut,
+            ["mattress 0.40 m (furniture.json `beds`): no model under it (x 0.00, depth 0.60)"]
+        );
     }
 
     /// A model of flat quads facing up, a node each: `[height, x from, x to, depth from, depth to]` (glTF axes: game
@@ -2834,43 +4070,92 @@ mod tests {
     fn a_seat_front_is_where_the_seat_ends_in_front() {
         // A deep sofa's seat at 0.44 m from 0.4 m back to 0.38 m forward, its back at 0.8 m behind it, and a
         // cushion's rounded front lip 3 cm lower up to 0.4 m: the seat ends at 0.4 m.
-        let sofa = quads(&[[0.44, -0.4, 0.4, -0.4, 0.38], [0.41, -0.4, 0.4, 0.38, 0.4], [0.8, -0.4, 0.4, -0.5, -0.4], [0.1, -0.4, 0.4, 0.4, 0.45]]);
-        let s = Sampler::new(&sofa, &J::Obj(Vec::new()), None).unwrap().unwrap();
-        assert_eq!(s.front(0.0, -0.09, 0.44).map(|f| (f * 100.0).round()), Some(40.0));
-        assert_eq!(s.front(0.0, 0.6, 0.44), None, "nothing under hips in front of it");
+        let sofa = quads(&[
+            [0.44, -0.4, 0.4, -0.4, 0.38],
+            [0.41, -0.4, 0.4, 0.38, 0.4],
+            [0.8, -0.4, 0.4, -0.5, -0.4],
+            [0.1, -0.4, 0.4, 0.4, 0.45],
+        ]);
+        let s = Sampler::new(&sofa, &J::Obj(Vec::new()), None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            s.front(0.0, -0.09, 0.44).map(|f| (f * 100.0).round()),
+            Some(40.0)
+        );
+        assert_eq!(
+            s.front(0.0, 0.6, 0.44),
+            None,
+            "nothing under hips in front of it"
+        );
         let furniture = |front: f64| Furniture {
-            seats: json::loads_text(format!(r#"{{"sofaThree": {{"h": 0.44, "fwd": -0.09, "front": {front}}}}}"#).as_bytes()).unwrap(),
+            seats: json::loads_text(
+                format!(r#"{{"sofaThree": {{"h": 0.44, "fwd": -0.09, "front": {front}}}}}"#)
+                    .as_bytes(),
+            )
+            .unwrap(),
             default_seat: json::loads_text(br#"{"h": 0.45, "fwd": 0}"#).unwrap(),
             beds: J::Obj(Vec::new()),
             default_bed: json::loads_text(br#"{"h": 0.5}"#).unwrap(),
             bunks: J::Obj(Vec::new()),
         };
-        let object = json::loads_text(br#"{"id": "sofaThree", "footprint": [1, 1], "interactions": [{"pose": "sit"}]}"#).unwrap();
-        let warn = |front: f64| -> Vec<String> { heights(&sofa, &J::Obj(Vec::new()), &object, &furniture(front), true).unwrap().iter().flat_map(Height::warnings).collect() };
+        let object = json::loads_text(
+            br#"{"id": "sofaThree", "footprint": [1, 1], "interactions": [{"pose": "sit"}]}"#,
+        )
+        .unwrap();
+        let warn = |front: f64| -> Vec<String> {
+            heights(&sofa, &J::Obj(Vec::new()), &object, &furniture(front), true)
+                .unwrap()
+                .iter()
+                .flat_map(Height::warnings)
+                .collect()
+        };
         assert!(warn(0.41).is_empty(), "{:?}", warn(0.41));
-        assert_eq!(warn(0.3), ["seat front 0.30 m forward (furniture.json `seats`), the model's seat ends 0.40 m forward there (x 0.00, depth -0.09): 10.0 cm further forward"]);
+        assert_eq!(
+            warn(0.3),
+            [
+                "seat front 0.30 m forward (furniture.json `seats`), the model's seat ends 0.40 m forward there (x 0.00, depth -0.09): 10.0 cm further forward"
+            ]
+        );
     }
 
     fn quads(quads: &[[f32; 5]]) -> Glb {
         let mut bin = Vec::new();
         for [y, x0, x1, z0, z1] in quads {
-            for v in [[*x0, *y, *z0], [*x0, *y, *z1], [*x1, *y, *z1], [*x1, *y, *z0]] {
+            for v in [
+                [*x0, *y, *z0],
+                [*x0, *y, *z1],
+                [*x1, *y, *z1],
+                [*x1, *y, *z0],
+            ] {
                 bin.extend(v.iter().flat_map(|c: &f32| c.to_le_bytes()));
             }
         }
         let at = bin.len();
         bin.extend([0u16, 1, 2, 0, 2, 3].iter().flat_map(|i| i.to_le_bytes()));
         let n = quads.len();
-        let nodes: Vec<String> = (0..n).map(|k| format!(r#"{{"name": "q{k}", "mesh": {k}}}"#)).collect();
-        let meshes: Vec<String> = (0..n).map(|k| format!(r#"{{"primitives": [{{"attributes": {{"POSITION": {k}}}, "indices": {n}}}]}}"#)).collect();
-        let mut views: Vec<String> = (0..n).map(|k| format!(r#"{{"byteOffset": {}, "byteLength": 48}}"#, k * 48)).collect();
+        let nodes: Vec<String> = (0..n)
+            .map(|k| format!(r#"{{"name": "q{k}", "mesh": {k}}}"#))
+            .collect();
+        let meshes: Vec<String> = (0..n)
+            .map(|k| {
+                format!(
+                    r#"{{"primitives": [{{"attributes": {{"POSITION": {k}}}, "indices": {n}}}]}}"#
+                )
+            })
+            .collect();
+        let mut views: Vec<String> = (0..n)
+            .map(|k| format!(r#"{{"byteOffset": {}, "byteLength": 48}}"#, k * 48))
+            .collect();
         views.push(format!(r#"{{"byteOffset": {at}, "byteLength": 12}}"#));
         let mut accessors: Vec<String> = quads
             .iter()
             .enumerate()
             .map(|(k, [y, x0, x1, z0, z1])| format!(r#"{{"bufferView": {k}, "componentType": 5126, "type": "VEC3", "count": 4, "min": [{x0}, {y}, {z0}], "max": [{x1}, {y}, {z1}]}}"#))
             .collect();
-        accessors.push(format!(r#"{{"bufferView": {n}, "componentType": 5123, "type": "SCALAR", "count": 6}}"#));
+        accessors.push(format!(
+            r#"{{"bufferView": {n}, "componentType": 5123, "type": "SCALAR", "count": 6}}"#
+        ));
         let json = format!(
             r#"{{"asset": {{"version": "2.0"}}, "scenes": [{{"nodes": [{}]}}], "nodes": [{}], "meshes": [{}], "bufferViews": [{}], "accessors": [{}]}}"#,
             (0..n).map(|k| k.to_string()).collect::<Vec<_>>().join(", "),
@@ -2886,8 +4171,16 @@ mod tests {
     fn a_top_the_content_hasnt_a_table_without_its_chairs_and_a_stairs_steps() {
         // A table: its top 0.74 m up (1.2 × 0.8), a shelf under it, a vase on it; a chair behind it, its seat 0.46
         // m up and its back's top rail 1.0 m.
-        let table = quads(&[[0.74, -0.6, 0.6, -0.4, 0.4], [0.3, -0.6, 0.6, -0.4, 0.4], [0.95, -0.05, 0.05, -0.05, 0.05], [0.46, -0.25, 0.25, -0.7, -0.3], [1.0, -0.25, 0.25, -0.72, -0.68]]);
-        let s = Sampler::new(&table, &J::Obj(Vec::new()), None).unwrap().unwrap();
+        let table = quads(&[
+            [0.74, -0.6, 0.6, -0.4, 0.4],
+            [0.3, -0.6, 0.6, -0.4, 0.4],
+            [0.95, -0.05, 0.05, -0.05, 0.05],
+            [0.46, -0.25, 0.25, -0.7, -0.3],
+            [1.0, -0.25, 0.25, -0.72, -0.68],
+        ]);
+        let s = Sampler::new(&table, &J::Obj(Vec::new()), None)
+            .unwrap()
+            .unwrap();
         // The vase on the middle line and the shelf under every one don't move it.
         let (at, top) = top_near(&s, [0.72, 0.76], &[]).unwrap();
         assert!((top - 0.74).abs() < 1e-6, "{at:?} {top}");
@@ -2896,24 +4189,74 @@ mod tests {
         assert!((top_near(&s, [0.85, 0.95], &[]).unwrap().1 - 0.74).abs() < 1e-6);
         // A sink: its worktop 0.9 m up at the back, the basin's floor 0.75 m in front (on six lines of nine).
         let sink = quads(&[[0.9, -0.5, 0.5, -0.5, -0.2], [0.75, -0.5, 0.5, -0.2, 0.5]]);
-        let (at, top) = top_near(&Sampler::new(&sink, &J::Obj(Vec::new()), None).unwrap().unwrap(), [0.76, 0.91], &[]).unwrap();
+        let (at, top) = top_near(
+            &Sampler::new(&sink, &J::Obj(Vec::new()), None)
+                .unwrap()
+                .unwrap(),
+            [0.76, 0.91],
+            &[],
+        )
+        .unwrap();
         assert!((top - 0.9).abs() < 1e-6 && at[1] < -0.2, "{at:?} {top}");
         // The lines: its middle (0, -0.16) and a quarter of its 1.2 × 1.12 m round it; those within 0.3 m of a
         // seat's hips are left out (over the chair's seat, and the middle), unless the others find nothing.
-        let cm = |lines: Vec<[f64; 2]>| -> Vec<[i64; 2]> { lines.iter().map(|p| p.map(|v| (v * 100.0).round() as i64)).collect() };
+        let cm = |lines: Vec<[f64; 2]>| -> Vec<[i64; 2]> {
+            lines
+                .iter()
+                .map(|p| p.map(|v| (v * 100.0).round() as i64))
+                .collect()
+        };
         let all = top_lines(&s, &[]);
-        assert_eq!(cm(all), [[-30, -44], [-30, -16], [-30, 12], [0, -44], [0, -16], [0, 12], [30, -44], [30, -16], [30, 12]]);
-        assert_eq!(cm(top_lines(&s, &[[0.0, -0.4]])), [[-30, -44], [-30, -16], [-30, 12], [0, 12], [30, -44], [30, -16], [30, 12]]);
+        assert_eq!(
+            cm(all),
+            [
+                [-30, -44],
+                [-30, -16],
+                [-30, 12],
+                [0, -44],
+                [0, -16],
+                [0, 12],
+                [30, -44],
+                [30, -16],
+                [30, 12]
+            ]
+        );
+        assert_eq!(
+            cm(top_lines(&s, &[[0.0, -0.4]])),
+            [
+                [-30, -44],
+                [-30, -16],
+                [-30, 12],
+                [0, 12],
+                [30, -44],
+                [30, -16],
+                [30, 12]
+            ]
+        );
         let seated = [[0.3, -0.1], [-0.05, -0.44], [-0.3, -0.16], [0.0, 0.0]];
-        assert_eq!(cm(top_lines(&s, &seated)), [[30, -44]], "the one line left, off the table");
-        assert!((top_near(&s, [0.72, 0.76], &seated).unwrap().1 - 0.74).abs() < 1e-6, "so all the lines");
+        assert_eq!(
+            cm(top_lines(&s, &seated)),
+            [[30, -44]],
+            "the one line left, off the table"
+        );
+        assert!(
+            (top_near(&s, [0.72, 0.76], &seated).unwrap().1 - 0.74).abs() < 1e-6,
+            "so all the lines"
+        );
         // Without the chair's back: the vase, over the top, counts.
         assert!((s.height_by(0.74).unwrap() - 0.95).abs() < 1e-6);
         assert_eq!(s.height_by(0.5), None, "nothing flat there");
 
         // A stair of three treads, a rail at its side.
-        let stair = quads(&[[0.2, -0.4, 0.4, 0.2, 0.6], [0.4, -0.4, 0.4, -0.2, 0.2], [0.6, -0.4, 0.4, -0.6, -0.2], [1.5, 0.45, 0.5, -0.6, 0.6]]);
-        let s = Sampler::new(&stair, &J::Obj(Vec::new()), None).unwrap().unwrap();
+        let stair = quads(&[
+            [0.2, -0.4, 0.4, 0.2, 0.6],
+            [0.4, -0.4, 0.4, -0.2, 0.2],
+            [0.6, -0.4, 0.4, -0.6, -0.2],
+            [1.5, 0.45, 0.5, -0.6, 0.6],
+        ]);
+        let s = Sampler::new(&stair, &J::Obj(Vec::new()), None)
+            .unwrap()
+            .unwrap();
         let (top, n) = s.steps().unwrap();
         assert_eq!(((top * 100.0).round(), n), (60.0, 3));
     }
@@ -2930,7 +4273,14 @@ mod tests {
             bunks: J::Obj(Vec::new()),
         };
         let object = json::loads_text(br#"{"id": "crib", "footprint": [2, 1], "slots": 2, "interactions": [{"pose": "lie"}]}"#).unwrap();
-        let mattress = |every: bool| heights(&g, &J::Obj(Vec::new()), &object, &furniture, every).unwrap().into_iter().find(|h| h.what == "mattress").map(|h| (h.at, h.mesh)).unwrap();
+        let mattress = |every: bool| {
+            heights(&g, &J::Obj(Vec::new()), &object, &furniture, every)
+                .unwrap()
+                .into_iter()
+                .find(|h| h.what == "mattress")
+                .map(|h| (h.at, h.mesh))
+                .unwrap()
+        };
         assert_eq!(mattress(false), ([-0.5, 0.0], Some(0.5)));
         let (at, mesh) = mattress(true);
         assert_eq!(at, [0.5, 0.0], "the gate takes the worst slot");
@@ -2941,15 +4291,34 @@ mod tests {
     fn motions_played_in_order_and_checked() {
         let m = json::loads_text(br#"{"uses": {"fetch": ["door_open", {"clip": "door_open", "hold": -1, "slot": true, "x": 1}], "b": "lid"},
             "loops": {"relax": "rock"}, "idle": "rock", "clock": {"hour": "h", "at": "noon"}}"#).unwrap();
-        let p: Vec<(String, String)> = played(&m).unwrap().into_iter().map(|(c, by)| (c.key(), by)).collect();
-        assert_eq!(p, [("door_open", "use 'fetch'"), ("lid", "use 'b'"), ("rock", "loop 'relax'"), ("h", "clock hour")].map(|(a, b)| (a.to_string(), b.to_string())));
-        assert_eq!(motions_errors(&m), [
-            "`motions.uses` 'fetch': hold -1 is no number of seconds",
-            "`motions.uses` 'fetch': slot True is no slot (0, 1, ...)",
-            "`motions.uses` 'fetch': unknown x",
-            "`motions.clock.at` 'noon' is no time (minutes past twelve)",
-        ]);
-        assert_eq!(loops(&m).unwrap(), HashSet::from(["rock".to_string(), "h".to_string()]));
+        let p: Vec<(String, String)> = played(&m)
+            .unwrap()
+            .into_iter()
+            .map(|(c, by)| (c.key(), by))
+            .collect();
+        assert_eq!(
+            p,
+            [
+                ("door_open", "use 'fetch'"),
+                ("lid", "use 'b'"),
+                ("rock", "loop 'relax'"),
+                ("h", "clock hour")
+            ]
+            .map(|(a, b)| (a.to_string(), b.to_string()))
+        );
+        assert_eq!(
+            motions_errors(&m),
+            [
+                "`motions.uses` 'fetch': hold -1 is no number of seconds",
+                "`motions.uses` 'fetch': slot True is no slot (0, 1, ...)",
+                "`motions.uses` 'fetch': unknown x",
+                "`motions.clock.at` 'noon' is no time (minutes past twelve)",
+            ]
+        );
+        assert_eq!(
+            loops(&m).unwrap(),
+            HashSet::from(["rock".to_string(), "h".to_string()])
+        );
     }
 
     fn j(text: &str) -> J {
@@ -2958,16 +4327,32 @@ mod tests {
 
     #[test]
     fn a_birds_fields_are_its_sizes() {
-        assert!(bird_fields(&j(r#"{"length": 0.12, "wingspan": 0.185, "perchHeight": 0.03, "pitch": 34}"#)).is_empty());
-        assert!(bird_fields(&j(r#"{"length": 0.12, "wingspan": 0.185}"#)).is_empty(), "the rest is optional");
-        assert_eq!(bird_fields(&j(r#"{"length": 0, "span": 1, "pitch": 95, "perchHeight": true}"#)), [
-            "`bird`: unknown span (it takes length, wingspan, perchHeight, pitch)",
-            "`bird.length` 0 is no length (metres, over 0)",
-            "`bird` has no `wingspan`",
-            "`bird.perchHeight` True is no length (metres, over 0)",
-            "`bird.pitch` 95 is no angle (degrees, -90 to 90)",
-        ]);
-        assert_eq!(bird_fields(&j("[0.12]")), ["`bird` is {\"length\", \"wingspan\", ...} (metres), not [0.12]"]);
+        assert!(
+            bird_fields(&j(
+                r#"{"length": 0.12, "wingspan": 0.185, "perchHeight": 0.03, "pitch": 34}"#
+            ))
+            .is_empty()
+        );
+        assert!(
+            bird_fields(&j(r#"{"length": 0.12, "wingspan": 0.185}"#)).is_empty(),
+            "the rest is optional"
+        );
+        assert_eq!(
+            bird_fields(&j(
+                r#"{"length": 0, "span": 1, "pitch": 95, "perchHeight": true}"#
+            )),
+            [
+                "`bird`: unknown span (it takes length, wingspan, perchHeight, pitch)",
+                "`bird.length` 0 is no length (metres, over 0)",
+                "`bird` has no `wingspan`",
+                "`bird.perchHeight` True is no length (metres, over 0)",
+                "`bird.pitch` 95 is no angle (degrees, -90 to 90)",
+            ]
+        );
+        assert_eq!(
+            bird_fields(&j("[0.12]")),
+            ["`bird` is {\"length\", \"wingspan\", ...} (metres), not [0.12]"]
+        );
     }
 
     /// The blue tit as built (families/birds.py) against its `bird`, and against wrong ones.
@@ -2976,15 +4361,42 @@ mod tests {
         let path = join(&repo_root(), "web/public/assets/models/birds/blueTit.glb");
         let g = parse_glb(&std::fs::read(&path).unwrap()).unwrap();
         let parts = bird_parts(&g).unwrap();
-        assert_eq!(parts.names.iter().map(String::as_str).collect::<Vec<_>>(), ["body", "head", "tail", "wing.L", "wing.R"]);
+        assert_eq!(
+            parts.names.iter().map(String::as_str).collect::<Vec<_>>(),
+            ["body", "head", "tail", "wing.L", "wing.R"]
+        );
         assert!(parts.flat.is_empty());
         let dims = [0.185, 0.072, 0.106];
-        assert!(bird_errors(&j(r#"{"length": 0.12, "wingspan": 0.185, "perchHeight": 0.03, "pitch": 34}"#), &parts, dims).is_empty());
-        let wrong = bird_errors(&j(r#"{"length": 0.2, "wingspan": 0.3, "perchHeight": 0.5}"#), &parts, dims);
+        assert!(
+            bird_errors(
+                &j(r#"{"length": 0.12, "wingspan": 0.185, "perchHeight": 0.03, "pitch": 34}"#),
+                &parts,
+                dims
+            )
+            .is_empty()
+        );
+        let wrong = bird_errors(
+            &j(r#"{"length": 0.2, "wingspan": 0.3, "perchHeight": 0.5}"#),
+            &parts,
+            dims,
+        );
         assert_eq!(wrong.len(), 3, "{wrong:?}");
-        assert!(wrong[0].starts_with("0.185 m across its spread wings, its `bird.wingspan` says 0.300 m"), "{}", wrong[0]);
-        assert!(wrong[1].starts_with("0.12") && wrong[1].contains("from bill to tail tip, its `bird.length` says 0.200 m"), "{}", wrong[1]);
-        assert_eq!(wrong[2], "`bird.perchHeight` 0.500 m is over the bird's height, 0.072 m");
+        assert!(
+            wrong[0]
+                .starts_with("0.185 m across its spread wings, its `bird.wingspan` says 0.300 m"),
+            "{}",
+            wrong[0]
+        );
+        assert!(
+            wrong[1].starts_with("0.12")
+                && wrong[1].contains("from bill to tail tip, its `bird.length` says 0.200 m"),
+            "{}",
+            wrong[1]
+        );
+        assert_eq!(
+            wrong[2],
+            "`bird.perchHeight` 0.500 m is over the bird's height, 0.072 m"
+        );
         // Its wings swapped over, one part gone and one saved flat.
         let mut points = parts.points;
         let left = points.remove("wing.L").unwrap();
@@ -2992,44 +4404,94 @@ mod tests {
         points.insert("wing.L".into(), right);
         let mut names = parts.names;
         names.remove("tail");
-        let broken = BirdParts { names, points, flat: vec!["wing.L".into()] };
+        let broken = BirdParts {
+            names,
+            points,
+            flat: vec!["wing.L".into()],
+        };
         let e = bird_errors(&j(r#"{"length": 0.12, "wingspan": 0.185}"#), &broken, dims);
-        assert_eq!(e[0], "a bird's parts are nodes named body, head, tail, wing.L, wing.R: it has no tail");
+        assert_eq!(
+            e[0],
+            "a bird's parts are nodes named body, head, tail, wing.L, wing.R: it has no tail"
+        );
         assert!(e[1].starts_with("wing.L is saved at scale 0"), "{}", e[1]);
-        assert_eq!(&e[2..], [
-            "wing.L reaches out the wrong way: a bird's wing.L is spread to its left, game -x (glTF +x)",
-            "wing.R reaches out the wrong way: a bird's wing.R is spread to its right, game +x (glTF -x)",
-        ]);
+        assert_eq!(
+            &e[2..],
+            [
+                "wing.L reaches out the wrong way: a bird's wing.L is spread to its left, game -x (glTF +x)",
+                "wing.R reaches out the wrong way: a bird's wing.R is spread to its right, game +x (glTF -x)",
+            ]
+        );
     }
 
     #[test]
     fn perches_are_points_inside_the_model() {
         let (lo, hi) = ([-1.0, 0.0, -1.0], [1.0, 4.0, 1.0]);
-        assert!(perch_errors(&j("[[0.5, 3.9, -0.5], [-1.005, 0, 1]]"), lo, hi, 1.0).is_empty(), "a centimetre out is in");
-        assert_eq!(perch_errors(&j("[[0, 5, 0], [0.5, 1], [1, 1, \"x\"], [0, 2, 0], [3, 1, 0]]"), lo, hi, 1.0), [
-            "`perches` 1: [0.5, 1] is no [x, y, z]",
-            "`perches` 2: [1, 1, 'x'] is no [x, y, z]",
-            "2 of 5 perches outside the model (the first, 0: [0, 5, 0]; its box x, y, z: -1.00 to 1.00, 0.00 to 4.00, -1.00 to 1.00)",
-        ]);
+        assert!(
+            perch_errors(&j("[[0.5, 3.9, -0.5], [-1.005, 0, 1]]"), lo, hi, 1.0).is_empty(),
+            "a centimetre out is in"
+        );
+        assert_eq!(
+            perch_errors(
+                &j("[[0, 5, 0], [0.5, 1], [1, 1, \"x\"], [0, 2, 0], [3, 1, 0]]"),
+                lo,
+                hi,
+                1.0
+            ),
+            [
+                "`perches` 1: [0.5, 1] is no [x, y, z]",
+                "`perches` 2: [1, 1, 'x'] is no [x, y, z]",
+                "2 of 5 perches outside the model (the first, 0: [0, 5, 0]; its box x, y, z: -1.00 to 1.00, 0.00 to 4.00, -1.00 to 1.00)",
+            ]
+        );
         // Before the entry's `scale`: a tree drawn twice its size has its box twice as big, its perches as written.
-        assert!(perch_errors(&j("[[0, 3, 0]]"), [-2.0, 0.0, -2.0], [2.0, 8.0, 2.0], 2.0).is_empty());
-        assert_eq!(perch_errors(&j("[[0, 5, 0]]"), [-2.0, 0.0, -2.0], [2.0, 8.0, 2.0], 2.0).len(), 1);
-        assert_eq!(perch_errors(&j("[]"), lo, hi, 1.0), ["`perches` is empty: leave it out"]);
-        assert_eq!(perch_errors(&j("{\"a\": 1}"), lo, hi, 1.0), ["`perches` is a list of [x, y, z] (metres), not {'a': 1}"]);
+        assert!(
+            perch_errors(&j("[[0, 3, 0]]"), [-2.0, 0.0, -2.0], [2.0, 8.0, 2.0], 2.0).is_empty()
+        );
+        assert_eq!(
+            perch_errors(&j("[[0, 5, 0]]"), [-2.0, 0.0, -2.0], [2.0, 8.0, 2.0], 2.0).len(),
+            1
+        );
+        assert_eq!(
+            perch_errors(&j("[]"), lo, hi, 1.0),
+            ["`perches` is empty: leave it out"]
+        );
+        assert_eq!(
+            perch_errors(&j("{\"a\": 1}"), lo, hi, 1.0),
+            ["`perches` is a list of [x, y, z] (metres), not {'a': 1}"]
+        );
     }
 
     #[test]
     fn a_habitat_is_one_of_four_and_goes_with_perches() {
         for h in HABITATS {
-            assert!(habitat_errors(&j(&format!(r#"{{"perches": [[0, 1, 0]], "habitat": "{h}"}}"#))).is_empty(), "{h}");
+            assert!(
+                habitat_errors(&j(&format!(
+                    r#"{{"perches": [[0, 1, 0]], "habitat": "{h}"}}"#
+                )))
+                .is_empty(),
+                "{h}"
+            );
         }
-        assert!(habitat_errors(&j(r#"{"perches": [[0, 1, 0]]}"#)).is_empty(), "optional");
+        assert!(
+            habitat_errors(&j(r#"{"perches": [[0, 1, 0]]}"#)).is_empty(),
+            "optional"
+        );
         assert!(habitat_errors(&j(r#"{"url": "a.glb"}"#)).is_empty());
-        assert_eq!(habitat_errors(&j(r#"{"perches": [[0, 1, 0]], "habitat": "shrub"}"#)), ["`habitat` 'shrub' is none of tree, conifer, bush, hedge"]);
-        assert_eq!(habitat_errors(&j(r#"{"perches": [[0, 1, 0]], "habitat": ["tree"]}"#)), ["`habitat` ['tree'] is none of tree, conifer, bush, hedge"]);
-        assert_eq!(habitat_errors(&j(r#"{"habitat": "Tree"}"#)), [
-            "`habitat` 'Tree' is none of tree, conifer, bush, hedge",
-            "`habitat` without `perches`: it says what the perches are on",
-        ]);
+        assert_eq!(
+            habitat_errors(&j(r#"{"perches": [[0, 1, 0]], "habitat": "shrub"}"#)),
+            ["`habitat` 'shrub' is none of tree, conifer, bush, hedge"]
+        );
+        assert_eq!(
+            habitat_errors(&j(r#"{"perches": [[0, 1, 0]], "habitat": ["tree"]}"#)),
+            ["`habitat` ['tree'] is none of tree, conifer, bush, hedge"]
+        );
+        assert_eq!(
+            habitat_errors(&j(r#"{"habitat": "Tree"}"#)),
+            [
+                "`habitat` 'Tree' is none of tree, conifer, bush, hedge",
+                "`habitat` without `perches`: it says what the perches are on",
+            ]
+        );
     }
 }

@@ -16,7 +16,10 @@ use crate::content::Layer;
 use crate::lot::{Diagonal, Edge, EdgeLook, EdgeRef, FORM_HALF, OUTDOORS};
 use crate::path::NavGrid;
 use crate::social::EventKind;
-use crate::world::{GameMode, Layout, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_SIZE, ObjectInstance, TaskKind, World, end_activity, kind_size};
+use crate::world::{
+    GameMode, Layout, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_SIZE, ObjectInstance,
+    TaskKind, World, end_activity, kind_size,
+};
 
 /// Tiles around a plot that still count when checking who can reach what (the path from the street).
 const REACH_MARGIN: i32 = 2;
@@ -88,14 +91,18 @@ fn shift_objects(t: &mut TaskKind, id: u32) {
     };
     match t {
         TaskKind::Use { object, .. } | TaskKind::Repair { object } => shift(object),
-        TaskKind::Cook { station, origin, .. } => {
+        TaskKind::Cook {
+            station, origin, ..
+        } => {
             if *origin == Some(id) {
                 *origin = None;
             }
             station.iter_mut().chain(origin.iter_mut()).for_each(shift);
         }
         TaskKind::Dishes { station, .. } => station.iter_mut().for_each(shift),
-        TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat.iter_mut().for_each(shift),
+        TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => {
+            seat.iter_mut().for_each(shift)
+        }
         TaskKind::Carry { from, to, .. } => {
             shift(from);
             shift(to);
@@ -148,12 +155,18 @@ impl World {
 
     /// Build and buy edits the household can take back.
     pub fn undo_steps(&self, household: usize) -> usize {
-        self.undo.iter().filter(|s| s.household == household).count()
+        self.undo
+            .iter()
+            .filter(|s| s.household == household)
+            .count()
     }
 
     /// Edits the household took back and can make again.
     pub fn redo_steps(&self, household: usize) -> usize {
-        self.redo.iter().filter(|s| s.household == household).count()
+        self.redo
+            .iter()
+            .filter(|s| s.household == household)
+            .count()
     }
 
     /// Takes back the household's last build or buy edit: walls, furniture, money and residents
@@ -164,7 +177,9 @@ impl World {
         if self.undo.last().is_none_or(|s| s.household != h) {
             return Err(Error::new("nothing to undo"));
         }
-        let mut now = self.home_snapshot(household).expect("the household has a home");
+        let mut now = self
+            .home_snapshot(household)
+            .expect("the household has a home");
         let mut s = self.undo.pop().expect("checked above");
         // What the edit told goes from the story (and comes back with a redo).
         now.story = self.events.take(&s.story);
@@ -180,7 +195,9 @@ impl World {
         if self.redo.last().is_none_or(|s| s.household != h) {
             return Err(Error::new("nothing to redo"));
         }
-        let mut now = self.home_snapshot(household).expect("the household has a home");
+        let mut now = self
+            .home_snapshot(household)
+            .expect("the household has a home");
         let mut s = self.redo.pop().expect("checked above");
         now.story = self.events.put_back(std::mem::take(&mut s.story));
         self.keep_orders(&mut s);
@@ -265,7 +282,12 @@ impl World {
 
     /// Checks that household `h` can pay `cost` for an edit (free in Creative); `Ok` means
     /// the edit may go ahead and be paid with `pay`.
-    pub(crate) fn can_pay(&self, h: usize, cost: i64, refusal: impl FnOnce() -> String) -> Result<(), Error> {
+    pub(crate) fn can_pay(
+        &self,
+        h: usize,
+        cost: i64,
+        refusal: impl FnOnce() -> String,
+    ) -> Result<(), Error> {
         let cost = self.build_price(cost);
         if cost > 0 && self.households[h].funds < cost {
             return Err(Error::new(refusal()));
@@ -293,14 +315,26 @@ impl World {
 
     /// How far object type `def`, facing `rot`, stands off the middle of its footprint: by up
     /// to half a tile, things on a wall only along it. Stairs stand square.
-    pub(crate) fn check_offset(&self, def: usize, rot: u8, offset: [i8; 2]) -> Result<[i8; 2], Error> {
+    pub(crate) fn check_offset(
+        &self,
+        def: usize,
+        rot: u8,
+        offset: [i8; 2],
+    ) -> Result<[i8; 2], Error> {
         let d = &self.content.objects[def];
         // Across the wall (z facing 0 or 2, x facing 1 or 3) a thing on it can't move.
-        let across = if rot.is_multiple_of(2) { offset[1] } else { offset[0] };
+        let across = if rot.is_multiple_of(2) {
+            offset[1]
+        } else {
+            offset[0]
+        };
         if offset == [0, 0] {
             Ok(offset)
         } else if d.stairs {
-            Err(Error::new(format!("the {} stands square on its tiles", d.name.to_lowercase())))
+            Err(Error::new(format!(
+                "the {} stands square on its tiles",
+                d.name.to_lowercase()
+            )))
         } else if d.layer == Layer::Wall && across != 0 {
             Err(Error::new("that hangs flat on its wall"))
         } else if offset.iter().any(|&o| o.unsigned_abs() > MAX_OFFSET as u8) {
@@ -314,30 +348,61 @@ impl World {
     /// centimetres taller): each side `MIN_SIZE` to `MAX_SIZE` tiles. Stairs keep theirs; things
     /// on a wall keep their depth and things on a top their footprint (they can still be taller
     /// or shorter).
-    pub(crate) fn check_size(&self, def: usize, size: [u16; 2], tall: i16) -> Result<([u16; 2], i16), Error> {
+    pub(crate) fn check_size(
+        &self,
+        def: usize,
+        size: [u16; 2],
+        tall: i16,
+    ) -> Result<([u16; 2], i16), Error> {
         let d = &self.content.objects[def];
         let name = d.name.to_lowercase();
         let own = kind_size(d.footprint);
         if d.stairs && (size != own || tall != 0) {
             Err(Error::new(format!("the {name} keep their size")))
         } else if d.layer == Layer::Surface && size != own {
-            Err(Error::new(format!("the {name} only gets taller or shorter")))
+            Err(Error::new(format!(
+                "the {name} only gets taller or shorter"
+            )))
         } else if d.layer == Layer::Wall && size[1] != own[1] {
             Err(Error::new(format!("the {name} hangs flat on its wall")))
-        } else if size.iter().any(|&s| !(MIN_SIZE..=MAX_SIZE as u16 * 100).contains(&s)) {
-            Err(Error::new(format!("things measure {MIN_SIZE} cm to {MAX_SIZE} m each way")))
+        } else if size
+            .iter()
+            .any(|&s| !(MIN_SIZE..=MAX_SIZE as u16 * 100).contains(&s))
+        {
+            Err(Error::new(format!(
+                "things measure {MIN_SIZE} cm to {MAX_SIZE} m each way"
+            )))
         } else if !(-MAX_SHORTER..=MAX_TALLER).contains(&tall) {
-            Err(Error::new(format!("things grow {} m at most, or shrink {} m", MAX_TALLER as f32 / 100.0, MAX_SHORTER as f32 / 100.0)))
+            Err(Error::new(format!(
+                "things grow {} m at most, or shrink {} m",
+                MAX_TALLER as f32 / 100.0,
+                MAX_SHORTER as f32 / 100.0
+            )))
         } else {
             Ok((size, tall))
         }
     }
 
     /// `layout` for object type `def` facing `rot`, checked (`check_offset`, `check_size`).
-    pub(crate) fn check_layout(&self, def: usize, rot: u8, layout: Layout) -> Result<Layout, Error> {
+    pub(crate) fn check_layout(
+        &self,
+        def: usize,
+        rot: u8,
+        layout: Layout,
+    ) -> Result<Layout, Error> {
         let offset = self.check_offset(def, rot, layout.offset)?;
-        let (size, tall) = self.check_size(def, layout.extent.unwrap_or(kind_size(self.content.objects[def].footprint)), layout.tall)?;
-        Ok(Layout { offset, extent: Some(size), tall })
+        let (size, tall) = self.check_size(
+            def,
+            layout
+                .extent
+                .unwrap_or(kind_size(self.content.objects[def].footprint)),
+            layout.tall,
+        )?;
+        Ok(Layout {
+            offset,
+            extent: Some(size),
+            tall,
+        })
     }
 
     fn home_object(&self, household: u32, object: u32) -> Result<(usize, u32), Error> {
@@ -388,8 +453,15 @@ impl World {
         seen[lot.tile_index(start.0, start.1)] = true;
         while let Some((x, z)) = open.pop_front() {
             let steps = [(1, 0), (-1, 0), (0, 1), (0, -1)].map(|(dx, dz)| (x + dx, z + dz));
-            let up_or_down = self.stairs.link(x, z).filter(|&(lx, lz)| nav.tile_free(lx, lz));
-            for (nx, nz) in steps.into_iter().filter(|&(nx, nz)| nav.can_step(x, z, nx, nz)).chain(up_or_down) {
+            let up_or_down = self
+                .stairs
+                .link(x, z)
+                .filter(|&(lx, lz)| nav.tile_free(lx, lz));
+            for (nx, nz) in steps
+                .into_iter()
+                .filter(|&(nx, nz)| nav.can_step(x, z, nx, nz))
+                .chain(up_or_down)
+            {
                 if inside(nx, nz) && !std::mem::replace(&mut seen[lot.tile_index(nx, nz)], true) {
                     open.push_back((nx, nz));
                 }
@@ -410,7 +482,9 @@ impl World {
                 // top; chairs pulled up to a table, from any side.
                 self.object_plot[o.id as usize] != Some(plot)
                     || !def.reached()
-                    || self.approach_tiles(o).iter().any(|&(fx, fz)| self.lot.in_bounds(fx, fz) && seen[self.lot.tile_index(fx, fz)])
+                    || self.approach_tiles(o).iter().any(|&(fx, fz)| {
+                        self.lot.in_bounds(fx, fz) && seen[self.lot.tile_index(fx, fz)]
+                    })
             })
             .collect();
         (fronts, seen)
@@ -446,7 +520,11 @@ impl World {
             // (Under an arc lamp's shade, only someone on their feet: one sitting on the sofa
             // under it is out of its way.)
             let standing = s.pose == crate::content::Pose::Stand;
-            s.away_until.is_none() && (obj.tiles(&self.content).any(|t| t == s.tile() || Some(t) == seated) || (standing && obj.overhang_tiles(&self.content).any(|t| t == s.tile())))
+            s.away_until.is_none()
+                && (obj
+                    .tiles(&self.content)
+                    .any(|t| t == s.tile() || Some(t) == seated)
+                    || (standing && obj.overhang_tiles(&self.content).any(|t| t == s.tile())))
         })
     }
 
@@ -472,7 +550,14 @@ impl World {
                 return Error::new(e);
             }
             // Why it doesn't fit beside something else, as it says it.
-            for why in ["would hang into ", "would hang too low over ", "is too tall for ", "is under ", "can't hang over a window", "can't stand against a window"] {
+            for why in [
+                "would hang into ",
+                "would hang too low over ",
+                "is too tall for ",
+                "is under ",
+                "can't hang over a window",
+                "can't stand against a window",
+            ] {
                 if let Some(i) = e.find(why) {
                     return Error::new(format!("that {}", &e[i..]));
                 }
@@ -509,7 +594,10 @@ impl World {
         let before = self.reach_signature(plot);
         let id = self.place(def, x, z, rot, layout, colors, quality, value, None)?;
         let approach = self.approach_tiles(&self.objects[id as usize]);
-        let (fx, fz) = approach.first().copied().unwrap_or_else(|| self.objects[id as usize].front_tile(&self.content));
+        let (fx, fz) = approach
+            .first()
+            .copied()
+            .unwrap_or_else(|| self.objects[id as usize].front_tile(&self.content));
         let seen = self.reachable(plot);
         // Upstairs before there are stairs, nothing in the room can be reached yet anyway.
         let cut_off = || {
@@ -517,13 +605,19 @@ impl World {
             let p = &self.plots[plot as usize];
             let k = self.storey_row(self.storey_of(fz));
             room != OUTDOORS
-                && !(p.z + k..p.z + p.d + k).any(|z| (p.x..p.x + p.w).any(|x| self.lot.room_at(x, z) == room && seen[self.lot.tile_index(x, z)]))
+                && !(p.z + k..p.z + p.d + k).any(|z| {
+                    (p.x..p.x + p.w)
+                        .any(|x| self.lot.room_at(x, z) == room && seen[self.lot.tile_index(x, z)])
+                })
         };
         // A picture, a rug, a table nobody uses or a thing on a top can go anywhere (over a bed,
         // behind a sofa, with chairs all round); a chair pulled up to a table needs one free side.
         let unused = !self.content.objects[def].reached();
-        let reached = approach.iter().any(|&(ax, az)| self.lot.in_bounds(ax, az) && seen[self.lot.tile_index(ax, az)]);
-        let front_ok = unused || reached || (!approach.is_empty() && self.storey_of(fz) != 0 && cut_off());
+        let reached = approach
+            .iter()
+            .any(|&(ax, az)| self.lot.in_bounds(ax, az) && seen[self.lot.tile_index(ax, az)]);
+        let front_ok =
+            unused || reached || (!approach.is_empty() && self.storey_of(fz) != 0 && cut_off());
         if !front_ok || !self.keeps_reach(plot, &before, Some(id)) {
             self.remove_object(id);
             return Err(Error::new("that would block the way"));
@@ -537,12 +631,23 @@ impl World {
     /// plot's first good free spot (`find_spot`). On a plot it must block nothing there
     /// (`place_at_home`). None if it fits nowhere: the caller sells it back.
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn place_grown(&mut self, def: usize, x: i32, z: i32, rot: u8, colors: crate::world::Colors, quality: u8, value: i64) -> Option<u32> {
+    pub(crate) fn place_grown(
+        &mut self,
+        def: usize,
+        x: i32,
+        z: i32,
+        rot: u8,
+        colors: crate::world::Colors,
+        quality: u8,
+        value: i64,
+    ) -> Option<u32> {
         let plot = self.plot_at(x, z);
         let mut near: Vec<(i32, i32, u8)> = Vec::new();
         for turn in 0..4u8 {
             let r = (rot + turn) % 4;
-            let mut shifts: Vec<(i32, i32)> = (-1..=1).flat_map(|dx| (-1..=1).map(move |dz| (dx, dz))).collect();
+            let mut shifts: Vec<(i32, i32)> = (-1..=1)
+                .flat_map(|dx| (-1..=1).map(move |dz| (dx, dz)))
+                .collect();
             shifts.sort_by_key(|&(dx, dz)| dx.abs() + dz.abs());
             for (dx, dz) in shifts {
                 let covers = self
@@ -555,11 +660,40 @@ impl World {
         }
         let Some(plot) = plot else {
             // (A lot without plots, as the oldest saves: placed as anything loads, where it fits.)
-            return near.into_iter().find_map(|(cx, cz, r)| self.place(def, cx, cz, r, Layout::default(), colors.clone(), quality, value, None).ok());
+            return near.into_iter().find_map(|(cx, cz, r)| {
+                self.place(
+                    def,
+                    cx,
+                    cz,
+                    r,
+                    Layout::default(),
+                    colors.clone(),
+                    quality,
+                    value,
+                    None,
+                )
+                .ok()
+            });
         };
-        let spots = self.find_spot(plot, def).into_iter().map(|(cx, cz, r, _)| (cx, cz, r));
+        let spots = self
+            .find_spot(plot, def)
+            .into_iter()
+            .map(|(cx, cz, r, _)| (cx, cz, r));
         let tries: Vec<(i32, i32, u8)> = near.into_iter().chain(spots).collect();
-        tries.into_iter().find_map(|(cx, cz, r)| self.place_at_home(plot, def, cx, cz, r, Layout::default(), colors.clone(), quality, value).ok())
+        tries.into_iter().find_map(|(cx, cz, r)| {
+            self.place_at_home(
+                plot,
+                def,
+                cx,
+                cz,
+                r,
+                Layout::default(),
+                colors.clone(),
+                quality,
+                value,
+            )
+            .ok()
+        })
     }
 
     /// v32 to v33: `id`, a post of the town's (content `staff`) on a public lot just placed as it was
@@ -569,7 +703,9 @@ impl World {
     /// Else it stays (and is self-serve, as it was). Returns its id.
     pub(crate) fn nudge_post(&mut self, id: u32) -> u32 {
         let o = &self.objects[id as usize];
-        let Some(plot) = self.plot_at(o.x, o.z) else { return id };
+        let Some(plot) = self.plot_at(o.x, o.z) else {
+            return id;
+        };
         if id as usize + 1 != self.objects.len()
             || self.content.objects[o.def].staff.is_none()
             || !self.plots[plot as usize].public
@@ -580,14 +716,33 @@ impl World {
         let a = o.angle();
         let (dx, dz) = (a.sin().round() as i32, a.cos().round() as i32);
         let old = self.remove_object(id);
-        if let Ok(moved) = self.replace_at_home(plot, &old, old.x + dx, old.z + dz, old.rot, Layout::of(&old)) {
-            if crate::staff::room_behind(self, &self.nav(), &self.objects[moved as usize], plot).is_some() {
+        if let Ok(moved) = self.replace_at_home(
+            plot,
+            &old,
+            old.x + dx,
+            old.z + dz,
+            old.rot,
+            Layout::of(&old),
+        ) {
+            if crate::staff::room_behind(self, &self.nav(), &self.objects[moved as usize], plot)
+                .is_some()
+            {
                 return moved;
             }
             self.remove_object(moved);
         }
         // (Where it was: it stood there a moment ago.)
-        let back = self.place(old.def, old.x, old.z, old.rot, Layout::of(&old), old.colors.clone(), old.quality, old.value, None);
+        let back = self.place(
+            old.def,
+            old.x,
+            old.z,
+            old.rot,
+            Layout::of(&old),
+            old.colors.clone(),
+            old.quality,
+            old.value,
+            None,
+        );
         let back = back.expect("it stood there");
         self.objects[back as usize].carry_state(&old);
         back
@@ -595,8 +750,26 @@ impl World {
 
     /// Places `old`, lifted out, back on the home plot at `x`, `z` (see `place_at_home`), keeping
     /// what it was (`ObjectInstance::carry_state`).
-    pub(crate) fn replace_at_home(&mut self, plot: u32, old: &ObjectInstance, x: i32, z: i32, rot: u8, layout: Layout) -> Result<u32, Error> {
-        let id = self.place_at_home(plot, old.def, x, z, rot, layout, old.colors.clone(), old.quality, old.value)?;
+    pub(crate) fn replace_at_home(
+        &mut self,
+        plot: u32,
+        old: &ObjectInstance,
+        x: i32,
+        z: i32,
+        rot: u8,
+        layout: Layout,
+    ) -> Result<u32, Error> {
+        let id = self.place_at_home(
+            plot,
+            old.def,
+            x,
+            z,
+            rot,
+            layout,
+            old.colors.clone(),
+            old.quality,
+            old.value,
+        )?;
         self.objects[id as usize].carry_state(old);
         Ok(id)
     }
@@ -623,7 +796,14 @@ impl World {
     /// Furniture on the floor (not pictures, ceiling lamps up out of the way, rugs, things on tops or stairs)
     /// doesn't go just inside a door, where it would make the way through a squeeze: a lamp
     /// nobody needs to reach could otherwise stand anywhere that leaves the rest reachable.
-    fn keep_doorway_clear(&self, def: usize, x: i32, z: i32, rot: u8, layout: Layout) -> Result<(), Error> {
+    fn keep_doorway_clear(
+        &self,
+        def: usize,
+        x: i32,
+        z: i32,
+        rot: u8,
+        layout: Layout,
+    ) -> Result<(), Error> {
         let d = &self.content.objects[def];
         if d.walked_under() || d.stairs {
             return Ok(());
@@ -632,7 +812,10 @@ impl World {
         let Ok(obj) = self.check_fit(def, x, z, rot, layout) else {
             return Ok(());
         };
-        if obj.tiles(&self.content).any(|(tx, tz)| self.by_door(tx, tz)) {
+        if obj
+            .tiles(&self.content)
+            .any(|(tx, tz)| self.by_door(tx, tz))
+        {
             return Err(Error::new("that would stand in a doorway"));
         }
         Ok(())
@@ -650,7 +833,16 @@ impl World {
                 .filter(|o| self.object_plot[o.id as usize] == Some(plot))
                 .filter_map(|o| {
                     let c = crate::surface::middle(&self.content, o);
-                    crate::surface::free_surface_spot_near(&self.content, &self.objects, &[o.id], c, f32::INFINITY, 0, radius, &[])
+                    crate::surface::free_surface_spot_near(
+                        &self.content,
+                        &self.objects,
+                        &[o.id],
+                        c,
+                        f32::INFINITY,
+                        0,
+                        radius,
+                        &[],
+                    )
                 })
                 .map(|s| (s.x, s.z, 0, s.offset))
                 .collect();
@@ -665,7 +857,9 @@ impl World {
                         continue;
                     };
                     if !self.fits_on_plot(&obj, plot)
-                        || obj.tiles(&self.content).any(|(tx, tz)| self.by_door(tx, tz))
+                        || obj
+                            .tiles(&self.content)
+                            .any(|(tx, tz)| self.by_door(tx, tz))
                     {
                         continue;
                     }
@@ -685,7 +879,10 @@ impl World {
             }
         }
         spots.sort_by_key(|s| -s.0);
-        spots.into_iter().map(|(_, x, z, r)| (x, z, r, [0, 0])).collect()
+        spots
+            .into_iter()
+            .map(|(_, x, z, r)| (x, z, r, [0, 0]))
+            .collect()
     }
 
     /// Buys an object for the household's home. Returns the new object's id.
@@ -732,7 +929,8 @@ impl World {
                 .into_iter()
                 .find_map(|(x, z, rot, found)| {
                     let layout = if on_top { Layout::at(found) } else { layout };
-                    self.place_at_home(plot, def, x, z, rot, layout, colors.clone(), 0, price).ok()
+                    self.place_at_home(plot, def, x, z, rot, layout, colors.clone(), 0, price)
+                        .ok()
                 })
                 .ok_or_else(|| Error::new("there's no free spot for that at home"))?,
         };
@@ -757,7 +955,20 @@ impl World {
         let value = self.content.objects[def].price.unwrap_or(0);
         self.find_spot(plot, def)
             .into_iter()
-            .find_map(|(x, z, rot, offset)| self.place_at_home(plot, def, x, z, rot, Layout::at(offset), Default::default(), 0, value).ok())
+            .find_map(|(x, z, rot, offset)| {
+                self.place_at_home(
+                    plot,
+                    def,
+                    x,
+                    z,
+                    rot,
+                    Layout::at(offset),
+                    Default::default(),
+                    0,
+                    value,
+                )
+                .ok()
+            })
     }
 
     /// Sells an object at home for part of what was spent on it (nothing in Creative). What
@@ -772,7 +983,11 @@ impl World {
         sold.push(object);
         sold.sort_unstable();
         // Food and dishes on it (or kept in it) go too, not what's on the table under it.
-        let held: Vec<u32> = self.items_held_by(&sold).into_iter().map(|(item, _)| item).collect();
+        let held: Vec<u32> = self
+            .items_held_by(&sold)
+            .into_iter()
+            .map(|(item, _)| item)
+            .collect();
         self.drop_items(&held);
         let mut refund = 0;
         // Highest id first: the ids before it stay put.
@@ -819,7 +1034,9 @@ impl World {
         tall: Option<i16>,
     ) -> Result<u32, Error> {
         let (_, plot) = self.home_object(household, object)?;
-        let before = self.home_snapshot(household).expect("the household has a home");
+        let before = self
+            .home_snapshot(household)
+            .expect("the household has a home");
         let riders = crate::surface::riders(&self.content, &self.objects, object);
         let old_top = crate::surface::Top::of(&self.content, &self.objects[object as usize]);
         // Lift it and its riders out, highest id first (the ids before each stay put).
@@ -828,11 +1045,20 @@ impl World {
         ids.sort_unstable();
         // Food and dishes on or in them (not what's on the table under it) come along.
         let held = self.items_held_by(&ids);
-        let mut lifted: Vec<ObjectInstance> = ids.iter().rev().map(|&id| self.remove_object(id)).collect();
+        let mut lifted: Vec<ObjectInstance> =
+            ids.iter().rev().map(|&id| self.remove_object(id)).collect();
         lifted.reverse();
-        let old = lifted.iter().find(|o| o.id == object).expect("lifted it").clone();
+        let old = lifted
+            .iter()
+            .find(|o| o.id == object)
+            .expect("lifted it")
+            .clone();
         let result = (|| {
-            let layout = Layout { offset: offset.unwrap_or(old.offset), extent: Some(size.unwrap_or(old.extent)), tall: tall.unwrap_or(old.tall) };
+            let layout = Layout {
+                offset: offset.unwrap_or(old.offset),
+                extent: Some(size.unwrap_or(old.extent)),
+                tall: tall.unwrap_or(old.tall),
+            };
             self.keep_doorway_clear(old.def, x, z, rot, layout)?;
             let id = self.replace_at_home(plot, &old, x, z, rot, layout)?;
             self.objects[id as usize].turn = turn.unwrap_or(old.turn);
@@ -853,13 +1079,31 @@ impl World {
                 let facing = (turned(r) + delta).rem_euclid(360);
                 let name = self.content.objects[r.def].name.to_lowercase();
                 let rid = self
-                    .replace_at_home(plot, r, x, z, (facing / 90) as u8, Layout { offset, ..Layout::of(r) })
+                    .replace_at_home(
+                        plot,
+                        r,
+                        x,
+                        z,
+                        (facing / 90) as u8,
+                        Layout {
+                            offset,
+                            ..Layout::of(r)
+                        },
+                    )
                     .map_err(|_| Error::new(format!("the {name} on it wouldn't fit there")))?;
-                self.objects[rid as usize].turn = if self.content.objects[r.def].turns { (facing % 90) as u8 } else { 0 };
+                self.objects[rid as usize].turn = if self.content.objects[r.def].turns {
+                    (facing % 90) as u8
+                } else {
+                    0
+                };
                 placed.push((r.clone(), rid));
             }
             for (was, now) in placed {
-                let items: Vec<u32> = held.iter().filter(|&&(_, holder)| holder == was.id).map(|&(item, _)| item).collect();
+                let items: Vec<u32> = held
+                    .iter()
+                    .filter(|&&(_, holder)| holder == was.id)
+                    .map(|&(item, _)| item)
+                    .collect();
                 if !items.is_empty() {
                     let new = self.objects[now as usize].clone();
                     self.carry_items(&was, &new, &items);
@@ -873,7 +1117,12 @@ impl World {
         result
     }
 
-    pub(crate) fn recolor(&mut self, household: u32, object: u32, colors: crate::world::Colors) -> Result<(), Error> {
+    pub(crate) fn recolor(
+        &mut self,
+        household: u32,
+        object: u32,
+        colors: crate::world::Colors,
+    ) -> Result<(), Error> {
         self.home_object(household, object)?;
         self.objects[object as usize].colors = colors;
         self.structure_version = self.structure_version.wrapping_add(1);
@@ -916,7 +1165,9 @@ impl World {
         }
         let cost = rules.upgrade_price(price);
         let name = def.name.clone();
-        self.can_pay(h, cost, || format!("not enough money to upgrade the {name}"))?;
+        self.can_pay(h, cost, || {
+            format!("not enough money to upgrade the {name}")
+        })?;
         self.pay(h, cost);
         let obj = &mut self.objects[object as usize];
         obj.quality += 1;
@@ -925,7 +1176,11 @@ impl World {
         self.structure_version = self.structure_version.wrapping_add(1);
         self.rooms_need_rescore();
         // Told about the household's first resident (nobody may live there yet).
-        if let Some(member) = self.sims.iter().position(|s| s.here() && s.household as usize == h) {
+        if let Some(member) = self
+            .sims
+            .iter()
+            .position(|s| s.here() && s.household as usize == h)
+        {
             self.events.push_detail(
                 self.tick,
                 EventKind::Upgraded,
@@ -1006,12 +1261,20 @@ impl World {
                 return Err(Error::new("fences and gates run along the grid"));
             }
             let (a, b) = sides(e);
-            if matches!(target, Edge::Window | Edge::Fence | Edge::Gate) && (self.storey_of(a.1) < 0 || self.storey_of(b.1) < 0) {
-                return Err(Error::new("a basement is underground: no windows, fences or gates down there"));
+            if matches!(target, Edge::Window | Edge::Fence | Edge::Gate)
+                && (self.storey_of(a.1) < 0 || self.storey_of(b.1) < 0)
+            {
+                return Err(Error::new(
+                    "a basement is underground: no windows, fences or gates down there",
+                ));
             }
             if e.kind != EdgeKind::Open
                 && let Some(dir) = diagonal
-                && (object_at(a.0, a.1).is_some() || self.objects.iter().any(|o| o.body_crosses(&self.content, e.x, e.z, dir)))
+                && (object_at(a.0, a.1).is_some()
+                    || self
+                        .objects
+                        .iter()
+                        .any(|o| o.body_crosses(&self.content, e.x, e.z, dir)))
             {
                 return Err(Error::new("a wall can't go through furniture"));
             }
@@ -1037,18 +1300,28 @@ impl World {
             // Nor does the wall come down (or become a door or a window) behind what stands against it.
             if target != Edge::Wall
                 && diagonal.is_none()
-                && let Some(o) = self.objects.iter().find(|o| self.content.objects[o.def].against_wall && o.back_edges(&self.content).contains(&(e.axis == EdgeAxis::H, e.x, e.z)))
+                && let Some(o) = self.objects.iter().find(|o| {
+                    self.content.objects[o.def].against_wall
+                        && o.back_edges(&self.content)
+                            .contains(&(e.axis == EdgeAxis::H, e.x, e.z))
+                })
             {
                 let name = self.content.objects[o.def].name.to_lowercase();
-                return Err(Error::new(format!("the {name} stands against that wall: move it first")));
+                return Err(Error::new(format!(
+                    "the {name} stands against that wall: move it first"
+                )));
             }
             // Only curtains and the like hang over a window.
             if target == Edge::Window
                 && diagonal.is_none()
-                && let Some(o) = self.hung_on(e.axis == EdgeAxis::H, e.x, e.z).find(|o| !self.content.objects[o.def].over_window)
+                && let Some(o) = self
+                    .hung_on(e.axis == EdgeAxis::H, e.x, e.z)
+                    .find(|o| !self.content.objects[o.def].over_window)
             {
                 let name = self.content.objects[o.def].name.to_lowercase();
-                return Err(Error::new(format!("the {name} hangs there, and it can't hang over a window: move it first")));
+                return Err(Error::new(format!(
+                    "the {name} hangs there, and it can't hang over a window: move it first"
+                )));
             }
             if let Some(dir) = diagonal
                 && target != Edge::Open
@@ -1118,7 +1391,10 @@ impl World {
                     Edge::Gate => rules.gate_price(look.style),
                     Edge::Open => rules.remove,
                 };
-            } else if target != Edge::Open && look != old && (look.style, look.form, look.sides) != (old.style, old.form, old.sides) {
+            } else if target != Edge::Open
+                && look != old
+                && (look.style, look.form, look.sides) != (old.style, old.form, old.sides)
+            {
                 // Rebuilt in another form, or replaced by another style (resizing a door or window is free).
                 cost += match target {
                     Edge::Door => rules.door_price(look.style),
@@ -1162,7 +1438,10 @@ impl World {
                 "that would shut a resident or an object in — add a door or a gate",
             ));
         }
-        if let Err(e) = self.storeys_stand(plot).and_then(|()| self.walls_still_hold(plot)) {
+        if let Err(e) = self
+            .storeys_stand(plot)
+            .and_then(|()| self.walls_still_hold(plot))
+        {
             self.lot = saved;
             return Err(e);
         }
@@ -1292,12 +1571,20 @@ impl World {
     /// it below). Nothing stands on the stairwell either. Stairs up from the basement keep
     /// coming up inside a room.
     pub(crate) fn storeys_stand(&self, plot: u32) -> Result<(), Error> {
-        let indoor = |x: i32, z: i32| self.lot.in_bounds(x, z) && self.lot.room_at(x, z) != OUTDOORS;
-        for (o, _) in self.objects.iter().zip(&self.object_plot).filter(|(_, on)| **on == Some(plot)) {
+        let indoor =
+            |x: i32, z: i32| self.lot.in_bounds(x, z) && self.lot.room_at(x, z) != OUTDOORS;
+        for (o, _) in self
+            .objects
+            .iter()
+            .zip(&self.object_plot)
+            .filter(|(_, on)| **on == Some(plot))
+        {
             if self.content.objects[o.def].stairs && self.storey_of(o.z) < 0 {
                 let rise = self.stairs.rise(-1);
                 if o.tiles(&self.content).any(|(x, z)| !indoor(x, z + rise)) {
-                    return Err(Error::new("the stairs down to the basement need a room over them"));
+                    return Err(Error::new(
+                        "the stairs down to the basement need a room over them",
+                    ));
                 }
             }
         }
@@ -1318,9 +1605,13 @@ impl World {
             for z in p.z + up..=p.z + p.d + up {
                 for x in p.x..=p.x + p.w {
                     let h = x < p.x + p.w && self.lot.h_edge(x as usize, z as usize) != Edge::Open;
-                    let v = z < p.z + p.d + up && self.lot.v_edge(x as usize, z as usize) != Edge::Open;
+                    let v =
+                        z < p.z + p.d + up && self.lot.v_edge(x as usize, z as usize) != Edge::Open;
                     let diag = x < p.x + p.w && z < p.z + p.d + up && self.lot.diag(x, z).is_some();
-                    if h && !(indoor(x, z - 1 - d) || indoor(x, z - d)) || v && !(indoor(x - 1, z - d) || indoor(x, z - d)) || diag && !indoor(x, z - d) {
+                    if h && !(indoor(x, z - 1 - d) || indoor(x, z - d))
+                        || v && !(indoor(x - 1, z - d) || indoor(x, z - d))
+                        || diag && !indoor(x, z - d)
+                    {
                         return Err(Error::new("walls upstairs have to stand on a room below"));
                     }
                 }
@@ -1334,15 +1625,29 @@ impl World {
     /// basement, inside a room (a wall taken down doesn't leave a ceiling lamp hanging from
     /// nothing outdoors), and what stands against a wall with plain wall behind it.
     pub(crate) fn walls_still_hold(&self, plot: u32) -> Result<(), Error> {
-        for (o, _) in self.objects.iter().zip(&self.object_plot).filter(|(_, on)| **on == Some(plot)) {
+        for (o, _) in self
+            .objects
+            .iter()
+            .zip(&self.object_plot)
+            .filter(|(_, on)| **on == Some(plot))
+        {
             let def = &self.content.objects[o.def];
             let name = || def.name.to_lowercase();
             let needs_room = def.layer == Layer::Ceiling || self.storey_of(o.z) != 0;
-            if needs_room && o.tiles(&self.content).any(|(x, z)| self.lot.room_at(x, z) == OUTDOORS) {
-                return Err(Error::new(format!("the {} would be left outdoors: move it first", name())));
+            if needs_room
+                && o.tiles(&self.content)
+                    .any(|(x, z)| self.lot.room_at(x, z) == OUTDOORS)
+            {
+                return Err(Error::new(format!(
+                    "the {} would be left outdoors: move it first",
+                    name()
+                )));
             }
             if def.against_wall && self.wall_behind(o) != Some(false) {
-                return Err(Error::new(format!("the {} stands against that wall: move it first", name())));
+                return Err(Error::new(format!(
+                    "the {} stands against that wall: move it first",
+                    name()
+                )));
             }
         }
         Ok(())
@@ -1358,14 +1663,22 @@ impl World {
             ..
         } = self;
         for sim in sims.iter_mut() {
-            if sim.current.as_ref().is_some_and(|a| uses_object(&a.task.kind, id)) {
+            if sim
+                .current
+                .as_ref()
+                .is_some_and(|a| uses_object(&a.task.kind, id))
+            {
                 end_activity(sim, content, objects);
             }
             sim.queue.retain(|t| !uses_object(&t.kind, id));
             // (A routine's next step, washing hands at this sink, goes with it.)
             sim.follow_up = sim.follow_up.take().filter(|t| !uses_object(&t.kind, id));
             // Talking from the seat that goes: on their feet, and nothing to sit back down to.
-            if sim.paused.as_ref().is_some_and(|a| uses_object(&a.task.kind, id)) {
+            if sim
+                .paused
+                .as_ref()
+                .is_some_and(|a| uses_object(&a.task.kind, id))
+            {
                 sim.paused = None;
                 if sim.use_seat.is_none() {
                     sim.seated_from = None;
@@ -1374,10 +1687,21 @@ impl World {
             }
             let current = sim.current.as_mut().map(|a| &mut a.task);
             let paused = sim.paused.as_mut().map(|a| &mut a.task);
-            for t in current.into_iter().chain(paused).chain(sim.queue.iter_mut()).chain(sim.follow_up.iter_mut()) {
+            for t in current
+                .into_iter()
+                .chain(paused)
+                .chain(sim.queue.iter_mut())
+                .chain(sim.follow_up.iter_mut())
+            {
                 shift_objects(&mut t.kind, id);
             }
-            sim.remap_unreachable(|o| if o == id { None } else { Some(if o > id { o - 1 } else { o }) });
+            sim.remap_unreachable(|o| {
+                if o == id {
+                    None
+                } else {
+                    Some(if o > id { o - 1 } else { o })
+                }
+            });
             // A seat taken to use something else (content `seatNear`): ids shift down too, and
             // if the seat itself goes they stand up but may carry on with what they were using.
             match sim.use_seat {
@@ -1445,14 +1769,29 @@ fn check_look(rules: &crate::content::BuildRules, e: &EdgeEdit) -> Result<(), Er
     match e.kind {
         _ if e.sill.is_none() && e.head.is_none() => {}
         EdgeKind::Door if e.sill.is_some() => return Err(Error::new("a door starts at the floor")),
-        EdgeKind::Door if e.head.is_some_and(|h| !(MIN_DOOR_HEAD..=MAX_HEAD).contains(&h)) => {
-            return Err(Error::new(format!("a door is {} to {} m tall", MIN_DOOR_HEAD as f32 / 100.0, MAX_HEAD as f32 / 100.0)));
+        EdgeKind::Door
+            if e.head
+                .is_some_and(|h| !(MIN_DOOR_HEAD..=MAX_HEAD).contains(&h)) =>
+        {
+            return Err(Error::new(format!(
+                "a door is {} to {} m tall",
+                MIN_DOOR_HEAD as f32 / 100.0,
+                MAX_HEAD as f32 / 100.0
+            )));
         }
-        EdgeKind::Window if e.head.is_some_and(|h| h > MAX_HEAD) || e.sill.is_some_and(|s| s + MIN_WINDOW > MAX_HEAD) => {
-            return Err(Error::new(format!("a window reaches {} m at most", MAX_HEAD as f32 / 100.0)));
+        EdgeKind::Window
+            if e.head.is_some_and(|h| h > MAX_HEAD)
+                || e.sill.is_some_and(|s| s + MIN_WINDOW > MAX_HEAD) =>
+        {
+            return Err(Error::new(format!(
+                "a window reaches {} m at most",
+                MAX_HEAD as f32 / 100.0
+            )));
         }
         EdgeKind::Window if matches!((e.sill, e.head), (Some(s), Some(h)) if s + MIN_WINDOW > h) => {
-            return Err(Error::new(format!("a window is at least {MIN_WINDOW} cm tall")));
+            return Err(Error::new(format!(
+                "a window is at least {MIN_WINDOW} cm tall"
+            )));
         }
         EdgeKind::Door | EdgeKind::Window => {}
         _ => return Err(Error::new("only doors and windows have a sill or a top")),
@@ -1505,7 +1844,11 @@ fn next_look(current: Edge, target: Edge, old: EdgeLook, e: &EdgeEdit) -> EdgeLo
             style: e
                 .style
                 .unwrap_or(if current == target { old.style } else { 0 }),
-            sill: if target == Edge::Window { e.sill.or(if current == target { old.sill } else { None }) } else { None },
+            sill: if target == Edge::Window {
+                e.sill.or(if current == target { old.sill } else { None })
+            } else {
+                None
+            },
             head: e.head.or(if current == target { old.head } else { None }),
             ..old
         },
@@ -1513,9 +1856,14 @@ fn next_look(current: Edge, target: Edge, old: EdgeLook, e: &EdgeEdit) -> EdgeLo
 }
 
 /// What the player's quick fix costs (Buy mode): a share of the price, by wear.
-pub(crate) fn repair_cost(content: &crate::content::Content, obj: &crate::world::ObjectInstance) -> i64 {
+pub(crate) fn repair_cost(
+    content: &crate::content::Content,
+    obj: &crate::world::ObjectInstance,
+) -> i64 {
     let price = content.objects[obj.def].price.unwrap_or(0) as f32;
-    (price * content.object_rules.repair.cost * obj.wear).round().max(1.0) as i64
+    (price * content.object_rules.repair.cost * obj.wear)
+        .round()
+        .max(1.0) as i64
 }
 
 #[cfg(test)]
@@ -1533,7 +1881,10 @@ mod tests {
         "sims":[{"name":"Ada","x":3.5,"z":5.5}]}"#;
 
     fn snack(object: u32) -> TaskKind {
-        TaskKind::Use { object, interaction: 0 }
+        TaskKind::Use {
+            object,
+            interaction: 0,
+        }
     }
 
     fn object(t: Option<TaskKind>) -> Option<u32> {
@@ -1548,15 +1899,25 @@ mod tests {
     #[test]
     fn follow_ups_and_what_they_couldnt_reach_follow_the_object() {
         let mut w = World::from_json(CONTENT, LOT, 7).unwrap();
-        w.sims[0].follow_up = Some(Task { kind: snack(2), directed: false, routine: true });
+        w.sims[0].follow_up = Some(Task {
+            kind: snack(2),
+            directed: false,
+            routine: true,
+        });
         w.sims[0].remember_unreachable(snack(1), 1000);
         w.remove_object(0);
         assert_eq!(object(w.sims[0].follow_up.map(|t| t.kind)), Some(1));
         assert_eq!(object(w.sims[0].unreachable[0].map(|s| s.0)), Some(0));
         w.remove_object(0);
         assert_eq!(object(w.sims[0].follow_up.map(|t| t.kind)), Some(0));
-        assert!(w.sims[0].unreachable[0].is_none(), "the one they couldn't reach is gone");
+        assert!(
+            w.sims[0].unreachable[0].is_none(),
+            "the one they couldn't reach is gone"
+        );
         w.remove_object(0);
-        assert!(w.sims[0].follow_up.is_none(), "the one they'd use next is gone");
+        assert!(
+            w.sims[0].follow_up.is_none(),
+            "the one they'd use next is gone"
+        );
     }
 }

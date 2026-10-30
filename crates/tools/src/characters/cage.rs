@@ -72,7 +72,10 @@ pub struct RingTags<'a> {
 
 impl Default for RingTags<'_> {
     fn default() -> Self {
-        RingTags { arm: Per::All(0.0), blush: Per::All(0.0) }
+        RingTags {
+            arm: Per::All(0.0),
+            blush: Per::All(0.0),
+        }
     }
 }
 
@@ -105,7 +108,14 @@ impl Cage {
 
     /// A vertex: `p` on the smooth surface (fitted exactly), `disp` a feature offset added to the
     /// fitted cage as it is (a soft bump of about 0.45 x its size, no ringing round it).
-    pub fn add(&mut self, p: V3, w: Weights, region: &'static str, disp: Option<V3>, tags: Tags) -> usize {
+    pub fn add(
+        &mut self,
+        p: V3,
+        w: Weights,
+        region: &'static str,
+        disp: Option<V3>,
+        tags: Tags,
+    ) -> usize {
         let k = self.p.len();
         self.p.push(p);
         self.d.push(disp.unwrap_or_else(V3::zeros));
@@ -116,14 +126,24 @@ impl Cage {
     }
 
     /// Vertices for `pts`; `w`, `disp` and tags may be per vertex or shared.
-    pub fn ring(&mut self, pts: &[V3], w: Per<'_, &Weights>, region: &'static str, disp: Option<&[V3]>, tags: RingTags<'_>) -> Vec<usize> {
+    pub fn ring(
+        &mut self,
+        pts: &[V3],
+        w: Per<'_, &Weights>,
+        region: &'static str,
+        disp: Option<&[V3]>,
+        tags: RingTags<'_>,
+    ) -> Vec<usize> {
         (0..pts.len())
             .map(|i| {
                 let wi = match &w {
                     Per::All(v) => (*v).clone(),
                     Per::Each(v) => v[i].clone(),
                 };
-                let t = Tags { arm: tags.arm.at(i), blush: tags.blush.at(i) };
+                let t = Tags {
+                    arm: tags.arm.at(i),
+                    blush: tags.blush.at(i),
+                };
                 self.add(pts[i], wi, region, disp.map(|d| d[i]), t)
             })
             .collect()
@@ -196,6 +216,11 @@ impl Cage {
                 d.map(|v| v / s)
             })
             .collect();
-        CageArrays { t: self.p.clone(), d: self.d.clone(), dense, tags: self.tags.clone() }
+        CageArrays {
+            t: self.p.clone(),
+            d: self.d.clone(),
+            dense,
+            tags: self.tags.clone(),
+        }
     }
 }

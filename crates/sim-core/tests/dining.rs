@@ -51,12 +51,25 @@ fn world() -> World {
 /// Its index in `World::objects`, what the seat and table lookups here take (nothing is sold
 /// before one is used as a stable id, in a command).
 fn buy(w: &mut World, def: &str, x: i32, z: i32, rot: i32) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), colors: Default::default(), turn: None, offset: None, size: None, tall: None })?;
+    w.apply(Command::Buy {
+        household: 0,
+        object: def.into(),
+        at: Some([x, z, rot]),
+        colors: Default::default(),
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })?;
     Ok(w.objects.len() as u32 - 1)
 }
 
 fn nav(w: &World) -> NavGrid<'_> {
-    NavGrid { lot: &w.lot, blocked: w.blocked(), stairs: w.stair_map() }
+    NavGrid {
+        lot: &w.lot,
+        blocked: w.blocked(),
+        stairs: w.stair_map(),
+    }
 }
 
 fn table_of(w: &World, seat: u32) -> Option<u32> {
@@ -64,7 +77,11 @@ fn table_of(w: &World, seat: u32) -> Option<u32> {
 }
 
 fn interaction(w: &World, object: u32, id: &str) -> usize {
-    w.content.objects[w.objects[object as usize].def].interactions.iter().position(|i| i.id == id).unwrap()
+    w.content.objects[w.objects[object as usize].def]
+        .interactions
+        .iter()
+        .position(|i| i.id == id)
+        .unwrap()
 }
 
 #[test]
@@ -74,13 +91,18 @@ fn chairs_pull_up_to_a_table_bought_before_or_after_them() {
     let chair = buy(&mut w, "chair", 4, 3, 0).expect("a chair facing the table, used from behind");
     assert_eq!(table_of(&w, chair), Some(table));
     let side = buy(&mut w, "chair", 3, 4, 3).expect("one at the end of the table");
-    assert_eq!(table_of(&w, side), None, "facing away from it: just a chair");
+    assert_eq!(
+        table_of(&w, side),
+        None,
+        "facing away from it: just a chair"
+    );
 
     // Two chairs facing each other, then a table between them.
     let a = buy(&mut w, "chair", 9, 3, 0).unwrap();
     let b = buy(&mut w, "chair", 9, 5, 2).unwrap();
     assert_eq!((table_of(&w, a), table_of(&w, b)), (None, None));
-    let t = buy(&mut w, "table", 9, 4, 0).expect("a table needs no free front: chairs go all round it");
+    let t =
+        buy(&mut w, "table", 9, 4, 0).expect("a table needs no free front: chairs go all round it");
     assert_eq!((table_of(&w, a), table_of(&w, b)), (Some(t), Some(t)));
     common::check(&w);
 }
@@ -95,10 +117,17 @@ fn a_chair_needs_one_free_side() {
     let err = buy(&mut w, "chair", 4, 3, 0).unwrap_err().to_string();
     assert!(err.contains("block"), "boxed in: {err}");
     let back = w.objects.iter().position(|o| (o.x, o.z) == (4, 2)).unwrap() as u32;
-    w.apply(Command::Sell { household: 0, object: w.objects[back as usize].stable }).unwrap();
+    w.apply(Command::Sell {
+        household: 0,
+        object: w.objects[back as usize].stable,
+    })
+    .unwrap();
     let chair = buy(&mut w, "chair", 4, 3, 0).expect("free behind it");
     // Now nothing may take that last free side.
-    assert!(buy(&mut w, "crate", 4, 2, 0).is_err(), "the chair's last way in stays free");
+    assert!(
+        buy(&mut w, "crate", 4, 2, 0).is_err(),
+        "the chair's last way in stays free"
+    );
     assert!(table_of(&w, chair).is_some());
 }
 
@@ -120,7 +149,12 @@ fn a_diner_comes_round_the_chair_sits_facing_the_table_and_gets_up_behind_it() {
     let chair = buy(&mut w, "chair", 4, 3, 0).unwrap();
     w.sims[0].needs[0] = 0.2;
     let dine = interaction(&w, chair, "dine");
-    w.apply(Command::Use { sim: 0, object: chair, interaction: dine }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: chair,
+        interaction: dine,
+    })
+    .unwrap();
     until_pose_changes(&mut w, Pose::Stand, 2000);
     let s = &w.sims[0];
     assert_eq!(s.pose, Pose::Sit);
@@ -132,7 +166,11 @@ fn a_diner_comes_round_the_chair_sits_facing_the_table_and_gets_up_behind_it() {
     assert_eq!(loaded.sims[0].pos, [4.5, 2.5]);
 
     until_pose_changes(&mut w, Pose::Sit, 5000);
-    assert_eq!(w.sims[0].pos, [4.5, 2.5], "up behind the chair, not on the table");
+    assert_eq!(
+        w.sims[0].pos,
+        [4.5, 2.5],
+        "up behind the chair, not on the table"
+    );
     // The meal's mess is where they got up.
     let i = w.lot.tile_index(4, 2);
     assert!(w.dirt[i] > 0.0, "crumbs behind the chair");
@@ -144,7 +182,14 @@ fn dining_needs_a_table() {
     let mut w = world();
     let chair = buy(&mut w, "chair", 8, 8, 0).unwrap();
     let dine = interaction(&w, chair, "dine");
-    let err = w.apply(Command::Use { sim: 0, object: chair, interaction: dine }).unwrap_err().to_string();
+    let err = w
+        .apply(Command::Use {
+            sim: 0,
+            object: chair,
+            interaction: dine,
+        })
+        .unwrap_err()
+        .to_string();
     assert!(err.contains("table"), "{err}");
     // Left to themselves, a hungry resident never dines at a chair in the middle of nowhere.
     w.autonomy = true;
@@ -168,7 +213,14 @@ fn a_chair_is_no_seat_at_a_dining_set_with_its_own_chairs() {
     assert_eq!(table_of(&w, at_set), None);
     assert_eq!(table_of(&w, at_table), Some(table));
     let dine = interaction(&w, at_set, "dine");
-    let err = w.apply(Command::Use { sim: 0, object: at_set, interaction: dine }).unwrap_err().to_string();
+    let err = w
+        .apply(Command::Use {
+            sim: 0,
+            object: at_set,
+            interaction: dine,
+        })
+        .unwrap_err()
+        .to_string();
     assert!(err.contains("table"), "{err}");
 }
 
@@ -194,40 +246,65 @@ fn diners_pick_a_chair_at_a_table_then_a_dining_set_then_anywhere_comfy() {
     let links = Links::new(&w.content, &w.objects, &nav(&w));
     // From right next to the sofa, the chair at the table is still the best place to eat.
     let from = [8.5, 9.5];
-    let pick = |candidates: &[u32]| dining_seat(&w.content, &w.objects, &links, candidates, from, 0).unwrap();
+    let pick = |candidates: &[u32]| {
+        dining_seat(&w.content, &w.objects, &links, candidates, from, 0).unwrap()
+    };
     let all = [table, chair, set, sofa, toilet];
     let best = pick(&all);
-    assert_eq!((best.object, best.rank, best.table), (chair, DiningRank::ChairAtTable, Some(table)));
-    assert_eq!(best.spot.map(|s| s.host), Some(table), "the plate goes on the table");
+    assert_eq!(
+        (best.object, best.rank, best.table),
+        (chair, DiningRank::ChairAtTable, Some(table))
+    );
+    assert_eq!(
+        best.spot.map(|s| s.host),
+        Some(table),
+        "the plate goes on the table"
+    );
     let next = pick(&[table, set, sofa, toilet]);
     assert_eq!((next.object, next.rank), (set, DiningRank::TableSeat));
     assert_eq!(next.spot.map(|s| s.host), Some(set), "on the set's own top");
     let last = pick(&[table, sofa, toilet]);
     assert_eq!((last.object, last.rank), (sofa, DiningRank::AnySeat));
-    assert!(dining_seat(&w.content, &w.objects, &links, &[table, toilet], from, 0).is_none(), "not on the toilet");
+    assert!(
+        dining_seat(&w.content, &w.objects, &links, &[table, toilet], from, 0).is_none(),
+        "not on the toilet"
+    );
 }
 
 #[test]
 fn four_chairs_round_a_table_each_get_their_own_place() {
     let mut w = world();
     let table = buy(&mut w, "table", 4, 4, 0).unwrap();
-    let chairs = [(4, 3, 0), (5, 3, 0), (4, 5, 2), (5, 5, 2)].map(|(x, z, r)| buy(&mut w, "chair", x, z, r).unwrap());
+    let chairs = [(4, 3, 0), (5, 3, 0), (4, 5, 2), (5, 5, 2)]
+        .map(|(x, z, r)| buy(&mut w, "chair", x, z, r).unwrap());
     let links = Links::new(&w.content, &w.objects, &nav(&w));
-    let spots: Vec<_> = chairs.iter().map(|&c| spot_for_seat(&w.content, &w.objects, &links, c, 0, 0.12, &[]).unwrap()).collect();
+    let spots: Vec<_> = chairs
+        .iter()
+        .map(|&c| spot_for_seat(&w.content, &w.objects, &links, c, 0, 0.12, &[]).unwrap())
+        .collect();
     for (i, s) in spots.iter().enumerate() {
         assert_eq!(s.host, table);
         let c = w.objects[chairs[i] as usize].centre(&w.content);
         let p = s.centre();
-        assert!((p[0] - c[0]).abs() < 0.05 && (p[1] - c[1]).abs() < 0.9, "in front of its chair: {p:?} {c:?}");
+        assert!(
+            (p[0] - c[0]).abs() < 0.05 && (p[1] - c[1]).abs() < 0.9,
+            "in front of its chair: {p:?} {c:?}"
+        );
         for t in &spots[..i] {
             let q = t.centre();
-            assert!((p[0] - q[0]).hypot(p[1] - q[1]) >= 0.24, "plates don't overlap: {p:?} {q:?}");
+            assert!(
+                (p[0] - q[0]).hypot(p[1] - q[1]) >= 0.24,
+                "plates don't overlap: {p:?} {q:?}"
+            );
         }
     }
     // With something already there, the plate goes beside it.
     let taken = [(spots[0].centre(), 0.12)];
     let moved = spot_for_seat(&w.content, &w.objects, &links, chairs[0], 0, 0.12, &taken).unwrap();
-    assert!((moved.centre()[0] - spots[0].centre()[0]).hypot(moved.centre()[1] - spots[0].centre()[1]) >= 0.24);
+    assert!(
+        (moved.centre()[0] - spots[0].centre()[0]).hypot(moved.centre()[1] - spots[0].centre()[1])
+            >= 0.24
+    );
 }
 
 #[test]
@@ -239,19 +316,34 @@ fn long_seats_spread_their_sitters_across_their_width() {
         let o = &w.objects[seat as usize];
         let xs: Vec<f32> = (0..n).map(|s| o.slot_position(&w.content, s)[0]).collect();
         for pair in xs.windows(2) {
-            assert!((pair[1] - pair[0] - 1.0).abs() < 1e-4, "a metre apart: {xs:?}");
+            assert!(
+                (pair[1] - pair[0] - 1.0).abs() < 1e-4,
+                "a metre apart: {xs:?}"
+            );
         }
-        assert!(xs.iter().all(|&x| x > o.x as f32 && x < (o.x + n as i32) as f32));
+        assert!(
+            xs.iter()
+                .all(|&x| x > o.x as f32 && x < (o.x + n as i32) as f32)
+        );
     }
     // Three residents on the long sofa sit side by side.
     for i in 0..2 {
-        let spawn: sim_core::lot::SimSpawn = serde_json::from_str(&format!(r#"{{"name":"S{i}","household":0,"x":{}.5,"z":10.5}}"#, 4 + i)).unwrap();
+        let spawn: sim_core::lot::SimSpawn = serde_json::from_str(&format!(
+            r#"{{"name":"S{i}","household":0,"x":{}.5,"z":10.5}}"#,
+            4 + i
+        ))
+        .unwrap();
         w.spawn_sim(&spawn).unwrap();
     }
     let sit = interaction(&w, long, "sit");
     for sim in 0..3 {
         w.sims[sim as usize].needs[1] = 0.1;
-        w.apply(Command::Use { sim, object: long, interaction: sit }).unwrap();
+        w.apply(Command::Use {
+            sim,
+            object: long,
+            interaction: sit,
+        })
+        .unwrap();
     }
     for _ in 0..2000 {
         w.tick_once();
@@ -279,11 +371,22 @@ fn kitchen(table: bool) -> (World, u32, Option<u32>) {
 fn a_snack_is_eaten_sitting_at_the_table_if_there_is_one_else_standing() {
     for with_table in [true, false] {
         let (mut w, fridge, table) = kitchen(with_table);
-        let hunger = w.content.needs.iter().position(|n| n.id == "hunger").unwrap();
+        let hunger = w
+            .content
+            .needs
+            .iter()
+            .position(|n| n.id == "hunger")
+            .unwrap();
         w.sims[0].needs[hunger] = 0.3;
         let snack = interaction(&w, fridge, "snack");
-        let gain = w.content.objects[w.objects[fridge as usize].def].interactions[snack].total_gain[hunger];
-        w.apply(Command::Use { sim: 0, object: fridge, interaction: snack }).unwrap();
+        let gain = w.content.objects[w.objects[fridge as usize].def].interactions[snack].total_gain
+            [hunger];
+        w.apply(Command::Use {
+            sim: 0,
+            object: fridge,
+            interaction: snack,
+        })
+        .unwrap();
         // Fetched at the fridge, then eaten: sitting at the table with the plate on it, or
         // standing with it in hand.
         let mut eating = None;
@@ -301,7 +404,10 @@ fn a_snack_is_eaten_sitting_at_the_table_if_there_is_one_else_standing() {
         if with_table {
             assert_eq!(seat, table, "at the table");
             assert_eq!(w.sims[0].pose, Pose::Sit);
-            assert!(plate.is_some() && w.sims[0].held.is_none(), "the plate on the table");
+            assert!(
+                plate.is_some() && w.sims[0].held.is_none(),
+                "the plate on the table"
+            );
         } else {
             assert_eq!(seat, None, "nowhere to sit");
             assert_eq!(w.sims[0].pose, Pose::Stand);
@@ -311,7 +417,14 @@ fn a_snack_is_eaten_sitting_at_the_table_if_there_is_one_else_standing() {
             let loaded = World::from_save_json(&common::content(), &w.save_json()).unwrap();
             let recipe = w.sims[0].held.and_then(|h| h.recipe);
             assert!(recipe.is_some_and(|r| loaded.content.recipes[r].hidden));
-            assert!(loaded.items.list.iter().any(|it| it.recipe == recipe && it.edible()), "the snack is still there");
+            assert!(
+                loaded
+                    .items
+                    .list
+                    .iter()
+                    .any(|it| it.recipe == recipe && it.edible()),
+                "the snack is still there"
+            );
         }
         for _ in 0..4000 {
             w.tick_once();
@@ -320,8 +433,17 @@ fn a_snack_is_eaten_sitting_at_the_table_if_there_is_one_else_standing() {
             }
         }
         assert!(w.sims[0].current().is_none(), "done eating");
-        assert!(w.sims[0].needs[hunger] > 0.3 + gain - 0.05, "the snack fed them: {}", w.sims[0].needs[hunger]);
-        let dirty = w.items.list.iter().filter(|it| w.content.items[it.def].dirty).count();
+        assert!(
+            w.sims[0].needs[hunger] > 0.3 + gain - 0.05,
+            "the snack fed them: {}",
+            w.sims[0].needs[hunger]
+        );
+        let dirty = w
+            .items
+            .list
+            .iter()
+            .filter(|it| w.content.items[it.def].dirty)
+            .count();
         assert_eq!(dirty, 1, "a plate to wash up");
         common::check(&w);
     }

@@ -46,13 +46,19 @@ pub const fn v3(x: f64, y: f64, z: f64) -> V3 {
 
 /// The repo's root (the Python found it from `__file__`).
 pub fn repo_root() -> PathBuf {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("..");
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..");
     std::fs::canonicalize(&root).unwrap_or(root)
 }
 
 /// The committed set.
 pub fn default_out() -> PathBuf {
-    repo_root().join("web").join("public").join("assets").join("characters")
+    repo_root()
+        .join("web")
+        .join("public")
+        .join("assets")
+        .join("characters")
 }
 
 /// A part: positions and normals (counter-clockwise from outside), flat triangle indices, skin
@@ -86,8 +92,13 @@ impl Mesh {
 pub fn merge(meshes: &[&Mesh]) -> Mesh {
     let mut out = Mesh::default();
     let all = |f: fn(&Mesh) -> bool| meshes.iter().all(|m| f(m));
-    let (has_nor, has_dense, has_f, has_t, has_arm) =
-        (all(|m| m.nor.len() == m.len()), all(|m| m.dense.len() == m.len()), all(|m| m.fields.len() == m.len()), all(|m| m.tone.len() == m.len()), all(|m| m.arm.len() == m.len()));
+    let (has_nor, has_dense, has_f, has_t, has_arm) = (
+        all(|m| m.nor.len() == m.len()),
+        all(|m| m.dense.len() == m.len()),
+        all(|m| m.fields.len() == m.len()),
+        all(|m| m.tone.len() == m.len()),
+        all(|m| m.arm.len() == m.len()),
+    );
     for m in meshes {
         let n = out.pos.len();
         out.idx.extend(m.idx.iter().map(|&i| i + n));

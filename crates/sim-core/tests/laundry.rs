@@ -28,7 +28,11 @@ const LINE: u32 = 3;
 fn world() -> (World, String) {
     let content = common::content();
     let mut w = World::from_json(&content, TOWN, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     let morning = clock::tick_at(1, 9.0 * 60.0).unwrap();
     while w.tick < morning {
         w.tick_once();
@@ -46,13 +50,22 @@ fn fill(w: &mut World) {
 
 fn interaction(w: &World, object: u32, id: &str) -> usize {
     let def = w.objects[object as usize].def;
-    w.content.objects[def].interactions.iter().position(|i| i.id == id).unwrap_or_else(|| panic!("no {id}"))
+    w.content.objects[def]
+        .interactions
+        .iter()
+        .position(|i| i.id == id)
+        .unwrap_or_else(|| panic!("no {id}"))
 }
 
 fn order(w: &mut World, object: u32, id: &str) -> Result<(), String> {
     let interaction = interaction(w, object, id);
     let object = w.objects[object as usize].stable;
-    w.apply(Command::Use { sim: 0, object, interaction }).map_err(|e| e.to_string())
+    w.apply(Command::Use {
+        sim: 0,
+        object,
+        interaction,
+    })
+    .map_err(|e| e.to_string())
 }
 
 /// Ticks up to `minutes` until `f` holds (checking the world each tick): whether it did.
@@ -70,8 +83,16 @@ fn until(w: &mut World, minutes: u32, mut f: impl FnMut(&World) -> bool) -> bool
 /// What Ada is doing at which object: (object, interaction id, using it yet).
 fn doing(w: &World) -> Option<(u32, String, bool)> {
     let a = w.sims[0].current()?;
-    let TaskKind::Use { object, interaction } = a.task.kind else { return None };
-    let id = w.content.objects[w.objects[object as usize].def].interactions[interaction].id.clone();
+    let TaskKind::Use {
+        object,
+        interaction,
+    } = a.task.kind
+    else {
+        return None;
+    };
+    let id = w.content.objects[w.objects[object as usize].def].interactions[interaction]
+        .id
+        .clone();
     Some((object, id, matches!(a.phase, Phase::Using { .. })))
 }
 
@@ -91,69 +112,161 @@ fn shown_held(w: &World) -> Option<String> {
 fn the_washing_is_loaded_washes_on_its_own_and_goes_on_to_the_dryer_and_the_basket() {
     let (mut w, _) = world();
     let [dirty, washed, dried] = w.households[0].laundry;
-    assert!(dirty >= 1.0 && washed == 1.0 && dried == 0.0, "a dirty load and a washed one to start with: {:?}", w.households[0].laundry);
-    assert!(order(&mut w, WASHER, "unload").is_err_and(|e| e.contains("nothing in the washing machine")));
+    assert!(
+        dirty >= 1.0 && washed == 1.0 && dried == 0.0,
+        "a dirty load and a washed one to start with: {:?}",
+        w.households[0].laundry
+    );
+    assert!(
+        order(&mut w, WASHER, "unload")
+            .is_err_and(|e| e.contains("nothing in the washing machine"))
+    );
     order(&mut w, WASHER, "laundry").unwrap();
     // On the way, the basket of washing in the arms.
     assert!(until(&mut w, 2, |w| doing(w).is_some_and(|(_, _, at)| !at)));
-    assert_eq!(shown_held(&w).as_deref(), Some("washingBasket"), "carried to the washer");
-    assert!(until(&mut w, 10, |w| using(w, WASHER, "laundry")), "loading it");
+    assert_eq!(
+        shown_held(&w).as_deref(),
+        Some("washingBasket"),
+        "carried to the washer"
+    );
+    assert!(
+        until(&mut w, 10, |w| using(w, WASHER, "laundry")),
+        "loading it"
+    );
     let start = w.tick;
-    assert!(until(&mut w, 10, |w| w.sims[0].current().is_none()), "done loading");
+    assert!(
+        until(&mut w, 10, |w| w.sims[0].current().is_none()),
+        "done loading"
+    );
     let minutes = (w.tick - start) as f32 / sim_core::TICKS_PER_MINUTE as f32;
-    assert!(minutes <= 6.0, "a few minutes' loading, not the wash: {minutes}");
+    assert!(
+        minutes <= 6.0,
+        "a few minutes' loading, not the wash: {minutes}"
+    );
     assert!(w.objects[WASHER as usize].running(), "it runs on its own");
-    assert!(w.households[0].laundry[0] < 0.1, "the dirty load is in it: {:?}", w.households[0].laundry);
+    assert!(
+        w.households[0].laundry[0] < 0.1,
+        "the dirty load is in it: {:?}",
+        w.households[0].laundry
+    );
     // Nobody at it, it washes; nothing more goes in, nor comes out, till it's done.
     assert!(order(&mut w, WASHER, "laundry").is_err_and(|e| e.contains("still running")));
     assert!(order(&mut w, WASHER, "unload").is_err_and(|e| e.contains("still running")));
-    let view: serde_json::Value = serde_json::from_str(&sim_core::view::structure_json(&w)).unwrap();
-    assert_eq!(view["objects"][WASHER as usize]["running"], true, "the renderer turns the drum");
-    assert!(until(&mut w, 70, |w| w.objects[WASHER as usize].done()), "done in its hour");
-    let view: serde_json::Value = serde_json::from_str(&sim_core::view::structure_json(&w)).unwrap();
-    assert!(view["objects"][WASHER as usize].get("running").is_none(), "and stops");
-    assert!(order(&mut w, WASHER, "laundry").is_err_and(|e| e.contains("take the washing out first")));
+    let view: serde_json::Value =
+        serde_json::from_str(&sim_core::view::structure_json(&w)).unwrap();
+    assert_eq!(
+        view["objects"][WASHER as usize]["running"], true,
+        "the renderer turns the drum"
+    );
+    assert!(
+        until(&mut w, 70, |w| w.objects[WASHER as usize].done()),
+        "done in its hour"
+    );
+    let view: serde_json::Value =
+        serde_json::from_str(&sim_core::view::structure_json(&w)).unwrap();
+    assert!(
+        view["objects"][WASHER as usize].get("running").is_none(),
+        "and stops"
+    );
+    assert!(
+        order(&mut w, WASHER, "laundry").is_err_and(|e| e.contains("take the washing out first"))
+    );
 
     // Taken out, the wet washing is carried on to the dryer, which is loaded and runs.
     fill(&mut w);
     order(&mut w, WASHER, "unload").unwrap();
     assert!(until(&mut w, 10, |w| using(w, WASHER, "unload")));
-    assert!(until(&mut w, 10, |w| doing(w).is_some_and(|(o, _, _)| o == DRYER)), "on to the dryer: {:?}", w.sims[0].current());
-    assert!(w.objects[WASHER as usize].run.is_none(), "the washer empty again");
-    assert_eq!(shown_held(&w).as_deref(), Some("washingBasket"), "the wet washing in the basket");
-    assert!(until(&mut w, 10, |w| using(w, DRYER, "laundry")), "loading the dryer");
+    assert!(
+        until(&mut w, 10, |w| doing(w).is_some_and(|(o, _, _)| o == DRYER)),
+        "on to the dryer: {:?}",
+        w.sims[0].current()
+    );
+    assert!(
+        w.objects[WASHER as usize].run.is_none(),
+        "the washer empty again"
+    );
+    assert_eq!(
+        shown_held(&w).as_deref(),
+        Some("washingBasket"),
+        "the wet washing in the basket"
+    );
+    assert!(
+        until(&mut w, 10, |w| using(w, DRYER, "laundry")),
+        "loading the dryer"
+    );
     assert!(until(&mut w, 10, |w| w.sims[0].current().is_none()));
-    assert!(w.objects[DRYER as usize].running(), "the dryer runs on its own");
-    assert!(until(&mut w, 50, |w| w.objects[DRYER as usize].done()), "dry in its 45 minutes");
+    assert!(
+        w.objects[DRYER as usize].running(),
+        "the dryer runs on its own"
+    );
+    assert!(
+        until(&mut w, 50, |w| w.objects[DRYER as usize].done()),
+        "dry in its 45 minutes"
+    );
 
     // The dry washing taken out, it's folded at the basket, a piece in the hands.
     fill(&mut w);
     let dried = w.households[0].laundry[2];
     order(&mut w, DRYER, "unload").unwrap();
     assert!(until(&mut w, 10, |w| using(w, DRYER, "unload")));
-    assert!(until(&mut w, 10, |w| doing(w).is_some_and(|(o, _, at)| o == BASKET && !at)), "on to the basket: {:?}", w.sims[0].current());
-    assert_eq!(shown_held(&w).as_deref(), Some("washingArmful"), "the dry washing in the arms");
+    assert!(
+        until(&mut w, 10, |w| doing(w)
+            .is_some_and(|(o, _, at)| o == BASKET && !at)),
+        "on to the basket: {:?}",
+        w.sims[0].current()
+    );
+    assert_eq!(
+        shown_held(&w).as_deref(),
+        Some("washingArmful"),
+        "the dry washing in the arms"
+    );
     assert!(until(&mut w, 10, |w| using(w, BASKET, "fold")), "folding");
-    assert_eq!(shown_held(&w).as_deref(), Some("washingPiece"), "the washing in the hands");
+    assert_eq!(
+        shown_held(&w).as_deref(),
+        Some("washingPiece"),
+        "the washing in the hands"
+    );
     w.tick_once();
-    assert_eq!(w.households[0].laundry[2], dried, "the dry load made and taken up to fold");
-    assert!(until(&mut w, 20, |w| w.sims[0].current().is_none()), "folded");
+    assert_eq!(
+        w.households[0].laundry[2], dried,
+        "the dry load made and taken up to fold"
+    );
+    assert!(
+        until(&mut w, 20, |w| w.sims[0].current().is_none()),
+        "folded"
+    );
     assert_eq!(shown_held(&w), None);
-    assert!(order(&mut w, BASKET, "fold").is_err_and(|e| e.contains("no dry laundry")), "nothing more to fold");
+    assert!(
+        order(&mut w, BASKET, "fold").is_err_and(|e| e.contains("no dry laundry")),
+        "nothing more to fold"
+    );
 }
 
 #[test]
 fn the_washing_line_dries_in_the_sun_and_is_taken_in_to_fold() {
     let (mut w, _) = world();
     order(&mut w, LINE, "washing").unwrap();
-    assert!(until(&mut w, 40, |w| w.sims[0].current().is_none()), "hung out");
+    assert!(
+        until(&mut w, 40, |w| w.sims[0].current().is_none()),
+        "hung out"
+    );
     let line = &w.objects[LINE as usize];
     assert!(line.open && line.running(), "out on the line, drying");
-    assert!(order(&mut w, LINE, "takeIn").is_err_and(|e| e.contains("still running")), "not dry yet");
-    assert!(until(&mut w, 190, |w| w.objects[LINE as usize].done()), "dry in three hours");
+    assert!(
+        order(&mut w, LINE, "takeIn").is_err_and(|e| e.contains("still running")),
+        "not dry yet"
+    );
+    assert!(
+        until(&mut w, 190, |w| w.objects[LINE as usize].done()),
+        "dry in three hours"
+    );
     fill(&mut w);
     order(&mut w, LINE, "takeIn").unwrap();
-    assert!(until(&mut w, 30, |w| doing(w).is_some_and(|(o, _, _)| o == BASKET)), "taken in, on to the basket");
+    assert!(
+        until(&mut w, 30, |w| doing(w)
+            .is_some_and(|(o, _, _)| o == BASKET)),
+        "taken in, on to the basket"
+    );
     let line = &w.objects[LINE as usize];
     assert!(!line.open && line.run.is_none(), "the line empty");
     // Not hung out at night.
@@ -176,9 +289,17 @@ fn a_running_machine_is_saved_and_loaded_as_it_was() {
     let json: serde_json::Value = serde_json::from_str(&saved).unwrap();
     assert_eq!(json["version"], 33);
     let mut loaded = World::from_save_json(&content, &saved).unwrap();
-    assert_eq!(loaded.objects[WASHER as usize].run, Some(left), "running, as long left");
+    assert_eq!(
+        loaded.objects[WASHER as usize].run,
+        Some(left),
+        "running, as long left"
+    );
     assert_eq!(loaded.households[0].laundry, w.households[0].laundry);
-    assert!(until(&mut loaded, left as u32 + 6, |w| w.objects[WASHER as usize].done()), "and done in its time");
+    assert!(
+        until(&mut loaded, left as u32 + 6, |w| w.objects[WASHER as usize]
+            .done()),
+        "and done in its time"
+    );
     // Done, saved and loaded, it's still done with the washing in it.
     let again = World::from_save_json(&content, &loaded.save_json()).unwrap();
     assert!(again.objects[WASHER as usize].done());
@@ -191,15 +312,27 @@ fn a_load_cut_short_goes_back_on_its_pile() {
     order(&mut w, WASHER, "laundry").unwrap();
     assert!(until(&mut w, 10, |w| using(w, WASHER, "laundry")));
     until(&mut w, 2, |_| false);
-    assert!(w.households[0].laundry[0] < dirty - 0.9, "taken up as it starts: {:?}", w.households[0].laundry);
+    assert!(
+        w.households[0].laundry[0] < dirty - 0.9,
+        "taken up as it starts: {:?}",
+        w.households[0].laundry
+    );
     // Saved half way through loading: the load is on its pile (the use starts again on load).
     let saved = World::from_save_json(&content, &w.save_json()).unwrap();
-    assert!(saved.households[0].laundry[0] > dirty - 0.1, "in the save: {:?}", saved.households[0].laundry);
+    assert!(
+        saved.households[0].laundry[0] > dirty - 0.1,
+        "in the save: {:?}",
+        saved.households[0].laundry
+    );
     // Cancelled: back on its pile, and the washer empty.
     w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
     until(&mut w, 1, |_| false);
     assert!(w.sims[0].current().is_none());
-    assert!(w.households[0].laundry[0] > dirty - 0.1, "given back: {:?}", w.households[0].laundry);
+    assert!(
+        w.households[0].laundry[0] > dirty - 0.1,
+        "given back: {:?}",
+        w.households[0].laundry
+    );
     assert!(w.objects[WASHER as usize].run.is_none(), "not loaded");
     // Done to the end, it's used: in the washer, not back on the pile.
     order(&mut w, WASHER, "laundry").unwrap();
@@ -207,7 +340,11 @@ fn a_load_cut_short_goes_back_on_its_pile() {
     assert!(until(&mut w, 10, |w| w.sims[0].current().is_none()));
     until(&mut w, 1, |_| false);
     assert!(w.objects[WASHER as usize].running());
-    assert!(w.households[0].laundry[0] < dirty - 0.9, "in the washer: {:?}", w.households[0].laundry);
+    assert!(
+        w.households[0].laundry[0] < dirty - 0.9,
+        "in the washer: {:?}",
+        w.households[0].laundry
+    );
 }
 
 #[test]
@@ -221,21 +358,37 @@ fn an_older_save_takes_in_the_washing_left_out_and_has_none_dry() {
         h["laundry"] = serde_json::json!([2.0, 0.5]);
     }
     let loaded = World::from_save_json(&content, &old.to_string()).unwrap();
-    assert!(loaded.objects[LINE as usize].done(), "the washing out on the line is dry");
-    assert!(loaded.objects[WASHER as usize].run.is_none(), "the washer empty");
+    assert!(
+        loaded.objects[LINE as usize].done(),
+        "the washing out on the line is dry"
+    );
+    assert!(
+        loaded.objects[WASHER as usize].run.is_none(),
+        "the washer empty"
+    );
     assert_eq!(loaded.households[0].laundry, [2.0, 0.5, 0.0]);
 }
 
 #[test]
 fn free_will_takes_the_washing_out_once_its_done() {
     let (mut w, _) = world();
-    w.apply(Command::SetAutonomy { enabled: true, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: true,
+        household: None,
+    })
+    .unwrap();
     w.objects[WASHER as usize].run = Some(0.0);
     w.objects[DRYER as usize].run = Some(0.0);
     w.households[0].laundry = [0.0, 0.0, 0.0];
     // (Her needs full: what draws her is the washing waiting, `machines::pull`.)
-    let unloaded = until(&mut w, 3 * 60, |w| w.objects[WASHER as usize].run.is_none() && w.objects[DRYER as usize].run.is_none());
-    assert!(unloaded, "both still full after 3 hours: washer {:?}, dryer {:?}", w.objects[WASHER as usize].run, w.objects[DRYER as usize].run);
+    let unloaded = until(&mut w, 3 * 60, |w| {
+        w.objects[WASHER as usize].run.is_none() && w.objects[DRYER as usize].run.is_none()
+    });
+    assert!(
+        unloaded,
+        "both still full after 3 hours: washer {:?}, dryer {:?}",
+        w.objects[WASHER as usize].run, w.objects[DRYER as usize].run
+    );
 }
 
 #[test]
@@ -251,7 +404,9 @@ fn nothing_runs_forever() {
         assert_eq!(loaded.objects[o as usize].run, Some(minutes));
     }
     let mut w = loaded;
-    assert!(until(&mut w, 190, |w| [WASHER, DRYER, LINE].iter().all(|&o| w.objects[o as usize].done())));
+    assert!(until(&mut w, 190, |w| [WASHER, DRYER, LINE]
+        .iter()
+        .all(|&o| w.objects[o as usize].done())));
 }
 
 #[test]
@@ -261,11 +416,45 @@ fn machines_are_checked_at_load() {
         "laundry":{"perDay":0.4,"most":4},
         "objects":[{"id":"washer","name":"Washer","price":100,RUNS
           "interactions":[{"id":"load","label":"Load it","minutes":5,USE,"effects":{"comfort":0.1}}]}]}"#;
-    let load = |runs: &str, use_: &str| Content::from_json(&base.replace("RUNS", runs).replace("USE", use_)).map(|_| ()).map_err(|e| e.to_string());
-    load(r#""runs":{"minutes":60},"#, r#""loads":true,"brings":"basket""#).unwrap();
-    assert!(load("", r#""loads":true"#).unwrap_err().contains("give the object `runs`"));
-    assert!(load(r#""runs":{"minutes":0},"#, r#""loads":true"#).unwrap_err().contains("minutes > 0"));
-    assert!(load(r#""runs":{"minutes":60},"#, r#""loads":true,"unloads":true"#).unwrap_err().contains("not both"));
-    assert!(load(r#""runs":{"minutes":60},"#, r#""unloads":true,"makes":"dishes""#).unwrap_err().contains("a load of washing"));
-    assert!(load(r#""runs":{"minutes":60},"#, r#""holds":"sock""#).unwrap_err().contains("unknown item 'sock'"));
+    let load = |runs: &str, use_: &str| {
+        Content::from_json(&base.replace("RUNS", runs).replace("USE", use_))
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    };
+    load(
+        r#""runs":{"minutes":60},"#,
+        r#""loads":true,"brings":"basket""#,
+    )
+    .unwrap();
+    assert!(
+        load("", r#""loads":true"#)
+            .unwrap_err()
+            .contains("give the object `runs`")
+    );
+    assert!(
+        load(r#""runs":{"minutes":0},"#, r#""loads":true"#)
+            .unwrap_err()
+            .contains("minutes > 0")
+    );
+    assert!(
+        load(
+            r#""runs":{"minutes":60},"#,
+            r#""loads":true,"unloads":true"#
+        )
+        .unwrap_err()
+        .contains("not both")
+    );
+    assert!(
+        load(
+            r#""runs":{"minutes":60},"#,
+            r#""unloads":true,"makes":"dishes""#
+        )
+        .unwrap_err()
+        .contains("a load of washing")
+    );
+    assert!(
+        load(r#""runs":{"minutes":60},"#, r#""holds":"sock""#)
+            .unwrap_err()
+            .contains("unknown item 'sock'")
+    );
 }

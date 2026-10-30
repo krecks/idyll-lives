@@ -46,21 +46,46 @@ fn minutes(w: &mut World, m: u32) {
 fn babies_lie_in_the_crib_and_are_fed() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     minutes(&mut w, 1);
-    assert_eq!(w.sims[1].pose, sim_core::content::Pose::Lie, "Bea is in the crib");
+    assert_eq!(
+        w.sims[1].pose,
+        sim_core::content::Pose::Lie,
+        "Bea is in the crib"
+    );
     assert!(w.objects[0].users().any(|u| u == 1));
 
     // Hungry: she cries, and Ada feeds her.
     w.sims[1].needs[0] = 0.1;
     minutes(&mut w, 1);
-    assert!(w.sims[1].planner.thought.is_some_and(|t| t.kind == ThoughtKind::Crying));
+    assert!(
+        w.sims[1]
+            .planner
+            .thought
+            .is_some_and(|t| t.kind == ThoughtKind::Crying)
+    );
     let mut fed = false;
     for _ in 0..90 {
         minutes(&mut w, 1);
-        fed |= w.sims[0].current().is_some_and(|a| matches!(a.task.kind, sim_core::world::TaskKind::Use { object: 0, interaction: 1 }));
+        fed |= w.sims[0].current().is_some_and(|a| {
+            matches!(
+                a.task.kind,
+                sim_core::world::TaskKind::Use {
+                    object: 0,
+                    interaction: 1
+                }
+            )
+        });
     }
     assert!(fed, "Ada fed the baby");
-    assert!(w.sims[1].needs[0] > 0.6, "and Bea isn't hungry now: {}", w.sims[1].needs[0]);
-    assert_eq!(w.sims[1].pose, sim_core::content::Pose::Lie, "still in the crib");
+    assert!(
+        w.sims[1].needs[0] > 0.6,
+        "and Bea isn't hungry now: {}",
+        w.sims[1].needs[0]
+    );
+    assert_eq!(
+        w.sims[1].pose,
+        sim_core::content::Pose::Lie,
+        "still in the crib"
+    );
 
     // Two years on (four days at two a year) she's a child and gets out.
     for _ in 0..4 {
@@ -80,27 +105,54 @@ fn a_baby_lying_in_the_crib_grows_up_and_climbs_out() {
         w.sims[1].needs[..2].copy_from_slice(&[1.0, 0.5]);
         w.tick_once();
     }
-    assert_eq!(w.sims[1].pose, sim_core::content::Pose::Lie, "in the crib at midnight");
+    assert_eq!(
+        w.sims[1].pose,
+        sim_core::content::Pose::Lie,
+        "in the crib at midnight"
+    );
     w.tick_once();
     assert!(!w.content.life.baby(w.sims[1].age), "a child now");
     assert_eq!(w.sims[1].pose, sim_core::content::Pose::Stand);
     let (x, z) = w.sims[1].tile();
-    assert!(!(2..4).contains(&x) || z != 2, "standing in the crib at {x},{z}");
-    w.apply(Command::Use { sim: 1, object: 1, interaction: 0 }).unwrap();
+    assert!(
+        !(2..4).contains(&x) || z != 2,
+        "standing in the crib at {x},{z}"
+    );
+    w.apply(Command::Use {
+        sim: 1,
+        object: 1,
+        interaction: 0,
+    })
+    .unwrap();
     minutes(&mut w, 10);
-    assert_eq!(w.sims[1].pose, sim_core::content::Pose::Sit, "she walked over and sat down");
+    assert_eq!(
+        w.sims[1].pose,
+        sim_core::content::Pose::Sit,
+        "she walked over and sat down"
+    );
 }
 
 #[test]
 fn a_baby_in_a_home_with_no_money_gets_a_crib_and_is_looked_after() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     let spawn = |name: &str, age: f32| -> SimSpawn {
-        serde_json::from_value(serde_json::json!({"name": name, "x": 15.5, "z": 11.5, "age": age})).unwrap()
+        serde_json::from_value(serde_json::json!({"name": name, "x": 15.5, "z": 11.5, "age": age}))
+            .unwrap()
     };
     w.households[1].funds = 0;
-    w.apply(Command::MoveIn { household: 1, name: None, sims: vec![spawn("Cal", 28.0), spawn("Dot", 0.2)], bonds: vec![] }).unwrap();
+    w.apply(Command::MoveIn {
+        household: 1,
+        name: None,
+        sims: vec![spawn("Cal", 28.0), spawn("Dot", 0.2)],
+        bonds: vec![],
+    })
+    .unwrap();
     assert_eq!(w.households[1].funds, 0, "the crib was free");
-    let crib = w.objects.iter().position(|o| w.content.objects[o.def].id == "crib" && o.x >= 10).expect("a crib next door");
+    let crib = w
+        .objects
+        .iter()
+        .position(|o| w.content.objects[o.def].id == "crib" && o.x >= 10)
+        .expect("a crib next door");
     // Two days: Cal feeds her whenever she's hungry.
     let (mut sum, mut lowest) = (0.0, 1.0f32);
     for _ in 0..48 {
@@ -108,19 +160,38 @@ fn a_baby_in_a_home_with_no_money_gets_a_crib_and_is_looked_after() {
         sum += w.sims[3].needs[0];
         lowest = lowest.min(w.sims[3].needs[0]);
     }
-    assert!(w.objects[crib].users().any(|u| u == 3), "Dot is in her crib");
-    assert!(sum / 48.0 > 0.5 && lowest > 0.2, "Dot was fed: average {:.2}, lowest {lowest:.2}", sum / 48.0);
+    assert!(
+        w.objects[crib].users().any(|u| u == 3),
+        "Dot is in her crib"
+    );
+    assert!(
+        sum / 48.0 > 0.5 && lowest > 0.2,
+        "Dot was fed: average {:.2}, lowest {lowest:.2}",
+        sum / 48.0
+    );
 }
 
 #[test]
 fn a_baby_moving_in_comes_with_a_crib() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     let spawn = |name: &str, age: f32| -> SimSpawn {
-        serde_json::from_value(serde_json::json!({"name": name, "x": 15.5, "z": 11.5, "age": age})).unwrap()
+        serde_json::from_value(serde_json::json!({"name": name, "x": 15.5, "z": 11.5, "age": age}))
+            .unwrap()
     };
-    let cribs = |w: &World| w.objects.iter().filter(|o| w.content.objects[o.def].id == "crib").count();
+    let cribs = |w: &World| {
+        w.objects
+            .iter()
+            .filter(|o| w.content.objects[o.def].id == "crib")
+            .count()
+    };
     assert_eq!(cribs(&w), 1);
-    w.apply(Command::MoveIn { household: 1, name: None, sims: vec![spawn("Cal", 28.0), spawn("Dot", 0.2)], bonds: vec![] }).unwrap();
+    w.apply(Command::MoveIn {
+        household: 1,
+        name: None,
+        sims: vec![spawn("Cal", 28.0), spawn("Dot", 0.2)],
+        bonds: vec![],
+    })
+    .unwrap();
     assert_eq!(cribs(&w), 2, "a crib for Dot next door");
     minutes(&mut w, 1);
     assert_eq!(w.sims[3].pose, sim_core::content::Pose::Lie, "Dot is in it");
@@ -157,8 +228,17 @@ const COUPLE: &str = r#"{"width":12,"depth":12,
 fn partners_have_a_baby() {
     use sim_core::social::{EventKind, Kin};
     let mut w = World::from_json(FAMILY, COUPLE, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
-    w.apply(Command::Social { sim: 0, target: 1, social: 0 }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
+    w.apply(Command::Social {
+        sim: 0,
+        target: 1,
+        social: 0,
+    })
+    .unwrap();
     minutes(&mut w, 60);
     let e = w.households[0].expecting.expect("expecting");
     assert_eq!(e.parents, [0, 1]);
@@ -171,11 +251,28 @@ fn partners_have_a_baby() {
     assert_eq!(w.sims.len(), 3, "a baby");
     let baby = &w.sims[2];
     assert!(w.content.life.baby(baby.age) && ["Ivy", "Jun"].contains(&baby.name.as_str()));
-    assert_eq!(baby.appearance["parents"], serde_json::json!([0, 1]), "looks from the parents");
-    assert_eq!((w.relationships.kin(2, 0), w.relationships.kin(0, 2)), (Kin::Parent, Kin::Child));
-    assert!(w.events.iter().any(|e| e.kind == EventKind::Born && e.a == 2 && e.b == 0 && e.c == Some(1)));
+    assert_eq!(
+        baby.appearance["parents"],
+        serde_json::json!([0, 1]),
+        "looks from the parents"
+    );
+    assert_eq!(
+        (w.relationships.kin(2, 0), w.relationships.kin(0, 2)),
+        (Kin::Parent, Kin::Child)
+    );
+    assert!(
+        w.events
+            .iter()
+            .any(|e| e.kind == EventKind::Born && e.a == 2 && e.b == 0 && e.c == Some(1))
+    );
     assert!(w.households[0].expecting.is_none());
-    assert_eq!(w.objects.iter().filter(|o| w.content.objects[o.def].id == "crib").count(), 1);
+    assert_eq!(
+        w.objects
+            .iter()
+            .filter(|o| w.content.objects[o.def].id == "crib")
+            .count(),
+        1
+    );
     assert_eq!(w.sims[2].pose, sim_core::content::Pose::Lie, "in the crib");
 }
 
@@ -183,26 +280,58 @@ fn partners_have_a_baby() {
 fn adopting_a_child() {
     use sim_core::social::Kin;
     let mut w = World::from_json(FAMILY, COUPLE, 1).unwrap();
-    w.apply(Command::Adopt { household: 0, child: true }).unwrap();
+    w.apply(Command::Adopt {
+        household: 0,
+        child: true,
+    })
+    .unwrap();
     let kid = &w.sims[2];
     assert!((3.0..11.0).contains(&kid.age), "a child: {}", kid.age);
-    assert_eq!((w.relationships.kin(2, 0), w.relationships.kin(2, 1)), (Kin::Parent, Kin::Parent), "both are parents");
+    assert_eq!(
+        (w.relationships.kin(2, 0), w.relationships.kin(2, 1)),
+        (Kin::Parent, Kin::Parent),
+        "both are parents"
+    );
     assert_eq!(w.households[0].funds, 500, "adoption costs");
-    w.apply(Command::Adopt { household: 0, child: false }).unwrap();
-    assert_eq!(w.relationships.kin(3, 2), Kin::Sibling, "a little brother or sister");
-    let err = w.apply(Command::Adopt { household: 0, child: false }).unwrap_err();
-    assert!(err.to_string().contains("money") || err.to_string().contains("room"), "{err}");
+    w.apply(Command::Adopt {
+        household: 0,
+        child: false,
+    })
+    .unwrap();
+    assert_eq!(
+        w.relationships.kin(3, 2),
+        Kin::Sibling,
+        "a little brother or sister"
+    );
+    let err = w
+        .apply(Command::Adopt {
+            household: 0,
+            child: false,
+        })
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("money") || err.to_string().contains("room"),
+        "{err}"
+    );
 }
 
 #[test]
 fn neighbours_adopt_now_and_then() {
-    let content = FAMILY.replace(r#""adoption":{"cost":500}"#, r#""adoption":{"cost":500,"neighbours":1.0},"newcomers":{"hour":12,"days":1000}"#);
+    let content = FAMILY.replace(
+        r#""adoption":{"cost":500}"#,
+        r#""adoption":{"cost":500,"neighbours":1.0},"newcomers":{"hour":12,"days":1000}"#,
+    );
     let town = COUPLE.replace(r#""player":true"#, r#""player":false"#)
         .replace(r#""households":[{"name":"Moss","plot":0,"player":false}]"#, r#""households":[{"name":"Moss","plot":0,"player":false},{"name":"Player","player":true}]"#);
     let mut w = World::from_json(&content, &town, 1).unwrap();
     w.households[0].funds = 5000;
     minutes(&mut w, 24 * 60);
-    assert!(w.events.iter().any(|e| e.kind == sim_core::social::EventKind::Adopted), "the neighbours adopted");
+    assert!(
+        w.events
+            .iter()
+            .any(|e| e.kind == sim_core::social::EventKind::Adopted),
+        "the neighbours adopted"
+    );
     assert_eq!(w.households[0].funds, 4500);
 }
 
@@ -230,22 +359,40 @@ const NURSERY: &str = r#"{
     "economy":{"startingFunds":1000}}"#;
 
 fn nursery() -> World {
-    let town = TOWN.replace(r#"{"def":"armchair","x":6,"z":6}"#, r#"{"def":"armchair","x":6,"z":6},{"def":"toilet","x":8,"z":2}"#);
+    let town = TOWN.replace(
+        r#"{"def":"armchair","x":6,"z":6}"#,
+        r#"{"def":"armchair","x":6,"z":6},{"def":"toilet","x":8,"z":2}"#,
+    );
     World::from_json(NURSERY, &town, 1).unwrap()
 }
 
 /// How long (minutes) Bea has been lying in the crib, while she's in it (lying there, using it).
 fn in_crib(w: &World) -> Option<f32> {
     let a = w.sims[1].current()?;
-    let lying = matches!(a.task.kind, sim_core::world::TaskKind::Use { object: 0, interaction: 0 });
-    let sim_core::world::Phase::Using { elapsed } = a.phase else { return None };
-    (lying && w.sims[1].pose == sim_core::content::Pose::Lie && w.objects[0].users().any(|u| u == 1)).then_some(elapsed)
+    let lying = matches!(
+        a.task.kind,
+        sim_core::world::TaskKind::Use {
+            object: 0,
+            interaction: 0
+        }
+    );
+    let sim_core::world::Phase::Using { elapsed } = a.phase else {
+        return None;
+    };
+    (lying
+        && w.sims[1].pose == sim_core::content::Pose::Lie
+        && w.objects[0].users().any(|u| u == 1))
+    .then_some(elapsed)
 }
 
 /// Bea is still in the crib, the same stay as `last` (it hasn't started over): how long now.
 fn still_in_crib(w: &World, last: f32, what: &str) -> f32 {
     let now = in_crib(w).unwrap_or_else(|| panic!("{what}: Bea left the crib at tick {}", w.tick));
-    assert!(now > last, "{what}: Bea's crib stay started over at tick {} ({last} minutes, now {now})", w.tick);
+    assert!(
+        now > last,
+        "{what}: Bea's crib stay started over at tick {} ({last} minutes, now {now})",
+        w.tick
+    );
     now
 }
 
@@ -254,7 +401,11 @@ fn a_baby_stays_in_the_crib_needing_something_or_rested() {
     for (need, level) in [(2, 0.05), (1, 1.0)] {
         let mut w = nursery();
         // Nobody to see to her: Ada is out of the way.
-        w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+        w.apply(Command::SetAutonomy {
+            enabled: false,
+            household: None,
+        })
+        .unwrap();
         minutes(&mut w, 1);
         let mut lain = in_crib(&w).expect("Bea is in the crib");
         // Wet (or wide awake), for two hours: she lies there, the same stay all along.
@@ -275,14 +426,26 @@ fn a_wet_baby_is_changed_in_the_crib() {
     let mut changed = false;
     for _ in 0..90 * 20 {
         w.tick_once();
-        changed |= w.sims[0].current().is_some_and(|a| matches!(a.task.kind, sim_core::world::TaskKind::Use { object: 0, interaction: 1 }));
+        changed |= w.sims[0].current().is_some_and(|a| {
+            matches!(
+                a.task.kind,
+                sim_core::world::TaskKind::Use {
+                    object: 0,
+                    interaction: 1
+                }
+            )
+        });
         lain = still_in_crib(&w, lain, "wet");
         if w.sims[1].needs[2] > 0.9 {
             break;
         }
     }
     assert!(changed, "Ada changed the baby");
-    assert!(w.sims[1].needs[2] > 0.9, "and Bea's dry: {}", w.sims[1].needs[2]);
+    assert!(
+        w.sims[1].needs[2] > 0.9,
+        "and Bea's dry: {}",
+        w.sims[1].needs[2]
+    );
 }
 
 #[test]
@@ -294,7 +457,11 @@ fn a_baby_lies_awake_in_the_crib_needing_something_or_rested_by_day() {
         out[HEADER_LEN + SIM_STRIDE + sim::ACTION]
     };
     let mut w = nursery();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     let until = |w: &mut World, day: u32, hour: f32, needs: [f32; 3]| {
         let at = sim_core::clock::tick_at(day, hour * 60.0).unwrap();
         while w.tick < at {
@@ -373,27 +540,55 @@ fn night() -> World {
     w.sims[1].needs[1] = 0.35;
     night_until(&mut w, 1.0, Some(1.0), |_| {});
     let doing = |i: usize| w.sims[i].current().map(|a| a.task.kind);
-    assert!(w.sims[0].asleep(&w.content) && w.sims[1].asleep(&w.content), "both asleep at one: {:?} {:?}", doing(0), doing(1));
+    assert!(
+        w.sims[0].asleep(&w.content) && w.sims[1].asleep(&w.content),
+        "both asleep at one: {:?} {:?}",
+        doing(0),
+        doing(1)
+    );
     w
 }
 
 fn feeding(w: &World, i: usize) -> bool {
-    w.sims[i].current().is_some_and(|a| matches!(a.task.kind, sim_core::world::TaskKind::Use { object: 0, interaction: 1 }))
+    w.sims[i].current().is_some_and(|a| {
+        matches!(
+            a.task.kind,
+            sim_core::world::TaskKind::Use {
+                object: 0,
+                interaction: 1
+            }
+        )
+    })
 }
 
 #[test]
 fn woken_by_a_crying_baby_none_of_the_players_orders_are_dropped() {
     let mut w = night();
     // Ada was told to sleep, and has a full queue of orders for the morning; Ben is more tired.
-    w.apply(Command::Use { sim: 0, object: 1, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: 1,
+        interaction: 0,
+    })
+    .unwrap();
     w.tick_once();
     for k in 0..sim_core::world::MAX_QUEUE {
-        w.apply(Command::MoveTo { sim: 0, x: 3.5 + k as f32, z: 9.5 }).unwrap();
+        w.apply(Command::MoveTo {
+            sim: 0,
+            x: 3.5 + k as f32,
+            z: 9.5,
+        })
+        .unwrap();
     }
     w.sims[0].needs[1] = 0.9;
     w.sims[1].needs[1] = 0.5;
     w.sims[2].needs[0] = 0.25;
-    let orders = |w: &World| w.sims[0].queue().filter(|t| t.directed && matches!(t.kind, sim_core::world::TaskKind::MoveTo { .. })).count();
+    let orders = |w: &World| {
+        w.sims[0]
+            .queue()
+            .filter(|t| t.directed && matches!(t.kind, sim_core::world::TaskKind::MoveTo { .. }))
+            .count()
+    };
     assert_eq!(orders(&w), sim_core::world::MAX_QUEUE);
     let mut woken = false;
     for _ in 0..20 * 5 {
@@ -404,7 +599,11 @@ fn woken_by_a_crying_baby_none_of_the_players_orders_are_dropped() {
         }
     }
     assert!(woken, "Ada was woken for the baby");
-    assert_eq!(orders(&w), sim_core::world::MAX_QUEUE, "the morning's orders are all still there");
+    assert_eq!(
+        orders(&w),
+        sim_core::world::MAX_QUEUE,
+        "the morning's orders are all still there"
+    );
 }
 
 #[test]
@@ -419,13 +618,35 @@ fn a_crying_baby_wakes_one_parent_at_night_who_feeds_her_and_goes_back_to_bed() 
             fed[i] |= feeding(w, i);
         }
     });
-    assert_eq!(woke.iter().filter(|&&x| x).count(), 1, "one parent woke: {woke:?}");
+    assert_eq!(
+        woke.iter().filter(|&&x| x).count(),
+        1,
+        "one parent woke: {woke:?}"
+    );
     let (up, other) = if woke[0] { (0, 1) } else { (1, 0) };
     assert!(fed[up], "{} fed the baby", w.sims[up].name);
-    assert!(!fed[other] && w.sims[other].asleep(&w.content), "{} slept on", w.sims[other].name);
-    assert!(w.sims[up].asleep(&w.content), "{} is back in bed", w.sims[up].name);
-    assert!(w.sims[up].feelings.iter().any(|f| w.content.feelings[f.def].id == "brokenSleep"), "up in the night");
-    assert!(w.sims[2].needs[0] > 0.8, "Bea is fed: {}", w.sims[2].needs[0]);
+    assert!(
+        !fed[other] && w.sims[other].asleep(&w.content),
+        "{} slept on",
+        w.sims[other].name
+    );
+    assert!(
+        w.sims[up].asleep(&w.content),
+        "{} is back in bed",
+        w.sims[up].name
+    );
+    assert!(
+        w.sims[up]
+            .feelings
+            .iter()
+            .any(|f| w.content.feelings[f.def].id == "brokenSleep"),
+        "up in the night"
+    );
+    assert!(
+        w.sims[2].needs[0] > 0.8,
+        "Bea is fed: {}",
+        w.sims[2].needs[0]
+    );
     // And she's looked after till morning (she gets hungry again before then).
     let lowest = lowest.min(night_until(&mut w, 6.5, None, |_| {}));
     assert!(lowest > 0.2, "Bea's hunger never fell far: {lowest}");
@@ -444,7 +665,10 @@ fn partners_take_turns_getting_up_for_the_baby() {
         });
         up.push(who.expect("someone fed her"));
     }
-    assert!(up[0] != up[1] && up[1] != up[2], "turn and turn about: {up:?}");
+    assert!(
+        up[0] != up[1] && up[1] != up[2],
+        "turn and turn about: {up:?}"
+    );
 }
 
 #[test]
@@ -452,7 +676,11 @@ fn nobody_wakes_when_the_baby_needs_nothing() {
     let mut w = night();
     // Not hungry enough to cry: everyone sleeps through.
     night_until(&mut w, 6.0, Some(0.4), |w| {
-        assert!(w.sims[0].asleep(&w.content) && w.sims[1].asleep(&w.content), "woken at tick {}", w.tick);
+        assert!(
+            w.sims[0].asleep(&w.content) && w.sims[1].asleep(&w.content),
+            "woken at tick {}",
+            w.tick
+        );
     });
 }
 
@@ -486,7 +714,10 @@ fn night_owl(job: &str, hour: f32) -> World {
 /// television.
 fn night_owl_in(content: &str, objects: &str, job: &str, hour: f32) -> World {
     let town = NIGHT_TOWN
-        .replace(r#"{"def":"fridge","x":9,"z":9}"#, &format!(r#"{{"def":"fridge","x":9,"z":9}},{{"def":"tv","x":6,"z":9}}{objects}"#))
+        .replace(
+            r#"{"def":"fridge","x":9,"z":9}"#,
+            &format!(r#"{{"def":"fridge","x":9,"z":9}},{{"def":"tv","x":6,"z":9}}{objects}"#),
+        )
         .replace(r#""age":30}"#, &format!(r#""age":30{job}}}"#));
     let mut w = World::from_json(content, &town, 1).unwrap();
     let bedtime = sim_core::clock::tick_at(1, 22.0 * 60.0).unwrap();
@@ -501,7 +732,14 @@ fn night_owl_in(content: &str, objects: &str, job: &str, hour: f32) -> World {
     let doing = |i: usize| w.sims[i].current().map(|a| a.task);
     assert!(w.sims[1].asleep(&w.content), "Ben asleep: {:?}", doing(1));
     assert!(
-        matches!(doing(0), Some(sim_core::world::Task { kind: sim_core::world::TaskKind::Use { object: 4, .. }, directed: false, .. })),
+        matches!(
+            doing(0),
+            Some(sim_core::world::Task {
+                kind: sim_core::world::TaskKind::Use { object: 4, .. },
+                directed: false,
+                ..
+            })
+        ),
         "Ada watching TV: {:?}",
         doing(0)
     );
@@ -525,7 +763,13 @@ fn a_parent_up_at_night_sees_to_the_crying_baby_and_the_other_sleeps_on() {
     let waited = (fed_at - start) as f32 * sim_core::MINUTES_PER_TICK;
     assert!(waited < 5.0, "Ada saw to Bea promptly: {waited} minutes");
     assert!(lowest > 0.2, "Bea's hunger never fell far: {lowest}");
-    assert!(!w.sims[0].feelings.iter().any(|f| w.content.feelings[f.def].id == "brokenSleep"), "Ada wasn't woken");
+    assert!(
+        !w.sims[0]
+            .feelings
+            .iter()
+            .any(|f| w.content.feelings[f.def].id == "brokenSleep"),
+        "Ada wasn't woken"
+    );
 }
 
 #[test]
@@ -534,18 +778,39 @@ fn a_parent_about_to_leave_for_work_leaves_the_crying_baby_to_the_one_asleep() {
     // Crying with hunger as Ada is about to set off (at half past three): Ben is woken at once.
     w.sims[2].needs[0] = 0.25;
     let (ben, ada) = first_to_feed(&mut w, 4.0);
-    assert!(ben.is_some_and(|m| m < 5.0) && ada.is_none(), "Ben fed Bea promptly (Ben {ben:?}, Ada {ada:?} minutes on)");
-    assert!(w.sims[2].needs[0] > 0.8, "Bea is fed: {}", w.sims[2].needs[0]);
-    assert!(w.sims[0].away_until.is_some() || w.sims[0].current().is_some_and(|a| matches!(a.task.kind, sim_core::world::TaskKind::Work)), "Ada went to work");
+    assert!(
+        ben.is_some_and(|m| m < 5.0) && ada.is_none(),
+        "Ben fed Bea promptly (Ben {ben:?}, Ada {ada:?} minutes on)"
+    );
+    assert!(
+        w.sims[2].needs[0] > 0.8,
+        "Bea is fed: {}",
+        w.sims[2].needs[0]
+    );
+    assert!(
+        w.sims[0].away_until.is_some()
+            || w.sims[0]
+                .current()
+                .is_some_and(|a| matches!(a.task.kind, sim_core::world::TaskKind::Work)),
+        "Ada went to work"
+    );
 }
 
 #[test]
 fn a_parent_told_to_watch_tv_leaves_the_crying_baby_to_the_one_asleep() {
     let mut w = night_owl("", 1.0);
-    w.apply(Command::Use { sim: 0, object: 4, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: 4,
+        interaction: 0,
+    })
+    .unwrap();
     w.sims[2].needs[0] = 0.25;
     let (ben, ada) = first_to_feed(&mut w, 2.0);
-    assert!(ben.is_some_and(|m| m < 5.0) && ada.is_none(), "Ben fed Bea promptly (Ben {ben:?}, Ada {ada:?} minutes on)");
+    assert!(
+        ben.is_some_and(|m| m < 5.0) && ada.is_none(),
+        "Ben fed Bea promptly (Ben {ben:?}, Ada {ada:?} minutes on)"
+    );
 }
 
 /// `night_owl_content` with a kitchen: a fridge with `fridge` (its interactions) that keeps
@@ -577,9 +842,11 @@ fn night_kitchen_content(fridge: &str) -> String {
 }
 
 const SNACK: &str = r#"{"id":"snack","label":"Snack","minutes":2,"eat":{"item":"snack","minutes":30},"effects":{"hunger":0.6},"tags":["food"]}"#;
-const MEAL: &str = r#"{"id":"meal","label":"Make a meal","recipe":"meal","tags":["food","cooking"]}"#;
+const MEAL: &str =
+    r#"{"id":"meal","label":"Make a meal","recipe":"meal","tags":["food","cooking"]}"#;
 /// The table, counter and stove for `night_kitchen_content` (`night_owl_in`).
-const KITCHEN: &str = r#",{"def":"table","x":2,"z":6},{"def":"counter","x":10,"z":9},{"def":"stove","x":11,"z":9}"#;
+const KITCHEN: &str =
+    r#",{"def":"table","x":2,"z":6},{"def":"counter","x":10,"z":9},{"def":"stove","x":11,"z":9}"#;
 
 /// On (Bea fed) until `done`; panics after two hours.
 fn until(w: &mut World, what: &str, done: impl Fn(&World) -> bool) {
@@ -587,18 +854,30 @@ fn until(w: &mut World, what: &str, done: impl Fn(&World) -> bool) {
     while !done(w) {
         w.sims[2].needs[0] = 1.0;
         w.tick_once();
-        assert!(w.tick < limit, "{what}: Ada {:?}", w.sims[0].current().map(|a| a.task));
+        assert!(
+            w.tick < limit,
+            "{what}: Ada {:?}",
+            w.sims[0].current().map(|a| a.task)
+        );
     }
 }
 
 /// With Ada at step `step` of the meal (at its station), how many minutes of it are left.
 fn cooking(w: &World, step: u8) -> Option<f32> {
-    w.sims[0].current().and_then(|a| match (a.task.kind, &a.phase) {
-        (TaskKind::Cook { step: s, station: Some(_), minutes, .. }, Phase::Using { elapsed }) if s == step => {
-            Some(f32::from(minutes) - elapsed)
-        }
-        _ => None,
-    })
+    w.sims[0]
+        .current()
+        .and_then(|a| match (a.task.kind, &a.phase) {
+            (
+                TaskKind::Cook {
+                    step: s,
+                    station: Some(_),
+                    minutes,
+                    ..
+                },
+                Phase::Using { elapsed },
+            ) if s == step => Some(f32::from(minutes) - elapsed),
+            _ => None,
+        })
 }
 
 #[test]
@@ -608,12 +887,25 @@ fn a_parent_eating_at_night_leaves_her_plate_for_the_crying_baby_and_finishes_it
     w.sims[0].needs[0] = 0.1;
     w.sims[0].needs[2] = 1.0;
     let at_table = |w: &World| {
-        w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { plate: Some(_), .. }) && matches!(a.phase, Phase::Using { .. }))
+        w.sims[0].current().is_some_and(|a| {
+            matches!(a.task.kind, TaskKind::Eat { plate: Some(_), .. })
+                && matches!(a.phase, Phase::Using { .. })
+        })
     };
     until(&mut w, "Ada sits down to a snack", at_table);
     minutes(&mut w, 5);
-    assert!(at_table(&w), "still eating: {:?}", w.sims[0].current().map(|a| a.task));
-    let plate = w.items.list.iter().find(|it| it.edible()).expect("a plate on the table").id;
+    assert!(
+        at_table(&w),
+        "still eating: {:?}",
+        w.sims[0].current().map(|a| a.task)
+    );
+    let plate = w
+        .items
+        .list
+        .iter()
+        .find(|it| it.edible())
+        .expect("a plate on the table")
+        .id;
     // Bea cries: Ada leaves her plate on the table and feeds her; Ben sleeps on.
     w.sims[2].needs[0] = 0.25;
     let start = w.tick;
@@ -622,7 +914,10 @@ fn a_parent_eating_at_night_leaves_her_plate_for_the_crying_baby_and_finishes_it
         assert!(w.sims[1].asleep(&w.content), "Ben woken at tick {}", w.tick);
         // (The first feed: she feeds Bea again before morning.)
         if feeding(w, 0) && *fed_at.get_or_insert(w.tick) + 20 * 20 > w.tick {
-            left &= w.items.get(plate).is_some_and(|it| it.edible() && matches!(it.at, ItemAt::Surface { .. }));
+            left &= w
+                .items
+                .get(plate)
+                .is_some_and(|it| it.edible() && matches!(it.at, ItemAt::Surface { .. }));
         }
     });
     let fed_at = fed_at.expect("Ada fed Bea");
@@ -630,8 +925,16 @@ fn a_parent_eating_at_night_leaves_her_plate_for_the_crying_baby_and_finishes_it
     assert!(waited < 5.0, "Ada saw to Bea promptly: {waited} minutes");
     assert!(left, "the snack waited on the table while she fed Bea");
     // And she came back to it after.
-    assert!(w.items.get(plate).is_none_or(|it| !it.edible()), "the snack was eaten: {:?}", w.items.get(plate));
-    assert!(w.sims[0].needs[0] > 0.5, "Ada isn't hungry now: {}", w.sims[0].needs[0]);
+    assert!(
+        w.items.get(plate).is_none_or(|it| !it.edible()),
+        "the snack was eaten: {:?}",
+        w.items.get(plate)
+    );
+    assert!(
+        w.sims[0].needs[0] > 0.5,
+        "Ada isn't hungry now: {}",
+        w.sims[0].needs[0]
+    );
 }
 
 #[test]
@@ -641,7 +944,9 @@ fn a_parent_cooking_at_night_finishes_the_step_sees_to_the_crying_baby_and_goes_
     w.sims[0].needs[0] = 0.3;
     w.sims[0].needs[2] = 1.0;
     // Hungry: Ada makes a meal. Bea cries with a few minutes of chopping to go.
-    until(&mut w, "Ada at the counter", |w| cooking(w, 1).is_some_and(|m| m <= 6.0));
+    until(&mut w, "Ada at the counter", |w| {
+        cooking(w, 1).is_some_and(|m| m <= 6.0)
+    });
     w.sims[2].needs[0] = 0.25;
     let start = w.tick;
     let (mut fed_at, mut stove_first) = (None, false);
@@ -654,11 +959,20 @@ fn a_parent_cooking_at_night_finishes_the_step_sees_to_the_crying_baby_and_goes_
     });
     let fed_at = fed_at.expect("Ada fed Bea");
     let waited = (fed_at - start) as f32 * sim_core::MINUTES_PER_TICK;
-    assert!(waited > 5.0 && waited < 10.0, "Ada finished chopping, then saw to Bea: {waited} minutes");
+    assert!(
+        waited > 5.0 && waited < 10.0,
+        "Ada finished chopping, then saw to Bea: {waited} minutes"
+    );
     assert!(!stove_first, "Bea before the stove");
     // Then back to the stove: the meal is made (and she has some).
-    let made = w.items.list.iter().any(|it| w.content.items[it.def].id == "mealPot" || w.content.items[it.def].id == "potDirty");
-    assert!(made && w.sims[0].needs[0] > 0.5, "the meal was made and eaten: hunger {}", w.sims[0].needs[0]);
+    let made = w.items.list.iter().any(|it| {
+        w.content.items[it.def].id == "mealPot" || w.content.items[it.def].id == "potDirty"
+    });
+    assert!(
+        made && w.sims[0].needs[0] > 0.5,
+        "the meal was made and eaten: hunger {}",
+        w.sims[0].needs[0]
+    );
 }
 
 #[test]
@@ -668,10 +982,15 @@ fn a_parent_with_long_to_go_on_the_stove_leaves_the_crying_baby_to_the_one_aslee
     w.sims[0].needs[0] = 0.3;
     w.sims[0].needs[2] = 1.0;
     // Bea cries with most of the half hour on the stove to go: Ben is woken.
-    until(&mut w, "Ada at the stove", |w| cooking(w, 2).is_some_and(|m| m >= 25.0));
+    until(&mut w, "Ada at the stove", |w| {
+        cooking(w, 2).is_some_and(|m| m >= 25.0)
+    });
     w.sims[2].needs[0] = 0.25;
     let (ben, ada) = first_to_feed(&mut w, 2.5);
-    assert!(ben.is_some_and(|m| m < 5.0) && ada.is_none(), "Ben fed Bea promptly (Ben {ben:?}, Ada {ada:?} minutes on)");
+    assert!(
+        ben.is_some_and(|m| m < 5.0) && ada.is_none(),
+        "Ben fed Bea promptly (Ben {ben:?}, Ada {ada:?} minutes on)"
+    );
 }
 
 #[test]
@@ -679,17 +998,24 @@ fn whose_turn_it_is_at_night_survives_a_reload() {
     let mut w = night();
     w.sims[2].needs[0] = 0.25;
     let mut first = None;
-    night_until(&mut w, 1.5, None, |w| first = first.or((0..2).find(|&i| feeding(w, i))));
+    night_until(&mut w, 1.5, None, |w| {
+        first = first.or((0..2).find(|&i| feeding(w, i)))
+    });
     let first = first.expect("someone fed Bea");
     let mut w = World::from_save_json(NIGHT, &w.save_json()).unwrap();
     // Crying again at once: she's quiet for her hour (from one o'clock) and then the other
     // parent gets up.
     w.sims[2].needs[0] = 0.25;
     let mut next = None;
-    night_until(&mut w, 3.0, None, |w| next = next.or((0..2).find(|&i| feeding(w, i)).map(|i| (i, w.tick))));
+    night_until(&mut w, 3.0, None, |w| {
+        next = next.or((0..2).find(|&i| feeding(w, i)).map(|i| (i, w.tick)))
+    });
     let (next, at) = next.expect("someone fed Bea again");
     let hour = sim_core::clock::minute_of_day(at) as f32 / 60.0;
-    assert!(hour > 1.9, "Bea's quiet spell carried over: fed again at {hour:.2}");
+    assert!(
+        hour > 1.9,
+        "Bea's quiet spell carried over: fed again at {hour:.2}"
+    );
     assert_ne!(next, first, "turn and turn about after the reload");
 }
 
@@ -720,8 +1046,17 @@ const HOME: &str = r#"{"width":16,"depth":12,
 #[test]
 fn a_baby_with_a_grown_up_at_home_is_cuddled_and_stays_comfortable() {
     let mut w = World::from_json(&common::content(), HOME, 1).unwrap();
-    let comfort = w.content.needs.iter().position(|n| n.id == "comfort").unwrap();
-    let cuddle = w.content.objects[w.objects[0].def].interactions.iter().position(|i| i.id == "cuddle").unwrap();
+    let comfort = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "comfort")
+        .unwrap();
+    let cuddle = w.content.objects[w.objects[0].def]
+        .interactions
+        .iter()
+        .position(|i| i.id == "cuddle")
+        .unwrap();
     // Two days, Ada at home (no job): she sees to Bea, cuddling her when she needs it.
     let (mut sum, mut lowest, mut n, mut cuddled) = (0.0, 1.0f32, 0, false);
     for _ in 0..2 * 24 * 4 {
@@ -736,7 +1071,10 @@ fn a_baby_with_a_grown_up_at_home_is_cuddled_and_stays_comfortable() {
     let average = sum / n as f32;
     assert!(w.objects[0].users().any(|u| u == 1), "Bea is in her crib");
     assert!(cuddled, "Ada cuddled Bea");
-    assert!(average > 0.35 && lowest > 0.0, "Bea stayed comfortable: average {average:.2}, lowest {lowest:.2}");
+    assert!(
+        average > 0.35 && lowest > 0.0,
+        "Bea stayed comfortable: average {average:.2}, lowest {lowest:.2}"
+    );
 }
 
 /// Bea lying in the crib (asleep or awake) and Ada feeding her, saved and loaded: Bea lies back in
@@ -752,24 +1090,46 @@ fn a_baby_loaded_from_a_save_lies_back_in_the_crib() {
         let row = &out[HEADER_LEN + SIM_STRIDE..];
         let s = &w.sims[1];
         let slot = w.objects[0].users.iter().position(|u| *u == Some(1));
-        (s.pos, s.yaw, s.pose, slot, [row[sim::X], row[sim::Z], row[sim::YAW], row[sim::POSE]])
+        (
+            s.pos,
+            s.yaw,
+            s.pose,
+            slot,
+            [row[sim::X], row[sim::Z], row[sim::YAW], row[sim::POSE]],
+        )
     };
     for rot in 0..4 {
-        let town = TOWN.replace(r#"{"def":"crib","x":2,"z":2}"#, &format!(r#"{{"def":"crib","x":2,"z":2,"rot":{rot}}}"#));
+        let town = TOWN.replace(
+            r#"{"def":"crib","x":2,"z":2}"#,
+            &format!(r#"{{"def":"crib","x":2,"z":2,"rot":{rot}}}"#),
+        );
         for awake in [false, true] {
             let mut w = World::from_json(CONTENT, &town, 1).unwrap();
             minutes(&mut w, 1);
-            assert_eq!(w.sims[1].pose, sim_core::content::Pose::Lie, "rot {rot}: Bea is in the crib");
+            assert_eq!(
+                w.sims[1].pose,
+                sim_core::content::Pose::Lie,
+                "rot {rot}: Bea is in the crib"
+            );
             if awake {
                 w.sims[1].needs[0] = 0.1;
             }
-            w.apply(Command::Use { sim: 0, object: 0, interaction: 1 }).unwrap();
+            w.apply(Command::Use {
+                sim: 0,
+                object: 0,
+                interaction: 1,
+            })
+            .unwrap();
             minutes(&mut w, 1);
             let before = bea(&w);
             assert_eq!(before.3, Some(0), "rot {rot}: Bea lies in the crib's slot");
             let mut loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
             minutes(&mut loaded, 1);
-            assert_eq!(bea(&loaded), before, "rot {rot}, awake {awake}: Bea lies where she lay before the save");
+            assert_eq!(
+                bea(&loaded),
+                before,
+                "rot {rot}, awake {awake}: Bea lies where she lay before the save"
+            );
         }
     }
 }
@@ -790,10 +1150,16 @@ fn partners_in_a_full_town_dont_keep_trying_for_a_baby() {
         "bondPresets":{"partners":{"friendship":55,"romance":75,"partners":true}}}"#;
     let town = |people: usize| {
         let mut sims = vec![
-            r#"{"name":"Ada","household":0,"x":4.5,"z":8.5,"age":30,"gender":"female"}"#.to_string(),
+            r#"{"name":"Ada","household":0,"x":4.5,"z":8.5,"age":30,"gender":"female"}"#
+                .to_string(),
             r#"{"name":"Ben","household":0,"x":5.5,"z":8.5,"age":32,"gender":"male"}"#.to_string(),
         ];
-        sims.extend((2..people).map(|i| format!(r#"{{"name":"Old {i}","household":1,"x":{}.5,"z":20.5,"age":90}}"#, i % 12)));
+        sims.extend((2..people).map(|i| {
+            format!(
+                r#"{{"name":"Old {i}","household":1,"x":{}.5,"z":20.5,"age":90}}"#,
+                i % 12
+            )
+        }));
         format!(
             r#"{{"width":12,"depth":24,
             "plots":[{{"name":"Home","x":0,"z":0,"w":12,"d":12,"entry":[5.5,11.5]}},{{"name":"Home for the elderly","x":0,"z":12,"w":12,"d":12,"entry":[5.5,23.5]}}],
@@ -809,12 +1175,22 @@ fn partners_in_a_full_town_dont_keep_trying_for_a_baby() {
         let mut was = false;
         for _ in 0..6 * 60 {
             minutes(&mut w, 1);
-            let now = matches!(w.sims[0].current().map(|a| a.task.kind), Some(TaskKind::Social { social: 0, .. }));
+            let now = matches!(
+                w.sims[0].current().map(|a| a.task.kind),
+                Some(TaskKind::Social { social: 0, .. })
+            );
             tries += (now && !was) as u32;
             was = now;
         }
         tries
     };
-    assert!(tries(sim_core::world::MAX_SIMS - 1) > 0, "with room in town they do");
-    assert_eq!(tries(sim_core::world::MAX_SIMS), 0, "in a full town they don't");
+    assert!(
+        tries(sim_core::world::MAX_SIMS - 1) > 0,
+        "with room in town they do"
+    );
+    assert_eq!(
+        tries(sim_core::world::MAX_SIMS),
+        0,
+        "in a full town they don't"
+    );
 }

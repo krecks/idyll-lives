@@ -20,7 +20,11 @@ const TOWN: &str = r#"{"width":12,"depth":12,
 
 fn world() -> World {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     w
 }
 
@@ -29,7 +33,12 @@ fn changing_at_the_wardrobe_puts_on_the_next_outfit_halfway() {
     let mut w = world();
     w.sims[0].needs[0] = 1.0;
     assert_eq!(w.sims[0].outfit, 0, "in the creator's to start with");
-    w.apply(Command::Use { sim: 0, object: 0, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: 0,
+        interaction: 0,
+    })
+    .unwrap();
     let before = w.structure_version();
     // At the wardrobe: still in the old clothes until halfway, in the new ones after.
     let mut changed_at = None;
@@ -48,8 +57,14 @@ fn changing_at_the_wardrobe_puts_on_the_next_outfit_halfway() {
         w.tick_once();
     }
     let at = changed_at.expect("changed into the next outfit");
-    assert!((5.0..6.0).contains(&at), "halfway through the 10 minutes, not {at}");
-    assert!(minutes >= 9.9, "with comfort full it still lasts its time ({minutes} minutes)");
+    assert!(
+        (5.0..6.0).contains(&at),
+        "halfway through the 10 minutes, not {at}"
+    );
+    assert!(
+        minutes >= 9.9,
+        "with comfort full it still lasts its time ({minutes} minutes)"
+    );
     assert_eq!(w.sims[0].outfit, 1);
     assert_ne!(w.structure_version(), before, "views draw the new clothes");
     assert!(sim_core::view::structure_json(&w).contains(r#""outfit":1"#));
@@ -60,7 +75,12 @@ fn changing_at_the_wardrobe_puts_on_the_next_outfit_halfway() {
 
     // After the last one, the creator's again.
     for _ in 1..OUTFITS {
-        w.apply(Command::Use { sim: 0, object: 0, interaction: 0 }).unwrap();
+        w.apply(Command::Use {
+            sim: 0,
+            object: 0,
+            interaction: 0,
+        })
+        .unwrap();
         for _ in 0..60 * TICKS_PER_MINUTE {
             w.tick_once();
             if w.sims[0].current().is_none() {
@@ -79,14 +99,18 @@ fn older_saves_load_in_the_creators_outfit() {
     let saved: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
     assert_eq!(saved["version"], sim_core::save::SAVE_VERSION);
     assert_eq!(saved["sims"][0]["outfit"], 2);
-    let load = |save: &serde_json::Value| World::from_save_json(CONTENT, &save.to_string()).unwrap();
+    let load =
+        |save: &serde_json::Value| World::from_save_json(CONTENT, &save.to_string()).unwrap();
     // v31 keeps it.
     assert_eq!(load(&saved).sims[0].outfit, 2);
     // v30 (washing piles up, no outfits yet): the laundry kept, everyone in the creator's.
     let mut v30 = saved.clone();
     v30["version"] = 30.into();
     let back = load(&v30);
-    assert_eq!((back.sims[0].outfit, back.households[0].laundry), (0, [2.0, 0.5, 0.0]));
+    assert_eq!(
+        (back.sims[0].outfit, back.households[0].laundry),
+        (0, [2.0, 0.5, 0.0])
+    );
     // v29 (neither): one load of washing of each to start with, the creator's outfit.
     let mut v29 = saved.clone();
     v29["version"] = 29.into();
@@ -97,17 +121,28 @@ fn older_saves_load_in_the_creators_outfit() {
         s.as_object_mut().unwrap().remove("outfit");
     }
     let back = load(&v29);
-    assert_eq!((back.sims[0].outfit, back.households[0].laundry), (0, sim_core::world::LAUNDRY_START));
+    assert_eq!(
+        (back.sims[0].outfit, back.households[0].laundry),
+        (0, sim_core::world::LAUNDRY_START)
+    );
 }
 
 #[test]
 fn other_uses_leave_the_clothes_alone() {
     let mut w = world();
     w.sims[0].needs[0] = 0.0;
-    w.apply(Command::Use { sim: 0, object: 1, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: 1,
+        interaction: 0,
+    })
+    .unwrap();
     for _ in 0..60 * TICKS_PER_MINUTE {
         w.tick_once();
     }
     assert_eq!(w.sims[0].outfit, 0);
-    assert!(!w.save_json().contains(r#""outfit""#), "the creator's isn't written");
+    assert!(
+        !w.save_json().contains(r#""outfit""#),
+        "the creator's isn't written"
+    );
 }

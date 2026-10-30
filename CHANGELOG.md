@@ -2,6 +2,14 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+- **Bedrooms are their sleepers' own:** only those who belong together share a bedroom. While someone sleeps in one, its door is open to them, their partner, parents, children, brothers and sisters with a bed there, and whoever minds a crib in there, and keeps everyone else, guests included, out. The other half of a double bed is the partner's (or a child's for the night); a bunk bed is a bed for each. A lodger, even one sent to the bed, waits outside like anyone else; walking through a bedroom to a room beyond is fine.
+- **Newcomers and bed places:** households moving into town are a single, a couple (perhaps with a grown child) or siblings, never strangers, and bed places count a double bed as one place unless a couple sleeps in it (who moves in, the no-bed notice, the beds the town buys for its children).
+
+### Also
+- **Saves:** unchanged (format 33).
+
 ## 0.5.1 — 2026-10-29
 
 **Play it in your browser:** https://krecks.github.io/idyll-lives/

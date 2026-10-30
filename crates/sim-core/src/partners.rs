@@ -30,7 +30,10 @@ pub(crate) const PARTNER_WAIT_TICKS: u32 = 30 * crate::TICKS_PER_MINUTE as u32;
 /// The game for two `sim` is at or on their way to next (`Sim::game`).
 fn game_of(content: &Content, objects: &[ObjectInstance], sim: &Sim) -> Option<(u32, usize, bool)> {
     let game = |kind: TaskKind| match kind {
-        TaskKind::Use { object, interaction } => objects
+        TaskKind::Use {
+            object,
+            interaction,
+        } => objects
             .get(object as usize)
             .and_then(|o| content.objects[o.def].interactions.get(interaction))
             .filter(|i| i.partner)
@@ -39,27 +42,50 @@ fn game_of(content: &Content, objects: &[ObjectInstance], sim: &Sim) -> Option<(
     };
     match sim.current() {
         Some(a) => game(a.task.kind).map(|(o, i)| (o, i, matches!(a.phase, Phase::Using { .. }))),
-        None => sim.follow_up.or_else(|| sim.queue().next().copied()).and_then(|t| game(t.kind)).map(|(o, i)| (o, i, false)),
+        None => sim
+            .follow_up
+            .or_else(|| sim.queue().next().copied())
+            .and_then(|t| game(t.kind))
+            .map(|(o, i)| (o, i, false)),
     }
 }
 
 /// The game for two resident `sim` is at or on their way to next, as things are now.
 pub(crate) fn game(world: &World, sim: u32) -> Option<(u32, usize, bool)> {
-    world.sims.get(sim as usize).and_then(|s| game_of(&world.content, &world.objects, s))
+    world
+        .sims
+        .get(sim as usize)
+        .and_then(|s| game_of(&world.content, &world.objects, s))
 }
 
 /// Sets each resident's `Sim::game` as a tick starts.
 pub(crate) fn refresh(world: &mut World) {
-    let World { content, objects, sims, .. } = world;
+    let World {
+        content,
+        objects,
+        sims,
+        ..
+    } = world;
     for s in sims.iter_mut() {
-        s.game = if s.here() { game_of(content, objects, s) } else { None };
+        s.game = if s.here() {
+            game_of(content, objects, s)
+        } else {
+            None
+        };
     }
 }
 
 /// Whether `me` may take a place at `obj` for its game `i` (of `def`): with both its places free
 /// (starting it), or joining the one they were fetched for (`joins`), or the one at the other
 /// place who plays the same game (`along`: two told to play it, both games after a load).
-pub(crate) fn may_take(obj: &ObjectInstance, def: &ObjectDef, i: usize, me: u32, joins: Option<u32>, along: impl Fn(u32) -> bool) -> bool {
+pub(crate) fn may_take(
+    obj: &ObjectInstance,
+    def: &ObjectDef,
+    i: usize,
+    me: u32,
+    joins: Option<u32>,
+    along: impl Fn(u32) -> bool,
+) -> bool {
     let range = def.slots_for(i);
     if obj.slot_of(me).is_some_and(|k| range.contains(&k)) {
         return true;
@@ -89,7 +115,8 @@ pub(crate) fn free_near(ctx: &Ctx, sim: &Sim, obj: &ObjectInstance, inter: &Inte
             && b.free
             && b.plot == plot
             && crate::world::unfit(ctx.content, b.age, inter).is_none()
-            && crate::social::friend_level(ctx.rels.get(sim.id as usize, j).friendship) > LEVEL_DISLIKED
+            && crate::social::friend_level(ctx.rels.get(sim.id as usize, j).friendship)
+                > LEVEL_DISLIKED
     })
 }
 
@@ -108,12 +135,24 @@ pub(crate) enum Hold {
 /// How `me`'s game (`interaction` at `object`) goes this step (`begun`: it has run already;
 /// `finding`: someone to play with is being found), as the tick's start had the one they play
 /// with (`briefs`); `wait` counts the ticks waited.
-pub(crate) fn hold(ctx: &Ctx, me: u32, (object, interaction): (u32, usize), begun: bool, finding: bool, wait: &mut u32, ticks: u32) -> Hold {
+pub(crate) fn hold(
+    ctx: &Ctx,
+    me: u32,
+    (object, interaction): (u32, usize),
+    begun: bool,
+    finding: bool,
+    wait: &mut u32,
+    ticks: u32,
+) -> Hold {
     let other = ctx
         .briefs
         .iter()
         .enumerate()
-        .find(|&(j, b)| j as u32 != me && b.game.is_some_and(|(o, i, _)| (o, i) == (object, interaction)))
+        .find(|&(j, b)| {
+            j as u32 != me
+                && b.game
+                    .is_some_and(|(o, i, _)| (o, i) == (object, interaction))
+        })
         .map(|(_, b)| b.game.is_some_and(|g| g.2));
     match other {
         Some(true) => {
@@ -122,7 +161,11 @@ pub(crate) fn hold(ctx: &Ctx, me: u32, (object, interaction): (u32, usize), begu
         }
         _ if begun => {
             *wait = 0;
-            if other.is_some() { Hold::Play } else { Hold::Over }
+            if other.is_some() {
+                Hold::Play
+            } else {
+                Hold::Over
+            }
         }
         // (Someone being found for them this tick, or on their way.)
         Some(false) if *wait < PARTNER_WAIT_TICKS => {
@@ -155,7 +198,12 @@ pub(crate) fn free_now(content: &Content, s: &Sim, tick: u64) -> bool {
         && !s.queue().any(|t| t.directed)
         && s.available_for_social(content)
         && !s.asleep(content)
-        && s.current().is_none_or(|c| matches!(c.task.kind, TaskKind::Use { .. } | TaskKind::MoveTo { .. } | TaskKind::Clean { .. }))
+        && s.current().is_none_or(|c| {
+            matches!(
+                c.task.kind,
+                TaskKind::Use { .. } | TaskKind::MoveTo { .. } | TaskKind::Clean { .. }
+            )
+        })
         && !crate::world::leave_at(s, content, tick).is_some_and(|t| t <= tick + ready)
 }
 
@@ -163,7 +211,16 @@ pub(crate) fn free_now(content: &Content, s: &Sim, tick: u64) -> bool {
 /// there, its age for them, allowed to use it, not on bad terms), able to get to it (`front`:
 /// the tile it's used from; while the walkable regions are known).
 #[allow(clippy::too_many_arguments)]
-fn free_for(world: &World, j: usize, a: usize, plot: Option<u32>, at: [f32; 2], front: (i32, i32), def: &ObjectDef, inter: &Interaction) -> bool {
+fn free_for(
+    world: &World,
+    j: usize,
+    a: usize,
+    plot: Option<u32>,
+    at: [f32; 2],
+    front: (i32, i32),
+    def: &ObjectDef,
+    inter: &Interaction,
+) -> bool {
     let content = &world.content;
     let s = &world.sims[j];
     if j == a || !free_now(content, s, world.tick) {
@@ -175,11 +232,12 @@ fn free_for(world: &World, j: usize, a: usize, plot: Option<u32>, at: [f32; 2], 
         None => (s.pos[0] - at[0]).hypot(s.pos[1] - at[1]) <= OFF_PLOT_RANGE,
     };
     let access = crate::world::access_in(&world.households, &world.plots, s, plot);
-    here
-        && crate::world::unfit(content, s.age, inter).is_none()
-        && (access == Access::Full || (access == Access::Guest && crate::world::guest_may(content, def, inter)))
+    here && crate::world::unfit(content, s.age, inter).is_none()
+        && (access == Access::Full
+            || (access == Access::Guest && crate::world::guest_may(content, def, inter)))
         && crate::social::friend_level(world.relationships.get(a, j).friendship) > LEVEL_DISLIKED
-        && (world.reach_version != world.nav_version || world.reach.reaches(&world.nav(), (x, z), front))
+        && (world.reach_version != world.nav_version
+            || world.reach.reaches(&world.nav(), (x, z), front))
 }
 
 /// How far (m) someone off every plot (on the street) looks for someone to play with.
@@ -188,7 +246,12 @@ const OFF_PLOT_RANGE: f32 = 12.0;
 /// Who'd play game `interaction` at `object` with `a` now: one the player told to play it next
 /// (their next task, nothing they were told before it under way), else the nearest one free
 /// (`free_for`).
-pub(crate) fn partner_for(world: &World, a: usize, object: u32, interaction: usize) -> Option<usize> {
+pub(crate) fn partner_for(
+    world: &World,
+    a: usize,
+    object: u32,
+    interaction: usize,
+) -> Option<usize> {
     let content = &world.content;
     let obj = world.objects.get(object as usize)?;
     let inter = content.objects[obj.def].interactions.get(interaction)?;
@@ -207,7 +270,20 @@ pub(crate) fn partner_for(world: &World, a: usize, object: u32, interaction: usi
             let p = world.sims[j].pos;
             (p[0] - at[0]).hypot(p[1] - at[1])
         };
-        (0..world.sims.len()).filter(|&j| free_for(world, j, a, plot, at, front, &content.objects[obj.def], inter)).min_by(|&x, &y| far(x).total_cmp(&far(y)))
+        (0..world.sims.len())
+            .filter(|&j| {
+                free_for(
+                    world,
+                    j,
+                    a,
+                    plot,
+                    at,
+                    front,
+                    &content.objects[obj.def],
+                    inter,
+                )
+            })
+            .min_by(|&x, &y| far(x).total_cmp(&far(y)))
     })
 }
 
@@ -219,27 +295,52 @@ pub(crate) fn update(world: &mut World) {
         if !std::mem::take(&mut world.sims[a].wants_partner) {
             continue;
         }
-        let Some((object, interaction, directed)) = world.sims[a].current().and_then(|c| match c.task.kind {
-            TaskKind::Use { object, interaction } => Some((object, interaction, c.task.directed)),
-            _ => None,
-        }) else {
+        let Some((object, interaction, directed)) =
+            world.sims[a].current().and_then(|c| match c.task.kind {
+                TaskKind::Use {
+                    object,
+                    interaction,
+                } => Some((object, interaction, c.task.directed)),
+                _ => None,
+            })
+        else {
             continue;
         };
         let content = &world.content;
-        let Some(def) = world.objects.get(object as usize).map(|o| &content.objects[o.def]) else { continue };
+        let Some(def) = world
+            .objects
+            .get(object as usize)
+            .map(|o| &content.objects[o.def])
+        else {
+            continue;
+        };
         if !def.interactions.get(interaction).is_some_and(|i| i.partner) {
             continue;
         }
         // Someone is at it or on their way already (told to play it too).
-        let same = |s: &Sim| game_of(content, &world.objects, s).is_some_and(|(o, i, _)| (o, i) == (object, interaction));
-        if world.sims.iter().enumerate().any(|(j, s)| j != a && s.here() && same(s)) {
+        let same = |s: &Sim| {
+            game_of(content, &world.objects, s)
+                .is_some_and(|(o, i, _)| (o, i) == (object, interaction))
+        };
+        if world
+            .sims
+            .iter()
+            .enumerate()
+            .any(|(j, s)| j != a && s.here() && same(s))
+        {
             continue;
         }
         let range = def.slots_for(interaction);
         // (Trying for a baby is with the one it was asked of, sent along with them
         // (`Sim::to_bed`, `privacy::after_step`): nobody else is fetched.)
-        let room = world.objects[object as usize].users[range].iter().any(Option::is_none) && !def.interactions[interaction].conceive;
-        match room.then(|| partner_for(world, a, object, interaction)).flatten() {
+        let room = world.objects[object as usize].users[range]
+            .iter()
+            .any(Option::is_none)
+            && !def.interactions[interaction].conceive;
+        match room
+            .then(|| partner_for(world, a, object, interaction))
+            .flatten()
+        {
             Some(b) => fetch(world, b, a, object, interaction),
             None => alone(world, a, object, interaction, directed),
         }
@@ -249,17 +350,34 @@ pub(crate) fn update(world: &mut World) {
 /// Sends `b` to play game `interaction` at `object` with `a`: they drop what they're doing (an
 /// order of the player's to play it stays theirs).
 fn fetch(world: &mut World, b: usize, a: usize, object: u32, interaction: usize) {
-    let World { content, objects, sims, .. } = world;
+    let World {
+        content,
+        objects,
+        sims,
+        ..
+    } = world;
     let sim = &mut sims[b];
     let task = match sim.queue.front() {
-        Some(t) if t.directed && matches!(t.kind, TaskKind::Use { object: o, interaction: i } if (o, i) == (object, interaction)) => sim.queue.pop_front(),
+        Some(t)
+            if t.directed
+                && matches!(t.kind, TaskKind::Use { object: o, interaction: i } if (o, i) == (object, interaction)) =>
+        {
+            sim.queue.pop_front()
+        }
         _ => None,
     };
     if sim.current().is_some() {
         crate::world::end_activity(sim, content, objects);
     }
     sim.follow_up = None;
-    sim.queue.push_front(task.unwrap_or(Task { kind: TaskKind::Use { object, interaction }, directed: false, routine: false }));
+    sim.queue.push_front(task.unwrap_or(Task {
+        kind: TaskKind::Use {
+            object,
+            interaction,
+        },
+        directed: false,
+        routine: false,
+    }));
     crate::world::trim_queue(&mut sim.queue, 1);
     sim.joins = Some(a as u32);
     sim.game = Some((object, interaction, false));
@@ -269,28 +387,48 @@ fn fetch(world: &mut World, b: usize, a: usize, object: u32, interaction: usize)
 /// game's use for one, if it has one (or is dropped), and the story says so; what they chose
 /// themselves is given up, and not chosen again for a while.
 fn alone(world: &mut World, a: usize, object: u32, interaction: usize, directed: bool) {
-    let World { content, objects, sims, events, tick, .. } = world;
+    let World {
+        content,
+        objects,
+        sims,
+        events,
+        tick,
+        ..
+    } = world;
     let def = objects[object as usize].def;
-    let solo = content.objects[def].interactions[interaction].alone.filter(|_| directed);
+    let solo = content.objects[def].interactions[interaction]
+        .alone
+        .filter(|_| directed);
     let sim = &mut sims[a];
     match (solo, sim.current.as_mut()) {
         (Some(k), Some(act)) => {
-            act.task.kind = TaskKind::Use { object, interaction: k };
+            act.task.kind = TaskKind::Use {
+                object,
+                interaction: k,
+            };
             act.tags = content.objects[def].interactions[k].tags;
         }
         _ => {
-            let kind = TaskKind::Use { object, interaction };
+            let kind = TaskKind::Use {
+                object,
+                interaction,
+            };
             crate::world::end_activity(sim, content, objects);
             // (No game for two for a while: they choose something else.)
             if !directed {
-                sim.alone_until = *tick + crate::social::minutes_to_ticks(content.autonomy.retry_minutes);
+                sim.alone_until =
+                    *tick + crate::social::minutes_to_ticks(content.autonomy.retry_minutes);
                 sim.remember_unreachable(kind, sim.alone_until);
             }
         }
     }
     sim.partner_wait = 0;
     if directed {
-        let kind = if solo.is_some() { EventKind::PlayedAlone } else { EventKind::NoPartner };
+        let kind = if solo.is_some() {
+            EventKind::PlayedAlone
+        } else {
+            EventKind::NoPartner
+        };
         events.push_object(*tick, kind, a, def, None);
     }
 }

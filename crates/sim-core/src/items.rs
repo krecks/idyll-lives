@@ -25,7 +25,9 @@ pub enum ItemAt {
 impl ItemAt {
     pub fn tile(&self) -> (i32, i32) {
         match *self {
-            ItemAt::Surface { x, z, .. } | ItemAt::Stored { x, z } | ItemAt::Floor { x, z, .. } => (x, z),
+            ItemAt::Surface { x, z, .. } | ItemAt::Stored { x, z } | ItemAt::Floor { x, z, .. } => {
+                (x, z)
+            }
         }
     }
 
@@ -36,7 +38,10 @@ impl ItemAt {
             ItemAt::Surface { offset, .. } | ItemAt::Floor { offset, .. } => offset,
             ItemAt::Stored { .. } => [0, 0],
         };
-        [x as f32 + 0.5 + offset[0] as f32 / 100.0, z as f32 + 0.5 + offset[1] as f32 / 100.0]
+        [
+            x as f32 + 0.5 + offset[0] as f32 / 100.0,
+            z as f32 + 0.5 + offset[1] as f32 / 100.0,
+        ]
     }
 
     /// The same kind of place moved to point `p` (tiles).
@@ -53,7 +58,11 @@ impl ItemAt {
 
     /// A place on a surface (`surface::SurfaceSpot`).
     pub fn on(spot: &crate::surface::SurfaceSpot) -> ItemAt {
-        ItemAt::Surface { x: spot.x, z: spot.z, offset: spot.offset }
+        ItemAt::Surface {
+            x: spot.x,
+            z: spot.z,
+            offset: spot.offset,
+        }
     }
 }
 
@@ -104,7 +113,13 @@ pub struct Held {
 
 impl Held {
     pub fn of(def: usize) -> Held {
-        Held { def, servings: 0, quality: 1.0, made_at: 0, recipe: None }
+        Held {
+            def,
+            servings: 0,
+            quality: 1.0,
+            made_at: 0,
+            recipe: None,
+        }
     }
 }
 
@@ -159,7 +174,12 @@ impl Items {
 }
 
 /// The object that keeps things at tile `(x, z)` (a fridge; see `ObjectDef::stores`).
-pub fn storing_object(content: &Content, objects: &[ObjectInstance], x: i32, z: i32) -> Option<u32> {
+pub fn storing_object(
+    content: &Content,
+    objects: &[ObjectInstance],
+    x: i32,
+    z: i32,
+) -> Option<u32> {
     objects.iter().find_map(|o| {
         (content.objects[o.def].stores && o.tiles(content).any(|t| t == (x, z))).then_some(o.id)
     })

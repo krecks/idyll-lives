@@ -9,7 +9,10 @@ use super::{Dense, V3};
 /// Area-weighted vertex normals (counter-clockwise front faces).
 pub fn smooth_normals(pos: &[V3], idx: &[usize]) -> Vec<V3> {
     let tris: Vec<&[usize]> = idx.chunks(3).collect();
-    let fns: Vec<V3> = tris.iter().map(|t| (pos[t[1]] - pos[t[0]]).cross(&(pos[t[2]] - pos[t[0]]))).collect();
+    let fns: Vec<V3> = tris
+        .iter()
+        .map(|t| (pos[t[1]] - pos[t[0]]).cross(&(pos[t[2]] - pos[t[0]])))
+        .collect();
     let mut acc = vec![V3::zeros(); pos.len()];
     // np.add.at per corner, in that order.
     for k in 0..3 {
@@ -29,7 +32,11 @@ pub fn boundary_edges(idx: &[usize]) -> Vec<[usize; 2]> {
     }
     let key: Vec<[usize; 2]> = e.iter().map(|&[a, b]| [a.min(b), a.max(b)]).collect();
     let (_, inv, cnt) = unique_rows(&key);
-    e.iter().zip(&inv).filter(|&(_, &i)| cnt[i] == 1).map(|(&x, _)| x).collect()
+    e.iter()
+        .zip(&inv)
+        .filter(|&(_, &i)| cnt[i] == 1)
+        .map(|(&x, _)| x)
+        .collect()
 }
 
 /// Dense weights -> 4 joints and normalised weights: the heaviest first. Mirrored bones often weigh
@@ -54,7 +61,8 @@ pub type Src = (Vec<usize>, Vec<usize>, Vec<f64>);
 /// attributes; its one caller used only these.)
 pub fn clip_by_field(idx: &[usize], g: &[f64]) -> (Vec<usize>, Src) {
     let inside: Vec<bool> = g.iter().map(|&v| v > 0.0).collect();
-    let mut keep: std::collections::HashMap<(usize, usize), usize> = std::collections::HashMap::new();
+    let mut keep: std::collections::HashMap<(usize, usize), usize> =
+        std::collections::HashMap::new();
     let (mut out_a, mut out_b, mut out_t) = (Vec::new(), Vec::new(), Vec::new());
     let mut vert = |a: usize, b: Option<usize>| -> usize {
         let (k, a, b, t) = match b {
@@ -195,9 +203,20 @@ pub struct OnMesh {
 impl OnMesh {
     /// The triangles of `idx` whose corners are all among the first `n` of `pos`.
     pub fn new(pos: &[V3], idx: &[usize], n: usize) -> Self {
-        let tris: Vec<[usize; 3]> = idx.chunks(3).filter(|t| t.iter().all(|&i| i < n)).map(|t| [t[0], t[1], t[2]]).collect();
-        let centres: Vec<V3> = tris.iter().map(|t| (pos[t[0]] + pos[t[1]] + pos[t[2]]) / 3.0).collect();
-        OnMesh { pos: pos.to_vec(), tris, centres: KdTree::new(&centres) }
+        let tris: Vec<[usize; 3]> = idx
+            .chunks(3)
+            .filter(|t| t.iter().all(|&i| i < n))
+            .map(|t| [t[0], t[1], t[2]])
+            .collect();
+        let centres: Vec<V3> = tris
+            .iter()
+            .map(|t| (pos[t[0]] + pos[t[1]] + pos[t[2]]) / 3.0)
+            .collect();
+        OnMesh {
+            pos: pos.to_vec(),
+            tris,
+            centres: KdTree::new(&centres),
+        }
     }
 
     /// The nearest point to p (of the triangles with the 16 nearest centres): its corners and weights.
@@ -206,7 +225,8 @@ impl OnMesh {
         for (_, t) in self.centres.query(&p, 16) {
             let [a, b, c] = self.tris[t];
             let w = nearest_weights(p, self.pos[a], self.pos[b], self.pos[c]);
-            let d = (self.pos[a] * w[0] + self.pos[b] * w[1] + self.pos[c] * w[2] - p).norm_squared();
+            let d =
+                (self.pos[a] * w[0] + self.pos[b] * w[1] + self.pos[c] * w[2] - p).norm_squared();
             if d < best.0 {
                 best = (d, [a, b, c], w);
             }

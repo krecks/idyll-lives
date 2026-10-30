@@ -71,7 +71,9 @@ pub(crate) fn update(w: &mut World) {
     let mut out_of_cribs = Vec::new();
     let mut reached_retirement = Vec::new();
     for i in 0..w.sims.len() {
-        let Some(days_per_year) = days_per_year else { break };
+        let Some(days_per_year) = days_per_year else {
+            break;
+        };
         if !w.sims[i].here() || born.contains(&i) {
             continue;
         }
@@ -98,11 +100,23 @@ pub(crate) fn update(w: &mut World) {
             }
             if was && !now {
                 let grade = sim.grade;
-                let f = if grade >= school.good { school.good_feeling } else if grade < school.poor { school.poor_feeling } else { None };
+                let f = if grade >= school.good {
+                    school.good_feeling
+                } else if grade < school.poor {
+                    school.poor_feeling
+                } else {
+                    None
+                };
                 if let Some(f) = f {
                     social::add_feeling(&mut sim.feelings, f, &w.content.feelings, w.tick);
                 }
-                w.events.push_detail(w.tick, EventKind::Graduated, i, Some(grade.round() as i64), None);
+                w.events.push_detail(
+                    w.tick,
+                    EventKind::Graduated,
+                    i,
+                    Some(grade.round() as i64),
+                    None,
+                );
             }
         }
         let sim = &mut w.sims[i];
@@ -118,7 +132,8 @@ pub(crate) fn update(w: &mut World) {
         }
         w.refresh_base_mods(i);
         w.structure_version = w.structure_version.wrapping_add(1);
-        w.events.push_detail(w.tick, EventKind::GrewOlder, i, Some(stage as i64), None);
+        w.events
+            .push_detail(w.tick, EventKind::GrewOlder, i, Some(stage as i64), None);
     }
     for i in out_of_cribs {
         bed_for_child(w, i);
@@ -128,9 +143,13 @@ pub(crate) fn update(w: &mut World) {
             retire_if_due(w, i, reached_retirement.contains(&i));
         }
     }
-    let Some(days_per_year) = days_per_year else { return };
+    let Some(days_per_year) = days_per_year else {
+        return;
+    };
     for i in 0..w.sims.len() {
-        let Some(death) = w.content.life.death else { break };
+        let Some(death) = w.content.life.death else {
+            break;
+        };
         if !w.sims[i].here() || w.sims[i].age < death.from {
             continue;
         }
@@ -164,7 +183,8 @@ fn retire_if_due(w: &mut World, i: usize, reached: bool) {
     }
     // (The story tells of leaving a job; retiring without one passes quietly.)
     if let Some((career, grade)) = job {
-        w.events.push_career(w.tick, EventKind::Retired, i, career, Some(grade as i64));
+        w.events
+            .push_career(w.tick, EventKind::Retired, i, career, Some(grade as i64));
     }
 }
 
@@ -206,50 +226,113 @@ pub fn pass_away(w: &mut World, i: usize) {
 
 /// Residents of household `h` who are here.
 fn members(w: &World, h: usize) -> Vec<usize> {
-    (0..w.sims.len()).filter(|&i| w.sims[i].here() && w.sims[i].household as usize == h).collect()
+    (0..w.sims.len())
+        .filter(|&i| w.sims[i].here() && w.sims[i].household as usize == h)
+        .collect()
 }
 
 /// Residents of household `h` who are here and past the crib (who need a bed).
 fn sleepers(w: &World, h: usize) -> Vec<usize> {
-    members(w, h).into_iter().filter(|&i| !w.content.life.baby(w.sims[i].age)).collect()
+    members(w, h)
+        .into_iter()
+        .filter(|&i| !w.content.life.baby(w.sims[i].age))
+        .collect()
 }
 
-/// Beds (sleeping places) in the home on `plot`, broken ones too (whoever lives there fixes
-/// them; a house whose only bed broke while empty would otherwise never be lived in again).
-fn beds(w: &World, plot: u32) -> usize {
+/// Bed places in the home on `plot`, broken ones too (whoever lives there fixes them; a house
+/// whose only bed broke while empty would otherwise never be lived in again): one for each bed
+/// and each bunk of a bed for two apart, and the couple's beds (a double bed: somewhere to try
+/// for a baby, `privacy::couples_bed`), whose other half is only a partner's.
+#[derive(Clone, Copy)]
+struct Beds {
+    /// A place for anyone: a bed, a bunk, or a couple's bed slept in alone.
+    places: usize,
+    /// Couple's beds, each a place more for a couple.
+    couples: usize,
+}
+
+impl Beds {
+    /// Places for `pairs` couples and everyone else on their own.
+    fn for_pairs(self, pairs: usize) -> usize {
+        self.places + self.couples.min(pairs)
+    }
+
+    /// The most who could sleep here: couples in every couple's bed.
+    fn most(self) -> usize {
+        self.places + self.couples
+    }
+}
+
+fn beds(w: &World, plot: u32) -> Beds {
     let sleep = w.content.day_rhythm.sleep_tags;
-    w.objects
+    let mut beds = Beds {
+        places: 0,
+        couples: 0,
+    };
+    for (o, _) in w
+        .objects
         .iter()
         .zip(&w.object_plot)
         .filter(|(_, p)| **p == Some(plot))
-        .filter(|(o, _)| w.content.objects[o.def].interactions.iter().any(|it| it.tags & sleep != 0))
-        .map(|(o, _)| usize::from(w.content.objects[o.def].slots))
-        .sum()
+    {
+        let def = &w.content.objects[o.def];
+        if !def.interactions.iter().any(|it| it.tags & sleep != 0) {
+            continue;
+        }
+        if crate::privacy::couples_bed(def) {
+            beds.places += 1;
+            beds.couples += usize::from(def.slots) - 1;
+        } else {
+            beds.places += usize::from(def.slots);
+        }
+    }
+    beds
 }
 
-/// Whether household `h`'s home has a bed and room for `more` residents.
-fn has_room(w: &World, h: usize, more: usize) -> bool {
-    let Some(plot) = w.households[h].plot else { return false };
-    let n = members(w, h).len() + more;
-    n <= w.content.rules.max_household && beds(w, plot) >= n
+/// Couples among `sims` (both of them in it).
+fn pairs(w: &World, sims: &[usize]) -> usize {
+    sims.iter()
+        .filter(|&&a| {
+            w.relationships
+                .partner_of(a)
+                .is_some_and(|b| b > a && sims.contains(&b))
+        })
+        .count()
+}
+
+/// Whether household `h`'s home has a bed and room for one more resident, the partner of one of
+/// them moving in.
+fn has_room_for_partner(w: &World, h: usize) -> bool {
+    let Some(plot) = w.households[h].plot else {
+        return false;
+    };
+    let members = members(w, h);
+    let n = members.len() + 1;
+    n <= w.content.rules.max_household && beds(w, plot).for_pairs(pairs(w, &members) + 1) >= n
 }
 
 /// Whether a resident's household lets them move on their own (the player can say no). Being
 /// at work or out doesn't matter: they come back to the new home.
 fn may_move(w: &World, i: usize) -> bool {
     let s = &w.sims[i];
-    s.here() && s.adult(&w.content) && (w.player_moves || !w.households[s.household as usize].player)
+    s.here()
+        && s.adult(&w.content)
+        && (w.player_moves || !w.households[s.household as usize].player)
 }
 
-/// A house nobody lives in (not a park, not the player's home), with beds for `n`.
+/// A house nobody lives in (not a park, not the player's home), with beds for `n`: one, or two
+/// partners.
 fn vacant_plot(w: &World, n: usize) -> Option<u32> {
     w.plots
         .iter()
         .filter(|p| !p.public)
         .filter(|p| {
-            !w.households.iter().enumerate().any(|(h, hh)| hh.plot == Some(p.id) && (hh.player || !members(w, h).is_empty()))
+            !w.households
+                .iter()
+                .enumerate()
+                .any(|(h, hh)| hh.plot == Some(p.id) && (hh.player || !members(w, h).is_empty()))
         })
-        .find(|p| beds(w, p.id) >= n)
+        .find(|p| beds(w, p.id).for_pairs(n / 2) >= n)
         .map(|p| p.id)
 }
 
@@ -291,7 +374,9 @@ fn move_to(w: &mut World, i: usize, to: usize) {
     for o in &mut w.objects {
         o.release(id);
     }
-    let arrive = w.households[to].plot.map(|p| w.plots[p as usize].arrival_point());
+    let arrive = w.households[to]
+        .plot
+        .map(|p| w.plots[p as usize].arrival_point());
     let sim = &mut w.sims[i];
     sim.household = to as u32;
     sim.clear_activity();
@@ -311,20 +396,28 @@ fn moving(w: &mut World, rules: &crate::content::MovingRules) {
     for a in 0..n {
         for b in a + 1..n {
             let (ra, rb) = (*w.relationships.get(a, b), *w.relationships.get(b, a));
-            if !ra.partners || !may_move(w, a) || !may_move(w, b) || w.sims[a].household == w.sims[b].household {
+            if !ra.partners
+                || !may_move(w, a)
+                || !may_move(w, b)
+                || w.sims[a].household == w.sims[b].household
+            {
                 continue;
             }
             if ra.romance.min(rb.romance) < rules.romance || w.rng.next_f32() >= rules.partners {
                 continue;
             }
             let (ha, hb) = (w.sims[a].household as usize, w.sims[b].household as usize);
-            let into_b = has_room(w, hb, 1);
-            let into_a = has_room(w, ha, 1);
+            let into_b = has_room_for_partner(w, hb);
+            let into_a = has_room_for_partner(w, ha);
             // The player's home first, else the one from the fuller home moves.
             let mover = match (into_a, into_b) {
                 (true, true) if w.households[ha].player => Some(b),
                 (true, true) if w.households[hb].player => Some(a),
-                (true, true) => Some(if members(w, ha).len() >= members(w, hb).len() { a } else { b }),
+                (true, true) => Some(if members(w, ha).len() >= members(w, hb).len() {
+                    a
+                } else {
+                    b
+                }),
                 (true, false) => Some(b),
                 (false, true) => Some(a),
                 (false, false) => None,
@@ -333,7 +426,8 @@ fn moving(w: &mut World, rules: &crate::content::MovingRules) {
                 let partner = if m == a { b } else { a };
                 let to = w.sims[partner].household as usize;
                 move_to(w, m, to);
-                w.events.push(tick, EventKind::MovedInWith, m, partner, None);
+                w.events
+                    .push(tick, EventKind::MovedInWith, m, partner, None);
             } else if let Some(plot) = vacant_plot(w, 2) {
                 let name = w.households[ha].name.clone();
                 let h = household_for(w, plot, &name);
@@ -352,11 +446,19 @@ fn moving(w: &mut World, rules: &crate::content::MovingRules) {
         if !may_move(w, i) || age < rules.leave_home_age || !working {
             continue;
         }
-        let with_parent = (0..n).any(|j| w.sims[j].here() && w.sims[j].household as usize == h && w.relationships.kin(i, j) == Kin::Parent);
+        let with_parent = (0..n).any(|j| {
+            w.sims[j].here()
+                && w.sims[j].household as usize == h
+                && w.relationships.kin(i, j) == Kin::Parent
+        });
         if !with_parent || w.rng.next_f32() >= rules.leave_home {
             continue;
         }
-        let partner = (0..n).find(|&j| w.sims[j].here() && w.sims[j].household as usize == h && w.relationships.get(i, j).partners);
+        let partner = (0..n).find(|&j| {
+            w.sims[j].here()
+                && w.sims[j].household as usize == h
+                && w.relationships.get(i, j).partners
+        });
         let going = 1 + usize::from(partner.is_some());
         if let Some(plot) = vacant_plot(w, going) {
             let name = w.households[h].name.clone();
@@ -365,12 +467,18 @@ fn moving(w: &mut World, rules: &crate::content::MovingRules) {
             if let Some(p) = partner {
                 move_to(w, p, new);
             }
-            w.events.push_detail(tick, EventKind::MovedOut, i, None, None);
-        } else if age >= rules.leave_town_age && !w.households[h].player && w.rng.next_f32() < rules.leave_town {
-            w.events.push_detail(tick, EventKind::MovedAway, i, None, None);
+            w.events
+                .push_detail(tick, EventKind::MovedOut, i, None, None);
+        } else if age >= rules.leave_town_age
+            && !w.households[h].player
+            && w.rng.next_f32() < rules.leave_town
+        {
+            w.events
+                .push_detail(tick, EventKind::MovedAway, i, None, None);
             w.depart(i, GoneWhy::MovedAway);
             if let Some(p) = partner {
-                w.events.push_detail(tick, EventKind::MovedAway, p, None, None);
+                w.events
+                    .push_detail(tick, EventKind::MovedAway, p, None, None);
                 w.depart(p, GoneWhy::MovedAway);
             }
         }
@@ -384,8 +492,11 @@ fn moving(w: &mut World, rules: &crate::content::MovingRules) {
 fn newcomers(w: &mut World, rules: &crate::content::NewcomerRules) {
     for p in 0..w.plots.len() as u32 {
         if w.plots[p as usize].public
-            || beds(w, p) == 0
-            || w.households.iter().enumerate().any(|(h, hh)| hh.plot == Some(p) && (hh.player || !members(w, h).is_empty()))
+            || beds(w, p).most() == 0
+            || w.households
+                .iter()
+                .enumerate()
+                .any(|(h, hh)| hh.plot == Some(p) && (hh.player || !members(w, h).is_empty()))
         {
             continue;
         }
@@ -400,43 +511,76 @@ fn pick<'a, T>(rng: &mut crate::rng::Rng, list: &'a [T]) -> Option<&'a T> {
 }
 
 /// A new household moves into the house on `plot`: a single, a couple (sometimes with a grown
-/// child) or two siblings, sized to its beds, with names, traits, perks and ages from content
-/// and an appearance seed (`{"seed": n}`, expanded into a look by the web).
+/// child) or siblings, sized to its beds (only a couple shares a couple's bed), with names,
+/// traits, perks and ages from content and an appearance seed (`{"seed": n}`, expanded into a
+/// look by the web). Never strangers: only those who belong together share a bedroom
+/// (`privacy::room_claimants`).
 pub fn arrive(w: &mut World, plot: u32) -> bool {
     let content = &w.content;
-    let most = beds(w, plot).min(content.rules.max_household).max(1);
+    let beds = beds(w, plot);
+    let most = beds.most().min(content.rules.max_household).max(1);
     let here = w.sims.iter().filter(|s| s.here()).count();
     if here >= crate::world::MAX_SIMS || content.genders.is_empty() {
         return false;
     }
     let size = (1 + (w.rng.next_u32() as usize) % most).min(crate::world::MAX_SIMS - here);
     let couple = size >= 2 && w.rng.next_f32() < 0.6;
+    let size = size.min(beds.for_pairs(usize::from(couple))).max(1);
     // Everyone who moves in is grown up (the first stages are a baby's and a child's).
-    let adult = content.life.stages.iter().find(|s| s.adult).map_or(18.0, |s| s.from);
+    let adult = content
+        .life
+        .stages
+        .iter()
+        .find(|s| s.adult)
+        .map_or(18.0, |s| s.from);
     let [lo, hi] = content.life.start_age;
     let mut spawns = Vec::new();
     let mut bonds = Vec::new();
     let mut taken: Vec<String> = Vec::new();
     // A family name no household in town has (any, once every one is taken).
-    let used: Vec<&str> = w.sims.iter().filter(|s| s.here()).filter_map(|s| w.households.get(s.household as usize)).map(|h| h.name.as_str()).collect();
-    let free: Vec<&String> = content.names.last.iter().filter(|n| !used.contains(&n.as_str())).collect();
+    let used: Vec<&str> = w
+        .sims
+        .iter()
+        .filter(|s| s.here())
+        .filter_map(|s| w.households.get(s.household as usize))
+        .map(|h| h.name.as_str())
+        .collect();
+    let free: Vec<&String> = content
+        .names
+        .last
+        .iter()
+        .filter(|n| !used.contains(&n.as_str()))
+        .collect();
     let surname = match pick(&mut w.rng, &free) {
         Some(n) => (*n).clone(),
-        None => pick(&mut w.rng, &content.names.last).cloned().unwrap_or_else(|| "Newcomer".into()),
+        None => pick(&mut w.rng, &content.names.last)
+            .cloned()
+            .unwrap_or_else(|| "Newcomer".into()),
     };
     let at = w.plots[plot as usize].arrival_point();
     for k in 0..size {
         let content = &w.content;
-        let gender = pick(&mut w.rng, &content.genders).map(|g| g.id.clone()).unwrap_or_default();
-        let firsts = content.names.by_gender.get(&gender).filter(|l| !l.is_empty()).unwrap_or(&content.names.first);
+        let gender = pick(&mut w.rng, &content.genders)
+            .map(|g| g.id.clone())
+            .unwrap_or_default();
+        let firsts = content
+            .names
+            .by_gender
+            .get(&gender)
+            .filter(|l| !l.is_empty())
+            .unwrap_or(&content.names.first);
         let free: Vec<&String> = firsts.iter().filter(|n| !taken.contains(n)).collect();
-        let name = pick(&mut w.rng, &free).map(|n| (*n).clone()).unwrap_or_else(|| format!("Newcomer {}", k + 1));
+        let name = pick(&mut w.rng, &free)
+            .map(|n| (*n).clone())
+            .unwrap_or_else(|| format!("Newcomer {}", k + 1));
         taken.push(name.clone());
         // Partners close in age; a grown child twenty to thirty years younger.
         let age = match k {
             0 => lo + w.rng.next_f32() * (hi - lo),
             1 if couple => spawns_age(&spawns, 0) + w.rng.range(-4.0, 4.0),
-            2 if couple => (spawns_age(&spawns, 0).min(spawns_age(&spawns, 1)) - w.rng.range(20.0, 30.0)).max(adult),
+            2 if couple => (spawns_age(&spawns, 0).min(spawns_age(&spawns, 1))
+                - w.rng.range(20.0, 30.0))
+            .max(adult),
             _ => spawns_age(&spawns, 0) + w.rng.range(-6.0, 6.0),
         }
         .max(adult)
@@ -445,7 +589,12 @@ pub fn arrive(w: &mut World, plot: u32) -> bool {
             // The couple are attracted to each other (the second is picked to fit below).
             content.genders.iter().map(|g| g.id.clone()).collect()
         } else {
-            content.genders.iter().filter(|g| g.id != gender || w.rng.next_f32() < 0.15).map(|g| g.id.clone()).collect()
+            content
+                .genders
+                .iter()
+                .filter(|g| g.id != gender || w.rng.next_f32() < 0.15)
+                .map(|g| g.id.clone())
+                .collect()
         };
         let (traits, perks) = random_character(w);
         let seed = w.rng.next_u32();
@@ -460,8 +609,12 @@ pub fn arrive(w: &mut World, plot: u32) -> bool {
             bonds.push((2, 0, "parent"));
             bonds.push((2, 1, "parent"));
         }
-    } else if size >= 2 && w.rng.next_f32() < 0.4 {
-        bonds.push((0, 1, "siblings"));
+    } else {
+        for b in 1..size {
+            for a in 0..b {
+                bonds.push((a, b, "siblings"));
+            }
+        }
     }
     let h = household_for(w, plot, &surname);
     w.households[h].funds = w.content.starting_funds;
@@ -482,18 +635,26 @@ pub fn arrive(w: &mut World, plot: u32) -> bool {
     let bonds: Vec<crate::lot::BondRaw> = bonds
         .into_iter()
         .filter(|(_, _, preset)| w.content.bond_presets.contains_key(*preset))
-        .map(|(a, b, preset)| crate::lot::BondRaw { a: ids[a], b: ids[b], preset: preset.into() })
+        .map(|(a, b, preset)| crate::lot::BondRaw {
+            a: ids[a],
+            b: ids[b],
+            preset: preset.into(),
+        })
         .collect();
     if w.init_relationships_for(&ids, &bonds).is_err() {
         return false;
     }
     w.structure_version = w.structure_version.wrapping_add(1);
-    w.events.push_detail(w.tick, EventKind::MovedIn, ids[0], None, None);
+    w.events
+        .push_detail(w.tick, EventKind::MovedIn, ids[0], None, None);
     true
 }
 
 fn spawns_age(spawns: &[serde_json::Value], k: usize) -> f32 {
-    spawns.get(k).and_then(|s| s["age"].as_f64()).unwrap_or(30.0) as f32
+    spawns
+        .get(k)
+        .and_then(|s| s["age"].as_f64())
+        .unwrap_or(30.0) as f32
 }
 
 /// Traits (no two that clash) and perks within the points, at random.
@@ -512,7 +673,10 @@ fn random_character(w: &mut World) -> (Vec<String>, Vec<String>) {
         }
         let def = &w.content.traits[t];
         let clash = traits.iter().any(|x| def.conflicts.contains(x))
-            || w.content.traits.iter().any(|d| traits.contains(&d.id) && d.conflicts.contains(&def.id));
+            || w.content
+                .traits
+                .iter()
+                .any(|d| traits.contains(&d.id) && d.conflicts.contains(&def.id));
         if !clash {
             traits.push(def.id.clone());
         }
@@ -534,14 +698,32 @@ fn random_character(w: &mut World) -> (Vec<String>, Vec<String>) {
 /// Every baby of household `h` needs a crib at home: one is delivered for each baby without a
 /// free one (story: a crib arrived). Babies with no room for a crib stay with their parents.
 pub(crate) fn cribs_for_babies(w: &mut World, h: usize) {
-    let Some(plot) = w.households[h].plot else { return };
-    let Some(crib) = w.content.objects.iter().position(|d| d.price.is_some() && d.interactions.iter().any(|it| it.baby_bed())) else { return };
-    let babies = members(w, h).into_iter().filter(|&i| w.content.life.baby(w.sims[i].age)).count();
+    let Some(plot) = w.households[h].plot else {
+        return;
+    };
+    let Some(crib) = w
+        .content
+        .objects
+        .iter()
+        .position(|d| d.price.is_some() && d.interactions.iter().any(|it| it.baby_bed()))
+    else {
+        return;
+    };
+    let babies = members(w, h)
+        .into_iter()
+        .filter(|&i| w.content.life.baby(w.sims[i].age))
+        .count();
     let cribs = w
         .objects
         .iter()
         .zip(&w.object_plot)
-        .filter(|(o, p)| **p == Some(plot) && w.content.objects[o.def].interactions.iter().any(|it| it.baby_bed()))
+        .filter(|(o, p)| {
+            **p == Some(plot)
+                && w.content.objects[o.def]
+                    .interactions
+                    .iter()
+                    .any(|it| it.baby_bed())
+        })
         .count();
     for _ in cribs..babies {
         if w.deliver(h as u32, crib).is_none() {
@@ -552,15 +734,21 @@ pub(crate) fn cribs_for_babies(w: &mut World, h: usize) {
 
 /// The player's household starts in a home with fewer bed places than people past the crib:
 /// tell them once, for each resident without a bed (on the game's first step, so it's news to the
-/// view, not the story so far). The simulation's fallback is unchanged: they share a bed or sleep
+/// view, not the story so far). The simulation's fallback is unchanged: they share a bed (only a partner, in a couple's bed) or sleep
 /// on the floor until the player buys one.
 pub(crate) fn notify_missing_beds(w: &mut World, h: usize) {
     let sleep = w.content.day_rhythm.sleep_tags;
     if sleep == 0 || !w.households[h].player {
         return;
     }
-    let Some(plot) = w.households[h].plot else { return };
-    for &i in sleepers(w, h).iter().skip(beds(w, plot)) {
+    let Some(plot) = w.households[h].plot else {
+        return;
+    };
+    let sleepers = sleepers(w, h);
+    for &i in sleepers
+        .iter()
+        .skip(beds(w, plot).for_pairs(pairs(w, &sleepers)))
+    {
         w.events.push(w.tick, EventKind::NoBed, i, i, None);
     }
 }
@@ -573,8 +761,11 @@ pub(crate) fn notify_missing_beds(w: &mut World, h: usize) {
 pub(crate) fn bed_for_child(w: &mut World, i: usize) {
     let h = w.sims[i].household as usize;
     let sleep = w.content.day_rhythm.sleep_tags;
-    let Some(plot) = w.households[h].plot.filter(|_| sleep != 0) else { return };
-    if beds(w, plot) >= sleepers(w, h).len() {
+    let Some(plot) = w.households[h].plot.filter(|_| sleep != 0) else {
+        return;
+    };
+    let sleepers = sleepers(w, h);
+    if beds(w, plot).for_pairs(pairs(w, &sleepers)) >= sleepers.len() {
         return;
     }
     if w.households[h].player {
@@ -582,7 +773,12 @@ pub(crate) fn bed_for_child(w: &mut World, i: usize) {
         return;
     }
     let bed = (0..w.content.objects.len())
-        .filter(|&d| w.content.objects[d].interactions.iter().any(|it| it.tags & sleep != 0 && !it.baby && !it.spare))
+        .filter(|&d| {
+            w.content.objects[d]
+                .interactions
+                .iter()
+                .any(|it| it.tags & sleep != 0 && !it.baby && !it.spare)
+        })
         .filter_map(|d| w.content.objects[d].price.map(|p| (p, d)))
         .min();
     let reserve = crate::life::weekly_costs(w, h).map_or(0, |(rent, bills)| rent + bills);
@@ -600,18 +796,26 @@ pub(crate) fn bed_for_child(w: &mut World, i: usize) {
 /// is on the way, if they live together, are grown-ups young enough, there's room for one more
 /// and none is on the way already.
 pub(crate) fn conceive(w: &mut World, a: usize, b: usize) {
-    let Some(rules) = w.content.life.pregnancy else { return };
+    let Some(rules) = w.content.life.pregnancy else {
+        return;
+    };
     let (sa, sb) = (&w.sims[a], &w.sims[b]);
     let h = sa.household as usize;
     let fits = |s: &crate::world::Sim| s.here() && s.adult(&w.content) && s.age <= rules.max_age;
     if !fits(sa) || !fits(sb) || sb.household as usize != h || !w.relationships.get(a, b).partners {
         return;
     }
-    if w.households[h].expecting.is_some() || !room_for_one(w, h) || w.rng.next_f32() >= rules.chance {
+    if w.households[h].expecting.is_some()
+        || !room_for_one(w, h)
+        || w.rng.next_f32() >= rules.chance
+    {
         return;
     }
     let due = clock::day(w.tick) + rules.days;
-    w.households[h].expecting = Some(crate::world::Expecting { parents: [a as u32, b as u32], due });
+    w.households[h].expecting = Some(crate::world::Expecting {
+        parents: [a as u32, b as u32],
+        due,
+    });
     w.events.push(w.tick, EventKind::Expecting, a, b, None);
 }
 
@@ -626,14 +830,27 @@ fn births(w: &mut World) -> Vec<usize> {
     let today = clock::day(w.tick);
     let mut born = Vec::new();
     for h in 0..w.households.len() {
-        let Some(e) = w.households[h].expecting.filter(|e| e.due <= today) else { continue };
+        let Some(e) = w.households[h].expecting.filter(|e| e.due <= today) else {
+            continue;
+        };
         w.households[h].expecting = None;
-        let parents: Vec<usize> = e.parents.iter().map(|&p| p as usize).filter(|&p| w.sims[p].here()).collect();
+        let parents: Vec<usize> = e
+            .parents
+            .iter()
+            .map(|&p| p as usize)
+            .filter(|&p| w.sims[p].here())
+            .collect();
         if !members(w, h).iter().any(|&i| w.sims[i].adult(&w.content)) || !room_for_one(w, h) {
             continue;
         }
         if let Some(baby) = add_child(w, h, 0.0, &parents, true) {
-            w.events.push(w.tick, EventKind::Born, baby, parents.first().copied().unwrap_or(baby), parents.get(1).copied());
+            w.events.push(
+                w.tick,
+                EventKind::Born,
+                baby,
+                parents.first().copied().unwrap_or(baby),
+                parents.get(1).copied(),
+            );
             born.push(baby);
         }
     }
@@ -643,9 +860,16 @@ fn births(w: &mut World) -> Vec<usize> {
 /// Adopts a baby (or a child) into household `h`, for content `adoption` (free in Creative).
 pub fn adopt(w: &mut World, household: u32, child: bool) -> Result<u32, crate::Error> {
     use crate::Error;
-    let cost = w.content.life.adoption_cost.ok_or_else(|| Error::new("adoption isn't possible here"))?;
+    let cost = w
+        .content
+        .life
+        .adoption_cost
+        .ok_or_else(|| Error::new("adoption isn't possible here"))?;
     let (h, _) = w.home_of(household)?;
-    let adults: Vec<usize> = members(w, h).into_iter().filter(|&i| w.sims[i].adult(&w.content)).collect();
+    let adults: Vec<usize> = members(w, h)
+        .into_iter()
+        .filter(|&i| w.sims[i].adult(&w.content))
+        .collect();
     if adults.is_empty() {
         return Err(Error::new("it takes a grown-up to adopt"));
     }
@@ -656,12 +880,28 @@ pub fn adopt(w: &mut World, household: u32, child: bool) -> Result<u32, crate::E
     // The parents: a couple if there is one, else the first grown-up.
     let parents: Vec<usize> = adults
         .iter()
-        .find_map(|&a| adults.iter().find(|&&b| b != a && w.relationships.get(a, b).partners).map(|&b| vec![a, b]))
+        .find_map(|&a| {
+            adults
+                .iter()
+                .find(|&&b| b != a && w.relationships.get(a, b).partners)
+                .map(|&b| vec![a, b])
+        })
         .unwrap_or_else(|| vec![adults[0]]);
-    let age = if child { 3.0 + (w.rng.next_u32() % 8) as f32 } else { 0.0 };
-    let id = add_child(w, h, age, &parents, false).ok_or_else(|| Error::new("there's no room for another"))?;
+    let age = if child {
+        3.0 + (w.rng.next_u32() % 8) as f32
+    } else {
+        0.0
+    };
+    let id = add_child(w, h, age, &parents, false)
+        .ok_or_else(|| Error::new("there's no room for another"))?;
     w.pay(h, cost);
-    w.events.push(w.tick, EventKind::Adopted, id, parents[0], parents.get(1).copied());
+    w.events.push(
+        w.tick,
+        EventKind::Adopted,
+        id,
+        parents[0],
+        parents.get(1).copied(),
+    );
     if !w.content.life.baby(age) {
         bed_for_child(w, id);
     }
@@ -675,14 +915,30 @@ pub fn adopt(w: &mut World, household: u32, child: bool) -> Result<u32, crate::E
 fn add_child(w: &mut World, h: usize, age: f32, parents: &[usize], born: bool) -> Option<usize> {
     let content = &w.content;
     let gender = pick(&mut w.rng, &content.genders).map(|g| g.id.clone())?;
-    let firsts = content.names.by_gender.get(&gender).filter(|l| !l.is_empty()).unwrap_or(&content.names.first);
-    let taken: Vec<&str> = w.sims.iter().filter(|s| s.here() && s.household as usize == h).map(|s| s.name.as_str()).collect();
-    let free: Vec<&String> = firsts.iter().filter(|n| !taken.contains(&n.as_str())).collect();
-    let name = pick(&mut w.rng, &free).map(|n| (*n).clone()).unwrap_or_else(|| "Baby".into());
-    let at = parents
-        .first()
-        .map(|&p| w.sims[p].pos)
-        .or_else(|| w.households[h].plot.map(|p| w.plots[p as usize].arrival_point()))?;
+    let firsts = content
+        .names
+        .by_gender
+        .get(&gender)
+        .filter(|l| !l.is_empty())
+        .unwrap_or(&content.names.first);
+    let taken: Vec<&str> = w
+        .sims
+        .iter()
+        .filter(|s| s.here() && s.household as usize == h)
+        .map(|s| s.name.as_str())
+        .collect();
+    let free: Vec<&String> = firsts
+        .iter()
+        .filter(|n| !taken.contains(&n.as_str()))
+        .collect();
+    let name = pick(&mut w.rng, &free)
+        .map(|n| (*n).clone())
+        .unwrap_or_else(|| "Baby".into());
+    let at = parents.first().map(|&p| w.sims[p].pos).or_else(|| {
+        w.households[h]
+            .plot
+            .map(|p| w.plots[p as usize].arrival_point())
+    })?;
     let (traits, perks) = random_character(w);
     let seed = w.rng.next_u32();
     let spawn = serde_json::json!({
@@ -696,14 +952,24 @@ fn add_child(w: &mut World, h: usize, age: f32, parents: &[usize], born: bool) -
     let mut bonds = Vec::new();
     if w.content.bond_presets.contains_key("parent") {
         for &p in parents {
-            bonds.push(crate::lot::BondRaw { a: id, b: p, preset: "parent".into() });
+            bonds.push(crate::lot::BondRaw {
+                a: id,
+                b: p,
+                preset: "parent".into(),
+            });
         }
     }
     if w.content.bond_presets.contains_key("siblings") {
         for j in 0..w.sims.len() {
-            let child_of_ours = parents.iter().any(|&p| w.relationships.kin(j, p) == Kin::Parent);
+            let child_of_ours = parents
+                .iter()
+                .any(|&p| w.relationships.kin(j, p) == Kin::Parent);
             if j != id && w.sims[j].here() && child_of_ours {
-                bonds.push(crate::lot::BondRaw { a: id, b: j, preset: "siblings".into() });
+                bonds.push(crate::lot::BondRaw {
+                    a: id,
+                    b: j,
+                    preset: "siblings".into(),
+                });
             }
         }
     }
@@ -716,7 +982,10 @@ fn add_child(w: &mut World, h: usize, age: f32, parents: &[usize], born: bool) -
 /// Now and then a neighbour household of grown-ups with no children, room and the money for it
 /// adopts (content `adoption.neighbours`, a daily chance).
 fn neighbours_adopt(w: &mut World) {
-    let (Some(cost), chance) = (w.content.life.adoption_cost, w.content.life.adoption_chance) else { return };
+    let (Some(cost), chance) = (w.content.life.adoption_cost, w.content.life.adoption_chance)
+    else {
+        return;
+    };
     let max_age = w.content.life.pregnancy.map_or(55.0, |p| p.max_age + 5.0);
     for h in 0..w.households.len() {
         let hh = &w.households[h];
@@ -724,7 +993,10 @@ fn neighbours_adopt(w: &mut World) {
             continue;
         }
         let people = members(w, h);
-        let grown = people.iter().filter(|&&i| w.sims[i].adult(&w.content)).count();
+        let grown = people
+            .iter()
+            .filter(|&&i| w.sims[i].adult(&w.content))
+            .count();
         let young_enough = people.iter().any(|&i| w.sims[i].age <= max_age);
         if grown == 0 || grown < people.len() || !young_enough || !room_for_one(w, h) {
             continue;

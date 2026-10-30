@@ -124,7 +124,15 @@ pub const AHEAD: f32 = 1.5;
 
 // Every field fits in a Sim's row.
 const _: () = assert!(
-    sim::HEIGHT < SIM_STRIDE && sim::INTERACTION < SIM_STRIDE && sim::RECIPE < SIM_STRIDE && sim::CALL < SIM_STRIDE && sim::AHEAD_Z < SIM_STRIDE && sim::PROGRESS < SIM_STRIDE && sim::CARRY < SIM_STRIDE && sim::PLATE < SIM_STRIDE && sim::SHUTS < SIM_STRIDE
+    sim::HEIGHT < SIM_STRIDE
+        && sim::INTERACTION < SIM_STRIDE
+        && sim::RECIPE < SIM_STRIDE
+        && sim::CALL < SIM_STRIDE
+        && sim::AHEAD_Z < SIM_STRIDE
+        && sim::PROGRESS < SIM_STRIDE
+        && sim::CARRY < SIM_STRIDE
+        && sim::PLATE < SIM_STRIDE
+        && sim::SHUTS < SIM_STRIDE
 );
 const _: () = assert!(header::ITEMS_VERSION < HEADER_LEN && header::STAFF_COUNT < HEADER_LEN);
 
@@ -138,22 +146,44 @@ struct Doing {
 }
 
 impl Doing {
-    const NOTHING: Doing = Doing { object: -1.0, action: -1.0, def: -1.0, interaction: -1.0 };
+    const NOTHING: Doing = Doing {
+        object: -1.0,
+        action: -1.0,
+        def: -1.0,
+        interaction: -1.0,
+    };
 
     /// At an object (an index into `World::objects`; the renderer gets its stable id) or a spot
     /// without an interaction of its own.
     fn plain(world: &World, object: Option<u32>, anim: Option<usize>) -> Doing {
-        let object = object.and_then(|o| world.stable_of(o)).map_or(-1.0, |s| s as f32);
-        Doing { object, action: anim.map_or(-1.0, |a| a as f32), ..Doing::NOTHING }
+        let object = object
+            .and_then(|o| world.stable_of(o))
+            .map_or(-1.0, |s| s as f32);
+        Doing {
+            object,
+            action: anim.map_or(-1.0, |a| a as f32),
+            ..Doing::NOTHING
+        }
     }
 }
 
 /// What `s` eats while at it (`sim::PLATE`): the plate on the table in front of them, else what they hold.
 fn eating(world: &World, s: &Sim) -> Option<usize> {
-    let Some(Activity { task: Task { kind: TaskKind::Eat { plate, .. }, .. }, phase: Phase::Using { .. }, .. }) = s.current() else {
+    let Some(Activity {
+        task: Task {
+            kind: TaskKind::Eat { plate, .. },
+            ..
+        },
+        phase: Phase::Using { .. },
+        ..
+    }) = s.current()
+    else {
         return None;
     };
-    plate.and_then(|p| world.items.get(p)).map(|it| it.def).or(s.held.map(|h| h.def))
+    plate
+        .and_then(|p| world.items.get(p))
+        .map(|it| it.def)
+        .or(s.held.map(|h| h.def))
 }
 
 fn doing(world: &World, s: &Sim) -> Doing {
@@ -161,22 +191,78 @@ fn doing(world: &World, s: &Sim) -> Doing {
         return Doing::NOTHING;
     }
     // Repairing: at the object, the tinker animation while at it.
-    if let Some(Activity { task: Task { kind: TaskKind::Repair { object }, .. }, phase, .. }) = s.current() {
-        let anim = world.content.object_rules.repair.anim.filter(|_| matches!(phase, Phase::Using { .. }));
+    if let Some(Activity {
+        task: Task {
+            kind: TaskKind::Repair { object },
+            ..
+        },
+        phase,
+        ..
+    }) = s.current()
+    {
+        let anim = world
+            .content
+            .object_rules
+            .repair
+            .anim
+            .filter(|_| matches!(phase, Phase::Using { .. }));
         return Doing::plain(world, Some(*object), anim);
     }
     // An accident's while on the spot (asleep on the floor, takeout).
-    if let Some(Activity { task: Task { kind: TaskKind::Spot { accident }, .. }, .. }) = s.current() {
-        return Doing::plain(world, None, world.content.accidents[*accident].rest.as_ref().and_then(|r| r.anim));
+    if let Some(Activity {
+        task: Task {
+            kind: TaskKind::Spot { accident },
+            ..
+        },
+        ..
+    }) = s.current()
+    {
+        return Doing::plain(
+            world,
+            None,
+            world.content.accidents[*accident]
+                .rest
+                .as_ref()
+                .and_then(|r| r.anim),
+        );
     }
     // A visitor knocking at the door.
-    if let Some(Activity { phase: Phase::Knocking { .. }, .. }) = s.current() {
-        return Doing::plain(world, None, world.content.visits.door.as_ref().and_then(|d| d.knock_anim));
+    if let Some(Activity {
+        phase: Phase::Knocking { .. },
+        ..
+    }) = s.current()
+    {
+        return Doing::plain(
+            world,
+            None,
+            world
+                .content
+                .visits
+                .door
+                .as_ref()
+                .and_then(|d| d.knock_anim),
+        );
     }
     // Cooking: at the station, the step's animation for that station while at it (a meal put in
     // the oven, stirred on a hob; at the table, the dish put down); at `origin`, the object the
     // recipe was started from, its interaction is shown for the last step there.
-    if let Some(Activity { task: Task { kind: TaskKind::Cook { recipe, step, station, origin, .. }, .. }, phase, .. }) = s.current() {
+    if let Some(Activity {
+        task:
+            Task {
+                kind:
+                    TaskKind::Cook {
+                        recipe,
+                        step,
+                        station,
+                        origin,
+                        ..
+                    },
+                ..
+            },
+        phase,
+        ..
+    }) = s.current()
+    {
         let Some(o) = station.and_then(|o| world.objects.get(o as usize)) else {
             return Doing::NOTHING;
         };
@@ -186,7 +272,13 @@ fn doing(world: &World, s: &Sim) -> Doing {
         // (The recipe's own interaction names its last step, the cooking itself: a grill station
         // lifts its hood to grill, not to chop on its counter first.)
         let last = *step as usize + 1 >= r.steps.len();
-        let interaction = (*origin == Some(o.id) && last).then(|| def.interactions.iter().position(|i| i.recipe == Some(*recipe))).flatten();
+        let interaction = (*origin == Some(o.id) && last)
+            .then(|| {
+                def.interactions
+                    .iter()
+                    .position(|i| i.recipe == Some(*recipe))
+            })
+            .flatten();
         return Doing {
             object: o.stable as f32,
             // (Past the last step: putting the dish down on the table.)
@@ -201,14 +293,41 @@ fn doing(world: &World, s: &Sim) -> Doing {
         };
     }
     // Eating: at the seat (or standing), the eat animation while at it.
-    if let Some(Activity { task: Task { kind: TaskKind::Eat { seat, .. }, .. }, phase, .. }) = s.current() {
-        let anim = world.content.cooking.eat_anim.filter(|_| matches!(phase, Phase::Using { .. }));
+    if let Some(Activity {
+        task: Task {
+            kind: TaskKind::Eat { seat, .. },
+            ..
+        },
+        phase,
+        ..
+    }) = s.current()
+    {
+        let anim = world
+            .content
+            .cooking
+            .eat_anim
+            .filter(|_| matches!(phase, Phase::Using { .. }));
         return Doing::plain(world, *seat, anim);
     }
     // Carrying a baby (at the crib lifting them out, on the way to where they go, putting them
     // in: shown as the cuddle's lift, `sim::CARRY` says who) or a harvest to the fridge (putting
     // it away there).
-    if let Some(Activity { task: Task { kind: TaskKind::Carry { baby, from, to, stage }, .. }, phase, .. }) = s.current() {
+    if let Some(Activity {
+        task:
+            Task {
+                kind:
+                    TaskKind::Carry {
+                        baby,
+                        from,
+                        to,
+                        stage,
+                    },
+                ..
+            },
+        phase,
+        ..
+    }) = s.current()
+    {
         let at = if *stage == 0 { *from } else { *to };
         let using = matches!(phase, Phase::Using { .. });
         let anim = match baby {
@@ -217,12 +336,24 @@ fn doing(world: &World, s: &Sim) -> Doing {
         }
         .filter(|_| using);
         let mut d = Doing::plain(world, Some(at), anim);
-        d.def = world.objects.get(at as usize).map_or(-1.0, |o| o.def as f32);
+        d.def = world
+            .objects
+            .get(at as usize)
+            .map_or(-1.0, |o| o.def as f32);
         return d;
     }
     // Clearing away: at the bin, the sink or the counter, scraping, washing or putting away (the
     // station's kind too: washing at a dishwasher sounds unlike a sink's running tap).
-    if let Some(Activity { task: Task { kind: TaskKind::Dishes { station, stage, .. }, .. }, phase, .. }) = s.current() {
+    if let Some(Activity {
+        task:
+            Task {
+                kind: TaskKind::Dishes { station, stage, .. },
+                ..
+            },
+        phase,
+        ..
+    }) = s.current()
+    {
         let rules = &world.content.cooking;
         let anim = match stage {
             1 => rules.scrape_anim,
@@ -230,18 +361,53 @@ fn doing(world: &World, s: &Sim) -> Doing {
             _ => rules.dishes_anim,
         };
         let anim = anim.filter(|_| matches!(phase, Phase::Using { .. }));
-        let def = station.and_then(|o| world.objects.get(o as usize)).map_or(-1.0, |o| o.def as f32);
-        return Doing { def, ..Doing::plain(world, *station, anim) };
+        let def = station
+            .and_then(|o| world.objects.get(o as usize))
+            .map_or(-1.0, |o| o.def as f32);
+        return Doing {
+            def,
+            ..Doing::plain(world, *station, anim)
+        };
     }
     // On the phone: on the seat (or standing), the action's animation while at it.
-    if let Some(Activity { task: Task { kind: TaskKind::Phone { seat, action, .. }, .. }, phase, .. }) = s.current() {
+    if let Some(Activity {
+        task:
+            Task {
+                kind: TaskKind::Phone { seat, action, .. },
+                ..
+            },
+        phase,
+        ..
+    }) = s.current()
+    {
         let phone = &world.content.phone;
-        let anim = phone.actions.get(*action).map_or(phone.anim, |a| a.anim).filter(|_| matches!(phase, Phase::Using { .. }));
+        let anim = phone
+            .actions
+            .get(*action)
+            .map_or(phone.anim, |a| a.anim)
+            .filter(|_| matches!(phase, Phase::Using { .. }));
         return Doing::plain(world, *seat, anim);
     }
     // Tidying up: no object, the clean animation while at it.
-    if let Some(Activity { task: Task { kind: TaskKind::Clean { .. }, .. }, phase, .. }) = s.current() {
-        return Doing::plain(world, None, world.content.room_rules.clean.anim.filter(|_| matches!(phase, Phase::Using { .. })));
+    if let Some(Activity {
+        task: Task {
+            kind: TaskKind::Clean { .. },
+            ..
+        },
+        phase,
+        ..
+    }) = s.current()
+    {
+        return Doing::plain(
+            world,
+            None,
+            world
+                .content
+                .room_rules
+                .clean
+                .anim
+                .filter(|_| matches!(phase, Phase::Using { .. })),
+        );
     }
     let Some(Activity {
         task:
@@ -267,12 +433,23 @@ fn doing(world: &World, s: &Sim) -> Doing {
     // the one they play with as playing (`partners::hold`: a seesaw doesn't rock with one).
     // At a post: waiting for its server, standing; where nobody serves, helping themselves
     // (`staff.rs`).
-    let server = inter.served.as_ref().and_then(|_| world.staff.server_of(*object));
+    let server = inter
+        .served
+        .as_ref()
+        .and_then(|_| world.staff.server_of(*object));
     let action = match phase {
-        Phase::Using { .. } if inter.baby_bed() && s.awake_in_crib(&world.content, clock::hour(world.tick)) => None,
-        Phase::Using { elapsed } if inter.partner && (s.partner_wait > 0 || *elapsed == 0.0) => None,
+        Phase::Using { .. }
+            if inter.baby_bed() && s.awake_in_crib(&world.content, clock::hour(world.tick)) =>
+        {
+            None
+        }
+        Phase::Using { elapsed } if inter.partner && (s.partner_wait > 0 || *elapsed == 0.0) => {
+            None
+        }
         Phase::Using { .. } if server.is_some() && !s.being_served => None,
-        Phase::Using { .. } if server.is_none() && inter.served.is_some() => inter.served.as_ref().and_then(|f| f.anim).or(inter.anim),
+        Phase::Using { .. } if server.is_none() && inter.served.is_some() => {
+            inter.served.as_ref().and_then(|f| f.anim).or(inter.anim)
+        }
         Phase::Using { .. } => inter.anim,
         _ => None,
     };
@@ -289,33 +466,54 @@ fn progress(world: &World, s: &Sim) -> f32 {
     if s.away_until.is_some() {
         return -1.0;
     }
-    let Some(Activity { task, phase: Phase::Using { elapsed }, .. }) = s.current() else {
+    let Some(Activity {
+        task,
+        phase: Phase::Using { elapsed },
+        ..
+    }) = s.current()
+    else {
         return -1.0;
     };
     let minutes = match task.kind {
-        TaskKind::Use { object, interaction } => world
+        TaskKind::Use {
+            object,
+            interaction,
+        } => world
             .objects
             .get(object as usize)
             .and_then(|o| world.content.objects[o.def].interactions.get(interaction))
-            .map_or(0.0, |i| i.minutes_where(world.staff.server_of(object).is_some())),
+            .map_or(0.0, |i| {
+                i.minutes_where(world.staff.server_of(object).is_some())
+            }),
         TaskKind::Cook { minutes, .. } => f32::from(minutes),
         _ => return -1.0,
     };
-    if minutes > 0.0 { (elapsed / minutes).clamp(0.0, 1.0) } else { 1.0 }
+    if minutes > 0.0 {
+        (elapsed / minutes).clamp(0.0, 1.0)
+    } else {
+        1.0
+    }
 }
 
 /// The waypoint a Sim walks to and where their way is `AHEAD` metres on (`sim::WAY_X`,
 /// `sim::AHEAD_X`), both where they stand when they aren't walking (waiting outside a room kept
 /// shut too: its door doesn't open for them).
 fn way_ahead(world: &World, s: &Sim) -> ([f32; 2], [f32; 2]) {
-    let Some(Activity { phase: Phase::Routing { waypoints, next }, .. }) = s.current() else {
+    let Some(Activity {
+        phase: Phase::Routing { waypoints, next },
+        ..
+    }) = s.current()
+    else {
         return (s.pos, s.pos);
     };
     if s.kept_out() {
         return (s.pos, s.pos);
     }
     let storey = world.storey_of(s.pos[1].floor() as i32);
-    let Some(&way) = waypoints.get(*next).filter(|wp| world.storey_of(wp[1].floor() as i32) == storey) else {
+    let Some(&way) = waypoints
+        .get(*next)
+        .filter(|wp| world.storey_of(wp[1].floor() as i32) == storey)
+    else {
         return (s.pos, s.pos);
     };
     let (mut at, mut left) = (s.pos, AHEAD);
@@ -326,7 +524,10 @@ fn way_ahead(world: &World, s: &Sim) -> ([f32; 2], [f32; 2]) {
         let d = (wp[0] - at[0]).hypot(wp[1] - at[1]);
         if d >= left {
             let k = left / d;
-            return (way, [at[0] + (wp[0] - at[0]) * k, at[1] + (wp[1] - at[1]) * k]);
+            return (
+                way,
+                [at[0] + (wp[0] - at[0]) * k, at[1] + (wp[1] - at[1]) * k],
+            );
         }
         left -= d;
         at = wp;
@@ -339,7 +540,13 @@ fn way_ahead(world: &World, s: &Sim) -> ([f32; 2], [f32; 2]) {
 /// folding. Only shown.
 fn shown_held(world: &World, s: &crate::world::Sim) -> Option<usize> {
     let a = s.current()?;
-    let TaskKind::Use { object, interaction } = a.task.kind else { return None };
+    let TaskKind::Use {
+        object,
+        interaction,
+    } = a.task.kind
+    else {
+        return None;
+    };
     let o = world.objects.get(object as usize)?;
     let inter = world.content.objects[o.def].interactions.get(interaction)?;
     match a.phase {
@@ -393,13 +600,26 @@ pub fn write(world: &World, out: &mut [f32]) {
         o[sim::THOUGHT_SUBJECT] = thought.map_or(0.0, |t| t.subject as f32);
         o[sim::HEIGHT] = world.sim_height(s);
         // Being served: what they're handed (the renderer shows it once it's theirs).
-        o[sim::HELD] = s.held.map(|h| h.def).or_else(|| shown_held(world, s)).or_else(|| serving(world, s)).map_or(0.0, |d| d as f32 + 1.0);
+        o[sim::HELD] = s
+            .held
+            .map(|h| h.def)
+            .or_else(|| shown_held(world, s))
+            .or_else(|| serving(world, s))
+            .map_or(0.0, |d| d as f32 + 1.0);
         o[sim::RECIPE] = match s.current().map(|a| a.task.kind) {
             Some(TaskKind::Cook { recipe, .. }) => recipe as f32 + 1.0,
             _ => 0.0,
         };
         o[sim::CALL] = match s.current() {
-            Some(Activity { task: Task { kind: TaskKind::Social { target, .. }, .. }, phase: Phase::Calling { .. }, .. }) => *target as f32 + 1.0,
+            Some(Activity {
+                task:
+                    Task {
+                        kind: TaskKind::Social { target, .. },
+                        ..
+                    },
+                phase: Phase::Calling { .. },
+                ..
+            }) => *target as f32 + 1.0,
             _ => 0.0,
         };
         let (way, ahead) = way_ahead(world, s);
@@ -408,7 +628,9 @@ pub fn write(world: &World, out: &mut [f32]) {
         o[sim::CARRY] = crate::carry::carrying(s).map_or(0.0, |b| b as f32 + 1.0);
         o[sim::PROGRESS] = progress(world, s);
         // (Or what a use holds in the hands, a slice of cake at the café: eaten with a fork.)
-        o[sim::PLATE] = eating(world, s).or_else(|| shown_held(world, s)).map_or(0.0, |d| d as f32 + 1.0);
+        o[sim::PLATE] = eating(world, s)
+            .or_else(|| shown_held(world, s))
+            .map_or(0.0, |d| d as f32 + 1.0);
         o[sim::SHUTS] = crate::privacy::keeps_shut(world, s.id) as u8 as f32;
     }
     // Conversations: write the shared state into every participant's row.
@@ -419,7 +641,14 @@ pub fn write(world: &World, out: &mut [f32]) {
         // A hug or a kiss is answered at once, by the body (a refused one is leant away from); talk
         // halfway through.
         let def = &world.content.socials[social];
-        let reveal = if matches!(crate::social::ANIMATIONS.get(def.anim as usize - 1), Some(&("hug" | "kiss"))) { 0.0 } else { 0.5 };
+        let reveal = if matches!(
+            crate::social::ANIMATIONS.get(def.anim as usize - 1),
+            Some(&("hug" | "kiss"))
+        ) {
+            0.0
+        } else {
+            0.5
+        };
         let outcome = if progress < reveal {
             0.0
         } else if success {
@@ -430,8 +659,15 @@ pub fn write(world: &World, out: &mut [f32]) {
         let anim = def.anim as f32;
         let talk = world.content.talk_anim.map_or(-1.0, |a| a as f32);
         // Those listening in (a group conversation) have the one who started it as partner.
-        let listeners = world.sims.iter().filter(|l| l.listening_to() == Some(i as u32)).map(|l| (l.id as usize, i, 3.0));
-        for (me, other, role) in [(i, t as usize, 1.0), (t as usize, i, 2.0)].into_iter().chain(listeners) {
+        let listeners = world
+            .sims
+            .iter()
+            .filter(|l| l.listening_to() == Some(i as u32))
+            .map(|l| (l.id as usize, i, 3.0));
+        for (me, other, role) in [(i, t as usize, 1.0), (t as usize, i, 2.0)]
+            .into_iter()
+            .chain(listeners)
+        {
             let o = &mut out[HEADER_LEN + me * SIM_STRIDE..HEADER_LEN + (me + 1) * SIM_STRIDE];
             o[sim::SOCIAL] = social as f32 + 1.0;
             o[sim::OUTCOME] = outcome;
@@ -447,7 +683,13 @@ pub fn write(world: &World, out: &mut [f32]) {
 /// The servers' rows, after the residents' (`header::STAFF_COUNT`).
 fn write_staff(world: &World, out: &mut [f32]) {
     let first = world.sims.len();
-    for (k, server) in world.staff.servers.iter().take(crate::staff::MAX_STAFF).enumerate() {
+    for (k, server) in world
+        .staff
+        .servers
+        .iter()
+        .take(crate::staff::MAX_STAFF)
+        .enumerate()
+    {
         let row = first + k;
         let o = &mut out[HEADER_LEN + row * SIM_STRIDE..HEADER_LEN + (row + 1) * SIM_STRIDE];
         o.fill(0.0);
@@ -472,7 +714,8 @@ fn write_staff(world: &World, out: &mut [f32]) {
         {
             o[sim::ACTION] = world.content.service.anim.map_or(-1.0, |a| a as f32);
             o[sim::PROGRESS] = progress(world, c);
-            o[sim::HELD] = crate::staff::handed(&world.content, inter).map_or(0.0, |i| i as f32 + 1.0);
+            o[sim::HELD] =
+                crate::staff::handed(&world.content, inter).map_or(0.0, |i| i as f32 + 1.0);
         }
     }
 }
@@ -482,11 +725,27 @@ fn served_use<'a>(world: &'a World, s: &Sim) -> Option<&'a crate::content::Inter
     if !s.being_served {
         return None;
     }
-    let Some(Activity { task: Task { kind: TaskKind::Use { object, interaction }, .. }, phase: Phase::Using { .. }, .. }) = s.current() else {
+    let Some(Activity {
+        task:
+            Task {
+                kind:
+                    TaskKind::Use {
+                        object,
+                        interaction,
+                    },
+                ..
+            },
+        phase: Phase::Using { .. },
+        ..
+    }) = s.current()
+    else {
         return None;
     };
     let o = world.objects.get(*object as usize)?;
-    world.content.objects[o.def].interactions.get(*interaction).filter(|i| i.served.is_some())
+    world.content.objects[o.def]
+        .interactions
+        .get(*interaction)
+        .filter(|i| i.served.is_some())
 }
 
 /// What a resident being served at a post is handed (`staff::handed`).

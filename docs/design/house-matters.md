@@ -107,6 +107,23 @@ at once (a toilet beside the bed with no wall between), one with a door to the o
 with its toilet in the open: that door is the front door), or anything on a public place. The
 renderer keeps its door shut to everyone but the one going through it.
 
+## A bedroom is its sleepers' own (0.5.x)
+
+A room of a `claimed` kind (content `roomKinds[].claimed`, `private` as well; the bedroom) belongs
+to the people who sleep in it, and only those who belong together share one. Its door is kept
+shut while someone is in it, and the rest of the household, guests included, wait outside or go
+elsewhere. Those with a place go in and out: whoever lies in one of its beds, and their partner,
+parents, children, brothers and sisters with somewhere there to lie. The other half of a couple's
+bed is the partner's (Mummy and Daddy share a bed, and sometimes a child does for the night); a
+bunk bed is a bed for each. Whoever minds a crib in there goes in to the baby, a lodger too; being
+sent to a bed doesn't make anyone else one of them. Walking through a bedroom to a room beyond is
+allowed. Newcomers are never strangers (a single, a couple, perhaps with a grown child, or
+siblings), and bed places count a couple's bed as one unless a couple sleeps in it. The bathroom
+is never claimed: nobody has a place in it, so it shuts for whomever is in there. Residents don't
+have beds of their own yet: before anyone lies down, a free bed in the room is a place for any of
+the household. Code: `privacy.rs` (`Shut::claimants`, `World::claimants_cache`),
+`lifecycle.rs` (`Beds`).
+
 ## Opinions and wishes
 
 Once an hour each awake resident at home forms an opinion of the room they're in

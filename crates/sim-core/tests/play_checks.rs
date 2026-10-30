@@ -35,11 +35,18 @@ fn until(w: &mut World, day: u32, hour: f32) {
 /// Resident `i` stops what they're doing and drops their queue.
 fn free_up(w: &mut World, i: usize) {
     for _ in 0..30 {
-        if w.sims[i].current().is_none() && w.sims[i].queue().next().is_none() && w.sims[i].held.is_none() {
+        if w.sims[i].current().is_none()
+            && w.sims[i].queue().next().is_none()
+            && w.sims[i].held.is_none()
+        {
             return;
         }
         while w.sims[i].current().is_some() || w.sims[i].queue().next().is_some() {
-            w.apply(Command::Cancel { sim: i as u32, index: 0 }).unwrap();
+            w.apply(Command::Cancel {
+                sim: i as u32,
+                index: 0,
+            })
+            .unwrap();
         }
         for _ in 0..(2.0 / MINUTES_PER_TICK) as u32 {
             w.tick_once();
@@ -59,26 +66,52 @@ fn family_check() {
     let o = |def: &str, x: i32, z: i32, rot: u8| json!({"def": def, "x": x, "z": z, "rot": rot});
     let objects = vec![
         // Kitchen, run A against z = 4 (facing +z).
-        o("fridge", 3, 4, 0), o("counter", 4, 4, 0), o("stoveGas", 5, 4, 0), o("farmhouseSink", 6, 4, 0),
-        o("counterDrawers", 7, 4, 0), o("trashCan", 8, 4, 0),
+        o("fridge", 3, 4, 0),
+        o("counter", 4, 4, 0),
+        o("stoveGas", 5, 4, 0),
+        o("farmhouseSink", 6, 4, 0),
+        o("counterDrawers", 7, 4, 0),
+        o("trashCan", 8, 4, 0),
         // Run B against z = 12 (facing -z).
-        o("fridgeFrenchDoor", 3, 11, 2), o("counterMarble", 4, 11, 2), o("stoveElectric", 5, 11, 2), o("counterDrawers", 6, 11, 2),
+        o("fridgeFrenchDoor", 3, 11, 2),
+        o("counterMarble", 4, 11, 2),
+        o("stoveElectric", 5, 11, 2),
+        o("counterDrawers", 6, 11, 2),
         // Run C against x = 2 (facing +x).
-        o("fridgeRetro", 2, 6, 1), o("counter", 2, 7, 1), o("stoveGas", 2, 8, 1), o("counterDrawers", 2, 9, 1),
+        o("fridgeRetro", 2, 6, 1),
+        o("counter", 2, 7, 1),
+        o("stoveGas", 2, 8, 1),
+        o("counterDrawers", 2, 9, 1),
         // Run D against x = 14 (facing -x).
-        o("fridgeBuiltIn", 13, 6, 3), o("counterOpenShelf", 13, 7, 3), o("cooktopCounter", 13, 8, 3), o("counterDrawers", 13, 9, 3),
+        o("fridgeBuiltIn", 13, 6, 3),
+        o("counterOpenShelf", 13, 7, 3),
+        o("cooktopCounter", 13, 8, 3),
+        o("counterDrawers", 13, 9, 3),
         // The long island, a stool behind it.
-        o("islandLong", 6, 7, 0), o("stoolCounter", 7, 6, 0),
+        o("islandLong", 6, 7, 0),
+        o("stoolCounter", 7, 6, 0),
         // Bedroom.
-        o("bedBunk", 16, 4, 0), o("kidsBedCar", 19, 4, 0), o("crib", 22, 4, 0), o("laundryHamper", 26, 4, 0),
+        o("bedBunk", 16, 4, 0),
+        o("kidsBedCar", 19, 4, 0),
+        o("crib", 22, 4, 0),
+        o("laundryHamper", 26, 4, 0),
         o("exerciseBike", 24, 8, 0),
         // Living room: a table for four, the island four ways, a second long island.
-        o("diningTable", 4, 16, 0), o("diningChair", 4, 15, 0), o("diningChair", 5, 15, 0),
-        o("diningChair", 4, 17, 2), o("diningChair", 5, 17, 2),
-        o("kitchenIsland", 10, 15, 0), o("kitchenIsland", 14, 15, 2), o("kitchenIsland", 18, 14, 1), o("kitchenIsland", 22, 14, 3),
+        o("diningTable", 4, 16, 0),
+        o("diningChair", 4, 15, 0),
+        o("diningChair", 5, 15, 0),
+        o("diningChair", 4, 17, 2),
+        o("diningChair", 5, 17, 2),
+        o("kitchenIsland", 10, 15, 0),
+        o("kitchenIsland", 14, 15, 2),
+        o("kitchenIsland", 18, 14, 1),
+        o("kitchenIsland", 22, 14, 3),
         o("islandLong", 10, 19, 2),
         // Garden.
-        o("gardenChair", 4, 22, 0), o("adirondackChair", 6, 22, 0), o("outdoorBar", 9, 22, 0), o("hammock", 20, 26, 0),
+        o("gardenChair", 4, 22, 0),
+        o("adirondackChair", 6, 22, 0),
+        o("outdoorBar", 9, 22, 0),
+        o("hammock", 20, 26, 0),
     ];
     let placed = objects.len();
     let sim = |name: &str, gender: &str, age: f32, x: f64, z: f64| json!({"name": name, "gender": gender, "age": age, "traits": ["cheerful"], "x": x, "z": z});
@@ -102,7 +135,11 @@ fn family_check() {
         ],
     });
     let mut w = World::from_json(&merged, &lot.to_string(), 7).unwrap();
-    assert_eq!(w.objects.len(), placed, "every thing loads where it was put");
+    assert_eq!(
+        w.objects.len(),
+        placed,
+        "every thing loads where it was put"
+    );
     for s in w.sims.iter_mut() {
         s.job = None;
         s.job_search_from = u32::MAX;
@@ -124,10 +161,18 @@ fn family_check() {
     // Everyone home (the children back from school), the baby in the crib.
     for (i, s) in w.sims.iter().enumerate() {
         let [x, z] = s.pos;
-        assert!(x < 34.0 && z < 34.0 && s.away_until.is_none(), "resident {i} at home: {:?}", s.pos);
+        assert!(
+            x < 34.0 && z < 34.0 && s.away_until.is_none(),
+            "resident {i} at home: {:?}",
+            s.pos
+        );
     }
     assert!(w.content.life.baby(w.sims[5].age));
-    assert_eq!(w.sims[5].pose, sim_core::content::Pose::Lie, "Eve is in the crib");
+    assert_eq!(
+        w.sims[5].pose,
+        sim_core::content::Pose::Lie,
+        "Eve is in the crib"
+    );
     common::dump_state(&w, "family-check");
 }
 
@@ -141,12 +186,14 @@ fn generated_houses_to_look_at() {
         eprintln!("set HOUSES (from tools/housegen/sample.ts) and PICK (indices)");
         return;
     };
-    let houses: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let houses: Vec<serde_json::Value> =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     let content = common::content();
     for i in pick.split(',').map(|s| s.trim().parse::<usize>().unwrap()) {
         let mut town = houses[i]["town"].clone();
         let entry = town["plots"][0]["entry"].clone();
-        town["sims"] = json!([{ "name": "Ada", "x": entry[0], "z": entry[1], "traits": ["foodie"] }]);
+        town["sims"] =
+            json!([{ "name": "Ada", "x": entry[0], "z": entry[1], "traits": ["foodie"] }]);
         town["households"][0]["funds"] = json!(FUNDS);
         let mut w = World::from_json(&content, &town.to_string(), 1).unwrap();
         w.households[0].free_will = false;

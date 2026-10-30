@@ -683,6 +683,13 @@ How the house shows up in residents' lives (see `docs/design/house-matters.md`).
  "essentials": [["bathroom"], ["hygiene"]], "size": [3, 6], "exclusive": true, "private": true}
 ```
 
+A bedroom marks its door as its sleepers' own too:
+
+```json
+{"id": "bedroom", "label": "Bedroom", "icon": "icon.category.bedroom", "tags": ["sleep"],
+ "essentials": [["sleep"]], "size": [6, 12], "exclusive": true, "private": true, "claimed": true}
+```
+
 `essentials`: tag groups something in the room must offer for full function; `size`:
 `[cramped, comfortable]` in tiles; `exclusive`: can't share a room with another exclusive kind
 (a bed in the kitchen); `private`: kept shut while someone is in it. Nobody else goes in: someone
@@ -691,6 +698,16 @@ doesn't choose what's in it unless a need is about to run out, and kept out the 
 after its `graceMinutes` and the toilet counts as taken (`anotherRoom`). Not a room of two kinds
 (`mixed`), one with a door to the outside, or one on a public place. The renderer keeps its
 doors shut (snapshot `shuts`). Code: `crates/sim-core/src/privacy.rs`.
+
+`claimed`: the room is its sleepers' own (a bedroom; an error unless `private` too, and it can't
+be a `passage`). Only those who belong together share it: while someone lies in one of its beds,
+its door is open to them and to their partner, parents, children, brothers and sisters with
+somewhere here to lie (a bed nobody's in, a bunk's other bunk; the other half of a couple's bed,
+one with a `conceive` use, only for the partner or a child of whoever lies in it), and to whoever
+minds a crib in it, and keeps everyone else, guests included, out. Before anyone lies down it's
+open to whoever has a bed there. Walking through it to a room beyond is allowed; going in isn't.
+Bed places count the same way: a couple's bed is a place for one, or for a couple. The bathroom
+is never claimed.
 
 **Scoring** (`roomRules`, an object, so a pack can change single keys): `weights` of size, light,
 decor, cleanliness and function; `windowTiles` and `lampTiles` (tiles one window or lamp lights

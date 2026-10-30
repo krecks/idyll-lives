@@ -53,7 +53,9 @@ pub fn check_closed(faces: &[Vec<usize>], n: Option<usize>) -> Result<(), String
         for i in 0..f.len() {
             let (a, b) = (f[i], f[(i + 1) % f.len()]);
             if let Some(&g) = seen.get(&(a, b)) {
-                return Err(format!("edge {a}-{b} is used twice in the same direction (faces {g}, {fi})"));
+                return Err(format!(
+                    "edge {a}-{b} is used twice in the same direction (faces {g}, {fi})"
+                ));
             }
             seen.insert((a, b), fi);
             order.push((a, b));
@@ -179,7 +181,11 @@ pub fn subdivision(faces: &[Vec<usize>], n: usize) -> Subdivision {
     }
     for v in 0..n {
         let k = vert_edges[v].len();
-        assert!(k >= 3 && vert_faces[v].len() == k, "vertex {v}: valence {k}, {} faces", vert_faces[v].len());
+        assert!(
+            k >= 3 && vert_faces[v].len() == k,
+            "vertex {v}: valence {k}, {} faces",
+            vert_faces[v].len()
+        );
         let kf = k as f64;
         t.push((v, v, (kf - 3.0) / kf));
         for &e in &vert_edges[v] {

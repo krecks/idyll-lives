@@ -47,8 +47,17 @@ pub fn lod_from_env(w: &mut World) {
 
 /// Buys `def` for household 0 at `x`, `z`, facing the default way: its stable id.
 pub fn buy(w: &mut World, def: &str, x: i32, z: i32) -> u32 {
-    w.apply(sim_core::Command::Buy { household: 0, object: def.into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None })
-        .unwrap_or_else(|e| panic!("{def}: {e}"));
+    w.apply(sim_core::Command::Buy {
+        household: 0,
+        object: def.into(),
+        at: Some([x, z, 0]),
+        colors: Default::default(),
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .unwrap_or_else(|e| panic!("{def}: {e}"));
     w.objects.last().unwrap().stable
 }
 
@@ -88,14 +97,37 @@ pub fn garden_home() -> (World, String) {
 /// One-tile garden things for a crowded garden's rows (`garden_cluster`): crops, plants, beds,
 /// small trees and seats.
 pub const GARDEN_SMALL: [&str; 16] = [
-    "garden.tomatoes", "garden.strawberries", "garden.pumpkins", "garden.vegPatch", "garden.roses", "garden.lavender",
-    "garden.hydrangea", "flowerbed", "planterBox", "garden.birdbath", "garden.apple", "garden.japaneseMaple",
-    "garden.willow", "gardenChair", "adirondackChair", "firePit",
+    "garden.tomatoes",
+    "garden.strawberries",
+    "garden.pumpkins",
+    "garden.vegPatch",
+    "garden.roses",
+    "garden.lavender",
+    "garden.hydrangea",
+    "flowerbed",
+    "planterBox",
+    "garden.birdbath",
+    "garden.apple",
+    "garden.japaneseMaple",
+    "garden.willow",
+    "gardenChair",
+    "adirondackChair",
+    "firePit",
 ];
 /// Bigger garden things to pack in among them: beds, benches and swings, loungers, a table, a pond.
 pub const GARDEN_BIG: [&str; 12] = [
-    "raisedBed", "benchGarden3", "porchSwing", "sunLounger", "hammock", "patioSet", "picnicTable", "garden.pond",
-    "greenhouse", "swingSet", "seesaw", "hotTubCedar",
+    "raisedBed",
+    "benchGarden3",
+    "porchSwing",
+    "sunLounger",
+    "hammock",
+    "patioSet",
+    "picnicTable",
+    "garden.pond",
+    "greenhouse",
+    "swingSet",
+    "seesaw",
+    "hotTubCedar",
 ];
 
 /// How a crowded garden is laid out (`garden_cluster`).
@@ -112,18 +144,37 @@ pub enum Cluster {
 /// Buys a crowded garden for `household` in `area` (`x0, z0, x1, z1`, exclusive; outdoors and
 /// free), facing `rot` (or any way, at random, with `None`), as `layout` lays it out. Every buy
 /// goes through `Command::Buy`, so what stands is what buying allowed. Their stable ids.
-pub fn garden_cluster(w: &mut World, household: u32, area: (i32, i32, i32, i32), layout: Cluster, rot: Option<i32>) -> Vec<u32> {
+pub fn garden_cluster(
+    w: &mut World,
+    household: u32,
+    area: (i32, i32, i32, i32),
+    layout: Cluster,
+    rot: Option<i32>,
+) -> Vec<u32> {
     let (x0, z0, x1, z1) = area;
     let mut ids = Vec::new();
     let mut buy = |w: &mut World, def: &str, x: i32, z: i32, r: i32| {
-        let ok = w.apply(sim_core::Command::Buy { household, object: def.into(), at: Some([x, z, r]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).is_ok();
+        let ok = w
+            .apply(sim_core::Command::Buy {
+                household,
+                object: def.into(),
+                at: Some([x, z, r]),
+                colors: Default::default(),
+                turn: None,
+                offset: None,
+                size: None,
+                tall: None,
+            })
+            .is_ok();
         if ok {
             ids.push(w.objects.last().unwrap().stable);
         }
         ok
     };
     let footprint = |w: &World, def: &str, r: i32| {
-        let [fw, fd] = w.content.objects[w.content.object_index(def).unwrap()].footprint.map(i32::from);
+        let [fw, fd] = w.content.objects[w.content.object_index(def).unwrap()]
+            .footprint
+            .map(i32::from);
         if r % 2 == 0 { (fw, fd) } else { (fd, fw) }
     };
     match layout {
@@ -144,9 +195,17 @@ pub fn garden_cluster(w: &mut World, household: u32, area: (i32, i32, i32, i32),
                 let mut a = 0;
                 while a < along {
                     n += 1;
-                    let def = if n % 5 == 0 { GARDEN_BIG[n / 5 % 3] } else { GARDEN_SMALL[n % GARDEN_SMALL.len()] };
+                    let def = if n % 5 == 0 {
+                        GARDEN_BIG[n / 5 % 3]
+                    } else {
+                        GARDEN_SMALL[n % GARDEN_SMALL.len()]
+                    };
                     let (fw, fd) = footprint(w, def, towards);
-                    let (x, z) = if r % 2 == 0 { (x0 + a, z0 + line) } else { (x0 + line, z0 + a) };
+                    let (x, z) = if r % 2 == 0 {
+                        (x0 + a, z0 + line)
+                    } else {
+                        (x0 + line, z0 + a)
+                    };
                     let long = if r % 2 == 0 { fw } else { fd };
                     let deep = if r % 2 == 0 { fd } else { fw };
                     if deep == 1 && a + long <= along && buy(w, def, x, z, towards) {
@@ -163,7 +222,11 @@ pub fn garden_cluster(w: &mut World, household: u32, area: (i32, i32, i32, i32),
             let mut rng = Lcg::new(seed);
             let tiles = ((x1 - x0) * (z1 - z0)) as usize;
             for _ in 0..tiles * 6 {
-                let def = if rng.below(3) == 0 { GARDEN_BIG[rng.below(GARDEN_BIG.len())] } else { GARDEN_SMALL[rng.below(GARDEN_SMALL.len())] };
+                let def = if rng.below(3) == 0 {
+                    GARDEN_BIG[rng.below(GARDEN_BIG.len())]
+                } else {
+                    GARDEN_SMALL[rng.below(GARDEN_SMALL.len())]
+                };
                 let r = rot.unwrap_or(rng.below(4) as i32);
                 let (fw, fd) = footprint(w, def, r);
                 if fw > x1 - x0 || fd > z1 - z0 {
@@ -208,14 +271,33 @@ pub fn check(w: &World) {
             assert!((0.0..=1.0).contains(v), "{}'s need {k} is {v}", s.name);
         }
         // Every number about them is a real one in its range (NaN is in none).
-        assert!(s.yaw.is_finite() && s.yaw.abs() <= std::f32::consts::TAU, "{} faces {}", s.name, s.yaw);
-        assert!((0.0..=150.0).contains(&s.age), "{} is {} years old", s.name, s.age);
+        assert!(
+            s.yaw.is_finite() && s.yaw.abs() <= std::f32::consts::TAU,
+            "{} faces {}",
+            s.name,
+            s.yaw
+        );
+        assert!(
+            (0.0..=150.0).contains(&s.age),
+            "{} is {} years old",
+            s.name,
+            s.age
+        );
         for (k, v) in s.skills[..w.content.skills.len()].iter().enumerate() {
-            assert!((0.0..=max_level).contains(v), "{}'s skill {k} is {v}", s.name);
+            assert!(
+                (0.0..=max_level).contains(v),
+                "{}'s skill {k} is {v}",
+                s.name
+            );
         }
         let mood = s.mood(&w.content);
         assert!((0.0..=1.0).contains(&mood), "{}'s mood is {mood}", s.name);
-        assert!((0.0..=100.0).contains(&s.grade), "{}'s grade is {}", s.name, s.grade);
+        assert!(
+            (0.0..=100.0).contains(&s.grade),
+            "{}'s grade is {}",
+            s.name,
+            s.grade
+        );
         assert!((s.household as usize) < w.households.len());
         if let Some(t) = s.engaged_with {
             assert!((t as usize) < n && t as usize != i);
@@ -232,11 +314,23 @@ pub fn check(w: &World) {
             }
             match &act.phase {
                 Phase::Routing { waypoints, next } => {
-                    assert!(*next <= waypoints.len(), "{} walks past the end of their route", s.name);
-                    assert!(waypoints.iter().flatten().all(|v| v.is_finite()), "{} walks to nowhere: {waypoints:?}", s.name);
+                    assert!(
+                        *next <= waypoints.len(),
+                        "{} walks past the end of their route",
+                        s.name
+                    );
+                    assert!(
+                        waypoints.iter().flatten().all(|v| v.is_finite()),
+                        "{} walks to nowhere: {waypoints:?}",
+                        s.name
+                    );
                 }
                 Phase::Using { elapsed } | Phase::Conversing { elapsed, .. } => {
-                    assert!(elapsed.is_finite() && *elapsed >= 0.0, "{} has been at it for {elapsed} minutes", s.name)
+                    assert!(
+                        elapsed.is_finite() && *elapsed >= 0.0,
+                        "{} has been at it for {elapsed} minutes",
+                        s.name
+                    )
                 }
                 _ => {}
             }
@@ -255,8 +349,17 @@ pub fn check(w: &World) {
             follow_up_refs(w, i, &kind);
         }
         if let Some(h) = &s.held {
-            assert!(h.def < w.content.items.len(), "{} holds an unknown item", s.name);
-            assert!(h.quality.is_finite() && (0.0..=10.0).contains(&h.quality), "{} holds something of quality {}", s.name, h.quality);
+            assert!(
+                h.def < w.content.items.len(),
+                "{} holds an unknown item",
+                s.name
+            );
+            assert!(
+                h.quality.is_finite() && (0.0..=10.0).contains(&h.quality),
+                "{} holds something of quality {}",
+                s.name,
+                h.quality
+            );
         }
         if let Some(v) = s.visiting {
             assert!((v.plot as usize) < w.plots.len());
@@ -272,11 +375,25 @@ pub fn check(w: &World) {
     let max_quality = w.content.object_rules.max_quality;
     for (k, o) in w.objects.iter().enumerate() {
         assert_eq!(o.id as usize, k, "object ids are their index");
-        assert!(o.def < w.content.objects.len(), "object {k} is of an unknown kind");
-        assert!((0.0..=1.0).contains(&o.wear), "object {k} is worn {}", o.wear);
-        assert!(o.quality <= max_quality, "object {k} has quality {}", o.quality);
+        assert!(
+            o.def < w.content.objects.len(),
+            "object {k} is of an unknown kind"
+        );
+        assert!(
+            (0.0..=1.0).contains(&o.wear),
+            "object {k} is worn {}",
+            o.wear
+        );
+        assert!(
+            o.quality <= max_quality,
+            "object {k} has quality {}",
+            o.quality
+        );
         for u in o.users() {
-            assert!((u as usize) < n, "object {k} is held by unknown resident {u}");
+            assert!(
+                (u as usize) < n,
+                "object {k} is held by unknown resident {u}"
+            );
         }
     }
     for (t, d) in w.dirt.iter().enumerate() {
@@ -299,15 +416,32 @@ pub fn check(w: &World) {
     // Households: money that makes sense, homes on the town's plots (one each), parents-to-be
     // who are residents.
     for (h, hh) in w.households.iter().enumerate() {
-        assert!(hh.funds.abs() < 1_000_000_000, "{} has {} in the bank", hh.name, hh.funds);
+        assert!(
+            hh.funds.abs() < 1_000_000_000,
+            "{} has {} in the bank",
+            hh.name,
+            hh.funds
+        );
         if let Some(p) = hh.plot {
-            assert!((p as usize) < w.plots.len(), "{} lives on unknown plot {p}", hh.name);
+            assert!(
+                (p as usize) < w.plots.len(),
+                "{} lives on unknown plot {p}",
+                hh.name
+            );
             assert!(!w.plots[p as usize].public, "{} lives in the park", hh.name);
-            assert!(!w.households[..h].iter().any(|o| o.plot == Some(p)), "two households live on plot {p}");
+            assert!(
+                !w.households[..h].iter().any(|o| o.plot == Some(p)),
+                "two households live on plot {p}"
+            );
         }
         if let Some(e) = hh.expecting {
             let [a, b] = e.parents.map(|p| p as usize);
-            assert!(a < n && b < n && a != b, "{} expects a baby from {:?}", hh.name, e.parents);
+            assert!(
+                a < n && b < n && a != b,
+                "{} expects a baby from {:?}",
+                hh.name,
+                e.parents
+            );
         }
     }
     // Every object slot holder is someone who is using or heading to that object (or talking
@@ -318,14 +452,15 @@ pub fn check(w: &World) {
             let doing = s.paused().or(s.current());
             let ok = doing.is_some_and(|a| match a.task.kind {
                 TaskKind::Use { object, .. } | TaskKind::Repair { object } => object == o.id,
-                TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station == Some(o.id),
+                TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => {
+                    station == Some(o.id)
+                }
                 TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat == Some(o.id),
                 // (Beside the crib, lifting the baby out of it.)
                 TaskKind::Carry { from, stage: 0, .. } => from == o.id,
                 _ => false,
             }) || (s.use_seat == Some(o.id)
-                && doing
-                    .is_some_and(|a| matches!(a.task.kind, TaskKind::Use { .. })));
+                && doing.is_some_and(|a| matches!(a.task.kind, TaskKind::Use { .. })));
             assert!(
                 ok,
                 "object {} is held by {} who isn't using it",
@@ -337,18 +472,33 @@ pub fn check(w: &World) {
     for o in &w.objects {
         if w.content.objects[o.def].layer == sim_core::content::Layer::Surface {
             let host = sim_core::surface::host_of(&w.content, &w.objects, o);
-            assert!(host.is_some_and(|h| h < o.id), "object {} stands on nothing before it ({host:?})", o.id);
+            assert!(
+                host.is_some_and(|h| h < o.id),
+                "object {} stands on nothing before it ({host:?})",
+                o.id
+            );
         }
     }
     // Only cooks, people eating and washing up, and harvesters on their way to the fridge carry things
     // (the rest put them down).
     for s in &w.sims {
         if s.held.is_some() {
-            let chain = |k: &TaskKind| matches!(k, TaskKind::Cook { .. } | TaskKind::Eat { .. } | TaskKind::Dishes { .. } | TaskKind::Carry { baby: None, .. });
+            let chain = |k: &TaskKind| {
+                matches!(
+                    k,
+                    TaskKind::Cook { .. }
+                        | TaskKind::Eat { .. }
+                        | TaskKind::Dishes { .. }
+                        | TaskKind::Carry { baby: None, .. }
+                )
+            };
             assert!(
                 match s.current() {
                     Some(a) => chain(&a.task.kind),
-                    None => s.queue().next().is_some_and(|t| matches!(t.kind, TaskKind::Cook { .. })),
+                    None => s
+                        .queue()
+                        .next()
+                        .is_some_and(|t| matches!(t.kind, TaskKind::Cook { .. })),
                 },
                 "{} carries a {} while doing {:?}, then {:?}",
                 s.name,
@@ -367,8 +517,17 @@ pub fn check(w: &World) {
         let (x, z) = it.at.tile();
         assert!(w.lot.in_bounds(x, z), "item {} is off the lot", it.id);
         assert!(it.id < w.items.next_id);
-        assert!(it.def < w.content.items.len(), "item {} is of an unknown kind", it.id);
-        assert!(it.quality.is_finite() && (0.0..=10.0).contains(&it.quality), "item {} has quality {}", it.id, it.quality);
+        assert!(
+            it.def < w.content.items.len(),
+            "item {} is of an unknown kind",
+            it.id
+        );
+        assert!(
+            it.quality.is_finite() && (0.0..=10.0).contains(&it.quality),
+            "item {} has quality {}",
+            it.id,
+            it.quality
+        );
     }
     // Partners are mutual and one at a time.
     for a in 0..n {
@@ -385,8 +544,17 @@ pub fn check(w: &World) {
         assert!(e.id > last, "event ids increase");
         last = e.id;
         // A resident slot, or a former resident whose name is kept.
-        let known = |r: u32| if r & FORMER != 0 { ((r & !FORMER) as usize) < w.former.len() } else { (r as usize) < n };
-        assert!(known(e.a) && known(e.b) && e.c.is_none_or(known), "{e:?} names someone unknown");
+        let known = |r: u32| {
+            if r & FORMER != 0 {
+                ((r & !FORMER) as usize) < w.former.len()
+            } else {
+                (r as usize) < n
+            }
+        };
+        assert!(
+            known(e.a) && known(e.b) && e.c.is_none_or(known),
+            "{e:?} names someone unknown"
+        );
     }
 }
 
@@ -397,11 +565,19 @@ fn task_refs(w: &World, i: usize, kind: &TaskKind, doing: &str) {
     let name = &w.sims[i].name;
     let object = |o: Option<u32>| o.is_none_or(|o| (o as usize) < w.objects.len());
     let ok = match *kind {
-        TaskKind::Use { object: o, interaction } => {
-            w.objects.get(o as usize).is_some_and(|o| interaction < c.objects[o.def].interactions.len())
+        TaskKind::Use {
+            object: o,
+            interaction,
+        } => w
+            .objects
+            .get(o as usize)
+            .is_some_and(|o| interaction < c.objects[o.def].interactions.len()),
+        TaskKind::MoveTo { x, z } => {
+            x.is_finite() && z.is_finite() && w.lot.in_bounds(x.floor() as i32, z.floor() as i32)
         }
-        TaskKind::MoveTo { x, z } => x.is_finite() && z.is_finite() && w.lot.in_bounds(x.floor() as i32, z.floor() as i32),
-        TaskKind::Social { target, social } => (target as usize) < n && target as usize != i && social < c.socials.len(),
+        TaskKind::Social { target, social } => {
+            (target as usize) < n && target as usize != i && social < c.socials.len()
+        }
         TaskKind::Join { leader } => (leader as usize) < n && leader as usize != i,
         TaskKind::Work | TaskKind::GoHome => true,
         TaskKind::Visit { plot } => (plot as usize) < w.plots.len(),
@@ -409,15 +585,35 @@ fn task_refs(w: &World, i: usize, kind: &TaskKind, doing: &str) {
         TaskKind::Clean { x, z } => w.lot.in_bounds(x, z),
         TaskKind::Repair { object: o } => object(Some(o)),
         TaskKind::Spot { accident } => accident < c.accidents.len(),
-        TaskKind::Cook { recipe, station, origin, .. } => recipe < c.recipes.len() && object(station) && object(origin),
+        TaskKind::Cook {
+            recipe,
+            station,
+            origin,
+            ..
+        } => recipe < c.recipes.len() && object(station) && object(origin),
         TaskKind::Eat { seat, .. } => object(seat),
         TaskKind::Dishes { station, .. } => object(station),
-        TaskKind::Phone { action, contact, seat, .. } => {
-            action < c.phone.actions.len() && contact.is_none_or(|t| (t as usize) < n) && object(seat)
+        TaskKind::Phone {
+            action,
+            contact,
+            seat,
+            ..
+        } => {
+            action < c.phone.actions.len()
+                && contact.is_none_or(|t| (t as usize) < n)
+                && object(seat)
         }
-        TaskKind::Carry { baby, from, to, .. } => baby.is_none_or(|b| (b as usize) < n && b as usize != i) && object(Some(from)) && object(Some(to)),
+        TaskKind::Carry { baby, from, to, .. } => {
+            baby.is_none_or(|b| (b as usize) < n && b as usize != i)
+                && object(Some(from))
+                && object(Some(to))
+        }
     };
-    assert!(ok, "{name} {doing} {kind:?}, which names something that isn't there ({} objects)", w.objects.len());
+    assert!(
+        ok,
+        "{name} {doing} {kind:?}, which names something that isn't there ({} objects)",
+        w.objects.len()
+    );
 }
 
 /// What a resident does next before choosing anything else (washing hands after the toilet),
@@ -435,7 +631,9 @@ pub fn follow_up(s: &Sim) -> Option<String> {
 pub fn debug_field(kind: &str, field: &str) -> Option<u32> {
     let at = kind.find(&format!("{field}: "))? + field.len() + 2;
     let rest = kind[at..].strip_prefix("Some(").unwrap_or(&kind[at..]);
-    rest[..rest.find(|c: char| !c.is_ascii_digit())?].parse().ok()
+    rest[..rest.find(|c: char| !c.is_ascii_digit())?]
+        .parse()
+        .ok()
 }
 
 /// A follow-up names an object there is, and an interaction it has.
@@ -443,10 +641,16 @@ fn follow_up_refs(w: &World, i: usize, kind: &str) {
     let name = &w.sims[i].name;
     for field in ["object", "station", "origin", "seat"] {
         if let Some(o) = debug_field(kind, field) {
-            assert!((o as usize) < w.objects.len(), "{name}'s next thing is {kind}, an object that isn't there");
+            assert!(
+                (o as usize) < w.objects.len(),
+                "{name}'s next thing is {kind}, an object that isn't there"
+            );
         }
     }
-    if let (Some(o), Some(k)) = (debug_field(kind, "object"), debug_field(kind, "interaction")) {
+    if let (Some(o), Some(k)) = (
+        debug_field(kind, "object"),
+        debug_field(kind, "interaction"),
+    ) {
         let def = &w.content.objects[w.objects[o as usize].def];
         assert!(
             (k as usize) < def.interactions.len(),
@@ -472,7 +676,16 @@ pub struct Stuck {
 impl std::fmt::Display for Stuck {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let at = |t: u64| format!("day {} {:05.2}h", clock::day(t), clock::hour(t));
-        write!(f, "{} (#{}) {} since {}, still at {} (tick {})", self.name, self.sim, self.state, at(self.since), at(self.tick), self.tick)
+        write!(
+            f,
+            "{} (#{}) {} since {}, still at {} (tick {})",
+            self.name,
+            self.sim,
+            self.state,
+            at(self.since),
+            at(self.tick),
+            self.tick
+        )
     }
 }
 
@@ -522,7 +735,10 @@ impl State {
 
 fn doing(kind: &TaskKind) -> Doing {
     match *kind {
-        TaskKind::Use { object, interaction } => Doing(0, object, interaction as u32),
+        TaskKind::Use {
+            object,
+            interaction,
+        } => Doing(0, object, interaction as u32),
         TaskKind::MoveTo { x, z } => Doing(1, x.to_bits(), z.to_bits()),
         TaskKind::Social { target, social } => Doing(2, target, social as u32),
         TaskKind::Join { leader } => Doing(3, leader, 0),
@@ -547,15 +763,28 @@ fn state(w: &World, s: &Sim) -> State {
     }
     if let Some(t) = s.engaged_with {
         let home = w.households[s.household as usize].plot;
-        let guest = w.sims.get(t as usize).and_then(|g| g.visiting).is_some_and(|v| Some(v.plot) == home);
-        return if guest { State::Hosting(t) } else { State::Engaged(t) };
+        let guest = w
+            .sims
+            .get(t as usize)
+            .and_then(|g| g.visiting)
+            .is_some_and(|v| Some(v.plot) == home);
+        return if guest {
+            State::Hosting(t)
+        } else {
+            State::Engaged(t)
+        };
     }
-    let Some(act) = s.current() else { return State::Idle };
+    let Some(act) = s.current() else {
+        return State::Idle;
+    };
     let d = doing(&act.task.kind);
     match act.phase {
         Phase::Using { .. } => {
             let crib = match act.task.kind {
-                TaskKind::Use { object, interaction } => w
+                TaskKind::Use {
+                    object,
+                    interaction,
+                } => w
                     .objects
                     .get(object as usize)
                     .and_then(|o| w.content.objects[o.def].interactions.get(interaction))
@@ -572,20 +801,48 @@ fn state(w: &World, s: &Sim) -> State {
         }
         Phase::Conversing { .. } => State::Busy(d),
         Phase::Routing { .. } => State::Routing(d),
-        Phase::Calling { .. } | Phase::Waiting { .. } | Phase::Queued { .. } | Phase::Knocking { .. } => State::Waiting(d),
+        Phase::Calling { .. }
+        | Phase::Waiting { .. }
+        | Phase::Queued { .. }
+        | Phase::Knocking { .. } => State::Waiting(d),
     }
 }
 
 fn describe(w: &World, st: State) -> String {
     let thing = |d: Doing| match d {
-        Doing(0, o, i) => w.objects.get(o as usize).map_or(format!("Use object {o}"), |obj| {
-            let def = &w.content.objects[obj.def];
-            format!("Use {}.{}", def.id, def.interactions.get(i as usize).map_or("?", |i| i.id.as_str()))
-        }),
-        Doing(2, t, s) => format!("Social {} with {}", w.content.socials.get(s as usize).map_or("?", |s| s.id.as_str()), w.sims.get(t as usize).map_or("?", |s| s.name.as_str())),
-        Doing(10, a, _) => format!("Spot {}", w.content.accidents.get(a as usize).map_or("?", |a| a.id.as_str())),
+        Doing(0, o, i) => w
+            .objects
+            .get(o as usize)
+            .map_or(format!("Use object {o}"), |obj| {
+                let def = &w.content.objects[obj.def];
+                format!(
+                    "Use {}.{}",
+                    def.id,
+                    def.interactions
+                        .get(i as usize)
+                        .map_or("?", |i| i.id.as_str())
+                )
+            }),
+        Doing(2, t, s) => format!(
+            "Social {} with {}",
+            w.content
+                .socials
+                .get(s as usize)
+                .map_or("?", |s| s.id.as_str()),
+            w.sims.get(t as usize).map_or("?", |s| s.name.as_str())
+        ),
+        Doing(10, a, _) => format!(
+            "Spot {}",
+            w.content
+                .accidents
+                .get(a as usize)
+                .map_or("?", |a| a.id.as_str())
+        ),
         Doing(k, a, b) => {
-            let kinds = ["Use", "MoveTo", "Social", "Join", "Work", "Visit", "GoHome", "Answer", "Clean", "Repair", "Spot", "Cook", "Eat", "Dishes", "Phone"];
+            let kinds = [
+                "Use", "MoveTo", "Social", "Join", "Work", "Visit", "GoHome", "Answer", "Clean",
+                "Repair", "Spot", "Cook", "Eat", "Dishes", "Phone",
+            ];
             format!("{} {a} {b}", kinds[k as usize])
         }
     };
@@ -594,8 +851,14 @@ fn describe(w: &World, st: State) -> String {
         State::Busy(d) => format!("Busy {}", thing(d)),
         State::Routing(d) => format!("Routing {}", thing(d)),
         State::Waiting(d) => format!("Waiting {}", thing(d)),
-        State::Engaged(t) => format!("Engaged by {}", w.sims.get(t as usize).map_or("?", |s| s.name.as_str())),
-        State::Hosting(t) => format!("Engaged by guest {}", w.sims.get(t as usize).map_or("?", |s| s.name.as_str())),
+        State::Engaged(t) => format!(
+            "Engaged by {}",
+            w.sims.get(t as usize).map_or("?", |s| s.name.as_str())
+        ),
+        State::Hosting(t) => format!(
+            "Engaged by guest {}",
+            w.sims.get(t as usize).map_or("?", |s| s.name.as_str())
+        ),
         st => format!("{st:?}"),
     }
 }
@@ -636,11 +899,16 @@ impl Watch {
     pub const EVERY: u64 = 20;
 
     pub fn new() -> Self {
-        let trace = std::env::var("WATCH").ok().map(|v| match v.split_once('@') {
-            Some((name, day)) => (name.to_string(), day.parse().unwrap_or(1)),
-            None => (v, 1),
-        });
-        Watch { trace, ..Self::default() }
+        let trace = std::env::var("WATCH")
+            .ok()
+            .map(|v| match v.split_once('@') {
+                Some((name, day)) => (name.to_string(), day.parse().unwrap_or(1)),
+                None => (v, 1),
+            });
+        Watch {
+            trace,
+            ..Self::default()
+        }
     }
 
     /// Walking for longer than `hours` counts as stuck (instead of 4: a town much bigger than
@@ -668,11 +936,22 @@ impl Watch {
                 && self.last[i].as_ref().is_none_or(|st| st.state != now)
             {
                 let route = match s.current().map(|a| &a.phase) {
-                    Some(Phase::Routing { waypoints, next }) => format!(", route {next}/{} to {:?}", waypoints.len(), waypoints.last()),
+                    Some(Phase::Routing { waypoints, next }) => format!(
+                        ", route {next}/{} to {:?}",
+                        waypoints.len(),
+                        waypoints.last()
+                    ),
                     _ => String::new(),
                 };
                 let home = w.households[s.household as usize].plot;
-                eprintln!("day {} {:05.2}h {name} (home plot {home:?}) at {:.1},{:.1}: {}{route}", clock::day(w.tick), clock::hour(w.tick), s.pos[0], s.pos[1], describe(w, now));
+                eprintln!(
+                    "day {} {:05.2}h {name} (home plot {home:?}) at {:.1},{:.1}: {}{route}",
+                    clock::day(w.tick),
+                    clock::hour(w.tick),
+                    s.pos[0],
+                    s.pos[1],
+                    describe(w, now)
+                );
             }
             match &mut self.last[i] {
                 Some(st) if st.state == now && st.name == s.name => {
@@ -686,10 +965,25 @@ impl Watch {
                     if !st.reported && limit.is_some_and(|l| hours > l) {
                         st.reported = true;
                         let state = format!("{} (walked {:.0} m)", describe(w, now), st.walked);
-                        self.stuck.push(Stuck { sim: i as u32, name: s.name.clone(), state, since: st.since, tick: w.tick });
+                        self.stuck.push(Stuck {
+                            sim: i as u32,
+                            name: s.name.clone(),
+                            state,
+                            since: st.since,
+                            tick: w.tick,
+                        });
                     }
                 }
-                entry => *entry = Some(Stretch { state: now, since: w.tick, name: s.name.clone(), walked: 0.0, at: s.pos, reported: false }),
+                entry => {
+                    *entry = Some(Stretch {
+                        state: now,
+                        since: w.tick,
+                        name: s.name.clone(),
+                        walked: 0.0,
+                        at: s.pos,
+                        reported: false,
+                    })
+                }
             }
         }
     }
@@ -697,7 +991,12 @@ impl Watch {
     /// Panics with everyone found stuck.
     pub fn assert_quiet(&self) {
         let list: Vec<String> = self.stuck.iter().map(|s| s.to_string()).collect();
-        assert!(list.is_empty(), "{} residents stuck:\n{}", list.len(), list.join("\n"));
+        assert!(
+            list.is_empty(),
+            "{} residents stuck:\n{}",
+            list.len(),
+            list.join("\n")
+        );
     }
 }
 
@@ -754,15 +1053,24 @@ impl Long {
         }
         self.watch.sample(w);
         if w.events.last_id() > self.seen {
-            let new: Vec<_> = w.events.iter().rev().take_while(|e| e.id > self.seen).collect();
+            let new: Vec<_> = w
+                .events
+                .iter()
+                .rev()
+                .take_while(|e| e.id > self.seen)
+                .collect();
             // (Ids can skip one an undo took back; the log only forgets the oldest when it's full.)
             let full = w.events.iter().count() >= sim_core::social::EVENT_LOG_CAPACITY;
             let oldest = w.events.iter().next().map_or(0, |e| e.id);
-            assert!(!full || oldest <= self.seen + 1, "the story log dropped events before they were counted");
+            assert!(
+                !full || oldest <= self.seen + 1,
+                "the story log dropped events before they were counted"
+            );
             for e in new {
                 *self.story.entry(format!("{:?}", e.kind)).or_default() += 1;
                 if e.kind == sim_core::social::EventKind::Born {
-                    self.born.push((e.a as usize, w.sims[e.a as usize].name.clone()));
+                    self.born
+                        .push((e.a as usize, w.sims[e.a as usize].name.clone()));
                 }
             }
             self.seen = w.events.last_id();
@@ -786,10 +1094,15 @@ impl Long {
         check(w);
         let day = clock::day(w.tick);
         let when = format!("day {day} {:05.2}h", clock::hour(w.tick));
-        let year = w.lifespan.days_per_year(w.content.life.days_per_year).map(|d| 1.0 / d);
+        let year = w
+            .lifespan
+            .days_per_year(w.content.life.days_per_year)
+            .map(|d| 1.0 / d);
         let midnights = day - self.day;
         for (i, s) in w.sims.iter().enumerate() {
-            let Some(Some((name, age))) = self.ages.get(i) else { continue };
+            let Some(Some((name, age))) = self.ages.get(i) else {
+                continue;
+            };
             if !s.here() || s.name != *name {
                 continue;
             }
@@ -799,18 +1112,28 @@ impl Long {
                 expected += year.unwrap_or(0.0);
             }
             if s.age != expected {
-                let what = format!("{} was {age} on day {}, and is {} at {when} ({midnights} midnight(s) later)", s.name, self.day, s.age);
+                let what = format!(
+                    "{} was {age} on day {}, and is {} at {when} ({midnights} midnight(s) later)",
+                    s.name, self.day, s.age
+                );
                 self.note("ageing", what);
             }
         }
         for (i, name) in std::mem::take(&mut self.born) {
             let s = &w.sims[i];
             if s.here() && s.name == name && s.age != 0.0 {
-                self.note("ageing", format!("{name} was born on day {day} at the age of {}", s.age));
+                self.note(
+                    "ageing",
+                    format!("{name} was born on day {day} at the age of {}", s.age),
+                );
             }
         }
         self.day = day;
-        self.ages = w.sims.iter().map(|s| s.here().then(|| (s.name.clone(), s.age))).collect();
+        self.ages = w
+            .sims
+            .iter()
+            .map(|s| s.here().then(|| (s.name.clone(), s.age)))
+            .collect();
         let here = w.sims.iter().filter(|s| s.here()).count();
         self.fewest = self.fewest.min(here);
         self.most = self.most.max(here);
@@ -827,7 +1150,12 @@ impl Long {
     /// Panics with every problem noted and everyone found stuck.
     pub fn assert_ok(&self) {
         let counts: Vec<String> = self.noted.iter().map(|(k, n)| format!("{n} {k}")).collect();
-        assert!(self.problems.is_empty(), "problems ({}):\n{}", counts.join(", "), self.problems.join("\n"));
+        assert!(
+            self.problems.is_empty(),
+            "problems ({}):\n{}",
+            counts.join(", "),
+            self.problems.join("\n")
+        );
         self.watch.assert_quiet();
     }
 }
@@ -837,22 +1165,55 @@ impl Long {
 /// the lot again for lower detail).
 pub fn reload(w: &World, content: &str) -> World {
     let json = w.save_json();
-    let loaded = World::from_save_json(content, &json).unwrap_or_else(|e| panic!("the save on day {} doesn't load: {e}", clock::day(w.tick)));
+    let loaded = World::from_save_json(content, &json)
+        .unwrap_or_else(|e| panic!("the save on day {} doesn't load: {e}", clock::day(w.tick)));
     check(&loaded);
     assert_eq!(loaded.tick, w.tick);
     // The first difference, if any.
     fn same<T: PartialEq + std::fmt::Debug>(what: &str, saved: Vec<T>, loaded: Vec<T>) {
-        if let Some(i) = (0..saved.len().max(loaded.len())).find(|&i| saved.get(i) != loaded.get(i)) {
-            panic!("{what} don't survive saving: {} saved, {} loaded; #{i} was {:?}, is {:?}", saved.len(), loaded.len(), saved.get(i), loaded.get(i));
+        if let Some(i) = (0..saved.len().max(loaded.len())).find(|&i| saved.get(i) != loaded.get(i))
+        {
+            panic!(
+                "{what} don't survive saving: {} saved, {} loaded; #{i} was {:?}, is {:?}",
+                saved.len(),
+                loaded.len(),
+                saved.get(i),
+                loaded.get(i)
+            );
         }
     }
-    let who = |w: &World| w.sims.iter().map(|s| (s.name.clone(), s.here(), s.household, s.age.to_bits())).collect::<Vec<_>>();
+    let who = |w: &World| {
+        w.sims
+            .iter()
+            .map(|s| (s.name.clone(), s.here(), s.household, s.age.to_bits()))
+            .collect::<Vec<_>>()
+    };
     same("the residents", who(w), who(&loaded));
-    let homes = |w: &World| w.households.iter().map(|h| (h.plot, h.funds, h.expecting.map(|e| (e.parents, e.due)))).collect::<Vec<_>>();
+    let homes = |w: &World| {
+        w.households
+            .iter()
+            .map(|h| (h.plot, h.funds, h.expecting.map(|e| (e.parents, e.due))))
+            .collect::<Vec<_>>()
+    };
     same("the households", homes(w), homes(&loaded));
     // (Loading puts what stands on tops in last, so the order, and the ids, can change.)
     let things = |w: &World| {
-        let mut list: Vec<_> = w.objects.iter().map(|o| (w.content.objects[o.def].id.clone(), o.x, o.z, o.rot, o.quality, o.wear.to_bits(), o.open, o.growth.to_bits())).collect();
+        let mut list: Vec<_> = w
+            .objects
+            .iter()
+            .map(|o| {
+                (
+                    w.content.objects[o.def].id.clone(),
+                    o.x,
+                    o.z,
+                    o.rot,
+                    o.quality,
+                    o.wear.to_bits(),
+                    o.open,
+                    o.growth.to_bits(),
+                )
+            })
+            .collect();
         list.sort();
         list
     };
@@ -863,12 +1224,22 @@ pub fn reload(w: &World, content: &str) -> World {
     // visitor at the door aren't saved), so the first load can tidy up; from then on a save
     // loads as it was.
     let again = loaded.save_json();
-    let twice = World::from_save_json(content, &again).expect("a loaded game's save loads").save_json();
+    let twice = World::from_save_json(content, &again)
+        .expect("a loaded game's save loads")
+        .save_json();
     if twice != again {
         // Where they part, with a little before it.
-        let at = again.bytes().zip(twice.bytes()).position(|(a, b)| a != b).unwrap_or(again.len().min(twice.len()));
+        let at = again
+            .bytes()
+            .zip(twice.bytes())
+            .position(|(a, b)| a != b)
+            .unwrap_or(again.len().min(twice.len()));
         let around = |s: &str| s[at.saturating_sub(300)..(at + 200).min(s.len())].to_string();
-        panic!("a loaded game saves differently from character {at}:\nsaved:   …{}\nresaved: …{}", around(&again), around(&twice));
+        panic!(
+            "a loaded game saves differently from character {at}:\nsaved:   …{}\nresaved: …{}",
+            around(&again),
+            around(&twice)
+        );
     }
     loaded
 }
@@ -915,7 +1286,17 @@ pub struct Layout {
 /// without jobs, or none) lives on the first plot; every other house has neighbours, most of
 /// them with a job. Returns the town file.
 pub fn town(content: &str, seed: u64, player_size: usize) -> String {
-    town_with(content, seed, player_size, Layout { columns: 5, streets: 1, yards: false, max_residents: usize::MAX })
+    town_with(
+        content,
+        seed,
+        player_size,
+        Layout {
+            columns: 5,
+            streets: 1,
+            yards: false,
+            max_residents: usize::MAX,
+        },
+    )
 }
 
 /// A town laid out like `town`, of any size.
@@ -980,7 +1361,9 @@ pub fn town_with(content: &str, seed: u64, player_size: usize, layout: Layout) -
         .filter(|o| {
             o["outdoors"].as_bool() == Some(true)
                 && o["interactions"].as_array().is_some_and(|i| !i.is_empty())
-                && o["footprint"].as_array().is_none_or(|f| f[0] == 1 && f[1] == 1)
+                && o["footprint"]
+                    .as_array()
+                    .is_none_or(|f| f[0] == 1 && f[1] == 1)
         })
         .map(|o| o["id"].as_str().unwrap().to_string())
         .collect();
@@ -994,11 +1377,7 @@ pub fn town_with(content: &str, seed: u64, player_size: usize, layout: Layout) -
             let index = row * columns + col;
             let (x, z) = (
                 MARGIN + col * pw,
-                if row == 0 {
-                    block
-                } else {
-                    block + pd + STREET
-                },
+                if row == 0 { block } else { block + pd + STREET },
             );
             let rotated = row == 0;
             // Plot coordinates to town coordinates (the north row is turned 180°).
@@ -1089,7 +1468,11 @@ pub fn town_with(content: &str, seed: u64, player_size: usize, layout: Layout) -
             };
             let size = size.min(layout.max_residents.saturating_sub(sims.len()));
             if size == 0 {
-                let name = if player { "Player".to_string() } else { format!("House {}", households.len()) };
+                let name = if player {
+                    "Player".to_string()
+                } else {
+                    format!("House {}", households.len())
+                };
                 households.push(json!({"name": name, "plot": plot, "player": player}));
                 continue;
             }
@@ -1120,7 +1503,11 @@ pub fn town_with(content: &str, seed: u64, player_size: usize, layout: Layout) -
                 });
                 if family && m < 3 {
                     // A child of any age from three to grown up.
-                    sim["age"] = json!(if m < 2 { parents_age.floor() } else { (parents_age - 20.0 - rng.next() * 30.0).max(3.0).floor() });
+                    sim["age"] = json!(if m < 2 {
+                        parents_age.floor()
+                    } else {
+                        (parents_age - 20.0 - rng.next() * 30.0).max(3.0).floor()
+                    });
                 }
                 if !player && !tracks.is_empty() && rng.next() < 0.75 {
                     let level = (rng.next().powi(2) * 6.0) as usize;
@@ -1166,7 +1553,10 @@ pub fn town_with(content: &str, seed: u64, player_size: usize, layout: Layout) -
     let exits: Vec<Value> = (0..layout.streets)
         .flat_map(|s| {
             let street_z = (MARGIN + s * (pd * 2 + STREET) + pd) as f64 + STREET as f64 / 2.0;
-            [json!([0.5, street_z]), json!([width as f64 - 0.5, street_z])]
+            [
+                json!([0.5, street_z]),
+                json!([width as f64 - 0.5, street_z]),
+            ]
         })
         .collect();
     json!({
@@ -1180,11 +1570,21 @@ pub fn town_with(content: &str, seed: u64, player_size: usize, layout: Layout) -
 
 /// Garden things for a house's back yard and the strips beside it (plot coordinates, plot
 /// `w × d`): rows with a free lane in front of each, clear of the house's own objects.
-fn yard(house: &Value, number: usize, defs: &[String], (w, d): (i64, i64), footprint: impl Fn(&str) -> (i64, i64)) -> Value {
+fn yard(
+    house: &Value,
+    number: usize,
+    defs: &[String],
+    (w, d): (i64, i64),
+    footprint: impl Fn(&str) -> (i64, i64),
+) -> Value {
     // Tiles the house's own objects stand on, and one around them (where they're used from).
     let mut taken = std::collections::HashSet::new();
     for o in house["objects"].as_array().unwrap() {
-        let (x, z, rot) = (o["x"].as_i64().unwrap(), o["z"].as_i64().unwrap(), o["rot"].as_i64().unwrap());
+        let (x, z, rot) = (
+            o["x"].as_i64().unwrap(),
+            o["z"].as_i64().unwrap(),
+            o["rot"].as_i64().unwrap(),
+        );
         let (fw, fd) = footprint(o["def"].as_str().unwrap());
         let (ow, od) = if rot % 2 == 0 { (fw, fd) } else { (fd, fw) };
         for dz in -1..=od {
@@ -1194,8 +1594,12 @@ fn yard(house: &Value, number: usize, defs: &[String], (w, d): (i64, i64), footp
         }
     }
     // Two rows across the back facing the house, one down each side facing out.
-    let back = [d - 3, d - 1].into_iter().flat_map(|z| (1..w).step_by(2).map(move |x| (x, z, 2)));
-    let sides = (5..d - 4).step_by(2).flat_map(|z| [(1, z, 3), (w - 2, z, 1)]);
+    let back = [d - 3, d - 1]
+        .into_iter()
+        .flat_map(|z| (1..w).step_by(2).map(move |x| (x, z, 2)));
+    let sides = (5..d - 4)
+        .step_by(2)
+        .flat_map(|z| [(1, z, 3), (w - 2, z, 1)]);
     let list = back
         .chain(sides)
         .filter(|&(x, z, _)| !taken.contains(&(x, z)))
@@ -1223,7 +1627,9 @@ pub fn household_of_three() -> (World, Vec<usize>, String) {
     let content = content();
     let mut w = World::from_json(&content, &town(&content, 7, 3), 7).unwrap();
     let h = w.households.iter().position(|h| h.player).unwrap() as u32;
-    let home: Vec<usize> = (0..w.sims.len()).filter(|&i| w.sims[i].household == h).collect();
+    let home: Vec<usize> = (0..w.sims.len())
+        .filter(|&i| w.sims[i].household == h)
+        .collect();
     assert_eq!(home.len(), 3);
     w.autonomy = false;
     while w.tick < clock::tick_at(1, 9.0 * 60.0).unwrap() {
@@ -1247,18 +1653,51 @@ pub fn household_of_three() -> (World, Vec<usize>, String) {
 /// to keep: nobody talks to them then), with the sofa's comfort still to come. Free will off.
 pub fn sit_on_the_sofa(w: World, content: &str, who: &[usize]) -> World {
     use sim_core::content::Pose;
-    let plot = w.households.iter().find(|h| h.player).and_then(|h| h.plot).unwrap() as usize;
+    let plot = w
+        .households
+        .iter()
+        .find(|h| h.player)
+        .and_then(|h| h.plot)
+        .unwrap() as usize;
     let p = &w.plots[plot];
     let sofa_def = w.content.object_index("sofa").unwrap();
-    let sofa = w.objects.iter().find(|o| o.def == sofa_def && o.x >= p.x && o.x < p.x + p.w && o.z >= p.z && o.z < p.z + p.d).unwrap().id;
-    let relax = w.content.objects[sofa_def].interactions.iter().position(|i| i.pose == Pose::Sit).unwrap();
+    let sofa = w
+        .objects
+        .iter()
+        .find(|o| {
+            o.def == sofa_def && o.x >= p.x && o.x < p.x + p.w && o.z >= p.z && o.z < p.z + p.d
+        })
+        .unwrap()
+        .id;
+    let relax = w.content.objects[sofa_def]
+        .interactions
+        .iter()
+        .position(|i| i.pose == Pose::Sit)
+        .unwrap();
     let mut w = w;
-    let comfort = w.content.needs.iter().position(|n| n.id == "comfort").unwrap();
+    let comfort = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "comfort")
+        .unwrap();
     for &i in who {
         w.sims[i].needs[comfort] = 0.2;
-        w.apply(sim_core::Command::Use { sim: i as u32, object: sofa, interaction: relax }).unwrap();
+        w.apply(sim_core::Command::Use {
+            sim: i as u32,
+            object: sofa,
+            interaction: relax,
+        })
+        .unwrap();
     }
-    let seated = |w: &World| who.iter().all(|&i| w.sims[i].pose == Pose::Sit && w.sims[i].current().is_some_and(|a| matches!(a.phase, Phase::Using { .. })));
+    let seated = |w: &World| {
+        who.iter().all(|&i| {
+            w.sims[i].pose == Pose::Sit
+                && w.sims[i]
+                    .current()
+                    .is_some_and(|a| matches!(a.phase, Phase::Using { .. }))
+        })
+    };
     for _ in 0..(20.0 / MINUTES_PER_TICK) as u64 {
         if seated(&w) {
             break;

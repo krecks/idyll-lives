@@ -67,7 +67,10 @@ fn until(w: &mut World, day: u32, hour: f32) {
 /// a `use` sent from the page starts at once.
 fn free_up(w: &mut World) {
     for _ in 0..30 {
-        if w.sims[0].current().is_none() && w.sims[0].queue().next().is_none() && w.sims[0].held.is_none() {
+        if w.sims[0].current().is_none()
+            && w.sims[0].queue().next().is_none()
+            && w.sims[0].held.is_none()
+        {
             return;
         }
         while w.sims[0].current().is_some() || w.sims[0].queue().next().is_some() {
@@ -77,11 +80,19 @@ fn free_up(w: &mut World) {
             w.tick_once();
         }
     }
-    panic!("resident 0 doesn't come free: {:?}, holding {:?}", w.sims[0].current().map(|a| &a.task), w.sims[0].held);
+    panic!(
+        "resident 0 doesn't come free: {:?}, holding {:?}",
+        w.sims[0].current().map(|a| &a.task),
+        w.sims[0].held
+    );
 }
 
 fn need(w: &World, id: &str) -> usize {
-    w.content.needs.iter().position(|n| n.id == id).unwrap_or_else(|| panic!("a need '{id}'"))
+    w.content
+        .needs
+        .iter()
+        .position(|n| n.id == id)
+        .unwrap_or_else(|| panic!("a need '{id}'"))
 }
 
 /// Sets resident `i`'s needs: `id` → value, every other need to `rest`.
@@ -119,8 +130,13 @@ fn at_home(w: &World) {
     let plot = w.households[h].plot.expect("a home");
     let p = &w.plots[plot as usize];
     let [x, z] = w.sims[0].pos;
-    let inside = x >= p.x as f32 && x <= (p.x + p.w) as f32 && z >= p.z as f32 && z <= (p.z + p.d) as f32;
-    assert!(inside && w.sims[0].away_until.is_none(), "at home: {:?}", w.sims[0].pos);
+    let inside =
+        x >= p.x as f32 && x <= (p.x + p.w) as f32 && z >= p.z as f32 && z <= (p.z + p.d) as f32;
+    assert!(
+        inside && w.sims[0].away_until.is_none(),
+        "at home: {:?}",
+        w.sims[0].pos
+    );
 }
 
 #[test]
@@ -132,21 +148,53 @@ fn bathroom_check() {
     // An hour on, still nothing pulls them away.
     let day = clock::day(w.tick);
     until(&mut w, day, 11.0);
-    assert!(w.sims[0].needs.iter().take(w.content.needs.len()).all(|&n| n > w.content.autonomy.urgent_below), "{:?}", w.sims[0].needs);
+    assert!(
+        w.sims[0]
+            .needs
+            .iter()
+            .take(w.content.needs.len())
+            .all(|&n| n > w.content.autonomy.urgent_below),
+        "{:?}",
+        w.sims[0].needs
+    );
     // `?debug`'s `__addFunds`: money in, and out down to nothing.
     let h = w.sims[0].household;
     let before = w.households[h as usize].funds;
-    w.apply(Command::AddFunds { household: h, amount: 500 }).unwrap();
+    w.apply(Command::AddFunds {
+        household: h,
+        amount: 500,
+    })
+    .unwrap();
     assert_eq!(w.households[h as usize].funds, before + 500);
-    w.apply(Command::AddFunds { household: h, amount: -10 * FUNDS }).unwrap();
+    w.apply(Command::AddFunds {
+        household: h,
+        amount: -10 * FUNDS,
+    })
+    .unwrap();
     assert_eq!(w.households[h as usize].funds, 0);
-    assert!(w.apply(Command::AddFunds { household: 99, amount: 1 }).is_err());
+    assert!(
+        w.apply(Command::AddFunds {
+            household: 99,
+            amount: 1
+        })
+        .is_err()
+    );
 }
 
 #[test]
 fn needy_check() {
     let mut w = house(10.0, true);
-    set_needs(&mut w, 0, 0.5, &[("bladder", 0.05), ("hunger", 0.2), ("energy", 0.25), ("hygiene", 0.3)]);
+    set_needs(
+        &mut w,
+        0,
+        0.5,
+        &[
+            ("bladder", 0.05),
+            ("hunger", 0.2),
+            ("energy", 0.25),
+            ("hygiene", 0.3),
+        ],
+    );
     at_home(&w);
     common::dump_state(&w, "needy-check");
 }
@@ -164,9 +212,13 @@ fn office_night() {
 /// Every community thing in rows by group (each `(def, width, depth)` as `community.json` has it).
 fn town_things(content: &Value) -> Vec<(String, String, i64, i64)> {
     let objects = content["objects"].as_array().unwrap();
-    let community: Value = serde_json::from_str(&std::fs::read_to_string(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/content/community.json"),
-    ).unwrap())
+    let community: Value = serde_json::from_str(
+        &std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../web/public/content/community.json"),
+        )
+        .unwrap(),
+    )
     .unwrap();
     community["objects"]
         .as_array()
@@ -176,8 +228,15 @@ fn town_things(content: &Value) -> Vec<(String, String, i64, i64)> {
             let id = o["id"].as_str().unwrap();
             // As merged (a pack or later file may change it).
             let def = objects.iter().find(|d| d["id"] == id).unwrap_or(o);
-            let f = def["footprint"].as_array().map_or((1, 1), |f| (f[0].as_i64().unwrap(), f[1].as_i64().unwrap()));
-            (id.to_string(), def["group"].as_str().unwrap_or("").to_string(), f.0, f.1)
+            let f = def["footprint"]
+                .as_array()
+                .map_or((1, 1), |f| (f[0].as_i64().unwrap(), f[1].as_i64().unwrap()));
+            (
+                id.to_string(),
+                def["group"].as_str().unwrap_or("").to_string(),
+                f.0,
+                f.1,
+            )
         })
         .collect()
 }
@@ -192,7 +251,11 @@ fn town_things_lot() {
 #[test]
 fn town_street() {
     let world = town_things_world(STREET, 10.0);
-    assert_eq!(world.meta["streets"][0]["d"], STREET, "the street in front: {}", world.meta);
+    assert_eq!(
+        world.meta["streets"][0]["d"], STREET,
+        "the street in front: {}",
+        world.meta
+    );
     common::dump_state(&world, "town-street");
 }
 
@@ -200,7 +263,10 @@ fn town_street() {
 fn town_street_night() {
     let world = town_things_world(STREET, 22.0);
     let hour = clock::hour(world.tick);
-    assert!(sim_core::lights::dark_at(hour * 60.0) && hour >= 22.0, "after dark: {hour}");
+    assert!(
+        sim_core::lights::dark_at(hour * 60.0) && hour >= 22.0,
+        "after dark: {hour}"
+    );
     common::dump_state(&world, "town-street-night");
 }
 
@@ -214,13 +280,23 @@ fn town_things_world(street: i64, hour: f32) -> World {
     let merged = common::content();
     let content: Value = serde_json::from_str(&merged).unwrap();
     let things = town_things(&content);
-    assert!(things.len() >= 36, "every community thing: {}", things.len());
+    assert!(
+        things.len() >= 36,
+        "every community thing: {}",
+        things.len()
+    );
     // Home plot (empty) on the left, the town lot on the right; the street along their front.
     let (hw, w, d) = (12, 54, 32);
     let z = |v: i64| v + street;
     // Rows by group, front to back; each row starts a tile in, things two tiles apart. The
     // shops' row stands at the back against a wall, as in a shop.
-    let rows = [("street", 3), ("play", 8), ("food", 13), ("farm", 18), ("shops", d - 3)];
+    let rows = [
+        ("street", 3),
+        ("play", 8),
+        ("food", 13),
+        ("farm", 18),
+        ("shops", d - 3),
+    ];
     let mut objects = Vec::new();
     for (group, z0) in rows {
         let mut x = hw + 2;
@@ -233,7 +309,12 @@ fn town_things_world(street: i64, hour: f32) -> World {
         assert!(x <= hw + w, "the {group} row fits: {x}");
     }
     let placed = objects.len();
-    assert_eq!(placed, things.len(), "every thing in a row by its group: {:?}", things.iter().map(|t| &t.1).collect::<Vec<_>>());
+    assert_eq!(
+        placed,
+        things.len(),
+        "every thing in a row by its group: {:?}",
+        things.iter().map(|t| &t.1).collect::<Vec<_>>()
+    );
     let front = z(0) as f64 + 1.5;
     let lot = json!({
         "width": hw + w, "depth": d + street,
@@ -248,7 +329,11 @@ fn town_things_world(street: i64, hour: f32) -> World {
         "meta": if street > 0 { json!({"streets": [{"x": 0, "z": 0, "w": hw + w, "d": street}]}) } else { Value::Null },
     });
     let mut world = World::from_json(&merged, &lot.to_string(), 7).unwrap();
-    assert_eq!(world.objects.len(), placed, "every thing loads where it was put");
+    assert_eq!(
+        world.objects.len(),
+        placed,
+        "every thing loads where it was put"
+    );
     world.households[0].free_will = false;
     until(&mut world, 1, hour);
     free_up(&mut world);
@@ -307,7 +392,11 @@ fn stage(more: &[Value], hour: f32) -> World {
         ],
     });
     let mut world = World::from_json(&merged, &lot.to_string(), 7).unwrap();
-    assert_eq!(world.objects.len(), fixed + more.len(), "the crib, the kitchen and the rest load where they were put");
+    assert_eq!(
+        world.objects.len(),
+        fixed + more.len(),
+        "the crib, the kitchen and the rest load where they were put"
+    );
     for s in world.sims.iter_mut() {
         s.job = None;
         s.job_search_from = u32::MAX;
@@ -328,29 +417,63 @@ fn stage(more: &[Value], hour: f32) -> World {
     }
     // Every life stage, each at home.
     let life = &world.content.life;
-    let stages: Vec<&str> = world.sims.iter().map(|s| life.stage_at(s.age).unwrap().id.as_str()).collect();
-    assert_eq!(stages, ["adult", "youngAdult", "teen", "child", "elder", "baby"]);
+    let stages: Vec<&str> = world
+        .sims
+        .iter()
+        .map(|s| life.stage_at(s.age).unwrap().id.as_str())
+        .collect();
+    assert_eq!(
+        stages,
+        ["adult", "youngAdult", "teen", "child", "elder", "baby"]
+    );
     assert_eq!(life.stages.len(), stages.len(), "one resident per stage");
     for (i, s) in world.sims.iter().enumerate() {
         assert!(s.away_until.is_none(), "resident {i} at home");
     }
-    assert_eq!(world.sims[5].pose, sim_core::content::Pose::Lie, "Eve is in the crib");
+    assert_eq!(
+        world.sims[5].pose,
+        sim_core::content::Pose::Lie,
+        "Eve is in the crib"
+    );
     // The room is closed: one room of 144 tiles with its door and windows, the garden round it.
     let room = world.room_at_tile(10, 12).expect("a room");
-    assert!(!room.garden && room.tiles == 144.0 && room.doors == 1 && room.windows == 2, "{:?}", (room.garden, room.tiles, room.doors, room.windows));
-    assert!(world.room_at_tile(10, 22).is_some_and(|r| r.garden), "the garden behind");
+    assert!(
+        !room.garden && room.tiles == 144.0 && room.doors == 1 && room.windows == 2,
+        "{:?}",
+        (room.garden, room.tiles, room.doors, room.windows)
+    );
+    assert!(
+        world.room_at_tile(10, 22).is_some_and(|r| r.garden),
+        "the garden behind"
+    );
     world
 }
 
 /// Resident `sim` is given use `id` of the stage's first `def` (the command is taken and the
 /// use queued), and lets it go again.
 fn takes(w: &mut World, sim: u32, def: &str, id: &str) {
-    let o = w.objects.iter().find(|o| w.content.objects[o.def].id == def).unwrap_or_else(|| panic!("a {def}"));
-    let interaction = w.content.objects[o.def].interactions.iter().position(|i| i.id == id).unwrap_or_else(|| panic!("{def} offers '{id}'"));
+    let o = w
+        .objects
+        .iter()
+        .find(|o| w.content.objects[o.def].id == def)
+        .unwrap_or_else(|| panic!("a {def}"));
+    let interaction = w.content.objects[o.def]
+        .interactions
+        .iter()
+        .position(|i| i.id == id)
+        .unwrap_or_else(|| panic!("{def} offers '{id}'"));
     let object = o.stable;
-    w.apply(Command::Use { sim, object, interaction }).unwrap_or_else(|e| panic!("{def} / {id}: {e}"));
+    w.apply(Command::Use {
+        sim,
+        object,
+        interaction,
+    })
+    .unwrap_or_else(|e| panic!("{def} / {id}: {e}"));
     let s = &w.sims[sim as usize];
-    assert!(s.current().is_some() || s.queue().next().is_some(), "{def} / {id} queued");
+    assert!(
+        s.current().is_some() || s.queue().next().is_some(),
+        "{def} / {id} queued"
+    );
     w.apply(Command::Cancel { sim, index: 0 }).unwrap();
 }
 
@@ -364,40 +487,102 @@ fn review_stage() {
     // `check.mjs play --skills`: a skill set for a check (`Command::SetSkill`), within its range.
     let cooking = world.content.skill_index("cooking").unwrap();
     let max = world.content.skill_rules.max_level;
-    world.apply(Command::SetSkill { sim: 0, skill: "cooking".into(), level: 5.0 }).unwrap();
+    world
+        .apply(Command::SetSkill {
+            sim: 0,
+            skill: "cooking".into(),
+            level: 5.0,
+        })
+        .unwrap();
     assert_eq!(world.sims[0].skills[cooking], 5.0);
-    world.apply(Command::SetSkill { sim: 0, skill: "cooking".into(), level: max + 3.0 }).unwrap();
+    world
+        .apply(Command::SetSkill {
+            sim: 0,
+            skill: "cooking".into(),
+            level: max + 3.0,
+        })
+        .unwrap();
     assert_eq!(world.sims[0].skills[cooking], max);
-    assert!(world.apply(Command::SetSkill { sim: 0, skill: "juggling".into(), level: 1.0 }).is_err());
-    assert!(world.apply(Command::SetSkill { sim: 99, skill: "cooking".into(), level: 1.0 }).is_err());
+    assert!(
+        world
+            .apply(Command::SetSkill {
+                sim: 0,
+                skill: "juggling".into(),
+                level: 1.0
+            })
+            .is_err()
+    );
+    assert!(
+        world
+            .apply(Command::SetSkill {
+                sim: 99,
+                skill: "cooking".into(),
+                level: 1.0
+            })
+            .is_err()
+    );
 }
 
 #[test]
 fn review_stage_night() {
     let world = stage(&[], 22.0);
     let hour = clock::hour(world.tick);
-    assert!(sim_core::lights::dark_at(hour * 60.0) && hour >= 22.0, "after dark: {hour}");
+    assert!(
+        sim_core::lights::dark_at(hour * 60.0) && hour >= 22.0,
+        "after dark: {hour}"
+    );
     common::dump_state(&world, "review-stage-night");
 }
 
 #[test]
 fn review_baby() {
     let (tx, tz) = BABY_TABLE;
-    let more = [json!({"def": "tableDining4", "x": tx, "z": tz, "rot": 0}), json!({"def": "highChair", "x": tx, "z": tz + 1, "rot": 2})];
+    let more = [
+        json!({"def": "tableDining4", "x": tx, "z": tz, "rot": 0}),
+        json!({"def": "highChair", "x": tx, "z": tz + 1, "rot": 2}),
+    ];
     let mut world = stage(&more, 10.0);
-    let hunger = world.content.needs.iter().position(|n| n.id == "hunger").unwrap();
-    let bladder = world.content.needs.iter().position(|n| n.id == "bladder").unwrap();
+    let hunger = world
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "hunger")
+        .unwrap();
+    let bladder = world
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "bladder")
+        .unwrap();
     world.sims[5].needs[hunger] = 0.25;
     world.sims[5].needs[bladder] = 0.25;
     common::dump_state(&world, "review-baby");
     // Ada's feed from the crib goes to the high chair, by day.
-    let crib = world.objects.iter().find(|o| world.content.objects[o.def].id == "crib").unwrap().stable;
-    let feed = world.content.objects[world.objects[0].def].interactions.iter().position(|i| i.id == "feed").unwrap();
-    world.apply(Command::Use { sim: 0, object: crib, interaction: feed }).unwrap();
+    let crib = world
+        .objects
+        .iter()
+        .find(|o| world.content.objects[o.def].id == "crib")
+        .unwrap()
+        .stable;
+    let feed = world.content.objects[world.objects[0].def]
+        .interactions
+        .iter()
+        .position(|i| i.id == "feed")
+        .unwrap();
+    world
+        .apply(Command::Use {
+            sim: 0,
+            object: crib,
+            interaction: feed,
+        })
+        .unwrap();
     let mut seated = false;
     for _ in 0..(30.0 / MINUTES_PER_TICK) as u32 {
         world.tick_once();
-        seated |= world.objects.iter().any(|o| world.content.objects[o.def].id == "highChair" && o.users[0] == Some(5));
+        seated |= world
+            .objects
+            .iter()
+            .any(|o| world.content.objects[o.def].id == "highChair" && o.users[0] == Some(5));
     }
     assert!(seated, "Eve was carried to the high chair");
 }
@@ -408,13 +593,24 @@ fn review_garden() {
     // Every kind of crop, in a row at the back of the garden facing the house.
     let mut crops = Vec::new();
     let mut x = 2;
-    for o in merged["objects"].as_array().unwrap().iter().filter(|o| o.get("grows").is_some()) {
-        let fw = o["footprint"].as_array().map_or(1, |f| f[0].as_i64().unwrap() as i32);
+    for o in merged["objects"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|o| o.get("grows").is_some())
+    {
+        let fw = o["footprint"]
+            .as_array()
+            .map_or(1, |f| f[0].as_i64().unwrap() as i32);
         assert!(fw < GARDEN_STEP, "{} fits its place in the row", o["id"]);
         crops.push(json!({"def": o["id"], "x": x, "z": GARDEN_ROW, "rot": 2}));
         x += GARDEN_STEP;
     }
-    assert!(crops.len() >= 6 && x <= 32, "every crop in one row: {}", crops.len());
+    assert!(
+        crops.len() >= 6 && x <= 32,
+        "every crop in one row: {}",
+        crops.len()
+    );
     let mut world = stage(&crops, 10.0);
     let ripe: Vec<(String, String)> = world
         .objects
@@ -423,7 +619,15 @@ fn review_garden() {
         .map(|o| {
             let d = &world.content.objects[o.def];
             assert!(o.ripe(), "{} ripe", d.id);
-            (d.id.clone(), d.interactions.iter().find(|i| i.ripe).unwrap_or_else(|| panic!("{} has a 'when ripe' use", d.id)).id.clone())
+            (
+                d.id.clone(),
+                d.interactions
+                    .iter()
+                    .find(|i| i.ripe)
+                    .unwrap_or_else(|| panic!("{} has a 'when ripe' use", d.id))
+                    .id
+                    .clone(),
+            )
         })
         .collect();
     assert_eq!(ripe.len(), crops.len());
@@ -437,21 +641,46 @@ fn review_garden() {
 #[test]
 fn crowded_garden() {
     let (mut world, _) = common::garden_home();
-    common::garden_cluster(&mut world, 0, common::GARDEN_PATCH, common::Cluster::Packed(31), None);
+    common::garden_cluster(
+        &mut world,
+        0,
+        common::GARDEN_PATCH,
+        common::Cluster::Packed(31),
+        None,
+    );
     for i in 0..world.sims.len() {
         set_needs(&mut world, i, 0.5, &[]);
     }
     // The lounger whose sides are shut in by the beds round it, its foot free.
-    let lounger = world.objects.iter().find(|o| world.content.objects[o.def].id == "sunLounger").expect("a lounger in the crowd");
-    assert_eq!((lounger.x, lounger.z, lounger.rot), (10, 16, 2), "the first lounger is the shut-in one");
+    let lounger = world
+        .objects
+        .iter()
+        .find(|o| world.content.objects[o.def].id == "sunLounger")
+        .expect("a lounger in the crowd");
+    assert_eq!(
+        (lounger.x, lounger.z, lounger.rot),
+        (10, 16, 2),
+        "the first lounger is the shut-in one"
+    );
     let (object, at) = (lounger.stable, lounger.id);
     common::dump_state(&world, "crowded-garden");
     // Ada gets onto it all the same, from its foot.
-    let sunbathe = world.content.objects[world.objects[at as usize].def].interactions.iter().position(|i| i.id == "sunbathe").unwrap();
-    world.apply(Command::Use { sim: 0, object, interaction: sunbathe }).unwrap();
+    let sunbathe = world.content.objects[world.objects[at as usize].def]
+        .interactions
+        .iter()
+        .position(|i| i.id == "sunbathe")
+        .unwrap();
+    world
+        .apply(Command::Use {
+            sim: 0,
+            object,
+            interaction: sunbathe,
+        })
+        .unwrap();
     let on = (0..(30.0 / MINUTES_PER_TICK) as u32).any(|_| {
         world.tick_once();
-        world.objects[at as usize].users.contains(&Some(0)) && world.sims[0].pose == sim_core::content::Pose::Lie
+        world.objects[at as usize].users.contains(&Some(0))
+            && world.sims[0].pose == sim_core::content::Pose::Lie
     });
     assert!(on, "Ada lies on the shut-in lounger");
 }
@@ -474,9 +703,22 @@ fn review_resized() {
     for (resized, name) in [(true, "review-resized"), (false, "review-resized-base")] {
         let (mut world, _) = common::garden_home();
         for (def, x, z, rot, size, tall) in RESIZED {
-            let (size, tall) = if resized { (Some(size), Some(tall)) } else { (None, None) };
+            let (size, tall) = if resized {
+                (Some(size), Some(tall))
+            } else {
+                (None, None)
+            };
             world
-                .apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), colors: Default::default(), turn: None, offset: None, size, tall })
+                .apply(Command::Buy {
+                    household: 0,
+                    object: def.into(),
+                    at: Some([x, z, rot]),
+                    colors: Default::default(),
+                    turn: None,
+                    offset: None,
+                    size,
+                    tall,
+                })
                 .unwrap_or_else(|e| panic!("{def}: {e}"));
             let o = world.objects.last().unwrap();
             assert_eq!(o.tall, tall.unwrap_or(0), "{def} as bought");

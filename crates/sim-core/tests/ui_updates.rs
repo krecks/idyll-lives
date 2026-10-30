@@ -19,7 +19,9 @@ fn world(crowded: bool) -> World {
     let mut town: Value = serde_json::from_str(&common::town(&content, 7, 3)).unwrap();
     if crowded {
         let sims = town["sims"].as_array().unwrap();
-        let player = |s: &Value| town["households"][s["household"].as_u64().unwrap() as usize]["player"] == true;
+        let player = |s: &Value| {
+            town["households"][s["household"].as_u64().unwrap() as usize]["player"] == true
+        };
         let neighbours: Vec<&Value> = sims.iter().filter(|s| !player(s)).collect();
         let more: Vec<Value> = (0..sim_core::world::MAX_SIMS - sims.len())
             .map(|i| {
@@ -40,7 +42,9 @@ fn world(crowded: bool) -> World {
 }
 
 /// Fields the UI drops when a resident's details stop (`SimView.detail`).
-const DETAILS: [&str; 9] = ["grade", "needs", "mood", "emotion", "feelings", "actions", "skills", "phone", "plan"];
+const DETAILS: [&str; 9] = [
+    "grade", "needs", "mood", "emotion", "feelings", "actions", "skills", "phone", "plan",
+];
 
 /// The UI's copy of the view, kept the way `game/uiUpdates.ts` keeps it.
 #[derive(Default, Debug, PartialEq)]
@@ -66,7 +70,9 @@ impl Mirror {
             for (key, value) in patch.as_object().unwrap() {
                 match (key.as_str(), value) {
                     ("plan", Value::Object(parts)) => {
-                        let plan = sim.entry("plan").or_insert_with(|| Value::Object(Map::new()));
+                        let plan = sim
+                            .entry("plan")
+                            .or_insert_with(|| Value::Object(Map::new()));
                         plan.as_object_mut().unwrap().extend(parts.clone());
                     }
                     ("plan" | "pension" | "grade", Value::Null) => {
@@ -87,10 +93,12 @@ impl Mirror {
             self.households.insert(h["id"].as_u64().unwrap(), h);
         }
         for pair in list("relationshipsGone") {
-            self.relationships.remove(&(pair[0].as_u64().unwrap(), pair[1].as_u64().unwrap()));
+            self.relationships
+                .remove(&(pair[0].as_u64().unwrap(), pair[1].as_u64().unwrap()));
         }
         for r in list("relationships") {
-            self.relationships.insert((r["a"].as_u64().unwrap(), r["b"].as_u64().unwrap()), r);
+            self.relationships
+                .insert((r["a"].as_u64().unwrap(), r["b"].as_u64().unwrap()), r);
         }
         for id in list("roomsGone") {
             self.rooms.remove(&id.as_u64().unwrap());
@@ -117,7 +125,12 @@ fn changes_add_up_to_the_whole_view() {
     w.speed = 3;
     let mut sync = UiSync::new();
     let mut ui = Mirror::default();
-    let neighbour = w.sims.iter().find(|s| !w.households[s.household as usize].player).unwrap().id;
+    let neighbour = w
+        .sims
+        .iter()
+        .find(|s| !w.households[s.household as usize].player)
+        .unwrap()
+        .id;
     let mut inspected = None;
     let mut events = Vec::new();
     for step in 0..6000 {
@@ -146,14 +159,26 @@ fn changes_add_up_to_the_whole_view() {
     ui.apply(&sync.update_json(&w));
     assert_eq!(ui, fresh(&w, inspected));
     // Story events arrive in order; only the resync repeats the recent ones.
-    assert!(events.len() > 30, "the story moved on: {} events", events.len());
-    assert!(events.windows(2).filter(|p| p[0] >= p[1]).count() <= 1, "in order: {events:?}");
+    assert!(
+        events.len() > 30,
+        "the story moved on: {} events",
+        events.len()
+    );
+    assert!(
+        events.windows(2).filter(|p| p[0] >= p[1]).count() <= 1,
+        "in order: {events:?}"
+    );
 }
 
 #[test]
 fn details_only_for_the_household_and_the_inspected() {
     let w = world(false);
-    let neighbour = w.sims.iter().find(|s| !w.households[s.household as usize].player).unwrap().id;
+    let neighbour = w
+        .sims
+        .iter()
+        .find(|s| !w.households[s.household as usize].player)
+        .unwrap()
+        .id;
     let ui = fresh(&w, Some(neighbour));
     for (&id, sim) in &ui.sims {
         let player = w.households[w.sims[id as usize].household as usize].player;
@@ -161,11 +186,23 @@ fn details_only_for_the_household_and_the_inspected() {
         assert_eq!(sim["detail"], detailed, "resident {id}");
         assert_eq!(sim.contains_key("needs"), detailed, "resident {id}");
         assert_eq!(sim.contains_key("plan"), player, "resident {id}");
-        assert!(sim.contains_key("job") && sim.contains_key("plot"), "everyone's summary");
+        assert!(
+            sim.contains_key("job") && sim.contains_key("plot"),
+            "everyone's summary"
+        );
     }
     let detailed = |s: u64| ui.sims[&s]["detail"] == true;
-    assert!(ui.relationships.keys().all(|&(a, b)| detailed(a) || detailed(b)));
-    assert!(ui.relationships.keys().any(|&(a, _)| a == u64::from(neighbour)), "the inspected's people");
+    assert!(
+        ui.relationships
+            .keys()
+            .all(|&(a, b)| detailed(a) || detailed(b))
+    );
+    assert!(
+        ui.relationships
+            .keys()
+            .any(|&(a, _)| a == u64::from(neighbour)),
+        "the inspected's people"
+    );
 }
 
 #[test]
@@ -180,10 +217,24 @@ fn a_paused_game_sends_next_to_nothing() {
     let quiet = sync.update_json(&w);
     let u: Value = serde_json::from_str(&quiet).unwrap();
     assert_eq!(u["full"], false);
-    for key in ["sims", "simsGone", "households", "relationships", "relationshipsGone", "events", "rooms", "roomsGone"] {
+    for key in [
+        "sims",
+        "simsGone",
+        "households",
+        "relationships",
+        "relationshipsGone",
+        "events",
+        "rooms",
+        "roomsGone",
+    ] {
         assert!(u.get(key).is_none(), "{key} unchanged: {quiet}");
     }
-    assert!(quiet.len() < 200 && first.len() > 10_000, "{} then {} bytes", first.len(), quiet.len());
+    assert!(
+        quiet.len() < 200 && first.len() > 10_000,
+        "{} then {} bytes",
+        first.len(),
+        quiet.len()
+    );
 }
 
 /// Runs a game minute at `speed` (UI updates at 10 Hz: every other step) and reports what the

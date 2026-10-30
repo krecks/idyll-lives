@@ -59,12 +59,20 @@ impl Csr {
             }
             data.push(out);
         }
-        Csr { rows: self.rows, cols: other.cols, data }
+        Csr {
+            rows: self.rows,
+            cols: other.cols,
+            data,
+        }
     }
 
     /// The first `n` rows (`M[:n]`).
     pub fn head(&self, n: usize) -> Csr {
-        Csr { rows: n, cols: self.cols, data: self.data[..n].to_vec() }
+        Csr {
+            rows: n,
+            cols: self.cols,
+            data: self.data[..n].to_vec(),
+        }
     }
 
     /// `M @ x` of points.
@@ -83,7 +91,10 @@ impl Csr {
 
     /// `M @ x` of a scalar per vertex.
     pub fn apply1(&self, x: &[f64]) -> Vec<f64> {
-        self.data.iter().map(|row| row.iter().map(|&(c, a)| a * x[c]).fold(0.0, |s, v| s + v)).collect()
+        self.data
+            .iter()
+            .map(|row| row.iter().map(|&(c, a)| a * x[c]).fold(0.0, |s, v| s + v))
+            .collect()
     }
 
     /// `M @ x` of K values per vertex.

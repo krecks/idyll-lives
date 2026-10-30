@@ -19,7 +19,16 @@ const TOWN: &str = r#"{"width":12,"depth":12,
     "households":[{"name":"Player","plot":0,"player":true}]}"#;
 
 fn buy(w: &mut World, def: &str, x: i32, turn: u8) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, 1, 1]), colors: Default::default(), turn: Some(turn), offset: None, size: None, tall: None })?;
+    w.apply(Command::Buy {
+        household: 0,
+        object: def.into(),
+        at: Some([x, 1, 1]),
+        colors: Default::default(),
+        turn: Some(turn),
+        offset: None,
+        size: None,
+        tall: None,
+    })?;
     Ok(w.objects.last().unwrap().stable)
 }
 
@@ -27,19 +36,50 @@ fn buy(w: &mut World, def: &str, x: i32, turn: u8) -> Result<u32, sim_core::Erro
 fn decor_turns_freely_and_keeps_its_angle() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     let turns: Vec<bool> = w.content.objects.iter().map(|o| o.turns).collect();
-    assert_eq!(turns, [true, false, true, false], "1×1 decor, and anything that says so");
+    assert_eq!(
+        turns,
+        [true, false, true, false],
+        "1×1 decor, and anything that says so"
+    );
 
     let lamp = buy(&mut w, "lamp", 1, 30).unwrap();
-    assert_eq!((w.objects[lamp as usize].rot, w.objects[lamp as usize].turn), (1, 30));
-    assert!(buy(&mut w, "chair", 3, 30).unwrap_err().to_string().contains("four ways"));
-    assert!(buy(&mut w, "rug", 3, 15).is_err(), "bigger things stay on the grid");
-    assert!(buy(&mut w, "vase", 5, 90).is_err(), "90° is the next facing");
+    assert_eq!(
+        (w.objects[lamp as usize].rot, w.objects[lamp as usize].turn),
+        (1, 30)
+    );
+    assert!(
+        buy(&mut w, "chair", 3, 30)
+            .unwrap_err()
+            .to_string()
+            .contains("four ways")
+    );
+    assert!(
+        buy(&mut w, "rug", 3, 15).is_err(),
+        "bigger things stay on the grid"
+    );
+    assert!(
+        buy(&mut w, "vase", 5, 90).is_err(),
+        "90° is the next facing"
+    );
     assert_eq!(w.objects.len(), 1, "refused purchases buy nothing");
 
     // Moving keeps the angle unless a new one is given.
-    let mv = |turn| Command::MoveObject { household: 0, object: lamp, x: 4, z: 4, rot: 2, turn, offset: None, size: None, tall: None };
+    let mv = |turn| Command::MoveObject {
+        household: 0,
+        object: lamp,
+        x: 4,
+        z: 4,
+        rot: 2,
+        turn,
+        offset: None,
+        size: None,
+        tall: None,
+    };
     w.apply(mv(None)).unwrap();
-    assert_eq!((w.objects[lamp as usize].rot, w.objects[lamp as usize].turn), (2, 30));
+    assert_eq!(
+        (w.objects[lamp as usize].rot, w.objects[lamp as usize].turn),
+        (2, 30)
+    );
     w.apply(mv(Some(75))).unwrap();
     assert_eq!(w.objects[lamp as usize].turn, 75);
     // Undo puts the old angle back.
@@ -51,8 +91,24 @@ fn decor_turns_freely_and_keeps_its_angle() {
     assert_eq!(loaded.objects[lamp as usize].turn, 30);
 }
 
-fn buy_at(w: &mut World, household: u32, def: &str, x: i32, z: i32, offset: [i8; 2]) -> Result<u32, sim_core::Error> {
-    w.apply(Command::Buy { household, object: def.into(), at: Some([x, z, 0]), colors: Default::default(), turn: None, offset: Some(offset), size: None, tall: None })?;
+fn buy_at(
+    w: &mut World,
+    household: u32,
+    def: &str,
+    x: i32,
+    z: i32,
+    offset: [i8; 2],
+) -> Result<u32, sim_core::Error> {
+    w.apply(Command::Buy {
+        household,
+        object: def.into(),
+        at: Some([x, z, 0]),
+        colors: Default::default(),
+        turn: None,
+        offset: Some(offset),
+        size: None,
+        tall: None,
+    })?;
     Ok(w.objects.last().unwrap().stable)
 }
 
@@ -62,8 +118,17 @@ fn things_stand_anywhere_on_their_tiles() {
     let lamp = buy_at(&mut w, 0, "lamp", 1, 1, [25, -50]).unwrap();
     assert_eq!(w.objects[lamp as usize].offset, [25, -50]);
     let chair = buy_at(&mut w, 0, "chair", 3, 1, [25, 0]).unwrap();
-    assert_eq!(w.objects[chair as usize].offset, [25, 0], "not only what turns freely");
-    assert!(buy_at(&mut w, 0, "vase", 5, 1, [51, 0]).unwrap_err().to_string().contains("off its tile"));
+    assert_eq!(
+        w.objects[chair as usize].offset,
+        [25, 0],
+        "not only what turns freely"
+    );
+    assert!(
+        buy_at(&mut w, 0, "vase", 5, 1, [51, 0])
+            .unwrap_err()
+            .to_string()
+            .contains("off its tile")
+    );
     assert_eq!(w.objects.len(), 2, "refused purchases buy nothing");
     // The footprint stays on its tile: the next tile is still free.
     let vase = buy_at(&mut w, 0, "vase", 2, 1, [-50, 0]).unwrap();
@@ -72,16 +137,55 @@ fn things_stand_anywhere_on_their_tiles() {
     // Moving keeps the offset unless a new one is given; undo puts the old one back. A move
     // re-adds the object at the end of the list: the new offset is its own, not its neighbour's.
     assert!(lamp < vase);
-    w.apply(Command::MoveObject { household: 0, object: lamp, x: 4, z: 4, rot: 0, turn: Some(15), offset: Some([-10, 7]), size: None, tall: None }).unwrap();
-    assert_eq!((w.objects[at(&w, 4, 4)].offset, w.objects[at(&w, 4, 4)].turn), ([-10, 7], 15));
-    assert_eq!((w.objects[at(&w, 2, 1)].offset, w.objects[at(&w, 2, 1)].turn), ([-50, 0], 0), "the vase is as it was");
+    w.apply(Command::MoveObject {
+        household: 0,
+        object: lamp,
+        x: 4,
+        z: 4,
+        rot: 0,
+        turn: Some(15),
+        offset: Some([-10, 7]),
+        size: None,
+        tall: None,
+    })
+    .unwrap();
+    assert_eq!(
+        (w.objects[at(&w, 4, 4)].offset, w.objects[at(&w, 4, 4)].turn),
+        ([-10, 7], 15)
+    );
+    assert_eq!(
+        (w.objects[at(&w, 2, 1)].offset, w.objects[at(&w, 2, 1)].turn),
+        ([-50, 0], 0),
+        "the vase is as it was"
+    );
     w.apply(Command::Undo { household: 0 }).unwrap();
     let lamp_id = w.objects[at(&w, 1, 1)].stable;
-    let mv = |offset| Command::MoveObject { household: 0, object: lamp_id, x: 4, z: 4, rot: 0, turn: None, offset, size: None, tall: None };
+    let mv = |offset| Command::MoveObject {
+        household: 0,
+        object: lamp_id,
+        x: 4,
+        z: 4,
+        rot: 0,
+        turn: None,
+        offset,
+        size: None,
+        tall: None,
+    };
     w.apply(mv(None)).unwrap();
     let lamp = at(&w, 4, 4);
     assert_eq!(w.objects[lamp].offset, [25, -50]);
-    w.apply(Command::MoveObject { household: 0, object: lamp_id, x: 4, z: 4, rot: 0, turn: None, offset: Some([-10, 7]), size: None, tall: None }).unwrap();
+    w.apply(Command::MoveObject {
+        household: 0,
+        object: lamp_id,
+        x: 4,
+        z: 4,
+        rot: 0,
+        turn: None,
+        offset: Some([-10, 7]),
+        size: None,
+        tall: None,
+    })
+    .unwrap();
     let lamp = at(&w, 4, 4);
     assert_eq!(w.objects[lamp].offset, [-10, 7]);
     w.apply(Command::Undo { household: 0 }).unwrap();
@@ -103,10 +207,18 @@ fn a_blueprint_turned_round_turns_the_offset_round_too() {
     let mut w = World::from_json(CONTENT, TWO_LOTS, 1).unwrap();
     buy_at(&mut w, 0, "lamp", 2, 2, [25, -10]).unwrap();
     let bp = w.blueprint(0).unwrap();
-    w.apply(Command::BuildBlueprint { household: 1, blueprint: bp.clone() }).unwrap();
+    w.apply(Command::BuildBlueprint {
+        household: 1,
+        blueprint: bp.clone(),
+    })
+    .unwrap();
     let built = w.objects.iter().find(|o| o.x >= 12).unwrap();
     assert_eq!(built.offset, [-25, 10]);
-    assert_eq!(w.blueprint(1).unwrap().objects[0].offset, bp.objects[0].offset, "the same, seen from its own street");
+    assert_eq!(
+        w.blueprint(1).unwrap().objects[0].offset,
+        bp.objects[0].offset,
+        "the same, seen from its own street"
+    );
 }
 
 #[test]
@@ -114,15 +226,34 @@ fn nothing_stands_off_its_tile_through_a_wall() {
     use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind};
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     // A wall between (2, 1) and (3, 1).
-    w.apply(Command::Build { household: 0, edits: vec![EdgeEdit::new(EdgeAxis::V, 3, 1, EdgeKind::Wall)] }).unwrap();
-    assert!(buy_at(&mut w, 0, "chair", 2, 1, [50, 0]).is_err(), "half through the wall");
-    assert!(buy_at(&mut w, 0, "chair", 3, 1, [-25, 0]).is_err(), "nor from the other side");
-    assert!(buy_at(&mut w, 0, "chair", 2, 1, [-50, 0]).is_ok(), "away from it is fine");
-    assert!(buy_at(&mut w, 0, "lamp", 3, 1, [0, 50]).is_ok(), "and along it");
+    w.apply(Command::Build {
+        household: 0,
+        edits: vec![EdgeEdit::new(EdgeAxis::V, 3, 1, EdgeKind::Wall)],
+    })
+    .unwrap();
+    assert!(
+        buy_at(&mut w, 0, "chair", 2, 1, [50, 0]).is_err(),
+        "half through the wall"
+    );
+    assert!(
+        buy_at(&mut w, 0, "chair", 3, 1, [-25, 0]).is_err(),
+        "nor from the other side"
+    );
+    assert!(
+        buy_at(&mut w, 0, "chair", 2, 1, [-50, 0]).is_ok(),
+        "away from it is fine"
+    );
+    assert!(
+        buy_at(&mut w, 0, "lamp", 3, 1, [0, 50]).is_ok(),
+        "and along it"
+    );
 
     // Nor a wall built through something standing off its tile.
     buy_at(&mut w, 0, "chair", 6, 1, [50, 0]).unwrap();
-    let wall = |x| Command::Build { household: 0, edits: vec![EdgeEdit::new(EdgeAxis::V, x, 1, EdgeKind::Wall)] };
+    let wall = |x| Command::Build {
+        household: 0,
+        edits: vec![EdgeEdit::new(EdgeAxis::V, x, 1, EdgeKind::Wall)],
+    };
     assert!(w.apply(wall(7)).is_err());
     w.apply(wall(6)).unwrap();
 }
@@ -131,19 +262,51 @@ fn nothing_stands_off_its_tile_through_a_wall() {
 fn nothing_stands_off_its_tile_through_a_diagonal_wall() {
     use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind};
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-    let wall = |axis, x, z| Command::Build { household: 0, edits: vec![EdgeEdit::new(axis, x, z, EdgeKind::Wall)] };
+    let wall = |axis, x, z| Command::Build {
+        household: 0,
+        edits: vec![EdgeEdit::new(axis, x, z, EdgeKind::Wall)],
+    };
     // `/` across (4, 3), from corner (4, 3) to (5, 4).
     w.apply(wall(EdgeAxis::Dp, 4, 3)).unwrap();
-    assert!(buy_at(&mut w, 0, "lamp", 3, 3, [25, -25]).is_err(), "reaching into its tile, through it");
-    assert!(buy_at(&mut w, 0, "lamp", 3, 3, [1, 0]).is_err(), "by a centimetre, at its corner");
-    assert!(buy_at(&mut w, 0, "chair", 4, 4, [0, -25]).is_err(), "from below");
-    assert!(buy_at(&mut w, 0, "lamp", 3, 2, [25, 25]).is_err(), "from the corner tile it points at");
-    assert!(buy_at(&mut w, 0, "lamp", 5, 2, [-25, 25]).is_ok(), "the corner it doesn't reach is fine");
-    assert!(buy_at(&mut w, 0, "lamp", 3, 3, [0, 50]).is_ok(), "and along its side");
-    assert!(buy_at(&mut w, 0, "lamp", 3, 4, [-50, 0]).is_ok(), "and away from it");
+    assert!(
+        buy_at(&mut w, 0, "lamp", 3, 3, [25, -25]).is_err(),
+        "reaching into its tile, through it"
+    );
+    assert!(
+        buy_at(&mut w, 0, "lamp", 3, 3, [1, 0]).is_err(),
+        "by a centimetre, at its corner"
+    );
+    assert!(
+        buy_at(&mut w, 0, "chair", 4, 4, [0, -25]).is_err(),
+        "from below"
+    );
+    assert!(
+        buy_at(&mut w, 0, "lamp", 3, 2, [25, 25]).is_err(),
+        "from the corner tile it points at"
+    );
+    assert!(
+        buy_at(&mut w, 0, "lamp", 5, 2, [-25, 25]).is_ok(),
+        "the corner it doesn't reach is fine"
+    );
+    assert!(
+        buy_at(&mut w, 0, "lamp", 3, 3, [0, 50]).is_ok(),
+        "and along its side"
+    );
+    assert!(
+        buy_at(&mut w, 0, "lamp", 3, 4, [-50, 0]).is_ok(),
+        "and away from it"
+    );
 
     // Nor a diagonal wall built through something standing off its tile.
     buy_at(&mut w, 0, "chair", 7, 5, [25, 0]).unwrap();
-    assert!(w.apply(wall(EdgeAxis::Dn, 8, 5)).unwrap_err().to_string().contains("through furniture"));
-    assert!(w.apply(wall(EdgeAxis::Dp, 8, 6)).is_ok(), "a tile it doesn't reach into");
+    assert!(
+        w.apply(wall(EdgeAxis::Dn, 8, 5))
+            .unwrap_err()
+            .to_string()
+            .contains("through furniture")
+    );
+    assert!(
+        w.apply(wall(EdgeAxis::Dp, 8, 6)).is_ok(),
+        "a tile it doesn't reach into"
+    );
 }

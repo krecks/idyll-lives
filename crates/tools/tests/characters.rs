@@ -5,7 +5,10 @@ use ll_tools::characters::{build, check, default_out, diff};
 
 #[test]
 fn committed_set_passes_check() {
-    assert!(check::check(&default_out()), "the committed character set fails its checks");
+    assert!(
+        check::check(&default_out()),
+        "the committed character set fails its checks"
+    );
 }
 
 #[test]
@@ -16,6 +19,9 @@ fn build_matches_committed_set() {
     diff::print(&r, false);
     let ok = check::check(&out);
     std::fs::remove_dir_all(&out).ok();
-    assert!(r.failures.is_empty(), "the build differs from the committed set");
+    assert!(
+        r.failures.is_empty(),
+        "the build differs from the committed set"
+    );
     assert!(ok, "the build fails its checks");
 }

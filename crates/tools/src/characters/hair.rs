@@ -26,7 +26,10 @@
 use super::contract::{BEARD_FAMILIES, HAIR_STYLES};
 use super::head::HeadFrame;
 use super::meshops::{nearest_point, ray_hit, smooth_normals};
-use super::np::{PI, Periodic, TAU, clip, interp, linspace, linspace_open, mean_rows, pairwise_sum, py_mod, radians, smoothstep};
+use super::np::{
+    PI, Periodic, TAU, clip, interp, linspace, linspace_open, mean_rows, pairwise_sum, py_mod,
+    radians, smoothstep,
+};
 use super::prims::{caps, ellipsoid, grid, loft, noise3, orient, rings_mesh, spline, torus};
 use super::rig::{NB, b};
 use super::{Mesh, V3, v3};
@@ -52,16 +55,30 @@ pub struct Scalp<'a> {
 
 impl<'a> Scalp<'a> {
     pub fn new(h: &'a HeadFrame, cranium: bool) -> Self {
-        let q: Vec<V3> = h.hairline.iter().map(|p| (p - h.centre).component_div(&h.radii)).collect();
+        let q: Vec<V3> = h
+            .hairline
+            .iter()
+            .map(|p| (p - h.centre).component_div(&h.radii))
+            .collect();
         let a: Vec<f64> = q.iter().map(|q| q.x.atan2(q.z)).collect();
-        let phi: Vec<f64> = q.iter().map(|q| clip(q.y / q.norm(), -1.0, 1.0).acos()).collect();
+        let phi: Vec<f64> = q
+            .iter()
+            .map(|q| clip(q.y / q.norm(), -1.0, 1.0).acos())
+            .collect();
         let o = super::np::argsort(&a);
         // The hair's own edge: the head's hairline smoothed round (no point at the nape) and
         // brought a little lower over the forehead and temples (fuller hair, a softer face).
         let fa = linspace_open(-PI, PI, 180);
-        let per = Periodic::new(&o.iter().map(|&i| a[i]).collect::<Vec<_>>(), &o.iter().map(|&i| phi[i]).collect::<Vec<_>>(), TAU);
+        let per = Periodic::new(
+            &o.iter().map(|&i| a[i]).collect::<Vec<_>>(),
+            &o.iter().map(|&i| phi[i]).collect::<Vec<_>>(),
+            TAU,
+        );
         let fp: Vec<f64> = fa.iter().map(|&x| per.at(x)).collect();
-        let mut k: Vec<f64> = fa.iter().map(|&x| (-0.5 * (x.abs().min(TAU - x.abs()) / radians(16.0)).powi(2)).exp()).collect();
+        let mut k: Vec<f64> = fa
+            .iter()
+            .map(|&x| (-0.5 * (x.abs().min(TAU - x.abs()) / radians(16.0)).powi(2)).exp())
+            .collect();
         let ks = pairwise_sum(&k);
         for v in &mut k {
             *v /= ks;
@@ -70,17 +87,29 @@ impl<'a> Scalp<'a> {
         // products; a direct sum here).
         let n = fa.len();
         let kk: Vec<f64> = (0..n).map(|i| k[(i + n / 2) % n]).collect();
-        let mut fp: Vec<f64> = (0..n).map(|i| (0..n).fold(0.0, |s, j| s + fp[j] * kk[(i + n - j) % n])).collect();
+        let mut fp: Vec<f64> = (0..n)
+            .map(|i| (0..n).fold(0.0, |s, j| s + fp[j] * kk[(i + n - j) % n]))
+            .collect();
         for (v, &x) in fp.iter_mut().zip(&fa) {
             let t = x.abs();
-            *v += radians(5.0) * smoothstep(radians(70.0), 0.0, t) + radians(8.0) * (-((t - radians(70.0)) / radians(28.0)).powi(2)).exp();
+            *v += radians(5.0) * smoothstep(radians(70.0), 0.0, t)
+                + radians(8.0) * (-((t - radians(70.0)) / radians(28.0)).powi(2)).exp();
         }
-        Scalp { h, cranium, hl: Periodic::new(&fa, &fp, TAU), ovals: Vec::new() }
+        Scalp {
+            h,
+            cranium,
+            hl: Periodic::new(&fa, &fp, TAU),
+            ovals: Vec::new(),
+        }
     }
 
     /// The same, meeting the ears as drawn (an `Oval` round each).
     pub fn round(mut self, ears: &Ears) -> Self {
-        self.ovals = ears.ears.iter().filter_map(|e| Oval::new(&self, &e.own)).collect();
+        self.ovals = ears
+            .ears
+            .iter()
+            .filter_map(|e| Oval::new(&self, &e.own))
+            .collect();
         self
     }
 
@@ -106,7 +135,8 @@ impl<'a> Scalp<'a> {
         // ears don't push the hair about; caps go round them (`Oval`), curtains out over them.
         let hi0 = if self.cranium {
             // Past the ellipsoid only away from the ears (the brow and forehead may stand out of it).
-            let ear = (-((self::round(a) - PI / 2.0) / 0.6).powi(2)).exp() * (-((phi - PI / 2.0) / 0.5).powi(2)).exp();
+            let ear = (-((self::round(a) - PI / 2.0) / 0.6).powi(2)).exp()
+                * (-((phi - PI / 2.0) / 0.5).powi(2)).exp();
             1.0 + 0.6 * (1.0 - smoothstep(0.15, 0.5, ear))
         } else {
             2.5
@@ -114,7 +144,10 @@ impl<'a> Scalp<'a> {
         // March out to the first step outside (the field far from the head can't be trusted), then
         // bisect within that step.
         let steps = linspace(0.2, 2.5, 47);
-        let k = steps.iter().position(|&s| s >= hi0 || h.sdf(h.centre + d * s) >= 0.0).unwrap_or(0);
+        let k = steps
+            .iter()
+            .position(|&s| s >= hi0 || h.sdf(h.centre + d * s) >= 0.0)
+            .unwrap_or(0);
         let mut hi = steps[k].min(hi0);
         let mut lo = steps[k.max(1) - 1];
         for _ in 0..20 {
@@ -150,7 +183,9 @@ impl<'a> Scalp<'a> {
 
     /// The oval of the ear nearest azimuth a, if one was given.
     fn oval(&self, a: f64) -> Option<&Oval> {
-        self.ovals.iter().min_by(|p, q| round(a - p.a).total_cmp(&round(a - q.a)))
+        self.ovals
+            .iter()
+            .min_by(|p, q| round(a - p.a).total_cmp(&round(a - q.a)))
     }
 }
 
@@ -176,17 +211,32 @@ impl Oval {
         if pts.is_empty() {
             return None;
         }
-        let q: Vec<V3> = pts.iter().map(|p| (p - h.centre).component_div(&h.radii)).collect();
-        let ang: Vec<[f64; 2]> = q.iter().map(|q| [q.x.atan2(q.z), clip(q.y / q.norm(), -1.0, 1.0).acos()]).collect();
+        let q: Vec<V3> = pts
+            .iter()
+            .map(|p| (p - h.centre).component_div(&h.radii))
+            .collect();
+        let ang: Vec<[f64; 2]> = q
+            .iter()
+            .map(|q| [q.x.atan2(q.z), clip(q.y / q.norm(), -1.0, 1.0).acos()])
+            .collect();
         let n = ang.len() as f64;
-        let (a0, p0) = (ang.iter().map(|v| v[0]).sum::<f64>() / n, ang.iter().map(|v| v[1]).sum::<f64>() / n);
+        let (a0, p0) = (
+            ang.iter().map(|v| v[0]).sum::<f64>() / n,
+            ang.iter().map(|v| v[1]).sum::<f64>() / n,
+        );
         let t = q.iter().map(|q| q.norm()).fold(f64::INFINITY, f64::min);
         let e0 = Scalp::dirs(a0, p0).component_mul(&h.radii);
         let d = 1e-4;
-        let g = [(Scalp::dirs(a0 + d, p0).component_mul(&h.radii) - e0).norm() / d * t, (Scalp::dirs(a0, p0 + d).component_mul(&h.radii) - e0).norm() / d * t];
+        let g = [
+            (Scalp::dirs(a0 + d, p0).component_mul(&h.radii) - e0).norm() / d * t,
+            (Scalp::dirs(a0, p0 + d).component_mul(&h.radii) - e0).norm() / d * t,
+        ];
         let xy: Vec<[f64; 2]> = ang.iter().map(|v| [v[0] * g[0], v[1] * g[1]]).collect();
         // Its long axis (principal), then the smallest ellipse of its box's proportions round it.
-        let m = [xy.iter().map(|v| v[0]).sum::<f64>() / n, xy.iter().map(|v| v[1]).sum::<f64>() / n];
+        let m = [
+            xy.iter().map(|v| v[0]).sum::<f64>() / n,
+            xy.iter().map(|v| v[1]).sum::<f64>() / n,
+        ];
         let (mut sxx, mut sxy, mut syy) = (0.0, 0.0, 0.0);
         for v in &xy {
             let (dx, dy) = (v[0] - m[0], v[1] - m[1]);
@@ -196,12 +246,29 @@ impl Oval {
         }
         let th = 0.5 * (2.0 * sxy).atan2(sxx - syy);
         let e = [th.cos(), th.sin()];
-        let uv: Vec<[f64; 2]> = xy.iter().map(|v| [(v[0] - m[0]) * e[0] + (v[1] - m[1]) * e[1], -(v[0] - m[0]) * e[1] + (v[1] - m[1]) * e[0]]).collect();
-        let lo = [uv.iter().map(|v| v[0]).fold(f64::INFINITY, f64::min), uv.iter().map(|v| v[1]).fold(f64::INFINITY, f64::min)];
-        let hi = [uv.iter().map(|v| v[0]).fold(f64::NEG_INFINITY, f64::max), uv.iter().map(|v| v[1]).fold(f64::NEG_INFINITY, f64::max)];
+        let uv: Vec<[f64; 2]> = xy
+            .iter()
+            .map(|v| {
+                [
+                    (v[0] - m[0]) * e[0] + (v[1] - m[1]) * e[1],
+                    -(v[0] - m[0]) * e[1] + (v[1] - m[1]) * e[0],
+                ]
+            })
+            .collect();
+        let lo = [
+            uv.iter().map(|v| v[0]).fold(f64::INFINITY, f64::min),
+            uv.iter().map(|v| v[1]).fold(f64::INFINITY, f64::min),
+        ];
+        let hi = [
+            uv.iter().map(|v| v[0]).fold(f64::NEG_INFINITY, f64::max),
+            uv.iter().map(|v| v[1]).fold(f64::NEG_INFINITY, f64::max),
+        ];
         let (mu, mv) = ((lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0);
         let half = [(hi[0] - lo[0]) / 2.0, (hi[1] - lo[1]) / 2.0];
-        let k = uv.iter().map(|v| (((v[0] - mu) / half[0]).powi(2) + ((v[1] - mv) / half[1]).powi(2)).sqrt()).fold(0.0, f64::max);
+        let k = uv
+            .iter()
+            .map(|v| (((v[0] - mu) / half[0]).powi(2) + ((v[1] - mv) / half[1]).powi(2)).sqrt())
+            .fold(0.0, f64::max);
         // A little more than the margin: an ellipse grown by it along its axes is not quite its offset.
         let grow = 1.15 * (EAR_CLEAR + CLEAR);
         let c = [m[0] + mu * e[0] - mv * e[1], m[1] + mu * e[1] + mv * e[0]];
@@ -213,13 +280,23 @@ impl Oval {
                 (p - s).dot(&nrm)
             })
             .fold(0.0, f64::max);
-        Some(Oval { c, r: [k * half[0] + grow, k * half[1] + grow], e, g, a: a0, reach })
+        Some(Oval {
+            c,
+            r: [k * half[0] + grow, k * half[1] + grow],
+            e,
+            g,
+            a: a0,
+            reach,
+        })
     }
 
     /// A point's (azimuth, polar angle) along and across the oval's axes, in its radii.
     fn local(&self, a: f64, phi: f64) -> [f64; 2] {
         let (dx, dy) = (a * self.g[0] - self.c[0], phi * self.g[1] - self.c[1]);
-        [(dx * self.e[0] + dy * self.e[1]) / self.r[0], (-dx * self.e[1] + dy * self.e[0]) / self.r[1]]
+        [
+            (dx * self.e[0] + dy * self.e[1]) / self.r[0],
+            (-dx * self.e[1] + dy * self.e[0]) / self.r[1],
+        ]
     }
 
     /// How far out of the middle a point is (1 on the oval).
@@ -248,7 +325,10 @@ impl Oval {
         }
         let (dx, dy) = (a * self.g[0] - self.c[0], phi * self.g[1] - self.c[1]);
         let k = 1.0 / rho.max(1e-6);
-        ((self.c[0] + dx * k) / self.g[0], (self.c[1] + dy * k) / self.g[1])
+        (
+            (self.c[0] + dx * k) / self.g[0],
+            (self.c[1] + dy * k) / self.g[1],
+        )
     }
 
     /// A point inside the oval taken out to it upwards (away from a point below its middle); one
@@ -261,7 +341,11 @@ impl Oval {
         let (a0, p0) = (self.c[0] / self.g[0], (self.c[1] + below) / self.g[1]);
         let (l0, l1) = (self.local(a0, p0), self.local(a, phi));
         let d = [l1[0] - l0[0], l1[1] - l0[1]];
-        let (dd, ld, ll) = (d[0] * d[0] + d[1] * d[1], l0[0] * d[0] + l0[1] * d[1], l0[0] * l0[0] + l0[1] * l0[1]);
+        let (dd, ld, ll) = (
+            d[0] * d[0] + d[1] * d[1],
+            l0[0] * d[0] + l0[1] * d[1],
+            l0[0] * l0[0] + l0[1] * l0[1],
+        );
         let t = (-ld + (ld * ld - dd * (ll - 1.0)).max(0.0).sqrt()) / dd.max(1e-12);
         (a0 + t * (a - a0), p0 + t * (phi - p0))
     }
@@ -271,16 +355,27 @@ impl Oval {
     /// its ends, closer together near the ear.
     fn rim(&self, hl: &dyn Fn(f64) -> f64, a0: f64, a1: f64, n: usize) -> Vec<(f64, f64)> {
         let g = self.g;
-        let line: Vec<[f64; 2]> = linspace(a0, a1, 801).iter().map(|&a| [a * g[0], hl(a).min(self.top(a).unwrap_or(PI)) * g[1]]).collect();
+        let line: Vec<[f64; 2]> = linspace(a0, a1, 801)
+            .iter()
+            .map(|&a| [a * g[0], hl(a).min(self.top(a).unwrap_or(PI)) * g[1]])
+            .collect();
         // Evenly along it, smoothed (the ends held by reflecting the line past them) and back out of
         // the oval.
         let m = 1201;
         let line = along(&line, &|_| 1.0, &linspace(0.0, 1.0, m));
         let sig = RIM_ROUND / (length(&line) / (m - 1) as f64);
         let w = (3.0 * sig).ceil() as isize;
-        let kernel: Vec<f64> = (-w..=w).map(|k| (-0.5 * (k as f64 / sig).powi(2)).exp()).collect();
+        let kernel: Vec<f64> = (-w..=w)
+            .map(|k| (-0.5 * (k as f64 / sig).powi(2)).exp())
+            .collect();
         let at = |i: isize| -> [f64; 2] {
-            let (k, end) = if i < 0 { (-i, 0) } else if i >= m as isize { (2 * (m as isize - 1) - i, m - 1) } else { return line[i as usize] };
+            let (k, end) = if i < 0 {
+                (-i, 0)
+            } else if i >= m as isize {
+                (2 * (m as isize - 1) - i, m - 1)
+            } else {
+                return line[i as usize];
+            };
             let p = line[k.clamp(0, m as isize - 1) as usize];
             [2.0 * line[end][0] - p[0], 2.0 * line[end][1] - p[1]]
         };
@@ -300,13 +395,18 @@ impl Oval {
         // Spaced by length, twice as close near the ear.
         let near = |q: [f64; 2]| 1.0 + smoothstep(1.8, 1.15, self.rho(q[0] / g[0], q[1] / g[1]));
         let f: Vec<f64> = (1..=n).map(|k| k as f64 / (n + 1) as f64).collect();
-        along(&smooth, &near, &f).iter().map(|q| (q[0] / g[0], q[1] / g[1])).collect()
+        along(&smooth, &near, &f)
+            .iter()
+            .map(|q| (q[0] / g[0], q[1] / g[1]))
+            .collect()
     }
 }
 
 /// A polyline's length.
 fn length(line: &[[f64; 2]]) -> f64 {
-    line.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum()
+    line.windows(2)
+        .map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1]))
+        .sum()
 }
 
 /// The points at shares `f` of the way along a polyline, its length weighted by `w` (at each segment's end).
@@ -317,7 +417,9 @@ fn along(line: &[[f64; 2]], w: &dyn Fn([f64; 2]) -> f64, f: &[f64]) -> Vec<[f64;
     }
     let total = s[s.len() - 1];
     let (xs, ys): (Vec<f64>, Vec<f64>) = line.iter().map(|p| (p[0], p[1])).unzip();
-    f.iter().map(|&t| [interp(t * total, &s, &xs), interp(t * total, &s, &ys)]).collect()
+    f.iter()
+        .map(|&t| [interp(t * total, &s, &xs), interp(t * total, &s, &ys)])
+        .collect()
 }
 
 /// How round the hair's edge is where it meets the ovals round the ears (m: the smoothing's width).
@@ -360,11 +462,19 @@ impl Ears {
                     }
                     let tri = [pos[t[0]], pos[t[1]], pos[t[2]]];
                     near.push(tri);
-                    if t.iter().map(|&i| ear[i]).sum::<f64>() > 0.9 && t.iter().all(|&i| pos[i].x * c.x > 0.0) {
+                    if t.iter().map(|&i| ear[i]).sum::<f64>() > 0.9
+                        && t.iter().all(|&i| pos[i].x * c.x > 0.0)
+                    {
                         own.push(tri);
                     }
                 }
-                Ear { side: c.x.signum(), lo, hi, own, near }
+                Ear {
+                    side: c.x.signum(),
+                    lo,
+                    hi,
+                    own,
+                    near,
+                }
             })
             .collect();
         Ears { ears }
@@ -387,8 +497,19 @@ impl Ears {
                 continue;
             }
             let ray = v3(e.side, 0.0123, 0.0071).normalize();
-            let inside = e.near.iter().filter(|t| ray_hit(p, ray, t).is_some()).count() % 2 == 1;
-            let q = e.own.iter().map(|t| nearest_point(p, t)).min_by(|a, b| (a - p).norm_squared().total_cmp(&(b - p).norm_squared())).unwrap();
+            let inside = e
+                .near
+                .iter()
+                .filter(|t| ray_hit(p, ray, t).is_some())
+                .count()
+                % 2
+                == 1;
+            let q = e
+                .own
+                .iter()
+                .map(|t| nearest_point(p, t))
+                .min_by(|a, b| (a - p).norm_squared().total_cmp(&(b - p).norm_squared()))
+                .unwrap();
             let d = (q - p).norm();
             let out = if inside { q - p } else { p - q } / d.max(1e-9);
             let v = if inside { d } else { -d };
@@ -403,7 +524,12 @@ impl Ears {
     pub fn cut(&self, p: V3, q: V3) -> bool {
         let l = (q - p).norm();
         let d = (q - p) / l.max(1e-12);
-        self.ears.iter().any(|e| (0..3).all(|k| e.lo[k] <= p[k].max(q[k]) && p[k].min(q[k]) <= e.hi[k]) && e.own.iter().any(|t| ray_hit(p, d, t).is_some_and(|s| s < l)))
+        self.ears.iter().any(|e| {
+            (0..3).all(|k| e.lo[k] <= p[k].max(q[k]) && p[k].min(q[k]) <= e.hi[k])
+                && e.own
+                    .iter()
+                    .any(|t| ray_hit(p, d, t).is_some_and(|s| s < l))
+        })
     }
 }
 
@@ -411,7 +537,14 @@ impl Ears {
 fn near_sdf(h: &HeadFrame, p: V3) -> f64 {
     let r = 0.0004;
     let mut d = h.sdf(p);
-    for e in [v3(r, 0.0, 0.0), v3(0.0, r, 0.0), v3(0.0, 0.0, r), v3(-r, 0.0, 0.0), v3(0.0, -r, 0.0), v3(0.0, 0.0, -r)] {
+    for e in [
+        v3(r, 0.0, 0.0),
+        v3(0.0, r, 0.0),
+        v3(0.0, 0.0, r),
+        v3(-r, 0.0, 0.0),
+        v3(0.0, -r, 0.0),
+        v3(0.0, 0.0, -r),
+    ] {
         d = d.min(h.sdf(p + e));
     }
     d
@@ -439,13 +572,26 @@ pub struct Comp {
 }
 
 /// A component with faces turned to point along `out` (if given).
-fn comp(pos: Vec<V3>, idx: Vec<usize>, out: Option<Vec<V3>>, z: Option<Vec<f64>>, y: Option<Vec<f64>>, follow: Option<Vec<f64>>) -> Comp {
+fn comp(
+    pos: Vec<V3>,
+    idx: Vec<usize>,
+    out: Option<Vec<V3>>,
+    z: Option<Vec<f64>>,
+    y: Option<Vec<f64>>,
+    follow: Option<Vec<f64>>,
+) -> Comp {
     let n = pos.len();
     let idx = match out {
         Some(o) => orient(&pos, idx, &o),
         None => idx,
     };
-    Comp { f: follow.unwrap_or_else(|| vec![-1.0; n]), z: z.unwrap_or_else(|| vec![0.5; n]), y: y.unwrap_or_else(|| vec![0.0; n]), pos, idx }
+    Comp {
+        f: follow.unwrap_or_else(|| vec![-1.0; n]),
+        z: z.unwrap_or_else(|| vec![0.5; n]),
+        y: y.unwrap_or_else(|| vec![0.0; n]),
+        pos,
+        idx,
+    }
 }
 
 type Field<'a> = &'a dyn Fn(f64, f64) -> f64;
@@ -513,8 +659,13 @@ fn round(a: f64) -> f64 {
 fn cap(sc: &Scalp, c: Cap) -> Comp {
     let h = sc.h;
     let step = TAU / c.cols as f64;
-    let turn = c.part.map_or(0.0, |(ap, _)| ap - (((ap + PI) / (4.0 * step)).round() * 4.0 * step - PI));
-    let base: Vec<f64> = linspace_open(-PI, PI, c.cols).iter().map(|&a| a + turn).collect();
+    let turn = c.part.map_or(0.0, |(ap, _)| {
+        ap - (((ap + PI) / (4.0 * step)).round() * 4.0 * step - PI)
+    });
+    let base: Vec<f64> = linspace_open(-PI, PI, c.cols)
+        .iter()
+        .map(|&a| a + turn)
+        .collect();
     let hl = |a: f64| match c.limit {
         Some(l) => l(a),
         None => sc.hairline(a),
@@ -542,13 +693,19 @@ fn cap(sc: &Scalp, c: Cap) -> Comp {
         while j < c.cols && span(base[j]) {
             j += 1;
         }
-        assert!(j0 > 0 && j < c.cols, "a cap's columns round an ear wrap past the back");
+        assert!(
+            j0 > 0 && j < c.cols,
+            "a cap's columns round an ear wrap past the back"
+        );
         // Between the columns either side of the ear, the edge round it evenly.
         let n = j - j0 + extra;
         let (a0, a1) = (base[j0 - 1], base[j]);
         let pts = match sc.oval((a0 + a1) / 2.0) {
             Some(o) => o.rim(&hl, a0, a1, n),
-            None => (1..=n).map(|k| a0 + (a1 - a0) * k as f64 / (n + 1) as f64).map(|x| (x, hl(x))).collect(),
+            None => (1..=n)
+                .map(|k| a0 + (a1 - a0) * k as f64 / (n + 1) as f64)
+                .map(|x| (x, hl(x)))
+                .collect(),
         };
         for (k, q) in pts.into_iter().enumerate() {
             let f = (k + 1) as f64 / (n + 1) as f64;
@@ -576,7 +733,19 @@ fn cap(sc: &Scalp, c: Cap) -> Comp {
     // they bend round the ear evenly.
     let us = linspace(1.0, 1.0 / c.rows as f64, c.rows);
     let ease = 0.45;
-    let mut node: Vec<Vec<(f64, f64)>> = us.iter().map(|&u| (0..cols).map(|k| (a[k] + (rim[k].0 - a[k]) * smoothstep(ease, 1.0, u), u * lim[k])).collect()).collect();
+    let mut node: Vec<Vec<(f64, f64)>> = us
+        .iter()
+        .map(|&u| {
+            (0..cols)
+                .map(|k| {
+                    (
+                        a[k] + (rim[k].0 - a[k]) * smoothstep(ease, 1.0, u),
+                        u * lim[k],
+                    )
+                })
+                .collect()
+        })
+        .collect();
     for _ in 0..60 {
         let was = node.clone();
         for i in 1..c.rows - 1 {
@@ -599,7 +768,9 @@ fn cap(sc: &Scalp, c: Cap) -> Comp {
     };
     // Over the ears: at least as far out as they reach, and a little more over them.
     let over = |a: f64, phi: f64, more: f64| match sc.oval(a) {
-        Some(o) if c.ears == Meet::Over => (o.reach + EAR_CLEAR + CLEAR + more) * smoothstep(1.8, 1.0, o.rho(a, phi)),
+        Some(o) if c.ears == Meet::Over => {
+            (o.reach + EAR_CLEAR + CLEAR + more) * smoothstep(1.8, 1.0, o.rho(a, phi))
+        }
         _ => 0.0,
     };
     let mut p = Vec::new();
@@ -615,16 +786,30 @@ fn cap(sc: &Scalp, c: Cap) -> Comp {
             let groove = c.ridge * (1.0 - lk[k]) * smoothstep(0.25, 0.8, u) * (1.0 - ear);
             let pt = parting(ak, u);
             let t = (c.thick)(ak, u) * (1.0 - groove) * (1.0 - 0.8 * pt);
-            let t = (t + (c.edge - t) * smoothstep(0.82, 1.0, u)).max(c.edge).max(over(ak, phi, 0.003));
+            let t = (t + (c.edge - t) * smoothstep(0.82, 1.0, u))
+                .max(c.edge)
+                .max(over(ak, phi, 0.003));
             if i == 0 {
                 rim_t.push(t);
             }
             // A cut's edge comes down to the skin (the rows above are rounded out over it).
-            let (q, n) = sc.rounded(ak + WHORL * (1.0 - u).powi(2), phi, if c.ears == Meet::Over { ROUND } else { ROUND * smoothstep(1.0, 0.75, u) });
+            let (q, n) = sc.rounded(
+                ak + WHORL * (1.0 - u).powi(2),
+                phi,
+                if c.ears == Meet::Over {
+                    ROUND
+                } else {
+                    ROUND * smoothstep(1.0, 0.75, u)
+                },
+            );
             ring.push(q + n * t);
             z.push(match c.bands {
                 Some(bf) => bf(ak, u),
-                None => 0.5 + (0.6 * lk[k] * (0.7 + 0.3 * jitter((ell[k] / 4.0) as usize, 3.0)) - 0.3 + 0.1 * (u * 9.0 + ell[k]).sin()) * smoothstep(0.1, 0.6, u),
+                None => {
+                    0.5 + (0.6 * lk[k] * (0.7 + 0.3 * jitter((ell[k] / 4.0) as usize, 3.0)) - 0.3
+                        + 0.1 * (u * 9.0 + ell[k]).sin())
+                        * smoothstep(0.1, 0.6, u)
+                }
             });
             y.push(0.25 * smoothstep(0.85, 1.0, u) + 0.5 * groove + 0.6 * pt);
         }
@@ -647,8 +832,17 @@ fn cap(sc: &Scalp, c: Cap) -> Comp {
             hz.push(z[k]);
         }
         p.splice(0..0, hem);
-        z.splice(0..0, hz.iter().chain(&hz).chain(&hz).copied().collect::<Vec<_>>());
-        y.splice(0..0, [1.0, 0.9, 0.5].iter().flat_map(|&v| std::iter::repeat_n(v, cols)).collect::<Vec<_>>());
+        z.splice(
+            0..0,
+            hz.iter().chain(&hz).chain(&hz).copied().collect::<Vec<_>>(),
+        );
+        y.splice(
+            0..0,
+            [1.0, 0.9, 0.5]
+                .iter()
+                .flat_map(|&v| std::iter::repeat_n(v, cols))
+                .collect::<Vec<_>>(),
+        );
     }
     let top = sc.point(0.0, 0.0, (c.thick)(0.0, 0.0));
     let (pos, idx, _) = rings_mesh(&p, None, Some(top));
@@ -702,7 +896,11 @@ fn section(c: &[V3], n: &[V3], s: &[V3], h: &[f64], k: f64) -> Vec<(V3, V3, f64)
 fn slab(mid: &[Vec<V3>], nrm: &[Vec<V3>], half: &[Vec<f64>], curl: f64, bands: &[f64]) -> Comp {
     let (rows, cols) = (mid.len(), mid[0].len());
     let unit = |v: V3| v / v.norm().max(1e-12);
-    let across = |q: &[V3]| -> Vec<V3> { (0..cols).map(|j| unit(q[(j + 1).min(cols - 1)] - q[j.saturating_sub(1)])).collect() };
+    let across = |q: &[V3]| -> Vec<V3> {
+        (0..cols)
+            .map(|j| unit(q[(j + 1).min(cols - 1)] - q[j.saturating_sub(1)]))
+            .collect()
+    };
     let mut rings = Vec::new();
     let (mut outs, mut y) = (Vec::new(), Vec::new());
     let mut add = |sec: Vec<(V3, V3, f64)>, shade: Option<f64>| {
@@ -711,12 +909,19 @@ fn slab(mid: &[Vec<V3>], nrm: &[Vec<V3>], half: &[Vec<f64>], curl: f64, bands: &
         y.extend(sec.iter().map(|e| shade.unwrap_or(e.2)));
     };
     for i in 0..rows {
-        add(section(&mid[i], &nrm[i], &across(&mid[i]), &half[i], 1.0), None);
+        add(
+            section(&mid[i], &nrm[i], &across(&mid[i]), &half[i], 1.0),
+            None,
+        );
     }
     let l = rows - 1;
     let s = across(&mid[l]);
     for (kd, kn, shade) in [(0.55, 0.75, None), (0.9, 0.0, Some(0.2))] {
-        let c: Vec<V3> = (0..cols).map(|j| mid[l][j] + (unit(mid[l][j] - mid[l - 1][j]) - nrm[l][j] * curl) * (half[l][j] * kd)).collect();
+        let c: Vec<V3> = (0..cols)
+            .map(|j| {
+                mid[l][j] + (unit(mid[l][j] - mid[l - 1][j]) - nrm[l][j] * curl) * (half[l][j] * kd)
+            })
+            .collect();
         add(section(&c, &nrm[l], &s, &half[l], kn), shade);
     }
     let (pos, idx, _) = rings_mesh(&rings, None, None);
@@ -735,7 +940,17 @@ fn slab(mid: &[Vec<V3>], nrm: &[Vec<V3>], half: &[Vec<f64>], curl: f64, bands: &
 /// Clump bands across a sheet's columns (whole locks at its edges): light in the locks' middles,
 /// varying from lock to lock.
 fn lock_bands(cols: usize, seed: f64) -> Vec<f64> {
-    locks(cols).iter().enumerate().map(|(j, l)| clip(0.15 + 0.7 * l * (0.75 + 0.25 * jitter((j + 2) / 4, seed)), 0.0, 1.0)).collect()
+    locks(cols)
+        .iter()
+        .enumerate()
+        .map(|(j, l)| {
+            clip(
+                0.15 + 0.7 * l * (0.75 + 0.25 * jitter((j + 2) / 4, seed)),
+                0.0,
+                1.0,
+            )
+        })
+        .collect()
 }
 
 /// How far out hair hangs at azimuth a, by height: the scalp's section there (a share of the skull
@@ -792,7 +1007,12 @@ fn curtain(sc: &Scalp, c: Curtain) -> Comp {
     let lk = locks(cols);
     let seed = c.seed as f64;
     let tt: Vec<f64> = a.iter().map(|&a| (c.top)(a)).collect();
-    let bt: Vec<f64> = (0..cols).map(|j| (c.bottom)(a[j]) - c.tip * (0.35 + 0.65 * jitter((j + 2) / 4, seed)) * lk[j].powf(c.sharp)).collect();
+    let bt: Vec<f64> = (0..cols)
+        .map(|j| {
+            (c.bottom)(a[j])
+                - c.tip * (0.35 + 0.65 * jitter((j + 2) / 4, seed)) * lk[j].powf(c.sharp)
+        })
+        .collect();
     let hangs: Vec<_> = a.iter().map(|&a| hang(sc, a)).collect();
     let us = linspace(0.0, 1.0, c.rows);
     let inner: Vec<Vec<V3>> = us
@@ -806,13 +1026,18 @@ fn curtain(sc: &Scalp, c: Curtain) -> Comp {
                     let w = c.wave * (a[j] * 7.0 + seed).sin() * u;
                     let rx = (h.radii[0] * v + c.off + w) * f;
                     let rz = (h.radii[2] * v + c.off + w) * f;
-                    let mut p = v3(h.centre[0] + a[j].sin() * rx, y, h.centre[2] + a[j].cos() * rz);
+                    let mut p = v3(
+                        h.centre[0] + a[j].sin() * rx,
+                        y,
+                        h.centre[2] + a[j].cos() * rz,
+                    );
                     if let Some(bk) = c.back {
                         p[2] = p[2].min(bk(y));
                     }
                     // Out over the ears (the scalp it hangs from leaves them out).
                     for [ec, eh] in h.ears {
-                        let w = smoothstep(eh.y + 0.015, eh.y, (p.y - ec.y).abs()) * smoothstep(eh.z + 0.015, eh.z, (p.z - ec.z).abs());
+                        let w = smoothstep(eh.y + 0.015, eh.y, (p.y - ec.y).abs())
+                            * smoothstep(eh.z + 0.015, eh.z, (p.z - ec.z).abs());
                         let clear = ec.x.abs() + eh.x + 0.004;
                         if p.x * ec.x > 0.0 && p.x.abs() < clear {
                             p[0] += ec.x.signum() * (clear - p.x.abs()) * w;
@@ -826,8 +1051,26 @@ fn curtain(sc: &Scalp, c: Curtain) -> Comp {
     let nrm = grid_normals(&inner, &|q| v3(q.x - h.centre[0], 0.0, q.z - h.centre[2]));
     // The locks at the edges fuller (they frame the face).
     let full = |j: usize| 1.0 + 0.5 * smoothstep(2.0, 0.0, j.min(cols - 1 - j) as f64);
-    let half: Vec<Vec<f64>> = us.iter().map(|&u| (0..cols).map(|j| 0.5 * c.thick * full(j) * (0.35 + 0.65 * lk[j]) * (0.15 + 0.85 * smoothstep(0.0, 0.3, u))).collect()).collect();
-    let mid: Vec<Vec<V3>> = (0..c.rows).map(|i| (0..cols).map(|j| inner[i][j] + nrm[i][j] * half[i][j]).collect()).collect();
+    let half: Vec<Vec<f64>> = us
+        .iter()
+        .map(|&u| {
+            (0..cols)
+                .map(|j| {
+                    0.5 * c.thick
+                        * full(j)
+                        * (0.35 + 0.65 * lk[j])
+                        * (0.15 + 0.85 * smoothstep(0.0, 0.3, u))
+                })
+                .collect()
+        })
+        .collect();
+    let mid: Vec<Vec<V3>> = (0..c.rows)
+        .map(|i| {
+            (0..cols)
+                .map(|j| inner[i][j] + nrm[i][j] * half[i][j])
+                .collect()
+        })
+        .collect();
     slab(&mid, &nrm, &half, c.curl, &lock_bands(cols, seed))
 }
 
@@ -858,7 +1101,17 @@ fn fringe(face: &Scalp, c: Fringe) -> Comp {
     let a = linspace(c.a0, c.a1, cols);
     let lk = locks(cols);
     let t0: Vec<f64> = a.iter().map(|&a| (c.top)(a)).collect();
-    let t1: Vec<f64> = (0..cols).map(|j| at_height(face, a[j], (c.bottom)(a[j]) - c.tip * (0.5 + 0.5 * jitter((j + 2) / 4, c.seed)) * lk[j].powf(c.sharp), t0[j] + 0.02)).collect();
+    let t1: Vec<f64> = (0..cols)
+        .map(|j| {
+            at_height(
+                face,
+                a[j],
+                (c.bottom)(a[j])
+                    - c.tip * (0.5 + 0.5 * jitter((j + 2) / 4, c.seed)) * lk[j].powf(c.sharp),
+                t0[j] + 0.02,
+            )
+        })
+        .collect();
     let us = linspace(0.0, 1.0, c.rows);
     let (mut mid, mut nrm, mut half) = (Vec::new(), Vec::new(), Vec::new());
     for &u in &us {
@@ -895,31 +1148,103 @@ fn at_height(sc: &Scalp, a: f64, y: f64, from: f64) -> f64 {
 /// A lock falling over the face (`face`: a Scalp that isn't held to the cranium) from deep in the cap
 /// at (a0, phi0) through points (azimuth, height, offset off the skin; m): a flattened tube `wide`
 /// across, `thick` deep, tapering to a point.
-fn face_lock(face: &Scalp, a0: f64, phi0: f64, pts: &[(f64, f64, f64)], wide: f64, thick: f64, seed: f64) -> Comp {
+fn face_lock(
+    face: &Scalp,
+    a0: f64,
+    phi0: f64,
+    pts: &[(f64, f64, f64)],
+    wide: f64,
+    thick: f64,
+    seed: f64,
+) -> Comp {
     let mut ctl = vec![face.point(a0, phi0, 0.4 * pts[0].2)];
-    ctl.extend(pts.iter().map(|&(a, y, off)| face.point(a, at_height(face, a, y, phi0), off)));
+    ctl.extend(
+        pts.iter()
+            .map(|&(a, y, off)| face.point(a, at_height(face, a, y, phi0), off)),
+    );
     let path = spline(&ctl, 10);
     let t = linspace(0.0, 1.0, 10);
-    let rx: Vec<f64> = t.iter().map(|&t| thick * interp(t, &[0.0, 0.3, 1.0], &[0.8, 1.0, 0.35])).collect();
-    let rz: Vec<f64> = t.iter().map(|&t| wide * interp(t, &[0.0, 0.3, 0.75, 1.0], &[0.7, 1.0, 0.7, 0.12])).collect();
-    let m = loft(&path, &rx, &rz, 6, face.surface(pts[0].0, at_height(face, pts[0].0, pts[0].1, phi0)).1, caps(1));
-    let z = m.pos.iter().enumerate().map(|(i, _)| clip(0.55 + 0.35 * ((i % 6) as f64 * PI / 3.0 + seed).cos(), 0.0, 1.0)).collect();
-    comp(m.pos, m.idx, None, Some(z), Some(vec![0.1; m.t.len()]), None)
+    let rx: Vec<f64> = t
+        .iter()
+        .map(|&t| thick * interp(t, &[0.0, 0.3, 1.0], &[0.8, 1.0, 0.35]))
+        .collect();
+    let rz: Vec<f64> = t
+        .iter()
+        .map(|&t| wide * interp(t, &[0.0, 0.3, 0.75, 1.0], &[0.7, 1.0, 0.7, 0.12]))
+        .collect();
+    let m = loft(
+        &path,
+        &rx,
+        &rz,
+        6,
+        face.surface(pts[0].0, at_height(face, pts[0].0, pts[0].1, phi0))
+            .1,
+        caps(1),
+    );
+    let z = m
+        .pos
+        .iter()
+        .enumerate()
+        .map(|(i, _)| {
+            clip(
+                0.55 + 0.35 * ((i % 6) as f64 * PI / 3.0 + seed).cos(),
+                0.0,
+                1.0,
+            )
+        })
+        .collect();
+    comp(
+        m.pos,
+        m.idx,
+        None,
+        Some(z),
+        Some(vec![0.1; m.t.len()]),
+        None,
+    )
 }
 
 /// A lock lying on the scalp from (a, phi), `len` (rad of arc) long, turned `turn` from straight
 /// down the head and lifting off it by `lift` (m) at its tip: a flattened tube `wide` across and
 /// `thick` deep, tapering to a point.
 #[allow(clippy::too_many_arguments)]
-fn tuft(sc: &Scalp, a: f64, phi: f64, len: f64, turn: f64, lift: f64, off: f64, wide: f64, thick: f64, seed: f64) -> Comp {
+fn tuft(
+    sc: &Scalp,
+    a: f64,
+    phi: f64,
+    len: f64,
+    turn: f64,
+    lift: f64,
+    off: f64,
+    wide: f64,
+    thick: f64,
+    seed: f64,
+) -> Comp {
     let s = linspace(0.0, 1.0, 6);
     let st = phi.sin().max(0.3);
-    let pts: Vec<V3> = s.iter().map(|&s| sc.point(a + turn.sin() * len * s / st, (phi + turn.cos() * len * s).max(0.05), off + lift * s * s)).collect();
-    let rx: Vec<f64> = s.iter().map(|&s| thick * interp(s, &[0.0, 0.3, 1.0], &[0.8, 1.0, 0.3])).collect();
-    let rz: Vec<f64> = s.iter().map(|&s| wide * interp(s, &[0.0, 0.25, 0.7, 1.0], &[0.7, 1.0, 0.6, 0.08])).collect();
+    let pts: Vec<V3> = s
+        .iter()
+        .map(|&s| {
+            sc.point(
+                a + turn.sin() * len * s / st,
+                (phi + turn.cos() * len * s).max(0.05),
+                off + lift * s * s,
+            )
+        })
+        .collect();
+    let rx: Vec<f64> = s
+        .iter()
+        .map(|&s| thick * interp(s, &[0.0, 0.3, 1.0], &[0.8, 1.0, 0.3]))
+        .collect();
+    let rz: Vec<f64> = s
+        .iter()
+        .map(|&s| wide * interp(s, &[0.0, 0.25, 0.7, 1.0], &[0.7, 1.0, 0.6, 0.08]))
+        .collect();
     let m = loft(&pts, &rx, &rz, 6, sc.surface(a, phi).1, caps(1));
     let k = 0.3 + 0.4 * jitter(0, seed);
-    let z = m.t.iter().map(|&t| clip(k + 0.3 * (1.0 - t), 0.0, 1.0)).collect();
+    let z =
+        m.t.iter()
+            .map(|&t| clip(k + 0.3 * (1.0 - t), 0.0, 1.0))
+            .collect();
     let y = m.t.iter().map(|&t| 0.2 * (1.0 - t).max(0.0)).collect();
     comp(m.pos, m.idx, None, Some(z), Some(y), None)
 }
@@ -927,10 +1252,24 @@ fn tuft(sc: &Scalp, a: f64, phi: f64, len: f64, turn: f64, lift: f64, off: f64, 
 /// A bent capsule (lofted along a smooth curve through `points`); `hang` (a, b): it follows the
 /// body more and more from a to b along its length (a tail).
 #[allow(clippy::too_many_arguments)]
-fn lobe(points: &[V3], ry: &[f64], rz: &[f64], segs: usize, hint: V3, bands: f64, seed: f64, y: f64, hang: Option<(f64, f64)>) -> Comp {
+fn lobe(
+    points: &[V3],
+    ry: &[f64],
+    rz: &[f64],
+    segs: usize,
+    hint: V3,
+    bands: f64,
+    seed: f64,
+    y: f64,
+    hang: Option<(f64, f64)>,
+) -> Comp {
     let m = loft(points, ry, rz, segs, hint, caps(2));
     let n = m.pos.len();
-    let z = (0..n).map(|i| 0.5 + 0.5 * ((i % segs) as f64 / segs as f64 * TAU * 2.0 + seed + m.t[i] * bands).sin()).collect();
+    let z = (0..n)
+        .map(|i| {
+            0.5 + 0.5 * ((i % segs) as f64 / segs as f64 * TAU * 2.0 + seed + m.t[i] * bands).sin()
+        })
+        .collect();
     let follow = hang.map(|(a, b)| m.t.iter().map(|&t| smoothstep(a, b, t)).collect());
     comp(m.pos, m.idx, None, Some(z), Some(vec![y; n]), follow)
 }
@@ -938,7 +1277,13 @@ fn lobe(points: &[V3], ry: &[f64], rz: &[f64], segs: usize, hint: V3, bands: f64
 /// A loft's rings (`segs` points each, laid one after the other) in `grooves` locks round it: each
 /// point pushed out from its ring's middle by up to `depth` (a share) on a lock and in between
 /// them, twisting by `twist` (rad) along its length (t). Clump bands follow the locks.
-fn grooved(m: &mut super::prims::Prim, segs: usize, grooves: f64, depth: f64, twist: f64) -> Vec<f64> {
+fn grooved(
+    m: &mut super::prims::Prim,
+    segs: usize,
+    grooves: f64,
+    depth: f64,
+    twist: f64,
+) -> Vec<f64> {
     let rings = m.t.len() / segs;
     let mut z = vec![0.5; m.pos.len()];
     for r in 0..rings {
@@ -960,7 +1305,12 @@ fn tor(t: super::prims::Prim) -> Comp {
     comp(t.pos, t.idx, None, Some(z), Some(vec![0.4; n]), None)
 }
 
-pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> Vec<(String, Mesh)> {
+pub fn build_hair(
+    family: &str,
+    stage: &str,
+    head: &HeadFrame,
+    p: &[V3; NB],
+) -> Vec<(String, Mesh)> {
     let h = head;
     let ears = Ears::of(family, stage, h);
     let hh = h.hh;
@@ -974,7 +1324,18 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
     // The body's back (m, z) at height y, roughly: behind the neck, then the shoulder blades.
     let sp = p[b("spine_03")];
     let neck_z = p[b("neck_01")].z;
-    let back = move |y: f64| interp(y, &[sp[1] - 0.25 * hh, sp[1], neck_y, chin], &[sp[2] - 0.5 * hh, sp[2] - 0.46 * hh, neck_z - 0.3 * hh, h.centre[2] - 0.2 * hh]) - 0.012;
+    let back = move |y: f64| {
+        interp(
+            y,
+            &[sp[1] - 0.25 * hh, sp[1], neck_y, chin],
+            &[
+                sp[2] - 0.5 * hh,
+                sp[2] - 0.46 * hh,
+                neck_z - 0.3 * hh,
+                h.centre[2] - 0.2 * hh,
+            ],
+        ) - 0.012
+    };
 
     /// A thickness over the head: top at the crown, side over the ears, back_ behind.
     fn thick(top: f64, side: f64, back_: f64, nape: Option<f64>) -> impl Fn(f64, f64) -> f64 {
@@ -989,26 +1350,120 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
         }
     }
     // Short locks past the hairline at the temples and the nape (none over the forehead or the ears).
-    let nape_tips = move |a: f64| deg(4.5) * smoothstep(deg(105.0), deg(135.0), round(a)).max(smoothstep(deg(70.0), deg(50.0), round(a)) * smoothstep(deg(30.0), deg(45.0), round(a)));
+    let nape_tips = move |a: f64| {
+        deg(4.5)
+            * smoothstep(deg(105.0), deg(135.0), round(a)).max(
+                smoothstep(deg(70.0), deg(50.0), round(a))
+                    * smoothstep(deg(30.0), deg(45.0), round(a)),
+            )
+    };
 
     // Short: volume on top, combed away from a side parting (the resident's right) in locks, a quiff
     // over the forehead.
     let base = thick(0.05 * hh, 0.03 * hh, 0.028 * hh, Some(0.014 * hh));
-    let quiffed = |a: f64, u: f64| base(a, u) + 0.022 * hh * (-(a / 0.6).powi(2)).exp() * smoothstep(0.35, 0.75, u) * smoothstep(1.0, 0.85, u);
-    styles.push(("short", vec![cap(&sc, Cap { thick: &quiffed, rows: 11, cols: 40, limit: None, edge: CLEAR, ridge: 0.35, tips: Some(&nape_tips), part: Some((deg(20.0), 0.3)), bands: None, ears: Meet::Round(17) })]));
+    let quiffed = |a: f64, u: f64| {
+        base(a, u)
+            + 0.022
+                * hh
+                * (-(a / 0.6).powi(2)).exp()
+                * smoothstep(0.35, 0.75, u)
+                * smoothstep(1.0, 0.85, u)
+    };
+    styles.push((
+        "short",
+        vec![cap(
+            &sc,
+            Cap {
+                thick: &quiffed,
+                rows: 11,
+                cols: 40,
+                limit: None,
+                edge: CLEAR,
+                ridge: 0.35,
+                tips: Some(&nape_tips),
+                part: Some((deg(20.0), 0.3)),
+                bands: None,
+                ears: Meet::Round(17),
+            },
+        )],
+    ));
 
     // Crop: a thin cap, a squared hairline and a tiny fringe in short points.
     let front = sc.hairline(0.0) + deg(3.0);
-    let square = |a: f64| if a.abs() < deg(55.0) { front + deg(4.0) * (a.abs() / deg(55.0)).powf(6.0) } else { sc.hairline(a) };
-    let crop_tips = |a: f64| deg(3.0) * smoothstep(deg(60.0), deg(20.0), round(a)) + 0.5 * nape_tips(a);
-    styles.push(("crop", vec![cap(&sc, Cap { thick: &thick(0.022 * hh, 0.016 * hh, 0.016 * hh, Some(0.011 * hh)), rows: 8, cols: 40, limit: Some(&square), edge: CLEAR, ridge: 0.25, tips: Some(&crop_tips), part: None, bands: None, ears: Meet::Round(17) })]));
+    let square = |a: f64| {
+        if a.abs() < deg(55.0) {
+            front + deg(4.0) * (a.abs() / deg(55.0)).powf(6.0)
+        } else {
+            sc.hairline(a)
+        }
+    };
+    let crop_tips =
+        |a: f64| deg(3.0) * smoothstep(deg(60.0), deg(20.0), round(a)) + 0.5 * nape_tips(a);
+    styles.push((
+        "crop",
+        vec![cap(
+            &sc,
+            Cap {
+                thick: &thick(0.022 * hh, 0.016 * hh, 0.016 * hh, Some(0.011 * hh)),
+                rows: 8,
+                cols: 40,
+                limit: Some(&square),
+                edge: CLEAR,
+                ridge: 0.25,
+                tips: Some(&crop_tips),
+                part: None,
+                bands: None,
+                ears: Meet::Round(17),
+            },
+        )],
+    ));
 
     // Layered: a cap and three flared tiers in pointed locks, the lowest to the jaw.
-    let mut lay = vec![cap(&sc, Cap { thick: &thick(0.05 * hh, 0.04 * hh, 0.04 * hh, None), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.3, tips: None, part: None, bands: None, ears: Meet::Round(14) })];
-    for (k, (yt, yb, off, fl)) in [(0.72, 0.5, 0.028, 0.06), (0.58, 0.3, 0.02, 0.09), (0.44, 0.08, 0.012, 0.12)].into_iter().enumerate() {
+    let mut lay = vec![cap(
+        &sc,
+        Cap {
+            thick: &thick(0.05 * hh, 0.04 * hh, 0.04 * hh, None),
+            rows: 9,
+            cols: 32,
+            limit: None,
+            edge: CLEAR,
+            ridge: 0.3,
+            tips: None,
+            part: None,
+            bands: None,
+            ears: Meet::Round(14),
+        },
+    )];
+    for (k, (yt, yb, off, fl)) in [
+        (0.72, 0.5, 0.028, 0.06),
+        (0.58, 0.3, 0.02, 0.09),
+        (0.44, 0.08, 0.012, 0.12),
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let span = deg(62.0 + 6.0 * k as f64);
         let (top, bot) = (chin + yt * hh, chin + yb * hh);
-        lay.push(curtain(&sc, Curtain { a0: span, a1: TAU - span, top: &move |_| top, bottom: &move |_| bot, off: off * hh, locks: 6, rows: 3, flare: fl, thick: 0.017 * hh, curl: 0.5, tip: 0.1 * hh, sharp: 3.5, back: None, wave: 0.0, seed: k as i64 }));
+        lay.push(curtain(
+            &sc,
+            Curtain {
+                a0: span,
+                a1: TAU - span,
+                top: &move |_| top,
+                bottom: &move |_| bot,
+                off: off * hh,
+                locks: 6,
+                rows: 3,
+                flare: fl,
+                thick: 0.017 * hh,
+                curl: 0.5,
+                tip: 0.1 * hh,
+                sharp: 3.5,
+                back: None,
+                wave: 0.0,
+                seed: k as i64,
+            },
+        ));
     }
     styles.push(("layered", lay));
 
@@ -1016,33 +1471,108 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
     // forehead.
     let mut rng = Pcg64::new(11);
     let tb = thick(0.034 * hh, 0.028 * hh, 0.026 * hh, Some(0.016 * hh));
-    let lumpy = |a: f64, u: f64| tb(a, u) * (1.0 + 0.35 * noise3(v3(a.cos(), 2.0 * u, a.sin()), 5, 2.5));
-    let mut tou = vec![cap(&sc, Cap { thick: &lumpy, rows: 8, cols: 24, limit: None, edge: CLEAR, ridge: 0.3, tips: Some(&nape_tips), part: None, bands: None, ears: Meet::Round(10) })];
+    let lumpy =
+        |a: f64, u: f64| tb(a, u) * (1.0 + 0.35 * noise3(v3(a.cos(), 2.0 * u, a.sin()), 5, 2.5));
+    let mut tou = vec![cap(
+        &sc,
+        Cap {
+            thick: &lumpy,
+            rows: 8,
+            cols: 24,
+            limit: None,
+            edge: CLEAR,
+            ridge: 0.3,
+            tips: Some(&nape_tips),
+            part: None,
+            bands: None,
+            ears: Meet::Round(10),
+        },
+    )];
     for k in 0..22 {
         // Spread over the head on a spiral (each about as much of it), nudged.
-        let a = py_mod(k as f64 * PI * (3.0 - 5f64.sqrt()) + rng.uniform(-0.2, 0.2) + PI, TAU) - PI;
-        let phi = sc.hairline(a) * (0.82 * ((k as f64 + 0.5) / 22.0).sqrt() + rng.uniform(-0.05, 0.05));
+        let a = py_mod(
+            k as f64 * PI * (3.0 - 5f64.sqrt()) + rng.uniform(-0.2, 0.2) + PI,
+            TAU,
+        ) - PI;
+        let phi =
+            sc.hairline(a) * (0.82 * ((k as f64 + 0.5) / 22.0).sqrt() + rng.uniform(-0.05, 0.05));
         let len = rng.uniform(0.4, 0.65);
         let turn = rng.uniform(-0.65, 0.65);
         let lift = rng.uniform(0.015, 0.04) * hh;
         let wide = rng.uniform(0.055, 0.075) * hh;
-        tou.push(tuft(&sc, a, phi, len, turn, lift, 0.03 * hh, wide, 0.028 * hh, k as f64));
+        tou.push(tuft(
+            &sc,
+            a,
+            phi,
+            len,
+            turn,
+            lift,
+            0.03 * hh,
+            wide,
+            0.028 * hh,
+            k as f64,
+        ));
     }
     styles.push(("tousled", tou));
 
     // Side-swept: a cap with a high side parting and three locks swept from it across the forehead.
-    let mut sw = vec![cap(&sc, Cap { thick: &thick(0.045 * hh, 0.03 * hh, 0.028 * hh, Some(0.014 * hh)), rows: 9, cols: 36, limit: None, edge: CLEAR, ridge: 0.3, tips: Some(&nape_tips), part: Some((deg(45.0), 0.35)), bands: None, ears: Meet::Round(15) })];
+    let mut sw = vec![cap(
+        &sc,
+        Cap {
+            thick: &thick(0.045 * hh, 0.03 * hh, 0.028 * hh, Some(0.014 * hh)),
+            rows: 9,
+            cols: 36,
+            limit: None,
+            edge: CLEAR,
+            ridge: 0.3,
+            tips: Some(&nape_tips),
+            part: Some((deg(45.0), 0.35)),
+            bands: None,
+            ears: Meet::Round(15),
+        },
+    )];
     let fa = [0.75, 0.35, 0.0, -0.4, -0.75, -1.05];
     let fk = [0.55, 0.78, 0.92, 0.98, 1.02, 1.08];
     let fo = [0.05, 0.05, 0.048, 0.045, 0.038, 0.028];
-    for (k, (da, dk, len, size)) in [(0.0, 0.0, 1.0, 1.0), (0.07, -0.06, 0.8, 0.85), (-0.06, 0.05, 0.62, 0.8)].into_iter().enumerate() {
+    for (k, (da, dk, len, size)) in [
+        (0.0, 0.0, 1.0, 1.0),
+        (0.07, -0.06, 0.8, 0.85),
+        (-0.06, 0.05, 0.62, 0.8),
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let n = 3 + (len * 3.0) as usize;
-        let pts: Vec<V3> = (0..n).map(|i| sc.point(fa[i] + da, sc.hairline(fa[i] + da) * (fk[i] + dk), fo[i] * hh * (0.9 + 0.1 * size))).collect();
+        let pts: Vec<V3> = (0..n)
+            .map(|i| {
+                sc.point(
+                    fa[i] + da,
+                    sc.hairline(fa[i] + da) * (fk[i] + dk),
+                    fo[i] * hh * (0.9 + 0.1 * size),
+                )
+            })
+            .collect();
         let pts = spline(&pts, 9);
         let t9 = linspace(0.0, 1.0, 9);
-        let ry: Vec<f64> = t9.iter().map(|&t| interp(t, &[0.0, 0.4, 1.0], &[0.05, 0.068, 0.016]) * hh * size).collect();
-        let rz: Vec<f64> = t9.iter().map(|&t| interp(t, &[0.0, 0.5, 1.0], &[0.022, 0.028, 0.01]) * hh * size).collect();
-        sw.push(lobe(&pts, &ry, &rz, 8, v3(0.0, 1.0, 0.3), 9.0, k as f64, 0.0, None));
+        let ry: Vec<f64> = t9
+            .iter()
+            .map(|&t| interp(t, &[0.0, 0.4, 1.0], &[0.05, 0.068, 0.016]) * hh * size)
+            .collect();
+        let rz: Vec<f64> = t9
+            .iter()
+            .map(|&t| interp(t, &[0.0, 0.5, 1.0], &[0.022, 0.028, 0.01]) * hh * size)
+            .collect();
+        sw.push(lobe(
+            &pts,
+            &ry,
+            &rz,
+            8,
+            v3(0.0, 1.0, 0.3),
+            9.0,
+            k as f64,
+            0.0,
+            None,
+        ));
     }
     styles.push(("sideSwept", sw));
 
@@ -1057,7 +1587,16 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
         })
         .collect();
     // How far up a puff a direction is (0 between puffs .. 1 on a puff's top).
-    let puff = |e: V3| puffs.iter().map(|q| (1.0 - (e.dot(q).clamp(-1.0, 1.0).acos() / 0.32).powi(2)).max(0.0).sqrt()).fold(0.0, f64::max);
+    let puff = |e: V3| {
+        puffs
+            .iter()
+            .map(|q| {
+                (1.0 - (e.dot(q).clamp(-1.0, 1.0).acos() / 0.32).powi(2))
+                    .max(0.0)
+                    .sqrt()
+            })
+            .fold(0.0, f64::max)
+    };
     let dir = |a: f64, u: f64| {
         let e = Scalp::dirs(a, u * sc.hairline(a));
         e / e.norm()
@@ -1071,44 +1610,198 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
         let rr = h.radii.component_mul(&v3(1.36, 1.3, 1.36));
         let w = e.component_div(&rr).map(|v| v.abs().powf(2.1));
         let sh = v3(0.0, 0.1, -0.08).component_mul(&h.radii);
-        let r_t = 1.0 / (w.x + w.y + w.z).sqrt().powf(1.0 / 1.2) + (e.x * sh.x + e.y * sh.y + e.z * sh.z);
-        ((r_t - r_s - 0.02 * hh).max(0.02 * hh) + 0.06 * hh * puff(dir(a, u))) * (0.3 + 0.7 * smoothstep(1.0, 0.55, u))
+        let r_t =
+            1.0 / (w.x + w.y + w.z).sqrt().powf(1.0 / 1.2) + (e.x * sh.x + e.y * sh.y + e.z * sh.z);
+        ((r_t - r_s - 0.02 * hh).max(0.02 * hh) + 0.06 * hh * puff(dir(a, u)))
+            * (0.3 + 0.7 * smoothstep(1.0, 0.55, u))
     };
     let puff_bands = |a: f64, u: f64| 0.15 + 0.75 * puff(dir(a, u));
-    styles.push(("afro", vec![cap(&sc, Cap { thick: &rounded, rows: 16, cols: 44, limit: None, edge: CLEAR + 0.004 * hh, ridge: 0.0, tips: None, part: None, bands: Some(&puff_bands), ears: Meet::Over })]));
+    styles.push((
+        "afro",
+        vec![cap(
+            &sc,
+            Cap {
+                thick: &rounded,
+                rows: 16,
+                cols: 44,
+                limit: None,
+                edge: CLEAR + 0.004 * hh,
+                ridge: 0.0,
+                tips: None,
+                part: None,
+                bands: Some(&puff_bands),
+                ears: Meet::Over,
+            },
+        )],
+    ));
 
     // Bob: a shell to the jaw in blunt locks with a curled-in hem, and a straight fringe.
-    let mut bob = vec![cap(&sc, Cap { thick: &thick(0.05 * hh, 0.04 * hh, 0.04 * hh, None), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.15, tips: None, part: None, bands: None, ears: Meet::Round(14) })];
+    let mut bob = vec![cap(
+        &sc,
+        Cap {
+            thick: &thick(0.05 * hh, 0.04 * hh, 0.04 * hh, None),
+            rows: 9,
+            cols: 32,
+            limit: None,
+            edge: CLEAR,
+            ridge: 0.15,
+            tips: None,
+            part: None,
+            bands: None,
+            ears: Meet::Round(14),
+        },
+    )];
     let (bt, bb) = (chin + 0.72 * hh, chin + 0.06 * hh);
-    bob.push(curtain(&sc, Curtain { a0: deg(58.0), a1: TAU - deg(58.0), top: &move |_| bt, bottom: &move |_| bb, off: 0.012 * hh, locks: 9, rows: 5, flare: 0.12, thick: 0.03 * hh, curl: 1.0, tip: 0.03 * hh, sharp: 1.5, back: None, wave: 0.0, seed: 0 }));
+    bob.push(curtain(
+        &sc,
+        Curtain {
+            a0: deg(58.0),
+            a1: TAU - deg(58.0),
+            top: &move |_| bt,
+            bottom: &move |_| bb,
+            off: 0.012 * hh,
+            locks: 9,
+            rows: 5,
+            flare: 0.12,
+            thick: 0.03 * hh,
+            curl: 1.0,
+            tip: 0.03 * hh,
+            sharp: 1.5,
+            back: None,
+            wave: 0.0,
+            seed: 0,
+        },
+    ));
     let under = |a: f64| sc.hairline(a) * 0.8;
     let bob_bot = |a: f64| brow_y + hh * (0.05 + 0.03 * (a / deg(64.0)).powi(2));
-    bob.push(fringe(&skin, Fringe { a0: -deg(64.0), a1: deg(64.0), top: &under, bottom: &bob_bot, off: 0.03 * hh, thin: 0.012 * hh, locks: 6, rows: 3, thick: 0.022 * hh, tip: 0.03 * hh, sharp: 3.0, flare: 0.15, seed: 2.0 }));
+    bob.push(fringe(
+        &skin,
+        Fringe {
+            a0: -deg(64.0),
+            a1: deg(64.0),
+            top: &under,
+            bottom: &bob_bot,
+            off: 0.03 * hh,
+            thin: 0.012 * hh,
+            locks: 6,
+            rows: 3,
+            thick: 0.022 * hh,
+            tip: 0.03 * hh,
+            sharp: 3.0,
+            flare: 0.15,
+            seed: 2.0,
+        },
+    ));
     styles.push(("bob", bob));
 
     // Long: a cap parted in the middle, the sides to the shoulders, the back to mid-back, all in locks
     // with pointed tips; a fringe either side of the parting framing the face.
-    let mut lng = vec![cap(&sc, Cap { thick: &thick(0.045 * hh, 0.035 * hh, 0.035 * hh, None), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.15, tips: None, part: Some((0.0, 0.3)), bands: None, ears: Meet::Round(14) })];
+    let mut lng = vec![cap(
+        &sc,
+        Cap {
+            thick: &thick(0.045 * hh, 0.035 * hh, 0.035 * hh, None),
+            rows: 9,
+            cols: 32,
+            limit: None,
+            edge: CLEAR,
+            ridge: 0.15,
+            tips: None,
+            part: Some((0.0, 0.3)),
+            bands: None,
+            ears: Meet::Round(14),
+        },
+    )];
     let shoulder = p[b("clavicle_l")].y;
-    let side_bot = |a: f64| interp(round(a), &[deg(70.0), deg(110.0), deg(150.0)], &[shoulder + 0.25 * hh, shoulder - 0.1 * hh, sp[1] - 0.5 * hh]);
+    let side_bot = |a: f64| {
+        interp(
+            round(a),
+            &[deg(70.0), deg(110.0), deg(150.0)],
+            &[shoulder + 0.25 * hh, shoulder - 0.1 * hh, sp[1] - 0.5 * hh],
+        )
+    };
     let lt = chin + 0.72 * hh;
     // Further off the back at the shoulders, which rise and roll back under it when sitting down.
     let long_back = |y: f64| back(y) - 0.036 * hh * (-((y - shoulder) / (0.2 * hh)).powi(2)).exp();
-    lng.push(curtain(&sc, Curtain { a0: deg(66.0), a1: TAU - deg(66.0), top: &move |_| lt, bottom: &side_bot, off: 0.012 * hh, locks: 8, rows: 7, flare: 0.18, thick: 0.032 * hh, curl: 0.6, tip: 0.07 * hh, sharp: 2.5, back: Some(&long_back), wave: 0.004 * hh, seed: 0 }));
+    lng.push(curtain(
+        &sc,
+        Curtain {
+            a0: deg(66.0),
+            a1: TAU - deg(66.0),
+            top: &move |_| lt,
+            bottom: &side_bot,
+            off: 0.012 * hh,
+            locks: 8,
+            rows: 7,
+            flare: 0.18,
+            thick: 0.032 * hh,
+            curl: 0.6,
+            tip: 0.07 * hh,
+            sharp: 2.5,
+            back: Some(&long_back),
+            wave: 0.004 * hh,
+            seed: 0,
+        },
+    ));
     for s in [-1.0, 1.0] {
         // Two locks either side of the parting, the outer one down past the cheek to the jaw.
-        let outer = [(0.45 * s, brow_y + 0.14 * hh, 0.036 * hh), (0.85 * s, brow_y + 0.0 * hh, 0.038 * hh), (1.04 * s, brow_y - 0.2 * hh, 0.036 * hh), (1.13 * s, brow_y - 0.36 * hh, 0.032 * hh)];
-        lng.push(face_lock(&skin, 0.1 * s, sc.hairline(0.1 * s) * 0.7, &outer, 0.065 * hh, 0.028 * hh, 1.0 + s));
-        let inner = [(0.35 * s, brow_y + 0.15 * hh, 0.032 * hh), (0.62 * s, brow_y + 0.05 * hh, 0.034 * hh), (0.86 * s, brow_y - 0.08 * hh, 0.032 * hh)];
-        lng.push(face_lock(&skin, 0.06 * s, sc.hairline(0.06 * s) * 0.7, &inner, 0.055 * hh, 0.025 * hh, 2.0 + s));
+        let outer = [
+            (0.45 * s, brow_y + 0.14 * hh, 0.036 * hh),
+            (0.85 * s, brow_y + 0.0 * hh, 0.038 * hh),
+            (1.04 * s, brow_y - 0.2 * hh, 0.036 * hh),
+            (1.13 * s, brow_y - 0.36 * hh, 0.032 * hh),
+        ];
+        lng.push(face_lock(
+            &skin,
+            0.1 * s,
+            sc.hairline(0.1 * s) * 0.7,
+            &outer,
+            0.065 * hh,
+            0.028 * hh,
+            1.0 + s,
+        ));
+        let inner = [
+            (0.35 * s, brow_y + 0.15 * hh, 0.032 * hh),
+            (0.62 * s, brow_y + 0.05 * hh, 0.034 * hh),
+            (0.86 * s, brow_y - 0.08 * hh, 0.032 * hh),
+        ];
+        lng.push(face_lock(
+            &skin,
+            0.06 * s,
+            sc.hairline(0.06 * s) * 0.7,
+            &inner,
+            0.055 * hh,
+            0.025 * hh,
+            2.0 + s,
+        ));
     }
     styles.push(("long", lng));
 
     // Ponytail: a slicked cap, a band at the back of the head and a tapering tail in twisting locks.
     let b15 = |a: f64, _u: f64| 0.5 + 0.5 * (a * 15.0).sin();
-    let mut pt = vec![cap(&sc, Cap { thick: &thick(0.024 * hh, 0.018 * hh, 0.02 * hh, Some(0.012 * hh)), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.2, tips: None, part: None, bands: None, ears: Meet::Round(14) })];
+    let mut pt = vec![cap(
+        &sc,
+        Cap {
+            thick: &thick(0.024 * hh, 0.018 * hh, 0.02 * hh, Some(0.012 * hh)),
+            rows: 9,
+            cols: 32,
+            limit: None,
+            edge: CLEAR,
+            ridge: 0.2,
+            tips: None,
+            part: None,
+            bands: None,
+            ears: Meet::Round(14),
+        },
+    )];
     let tie = sc.point(PI, deg(95.0), 0.03 * hh);
-    pt.push(tor(torus(tie + v3(0.0, 0.0, -0.012 * hh), 0.05 * hh, 0.02 * hh, 12, 6, v3(0.0, 0.25, -1.0))));
+    pt.push(tor(torus(
+        tie + v3(0.0, 0.0, -0.012 * hh),
+        0.05 * hh,
+        0.02 * hh,
+        12,
+        6,
+        v3(0.0, 0.25, -1.0),
+    )));
     let mut tail = [
         tie + v3(0.0, 0.0, -0.03 * hh),
         tie + v3(0.0, -0.08 * hh, -0.13 * hh),
@@ -1121,8 +1814,14 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
     }
     let tp = spline(&tail, 12);
     let t12 = linspace(0.0, 1.0, 12);
-    let ry: Vec<f64> = t12.iter().map(|&t| interp(t, &[0.0, 0.25, 1.0], &[0.08, 0.105, 0.025]) * hh).collect();
-    let rz: Vec<f64> = t12.iter().map(|&t| interp(t, &[0.0, 0.25, 1.0], &[0.07, 0.085, 0.02]) * hh).collect();
+    let ry: Vec<f64> = t12
+        .iter()
+        .map(|&t| interp(t, &[0.0, 0.25, 1.0], &[0.08, 0.105, 0.025]) * hh)
+        .collect();
+    let rz: Vec<f64> = t12
+        .iter()
+        .map(|&t| interp(t, &[0.0, 0.25, 1.0], &[0.07, 0.085, 0.02]) * hh)
+        .collect();
     let mut m = loft(&tp, &ry, &rz, 12, v3(1.0, 0.0, 0.0), caps(2));
     let z = grooved(&mut m, 12, 4.0, 0.16, 2.5);
     let f = m.t.iter().map(|&t| smoothstep(0.1, 0.9, t)).collect();
@@ -1130,7 +1829,21 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
     styles.push(("ponytail", pt));
 
     // Braid: a cap and three strands plaited down the back, tied off with a tuft below the tie.
-    let mut br = vec![cap(&sc, Cap { thick: &thick(0.03 * hh, 0.024 * hh, 0.026 * hh, Some(0.018 * hh)), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.2, tips: None, part: None, bands: Some(&b15), ears: Meet::Round(14) })];
+    let mut br = vec![cap(
+        &sc,
+        Cap {
+            thick: &thick(0.03 * hh, 0.024 * hh, 0.026 * hh, Some(0.018 * hh)),
+            rows: 9,
+            cols: 32,
+            limit: None,
+            edge: CLEAR,
+            ridge: 0.2,
+            tips: None,
+            part: None,
+            bands: Some(&b15),
+            ears: Meet::Round(14),
+        },
+    )];
     let start = sc.point(PI, deg(120.0), 0.03 * hh);
     let len = 0.82 * hh;
     // The braid's middle at s (0 at the nape .. 1 at the tie).
@@ -1146,28 +1859,77 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
             .map(|&s| {
                 let th = TAU * 3.5 * s + ph;
                 let w = 0.05 * hh * (0.75 - 0.25 * s) * smoothstep(-0.1, 0.12, s);
-                axis(s) + v3(w * th.sin(), 0.0, -0.022 * hh * (2.0 * th).sin() * smoothstep(-0.1, 0.12, s))
+                axis(s)
+                    + v3(
+                        w * th.sin(),
+                        0.0,
+                        -0.022 * hh * (2.0 * th).sin() * smoothstep(-0.1, 0.12, s),
+                    )
             })
             .collect();
         let r: Vec<f64> = s.iter().map(|&s| 0.036 * hh * (1.0 - 0.35 * s)).collect();
         let m = loft(&pts, &r, &r, 6, v3(0.0, 0.0, -1.0), caps(1));
-        let z = m.t.iter().map(|&t| 0.5 + 0.4 * (TAU * 7.0 * t + ph).sin()).collect();
+        let z =
+            m.t.iter()
+                .map(|&t| 0.5 + 0.4 * (TAU * 7.0 * t + ph).sin())
+                .collect();
         let f = m.t.iter().map(|&t| smoothstep(0.0, 0.67, t)).collect();
-        br.push(comp(m.pos, m.idx, None, Some(z), Some(vec![0.1; m.t.len()]), Some(f)));
+        br.push(comp(
+            m.pos,
+            m.idx,
+            None,
+            Some(z),
+            Some(vec![0.1; m.t.len()]),
+            Some(f),
+        ));
     }
     let end = axis(1.0);
-    let mut knot = tor(torus(end + v3(0.0, -0.01 * hh, 0.0), 0.03 * hh, 0.012 * hh, 10, 5, v3(0.0, 1.0, 0.0)));
+    let mut knot = tor(torus(
+        end + v3(0.0, -0.01 * hh, 0.0),
+        0.03 * hh,
+        0.012 * hh,
+        10,
+        5,
+        v3(0.0, 1.0, 0.0),
+    ));
     knot.f = vec![1.0; knot.pos.len()];
     br.push(knot);
-    let tp: Vec<V3> = linspace(0.0, 1.0, 5).iter().map(|&s| end + v3(0.0, -0.13 * hh * s - 0.015 * hh, -0.01 * hh * s)).collect();
-    let r: Vec<f64> = linspace(0.0, 1.0, 5).iter().map(|&s| interp(s, &[0.0, 0.4, 1.0], &[0.025, 0.04, 0.012]) * hh).collect();
+    let tp: Vec<V3> = linspace(0.0, 1.0, 5)
+        .iter()
+        .map(|&s| end + v3(0.0, -0.13 * hh * s - 0.015 * hh, -0.01 * hh * s))
+        .collect();
+    let r: Vec<f64> = linspace(0.0, 1.0, 5)
+        .iter()
+        .map(|&s| interp(s, &[0.0, 0.4, 1.0], &[0.025, 0.04, 0.012]) * hh)
+        .collect();
     let mut m = loft(&tp, &r, &r, 8, v3(0.0, 0.0, -1.0), caps(1));
     let z = grooved(&mut m, 8, 3.0, 0.2, 1.0);
-    br.push(comp(m.pos, m.idx, None, Some(z), None, Some(vec![1.0; m.t.len()])));
+    br.push(comp(
+        m.pos,
+        m.idx,
+        None,
+        Some(z),
+        None,
+        Some(vec![1.0; m.t.len()]),
+    ));
     styles.push(("braid", br));
 
     // Buns: a cap and two buns high on each side, twisted, each with a band round its foot.
-    let mut bun = vec![cap(&sc, Cap { thick: &thick(0.026 * hh, 0.02 * hh, 0.022 * hh, Some(0.014 * hh)), rows: 9, cols: 32, limit: None, edge: CLEAR, ridge: 0.2, tips: None, part: Some((0.0, 0.3)), bands: Some(&b15), ears: Meet::Round(14) })];
+    let mut bun = vec![cap(
+        &sc,
+        Cap {
+            thick: &thick(0.026 * hh, 0.02 * hh, 0.022 * hh, Some(0.014 * hh)),
+            rows: 9,
+            cols: 32,
+            limit: None,
+            edge: CLEAR,
+            ridge: 0.2,
+            tips: None,
+            part: Some((0.0, 0.3)),
+            bands: Some(&b15),
+            ears: Meet::Round(14),
+        },
+    )];
     for s in [-1.0, 1.0] {
         let c = sc.point(s * deg(118.0), deg(38.0), 0.13 * hh);
         let ax = (c - h.centre) / (c - h.centre).norm();
@@ -1188,16 +1950,29 @@ pub fn build_hair(family: &str, stage: &str, head: &HeadFrame, p: &[V3; NB]) -> 
             .collect();
         let out = pos.iter().map(|q| q - c).collect();
         bun.push(comp(pos, e.idx, Some(out), Some(z), None, None));
-        bun.push(tor(torus(c - ax * (0.115 * hh), 0.085 * hh, 0.02 * hh, 12, 5, ax)));
+        bun.push(tor(torus(
+            c - ax * (0.115 * hh),
+            0.085 * hh,
+            0.02 * hh,
+            12,
+            5,
+            ax,
+        )));
     }
     styles.push(("bun", bun));
 
     let mut names: Vec<&str> = styles.iter().map(|s| s.0).collect();
     names.push("none");
     assert!(HAIR_STYLES.iter().all(|s| names.contains(s)) && names.len() == HAIR_STYLES.len());
-    let mut out: Vec<(String, Mesh)> = styles.into_iter().map(|(name, comps)| (format!("hair.{name}"), finish(&comps, h, &ears, p, false))).collect();
+    let mut out: Vec<(String, Mesh)> = styles
+        .into_iter()
+        .map(|(name, comps)| (format!("hair.{name}"), finish(&comps, h, &ears, p, false)))
+        .collect();
     if BEARD_FAMILIES.contains(&family) {
-        out.push(("hair.beard".into(), finish(&[beard(&skin)], h, &ears, p, true)));
+        out.push((
+            "hair.beard".into(),
+            finish(&[beard(&skin)], h, &ears, p, true),
+        ));
     }
     out
 }
@@ -1214,13 +1989,39 @@ fn beard(sc: &Scalp) -> Comp {
     // Mouth direction (polar angle) and the hole round it.
     let qm = (h.mouth - h.centre).component_div(&h.radii);
     let phm = (qm[1] / qm.norm()).acos();
-    let top: Vec<f64> = a.iter().map(|&a| interp(a.abs(), &[0.0, 22.0, 45.0, 70.0, 85.0, 94.0].map(radians), &[phm - 0.17, phm - 0.15, phm - 0.02, phm - 0.1, radians(96.0), radians(94.0)])).collect();
+    let top: Vec<f64> = a
+        .iter()
+        .map(|&a| {
+            interp(
+                a.abs(),
+                &[0.0, 22.0, 45.0, 70.0, 85.0, 94.0].map(radians),
+                &[
+                    phm - 0.17,
+                    phm - 0.15,
+                    phm - 0.02,
+                    phm - 0.1,
+                    radians(96.0),
+                    radians(94.0),
+                ],
+            )
+        })
+        .collect();
     // The lower edge: just under the jaw, rising to the jaw's corners at the sides; the locks' tips
     // lower round the chin.
     let bot: Vec<f64> = (0..cols)
         .map(|j| {
-            let tip = 0.035 * hh * lk[j].powf(2.5) * (0.6 + 0.4 * jitter((j + 2) / 4, 5.0)) * smoothstep(radians(70.0), radians(30.0), a[j].abs());
-            let want = h.chin_y + hh * interp(a[j].abs(), &[0.0, 45.0, 80.0, 94.0].map(radians), &[-0.01, 0.02, 0.15, 0.22]) - tip;
+            let tip = 0.035
+                * hh
+                * lk[j].powf(2.5)
+                * (0.6 + 0.4 * jitter((j + 2) / 4, 5.0))
+                * smoothstep(radians(70.0), radians(30.0), a[j].abs());
+            let want = h.chin_y
+                + hh * interp(
+                    a[j].abs(),
+                    &[0.0, 45.0, 80.0, 94.0].map(radians),
+                    &[-0.01, 0.02, 0.15, 0.22],
+                )
+                - tip;
             at_height(sc, a[j], want, top[j] + 0.1)
         })
         .collect();
@@ -1228,7 +2029,11 @@ fn beard(sc: &Scalp) -> Comp {
     // The hole: an ellipse in (side distance, polar angle) round the mouth.
     let wx = (h.mouth_w / 2.0 + 0.04 * hh) / h.radii[0];
     // The sideburns end in front of the ears (their boxes, EAR_CLEAR and the beard's thin edge clear).
-    let side = h.ears.iter().map(|[c, e]| (c.x.abs() - e.x).atan2(c.z + e.z + EAR_CLEAR + CLEAR - h.centre[2])).fold(radians(94.0), f64::min);
+    let side = h
+        .ears
+        .iter()
+        .map(|[c, e]| (c.x.abs() - e.x).atan2(c.z + e.z + EAR_CLEAR + CLEAR - h.centre[2]))
+        .fold(radians(94.0), f64::min);
     let mut pg = Vec::new();
     let (mut z, mut y) = (Vec::new(), Vec::new());
     for &u in &us {
@@ -1242,11 +2047,27 @@ fn beard(sc: &Scalp) -> Comp {
             let r = hx.hypot(hy);
             let inside = r < 1.0;
             let scale = if inside { 1.0 / r.max(1e-6) } else { 1.0 };
-            let a2 = if inside { clip(hx * scale * wx / phi.sin().max(1e-3), -1.0, 1.0).asin() } else { aa };
+            let a2 = if inside {
+                clip(hx * scale * wx / phi.sin().max(1e-3), -1.0, 1.0).asin()
+            } else {
+                aa
+            };
             let phi2 = if inside { phm + hy * scale * sy } else { phi };
             // The sides (past 60 degrees) drawn in to stop in front of the ears.
-            let a2 = if a2.abs() > radians(60.0) { a2.signum() * interp(a2.abs(), &[radians(60.0), radians(94.0)], &[radians(60.0), side]) } else { a2 };
-            let edge = smoothstep(1.0, 1.6, r).min(smoothstep(0.0, 0.2, u)).min(smoothstep(radians(94.0), radians(78.0), aa.abs())).min(smoothstep(1.0, 0.8, u));
+            let a2 = if a2.abs() > radians(60.0) {
+                a2.signum()
+                    * interp(
+                        a2.abs(),
+                        &[radians(60.0), radians(94.0)],
+                        &[radians(60.0), side],
+                    )
+            } else {
+                a2
+            };
+            let edge = smoothstep(1.0, 1.6, r)
+                .min(smoothstep(0.0, 0.2, u))
+                .min(smoothstep(radians(94.0), radians(78.0), aa.abs()))
+                .min(smoothstep(1.0, 0.8, u));
             let off = CLEAR + (0.02 * hh) * edge * (0.65 + 0.35 * lk[j]);
             row.push(sc.point(a2, phi2, off));
             z.push(0.5 + (0.35 * lk[j] - 0.1) * (0.7 + 0.3 * (phi * 8.0 + aa * 3.0).sin()));
@@ -1284,7 +2105,11 @@ fn finish(comps: &[Comp], h: &HeadFrame, ears: &Ears, p: &[V3; NB], head_only: b
     // in the files, wherever the field is rough). Only the vertices pushed can still be near.
     let mut near: Vec<usize> = (0..pos.len()).collect();
     for _ in 0..24 {
-        let d: Vec<(usize, f64)> = near.iter().map(|&i| (i, near_sdf(h, pos[i]))).filter(|&(_, d)| d < CLEAR).collect();
+        let d: Vec<(usize, f64)> = near
+            .iter()
+            .map(|&i| (i, near_sdf(h, pos[i])))
+            .filter(|&(_, d)| d < CLEAR)
+            .collect();
         if d.is_empty() {
             break;
         }
@@ -1307,7 +2132,10 @@ fn finish(comps: &[Comp], h: &HeadFrame, ears: &Ears, p: &[V3; NB], head_only: b
             continue;
         }
         let neck_y = p[nk].y;
-        let (mut a, mut bb) = (smoothstep(h.chin_y + 0.05 * h.hh, neck_y, pos[i].y), smoothstep(neck_y, p[s3].y, pos[i].y));
+        let (mut a, mut bb) = (
+            smoothstep(h.chin_y + 0.05 * h.hh, neck_y, pos[i].y),
+            smoothstep(neck_y, p[s3].y, pos[i].y),
+        );
         if ff[i] >= 0.0 {
             a = clip(ff[i] * 1.6, 0.0, 1.0);
             bb = smoothstep(0.4, 1.0, ff[i]);
@@ -1317,6 +2145,16 @@ fn finish(comps: &[Comp], h: &HeadFrame, ears: &Ears, p: &[V3; NB], head_only: b
         dense[i][s3] = a * bb;
     }
     let fields = vec![[0.1, 0.0, 0.0, 0.0]; n];
-    let tone = (0..n).map(|i| [0.0, clip(yy[i], 0.0, 1.0), clip(zz[i], 0.0, 1.0), 0.0]).collect();
-    Mesh { pos, idx, nor, dense, fields, tone, ..Mesh::default() }
+    let tone = (0..n)
+        .map(|i| [0.0, clip(yy[i], 0.0, 1.0), clip(zz[i], 0.0, 1.0), 0.0])
+        .collect();
+    Mesh {
+        pos,
+        idx,
+        nor,
+        dense,
+        fields,
+        tone,
+        ..Mesh::default()
+    }
 }

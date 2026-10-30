@@ -25,9 +25,15 @@ const NATURAL: [usize; 64] = [
     35, 42, 49, 56, 57, 50, 43, 36, 29, 22, 15, 23, 30, 37, 44, 51, 58, 59, 52, 45, 38, 31, 39, 46, 53, 60, 61, 54, 47, 55, 62, 63,
 ];
 
-const DC_BITS: [[u8; 16]; 2] = [[0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0], [0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0]];
+const DC_BITS: [[u8; 16]; 2] = [
+    [0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+    [0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+];
 const DC_VALS: [u8; 12] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-const AC_BITS: [[u8; 16]; 2] = [[0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 0x7d], [0, 2, 1, 2, 4, 4, 3, 4, 7, 5, 4, 4, 0, 1, 2, 0x77]];
+const AC_BITS: [[u8; 16]; 2] = [
+    [0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 0x7d],
+    [0, 2, 1, 2, 4, 4, 3, 4, 7, 5, 4, 4, 0, 1, 2, 0x77],
+];
 #[rustfmt::skip]
 const AC_VALS: [[u8; 162]; 2] = [
     [0x01, 0x02, 0x03, 0x00, 0x04, 0x11, 0x05, 0x12, 0x21, 0x31, 0x41, 0x06, 0x13, 0x51, 0x61, 0x07, 0x22, 0x71, 0x14, 0x32, 0x81, 0x91, 0xA1, 0x08,
@@ -92,7 +98,11 @@ pub fn fdct_islow(d: &mut [i32; 64]) {
     const F3_072: i32 = 25172;
     let descale = |x: i32, n: i32| (x + (1 << (n - 1))) >> n;
     for pass in 0..2 {
-        let (stride, step, shift_even, shift_odd) = if pass == 0 { (1, 8, 0, CONST_BITS - PASS1_BITS) } else { (8, 1, PASS1_BITS, CONST_BITS + PASS1_BITS) };
+        let (stride, step, shift_even, shift_odd) = if pass == 0 {
+            (1, 8, 0, CONST_BITS - PASS1_BITS)
+        } else {
+            (8, 1, PASS1_BITS, CONST_BITS + PASS1_BITS)
+        };
         for k in 0..8 {
             let at = |i: usize| k * step + i * stride;
             let tmp0 = d[at(0)] + d[at(7)];
@@ -280,7 +290,12 @@ fn block_symbols(block: &[i32; 64], last_dc: &mut i32, mut f: impl FnMut(usize, 
     let diff = block[0] - *last_dc;
     *last_dc = block[0];
     let n = nbits(diff);
-    f(0, n as u8, (if diff < 0 { diff - 1 } else { diff }) as u32 & ((1u32 << n) - 1), n);
+    f(
+        0,
+        n as u8,
+        (if diff < 0 { diff - 1 } else { diff }) as u32 & ((1u32 << n) - 1),
+        n,
+    );
     let mut run = 0;
     for &k in &NATURAL[1..] {
         let v = block[k];
@@ -293,7 +308,12 @@ fn block_symbols(block: &[i32; 64], last_dc: &mut i32, mut f: impl FnMut(usize, 
             run -= 16;
         }
         let n = nbits(v);
-        f(1, (run << 4 | n) as u8, (if v < 0 { v - 1 } else { v }) as u32 & ((1u32 << n) - 1), n);
+        f(
+            1,
+            (run << 4 | n) as u8,
+            (if v < 0 { v - 1 } else { v }) as u32 & ((1u32 << n) - 1),
+            n,
+        );
         run = 0;
     }
     if run > 0 {
@@ -328,7 +348,12 @@ impl Plane {
             let (r0, r1) = (&self.px[2 * y * self.w..], &self.px[(2 * y + 1) * self.w..]);
             for x in 0..w {
                 let bias = if x % 2 == 0 { 1 } else { 2 };
-                px[y * w + x] = ((r0[2 * x] as u32 + r0[2 * x + 1] as u32 + r1[2 * x] as u32 + r1[2 * x + 1] as u32 + bias) >> 2) as u8;
+                px[y * w + x] = ((r0[2 * x] as u32
+                    + r0[2 * x + 1] as u32
+                    + r1[2 * x] as u32
+                    + r1[2 * x + 1] as u32
+                    + bias)
+                    >> 2) as u8;
             }
         }
         Plane { w, h, px }
@@ -384,12 +409,23 @@ pub fn encode(px: &[u8], w: usize, h: usize, ch: usize, quality: u8, optimize: b
             let ds = Plane::padded(p, w, h, cw.div_ceil(8) * 16, chh * 2).h2v2();
             Plane::padded(&ds.px, ds.w, ds.h, ds.w, chh.div_ceil(8) * 8)
         };
-        vec![Plane::padded(&ycc[0], w, h, wib * 8, hib * 8), sub(&ycc[1]), sub(&ycc[2])]
+        vec![
+            Plane::padded(&ycc[0], w, h, wib * 8, hib * 8),
+            sub(&ycc[1]),
+            sub(&ycc[2]),
+        ]
     } else {
         vec![Plane::padded(px, w, h, wib * 8, hib * 8)]
     };
-    let tables: Vec<[u16; 64]> = if colour { vec![quant_table(0, quality), quant_table(1, quality)] } else { vec![quant_table(0, quality)] };
-    let divisors: Vec<[(u32, u32, u32); 64]> = tables.iter().map(|t| t.map(|q| reciprocal(q as u32 * 8))).collect();
+    let tables: Vec<[u16; 64]> = if colour {
+        vec![quant_table(0, quality), quant_table(1, quality)]
+    } else {
+        vec![quant_table(0, quality)]
+    };
+    let divisors: Vec<[(u32, u32, u32); 64]> = tables
+        .iter()
+        .map(|t| t.map(|q| reciprocal(q as u32 * 8)))
+        .collect();
     // The blocks in scan order, each with its component.
     let mut blocks: Vec<(usize, [i32; 64])> = Vec::with_capacity(wib * hib * 3 / 2);
     if colour {
@@ -426,13 +462,31 @@ pub fn encode(px: &[u8], w: usize, h: usize, ch: usize, quality: u8, optimize: b
         let mut last = [0i32; 3];
         for (comp, b) in &blocks {
             let t = table_of(*comp);
-            block_symbols(b, &mut last[*comp], |kind, sym, _, _| freq[t][kind][sym as usize] += 1);
+            block_symbols(b, &mut last[*comp], |kind, sym, _, _| {
+                freq[t][kind][sym as usize] += 1
+            });
         }
-        freq.iter().map(|f| [Huff::optimal(&f[0]), Huff::optimal(&f[1])]).collect()
+        freq.iter()
+            .map(|f| [Huff::optimal(&f[0]), Huff::optimal(&f[1])])
+            .collect()
     } else {
-        (0..ntab).map(|t| [Huff { bits: DC_BITS[t], vals: DC_VALS.to_vec() }, Huff { bits: AC_BITS[t], vals: AC_VALS[t].to_vec() }]).collect()
+        (0..ntab)
+            .map(|t| {
+                [
+                    Huff {
+                        bits: DC_BITS[t],
+                        vals: DC_VALS.to_vec(),
+                    },
+                    Huff {
+                        bits: AC_BITS[t],
+                        vals: AC_VALS[t].to_vec(),
+                    },
+                ]
+            })
+            .collect()
     };
-    let codes: Vec<[[(u16, u8); 256]; 2]> = huffs.iter().map(|h| [h[0].codes(), h[1].codes()]).collect();
+    let codes: Vec<[[(u16, u8); 256]; 2]> =
+        huffs.iter().map(|h| [h[0].codes(), h[1].codes()]).collect();
 
     let mut out = Vec::with_capacity(w * h / 4);
     let seg = |out: &mut Vec<u8>, marker: u8, body: &[u8]| {
@@ -441,7 +495,11 @@ pub fn encode(px: &[u8], w: usize, h: usize, ch: usize, quality: u8, optimize: b
         out.extend_from_slice(body);
     };
     out.extend_from_slice(&[0xFF, 0xD8]);
-    seg(&mut out, 0xE0, &[b'J', b'F', b'I', b'F', 0, 1, 1, 0, 0, 1, 0, 1, 0, 0]);
+    seg(
+        &mut out,
+        0xE0,
+        &[b'J', b'F', b'I', b'F', 0, 1, 1, 0, 0, 1, 0, 1, 0, 0],
+    );
     for (n, t) in tables.iter().enumerate() {
         let mut body = vec![n as u8];
         body.extend(NATURAL.iter().map(|&k| t[k] as u8));
@@ -521,7 +579,16 @@ pub fn idct_islow(c: &[i32; 64], out: &mut [u8; 64]) {
         let t1 = t1 * 16819 + z2 + z4;
         let t2 = t2 * 25172 + z2 + z3;
         let t3 = t3 * 12299 + z1 + z4;
-        [tmp10 + t3, tmp11 + t2, tmp12 + t1, tmp13 + t0, tmp13 - t0, tmp12 - t1, tmp11 - t2, tmp10 - t3]
+        [
+            tmp10 + t3,
+            tmp11 + t2,
+            tmp12 + t1,
+            tmp13 + t0,
+            tmp13 - t0,
+            tmp12 - t1,
+            tmp11 - t2,
+            tmp10 - t3,
+        ]
     };
     let mut ws = [0i32; 64];
     for col in 0..8 {
@@ -575,7 +642,8 @@ impl HuffDec {
                 if len as u32 <= LOOK {
                     let shift = LOOK - len as u32;
                     for fill in 0..1 << shift {
-                        look[((code << shift) | fill) as usize] = (len as u8, vals.get(k).copied().unwrap_or(0));
+                        look[((code << shift) | fill) as usize] =
+                            (len as u8, vals.get(k).copied().unwrap_or(0));
                     }
                 }
                 code += 1;
@@ -585,7 +653,13 @@ impl HuffDec {
             code <<= 1;
         }
         maxcode[17] = i32::MAX;
-        HuffDec { look, maxcode, valptr, mincode, vals }
+        HuffDec {
+            look,
+            maxcode,
+            valptr,
+            mincode,
+            vals,
+        }
     }
 }
 
@@ -663,12 +737,18 @@ impl BitReader {
             code = (p >> (32 - len)) as i32;
         }
         self.pos += len;
-        h.vals.get((h.valptr[len] + code - h.mincode[len]) as usize).copied()
+        h.vals
+            .get((h.valptr[len] + code - h.mincode[len]) as usize)
+            .copied()
     }
 
     fn extend(&mut self, s: u8) -> i32 {
         let v = self.bits(s as u32);
-        if s > 0 && v < 1 << (s - 1) { v - (1 << s) + 1 } else { v }
+        if s > 0 && v < 1 << (s - 1) {
+            v - (1 << s) + 1
+        } else {
+            v
+        }
     }
 
     /// A symbol and the value its extra bits code (`dc`: the symbol is the bit count; else its low nibble),
@@ -686,12 +766,23 @@ impl BitReader {
             return Some((sym, 0));
         }
         let v = ((p << len) >> (32 - s)) as i32;
-        Some((sym, if v < 1 << (s - 1) { v - (1 << s) + 1 } else { v }))
+        Some((
+            sym,
+            if v < 1 << (s - 1) {
+                v - (1 << s) + 1
+            } else {
+                v
+            },
+        ))
     }
 
     /// At a restart: drop the rest of the byte and go to where the next interval begins.
     fn restart(&mut self) {
-        let next = self.rst.get(self.next_rst).copied().unwrap_or(self.pos.div_ceil(8));
+        let next = self
+            .rst
+            .get(self.next_rst)
+            .copied()
+            .unwrap_or(self.pos.div_ceil(8));
         self.next_rst += 1;
         self.pos = next.max(self.pos.div_ceil(8)) * 8;
     }
@@ -783,7 +874,12 @@ pub fn decode(d: &[u8]) -> Option<(usize, usize, usize, Vec<u8>)> {
                 h = u16::from_be_bytes([seg[1], seg[2]]) as usize;
                 w = u16::from_be_bytes([seg[3], seg[4]]) as usize;
                 for c in seg[6..].as_chunks::<3>().0.iter().take(seg[5] as usize) {
-                    comps.push(Comp { id: c[0], h: (c[1] >> 4) as usize, v: (c[1] & 15) as usize, tq: (c[2] & 3) as usize });
+                    comps.push(Comp {
+                        id: c[0],
+                        h: (c[1] >> 4) as usize,
+                        v: (c[1] & 15) as usize,
+                        tq: (c[2] & 3) as usize,
+                    });
                 }
             }
             0xC2..=0xCF if m != 0xC4 && m != 0xC8 && m != 0xCC => return None,
@@ -795,7 +891,11 @@ pub fn decode(d: &[u8]) -> Option<(usize, usize, usize, Vec<u8>)> {
                     let n: usize = bits.iter().map(|&b| b as usize).sum();
                     let vals = s.get(17..17 + n)?.to_vec();
                     let t = HuffDec::new(&bits, vals);
-                    if class == 0 { dc[id] = Some(t) } else { ac[id] = Some(t) }
+                    if class == 0 {
+                        dc[id] = Some(t)
+                    } else {
+                        ac[id] = Some(t)
+                    }
                     s = &s[17 + n..];
                 }
             }
@@ -806,7 +906,11 @@ pub fn decode(d: &[u8]) -> Option<(usize, usize, usize, Vec<u8>)> {
                     let n = if pq == 0 { 64 } else { 128 };
                     let body = s.get(1..1 + n)?;
                     for (k, &nat) in NATURAL.iter().enumerate() {
-                        qt[id][nat] = if pq == 0 { body[k] as u16 } else { u16::from_be_bytes([body[2 * k], body[2 * k + 1]]) };
+                        qt[id][nat] = if pq == 0 {
+                            body[k] as u16
+                        } else {
+                            u16::from_be_bytes([body[2 * k], body[2 * k + 1]])
+                        };
                     }
                     s = &s[1 + n..];
                 }
@@ -821,9 +925,25 @@ pub fn decode(d: &[u8]) -> Option<(usize, usize, usize, Vec<u8>)> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn scan(d: &[u8], pos: usize, sos: &[u8], w: usize, h: usize, comps: &[Comp], qt: &[[u16; 64]; 4], dc: &[Option<HuffDec>; 4], ac: &[Option<HuffDec>; 4], restart: usize) -> Option<(usize, usize, usize, Vec<u8>)> {
+fn scan(
+    d: &[u8],
+    pos: usize,
+    sos: &[u8],
+    w: usize,
+    h: usize,
+    comps: &[Comp],
+    qt: &[[u16; 64]; 4],
+    dc: &[Option<HuffDec>; 4],
+    ac: &[Option<HuffDec>; 4],
+    restart: usize,
+) -> Option<(usize, usize, usize, Vec<u8>)> {
     let n = comps.len();
-    if !(n == 1 || n == 3) || w == 0 || h == 0 || sos[0] as usize != n || sos.get(1 + 2 * n..4 + 2 * n)? != [0, 63, 0] {
+    if !(n == 1 || n == 3)
+        || w == 0
+        || h == 0
+        || sos[0] as usize != n
+        || sos.get(1 + 2 * n..4 + 2 * n)? != [0, 63, 0]
+    {
         return None;
     }
     if n == 3 && comps.iter().map(|c| c.id).collect::<Vec<_>>() == *b"RGB" {
@@ -835,15 +955,33 @@ fn scan(d: &[u8], pos: usize, sos: &[u8], w: usize, h: usize, comps: &[Comp], qt
         if id != c.id {
             return None;
         }
-        tabs.push((dc[(t >> 4) as usize & 3].as_ref()?, ac[(t & 3) as usize].as_ref()?));
+        tabs.push((
+            dc[(t >> 4) as usize & 3].as_ref()?,
+            ac[(t & 3) as usize].as_ref()?,
+        ));
     }
     // One component is a non-interleaved scan: one block per MCU whatever its sampling says.
-    let samp: Vec<(usize, usize)> = if n == 1 { vec![(1, 1)] } else { comps.iter().map(|c| (c.h, c.v)).collect() };
-    let (hmax, vmax) = (samp.iter().map(|s| s.0).max()?, samp.iter().map(|s| s.1).max()?);
+    let samp: Vec<(usize, usize)> = if n == 1 {
+        vec![(1, 1)]
+    } else {
+        comps.iter().map(|c| (c.h, c.v)).collect()
+    };
+    let (hmax, vmax) = (
+        samp.iter().map(|s| s.0).max()?,
+        samp.iter().map(|s| s.1).max()?,
+    );
     let (mcux, mcuy) = (w.div_ceil(8 * hmax), h.div_ceil(8 * vmax));
-    let mut planes: Vec<(usize, Vec<u8>)> = samp.iter().map(|&(sh, sv)| (mcux * sh * 8, vec![0u8; mcux * sh * 8 * mcuy * sv * 8])).collect();
+    let mut planes: Vec<(usize, Vec<u8>)> = samp
+        .iter()
+        .map(|&(sh, sv)| (mcux * sh * 8, vec![0u8; mcux * sh * 8 * mcuy * sv * 8]))
+        .collect();
     let (buf, rst) = unstuff(d, pos);
-    let mut br = BitReader { buf, rst, next_rst: 0, pos: 0 };
+    let mut br = BitReader {
+        buf,
+        rst,
+        next_rst: 0,
+        pos: 0,
+    };
     let mut pred = vec![0i32; n];
     let mut coef = [0i32; 64];
     let mut px = [0u8; 64];
@@ -890,7 +1028,9 @@ fn scan(d: &[u8], pos: usize, sos: &[u8], w: usize, h: usize, comps: &[Comp], qt
     }
     if n == 1 {
         let (pw, plane) = &planes[0];
-        let px = (0..h).flat_map(|y| plane[y * pw..y * pw + w].iter().copied()).collect();
+        let px = (0..h)
+            .flat_map(|y| plane[y * pw..y * pw + w].iter().copied())
+            .collect();
         return Some((w, h, 1, px));
     }
     // Upsample each component to full size (only Y at full size, chroma 1x1, 2x1 or 2x2 below it).
@@ -922,7 +1062,12 @@ fn scan(d: &[u8], pos: usize, sos: &[u8], w: usize, h: usize, comps: &[Comp], qt
                     let above = row(y.saturating_sub(1));
                     let below = row((y + 1).min(dh - 1));
                     up_h2v2(row(y), above, dw, &mut out[2 * y * ow..(2 * y + 1) * ow]);
-                    up_h2v2(row(y), below, dw, &mut out[(2 * y + 1) * ow..(2 * y + 2) * ow]);
+                    up_h2v2(
+                        row(y),
+                        below,
+                        dw,
+                        &mut out[(2 * y + 1) * ow..(2 * y + 2) * ow],
+                    );
                 }
             }
             _ => return None,
@@ -952,10 +1097,17 @@ mod tests {
     fn round_trip() {
         let (w, h) = (37, 21);
         // A smooth gradient (4:2:0 keeps it) comes back within a few levels.
-        let px: Vec<u8> = (0..w * h * 3).map(|i| ((i / 3 % w) * 2 + (i / 3 / w) * 2 + (i % 3) * 30) as u8).collect();
+        let px: Vec<u8> = (0..w * h * 3)
+            .map(|i| ((i / 3 % w) * 2 + (i / 3 / w) * 2 + (i % 3) * 30) as u8)
+            .collect();
         let (dw, dh, ch, out) = decode(&encode(&px, w, h, 3, 95, true)).unwrap();
         assert_eq!((dw, dh, ch), (w, h, 3));
-        let err: f64 = px.iter().zip(&out).map(|(&a, &b)| (a as f64 - b as f64).powi(2)).sum::<f64>() / px.len() as f64;
+        let err: f64 = px
+            .iter()
+            .zip(&out)
+            .map(|(&a, &b)| (a as f64 - b as f64).powi(2))
+            .sum::<f64>()
+            / px.len() as f64;
         assert!(err < 10.0, "{err}");
         let grey: Vec<u8> = (0..w * h).map(|i| (i % 256) as u8).collect();
         let (_, _, ch, out) = decode(&encode(&grey, w, h, 1, 90, false)).unwrap();
@@ -974,7 +1126,11 @@ mod tests {
         for q in [8u32, 24, 40, 88, 792, 2040] {
             let (recip, corr, shift) = reciprocal(q);
             for t in 0..20000u32 {
-                assert_eq!(((t + corr) * recip) >> (shift + 16), (t + q / 2) / q, "q {q} t {t}");
+                assert_eq!(
+                    ((t + corr) * recip) >> (shift + 16),
+                    (t + q / 2) / q,
+                    "q {q} t {t}"
+                );
             }
         }
     }

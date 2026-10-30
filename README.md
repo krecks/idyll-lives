@@ -78,7 +78,7 @@ The first `bun run dev` or `bun run build` downloads the voice model (398 MB as 
 | `bun run assets` | Build or update the compressed asset copies (the build does this too) |
 | `bun run decoders` | Refresh `public/decoders` (PlayCanvas's Basis Universal transcoder for KTX2 textures) after a PlayCanvas upgrade (`cargo decoders`) |
 
-From the repo root: `cargo clippy --workspace --all-targets -- -D warnings` (CI gates on it), `bun tools/bench/render.mjs` (the rendering benchmark and reference screenshots, see [tools/bench/README.md](tools/bench/README.md) and [docs/design/graphics.md](docs/design/graphics.md)) and `cargo release-version` (the version, see [Versions and releasing](#versions-and-releasing)).
+From the repo root: `cargo fmt --all` (CI checks the code is formatted) and `cargo clippy --workspace --all-targets -- -D warnings` (CI gates on it), `bun tools/bench/render.mjs` (the rendering benchmark and reference screenshots, see [tools/bench/README.md](tools/bench/README.md) and [docs/design/graphics.md](docs/design/graphics.md)) and `cargo release-version` (the version, see [Versions and releasing](#versions-and-releasing)).
 
 **The production build** also:
 - runs binaryen's `wasm-opt -O3` on both WASM files and strips their names (`cargo wasm-opt`; about a minute the first time, then cached in `web/.assets/wasm-opt`). The dev server keeps the WASM as built, with its names;

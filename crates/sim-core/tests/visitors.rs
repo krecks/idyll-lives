@@ -49,13 +49,19 @@ fn minutes(w: &mut World, m: f32) {
 }
 
 fn knock_anim(w: &World) -> f32 {
-    w.content.animations.iter().position(|a| a == "knock").unwrap() as f32
+    w.content
+        .animations
+        .iter()
+        .position(|a| a == "knock")
+        .unwrap() as f32
 }
 
 fn action_of(w: &World, i: usize) -> f32 {
     let mut out = vec![0.0; sim_core::snapshot::CAPACITY];
     sim_core::snapshot::write(w, &mut out);
-    out[sim_core::snapshot::HEADER_LEN + i * sim_core::snapshot::SIM_STRIDE + sim_core::snapshot::sim::ACTION]
+    out[sim_core::snapshot::HEADER_LEN
+        + i * sim_core::snapshot::SIM_STRIDE
+        + sim_core::snapshot::sim::ACTION]
 }
 
 #[test]
@@ -72,11 +78,23 @@ fn a_friend_knocks_and_is_let_in() {
         }
     }
     assert!(knocked, "the visitor never knocked");
-    let visited = w.events.iter().find(|e| e.kind == EventKind::Visited).expect("never let in");
+    let visited = w
+        .events
+        .iter()
+        .find(|e| e.kind == EventKind::Visited)
+        .expect("never let in");
     assert_eq!((visited.a, visited.b), (1, 0), "Ada let Bo in");
     assert_eq!(w.sims[1].visiting.map(|v| v.plot), Some(0));
-    assert_ne!(action_of(&w, 1), knock_anim(&w), "inside, not knocking any more");
-    assert!(!w.events.iter().any(|e| matches!(e.kind, EventKind::TurnedAway | EventKind::NobodyHome)));
+    assert_ne!(
+        action_of(&w, 1),
+        knock_anim(&w),
+        "inside, not knocking any more"
+    );
+    assert!(
+        !w.events
+            .iter()
+            .any(|e| matches!(e.kind, EventKind::TurnedAway | EventKind::NobodyHome))
+    );
 }
 
 #[test]
@@ -84,7 +102,11 @@ fn an_enemy_is_turned_away() {
     let mut w = world("enemies");
     w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();
     minutes(&mut w, 90.0);
-    let turned = w.events.iter().find(|e| e.kind == EventKind::TurnedAway).expect("never turned away");
+    let turned = w
+        .events
+        .iter()
+        .find(|e| e.kind == EventKind::TurnedAway)
+        .expect("never turned away");
     assert_eq!((turned.a, turned.b), (1, 0));
     assert!(!w.events.iter().any(|e| e.kind == EventKind::Visited));
     let feeling = w.content.feeling_index("turnedAway").unwrap();
@@ -102,7 +124,11 @@ fn nobody_home_means_going_home() {
     w.sims[0].away_until = Some(w.tick + 100_000);
     w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();
     minutes(&mut w, 90.0);
-    let none = w.events.iter().find(|e| e.kind == EventKind::NobodyHome).expect("no note of an empty house");
+    let none = w
+        .events
+        .iter()
+        .find(|e| e.kind == EventKind::NobodyHome)
+        .expect("no note of an empty house");
     assert_eq!((none.a, none.b), (1, 0));
     assert!(!w.events.iter().any(|e| e.kind == EventKind::Visited));
     minutes(&mut w, 60.0);
@@ -115,12 +141,18 @@ fn a_visitor_knocking_at_save_time_knocks_again_after_loading() {
     w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();
     while action_of(&w, 1) != knock_anim(&w) {
         w.tick_once();
-        assert!(w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(), "never knocked");
+        assert!(
+            w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(),
+            "never knocked"
+        );
     }
     let mut loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     loaded.autonomy = false;
     minutes(&mut loaded, 90.0);
-    assert!(loaded.events.iter().any(|e| e.kind == EventKind::Visited), "let in after loading");
+    assert!(
+        loaded.events.iter().any(|e| e.kind == EventKind::Visited),
+        "let in after loading"
+    );
 }
 
 /// Three houses in a row with no fences between the gardens: the host's on the west, a
@@ -151,14 +183,21 @@ fn a_visitor_goes_round_by_the_street_not_through_the_neighbours_garden() {
     for _ in 0..(90.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
         let (x, z) = w.sims[1].tile();
-        assert_ne!(w.plot_at(x, z), Some(1), "Bo cut across the neighbours' garden at {x},{z}");
+        assert_ne!(
+            w.plot_at(x, z),
+            Some(1),
+            "Bo cut across the neighbours' garden at {x},{z}"
+        );
         on_street |= z >= 10;
         if w.events.iter().any(|e| e.kind == EventKind::Visited) {
             break;
         }
     }
     assert!(on_street, "by the street");
-    assert!(w.events.iter().any(|e| e.kind == EventKind::Visited), "and let in at the host's door");
+    assert!(
+        w.events.iter().any(|e| e.kind == EventKind::Visited),
+        "and let in at the host's door"
+    );
     assert_eq!(w.sims[1].visiting.map(|v| v.plot), Some(0));
 }
 
@@ -200,7 +239,10 @@ fn let_in(content: &str) -> World {
     w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();
     while !w.events.iter().any(|e| e.kind == EventKind::Visited) {
         w.tick_once();
-        assert!(w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(), "never let in");
+        assert!(
+            w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(),
+            "never let in"
+        );
     }
     w.autonomy = true;
     for s in &mut w.sims {
@@ -220,15 +262,29 @@ fn a_guest_with_nothing_to_do_while_the_host_is_busy_goes_home() {
     let arrived = w.tick;
     let until = w.sims[1].visiting.unwrap().until;
     // Ada settles down at her desk for hours.
-    w.apply(Command::Use { sim: 0, object: 1, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: 1,
+        interaction: 0,
+    })
+    .unwrap();
     let (mut stood, mut worst, mut walked, mut jump) = (0.0f32, 0.0f32, false, 0.0f32);
     let mut prev = w.sims[1].pos;
     while w.sims[1].visiting.is_some() {
         w.tick_once();
-        assert!(w.tick < arrived + (90.0 / sim_core::MINUTES_PER_TICK) as u64, "Bo stayed on with nothing to do");
-        stood = if idle(&w) { stood + sim_core::MINUTES_PER_TICK } else { 0.0 };
+        assert!(
+            w.tick < arrived + (90.0 / sim_core::MINUTES_PER_TICK) as u64,
+            "Bo stayed on with nothing to do"
+        );
+        stood = if idle(&w) {
+            stood + sim_core::MINUTES_PER_TICK
+        } else {
+            0.0
+        };
         worst = worst.max(stood);
-        walked |= w.sims[1].current().is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
+        walked |= w.sims[1]
+            .current()
+            .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
         let pos = w.sims[1].pos;
         jump = jump.max((pos[0] - prev[0]).hypot(pos[1] - prev[1]));
         prev = pos;
@@ -236,8 +292,14 @@ fn a_guest_with_nothing_to_do_while_the_host_is_busy_goes_home() {
     assert!(w.tick < until, "left before the visit was over");
     assert!(worst <= 35.0, "Bo stood around for {worst:.0} minutes");
     assert!(walked && jump < 0.5, "walked home (no teleporting)");
-    assert_eq!(w.plot_at(w.sims[1].tile().0, w.sims[1].tile().1), Some(1), "home");
-    let studying = w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Use { object: 1, .. }));
+    assert_eq!(
+        w.plot_at(w.sims[1].tile().0, w.sims[1].tile().1),
+        Some(1),
+        "home"
+    );
+    let studying = w.sims[0]
+        .current()
+        .is_some_and(|a| matches!(a.task.kind, TaskKind::Use { object: 1, .. }));
     assert!(studying, "Ada is still at her desk");
 }
 
@@ -248,19 +310,38 @@ fn a_guest_keeps_the_host_company() {
     let mut chatted = false;
     for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
-        chatted |= w.sims[1].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Social { target: 0, .. }));
+        chatted |= w.sims[1]
+            .current()
+            .is_some_and(|a| matches!(a.task.kind, TaskKind::Social { target: 0, .. }));
     }
     assert!(chatted, "Bo never talked to Ada");
-    assert_eq!(w.sims[1].visiting.map(|v| v.plot), Some(0), "still visiting");
+    assert_eq!(
+        w.sims[1].visiting.map(|v| v.plot),
+        Some(0),
+        "still visiting"
+    );
 }
 
 #[test]
 fn without_free_will_a_guest_waits_for_the_player() {
     let mut w = let_in(&bored_content());
-    w.apply(Command::SetAutonomy { enabled: false, household: Some(1) }).unwrap();
-    w.apply(Command::Use { sim: 0, object: 1, interaction: 0 }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: Some(1),
+    })
+    .unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: 1,
+        interaction: 0,
+    })
+    .unwrap();
     minutes(&mut w, 60.0);
-    assert_eq!(w.sims[1].visiting.map(|v| v.plot), Some(0), "still visiting");
+    assert_eq!(
+        w.sims[1].visiting.map(|v| v.plot),
+        Some(0),
+        "still visiting"
+    );
 }
 
 /// The test content with a goodbye at the end of a visit (`visits.farewell`) and a bed (sleep
@@ -297,12 +378,21 @@ fn visiting() -> World {
     w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();
     while !w.events.iter().any(|e| e.kind == EventKind::Visited) {
         w.tick_once();
-        assert!(w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(), "never let in");
+        assert!(
+            w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(),
+            "never let in"
+        );
     }
     // (Ada greets Bo with a chat.)
-    while w.sims[0].current().is_some() || w.sims[1].engaged_with.is_some() || w.sims[1].current().is_some() {
+    while w.sims[0].current().is_some()
+        || w.sims[1].engaged_with.is_some()
+        || w.sims[1].current().is_some()
+    {
         w.tick_once();
-        assert!(w.tick < clock::tick_at(1, 14.0 * 60.0).unwrap(), "the greeting never ended");
+        assert!(
+            w.tick < clock::tick_at(1, 14.0 * 60.0).unwrap(),
+            "the greeting never ended"
+        );
     }
     for s in &mut w.sims {
         s.needs = [1.0; sim_core::content::MAX_NEEDS];
@@ -317,12 +407,17 @@ fn goodbye(w: &World) -> usize {
 /// Whether Bo is saying (or on his way to say) goodbye to Ada.
 fn saying_goodbye(w: &World) -> bool {
     let g = goodbye(w);
-    w.sims[1].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Social { target: 0, social } if social == g))
+    w.sims[1].current().is_some_and(
+        |a| matches!(a.task.kind, TaskKind::Social { target: 0, social } if social == g),
+    )
 }
 
 /// Whether Ada is lying asleep in her bed.
 fn in_bed(w: &World) -> bool {
-    w.sims[0].pose == sim_core::content::Pose::Lie && w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Use { object: BED, .. }))
+    w.sims[0].pose == sim_core::content::Pose::Lie
+        && w.sims[0]
+            .current()
+            .is_some_and(|a| matches!(a.task.kind, TaskKind::Use { object: BED, .. }))
 }
 
 /// Ends Bo's visit now.
@@ -340,33 +435,59 @@ fn a_guest_says_goodbye_to_the_host_then_walks_home() {
     let (mut said, mut walked_after) = (false, false);
     while w.sims[1].visiting.is_some() {
         w.tick_once();
-        assert!(w.tick < start + (60.0 / sim_core::MINUTES_PER_TICK) as u64, "Bo never got home");
+        assert!(
+            w.tick < start + (60.0 / sim_core::MINUTES_PER_TICK) as u64,
+            "Bo never got home"
+        );
         said |= saying_goodbye(&w) && w.sims[0].engaged_with == Some(1);
-        let going = w.sims[1].current().is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
+        let going = w.sims[1]
+            .current()
+            .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
         assert!(!going || said, "Bo set off without saying goodbye");
         walked_after |= going;
     }
     assert!(said, "Bo said goodbye to Ada");
     assert!(walked_after, "and then walked home");
-    assert_eq!(w.plot_at(w.sims[1].tile().0, w.sims[1].tile().1), Some(1), "home");
-    assert!(w.relationships.get(1, 0).friendship > before, "a little closer for it");
+    assert_eq!(
+        w.plot_at(w.sims[1].tile().0, w.sims[1].tile().1),
+        Some(1),
+        "home"
+    );
+    assert!(
+        w.relationships.get(1, 0).friendship > before,
+        "a little closer for it"
+    );
 }
 
 #[test]
 fn a_guest_leaves_a_sleeping_host_be() {
     let mut w = visiting();
     // Ada goes to bed.
-    w.apply(Command::Use { sim: 0, object: BED, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: BED,
+        interaction: 0,
+    })
+    .unwrap();
     while !in_bed(&w) {
         w.tick_once();
-        assert!(w.tick < clock::tick_at(1, 16.0 * 60.0).unwrap(), "Ada never got into bed");
+        assert!(
+            w.tick < clock::tick_at(1, 16.0 * 60.0).unwrap(),
+            "Ada never got into bed"
+        );
     }
     time_up(&mut w);
     let start = w.tick;
     while w.sims[1].visiting.is_some() {
         w.tick_once();
-        assert!(w.tick < start + (45.0 / sim_core::MINUTES_PER_TICK) as u64, "Bo never got home");
-        assert!(!saying_goodbye(&w), "Bo went to say goodbye to a sleeping host");
+        assert!(
+            w.tick < start + (45.0 / sim_core::MINUTES_PER_TICK) as u64,
+            "Bo never got home"
+        );
+        assert!(
+            !saying_goodbye(&w),
+            "Bo went to say goodbye to a sleeping host"
+        );
     }
     assert!(in_bed(&w), "Ada is still asleep");
     assert_eq!(w.sims[0].engaged_with, None);
@@ -381,10 +502,18 @@ fn a_goodbye_that_cannot_happen_soon_is_skipped() {
     time_up(&mut w);
     while !saying_goodbye(&w) {
         w.tick_once();
-        assert!(w.tick < clock::tick_at(1, 16.0 * 60.0).unwrap(), "Bo never went to say goodbye");
+        assert!(
+            w.tick < clock::tick_at(1, 16.0 * 60.0).unwrap(),
+            "Bo never went to say goodbye"
+        );
     }
     // Ada heads off to bed just as Bo comes over.
-    w.apply(Command::Use { sim: 0, object: BED, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: BED,
+        interaction: 0,
+    })
+    .unwrap();
     let mut waited = sim_core::MINUTES_PER_TICK;
     while w.sims[1].visiting.is_some() {
         w.tick_once();
@@ -392,9 +521,16 @@ fn a_goodbye_that_cannot_happen_soon_is_skipped() {
             waited += sim_core::MINUTES_PER_TICK;
         }
         assert!(waited <= 4.1, "Bo hung around for a goodbye");
-        assert!(w.tick < clock::tick_at(1, 17.0 * 60.0).unwrap(), "Bo never got home");
+        assert!(
+            w.tick < clock::tick_at(1, 17.0 * 60.0).unwrap(),
+            "Bo never got home"
+        );
     }
-    assert_eq!(w.plot_at(w.sims[1].tile().0, w.sims[1].tile().1), Some(1), "home");
+    assert_eq!(
+        w.plot_at(w.sims[1].tile().0, w.sims[1].tile().1),
+        Some(1),
+        "home"
+    );
     assert!(waited > 3.5, "Bo gave Ada a few minutes ({waited:.1})");
     assert!(in_bed(&w), "Ada went to bed");
 }
@@ -405,13 +541,20 @@ fn a_guest_saying_goodbye_at_save_time_still_goes_home_after_loading() {
     time_up(&mut w);
     while !saying_goodbye(&w) {
         w.tick_once();
-        assert!(w.tick < clock::tick_at(1, 16.0 * 60.0).unwrap(), "Bo never went to say goodbye");
+        assert!(
+            w.tick < clock::tick_at(1, 16.0 * 60.0).unwrap(),
+            "Bo never went to say goodbye"
+        );
     }
     let mut loaded = World::from_save_json(&farewell_content(), &w.save_json()).unwrap();
     loaded.autonomy = false;
     minutes(&mut loaded, 60.0);
     assert!(loaded.sims[1].visiting.is_none(), "went home");
-    assert_eq!(loaded.plot_at(loaded.sims[1].tile().0, loaded.sims[1].tile().1), Some(1), "home");
+    assert_eq!(
+        loaded.plot_at(loaded.sims[1].tile().0, loaded.sims[1].tile().1),
+        Some(1),
+        "home"
+    );
 }
 
 #[test]
@@ -429,11 +572,18 @@ fn goodbyes_are_not_on_the_social_menu() {
 #[test]
 fn guests_hug_close_friends_goodbye_and_wave_to_others() {
     let content = common::content();
-    for (friendship, social, name) in [(70.0, "goodbyeHug", "goodbye-hug"), (30.0, "goodbye", "goodbye-wave")] {
+    for (friendship, social, name) in [
+        (70.0, "goodbyeHug", "goodbye-hug"),
+        (30.0, "goodbye", "goodbye-wave"),
+    ] {
         let mut w = World::from_json(&content, &common::town(&content, 7, 2), 7).unwrap();
         let h = w.households.iter().position(|h| h.player).unwrap();
         let plot = w.households[h].plot.unwrap();
-        let guest = w.sims.iter().position(|s| s.household as usize != h && s.adult(&w.content)).unwrap();
+        let guest = w
+            .sims
+            .iter()
+            .position(|s| s.household as usize != h && s.adult(&w.content))
+            .unwrap();
         w.autonomy = false;
         // (A day off for everyone.)
         for s in &mut w.sims {
@@ -451,10 +601,21 @@ fn guests_hug_close_friends_goodbye_and_wave_to_others() {
             }
         }
         common::look_at(&mut w, plot);
-        w.apply(Command::Visit { sim: guest as u32, plot }).unwrap();
-        while !w.events.iter().any(|e| e.kind == EventKind::Visited && e.a as usize == guest) {
+        w.apply(Command::Visit {
+            sim: guest as u32,
+            plot,
+        })
+        .unwrap();
+        while !w
+            .events
+            .iter()
+            .any(|e| e.kind == EventKind::Visited && e.a as usize == guest)
+        {
             w.tick_once();
-            assert!(w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(), "never let in");
+            assert!(
+                w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(),
+                "never let in"
+            );
         }
         minutes(&mut w, 30.0);
         let tick = w.tick;
@@ -463,7 +624,8 @@ fn guests_hug_close_friends_goodbye_and_wave_to_others() {
         let mut said = None;
         for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
             w.tick_once();
-            if let Some(TaskKind::Social { target, social }) = w.sims[guest].current().map(|a| a.task.kind)
+            if let Some(TaskKind::Social { target, social }) =
+                w.sims[guest].current().map(|a| a.task.kind)
                 && w.sims[target as usize].engaged_with == Some(guest as u32)
                 && w.content.visits.farewell.contains(&social)
             {
@@ -472,7 +634,10 @@ fn guests_hug_close_friends_goodbye_and_wave_to_others() {
             }
         }
         let (host, s) = said.unwrap_or_else(|| panic!("{name}: no goodbye"));
-        assert_eq!(w.sims[host as usize].household as usize, h, "{name}: to one of the hosts");
+        assert_eq!(
+            w.sims[host as usize].household as usize, h,
+            "{name}: to one of the hosts"
+        );
         assert_eq!(s, farewell, "{name}: {social}");
         for _ in 0..sim_core::TICKS_PER_SECOND / 4 {
             w.tick_once();
@@ -512,24 +677,45 @@ fn guest_uses_the_toilet(content: &str) -> bool {
     w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();
     while !w.events.iter().any(|e| e.kind == EventKind::Visited) {
         w.tick_once();
-        assert!(w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(), "never let in");
+        assert!(
+            w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(),
+            "never let in"
+        );
     }
     w.autonomy = true;
-    let toilet = w.objects.iter().find(|o| w.content.objects[o.def].id == "toilet").unwrap().id;
-    let bladder = w.content.needs.iter().position(|n| n.id == "bladder").unwrap();
+    let toilet = w
+        .objects
+        .iter()
+        .find(|o| w.content.objects[o.def].id == "toilet")
+        .unwrap()
+        .id;
+    let bladder = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "bladder")
+        .unwrap();
     w.sims[1].needs[bladder] = 0.2;
     let mut used = false;
     for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
-        used |= w.sims[1].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Use { object, .. } if object == toilet));
+        used |= w.sims[1].current().is_some_and(
+            |a| matches!(a.task.kind, TaskKind::Use { object, .. } if object == toilet),
+        );
     }
     used
 }
 
 #[test]
 fn a_guest_may_use_the_hosts_toilet() {
-    assert!(guest_uses_the_toilet(&toilet_content(r#"["bathroom"]"#)), "Bo never used Ada's toilet");
-    assert!(!guest_uses_the_toilet(&toilet_content("[]")), "without guestTags the toilet is the household's");
+    assert!(
+        guest_uses_the_toilet(&toilet_content(r#"["bathroom"]"#)),
+        "Bo never used Ada's toilet"
+    );
+    assert!(
+        !guest_uses_the_toilet(&toilet_content("[]")),
+        "without guestTags the toilet is the household's"
+    );
 }
 
 #[test]
@@ -540,30 +726,57 @@ fn a_guest_sent_home_says_goodbye_first() {
     let (mut said, mut walked_after) = (false, false);
     while w.sims[1].visiting.is_some() {
         w.tick_once();
-        assert!(w.tick < start + (60.0 / sim_core::MINUTES_PER_TICK) as u64, "Bo never got home");
+        assert!(
+            w.tick < start + (60.0 / sim_core::MINUTES_PER_TICK) as u64,
+            "Bo never got home"
+        );
         said |= saying_goodbye(&w) && w.sims[0].engaged_with == Some(1);
-        let going = w.sims[1].current().is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
+        let going = w.sims[1]
+            .current()
+            .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
         assert!(!going || said, "Bo set off without saying goodbye");
         walked_after |= going;
     }
-    assert!(said && walked_after, "Bo said goodbye to Ada, then walked home");
+    assert!(
+        said && walked_after,
+        "Bo said goodbye to Ada, then walked home"
+    );
 }
 
 #[test]
 fn a_guest_sent_home_while_the_host_sleeps_just_goes() {
     let mut w = visiting();
-    w.apply(Command::Use { sim: 0, object: BED, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: BED,
+        interaction: 0,
+    })
+    .unwrap();
     while !in_bed(&w) {
         w.tick_once();
-        assert!(w.tick < clock::tick_at(1, 16.0 * 60.0).unwrap(), "Ada never got into bed");
+        assert!(
+            w.tick < clock::tick_at(1, 16.0 * 60.0).unwrap(),
+            "Ada never got into bed"
+        );
     }
     w.apply(Command::GoHome { sim: 1 }).unwrap();
-    assert!(w.sims[1].queue().all(|t| matches!(t.kind, TaskKind::GoHome)), "no goodbye to a sleeper");
+    assert!(
+        w.sims[1]
+            .queue()
+            .all(|t| matches!(t.kind, TaskKind::GoHome)),
+        "no goodbye to a sleeper"
+    );
     let start = w.tick;
     while w.sims[1].visiting.is_some() {
         w.tick_once();
-        assert!(w.tick < start + (45.0 / sim_core::MINUTES_PER_TICK) as u64, "Bo never got home");
-        assert!(!saying_goodbye(&w), "Bo went to say goodbye to a sleeping host");
+        assert!(
+            w.tick < start + (45.0 / sim_core::MINUTES_PER_TICK) as u64,
+            "Bo never got home"
+        );
+        assert!(
+            !saying_goodbye(&w),
+            "Bo went to say goodbye to a sleeping host"
+        );
     }
     assert!(in_bed(&w), "Ada is still asleep");
 }
