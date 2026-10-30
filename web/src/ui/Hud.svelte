@@ -48,6 +48,13 @@
     transition: opacity var(--slow) var(--ease);
     container: hud / inline-size;
   }
+  /* The top bar takes two rows when narrow (TopBar's 780 px): what hangs below it (journal,
+     feed, town map) starts lower. */
+  @container hud (max-width: 780px) {
+    .hud > :global(*) {
+      --top: 114px;
+    }
+  }
   /* Watching with a quiet interface: everything fades until the player moves the mouse. */
   .hud.quiet {
     opacity: 0;

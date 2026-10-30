@@ -121,13 +121,14 @@
 <style>
   /* One bar, three zones: who you are and the mode on the left, the clock in the middle (centred
      on the screen, so it doesn't move as the funds or the buttons beside it change), and what you
-     can do now on the right. */
+     can do now on the right. When the sides are too wide to centre it, the clock moves aside
+     rather than slip under them. */
   .bar {
     position: absolute;
     inset: var(--edge) var(--edge) auto;
     height: 56px;
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
     align-items: center;
     gap: var(--gap);
     padding: 0 6px;
@@ -324,6 +325,23 @@
     }
     .modes button {
       padding: 0 8px;
+    }
+  }
+  /* Too narrow for one row even so (a small window or a large interface scale): the clock and
+     speeds take a row of their own. The width: the bar at its widest, in Live with the planner,
+     the storeys and a five-figure balance. (Of the HUD: the bar can't query its own width.
+     Hud.svelte moves what hangs below the bar at the same width.) */
+  @container hud (max-width: 780px) {
+    .bar {
+      height: auto;
+      grid-template-columns: auto 1fr;
+      row-gap: 4px;
+      padding: 6px;
+    }
+    .zone:nth-child(2) {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      justify-self: center;
     }
   }
 </style>

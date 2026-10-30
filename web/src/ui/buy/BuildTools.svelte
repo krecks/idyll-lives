@@ -167,10 +167,14 @@
     align-items: center;
     flex-wrap: wrap;
   }
+  /* A narrow dock scrolls the toolbar sideways rather than cut off its last tools. */
   .tools {
     flex: none;
+    max-width: 100%;
     display: flex;
     gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
   .group {
     display: flex;

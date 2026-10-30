@@ -77,7 +77,16 @@
       return terms.every((t) => text.includes(t));
     }),
   );
-  const items = $derived(category === ALL ? matching : matching.filter((def) => categoryOf(def) === category));
+  /** A category lists its groups in order (content order within each): the trees together, then the shrubs. */
+  const items = $derived.by(() => {
+    if (category === ALL) return matching;
+    const groups = content.buyCategories.find((c) => c.id === category)?.groups ?? [];
+    const rank = (def: ObjectDef) => {
+      const i = groups.findIndex((g) => g.id === def.group);
+      return i < 0 ? groups.length : i;
+    };
+    return matching.filter((def) => categoryOf(def) === category).sort((a, b) => rank(a) - rank(b));
+  });
 
   const folded = $derived(!!game.placing && !over);
   const selected = $derived(game.buySelection === null ? null : (game.objects.find((o) => o.id === game.buySelection) ?? null));
