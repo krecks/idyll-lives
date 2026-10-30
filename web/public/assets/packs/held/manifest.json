@@ -1261,6 +1261,33 @@
           "finish": "material.finish.satin"
         }
       }
+    },
+    "item.cutFlowers": {
+      "type": "model",
+      "url": "../../models/held/cutFlowers.glb",
+      "materials": {
+        "flower_eye": {
+          "finish": "material.finish.matte"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "petal_blush": {
+          "finish": "material.finish.satin"
+        },
+        "petal_rose": {
+          "finish": "material.finish.satin"
+        },
+        "petal_white": {
+          "finish": "material.finish.satin"
+        },
+        "petal_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "stem_green": {
+          "finish": "material.finish.satin"
+        }
+      }
     }
   }
 }

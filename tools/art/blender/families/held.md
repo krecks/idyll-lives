@@ -62,6 +62,7 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `item.crisps` | a packet of crisps lying on its back, puffed, blue with a yellow band, crimped seals, its top torn open on the silvered inside, five crisps spilt | 1 | 616 |
 | `item.apple` | an apple 7.5 cm across, lobed a little, red with a yellow blush at the stalk and the eye, a stalk and a leaf | 1 | 250 |
 | `item.pastryBag` | a white paper bag 12 cm wide, its top folded open, a croissant of five lobes standing out of it | 1 | 176 |
+| `item.cutFlowers` | a bunch of cut flowers 37 cm tall standing out of the hand, the stems gathered at the grip and curving up to six heads (three daisies with an amber eye, two tulip buds, a small daisy) and four leaves, the same heads as the vase of flowers (`tabletop.py`) | 1 | 624 |
 | `tool.book` | an open cloth-bound book, 30 x 22 cm: the boards, two page blocks rising from the spine and curving down to the fore-edges, a sheet over each with seven grey bands of type | 1 | 496 |
 | `tool.phone` | a smartphone 7.2 x 14.8 cm, a rounded dark body, the glass and a lit screen, a camera bump | 1 | 288 |
 | `tool.mug` | a glazed mug 8 cm across with a blue band, its handle to the right, coffee and crema | 1 | 480 |

@@ -80,7 +80,7 @@ Notes:
 
 | Item | Real uses | Content uses (minutes) | Verdict |
 |---|---|---|---|
-| `flowerbed` | water, weed and tend, smell the flowers, cut some | tend the flowers (20), smell the flowers (5) | OK |
+| `flowerbed` | water, weed and tend, smell the flowers, cut some | tend the flowers (20), smell the flowers (5), cut some flowers (6, a bunch for a vase) | OK (cutting added 2026-10-30, Q-18) |
 | `garden.tulips` | water, cut a bunch for a vase, deadhead | water (10), smell (5) | cutting missing (I-garden-08) |
 | `garden.daffodils` | water, cut a bunch, smell (light scent) | water (10), smell (5) | cutting missing (I-garden-08) |
 | `garden.daisies` | water, pick a few, make a daisy chain | water (10), smell (5) | picking missing (I-garden-08) |
@@ -366,8 +366,8 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Fix class:** content
 - **Where:** `web/public/content/garden.json:1052` (poppies `smell`, `feeling: garden.sweetScent`), `:1098` (marigolds), `:1282` (forget-me-nots), `:337-339` (magnolia "Smell the magnolia": `anim: admire`); the cut-flower uses would go beside the tulips', daffodils', lilies', cosmos' and daisies' (`:869`, `:915`, `:1190`, `:1328`, `:961`)
 - **Evidence:** `cargo review uses` (`tables/uses-garden.md`): the 11 beds have the same two uses. Poppies and forget-me-nots have no scent to speak of and marigolds' is sharp, yet each gives "Sweet scent". The magnolia's smell is looking up at flowers about 3 m above the nose (`sheets/obj-garden.magnolia.png`). The reference's real uses for a bed (`reference.json` `flowerBed`: water, smell, pick a few) include cutting, which the game has nowhere: the meadow's "Pick a wildflower" is the only picking. Make the scentless beds' second use "Admire" (anim `look`), relabel the magnolia's "Admire the magnolia", and decide at triage whether cut flowers (for a vase) are wanted.
-- **Status:** fixed (a45e65a2); cut flowers later (Q-18)
-- **After:** Poppies, marigolds and forget-me-nots: "Admire the …" (`look`), no Sweet scent feeling; the magnolia's reads "Admire the magnolia". Played on `review-garden`.
+- **Status:** fixed (a45e65a2; the cutting on 2026-10-30)
+- **After:** Poppies, marigolds and forget-me-nots: "Admire the …" (`look`), no Sweet scent feeling; the magnolia's reads "Admire the magnolia". Played on `review-garden`. Cutting (2026-10-30, Q-18) came as a use of the raised bed rather than of every bed: "Cut some flowers" (6 min, `anim: tend`, the bunch in the hand), and the bought empty vase takes it ("Put the flowers in"); the individual beds keep their two uses, so the tulips', daffodils', lilies', cosmos' and daisies' cutting is still open.
 - **Source:** wave: garden
 
 ### I-garden-09 — The bonsai is pruned for 45 minutes standing, stooped over a knee-high table

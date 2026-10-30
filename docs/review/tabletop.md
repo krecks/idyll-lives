@@ -1,13 +1,13 @@
 # Tabletop: authenticity ledger
 
-What it covers: the 39 objects of [docs/objects/tabletop.md](../objects/tabletop.md), in its groups and order.
+What it covers: the 40 objects of [docs/objects/tabletop.md](../objects/tabletop.md), in its groups and order.
 
 - **Evidence:** `bench-results/review/tabletop/` (gallery, clip, pose and play shots; shots stay out of git). Shots cells are paths under `bench-results/review/` in the review worktree. The models were also read from their previews (`tools/art/blender/previews/tabletop/<id>.png`, four contact sheets in the review log's folder).
 - **Reviewed** 2026-10-21 in the activities wave (decor, tabletop and lighting by one reviewer); its log is `bench-results/review/decor/review-log.md`.
 - **Rubric:** [plan/authenticity-review.md §3](../../plan/authenticity-review.md#3-rubrics); real-world ranges in [reference.md](reference.md). Finding format and severities: [README.md](README.md#writing-a-finding).
 - **Columns:** M, A and I take `OK`, a finding id or `n/a`; `—` is pending. Findings lists the ids filed against the row, with severity and fix class; Shots names the evidence files.
 - **Seeded findings** (`Status: seeded`) are known issues copied in from earlier docs. Confirm or close them; don't file them again.
-- **How these were judged.** (Phase 0–3; since G-63 twenty of them have uses, I-tabletop-01.) No tabletop thing had a use (content rule, `crates/sim-core/src/content.rs:2738`: things on a surface are 1 × 1 "with one slot and no interactions"), so A is `n/a` but for the clock's hands, and I is about coverage (I1) alone. M5 was judged on the play shots on the stage's counter (`tabletop/play/`), which are about Build-mode zoom: at the default Live camera (radius 24) a 9 cm mug is a few pixels, as the real thing would be. The gallery stands them on the ground beside the residents, which is why the index found the espresso machine and the mixer "knee high"; on the counter they are right.
+- **How these were judged.** (Phase 0–3; since G-63 twenty-one of them have uses, I-tabletop-01.) No tabletop thing had a use (content rule, `crates/sim-core/src/content.rs:2738`: things on a surface are 1 × 1 "with one slot and no interactions"), so A is `n/a` but for the clock's hands, and I is about coverage (I1) alone. M5 was judged on the play shots on the stage's counter (`tabletop/play/`), which are about Build-mode zoom: at the default Live camera (radius 24) a 9 cm mug is a few pixels, as the real thing would be. The gallery stands them on the ground beside the residents, which is why the index found the espresso machine and the mixer "knee high"; on the counter they are right.
 - **Sizes** (`cargo review sizes`): five outside ±10 %. Artefacts: `standMixer` D 0.17 (it stands side-on, profile to the front, so W and D swap; across, 0.17 against a real 0.20–0.24 is 1 cm under the band), `cuttingBoard` H 0.106 (the loaf and tomatoes on it), `candlesticks` D 0.066 (the bases, 6 mm), `monitor` D 0.335 (5 mm). Real: `tableClock` H 0.228 (M-tabletop-02).
 
 ## TT1. Kitchenware (11)
@@ -70,7 +70,7 @@ Family: `tools/art/blender/families/tabletop.py`.
 | `wineGlasses` | pour a glass | wine (10, sat, young adults and up) | OK (I-tabletop-01 fixed) |
 | `candlesticks` | light the candles | none; drawn lit, day and night | OK (decor); the lit look is M-tabletop-01 |
 
-## TT3. Books and small plants (7)
+## TT3. Books and small plants (8)
 
 Family: `tools/art/blender/families/tabletop.py`.
 
@@ -80,6 +80,7 @@ Family: `tools/art/blender/families/tabletop.py`.
 | `booksUpright` Books and bookends | OK | n/a | I-tabletop-01 | I-tabletop-01 S2 code | `tabletop/sheets/obj-booksUpright.png` |
 | `vaseFlowers` Vase of flowers | OK | n/a | OK | | `tabletop/sheets/obj-vaseFlowers.png` |
 | `vaseSmall` Bud vase | OK | n/a | OK | | `tabletop/sheets/obj-vaseSmall.png` |
+| `vaseEmpty` Empty vase | OK | OK | OK | | `tabletop/previews/vaseEmpty.png`, `tabletop/play/vase2-vaseEmpty-putFlowers-01.png` |
 | `potSucculent` Succulent | OK | n/a | I-tabletop-01 | I-tabletop-01 S2 code | `tabletop/sheets/obj-potSucculent.png` |
 | `potCactus` Cactus | OK | n/a | I-tabletop-01 | I-tabletop-01 S2 code | `tabletop/sheets/obj-potCactus.png` |
 | `potSmall` Small potted plant | OK | n/a | I-tabletop-01 | I-tabletop-01 S2 code | `tabletop/sheets/obj-potSmall.png` |
@@ -92,6 +93,7 @@ Family: `tools/art/blender/families/tabletop.py`.
 | `booksUpright` | pick one up and read it | read (45, sat) | OK (I-tabletop-01 fixed) |
 | `vaseFlowers` | change the water | none | OK (decor) |
 | `vaseSmall` | change the water | none | OK (decor) |
+| `vaseEmpty` | put a bunch cut in the garden in it, take it out again | put the flowers in (3), take the flowers out (2) | OK (2026-10-30, Q-18: the vase the garden's cut flowers go in; `vaseFlowers` stays the arranged one) |
 | `potSucculent` | water it now and then | water (3) | OK (I-tabletop-01 fixed; as the floor `plant`) |
 | `potCactus` | water it now and then | water (3) | OK (I-tabletop-01 fixed) |
 | `potSmall` | water it | water (3) | OK (I-tabletop-01 fixed) |

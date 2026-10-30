@@ -602,6 +602,54 @@
       "interactions": []
     },
     {
+      "id": "vaseEmpty",
+      "name": "Empty vase",
+      "model": "model.vaseEmpty",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 15,
+      "category": "tabletop",
+      "group": "plants",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.13,
+      "description": "A blue vase with nothing in it yet. Cut some flowers in the garden and put them in it, and it stands on a table, counter, desk or shelf full of them.",
+      "interactions": [
+        {
+          "id": "putFlowers",
+          "label": "Put the flowers in",
+          "anim": "fetch",
+          "minutes": 3,
+          "autonomous": false,
+          "when": "closed",
+          "brings": "cutFlowers",
+          "leaves": "open",
+          "effects": {
+            "fun": 0.05,
+            "comfort": 0.05
+          },
+          "tags": [
+            "chores",
+            "cozy"
+          ]
+        },
+        {
+          "id": "takeOut",
+          "label": "Take the flowers out",
+          "anim": "fetch",
+          "minutes": 2,
+          "autonomous": false,
+          "when": "open",
+          "leaves": "closed",
+          "tags": [
+            "chores"
+          ]
+        }
+      ]
+    },
+    {
       "id": "vaseSmall",
       "name": "Bud vase",
       "model": "model.vaseSmall",

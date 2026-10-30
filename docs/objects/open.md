@@ -131,7 +131,8 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
 - **Servers** wear no apron and appear at their post at opening time rather than walking in.
 - **The sounds want a listen by ear** (G-53): each was rendered and checked by its spectrum, timing and level, not
   heard (`bench-results/review/fixes/sounds/wav/`).
-- **Later, as polish:** flowers cut for a vase (Q-18).
+- **Cut flowers for a vase:** done 2026-10-30 (Q-18): the raised bed's "Cut some flowers" and the bought empty
+  vase that takes the bunch. Cutting the individual beds (tulips, daffodils, lilies, cosmos, daisies) is still open.
 - **Parts with no use, left decorative:** the executive desk's drawer (I-office-02, won't fix); the nesting tables'
   small table and the display cabinet's door (decor, decision 4). These are modelled parts without a clip, so no
   clip is orphaned. The laundry basket has no lid and none is planned: it holds clean washing heaped above its

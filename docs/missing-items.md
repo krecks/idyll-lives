@@ -10,22 +10,25 @@ Every buyable object the docs describe exists in content and has a model:
 
 | Check | Result |
 |---|---|
-| Object rows in `docs/objects/*.md` | 542 |
-| Objects in `web/public/content/**/*.json` | 542 |
+| Object rows in `docs/objects/*.md` | 543 |
+| Objects in `web/public/content/**/*.json` | 543 |
 | Doc ids with no content entry | 0 |
 | Content objects with no doc row | 0 |
 | Content objects with no buy category | 0 |
 | `model` keys referenced by content | 578 |
 | Model keys missing from the manifests | 0 |
 | Manifest entries whose file is missing | 0 |
-| `item` ids in content | 42 |
+| `item` ids in content | 43 |
 | Unresolved `item` references | 0 |
 
 **Doc bug (fixed 2026-10-30):** [objects/README.md](objects/README.md) said "541 of them", but its own
-category table sums to **542** (72+26+27+20+50+14+5+19+23+39+21+43+53+36+94), and content has 542.
+category table sums to **542** (72+26+27+20+50+14+5+19+23+39+21+43+53+36+94), and content had 542.
 Cause: the prose was written on 2026-10-17, when there were 541; `curtainsWide` was added on
-2026-10-21 and the table was updated, the prose was not. The count is now 542, and the wide curtains
-are named as the one object not in the 2026-10-17 play check.
+2026-10-21 and the table was updated, the prose was not. The count was then 542, and the wide curtains
+were named as the one object not in the 2026-10-17 play check.
+
+The empty vase, added 2026-10-30, brings both counts to **543** (tabletop 39 → 40); `item` ids to **43**
+(the bunch of cut flowers).
 
 So what is missing is not objects — it is **uses, clips, behaviours and polish** around them.
 
@@ -143,6 +146,28 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
   within 1.1 m, a wall along z). Pictures: `bench-results/check-doors/door-front-*.png` (shut, the hand
   on the leaf mid-swing, through, shut behind, and the same on WebGL2).
 
+**Done 2026-10-30 (cut flowers for a vase):**
+
+- The raised flower bed gains **"Cut some flowers"** (`cut`, 6 min, `anim: tend`, the bunch in the hand):
+  `web/public/content/base.json`.
+- **`vaseEmpty`** ("Empty vase", bought, price 15, tabletop / plants) takes the bunch: "Put the flowers in"
+  (3 min, `brings: cutFlowers`, `leaves: open`) grows the vase's own bunch up out of the mouth over 0.9 s
+  (`flowers_open`) and it stays up while the vase is open, saved that way; "Take the flowers out" (2 min) runs
+  the same clip back along the use (`{'clip': 'flowers_open', 'over': -1}`), so the flowers go down as they are
+  lifted out.
+- The bunch is one new held item (`item.cutFlowers`, `hold: hand`, 0.37 m, 624 tris, one draw) built from the
+  same six heads as the vase of flowers (`VASE_HEADS` / `BUNCH`), so a bunch cut in the garden and one bought
+  arranged look alike (G-10); the empty vase shares the filled one's body (`VASE_BODY`).
+- Tests: `crates/sim-core/tests/flowers.rs` (the bed gives a bunch in hand, the vase refuses `takeOut` while
+  closed, carries the bunch in the arms on the way, opens, keeps it open through a save and load, closes when
+  they are taken out). In play: `bench-results/check-flowers/` (`cut3-flowerbed-cut-00.png`,
+  `vase2-vaseEmpty-{idle,putFlowers-01}.png`; `flowers3-*` the take-out run).
+- Docs: `docs/objects/tabletop.md` (40 things, `vaseEmpty` in TT3), `docs/review/tabletop.md`,
+  `docs/objects/garden.md` and `docs/review/garden.md` (`flowerbed`'s `cut`), `docs/authenticity-review.md`
+  (Q-18, G-10, G-68, §9.1 I-garden-08).
+
 ## Suggested next items
 
-1. Cut flowers for a vase (M, needs a vase use + clip; Q-18 says "later", and the vase exists).
+Nothing from the review ledgers is left unbuilt: the remaining work is the not-yet-checked list in §4, the
+tooling in §6, and the per-bed cutting that Q-18 left open (the tulips', daffodils', lilies', cosmos' and
+daisies' "cut a bunch", which the raised bed's one use stands in for).

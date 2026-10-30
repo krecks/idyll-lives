@@ -1,20 +1,22 @@
 # Tabletop
 
-Small things that stand on tops (`surface` layer, 1×1). All 39 are built by `tools/art/blender/families/tabletop.py`
+Small things that stand on tops (`surface` layer, 1×1). All 40 are built by `tools/art/blender/families/tabletop.py`
 (notes: `families/tabletop.md`). The origin is at the base,
 centred, and the renderer lifts each to its host's top. Each is no wider than the `radius` the content gives it
 (the disc it takes on a top; the gate warns of one reaching over 10 % past it), so a thing still fits where the game puts it;
 the four widest (`plateSet`, `teapotSet`, `espressoMachineSmall`, `monitor`, radius 0.23–0.3 m) don't fit on a
 counter's top with its edge margin and go on tables and desks.
 
-Twenty of them have uses (G-63): the appliances and screens, food and drink, books, small plants and toys. A thing
+Twenty-one of them have uses (G-63): the appliances and screens, food and drink, books, small plants and toys,
+and the empty vase that takes a bunch cut in the garden. A thing
 on a top is used from the floor beside its top (`surface::rider_tiles`: in front of the counter, desk or table it
 stands on, else at the top's side), standing and facing it; a use with `"pose": "sit"` (the laptop, monitor, books,
 tea set, mugs, wine, blocks) takes a chair pulled up to that top if one is free, else a seat within `seatNear`, else
 it is done standing (sat on a chair pulled up to the top, the chair is shuffled in as for a meal: the thing on the top
 isn't taken for the seat, I-tabletop-06); at a top with chairs all round, any use is done from one of its chairs. The other nineteen are decor (the chopping board, the alarm clock, the globe and the
 ornaments, towels, soap and the like). Food, drink, books, plants and toys don't wear (`wearPerUse: 0`); the
-appliances and screens do. Three uses have a clip (below); otherwise one draw call where it can (wood `satin`, towels and the teddy
+appliances and screens do. Four have a clip (below: the kettle's lid, the bread bin's roll-top, the laptop's lid, the
+vase's flowers); otherwise one draw call where it can (wood `satin`, towels and the teddy
 `matte`), a second only for glass that is seen through (the cookie jar, the wine glasses, the snow globe), and the
 smallest triangle budget (`docs/design/objects.md`: 0.35 m, 1.5k/3k; built at 226–1,496). The player colours the
 main part, labelled `Body` (the cookie jar: its `Lid`); sets of like things (mugs, books, towels, blocks) list each
@@ -71,7 +73,7 @@ sits on the top, turns with its facing and lights right at night.
 - The tea set's Body colours the cups as well as the pot (a set).
 - Nothing needed fixing.
 
-## TT3. Books and small plants (7)
+## TT3. Books and small plants (8)
 
 - **Family:** `tools/art/blender/families/tabletop.py`
 
@@ -81,6 +83,7 @@ sits on the top, turns with its facing and lights right at night.
 | `booksUpright` Books and bookends | 1x1 · surface | read:read | tabletop / books | Bookends, Book 1–5 (each cover colour) | Static | Static. |
 | `vaseFlowers` Vase of flowers | 1x1 · surface | — | tabletop / plants | Body | Static | Static. |
 | `vaseSmall` Bud vase | 1x1 · surface | — | tabletop / plants | Body | Static | Static. |
+| `vaseEmpty` Empty vase | 1x1 · surface | putFlowers:fetch takeOut:fetch | tabletop / plants | Body | Use | `flowers_open`: the bunch it takes is a part of its own, hidden in the water; put in (`putFlowers`, 3 min) it grows up out of the mouth over 0.9 s and stays up while the vase is open; taken out (`takeOut`, 2 min) the same clip runs back along the use, so they go down as they are lifted. |
 | `potSucculent` Succulent | 1x1 · surface | water:water | tabletop / plants | Body | Static | Static. |
 | `potCactus` Cactus | 1x1 · surface | water:water | tabletop / plants | Body | Static | Static. |
 | `potSmall` Small potted plant | 1x1 · surface | water:water | tabletop / plants | Body | Static | Static. |
@@ -91,6 +94,11 @@ sits on the top, turns with its facing and lights right at night.
   Bookends, then Book 1 to 5, left to right in the order each colour first shows; Book 1 to 3 colour two books each
   (manifest only, the GLB is the same). Rechecked in all four facings, every slot its own colour, at night on WebGPU
   and Low WebGL2, and in the colour studio, each label landing on its covers.
+- The empty vase (added 2026-10-30, Q-18) was checked in play on `review-stage` at the counter (15,7): empty at 10:19
+  (`vase2-vaseEmpty-idle.png`), the resident carrying the bunch in her arms on the way and the vase's own flowers up
+  out of the mouth as she reaches it (`vase2-vaseEmpty-putFlowers-01.png`), and the same clip run back as she takes
+  them out. It shares the vase of flowers' body and bunch, so a bunch cut in the garden and one bought arranged look
+  alike; its Body colours the vase as the filled one's does.
 
 ## TT4. Small ornaments (6)
 

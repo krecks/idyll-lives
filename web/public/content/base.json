@@ -2950,6 +2950,27 @@
             "outdoors"
           ],
           "feeling": "garden.sweetScent"
+        },
+        {
+          "id": "cut",
+          "label": "Cut some flowers",
+          "anim": "tend",
+          "minutes": 6,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.06,
+            "hygiene": -0.03
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "cutFlowers"
         }
       ],
       "price": 60,
@@ -4340,6 +4361,13 @@
       "hold": "both",
       "serving": "freshPlate",
       "radius": 0.15
+    },
+    {
+      "id": "cutFlowers",
+      "label": "Cut flowers",
+      "model": "item.cutFlowers",
+      "hold": "hand",
+      "radius": 0.1
     },
     {
       "id": "freshPlate",
