@@ -525,18 +525,14 @@ export interface WorldStructure {
   garages?: { plot: number; x0: number; z0: number; x1: number; z1: number }[];
 }
 
-/** A household's car (`WorldStructure.cars`): where it parks (its middle, which way it faces: 0 towards +z), its size and look (`shared/cars.ts`), who may drive it. */
+/** A household's car (`WorldStructure.cars`): where it parks (its middle, which way it faces: 0 towards +z) and its look (`shared/cars.ts`: its size is its body's). */
 export interface CarInfo {
   plot: number;
-  household: number;
   x: number;
   z: number;
   yaw: number;
-  len: number;
-  wid: number;
   body: number;
   paint: number;
-  owners: number[];
 }
 
 /** One of the town's servers (`WorldStructure.staff`). */

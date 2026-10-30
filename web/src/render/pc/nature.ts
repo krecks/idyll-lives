@@ -30,7 +30,7 @@ import type { AssetRegistry } from '../../assets/registry';
 import type { WorldStructure } from '../../core/protocol';
 import { CountryRoads } from '../shared/countryRoads';
 import type { Lighting } from '../shared/environment';
-import { grassField, grassMargin, type GrassQuality } from '../shared/grass';
+import { grassField, type GrassQuality } from '../shared/grass';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
 import { groupInstances, hideLawn, LandscapeLayout, lawnLayer, lawnMask, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnLayer, type LawnMask } from '../shared/nature';
@@ -112,7 +112,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.batches = [];
     await perfTimeAsync('nature: forests', () => this.forests(app, parent, assets, pace));
     await perfTimeAsync('nature: lawns', () => this.plantLawns(app, parent, assets, world, pace));
-    const field = await perfTimeAsync('nature: grass field', () => grassField(world, this, pace, grassMargin(this.grassQuality.radius, this.ring)));
+    const field = await perfTimeAsync('nature: grass field', () => grassField(world, this, pace, this.ring));
     const grass = (this.grass = new Grass(app, parent, field, this.grassQuality));
     grass.onGround(ground.render!.meshInstances[0]);
     const plants = gather(this.batches);

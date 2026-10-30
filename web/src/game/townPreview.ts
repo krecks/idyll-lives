@@ -111,6 +111,6 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     meta,
     meshes: { walls: EMPTY_MESH, wallsLow: EMPTY_MESH, floors: EMPTY_MESH },
     garages: layout.garages,
-    cars: layout.cars.map(({ plot, x, z, yaw, len, wid, body, paint }): CarInfo => ({ plot, household: -1, x, z, yaw, len, wid, body, paint, owners: [] })),
+    cars: layout.cars.map(({ plot, x, z, yaw, body, paint }): CarInfo => ({ plot, x, z, yaw, body, paint })),
   };
 }

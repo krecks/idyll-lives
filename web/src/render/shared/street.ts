@@ -40,7 +40,7 @@ import type { ModelEntry } from '../../assets/types';
 import { groundDepth, objectCentre, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
-import { CARS, CAR_PAINT, hash, paintCar, parkCar, pick, type CarBody } from './cars';
+import { CARS, CAR_PAINT, driveEnd, hash, paintCar, parkCar, pick, type CarBody } from './cars';
 import type { HousePlanner, SilhouettePlan, SilhouetteSpec } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
@@ -625,7 +625,8 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
     const frontWall = front > 0 ? h.z1 + T : h.z0 - T;
     const backEdge = front > 0 ? plot.z : plot.z + plot.d;
 
-    const legacy = !world.cars && L.drive ? parkCar(plot, L.drive, streets) : null;
+    const end = !world.cars && L.drive ? driveEnd(plot, L.drive, streets) : null;
+    const legacy = end ? parkCar(plot, end) : null;
     if (legacy) parked(legacy.x, legacy.z, legacy.yaw, CARS[legacy.body], CAR_PAINT[legacy.paint]);
 
     // Fences or hedges: sides from the house front line back, and the back edge. A side

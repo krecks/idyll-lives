@@ -17,24 +17,25 @@ import type { FrameState } from '../../core/bridge';
 import type { Seat } from '../shared/characters/seats';
 import type { WorldStructure } from '../../core/protocol';
 import { CARS, CAR_PAINT, carDoor, DOORS, paintCar, paintDoor } from '../shared/cars';
+import { lerpAngle } from '../shared/characters/rig';
+import { DOOR_SWING, ease } from '../shared/doors';
 import { Geo } from '../shared/geometry';
 import { GAME_RATE } from '../shared/gameSpeed';
 import { blob, Painter } from '../shared/street';
 
 
-/** How wide a door opens (degrees), and how long it takes to swing open or shut (seconds of game time at 1×: about 9 sim ticks, which getting in and out leave it, sim-core `cars::DOOR_OPENS`). */
+/** How wide a door opens (degrees). It swings as a house's door does (`DOOR_SWING`, in game time: about 9 sim ticks, which getting in and out leave it, sim-core `cars::DOOR_OPENS`). */
 const DOOR_OPEN = 62;
-const DOOR_SECONDS = 0.45;
 
 /** A car's seat (sim-core `Car::seat_at`): lower than a chair's, so a grown-up's head stays under the roof. */
 const CAR_SEAT: Seat = { h: 0.3, fwd: 0 };
 
 interface Drawn {
   entity: pc.Entity;
-  /** Its size, and where it stands now (whether it's parked there, and whether it's in town at all). */
+  /** Its size, and where it stands now (`shown`: the snapshot's, 0 out of town, 1 parked, 2 moving). */
   len: number;
   wid: number;
-  at: { x: number; z: number; yaw: number; shown: boolean; out: boolean };
+  at: { x: number; z: number; yaw: number; shown: number };
   /** Its doors on their hinges, which way each opens (+1 or -1), and how far open each is (0..1). */
   doors: { entity: pc.Entity; side: number; open: number }[];
 }
@@ -81,8 +82,7 @@ export class Cars {
       });
       const shadow = this.mesh(`shadow ${info.body}`, () => {
         const g = new Geo().color('#000000');
-        const b = CARS[info.body % CARS.length];
-        blob(g, 0, 0, b.wid * 0.62, b.len * 0.56, 0, 0.55, 0.03);
+        blob(g, 0, 0, shape.wid * 0.62, shape.len * 0.56, 0, 0.55, 0.03);
         return g;
       });
       if (body) drawMesh(entity, 'carBody', body, this.lib.plainFinish(), { castShadows: this.shadows });
@@ -104,7 +104,7 @@ export class Cars {
       // Out of the house's lamps, as the street is.
       for (const r of entity.findComponents('render') as pc.RenderComponent[]) this.lib.excludeFromLights([], r.meshInstances);
       this.place(entity, info.x, info.z, info.yaw);
-      this.cars.push({ entity, doors, len: shape.len, wid: shape.wid, at: { x: info.x, z: info.z, yaw: info.yaw, shown: false, out: false } });
+      this.cars.push({ entity, doors, len: shape.len, wid: shape.wid, at: { x: info.x, z: info.z, yaw: info.yaw, shown: 0 } });
     }
   }
 
@@ -121,34 +121,37 @@ export class Cars {
     this.lastNow = frame.now;
     this.moved = false;
     if (base === undefined || stride === undefined || !f) return;
-    this.cars.forEach(({ entity, doors, at }, i) => {
+    const step = dt / DOOR_SWING;
+    for (let i = 0; i < this.cars.length; i++) {
+      const { entity, doors, at } = this.cars[i];
       const o = base + i * stride;
-      const shown = i < count ? curr[o + f.shown] : 0;
-      entity.enabled = shown > 0;
-      at.shown = shown === 1;
-      at.out = !shown;
-      if (!shown) return;
+      at.shown = i < count ? curr[o + f.shown] : 0;
+      if (!at.shown) {
+        entity.enabled = false;
+        continue;
+      }
       const k = prev[o + f.shown] > 0 ? Math.min(1, Math.max(0, alpha)) : 1;
-      const lerp = (j: number) => prev[o + j] + (curr[o + j] - prev[o + j]) * k;
-      let dy = curr[o + f.yaw] - prev[o + f.yaw];
-      dy -= Math.round(dy / (Math.PI * 2)) * Math.PI * 2;
-      const yaw = k < 1 ? prev[o + f.yaw] + dy * k : curr[o + f.yaw];
-      this.place(entity, lerp(f.x), lerp(f.z), yaw);
-      [at.x, at.z, at.yaw] = [lerp(f.x), lerp(f.z), yaw];
-      if (this.hidden) entity.enabled = !this.inHidden(at.x, at.z);
-      if (shown > 1) this.moved = true;
+      const x = prev[o + f.x] + (curr[o + f.x] - prev[o + f.x]) * k;
+      const z = prev[o + f.z] + (curr[o + f.z] - prev[o + f.z]) * k;
+      const yaw = lerpAngle(prev[o + f.yaw], curr[o + f.yaw], k);
+      // (A parked car stays put: no new transform for it and its doors.)
+      if (x !== at.x || z !== at.z || yaw !== at.yaw) {
+        this.place(entity, x, z, yaw);
+        [at.x, at.z, at.yaw] = [x, z, yaw];
+      }
+      entity.enabled = this.visible(at);
+      if (at.shown > 1) this.moved = true;
       const open = f.doors === undefined ? 0 : curr[o + f.doors];
-      doors.forEach((door, d) => {
+      for (let d = 0; d < doors.length; d++) {
+        const door = doors[d];
         const target = open & (1 << d) ? 1 : 0;
-        if (door.open === target) return;
-        const step = dt / DOOR_SECONDS;
+        if (door.open === target) continue;
         door.open = target > door.open ? Math.min(1, door.open + step) : Math.max(0, door.open - step);
-        // Eased; the rear edge swings out (`paintDoor`).
-        const k = door.open * door.open * (3 - 2 * door.open);
-        door.entity.setLocalEulerAngles(0, -door.side * DOOR_OPEN * k, 0);
+        // The rear edge swings out (`paintDoor`).
+        door.entity.setLocalEulerAngles(0, -door.side * DOOR_OPEN * ease(door.open), 0);
         this.moved = true;
-      });
-    });
+      }
+    }
   }
 
   /**
@@ -157,13 +160,13 @@ export class Cars {
    */
   hideOn(rect: readonly [number, number, number, number] | null): void {
     this.hidden = rect;
-    for (const { entity, at } of this.cars) entity.enabled = !at.out && !this.inHidden(at.x, at.z);
+    for (const { entity, at } of this.cars) entity.enabled = this.visible(at);
   }
 
   /** The seat of a parked car at (x, z) (someone sat in it), else null: for `Residents.setCarSeat`. */
   seatAt(x: number, z: number): Seat | null {
     for (const { len, wid, at } of this.cars) {
-      if (!at.shown) continue;
+      if (at.shown !== 1) continue;
       const [dx, dz] = [x - at.x, z - at.z];
       const along = dx * Math.sin(at.yaw) + dz * Math.cos(at.yaw);
       const across = dx * Math.cos(at.yaw) - dz * Math.sin(at.yaw);
@@ -184,9 +187,10 @@ export class Cars {
     this.root.destroy();
   }
 
-  private inHidden(x: number, z: number): boolean {
+  /** Whether a car is drawn: in town, and not standing where cars are hidden (`hideOn`). */
+  private visible(at: Drawn['at']): boolean {
     const r = this.hidden;
-    return !!r && x > r[0] && x < r[2] && z > r[1] && z < r[3];
+    return at.shown > 0 && !(r && at.x > r[0] && at.x < r[2] && at.z > r[1] && at.z < r[3]);
   }
 
   private place(entity: pc.Entity, x: number, z: number, yaw: number): void {

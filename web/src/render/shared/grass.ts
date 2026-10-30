@@ -6,7 +6,7 @@
  * nothing here places a blade. What the GPU reads is made here:
  *
  * - `GrassField`: the land round the town in two textures. `colour` (RGBA, 1 texel a metre over the
- *   town and its margin round it, `grassMargin`): the ground's own colour under the grass (sRGB,
+ *   town and its margin round it, `GRASS.margin`): the ground's own colour under the grass (sRGB,
  *   the terrain's vertex colour, `LandscapeLayout.terrainColour`) and, in alpha, how grassy the
  *   land is out there (roads, water, sand, fields, rock: none). `town` (one byte a texel, `GRASS.townTexels`
  *   a metre over the town's ground): the lawn as it grows now, none indoors, under furniture, on
@@ -27,20 +27,14 @@ const PER_PATCH = 448;
 const LOD_COUNT = 7;
 
 export const GRASS = {
-  /** How far the grass grows round the town (m), at least (`grassMargin`). */
+  /**
+   * How far the grass grows round the town (m) unless told (`grassField`). The game grows it over
+   * the whole landscape round the town (its `LandscapeLayout.ring`, 150 m or more, well past any
+   * preset's reach): the camera can be taken out over the meadows, and the grass grows on there
+   * (it's drawn only near the eye, wherever that is; a wider field costs only its build: about
+   * 110 ms over a town's loading, 195 ms a world's).
+   */
   margin: 40,
-  /**
-   * And at least this many of the preset's reaches: the field starts fading at 0.7 of its margin,
-   * so an eye at the town's edge sees the blades end where they would in town, by its own reach,
-   * past where they take the lawn's plain colour (`LAWN.blend`, `shaders/grass.ts`).
-   */
-  marginReach: 1.2,
-  /**
-   * And the whole landscape round the town (its `LandscapeLayout.ring`): the camera can be taken out
-   * over the meadows, and the grass grows on there (it's drawn only near the eye, wherever that is;
-   * a wider field costs only its build: about 110 ms over a town's loading, 195 ms a world's).
-   */
-  marginRing: 1,
   /**
    * Past the margin, the lawn's tone on the ground (`GAME_GRASS_GROUND`: as dark as the blades and
    * the shade between them average, and its gusts) fades into the land's own colour over this far (m).
@@ -93,7 +87,7 @@ export interface GrassLand {
 export interface GrassField {
   x0: number;
   z0: number;
-  /** How far it reaches round the town (m; `grassMargin`). */
+  /** How far it reaches round the town (m; `GRASS.margin`). */
   margin: number;
   /** The colour texture's texels (1 a metre) across and deep. */
   w: number;
@@ -110,15 +104,6 @@ export interface GrassField {
   patches: Uint8Array;
   /** Per patch: the ground's height at its corner (x0, z0 side) and its slope along x and z (3 floats). */
   ground: Float32Array;
-}
-
-/**
- * How far the grass grows round the town (m) for blades drawn within `radius` m of the eye
- * (`GrassQuality.radius`), in a landscape reaching `ring` m round it: at least `GRASS.margin`,
- * `GRASS.marginReach` reaches and `GRASS.marginRing` of the landscape.
- */
-export function grassMargin(radius: number, ring = 0): number {
-  return Math.max(GRASS.margin, radius * GRASS.marginReach, ring * GRASS.marginRing);
 }
 
 /** The grass of a town as the land grows it, `margin` m round it (the town's mask comes with `townGrass`, again whenever the lot changes). */

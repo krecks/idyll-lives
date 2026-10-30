@@ -262,7 +262,7 @@ fn is_zero_u32(n: &u32) -> bool {
     *n == 0
 }
 
-fn is_zero_u64(n: &u64) -> bool {
+pub(crate) fn is_zero_u64(n: &u64) -> bool {
     *n == 0
 }
 

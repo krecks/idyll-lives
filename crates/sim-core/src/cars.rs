@@ -36,7 +36,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::TICKS_PER_SECOND;
 use crate::lot::OUTDOORS;
-use crate::world::{Household, Phase, Sim, SimBrief, Task, TaskKind, World};
+use crate::world::{
+    Household, Phase, Sim, SimBrief, Task, TaskKind, World, nearest_exit, wrap_angle,
+};
 
 /// Most cars in a town (the snapshot's rows).
 pub const MAX_CARS: usize = 64;
@@ -140,7 +142,7 @@ pub struct Car {
     pub done: Vec<u32>,
     /// Away: it sets off back to town no sooner than this (the last one done, and the drive from
     /// work to the end of town).
-    #[serde(default, skip_serializing_if = "is_zero")]
+    #[serde(default, skip_serializing_if = "crate::save::is_zero_u64")]
     pub ready_at: u64,
     /// Something stands where it parks: it isn't used (`refresh`). Not saved.
     #[serde(skip)]
@@ -162,10 +164,6 @@ pub struct Car {
     /// saved).
     #[serde(skip)]
     pub shown: Option<([f32; 2], f32, bool, u8)>,
-}
-
-fn is_zero(v: &u64) -> bool {
-    *v == 0
 }
 
 fn is_zero_f32(v: &f32) -> bool {
@@ -213,19 +211,24 @@ pub struct Garage {
 }
 
 impl Garage {
-    /// The tiles it stands on: those it covers at least half of each way.
+    /// The tiles it stands on.
     fn tiles(&self) -> Vec<(i32, i32)> {
-        let covers = |a: f32, b: f32, t: i32| (b.min(t as f32 + 1.0) - a.max(t as f32)) >= 0.5;
-        let mut out = Vec::new();
-        for z in self.z0.floor() as i32..=self.z1.floor() as i32 {
-            for x in self.x0.floor() as i32..=self.x1.floor() as i32 {
-                if covers(self.x0, self.x1, x) && covers(self.z0, self.z1, z) {
-                    out.push((x, z));
-                }
+        covered_tiles(self.x0, self.z0, self.x1, self.z1)
+    }
+}
+
+/// The tiles the box from (x0, z0) to (x1, z1) covers at least half of each way.
+fn covered_tiles(x0: f32, z0: f32, x1: f32, z1: f32) -> Vec<(i32, i32)> {
+    let covers = |a: f32, b: f32, t: i32| (b.min(t as f32 + 1.0) - a.max(t as f32)) >= 0.5;
+    let mut out = Vec::new();
+    for z in z0.floor() as i32..=z1.floor() as i32 {
+        for x in x0.floor() as i32..=x1.floor() as i32 {
+            if covers(x0, x1, x) && covers(z0, z1, z) {
+                out.push((x, z));
             }
         }
-        out
     }
+    out
 }
 
 impl Car {
@@ -261,38 +264,38 @@ impl Car {
         matches!(self.state, CarState::Parked | CarState::Boarding)
     }
 
-    /// Where someone stands to get in by door `d` (or out): beside it, outside the car.
-    fn door_at(&self, d: usize) -> [f32; 2] {
+    /// The point `along` its length (forward) and `left` across it (to its left) from its middle,
+    /// parked.
+    fn local(&self, along: f32, left: f32) -> [f32; 2] {
         let (s, c) = self.yaw.sin_cos();
-        let (f, left) = ([s, c], [c, -s]);
+        [
+            self.spot[0] + s * along + c * left,
+            self.spot[1] + c * along - s * left,
+        ]
+    }
+
+    /// Door `d`'s side (+1 left, -1 right) and how far along the car it is.
+    fn door_side(&self, d: usize) -> (f32, f32) {
         let k = if d.is_multiple_of(2) { 1.0 } else { -1.0 };
         let along = if d < 2 {
             self.len * 0.08
         } else {
             -self.len * 0.19
         };
-        let out = (self.wid / 2.0 + DOOR_OUT) * k;
-        [
-            self.spot[0] + left[0] * out + f[0] * along,
-            self.spot[1] + left[1] * out + f[1] * along,
-        ]
+        (k, along)
     }
 
-    /// Where the one getting in by door `d` sits.
+    /// Where someone stands to get in by door `d` (or out): beside it, outside the car.
+    fn door_at(&self, d: usize) -> [f32; 2] {
+        let (k, along) = self.door_side(d);
+        self.local(along, (self.wid / 2.0 + DOOR_OUT) * k)
+    }
+
+    /// Where the one getting in by door `d` sits (the front seats a little back from the doors).
     pub(crate) fn seat_at(&self, d: usize) -> [f32; 2] {
-        let (s, c) = self.yaw.sin_cos();
-        let (f, left) = ([s, c], [c, -s]);
-        let k = if d.is_multiple_of(2) { 1.0 } else { -1.0 };
-        let along = if d < 2 {
-            self.len * 0.05
-        } else {
-            -self.len * 0.19
-        };
-        let out = (self.wid / 2.0 - 0.5).max(0.2) * k;
-        [
-            self.spot[0] + left[0] * out + f[0] * along,
-            self.spot[1] + left[1] * out + f[1] * along,
-        ]
+        let (k, along) = self.door_side(d);
+        let along = if d < 2 { self.len * 0.05 } else { along };
+        self.local(along, (self.wid / 2.0 - 0.5).max(0.2) * k)
     }
 
     /// The door someone in seat `seat` (0 the driver's) gets in by, and where they stand for it:
@@ -308,30 +311,19 @@ impl Car {
         let open = |x: i32, z: i32| {
             own.contains(&(x, z)) || (nav.tile_free(x, z) && nav.lot.room_at(x, z) == OUTDOORS)
         };
-        let (s, c) = self.yaw.sin_cos();
-        let (f, left) = ([s, c], [c, -s]);
         ORDER[seat.min(3)]
             .into_iter()
             .map(|d| (d, self.door_at(d)))
             .find(|&(d, p)| {
-                let k = if d.is_multiple_of(2) { 1.0 } else { -1.0 };
+                let (k, along) = self.door_side(d);
                 let side = self.wid / 2.0;
-                let along = if d < 2 {
-                    self.len * 0.08
-                } else {
-                    -self.len * 0.19
-                };
                 let (x, z) = (p[0].floor() as i32, p[1].floor() as i32);
                 // The ground the door sweeps, outside the car along its length: nothing in the way,
                 // nor a fence or a wall between it and where they stand.
                 let swept_clear = || {
                     [-0.5f32, 0.0, 0.5].into_iter().all(|a| {
                         [0.25f32, 0.6, SWING].into_iter().all(|o| {
-                            let (u, v) = (along + a, (side + o) * k);
-                            let q = [
-                                self.spot[0] + f[0] * u + left[0] * v,
-                                self.spot[1] + f[1] * u + left[1] * v,
-                            ];
+                            let q = self.local(along + a, (side + o) * k);
                             let (qx, qz) = (q[0].floor() as i32, q[1].floor() as i32);
                             let next = (qx - x).abs() + (qz - z).abs() == 1;
                             open(qx, qz)
@@ -384,8 +376,9 @@ impl Car {
 
     /// Works out again what follows from where it parks (after it came home, moved, or loaded).
     fn settle(&mut self, exits: &[[f32; 2]]) {
-        self.route = None;
-        self.out_ticks = Route::new(self, exits, false).ticks();
+        let out = Route::new(self, exits, false);
+        self.out_ticks = out.ticks();
+        self.route = Some((false, out));
     }
 
     /// The yaw it parks with after coming home: nose in, facing away from the street.
@@ -397,7 +390,7 @@ impl Car {
         }
     }
 
-    /// The tiles it takes up parked: those it covers at least half of each way.
+    /// The tiles it takes up parked.
     fn tiles(&self) -> Vec<(i32, i32)> {
         let (s, c) = self.yaw.sin_cos();
         // Axis-aligned enough: a car parks along its driveway.
@@ -406,18 +399,8 @@ impl Car {
         } else {
             (self.wid / 2.0, self.len / 2.0)
         };
-        let (x0, x1) = (self.spot[0] - hw, self.spot[0] + hw);
-        let (z0, z1) = (self.spot[1] - hl, self.spot[1] + hl);
-        let covers = |a: f32, b: f32, t: i32| (b.min(t as f32 + 1.0) - a.max(t as f32)) >= 0.5;
-        let mut out = Vec::new();
-        for z in z0.floor() as i32..=z1.floor() as i32 {
-            for x in x0.floor() as i32..=x1.floor() as i32 {
-                if covers(x0, x1, x) && covers(z0, z1, z) {
-                    out.push((x, z));
-                }
-            }
-        }
-        out
+        let [x, z] = self.spot;
+        covered_tiles(x - hw, z - hl, x + hw, z + hl)
     }
 }
 
@@ -505,9 +488,7 @@ impl Route {
             a.0[0] + (b.0[0] - a.0[0]) * k,
             a.0[1] + (b.0[1] - a.0[1]) * k,
         ];
-        let mut dy = b.1 - a.1;
-        dy -= (dy / std::f32::consts::TAU).round() * std::f32::consts::TAU;
-        (p, a.1 + dy * k, a.3)
+        (p, a.1 + wrap_angle(b.1 - a.1) * k, a.3)
     }
 }
 
@@ -545,14 +526,7 @@ impl Legs {
     /// A quarter turn about `c` from `a` to `b` (both `r` from it).
     fn arc(&mut self, c: [f32; 2], r: f32, a: [f32; 2], b: [f32; 2], reverse: bool) {
         let a0 = (a[1] - c[1]).atan2(a[0] - c[0]);
-        let mut a1 = (b[1] - c[1]).atan2(b[0] - c[0]);
-        let pi = std::f32::consts::PI;
-        while a1 - a0 > pi {
-            a1 -= 2.0 * pi;
-        }
-        while a1 - a0 < -pi {
-            a1 += 2.0 * pi;
-        }
+        let a1 = a0 + wrap_angle((b[1] - c[1]).atan2(b[0] - c[0]) - a0);
         let n = ((a1 - a0).abs() * r / STEP).ceil().max(1.0) as usize;
         for i in 0..=n {
             let t = a0 + (a1 - a0) * i as f32 / n as f32;
@@ -660,8 +634,9 @@ pub(crate) fn seat(
                     *j as u32 != sim.id && b.bound_for_car == Some(c) && !drives(*j as u32)
                 })
                 .count();
-        let rider = (riders % (SEATS - 1)) + 1;
-        let room = car.aboard.len() < SEATS;
+        let rider = riders + 1;
+        // (Room for them past the driver and the riders before them, in it or on their way.)
+        let room = rider < SEATS;
         match (car.state, car.driver) {
             (CarState::Parked, _) | (CarState::Boarding, None) if drives(sim.id) && !coming() => {
                 Some((c, 0))
@@ -772,13 +747,7 @@ pub(crate) fn off_work(w: &mut World, i: usize) -> bool {
 
 /// `i` stands at the town's exit nearest them (out of sight).
 fn to_exit(w: &mut World, i: usize) {
-    let pos = w.sims[i].pos;
-    let near = w.exits.iter().copied().min_by(|a, b| {
-        (a[0] - pos[0])
-            .hypot(a[1] - pos[1])
-            .total_cmp(&(b[0] - pos[0]).hypot(b[1] - pos[1]))
-    });
-    if let Some(at) = near {
+    if let Some(at) = nearest_exit(&w.exits, w.sims[i].pos) {
         w.sims[i].pos = at;
     }
 }
@@ -792,6 +761,7 @@ pub(crate) fn update(w: &mut World) {
     let tick = w.tick;
     if w.cars_nav != w.nav_version {
         w.cars_nav = w.nav_version;
+        w.cars_parked = None;
         refresh(w);
     }
     for c in 0..w.cars.len() {
@@ -1104,13 +1074,12 @@ fn keep_away(w: &mut World, c: usize, until: u64) {
 /// The car is home: it parks, nose in, its doors open and they get out and walk to the house.
 fn arrive(w: &mut World, c: usize) {
     let tick = w.tick;
-    let exits = std::mem::take(&mut w.exits);
-    let car = &mut w.cars[c];
+    let World { cars, exits, .. } = &mut *w;
+    let car = &mut cars[c];
     car.state = CarState::Parked;
     car.since = tick;
     car.yaw = car.nose_in();
-    car.settle(&exits);
-    w.exits = exits;
+    car.settle(exits);
     let driver = car.driver.take();
     let mut out = std::mem::take(&mut car.done);
     car.aboard.clear();
@@ -1129,20 +1098,9 @@ fn arrive(w: &mut World, c: usize) {
 /// its door opens, then out beside it (`Phase::Alighting`); else from where they are.
 fn walk_home(w: &mut World, i: usize, by: Option<(usize, usize)>) {
     if let Some((c, seat)) = by {
-        let World {
-            lot,
-            blocked,
-            stairs,
-            cars,
-            ..
-        } = &*w;
-        let nav = crate::path::NavGrid {
-            lot,
-            blocked,
-            stairs,
-        };
-        if let Some((door, _)) = cars[c].door(&nav, seat) {
-            let car = &cars[c];
+        let door = w.cars[c].door(&w.nav(), seat).map(|(d, _)| d);
+        if let Some(door) = door {
+            let car = &w.cars[c];
             let (at, yaw) = (car.seat_at(door), car.yaw);
             let sim = &mut w.sims[i];
             sim.pos = at;
@@ -1286,14 +1244,15 @@ fn relocate(w: &mut World, c: usize) {
     if taken {
         return;
     }
-    let exits = std::mem::take(&mut w.exits);
-    let car = &mut w.cars[c];
+    let World { cars, exits, .. } = &mut *w;
+    let car = &mut cars[c];
     car.plot = home;
     car.street = drive.street;
     car.spot = [drive.x, drive.z + drive.front * (PARK_GAP + car.len / 2.0)];
     car.yaw = car.nose_in();
-    car.settle(&exits);
-    w.exits = exits;
+    car.settle(exits);
+    // (Parked as it was, somewhere else: its tiles are worked out again.)
+    w.cars_parked = None;
     refresh(w);
 }
 
@@ -1333,6 +1292,14 @@ fn refresh(w: &mut World) {
 /// (`World::blocked`; things never stand on them, see `refresh`). Walkers find their way again
 /// when that changes (the walkable regions, not the views: `nav_version` only).
 pub(crate) fn reblock(w: &mut World) {
+    // (Nothing to do while the same cars stand parked: `MAX_CARS` bits.)
+    let parked = (0..w.cars.len())
+        .filter(|&c| present(w, c))
+        .fold(0u64, |m, c| m | 1 << c);
+    if w.cars_parked == Some(parked) {
+        return;
+    }
+    w.cars_parked = Some(parked);
     let mut tiles: Vec<usize> = Vec::new();
     // (Garages too, as they stand.)
     for g in &w.garages {
@@ -1343,7 +1310,7 @@ pub(crate) fn reblock(w: &mut World) {
         }
     }
     for c in 0..w.cars.len() {
-        if present(w, c) {
+        if parked & 1 << c != 0 {
             for (x, z) in w.cars[c].tiles() {
                 if w.lot.in_bounds(x, z) {
                     tiles.push(w.lot.tile_index(x, z));
@@ -1430,12 +1397,12 @@ pub(crate) fn from_file(w: &mut World, raw: &[CarRaw], drives: &[Drive], garages
 /// After the cars were made or loaded: their routes' lengths, what's built over, the tiles they
 /// take up, where they are.
 fn settle_all(w: &mut World) {
-    let exits = std::mem::take(&mut w.exits);
-    for car in &mut w.cars {
-        car.settle(&exits);
+    let World { cars, exits, .. } = &mut *w;
+    for car in cars.iter_mut() {
+        car.settle(exits);
     }
-    w.exits = exits;
     w.car_tiles.clear();
+    w.cars_parked = None;
     refresh(w);
     reblock(w);
     poses(w);
@@ -1679,12 +1646,7 @@ mod tests {
                 r#""walls":[[36,0,40,0],[40,0,40,6],[36,6,40,6],[36,0,36,6]],"sims":"#,
             );
         let w = World::from_json(CONTENT, &town, 1).unwrap();
-        let nav = crate::path::NavGrid {
-            lot: &w.lot,
-            blocked: &w.blocked,
-            stairs: &w.stairs,
-        };
-        let (door, _) = w.cars[0].door(&nav, 0).unwrap();
+        let (door, _) = w.cars[0].door(&w.nav(), 0).unwrap();
         assert_eq!(door, 1, "the driver gets in on the other side");
     }
 

@@ -739,6 +739,8 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       for (const r of place.paths ?? []) paths.push(area(s, r));
       continue;
     }
+    // (This lot's things from here on: the garage keeps clear of them.)
+    const first = objects.length;
     // A farm's fields and farmyard (an empty farm lot keeps them too).
     if (s.farm) {
       placeAll(s, s.farm.objects);
@@ -765,20 +767,22 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     // A driveway beside the house, and the household's car on it.
     const drive = driveway(h, pw, pd, footprint);
     if (!drive) continue;
-    paths.push(area(s, drive));
+    const rect = area(s, drive);
+    paths.push(rect);
     const lot = { x: s.x, z: s.z, w: pw, d: pd };
-    const end = driveEnd(lot, area(s, drive), town.streets);
-    if (end) drives.push({ plot: s.index, ...end });
+    const end = driveEnd(lot, rect, town.streets);
+    if (!end) continue;
+    drives.push({ plot: s.index, ...end });
     // A garage at its inner end, clear of what's in the garden (as the street draws it).
     const corners = h.walls.flatMap(([x0, z0, x1, z1]) => [point(s, [x0, z0]), point(s, [x1, z1])]);
     const box = { x0: Math.min(...corners.map((c) => c[0])), z0: Math.min(...corners.map((c) => c[1])), x1: Math.max(...corners.map((c) => c[0])), z1: Math.max(...corners.map((c) => c[1])) };
-    const things = objects.map((o): Rect => {
+    const things = objects.slice(first).map((o): Rect => {
       const [fw, fd] = footprint(o.def);
       return o.rot % 2 === 0 ? { x: o.x, z: o.z, w: fw, d: fd } : { x: o.x, z: o.z, w: fd, d: fw };
     });
-    const garage = end && corners.length ? garageFor(lot, box, area(s, drive), end.front, things) : null;
+    const garage = corners.length ? garageFor(lot, box, rect, end.front, things) : null;
     if (garage) garages.push({ plot: s.index, ...garage });
-    const car = living.has(s.index) || s.index === playerSlot ? parkCar(lot, area(s, drive), town.streets) : null;
+    const car = living.has(s.index) || s.index === playerSlot ? parkCar(lot, end) : null;
     if (car) cars.push({ plot: s.index, ...car });
   }
   return { walls, doors, windows, objects, paths, fields, cars, drives, garages, plots, storeys, basement };

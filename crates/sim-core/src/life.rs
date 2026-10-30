@@ -338,8 +338,14 @@ pub fn school_today(
 
 /// Off to school when it's time (once a day; too late, and it's skipped for today).
 fn schedule_school(w: &mut World, i: usize, day: u32) {
+    if w.sims[i].school_day == day {
+        return;
+    }
+    let Some((leave, start, _)) = school_today(&w.content, &w.sims[i], w.tick) else {
+        return;
+    };
     // By car, earlier: the drive takes a while (`cars::lead_ticks`).
-    let lead = crate::cars::lead_ticks(w, i);
+    let leave = leave.min(start.saturating_sub(crate::cars::lead_ticks(w, i)));
     let World {
         content,
         sims,
@@ -349,13 +355,6 @@ fn schedule_school(w: &mut World, i: usize, day: u32) {
     } = w;
     let tick = *tick;
     let sim = &mut sims[i];
-    if sim.school_day == day {
-        return;
-    }
-    let Some((leave, start, _)) = school_today(content, sim, tick) else {
-        return;
-    };
-    let leave = leave.min(start.saturating_sub(lead));
     if tick > start + ticks(content.career_rules.late_minutes) {
         // A day missed.
         sim.school_day = day;

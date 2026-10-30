@@ -118,8 +118,8 @@ pub(crate) fn update(world: &mut World) {
                 switch_room(world, room, true);
             }
         }
+        watch.fresh = false;
     }
-    watch.fresh = false;
     if watch.primed && watch.lot_version == lot_version && world.autonomy {
         let came: Vec<u16> = awake
             .iter()

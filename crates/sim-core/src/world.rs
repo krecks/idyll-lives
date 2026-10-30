@@ -1691,6 +1691,9 @@ pub struct World {
     pub(crate) car_tiles: Vec<usize>,
     /// The `nav_version` the cars' parking spots were last checked at (`cars::update`).
     pub(crate) cars_nav: u32,
+    /// Which cars (a bit each) stood parked when `car_tiles` was worked out; None: work it out
+    /// again (`cars::reblock`).
+    pub(crate) cars_parked: Option<u64>,
     /// Opaque presentation data from the lot/town file, saved unchanged.
     pub meta: serde_json::Value,
     /// Build and buy edits that can be taken back, oldest first (see `World::undo`).
@@ -2005,6 +2008,7 @@ impl World {
             garages: Vec::new(),
             car_tiles: Vec::new(),
             cars_nav: 0,
+            cars_parked: None,
             meta: serde_json::Value::Null,
             undo: Vec::new(),
             redo: Vec::new(),
@@ -6501,11 +6505,7 @@ fn start_task(
                 (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
             } else {
                 // Nearest way out of town; with no exits, work starts on the spot.
-                let exit = ctx.exits.iter().copied().min_by(|a, b| {
-                    let d = |p: &[f32; 2]| (p[0] - sim.pos[0]).hypot(p[1] - sim.pos[1]);
-                    d(a).total_cmp(&d(b))
-                });
-                let Some(exit) = exit else {
+                let Some(exit) = nearest_exit(ctx.exits, sim.pos) else {
                     sim.transition = Some(crate::life::Transition::Work);
                     return;
                 };
@@ -7613,10 +7613,17 @@ fn arrive(
         }
         TaskKind::Work => match sim.bound_for_car.and_then(|c| ctx.cars.get(c as usize)) {
             // At the car's door: facing it, they open it and get in.
-            Some(car) => {
+            Some(car) if car.at_home() => {
                 sim.yaw = (car.spot[0] - sim.pos[0]).atan2(car.spot[1] - sim.pos[1]);
                 sim.pose = Pose::Stand;
                 act.phase = Phase::Boarding { ticks: 0 };
+            }
+            // Gone without them (it didn't wait any longer): on foot to the end of town after all.
+            Some(_) => {
+                sim.bound_for_car = None;
+                if let Some(a) = sim.current.take() {
+                    sim.queue.push_front(a.task);
+                }
             }
             None => {
                 sim.current = None;
@@ -8291,6 +8298,12 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
 /// `a` (radians) as a facing from -PI to PI.
 pub(crate) fn wrap_angle(a: f32) -> f32 {
     (a + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
+}
+
+/// The town's way out (`World::exits`) nearest `pos`, if it has any.
+pub(crate) fn nearest_exit(exits: &[[f32; 2]], pos: [f32; 2]) -> Option<[f32; 2]> {
+    let d = |p: &[f32; 2]| (p[0] - pos[0]).hypot(p[1] - pos[1]);
+    exits.iter().copied().min_by(|a, b| d(a).total_cmp(&d(b)))
 }
 
 /// The object a task holds a place at (using it, repairing it, cooking at it, the seat they eat

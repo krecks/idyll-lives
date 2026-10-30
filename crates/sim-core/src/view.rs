@@ -1530,19 +1530,15 @@ struct StructureView<'a> {
     garages: &'a [crate::cars::Garage],
 }
 
-/// A household's car: where it's parked (its middle, its yaw), its size and look, and who owns it.
+/// A household's car: where it's parked (its middle, its yaw) and its look.
 #[derive(Serialize)]
 struct CarView {
     plot: u32,
-    household: u32,
     x: f32,
     z: f32,
     yaw: f32,
-    len: f32,
-    wid: f32,
     body: u8,
     paint: u8,
-    owners: Vec<u32>,
 }
 
 /// One of the town's servers: what they look like (`seed`, the renderer makes the look) and the
@@ -2126,15 +2122,11 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
             .take(crate::cars::MAX_CARS)
             .map(|c| CarView {
                 plot: c.plot,
-                household: c.household,
                 x: c.spot[0],
                 z: c.spot[1],
                 yaw: c.yaw,
-                len: c.len,
-                wid: c.wid,
                 body: c.body,
                 paint: c.paint,
-                owners: c.owners.clone(),
             })
             .collect(),
         garages: &world.garages,

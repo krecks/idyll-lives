@@ -7,7 +7,7 @@
  * Engine-neutral: the street (`street.ts`) and the moving cars (`pc/cars.ts`) draw them.
  */
 
-import type { V3 } from './geometry';
+import { facing, type V3 } from './geometry';
 import type { Painter, Rect } from './street';
 
 /** Car paints. */
@@ -219,16 +219,10 @@ export function paintDoor(p: Painter, body: CarBody, paint: string, d: number): 
   face([glass(0.08, 0.1), glass(0.92, 0.1), glass(0.92, 0.86), glass(0.08, 0.86)], back, 0.03);
 }
 
+/** `q`'s normal (its first three corners), turned to face `towards`. */
 function facingOut(q: V3[], towards: V3): V3 {
-  const [a, b, c] = q;
-  const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-  const v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-  let n: [number, number, number] = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
-  const l = Math.hypot(...n) || 1;
-  n = [n[0] / l, n[1] / l, n[2] / l];
-  return n[0] * towards[0] + n[1] * towards[1] + n[2] * towards[2] >= 0 ? n : [-n[0], -n[1], -n[2]];
+  return facing(q[0], q[1], q[2], towards);
 }
-
 
 /** Clearance from a driveway's inner end to the car parked on it (m; sim-core `cars::PARK_GAP`). */
 const PARK_GAP = 0.45;
@@ -264,15 +258,13 @@ export interface ParkedCar {
 }
 
 /**
- * The car of the house on `plot`, on its driveway `drive` (at its inner end, beside the house:
- * not in the front yard Sims cross), facing the house or the street; null when the house has
- * none (about one in five) or its plot faces no street. From the plot's place, so the town, the
- * menus and the game agree.
+ * The car of the house on `plot`, on its driveway (at its inner end `spot`, `driveEnd`: beside
+ * the house, not in the front yard Sims cross), facing the house or the street; null when the
+ * house has none (about one in five). From the plot's place, so the town, the menus and the game
+ * agree.
  */
-export function parkCar(plot: Rect, drive: Rect, streets: readonly Rect[]): ParkedCar | null {
+export function parkCar(plot: Rect, spot: DriveEnd): ParkedCar | null {
   if (hash(plot.x, plot.z, 20) >= 0.8) return null;
-  const spot = driveEnd(plot, drive, streets);
-  if (!spot) return null;
   const { front, street } = spot;
   const body = Math.floor(hash(plot.x, plot.z, 21) * CARS.length) % CARS.length;
   const { len, wid } = CARS[body];

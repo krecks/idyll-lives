@@ -206,13 +206,13 @@ function lightMixFromURL(): [number, number, number] | null {
   return [sun, sky, env].map((x) => (Number.isFinite(x) ? x : 1)) as [number, number, number];
 }
 
-/** A hex colour (sRGB) in linear light (`pow(c, 2.2)`). */
 /** How bright a sky fill of `l`'s colours is, for an intensity of 1: the luminance of its sky and ground, averaged (linear). */
 function skyLuma(l: Lighting): number {
   const luma = (c: RGB) => 0.2126 * toLinear(c.r) + 0.7152 * toLinear(c.g) + 0.0722 * toLinear(c.b);
   return Math.max((luma(l.skyColor) + luma(l.groundColor)) / 2, 1e-3);
 }
 
+/** A hex colour (sRGB) in linear light (`pow(c, 2.2)`). */
 function linearHex(hex: string): RGB {
   const v = parseInt(hex.slice(1), 16);
   return { r: toLinear(((v >> 16) & 255) / 255), g: toLinear(((v >> 8) & 255) / 255), b: toLinear((v & 255) / 255) };

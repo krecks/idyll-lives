@@ -200,19 +200,25 @@ pub(crate) fn approach_tile(nav: &NavGrid, target: [f32; 2], from: [f32; 2]) -> 
 /// going through it (as the renderer swings it: `doors.ts`). A doorway inside the house stands
 /// open, and fences and gates are talked over.
 fn shut(lot: &Lot, (ax, az): (i32, i32), (bx, bz): (i32, i32)) -> bool {
-    match lot.edge_between(ax, az, bx, bz) {
+    let side = match (bx - ax, bz - az) {
+        (1, 0) => Side::PosX,
+        (-1, 0) => Side::NegX,
+        (0, 1) => Side::PosZ,
+        _ => Side::NegZ,
+    };
+    // (The halves either side of it, on a tile a diagonal wall splits.)
+    let room = |x, z, side| lot.half_room(x, z, lot.half_at_side(x, z, side));
+    stops(lot.edge_between(ax, az, bx, bz), || {
+        (room(ax, az, side) == OUTDOORS) != (room(bx, bz, side.opposite()) == OUTDOORS)
+    })
+}
+
+/// Whether an edge of kind `edge` stops voices and eyes (`shut`): a door only if it's a front
+/// door (`front`: between the house and outdoors).
+fn stops(edge: Edge, front: impl FnOnce() -> bool) -> bool {
+    match edge {
         Edge::Wall | Edge::Window => true,
-        Edge::Door => {
-            let side = match (bx - ax, bz - az) {
-                (1, 0) => Side::PosX,
-                (-1, 0) => Side::NegX,
-                (0, 1) => Side::PosZ,
-                _ => Side::NegZ,
-            };
-            // (The halves either side of it, on a tile a diagonal wall splits.)
-            let room = |x, z, side| lot.half_room(x, z, lot.half_at_side(x, z, side));
-            (room(ax, az, side) == OUTDOORS) != (room(bx, bz, side.opposite()) == OUTDOORS)
-        }
+        Edge::Door => front(),
         Edge::Open | Edge::Fence | Edge::Gate => false,
     }
 }
@@ -239,19 +245,15 @@ pub(crate) fn in_sight(nav: &NavGrid, a: [f32; 2], b: [f32; 2]) -> bool {
         let Some(d) = lot.diag(x, z) else {
             return false;
         };
-        let stops = match d.edge {
-            Edge::Wall | Edge::Window => true,
-            Edge::Door => {
-                (lot.half_room(x, z, 0) == OUTDOORS) != (lot.half_room(x, z, 1) == OUTDOORS)
-            }
-            Edge::Open | Edge::Fence | Edge::Gate => false,
-        };
+        let shut = stops(d.edge, || {
+            (lot.half_room(x, z, 0) == OUTDOORS) != (lot.half_room(x, z, 1) == OUTDOORS)
+        });
         let (x, z) = (x as f32, z as f32);
         let (p, q) = match d.dir {
             DiagDir::Dp => ([x, z], [x + 1.0, z + 1.0]),
             DiagDir::Dn => ([x, z + 1.0], [x + 1.0, z]),
         };
-        stops && side(p, q, a) * side(p, q, b) <= 0.0 && side(a, b, p) * side(a, b, q) <= 0.0
+        shut && side(p, q, a) * side(p, q, b) <= 0.0 && side(a, b, p) * side(a, b, q) <= 0.0
     };
     let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
     let (sx, sz) = (if dx > 0.0 { 1 } else { -1 }, if dz > 0.0 { 1 } else { -1 });
@@ -536,14 +538,16 @@ pub(crate) fn update(w: &mut World) {
             State::Waiting(ticks) => {
                 sims[i].social_waited += 1;
                 // Near enough to talk is only where they see each other (`in_sight`).
-                let seen = in_sight(&nav, sims[i].pos, sims[t].pos);
+                let (from, to) = (sims[i].pos, sims[t].pos);
+                let mut sight = None;
+                let mut seen = || *sight.get_or_insert_with(|| in_sight(&nav, from, to));
                 // About to drop (or burst) themselves: the talk would break off at once.
                 if sims[i].pressed(content) {
                     end_activity(&mut sims[i], content, objects);
                 } else if sims[i].paused.is_some() {
                     // From the seat: with them sitting there, or not at all (back to what they sat
                     // down to do).
-                    if gap <= SEAT_RANGE + 0.3 && seen && sims[t].available_for_social(content) {
+                    if gap <= SEAT_RANGE + 0.3 && seen() && sims[t].available_for_social(content) {
                         engage(
                             content,
                             &nav,
@@ -560,11 +564,11 @@ pub(crate) fn update(w: &mut World) {
                     } else {
                         end_activity(&mut sims[i], content, objects);
                     }
-                } else if walking && (gap > s.distance + ENGAGE_SLACK || !seen) {
+                } else if walking && (gap > s.distance + ENGAGE_SLACK || !seen()) {
                     // Got to the middle first: wait for them to get there too (where they see it).
                     sims[i].yaw = facing(sims[i].pos, sims[t].pos);
                     set_phase(&mut sims[i], Phase::Waiting { ticks: ticks + 1 });
-                } else if gap > s.distance + ENGAGE_SLACK + 0.6 || !seen {
+                } else if gap > s.distance + ENGAGE_SLACK + 0.6 || !seen() {
                     if coming {
                         chase(&nav, reach, &walk, sims, i, t, content, objects);
                     } else {
@@ -685,10 +689,12 @@ pub(crate) fn update(w: &mut World) {
                 // (Listening in from their seat: only to a talk beside them, in sight of it.)
                 let seated = sims[j].paused.is_some();
                 let off = dist(sims[j].pos, middle(sims, l, t));
-                let seen = in_sight(&nav, sims[j].pos, sims[l].pos);
-                if seated && (off > SEAT_RANGE + 0.6 || !seen) {
+                let (from, to) = (sims[j].pos, sims[l].pos);
+                let mut sight = None;
+                let mut seen = || *sight.get_or_insert_with(|| in_sight(&nav, from, to));
+                if seated && (off > SEAT_RANGE + 0.6 || !seen()) {
                     end_activity(&mut sims[j], content, objects);
-                } else if off > JOIN_RANGE + 0.6 || !seen {
+                } else if off > JOIN_RANGE + 0.6 || !seen() {
                     chase(&nav, reach, &walk, sims, j, l, content, objects);
                 } else if group(sims, content, l).len() >= MAX_GROUP {
                     end_activity(&mut sims[j], content, objects);
