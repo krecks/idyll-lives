@@ -17,8 +17,7 @@ import { fetchText } from '../content/content';
 import { bedroomsNeeded, householdBonds, householdSpawns, randomHousehold, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { generateHouse, objectInfos, random, residentsKey, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
 import { streetNames, WORLDS, worldName, worldTagline, type WorldKind } from './world';
-import { driveEnd, parkCar, type DriveEnd, type ParkedCar } from '../render/shared/cars';
-import { garageFor } from '../render/shared/street';
+import { driveEnd, garageFor, parkCar, type DriveEnd, type ParkedCar } from '../render/shared/cars';
 
 export type Wall = [number, number, number, number];
 export interface Door {

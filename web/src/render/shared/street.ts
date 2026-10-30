@@ -40,7 +40,7 @@ import type { ModelEntry } from '../../assets/types';
 import { groundDepth, objectCentre, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
-import { CARS, CAR_PAINT, driveEnd, hash, paintCar, parkCar, pick, type CarBody } from './cars';
+import { CARS, CAR_PAINT, driveEnd, garageFor, hash, paintCar, parkCar, pick, type CarBody } from './cars';
 import type { HousePlanner, SilhouettePlan, SilhouetteSpec } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
@@ -67,9 +67,6 @@ const KERB_Y = 0.045;
 const ROAD_Y = 0.012;
 /** Paths at least this wide are driveways (garden paths are 1 m; see `game/town.ts`). */
 const DRIVEWAY_MIN_WIDTH = 1.8;
-const GARAGE_DEPTH = 5.4;
-/** A garage's least width between its wall lines: 3 m inside, a single garage's (its door 2.4 m). */
-const GARAGE_WIDTH = 3.14;
 /** Half wall thickness (as in house.ts). */
 const T = 0.07;
 
@@ -827,30 +824,6 @@ function layout(world: WorldStructure, view: ViewRect | null, streets: Rect[], p
 /** A garage at the inner end of the driveway, beside the house, when it fits (`garageFor`). */
 function garage(L: PlotLayout, blocked: Rect[]): SilhouetteSpec['garage'] {
   return L.drive && L.house ? garageFor(L.plot, L.house, L.drive, L.front, blocked) : null;
-}
-
-/**
- * The garage of the house (`h`: its wall box) on `plot` at the inner end of its driveway `d` (the
- * street on its `front` side), when it has one (about seven in ten) and it fits clear of
- * `blocked` (things on the lot): wall centre lines. The town as it's made decides it
- * (`game/town.ts`, the sim's `garages`), and so the menus and the game agree.
- */
-export function garageFor(plot: Rect, h: { x0: number; z0: number; x1: number; z1: number }, d: Rect, front: 1 | -1, blocked: readonly Rect[]): SilhouetteSpec['garage'] {
-  if (hash(plot.x, plot.z, 50) > 0.7) return null;
-  // As wide as the drive and a little more, at least a single garage's `GARAGE_WIDTH`, moved
-  // (off the drive's middle if it must) to stand clear of the house and the plot's edge.
-  const toRight = d.x >= h.x1;
-  const [lo, hi] = toRight ? [h.x1 + 0.35, plot.x + plot.w - 0.45] : [plot.x + 0.45, h.x0 - 0.35];
-  const w = Math.max(d.w + 0.3, GARAGE_WIDTH);
-  if (hi - lo < w) return null;
-  const x0 = Math.min(Math.max(d.x + d.w / 2 - w / 2, lo), hi - w);
-  const x1 = x0 + w;
-  const inner = front > 0 ? d.z : d.z + d.d;
-  const [z0, z1] = front > 0 ? [inner - GARAGE_DEPTH, inner] : [inner, inner + GARAGE_DEPTH];
-  if (z0 < plot.z + 0.8 || z1 > plot.z + plot.d - 0.8) return null;
-  const r = { x: x0 - T, z: z0 - T, w: x1 - x0 + 2 * T, d: z1 - z0 + 2 * T };
-  if (blocked.some((b) => overlaps(r, b, 0.1))) return null;
-  return { x0, z0, x1, z1 };
 }
 
 /** A fence or hedge along a line, skipping stretches that would run through objects. */

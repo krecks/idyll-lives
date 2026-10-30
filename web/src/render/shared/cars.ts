@@ -280,3 +280,46 @@ export function parkCar(plot: Rect, spot: DriveEnd): ParkedCar | null {
     wid,
   };
 }
+
+// ---- garages ---------------------------------------------------------------------------
+
+/** A garage's depth, and its least width between its wall lines: 3 m inside, a single garage's (its door 2.4 m). */
+const GARAGE_DEPTH = 5.4;
+const GARAGE_WIDTH = 3.14;
+/** Half a wall's thickness (as in `house.ts`). */
+const WALL_HALF = 0.07;
+/** How far a garage keeps from the things on the lot (m): a tile, to use them from and walk round them by. */
+const GARAGE_CLEAR = 1;
+
+/** A garage: its wall centre lines (sim-core `cars::Garage`). */
+export interface Garage {
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+}
+
+/**
+ * The garage of the house (`h`: its wall box) on `plot` at the inner end of its driveway `d` (the
+ * street on its `front` side), when it has one (about seven in ten) and it fits clear of
+ * `blocked` (things on the lot, by `GARAGE_CLEAR`): wall centre lines. The town as it's made decides it
+ * (`game/town.ts`, the sim's `garages`), and so the menus and the game agree.
+ */
+export function garageFor(plot: Rect, h: { x0: number; z0: number; x1: number; z1: number }, d: Rect, front: 1 | -1, blocked: readonly Rect[]): Garage | null {
+  if (hash(plot.x, plot.z, 50) > 0.7) return null;
+  // As wide as the drive and a little more, at least a single garage's `GARAGE_WIDTH`, moved
+  // (off the drive's middle if it must) to stand clear of the house and the plot's edge.
+  const toRight = d.x >= h.x1;
+  const [lo, hi] = toRight ? [h.x1 + 0.35, plot.x + plot.w - 0.45] : [plot.x + 0.45, h.x0 - 0.35];
+  const w = Math.max(d.w + 0.3, GARAGE_WIDTH);
+  if (hi - lo < w) return null;
+  const x0 = Math.min(Math.max(d.x + d.w / 2 - w / 2, lo), hi - w);
+  const x1 = x0 + w;
+  const inner = front > 0 ? d.z : d.z + d.d;
+  const [z0, z1] = front > 0 ? [inner - GARAGE_DEPTH, inner] : [inner, inner + GARAGE_DEPTH];
+  if (z0 < plot.z + 0.8 || z1 > plot.z + plot.d - 0.8) return null;
+  const r = { x: x0 - WALL_HALF, z: z0 - WALL_HALF, w: x1 - x0 + 2 * WALL_HALF, d: z1 - z0 + 2 * WALL_HALF };
+  const m = GARAGE_CLEAR;
+  if (blocked.some((b) => r.x - m < b.x + b.w && r.x + r.w + m > b.x && r.z - m < b.z + b.d && r.z + r.d + m > b.z)) return null;
+  return { x0, z0, x1, z1 };
+}
