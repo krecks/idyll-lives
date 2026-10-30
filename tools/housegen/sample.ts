@@ -7,27 +7,30 @@
  * family) and checked here against them all: the same layout for each, beds enough, no toys
  * without children, no bathroom off the room the front door opens into, the front door into a
  * shared room, no way through a bathroom, a laundry or a bedroom, and a lot cut to fit the house
- * (the garden sizes in turn) that it covers no more and no less of than `COVER` says. Problems
- * are listed (and the exit code is 1). The houses are written turned to face a street on each
+ * (the garden sizes in turn) that it covers no more and no less of than `COVER` says. Each house
+ * is priced as the game prices a home (`price.ts`, furnished for nobody): the prices by house
+ * class and garden size are listed, and the bigger the class, the dearer. Problems are listed
+ * (and the exit code is 1). The houses are written turned to face a street on each
  * side in turn, as towns turn their lots.
  *
  * Run: bun tools/housegen/sample.ts out.json [houses per lot size]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import type { ObjectDef } from '../../web/src/content/content.ts';
+import type { Economy, ObjectDef } from '../../web/src/content/content.ts';
 import type { GardenSize, HouseGenConfig, Residents } from '../../web/src/game/housegen.ts';
 import type { Facing, HouseTemplate } from '../../web/src/game/town.ts';
 
 const { GARDEN_SIZES, generateHouse, objectInfos } = await import('../../web/src/game/housegen.ts');
 const { turner } = await import('../../web/src/game/town.ts');
+const { priceOf } = await import('../../web/src/game/price.ts');
 
 /** How much of its lot a house covers (its ground floor), by garden size: least and most. */
 const COVER: Record<GardenSize, [number, number]> = { snug: [0.2, 0.6], roomy: [0.16, 0.45], big: [0.12, 0.32] };
 
 const root = new URL('../../web/public/content/', import.meta.url);
 const cfg = JSON.parse(readFileSync(new URL('housegen.json', root), 'utf8')) as HouseGenConfig;
-type ContentFile = { objects?: ObjectDef[]; include?: string[]; roomRules?: { lampTiles?: number; windowTiles?: number } };
+type ContentFile = { objects?: ObjectDef[]; include?: string[]; roomRules?: { lampTiles?: number; windowTiles?: number }; economy?: Partial<Economy> };
 const baseFile = JSON.parse(readFileSync(new URL('base.json', root), 'utf8')) as ContentFile;
 // Objects of base.json and the files it includes (the catalogue in furniture.json, the garden, packs).
 const base = {
@@ -98,6 +101,12 @@ const stats = { tried: 0, made: 0, two: 0, basements: 0, value: 0, seats: 0, din
 const covers = new Map<string, number[]>();
 // Per room kind: how many, their floor in all, the biggest (tiles).
 const kinds = new Map<string, { n: number; area: number; most: number; long: number }>();
+/** The house classes, smallest first (`housegen.json` `classes`, as the descriptions name them). */
+const CLASSES = ['cottage', 'bungalow', 'town house', 'family house', 'villa'];
+/** Per house class, and per class and garden size: the houses' prices (as `price.ts` prices a home on its lot). */
+const prices = new Map<string, number[]>();
+const classOf = (description: string) => CLASSES.find((c) => new RegExp(`^An? (?:two-storey )?${c}\\b`).test(description));
+const objectPrice = (def: string) => byId.get(def)?.price ?? 0;
 // A farm lot's house is a large lot's (town.ts `houseLot`).
 for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => size !== 'farm')) {
   for (let seed = 1; seed <= perSize; seed++) {
@@ -131,6 +140,17 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
     const outer = h.doors.slice(1).filter((d) => (d.axis === 'x' ? d.z === z1 : d.x === x0 || d.x === x1) && d.z >= z0);
     if (outer.length) stats.gardenDoors++;
     if (outer.some((d) => d.axis === 'x')) stats.backs++;
+    // Priced as it stands for sale: furnished for nobody in particular.
+    const cls = classOf(h.description);
+    if (!cls) problems.push(`${name}: no house class in "${h.description}"`);
+    else {
+      const [bare, rates] = [variants[0][2]!, baseFile.economy?.homePrice];
+      const { width, depth } = bare.lot ?? lot;
+      const { total } = priceOf(objectPrice, rates, bare, width, depth);
+      for (const k of [cls, `${cls} ${garden}`]) prices.set(k, [...(prices.get(k) ?? []), total]);
+      // The same lot with the house cleared away.
+      prices.set(`empty ${garden}`, [...(prices.get(`empty ${garden}`) ?? []), priceOf(objectPrice, rates, undefined, width, depth).total]);
+    }
     if (h.upper) stats.two++;
     if (h.basement) stats.basements++;
     const all = [...h.objects, ...(h.upper?.objects ?? []), ...(h.basement?.objects ?? [])];
@@ -194,6 +214,23 @@ console.log(`  ${per(stats.rooms)} rooms per house; by kind (count, mean and lar
 for (const [k, v] of [...kinds].sort((a, b) => b[1].n - a[1].n)) console.log(`    ${k}: ${v.n}, ${(v.area / v.n).toFixed(1)} m², up to ${v.most} m², ${v.long} m long`);
 console.log('  share of the lot a house covers (least, mean, most), by house and garden size:');
 for (const [k, v] of [...covers].sort()) console.log(`    ${k}: ${[Math.min(...v), v.reduce((a, b) => a + b, 0) / v.length, Math.max(...v)].map((c) => `${(c * 100).toFixed(0)}%`).join(', ')}`);
+const mean = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
+const priced = (v: number[]) => `$${Math.min(...v).toLocaleString()} / $${Math.round(mean(v)).toLocaleString()} / $${Math.max(...v).toLocaleString()} (${v.length})`;
+console.log('  prices (least / mean / most, and how many), by house class and garden size:');
+for (const c of CLASSES) {
+  if (!prices.has(c)) continue;
+  console.log(`    ${c}: ${priced(prices.get(c)!)}`);
+  for (const g of GARDEN_SIZES) if (prices.has(`${c} ${g}`)) console.log(`      ${g}: ${priced(prices.get(`${c} ${g}`)!)}`);
+}
+console.log(`  an empty lot (a house's lot, the house cleared away): ${GARDEN_SIZES.filter((g) => prices.has(`empty ${g}`)).map((g) => `${g} ${priced(prices.get(`empty ${g}`)!)}`).join(', ')}`);
+// The bigger the class, the dearer: a bungalow and a town house are much the same (wider and lower, or narrower and taller), so they may swap a little.
+const means = CLASSES.flatMap((c) => (prices.has(c) ? [[c, mean(prices.get(c)!)] as const] : []));
+for (const [i, [a, pa]] of means.entries()) {
+  for (const [b, pb] of means.slice(i + 1)) {
+    const near = a === 'bungalow' && b === 'town house';
+    if (near ? pb < pa * 0.85 : pb <= pa) problems.push(`a ${b} costs $${Math.round(pb).toLocaleString()} on average, a ${a} $${Math.round(pa).toLocaleString()}: the bigger, the dearer`);
+  }
+}
 for (const t of towns.slice(0, 8) as { size: string; name: string; description: string }[]) console.log(`  ${t.size}: ${t.name} — ${t.description}`);
 if (problems.length) {
   console.log(`${problems.length} problems:`);

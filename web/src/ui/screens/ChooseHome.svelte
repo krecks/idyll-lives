@@ -4,6 +4,8 @@
   import { houseTemplate, loadTemplates, slotDims, vacantSlots, withGarden, type PlotSlot, type Templates } from '../../game/town';
   import type { GardenSize } from '../../game/housegen';
   import { residentsOf, sleepersOf } from '../../game/household';
+  import { homePrice, priceParts } from '../../game/price';
+  import { fundsAfter, savingsOf } from '../../game/wealth';
   import { app } from '../app.svelte';
   import { money } from '../format';
   import Icon from '../Icon.svelte';
@@ -81,11 +83,21 @@
           .slice(0, 3)
       : [],
   );
-  /** What the household has to build with on an empty lot (Living), or "free" (Creative). */
+  /** A Creative game: homes are free, money is no object. */
+  const creative = $derived(app.mode === 'creative');
+  /** What the household has saved: what it can pay for a home (Living). */
+  const savings = savingsOf(services.content, household);
+  /** The chosen home's price (an empty lot: the land alone), and what it's made of. */
+  const parts = $derived(templates && selected ? priceParts(services.content, templates, selected, lot === 'empty' || !house) : null);
+  /** The chosen home costs more than the household has saved: it can't move in (Living). */
+  const tooDear = $derived(!creative && !!parts && parts.total > savings);
+  /** Whether the household can buy plot `s`'s home as it stands (for sale tags and chips; Creative: any). */
+  const affordable = (s: PlotSlot) => creative || !templates || homePrice(services.content, templates, s) <= savings;
+  /** What the household has to build with once it has bought its home (Living), or "free" (Creative). */
   const budget = $derived(
-    app.mode === 'creative'
+    creative
       ? 'Free: this is a Creative game'
-      : money(economy.startingFunds + (lot === 'empty' ? (economy.emptyLotFunds ?? 0) : 0)),
+      : money(fundsAfter(services.content, savings, parts?.total ?? 0) + (lot === 'empty' ? (economy.emptyLotFunds ?? 0) : 0)),
   );
   const mine = `The ${household.name}s`;
 
@@ -95,7 +107,8 @@
       if (s.kind !== 'house') return { plot: s.index, title: s.name, kind: 'park' };
       if (h) return { plot: s.index, title: `The ${h.household.name}s`, kind: 'home' };
       if (selected?.index === s.index) return { plot: s.index, title: mine, sub: lot === 'empty' ? 'An empty lot' : 'Your new home', kind: 'mine' };
-      return { plot: s.index, title: 'For sale', sub: bedrooms(s), kind: 'sale' };
+      const price = creative || !templates ? 0 : homePrice(services.content, templates, s);
+      return { plot: s.index, title: price ? `For sale · ${money(price)}` : 'For sale', sub: bedrooms(s), kind: 'sale' };
     }),
   );
 
@@ -115,6 +128,7 @@
   }
 
   function moveIn() {
+    if (tooDear) return;
     if (shortage) {
       confirming = true;
       return;
@@ -159,7 +173,7 @@
       <span class="eyebrow">Step 4 of 4 · Choose a home</span>
       <h1>Where will the {household.name}s live?</h1>
     </div>
-    <button class="btn primary large move" disabled={!selected} onclick={moveIn}>Move in →</button>
+    <button class="btn primary large move" disabled={!selected || tooDear} title={tooDear ? `The ${household.name}s can't afford this home` : undefined} onclick={moveIn}>Move in →</button>
   </header>
 
   <main>
@@ -222,11 +236,27 @@
                 <dt>Bedrooms</dt>
                 <dd>{house.bedrooms}</dd>
               {/if}
+              {#if parts && !creative}
+                <dt>Price</dt>
+                <dd>
+                  {money(parts.total)}
+                  {#if parts.house || parts.furniture}
+                    <small class="parts">land {money(parts.land)} · house {money(parts.house)} · furniture {money(parts.furniture)}</small>
+                  {/if}
+                </dd>
+                <dt>Saved</dt>
+                <dd>{money(savings)}</dd>
+              {/if}
               <dt>To build with</dt>
               <dd>{budget}</dd>
               <dt>Your household</dt>
               <dd>{household.members.map((m) => m.name).join(', ')}</dd>
             </dl>
+            {#if tooDear && parts}
+              <p class="shortage" role="status">
+                Too expensive: the {household.name}s have {money(savings)} saved, {money(parts.total - savings)} short.{lot === 'empty' ? '' : ' Start on an empty lot, or choose a home that costs less.'}
+              </p>
+            {/if}
             {#if shortage}
               <p class="shortage" role="status">
                 Only {shortage.beds} bed place{shortage.beds === 1 ? '' : 's'} for {shortage.sleepers} sleepers. You can still move in: they'll share a bed or sleep on the floor until you add beds.
@@ -247,7 +277,15 @@
             <span class="eyebrow">Also for sale</span>
             <div class="chips">
               {#each vacant as v (v.index)}
-                <button class="chip" class:on={v.index === selected.index} onmouseenter={() => (hover = v.index)} onmouseleave={() => (hover = null)} onclick={() => choose(v.index)}>
+                <button
+                  class="chip"
+                  class:on={v.index === selected.index}
+                  class:dear={!affordable(v)}
+                  title={affordable(v) ? undefined : 'Too expensive for them'}
+                  onmouseenter={() => (hover = v.index)}
+                  onmouseleave={() => (hover = null)}
+                  onclick={() => choose(v.index)}
+                >
                   {v.name}
                 </button>
               {/each}
@@ -488,6 +526,16 @@
   .chip.on {
     background: var(--accent);
     color: #fff;
+  }
+  /* More than the household has saved: still there to look at. */
+  .chip.dear {
+    opacity: 0.45;
+  }
+  .parts {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
   }
   @keyframes rise {
     from {

@@ -17,8 +17,10 @@ import type { Content } from '../content/content';
 import type { GameKind, LandscapeParams, Lifespan, WorldLook } from '../core/protocol';
 import { fetchText } from '../content/content';
 import { bedroomsNeeded, householdBonds, householdSpawns, randomHousehold, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
+import { homePrice } from './price';
 import { generateHouse, objectInfos, random, residentsKey, type GardenSize, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
 import { cropRoads, inside, leftOf, lengths, nearest, roadExits, roadMask, tangent, type Pt, type RoadPlan } from './roads';
+import { fundsAfter, savingsOf } from './wealth';
 import { streetNames, WORLDS, worldName, worldTagline, type WorldKind } from './world';
 
 export type Wall = [number, number, number, number];
@@ -667,31 +669,83 @@ export function generateWorld(content: Content, t: Templates, kind: WorldKind, s
   };
 }
 
+/** Tries at a household for a home: one that fits it and can buy it, not too rich for it. */
+const HOUSEHOLD_TRIES = 36;
+/** Savings beyond this many times a home's price make a household too well off for it (taken only when nothing closer turns up). */
+const RICH_FOR = 4;
+
 /**
- * Neighbours for a town: `count` households (default: all but two houses empty) in houses picked
- * at random, each sized to its home, no more than `MAX_NEIGHBOURS` residents in all.
+ * Neighbours for a town: `count` households (default: all but two houses empty), each in a home
+ * that has room for it and that it could buy (`wealth.ts` `savingsOf` covers `price.ts`
+ * `homePrice`), no more than `MAX_NEIGHBOURS` residents in all. The houses are picked at random
+ * and filled dearest first; one no household turns up for stays for sale.
  */
 export function populate(content: Content, assets: AssetRegistry, t: Templates, town: NeighbourhoodDraft, count?: number): NeighbourhoodDraft {
   const houses = town.slots.filter((s) => s.kind === 'house');
   const wanted = Math.max(0, Math.min(count ?? houses.length - 2, houses.length - 1));
+  const price = new Map(houses.map((s) => [s.index, homePrice(content, t, s)]));
+  const dearestFirst = (list: PlotSlot[]) => [...list].sort((a, b) => price.get(b.index)! - price.get(a.index)!);
+  // The houses picked first; the others stand in for any of them nobody could buy. The town's
+  // cheapest home stays for sale (if it can): a starter home within reach of a young household.
+  const cheapest = houses.reduce<PlotSlot | undefined>((a, s) => (!a || price.get(s.index)! < price.get(a.index)! ? s : a), undefined);
+  const order = [...shuffled(houses.filter((s) => s !== cheapest)), ...(cheapest ? [cheapest] : [])];
+  const queue = [...dearestFirst(order.slice(0, wanted)), ...dearestFirst(order.slice(wanted))];
   const taken = new Set<string>();
   const households: NeighbourhoodDraft['households'] = [];
   let residents = 0;
-  for (const slot of shuffled(houses).slice(0, wanted)) {
-    if (residents >= MAX_NEIGHBOURS) break;
+  for (const slot of queue) {
+    if (households.length >= wanted || residents >= MAX_NEIGHBOURS) break;
     const bedrooms = houseTemplate(t, slot.template)?.bedrooms ?? 1;
-    let size = Math.max(1, Math.min(4, bedrooms + Math.floor(Math.random() * 2), MAX_NEIGHBOURS - residents));
-    // A household that fits: a couple shares a bedroom, two children may, anyone else needs one.
-    let household = randomHousehold(content, assets, size, [...taken]);
-    for (let tries = 1; bedroomsNeeded(residentsOf(content, household)) > bedrooms && size > 1; tries++) {
-      if (tries % 6 === 0) size--;
-      household = randomHousehold(content, assets, size, [...taken]);
-    }
+    const household = householdFor(content, assets, bedrooms, price.get(slot.index)!, MAX_NEIGHBOURS - residents, [...taken]);
+    if (!household) continue;
     taken.add(household.name);
     residents += household.members.length;
     households.push({ household, slot: slot.index });
   }
   return { ...town, households };
+}
+
+/**
+ * A household for a home with `bedrooms` that costs `price`: it fits (a couple shares a bedroom,
+ * two children may, anyone else needs one), has saved enough to buy it, and preferably isn't
+ * many times richer than it needs to be. A dear home looks mostly among older households, who
+ * have climbed higher and put more by. Null if none turns up.
+ */
+function householdFor(
+  content: Content,
+  assets: AssetRegistry,
+  bedrooms: number,
+  price: number,
+  room: number,
+  avoidNames: readonly string[],
+): HouseholdDraft | null {
+  let size = Math.max(1, Math.min(4, bedrooms + Math.floor(Math.random() * 2), room));
+  let best: { household: HouseholdDraft; savings: number } | null = null;
+  // A home dearer than two young grown-ups between jobs could buy goes mostly to an older household.
+  const young = (content.adultStages[0]?.from ?? 18) + 7;
+  const dear = price > savingsOf(content, { members: [{ age: young }, { age: young }] });
+  for (let tries = 0, misfits = 0; tries < HOUSEHOLD_TRIES; tries++) {
+    const household = randomHousehold(content, assets, size, avoidNames, { older: dear ? Math.random() < 0.8 : Math.random() < 0.2 });
+    if (bedroomsNeeded(residentsOf(content, household)) > bedrooms) {
+      if (++misfits % 6 === 0 && size > 1) size--;
+      continue;
+    }
+    const savings = savingsOf(content, household);
+    if (savings < price) continue;
+    if (savings <= Math.max(price, 1) * RICH_FOR) return household;
+    if (!best || savings < best.savings) best = { household, savings };
+  }
+  return best?.household ?? null;
+}
+
+/**
+ * Another household for the home on `slot` (one that fits it and can buy it, as `populate` finds
+ * them), with a name none of `avoidNames` has; any household of `size` if none turns up.
+ */
+export function rehouse(content: Content, assets: AssetRegistry, t: Templates, town: NeighbourhoodDraft, slot: number, size: number, avoidNames: readonly string[]): HouseholdDraft {
+  const s = town.slots[slot];
+  const bedrooms = (s && houseTemplate(t, s.template)?.bedrooms) ?? 1;
+  return (s && householdFor(content, assets, bedrooms, homePrice(content, t, s), MAX_NEIGHBOURS, avoidNames)) ?? randomHousehold(content, assets, size, avoidNames);
 }
 
 /** A town of one of the older sizes with its neighbours (a large one is a dense town now). */
@@ -1003,14 +1057,22 @@ export function assembleTown(
   const residents: { household: HouseholdDraft; slot: number; player: boolean }[] = existing
     ? neighbours
     : [{ household: player, slot: playerSlot, player: true }, ...neighbours];
-  const { startingFunds, emptyLotFunds = 0 } = content.economy;
+  const { emptyLotFunds = 0 } = content.economy;
   const emptyLot = !houseTemplate(t, home.template);
-  const households = residents.map((r, i) => ({
-    name: r.household.name.trim(),
-    plot: r.slot,
-    player: r.player,
-    ...(!existing && i === 0 && emptyLot && mode === 'living' ? { funds: startingFunds + emptyLotFunds } : {}),
-  }));
+  // What each household has left to spend once it has bought its home (a new household on an
+  // empty lot: the lot, and money to build with besides). A new household in a Creative game
+  // has the game's money.
+  const funds = (r: (typeof residents)[number], i: number): number | undefined => {
+    const fresh = !existing && i === 0;
+    if (fresh && mode !== 'living') return undefined;
+    const slot = town.slots[r.slot];
+    const after = fundsAfter(content, savingsOf(content, r.household), homePrice(content, t, slot, fresh && emptyLot));
+    return fresh && emptyLot ? after + emptyLotFunds : after;
+  };
+  const households = residents.map((r, i) => {
+    const money = funds(r, i);
+    return { name: r.household.name.trim(), plot: r.slot, player: r.player, ...(money !== undefined ? { funds: money } : {}) };
+  });
   const sims: (SimSpawn & { job?: { career: string; level: number } })[] = [];
   const relationships: { a: number; b: number; preset: string }[] = [];
   residents.forEach((r, index) => {
@@ -1018,16 +1080,12 @@ export function assembleTown(
     const template = houseTemplate(t, slot.template);
     const spawns = ((template && onLot(t, template, slot, footprint).spawns) ?? [[slotDims(t, slot).width / 2, 1.5]]).map(turnOnto(t, slot).point);
     relationships.push(...householdBonds(r.household, sims.length));
-    for (const spawn of householdSpawns(r.household, index, spawns)) {
-      // Most neighbours already work somewhere (an existing household the player takes over too);
-      // a newly arrived household finds jobs in game. Neighbours start somewhere on the ladder
-      // (mostly the lower grades) with the skills for it.
-      const tracks = content.careerCategories.flatMap((c) => c.tracks);
-      const settled = !r.player || existing;
-      const track = settled && tracks.length && Math.random() < 0.75 ? pick(tracks) : null;
-      const level = Math.floor(Math.random() ** 2 * 6);
-      sims.push(track ? { ...spawn, job: { career: track.id, level } } : spawn);
-    }
+    householdSpawns(r.household, index, spawns).forEach((spawn, m) => {
+      // Their jobs as drafted (`wealth.ts` `jobFor`, or picked in Creation): the simulation gives
+      // them the skills for their grade (a retired one's becomes a pension). Children have none.
+      const { age, job } = r.household.members[m];
+      sims.push(job && content.isAdult(age) ? { ...spawn, job: { career: job.career, level: job.level } } : spawn);
+    });
   });
 
   // Neighbours have history with each other; a newly arrived player household doesn't.

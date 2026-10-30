@@ -5,7 +5,9 @@
  * (`cargo test -p sim-core --test generated_worlds -- --ignored`, reading WORLDS). Checks the
  * layout first: lots inside the town, apart from each other and off the roads, each by its road (a
  * park may stand on a green),
- * the ways out of town on its edge. Problems are listed (and the exit code is 1).
+ * the ways out of town on its edge. And the neighbours: every household's savings cover its
+ * home's price (web/src/game/wealth.ts, price.ts); per kind of house, how old its owners are and
+ * how high up they work. Problems are listed (and the exit code is 1).
  *
  * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind]
  */
@@ -30,6 +32,8 @@ const { objectInfos } = await import('../../web/src/game/housegen.ts');
 const { randomHousehold } = await import('../../web/src/game/household.ts');
 const { assembleTown, generateWorld, houseTemplate, populate, vacantSlots } = await import('../../web/src/game/town.ts');
 const { WORLD_KINDS } = await import('../../web/src/game/world.ts');
+const { homePrice } = await import('../../web/src/game/price.ts');
+const { savingsOf } = await import('../../web/src/game/wealth.ts');
 const { nearest, roadMask } = await import('../../web/src/game/roads.ts');
 
 type Rect = { x: number; z: number; w: number; d: number };
@@ -65,6 +69,14 @@ const templates: Templates = { ...(read('houses.json') as Templates), gen: read(
 const out = process.argv[2] ?? 'worlds.json';
 const perKind = Number(process.argv[3] ?? 3);
 const worlds: unknown[] = [];
+/** House classes (housegen.json `classes`), as a generated house's description names them. */
+const HOUSE_CLASSES = ['cottage', 'bungalow', 'town house', 'family house', 'villa'];
+/** Per house class: homes lived in, and their owners' summed eldest grown-up's age, top job grade (-1 none), how many are settled (`SETTLED_AGE` or `SENIOR`), price, savings. */
+const owned: Record<string, { homes: number; age: number; level: number; settled: number; price: number; savings: number }> = {};
+const SETTLED_AGE = 35;
+/** Grade F, Senior. */
+const SENIOR = 5;
+const forSale: Record<string, number> = {};
 for (const kind of WORLD_KINDS) {
   for (let i = 1; i <= perKind; i++) {
     const seed = i * 104729 + kind.length;
@@ -74,6 +86,29 @@ for (const kind of WORLD_KINDS) {
     const player = randomHousehold(content, assets, 2);
     const file = JSON.parse(assembleTown(content, templates, town, player, home.index));
     for (const p of layoutProblems(file)) problems.push(`${kind} ${seed}: ${p}`);
+    for (const { household, slot } of town.households) {
+      const s = town.slots[slot];
+      const price = homePrice(content, templates, s);
+      const savings = savingsOf(content, household);
+      if (savings < price) problems.push(`${kind} ${seed}: the ${household.name}s saved $${savings} for ${s.name}, which costs $${price}`);
+      const house = houseTemplate(templates, s.template);
+      const cls = HOUSE_CLASSES.find((c) => house?.description.toLowerCase().includes(c)) ?? house?.name ?? s.template;
+      const adults = household.members.filter((m) => content.isAdult(m.age));
+      const owners = (owned[cls] ??= { homes: 0, age: 0, level: 0, settled: 0, price: 0, savings: 0 });
+      const eldest = Math.max(0, ...adults.map((m) => m.age));
+      const level = Math.max(-1, ...adults.map((m) => m.job?.level ?? -1));
+      owners.homes++;
+      owners.age += eldest;
+      owners.level += level;
+      if (eldest >= SETTLED_AGE || level >= SENIOR) owners.settled++;
+      owners.price += price;
+      owners.savings += savings;
+    }
+    for (const s of vacantSlots(town)) {
+      const house = houseTemplate(templates, s.template);
+      const cls = HOUSE_CLASSES.find((c) => house?.description.toLowerCase().includes(c)) ?? house?.name ?? s.template;
+      forSale[cls] = (forSale[cls] ?? 0) + 1;
+    }
     worlds.push({ kind, seed, name: town.name, town: file });
     const farms = town.slots.filter((s) => s.lot === 'farm').length;
     const basements = town.slots.filter((s) => s.kind === 'house' && houseTemplate(templates, s.template)?.basement).length;
@@ -83,6 +118,17 @@ for (const kind of WORLD_KINDS) {
         `${file.sims.length} residents, ${file.objects.length} things`,
     );
   }
+}
+console.log(`Owners per kind of house (the eldest grown-up, the highest job grade, A = 0; settled: ${SETTLED_AGE}+ or grade F up):`);
+for (const cls of [...HOUSE_CLASSES, ...Object.keys(owned).filter((c) => !HOUSE_CLASSES.includes(c))]) {
+  const o = owned[cls];
+  if (!o && !forSale[cls]) continue;
+  const n = o?.homes ?? 0;
+  const mean = (v: number) => (n ? (v / n).toFixed(1) : '-');
+  const dollars = (v: number) => (n ? `$${Math.round(v / n / 1000)}k` : '-');
+  console.log(
+    `  ${cls.padEnd(13)} ${String(n).padStart(3)} lived in, ${String(forSale[cls] ?? 0).padStart(3)} for sale: age ${mean(o?.age ?? 0)}, grade ${mean(o?.level ?? 0)}, ${n ? Math.round((100 * o!.settled) / n) : '-'}% settled, price ${dollars(o?.price ?? 0)}, saved ${dollars(o?.savings ?? 0)}`,
+  );
 }
 writeFileSync(out, JSON.stringify(worlds));
 console.log(`${worlds.length} worlds → ${out}`);

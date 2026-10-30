@@ -508,12 +508,30 @@ export interface WindowStyleDef {
   price?: number;
 }
 
+/** A work shift: when it starts, how many hours, on which days of the week (0 Monday). */
+export interface Shift {
+  start: number;
+  hours: number;
+  days: number[];
+}
+
+/** A grade of every career (`careers.json` `grades`): a career's titles are its grades in order. */
+export interface CareerGrade {
+  id: string;
+  label: string;
+  payPerHour: number;
+  skillLevel: number;
+}
+
 export interface CareerCategory {
   id: string;
   label: string;
   icon: string;
   description: string;
-  tracks: { id: string; label: string; titles: string[] }[];
+  /** Pay against the grades' (sim-core `content.rs` `careers`); the tracks' shift, unless they have their own. */
+  payFactor?: number;
+  shift?: Shift;
+  tracks: { id: string; label: string; titles: string[]; payFactor?: number; shift?: Shift }[];
 }
 
 export interface Economy {
@@ -521,7 +539,11 @@ export interface Economy {
   /** Extra money to build with when a household starts on an empty lot (Living games). */
   emptyLotFunds?: number;
   currency: string;
-  rent?: { weekday: number; hour: number; base: number; perTile: number; billsBase?: number; billsRate?: number };
+  rent?: { weekday: number; hour: number; base: number; perTile: number; billsBase?: number; billsRate?: number; perResident?: number };
+  /** A home's price (`game/price.ts`). */
+  homePrice?: { perTile: number; perFloorTile: number; furniture: number; round: number; sizeRef?: number; sizePremium?: number };
+  /** What a household has saved (`game/wealth.ts`). */
+  savings?: { base: number; rate: number; yearsPerGrade: number; keep: number };
 }
 
 export interface TraitDef {
@@ -636,6 +658,7 @@ interface ContentFile {
   emotions: EmotionDef[];
   socials: SocialDef[];
   careerCategories?: CareerCategory[];
+  grades?: CareerGrade[];
   bondPresets: Record<string, unknown>;
   events: Record<string, string>;
   objects: ObjectDef[];
@@ -653,7 +676,7 @@ interface ContentFile {
   roomKinds?: RoomKindDef[];
   accidents?: AccidentDef[];
   roomRules?: { decorByCategory?: Record<string, number>; lampTiles?: number; windowTiles?: number };
-  life?: { daysPerYear?: number; startAge?: [number, number]; stages?: LifeStageDef[]; adoption?: { cost: number } };
+  life?: { daysPerYear?: number; startAge?: [number, number]; stages?: LifeStageDef[]; adoption?: { cost: number }; retireAt?: number };
   economy?: Partial<Economy>;
   objectRules?: { freeRotation?: string[] };
   /** Animation tags interactions can use as `anim` (the snapshot layout's `actions`). */
@@ -684,6 +707,10 @@ export class Content {
   readonly emotions: readonly EmotionDef[];
   readonly socials: readonly SocialDef[];
   readonly careerCategories: readonly CareerCategory[];
+  /** The grades every career's titles are, in order. */
+  readonly careerGrades: readonly CareerGrade[];
+  /** The age residents retire at (their job becomes a pension). */
+  readonly retireAt: number;
   readonly skills: readonly SkillDef[];
   readonly objectColors: readonly ObjectColorDef[];
   readonly buyCategories: readonly BuyCategory[];
@@ -750,6 +777,8 @@ export class Content {
     this.emotions = file.emotions ?? [];
     this.socials = file.socials ?? [];
     this.careerCategories = file.careerCategories ?? [];
+    this.careerGrades = file.grades ?? [];
+    this.retireAt = file.life?.retireAt ?? 65;
     this.skills = file.skills ?? [];
     this.objectColors = file.objectColors ?? [];
     this.buyCategories = file.buyCategories ?? [];

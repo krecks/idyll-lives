@@ -3,7 +3,7 @@
   import { lookAtAge, randomHousehold } from '../../game/household';
   import { reducedMotion } from '../../game/host';
   import { menuScene } from '../../game/menuScene';
-  import { loadTemplates, populate, vacantSlots, type NeighbourhoodDraft, type Templates } from '../../game/town';
+  import { loadTemplates, populate, rehouse, vacantSlots, type NeighbourhoodDraft, type Templates } from '../../game/town';
   import { app } from '../app.svelte';
   import Icon from '../Icon.svelte';
   import SimPreview from '../kit/SimPreview.svelte';
@@ -53,7 +53,8 @@
     const households = [...town.households];
     // (A name no other household here has.)
     const taken = households.filter((_, j) => j !== i).map((h) => h.household.name);
-    households[i] = { ...households[i], household: randomHousehold(content, assets, households[i].household.members.length, taken) };
+    // (One that can buy the home they live in.)
+    households[i] = { ...households[i], household: templates ? rehouse(content, assets, templates, town, households[i].slot, households[i].household.members.length, taken) : randomHousehold(content, assets, households[i].household.members.length, taken) };
     town = { ...town, households };
   }
 
