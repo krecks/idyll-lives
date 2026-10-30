@@ -192,8 +192,8 @@ flags are at the top of its file in `web/src/debug/`. The ones the review uses:
 
 ## States for checks
 
-The simulation's tests write these with `DUMP_STATES=1 cargo test -p sim-core --test check_states`
-(`crates/sim-core/tests/check_states.rs`) into `debug-states/` (gitignored); open one with
+The simulation's tests write these with `DUMP_STATES=1 cargo test -p sim-core --test sim check_states::`
+(`crates/sim-core/tests/sim/check_states.rs`) into `debug-states/` (gitignored); open one with
 `?state=<name>&debug` on the dev server. Each test checks its state is still fit for use as content changes.
 
 | State | What's in it |

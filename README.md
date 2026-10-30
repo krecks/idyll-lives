@@ -189,7 +189,7 @@ Everything gameplay-related is JSON in `web/public/content/`:
 - `base.json`: needs, genders, traits, perks, objects, **social interactions** (requirements, success chances, outcomes, animation), emotions, feelings, bond presets, social rules, **careers** (levels, pay, hours, workdays, work effects), **daily schedule** windows, visit rules, starting funds, story-feed texts.
 - `houses.json`: house layouts and the park, stamped onto town plots.
 
-Add an object to `content/base.json` or one of the files it `include`s (the catalogue is in `furniture.json`, `garden.json`, `community.json`, `catalog2/` and `packs/`: footprint, interactions, need effects, model key) and its model key to the manifest; homes are furnished from `houses.json` and `housegen.json`, or bought in the game. (`content/lots/starter.json` is only for the tests and the pack checker.) Content is checked when it loads: a value that would break the game is refused with the file and id in the message. `cargo test` validates the shipped content (`crates/sim-core/tests/shipped_content.rs`).
+Add an object to `content/base.json` or one of the files it `include`s (the catalogue is in `furniture.json`, `garden.json`, `community.json`, `catalog2/` and `packs/`: footprint, interactions, need effects, model key) and its model key to the manifest; homes are furnished from `houses.json` and `housegen.json`, or bought in the game. (`content/lots/starter.json` is only for the tests and the pack checker.) Content is checked when it loads: a value that would break the game is refused with the file and id in the message. `cargo test` validates the shipped content (`crates/sim-core/tests/sim/shipped_content.rs`).
 
 A production build serves the content from `bundle.json`, which wins over the loose files: to edit content inside a built site, rebuild it or delete `dist/bundle.json`.
 
@@ -199,7 +199,7 @@ Pack authors: see [docs/content-packs.md](docs/content-packs.md). The look of th
 
 The current version is **0.5.1**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `cargo release-version` prints it and fails if they differ (CI checks this); `cargo release-version 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
 
-Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 33 since 0.5.0, also in 0.5.1 (32 in 0.3.1 to 0.4.2, 29 in 0.3.0, 23 in 0.2.0; 0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
+Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 33 since 0.5.0, also in 0.5.1 (32 in 0.3.1 to 0.4.2, 29 in 0.3.0, 23 in 0.2.0; 0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/sim/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
 
 **Releasing** (`.github/workflows/pages.yml`):
 1. `cargo release-version <x.y.z>` (it updates `Cargo.lock` too, so no `cargo build` is needed), and a `## <x.y.z> — <date>` section in CHANGELOG.md, with the date set by hand. Commit both on `main`, and `git push origin main`: the dry run builds what GitHub has.
