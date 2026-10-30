@@ -807,7 +807,7 @@ Phase 4, by band and group. Commits are from each finding's Status line in its l
 | G-45 | I-kids-03, I-kitchen-06, I-community-04 (S1s), I-systems-04, I-kids-08 | 697544c2, 742572df, d2027317 | Age rules (`stages`, `upperStages`) on free will and orders alike; the kids' table seats children for a meal. |
 | G-46 | M-bedroom-04, A-bedroom-04, I-bedroom-01, I-bathroom-03 | f4925b24, d7190242 | Quilts in each bed's colours and none at the origin; pyjamas only for a night's sleep; towels and swimwear (Q-10). |
 | G-47 | I-living-05 | aac64b84, 1224f373 | Watching takes a seat that faces the screen. |
-| G-48 | A-houses-01, A-houses-02, A-town-02 | e04bc6c0, 163884cd | Doors and gates open only for the one going through, in time at every speed (the cheap part, Q-03); the resident's hand on the handle, and the leaf's lead following the game's speed (`doorLead`, 2026-10-30). |
+| G-48 | A-houses-01, A-houses-02, A-town-02 | e04bc6c0, 0cca0ba3 | Doors and gates open only for the one going through, in time at every speed (the cheap part, Q-03); the resident's hand on the handle, and the leaf's lead following the game's speed (`doorLead`, 2026-10-30). |
 | G-49 | I-kitchen-04, I-held-04 | 57b3a576 | Hands free at each station; the dish carried to the table and eaten there. |
 | G-50 | I-garden-03, A-outdoor-02 (in part) | 7d186856 | A crop is picked and the washing hung out as the hands go (`gradual`, motions `over`). |
 | G-51 | A-bedroom-03, A-hobbies-01, A-residents-01 | 36198175, 0d20c5c9, d7b7096d, ad1c277d | Into bed from its side, to a desk from behind (`approach`), up at the seat before the step back. |
