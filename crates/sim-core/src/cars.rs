@@ -64,6 +64,9 @@ const AHEAD: f32 = 2.2;
 const BESIDE: f32 = 0.35;
 /// Someone waiting for a car to pass for this long steps aside out of its way (`make_way`).
 pub(crate) const MAKE_WAY_TICKS: u32 = 30;
+/// How long a car waits for someone who won't step aside (with nowhere to step) before it drives
+/// on.
+const PASS_TICKS: u32 = 3 * crate::TICKS_PER_MINUTE as u32;
 /// How long someone done at work waits there for the others in their car.
 const RIDE_WAIT_TICKS: u64 = 60 * crate::TICKS_PER_MINUTE;
 /// The drive between the end of town and work, each way.
@@ -291,9 +294,13 @@ impl Car {
         self.local(along, (self.wid / 2.0 + DOOR_OUT) * k)
     }
 
-    /// Where the one getting in by door `d` sits (the front seats a little back from the doors).
-    pub(crate) fn seat_at(&self, d: usize) -> [f32; 2] {
+    /// Where the one in `seat` sits, getting in by door `d`: on that door's side (the front seats a
+    /// little back from the doors), the fifth (seat 4) in the middle at the back.
+    pub(crate) fn seat_at(&self, seat: usize, d: usize) -> [f32; 2] {
         let (k, along) = self.door_side(d);
+        if seat >= DOORS {
+            return self.local(-self.len * 0.19, 0.0);
+        }
         let along = if d < 2 { self.len * 0.05 } else { along };
         self.local(along, (self.wid / 2.0 - 0.5).max(0.2) * k)
     }
@@ -666,22 +673,49 @@ pub(crate) fn may_board(w: &World, i: usize, c: u32) -> bool {
     seat(&w.cars, &w.briefs, &w.households, &w.sims[i]).is_some_and(|(k, _)| k == c)
 }
 
-/// How much earlier than on foot `i` leaves for work or school when their household's car is
-/// at home to take them: the walk to it, getting in, the drive out of town and on to work. 0
-/// without one.
-pub(crate) fn lead_ticks(w: &World, i: usize) -> u64 {
+/// How much earlier than on foot `i` leaves for work or school starting at `start` when their
+/// household's car is at home to take them: the walk to it, getting in, the drive out of town and
+/// on to work. 0 without one, and for one who can't drive it unless someone who can starts about
+/// when they do (so they set off together: `seat`).
+pub(crate) fn lead_ticks(w: &World, i: usize, start: u64) -> u64 {
     let s = &w.sims[i];
     let home = w.households.get(s.household as usize).and_then(|h| h.plot);
-    w.cars
+    let Some(car) = w
+        .cars
         .iter()
         .find(|c| c.household == s.household && Some(c.plot) == home && c.at_home() && !c.blocked)
-        .map_or(0, |c| {
-            WALK_TO_CAR_TICKS
-                + u64::from(GET_IN_TICKS)
-                + BOARD_MIN_TICKS
-                + c.out_ticks.ceil() as u64
-                + OFF_MAP_TICKS
+    else {
+        return 0;
+    };
+    let drives =
+        |j: usize| car.owners.contains(&(j as u32)) && w.briefs.get(j).is_some_and(|b| b.adult);
+    let lift = || {
+        car.owners.iter().any(|&j| {
+            let j = j as usize;
+            j != i
+                && drives(j)
+                && w.sims.get(j).is_some_and(|o| o.here())
+                && starts_today(w, j).is_some_and(|st| st.abs_diff(start) <= BOARD_WAIT_TICKS)
         })
+    };
+    if !drives(i) && !lift() {
+        return 0;
+    }
+    WALK_TO_CAR_TICKS
+        + u64::from(GET_IN_TICKS)
+        + BOARD_MIN_TICKS
+        + car.out_ticks.ceil() as u64
+        + OFF_MAP_TICKS
+}
+
+/// When `j`'s work (or school) starts today, if they have it.
+fn starts_today(w: &World, j: usize) -> Option<u64> {
+    let s = &w.sims[j];
+    match &s.job {
+        Some(job) => crate::life::shift_today(&w.content, job, &s.skills, w.tick),
+        None => crate::life::school_today(&w.content, s, w.tick),
+    }
+    .map(|(_, start, _)| start)
 }
 
 /// `i` gets in (their shift is under way): the first owner in drives (someone in before them waits
@@ -894,8 +928,9 @@ fn route_ticks(w: &mut World, c: usize, home: bool) -> f32 {
 }
 
 /// A tick further along its drive, unless someone is in its way: it waits for them. Someone
-/// standing there a while (a chat on the pavement) steps aside for it (`make_way`), unless
-/// they're at something.
+/// standing there a while (a chat on the pavement) steps aside for it (`make_way`). Someone at
+/// something (a bench, a letterbox) is beside its way at most, nothing stands on a street or a
+/// driveway: it doesn't wait for them. Nor, past `PASS_TICKS`, for anyone.
 fn drive_on(w: &mut World, c: usize) {
     let home = w.cars[c].state == CarState::Arriving;
     let t = w.cars[c].progress;
@@ -914,14 +949,19 @@ fn drive_on(w: &mut World, c: usize) {
     let (ahead, behind) = if reverse { (0.2, AHEAD) } else { (AHEAD, 0.2) };
     let mut waiting = false;
     for s in sims.iter_mut() {
-        if !s.here() || s.away_until.is_some() || !car.covers(at, yaw, s.pos, ahead, behind) {
+        let busy = || {
+            s.current()
+                .is_some_and(|a| matches!(a.phase, Phase::Using { .. }))
+        };
+        if !s.here()
+            || s.away_until.is_some()
+            || !car.covers(at, yaw, s.pos, ahead, behind)
+            || busy()
+        {
             continue;
         }
         waiting = true;
-        let busy = s
-            .current()
-            .is_some_and(|a| matches!(a.phase, Phase::Using { .. }));
-        if car.waited > MAKE_WAY_TICKS && !busy {
+        if car.waited > MAKE_WAY_TICKS {
             let nav = crate::path::NavGrid {
                 lot,
                 blocked,
@@ -932,54 +972,34 @@ fn drive_on(w: &mut World, c: usize) {
             }
         }
     }
-    if waiting {
+    if !waiting {
+        car.waited = 0;
+        car.progress += 1.0;
+    } else if car.waited < PASS_TICKS {
         car.waited += 1;
     } else {
-        car.waited = 0;
         car.progress += 1.0;
     }
 }
 
-/// Getting into `car` by their door, `t` ticks in (`Phase::Boarding`): at the door while it
-/// opens, a step in, sat in their seat while it shuts.
-pub(crate) fn getting_in(sim: &mut Sim, car: &Car, t: u32) {
+/// Getting into `car` (`inward`, `Phase::Boarding`) or out of it (`Phase::Alighting`) by their
+/// door, `t` ticks in: while it opens at the door going in (sat in their seat going out), then a
+/// step between the two, and in, sat while it shuts.
+pub(crate) fn getting(sim: &mut Sim, car: &Car, t: u32, inward: bool) {
     let d = usize::from(sim.car_door).min(DOORS - 1);
-    let (door, seat) = (car.door_at(d), car.seat_at(d));
-    if t < DOOR_OPENS {
+    let (door, seat) = (car.door_at(d), car.seat_at(usize::from(sim.car_seat), d));
+    let k = (t.saturating_sub(DOOR_OPENS) as f32 / STEP_IN as f32).min(1.0);
+    if t < DOOR_OPENS || inward && k >= 1.0 {
+        if inward == (t >= DOOR_OPENS) {
+            sim.pos = seat;
+            sim.yaw = car.yaw;
+            sim.pose = crate::content::Pose::Sit;
+        }
         return;
     }
-    let k = ((t - DOOR_OPENS) as f32 / STEP_IN as f32).min(1.0);
-    if k < 1.0 {
-        sim.pos = [
-            door[0] + (seat[0] - door[0]) * k,
-            door[1] + (seat[1] - door[1]) * k,
-        ];
-        sim.yaw = (seat[0] - door[0]).atan2(seat[1] - door[1]);
-        sim.pose = crate::content::Pose::Stand;
-    } else {
-        sim.pos = seat;
-        sim.yaw = car.yaw;
-        sim.pose = crate::content::Pose::Sit;
-    }
-}
-
-/// Getting out of `car` by their door, `t` ticks in (`Phase::Alighting`): sat while it opens,
-/// then a step out to beside it.
-pub(crate) fn getting_out(sim: &mut Sim, car: &Car, t: u32) {
-    let d = usize::from(sim.car_door).min(DOORS - 1);
-    let (door, seat) = (car.door_at(d), car.seat_at(d));
-    if t < DOOR_OPENS {
-        sim.pos = seat;
-        sim.yaw = car.yaw;
-        sim.pose = crate::content::Pose::Sit;
-        return;
-    }
-    let k = ((t - DOOR_OPENS) as f32 / STEP_IN as f32).min(1.0);
-    sim.pos = [
-        seat[0] + (door[0] - seat[0]) * k,
-        seat[1] + (door[1] - seat[1]) * k,
-    ];
-    sim.yaw = (door[0] - seat[0]).atan2(door[1] - seat[1]);
+    let (a, b) = if inward { (door, seat) } else { (seat, door) };
+    sim.pos = [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+    sim.yaw = (b[0] - a[0]).atan2(b[1] - a[1]);
     sim.pose = crate::content::Pose::Stand;
 }
 
@@ -1101,12 +1121,13 @@ fn walk_home(w: &mut World, i: usize, by: Option<(usize, usize)>) {
         let door = w.cars[c].door(&w.nav(), seat).map(|(d, _)| d);
         if let Some(door) = door {
             let car = &w.cars[c];
-            let (at, yaw) = (car.seat_at(door), car.yaw);
+            let (at, yaw) = (car.seat_at(seat, door), car.yaw);
             let sim = &mut w.sims[i];
             sim.pos = at;
             sim.yaw = yaw;
             sim.pose = crate::content::Pose::Sit;
             sim.bound_for_car = Some(c as u32);
+            sim.car_seat = seat as u8;
             sim.car_door = door as u8;
             sim.current = Some(crate::world::Activity {
                 task: Task {

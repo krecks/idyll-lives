@@ -881,12 +881,12 @@ pub enum Phase {
         host: Option<u32>,
     },
     /// At the door of the car they go to work in (`Sim::bound_for_car`), getting in: it opens,
-    /// they sit in, it shuts (`cars::getting_in`).
+    /// they sit in, it shuts (`cars::getting`).
     Boarding {
         ticks: u32,
     },
     /// Back home in the car, getting out on their way in (a `GoHome` task): sat in it as its door
-    /// opens, then out beside it (`cars::getting_out`).
+    /// opens, then out beside it (`cars::getting`).
     Alighting {
         ticks: u32,
     },
@@ -6955,7 +6955,7 @@ fn progress(
             *waited += ticks;
             let t = *waited;
             if let Some(car) = sim.bound_for_car.and_then(|c| ctx.cars.get(c as usize)) {
-                crate::cars::getting_in(sim, car, t);
+                crate::cars::getting(sim, car, t, true);
             }
             if t >= crate::cars::GET_IN_TICKS {
                 sim.current = None;
@@ -6971,7 +6971,7 @@ fn progress(
             *waited += ticks;
             let t = *waited;
             if let Some(car) = sim.bound_for_car.and_then(|c| ctx.cars.get(c as usize)) {
-                crate::cars::getting_out(sim, car, t);
+                crate::cars::getting(sim, car, t, false);
             }
             if t >= crate::cars::GET_OUT_TICKS {
                 sim.current = None;

@@ -1521,10 +1521,10 @@ struct StructureView<'a> {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     staff: Vec<StaffView>,
     /// Households' cars (`cars.rs`), in their snapshot rows' order (`snapshot::car`). Left out
-    /// when there are none (a game saved before cars: the renderer parks its own by the
-    /// neighbours' driveways).
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    cars: Vec<CarView>,
+    /// only for a game saved before cars, which has no driveways either (the renderer parks its
+    /// own by the neighbours' driveways); a town where nobody has one sends none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cars: Option<Vec<CarView>>,
     /// Garages at the inner ends of driveways (`cars::Garage`); left out when there are none.
     #[serde(skip_serializing_if = "<[_]>::is_empty")]
     garages: &'a [crate::cars::Garage],
@@ -2116,19 +2116,21 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                     .collect(),
             })
             .collect(),
-        cars: world
-            .cars
-            .iter()
-            .take(crate::cars::MAX_CARS)
-            .map(|c| CarView {
-                plot: c.plot,
-                x: c.spot[0],
-                z: c.spot[1],
-                yaw: c.yaw,
-                body: c.body,
-                paint: c.paint,
-            })
-            .collect(),
+        cars: (!world.cars.is_empty() || !world.drives.is_empty()).then(|| {
+            world
+                .cars
+                .iter()
+                .take(crate::cars::MAX_CARS)
+                .map(|c| CarView {
+                    plot: c.plot,
+                    x: c.spot[0],
+                    z: c.spot[1],
+                    yaw: c.yaw,
+                    body: c.body,
+                    paint: c.paint,
+                })
+                .collect()
+        }),
         garages: &world.garages,
     })
     .expect("structure serializes")
