@@ -81,6 +81,7 @@ const PROP = {
   sign: 'model.street.sign',
   busSign: 'model.street.busSign',
   shelter: 'model.busStop',
+  fountain: 'model.fountainTown',
   pot: 'model.street.pot',
   pathLight: 'model.street.pathLight',
   litterBin: 'model.litterBin',
@@ -598,6 +599,20 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
   roadMeshes(roads, null, 0, { walk, shadows });
   const index = new RoadIndex(roads);
   const cuts = sidewalkCuts(roads);
+  // How much of a side of a road looks out over the water (towards the sea's side of town, or the lake).
+  const water = world.meta?.world?.landscape?.water;
+  const waterward = (kerb: Kerb) => {
+    if (!water) return 0;
+    let [n, k] = [0, 0];
+    for (let s = 2; s < kerb.length - 2; s += 5, k++) {
+      const [ex, ez] = kerb.at(s, 0);
+      const [cx, cz] = kerb.at(s, kerb.road.width / 2);
+      const [wx, wz] = water.kind === 'sea' ? [0, water.side === 'zmin' ? -1 : 1] : [water.x - ex, water.z - ez];
+      const l = Math.hypot(ex - cx, ez - cz) * Math.hypot(wx, wz) || 1;
+      if (((ex - cx) * wx + (ez - cz) * wz) / l > 0.7) n++;
+    }
+    return k ? n / k : 0;
+  };
   // Each plot on the side of the road its front faces, and where along the road it is.
   const fronting = plots.map((L) => {
     const at = (u: number) => townPoint(L.turned, u, L.edge);
@@ -654,7 +669,8 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
         if (s === undefined) continue;
         used.push(s);
         const [x, z] = on(s);
-        mailbox(props.at(x, z, kerb.yaw(s), WALK_Y), pick(MAILBOX, f.L.plot.x, f.L.plot.z, 3));
+        // (None of them quite straight.)
+        mailbox(props.at(x, z, kerb.yaw(s) + (hash(x, z, 9) - 0.5) * 0.5, WALK_Y), pick(MAILBOX, f.L.plot.x, f.L.plot.z, 3));
         blob(shadows, x, z, 0.2, 0.3, kerb.yaw(s), 0.35, WALK_Y + 0.004);
       }
       // A hydrant every other plot.
@@ -733,9 +749,49 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
           put(PROP.sign, ...on(s), kerb.yaw(s) + Math.PI / 4);
         }
       }
+      // Where nobody lives along the road: on the water's side a promenade (benches looking out over
+      // the water, a lamp between each two), elsewhere now and then a bench with a view.
+      const empty = (s: number) => !row.some((f) => s > f.s0 - 6 && s < f.s1 + 6);
+      const onVerge = (x: number, z: number) => x > 1 && z > 1 && x < world.width - 1 && z < groundDepth(world) - 1 && !index.onRoad(x, z, 0.4, r) && free({ x: x - 1, z: z - 1, w: 2, d: 2 }, 0.2);
+      const bench = (s: number, d: number) => {
+        const [x, z] = kerb.at(s, d);
+        if (!onVerge(x, z)) return false;
+        used.push(s);
+        put(PROP.bench, x, z, kerb.yaw(s) + Math.PI);
+        blob(shadows, x, z, 0.95, 0.3, kerb.yaw(s), 0.35, WALK_Y + 0.004);
+        return true;
+      };
+      if (waterward(kerb) > 0.5) {
+        for (let s = 6, k = 0; s < kerb.length - 6; s += 7, k++) {
+          if (!empty(s) || !clear(s, 1.4) || near(s, 2)) continue;
+          if (k % 2 === 0) bench(s, -1.1);
+          else {
+            const [x, z] = on(s, 0.35);
+            used.push(s);
+            streetlight(props.at(x, z, kerb.yaw(s) + Math.PI, WALK_Y), glow.at(x, z, kerb.yaw(s) + Math.PI, WALK_Y));
+            pool(pools, ...on(s, -0.6), 4.2);
+          }
+        }
+      } else {
+        for (let s = 12, run = 0; s < kerb.length - 12; s++) {
+          run = empty(s) && kerb.open(s) ? run + 1 : 0;
+          if (run < 40 || hash(s, r * 7 + side, 81) > 0.6) continue;
+          if (bench(s - 20, -1.3)) run = -40;
+        }
+      }
     }
   }
 
+  // A fountain in the middle of every roundabout (a small ring of road), flowers round it.
+  for (const road of roads) {
+    if (road.ends[0] !== 'loop' || road.points.length > 80) continue;
+    const [cx, cz] = [road.points.reduce((n, p) => n + p[0], 0) / road.points.length, road.points.reduce((n, p) => n + p[1], 0) / road.points.length];
+    put(PROP.fountain, cx, cz, hash(cx, cz, 90) * 6.28, 0.85);
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * Math.PI * 2;
+      plants.flowers.push([cx + Math.cos(a) * 2.6, cz + Math.sin(a) * 2.6, 0.9 + hash(cx, k, 91) * 0.3, 0.85 + hash(cz, k, 92) * 0.3, a]);
+    }
+  }
   perfEnd(sidewalks);
   await pace?.();
 

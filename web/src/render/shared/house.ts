@@ -194,6 +194,8 @@ interface Run {
 const SIDING = ['#ECE6D8', '#C9D8C4', '#BCD0E0', '#EADBA8', '#D9C6B2', '#F4F2EC', '#A9BBA8', '#E6C9B8'];
 const BRICK = ['#FFFFFF', '#E8D8CC', '#D6C2B4'];
 const ACCENT = ['#3E5A4A', '#2F4058', '#7A3B34', '#4A4A4A', '#5B6E86', '#6E5A3E'];
+/** The front door (and shutters) of about one house in twelve: somebody wanted it seen. */
+const LOUD = ['#E8457A', '#F2B51D', '#3FA7D6', '#7BC950', '#9B5DE5', '#FF7A3D'];
 const ROOF = ['#5C626A', '#6B4A3A', '#8C4E3C', '#4F5A4C', '#3E4148', '#7A6A5A'];
 const TRIM = '#F7F5F0';
 const ROOM_WALLS: Record<RoomKind, string[]> = {
@@ -505,7 +507,7 @@ export function houseScheme(x: number, z: number): HouseScheme {
   return {
     brick,
     wall: brick ? pick(BRICK, x, z, 2) : pick(SIDING, x, z, 2),
-    accent: pick(ACCENT, x, z, 3),
+    accent: hash(x, z, 7) < 1 / 12 ? pick(LOUD, x, z, 8) : pick(ACCENT, x, z, 3),
     roof: pick(ROOF, x, z, 4),
     hip: hash(x, z, 5) < 0.45,
     shutters: hash(x, z, 6) < 0.6,

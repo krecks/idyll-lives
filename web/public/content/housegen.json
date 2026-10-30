@@ -357,7 +357,7 @@
   "$garden": "Things outside the house: first the washing line (`washingLine`) for a home with a washer and nothing to dry the washing in (a thing whose use leaves a washed load, content `makes`, and none that works on one, `workOn`: no dryer), on the lawn behind or beside the house with a clear tile all round, by the garden door if it fits; then tables with chairs round them (`sets`, as a room's `dining`), then a few things: one for every `area` m² of garden behind and beside the house, within `count`.",
   "garden": {
     "sets": [{ "tables": ["patioTableRound", "patioTable4"], "chairs": ["patioChair"], "seats": [2, 4], "chance": 0.45 }],
-    "objects": ["plant", "flowerbed", "flowerbed", "bush", "bush", "tree", "pine", "bench", "grill", "gardenChair", "sunLounger", "lampPost", "firePit", "swingSet", "planterBox", "birdFeederPole", "birdhouse", "adirondackChair", "benchGarden3", "parasol", "raisedBed", "compostBin", "rainBarrel", "sundial", "firewoodStack"],
+    "objects": ["plant", "flowerbed", "flowerbed", "bush", "bush", "tree", "pine", "bench", "grill", "gardenChair", "sunLounger", "lampPost", "firePit", "swingSet", "planterBox", "birdFeederPole", "birdhouse", "adirondackChair", "benchGarden3", "parasol", "raisedBed", "compostBin", "rainBarrel", "sundial", "firewoodStack", "statueCat"],
     "count": [1, 10],
     "area": 35,
     "washingLine": "clothesline"

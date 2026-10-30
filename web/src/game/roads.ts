@@ -166,6 +166,36 @@ export function ring(rand: Rand, cx: number, cz: number, rx: number, rz: number,
   return { points: curve(ctrl, 1, true), width, ends: ['loop', 'loop'] };
 }
 
+/** A roundabout: a small ring round (`cx`, `cz`), `r` m to the middle of its lane. */
+export function roundabout(cx: number, cz: number, r: number, width = LANE_WIDTH): Road {
+  const n = Math.max(12, Math.round((2 * Math.PI * r) / 1.5));
+  const ctrl: Pt[] = Array.from({ length: n }, (_, i): Pt => [cx + Math.cos((i / n) * Math.PI * 2) * r, cz + Math.sin((i / n) * Math.PI * 2) * r]);
+  return { points: curve(ctrl, 1, true), width, ends: ['loop', 'loop'] };
+}
+
+/** Where two roads cross (nearest the middle of each, if they cross more than once): null if they don't come within `within` m. */
+export function crossing(a: RoadPlan, b: RoadPlan, within = 2): Pt | null {
+  let best: { d: number; p: Pt } | null = null;
+  for (const p of a.points) {
+    const { dist } = nearest(b.points, p[0], p[1]);
+    if (dist < within && (!best || dist < best.d)) best = { d: dist, p };
+  }
+  return best?.p ?? null;
+}
+
+/** `road` with what lies within `r` m of `c` taken out: the pieces either side, joining what goes there. */
+export function cutAround(road: Road, c: Pt, r: number): Road[] {
+  const near = (p: Pt) => Math.hypot(p[0] - c[0], p[1] - c[1]) < r;
+  const first = road.points.findIndex(near);
+  if (first < 0) return [road];
+  let last = first;
+  while (last + 1 < road.points.length && near(road.points[last + 1])) last++;
+  const pieces: Road[] = [];
+  if (first >= 2) pieces.push({ ...road, points: road.points.slice(0, first + 1), ends: [road.ends[0], 'join'] });
+  if (road.points.length - last >= 3) pieces.push({ ...road, points: road.points.slice(last), ends: ['join', road.ends[1]] });
+  return pieces;
+}
+
 /** A lane through points of the caller's choosing (`ends`: what is at each end). */
 export function lane(ctrl: readonly Pt[], ends: [RoadEnd, RoadEnd], width = LANE_WIDTH): Road {
   return { points: curve(ctrl), width, ends };

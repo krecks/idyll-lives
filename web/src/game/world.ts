@@ -9,7 +9,7 @@
 import type { Content, WorldNames } from '../content/content';
 import { DEFAULT_LANDSCAPE, type LandscapeParams } from '../core/protocol';
 import type { GardenSize } from './housegen';
-import { branch, lane, lengths, loop, ring, through, type Box, type Pt, type Road } from './roads';
+import { branch, crossing, cutAround, lane, lengths, loop, ring, roundabout, through, type Box, type Pt, type Road } from './roads';
 
 export type WorldKind = 'small' | 'medium' | 'dense' | 'farm' | 'seaside' | 'mountain' | 'lakeside' | 'forest';
 export const WORLD_KINDS: readonly WorldKind[] = ['small', 'medium', 'dense', 'farm', 'seaside', 'mountain', 'lakeside', 'forest'];
@@ -112,17 +112,19 @@ function crescentTown(rand: Rand, box: Box): RoadLayout {
   return { roads: [main, crescent.road, ...lanes], greens: [crescent.green], centre: pointOf(crescent.green) };
 }
 
-/** A crossroads, crooked lanes off both roads either side. */
+/** A crossroads with a roundabout (a fountain in the middle), crooked lanes off both roads either side. */
 function crossroads(rand: Rand, box: Box): RoadLayout {
   const main = through(rand, box, { amp: range(rand, 4, 8), bends: 2 });
   const cross = through(rand, box, { along: 'z', amp: range(rand, 4, 8), bends: 2 });
   const [L, C] = [lengthOf(main), lengthOf(cross)];
-  const roads: Road[] = [main, cross];
+  const at = crossing(main, cross) ?? ([box.w / 2, box.d / 2] as Pt);
+  const R = 6.5;
+  const roads: Road[] = [...cutAround(main, at, R), ...cutAround(cross, at, R), roundabout(at[0], at[1], R)];
   for (const [parent, len, at] of [[main, L, 0.24], [main, L, 0.76], [cross, C, 0.24], [cross, C, 0.76]] as const) {
     roads.push(branch(parent, len * (at + range(rand, -0.04, 0.04)), 1, range(rand, 45, 60), range(rand, -1.1, 1.1)));
     roads.push(branch(parent, len * (at + range(rand, -0.06, 0.06)), -1, range(rand, 40, 55), range(rand, -1.1, 1.1)));
   }
-  return { roads, centre: [box.w / 2, box.d / 2] };
+  return { roads, centre: at };
 }
 
 /** A long country lane winding through the fields, a fork off it leading out of town. */
