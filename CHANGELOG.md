@@ -5,6 +5,7 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 ## Unreleased
 
 - **Bedrooms are their sleepers' own:** only those who belong together share a bedroom. While someone sleeps in one, its door is open to them, their partner, parents, children, brothers and sisters with a bed there, and whoever minds a crib in there, and keeps everyone else, guests included, out. The other half of a double bed is the partner's (or a child's for the night); a bunk bed is a bed for each. A lodger, even one sent to the bed, waits outside like anyone else; walking through a bedroom to a room beyond is fine.
+- **A calmer interface:** the top bar is one row (the clock and speeds take a second row only in a small window or at a large interface scale), and Undo, Redo and the eyedropper sit in the Build dock beside its tabs. The Furnish catalog has a fixed height: the categories along its top with their names, a grid of items below, and a search; the sort, the filters and the group chips are gone (each category still lists its groups in order), as is the *Build catalog* size setting. A quiet interface while watching can't be clicked by accident.
 - **Newcomers and bed places:** households moving into town are a single, a couple (perhaps with a grown child) or siblings, never strangers, and bed places count a double bed as one place unless a couple sleeps in it (who moves in, the no-bed notice, the beds the town buys for its children).
 
 ### Also

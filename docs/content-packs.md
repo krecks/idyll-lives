@@ -96,7 +96,7 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `footprint` | `[width, depth]` in tiles, default `[1, 1]`. The resident uses it from the tile in front of the footprint's centre (local +z), which must be free (unless nobody uses it: no interactions; see `approach` for chairs). |
 | `price` | Buy-mode price in dollars. Without a price the object isn't sold (scenery). |
 | `category` | Buy-mode category id (see [Buy categories](#buy-categories)). |
-| `group` | Optional group within the category, for categories that have `groups` (the garden: `trees`, `shrubs`, `flowers`, `edibles`, `houseplants`). The catalog shows the groups as chips. |
+| `group` | Optional group within the category, for categories that have `groups` (the garden: `trees`, `shrubs`, `flowers`, `edibles`, `houseplants`). The catalog lists a category's items group by group. |
 | `outdoors` | `true` for things that can only stand outdoors (trees, flower beds, ponds). Buying or moving one indoors is refused ("Goes outdoors"). Default `false`. |
 | `private` | `true` for the household's own things (a wardrobe, a dresser, the bath cabinet, a vanity): someone visiting uses none of its uses, chosen or told ("Ada is a guest there, and the wardrobe is the household's own"), as with beds and showers (`busyTags`). Code: `crates/sim-core/src/privacy.rs`. Default `false`. |
 | `layer` | Where it goes: `floor` (default: furniture, which takes its tiles), `wall` (hangs with its back on a plain wall: pictures, shelves, wall lamps; on a window too with `overWindow`), `ceiling` (hangs in a room: pendant lamps, fans) or `rug` (lies on the floor). Off the floor layer it takes no floor space: residents walk under and over it, furniture stands in front of, under or on it, and only things on the same layer can't overlap. A wall with something on it can't be removed or get a door. Model things on a wall with their back on the wall face (`z = -0.43` in a 1-deep footprint) at their real height, ceiling things hanging from 2.8 m. `surface`: small things standing on another object's top (vases, books, plates, table lamps); see `surface` and `radius` below. They must be 1×1 with one slot, always turn freely, and stand anywhere on a top: the disc they take (`radius`) lies wholly on one top, clear of its edges and of anything else standing there. Moving or turning the top carries them along, selling it sells them too. Model them standing on y = 0; the game lifts them to the top's height. Things nobody uses (no interactions), on any layer, needn't be reachable: a table can have chairs all round it. Their interactions (the kettle's tea, the laptop's browsing) are used from the floor beside their top: in front of the counter, desk or table they stand on, else at its side (the top's front, then its left, right and back of the tile they stand over, then anywhere along its edge, nearest first), standing and facing them. With `"pose": "sit"` the resident sits on a free seat pulled up to that top (its `seatAt`), else on one within `seatNear`, else stands; with no side of the top free (chairs all round a table) they sit down at one of its chairs to use them. They can't be lain on, stood in (`inside`), taken `whole`, be a baby's or a carer's, need a table or start a `recipe` (an `eat` is fine: the toaster's toast). Building never has to leave a way to them: they are reached when their top is. |
@@ -635,11 +635,12 @@ id) and `last` (household names).
   `play`, `lights`, `decor`, `yard`), `garden` (groups `trees`, `shrubs`, `flowers`, `edibles`,
   `houseplants`), `community` (`play`, `street`, `food`, `shops`: the town's playground,
   street furniture, carts and vending machines, shop fittings; `content/community.json`),
-  `wellness` (example pack). An object without a `group` shows under its
-  category's *All*. Add a category with
+  `wellness` (example pack). An object without a `group` comes after its
+  category's groups. Add a category with
   `"buyCategories": [{ "id": "...", "label": "...", "icon": "icon.category.<id>" }]` only if
   none fits (`icon` is optional: the catalog tab's icon, an `icon` asset key; `groups`
-  optional: `[{ "id": "...", "label": "..." }]`, chips that objects pick with `group`;
+  optional: `[{ "id": "...", "label": "..." }]`, the order of the category's items, picked
+  with `group`;
   `"outside": true` on a category or group marks garden things, which wishes for a room don't
   offer: base game `outdoor` and `community` (except its `shops` group, `"outside": false`)
   and the garden's `trees`, `shrubs`, `flowers`, `edibles`).

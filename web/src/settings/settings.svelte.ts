@@ -74,8 +74,6 @@ export interface Settings {
   masterVolume: number;
   /** Silent while another window has focus (sound always stops while the tab is hidden). */
   muteInBackground: boolean;
-  /** Build mode's dock: `compact` keeps one row of the catalog (more of the lot in view), `expanded` shows several. */
-  catalogSize: 'compact' | 'expanded';
   /** First-use tips already dismissed (ids from `FirstTip`). */
   tipsSeen: string[];
 }
@@ -116,7 +114,6 @@ export const DEFAULT_SETTINGS: Settings = {
   worldVolume: 0.6,
   masterVolume: 1,
   muteInBackground: true,
-  catalogSize: 'compact',
   tipsSeen: [],
 };
 
@@ -192,36 +189,65 @@ function oneOf<T extends string>(value: unknown, options: readonly T[], fallback
  * switches really on or off, and choices one of the ones there are. (A stored file may be from
  * another version, hand-edited, or truncated.)
  */
-function sanitize(s: Settings): Settings {
+function sanitize(s: Record<string, unknown>): Settings {
+  const out: Settings = { ...DEFAULT_SETTINGS, tipsSeen: [] };
   for (const k of BOOLEAN_KEYS) {
-    if (typeof s[k] !== 'boolean') s[k] = DEFAULT_SETTINGS[k];
+    const value = s[k];
+    if (typeof value === 'boolean') out[k] = value;
   }
   // 0 is "no cap", so it isn't below the smallest cap the interface offers.
-  s.fpsCap = s.fpsCap === 0 ? 0 : Math.round(clampNumber(s.fpsCap, 10, 500, DEFAULT_SETTINGS.fpsCap));
-  s.autosaveMinutes = clampNumber(s.autosaveMinutes, 0, 60, DEFAULT_SETTINGS.autosaveMinutes);
-  s.cameraSensitivity = clampNumber(s.cameraSensitivity, 0.5, 2, DEFAULT_SETTINGS.cameraSensitivity);
-  s.uiScale = clampNumber(s.uiScale, 0.5, 2, DEFAULT_SETTINGS.uiScale);
-  s.directorDelay = clampNumber(s.directorDelay, 0, 600, DEFAULT_SETTINGS.directorDelay);
-  s.voiceVolume = clampNumber(s.voiceVolume, 0, 1, DEFAULT_SETTINGS.voiceVolume);
-  s.worldVolume = clampNumber(s.worldVolume, 0, 1, DEFAULT_SETTINGS.worldVolume);
-  s.masterVolume = clampNumber(s.masterVolume, 0, 1, DEFAULT_SETTINGS.masterVolume);
-  s.graphics = isGraphicsPreset(s.graphics) ? s.graphics : DEFAULT_SETTINGS.graphics;
-  s.shading = oneOf(s.shading, ['soft', 'classic'] as const, DEFAULT_SETTINGS.shading);
-  if (s.resolution !== 'auto' && (typeof s.resolution !== 'number' || !(s.resolution >= MIN_SCALE && s.resolution <= 1))) s.resolution = DEFAULT_SETTINGS.resolution;
-  s.renderer = oneOf(s.renderer, ['auto', 'webgl'] as const, DEFAULT_SETTINGS.renderer);
-  s.directorPace = oneOf(s.directorPace, ['calm', 'lively'] as const, DEFAULT_SETTINGS.directorPace);
-  s.directControl = oneOf(s.directControl, ['inspect', 'always'] as const, DEFAULT_SETTINGS.directControl);
-  s.voiceLanguage = oneOf(s.voiceLanguage, ['en'] as const, DEFAULT_SETTINGS.voiceLanguage);
-  s.voiceDevice = oneOf(s.voiceDevice, ['auto', 'cpu', 'gpu'] as const, DEFAULT_SETTINGS.voiceDevice);
-  s.voiceWriter = oneOf(s.voiceWriter, ['lines', 'llm'] as const, DEFAULT_SETTINGS.voiceWriter);
-  s.catalogSize = oneOf(s.catalogSize, ['compact', 'expanded'] as const, DEFAULT_SETTINGS.catalogSize);
-  if (!Array.isArray(s.tipsSeen) || s.tipsSeen.some((id) => typeof id !== 'string')) s.tipsSeen = [];
-  return s;
+  const fpsCap = s.fpsCap;
+  out.fpsCap = fpsCap === 0 ? 0 : Math.round(clampNumber(fpsCap, 10, 500, DEFAULT_SETTINGS.fpsCap));
+  out.autosaveMinutes = clampNumber(s.autosaveMinutes, 0, 60, DEFAULT_SETTINGS.autosaveMinutes);
+  out.cameraSensitivity = clampNumber(s.cameraSensitivity, 0.5, 2, DEFAULT_SETTINGS.cameraSensitivity);
+  out.uiScale = clampNumber(s.uiScale, 0.5, 2, DEFAULT_SETTINGS.uiScale);
+  out.directorDelay = clampNumber(s.directorDelay, 0, 600, DEFAULT_SETTINGS.directorDelay);
+  out.voiceVolume = clampNumber(s.voiceVolume, 0, 1, DEFAULT_SETTINGS.voiceVolume);
+  out.worldVolume = clampNumber(s.worldVolume, 0, 1, DEFAULT_SETTINGS.worldVolume);
+  out.masterVolume = clampNumber(s.masterVolume, 0, 1, DEFAULT_SETTINGS.masterVolume);
+  out.graphics = isGraphicsPreset(s.graphics) ? s.graphics : DEFAULT_SETTINGS.graphics;
+  out.shading = oneOf(s.shading, ['soft', 'classic'] as const, DEFAULT_SETTINGS.shading);
+  const resolution = s.resolution;
+  out.resolution =
+    resolution === 'auto' || (typeof resolution === 'number' && resolution >= MIN_SCALE && resolution <= 1)
+      ? resolution
+      : DEFAULT_SETTINGS.resolution;
+  out.renderer = oneOf(s.renderer, ['auto', 'webgl'] as const, DEFAULT_SETTINGS.renderer);
+  out.directorPace = oneOf(s.directorPace, ['calm', 'lively'] as const, DEFAULT_SETTINGS.directorPace);
+  out.directControl = oneOf(s.directControl, ['inspect', 'always'] as const, DEFAULT_SETTINGS.directControl);
+  out.voiceLanguage = oneOf(s.voiceLanguage, ['en'] as const, DEFAULT_SETTINGS.voiceLanguage);
+  out.voiceDevice = oneOf(s.voiceDevice, ['auto', 'cpu', 'gpu'] as const, DEFAULT_SETTINGS.voiceDevice);
+  out.voiceWriter = oneOf(s.voiceWriter, ['lines', 'llm'] as const, DEFAULT_SETTINGS.voiceWriter);
+  const tips = s.tipsSeen;
+  out.tipsSeen = Array.isArray(tips) && tips.every((id: unknown): id is string => typeof id === 'string') ? tips : [];
+  return out;
+}
+
+/** (`tipsSeen` by value: the copy must not share the defaults' array.) */
+function freshDefaults(): Settings {
+  return { ...DEFAULT_SETTINGS, tipsSeen: [] };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function load(): Settings {
+  let raw: string;
   try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Record<string, unknown>;
+    raw = localStorage.getItem(STORAGE_KEY) ?? '{}';
+  } catch {
+    return freshDefaults();
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return freshDefaults();
+  }
+  if (!isRecord(parsed)) return freshDefaults();
+  const stored = parsed;
+  try {
     const saved = typeof stored.settingsVersion === 'number' && Number.isInteger(stored.settingsVersion) ? stored.settingsVersion : 0;
     // A file from a newer version keeps the settings this one knows; there's no way back to
     // the ones it doesn't.
@@ -230,11 +256,11 @@ function load(): Settings {
     }
     delete stored.settingsVersion;
     // Settings that are gone (bloom, tilt-shift, the quality preset and its parts, the visual style) aren't kept.
-    const known = Object.fromEntries(Object.entries(stored).filter(([k]) => k in DEFAULT_SETTINGS));
-    return sanitize({ ...DEFAULT_SETTINGS, ...known } as Settings);
-  } catch {
-    // (`tipsSeen` by value: the copy must not share the defaults' array.)
-    return { ...DEFAULT_SETTINGS, tipsSeen: [] };
+    const known = Object.fromEntries(Object.entries(stored).filter(([k]) => Object.hasOwn(DEFAULT_SETTINGS, k)));
+    return sanitize({ ...DEFAULT_SETTINGS, ...known });
+  } catch (err) {
+    console.warn('[settings] could not migrate saved settings; using defaults', err);
+    return freshDefaults();
   }
 }
 

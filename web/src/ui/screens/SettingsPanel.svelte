@@ -62,7 +62,7 @@
     { id: 'performance', label: 'Performance', icon: 'icon.ui.perf', keys: ['graphics', 'shading', 'resolution', 'fpsCap', 'renderer'] },
     { id: 'gameplay', label: 'Gameplay', icon: 'icon.ui.live', keys: ['autonomy', 'autosaveMinutes'] },
     { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch', keys: ['directorDelay', 'directorPace', 'hideHudWhileWatching', 'autoSlow', 'skipQuietHours', 'pauseOnBlur'] },
-    { id: 'interface', label: 'Interface', icon: 'icon.ui.display', keys: ['uiScale', 'catalogSize', 'clock24h', 'reducedMotion', 'showFps'] },
+    { id: 'interface', label: 'Interface', icon: 'icon.ui.display', keys: ['uiScale', 'clock24h', 'reducedMotion', 'showFps'] },
     { id: 'audio', label: 'Audio', icon: 'icon.ui.audio', keys: ['masterVolume', 'sound', 'worldSound', 'worldVolume', 'muteInBackground'] },
     { id: 'voices', label: 'Voices', icon: 'icon.ui.voice', keys: ['voices', 'voiceDevice', 'voiceVolume', 'voiceWriter', 'subtitles'] },
     { id: 'controls', label: 'Controls', icon: 'icon.ui.move', keys: ['directControl', 'cameraSensitivity'] },
@@ -470,16 +470,6 @@
               { value: 1, label: 'M' },
               { value: 1.1, label: 'L' },
               { value: 1.25, label: 'XL' },
-            ]}
-          />
-        </SettingRow>
-        <SettingRow title="Build catalog" hint="One row keeps more of your lot in view." details="The button at the end of the Build dock's header switches it too.">
-          <Segmented
-            label="Build catalog"
-            bind:value={settings.catalogSize}
-            options={[
-              { value: 'compact', label: 'One row' },
-              { value: 'expanded', label: 'Several rows' },
             ]}
           />
         </SettingRow>
