@@ -34,7 +34,7 @@ here runs inside Blender (`gamekit/manifest.py` is plain Python, no bpy).
 5. **Validate.** Install the Khronos validator in a scratch directory (`npm i gltf-validator`), outside
    the repo, and run `validateBytes` on the file: 0 errors, 0 warnings.
 6. **Wire it in** outside this folder when the object is new (below). Run
-   `cargo test -p sim-core --test shipped_content`, and `cargo test -p sim-core` if you touched the sim.
+   `cargo test -p sim-core --test sim shipped_content::`, and `cargo test -p sim-core` if you touched the sim.
 7. **Look in the game.** Start your own dev server and drive it headless (below). Check WebGPU and
    `&renderer=webgl`, at rest and with each clip playing.
 8. **Finish up.**
@@ -191,7 +191,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
   - `BEDS` (from `furniture.json`'s `beds`): mattress-top height, for anything residents lie on;
   - `BLANKET_BEDS`: whether sleepers get a blanket. Then don't model a full duvet: it shows doubled.
 - **Tests.**
-  - `cargo test -p sim-core --test shipped_content` checks every object's and item's model has its file
+  - `cargo test -p sim-core --test sim shipped_content::` checks every object's and item's model has its file
     (and its `far` file) once the manifests are stacked (a pack left out of `packs` fails it), every
     interaction has an animation, and the categories and groups exist.
   - Changed the sim? Run `cargo test -p sim-core`, then `bun run wasm` in `web/` before testing in the
@@ -338,7 +338,7 @@ never one that's already running) and drive Playwright headless with full Chrome
 - **A house.** Open `/?state=bathroom-check&debug`: the house with resident 0 at home, doing nothing,
   needs at 0.8 (a use that fills a need lasts), plenty of money. `needy-check` has low needs and free
   will on, `office-night` is the same house at 21:30, `town-things` a town lot with every community
-  thing (`__showPlot(1)`). Make them with `DUMP_STATES=1 cargo test -p sim-core --test check_states`
+  thing (`__showPlot(1)`). Make them with `DUMP_STATES=1 cargo test -p sim-core --test sim check_states::`
   (`debug-states/`, gitignored; `tools/bench/README.md` says more).
   - Wait until `__sims()` answers and the strip shows "House 0" (not "Drawing portraits…").
   - Turn free will off: `__send({type: 'setAutonomy', enabled: false, household: 0})` (the game's own

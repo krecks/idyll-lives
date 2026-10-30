@@ -50,14 +50,12 @@ jobs:
       # The generated_* tests are ignored because they need sample files; make them here so they
       # run instead of passing without checking anything.
       - name: Generated houses and worlds
-        # Optimised for speed, but without the release build's fat LTO (minutes, for two test binaries).
-        env:
-          CARGO_PROFILE_RELEASE_LTO: 'false'
-          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
+        # In the simulation tests' own build (already optimised, `opt-level = 1`, and built by the
+        # step before): a release build of the whole test binary would cost more than it saves.
         run: |
           bun tools/housegen/sample.ts /tmp/houses.json
           bun tools/worlds/sample.ts /tmp/worlds.json
-          HOUSES=/tmp/houses.json WORLDS=/tmp/worlds.json cargo test -p sim-core --release --locked --test generated_houses --test generated_worlds -- --ignored
+          HOUSES=/tmp/houses.json WORLDS=/tmp/worlds.json cargo test -p sim-core --locked --test sim -- --ignored generated_houses:: generated_worlds::
 
       # The residents' clips on both bodies at every life stage; the known failures are in
       # tools/characters/clip-baseline.json, so only a new one fails.

@@ -909,7 +909,7 @@ grades' rates). Running costs
 come as weekly **bills**, paid with the rent: `economy.rent.billsBase` ($25) plus `billsRate`
 (1.5%) of what the household's objects are worth (price plus upgrades) plus `perResident`
 ($150 per resident). A $2,000 luxury item adds about $30 a week. A working household saves
-roughly $100–2,000 a week; `crates/sim-core/tests/balance.rs` checks this (and how fast
+roughly $100–2,000 a week; `crates/sim-core/tests/sim/balance.rs` checks this (and how fast
 careers go) for the base game, so run it after changing prices, pay or rent.
 
 **Prices by category** (base game):
@@ -955,7 +955,7 @@ consumables bought from outside, such as takeout or deliveries; never for using 
 energy 0, hunger ×0.3, bladder ×0.15, hygiene ×0.5, comfort ×0.3, fun and social ×0.1. At work or
 school (`workDecay`, a career's `workEffects` on top): hunger ×0.2, energy ×0.35, bladder ×0.1,
 hygiene ×0.3, fun and comfort ×0.2, social ×0.1, with `workBreaks` on top. Awake at night energy goes ×1.8 (`nightDecay`).
-Walking takes time too (1.5 tiles a game minute): `crates/sim-core/tests/routines.rs` prints
+Walking takes time too (1.5 tiles a game minute): `crates/sim-core/tests/sim/routines.rs` prints
 residents' days (toilet visits, how low needs go and what they were doing then, hours a day
 walking, eating, asleep...). With these numbers residents go to the toilet about 4 times a day
 at home and needs rarely run out; mostly for loners (social), long early shifts and homes where

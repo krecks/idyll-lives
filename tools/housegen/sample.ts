@@ -1,7 +1,7 @@
 /**
  * Generates sample houses with the shipped config and content (web/public/content/housegen.json)
  * and writes them as small town files, one house each, for the simulation to check
- * (`cargo test -p sim-core --test generated_houses -- --ignored`, reading HOUSES).
+ * (`cargo test -p sim-core --test sim generated_houses:: -- --ignored`, reading HOUSES).
  *
  * Each house is furnished for one of a few households in turn (empty, a couple, two friends, a
  * family) and checked here against them all: the same layout for each, beds enough, no toys

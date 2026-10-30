@@ -426,7 +426,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   stands against a wall, so one standing off it isn't caught. It needs no Blender, so CI runs it (in
   `cargo test -p ll-tools`); `--preview` also has Blender re-import each file and render it. A
   content file or manifest it can't read is a FAIL naming the file.
-- **`cargo test -p sim-core --test shipped_content`** (in CI) fails when an object or item has no
+- **`cargo test -p sim-core --test sim shipped_content::`** (in CI) fails when an object or item has no
   model file, or no `far` file where its entry names one, once the manifests are stacked as the game
   stacks them, and on an empty `model`.
 - **The build** (`Family.run`, before it builds anything; `write_pack` again as a backstop) refuses a

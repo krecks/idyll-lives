@@ -90,7 +90,7 @@ notes and scripts refer to them by these names.
 | E6 | Mirrors from files | a material's `"mirror": "front"` (gamekit: `glass=('#hex', 'glass', 'front')`) |
 | E7 | Level of detail | an entry's `far` file, `<id>.far.glb`; `G.Model(far=0.25)` writes it (trees, hedges, street props, the farm) |
 | E8 | Finishes by name, packs that extend, night glow | materials named `stone@matte`; a pack entry without `vary` keeps the one it overrides; a material's `"glow": "#hex"` (gamekit: `{'glow': '#hex'}`) follows the lamp level, never emissive at noon |
-| C1 | Content: things that stay open | interactions with `when` / `leaves` (`docs/content-packs.md`): the futon, the sofa bed, the washing line and the hot tub stay open (`crates/sim-core/tests/open_objects.rs`) |
+| C1 | Content: things that stay open | interactions with `when` / `leaves` (`docs/content-packs.md`): the futon, the sofa bed, the washing line and the hot tub stay open (`crates/sim-core/tests/sim/open_objects.rs`) |
 
 Added after, in the same spirit:
 - **Riders:** `motions.ride: clip`: residents sitting or lying on the object move with that clip's part (a rocking
@@ -122,7 +122,7 @@ Follow `tools/art/blender/README.md` ("Working as an agent: the loop") and `docs
 3. **Preview** (`cargo art <family> --preview`) and look at every model at rest and with every clip.
 4. **Export** (`cargo art <family> [--only <id>]`). The gate (`cargo check-glb`) must say `0 failed`;
    read every warning. The Khronos validator must report 0 errors and 0 warnings.
-5. **Test.** `cargo test -p sim-core --test shipped_content`, and the whole `sim-core` suite if content changed.
+5. **Test.** `cargo test -p sim-core --test sim shipped_content::`, and the whole `sim-core` suite if content changed.
 6. **Check it in play** (below).
 7. **Finish.** Add a line to `web/public/assets/CREDITS.md`. Commit only the `.glb` files you meant to change:
    re-exports aren't byte-for-byte the same, so `git checkout` the rest. Never commit `previews/`. Add the object's
@@ -144,8 +144,8 @@ Tools:
 - `tools/bench/check.mjs gallery | clips | play` runs the checks headless at 1 % volume on its own port. In the page,
   `__sims()` says where residents are and what they use; `__addFunds`, `__camera`, `__controls.follow` with zoom;
   `__renderer.motion.states`.
-- Debug states (`?state=<name>`): `DUMP_STATES=1 cargo test -p sim-core --test check_states` writes `bathroom-check`,
-  `needy-check`, `office-night` and `town-things` (all 36 community and farm things); `--test play_checks` writes
+- Debug states (`?state=<name>`): `DUMP_STATES=1 cargo test -p sim-core --test sim check_states::` writes `bathroom-check`,
+  `needy-check`, `office-night` and `town-things` (all 36 community and farm things); `--test sim play_checks::` writes
   `family-check` (`generated-<i>` with `--ignored`, `HOUSES=…`, `PICK=…`). Scripts must send `setAutonomy` off.
 - Residents' clips: `bun tools/characters/check_clips.ts`, or `bun run check:clips` for every body and stage (`tools/characters/README.md`);
   the poses per action are the table in `web/src/render/shared/characters/actions.ts` (`ACTIONS`).
@@ -169,7 +169,7 @@ cargo content out --group <group> [--to <category>/<group>] [--dry-run]
 Without `--to`, `out` sends each item to the **Home** column of the tables on these pages. To use it again, add the
 `validate` category back to `web/public/content/base.json` with an empty `groups` (and its icon), and remove it when
 the last group leaves. Items whose home category turns them freely (`objectRules.freeRotation`) carry
-`"freeRotation": true` while in Validate. Run `cargo test -p sim-core --test shipped_content` after.
+`"freeRotation": true` while in Validate. Run `cargo test -p sim-core --test sim shipped_content::` after.
 
 ## Lessons for the tooling
 
