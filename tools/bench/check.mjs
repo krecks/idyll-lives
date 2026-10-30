@@ -43,6 +43,8 @@
  *                 sent to the resident using it)
  *               --walk 3 (speed walking there, at most 3 = 10×)  --speed 1 (from 3 tiles off)
  *               --radius --beta --alpha --y (the camera; default from the model's size and facing)
+ *               --top (the camera above, looking down: who sits where at a table)
+ *               --shot-idle (a picture of it as bought, before any use: `<object>-idle`)
  *               --hour 12 (the renderer's light only; the state sets the clock; on a `*-night`
  *                 state none, the light the sim's clock gives; `--hour state` for none anywhere)
  *               --free-will (leave it on: with `needy-check`, to watch them go on their own)
@@ -555,6 +557,10 @@ if (what === 'play') {
   /** The camera following the resident: `--radius` (else `radius`), `--beta`, `--alpha`, `--y`, the ones given. */
   const view = (radius) => Object.fromEntries(Object.entries({ radius: num('radius', radius), beta: num('beta'), alpha: num('alpha'), y: num('y') }).filter(([, v]) => Number.isFinite(v)));
   const shots = num('shots', batch ? 3 : 6);
+  /** A picture of each thing as bought, before its uses (`--shot-idle`). */
+  const shotIdle = has('shot-idle');
+  /** The camera above, looking down (`--top`), instead of the usual three-quarter view. */
+  const top = has('top');
   const every = num('every', batch ? 1000 : 500);
   const cap = num('wait', 60) * 1000;
   const speed = num('speed', 1);
@@ -681,11 +687,11 @@ if (what === 'play') {
     // resident at it hides less of it).
     const facing = [Math.PI / 2, 0, -Math.PI / 2, Math.PI][rot % 4];
     const alpha = num('alpha', facing + 0.7);
-    const beta = num('beta', layer === 'ceiling' ? 1.3 : 0.95);
+    const beta = top ? 1.35 : num('beta', layer === 'ceiling' ? 1.3 : 0.95);
     const [bottom, height, from] = bounds ? [bounds.lo[1], bounds.hi[1], 'bounds'] : box ? [box.bottom, box.height, 'box'] : [0, layer === 'floor' ? 1 + 0.5 * Math.max(...size) : 0.8, 'guess'];
     const tall = layer !== 'ceiling' && height - bottom > TALL;
     const usual = layer === 'wall' ? 1.3 : layer === 'ceiling' ? 1.9 : use?.pose === 'lie' ? 0.5 : 0.7;
-    const target = [mid[0], num('y', tall ? (bottom + height) / 2 : usual), mid[1]];
+    const target = [mid[0], top ? 0.2 : num('y', tall ? (bottom + height) / 2 : usual), mid[1]];
     // At least as far as the footprint needs (with room for the resident at it); further when the
     // model's vertices need it (`__check.fit`), or without them a tall one's height as seen from
     // `beta`. (The game camera never comes nearer than its own limit, 6.)
@@ -778,15 +784,20 @@ if (what === 'play') {
       return { names: m ? [m.idle, m.growth, m.night, m.clock?.hour, m.clock?.minute].filter(Boolean) : [], open: m?.open ?? null, any: Boolean(m) };
     }, id);
 
+  /** A picture's name part for `thing` as `bought`: its id, the place if it's bought twice, its helpers (`--with`). */
+  const baseName = (thing, bought) => {
+    const twice = things.filter((t) => t.def === thing.def).length > 1 ? `-${bought.where.x}-${bought.where.z}-${bought.where.rot}` : '';
+    const helps = (bought.with ?? []).map((h) => `with-${slug(h.split('@')[0])}`).join('-');
+    return `${prefix}${slug(thing.def)}${twice}${helps ? `-${helps}` : ''}`;
+  };
+
   /**
    * One use: watched from the frame it's sent, walking fast and slowing down near the object, up
    * to `cap` ms until the resident is using it, then `shots` pictures `every` ms apart framing the
    * object, then stopped. One record in `play-<run>.jsonl`.
    */
   async function runUse(thing, bought, use, attempt, helper = null) {
-    // (A kind used twice in a run, in two places: the place in its pictures' names too.)
-    const twice = things.filter((t) => t.def === thing.def).length > 1 ? `-${bought.where.x}-${bought.where.z}-${bought.where.rot}` : '';
-    const name = `${prefix}${slug(thing.def)}${twice}-${slug(use.id)}`;
+    const name = `${baseName(thing, bought)}-${slug(use.id)}`;
     const record = { object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], use: use.id, index: use.index, label: use.label, pose: use.pose ?? null, anim: use.anim ?? null, attempt, ...(helper ? { helper } : {}), ...about(thing, bought), outcome: null, shots: [], errors: [] };
     const j = startJob(`${thing.def}/${use.id}`, { attempt });
     const t0 = Date.now();
@@ -869,6 +880,12 @@ if (what === 'play') {
           },
           { sim, id: bought.id, others: sims.slice(1) },
         );
+        // How far from the object's nearest face the resident stands (a use from the back or the side says so).
+        const [fw, fd] = bought.where.size;
+        const face = (p) =>
+          p && +Math.hypot(Math.max(bought.where.x - p.x, 0, p.x - (bought.where.x + fw)), Math.max(bought.where.z - p.z, 0, p.z - (bought.where.z + fd))).toFixed(2);
+        if (info.sim) info.sim.distance = face(info.sim);
+        for (const other of info.others ?? []) other.distance = face(other);
         const file = await shot(page, batch ? `${name}-${String(i).padStart(2, '0')}` : `${prefix}play-${thing.def}-${bought.where.x}-${bought.where.z}-${bought.where.rot}-${String(i).padStart(2, '0')}`, info);
         record.shots.push({ file, ...info });
         if (i < shots - 1) await settle(page, every);
@@ -963,6 +980,14 @@ if (what === 'play') {
     bought.with = helpers.map((h) => `${h.def}@${h.at.join(',')}`);
     const uses = await usesOf(thing.def);
     const chosen = uses.filter(pick);
+    if (shotIdle && chosen.length) {
+      // As bought: before any use moves it (a wall bed folded down, a table's chairs pulled out).
+      await aim(bought.id);
+      await settle(page, 300);
+      const view = await aim(bought.id);
+      await settle(page, 300);
+      await shot(page, `${baseName(thing, bought)}-idle`, { object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], idle: true, view });
+    }
     if (!chosen.length) {
       // Decor (no uses): bought, one picture, sold.
       const offered = uses.map((u) => u.id);

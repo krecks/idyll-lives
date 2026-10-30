@@ -486,3 +486,77 @@ fn a_fire_sat_by_in_daylight_isnt_lit() {
     .unwrap();
     assert!(on(&w, hearth), "unless the player lights it");
 }
+
+/// A hood whose light follows the hob under it (`light.while`): off until someone cooks, on while
+/// they do, off when they finish; it has no switch of its own.
+const HOOD_CONTENT: &str = r#"{
+    "animations":["cook"],
+    "needs":[{"id":"energy","label":"Energy","decayPerHour":0.0}],
+    "objects":[
+      {"id":"stove","name":"Stove","price":100,"footprint":[2,1],"interactions":[
+        {"id":"cook","label":"Cook","minutes":10,"anim":"cook","effects":{"energy":0.1}}]},
+      {"id":"hood","name":"Hood","price":100,"layer":"wall","light":{"range":1.5,"switch":false,"while":"cook"}}],
+    "economy":{"startingFunds":1000}}"#;
+
+const HOOD_TOWN: &str = r#"{"width":8,"depth":8,
+    "plots":[{"name":"Home","x":0,"z":0,"w":8,"d":8,"entry":[6.5,6.5]}],
+    "households":[{"name":"Player","plot":0,"player":true}],
+    "walls":[[0,2,7,2],[0,0,0,7],[0,7,7,7],[7,0,7,7]],
+    "objects":[{"def":"stove","x":2,"z":2},{"def":"hood","x":2,"z":2}],
+    "sims":[{"name":"Ada","x":2.5,"z":3.5}]}"#;
+
+#[test]
+fn a_light_follows_the_use_under_it() {
+    let mut w = World::from_json(HOOD_CONTENT, HOOD_TOWN, 1).unwrap();
+    let hood = w.objects[1].stable;
+    let stove = w.objects[0].stable;
+    assert!(
+        lights::lamps_off(&w).contains(&hood),
+        "off with nothing cooking"
+    );
+    assert!(
+        !lights::switchable(&w, w.objects[1].def),
+        "it has no switch of its own"
+    );
+    let version = w.lights_version();
+    w.apply(Command::Use {
+        sim: 0,
+        object: stove,
+        interaction: 0,
+    })
+    .unwrap();
+    let mut using = false;
+    for _ in 0..TICKS_PER_MINUTE * 3 {
+        w.tick_once();
+        if matches!(
+            w.sims[0].current().map(|a| &a.phase),
+            Some(sim_core::world::Phase::Using { .. })
+        ) {
+            using = true;
+            break;
+        }
+    }
+    assert!(using, "Ada started cooking");
+    assert!(
+        !lights::lamps_off(&w).contains(&hood),
+        "lit while the hob is in use"
+    );
+    assert_ne!(w.lights_version(), version, "the renderer is told");
+    w.autonomy = false;
+    let mut done = false;
+    for _ in 0..TICKS_PER_MINUTE * 30 {
+        w.tick_once();
+        if !matches!(
+            w.sims[0].current().map(|a| &a.phase),
+            Some(sim_core::world::Phase::Using { .. })
+        ) {
+            done = true;
+            break;
+        }
+    }
+    assert!(done, "the cooking ends");
+    assert!(
+        lights::lamps_off(&w).contains(&hood),
+        "off again when the cooking is done"
+    );
+}

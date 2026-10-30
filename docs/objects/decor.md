@@ -93,6 +93,9 @@ cutaway drops it, from either side.
 - The curtains hang over windows on all four sides, open by day and drawn closed at night, on WebGPU and WebGL2 at
   Low; they stay drawn over sleepers. The two pleated panels widen from their outer ends until they meet (the
   fabric stretches to close, kept so).
+- Since 2026-10-30 (`curtainsWide` checked in play): on the stage's two-wide window it hangs on its 2.38 m rail,
+  drawn closed over both edges at 22:00 and stacked at each end by day at 10:00, the glass clear between them and
+  the hems just under the sill; WebGPU and WebGL2 (`bench-results/check-curtains/curtains-*-curtainsWide-no-uses.png`).
 - The rugs lie flat in all four facings. Each rug's "Rug" colours its field; borders and motifs keep their colours.
 - A 2-wide curtain over the house's 1-wide windows hangs with the window in one half of its rail (the placement,
   not the model). Generated houses no longer do (M-decor-03, 2026-10-21): their curtains are as wide as the window,

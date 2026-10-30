@@ -274,9 +274,11 @@ export interface ObjectDef {
    * `down` (a pendant's dome, a desk lamp), `up` (a sconce's open cup: a wash up the wall), `out`
    * (a wall light: away from its wall and down, none behind it) or `ceiling` (an uplighter: up
    * at the ceiling, which lights the room). `switch: false`: no switch, lit every night; `fire`:
-   * a fire, lit to sit by (sim-core `lights.rs`), its flames burning while it's lit.
+   * a fire, lit to sit by (sim-core `lights.rs`), its flames burning while it's lit. `while`: lit
+   * only while someone does one of these animations at an object on its tiles (a cooker hood's
+   * light over the hob: `['stir', 'bake']`; sim-core `lights.rs`), by day as at night.
    */
-  light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean; fire?: boolean; aim?: LightAim };
+  light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean; fire?: boolean; aim?: LightAim; while?: string | string[] };
   /**
    * What's done at it sounds like this, by animation tag (world sound keys or `none`, as an
    * interaction's `sound`), for its uses without a `sound` and the cooking steps at it as a

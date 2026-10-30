@@ -85,3 +85,10 @@ jobs:
           CARGO_PROFILE_RELEASE_LTO: 'false'
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
         run: cargo test -p ll-tools --release --locked
+
+      # Every shipped model against the reference's kinds: a content object no kind covers (a new
+      # thing nobody sized) fails, where a measure outside its range is the review's to weigh.
+      - name: Object sizes
+        run: |
+          set -o pipefail
+          cargo review sizes | tee /tmp/review-sizes.md

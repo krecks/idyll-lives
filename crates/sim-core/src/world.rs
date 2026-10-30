@@ -1706,6 +1706,9 @@ pub struct World {
     pub(crate) lights_version: u32,
     /// What residents switching lights saw last (see `lights::update`).
     pub(crate) light_watch: crate::lights::Watch,
+    /// The lights that follow a use (content `light.while`) that are lit now (object ids): a cooker
+    /// hood's light while the hob under it cooks (see `lights::update_while`). Not saved.
+    pub(crate) while_lit: Vec<u32>,
     /// Who serves at the town's stalls and counters (see `staff.rs`); not saved.
     pub staff: crate::staff::Staff,
 }
@@ -1978,6 +1981,7 @@ impl World {
             watched: Vec::new(),
             lights_version: 0,
             light_watch: Default::default(),
+            while_lit: Vec::new(),
             staff: Default::default(),
         }
     }
@@ -3500,6 +3504,7 @@ impl World {
         crate::planner::update(self);
         crate::cooking::after_step(self);
         crate::lights::update(self);
+        crate::lights::update_while(self);
         if self.tick.is_multiple_of(TICKS_PER_HOUR) {
             crate::rooms::opinions(self);
         }

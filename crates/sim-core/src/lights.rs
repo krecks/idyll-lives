@@ -50,7 +50,65 @@ pub fn dark_at(minute: f32) -> bool {
 
 /// Whether object kind `def` is a lamp that can be switched.
 pub fn switchable(world: &World, def: usize) -> bool {
-    world.content.objects[def].switch
+    let def = &world.content.objects[def];
+    def.switch && def.while_anims.is_empty()
+}
+
+/// Whether a light that follows a use (content `light.while`) is lit now: someone is doing that
+/// animation at an object on its tiles (a cooker hood's light while the hob under it cooks).
+/// Any task counts, not only a plain use: cooking a recipe is `TaskKind::Cook`, its step's
+/// animation the one the hood watches.
+pub fn while_on(world: &World, o: &crate::world::ObjectInstance) -> bool {
+    let tags = &world.content.objects[o.def].while_anims;
+    if tags.is_empty() {
+        return false;
+    }
+    let anims: Vec<usize> = world
+        .content
+        .animations
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| tags.contains(a))
+        .map(|(i, _)| i)
+        .collect();
+    let tiles: Vec<(i32, i32)> = o.tiles(&world.content).collect();
+    let on_tiles = |x: i32, z: i32| tiles.contains(&(x, z));
+    world.sims.iter().any(|s| {
+        let doing = crate::snapshot::doing(world, s);
+        if doing.action < 0.0 || !anims.contains(&(doing.action as usize)) {
+            return false;
+        }
+        // At a station on the tiles, or standing on them (a hob with no station to speak of).
+        let at = world.index_of(doing.object as u32).map(|i| {
+            world.objects[i]
+                .tiles(&world.content)
+                .any(|t| on_tiles(t.0, t.1))
+        });
+        at == Some(true) || on_tiles(s.pos[0].floor() as i32, s.pos[1].floor() as i32)
+    })
+}
+
+/// Keeps `World::while_lit` (the lights that follow a use) up to date, telling the renderer when
+/// one comes on or goes off.
+pub(crate) fn update_while(world: &mut World) {
+    if !world
+        .content
+        .objects
+        .iter()
+        .any(|o| !o.while_anims.is_empty())
+    {
+        return;
+    }
+    let lit: Vec<u32> = world
+        .objects
+        .iter()
+        .filter(|o| while_on(world, o))
+        .map(|o| o.stable)
+        .collect();
+    if lit != world.while_lit {
+        world.while_lit = lit;
+        world.lights_version = world.lights_version.wrapping_add(1);
+    }
 }
 
 /// Switches one lamp; false if it was so already (or isn't a lamp).
@@ -66,12 +124,17 @@ pub(crate) fn set(world: &mut World, object: u32, on: bool) -> bool {
     true
 }
 
-/// The lamps that are off (object ids), for the renderer.
+/// The lamps that are off (object ids), for the renderer: those switched off, and the lights that
+/// follow a use while nothing is being done under them.
 pub fn lamps_off(world: &World) -> Vec<u32> {
     world
         .objects
         .iter()
-        .filter(|o| o.off && switchable(world, o.def))
+        .filter(|o| {
+            (o.off && switchable(world, o.def))
+                || (!world.content.objects[o.def].while_anims.is_empty()
+                    && !world.while_lit.contains(&o.stable))
+        })
         .map(|o| o.stable)
         .collect()
 }

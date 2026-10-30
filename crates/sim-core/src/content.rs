@@ -448,6 +448,11 @@ pub struct ObjectDef {
     /// use of it lights it when it's dark) or the player, never by coming into the room; it burns
     /// down by morning (see `lights.rs`).
     pub fire: bool,
+    /// A light that follows a use (content `light.while`, animation tags): it's lit only while
+    /// someone does one of those animations at an object on its tiles (a cooker hood's light over
+    /// a hob: `["stir", "bake"]`). It has no switch of its own; the simulation decides
+    /// (`lights.rs`).
+    pub while_anims: Vec<String>,
     /// Wear per finished use (it breaks at 1; see `ObjectRules::wear_per_quality`).
     pub wear_per_use: f32,
     /// Every tag its interactions have (what the room it stands in can be used for).
@@ -3799,8 +3804,15 @@ impl Content {
                 lamp: obj.light.as_ref().map_or(0.0, |l| {
                     l.get("tiles").and_then(serde_json::Value::as_f64).map_or(lamp_tiles, |t| t as f32).max(0.1)
                 }),
-                switch: obj.light.as_ref().is_some_and(|l| l.get("switch").and_then(serde_json::Value::as_bool) != Some(false)),
+                switch: obj.light.as_ref().is_some_and(|l| l.get("switch").and_then(serde_json::Value::as_bool) != Some(false) && l.get("while").is_none()),
                 fire: obj.light.as_ref().is_some_and(|l| l.get("fire").and_then(serde_json::Value::as_bool) == Some(true) && l.get("switch").and_then(serde_json::Value::as_bool) != Some(false)),
+                while_anims: match obj.light.as_ref().and_then(|l| l.get("while")) {
+                    Some(serde_json::Value::String(s)) => vec![s.clone()],
+                    Some(serde_json::Value::Array(a)) => {
+                        a.iter().filter_map(serde_json::Value::as_str).map(str::to_owned).collect()
+                    }
+                    _ => Vec::new(),
+                },
                 // Things nobody uses up (scenery, plants, decor) never wear out.
                 wear_per_use: if !used {
                     0.0

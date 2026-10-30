@@ -680,7 +680,8 @@ From the coordinator's notes and each wave's `review-log.md`, deduplicated; the 
 **`cargo check-glb` heights (T1, T2)**
 - It probes one point, so a gap between slats, planks or cushions gives a false warning (six outdoors, the park bench). It wants the highest point over a 5–10 cm strip.
 - For a tub it reads the water's surface, not the tub's floor. The crib's check reads the changing pad under slot 1.
-- Not in CI yet, nor `cargo review sizes` and `uses` (plan §1 success criteria); only `pnpm check:clips` is.
+- Not in CI yet; `cargo review sizes` joined it on 2026-10-30 (an object mapping to no kind fails), but
+  `uses` (which always exits 0) and the browser checks did not.
 
 **`cargo review uses` (T4)**
 - The ladder shelf has no use but isn't flagged.
@@ -689,14 +690,18 @@ From the coordinator's notes and each wave's `review-log.md`, deduplicated; the 
 **`tools/bench/check.mjs play`**
 - `--use ripe`, for every `when: ripe` use (the veggie bed's is `pickSnack`), and the growth stage in the record.
 - It records clips only on the object used, not on the helpers a recipe walks to; it can't follow a whole recipe.
-- Picture names leave out the helper, so one chair tried at several desks overwrites itself.
+- ~~Picture names leave out the helper, so one chair tried at several desks overwrites itself.~~ Fixed
+  2026-10-30: `chairWood-with-coffeeTable-sit-00.png`.
 - The free-spot rule keys on `fillsWall`, so the wall bed was put mid-floor.
 - The camera:
   - it is sized by the footprint, so it cuts tall trees and sits inside the phone box;
-  - one camera per run (wanted: `--views a,b,c`, and a `--top` view for seats at tables);
-  - no shot of an object as bought, with no use (wanted: `--shot-idle`, by day and at night).
+  - one camera per run (wanted: `--views a,b,c`); `--top` added 2026-10-30 (looking down; the game
+    camera stops at 1.35 rad);
+  - ~~no shot of an object as bought~~: `--shot-idle` added 2026-10-30 (one picture before any use;
+    a night one needs the `*-night` state).
 - Needs carry over from one use to the next in a chunk, so short uses vary. It should reset them or log them at the use's start.
-- Wanted in the log: the resident's distance to the object's nearest face, the slot against a `stand` surface, and the doors' state.
+- In the log: ~~the resident's distance to the object's nearest face~~ (2026-10-30, each picture's
+  `sim.distance`); still wanted: the slot against a `stand` surface and the doors' state.
 - A `--build` option (edges built first).
 
 **`check.mjs sheet`**
@@ -910,7 +915,7 @@ Planned separately, after this review (§11.1).
 | I-bathroom-04 (fixed) | S3 | About thirty uses still have no sound: the treadmill and bikes, the workbench, the ball games and darts, the arcade, the sewing machine, the pottery wheel, the coffee machines, the blender's motor, the microwave, the toaster, an oven's fan, the pizza oven, the fridge door, the bin lid, the vending machines, the phone box, the basketball, singing, a bowed cello, the punch bag and the smash bin. | New synthesised sounds (art), keyed by `sound`; the headed listening check G-53 left. M. |
 | A-residents-03 (in part) | S3 | Feet slide 56–78 % of the way at speeds 4 and 5. | Won't fix: no gait steps at 45–90 m/s without strobing. |
 | M-lighting-08 (fixed) | S3 | On Low the four forward lamps aren't kept to their room, nor are tiles split by a diagonal wall. | The same room mask in the forward lights' shader (§11.3 e). M. Done for 0.5.0: the mask on every preset, a room per half of a split tile. |
-| I-kitchen-09 (fixed) | S3 | The range hood's light and hum while the hob below is in use. | Later, as polish (Q-19). S. |
+| I-kitchen-09 (fixed) | S3 | The range hood's light and hum while the hob below is in use. | Done 2026-10-30: the light comes on with the cooking (`light.while`, sim-core `lights.rs`), by day as at night, and off when it's done; the hum was already in. S. |
 | I-garden-08 (fixed) | S3 | No flower can be cut for a vase. | Later, with a vase to put them in (Q-18). M. |
 
 The tooling left to improve is in §7.

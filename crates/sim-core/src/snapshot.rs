@@ -138,11 +138,11 @@ const _: () = assert!(header::ITEMS_VERSION < HEADER_LEN && header::STAFF_COUNT 
 
 /// What a Sim does for the snapshot; see `sim::OBJECT`, `sim::ACTION`, `sim::OBJECT_DEF` and
 /// `sim::INTERACTION`.
-struct Doing {
-    object: f32,
-    action: f32,
-    def: f32,
-    interaction: f32,
+pub(crate) struct Doing {
+    pub(crate) object: f32,
+    pub(crate) action: f32,
+    pub(crate) def: f32,
+    pub(crate) interaction: f32,
 }
 
 impl Doing {
@@ -186,7 +186,7 @@ fn eating(world: &World, s: &Sim) -> Option<usize> {
         .or(s.held.map(|h| h.def))
 }
 
-fn doing(world: &World, s: &Sim) -> Doing {
+pub(crate) fn doing(world: &World, s: &Sim) -> Doing {
     if s.away_until.is_some() {
         return Doing::NOTHING;
     }

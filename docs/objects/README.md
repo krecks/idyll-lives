@@ -1,8 +1,9 @@
 # Objects
 
-Every object in the game, 541 of them, has a model built in Blender (`tools/art/blender`), exported as a `.glb`,
+Every object in the game, 542 of them, has a model built in Blender (`tools/art/blender`), exported as a `.glb`,
 with the moving parts it can show. Blender is the only source: the primitive parts the models replaced are gone, and
-the keys never changed, so saves and content need no migration. All 541 were built and checked in play by 2026-10-17,
+the keys never changed, so saves and content need no migration. All but the wide curtains, added 2026-10-21, were
+built and checked in play by 2026-10-17,
 as were the 36 models that aren't buyable: the 20 things residents carry and cook with (`families/held.py`), the 9 street props
 (`families/street.py`), and the lawn's grass tufts and wildflowers, the woods' rocks and the selection marker
 (`families/ground.py`). Every model key in the manifests has a `.glb`.

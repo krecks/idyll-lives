@@ -131,12 +131,13 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
 - **Servers** wear no apron and appear at their post at opening time rather than walking in.
 - **The sounds want a listen by ear** (G-53): each was rendered and checked by its spectrum, timing and level, not
   heard (`bench-results/review/fixes/sounds/wav/`).
-- **Later, as polish:** the range hood's light while the hob below is in use (its hum is in; Q-19); flowers cut for
-  a vase (Q-18).
+- **Later, as polish:** flowers cut for a vase (Q-18).
 - **Parts with no use, left decorative:** the executive desk's drawer (I-office-02, won't fix); the nesting tables'
-  small table and the display cabinet's door (decor, decision 4); the laundry basket's lid (not built). These are
-  modelled parts without a clip, so no clip is orphaned. The grandfather clock's trunk door is not a part of its own
-  (A-decor-01, won't fix): it would be a fifth draw, over what the gate passes, and the clock is wound at its dial.
+  small table and the display cabinet's door (decor, decision 4). These are modelled parts without a clip, so no
+  clip is orphaned. The laundry basket has no lid and none is planned: it holds clean washing heaped above its
+  rim (bathroom review, 2026-10-21); the lidded one is the bedroom's `laundryHamper`, whose lid lifts for sorting.
+  The grandfather clock's trunk door is not a part of its own (A-decor-01, won't fix): it would be a fifth draw,
+  over what the gate passes, and the clock is wound at its dial.
 - **Uses end once every need they raise is full**, by design (I-systems-02); it makes clips easy to miss in checks.
 
 ### Tools
@@ -228,7 +229,8 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
   blenders and the stand mixer, the microwaves (a hum, then a ping), toast (then the pop), an oven's fan, the pizza
   oven's fire (and the fireplace's and the fire pit's), the phone box, the vending machines, basketball, karaoke
   singing, a bowed cello, the punch bag and the smash bin; a fridge door and the pedal bin's lid, once as they're
-  used. The cooker hood hums while the hob under it is in use (I-kitchen-09, Q-19).
+  used. The cooker hood hums, and its light comes on, while the hob under it is in use (I-kitchen-09, Q-19;
+  2026-10-30).
 - **Rendering:** each lamp lights only its own room on Low too, and on each half of a tile split by a diagonal wall,
   on every preset (M-lighting-08); the town map leaves the world its clicks and camera drags, as the pie menu does;
   with a wall thing in hand the walls stand, so nothing hangs over a lowered wall (M-houses-01); `partBox` is the box

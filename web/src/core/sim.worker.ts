@@ -36,6 +36,7 @@ let writer: SharedSnapshotWriter | null = null;
 let lastStructure = -1;
 let lastItems = -1;
 let lastLights = -1;
+let lastOff = '';
 /** Lot version and region the renderer last got the lot (walls, rooms, meshes) for. */
 let lastLot = -1;
 let lastRegion = '';
@@ -251,9 +252,13 @@ function publish(): void {
   const version = g.structure_version();
   // (Before the world, which the renderer builds with them.)
   const lights = g.lights_version();
-  if (version !== lastStructure || lights !== lastLights) {
+  // The list itself, not only the version: a light that follows a use (a hood over a hob) comes on
+  // without a switch, and the renderer must hear of it.
+  const off = g.lamps_off();
+  if (version !== lastStructure || lights !== lastLights || off !== lastOff) {
     lastLights = lights;
-    scope.postMessage({ type: 'lamps', off: JSON.parse(g.lamps_off()) });
+    lastOff = off;
+    scope.postMessage({ type: 'lamps', off: JSON.parse(off) });
   }
   if (version !== lastStructure) {
     lastStructure = version;
