@@ -63,6 +63,7 @@ export const SOFT_LOOK: ShaderFeature = {
 	vec3 gameHemi(vec3 n) {
 		vec3 c = mix(game_hemiGround, game_hemiSky, dot(n, game_hemiDir) * 0.5 + 0.5);
 		#ifdef GAME_UNDERGROUND
+			if (gameGrey) { c = vec3(dot(c, ${LUM.glsl})); }
 			c *= gameUnder.y;
 		#endif
 		return c;
@@ -84,6 +85,7 @@ export const SOFT_LOOK: ShaderFeature = {
 	vec3 gameAlbedo = albedo * ${DIELECTRIC};
 	vec3 gameDirect = gameAlbedo * dDiffuseLight;
 	#ifdef GAME_UNDERGROUND
+		if (gameGrey) { gameAmbient = vec3(dot(gameAmbient, ${LUM.glsl})); }
 		gameAmbient *= gameUnder.z;
 		#ifdef LIT_REFLECTIONS
 			dReflection.rgb *= gameUnder.z;
@@ -125,6 +127,7 @@ export const SOFT_LOOK: ShaderFeature = {
 	fn gameHemi(n: vec3f) -> vec3f {
 		var c = mix(uniform.game_hemiGround, uniform.game_hemiSky, dot(n, uniform.game_hemiDir) * 0.5 + 0.5);
 		#ifdef GAME_UNDERGROUND
+			if (gameGrey) { c = vec3f(dot(c, ${LUM.wgsl})); }
 			c = c * gameUnder.y;
 		#endif
 		return c;
@@ -143,6 +146,7 @@ export const SOFT_LOOK: ShaderFeature = {
 	let gameAlbedo = albedo * ${DIELECTRIC};
 	let gameDirect = gameAlbedo * dDiffuseLight;
 	#ifdef GAME_UNDERGROUND
+		if (gameGrey) { gameAmbient = vec3f(dot(gameAmbient, ${LUM.wgsl})); }
 		gameAmbient = gameAmbient * gameUnder.z;
 		#ifdef LIT_REFLECTIONS
 			dReflection = vec4f(dReflection.rgb * gameUnder.z, dReflection.a);

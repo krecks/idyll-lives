@@ -22,6 +22,7 @@ import { generateHouse, objectInfos, random, residentsKey, weighted, type Garden
 import { cropRoads, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Pt, type RoadPlan } from './roads';
 import { householdFunds, savingsOf } from './wealth';
 import { streetNames, WORLDS, worldName, worldTagline, type WorldKind } from './world';
+import { garageFor } from '../render/shared/cars';
 
 export type Wall = [number, number, number, number];
 export interface Door {
@@ -913,6 +914,8 @@ export interface TownLayout {
   paths: Rect[];
   /** Farm fields (see `WorldLook.fields`). */
   fields: Rect[];
+  /** Garages at the inner ends of driveways (`garageFor`: wall centre lines; `plot`: the slot's index). */
+  garages: { plot: number; x0: number; z0: number; x1: number; z1: number }[];
   plots: { name: string; x: number; z: number; w: number; d: number; public: boolean; entry: [number, number]; storeys: number }[];
   /** Each plot's `Facing` (as `TownMeta.facing`). */
   facing: Facing[];
@@ -923,9 +926,11 @@ export interface TownLayout {
 }
 
 /**
- * Stamps every plot's house layout (or its public place: a park, a square, a shop) onto the town. `playerSlot` is left without a
- * driveway (it stays open for building); null gives every house one. Each generated house is
- * furnished for its household (`player`: a new one moving in at `playerSlot`).
+ * Stamps every plot's house layout (or its public place: a park, a square, a shop) onto the town,
+ * each house with its driveway and maybe a garage, the player's too: their home looks as the town
+ * showed it. Each generated house is furnished for its household (`player`: a new one moving in
+ * at `playerSlot`). No cars for the simulation to drive yet: it drives them along a straight
+ * street, and a town's roads wind (the street draws them parked on the driveways).
  */
 export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDraft, playerSlot: number | null, player?: HouseholdDraft): TownLayout {
   const walls: Wall[] = [];
@@ -934,6 +939,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
   const objects: Placement[] = [];
   const paths: Rect[] = [];
   const fields: Rect[] = [];
+  const garages: TownLayout['garages'] = [];
   const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
 
   /** Things of a layout onto the town, `lift` rows up (see `TownLayout.storeys`). */
@@ -1021,15 +1027,30 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     }
     // A garden path from the front door to the street.
     if (h.doors[0]) pathTo(s, h.doors[0]);
-    // Neighbours get a driveway beside the house (the renderer parks a car on it); the player's
-    // plot stays open for building.
-    const drive = s.index === playerSlot ? null : driveway(h, pw, pd, footprint);
-    if (drive) {
-      paths.push(turnOnto(t, s).rect(drive));
-      verge(s, drive);
+    // A driveway beside the house, crossing the verge to the road.
+    const drive = driveway(h, pw, pd, footprint);
+    if (!drive) continue;
+    paths.push(turnOnto(t, s).rect(drive));
+    verge(s, drive);
+    // A garage at its inner end, clear of what's in the garden (as the street draws it): laid out
+    // as the plot is (its street at z = 0), at the plot's place on the town (so each plot decides
+    // its own), then turned onto the town.
+    const [ox, oz] = [s.x, s.z];
+    const shift = (r: Rect): Rect => ({ x: r.x + ox, z: r.z + oz, w: r.w, d: r.d });
+    const xs = h.walls.flatMap(([x0, , x1]) => [x0, x1]);
+    const zs = h.walls.flatMap(([, z0, , z1]) => [z0, z1]);
+    const box = { x0: Math.min(...xs) + ox, z0: Math.min(...zs) + oz, x1: Math.max(...xs) + ox, z1: Math.max(...zs) + oz };
+    const things = [...h.objects, ...(s.farm?.objects ?? [])].map((o): Rect => {
+      const [fw, fd] = footprint(o.def);
+      return shift(o.rot % 2 === 0 ? { x: o.x, z: o.z, w: fw, d: fd } : { x: o.x, z: o.z, w: fd, d: fw });
+    });
+    const garage = xs.length ? garageFor({ x: ox, z: oz, w: pw, d: pd }, box, shift(drive), -1, things) : null;
+    if (garage) {
+      const r = turnOnto(t, s).rect({ x: garage.x0 - ox, z: garage.z0 - oz, w: garage.x1 - garage.x0, d: garage.z1 - garage.z0 });
+      garages.push({ plot: s.index, x0: r.x, z0: r.z, x1: r.x + r.w, z1: r.z + r.d });
     }
   }
-  return { walls, doors, windows, objects, paths, fields, plots, facing: town.slots.map((s) => s.facing), storeys, basement };
+  return { walls, doors, windows, objects, paths, fields, garages, plots, facing: town.slots.map((s) => s.facing), storeys, basement };
 }
 
 /** What the renderer needs to know about a town's world (it survives save/load in `meta`). */
@@ -1058,7 +1079,7 @@ export function assembleTown(
   playerSlot: number,
   { existing = false, mode = 'living', lifespan = 'normal' }: AssembleOptions = {},
 ): string {
-  const { walls, doors, windows, objects, paths, fields, plots, facing, storeys, basement } = layoutTown(content, t, town, playerSlot, existing ? undefined : player);
+  const { walls, doors, windows, objects, paths, fields, garages, plots, facing, storeys, basement } = layoutTown(content, t, town, playerSlot, existing ? undefined : player);
   const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
 
   if (existing && !town.households.some((h) => h.slot === playerSlot)) throw new Error('Nobody lives in that house.');
@@ -1111,5 +1132,5 @@ export function assembleTown(
   const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths, facing, seed: town.seed ?? (Math.random() * 2 ** 31) >>> 0, world: worldLook(town, fields) };
   // Residents leave town (for work) where its roads lead out of it.
   const exits = roadExits(town.roads, town.width, town.depth);
-  return JSON.stringify({ mode, lifespan, width: town.width, depth: town.depth, storeys, ...(basement ? { basement } : {}), walls, doors, windows, objects, plots, households, sims, relationships, exits, meta });
+  return JSON.stringify({ mode, lifespan, width: town.width, depth: town.depth, storeys, ...(basement ? { basement } : {}), walls, doors, windows, objects, plots, households, sims, relationships, exits, garages, meta });
 }

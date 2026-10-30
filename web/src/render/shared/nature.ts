@@ -499,7 +499,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   /**
    * The terrain's heights and colours: each vertex of `positions` (x, y, z; in place) lifted to the
    * land, and its colour (RGBA, sRGB, converted on the GPU; it multiplies the grass detail texture)
-   * into `colors`.
+   * into `colors`, in alpha how much of it is lawn (the lawn's tone on the ground past the grass's
+   * field, `GAME_GRASS_GROUND`).
    */
   protected async shadeTerrain(positions: Float32Array | number[], colors: Float32Array, pace?: () => Promise<void>): Promise<void> {
     const tmp: Rgb = { r: 0, g: 0, b: 0 };
@@ -510,11 +511,11 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       const z = positions[i + 2];
       const h = this.heightAt(x, z);
       positions[i + 1] = h;
-      this.terrainColour(x, z, h, tmp);
+      const lawn = this.terrainColour(x, z, h, tmp);
       colors[c] = tmp.r;
       colors[c + 1] = tmp.g;
       colors[c + 2] = tmp.b;
-      colors[c + 3] = 1;
+      colors[c + 3] = lawn;
     }
   }
 

@@ -7,7 +7,7 @@
  * town always grows the same plants in the same places.
  *
  * The lawn's grass is built on the GPU (`grass.ts`), drawn near the eye; past it the ground
- * carries the lawn, its gusts too (`grassGround`).
+ * carries the lawn, its gusts too (`grassGround`), and on past the town into the landscape.
  *
  * Trees, bushes, hedges, the lawn's flowers and the garden catalog's plants are Blender-built files
  * (tools/art/blender/families/plants.py, trees.py): crowns on the leafy `foliage` finish over `bark`
@@ -112,7 +112,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.batches = [];
     await perfTimeAsync('nature: forests', () => this.forests(app, parent, assets, pace));
     await perfTimeAsync('nature: lawns', () => this.plantLawns(app, parent, assets, world, pace));
-    const field = await perfTimeAsync('nature: grass field', () => grassField(world, this, pace));
+    const field = await perfTimeAsync('nature: grass field', () => grassField(world, this, pace, this.ring));
     const grass = (this.grass = new Grass(app, parent, field, this.grassQuality));
     grass.onGround(ground.render!.meshInstances[0]);
     const plants = gather(this.batches);
