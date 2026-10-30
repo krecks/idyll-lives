@@ -37,8 +37,8 @@
   }
 </script>
 
-<header class="bar glass" class:live={game.mode === 'live'}>
-  <div class="zone">
+<header class="bar" class:live={game.mode === 'live'}>
+  <div class="zone glass">
     <span class="brand" title={game.household || undefined}>{game.household || 'Idyll Lives'}</span>
     <div class="segmented modes" role="tablist" aria-label="Mode">
       {#each modes as mode (mode.id)}
@@ -50,7 +50,7 @@
     </div>
   </div>
 
-  <div class="zone">
+  <div class="zone glass">
     <div class="time">
       <span class="day tabular">{WEEKDAYS[game.weekday]} · Day {game.day}</span>
       <span class="clock tabular">{clock(game.minute, settings.clock24h)}</span>
@@ -70,7 +70,7 @@
     {/if}
   </div>
 
-  <div class="zone right">
+  <div class="zone glass right">
     {#if game.mode === 'live'}
       <div class="tools">
         {#if game.occupied}
@@ -119,37 +119,44 @@
 </header>
 
 <style>
-  /* One bar, three zones: who you are and the mode on the left, the clock in the middle (centred
-     on the screen, so it doesn't move as the funds or the buttons beside it change), and what you
-     can do now on the right. When the sides are too wide to centre it, the clock moves aside
-     rather than slip under them. */
+  /* Three islands of glass with the game between them: who you are and the mode on the left, the
+     clock in the middle (centred on the screen, so it doesn't move as the funds or the buttons
+     beside it change), and what you can do now on the right. When the sides are too wide to
+     centre it, the clock moves aside rather than slip under them. */
   .bar {
     position: absolute;
     inset: var(--edge) var(--edge) auto;
-    height: 56px;
     display: grid;
     grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
     align-items: center;
     gap: var(--gap);
-    padding: 0 6px;
-    pointer-events: auto;
+    pointer-events: none;
     container-type: inline-size;
   }
   .zone {
     display: flex;
     align-items: center;
-    gap: 6px;
-    min-width: 0;
+    gap: 4px;
+    height: 44px;
+    padding: 0 4px;
+    border-radius: var(--radius-md);
+    pointer-events: auto;
+  }
+  .zone:first-child {
+    justify-self: start;
+  }
+  .zone:nth-child(2) {
+    justify-self: center;
   }
   .right {
-    justify-content: flex-end;
+    justify-self: end;
   }
   .brand {
     max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 0 8px 0 10px;
+    padding: 0 6px 0 8px;
     font-weight: 700;
     letter-spacing: -0.02em;
   }
@@ -196,8 +203,8 @@
     display: flex;
     flex-direction: column;
     line-height: 1.1;
-    padding: 0 8px 0 10px;
-    min-width: 104px;
+    padding: 0 6px 0 8px;
+    min-width: 100px;
   }
   .day {
     font-size: 10.5px;
@@ -231,8 +238,8 @@
   .tool {
     display: grid;
     place-items: center;
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     border-radius: var(--radius-sm);
     color: var(--text-muted);
     transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
@@ -251,8 +258,8 @@
   }
   .divider {
     width: 1px;
-    height: 22px;
-    margin: 0 4px;
+    height: 20px;
+    margin: 0 2px;
     background: var(--hairline);
   }
   .funds {
@@ -312,16 +319,13 @@
   }
   @container (max-width: 940px) {
     .zone {
-      gap: 4px;
+      gap: 2px;
     }
     .tool {
-      width: 32px;
+      width: 30px;
     }
     .funds {
       padding: 0 5px;
-    }
-    .divider {
-      margin: 0 2px;
     }
     .modes button {
       padding: 0 8px;
@@ -333,10 +337,8 @@
      Hud.svelte moves what hangs below the bar at the same width.) */
   @container hud (max-width: 780px) {
     .bar {
-      height: auto;
       grid-template-columns: auto 1fr;
-      row-gap: 4px;
-      padding: 6px;
+      row-gap: 8px;
     }
     .zone:nth-child(2) {
       grid-column: 1 / -1;

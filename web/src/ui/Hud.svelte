@@ -52,7 +52,7 @@
      feed, town map) starts lower. */
   @container hud (max-width: 780px) {
     .hud > :global(*) {
-      --top: 114px;
+      --top: 128px;
     }
   }
   /* Watching with a quiet interface: everything fades until the player moves the mouse. */
