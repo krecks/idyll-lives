@@ -64,9 +64,11 @@ door) shipped in 0.5.0 — see open.md, "Fixed in 0.5.0".
 | Item | What is missing | Source | Effort |
 |---|---|---|---|
 | Servers | No apron; they appear at their post at opening time instead of walking in | open.md, "Content and sim" | S–M |
-| Flowers for a vase | No flower can be cut to put in a vase | I-garden-08, Q-18 polish | M |
 | Furniture resizing | Resize arrows stay off (`RESIZING`, `buildmode.ts`); moving parts do not follow a resize yet | PLAN.md roadmap "later" | L |
 | Smarter thoughts | No LLM re-rank of the utility AI's top-3; research only | PLAN.md roadmap "later", [design/smarter-thoughts.md](design/smarter-thoughts.md) | L (research) |
+
+Flowers cut for a vase left this list on 2026-10-30 (below). Cutting the individual beds — the tulips',
+daffodils', lilies', cosmos' and daisies' "cut a bunch" — is still open, stood in for by the raised bed's one use.
 
 ## 4. Not yet checked (not known broken)
 
