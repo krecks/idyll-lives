@@ -378,6 +378,8 @@ export interface WorldMeta {
   name?: string;
   streets?: { x: number; z: number; w: number; d: number }[];
   paths?: { x: number; z: number; w: number; d: number }[];
+  /** Where each plot's street is (by plot index; `game/town.ts` `Facing`): 0 north, 1 west, 2 south, 3 east. Missing in older saves. */
+  facing?: number[];
   seed?: number;
   /** What kind of world the town is in and how its land looks (missing: the classic valley). */
   world?: WorldLook;

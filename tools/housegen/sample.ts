@@ -8,7 +8,8 @@
  * without children, no bathroom off the room the front door opens into, the front door into a
  * shared room, no way through a bathroom, a laundry or a bedroom, and a lot cut to fit the house
  * (the garden sizes in turn) that it covers no more and no less of than `COVER` says. Problems
- * are listed (and the exit code is 1).
+ * are listed (and the exit code is 1). The houses are written turned to face a street on each
+ * side in turn, as towns turn their lots.
  *
  * Run: bun tools/housegen/sample.ts out.json [houses per lot size]
  */
@@ -16,9 +17,10 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import type { ObjectDef } from '../../web/src/content/content.ts';
 import type { GardenSize, HouseGenConfig, Residents } from '../../web/src/game/housegen.ts';
-import type { HouseTemplate } from '../../web/src/game/town.ts';
+import type { Facing, HouseTemplate } from '../../web/src/game/town.ts';
 
 const { GARDEN_SIZES, generateHouse, objectInfos } = await import('../../web/src/game/housegen.ts');
+const { turner } = await import('../../web/src/game/town.ts');
 
 /** How much of its lot a house covers (its ground floor), by garden size: least and most. */
 const COVER: Record<GardenSize, [number, number]> = { snug: [0.2, 0.6], roomy: [0.16, 0.45], big: [0.12, 0.32] };
@@ -142,45 +144,41 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
       kinds.set(r.kind, { n: k.n + 1, area: k.area + r.w * r.d, most: Math.max(k.most, r.w * r.d), long: Math.max(k.long, r.w, r.d) });
       stats.rooms++;
     }
-    // On its own lot (the layout is in its frame).
-    const dx = 0;
+    // On its own lot, turned to face a street on any side (as `town.ts` turns lots onto a town).
+    const facing = (seed % 4) as Facing;
     const { width, depth } = h.lot ?? lot;
-    // The basement on the rows after every storey's (as `town.ts` puts it).
+    const turn = turner(0, 0, width, depth, facing);
+    const [W, D] = facing % 2 ? [depth, width] : [width, depth];
+    const footprint = (def: string): [number, number] => byId.get(def)?.footprint ?? [1, 1];
+    // The storey above `D` rows down, the basement on the rows after every storey's (as `town.ts` puts them).
     const storeys = h.upper ? 2 : 1;
-    const down = storeys * depth;
-    const moveDoor = (lift: number) => (d: { x: number; z: number; axis: string }) => ({ x: d.x + dx, z: d.z + lift, axis: d.axis });
-    const walls = [
-      ...h.walls.map(([a, b, c, d]) => [a + dx, b, c + dx, d]),
-      ...(h.upper?.walls ?? []).map(([a, b, c, d]) => [a + dx, b + depth, c + dx, d + depth]),
-      ...(h.basement?.walls ?? []).map(([a, b, c, d]) => [a + dx, b + down, c + dx, d + down]),
-    ];
+    const floors = [[h, 0], [h.upper, D], [h.basement, storeys * D]] as const;
+    const onTown = <T>(f: (floor: NonNullable<(typeof floors)[number][0]>, lift: number) => T[]) => floors.flatMap(([floor, lift]) => (floor ? f(floor, lift) : []));
     towns.push({
       size,
       garden,
+      facing,
       seed: seed * 7919,
       household,
       name: h.name,
       description: h.description,
-      // The rooms as planned, on the lot (the storey above `depth` rows down, the basement after it, like the town).
-      rooms: [
-        ...(h.rooms ?? []).map((r) => ({ ...r, x: r.x + dx })),
-        ...(h.upper?.rooms ?? []).map((r) => ({ ...r, x: r.x + dx, z: r.z + depth })),
-        ...(h.basement?.rooms ?? []).map((r) => ({ ...r, x: r.x + dx, z: r.z + down })),
-      ],
+      // The rooms as planned, on the town (each storey on its rows, like the town).
+      rooms: onTown((f, lift) =>
+        (f.rooms ?? []).map((r) => {
+          const at = turn.rect(r);
+          return { ...r, ...at, z: at.z + lift };
+        }),
+      ),
       town: {
-        width,
-        depth,
+        width: W,
+        depth: D,
         storeys,
         ...(h.basement ? { basement: true } : {}),
-        walls,
-        doors: [...h.doors.map(moveDoor(0)), ...(h.upper?.doors ?? []).map(moveDoor(depth)), ...(h.basement?.doors ?? []).map(moveDoor(down))],
-        windows: [...(h.windows ?? []).map(moveDoor(0)), ...(h.upper?.windows ?? []).map(moveDoor(depth)), ...(h.basement?.windows ?? []).map(moveDoor(down))],
-        objects: [
-          ...h.objects.map((o) => ({ ...o, x: o.x + dx })),
-          ...(h.upper?.objects ?? []).map((o) => ({ ...o, x: o.x + dx, z: o.z + depth })),
-          ...(h.basement?.objects ?? []).map((o) => ({ ...o, x: o.x + dx, z: o.z + down })),
-        ],
-        plots: [{ name: 'Home', x: 0, z: 0, w: width, d: depth, entry: h.spawns[0] && [h.spawns[0][0] + dx, h.spawns[0][1]] }],
+        walls: onTown((f, lift) => f.walls.map((w) => turn.wall(w, lift))),
+        doors: onTown((f, lift) => f.doors.map((d) => turn.edge(d, lift))),
+        windows: onTown((f, lift) => (f.windows ?? []).map((d) => turn.edge(d, lift))),
+        objects: onTown((f, lift) => f.objects.map((o) => turn.place(o, footprint, lift))),
+        plots: [{ name: 'Home', x: 0, z: 0, w: W, d: D, entry: h.spawns[0] && turn.point(h.spawns[0]) }],
         households: [{ name: 'Test', plot: 0, player: true }],
         sims: [],
       },

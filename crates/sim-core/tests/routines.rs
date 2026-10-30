@@ -9,7 +9,7 @@
 //! (with `LOD=1` the rest of the town runs at lower detail, as in the game; `SEED=n` for another
 //! town and other choices than seed 7's; `BY_DAY=1` for needs day by day). The test town's
 //! houses have only a fridge to cook at; for generated houses with whole kitchens, make worlds
-//! (`node --experimental-transform-types tools/worlds/sample.ts worlds.json`) and set
+//! (`bun tools/worlds/sample.ts worlds.json`) and set
 //! `WORLDS=worlds.json` (the first world, or the one of kind `WORLD`, e.g. `WORLD=medium`).
 
 mod common;

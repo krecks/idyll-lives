@@ -93,7 +93,7 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     return { id, def: o.def, x: o.x, z: o.z, rot: o.rot, turn: o.turn, offset: o.offset, w, d, quality: 0, sellValue: null };
   });
 
-  const meta: TownMeta = { kind: 'town', name: town.name, streets: town.streets, paths: layout.paths, seed: town.seed ?? 1, world: worldLook(town, layout.fields), home: playerSlot };
+  const meta: TownMeta = { kind: 'town', name: town.name, streets: town.streets, paths: layout.paths, facing: layout.facing, seed: town.seed ?? 1, world: worldLook(town, layout.fields), home: playerSlot };
   return {
     version: 0,
     lotVersion: 0,
