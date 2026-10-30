@@ -40,11 +40,13 @@ import type { ModelEntry } from '../../assets/types';
 import { groundDepth, objectCentre, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
-import { CARS, CAR_PAINT, driveEnd, garageFor, hash, paintCar, parkCar, pick, type CarBody } from './cars';
+import { CARS, CAR_PAINT, garageFor, hash, paintCar, parkCar, pick, type CarBody } from './cars';
 import type { HousePlanner, SilhouettePlan, SilhouetteSpec } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
 import { perfEnd, perfStart, perfTime } from '../../debug/perf';
+import { centroid } from '../../game/roads';
+import { Kerb, KERB, roadIndex, roadMeshes, SIDEWALK, townRoads, WALK_Y } from './roads';
 
 /** Vertex-colour alpha for the plain finish, as the material libraries' `encodeFinish`: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. */
 function encodeFinish(roughness: number, metallic: number): number {
@@ -59,12 +61,6 @@ export interface Rect {
   d: number;
 }
 
-/** Sidewalk width (including the kerb) on each side of the road, and its levels. */
-const SIDEWALK = 1.35;
-const KERB = 0.14;
-const WALK_Y = 0.03;
-const KERB_Y = 0.045;
-const ROAD_Y = 0.012;
 /** Paths at least this wide are driveways (garden paths are 1 m; see `game/town.ts`). */
 const DRIVEWAY_MIN_WIDTH = 1.8;
 /** Half wall thickness (as in house.ts). */
@@ -92,6 +88,7 @@ const PROP = {
   sign: 'model.street.sign',
   busSign: 'model.street.busSign',
   shelter: 'model.busStop',
+  fountain: 'model.fountainTown',
   pot: 'model.street.pot',
   pathLight: 'model.street.pathLight',
   litterBin: 'model.litterBin',
@@ -104,6 +101,21 @@ const AWNINGS: [string, string][] = [['#2F6B4F', '#F2F0EA'], ['#B8322B', '#F2F0E
 export type ObjectLook = (def: string) => { model: string; footprint: [number, number]; standIn: StandIn } | undefined;
 
 const overlaps = (a: Rect, b: Rect, m = 0) => a.x - m < b.x + b.w && a.x + a.w + m > b.x && a.z - m < b.z + b.d && a.z + a.d + m > b.z;
+
+/*
+ * A plot's dressing is laid out as if its street ran along x (`PlotLayout`'s coordinates): a plot
+ * on a street along z is turned a quarter for it, the town's (x, z) at (z, -x), and its dressing
+ * turned back onto the town.
+ */
+const localRect = (turned: boolean, r: Rect): Rect => (turned ? { x: r.z, z: -(r.x + r.w), w: r.d, d: r.w } : r);
+const townRect = (turned: boolean, r: Rect): Rect => (turned ? { x: -(r.z + r.d), z: r.x, w: r.d, d: r.w } : r);
+const townPoint = (turned: boolean, x: number, z: number): [number, number] => (turned ? [-z, x] : [x, z]);
+const townYaw = (turned: boolean, yaw: number) => (turned ? yaw - Math.PI / 2 : yaw);
+/** A box (x0, z0, x1, z1) as laid out, on the town. */
+const townBox = (turned: boolean, b: { x0: number; z0: number; x1: number; z1: number }) => {
+  const r = townRect(turned, { x: b.x0, z: b.z0, w: b.x1 - b.x0, d: b.z1 - b.z0 });
+  return { x0: r.x, z0: r.z, x1: r.x + r.w, z1: r.z + r.d };
+};
 
 /**
  * Writes posed primitives into a `Geo`: a local frame (origin on the ground, +z forward)
@@ -315,18 +327,29 @@ export function blob(g: Geo, x: number, z: number, rx: number, rz: number, yaw: 
 
 // ---- layout ---------------------------------------------------------------------------
 
+/**
+ * A plot as its dressing is laid out: in the town's coordinates, or turned a quarter (`turned`;
+ * see `localRect`) so that its street runs along x either way.
+ */
 export interface PlotLayout {
+  /** The plot (its rectangle as laid out). */
   plot: PlotInfo;
+  /** The plot in the town's own coordinates. */
+  info: PlotInfo;
+  /** Laid out turned a quarter (its street runs along z in the town). */
+  turned: boolean;
   /** `shop`: a public place with walls; `park`: one in the open. */
   kind: 'home' | 'house' | 'park' | 'shop' | 'empty';
-  /** +1: the street is on the plot's max-z side; -1: on its min-z side. */
+  /** +1: the street is on the plot's max-z side; -1: on its min-z side (as laid out). */
   front: 1 | -1;
-  /** z of the plot edge on the street. */
+  /** z of the plot edge on the street (as laid out). */
   edge: number;
   /** Wall bounding box. */
   house: { x0: number; z0: number; x1: number; z1: number } | null;
   /** Centre x of the garden path to the front door. */
   door: number | null;
+  /** The garden path to the front door, and the driveway. */
+  path: Rect | null;
   drive: Rect | null;
 }
 
@@ -408,6 +431,7 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
   const footprints = new Map<string, [number, number]>();
   const standIns = new Map<string, StandIn>();
   const streets = (world.meta?.streets ?? []).filter((s) => s.w >= s.d);
+  const roads = townRoads(world);
   const paths = world.meta?.paths ?? [];
   const fields = world.meta?.world?.fields ?? [];
   const plots = layout(world, view, streets, paths);
@@ -436,7 +460,10 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
   // Garages: the town's (`WorldStructure.garages`, the viewed lot's too); a game from before them
   // places the neighbours' itself.
   const garageOf = (L: PlotLayout): SilhouetteSpec['garage'] => {
-    if (!world.garages) return L.kind === 'house' ? garage(L, blocked) : null;
+    if (!world.garages) {
+      const g = L.kind === 'house' ? garage(L, blocked) : null;
+      return g && townBox(L.turned, g);
+    }
     const g = world.garages.find((g) => g.plot === L.plot.id);
     return g ? { x0: g.x0, z0: g.z0, x1: g.x1, z1: g.z1 } : null;
   };
@@ -448,7 +475,10 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
     const g = L.kind === 'shop' ? null : garageOf(L);
     if (home && view && !g) continue;
     // (Only the game's street follows who's up: the menus' town keeps every window lit.)
-    specs.push({ ...L.house, lot: L.plot, home, garageOnly: home && !!view, front: L.front, door: L.door, garage: g, roof: L.plot.roof, storeys: L.plot.storeys, lived: L.kind === 'house' && options.lived });
+    const [x0, z0, x1, z1] = L.info.house!;
+    // The street side's normal: (0, front) as laid out.
+    const front: [number, number] = L.turned ? [-L.front, 0] : [0, L.front];
+    specs.push({ x0, z0, x1, z1, lot: L.info, home, garageOnly: home && !!view, front, door: L.door, garage: g, roof: L.plot.roof, storeys: L.plot.storeys, lived: L.kind === 'house' && options.lived });
   }
   // The viewed lot's garage is planned apart (`StreetPlan.lot`).
   const silhouettes = perfTime('street: silhouettes', () => planner.silhouettes(specs.filter((s) => !s.garageOnly), world.openings ?? [], world));
@@ -467,137 +497,192 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
   lamps(silhouettes.lamps, props, glow, pools);
   if (lot) lamps(lot.silhouettes.lamps, lot.props, lot.glow, lot.pools);
 
-  // ---- sidewalks, kerbs, centre line, kerbside furniture ------------------------------
+  // ---- sidewalks, kerbs, kerbside furniture -----------------------------------------
   const sidewalks = perfStart('street: sidewalks');
-  for (const st of streets) {
-    for (const side of [-1, 1] as const) {
-      // side -1: the sidewalk along the street's min-z edge; +1: along its max-z edge.
-      const edge = side < 0 ? st.z : st.z + st.d;
-      const into = -side; // from the edge into the street
-      const zAt = (d: number) => edge + into * d;
-      const span = (d0: number, d1: number) => [Math.min(zAt(d0), zAt(d1)), Math.max(zAt(d0), zAt(d1))];
-      const [w0, w1] = span(0, SIDEWALK - KERB);
-      const [k0, k1] = span(SIDEWALK - KERB, SIDEWALK);
-      const [xa, xb] = [st.x, st.x + st.w];
-      walk.color('#E6E6E6').poly([[xa, WALK_Y, w0], [xb, WALK_Y, w0], [xb, WALK_Y, w1], [xa, WALK_Y, w1]], [0, 1, 0]);
-      walk.color('#FFFFFF').poly([[xa, KERB_Y, k0], [xb, KERB_Y, k0], [xb, KERB_Y, k1], [xa, KERB_Y, k1]], [0, 1, 0]);
-      // Kerb faces: the step up from the walk and the drop to the road.
-      const kIn = zAt(SIDEWALK - KERB);
-      const kOut = zAt(SIDEWALK);
-      walk.poly([[xa, WALK_Y, kIn], [xb, WALK_Y, kIn], [xb, KERB_Y, kIn], [xa, KERB_Y, kIn]], [0, 0, -into]);
-      walk.poly([[xa, ROAD_Y, kOut], [xb, ROAD_Y, kOut], [xb, KERB_Y, kOut], [xa, KERB_Y, kOut]], [0, 0, into]);
-      walk.color('#E6E6E6').poly([[xa, 0, edge], [xb, 0, edge], [xb, WALK_Y, edge], [xa, WALK_Y, edge]], [0, 0, side]);
-      // Gutter: the road darkens along the kerb.
-      const g0 = zAt(SIDEWALK);
-      const g1 = zAt(SIDEWALK + 0.4);
-      shadows.poly([[xa, ROAD_Y + 0.003, g0], [xb, ROAD_Y + 0.003, g0], [xb, ROAD_Y + 0.003, g1], [xa, ROAD_Y + 0.003, g1]], [0, 1, 0], undefined, [0.3, 0.3, 0, 0]);
-
+  roadMeshes(roads, null, 0, { walk, shadows }, 'sidewalks');
+  const index = roadIndex(roads);
+  // Each plot on the side of the road its front faces, and where along the road it is.
+  const fronting = plots.map((L) => {
+    const at = (u: number) => townPoint(L.turned, u, L.edge);
+    const [cx, cz] = at(L.plot.x + L.plot.w / 2);
+    const near = index.nearest(cx, cz);
+    return near && { L, road: near.road, side: near.side, at };
+  });
+  // Each garden path and driveway with the road and side it meets (as near as the sidewalk).
+  const meeting = paths.flatMap((p) => {
+    const near = index.nearest(p.x + p.w / 2, p.z + p.d / 2);
+    return near && near.dist <= roads[near.road].width / 2 + Math.max(p.w, p.d) / 2 + 0.6 ? [{ p, road: near.road, side: near.side }] : [];
+  });
+  for (const [r, road] of roads.entries()) {
+    for (const side of [1, -1] as const) {
+      const kerb = new Kerb(road, r, side, index);
+      const along = (u: [number, number]) => kerb.along(u[0], u[1]);
+      // The plots fronting this side, in order along it: their fronts (s0..s1), front doors and driveways.
+      const row = fronting
+        .filter((f) => f && f.road === r && f.side === side)
+        .map((f) => {
+          const { L, at } = f!;
+          const [a, b] = [along(at(L.plot.x)), along(at(L.plot.x + L.plot.w))];
+          const drive = L.drive && [along(at(L.drive.x)), along(at(L.drive.x + L.drive.w))].sort((p, q) => p - q);
+          return { L, s0: Math.min(a, b), s1: Math.max(a, b), door: L.door === null ? null : along(at(L.door)), drive };
+        })
+        .sort((a, b) => a.s0 - b.s0);
       // Mouths of garden paths and driveways on this side: keep them clear.
-      const mouths = paths.filter((r) => Math.abs((side < 0 ? r.z + r.d : r.z) - edge) < 0.05);
-      const clear = (x: number, m: number) => x > xa + 1 && x < xb - 1 && !mouths.some((r) => x > r.x - m && x < r.x + r.w + m);
+      const mouths: [number, number][] = [];
+      for (const { p } of meeting.filter((m) => m.road === r && m.side === side)) {
+        const corners = [[p.x, p.z], [p.x + p.w, p.z], [p.x, p.z + p.d], [p.x + p.w, p.z + p.d]].map(([x, z]) => kerb.along(x, z));
+        mouths.push([Math.min(...corners), Math.max(...corners)]);
+      }
+      const clear = (s: number, m: number) => s > 1 && s < kerb.length - 1 && kerb.open(s) && !mouths.some(([a, b]) => s > a - m && s < b + m);
       const used: number[] = [];
-      const near = (x: number, m: number) => used.some((u) => Math.abs(u - x) < m);
-      const kerbZ = zAt(SIDEWALK - KERB - 0.3);
-      const yaw = side < 0 ? 0 : Math.PI; // props' +z faces the road
-      const row = plots.filter((L) => Math.abs(L.edge - edge) < 0.05).sort((a, b) => a.plot.x - b.plot.x);
+      const near = (s: number, m: number) => used.some((u) => Math.abs(u - s) < m);
+      const kerbD = SIDEWALK - KERB - 0.3;
+      const on = (s: number, d = kerbD) => kerb.at(s, d);
 
       // Streetlights, one per plot width, staggered between the two sides.
-      const lights = row.map((L) => L.plot.x + (side < 0 ? 1.2 : L.plot.w / 2));
-      if (row.length) lights.push(row[row.length - 1].plot.x + row[row.length - 1].plot.w + (side < 0 ? 1.2 : -1.2));
-      for (const x0 of lights) {
-        const x = [0, 1.5, -1.5, 3, -3].map((d) => x0 + d).find((x) => clear(x, 1.2) && !near(x, 1.5));
-        if (x === undefined) continue;
-        used.push(x);
-        streetlight(props.at(x, kerbZ, yaw, WALK_Y), glow.at(x, kerbZ, yaw, WALK_Y));
-        blob(shadows, x, kerbZ, 0.32, 0.32, 0, 0.45, WALK_Y + 0.004);
-        pool(pools, x, kerbZ + into * 0.5, 4.2);
+      const lights = row.map((f) => f.s0 + (side > 0 ? 1.2 : (f.s1 - f.s0) / 2));
+      if (row.length) lights.push(row[row.length - 1].s1 + (side > 0 ? 1.2 : -1.2));
+      for (const s0 of lights) {
+        const s = [0, 1.5, -1.5, 3, -3].map((d) => s0 + d).find((s) => clear(s, 1.2) && !near(s, 1.5));
+        if (s === undefined) continue;
+        used.push(s);
+        const [x, z] = on(s);
+        streetlight(props.at(x, z, kerb.yaw(s), WALK_Y), glow.at(x, z, kerb.yaw(s), WALK_Y));
+        blob(shadows, x, z, 0.32, 0.32, 0, 0.45, WALK_Y + 0.004);
+        pool(pools, ...on(s, kerbD + 0.5), 4.2);
       }
       // Mailboxes in front of every house (beside the path, away from the driveway).
-      for (const L of row) {
-        if (L.door === null || (L.kind !== 'house' && L.kind !== 'home')) continue;
-        const away = L.drive && L.drive.x > L.door ? -1 : 1;
-        const x = [0.95 * away, -0.95 * away, 1.6 * away].map((d) => L.door! + d).find((x) => clear(x, 0.25) && !near(x, 0.6));
-        if (x === undefined) continue;
-        used.push(x);
-        mailbox(props.at(x, kerbZ, yaw, WALK_Y), pick(MAILBOX, L.plot.x, L.plot.z, 3));
-        blob(shadows, x, kerbZ, 0.2, 0.3, yaw, 0.35, WALK_Y + 0.004);
+      for (const f of row) {
+        if (f.door === null || (f.L.kind !== 'house' && f.L.kind !== 'home')) continue;
+        const away = f.drive && (f.drive[0] + f.drive[1]) / 2 > f.door ? -1 : 1;
+        const s = [0.95 * away, -0.95 * away, 1.6 * away].map((d) => f.door! + d).find((s) => clear(s, 0.25) && !near(s, 0.6));
+        if (s === undefined) continue;
+        used.push(s);
+        const [x, z] = on(s);
+        // (None of them quite straight.)
+        mailbox(props.at(x, z, kerb.yaw(s) + (hash(x, z, 9) - 0.5) * 0.5, WALK_Y), pick(MAILBOX, f.L.plot.x, f.L.plot.z, 3));
+        blob(shadows, x, z, 0.2, 0.3, kerb.yaw(s), 0.35, WALK_Y + 0.004);
       }
       // A hydrant every other plot.
-      row.forEach((L, i) => {
-        if ((i + (side < 0 ? 0 : 1)) % 2) return;
-        const x = [6, 8, 4, 10].map((d) => L.plot.x + d).find((x) => clear(x, 0.8) && !near(x, 1.2));
-        if (x === undefined) return;
-        used.push(x);
-        hydrant(props.at(x, kerbZ, yaw + hash(x, edge, 5) * 0.6, WALK_Y), hash(x, edge, 4) < 0.75 ? '#B32B24' : '#D9A520');
-        blob(shadows, x, kerbZ, 0.22, 0.22, 0, 0.4, WALK_Y + 0.004);
+      row.forEach((f, i) => {
+        if ((i + (side > 0 ? 0 : 1)) % 2) return;
+        const s = [6, 8, 4, 10].map((d) => f.s0 + d).find((s) => s < f.s1 && clear(s, 0.8) && !near(s, 1.2));
+        if (s === undefined) return;
+        used.push(s);
+        const [x, z] = on(s);
+        hydrant(props.at(x, z, kerb.yaw(s) + hash(x, z, 5) * 0.6, WALK_Y), hash(x, z, 4) < 0.75 ? '#B32B24' : '#D9A520');
+        blob(shadows, x, z, 0.22, 0.22, 0, 0.4, WALK_Y + 0.004);
       });
       // Bins out by some driveways, on the garden side of the sidewalk.
-      for (const L of row) {
-        if ((L.kind !== 'house' && L.kind !== 'home') || !L.drive || hash(L.plot.x, L.plot.z, 12) > 0.6) continue;
-        const outer = L.drive.x + L.drive.w / 2 > L.plot.x + L.plot.w / 2 ? 1 : -1;
-        const binZ = zAt(0.4);
+      for (const f of row) {
+        const L = f.L;
+        if ((L.kind !== 'house' && L.kind !== 'home') || !f.drive || hash(L.plot.x, L.plot.z, 12) > 0.6) continue;
+        const outer = (f.drive[0] + f.drive[1]) / 2 > (f.s0 + f.s1) / 2 ? 1 : -1;
         for (let k = 0; k < (hash(L.plot.x, L.plot.z, 13) < 0.5 ? 2 : 1); k++) {
-          const x = (outer > 0 ? L.drive.x + L.drive.w + 0.45 : L.drive.x - 0.45) + outer * k * 0.7;
-          if (!clear(x, 0.35) || near(x, 0.5) || x > L.plot.x + L.plot.w - 0.3 || x < L.plot.x + 0.3) continue;
-          used.push(x);
-          bin(props.at(x, binZ, yaw + Math.PI + (hash(x, binZ, 6) - 0.5) * 0.3, WALK_Y), BIN[(k + Math.floor(hash(L.plot.x, 1, 14) * 3)) % BIN.length]);
-          blob(shadows, x, binZ, 0.36, 0.4, 0, 0.4, WALK_Y + 0.004);
+          const s = (outer > 0 ? f.drive[1] + 0.45 : f.drive[0] - 0.45) + outer * k * 0.7;
+          if (!clear(s, 0.35) || near(s, 0.5) || s > f.s1 - 0.3 || s < f.s0 + 0.3) continue;
+          used.push(s);
+          const [x, z] = on(s, 0.4);
+          bin(props.at(x, z, kerb.yaw(s) + Math.PI + (hash(x, z, 6) - 0.5) * 0.3, WALK_Y), BIN[(k + Math.floor(hash(L.plot.x, 1, 14) * 3)) % BIN.length]);
+          blob(shadows, x, z, 0.36, 0.4, 0, 0.4, WALK_Y + 0.004);
         }
       }
       // In front of the public places: planters with a little tree, benches facing the place
       // (backs to the road), a litter bin by each bench.
-      for (const L of row) {
-        if (L.kind !== 'park' && L.kind !== 'shop') continue;
-        let k = Math.floor(hash(L.plot.x, edge, 70) * 2);
-        for (let x0 = L.plot.x + 2.2; x0 < L.plot.x + L.plot.w - 2; x0 += 3.6) {
+      for (const f of row) {
+        if (f.L.kind !== 'park' && f.L.kind !== 'shop') continue;
+        let k = Math.floor(hash(f.L.plot.x, f.L.plot.z, 70) * 2);
+        for (let s0 = f.s0 + 2.2; s0 < f.s1 - 2; s0 += 3.6) {
           const bench = k++ % 2 === 1;
-          const x = [0, 0.6, -0.6].map((d) => x0 + d).find((x) => clear(x, bench ? 1.3 : 0.8) && !near(x, bench ? 1.5 : 1.0));
-          if (x === undefined) continue;
-          used.push(x);
+          const s = [0, 0.6, -0.6].map((d) => s0 + d).find((s) => clear(s, bench ? 1.3 : 0.8) && !near(s, bench ? 1.5 : 1.0));
+          if (s === undefined) continue;
+          used.push(s);
+          const [x, z] = on(s);
+          const yaw = kerb.yaw(s);
           if (bench) {
-            put(PROP.bench, x, kerbZ, yaw + Math.PI);
-            blob(shadows, x, kerbZ, 0.95, 0.3, 0, 0.35, WALK_Y + 0.004);
-            const bx = x + (hash(x, edge, 71) < 0.5 ? -1.2 : 1.2);
-            if (clear(bx, 0.3) && !near(bx, 0.5)) {
-              used.push(bx);
-              put(PROP.litterBin, bx, kerbZ, yaw + (hash(bx, edge, 72) - 0.5) * 0.5, 0.9);
+            put(PROP.bench, x, z, yaw + Math.PI);
+            blob(shadows, x, z, 0.95, 0.3, yaw, 0.35, WALK_Y + 0.004);
+            const bs = s + (hash(x, z, 71) < 0.5 ? -1.2 : 1.2);
+            if (clear(bs, 0.3) && !near(bs, 0.5)) {
+              used.push(bs);
+              put(PROP.litterBin, ...on(bs), kerb.yaw(bs) + (hash(x, z, 72) - 0.5) * 0.5, 0.9);
             }
           } else {
-            put(hash(x, edge, 73) < 0.75 ? PROP.planter : PROP.flowerTub, x, kerbZ, hash(x, edge, 74) * 6.28, 0.9 + hash(x, edge, 75) * 0.15);
-            blob(shadows, x, kerbZ, 0.5, 0.5, 0, 0.4, WALK_Y + 0.004);
+            put(hash(x, z, 73) < 0.75 ? PROP.planter : PROP.flowerTub, x, z, hash(x, z, 74) * 6.28, 0.9 + hash(x, z, 75) * 0.15);
+            blob(shadows, x, z, 0.5, 0.5, 0, 0.4, WALK_Y + 0.004);
           }
         }
       }
-      // At the ends of the street (past the last lots): a bus shelter facing the road, its stop
-      // sign at the kerb, and a street-name sign on the corner.
+      // At the ends of the row (past the last lots): a bus shelter facing the road, its stop sign
+      // at the kerb, and a street-name sign on the corner.
       if (row.length) {
-        const west = side < 0;
-        const corner = west ? row[0].plot.x : row[row.length - 1].plot.x + row[row.length - 1].plot.w;
-        const out = west ? -1 : 1;
-        const cx = corner + out * 4;
-        const cz = edge - into * 0.62;
-        const shelter = { x: cx - 1.55, z: cz - 0.55, w: 3.1, d: 1.1 };
-        if (clear(cx, 1.6) && free(shelter, 0.2)) {
-          put(PROP.shelter, cx, cz, yaw);
-          blob(shadows, cx, cz, 1.7, 0.6, 0, 0.35, 0.02);
-          const sx = cx - out * 2.1;
-          if (clear(sx, 0.3) && !near(sx, 0.6)) {
-            used.push(sx);
-            put(PROP.busSign, sx, kerbZ, yaw);
+        const first = side > 0;
+        const corner = first ? row[0].s0 : row[row.length - 1].s1;
+        const out = first ? -1 : 1;
+        const cs = corner + out * 4;
+        const [cx, cz] = kerb.at(cs, -0.62);
+        const shelter = { x: cx - 1.6, z: cz - 1.6, w: 3.2, d: 3.2 };
+        if (clear(cs, 1.6) && free(shelter, 0.2) && !index.onRoad(cx, cz, 1)) {
+          put(PROP.shelter, cx, cz, kerb.yaw(cs));
+          blob(shadows, cx, cz, 1.7, 0.6, kerb.yaw(cs), 0.35, 0.02);
+          const ss = cs - out * 2.1;
+          if (clear(ss, 0.3) && !near(ss, 0.6)) {
+            used.push(ss);
+            put(PROP.busSign, ...on(ss), kerb.yaw(ss));
           }
         }
-        // Street-name signs at both ends, on one side of the street.
-        const ends = west ? [row[0].plot.x - 0.9, row[row.length - 1].plot.x + row[row.length - 1].plot.w + 0.9] : [];
-        for (const x of ends) {
-          if (!clear(x, 0.3) || near(x, 0.8)) continue;
-          used.push(x);
-          put(PROP.sign, x, kerbZ, yaw + Math.PI / 4);
+        // Street-name signs at both ends, on one side of the road.
+        const ends = first ? [row[0].s0 - 0.9, row[row.length - 1].s1 + 0.9] : [];
+        for (const s of ends) {
+          if (!clear(s, 0.3) || near(s, 0.8)) continue;
+          used.push(s);
+          put(PROP.sign, ...on(s), kerb.yaw(s) + Math.PI / 4);
+        }
+      }
+      // Where nobody lives along the road: on the water's side (the side its lots aren't on) a
+      // promenade (benches looking out over the water, a lamp between each two), elsewhere now and
+      // then a bench with a view.
+      const empty = (s: number) => !row.some((f) => s > f.s0 - 6 && s < f.s1 + 6);
+      const onVerge = (x: number, z: number) => x > 1 && z > 1 && x < world.width - 1 && z < groundDepth(world) - 1 && !index.onRoad(x, z, 0.4, r) && free({ x: x - 1, z: z - 1, w: 2, d: 2 }, 0.2);
+      const bench = (s: number, d: number) => {
+        const [x, z] = kerb.at(s, d);
+        if (!onVerge(x, z)) return false;
+        used.push(s);
+        put(PROP.bench, x, z, kerb.yaw(s) + Math.PI);
+        blob(shadows, x, z, 0.95, 0.3, kerb.yaw(s), 0.35, WALK_Y + 0.004);
+        return true;
+      };
+      if (road.lots && side !== road.lots) {
+        for (let s = 6, k = 0; s < kerb.length - 6; s += 7, k++) {
+          if (!empty(s) || !clear(s, 1.4) || near(s, 2)) continue;
+          if (k % 2 === 0) bench(s, -1.1);
+          else {
+            const [x, z] = on(s, 0.35);
+            used.push(s);
+            streetlight(props.at(x, z, kerb.yaw(s) + Math.PI, WALK_Y), glow.at(x, z, kerb.yaw(s) + Math.PI, WALK_Y));
+            pool(pools, ...on(s, -0.6), 4.2);
+          }
+        }
+      } else {
+        for (let s = 12, run = 0; s < kerb.length - 12; s++) {
+          run = empty(s) && kerb.open(s) ? run + 1 : 0;
+          if (run < 40 || hash(s, r * 7 + side, 81) > 0.6) continue;
+          if (bench(s - 20, -1.3)) run = -40;
         }
       }
     }
-    // No centre line: 3.3 m between the kerbs is one lane, a mews (two would need 5.5 m or more).
   }
 
+  // A fountain in the middle of every roundabout, flowers round it.
+  for (const road of roads) {
+    if (road.island !== 'fountain') continue;
+    const [cx, cz] = centroid(road.points);
+    put(PROP.fountain, cx, cz, hash(cx, cz, 90) * 6.28, 0.85);
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * Math.PI * 2;
+      plants.flowers.push([cx + Math.cos(a) * 2.6, cz + Math.sin(a) * 2.6, 0.9 + hash(cx, k, 91) * 0.3, 0.85 + hash(cz, k, 92) * 0.3, a]);
+    }
+  }
   perfEnd(sidewalks);
   await pace?.();
 
@@ -616,23 +701,30 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
   }
   for (const L of plots) {
     if (L.kind !== 'house' || !L.house) continue;
-    const { plot, front } = L;
+    const { plot, front, turned } = L;
     const h = L.house;
+    // Laid out as the plot is (see `PlotLayout`), drawn on the town.
+    const at = (x: number, z: number, yaw = 0, y = 0) => props.at(...townPoint(turned, x, z), townYaw(turned, yaw), y);
+    const isFree = (r: Rect, m = 0) => free(townRect(turned, r), m);
+    const plant = (kind: FoliageKind, [x, z, sx, sy, yaw]: Inst) => plants[kind].push([...townPoint(turned, x, z), sx, sy, townYaw(turned, yaw)]);
+    const putAt = (key: string, x: number, z: number, yaw: number, size?: number) => put(key, ...townPoint(turned, x, z), townYaw(turned, yaw), size);
     const vz = (v: number) => L.edge - front * v; // depth into the plot -> z
     const frontWall = front > 0 ? h.z1 + T : h.z0 - T;
     const backEdge = front > 0 ? plot.z : plot.z + plot.d;
 
-    const end = !world.cars && L.drive ? driveEnd(plot, L.drive, streets) : null;
-    const legacy = end ? parkCar(plot, end) : null;
-    if (legacy) parked(legacy.x, legacy.z, legacy.yaw, CARS[legacy.body], CAR_PAINT[legacy.paint]);
+    // A game without cars of its own (none in `WorldStructure.cars`: towns of winding roads, whose
+    // cars stay parked for now, and games from before cars): a car on some driveways, for good.
+    const end = !world.cars && L.drive ? { x: L.drive.x + L.drive.w / 2, z: front > 0 ? L.drive.z : L.drive.z + L.drive.d, front, street: 0 } : null;
+    const car = end ? parkCar(plot, end) : null;
+    if (car) parked(...townPoint(turned, car.x, car.z), townYaw(turned, car.yaw), CARS[car.body], CAR_PAINT[car.paint]);
 
     // Fences or hedges: sides from the house front line back, and the back edge. A side
     // shared with another neighbour is drawn once, on the boundary, by the plot on its left.
     // Farms have rail fences.
-    const farm = fields.some((f) => overlaps(f, plot, -0.01));
+    const farm = fields.some((f) => overlaps(f, L.info, -0.01));
     const style = farm ? 'rail' : hash(plot.x, plot.z, 30) < 0.5 ? 'picket' : hash(plot.x, plot.z, 31) < 0.75 ? 'hedge' : 'none';
     if (style !== 'none') {
-      const row = plots.filter((o) => o.edge === L.edge).sort((a, b) => a.plot.x - b.plot.x);
+      const row = plots.filter((o) => o.turned === turned && o.edge === L.edge).sort((a, b) => a.plot.x - b.plot.x);
       const i = row.indexOf(L);
       const left = row[i - 1] && Math.abs(row[i - 1].plot.x + row[i - 1].plot.w - plot.x) < 0.01 ? row[i - 1] : undefined;
       const right = row[i + 1] && Math.abs(plot.x + plot.w - row[i + 1].plot.x) < 0.01 ? row[i + 1] : undefined;
@@ -645,7 +737,7 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
       if (!neighbour(left)) lines.push([plot.x + inL, vz(vStart), plot.x + inL, vz(vEnd)]);
       lines.push(neighbour(right) ? [plot.x + plot.w, vz(vStart), plot.x + plot.w, vz(vEnd)] : [plot.x + plot.w - inR, vz(vStart), plot.x + plot.w - inR, vz(vEnd)]);
       lines.push([plot.x + inL, backEdge + front * inset, plot.x + plot.w - inR, backEdge + front * inset]);
-      for (const [x0, z0, x1, z1] of lines) edgeRun(style, props, plants.hedge, x0, z0, x1, z1, blocked);
+      for (const [x0, z0, x1, z1] of lines) edgeRun(style, props, plants.hedge, ...townPoint(turned, x0, z0), ...townPoint(turned, x1, z1), blocked);
     }
 
     // Flower beds along the house front, either side of the porch (one along all of it when no path
@@ -663,38 +755,38 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
     for (const [a0, a1] of runs) {
       if (a1 - a0 < 1.2) continue;
       const r = bedRect(a0, a1);
-      if (!free(r, 0.1)) continue;
+      if (!isFree(r, 0.1)) continue;
       const [z0, z1] = [r.z, r.z + r.d];
-      props.at(0, 0).paint('#3E2C20', 0.95, 0).box(a0, 0, z0, a1, 0.045, z1, 'ny');
+      at(0, 0).paint('#3E2C20', 0.95, 0).box(a0, 0, z0, a1, 0.045, z1, 'ny');
       const ez = front > 0 ? z1 : z0;
-      props.at(0, 0).paint('#B5AEA2', 0.85, 0).box(a0 - 0.04, 0, Math.min(ez, ez + front * 0.08), a1 + 0.04, 0.08, Math.max(ez, ez + front * 0.08), 'ny');
+      at(0, 0).paint('#B5AEA2', 0.85, 0).box(a0 - 0.04, 0, Math.min(ez, ez + front * 0.08), a1 + 0.04, 0.08, Math.max(ez, ez + front * 0.08), 'ny');
       for (let x = a0 + 0.35; x < a1 - 0.2; x += 0.62) {
         const k = hash(x, plot.z, 40);
         const back = frontWall + front * 0.3;
         const fore = frontWall + front * 0.62;
-        if (k < 0.45) plants.bush.push([x, back, 0.42 + hash(x, 1, 41) * 0.18, 0.4 + hash(x, 2, 41) * 0.25, hash(x, 3, 42) * 6.28]);
-        plants.flowers.push([x + 0.15, k < 0.45 ? fore : (back + fore) / 2, 0.85 + hash(x, 4, 43) * 0.35, 0.8 + hash(x, 5, 43) * 0.4, hash(x, 6, 44) * 6.28]);
+        if (k < 0.45) plant('bush', [x, back, 0.42 + hash(x, 1, 41) * 0.18, 0.4 + hash(x, 2, 41) * 0.25, hash(x, 3, 42) * 6.28]);
+        plant('flowers', [x + 0.15, k < 0.45 ? fore : (back + fore) / 2, 0.85 + hash(x, 4, 43) * 0.35, 0.8 + hash(x, 5, 43) * 0.4, hash(x, 6, 44) * 6.28]);
       }
     }
     // A shrub at each front corner of the house.
     for (const cx of [h.x0 - 0.55, h.x1 + 0.55]) {
       const cz = frontWall + front * 0.2;
       const r = { x: cx - 0.5, z: cz - 0.5, w: 1, d: 1 };
-      if (free(r) && !(L.drive && overlaps(r, L.drive, 0.2))) plants.bush.push([cx, cz, 0.7, 0.75, hash(cx, cz, 45) * 6.28]);
+      if (isFree(r) && !(L.drive && overlaps(r, L.drive, 0.2))) plant('bush', [cx, cz, 0.7, 0.75, hash(cx, cz, 45) * 6.28]);
     }
     // Pots either side of the front door, and on some plots little lights along the garden path.
     if (L.door !== null && hash(plot.x, plot.z, 46) < 0.8) {
       for (const dx of [-0.85, 0.85]) {
         const [px, pz] = [L.door + dx, frontWall + front * 0.32];
-        if (free({ x: px - 0.2, z: pz - 0.2, w: 0.4, d: 0.4 })) put(PROP.pot, px, pz, hash(px, pz, 47) * 6.28, 0.85 + hash(px, pz, 48) * 0.3);
+        if (isFree({ x: px - 0.2, z: pz - 0.2, w: 0.4, d: 0.4 })) putAt(PROP.pot, px, pz, hash(px, pz, 47) * 6.28, 0.85 + hash(px, pz, 48) * 0.3);
       }
     }
-    const path = L.door === null ? undefined : paths.find((r) => r.w < DRIVEWAY_MIN_WIDTH && Math.abs(r.x + r.w / 2 - L.door!) < 0.01);
+    const path = L.path ?? undefined;
     if (path && hash(plot.x, plot.z, 49) < 0.55) {
       const [a, b] = [Math.min(L.edge, frontWall) + 1.0, Math.max(L.edge, frontWall) - 1.0];
       for (let z = a, i = 0; z <= b; z += 2.2, i++) {
         const px = i % 2 ? path.x - 0.22 : path.x + path.w + 0.22;
-        if (free({ x: px - 0.1, z: z - 0.1, w: 0.2, d: 0.2 })) put(PROP.pathLight, px, z, 0);
+        if (isFree({ x: px - 0.1, z: z - 0.1, w: 0.2, d: 0.2 })) putAt(PROP.pathLight, px, z, 0);
       }
     }
   }
@@ -702,8 +794,8 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
   // ---- farm fields: rail fences round them, a gate on the side towards the farmhouse ----
   for (const f of fields) {
     if (view && overlaps(f, view, -0.01)) continue;
-    const owner = plots.find((L) => L.house && overlaps(f, L.plot, -0.01));
-    const gateWest = !owner?.house || (owner.house.x0 + owner.house.x1) / 2 < f.x + f.w / 2;
+    const house = plots.find((L) => L.info.house && overlaps(f, L.info, -0.01))?.info.house;
+    const gateWest = !house || (house[0] + house[2]) / 2 < f.x + f.w / 2;
     const [x0, z0, x1, z1] = [f.x + 0.3, f.z + 0.3, f.x + f.w - 0.3, f.z + f.d - 0.3];
     const [gx, ox] = gateWest ? [x0, x1] : [x1, x0];
     const gate = (z0 + z1) / 2;
@@ -730,7 +822,7 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
       const frontWall = L.front > 0 ? h.z1 + T : h.z0 - T;
       const [x0, x1] = [h.x0 + 0.5, h.x1 - 0.5];
       const [a, b] = pick(AWNINGS, L.plot.x, L.plot.z, 76);
-      props.at((x0 + x1) / 2, frontWall, L.front > 0 ? 0 : Math.PI);
+      props.at(...townPoint(L.turned, (x0 + x1) / 2, frontWall), townYaw(L.turned, L.front > 0 ? 0 : Math.PI));
       const half = (x1 - x0) / 2;
       const n = Math.max(2, Math.round((x1 - x0) / 0.5));
       for (let i = 0; i < n; i++) {
@@ -742,7 +834,7 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
       }
       props.paint('#3A3D41', 0.5, 0.5);
       for (const u of [-half, half]) props.box(u - 0.02, 2.2, 0, u + 0.02, 2.24, 0.95);
-      blob(shadows, (x0 + x1) / 2, frontWall + L.front * 0.6, half, 0.6, 0, 0.25, 0.02);
+      blob(shadows, ...townPoint(L.turned, (x0 + x1) / 2, frontWall + L.front * 0.6), half, 0.6, townYaw(L.turned, 0), 0.25, 0.02);
     }
     // The outdoor things of a public place or a neighbour's garden, where the lot would draw them:
     // the lawn round the viewed lot is cleared under every lot's things (`lawnMask`), so a thing left
@@ -752,7 +844,7 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
     const W = world.width;
     const D = groundDepth(world);
     for (const o of outside) {
-      if (o.x < L.plot.x || o.z < L.plot.z || o.x >= L.plot.x + L.plot.w || o.z >= L.plot.z + L.plot.d || o.z + o.d > D) continue;
+      if (o.x < L.info.x || o.z < L.info.z || o.x >= L.info.x + L.info.w || o.z >= L.info.z + L.info.d || o.z + o.d > D) continue;
       let indoors = false;
       for (let z = o.z; z < o.z + o.d; z++) for (let x = o.x; x < o.x + o.w; x++) indoors ||= !!world.rooms[z * W + x];
       const look = options.look(o.def);
@@ -791,39 +883,48 @@ const scratchM = new Float32Array(16);
 
 function layout(world: WorldStructure, view: ViewRect | null, streets: Rect[], paths: Rect[]): PlotLayout[] {
   const out: PlotLayout[] = [];
-  for (const plot of world.plots) {
-    // The street this plot faces: one of its z edges lies on a street edge.
-    let edge: number | null = null;
-    let front: 1 | -1 = 1;
-    for (const st of streets) {
-      if (plot.x + plot.w <= st.x || plot.x >= st.x + st.w) continue;
-      if (Math.abs(plot.z + plot.d - st.z) < 0.05) [edge, front] = [plot.z + plot.d, 1];
-      else if (Math.abs(plot.z - (st.z + st.d)) < 0.05) [edge, front] = [plot.z, -1];
+  world.plots.forEach((info, i) => {
+    // The side its street is on: as the town says (`meta.facing`: 0 north, 1 west, 2 south,
+    // 3 east), else (older saves) the street one of its z edges lies on.
+    let facing = world.meta?.facing?.[i];
+    if (facing === undefined) {
+      for (const st of streets) {
+        if (info.x + info.w <= st.x || info.x >= st.x + st.w) continue;
+        if (Math.abs(info.z + info.d - st.z) < 0.05) facing = 2;
+        else if (Math.abs(info.z - (st.z + st.d)) < 0.05) facing = 0;
+      }
     }
-    if (edge === null) continue;
+    if (facing === undefined) return;
+    const turned = facing % 2 === 1;
+    const plot = { ...info, ...localRect(turned, info) };
+    // Turned a quarter, the street west of a plot is on its max-z side as laid out, east of it on its min-z side.
+    const front: 1 | -1 = facing === 2 || facing === 1 ? 1 : -1;
     // The viewed lot in the game; in the menus' town the lot they treat as the player's.
-    const home = view ? overlaps({ x: plot.x, z: plot.z, w: plot.w, d: plot.d }, view, -0.01) : plot.id === world.meta?.home;
-    const inside = (r: Rect) => r.x >= plot.x - 0.01 && r.x + r.w <= plot.x + plot.w + 0.01 && r.z >= plot.z - 0.01 && r.z + r.d <= plot.z + plot.d + 0.01;
-    const own = paths.filter(inside);
-    const path = own.find((r) => r.w < DRIVEWAY_MIN_WIDTH);
+    const home = view ? overlaps(info, view, -0.01) : info.id === world.meta?.home;
+    const inside = (r: Rect) => r.x >= info.x - 0.01 && r.x + r.w <= info.x + info.w + 0.01 && r.z >= info.z - 0.01 && r.z + r.d <= info.z + info.d + 0.01;
+    const own = paths.filter(inside).map((r) => localRect(turned, r));
+    const path = own.find((r) => r.w < DRIVEWAY_MIN_WIDTH) ?? null;
     const drive = own.find((r) => r.w >= DRIVEWAY_MIN_WIDTH) ?? null;
-    const [x0, z0, x1, z1] = plot.house ?? [0, 0, 0, 0];
+    const house = info.house && localRect(turned, { x: info.house[0], z: info.house[1], w: info.house[2] - info.house[0], d: info.house[3] - info.house[1] });
     out.push({
       plot,
-      kind: home ? 'home' : plot.public ? (plot.house ? 'shop' : 'park') : plot.house ? 'house' : 'empty',
+      info,
+      turned,
+      kind: home ? 'home' : info.public ? (info.house ? 'shop' : 'park') : info.house ? 'house' : 'empty',
       front,
-      edge,
-      house: plot.house ? { x0, z0, x1, z1 } : null,
+      edge: front > 0 ? plot.z + plot.d : plot.z,
+      house: house ? { x0: house.x, z0: house.z, x1: house.x + house.w, z1: house.z + house.d } : null,
       door: path ? path.x + path.w / 2 : null,
+      path,
       drive,
     });
-  }
+  });
   return out;
 }
 
-/** A garage at the inner end of the driveway, beside the house, when it fits (`garageFor`). */
+/** A garage at the inner end of the driveway, beside the house, when it fits clear of `blocked` (the town's; `garageFor`): as laid out. */
 function garage(L: PlotLayout, blocked: Rect[]): SilhouetteSpec['garage'] {
-  return L.drive && L.house ? garageFor(L.plot, L.house, L.drive, L.front, blocked) : null;
+  return L.drive && L.house ? garageFor(L.plot, L.house, L.drive, L.front, blocked.map((b) => localRect(L.turned, b))) : null;
 }
 
 /** A fence or hedge along a line, skipping stretches that would run through objects. */

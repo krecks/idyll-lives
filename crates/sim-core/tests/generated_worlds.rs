@@ -5,7 +5,7 @@
 //! can the houses' basements from their front doors and everything residents use in the houses
 //! (on lots facing either way), and the town keeps going for half a day.
 //!
-//! Make the worlds first: `node --experimental-transform-types tools/worlds/sample.ts worlds.json`,
+//! Make the worlds first: `bun tools/worlds/sample.ts worlds.json`,
 //! then `WORLDS=worlds.json cargo test --release -p sim-core --test generated_worlds -- --ignored --nocapture`.
 
 mod common;
@@ -21,7 +21,8 @@ const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
 #[test]
 #[ignore]
 fn generated_worlds_are_livable() {
-    let path = std::env::var("WORLDS").expect("set WORLDS to a file made by `node --experimental-transform-types tools/worlds/sample.ts worlds.json`");
+    let path = std::env::var("WORLDS")
+        .expect("set WORLDS to a file made by `bun tools/worlds/sample.ts worlds.json`");
     let worlds: Vec<serde_json::Value> =
         serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     let content = common::content();

@@ -20,6 +20,8 @@
     type HouseholdDraft,
   } from '../../game/household';
   import type { Wardrobe } from '../../render/types';
+  import { careerTrack, jobTitle, savingsOf, topLevelAt, weeklyPay } from '../../game/wealth';
+  import { money } from '../format';
   import { kinLabel } from '../relationship';
   import Segmented from '../kit/Segmented.svelte';
   import SimStage from '../kit/SimStage.svelte';
@@ -88,6 +90,7 @@
     nextLabel = 'Choose a home →',
     avoidNames = (app.town?.households ?? []).map((h) => h.household.name),
     draft = app.household,
+    work = true,
     onback = (h: HouseholdDraft) => ((app.household = h), (app.screen = 'neighbourhood')),
     onnext = (h: HouseholdDraft) => ((app.household = h), (app.screen = 'home')),
   }: {
@@ -98,6 +101,8 @@
     avoidNames?: string[];
     /** Where editing starts (null: a random household of two). */
     draft?: HouseholdDraft | null;
+    /** Whether grown-ups bring a job and the household its savings (a new game: they buy their home with them). */
+    work?: boolean;
     onback?: (household: HouseholdDraft) => void;
     onnext?: (household: HouseholdDraft) => void;
   } = $props();
@@ -116,6 +121,29 @@
   const problems = $derived(householdProblems(content, household));
   const spent = $derived(content.perkCost(sim.perks));
   const others = () => household.members.filter((m) => m !== sim).map((m) => m.name);
+
+  // Work: a grown-up's job (a field, a track in it, a position no higher than their years allow).
+  const savings = $derived(work ? savingsOf(content, household) : 0);
+  const top = $derived(topLevelAt(content, sim.age));
+  const career = $derived(sim.job ? careerTrack(content, sim.job.career) : null);
+  // A position their age no longer allows comes down with it; a child has no job.
+  $effect(() => {
+    for (const m of household.members) {
+      if (!m.job) continue;
+      const most = topLevelAt(content, m.age);
+      if (most < 0) delete m.job;
+      else if (m.job.level > most) m.job.level = most;
+    }
+  });
+  function setField(id: string) {
+    const category = content.careerCategory(id);
+    if (!category?.tracks.length) delete sim.job;
+    else if (career?.category.id !== id) sim.job = { career: category.tracks[0].id, level: Math.min(sim.job?.level ?? 0, Math.max(0, top)) };
+  }
+  function setTrack(id: string) {
+    const track = careerTrack(content, id)?.track;
+    if (track) sim.job = { career: id, level: Math.min(sim.job?.level ?? 0, track.titles.length - 1, Math.max(0, top)) };
+  }
 
   $effect(() => {
     const gender = sim.gender;
@@ -343,6 +371,7 @@
             <span class="mini"><SimPreview appearance={lookAtAge(content, assets, m.appearance, m.age)} gender={m.gender} size={44} /></span>
             <span class="meta">
               <b>{m.name || 'Unnamed'}</b>
+              {#if work && m.job}<span class="job">{jobTitle(content, m.job)}</span>{/if}
               <span class="traits">
                 {#each m.traits as t (t)}<Icon name={content.trait(t)?.icon ?? ''} size={13} />{/each}
               </span>
@@ -355,6 +384,13 @@
       {/each}
       {#if household.members.length < rules.maxHousehold}
         <button class="add" onclick={addMember}><Icon name="icon.ui.plus" size={16} /> Add member</button>
+      {/if}
+      {#if work && content.economy.savings}
+        <div class="savings" title="What the grown-ups have put by from their work over the years">
+          <span class="eyebrow">Savings</span>
+          <b>{money(savings)}</b>
+          <span class="hint small">Buys your home; what's left comes along to spend.</span>
+        </div>
       {/if}
     </aside>
 
@@ -419,6 +455,37 @@
                 />
                 <span class="hint">years old</span>
               </label>
+            </div>
+          {/if}
+          {#if work && top >= 0 && content.careerCategories.length}
+            <div class="field">
+              <span class="eyebrow">Work</span>
+              <div class="work">
+                <select class="input" aria-label="Field of work" value={career?.category.id ?? ''} onchange={(e) => setField(e.currentTarget.value)}>
+                  <option value="">No job</option>
+                  {#each content.careerCategories as c (c.id)}<option value={c.id}>{c.label}</option>{/each}
+                </select>
+                {#if sim.job && career}
+                  <select class="input" aria-label="Career" value={sim.job.career} onchange={(e) => setTrack(e.currentTarget.value)}>
+                    {#each career.category.tracks as t (t.id)}<option value={t.id}>{t.label}</option>{/each}
+                  </select>
+                  <select
+                    class="input"
+                    aria-label="Position"
+                    value={sim.job.level}
+                    onchange={(e) => sim.job && (sim.job.level = Number(e.currentTarget.value))}
+                  >
+                    {#each career.track.titles.slice(0, top + 1) as title, level (level)}
+                      <option value={level}>{title} · {content.careerGrades[level]?.label ?? ''}</option>
+                    {/each}
+                  </select>
+                {/if}
+              </div>
+              <span class="hint small">
+                {sim.job
+                  ? `${sim.age >= content.retireAt ? 'Retired, with a pension from a job that paid' : 'Pays'} ${money(weeklyPay(content, sim.job.career, sim.job.level))} a week. The older a resident, the higher up they may have climbed.`
+                  : `${sim.name || 'This resident'} is between jobs: they can look for one in the game.`}
+              </span>
             </div>
           {/if}
           {#if content.genders.length}
@@ -755,6 +822,33 @@
     display: flex;
     flex-direction: column;
     gap: 3px;
+  }
+  .job {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .work {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  /* On the live 3D town, like "Add member". */
+  .savings {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: auto;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    background: var(--glass-menu);
+    border: 1px solid var(--glass-menu-border);
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  .savings b {
+    font-size: 20px;
+    letter-spacing: -0.02em;
   }
   .traits {
     display: flex;

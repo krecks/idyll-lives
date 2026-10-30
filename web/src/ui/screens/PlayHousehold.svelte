@@ -6,7 +6,10 @@
   import { onMount } from 'svelte';
   import { lookAtAge } from '../../game/household';
   import { menuScene } from '../../game/menuScene';
+  import type { SimDraft } from '../../game/household';
+  import { homePrice } from '../../game/price';
   import { houseTemplate, loadTemplates, type Templates } from '../../game/town';
+  import { householdFunds, jobTitle, savingsOf } from '../../game/wealth';
   import { app } from '../app.svelte';
   import { money } from '../format';
   import Icon from '../Icon.svelte';
@@ -29,6 +32,22 @@
   const chosen = $derived(town.households.find((h) => h.slot === slot));
   const address = $derived(slot !== null ? town.slots[slot] : null);
   const house = $derived(templates && address ? houseTemplate(templates, address.template) : undefined);
+  /** What they saved, what their home cost them, and so what they have left to spend (as `assembleTown` works it out). */
+  const savings = $derived(chosen ? savingsOf(content, chosen.household) : 0);
+  const price = $derived(templates && address ? homePrice(content, templates, address) : null);
+
+  /** "34 · Junior Developer": a resident's age and what they do. */
+  function about(m: SimDraft): string {
+    const retired = m.age >= content.retireAt;
+    const work = !content.isAdult(m.age)
+      ? (content.stageOf(m.age)?.label ?? '')
+      : m.job
+        ? `${retired ? 'Retired ' : ''}${jobTitle(content, m.job)}`
+        : retired
+          ? 'Retired'
+          : 'Between jobs';
+    return `${m.age} · ${work}`;
+  }
   const neighbours = $derived(
     address
       ? town.households
@@ -135,6 +154,7 @@
                   <span class="face"><SimPreview appearance={lookAtAge(services.content, services.assets, m.appearance, m.age)} gender={m.gender} size={60} /></span>
                   <span class="who">
                     <b>{m.name}</b>
+                    <span class="about">{about(m)}</span>
                     {#if bond}<span class="bond">{bond}</span>{/if}
                     <span class="tags">
                       {#each m.traits as t (t)}<span class="trait">{content.trait(t)?.label ?? t}</span>{/each}
@@ -147,8 +167,16 @@
             <dl>
               <dt>Home</dt>
               <dd>{house ? `${house.name}, ${house.bedrooms} bedroom${house.bedrooms === 1 ? '' : 's'}` : address.name}</dd>
-              <dt>Household funds</dt>
-              <dd>{app.mode === 'creative' ? 'Free: this is a Creative game' : money(content.economy.startingFunds)}</dd>
+              {#if price !== null}
+                <dt>Bought for</dt>
+                <dd>{money(price)}</dd>
+              {/if}
+              {#if content.economy.savings}
+                <dt>Savings</dt>
+                <dd>{money(Math.max(0, savings - (price ?? 0)))} left of {money(savings)}</dd>
+              {/if}
+              <dt>To spend</dt>
+              <dd>{app.mode === 'creative' ? 'Free: this is a Creative game' : money(householdFunds(content, savings, price ?? 0))}</dd>
             </dl>
             <p class="note">Settled residents: most already have a job and know a few of the neighbours.</p>
             {#if neighbours.length}
@@ -343,6 +371,10 @@
   }
   .who b {
     font-size: 16px;
+  }
+  .about {
+    font-size: 13px;
+    color: var(--text-muted);
   }
   .bond {
     font-size: 12px;

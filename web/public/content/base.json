@@ -2013,6 +2013,10 @@
     "startingFunds": 2500,
     "emptyLotFunds": 10000,
     "currency": "$",
+    "$homePrice": "A home's price (web/src/game/price.ts), paid once from the household's savings when it moves in: the land (`perTile` a tile of the lot), the house (`perFloorTile` a tile of floor, every storey and the basement, times (floor / `sizeRef`) to the `sizePremium`: a bigger house costs more a tile) and what's in it (`furniture` times the things' prices), rounded to `round`. An empty lot is the land alone.",
+    "homePrice": { "perTile": 40, "perFloorTile": 260, "sizeRef": 100, "sizePremium": 1, "furniture": 1, "round": 500 },
+    "$savings": "What a household has saved (web/src/game/wealth.ts): `base`, and a share (`rate`) of what each grown-up earned in the years they worked, climbing a grade every `yearsPerGrade` years from 18. Of what's left after buying a home, at most `keep` comes with the household as money to spend.",
+    "savings": { "base": 1500, "rate": 0.16, "yearsPerGrade": 3.5, "keep": 10000 },
     "rent": {
       "weekday": 6,
       "hour": 12,

@@ -7,7 +7,7 @@
  */
 
 import type { Content } from '../content/content';
-import type { CarInfo, ObjectPlacement, Opening, PlotInfo, WallEdge, WorldStructure } from '../core/protocol';
+import type { ObjectPlacement, Opening, PlotInfo, WallEdge, WorldStructure } from '../core/protocol';
 import { layoutTown, worldLook, type NeighbourhoodDraft, type Templates, type TownMeta } from './town';
 
 const EMPTY_MESH = { positions: new Float32Array(0), normals: new Float32Array(0), uvs: new Float32Array(0), indices: new Uint32Array(0) };
@@ -93,7 +93,7 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     return { id, def: o.def, x: o.x, z: o.z, rot: o.rot, turn: o.turn, offset: o.offset, w, d, quality: 0, sellValue: null };
   });
 
-  const meta: TownMeta = { kind: 'town', name: town.name, streets: town.streets, paths: layout.paths, seed: town.seed ?? 1, world: worldLook(town, layout.fields), home: playerSlot };
+  const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths: layout.paths, facing: layout.facing, seed: town.seed ?? 1, world: worldLook(town, layout.fields), home: playerSlot };
   return {
     version: 0,
     lotVersion: 0,
@@ -111,6 +111,5 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     meta,
     meshes: { walls: EMPTY_MESH, wallsLow: EMPTY_MESH, floors: EMPTY_MESH },
     garages: layout.garages,
-    cars: layout.cars.map(({ plot, x, z, yaw, body, paint }): CarInfo => ({ plot, x, z, yaw, body, paint })),
   };
 }

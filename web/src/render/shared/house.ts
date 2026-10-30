@@ -35,6 +35,7 @@ import type { DoorStyleDef, FloorCoveringDef, LightAim, RoofColorDef, RoofStyleD
 import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
+import { roadIndex, townRoads } from './roads';
 import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from './slanted';
 import { WALL_HALF, WALL_HEIGHT } from './walls';
 
@@ -195,6 +196,8 @@ interface Run {
 const SIDING = ['#ECE6D8', '#C9D8C4', '#BCD0E0', '#EADBA8', '#D9C6B2', '#F4F2EC', '#A9BBA8', '#E6C9B8'];
 const BRICK = ['#FFFFFF', '#E8D8CC', '#D6C2B4'];
 const ACCENT = ['#3E5A4A', '#2F4058', '#7A3B34', '#4A4A4A', '#5B6E86', '#6E5A3E'];
+/** The front door (and shutters) of about one house in twelve: somebody wanted it seen. */
+const LOUD = ['#E8457A', '#F2B51D', '#3FA7D6', '#7BC950', '#9B5DE5', '#FF7A3D'];
 const ROOF = ['#5C626A', '#6B4A3A', '#8C4E3C', '#4F5A4C', '#3E4148', '#7A6A5A'];
 const TRIM = '#F7F5F0';
 const ROOM_WALLS: Record<RoomKind, string[]> = {
@@ -399,9 +402,9 @@ export interface SilhouetteSpec {
   home?: boolean;
   /** Only its garage: the game draws the house itself (the viewed lot's). */
   garageOnly?: boolean;
-  /** Street side: 1 = the wall at z1 faces the street, -1 = the wall at z0. */
-  front: 1 | -1;
-  /** Centre x of the front door (where the garden path meets the house), if known. */
+  /** The street side: the outward normal (x, z) of the wall that faces the street ([0, 1]: the wall at z1, [-1, 0]: the wall at x0...). */
+  front: [number, number];
+  /** Centre of the front door along the front wall (x, or z on a wall along z), where the garden path meets the house, if known. */
   door: number | null;
   /** Garage beside the house (wall centre lines), its door facing the street. */
   garage: { x0: number; z0: number; x1: number; z1: number } | null;
@@ -508,7 +511,7 @@ export function houseScheme(x: number, z: number): HouseScheme {
   return {
     brick,
     wall: brick ? pick(BRICK, x, z, 2) : pick(SIDING, x, z, 2),
-    accent: pick(ACCENT, x, z, 3),
+    accent: hash(x, z, 7) < 1 / 12 ? pick(LOUD, x, z, 8) : pick(ACCENT, x, z, 3),
     roof: pick(ROOF, x, z, 4),
     hip: hash(x, z, 5) < 0.45,
     shutters: hash(x, z, 6) < 0.6,
@@ -1505,8 +1508,9 @@ export class HousePlanner {
     const homeId = world.households?.find((h) => h.player)?.plot;
     const home = homeId == null ? null : world.plots?.[homeId];
     const onHome = (x: number, z: number) => !!home && x >= home.x && z >= home.z && x < home.x + home.w && z < home.z + home.d;
-    const paths = [...(world.meta?.paths ?? []), ...(world.meta?.streets ?? [])];
-    const paved = (x: number, z: number) => paths.some((r) => x >= r.x - 0.6 && x < r.x + r.w + 0.6 && z >= r.z - 0.6 && z < r.z + r.d + 0.6);
+    const paths = world.meta?.paths ?? [];
+    const roads = roadIndex(townRoads(world));
+    const paved = (x: number, z: number) => roads.onRoad(x, z, 0.6) || paths.some((r) => x >= r.x - 0.6 && x < r.x + r.w + 0.6 && z >= r.z - 0.6 && z < r.z + r.d + 0.6);
     // Garden spots: outdoors, off furniture and paths, and not on a tile split by a diagonal.
     const free = (x: number, z: number) =>
       inView(Math.floor(x), Math.floor(z)) && roomP(x, z) === 0 && !diagonal(Math.floor(x), Math.floor(z)) && !occupied.has(Math.floor(z) * W + Math.floor(x)) && !paved(x, z);
@@ -1646,20 +1650,24 @@ export class HousePlanner {
       shell(walls, g.x0, g.z0, g.x1, g.z1, GARAGE_HEIGHT);
       roof.color(s.roof);
       addRoofShaped(g, s, roof, trim, walls, GARAGE_HEIGHT, 0.3);
-      // Sectional door on the street side, with a coach lamp beside it.
-      const plane = b.front > 0 ? g.z1 + T : g.z0 - T;
-      const n: V3 = [0, 0, b.front];
+      // Sectional door on the street side (whichever wall that is), with a coach lamp beside it.
+      const [fx, fz] = b.front;
+      const axis = fz ? 'h' : 'v';
+      const plane = fz ? (fz > 0 ? g.z1 + T : g.z0 - T) : fx > 0 ? g.x1 + T : g.x0 - T;
+      const n: V3 = [fx, 0, fz];
+      // Along the door's wall.
+      const [g0, g1] = fz ? [g.x0, g.x1] : [g.z0, g.z1];
       // A single garage's door, 2.4–2.5 m (wider garages keep their walls either side).
-      const half = Math.min(g.x1 - g.x0 - 0.7, 2.5) / 2;
-      const [d0, d1] = [(g.x0 + g.x1) / 2 - half, (g.x0 + g.x1) / 2 + half];
-      trim.color(TRIM).box(...span('h', plane, n, d0 - 0.1, d1 + 0.1, 0, 2.25, 0.03));
+      const half = Math.min(g1 - g0 - 0.7, 2.5) / 2;
+      const [d0, d1] = [(g0 + g1) / 2 - half, (g0 + g1) / 2 + half];
+      trim.color(TRIM).box(...span(axis, plane, n, d0 - 0.1, d1 + 0.1, 0, 2.25, 0.03));
       const door = hash(b.x0, b.z0, 9) < 0.5 ? '#F2F0EA' : s.accent;
-      trim.color(door).box(...span('h', plane, n, d0, d1, 0, 2.12, 0.045));
+      trim.color(door).box(...span(axis, plane, n, d0, d1, 0, 2.12, 0.045));
       trim.color(shade(door, 0.82));
-      for (const y of [0.53, 1.06, 1.59]) trim.box(...span('h', plane, n, d0 + 0.04, d1 - 0.04, y - 0.015, y + 0.015, 0.05));
+      for (const y of [0.53, 1.06, 1.59]) trim.box(...span(axis, plane, n, d0 + 0.04, d1 - 0.04, y - 0.015, y + 0.015, 0.05));
       trim.color(TRIM);
-      const lx = b.door !== null && b.door < (g.x0 + g.x1) / 2 ? d0 - 0.3 : d1 + 0.3;
-      lamps.push([lx, 1.9, plane + b.front * 0.08, 0, b.front]);
+      const la = b.door !== null && b.door < (g0 + g1) / 2 ? d0 - 0.3 : d1 + 0.3;
+      lamps.push(fz ? [la, 1.9, plane + fz * 0.08, 0, fz] : [plane + fx * 0.08, 1.9, la, fx, 0]);
     };
 
     const homes: { spec: SilhouetteSpec; panes: Geo }[] = [];
@@ -1736,7 +1744,7 @@ export class HousePlanner {
           board(a + 0.5 + 0.04, a + 1 - T - 0.1, 0.15, 0.95, 0.04);
           trim.color('#C8A64A').box(...span(o.axis, plane, n, a + 1 - T - 0.16, a + 1 - T - 0.1, 1.0, 1.06, 0.07));
           trim.color(TRIM);
-          const front = !b.home && b.door !== null && o.axis === 'h' && Math.abs(a + 0.5 - b.door) < 0.6 && n[2] === b.front;
+          const front = !b.home && b.door !== null && Math.abs(a + 0.5 - b.door) < 0.6 && n[0] === b.front[0] && n[2] === b.front[1];
           if (front) this.porch(o.axis, plane, n, a + 0.5, s, walls, roof, trim, lamps);
         }
       }
@@ -1769,29 +1777,37 @@ export class HousePlanner {
 
   /** Landing, posts and a small gabled canopy over a front door; a lamp beside the door. */
   private porch(axis: 'h' | 'v', plane: number, n: V3, mid: number, s: HouseScheme, walls: Geo, roof: Geo, trim: Geo, lamps: SilhouettePlan['lamps']): void {
-    if (axis !== 'h') return;
-    const out = n[2];
+    // Laid out along the wall (u) and out from it (v: z on a wall along x, x on one along z).
+    const out = axis === 'h' ? n[2] : n[0];
+    const box = (u0: number, y0: number, v0: number, u1: number, y1: number, v1: number, skip?: string) => {
+      const [va, vb] = [Math.min(v0, v1), Math.max(v0, v1)];
+      if (axis === 'h') trim.box(u0, y0, va, u1, y1, vb, skip);
+      else trim.box(va, y0, u0, vb, y1, u1, skip);
+    };
     const depth = 1.3;
     const half = 0.95;
     const z0 = plane;
     const z1 = plane + out * depth;
-    const [za, zb] = [Math.min(z0, z1), Math.max(z0, z1)];
     // Kept low: Sims walk up to the door at ground level.
     trim.color('#C9C4BA');
-    trim.box(mid - half, 0, za, mid + half, 0.05, zb, 'ny');
-    trim.box(mid - half + 0.15, 0, Math.min(z1, z1 + out * 0.3), mid + half - 0.15, 0.025, Math.max(z1, z1 + out * 0.3), 'ny');
+    box(mid - half, 0, z0, mid + half, 0.05, z1, 'ny');
+    box(mid - half + 0.15, 0, z1, mid + half - 0.15, 0.025, z1 + out * 0.3, 'ny');
     const top = 2.34;
     trim.color(TRIM);
     for (const x of [mid - half + 0.08, mid + half - 0.08]) {
       const zc = z1 - out * 0.08;
-      trim.box(x - 0.055, 0.05, zc - 0.055, x + 0.055, top, zc + 0.055);
-      trim.box(x - 0.08, 0.05, zc - 0.08, x + 0.08, 0.22, zc + 0.08);
+      box(x - 0.055, 0.05, zc - 0.055, x + 0.055, top, zc + 0.055);
+      box(x - 0.08, 0.05, zc - 0.08, x + 0.08, 0.22, zc + 0.08);
     }
     // The canopy runs into the wall so its ridge meets the house at right angles.
     roof.color(s.roof);
-    addRoof({ x0: mid - half + T, z0: Math.min(z1, z0 - out * 0.9) + T, x1: mid + half - T, z1: Math.max(z1, z0 - out * 0.9) - T }, false, roof, trim, walls, top, 0.12);
-    lamps.push([mid + 0.72, 1.75, plane + out * 0.08, 0, out]);
-    trim.color('#2E2E30').box(mid + 0.66, 1.62, Math.min(plane, plane + out * 0.05), mid + 0.78, 1.66, Math.max(plane, plane + out * 0.05));
+    const [ca, cb] = [Math.min(z1, z0 - out * 0.9) + T, Math.max(z1, z0 - out * 0.9) - T];
+    const canopy = axis === 'h' ? { x0: mid - half + T, z0: ca, x1: mid + half - T, z1: cb } : { x0: ca, z0: mid - half + T, x1: cb, z1: mid + half - T };
+    addRoof(canopy, false, roof, trim, walls, top, 0.12);
+    // The lamp on the side towards larger u (larger x on a wall along x, larger z on one along z).
+    lamps.push(axis === 'h' ? [mid + 0.72, 1.75, plane + out * 0.08, 0, out] : [plane + out * 0.08, 1.75, mid + 0.72, out, 0]);
+    trim.color('#2E2E30');
+    box(mid + 0.66, 1.62, plane, mid + 0.78, 1.66, plane + out * 0.05);
     trim.color(TRIM);
   }
 

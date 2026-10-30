@@ -11,6 +11,7 @@
 
 import { DEFAULT_LANDSCAPE, groundDepth, type LandscapeParams, type WorldStructure } from '../../core/protocol';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
+import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
 
 /**
@@ -236,18 +237,28 @@ export function bareTiles(world: WorldStructure, mask: LawnMask = lawnMask(world
   const w = world.width;
   const d = groundDepth(world);
   const bare = mask.hidden.slice(0, w * d);
-  for (const r of unlawned(world)) {
-    for (let z = Math.max(0, Math.floor(r.z)); z < Math.min(d, Math.ceil(r.z + r.d)); z++) {
-      for (let x = Math.max(0, Math.floor(r.x)); x < Math.min(w, Math.ceil(r.x + r.w)); x++) bare[z * w + x] = 1;
-    }
-  }
+  const paved = unlawned(world);
+  for (let i = 0; i < bare.length; i++) if (paved[i]) bare[i] = 1;
   for (const [x, z] of world.floors ?? []) if (x >= 0 && z >= 0 && x < w && z < d) bare[z * w + x] = 1;
   return bare;
 }
 
-/** The town's ground where no lawn grows at all: its streets, paths and fields (the birds forage on the lawn). */
-export function unlawned(world: WorldStructure): readonly { x: number; z: number; w: number; d: number }[] {
-  return [...(world.meta?.streets ?? []), ...(world.meta?.paths ?? []), ...(world.meta?.world?.fields ?? [])];
+/**
+ * Per tile of the town's ground (1), where no lawn grows at all: its roads (or streets), paths and
+ * fields (the birds forage on the lawn). `any`: the tiles any of them reaches into; else only those
+ * whose middle they cover.
+ */
+export function unlawned(world: WorldStructure, any = true): Uint8Array {
+  const w = world.width;
+  const d = groundDepth(world);
+  const out = world.meta?.roads ? roadTiles(world.meta.roads, w, d).slice() : new Uint8Array(w * d);
+  const span = (a: number, len: number, n: number): [number, number] =>
+    any ? [Math.max(0, Math.floor(a)), Math.min(n, Math.ceil(a + len))] : [Math.max(0, Math.ceil(a - 0.5)), Math.min(n, Math.ceil(a + len - 0.5))];
+  for (const r of [...(world.meta?.streets ?? []), ...(world.meta?.paths ?? []), ...(world.meta?.world?.fields ?? [])]) {
+    const [[x0, x1], [z0, z1]] = [span(r.x, r.w, w), span(r.z, r.d, d)];
+    for (let z = z0; z < z1; z++) out.fill(1, z * w + x0, z * w + Math.max(x0, x1));
+  }
+  return out;
 }
 
 /** Where the lawn that grows is hidden now: the tiles indoors (or the half of a split tile that is) and under furniture. */
@@ -334,8 +345,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   protected readonly land: LandscapeParams;
   /** How far the land reaches past the town (m). */
   protected readonly ring: number;
-  /** Where the road leaves town (z of the main street; the mountains part there). */
-  private readonly passZ: number | null;
+  /** Where the roads leave town (the mountains part there). */
+  private readonly passes: TownExit[];
   /** The roads out of town (the ground is levelled under them). */
   readonly roads: R;
   /** The woods' trees and bushes near the town (full models), where birds may live (`woodsNear`). */
@@ -361,9 +372,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     this.d = groundDepth(world);
     this.land = { ...DEFAULT_LANDSCAPE, ...world.meta?.world?.landscape };
     this.ring = world.meta?.world ? WORLD_RING : RING;
-    const streets = (world.meta?.streets ?? []).filter((s) => s.w >= s.d).sort((a, b) => a.z - b.z);
-    const main = streets[Math.floor((streets.length - 1) / 2)];
-    this.passZ = main ? main.z + main.d / 2 : null;
+    this.passes = townExits(world);
     this.roads = makeRoads(
       { seed: this.seed, w: this.w, d: this.d, ring: this.ring, ground: (x, z) => this.ground(x, z), waterEdge: (x, z) => this.waterEdge(x, z), distanceToTown: (x, z) => this.distanceToTown(x, z) },
       world,
@@ -391,7 +400,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   /** Identity of a town's landscape (built once per town and kept while it is shown). */
   static key(world: WorldStructure): string {
     const look = world.meta?.world;
-    const streets = (world.meta?.streets ?? []).map((s) => `${s.z}`).join(',');
+    const streets = [...(world.meta?.streets ?? []).map((s) => `${s.z}`), ...(world.meta?.roads ?? []).map((r) => `${r.points[0]}:${r.points.length}`)].join(',');
     return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}:${streets}${look ? `:${look.kind}:${JSON.stringify(look.landscape)}` : ''}`;
   }
 
@@ -441,9 +450,14 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const ramp = smoothstep(APRON + 10, APRON + 130, dist);
     if (ramp <= 0) return 0;
     const open = this.openness(z);
-    // A pass where the road leaves town at each end.
-    const past = Math.max(-x, x - this.w);
-    const pass = this.passZ === null || past <= 0 ? 1 : 1 - smoothstep(0, 50, past) * (1 - smoothstep(14, 70, Math.abs(z - this.passZ))) * 0.8;
+    // A pass where each road leaves town: lower along its way out (`past` the town, `aside` from that way).
+    let pass = 1;
+    for (const e of this.passes) {
+      const past = (x - e.x) * e.dx + (z - e.z) * e.dz;
+      if (past <= 0) continue;
+      const aside = Math.abs((x - e.x) * e.dz - (z - e.z) * e.dx);
+      pass = Math.min(pass, 1 - smoothstep(0, 50, past) * (1 - smoothstep(14, 70, aside)) * 0.8);
+    }
     const crest = ridged(x * 0.0075, z * 0.0075, this.seed + 211);
     return top * ramp * open * pass * (0.25 + 0.75 * crest);
   }
@@ -668,15 +682,15 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   protected async lawns(world: WorldStructure, pace?: () => Promise<void>): Promise<LawnPlacement[]> {
     const rand = mulberry32(this.seed ^ 0x1a3d);
-    const covered = unlawned(world);
-    const onPavement = (x: number, z: number) => covered.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.d);
+    // (Tiles whose middle is paved.)
+    const paved = unlawned(world, false);
     const flowers: Float32Array[] = [];
     const flowerTiles: number[] = [];
     for (let z = 0; z < groundDepth(world); z++) {
       if (z % 4 === 0) await pace?.();
       for (let x = 0; x < world.width; x++) {
         const i = z * world.width + x;
-        if (onPavement(x + 0.5, z + 0.5)) continue;
+        if (paved[i]) continue;
         // (Where the tufts were, before the grass: one or two a tile.)
         const n = rand() < 0.5 ? 2 : 1;
         for (let k = 0; k < n * TUFT_DRAWS; k++) rand();
@@ -721,11 +735,11 @@ const TREE_CLEAR = { street: 3.0, path: 1.3, house: 2.2, object: 1.0 };
 
 /**
  * Moves a lot tree (by up to 2.5 m, staying on the viewed lot) until its trunk is clear of the
- * street (road, sidewalk, kerb furniture and streetlights all stand inside the street rects, see
+ * roads (road, sidewalk, kerb furniture and streetlights all stand within their width, see
  * street.ts), garden paths and driveways, the house and placed objects; null when no spot is.
  */
 function clearTreeSpot(x: number, z: number, world: WorldStructure, view: { x: number; z: number; w: number; d: number } | null): [number, number] | null {
-  const streets = world.meta?.streets ?? [];
+  const roads = roadIndex(townRoads(world));
   const paths = world.meta?.paths ?? [];
   const gap = (r: { x: number; z: number; w: number; d: number }, px: number, pz: number) =>
     Math.hypot(Math.max(r.x - px, 0, px - (r.x + r.w)), Math.max(r.z - pz, 0, pz - (r.z + r.d)));
@@ -740,7 +754,7 @@ function clearTreeSpot(x: number, z: number, world: WorldStructure, view: { x: n
   };
   const ok = (px: number, pz: number) =>
     (!view || (px > view.x + 0.8 && px < view.x + view.w - 0.8 && pz > view.z + 0.8 && pz < view.z + view.d - 0.8)) &&
-    streets.every((r) => gap(r, px, pz) >= TREE_CLEAR.street) &&
+    !roads.onRoad(px, pz, TREE_CLEAR.street) &&
     paths.every((r) => gap(r, px, pz) >= TREE_CLEAR.path) &&
     world.objects.every((o) => gap(o, px, pz) >= TREE_CLEAR.object) &&
     !indoorNear(px, pz, TREE_CLEAR.house);
