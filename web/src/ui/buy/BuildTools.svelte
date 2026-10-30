@@ -9,8 +9,9 @@
   import LookPicker from './LookPicker.svelte';
 
   /**
-   * Build mode's Construct tab: walls, rooms, paint, floors, doors, windows, stairs and removing
-   * them, on the home lot. A toolbar in groups with the looks for the tool in hand beside it; one
+   * Build mode's Construct tab: walls, rooms, fences, gates, stairs, the roof, paint, floors,
+   * doors, windows, removing and moving things, and blueprints, on the home lot. A toolbar in
+   * groups with the looks for the tool in hand beside it; one
    * line of how-to in the dock's header (what an edit costs shows at the cursor: `BuyFx`).
    */
   const content = services.content;
@@ -55,26 +56,36 @@
       return stairs ? money(stairs) : 'Free';
     }
     const look = game.buildLook;
-    const p =
-      id === 'wall' || id === 'room'
-        ? prices.wall
-        : id === 'paint'
-          ? look.cover
-            ? (content.wallCoverings[look.cover - 1]?.price ?? 0)
-            : 0
-          : id === 'floor'
-            ? look.floor
-              ? (content.floorCoverings[look.floor - 1]?.price ?? 0)
-              : 0
-            : id === 'fence'
-              ? (content.fenceStyles[look.fence]?.price ?? prices.fence ?? 0)
-              : id === 'gate'
-                ? (content.fenceStyles[look.fence]?.price ?? prices.fence ?? 0) + (prices.gate ?? 0)
-            : id === 'door'
-              ? (content.doorStyles[look.door]?.price ?? prices.door)
-              : id === 'window'
-                ? (content.windowStyles[look.window]?.price ?? prices.window)
-                : prices.remove;
+    let p: number;
+    switch (id) {
+      case 'wall':
+      case 'room':
+        p = prices.wall;
+        break;
+      case 'paint':
+        p = look.cover ? (content.wallCoverings[look.cover - 1]?.price ?? 0) : 0;
+        break;
+      case 'floor':
+        p = look.floor ? (content.floorCoverings[look.floor - 1]?.price ?? 0) : 0;
+        break;
+      case 'fence':
+      case 'gate': {
+        const fence = content.fenceStyles[look.fence]?.price ?? prices.fence ?? 0;
+        p = id === 'gate' ? fence + (prices.gate ?? 0) : fence;
+        break;
+      }
+      case 'door':
+        p = content.doorStyles[look.door]?.price ?? prices.door;
+        break;
+      case 'window':
+        p = content.windowStyles[look.window]?.price ?? prices.window;
+        break;
+      case 'remove':
+        p = prices.remove;
+        break;
+      default:
+        p = 0;
+    }
     return p ? money(p) : 'Free';
   };
   const costLabel = (t: Tool) => {
@@ -94,7 +105,7 @@
   }
 </script>
 
-<BuildDock label="Construct" tipId="construct" tall={game.buildTool === 'blueprint'} style="--build: #c9772b; --build-soft: rgba(201, 119, 43, 0.14)">
+<BuildDock label="Construct" tipId="construct" style="--build: #c9772b; --build-soft: rgba(201, 119, 43, 0.14)">
   {#snippet tip()}
     <b>Build your home.</b> Pick a tool, then drag on your lot to draw walls and rooms, or click a wall to fit doors and windows. Point at a tool for what it costs; the cursor shows what each edit
     will. Residents and furniture can't be shut in. <kbd>Esc</kbd> or right-click cancels.
@@ -159,17 +170,23 @@
   .tools {
     flex: none;
     display: flex;
-    gap: 6px;
+    gap: 2px;
   }
   .group {
     display: flex;
     gap: 2px;
-    padding: 3px;
-    border-radius: var(--radius-md);
-    background: var(--hairline);
+    padding: 0 7px;
+    border-left: 1px solid var(--hairline);
+  }
+  .group:first-child {
+    padding-left: 0;
+    border-left: 0;
+  }
+  .group:last-child {
+    padding-right: 0;
   }
   .tools button {
-    width: 56px;
+    width: 54px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -181,30 +198,20 @@
     font-size: 11px;
     transition:
       background var(--fast) var(--ease),
-      color var(--fast) var(--ease),
-      transform 220ms var(--ease);
+      color var(--fast) var(--ease);
   }
   .tools button:hover {
     color: var(--text);
-    background: var(--surface);
-  }
-  .tools button:active {
-    transform: scale(0.95);
+    background: var(--hairline);
   }
   .badge {
     display: grid;
     place-items: center;
     width: 30px;
     height: 30px;
-    border-radius: 10px;
+    border-radius: 9px;
     background: var(--build-soft);
     color: var(--build);
-    transition:
-      transform 320ms var(--ease),
-      background var(--fast) var(--ease);
-  }
-  .tools button:hover .badge {
-    transform: rotate(-6deg) scale(1.06);
   }
   .tools button.active {
     background: var(--surface);
@@ -214,7 +221,6 @@
   .tools button.active .badge {
     background: var(--build);
     color: #fff;
-    animation: bounce 420ms var(--ease);
   }
   .tools button:disabled {
     opacity: 0.4;
@@ -244,11 +250,6 @@
     background: var(--hairline);
     font-family: inherit;
     font-size: 11px;
-  }
-  @keyframes bounce {
-    40% {
-      transform: scale(1.18) rotate(-4deg);
-    }
   }
   @keyframes step {
     from {

@@ -22,19 +22,25 @@
     game.townOpen = !game.townOpen;
     if (game.townOpen) game.journalOpen = false;
   }
-  const fundsTitle = $derived(
-    game.creative
-      ? 'Household funds · Creative game: building and buying are free, and your home pays no rent or bills.'
-      : game.rent !== null && rent
-      ? `Household funds · rent ${money(game.rent)} + bills ${money(game.bills ?? 0)} every ${WEEKDAYS[rent.weekday]} at ${clock(rent.hour * 60, settings.clock24h)}. Bills grow with the value of everything you own and with how many of you there are.`
-      : 'Household funds',
-  );
+  const fundsTitle = $derived.by(() => {
+    if (game.creative) return 'Household funds · Creative game: building and buying are free, and your home pays no rent or bills.';
+    if (game.rent !== null && rent) {
+      return `Household funds · rent ${money(game.rent)} + bills ${money(game.bills ?? 0)} every ${WEEKDAYS[rent.weekday]} at ${clock(rent.hour * 60, settings.clock24h)}. Bills grow with the value of everything you own and with how many of you there are.`;
+    }
+    return 'Household funds';
+  });
+
+  function storeyLabel(storey: number): string {
+    if (storey < 0) return 'Basement';
+    if (storey === 0) return 'Ground';
+    return `Floor ${storey}`;
+  }
 </script>
 
-<header class="bar">
-  <div class="glass group">
+<header class="bar glass" class:live={game.mode === 'live'}>
+  <div class="zone">
     <span class="brand" title={game.household || undefined}>{game.household || 'Idyll Lives'}</span>
-    <div class="segmented" role="tablist" aria-label="Mode">
+    <div class="segmented modes" role="tablist" aria-label="Mode">
       {#each modes as mode (mode.id)}
         <button role="tab" aria-selected={mode.id === game.mode} class:active={mode.id === game.mode} title={mode.title} onclick={() => services.controls.setMode(mode.id)}>
           <Icon name={mode.icon} size={16} />
@@ -44,84 +50,60 @@
     </div>
   </div>
 
-  <div class="glass group center">
+  <div class="zone">
     <div class="time">
       <span class="day tabular">{WEEKDAYS[game.weekday]} · Day {game.day}</span>
       <span class="clock tabular">{clock(game.minute, settings.clock24h)}</span>
     </div>
-    {#if game.mode !== 'live'}
-      <span class="paused" title="Time stands still while you build. Back to Live (L) to resume.">
-        <Icon name="icon.ui.pause" size={14} />Paused
-      </span>
-    {/if}
-    {#if game.mode === 'build'}
-      <button
-        class="undo"
-        disabled={game.undoSteps === 0}
-        title={game.undoSteps ? 'Undo the last change (Ctrl+Z / ⌘Z)' : 'Nothing to undo. Changes can be undone until time moves on.'}
-        onclick={() => services.controls.undo()}
-      >
-        <Icon name="icon.ui.undo" size={16} /><span>Undo</span>
-      </button>
-      <button
-        class="undo redo"
-        disabled={game.redoSteps === 0}
-        title={game.redoSteps ? 'Redo what you undid (Ctrl+Shift+Z / ⌘⇧Z)' : 'Nothing to redo'}
-        aria-label="Redo"
-        onclick={() => services.controls.redo()}
-      >
-        <span class="mirror"><Icon name="icon.ui.undo" size={16} /></span>
-      </button>
-      <button
-        class="undo redo"
-        class:on={game.eyedropper}
-        aria-pressed={game.eyedropper}
-        title="Eyedropper (E, or hold Alt): click a wall, floor, door, window or object to build or buy more of the same"
-        aria-label="Eyedropper"
-        onclick={() => services.controls.toggleEyedropper()}
-      >
-        <Icon name="icon.ui.eyedropper" size={16} />
-      </button>
-    {:else if game.mode === 'live'}
-      <div class="segmented">
+    {#if game.mode === 'live'}
+      <div class="segmented speeds">
         {#each speeds as s (s.value)}
           <button class:active={game.speed === s.value} title={s.label} aria-label={s.label} onclick={() => services.controls.setSpeed(s.value)}>
-            <Icon name={s.icon} size={16} />
+            <Icon name={s.icon} size={15} />
           </button>
         {/each}
       </div>
+    {:else}
+      <span class="paused" title="Time stands still while you build. Back to Live (L) to resume.">
+        <Icon name="icon.ui.pause" size={13} />Paused
+      </span>
     {/if}
   </div>
 
-  <div class="glass group">
+  <div class="zone right">
     {#if game.mode === 'live'}
-      {#if game.occupied}
-        <button class="tool" class:active={game.plannerOpen} title="Planner (P): routines and goals" aria-label="Planner" onclick={() => services.controls.openPlanner()}>
-          <Icon name="icon.ui.calendar" />
+      <div class="tools">
+        {#if game.occupied}
+          <button class="tool" class:active={game.plannerOpen} title="Planner (P): routines and goals" aria-label="Planner" onclick={() => services.controls.openPlanner()}>
+            <Icon name="icon.ui.calendar" />
+          </button>
+        {/if}
+        <button class="tool" class:active={game.journalOpen} title="Journal (J)" aria-label="Journal" aria-pressed={game.journalOpen} onclick={() => services.controls.toggleJournal()}>
+          <Icon name="icon.ui.journal" />
         </button>
-      {/if}
-      <button class="tool" class:active={game.journalOpen} title="Journal (J)" aria-label="Journal" aria-pressed={game.journalOpen} onclick={() => services.controls.toggleJournal()}>
-        <Icon name="icon.ui.journal" />
-      </button>
-      <button class="tool" class:active={game.townOpen} title="Town map (M)" aria-label="Town map" aria-pressed={game.townOpen} aria-controls="town-map" onclick={toggleTown}>
-        <Icon name="icon.ui.town" />
-      </button>
+        <button class="tool" class:active={game.townOpen} title="Town map (M)" aria-label="Town map" aria-pressed={game.townOpen} aria-controls="town-map" onclick={toggleTown}>
+          <Icon name="icon.ui.town" />
+        </button>
+      </div>
       <span class="divider" aria-hidden="true"></span>
     {/if}
+
     <span class="funds tabular" class:debt={game.funds < 0} title={fundsTitle}>
       <Icon name="icon.ui.funds" size={16} />{money(game.funds)}
     </span>
+
     {#if game.storeys - game.lowestStorey > 1}
       <div class="storeys" role="group" aria-label="Storey">
-        <button class="tool" title="Storey down (Page Down)" aria-label="Storey down" disabled={game.storey <= game.lowestStorey} onclick={() => services.controls.setStorey(game.storey - 1)}>
-          <span class="arrow down"><Icon name="icon.ui.back" size={16} /></span>
+        <button class="tool small" title="Storey down (Page Down)" aria-label="Storey down" disabled={game.storey <= game.lowestStorey} onclick={() => services.controls.setStorey(game.storey - 1)}>
+          <span class="arrow down"><Icon name="icon.ui.back" size={14} /></span>
         </button>
-        <span class="storey" title="Storey in view: higher ones are hidden">{game.storey < 0 ? 'Basement' : game.storey === 0 ? 'Ground' : `Floor ${game.storey}`}</span>
-        <button class="tool" title="Storey up (Page Up)" aria-label="Storey up" disabled={game.storey >= game.storeys - 1} onclick={() => services.controls.setStorey(game.storey + 1)}>
-          <span class="arrow up"><Icon name="icon.ui.back" size={16} /></span>
+        <span class="storey" title="Storey in view: higher ones are hidden">{storeyLabel(game.storey)}</span>
+        <button class="tool small" title="Storey up (Page Up)" aria-label="Storey up" disabled={game.storey >= game.storeys - 1} onclick={() => services.controls.setStorey(game.storey + 1)}>
+          <span class="arrow up"><Icon name="icon.ui.back" size={14} /></span>
         </button>
       </div>
     {/if}
+
     <button
       class="tool"
       title="Walls: {game.wallMode} (W: up → cutaway → down)"
@@ -137,165 +119,162 @@
 </header>
 
 <style>
-  /* Three columns, the middle one centred on the screen: the clock and speeds stay put when the
-     groups beside them change width (the funds as money comes and goes). */
+  /* One bar, three zones: who you are and the mode on the left, the clock in the middle (centred
+     on the screen, so it doesn't move as the funds or the buttons beside it change), and what you
+     can do now on the right. */
   .bar {
     position: absolute;
     inset: var(--edge) var(--edge) auto;
+    height: 56px;
     display: grid;
     grid-template-columns: 1fr auto 1fr;
-    align-items: start;
-    /* Narrow windows (or a large UI scale) compact the bar in steps, below. */
-    container-type: inline-size;
+    align-items: center;
     gap: var(--gap);
-    pointer-events: none;
+    padding: 0 6px;
+    pointer-events: auto;
+    container-type: inline-size;
   }
-  .bar > .group:first-child {
-    grid-column: 1;
-    justify-self: start;
-  }
-  .bar > .group:last-child {
-    grid-column: 3;
-    justify-self: end;
-  }
-  .bar > .group.center {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  /* Too narrow for the three groups side by side: first Live and Build show only their icons,
-     then the household's name goes, and last the clock and speeds take a row of their own. The
-     widths: the groups at their widest (Build's middle group, the storey buttons on the right, a
-     name at its 140 px) and the gaps between them. */
-  @container (max-width: 1180px) {
-    .segmented .label {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
-  }
-  @container (max-width: 1110px) {
-    .brand {
-      display: none;
-    }
-  }
-  /* (Hud.svelte moves the panels below the bar at the same width.) */
-  @container (max-width: 980px) {
-    .bar > .group.center {
-      grid-column: 1 / -1;
-      grid-row: 2;
-      justify-self: center;
-    }
-  }
-  .group {
+  .zone {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 6px;
-    pointer-events: auto;
+    gap: 6px;
+    min-width: 0;
+  }
+  .right {
+    justify-content: flex-end;
   }
   .brand {
-    max-width: 140px;
+    max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    padding: 0 8px 0 10px;
     font-weight: 700;
     letter-spacing: -0.02em;
-    padding: 0 8px 0 10px;
   }
   .segmented {
     display: flex;
     gap: 2px;
     padding: 3px;
-    background: var(--hairline);
     border-radius: var(--radius-md);
+    background: var(--hairline);
   }
   .segmented button {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
     height: 30px;
     padding: 0 10px;
     border-radius: var(--radius-sm);
     color: var(--text-muted);
-    font-weight: 550;
+    font-weight: 600;
+    font-size: 13px;
     transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
   }
-  .segmented button:hover:not(:disabled) {
+  .segmented button:hover {
     color: var(--text);
   }
-  .segmented button.active {
-    background: var(--glass-strong);
+  .modes button.active {
+    background: var(--text);
+    color: var(--text-inverse);
+  }
+  .speeds {
+    margin-left: 4px;
+  }
+  .speeds button {
+    width: 28px;
+    padding: 0;
+    justify-content: center;
+  }
+  .speeds button.active {
+    background: var(--surface);
     color: var(--accent);
     box-shadow: var(--shadow-sm);
-  }
-  .segmented button:disabled {
-    opacity: 0.45;
-    cursor: default;
   }
   .time {
     display: flex;
     flex-direction: column;
     line-height: 1.1;
-    padding: 0 6px 0 10px;
-    /* As wide as "Mon · Day 99" or "12:00 AM", so the speeds beside it don't move as the day or the hour changes. */
+    padding: 0 8px 0 10px;
     min-width: 104px;
-    box-sizing: border-box;
   }
   .day {
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 600;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
   .clock {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 650;
     letter-spacing: -0.01em;
   }
-  .funds {
+  .paused {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 0 10px 0 8px;
+    height: 30px;
+    padding: 0 11px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 12px;
     font-weight: 650;
-    color: var(--good);
+    white-space: nowrap;
   }
-  .funds.debt {
-    color: var(--bad);
+  .tools {
+    display: flex;
+    gap: 2px;
   }
   .tool {
     display: grid;
     place-items: center;
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     border-radius: var(--radius-sm);
     color: var(--text-muted);
     transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
   }
-  .divider {
-    width: 1px;
-    height: 22px;
-    background: var(--hairline);
+  .tool.small {
+    width: 26px;
+  }
+  .tool:hover:not(:disabled),
+  .tool.active {
+    background: var(--accent-soft);
+    color: var(--accent);
   }
   .tool:disabled {
     opacity: 0.4;
     cursor: default;
   }
+  .divider {
+    width: 1px;
+    height: 22px;
+    margin: 0 4px;
+    background: var(--hairline);
+  }
+  .funds {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    font-weight: 650;
+    white-space: nowrap;
+    color: var(--good);
+  }
+  .funds.debt {
+    color: var(--bad);
+  }
   .storeys {
     display: flex;
     align-items: center;
-  }
-  .storeys .tool {
-    width: 28px;
+    gap: 2px;
   }
   .storey {
-    min-width: 50px;
+    min-width: 48px;
     text-align: center;
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 650;
     color: var(--text-muted);
   }
@@ -308,61 +287,43 @@
   .arrow.down {
     transform: rotate(-90deg);
   }
-  .undo.redo {
-    padding: 0 10px;
+  /* Narrow windows: the household's name goes first, then the mode labels; the clock keeps its place. */
+  @container (max-width: 1180px) {
+    .brand {
+      display: none;
+    }
   }
-  .undo.on {
-    background: var(--accent);
-    color: #fff;
+  /* In live mode the right-hand tools are widest, so the storey's name goes first there. */
+  @container (max-width: 1100px) {
+    .live .storey {
+      display: none;
+    }
   }
-  .mirror {
-    display: inline-flex;
-    transform: scaleX(-1);
+  @container (max-width: 960px) {
+    .modes .label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
   }
-  .undo {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 36px;
-    padding: 0 12px;
-    border-radius: var(--radius-pill);
-    background: var(--surface);
-    box-shadow: var(--shadow-sm);
-    color: var(--text);
-    font-size: 12px;
-    font-weight: 650;
-    white-space: nowrap;
-    transition:
-      transform var(--fast) var(--ease),
-      opacity var(--fast) var(--ease);
-  }
-  .undo:hover:not(:disabled) {
-    transform: translateY(-1px);
-  }
-  .undo:active:not(:disabled) {
-    transform: scale(0.96);
-  }
-  .undo:disabled {
-    opacity: 0.45;
-    cursor: default;
-    box-shadow: none;
-  }
-  .paused {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 36px;
-    padding: 0 12px;
-    border-radius: var(--radius-pill);
-    background: var(--accent-soft);
-    color: var(--accent);
-    font-size: 12px;
-    font-weight: 650;
-    white-space: nowrap;
-  }
-  .tool:hover:not(:disabled),
-  .tool.active {
-    background: var(--accent-soft);
-    color: var(--accent);
+  @container (max-width: 940px) {
+    .zone {
+      gap: 4px;
+    }
+    .tool {
+      width: 32px;
+    }
+    .funds {
+      padding: 0 5px;
+    }
+    .divider {
+      margin: 0 2px;
+    }
+    .modes button {
+      padding: 0 8px;
+    }
   }
 </style>

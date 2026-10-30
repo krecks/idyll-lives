@@ -6,7 +6,7 @@
   /** Build mode's tabs, at the head of its dock: the catalog, the house itself, and how the home is doing. */
   const tabs: { id: BuildTab; icon: string; label: string; title: string }[] = [
     { id: 'furnish', icon: 'icon.ui.buy', label: 'Furnish', title: 'Furnish (V): buy, move, upgrade and sell furniture' },
-    { id: 'build', icon: 'icon.ui.build', label: 'Construct', title: 'Construct (C): walls, rooms, paint, floors, doors, windows, stairs and the roof' },
+    { id: 'build', icon: 'icon.ui.build', label: 'Construct', title: 'Construct (C): walls, rooms, fences, gates, paint, floors, doors, windows, stairs, the roof and blueprints' },
     { id: 'home', icon: 'icon.ui.home', label: 'Home', title: "Home (O): the rooms and how they're doing, what's broken, and the family" },
   ];
 </script>
@@ -32,10 +32,10 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    height: 28px;
-    padding: 0 12px;
+    height: 30px;
+    padding: 0 13px;
     border-radius: var(--radius-sm);
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 650;
     color: var(--text-muted);
     white-space: nowrap;
@@ -45,12 +45,12 @@
     color: var(--text);
   }
   button.active {
-    background: var(--accent);
-    color: #fff;
+    background: var(--surface);
+    color: var(--accent);
     box-shadow: var(--shadow-sm);
   }
   /* A narrow dock (a small window or a large interface scale): icons only, so the row beside them
-     (search, sort, filters) still fits. */
+     (search) still fits. */
   @container dock (max-width: 820px) {
     button {
       padding: 0 9px;
