@@ -290,7 +290,7 @@ export class TownOverview {
   /** Road and garden paths / driveways and fields, one flat mesh each (hidden until the swap). */
   private async buildGround(world: WorldStructure, pace?: () => Promise<void>): Promise<pc.Entity[]> {
     const out: pc.Entity[] = [];
-    const road = meshFrom(this.device, roadMeshes(townRoads(world)).surface.meshData());
+    const road = meshFrom(this.device, roadMeshes(townRoads(world), null, 0, {}, 'surface').surface.meshData());
     if (road) {
       const entity = drawMesh(this.root, 'townStreets', road, this.lib.surface('material.road', { doubleSided: true }), { receiveShadows: true, layers: this.layers });
       entity.enabled = false;

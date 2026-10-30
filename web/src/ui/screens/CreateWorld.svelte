@@ -23,7 +23,7 @@
   const homes = $derived(world ? world.slots.filter((s) => s.kind === 'house').length : 0);
   const farms = $derived(world ? world.slots.filter((s) => s.lot === 'farm').length : 0);
   const places = $derived(world ? world.slots.filter((s) => s.kind !== 'house').length : 0);
-  const roadCount = $derived(world ? (world.roads?.length ?? world.streets.length) : 0);
+  const roadCount = $derived(world ? world.roads.length : 0);
 
   // Public places and farms have their names on them; plain houses are left untagged (the town reads better).
   const labels = $derived<LotLabel[]>(

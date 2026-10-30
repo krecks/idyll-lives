@@ -1009,7 +1009,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** Roads, garden paths and farm fields from the town metadata, each a flat mesh. */
   private buildStreets(world: WorldStructure): void {
     // Only the stretch of road near the viewed lot.
-    const road = meshFrom(this.device, roadMeshes(townRoads(world), this.view, STREET_MARGIN).surface.meshData());
+    const road = meshFrom(this.device, roadMeshes(townRoads(world), this.view, STREET_MARGIN, {}, 'surface').surface.meshData());
     if (road) this.lotEntities.push({ entity: drawMesh(this.root, 'streets', road, this.lotMaterial('material.road')) });
     const layers: [string, { x: number; z: number; w: number; d: number }[] | undefined, string, number][] = [
       ['paths', world.meta?.paths, 'material.path', 0.014],

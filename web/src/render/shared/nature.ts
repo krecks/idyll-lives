@@ -11,7 +11,7 @@
 
 import { DEFAULT_LANDSCAPE, groundDepth, type LandscapeParams, type WorldStructure } from '../../core/protocol';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
-import { RoadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
+import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
 
 /**
@@ -237,23 +237,28 @@ export function bareTiles(world: WorldStructure, mask: LawnMask = lawnMask(world
   const w = world.width;
   const d = groundDepth(world);
   const bare = mask.hidden.slice(0, w * d);
-  for (const r of unlawned(world)) {
-    for (let z = Math.max(0, Math.floor(r.z)); z < Math.min(d, Math.ceil(r.z + r.d)); z++) {
-      for (let x = Math.max(0, Math.floor(r.x)); x < Math.min(w, Math.ceil(r.x + r.w)); x++) bare[z * w + x] = 1;
-    }
-  }
+  const paved = unlawned(world);
+  for (let i = 0; i < bare.length; i++) if (paved[i]) bare[i] = 1;
   for (const [x, z] of world.floors ?? []) if (x >= 0 && z >= 0 && x < w && z < d) bare[z * w + x] = 1;
   return bare;
 }
 
-/** The town's ground where no lawn grows at all: its roads (or streets), paths and fields (the birds forage on the lawn). */
-export function unlawned(world: WorldStructure): readonly { x: number; z: number; w: number; d: number }[] {
-  const roads: { x: number; z: number; w: number; d: number }[] = [];
-  if (world.meta?.roads) {
-    const tiles = roadTiles(world.meta.roads, world.width, groundDepth(world));
-    for (let i = 0; i < tiles.length; i++) if (tiles[i]) roads.push({ x: i % world.width, z: Math.floor(i / world.width), w: 1, d: 1 });
+/**
+ * Per tile of the town's ground (1), where no lawn grows at all: its roads (or streets), paths and
+ * fields (the birds forage on the lawn). `any`: the tiles any of them reaches into; else only those
+ * whose middle they cover.
+ */
+export function unlawned(world: WorldStructure, any = true): Uint8Array {
+  const w = world.width;
+  const d = groundDepth(world);
+  const out = world.meta?.roads ? roadTiles(world.meta.roads, w, d).slice() : new Uint8Array(w * d);
+  const span = (a: number, len: number, n: number): [number, number] =>
+    any ? [Math.max(0, Math.floor(a)), Math.min(n, Math.ceil(a + len))] : [Math.max(0, Math.ceil(a - 0.5)), Math.min(n, Math.ceil(a + len - 0.5))];
+  for (const r of [...(world.meta?.streets ?? []), ...(world.meta?.paths ?? []), ...(world.meta?.world?.fields ?? [])]) {
+    const [[x0, x1], [z0, z1]] = [span(r.x, r.w, w), span(r.z, r.d, d)];
+    for (let z = z0; z < z1; z++) out.fill(1, z * w + x0, z * w + Math.max(x0, x1));
   }
-  return [...(world.meta?.streets ?? []), ...roads, ...(world.meta?.paths ?? []), ...(world.meta?.world?.fields ?? [])];
+  return out;
 }
 
 /** Where the lawn that grows is hidden now: the tiles indoors (or the half of a split tile that is) and under furniture. */
@@ -676,15 +681,15 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   protected async lawns(world: WorldStructure, pace?: () => Promise<void>): Promise<LawnPlacement[]> {
     const rand = mulberry32(this.seed ^ 0x1a3d);
-    const covered = unlawned(world);
-    const onPavement = (x: number, z: number) => covered.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.d);
+    // (Tiles whose middle is paved.)
+    const paved = unlawned(world, false);
     const flowers: Float32Array[] = [];
     const flowerTiles: number[] = [];
     for (let z = 0; z < groundDepth(world); z++) {
       if (z % 4 === 0) await pace?.();
       for (let x = 0; x < world.width; x++) {
         const i = z * world.width + x;
-        if (onPavement(x + 0.5, z + 0.5)) continue;
+        if (paved[i]) continue;
         // (Where the tufts were, before the grass: one or two a tile.)
         const n = rand() < 0.5 ? 2 : 1;
         for (let k = 0; k < n * TUFT_DRAWS; k++) rand();
@@ -733,7 +738,7 @@ const TREE_CLEAR = { street: 3.0, path: 1.3, house: 2.2, object: 1.0 };
  * street.ts), garden paths and driveways, the house and placed objects; null when no spot is.
  */
 function clearTreeSpot(x: number, z: number, world: WorldStructure, view: { x: number; z: number; w: number; d: number } | null): [number, number] | null {
-  const roads = new RoadIndex(townRoads(world));
+  const roads = roadIndex(townRoads(world));
   const paths = world.meta?.paths ?? [];
   const gap = (r: { x: number; z: number; w: number; d: number }, px: number, pz: number) =>
     Math.hypot(Math.max(r.x - px, 0, px - (r.x + r.w)), Math.max(r.z - pz, 0, pz - (r.z + r.d)));

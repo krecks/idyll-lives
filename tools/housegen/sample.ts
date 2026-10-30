@@ -101,11 +101,10 @@ const stats = { tried: 0, made: 0, two: 0, basements: 0, value: 0, seats: 0, din
 const covers = new Map<string, number[]>();
 // Per room kind: how many, their floor in all, the biggest (tiles).
 const kinds = new Map<string, { n: number; area: number; most: number; long: number }>();
-/** The house classes, smallest first (`housegen.json` `classes`, as the descriptions name them). */
-const CLASSES = ['cottage', 'bungalow', 'town house', 'family house', 'villa'];
+/** The house classes, smallest first (`housegen.json` `classes`, by the label houses carry as `class`). */
+const CLASSES = Object.values(cfg.classes).map((c) => c.label);
 /** Per house class, and per class and garden size: the houses' prices (as `price.ts` prices a home on its lot). */
 const prices = new Map<string, number[]>();
-const classOf = (description: string) => CLASSES.find((c) => new RegExp(`^An? (?:two-storey )?${c}\\b`).test(description));
 const objectPrice = (def: string) => byId.get(def)?.price ?? 0;
 // A farm lot's house is a large lot's (town.ts `houseLot`).
 for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => size !== 'farm')) {
@@ -141,8 +140,8 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
     if (outer.length) stats.gardenDoors++;
     if (outer.some((d) => d.axis === 'x')) stats.backs++;
     // Priced as it stands for sale: furnished for nobody in particular.
-    const cls = classOf(h.description);
-    if (!cls) problems.push(`${name}: no house class in "${h.description}"`);
+    const cls = h.class;
+    if (!cls) problems.push(`${name}: no house class`);
     else {
       const [bare, rates] = [variants[0][2]!, baseFile.economy?.homePrice];
       const { width, depth } = bare.lot ?? lot;

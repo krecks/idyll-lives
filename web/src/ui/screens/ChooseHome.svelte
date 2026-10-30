@@ -2,10 +2,10 @@
   import { onMount } from 'svelte';
   import { menuScene } from '../../game/menuScene';
   import { houseTemplate, loadTemplates, slotDims, vacantSlots, withGarden, type PlotSlot, type Templates } from '../../game/town';
-  import type { GardenSize } from '../../game/housegen';
+  import { GARDEN_SIZES, type GardenSize } from '../../game/housegen';
   import { residentsOf, sleepersOf } from '../../game/household';
   import { homePrice, priceParts } from '../../game/price';
-  import { fundsAfter, savingsOf } from '../../game/wealth';
+  import { householdFunds, savingsOf } from '../../game/wealth';
   import { app } from '../app.svelte';
   import { money } from '../format';
   import Icon from '../Icon.svelte';
@@ -30,7 +30,7 @@
   }
   /** The garden sizes to choose from: one that doesn't fit beside the neighbours can't be picked. */
   const gardens = $derived(
-    (['snug', 'roomy', 'big'] as const).map((value) => ({
+    GARDEN_SIZES.map((value) => ({
       value,
       label: value[0].toUpperCase() + value.slice(1),
       disabled: !!templates && !!selected && value !== garden && withGarden(templates, town, selected.index, value) === town,
@@ -88,7 +88,9 @@
   /** What the household has saved: what it can pay for a home (Living). */
   const savings = savingsOf(services.content, household);
   /** The chosen home's price (an empty lot: the land alone), and what it's made of. */
-  const parts = $derived(templates && selected ? priceParts(services.content, templates, selected, lot === 'empty' || !house) : null);
+  /** Bought as an empty lot: chosen so, or no house stands on it (as `assembleTown` sees it: money to build with besides). */
+  const emptyLot = $derived(lot === 'empty' || (!!templates && !!selected && !house));
+  const parts = $derived(templates && selected ? priceParts(services.content, templates, selected, emptyLot) : null);
   /** The chosen home costs more than the household has saved: it can't move in (Living). */
   const tooDear = $derived(!creative && !!parts && parts.total > savings);
   /** Whether the household can buy plot `s`'s home as it stands (for sale tags and chips; Creative: any). */
@@ -97,7 +99,7 @@
   const budget = $derived(
     creative
       ? 'Free: this is a Creative game'
-      : money(fundsAfter(services.content, savings, parts?.total ?? 0) + (lot === 'empty' ? (economy.emptyLotFunds ?? 0) : 0)),
+      : money(householdFunds(services.content, savings, parts?.total ?? 0, emptyLot)),
   );
   const mine = `The ${household.name}s`;
 

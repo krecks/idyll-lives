@@ -5,17 +5,21 @@
  */
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan, WorldStructure } from '../src/core/protocol';
-import { Kerb, RoadIndex, roadMeshes, roadTiles, SIDEWALK, sidewalkCuts, townRoads, WALK_Y } from '../src/render/shared/roads';
+import { trimJoins } from '../src/game/roads';
+import { Kerb, RoadIndex, roadMeshes, roadTiles, SIDEWALK, townRoads, WALK_Y } from '../src/render/shared/roads';
 
 const line = (x0: number, z0: number, x1: number, z1: number, n: number): [number, number][] => Array.from({ length: n + 1 }, (_, i) => [x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n]);
-/** A road along x at z = 50, and a lane off it to the south (+z) ending in a dead end. */
+/** A road along x at z = 50, and a lane off it to the south (+z) ending in a dead end: beginning at the road's kerb, as the town's lanes do (`trimJoins`). */
 const road: RoadPlan = { points: line(0, 50, 100, 50, 100), width: 7, ends: ['out', 'out'] };
-const lane: RoadPlan = { points: line(50, 50, 50, 90, 40), width: 6, ends: ['join', 'dead'] };
+const [, lane] = trimJoins([road, { points: line(50, 50, 50, 90, 40), width: 6, ends: ['join', 'dead'] }]);
+const index = new RoadIndex([road, lane]);
 
 describe('roads as drawn', () => {
   test('sidewalks stop where a lane meets the road', () => {
     const { walk } = roadMeshes([road, lane]);
-    const index = new RoadIndex([road, lane]);
+    // The lane begins at the road's kerb (its first point past it; they're a metre apart).
+    expect(lane.points[0][1]).toBeGreaterThanOrEqual(50 + 3.5 - SIDEWALK);
+    expect(lane.points[0][1]).toBeLessThan(50 + 3.5 - SIDEWALK + 1);
     for (let i = 0; i < walk.pos.length; i += 3) {
       const [x, y, z] = [walk.pos[i], walk.pos[i + 1], walk.pos[i + 2]];
       if (y < WALK_Y - 0.001) continue;
@@ -23,18 +27,17 @@ describe('roads as drawn', () => {
       for (const [k, r] of [road, lane].entries()) expect(index.distance(k, x, z)).toBeGreaterThan(r.width / 2 - SIDEWALK - 0.01);
     }
     // The road's sidewalk on the lane's side is cut across the lane's mouth, kept elsewhere and across the road.
-    const cuts = sidewalkCuts([road, lane]);
-    const south = new Kerb(road, 0, -1, cuts);
+    const south = new Kerb(road, 0, -1, index);
     expect(south.open(50)).toBe(false);
     expect(south.open(20)).toBe(true);
-    expect(new Kerb(road, 0, 1, cuts).open(50)).toBe(true);
+    expect(new Kerb(road, 0, 1, index).open(50)).toBe(true);
     // The lane's sidewalks begin at the road's.
-    expect(new Kerb(lane, 1, 1, cuts).open(2)).toBe(false);
-    expect(new Kerb(lane, 1, 1, cuts).open(8)).toBe(true);
+    expect(new Kerb(lane, 1, 1, index).open(0.5)).toBe(false);
+    expect(new Kerb(lane, 1, 1, index).open(6)).toBe(true);
   });
 
   test('a dead end has a turning circle', () => {
-    const kerb = new Kerb(lane, 1, 1, sidewalkCuts([road, lane]));
+    const kerb = new Kerb(lane, 1, 1, index);
     expect(kerb.inTurning(50, 90)).toBe(true);
     expect(kerb.open(kerb.length - 0.5)).toBe(false);
     expect(kerb.open(kerb.length / 2)).toBe(true);

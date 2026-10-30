@@ -6,7 +6,7 @@
  */
 
 import type { Content, Economy } from '../content/content';
-import { EMPTY_LOT, houseTemplate, slotDims, type HouseTemplate, type PlotSlot, type Templates, type Wall } from './town';
+import { houseTemplate, slotDims, type HouseTemplate, type PlotSlot, type Templates, type Wall } from './town';
 
 /** A home's price and what it's made of ($). */
 export interface PriceParts {
@@ -56,7 +56,8 @@ export function priceParts(content: Content, t: Templates, slot: PlotSlot, empty
   if (slot.kind !== 'house') return null;
   const { width, depth } = slotDims(t, slot);
   // The house as it stands for sale: furnished for nobody in particular (the layout is the same for anyone).
-  const house = empty || !slot.template || slot.template === EMPTY_LOT ? undefined : houseTemplate(t, slot.template);
+  // (An empty lot has no template: `houseTemplate` finds nothing for it.)
+  const house = empty ? undefined : houseTemplate(t, slot.template);
   return priceOf((def) => content.object(def)?.price ?? 0, content.economy.homePrice, house, width, depth);
 }
 

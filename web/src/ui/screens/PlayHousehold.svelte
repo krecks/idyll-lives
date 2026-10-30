@@ -9,7 +9,7 @@
   import type { SimDraft } from '../../game/household';
   import { homePrice } from '../../game/price';
   import { houseTemplate, loadTemplates, type Templates } from '../../game/town';
-  import { fundsAfter, jobTitle, savingsOf } from '../../game/wealth';
+  import { householdFunds, jobTitle, savingsOf } from '../../game/wealth';
   import { app } from '../app.svelte';
   import { money } from '../format';
   import Icon from '../Icon.svelte';
@@ -176,7 +176,7 @@
                 <dd>{money(Math.max(0, savings - (price ?? 0)))} left of {money(savings)}</dd>
               {/if}
               <dt>To spend</dt>
-              <dd>{app.mode === 'creative' ? 'Free: this is a Creative game' : money(fundsAfter(content, savings, price ?? 0))}</dd>
+              <dd>{app.mode === 'creative' ? 'Free: this is a Creative game' : money(householdFunds(content, savings, price ?? 0))}</dd>
             </dl>
             <p class="note">Settled residents: most already have a job and know a few of the neighbours.</p>
             {#if neighbours.length}

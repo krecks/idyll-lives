@@ -382,6 +382,10 @@ export interface RoadPlan {
   width: number;
   ends: [RoadEnd, RoadEnd];
   name?: string;
+  /** The side its lots are on, if only one (+1: its left, looking along it; -1: its right): the other looks out over the water. */
+  lots?: 1 | -1;
+  /** What stands in the middle of a ring this small (a roundabout). */
+  island?: 'fountain';
 }
 
 export interface WorldMeta {

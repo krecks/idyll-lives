@@ -3,17 +3,19 @@
  * sidewalk with its kerb and a gutter's shade, following the road round its bends. Where a road
  * meets or crosses another, the sidewalk stops at the other's edge; a dead end gets a turning
  * circle with the sidewalk round it. `Kerb` walks a road's side by distance along it, for what
- * stands on the sidewalk (`street.ts`).
+ * stands on the sidewalk (`street.ts`). Where roads are, how far, which is nearest: `game/roads.ts`
+ * (`RoadIndex`), as the town was laid out with.
  *
  * Older towns have straight streets along x (`WorldMeta.streets`): drawn as roads the same way
  * (`townRoads`).
  */
 
 import type { RoadPlan, WorldStructure } from '../../core/protocol';
+import { rasterRoads, roadEnds, RoadIndex, roadIndex, SIDEWALK } from '../../game/roads';
 import { Geo, type V3 } from './geometry';
 
-/** Sidewalk width (including the kerb) on each side of the road, and its levels. */
-export const SIDEWALK = 1.35;
+export { RoadIndex, roadIndex, SIDEWALK };
+/** The kerb's width, and the levels of the sidewalk, the kerb and the road. */
 export const KERB = 0.14;
 export const WALK_Y = 0.03;
 export const KERB_Y = 0.045;
@@ -29,12 +31,20 @@ export interface Box {
   d: number;
 }
 
+/** An older town's streets as roads, once per town. */
+const streetRoads = new WeakMap<object, RoadPlan[]>();
+
 /** The town's roads: its own, or an older town's straight streets as roads. */
 export function townRoads(world: WorldStructure): RoadPlan[] {
-  if (world.meta?.roads) return world.meta.roads;
-  return (world.meta?.streets ?? [])
-    .filter((s) => s.w >= s.d)
-    .map((s): RoadPlan => ({ points: [[s.x, s.z + s.d / 2], [s.x + s.w, s.z + s.d / 2]], width: s.d, ends: ['out', 'out'] }));
+  const meta = world.meta;
+  if (!meta) return [];
+  if (meta.roads) return meta.roads;
+  let roads = streetRoads.get(meta);
+  if (!roads) {
+    roads = (meta.streets ?? []).filter((s) => s.w >= s.d).map((s): RoadPlan => ({ points: [[s.x, s.z + s.d / 2], [s.x + s.w, s.z + s.d / 2]], width: s.d, ends: ['out', 'out'] }));
+    streetRoads.set(meta, roads);
+  }
+  return roads;
 }
 
 /** A way out of town: where a road leaves it, and the way out (a unit direction). */
@@ -57,16 +67,7 @@ export function townExits(world: WorldStructure): TownExit[] {
     const z = main.points[0][1];
     return [{ x: 0, z, dx: -1, dz: 0 }, { x: world.width, z, dx: 1, dz: 0 }];
   }
-  return world.meta.roads.flatMap((r) =>
-    ([0, 1] as const)
-      .filter((e) => r.ends[e] === 'out')
-      .map((e) => {
-        const pts = r.points;
-        const [end, before] = e === 0 ? [pts[0], pts[1]] : [pts[pts.length - 1], pts[pts.length - 2]];
-        const l = Math.hypot(end[0] - before[0], end[1] - before[1]) || 1;
-        return { x: end[0], z: end[1], dx: (end[0] - before[0]) / l, dz: (end[1] - before[1]) / l };
-      }),
-  );
+  return roadEnds(world.meta.roads);
 }
 
 /** Tiles of a `w` × `d` town a road's surface or sidewalk covers (1), else 0 (each town's roads drawn once). */
@@ -74,20 +75,8 @@ const tilesOf = new WeakMap<readonly RoadPlan[], Uint8Array>();
 export function roadTiles(roads: readonly RoadPlan[], w: number, d: number): Uint8Array {
   const had = tilesOf.get(roads);
   if (had && had.length === w * d) return had;
-  const out = new Uint8Array(w * d);
+  const out = rasterRoads(roads, w, d, (r) => r.width / 2);
   for (const r of roads) {
-    const reach = r.width / 2;
-    for (let i = 0; i + 1 < r.points.length; i++) {
-      const [[ax, az], [bx, bz]] = [r.points[i], r.points[i + 1]];
-      const [dx, dz] = [bx - ax, bz - az];
-      const l2 = dx * dx + dz * dz || 1;
-      for (let z = Math.max(0, Math.floor(Math.min(az, bz) - reach)); z <= Math.min(d - 1, Math.ceil(Math.max(az, bz) + reach)); z++) {
-        for (let x = Math.max(0, Math.floor(Math.min(ax, bx) - reach)); x <= Math.min(w - 1, Math.ceil(Math.max(ax, bx) + reach)); x++) {
-          const t = Math.max(0, Math.min(1, ((x + 0.5 - ax) * dx + (z + 0.5 - az) * dz) / l2));
-          if (Math.hypot(x + 0.5 - (ax + dx * t), z + 0.5 - (az + dz * t)) < reach) out[z * w + x] = 1;
-        }
-      }
-    }
     // A dead end's turning circle.
     for (const [cx, cz, rr] of deadEnds(r)) {
       for (let z = Math.max(0, Math.floor(cz - rr - SIDEWALK)); z <= Math.min(d - 1, Math.ceil(cz + rr + SIDEWALK)); z++) {
@@ -132,87 +121,6 @@ function framesOf(road: RoadPlan): Frame[] {
   });
 }
 
-/** Roads near points, for "is this on a road": each road's bounding box, grown. */
-export class RoadIndex {
-  private readonly boxes: [number, number, number, number][];
-
-  constructor(readonly roads: readonly RoadPlan[]) {
-    this.boxes = roads.map((r) => {
-      const xs = r.points.map((p) => p[0]);
-      const zs = r.points.map((p) => p[1]);
-      const m = r.width / 2 + 1;
-      return [Math.min(...xs) - m, Math.min(...zs) - m, Math.max(...xs) + m, Math.max(...zs) + m];
-    });
-  }
-
-  /** Distance from road `i`'s middle (Infinity well away from it). */
-  distance(i: number, x: number, z: number): number {
-    const [x0, z0, x1, z1] = this.boxes[i];
-    if (x < x0 || x > x1 || z < z0 || z > z1) return Infinity;
-    const pts = this.roads[i].points;
-    let best = Infinity;
-    for (let k = 0; k + 1 < pts.length; k++) {
-      const [[ax, az], [bx, bz]] = [pts[k], pts[k + 1]];
-      const [dx, dz] = [bx - ax, bz - az];
-      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
-      best = Math.min(best, Math.hypot(x - (ax + dx * t), z - (az + dz * t)));
-    }
-    return best;
-  }
-
-  /** Whether (x, z) is on a road other than `skip` (within its width and `margin`). */
-  onRoad(x: number, z: number, margin = 0, skip = -1): boolean {
-    return this.roads.some((r, i) => i !== skip && this.distance(i, x, z) < r.width / 2 + margin);
-  }
-
-  /** The road nearest (x, z), how far its middle is, the arc length there and which side (+1: its left). */
-  nearest(x: number, z: number): { road: number; dist: number; s: number; side: 1 | -1 } | null {
-    let best: { road: number; dist: number; s: number; side: 1 | -1 } | null = null;
-    this.roads.forEach((r, i) => {
-      let s = 0;
-      for (let k = 0; k + 1 < r.points.length; k++) {
-        const [[ax, az], [bx, bz]] = [r.points[k], r.points[k + 1]];
-        const [dx, dz] = [bx - ax, bz - az];
-        const l = Math.hypot(dx, dz) || 1;
-        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (l * l)));
-        const dist = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
-        if (!best || dist < best.dist) best = { road: i, dist, s: s + t * l, side: (x - ax) * dz - (z - az) * dx >= 0 ? 1 : -1 };
-        s += l;
-      }
-    });
-    return best;
-  }
-}
-
-/**
- * The roads as far as they cut into others' sidewalks: a lane that joins a road begins at that
- * road's middle; for this it begins at the road's kerb, so it doesn't cut the sidewalk across
- * the road from it too.
- */
-export function sidewalkCuts(roads: readonly RoadPlan[]): RoadIndex {
-  const all = new RoadIndex(roads);
-  return new RoadIndex(
-    roads.map((r, i) => {
-      let pts = r.points;
-      for (const e of [0, 1] as const) {
-        if (r.ends[e] !== 'join') continue;
-        const end = e === 0 ? pts[0] : pts[pts.length - 1];
-        // The road it joins: the one whose middle is nearest its end.
-        let parent = -1;
-        roads.forEach((_, k) => {
-          if (k !== i && (parent < 0 || all.distance(k, end[0], end[1]) < all.distance(parent, end[0], end[1]))) parent = k;
-        });
-        if (parent < 0) continue;
-        const kerb = roads[parent].width / 2 - SIDEWALK;
-        const keep = (p: Pt) => all.distance(parent, p[0], p[1]) >= kerb;
-        const kept = e === 0 ? pts.slice(Math.max(0, pts.findIndex(keep))) : pts.slice(0, pts.length - Math.max(0, [...pts].reverse().findIndex(keep)));
-        if (kept.length >= 2) pts = kept;
-      }
-      return { ...r, points: pts };
-    }),
-  );
-}
-
 /**
  * One side of a road, by distance along it (`s`) and in from the sidewalk's outer edge (`d`):
  * where things on the sidewalk stand, and which way they face the road.
@@ -234,8 +142,14 @@ export class Kerb {
 
   private frameAt(s: number): { p: Pt; t: Pt } {
     const f = this.frames;
-    let i = 0;
-    while (i < f.length - 2 && f[i + 1].s < s) i++;
+    // The last frame at or before `s` (arc lengths only grow).
+    let [lo, hi] = [0, f.length - 2];
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (f[mid].s <= s) lo = mid;
+      else hi = mid - 1;
+    }
+    const i = lo;
     const u = Math.max(0, Math.min(1, (s - f[i].s) / (f[i + 1].s - f[i].s || 1)));
     const [a, b] = [f[i].p, f[i + 1].p];
     const [tx, tz] = [b[0] - a[0], b[1] - a[1]];
@@ -260,17 +174,7 @@ export class Kerb {
 
   /** Arc length along the road nearest (x, z). */
   along(x: number, z: number): number {
-    let best = { dist: Infinity, s: 0 };
-    const f = this.frames;
-    for (let i = 0; i + 1 < f.length; i++) {
-      const [[ax, az], [bx, bz]] = [f[i].p, f[i + 1].p];
-      const [dx, dz] = [bx - ax, bz - az];
-      const l = Math.hypot(dx, dz) || 1;
-      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (l * l)));
-      const dist = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
-      if (dist < best.dist) best = { dist, s: f[i].s + t * l };
-    }
-    return best.s;
+    return this.others.along(this.index, x, z);
   }
 
   /** Whether the sidewalk runs at `s` (not cut by a road it meets, not in a turning circle). */
@@ -303,13 +207,15 @@ export interface RoadMeshes {
 
 /**
  * The roads' surfaces, sidewalks, kerbs and gutters, only near `clip` (grown by `margin`) when
- * given: the road surface under the sidewalks too, the sidewalks on top (added to `into`'s meshes if given).
+ * given: the road surface under the sidewalks too, the sidewalks on top (added to `into`'s meshes if given;
+ * `parts`: only the surface, or only the sidewalks, kerbs and gutters).
  */
-export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, margin = 0, into: Partial<RoadMeshes> = {}): RoadMeshes {
+export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, margin = 0, into: Partial<RoadMeshes> = {}, parts: 'both' | 'surface' | 'sidewalks' = 'both'): RoadMeshes {
+  const [withSurface, withSidewalks] = [parts !== 'sidewalks', parts !== 'surface'];
   const surface = into.surface ?? new Geo();
   const walk = into.walk ?? new Geo();
   const shadows = into.shadows ?? new Geo().color('#000000');
-  const index = sidewalkCuts(roads);
+  const index = roadIndex(roads);
   const near = (x: number, z: number, r = 0) => !clip || (x > clip.x - margin - r && x < clip.x + clip.w + margin + r && z > clip.z - margin - r && z < clip.z + clip.d + margin + r);
   const up: V3 = [0, 1, 0];
   roads.forEach((road, ri) => {
@@ -321,8 +227,8 @@ export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, 
     for (let i = 0; i + 1 < frames.length; i++) {
       const [mx, mz] = [(frames[i].p[0] + frames[i + 1].p[0]) / 2, (frames[i].p[1] + frames[i + 1].p[1]) / 2];
       if (!near(mx, mz, half)) continue;
-      surface.poly([P(i, half, ROAD_Y), P(i + 1, half, ROAD_Y), P(i + 1, -half, ROAD_Y), P(i, -half, ROAD_Y)], up);
-      for (const side of [1, -1] as const) {
+      if (withSurface) surface.poly([P(i, half, ROAD_Y), P(i + 1, half, ROAD_Y), P(i + 1, -half, ROAD_Y), P(i, -half, ROAD_Y)], up);
+      for (const side of withSidewalks ? ([1, -1] as const) : []) {
         // Offsets from the middle: the sidewalk's outer edge, the kerb's top, the road's edge, the gutter.
         const [edge, walkIn, kerb, gutter] = [half, half - (SIDEWALK - KERB), half - SIDEWALK, half - SIDEWALK - 0.4].map((o) => o * side);
         const [cx, cz] = [mx + frames[i].n[0] * (edge + walkIn) / 2, mz + frames[i].n[1] * (edge + walkIn) / 2];
@@ -356,9 +262,9 @@ export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, 
       const inLane = (x: number, z: number) => laneIndex.distance(0, x, z) < half;
       for (let k = 0; k < n; k++) {
         const [a0, a1] = [(k / n) * Math.PI * 2, ((k + 1) / n) * Math.PI * 2];
-        surface.poly([[ex, ROAD_Y, ez], at(a1, r + SIDEWALK, ROAD_Y), at(a0, r + SIDEWALK, ROAD_Y)], up);
+        if (withSurface) surface.poly([[ex, ROAD_Y, ez], at(a1, r + SIDEWALK, ROAD_Y), at(a0, r + SIDEWALK, ROAD_Y)], up);
         const am = (a0 + a1) / 2;
-        if (inLane(ex + Math.cos(am) * (r + SIDEWALK / 2), ez + Math.sin(am) * (r + SIDEWALK / 2))) continue;
+        if (!withSidewalks || inLane(ex + Math.cos(am) * (r + SIDEWALK / 2), ez + Math.sin(am) * (r + SIDEWALK / 2))) continue;
         const [edge, walkIn, kerb] = [r + SIDEWALK, r + KERB, r];
         const radial: V3 = [Math.cos(am), 0, Math.sin(am)];
         walk.color('#E6E6E6').poly([at(a0, walkIn, WALK_Y), at(a0, edge, WALK_Y), at(a1, edge, WALK_Y), at(a1, walkIn, WALK_Y)], up);

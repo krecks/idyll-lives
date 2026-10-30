@@ -1,6 +1,6 @@
 /**
- * Neighbourhood generation and assembly. A town is a few roads winding through it (`roads.ts`;
- * older drafts: straight streets one behind the other) with plots along them; each plot has a
+ * Neighbourhood generation and assembly. A town is a few roads winding through it (`roads.ts`)
+ * with plots along them; each plot has a
  * small, medium or large house (or a farm) and gets a house layout (or a public place: the park,
  * a playground, a square, a shop) from `content/houses.json`. A generated house comes with its
  * lot, cut to fit it with a snug, roomy or big garden (`housegen.ts` `fitLot`); the fixed layouts
@@ -18,9 +18,9 @@ import type { GameKind, LandscapeParams, Lifespan, WorldLook } from '../core/pro
 import { fetchText } from '../content/content';
 import { bedroomsNeeded, householdBonds, householdSpawns, randomHousehold, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { homePrice } from './price';
-import { generateHouse, objectInfos, random, residentsKey, type GardenSize, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
-import { cropRoads, inside, leftOf, lengths, nearest, roadExits, roadMask, tangent, type Pt, type RoadPlan } from './roads';
-import { fundsAfter, savingsOf } from './wealth';
+import { generateHouse, objectInfos, random, residentsKey, weighted, type GardenSize, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
+import { cropRoads, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Pt, type RoadPlan } from './roads';
+import { householdFunds, savingsOf } from './wealth';
 import { streetNames, WORLDS, worldName, worldTagline, type WorldKind } from './world';
 
 export type Wall = [number, number, number, number];
@@ -57,6 +57,8 @@ export interface HouseTemplate {
   basement?: { walls: Wall[]; doors: Door[]; windows?: Door[]; objects: Placement[]; rooms?: PlannedRoom[] };
   /** Generated houses: the rooms as planned (for checking them; the game finds rooms from the walls). */
   rooms?: PlannedRoom[];
+  /** Generated houses: what kind of house it is (its class's label in housegen.json: cottage, villa...). */
+  class?: string;
   /** Generated houses with a garden size: the lot cut to fit the house, the layout in its frame (see `housegen.ts` `fitLot`). */
   lot?: { width: number; depth: number };
 }
@@ -138,8 +140,6 @@ export interface PlotSlot {
   garden?: GardenSize;
   /** The middle of its front along its road (x, or z for a plot turned a quarter), where its lot is cut again round it (`withGarden`). */
   anchor?: number;
-  /** The road (or street) it is on: an index into the draft's `roads` (or `streets`); missing: the first. */
-  street?: number;
   /** A farm lot's fields and farmyard, in plot coordinates like the house layout. */
   farm?: { objects: Placement[]; fields: Rect[] };
 }
@@ -165,12 +165,10 @@ export interface NeighbourhoodDraft {
   width: number;
   depth: number;
   slots: PlotSlot[];
-  /** Drafts from older code: straight streets along x (newer towns have `roads`). */
-  streets: Rect[];
-  /** The town's roads (`roads.ts`), each plot facing one (`PlotSlot.street`). */
-  roads?: RoadPlan[];
+  /** The town's roads (`roads.ts`), each plot facing one. */
+  roads: RoadPlan[];
   /** Greens the roads go round (polygons). */
-  greens?: Pt[][];
+  greens: Pt[][];
   /** Neighbour households and the slot each lives in. */
   households: { household: HouseholdDraft; slot: number }[];
   /**
@@ -194,7 +192,8 @@ export interface WorldInfo {
 export interface TownMeta {
   kind: 'town';
   name: string;
-  streets: Rect[];
+  /** Older towns' straight streets (newer ones have `roads`). */
+  streets?: Rect[];
   roads?: RoadPlan[];
   greens?: Pt[][];
   paths: Rect[];
@@ -243,13 +242,6 @@ export function generatedId(size: LotSize, seed: number, garden?: GardenSize): s
 
 type Rand = () => number;
 const pick = <T>(list: readonly T[], rand: Rand = Math.random): T => list[Math.floor(rand() * list.length)];
-/** One of the keys of `weights`, as likely as its weight. */
-function pickWeighted<K extends string>(weights: Partial<Record<K, number>>, rand: Rand): K {
-  const entries = Object.entries(weights) as [K, number][];
-  let r = rand() * entries.reduce((n, [, w]) => n + w, 0);
-  for (const [k, w] of entries) if ((r -= w) < 0) return k;
-  return entries[entries.length - 1][0];
-}
 /** A shuffled copy (Fisher-Yates). */
 function shuffled<T>(list: readonly T[], rand: Rand = Math.random): T[] {
   const out = [...list];
@@ -413,7 +405,7 @@ function lotOf(h: HouseTemplate, size: LotSize): Pick<PlotSlot, 'w' | 'd'> {
  */
 export function withGarden(t: Templates, town: NeighbourhoodDraft, slot: number, garden: GardenSize): NeighbourhoodDraft {
   const old = town.slots[slot];
-  if (!old || old.garden === garden || !old.template.startsWith('gen:') || !town.roads) return town;
+  if (!old || old.garden === garden || !old.template.startsWith('gen:')) return town;
   const [, size, seed] = old.template.split(':');
   const template = generatedId(size as LotSize, Number(seed), garden);
   const h = houseTemplate(t, template);
@@ -421,19 +413,23 @@ export function withGarden(t: Templates, town: NeighbourhoodDraft, slot: number,
   const was = plotRect(t, old);
   const now = plotRect(t, { ...old, ...lotOf(h, old.lot ?? 'medium') });
   // The front stays on the street, its middle where it was cut round (`anchor`).
-  const across = old.facing % 2 === 0;
-  const anchor = old.anchor ?? (across ? was.x + was.w / 2 : was.z + was.d / 2);
-  const [x, z] = [Math.round(anchor - now.w / 2), Math.round(anchor - now.d / 2)];
-  const at = old.facing === 0 ? { x, z: old.z } : old.facing === 2 ? { x, z: old.z + was.d - now.d } : old.facing === 1 ? { x: old.x, z } : { x: old.x + was.w - now.w, z };
+  const front = [was.z, was.x, was.z + was.d, was.x + was.w][old.facing];
+  const anchor = old.anchor ?? (old.facing % 2 ? was.z + was.d / 2 : was.x + was.w / 2);
+  const at = fronting(old.facing, front, anchor, now.w, now.d);
   const ground = new Ground(town.width, town.depth, town.roads, town.greens);
   for (const s of town.slots) if (s.index !== slot) ground.take(plotRect(t, s));
-  if (!ground.free({ ...now, ...at }, 1)) return town;
-  return { ...town, slots: town.slots.map((s) => (s.index === slot ? { ...s, ...at, template, garden, ...lotOf(h, s.lot ?? 'medium') } : s)) };
+  if (!ground.free(at, 1)) return town;
+  return { ...town, slots: town.slots.map((s) => (s.index === slot ? { ...s, x: at.x, z: at.z, template, garden, ...lotOf(h, s.lot ?? 'medium') } : s)) };
 }
+
+/** Each set of roads' land (see `Ground`): the tiles they take alone, and with their greens. */
+const groundOf = new WeakMap<readonly RoadPlan[], { w: number; d: number; greens: readonly Pt[][]; roads: Uint8Array; base: Uint8Array }>();
 
 /** A town's land as its lots go down: the tiles roads, greens and lots already take. */
 class Ground {
   private readonly taken: Uint8Array;
+  /** The tiles the roads alone take. */
+  private readonly roads: Uint8Array;
 
   constructor(
     readonly w: number,
@@ -441,18 +437,26 @@ class Ground {
     roads: readonly RoadPlan[],
     greens: readonly Pt[][] = [],
   ) {
-    this.taken = roadMask(roads, w, d);
-    for (const g of greens) {
-      const [x0, x1] = [Math.max(0, Math.floor(Math.min(...g.map((p) => p[0])))), Math.min(w, Math.ceil(Math.max(...g.map((p) => p[0]))))];
-      const [z0, z1] = [Math.max(0, Math.floor(Math.min(...g.map((p) => p[1])))), Math.min(d, Math.ceil(Math.max(...g.map((p) => p[1]))))];
-      for (let z = z0; z < z1; z++) for (let x = x0; x < x1; x++) if (inside(g, x + 0.5, z + 0.5)) this.taken[z * w + x] = 1;
+    let had = groundOf.get(roads);
+    if (!had || had.w !== w || had.d !== d || had.greens !== greens) {
+      const base = roadMask(roads, w, d);
+      const mask = base.slice();
+      for (const g of greens) {
+        const [x0, x1] = [Math.max(0, Math.floor(Math.min(...g.map((p) => p[0])))), Math.min(w, Math.ceil(Math.max(...g.map((p) => p[0]))))];
+        const [z0, z1] = [Math.max(0, Math.floor(Math.min(...g.map((p) => p[1])))), Math.min(d, Math.ceil(Math.max(...g.map((p) => p[1]))))];
+        for (let z = z0; z < z1; z++) for (let x = x0; x < x1; x++) if (inside(g, x + 0.5, z + 0.5)) mask[z * w + x] = 1;
+      }
+      groundOf.set(roads, (had = { w, d, greens, roads: base, base: mask }));
     }
+    this.roads = had.roads;
+    this.taken = had.base.slice();
   }
 
-  /** Whether `r` is clear, `margin` m inside the edge of the land. */
-  free(r: Rect, margin = MARGIN): boolean {
+  /** Whether `r` is clear, `margin` m inside the edge of the land (`greens`: it may lie on a green, off the roads). */
+  free(r: Rect, margin = MARGIN, greens = false): boolean {
     if (r.x < margin || r.z < margin || r.x + r.w > this.w - margin || r.z + r.d > this.d - margin) return false;
-    for (let z = r.z; z < r.z + r.d; z++) for (let x = r.x; x < r.x + r.w; x++) if (this.taken[z * this.w + x]) return false;
+    const mask = greens ? this.roads : this.taken;
+    for (let z = r.z; z < r.z + r.d; z++) for (let x = r.x; x < r.x + r.w; x++) if (mask[z * this.w + x]) return false;
     return true;
   }
 
@@ -499,18 +503,24 @@ function lotAt(ground: Ground, road: RoadPlan, f: Frontage, w: number, d: number
   // (Quickly past frontage a lot already takes.)
   if (ground.takenAt(qx + f.n[0] * 3, qz + f.n[1] * 3)) return null;
   // On a bend or across a road running aslant, further back (a wedge of front garden before it).
+  const [across, along] = facing % 2 ? [qx, qz] : [qz, qx];
   for (let back = 0; back <= Math.min(10, Math.ceil(w / 2)); back++) {
-    const [x, z] =
-      facing === 0
-        ? [Math.round(qx - W / 2), Math.ceil(qz) + back]
-        : facing === 2
-          ? [Math.round(qx - W / 2), Math.floor(qz) - D - back]
-          : facing === 1
-            ? [Math.ceil(qx) + back, Math.round(qz - D / 2)]
-            : [Math.floor(qx) - W - back, Math.round(qz - D / 2)];
-    if (ground.free({ x, z, w: W, d: D })) return { x, z, facing, anchor: facing % 2 === 0 ? qx : qz };
+    // The front edge on the first tile line past the verge (further on, the further back).
+    const front = facing < 2 ? Math.ceil(across) + back : Math.floor(across) - back;
+    const r = fronting(facing, front, along, W, D);
+    if (ground.free(r)) return { x: r.x, z: r.z, facing, anchor: along };
   }
   return null;
+}
+
+/**
+ * A `W` × `D` rectangle (town tiles) facing `facing`'s way, its front edge on the tile line `front`
+ * (z when it faces north or south, x when east or west) and its middle at `along` across it.
+ */
+function fronting(facing: Facing, front: number, along: number, W: number, D: number): Rect {
+  const a = Math.round(along - (facing % 2 ? D : W) / 2);
+  const at = [{ x: a, z: front }, { x: front, z: a }, { x: a, z: front - D }, { x: front - W, z: a }][facing];
+  return { ...at, w: W, d: D };
 }
 
 /** Template id of a lot with nothing on it yet (no house template has it): build from the ground up. */
@@ -541,8 +551,15 @@ export function generateWorld(content: Content, t: Templates, kind: WorldKind, s
   const tagline = worldTagline(content, kind, rand);
   const { box } = recipe;
   const layout = recipe.roads(rand, box);
-  // Dead ends stop short of the edge of the land (the roads out of town go on past it).
-  const roads = layout.roads.map((r) => (r.ends[1] !== 'dead' ? r : { ...r, points: r.points.filter(([x, z], i) => i < 2 || (x > 14 && z > 14 && x < box.w - 14 && z < box.d - 14)) }));
+  // Dead ends stop short of the edge of the land (the roads out of town go on past it); lanes
+  // begin at the kerb of the road they join.
+  const within = ([x, z]: Pt) => x > 14 && z > 14 && x < box.w - 14 && z < box.d - 14;
+  const roads = trimJoins(
+    layout.roads.map((r) => {
+      const out = r.ends[1] === 'dead' ? r.points.findIndex((p, i) => i >= 2 && !within(p)) : -1;
+      return out < 0 ? r : { ...r, points: r.points.slice(0, out) };
+    }),
+  );
   const names = streetNames(content, kind, rand, roads.length);
   const greens = layout.greens ?? [];
   const centre = layout.centre ?? roads[0].points[Math.floor(roads[0].points.length / 2)];
@@ -563,7 +580,7 @@ export function generateWorld(content: Content, t: Templates, kind: WorldKind, s
     const r = rand();
     return r < recipe.small ? 'small' : r < 1 - recipe.large ? 'medium' : 'large';
   };
-  const gardenSize = () => pickWeighted(recipe.gardens, rand);
+  const gardenSize = () => weighted(rand, recipe.gardens as Record<string, number>) as GardenSize;
   type Unplaced = Omit<PlotSlot, 'index' | 'x' | 'z' | 'facing'>;
   const wanted: Unplaced[] = [
     // On a lot of the frame they are drawn for.
@@ -579,7 +596,7 @@ export function generateWorld(content: Content, t: Templates, kind: WorldKind, s
   const ground = new Ground(box.w, box.d, roads, greens);
   const frontage: Frontage[] = roads.flatMap((road, r) => {
     const ls = lengths(road.points);
-    return (road.side ? [road.side] : ([1, -1] as const)).flatMap((side) =>
+    return (road.lots ? [road.lots] : ([1, -1] as const)).flatMap((side) =>
       road.points
         .map((p, i): Frontage => {
           const n = leftOf(tangent(road.points, i)).map((v) => v * side) as Pt;
@@ -595,7 +612,7 @@ export function generateWorld(content: Content, t: Templates, kind: WorldKind, s
   const slots: PlotSlot[] = [];
   const placed = new Map<PlotSlot, Frontage>();
   const put = (u: Unplaced, at: { x: number; z: number; facing: Facing; anchor?: number }, f: Frontage | null) => {
-    const slot: PlotSlot = { ...u, index: slots.length, ...at, street: f?.road ?? 0 };
+    const slot: PlotSlot = { ...u, index: slots.length, ...at };
     if (u.lot === 'farm') slot.farm = farmstead(content, t, slot, rand);
     slots.push(slot);
     if (f) placed.set(slot, f);
@@ -608,17 +625,14 @@ export function generateWorld(content: Content, t: Templates, kind: WorldKind, s
     const { width, depth } = slotDims(t, u);
     // The park on the green, facing the road nearest it, if it fits there.
     if (u === wanted[0] && greens.length) {
-      const [gx, gz] = layout.centre ?? centre;
+      const [gx, gz] = centre;
       const near = roads.map((road, r) => ({ r, ...nearest(road.points, gx, gz) })).sort((a, b) => a.dist - b.dist)[0];
-      const q = roads[near.r].points[Math.max(0, Math.min(roads[near.r].points.length - 1, Math.round(near.s)))];
-      const facing = facingFrom([gx - q[0], gz - q[1]].map((v) => v / (Math.hypot(gx - q[0], gz - q[1]) || 1)) as Pt);
+      const [qx, qz] = pointAt(roads[near.r].points, near.s).p;
+      const facing = facingFrom([gx - qx, gz - qz]);
       const [W, D] = facing % 2 ? [depth, width] : [width, depth];
       const r = { x: Math.round(gx - W / 2), z: Math.round(gz - D / 2), w: W, d: D };
       const corners: Pt[] = [[r.x, r.z], [r.x + r.w, r.z], [r.x, r.z + r.d], [r.x + r.w, r.z + r.d]];
-      const mask = roadMask(roads, box.w, box.d);
-      let clear = r.x >= MARGIN && r.z >= MARGIN && r.x + r.w <= box.w - MARGIN && r.z + r.d <= box.d - MARGIN && greens.some((g) => corners.every(([x, z]) => inside(g, x, z)));
-      for (let z = r.z; clear && z < r.z + r.d; z++) for (let x = r.x; clear && x < r.x + r.w; x++) clear = !mask[z * box.w + x];
-      if (clear) {
+      if (greens.some((g) => corners.every(([x, z]) => inside(g, x, z))) && ground.free(r, MARGIN, true)) {
         put(u, { x: r.x, z: r.z, facing }, null);
         continue;
       }
@@ -653,14 +667,13 @@ export function generateWorld(content: Content, t: Templates, kind: WorldKind, s
   const width = Math.min(MAX_TOWN, Math.ceil(Math.min(box.w, Math.max(...xs) + MARGIN)) - x0);
   const depth = Math.min(MAX_TOWN, Math.ceil(Math.min(box.d, Math.max(...zs) + MARGIN)) - z0);
   const moved = slots.map((s) => ({ ...s, x: s.x - x0, z: s.z - z0, ...(s.anchor === undefined ? {} : { anchor: s.anchor - (s.facing % 2 === 0 ? x0 : z0) }) }));
-  const kept = cropRoads(roads, -x0, -z0, width, depth).map(({ side: _, ...r }) => r);
+  const kept = cropRoads(roads, -x0, -z0, width, depth);
   const landscape = recipe.landscape(rand, width, depth, layout.water);
   return {
     name: name ?? rolledName,
     width,
     depth,
     slots: moved,
-    streets: [],
     roads: kept,
     greens: greens.map((g) => g.map(([x, z]): Pt => [Math.round((x - x0) * 100) / 100, Math.round((z - z0) * 100) / 100])),
     households: [],
@@ -935,23 +948,21 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     doors.push(...(f.doors ?? []).map((d) => turn.edge(d, lift)));
     windows.push(...(f.windows ?? []).map((d) => turn.edge(d, lift)));
   };
-  /** A garden path from a front door (plot coordinates) to the street. */
   /**
    * A path's way on from the front of plot `s` to its road, across the verge (`r`: its stretch on the
    * plot, plot coordinates): as far as the sidewalk, longer where the plot stands back from a bend.
    */
-  const ls = (town.roads ?? []).map((r) => lengths(r.points));
-  const onRoad = (x: number, z: number) => (town.roads ?? []).some((r, i) => nearest(r.points, x, z, ls[i]).dist <= r.width / 2);
+  const roads = roadIndex(town.roads);
   const verge = (s: PlotSlot, r: Rect) => {
-    if (!town.roads) return;
     const turn = turnOnto(t, s);
     for (let k = 1; k <= 12; k++) {
       const [x, z] = turn.point([r.x + r.w / 2, -k + 0.5]);
-      if (!onRoad(x, z)) continue;
+      if (!roads.onRoad(x, z)) continue;
       paths.push(turn.rect({ x: r.x, z: -k, w: r.w, d: k }));
       return;
     }
   };
+  /** A garden path from a front door (plot coordinates) to the street, and on across the verge. */
   const pathTo = (s: PlotSlot, front: Door) => {
     const r = { x: front.x, z: 0, w: 1, d: front.z };
     paths.push(turnOnto(t, s).rect(r));
@@ -1057,7 +1068,6 @@ export function assembleTown(
   const residents: { household: HouseholdDraft; slot: number; player: boolean }[] = existing
     ? neighbours
     : [{ household: player, slot: playerSlot, player: true }, ...neighbours];
-  const { emptyLotFunds = 0 } = content.economy;
   const emptyLot = !houseTemplate(t, home.template);
   // What each household has left to spend once it has bought its home (a new household on an
   // empty lot: the lot, and money to build with besides). A new household in a Creative game
@@ -1065,9 +1075,8 @@ export function assembleTown(
   const funds = (r: (typeof residents)[number], i: number): number | undefined => {
     const fresh = !existing && i === 0;
     if (fresh && mode !== 'living') return undefined;
-    const slot = town.slots[r.slot];
-    const after = fundsAfter(content, savingsOf(content, r.household), homePrice(content, t, slot, fresh && emptyLot));
-    return fresh && emptyLot ? after + emptyLotFunds : after;
+    const empty = fresh && emptyLot;
+    return householdFunds(content, savingsOf(content, r.household), homePrice(content, t, town.slots[r.slot], empty), empty);
   };
   const households = residents.map((r, i) => {
     const money = funds(r, i);
@@ -1099,8 +1108,8 @@ export function assembleTown(
     }
   }
 
-  const meta: TownMeta = { kind: 'town', name: town.name, streets: town.streets, roads: town.roads, greens: town.greens, paths, facing, seed: town.seed ?? (Math.random() * 2 ** 31) >>> 0, world: worldLook(town, fields) };
-  // Residents leave town (for work) where its roads lead out of it (an older town's: at both ends of every street).
-  const exits = town.roads ? roadExits(town.roads, town.width, town.depth) : town.streets.flatMap((st) => [[0.5, st.z + st.d / 2], [town.width - 0.5, st.z + st.d / 2]]);
+  const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths, facing, seed: town.seed ?? (Math.random() * 2 ** 31) >>> 0, world: worldLook(town, fields) };
+  // Residents leave town (for work) where its roads lead out of it.
+  const exits = roadExits(town.roads, town.width, town.depth);
   return JSON.stringify({ mode, lifespan, width: town.width, depth: town.depth, storeys, ...(basement ? { basement } : {}), walls, doors, windows, objects, plots, households, sims, relationships, exits, meta });
 }

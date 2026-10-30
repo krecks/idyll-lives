@@ -35,7 +35,8 @@ import type { HousePlanner, SilhouettePlan, SilhouetteSpec } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
 import { perfEnd, perfStart, perfTime } from '../../debug/perf';
-import { Kerb, KERB, RoadIndex, roadMeshes, SIDEWALK, sidewalkCuts, townRoads, WALK_Y } from './roads';
+import { centroid } from '../../game/roads';
+import { Kerb, KERB, roadIndex, roadMeshes, SIDEWALK, townRoads, WALK_Y } from './roads';
 
 /** Vertex-colour alpha for the plain finish, as the material libraries' `encodeFinish`: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. */
 function encodeFinish(roughness: number, metallic: number): number {
@@ -114,6 +115,11 @@ const localRect = (turned: boolean, r: Rect): Rect => (turned ? { x: r.z, z: -(r
 const townRect = (turned: boolean, r: Rect): Rect => (turned ? { x: -(r.z + r.d), z: r.x, w: r.d, d: r.w } : r);
 const townPoint = (turned: boolean, x: number, z: number): [number, number] => (turned ? [-z, x] : [x, z]);
 const townYaw = (turned: boolean, yaw: number) => (turned ? yaw - Math.PI / 2 : yaw);
+/** A box (x0, z0, x1, z1) as laid out, on the town. */
+const townBox = (turned: boolean, b: { x0: number; z0: number; x1: number; z1: number }) => {
+  const r = townRect(turned, { x: b.x0, z: b.z0, w: b.x1 - b.x0, d: b.z1 - b.z0 });
+  return { x0: r.x, z0: r.z, x1: r.x + r.w, z1: r.z + r.d };
+};
 
 /**
  * Writes posed primitives into a `Geo`: a local frame (origin on the ground, +z forward)
@@ -577,13 +583,11 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
     const home = L.kind === 'home' && !view;
     if ((L.kind !== 'house' && L.kind !== 'shop' && !home) || !L.house) continue;
     // (Only the game's street follows who's up: the menus' town keeps every window lit.)
-    const box = (r: Rect) => ({ x0: r.x, z0: r.z, x1: r.x + r.w, z1: r.z + r.d });
-    const asRect = (b: { x0: number; z0: number; x1: number; z1: number }): Rect => ({ x: b.x0, z: b.z0, w: b.x1 - b.x0, d: b.z1 - b.z0 });
-    const turn = (b: { x0: number; z0: number; x1: number; z1: number }) => box(townRect(L.turned, asRect(b)));
     const g = L.kind === 'house' ? garage(L, (r) => free(townRect(L.turned, r), 0.1)) : null;
+    const [x0, z0, x1, z1] = L.info.house!;
     // The street side's normal: (0, front) as laid out.
     const front: [number, number] = L.turned ? [-L.front, 0] : [0, L.front];
-    specs.push({ ...turn(L.house), lot: L.info, home, front, door: L.door, garage: g && turn(g), roof: L.plot.roof, storeys: L.plot.storeys, lived: L.kind === 'house' && options.lived });
+    specs.push({ x0, z0, x1, z1, lot: L.info, home, front, door: L.door, garage: g && townBox(L.turned, g), roof: L.plot.roof, storeys: L.plot.storeys, lived: L.kind === 'house' && options.lived });
   }
   const silhouettes = perfTime('street: silhouettes', () => planner.silhouettes(specs, world.openings ?? [], world));
   await pace?.();
@@ -596,23 +600,8 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
 
   // ---- sidewalks, kerbs, kerbside furniture -----------------------------------------
   const sidewalks = perfStart('street: sidewalks');
-  roadMeshes(roads, null, 0, { walk, shadows });
-  const index = new RoadIndex(roads);
-  const cuts = sidewalkCuts(roads);
-  // How much of a side of a road looks out over the water (towards the sea's side of town, or the lake).
-  const water = world.meta?.world?.landscape?.water;
-  const waterward = (kerb: Kerb) => {
-    if (!water) return 0;
-    let [n, k] = [0, 0];
-    for (let s = 2; s < kerb.length - 2; s += 5, k++) {
-      const [ex, ez] = kerb.at(s, 0);
-      const [cx, cz] = kerb.at(s, kerb.road.width / 2);
-      const [wx, wz] = water.kind === 'sea' ? [0, water.side === 'zmin' ? -1 : 1] : [water.x - ex, water.z - ez];
-      const l = Math.hypot(ex - cx, ez - cz) * Math.hypot(wx, wz) || 1;
-      if (((ex - cx) * wx + (ez - cz) * wz) / l > 0.7) n++;
-    }
-    return k ? n / k : 0;
-  };
+  roadMeshes(roads, null, 0, { walk, shadows }, 'sidewalks');
+  const index = roadIndex(roads);
   // Each plot on the side of the road its front faces, and where along the road it is.
   const fronting = plots.map((L) => {
     const at = (u: number) => townPoint(L.turned, u, L.edge);
@@ -620,9 +609,14 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
     const near = index.nearest(cx, cz);
     return near && { L, road: near.road, side: near.side, at };
   });
+  // Each garden path and driveway with the road and side it meets (as near as the sidewalk).
+  const meeting = paths.flatMap((p) => {
+    const near = index.nearest(p.x + p.w / 2, p.z + p.d / 2);
+    return near && near.dist <= roads[near.road].width / 2 + Math.max(p.w, p.d) / 2 + 0.6 ? [{ p, road: near.road, side: near.side }] : [];
+  });
   for (const [r, road] of roads.entries()) {
     for (const side of [1, -1] as const) {
-      const kerb = new Kerb(road, r, side, cuts);
+      const kerb = new Kerb(road, r, side, index);
       const along = (u: [number, number]) => kerb.along(u[0], u[1]);
       // The plots fronting this side, in order along it: their fronts (s0..s1), front doors and driveways.
       const row = fronting
@@ -636,10 +630,7 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
         .sort((a, b) => a.s0 - b.s0);
       // Mouths of garden paths and driveways on this side: keep them clear.
       const mouths: [number, number][] = [];
-      for (const p of paths) {
-        const [cx, cz] = [p.x + p.w / 2, p.z + p.d / 2];
-        const near = index.nearest(cx, cz);
-        if (!near || near.road !== r || near.side !== side || near.dist > road.width / 2 + Math.max(p.w, p.d) / 2 + 0.6) continue;
+      for (const { p } of meeting.filter((m) => m.road === r && m.side === side)) {
         const corners = [[p.x, p.z], [p.x + p.w, p.z], [p.x, p.z + p.d], [p.x + p.w, p.z + p.d]].map(([x, z]) => kerb.along(x, z));
         mouths.push([Math.min(...corners), Math.max(...corners)]);
       }
@@ -749,8 +740,9 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
           put(PROP.sign, ...on(s), kerb.yaw(s) + Math.PI / 4);
         }
       }
-      // Where nobody lives along the road: on the water's side a promenade (benches looking out over
-      // the water, a lamp between each two), elsewhere now and then a bench with a view.
+      // Where nobody lives along the road: on the water's side (the side its lots aren't on) a
+      // promenade (benches looking out over the water, a lamp between each two), elsewhere now and
+      // then a bench with a view.
       const empty = (s: number) => !row.some((f) => s > f.s0 - 6 && s < f.s1 + 6);
       const onVerge = (x: number, z: number) => x > 1 && z > 1 && x < world.width - 1 && z < groundDepth(world) - 1 && !index.onRoad(x, z, 0.4, r) && free({ x: x - 1, z: z - 1, w: 2, d: 2 }, 0.2);
       const bench = (s: number, d: number) => {
@@ -761,7 +753,7 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
         blob(shadows, x, z, 0.95, 0.3, kerb.yaw(s), 0.35, WALK_Y + 0.004);
         return true;
       };
-      if (waterward(kerb) > 0.5) {
+      if (road.lots && side !== road.lots) {
         for (let s = 6, k = 0; s < kerb.length - 6; s += 7, k++) {
           if (!empty(s) || !clear(s, 1.4) || near(s, 2)) continue;
           if (k % 2 === 0) bench(s, -1.1);
@@ -782,10 +774,10 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
     }
   }
 
-  // A fountain in the middle of every roundabout (a small ring of road), flowers round it.
+  // A fountain in the middle of every roundabout, flowers round it.
   for (const road of roads) {
-    if (road.ends[0] !== 'loop' || road.points.length > 80) continue;
-    const [cx, cz] = [road.points.reduce((n, p) => n + p[0], 0) / road.points.length, road.points.reduce((n, p) => n + p[1], 0) / road.points.length];
+    if (road.island !== 'fountain') continue;
+    const [cx, cz] = centroid(road.points);
     put(PROP.fountain, cx, cz, hash(cx, cz, 90) * 6.28, 0.85);
     for (let k = 0; k < 10; k++) {
       const a = (k / 10) * Math.PI * 2;
@@ -886,7 +878,7 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
         if (isFree({ x: px - 0.2, z: pz - 0.2, w: 0.4, d: 0.4 })) putAt(PROP.pot, px, pz, hash(px, pz, 47) * 6.28, 0.85 + hash(px, pz, 48) * 0.3);
       }
     }
-    const path = L.door === null ? undefined : L.path ?? undefined;
+    const path = L.path ?? undefined;
     if (path && hash(plot.x, plot.z, 49) < 0.55) {
       const [a, b] = [Math.min(L.edge, frontWall) + 1.0, Math.max(L.edge, frontWall) - 1.0];
       for (let z = a, i = 0; z <= b; z += 2.2, i++) {

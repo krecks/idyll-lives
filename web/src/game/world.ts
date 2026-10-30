@@ -9,7 +9,7 @@
 import type { Content, WorldNames } from '../content/content';
 import { DEFAULT_LANDSCAPE, type LandscapeParams } from '../core/protocol';
 import type { GardenSize } from './housegen';
-import { branch, crossing, cutAround, lane, lengths, loop, ring, roundabout, through, type Box, type Pt, type Road } from './roads';
+import { branch, centroid, crossing, cutAround, lane, lengths, loop, range, ring, roundabout, through, type Box, type Pt, type RoadPlan } from './roads';
 
 export type WorldKind = 'small' | 'medium' | 'dense' | 'farm' | 'seaside' | 'mountain' | 'lakeside' | 'forest';
 export const WORLD_KINDS: readonly WorldKind[] = ['small', 'medium', 'dense', 'farm', 'seaside', 'mountain', 'lakeside', 'forest'];
@@ -18,7 +18,7 @@ type Rand = () => number;
 
 /** A town's roads as a recipe lays them out (`box`'s coordinates). */
 export interface RoadLayout {
-  roads: Road[];
+  roads: RoadPlan[];
   /** Greens the roads go round: no lots there, the park on one if it fits. */
   greens?: Pt[][];
   /** Where the town's middle is (its lots gather round it); default: the middle of the first road. */
@@ -52,8 +52,6 @@ export interface WorldRecipe {
   landscape(rand: Rand, width: number, depth: number, water?: 'zmin' | 'zmax'): LandscapeParams;
 }
 
-/** `lo..hi`, evenly. */
-const range = (rand: Rand, lo: number, hi: number) => lo + rand() * (hi - lo);
 
 /** A green moved a little in hue and brightness (so each world's grass is its own). */
 function tint(hex: string, rand: Rand, warm: number, light: number): string {
@@ -87,7 +85,7 @@ const valley = (rand: Rand): LandscapeParams => ({
 });
 
 const side = (rand: Rand): 1 | -1 => (rand() < 0.5 ? 1 : -1);
-const lengthOf = (r: Road) => lengths(r.points).at(-1)!;
+const lengthOf = (r: RoadPlan) => lengths(r.points).at(-1)!;
 
 /** One winding high street, a short cul-de-sac off it. */
 function highStreet(rand: Rand, box: Box): RoadLayout {
@@ -109,7 +107,7 @@ function crescentTown(rand: Rand, box: Box): RoadLayout {
     branch(main, L * range(rand, 0.17, 0.24), side(rand), range(rand, 40, 55), range(rand, -0.7, 0.7)),
     branch(main, L * range(rand, 0.76, 0.83), side(rand), range(rand, 40, 55), range(rand, -0.7, 0.7)),
   ];
-  return { roads: [main, crescent.road, ...lanes], greens: [crescent.green], centre: pointOf(crescent.green) };
+  return { roads: [main, crescent.road, ...lanes], greens: [crescent.green], centre: centroid(crescent.green) };
 }
 
 /** A crossroads with a roundabout (a fountain in the middle), crooked lanes off both roads either side. */
@@ -119,7 +117,7 @@ function crossroads(rand: Rand, box: Box): RoadLayout {
   const [L, C] = [lengthOf(main), lengthOf(cross)];
   const at = crossing(main, cross) ?? ([box.w / 2, box.d / 2] as Pt);
   const R = 6.5;
-  const roads: Road[] = [...cutAround(main, at, R), ...cutAround(cross, at, R), roundabout(at[0], at[1], R)];
+  const roads: RoadPlan[] = [...cutAround(main, at, R), ...cutAround(cross, at, R), roundabout(at[0], at[1], R)];
   for (const [parent, len, at] of [[main, L, 0.24], [main, L, 0.76], [cross, C, 0.24], [cross, C, 0.76]] as const) {
     roads.push(branch(parent, len * (at + range(rand, -0.04, 0.04)), 1, range(rand, 45, 60), range(rand, -1.1, 1.1)));
     roads.push(branch(parent, len * (at + range(rand, -0.06, 0.06)), -1, range(rand, 40, 55), range(rand, -1.1, 1.1)));
@@ -135,19 +133,28 @@ function countryLane(rand: Rand, box: Box): RoadLayout {
   return { roads: [main, fork], centre: [box.w / 2, box.d / 2] };
 }
 
-/** A road along the shore (homes on its landward side only), a lane climbing inland, a crescent up the hill. */
-function shoreRoad(rand: Rand, box: Box): RoadLayout {
+/**
+ * A road along the water's side of town, `at` across the box from that edge, winding `amp` m:
+ * its lots on its landward side only (`land`, +1: its left); the town's middle a little inland.
+ */
+function waterfront(rand: Rand, box: Box, at: number, amp: [number, number]) {
   const water = rand() < 0.5 ? 'zmin' : 'zmax';
-  const main = through(rand, box, { at: water === 'zmin' ? 0.12 : 0.88, amp: range(rand, 3, 6), bends: 2 });
+  const main = through(rand, box, { at: water === 'zmin' ? at : 1 - at, amp: range(rand, ...amp), bends: 2 });
   // Inland: the left of a road along +x is towards smaller z.
   const land: 1 | -1 = water === 'zmin' ? -1 : 1;
-  main.side = land;
-  const L = lengthOf(main);
+  main.lots = land;
+  const centre: Pt = [box.w / 2, water === 'zmin' ? box.d * 0.3 : box.d * 0.7];
+  return { main, water, land, centre, L: lengthOf(main) } as const;
+}
+
+/** A road along the shore (homes on its landward side only), a lane climbing inland, a crescent up the hill. */
+function shoreRoad(rand: Rand, box: Box): RoadLayout {
+  const { main, water, land, centre, L } = waterfront(rand, box, 0.12, [3, 6]);
   const climb = branch(main, L * range(rand, 0.42, 0.58), land, range(rand, 55, 70), range(rand, -0.8, 0.8));
   // A crescent up the hill at one end of the village.
   const at = rand() < 0.5 ? L * 0.22 : L * 0.78;
   const crescent = loop(main, at - 22, at + 22, land, range(rand, 30, 38));
-  return { roads: [main, climb, crescent.road], water, centre: [box.w / 2, water === 'zmin' ? box.d * 0.3 : box.d * 0.7] };
+  return { roads: [main, climb, crescent.road], water, centre };
 }
 
 /** A lane winding up the valley in tight bends, tracks off it. */
@@ -160,14 +167,10 @@ function switchback(rand: Rand, box: Box): RoadLayout {
 
 /** A road round the lake's end of town (homes on its landward side), a crescent and lanes off it inland. */
 function lakeRoad(rand: Rand, box: Box): RoadLayout {
-  const water = rand() < 0.5 ? 'zmin' : 'zmax';
-  const main = through(rand, box, { at: water === 'zmin' ? 0.14 : 0.86, amp: range(rand, 5, 9), bends: 2 });
-  const land: 1 | -1 = water === 'zmin' ? -1 : 1;
-  main.side = land;
-  const L = lengthOf(main);
+  const { main, water, land, centre, L } = waterfront(rand, box, 0.14, [5, 9]);
   const crescent = loop(main, L * 0.5 - 24, L * 0.5 + 24, land, range(rand, 34, 42));
-  const roads = [main, crescent.road, branch(main, L * range(rand, 0.18, 0.26), land, range(rand, 75, 95), range(rand, -0.9, 0.9)), branch(main, L * range(rand, 0.74, 0.82), land, range(rand, 75, 95), range(rand, -0.9, 0.9))];
-  return { roads, water, centre: [box.w / 2, water === 'zmin' ? box.d * 0.3 : box.d * 0.7] };
+  const lanes = [0.22, 0.78].map((at) => branch(main, L * (at + range(rand, -0.04, 0.04)), land, range(rand, 75, 95), range(rand, -0.9, 0.9)));
+  return { roads: [main, crescent.road, ...lanes], water, centre };
 }
 
 /** A lane round a clearing in the woods, a way out of it and a track into the trees. */
@@ -181,11 +184,6 @@ function clearing(rand: Rand, box: Box): RoadLayout {
   const top = round.points.reduce((a, b) => (b[1] < a[1] ? b : a));
   const track = lane([top, [top[0] + range(rand, -14, 14), top[1] - 20], [top[0] + range(rand, -24, 24), top[1] - 34]], ['join', 'dead']);
   return { roads: [round, out, track], greens: [round.points], centre: [cx, cz] };
-}
-
-/** A polygon's middle (the mean of its points). */
-function pointOf(poly: readonly Pt[]): Pt {
-  return [poly.reduce((n, p) => n + p[0], 0) / poly.length, poly.reduce((n, p) => n + p[1], 0) / poly.length];
 }
 
 export const WORLDS: Record<WorldKind, WorldRecipe> = {

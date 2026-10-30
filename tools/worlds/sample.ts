@@ -15,7 +15,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { HouseGenConfig } from '../../web/src/game/housegen.ts';
-import type { Templates } from '../../web/src/game/town.ts';
+import type { Facing, Templates } from '../../web/src/game/town.ts';
 
 // The loaders fetch from the page's address: here, files under web/public.
 const root = new URL('../../web/public/', import.meta.url);
@@ -30,7 +30,7 @@ const { Content } = await import('../../web/src/content/content.ts');
 const { AssetRegistry } = await import('../../web/src/assets/registry.ts');
 const { objectInfos } = await import('../../web/src/game/housegen.ts');
 const { randomHousehold } = await import('../../web/src/game/household.ts');
-const { assembleTown, generateWorld, houseTemplate, populate, vacantSlots } = await import('../../web/src/game/town.ts');
+const { assembleTown, generateWorld, houseTemplate, populate, turner, vacantSlots } = await import('../../web/src/game/town.ts');
 const { WORLD_KINDS } = await import('../../web/src/game/world.ts');
 const { homePrice } = await import('../../web/src/game/price.ts');
 const { savingsOf } = await import('../../web/src/game/wealth.ts');
@@ -49,8 +49,10 @@ function layoutProblems(town: { width: number; depth: number; plots: (Rect & { p
     for (let z = p.z; z < p.z + p.d; z++) for (let x = p.x; x < p.x + p.w; x++) onRoad ||= mask[z * town.width + x] === 1 && roads.some((r) => nearest(r.points, x + 0.5, z + 0.5).dist < r.width / 2);
     if (onRoad) out.push(`plot ${i} on a road`);
     // The middle of its front, by a road.
-    const f = town.meta.facing?.[i] ?? 0;
-    const [fx, fz] = f === 0 ? [p.x + p.w / 2, p.z] : f === 1 ? [p.x, p.z + p.d / 2] : f === 2 ? [p.x + p.w / 2, p.z + p.d] : [p.x + p.w, p.z + p.d / 2];
+    const f = (town.meta.facing?.[i] ?? 0) as Facing;
+    // The lot's width along its street and its depth (turned a quarter, it lies across).
+    const [lw, ld] = f % 2 ? [p.d, p.w] : [p.w, p.d];
+    const [fx, fz] = turner(p.x, p.z, lw, ld, f).point([lw / 2, 0]);
     const gap = Math.min(...roads.map((r) => nearest(r.points, fx, fz).dist - r.width / 2));
     // (A park may stand in the middle of a green.)
     if (roads.length && gap > 13 && !p.public) out.push(`plot ${i} ${gap.toFixed(1)} m from its road`);
@@ -69,8 +71,8 @@ const templates: Templates = { ...(read('houses.json') as Templates), gen: read(
 const out = process.argv[2] ?? 'worlds.json';
 const perKind = Number(process.argv[3] ?? 3);
 const worlds: unknown[] = [];
-/** House classes (housegen.json `classes`), as a generated house's description names them. */
-const HOUSE_CLASSES = ['cottage', 'bungalow', 'town house', 'family house', 'villa'];
+/** The house classes, smallest first (`housegen.json` `classes`, by the label houses carry as `class`). */
+const HOUSE_CLASSES = Object.values(templates.gen!.classes).map((c) => c.label);
 /** Per house class: homes lived in, and their owners' summed eldest grown-up's age, top job grade (-1 none), how many are settled (`SETTLED_AGE` or `SENIOR`), price, savings. */
 const owned: Record<string, { homes: number; age: number; level: number; settled: number; price: number; savings: number }> = {};
 const SETTLED_AGE = 35;
@@ -92,7 +94,7 @@ for (const kind of WORLD_KINDS) {
       const savings = savingsOf(content, household);
       if (savings < price) problems.push(`${kind} ${seed}: the ${household.name}s saved $${savings} for ${s.name}, which costs $${price}`);
       const house = houseTemplate(templates, s.template);
-      const cls = HOUSE_CLASSES.find((c) => house?.description.toLowerCase().includes(c)) ?? house?.name ?? s.template;
+      const cls = house?.class ?? house?.name ?? s.template;
       const adults = household.members.filter((m) => content.isAdult(m.age));
       const owners = (owned[cls] ??= { homes: 0, age: 0, level: 0, settled: 0, price: 0, savings: 0 });
       const eldest = Math.max(0, ...adults.map((m) => m.age));
@@ -106,14 +108,14 @@ for (const kind of WORLD_KINDS) {
     }
     for (const s of vacantSlots(town)) {
       const house = houseTemplate(templates, s.template);
-      const cls = HOUSE_CLASSES.find((c) => house?.description.toLowerCase().includes(c)) ?? house?.name ?? s.template;
+      const cls = house?.class ?? house?.name ?? s.template;
       forSale[cls] = (forSale[cls] ?? 0) + 1;
     }
     worlds.push({ kind, seed, name: town.name, town: file });
     const farms = town.slots.filter((s) => s.lot === 'farm').length;
     const basements = town.slots.filter((s) => s.kind === 'house' && houseTemplate(templates, s.template)?.basement).length;
     console.log(
-      `${kind} ${seed}: ${town.name} (${town.world?.tagline}) ${town.width}×${town.depth}, ${town.roads?.length ?? town.streets.length} road(s), ` +
+      `${kind} ${seed}: ${town.name} (${town.world?.tagline}) ${town.width}×${town.depth}, ${town.roads.length} road(s), ` +
         `${town.slots.filter((s) => s.kind === 'house').length} houses${farms ? ` (${farms} farms)` : ''}, ${basements} with a basement, ${town.households.length} households, ` +
         `${file.sims.length} residents, ${file.objects.length} things`,
     );

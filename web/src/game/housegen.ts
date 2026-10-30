@@ -400,7 +400,8 @@ function between(rng: () => number, [a, b]: readonly [number, number]): number {
   return a + Math.floor(rng() * (b - a + 1));
 }
 
-function weighted(rng: () => number, weights: Record<string, number>): string | null {
+/** One of the keys of `weights`, as likely as its weight (null: none weighs anything). */
+export function weighted(rng: () => number, weights: Record<string, number>): string | null {
   const entries = Object.entries(weights).filter(([, w]) => w > 0);
   const total = entries.reduce((n, [, w]) => n + w, 0);
   let r = rng() * total;
@@ -577,6 +578,7 @@ function attemptHouse(
     id: '',
     name,
     description,
+    class: cls.label,
     bedrooms,
     ...out(g),
     spawns,

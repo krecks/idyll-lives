@@ -18,11 +18,9 @@ export type Pt = [number, number];
 /** Road widths (m, kerb to kerb with the sidewalks): the main road and the lanes off it. */
 export const MAIN_WIDTH = 7;
 export const LANE_WIDTH = 6;
+/** Sidewalk width (including the kerb) on each side of a road. */
+export const SIDEWALK = 1.35;
 
-/** A road being laid out: `side` keeps lots to one side of it (+1: its left, looking along it; -1: its right). */
-export interface Road extends RoadPlan {
-  side?: 1 | -1;
-}
 
 /** The area a town's roads are laid out in (m). */
 export interface Box {
@@ -31,7 +29,8 @@ export interface Box {
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const range = (rand: Rand, lo: number, hi: number) => lerp(lo, hi, rand());
+/** `lo..hi`, evenly. */
+export const range = (rand: Rand, lo: number, hi: number) => lerp(lo, hi, rand());
 
 /** Points along a Catmull-Rom curve through `ctrl` (its ends included), about `step` m apart. */
 export function curve(ctrl: readonly Pt[], step = 1, closed = false): Pt[] {
@@ -103,7 +102,7 @@ export function nearest(pts: readonly Pt[], x: number, z: number, ls = lengths(p
  * A road across the whole of `box` (along x, or along z), winding gently: `bends` turns, as far as
  * `amp` m off the middle (`at`: where across the box its middle runs, 0..1). Both ends lead out of town.
  */
-export function through(rand: Rand, box: Box, { along = 'x', at = 0.5, amp = 10, bends = 2, width = MAIN_WIDTH }: { along?: 'x' | 'z'; at?: number; amp?: number; bends?: number; width?: number } = {}): Road {
+export function through(rand: Rand, box: Box, { along = 'x', at = 0.5, amp = 10, bends = 2, width = MAIN_WIDTH }: { along?: 'x' | 'z'; at?: number; amp?: number; bends?: number; width?: number } = {}): RoadPlan {
   const [len, across] = along === 'x' ? [box.w, box.d] : [box.d, box.w];
   const n = bends + 2;
   const ctrl: Pt[] = [];
@@ -121,7 +120,7 @@ export function through(rand: Rand, box: Box, { along = 'x', at = 0.5, amp = 10,
  * A lane off `parent` at arc length `s`, on its `side`, `length` m long, curling `curl` radians
  * as it goes (a dead end, or `end`).
  */
-export function branch(parent: RoadPlan, s: number, side: 1 | -1, length: number, curl: number, { width = LANE_WIDTH, end = 'dead' as RoadEnd } = {}): Road {
+export function branch(parent: RoadPlan, s: number, side: 1 | -1, length: number, curl: number, { width = LANE_WIDTH, end = 'dead' as RoadEnd } = {}): RoadPlan {
   const { p, t } = pointAt(parent.points, s);
   const n = leftOf(t).map((v) => v * side) as Pt;
   const turn = (a: number): Pt => [n[0] * Math.cos(a) - n[1] * Math.sin(a), n[0] * Math.sin(a) + n[1] * Math.cos(a)];
@@ -138,7 +137,7 @@ export function branch(parent: RoadPlan, s: number, side: 1 | -1, length: number
  * A crescent off `parent`: leaves it at arc length `s0` and comes back at `s1`, bowing out `depth`
  * m on its `side` round a green (the green: what it encloses with the parent, `green`).
  */
-export function loop(parent: RoadPlan, s0: number, s1: number, side: 1 | -1, depth: number, width = LANE_WIDTH): { road: Road; green: Pt[] } {
+export function loop(parent: RoadPlan, s0: number, s1: number, side: 1 | -1, depth: number, width = LANE_WIDTH): { road: RoadPlan; green: Pt[] } {
   const a = pointAt(parent.points, s0);
   const b = pointAt(parent.points, s1);
   const out = (q: { p: Pt; t: Pt }, k: number): Pt => {
@@ -154,7 +153,7 @@ export function loop(parent: RoadPlan, s0: number, s1: number, side: 1 | -1, dep
 }
 
 /** A lane round a clearing: a closed loop round (`cx`, `cz`), `rx` by `rz` m, wobbling a little. */
-export function ring(rand: Rand, cx: number, cz: number, rx: number, rz: number, width = LANE_WIDTH): Road {
+export function ring(rand: Rand, cx: number, cz: number, rx: number, rz: number, width = LANE_WIDTH): RoadPlan {
   const n = 7;
   const turn = rand() * Math.PI * 2;
   const ctrl: Pt[] = [];
@@ -166,11 +165,11 @@ export function ring(rand: Rand, cx: number, cz: number, rx: number, rz: number,
   return { points: curve(ctrl, 1, true), width, ends: ['loop', 'loop'] };
 }
 
-/** A roundabout: a small ring round (`cx`, `cz`), `r` m to the middle of its lane. */
-export function roundabout(cx: number, cz: number, r: number, width = LANE_WIDTH): Road {
+/** A roundabout: a small ring round (`cx`, `cz`), `r` m to the middle of its lane, a fountain in the middle. */
+export function roundabout(cx: number, cz: number, r: number, width = LANE_WIDTH): RoadPlan {
   const n = Math.max(12, Math.round((2 * Math.PI * r) / 1.5));
   const ctrl: Pt[] = Array.from({ length: n }, (_, i): Pt => [cx + Math.cos((i / n) * Math.PI * 2) * r, cz + Math.sin((i / n) * Math.PI * 2) * r]);
-  return { points: curve(ctrl, 1, true), width, ends: ['loop', 'loop'] };
+  return { points: curve(ctrl, 1, true), width, ends: ['loop', 'loop'], island: 'fountain' };
 }
 
 /** Where two roads cross (nearest the middle of each, if they cross more than once): null if they don't come within `within` m. */
@@ -184,50 +183,192 @@ export function crossing(a: RoadPlan, b: RoadPlan, within = 2): Pt | null {
 }
 
 /** `road` with what lies within `r` m of `c` taken out: the pieces either side, joining what goes there. */
-export function cutAround(road: Road, c: Pt, r: number): Road[] {
+export function cutAround(road: RoadPlan, c: Pt, r: number): RoadPlan[] {
   const near = (p: Pt) => Math.hypot(p[0] - c[0], p[1] - c[1]) < r;
   const first = road.points.findIndex(near);
   if (first < 0) return [road];
   let last = first;
   while (last + 1 < road.points.length && near(road.points[last + 1])) last++;
-  const pieces: Road[] = [];
+  const pieces: RoadPlan[] = [];
   if (first >= 2) pieces.push({ ...road, points: road.points.slice(0, first + 1), ends: [road.ends[0], 'join'] });
   if (road.points.length - last >= 3) pieces.push({ ...road, points: road.points.slice(last), ends: ['join', road.ends[1]] });
   return pieces;
 }
 
 /** A lane through points of the caller's choosing (`ends`: what is at each end). */
-export function lane(ctrl: readonly Pt[], ends: [RoadEnd, RoadEnd], width = LANE_WIDTH): Road {
+export function lane(ctrl: readonly Pt[], ends: [RoadEnd, RoadEnd], width = LANE_WIDTH): RoadPlan {
   return { points: curve(ctrl), width, ends };
 }
 
 // ---- the land the roads take ---------------------------------------------------------------
 
 /**
- * Tiles of a `w` × `d` area within `clear` m of a road's edge (1), else 0: where no lot may lie.
+ * Tiles of a `w` × `d` area (1, else 0) that roads reach: those whose middle is within `reach(road)`
+ * of a road's middle (plus `slack`: within it, any of the tile).
  */
-export function roadMask(roads: readonly RoadPlan[], w: number, d: number, clear = 0.5): Uint8Array {
+export function rasterRoads(roads: readonly RoadPlan[], w: number, d: number, reach: (r: RoadPlan) => number, slack = 0): Uint8Array {
   const mask = new Uint8Array(w * d);
   for (const r of roads) {
-    const reach = r.width / 2 + clear;
+    const far = reach(r) + slack;
     for (let i = 0; i + 1 < r.points.length; i++) {
       const [[ax, az], [bx, bz]] = [r.points[i], r.points[i + 1]];
       const [dx, dz] = [bx - ax, bz - az];
       const l2 = dx * dx + dz * dz || 1;
-      const [x0, x1] = [Math.max(0, Math.floor(Math.min(ax, bx) - reach)), Math.min(w - 1, Math.ceil(Math.max(ax, bx) + reach))];
-      const [z0, z1] = [Math.max(0, Math.floor(Math.min(az, bz) - reach)), Math.min(d - 1, Math.ceil(Math.max(az, bz) + reach))];
+      const [x0, x1] = [Math.max(0, Math.floor(Math.min(ax, bx) - far)), Math.min(w - 1, Math.ceil(Math.max(ax, bx) + far))];
+      const [z0, z1] = [Math.max(0, Math.floor(Math.min(az, bz) - far)), Math.min(d - 1, Math.ceil(Math.max(az, bz) + far))];
       for (let z = z0; z <= z1; z++) {
         for (let x = x0; x <= x1; x++) {
           if (mask[z * w + x]) continue;
-          // The tile, not only its middle: a road's edge through any of it.
           const [px, pz] = [x + 0.5, z + 0.5];
           const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l2));
-          if (Math.hypot(px - (ax + dx * t), pz - (az + dz * t)) < reach + 0.7) mask[z * w + x] = 1;
+          if (Math.hypot(px - (ax + dx * t), pz - (az + dz * t)) < far) mask[z * w + x] = 1;
         }
       }
     }
   }
   return mask;
+}
+
+/** Tiles of a `w` × `d` area within `clear` m of a road's edge (1), else 0: where no lot may lie. */
+export function roadMask(roads: readonly RoadPlan[], w: number, d: number, clear = 0.5): Uint8Array {
+  // (Any of the tile: a road's edge through its corner too.)
+  return rasterRoads(roads, w, d, (r) => r.width / 2 + clear, 0.7);
+}
+
+/** Grid cells (m) roads' segments are filed under, for `RoadIndex`'s questions. */
+const CELL = 8;
+
+/**
+ * The roads, for questions about points near them: how far a road's middle is, whether a point is
+ * on a road, the road nearest it. Each road's segments are filed by grid cell, so a question looks
+ * only at those nearby. (One per set of roads: `roadIndex`.)
+ */
+export class RoadIndex {
+  private readonly cells = new Map<number, number[]>();
+  /** Per segment (in `cells`): its road, its first point, the arc length there. */
+  private readonly segs: { road: number; k: number; s: number }[] = [];
+  /** Each road's arc lengths, worked out when first asked (`along`). */
+  private readonly lens: (number[] | undefined)[] = [];
+  private readonly widest: number;
+
+  constructor(readonly roads: readonly RoadPlan[]) {
+    this.widest = Math.max(0, ...roads.map((r) => r.width));
+    roads.forEach((r, road) => {
+      let s = 0;
+      for (let k = 0; k + 1 < r.points.length; k++) {
+        const [[ax, az], [bx, bz]] = [r.points[k], r.points[k + 1]];
+        const id = this.segs.push({ road, k, s }) - 1;
+        for (let cz = Math.floor(Math.min(az, bz) / CELL); cz <= Math.floor(Math.max(az, bz) / CELL); cz++) {
+          for (let cx = Math.floor(Math.min(ax, bx) / CELL); cx <= Math.floor(Math.max(ax, bx) / CELL); cx++) {
+            const key = cx * 65536 + cz;
+            const list = this.cells.get(key);
+            if (list) list.push(id);
+            else this.cells.set(key, [id]);
+          }
+        }
+        s += Math.hypot(bx - ax, bz - az);
+      }
+    });
+  }
+
+  /**
+   * Calls `fn` with each segment filed within `r` m of (x, z), until it returns true (then true).
+   * A segment in several cells comes more than once: harmless for a nearest or an any.
+   */
+  private near(x: number, z: number, r: number, fn: (id: number) => boolean | void): boolean {
+    for (let cz = Math.floor((z - r) / CELL); cz <= Math.floor((z + r) / CELL); cz++) {
+      for (let cx = Math.floor((x - r) / CELL); cx <= Math.floor((x + r) / CELL); cx++) {
+        const list = this.cells.get(cx * 65536 + cz);
+        if (list) for (const id of list) if (fn(id)) return true;
+      }
+    }
+    return false;
+  }
+
+  /** Distance from (x, z) to segment `id`, the arc length there and the side (+1: the road's left). */
+  private measure(id: number, x: number, z: number): [dist: number, s: number, side: 1 | -1] {
+    const { road, k, s } = this.segs[id];
+    const [[ax, az], [bx, bz]] = [this.roads[road].points[k], this.roads[road].points[k + 1]];
+    const [dx, dz] = [bx - ax, bz - az];
+    const l = Math.hypot(dx, dz) || 1;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (l * l)));
+    // Left of the way along: (dx, dz) turned a quarter, as `leftOf`.
+    return [Math.hypot(x - (ax + dx * t), z - (az + dz * t)), s + t * l, (x - ax) * dz - (z - az) * dx >= 0 ? 1 : -1];
+  }
+
+  /** Distance from road `i`'s middle, if it's within `within` m (else Infinity). */
+  distance(i: number, x: number, z: number, within = this.roads[i].width / 2 + 2): number {
+    let best = Infinity;
+    this.near(x, z, within, (id) => {
+      if (this.segs[id].road === i) best = Math.min(best, this.measure(id, x, z)[0]);
+    });
+    return best <= within ? best : Infinity;
+  }
+
+  /** Arc length along road `i` nearest (x, z), however far. */
+  along(i: number, x: number, z: number): number {
+    const pts = this.roads[i].points;
+    return nearest(pts, x, z, (this.lens[i] ??= lengths(pts))).s;
+  }
+
+  /** Whether (x, z) is on a road other than `skip` (within its width and `margin`). */
+  onRoad(x: number, z: number, margin = 0, skip = -1): boolean {
+    return this.near(x, z, this.widest / 2 + margin, (id) => {
+      const road = this.segs[id].road;
+      return road !== skip && this.measure(id, x, z)[0] < this.roads[road].width / 2 + margin;
+    });
+  }
+
+  /** The road nearest (x, z) within `within` m, how far its middle is, the arc length there and which side (+1: its left). */
+  nearest(x: number, z: number, within = 64): { road: number; dist: number; s: number; side: 1 | -1 } | null {
+    let best: { road: number; dist: number; s: number; side: 1 | -1 } | null = null;
+    this.near(x, z, within, (id) => {
+      const [dist, s, side] = this.measure(id, x, z);
+      if (dist <= within && (!best || dist < best.dist)) best = { road: this.segs[id].road, dist, s, side };
+    });
+    return best;
+  }
+}
+
+/** Each set of roads' `RoadIndex`, built once. */
+const indexes = new WeakMap<readonly RoadPlan[], RoadIndex>();
+export function roadIndex(roads: readonly RoadPlan[]): RoadIndex {
+  let index = indexes.get(roads);
+  if (!index) indexes.set(roads, (index = new RoadIndex(roads)));
+  return index;
+}
+
+/**
+ * Lanes that join a road begin at its kerb, not its middle: a lane's sidewalks then begin at the
+ * road's, and it cuts the road's sidewalk only on its own side. (The road it joins: the one whose
+ * middle is nearest the lane's end.)
+ */
+export function trimJoins(roads: readonly RoadPlan[]): RoadPlan[] {
+  const all = new RoadIndex(roads);
+  return roads.map((r, i) => {
+    let pts = r.points;
+    for (const e of [0, 1] as const) {
+      if (r.ends[e] !== 'join') continue;
+      const [ex, ez] = e === 0 ? pts[0] : pts[pts.length - 1];
+      let parent = -1;
+      let near = Infinity;
+      roads.forEach((_, k) => {
+        const d = k === i ? Infinity : all.distance(k, ex, ez, 4);
+        if (d < near) [parent, near] = [k, d];
+      });
+      if (parent < 0) continue;
+      const kerb = roads[parent].width / 2 - SIDEWALK;
+      const keep = ([x, z]: Pt) => all.distance(parent, x, z, kerb + 1) >= kerb;
+      const kept = e === 0 ? pts.slice(Math.max(0, pts.findIndex(keep))) : pts.slice(0, pts.length - Math.max(0, [...pts].reverse().findIndex(keep)));
+      if (kept.length >= 2) pts = kept;
+    }
+    return pts === r.points ? r : { ...r, points: pts };
+  });
+}
+
+/** A polygon's middle (the mean of its points). */
+export function centroid(poly: readonly Pt[]): Pt {
+  return [poly.reduce((n, p) => n + p[0], 0) / poly.length, poly.reduce((n, p) => n + p[1], 0) / poly.length];
 }
 
 /** Whether a point is inside a polygon (even-odd). */
@@ -244,8 +385,8 @@ export function inside(poly: readonly Pt[], x: number, z: number): boolean {
  * Roads cut to the town's rectangle (`w` × `d`, after it moved by `dx`, `dz`): a road's end
  * outside it now ends at its edge (`out`).
  */
-export function cropRoads(roads: readonly Road[], dx: number, dz: number, w: number, d: number): Road[] {
-  const out: Road[] = [];
+export function cropRoads(roads: readonly RoadPlan[], dx: number, dz: number, w: number, d: number): RoadPlan[] {
+  const out: RoadPlan[] = [];
   const within = ([x, z]: Pt) => x >= 0 && z >= 0 && x <= w && z <= d;
   for (const r of roads) {
     const pts = r.points.map(([x, z]): Pt => [x + dx, z + dz]);
@@ -272,19 +413,28 @@ export function cropRoads(roads: readonly Road[], dx: number, dz: number, w: num
       kept.push(edge(pts[last], pts[last + 1]));
       ends[1] = 'out';
     }
-    if (kept.length >= 2) out.push({ ...r, points: kept.map(([x, z]): Pt => [Math.round(x * 100) / 100, Math.round(z * 100) / 100]), ends });
+    // (A ring cut open has no middle left to stand anything in.)
+    const { island: _, ...open } = r;
+    if (kept.length >= 2) out.push({ ...(ends[0] === r.ends[0] && ends[1] === r.ends[1] ? r : open), points: kept.map(([x, z]): Pt => [Math.round(x * 100) / 100, Math.round(z * 100) / 100]), ends });
   }
   return out;
 }
 
-/** Where each road leads out of town: its `out` ends (a little inside the town's edge). */
-export function roadExits(roads: readonly RoadPlan[], w: number, d: number): Pt[] {
+/** Where the roads lead out of town (their `out` ends), and the way out there (a unit direction). */
+export function roadEnds(roads: readonly RoadPlan[]): { x: number; z: number; dx: number; dz: number }[] {
   return roads.flatMap((r) =>
     ([0, 1] as const)
       .filter((e) => r.ends[e] === 'out')
       .map((e) => {
-        const [x, z] = r.points[e === 0 ? 0 : r.points.length - 1];
-        return [Math.max(0.5, Math.min(w - 0.5, x)), Math.max(0.5, Math.min(d - 0.5, z))] as Pt;
+        const pts = r.points;
+        const [end, before] = e === 0 ? [pts[0], pts[1]] : [pts[pts.length - 1], pts[pts.length - 2]];
+        const l = Math.hypot(end[0] - before[0], end[1] - before[1]) || 1;
+        return { x: end[0], z: end[1], dx: (end[0] - before[0]) / l, dz: (end[1] - before[1]) / l };
       }),
   );
+}
+
+/** Where residents leave town: the roads' `out` ends, a little inside the town's edge. */
+export function roadExits(roads: readonly RoadPlan[], w: number, d: number): Pt[] {
+  return roadEnds(roads).map(({ x, z }): Pt => [Math.max(0.5, Math.min(w - 0.5, x)), Math.max(0.5, Math.min(d - 0.5, z))]);
 }

@@ -101,6 +101,14 @@ export function savingsOf(content: Content, household: { members: readonly Pick<
   return Math.round(total / 100) * 100;
 }
 
+/**
+ * The money a household that saved `savings` starts with once it has paid `price` for its home
+ * (`emptyLot`: a new household starting on an empty lot, which has money to build with besides).
+ */
+export function householdFunds(content: Content, savings: number, price: number, emptyLot = false): number {
+  return fundsAfter(content, savings, price) + (emptyLot ? (content.economy.emptyLotFunds ?? 0) : 0);
+}
+
 /** The money a household that saved `savings` has to spend once it has paid `price` for its home (the rest stays put by). */
 export function fundsAfter(content: Content, savings: number, price: number): number {
   const keep = content.economy.savings?.keep ?? 0;

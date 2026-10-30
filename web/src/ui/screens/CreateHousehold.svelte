@@ -136,7 +136,7 @@
     }
   });
   function setField(id: string) {
-    const category = content.careerCategories.find((c) => c.id === id);
+    const category = content.careerCategory(id);
     if (!category?.tracks.length) delete sim.job;
     else if (career?.category.id !== id) sim.job = { career: category.tracks[0].id, level: Math.min(sim.job?.level ?? 0, Math.max(0, top)) };
   }
