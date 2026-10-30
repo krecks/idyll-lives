@@ -45,6 +45,8 @@
  *               --radius --beta --alpha --y (the camera; default from the model's size and facing)
  *               --top (the camera above, looking down: who sits where at a table)
  *               --shot-idle (a picture of it as bought, before any use: `<object>-idle`)
+ *               --walk-shots 40 (pictures on the way there, before the use begins: `<object>-walk-00`,
+ *                 the walk and a door's swing; with `--every 0` as fast as the page draws)
  *               --hour 12 (the renderer's light only; the state sets the clock; on a `*-night`
  *                 state none, the light the sim's clock gives; `--hour state` for none anywhere)
  *               --free-will (leave it on: with `needy-check`, to watch them go on their own)
@@ -557,6 +559,8 @@ if (what === 'play') {
   /** The camera following the resident: `--radius` (else `radius`), `--beta`, `--alpha`, `--y`, the ones given. */
   const view = (radius) => Object.fromEntries(Object.entries({ radius: num('radius', radius), beta: num('beta'), alpha: num('alpha'), y: num('y') }).filter(([, v]) => Number.isFinite(v)));
   const shots = num('shots', batch ? 3 : 6);
+  // Pictures on the way there (`--walk-shots`): before the use begins, as fast as the page draws.
+  const walkShots = num('walk-shots', 0);
   /** A picture of each thing as bought, before its uses (`--shot-idle`). */
   const shotIdle = has('shot-idle');
   /** The camera above, looking down (`--top`), instead of the usual three-quarter view. */
@@ -798,7 +802,7 @@ if (what === 'play') {
    */
   async function runUse(thing, bought, use, attempt, helper = null) {
     const name = `${baseName(thing, bought)}-${slug(use.id)}`;
-    const record = { object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], use: use.id, index: use.index, label: use.label, pose: use.pose ?? null, anim: use.anim ?? null, attempt, ...(helper ? { helper } : {}), ...about(thing, bought), outcome: null, shots: [], errors: [] };
+    const record = { object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], use: use.id, index: use.index, label: use.label, pose: use.pose ?? null, anim: use.anim ?? null, attempt, ...(helper ? { helper } : {}), ...about(thing, bought), outcome: null, walk: [], shots: [], errors: [] };
     const j = startJob(`${thing.def}/${use.id}`, { attempt });
     const t0 = Date.now();
     await loaded();
@@ -819,6 +823,25 @@ if (what === 'play') {
     for (const other of sims.slice(1)) {
       await settle(page, 300);
       await page.evaluate(({ id, sim, interaction }) => window.__send({ type: 'use', sim, object: id, interaction }), { id: bought.id, sim: other, interaction: use.index });
+    }
+    // On the way (`--walk-shots`): pictures before they get there — the walk itself, and a door's
+    // swing as their hand takes its handle (`residents.ts`, `doorHand`), which is over by the time
+    // they're using anything. As fast as the page draws, so a 0.45 s swing lands in one.
+    if (walkShots > 0) {
+      for (let i = 0; i < walkShots; i++) {
+        const arrived = await page.evaluate(() => window.__check.watched()?.usingAt !== null);
+        if (arrived) break;
+        await loaded();
+        const info = await page.evaluate(({ sim, id }) => {
+          const all = window.__sims();
+          const o = all.find((x) => x.id === sim);
+          const w = window.__check.watched();
+          return { t: Math.round(w?.t ?? 0), sim: o && { id: o.id, x: +o.x.toFixed(2), z: +o.z.toFixed(2), moving: o.moving, pose: o.pose, using: o.using && o.object === id } };
+        }, { sim, id: bought.id });
+        const file = await shot(page, `${name}-walk-${String(i).padStart(2, '0')}`, info);
+        record.walk.push({ file, ...info });
+        await settle(page, every);
+      }
     }
     // Using it (seen in a frame), not taken (nothing to do for 4 s), or out of time.
     record.outcome = await page

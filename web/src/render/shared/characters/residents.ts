@@ -648,6 +648,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         walkDown: false,
         toweled: -1,
         shower: null,
+        doorHand: 0,
         sitX: 0,
         sitZ: 0,
         inside: null,
@@ -1407,7 +1408,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
    * (one 4x4 per Sim row) are written into `shadows`.
    */
   /** `storey`: the storey in view; residents above it (or, viewing the basement, not in it) aren't drawn. */
-  update(frame: FrameState, inView: (x: number, z: number) => boolean, shadows: Float32Array, storey = Infinity): void {
+  update(frame: FrameState, inView: (x: number, z: number) => boolean, shadows: Float32Array, storey = Infinity, doorHand?: Float32Array): void {
     this.restTaken.clear();
     this.seedCount = 0;
     const set = this.set;
@@ -1487,6 +1488,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const o = H + i * S;
       const cx = curr[o + k.x];
       const cz = this.groundRow(curr[o + k.z]);
+      // The hand out to a door's handle (the renderer's `doorHand`: the leaf's swing is timed to it).
+      if (rig) rig.doorHand = doorHand ? doorHand[i] : 0;
       const pz = this.groundRow(prev[o + k.z]);
       const ch = k.height !== undefined ? curr[o + k.height] : 0;
       let tx = cx;
@@ -2876,6 +2879,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         addRotation(add, B.pelvis, 0, 0, 1, roll);
         addRotation(add, B.spine_02, 0, 0, 1, -roll * 0.7);
         addRotation(add, B.spine_03, 0, 0, 1, -roll * 0.4);
+      }
+      // A hand on a door's handle: as the leaf starts to swing, the right arm comes out and across to
+      // the handle's height, and goes down again once they're through (`doorHand`: the leaf's swing is
+      // timed to the hand, so the door opens as it touches it). Not with both arms taken: a baby in the
+      // arms, something held.
+      const door = moving && rig.carryT < 0 && rig.liftW <= 0 ? rig.doorHand : 0;
+      if (door > 0.01) {
+        addRotation(add, B.upperarm_r, 0, 0, 1, -0.16 * door);
+        addRotation(add, B.upperarm_r, 1, 0, 0, -1.02 * door);
+        addRotation(add, B.lowerarm_r, 1, 0, 0, -0.32 * door);
+        addRotation(add, B.spine_03, 0, 1, 0, -0.07 * door);
       }
       if (!dir?.still) {
         // Breathing (a slow lift of the chest, the head kept level; quicker when worked up) and a

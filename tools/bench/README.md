@@ -136,6 +136,10 @@ answer 200 (a missing or linked wasm package otherwise gives pictures of an empt
   --use sit`, 6 shots 500 ms apart) still follows the resident, as does `--follow`.
 - **Light.** `--hour 12` fixes the renderer's light (the state sets the clock); on a `*-night` state
   there's no default, so the light is the sim's clock's; `--hour state` for that anywhere.
+- **On the way.** `--walk-shots <n>` takes up to `n` pictures before the use begins
+  (`<def>-<use>-walk-00.png`), `--every` ms apart, stopping as the resident starts using it: the walk
+  itself, and a door's swing as their hand takes the handle (`0.45 s`, over by the first picture of a
+  use). With `--every 0` they are as fast as the page draws, a frame every ~0.07 s on `review-stage`.
 - **Names.** Pictures are `<def>-<use>-<n>.png` (a kind used twice in a run: with its place; its
   `--with` helpers after it, `chair-with-coffeeTable-sit-01.png`); with
   `--name <run>` they start with it, so runs (an adult's, then a child's) into one `--out` keep theirs.

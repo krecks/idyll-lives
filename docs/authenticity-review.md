@@ -365,7 +365,6 @@ S3: 4 in [social.md](review/social.md).
 | I-kids-03 | S1 | code | A direct use skips the rules free will keeps: an adult lies in the crib, a child cares for the baby, an adult does homework | G-45 |
 | I-kitchen-06 | S1 | code | Children pour wine and mix cocktails | G-45 |
 | A-hobbies-01 | S2 | code | Residents walk through the table, the wheel or the drum kit to a seat behind it | G-51 |
-| A-houses-01 | S2 | code | House doors open by nearness, not by hand | G-48 |
 | A-kitchen-02 | S2 | motion | The hob, the oven and the microwave don't work when the meal was started somewhere else | G-16 |
 | A-town-02 | S2 | code | Gates never open: residents walk through the shut leaf | G-48 |
 | I-garden-03 | S2 | code | A crop is picked the moment the harvest starts: the bed empties, then the resident picks at nothing for 18 minutes | G-50 |
@@ -460,7 +459,7 @@ In all: 72 groups.
 | G-45 | code | Age rules: who may use what, also on a direct use. **Fix now (owner, 2026-10-21).** | I-kids-03, I-kitchen-06, I-community-04, I-systems-04, I-kids-08 | S1 | code, content | L | Q-01: it needs the age-rule behaviour the owner put off (decision 3) |
 | G-46 | code | Blankets, pyjamas and bath clothes. | M-bedroom-04, A-bedroom-04, I-bedroom-01, I-bathroom-03 | S2 | code (one decision) | M | Q-10 (bath clothes) |
 | G-47 | code | The seat for watching faces the screen. | I-living-05 | S2 | code | S | — |
-| G-48 | code | Doors and gates open for the one going through. | A-houses-01, A-houses-02, A-town-02 | S2 | code | M | Q-03; doors by hand stay new behaviour (decision 3) |
+| G-48 | code | Doors and gates open for the one going through. | A-houses-01, A-houses-02, A-town-02 | S2 | code | M | Q-03; doors by hand (A-houses-01's rest) done 2026-10-30 |
 | G-49 | code | Cooking: hands free to cook, the dish to the table. | I-kitchen-04, I-held-04 | S2 | code | M | G-16 |
 | G-50 | code | State changes when the hands do it: harvests and the washing line. | I-garden-03, A-outdoor-02 | S2 | code, motion | M | — |
 | G-51 | code | Getting onto seats and into bed from the right side. | A-bedroom-03, A-hobbies-01, A-residents-01 | S2 | code | L | — |
@@ -596,7 +595,7 @@ Every `decision` finding (31) and every question a fix group raises, each as a c
 
 - **Q-01: age rules for the S1s (G-45: I-kids-03, I-kitchen-06, I-community-04, I-systems-04, I-kids-08).** The S1 rule now covers adults and children using each other's things, and three S1s are such cases: a child pours wine, an adult rides the toddlers' spring horse, an adult lies in the cot. Fixing them needs the hard age rules that decision 3 files as new behaviour, planned later. Fix them now, partly now, or later? **Recommendation:** now, in two steps. First the contained part (M): a direct use applies the rules free will already keeps (a baby's use for a baby, care by an adult, homework by a pupil), and the climbing frame gets the `toys` tag. Then plan the age rules as the first new-behaviour item: a life-stage range on objects and uses (the kids' furniture, the toddler rides, the alcohol, the stoves, the upper bunk), checked on free will and direct use alike, and for fights with a child. The kids' table as a place to eat (I-kids-08) waits for it.
 - **Q-02: the bunk's ladder (G-44: A-bedroom-02, S1).** Climbing the ladder is new code, though not on decision 3's list. Fix now? **Recommendation:** yes, as a step-in round like the climbing frame's.
-- **Q-03: doors (G-48: A-houses-01).** Doors by hand are decision 3's new behaviour, but the cheap part closes the S2: a door opens only for someone going through it, and an engaged bathroom's door stays shut to everyone but the one leaving. Do the cheap part now? **Recommendation:** yes; hands on handles later.
+- **Q-03: doors (G-48: A-houses-01).** Doors by hand are decision 3's new behaviour, but the cheap part closes the S2: a door opens only for someone going through it, and an engaged bathroom's door stays shut to everyone but the one leaving. Do the cheap part now? **Recommendation:** yes; hands on handles later. *Done: the cheap part in `e04bc6c0`, the hands on the handles on 2026-10-30.*
 - **Q-04: dining for two (G-39: M-kitchen-01, M-packs-11, I-packs-11; G-62: I-outdoor-07).** Two diners face across a table only once a slot can have its own place and facing (new behaviour, L). Rebuild the tables first, or with it? **Recommendation:** plan G-62 right after the age rules and rebuild the base table, the two dining sets and the candlelit table with it, not before.
 
 **Models: rebuild, rename or accept**
@@ -699,6 +698,9 @@ From the coordinator's notes and each wave's `review-log.md`, deduplicated; the 
     camera stops at 1.35 rad);
   - ~~no shot of an object as bought~~: `--shot-idle` added 2026-10-30 (one picture before any use;
     a night one needs the `*-night` state).
+  - ~~nothing of the walk to the use, so a door's swing (0.45 s) is over before the first picture~~:
+    `--walk-shots <n>` added 2026-10-30, taken as fast as the page draws; with the camera following, a
+    frame every ~0.07 s, so the hand and the leaf are caught (`bench-results/check-doors/door-front-*`).
 - Needs carry over from one use to the next in a chunk, so short uses vary. It should reset them or log them at the use's start.
 - In the log: ~~the resident's distance to the object's nearest face~~ (2026-10-30, each picture's
   `sim.distance`); still wanted: the slot against a `stand` surface and the doors' state.
@@ -805,7 +807,7 @@ Phase 4, by band and group. Commits are from each finding's Status line in its l
 | G-45 | I-kids-03, I-kitchen-06, I-community-04 (S1s), I-systems-04, I-kids-08 | 697544c2, 742572df, d2027317 | Age rules (`stages`, `upperStages`) on free will and orders alike; the kids' table seats children for a meal. |
 | G-46 | M-bedroom-04, A-bedroom-04, I-bedroom-01, I-bathroom-03 | f4925b24, d7190242 | Quilts in each bed's colours and none at the origin; pyjamas only for a night's sleep; towels and swimwear (Q-10). |
 | G-47 | I-living-05 | aac64b84, 1224f373 | Watching takes a seat that faces the screen. |
-| G-48 | A-houses-01, A-houses-02, A-town-02 | e04bc6c0 | Doors and gates open only for the one going through, in time at every speed (the cheap part, Q-03). |
+| G-48 | A-houses-01, A-houses-02, A-town-02 | e04bc6c0, 163884cd | Doors and gates open only for the one going through, in time at every speed (the cheap part, Q-03); the resident's hand on the handle, and the leaf's lead following the game's speed (`doorLead`, 2026-10-30). |
 | G-49 | I-kitchen-04, I-held-04 | 57b3a576 | Hands free at each station; the dish carried to the table and eaten there. |
 | G-50 | I-garden-03, A-outdoor-02 (in part) | 7d186856 | A crop is picked and the washing hung out as the hands go (`gradual`, motions `over`). |
 | G-51 | A-bedroom-03, A-hobbies-01, A-residents-01 | 36198175, 0d20c5c9, d7b7096d, ad1c277d | Into bed from its side, to a desk from behind (`approach`), up at the seat before the step back. |
@@ -887,7 +889,6 @@ Planned separately, after this review (§11.1).
 | G-70: props in hand | I-held-01, I-social-01, I-hobbies-05, I-kitchen-13, I-community-11 | S2 | Prop models in `held.py` (a book, a cup, cutlery, a phone, the cue and bats, the shaker, a coin, bird seed), a prop per use in `ACTIONS` with grips (`writeProp`, the `held` grips), the pool table's cue and balls as moving parts; every prop use played, and `pnpm check:clips`. L. The coin toss at the fountain alone is a clip and table change that could go first. |
 | G-71: body language, turning on the spot | A-residents-07, A-residents-08 | S2 | A body layer per mood beside the face's 18 (posture, pace, arms), and a step-round clip for turns on the spot in `locomotion.ts`; a headed, timed check. L. |
 | G-72: privacy | I-systems-05, I-social-05 | S3 | A private flag on rooms and things, a shut bathroom door the sim knows of (others wait outside it, visitors are refused private things), then "Try for a baby" at a double bed behind a shut door (Q-21). With it the bathroom door can stay shut to someone walking in (§11.3 a). L. |
-| Doors by hand | A-houses-01 (the rest) | S2 | A hand on the handle and the swing timed by it, on top of G-48's door that opens only for the one going through. M. |
 
 ### 9.2 Model work still to do
 

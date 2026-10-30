@@ -60,7 +60,6 @@ door) shipped in 0.5.0 — see open.md, "Fixed in 0.5.0".
 
 | Item | What is missing | Source | Effort |
 |---|---|---|---|
-| Doors opened by hand | Doors open for whoever walks through (G-48), but no hand on the handle and no swing timed by it | A-houses-01 (rest), §9.1 | M |
 | Servers | No apron; they appear at their post at opening time instead of walking in | open.md, "Content and sim" | S–M |
 | Flowers for a vase | No flower can be cut to put in a vase | I-garden-08, Q-18 polish | M |
 | Furniture resizing | Resize arrows stay off (`RESIZING`, `buildmode.ts`); moving parts do not follow a resize yet | PLAN.md roadmap "later" | L |
@@ -127,8 +126,23 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
 - Each `play` picture's `sim` records `distance`: how far the resident stands from the object's nearest
   face (a use from the back or the side is visible in the log).
 - CI's **Object sizes** step runs `cargo review sizes` and fails when an object maps to no kind.
+- `play --walk-shots <n>`: pictures on the way to a use, before it begins (`<object>-walk-00.png`), for
+  the walk itself and for a door's swing, which is over by the time the resident is using anything.
+
+**Done 2026-10-30 (doors by hand):**
+
+- A house door's leaf is timed by the walker: the lead follows the game's speed
+  (`doorLead(rate)` = 0.75 m, or 1.5 m/s × rate × 0.45 s), so at 1× it starts a hand's reach out and
+  stands open as they arrive, and at 10× it is still open 0.6 m out. The old fixed 1.5 m lead left the
+  leaf a quarter open at 3× (`web/src/render/shared/doors.ts`).
+- The resident's right arm reaches for the handle as the leaf swings (`doorHand`, 0..1 over the last
+  0.75 m, not while carrying a baby or holding something), and only for a door that actually swings:
+  one standing open has no handle to reach.
+- Tests: `web/tests/doors.test.ts` (7: the lead at each game speed, the swing finishing before the
+  walker arrives, the hand out as the leaf starts and back once through, a shut leaf clear of anyone
+  within 1.1 m, a wall along z). Pictures: `bench-results/check-doors/door-front-*.png` (shut, the hand
+  on the leaf mid-swing, through, shut behind, and the same on WebGL2).
 
 ## Suggested next items
 
-1. Doors opened by hand (M, last new-behaviour item from decision 3).
-2. Cut flowers for a vase (M, needs a vase use + clip; Q-18 says "later", and the vase exists).
+1. Cut flowers for a vase (M, needs a vase use + clip; Q-18 says "later", and the vase exists).

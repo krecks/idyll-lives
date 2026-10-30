@@ -64,7 +64,7 @@ import { benchDiag } from '../../debug/benchFlags';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
-import { DOOR_SWING, ease, goingThrough, shutDefs } from '../shared/doors';
+import { DOOR_SWING, doorLead, ease, goingThrough, shutDefs } from '../shared/doors';
 import { createLighting, lightingAt, type RGB } from '../shared/environment';
 import { GAME_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
@@ -342,6 +342,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private doors: { leaf: HouseDoor; open: number }[] = [];
   /** Gates in the fences' meshes, each with how far open it stands (0 shut, as drawn) and the side it opens to. */
   private gates: { fences: Fences; leaf: GateLeaf; open: number; towards: number }[] = [];
+  /**
+   * How far out each resident's hand reaches for a door's handle this frame, 0..1 (indexed by their
+   * row; `goingThrough`'s `hand`), 0 where they go through no leaf that moves. The arm goes out with
+   * the leaf's swing (`residents.ts`).
+   */
+  private readonly doorHand = new Float32Array(MAX_CHARACTERS);
   /** Pools of lamplight on the lawn under the garden's lamps. */
   private gardenPools: GardenPools | null = null;
   private readonly poolLampOn = (lamp: number | undefined) => this.lamps.lampOn(lamp); // (as its lamp fades, `lamps.ts`.)
@@ -1455,8 +1461,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         const wz = k.wayZ;
         const ax = k.aheadX;
         const az = k.aheadZ;
-        if (wx === undefined || wz === undefined || ax === undefined || az === undefined) movers.push(px, pz, px, pz, px, pz);
-        else movers.push(px, pz, curr[o + wx], curr[o + wz], curr[o + ax], curr[o + az]);
+        if (wx === undefined || wz === undefined || ax === undefined || az === undefined) movers.push(px, pz, px, pz, px, pz, i);
+        else movers.push(px, pz, curr[o + wx], curr[o + wz], curr[o + ax], curr[o + az], i);
       }
       const asleep = curr[o + k.pose] === Pose.Lie && sleeping.has(curr[o + k.action] | 0);
       const baby = babies.has(world.sims[i]?.stage ?? '');
@@ -1497,15 +1503,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * Front doors and gates stand shut, and the doors of a room the simulation keeps shut (someone
    * in the bathroom: nobody else goes in, they wait outside); each opens only for someone going
    * through it (`goingThrough`: not for someone walking past, nor someone waiting outside), and
-   * swings back once they're through. `rate`: how fast the game runs (`GAME_RATE`).
+   * swings back once they're through. It opens at the hand: the leaf starts when the walker's hand
+   * could be on its handle (`doorLead`: a hand's reach, or as far ahead as the swing needs at this
+   * game speed, so it's open by the time they are), and the resident's arm goes out with it
+   * (`doorHand`, `residents.ts`). `rate`: how fast the game runs (`GAME_RATE`).
    */
   private swingDoors(rate: number): void {
+    const hand = this.doorHand;
+    hand.fill(0);
     if (!this.doors.length && !this.gates.length) return;
     const movers = this.movers;
+    const lead = doorLead(rate);
     const step = Math.min(1, (this.frameDt / 1000 / DOOR_SWING) * Math.min(Math.max(rate, 1), 10));
     let moved = false;
     for (const gate of this.gates) {
-      const way = goingThrough(movers, gate.leaf.axis, gate.leaf.centre, gate.open === 1);
+      const way = goingThrough(movers, gate.leaf.axis, gate.leaf.centre, gate.open === 1, lead, hand);
       // It opens away from the one coming through, and shuts the way it opened.
       if (way && gate.open === 0) gate.towards = way;
       const target = way ? 1 : 0;
@@ -1517,10 +1529,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     for (const door of this.doors) {
       const { leaf } = door;
-      // (Both in lot rows: the storey is in the row.)
-      const going = goingThrough(movers, leaf.axis, leaf.centre, door.open === 1) !== 0;
       const engaged = leaf.shuts.some((r) => this.shutRooms.has(r));
-      const target = going || !(leaf.front || engaged) ? 1 : 0;
+      const swings = leaf.front || engaged;
+      // (Both in lot rows: the storey is in the row.) A door that stands open has no handle to reach.
+      const going = goingThrough(movers, leaf.axis, leaf.centre, door.open === 1, lead, swings ? hand : undefined) !== 0;
+      const target = going || !swings ? 1 : 0;
       const open = door.open < 0 ? target : target > door.open ? Math.min(target, door.open + step) : Math.max(target, door.open - step);
       if (open === door.open) continue;
       door.open = open;
@@ -1577,7 +1590,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (With the vendors and shopkeepers drawn after them.)
     const count = Math.min(this.simCount + (layout.header.staffCount === undefined ? 0 : curr[layout.header.staffCount]), MAX_CHARACTERS);
     const shadows = this.simShadowMatrices;
-    this.characters.update(frame, this.simInView, shadows, this.storey);
+    this.characters.update(frame, this.simInView, shadows, this.storey, this.doorHand);
     this.lot.pullChairs(this.characters.pulled, this.placing.held); // (not the one in hand.)
     this.lot.takeRestProps(this.characters.restTaken);
     if (this.characters.posed && this.quality.characterShadows) this.sunShadows.moved(false);
