@@ -35,6 +35,7 @@ import type { HousePlanner, SilhouettePlan, SilhouetteSpec } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
 import { perfEnd, perfStart, perfTime } from '../../debug/perf';
+import { Kerb, KERB, RoadIndex, roadMeshes, SIDEWALK, sidewalkCuts, townRoads, WALK_Y } from './roads';
 
 /** Vertex-colour alpha for the plain finish, as the material libraries' `encodeFinish`: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. */
 function encodeFinish(roughness: number, metallic: number): number {
@@ -49,12 +50,6 @@ export interface Rect {
   d: number;
 }
 
-/** Sidewalk width (including the kerb) on each side of the road, and its levels. */
-const SIDEWALK = 1.35;
-const KERB = 0.14;
-const WALK_Y = 0.03;
-const KERB_Y = 0.045;
-const ROAD_Y = 0.012;
 /** Paths at least this wide are driveways (garden paths are 1 m; see `game/town.ts`). */
 const DRIVEWAY_MIN_WIDTH = 1.8;
 const GARAGE_DEPTH = 5.4;
@@ -550,6 +545,7 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
   const footprints = new Map<string, [number, number]>();
   const standIns = new Map<string, StandIn>();
   const streets = (world.meta?.streets ?? []).filter((s) => s.w >= s.d);
+  const roads = townRoads(world);
   const paths = world.meta?.paths ?? [];
   const fields = world.meta?.world?.fields ?? [];
   const plots = layout(world, view, streets, paths);
@@ -597,135 +593,147 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
     pool(pools, x + nx * 0.9, z + nz * 0.9, 1.7);
   }
 
-  // ---- sidewalks, kerbs, centre line, kerbside furniture ------------------------------
+  // ---- sidewalks, kerbs, kerbside furniture -----------------------------------------
   const sidewalks = perfStart('street: sidewalks');
-  for (const st of streets) {
-    for (const side of [-1, 1] as const) {
-      // side -1: the sidewalk along the street's min-z edge; +1: along its max-z edge.
-      const edge = side < 0 ? st.z : st.z + st.d;
-      const into = -side; // from the edge into the street
-      const zAt = (d: number) => edge + into * d;
-      const span = (d0: number, d1: number) => [Math.min(zAt(d0), zAt(d1)), Math.max(zAt(d0), zAt(d1))];
-      const [w0, w1] = span(0, SIDEWALK - KERB);
-      const [k0, k1] = span(SIDEWALK - KERB, SIDEWALK);
-      const [xa, xb] = [st.x, st.x + st.w];
-      walk.color('#E6E6E6').poly([[xa, WALK_Y, w0], [xb, WALK_Y, w0], [xb, WALK_Y, w1], [xa, WALK_Y, w1]], [0, 1, 0]);
-      walk.color('#FFFFFF').poly([[xa, KERB_Y, k0], [xb, KERB_Y, k0], [xb, KERB_Y, k1], [xa, KERB_Y, k1]], [0, 1, 0]);
-      // Kerb faces: the step up from the walk and the drop to the road.
-      const kIn = zAt(SIDEWALK - KERB);
-      const kOut = zAt(SIDEWALK);
-      walk.poly([[xa, WALK_Y, kIn], [xb, WALK_Y, kIn], [xb, KERB_Y, kIn], [xa, KERB_Y, kIn]], [0, 0, -into]);
-      walk.poly([[xa, ROAD_Y, kOut], [xb, ROAD_Y, kOut], [xb, KERB_Y, kOut], [xa, KERB_Y, kOut]], [0, 0, into]);
-      walk.color('#E6E6E6').poly([[xa, 0, edge], [xb, 0, edge], [xb, WALK_Y, edge], [xa, WALK_Y, edge]], [0, 0, side]);
-      // Gutter: the road darkens along the kerb.
-      const g0 = zAt(SIDEWALK);
-      const g1 = zAt(SIDEWALK + 0.4);
-      shadows.poly([[xa, ROAD_Y + 0.003, g0], [xb, ROAD_Y + 0.003, g0], [xb, ROAD_Y + 0.003, g1], [xa, ROAD_Y + 0.003, g1]], [0, 1, 0], undefined, [0.3, 0.3, 0, 0]);
-
+  roadMeshes(roads, null, 0, { walk, shadows });
+  const index = new RoadIndex(roads);
+  const cuts = sidewalkCuts(roads);
+  // Each plot on the side of the road its front faces, and where along the road it is.
+  const fronting = plots.map((L) => {
+    const at = (u: number) => townPoint(L.turned, u, L.edge);
+    const [cx, cz] = at(L.plot.x + L.plot.w / 2);
+    const near = index.nearest(cx, cz);
+    return near && { L, road: near.road, side: near.side, at };
+  });
+  for (const [r, road] of roads.entries()) {
+    for (const side of [1, -1] as const) {
+      const kerb = new Kerb(road, r, side, cuts);
+      const along = (u: [number, number]) => kerb.along(u[0], u[1]);
+      // The plots fronting this side, in order along it: their fronts (s0..s1), front doors and driveways.
+      const row = fronting
+        .filter((f) => f && f.road === r && f.side === side)
+        .map((f) => {
+          const { L, at } = f!;
+          const [a, b] = [along(at(L.plot.x)), along(at(L.plot.x + L.plot.w))];
+          const drive = L.drive && [along(at(L.drive.x)), along(at(L.drive.x + L.drive.w))].sort((p, q) => p - q);
+          return { L, s0: Math.min(a, b), s1: Math.max(a, b), door: L.door === null ? null : along(at(L.door)), drive };
+        })
+        .sort((a, b) => a.s0 - b.s0);
       // Mouths of garden paths and driveways on this side: keep them clear.
-      const mouths = paths.filter((r) => Math.abs((side < 0 ? r.z + r.d : r.z) - edge) < 0.05);
-      const clear = (x: number, m: number) => x > xa + 1 && x < xb - 1 && !mouths.some((r) => x > r.x - m && x < r.x + r.w + m);
+      const mouths: [number, number][] = [];
+      for (const p of paths) {
+        const [cx, cz] = [p.x + p.w / 2, p.z + p.d / 2];
+        const near = index.nearest(cx, cz);
+        if (!near || near.road !== r || near.side !== side || near.dist > road.width / 2 + Math.max(p.w, p.d) / 2 + 0.6) continue;
+        const corners = [[p.x, p.z], [p.x + p.w, p.z], [p.x, p.z + p.d], [p.x + p.w, p.z + p.d]].map(([x, z]) => kerb.along(x, z));
+        mouths.push([Math.min(...corners), Math.max(...corners)]);
+      }
+      const clear = (s: number, m: number) => s > 1 && s < kerb.length - 1 && kerb.open(s) && !mouths.some(([a, b]) => s > a - m && s < b + m);
       const used: number[] = [];
-      const near = (x: number, m: number) => used.some((u) => Math.abs(u - x) < m);
-      const kerbZ = zAt(SIDEWALK - KERB - 0.3);
-      const yaw = side < 0 ? 0 : Math.PI; // props' +z faces the road
-      const row = plots.filter((L) => !L.turned && Math.abs(L.edge - edge) < 0.05).sort((a, b) => a.plot.x - b.plot.x);
+      const near = (s: number, m: number) => used.some((u) => Math.abs(u - s) < m);
+      const kerbD = SIDEWALK - KERB - 0.3;
+      const on = (s: number, d = kerbD) => kerb.at(s, d);
 
       // Streetlights, one per plot width, staggered between the two sides.
-      const lights = row.map((L) => L.plot.x + (side < 0 ? 1.2 : L.plot.w / 2));
-      if (row.length) lights.push(row[row.length - 1].plot.x + row[row.length - 1].plot.w + (side < 0 ? 1.2 : -1.2));
-      for (const x0 of lights) {
-        const x = [0, 1.5, -1.5, 3, -3].map((d) => x0 + d).find((x) => clear(x, 1.2) && !near(x, 1.5));
-        if (x === undefined) continue;
-        used.push(x);
-        streetlight(props.at(x, kerbZ, yaw, WALK_Y), glow.at(x, kerbZ, yaw, WALK_Y));
-        blob(shadows, x, kerbZ, 0.32, 0.32, 0, 0.45, WALK_Y + 0.004);
-        pool(pools, x, kerbZ + into * 0.5, 4.2);
+      const lights = row.map((f) => f.s0 + (side > 0 ? 1.2 : (f.s1 - f.s0) / 2));
+      if (row.length) lights.push(row[row.length - 1].s1 + (side > 0 ? 1.2 : -1.2));
+      for (const s0 of lights) {
+        const s = [0, 1.5, -1.5, 3, -3].map((d) => s0 + d).find((s) => clear(s, 1.2) && !near(s, 1.5));
+        if (s === undefined) continue;
+        used.push(s);
+        const [x, z] = on(s);
+        streetlight(props.at(x, z, kerb.yaw(s), WALK_Y), glow.at(x, z, kerb.yaw(s), WALK_Y));
+        blob(shadows, x, z, 0.32, 0.32, 0, 0.45, WALK_Y + 0.004);
+        pool(pools, ...on(s, kerbD + 0.5), 4.2);
       }
       // Mailboxes in front of every house (beside the path, away from the driveway).
-      for (const L of row) {
-        if (L.door === null || (L.kind !== 'house' && L.kind !== 'home')) continue;
-        const away = L.drive && L.drive.x > L.door ? -1 : 1;
-        const x = [0.95 * away, -0.95 * away, 1.6 * away].map((d) => L.door! + d).find((x) => clear(x, 0.25) && !near(x, 0.6));
-        if (x === undefined) continue;
-        used.push(x);
-        mailbox(props.at(x, kerbZ, yaw, WALK_Y), pick(MAILBOX, L.plot.x, L.plot.z, 3));
-        blob(shadows, x, kerbZ, 0.2, 0.3, yaw, 0.35, WALK_Y + 0.004);
+      for (const f of row) {
+        if (f.door === null || (f.L.kind !== 'house' && f.L.kind !== 'home')) continue;
+        const away = f.drive && (f.drive[0] + f.drive[1]) / 2 > f.door ? -1 : 1;
+        const s = [0.95 * away, -0.95 * away, 1.6 * away].map((d) => f.door! + d).find((s) => clear(s, 0.25) && !near(s, 0.6));
+        if (s === undefined) continue;
+        used.push(s);
+        const [x, z] = on(s);
+        mailbox(props.at(x, z, kerb.yaw(s), WALK_Y), pick(MAILBOX, f.L.plot.x, f.L.plot.z, 3));
+        blob(shadows, x, z, 0.2, 0.3, kerb.yaw(s), 0.35, WALK_Y + 0.004);
       }
       // A hydrant every other plot.
-      row.forEach((L, i) => {
-        if ((i + (side < 0 ? 0 : 1)) % 2) return;
-        const x = [6, 8, 4, 10].map((d) => L.plot.x + d).find((x) => clear(x, 0.8) && !near(x, 1.2));
-        if (x === undefined) return;
-        used.push(x);
-        hydrant(props.at(x, kerbZ, yaw + hash(x, edge, 5) * 0.6, WALK_Y), hash(x, edge, 4) < 0.75 ? '#B32B24' : '#D9A520');
-        blob(shadows, x, kerbZ, 0.22, 0.22, 0, 0.4, WALK_Y + 0.004);
+      row.forEach((f, i) => {
+        if ((i + (side > 0 ? 0 : 1)) % 2) return;
+        const s = [6, 8, 4, 10].map((d) => f.s0 + d).find((s) => s < f.s1 && clear(s, 0.8) && !near(s, 1.2));
+        if (s === undefined) return;
+        used.push(s);
+        const [x, z] = on(s);
+        hydrant(props.at(x, z, kerb.yaw(s) + hash(x, z, 5) * 0.6, WALK_Y), hash(x, z, 4) < 0.75 ? '#B32B24' : '#D9A520');
+        blob(shadows, x, z, 0.22, 0.22, 0, 0.4, WALK_Y + 0.004);
       });
       // Bins out by some driveways, on the garden side of the sidewalk.
-      for (const L of row) {
-        if (L.kind !== 'house' || !L.drive || hash(L.plot.x, L.plot.z, 12) > 0.6) continue;
-        const outer = L.drive.x + L.drive.w / 2 > L.plot.x + L.plot.w / 2 ? 1 : -1;
-        const binZ = zAt(0.4);
+      for (const f of row) {
+        const L = f.L;
+        if (L.kind !== 'house' || !f.drive || hash(L.plot.x, L.plot.z, 12) > 0.6) continue;
+        const outer = (f.drive[0] + f.drive[1]) / 2 > (f.s0 + f.s1) / 2 ? 1 : -1;
         for (let k = 0; k < (hash(L.plot.x, L.plot.z, 13) < 0.5 ? 2 : 1); k++) {
-          const x = (outer > 0 ? L.drive.x + L.drive.w + 0.45 : L.drive.x - 0.45) + outer * k * 0.7;
-          if (!clear(x, 0.35) || near(x, 0.5) || x > L.plot.x + L.plot.w - 0.3 || x < L.plot.x + 0.3) continue;
-          used.push(x);
-          bin(props.at(x, binZ, yaw + Math.PI + (hash(x, binZ, 6) - 0.5) * 0.3, WALK_Y), BIN[(k + Math.floor(hash(L.plot.x, 1, 14) * 3)) % BIN.length]);
-          blob(shadows, x, binZ, 0.36, 0.4, 0, 0.4, WALK_Y + 0.004);
+          const s = (outer > 0 ? f.drive[1] + 0.45 : f.drive[0] - 0.45) + outer * k * 0.7;
+          if (!clear(s, 0.35) || near(s, 0.5) || s > f.s1 - 0.3 || s < f.s0 + 0.3) continue;
+          used.push(s);
+          const [x, z] = on(s, 0.4);
+          bin(props.at(x, z, kerb.yaw(s) + Math.PI + (hash(x, z, 6) - 0.5) * 0.3, WALK_Y), BIN[(k + Math.floor(hash(L.plot.x, 1, 14) * 3)) % BIN.length]);
+          blob(shadows, x, z, 0.36, 0.4, 0, 0.4, WALK_Y + 0.004);
         }
       }
       // In front of the public places: planters with a little tree, benches facing the place
       // (backs to the road), a litter bin by each bench.
-      for (const L of row) {
-        if (L.kind !== 'park' && L.kind !== 'shop') continue;
-        let k = Math.floor(hash(L.plot.x, edge, 70) * 2);
-        for (let x0 = L.plot.x + 2.2; x0 < L.plot.x + L.plot.w - 2; x0 += 3.6) {
+      for (const f of row) {
+        if (f.L.kind !== 'park' && f.L.kind !== 'shop') continue;
+        let k = Math.floor(hash(f.L.plot.x, f.L.plot.z, 70) * 2);
+        for (let s0 = f.s0 + 2.2; s0 < f.s1 - 2; s0 += 3.6) {
           const bench = k++ % 2 === 1;
-          const x = [0, 0.6, -0.6].map((d) => x0 + d).find((x) => clear(x, bench ? 1.3 : 0.8) && !near(x, bench ? 1.5 : 1.0));
-          if (x === undefined) continue;
-          used.push(x);
+          const s = [0, 0.6, -0.6].map((d) => s0 + d).find((s) => clear(s, bench ? 1.3 : 0.8) && !near(s, bench ? 1.5 : 1.0));
+          if (s === undefined) continue;
+          used.push(s);
+          const [x, z] = on(s);
+          const yaw = kerb.yaw(s);
           if (bench) {
-            put(PROP.bench, x, kerbZ, yaw + Math.PI);
-            blob(shadows, x, kerbZ, 0.95, 0.3, 0, 0.35, WALK_Y + 0.004);
-            const bx = x + (hash(x, edge, 71) < 0.5 ? -1.2 : 1.2);
-            if (clear(bx, 0.3) && !near(bx, 0.5)) {
-              used.push(bx);
-              put(PROP.litterBin, bx, kerbZ, yaw + (hash(bx, edge, 72) - 0.5) * 0.5, 0.9);
+            put(PROP.bench, x, z, yaw + Math.PI);
+            blob(shadows, x, z, 0.95, 0.3, yaw, 0.35, WALK_Y + 0.004);
+            const bs = s + (hash(x, z, 71) < 0.5 ? -1.2 : 1.2);
+            if (clear(bs, 0.3) && !near(bs, 0.5)) {
+              used.push(bs);
+              put(PROP.litterBin, ...on(bs), kerb.yaw(bs) + (hash(x, z, 72) - 0.5) * 0.5, 0.9);
             }
           } else {
-            put(hash(x, edge, 73) < 0.75 ? PROP.planter : PROP.flowerTub, x, kerbZ, hash(x, edge, 74) * 6.28, 0.9 + hash(x, edge, 75) * 0.15);
-            blob(shadows, x, kerbZ, 0.5, 0.5, 0, 0.4, WALK_Y + 0.004);
+            put(hash(x, z, 73) < 0.75 ? PROP.planter : PROP.flowerTub, x, z, hash(x, z, 74) * 6.28, 0.9 + hash(x, z, 75) * 0.15);
+            blob(shadows, x, z, 0.5, 0.5, 0, 0.4, WALK_Y + 0.004);
           }
         }
       }
-      // At the ends of the street (past the last lots): a bus shelter facing the road, its stop
-      // sign at the kerb, and a street-name sign on the corner.
+      // At the ends of the row (past the last lots): a bus shelter facing the road, its stop sign
+      // at the kerb, and a street-name sign on the corner.
       if (row.length) {
-        const west = side < 0;
-        const corner = west ? row[0].plot.x : row[row.length - 1].plot.x + row[row.length - 1].plot.w;
-        const out = west ? -1 : 1;
-        const cx = corner + out * 4;
-        const cz = edge - into * 0.62;
-        const shelter = { x: cx - 1.55, z: cz - 0.55, w: 3.1, d: 1.1 };
-        if (clear(cx, 1.6) && free(shelter, 0.2)) {
-          put(PROP.shelter, cx, cz, yaw);
-          blob(shadows, cx, cz, 1.7, 0.6, 0, 0.35, 0.02);
-          const sx = cx - out * 2.1;
-          if (clear(sx, 0.3) && !near(sx, 0.6)) {
-            used.push(sx);
-            put(PROP.busSign, sx, kerbZ, yaw);
+        const first = side > 0;
+        const corner = first ? row[0].s0 : row[row.length - 1].s1;
+        const out = first ? -1 : 1;
+        const cs = corner + out * 4;
+        const [cx, cz] = kerb.at(cs, -0.62);
+        const shelter = { x: cx - 1.6, z: cz - 1.6, w: 3.2, d: 3.2 };
+        if (clear(cs, 1.6) && free(shelter, 0.2) && !index.onRoad(cx, cz, 1)) {
+          put(PROP.shelter, cx, cz, kerb.yaw(cs));
+          blob(shadows, cx, cz, 1.7, 0.6, kerb.yaw(cs), 0.35, 0.02);
+          const ss = cs - out * 2.1;
+          if (clear(ss, 0.3) && !near(ss, 0.6)) {
+            used.push(ss);
+            put(PROP.busSign, ...on(ss), kerb.yaw(ss));
           }
         }
-        // Street-name signs at both ends, on one side of the street.
-        const ends = west ? [row[0].plot.x - 0.9, row[row.length - 1].plot.x + row[row.length - 1].plot.w + 0.9] : [];
-        for (const x of ends) {
-          if (!clear(x, 0.3) || near(x, 0.8)) continue;
-          used.push(x);
-          put(PROP.sign, x, kerbZ, yaw + Math.PI / 4);
+        // Street-name signs at both ends, on one side of the road.
+        const ends = first ? [row[0].s0 - 0.9, row[row.length - 1].s1 + 0.9] : [];
+        for (const s of ends) {
+          if (!clear(s, 0.3) || near(s, 0.8)) continue;
+          used.push(s);
+          put(PROP.sign, ...on(s), kerb.yaw(s) + Math.PI / 4);
         }
       }
     }
-    // No centre line: 3.3 m between the kerbs is one lane, a mews (two would need 5.5 m or more).
   }
 
   perfEnd(sidewalks);

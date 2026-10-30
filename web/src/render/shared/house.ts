@@ -35,6 +35,7 @@ import type { DoorStyleDef, FloorCoveringDef, LightAim, RoofColorDef, RoofStyleD
 import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
+import { RoadIndex, townRoads } from './roads';
 import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from './slanted';
 import { WALL_HALF, WALL_HEIGHT } from './walls';
 
@@ -1494,8 +1495,9 @@ export class HousePlanner {
     const homeId = world.households?.find((h) => h.player)?.plot;
     const home = homeId == null ? null : world.plots?.[homeId];
     const onHome = (x: number, z: number) => !!home && x >= home.x && z >= home.z && x < home.x + home.w && z < home.z + home.d;
-    const paths = [...(world.meta?.paths ?? []), ...(world.meta?.streets ?? [])];
-    const paved = (x: number, z: number) => paths.some((r) => x >= r.x - 0.6 && x < r.x + r.w + 0.6 && z >= r.z - 0.6 && z < r.z + r.d + 0.6);
+    const paths = world.meta?.paths ?? [];
+    const roads = new RoadIndex(townRoads(world));
+    const paved = (x: number, z: number) => roads.onRoad(x, z, 0.6) || paths.some((r) => x >= r.x - 0.6 && x < r.x + r.w + 0.6 && z >= r.z - 0.6 && z < r.z + r.d + 0.6);
     // Garden spots: outdoors, off furniture and paths, and not on a tile split by a diagonal.
     const free = (x: number, z: number) =>
       inView(Math.floor(x), Math.floor(z)) && roomP(x, z) === 0 && !diagonal(Math.floor(x), Math.floor(z)) && !occupied.has(Math.floor(z) * W + Math.floor(x)) && !paved(x, z);

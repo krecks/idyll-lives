@@ -26,6 +26,14 @@
   function setGarden(size: GardenSize) {
     if (templates && selected) app.town = withGarden(templates, town, selected.index, size);
   }
+  /** The garden sizes to choose from: one that doesn't fit beside the neighbours can't be picked. */
+  const gardens = $derived(
+    (['snug', 'roomy', 'big'] as const).map((value) => ({
+      value,
+      label: value[0].toUpperCase() + value.slice(1),
+      disabled: !!templates && !!selected && value !== garden && withGarden(templates, town, selected.index, value) === town,
+    })),
+  );
   let hover = $state<number | null>(null);
   /** The camera is on the chosen lot (false: the whole town). */
   let close = $state(true);
@@ -191,7 +199,7 @@
         {#if garden && selected.lot !== 'farm'}
           <div class="lot-size">
             <span class="eyebrow">Garden</span>
-            <Segmented label="Garden" bind:value={() => garden, setGarden} options={[{ value: 'snug', label: 'Snug' }, { value: 'roomy', label: 'Roomy' }, { value: 'big', label: 'Big' }]} />
+            <Segmented label="Garden" bind:value={() => garden, setGarden} options={gardens} />
           </div>
         {/if}
         {#key `${selected.index}:${lot}:${selected.template}`}

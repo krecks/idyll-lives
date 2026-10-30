@@ -33,6 +33,7 @@ import type { RGB } from '../shared/environment';
 import { Geo, type V3 } from '../shared/geometry';
 import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
 import { placementVariation, standInOf } from '../shared/modelEntry';
+import { roadMeshes, townRoads } from '../shared/roads';
 import { fieldLayers } from '../shared/street';
 
 /** Height that labels and fits allow for (roofs, chimneys, crowns). */
@@ -289,8 +290,13 @@ export class TownOverview {
   /** Road and garden paths / driveways and fields, one flat mesh each (hidden until the swap). */
   private async buildGround(world: WorldStructure, pace?: () => Promise<void>): Promise<pc.Entity[]> {
     const out: pc.Entity[] = [];
+    const road = meshFrom(this.device, roadMeshes(townRoads(world)).surface.meshData());
+    if (road) {
+      const entity = drawMesh(this.root, 'townStreets', road, this.lib.surface('material.road', { doubleSided: true }), { receiveShadows: true, layers: this.layers });
+      entity.enabled = false;
+      out.push(entity);
+    }
     const layers: [string, { x: number; z: number; w: number; d: number }[] | undefined, string, number][] = [
-      ['townStreets', world.meta?.streets, 'material.road', 0.012],
       ['townPaths', world.meta?.paths, 'material.path', 0.014],
       ...fieldLayers(world.meta?.world?.fields, 'town'),
     ];

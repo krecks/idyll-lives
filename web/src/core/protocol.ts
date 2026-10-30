@@ -373,10 +373,26 @@ export interface FormerResident {
 /** Event references with this bit name a former resident (sim-core `social::FORMER`). */
 export const FORMER = 2 ** 31;
 
+/** What is at the end of a road: the way out of town, a dead end (a turning circle), another road it joins, or itself (a ring). */
+export type RoadEnd = 'out' | 'dead' | 'join' | 'loop';
+
+/** A town's road (`game/roads.ts`): its middle, a point about every metre (town tiles); its width with the sidewalks. */
+export interface RoadPlan {
+  points: [number, number][];
+  width: number;
+  ends: [RoadEnd, RoadEnd];
+  name?: string;
+}
+
 export interface WorldMeta {
   kind?: string;
   name?: string;
+  /** Older towns' streets: straight, along x (newer ones have `roads`). */
   streets?: { x: number; z: number; w: number; d: number }[];
+  /** The town's roads (missing in older saves: their `streets`). */
+  roads?: RoadPlan[];
+  /** Village greens and the like: grass the roads go round (polygons, town tiles). */
+  greens?: [number, number][][];
   paths?: { x: number; z: number; w: number; d: number }[];
   /** Where each plot's street is (by plot index; `game/town.ts` `Facing`): 0 north, 1 west, 2 south, 3 east. Missing in older saves. */
   facing?: number[];

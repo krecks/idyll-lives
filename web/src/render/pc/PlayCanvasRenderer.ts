@@ -77,6 +77,7 @@ import { OverviewCamera } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
 import { standInOf } from '../shared/modelEntry';
 import { renderScale, watchPixelRatio } from '../shared/resolution';
+import { roadMeshes, townRoads } from '../shared/roads';
 import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
@@ -895,7 +896,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const refs = [world.meta, world.walls, world.openings, world.diagonals, world.floors, world.fences];
     if (!this.lotParts || this.lotParts.refs.some((r, i) => r !== refs[i])) {
       const m = world.meta;
-      this.lotParts = { refs, key: JSON.stringify([m?.seed, m?.streets, m?.paths, world.walls, world.openings, world.diagonals, world.floors, world.fences]) };
+      this.lotParts = { refs, key: JSON.stringify([m?.seed, m?.streets, m?.roads, m?.paths, world.walls, world.openings, world.diagonals, world.floors, world.fences]) };
     }
     return JSON.stringify([
       view,
@@ -1007,8 +1008,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /** Roads, garden paths and farm fields from the town metadata, each a flat mesh. */
   private buildStreets(world: WorldStructure): void {
+    // Only the stretch of road near the viewed lot.
+    const road = meshFrom(this.device, roadMeshes(townRoads(world), this.view, STREET_MARGIN).surface.meshData());
+    if (road) this.lotEntities.push({ entity: drawMesh(this.root, 'streets', road, this.lotMaterial('material.road')) });
     const layers: [string, { x: number; z: number; w: number; d: number }[] | undefined, string, number][] = [
-      ['streets', world.meta?.streets, 'material.road', 0.012],
       ['paths', world.meta?.paths, 'material.path', 0.014],
       ...fieldLayers(world.meta?.world?.fields, ''),
     ];
