@@ -1,14 +1,15 @@
 /**
  * The neighbourhood around the viewed lot on PlayCanvas: the street as `shared/street.ts` lays it
  * out (`planStreet`: the neighbours' houses, sidewalks, streetlights and their pools of light,
- * kerbside furniture, cars, fences and hedges, gardens, public places' things), drawn as a handful
+ * kerbside furniture, cars, fences and hedges, gardens, other lots' things), drawn as a handful
  * of meshes (one per material) and instanced models (`model.street.*`, the foliage, the town's
  * things: one draw per model mesh, `instancing.ts`).
  *
  * Static: built once per town layout round the viewed lot (`streetKey`) and kept across structure
  * versions; the models are kept (hidden) between builds in the street's own template cache. The
  * neighbours' window glass glows at night only while someone is up in there (`setUp`), redrawn
- * at most once a second.
+ * at most once a second. The viewed lot's garage hangs apart (`lotRoot`), hidden with the lot's
+ * ground while its basement is in view (`showLot`).
  */
 
 import * as pc from './engine';
@@ -34,7 +35,7 @@ export interface StreetOptions {
   layers?: number[];
   /** Neighbours' windows glow only while someone is up in there (`setUp`; the game's street, not the menus' town). */
   lived?: boolean;
-  /** Draws the outdoor things of public places outside the viewed lot (the game, not the overview, which draws every lot's). */
+  /** Draws the outdoor things of the lots outside the viewed one, public places' and neighbours' gardens' (the game, not the overview, which draws every lot's). */
   look?: ObjectLook;
   /** 1: the street's models' far versions, if they have one (`QualitySettings.streetLod`); 0: full detail. */
   lod?: 0 | 1;
@@ -67,14 +68,15 @@ const WINDOWS_EVERY_MS = 1000;
 export class Street {
   private readonly lib: MaterialLibrary;
   private readonly device: pc.GraphicsDevice;
-  /** Everything the street draws hangs here (game space). */
+  /** Everything the street draws hangs here (game space); the viewed lot's own (its garage, `StreetPlan.lot`) under `lotRoot`. */
   readonly root: pc.Entity;
+  private readonly lotRoot: pc.Entity;
   private key = '';
   private meshes: pc.Entity[] = [];
   /** Instanced models by key (foliage, props, public places' things), kept hidden between builds. */
   private readonly templates: TemplateCache<ModelTemplate>;
   private readonly placed = new Map<string, Placed>();
-  /** Footprints of public places' things by model key, and the boxes they're drawn as without their files (see `look`). */
+  /** Footprints of other lots' things by model key, and the boxes they're drawn as without their files (see `look`). */
   private readonly footprints = new Map<string, [number, number]>();
   private readonly standIns = new Map<string, StandIn>();
   /** Keys of the templates the last build draws (see `invalidate`). */
@@ -118,6 +120,8 @@ export class Street {
     this.templates = new TemplateCache(app);
     this.root = new pc.Entity('street');
     parent.addChild(this.root);
+    this.lotRoot = new pc.Entity('streetLot');
+    this.root.addChild(this.lotRoot);
     // Streetlights' glass: unlit, its colour by the time of day (`setNight`). (Its colours, and the
     // pools' and the lenses' strengths, are sRGB as PlayCanvas takes them, as they were tuned;
     // clamped to 1.)
@@ -169,18 +173,19 @@ export class Street {
     for (const [k, f] of plan.footprints) this.footprints.set(k, f);
     for (const [k, s] of plan.standIns) this.standIns.set(k, s);
     const sil = this.house.silhouetteMeshes(plan.silhouettes, this.root);
-    for (const m of sil.meshes) this.dress(m.entity, m.part.cast);
-    this.meshes.push(...sil.meshes.map((m) => m.entity));
+    const garage = plan.lot ? this.house.silhouetteMeshes(plan.lot.silhouettes, this.lotRoot).meshes : [];
+    for (const m of [...sil.meshes, ...garage]) this.dress(m.entity, m.part.cast);
+    this.meshes.push(...[...sil.meshes, ...garage].map((m) => m.entity));
     // Who was up stays so through a rebuild (the lights don't flick on for a frame).
     this.homes = sil.homes.map(({ spec, panes }) => ({ box: [spec.x0, spec.z0, spec.x1, spec.z1], panes, up: wasUp.get(`${spec.x0},${spec.z0}`) ?? true }));
     this.boxes = this.homes.map((h) => h.box);
     this.drawWindows();
 
     const meshesSpan = perfStart('street: meshes');
-    const add = (geo: Geo, name: string, material: pc.Material, opts: { cast?: boolean; colors?: boolean } & DrawOptions = {}) => {
+    const add = (geo: Geo, name: string, material: pc.Material, opts: { cast?: boolean; colors?: boolean; parent?: pc.Entity } & DrawOptions = {}) => {
       const mesh = meshFrom(this.device, geo.meshData({ colors: opts.colors ?? true }));
       if (!mesh) return;
-      const entity = drawMesh(this.root, name, mesh, material, { ...opts, castShadows: !!opts.cast && this.shadows, ...(this.layers ? { layers: this.layers } : {}) });
+      const entity = drawMesh(opts.parent ?? this.root, name, mesh, material, { ...opts, castShadows: !!opts.cast && this.shadows, ...(this.layers ? { layers: this.layers } : {}) });
       this.dress(entity, !!opts.cast);
       this.meshes.push(entity);
     };
@@ -189,6 +194,12 @@ export class Street {
     add(plan.glow, 'streetLamps', this.glowMat, { colors: false });
     add(plan.pools, 'streetLightPools', this.poolMat, { colors: false, receiveShadows: false, alphaIndex: 5 });
     add(plan.shadows, 'streetShadows', this.lib.contactShadow(false));
+    if (plan.lot) {
+      const parent = this.lotRoot;
+      add(plan.lot.props, 'streetLotProps', this.lib.plainFinish(), { cast: true, parent });
+      add(plan.lot.glow, 'streetLotLamps', this.glowMat, { colors: false, parent });
+      add(plan.lot.pools, 'streetLotPools', this.poolMat, { colors: false, receiveShadows: false, alphaIndex: 5, parent });
+    }
     perfEnd(meshesSpan);
     await pace?.();
     if (this.destroyed || this.key !== key) return;
@@ -198,7 +209,7 @@ export class Street {
     // Models from the last build that aren't used now are hidden.
     for (const [k, p] of this.placed) if (!batches.some(([b]) => b === k)) this.hide(p);
     this.used = new Set(batches.filter(([, items]) => items.length).map(([k]) => k));
-    this.plants = batches.flatMap(([k, items]) => items.map(([x, z, s, sy, yaw]): StreetPlant => ({ key: k, x, y: 0, z, sx: s, sy, sz: k === FOLIAGE.hedge ? 1 : s, yaw })));
+    this.plants = batches.flatMap(([k, items]) => items.map(([x, z, s, sy, yaw, y = 0]): StreetPlant => ({ key: k, x, y, z, sx: s, sy, sz: k === FOLIAGE.hedge ? 1 : s, yaw })));
     for (const [k, items, cast] of batches) {
       await pace?.();
       if (this.destroyed || this.key !== key) return;
@@ -214,7 +225,7 @@ export class Street {
 
   /**
    * The models the last build drew from instances, as placed (a hedge isn't scaled along its depth):
-   * where the birds find the street's bushes, hedges and public places' trees. A new array only when
+   * where the birds find the street's bushes, hedges and other lots' trees. A new array only when
    * the street is built again.
    */
   plants: readonly StreetPlant[] = [];
@@ -258,6 +269,11 @@ export class Street {
     this.glowMat.destroy();
     this.poolMat.destroy();
     this.poolTexture.destroy();
+  }
+
+  /** Shows or hides the viewed lot's own (its garage): it stands on the lot's ground, hidden while its basement is in view. */
+  showLot(on: boolean): void {
+    this.lotRoot.enabled = on;
   }
 
   /** Neighbours' houses: their wall boxes (x0, z0, x1, z1 on the ground's grid lines). */
@@ -371,8 +387,8 @@ export class Street {
   }
 
   /**
-   * Instances of a model (`flat`: not scaled along z, hedges stretched along their run). A public
-   * place's thing without its file is its box (`standIn`); foliage and kerbside props are left out.
+   * Instances of a model (`flat`: not scaled along z, hedges stretched along their run). Another
+   * lot's thing without its file is its box (`standIn`); foliage and kerbside props are left out.
    */
   private async instances(key: string, items: Inst[], flat: boolean, cast: boolean, footprint: [number, number] = [1, 1], standIn?: StandIn, pace?: () => Promise<void>): Promise<void> {
     const template = this.templates.get(key, () => buildModel(this.app, `street:${key}`, this.assets.has(key, 'model') ? (this.assets.get(key, 'model') as ModelEntry) : undefined, footprint, { far: this.layers !== undefined, lod: this.lod, standIn }));

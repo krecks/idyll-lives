@@ -880,6 +880,16 @@ pub enum Phase {
         /// The resident on their way to answer.
         host: Option<u32>,
     },
+    /// At the door of the car they go to work in (`Sim::bound_for_car`), getting in: it opens,
+    /// they sit in, it shuts (`cars::getting_in`).
+    Boarding {
+        ticks: u32,
+    },
+    /// Back home in the car, getting out on their way in (a `GoHome` task): sat in it as its door
+    /// opens, then out beside it (`cars::getting_out`).
+    Alighting {
+        ticks: u32,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -998,6 +1008,17 @@ pub struct Sim {
     pub(crate) being_served: bool,
     /// Ticks they've waited at a post for its server (`staff::hold`). Not saved.
     pub(crate) serve_wait: u32,
+    /// The car they're on their way to for work or school (`cars::ride_for`), their seat in it (0:
+    /// they drive) and the door they get in by (`cars::DOORS`). Not saved (after a load, they set
+    /// off again).
+    pub(crate) bound_for_car: Option<u32>,
+    pub(crate) car_seat: u8,
+    pub(crate) car_door: u8,
+    /// Ticks they've waited for a car driving by to pass (`cars::in_the_way`). Not saved.
+    pub(crate) car_wait: u32,
+    /// The work shift (or school day) they're away for starts at this tick: until then they're on
+    /// their way (`life::at_work`). Not saved (after a load, it's under way).
+    pub(crate) shift_from: u64,
     /// Found nobody to play a game for two with they chose: none chosen again until this tick
     /// (`partners::alone`). Not saved.
     pub(crate) alone_until: u64,
@@ -1583,6 +1604,8 @@ pub(crate) struct SimBrief {
     pub game: Option<(u32, usize, bool)>,
     /// Free to be fetched for one (`partners::free_now`).
     pub free: bool,
+    /// On their way to this car for work or school (`Sim::bound_for_car`).
+    pub bound_for_car: Option<u32>,
 }
 
 pub struct World {
@@ -1658,6 +1681,16 @@ pub struct World {
     work: Vec<u8>,
     /// Where Sims leave town for work.
     pub exits: Vec<[f32; 2]>,
+    /// Households' cars (see `cars.rs`), and every house's driveway (where a car goes when its
+    /// household moves).
+    pub cars: Vec<crate::cars::Car>,
+    pub drives: Vec<crate::cars::Drive>,
+    /// Garages at the inner ends of driveways (`cars::Garage`).
+    pub garages: Vec<crate::cars::Garage>,
+    /// The tiles parked cars take up in `blocked` (`cars::reblock`), sorted.
+    pub(crate) car_tiles: Vec<usize>,
+    /// The `nav_version` the cars' parking spots were last checked at (`cars::update`).
+    pub(crate) cars_nav: u32,
     /// Opaque presentation data from the lot/town file, saved unchanged.
     pub meta: serde_json::Value,
     /// Build and buy edits that can be taken back, oldest first (see `World::undo`).
@@ -1728,6 +1761,8 @@ pub(crate) struct Ctx<'a> {
     /// Objects by plot (`World::object_index`).
     pub index: &'a ObjectIndex,
     pub exits: &'a [[f32; 2]],
+    /// Households' cars (`World::cars`).
+    pub cars: &'a [crate::cars::Car],
     pub autonomy: bool,
     /// Room score per tile (`World::room_score`).
     pub room_score: &'a [f32],
@@ -1908,12 +1943,20 @@ impl World {
             world.spawn_sim(s)?;
         }
         world.init_relationships(&lot_file.relationships)?;
+        crate::cars::from_file(
+            &mut world,
+            &lot_file.cars,
+            &lot_file.drives,
+            &lot_file.garages,
+        );
         // Babies come with a crib (a crowded home is reported to the player as time starts).
         for h in 0..world.households.len() {
             crate::lifecycle::cribs_for_babies(&mut world, h);
         }
         world.make_storeys();
         world.refresh_rooms();
+        // A new lot's lamps come on only where someone is (`lights::Watch::fresh`).
+        world.light_watch.fresh = true;
         Ok(world)
     }
 
@@ -1957,6 +2000,11 @@ impl World {
             claimants_cache: Vec::new(),
             work: Vec::new(),
             exits: Vec::new(),
+            cars: Vec::new(),
+            drives: Vec::new(),
+            garages: Vec::new(),
+            car_tiles: Vec::new(),
+            cars_nav: 0,
             meta: serde_json::Value::Null,
             undo: Vec::new(),
             redo: Vec::new(),
@@ -2005,6 +2053,12 @@ impl World {
     /// `conversation::within_earshot`).
     pub fn within_earshot(&self, a: [f32; 2], b: [f32; 2]) -> bool {
         conversation::within_earshot(&self.nav(), a, b)
+    }
+
+    /// Whether people at `a` and `b` see each other, as two talking must (see
+    /// `conversation::in_sight`).
+    pub fn in_sight(&self, a: [f32; 2], b: [f32; 2]) -> bool {
+        conversation::in_sight(&self.nav(), a, b)
     }
 
     /// The plot a tile is on (on any storey).
@@ -2552,6 +2606,11 @@ impl World {
             partner_wait: 0,
             being_served: false,
             serve_wait: 0,
+            bound_for_car: None,
+            car_seat: 0,
+            car_door: 0,
+            car_wait: 0,
+            shift_from: 0,
             alone_until: 0,
             household: spawn.household,
             job,
@@ -3404,6 +3463,10 @@ impl World {
                 eating: s.eating_seated(),
                 game: s.game,
                 free: crate::partners::free_now(&self.content, s, tick),
+                bound_for_car: s.bound_for_car.filter(|_| {
+                    s.current()
+                        .is_some_and(|a| matches!(a.task.kind, TaskKind::Work))
+                }),
             });
         }
         // Who's in a conversation, and whose (for joining in).
@@ -3442,6 +3505,7 @@ impl World {
                 object_plot,
                 object_index,
                 exits,
+                cars,
                 room_score,
                 dirt,
                 stairs,
@@ -3471,6 +3535,7 @@ impl World {
                 object_plot,
                 index: object_index,
                 exits,
+                cars,
                 autonomy: *autonomy,
                 hour,
                 day: crate::clock::day(tick),
@@ -3497,6 +3562,7 @@ impl World {
         crate::phone::update(self);
         crate::life::update(self);
         crate::lifecycle::update(self);
+        crate::cars::update(self);
         crate::planner::update(self);
         crate::cooking::after_step(self);
         crate::lights::update(self);
@@ -6055,7 +6121,11 @@ fn pick_autonomous(
     // From the seat: only a word with someone sitting near (nothing that takes them closer than
     // talking does: a hug, a kiss, a fight), or listening in on a talk going on beside them.
     if let Some(range) = from_seat {
-        let near = |p: [f32; 2]| (p[0] - sim.pos[0]).hypot(p[1] - sim.pos[1]) <= range;
+        // (In sight, too: not the one on the sofa the other side of the wall.)
+        let near = |p: [f32; 2]| {
+            (p[0] - sim.pos[0]).hypot(p[1] - sim.pos[1]) <= range
+                && conversation::in_sight(&ctx.nav, sim.pos, p)
+        };
         candidates.retain(|&(_, choice)| match choice {
             Choice::Social(t, s) => {
                 ctx.briefs[t as usize].seated
@@ -6422,16 +6492,25 @@ fn start_task(
             )
         }
         TaskKind::Work => {
-            // Nearest way out of town; with no exits, work starts on the spot.
-            let exit = ctx.exits.iter().copied().min_by(|a, b| {
-                let d = |p: &[f32; 2]| (p[0] - sim.pos[0]).hypot(p[1] - sim.pos[1]);
-                d(a).total_cmp(&d(b))
-            });
-            let Some(exit) = exit else {
-                sim.transition = Some(crate::life::Transition::Work);
-                return;
-            };
-            (exit, (exit[0].floor() as i32, exit[1].floor() as i32), 0)
+            // By car (`cars.rs`): to its door.
+            sim.bound_for_car = None;
+            if let Some((car, seat, door, at)) = crate::cars::ride_for(ctx, sim) {
+                sim.bound_for_car = Some(car);
+                sim.car_seat = seat as u8;
+                sim.car_door = door as u8;
+                (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
+            } else {
+                // Nearest way out of town; with no exits, work starts on the spot.
+                let exit = ctx.exits.iter().copied().min_by(|a, b| {
+                    let d = |p: &[f32; 2]| (p[0] - sim.pos[0]).hypot(p[1] - sim.pos[1]);
+                    d(a).total_cmp(&d(b))
+                });
+                let Some(exit) = exit else {
+                    sim.transition = Some(crate::life::Transition::Work);
+                    return;
+                };
+                (exit, (exit[0].floor() as i32, exit[1].floor() as i32), 0)
+            }
         }
         // (Their visit starts once there's a way there: see below.)
         TaskKind::Visit { plot } => {
@@ -6871,6 +6950,41 @@ fn progress(
             *waited += ticks;
             false
         }
+        // Getting into the car: in, and off to work (`life`, `cars::board`).
+        Phase::Boarding { ticks: waited } => {
+            *waited += ticks;
+            let t = *waited;
+            if let Some(car) = sim.bound_for_car.and_then(|c| ctx.cars.get(c as usize)) {
+                crate::cars::getting_in(sim, car, t);
+            }
+            if t >= crate::cars::GET_IN_TICKS {
+                sim.current = None;
+                sim.transition = Some(match sim.bound_for_car.take() {
+                    Some(car) => crate::life::Transition::Board { car },
+                    None => crate::life::Transition::Work,
+                });
+            }
+            return;
+        }
+        // Getting out of the car, then on their way in.
+        Phase::Alighting { ticks: waited } => {
+            *waited += ticks;
+            let t = *waited;
+            if let Some(car) = sim.bound_for_car.and_then(|c| ctx.cars.get(c as usize)) {
+                crate::cars::getting_out(sim, car, t);
+            }
+            if t >= crate::cars::GET_OUT_TICKS {
+                sim.current = None;
+                sim.bound_for_car = None;
+                sim.pose = Pose::Stand;
+                sim.queue.push_front(Task {
+                    kind: TaskKind::GoHome,
+                    directed: false,
+                    routine: false,
+                });
+            }
+            return;
+        }
         // Waiting for a busy station: try again.
         Phase::Queued { ticks: waited } => {
             *waited += ticks;
@@ -6895,6 +7009,29 @@ fn progress(
                 }
                 let (dx, dz) = (wp[0] - sim.pos[0], wp[1] - sim.pos[1]);
                 let dist = dx.hypot(dz);
+                // A car driving by: they wait for it (and after a while step aside, out of its way).
+                let step = budget.min(dist).max(0.05);
+                let to = [
+                    sim.pos[0] + dx / dist.max(1e-4) * step,
+                    sim.pos[1] + dz / dist.max(1e-4) * step,
+                ];
+                if let Some(c) = crate::cars::in_the_way(ctx.cars, sim.pos, to) {
+                    sim.car_wait = sim.car_wait.saturating_add(ticks);
+                    if sim.car_wait > crate::cars::MAKE_WAY_TICKS
+                        && let Some((at, yaw, ..)) = ctx.cars[c].shown
+                        && let Some(p) = crate::cars::make_way(
+                            at,
+                            yaw,
+                            &ctx.nav,
+                            sim.pos,
+                            (0.06 * ticks as f32).min(0.3),
+                        )
+                    {
+                        sim.pos = p;
+                    }
+                    break;
+                }
+                sim.car_wait = 0;
                 if dist > 1e-4 {
                     sim.yaw = dx.atan2(dz);
                 }
@@ -7474,10 +7611,18 @@ fn arrive(
             sim.pose = Pose::Stand;
             act.phase = Phase::Using { elapsed: 0.0 };
         }
-        TaskKind::Work => {
-            sim.current = None;
-            sim.transition = Some(crate::life::Transition::Work);
-        }
+        TaskKind::Work => match sim.bound_for_car.and_then(|c| ctx.cars.get(c as usize)) {
+            // At the car's door: facing it, they open it and get in.
+            Some(car) => {
+                sim.yaw = (car.spot[0] - sim.pos[0]).atan2(car.spot[1] - sim.pos[1]);
+                sim.pose = Pose::Stand;
+                act.phase = Phase::Boarding { ticks: 0 };
+            }
+            None => {
+                sim.current = None;
+                sim.transition = Some(crate::life::Transition::Work);
+            }
+        },
         TaskKind::Visit { plot } => {
             // At a house (not a park) with door rules: knock and wait (`life::doors`).
             if content.visits.door.is_some() && !ctx.plots[plot as usize].public {

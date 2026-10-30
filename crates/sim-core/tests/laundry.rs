@@ -287,7 +287,7 @@ fn a_running_machine_is_saved_and_loaded_as_it_was() {
     assert!(left > 30.0 && left < 60.0, "mid-wash: {left}");
     let saved = w.save_json();
     let json: serde_json::Value = serde_json::from_str(&saved).unwrap();
-    assert_eq!(json["version"], 33);
+    assert_eq!(json["version"], sim_core::save::SAVE_VERSION);
     let mut loaded = World::from_save_json(&content, &saved).unwrap();
     assert_eq!(
         loaded.objects[WASHER as usize].run,

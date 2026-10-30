@@ -9,6 +9,10 @@
 //!   on a room with someone awake in it;
 //! - the last one awake leaves a room, or goes to sleep in it: its lamps go off.
 //!
+//! A new game's lot (its file's lamps all on) is first seen as if everyone had just come in: the
+//! lamps of the rooms with nobody awake in them go off, those of a dark room with someone awake
+//! in it on (`Watch::fresh`). A save opens with its lamps as they were.
+//!
 //! A fire (content `light.fire`: a fireplace, a fire pit) is switched as a lamp is, but nobody
 //! lights it just for coming in: whoever sits down by it in the dark lights it (`world::arrive`),
 //! or the player does. It goes out with the room's lamps when the last one awake leaves, and a
@@ -41,6 +45,8 @@ pub(crate) struct Watch {
     /// The lot (walls) these room ids were for; after a rebuild the rooms are seen afresh.
     lot_version: u32,
     primed: bool,
+    /// A new game's lot, not looked at yet: its rooms' lamps are switched for who's in them.
+    pub(crate) fresh: bool,
 }
 
 /// Whether it's dark at `minute` of the day.
@@ -99,6 +105,21 @@ pub(crate) fn update(world: &mut World) {
     let dark = dark_at(crate::clock::minute_of_day(world.tick));
     let lot_version = world.lot_version();
     let mut watch = std::mem::take(&mut world.light_watch);
+    if watch.fresh && world.autonomy {
+        let rooms: Vec<u16> = world
+            .rooms()
+            .iter()
+            .filter(|r| !r.garden && r.id != OUTDOORS)
+            .map(|r| r.id)
+            .collect();
+        for room in rooms {
+            switch_room(world, room, false);
+            if awake.binary_search(&room).is_ok() && room_dark(world, room, dark) {
+                switch_room(world, room, true);
+            }
+        }
+    }
+    watch.fresh = false;
     if watch.primed && watch.lot_version == lot_version && world.autonomy {
         let came: Vec<u16> = awake
             .iter()

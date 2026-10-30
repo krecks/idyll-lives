@@ -381,7 +381,7 @@ export interface WorldMeta {
   seed?: number;
   /** What kind of world the town is in and how its land looks (missing: the classic valley). */
   world?: WorldLook;
-  /** The menus' town preview only: the plot drawn as the player's house, as the game shows it (no garage, car or garden dressing). */
+  /** The menus' town preview only: the plot drawn as the player's house, as the game shows it (its car on the driveway, no garage or garden dressing). */
   home?: number | null;
 }
 
@@ -516,6 +516,27 @@ export interface WorldStructure {
   staff?: StaffInfo[];
   /** The servers as residents for the renderer (rows `sims.length + k`), given their looks by the session (`game/staff.ts`). */
   staffSims?: SimInfo[];
+  /**
+   * Households' cars (sim-core `cars.rs`), in their snapshot rows' order (`SnapshotLayout.car`): where each
+   * parks. Absent: a game from before cars (the street draws some by the neighbours' driveways, parked).
+   */
+  cars?: CarInfo[];
+  /** Garages at the inner ends of driveways (sim-core `cars::Garage`: wall centre lines, by plot). Absent: a game from before them (the street places neighbours' own). */
+  garages?: { plot: number; x0: number; z0: number; x1: number; z1: number }[];
+}
+
+/** A household's car (`WorldStructure.cars`): where it parks (its middle, which way it faces: 0 towards +z), its size and look (`shared/cars.ts`), who may drive it. */
+export interface CarInfo {
+  plot: number;
+  household: number;
+  x: number;
+  z: number;
+  yaw: number;
+  len: number;
+  wid: number;
+  body: number;
+  paint: number;
+  owners: number[];
 }
 
 /** One of the town's servers (`WorldStructure.staff`). */

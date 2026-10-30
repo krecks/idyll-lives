@@ -71,6 +71,8 @@ pub struct Visit {
 pub enum Transition {
     /// Reached the town exit: the shift starts.
     Work,
+    /// Got into a car to go to work in (`cars.rs`): off they go.
+    Board { car: u32 },
     /// Set off to visit a plot (guest status starts now, so an interrupted trip still ends at home).
     /// Visits the player asked for last longer.
     Visit { plot: u32, directed: bool },
@@ -198,7 +200,15 @@ pub(crate) fn update(w: &mut World) {
             apply_transition(w, i, transition);
         }
         if w.sims[i].away_until.is_some() {
-            at_work(w, i);
+            // (Done, and waiting for their car home or in it: `cars.rs` brings them back.)
+            if !crate::cars::homeward(w, i) {
+                at_work(w, i);
+                if w.sims[i].away_until.is_none() && crate::cars::off_work(w, i) {
+                    w.sims[i]
+                        .queue
+                        .retain(|t| !matches!(t.kind, TaskKind::GoHome));
+                }
+            }
         } else {
             schedule_work(w, i, day);
             schedule_school(w, i, day);
@@ -328,6 +338,8 @@ pub fn school_today(
 
 /// Off to school when it's time (once a day; too late, and it's skipped for today).
 fn schedule_school(w: &mut World, i: usize, day: u32) {
+    // By car, earlier: the drive takes a while (`cars::lead_ticks`).
+    let lead = crate::cars::lead_ticks(w, i);
     let World {
         content,
         sims,
@@ -343,6 +355,7 @@ fn schedule_school(w: &mut World, i: usize, day: u32) {
     let Some((leave, start, _)) = school_today(content, sim, tick) else {
         return;
     };
+    let leave = leave.min(start.saturating_sub(lead));
     if tick > start + ticks(content.career_rules.late_minutes) {
         // A day missed.
         sim.school_day = day;
@@ -377,6 +390,8 @@ fn schedule_work(w: &mut World, i: usize, day: u32) {
     let Some((leave, start, _)) = shift_today(&w.content, job, &sim.skills, tick) else {
         return;
     };
+    // By car, earlier: the drive takes a while (`cars::lead_ticks`).
+    let leave = leave.min(start.saturating_sub(crate::cars::lead_ticks(w, i)));
     if tick > start + ticks(w.content.career_rules.late_minutes) {
         miss_shift(w, i, day);
         return;
@@ -695,6 +710,7 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             if sim.job.is_none() {
                 if let Some((_, start, end)) = school_today(content, sim, tick) {
                     sim.school_day = clock::day(tick);
+                    sim.shift_from = start;
                     sim.away_until = Some(end.max(start).max(tick + 1));
                     sim.queue.clear();
                 }
@@ -706,7 +722,9 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             };
             job.last_shift_day = clock::day(tick);
             job.shift_mood = mood;
-            // Early arrivals still work until the shift's end; late ones lose that time.
+            // Early arrivals still work until the shift's end; late ones lose that time. Before
+            // it starts they're on their way (`at_work`).
+            sim.shift_from = start;
             sim.away_until = Some(end.max(start).max(tick + 1));
             sim.queue.clear();
         }
@@ -742,6 +760,21 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
                 })
             {
                 w.events.push(tick, EventKind::Visited, i, j, None);
+            }
+        }
+        Transition::Board { car } => {
+            // Gone without them (or not theirs to take now): on foot after all.
+            if !crate::cars::may_board(w, i, car) {
+                w.sims[i].queue.push_front(Task {
+                    kind: TaskKind::Work,
+                    directed: true,
+                    routine: false,
+                });
+                return;
+            }
+            apply_transition(w, i, Transition::Work);
+            if w.sims[i].away_until.is_some() {
+                crate::cars::board(w, i, car);
             }
         }
         Transition::Home => w.sims[i].visiting = None,
@@ -999,6 +1032,10 @@ fn at_work(w: &mut World, i: usize) {
         ..
     } = w;
     let sim = &mut sims[i];
+    // Still on their way: work (or school) hasn't started.
+    if tick < sim.shift_from {
+        return;
+    }
     let minutes = sim.minutes();
     let Some(job) = sim.job.clone() else {
         take_breaks(sim, content, None);

@@ -98,6 +98,41 @@ fn a_friend_knocks_and_is_let_in() {
 }
 
 #[test]
+fn the_host_steps_out_to_greet_a_visitor_rather_than_talk_through_the_front_door() {
+    // Ada's house has walls round it and a front door onto the garden path (at x 10, z 8): Bo
+    // knocks on the doorstep, and Ada comes out to him to say hello.
+    let town = town("friends").replace(
+        r#""objects":"#,
+        r#""walls":[[2,1,18,1],[2,8,18,8],[2,1,2,8],[18,1,18,8]],"doors":[{"x":10,"z":8,"axis":"x"}],"objects":"#,
+    );
+    let mut w = World::from_json(CONTENT, &town, 7).unwrap();
+    w.autonomy = false;
+    while w.tick < clock::tick_at(1, 11.0 * 60.0).unwrap() {
+        w.tick_once();
+    }
+    w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();
+    let mut greeted = false;
+    for _ in 0..(90.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        if w.sims[0].conversation(&w.content).is_some_and(|c| c.0 == 1) {
+            greeted = true;
+            let (a, b) = (w.sims[0].pos, w.sims[1].pos);
+            assert!(
+                w.in_sight(a, b),
+                "Ada at {a:?} greets Bo at {b:?} through the front door"
+            );
+        } else if greeted {
+            break;
+        }
+    }
+    assert!(greeted, "Ada never greeted Bo");
+    assert!(
+        w.events.iter().any(|e| e.kind == EventKind::Visited),
+        "Bo was let in"
+    );
+}
+
+#[test]
 fn an_enemy_is_turned_away() {
     let mut w = world("enemies");
     w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();

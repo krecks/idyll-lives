@@ -4,19 +4,28 @@
  * a dashed centre line, streetlights that light up at night (with pools of light on the
  * ground), mailboxes, hydrants and bins along the kerb, cars parked on neighbours' driveways,
  * picket fences or hedges around neighbours' back gardens, and flower beds along their house
- * fronts, with pots by the door and little lights along the garden path. The town's public places
- * seen from another lot: shops as silhouettes with an awning, and the park, playground and market
- * things standing in the open. At the ends of the street a bus stop and street signs; benches,
- * planters and bins along the kerb in front of the public places.
+ * fronts, with pots by the door and little lights along the garden path; the things standing in
+ * their gardens. The town's public places seen from another lot: shops as silhouettes with an awning,
+ * and the park, playground and market things standing in the open. At the ends of the street a bus
+ * stop and street signs; benches, planters and bins along the kerb in front of the public places.
  *
  * Rules:
  * - Visual only, and kept off where Sims walk: front lawns (Sims cut across them on their way
  *   out of town), garden paths, driveway mouths, the road and the middle of the sidewalk. Kerb
  *   furniture stands on the road side of the sidewalk, fences only run from the house front line
  *   backwards, cars park beside the houses.
+ * - The things outdoors on other lots (neighbours' garden furniture and planters, the park's
+ *   benches; not what stands indoors, in the silhouettes) in the game, placed, turned and moved off
+ *   their tiles' middle as the lot draws them: the lawn is cleared under every lot's things
+ *   (`lawnMask`). The menus' town (`pc/overview.ts`) draws every lot's things itself.
  * - Nothing on the viewed lot: the player builds there (the mailbox stands on the sidewalk). In
  *   the menus' town the player's lot (`WorldMeta.home`) gets its house as a shell dressed as the
- *   game builds it (no porch, chimney, garage, car or garden dressing), and nothing else.
+ *   game builds it (no porch, chimney or garden dressing), and nothing else. Its garage, if the
+ *   town gave it one (`WorldStructure.garages`), stands on it in the game too, drawn apart
+ *   (`StreetPlan.lot`): it goes with the lot's ground while its basement is in view.
+ * - Cars: the world's (`WorldStructure.cars`), parked, in the menus' town; in the game they come
+ *   and go, drawn by `pc/cars.ts`. A game saved before there were cars gets them by some neighbours'
+ *   driveways (`parkCar`), parked for good.
  * - Static: generated once per town layout and kept across structure versions of the viewed
  *   lot (build-mode edits don't rebuild it), merged into a handful of meshes (one per material)
  *   plus thin-instanced foliage and props (manifest models: `model.street.*` and the town's
@@ -28,9 +37,10 @@
  */
 
 import type { ModelEntry } from '../../assets/types';
-import { groundDepth, objectCentre, type PlotInfo, type WorldStructure } from '../../core/protocol';
+import { groundDepth, objectCentre, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
+import { CARS, CAR_PAINT, hash, paintCar, parkCar, pick, type CarBody } from './cars';
 import type { HousePlanner, SilhouettePlan, SilhouetteSpec } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
@@ -63,7 +73,6 @@ const GARAGE_WIDTH = 3.14;
 /** Half wall thickness (as in house.ts). */
 const T = 0.07;
 
-const CAR_PAINT = ['#C9CDD2', '#F0F0EC', '#1E2328', '#2B4A7A', '#9E2A2B', '#56684C', '#7C8288', '#C8B48E', '#6E8FB0', '#5B2333'];
 const MAILBOX = ['#22262A', '#2F4A3A', '#E8E6E0', '#8C2A26', '#2E4568'];
 const BIN = ['#3C6B3A', '#55595E', '#2E5C8A'];
 const FENCE_WHITE = '#F2F0EA';
@@ -90,22 +99,12 @@ const PROP = {
   pathLight: 'model.street.pathLight',
   litterBin: 'model.litterBin',
 } as const;
-/** A thin instance: x, z, scale across, scale up, yaw. */
-export type Inst = [number, number, number, number, number];
+/** A thin instance: x, z, scale across, scale up, yaw, and how high it stands (a thing on a top; 0 if left out). */
+export type Inst = [number, number, number, number, number, number?];
 /** Shop awnings: stripe colours. */
 const AWNINGS: [string, string][] = [['#2F6B4F', '#F2F0EA'], ['#B8322B', '#F2F0EA'], ['#2E5C8A', '#F2F0EA'], ['#C98F2E', '#F7EBD3'], ['#6B3E5E', '#F2E6EE']];
-/** What a placed object looks like and how big it is (the game's content), for public places seen from another lot. */
+/** What a placed object looks like and how big it is (the game's content), for the things on other lots. */
 export type ObjectLook = (def: string) => { model: string; footprint: [number, number]; standIn: StandIn } | undefined;
-
-function hash(x: number, z: number, salt: number): number {
-  let h = (Math.imul(Math.round(x * 10) | 0, 374761393) + Math.imul(Math.round(z * 10) | 0, 668265263) + Math.imul(salt, 2147483647)) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-
-function pick<T>(list: readonly T[], x: number, z: number, salt: number): T {
-  return list[Math.floor(hash(x, z, salt) * list.length) % list.length];
-}
 
 const overlaps = (a: Rect, b: Rect, m = 0) => a.x - m < b.x + b.w && a.x + a.w + m > b.x && a.z - m < b.z + b.d && a.z + a.d + m > b.z;
 
@@ -195,140 +194,6 @@ export class Painter {
     }
     return this;
   }
-}
-
-// ---- cars ------------------------------------------------------------------------------
-
-interface CarBody {
-  len: number;
-  wid: number;
-  wheelR: number;
-  wheelBase: number;
-  /**
-   * Side profile of the lower body (z forward, y up), convex, counter-clockwise; its first two
-   * points the sills, at the ground clearance (a saloon's 0.13–0.16 m, a compact SUV's 0.2 m, and
-   * a little for the sills).
-   */
-  low: [number, number][];
-  /** Greenhouse: base rear z, base front z, roof rear z, roof front z, belt y, roof y. */
-  cabin: [number, number, number, number, number, number];
-}
-
-const CARS: CarBody[] = [
-  // Saloon.
-  { len: 4.4, wid: 1.78, wheelR: 0.32, wheelBase: 2.65, low: [[-2.2, 0.17], [2.2, 0.17], [2.24, 0.52], [2.14, 0.74], [0.95, 0.88], [-1.35, 0.93], [-2.12, 0.88], [-2.24, 0.58]], cabin: [-1.4, 0.95, -0.8, 0.16, 0.9, 1.42] },
-  // Hatchback.
-  { len: 4.0, wid: 1.74, wheelR: 0.31, wheelBase: 2.5, low: [[-1.98, 0.17], [2.0, 0.17], [2.04, 0.52], [1.96, 0.72], [0.85, 0.87], [-1.9, 0.93], [-2.02, 0.6]], cabin: [-1.9, 0.88, -1.72, 0.08, 0.9, 1.46] },
-  // SUV.
-  { len: 4.6, wid: 1.88, wheelR: 0.37, wheelBase: 2.75, low: [[-2.3, 0.23], [2.3, 0.23], [2.34, 0.66], [2.24, 0.92], [1.25, 1.02], [-2.25, 1.06], [-2.34, 0.7]], cabin: [-2.24, 1.28, -2.14, 0.48, 1.02, 1.76] },
-  // Estate.
-  { len: 4.6, wid: 1.8, wheelR: 0.32, wheelBase: 2.7, low: [[-2.3, 0.17], [2.3, 0.17], [2.34, 0.52], [2.24, 0.74], [1.05, 0.88], [-2.25, 0.93], [-2.33, 0.6]], cabin: [-2.24, 1.05, -2.1, 0.25, 0.9, 1.45] },
-];
-
-/** A parked car in `p`'s frame (front towards +z), sitting on the ground at `y`. */
-function car(p: Painter, body: CarBody, paint: string): void {
-  const { wid, low } = body;
-  const hw = wid / 2;
-  const inner = hw - 0.045;
-  const [cz, cy] = [low.reduce((a, q) => a + q[0], 0) / low.length, low.reduce((a, q) => a + q[1], 0) / low.length];
-  const shrunk = low.map(([z, y]): [number, number] => {
-    const [dz, dy] = [cz - z, cy - y];
-    const l = Math.hypot(dz, dy) || 1;
-    return [z + (dz / l) * 0.035, y + (dy / l) * 0.035];
-  });
-  p.paint(paint, 0.2, 0);
-  // Sides, chamfers and the perimeter.
-  for (const side of [-1, 1]) {
-    p.poly(shrunk.map(([z, y]): V3 => [side * hw, y, z]), [side, 0, 0]);
-  }
-  for (let i = 0; i < low.length; i++) {
-    const [z0, y0] = low[i];
-    const [z1, y1] = low[(i + 1) % low.length];
-    const l = Math.hypot(z1 - z0, y1 - y0) || 1;
-    const [ny, nz] = [-(z1 - z0) / l, (y1 - y0) / l];
-    if (ny < -0.9) p.paint('#202224', 0.8, 0);
-    p.poly([[-inner, y0, z0], [inner, y0, z0], [inner, y1, z1], [-inner, y1, z1]], [0, ny, nz]);
-    for (const side of [-1, 1]) {
-      const [s0, s1] = [shrunk[i], shrunk[(i + 1) % low.length]];
-      const n: V3 = [side * 0.7, ny * 0.7, nz * 0.7];
-      p.poly([[side * hw, s0[1], s0[0]], [side * hw, s1[1], s1[0]], [side * inner, y1, z1], [side * inner, y0, z0]], n);
-    }
-    if (ny < -0.9) p.paint(paint, 0.2, 0);
-  }
-  // Greenhouse: painted frame and roof, glass inset into it.
-  const [br, bf, rr, rf, yb, yr] = body.cabin;
-  const hb = hw - 0.07;
-  const hr = hw - 0.25;
-  const B = (x: number, z: number): V3 => [x, yb, z];
-  const R = (x: number, z: number): V3 => [x, yr, z];
-  const quad = (q: V3[], out: V3, glass: [number, number, number, number] | null, pillar = false) => {
-    p.paint(paint, 0.2, 0).poly(q, out);
-    if (!glass) return;
-    const [u0, u1, v0, v1] = glass;
-    // Bilinear sub-rectangle of the quad (q0..q1 along the bottom, q3..q2 along the top).
-    const at = (u: number, v: number): V3 => {
-      const b = [0, 1, 2].map((k) => q[0][k] + (q[1][k] - q[0][k]) * u);
-      const t = [0, 1, 2].map((k) => q[3][k] + (q[2][k] - q[3][k]) * u);
-      const len = Math.hypot(...out) || 1;
-      const n = [0, 1, 2].map((k) => b[k] + (t[k] - b[k]) * v + (out[k] / len) * 0.006);
-      return [n[0], n[1], n[2]];
-    };
-    p.paint('#1C252D', 0.06, 0).poly([at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)], out);
-    if (pillar) {
-      const mid = 0.52;
-      const lift = (v: V3): V3 => {
-        const len = Math.hypot(...out) || 1;
-        return [v[0] + (out[0] / len) * 0.004, v[1] + (out[1] / len) * 0.004, v[2] + (out[2] / len) * 0.004];
-      };
-      p.paint(paint, 0.2, 0).poly([lift(at(mid - 0.025, 0)), lift(at(mid + 0.025, 0)), lift(at(mid + 0.025, 1)), lift(at(mid - 0.025, 1))], out);
-    }
-  };
-  const ws = facingOut([B(-hb, bf), B(hb, bf), R(hr, rf)], [0, 0.6, 1]);
-  quad([B(-hb, bf), B(hb, bf), R(hr, rf), R(-hr, rf)], ws, [0.05, 0.95, 0.06, 0.9]);
-  const rw = facingOut([B(hb, br), B(-hb, br), R(-hr, rr)], [0, 0.6, -1]);
-  quad([B(hb, br), B(-hb, br), R(-hr, rr), R(hr, rr)], rw, [0.06, 0.94, 0.1, 0.88]);
-  for (const side of [-1, 1]) {
-    const q: V3[] = side > 0 ? [B(hb, bf), B(hb, br), R(hr, rr), R(hr, rf)] : [B(-hb, br), B(-hb, bf), R(-hr, rf), R(-hr, rr)];
-    quad(q, facingOut(q, [side, 0.3, 0]), [0.05, 0.95, 0.1, 0.86], true);
-  }
-  p.paint(paint, 0.2, 0).poly([R(-hr, rr), R(hr, rr), R(hr, rf), R(-hr, rf)], [0, 1, 0]);
-  // Wheels in dark arches, hubcaps.
-  const r = body.wheelR;
-  for (const wz of [body.wheelBase / 2, -body.wheelBase / 2]) {
-    for (const side of [-1, 1]) {
-      p.paint('#141517', 0.9, 0).tube('x', side * (hw + 0.002), side * (hw + 0.003), r, wz, r + 0.07, r + 0.07, 8, true, 0, Math.PI);
-      p.paint('#1A1A1C', 0.85, 0).tube('x', side * (hw - 0.22), side * (hw + 0.012), r, wz, r, r, 12);
-      p.paint('#B4B8BC', 0.3, 1).tube('x', side * (hw + 0.012), side * (hw + 0.02), r, wz, r * 0.6, r * 0.5, 10);
-    }
-  }
-  // Bumpers, lights, grille, plates, mirrors.
-  const zf = Math.max(...low.map((q) => q[0]));
-  const zb = Math.min(...low.map((q) => q[0]));
-  // Bumpers and lights by the wheels' height, not the sills'.
-  const yl = body.wheelR - 0.02;
-  p.paint('#2A2C2E', 0.6, 0);
-  p.box(-hw + 0.04, yl - 0.02, zf - 0.12, hw - 0.04, yl + 0.16, zf + 0.04);
-  p.box(-hw + 0.04, yl - 0.02, zb - 0.04, hw - 0.04, yl + 0.16, zb + 0.12);
-  p.box(-0.42, yl + 0.26, zf - 0.08, 0.42, yl + 0.36, zf + 0.0);
-  p.paint('#F5F3EA', 0.1, 0);
-  for (const s of [-1, 1]) p.box(s * (hw - 0.34), yl + 0.24, zf - 0.1, s * (hw - 0.08), yl + 0.36, zf - 0.02);
-  p.paint('#A3161E', 0.2, 0);
-  for (const s of [-1, 1]) p.box(s * (hw - 0.36), yl + 0.28, zb + 0.02, s * (hw - 0.06), yl + 0.42, zb + 0.1);
-  p.paint('#E9E6D8', 0.4, 0);
-  p.box(-0.26, yl + 0.02, zf + 0.04, 0.26, yl + 0.13, zf + 0.06);
-  p.box(-0.26, yl + 0.2, zb - 0.02, 0.26, yl + 0.31, zb);
-  p.paint(paint, 0.2, 0);
-  for (const s of [-1, 1]) p.box(Math.min(s * hw, s * (hw + 0.12)), yb + 0.04, bf - 0.32, Math.max(s * hw, s * (hw + 0.12)), yb + 0.14, bf - 0.2);
-}
-
-function facingOut(q: V3[], towards: V3): V3 {
-  const [a, b, c] = q;
-  const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-  const v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-  let n: [number, number, number] = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
-  const l = Math.hypot(...n) || 1;
-  n = [n[0] / l, n[1] / l, n[2] / l];
-  return n[0] * towards[0] + n[1] * towards[1] + n[2] * towards[2] >= 0 ? n : [-n[0], -n[1], -n[2]];
 }
 
 // ---- street furniture -------------------------------------------------------------------
@@ -438,7 +303,7 @@ export function fieldLayers(fields: Rect[] | undefined, prefix: string): [string
 }
 
 /** Soft elliptical contact shadow (alpha falls off to the rim). */
-function blob(g: Geo, x: number, z: number, rx: number, rz: number, yaw: number, alpha: number, y = 0.02): void {
+export function blob(g: Geo, x: number, z: number, rx: number, rz: number, yaw: number, alpha: number, y = 0.02): void {
   const c = Math.cos(yaw);
   const s = Math.sin(yaw);
   const seg = 14;
@@ -481,8 +346,19 @@ export function streetKey(world: WorldStructure, view: ViewRect | null): string 
     (world.meta?.paths ?? []).length,
     (world.meta?.world?.fields ?? []).length,
     outside.length,
-    outside.reduce((a, o) => a + o.x * 31 + o.z, 0),
+    outside.reduce((a, o) => (a + poseHash(o)) | 0, 0),
   ].join('|');
+}
+
+/**
+ * A placed thing's kind and where and how it stands, hashed: the street draws other lots' things as
+ * they stand, so one moved, turned or swapped for another builds it again (`streetKey`).
+ */
+function poseHash(o: ObjectPlacement): number {
+  let h = Math.imul(o.x, 73856093) ^ Math.imul(o.z, 19349663) ^ Math.imul(o.rot * 90 + (o.turn ?? 0) + 1, 83492791);
+  h ^= Math.imul((o.offset?.[0] ?? 0) + 1000, 40503) ^ Math.imul((o.offset?.[1] ?? 0) + 1000, 2246822519 | 0) ^ Math.imul(Math.round((o.lift ?? 0) * 100), 3266489917 | 0);
+  for (let i = 0; i < o.def.length; i++) h = Math.imul(h ^ o.def.charCodeAt(i), 16777619);
+  return h;
 }
 
 /** What `planStreet` needs to know of the game: its models, and its public places' things. */
@@ -493,7 +369,7 @@ export interface StreetSource {
   entry(key: string): ModelEntry | undefined;
   /** Neighbours' windows glow only while someone is up in there (`StreetOptions.lived`). */
   lived: boolean;
-  /** The outdoor things of public places outside the viewed lot (`StreetOptions.look`). */
+  /** The outdoor things of the lots outside the viewed one, public places' and neighbours' (`StreetOptions.look`). */
   look?: ObjectLook;
 }
 
@@ -513,9 +389,15 @@ export interface StreetPlan {
   pools: Geo;
   /** Soft contact shadows (black, by vertex alpha). */
   shadows: Geo;
+  /**
+   * The viewed lot's own (the game's): its garage and the garage's coach lamp (its cap, glass and
+   * pool of light), apart from the street's meshes so they hide with the lot's ground while its
+   * basement is in view. Null when it has no garage.
+   */
+  lot: { silhouettes: SilhouettePlan; props: Geo; glow: Geo; pools: Geo } | null;
   /** Instanced models in the order they're drawn: the foliage first, then props and things; `cast`: they cast shadows. */
   batches: [key: string, items: Inst[], cast: boolean][];
-  /** Public places' things: their footprints and the boxes they're drawn as without their files, by model key. */
+  /** Other lots' things: their footprints and the boxes they're drawn as without their files, by model key. */
   footprints: Map<string, [number, number]>;
   standIns: Map<string, StandIn>;
 }
@@ -541,11 +423,11 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
   const walk = new Geo();
   const plants: Record<FoliageKind, Inst[]> = { bush: [], flowers: [], hedge: [] };
   const things = new Map<string, Inst[]>();
-  const put = (key: string, x: number, z: number, yaw: number, s = 1, sy = s) => {
+  const put = (key: string, x: number, z: number, yaw: number, s = 1, sy = s, y = 0) => {
     if (!options.has(key)) return;
     let list = things.get(key);
     if (!list) things.set(key, (list = []));
-    list.push([x, z, s, sy, yaw]);
+    list.push(y ? [x, z, s, sy, yaw, y] : [x, z, s, sy, yaw]);
   };
 
   // Footprints Sims and props must not share: objects, paths, the viewed lot.
@@ -554,21 +436,39 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
 
   // ---- neighbour houses -------------------------------------------------------------
   const specs: SilhouetteSpec[] = [];
+  // Garages: the town's (`WorldStructure.garages`, the viewed lot's too); a game from before them
+  // places the neighbours' itself.
+  const garageOf = (L: PlotLayout): SilhouetteSpec['garage'] => {
+    if (!world.garages) return L.kind === 'house' ? garage(L, blocked) : null;
+    const g = world.garages.find((g) => g.plot === L.plot.id);
+    return g ? { x0: g.x0, z0: g.z0, x1: g.x1, z1: g.z1 } : null;
+  };
   for (const L of plots) {
-    // The player's house is the game's own on its lot; seen from the menus' town it is a shell dressed like it.
-    const home = L.kind === 'home' && !view;
+    // The player's house is the game's own on its lot (only its garage drawn here); seen from the
+    // menus' town it is a shell dressed like it.
+    const home = L.kind === 'home';
     if ((L.kind !== 'house' && L.kind !== 'shop' && !home) || !L.house) continue;
+    const g = L.kind === 'shop' ? null : garageOf(L);
+    if (home && view && !g) continue;
     // (Only the game's street follows who's up: the menus' town keeps every window lit.)
-    specs.push({ ...L.house, lot: L.plot, home, front: L.front, door: L.door, garage: L.kind === 'house' ? garage(L, blocked) : null, roof: L.plot.roof, storeys: L.plot.storeys, lived: L.kind === 'house' && options.lived });
+    specs.push({ ...L.house, lot: L.plot, home, garageOnly: home && !!view, front: L.front, door: L.door, garage: g, roof: L.plot.roof, storeys: L.plot.storeys, lived: L.kind === 'house' && options.lived });
   }
-  const silhouettes = perfTime('street: silhouettes', () => planner.silhouettes(specs, world.openings ?? [], world));
+  // The viewed lot's garage is planned apart (`StreetPlan.lot`).
+  const silhouettes = perfTime('street: silhouettes', () => planner.silhouettes(specs.filter((s) => !s.garageOnly), world.openings ?? [], world));
+  const own = specs.filter((s) => s.garageOnly);
+  const lot = own.length ? { silhouettes: planner.silhouettes(own, world.openings ?? [], world), props: new Painter(new Geo()), glow: new Painter(new Geo()), pools: new Geo() } : null;
   await pace?.();
   for (const s of specs) if (s.garage) blocked.push({ x: s.garage.x0 - T, z: s.garage.z0 - T, w: s.garage.x1 - s.garage.x0 + 2 * T, d: s.garage.z1 - s.garage.z0 + 2 * T });
-  for (const [x, y, z, nx, nz] of silhouettes.lamps) {
-    glow.at(x, z).box(-0.06 + nx * 0.02, y - 0.12, -0.06 + nz * 0.02, 0.06 + nx * 0.02, y + 0.08, 0.06 + nz * 0.02);
-    props.at(x, z).paint('#26282A', 0.5, 0).box(-0.08, y + 0.08, -0.08, 0.08, y + 0.12, 0.08);
-    pool(pools, x + nx * 0.9, z + nz * 0.9, 1.7);
-  }
+  // Porch and coach lamps: a cap, the glass, a pool of light under it.
+  const lamps = (list: SilhouettePlan['lamps'], props: Painter, glow: Painter, pools: Geo) => {
+    for (const [x, y, z, nx, nz] of list) {
+      glow.at(x, z).box(-0.06 + nx * 0.02, y - 0.12, -0.06 + nz * 0.02, 0.06 + nx * 0.02, y + 0.08, 0.06 + nz * 0.02);
+      props.at(x, z).paint('#26282A', 0.5, 0).box(-0.08, y + 0.08, -0.08, 0.08, y + 0.12, 0.08);
+      pool(pools, x + nx * 0.9, z + nz * 0.9, 1.7);
+    }
+  };
+  lamps(silhouettes.lamps, props, glow, pools);
+  if (lot) lamps(lot.silhouettes.lamps, lot.props, lot.glow, lot.pools);
 
   // ---- sidewalks, kerbs, centre line, kerbside furniture ------------------------------
   const sidewalks = perfStart('street: sidewalks');
@@ -636,7 +536,7 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
       });
       // Bins out by some driveways, on the garden side of the sidewalk.
       for (const L of row) {
-        if (L.kind !== 'house' || !L.drive || hash(L.plot.x, L.plot.z, 12) > 0.6) continue;
+        if ((L.kind !== 'house' && L.kind !== 'home') || !L.drive || hash(L.plot.x, L.plot.z, 12) > 0.6) continue;
         const outer = L.drive.x + L.drive.w / 2 > L.plot.x + L.plot.w / 2 ? 1 : -1;
         const binZ = zAt(0.4);
         for (let k = 0; k < (hash(L.plot.x, L.plot.z, 13) < 0.5 ? 2 : 1); k++) {
@@ -707,6 +607,16 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
   // ---- gardens: cars, fences / hedges, flower beds -------------------------------------
   const gardens = perfStart('street: gardens');
   const neighbour = (L: PlotLayout | undefined) => !!L && L.kind === 'house';
+  // Cars on the driveways, beside the houses (not in the front yards Sims cross). The world's own
+  // (`WorldStructure.cars`) parked, in the menus' town: the game draws them, coming and going
+  // (`pc/cars.ts`). A game saved before cars has a car by some neighbours' driveways, for good.
+  const parked = (x: number, z: number, yaw: number, body: CarBody, paint: string) => {
+    paintCar(props.at(x, z, yaw, 0.015), body, paint);
+    blob(shadows, x, z, body.wid * 0.62, body.len * 0.56, yaw, 0.55, 0.03);
+  };
+  if (world.cars && !view) {
+    for (const c of world.cars) parked(c.x, c.z, c.yaw, CARS[c.body % CARS.length], CAR_PAINT[c.paint % CAR_PAINT.length]);
+  }
   for (const L of plots) {
     if (L.kind !== 'house' || !L.house) continue;
     const { plot, front } = L;
@@ -715,16 +625,8 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
     const frontWall = front > 0 ? h.z1 + T : h.z0 - T;
     const backEdge = front > 0 ? plot.z : plot.z + plot.d;
 
-    // Car on the driveway, beside the house (not in the front yard Sims cross).
-    if (L.drive && hash(plot.x, plot.z, 20) < 0.8) {
-      const body = pick(CARS, plot.x, plot.z, 21);
-      const dEnd = front > 0 ? L.drive.z : L.drive.z + L.drive.d; // inner end
-      const cz = dEnd + front * (0.45 + body.len / 2);
-      const cx = L.drive.x + L.drive.w / 2;
-      const yaw = (hash(plot.x, plot.z, 22) < 0.65 ? (front > 0 ? Math.PI : 0) : front > 0 ? 0 : Math.PI) + (hash(plot.x, plot.z, 23) - 0.5) * 0.06;
-      car(props.at(cx, cz, yaw, 0.015), body, pick(CAR_PAINT, plot.x, plot.z, 24));
-      blob(shadows, cx, cz, body.wid * 0.62, body.len * 0.56, yaw, 0.55, 0.03);
-    }
+    const legacy = !world.cars && L.drive ? parkCar(plot, L.drive, streets) : null;
+    if (legacy) parked(legacy.x, legacy.z, legacy.yaw, CARS[legacy.body], CAR_PAINT[legacy.paint]);
 
     // Fences or hedges: sides from the house front line back, and the back edge. A side
     // shared with another neighbour is drawn once, on the boundary, by the plot on its left.
@@ -821,8 +723,8 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
   perfEnd(gardens);
   await pace?.();
 
-  // ---- public places seen from another lot: shops' awnings, the things in the open ------
-  const publicPlaces = perfStart('street: public places');
+  // ---- other lots seen from this one: shops' awnings, the things in the open ------------
+  const otherLots = perfStart('street: other lots');
   for (const L of plots) {
     if (L.kind === 'shop' && L.house) {
       // A striped awning along the shop front, over the windows and the door.
@@ -844,8 +746,11 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
       for (const u of [-half, half]) props.box(u - 0.02, 2.2, 0, u + 0.02, 2.24, 0.95);
       blob(shadows, (x0 + x1) / 2, frontWall + L.front * 0.6, half, 0.6, 0, 0.25, 0.02);
     }
-    // The outdoor things of a public place (the overview draws every lot's things itself).
-    if (!view || !options.look || L.kind === 'home' || L.kind === 'house' || L.kind === 'empty') continue;
+    // The outdoor things of a public place or a neighbour's garden, where the lot would draw them:
+    // the lawn round the viewed lot is cleared under every lot's things (`lawnMask`), so a thing left
+    // out would leave a bare patch. Indoor ones stay hidden in the silhouettes. (The overview draws
+    // every lot's things itself.)
+    if (!view || !options.look || L.kind === 'home') continue;
     const W = world.width;
     const D = groundDepth(world);
     for (const o of outside) {
@@ -857,29 +762,30 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
       footprints.set(look.model, look.footprint);
       standIns.set(look.model, look.standIn);
       const c = objectCentre(o);
+      // (As `lotContents.ts` places it: its model's own variation by tile, and a thing on a top on it.)
       const { turn, size } = placementVariation(options.entry(look.model)?.vary ?? 0, o.x, o.z);
-      put(look.model, c.x, c.z, (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn, size);
+      put(look.model, c.x, c.z, (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn, size, size, o.lift ?? 0);
     }
   }
 
-  perfEnd(publicPlaces);
+  perfEnd(otherLots);
   await pace?.();
 
   const batches: StreetPlan['batches'] = [
     ...(Object.keys(FOLIAGE) as FoliageKind[]).map((kind): [string, Inst[], boolean] => [FOLIAGE[kind], plants[kind], kind === 'hedge']),
     ...[...things].map(([key, list]): [string, Inst[], boolean] => [key, list, true]),
   ];
-  return { silhouettes, specs, walk, props: props.geo, glow: glow.geo, pools, shadows, batches, footprints, standIns };
+  return { silhouettes, specs, walk, props: props.geo, glow: glow.geo, pools, shadows, lot: lot && { silhouettes: lot.silhouettes, props: lot.props.geo, glow: lot.glow.geo, pools: lot.pools }, batches, footprints, standIns };
 }
 
 /**
  * An instance's matrix (game space, in the layout of `shared/math.ts`) into `out` at `offset`: at
- * (x, 0, z), turned by `yaw`, scaled `s` across and `sy` up (`flat`: not along z, a hedge stretched
+ * (x, y, z), turned by `yaw`, scaled `s` across and `sy` up (`flat`: not along z, a hedge stretched
  * along its run).
  */
 export function instanceMatrix(item: Inst, flat: boolean, out: Float32Array, offset: number): void {
-  const [x, z, s, sy, yaw] = item;
-  compose(s, sy, flat ? 1 : s, quatYawPitchRoll(yaw, 0, 0, scratchQ), x, 0, z, scratchM);
+  const [x, z, s, sy, yaw, y = 0] = item;
+  compose(s, sy, flat ? 1 : s, quatYawPitchRoll(yaw, 0, 0, scratchQ), x, y, z, scratchM);
   out.set(scratchM, offset);
 }
 const scratchQ: Quat = [0, 0, 0, 1];
@@ -917,12 +823,19 @@ function layout(world: WorldStructure, view: ViewRect | null, streets: Rect[], p
   return out;
 }
 
-/** A garage at the inner end of the driveway, beside the house, when it fits. */
+/** A garage at the inner end of the driveway, beside the house, when it fits (`garageFor`). */
 function garage(L: PlotLayout, blocked: Rect[]): SilhouetteSpec['garage'] {
-  const d = L.drive;
-  const h = L.house;
-  if (!d || !h || hash(L.plot.x, L.plot.z, 50) > 0.7) return null;
-  const { plot, front } = L;
+  return L.drive && L.house ? garageFor(L.plot, L.house, L.drive, L.front, blocked) : null;
+}
+
+/**
+ * The garage of the house (`h`: its wall box) on `plot` at the inner end of its driveway `d` (the
+ * street on its `front` side), when it has one (about seven in ten) and it fits clear of
+ * `blocked` (things on the lot): wall centre lines. The town as it's made decides it
+ * (`game/town.ts`, the sim's `garages`), and so the menus and the game agree.
+ */
+export function garageFor(plot: Rect, h: { x0: number; z0: number; x1: number; z1: number }, d: Rect, front: 1 | -1, blocked: readonly Rect[]): SilhouetteSpec['garage'] {
+  if (hash(plot.x, plot.z, 50) > 0.7) return null;
   // As wide as the drive and a little more, at least a single garage's `GARAGE_WIDTH`, moved
   // (off the drive's middle if it must) to stand clear of the house and the plot's edge.
   const toRight = d.x >= h.x1;
@@ -940,7 +853,7 @@ function garage(L: PlotLayout, blocked: Rect[]): SilhouetteSpec['garage'] {
 }
 
 /** A fence or hedge along a line, skipping stretches that would run through objects. */
-function edgeRun(style: 'picket' | 'hedge' | 'rail', props: Painter, hedges: [number, number, number, number, number][], x0: number, z0: number, x1: number, z1: number, blocked: Rect[]): void {
+function edgeRun(style: 'picket' | 'hedge' | 'rail', props: Painter, hedges: Inst[], x0: number, z0: number, x1: number, z1: number, blocked: Rect[]): void {
   const len = Math.hypot(x1 - x0, z1 - z0);
   if (len < 1) return;
   const step = 2;

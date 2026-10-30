@@ -1520,6 +1520,29 @@ struct StructureView<'a> {
     /// The town's servers (`staff.rs`), in their snapshot rows' order (after the residents').
     #[serde(skip_serializing_if = "Vec::is_empty")]
     staff: Vec<StaffView>,
+    /// Households' cars (`cars.rs`), in their snapshot rows' order (`snapshot::car`). Left out
+    /// when there are none (a game saved before cars: the renderer parks its own by the
+    /// neighbours' driveways).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cars: Vec<CarView>,
+    /// Garages at the inner ends of driveways (`cars::Garage`); left out when there are none.
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    garages: &'a [crate::cars::Garage],
+}
+
+/// A household's car: where it's parked (its middle, its yaw), its size and look, and who owns it.
+#[derive(Serialize)]
+struct CarView {
+    plot: u32,
+    household: u32,
+    x: f32,
+    z: f32,
+    yaw: f32,
+    len: f32,
+    wid: f32,
+    body: u8,
+    paint: u8,
+    owners: Vec<u32>,
 }
 
 /// One of the town's servers: what they look like (`seed`, the renderer makes the look) and the
@@ -2097,6 +2120,24 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                     .collect(),
             })
             .collect(),
+        cars: world
+            .cars
+            .iter()
+            .take(crate::cars::MAX_CARS)
+            .map(|c| CarView {
+                plot: c.plot,
+                household: c.household,
+                x: c.spot[0],
+                z: c.spot[1],
+                yaw: c.yaw,
+                len: c.len,
+                wid: c.wid,
+                body: c.body,
+                paint: c.paint,
+                owners: c.owners.clone(),
+            })
+            .collect(),
+        garages: &world.garages,
     })
     .expect("structure serializes")
 }

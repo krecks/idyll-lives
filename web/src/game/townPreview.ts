@@ -7,12 +7,12 @@
  */
 
 import type { Content } from '../content/content';
-import type { ObjectPlacement, Opening, PlotInfo, WallEdge, WorldStructure } from '../core/protocol';
+import type { CarInfo, ObjectPlacement, Opening, PlotInfo, WallEdge, WorldStructure } from '../core/protocol';
 import { layoutTown, worldLook, type NeighbourhoodDraft, type Templates, type TownMeta } from './town';
 
 const EMPTY_MESH = { positions: new Float32Array(0), normals: new Float32Array(0), uvs: new Float32Array(0), indices: new Uint32Array(0) };
 
-/** World structure of a draft (`playerSlot` gets no driveway and is drawn as the player's house, as in the game). */
+/** World structure of a draft (`playerSlot` is drawn as the player's house, as in the game). */
 export function previewWorld(content: Content, t: Templates, town: NeighbourhoodDraft, playerSlot: number | null = null): WorldStructure {
   const layout = layoutTown(content, t, town, playerSlot);
   const W = town.width;
@@ -110,5 +110,7 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     openings,
     meta,
     meshes: { walls: EMPTY_MESH, wallsLow: EMPTY_MESH, floors: EMPTY_MESH },
+    garages: layout.garages,
+    cars: layout.cars.map(({ plot, x, z, yaw, len, wid, body, paint }): CarInfo => ({ plot, household: -1, x, z, yaw, len, wid, body, paint, owners: [] })),
   };
 }

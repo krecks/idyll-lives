@@ -56,7 +56,10 @@
 //! was 1 × 1): an older file's goes over the tile it stood on where it fits, else at a free spot
 //! at home, else it is sold back (`migrate_32_grown`); and an older file's posts in town (content
 //! `staff`) with their back to a wall move a tile out from it, where there's room, for their server
-//! (`World::nudge_post`). Older files load. Saves
+//! (`World::nudge_post`); 34 = households' cars (`cars`: where each parks, its look, its
+//! owners and where it is on its day out), every house's driveway (`drives`, where a car goes
+//! when its household moves) and the garages on them (`garages`); absent: none, and the renderer draws the cars it used to draw,
+//! parked for good. Older files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
 
@@ -74,7 +77,7 @@ use crate::social::{self, Relationship};
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 33;
+pub const SAVE_VERSION: u32 = 34;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -136,6 +139,13 @@ pub struct SaveFile {
     /// The next item's id (ids are never reused).
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub next_item: u32,
+    /// Households' cars, and every house's driveway (absent before v34: none).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cars: Vec<crate::cars::Car>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub drives: Vec<crate::cars::Drive>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub garages: Vec<crate::cars::Garage>,
 }
 
 /// Food or a dish somewhere, by content id (unknown ones are dropped on load).
@@ -952,6 +962,9 @@ impl World {
                 .collect(),
             next_event_id: self.events.last_id(),
             former: self.former.clone(),
+            cars: self.cars.clone(),
+            drives: self.drives.clone(),
+            garages: self.garages.clone(),
             items: self
                 .items
                 .list
@@ -1544,6 +1557,7 @@ impl World {
         world.items.next_id = save.next_item.max(after_last);
         world.make_storeys();
         world.refresh_rooms();
+        crate::cars::load(&mut world, &save.cars, &save.drives, &save.garages);
         // What someone was eating or washing up is put down (those don't go on after loading).
         crate::cooking::settle(&mut world);
         Ok(world)

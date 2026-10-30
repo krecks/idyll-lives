@@ -6,9 +6,9 @@
  * nothing here places a blade. What the GPU reads is made here:
  *
  * - `GrassField`: the land round the town in two textures. `colour` (RGBA, 1 texel a metre over the
- *   town and `GRASS.margin` round it): the ground's own colour under the grass (sRGB, the terrain's
- *   vertex colour, `LandscapeLayout.terrainColour`) and, in alpha, how grassy the land is out
- *   there (roads, water, sand, fields, rock: none). `town` (one byte a texel, `GRASS.townTexels`
+ *   town and its margin round it, `grassMargin`): the ground's own colour under the grass (sRGB,
+ *   the terrain's vertex colour, `LandscapeLayout.terrainColour`) and, in alpha, how grassy the
+ *   land is out there (roads, water, sand, fields, rock: none). `town` (one byte a texel, `GRASS.townTexels`
  *   a metre over the town's ground): the lawn as it grows now, none indoors, under furniture, on
  *   patios, streets, paths and fields, nor right by a wall (`townGrass`, again on `refreshLawn`).
  * - Which 2 m patches have any grass at all (`patches`), and each one's height and slope.
@@ -27,8 +27,25 @@ const PER_PATCH = 448;
 const LOD_COUNT = 7;
 
 export const GRASS = {
-  /** How far the grass grows round the town (m). */
+  /** How far the grass grows round the town (m), at least (`grassMargin`). */
   margin: 40,
+  /**
+   * And at least this many of the preset's reaches: the field starts fading at 0.7 of its margin,
+   * so an eye at the town's edge sees the blades end where they would in town, by its own reach,
+   * past where they take the lawn's plain colour (`LAWN.blend`, `shaders/grass.ts`).
+   */
+  marginReach: 1.2,
+  /**
+   * And the whole landscape round the town (its `LandscapeLayout.ring`): the camera can be taken out
+   * over the meadows, and the grass grows on there (it's drawn only near the eye, wherever that is;
+   * a wider field costs only its build: about 110 ms over a town's loading, 195 ms a world's).
+   */
+  marginRing: 1,
+  /**
+   * Past the margin, the lawn's tone on the ground (`GAME_GRASS_GROUND`: as dark as the blades and
+   * the shade between them average, and its gusts) fades into the land's own colour over this far (m).
+   */
+  toneFade: 90,
   /** The town mask's texels a metre. */
   townTexels: 4,
   /** Patches (m square): the grass is drawn a patch at a time. */
@@ -76,6 +93,8 @@ export interface GrassLand {
 export interface GrassField {
   x0: number;
   z0: number;
+  /** How far it reaches round the town (m; `grassMargin`). */
+  margin: number;
   /** The colour texture's texels (1 a metre) across and deep. */
   w: number;
   d: number;
@@ -93,9 +112,18 @@ export interface GrassField {
   ground: Float32Array;
 }
 
-/** The grass of a town as the land grows it (the town's mask comes with `townGrass`, again whenever the lot changes). */
-export async function grassField(world: WorldStructure, land: GrassLand, pace?: () => Promise<void>): Promise<GrassField> {
-  const m = GRASS.margin;
+/**
+ * How far the grass grows round the town (m) for blades drawn within `radius` m of the eye
+ * (`GrassQuality.radius`), in a landscape reaching `ring` m round it: at least `GRASS.margin`,
+ * `GRASS.marginReach` reaches and `GRASS.marginRing` of the landscape.
+ */
+export function grassMargin(radius: number, ring = 0): number {
+  return Math.max(GRASS.margin, radius * GRASS.marginReach, ring * GRASS.marginRing);
+}
+
+/** The grass of a town as the land grows it, `margin` m round it (the town's mask comes with `townGrass`, again whenever the lot changes). */
+export async function grassField(world: WorldStructure, land: GrassLand, pace?: () => Promise<void>, margin: number = GRASS.margin): Promise<GrassField> {
+  const m = margin;
   const [tw, td] = [world.width, groundDepth(world)];
   const x0 = -m;
   const z0 = -m;
@@ -109,9 +137,10 @@ export async function grassField(world: WorldStructure, land: GrassLand, pace?: 
       // (Texel centres: the GPU filters between them.)
       const x = x0 + i + 0.5;
       const z = z0 + j + 0.5;
-      const lawn = land.terrainColour(x, z, land.heightAt(x, z), tmp);
-      // Fading out towards the margin's edge, where the blades stop.
+      // Fading out towards the margin's edge, where the blades stop (past it, in the corners, none: nothing reads it).
       const edge = 1 - smoothstep(m * 0.7, m * 0.95, land.distanceToTown(x, z));
+      if (edge <= 0) continue;
+      const lawn = land.terrainColour(x, z, land.heightAt(x, z), tmp);
       const o = (j * w + i) * 4;
       colour[o] = byte(tmp.r);
       colour[o + 1] = byte(tmp.g);
@@ -140,7 +169,7 @@ export async function grassField(world: WorldStructure, land: GrassLand, pace?: 
       ground[k + 2] = sz;
     }
   }
-  const field: GrassField = { x0, z0, w, d, colour, townW: 0, townD: 0, town: new Uint8Array(0), pw, pd, patches: new Uint8Array(pw * pd), ground };
+  const field: GrassField = { x0, z0, margin: m, w, d, colour, townW: 0, townD: 0, town: new Uint8Array(0), pw, pd, patches: new Uint8Array(pw * pd), ground };
   townGrass(field, world);
   return field;
 }

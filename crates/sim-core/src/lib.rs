@@ -9,6 +9,7 @@
 pub mod ai;
 pub mod blueprint;
 pub mod carry;
+pub mod cars;
 pub mod clock;
 pub mod command;
 pub mod content;

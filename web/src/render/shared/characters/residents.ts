@@ -149,6 +149,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private footstools: PlacedObject[] = [];
   /** Where an object's moving seat has its riders now (`ObjectMotion.ride`): world space, from rest. */
   private rideOf: ((objectId: number) => ArrayLike<number> | null) | null = null;
+  /** The seat of a car someone sits in at (x, z), getting in or out (`setCarSeat`). */
+  private carSeatAt: ((x: number, z: number) => Seat | null) | null = null;
   /** Scratch for `riding`: the placement as a matrix, then moved by the ride. */
   private readonly rideM = new Float32Array(16);
   /** The lanes others have taken on what `freeLane` looks at (scratch). */
@@ -1977,7 +1979,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       hands = tag === 'lift' ? HANDS.grip : HANDS.open;
     } else if (pose === Pose.Sit) {
       const obj = known ? this.seatUnder(rig, useObj) : this.objectAt(rig.x, rig.z);
-      const seat = obj?.seat ?? DEFAULT_SEAT;
+      // (Sat in a car, getting in or out: its seat, lower than a chair's.)
+      const seat = obj?.seat ?? (obj ? null : this.carSeatAt?.(rig.x, rig.z)) ?? DEFAULT_SEAT;
       // A seat on the floor (a floor cushion) is sat on cross-legged, by its own clips.
       const floor = floorSit(seat.h - (obj?.lift ?? 0));
       rig.floorSat = floor;
@@ -2746,6 +2749,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const was = this.pulled.get(rig.tuckSeat);
       this.pulled.set(rig.tuckSeat, was === undefined ? rig.tuck : Math.min(was, rig.tuck));
     }
+  }
+
+  /** The seat of the car at a spot, for those sitting there with no object under them (getting in or out of it: `pc/cars.ts`). */
+  setCarSeat(seatAt: ((x: number, z: number) => Seat | null) | null): void {
+    this.carSeatAt = seatAt;
   }
 
   /** Where residents sitting or lying on an object are carried by its moving seat (`ObjectMotion.ride`). */

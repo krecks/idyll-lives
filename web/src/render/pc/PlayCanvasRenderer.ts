@@ -56,6 +56,7 @@ import { shadingFromSettings, softLookFromURL } from './shaders/softLook';
 import { drawRoads } from './roads';
 import { createWorldRoot, toEngine } from './space';
 import { Street } from './street';
+import { Cars } from './cars';
 import { SelectionMarker } from './selectionMarker';
 import { SunShadows } from './sunShadows';
 import { TemplateCache } from './templateCache';
@@ -65,7 +66,7 @@ import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
 import { DOOR_SWING, ease, goingThrough, shutDefs } from '../shared/doors';
-import { createLighting, lightingAt, type RGB } from '../shared/environment';
+import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
 import { GAME_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
 import { GrassPush } from '../shared/grass';
@@ -150,11 +151,25 @@ const ROOF_MIN_DISTANCE = 15;
 /** Main-thread time (ms) a world build runs before the frames it runs behind get one (`pace`). */
 const BUILD_SLICE_MS = 8;
 /**
- * A basement in view gets no sun, only this much of the sky fill and the environment (as seen,
- * intensity times exposure: the same by day and by night).
+ * Daylight doesn't reach under the ground or into a room without windows: no sun, only this much
+ * of the sky fill and the environment (as seen, intensity times exposure: the same by day and by
+ * night). A windowless room up here keeps that little, so its lamps tell. The basement in view
+ * gets more, a soft fill to see it by: all its rooms are windowless, and residents switch an empty
+ * room's lamps off (sim-core `lights.rs`), so it would be lit only where someone is. Still well
+ * under daylight, so a lit room shows warm against the rest. By night its fill is as bright as by
+ * day (lamps or not): the night's dim, deep blue sky lifted to it, its colour's brightness against
+ * noon's too (`skyLuma`), up to `BASEMENT_NIGHT_GAIN` times; a windowless room's share stops at the
+ * night's own.
  */
-const BASEMENT_SKY = 0.12;
-const BASEMENT_ENV = 0.12;
+const WINDOWLESS_SKY = 0.12;
+const WINDOWLESS_ENV = 0.12;
+const BASEMENT_SKY = 0.35;
+const BASEMENT_ENV = 0.35;
+const BASEMENT_NIGHT_GAIN = 12;
+/** How much of the moonlight grade (`nightGrade.ts`) is left while the basement is in view. */
+const BASEMENT_NIGHT_GRADE = 0.3;
+/** How bright the sky fill's colours are at noon (`skyLuma`): the basement's fill is matched to it. */
+const NOON_SKY_LUMA = skyLuma(lightingAt(13 * 60, LOOK, createLighting()));
 
 /** Residents this far (m) outside the viewed lot are still drawn (walking up to it). */
 const SIM_VIEW_MARGIN = 2;
@@ -192,6 +207,12 @@ function lightMixFromURL(): [number, number, number] | null {
 }
 
 /** A hex colour (sRGB) in linear light (`pow(c, 2.2)`). */
+/** How bright a sky fill of `l`'s colours is, for an intensity of 1: the luminance of its sky and ground, averaged (linear). */
+function skyLuma(l: Lighting): number {
+  const luma = (c: RGB) => 0.2126 * toLinear(c.r) + 0.7152 * toLinear(c.g) + 0.0722 * toLinear(c.b);
+  return Math.max((luma(l.skyColor) + luma(l.groundColor)) / 2, 1e-3);
+}
+
 function linearHex(hex: string): RGB {
   const v = parseInt(hex.slice(1), 16);
   return { r: toLinear(((v >> 16) & 255) / 255), g: toLinear(((v >> 8) & 255) / 255), b: toLinear((v & 255) / 255) };
@@ -306,6 +327,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The viewed lot's house, the street's houses (`house.ts`), and the street (`street.ts`). */
   private house!: HouseBuilder;
   private street!: Street;
+  /** Households' cars, parked and on the road (`cars.ts`). */
+  private cars!: Cars;
   /** What grows and stands on the lot: the landscape and sky, objects and their clips, items (`lotContents.ts`). */
   private lot!: LotContents;
   /** The viewed house's interior lights (`lamps.ts`). */
@@ -524,7 +547,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const c = this.deps.content;
     this.shutDefs = shutDefs(c);
     this.house.setLooks({ coverings: c.wallCoverings, floors: c.floorCoverings, doors: c.doorStyles, windows: c.windowStyles, roofs: c.roofStyles, roofColors: c.roofColors, shuts: this.shutDefs });
-    // Public places seen from another lot show their things in the open (as the overview does).
+    // Other lots show their things in the open, public places' and neighbours' gardens' (as the overview does).
     this.street = new Street(this.app, this.root, this.deps.assets, this.house, {
       lived: true,
       look: (def) => {
@@ -534,6 +557,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       lod: this.quality.streetLod,
       shadows: this.quality.streetShadows,
     });
+    this.cars = new Cars(this.app, this.root, this.quality.streetShadows);
+    this.characters.setCarSeat((x, z) => this.cars.seatAt(x, z));
     this.decorTemplates = new TemplateCache(this.app);
     this.storeyLayer = new pc.Entity('storeyLayer');
     this.root.addChild(this.storeyLayer);
@@ -945,6 +970,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.placeRoomLights(world, view);
     await this.pace();
     await this.street.build(world, this.view, () => this.pace());
+    this.cars.build(world);
     await this.lot.buildObjects(world); // (the objects, their clips, contact shadows, items.)
     this.mirrors.set(this.lot.mirrors);
     this.placing.objectsBuilt(); // (the thing in hand hidden in them.)
@@ -1005,21 +1031,30 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sliceStart = performance.now();
   }
 
-  /** Roads, garden paths and farm fields from the town metadata, each a flat mesh. */
+  /**
+   * Roads, garden paths and farm fields from the town metadata, each a flat mesh. Those on the
+   * viewed lot (its garden paths and driveway, a farm's fields) are a mesh of their own, on its
+   * ground: hidden with it while the basement is in view.
+   */
   private buildStreets(world: WorldStructure): void {
     const layers: [string, { x: number; z: number; w: number; d: number }[] | undefined, string, number][] = [
       ['streets', world.meta?.streets, 'material.road', 0.012],
       ['paths', world.meta?.paths, 'material.path', 0.014],
       ...fieldLayers(world.meta?.world?.fields, ''),
     ];
+    const v = this.view;
+    const onLot = (r: { x: number; z: number; w: number; d: number }) => !!v && r.x >= v.x && r.z >= v.z && r.x + r.w <= v.x + v.w && r.z + r.d <= v.z + v.d;
     for (const [name, all, material, y] of layers) {
       // Only the stretch of road in front of the viewed lot.
       const rects = all?.map((r) => this.clipToView(r, STREET_MARGIN)).filter((r) => r !== null);
       if (!rects?.length) continue;
-      const geo = new Geo();
-      for (const r of rects) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-      const mesh = meshFrom(this.device, geo.meshData());
-      if (mesh) this.lotEntities.push({ entity: drawMesh(this.root, name, mesh, this.lotMaterial(material)) });
+      for (const [list, storey] of [[rects.filter(onLot), 0], [rects.filter((r) => !onLot(r)), undefined]] as const) {
+        if (!list.length) continue;
+        const geo = new Geo();
+        for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+        const mesh = meshFrom(this.device, geo.meshData());
+        if (mesh) this.lotEntities.push({ entity: drawMesh(this.root, name, mesh, this.lotMaterial(material)), storey });
+      }
     }
   }
 
@@ -1175,9 +1210,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private buildPit(view: ViewRect, margin = PIT_MARGIN, storey = -1): void {
     const [x0, z0, x1, z1] = [view.x - margin, view.z - margin, view.x + view.w + margin, view.z + view.d + margin];
     const [y0, y1] = [-WALL_HEIGHT - 0.03, 0];
-    const geo = new Geo().color('#6B5440');
+    // (The soil's own colour on the floor, the walls a shade darker: the vertex colours tint it.)
+    const geo = new Geo().color('#FFFFFF');
     geo.poly([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], [0, 1, 0]);
-    geo.color('#4A3A2C');
+    geo.color('#B4A898');
     geo.poly([[x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [x1, y0, z0]], [0, 0, 1]);
     geo.poly([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [0, 0, -1]);
     geo.poly([[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], [1, 0, 0]);
@@ -1202,6 +1238,22 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // The basement itself in view: no daylight down there.
     dig.on = on;
     dig.under = on && this.storey < 0;
+    this.applyUnderLight();
+  }
+
+  /**
+   * The share of daylight under the ground and in rooms without windows (`DigState.lit`), at the
+   * last lighting update: the basement's while it is in view (its fill), else the windowless
+   * rooms' (the only ones that read it then: `darkTiles` marks none from the basement). With the
+   * basement in view the moonlight grade is softened too (`BASEMENT_NIGHT_GRADE`): no moon down there.
+   */
+  private applyUnderLight(): void {
+    const l = this.lighting;
+    if (this.post) this.post.night = l.night * LOOK.nightGrade * (this.storey < 0 && !this.townMode ? BASEMENT_NIGHT_GRADE : 1);
+    const under = this.storey < 0;
+    const [sky, env, most] = under ? [BASEMENT_SKY * (NOON_SKY_LUMA / skyLuma(l)), BASEMENT_ENV, BASEMENT_NIGHT_GAIN] : [WINDOWLESS_SKY, WINDOWLESS_ENV, 1];
+    const seen = Math.max(l.exposure, 1e-3);
+    this.lib.dig.lit.set(0, Math.min(most, sky / Math.max(l.skyIntensity * seen, 1e-3)), Math.min(most, env / Math.max(l.envIntensity * seen, 1e-3)), 0);
   }
 
   /**
@@ -1305,6 +1357,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.clearLot();
     this.lotParts = null;
     this.street.clear();
+    this.cars.clear();
     this.windowless = { rooms: new Set(), of: [] };
     this.dimming = null;
     this.applyDimming();
@@ -1385,10 +1438,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sunShadows.moved();
   }
 
-  /** Storeys above the one in view are hidden (walls, floors, roofs), and the garden while the basement is. */
+  /**
+   * Storeys above the one in view are hidden (walls, floors, roofs), and the lot's ground while the
+   * basement is: its garden, paths and fences, its garage (the street's, `Street.showLot`) and a
+   * car standing on it (`Cars.hideOn`).
+   */
   private applyStoreys(): void {
     for (const { entity, storey } of this.lotEntities) if (storey !== undefined) entity.enabled = storeyShown(storey, this.storey);
     for (const p of this.decor.values()) for (const d of p.draws) d.enabled = this.storey >= 0 && d.count > 0;
+    const v = this.view;
+    this.street.showLot(this.storey >= 0);
+    this.cars.hideOn(this.storey < 0 && v ? [v.x - PIT_MARGIN, v.z - PIT_MARGIN, v.x + v.w + PIT_MARGIN, v.z + v.d + PIT_MARGIN] : null);
     this.applyDig();
     this.sunShadows.moved();
   }
@@ -1559,6 +1619,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.lot.update(frame)) this.mirrors.changed(); // (the objects' clips, the screens; things moving, in the held reflections.)
     this.placing.frame(this.frameDt); // (the effects, the thing in hand.)
     this.updateSims(frame);
+    this.cars.update(frame);
+    if (this.cars.moved) this.sunShadows.moved(false); // (a car's shadow goes with it.)
     this.birdLife.update(frame, minute, this.frameDt, this.characters, this.simCount); // (after the residents, who scare them.)
     if (this.roofs.length && this.roofVisible() !== this.roofShown) {
       this.roofShown = !this.roofShown;
@@ -1792,13 +1854,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.app.scene.fog.color.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
     this.camera.camera.clearColor = this.colorTmp.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
     // The look's exposure for the hour and the moonlight grade (`post.ts`: uniforms).
-    if (this.post) {
-      this.post.exposure = l.exposure * LOOK.exposure;
-      this.post.night = l.night * LOOK.nightGrade;
-    }
-    // Under the ground (a basement in view, see `applyDig`) daylight doesn't reach.
-    const seen = Math.max(l.exposure, 1e-3);
-    this.lib.dig.lit.set(0, Math.min(1, BASEMENT_SKY / Math.max(l.skyIntensity * seen, 1e-3)), Math.min(1, BASEMENT_ENV / Math.max(l.envIntensity * seen, 1e-3)), 0);
+    if (this.post) this.post.exposure = l.exposure * LOOK.exposure;
+    this.applyUnderLight(); // (and the moonlight grade.)
     // Glowing windows outside at night, cool daylight in the panes by day; the street's lamps; the garden's pools.
     this.lampsLevel = l.lamps;
     this.lot.applyLighting(l); // (the sky, the night clips, the shades' glow.)
@@ -2424,6 +2481,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.unlistenFiles = null;
     this.overview?.destroy();
     this.street?.destroy();
+    this.cars?.destroy();
     this.gardenPools?.destroy();
     for (const p of this.decor.values()) for (const d of p.draws) d.destroy();
     this.decor.clear();

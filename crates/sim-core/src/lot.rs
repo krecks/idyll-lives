@@ -194,6 +194,15 @@ pub struct LotFile {
     /// Where Sims leave town (for work) and come back. Optional.
     #[serde(default)]
     pub exits: Vec<[f32; 2]>,
+    /// Households' cars on their driveways (`cars.rs`). Optional.
+    #[serde(default)]
+    pub cars: Vec<crate::cars::CarRaw>,
+    /// Every house's driveway, where a car parks (`cars.rs`). Optional.
+    #[serde(default)]
+    pub drives: Vec<crate::cars::Drive>,
+    /// Garages at the inner ends of driveways (`cars.rs`). Optional.
+    #[serde(default)]
+    pub garages: Vec<crate::cars::Garage>,
     /// Opaque data for the presentation layer (streets, scenery seed...). Saved unchanged.
     #[serde(default)]
     pub meta: serde_json::Value,
