@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { menuScene } from '../../game/menuScene';
-  import { houseTemplate, loadTemplates, lotDims, vacantSlots, withLotSize, type LotSize, type PlotSlot, type Templates } from '../../game/town';
+  import { houseTemplate, loadTemplates, slotDims, vacantSlots, withGarden, type PlotSlot, type Templates } from '../../game/town';
+  import type { GardenSize } from '../../game/housegen';
   import { residentsOf, sleepersOf } from '../../game/household';
   import { app } from '../app.svelte';
   import { money } from '../format';
@@ -12,7 +13,7 @@
   import { services } from '../services';
 
   let templates = $state.raw<Templates | null>(null);
-  /** Changes when a lot is made bigger or smaller (the lots along the street move). */
+  /** Changes when a lot's garden is made bigger or smaller (the lots along the street move). */
   const town = $derived(app.town!);
   const household = app.household!;
   const economy = services.content.economy;
@@ -20,10 +21,10 @@
   const vacantIds = $derived(vacant.map((v) => v.index));
   let selectedIndex = $state<number | null>(vacantSlots(app.town!).find((v) => v.index === app.homeSlot)?.index ?? vacantSlots(app.town!)[0]?.index ?? null);
   const selected = $derived(selectedIndex === null ? null : (town.slots[selectedIndex] ?? null));
-  const lotSize = $derived<LotSize>(selected?.lot ?? 'medium');
-  const dims = $derived(templates && selected ? lotDims(templates, selected.lot) : null);
-  function setLotSize(size: LotSize) {
-    if (templates && selected) app.town = withLotSize(templates, town, selected.index, size);
+  const garden = $derived<GardenSize | undefined>(selected?.garden);
+  const dims = $derived(templates && selected ? slotDims(templates, selected) : null);
+  function setGarden(size: GardenSize) {
+    if (templates && selected) app.town = withGarden(templates, town, selected.index, size);
   }
   let hover = $state<number | null>(null);
   /** The camera is on the chosen lot (false: the whole town). */
@@ -186,11 +187,11 @@
             ]}
           />
         {/if}
-        <!-- A farm keeps its size (its fields and farmyard come with it). -->
-        {#if templates?.lotSizes && lotSize !== 'farm'}
+        <!-- A generated house's lot is cut to fit it: its garden can be made bigger or smaller. A farm keeps its size (its fields and farmyard come with it). -->
+        {#if garden && selected.lot !== 'farm'}
           <div class="lot-size">
-            <span class="eyebrow">Lot size</span>
-            <Segmented label="Lot size" bind:value={() => lotSize, setLotSize} options={[{ value: 'small', label: 'Small' }, { value: 'medium', label: 'Medium' }, { value: 'large', label: 'Large' }]} />
+            <span class="eyebrow">Garden</span>
+            <Segmented label="Garden" bind:value={() => garden, setGarden} options={[{ value: 'snug', label: 'Snug' }, { value: 'roomy', label: 'Roomy' }, { value: 'big', label: 'Big' }]} />
           </div>
         {/if}
         {#key `${selected.index}:${lot}:${selected.template}`}

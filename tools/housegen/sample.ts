@@ -6,17 +6,22 @@
  * Each house is furnished for one of a few households in turn (empty, a couple, two friends, a
  * family) and checked here against them all: the same layout for each, beds enough, no toys
  * without children, no bathroom off the room the front door opens into, the front door into a
- * shared room, no way through a bathroom, a laundry or a bedroom. Problems are listed (and the exit code is 1).
+ * shared room, no way through a bathroom, a laundry or a bedroom, and a lot cut to fit the house
+ * (the garden sizes in turn) that it covers no more and no less of than `COVER` says. Problems
+ * are listed (and the exit code is 1).
  *
  * Run: bun tools/housegen/sample.ts out.json [houses per lot size]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import type { ObjectDef } from '../../web/src/content/content.ts';
-import type { HouseGenConfig, Residents } from '../../web/src/game/housegen.ts';
+import type { GardenSize, HouseGenConfig, Residents } from '../../web/src/game/housegen.ts';
 import type { HouseTemplate } from '../../web/src/game/town.ts';
 
-const { generateHouse, objectInfos } = await import('../../web/src/game/housegen.ts');
+const { GARDEN_SIZES, generateHouse, objectInfos } = await import('../../web/src/game/housegen.ts');
+
+/** How much of its lot a house covers (its ground floor), by garden size: least and most. */
+const COVER: Record<GardenSize, [number, number]> = { snug: [0.2, 0.6], roomy: [0.16, 0.45], big: [0.12, 0.32] };
 
 const root = new URL('../../web/public/content/', import.meta.url);
 const cfg = JSON.parse(readFileSync(new URL('housegen.json', root), 'utf8')) as HouseGenConfig;
@@ -87,18 +92,23 @@ function check(h: HouseTemplate, who: Residents | undefined): string[] {
   return out;
 }
 const stats = { tried: 0, made: 0, two: 0, basements: 0, value: 0, seats: 0, dining: 0, tops: 0, rooms: 0, backs: 0, gardenDoors: 0 };
+/** Per house size and garden size: how much of the lot houses cover (each house's share). */
+const covers = new Map<string, number[]>();
 // Per room kind: how many, their floor in all, the biggest (tiles).
 const kinds = new Map<string, { n: number; area: number; most: number; long: number }>();
 // A farm lot's house is a large lot's (town.ts `houseLot`).
 for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => size !== 'farm')) {
   for (let seed = 1; seed <= perSize; seed++) {
     stats.tried++;
-    const variants = households.map(([name, who]) => [name, who, generateHouse(cfg, info, lot, houses.plot, size, seed * 7919, baseFile.roomRules?.lampTiles, baseFile.roomRules?.windowTiles, who)] as const);
-    if (variants.some(([, , v]) => !v !== !variants[0][2])) problems.push(`${size} ${seed * 7919}: made for some households, not others`);
-    for (const [name, who, v] of variants) {
+    const garden = GARDEN_SIZES[seed % GARDEN_SIZES.length];
+    const name = `${size} ${seed * 7919} ${garden}`;
+    const variants = households.map(([name, who]) => [name, who, generateHouse(cfg, info, lot, houses.plot, size, seed * 7919, baseFile.roomRules?.lampTiles, baseFile.roomRules?.windowTiles, who, garden)] as const);
+    if (variants.some(([, , v]) => !v !== !variants[0][2])) problems.push(`${name}: made for some households, not others`);
+    for (const [household, who, v] of variants) {
       if (!v) continue;
-      if (layout(v) !== layout(variants[0][2]!)) problems.push(`${size} ${seed * 7919} (${name}): another layout`);
-      for (const p of check(v, who)) problems.push(`${size} ${seed * 7919} (${name}): ${p}`);
+      if (layout(v) !== layout(variants[0][2]!)) problems.push(`${name} (${household}): another layout`);
+      if (JSON.stringify(v.lot) !== JSON.stringify(variants[0][2]!.lot)) problems.push(`${name} (${household}): another lot`);
+      for (const p of check(v, who)) problems.push(`${name} (${household}): ${p}`);
     }
     const [household, , h] = variants[seed % variants.length];
     if (!h) continue;
@@ -106,6 +116,16 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
     // A garden door: in the back wall, else a side wall (none where the stairs and a room's only window take it).
     const ground = h.rooms ?? [];
     const [x0, x1, z0, z1] = [Math.min(...ground.map((r) => r.x)), Math.max(...ground.map((r) => r.x + r.w)), Math.min(...ground.map((r) => r.z)), Math.max(...ground.map((r) => r.z + r.d))];
+    // The lot cut to fit it: inside it, and covered no more and no less than its garden size says.
+    if (!h.lot) problems.push(`${name}: no lot cut to fit the house`);
+    else {
+      const cover = ((x1 - x0) * (z1 - z0)) / (h.lot.width * h.lot.depth);
+      const [least, most] = COVER[garden];
+      if (x0 < 1 || x1 > h.lot.width - 1 || z1 > h.lot.depth - 4) problems.push(`${name}: the house (${x0}..${x1} × ..${z1}) off its ${h.lot.width}×${h.lot.depth} lot`);
+      if (cover < least || cover > most) problems.push(`${name}: covers ${(cover * 100).toFixed(0)}% of its ${h.lot.width}×${h.lot.depth} lot`);
+      const k = `${size} ${garden}`;
+      covers.set(k, [...(covers.get(k) ?? []), cover]);
+    }
     const outer = h.doors.slice(1).filter((d) => (d.axis === 'x' ? d.z === z1 : d.x === x0 || d.x === x1) && d.z >= z0);
     if (outer.length) stats.gardenDoors++;
     if (outer.some((d) => d.axis === 'x')) stats.backs++;
@@ -122,9 +142,9 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
       kinds.set(r.kind, { n: k.n + 1, area: k.area + r.w * r.d, most: Math.max(k.most, r.w * r.d), long: Math.max(k.long, r.w, r.d) });
       stats.rooms++;
     }
-    // Back on the lot (the layouts' frame is a medium lot's).
-    const dx = Math.floor((lot.width - houses.plot.width) / 2);
-    const depth = lot.depth;
+    // On its own lot (the layout is in its frame).
+    const dx = 0;
+    const { width, depth } = h.lot ?? lot;
     // The basement on the rows after every storey's (as `town.ts` puts it).
     const storeys = h.upper ? 2 : 1;
     const down = storeys * depth;
@@ -136,6 +156,7 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
     ];
     towns.push({
       size,
+      garden,
       seed: seed * 7919,
       household,
       name: h.name,
@@ -147,7 +168,7 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
         ...(h.basement?.rooms ?? []).map((r) => ({ ...r, x: r.x + dx, z: r.z + down })),
       ],
       town: {
-        width: lot.width,
+        width,
         depth,
         storeys,
         ...(h.basement ? { basement: true } : {}),
@@ -159,7 +180,7 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
           ...(h.upper?.objects ?? []).map((o) => ({ ...o, x: o.x + dx, z: o.z + depth })),
           ...(h.basement?.objects ?? []).map((o) => ({ ...o, x: o.x + dx, z: o.z + down })),
         ],
-        plots: [{ name: 'Home', x: 0, z: 0, w: lot.width, d: depth, entry: h.spawns[0] && [h.spawns[0][0] + dx, h.spawns[0][1]] }],
+        plots: [{ name: 'Home', x: 0, z: 0, w: width, d: depth, entry: h.spawns[0] && [h.spawns[0][0] + dx, h.spawns[0][1]] }],
         households: [{ name: 'Test', plot: 0, player: true }],
         sims: [],
       },
@@ -173,6 +194,8 @@ console.log(`  per house: $${per(stats.value)} of things, ${per(stats.seats)} ch
 console.log(`  ${stats.gardenDoors} houses with a garden door (${stats.backs} in the back wall, the others in a side wall)`);
 console.log(`  ${per(stats.rooms)} rooms per house; by kind (count, mean and largest floor, longest side):`);
 for (const [k, v] of [...kinds].sort((a, b) => b[1].n - a[1].n)) console.log(`    ${k}: ${v.n}, ${(v.area / v.n).toFixed(1)} m², up to ${v.most} m², ${v.long} m long`);
+console.log('  share of the lot a house covers (least, mean, most), by house and garden size:');
+for (const [k, v] of [...covers].sort()) console.log(`    ${k}: ${[Math.min(...v), v.reduce((a, b) => a + b, 0) / v.length, Math.max(...v)].map((c) => `${(c * 100).toFixed(0)}%`).join(', ')}`);
 for (const t of towns.slice(0, 8) as { size: string; name: string; description: string }[]) console.log(`  ${t.size}: ${t.name} — ${t.description}`);
 if (problems.length) {
   console.log(`${problems.length} problems:`);

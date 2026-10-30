@@ -8,6 +8,7 @@
 
 import type { Content, WorldNames } from '../content/content';
 import { DEFAULT_LANDSCAPE, type LandscapeParams } from '../core/protocol';
+import type { GardenSize } from './housegen';
 
 export type WorldKind = 'small' | 'medium' | 'dense' | 'farm' | 'seaside' | 'mountain' | 'lakeside' | 'forest';
 export const WORLD_KINDS: readonly WorldKind[] = ['small', 'medium', 'dense', 'farm', 'seaside', 'mountain', 'lakeside', 'forest'];
@@ -21,9 +22,11 @@ export interface WorldRecipe {
   streets: number;
   /** Lots on each side of a street. */
   columns: number;
-  /** Chances of a small and a large lot (the rest are medium). */
+  /** Chances of a small and a large house (the rest are medium). */
   small: number;
   large: number;
+  /** How much garden the houses get round them, by weight (each lot is cut to fit its house; `housegen.ts` `fitLot`). */
+  gardens: Partial<Record<GardenSize, number>>;
   /** Public places besides the town park (fewest, most), and the ones it would rather have. */
   places: [number, number];
   prefer?: string[];
@@ -75,6 +78,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
     columns: 5,
     small: 0.25,
     large: 0.2,
+    gardens: { snug: 1, roomy: 3, big: 1 },
     places: [1, 2],
     landscape: valley,
   },
@@ -85,6 +89,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
     columns: 5,
     small: 0.25,
     large: 0.2,
+    gardens: { snug: 1, roomy: 3, big: 1 },
     places: [3, 3],
     landscape: valley,
   },
@@ -95,6 +100,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
     columns: 7,
     small: 0.6,
     large: 0.05,
+    gardens: { snug: 4, roomy: 1 },
     places: [5, 5],
     prefer: ['cafe', 'grocer', 'bakery', 'market'],
     landscape: (rand) => ({ ...valley(rand), hills: range(rand, 6, 11), forest: range(rand, -0.18, -0.06), treeline: range(rand, 6, 12) }),
@@ -106,6 +112,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
     columns: 5,
     small: 0.1,
     large: 0.35,
+    gardens: { roomy: 1, big: 3 },
     places: [1, 2],
     prefer: ['market', 'grocer'],
     farms: [3, 4],
@@ -127,6 +134,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
     columns: 7,
     small: 0.4,
     large: 0.1,
+    gardens: { snug: 2, roomy: 2 },
     places: [3, 3],
     prefer: ['cafe', 'market', 'bakery'],
     landscape: (rand) => ({
@@ -146,6 +154,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
     columns: 4,
     small: 0.05,
     large: 0.55,
+    gardens: { roomy: 1, big: 3 },
     places: [1, 2],
     prefer: ['cafe', 'bakery'],
     landscape: (rand) => ({
@@ -169,6 +178,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
     columns: 5,
     small: 0.2,
     large: 0.25,
+    gardens: { roomy: 3, big: 1 },
     places: [2, 3],
     prefer: ['cafe', 'market'],
     landscape: (rand, width, depth) => {
@@ -188,6 +198,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
     columns: 5,
     small: 0,
     large: 0.6,
+    gardens: { roomy: 1, big: 4 },
     places: [1, 1],
     prefer: ['bakery', 'cafe'],
     landscape: (rand) => ({
