@@ -17,6 +17,7 @@ import { fetchText } from '../content/content';
 import { bedroomsNeeded, householdBonds, householdSpawns, randomHousehold, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { generateHouse, objectInfos, random, residentsKey, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
 import { streetNames, WORLDS, worldName, worldTagline, type WorldKind } from './world';
+import { driveEnd, garageFor, parkCar, type DriveEnd, type ParkedCar } from '../render/shared/cars';
 
 export type Wall = [number, number, number, number];
 export interface Door {
@@ -627,6 +628,12 @@ export interface TownLayout {
   paths: Rect[];
   /** Farm fields (see `WorldLook.fields`). */
   fields: Rect[];
+  /** The cars of the houses someone lives in (or moves into: `playerSlot`), on their driveways (`plot`: the slot's index; sim-core `cars.rs`). */
+  cars: (ParkedCar & { plot: number })[];
+  /** Every house's driveway, where a car parks (`plot`: the slot's index): a household's car goes along when it moves. */
+  drives: (DriveEnd & { plot: number })[];
+  /** Garages at the inner ends of driveways (`garageFor`: wall centre lines; `plot`: the slot's index). */
+  garages: { plot: number; x0: number; z0: number; x1: number; z1: number }[];
   plots: { name: string; x: number; z: number; w: number; d: number; public: boolean; entry: [number, number]; storeys: number }[];
   /** Storeys of the tallest house: storey `k`'s walls and objects are on rows `k * depth ..` (see `WorldStructure.storeys`). */
   storeys: number;
@@ -635,9 +642,10 @@ export interface TownLayout {
 }
 
 /**
- * Stamps every plot's house layout (or its public place: a park, a square, a shop) onto the town. `playerSlot` is left without a
- * driveway (it stays open for building); null gives every house one. Each generated house is
- * furnished for its household (`player`: a new one moving in at `playerSlot`).
+ * Stamps every plot's house layout (or its public place: a park, a square, a shop) onto the town,
+ * each house with its driveway, the player's too: their home looks as the town showed it. Most
+ * houses someone lives in have a car on it (`parkCar`; the household's, `cars`). Each generated
+ * house is furnished for its household (`player`: a new one moving in at `playerSlot`).
  */
 export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDraft, playerSlot: number | null, player?: HouseholdDraft): TownLayout {
   const walls: Wall[] = [];
@@ -646,6 +654,9 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
   const objects: Placement[] = [];
   const paths: Rect[] = [];
   const fields: Rect[] = [];
+  const cars: TownLayout['cars'] = [];
+  const drives: TownLayout['drives'] = [];
+  const garages: TownLayout['garages'] = [];
   const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
 
   /** A rectangle in plot coordinates onto the town. */
@@ -727,6 +738,8 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       for (const r of place.paths ?? []) paths.push(area(s, r));
       continue;
     }
+    // (This lot's things from here on: the garage keeps clear of them.)
+    const first = objects.length;
     // A farm's fields and farmyard (an empty farm lot keeps them too).
     if (s.farm) {
       placeAll(s, s.farm.objects);
@@ -750,12 +763,28 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     }
     // A garden path from the front door to the street.
     if (h.doors[0]) pathTo(s, h.doors[0]);
-    // Neighbours get a driveway beside the house (the renderer parks a car on it); the player's
-    // plot stays open for building.
-    const drive = s.index === playerSlot ? null : driveway(h, pw, pd, footprint);
-    if (drive) paths.push(area(s, drive));
+    // A driveway beside the house, and the household's car on it.
+    const drive = driveway(h, pw, pd, footprint);
+    if (!drive) continue;
+    const rect = area(s, drive);
+    paths.push(rect);
+    const lot = { x: s.x, z: s.z, w: pw, d: pd };
+    const end = driveEnd(lot, rect, town.streets);
+    if (!end) continue;
+    drives.push({ plot: s.index, ...end });
+    // A garage at its inner end, clear of what's in the garden (as the street draws it).
+    const corners = h.walls.flatMap(([x0, z0, x1, z1]) => [point(s, [x0, z0]), point(s, [x1, z1])]);
+    const box = { x0: Math.min(...corners.map((c) => c[0])), z0: Math.min(...corners.map((c) => c[1])), x1: Math.max(...corners.map((c) => c[0])), z1: Math.max(...corners.map((c) => c[1])) };
+    const things = objects.slice(first).map((o): Rect => {
+      const [fw, fd] = footprint(o.def);
+      return o.rot % 2 === 0 ? { x: o.x, z: o.z, w: fw, d: fd } : { x: o.x, z: o.z, w: fd, d: fw };
+    });
+    const garage = corners.length ? garageFor(lot, box, rect, end.front, things) : null;
+    if (garage) garages.push({ plot: s.index, ...garage });
+    const car = living.has(s.index) || s.index === playerSlot ? parkCar(lot, end) : null;
+    if (car) cars.push({ plot: s.index, ...car });
   }
-  return { walls, doors, windows, objects, paths, fields, plots, storeys, basement };
+  return { walls, doors, windows, objects, paths, fields, cars, drives, garages, plots, storeys, basement };
 }
 
 /** What the renderer needs to know about a town's world (it survives save/load in `meta`). */
@@ -784,7 +813,7 @@ export function assembleTown(
   playerSlot: number,
   { existing = false, mode = 'living', lifespan = 'normal' }: AssembleOptions = {},
 ): string {
-  const { walls, doors, windows, objects, paths, fields, plots, storeys, basement } = layoutTown(content, t, town, playerSlot, existing ? undefined : player);
+  const { walls, doors, windows, objects, paths, fields, cars, drives, garages, plots, storeys, basement } = layoutTown(content, t, town, playerSlot, existing ? undefined : player);
   const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
   const point = (s: PlotSlot, [x, z]: [number, number]): [number, number] => {
     const { width: pw, depth: pd } = lotDims(t, s.lot);
@@ -839,5 +868,5 @@ export function assembleTown(
   const meta: TownMeta = { kind: 'town', name: town.name, streets: town.streets, paths, seed: town.seed ?? (Math.random() * 2 ** 31) >>> 0, world: worldLook(town, fields) };
   // Residents leave town (for work) at both ends of every street.
   const exits = town.streets.flatMap((st) => [[0.5, st.z + st.d / 2], [town.width - 0.5, st.z + st.d / 2]]);
-  return JSON.stringify({ mode, lifespan, width: town.width, depth: town.depth, storeys, ...(basement ? { basement } : {}), walls, doors, windows, objects, plots, households, sims, relationships, exits, meta });
+  return JSON.stringify({ mode, lifespan, width: town.width, depth: town.depth, storeys, ...(basement ? { basement } : {}), walls, doors, windows, objects, plots, households, sims, relationships, exits, cars, drives, garages, meta });
 }

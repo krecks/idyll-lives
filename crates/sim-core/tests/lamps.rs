@@ -2,7 +2,8 @@
 //! they come and go after dark (on into a dark room, off as the last one awake leaves or goes to
 //! sleep), saved; the garden isn't theirs to switch, nor a light with no switch. A lamp bought
 //! comes off. A fire is lit by sitting down by it in the dark (not by coming in), goes out with
-//! the room and burns down by morning. A room without windows is dark by day too.
+//! the room and burns down by morning. A room without windows is dark by day too. A new game's
+//! lamps come on only where someone is; a save opens with them as they were.
 
 mod common;
 
@@ -382,6 +383,33 @@ fn shipped_lamps_at_night() {
     tick(&mut w, 1);
     assert!((0..3).all(|l| on(&w, l)) && (3..6).all(|l| !on(&w, l)));
     common::dump_state(&w, "lamps-night");
+}
+
+#[test]
+fn a_new_games_lamps_are_on_only_where_someone_is() {
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    set_hour(&mut w, 21.0);
+    w.sims[0].pos = IN_A;
+    w.sims[0].needs[0] = 1.0;
+    assert!(
+        [A[0], A[1], B, GARDEN].iter().all(|&l| on(&w, l)),
+        "the lot's file has them on"
+    );
+    tick(&mut w, 1);
+    assert!(
+        A.iter().all(|&l| on(&w, l)),
+        "Ada's room stays lit after dark"
+    );
+    assert!(!on(&w, B), "the windowless room nobody is in goes off");
+    assert!(on(&w, GARDEN), "the garden's lamp is the player's");
+    w.apply(Command::SwitchLamp {
+        object: B,
+        on: true,
+    })
+    .unwrap();
+    let mut w2 = common::reload(&w, CONTENT);
+    tick(&mut w2, 1);
+    assert!(on(&w2, B), "a save opens with its lamps as they were");
 }
 
 /// Buys `def` at `x`, `z` (facing the default way): its object id.

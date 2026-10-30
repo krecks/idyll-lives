@@ -67,6 +67,8 @@ export interface HousePart {
 export { WALL_HALF, WALL_HEIGHT };
 export const WALL_STUB = 0.35;
 const T = WALL_HALF; // half wall thickness (sim-core WALL_THICKNESS / 2)
+/** How far a post's face against a wall sits inside it (m): its edges on the wall's faces showed as lines. */
+const INSIDE = 0.002;
 const DOOR_HEIGHT = 2.1;
 const PLINTH = 0.32;
 // Window opening (matches sim-core `WINDOW_SILL` / `WINDOW_HEAD`); the glazed part is narrower
@@ -393,8 +395,10 @@ export interface SilhouetteSpec {
   z1: number;
   /** Origin of the house's lot: its look (siding, roof, accent) is chosen from it, as for the game's house. */
   lot: { x: number; z: number };
-  /** The player's house, dressed as the game builds it (no porch, chimney or garage). */
+  /** The player's house, dressed as the game builds it (no porch or chimney; its garage). */
   home?: boolean;
+  /** Only its garage: the game draws the house itself (the viewed lot's). */
+  garageOnly?: boolean;
   /** Street side: 1 = the wall at z1 faces the street, -1 = the wall at z0. */
   front: 1 | -1;
   /** Centre x of the front door (where the garden path meets the house), if known. */
@@ -827,8 +831,12 @@ export class HousePlanner {
         if (y0 < plinth) {
           const out = 0.03;
           stone.poly([P(a0, y0), P(a1, y0), P(a1, Math.min(plinth, y1)), P(a0, Math.min(plinth, y1))], n);
-          stone.poly([Q(a0, plinth, 0), Q(a1, plinth, 0), Q(a1, plinth, out), Q(a0, plinth, out)], [0, 1, 0]);
-          stone.poly([Q(a0, y0, out), Q(a1, y0, out), Q(a1, plinth, out), Q(a0, plinth, out)], n);
+          // Its ledge only where wall goes on above it: faced all the way up (a basement's), it
+          // would lie on the wall's top, and inside the walls a post joins.
+          if (plinth < y1) {
+            stone.poly([Q(a0, plinth, 0), Q(a1, plinth, 0), Q(a1, plinth, out), Q(a0, plinth, out)], [0, 1, 0]);
+            stone.poly([Q(a0, y0, out), Q(a1, y0, out), Q(a1, plinth, out), Q(a0, plinth, out)], n);
+          }
         }
         const yb = Math.max(y0, plinth);
         if (y1 > yb) (own ?? ext).poly([P(a0, yb), P(a1, yb), P(a1, y1), P(a0, y1)], n);
@@ -1071,7 +1079,10 @@ export class HousePlanner {
                   : [['h', x - 1, z, 0], ['h', x, z, 0], ['v', x, z, 0]];
           const from = faces.find(([axis, ex, ez]) => edges.get(axis, ex, ez));
           const cover = from ? faceAt(...from) : 0;
-          face(axis, plane, a0, a1, 0, top, n, ra === 0 || rb === 0 ? 0 : ra, cover, from && from.join(':'));
+          // Against a wall it sits a hair inside it (its edges off the wall's faces and top): only
+          // a cut wall shows it, and then a hair's crack round it doesn't.
+          const e0 = e ? INSIDE : 0;
+          face(axis, plane, a0 + e0, a1 - e0, 0, top - e0, n, ra === 0 || rb === 0 ? 0 : ra, cover, from && from.join(':'));
         };
         const q = (dx: number, dz: number) => roomP(x + dx * 0.25, z + dz * 0.25);
         side('px', hr, [1, 0, 0], q(1, -1), q(1, 1));
@@ -1629,10 +1640,36 @@ export class HousePlanner {
       }
     };
 
+    /** A garage of house `b`'s look (wall centre lines `g`): its roof, a sectional door on the street side, a coach lamp beside it. */
+    const garage = (b: SilhouetteSpec, g: NonNullable<SilhouetteSpec['garage']>, s: HouseScheme & RoofShape, walls: Geo) => {
+      walls.color(s.wall);
+      shell(walls, g.x0, g.z0, g.x1, g.z1, GARAGE_HEIGHT);
+      roof.color(s.roof);
+      addRoofShaped(g, s, roof, trim, walls, GARAGE_HEIGHT, 0.3);
+      // Sectional door on the street side, with a coach lamp beside it.
+      const plane = b.front > 0 ? g.z1 + T : g.z0 - T;
+      const n: V3 = [0, 0, b.front];
+      // A single garage's door, 2.4–2.5 m (wider garages keep their walls either side).
+      const half = Math.min(g.x1 - g.x0 - 0.7, 2.5) / 2;
+      const [d0, d1] = [(g.x0 + g.x1) / 2 - half, (g.x0 + g.x1) / 2 + half];
+      trim.color(TRIM).box(...span('h', plane, n, d0 - 0.1, d1 + 0.1, 0, 2.25, 0.03));
+      const door = hash(b.x0, b.z0, 9) < 0.5 ? '#F2F0EA' : s.accent;
+      trim.color(door).box(...span('h', plane, n, d0, d1, 0, 2.12, 0.045));
+      trim.color(shade(door, 0.82));
+      for (const y of [0.53, 1.06, 1.59]) trim.box(...span('h', plane, n, d0 + 0.04, d1 - 0.04, y - 0.015, y + 0.015, 0.05));
+      trim.color(TRIM);
+      const lx = b.door !== null && b.door < (g.x0 + g.x1) / 2 ? d0 - 0.3 : d1 + 0.3;
+      lamps.push([lx, 1.9, plane + b.front * 0.08, 0, b.front]);
+    };
+
     const homes: { spec: SilhouetteSpec; panes: Geo }[] = [];
     for (const b of houses) {
       const s = this.schemeWith(houseScheme(b.lot.x, b.lot.z), b.roof);
       const walls = s.brick ? brick : siding;
+      if (b.garageOnly) {
+        if (b.garage) garage(b, b.garage, s, walls);
+        continue;
+      }
       const panes = b.lived ? new Geo() : glass;
       if (b.lived) homes.push({ spec: b, panes });
       const curtain = pick(CURTAINS, b.x0, b.z0, 7);
@@ -1706,27 +1743,7 @@ export class HousePlanner {
       roof.color(s.roof);
       addRoofShaped({ x0: b.x0, z0: b.z0, x1: b.x1, z1: b.z1 }, s, roof, trim, walls, tall);
       if (hash(b.x0, b.z0, 8) < 0.6 && s.shape !== 'flat' && !b.roof && !b.home) this.chimney(b, s, brick, stone, tall);
-      const g = b.home ? null : b.garage;
-      if (g) {
-        walls.color(s.wall);
-        shell(walls, g.x0, g.z0, g.x1, g.z1, GARAGE_HEIGHT);
-        roof.color(s.roof);
-        addRoofShaped(g, s, roof, trim, walls, GARAGE_HEIGHT, 0.3);
-        // Sectional door on the street side, with a coach lamp beside it.
-        const plane = b.front > 0 ? g.z1 + T : g.z0 - T;
-        const n: V3 = [0, 0, b.front];
-        // A single garage's door, 2.4–2.5 m (wider garages keep their walls either side).
-        const half = Math.min(g.x1 - g.x0 - 0.7, 2.5) / 2;
-        const [d0, d1] = [(g.x0 + g.x1) / 2 - half, (g.x0 + g.x1) / 2 + half];
-        trim.color(TRIM).box(...span('h', plane, n, d0 - 0.1, d1 + 0.1, 0, 2.25, 0.03));
-        const door = hash(b.x0, b.z0, 9) < 0.5 ? '#F2F0EA' : s.accent;
-        trim.color(door).box(...span('h', plane, n, d0, d1, 0, 2.12, 0.045));
-        trim.color(shade(door, 0.82));
-        for (const y of [0.53, 1.06, 1.59]) trim.box(...span('h', plane, n, d0 + 0.04, d1 - 0.04, y - 0.015, y + 0.015, 0.05));
-        trim.color(TRIM);
-        const lx = b.door !== null && b.door < (g.x0 + g.x1) / 2 ? d0 - 0.3 : d1 + 0.3;
-        lamps.push([lx, 1.9, plane + b.front * 0.08, 0, b.front]);
-      }
+      if (b.garage) garage(b, b.garage, s, walls);
     }
     const M = HOUSE_MATERIALS;
     const parts = ([
