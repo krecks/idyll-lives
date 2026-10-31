@@ -38,7 +38,10 @@
  *               --sims 0,1   each of these does the use, the first watched (pairs: the seesaw, ping-pong)
  *               --social chat,joke | --phone call,text   no object: the first of --sims starts each with the
  *                 second (socials by content id; phone actions, the second the contact)
- *               --use all|<id>|<index>   (default all)  --sim 0  --colors body:12  --turn 0
+ *               --use all|<id>|<index>|ripe   (default all)  --sim 0  --colors body:12  --turn 0
+ *                 (`ripe`: every use offered only when the crop is ripe — the veggie bed's
+ *                 `pickSnack` — on a state whose crops are, `review-garden`'s; the record's
+ *                 `growth` says which stage it found: 2 ripe)
  *               --state bathroom-check  --shots 3 --every 1000 (ms)  --wait 60 (s, from the use
  *                 sent to the resident using it)
  *               --walk 3 (speed walking there, at most 3 = 10×)  --speed 1 (from 3 tiles off)
@@ -807,6 +810,9 @@ if (what === 'play') {
     const t0 = Date.now();
     await loaded();
     const bg = await background(bought.id);
+    // A crop's stage as the use begins (0 planted, 1 growing, 2 ripe, 3 picked): what a `when:
+    // ripe` use needs, and what the record says it found.
+    record.growth = (await placed(bought.id))?.growth ?? null;
     record.before = await resident();
     const near = { x: bought.where.mid[0], z: bought.where.mid[1], r: 3 + Math.max(...bought.where.size) / 2, speed };
     const sent = await page.evaluate(() => window.__check.now());
@@ -1025,8 +1031,9 @@ if (what === 'play') {
     const failed = [];
     for (const use of chosen) {
       // A crop bought new is just planted, one picked lies fallow: its "when ripe" uses aren't
-      // offered (`review-garden`'s are ripe: `--use-existing`).
-      if (use.when === 'ripe' && (await placed(bought.id))?.growth !== 2) {
+      // offered (`review-garden`'s are ripe: `--use-existing`, or `--use ripe`). Asked for them by
+      // name, it is run anyway and the game says why not ("isn't ripe yet").
+      if (use.when === 'ripe' && which !== 'ripe' && (await placed(bought.id))?.growth !== 2) {
         const reason = thing.existing ? 'only when ripe (not ripe now)' : 'only when ripe (bought new, a crop is just planted: --use-existing it on review-garden)';
         write({ object: thing.def, use: use.id, index: use.index, attempt, ...about(thing, bought), outcome: 'skipped', reason });
         continue;
@@ -1121,7 +1128,8 @@ if (what === 'play') {
     return { outcome: record.outcome };
   }
 
-  const pickUse = (u) => (which === 'all' ? true : /^\d+$/.test(which) ? u.index === Number(which) : u.id === which);
+  const pickUse = (u) =>
+    which === 'all' ? true : which === 'ripe' ? u.when === 'ripe' : /^\d+$/.test(which) ? u.index === Number(which) : u.id === which;
   const timings = [];
   log.setup.open = await openState();
   for (const thing of things) {

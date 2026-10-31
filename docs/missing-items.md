@@ -146,8 +146,9 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
 - `cargo review sizes` measures the wrong face (basin drain/underside, closed toilet lid, kettle grate,
   pool cloth) and includes non-object geometry.
 - `cargo review uses` does not flag the ladder shelf's missing use.
-- `check.mjs play`: no `--use ripe` (a ripe use still needs `--use-existing`), no whole-recipe
-  following, no `--views`; needs carry over between uses.
+- `check.mjs play`: no whole-recipe following (it records clips only on the object used, not on the
+  helpers a recipe walks to), no `--views` (one camera per run; `--top` since 2026-10-30); needs carry
+  over between uses. (`--use ripe` and the crop stage in the record came 2026-10-31.)
 - `check.mjs sheet`, `poses.html`, gallery and previews each have known blind spots (see §7).
 - CI runs clips, the GLB gate, `cargo check-glb` (since 2026-10-31) and, since 2026-10-30,
   `review sizes` (a content object no kind covers fails); still not `review uses` (it always exits 0) or
@@ -171,6 +172,15 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
 - In CI: a new **Models** step runs `cargo check-glb` after **Object sizes** (0.4 s; a broken model fails,
   a measure out of range is the review's to weigh) — `.github/workflows/ci.yml`.
 - Warnings from the whole gate: 105 → 94, and every one of the eleven that went was a false one.
+
+**Done 2026-10-31 (a ripe use):**
+
+- `play --use ripe` runs every use offered only when a crop is ripe (the veggie bed's `pickSnack`, the
+  trees' `pick`), and each record says the stage it found (`growth`: 0 planted, 1 growing, 2 ripe, 3
+  picked) — `--use-existing garden.vegPatch --use ripe` on `review-garden` harvests a ripe bed
+  (`bench-results/check-ripe/ripe3-garden.vegPatch-harvest-01.png`). Asked for by name on a crop that
+  isn't ripe, the use runs and the game says why not ("the vegetable patch isn't ripe yet"), instead of
+  the harness skipping it silently (`tools/bench/check.mjs`, `tools/bench/README.md`).
 
 **Done 2026-10-30 (tooling):**
 

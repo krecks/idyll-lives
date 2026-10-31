@@ -699,7 +699,12 @@ From the coordinator's notes and each wave's `review-log.md`, deduplicated; the 
 - A flag for an odd sound for the kind (a sizzle away from a hob) would have found I-packs-19 at once.
 
 **`tools/bench/check.mjs play`**
-- `--use ripe`, for every `when: ripe` use (the veggie bed's is `pickSnack`), and the growth stage in the record.
+- ~~`--use ripe`, for every `when: ripe` use (the veggie bed's is `pickSnack`), and the growth stage in
+  the record.~~ Fixed 2026-10-31: `--use ripe` runs every use offered only when a crop is ripe, and
+  each record says the stage it found (`growth`: 0 planted, 1 growing, 2 ripe, 3 picked) —
+  `--use-existing garden.vegPatch --use ripe` on `review-garden` harvests it
+  (`bench-results/check-ripe/ripe3-garden.vegPatch-harvest-01.png`); asked for by name on a crop
+  that isn't ripe the use runs anyway and the game says why ("the vegetable patch isn't ripe yet").
 - It records clips only on the object used, not on the helpers a recipe walks to; it can't follow a whole recipe.
 - ~~Picture names leave out the helper, so one chair tried at several desks overwrites itself.~~ Fixed
   2026-10-30: `chairWood-with-coffeeTable-sit-00.png`.
