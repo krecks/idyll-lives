@@ -190,9 +190,8 @@ struct Stroke {
     salt: u32,
 }
 
-/// Draw a few long cracks as wandering, branching strokes (in pixels, wrapping); returns per pixel
-/// the crack's depth 0..1 and a wider soft halo (sealant, dirt) 0..1.
-#[allow(clippy::too_many_arguments)]
+/// Draw cracks as wandering strokes running every which way, the odd one branching (in pixels,
+/// wrapping); returns per pixel the crack's depth 0..1 and a wider soft halo (sealant, dirt) 0..1.
 fn cracks(
     n: &Noise,
     w: usize,
@@ -201,7 +200,6 @@ fn cracks(
     len_px: f64,
     width_px: f64,
     halo_px: f64,
-    dir: f64,
 ) -> (Vec<f64>, Vec<f64>) {
     let mut depth = vec![0.0f64; w * h];
     let mut halo = vec![0.0f64; w * h];
@@ -212,15 +210,9 @@ fn cracks(
             let stroke = Stroke {
                 x: r(0) * w as f64,
                 y: r(1) * h as f64,
-                a: dir
-                    + (r(2) - 0.5) * 0.7
-                    + if r(4) < 0.35 {
-                        std::f64::consts::FRAC_PI_2
-                    } else {
-                        0.0
-                    },
-                len: len_px * (0.6 + 0.6 * r(3)),
-                wid: width_px,
+                a: r(2) * std::f64::consts::TAU,
+                len: len_px * (0.4 + 1.2 * r(3) * r(3)),
+                wid: width_px * (0.6 + 0.6 * r(4)),
                 salt: c as u32 * 7 + 1,
             };
             (stroke, true)
@@ -254,7 +246,7 @@ fn cracks(
             );
             stamp(&mut halo, w, h, x, y, halo_px * taper.max(0.3), 1.0);
             let r = |q: u32| n.rand(s.salt as i64, k as i64, 900 + q);
-            if branches && r(0) < 0.0025 {
+            if branches && r(0) < 0.0008 {
                 let side = if r(1) < 0.5 { -1.0 } else { 1.0 };
                 next += 1;
                 todo.push((
@@ -1203,7 +1195,8 @@ fn sidewalk(n: &Noise, size: usize) -> Surface {
     })
 }
 
-/// Worn asphalt, 5 m: aggregate in dark binder, broad patches, a few long cracks (some sealed).
+/// Worn asphalt, 5 m: aggregate in dark binder, broad patches, hairline cracks running every which
+/// way (some sealed), none of them standing out so the tile's repeat doesn't show.
 fn asphalt(n: &Noise, size: usize) -> Surface {
     let t = TILE_ROAD;
     let k = size as f64 / 1024.0;
@@ -1211,11 +1204,10 @@ fn asphalt(n: &Noise, size: usize) -> Surface {
         &n.layer(9),
         size,
         size,
-        5,
-        size as f64 * 0.5,
-        k * 1.8,
-        k * 7.0,
-        std::f64::consts::FRAC_PI_2,
+        16,
+        size as f64 * 0.16,
+        k * 1.1,
+        k * 4.0,
     );
     let ng = n.layer(1);
     let nd = n.layer(2);
@@ -1247,12 +1239,12 @@ fn asphalt(n: &Noise, size: usize) -> Surface {
             // Sealed cracks (dark, smoother tar band) and open cracks.
             let seal = smoothstep(0.3, 0.8, halo)
                 * smoothstep(-0.05, 0.1, fbm(&nd.layer(2), u, v, 3, 3, 2));
-            c = mix(c, rgb(40, 40, 40), seal * 0.7);
-            c = mix(c, rgb(30, 30, 30), crack * 0.75);
+            c = mix(c, rgb(44, 44, 43), seal * 0.4);
+            c = mix(c, rgb(34, 34, 33), crack * 0.55);
             let oil = smoothstep(0.12, 0.28, fbm(&nd.layer(3), u, v, 6, 6, 4));
             c = mul(c, 1.0 - 0.12 * oil);
             let h = 0.5 + 0.35 * st * (0.5 + tone * 0.5) + 0.3 * big + 0.1 * binder
-                - 0.9 * crack
+                - 0.6 * crack
                 - 0.05 * seal;
             let rough =
                 (0.86 - 0.1 * st * tone - 0.25 * seal - 0.1 * oil + 0.1 * crack).clamp(0.3, 1.0);

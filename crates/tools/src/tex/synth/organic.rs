@@ -20,38 +20,6 @@ use crate::tex::pil::Img;
 use std::f64::consts::{PI, TAU};
 
 /// The organic sets' names (the ones [`generate`] makes).
-/// `lines` vertical furrows across the tile, each wandering sideways along v (far enough that
-/// neighbours meet) and swelling and pinching in width (up to `width` px). Returns the furrow mask
-/// as a function of a pixel jitter of its edge, and the distance in px from the nearest furrow's
-/// edge (negative inside).
-fn furrows(
-    n: &Noise,
-    u: f64,
-    v: f64,
-    size: usize,
-    lines: i64,
-    width: f64,
-    salt: f64,
-) -> (impl Fn(f64) -> f64, f64) {
-    let spacing = size as f64 / lines as f64;
-    let xs = u * lines as f64;
-    let mut edge = f64::INFINITY;
-    let mut wid = 1.0;
-    for k in xs.floor() as i64 - 3..=xs.floor() as i64 + 3 {
-        let kw = k.rem_euclid(lines) as f64 + salt;
-        let base = (n.rand(k.rem_euclid(lines), salt as i64, 71) - 0.5) * 0.5;
-        let wander = 0.9 * line_noise(n, v, 2, kw, 2) + 0.35 * line_noise(n, v, 7, kw + 50.0, 3);
-        let d = (xs - (k as f64 + 0.5 + base + wander)).abs() * spacing;
-        let w = width * smoothstep(-0.35, 0.75, line_noise(n, v, 6, kw + 25.0, 2));
-        if d - w < edge {
-            edge = d - w;
-            wid = w;
-        }
-    }
-    let mask = move |jag: f64| 1.0 - smoothstep(-0.6 * wid, 0.8, edge + jag * 0.5);
-    (mask, edge)
-}
-
 #[cfg(test)]
 const NAMES: [&str; 9] = [
     "bark",
@@ -101,7 +69,7 @@ pub fn generate(name: &str, size: usize) -> Option<Organic> {
     let n = Noise::new(seed(name));
     let mut r = Rng(seed(name) ^ 0x6f72_6761_6e69_6321);
     Some(match name {
-        "bark" => bark(&n, size),
+        "bark" => bark(&n, &mut r, size),
         "carpet" => carpet(&n, &mut r, size),
         "fabric_linen" => linen(&n, size),
         "foliage" => foliage(&n, &mut r, size),
@@ -645,71 +613,167 @@ fn foliage(n: &Noise, r: &mut Rng, size: usize) -> Organic {
     finish_layered(c, 0.35, &[(2, 1.6), (5, 0.8)], 0.35)
 }
 
-/// Bark (1 m a tile, on the trunks, rings round the trunk along u): long vertical fissures that
-/// wander, pinch and meet (so the ridges between them braid), deep and dark, between rounded ridges
-/// with a fibrous, cross-checked surface; grey where the ridges weather, warm brown towards the
-/// fissures, moss and lichen in patches.
-fn bark(n: &Noise, size: usize) -> Organic {
+/// The plates of a bark: cells of a Voronoi over a wrapping grid of `cols` x `rows` cells, nearest
+/// by the grid's own measure (so the cells are as long as its rows are tall), and how far `(u, v)`
+/// lies from its plate's border in cm (a tile being 1 m), with the plate's index.
+fn plates(n: &Noise, u: f64, v: f64, cols: i64, rows: i64, salt: u32) -> (f64, i64, i64) {
+    let (sx, sy) = (100.0 / cols as f64, 100.0 / rows as f64);
+    let (x, y) = (u * cols as f64, v * rows as f64);
+    let (cx, cy) = (x.floor() as i64, y.floor() as i64);
+    let mut seeds = [(0.0, 0.0); 25];
+    let (mut near, mut best, mut id) = (0, f64::INFINITY, (0, 0));
+    for (k, seed) in seeds.iter_mut().enumerate() {
+        let (i, j) = (cx + k as i64 % 5 - 2, cy + k as i64 / 5 - 2);
+        let (wi, wj) = (i.rem_euclid(cols), j.rem_euclid(rows));
+        *seed = (
+            i as f64 + n.rand(wi, wj, salt),
+            j as f64 + n.rand(wi, wj, salt + 1),
+        );
+        let d = (x - seed.0).powi(2) + (y - seed.1).powi(2);
+        if d < best {
+            (near, best, id) = (k, d, (wi, wj));
+        }
+    }
+    // The border with each neighbour is the two seeds' bisector in the grid; in cm its normal is
+    // squeezed by the scale. The nearest of them is the plate's border.
+    let (ax, ay) = seeds[near];
+    let mut edge = f64::INFINITY;
+    for (k, &(bx, by)) in seeds.iter().enumerate() {
+        if k == near {
+            continue;
+        }
+        let (nx, ny) = ((bx - ax) / sx, (by - ay) / sy);
+        let (mx, my) = ((x - (ax + bx) * 0.5) * sx, (y - (ay + by) * 0.5) * sy);
+        edge = edge.min(-(mx * nx + my * ny) / (nx * nx + ny * ny).sqrt());
+    }
+    (edge, id.0, id.1)
+}
+
+/// Bark (1 m a tile, on the trunks, rings round the trunk along u): thick plates a few cm wide and a
+/// hand or two long, braided between deep, dark fissures that wander, pinch and meet, the plates
+/// broken across here and there and crazed finely on top; a few knots the plates part around. The
+/// plates' tops are grey and weathered with a fibrous grain, the fissures' walls warm brown; moss
+/// streaks down the trunk in places, lichen spots the crowns.
+fn bark(n: &Noise, r: &mut Rng, size: usize) -> Organic {
     let px = 1.0 / size as f64;
+    let wrap = |d: f64| d - d.round();
+    // Knots: (u, v, half width, half height), in tile units.
+    let knots: Vec<[f64; 4]> = (0..3)
+        .map(|_| {
+            let w = r.range(0.014, 0.024);
+            [r.f(), r.f(), w, w * r.range(1.2, 1.7)]
+        })
+        .collect();
+    let (nw, nf, nc, nk) = (n.layer(1), n.layer(2), n.layer(3), n.layer(4));
     let mut z = vec![0.0; size * size];
     let mut rough = vec![0.0; size * size];
     let mut cols = vec![[0.0f64; 3]; size * size];
     for y in 0..size {
-        let v = (y as f64 + 0.5) * px;
+        let v0 = (y as f64 + 0.5) * px;
         for x in 0..size {
-            let u = (x as f64 + 0.5) * px;
-            let jag = 1.5 * (n.fbm2(u, v, 48, 24, 3) - 0.5) / 0.1;
-            let (f1, e1) = furrows(n, u, v, size, 30, 3.6, 0.0);
-            let (f2, _) = furrows(n, u, v, size, 64, 2.0, 100.0);
-            let f1 = f1(jag);
-            // The finer furrows come and go; the finest crazing is a ridged noise.
-            let f2 = f2(jag * 0.5) * smoothstep(0.35, 0.55, n.fbm2(u, v, 8, 4, 3));
-            let craze = n.fbm2(u, v, 80, 20, 3) - 0.5;
-            let f3 = (1.0 - smoothstep(0.0, 0.035, craze.abs()))
-                * smoothstep(0.4, 0.6, n.fbm2(u, v, 12, 6, 2));
-            let e1 = e1 + jag;
-            // Cross checks: short horizontal cracks over the ridges, here and there.
-            let cc = n.fbm2(u, v, 10, 72, 3) - 0.5;
-            let check = (1.0 - smoothstep(0.0, 0.025, cc.abs()))
-                * smoothstep(0.58, 0.70, n.fbm2(u, v, 16, 10, 3))
-                * smoothstep(1.0, 4.0, e1);
-            let fibre = n.fbm2(u, v, 192, 16, 3) - 0.5;
-            let grit = n.fbm(u, v, 128, 2) - 0.5;
-            let lump = n.fbm2(u, v, 24, 6, 3) - 0.5;
-            // Ridges round over from the fissure's lip to a flattish top.
-            let crown = smoothstep(0.0, 8.0, e1);
-            let h = 0.10 + 0.45 * (1.0 - f1) + 0.25 * crown - 0.22 * f2 - 0.15 * check - 0.10 * f3
-                + 0.10 * fibre
-                + 0.05 * grit
-                + 0.10 * lump;
-            let i = y * size + x;
-            z[i] = h;
-            let open = (1.0 - f1) * (1.0 - 0.75 * f2) * (1.0 - 0.6 * check) * (1.0 - 0.45 * f3);
-            // Colour: a broad drift between grey and warm brown, paler on the crowns.
-            let drift = n.fbm2(u, v, 3, 2, 3);
-            let warm = n.fbm2(u + 0.3, v, 5, 3, 3);
+            let u0 = (x as f64 + 0.5) * px;
+            // The nearest knot, in its own radii. The plates part round a knot: close to one the
+            // network is drawn from a smaller patch round its centre, so a plate swells to wrap it.
+            let (mut kr, mut slit, mut pu, mut pv) = (f64::INFINITY, 0.0, 0.0, 0.0);
+            for k in &knots {
+                let (dx, dy) = (wrap(u0 - k[0]), wrap(v0 - k[1]));
+                let rr = ((dx / k[2]).powi(2) + (dy / k[3]).powi(2)).sqrt();
+                if rr < kr {
+                    kr = rr;
+                    slit = ((dx / k[2] * 3.0).powi(2) + (dy / k[3]).powi(2)).sqrt();
+                }
+                let pull = 0.65 * (-(rr / 2.6).powi(2)).exp();
+                (pu, pv) = (pu + dx * pull, pv + dy * pull);
+            }
+            let (u, v) = ((u0 - pu).rem_euclid(1.0), (v0 - pv).rem_euclid(1.0));
+            // Bent at a hand's scale, ragged at a finger's.
+            let (wu, wv) = nw.warp(u, v, 0.12, 4);
+            let (wu, wv) = nw.layer(1).warp(wu, wv, 0.045, 12);
+            let (wu, wv) = nw.layer(2).warp(wu, wv, 0.014, 28);
+            let (ru, rv) = nw.layer(3).warp(wu, wv, 0.006, 64);
+            // Plates: cells of a Voronoi stretched along the trunk, their borders the fissures; a
+            // finer network splits them again, here deep, there barely.
+            let (edge, ci, cj) = plates(n, ru, rv, 17, 3, 11);
+            let (su, sv) = nc.warp(ru, rv, 0.025, 24);
+            let (edge2, _, _) = plates(&nc, su, sv, 30, 7, 31);
+            // A plate's own tone, fading out at its border (where a fissure may close up).
+            let tone = lerp(0.5, n.rand(ci, cj, 13), smoothstep(0.0, 1.5, edge));
+            let fw =
+                0.3 + 1.2 * smoothstep(0.25, 0.75, nf.fbm2(wu, wv, 6, 3, 3)).powf(1.5) + 0.2 * tone;
+            let jag = (nf.fbm2(u, v, 90, 60, 3) - 0.5) / 0.15;
+            // From the fissures' lips (cm), negative inside them.
+            let e = edge - fw + 0.35 * jag;
+            let deep2 = smoothstep(0.35, 0.65, nc.fbm2(u, v, 6, 3, 3));
+            let e2 = edge2 - (0.12 + 0.35 * deep2) + 0.2 * jag;
+            let open = smoothstep(-0.2, 0.25, e);
+            let open2 = 1.0 - (1.0 - smoothstep(-0.15, 0.2, e2)) * (0.35 + 0.65 * deep2);
+            let crown = smoothstep(0.0, 2.0, e) * smoothstep(-0.1, 1.2, e2).max(1.0 - deep2);
+            // The plates' tops flake: short splits along the grain, scaly bits, a fibrous grain.
+            let split = nf.fbm2(wu, wv, 64, 9, 3) - 0.5;
+            let flake = (1.0 - smoothstep(0.0, 0.03, split.abs()))
+                * smoothstep(0.5, 0.62, nf.fbm2(u, v, 22, 8, 2));
+            let scale = (nc.fbm(wu, wv, 40, 3) - 0.5).abs();
+            let fibre = nf.fbm2(u, v, 150, 12, 3) - 0.5;
+            let grit = nf.fbm(u, v, 128, 2) - 0.5;
+            let lump = nc.fbm2(u, v, 18, 5, 3) - 0.5;
+            let mut h = 0.12
+                + open * open2 * (0.30 + (0.26 + 0.14 * tone) * crown)
+                + 0.04 * open * (1.0 - open2)
+                - 0.10 * smoothstep(0.0, 1.0, -e)
+                - 0.10 * flake * crown
+                + 0.10 * smoothstep(0.05, 0.25, scale) * crown
+                + 0.05 * fibre * open
+                + 0.03 * grit
+                + 0.08 * lump;
+            // Colour: grey on the weathered tops, warm brown down the walls, near black deep in.
+            let drift = nk.fbm2(u, v, 3, 2, 3);
+            let warm = nk.fbm2(u + 0.3, v, 5, 2, 3);
             let mut top = mix3(
-                rgb(104, 86, 66),
-                rgb(142, 134, 120),
-                smoothstep(0.38, 0.62, drift),
+                rgb(122, 112, 96),
+                rgb(158, 154, 141),
+                smoothstep(0.35, 0.65, drift),
             );
-            top = mix3(top, rgb(134, 98, 66), 0.6 * smoothstep(0.55, 0.70, warm));
+            top = mix3(top, rgb(120, 94, 68), 0.45 * smoothstep(0.55, 0.70, warm));
             top = mix3(
                 top,
-                rgb(166, 158, 144),
-                0.30 * crown * smoothstep(0.45, 0.6, drift),
+                rgb(160, 156, 144),
+                0.35 * crown * smoothstep(0.45, 0.65, drift),
             );
-            let mut col = mix3(rgb(28, 20, 15), top, open.powf(1.2) * (0.6 + 0.4 * crown));
-            col = scale3(col, 0.92 + 0.30 * fibre + 0.18 * grit + 0.40 * lump);
-            // Moss: green beside the fissures, in patches.
-            let mp = smoothstep(0.50, 0.66, n.fbm2(u, v, 4, 2, 4));
-            let moss = mp * (0.35 + 0.65 * (1.0 - crown)) * (0.7 + 0.8 * fibre).clamp(0.0, 1.0);
-            col = mix3(col, scale3(rgb(78, 92, 40), 0.8 + 0.4 * grit), moss * 0.75);
-            // Lichen: pale grey-green flecks on the ridges.
-            let lichen = smoothstep(0.60, 0.75, n.fbm(u, v, 10, 4)) * open * crown;
-            col = mix3(col, rgb(160, 164, 144), lichen * 0.45);
+            top = scale3(top, 0.86 + 0.24 * tone);
+            let wall = mix3(rgb(22, 17, 13), rgb(84, 64, 46), smoothstep(-fw, 0.2, e));
+            let wall2 = mix3(rgb(40, 31, 24), rgb(90, 72, 54), smoothstep(-0.4, 0.15, e2));
+            let mut col = mix3(wall2, top, open2 * (0.6 + 0.4 * crown));
+            col = mix3(wall, col, open);
+            col = mix3(col, scale3(top, 0.45), 0.7 * flake * crown);
+            col = scale3(
+                col,
+                0.94 + 0.35 * fibre * open + 0.2 * grit + 0.3 * lump
+                    - 0.25 * smoothstep(0.12, 0.0, scale) * crown,
+            );
+            // Knots: an almond scar sunk in, healed over in rings, the bark swelling round it.
+            let inner = 1.0 - smoothstep(0.55, 0.85, kr + 0.15 * jag);
+            let lip = (-((kr - 0.95) / 0.3).powi(2)).exp();
+            if inner > 0.0 || lip > 0.01 {
+                let eye = 1.0 - smoothstep(0.3, 0.75, slit + 0.25 * jag.abs());
+                let curl = (kr * 16.0 + 1.5 * jag).sin() * 0.5 + 0.5;
+                let kh = 0.40 - 0.22 * eye + 0.04 * curl * (1.0 - eye) + 0.04 * grit;
+                h = lerp(h, kh, inner) + 0.12 * lip * open;
+                let kc = mix3(scale3(top, 0.8), rgb(84, 66, 50), 0.3 + 0.3 * curl);
+                let kc = mix3(kc, rgb(28, 20, 15), eye);
+                col = mix3(col, scale3(kc, 0.9 + 0.4 * grit + 0.3 * fibre), inner);
+            }
+            // Moss: streaks running down the trunk, thickest beside the fissures.
+            let mp = smoothstep(0.50, 0.68, nk.fbm2(u0, v0, 4, 1, 4));
+            let moss = mp * (0.35 + 0.65 * (1.0 - crown)) * (0.6 + 0.8 * fibre).clamp(0.0, 1.0);
+            col = mix3(col, scale3(rgb(80, 92, 42), 0.8 + 0.5 * grit), moss * 0.7);
+            // Lichen: pale grey-green spots on the crowns.
+            let lichen = smoothstep(0.62, 0.74, nk.fbm(u0, v0, 9, 4)) * crown;
+            col = mix3(col, rgb(160, 164, 146), lichen * 0.45);
+            let i = y * size + x;
+            z[i] = h;
             cols[i] = col;
-            rough[i] = 0.84 + 0.12 * (1.0 - open) - 0.06 * lichen + 0.04 * grit;
+            rough[i] =
+                0.82 + 0.12 * (1.0 - open * open2) - 0.06 * lichen + 0.06 * moss + 0.04 * grit;
         }
     }
     let occ = cavity(&z, size, size, &[(2, 1.5), (6, 1.0)]);
