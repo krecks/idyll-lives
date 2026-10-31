@@ -510,6 +510,16 @@ impl Flag {
         }
     }
 
+    /// Whether the gate fails on it: a use the renderer can't play, a `motions` key no use answers to,
+    /// or a model that opens without a clip. A missing use, a duration and a sound are the reviewer's to
+    /// weigh — a table with no use of its own is still a table the sim uses as a station.
+    pub fn hard(&self) -> bool {
+        !matches!(
+            self,
+            Flag::NoUse | Flag::Duration { .. } | Flag::OddSound { .. }
+        )
+    }
+
     pub fn text(&self) -> String {
         match self {
             Flag::NoUse => "no use".into(),
@@ -1142,9 +1152,9 @@ pub fn uses(
                 kind.is_some_and(|k| reference.is_some_and(|r| r.decor.iter().any(|d| d == k)));
             (
                 o,
-                use_flags(
+                flags_of(
                     o,
-                    motions.get(&o.model),
+                    motions,
                     actions,
                     &medians,
                     decor,
@@ -1273,6 +1283,55 @@ pub fn uses(
     (out, files)
 }
 
+/// One object's flags: the reference says which kinds are decor and which kind owns a sound.
+fn flags_of(
+    o: &Object,
+    motions: &BTreeMap<String, Value>,
+    actions: &BTreeSet<String>,
+    medians: &BTreeMap<String, f32>,
+    decor: bool,
+    heard: &Sounds,
+) -> Vec<Flag> {
+    use_flags(o, motions.get(&o.model), actions, medians, decor, heard)
+}
+
+/// Every object's flags as `(id, flags)`, in the content's order (`cargo review uses --check`).
+pub fn all_flags(
+    objects: &[Object],
+    motions: &BTreeMap<String, Value>,
+    actions: &BTreeSet<String>,
+    sounds: &BTreeMap<String, String>,
+    reference: Option<&Reference>,
+) -> Vec<(String, Vec<Flag>)> {
+    let medians = tag_medians(objects);
+    let kind_of =
+        |o: &Object| reference.and_then(|r| r.kind_of(&o.id, &o.model, &o.category, &o.group));
+    let owners = sound_owners(objects, sounds, &|o| kind_of(o).map(str::to_string));
+    objects
+        .iter()
+        .map(|o| {
+            let kind = kind_of(o);
+            let decor =
+                kind.is_some_and(|k| reference.is_some_and(|r| r.decor.iter().any(|d| d == k)));
+            (
+                o.id.clone(),
+                flags_of(
+                    o,
+                    motions,
+                    actions,
+                    &medians,
+                    decor,
+                    &Sounds {
+                        tag: sounds,
+                        owners: &owners,
+                        kind,
+                    },
+                ),
+            )
+        })
+        .collect()
+}
+
 /// Writes `files` into `dir` (made if missing).
 fn write_md(dir: &Path, files: &BTreeMap<String, String>) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
@@ -1303,10 +1362,12 @@ impl Sources {
     }
 }
 
-pub const USAGE: &str = "usage: cargo review sizes [--md <dir>] | uses [--md <dir>]";
+pub const USAGE: &str = "usage: cargo review sizes [--md <dir>] | uses [--md <dir>] [--check]";
 
-/// `cargo review <sizes|uses> [--md <dir>]`: the exit code (2: usage, or no reference for `sizes`).
+/// `cargo review <sizes|uses> [--md <dir>] [--check]`: the exit code (2: usage, or no reference for
+/// `sizes`; 1: `--check` found a hard flag, a use the renderer can't play).
 pub fn main(args: &[String]) -> i32 {
+    let check = args.iter().any(|a| a == "--check");
     let md = match args.iter().position(|a| a == "--md") {
         Some(i) => match args.get(i + 1) {
             Some(dir) => Some(PathBuf::from(dir)),
@@ -1344,14 +1405,34 @@ pub fn main(args: &[String]) -> i32 {
                     .map_err(|e| format!("actions.ts: {e}"))?;
                 let sounds = action_sounds(&s.read("web/src/audio/world.ts")?)
                     .map_err(|e| format!("world.ts: {e}"))?;
-                let (text, files) = uses(
-                    &objects,
-                    &motions(&s.paths)?,
-                    &actions,
-                    &sounds,
-                    reference.as_ref(),
-                );
-                (text, files, 0)
+                let motions = motions(&s.paths)?;
+                let (text, files) = uses(&objects, &motions, &actions, &sounds, reference.as_ref());
+                let hard: Vec<String> = if check {
+                    all_flags(&objects, &motions, &actions, &sounds, reference.as_ref())
+                        .into_iter()
+                        .flat_map(|(id, flags)| {
+                            flags
+                                .into_iter()
+                                .filter(Flag::hard)
+                                .map(move |f| format!("{id}: {}", f.text()))
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                let code = if hard.is_empty() {
+                    0
+                } else {
+                    eprintln!(
+                        "review uses: {} hard flag(s), a use the renderer can't play or a model that opens without a clip:",
+                        hard.len()
+                    );
+                    for line in hard.iter().take(20) {
+                        eprintln!("  {line}");
+                    }
+                    1
+                };
+                (text, files, code)
             }
             _ => {
                 eprintln!("{USAGE}");

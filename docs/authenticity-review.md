@@ -706,8 +706,10 @@ From the coordinator's notes and each wave's `review-log.md`, deduplicated; the 
 - Still open: for a tub it reads the water's surface, not the tub's floor (no content seat names a tub's
   floor today, so nothing warns).
 - In CI since 2026-10-31 (the **Models** step, 0.4 s: a broken model fails, a measure out of range is the
-  review's to weigh); `cargo review sizes` joined it on 2026-10-30 (an object mapping to no kind fails), but
-  `uses` (which always exits 0) and the browser checks did not.
+  review's to weigh); `cargo review sizes` joined it on 2026-10-30 (an object mapping to no kind fails) and
+  `review uses --check` on 2026-10-31 (a use the renderer can't play fails: an anim with no `ACTIONS` entry,
+  a `motions` key no use answers to, an open without `motions.open`; a missing use, a duration and a sound
+  stay the review's to weigh). The browser checks did not.
 
 **`cargo review uses` (T4)**
 - ~~The ladder shelf has no use but isn't flagged.~~ Not a blind spot: the reference's `decor` list is the

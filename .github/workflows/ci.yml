@@ -93,6 +93,15 @@ jobs:
           set -o pipefail
           cargo review sizes | tee /tmp/review-sizes.md
 
+      # Every use the renderer can play and every open that has its clip: a use whose animation
+      # `ACTIONS` has no entry for, a `motions` key no use answers to, an open without
+      # `motions.open` fails. An object with no use of its own, a duration out of the median and a
+      # sound only another kind makes stay the review's to weigh (the summary counts them).
+      - name: Object uses
+        run: |
+          set -o pipefail
+          cargo review uses --check | tee /tmp/review-uses.md
+
       # Every shipped model at the gate (no Blender): a clip that does not run rest to rest, a part that
       # moves without one, a budget over, a functional height (seat, top, mattress, lamp) the mesh and the
       # content disagree on. A measure out of range is the review's to weigh; a broken model fails here.

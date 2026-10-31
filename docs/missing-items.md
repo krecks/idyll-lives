@@ -150,9 +150,21 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
   helpers a recipe walks to), no `--views` (one camera per run; `--top` since 2026-10-30); needs carry
   over between uses. (`--use ripe` and the crop stage in the record came 2026-10-31.)
 - `check.mjs sheet`, `poses.html`, gallery and previews each have known blind spots (see §7).
-- CI runs clips, the GLB gate, `cargo check-glb` (since 2026-10-31) and, since 2026-10-30,
-  `review sizes` (a content object no kind covers fails); still not `review uses` (it always exits 0) or
-  the browser checks.
+- CI runs clips, the GLB gate, `cargo check-glb` (since 2026-10-31), `review sizes` (2026-10-30) and
+  `review uses --check` (2026-10-31); still not the browser checks.
+
+**Done 2026-10-31 (`review uses --check`: a use the renderer can't play fails CI):**
+
+- `cargo review uses` exited 0 whatever it found, so nothing could be gated on it. It has `--check` now:
+  exit 1 if any object's flags include one the renderer can't play — an animation `ACTIONS` has no entry
+  for (`anim not in ACTIONS`), a `motions.uses`/`motions.loops` key that is no use or animation of the
+  object, or a use that opens the thing on a model with no `motions.open`.
+- The other three flags stay the reviewer's: a missing use (a table with no use of its own is still a table
+  the sim uses as a station — 50 of the 100 are flagged today, and that is the review's business), a
+  duration out of its median, and an odd sound.
+- `Flag::hard` is the rule, `all_flags` is the list the gate and the table both read, and the CI step
+  **Object uses** sits after **Object sizes**. `the_shipped_content_reads` asserts the shipped content has
+  no hard flag, so the gate can't quietly start failing on a change that only touched content.
 
 **Done 2026-10-31 (`review sizes`: the faces it measured, and the kinds that were wrong):**
 

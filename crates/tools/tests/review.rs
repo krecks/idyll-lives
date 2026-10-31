@@ -608,6 +608,26 @@ fn each_uses_flag() {
     // `when: ripe` is a crop's, not an open state.
     assert_eq!(flags("tomatoes", false), []);
     assert_eq!(Flag::NoUse.column(), review::FLAG_COLUMNS[0]);
+    // A use the renderer can't play fails the gate; a missing use, a duration and a sound do not.
+    assert!(!Flag::NoUse.hard());
+    assert!(
+        Flag::NoAction {
+            using: "x".into(),
+            anim: "y".into()
+        }
+        .hard()
+    );
+    assert!(Flag::NoOpen { using: "x".into() }.hard());
+    assert!(Flag::MotionKey { key: "x".into() }.hard());
+    assert!(
+        !Flag::Duration {
+            using: "x".into(),
+            minutes: 1.0,
+            like: "y".into(),
+            median: 9.0
+        }
+        .hard()
+    );
     assert_eq!(
         Flag::OddSound {
             using: String::new(),
@@ -787,4 +807,20 @@ fn the_shipped_content_reads() {
     let (text, files) = review::uses(&objects, &motions, &actions, &sounds, None);
     assert!(text.contains("| **all** | 543 |"), "{text}");
     assert_eq!(files.len(), 15);
+
+    // The gate CI runs (`cargo review uses --check`): no use the renderer can't play, no `motions` key
+    // no use answers to, no open without its clip. A missing use is the review's to weigh, not the gate's.
+    let reference = std::fs::read_to_string(format!("{root}/docs/review/reference.json")).unwrap();
+    let reference = review::Reference::parse(&reference).unwrap();
+    let hard: Vec<String> =
+        review::all_flags(&objects, &motions, &actions, &sounds, Some(&reference))
+            .into_iter()
+            .flat_map(|(id, flags)| {
+                flags
+                    .into_iter()
+                    .filter(review::Flag::hard)
+                    .map(move |f| format!("{id}: {}", f.text()))
+            })
+            .collect();
+    assert!(hard.is_empty(), "{hard:?}");
 }
