@@ -1195,8 +1195,8 @@ fn sidewalk(n: &Noise, size: usize) -> Surface {
     })
 }
 
-/// Worn asphalt, 5 m: aggregate in dark binder, broad patches, hairline cracks running every which
-/// way (some sealed), none of them standing out so the tile's repeat doesn't show.
+/// Worn asphalt, 5 m: aggregate in dark binder, broad patches, a few hairline cracks running every
+/// which way (some sealed), none of them standing out so the tile's repeat doesn't show.
 fn asphalt(n: &Noise, size: usize) -> Surface {
     let t = TILE_ROAD;
     let k = size as f64 / 1024.0;
@@ -1204,9 +1204,9 @@ fn asphalt(n: &Noise, size: usize) -> Surface {
         &n.layer(9),
         size,
         size,
-        16,
-        size as f64 * 0.16,
-        k * 1.1,
+        5,
+        size as f64 * 0.14,
+        k * 1.0,
         k * 4.0,
     );
     let ng = n.layer(1);
