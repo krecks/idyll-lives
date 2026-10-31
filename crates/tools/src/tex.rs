@@ -411,7 +411,7 @@ pub fn materials() -> J {
             "environment.sky",
             J::Obj(vec![
                 ("type", s("image")),
-                ("url", s("env/belfast_open_field.env")),
+                ("url", s("env/belfast_open_field.pcenv")),
             ]),
         ),
         (
@@ -693,7 +693,7 @@ mod tests {
         assert_eq!(py_fsum(std::iter::repeat_n(0.1, 10)), 1.0);
     }
 
-    /// `tests/fixtures/tex/materials.json` is what materials.py wrote.
+    /// `tests/fixtures/tex/materials.json` is what materials.py wrote (but for the sky's URL, since `cargo envconv`'s `.pcenv`).
     #[test]
     fn materials_bytes() {
         assert_eq!(
