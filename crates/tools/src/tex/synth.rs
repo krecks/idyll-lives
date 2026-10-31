@@ -11,14 +11,20 @@
 //! in metres at the manifest's tile size, with their own roughness and multi-scale cavity AO
 //! ([`Surface`], [`HeightMap::cavity_ao`]) instead of the ones [`HeightMap::arm`] derives.
 //!
+//! The organic sets (lawn and field earth, foliage, bark, carpet, linen, wallpaper, painted wood and
+//! oak) are made in [`organic`] instead: sprites (blades, leaves, fibres) drawn into a z-buffered
+//! layer, with their own albedo tone, AO and roughness besides the height.
+//!
 //! The output keeps the filenames and sizes the game expects: the 19 texture sets under
 //! `textures/<set>/`, the sidewalk under `street/sidewalk/`. Everything is original and CC0; there are
 //! no downloads and no Python.
 
+mod organic;
+
 use super::grey_detail;
 use super::pil::{Filter, Img};
 use crate::content;
-use std::f64::consts::{FRAC_1_SQRT_2, TAU};
+use std::f64::consts::FRAC_1_SQRT_2;
 use std::path::Path;
 
 mod built;
@@ -328,21 +334,6 @@ pub fn par_map<T: Send + Clone + Default>(
     out
 }
 
-fn render(w: usize, h: usize, f: impl Fn(f64, f64) -> (f64, [f64; 3]) + Sync) -> (HeightMap, Img) {
-    let samples = par_map(w, h, |x, y| {
-        f((x as f64 + 0.5) / w as f64, (y as f64 + 0.5) / h as f64)
-    });
-    let mut hm = HeightMap::new(w, h);
-    let mut px = vec![0u8; w * h * 3];
-    for (i, (height, c)) in samples.into_iter().enumerate() {
-        hm.v[i] = height;
-        px[i * 3] = to_u8(c[0]);
-        px[i * 3 + 1] = to_u8(c[1]);
-        px[i * 3 + 2] = to_u8(c[2]);
-    }
-    (hm, Img { w, h, ch: 3, px })
-}
-
 /// What a generator makes: the height, the colour (or, with `grey_from_albedo`, the luminance the
 /// grey detail map is made from instead of the height) and optionally its own roughness and ambient
 /// occlusion (else [`HeightMap::arm`] derives both from the height with the set's numbers).
@@ -396,83 +387,6 @@ fn mul(c: [f64; 3], k: f64) -> [f64; 3] {
 }
 
 // --- pattern primitives ---------------------------------------------------------------------------
-
-/// Long wood grain: rings across the board, fine fibres along it.
-fn wood_grain(n: &Noise, u: f64, v: f64, freq: i64) -> f64 {
-    let (wu, wv) = n.warp(u, v, 0.16, 4);
-    let fine = n.fbm2(wu, wv, 2, freq, 5);
-    let ring = 0.5 + 0.5 * ((wv * freq as f64 + fine * 3.0) * TAU).sin();
-    let fibre = n.fbm2(wu, wv, 64, 8, 3);
-    (0.55 * ring + 0.45 * fibre).clamp(0.0, 1.0)
-}
-
-/// A field of grass blades: one per jittered cell, mostly upright, with a soft taper.
-fn blade_field(n: &Noise, u: f64, v: f64, cols: i64, rows: i64, seed: u32) -> (f64, f64) {
-    let ci = (u * cols as f64).floor() as i64;
-    let cj = (v * rows as f64).floor() as i64;
-    let (mut best, mut tone) = (0.0, 0.0);
-    for dj in -1..=1 {
-        for di in -1..=1 {
-            let (i, j) = (ci + di, cj + dj);
-            let wi = i.rem_euclid(cols);
-            let wj = j.rem_euclid(rows);
-            let cx = (i as f64 + 0.5 + (n.rand(wi, wj, seed) - 0.5) * 0.9) / cols as f64;
-            let cy = (j as f64 + 0.5 + (n.rand(wi, wj, seed + 1) - 0.5) * 0.9) / rows as f64;
-            let ang = std::f64::consts::FRAC_PI_2 + (n.rand(wi, wj, seed + 2) - 0.5) * 1.1;
-            let len = (1.8 + 1.0 * n.rand(wi, wj, seed + 3)) / cols as f64;
-            let wid = (0.12 + 0.08 * n.rand(wi, wj, seed + 4)) / cols as f64;
-            let dx = (u - cx + 0.5).rem_euclid(1.0) - 0.5;
-            let dy = (v - cy + 0.5).rem_euclid(1.0) - 0.5;
-            let (ca, sa) = (ang.cos(), ang.sin());
-            let lx = dx * ca + dy * sa;
-            let ly = -dx * sa + dy * ca;
-            let t = lx.clamp(-len * 0.5, len * 0.5);
-            let d = ((lx - t).powi(2) + ly * ly).sqrt();
-            let along = (t / len + 0.5).clamp(0.0, 1.0);
-            let cov = (1.0 - smoothstep(0.0, wid, d))
-                * (1.0 - (2.0 * t / len).abs()).clamp(0.0, 1.0)
-                * (0.35 + 0.65 * along);
-            if cov > best {
-                best = cov;
-                tone = n.rand(wi, wj, seed + 5);
-            }
-        }
-    }
-    (best, tone)
-}
-
-/// A field of overlapping leaves: ellipses with a central vein, gaps showing through.
-fn leaf_field(n: &Noise, u: f64, v: f64, cols: i64, rows: i64, seed: u32) -> (f64, f64) {
-    let ci = (u * cols as f64).floor() as i64;
-    let cj = (v * rows as f64).floor() as i64;
-    let (mut best, mut tone) = (0.0, 0.0);
-    for dj in -1..=1 {
-        for di in -1..=1 {
-            let (i, j) = (ci + di, cj + dj);
-            let wi = i.rem_euclid(cols);
-            let wj = j.rem_euclid(rows);
-            let cx = (i as f64 + 0.5 + (n.rand(wi, wj, seed) - 0.5) * 0.9) / cols as f64;
-            let cy = (j as f64 + 0.5 + (n.rand(wi, wj, seed + 1) - 0.5) * 0.9) / rows as f64;
-            let ang = n.rand(wi, wj, seed + 2) * TAU;
-            let len = (1.6 + 0.8 * n.rand(wi, wj, seed + 3)) / cols as f64;
-            let wid = len * (0.24 + 0.10 * n.rand(wi, wj, seed + 4));
-            let dx = u - cx;
-            let dy = v - cy;
-            let (ca, sa) = (ang.cos(), ang.sin());
-            let lx = dx * ca + dy * sa;
-            let ly = -dx * sa + dy * ca;
-            let e = (lx / (len * 0.5)).abs().powf(1.25) + (ly / wid).powi(2);
-            let cov = 1.0 - smoothstep(0.55, 1.0, e);
-            let vein = (1.0 - smoothstep(0.0, 0.22, (ly / wid).abs())) * cov;
-            let h = cov * (0.72 + 0.28 * vein);
-            if h > best {
-                best = h;
-                tone = n.rand(wi, wj, seed + 5);
-            }
-        }
-    }
-    (best, tone)
-}
 
 // --- the sets -------------------------------------------------------------------------------------
 
@@ -528,13 +442,13 @@ const fn set_ao(
 }
 
 pub const SETS: [Set; 20] = [
-    set("bark", 512, 512, None, 0.0058, (0.84, 0.20, 2.3)),
+    set("bark", 512, 512, None, 0.010, (0.84, 0.20, 2.3)),
     set_ao("brick", 1024, 1024, None, 0.0041, (0.81, 0.12, 4.5), 0.945),
     set(
         "carpet",
         512,
         512,
-        Some((0.58, 1.40, 48.0)),
+        Some((0.58, 0.85, 48.0)),
         0.0052,
         (0.87, 0.30, 5.0),
     ),
@@ -542,7 +456,7 @@ pub const SETS: [Set; 20] = [
         "fabric_linen",
         512,
         512,
-        Some((0.80, 0.04, 0.0)),
+        Some((0.80, 0.45, 0.0)),
         0.0006,
         (0.60, 0.10, 1.5),
     ),
@@ -561,15 +475,15 @@ pub const SETS: [Set; 20] = [
         512,
         512,
         Some((0.58, 1.10, 0.0)),
-        0.008,
+        0.012,
         (0.74, 0.20, 4.0),
     ),
     set(
         "grass",
         1024,
         1024,
-        Some((0.75, 0.30, 0.0)),
-        0.0019,
+        Some((0.75, 0.55, 0.0)),
+        0.0040,
         (0.45, 0.15, 1.6),
     ),
     set(
@@ -577,14 +491,14 @@ pub const SETS: [Set; 20] = [
         1024,
         1024,
         Some((0.70, 0.70, 24.0)),
-        0.0020,
+        0.005,
         (0.74, 0.10, 1.7),
     ),
     set(
         "painted_wood",
         512,
         512,
-        Some((0.75, 0.04, 0.0)),
+        Some((0.75, 1.0, 0.0)),
         0.0007,
         (0.39, 0.05, 0.4),
     ),
@@ -642,15 +556,15 @@ pub const SETS: [Set; 20] = [
         "wallpaper",
         1024,
         512,
-        Some((0.75, 0.05, 0.0)),
-        0.0025,
+        Some((0.75, 1.0, 0.0)),
+        0.0015,
         (0.78, 0.05, 0.05),
     ),
     set(
         "wood_oak",
         512,
         512,
-        Some((0.80, 0.11, 0.0)),
+        Some((0.80, 0.60, 0.0)),
         0.0003,
         (0.52, 0.20, 0.2),
     ),
@@ -686,23 +600,32 @@ pub fn run(only: &[&str]) -> Result<(), String> {
 }
 
 fn write_set(root: &Path, set: &Set) -> Result<(), String> {
-    let surface = generate(set.name, set.albedo);
-    let mut height = surface.height;
-    height.stretch();
-    let albedo = match set.grey {
-        Some((target, contrast, flatten)) if surface.grey_from_albedo => {
-            grey_detail(&surface.albedo, target, contrast, flatten)
+    // The organic sets (`organic`) make their own albedo tone, AO and roughness.
+    let (albedo, normal, arm) = match organic::generate(set.name, set.albedo) {
+        Some(o) => o.maps(set),
+        None => {
+            let surface = generate(set.name, set.albedo);
+            let mut height = surface.height;
+            height.stretch();
+            let albedo = match set.grey {
+                Some((target, contrast, flatten)) if surface.grey_from_albedo => {
+                    grey_detail(&surface.albedo, target, contrast, flatten)
+                }
+                Some((target, contrast, flatten)) => {
+                    grey_detail(&height.grey(), target, contrast, flatten)
+                }
+                None => surface.albedo,
+            };
+            let normal = height.normal(set.relief);
+            let arm = match (&surface.ao, &surface.rough) {
+                (Some(ao), Some(rough)) => {
+                    let ao: Vec<f64> = ao.iter().map(|a| a * set.ao_base).collect();
+                    pack_arm(height.w, height.h, &ao, rough)
+                }
+                _ => height.arm(set.rough.0, set.rough.1, set.rough.2, set.ao_base),
+            };
+            (albedo, normal, arm)
         }
-        Some((target, contrast, flatten)) => grey_detail(&height.grey(), target, contrast, flatten),
-        None => surface.albedo,
-    };
-    let normal = height.normal(set.relief);
-    let arm = match (&surface.ao, &surface.rough) {
-        (Some(ao), Some(rough)) => {
-            let ao: Vec<f64> = ao.iter().map(|a| a * set.ao_base).collect();
-            pack_arm(height.w, height.h, &ao, rough)
-        }
-        _ => height.arm(set.rough.0, set.rough.1, set.rough.2, set.ao_base),
     };
     let dir = if set.name == "sidewalk" {
         root.join("../street/sidewalk")
@@ -749,129 +672,11 @@ fn seed(name: &str) -> u64 {
 }
 
 fn generate(name: &str, size: usize) -> Surface {
-    let n = Noise::new(seed(name));
-    if let Some(s) = built::generate(name, &n, size) {
-        return s;
+    if let Some(o) = organic::generate(name, size) {
+        return Surface::plain((o.height, o.albedo.rgb()));
     }
-    Surface::plain(match name {
-        "bark" => bark(&n, size),
-        "carpet" => carpet(&n, size),
-        "fabric_linen" => fabric(&n, size),
-        "foliage" => foliage(&n, size),
-        "grass" => grass(&n, size, 192, 0.75),
-        "grass_lush" => grass(&n, size, 224, 1.0),
-        "painted_wood" => painted_wood(&n, size),
-        "wallpaper" => wallpaper(&n, size),
-        "wood_oak" => wood_oak(&n, size),
-        _ => unreachable!("unknown set {name}"),
-    })
-}
-
-// --- generators -----------------------------------------------------------------------------------
-
-fn carpet(n: &Noise, size: usize) -> (HeightMap, Img) {
-    render(size, size, |u, v| {
-        let a = n.fbm2(u, v, 64, 64, 4) - 0.5;
-        let b = n.fbm2(u, v, 8, 128, 3) - 0.5;
-        let c = n.fbm2(u, v, 256, 256, 2) - 0.5;
-        let d = n.fbm2(u, v, 512, 512, 1) - 0.5;
-        let h = 0.5 + 0.10 * a + 0.04 * b + 0.20 * c + 0.16 * d;
-        (h, [0.5; 3])
-    })
-}
-
-fn fabric(n: &Noise, size: usize) -> (HeightMap, Img) {
-    let threads = 96i64;
-    render(size, size, |u, v| {
-        let x = u * threads as f64;
-        let y = v * threads as f64;
-        let (ix, iy) = (x.floor() as i64, y.floor() as i64);
-        let (fx, fy) = (x - ix as f64, y - iy as f64);
-        let warp = 0.5 + 0.5 * (fx * TAU).cos();
-        let weft = 0.5 + 0.5 * (fy * TAU).cos();
-        let over = (ix + iy).rem_euclid(2) == 0;
-        let (a, b) = if over { (0.18, 0.12) } else { (0.12, 0.18) };
-        let fuzz = n.fbm2(u, v, 256, 256, 2) - 0.5;
-        let slub = n.fbm2(u, v, 96, 6, 3) - 0.5;
-        let h = 0.5 + a * warp + b * weft + 0.08 * fuzz + 0.05 * slub;
-        (h, [0.5; 3])
-    })
-}
-
-fn foliage(n: &Noise, size: usize) -> (HeightMap, Img) {
-    render(size, size, |u, v| {
-        let (leaf, tone) = leaf_field(n, u, v, 96, 96, 91);
-        let (small, tone2) = leaf_field(n, u, v, 192, 192, 97);
-        let cover =
-            (0.60 * leaf * (0.55 + 0.45 * tone) + 0.30 * small * (0.55 + 0.45 * tone2)).min(1.0);
-        let base = n.fbm2(u, v, 32, 32, 3) - 0.5;
-        let shade = 0.55 + 0.45 * n.fbm2(u, v, 8, 8, 4);
-        let h = (0.22 + 0.70 * cover) * shade + 0.05 * base;
-        let c = mix(
-            rgb(74, 74, 74),
-            rgb(204, 204, 204),
-            tone * 0.65 + tone2 * 0.35,
-        );
-        (h, c)
-    })
-}
-
-fn grass(n: &Noise, size: usize, cells: i64, lush: f64) -> (HeightMap, Img) {
-    render(size, size, |u, v| {
-        let (blade, tone) = blade_field(n, u, v, cells, cells, 101);
-        let blade = blade * (0.62 + 0.38 * tone);
-        let clump = n.fbm2(u, v, 8, 8, 4) - 0.5;
-        let base = n.fbm2(u, v, 32, 32, 3) - 0.5;
-        let h = 0.22 + 0.78 * blade + (0.08 - 0.06 * lush) * clump + 0.06 * base;
-        let c = mix(rgb(90, 90, 90), rgb(170, 170, 170), tone);
-        (h, c)
-    })
-}
-
-fn wallpaper(n: &Noise, size: usize) -> (HeightMap, Img) {
-    render(size, size, |u, v| {
-        let h = 0.5
-            + 0.08 * (n.fbm2(u, v, 64, 64, 3) - 0.5)
-            + 0.05 * (n.fbm2(u, v, 8, 8, 4) - 0.5)
-            + 0.02 * (n.fbm2(u, v, 128, 4, 3) - 0.5);
-        (h, [0.5; 3])
-    })
-}
-
-fn painted_wood(n: &Noise, size: usize) -> (HeightMap, Img) {
-    render(size, size, |u, v| {
-        let g = wood_grain(n, u, v, 32);
-        let h = 0.5 + 0.18 * (g - 0.5) + 0.06 * (n.fbm2(u, v, 64, 64, 3) - 0.5);
-        (h, [0.5; 3])
-    })
-}
-
-fn wood_oak(n: &Noise, size: usize) -> (HeightMap, Img) {
-    render(size, size, |u, v| {
-        let g = wood_grain(n, u, v, 18);
-        let h = 0.12 + 0.88 * g + 0.06 * (n.fbm2(u, v, 128, 16, 3) - 0.5);
-        (h, [0.5; 3])
-    })
-}
-
-fn bark(n: &Noise, size: usize) -> (HeightMap, Img) {
-    render(size, size, |u, v| {
-        let (wu, wv) = n.warp(u, v, 0.02, 8);
-        let base = n.fbm2(wu, wv, 160, 24, 4);
-        let ridge = smoothstep(0.42, 0.62, base);
-        let crev = smoothstep(0.40, 0.28, base);
-        let fine = n.fbm2(u, v, 256, 16, 3) - 0.5;
-        let pit = smoothstep(0.64, 0.80, n.fbm2(u, v, 128, 128, 2));
-        let h = 0.12 + 0.78 * ridge + 0.14 * fine - 0.05 * pit;
-        let c = mix(rgb(72, 60, 46), rgb(138, 120, 94), ridge);
-        let c = mix(c, rgb(34, 27, 20), crev * 0.20);
-        let mottle = n.fbm2(u, v, 8, 8, 3) - 0.5;
-        let c = mul(c, 0.90 + 0.20 * (fine + 0.5) + 0.24 * mottle);
-        let c = mix(c, rgb(38, 32, 26), pit * 0.35);
-        let moss = smoothstep(0.55, 0.78, n.fbm2(u, v, 6, 6, 4)) * smoothstep(0.55, 0.15, ridge);
-        let c = mix(c, rgb(76, 88, 56), moss * 0.30);
-        (h, c)
-    })
+    let n = Noise::new(seed(name));
+    built::generate(name, &n, size).unwrap_or_else(|| unreachable!("unknown set {name}"))
 }
 
 #[cfg(test)]
