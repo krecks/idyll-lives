@@ -2110,6 +2110,11 @@ const SAME: f64 = 0.005;
 /// below the seat's height (a cushion's rounded front), and how far the model's may be from what the table says.
 const FRONT_DROP: f64 = 0.06;
 const FRONT_OFF: f64 = 0.03;
+/// How far (m) around the point a functional height is measured: the widest gap a top may have there and still be
+/// the thing itself (a bench's slats, a table's planks, a cushion's seams). A single point falls between them and
+/// reports nothing under a seat that is right.
+const PROBE: f64 = 0.05;
+
 /// A seat this low (m) is the ground (furniture.json `seats` `shade`: against a tree's trunk), not the model's to measure.
 const GROUND: f64 = 0.02;
 
@@ -2207,6 +2212,30 @@ impl Sampler {
     /// any face. None: nothing there.
     fn top(&self, x: f64, z: f64, near: f64) -> Option<f64> {
         self.top_in(x, z, [near, near])
+    }
+
+    /// `top` over the `PROBE` strip around (x, depth): the faces looking up at the point itself and on a ring round
+    /// it, the one nearest `near` of those (a gap between slats has nothing on the line but its neighbours do).
+    fn top_around(&self, x: f64, z: f64, near: f64) -> Option<f64> {
+        // The point first, then the ring: a tie keeps the point's own face.
+        let mut best = self.top(x, z, near);
+        for (dx, dz) in [
+            (1.0, 0.0),
+            (-1.0, 0.0),
+            (0.0, 1.0),
+            (0.0, -1.0),
+            (0.7, 0.7),
+            (-0.7, 0.7),
+            (0.7, -0.7),
+            (-0.7, -0.7),
+        ] {
+            let found = self.top(x + dx * PROBE, z + dz * PROBE, near);
+            let off = |m: Option<f64>| m.map_or(f64::INFINITY, |m| (m - near).abs());
+            if found.is_some() && off(found) < off(best) {
+                best = found;
+            }
+        }
+        best
     }
 
     /// `top`, nearest the range `[lo, hi]` (of those in it, nearest its middle).
@@ -2490,6 +2519,15 @@ fn slot_points(object: &J, fwd: f64) -> Vec<[f64; 2]> {
             })
             .collect();
     }
+    // A baby's place is the middle, however many slots it has (sim-core `place_at`: a baby is put at the object's
+    // centre, not spread across its width), so a crib's mattress is one mattress and a high chair one seat.
+    let baby = object
+        .get("interactions")
+        .and_then(J::list)
+        .is_some_and(|l| l.iter().any(|i| i.get("baby").is_some_and(J::truthy)));
+    if baby {
+        return vec![[0.0, fwd]];
+    }
     let n = object
         .get("slots")
         .and_then(J::num)
@@ -2508,6 +2546,11 @@ fn slot_points(object: &J, fwd: f64) -> Vec<[f64; 2]> {
 /// one sat on), the hips' point `fwd` ahead of each slot's place (`slot_points`; along the object for a bath, `along`).
 /// None: no one sits on it.
 fn seat_of(object: &J, furniture: &Furniture) -> Option<Seat> {
+    // A thing that stands on a top (content `layer: "surface"`) has no seat of its own: a `sit` use of the mugs or
+    // the books is the resident sitting at the table they stand on, not on them.
+    if object.get("layer").is_some_and(|l| l.key() == "surface") {
+        return None;
+    }
     let id = object.get("id").map(J::key).unwrap_or_default();
     let own = object.opt("seat");
     let table = furniture.seats.get(&id);
@@ -2619,7 +2662,7 @@ fn heights(
     let worst = |s: &Sampler, points: &[[f64; 2]], near: f64| -> ([f64; 2], Option<f64>) {
         let mut best: Option<([f64; 2], Option<f64>)> = None;
         for p in points {
-            let m = s.top(p[0], p[1], near);
+            let m = s.top_around(p[0], p[1], near);
             let off = |m: Option<f64>| m.map_or(f64::INFINITY, |m| (m - near).abs());
             if best.is_none_or(|(_, b)| off(m) > off(b)) {
                 best = Some((*p, m));

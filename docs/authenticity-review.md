@@ -677,9 +677,21 @@ From the coordinator's notes and each wave's `review-log.md`, deduplicated; the 
 - "No top to measure" where content has no `surface` (the workbench, the chess table).
 
 **`cargo check-glb` heights (T1, T2)**
-- It probes one point, so a gap between slats, planks or cushions gives a false warning (six outdoors, the park bench). It wants the highest point over a 5–10 cm strip.
-- For a tub it reads the water's surface, not the tub's floor. The crib's check reads the changing pad under slot 1.
-- Not in CI yet; `cargo review sizes` joined it on 2026-10-30 (an object mapping to no kind fails), but
+- ~~It probes one point, so a gap between slats, planks or cushions gives a false warning.~~ Fixed 2026-10-31:
+  it takes the face nearest the expected height over a 5 cm ring round the point (`PROBE`,
+  `Sampler::top_around`), and a thing that stands on a top (`layer: "surface"`) is not a seat, so the eight
+  tabletop things' seated uses (mugs, books, laptop, toy blocks) no longer read as a seat 45 cm lower.
+- ~~The crib's check reads the changing pad under slot 1.~~ Fixed 2026-10-31: a baby's place is the object's
+  middle, as sim-core puts it (`place_at`), so a crib's mattress is one mattress (0.558 m) and the high
+  chair's seat is its own (0.605 m, was read at a leg at 0.21 m).
+- `outgoing.partyBar`'s content seat sat 0.5 m forward of its middle where its stools stand at 0.28 m: fixed
+  (`seat.forward`), so its 0.74 m stool seat is measured (it read "no model there") — and in play the sitter
+  sat in the air behind the stools at 0.5 and on one at 0.28 (`bench-results/check-bar/bar28-…-05.png`,
+  `bar50-…-05.png`).
+- Still open: for a tub it reads the water's surface, not the tub's floor (no content seat names a tub's
+  floor today, so nothing warns).
+- In CI since 2026-10-31 (the **Models** step, 0.4 s: a broken model fails, a measure out of range is the
+  review's to weigh); `cargo review sizes` joined it on 2026-10-30 (an object mapping to no kind fails), but
   `uses` (which always exits 0) and the browser checks did not.
 
 **`cargo review uses` (T4)**

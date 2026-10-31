@@ -145,14 +145,32 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
 
 - `cargo review sizes` measures the wrong face (basin drain/underside, closed toilet lid, kettle grate,
   pool cloth) and includes non-object geometry.
-- `cargo check-glb` heights probe one point, so slats/planks give false warnings (the gate itself runs
-  in the tool tests).
 - `cargo review uses` does not flag the ladder shelf's missing use.
 - `check.mjs play`: no `--use ripe` (a ripe use still needs `--use-existing`), no whole-recipe
   following, no `--views`; needs carry over between uses.
 - `check.mjs sheet`, `poses.html`, gallery and previews each have known blind spots (see §7).
-- CI runs clips, the GLB gate and, since 2026-10-30, `review sizes` (a content object no kind covers
-  fails); still not `review uses` (it always exits 0) or the browser checks.
+- CI runs clips, the GLB gate, `cargo check-glb` (since 2026-10-31) and, since 2026-10-30,
+  `review sizes` (a content object no kind covers fails); still not `review uses` (it always exits 0) or
+  the browser checks.
+
+**Done 2026-10-31 (the height gate):**
+
+- `cargo check-glb` no longer probes a single point for a functional height: it takes the face nearest the
+  expected height over a 5 cm ring round the point (`PROBE`, `Sampler::top_around`), so a gap between a
+  bench's slats or a table's planks is no longer "no model under it" (`crates/tools/src/checkglb.rs`).
+- A thing that stands on a top (content `layer: "surface"`) has no seat: a `sit` use of the mugs, the
+  books, the laptop or the toy blocks is the resident sitting at the table they stand on, and the gate no
+  longer reads a seat 45 cm lower there — eight false warnings (the tabletop things) went.
+- A baby's place is the object's middle, as sim-core puts it (`place_at`), so a crib's mattress is measured
+  once at its middle (0.558 m, was the changing pad under slot 1 at 0.78 m) and the high chair's seat is its
+  own (0.605 m, was read at a leg at 0.21 m). `crates/tools/tests/checkglb.rs` says so.
+- `outgoing.partyBar`'s seat was 0.5 m forward of its middle where its stools stand at 0.28 m: the content's
+  `seat.forward` fixed, so `review sizes` and the gate measure the 0.74 m stool seat (it read "no model there") —
+  and in play the sitter sat in the air behind the stools at 0.5, on a stool at 0.28
+  (`bench-results/check-bar/bar28-outgoing.partyBar-barDrink-05.png`, `bar50-…-05.png`).
+- In CI: a new **Models** step runs `cargo check-glb` after **Object sizes** (0.4 s; a broken model fails,
+  a measure out of range is the review's to weigh) — `.github/workflows/ci.yml`.
+- Warnings from the whole gate: 105 → 94, and every one of the eleven that went was a false one.
 
 **Done 2026-10-30 (tooling):**
 

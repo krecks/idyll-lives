@@ -792,7 +792,7 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Where:** `web/public/content/packs/cheerful.json:40` (`jukebox`: `dance` only), `outgoing.json:5` (`partyBar`: `mixDrinks`, `soda`, both standing)
 - **Evidence:** `packs/sheets/obj-cheerful.jukebox.png`: picking a song and listening, the jukebox's first use, isn't offered (the record cabinet and the gramophone have `listen`). `packs/sheets/obj-outgoing.partyBar.png`: the bar is built with two stools for its guests but both uses stand at the guest side; a seated drink at the bar is missing.
 - **Status:** fixed (eaca9ed8)
-- **After:** The jukebox's "Pick a song and listen" (`seatNear` 4); the party bar's "Have a drink at the bar", sat on its stools facing the counter (seat 0.74, forward 0.5, `facing: back`: `bench-results/review/fixes/content/g09/fwd50-outgoing.partyBar-barDrink-00.png`). The jukebox's record clip plays only for dance (a manifest key).
+- **After:** The jukebox's "Pick a song and listen" (`seatNear` 4); the party bar's "Have a drink at the bar", sat on its stools facing the counter (seat 0.74, `facing: back`). The seat's `forward` was 0.5, which put the sitter a hand's width behind the stools, in the air; the stools stand 0.28 m forward of the bar's middle, so the content says 0.28 now and they sit on a stool (`bench-results/check-bar/bar28-outgoing.partyBar-barDrink-05.png`, against `bar50-…-05.png` at 0.5). The jukebox's record clip plays only for dance (a manifest key).
 - **Source:** wave: packs
 
 ### I-packs-17 — The sauna-goer's feet poke through the shut glass door

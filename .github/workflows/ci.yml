@@ -92,3 +92,11 @@ jobs:
         run: |
           set -o pipefail
           cargo review sizes | tee /tmp/review-sizes.md
+
+      # Every shipped model at the gate (no Blender): a clip that does not run rest to rest, a part that
+      # moves without one, a budget over, a functional height (seat, top, mattress, lamp) the mesh and the
+      # content disagree on. A measure out of range is the review's to weigh; a broken model fails here.
+      - name: Models
+        run: |
+          set -o pipefail
+          cargo check-glb | tee /tmp/check-glb.txt

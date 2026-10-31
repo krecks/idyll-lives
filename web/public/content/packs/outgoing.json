@@ -5,7 +5,7 @@
       "id": "outgoing.partyBar",
       "name": "Home party bar",
       "model": "model.outgoing.partyBar",
-      "seat": { "height": 0.74, "forward": 0.5, "facing": "back" },
+      "seat": { "height": 0.74, "forward": 0.28, "facing": "back" },
       "footprint": [2, 1],
       "price": 1150,
       "category": "kitchen",
