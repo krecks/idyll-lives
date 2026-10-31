@@ -155,7 +155,7 @@ Family: `tools/art/blender/families/living.py`.
 | `bookcaseTall` | take a book and read, study | read (45), study (60), standing | standing to read (I-living-03) |
 | `bookcaseCorner` | take a book and read | read (45, standing) | standing to read (I-living-03) |
 | `shelvingIndustrial`, `cubeShelf` | store boxes and books | none; a `surface` on top | OK (decor) |
-| `ladderShelf` | show plants and books | none | OK (decor) |
+| `ladderShelf` | show plants and books | none | OK (decor; in the reference's `decor` list, which is why `review uses` stays silent on it) |
 | `displayCabinet` | show off china and glass, take out the good plates | open the cabinet (1), shut it (1) | OK (the door swings open, 2026-10-31; taking the china out is still missing, and the two uses are the owner's) |
 
 ## L6. Stairs (1)

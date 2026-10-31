@@ -695,8 +695,17 @@ From the coordinator's notes and each wave's `review-log.md`, deduplicated; the 
   `uses` (which always exits 0) and the browser checks did not.
 
 **`cargo review uses` (T4)**
-- The ladder shelf has no use but isn't flagged.
-- A flag for an odd sound for the kind (a sizzle away from a hob) would have found I-packs-19 at once.
+- ~~The ladder shelf has no use but isn't flagged.~~ Not a blind spot: the reference's `decor` list is the
+  review's decision record, and the living ledger's real-uses table says `ladderShelf | show plants and books
+  | none | OK (decor)` (`docs/review/living.md:158`). The gate is silent on purpose; since 2026-10-31 it also
+  says so — `cargo review uses` ends with how many objects have no use and how many of those are decor by the
+  reference's list (100 have no use, 50 are decor by the list).
+- ~~A flag for an odd sound for the kind (a sizzle away from a hob) would have found I-packs-19 at once.~~
+  Fixed 2026-10-31: `Flag::OddSound` — a sound that `SOUND_OWNERS` (3) objects of one kind make and nothing
+  else does belongs to that kind, and another kind making it is flagged (`sound_owners`; a sixth column,
+  `odd sound`). Today's content raises none: the only sounds a single kind owns are the arcade cabinets',
+  the dishwasher's crockery, the drum kits', the microwave cart's and karaoke's — the counters' sizzle is a
+  cooktop's (`cooktopCounter` maps to the kind `baseCabinet`, so the hobs do not own `sizzle` alone).
 
 **`tools/bench/check.mjs play`**
 - ~~`--use ripe`, for every `when: ripe` use (the veggie bed's is `pickSnack`), and the growth stage in

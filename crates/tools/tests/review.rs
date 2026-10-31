@@ -460,7 +460,7 @@ fn catalogue() -> (Vec<Object>, BTreeMap<String, Value>, BTreeSet<String>) {
             json!({ "uses": { "fetch": "door", "stir": "door", "drink": "door" }, "loops": { "feast": "hum", "dance": "spin" } }),
         ),
     ]);
-    let actions: BTreeSet<String> = ["relax", "nap", "fetch", "eat", "wash", "harvest"]
+    let actions: BTreeSet<String> = ["relax", "nap", "fetch", "eat", "wash", "harvest", "cook"]
         .iter()
         .map(|s| s.to_string())
         .collect();
@@ -472,15 +472,61 @@ fn catalogue() -> (Vec<Object>, BTreeMap<String, Value>, BTreeSet<String>) {
 }
 
 #[test]
+fn a_sound_only_one_kind_makes() {
+    let sounds = BTreeMap::from([("cook".to_string(), "sizzle".to_string())]);
+    let hob = |id: &str| {
+        let mut o = object(id, "kitchen", "cooking");
+        o.uses = vec![using("cook", "cook", 30.0, &["food"])];
+        o
+    };
+    let three = [hob("cooker"), hob("rangeCooker"), hob("stoveElectric")];
+    // Two of them: too few to own it.
+    assert!(review::sound_owners(&three[..2], &sounds, &|_| Some("hob".into())).is_empty());
+    // Three of one kind: theirs.
+    assert_eq!(
+        review::sound_owners(&three, &sounds, &|_| Some("hob".into()))["sizzle"],
+        "hob"
+    );
+    // Two kinds: neither owns it, so neither is odd.
+    assert!(
+        review::sound_owners(&three, &sounds, &|o| Some(if o.id == "cooker" {
+            "hob".into()
+        } else {
+            "toaster".into()
+        }))
+        .is_empty()
+    );
+    // A kind with no name (`None`) is not counted at all.
+    assert!(review::sound_owners(&three, &sounds, &|_| None).is_empty());
+}
+
+#[test]
 fn each_uses_flag() {
     let (objects, motions, actions) = catalogue();
     let medians = review::tag_medians(&objects);
     // By animation: the eats 15, 20, 90 (the middle one); the fetches 5 and 2.
     assert_eq!(medians["eat"], 20.0);
     assert_eq!(medians["fetch"], 3.5);
+    // `cook` sounds a sizzle; the hobs own it (`hob` is the kind), so a toaster that sizzles is odd.
+    let sounds = BTreeMap::from([
+        ("cook".to_string(), "sizzle".to_string()),
+        ("wash".to_string(), "tap".to_string()),
+    ]);
+    let owners = BTreeMap::from([("sizzle".to_string(), "hob".to_string())]);
     let flags = |id: &str, decor: bool| {
         let o = objects.iter().find(|o| o.id == id).unwrap();
-        review::use_flags(o, motions.get(&o.model), &actions, &medians, decor)
+        review::use_flags(
+            o,
+            motions.get(&o.model),
+            &actions,
+            &medians,
+            decor,
+            &review::Sounds {
+                tag: &sounds,
+                owners: &owners,
+                kind: Some(o.id.as_str()),
+            },
+        )
     };
     // Opens with `leaves` but its model has no `motions.open`.
     assert_eq!(
@@ -523,27 +569,74 @@ fn each_uses_flag() {
     let mut lamp = object("lamp", "lighting", "lamps");
     lamp.lamp = true;
     assert_eq!(
-        review::use_flags(&lamp, None, &actions, &medians, false),
+        review::use_flags(
+            &lamp,
+            None,
+            &actions,
+            &medians,
+            false,
+            &review::Sounds {
+                tag: &sounds,
+                owners: &owners,
+                kind: None,
+            }
+        ),
         []
+    );
+    // A sizzle is the hobs' sound: a toaster whose `cook` sounds like one is flagged.
+    let mut toaster = object("toaster", "kitchen", "appliances");
+    toaster.uses = vec![using("toast", "cook", 4.0, &["food"])];
+    assert_eq!(
+        review::use_flags(
+            &toaster,
+            None,
+            &actions,
+            &medians,
+            false,
+            &review::Sounds {
+                tag: &sounds,
+                owners: &owners,
+                kind: Some("toaster"),
+            }
+        ),
+        [Flag::OddSound {
+            using: "toast".into(),
+            sound: "sizzle".into(),
+            kind: "hob".into()
+        }]
     );
     // `when: ripe` is a crop's, not an open state.
     assert_eq!(flags("tomatoes", false), []);
     assert_eq!(Flag::NoUse.column(), review::FLAG_COLUMNS[0]);
+    assert_eq!(
+        Flag::OddSound {
+            using: String::new(),
+            sound: String::new(),
+            kind: String::new()
+        }
+        .column(),
+        "odd sound"
+    );
 
     // The whole table: the vase is decor by the reference (its group `ornaments`), the crate isn't.
     let sounds = BTreeMap::from([("wash".to_string(), "tap".to_string())]);
     let r = reference();
     let (text, files) = review::uses(&objects, &motions, &actions, &sounds, Some(&r));
     assert!(
-        text.contains("| kitchen | 2 | 2 | 0 | 1 | 2 | 0 | 1 |"),
+        text.contains("| kitchen | 2 | 2 | 0 | 1 | 2 | 0 | 1 | 0 |"),
         "{text}"
     );
     assert!(
-        text.contains("| decor | 2 | 1 | 1 | 0 | 0 | 0 | 0 |"),
+        text.contains("| decor | 2 | 1 | 1 | 0 | 0 | 0 | 0 | 0 |"),
         "{text}"
     );
     assert!(
-        text.contains("| **all** | 7 | 4 | 1 | 1 | 2 | 1 | 1 |"),
+        text.contains("| **all** | 7 | 4 | 1 | 1 | 2 | 1 | 1 | 0 |"),
+        "{text}"
+    );
+    // Why an object with no uses is not flagged: decor by the reference's list. The crate is the one flagged.
+    assert!(
+        text.contains("- 2 objects have no use; decor by `docs/review/reference.json`'s `decor` list (the decision record): 1;"),
         "{text}"
     );
     let living = &files["uses-living.md"];
@@ -555,7 +648,7 @@ fn each_uses_flag() {
     let (text, _) = review::uses(&objects, &motions, &actions, &sounds, None);
     assert!(
         text.contains("No docs/review/reference.json yet")
-            && text.contains("| decor | 2 | 2 | 2 |"),
+            && text.contains("| decor | 2 | 2 | 2 | 0 |"),
         "{text}"
     );
 }

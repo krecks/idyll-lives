@@ -489,6 +489,12 @@ pub enum Flag {
         like: String,
         median: f32,
     },
+    /// A use's sound that every object using it is of one other kind (a sizzle away from a hob).
+    OddSound {
+        using: String,
+        sound: String,
+        kind: String,
+    },
 }
 
 impl Flag {
@@ -500,6 +506,7 @@ impl Flag {
             Flag::MotionKey { .. } => "motions key",
             Flag::NoOpen { .. } => "opens, no motions.open",
             Flag::Duration { .. } => "duration",
+            Flag::OddSound { .. } => "odd sound",
         }
     }
 
@@ -519,17 +526,21 @@ impl Flag {
                 like,
                 median,
             } => format!("{using}: {minutes} min, the median for `{like}` {median} min"),
+            Flag::OddSound { using, sound, kind } => {
+                format!("{using}: sounds `{sound}`, which only a {kind} sounds")
+            }
         }
     }
 }
 
 /// The columns of `Flag::column`, in order.
-pub const FLAG_COLUMNS: [&str; 5] = [
+pub const FLAG_COLUMNS: [&str; 6] = [
     "no use",
     "anim not in ACTIONS",
     "motions key",
     "opens, no motions.open",
     "duration",
+    "odd sound",
 ];
 
 /// What a use's duration is compared with: the uses with the same animation (a night's sleep with sleeps, a nap
@@ -569,12 +580,21 @@ pub fn tag_medians(objects: &[Object]) -> BTreeMap<String, f32> {
 
 /// What looks wrong in `object`'s uses: `motions` is its model's (None: none), `actions` the renderer's action
 /// tags, `medians` the minutes per `like_key` (`tag_medians`), and `decor` whether its kind expects no use.
+/// What a use's sound is weighed against: the tag map (`ACTION_SOUNDS`), the sounds only one kind makes
+/// (`sound_owners`) and this object's kind.
+pub struct Sounds<'a> {
+    pub tag: &'a BTreeMap<String, String>,
+    pub owners: &'a BTreeMap<String, String>,
+    pub kind: Option<&'a str>,
+}
+
 pub fn use_flags(
     object: &Object,
     motions: Option<&Value>,
     actions: &BTreeSet<String>,
     medians: &BTreeMap<String, f32>,
     decor: bool,
+    heard: &Sounds,
 ) -> Vec<Flag> {
     let mut out = Vec::new();
     if object.uses.is_empty() && !object.lamp && !decor {
@@ -631,7 +651,51 @@ pub fn use_flags(
             });
         }
     }
+    if let Some(kind) = heard.kind {
+        for u in &object.uses {
+            let Some(sound) = sound_of(heard.tag, object, u) else {
+                continue;
+            };
+            if let Some(owns) = heard.owners.get(&sound)
+                && owns != kind
+            {
+                out.push(Flag::OddSound {
+                    using: u.id.clone(),
+                    sound,
+                    kind: owns.clone(),
+                });
+            }
+        }
+    }
     out
+}
+
+/// The sounds only one kind of object makes: `sound` → that kind, for every sound `SOUND_OWNERS` objects of one
+/// kind make and nothing else does. A sizzle belongs to the hobs; a toaster that sizzles is flagged.
+pub const SOUND_OWNERS: usize = 3;
+
+pub fn sound_owners(
+    objects: &[Object],
+    sounds: &BTreeMap<String, String>,
+    kind_of: &dyn Fn(&Object) -> Option<String>,
+) -> BTreeMap<String, String> {
+    let mut by_sound: BTreeMap<String, (BTreeMap<String, usize>, usize)> = BTreeMap::new();
+    for o in objects {
+        let Some(kind) = kind_of(o) else { continue };
+        for u in &o.uses {
+            let Some(sound) = sound_of(sounds, o, u) else {
+                continue;
+            };
+            let entry = by_sound.entry(sound).or_default();
+            *entry.0.entry(kind.clone()).or_default() += 1;
+            entry.1 += 1;
+        }
+    }
+    by_sound
+        .into_iter()
+        .filter(|(_, (kinds, n))| *n >= SOUND_OWNERS && kinds.len() == 1)
+        .map(|(sound, (kinds, _))| (sound, kinds.into_keys().next().unwrap_or_default()))
+        .collect()
 }
 
 /// One object against the reference (`cargo review sizes`).
@@ -1069,14 +1133,27 @@ pub fn uses(
     let medians = tag_medians(objects);
     let kind_of =
         |o: &Object| reference.and_then(|r| r.kind_of(&o.id, &o.model, &o.category, &o.group));
+    let owners = sound_owners(objects, sounds, &|o| kind_of(o).map(str::to_string));
     let flagged: Vec<(&Object, Vec<Flag>)> = objects
         .iter()
         .map(|o| {
-            let decor = kind_of(o)
-                .is_some_and(|k| reference.is_some_and(|r| r.decor.iter().any(|d| d == k)));
+            let kind = kind_of(o);
+            let decor =
+                kind.is_some_and(|k| reference.is_some_and(|r| r.decor.iter().any(|d| d == k)));
             (
                 o,
-                use_flags(o, motions.get(&o.model), actions, &medians, decor),
+                use_flags(
+                    o,
+                    motions.get(&o.model),
+                    actions,
+                    &medians,
+                    decor,
+                    &Sounds {
+                        tag: sounds,
+                        owners: &owners,
+                        kind,
+                    },
+                ),
             )
         })
         .collect();
@@ -1093,7 +1170,7 @@ pub fn uses(
         FLAG_COLUMNS.join(" | ")
     );
     let _ = writeln!(out, "|---|---|---|{}", "---|".repeat(FLAG_COLUMNS.len()));
-    let mut totals = [0usize; 7];
+    let mut totals = [0usize; 8];
     let mut files = BTreeMap::new();
     for page in page_order(objects.iter().map(|o| o.page.clone())) {
         let here: Vec<&(&Object, Vec<Flag>)> =
@@ -1181,6 +1258,17 @@ pub fn uses(
             .map(usize::to_string)
             .collect::<Vec<_>>()
             .join(" | ")
+    );
+    // Why an object with no uses is not flagged: its kind is decor by the reference's decision.
+    let silent = objects
+        .iter()
+        .filter(|o| o.uses.is_empty() && !o.lamp)
+        .count();
+    let _ = writeln!(
+        out,
+        "\n- {} objects have no use; decor by `{REFERENCE}`'s `decor` list (the decision record): {}; the rest are flagged.",
+        silent,
+        silent.saturating_sub(totals[2])
     );
     (out, files)
 }

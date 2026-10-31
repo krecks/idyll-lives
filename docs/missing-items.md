@@ -145,7 +145,6 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
 
 - `cargo review sizes` measures the wrong face (basin drain/underside, closed toilet lid, kettle grate,
   pool cloth) and includes non-object geometry.
-- `cargo review uses` does not flag the ladder shelf's missing use.
 - `check.mjs play`: no whole-recipe following (it records clips only on the object used, not on the
   helpers a recipe walks to), no `--views` (one camera per run; `--top` since 2026-10-30); needs carry
   over between uses. (`--use ripe` and the crop stage in the record came 2026-10-31.)
@@ -153,6 +152,23 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
 - CI runs clips, the GLB gate, `cargo check-glb` (since 2026-10-31) and, since 2026-10-30,
   `review sizes` (a content object no kind covers fails); still not `review uses` (it always exits 0) or
   the browser checks.
+
+**Done 2026-10-31 (`review uses`: the odd sound, and what the decor list silences):**
+
+- A use's sound is now weighed against the kind that owns it: a sound that `SOUND_OWNERS` (3) objects of one
+  kind make and nothing else does belongs to that kind, and any other kind making it is flagged `odd sound`
+  (`Flag::OddSound`, `sound_owners`, `crates/tools/src/review.rs`) — the check that would have found
+  I-packs-19 (a toaster sizzling like a pan) at once. It is a sixth column in the summary table.
+  Today's content raises none: the only sounds one kind owns are the arcade cabinets', the dishwasher's
+  crockery, the drum kits', the microwave cart's and karaoke's. The counters' sizzle is not a miss but a
+  cooktop: `cooktopCounter` maps to the kind `baseCabinet`, as every counter does, so the hobs do not own
+  `sizzle` alone and a pan on a counter is not flagged.
+- The ladder shelf is not a blind spot: `docs/review/reference.json`'s `decor` list is the review's decision
+  record, and the living ledger's real-uses table already reads `ladderShelf | show plants and books | none |
+  OK (decor)` (`docs/review/living.md:158`, beside the industrial shelving and the cube shelf, which at least
+  take things on top). The gate stays silent on purpose; what it did not do was say so, and now it does:
+  `cargo review uses` ends with how many objects have no use and how many of those are decor by the
+  reference's list (100 have no use, 50 are decor by the list, so the 50 flagged are the ones nobody decided).
 
 **Done 2026-10-31 (the height gate):**
 
