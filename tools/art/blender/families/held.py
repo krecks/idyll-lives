@@ -1601,6 +1601,27 @@ def cutFlowers():
     return done('cutFlowers')
 
 
+def daisyChain():
+    """A daisy chain, 16 cm across, coiled flat in the hand: a ring of plaited stems with eleven daisies round it,
+    heads up, and the two stem ends showing where the chain was closed (Q-18, the daisies' one real use left)."""
+    r = 0.062
+    F.sweep('chain', [(r * math.cos(math.tau * k / 24), 0.004, r * math.sin(math.tau * k / 24)) for k in range(25)],
+            0.0034, M.stem_green, verts=5, resolution=1)
+    for k in range(11):
+        a = math.tau * k / 11
+        x, z = r * math.cos(a), r * math.sin(a)
+        F.extrude(f'face{k}', _star(0.019, 0.42), 0.003, (x, 0.009, z), M.petal_white, plane='top',
+                  rot=(0, 0, 18 * k))
+        ball(f'eye{k}', 0.0065, (x, 0.0115, z), M.flower_eye, scale=(1, 0.5, 1), seg=6, rings=3)
+    # the ends, plaited back under the last daisies
+    for i, (a, sgn) in enumerate(((0.0, 1), (math.pi, -1))):
+        F.sweep(f'end{i}', [(r * 0.92 * math.cos(a), 0.006, r * 0.92 * math.sin(a)),
+                            (r * 1.14 * math.cos(a), 0.004, r * 1.14 * math.sin(a)),
+                            (r * 1.1 * math.cos(a + sgn * 0.35), 0.003, r * 1.1 * math.sin(a + sgn * 0.35))],
+                0.0026, M.stem_green, verts=4, resolution=1)
+    return done('daisyChain')
+
+
 def paintbrush():
     """An artist's brush, 24 cm long, lying along the depth, its bristles to the front (+depth), held at the origin
     6 cm behind the ferrule: a lacquered wooden handle swelling and tapering, a steel ferrule, bristles dipped in
@@ -1872,6 +1893,7 @@ FAMILY = G.Family(
         I('apple', apple, (0.074, 0.081, 0.073), 'item.apple'),
         I('pastryBag', pastryBag, (0.128, 0.198, 0.072), 'item.pastryBag'),
         I('cutFlowers', cutFlowers, (0.134, 0.370, 0.070), 'item.cutFlowers', centre=(0.0, 0.0387)),
+        I('daisyChain', daisyChain, (0.159, 0.014, 0.159), 'item.daisyChain'),
     ],
     comment='Blender-built things residents carry and cook with (tools/art/blender/families/held.py): the '
             'models of content `items`, the props drawn on a station while cooking and those in the hands '

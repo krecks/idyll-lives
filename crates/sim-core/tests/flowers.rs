@@ -16,7 +16,8 @@ const TOWN: &str = r#"{"width":14,"depth":14,
   "walls":[[1,1,9,1],[1,1,1,7],[1,7,9,7],[9,1,9,7]],
   "doors":[{"x":4,"z":7,"axis":"x"}],
   "objects":[{"def":"sideTableRound","x":4,"z":3},{"def":"vaseEmpty","x":4,"z":3},
-             {"def":"flowerbed","x":12,"z":12},{"def":"garden.tulips","x":10,"z":12}],
+             {"def":"flowerbed","x":12,"z":12},{"def":"garden.tulips","x":10,"z":12},
+             {"def":"garden.daisies","x":2,"z":12}],
   "sims":[{"name":"Ada","x":6,"z":10,"traits":["cheerful"]}]}"#;
 
 fn world() -> (World, String) {
@@ -202,6 +203,35 @@ fn a_bed_of_tulips_gives_a_bunch_too() {
         w.tick_once();
     }
     assert!(in_hand, "the tulips in hand as they're cut");
+}
+
+/// The daisies' chain (Q-18): the one real use the beds were still missing. It is the bed's own daisies,
+/// made at the bed, and the chain is in the hand while it's made.
+#[test]
+fn the_daisies_make_a_daisy_chain() {
+    let (mut w, _content) = world();
+    let bed = object(&w, "garden.daisies");
+    let make = interaction(&w, bed, "daisyChain");
+    w.apply(Command::Use {
+        sim: 0,
+        object: bed,
+        interaction: make,
+    })
+    .unwrap();
+    let (mut in_hand, mut finished) = (false, false);
+    for _ in 0..40 * TICKS_PER_MINUTE {
+        if using(&w, make) {
+            in_hand |= shown(&w).as_deref() == Some("daisyChain");
+        }
+        if in_hand && w.sims[0].current().is_none() {
+            finished = true;
+            break;
+        }
+        w.tick_once();
+    }
+    assert!(finished, "the chain made");
+    assert!(in_hand, "the chain in hand as it's made");
+    assert_eq!(shown(&w), None, "the chain is only shown while it is made");
 }
 
 /// Every bed of flowers the garden sells can be cut for a vase, and each cut is the same act: the bunch

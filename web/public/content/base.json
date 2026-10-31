@@ -4370,6 +4370,13 @@
       "radius": 0.1
     },
     {
+      "id": "daisyChain",
+      "label": "Daisy chain",
+      "model": "item.daisyChain",
+      "hold": "hand",
+      "radius": 0.1
+    },
+    {
       "id": "freshPlate",
       "label": "Something fresh from the garden",
       "model": "item.treatPlate",

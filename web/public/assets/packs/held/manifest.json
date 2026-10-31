@@ -1288,6 +1288,21 @@
           "finish": "material.finish.satin"
         }
       }
+    },
+    "item.daisyChain": {
+      "type": "model",
+      "url": "../../models/held/daisyChain.glb",
+      "materials": {
+        "flower_eye": {
+          "finish": "material.finish.matte"
+        },
+        "petal_white": {
+          "finish": "material.finish.satin"
+        },
+        "stem_green": {
+          "finish": "material.finish.satin"
+        }
+      }
     }
   }
 }

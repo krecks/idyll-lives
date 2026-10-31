@@ -1089,6 +1089,27 @@
             "gardening": 0.1
           },
           "holds": "cutFlowers"
+        },
+        {
+          "id": "daisyChain",
+          "label": "Make a daisy chain",
+          "anim": "tend",
+          "minutes": 12,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.15,
+            "comfort": 0.05
+          },
+          "tags": [
+            "nature",
+            "garden",
+            "outdoors",
+            "cozy"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "daisyChain"
         }
       ]
     },

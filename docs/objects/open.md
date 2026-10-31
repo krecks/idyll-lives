@@ -134,7 +134,8 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
 - **The sounds want a listen by ear** (G-53): each was rendered and checked by its spectrum, timing and level, not
   heard (`bench-results/review/fixes/sounds/wav/`).
 - **Cut flowers for a vase:** done 2026-10-30 (Q-18): the raised bed's "Cut some flowers" and the bought empty
-  vase that takes the bunch. Cutting the individual beds (tulips, daffodils, lilies, cosmos, daisies) is still open.
+  vase that takes the bunch; the individual beds (tulips, daffodils, lilies, cosmos, daisies) cut for a vase too.
+  The daisies' "Make a daisy chain" (2026-10-31) was the last use the beds were missing.
 - **Parts with no use, left decorative:** the executive desk's drawer (I-office-02, won't fix) — the last one. The
   nesting tables' small table slides out for "Pull out the small table" and the display cabinet's door swings for
   "Open the cabinet" (2026-10-31; both were decor under decision 4, now built), so no modelled part is left without

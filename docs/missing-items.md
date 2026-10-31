@@ -18,7 +18,7 @@ Every buyable object the docs describe exists in content and has a model:
 | `model` keys referenced by content | 578 |
 | Model keys missing from the manifests | 0 |
 | Manifest entries whose file is missing | 0 |
-| `item` ids in content | 43 |
+| `item` ids in content | 44 |
 | Unresolved `item` references | 0 |
 
 **Doc bug (fixed 2026-10-30):** [objects/README.md](objects/README.md) said "541 of them", but its own
@@ -28,7 +28,7 @@ Cause: the prose was written on 2026-10-17, when there were 541; `curtainsWide` 
 were named as the one object not in the 2026-10-17 play check.
 
 The empty vase, added 2026-10-30, brings both counts to **543** (tabletop 39 → 40); `item` ids to **43**
-(the bunch of cut flowers).
+(the bunch of cut flowers), and the daisy chain, added 2026-10-31, to **44**.
 
 So what is missing is not objects — it is **uses, clips, behaviours and polish** around them.
 
@@ -86,8 +86,8 @@ door) shipped in 0.5.0 — see open.md, "Fixed in 0.5.0".
 | Smarter thoughts | No LLM re-rank of the utility AI's top-3; research only | PLAN.md roadmap "later", [design/smarter-thoughts.md](design/smarter-thoughts.md) | L (research) |
 
 Flowers cut for a vase left this list on 2026-10-30 (below), on the raised bed and then on the five beds cut for a
-vase (tulips, daffodils, lilies, cosmos, daisies). The daisies' "make a daisy chain" is the one real use of a bed
-still missing.
+vase (tulips, daffodils, lilies, cosmos, daisies). The daisies' "make a daisy chain" followed on 2026-10-31, so no
+bed is missing a real use any more.
 
 ## 4. Not yet checked (not known broken)
 
@@ -191,6 +191,23 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
   `docs/objects/garden.md` and `docs/review/garden.md` (`flowerbed`'s `cut`, the five beds'), `docs/authenticity-review.md`
   (Q-18, G-10, G-68, §9.1 I-garden-08).
 
+**Done 2026-10-31 (the daisies' daisy chain):**
+
+- The daisies' bed gains **"Make a daisy chain"** (`daisyChain`, 12 min, `anim: tend`, `holds: daisyChain`,
+  never chosen on its own) — `web/public/content/garden.json`. It was the one real use of a flower bed the
+  garden still lacked (`docs/review/garden.md`, I-garden-08's After).
+- One new held item: **`item.daisyChain`** (`hold: hand`, 16 cm across, 1,034 tris, one draw, three materials) —
+  a ring of plaited green stems with eleven white daisies round it, heads up, the stem ends tucked back under
+  where the chain was closed; the daisies are the beds' own white and amber (`tools/art/blender/families/held.py`,
+  `daisyChain()`). `item` ids: 43 → **44**.
+- Test: `crates/sim-core/tests/flowers.rs` `the_daisies_make_a_daisy_chain` (the chain in the hand while it is
+  made, and only then).
+- In play: `bench-results/check-chain/chain-garden.daisies-daisyChain-01.png` (Ada kneeling at the daisies, the
+  chain coiled in her hand), `play-chain.json` (used after 3.9 s; `tend` has no clip, as the other cuts).
+- Docs: `tools/art/blender/families/held.md` (the item), `docs/objects/garden.md` (daisies row, in play),
+  `docs/review/garden.md` (I1 row, I-garden-08's After), `docs/authenticity-review.md` (Q-18, I-garden-08),
+  `docs/objects/open.md`.
+
 **Done 2026-10-30 (servers walk in):**
 
 - A server now comes in to work instead of standing at their post from the first minute: `Server.home` is the
@@ -212,5 +229,5 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
 ## Suggested next items
 
 Nothing from the review ledgers is left unbuilt: the remaining work is the not-yet-checked list in §4, the
-tooling in §6, the daisies' "make a daisy chain" (the one real use of a bed the game still lacks), and the
-servers' apron, which wants a garment the character set doesn't have.
+tooling in §6, and the servers' apron, which wants a garment the character set doesn't have. Every flower bed now
+has its real uses.
