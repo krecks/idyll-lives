@@ -19,8 +19,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::Error;
 use crate::command::{EdgeAxis, EdgeEdit, EdgeKind, FacePaint, FloorPaint};
-use crate::lot::{DiagDir, Diagonal, Edge, EdgeLook, EdgeRef, OUTDOORS};
 use crate::content::Layer;
+use crate::lot::{DiagDir, Diagonal, Edge, EdgeLook, EdgeRef, OUTDOORS};
 use crate::world::{Layout, ObjectInstance, Plot, World, kind_size, tiles_for};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -129,22 +129,40 @@ impl Frame {
     fn of(p: &Plot) -> Self {
         // The street is on the side the visitors' arrival point is nearest to.
         let entry = p.arrival_point();
-        Self { x: p.x, z: p.z, w: p.w, d: p.d, flip: entry[1] > p.z as f32 + p.d as f32 / 2.0 }
+        Self {
+            x: p.x,
+            z: p.z,
+            w: p.w,
+            d: p.d,
+            flip: entry[1] > p.z as f32 + p.d as f32 / 2.0,
+        }
     }
 
     /// Town tile ↔ lot tile.
     fn tile(&self, x: i32, z: i32) -> (i32, i32) {
-        if self.flip { (self.w - 1 - (x - self.x), self.d - 1 - (z - self.z)) } else { (x - self.x, z - self.z) }
+        if self.flip {
+            (self.w - 1 - (x - self.x), self.d - 1 - (z - self.z))
+        } else {
+            (x - self.x, z - self.z)
+        }
     }
 
     fn tile_back(&self, x: i32, z: i32) -> (i32, i32) {
-        if self.flip { (self.x + self.w - 1 - x, self.z + self.d - 1 - z) } else { (self.x + x, self.z + z) }
+        if self.flip {
+            (self.x + self.w - 1 - x, self.z + self.d - 1 - z)
+        } else {
+            (self.x + x, self.z + z)
+        }
     }
 
     /// An edge (`h`: tile column `x`, grid line `z`; `v`: grid line `x`, tile row `z`; diagonals:
     /// the tile) in the other frame.
     fn edge(&self, axis: EdgeAxis, x: i32, z: i32, back: bool) -> (i32, i32) {
-        let (ox, oz) = if back { (self.x, self.z) } else { (-self.x, -self.z) };
+        let (ox, oz) = if back {
+            (self.x, self.z)
+        } else {
+            (-self.x, -self.z)
+        };
         let (x, z) = if back { (x, z) } else { (x + ox, z + oz) };
         let (lx, lz) = if !self.flip {
             (x, z)
@@ -160,19 +178,45 @@ impl Frame {
 
     /// An object's corner and facing in the other frame (`w`, `d`: its turned footprint).
     fn object(&self, x: i32, z: i32, w: i32, d: i32, rot: u8, back: bool) -> (i32, i32, u8) {
-        let (lx, lz) = if back { (x, z) } else { (x - self.x, z - self.z) };
-        let (lx, lz, rot) = if self.flip { (self.w - lx - w, self.d - lz - d, (rot + 2) % 4) } else { (lx, lz, rot) };
-        if back { (lx + self.x, lz + self.z, rot) } else { (lx, lz, rot) }
+        let (lx, lz) = if back {
+            (x, z)
+        } else {
+            (x - self.x, z - self.z)
+        };
+        let (lx, lz, rot) = if self.flip {
+            (self.w - lx - w, self.d - lz - d, (rot + 2) % 4)
+        } else {
+            (lx, lz, rot)
+        };
+        if back {
+            (lx + self.x, lz + self.z, rot)
+        } else {
+            (lx, lz, rot)
+        }
     }
 }
 
 fn axis_of(e: EdgeRef, lot: &crate::lot::Lot) -> Option<(EdgeAxis, i32, i32, Edge)> {
     match e {
-        EdgeRef::H(x, z) => Some((EdgeAxis::H, x as i32, z as i32, lot.h_edge(x as usize, z as usize))),
-        EdgeRef::V(x, z) => Some((EdgeAxis::V, x as i32, z as i32, lot.v_edge(x as usize, z as usize))),
+        EdgeRef::H(x, z) => Some((
+            EdgeAxis::H,
+            x as i32,
+            z as i32,
+            lot.h_edge(x as usize, z as usize),
+        )),
+        EdgeRef::V(x, z) => Some((
+            EdgeAxis::V,
+            x as i32,
+            z as i32,
+            lot.v_edge(x as usize, z as usize),
+        )),
         EdgeRef::Diag(x, z) => {
             let d = lot.diag(x as i32, z as i32)?;
-            let axis = if d.dir == DiagDir::Dp { EdgeAxis::Dp } else { EdgeAxis::Dn };
+            let axis = if d.dir == DiagDir::Dp {
+                EdgeAxis::Dp
+            } else {
+                EdgeAxis::Dn
+            };
             Some((axis, x as i32, z as i32, d.edge))
         }
     }
@@ -210,21 +254,27 @@ impl World {
             let z0 = p.z + self.storey_row(k);
             for z in z0..=z0 + p.d {
                 for x in p.x..p.x + p.w {
-                    if let Some((a, x, z, e)) = axis_of(EdgeRef::H(x as u16, z as u16), &self.lot).filter(|t| t.3 != Edge::Open) {
+                    if let Some((a, x, z, e)) = axis_of(EdgeRef::H(x as u16, z as u16), &self.lot)
+                        .filter(|t| t.3 != Edge::Open)
+                    {
                         out.push((EdgeRef::H(x as u16, z as u16), a, x, z, e));
                     }
                 }
             }
             for z in z0..z0 + p.d {
                 for x in p.x..=p.x + p.w {
-                    if let Some((a, x, z, e)) = axis_of(EdgeRef::V(x as u16, z as u16), &self.lot).filter(|t| t.3 != Edge::Open) {
+                    if let Some((a, x, z, e)) = axis_of(EdgeRef::V(x as u16, z as u16), &self.lot)
+                        .filter(|t| t.3 != Edge::Open)
+                    {
                         out.push((EdgeRef::V(x as u16, z as u16), a, x, z, e));
                     }
                 }
             }
             for z in z0..z0 + p.d {
                 for x in p.x..p.x + p.w {
-                    if let Some((a, x, z, e)) = axis_of(EdgeRef::Diag(x as u16, z as u16), &self.lot) {
+                    if let Some((a, x, z, e)) =
+                        axis_of(EdgeRef::Diag(x as u16, z as u16), &self.lot)
+                    {
                         out.push((EdgeRef::Diag(x as u16, z as u16), a, x, z, e));
                     }
                 }
@@ -244,8 +294,16 @@ impl World {
         let p = &self.plots[plot as usize];
         let f = Frame::of(p);
         let b = &self.content.build;
-        let covering = |c: u8| (c > 0).then(|| b.coverings.get(c as usize - 1).map(|s| s.id.clone())).flatten();
-        let mut bp = Blueprint { w: p.w, d: p.d, ..Default::default() };
+        let covering = |c: u8| {
+            (c > 0)
+                .then(|| b.coverings.get(c as usize - 1).map(|s| s.id.clone()))
+                .flatten()
+        };
+        let mut bp = Blueprint {
+            w: p.w,
+            d: p.d,
+            ..Default::default()
+        };
         for (r, axis, x, z, edge) in self.plot_edges(p) {
             let Some(kind) = kind_of(edge) else { continue };
             let look = self.lot.look(r);
@@ -267,7 +325,18 @@ impl World {
             let (storey, gz) = self.on_storey(if axis == EdgeAxis::H { z - 1 } else { z });
             let gz = if axis == EdgeAxis::H { gz + 1 } else { gz };
             let (lx, lz) = f.edge(axis, x, gz, false);
-            bp.edges.push(BlueprintEdge { storey, axis, x: lx, z: lz, kind, form: look.form, style, sides, sill: look.sill, head: look.head });
+            bp.edges.push(BlueprintEdge {
+                storey,
+                axis,
+                x: lx,
+                z: lz,
+                kind,
+                form: look.form,
+                style,
+                sides,
+                sill: look.sill,
+                head: look.head,
+            });
         }
         for (x, z, c) in self.lot.floors() {
             let (x, z) = (x as i32, z as i32);
@@ -277,11 +346,19 @@ impl World {
             }
             if let Some(id) = b.floors.get(c as usize - 1).map(|s| s.id.clone()) {
                 let (lx, lz) = f.tile(x, gz);
-                bp.floors.push(BlueprintFloor { storey, x: lx, z: lz, covering: id });
+                bp.floors.push(BlueprintFloor {
+                    storey,
+                    x: lx,
+                    z: lz,
+                    covering: id,
+                });
             }
         }
         bp.roof = p.roof.and_then(|r| {
-            Some(BlueprintRoof { style: b.roofs.get(r.style as usize)?.id.clone(), color: b.roof_colors.get(r.color as usize)?.id.clone() })
+            Some(BlueprintRoof {
+                style: b.roofs.get(r.style as usize)?.id.clone(),
+                color: b.roof_colors.get(r.color as usize)?.id.clone(),
+            })
         });
         for (o, on) in self.objects.iter().zip(&self.object_plot) {
             let def = &self.content.objects[o.def];
@@ -299,7 +376,11 @@ impl World {
                 rot,
                 turn: o.turn,
                 // Turned round, it stands off the other way.
-                offset: if f.flip { o.offset.map(|c| -c) } else { o.offset },
+                offset: if f.flip {
+                    o.offset.map(|c| -c)
+                } else {
+                    o.offset
+                },
                 size: (o.extent != kind_size(def.footprint)).then_some(o.extent),
                 tall: o.tall,
                 colors: crate::world::colors_hex(&o.colors),
@@ -322,9 +403,13 @@ impl World {
         let (h, plot) = self.home_of(household)?;
         let p = self.plots[plot as usize].clone();
         if self.plot_edges(&p).iter().any(|(.., e)| e.is_wall()) {
-            return Err(Error::new("a blueprint goes on an empty lot: take the house down first"));
+            return Err(Error::new(
+                "a blueprint goes on an empty lot: take the house down first",
+            ));
         }
-        let before = self.home_snapshot(household).expect("the household has a home");
+        let before = self
+            .home_snapshot(household)
+            .expect("the household has a home");
         // Price it by building it with all the money in the world, then settle the bill.
         let funds = self.households[h].funds;
         const PURSE: i64 = i64::MAX / 4;
@@ -339,7 +424,9 @@ impl World {
         if cost > funds {
             self.restore(before);
             self.refresh_rooms();
-            return Err(Error::new(format!("not enough money: building it costs ${cost}")));
+            return Err(Error::new(format!(
+                "not enough money: building it costs ${cost}"
+            )));
         }
         self.households[h].funds = funds - cost;
         self.refresh_rooms();
@@ -351,13 +438,20 @@ impl World {
         // Centred across a lot of another width; the front stays at the street.
         let ox = (p.w - bp.w).div_euclid(2);
         let b = self.content.build.clone();
-        let index = |list: &[crate::content::BuildStyle], id: &Option<String>| id.as_ref().and_then(|id| list.iter().position(|s| &s.id == id));
+        let index = |list: &[crate::content::BuildStyle], id: &Option<String>| {
+            id.as_ref()
+                .and_then(|id| list.iter().position(|s| &s.id == id))
+        };
         let mut edits = Vec::new();
         let mut faces = Vec::new();
         let (storeys, rows) = (self.storey_range(), self.stairs.clone());
         let lift = move |storey: i8| -> Result<i32, Error> {
             if !storeys.contains(&i32::from(storey)) {
-                return Err(Error::new(if storey < 0 { "this game's houses have no basements" } else { "this game's houses can't be that tall" }));
+                return Err(Error::new(if storey < 0 {
+                    "this game's houses have no basements"
+                } else {
+                    "this game's houses can't be that tall"
+                }));
             }
             Ok(rows.storey_row(i32::from(storey)))
         };
@@ -386,8 +480,16 @@ impl World {
                 cover: None,
                 form: (e.kind == EdgeKind::Wall && e.form != 0).then_some(e.form),
                 style: style.map(|s| s as u8),
-                sill: if e.kind == EdgeKind::Window { e.sill } else { None },
-                head: if matches!(e.kind, EdgeKind::Door | EdgeKind::Window) { e.head } else { None },
+                sill: if e.kind == EdgeKind::Window {
+                    e.sill
+                } else {
+                    None
+                },
+                head: if matches!(e.kind, EdgeKind::Door | EdgeKind::Window) {
+                    e.head
+                } else {
+                    None
+                },
             });
             let mut sides = e.sides.clone();
             if f.flip {
@@ -395,16 +497,37 @@ impl World {
             }
             for (side, cover) in sides.iter().enumerate() {
                 if let Some(c) = index(&b.coverings, cover) {
-                    faces.push(FacePaint { axis: e.axis, x, z, side: side as u8, covering: c as u8 + 1 });
+                    faces.push(FacePaint {
+                        axis: e.axis,
+                        x,
+                        z,
+                        side: side as u8,
+                        covering: c as u8 + 1,
+                    });
                 }
             }
         }
         // Everything at once (a door goes in with the wall around it); if the rules want walls
         // first, walls and fences, then what goes into them.
         if self.build(household, &edits).is_err() {
-            let (openings, walls): (Vec<EdgeEdit>, Vec<EdgeEdit>) =
-                edits.iter().partition(|e| matches!(e.kind, EdgeKind::Door | EdgeKind::Window | EdgeKind::Gate));
-            let base = |e: &EdgeEdit| EdgeEdit { kind: if e.kind == EdgeKind::Gate { EdgeKind::Fence } else { EdgeKind::Wall }, style: if e.kind == EdgeKind::Gate { e.style } else { None }, sill: None, head: None, ..*e };
+            let (openings, walls): (Vec<EdgeEdit>, Vec<EdgeEdit>) = edits.iter().partition(|e| {
+                matches!(e.kind, EdgeKind::Door | EdgeKind::Window | EdgeKind::Gate)
+            });
+            let base = |e: &EdgeEdit| EdgeEdit {
+                kind: if e.kind == EdgeKind::Gate {
+                    EdgeKind::Fence
+                } else {
+                    EdgeKind::Wall
+                },
+                style: if e.kind == EdgeKind::Gate {
+                    e.style
+                } else {
+                    None
+                },
+                sill: None,
+                head: None,
+                ..*e
+            };
             let mut first = walls;
             first.extend(openings.iter().map(base));
             self.build(household, &first)?;
@@ -421,35 +544,68 @@ impl World {
                 let c = b.floors.iter().position(|s| s.id == t.covering)?;
                 let (x, z) = f.tile_back(t.x + ox, t.z);
                 let up = lift(t.storey).ok()?;
-                p.contains(x, z).then_some(FloorPaint { x, z: z + up, covering: c as u8 + 1 })
+                p.contains(x, z).then_some(FloorPaint {
+                    x,
+                    z: z + up,
+                    covering: c as u8 + 1,
+                })
             })
             .collect();
         if !tiles.is_empty() {
             self.paint_floor(household, &tiles)?;
         }
         if let Some(r) = &bp.roof
-            && let (Some(style), Some(color)) = (b.roofs.iter().position(|s| s.id == r.style), b.roof_colors.iter().position(|s| s.id == r.color))
+            && let (Some(style), Some(color)) = (
+                b.roofs.iter().position(|s| s.id == r.style),
+                b.roof_colors.iter().position(|s| s.id == r.color),
+            )
         {
             self.set_roof(household, style as u8, color as u8)?;
         }
         // Things standing on tops go on once everything else stands.
-        let on_top = |o: &&BlueprintObject| self.content.object_index(&o.def).is_some_and(|d| self.content.objects[d].layer == Layer::Surface);
-        let (riders, rest): (Vec<&BlueprintObject>, Vec<&BlueprintObject>) = bp.objects.iter().partition(on_top);
+        let on_top = |o: &&BlueprintObject| {
+            self.content
+                .object_index(&o.def)
+                .is_some_and(|d| self.content.objects[d].layer == Layer::Surface)
+        };
+        let (riders, rest): (Vec<&BlueprintObject>, Vec<&BlueprintObject>) =
+            bp.objects.iter().partition(on_top);
         for o in rest.into_iter().chain(riders) {
-            let Some(def) = self.content.object_index(&o.def) else { continue };
-            let [fw, fd] = o.size.map_or(self.content.objects[def].footprint, tiles_for);
-            let (w, d) = if o.rot % 2 == 0 { (fw as i32, fd as i32) } else { (fd as i32, fw as i32) };
+            let Some(def) = self.content.object_index(&o.def) else {
+                continue;
+            };
+            let [fw, fd] = o
+                .size
+                .map_or(self.content.objects[def].footprint, tiles_for);
+            let (w, d) = if o.rot % 2 == 0 {
+                (fw as i32, fd as i32)
+            } else {
+                (fd as i32, fw as i32)
+            };
             let (x, z, rot) = f.object(o.x + ox, o.z, w, d, o.rot, true);
             let Ok(up) = lift(o.storey) else { continue };
             let z = z + up;
             let colors = crate::world::parse_colors(&o.colors, o.color.as_deref());
             // Turned round, it stands off the other way.
-            let offset = if f.flip { o.offset.map(|c| c.saturating_neg()) } else { o.offset };
+            let offset = if f.flip {
+                o.offset.map(|c| c.saturating_neg())
+            } else {
+                o.offset
+            };
             let offset = self.check_offset(def, rot, offset).unwrap_or([0, 0]);
             let own = kind_size(self.content.objects[def].footprint);
-            let (size, tall) = self.check_size(def, o.size.unwrap_or(own), o.tall).unwrap_or((own, 0));
-            let layout = Layout { offset, extent: Some(size), tall };
-            let Ok(id) = self.buy_at(household, &o.def, Some([x, z, rot as i32]), colors, layout) else { continue };
+            let (size, tall) = self
+                .check_size(def, o.size.unwrap_or(own), o.tall)
+                .unwrap_or((own, 0));
+            let layout = Layout {
+                offset,
+                extent: Some(size),
+                tall,
+            };
+            let Ok(id) = self.buy_at(household, &o.def, Some([x, z, rot as i32]), colors, layout)
+            else {
+                continue;
+            };
             if self.content.objects[def].turns && o.turn < 90 {
                 self.objects[id as usize].turn = o.turn;
             }
@@ -465,12 +621,20 @@ impl World {
     /// Moves the room around tile `(x, z)` of the household's home by `(dx, dz)` tiles: its
     /// walls (those it shares with another room stay for that room too), doors, windows, floors
     /// and everything standing in it. The new place must be open ground on the lot. Free.
-    pub fn move_room(&mut self, household: u32, x: i32, z: i32, dx: i32, dz: i32) -> Result<(), Error> {
+    pub fn move_room(
+        &mut self,
+        household: u32,
+        x: i32,
+        z: i32,
+        dx: i32,
+        dz: i32,
+    ) -> Result<(), Error> {
         let (_, plot) = self.home_of(household)?;
         let p = self.plots[plot as usize].clone();
         // On the room's own storey.
         let up = self.storey_row(self.storey_of(z));
-        let on_plot = |tx: i32, tz: i32| tz >= p.z + up && tz < p.z + p.d + up && p.contains(tx, tz - up);
+        let on_plot =
+            |tx: i32, tz: i32| tz >= p.z + up && tz < p.z + p.d + up && p.contains(tx, tz - up);
         if !on_plot(x, z) {
             return Err(Error::new("that isn't on your lot"));
         }
@@ -492,7 +656,9 @@ impl World {
             }
         }
         let ours = |t: (i32, i32)| tiles.contains(&t);
-        let indoors_other = |w: &World, t: (i32, i32)| w.lot.in_bounds(t.0, t.1) && !ours(t) && w.lot.room_at(t.0, t.1) != OUTDOORS;
+        let indoors_other = |w: &World, t: (i32, i32)| {
+            w.lot.in_bounds(t.0, t.1) && !ours(t) && w.lot.room_at(t.0, t.1) != OUTDOORS
+        };
         // Its edges: where it is now, whether that place is vacated (no other room needs it).
         let mut moving: Vec<(EdgeRef, EdgeAxis, i32, i32, Edge, EdgeLook, bool)> = Vec::new();
         for (r, axis, ex, ez, edge) in self.plot_edges(&p) {
@@ -517,12 +683,15 @@ impl World {
             moving.push((r, axis, ex, ez, edge, self.lot.look(r), !shared));
         }
         // The new place: on the lot, open ground (or the room's own place), nothing else standing there.
-        let target: BTreeSet<(i32, i32)> = tiles.iter().map(|&(tx, tz)| (tx + dx, tz + dz)).collect();
+        let target: BTreeSet<(i32, i32)> =
+            tiles.iter().map(|&(tx, tz)| (tx + dx, tz + dz)).collect();
         for &(tx, tz) in &target {
             if !on_plot(tx, tz) {
                 return Err(Error::new("the room has to stay on your lot"));
             }
-            if !ours((tx, tz)) && (self.lot.room_at(tx, tz) != OUTDOORS || self.lot.diag(tx, tz).is_some()) {
+            if !ours((tx, tz))
+                && (self.lot.room_at(tx, tz) != OUTDOORS || self.lot.diag(tx, tz).is_some())
+            {
                 return Err(Error::new("there's another room in the way"));
             }
         }
@@ -531,19 +700,29 @@ impl World {
         let mut carried: Vec<u32> = self
             .objects
             .iter()
-            .filter(|o| !on_top(o) && self.object_plot[o.id as usize] == Some(plot) && o.tiles(content).all(&ours))
+            .filter(|o| {
+                !on_top(o)
+                    && self.object_plot[o.id as usize] == Some(plot)
+                    && o.tiles(content).all(&ours)
+            })
             .map(|o| o.id)
             .collect();
         // Things on tops go with what they stand on (and are never in the way themselves).
         let riders: Vec<u32> = self
             .objects
             .iter()
-            .filter(|o| on_top(o) && crate::surface::host_of(content, &self.objects, o).is_some_and(|h| carried.contains(&h)))
+            .filter(|o| {
+                on_top(o)
+                    && crate::surface::host_of(content, &self.objects, o)
+                        .is_some_and(|h| carried.contains(&h))
+            })
             .map(|o| o.id)
             .collect();
         carried.extend(riders);
         carried.sort_unstable();
-        let in_the_way = self.objects.iter().any(|o| !on_top(o) && !carried.contains(&o.id) && o.tiles(content).any(|t| target.contains(&t)));
+        let in_the_way = self.objects.iter().any(|o| {
+            !on_top(o) && !carried.contains(&o.id) && o.tiles(content).any(|t| target.contains(&t))
+        });
         if in_the_way {
             return Err(Error::new("something is standing where the room would go"));
         }
@@ -552,8 +731,13 @@ impl World {
         for m in &moving {
             let to = moved_ref(m.1, m.2, m.3);
             let free = match to {
-                EdgeRef::Diag(tx, tz) => self.lot.diag(tx as i32, tz as i32).is_none() || vacated.contains(&to),
-                _ => axis_of(to, &self.lot).is_none_or(|t| t.3 == Edge::Open || t.3.is_wall()) || vacated.contains(&to),
+                EdgeRef::Diag(tx, tz) => {
+                    self.lot.diag(tx as i32, tz as i32).is_none() || vacated.contains(&to)
+                }
+                _ => {
+                    axis_of(to, &self.lot).is_none_or(|t| t.3 == Edge::Open || t.3.is_wall())
+                        || vacated.contains(&to)
+                }
             };
             if !free {
                 return Err(Error::new("a fence is in the way"));
@@ -566,18 +750,28 @@ impl World {
                 .iter()
                 .filter(|o| w.object_plot[o.id as usize] == Some(plot))
                 .filter(|o| {
-                    w.content.objects[o.def].reached() && !w.approach_tiles(o).iter().any(|&(fx, fz)| w.lot.in_bounds(fx, fz) && seen[w.lot.tile_index(fx, fz)])
+                    w.content.objects[o.def].reached()
+                        && !w.approach_tiles(o).iter().any(|&(fx, fz)| {
+                            w.lot.in_bounds(fx, fz) && seen[w.lot.tile_index(fx, fz)]
+                        })
                 })
                 .count();
             let sims = w
                 .sims
                 .iter()
-                .filter(|s| s.here() && s.away_until.is_none() && p.contains(s.tile().0, w.ground_z(s.tile().1)) && !seen[w.lot.tile_index(s.tile().0, s.tile().1)])
+                .filter(|s| {
+                    s.here()
+                        && s.away_until.is_none()
+                        && p.contains(s.tile().0, w.ground_z(s.tile().1))
+                        && !seen[w.lot.tile_index(s.tile().0, s.tile().1)]
+                })
                 .count();
             objects + sims
         };
         let shut_in = unreachable(self);
-        let before = self.home_snapshot(household).expect("the household has a home");
+        let before = self
+            .home_snapshot(household)
+            .expect("the household has a home");
         let result = (|| {
             // Lift the furniture out (ids shift down as each goes; take the highest first).
             let mut lifted = Vec::new();
@@ -604,7 +798,10 @@ impl World {
                 self.set_edge(to, m.4, dir);
                 self.lot.set_look(to, m.5);
             }
-            let floors: BTreeMap<(i32, i32), u8> = tiles.iter().map(|&(tx, tz)| ((tx, tz), self.lot.floor(tx as u16, tz as u16))).collect();
+            let floors: BTreeMap<(i32, i32), u8> = tiles
+                .iter()
+                .map(|&(tx, tz)| ((tx, tz), self.lot.floor(tx as u16, tz as u16)))
+                .collect();
             for &(tx, tz) in floors.keys() {
                 self.lot.set_floor(tx as u16, tz as u16, 0);
             }
@@ -617,7 +814,8 @@ impl World {
             self.refresh_rooms();
             // Everything else first, then what stands on tops.
             let on_top = |o: &&ObjectInstance| self.content.objects[o.def].layer == Layer::Surface;
-            let (riders, rest): (Vec<&ObjectInstance>, Vec<&ObjectInstance>) = lifted.iter().rev().partition(on_top);
+            let (riders, rest): (Vec<&ObjectInstance>, Vec<&ObjectInstance>) =
+                lifted.iter().rev().partition(on_top);
             for o in rest.into_iter().chain(riders) {
                 let name = self.content.objects[o.def].name.to_lowercase();
                 self.replace_at_home(plot, o, o.x + dx, o.z + dz, o.rot, Layout::of(o))
@@ -629,7 +827,8 @@ impl World {
             if unreachable(self) > shut_in {
                 return Err(Error::new("that would shut someone or something in"));
             }
-            self.storeys_stand(plot).and_then(|()| self.walls_still_hold(plot))
+            self.storeys_stand(plot)
+                .and_then(|()| self.walls_still_hold(plot))
         })();
         if let Err(e) = result {
             self.restore(before);
@@ -645,7 +844,10 @@ impl World {
             EdgeRef::H(x, z) => self.lot.set_h(x as usize, z as usize, e),
             EdgeRef::V(x, z) => self.lot.set_v(x as usize, z as usize, e),
             EdgeRef::Diag(x, z) => {
-                let d = match (e, dir.or_else(|| self.lot.diag(x as i32, z as i32).map(|d| d.dir))) {
+                let d = match (
+                    e,
+                    dir.or_else(|| self.lot.diag(x as i32, z as i32).map(|d| d.dir)),
+                ) {
                     (Edge::Open, _) | (_, None) => None,
                     (edge, Some(dir)) => Some(Diagonal { dir, edge }),
                 };

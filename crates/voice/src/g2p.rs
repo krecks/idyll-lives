@@ -23,8 +23,15 @@ pub struct G2p {
 
 #[derive(Debug)]
 enum Token {
-    Word { text: String, fixed: Option<String>, space: bool },
-    Punct { ch: char, space: bool },
+    Word {
+        text: String,
+        fixed: Option<String>,
+        space: bool,
+    },
+    Punct {
+        ch: char,
+        space: bool,
+    },
 }
 
 /// What follows the word being phonemized (Misaki works right to left).
@@ -42,8 +49,8 @@ const THAT_DEMONSTRATIVE: &str = "ðˈæt";
 
 /// Words that usually start a clause.
 const CLAUSE_STARTERS: [&str; 24] = [
-    "i", "i'm", "i've", "i'd", "i'll", "you", "you're", "he", "he's", "she", "she's", "it", "it's", "we",
-    "we're", "they", "they're", "there", "the", "a", "an", "this", "my", "your",
+    "i", "i'm", "i've", "i'd", "i'll", "you", "you're", "he", "he's", "she", "she's", "it", "it's",
+    "we", "we're", "they", "they're", "there", "the", "a", "an", "this", "my", "your",
 ];
 
 impl G2p {
@@ -93,8 +100,12 @@ impl G2p {
         tokenize(text)
             .into_iter()
             .filter_map(|t| match t {
-                Token::Word { text, fixed: None, .. } if self.word_known(&text) => None,
-                Token::Word { text, fixed: None, .. } => Some(text),
+                Token::Word {
+                    text, fixed: None, ..
+                } if self.word_known(&text) => None,
+                Token::Word {
+                    text, fixed: None, ..
+                } => Some(text),
                 _ => None,
             })
             .collect()
@@ -147,7 +158,8 @@ impl G2p {
         let lower = word.to_lowercase();
         let mut word = word.to_owned();
         let letters_only = word.chars().filter(|&c| c != '\'').all(char::is_alphabetic);
-        let rest_lower = word.chars().skip(1).collect::<String>() == lower.chars().skip(1).collect::<String>();
+        let rest_lower =
+            word.chars().skip(1).collect::<String>() == lower.chars().skip(1).collect::<String>();
         if word.chars().count() > 1
             && letters_only
             && word != lower
@@ -230,7 +242,11 @@ impl G2p {
         if self.lexicon.contains(word) || SYMBOLS.iter().any(|(s, _)| *s == word) {
             return true;
         }
-        if !word.bytes().all(|c| c.is_ascii_alphabetic() || c == b'\'' || c == b'-') || !word.chars().all(char::is_alphabetic) {
+        if !word
+            .bytes()
+            .all(|c| c.is_ascii_alphabetic() || c == b'\'' || c == b'-')
+            || !word.chars().all(char::is_alphabetic)
+        {
             return false;
         }
         if word.chars().count() == 1 {
@@ -278,7 +294,10 @@ impl G2p {
         let n = word.len();
         let stem = if !word.ends_with("ss") && self.is_known(&word[..n - 1]) {
             word[..n - 1].to_owned()
-        } else if (word.ends_with("'s") || (n > 4 && word.ends_with("es") && !word.ends_with("ies"))) && self.is_known(&word[..n - 2]) {
+        } else if (word.ends_with("'s")
+            || (n > 4 && word.ends_with("es") && !word.ends_with("ies")))
+            && self.is_known(&word[..n - 2])
+        {
             word[..n - 2].to_owned()
         } else if n > 4 && word.ends_with("ies") && self.is_known(&format!("{}y", &word[..n - 3])) {
             format!("{}y", &word[..n - 3])
@@ -295,7 +314,11 @@ impl G2p {
         let n = word.len();
         let stem = if !word.ends_with("dd") && self.is_known(&word[..n - 1]) {
             &word[..n - 1]
-        } else if n > 4 && word.ends_with("ed") && !word.ends_with("eed") && self.is_known(&word[..n - 2]) {
+        } else if n > 4
+            && word.ends_with("ed")
+            && !word.ends_with("eed")
+            && self.is_known(&word[..n - 2])
+        {
             &word[..n - 2]
         } else {
             return None;
@@ -311,7 +334,9 @@ impl G2p {
         let base = &word[..n - 3];
         let doubled = {
             let b = base.as_bytes();
-            b.len() >= 2 && b[b.len() - 1] == b[b.len() - 2] && b"bcdgklmnprstvxz".contains(&b[b.len() - 1])
+            b.len() >= 2
+                && b[b.len() - 1] == b[b.len() - 2]
+                && b"bcdgklmnprstvxz".contains(&b[b.len() - 1])
         };
         let stem = if n > 5 && self.is_known(base) {
             base.to_owned()
@@ -326,7 +351,9 @@ impl G2p {
     }
 
     fn number(&self, word: &str) -> Option<String> {
-        let digits_end = word.find(|c: char| !(c.is_ascii_digit() || c == ',' || c == '.')).unwrap_or(word.len());
+        let digits_end = word
+            .find(|c: char| !(c.is_ascii_digit() || c == ',' || c == '.'))
+            .unwrap_or(word.len());
         let (num, suffix) = word.split_at(digits_end);
         let suffix = suffix.to_lowercase();
         let plain: String = num.chars().filter(|&c| c != ',').collect();
@@ -341,12 +368,28 @@ impl G2p {
             }
         } else {
             let (whole, frac) = plain.split_once('.')?;
-            let whole = if whole.is_empty() { String::new() } else { numbers::cardinal(whole.parse().ok()?) };
-            let frac: Vec<&str> = frac.bytes().filter(u8::is_ascii_digit).map(|d| ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][(d - b'0') as usize]).collect();
+            let whole = if whole.is_empty() {
+                String::new()
+            } else {
+                numbers::cardinal(whole.parse().ok()?)
+            };
+            let frac: Vec<&str> = frac
+                .bytes()
+                .filter(u8::is_ascii_digit)
+                .map(|d| {
+                    [
+                        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
+                        "nine",
+                    ][(d - b'0') as usize]
+                })
+                .collect();
             format!("{whole} point {}", frac.join(" "))
         };
         let mut parts = Vec::new();
-        for w in words.split(|c: char| !c.is_ascii_alphabetic()).filter(|w| !w.is_empty() && *w != "and") {
+        for w in words
+            .split(|c: char| !c.is_ascii_alphabetic())
+            .filter(|w| !w.is_empty() && *w != "and")
+        {
             parts.push(self.lookup(w, if w == "point" { Some(-2.0) } else { None })?);
         }
         let ps = parts.join(" ");
@@ -360,10 +403,18 @@ impl G2p {
 }
 
 fn next_context(ctx: Context, ps: &str) -> Context {
-    let first = ps.chars().find(|&c| VOWELS.contains(c) || CONSONANTS.contains(c) || NON_QUOTE_PUNCTS.contains(c));
+    let first = ps
+        .chars()
+        .find(|&c| VOWELS.contains(c) || CONSONANTS.contains(c) || NON_QUOTE_PUNCTS.contains(c));
     match first {
-        Some(c) if NON_QUOTE_PUNCTS.contains(c) => Context { future_vowel: None, ..ctx },
-        Some(c) => Context { future_vowel: Some(VOWELS.contains(c)), ..ctx },
+        Some(c) if NON_QUOTE_PUNCTS.contains(c) => Context {
+            future_vowel: None,
+            ..ctx
+        },
+        Some(c) => Context {
+            future_vowel: Some(VOWELS.contains(c)),
+            ..ctx
+        },
         None => ctx,
     }
 }
@@ -380,7 +431,8 @@ fn is_number(word: &str) -> bool {
             break;
         }
     }
-    core.bytes().all(|c| c.is_ascii_digit() || c == b',' || c == b'.')
+    core.bytes()
+        .all(|c| c.is_ascii_digit() || c == b',' || c == b'.')
 }
 
 fn last_char(s: &str) -> Option<char> {
@@ -404,7 +456,9 @@ fn suffix_ed(stem: &str) -> String {
         Some('d') => format!("{stem}ᵻd"),
         Some(c) if *c != 't' => format!("{stem}d"),
         _ if chars.len() < 2 => format!("{stem}ɪd"),
-        _ if US_TAUS.contains(chars[chars.len() - 2]) => format!("{}ɾᵻd", chars[..chars.len() - 1].iter().collect::<String>()),
+        _ if US_TAUS.contains(chars[chars.len() - 2]) => {
+            format!("{}ɾᵻd", chars[..chars.len() - 1].iter().collect::<String>())
+        }
         _ => format!("{stem}ᵻd"),
     }
 }
@@ -412,7 +466,8 @@ fn suffix_ed(stem: &str) -> String {
 /// "-ing" (https://en.wiktionary.org/wiki/-ing).
 fn suffix_ing(stem: &str) -> String {
     let chars: Vec<char> = stem.chars().collect();
-    if chars.len() > 1 && chars[chars.len() - 1] == 't' && US_TAUS.contains(chars[chars.len() - 2]) {
+    if chars.len() > 1 && chars[chars.len() - 1] == 't' && US_TAUS.contains(chars[chars.len() - 2])
+    {
         format!("{}ɾɪŋ", chars[..chars.len() - 1].iter().collect::<String>())
     } else {
         format!("{stem}ɪŋ")
@@ -424,17 +479,28 @@ fn suffix_ing(stem: &str) -> String {
 fn apply_stress(ps: &str, stress: Option<f32>) -> String {
     let has_stress = ps.contains(PRIMARY) || ps.contains(SECONDARY);
     let has_vowel = ps.chars().any(|c| VOWELS.contains(c));
-    let Some(stress) = stress else { return ps.to_owned() };
+    let Some(stress) = stress else {
+        return ps.to_owned();
+    };
     if stress < -1.0 {
         ps.replace([PRIMARY, SECONDARY], "")
     } else if stress == -1.0 || ((stress == 0.0 || stress == -0.5) && ps.contains(PRIMARY)) {
-        ps.replace(SECONDARY, "").replace(PRIMARY, &SECONDARY.to_string())
+        ps.replace(SECONDARY, "")
+            .replace(PRIMARY, &SECONDARY.to_string())
     } else if (stress == 0.0 || stress == 0.5 || stress == 1.0) && !has_stress {
-        if has_vowel { restress(&format!("{SECONDARY}{ps}")) } else { ps.to_owned() }
+        if has_vowel {
+            restress(&format!("{SECONDARY}{ps}"))
+        } else {
+            ps.to_owned()
+        }
     } else if stress >= 1.0 && !ps.contains(PRIMARY) && ps.contains(SECONDARY) {
         ps.replace(SECONDARY, &PRIMARY.to_string())
     } else if stress > 1.0 && !has_stress {
-        if has_vowel { restress(&format!("{PRIMARY}{ps}")) } else { ps.to_owned() }
+        if has_vowel {
+            restress(&format!("{PRIMARY}{ps}"))
+        } else {
+            ps.to_owned()
+        }
     } else {
         ps.to_owned()
     }
@@ -469,14 +535,21 @@ fn restress(ps: &str) -> String {
 /// fixes a word's pronunciation.
 /// `word` with Latin accents taken off, if it has any (and nothing else outside ASCII).
 fn unaccented(word: &str) -> Option<String> {
-    const FROM: &str = "àáâãäåāçćčèéêëēěìíîïīñńňòóôõöøōùúûüūýÿžśšźżÀÁÂÃÄÅĀÇĆČÈÉÊËĒĚÌÍÎÏĪÑŃŇÒÓÔÕÖØŌÙÚÛÜŪÝŸŽŚŠŹŻ";
-    const TO: &str = "aaaaaaaccceeeeeeiiiiinnnooooooouuuuuyyzsszzAAAAAAACCCEEEEEEIIIIINNNOOOOOOOUUUUUYYZSSZZ";
+    const FROM: &str =
+        "àáâãäåāçćčèéêëēěìíîïīñńňòóôõöøōùúûüūýÿžśšźżÀÁÂÃÄÅĀÇĆČÈÉÊËĒĚÌÍÎÏĪÑŃŇÒÓÔÕÖØŌÙÚÛÜŪÝŸŽŚŠŹŻ";
+    const TO: &str =
+        "aaaaaaaccceeeeeeiiiiinnnooooooouuuuuyyzsszzAAAAAAACCCEEEEEEIIIIINNNOOOOOOOUUUUUYYZSSZZ";
     if word.is_ascii() {
         return None;
     }
     let plain: String = word
         .chars()
-        .map(|c| FROM.chars().position(|f| f == c).and_then(|i| TO.chars().nth(i)).unwrap_or(c))
+        .map(|c| {
+            FROM.chars()
+                .position(|f| f == c)
+                .and_then(|i| TO.chars().nth(i))
+                .unwrap_or(c)
+        })
         .collect();
     plain.is_ascii().then_some(plain)
 }
@@ -519,7 +592,11 @@ fn tokenize(text: &str) -> Vec<Token> {
         if c == '['
             && let Some((word, phonemes, len)) = parse_link(&chars[i..])
         {
-            tokens.push(Token::Word { text: word, fixed: Some(phonemes), space });
+            tokens.push(Token::Word {
+                text: word,
+                fixed: Some(phonemes),
+                space,
+            });
             space = false;
             i += len;
             continue;
@@ -541,13 +618,21 @@ fn tokenize(text: &str) -> Vec<Token> {
             }
             let word: String = chars[start..i].iter().collect();
             for (k, part) in split_word(&word).into_iter().enumerate() {
-                tokens.push(Token::Word { text: part, fixed: None, space: space || k > 0 });
+                tokens.push(Token::Word {
+                    text: part,
+                    fixed: None,
+                    space: space || k > 0,
+                });
             }
             space = false;
             continue;
         }
         if let Some((sym, _)) = SYMBOLS.iter().find(|(s, _)| s.starts_with(c)) {
-            tokens.push(Token::Word { text: (*sym).to_owned(), fixed: None, space: true });
+            tokens.push(Token::Word {
+                text: (*sym).to_owned(),
+                fixed: None,
+                space: true,
+            });
             space = true;
         } else if c == '-' || c == '_' || c == '/' {
             // "made-up", "CPU/GPU": separate words.
@@ -572,7 +657,14 @@ fn split_word(word: &str) -> Vec<String> {
     for c in word.chars() {
         let digit = c.is_ascii_digit() || c == '.' || c == ',';
         match parts.last_mut() {
-            Some(last) if last.chars().last().is_some_and(|l| (l.is_ascii_digit() || l == '.' || l == ',') == digit) => last.push(c),
+            Some(last)
+                if last
+                    .chars()
+                    .last()
+                    .is_some_and(|l| (l.is_ascii_digit() || l == '.' || l == ',') == digit) =>
+            {
+                last.push(c)
+            }
             _ => parts.push(c.to_string()),
         }
     }
@@ -586,7 +678,11 @@ fn parse_link(chars: &[char]) -> Option<(String, String, usize)> {
     }
     let end = chars[close + 3..].iter().position(|&c| c == ')')? + close + 3;
     let word: String = chars[1..close].iter().collect();
-    let phonemes: String = chars[close + 3..end].iter().collect::<String>().trim_end_matches('/').to_owned();
+    let phonemes: String = chars[close + 3..end]
+        .iter()
+        .collect::<String>()
+        .trim_end_matches('/')
+        .to_owned();
     Some((word, phonemes, end + 1))
 }
 
@@ -596,7 +692,10 @@ mod tests {
 
     #[test]
     fn plain_text_drops_pronunciations() {
-        assert_eq!(plain_text("I [read](/ɹˈɛd/) it,  [Kokoro](/kˈOkəɹˌO/)!"), "I read it, Kokoro!");
+        assert_eq!(
+            plain_text("I [read](/ɹˈɛd/) it,  [Kokoro](/kˈOkəɹˌO/)!"),
+            "I read it, Kokoro!"
+        );
         assert_eq!(plain_text("a [b] c (d)"), "a [b] c (d)");
     }
 

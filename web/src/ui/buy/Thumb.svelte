@@ -7,7 +7,7 @@
    * `render/preview/items.ts`) and cached. A soft placeholder with `glyph` shows until it arrives
    * (or if 3D isn't available).
    */
-  let { model, footprint, glyph, size = 22 }: { model: string; footprint: [number, number]; glyph: string; size?: number } = $props();
+  let { model, footprint, glyph, size = 30 }: { model: string; footprint: [number, number]; glyph: string; size?: number } = $props();
 
   let url = $state<string | null>(null);
   let failed = $state(false);
@@ -30,11 +30,17 @@
     failed = false;
     if (hit || !services.items || !near) return;
     const abort = new AbortController();
-    void services.items.thumbnail(key, fp, 'now', abort.signal).then((u) => {
-      if (abort.signal.aborted) return;
-      url = u;
-      failed = !u;
-    });
+    void services.items
+      .thumbnail(key, fp, 'now', abort.signal)
+      .then((u) => {
+        if (abort.signal.aborted) return;
+        url = u;
+        failed = !u;
+      })
+      .catch(() => {
+        // A failed picture leaves the glyph in place instead of an unhandled rejection.
+        if (!abort.signal.aborted) failed = true;
+      });
     // Scrolled away or another category: withdraw the request.
     return () => abort.abort();
   });

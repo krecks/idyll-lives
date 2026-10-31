@@ -114,7 +114,8 @@ impl JValue {
 
     /// The value under `k` (panics if missing: the set is malformed).
     pub fn at(&self, k: &str) -> &JValue {
-        self.get(k).unwrap_or_else(|| panic!("rig.json: missing key {k}"))
+        self.get(k)
+            .unwrap_or_else(|| panic!("rig.json: missing key {k}"))
     }
 
     pub fn f64(&self) -> f64 {

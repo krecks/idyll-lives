@@ -40,7 +40,7 @@
       <div><span>Residents</span><b>{s.residentsMs.toFixed(2)} ms</b></div>
       {#if t}<div title="Frames from start to finish: the game's work, then the browser's style, layout and paint (not the interface's updates between frames)"><span>Busy (frames)</span><b>{pct(t.main.busy)}</b></div>{/if}
       <div><span>Draw calls</span><b>{s.drawCalls}</b></div>
-      <div><span>Snapshot rendering</span><b>{s.snapshotRendering ? 'on' : 'off'}</b></div>
+      <div><span>Held frames</span><b>{s.holdStillFrames ? 'on' : 'off'}</b></div>
       {#if t?.main.longTasks != null}
         <div><span>Long tasks (10 s)</span><b>{t.main.longTasks}{t.main.longTasks ? ` · max ${t.main.longestTaskMs.toFixed(0)} ms` : ''}</b></div>
       {/if}

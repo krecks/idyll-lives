@@ -23,7 +23,11 @@ const TOWN: &str = r#"{"width":12,"depth":10,
 
 fn world() -> World {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     w
 }
 
@@ -36,20 +40,43 @@ fn days(w: &mut World, d: u32) {
 #[test]
 fn residents_age_and_become_elders() {
     let mut w = world();
-    assert_eq!(w.lifespan, Lifespan::Normal, "new games age at the normal pace");
+    assert_eq!(
+        w.lifespan,
+        Lifespan::Normal,
+        "new games age at the normal pace"
+    );
     let bo = w.sims[1].age;
-    assert!((25.0..=50.0).contains(&bo) && bo.fract() == 0.0, "a starting age from content: {bo}");
+    assert!(
+        (25.0..=50.0).contains(&bo) && bo.fract() == 0.0,
+        "a starting age from content: {bo}"
+    );
     assert_eq!(w.sims[0].mods.walk_speed, 1.0);
 
     // Two days a year: a year older after two midnights.
     days(&mut w, 2);
     assert!((w.sims[0].age - 60.2).abs() < 1e-3, "{}", w.sims[0].age);
     assert!((w.sims[1].age - (bo + 1.0)).abs() < 1e-3);
-    let elder: Vec<_> = w.events.iter().filter(|e| e.kind == EventKind::GrewOlder).map(|e| (e.a, e.n)).collect();
+    let elder: Vec<_> = w
+        .events
+        .iter()
+        .filter(|e| e.kind == EventKind::GrewOlder)
+        .map(|e| (e.a, e.n))
+        .collect();
     assert_eq!(elder, [(0, Some(2))], "Ada is an elder now");
-    assert!(w.sims[0].feelings.iter().any(|f| w.content.feelings[f.def].id == "goldenYears"));
-    assert!((w.sims[0].mods.walk_speed - 0.85).abs() < 1e-6, "elders walk slower");
-    assert!((w.sims[0].mods.need_decay[0] - 1.2).abs() < 1e-6, "and tire sooner");
+    assert!(
+        w.sims[0]
+            .feelings
+            .iter()
+            .any(|f| w.content.feelings[f.def].id == "goldenYears")
+    );
+    assert!(
+        (w.sims[0].mods.walk_speed - 0.85).abs() < 1e-6,
+        "elders walk slower"
+    );
+    assert!(
+        (w.sims[0].mods.need_decay[0] - 1.2).abs() < 1e-6,
+        "and tire sooner"
+    );
 
     // Saved and loaded with their ages and the elder's slower step.
     let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
@@ -61,10 +88,19 @@ fn residents_age_and_become_elders() {
 #[test]
 fn the_lifespan_sets_the_pace_and_off_stops_it() {
     let mut w = world();
-    w.apply(Command::SetLifespan { lifespan: Lifespan::Long }).unwrap();
+    w.apply(Command::SetLifespan {
+        lifespan: Lifespan::Long,
+    })
+    .unwrap();
     days(&mut w, 4);
-    assert!((w.sims[0].age - 60.2).abs() < 1e-3, "long: four days a year");
-    w.apply(Command::SetLifespan { lifespan: Lifespan::Off }).unwrap();
+    assert!(
+        (w.sims[0].age - 60.2).abs() < 1e-3,
+        "long: four days a year"
+    );
+    w.apply(Command::SetLifespan {
+        lifespan: Lifespan::Off,
+    })
+    .unwrap();
     days(&mut w, 4);
     assert!((w.sims[0].age - 60.2).abs() < 1e-3, "off: nobody ages");
 }
@@ -79,7 +115,11 @@ fn older_saves_load_with_aging_off() {
         s.as_object_mut().unwrap().remove("age");
     }
     let loaded = World::from_save_json(CONTENT, &save.to_string()).unwrap();
-    assert_eq!(loaded.lifespan, Lifespan::Off, "an older game doesn't start aging by surprise");
+    assert_eq!(
+        loaded.lifespan,
+        Lifespan::Off,
+        "an older game doesn't start aging by surprise"
+    );
     assert!((25.0..=50.0).contains(&loaded.sims[0].age));
 }
 
@@ -115,12 +155,25 @@ const ELDERS: &str = r#"{"width":20,"depth":10,
 #[test]
 fn working_residents_retire_with_a_pension() {
     let mut w = World::from_json(LATER_LIFE, ELDERS, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     days(&mut w, 1);
     assert!(w.sims[0].retired && w.sims[0].job.is_none(), "65: retired");
     assert_eq!(w.sims[0].pension, 80, "40% of 5 shifts of 4 hours at $10");
-    assert!(w.events.iter().any(|e| e.kind == EventKind::Retired && e.a == 0));
-    assert!(w.sims[0].feelings.iter().any(|f| w.content.feelings[f.def].id == "retired"));
+    assert!(
+        w.events
+            .iter()
+            .any(|e| e.kind == EventKind::Retired && e.a == 0)
+    );
+    assert!(
+        w.sims[0]
+            .feelings
+            .iter()
+            .any(|f| w.content.feelings[f.def].id == "retired")
+    );
     // Saved retired.
     let loaded = World::from_save_json(LATER_LIFE, &w.save_json()).unwrap();
     assert_eq!((loaded.sims[0].retired, loaded.sims[0].pension), (true, 80));
@@ -134,12 +187,22 @@ fn working_residents_retire_with_a_pension() {
 #[test]
 fn the_old_pass_away_and_are_mourned() {
     let mut w = World::from_json(LATER_LIFE, ELDERS, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     w.sims[0].age = 80.0;
-    w.apply(Command::SetLifespan { lifespan: Lifespan::Off }).unwrap();
+    w.apply(Command::SetLifespan {
+        lifespan: Lifespan::Off,
+    })
+    .unwrap();
     days(&mut w, 3);
     assert!(w.sims[0].here(), "nobody dies when nobody ages");
-    w.apply(Command::SetLifespan { lifespan: Lifespan::Normal }).unwrap();
+    w.apply(Command::SetLifespan {
+        lifespan: Lifespan::Normal,
+    })
+    .unwrap();
     for _ in 0..30 {
         days(&mut w, 1);
         if !w.sims[0].here() {
@@ -148,9 +211,21 @@ fn the_old_pass_away_and_are_mourned() {
     }
     assert!(!w.sims[0].here(), "a certain death in this content");
     assert_eq!(w.sims[0].gone.unwrap().why, sim_core::world::GoneWhy::Died);
-    assert!(w.events.iter().any(|e| e.kind == EventKind::Died && e.a == 0));
-    let feels = |i: usize, id: &str| w.sims[i].feelings.iter().any(|f| w.content.feelings[f.def].id == id);
+    assert!(
+        w.events
+            .iter()
+            .any(|e| e.kind == EventKind::Died && e.a == 0)
+    );
+    let feels = |i: usize, id: &str| {
+        w.sims[i]
+            .feelings
+            .iter()
+            .any(|f| w.content.feelings[f.def].id == id)
+    };
     assert!(feels(1, "grieving"), "her son grieves");
     assert!(feels(2, "missesSomeone"), "a friend misses her");
-    assert!(!feels(3, "grieving") && !feels(3, "missesSomeone"), "a stranger doesn't");
+    assert!(
+        !feels(3, "grieving") && !feels(3, "missesSomeone"),
+        "a stranger doesn't"
+    );
 }

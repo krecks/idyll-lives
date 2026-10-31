@@ -12,12 +12,16 @@ Ceiling Lights, Wall Lights, Floor Lamps and Table Lamps until signed off.
   `headHeight`).
 - **LT2, wall:** `wallSconce`, `wallLampArm`, `wallLightOutdoor`. Their back is on the wall face (−0.43), at
   their real height (`G.settle(centre=False, floor=False)`, `centre=` on the `Model`).
-- **LT3, floor:** `lamp`, `floorLampSimple`, `lampFloorArc`, `lampFloorTripod`, `lampTorchiere`. The arc lamp's
-  base stands in the back corner, its back on the wall face (`centre=`), as its old part now does.
-  Still to do (M-lighting-06, the model half): the arc reaches over the next tile, the shade about 1.2 m in front of
-  the base and 1.9–2.0 m up over the middle of the tile in front (a sofa's seat), the base where it is; then content
-  `overhang: [[0, 1]]` on `lampFloorArc` (the sim allows it since 2026-10-22: furniture under the shade, nobody walking
-  there), `light.at` moved to the shade, and build mode's and `housegen.ts`'s placing taught the overhang.
+- **LT3, floor:** `lamp`, `floorLampSimple`, `lampFloorArc`, `lampFloorTripod`, `lampTorchiere`. The arc lamp
+  reaches over the next tile (2026-10-26, review M-lighting-06): its base in the back left corner of its tile, its
+  back on the wall face, the arc rising to 2.05 m and coming down over the middle of the tile in front, 1.33 m from
+  the base across the floor (`ARC_BASE`, `ARC_SHADE_AT`), the shade from 1.6 to 1.8 m, over a sofa's seat. It is
+  built where it stands (`G.settle(centre=False)`, `centre` the box's middle, -0.1245, 0.3755). Content: `overhang`
+  [[0, 1]] (furniture under the shade, nobody walking there, nothing tall or hanging low), `light.at` (0, 1) and
+  `light.height` 1.65 at the bulb, and `freeRotation` false (the sim refuses an `overhang` that turns freely: the
+  shade's tile turns in quarter turns). Build mode checks the shade's tile as the sim does; the house generator hangs
+  it over a seat beside the lamp when there is one, else over free floor, which it takes from walking (2 of 24 over a
+  sofa in the 180 sample houses). The gate counts the tiles it reaches over as its own.
 - **LT4, table:** `tableLamp` (a lamp on its own oak side table, a floor object), and the surface lamps
   `lampTableRound`, `lampTableSquare`, `lampBanker`, `lampMushroom`, `lampLantern`. Their content `radius` (the room
   they take on a top) follows the drawn model: the round, square, mushroom and lantern lamps' were taken from their
@@ -32,9 +36,11 @@ asserts each bulb within 25 cm of the content's `light.height`, read from `base.
 at the top of its dome (2.1 m, as the old part had it), 20 cm above the bulb; it is at the bulb now (1.9 m,
 2026-10-14), a little brighter on the floor and a little darker on the ceiling. Across, the light is at the
 footprint's middle unless the content's `light.at` moves it (in the game's frame, the old part's: the GLB's x
-mirrored, as the glTF loader turns it): the arc lamp's (0.245, 0.2) and the table lamp's (−0.12, 0) put it at
-their bulbs, the nightstand lamp's (0, −0.26) at its bulb near the wall (2026-10-17; `_bulb` checks only the
-height). The wall lights keep theirs at the middle, 13–38 cm out from the bulb: tried at the bulb, the sconce and
+mirrored, as the glTF loader turns it): the arc lamp's (0, 1), over the tile in front, and the table lamp's (−0.12, 0)
+put it at their bulbs, the nightstand lamp's (0, −0.26, bedroom) at its bulb near the wall (2026-10-17). Since
+2026-10-26 the build checks `at` too: once a lamp of this family with a `light.at` is built and settled, `_check_at`
+finds its bulb (the middle of the faces in the bulb's material, which `_bulb` notes) and asserts it within 5 cm across
+of `at`. The wall lights keep theirs at the middle, 13–38 cm out from the bulb: tried at the bulb, the sconce and
 bulkhead lit only a small hot ring round themselves and lost the warm pool on the wall and floor.
 
 ## Night glow
@@ -101,9 +107,8 @@ their materials and glows.
   3 cm into the wall behind its plate (its hidden back half is flattened onto the wall face), so it is 0.11 m deep,
   as the model does.
 
-As of 2026-10-22 the gate shows only the floats warnings and one more: `lampFloorArc`'s content light (1.5 m at
-(0.245, 0.2)) is outside the lamp there (the bulb's bottom is 1.52 m), as it was before the detail pass; it goes with
-the arc's overhang still to do (M-lighting-06). Khronos validator: 0 errors, 0 warnings each.
+As of 2026-10-26 the gate shows only the floats warnings: `lampFloorArc`'s light (1.65 m at (0, 1)) is inside its
+shade, and the tiles it reaches over count as its own. Khronos validator: 0 errors, 0 warnings each.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
@@ -119,7 +124,7 @@ the arc's overhang still to do (M-lighting-06). Khronos validator: 0 errors, 0 w
 | wallLightOutdoor | 0.22 × 0.33 × 0.11 | 1,228 | 2 | Body, Shade |
 | lamp | 0.45 × 1.81 × 0.45 | 3,324 | 2 | Stand, Shade, Fittings |
 | floorLampSimple | 0.28 × 1.60 × 0.28 | 1,016 | 2 | Stand, Shade |
-| lampFloorArc | 0.85 × 1.86 × 0.81 | 3,312 | 1 | Stand, Shade, Base |
+| lampFloorArc | 0.61 × 2.06 × 1.61 | 3,632 | 1 | Stand, Shade, Base |
 | lampFloorTripod | 0.54 × 1.62 × 0.55 | 2,584 | 3 | Stand, Shade |
 | lampTorchiere | 0.40 × 1.85 × 0.40 | 2,284 | 2 | Stand, Shade, Base |
 | tableLamp | 0.66 × 0.92 × 0.42 | 3,220 | 3 | Base, Shade, Table |

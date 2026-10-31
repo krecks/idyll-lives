@@ -68,11 +68,20 @@ fn turn(a: f32, b: f32) -> f32 {
 
 #[test]
 fn places_parse_and_say_where_each_slot_is() {
-    let w = world(r#"{"def":"picnic","x":4,"z":4,"rot":0},{"def":"picnic","x":4,"z":9,"rot":1},{"def":"bench","x":10,"z":4}"#, "");
+    let w = world(
+        r#"{"def":"picnic","x":4,"z":4,"rot":0},{"def":"picnic","x":4,"z":9,"rot":1},{"def":"bench","x":10,"z":4}"#,
+        "",
+    );
     let def = &w.content.objects[PICNIC];
     assert_eq!(def.places.len(), 2);
-    assert!((def.places[0].facing - PI).abs() < 1e-5, "degrees read as radians");
-    assert!(w.content.objects[BENCH].places.is_empty(), "none unless given");
+    assert!(
+        (def.places[0].facing - PI).abs() < 1e-5,
+        "degrees read as radians"
+    );
+    assert!(
+        w.content.objects[BENCH].places.is_empty(),
+        "none unless given"
+    );
     // Facing +z: the first on the front bench facing back, the second on the far one facing out.
     let o = &w.objects[0];
     assert!(near(o.slot_position(&w.content, 0), [5.2, 5.7]));
@@ -81,7 +90,11 @@ fn places_parse_and_say_where_each_slot_is() {
     assert!(turn(o.slot_yaw(&w.content, 1), 0.0) < 1e-4);
     // Turned a quarter (facing +x, 2 wide and 3 deep): the places turn with it.
     let o = &w.objects[1];
-    assert!(near(o.slot_position(&w.content, 0), [5.7, 10.8]), "{:?}", o.slot_position(&w.content, 0));
+    assert!(
+        near(o.slot_position(&w.content, 0), [5.7, 10.8]),
+        "{:?}",
+        o.slot_position(&w.content, 0)
+    );
     assert!(turn(o.slot_yaw(&w.content, 0), FRAC_PI_2 + PI) < 1e-4);
     // Without places: spread across the width, facing the front, as before.
     let b = &w.objects[2];
@@ -92,26 +105,52 @@ fn places_parse_and_say_where_each_slot_is() {
 
 #[test]
 fn places_must_fit_the_slots() {
-    let bad = CONTENT.replace(r#""slots":2,
-       "places":[{"at":[-0.3,0.7],"facing":180},{"at":[-0.3,-0.7]}]"#, r#""slots":3,
-       "places":[{"at":[-0.3,0.7],"facing":180},{"at":[-0.3,-0.7]}]"#);
+    let bad = CONTENT.replace(
+        r#""slots":2,
+       "places":[{"at":[-0.3,0.7],"facing":180},{"at":[-0.3,-0.7]}]"#,
+        r#""slots":3,
+       "places":[{"at":[-0.3,0.7],"facing":180},{"at":[-0.3,-0.7]}]"#,
+    );
     assert_ne!(bad, CONTENT);
-    let Err(err) = World::from_json(&bad, &lot("", ""), 1) else { panic!("refused") };
+    let Err(err) = World::from_json(&bad, &lot("", ""), 1) else {
+        panic!("refused")
+    };
     assert!(err.to_string().contains("one place a slot"), "{err}");
-    let far = CONTENT.replace(r#"{"at":[1.3,0],"facing":-90}"#, r#"{"at":[3.1,0],"facing":-90}"#);
-    let Err(err) = World::from_json(&far, &lot("", ""), 1) else { panic!("refused") };
+    let far = CONTENT.replace(
+        r#"{"at":[1.3,0],"facing":-90}"#,
+        r#"{"at":[3.1,0],"facing":-90}"#,
+    );
+    let Err(err) = World::from_json(&far, &lot("", ""), 1) else {
+        panic!("refused")
+    };
     assert!(err.to_string().contains("off its footprint"), "{err}");
-    let lone = CONTENT.replace(r#""seatNear":5,"seatFacing":"front""#, r#""seatFacing":"front""#);
-    let Err(err) = World::from_json(&lone, &lot("", ""), 1) else { panic!("refused") };
-    assert!(err.to_string().contains("seatFacing needs a seatNear"), "{err}");
+    let lone = CONTENT.replace(
+        r#""seatNear":5,"seatFacing":"front""#,
+        r#""seatFacing":"front""#,
+    );
+    let Err(err) = World::from_json(&lone, &lot("", ""), 1) else {
+        panic!("refused")
+    };
+    assert!(
+        err.to_string().contains("seatFacing needs a seatNear"),
+        "{err}"
+    );
 }
 
 #[test]
 fn two_at_a_picnic_table_sit_across_it_facing_each_other() {
     // The table on x 4..7, z 4..6, facing +z; Ada comes from the front, Bea from behind it.
-    let mut w = world(r#"{"def":"picnic","x":4,"z":4,"rot":0}"#, r#"{"name":"Ada","x":5.5,"z":9.5},{"name":"Bea","x":5.5,"z":1.5}"#);
+    let mut w = world(
+        r#"{"def":"picnic","x":4,"z":4,"rot":0}"#,
+        r#"{"name":"Ada","x":5.5,"z":9.5},{"name":"Bea","x":5.5,"z":1.5}"#,
+    );
     for sim in 0..2 {
-        w.apply(Command::Use { sim, object: 0, interaction: 0 }).unwrap();
+        w.apply(Command::Use {
+            sim,
+            object: 0,
+            interaction: 0,
+        })
+        .unwrap();
     }
     // (Where Bea stood last before she sat down.)
     let mut from = (0, 0);
@@ -124,37 +163,75 @@ fn two_at_a_picnic_table_sit_across_it_facing_each_other() {
     assert!(both, "both sit down");
     let (a, b) = (&w.sims[0], &w.sims[1]);
     // Each on their own bench, the one nearer them: across the table, facing each other.
-    assert!(near(a.pos, [5.2, 5.7]), "Ada on the front bench: {:?}", a.pos);
+    assert!(
+        near(a.pos, [5.2, 5.7]),
+        "Ada on the front bench: {:?}",
+        a.pos
+    );
     assert!(near(b.pos, [5.2, 4.3]), "Bea on the far bench: {:?}", b.pos);
-    assert!(turn(a.yaw, b.yaw + PI) < 1e-4, "facing each other: {} {}", a.yaw, b.yaw);
+    assert!(
+        turn(a.yaw, b.yaw + PI) < 1e-4,
+        "facing each other: {} {}",
+        a.yaw,
+        b.yaw
+    );
     let to_b = [b.pos[0] - a.pos[0], b.pos[1] - a.pos[1]];
-    assert!(ahead(a.yaw)[0] * to_b[0] + ahead(a.yaw)[1] * to_b[1] > 0.0, "Ada looks at Bea");
+    assert!(
+        ahead(a.yaw)[0] * to_b[0] + ahead(a.yaw)[1] * to_b[1] > 0.0,
+        "Ada looks at Bea"
+    );
     // Bea came round to her bench from behind it, not through the table.
     assert_eq!(from, (5, 3));
 }
 
 #[test]
 fn ping_pong_players_stand_at_the_two_ends_facing_each_other() {
-    let mut w = world(r#"{"def":"pingPong","x":6,"z":6,"rot":0}"#, r#"{"name":"Ada","x":2.5,"z":7.5},{"name":"Bea","x":11.5,"z":7.5}"#);
+    let mut w = world(
+        r#"{"def":"pingPong","x":6,"z":6,"rot":0}"#,
+        r#"{"name":"Ada","x":2.5,"z":7.5},{"name":"Bea","x":11.5,"z":7.5}"#,
+    );
     for sim in 0..2 {
-        w.apply(Command::Use { sim, object: 0, interaction: 0 }).unwrap();
+        w.apply(Command::Use {
+            sim,
+            object: 0,
+            interaction: 0,
+        })
+        .unwrap();
     }
-    let playing = |w: &World| w.sims.iter().all(|s| s.current().is_some_and(|a| matches!(a.phase, sim_core::world::Phase::Using { .. })));
+    let playing = |w: &World| {
+        w.sims.iter().all(|s| {
+            s.current()
+                .is_some_and(|a| matches!(a.phase, sim_core::world::Phase::Using { .. }))
+        })
+    };
     assert!(until(&mut w, 10, playing), "both play");
     let (a, b) = (&w.sims[0], &w.sims[1]);
     assert_eq!(a.pose, Pose::Stand);
     assert!(near(a.pos, [5.7, 6.5]), "Ada at the left end: {:?}", a.pos);
     assert!(near(b.pos, [8.3, 6.5]), "Bea at the right end: {:?}", b.pos);
-    assert!(turn(a.yaw, FRAC_PI_2) < 1e-4 && turn(b.yaw, -FRAC_PI_2) < 1e-4, "facing each other across the net");
+    assert!(
+        turn(a.yaw, FRAC_PI_2) < 1e-4 && turn(b.yaw, -FRAC_PI_2) < 1e-4,
+        "facing each other across the net"
+    );
 }
 
 #[test]
 fn a_blocked_end_is_played_from_the_front() {
     // A bench takes the tiles past the table's left end (x 4..6): Ada, the only one, gets the
     // slot nearest her there, can't stand on it, and plays from the front tile, facing the table.
-    let mut w = world(r#"{"def":"pingPong","x":6,"z":6,"rot":0},{"def":"bench","x":4,"z":6,"rot":0}"#, r#"{"name":"Ada","x":2.5,"z":7.5}"#);
-    w.apply(Command::Use { sim: 0, object: 0, interaction: 0 }).unwrap();
-    assert!(until(&mut w, 10, |w| w.sims[0].current().is_some_and(|a| matches!(a.phase, sim_core::world::Phase::Using { .. }))));
+    let mut w = world(
+        r#"{"def":"pingPong","x":6,"z":6,"rot":0},{"def":"bench","x":4,"z":6,"rot":0}"#,
+        r#"{"name":"Ada","x":2.5,"z":7.5}"#,
+    );
+    w.apply(Command::Use {
+        sim: 0,
+        object: 0,
+        interaction: 0,
+    })
+    .unwrap();
+    assert!(until(&mut w, 10, |w| w.sims[0].current().is_some_and(
+        |a| matches!(a.phase, sim_core::world::Phase::Using { .. })
+    )));
     let a = &w.sims[0];
     assert_eq!(a.tile(), (6, 7), "on the front tile: {:?}", a.pos);
     assert!(ahead(a.yaw)[1] < -0.5, "facing the table: {}", a.yaw);
@@ -166,9 +243,21 @@ fn watching_tv_takes_the_seat_that_faces_the_screen() {
     // screen); further off, one facing it.
     let objects = r#"{"def":"tv","x":7,"z":7,"rot":0},{"def":"sofa","x":7,"z":9,"rot":0},{"def":"sofa","x":7,"z":12,"rot":2}"#;
     let mut w = world(objects, r#"{"name":"Ada","x":3.5,"z":9.5}"#);
-    w.apply(Command::Use { sim: 0, object: 0, interaction: 0 }).unwrap();
-    assert!(until(&mut w, 10, |w| w.sims[0].pose == Pose::Sit), "sits down");
-    assert_eq!(w.sims[0].use_seat, Some(2), "the sofa that faces the screen");
+    w.apply(Command::Use {
+        sim: 0,
+        object: 0,
+        interaction: 0,
+    })
+    .unwrap();
+    assert!(
+        until(&mut w, 10, |w| w.sims[0].pose == Pose::Sit),
+        "sits down"
+    );
+    assert_eq!(
+        w.sims[0].use_seat,
+        Some(2),
+        "the sofa that faces the screen"
+    );
 }
 
 #[test]
@@ -176,8 +265,15 @@ fn with_no_seat_facing_it_the_tv_is_watched_standing() {
     // Only the sofa with its back to the screen, and one behind the TV looking at its back.
     let objects = r#"{"def":"tv","x":7,"z":7,"rot":0},{"def":"sofa","x":7,"z":9,"rot":0},{"def":"sofa","x":7,"z":4,"rot":0}"#;
     let mut w = world(objects, r#"{"name":"Ada","x":8.5,"z":12.5}"#);
-    w.apply(Command::Use { sim: 0, object: 0, interaction: 0 }).unwrap();
-    assert!(until(&mut w, 10, |w| w.sims[0].current().is_some_and(|a| matches!(a.phase, sim_core::world::Phase::Using { .. }))));
+    w.apply(Command::Use {
+        sim: 0,
+        object: 0,
+        interaction: 0,
+    })
+    .unwrap();
+    assert!(until(&mut w, 10, |w| w.sims[0].current().is_some_and(
+        |a| matches!(a.phase, sim_core::world::Phase::Using { .. })
+    )));
     assert_eq!(w.sims[0].use_seat, None);
     assert_eq!(w.sims[0].pose, Pose::Stand);
 }
@@ -187,15 +283,41 @@ fn round_the_fire_pit_from_a_chair_facing_it_or_standing_facing_in() {
     // The pit at (7, 7); a chair three tiles behind it facing it (rot 0, towards +z), and a
     // nearer one off its front corner facing away (rot 1, towards +x).
     let objects = r#"{"def":"firePit","x":7,"z":7},{"def":"chair","x":7,"z":4,"rot":0},{"def":"chair","x":8,"z":8,"rot":1}"#;
-    let mut w = world(objects, r#"{"name":"Ada","x":10.5,"z":5.5},{"name":"Bea","x":7.5,"z":12.5}"#);
-    w.apply(Command::Use { sim: 0, object: 0, interaction: 0 }).unwrap();
-    assert!(until(&mut w, 10, |w| w.sims[0].pose == Pose::Sit), "Ada sits");
-    assert_eq!(w.sims[0].use_seat, Some(1), "on the chair that faces the fire, not the one turned away");
+    let mut w = world(
+        objects,
+        r#"{"name":"Ada","x":10.5,"z":5.5},{"name":"Bea","x":7.5,"z":12.5}"#,
+    );
+    w.apply(Command::Use {
+        sim: 0,
+        object: 0,
+        interaction: 0,
+    })
+    .unwrap();
+    assert!(
+        until(&mut w, 10, |w| w.sims[0].pose == Pose::Sit),
+        "Ada sits"
+    );
+    assert_eq!(
+        w.sims[0].use_seat,
+        Some(1),
+        "on the chair that faces the fire, not the one turned away"
+    );
     // No other chair faces it: Bea stands at the place round it nearest her, facing the fire.
-    w.apply(Command::Use { sim: 1, object: 0, interaction: 0 }).unwrap();
-    assert!(until(&mut w, 10, |w| w.sims[1].current().is_some_and(|a| matches!(a.phase, sim_core::world::Phase::Using { .. }))));
+    w.apply(Command::Use {
+        sim: 1,
+        object: 0,
+        interaction: 0,
+    })
+    .unwrap();
+    assert!(until(&mut w, 10, |w| w.sims[1].current().is_some_and(
+        |a| matches!(a.phase, sim_core::world::Phase::Using { .. })
+    )));
     let b = &w.sims[1];
     assert_eq!((b.use_seat, b.pose), (None, Pose::Stand));
-    assert!(near(b.pos, [7.5, 8.35]), "in front of the pit, off its rim: {:?}", b.pos);
+    assert!(
+        near(b.pos, [7.5, 8.35]),
+        "in front of the pit, off its rim: {:?}",
+        b.pos
+    );
     assert!(turn(b.yaw, PI) < 1e-4, "facing the fire");
 }

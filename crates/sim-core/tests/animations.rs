@@ -167,7 +167,11 @@ fn object_ids_stay_valid_after_a_sell() {
     let fridge = w.objects[1].stable;
 
     // Selling an object listed before it doesn't change the fridge's id.
-    w.apply(Command::Sell { household: 0, object: w.objects[0].stable }).unwrap();
+    w.apply(Command::Sell {
+        household: 0,
+        object: w.objects[0].stable,
+    })
+    .unwrap();
     let (object, act) = row(&w, 0);
     assert_eq!(object, fridge as f32);
     assert_eq!(act, action(&w, "eat"), "still eating");
@@ -178,21 +182,45 @@ fn object_ids_stay_valid_after_a_sell() {
     let mut sync = sim_core::view::UiSync::new();
     sync.inspect(Some(0));
     let ui: serde_json::Value = serde_json::from_str(&sync.update_json(&w)).unwrap();
-    let ada = ui["sims"].as_array().unwrap().iter().find(|s| s["id"] == 0).unwrap();
+    let ada = ui["sims"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["id"] == 0)
+        .unwrap();
     assert_eq!(ada["actions"][0]["object"], fridge, "{}", ada["actions"]);
 
     // Selling the object in use stops the Sim.
-    w.apply(Command::Sell { household: 0, object: fridge }).unwrap();
+    w.apply(Command::Sell {
+        household: 0,
+        object: fridge,
+    })
+    .unwrap();
     assert_eq!(row(&w, 0), (-1.0, -1.0));
 
     // A second click on Sell, or a menu still open on it: nothing happens, and no error.
     let funds = w.households[0].funds;
-    w.apply(Command::Sell { household: 0, object: fridge }).expect("already sold: nothing to do");
-    w.apply(Command::Use { sim: 0, object: fridge, interaction: 0 }).expect("gone: nothing to do");
+    w.apply(Command::Sell {
+        household: 0,
+        object: fridge,
+    })
+    .expect("already sold: nothing to do");
+    w.apply(Command::Use {
+        sim: 0,
+        object: fridge,
+        interaction: 0,
+    })
+    .expect("gone: nothing to do");
     assert_eq!(w.households[0].funds, funds);
     assert_eq!(row(&w, 0), (-1.0, -1.0));
     // An id never handed out is still an error.
-    assert!(w.apply(Command::Sell { household: 0, object: 1000 }).is_err());
+    assert!(
+        w.apply(Command::Sell {
+            household: 0,
+            object: 1000
+        })
+        .is_err()
+    );
 }
 
 #[test]
@@ -232,21 +260,37 @@ fn walkers_tell_where_their_way_goes() {
         snapshot::write(w, &mut out);
         let o = HEADER_LEN;
         let f = |k: usize| out[o + k];
-        ([f(sim::X), f(sim::Z)], [f(sim::WAY_X), f(sim::WAY_Z)], [f(sim::AHEAD_X), f(sim::AHEAD_Z)])
+        (
+            [f(sim::X), f(sim::Z)],
+            [f(sim::WAY_X), f(sim::WAY_Z)],
+            [f(sim::AHEAD_X), f(sim::AHEAD_Z)],
+        )
     };
     // Standing: all three where she stands.
     let (pos, way, ahead) = at(&w);
     assert!(way == pos && ahead == pos);
     // Walking 4 m straight along x: the way and the look ahead are on that line, 1.5 m on.
-    w.apply(Command::MoveTo { sim: 0, x: 10.5, z: 8.5 }).unwrap();
+    w.apply(Command::MoveTo {
+        sim: 0,
+        x: 10.5,
+        z: 8.5,
+    })
+    .unwrap();
     for _ in 0..10 {
         w.tick_once();
     }
     let (pos, way, ahead) = at(&w);
     assert!(w.sims[0].is_moving());
-    assert!((way[0] - 10.5).abs() < 0.01 && (way[1] - 8.5).abs() < 0.01, "{way:?}");
+    assert!(
+        (way[0] - 10.5).abs() < 0.01 && (way[1] - 8.5).abs() < 0.01,
+        "{way:?}"
+    );
     let on = (ahead[0] - pos[0]).hypot(ahead[1] - pos[1]);
-    assert!((on - snapshot::AHEAD).abs() < 0.01 && (ahead[1] - 8.5).abs() < 0.01, "{pos:?} {ahead:?}");
-    let layout: serde_json::Value = serde_json::from_str(&snapshot::layout_json(&w.content)).unwrap();
+    assert!(
+        (on - snapshot::AHEAD).abs() < 0.01 && (ahead[1] - 8.5).abs() < 0.01,
+        "{pos:?} {ahead:?}"
+    );
+    let layout: serde_json::Value =
+        serde_json::from_str(&snapshot::layout_json(&w.content)).unwrap();
     assert_eq!(layout["sim"]["aheadZ"], sim::AHEAD_Z);
 }

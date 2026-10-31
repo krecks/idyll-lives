@@ -38,11 +38,19 @@ import { ownSize } from './surfaces';
 import { colorValues } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
 import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
+import { clockTime, openAt, staffed, staffResidents } from './staff';
 import { PointerInput } from './input';
 import { assembleTown, loadTemplates, useTownContent, type NeighbourhoodDraft } from './town';
 import { gameAssetPlan } from './streamPlan';
 import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
+
+declare global {
+  interface Window {
+    /** What the benches drive the game through (`tools/bench/scene.mjs`); set only in development builds. */
+    __osw?: Record<string, unknown>;
+  }
+}
 
 /** Click radius (CSS px) around a Sim's projected centre. */
 const SIM_PICK_RADIUS = 32;
@@ -137,7 +145,7 @@ export function loadGameData(): Promise<{ content: Content; assets: AssetRegistr
     services.assets = assets;
     useTownContent(content);
     services.previews = createSimPreviews({ assets, emotions: content.emotions.map((e) => e.id), backend: () => liveSettings.renderer });
-    services.items = createItemPreviews(assets);
+    services.items = createItemPreviews(assets, () => liveSettings.renderer);
     return { content, assets };
   });
   return shared;
@@ -368,8 +376,12 @@ export async function startSession(
   let autosaveMinutes = -1;
   /** The performance overlay setting last applied (F3 opens and closes the overlay in between). */
   let showFps: boolean | null = null;
-  /** The free will setting last sent: sent again only when it changes, not with every other setting (a debug `setAutonomy` holds). */
-  let autonomy: boolean | null = null;
+  /**
+   * The free will setting last sent: sent again only when it changes, not with every other setting (a debug `setAutonomy`
+   * holds). A state the tests wrote (`?state=`) keeps its own free will as it opens (`check_states.rs`: off, so nobody
+   * goes off on their own before a check turns it off); the setting is sent once it's changed.
+   */
+  let autonomy: boolean | null = params.has('state') ? settings.autonomy : null;
 
   const controls: GameControls = {
     setSpeed(speed) {
@@ -808,16 +820,19 @@ export async function startSession(
   };
   services.controls = controls;
   // `?debug`: drive the game from the console / test harness (and look at any lot: `__showPlot(i)`, `__world().plots`;
-  // `__send(command)` sends any simulation command, `__items()` the food and dishes about).
+  // `__send(command)` sends any simulation command, `__items()` the food and dishes about). `__world().objects` carry
+  // a lamp's (or a fire's) `off`, which the world itself doesn't (the snapshot has it: `bridge.lampOff`).
   if (params.has('debug')) {
-    Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => world, __send: (cmd: Command) => bridge.send(cmd), __items: () => itemsSeen });
+    const withLamps = (w: WorldStructure | null) =>
+      w && { ...w, objects: w.objects.map((o) => (content.object(o.def)?.light ? { ...o, off: bridge.lampOff(o.id) } : o)) };
+    Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => withLamps(world), __send: (cmd: Command) => bridge.send(cmd), __items: () => itemsSeen });
     // `__sims()`: every resident as the newest snapshot shows them (where, pose, the object and use,
     // needs; `debug/sims.ts`), to wait on; `__content` the game's content (`__content.object(id)`).
     // `__addFunds(amount)`: money for the player's household. `__customise(id)`: the colour studio
     // of the object `id` at home (null: closed).
     // `__camera(pose?)`: the camera's pose, and with a (partial) pose, puts it there and stops the
     // camera watching on its own. `__controls.follow(id, view?)` also sets the radius, beta, alpha
-    // or target height (`y`) it follows with.
+    // or target height (`y`) it follows with; `follow(null)` stops following and stays on the lot in view.
     const placeCamera = (pose: Partial<CameraPose> & { y?: number }) => {
       takeBack();
       const now = renderer.cameraPose();
@@ -837,8 +852,13 @@ export async function startSession(
         return renderer.cameraPose();
       },
       __controls: Object.assign(Object.create(controls) as GameControls, {
+        // (Stopping, the view stays on the lot it shows: the game's own goes back home, which a check looking at
+        // another lot doesn't want.)
         follow(id: number | null, view?: Partial<Omit<CameraPose, 'target'>> & { y?: number }) {
-          controls.follow(id);
+          if (id === null) {
+            game.follow = null;
+            renderer.followSim(null);
+          } else controls.follow(id);
           if (view) placeCamera(view);
         },
       }),
@@ -1002,6 +1022,8 @@ export async function startSession(
       const stage = content.lifeStages.find((st) => st.id === s.stage);
       if (s.appearance) s.appearance = lookAtStage(s.appearance, stage, palette(assets, 'palette.hair'));
     }
+    // The town's vendors and shopkeepers, drawn after the residents (`game/staff.ts`).
+    w.staffSims = staffResidents(content, assets, w);
     // Build mode: show what the simulation just accepted (furniture popping in, dust, money).
     const feedback = game.mode === 'build' && world && worldView === viewPlot ? editFeedback(world, w) : null;
     if (feedback?.sound) play(feedback.sound);
@@ -1174,6 +1196,7 @@ export async function startSession(
     const stage = game.sims.find((s) => s.id === game.selected)?.stage;
     // Paid interactions show their price; the pie menu greys them out when funds run short.
     // Dining at a table only at a chair pulled up to one; folding down only what's folded up.
+    // (Trying for a baby is asked of a partner, not offered by the bed.)
     const atTable = def.interactions.some((it) => it.needsTable) && buildBuy.atTable(objectId);
     const state = placement.open ? 'open' : 'closed';
     // A crop is harvested only ripe (growth stage 2).
@@ -1188,11 +1211,29 @@ export async function startSession(
       }
     }
     const supplied = (requires: string[] | undefined) => !requires?.length || requires.every((r) => provided.has(r));
-    const items: { label: string; index: number; disabled?: boolean; cost?: number }[] = def.interactions.flatMap((it, index) =>
-      (it.needsTable && !atTable) || !supplied(it.requires) || !offered(it.when)
-        ? []
-        : [{ label: it.label, index, ...(it.cost ? { cost: it.cost } : {}), ...(content.mayUse(def, it, stage) ? {} : { disabled: true }) }],
-    );
+    // Sold by a vendor or shopkeeper where someone serves (`game/staff.ts`): greyed out while they're off
+    // (the post's hours, or the café's machine a table's coffee is fetched from); helped to elsewhere.
+    const post = staffed(world, objectId);
+    const closedAt = (it: (typeof def.interactions)[number]): number | null => {
+      if (it.selfServe && post) return openAt(def, game.minute) ? null : (def.staff?.hours[0] ?? null);
+      if (!it.fetch || !plot) return null;
+      const sources = (world?.objects ?? []).filter((o) => {
+        const d = content.object(o.def);
+        return o.id !== objectId && o.x >= plot.x && o.z >= plot.z && o.x < plot.x + plot.w && o.z < plot.z + plot.d && (o.wear ?? 0) < 1 && (it.requires ?? []).every((r) => d?.provides?.includes(r)) && d?.interactions.some((i) => i.id === it.fetch);
+      });
+      // (As `staff::closed`: only a sold use at a post someone serves at is ever shut.)
+      const shut = sources.filter((o) => {
+        const d = content.object(o.def)!;
+        return !!d.interactions.find((i) => i.id === it.fetch)?.selfServe && staffed(world, o.id) && !openAt(d, game.minute);
+      });
+      return sources.length && shut.length === sources.length ? (content.object(shut[0].def)?.staff?.hours[0] ?? null) : null;
+    };
+    const items: { label: string; index: number; disabled?: boolean; cost?: number }[] = def.interactions.flatMap((it, index) => {
+      if ((it.needsTable && !atTable) || !supplied(it.requires) || !offered(it.when) || it.conceive) return [];
+      const opens = closedAt(it);
+      const label = it.selfServe && !post ? it.selfServe.label : it.label;
+      return [{ label: opens === null ? label : `${label} (opens at ${clockTime(opens)})`, index, ...(it.cost ? { cost: it.cost } : {}), ...(content.mayUse(def, it, stage) && opens === null ? {} : { disabled: true }) }];
+    });
     // A lamp: its switch; a fire is lit and put out.
     const off = bridge.lampOff(objectId);
     if (def.light && def.light.switch !== false) items.unshift({ label: def.light.fire ? (off ? 'Light the fire' : 'Put out the fire') : off ? 'Turn on' : 'Turn off', index: -1 });
@@ -1221,6 +1262,7 @@ export async function startSession(
       if (game.pauseMenu) return;
       game.menu = null;
       game.socialMenu = null;
+      game.townOpen = false;
       if (game.mode === 'create') return;
       if (game.mode === 'build') {
         const hit = renderer.pick(x, y);
@@ -1278,7 +1320,7 @@ export async function startSession(
       if (game.pauseMenu || game.mode !== 'build' || buildBuy.picking()) return false;
       const hit = renderer.pick(x, y);
       const g = hit.ground;
-      return buildBuy.press(g && inLot(g.x, g.z) ? g : null, hit.objectId, { x, y });
+      return buildBuy.press(g && inLot(g.x, g.z) ? g : null, { x, y });
     },
     release(x, y, moved) {
       const g = renderer.pick(x, y).ground;
@@ -1622,8 +1664,7 @@ export async function startSession(
   session.applySettings(settings);
   if (import.meta.env.DEV) {
     // Test hook for automated browser checks; not present in production builds.
-    // SAFETY: the window object has no index signature in TypeScript; the hook is ours.
-    (window as unknown as Record<string, unknown>).__osw = {
+    window.__osw = {
       simScreen(id: number) {
         const head = { x: 0, y: 0, z: 0 };
         const out = { x: 0, y: 0 };
@@ -1633,7 +1674,8 @@ export async function startSession(
         const head = { x: 0, y: 0, z: 0 };
         if (renderer.simHead(id, head)) renderer.focus(head.x, head.z);
       },
-      stats: () => renderer.stats(),      view: () => viewPlot,
+      stats: () => renderer.stats(),
+      view: () => viewPlot,
       project(x: number, y: number, z: number) {
         const out = { x: 0, y: 0 };
         return renderer.project(x, y, z, out) ? out : null;

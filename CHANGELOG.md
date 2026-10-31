@@ -4,7 +4,99 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 
 ## Unreleased
 
-- **Textures:** every surface map, the 19 texture sets and the sidewalk, is now generated in code by `cargo tex synth` (`crates/tools/src/tex/synth.rs`) from tileable height fields, and is original CC0. The download/process pipeline is gone, along with its `ureq` dependency; `web/public/assets/CREDITS.md` and `tools/art/README.md` describe the new flow.
+- **Cars:** most households have a car on their driveway, the one you play too: your home keeps the driveway and car the town showed. Only its owners drive it, and only from 18: the household's grown-ups when the town was made (a household left without one hands it down to its grown-ups). Those going by car leave early enough to be at work on time (the walk to the car, the drive out of town and on to work), and their shift starts at its hour, not as they get in. An owner walks to the driver's door, it opens, they step in and sit, and it shuts before they're gone from view; they wait a moment for the rest of the household leaving at the same time (children off to school too), each getting in by a door of their own, never one with no room to swing open (next to the house, say). The car backs or pulls out and drives off along the street out of town. Whoever finishes first waits at work for the others if they're done within the hour, and the car brings them home, nose in; its doors open and they step out. A rider whose driver works on longer walks home as before. A parked car takes up its spot: nobody walks through it and nothing can be put there. A car on the move stops for anyone in its way (who steps aside after a moment), and nobody walks into one driving by. Garages stand where the town showed them, your home's too, and can't be walked through or built on. When a household moves house, its car goes with it to the new driveway. The neighbours' cars come and go as well. A car whose spot was built over while it was out stays put, unused, and isn't drawn.
+- **Bedrooms are their sleepers' own:** only those who belong together share a bedroom. While someone sleeps in one, its door is open to them, their partner, parents, children, brothers and sisters with a bed there, and whoever minds a crib in there, and keeps everyone else, guests included, out. The other half of a double bed is the partner's (or a child's for the night); a bunk bed is a bed for each. A lodger, even one sent to the bed, waits outside like anyone else; walking through a bedroom to a room beyond is fine.
+- **A calmer interface:** the top bar is three small islands in one row, with the lot showing between them (the clock and speeds take a second row only in a small window or at a large interface scale), and Undo, Redo and the eyedropper sit in the Build dock beside its tabs. The Furnish catalog has a fixed height: the categories along its top with their names, a grid of items below, and a search; the sort, the filters and the group chips are gone (each category still lists its groups in order), as is the *Build catalog* size setting. A quiet interface while watching can't be clicked by accident.
+- **Newcomers and bed places:** households moving into town are a single, a couple (perhaps with a grown child) or siblings, never strangers, and bed places count a double bed as one place unless a couple sleeps in it (who moves in, the no-bed notice, the beds the town buys for its children).
+- **No talking through walls:** residents talk, and listen in, only where they can see each other, never through a wall, a window or the shut front door; someone going over to talk to a person the other side of a wall goes round by the door, and nobody calls out through the front door. Whoever answers the door steps out onto the path to say hello to the visitor, rather than talking to them through the shut door.
+- **The neighbours' gardens:** the things in your neighbours' gardens (garden furniture, planters, loungers, swings) stand there while you play, as the town seen from the menus shows them, instead of bare patches in the grass where they should be.
+- **Grass past the edge of town:** the lawn's grass no longer stops in a line a little way out of town. Its blades grow on over the whole landscape round the town, however far out the camera goes, thinning out with distance from the camera as they do in town, and the land beyond keeps the lawn's colour and its gusts of wind, fading gently into the far hills.
+- **A basement you can see:** looking at the basement, your lot's garage, car, driveway and garden paths go with the rest of the ground instead of floating over the dug-out lot, the earth round the basement is earth-brown instead of a near-black slab, and rooms nobody is in (their lamps off) are softly lit enough to see what's in them, still well below a room with its lamps on. That soft light is as bright at night as by day, with no moonlight's blue down there. A new game's lamps are on only in rooms someone is in (they all came on before, and stayed on in a basement nobody went down to); residents switch them as they come and go, as before. The basement's walls have clean tops: no dark stone ledge along them and no dark notches at every post, which showed once it was lit.
+
+- **Textures:** every surface map, the 19 texture sets and the sidewalk, is now generated in code by `cargo tex synth` (`crates/tools/src/tex/synth.rs`) from tileable height fields, and is original CC0. The download/process pipeline for them is gone; `web/public/assets/CREDITS.md` and `tools/art/README.md` describe the new flow.
+
+### Also
+- **Saves:** format 34 (where every car is, who owns it, every house's driveway and the garages). Older saves open with no cars in the simulation: their neighbours' cars stay parked, as before.
+
+## 0.5.1 — 2026-10-29
+
+**Play it in your browser:** https://krecks.github.io/idyll-lives/
+
+Three fixes: the town seen from the menus, how smoothly it moves, and residents going next door.
+
+- **Streets in the menus' town:** no more green patches on the roads. From the overview's height the graphics card couldn't tell the roads from the ground just beneath them; the camera now keeps its precision for where it is looking, near or far. The game's own wide view gains a cleaner edge to the side roads too.
+- **Frame rate in the menus:** the town behind the menus draws at the frame rate cap from Settings (30, 60, 120 or none), as the game does. Before, it kept to 30 frames a second, and its camera juddered as it glided in or was dragged. Standing still it still costs nothing: the last picture is shown until something changes.
+- **Next door by the street:** residents going into a neighbour's garden no longer walk through the hedge or fence between the gardens. They go out to the street and in at the front.
+
+### Also
+- **Saves:** unchanged (format 33): 0.5.0 and 0.5.1 open each other's saves.
+- **Known:** choosing another world on the new-world screen still takes a tenth of a second while the world is made, as before.
+
+## 0.5.0 — 2026-10-29
+
+**Play it in your browser:** https://krecks.github.io/idyll-lives/
+
+Everything left open after 0.4.2, done: residents hold what they use, carry themselves as they feel, keep the bathroom door shut, and buy from people in town; the washing runs on its own.
+
+- **Things in hand:** residents hold what they use instead of miming it: a book, a cup, cutlery and the food on it, the phone, a pen, the whiteboard's marker, a card, tools, the pool cue, ping-pong bats, the cocktail shaker, a coin, a dart, bird seed (and the birds come down for it), the basketball while dribbling and in the air, the phone box's receiver. Food from town comes in its own wrapping.
+- **Body language:** a resident's mood shows in how they stand and walk: upright with the arms swinging when happy, head down and slower when sad, stiff and quick when angry, shoulders drawn up when tense. They step round to turn on the spot instead of spinning, and children run at game speed 3 without their feet sliding.
+- **Privacy:** a resident in the bathroom keeps its door shut, and others wait outside rather than walk in. *Try for a baby* happens in a double bed behind a shut door, with nobody else in the room.
+- **Vendors and shopkeepers:** someone serves at the town's carts, stalls and counters, turns to their customer and hands over what's bought; a customer who gives up waiting gets their money back, and one on the way at closing time is still served. Self-serve uses take their own time.
+- **Laundry and machines:** the washer, the dryer and the dishwasher run on their own: loaded, left to run (their drums turn and are heard), then emptied. The washing goes out on the line a piece at a time and comes in to the basket in an armful; a home with a washer and no dryer gets a washing line in the garden.
+- **In the garden and at home:** the apple tree's low boughs can be picked, by children too; the home chess table seats two and is played with a partner; the bonsai, the arbour's roses, the lectern and the basketball hoop are used at the right part.
+- **Moving parts:** the kettle's lid, the bread bin's roll-top and the laptop's lid open for their uses; the high chair's tray slides out; the hot tub's cover folds back in two halves; the arc lamp reaches over the next tile.
+- **Sounds:** the uses that were silent now sound like their things, 34 new sounds made in the game: machines, games, tools, a fire, a cello, singing.
+- **Graphics:** on Low every lamp keeps to its own room, as on Medium and High, and the woods are drawn in squares, so far fewer trees are drawn that aren't on screen. Fixed: things hanging over lowered walls, the stairs from the basement, the town map's backdrop. The camera keeps up with whoever it follows at game speeds 3 to 5.
+
+### Also
+- **Saves:** format 33. 0.4.2's saves open in 0.5.0; a home chess table, now two tiles long, moves over to fit or is sold back for what it was worth. 0.4.2 can't open 0.5.0's saves: it keeps them and lists only the ones it can open.
+- **Updated:** PlayCanvas 2.23.3 and ONNX Runtime Web 1.31.1 (the voices sound the same; the one-time download is 218.7 MB).
+- **Known:** on Low with WebGL2 the graphics processor is now within 5 % of Babylon's in the wide view (it was +16–18 %), but the close orbits are still 11–16 % over (`docs/design/performance.md`).
+
+## 0.4.2 — 2026-10-25
+
+**Play it in your browser:** https://krecks.github.io/idyll-lives/
+
+The lawn is a lawn now: real blades of grass that sway in the wind and part where residents walk.
+
+- **Grass:** the lawn's little star-shaped tufts are replaced by blades drawn by the graphics processor, thousands of them round the camera: curved and fine up close, dark at the root and light at the tip, taking the colour of the ground they grow on in every kind of world. Farther off the ground carries the lawn, so there's no edge where the blades end and no twinkling when you zoom out.
+- **Wind:** gusts roll across the lawn in waves you can see, bending the blades as they pass, and carry on over the ground beyond them. Reduce motion stills it, as it does the trees.
+- **Residents:** the grass bends away round anyone walking through it and springs back after them.
+- **Where it grows:** not indoors, under furniture, on patios, paths, streets or the roads out of town, nor right against a wall; building a room or placing furniture on the lawn clears the grass under it.
+- **Graphics settings:** Low draws half the blades, wider, nearer the camera; Medium and High the full lawn. On the game's benchmark the lawn costs about as much as the old tufts did (Medium, WebGL2: +0.45 ms a frame in the close view, less in the wide one).
+
+### Also
+- **Saves:** unchanged (format 32): 0.4.1 and 0.4.2 open each other's saves.
+
+## 0.4.1 — 2026-10-24
+
+**Play it in your browser:** https://krecks.github.io/idyll-lives/
+
+Two fixes to the renderer and a tool.
+
+- **Changing graphics settings between games:** the renderer that's replaced now lets its WebGL context go at once, and the new one draws on a fresh canvas. Before, each change left a context behind until the browser cleared it, and after enough of them the browser could drop the one in use. Replacing the renderer on WebGL also no longer throws an error for every model it had loaded.
+- **`cargo envconv`:** the sky's HDRI download stops as soon as an answer is longer than the pinned file, instead of writing it all to disk before the checksum refuses it.
+
+### Also
+- **Saves:** unchanged (format 32): 0.4.0 and 0.4.1 open each other's saves.
+- **Known:** on Low with WebGL2 the graphics processor still does more work than it did with Babylon, most in the wide view (+16–18 %). It was profiled for this release: not the FXAA, but nature's share, which needs switches of its own to go further (`docs/design/performance.md`, Low on WebGL2).
+
+## 0.4.0 — 2026-10-24
+
+**Play it in your browser:** https://krecks.github.io/idyll-lives/
+
+The game draws with **PlayCanvas** instead of Babylon.js.
+
+- **Renderer:** PlayCanvas 2.23 on WebGPU, with the WebGL2 fallback, replaces Babylon.js 9.30. On the game's own scene PlayCanvas took about a third of Babylon's main-thread time in Chrome and about a ninth in Safari's engine, where Babylon fell below 60 fps (`docs/design/performance.md`). The pictures were matched to Babylon's stage by stage: the same light, shadows, soft look, colour grading, residents, mirrors, build tools, previews and town overview; the camera moves as it did.
+- **The menus' town:** standing still, it isn't drawn again until something in it changes, on WebGPU and WebGL2 alike (Babylon's snapshot rendering only spared the processor, on WebGPU).
+- **Under the hood:** the engine-neutral parts of the renderer (`web/src/render/shared`) are tested by `bun run test`, and `bun run check:chunks` checks the PlayCanvas internals the renderer patches; both run in CI. Parts of the renderer are ported from Babylon.js (Apache-2.0) and say so; its licence and notice ship in `THIRD-PARTY-LICENSES.txt`. The decoders Babylon needed are gone; PlayCanvas's Basis transcoder decodes the textures.
+- **No stalls at the start of play:** the game compiles its shaders behind the loading screen, so the first seconds of play, the first night, a mirror and Build mode no longer stutter while they compile (only a model bought for the first time compiles its own).
+
+### Also
+- **Saves:** unchanged (format 32): 0.3.2 and 0.4.0 open each other's saves.
+- **Generated houses:** a house is laid out the same every time and for whoever moves in, so the home you pick is the one you get. Since 0.3.2 the same house could come out with other rooms from one time to the next, in Safari especially. New towns get new houses; the towns in saved games keep theirs.
+- **Known:** on Low with WebGL2 the graphics processor does up to 15 % more work than it did with Babylon; everywhere else it does the same or less.
+- **The sky's light** is made straight from the CC0 HDRI it came from (Poly Haven's Belfast Open Field, `cargo envconv`), instead of from Babylon's packed copy of it; the lighting is unchanged.
 
 ## 0.3.2 — 2026-10-22
 

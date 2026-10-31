@@ -111,14 +111,20 @@ class FrameMeter {
 
 const frameMeter = new FrameMeter();
 
+declare global {
+  interface Performance {
+    /** Chrome only (not in the DOM's types): the page's JavaScript heap. */
+    readonly memory?: { usedJSHeapSize: number };
+  }
+}
+
 export function threadStats(
   render: RenderStats,
   sim: SimThreadStats | null,
   director: VoiceDirectorStats,
 ): ThreadStats {
   forgetLongTasks(performance.now());
-  // Chrome only.
-  const heapBytes = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? null;
+  const heapBytes = performance.memory?.usedJSHeapSize ?? null;
   const frameWork = Math.min(1, (render.cpuMs * render.fps) / 1000);
   const mainBusy = Math.min(1, frameWork + (frameMeter.read() ?? 0));
   const voice = { ...voiceThreadStats(), ...director };

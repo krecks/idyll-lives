@@ -10,7 +10,11 @@ pub fn loads_text(bytes: &[u8]) -> Result<J, String> {
     let text = utf8(bytes)?.replace("\r\n", "\n").replace('\r', "\n");
     let s: Vec<char> = text.chars().collect();
     if s.first() == Some(&'\u{feff}') {
-        return Err(message(&s, "Unexpected UTF-8 BOM (decode using utf-8-sig)", 0));
+        return Err(message(
+            &s,
+            "Unexpected UTF-8 BOM (decode using utf-8-sig)",
+            0,
+        ));
     }
     decode(&s)
 }
@@ -28,9 +32,23 @@ fn utf8(bytes: &[u8]) -> Result<&str, String> {
         let at = e.valid_up_to();
         let (end, why) = match e.error_len() {
             None => (bytes.len() - 1, "unexpected end of data"),
-            Some(n) => (at + n - 1, if matches!(bytes[at], 0x80..=0xC1 | 0xF5..=0xFF) { "invalid start byte" } else { "invalid continuation byte" }),
+            Some(n) => (
+                at + n - 1,
+                if matches!(bytes[at], 0x80..=0xC1 | 0xF5..=0xFF) {
+                    "invalid start byte"
+                } else {
+                    "invalid continuation byte"
+                },
+            ),
         };
-        if end == at { format!("'utf-8' codec can't decode byte 0x{:02x} in position {at}: {why}", bytes[at]) } else { format!("'utf-8' codec can't decode bytes in position {at}-{end}: {why}") }
+        if end == at {
+            format!(
+                "'utf-8' codec can't decode byte 0x{:02x} in position {at}: {why}",
+                bytes[at]
+            )
+        } else {
+            format!("'utf-8' codec can't decode bytes in position {at}-{end}: {why}")
+        }
     })
 }
 
@@ -57,7 +75,11 @@ fn decode(s: &[char]) -> Result<J, String> {
     match scanner.scan(at) {
         Ok((v, end)) => {
             let end = skip(s, end);
-            if end != s.len() { Err(message(s, "Extra data", end)) } else { Ok(v) }
+            if end != s.len() {
+                Err(message(s, "Extra data", end))
+            } else {
+                Ok(v)
+            }
         }
         Err(Stop::NoValue(at)) => Err(message(s, "Expecting value", at)),
         Err(Stop::Error(msg, at)) => Err(message(s, msg, at)),
@@ -82,7 +104,9 @@ struct Scanner<'a> {
 
 impl Scanner<'_> {
     fn at(&self, i: usize, word: &str) -> bool {
-        word.chars().enumerate().all(|(k, c)| self.s.get(i + k) == Some(&c))
+        word.chars()
+            .enumerate()
+            .all(|(k, c)| self.s.get(i + k) == Some(&c))
     }
 
     /// One value at `idx`: it and where it ends.
@@ -96,19 +120,32 @@ impl Scanner<'_> {
             '"' => return self.string(idx + 1).map(|(v, end)| (J::Str(v), end)),
             '{' | '[' => {
                 if self.depth > 5000 {
-                    return Err(Stop::Error("maximum recursion depth exceeded while decoding a JSON document", idx));
+                    return Err(Stop::Error(
+                        "maximum recursion depth exceeded while decoding a JSON document",
+                        idx,
+                    ));
                 }
                 self.depth += 1;
-                let r = if s[idx] == '{' { self.object(idx + 1) } else { self.array(idx + 1) };
+                let r = if s[idx] == '{' {
+                    self.object(idx + 1)
+                } else {
+                    self.array(idx + 1)
+                };
                 self.depth -= 1;
                 return r;
             }
             'n' if idx + 3 < len && self.at(idx, "null") => return Ok((J::Null, idx + 4)),
             't' if idx + 3 < len && self.at(idx, "true") => return Ok((J::Bool(true), idx + 4)),
             'f' if idx + 4 < len && self.at(idx, "false") => return Ok((J::Bool(false), idx + 5)),
-            'N' if idx + 2 < len && self.at(idx, "NaN") => return Ok((J::Float(f64::NAN), idx + 3)),
-            'I' if idx + 7 < len && self.at(idx, "Infinity") => return Ok((J::Float(f64::INFINITY), idx + 8)),
-            '-' if idx + 8 < len && self.at(idx, "-Infinity") => return Ok((J::Float(f64::NEG_INFINITY), idx + 9)),
+            'N' if idx + 2 < len && self.at(idx, "NaN") => {
+                return Ok((J::Float(f64::NAN), idx + 3));
+            }
+            'I' if idx + 7 < len && self.at(idx, "Infinity") => {
+                return Ok((J::Float(f64::INFINITY), idx + 8));
+            }
+            '-' if idx + 8 < len && self.at(idx, "-Infinity") => {
+                return Ok((J::Float(f64::NEG_INFINITY), idx + 9));
+            }
             _ => {}
         }
         self.number(idx)
@@ -162,7 +199,9 @@ impl Scanner<'_> {
         let v = if float {
             J::Float(text.parse().unwrap_or(f64::NAN))
         } else {
-            text.parse::<i64>().map(J::Int).unwrap_or_else(|_| J::Float(text.parse().unwrap_or(f64::NAN)))
+            text.parse::<i64>()
+                .map(J::Int)
+                .unwrap_or_else(|_| J::Float(text.parse().unwrap_or(f64::NAN)))
         };
         Ok((v, idx))
     }
@@ -187,7 +226,9 @@ impl Scanner<'_> {
                 }
                 next += 1;
             }
-            let Some(c) = c else { return Err(Stop::Error("Unterminated string starting at", begin)) };
+            let Some(c) = c else {
+                return Err(Stop::Error("Unterminated string starting at", begin));
+            };
             out.extend(&s[end..next]);
             next += 1;
             if c == '"' {
@@ -216,10 +257,18 @@ impl Scanner<'_> {
             if end >= len {
                 return Err(Stop::Error("Invalid \\uXXXX escape", next - 1));
             }
-            let hex = |from: usize, to: usize| -> Option<u32> { s[from..to].iter().try_fold(0u32, |n, d| d.to_digit(16).map(|v| n << 4 | v)) };
+            let hex = |from: usize, to: usize| -> Option<u32> {
+                s[from..to]
+                    .iter()
+                    .try_fold(0u32, |n, d| d.to_digit(16).map(|v| n << 4 | v))
+            };
             let mut u = hex(next, end).ok_or(Stop::Error("Invalid \\uXXXX escape", end - 5))?;
             next = end;
-            if (0xD800..0xDC00).contains(&u) && end + 6 < len && s[next] == '\\' && s[next + 1] == 'u' {
+            if (0xD800..0xDC00).contains(&u)
+                && end + 6 < len
+                && s[next] == '\\'
+                && s[next + 1] == 'u'
+            {
                 next += 2;
                 end += 6;
                 let low = hex(next, end).ok_or(Stop::Error("Invalid \\uXXXX escape", end - 5))?;
@@ -244,7 +293,10 @@ impl Scanner<'_> {
         if !le(idx) || s[idx] != '}' {
             loop {
                 if !le(idx) || s[idx] != '"' {
-                    return Err(Stop::Error("Expecting property name enclosed in double quotes", idx));
+                    return Err(Stop::Error(
+                        "Expecting property name enclosed in double quotes",
+                        idx,
+                    ));
                 }
                 let (key, next) = self.string(idx + 1)?;
                 idx = skip(s, next);
@@ -267,7 +319,10 @@ impl Scanner<'_> {
                 let comma = idx;
                 idx = skip(s, idx + 1);
                 if le(idx) && s[idx] == '}' {
-                    return Err(Stop::Error("Illegal trailing comma before end of object", comma));
+                    return Err(Stop::Error(
+                        "Illegal trailing comma before end of object",
+                        comma,
+                    ));
                 }
             }
         }
@@ -294,7 +349,10 @@ impl Scanner<'_> {
                 let comma = idx;
                 idx = skip(s, idx + 1);
                 if le(idx) && s[idx] == ']' {
-                    return Err(Stop::Error("Illegal trailing comma before end of array", comma));
+                    return Err(Stop::Error(
+                        "Illegal trailing comma before end of array",
+                        comma,
+                    ));
                 }
             }
         }
@@ -316,20 +374,50 @@ mod tests {
         for (text, msg) in [
             ("", "Expecting value: line 1 column 1 (char 0)"),
             (" ", "Expecting value: line 1 column 2 (char 1)"),
-            ("{", "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"),
+            (
+                "{",
+                "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)",
+            ),
             ("{\"a\": }", "Expecting value: line 1 column 7 (char 6)"),
-            ("{\"a\" 1}", "Expecting ':' delimiter: line 1 column 6 (char 5)"),
-            ("{\"a\": 1 \"b\": 2}", "Expecting ',' delimiter: line 1 column 9 (char 8)"),
-            ("{\"a\": 1,}", "Illegal trailing comma before end of object: line 1 column 8 (char 7)"),
-            ("[1,]", "Illegal trailing comma before end of array: line 1 column 3 (char 2)"),
+            (
+                "{\"a\" 1}",
+                "Expecting ':' delimiter: line 1 column 6 (char 5)",
+            ),
+            (
+                "{\"a\": 1 \"b\": 2}",
+                "Expecting ',' delimiter: line 1 column 9 (char 8)",
+            ),
+            (
+                "{\"a\": 1,}",
+                "Illegal trailing comma before end of object: line 1 column 8 (char 7)",
+            ),
+            (
+                "[1,]",
+                "Illegal trailing comma before end of array: line 1 column 3 (char 2)",
+            ),
             ("[1 2]", "Expecting ',' delimiter: line 1 column 4 (char 3)"),
             ("[", "Expecting value: line 1 column 2 (char 1)"),
-            ("{\"a\": [1, 2", "Expecting ',' delimiter: line 1 column 12 (char 11)"),
-            ("\"abc", "Unterminated string starting at: line 1 column 1 (char 0)"),
+            (
+                "{\"a\": [1, 2",
+                "Expecting ',' delimiter: line 1 column 12 (char 11)",
+            ),
+            (
+                "\"abc",
+                "Unterminated string starting at: line 1 column 1 (char 0)",
+            ),
             ("\"a\\qb\"", "Invalid \\escape: line 1 column 3 (char 2)"),
-            ("\"a\\u12\"", "Invalid \\uXXXX escape: line 1 column 4 (char 3)"),
-            ("\"a\\u12zz\"", "Invalid \\uXXXX escape: line 1 column 4 (char 3)"),
-            ("\"\u{1}\"", "Invalid control character at: line 1 column 2 (char 1)"),
+            (
+                "\"a\\u12\"",
+                "Invalid \\uXXXX escape: line 1 column 4 (char 3)",
+            ),
+            (
+                "\"a\\u12zz\"",
+                "Invalid \\uXXXX escape: line 1 column 4 (char 3)",
+            ),
+            (
+                "\"\u{1}\"",
+                "Invalid control character at: line 1 column 2 (char 1)",
+            ),
             ("nul", "Expecting value: line 1 column 1 (char 0)"),
             ("True", "Expecting value: line 1 column 1 (char 0)"),
             ("-", "Expecting value: line 1 column 1 (char 0)"),
@@ -337,18 +425,42 @@ mod tests {
             ("1.", "Extra data: line 1 column 2 (char 1)"),
             ("1e+", "Extra data: line 1 column 2 (char 1)"),
             ("{\"a\":1} \n x", "Extra data: line 2 column 2 (char 10)"),
-            ("\n\n  {\"a\": [1, 2,]}", "Illegal trailing comma before end of array: line 3 column 14 (char 15)"),
-            ("\u{feff}{}", "Unexpected UTF-8 BOM (decode using utf-8-sig): line 1 column 1 (char 0)"),
-            ("[\n1,\n\n]", "Illegal trailing comma before end of array: line 2 column 2 (char 3)"),
-            ("\"\\\"", "Unterminated string starting at: line 1 column 1 (char 0)"),
-            ("\"\\u\"", "Invalid \\uXXXX escape: line 1 column 3 (char 2)"),
-            ("{\"é\": 1,}", "Illegal trailing comma before end of object: line 1 column 8 (char 7)"),
+            (
+                "\n\n  {\"a\": [1, 2,]}",
+                "Illegal trailing comma before end of array: line 3 column 14 (char 15)",
+            ),
+            (
+                "\u{feff}{}",
+                "Unexpected UTF-8 BOM (decode using utf-8-sig): line 1 column 1 (char 0)",
+            ),
+            (
+                "[\n1,\n\n]",
+                "Illegal trailing comma before end of array: line 2 column 2 (char 3)",
+            ),
+            (
+                "\"\\\"",
+                "Unterminated string starting at: line 1 column 1 (char 0)",
+            ),
+            (
+                "\"\\u\"",
+                "Invalid \\uXXXX escape: line 1 column 3 (char 2)",
+            ),
+            (
+                "{\"é\": 1,}",
+                "Illegal trailing comma before end of object: line 1 column 8 (char 7)",
+            ),
             ("{\"a\": 1}\r\n,", "Extra data: line 2 column 1 (char 9)"),
         ] {
             assert_eq!(err(text), msg, "{text:?}");
         }
-        assert_eq!(loads_text(b"[1, \xff]").err().unwrap(), "'utf-8' codec can't decode byte 0xff in position 4: invalid start byte");
-        assert_eq!(loads_text(b"\"\xf0\x9f\x98(\"").err().unwrap(), "'utf-8' codec can't decode bytes in position 1-3: invalid continuation byte");
+        assert_eq!(
+            loads_text(b"[1, \xff]").err().unwrap(),
+            "'utf-8' codec can't decode byte 0xff in position 4: invalid start byte"
+        );
+        assert_eq!(
+            loads_text(b"\"\xf0\x9f\x98(\"").err().unwrap(),
+            "'utf-8' codec can't decode bytes in position 1-3: invalid continuation byte"
+        );
     }
 
     #[test]
@@ -364,7 +476,10 @@ mod tests {
         assert_eq!(v[6], J::Float(1500.0));
         assert_eq!(v[7], J::Str("😀".into()));
         assert_eq!(v[8], J::Str("é\n".into()));
-        assert_eq!(v[9], J::Obj(vec![("a".into(), J::Int(2)), ("b".into(), J::Int(3))]));
+        assert_eq!(
+            v[9],
+            J::Obj(vec![("a".into(), J::Int(2)), ("b".into(), J::Int(3))])
+        );
         assert_eq!(loads_bytes(b"\xef\xbb\xbf{} ").unwrap(), J::Obj(Vec::new()));
     }
 }

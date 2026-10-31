@@ -206,7 +206,9 @@ fn rent_and_bills_are_charged_weekly_and_debt_hurts() {
 #[test]
 fn buying_selling_and_moving_objects() {
     let mut w = world();
-    let id = w.buy(0, "shower", Some([4, 1, 0]), Default::default()).unwrap();
+    let id = w
+        .buy(0, "shower", Some([4, 1, 0]), Default::default())
+        .unwrap();
     assert_eq!(w.households[0].funds, 400);
     assert_eq!(
         life::weekly_costs(&w, 0),
@@ -217,7 +219,10 @@ fn buying_selling_and_moving_objects() {
         w.buy(0, "shower", None, Default::default()).is_err(),
         "can't afford a second"
     );
-    assert!(w.buy(0, "rock", None, Default::default()).is_err(), "not for sale");
+    assert!(
+        w.buy(0, "rock", None, Default::default()).is_err(),
+        "not for sale"
+    );
     w.apply(Command::MoveObject {
         household: 0,
         object: w.objects[id as usize].stable,
@@ -233,7 +238,11 @@ fn buying_selling_and_moving_objects() {
     let moved = w.objects.iter().find(|o| o.x == 4 && o.z == 3).unwrap();
     assert_eq!(moved.rot, 2);
     let id = moved.stable;
-    w.apply(Command::Sell { household: 0, object: id }).unwrap();
+    w.apply(Command::Sell {
+        household: 0,
+        object: id,
+    })
+    .unwrap();
     assert_eq!(w.households[0].funds, 700, "half back");
     assert_eq!(w.objects.len(), 3);
     assert_eq!(
@@ -242,10 +251,15 @@ fn buying_selling_and_moving_objects() {
         "selling lowers them again"
     );
     // Auto-placement finds a free spot.
-    let id = w.buy(0, "weights", None, [("body".into(), 0xC46B4A)].into()).unwrap();
+    let id = w
+        .buy(0, "weights", None, [("body".into(), 0xC46B4A)].into())
+        .unwrap();
     assert_eq!(w.objects[id as usize].colors["body"], 0xC46B4A);
     // Off the plot, or blocking the only way in, is refused.
-    assert!(w.buy(0, "weights", Some([5, 11, 0]), Default::default()).is_err());
+    assert!(
+        w.buy(0, "weights", Some([5, 11, 0]), Default::default())
+            .is_err()
+    );
 }
 
 #[test]
@@ -253,7 +267,11 @@ fn upgrades_are_instant_purchases_that_make_objects_better() {
     let mut w = world();
     w.autonomy = false;
     let version = w.structure_version();
-    w.apply(Command::Upgrade { household: 0, object: 2 }).unwrap();
+    w.apply(Command::Upgrade {
+        household: 0,
+        object: 2,
+    })
+    .unwrap();
     assert_eq!(w.objects[2].quality, 1, "no Sim task: done at once");
     assert_eq!(w.households[0].funds, 700, "costs half the price");
     assert_eq!(w.objects[2].value, 900);
@@ -269,13 +287,25 @@ fn upgrades_are_instant_purchases_that_make_objects_better() {
             .any(|e| e.kind == EventKind::Upgraded && e.n == Some(1))
     );
     assert!(w.sims[0].current().is_none() && w.sims[0].queue().next().is_none());
-    w.apply(Command::Upgrade { household: 0, object: 2 }).unwrap();
+    w.apply(Command::Upgrade {
+        household: 0,
+        object: 2,
+    })
+    .unwrap();
     assert!(
-        w.apply(Command::Upgrade { household: 0, object: 2 }).is_err(),
+        w.apply(Command::Upgrade {
+            household: 0,
+            object: 2
+        })
+        .is_err(),
         "max quality 2"
     );
     assert!(
-        w.apply(Command::Upgrade { household: 0, object: 3 }).is_err(),
+        w.apply(Command::Upgrade {
+            household: 0,
+            object: 3
+        })
+        .is_err(),
         "unknown object"
     );
     // A better shower cleans faster.
@@ -329,14 +359,34 @@ fn garden_things_only_go_outdoors() {
     let edge = |axis, x, z, kind| EdgeEdit::new(axis, x, z, kind);
     // A free-standing room (x 1..4, z 4..7) with a door; areas touching the lot edge stay outdoors.
     let mut room: Vec<_> = (1..4)
-        .flat_map(|x| [edge(EdgeAxis::H, x, 4, EdgeKind::Wall), edge(EdgeAxis::H, x, 7, EdgeKind::Wall)])
+        .flat_map(|x| {
+            [
+                edge(EdgeAxis::H, x, 4, EdgeKind::Wall),
+                edge(EdgeAxis::H, x, 7, EdgeKind::Wall),
+            ]
+        })
         .collect();
     room.extend((4..7).map(|z| edge(EdgeAxis::V, 1, z, EdgeKind::Wall)));
-    room.extend((4..7).map(|z| edge(EdgeAxis::V, 4, z, if z == 5 { EdgeKind::Door } else { EdgeKind::Wall })));
+    room.extend((4..7).map(|z| {
+        edge(
+            EdgeAxis::V,
+            4,
+            z,
+            if z == 5 {
+                EdgeKind::Door
+            } else {
+                EdgeKind::Wall
+            },
+        )
+    }));
     w.build(0, &room).unwrap();
-    let err = w.buy(0, "sapling", Some([2, 5, 0]), Default::default()).unwrap_err();
+    let err = w
+        .buy(0, "sapling", Some([2, 5, 0]), Default::default())
+        .unwrap_err();
     assert!(err.to_string().contains("outside"), "{err}");
-    let id = w.buy(0, "sapling", Some([6, 8, 0]), Default::default()).unwrap();
+    let id = w
+        .buy(0, "sapling", Some([6, 8, 0]), Default::default())
+        .unwrap();
     // Moving it indoors fails and leaves it where it was.
     let moved = w.apply(Command::MoveObject {
         household: 0,
@@ -392,7 +442,12 @@ fn a_resident_in_bed_cant_be_shut_in_where_they_get_up() {
     // Bo goes to bed, then Ada beside him; the tile she lay down from is where she'll get up.
     let mut from = None;
     for sim in [1, 0] {
-        w.apply(Command::Use { sim, object: 0, interaction: 0 }).unwrap();
+        w.apply(Command::Use {
+            sim,
+            object: 0,
+            interaction: 0,
+        })
+        .unwrap();
         for _ in 0..sim_core::TICKS_PER_MINUTE * 20 {
             if w.sims[sim as usize].pose == Pose::Lie {
                 break;
@@ -406,9 +461,16 @@ fn a_resident_in_bed_cant_be_shut_in_where_they_get_up() {
     let edge = |axis, x, z| EdgeEdit::new(axis, x, z, EdgeKind::Wall);
     // Walls round it but on the bed's side, the bed still reached at its front (Bo's side).
     assert_eq!((x, z), (2, 3), "in front of the bed's second slot");
-    let cage = [edge(EdgeAxis::V, x, z), edge(EdgeAxis::V, x + 1, z), edge(EdgeAxis::H, x, z + 1)];
+    let cage = [
+        edge(EdgeAxis::V, x, z),
+        edge(EdgeAxis::V, x + 1, z),
+        edge(EdgeAxis::H, x, z + 1),
+    ];
     let err = w.build(0, &cage).unwrap_err();
-    assert!(err.to_string().contains("shut a resident"), "walls round ({x}, {z}): {err}");
+    assert!(
+        err.to_string().contains("shut a resident"),
+        "walls round ({x}, {z}): {err}"
+    );
 }
 
 #[test]
@@ -484,7 +546,11 @@ fn skills_quality_and_colour_survive_saving() {
         colors: [("body".into(), 0x4E9C9A), ("stone".into(), 0xF2EFE8)].into(),
     })
     .unwrap();
-    assert!(w.save_json().contains(r##""colors":{"body":"#4e9c9a","stone":"#f2efe8"}"##), "saved as #rrggbb by part");
+    assert!(
+        w.save_json()
+            .contains(r##""colors":{"body":"#4e9c9a","stone":"#f2efe8"}"##),
+        "saved as #rrggbb by part"
+    );
     let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     assert_eq!(loaded.sims[0].skills[1], 3.5);
     assert_eq!(loaded.objects[2].quality, 2);
@@ -492,7 +558,13 @@ fn skills_quality_and_colour_survive_saving() {
     assert!(loaded.objects[1].colors.is_empty(), "as made");
     assert_eq!(loaded.save_json(), w.save_json());
     // A file from before parts had colours of their own: its one colour goes on the body.
-    let old = w.save_json().replace(r##""colors":{"body":"#4e9c9a","stone":"#f2efe8"}"##, r##""color":"#c46b4a""##);
+    let old = w.save_json().replace(
+        r##""colors":{"body":"#4e9c9a","stone":"#f2efe8"}"##,
+        r##""color":"#c46b4a""##,
+    );
     let loaded = World::from_save_json(CONTENT, &old).unwrap();
-    assert_eq!(loaded.objects[2].colors, [("body".to_string(), 0xC46B4A)].into());
+    assert_eq!(
+        loaded.objects[2].colors,
+        [("body".to_string(), 0xC46B4A)].into()
+    );
 }

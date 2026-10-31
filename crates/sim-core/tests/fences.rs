@@ -21,13 +21,20 @@ const TOWN: &str = r#"{"width":12,"depth":12,
 
 fn world() -> World {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     w.apply(Command::SetSpeed { speed: 0 }).unwrap();
     w
 }
 
 fn edit(axis: EdgeAxis, x: i32, z: i32, kind: EdgeKind, style: Option<u8>) -> EdgeEdit {
-    EdgeEdit { style, ..EdgeEdit::new(axis, x, z, kind) }
+    EdgeEdit {
+        style,
+        ..EdgeEdit::new(axis, x, z, kind)
+    }
 }
 
 /// A 3×3 pen at (1..4, 1..4); `gate` puts a gate in its south side.
@@ -44,17 +51,31 @@ fn pen(kind: EdgeKind, gate: bool) -> Vec<EdgeEdit> {
 }
 
 fn build(w: &mut World, edits: Vec<EdgeEdit>) -> Result<(), sim_core::Error> {
-    w.apply(Command::Build { household: 0, edits })
+    w.apply(Command::Build {
+        household: 0,
+        edits,
+    })
 }
 
 #[test]
 fn fences_block_gates_let_through_and_neither_makes_a_room() {
     let mut w = world();
     build(&mut w, pen(EdgeKind::Fence, true)).unwrap();
-    assert_eq!(w.households[0].funds, 5000 - 11 * 12 - (12 + 20), "11 m of iron fence and an iron gate");
-    assert_eq!(w.lot.room_at(2, 2), OUTDOORS, "a fenced garden stays outdoors");
+    assert_eq!(
+        w.households[0].funds,
+        5000 - 11 * 12 - (12 + 20),
+        "11 m of iron fence and an iron gate"
+    );
+    assert_eq!(
+        w.lot.room_at(2, 2),
+        OUTDOORS,
+        "a fenced garden stays outdoors"
+    );
     assert!(!w.lot.edge_walkable(2, 0, 2, 1), "the fence blocks");
-    assert!(w.lot.edge_walkable(2, 3, 2, 4), "the gate lets residents through");
+    assert!(
+        w.lot.edge_walkable(2, 3, 2, 4),
+        "the gate lets residents through"
+    );
     assert_eq!(w.lot.h_edge(2, 4), Edge::Gate);
 
     // Walls make a room of the same pen; a wall may replace a fence.
@@ -66,14 +87,43 @@ fn fences_block_gates_let_through_and_neither_makes_a_room() {
     // ...but a fence doesn't go into a wall, nor across a tile.
     let err = build(&mut w, vec![edit(EdgeAxis::H, 1, 1, EdgeKind::Fence, None)]).unwrap_err();
     assert!(err.to_string().contains("take it down"), "{err}");
-    assert!(build(&mut w, vec![edit(EdgeAxis::Dp, 6, 6, EdgeKind::Fence, None)]).is_err());
-    assert!(build(&mut w, vec![edit(EdgeAxis::H, 6, 6, EdgeKind::Fence, Some(5))]).is_err(), "unknown style");
+    assert!(
+        build(
+            &mut w,
+            vec![edit(EdgeAxis::Dp, 6, 6, EdgeKind::Fence, None)]
+        )
+        .is_err()
+    );
+    assert!(
+        build(
+            &mut w,
+            vec![edit(EdgeAxis::H, 6, 6, EdgeKind::Fence, Some(5))]
+        )
+        .is_err(),
+        "unknown style"
+    );
     // A gate on a standing fence keeps its style.
     build(&mut w, vec![edit(EdgeAxis::V, 1, 2, EdgeKind::Gate, None)]).unwrap();
-    let structure: serde_json::Value = serde_json::from_str(&sim_core::view::structure_json(&w)).unwrap();
-    let gate = structure["fences"].as_array().unwrap().iter().find(|f| f["axis"] == "v" && f["x"] == 1 && f["z"] == 2).unwrap();
-    assert_eq!((gate["kind"].as_str(), gate["style"].as_u64()), (Some("gate"), Some(1)));
-    assert!(structure["walls"].as_array().unwrap().iter().all(|e| e["axis"] != "v" || e["x"] != 1), "fences aren't walls");
+    let structure: serde_json::Value =
+        serde_json::from_str(&sim_core::view::structure_json(&w)).unwrap();
+    let gate = structure["fences"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["axis"] == "v" && f["x"] == 1 && f["z"] == 2)
+        .unwrap();
+    assert_eq!(
+        (gate["kind"].as_str(), gate["style"].as_u64()),
+        (Some("gate"), Some(1))
+    );
+    assert!(
+        structure["walls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|e| e["axis"] != "v" || e["x"] != 1),
+        "fences aren't walls"
+    );
 }
 
 #[test]
@@ -84,7 +134,17 @@ fn fences_cant_shut_anyone_in_or_run_through_furniture() {
         let mut e = Vec::new();
         for i in 7..10 {
             e.push(edit(EdgeAxis::H, i, 7, EdgeKind::Fence, None));
-            e.push(edit(EdgeAxis::H, i, 10, if gate && i == 8 { EdgeKind::Gate } else { EdgeKind::Fence }, None));
+            e.push(edit(
+                EdgeAxis::H,
+                i,
+                10,
+                if gate && i == 8 {
+                    EdgeKind::Gate
+                } else {
+                    EdgeKind::Fence
+                },
+                None,
+            ));
             e.push(edit(EdgeAxis::V, 7, i, EdgeKind::Fence, None));
             e.push(edit(EdgeAxis::V, 10, i, EdgeKind::Fence, None));
         }
@@ -94,10 +154,33 @@ fn fences_cant_shut_anyone_in_or_run_through_furniture() {
     assert!(err.to_string().contains("gate"), "{err}");
     build(&mut w, around(true)).unwrap();
 
-    w.apply(Command::Buy { household: 0, object: "chair".into(), at: Some([3, 6, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
-    assert!(build(&mut w, vec![edit(EdgeAxis::H, 3, 7, EdgeKind::Fence, None)]).is_err(), "not in front of the chair");
+    w.apply(Command::Buy {
+        household: 0,
+        object: "chair".into(),
+        at: Some([3, 6, 0]),
+        colors: Default::default(),
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .unwrap();
     assert!(
-        w.apply(Command::Buy { household: 0, object: "chair".into(), at: Some([8, 9, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).is_err(),
+        build(&mut w, vec![edit(EdgeAxis::H, 3, 7, EdgeKind::Fence, None)]).is_err(),
+        "not in front of the chair"
+    );
+    assert!(
+        w.apply(Command::Buy {
+            household: 0,
+            object: "chair".into(),
+            at: Some([8, 9, 0]),
+            colors: Default::default(),
+            turn: None,
+            offset: None,
+            size: None,
+            tall: None
+        })
+        .is_err(),
         "nor a chair facing a fence"
     );
 }

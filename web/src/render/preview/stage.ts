@@ -1,16 +1,17 @@
 /**
- * The household-creator stage: the studio's row 0 on a transparent canvas inside a host element.
+ * The household-creator stage: the studio's row 0 on a transparent canvas inside a host element,
+ * drawn by its camera (onto the canvas) in the studio's frame (`Studio.draw`).
  * The Sim turns (drag, with a little momentum) in front of a fixed camera and studio lights;
  * the camera frames anything from the full body to the face (wheel, double-click, `zoomTo`).
  * Reactions are short performances (`reactions.ts`) layered over the idle.
  */
 
-import { FreeCamera, Vector3 } from '../babylon/core';
-import type { StageDirection } from '../babylon/characters';
+import type * as pc from '../pc/engine';
+import type { StageDirection } from '../shared/characters/expressions';
 import type { VisemeTrack } from '../../voice/visemes';
 import type { SimLook, SimStage, StageReaction } from '../types';
 import { reactionFor, slump, tilt, type Performance } from './reactions';
-import type { Studio } from './studio';
+import { Studio } from './studio';
 
 const ROW = 0;
 const FOV = 0.46;
@@ -30,7 +31,7 @@ interface Act {
 
 export class StageController implements SimStage {
   onZoom: ((zoom: number) => void) | null = null;
-  readonly camera: FreeCamera;
+  readonly camera: pc.CameraComponent;
   private look: SimLook | null = null;
   private yaw = START_YAW;
   private yawTarget = START_YAW;
@@ -42,7 +43,7 @@ export class StageController implements SimStage {
   /** Between performances: the game's own idle (stance and resting face included). */
   private readonly idle: StageDirection = {};
   private readonly eye = { x: 0, y: 1.6, z: 3 };
-  private readonly target = new Vector3();
+  private readonly target = { x: 0, y: 0, z: 0 };
   private lastNow = 0;
   private dragging: { id: number; x: number; t: number } | null = null;
   private readonly resize: ResizeObserver;
@@ -58,17 +59,14 @@ export class StageController implements SimStage {
     canvas.setAttribute('aria-label', 'Resident preview: drag or arrow keys to turn, scroll or +/- to zoom');
     canvas.tabIndex = 0;
     host.appendChild(canvas);
-    this.camera = new FreeCamera('stageCamera', new Vector3(0, 1, 4), studio.scene, false);
-    this.camera.fov = FOV;
-    this.camera.minZ = 0.1;
-    // Portrait Sims stand 40 m and more to the side; keep them out of view.
-    this.camera.maxZ = 30;
-    this.camera.inputs.clear();
-    studio.scene.activeCamera = this.camera;
-    studio.pool.setEnabled(true);
-    this.resize = new ResizeObserver(() => studio.engine.resize());
+    // Portrait Sims stand 40 m and more to the side; keep them out of view (far 30 m).
+    this.camera = studio.camera('stageCamera', FOV, 0.1, 30, 0);
+    this.camera.entity.enabled = true;
+    studio.viewer = this.camera;
+    studio.pool.enabled = true;
+    this.resize = new ResizeObserver(() => studio.resize());
     this.resize.observe(host);
-    studio.engine.resize();
+    studio.resize();
     canvas.addEventListener('pointerdown', this.onDown);
     canvas.addEventListener('pointermove', this.onMove);
     canvas.addEventListener('pointerup', this.onUp);
@@ -148,13 +146,6 @@ export class StageController implements SimStage {
     this.frame(dt);
   }
 
-  /** Draws the stage (after posing). */
-  render(): void {
-    const scene = this.studio.scene;
-    scene.activeCamera = this.camera;
-    scene.render();
-  }
-
   detach(): void {
     if (this.detached) return;
     this.detached = true;
@@ -168,11 +159,12 @@ export class StageController implements SimStage {
     canvas.removeEventListener('keydown', this.onKey);
     this.resize.disconnect();
     canvas.remove();
-    this.studio.pool.setEnabled(false);
+    this.studio.pool.enabled = false;
+    if (this.studio.viewer === this.camera) this.studio.viewer = null;
     this.studio.characters.directions[ROW] = null;
     this.studio.characters.setSpeech(ROW, null, 0);
     this.studio.setRow(ROW, null);
-    this.camera.dispose();
+    this.camera.entity.destroy();
     this.release();
   }
 
@@ -185,8 +177,8 @@ export class StageController implements SimStage {
     // (As quickly at any frame rate: about a fifth of the way per 60th of a second.)
     if (this.studio.characters.visible[ROW]) this.headTop += (heads[ROW * 3 + 1] - this.headTop) * (1 - Math.exp(-dt * 12));
     const top = this.headTop + 0.06;
-    const engine = this.studio.engine;
-    const aspect = engine.getRenderWidth() / Math.max(1, engine.getRenderHeight());
+    const device = this.studio.device;
+    const aspect = device.width / Math.max(1, device.height);
     const tan = Math.tan(FOV / 2);
     // Full body: feet to head top in the canvas above the bottom UI; wide enough for the arms.
     const bodyLo = -0.04;
@@ -203,12 +195,13 @@ export class StageController implements SimStage {
     const dist = h / 2 / tan;
     // Looking down a little at the body (the floor reads as a stage), level with the face.
     const lift = dist * (0.11 * (1 - z) + 0.05 * z);
-    this.camera.position.set(0, y + lift, dist);
-    this.target.set(0, y, 0);
-    this.camera.setTarget(this.target);
     this.eye.x = 0;
     this.eye.y = y + lift;
     this.eye.z = dist;
+    this.target.x = 0;
+    this.target.y = y;
+    this.target.z = 0;
+    Studio.aim(this.camera, this.eye, this.target);
   }
 
   private readonly onDown = (e: PointerEvent) => {

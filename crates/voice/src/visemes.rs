@@ -8,7 +8,9 @@
 //! so the times are the clip's own.
 
 /// The visemes in index order (Oculus/Meta's set).
-pub const VISEMES: [&str; 15] = ["sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa", "E", "I", "O", "U"];
+pub const VISEMES: [&str; 15] = [
+    "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa", "E", "I", "O", "U",
+];
 
 pub const SIL: u8 = 0;
 const PP: u8 = 1;
@@ -70,7 +72,8 @@ pub struct VisemeTrack {
 impl VisemeTrack {
     /// One array for JavaScript: `[segments, energy frames, times…, visemes…, energy…]`.
     pub fn flat(&self) -> Vec<f32> {
-        let mut out = Vec::with_capacity(2 + self.times.len() + self.visemes.len() + self.energy.len());
+        let mut out =
+            Vec::with_capacity(2 + self.times.len() + self.visemes.len() + self.energy.len());
         out.push(self.visemes.len() as f32);
         out.push(self.energy.len() as f32);
         out.extend(&self.times);
@@ -165,7 +168,10 @@ fn sound(c: char) -> Sound {
 
 /// The phoneme symbols with no viseme (they are shown as E).
 pub fn unknown_symbols(phonemes: &str) -> String {
-    phonemes.chars().filter(|&c| matches!(sound(c), Sound::Unknown)).collect()
+    phonemes
+        .chars()
+        .filter(|&c| matches!(sound(c), Sound::Unknown))
+        .collect()
 }
 
 /// The segments for a line of Misaki phonemes, without pauses at either end. Neighbours with the
@@ -181,13 +187,26 @@ pub fn segments(phonemes: &str) -> Vec<Segment> {
                 last.pause |= pause;
             }
             Some(last) if last.viseme == viseme => last.weight += weight,
-            _ => out.push(Segment { viseme, weight, pause }),
+            _ => out.push(Segment {
+                viseme,
+                weight,
+                pause,
+            }),
         }
     }
     for (i, &c) in chars.iter().enumerate() {
         match sound(c) {
             Sound::Vowel(v) => {
-                push(&mut out, v, if c == 'ᵊ' { SMALL_SCHWA } else { VOWEL * stress }, false);
+                push(
+                    &mut out,
+                    v,
+                    if c == 'ᵊ' {
+                        SMALL_SCHWA
+                    } else {
+                        VOWEL * stress
+                    },
+                    false,
+                );
                 stress = 1.0;
             }
             Sound::Diphthong(a, b) => {
@@ -235,11 +254,18 @@ pub fn segments(phonemes: &str) -> Vec<Segment> {
 /// [`crate::G2p::phonemize`]).
 pub fn track(phonemes: &str, samples: &[f32], sample_rate: u32) -> VisemeTrack {
     let frame = (sample_rate / FRAMES_PER_SECOND).max(1) as usize;
-    let rms: Vec<f32> = samples.chunks(frame).map(|f| (f.iter().map(|x| x * x).sum::<f32>() / f.len() as f32).sqrt()).collect();
+    let rms: Vec<f32> = samples
+        .chunks(frame)
+        .map(|f| (f.iter().map(|x| x * x).sum::<f32>() / f.len() as f32).sqrt())
+        .collect();
     let loudest = rms.iter().copied().fold(0.0, f32::max);
     let voiced = |r: &f32| loudest > 0.0 && *r > loudest * VOICED;
-    let (Some(first), Some(last)) = (rms.iter().position(voiced), rms.iter().rposition(voiced)) else {
-        return VisemeTrack { energy: vec![0.0; rms.len()], ..VisemeTrack::default() };
+    let (Some(first), Some(last)) = (rms.iter().position(voiced), rms.iter().rposition(voiced))
+    else {
+        return VisemeTrack {
+            energy: vec![0.0; rms.len()],
+            ..VisemeTrack::default()
+        };
     };
 
     // Loudness against the line's 95th percentile (its voiced part).
@@ -248,7 +274,10 @@ pub fn track(phonemes: &str, samples: &[f32], sample_rate: u32) -> VisemeTrack {
 
     let segs = segments(phonemes);
     if segs.is_empty() {
-        return VisemeTrack { energy, ..VisemeTrack::default() };
+        return VisemeTrack {
+            energy,
+            ..VisemeTrack::default()
+        };
     }
     let rate = sample_rate as f64;
     let start = (first * frame) as f64 / rate;
@@ -263,10 +292,19 @@ pub fn track(phonemes: &str, samples: &[f32], sample_rate: u32) -> VisemeTrack {
     }
     let gaps = quiet_gaps(&rms[first..=last], p95 * GAP_LEVEL)
         .into_iter()
-        .map(|(a, b)| (((first + a) * frame) as f64 / rate, (((first + b) * frame).min(samples.len())) as f64 / rate))
+        .map(|(a, b)| {
+            (
+                ((first + a) * frame) as f64 / rate,
+                (((first + b) * frame).min(samples.len())) as f64 / rate,
+            )
+        })
         .collect::<Vec<_>>();
     let bounds = snap_pauses(&segs, &bounds, &gaps);
-    VisemeTrack { times: bounds.iter().map(|&t| t as f32).collect(), visemes: segs.iter().map(|s| s.viseme).collect(), energy }
+    VisemeTrack {
+        times: bounds.iter().map(|&t| t as f32).collect(),
+        visemes: segs.iter().map(|s| s.viseme).collect(),
+        energy,
+    }
 }
 
 /// The `q` quantile of `xs` (all within 0..=`max`), by bisection (small in WASM, unlike a sort).
@@ -319,14 +357,24 @@ fn snap_pauses(segs: &[Segment], bounds: &[f64], gaps: &[(f64, f64)]) -> Vec<f64
         let near = gaps
             .iter()
             .filter(|(ga, gb)| *gb > a - MAX_SHIFT && *ga < b + MAX_SHIFT)
-            .min_by(|x, y| ((x.0 + x.1) / 2.0 - centre).abs().total_cmp(&((y.0 + y.1) / 2.0 - centre).abs()));
+            .min_by(|x, y| {
+                ((x.0 + x.1) / 2.0 - centre)
+                    .abs()
+                    .total_cmp(&((y.0 + y.1) / 2.0 - centre).abs())
+            });
         let Some(&(ga, gb)) = near else { continue };
         let (prev_k, prev_t) = *anchors.last().unwrap();
         if k <= prev_k {
             continue;
         }
-        let new_a = ga.max(a - MAX_SHIFT).min(a + MAX_SHIFT).max(prev_t + MIN_SEGMENT * (k - prev_k) as f64);
-        let new_b = gb.max(b - MAX_SHIFT).min(b + MAX_SHIFT).min(bounds[n] - MIN_SEGMENT * (n - k - 1) as f64);
+        let new_a = ga
+            .max(a - MAX_SHIFT)
+            .min(a + MAX_SHIFT)
+            .max(prev_t + MIN_SEGMENT * (k - prev_k) as f64);
+        let new_b = gb
+            .max(b - MAX_SHIFT)
+            .min(b + MAX_SHIFT)
+            .min(bounds[n] - MIN_SEGMENT * (n - k - 1) as f64);
         if new_b - new_a < MIN_SEGMENT {
             continue;
         }
@@ -339,7 +387,11 @@ fn snap_pauses(segs: &[Segment], bounds: &[f64], gaps: &[(f64, f64)]) -> Vec<f64
         let ((k0, t0), (k1, t1)) = (pair[0], pair[1]);
         let (b0, b1) = (bounds[k0], bounds[k1]);
         for k in k0..=k1 {
-            out[k] = if k1 == k0 { t0 } else { t0 + (bounds[k] - b0) / (b1 - b0) * (t1 - t0) };
+            out[k] = if k1 == k0 {
+                t0
+            } else {
+                t0 + (bounds[k] - b0) / (b1 - b0) * (t1 - t0)
+            };
         }
     }
     out
@@ -351,7 +403,13 @@ mod tests {
 
     #[test]
     fn diphthongs_split_and_h_takes_the_next_vowel() {
-        let v = |ps: &str| segments(ps).iter().map(|s| VISEMES[s.viseme as usize]).collect::<Vec<_>>().join(" ");
+        let v = |ps: &str| {
+            segments(ps)
+                .iter()
+                .map(|s| VISEMES[s.viseme as usize])
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
         assert_eq!(v("hˈI"), "aa I");
         assert_eq!(v("nˈO"), "nn O U");
         assert_eq!(v("ðə kˈæt, sˈæt."), "TH E sil kk aa DD sil SS aa DD");

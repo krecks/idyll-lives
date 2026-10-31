@@ -114,10 +114,12 @@ Built 2026-10-14; they sat in Validate › Loungers until signed off (back to Ou
   1.6 s while played on, ridden.
 - **Cedar hot tub** (`hotTubCedar`): banded staves with grooves, a rim and a step; the water with bubbles is its own
   part (`bubbles`: a whole turn in 2 s, a loop while soaking); a bench runs round the inside wall at 0.35 m under
-  the water (`seats.hotTubCedar`). `cover_off` (1.5 s) folds the cover back on its seam (one part, squashed to half
-  its depth and twice its thickness about its back edge: two halves would be a fourth draw), lifts it, turns it
-  down behind the tub and lowers it to hang there on its folded edge, as on a cover lifter, its round edge just off
-  the ground (before, it stood on end in the air behind the tub). It is the model's `open` clip too: soaking
+  the water (`seats.hotTubCedar`). The cover is two halves, a hair apart at the seam across its middle,
+  the front one inside the back one (`cover_front` attached to `cover`). `cover_off` (1.5 s) folds the front half
+  back over the back half on the seam (half a second), then lifts the two together, turns them down behind the tub
+  and lowers them to hang there on their folded edge, as on a cover lifter, the round edge just off the ground
+  (before, it stood on end in the air behind the tub; then, 2026-10-21, one part squashed to half its depth about its
+  back edge). The second half is a fourth draw, as the shower's door was (Q-05; 2026-10-26, review A-outdoor-01). It is the model's `open` clip too: soaking
   leaves the tub open (content `leaves`), so the cover stays off until a resident puts it back on.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
@@ -126,9 +128,10 @@ Built 2026-10-14; they sat in Validate › Loungers until signed off (back to Ou
 | hammock | 1.00 × 1.20 × 2.80 | 2164 | 3 | Frame, Fabric, Stripes |
 | porchSwing | 1.92 × 2.05 × 0.92 | 2580 | 3 | Seat, Frame, Chains, Cushion |
 | swingSet | 1.92 × 1.99 × 1.51 | 1628 | 2 | Frame, Seats |
-| hotTubCedar | 1.88 × 0.93 × 1.90 | 4352 | 3 | Cedar, Cover |
+| hotTubCedar | 1.88 × 0.93 × 1.90 | 4368 | 4 | Cedar, Cover |
 
-`check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
+`check-glb`: 0 failed; one warning, the hot tub's 4 draws (aim for 3; at most 4, as the shower's, Q-05). Khronos
+validator: 0 errors, 0 warnings each.
 
 **In the game** (2026-10-14, headless WebGPU): all five bought; a resident sunbathing on the reclined lounger, lying
 in the hammock, riding the porch swing and the swing set (frames in a row show seat and resident moving together),

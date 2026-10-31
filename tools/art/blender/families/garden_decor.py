@@ -414,7 +414,7 @@ FAMILY = G.Family(
     comment='Blender-built garden decor (tools/art/blender/families/garden_decor.py): a gnome, a bird '
             'bath, a two-tier fountain, a stone lantern, a wheelbarrow planter and boulders. Listed in '
             'the base manifest\'s packs. Each file\'s materials map by name onto the game\'s finishes '
-            '(`materials`, see render/babylon/models.ts), so a model costs one draw call per finish group '
+            '(`materials`, see render/pc/models.ts), so a model costs one draw call per finish group '
             'and lights like the rest of the garden.',
 )
 

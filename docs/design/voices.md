@@ -16,7 +16,7 @@ missing or too slow. Measurements and research behind the choices are at the end
 ## Built so far
 
 - **Model (`web/src/voice/supertonic.ts`):** Supertonic 3 (Supertone, BigScience OpenRAIL-M),
-  four ONNX graphs with their weights stored as 16-bit floats (`tools/voice/fp16.mjs`, cast back
+  four ONNX graphs with their weights stored as 16-bit floats (`crates/tools/src/fp16.rs`, cast back
   to 32-bit when the model loads, so the GPU does the same arithmetic) and gzipped (`.onnxz`,
   unpacked in the worker): 185 MB instead of 398 as published. Measured against the published
   weights, on the GPU, a line differs less than it does between two random seeds (spectral
@@ -26,7 +26,7 @@ missing or too slow. Measurements and research behind the choices are at the end
   duration predictor (how long a line lasts), text encoder, vector estimator (flow matching: 8
   passes turn noise into the line's latents) and vocoder (44.1 kHz). A whole line in a few large passes, which suits the GPU. The loop is
   ported from Supertone's reference code (`web/helper.js`). It runs in the voice worker on
-  **ONNX Runtime Web** 1.30.0, on WebGPU (the graphics card) or WASM (the processor, Auto's
+  **ONNX Runtime Web** 1.31.1, on WebGPU (the graphics card) or WASM (the processor, Auto's
   fallback). Lines are made one at a time; the Node checks run the same `supertonic.ts` (on the
   CPU).
 - **Deterministic:** the starting noise is ours, a hash of the voice, speed and text, so the
@@ -61,7 +61,7 @@ missing or too slow. Measurements and research behind the choices are at the end
   WebGPU is much slower for both models here (speech 0.7 s against 0.18 s), so the test turns the
   language model off there and the settings say why; voices still run. Not the computer: the
   same Mac is fast in the other browsers.
-- **Download:** 216.7 MB once (the model 185.2, the runtime's WebGPU build 26.8, voices and text
+- **Download:** 218.7 MB once (the model 185.2, the runtime's WebGPU build 28.7, voices and text
   files 3.2, dictionary 1.3, our WASM 0.16), kept in the browser's cache (packed).
 - **Lines of 1–5 sentences (the language model's):** each line is asked for a length picked by
   its seed (1: 20 %, 2: 25 %, 3: 25 %, 4: 15 %, 5: 15 %; `lineSentences` in `talk/writer.ts`),
@@ -586,7 +586,7 @@ times slower (many small passes). Replaced by Supertonic 3 on the GPU. What was 
   the transformer (`flow_lm_main`, one 80 ms frame per run, with its attention caches as state),
   the flow network (one Euler step from noise to the frame's latent) and the Mimi decoder (latents
   to 24 kHz). The loop around them is ported from the export's reference code. It runs in the
-  voice worker on **ONNX Runtime Web** 1.30.0 (WASM with SIMD; two threads when the page is
+  voice worker on **ONNX Runtime Web** 1.31.1 (WASM with SIMD; two threads when the page is
   cross-origin isolated and the computer has six cores or more). Lines are made one at a time;
   the Node checks run the same `pocket.ts`.
 - **Deterministic:** the flow's noise is ours, a hash of the voice, the text and the frame
@@ -595,7 +595,7 @@ times slower (many small passes). Replaced by Supertonic 3 on the GPU. What was 
   clip cache relies on. No graph edits are needed.
 - **Voices (`PRESETS` in `web/src/voice/voices.ts`):** 24 bundled clips, twelve women's and
   twelve men's, from Kyutai's voice repository (VCTK, CC BY 4.0; Voice-Zero, CC0), each turned
-  by `tools/voice/fetch.mjs` into a clip as the encoder takes it (24 kHz, trimmed, at most 10 s,
+  by `cargo fetch-voice` into a clip as the encoder takes it (24 kHz, trimmed, at most 10 s,
   loudness evened out) and packed into one 16-bit file (11.3 MB). See "Voices".
 - **Shaping (`crates/voice/src/dsp.rs`, in the voice WASM):** our own TD-PSOLA moves pitch, size
   (formants, by resampling first) and speed independently. A voice's pitch and size can go
@@ -658,7 +658,7 @@ files, the graph edits (`tools/voice/model.mjs`) and the KittenTTS tokenizer are
   the first time a voice is needed. It works with and without cross-origin isolation. Lines are
   made one at a time, by `voice/synth.ts` (the Node checks use the same code). Files the current
   version no longer uses (an older build's WASM, Paradee's model) are dropped from the cache.
-- **Model edits (`tools/voice/model.mjs`):** `bun run voice` (`tools/voice/fetch.mjs`) fetches the
+- **Model edits (`tools/voice/model.mjs`):** `bun run voice` (`cargo fetch-voice`) fetches the
   pinned upstream model and edits it in Node (a minimal protobuf reader/writer, so
   CI needs no Python): a `pitch` input multiplies the pitch curve, and the two random nodes are
   replaced by a counter-based hash of each value's position (h = (i·48271 + salt) mod 2³¹−1, then
@@ -740,7 +740,7 @@ distilled from Kokoro's `af_heart` voice.
 | Speed (paper) | about 18× faster than real time, int8 ONNX, one CPU thread |
 | Limits | American English only, **one voice** (female), a faint buzz on some voiced sounds |
 
-It needs no GPU, so the GPU stays with Babylon.
+It needs no GPU, so the GPU stays with the renderer.
 
 What we measured ourselves (M-series Mac, one thread, "Hello! I'm hungry, I should cook
 something.", 2.95 s of audio):
@@ -846,7 +846,7 @@ vectors, one per text length, fed as the `style` input, so two voices can be **m
 Its makers call the 0.8 ONNX models "legacy" (their KittenTTS 2 is 1.7B parameters); they are
 frozen but fine for us.
 
-- **Download and edits (`tools/voice/fetch.mjs`, `model.mjs`, `npz.mjs`):** the fp32 model
+- **Download and edits (`cargo fetch-voice`, `model.mjs`, `npz.mjs`):** the fp32 model
   (`kitten-tts-nano-0.8-fp32`, pinned revision and SHA-256) has its large float weights stored as
   int8 with one float scale per output channel and `DequantizeLinear` (`quantizeWeights`), so it
   is 15.5 MB but computes in float. (The upstream int8 build uses dynamic quantisation,

@@ -4,7 +4,7 @@ The street's dressing props (`model.street.*`): the kerbside bench, the planter 
 the street-name sign, the bus-stop sign, the door pot, the garden path light and the flower clump.
 One pack, `packs/street/manifest.json`, models in `models/street/`. Built 2026-10-16. They aren't buyable: no content entry, no Validate group.
 
-`render/babylon/street.ts` draws them as thin instances (`PROP`, `FOLIAGE`): benches, planters and flower tubs along
+`render/pc/street.ts` draws them as thin instances (`PROP`, `FOLIAGE`): benches, planters and flower tubs along
 the kerb in front of the public places, the bus-stop and street-name signs at the ends of the streets, pots by the
 neighbours' front doors and path lights along their garden paths, flower clumps in the beds along their house fronts.
 The town overview draws the same street again from afar, from the far versions (`BuildOptions.far`). Each model is

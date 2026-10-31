@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built laundry models (tools/art/blender/families/laundry.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The washer and the dryer open their door (`door_open`) while a resident loads or empties them, and the washer turns its drum (`drum_spin`) once the door has shut.",
+  "$comment": "Blender-built laundry models (tools/art/blender/families/laundry.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The washer and the dryer open their door (`door_open`) while a resident loads or empties them, and turn their drum (`drum_spin`) while they run on their own (`running`). The basket of washing and the piece held up to fold are carried (content `items`).",
   "version": 1,
   "entries": {
     "model.laundryWasher": {
@@ -42,16 +42,11 @@
       },
       "motions": {
         "uses": {
-          "laundry": [
-            "door_open",
-            {
-              "clip": "drum_spin",
-              "delay": 3.5,
-              "every": 1.1
-            }
-          ]
+          "laundry": "door_open",
+          "unload": "door_open"
         },
-        "hold": 2.5
+        "hold": 2.5,
+        "running": "drum_spin"
       },
       "paint": [
         {
@@ -114,9 +109,11 @@
       },
       "motions": {
         "uses": {
-          "laundry": "door_open"
+          "laundry": "door_open",
+          "unload": "door_open"
         },
-        "hold": 2.5
+        "hold": 2.5,
+        "running": "drum_spin"
       },
       "paint": [
         {
@@ -262,6 +259,57 @@
           "label": "Pile"
         }
       ]
+    },
+    "item.washingBasket": {
+      "type": "model",
+      "url": "../../models/laundry/washingBasket.glb",
+      "materials": {
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "wash_a": {
+          "finish": "material.finish.satin"
+        },
+        "wash_b": {
+          "finish": "material.finish.satin"
+        },
+        "wash_c": {
+          "finish": "material.finish.satin"
+        },
+        "wicker_band": {
+          "finish": "material.finish.satin"
+        },
+        "wicker_plain": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "item.washingPiece": {
+      "type": "model",
+      "url": "../../models/laundry/washingPiece.glb",
+      "materials": {
+        "towel": {
+          "finish": "material.finish.fabric"
+        },
+        "towel_hem": {
+          "finish": "material.finish.fabric"
+        }
+      }
+    },
+    "item.washingArmful": {
+      "type": "model",
+      "url": "../../models/laundry/washingArmful.glb",
+      "materials": {
+        "wash_a": {
+          "finish": "material.finish.satin"
+        },
+        "wash_b": {
+          "finish": "material.finish.satin"
+        },
+        "wash_c": {
+          "finish": "material.finish.satin"
+        }
+      }
     }
   }
 }

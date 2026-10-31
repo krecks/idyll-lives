@@ -19,6 +19,7 @@
     tint = 210,
     onpick,
     onpoint,
+    onblur,
   }: {
     def: ObjectDef;
     /** Model key in the household's style (the picture follows the style chips). */
@@ -35,6 +36,8 @@
     onpick: () => void;
     /** Pointed at or focused (its hover card shows above it). */
     onpoint: (card: HTMLElement) => void;
+    /** Focus left the card. */
+    onblur?: () => void;
   } = $props();
 
   const content = services.content;
@@ -79,6 +82,7 @@
   }}
   onmouseenter={(e) => onpoint(e.currentTarget)}
   onfocus={(e) => onpoint(e.currentTarget)}
+  onblur={() => onblur?.()}
 >
   <span class="stage">
     <span class="picture">
@@ -143,11 +147,11 @@
     flex: 1;
     min-height: 0;
     background:
-      radial-gradient(ellipse 70% 62% at 50% 46%, hsl(var(--hue) 70% 98%) 0%, hsl(var(--hue) 45% 92%) 70%, hsl(var(--hue) 35% 88%) 100%);
+      radial-gradient(ellipse 72% 64% at 50% 46%, hsl(var(--hue) 48% 98%) 0%, hsl(var(--hue) 30% 94%) 70%, hsl(var(--hue) 24% 90%) 100%);
   }
   .picture {
     position: absolute;
-    inset: 6px 8px 4px;
+    inset: 5px 8px 2px;
     transition: transform 320ms var(--ease);
   }
   .card:hover .picture {
@@ -213,11 +217,11 @@
     display: flex;
     flex-direction: column;
     gap: 0;
-    padding: 4px 8px 5px;
+    padding: 3px 8px 4px;
   }
   .name {
     font-weight: 650;
-    font-size: 12px;
+    font-size: 11.5px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -226,7 +230,7 @@
   .price {
     color: var(--good);
     font-weight: 700;
-    font-size: 12px;
+    font-size: 11.5px;
   }
 
 

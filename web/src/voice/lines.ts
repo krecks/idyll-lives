@@ -77,7 +77,7 @@ export class Lines {
 
   /** `packs`: the same layout from content packs (`Content.voice[language]`), laid over the file. */
   constructor(file: LinesFile, packs?: Record<string, unknown>) {
-    this.data = packs ? (mergeDeep(file as unknown as Record<string, unknown>, packs) as unknown as LinesFile) : file;
+    this.data = packs ? mergeDeep(file, packs) : file;
   }
 
   social(who: number, id: string, part: 'start' | 'good' | 'bad', seed: number): Line | null {

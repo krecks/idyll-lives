@@ -54,13 +54,22 @@ fn full_but(w: &mut World, but: &[(&str, f32)]) {
 
 /// What they're using right now (not on their way to): `(object, interaction id)`.
 fn using(w: &World) -> Option<(u32, String)> {
-    w.sims[0].current().filter(|a| matches!(a.phase, Phase::Using { .. })).and_then(|a| match a.task.kind {
-        TaskKind::Use { object, interaction } => {
-            let def = w.objects[object as usize].def;
-            Some((object, w.content.objects[def].interactions[interaction].id.clone()))
-        }
-        _ => None,
-    })
+    w.sims[0]
+        .current()
+        .filter(|a| matches!(a.phase, Phase::Using { .. }))
+        .and_then(|a| match a.task.kind {
+            TaskKind::Use {
+                object,
+                interaction,
+            } => {
+                let def = w.objects[object as usize].def;
+                Some((
+                    object,
+                    w.content.objects[def].interactions[interaction].id.clone(),
+                ))
+            }
+            _ => None,
+        })
 }
 
 /// Ticks until resident 0 uses `object` (any interaction), at most `hours`.
@@ -104,7 +113,10 @@ fn a_film_they_chose_is_left_for_the_toilet_before_the_bladder_runs_out() {
         until_using(&mut w, CINEMA, 1.0).expect("bored, they watch something");
         let (left, lowest) = bladder_during_a_film(&mut w);
         assert!(left, "seed {seed}: up from the cinema and to the toilet");
-        assert!(lowest > 0.05, "seed {seed}: before the bladder ran out (it got to {lowest:.2})");
+        assert!(
+            lowest > 0.05,
+            "seed {seed}: before the bladder ran out (it got to {lowest:.2})"
+        );
     }
 }
 
@@ -113,14 +125,27 @@ fn a_film_the_player_asked_for_goes_on() {
     let mut w = world(1, 14.0);
     full_but(&mut w, &[("fun", 0.0)]);
     let def = w.objects[CINEMA as usize].def;
-    let film = w.content.objects[def].interactions.iter().position(|i| i.id == "film").unwrap();
-    w.apply(Command::Use { sim: 0, object: CINEMA, interaction: film }).unwrap();
+    let film = w.content.objects[def]
+        .interactions
+        .iter()
+        .position(|i| i.id == "film")
+        .unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: CINEMA,
+        interaction: film,
+    })
+    .unwrap();
     until_using(&mut w, CINEMA, 0.5).expect("they sit down to the film");
     let b = need(&w, "bladder");
     w.sims[0].needs[b] = 0.12;
     for _ in 0..(30.0 / MINUTES_PER_TICK) as u32 {
         w.tick_once();
-        assert_eq!(using(&w).map(|(o, _)| o), Some(CINEMA), "the player's film isn't left for the toilet");
+        assert_eq!(
+            using(&w).map(|(o, _)| o),
+            Some(CINEMA),
+            "the player's film isn't left for the toilet"
+        );
     }
 }
 
@@ -141,16 +166,25 @@ fn nobody_starts_a_two_hour_film_on_a_bladder_that_wont_last_it() {
             None
         })
         .collect();
-    assert!(b_at_film.iter().all(|&b| b > 0.4), "a film only on a bladder that lasts it: {b_at_film:?}");
+    assert!(
+        b_at_film.iter().all(|&b| b > 0.4),
+        "a film only on a bladder that lasts it: {b_at_film:?}"
+    );
 }
 
 #[test]
 fn the_toilet_before_leaving_for_work() {
     let mut w = world(3, 8.0);
-    w.apply(Command::JoinCareer { sim: 0, career: 0, level: 0 }).unwrap();
+    w.apply(Command::JoinCareer {
+        sim: 0,
+        career: 0,
+        level: 0,
+    })
+    .unwrap();
     until(&mut w, 2, 0.5);
     let job = w.sims[0].job.clone().unwrap();
-    let (leave, ..) = life::shift_today(&w.content, &job, &w.sims[0].skills, w.tick).expect("a workday");
+    let (leave, ..) =
+        life::shift_today(&w.content, &job, &w.sims[0].skills, w.tick).expect("a workday");
     // An hour before they leave, up and about with a bladder not quite full.
     let ready = (w.content.day_rhythm.ready_minutes / MINUTES_PER_TICK) as u64;
     while w.tick < leave - ready - (15.0 / MINUTES_PER_TICK) as u64 {
@@ -167,8 +201,16 @@ fn the_toilet_before_leaving_for_work() {
     }
     assert!(w.sims[0].away_until.is_some(), "off to work");
     let toilet_at = toilet_at.expect("the toilet before leaving");
-    assert!(toilet_at + ready >= leave, "in the last {:.0} minutes before leaving", ready as f32 * MINUTES_PER_TICK);
-    assert!(w.sims[0].needs[b] > 0.85, "left with a bladder at {:.2}", w.sims[0].needs[b]);
+    assert!(
+        toilet_at + ready >= leave,
+        "in the last {:.0} minutes before leaving",
+        ready as f32 * MINUTES_PER_TICK
+    );
+    assert!(
+        w.sims[0].needs[b] > 0.85,
+        "left with a bladder at {:.2}",
+        w.sims[0].needs[b]
+    );
 }
 
 #[test]
@@ -187,10 +229,23 @@ fn the_toilet_before_bed_and_on_getting_up() {
                 seen.push((o, id));
             }
         }
-        let first_sleep = seen.iter().position(|(o, id)| *o == BED && id == "sleep").expect("a night's sleep");
-        assert!(seen[..first_sleep].iter().any(|(o, _)| *o == TOILET), "seed {seed}: the toilet before bed: {seen:?}");
-        let last_sleep = seen.iter().rposition(|(o, id)| *o == BED && id == "sleep").unwrap();
-        assert_eq!(seen.get(last_sleep + 1).map(|s| s.0), Some(TOILET), "seed {seed}: the toilet on getting up: {seen:?}");
+        let first_sleep = seen
+            .iter()
+            .position(|(o, id)| *o == BED && id == "sleep")
+            .expect("a night's sleep");
+        assert!(
+            seen[..first_sleep].iter().any(|(o, _)| *o == TOILET),
+            "seed {seed}: the toilet before bed: {seen:?}"
+        );
+        let last_sleep = seen
+            .iter()
+            .rposition(|(o, id)| *o == BED && id == "sleep")
+            .unwrap();
+        assert_eq!(
+            seen.get(last_sleep + 1).map(|s| s.0),
+            Some(TOILET),
+            "seed {seed}: the toilet on getting up: {seen:?}"
+        );
     }
 }
 
@@ -204,12 +259,27 @@ fn needs_stay_between_empty_and_full() {
     let (hunger, fun) = (need(&w, "hunger"), need(&w, "fun"));
     w.sims[0].mods.need_decay[hunger] = -50.0;
     w.sims[0].mods.need_gain[fun] = -50.0;
-    let watch = w.content.objects[w.objects[CINEMA as usize].def].interactions.iter().position(|i| i.total_gain[fun] > 0.0).unwrap();
-    w.apply(Command::Use { sim: 0, object: CINEMA, interaction: watch }).unwrap();
+    let watch = w.content.objects[w.objects[CINEMA as usize].def]
+        .interactions
+        .iter()
+        .position(|i| i.total_gain[fun] > 0.0)
+        .unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: CINEMA,
+        interaction: watch,
+    })
+    .unwrap();
     for _ in 0..(60.0 / MINUTES_PER_TICK) as u32 {
         w.tick_once();
         let needs = &w.sims[0].needs[..w.content.needs.len()];
-        assert!(needs.iter().all(|n| (0.0..=1.0).contains(n)), "needs out of range: {needs:?}");
+        assert!(
+            needs.iter().all(|n| (0.0..=1.0).contains(n)),
+            "needs out of range: {needs:?}"
+        );
     }
-    assert_eq!(w.sims[0].needs[hunger], 1.0, "hunger decayed backwards up to full, no further");
+    assert_eq!(
+        w.sims[0].needs[hunger], 1.0,
+        "hunger decayed backwards up to full, no further"
+    );
 }

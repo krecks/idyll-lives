@@ -73,11 +73,15 @@ resident panel says "At school". No pay, no career, no grades yet.
 ## Having children
 
 - **Pregnancy:** partners who are both adults (and at most `pregnancy.maxAge`) can *Try for a
-  baby* (a romantic social whose success has the `conceive` effect). The conversation only marks
-  it; after the step the life cycle checks living together, ages, room and nothing on the way,
-  and with `pregnancy.chance` the household is expecting (`Household::expecting`: the parents and
-  the due day, `pregnancy.days` later), so any couple can have a baby. The AI only tries where a
-  baby could come of it. The story says they're expecting, then that the baby is born (at
+  baby* (a romantic social whose success has the `conceive` effect): a short ask (a kiss, 3
+  minutes), and if it goes well the two go to bed (0.5.0, G-72: `privacy.rs`): to a double bed at
+  home that nobody else is on, in a room indoors with a door and nobody else in it, where they
+  lie under the covers for half an hour with the door shut (others wait outside or go elsewhere).
+  Once they've lain there its time, the life cycle checks living together, ages, room and nothing
+  on the way, and with `pregnancy.chance` the household is expecting (`Household::expecting`: the
+  parents and the due day, `pregnancy.days` later), so any couple with a bedroom can have a baby.
+  The AI only tries where a baby could come of it and a bed like that is free; the player's ask
+  without one is refused. The story says they're expecting, then that the baby is born (at
   midnight on the due day).
 - Only with room: below `rules.maxHousehold`, and the town below its cap.
 - **The baby:** a name from content `names` by gender, the household's name, random traits, a

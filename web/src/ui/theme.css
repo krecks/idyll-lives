@@ -14,10 +14,10 @@
   --warn: #f0b54a;
   --bad: #ec6a5c;
 
-  --glass: rgba(255, 255, 255, 0.66);
-  --glass-strong: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(255, 255, 255, 0.75);
-  --glass-blur: 18px;
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-strong: rgba(255, 255, 255, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.78);
+  --glass-blur: 20px;
   --hairline: rgba(29, 34, 48, 0.08);
 
   --radius-sm: 10px;

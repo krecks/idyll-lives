@@ -12,7 +12,9 @@ use sim_core::{World, clock};
 fn dead_days(minute: f32, last: u32) -> Vec<(u32, u32)> {
     let mut ranges: Vec<(u32, u32)> = Vec::new();
     for day in 2..=last {
-        let Some(t) = clock::tick_at(day, minute) else { continue };
+        let Some(t) = clock::tick_at(day, minute) else {
+            continue;
+        };
         if clock::tick_at(clock::day(t), minute) == Some(t) {
             continue;
         }
@@ -27,7 +29,14 @@ fn dead_days(minute: f32, last: u32) -> Vec<(u32, u32)> {
 #[test]
 fn every_days_gates_fire() {
     let mut failed = false;
-    for minute in [0.0, 6.0 * 60.0, 9.0 * 60.0, 12.0 * 60.0, 18.0 * 60.0, 23.5 * 60.0] {
+    for minute in [
+        0.0,
+        6.0 * 60.0,
+        9.0 * 60.0,
+        12.0 * 60.0,
+        18.0 * 60.0,
+        23.5 * 60.0,
+    ] {
         let dead = dead_days(minute, 6000);
         if !dead.is_empty() {
             eprintln!("minute {minute:>6}: dead on days {dead:?}");
@@ -54,7 +63,11 @@ fn clock_edges() {
             }
         }
     }
-    assert_eq!(at_1440 + backwards, 0, "minute_of_day >= 1440: {at_1440} (first {first:?}); day going backwards: {backwards}");
+    assert_eq!(
+        at_1440 + backwards,
+        0,
+        "minute_of_day >= 1440: {at_1440} (first {first:?}); day going backwards: {backwards}"
+    );
 }
 
 /// Residents' ages at each midnight from day `from` for `days` days (the town jumped there).
@@ -72,7 +85,11 @@ fn ages_from(from: u32, days: u32) -> Vec<(u32, f32, usize)> {
         let day = clock::day(w.tick);
         if day != last_day {
             last_day = day;
-            let grew = w.events.iter().filter(|e| e.kind == EventKind::GrewOlder).count();
+            let grew = w
+                .events
+                .iter()
+                .filter(|e| e.kind == EventKind::GrewOlder)
+                .count();
             out.push((day, w.sims[first].age, grew));
         }
     }
@@ -87,5 +104,9 @@ fn residents_still_age_after_day_1167() {
     let late = ages_from(1166, 3);
     let grows = |a: &[(u32, f32, usize)]| a.windows(2).filter(|p| p[1].1 > p[0].1).count();
     assert_eq!(grows(&early), 2, "ages each midnight early on: {early:?}");
-    assert_eq!(grows(&late), 2, "ages each midnight on days 1167 and 1168 too: {late:?}");
+    assert_eq!(
+        grows(&late),
+        2,
+        "ages each midnight on days 1167 and 1168 too: {late:?}"
+    );
 }

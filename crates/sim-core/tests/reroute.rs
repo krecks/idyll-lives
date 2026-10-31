@@ -17,13 +17,24 @@ const LOT: &str = r#"{"width":24,"depth":10,
     "sims":[{"name":"Ada","household":0,"x":2.5,"z":5.5}]}"#;
 
 fn wall(x: i32, z0: i32, z1: i32) -> Vec<EdgeEdit> {
-    (z0..z1).map(|z| EdgeEdit::new(EdgeAxis::V, x, z, EdgeKind::Wall)).collect()
+    (z0..z1)
+        .map(|z| EdgeEdit::new(EdgeAxis::V, x, z, EdgeKind::Wall))
+        .collect()
 }
 
 fn walking() -> World {
     let mut w = World::from_json(CONTENT, LOT, 3).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
-    w.apply(Command::MoveTo { sim: 0, x: 21.5, z: 5.5 }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
+    w.apply(Command::MoveTo {
+        sim: 0,
+        x: 21.5,
+        z: 5.5,
+    })
+    .unwrap();
     // Far enough along to be well past the left end, short of the new wall.
     for _ in 0..20 {
         w.tick_once();
@@ -36,7 +47,11 @@ fn walking() -> World {
 #[test]
 fn a_wall_across_the_way_makes_them_give_up() {
     let mut w = walking();
-    w.apply(Command::Build { household: 0, edits: wall(12, 0, 10) }).unwrap();
+    w.apply(Command::Build {
+        household: 0,
+        edits: wall(12, 0, 10),
+    })
+    .unwrap();
     w.tick_once();
     assert!(w.sims[0].current().is_none(), "no way there any more");
 }
@@ -45,7 +60,11 @@ fn a_wall_across_the_way_makes_them_give_up() {
 fn a_wall_they_can_go_round_sends_them_round() {
     let mut w = walking();
     // The wall stops short of the far side, so there's still a way round it.
-    w.apply(Command::Build { household: 0, edits: wall(12, 0, 8) }).unwrap();
+    w.apply(Command::Build {
+        household: 0,
+        edits: wall(12, 0, 8),
+    })
+    .unwrap();
     for _ in 0..600 {
         w.tick_once();
         if w.sims[0].current().is_none() {
@@ -63,14 +82,27 @@ fn a_walker_nobody_watches_gives_up_on_their_next_turn() {
     let lot = LOT.replace(r#""player":true"#, r#""player":false"#);
     let mut w = World::from_json(CONTENT, &lot, 3).unwrap();
     w.set_view(Some([100, 100, 110, 110]));
-    w.apply(Command::MoveTo { sim: 0, x: 21.5, z: 5.5 }).unwrap();
+    w.apply(Command::MoveTo {
+        sim: 0,
+        x: 21.5,
+        z: 5.5,
+    })
+    .unwrap();
     for _ in 0..21 {
         w.tick_once();
     }
     assert!(w.sims[0].current().is_some(), "should still be on the way");
-    w.apply(Command::Build { household: 0, edits: wall(12, 0, 10) }).unwrap();
+    w.apply(Command::Build {
+        household: 0,
+        edits: wall(12, 0, 10),
+    })
+    .unwrap();
     for _ in 0..200 {
         w.tick_once();
     }
-    assert!(w.sims[0].pos[0] < 12.0, "walked through the wall to {:?}", w.sims[0].pos);
+    assert!(
+        w.sims[0].pos[0] < 12.0,
+        "walked through the wall to {:?}",
+        w.sims[0].pos
+    );
 }

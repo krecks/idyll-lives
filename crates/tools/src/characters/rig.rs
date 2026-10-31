@@ -2,7 +2,7 @@
 //! family (`male`, `female`) at every life stage.
 //!
 //! Conventions (see docs/characters-format.md):
-//! - Babylon's left-handed space, metres, y up, the character faces +z, its left is -x;
+//! - the game's left-handed space, metres, y up, the character faces +z, its left is -x;
 //! - every rest local rotation is the identity, so a bone's frame at rest is model space and a
 //!   joint's local translation is just the offset from its parent's joint;
 //! - the rest pose is an A-pose: arms 45 degrees down, legs straight and vertical;
@@ -16,12 +16,39 @@ use super::np::radians;
 use super::{V3, v3};
 
 pub const BONES: [&str; 33] = [
-    "root", "pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "Head",
-    "clavicle_l", "upperarm_l", "lowerarm_l", "hand_l", "thumb_01_l", "thumb_02_l", "fingers_01_l", "fingers_02_l",
-    "clavicle_r", "upperarm_r", "lowerarm_r", "hand_r", "thumb_01_r", "thumb_02_r", "fingers_01_r", "fingers_02_r",
-    "thigh_l", "calf_l", "foot_l", "ball_l",
-    "thigh_r", "calf_r", "foot_r", "ball_r",
-    "eye_l", "eye_r",
+    "root",
+    "pelvis",
+    "spine_01",
+    "spine_02",
+    "spine_03",
+    "neck_01",
+    "Head",
+    "clavicle_l",
+    "upperarm_l",
+    "lowerarm_l",
+    "hand_l",
+    "thumb_01_l",
+    "thumb_02_l",
+    "fingers_01_l",
+    "fingers_02_l",
+    "clavicle_r",
+    "upperarm_r",
+    "lowerarm_r",
+    "hand_r",
+    "thumb_01_r",
+    "thumb_02_r",
+    "fingers_01_r",
+    "fingers_02_r",
+    "thigh_l",
+    "calf_l",
+    "foot_l",
+    "ball_l",
+    "thigh_r",
+    "calf_r",
+    "foot_r",
+    "ball_r",
+    "eye_l",
+    "eye_r",
 ];
 pub const NB: usize = BONES.len();
 pub const CLIP_BONES: usize = 31;
@@ -29,8 +56,28 @@ pub const FACE_BONES: [&str; 2] = ["eye_l", "eye_r"];
 
 /// Bones the runtime looks up by name (characters.ts, reactions.ts, data.ts).
 pub const RUNTIME_BONES: [&str; 22] = [
-    "pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "Head", "clavicle_l", "clavicle_r", "upperarm_l", "upperarm_r",
-    "lowerarm_l", "lowerarm_r", "hand_l", "hand_r", "thigh_l", "thigh_r", "calf_l", "calf_r", "foot_l", "foot_r", "eye_l", "eye_r",
+    "pelvis",
+    "spine_01",
+    "spine_02",
+    "spine_03",
+    "neck_01",
+    "Head",
+    "clavicle_l",
+    "clavicle_r",
+    "upperarm_l",
+    "upperarm_r",
+    "lowerarm_l",
+    "lowerarm_r",
+    "hand_l",
+    "hand_r",
+    "thigh_l",
+    "thigh_r",
+    "calf_l",
+    "calf_r",
+    "foot_l",
+    "foot_r",
+    "eye_l",
+    "eye_r",
 ];
 
 pub const FAMILIES: [&str; 2] = ["male", "female"];
@@ -41,7 +88,10 @@ pub const REFERENCE: (&str, &str) = ("male", BASE_STAGE);
 
 /// The index of bone `name`.
 pub fn b(name: &str) -> usize {
-    BONES.iter().position(|&n| n == name).unwrap_or_else(|| panic!("no bone {name}"))
+    BONES
+        .iter()
+        .position(|&n| n == name)
+        .unwrap_or_else(|| panic!("no bone {name}"))
 }
 
 pub fn head() -> usize {
@@ -50,17 +100,47 @@ pub fn head() -> usize {
 
 /// Each bone's parent (`PARENT` in rig.py), in `BONES` order.
 const PARENT: [&str; NB] = [
-    "", "root", "pelvis", "spine_01", "spine_02", "spine_03", "neck_01",
-    "spine_03", "clavicle_l", "upperarm_l", "lowerarm_l", "hand_l", "thumb_01_l", "hand_l", "fingers_01_l",
-    "spine_03", "clavicle_r", "upperarm_r", "lowerarm_r", "hand_r", "thumb_01_r", "hand_r", "fingers_01_r",
-    "pelvis", "thigh_l", "calf_l", "foot_l",
-    "pelvis", "thigh_r", "calf_r", "foot_r",
-    "Head", "Head",
+    "",
+    "root",
+    "pelvis",
+    "spine_01",
+    "spine_02",
+    "spine_03",
+    "neck_01",
+    "spine_03",
+    "clavicle_l",
+    "upperarm_l",
+    "lowerarm_l",
+    "hand_l",
+    "thumb_01_l",
+    "hand_l",
+    "fingers_01_l",
+    "spine_03",
+    "clavicle_r",
+    "upperarm_r",
+    "lowerarm_r",
+    "hand_r",
+    "thumb_01_r",
+    "hand_r",
+    "fingers_01_r",
+    "pelvis",
+    "thigh_l",
+    "calf_l",
+    "foot_l",
+    "pelvis",
+    "thigh_r",
+    "calf_r",
+    "foot_r",
+    "Head",
+    "Head",
 ];
 
 /// Parent index per bone (-1 for the root).
 pub fn parents() -> Vec<i64> {
-    PARENT.iter().map(|&p| if p.is_empty() { -1 } else { b(p) as i64 }).collect()
+    PARENT
+        .iter()
+        .map(|&p| if p.is_empty() { -1 } else { b(p) as i64 })
+        .collect()
 }
 
 /// Per bone, its mirror's index (`_l` <-> `_r`; the rest map to themselves).
@@ -130,17 +210,104 @@ pub fn proportions(family: &str, stage: &str) -> Proportions {
     let a = ADULT;
     let female = family == "female";
     match (stage, female) {
-        ("baby", _) => Proportions { h: 0.67, hh: 1.0 / 3.4, hip: 0.38, shoulder: 0.12, hip_w: 0.075, upper: 0.12, lower: 0.105, girth: 1.35, belly: 0.03, ..a },
-        ("child", false) => Proportions { h: 1.13, hh: 1.0 / 4.6, hip: 0.45, shoulder: 0.11, hip_w: 0.06, upper: 0.15, lower: 0.13, girth: 1.1, ..a },
-        ("child", true) => Proportions { h: 1.09, hh: 1.0 / 4.6, hip: 0.45, shoulder: 0.11, hip_w: 0.062, upper: 0.15, lower: 0.13, girth: 1.1, ..a },
-        ("teen", false) => Proportions { h: 1.51, hh: 1.0 / 6.0, hip: 0.50, shoulder: 0.12, hip_w: 0.054, upper: 0.162, lower: 0.142, girth: 0.95, ..a },
-        ("teen", true) => Proportions { h: 1.44, hh: 1.0 / 6.0, hip: 0.50, shoulder: 0.105, hip_w: 0.058, upper: 0.162, lower: 0.142, girth: 0.95, ..a },
+        ("baby", _) => Proportions {
+            h: 0.67,
+            hh: 1.0 / 3.4,
+            hip: 0.38,
+            shoulder: 0.12,
+            hip_w: 0.075,
+            upper: 0.12,
+            lower: 0.105,
+            girth: 1.35,
+            belly: 0.03,
+            ..a
+        },
+        ("child", false) => Proportions {
+            h: 1.13,
+            hh: 1.0 / 4.6,
+            hip: 0.45,
+            shoulder: 0.11,
+            hip_w: 0.06,
+            upper: 0.15,
+            lower: 0.13,
+            girth: 1.1,
+            ..a
+        },
+        ("child", true) => Proportions {
+            h: 1.09,
+            hh: 1.0 / 4.6,
+            hip: 0.45,
+            shoulder: 0.11,
+            hip_w: 0.062,
+            upper: 0.15,
+            lower: 0.13,
+            girth: 1.1,
+            ..a
+        },
+        ("teen", false) => Proportions {
+            h: 1.51,
+            hh: 1.0 / 6.0,
+            hip: 0.50,
+            shoulder: 0.12,
+            hip_w: 0.054,
+            upper: 0.162,
+            lower: 0.142,
+            girth: 0.95,
+            ..a
+        },
+        ("teen", true) => Proportions {
+            h: 1.44,
+            hh: 1.0 / 6.0,
+            hip: 0.50,
+            shoulder: 0.105,
+            hip_w: 0.058,
+            upper: 0.162,
+            lower: 0.142,
+            girth: 0.95,
+            ..a
+        },
         ("youngAdult", false) => Proportions { h: 1.77, ..a },
-        ("youngAdult", true) => Proportions { h: 1.67, shoulder: 0.115, hip_w: 0.058, ..a },
-        ("adult", false) => Proportions { h: 1.76, waist: 1.08, belly: 0.006, ..a },
-        ("adult", true) => Proportions { h: 1.66, shoulder: 0.115, hip_w: 0.058, waist: 1.08, belly: 0.006, ..a },
-        ("elder", false) => Proportions { h: 1.74, hh: 1.0 / 6.4, hip: 0.49, shoulder: 0.13 * 0.95, waist: 1.12, belly: 0.01, neck_z: -0.002, ..a },
-        ("elder", true) => Proportions { h: 1.64, hh: 1.0 / 6.4, hip: 0.49, shoulder: 0.115 * 0.95, hip_w: 0.058, waist: 1.12, belly: 0.01, neck_z: -0.002, ..a },
+        ("youngAdult", true) => Proportions {
+            h: 1.67,
+            shoulder: 0.115,
+            hip_w: 0.058,
+            ..a
+        },
+        ("adult", false) => Proportions {
+            h: 1.76,
+            waist: 1.08,
+            belly: 0.006,
+            ..a
+        },
+        ("adult", true) => Proportions {
+            h: 1.66,
+            shoulder: 0.115,
+            hip_w: 0.058,
+            waist: 1.08,
+            belly: 0.006,
+            ..a
+        },
+        ("elder", false) => Proportions {
+            h: 1.74,
+            hh: 1.0 / 6.4,
+            hip: 0.49,
+            shoulder: 0.13 * 0.95,
+            waist: 1.12,
+            belly: 0.01,
+            neck_z: -0.002,
+            ..a
+        },
+        ("elder", true) => Proportions {
+            h: 1.64,
+            hh: 1.0 / 6.4,
+            hip: 0.49,
+            shoulder: 0.115 * 0.95,
+            hip_w: 0.058,
+            waist: 1.12,
+            belly: 0.01,
+            neck_z: -0.002,
+            ..a
+        },
         _ => panic!("no stage {stage}"),
     }
 }
@@ -167,20 +334,33 @@ pub fn joints(family: &str, stage: &str) -> [V3; NB] {
     let d = v3(-radians(45.0).cos(), -radians(45.0).sin(), 0.0);
     for (s, sx) in [("l", 1.0), ("r", -1.0)] {
         let m = v3(sx, 1.0, 1.0);
-        set(&format!("clavicle_{s}"), v3(-0.012 * sx, neck - 0.015, 0.01));
+        set(
+            &format!("clavicle_{s}"),
+            v3(-0.012 * sx, neck - 0.015, 0.01),
+        );
         let up = v3(-p.shoulder, sh_y, -0.005);
         let el = up + d * p.upper;
         let wr = el + d * p.lower;
         // Hands and feet are 1.15x real ones (the toy look), and relatively bigger on small people.
         let hs = (p.upper / ADULT.upper).powf(0.5);
         let k1 = wr + d * (0.055 * hs);
-        let k2 = k1 + d * (0.03 * hs);
+        // The fingers' middle joint, 0.42 palm lengths past the knuckle (a real proximal finger
+        // bone's share), so a fist's tips fold back onto the palm.
+        let k2 = k1 + d * (0.023 * hs);
         // The thumb's base (at the wrist end of the palm's thumb side) and its knuckle off the
         // palm, in palm lengths along the hand, towards the palm and forward (the thumb side).
         let palm = v3(-d[1], d[0], 0.0);
         let t1 = wr + (d * 0.12 + palm * 0.12 + v3(0.0, 0.0, 0.28)) * (0.055 * hs);
         let t2 = wr + (d * 0.6 + palm * 0.25 + v3(0.0, 0.0, 0.45)) * (0.055 * hs);
-        for (name, v) in [("upperarm", up), ("lowerarm", el), ("hand", wr), ("fingers_01", k1), ("fingers_02", k2), ("thumb_01", t1), ("thumb_02", t2)] {
+        for (name, v) in [
+            ("upperarm", up),
+            ("lowerarm", el),
+            ("hand", wr),
+            ("fingers_01", k1),
+            ("fingers_02", k2),
+            ("thumb_01", t1),
+            ("thumb_02", t2),
+        ] {
             set(&format!("{name}_{s}"), v.component_mul(&m));
         }
         let hx = -p.hip_w * sx;
@@ -190,9 +370,14 @@ pub fn joints(family: &str, stage: &str) -> [V3; NB] {
         set(&format!("foot_{s}"), v3(hx, hip * 0.096, -0.01));
         set(&format!("ball_{s}"), v3(hx, 0.012 * fs, -0.01 + 0.095 * fs));
     }
-    // Eyes: sphere centres, head-relative.
+    // Eyes: sphere centres, head-relative; their fronts about level with the face round them, so the
+    // sockets (head.rs) are shallow.
+    let eye_z = if family == "male" { 0.32 } else { 0.315 };
     for (s, sx) in [("l", 1.0), ("r", -1.0)] {
-        set(&format!("eye_{s}"), v3(-0.17 * hh * sx, chin + 0.44 * hh, 0.275 * hh));
+        set(
+            &format!("eye_{s}"),
+            v3(-0.17 * hh * sx, chin + 0.44 * hh, eye_z * hh),
+        );
     }
     j.map(|v| v * h)
 }
@@ -212,13 +397,26 @@ pub fn skeleton(family: &str, stage: &str) -> Skeleton {
     let mut rest_t = Vec::with_capacity(NB * 3);
     let mut ibm = Vec::with_capacity(NB * 16);
     for bi in 0..NB {
-        let t = if par[bi] >= 0 { j[bi] - j[par[bi] as usize] } else { j[bi] };
+        let t = if par[bi] >= 0 {
+            j[bi] - j[par[bi] as usize]
+        } else {
+            j[bi]
+        };
         rest_t.extend([t.x, t.y, t.z]);
-        ibm.extend([1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -j[bi].x, -j[bi].y, -j[bi].z, 1.0]);
+        ibm.extend([
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -j[bi].x, -j[bi].y,
+            -j[bi].z, 1.0,
+        ]);
     }
     let r = joints(REFERENCE.0, REFERENCE.1);
     let pv = b("pelvis");
-    Skeleton { joints: j, rest_t, inverse_bind: ibm, height: proportions(family, stage).h, pelvis_scale: j[pv].y / r[pv].y }
+    Skeleton {
+        joints: j,
+        rest_t,
+        inverse_bind: ibm,
+        height: proportions(family, stage).h,
+        pelvis_scale: j[pv].y / r[pv].y,
+    }
 }
 
 /// The reference pelvis rest position (clip pelvis translations are relative to it).
@@ -229,5 +427,8 @@ pub fn source_pelvis() -> V3 {
 /// Reference thigh and shin lengths (hip to knee, knee to ankle), for the clips' leg IK.
 pub fn leg_lengths() -> (f64, f64) {
     let j = joints(REFERENCE.0, REFERENCE.1);
-    ((j[b("calf_l")] - j[b("thigh_l")]).norm(), (j[b("foot_l")] - j[b("calf_l")]).norm())
+    (
+        (j[b("calf_l")] - j[b("thigh_l")]).norm(),
+        (j[b("foot_l")] - j[b("calf_l")]).norm(),
+    )
 }

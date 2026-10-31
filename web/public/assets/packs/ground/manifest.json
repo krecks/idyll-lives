@@ -1,26 +1,7 @@
 {
-  "$comment": "The lawn's grass tuft and wildflowers, the woods' rocks and the selection marker, built in Blender (tools/art/blender/families/ground.py).",
+  "$comment": "The lawn's wildflowers, the woods' rocks and the selection marker, built in Blender (tools/art/blender/families/ground.py).",
   "version": 1,
   "entries": {
-    "model.grassTuft": {
-      "type": "model",
-      "url": "../../models/ground/grassTuft.glb",
-      "materials": {
-        "blade": {
-          "finish": "material.finish.foliage"
-        },
-        "blade_light": {
-          "finish": "material.finish.foliage"
-        },
-        "blade_mid": {
-          "finish": "material.finish.foliage"
-        },
-        "blade_pale": {
-          "finish": "material.finish.foliage"
-        }
-      },
-      "far": "../../models/ground/grassTuft.far.glb"
-    },
     "model.flowers": {
       "type": "model",
       "url": "../../models/ground/flowers.glb",

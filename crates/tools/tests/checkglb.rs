@@ -7,8 +7,17 @@ use ll_tools::review::{self, Reference};
 fn every_shipped_model_passes_the_gate() {
     let report = gate(&Paths::repo(), &[]);
     assert_eq!(report.failed, 0, "the gate failed:\n{}", report.text);
-    assert!(report.checked.len() > 100, "only {} models checked:\n{}", report.checked.len(), report.text);
-    assert!(report.text.ends_with(&format!("{} models, 0 failed\n", report.checked.len())));
+    assert!(
+        report.checked.len() > 100,
+        "only {} models checked:\n{}",
+        report.checked.len(),
+        report.text
+    );
+    assert!(
+        report
+            .text
+            .ends_with(&format!("{} models, 0 failed\n", report.checked.len()))
+    );
 }
 
 #[test]
@@ -16,7 +25,11 @@ fn a_key_alone_is_checked_alone() {
     let report = gate(&Paths::repo(), &["model.fridge".to_string()]);
     assert_eq!(report.checked, ["model.fridge"]);
     assert_eq!(report.failed, 0, "{}", report.text);
-    assert!(report.text.starts_with("ok   model.fridge "), "{}", report.text);
+    assert!(
+        report.text.starts_with("ok   model.fridge "),
+        "{}",
+        report.text
+    );
 }
 
 #[test]
@@ -49,14 +62,40 @@ fn the_sofa_bed_is_measured_held_open_where_furniture_json_has_it() {
     let sofa = m.objects["sofaBed"].as_ref().unwrap();
     let of = |what: &str| sofa.heights.iter().find(|h| h.what == what).unwrap();
     let (mattress, seat) = (of("mattress"), of("seat"));
-    assert_eq!((mattress.expected, mattress.source.as_str(), mattress.open.as_deref()), (0.44, "furniture.json `beds`", Some("bed_out")));
-    assert_eq!(mattress.at, [-0.5, 0.6], "the first sleeper's slot, 0.6 m forward");
-    assert!((mattress.mesh.unwrap() - 0.44).abs() < 0.002, "mattress {:?}", mattress.mesh);
-    assert_eq!((seat.expected, seat.source.as_str(), seat.open.as_deref()), (0.44, "furniture.json `seats`", None));
-    assert!((seat.mesh.unwrap() - 0.44).abs() < 0.002, "seat {:?}", seat.mesh);
+    assert_eq!(
+        (
+            mattress.expected,
+            mattress.source.as_str(),
+            mattress.open.as_deref()
+        ),
+        (0.44, "furniture.json `beds`", Some("bed_out"))
+    );
+    assert_eq!(
+        mattress.at,
+        [-0.5, 0.6],
+        "the first sleeper's slot, 0.6 m forward"
+    );
+    assert!(
+        (mattress.mesh.unwrap() - 0.44).abs() < 0.002,
+        "mattress {:?}",
+        mattress.mesh
+    );
+    assert_eq!(
+        (seat.expected, seat.source.as_str(), seat.open.as_deref()),
+        (0.44, "furniture.json `seats`", None)
+    );
+    assert!(
+        (seat.mesh.unwrap() - 0.44).abs() < 0.002,
+        "seat {:?}",
+        seat.mesh
+    );
     assert!(mattress.fits() && seat.fits() && seat.disagrees.is_none());
     let report = gate(&paths, &["model.sofaBed".to_string()]);
-    assert!(!report.text.contains("warning: seat") && !report.text.contains("warning: mattress"), "{}", report.text);
+    assert!(
+        !report.text.contains("warning: seat") && !report.text.contains("warning: mattress"),
+        "{}",
+        report.text
+    );
 }
 
 /// What `cargo review sizes` measures besides, on the pilot's cases: a crib's mattress at slot 0 (not its changing
@@ -66,11 +105,18 @@ fn the_sofa_bed_is_measured_held_open_where_furniture_json_has_it() {
 fn the_review_measures_the_pilots_cases() {
     let paths = Paths::repo();
     let root = ll_tools::checkglb::repo_root();
-    let reference = Reference::parse(&std::fs::read_to_string(format!("{root}/{}", review::REFERENCE)).unwrap()).unwrap();
+    let reference = Reference::parse(
+        &std::fs::read_to_string(format!("{root}/{}", review::REFERENCE)).unwrap(),
+    )
+    .unwrap();
     let objects = review::objects(std::path::Path::new(&paths.content)).unwrap();
     let m = measures(&paths, &review::tops(&objects, &reference)).unwrap();
     let of = |id: &str| m.objects[id].as_ref().unwrap();
-    let crib = of("crib").heights.iter().find(|h| h.what == "mattress").unwrap();
+    let crib = of("crib")
+        .heights
+        .iter()
+        .find(|h| h.what == "mattress")
+        .unwrap();
     assert_eq!(crib.at[0], -0.5, "slot 0");
     assert!((crib.mesh.unwrap() - 0.56).abs() < 0.01, "{:?}", crib.mesh);
     let (_, workbench) = of("workbench").top.unwrap();
@@ -80,7 +126,11 @@ fn the_review_measures_the_pilots_cases() {
     // The base sink is a kitchen sink unit since G-11 (reference kind `kitchenSink`): its worktop, not a basin rim.
     assert!((0.85..=1.0).contains(&sink), "{sink}");
     let table = of("diningTable");
-    assert!(table.table.unwrap() <= table.size[1] + 1e-9 && table.top.is_none(), "{:?}", table.table);
+    assert!(
+        table.table.unwrap() <= table.size[1] + 1e-9 && table.top.is_none(),
+        "{:?}",
+        table.table
+    );
     let (top, steps) = of("stairs").steps.unwrap();
     assert_eq!(((top * 100.0).round(), steps), (280.0, 14));
 }
@@ -89,11 +139,19 @@ fn the_review_measures_the_pilots_cases() {
 fn every_object_is_measured() {
     let m = measures(&Paths::repo(), &Default::default()).unwrap();
     assert!(m.objects.len() > 500, "{}", m.objects.len());
-    let unread: Vec<_> = m.objects.iter().filter_map(|(id, r)| r.as_ref().err().map(|e| format!("{id}: {e}"))).collect();
+    let unread: Vec<_> = m
+        .objects
+        .iter()
+        .filter_map(|(id, r)| r.as_ref().err().map(|e| format!("{id}: {e}")))
+        .collect();
     assert!(unread.is_empty(), "{unread:?}");
     let counter = m.objects["counter"].as_ref().unwrap();
     assert_eq!(counter.model, "model.counter");
-    assert!((counter.size[0] - 1.0).abs() < 0.01 && (counter.size[1] - 0.95).abs() < 0.01, "{:?}", counter.size);
+    assert!(
+        (counter.size[0] - 1.0).abs() < 0.01 && (counter.size[1] - 0.95).abs() < 0.01,
+        "{:?}",
+        counter.size
+    );
 }
 
 /// The birds the renderer flies (`packs/birds`, families/birds.py) carry their sizes, and the trees, shrubs and hedges
@@ -103,23 +161,46 @@ fn every_object_is_measured() {
 fn the_birds_and_their_perches_are_in_the_packs() {
     let paths = Paths::repo();
     let pack = |name: &str| -> serde_json::Value {
-        serde_json::from_str(&std::fs::read_to_string(format!("{}/packs/{name}/manifest.json", paths.assets)).unwrap()).unwrap()
+        serde_json::from_str(
+            &std::fs::read_to_string(format!("{}/packs/{name}/manifest.json", paths.assets))
+                .unwrap(),
+        )
+        .unwrap()
     };
     let (birds, trees, plants) = (pack("birds"), pack("trees"), pack("plants"));
     let mut keys = Vec::new();
-    for id in ["blueTit", "chaffinch", "warbler", "blackbird", "collaredDove"] {
+    for id in [
+        "blueTit",
+        "chaffinch",
+        "warbler",
+        "blackbird",
+        "collaredDove",
+    ] {
         let key = format!("model.bird.{id}");
         let bird = &birds["entries"][&key]["bird"];
-        let (length, span) = (bird["length"].as_f64().unwrap(), bird["wingspan"].as_f64().unwrap());
+        let (length, span) = (
+            bird["length"].as_f64().unwrap(),
+            bird["wingspan"].as_f64().unwrap(),
+        );
         assert!(length > 0.1 && span > length, "{key}: {bird}");
-        assert!(bird["perchHeight"].as_f64().is_some() && bird["pitch"].as_f64().is_some(), "{key}: {bird}");
+        assert!(
+            bird["perchHeight"].as_f64().is_some() && bird["pitch"].as_f64().is_some(),
+            "{key}: {bird}"
+        );
         keys.push(key);
     }
     // Each perched model's perches, and what they are on (`habitat`).
     let count = |pack: &serde_json::Value, key: &str, habitat: &str| {
         let entry = &pack["entries"][key];
-        let perches = entry["perches"].as_array().unwrap_or_else(|| panic!("{key} has no perches"));
-        assert!(perches.iter().all(|p| p.as_array().is_some_and(|p| p.len() == 3 && p.iter().all(serde_json::Value::is_number))), "{key}");
+        let perches = entry["perches"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{key} has no perches"));
+        assert!(
+            perches.iter().all(|p| p
+                .as_array()
+                .is_some_and(|p| p.len() == 3 && p.iter().all(serde_json::Value::is_number))),
+            "{key}"
+        );
         assert_eq!(entry["habitat"], habitat, "{key}");
         perches.len()
     };

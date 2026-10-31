@@ -50,9 +50,10 @@ it costs no draw call. The bar cart's trays, bottles and wine glasses are `glass
   0.6 s, then it turns back. `ride: swivel` carries the sitter round with it, as the office chairs do. The legs,
   foot ring and hub are the still part. The wood stools' feet and swivel plate are in the frame's wood, so a
   stool draws in 3 groups (base wood; seat wood and fabric).
-- **Bar cart**: the cocktail shaker is a part of its own pivoting at its foot, in the middle of the top tray's
-  front edge, before the resident who mixes from the front tile. `shake` lifts it 10 cm and tips it 30° towards
-  them (one clip, both channels) in 0.6 s for `mix`; `hold` 1.5 s.
+- **Bar cart**: the cocktail shaker is a part of its own, its origin at its foot, in the middle of the top tray's
+  front edge, before the resident who mixes from the front tile. `shake` squashes it away in 0.2 s for `mix`, for as
+  long as the drink is mixed, while the resident shakes the same shaker in both hands (held.py `tool.shaker`,
+  `clips/props.ts` `shake`; 2026-10-26, review I-kitchen-13: it lifted 10 cm and tipped 30° on its own).
 - **Storage doors:** the sideboard's four fluted doors, the buffet's five panelled doors and the china cabinet's two
   glazed doors are parts of their own, hinged on their outer edges. All three are `cupboard` stations (content
   `stations`): clean things are put away in the nearest cupboard or counter (cooking `putAwayAt`), and one door
@@ -126,7 +127,7 @@ The family's helpers:
 | `model.sideboard` | 1.82 × 1.10 × 0.66 m | 5,960 | 4 | `door_open` (putting clean things away, `fetch`): half-round reeds on the doors, mushroom knobs, turned legs in brass shoes, moulded top, a bead round the foot; a vase and a bowl of lemons |
 | `model.buffet` | 1.88 × 0.90 × 0.67 m | 5,500 | 3 | `door_open` (putting clean things away, `fetch`): raised-field doors and drawers, brass bar pulls and knobs, moulded oak top, arched apron, turned legs |
 | `model.chinaCabinet` | 0.98 × 2.10 × 0.55 m | 6,704 | 4 | `door_open` (putting clean things away, `fetch`): shaped plinth, raised panels, moulded worktop, cornice (a moulded cap over a cove swept round), glazing bars, rimmed plates leaning on the rails, cups |
-| `model.barCart` | 0.77 × 1.09 × 0.45 m | 6,404 | 3 | `shake` 0.6 s (mix, `hold` 1.5 s): glass trays in bent brass rims, a gallery round the lower tier, finials, castors with forks, a handle bent in one piece, labelled bottles with corks, wine glasses, ice bucket with ice, basket with a handle |
+| `model.barCart` | 0.77 × 1.09 × 0.45 m | 6,404 | 3 | `shake` 0.2 s (mix: the shaker taken off): glass trays in bent brass rims, a gallery round the lower tier, finials, castors with forks, a handle bent in one piece, labelled bottles with corks, wine glasses, ice bucket with ice, basket with a handle |
 
 The crockery in the sideboard's and buffet's cupboards is plain discs and cones under one rimmed plate and one
 open bowl per stack: it shows only while the door is open.

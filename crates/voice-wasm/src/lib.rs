@@ -6,7 +6,9 @@
 // SIMD comes from `.cargo/config.toml`'s rustflags, which a `RUSTFLAGS` in the environment replaces
 // rather than adds to: such a build stops here instead of shipping a slower wasm without it.
 #[cfg(all(target_arch = "wasm32", not(target_feature = "simd128")))]
-compile_error!("the wasm needs SIMD: a RUSTFLAGS in the environment replaces .cargo/config.toml's `-C target-feature=+simd128`, so add it there too");
+compile_error!(
+    "the wasm needs SIMD: a RUSTFLAGS in the environment replaces .cargo/config.toml's `-C target-feature=+simd128`, so add it there too"
+);
 
 use voice::{Engine, G2p, Lexicon, LineInputs, VoiceParams, dsp};
 use wasm_bindgen::prelude::*;
@@ -73,12 +75,24 @@ impl Voice {
     /// `lexicon`: `en-us.lex` (decompressed).
     #[wasm_bindgen(constructor)]
     pub fn new(lexicon: &str) -> Voice {
-        Voice { engine: Engine::new(G2p::new(Lexicon::parse(lexicon))) }
+        Voice {
+            engine: Engine::new(G2p::new(Lexicon::parse(lexicon))),
+        }
     }
 
     /// A line with pitch, size and speed for its output (clamped to what sounds right).
     pub fn line(&self, text: &str, speed: f32, pitch: f32, depth: f32) -> Line {
-        Line { inner: self.engine.line(text, VoiceParams { speed, pitch, depth }), visemes: Vec::new() }
+        Line {
+            inner: self.engine.line(
+                text,
+                VoiceParams {
+                    speed,
+                    pitch,
+                    depth,
+                },
+            ),
+            visemes: Vec::new(),
+        }
     }
 }
 

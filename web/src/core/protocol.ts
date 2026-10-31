@@ -14,6 +14,8 @@ export type Command =
   | { type: 'addFunds'; household: number; amount: number }
   /** Tests and `?debug` only (`check.mjs play --skills`): a resident's skill set to a level. */
   | { type: 'setSkill'; sim: number; skill: string; level: number }
+  | { type: 'setNeed'; sim: number; need: string; value: number }
+  | { type: 'setBond'; a: number; b: number; friendship?: number; romance?: number; chemistry?: number; partners?: boolean }
   | { type: 'adopt'; household: number; child: boolean }
   /** "Skip quiet hours": time-lapse while the player's household sleeps or is at work. */
   | { type: 'setAutoFast'; enabled: boolean }
@@ -337,6 +339,8 @@ export interface ObjectPlacement {
   open?: boolean;
   /** A crop's stage (content `grows`): 0 planted, 1 growing, 2 ripe, 3 picked; absent for other things. */
   growth?: number;
+  /** A machine running on its own (content `runs`: the washer's drum turning, its sound); sim-core `ObjectInstance::run`. */
+  running?: boolean;
   /** What the quick fix costs (worn things). */
   repairCost?: number;
 }
@@ -369,15 +373,37 @@ export interface FormerResident {
 /** Event references with this bit name a former resident (sim-core `social::FORMER`). */
 export const FORMER = 2 ** 31;
 
+/** What is at the end of a road: the way out of town, a dead end (a turning circle), another road it joins, or itself (a ring). */
+export type RoadEnd = 'out' | 'dead' | 'join' | 'loop';
+
+/** A town's road (`game/roads.ts`): its middle, a point about every metre (town tiles); its width with the sidewalks. */
+export interface RoadPlan {
+  points: [number, number][];
+  width: number;
+  ends: [RoadEnd, RoadEnd];
+  name?: string;
+  /** The side its lots are on, if only one (+1: its left, looking along it; -1: its right): the other looks out over the water. */
+  lots?: 1 | -1;
+  /** What stands in the middle of a ring this small (a roundabout). */
+  island?: 'fountain';
+}
+
 export interface WorldMeta {
   kind?: string;
   name?: string;
+  /** Older towns' streets: straight, along x (newer ones have `roads`). */
   streets?: { x: number; z: number; w: number; d: number }[];
+  /** The town's roads (missing in older saves: their `streets`). */
+  roads?: RoadPlan[];
+  /** Village greens and the like: grass the roads go round (polygons, town tiles). */
+  greens?: [number, number][][];
   paths?: { x: number; z: number; w: number; d: number }[];
+  /** Where each plot's street is (by plot index; `game/town.ts` `Facing`): 0 north, 1 west, 2 south, 3 east. Missing in older saves. */
+  facing?: number[];
   seed?: number;
   /** What kind of world the town is in and how its land looks (missing: the classic valley). */
   world?: WorldLook;
-  /** The menus' town preview only: the plot drawn as the player's house, as the game shows it (no garage, car or garden dressing). */
+  /** The menus' town preview only: the plot drawn as the player's house, as the game shows it (its car on the driveway, no garage or garden dressing). */
   home?: number | null;
 }
 
@@ -390,7 +416,7 @@ export interface WorldLook {
 }
 
 /**
- * How the land round a town looks (see `render/babylon/nature.ts`). `DEFAULT_LANDSCAPE` is the
+ * How the land round a town looks (see `render/shared/nature.ts`). `DEFAULT_LANDSCAPE` is the
  * classic valley every town had before worlds had kinds.
  */
 export interface LandscapeParams {
@@ -505,6 +531,36 @@ export interface WorldStructure {
   /** Presentation data carried by the simulation unchanged (see `game/town.ts`). */
   meta: WorldMeta | null;
   meshes: { walls: MeshArrays; wallsLow: MeshArrays; floors: MeshArrays };
+  /**
+   * The town's vendors and shopkeepers (sim-core `staff.rs`), in their snapshot rows' order (after the
+   * residents'): what each looks like (`seed`) and the posts they serve at (stable object ids). Absent: none.
+   */
+  staff?: StaffInfo[];
+  /** The servers as residents for the renderer (rows `sims.length + k`), given their looks by the session (`game/staff.ts`). */
+  staffSims?: SimInfo[];
+  /**
+   * Households' cars (sim-core `cars.rs`), in their snapshot rows' order (`SnapshotLayout.car`): where each
+   * parks. Absent: a game from before cars (the street draws some by the neighbours' driveways, parked).
+   */
+  cars?: CarInfo[];
+  /** Garages at the inner ends of driveways (sim-core `cars::Garage`: wall centre lines, by plot). Absent: a game from before them (the street places neighbours' own). */
+  garages?: { plot: number; x0: number; z0: number; x1: number; z1: number }[];
+}
+
+/** A household's car (`WorldStructure.cars`): where it parks (its middle, which way it faces: 0 towards +z) and its look (`shared/cars.ts`: its size is its body's). */
+export interface CarInfo {
+  plot: number;
+  x: number;
+  z: number;
+  yaw: number;
+  body: number;
+  paint: number;
+}
+
+/** One of the town's servers (`WorldStructure.staff`). */
+export interface StaffInfo {
+  seed: number;
+  posts: number[];
 }
 
 export interface ActionView {
@@ -760,6 +816,8 @@ export interface SocialEvent {
   c?: number;
   /** A level or an amount of money. */
   n?: number;
+  /** A one-off payment that came with the event (a promotion bonus). Where an event has both, `{money}` in its text is this and `{n}` is `n`. */
+  pay?: number;
   /** Skill index. */
   skill?: number;
   /** Career index (catalog `careers`), for job events; `n` is then the level. Goal events: career category index. */

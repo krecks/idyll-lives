@@ -75,6 +75,7 @@ M = G.Palette(
     chair_white=('#F2F2F0', 'satin'),
     chair_legs=('#E3CFA8', 'satin'),
     chair_cushion=('#9DC6CF', 'fabric'),
+    tray_mat=('#9DC6CF', 'satin'),     # the high chair's wipe-clean mat: plain, so its sliding tray is one draw
     # the toy box and the toy chest
     toybox=('#F2C14E', 'satin'),
     toybox_lid=('#E9A23B', 'satin'),
@@ -638,19 +639,21 @@ def highChair():
                 None, M.chair_cushion, profile=G.rounded_rect(0.004, 0.03, 0.002, corner=1), up=(0, 1, 0), resolution=2)
     F.box('buckle', 0.04, 0.012, 0.04, (0, 0.645, 0.08), M.dark, bevel=0.005, bevel_segments=1)
     _still('body')
-    # the tray, its own part so it can slide out once the chair has a use: a rim round it, a cup well, a bowl
+    # the tray, its own part, sliding out to let the baby in: a rim round it, a cup well, a bowl
     with G.new_parts() as parts:
         F.extrude('tray', G.rounded_rect(0.44, 0.17, 0.05, corner=4), 0.02, (0, 0.792, 0.2), M.chair_white, plane='top',
                   bevel=0.006, bevel_segments=1)
         rim = G.rounded_rect(0.424, 0.154, 0.042, corner=3)
         F.sweep('tray_rim', [(u, 0.804, 0.2 + v) for u, v in rim], 0.006, M.chair_white, verts=6, closed=True)
-        F.extrude('tray_mat', G.rounded_rect(0.24, 0.11, 0.03, corner=3), 0.003, (-0.05, 0.8035, 0.2), M.chair_cushion,
+        F.extrude('tray_mat', G.rounded_rect(0.24, 0.11, 0.03, corner=3), 0.003, (-0.05, 0.8035, 0.2), M.tray_mat,
                   plane='top')
         _turned('bowl', 0.13, 0.2, [(0.0, 0.0), (0.022, 0.0), (0.034, 0.012), (0.04, 0.03), (0.036, 0.031), (0.03, 0.016),
                                     (0.0, 0.012)], M.toy_green, segments=12, y=0.802)
         F.sweep('spoon', [(0.06, 0.806, 0.17), (0.1, 0.81, 0.23), (0.15, 0.83, 0.235)], 0.0035, M.toy_yellow, verts=5)
-    G.join(parts, 'tray')
+    tray = G.join(parts, 'tray')
     _place()
+    # out along the arms as the baby is put in (and taken out), then back in front of them
+    G.slide(tray, 'tray_out', (0, -0.16, 0), seconds=0.5)
     return G.meshes()
 
 
@@ -1698,6 +1701,7 @@ FAMILY = G.Family(
         G.Model('kidsBedCar', kidsBedCar, size=(0.985, 0.775, 1.916), key='model.kidsBedCar', centre=(0.0, 0.028),
                 motions=TURN_DOWN, paint=[('car', 'Car body'), ('car_bedding', 'Bedding')]),
         G.Model('highChair', highChair, size=(0.533, 0.945, 0.554), key='model.highChair', centre=(0.0, 0.06),
+                motions={'uses': {'sit': {'clip': 'tray_out', 'hold': 1.0, 'out': 1.2}}},
                 paint=[('chair_white', 'Frame'), ('chair_cushion', 'Bedding')]),
         # KD2
         G.Model('toyBox', toyBox, size=(0.82, 0.51, 0.802), key='model.toyBox', centre=(0.0, -0.0389),

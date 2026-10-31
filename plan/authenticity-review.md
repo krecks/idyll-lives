@@ -42,7 +42,7 @@ Counted on `e725166`.
 | Houses | walls, 7 door styles, 6 window styles, 25 wall and 13 floor coverings, roofs, porches, chimneys, garages, neighbour shells | `base.json` style lists | code: `web/src/render/babylon/house.ts` |
 | Town, built in code | fences, roads and pavements, 4 car bodies, streetlights, mailboxes, hydrants, bins, shop silhouettes | `fences.ts`, `roads.ts`, `street.ts` (`CARS`) | code |
 | Residents | 2 bodies × 6 life stages, 11 hairstyles plus bald and beard, painted clothes (7/3 male, 6/4 female tops and bottoms, 4 shoes), garment shells | `docs/characters-format.md`, `docs/design/look.md` | `cargo characters` (`crates/tools/src/characters/`) |
-| Resident clips | about 55 clips (locomotion, seated, use and cooking, social, garden, lying, baby, street) plus procedural layers | `web/src/render/babylon/characters/clips/index.ts` | TypeScript key poses |
+| Resident clips | about 55 clips (locomotion, seated, use and cooking, social, garden, lying, baby, street) plus procedural layers | `web/src/render/shared/characters/clips/index.ts` | TypeScript key poses |
 | Object motions | 316 of 577 models (uses, loops, idle, ride, open, night, growth, clock) | `web/public/assets/packs/*/manifest.json` `motions` | Blender clips, `objectMotion.ts` |
 | Code-driven motion | front and bathroom door swing, lamp fades, blankets, held grips | `BabylonRenderer.swingDoors`, `characters.ts` | code |
 | Object interactions | 599 interactions on 541 objects; 159 objects have none | content `interactions` | content and `characters.ts` `ACTIONS` |
@@ -59,7 +59,7 @@ Each reviewer works from these lists and records a verdict per line: **OK**, **f
 
 **Size and proportion**
 - M1. Overall W × H × D is inside a real-world range for the thing (§3.4 reference table). Built size comes from the `cargo check-glb` summary line, not from the family notes.
-- M2. Functional heights match people: seat, table top, counter, desk, bed mattress, sink rim, toilet seat, shelf reach, light switch, handle heights. They also agree three ways: content (`seat.height`, `surface.height`, `light.height`), the renderer tables (`web/src/render/babylon/characters/furniture.json`) and the mesh. A height up to 1 cm out (5 mm on table tops) counts as inside: the modelling grid and bevels move it that much.
+- M2. Functional heights match people: seat, table top, counter, desk, bed mattress, sink rim, toilet seat, shelf reach, light switch, handle heights. They also agree three ways: content (`seat.height`, `surface.height`, `light.height`), the renderer tables (`web/src/render/shared/characters/furniture.json`) and the mesh. A height up to 1 cm out (5 mm on table tops) counts as inside: the modelling grid and bevels move it that much.
 - M3. Parts are in proportion to each other: a fridge handle against the door, a drawer against the carcass, a tap against the basin.
 - M4. The model fits its footprint and layer: floor, surface, wall back on the wall face, ceiling hanging from 2.8 m. A model may be smaller than its tile only where a real one would be.
 

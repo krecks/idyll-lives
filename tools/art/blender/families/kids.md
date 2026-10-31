@@ -37,9 +37,11 @@ creases move its vertices up and down only (`_rumple`): `G.jitter` sideways move
   quilt over the sleeper. The car's body, wheels and spoiler are
   still.
 - **High chair**: its legs splay to 0.54 m each way at the floor, so it can't tip (2026-10-21, review M-kids-04:
-  0.44 × 0.47 m); the seat stays at 0.61 m. Static, and left decorative in 0.3.0. Its tray is a part of its own (no clip yet), so a "tray
-  slides out" clip can come with a use. Content can't give it one yet: a baby is only ever placed lying (`baby`,
-  `care` are for a baby lying in an object), so feeding a baby in the chair needs the sim first.
+  0.44 × 0.47 m); the seat stays at 0.61 m. Babies sit in it since G-66 (*Sit in the high chair*, `sit`, put in by
+  a carer). Its tray is a part of its own: `tray_out` slides it 16 cm forward along the arms in 0.5 s as the baby is
+  put in, holds it there 1 s and slides it back in front of them; it slides out again for 1.2 s as they are taken
+  out (`out`) (2026-10-26, review I-kids-01). Its mat is a plain satin (`tray_mat`, the cushions' blue), not the
+  cushions' fabric, so the tray is one draw: 3 in all (the body's plain and fabric, the tray).
 
 ## KD2: the toys
 
@@ -79,7 +81,7 @@ town at its left. Its track is a circle (the old part's is an oval), so the trai
 | `model.crib` | 1.94 × 1.01 × 0.69 m | 7,344 | 3 | Frame, Bedding, Mobile | turned finials, round spindles, solid arched ends with a heart and a star cut through, a piped mattress, a folded blanket; the mobile's arm bent from one tube on a clamp, its arms curving to a star, a heart, a moon and a ball facing out; the chest's drawers shaker fronts with turned knobs, a contoured changing pad between bolsters, a guard rail in one piece |
 | `model.kidsBed` | 0.97 × 0.76 × 1.88 m | 5,922 | 3 | Frame, Bedding | turned bun feet, a rounded rim round the base, two drawers under it (cut-out grips), a piped mattress, an arched headboard with a moon and two stars cut through it, bunting draped on a string, a guard rail bent from one tube, a soft pillow, a sitting teddy, a soft rumpled duvet |
 | `model.kidsBedCar` | 0.99 × 0.78 × 1.92 m | 6,776 | 3 | Car body, Bedding | sides extruded from the car's profile (nose, sill, tail, arches over the wheels), bonnet and tail between them, revolved tyres and dished hubs, headlights in rims, a barred grille, bonnet stripes, side stripes and a number 7 on each roundel, an aerofoil wing on struts between end plates; mattress, pillow, duvet soft |
-| `model.highChair` | 0.53 × 0.94 × 0.55 m | 2,926 | 2 | Frame, Bedding | tapered legs on rubber feet, stretchers and a footrest bar, a moulded seat, a piped cushion and back cushion, a rounded back, rolled arms bent in one piece, a harness and buckle; the tray rounded, rimmed, a mat, a bowl and a spoon |
+| `model.highChair` | 0.53 × 0.94 × 0.55 m | 2,926 | 3 | Frame, Bedding | tapered legs on rubber feet, stretchers and a footrest bar, a moulded seat, a piped cushion and back cushion, a rounded back, rolled arms bent in one piece, a harness and buckle; the tray rounded, rimmed, a mat, a bowl and a spoon |
 | `model.toyBox` | 0.82 × 0.51 × 0.80 m | 3,360 | 2 | Body, Lid | walls in one piece with rounded corners and hand holds cut through the ends, a rim along their top, a star, a circle and a triangle set in framed tiles; the lid with a finger notch, a raised panel and a piano hinge; inside a banded ball, lettered blocks and a teddy; lettered blocks on the floor |
 | `model.toyChest` | 0.85 × 0.53 × 0.51 m | 3,596 | 2 | Body, Trim | bun feet, plank grooves, bands and straps, iron corner plates, bail handles on plates; the lid domed, straps over the dome, a lock plate with a keyhole; toys inside |
 | `model.dollHouse` | 0.84 × 0.91 × 0.45 m | 3,808 | 2 | Walls, Roof | courses of shingles on the roof, a ridge, a chimney, a round gable window; inside a sofa, a round table and lamp, a staircase, a bed with a headboard, a cupboard, a framed picture; the front with corner boards, a panelled door under a porch, framed windows with sills, glazing bars and louvred shutters, a flower box |

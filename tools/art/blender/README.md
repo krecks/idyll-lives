@@ -98,7 +98,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
   - Lying, the head is about 0.84 m behind that middle and the feet 0.86 m in front, whatever the
     footprint.
   - A bed's mattress is wherever its footprint's middle is. Its height is the renderer's
-    `beds` table in `web/src/render/babylon/characters/furniture.json` (default 0.5 m), not the model's.
+    `beds` table in `web/src/render/shared/characters/furniture.json` (default 0.5 m), not the model's.
 
 ## A new object
 
@@ -187,8 +187,8 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
   living room a living room.
 - **Opening and closing.** For something that opens and stays open (the wall bed), use the interaction
   fields `when` and `leaves`, and the model's `motions.open` (below).
-- **Renderer tables** (`web/src/render/babylon/characters.ts`), keyed by object id:
-  - `BEDS`: mattress-top height, for anything residents lie on;
+- **Renderer tables** (`web/src/render/shared/characters/seats.ts`), keyed by object id:
+  - `BEDS` (from `furniture.json`'s `beds`): mattress-top height, for anything residents lie on;
   - `BLANKET_BEDS`: whether sleepers get a blanket. Then don't model a full duvet: it shows doubled.
 - **Tests.**
   - `cargo test -p sim-core --test shipped_content` checks every object's and item's model has its file

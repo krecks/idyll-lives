@@ -10,9 +10,11 @@ reflecting every frame on High), listed in
 The world has one look: soft, painterly shading with golden-hour light and blue moonlit nights.
 All art is original or CC0.
 
-Code: `web/src/render/look.ts` holds the look as data; `web/src/render/babylon/*` applies it, and
-`softLook.ts` draws every lit surface in the soft shading below (Settings, Performance, Shading;
-the `classic` option brings back the PBR shading it replaced).
+Code: `web/src/render/look.ts` holds the look as data, in the units it was tuned in up to 0.3.2 (a
+sun or a lamp of strength 1 lights a white surface to 1/π); `web/src/render/pc/*` applies it on
+PlayCanvas (its units converted in `lightUnits.ts`, see [graphics.md](graphics.md#the-renderer)),
+and `shaders/softLook.ts` draws every lit surface in the soft shading below (Settings, Performance,
+Shading; the `classic` option brings back the PBR shading it replaced).
 
 ## Goals
 
@@ -45,24 +47,23 @@ the `classic` option brings back the PBR shading it replaced).
 
 ## Shading
 
-Every lit PBR surface is drawn with the **soft look** (`softLook.ts`, a material plugin that works
-on WebGPU and WebGL2). It keeps the light PBR computed — the sun and the lamps, with their cast
+Every lit PBR surface is drawn with the **soft look** (`render/pc/shaders/softLook.ts`, a shader
+feature of the game's materials in GLSL and WGSL, for WebGPU and WebGL2). It keeps the light PBR computed — the sun and the lamps, with their cast
 shadows — and redraws it as a wide, soft ramp in the light's own colour, so golden hour stays
 golden, lamps stay warm and night stays dark. The environment (the sky, with its occlusion) fills
 the shade at just over half, tinted cool, so shadows read blue-grey rather than black. A gentle
 fresnel rim lifts silhouettes and a little extra saturation keeps the palette lively. There are no
 ink outlines: the look is soft and illustrative, not cel-shaded.
 
-The plugin replaces the material's colour just before fog and image processing, so ACES, the
-exposure and the night grade still apply, and it runs after the wall cutaway and the basements.
+It replaces the material's colour just before fog and image processing, so ACES, the exposure
+and the night grade still apply, and it runs after the wall cutaway and the basements.
 Metals shade in their base colour (PBR gives them no diffuse colour); unlit materials keep their own
 look. Water, the sky and glass panes that keep their reflections keep their own materials on
 purpose.
 
 It is the default (Settings, Performance, **Shading**). **Classic** draws the PBR shading it
-replaced, and switching is live: the plugin takes its define from the setting whenever a material's
-shaders are prepared, so the materials (the game's and the preview studios') are only marked dirty
-to redraw them the other way. The item pictures in Furnish and the portraits are drawn in the chosen
+replaced, and switching is live: every lit material (the game's and the preview studios') gets the
+other define and its shaders compile again (`MaterialLibrary.setShading`). The item pictures in Furnish and the portraits are drawn in the chosen
 shading and cached per shading; Furnish keeps its pictures between visits per app version, so a
 change to the look's code bumps the picture store's version in `preview/items.ts`. On the dev
 server `?look=soft|classic` overrides the setting.
@@ -73,15 +74,15 @@ server `?look=soft|classic` overrides the setting.
 |---|---|
 | Houses | `house.ts` generates walls from the simulation layout: siding or brick per house, interior paint per room, a tiled wainscot in bathrooms, a stone plinth, corner boards, a frieze, baseboards, windows with muntins, shutters and sills, door casings, painted doors, and gable or hip roofs (34° pitch, 0.4 m overhang, closed gables). |
 | Cutaway | Done on the GPU. Each wall vertex stores which view directions it hides, and the vertex shader lowers it to a 0.35 m stub. Roofs show only with walls up and when not zoomed in. |
-| Night interiors | Every lamp gives warm light (clustered lighting, up to 32 lamps) on Medium and High; on Low only the four nearest the biggest rooms do, the storey in view first. A room with no lamp gets a dim fill. Lamps switch on and off (the player per lamp, residents per room as they come and go); a room whose lamps are all off goes dark at the windows. When everyone in a room is asleep its lights go out and its windows stop glowing, and a neighbour's windows glow only while one of its residents is home and up. Windows glow from outside at night only. |
+| Night interiors | Every lamp gives warm light (clustered lighting, up to 32 lamps) on Medium and High; on Low only the four nearest the biggest rooms do, the storey in view first. Each lights only its own room, on every preset (a room per half of a tile split by a diagonal wall). A room with no lamp gets a dim fill. Lamps switch on and off (the player per lamp, residents per room as they come and go); a room whose lamps are all off goes dark at the windows. When everyone in a room is asleep its lights go out and its windows stop glowing, and a neighbour's windows glow only while one of its residents is home and up. Windows glow from outside at night only. |
 | Sunlight indoors | The sun comes in through windows and doorways only: walls cast in every wall mode under a shadow-only ceiling. A room without windows is dark by day, as a basement is, and its lamps light it day and night. |
 | Garden | A bright yellow-green lawn, foundation shrubs, lot trees, clouds and a sun glow in the sky. |
 | Selection marker | A small marker over the selected resident. Its colour follows their mood through a five-step palette (`marker` in `look.ts`). |
-| Residents | Made in code (`cargo characters`): smooth, slightly toy-like bodies (an adult's head about 1/6.5 of the height, hands and feet a little large) from a cage of rounded cross-sections, subdivided once, with a low-detail copy for far residents and shadows. Women and men are separate bodies; each life stage, from a baby to an elder, has its own proportions, and a build slider makes anyone slimmer or broader. The head never deforms: eyelids, brows, lips, teeth, tongue and the beard are small shapes moved by morphs (ARKit face units for moods, one whole-face recipe per emotion adapted from TalkingHead's expressions; idle micro-expressions; blinks and lids following the gaze; visemes for lip sync). Eyes are drawn by the shader (iris in the resident's eye colour, pupil, catchlight) and turn on bones. Eleven hairstyles, bald and a beard, built from caps, curtains, lobes and tails, in flat colour with soft clump bands; long hair and tails follow the neck and shoulders. Clothes are painted on the body by its shader (tops, bottoms and shoes in the creator's colours, with soft edges), with shells only where the silhouette needs them (jackets and suits, collars, skirts, soles and boot cuffs). Skin takes the creator's tone, warmed as real skin reflects, deep tones keeping enough value for their features to read; cavities deepen with age. Clips are made in code (`characters/clips`) with arm and leg IK: residents stand relaxed with the weight drifting from leg to leg, walk with planted feet and a hip sway (more in women), sit back onto seats, lie under a blanket, and carry dishes on their palms. See `tools/characters/README.md`. |
+| Residents | Made in code (`cargo characters`): smooth, slightly toy-like bodies (an adult's head about 1/6.5 of the height, hands and feet a little large) from a cage of rounded cross-sections, subdivided once, with a low-detail copy for far residents and shadows. Women and men are separate bodies; each life stage, from a baby to an elder, has its own proportions, and a build slider makes anyone slimmer or broader. The head never deforms: eyelids, brows, lips, teeth, tongue and the beard are small shapes moved by morphs (ARKit face units for moods, one whole-face recipe per emotion adapted from TalkingHead's expressions; idle micro-expressions; blinks and lids following the gaze; visemes for lip sync). Eyes are drawn by the shader (iris in the resident's eye colour, pupil, catchlight) and turn on bones. Faces have a nose shaped by the head's cage, full lips with a cupid's bow, a lid crease and tapered brows, and soft folds that come with age. Hands have five fingers with a knuckle and a middle joint, curling together into a fist. Eleven hairstyles, bald and a beard, built in locks (grooved caps with a whorl and a parting, thick curtains with curled, uneven hems, tufts, puffs, a plaited braid), in the hair colour with clump bands and a soft sheen that shows on dark hair; long hair and tails follow the neck and shoulders. Clothes are painted on the body by its shader (tops, bottoms and socks in the creator's colours, with soft edges, turned hems, cuffs, a waistband, a neck rib and stitch lines; a shirt of its own in an open jacket), with shells only where the silhouette needs them (jackets and suits with banded edges, collars, skirts, shoes: an upper with a collar and laces on a sole that stands out round it). Skin takes the creator's tone, warmed as real skin reflects, deep tones keeping enough value for their features to read. Creases are baked into every part as the furniture's are (ambient occlusion: armpits, neck, inside a jacket, between fingers, deep in the hair), deepening with age. Clips are made in code (`characters/clips`) with arm and leg IK: residents stand relaxed with the weight drifting from leg to leg, walk with planted feet and a hip sway (more in women), sit back onto seats, lie under a blanket, and carry dishes on their palms. See `tools/characters/README.md`. |
 
 ## Birds
 
-Garden birds live about the viewed lot (`render/babylon/birds.ts`; presentation only, nothing in the simulation or the save): blue tits, chaffinches, willow warblers, blackbirds and collared doves, Blender-built (`tools/art/blender/families/birds.py`) in five rigid parts the renderer moves (body, head, tail and the two spread wings, hidden while perched). They are drawn 1.25–1.6× life size, the small ones most: at real size a tit is about 5 px from the game's usual camera, and the game's apples and flowers are a little larger than life too, so they still differ in size as they should.
+Garden birds live about the viewed lot (`render/shared/birds.ts`, drawn by `render/pc/birds.ts`; presentation only, nothing in the simulation or the save): blue tits, chaffinches, willow warblers, blackbirds and collared doves, Blender-built (`tools/art/blender/families/birds.py`) in five rigid parts the renderer moves (body, head, tail and the two spread wings, hidden while perched). They are drawn 1.25–1.6× life size, the small ones most: at real size a tit is about 5 px from the game's usual camera, and the game's apples and flowers are a little larger than life too, so they still differ in size as they should.
 
 - **Homes:** each bird belongs to a plant near the lot (the lot's garden trees and shrubs, garden things outdoors, the street's bushes and hedges, the woods near the town), as many as its size and the preset allow (`birds` in [graphics.md](graphics.md)), made from where it stands, so a rebuild brings back the same birds. Species go by habitat: tits, finches and warblers in broadleaved trees and bushes, blackbirds low in bushes and on the lawn, collared doves in pairs, high up and on the roof ridge (while the roof shows).
 - **Perched:** on a perch point of the plant's model (manifest `perches`, on its outer twigs), swaying as the wind bends the branch (the vertex shader's bend, worked out on the CPU). Small jerky glances of the head, a cock of it, a flick of the tail (a blackbird holds it up a moment), preening now and then, a hop to a nearby twig or a turn on the spot. Small birds fidget; doves sit still and long. A bird that sings lifts its head and holds still.

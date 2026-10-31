@@ -75,9 +75,12 @@
       },
       "motions": {
         "uses": {
-          "treat": "till"
-        },
-        "hold": 1.5
+          "treat": {
+            "clip": "till",
+            "delay": 3.9,
+            "hold": 1.1
+          }
+        }
       },
       "paint": [
         {
@@ -140,9 +143,17 @@
       },
       "motions": {
         "uses": {
-          "pastry": "door"
-        },
-        "hold": 2.0
+          "pastry": {
+            "clip": "door",
+            "delay": 1.0,
+            "hold": 1.4
+          },
+          "takeCake": {
+            "clip": "door",
+            "delay": 1.0,
+            "hold": 1.4
+          }
+        }
       },
       "paint": [
         {

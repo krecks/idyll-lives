@@ -36,6 +36,8 @@ class Model:
                    'idle': clip going round all the time near the camera (G.spin, G.rock);
                    'night': clip held open from dusk to dawn (curtains drawn);
                    'growth': a crop's clip, held where its growth stage is (G.stages);
+                   'running': clip going round while a machine runs on its own, nobody at it
+                              (content `runs`: the washer's drum; G.spin);
                    'ride': the clip whose (first) part carries the residents sitting or lying on it
                            (a rocking chair's seat, a swing), played by `loops` or `uses`
       paint      the parts the player may colour (the pack's `paint`): [(material, label)], the main part

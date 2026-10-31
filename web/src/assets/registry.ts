@@ -56,10 +56,11 @@ export class AssetRegistry {
     return this.get(key, 'icon') ?? { type: 'icon', url: FALLBACK_ICON, mode: 'mask' };
   }
 
+  /** Says `problem` about `key` once (a lookup made every frame would otherwise fill the console). */
   private warnOnce(key: string, problem: string): void {
     if (this.warned.has(key)) return;
     this.warned.add(key);
-    console.warn(`[assets] '${key}' ${problem}; using fallback`);
+    console.warn(`[assets] '${key}' ${problem}`);
   }
 }
 
@@ -112,14 +113,18 @@ function extended(below: AssetEntry | undefined, entry: AssetEntry): AssetEntry 
   return { ...entry, ...((entry.vary ?? below.vary) !== undefined ? { vary: entry.vary ?? below.vary } : {}) };
 }
 
+/** The file references an entry has: every kind of entry has one or two of `URL_FIELDS`. */
+type UrlFields = Partial<Record<(typeof URL_FIELDS)[number], string>>;
+
 /** Makes file references absolute relative to the manifest that declared them, with this build's query. */
 function resolveUrls(entry: AssetEntry, base: URL): AssetEntry {
-  const out: Record<string, unknown> = { ...entry };
+  const out = { ...entry } as AssetEntry & UrlFields;
   for (const field of URL_FIELDS) {
-    const value = out[field];
-    if (typeof value === 'string') out[field] = withBuild(new URL(value, base).href);
+    const url = out[field];
+    // (A hand-written pack can put anything there: `null` would become a file called `null`.)
+    if (typeof url === 'string') out[field] = withBuild(new URL(url, base).href);
   }
-  return out as unknown as AssetEntry;
+  return out;
 }
 
 const FALLBACK_ICON =

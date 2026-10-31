@@ -168,7 +168,11 @@ impl Periodic {
         let mut f = vec![fs[n - 1]];
         f.extend(&fs);
         f.push(fs[0]);
-        Periodic { xp: x, fp: f, period }
+        Periodic {
+            xp: x,
+            fp: f,
+            period,
+        }
     }
 
     pub fn at(&self, x: f64) -> f64 {
@@ -323,7 +327,11 @@ pub fn percentile(a: &[f64], q: f64) -> f64 {
     let t = vi - prev;
     let (a, b) = (s[lo], s[hi]);
     let d = b - a;
-    if t >= 0.5 { b - d * (1.0 - t) } else { a + d * t }
+    if t >= 0.5 {
+        b - d * (1.0 - t)
+    } else {
+        a + d * t
+    }
 }
 
 /// `np.median`.
@@ -331,12 +339,18 @@ pub fn median(a: &[f64]) -> f64 {
     let mut s = a.to_vec();
     s.sort_by(f64::total_cmp);
     let n = s.len();
-    if n % 2 == 1 { s[n / 2] } else { (s[n / 2 - 1] + s[n / 2]) / 2.0 }
+    if n % 2 == 1 {
+        s[n / 2]
+    } else {
+        (s[n / 2 - 1] + s[n / 2]) / 2.0
+    }
 }
 
 /// `np.unique(rows, axis=0, return_inverse=True, return_counts=True)`: the distinct rows in
 /// lexicographic order, each row's index among them, and how often each occurs.
-pub fn unique_rows<T: Ord + Copy, const K: usize>(rows: &[[T; K]]) -> (Vec<[T; K]>, Vec<usize>, Vec<usize>) {
+pub fn unique_rows<T: Ord + Copy, const K: usize>(
+    rows: &[[T; K]],
+) -> (Vec<[T; K]>, Vec<usize>, Vec<usize>) {
     let mut o: Vec<usize> = (0..rows.len()).collect();
     o.sort_by(|&i, &j| rows[i].cmp(&rows[j]));
     let mut uniq: Vec<[T; K]> = Vec::new();
@@ -387,10 +401,18 @@ pub fn py_repr(x: f64) -> String {
         return "NaN".into();
     }
     if x.is_infinite() {
-        return if x > 0.0 { "Infinity".into() } else { "-Infinity".into() };
+        return if x > 0.0 {
+            "Infinity".into()
+        } else {
+            "-Infinity".into()
+        };
     }
     if x == 0.0 {
-        return if x.is_sign_negative() { "-0.0".into() } else { "0.0".into() };
+        return if x.is_sign_negative() {
+            "-0.0".into()
+        } else {
+            "0.0".into()
+        };
     }
     let e = format!("{x:e}");
     let (mant, exp) = e.split_once('e').unwrap();
@@ -404,14 +426,22 @@ pub fn py_repr(x: f64) -> String {
             if n <= exp + 1 {
                 format!("{digits}{}.0", "0".repeat((exp + 1 - n) as usize))
             } else {
-                format!("{}.{}", &digits[..(exp + 1) as usize], &digits[(exp + 1) as usize..])
+                format!(
+                    "{}.{}",
+                    &digits[..(exp + 1) as usize],
+                    &digits[(exp + 1) as usize..]
+                )
             }
         } else {
             format!("0.{}{digits}", "0".repeat((-exp - 1) as usize))
         };
         format!("{sign}{s}")
     } else {
-        let m = if digits.len() > 1 { format!("{}.{}", &digits[..1], &digits[1..]) } else { digits };
+        let m = if digits.len() > 1 {
+            format!("{}.{}", &digits[..1], &digits[1..])
+        } else {
+            digits
+        };
         let es = if exp < 0 { '-' } else { '+' };
         format!("{sign}{m}e{es}{:02}", exp.abs())
     }
@@ -433,7 +463,10 @@ mod tests {
         assert_eq!(interp(2.0, &xp, &fp), 1.0);
         // np.interp(x, [-3, -1, 1, 3], [0, 1, 2, 3], period=8) at x = 3.5, -3.5, 7, 4.
         let p = Periodic::new(&[-3.0, -1.0, 1.0, 3.0], &[0.0, 1.0, 2.0, 3.0], 8.0);
-        assert_eq!([p.at(3.5), p.at(-3.5), p.at(7.0), p.at(4.0), p.at(0.0)], [2.25, 0.75, 1.0, 1.5, 1.5]);
+        assert_eq!(
+            [p.at(3.5), p.at(-3.5), p.at(7.0), p.at(4.0), p.at(0.0)],
+            [2.25, 0.75, 1.0, 1.5, 1.5]
+        );
     }
 
     #[test]
@@ -448,7 +481,10 @@ mod tests {
 
     #[test]
     fn gradient_edges() {
-        let p: Vec<V3> = [0.0, 1.0, 4.0, 9.0].iter().map(|&x| V3::new(x, 0.0, -x)).collect();
+        let p: Vec<V3> = [0.0, 1.0, 4.0, 9.0]
+            .iter()
+            .map(|&x| V3::new(x, 0.0, -x))
+            .collect();
         let g: Vec<f64> = gradient(&p).iter().map(|v| v.x).collect();
         assert_eq!(g, [1.0, 2.0, 4.0, 5.0]);
     }
@@ -466,7 +502,10 @@ mod tests {
 
     #[test]
     fn rounding() {
-        assert_eq!([0.5f64, 1.5, 2.5, -0.5, -1.5].map(f64::round_ties_even), [0.0, 2.0, 2.0, -0.0, -2.0]);
+        assert_eq!(
+            [0.5f64, 1.5, 2.5, -0.5, -1.5].map(f64::round_ties_even),
+            [0.0, 2.0, 2.0, -0.0, -2.0]
+        );
         assert_eq!(py_round(0.123456789, 4), 0.1235);
         assert_eq!(py_round(2.675, 2), 2.67); // 2.675 is just below the tie
         assert_eq!(np_round(0.00125, 4), 0.0012);
@@ -498,9 +537,21 @@ mod tests {
         a[10] = -0.5;
         a[12] = -0.25;
         a[13] = -0.25;
-        assert_eq!(argsort_numpy(&a), [10, 13, 12, 0, 20, 21, 22, 19, 23, 25, 26, 27, 28, 29, 30, 24, 18, 16, 31, 15, 14, 11, 9, 8, 7, 6, 5, 4, 3, 2, 1, 17, 32]);
+        assert_eq!(
+            argsort_numpy(&a),
+            [
+                10, 13, 12, 0, 20, 21, 22, 19, 23, 25, 26, 27, 28, 29, 30, 24, 18, 16, 31, 15, 14,
+                11, 9, 8, 7, 6, 5, 4, 3, 2, 1, 17, 32
+            ]
+        );
         let b: Vec<f64> = (0..33).map(|i| -((i % 3) as f64) * 0.1).collect();
-        assert_eq!(argsort_numpy(&b), [32, 29, 2, 26, 5, 23, 8, 20, 11, 17, 14, 28, 25, 22, 19, 31, 16, 13, 10, 7, 4, 1, 18, 12, 21, 9, 24, 6, 27, 3, 30, 15, 0]);
+        assert_eq!(
+            argsort_numpy(&b),
+            [
+                32, 29, 2, 26, 5, 23, 8, 20, 11, 17, 14, 28, 25, 22, 19, 31, 16, 13, 10, 7, 4, 1,
+                18, 12, 21, 9, 24, 6, 27, 3, 30, 15, 0
+            ]
+        );
         // Any order it gives is sorted.
         let c: Vec<f64> = (0..200).map(|i| ((i * 37) % 11) as f64).collect();
         let o = argsort_numpy(&c);

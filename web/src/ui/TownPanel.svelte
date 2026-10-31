@@ -2,6 +2,7 @@
   import Icon from './Icon.svelte';
   import { clock } from './format';
   import SimPreview from './kit/SimPreview.svelte';
+  import { closeOutside } from './kit/popup';
   import { services } from './services';
   import { game } from './state.svelte';
   import { settings } from '../settings/settings.svelte';
@@ -29,9 +30,8 @@
 </script>
 
 {#if game.townOpen}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="scrim" onclick={() => (game.townOpen = false)}></div>
-  <div class="town glass" role="dialog" aria-label="Town map">
+  <!-- No backdrop: the world behind keeps its clicks and camera drags (`kit/popup.ts`). -->
+  <div class="town glass" id="town-map" use:closeOutside={() => (game.townOpen = false)} role="dialog" aria-label="Town map">
     <header>
       <b>Town</b>
       {#if me && me.plot !== homePlot}
@@ -89,11 +89,6 @@
 {/if}
 
 <style>
-  .scrim {
-    position: absolute;
-    inset: 0;
-    pointer-events: auto;
-  }
   .town {
     position: absolute;
     top: var(--top);

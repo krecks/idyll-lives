@@ -184,6 +184,21 @@ def grow(obj, clip, seconds=0.4, axis='Z'):
     return _clip(obj, clip, 'scale', i, obj.scale[i], 1.0, seconds)
 
 
+def grow_in_turn(objs, clip, seconds=1.5, axis='Z'):
+    """A clip `clip` in which `objs` grow one after another, the first first, each in its share of `seconds`, along
+    `axis` from where it is (built small and hidden) to full size: the washing pegged out line by line. Played along
+    with a use (`over`), they come one at a time through it; played back, the last goes first."""
+    i = 'XYZ'.index(axis)
+    end = last_frame(seconds)
+    bounds = [1 + round((end - 1) * k / len(objs)) for k in range(len(objs) + 1)]
+    for obj, a, b in zip(objs, bounds, bounds[1:]):
+        rest = obj.scale[i]
+        keys = [(1, rest), (a, rest), (b, 1.0), (end, 1.0)]
+        keys = [kv for n, kv in enumerate(keys) if n == 0 or kv[0] != keys[n - 1][0]]   # one key a frame
+        _clip(obj, clip, 'scale', i, keys)
+    return _peak(objs[-1], clip, end)
+
+
 def _clip(obj, clip, path, index, a, b=None, seconds=None, linear=False):
     """Keys `obj`.`path`[`index`] from `a` (frame 1) to `b` at the end of `seconds`, or at the frames of
     `a` when it is a list of (frame, value); in an action pushed to the NLA track `clip` (one action per

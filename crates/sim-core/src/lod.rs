@@ -37,16 +37,25 @@ impl World {
     /// detail is on, there's a view, and they're neither of the player's household, nor on a
     /// watched lot, nor near the view.
     pub fn full_detail(&self, i: usize) -> bool {
-        let Some(s) = self.sims.get(i) else { return false };
-        let Some([x0, z0, x1, z1]) = self.view.filter(|_| self.lod) else { return true };
+        let Some(s) = self.sims.get(i) else {
+            return false;
+        };
+        let Some([x0, z0, x1, z1]) = self.view.filter(|_| self.lod) else {
+            return true;
+        };
         let watched = |p: u32| self.watched.get(p as usize).copied().unwrap_or(false);
         let m = VIEW_MARGIN;
         // (Upstairs is the same ground: the view is on the ground storey's rows.)
         let [x, z] = s.pos;
         let z = self.ground_z(z.floor() as i32) as f32 + z.fract();
-        self.households.get(s.household as usize).is_some_and(|h| h.player)
+        self.households
+            .get(s.household as usize)
+            .is_some_and(|h| h.player)
             || self.briefs.get(i).and_then(|b| b.plot).is_some_and(watched)
-            || (x >= x0 as f32 - m && z >= z0 as f32 - m && x <= x1 as f32 + m && z <= z1 as f32 + m)
+            || (x >= x0 as f32 - m
+                && z >= z0 as f32 - m
+                && x <= x1 as f32 + m
+                && z <= z1 as f32 + m)
     }
 }
 
@@ -55,10 +64,22 @@ impl World {
 pub(crate) fn plan(w: &mut World) {
     if let Some([x0, z0, x1, z1]) = w.view.filter(|_| w.lod) {
         w.watched.clear();
-        w.watched.extend(w.plots.iter().map(|p| p.x < x1 && p.x + p.w > x0 && p.z < z1 && p.z + p.d > z0));
+        w.watched.extend(
+            w.plots
+                .iter()
+                .map(|p| p.x < x1 && p.x + p.w > x0 && p.z < z1 && p.z + p.d > z0),
+        );
         let player = |h: u32| w.households.get(h as usize).is_some_and(|h| h.player);
-        let homes = w.households.iter().filter(|h| h.player).filter_map(|h| h.plot);
-        let with_them = w.briefs.iter().filter(|b| b.here && player(b.household)).filter_map(|b| b.plot);
+        let homes = w
+            .households
+            .iter()
+            .filter(|h| h.player)
+            .filter_map(|h| h.plot);
+        let with_them = w
+            .briefs
+            .iter()
+            .filter(|b| b.here && player(b.household))
+            .filter_map(|b| b.plot);
         for p in homes.chain(with_them) {
             w.watched[p as usize] = true;
         }
@@ -110,7 +131,10 @@ mod tests {
                 w.tick_once();
             }
         }
-        assert!(lower.full_detail(0), "the player's household is always at full detail");
+        assert!(
+            lower.full_detail(0),
+            "the player's household is always at full detail"
+        );
         assert!(!lower.full_detail(1), "the neighbour's lot isn't watched");
         assert!(full.full_detail(1));
         // Needs run down the same, at most a turn behind.

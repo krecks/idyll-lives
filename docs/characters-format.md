@@ -2,8 +2,9 @@
 
 The residents (bodies, faces, hair, clothes) are generated in code by `cargo characters` (in Rust,
 `crates/tools/src/characters`), and their animation clips are made in code in
-`web/src/render/babylon/characters/clips`. This page is the contract between the generator, the
-clips and the runtime (`web/src/render/babylon/characters*`). Everything here is original work.
+`web/src/render/shared/characters/clips`. This page is the contract between the generator, the
+clips and the runtime (`web/src/render/shared/characters/`, drawn by `web/src/render/pc/characters.ts`).
+Everything here is original work.
 
 ```
 cargo characters build                                # writes web/public/assets/characters, then checks it
@@ -17,13 +18,14 @@ The build is deterministic (seeded noise only): the same code gives the same byt
 
 ## Conventions
 
-- Babylon's left-handed space, metres, y up. A resident faces +z; their left is -x.
+- The game's left-handed space (Babylon's, which the PlayCanvas renderer keeps under its mirrored world
+  root), metres, y up. A resident faces +z; their left is -x.
 - Every rest local rotation is the identity. A bone's frame at rest is model space, and its local
   translation is the offset from its parent's joint. `restQ`, `pre`, `post` and `sourceRestQ` are
   absent or identity.
 - The rest pose is an A-pose: arms 45 degrees down, legs straight and vertical, a gently curled
   open hand.
-- Meshes are written with clockwise front faces (Babylon's left-handed convention). Inside the
+- Meshes are written with clockwise front faces (the left-handed convention, as Babylon had it). Inside the
   generator every mesh is counter-clockwise from outside; `write.py` turns the faces round.
 
 ## Skeleton (33 bones)
@@ -123,16 +125,88 @@ Every body has:
 | `teeth`, `tongue` | teeth; the mouth plate (dark, tone.y = 1) and tongue | Head | `mouth` |
 | `hair.<style>` | every hairstyle but `none` (`short crop layered tousled sideSwept afro bob long ponytail braid bun`) | Head, blending to neck_01 / spine_03 below the jaw | `hair` |
 | `hair.beard` | facial hair (male only; hidden for baby, child, teen) | Head; follows the mouth's morphs | `hair` |
-| `top.*`, `bottom.*`, `shoes.*` | shells, only where the silhouette needs one: jacket and suit (torso and upper arms, open in a V; the sleeves are painted), the collars of polo and shirt, the skirt, every shoe's soles and the boots' cuffs | from the body | `cloth` (flat colour) |
+| `top.*`, `bottom.*`, `shoes.*` | shells, only where the silhouette needs one: jacket and suit (torso and upper arms, open in a V; the sleeves are painted), the collars of polo and shirt, the skirt, every shoe (below) | from the body | `cloth` (flat colour) |
 | `lod.<shell>` | a low-detail copy of every shell | | `cloth` |
 
 `hair.none` has no part: a bald resident's scalp keeps the skin colour (appearance texel 7 w = 0).
 
+Hair (`hair.rs`, up to 3,000 triangles a style, one draw) is closed shapes in locks, so it breaks
+its outline and shades in clumps:
+
+- every style has a skull cap: rows from the crown to the hairline in locks 4 columns wide, which
+  leave the crown in a whorl, the grooves between them deepening to the hairline (none over the
+  ears); a parting where the style has one (short and side-swept at the side, long and buns in the
+  middle) is a groove the columns turn onto; short locks past the hairline at the temples and nape;
+  the rim comes down to the skin and goes round the ears in an arc, as a cut does: above an ellipse
+  round each ear's faces (seen from the head's centre, about 6 mm out), the hairline and the arc
+  rounded where they meet, on more columns there (7 for every 16 round the head, each side). The
+  afro's stands off the ears instead (its rim at the hairline, out past them) and closes under
+  itself in a hem, in to the skin and, over an ear, above its ellipse;
+- curtains (long, bob, layered) and fringes (bob) are sheets with a thickness: each row a closed
+  section with rounded edges, a rounded hem curled in, in locks (thinner between them, the edge
+  locks fuller), each lock's tip hanging lower than the partings either side of it. A curtain comes
+  out from under the cap and falls straight from the scalp's widest, out over the ears, its inner
+  face no nearer the back than `back(y)` (the long style's further off at the shoulders, which rise
+  under it sitting down);
+- the long style's fringe is two lofted locks a side from the parting past the cheek; side-swept,
+  three locks swept across the forehead; tousled, a lumpy cap and 22 tapering locks lifting at their
+  tips; the afro, a rounded shell in 46 round puffs; the ponytail's tail, a loft in four twisting locks;
+  the braid, three strands plaited (each a loft), a tie and a tuft; buns, twisted, with a band.
+- the beard is a shell over the jaw in locks, their tips below the chin, thinning to the skin at
+  its lower edge; the sideburns stop in front of the ears.
+- no hair comes within 2 mm of the head (`sdf`) or 1.5 mm of an ear (the body's ear faces), and no
+  edge passes through an ear, at every life stage at rest (`check`).
+
+The shader (`hair` branch of `characters/material.ts`) takes the hair colour with the clump bands
+(tone.z), and on dark hair lifts the clumps and a sheen band round the crown (where the strands, taken
+straight down the head from the normal, lie square to the half-way vector between the view and a light
+from above) towards a lighter tint; both even out under a pixel or two. The material has no PBR sheen
+(linked to the albedo it took the colour down to 8 %).
+
 The body (`body.rs`) is a control cage of superellipse rings (`cage.rs`; the head's cage
 in `head.rs`) fitted so its limit surface passes through the ring points and subdivided once
-(`subdiv.rs`): `body` is about 3.5k triangles of skin plus the face's lids and lips (budget
-4.5k), `lod.body` the cage at its limit plus the lids (budget 1.2k). Skin weights are set per ring
-and subdivide with the positions. Every stage of a family has the same cage.
+(`subdiv.rs`): `body` is about 5.2k triangles of skin plus the face's lids and lips (budget
+6k), `lod.body` the cage at its limit plus the lids (budget 1.4k; the fingers are on it too). Skin
+weights are set per ring and subdivide with the positions. Every stage of a family has the same cage.
+
+A hand is a palm with the ball of the thumb on it, a knuckle ring, four fingers and a thumb. A
+finger is a 6-sided tube in two bands: from the knuckles straight to just short of its middle
+joint (`fingers_02`'s joint, 0.42 palm lengths past the knuckle, so the outer band is about as long
+as the inner one), then on to a narrower ring before the rounded tip, curled a little at rest.
+Neighbouring fingers share the edges down into a crotch past the knuckles and stand apart beyond it,
+so the baked shade (tone w) darkens the gaps. The thumb is a 6-sided tube from the palm's thumb side
+and the palm next to it. Weights: the knuckle ring is about half `hand` and half `fingers_01` (more
+of the fingers' on the palm side), a finger `fingers_01` up to the middle joint and `fingers_02`
+past it (on `body` all of it from just past the joint, so the outer band stays round when it
+folds), so the clips' fist (`GRIP`) bends at the knuckles and the middle joints, the tips fold back
+onto the palm and all four fingers curl together; the thumb's as before (`thumb_01` / `thumb_02`).
+A small child's hand is a little wider, its fingers plumper and shorter.
+
+The head's cage (`head.rs`) is a grid of rows (from the jaw up) and columns (degrees round the head)
+under a crown patch: 8 rings of 12 round the whole head, and over the face a finer grid whose rows
+and columns run only part of the way, each ending on a whole one (so every face is a quad, or a
+pentagon or hexagon where a line ends on its side): columns at 7 degrees beside the nose's middle
+(from the mouth to over the eyes) and at 40 at the eyes' outer corners (from the nose's tip to the
+brow), rows at the mouth and the nose's base (to 28 degrees) and under and over the eyes (to 50).
+The points lie on a smooth head (a soft union of a cranium, cheeks-and-jaw, a muzzle and a chin
+ellipsoid: the face from the nose down stands up rather than sloping back to the chin); the features
+are offsets on them: the nose (a bridge from between the eyes to a round tip over the nose's base,
+its wings beside the tip and the base), the upper lip rounded forward with a groove down its middle
+(the philtrum), the brow, the ears. Between the grid's vertices the drawn head is snapped onto the
+smooth one (the cage's limit alone dents it by up to 4 mm there, where the grid's spacing is uneven
+and its partial lines end: patches on the cheeks), and the eye sockets are carved into every point
+of it (`sockets`): round each eye a shallow hollow (the eyes' fronts are about level with the face
+round them) that the eyeball stands out of, deepest at the eye's corners and going on down behind the
+eyeball under the lids; the LOD has one vertex in each, set back. The lids cover the sockets, so the
+skin's normals are the head's without them (and its shade is baked so, below). The LOD keeps the
+8 x 12 grid (`Cage::lod_faces`): the finer grid's vertices are in `lod.body` but unused. On the face
+(`face.rs`): lids reaching from a seam on the face round each socket (0.5 mm in front of it) to their
+edges on the eyeball, lying on the face as it is without the socket, or on the eye's bulge where that
+stands out, so a closed lid is the face with the eye's round under it and no socket shows round it;
+the lids meet on the eye's front at its corners, the upper has a crease above its edge. The lids'
+surface is the base stage's face as far from the eye in eye radii (`Face::lid_z`), so the channels,
+made on the base stage, close the lids over the eye at every stage. Full lips, tubes along the mouth,
+the upper with a cupid's bow over the philtrum; brows thickest at the inner end.
 
 The head interface (`head_frame(family, stage)`, `head.rs`): `sdf` is a smooth signed distance
 to the head and neck as drawn (the ears left out; about 1 mm near the surface), `surface_z` the
@@ -145,23 +219,49 @@ hairline and chin as before.
 | Part | x | y | z | w |
 |---|---|---|---|---|
 | body | sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, > 1 hand) | height (m, base body) | crew neckline (m, > 0 covered: distance from the neck's axis plus depth below a curve round the neck's base); head: -1 - scalp weight | scoop neckline (women: round and low in front; men: a V); head: -1 - scalp weight |
-| shells | hem distance (m) | flag: 1 sole, 2 waistband, 3 skirt | category: 0 top, 1 bottom, 2 shoes | 0 |
+| shells | hem distance (m; a shoe's from its collar, negative on its lining) | flag: 1 sole, 2 waistband, 3 skirt, 4 light midsole, 5 polished | category: 0 top, 1 bottom, 2 shoes | shoes: across the instep (m from its middle; over 1 off its front), else 0 |
 | eyes | offset from the iris centre on the eye's front (m), x | y | iris radius (m) | pupil radius (m) |
 | hair | 0.1 (unused) | | | |
 
 ## Tone (4 per vertex)
 
-x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = cavity darkening (armpits,
-between fingers, under the chin, between the lips, deep in the hair; the mouth plate is 1), z = hair
-clump bands (0..1), w reserved. The eyelids take the tone of the skin they lie on (build.rs). Every
-stage uses the base stage's tone; the shader deepens the cavities with the resident's age
-(appearance texel 4 g).
+x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = shade drawn by hand (the
+line between the lips, the upper lids' crease, the teeth's sides, deep in the hair; the mouth plate is
+1), z = hair clump bands (0..1: light in a lock's middle, dark in the parting between two) and on the
+body the face's age folds (0..1: a soft line from beside
+each nose wing down past the mouth's corner, `HeadFrame::fold`, each vertex's the mean over its
+triangles weighted by its barycentric weight, as the triangles can show it; the shader darkens the
+skin by `0.3 z age`, appearance texel 4 g, so young adults show none), w = the baked ambient occlusion
+(below). On `body` the eyelids take the tone of the face they lie on (as it is without the socket, at
+their nearest point), w included (the upper lid keeps its crease), and its normals there, in every
+shape of the face (build.rs `lid_shading`); on `lod.body` the mean tone of the skin round them. Every
+stage uses the base stage's tone.
+
+w is how much of the sky a vertex does not see at rest, 0 (open) to 1 (enclosed), in 32 steps
+(`ao.rs`, after the furniture's `gamekit/shade.py`): 48 rays per vertex over the hemisphere about its
+normal (cosine-weighted, a Fibonacci spiral twisted by the vertex's index), started 1.5 mm off the
+surface; a hit counts `1 - (d / 0.34 m)^2`. A vertex whose rays mostly meet a back face first is
+buried in another part and stays 0. On the head (from 0.1 hh under the chin up) a skin vertex takes
+instead the mean over its triangles (four points each, weighted by its barycentric weight), so a
+crease's shade narrower than the triangles (the skin against the lips, beside the nose) is not
+caught at a few vertices and spread in spikes; and the skin is baked as it is without the eye
+sockets (the lids cover them). What occludes what:
+
+- `body`: itself (its lids and lips included) and the teeth and tongue, not the eyes;
+- `lod.body`: the same, its own bake;
+- shells: themselves and `body`; their `lod.` copies themselves and `lod.body`;
+- `hair.*`, `hair.beard`: themselves, `body` and the eyes (one body serves every style and outfit,
+  so hair and clothes don't shade the skin).
+
+The shader takes the colour (after the painted clothes, on the body) times `1 - 0.8 min(k w, 1)`: as
+dark as the furniture's at most, reached once two thirds of the sky are hidden (k = 1.5; on the
+body 1.5 + 0.6 age, appearance texel 4 g, so elders' creases are deeper).
 
 The jacket, suit and skirt shells use their tone's xyz for their seated shape instead (m, in the
-rest space, before skinning; w 0): what moves each vertex from where a seated pose (`seated_pose`
-with the thighs turned 76° forward, as `sit` has them) skins it to where its seated shape is skinned
-(the skirt without its flare, its hollows between the legs bridged, the jacket without its hem's
-flare), out of the seated skin and no lower than the seat (`seated_tone`, clothes.rs). The runtime
+rest space, before skinning; w is still the occlusion): what moves each vertex from where a seated
+pose (`seated_pose` with the thighs turned 76° forward, as `sit` has them) skins it to where its
+seated shape is skinned (the skirt without its flare, its hollows between the legs bridged, the
+jacket without its hem's flare), out of the seated skin and no lower than the seat (`seated_tone`, clothes.rs). The runtime
 adds it as far as the thighs are turned forward (`writeSit`: from 15° to 76°, the mean of both, at
 the body's size; appearance texel 4 b), so a seated skirt lies on the lap and the jacket's hem on it
 instead of standing out round the seat as they hang standing.
@@ -173,7 +273,7 @@ fields) decides where it covers:
 
 - top: `(sleeve - x) * 0.55 > 0`, `y > hem`, `z > crew` (if set), `w > scoop` (if set);
 - bottom: `y < waist`, `y > leg`, `x < -0.5` (not on the arms);
-- shoes: `y < shoe`.
+- shoes: `y < shoe`, the sock's top (under the shoe's shell, and the sock in its collar's opening).
 
 A top with `over: true` (its hem is below the waistband: shirt, jacket, suit) is painted over the
 bottom; otherwise the bottom wins. Shoes win over both. Edges are anti-aliased; painted cloth is
@@ -182,12 +282,42 @@ paints the thighs (the shell hangs over them). Babies don't wear skirts (the she
 their drawn-up, spread legs): a baby whose outfit has one wears `bottom.shorts` in the top's colour,
 a romper (outfit.ts).
 
+Each painted cut edge is drawn as fabric (material.ts `simHem`, `BAND`): a turned band along it, a
+little darker (lighter on dark cloth), with a thin stitch line in it. The band is 2.2 cm at a cuff,
+2.4 cm at a top's or a leg's hem, a 1.6 cm rib at a crew neck, a 1.1 cm binding at a scoop, a 3.4 cm
+waistband and a 1.2 cm cuff at the sock's top (m on the fields, as the cuts). Bands and stitches fade
+out as they come under a few pixels: they show at the closest game camera (6 m) and are gone at the
+default one (24 m). The skirt's, the jacket's and the suit's shells have the hem band too, from
+their `fields.x`: the distance from the hem (the jacket's: from its nearest open edge, the hem, the
+lapels and the neck, not the sleeves' ends; 0 on the turned rim). The collars have none (0.05: out
+of reach).
+
+The shirt under an open jacket or suit has its own colour (outfit.ts `shirtUnder`): white under a
+suit, a charcoal tee under a light jacket, a white or grey one under a dark one. It is painted on the
+torso from the waistband up to the jacket's neck line (1 cm under `neck_01`, where clothes.rs cuts the
+shell outside the V; `OutfitFit.neck`), and above that only as a 1.2 cm collar at the neckline, so the
+jacket's colour still reaches the neck on the shoulders.
+
+A shoe's shell (`shoes.*`, clothes.rs `shoe`) is its upper and two soles. The upper is the foot's
+skin under the collar, lifted 3-6 mm off it (more on a toe box, round a heel counter, in a padded
+collar, at a boot's top; a dress shoe's toe drawn out forward) and skinned as the skin is, so it
+moves with the foot; its edges the collar crosses are split, and every point lies on the curved
+skin. The collar runs round the ankle, low at the sides (a boot's up the shin; a dress shoe's low,
+with a throat down the instep), its lining a band turned in to the skin. The sole stands a few mm out
+round the upper, from the floor (as the old soles: the clips and the seat fit stand on it) to its
+top; heels are thicker, and a heel's arch is lifted off the floor. Laces are bars across the
+instep (fields w and x); a sole is dark, or a light midsole over a dark outsole; dress shoes are
+polished. The low-detail copy is the low-detail body's skin, unsplit and unlined, on the same
+soles (fewer sides).
+
 What a resident wears changes with what it does (`Wear`, outfit.ts; characters.ts `wearFor`): its day
 clothes; pyjamas for a night's sleep in bed (a `sleep` use lying down: the `top.long` and
 `bottom.trousers` cuts in a sleep colour, barefoot); the day clothes barefoot for a nap on something
 slept in; a towel under a shower and sat in a bath (the bottom's cut alone, from under the arms, or
 round a man's hips, to the thigh); swimwear in a hot tub (a swimsuit, the `top.tank` cut down to the
-top of the legs, or trunks). Only the day clothes draw their shells: the others leave them out by the
+top of the legs, or trunks). Pyjamas have the bands of the cuts they reuse (cuffs, hems, a crew rib,
+an elastic waistband); the towel and swimwear are `plain` (no bands: a towel has no stitched cuff, and
+swimwear's edges are bound flat). Only the day clothes draw their shells: the others leave them out by the
 resident's row (`bare`), so a change of clothes draws nothing more. The towel's and swimwear's heights
 come from the base body's joints at rest (`OutfitFit`: under the arms half way between `spine_03` and
 `upperarm_l`, the hips and the knees).
@@ -215,9 +345,9 @@ Garment ids per family (outfit.ts):
 | 1 | top colour | top: hem |
 | 2 | bottom colour | top: crew cut |
 | 3 | hair colour (plain) | top: scoop cut |
-| 4 | r = 1 if the top is `over` the bottom; g = age (0 young, 0.4 adult, 1 elder); b = how far the shells take their seated shape (0..1, at the body's size; below) | bottom: waist |
+| 4 | r = 1 if the top is `over` the bottom, or 1 + n + y / 4 with a shirt under an open jacket (n: 1 white, 2 charcoal, 3 grey; y: the jacket's neck line, m), else 0, or -1 if `plain` (no bands); g = age (0 young, 0.4 adult, 1 elder); b = how far the shells take their seated shape (0..1, at the body's size; below) | bottom: waist |
 | 5 | skin reference (1) | bottom: leg cut |
-| 6 | shoe colour | shoes: top height |
+| 6 | shoe colour | shoes: the sock's top |
 | 7 | eye colour | 1 if the resident wears hair (the scalp takes the hair colour) |
 
 Then 12 texels of face morph (channel, weight) pairs. Disabled cuts are -10 (+10 for "below" cuts).
@@ -249,10 +379,24 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
   left upper arm brings it down to the side.
 - `thigh` sets `thigh_l` and the mirrored `thigh_r` (x, -y, -z); `thigh_r` sets one side and wins.
   Bones a pose doesn't name rest. `move` is the pelvis offset from rest (m, reference skeleton).
-- Clips hold fists (`GRIP`); the runtime opens the hands towards the rest (open) pose per activity.
+- Clips hold fists (`GRIP`: the fingers 100 degrees at the knuckles and 110 at the middle joints, the
+  tips on the palm, the thumb across them); the runtime opens the hands towards the rest (open) pose
+  per activity.
 - Clips start from the relaxed stance (feet under the hips, upright, arms hanging loose); the
-  runtime adds no stance corrections of its own (only the arms a little out over a skirt and an
-  elder's stoop), so a clip looks in game as it was authored.
+  runtime adds no stance corrections of its own (only the arms a little out over a skirt, an
+  elder's stoop and the body language below), so a clip looks in game as it was authored.
+- Body language (`characters/bodyLanguage.ts`): a layer over every clip for the emotion the face shows, by emotion
+  id (`BEARINGS`): the back bent or held up, the head bowed or raised, the shoulders dropped or drawn up, the arms
+  held in or loose, the elbows bent, the walk's arm swing smaller or larger (sad: the head 12° down, the back 8°, a
+  swing under half the clip's; happy: up straight, the swing 30 % larger; angry: upright, the arms in and the elbows
+  bent 16°). Standing free or walking it takes all of it (but the arms while carrying); using a thing standing,
+  inside one, in a hug, kiss, fight or cuddle only the head; seated the head and, sat plainly, a third of the back;
+  lying, a baby or under stage directions (the creator, portraits) none. It eases in over about a second. The pace
+  is sim-core's: an emotion's `walkSpeed` (content `emotions`), the walk matched to it as to any.
+- Turning on the spot (`characters/turns.ts`): standing free, a turn of 35° or more steps round with a turn clip
+  (`turnR90`, `turnL180Child`, …: below), the Sim's yaw following the clip's steps (`turnShare`) so a planted foot
+  stays put; smaller turns pivot on the feet. Not while walked in, inside or up on a thing, getting up, holding or
+  lifting a baby, or in a hug, kiss or fight.
 - Seated clips share `sit`'s pelvis. The runtime fits it to each body and seat: the pelvis joint
   goes `seatDrop` above the seat's surface and at the seat's forward offset (`SEATS`, from
   characters/furniture.json, or the content's `seat`). It fits the legs too (`characters/seatFit.ts`, shared with
@@ -279,7 +423,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | walk | yes | 1.1 (1.1 m/s) | moving (played at the ground speed) |
 | jog | yes | 0.7 | running on the spot, treadmills, exercise |
 | jogAlong | yes | 0.7 (2.5 m/s) | moving fast: the jog's pose given a stride, the hips 6 cm lower (the knees bent through the stance), played at the ground speed when the walk would need more than 3× its own pace (`GAIT_MAX_RATE`); back to walking below 0.8 of that (`JOG_BACK`) |
-| runAlong | yes | 0.6 (5.8 m/s) | moving faster still (game speed 3 and up, children from 2): a run with a 3.5 m stride, each foot down a sixth of the time, played at the ground speed when the jog would need more than 3×, up to 4× (`RUN_MAX_RATE`); back to the jog below 0.8 of the switch |
+| runAlong | yes | 0.6 (5.8 m/s) | moving faster still (game speed 3 and up, children from 2): a run with a 3.5 m stride, each foot down a sixth of the time, played at the ground speed when the jog would need more than 3×, up to 4× (`RUN_MAX_RATE`) on a grown-up's legs and quicker on shorter ones, as the square root of their length (`gait.ts` `runMaxRate`: 5.3–5.4× on a child's, so no stage's feet slide at speed 3); back to the jog below 0.8 of the switch |
 | sit | yes | 1.67 | seated |
 | sitTalk | yes | 2.93 | seated in a conversation |
 | sitDown | no | 1.33 | sitting down, and onto the edge of a bed before lying down |
@@ -291,15 +435,20 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | sitHandsFar | yes | 1.67 | the same reaching further out, leaning in more: at a desk or table a chair can't be pulled in to far enough (drawer pedestals where the knees go: `TUCK`) |
 | interact | no | 2.0 | reaching to use something |
 | pickUp | no | 0.87 | lifting, serving, fetching |
+| buy, sell | no | 5.0 | at a vendor's (`clips/serve.ts`, sim-core `staff.rs`): the customer orders pointing at it, waits, takes it in the right hand and pays with the left; the vendor behind listens and nods, turns and reaches down into the goods, holds it out over the top and hands it over, takes the money and puts it away. Played together from the moment the vendor serves; what changes hands is drawn on the vendor's right palm between picking it up and handing it over (0.42–0.62 of the clip), on the customer's from then on (`HANDED`) |
 | spell | yes | 2.1 | hands busy at a counter (cook, wash, paint, tinker) |
 | chop, stir, flip | yes | 1.6, 2.0, 2.0 | the cooking steps of those names |
-| eat, drink | no | 1.33, 2.0 | eating and sips (standing, and now and then as the seated upper body) |
+| eat, drink | no | 1.33, 2.0 | eating and sips (standing, and now and then as the seated upper body); the fork, spoon or chopsticks and the cup are drawn in the hand (`ACTIONS.eat`, `ACTIONS.drink` `prop`) |
+| holdCup | yes | 2.5 | the cup held before the chest between sips (standing, and as the seated upper body: `ACTIONS.drink` `between`) |
+| toss | no | 3.2 | a wish at the town fountain (`ACTIONS.look`): the coin looked at in the palm, held to the chest, the arm back and an underarm toss over the rim (the coin in the hand until 0.63 of it), the follow-through |
+| scatter | yes | 3 | feeding the pigeons on the park bench (`ACTIONS.feed`, the seated upper body): the bag of seed on the left palm over the lap, the right hand dipping in and flinging a pinch ahead |
+| shake | yes | 2 | a cocktail shaken at the bar cart and the mocktail cart (`ACTIONS.drink`): the shaker before the chest, the right hand round its tin and the left over its cap, eight hard shakes along its line and a look at it |
 | carry, carryOne | yes | 1.1 | the upper body while carrying something in both hands / on the right palm (`held`, content `hold`) |
 | lie | yes | 2.4 | lying (turned flat by the runtime, played at a third of the speed) |
 | babyLieAsleep, babyLieAwake | yes | 9, 6 | a baby lying in the crib, asleep (still, quick breaths, a twitch) or awake (kicking, waving, turning the head); legs drawn up, hands by the head; turned flat like `lie`, played at full speed |
 | foldArms | yes | 2.5 | watching, relaxing, idle variations; unamused at a joke that fell flat, unmoved by an apology or a compliment |
 | yes / no | no / yes | 2.5 | listening, arguing |
-| phone, lantern | yes | 2.93, 2.5 | a call, the phone at the ear; reading (a book at the chest) |
+| phone, lantern | yes | 2.93, 2.5 | a call, the phone at the ear (the palm over the ear, the fingers up the side of the head); reading (an open book across both palms at the chest) |
 | phoneText | yes | 3.0 | texting and scrolling (`ACTIONS.phoneScreen`, content `phone.actions[].anim`): the phone held in both hands before the chest, the head bowed over it, the thumbs tapping and swiping; the upper body of it seated |
 | compliment, deepTalk, flirt, sweetTalk, argue, insult, apologize, joke, introduce, askPartner, breakUp, prank | yes | 3, 4, 3.2, 3.4, 2.2, 2.4, 3.4, 2.8, 3, 3.2, 3, 2.6 | the socials' own gestures on a speaker's turn (`GESTURES`, `clips/social.ts`): an open hand offered and two claps; the fingertips together, then the chin on the hand; a hand in the hair, the other on the hip; the hands clasped at the heart, a reach to the other's arm; palms up, then a chopping hand; a dismissive flick; a hand on the heart, then open palms; the story told with the hands, then the arms thrown wide; a hand to the chest, then held out to shake; hands clasped low, then held out; a hand to the brow, then both sweeping apart; a creep, "boo!" with clawed hands, a laugh |
 | laugh, shrug, rebuffed, refuse | yes | 2, 2.4, 2.6, 2.4 | how a social is taken (`GESTURES`, `REFUSED`): laughing at a joke that landed (the head back, a hand on the belly, bent over once); a teller's shrug at a joke that fell flat; turned down (the shoulders dropped, the head bowed aside, a hand to the neck); turning down a hug or a kiss (leaning away, the head turned aside, a hand up, palm out, a step back) |
@@ -317,8 +466,8 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | fountainDrink181, 163, 147, 129, 112 | yes | 3 | bent over a drinking fountain's spout, sipping from its water (a size per height, in cm; the smaller two on tiptoe at the water's falling end); `STEP_IN` steps them up to it |
 | climb172a, 147a, 112a; climb172b, 147b, 112b | yes | 13 | a round on the climbing frame: up its rope net three ropes, hands and feet in turn, over the edge onto the deck, ducking under the roof across it to the fireman's pole, round the pole and down it (hands and legs round it), and back round to the net; a size per height (cm), and one per lane of the net (`a`, `b`: the second waits on the deck for the first to slide; one stepping in while someone goes round waits at their lane until that round is back at its start, so the two stay in step: `inTurn`) |
 | dartThrow | yes | 7.2 | darts (`ACTIONS.play` at the `dartboard`): side-on at the line, three throws (aim, the forearm back, through, the hand following to the board), a step back to read the score and in again; the first dart goes as the board's darts grow in |
-| pingPong | yes | 1.8 | table tennis (`ACTIONS.play` at the `pingPongTable`): the ready stance, a forehand and a backhand, the bat mimed in a closed hand |
-| poolShot172, 147, 112 | yes | 8 | the pool table (`STEP_IN`, a lane each for two): bent over the long rail as far as the height needs, the left hand bridging on the cloth, two practice strokes and the shot, then up to chalk the cue (mimed); a size per height (cm) |
+| pingPong | yes | 1.8 | table tennis (`ACTIONS.play` at the `pingPongTable`): the ready stance, a forehand and a backhand, the bat in the closed right hand |
+| poolShot172, 147, 112 | yes | 8 | the pool table (`STEP_IN`, a lane each for two): bent over the long rail as far as the height needs, the left hand bridging on the cloth, two practice strokes and the shot, then up to chalk the cue held upright; the cue in the hands (`placeHand` `cue`); a size per height (cm) |
 | foosball172, 147, 112 | yes | 3.2 | the foosball table (`STEP_IN`, a pair of rods each for two): hands on two handles, the wrists turning the rods (the right in time with the table's moving rods) and sliding them; a size per height |
 | smashPlate172, 147, 112 | yes | 3.4 | the plate-smash bin (`STEP_IN`): a plate taken from the stack (mimed), up over the right shoulder and thrown overarm down into the crate; a size per height |
 | boulder172, 147, 112 | yes | 16 | the bouldering wall (`STEP_IN`, up on its crash mat): hands to the start holds, the feet onto the low ones, up the wall's holds hand and foot in turn to the top, a drop to the mat onto bent knees; the route scaled to the size and put on the model's nearest holds |
@@ -342,6 +491,8 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | warmHands | yes | 7 | warming up standing at a fire (`ACTIONS.relax` at `WARM_AT`: the fire pit): leant a little to it, the hands held out over it, palms to the flames, turned now and then, then brought together and rubbed (clips/uses.ts) |
 | plateHold177, 147, 112 | yes | 3 | stood on the vibration plate (`GRIPPED`): both hands on its grips (fore-and-aft bars 0.26 m either side, 0.96 m over the deck, 0.12 m ahead), the weight shifting a little; the plate's buzz on top (`activityPose`); a size per height |
 | lieCurl | yes | 2.4 | dozing on a bed too short to lie on flat (`CURLED_BEDS`: the window seat): curled up on the left side facing the room, the knees drawn up, the head on the pillow on the left forearm; turned flat like `lie` |
+| lieSide | yes | 2.4 | lying at full length on the right side (`SIDE_BEDS`: the daybed): the back to the object's back rail, the legs along the mattress, the right one straight and the left a little over it, the right forearm under the cheek on the pillow, the left hand in front of the chest; turned flat like `lie` |
+| turnR30 … turnR180, turnL30 … turnL180 (every 5°), and each `…Child` | no | 0.8 (up to 90°), 1.1 (to 150°), 1.4 | turning on the spot (`turns.ts`), made in the turning body's frame: the foot on the side of the turn steps out on a low arc and the other follows (two steps, three, four for an about-turn), each planted foot turned back against the body's turn so it stays put on the floor, the hips midway between the ways the feet face, the head ahead into the turn. The feet are placed for hips a little wider for their legs than the reference's, a child's size for theirs (`TURN_HIPS`). Baked the first time a resident turns that far (`turnDef`, about a millisecond); the runtime plays the nearest size and turns by the turn itself |
 
 ### Checking clips
 
@@ -349,7 +500,8 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 [--update-baseline]` bakes the clips as the runtime does and checks loop flags, NaNs, loop seams,
 lengths, sliding feet, the seated pelvis and feet (with the runtime's leg fit, `seatFit.ts`: on a 0.45 m seat, a
 child's on the kids' chair, and the knees clear of every deep seat's `front`), the floor sits' knees and ankles
-against the floor, `lie` and the baby's clips (the list is in its header). The default is the reference: `male` at
+against the floor, `lie` and the baby's clips, and the turns on the spot, every size each way, a foot on the floor
+staying put as the clip's share of the turn turns the body (the list is in its header). The default is the reference: `male` at
 `youngAdult`, plus `baby` for the baby's clips.
 Each body and stage plays the clips on its own skeleton (`restT`, the pelvis motion and ground
 speed scaled by `pelvisScale`, `walk`'s hip roll), the sized clips at the size its height picks,
@@ -365,7 +517,7 @@ In dev, editing a clip file re-bakes the clips in place (Vite HMR).
 
 ## Seats and beds
 
-`web/src/render/babylon/characters/furniture.json` holds where residents sit and lie, by object id: `seats`
+`web/src/render/shared/characters/furniture.json` holds where residents sit and lie, by object id: `seats`
 (`SEATS`), `defaultSeat`, `beds` (`BEDS`), `defaultBed`, `bunks` (`BUNKS`) and `footstools` (`FOOTSTOOLS`). `characters.ts` reads it with its
 `Seat` and `Bed` types (the fields are documented there); `cargo check-glb` measures the meshes against it and
 `cargo review sizes` against real-world sizes. An object in `seats` takes that seat over the content's `seat`
@@ -406,7 +558,9 @@ Why some entries are as they are:
   from their models' builds).
 - `bedDouble`, `bedQueenUpholstered`, `bedCanopy`: their mattress tops; `bedDaybed` its daybed top, its quilt tucked in
   between the back, the arms and the rail (`tuck`: the quilt's width, no side drop showing; `foot` 0.12, the quilt ending
-  just past the toes inside the foot end's arm).
+  just past the toes inside the foot end's arm). The daybed is lain on at full length on the side (`SIDE_BEDS`, the
+  `lieSide` clip): turned a quarter about its length, its back to the back rail (a sofa by day is lounged on, not
+  lain flat on the back).
 - `sofaBed`: the head on the seat, the rest on the mattress pulled out in front (`bed_out`, `fwd`).
 - `gloomy.windowSeat`, `kind.hearthSettee` (2 wide): dozed on along the cushion, head to its left, whichever slot
   (the nap takes both, content `whole`).
@@ -442,19 +596,20 @@ rider, the seesaw), which they settle onto as before rather than walk through.
 |---|---|
 | the contract | `rig.rs`, `head.rs` (the head interface), `contract.rs`, `write.rs`, `build.rs`, `check.rs`, `check_clips.ts`, `clips/dsl.ts`, this page |
 | body and clothes | `body.rs`, `cage.rs`, `subdiv.rs`, `clothes.rs`, `garments.rs`, `meshops.rs` |
-| face and hair | `face.rs`, `hair.rs`, `prims.rs`; the eye, hair and brow branches of `characters/material.ts`; `characters/face.ts` |
+| face and hair | `face.rs`, `hair.rs`, `prims.rs`; the eye, hair and brow branches of `render/pc/shaders/character.ts`; `characters/face.ts` |
 | clips | `clips/*` (with `clips/ik.ts`) |
-| the runtime | `characters.ts` (activities, seats, beds, carrying, faces), `characters/{data,pose,material,outfit,blanket}.ts`; the creator in `ui/screens/CreateHousehold.svelte` and `render/preview` |
+| the runtime | `render/shared/characters/residents.ts` (activities, seats, beds, carrying, faces; its tables in `actions.ts`, `seats.ts`, `socials.ts`, `expressions.ts`, `parts.ts`; drawn through `view.ts` by `pc/characters.ts`), `shared/characters/{data,pose,outfit,blanket}.ts`, `pc/characterMaterial.ts` and `pc/shaders/character.ts` (the shading), `pc/poseTexture.ts`; the creator in `ui/screens/CreateHousehold.svelte` and `render/preview` |
 
 See also `tools/characters/README.md`.
 
 ## Dev benches
 
 - `/characters.html`: a grid of residents. `?family=male|female`, `?stage=<id>|all` (default: every
-  stage), `?hair=all`, `?tops=all`, `?skins=all`, `?builds=all`, `?face=moods|visemes`,
-  `?clip=<name>&t=<s>`, `?view=side|back`, `?closeup=1`, `?build=1.2`, `?cols=`, `?manual`
+  stage), `?hair=all` (or `?hair=long,beard`: only those), `?tops=all`, `?skins=all`, `?builds=all`, `?face=moods|visemes`,
+  `?clip=<name>&t=<s>`, `?view=side|back`, `?closeup=1` (`?y=`: the height it looks at), `?build=1.2`, `?cols=`, `?manual`
   (`__bench.advance(s)`); sets `window.__ready`.
 - `/poses.html`: residents at real furniture, seats and beds, cooking, carrying, socials.
   `?only=<labels>` picks stations, `?seats=sofa,toilet` seats a man and a woman on each object,
   `?clip=<name>` plays one clip on everyone, `?clip=<name>&strip=8` shows it held at 8 times on a
-  man, a woman and a child; `?manual` with `__poses.advance(s)` and `__poses.focus(n)`.
+  man, a woman and a child; `?top=`, `?bottom=`, `?hair=braid` dress everyone who can wear it;
+  `?manual` with `__poses.advance(s)` and `__poses.focus(n)`.

@@ -77,8 +77,8 @@ export async function basicReport(note: string, parts: { settings: unknown; ui: 
 /** Adapter details for the report (WebGPU only; empty when unavailable). */
 export async function gpuInfo(): Promise<Record<string, string> | null> {
   try {
-    const gpu = (navigator as unknown as { gpu?: { requestAdapter(): Promise<{ info?: Record<string, string> } | null> } }).gpu;
-    const adapter = await gpu?.requestAdapter();
+    // (The DOM's types have `gpu` on every navigator; browsers without WebGPU have none.)
+    const adapter = 'gpu' in navigator ? await navigator.gpu.requestAdapter() : null;
     const info = adapter?.info;
     if (!info) return null;
     return { vendor: info.vendor, architecture: info.architecture, device: info.device, description: info.description };

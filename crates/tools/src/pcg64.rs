@@ -17,7 +17,11 @@ impl Pcg64 {
         let word = |i: usize| (s[2 * i] as u64 | (s[2 * i + 1] as u64) << 32) as u128;
         let init_state = word(0) << 64 | word(1);
         let init_seq = word(2) << 64 | word(3);
-        let mut rng = Pcg64 { state: 0, inc: init_seq << 1 | 1, half: None };
+        let mut rng = Pcg64 {
+            state: 0,
+            inc: init_seq << 1 | 1,
+            half: None,
+        };
         rng.step();
         rng.state = rng.state.wrapping_add(init_state);
         rng.step();
@@ -131,9 +135,15 @@ mod tests {
     fn matches_numpy() {
         let mut r = Pcg64::new(7);
         let got: Vec<f64> = (0..3).map(|_| r.random()).collect();
-        assert_eq!(got, [0.625095466604667, 0.8972138009695755, 0.7756856902451935]);
+        assert_eq!(
+            got,
+            [0.625095466604667, 0.8972138009695755, 0.7756856902451935]
+        );
         let mut r = Pcg64::new(11);
-        assert_eq!([r.uniform(-0.7, 0.7), r.uniform(-0.7, 0.7)], [-0.5200017161231205, -0.0010109925838390542]);
+        assert_eq!(
+            [r.uniform(-0.7, 0.7), r.uniform(-0.7, 0.7)],
+            [-0.5200017161231205, -0.0010109925838390542]
+        );
         let mut r = Pcg64::new(5);
         let got: Vec<i64> = (0..4).map(|_| r.integers(16, 112)).collect();
         assert_eq!(got, [80, 93, 18, 93]);

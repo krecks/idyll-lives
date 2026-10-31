@@ -12,7 +12,11 @@ fn is_vowel_letter(c: u8) -> bool {
 /// A pronunciation for an unknown word of ASCII letters, stressed on the first syllable.
 /// Empty if the word has no letters.
 pub fn guess(word: &str) -> String {
-    let w: Vec<u8> = word.bytes().filter(u8::is_ascii_alphabetic).map(|c| c.to_ascii_lowercase()).collect();
+    let w: Vec<u8> = word
+        .bytes()
+        .filter(u8::is_ascii_alphabetic)
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
     if w.is_empty() {
         return String::new();
     }
@@ -20,9 +24,13 @@ pub fn guess(word: &str) -> String {
     let at = |i: usize| w.get(i).copied();
     let rest = |i: usize, s: &str| w[i..].starts_with(s.as_bytes());
     // "Magic e": vowel, one consonant, final "e" (Jane, Pete, Mike, Rose, June).
-    let magic = |i: usize| i + 3 == n && at(i + 2) == Some(b'e') && at(i + 1).is_some_and(|c| !is_vowel_letter(c));
+    let magic = |i: usize| {
+        i + 3 == n && at(i + 2) == Some(b'e') && at(i + 1).is_some_and(|c| !is_vowel_letter(c))
+    };
     // Open syllable: vowel, one consonant, vowel (Lara, Kokoro, Mina, Ruben).
-    let open = |i: usize| at(i + 1).is_some_and(|c| !is_vowel_letter(c)) && at(i + 2).is_some_and(is_vowel_letter);
+    let open = |i: usize| {
+        at(i + 1).is_some_and(|c| !is_vowel_letter(c)) && at(i + 2).is_some_and(is_vowel_letter)
+    };
     let mut out = String::new();
     let mut i = 0;
     while i < n {
@@ -150,7 +158,8 @@ pub fn guess(word: &str) -> String {
                 b'q' => "k",
                 b'r' => "ɹ",
                 b's' => {
-                    let between = i > 0 && is_vowel_letter(w[i - 1]) && next.is_some_and(is_vowel_letter);
+                    let between =
+                        i > 0 && is_vowel_letter(w[i - 1]) && next.is_some_and(is_vowel_letter);
                     if between { "z" } else { "s" }
                 }
                 b'x' => {
@@ -194,7 +203,11 @@ fn stress_first_syllable(ps: &str) -> String {
                 out.push(c);
                 continue;
             }
-            out.push(if matches!(c, 'æ' | 'ʌ' | 'ɑ' | 'ɛ') { 'ə' } else { c });
+            out.push(if matches!(c, 'æ' | 'ʌ' | 'ɑ' | 'ɛ') {
+                'ə'
+            } else {
+                c
+            });
         } else {
             out.push(c);
         }

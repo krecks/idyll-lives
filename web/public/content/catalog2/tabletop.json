@@ -53,6 +53,8 @@
           "id": "toast",
           "label": "Make toast",
           "anim": "cook",
+          "sound": "toaster",
+          "endSound": "toastPop",
           "minutes": 4,
           "eat": {
             "item": "toast",
@@ -87,6 +89,7 @@
           "id": "smoothie",
           "label": "Blend a smoothie",
           "anim": "cook",
+          "sound": "blender",
           "minutes": 3,
           "eat": {
             "item": "smoothie",
@@ -122,6 +125,7 @@
           "id": "bake",
           "label": "Practise baking",
           "anim": "cook",
+          "sound": "mixer",
           "minutes": 30,
           "effects": {
             "fun": 0.1
@@ -163,6 +167,7 @@
             "elder"
           ],
           "anim": "drink",
+          "sound": "espresso",
           "minutes": 10,
           "effects": {
             "energy": 0.1,

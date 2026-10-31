@@ -158,6 +158,7 @@
       "category": "kitchen",
       "slots": 1,
       "description": "A small fridge that sits next to the sofa, with a door screen for ordering food. Snacks within reach, and takeout so nobody has to cook (it costs money).",
+      "sounds": {"fetch": "fridgeDoor"},
       "interactions": [
         {
           "id": "snack",

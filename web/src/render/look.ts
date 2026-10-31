@@ -32,7 +32,7 @@ export interface Look {
   contrast: number;
   /** Multiplies the time-of-day exposure. */
   exposure: number;
-  /** Colour grading (Babylon colour curves, -100..100). */
+  /** Colour grading (the colour curves' global saturation, -100..100). */
   saturation: number;
   /** Warm highlights / cool shadows split toning: hue (degrees) and density (0..100). */
   highlightsHue: number;
@@ -40,7 +40,7 @@ export interface Look {
   shadowsHue: number;
   shadowsDensity: number;
   /**
-   * Moonlight grade strength at night (0..1, faded in with the lamps; see babylon/nightGrade.ts).
+   * Moonlight grade strength at night (0..1, faded in with the lamps; see pc/nightGrade.ts).
    * Grass reflects almost no blue, so a blue moon alone renders nights dark green; the grade turns
    * dark tones blue-grey while lamps and lit windows stay warm.
    */

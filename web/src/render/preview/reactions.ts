@@ -3,8 +3,9 @@
  * facial expressions, with a head tilt or a slump on top for some.
  */
 
-import { EXPRESSIONS, type Face } from '../babylon/characters';
-import { addRotation, type Additive } from '../babylon/characters/pose';
+import { EXPRESSIONS } from '../shared/characters/expressions';
+import type { Face } from '../shared/characters/face';
+import { addRotation, type Additive } from '../shared/characters/pose';
 import type { StageReaction } from '../types';
 
 export interface Performance {

@@ -28,7 +28,7 @@ export async function prune(cache: Cache | null, keep: string[]): Promise<void> 
 }
 
 /**
- * A model file shipped gzipped (by `tools/llm/fetch.mjs` and `tools/voice/fetch.mjs`): its name
+ * A model file shipped gzipped (by `cargo fetch-llm` and `cargo fetch-voice`): its name
  * ends in `z` (`model_q4.onnx_dataz`), not `.gz`, which servers would send with
  * `Content-Encoding: gzip` for the browser to unpack on its own. Kept packed in the cache.
  */

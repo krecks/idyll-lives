@@ -819,8 +819,9 @@ FAMILY = G.Family(
              motions={'uses': {use: ['door_open', TURNTABLE] for use in ('reheat', 'bake')}, 'hold': 1.2},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('charcoal', 'Microwave')]),
      G.Model('coffeeMachine', coffeeMachine, size=(1.0, 1.40, 0.66), key='model.coffeeMachine', centre=(0, -0.097),
-             # espresso slides a cup under the spout and grows a stream of coffee
-             motions={'uses': {'espresso': 'brew', 'pour': 'brew'}, 'hold': 2.0},
+             # espresso slides a cup under the spout and grows a stream of coffee; pour too, a second in (at a café
+             # as the barista turns to the machine: the game's `sell` clip)
+             motions={'uses': {'espresso': 'brew', 'pour': {'clip': 'brew', 'delay': 1.0}}, 'hold': 2.0},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('charcoal', 'Machine')]),
      G.Model('breakfastCounter', breakfastCounter, size=(1.0, 1.38, 0.66), key='model.breakfastCounter', centre=(0, -0.097),
              # toast presses the lever and the toast down (back up, popping, after `hold`); smoothie lifts the

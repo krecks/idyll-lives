@@ -56,6 +56,14 @@ export interface InteractionDef {
   needsTable?: boolean;
   /** Things a working object on the same plot must provide (`ObjectDef.provides`): coffee needs a coffee machine. */
   requires?: string[];
+  /**
+   * Sold by someone at the object (sim-core `staff.rs`): on a public lot whose post has a server, under `label`
+   * and `anim` (ordered, handed over, paid for; greyed out outside the post's `staff.hours`); where nobody serves
+   * (a household's own cart), helping themselves under this label and animation.
+   */
+  selfServe?: { label: string; anim?: string };
+  /** What it `requires` is fetched first, with this interaction (by id) of what provides it on the plot: a coffee poured at the machine. */
+  fetch?: string;
   /** Takes every slot of the object: only started with nobody else on it, and nobody else gets on while it lasts. */
   whole?: boolean;
   /**
@@ -90,19 +98,34 @@ export interface InteractionDef {
   hours?: [number, number];
   /** Only under open sky: the object stands outside. */
   sky?: boolean;
-  /** Only with something to work on: dirty dishes, washing to do, a washed load to dry (sim-core `content::WorkOn`). */
-  workOn?: 'dishes' | 'laundry' | 'washed';
+  /** Only with something to work on: dirty dishes, washing to do, a washed load to dry, a dry one to fold (sim-core `content::WorkOn`). */
+  workOn?: 'dishes' | 'laundry' | 'washed' | 'dried';
+  /** Puts a load in a machine that runs on its own (the object's `runs`): only while it's empty; it runs once the use ends (sim-core `machines.rs`). */
+  loads?: boolean;
+  /** Takes the load out of a machine once its run is done: only then; it's empty again as the use ends. */
+  unloads?: boolean;
+  /** Leaves the household a load of washing to work on next, as the use ends (taken out washed, or dry): then on with it to what works on it. */
+  makes?: 'laundry' | 'washed' | 'dried';
+  /** An item carried in the arms on the way to it (the basket of washing to the dryer): only shown, the snapshot's `held`. */
+  brings?: string;
+  /** An item held in the hands while it's done (a towel being folded): only shown, as `brings`. */
+  holds?: string;
   /** A game for two, at an object with two places: played with someone free nearby, fetched to the other place (sim-core `partners.rs`). */
   partner?: boolean;
   /** With `partner`: the use (an id of the same object's) the player's order does instead with nobody free to play. */
   alone?: string;
+  /** Done behind a shut door: the room it's done in is kept shut while it lasts (sim-core `privacy.rs`). */
+  private?: boolean;
+  /** Where partners try for a baby (a double bed's): started only by the social, never from the object's menu. */
+  conceive?: boolean;
   /**
    * What it sounds like while it lasts: a world sound by key (`audio/world.ts` `LOOPS`: `chop` for
-   * a cheese board), or `none`; absent: by the object's `sounds`, else by `anim`. Not for a
-   * `recipe`, whose steps sound by the station they're done at.
+   * a cheese board), or `none`; absent: by the object's `sounds`, else by `anim`. A sound played
+   * once (`audio/things.ts` `ONCE_THINGS`: `vendCan`) plays as it starts. Not for a `recipe`, whose
+   * steps sound by the station they're done at.
    */
   sound?: string;
-  /** A sound played once as it ends (`audio/water.ts` `ONCE`: a toilet's `flush`). */
+  /** A sound played once as it ends (`audio/water.ts` `ONCE`, `audio/things.ts` `ONCE_THINGS`: a toilet's `flush`, a microwave's `ping`). */
   endSound?: string;
 }
 
@@ -232,8 +255,15 @@ export interface ObjectDef {
   places?: { at: [number, number]; facing?: number }[];
   /** Things it provides while it works (interactions `requires`): a coffee machine provides coffee. */
   provides?: string[];
+  /**
+   * Someone serves here on a public lot (sim-core `staff.rs`, `game/staff.ts`): where they stand, metres off the
+   * footprint's middle to its right and front (behind it: a negative front), and the hours it's open.
+   */
+  staff?: { at: [number, number]; hours: [number, number] };
   /** Can only be placed outdoors (trees, flower beds, ponds). */
   outdoors?: boolean;
+  /** The household's own (a wardrobe, a dresser): visitors don't use it (sim-core `world::guest_may`). */
+  private?: boolean;
   /** A flight of stairs to the storey above (sim-core `storeys.rs`). */
   stairs?: boolean;
   /**
@@ -255,6 +285,14 @@ export interface ObjectDef {
   sounds?: Record<string, string>;
   /** A world sound it makes by itself, used or not, while its lot is looked at (a fountain's water). */
   ambient?: string;
+  /** With `ambient`: it sounds only while a use on its tiles sounds like this (a world sound key: a cooker hood's fan over a hob's `sizzle`). */
+  ambientWhile?: string;
+  /**
+   * A machine that runs on its own (sim-core `machines.rs`): loaded by a use that `loads`, it runs `minutes` game
+   * minutes with nobody at it (the model's `running` clip, and `sound` while its lot is looked at), then waits, done,
+   * for a use that `unloads` it.
+   */
+  runs?: { minutes: number; sound?: string };
   /** Turns freely (at any angle, for looks); default: 1×1 objects of `objectRules.freeRotation` categories. */
   freeRotation?: boolean;
   /**
@@ -272,6 +310,12 @@ export interface ObjectDef {
   hangsLow?: boolean;
   /** From the ceiling: hangs at head height (a chandelier, a low pendant), to hang over a table: nobody walks under it, but furniture goes under it. */
   headHeight?: boolean;
+  /**
+   * On the floor, 1×1: tiles beside its own it reaches over at head height, as `[right, front]` tiles from it (an
+   * arc lamp's shade over the sofa in front: `[[0, 1]]`). Furniture may stand there; nobody walks there, and
+   * nothing as tall as the wall, hanging low or at head height goes there (sim-core `overhang_tiles`).
+   */
+  overhang?: [number, number][];
   /** On the floor: built to stand back to a wall (a wall-hung toilet, a wall bed, a leaning ladder): it needs plain wall all along its back. */
   againstWall?: boolean;
   /** Bunk beds: the second slot lies on the upper bunk. */
@@ -398,6 +442,12 @@ export interface RoomKindDef {
   exclusive?: boolean;
   /** A room no kind's tags are offered in is of this kind if people pass through it (two doors or more, or stairs): a hallway. */
   passage?: boolean;
+  /** Kept shut while someone is in it (a bathroom): others wait outside (sim-core `privacy.rs`). */
+  private?: boolean;
+  /** A private room that's its people's own (a bedroom): whoever has a place in it comes and goes,
+   * its door keeps everyone else out (sim-core `privacy.rs`). Requires `private`, and can't be a
+   * `passage`; sim-core refuses either at load. */
+  claimed?: boolean;
 }
 
 /** A roof style (Build mode's Roof tool): the shape and, for pitched roofs, the pitch in degrees. */
@@ -458,12 +508,30 @@ export interface WindowStyleDef {
   price?: number;
 }
 
+/** A work shift: when it starts, how many hours, on which days of the week (0 Monday). */
+export interface Shift {
+  start: number;
+  hours: number;
+  days: number[];
+}
+
+/** A grade of every career (`careers.json` `grades`): a career's titles are its grades in order. */
+export interface CareerGrade {
+  id: string;
+  label: string;
+  payPerHour: number;
+  skillLevel: number;
+}
+
 export interface CareerCategory {
   id: string;
   label: string;
   icon: string;
   description: string;
-  tracks: { id: string; label: string; titles: string[] }[];
+  /** Pay against the grades' (sim-core `content.rs` `careers`); the tracks' shift, unless they have their own. */
+  payFactor?: number;
+  shift?: Shift;
+  tracks: { id: string; label: string; titles: string[]; payFactor?: number; shift?: Shift }[];
 }
 
 export interface Economy {
@@ -471,7 +539,11 @@ export interface Economy {
   /** Extra money to build with when a household starts on an empty lot (Living games). */
   emptyLotFunds?: number;
   currency: string;
-  rent?: { weekday: number; hour: number; base: number; perTile: number; billsBase?: number; billsRate?: number };
+  rent?: { weekday: number; hour: number; base: number; perTile: number; billsBase?: number; billsRate?: number; perResident?: number };
+  /** A home's price (`game/price.ts`). */
+  homePrice?: { perTile: number; perFloorTile: number; furniture: number; round: number; sizeRef?: number; sizePremium?: number };
+  /** What a household has saved (`game/wealth.ts`). */
+  savings?: { base: number; rate: number; yearsPerGrade: number; keep: number };
 }
 
 export interface TraitDef {
@@ -586,6 +658,7 @@ interface ContentFile {
   emotions: EmotionDef[];
   socials: SocialDef[];
   careerCategories?: CareerCategory[];
+  grades?: CareerGrade[];
   bondPresets: Record<string, unknown>;
   events: Record<string, string>;
   objects: ObjectDef[];
@@ -603,7 +676,7 @@ interface ContentFile {
   roomKinds?: RoomKindDef[];
   accidents?: AccidentDef[];
   roomRules?: { decorByCategory?: Record<string, number>; lampTiles?: number; windowTiles?: number };
-  life?: { daysPerYear?: number; startAge?: [number, number]; stages?: LifeStageDef[]; adoption?: { cost: number } };
+  life?: { daysPerYear?: number; startAge?: [number, number]; stages?: LifeStageDef[]; adoption?: { cost: number }; retireAt?: number };
   economy?: Partial<Economy>;
   objectRules?: { freeRotation?: string[] };
   /** Animation tags interactions can use as `anim` (the snapshot layout's `actions`). */
@@ -634,6 +707,10 @@ export class Content {
   readonly emotions: readonly EmotionDef[];
   readonly socials: readonly SocialDef[];
   readonly careerCategories: readonly CareerCategory[];
+  /** The grades every career's titles are, in order. */
+  readonly careerGrades: readonly CareerGrade[];
+  /** The age residents retire at (their job becomes a pension). */
+  readonly retireAt: number;
   readonly skills: readonly SkillDef[];
   readonly objectColors: readonly ObjectColorDef[];
   readonly buyCategories: readonly BuyCategory[];
@@ -700,6 +777,8 @@ export class Content {
     this.emotions = file.emotions ?? [];
     this.socials = file.socials ?? [];
     this.careerCategories = file.careerCategories ?? [];
+    this.careerGrades = file.grades ?? [];
+    this.retireAt = file.life?.retireAt ?? 65;
     this.skills = file.skills ?? [];
     this.objectColors = file.objectColors ?? [];
     this.buyCategories = file.buyCategories ?? [];
@@ -1042,15 +1121,16 @@ export function mergeContent(files: [name: string, text: string][]): Json {
 
 /**
  * `b` laid over `a`: objects merge key by key at every depth, anything else (a list of lines)
- * is replaced. Neither input changes.
+ * is replaced. Neither input changes. The type of `a` is kept: a pack only overrides fields of the
+ * file it is laid over (a content pack's `talk`, a language pack's lines).
  */
-export function mergeDeep(a: Json, b: Json): Json {
-  const out: Json = { ...a };
+export function mergeDeep<T extends object>(a: T, b: object): T {
+  const out = { ...a } as Record<string, unknown>;
   for (const [key, value] of Object.entries(b)) {
     const prev = out[key];
     out[key] = isJsonObject(prev) && isJsonObject(value) ? mergeDeep(prev, value) : value;
   }
-  return out;
+  return out as T;
 }
 
 /** A file's text: from the build's bundle (`assets/bundle.ts`) when it's there, else fetched. */

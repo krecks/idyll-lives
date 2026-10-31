@@ -8,7 +8,8 @@
 # sits (`swivel`, carrying them: `ride`), the dining chair, the wooden, upholstered, moulded, Windsor, bentwood,
 # folding and carver chairs and the dining bench.
 # K9, dining storage: the walnut sideboard, the painted buffet, the china cabinet and the bar cart, whose cocktail
-# shaker lifts 10 cm and tips 30 degrees while a resident mixes a drink (`shake`).
+# shaker is taken off it while a resident mixes a drink (`shake`: squashed away, the resident shakes held.py's
+# `tool.shaker`, the same shaker, in both hands; review I-kitchen-13).
 #
 # Each is built in place where the game places it (`F`, game axes): table tops at the content's `surface`
 # heights (`TT` 0.75, `BT` 1.06; 0.75-0.76 for the catalog sets), seats where the game seats residents
@@ -1333,7 +1334,7 @@ def _bottle(name, x, y, z, r, h, material, cap, label=None, verts=12):
 
 def barCart():
     """Bar cart (catalog2): two glass tiers in brass frames on castors, a handle bent from one tube, bottles, glasses,
-    an ice bucket and a basket; the shaker lifts and tips while a resident mixes a drink."""
+    an ice bucket and a basket; the shaker is taken off it while a resident mixes a drink."""
     with G.new_parts() as still:
         for k, y in enumerate((0.3, 0.76)):
             _slab(f'tray{k}', 0.68, 0.38, y + 0.006, 0.012, M.tray, r=0.02,
@@ -1390,7 +1391,7 @@ def barCart():
               M.basket, bend=0.04, verts=5)
     G.join(still, 'cart', origin=(0, 0, 0))
     # the cocktail shaker, standing at the front of the top tier, in the middle, before the resident who
-    # mixes from the front: its own part, pivoting at its foot, tipping towards them
+    # mixes from the front: its own part, its origin at its foot, squashed away while it is in their hands
     sx, sz = 0.0, 0.1
     with G.new_parts() as shake:
         _turned('shaker', [(0, 0), (0.034, 0), (0.036, 0.004), (0.04, 0.12), (0.042, 0.124), (0.037, 0.13),
@@ -1398,8 +1399,7 @@ def barCart():
                 (sx, 0.766, sz), M.shaker, segments=16)
     shaker = G.hinged(G.join(shake, 'shaker'), F.at(sx, 0.766, sz))
     G.settle(centre=False)
-    G.slide(shaker, 'shake', (0, 0, 0.1), seconds=0.6)
-    G.swing(shaker, 'shake', 30, seconds=0.6, axis='X')
+    G.squash(shaker, 'shake', 0.001, seconds=0.2)
     return G.meshes()
 
 
@@ -1467,14 +1467,14 @@ FAMILY = G.Family(
      G.Model('chinaCabinet', chinaCabinet, size=(0.98, 2.1, 0.548), centre=(0, -0.156), key='model.chinaCabinet',
              motions=PUT_AWAY, paint=[('body_china', 'Body'), ('top_china', 'Top'), ('brass', 'Handles')]),
      G.Model('barCart', barCart, size=(0.769, 1.09, 0.45), centre=(-0.017, 0), key='model.barCart',
-             motions={'uses': {'mix': 'shake'}, 'hold': 1.5},
+             motions={'uses': {'mix': 'shake'}},
              paint=[('frame_brass', 'Frame'), ('tray', 'Trays')])],
     comment='Blender-built dining tables, chairs, stools and storage '
             '(tools/art/blender/families/dining.py). Listed in the base manifest\'s packs. The materials '
             'map onto the game\'s finishes so a model costs one draw call per finish group. Table tops '
             'stand at the content\'s surface heights and seats where the game seats residents; the stools\' '
             'seats swivel 20 degrees as a resident sits (`swivel`, carrying them), and the bar cart\'s '
-            'cocktail shaker lifts and tips while a drink is mixed (`shake`).',
+            'cocktail shaker is taken off it while a drink is mixed (`shake`).',
 )
 
 if __name__ == '__main__':

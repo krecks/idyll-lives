@@ -13,7 +13,7 @@ An object is three things, joined by keys:
 | Part | Where | Owned by |
 |---|---|---|
 | The definition: footprint, layer, top, seat, slots, light, interactions, price | `web/public/content/*.json` (`objects`, see [content-packs.md](../content-packs.md#objects)) | The simulation. It never sees the model. |
-| The model entry: file, finishes, fallback | An asset manifest (`model.<family>.<id>`) | The renderer (`render/babylon/models.ts`) |
+| The model entry: file, finishes, fallback | An asset manifest (`model.<family>.<id>`) | The renderer (`render/pc/models.ts`) |
 | The model: one `.glb` | `web/public/assets/models/<family>/<id>.glb`, exported by a family script in `tools/art/blender/families/` | The art |
 
 The content must agree with the model (a seat at the seat's height, a top where the top is), and
@@ -144,7 +144,7 @@ The game's surfaces are a dozen finishes, the `material.finish.*` entries of the
 (see-through). A model's parts are coloured per part; all the plain finishes of a model merge into
 one mesh, so a model costs one draw call for its plain parts plus one per textured or see-through
 finish it uses. The plain finishes carry their roughness and metalness in the vertex colour's alpha
-(`encodeFinish`, read by `PlainFinishPlugin` in `render/babylon/materials.ts`; until 2026-10-15 the
+(`encodeFinish`, read by `PLAIN_FINISH` in `render/pc/shaders/surface.ts`; until 2026-10-15 the
 shader never saw it and drew every plain finish as rough metal). Metals mirror the sky just above the
 horizon where they would reflect the ground: the game looks down on everything, so anything upright
 and shiny (a handle, a steel fridge) would otherwise mirror the dark field of the sky map, which no
@@ -239,7 +239,7 @@ room has.
   what only shows while it moves), or `far=build_function` builds one of its own; `cargo check-glb`
   checks it (still, the same size, at most half the triangles). Give one to what is placed by the
   hundred or seen far off: trees and hedges, street lamps and benches, the farm's buildings.
-- **Plants and trees** (`render/babylon/nature.ts`) use a reduced build at a distance, for the far
+- **Plants and trees** (`render/shared/nature.ts`, drawn by `render/pc/nature.ts`) use a reduced build at a distance, for the far
   woods too: a file's `far` (`families/plants.py`). Its parts on `foliage` and `bark` take the nature
   shader's wind and tint.
 
@@ -324,6 +324,12 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   ```json
   "motions": { "idle": "blades_turn" }
   ```
+- **Running on its own:** `running` names a clip that goes round while the object runs on its own (content `runs`:
+  a washer loaded, its drum turning), nobody at it, from rest to rest like a loop, finishing its round when the run
+  ends. The sim says when (the placement's `running`); its sound is the object's `runs.sound`.
+  ```json
+  "motions": { "uses": { "laundry": "door_open", "unload": "door_open" }, "hold": 2.5, "running": "drum_spin" }
+  ```
 - **Clocks:** `clock` names a clock's hands: `hour` a clip turning its hand once round in 12 hours,
   `minute` one turning its hand once round in an hour (each a whole turn from rest, any length:
   `G.spin`), and `at` the time the hands show at rest, in minutes past twelve (the catalogue picture's
@@ -405,7 +411,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   middle, or the `centre` it gives; `tools/art/blender/centres.json`, which the build writes for the gate
   only) by over 2 cm at rest (not its far version), one that reaches over 1 cm into the wall, one
   indoors (on the floor, a wall or the ceiling, without `vary`) that reaches over 2 cm past its
-  footprint at rest, or whose part that goes round (a loop or ambient spin: a fan's blades) sweeps
+  footprint at rest (and the tiles it reaches over, content `overhang`: the arc lamp's shade), or whose part that goes round (a loop or ambient spin: a fan's blades) sweeps
   over 1 cm past it, a thing on a top that reaches more than 10 % past its content `radius` from its
   origin (its farthest vertex, as it shows), and a floor model or moving part lower than the floor
   drawn over it; each against every content object that draws the model. Functional heights (warnings
@@ -496,7 +502,7 @@ didn't change. A new object gets a Blender file from the start.
 
 ## Before Blender is the standard
 
-What the engine (`render/babylon/models.ts` and around) must do first, most important first.
+What the engine (`render/pc/models.ts` and around) must do first, most important first.
 Placement, turning, height, shadows, contact shadows, footprints, the fallback when a file fails (a
 plain box, until a background try brings the file),
 WebGPU and WebGL2, the town overview, catalog pictures, meshopt copies and player colours (`paint`) already

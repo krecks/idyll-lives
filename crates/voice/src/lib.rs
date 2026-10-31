@@ -38,14 +38,22 @@ pub struct VoiceParams {
 
 impl Default for VoiceParams {
     fn default() -> Self {
-        VoiceParams { speed: 1.0, pitch: 1.0, depth: 1.0 }
+        VoiceParams {
+            speed: 1.0,
+            pitch: 1.0,
+            depth: 1.0,
+        }
     }
 }
 
 impl VoiceParams {
     /// Within what sounds right: speed 0.5–2, pitch 0.5–2, depth 0.75–1.3.
     pub fn clamped(self) -> Self {
-        VoiceParams { speed: self.speed.clamp(0.5, 2.0), pitch: self.pitch.clamp(0.5, 2.0), depth: self.depth.clamp(0.75, 1.3) }
+        VoiceParams {
+            speed: self.speed.clamp(0.5, 2.0),
+            pitch: self.pitch.clamp(0.5, 2.0),
+            depth: self.depth.clamp(0.75, 1.3),
+        }
     }
 }
 
@@ -66,7 +74,11 @@ impl LineInputs {
     /// ([`VisemeTrack::flat`]).
     pub fn finish(&self, samples: &[f32], rate: u32) -> (Vec<f32>, Vec<f32>) {
         let v = self.voice;
-        let at_rate = if rate == SAMPLE_RATE || rate == 0 { samples.to_vec() } else { resample(samples, rate as f32 / SAMPLE_RATE as f32) };
+        let at_rate = if rate == SAMPLE_RATE || rate == 0 {
+            samples.to_vec()
+        } else {
+            resample(samples, rate as f32 / SAMPLE_RATE as f32)
+        };
         let samples = dsp::shape(dsp::trim(&at_rate), v.pitch, v.depth, v.speed);
         let track = visemes::track(&self.phonemes, &samples, SAMPLE_RATE);
         (samples, track.flat())
@@ -88,8 +100,16 @@ impl Engine {
     pub fn line(&self, text: &str, voice: VoiceParams) -> LineInputs {
         let plain = plain_text(text);
         if !plain.chars().any(char::is_alphanumeric) {
-            return LineInputs { text: String::new(), phonemes: String::new(), voice: VoiceParams::default() };
+            return LineInputs {
+                text: String::new(),
+                phonemes: String::new(),
+                voice: VoiceParams::default(),
+            };
         }
-        LineInputs { text: plain, phonemes: self.g2p.phonemize(text), voice: voice.clamped() }
+        LineInputs {
+            text: plain,
+            phonemes: self.g2p.phonemize(text),
+            voice: voice.clamped(),
+        }
     }
 }

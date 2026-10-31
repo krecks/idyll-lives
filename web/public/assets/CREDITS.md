@@ -9,7 +9,7 @@ reproducible from the source tree; no downloaded texture maps are used.
 
 | File | Source asset | Authors | URL | Licence |
 |---|---|---|---|---|
-| `belfast_open_field.env` | Belfast Open Field (1k HDRI, prefiltered to a Babylon `.env`) | Dimitrios Savva, Jarod Guest | https://polyhaven.com/a/belfast_open_field | CC0 |
+| `belfast_open_field.pcenv` | Belfast Open Field (1k HDRI), converted by `cargo envconv` | Dimitrios Savva, Jarod Guest | https://polyhaven.com/a/belfast_open_field | CC0 |
 
 ## Models
 
@@ -223,10 +223,11 @@ it is used: the bed's head section rises, the pod's hood swings over, the quilt'
 plate's deck shakes and the tablet tilts up.
 
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
-`laundryBasket.glb`, `bathMat.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
+`laundryBasket.glb`, `bathMat.glb`, and the things carried doing the laundry, `washingBasket.glb`, `washingArmful.glb` and
+`washingPiece.glb`, override pack `packs/laundry/manifest.json`) are built in Blender by
 `tools/art/blender/families/laundry.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The washer and
-the dryer open their door and turn their drum while a resident does the laundry; the rail, ladder, basket and mat
-are still.
+the dryer open their door while a resident loads or empties them and turn their drum while they run; the rail,
+ladder, basket and mat are still.
 
 The hobby models (`models/hobbies/piano.glb`, `ukulele.glb`, `guitarElectric.glb`, `keyboardDigital.glb`,
 `drumKit.glb`, `guitarAcoustic.glb`, `chessTable.glb`, `poolTable.glb`, `foosball.glb`, `dartboard.glb`,
@@ -264,7 +265,7 @@ The play and yard things (`models/yard/sandbox.glb`, `bikeRack.glb`, `raisedBed.
 `.far.glb`, override pack `packs/yard/manifest.json`) are built in Blender by `tools/art/blender/families/yard.py`
 on `gamekit` and exported as `.glb` (glTF, original, CC0). A sand castle grows in the sandpit, the bike lifts and
 turns its back wheel, the raised bed's crop grows and is picked, the shed's and the greenhouse's doors open, the
-compost bin's lid lifts and the washing goes out on the line.
+compost bin's lid lifts and the washing goes out on the line a line at a time.
 
 The grills and the fire pit (`models/outdoor/grill.glb`, `grillStation.glb`, `firePit.glb`, same pack and family)
 are built the same way (glTF, original, CC0). The grill's lid and the station's hood swing up while residents cook,
@@ -456,10 +457,11 @@ Blender by `tools/art/blender/families/garden_things.py` on `gamekit` (the plant
 koi comes up to be fed or watched, a blue tit lands on the feeders while a resident watches, the lamp's panes and the
 festoon bulbs glow at night and the string sways.
 
-The ground cover, the woods' rocks and the selection marker (`models/ground/grassTuft.glb`, `flowers.glb`,
-`rock.glb`, `marker.glb`, the first three each with a `.far.glb`, override pack `packs/ground/manifest.json`) are
-built in Blender by `tools/art/blender/families/ground.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
-The lawn's tufts and wildflowers sway in the wind and take a tint per instance (the foliage finish).
+The ground cover, the woods' rocks and the selection marker (`models/ground/flowers.glb`, `rock.glb`,
+`marker.glb`, the first two each with a `.far.glb`, override pack `packs/ground/manifest.json`) are built in
+Blender by `tools/art/blender/families/ground.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The
+lawn's wildflowers sway in the wind and take a tint per instance (the foliage finish). The lawn's grass is no file:
+it is built on the GPU (`web/src/render/pc/grass.ts`, original code).
 
 The living room's media (`models/media/tv.glb`, `tvWall.glb`, `tvRetro.glb`, `tvStandLow.glb`, `homeCinema.glb`,
 `stereo.glb`, `boombox.glb`, `fireplaceElectric.glb`, override pack `packs/media/manifest.json`) are built in Blender
@@ -470,10 +472,15 @@ cassette door tips open, and the electric fire's flames grow while a resident wa
 
 The things residents carry and cook with (`models/held/*.glb`: the bag of shopping, the prep bowl, the stew pot and
 the dirty pot, the tasting board, the grill platter and the dirty platter, the pizza, the baking tray and the dirty
-tray, the pie and the dirty pie dish, the plates of stew, pizza, treats, pie, a sandwich and toast, the dirty plate, the
+tray, the pie and the dirty pie dish, the plates of stew, pizza, treats, pie, cake, a sandwich and toast, the dirty plate, the
 dirty tasting board and pizza board, the bowl of ice cream and the dirty bowl, the smoothie, the noodle pail and the
-takeaway box, and the chopping board, the
-pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks; override pack
+takeaway box, the food bought in town (a paper cup of ice cream, a hot dog on its paper boat, a packet of crisps, an
+apple, a pastry in a paper bag), the chopping board, the
+pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks, and what residents hold
+while they use a thing (a book, a mug, a tumbler, a wine glass, a can, a fork, a spoon, chopsticks, a phone, a coin,
+a bag of bird seed, a dart, a pool cue, a ping-pong bat, a cocktail shaker, a watering can, secateurs, a paintbrush,
+chalk, a baby's bottle, a postcard, a basketball, a pen, a pencil, a whiteboard marker and the phone box's receiver);
+override pack
 `packs/held/manifest.json`, over the `item.*` and `tool.*` keys) are built in Blender by
 `tools/art/blender/families/held.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They are still.
 
@@ -490,27 +497,23 @@ pan, the mixing bowl and the food on the grill that stand on a station while a r
 The residents are generated in code (original, CC0): their bodies at every life stage, faces and
 their expressions and visemes, eyes, hair, beards and clothes by `cargo characters`
 (`crates/tools/src/characters`; `cargo characters build` writes `rig.json` and the `.bin` files),
-and their animation clips by `render/babylon/characters/clips` (baked when the game loads). Bed
-blankets are generated at runtime in `render/babylon/characters/blanket.ts`. No downloaded models,
+and their animation clips by `render/shared/characters/clips` (baked when the game loads). Bed
+blankets are generated at runtime in `render/shared/characters/blanket.ts`. No downloaded models,
 textures or animations are used. The facial expressions (`MOODS` in
-`render/babylon/characters/face.ts`) and the idle micro-expressions (`MICRO`) are adapted from the
+`render/shared/characters/face.ts`) and the idle micro-expressions (`MICRO`) are adapted from the
 expressions of TalkingHead by Mika Suominen (MIT, https://github.com/met4citizen/TalkingHead).
 
 ## Street and gardens (`street/`)
 
-The neighbourhood dressing (`render/babylon/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants,
-bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from
-primitives in code (original, CC0). The flower-clump models are Blender-built (`packs/street`, above); the hedges
-are the plants pack's (`models/plants/hedge.glb`). The sidewalk surface is `cargo tex synth sidewalk`, generated
-like the other textures (original, CC0).
+The neighbourhood dressing (`render/shared/street.ts`, drawn by `render/pc/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants, bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from primitives in code (original, CC0). The flower-clump models are Blender-built (`packs/street`, above); the hedges are the plants pack's (`models/plants/hedge.glb`). The sidewalk surface is `cargo tex synth sidewalk`, generated like the other textures (original, CC0).
 
-## Resident voices (`../voice/`, fetched by `tools/voice/fetch.mjs`)
+## Resident voices (`../voice/`, fetched by `cargo fetch-voice`)
 
 Unlike the art above, these come with their own licences: the model under the **BigScience OpenRAIL-M** licence (with use restrictions), the dictionary under **Apache-2.0**. They are downloaded at build time, pinned and checked by SHA-256, and are not stored in git.
 
 | File | Source | Authors | URL | Licence |
 |---|---|---|---|---|
-| `supertonic-3/*.onnxz` | Supertonic 3 (revision `3cadd1ee`): duration predictor, text encoder, vector estimator and vocoder, **modified**: every float32 weight of 1,024 values or more stored as float16 and cast back to float32 when the model loads (`tools/voice/fp16.mjs`), then gzipped; nothing retrained (`supertonic-3/NOTICE`) | Supertone Inc. | https://huggingface.co/Supertone/supertonic-3, https://github.com/supertone-inc/supertonic | BigScience OpenRAIL-M (`supertonic-3/LICENSE.txt`) |
+| `supertonic-3/*.onnxz` | Supertonic 3 (revision `3cadd1ee`): duration predictor, text encoder, vector estimator and vocoder, **modified**: every float32 weight of 1,024 values or more stored as float16 and cast back to float32 when the model loads (`crates/tools/src/fp16.rs`), then gzipped; nothing retrained (`supertonic-3/NOTICE`) | Supertone Inc. | https://huggingface.co/Supertone/supertonic-3, https://github.com/supertone-inc/supertonic | BigScience OpenRAIL-M (`supertonic-3/LICENSE.txt`) |
 | `supertonic-3/tts.json`, `unicode_indexer.json`, `F1.json`…`F5.json`, `M1.json`…`M5.json` | Supertonic 3 (revision `3cadd1ee`): config, text indexer and ten voice styles, **unchanged** | Supertone Inc. | https://huggingface.co/Supertone/supertonic-3 | BigScience OpenRAIL-M (`supertonic-3/LICENSE.txt`) |
 | `en-us.lexz` | Misaki US English dictionaries (`us_gold`, `us_silver`), merged and gzipped | hexgrad | https://github.com/hexgrad/misaki | Apache-2.0 (`misaki-LICENSE.txt`) |
 
@@ -518,7 +521,7 @@ Unlike the art above, these come with their own licences: the model under the **
 
 Our own code reads the text plain for the model and phonemizes it only for the mouth shapes: `crates/voice/src/g2p.rs` ports the English rules of Misaki (Apache-2.0); no espeak-ng code is used. Pitch, size and the 24 kHz resampling are done around the model in `crates/voice/src/dsp.rs` and `resample.rs` (our own TD-PSOLA and resampler); the model's starting noise comes from our own hash in `web/src/voice/supertonic.ts`.
 
-The model runs with **ONNX Runtime Web** 1.30.0 (`onnxruntime-web`, its WebGPU build `ort-wasm-simd-threaded.asyncify.wasm`, bundled with the game), © Microsoft Corporation, MIT licence: https://github.com/microsoft/onnxruntime.
+The model runs with **ONNX Runtime Web** 1.31.1 (`onnxruntime-web`, its WebGPU build `ort-wasm-simd-threaded.asyncify.wasm`, bundled with the game), © Microsoft Corporation, MIT licence: https://github.com/microsoft/onnxruntime.
 
 ## The language model for residents' lines
 
@@ -536,15 +539,12 @@ The tokenizer runs with **Tokenizers.js** (`@huggingface/tokenizers`), © Huggin
 
 **Inter** by Rasmus Andersson and the Inter Project Authors (`@fontsource-variable/inter`), SIL Open Font License 1.1: its licence ships next to the font files as `inter-LICENSE.txt`.
 
-## Decoders (`../decoders/`, refreshed by `tools/assets/decoders.mjs`)
+## Decoders (`../decoders/`, refreshed by `cargo decoders`)
 
-Production builds ship compressed copies of the assets above (KTX2 textures, meshopt models, made by `tools/assets/optimize.mjs`; the art itself is unchanged). The game decodes them with these files, served from its own folder instead of Babylon's CDN:
+Production builds ship compressed copies of the assets above (KTX2 textures, meshopt models, made by `tools/assets/optimize.mjs`; the art itself is unchanged). The game decodes the textures with this file, served from its own folder instead of a CDN; the models' meshopt geometry is decoded by meshoptimizer's decoder (Arseny Kapoulkine, MIT), bundled into the game's code:
 
 | File(s) | What | Source | Authors | Licence |
 |---|---|---|---|---|
-| `babylon.ktx2Decoder.js`, `ktx2Transcoders/1/uastc_*.wasm` | KTX2 texture decoder and UASTC transcoders | Babylon.js 9.30.0 (cdn.babylonjs.com) | Babylon.js contributors | Apache-2.0 |
-| `ktx2Transcoders/1/msc_basis_transcoder.js`, `.wasm` | Basis Universal transcoder | Basis Universal, built by Babylon.js | Binomial LLC | Apache-2.0 |
-| `zstddec.wasm` | Zstandard decompression (UASTC KTX2) | zstddec, built by Babylon.js | Don McCurdy; Zstandard by Meta | MIT; BSD-3-Clause |
-| `meshopt_decoder.js` | meshopt geometry decoder | meshoptimizer 1.3.0 | Arseny Kapoulkine | MIT |
+| `basis/basis.wasm.js`, `basis/basis.wasm.wasm` | Basis Universal transcoder (KTX2 textures) | Basis Universal, PlayCanvas's build (its engine repository, at the `playcanvas` version the game uses) | Binomial LLC | Apache-2.0 |
 
 The build tools that make the compressed copies are not shipped: the Basis Universal encoder (Apache-2.0, through ktx2-encoder, MIT), glTF-Transform (MIT), meshoptimizer (MIT) and sharp (Apache-2.0, with libvips, LGPL-3.0).

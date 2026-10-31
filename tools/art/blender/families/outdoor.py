@@ -1106,23 +1106,37 @@ def hotTubCedar():
             F.sphere(f'jet{k}', 0.06, ((TUB_R - 0.11) * G.cosd(a), 0.69, (TUB_R - 0.11) * G.sind(a)), M.foam,
                      scale=(1, 0.7, 0.3), segments=8, rings=4)
     water = G.hinged(G.join(water, 'water'), F.at(0, 0.68, 0))
-    with G.new_parts() as cover:
-        rings = [(TUB_R + 0.0, 0.84), (TUB_R + 0.02, 0.85), (TUB_R + 0.02, 0.895), (TUB_R + 0.005, 0.91), (TUB_R - 0.03, 0.912)]
-        G.loft('cover', [G.ring(r, r, y, 32) for r, y in rings], material=M.tub_cover, angle=30)
-        F.box('cover_seam', 1.84, 0.008, 0.02, (0, 0.912, 0), M.tub_cover, bevel=0.003, bevel_segments=1)
+    # The cover in two halves meeting at the seam across its middle (a fourth draw, as the shower's door, Q-05): one
+    # lofted disc, each half cut from a copy of it, a hair apart at the seam, where a vinyl hinge strip joins them.
+    rings = [(TUB_R + 0.0, 0.84), (TUB_R + 0.02, 0.85), (TUB_R + 0.02, 0.895), (TUB_R + 0.005, 0.91), (TUB_R - 0.03, 0.912)]
+
+    def half(name, s):
+        """The half of the cover on side `s` of the seam (1: the front, game +z; -1: the back), cut from the disc."""
+        disc = G.loft(name, [G.ring(r, r, y, 32) for r, y in rings], material=M.tub_cover, angle=30)
+        cutter = F.box(f'{name}_cutter', 2.2, 0.2, 1.2, (0, 0.876, -s * 0.597), M.tub_cover)
+        return G.cut(disc, cutter)
+
+    with G.new_parts() as back:
+        half('cover', -1)
+        F.box('cover_seam', 1.84, 0.008, 0.02, (0, 0.912, -0.003), M.tub_cover, bevel=0.003, bevel_segments=1)
+    with G.new_parts() as front:
+        half('cover_front', 1)
         for x in (-0.3, 0.3):                              # the straps down to their clips, and the handles
             F.box(f'strap{x}', 0.05, 0.06, 0.008, (x, 0.865, TUB_R + 0.024), M.tub_cover, bevel=0.002, bevel_segments=1)
             F.box(f'clip{x}', 0.04, 0.025, 0.012, (x, 0.83, TUB_R + 0.028), M.tub_cover,
                   bevel=0.003, bevel_segments=1)
             F.sweep(f'handle{x}', [(x - 0.05, 0.91, 0.6), (x - 0.03, 0.919, 0.6), (x + 0.03, 0.919, 0.6), (x + 0.05, 0.91, 0.6)],
                     0.006, M.tub_cover, verts=5, resolution=2)
-    # its origin on the back edge, at the bottom: it folds onto its back half about it
-    cover = G.hinged(G.join(cover, 'cover'), F.at(0, 0.84, -TUB_R - 0.02))
+    # the back half's origin on its back edge, at the bottom; the front half's on the seam, at the top, about which
+    # it folds over onto the back half
+    cover = G.hinged(G.join(back, 'cover'), F.at(0, 0.84, -TUB_R - 0.02))
+    flap = G.hinged(G.join(front, 'cover_front'), F.at(0, 0.912, 0))
     G.settle(centre=False)
-    # Off for a soak: folded back on its seam (its front half over its back: half as deep, twice as thick; one
-    # part, so the tub keeps its three draws), lifted and turned down behind the tub, and lowered to hang there
-    # on its folded edge, as on a cover lifter, its round edge just off the ground (Blender offsets: +y is back).
-    G.squash(cover, 'cover_off', (1, 0.5, 2), seconds=0.5)
+    G.attach(flap, cover)
+    # Off for a soak: the front half folds back over the back half on the seam, then the two together are lifted,
+    # turned down behind the tub and lowered to hang there on their folded edge, as on a cover lifter, the round
+    # edge just off the ground (Blender offsets: +y is back).
+    G.swing(flap, 'cover_off', -180, seconds=0.5, axis='X')
     G.path(cover, 'cover_off', [(0, (0, 0, 0), (0, 0, 0)), (0.5, (0, 0, 0), (0, 0, 0)), (0.8, (0, 0, 0.25), (0, 0, 0)),
                                 (1.1, (0, 0.16, 1.16), (90, 0, 0)), (1.5, (0, 0.16, 0.11), (90, 0, 0))])
     G.motion._peak(cover, 'cover_off', G.motion.last_frame(1.5))   # previewed hung up, at its end

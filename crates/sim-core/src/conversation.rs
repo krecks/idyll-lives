@@ -14,18 +14,24 @@
 //! little closer. They stay for the leader's next social with someone there, and go otherwise.
 //! Someone joining walks to their place in the group.
 //!
+//! Two talk, and others listen in, only where they see each other (`in_sight`): not through a
+//! wall, a window or a shut front door. Whoever goes over to someone goes round to where they
+//! can (`approach_tile`), and calling out doesn't carry through a front door either.
+//!
 //! People sitting stay sitting for a talk: the one talked to on the sofa or at the table keeps
 //! their seat (and carries on with what they sat down to do afterwards), and people sitting near
 //! each other talk, or listen in, from their seats (`from_seat`), without getting up. Only what
 //! takes them closer than talking does (a hug, a kiss, a fight: `SEATED_DISTANCE`) gets them up.
 
-use crate::{MINUTES_PER_TICK, TICKS_PER_SECOND};
 use crate::content::{Content, MAX_NEEDS, Pose, stage_in};
+use crate::lot::{DiagDir, Edge, Lot, OUTDOORS, Side};
 use crate::path::{Grounds, NavGrid, STOREY_WALK};
 use crate::rng::Rng;
 use crate::social::{self, Effect, EventKind, EventLog, Relationships, SocialDef};
-use crate::lot::Edge;
-use crate::world::{Activity, ObjectInstance, Phase, Sim, Task, TaskKind, World, end_activity, grounds, route};
+use crate::world::{
+    Activity, ObjectInstance, Phase, Sim, Task, TaskKind, World, end_activity, grounds, route,
+};
+use crate::{MINUTES_PER_TICK, TICKS_PER_SECOND};
 
 /// How long an actor waits for a busy target before giving up (in all: following them about
 /// counts too, see `follow`).
@@ -78,6 +84,12 @@ pub fn duration(s: &SocialDef, success: bool) -> f32 {
     }
 }
 
+/// Whether two can court at all: both grown up and not family (`rel` between them; attraction is
+/// each social's and spark's own). Free will, the player's socials and `SetBond` keep to it alike.
+pub(crate) fn may_court(grown_ups: bool, rel: &social::Relationship) -> bool {
+    grown_ups && rel.kin.is_none()
+}
+
 /// Whether `actor` can start `s` with `target` (relationship requirements, both their life
 /// stages and attraction).
 pub fn social_allowed(
@@ -95,7 +107,7 @@ pub fn social_allowed(
         && s.requires.allows(rel)
         && stage_in(s.stages, stage(actor))
         && stage_in(s.target_stages, stage(target))
-        && (!romantic || (grown_ups && actor.attracted_to(target) && rel.kin.is_none()))
+        && (!romantic || (may_court(grown_ups, rel) && actor.attracted_to(target)))
 }
 
 /// Probability that `target` responds well to `actor` doing `s`.
@@ -152,12 +164,17 @@ pub fn options(w: &World, actor: usize, target: usize) -> Vec<(usize, f32)> {
         .socials
         .iter()
         .enumerate()
-        .filter(|(i, s)| !w.content.visits.farewell.contains(i) && social_allowed(&w.content, &w.relationships, a, t, s))
+        .filter(|(i, s)| {
+            !w.content.visits.farewell.contains(i)
+                && social_allowed(&w.content, &w.relationships, a, t, s)
+        })
         .map(|(i, s)| (i, acceptance_chance(&w.content, &w.relationships, a, t, s)))
         .collect()
 }
 
-/// A free tile next to `target` (or under it), closest to `from`.
+/// A free tile next to `target` (or under it), closest to `from`, from where `target` is in
+/// sight (`in_sight`): never the one on the far side of the wall, nor indoors behind the front
+/// door from someone on the doorstep (whoever answers it steps out to them).
 pub(crate) fn approach_tile(nav: &NavGrid, target: [f32; 2], from: [f32; 2]) -> Option<(i32, i32)> {
     let (tx, tz) = (target[0].floor() as i32, target[1].floor() as i32);
     let mut best = None;
@@ -165,7 +182,7 @@ pub(crate) fn approach_tile(nav: &NavGrid, target: [f32; 2], from: [f32; 2]) -> 
     for dz in -1..=1 {
         for dx in -1..=1 {
             let (x, z) = (tx + dx, tz + dz);
-            if !nav.tile_free(x, z) {
+            if !nav.tile_free(x, z) || !in_sight(nav, [x as f32 + 0.5, z as f32 + 0.5], target) {
                 continue;
             }
             let d = (x as f32 + 0.5 - from[0]).hypot(z as f32 + 0.5 - from[1]);
@@ -178,9 +195,119 @@ pub(crate) fn approach_tile(nav: &NavGrid, target: [f32; 2], from: [f32; 2]) -> 
     best
 }
 
+/// Whether the edge from tile `a` to its neighbour `b` stands shut to voices and eyes: a wall, a
+/// window, or a front door (between the house and outdoors), which stays shut but for someone
+/// going through it (as the renderer swings it: `doors.ts`). A doorway inside the house stands
+/// open, and fences and gates are talked over.
+fn shut(lot: &Lot, (ax, az): (i32, i32), (bx, bz): (i32, i32)) -> bool {
+    let side = match (bx - ax, bz - az) {
+        (1, 0) => Side::PosX,
+        (-1, 0) => Side::NegX,
+        (0, 1) => Side::PosZ,
+        _ => Side::NegZ,
+    };
+    // (The halves either side of it, on a tile a diagonal wall splits.)
+    let room = |x, z, side| lot.half_room(x, z, lot.half_at_side(x, z, side));
+    stops(lot.edge_between(ax, az, bx, bz), || {
+        (room(ax, az, side) == OUTDOORS) != (room(bx, bz, side.opposite()) == OUTDOORS)
+    })
+}
+
+/// Whether an edge of kind `edge` stops voices and eyes (`shut`): a door only if it's a front
+/// door (`front`: between the house and outdoors).
+fn stops(edge: Edge, front: impl FnOnce() -> bool) -> bool {
+    match edge {
+        Edge::Wall | Edge::Window => true,
+        Edge::Door => front(),
+        Edge::Open | Edge::Fence | Edge::Gate => false,
+    }
+}
+
+/// Whether people at `a` and `b` see each other, as two talking (and those listening in) must:
+/// on the same storey, with nothing `shut` on the straight line between them (through a grid
+/// corner, open one way round it or the other), nor a diagonal wall, window or front door across
+/// it. Furniture doesn't hide anyone. It walks the tiles the line crosses, so it's cheap for
+/// people near each other, as it's asked of every tick someone is about to start talking.
+pub(crate) fn in_sight(nav: &NavGrid, a: [f32; 2], b: [f32; 2]) -> bool {
+    let lot = nav.lot;
+    let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
+    let (mut at, goal) = (tile(a), tile(b));
+    if !lot.in_bounds(at.0, at.1) || nav.stairs.storey(at.1) != nav.stairs.storey(goal.1) {
+        return false;
+    }
+    let open = |from: (i32, i32), to: (i32, i32)| lot.in_bounds(to.0, to.1) && !shut(lot, from, to);
+    // Which side of the line from `p` to `q` the point `r` is on (0 on it).
+    let side = |p: [f32; 2], q: [f32; 2], r: [f32; 2]| {
+        (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+    };
+    // A diagonal across the tile, shut as `shut` has it, that the line crosses.
+    let across = |(x, z): (i32, i32)| {
+        let Some(d) = lot.diag(x, z) else {
+            return false;
+        };
+        let shut = stops(d.edge, || {
+            (lot.half_room(x, z, 0) == OUTDOORS) != (lot.half_room(x, z, 1) == OUTDOORS)
+        });
+        let (x, z) = (x as f32, z as f32);
+        let (p, q) = match d.dir {
+            DiagDir::Dp => ([x, z], [x + 1.0, z + 1.0]),
+            DiagDir::Dn => ([x, z + 1.0], [x + 1.0, z]),
+        };
+        shut && side(p, q, a) * side(p, q, b) <= 0.0 && side(a, b, p) * side(a, b, q) <= 0.0
+    };
+    let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
+    let (sx, sz) = (if dx > 0.0 { 1 } else { -1 }, if dz > 0.0 { 1 } else { -1 });
+    // How far along the line (0 at `a`, 1 at `b`) it next crosses a grid line across x, and one
+    // across z; and how far on it crosses the one after.
+    let first = |p: f32, d: f32| {
+        if d > 0.0 {
+            (p.floor() + 1.0 - p) / d
+        } else if d < 0.0 {
+            (p.floor() - p) / d
+        } else {
+            f32::INFINITY
+        }
+    };
+    let (mut tx, mut tz) = (first(a[0], dx), first(a[1], dz));
+    let (step_x, step_z) = (1.0 / dx.abs(), 1.0 / dz.abs());
+    for _ in 0..=(goal.0 - at.0).abs() + (goal.1 - at.1).abs() {
+        if across(at) {
+            return false;
+        }
+        if at == goal {
+            return true;
+        }
+        let to = if (tx - tz).abs() < 1e-5 {
+            let (side_x, side_z, to) =
+                ((at.0 + sx, at.1), (at.0, at.1 + sz), (at.0 + sx, at.1 + sz));
+            if !(open(at, side_x) && open(side_x, to) || open(at, side_z) && open(side_z, to)) {
+                return false;
+            }
+            tx += step_x;
+            tz += step_z;
+            to
+        } else {
+            let to = if tx < tz {
+                tx += step_x;
+                (at.0 + sx, at.1)
+            } else {
+                tz += step_z;
+                (at.0, at.1 + sz)
+            };
+            if !open(at, to) {
+                return false;
+            }
+            to
+        };
+        at = to;
+    }
+    false
+}
+
 /// Whether someone at `b` hears a call from `a`: within `EARSHOT` of open floor (round walls and
 /// furniture-free of them: furniture doesn't stop a voice), a doorway counting `DOOR_MUFFLE`
-/// more and a flight of stairs `STOREY_WALK`. Walls and windows stop it; garden fences don't.
+/// more and a flight of stairs `STOREY_WALK`. Walls, windows and the front door (`shut`) stop
+/// it; garden fences don't.
 pub(crate) fn within_earshot(nav: &NavGrid, a: [f32; 2], b: [f32; 2]) -> bool {
     if nav.stairs.distance(a, b) > EARSHOT {
         return false;
@@ -201,9 +328,9 @@ pub(crate) fn within_earshot(nav: &NavGrid, a: [f32; 2], b: [f32; 2]) -> bool {
             return None;
         }
         match lot.edge_between(ax, az, bx, bz) {
-            Edge::Wall | Edge::Window => None,
+            _ if shut(lot, (ax, az), (bx, bz)) => None,
             Edge::Door => Some(muffle),
-            Edge::Open | Edge::Fence | Edge::Gate => Some(0),
+            _ => Some(0),
         }
     };
     let mut best = std::collections::HashMap::from([(start, 0u32)]);
@@ -226,7 +353,14 @@ pub(crate) fn within_earshot(nav: &NavGrid, a: [f32; 2], b: [f32; 2]) -> bool {
         for (dx, dz) in [(1, 1), (1, -1), (-1, 1), (-1, -1)] {
             let (side_x, side_z) = ((at.0 + dx, at.1), (at.0, at.1 + dz));
             let to = (at.0 + dx, at.1 + dz);
-            let clear = [open(at, side_x), open(side_x, to), open(at, side_z), open(side_z, to)].iter().all(|e| *e == Some(0));
+            let clear = [
+                open(at, side_x),
+                open(side_x, to),
+                open(at, side_z),
+                open(side_z, to),
+            ]
+            .iter()
+            .all(|e| *e == Some(0));
             if clear {
                 next.push((to, 14));
             }
@@ -263,7 +397,9 @@ enum State {
 /// Where someone joining in is at.
 #[derive(Clone, Copy)]
 enum Joining {
-    Routing { goal: [f32; 2] },
+    Routing {
+        goal: [f32; 2],
+    },
     /// Arrived, or between two of the leader's socials.
     Waiting(u32),
     Listening(f32),
@@ -287,7 +423,11 @@ pub(crate) fn update(w: &mut World) {
         reach,
         ..
     } = w;
-    let nav = NavGrid { lot, blocked, stairs };
+    let nav = NavGrid {
+        lot,
+        blocked,
+        stairs,
+    };
     // (Round other people's gardens, as for any walk.)
     let walk = |sim: &Sim, goal| grounds(tile_plot, plots, households, &nav, sim, goal);
     let n = sims.len();
@@ -324,7 +464,11 @@ pub(crate) fn update(w: &mut World) {
             Phase::Calling { ticks } => State::Calling(*ticks),
             Phase::Waiting { ticks } => State::Waiting(*ticks),
             Phase::Conversing { elapsed, success } => State::Conversing(*elapsed, *success),
-            Phase::Using { .. } | Phase::Knocking { .. } | Phase::Queued { .. } => continue,
+            Phase::Using { .. }
+            | Phase::Knocking { .. }
+            | Phase::Queued { .. }
+            | Phase::Boarding { .. }
+            | Phase::Alighting { .. } => continue,
         };
         let s = &content.socials[social];
         let gap = dist(sims[i].pos, sims[t].pos);
@@ -343,9 +487,13 @@ pub(crate) fn update(w: &mut World) {
                 if sims[i].social_waited > 0 {
                     sims[i].social_waited += 1;
                 }
-                if gap <= s.distance + ENGAGE_SLACK {
+                // (Near, but the other side of a wall: on round to them.)
+                if gap <= s.distance + ENGAGE_SLACK && in_sight(&nav, sims[i].pos, sims[t].pos) {
                     set_phase(&mut sims[i], Phase::Waiting { ticks: 0 });
-                } else if !sims[i].called && sims[t].available_for_social(content) && calls_out(&nav, s, sims[i].pos, sims[t].pos) {
+                } else if !sims[i].called
+                    && sims[t].available_for_social(content)
+                    && calls_out(&nav, s, sims[i].pos, sims[t].pos)
+                {
                     // Near enough to call out to them (on the player's orders, from across the house).
                     sims[i].called = true;
                     set_phase(&mut sims[i], Phase::Calling { ticks: 0 });
@@ -389,22 +537,38 @@ pub(crate) fn update(w: &mut World) {
             }
             State::Waiting(ticks) => {
                 sims[i].social_waited += 1;
+                // Near enough to talk is only where they see each other (`in_sight`).
+                let (from, to) = (sims[i].pos, sims[t].pos);
+                let mut sight = None;
+                let mut seen = || *sight.get_or_insert_with(|| in_sight(&nav, from, to));
                 // About to drop (or burst) themselves: the talk would break off at once.
                 if sims[i].pressed(content) {
                     end_activity(&mut sims[i], content, objects);
                 } else if sims[i].paused.is_some() {
                     // From the seat: with them sitting there, or not at all (back to what they sat
                     // down to do).
-                    if gap <= SEAT_RANGE + 0.3 && sims[t].available_for_social(content) {
-                        engage(content, &nav, relationships, events, rng, objects, sims, i, t, social, tick);
+                    if gap <= SEAT_RANGE + 0.3 && seen() && sims[t].available_for_social(content) {
+                        engage(
+                            content,
+                            &nav,
+                            relationships,
+                            events,
+                            rng,
+                            objects,
+                            sims,
+                            i,
+                            t,
+                            social,
+                            tick,
+                        );
                     } else {
                         end_activity(&mut sims[i], content, objects);
                     }
-                } else if walking && gap > s.distance + ENGAGE_SLACK {
-                    // Got to the middle first: wait for them to get there too.
+                } else if walking && (gap > s.distance + ENGAGE_SLACK || !seen()) {
+                    // Got to the middle first: wait for them to get there too (where they see it).
                     sims[i].yaw = facing(sims[i].pos, sims[t].pos);
                     set_phase(&mut sims[i], Phase::Waiting { ticks: ticks + 1 });
-                } else if gap > s.distance + ENGAGE_SLACK + 0.6 {
+                } else if gap > s.distance + ENGAGE_SLACK + 0.6 || !seen() {
                     if coming {
                         chase(&nav, reach, &walk, sims, i, t, content, objects);
                     } else {
@@ -433,7 +597,10 @@ pub(crate) fn update(w: &mut World) {
             }
             State::Conversing(elapsed, success) => {
                 // (Either of them bursting breaks it off.)
-                if sims[t].engaged_with != Some(i as u32) || sims[i].pressed(content) || sims[t].pressed(content) {
+                if sims[t].engaged_with != Some(i as u32)
+                    || sims[i].pressed(content)
+                    || sims[t].pressed(content)
+                {
                     if sims[t].engaged_with == Some(i as u32) {
                         sims[t].engaged_with = None;
                     }
@@ -480,10 +647,17 @@ pub(crate) fn update(w: &mut World) {
         };
         let l = leader as usize;
         let state = match &act.phase {
-            Phase::Routing { waypoints, .. } => Joining::Routing { goal: *waypoints.last().unwrap_or(&sims[j].pos) },
+            Phase::Routing { waypoints, .. } => Joining::Routing {
+                goal: *waypoints.last().unwrap_or(&sims[j].pos),
+            },
             Phase::Waiting { ticks } => Joining::Waiting(*ticks),
             Phase::Conversing { elapsed, .. } => Joining::Listening(*elapsed),
-            Phase::Using { .. } | Phase::Calling { .. } | Phase::Knocking { .. } | Phase::Queued { .. } => continue,
+            Phase::Using { .. }
+            | Phase::Calling { .. }
+            | Phase::Knocking { .. }
+            | Phase::Queued { .. }
+            | Phase::Boarding { .. }
+            | Phase::Alighting { .. } => continue,
         };
         if l == j || sims.get(l).is_none_or(|s| !s.here()) || sims[j].pressed(content) {
             end_activity(&mut sims[j], content, objects);
@@ -498,7 +672,9 @@ pub(crate) fn update(w: &mut World) {
             (Joining::Routing { goal }, Some((t, _))) => {
                 if sims[j].join_spot.is_some() {
                     // (On their way to their place in the group: they take it on getting there.)
-                } else if dist(sims[j].pos, middle(sims, l, t)) <= JOIN_RANGE {
+                } else if dist(sims[j].pos, middle(sims, l, t)) <= JOIN_RANGE
+                    && in_sight(&nav, sims[j].pos, sims[l].pos)
+                {
                     set_phase(&mut sims[j], Phase::Waiting { ticks: 0 });
                 } else if dist(goal, sims[l].pos) > REPATH_DISTANCE {
                     chase(&nav, reach, &walk, sims, j, l, content, objects);
@@ -510,17 +686,33 @@ pub(crate) fn update(w: &mut World) {
                 }
             }
             (Joining::Waiting(_), Some((t, _))) => {
-                // (Listening in from their seat: only to a talk beside them.)
+                // (Listening in from their seat: only to a talk beside them, in sight of it.)
                 let seated = sims[j].paused.is_some();
                 let off = dist(sims[j].pos, middle(sims, l, t));
-                if seated && off > SEAT_RANGE + 0.6 {
+                let (from, to) = (sims[j].pos, sims[l].pos);
+                let mut sight = None;
+                let mut seen = || *sight.get_or_insert_with(|| in_sight(&nav, from, to));
+                if seated && (off > SEAT_RANGE + 0.6 || !seen()) {
                     end_activity(&mut sims[j], content, objects);
-                } else if off > JOIN_RANGE + 0.6 {
+                } else if off > JOIN_RANGE + 0.6 || !seen() {
                     chase(&nav, reach, &walk, sims, j, l, content, objects);
                 } else if group(sims, content, l).len() >= MAX_GROUP {
                     end_activity(&mut sims[j], content, objects);
                 } else {
-                    take_place(&nav, reach, &walk, relationships, events, sims, content, j, l, t, tick);
+                    take_place(
+                        &nav,
+                        reach,
+                        &walk,
+                        relationships,
+                        events,
+                        sims,
+                        content,
+                        objects,
+                        j,
+                        l,
+                        t,
+                        tick,
+                    );
                 }
             }
             (Joining::Waiting(ticks), None) => {
@@ -533,7 +725,13 @@ pub(crate) fn update(w: &mut World) {
             (Joining::Listening(elapsed), Some((_, social))) => {
                 let s = &content.socials[social];
                 gain(&mut sims[j], &s.target_gain, s.minutes);
-                set_phase(&mut sims[j], Phase::Conversing { elapsed: elapsed + MINUTES_PER_TICK, success: true });
+                set_phase(
+                    &mut sims[j],
+                    Phase::Conversing {
+                        elapsed: elapsed + MINUTES_PER_TICK,
+                        success: true,
+                    },
+                );
             }
             (Joining::Listening(_), None) => set_phase(&mut sims[j], Phase::Waiting { ticks: 0 }),
         }
@@ -544,24 +742,45 @@ pub(crate) fn update(w: &mut World) {
 /// with afterwards (the sofa, a coffee at the table, a meal; or talking from it themselves), for
 /// a social they needn't get up for.
 fn keeps_seat(sim: &Sim, s: &SocialDef) -> bool {
-    let sitting = sim.paused.is_some() || sim.current.as_ref().is_some_and(|a| matches!((a.task.kind, &a.phase), (TaskKind::Use { .. } | TaskKind::Eat { .. }, Phase::Using { .. })));
+    let sitting = sim.paused.is_some()
+        || sim.current.as_ref().is_some_and(|a| {
+            matches!(
+                (a.task.kind, &a.phase),
+                (
+                    TaskKind::Use { .. } | TaskKind::Eat { .. },
+                    Phase::Using { .. }
+                )
+            )
+        });
     sim.pose == Pose::Sit && sitting && s.distance >= SEATED_DISTANCE
 }
 
 /// Someone sitting talks to someone sitting near (`task`, a social), or listens in on a talk
 /// beside them (a `Join`), from their seat (`World::step_sim`'s `pick_autonomous` with
 /// `from_seat`): what they sat down to do waits (`Sim::paused`) until it's over.
-pub(crate) fn from_seat(sim: &mut Sim, task: Task, content: &Content, briefs: &[crate::world::SimBrief]) {
+pub(crate) fn from_seat(
+    sim: &mut Sim,
+    task: Task,
+    content: &Content,
+    briefs: &[crate::world::SimBrief],
+) {
     let tags = match task.kind {
         TaskKind::Social { social, .. } => content.socials[social].tags,
-        TaskKind::Join { leader } => briefs.get(leader as usize).and_then(|b| b.conversing).map_or(0, |(_, social)| content.socials[social].tags),
+        TaskKind::Join { leader } => briefs
+            .get(leader as usize)
+            .and_then(|b| b.conversing)
+            .map_or(0, |(_, social)| content.socials[social].tags),
         _ => return,
     };
     sim.paused = sim.current.take();
     // (Right there: no calling out, no walking over.)
     sim.called = true;
     sim.social_waited = 0;
-    sim.current = Some(Activity { task, phase: Phase::Waiting { ticks: 0 }, tags });
+    sim.current = Some(Activity {
+        task,
+        phase: Phase::Waiting { ticks: 0 },
+        tags,
+    });
 }
 
 /// Everyone in the conversation `l` leads: `l`, the one talked to, then those listening in.
@@ -592,16 +811,19 @@ fn regrouping(sims: &[Sim], l: usize, j: usize) -> bool {
         None => true,
         Some(a) => match (a.task.kind, &a.phase) {
             (_, Phase::Conversing { .. }) => false,
-            (TaskKind::Social { target, .. }, _) => sims.get(target as usize).is_some_and(|t| dist(t.pos, sims[j].pos) <= JOIN_RANGE * 2.0),
+            (TaskKind::Social { target, .. }, _) => sims
+                .get(target as usize)
+                .is_some_and(|t| dist(t.pos, sims[j].pos) <= JOIN_RANGE * 2.0),
             _ => false,
         },
     }
 }
 
 /// `j` joins in on the conversation `l` is having with `t`: a free spot around the two (to one
-/// side of them first, then all round), walked to (`join_spot`) unless they're already there;
-/// there, everyone faces the middle of the group. Sitting (listening in from their seat), they
-/// stay where they are.
+/// side of them first, then all round) in sight of both, walked to (`join_spot`) unless they're
+/// already there; there, everyone faces the middle of the group. Sitting (listening in from their
+/// seat), they stay where they are. Nowhere to go and the two not both in sight from where they
+/// are (one round the door frame): there's no place for them, and they go.
 #[allow(clippy::too_many_arguments)]
 fn take_place<'a>(
     nav: &NavGrid,
@@ -611,12 +833,16 @@ fn take_place<'a>(
     events: &mut EventLog,
     sims: &mut [Sim],
     content: &Content,
+    objects: &mut [ObjectInstance],
     j: usize,
     l: usize,
     t: usize,
     tick: u64,
 ) {
-    let others: Vec<usize> = group(sims, content, l).into_iter().filter(|&m| m != j).collect();
+    let others: Vec<usize> = group(sims, content, l)
+        .into_iter()
+        .filter(|&m| m != j)
+        .collect();
     let (a, b) = (sims[l].pos, sims[t].pos);
     let mid = middle(sims, l, t);
     let d = dist(a, b).max(0.5);
@@ -626,7 +852,10 @@ fn take_place<'a>(
     let round = (d * 0.5 + 0.5).max(side);
     let from = sims[j].pos;
     let by_distance = |p: &[f32; 2], q: &[f32; 2]| dist(*p, from).total_cmp(&dist(*q, from));
-    let mut spots: Vec<[f32; 2]> = [1.0, -1.0].iter().map(|k| [mid[0] + across[0] * side * k, mid[1] + across[1] * side * k]).collect();
+    let mut spots: Vec<[f32; 2]> = [1.0, -1.0]
+        .iter()
+        .map(|k| [mid[0] + across[0] * side * k, mid[1] + across[1] * side * k])
+        .collect();
     spots.sort_by(by_distance);
     let mut ring: Vec<[f32; 2]> = (0..12)
         .map(|k| {
@@ -636,18 +865,33 @@ fn take_place<'a>(
         .collect();
     ring.sort_by(by_distance);
     spots.extend(ring);
+    let seen = |p: [f32; 2]| in_sight(nav, p, a) && in_sight(nav, p, b);
     let spot = spots.into_iter().find(|&p| {
         nav.tile_free(p[0].floor() as i32, p[1].floor() as i32)
             && nav.line_walkable(from, p)
-            && others.iter().all(|&m| dist(sims[m].pos, p) >= GROUP_SPACING)
+            && seen(p)
+            && others
+                .iter()
+                .all(|&m| dist(sims[m].pos, p) >= GROUP_SPACING)
     });
     // (Nowhere free, or sitting: they listen from where they are.)
     let spot = spot.filter(|_| sims[j].pose == Pose::Stand);
+    if spot.is_none() && !seen(from) {
+        return end_activity(&mut sims[j], content, objects);
+    }
     if let Some(p) = spot {
         if dist(from, p) > SETTLE {
             // Over to it on foot; they take it on getting there (`update`, again here).
             let tile = (p[0].floor() as i32, p[1].floor() as i32);
-            if let Some(waypoints) = route(nav, Some(reach), from, sims[j].tile(), tile, p, Some(&walk(&sims[j], tile))) {
+            if let Some(waypoints) = route(
+                nav,
+                Some(reach),
+                from,
+                sims[j].tile(),
+                tile,
+                p,
+                Some(&walk(&sims[j], tile)),
+            ) {
                 sims[j].join_spot = Some(p);
                 return set_phase(&mut sims[j], Phase::Routing { waypoints, next: 0 });
             }
@@ -662,7 +906,13 @@ fn take_place<'a>(
             events.push(tick, EventKind::Met, j, m, None);
         }
     }
-    set_phase(&mut sims[j], Phase::Conversing { elapsed: 0.0, success: true });
+    set_phase(
+        &mut sims[j],
+        Phase::Conversing {
+            elapsed: 0.0,
+            success: true,
+        },
+    );
     open_up(sims, content, l, t);
 }
 
@@ -684,7 +934,9 @@ fn open_up(sims: &mut [Sim], content: &Content, l: usize, t: usize) {
         return;
     }
     let count = members.len() as f32;
-    let sum = members.iter().fold([0.0, 0.0], |c, &m| [c[0] + sims[m].pos[0], c[1] + sims[m].pos[1]]);
+    let sum = members.iter().fold([0.0, 0.0], |c, &m| {
+        [c[0] + sims[m].pos[0], c[1] + sims[m].pos[1]]
+    });
     let centre = [sum[0] / count, sum[1] / count];
     for m in members {
         // (Someone right on the middle, as can't happen with everyone apart: they stay as they are.)
@@ -697,7 +949,15 @@ fn open_up(sims: &mut [Sim], content: &Content, l: usize, t: usize) {
 /// A joinable social `s` led by `l` went well: those listening in get the feeling the one talked
 /// to does, and everyone there grows a little closer to everyone else (the pair talking to each
 /// other through their social's outcome).
-fn group_outcome(content: &Content, rels: &mut Relationships, events: &mut EventLog, sims: &mut [Sim], l: usize, s: &SocialDef, tick: u64) {
+fn group_outcome(
+    content: &Content,
+    rels: &mut Relationships,
+    events: &mut EventLog,
+    sims: &mut [Sim],
+    l: usize,
+    s: &SocialDef,
+    tick: u64,
+) {
     let members = group(sims, content, l);
     if members.len() <= 2 {
         return;
@@ -708,7 +968,9 @@ fn group_outcome(content: &Content, rels: &mut Relationships, events: &mut Event
             let before = (*rels.get(a, b), *rels.get(b, a));
             rels.adjust(a, b, f, 0.0);
             rels.adjust(b, a, f, 0.0);
-            for (kind, reversed) in social::milestone_events((&before.0, &before.1), (rels.get(a, b), rels.get(b, a))) {
+            for (kind, reversed) in
+                social::milestone_events((&before.0, &before.1), (rels.get(a, b), rels.get(b, a)))
+            {
                 let (p, q) = if reversed { (b, a) } else { (a, b) };
                 events.push(tick, kind, p, q, None);
             }
@@ -745,7 +1007,10 @@ fn follow<'a>(
 ) {
     let (x, z) = sims[t].tile();
     let open = walk(&sims[i], sims[i].tile());
-    let allowed = directed || open.plot(nav, x, z).is_none_or(|p| open.open.get(p as usize).copied().unwrap_or(true));
+    let allowed = directed
+        || open
+            .plot(nav, x, z)
+            .is_none_or(|p| open.open.get(p as usize).copied().unwrap_or(true));
     if allowed && sims[t].available_for_social(content) {
         chase(nav, reach, walk, sims, i, t, content, objects);
     } else {
@@ -800,7 +1065,15 @@ fn meet<'a>(
     let centre = |(x, z): (i32, i32)| [x as f32 + 0.5, z as f32 + 0.5];
     let way = |sims: &[Sim], who: usize, to: [f32; 2]| {
         approach_tile(nav, to, sims[who].pos).and_then(|goal| {
-            route(nav, Some(reach), sims[who].pos, sims[who].tile(), goal, centre(goal), Some(&walk(&sims[who], goal)))
+            route(
+                nav,
+                Some(reach),
+                sims[who].pos,
+                sims[who].tile(),
+                goal,
+                centre(goal),
+                Some(&walk(&sims[who], goal)),
+            )
         })
     };
     let Some(all) = way(sims, i, sims[t].pos) else {
@@ -810,18 +1083,44 @@ fn meet<'a>(
     let (mut mine, middle) = halfway(sims[i].pos, &all);
     match way(sims, t, middle) {
         Some(waypoints) => {
+            // What `t` was still at (back on the sofa after listening in, say) ends as they set
+            // off: its slot freed (else the seat stays theirs while they walk away).
+            if sims[t].current.is_some() {
+                end_activity(&mut sims[t], content, objects);
+            }
             let goal = *waypoints.last().unwrap_or(&sims[t].pos);
-            let task = Task { kind: TaskKind::MoveTo { x: goal[0], z: goal[1] }, directed: false, routine: false };
-            sims[t].current = Some(Activity { task, phase: Phase::Routing { waypoints, next: 0 }, tags: 0 });
+            let task = Task {
+                kind: TaskKind::MoveTo {
+                    x: goal[0],
+                    z: goal[1],
+                },
+                directed: false,
+                routine: false,
+            };
+            sims[t].current = Some(Activity {
+                task,
+                phase: Phase::Routing { waypoints, next: 0 },
+                tags: 0,
+            });
         }
         None => mine = all,
     }
-    set_phase(&mut sims[i], Phase::Routing { waypoints: mine, next: 0 });
+    set_phase(
+        &mut sims[i],
+        Phase::Routing {
+            waypoints: mine,
+            next: 0,
+        },
+    );
 }
 
 /// The waypoints from `from` along `path` to its middle, and the middle.
 fn halfway(from: [f32; 2], path: &[[f32; 2]]) -> (Vec<[f32; 2]>, [f32; 2]) {
-    let legs = || std::iter::once(from).chain(path.iter().copied()).zip(path.iter().copied());
+    let legs = || {
+        std::iter::once(from)
+            .chain(path.iter().copied())
+            .zip(path.iter().copied())
+    };
     let mut left = legs().map(|(a, b)| dist(a, b)).sum::<f32>() / 2.0;
     let mut out = Vec::new();
     for (a, b) in legs() {
@@ -876,7 +1175,12 @@ fn engage(
     let (ap, tp) = (sims[i].pos, sims[t].pos);
     let d = dist(ap, tp);
     let at = |dir: [f32; 2]| [tp[0] + dir[0] * s.distance, tp[1] + dir[1] * s.distance];
-    let open = |spot: [f32; 2]| nav.tile_free(spot[0].floor() as i32, spot[1].floor() as i32) && nav.line_walkable(ap, spot);
+    // (Never round a wall, or out of sight behind the front door.)
+    let open = |spot: [f32; 2]| {
+        nav.tile_free(spot[0].floor() as i32, spot[1].floor() as i32)
+            && nav.line_walkable(ap, spot)
+            && in_sight(nav, spot, tp)
+    };
     let spot = if d > 0.05 {
         Some(at([(ap[0] - tp[0]) / d, (ap[1] - tp[1]) / d])).filter(|&p| open(p))
     } else {
@@ -923,7 +1227,9 @@ fn apply_outcome(
 ) {
     let s = &content.socials[social];
     let o = if success { &s.success } else { &s.failure };
-    outcome(content, rels, events, rng, sims, a, t, o, s.tags, success, tick);
+    outcome(
+        content, rels, events, rng, sims, a, t, o, s.tags, success, tick,
+    );
 }
 
 /// What came of something `a` did with `t` (a social, a phone call): relationship changes both
@@ -962,9 +1268,10 @@ pub(crate) fn outcome(
 
     match o.effect {
         Effect::None => {}
+        // (Off to bed together, where the content has beds for it: `privacy::after_step`.)
         Effect::Conceive => {
             if success {
-                sims[a].conceived = Some(t as u32);
+                sims[a].to_bed = Some(t as u32);
             }
         }
         Effect::Kiss => {
@@ -1113,7 +1420,7 @@ fn facing(from: [f32; 2], to: [f32; 2]) -> f32 {
 #[cfg(test)]
 mod tests {
     use crate::social::EventKind;
-    use crate::world::{Phase, Task, TaskKind, TICKS_PER_DAY};
+    use crate::world::{Phase, TICKS_PER_DAY, Task, TaskKind};
     use crate::{Command, TICKS_PER_SECOND, World};
 
     const CONTENT: &str = r#"{
@@ -1154,11 +1461,123 @@ mod tests {
         assert!(heard([3.5, 6.5], [11.5, 6.5]), "across a room");
         assert!(heard([3.5, 2.5], [10.5, 9.5]), "diagonally across a room");
         assert!(heard([10.5, 6.5], [14.5, 6.5]), "through the doorway");
-        assert!(!heard([7.5, 6.5], [15.5, 6.5]), "through the doorway, from afar");
+        assert!(
+            !heard([7.5, 6.5], [15.5, 6.5]),
+            "through the doorway, from afar"
+        );
         assert!(!heard([11.5, 2.5], [14.5, 2.5]), "through a wall");
         assert!(!heard([12.5, 3.5], [13.5, 3.5]), "through a window");
+        assert!(!heard([5.5, 10.5], [5.5, 11.5]), "through the front door");
         assert!(heard([2.5, 12.5], [13.5, 12.5]), "out in the garden");
-        assert!(!heard([2.5, 12.5], [16.5, 12.5]), "too far out in the garden");
+        assert!(
+            !heard([2.5, 12.5], [16.5, 12.5]),
+            "too far out in the garden"
+        );
+    }
+
+    #[test]
+    fn two_see_each_other_through_a_doorway_but_not_a_wall_a_window_or_the_front_door() {
+        // The rooms of the test above, and a diagonal wall out in the garden.
+        let lot = r#"{"width":30,"depth":14,
+            "walls":[[1,1,23,1],[1,11,23,11],[1,1,1,11],[23,1,23,11],[13,1,13,11]],
+            "doors":[{"x":13,"z":6,"axis":"z"},{"x":5,"z":11,"axis":"x"}],
+            "windows":[{"x":13,"z":3,"axis":"z"}],
+            "diagonals":[{"x":20,"z":12,"dir":"dp"}]}"#;
+        let w = World::from_json(CONTENT, lot, 1).unwrap();
+        let seen = |a: [f32; 2], b: [f32; 2]| {
+            let (there, back) = (w.in_sight(a, b), w.in_sight(b, a));
+            assert_eq!(there, back, "{a:?} and {b:?} see each other one way only");
+            there
+        };
+        assert!(seen([3.5, 6.5], [11.5, 6.5]), "across a room");
+        assert!(seen([3.5, 2.5], [10.5, 9.5]), "diagonally across a room");
+        assert!(seen([10.5, 6.5], [14.5, 6.5]), "through the doorway");
+        assert!(seen([12.5, 5.5], [13.5, 6.5]), "past the door frame");
+        assert!(!seen([11.5, 2.5], [14.5, 2.5]), "through a wall");
+        assert!(!seen([12.5, 7.8], [13.5, 6.8]), "round the door frame");
+        assert!(!seen([22.5, 10.5], [23.5, 11.5]), "through a corner");
+        assert!(!seen([12.5, 3.5], [13.5, 3.5]), "through a window");
+        assert!(!seen([5.5, 10.5], [5.5, 11.5]), "through the front door");
+        assert!(seen([2.5, 12.5], [13.5, 12.5]), "out in the garden");
+        assert!(!seen([19.5, 12.2], [21.5, 12.8]), "across a diagonal wall");
+        assert!(
+            seen([19.5, 12.6], [21.5, 13.6]),
+            "by the end of a diagonal wall"
+        );
+    }
+
+    /// Two rooms side by side (x 1..8 and 8..15), a doorway between them at z 4.
+    fn two_rooms(sims: &str) -> World {
+        let lot = format!(
+            r#"{{"width":16,"depth":12,
+            "walls":[[1,1,15,1],[1,11,15,11],[1,1,1,11],[15,1,15,11],[8,1,8,11]],
+            "doors":[{{"x":8,"z":4,"axis":"z"}}],"sims":[{sims}]}}"#
+        );
+        let mut w = World::from_json(CONTENT, &lot, 5).unwrap();
+        w.autonomy = false;
+        w
+    }
+
+    #[test]
+    fn nobody_talks_through_a_wall() {
+        // B stands against the wall, A just the other side of it: the tile next to B nearest A
+        // is A's side of the wall. A goes round by the doorway to talk.
+        let mut w = two_rooms(r#"{"name":"A","x":6.5,"z":8.5},{"name":"B","x":8.5,"z":8.5}"#);
+        let chat = w.content.social_index("chat").unwrap();
+        w.apply(Command::Social {
+            sim: 0,
+            target: 1,
+            social: chat,
+        })
+        .unwrap();
+        let mut talked = false;
+        for _ in 0..TICKS_PER_SECOND * 30 {
+            w.tick_once();
+            if w.sims[0].conversation(&w.content).is_some() {
+                talked = true;
+                let (a, b) = (w.sims[0].pos, w.sims[1].pos);
+                assert!(
+                    w.in_sight(a, b),
+                    "A at {a:?} talks to B at {b:?} through the wall"
+                );
+            }
+        }
+        assert!(talked, "A and B never talked");
+    }
+
+    #[test]
+    fn nobody_listens_in_through_a_wall() {
+        // A talks to B with their back to the wall; C, the other side of it, comes round by the
+        // doorway to listen in.
+        let mut w = two_rooms(
+            r#"{"name":"A","x":7.5,"z":8.5},{"name":"B","x":6.5,"z":8.5},{"name":"C","x":9.5,"z":8.5}"#,
+        );
+        let chat = w.content.social_index("chat").unwrap();
+        w.apply(Command::Social {
+            sim: 0,
+            target: 1,
+            social: chat,
+        })
+        .unwrap();
+        ticks(&mut w, 2);
+        assert!(w.sims[0].conversation(&w.content).is_some());
+        join(&mut w, 2, 0);
+        let mut listened = false;
+        for _ in 0..TICKS_PER_SECOND * 10 {
+            w.tick_once();
+            if w.sims[2].listening_to() == Some(0) {
+                listened = true;
+                let c = w.sims[2].pos;
+                for m in [0, 1] {
+                    let p = w.sims[m].pos;
+                    assert!(
+                        w.in_sight(c, p),
+                        "C at {c:?} listens to {m} at {p:?} through the wall"
+                    );
+                }
+            }
+        }
+        assert!(listened, "C never listened in");
     }
 
     fn town(sims: &str, relationships: &str) -> World {
@@ -1337,10 +1756,18 @@ mod tests {
     /// A and B chatting (A started it, the player's order), the others elsewhere on the lot,
     /// nobody choosing anything for themselves yet.
     fn chatting(others: &str) -> World {
-        let mut w = town(&format!(r#"{{"name":"A","x":5.5,"z":5.5}},{{"name":"B","x":7.5,"z":5.5}}{others}"#), "");
+        let mut w = town(
+            &format!(r#"{{"name":"A","x":5.5,"z":5.5}},{{"name":"B","x":7.5,"z":5.5}}{others}"#),
+            "",
+        );
         w.autonomy = false;
         let chat = w.content.social_index("chat").unwrap();
-        w.apply(Command::Social { sim: 0, target: 1, social: chat }).unwrap();
+        w.apply(Command::Social {
+            sim: 0,
+            target: 1,
+            social: chat,
+        })
+        .unwrap();
         for _ in 0..TICKS_PER_SECOND * 5 {
             w.tick_once();
             if w.sims[0].conversation(&w.content).is_some() {
@@ -1351,11 +1778,18 @@ mod tests {
     }
 
     fn join(w: &mut World, sim: usize, leader: u32) {
-        w.sims[sim].queue.push_back(Task { kind: TaskKind::Join { leader }, directed: false, routine: false });
+        w.sims[sim].queue.push_back(Task {
+            kind: TaskKind::Join { leader },
+            directed: false,
+            routine: false,
+        });
     }
 
     fn listeners(w: &World, leader: u32) -> usize {
-        w.sims.iter().filter(|s| s.listening_to() == Some(leader)).count()
+        w.sims
+            .iter()
+            .filter(|s| s.listening_to() == Some(leader))
+            .count()
     }
 
     fn apart(p: [f32; 2], q: [f32; 2]) -> f32 {
@@ -1381,8 +1815,14 @@ mod tests {
         w.autonomy = false;
         let before = w.sims[2].needs[0];
         let (c, a, b) = (w.sims[2].pos, w.sims[0].pos, w.sims[1].pos);
-        assert!(apart(c, a) < 2.0 && apart(c, b) < 2.0, "C listens from {c:?}, A at {a:?}, B at {b:?}");
-        assert!(apart(c, a) >= 0.6 && apart(c, b) >= 0.6, "C stands on someone");
+        assert!(
+            apart(c, a) < 2.0 && apart(c, b) < 2.0,
+            "C listens from {c:?}, A at {a:?}, B at {b:?}"
+        );
+        assert!(
+            apart(c, a) >= 0.6 && apart(c, b) >= 0.6,
+            "C stands on someone"
+        );
         // The snapshot: C listens to A's chat (role 3, A as partner).
         let mut out = vec![0.0; crate::snapshot::CAPACITY];
         crate::snapshot::write(&w, &mut out);
@@ -1393,7 +1833,10 @@ mod tests {
         assert_eq!(out[row(2) + sim::SOCIAL], out[row(0) + sim::SOCIAL]);
         assert!(!w.sims[2].available_for_social(&w.content));
 
-        let friends = (w.relationships.get(2, 0).friendship, w.relationships.get(1, 2).friendship);
+        let friends = (
+            w.relationships.get(2, 0).friendship,
+            w.relationships.get(1, 2).friendship,
+        );
         let mut ended = false;
         for _ in 0..TICKS_PER_SECOND * 15 {
             w.tick_once();
@@ -1403,14 +1846,26 @@ mod tests {
             }
         }
         assert!(ended);
-        assert!(w.sims[2].needs[0] > before, "listening filled C's social need");
+        assert!(
+            w.sims[2].needs[0] > before,
+            "listening filled C's social need"
+        );
         let gain = w.content.social_rules.join_friendship;
         assert_eq!(w.relationships.get(2, 0).friendship, friends.0 + gain);
         assert_eq!(w.relationships.get(1, 2).friendship, friends.1 + gain);
-        assert!(w.sims[2].feelings.iter().any(|f| w.content.feelings[f.def].id == "goodChat"));
+        assert!(
+            w.sims[2]
+                .feelings
+                .iter()
+                .any(|f| w.content.feelings[f.def].id == "goodChat")
+        );
         // A doesn't talk again (nobody chooses): C goes after a little while.
         ticks(&mut w, super::REGROUP_TICKS as u64 + 2);
-        assert!(w.sims[2].current.is_none(), "C still {:?}", w.sims[2].current.as_ref().map(|a| a.task.kind));
+        assert!(
+            w.sims[2].current.is_none(),
+            "C still {:?}",
+            w.sims[2].current.as_ref().map(|a| a.task.kind)
+        );
         assert!(w.sims[2].available_for_social(&w.content));
     }
 
@@ -1422,14 +1877,22 @@ mod tests {
         assert_eq!(listeners(&w, 0), 1);
         // The player has A chat with B again right after: C stays for it.
         let chat = w.content.social_index("chat").unwrap();
-        w.apply(Command::Social { sim: 0, target: 1, social: chat }).unwrap();
+        w.apply(Command::Social {
+            sim: 0,
+            target: 1,
+            social: chat,
+        })
+        .unwrap();
         let mut gap = false;
         for _ in 0..TICKS_PER_SECOND * 30 {
             w.tick_once();
             if w.sims[0].conversation(&w.content).is_none() {
                 gap = true;
                 assert!(
-                    matches!(w.sims[2].current.as_ref().map(|a| a.task.kind), Some(TaskKind::Join { leader: 0 })),
+                    matches!(
+                        w.sims[2].current.as_ref().map(|a| a.task.kind),
+                        Some(TaskKind::Join { leader: 0 })
+                    ),
                     "C left between the two"
                 );
             } else if gap {
@@ -1478,7 +1941,9 @@ mod tests {
 
     #[test]
     fn a_conversation_takes_four_at_most() {
-        let mut w = chatting(r#",{"name":"C","x":9.5,"z":9.5},{"name":"D","x":2.5,"z":9.5},{"name":"E","x":5.5,"z":1.5}"#);
+        let mut w = chatting(
+            r#",{"name":"C","x":9.5,"z":9.5},{"name":"D","x":2.5,"z":9.5},{"name":"E","x":5.5,"z":1.5}"#,
+        );
         for k in 2..5 {
             join(&mut w, k, 0);
         }
@@ -1490,12 +1955,17 @@ mod tests {
         let group = super::group(&w.sims, &w.content, 0);
         assert_eq!(group.len(), super::MAX_GROUP);
         // The one left out does something else.
-        let out = (2..5).find(|&k| w.sims[k].listening_to().is_none()).unwrap();
+        let out = (2..5)
+            .find(|&k| w.sims[k].listening_to().is_none())
+            .unwrap();
         assert!(w.sims[out].current.is_none());
         // Everyone in the group stands apart.
         for (x, &a) in group.iter().enumerate() {
             for &b in &group[x + 1..] {
-                assert!(apart(w.sims[a].pos, w.sims[b].pos) >= 0.59, "{a} and {b} too close");
+                assert!(
+                    apart(w.sims[a].pos, w.sims[b].pos) >= 0.59,
+                    "{a} and {b} too close"
+                );
             }
         }
     }
@@ -1510,7 +1980,9 @@ mod tests {
 
     fn centroid(w: &World, members: &[usize]) -> [f32; 2] {
         let n = members.len() as f32;
-        let sum = members.iter().fold([0.0, 0.0], |c, &m| [c[0] + w.sims[m].pos[0], c[1] + w.sims[m].pos[1]]);
+        let sum = members.iter().fold([0.0, 0.0], |c, &m| {
+            [c[0] + w.sims[m].pos[0], c[1] + w.sims[m].pos[1]]
+        });
         [sum[0] / n, sum[1] / n]
     }
 
@@ -1520,7 +1992,10 @@ mod tests {
         // Just the two: face to face.
         ticks(&mut w, 2);
         let (a, b) = (w.sims[0].pos, w.sims[1].pos);
-        assert!(off(&w, 0, b) < 0.01 && off(&w, 1, a) < 0.01, "A and B don't face each other");
+        assert!(
+            off(&w, 0, b) < 0.01 && off(&w, 1, a) < 0.01,
+            "A and B don't face each other"
+        );
 
         join(&mut w, 2, 0);
         ticks(&mut w, TICKS_PER_SECOND as u64 * 5);
@@ -1529,24 +2004,37 @@ mod tests {
         assert_eq!(group.len(), 3);
         let centre = centroid(&w, &group);
         for m in group {
-            assert!(off(&w, m, centre) < 0.05, "{m} doesn't face the middle of the group");
+            assert!(
+                off(&w, m, centre) < 0.05,
+                "{m} doesn't face the middle of the group"
+            );
         }
         // Not straight at each other any more: both turned part way towards C (about 30 degrees,
         // standing in a triangle).
         let (a, b, c) = (w.sims[0].pos, w.sims[1].pos, w.sims[2].pos);
-        assert!(off(&w, 0, b) > 0.3 && off(&w, 1, a) > 0.3, "A and B still face each other");
+        assert!(
+            off(&w, 0, b) > 0.3 && off(&w, 1, a) > 0.3,
+            "A and B still face each other"
+        );
         let between = |p: [f32; 2], q: [f32; 2], r: [f32; 2]| {
-            let d = ((r[0] - p[0]).atan2(r[1] - p[1]) - (q[0] - p[0]).atan2(q[1] - p[1])).rem_euclid(std::f32::consts::TAU);
+            let d = ((r[0] - p[0]).atan2(r[1] - p[1]) - (q[0] - p[0]).atan2(q[1] - p[1]))
+                .rem_euclid(std::f32::consts::TAU);
             d.min(std::f32::consts::TAU - d)
         };
-        assert!(off(&w, 0, c) < between(a, b, c) && off(&w, 1, c) < between(b, a, c), "they don't turn towards C");
+        assert!(
+            off(&w, 0, c) < between(a, b, c) && off(&w, 1, c) < between(b, a, c),
+            "they don't turn towards C"
+        );
 
         // C goes: back to face to face.
         w.apply(Command::Cancel { sim: 2, index: 0 }).unwrap();
         ticks(&mut w, 2);
         assert_eq!(listeners(&w, 0), 0);
         let (a, b) = (w.sims[0].pos, w.sims[1].pos);
-        assert!(off(&w, 0, b) < 0.01 && off(&w, 1, a) < 0.01, "A and B don't face each other again");
+        assert!(
+            off(&w, 0, b) < 0.01 && off(&w, 1, a) < 0.01,
+            "A and B don't face each other again"
+        );
     }
 
     #[test]
@@ -1563,30 +2051,52 @@ mod tests {
     fn outcome_shown(w: &World, i: usize) -> f32 {
         let mut out = vec![0.0; crate::snapshot::CAPACITY];
         crate::snapshot::write(w, &mut out);
-        out[crate::snapshot::HEADER_LEN + i * crate::snapshot::SIM_STRIDE + crate::snapshot::sim::OUTCOME]
+        out[crate::snapshot::HEADER_LEN
+            + i * crate::snapshot::SIM_STRIDE
+            + crate::snapshot::sim::OUTCOME]
     }
 
     #[test]
     fn a_refused_hug_shows_at_once_a_chat_halfway_through() {
         // A hug is answered by the body, from the start (the renderer's step back, `characters.ts`).
-        let mut w = town(r#"{"name":"A","x":5.5,"z":5.5},{"name":"B","x":7.5,"z":5.5}"#, "");
+        let mut w = town(
+            r#"{"name":"A","x":5.5,"z":5.5},{"name":"B","x":7.5,"z":5.5}"#,
+            "",
+        );
         w.autonomy = false;
         let hug = w.content.social_index("hug").unwrap();
-        w.apply(Command::Social { sim: 0, target: 1, social: hug }).unwrap();
+        w.apply(Command::Social {
+            sim: 0,
+            target: 1,
+            social: hug,
+        })
+        .unwrap();
         let mut seen = None;
         for _ in 0..TICKS_PER_SECOND * 5 {
             w.tick_once();
             if let Some((_, _, success, progress)) = w.sims[0].conversation(&w.content) {
-                seen = Some((success, progress, outcome_shown(&w, 0), outcome_shown(&w, 1)));
+                seen = Some((
+                    success,
+                    progress,
+                    outcome_shown(&w, 0),
+                    outcome_shown(&w, 1),
+                ));
                 break;
             }
         }
         let (success, progress, a, b) = seen.expect("A never started the hug");
-        assert!(!success && progress < 0.1, "refused, just begun: {progress}");
+        assert!(
+            !success && progress < 0.1,
+            "refused, just begun: {progress}"
+        );
         assert_eq!((a, b), (2.0, 2.0), "the refusal shows from the start");
         // A chat's outcome shows only halfway through (the answer after the opener).
         let w = chatting("");
-        assert!(w.sims[0].conversation(&w.content).is_some_and(|c| c.3 < 0.5));
+        assert!(
+            w.sims[0]
+                .conversation(&w.content)
+                .is_some_and(|c| c.3 < 0.5)
+        );
         assert_eq!(outcome_shown(&w, 1), 0.0);
     }
 }

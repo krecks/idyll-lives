@@ -29,18 +29,29 @@ fn a_mess_out_of_reach_doesnt_keep_them_from_the_one_they_can_get_to() {
     for _ in 0..30 * 20 {
         w.tick_once();
     }
-    assert!(w.dirt[open] < 0.1, "the reachable mess is still there: {:.2}", w.dirt[open]);
+    assert!(
+        w.dirt[open] < 0.1,
+        "the reachable mess is still there: {:.2}",
+        w.dirt[open]
+    );
     assert!((w.dirt[shut_in] - 0.9).abs() < 1e-4);
 }
 
 #[test]
 fn a_visit_with_no_way_there_doesnt_make_them_a_guest() {
     let mut w = World::from_json(CONTENT, TOWN, 3).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     w.apply(Command::Visit { sim: 0, plot: 1 }).unwrap();
     for _ in 0..20 {
         w.tick_once();
     }
     assert!(w.sims[0].current().is_none(), "no way over");
-    assert!(w.sims[0].visiting.is_none(), "a guest next door while still at home");
+    assert!(
+        w.sims[0].visiting.is_none(),
+        "a guest next door while still at home"
+    );
 }

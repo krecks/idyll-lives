@@ -32,7 +32,7 @@ rides.
 | `springRider` Spring rider | 1x1 · floor | ride:play | community / play | Horse, Saddle, Spring | Loop (E1) | `rock` on its spring while ridden (E1). Its saddle 0.62 m up. Ridden astride, the feet on the pegs, the hands on the handles (`rideSpring112`). |
 | `merryGoRound` Merry-go-round | 2x2 · floor | spin:play | community / play | Platform, Rails, Stripes | Loop (E1) | `spin` while ridden (E1). Its deck 0.26 m up, where the riders sit. Four sit round the platform between the rails, facing the column (content `places`). Leant in, a hand on the rail either side, the legs out towards the column (`rideRound147`/`112`). |
 | `basketballHoop` Basketball hoop | 1x1 · floor | shoot:exercise | community / play | Frame, Backboard, Hoop | Use | `swish`: the net sways after each shot (1.4 s into the use, then every 3.2 s: `delay`, `every`). The rim at 3.05 m on a 1.2 × 0.8 m board. |
-| `pingPongTable` Ping-pong table | 3x2 · floor | pingPong:play | community / play | Table, Legs | Static | Static. Full size (2.74 × 1.525 m, its top 0.76 m up). The two players stand at the two ends, facing each other across the net (content `places`, off its tiles; a blocked end is played from the front). A game for two (`partner`, G-65). |
+| `pingPongTable` Ping-pong table | 3x2 · floor | pingPong:play | community / play | Table, Legs | Static | Static. Full size (2.74 × 1.525 m, its top 0.76 m up). The two players stand at the two ends, facing each other across the net (content `places`, off its tiles; a blocked end is played from the front). A game for two (`partner`, G-65). Each player holds a bat (held.py `tool.bat`, G-70); none lies on the top. |
 | `parkChessTable` Park chess table | 2x1 · floor | chess:play | community / play | Table, Stools | Use | `move`: a pawn slides one square for chess. A stool either side, the players facing each other across the board (content `places`, 1.2 m apart over a 0.7 m top; rebuilt 2026-10-21, the stools were both behind it). A game for two (`partner`, G-65). |
 
 **In play** (signed off 2026-10-16):
@@ -43,8 +43,8 @@ rides.
   over for both when either stops. With nobody free, nobody chooses it and the player's order is refused ("nobody
   is free to ride the seesaw with Dee"): none of the three has a use for one.
 - Checked in the yard of the check house in all four facings: the slide gone down, the ping-pong table played at;
-  table tennis is a rally of forehands and backhands (`pingPong`, G-26), the bat mimed in a closed hand (props in hand:
-  G-70; where the players stand: G-62);
+  table tennis is a rally of forehands and backhands (`pingPong`, G-26), a bat in the closed right hand (since
+  2026-10-26, G-70; where the players stand: G-62);
   the seesaw, spring rider and merry-go-round loops go round with the rider on them and finish their round when the
   use ends; the hoop's net swishes after each shot; a pawn slides for chess. Every part coloured in buy and in the
   colour studio.
@@ -76,14 +76,14 @@ rides.
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `streetLamp` Street lamp | 1x1 · floor | — | community / street | Lamp post | Static | Static. The lantern lights at night (E8); far version (E7). |
-| `parkBench` Long park bench | 3x1 · floor | sit:sit feedBirds:sit | community / street | Frame | Static | Static. 2.5 m long. |
+| `parkBench` Long park bench | 3x1 · floor | sit:sit feedBirds:feed | community / street | Frame | Static | Static. 2.5 m long. *Feed the pigeons*: a bag of seed held on the left palm over the lap, a pinch scattered ahead every three seconds (`scatter`, the seated upper layer; held.py `tool.seedBag`, G-70). The garden birds that feed on the ground (blackbirds, chaffinches, doves) within 25 m come down round the seed a few at a time, work towards it and peck, and stay while it's thrown; the one throwing it doesn't scare them (birds.ts, `Residents.seed`). |
 | `drinkingFountain` Drinking fountain | 1x1 · floor | drink:drink | community / street | Pillar | Use | `water_on`: the water arc grows for drink; the drinker steps up and bends over the spout (`fountainDrink<cm>` by height). |
 | `litterBin` Litter bin | 1x1 · floor | — | community / street | Bin | Static | Static. |
 | `busStop` Bus shelter | 3x1 · floor | wait:sit timetable:read | community / street | Frame | Static | Static. 1.2 m deep, the bench at the back. |
 | `postBox` Post box | 1x1 · floor | post:write | community / street | Box | Use | `flap`: the slot flap swings in for post (`hold` 1 s). |
 | `noticeBoard` Notice board | 1x1 · floor | read:read | community / street | Frame | Static | Static. |
 | `phoneBooth` Phone box | 1x1 · floor | call:phone | community / street | Kiosk | Use | `door_open`: the door opens out (`delay` 0.3 s), the caller steps inside and it shuts behind them (`hold` 2.4 s); it opens again to let them out (`out` 1.6 s). |
-| `fountainTown` Town fountain | 3x3 · floor | wish:look sitBy:relax | community / street | Stone | Ambient (E2) | `water_run`: the water runs all the time, ambient (not on Low). Its text says square, as built. |
+| `fountainTown` Town fountain | 3x3 · floor | wish:look sitBy:relax | community / street | Stone | Ambient (E2) | `water_run`: the water runs all the time, ambient (not on Low). Its text says square, as built. A wish: a coin looked at in the palm, held to the chest, then tossed underarm over the rim (`toss`, 3.2 s, the coin in the hand until it goes: held.py `tool.coin`; G-70), then standing at the rim. |
 | `townStatue` Founder's statue | 2x2 · floor | admire:admire | community / street | Statue | Static | Static. |
 
 **In play** (signed off 2026-10-16):
@@ -109,16 +109,21 @@ rides.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `iceCreamCart` Ice cream cart | 2x1 · floor | iceCream:fetch | community / food | Body, Parasol, Bands | Use | `lid_open`: the freezer lid slides open for iceCream (*Take an ice cream from the freezer*); `hold` 2 s. Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). Drawn as three scoops in a dessert bowl (`item.iceCream`, M-held-03; a cone or a paper cup is still to be made). |
-| `hotDogStand` Hot dog stand | 2x1 · floor | hotDog:fetch | community / food | Body, Awning | Use | `lid_open`: the hot-plate lid lifts for hotDog (*Help yourself to a hot dog*). Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). Carried in the kraft takeaway box (`item.takeout`, M-held-03; a hot dog in its bun is still to be made). |
-| `vendingSnack` Snack machine | 1x1 · floor | snack:fetch | community / food | Body | Use | `drop`: a snack slides down to the tray for snack, then eaten sitting on a bench or at a table nearby (G-67). |
-| `vendingDrink` Drinks machine | 1x1 · floor | drink:drink | community / food | Body | Use | `drop`: a can drops to the tray for drink. |
-| `marketStall` Market stall | 2x1 · floor | browse:look fruit:fetch | community / food | Body, Awning | Static | Static. *Pick a piece of fruit* (was "a bag of fruit"), paid into an honesty box. Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). |
+| `iceCreamCart` Ice cream cart | 2x1 · floor | iceCream:buy | community / food | Body, Parasol, Bands | Use | `lid_open`: the freezer lid slides open a second into the sale, as the seller reaches in, for 1.4 s. On a public lot the ice cream seller stands behind it from 10:00 to 20:00 (`staff`) and serves *Buy an ice cream* (5 minutes: ordered, scooped, handed over, paid for); closed outside those hours. In a garden of a household's own it is self-serve, *Take an ice cream from the freezer* (`selfServe`, 2 minutes: nobody to order from or pay). Then eaten sitting on a bench or at a café table nearby (else standing). Drawn as two scoops in a paper cup with a wooden spoon (`item.iceCreamCup`, M-held-03). |
+| `hotDogStand` Hot dog stand | 2x1 · floor | hotDog:buy | community / food | Body, Awning | Use | `lid_open`: the hot-plate lid lifts a second into the sale for 1.4 s. Its vendor serves from behind it from 11:00 to 21:00 on a public lot, *Buy a hot dog*; self-serve elsewhere (*Help yourself to a hot dog*). Then eaten sitting on a bench or at a café table nearby (else standing). Carried in the kraft takeaway box (`item.takeout`, M-held-03; a hot dog in its bun is still to be made). Drawn as a hot dog in its bun on a paper boat, mustard and ketchup on it (`item.hotDog`, M-held-03). |
+| `vendingSnack` Snack machine | 1x1 · floor | snack:fetch | community / food | Body | Use | `drop`: a snack slides down to the tray for snack, then eaten sitting on a bench or at a table nearby (G-67). Drawn as a packet of crisps (`item.crisps`, M-held-03). |
+| `vendingDrink` Drinks machine | 1x1 · floor | drink:drink | community / food | Body | Use | `drop`: a can drops to the tray for drink, drunk from in the hand (held.py `tool.can`, G-70). |
+| `marketStall` Market stall | 2x1 · floor | browse:look fruit:buy | community / food | Body, Awning | Static | Static. A stallholder behind each stall from 8:00 to 18:00 on a public lot sells *Buy a piece of fruit* (was "a bag of fruit"); browsing needs nobody. Self-serve elsewhere (*Pick a piece of fruit*). Then eaten sitting on a bench or at a café table nearby (else standing). Drawn as an apple (`item.apple`, M-held-03). |
 
 **In play** (signed off 2026-10-16):
 - Checked with the carts and market stall outdoors, the machines indoors: the ice cream cart's lid for an ice cream
   (held 2 s), the hot dog stand's lid, a snack and a can dropping in the machines, the market stall browsed and
   fruit bought.
+- With vendors (0.5.0, I-community-09; `vendors-park`, `vendors-market`): the seller listens to the order, turns to
+  the freezer as its lid slides open and scoops, holds the ice cream out over the cart and hands it over, and takes
+  the money (`buy` and `sell`, `characters/clips/serve.ts`); the same at the hot dog stand and the stall. The machines
+  stay self-serve. On a household's own lot the carts, the stall and the counters are helped from in their own time
+  (content `selfServe.minutes`, 1 to 2 minutes), not the sold five (`public_places.rs` `a_cart_at_home_is_self_serve`).
 - Each clip plays its full length and shuts in every run. Nothing needed fixing.
 - Since the authenticity review (G-43): two at a stall stand one in front of each half, facing it, not one inside the
   other (`stand_spot`); one alone at a 2-wide stall or cart at its middle, not its left end (I-community-08).
@@ -129,11 +134,11 @@ rides.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `shopCounter` Shop counter | 2x1 · floor | treat:idle | community / shops | Counter, Trim | Use | `till`: the cash drawer slides out for treat (`hold` 1.5 s): *Pick a little something and pay at the till*, a self-service till (G-67: nobody serves). |
-| `bakeryCase` Bakery case | 2x1 · floor | pastry:fetch takeCake:fetch | community / shops | Counter, Trim | Use | `door`: the back glass door slides aside for pastry (`hold` 2 s; the door is still the baker's side's). Provides `cake`: the café chair's slice of cake is taken from it first (`takeCake`, not chosen on its own). Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). |
-| `groceryShelf` Grocery shelves | 2x1 · floor | browse:look sandwich:fetch | community / shops | Shelves, Trim | Static | Static. Nobody sells: it is self-serve (G-67), fetched and paid for here, then eaten sitting on a bench or at a café table nearby (else standing). |
+| `shopCounter` Shop counter | 2x1 · floor | treat:buy | community / shops | Counter, Trim | Use | The till faces the shopkeeper behind it (keypad and drawer; the customer's display at its front, 0.5.0). `till`: the cash drawer pops 10 cm out to the back as the shopkeeper takes the money (3.9 s into the sale, for 1.1 s). On a public lot the shopkeeper serves from 8:00 to 20:00, *Buy a little something* (6 minutes); elsewhere it's a self-service till (*Pick a little something and pay at the till*). |
+| `bakeryCase` Bakery case | 2x1 · floor | pastry:buy takeCake:buy | community / shops | Counter, Trim | Use | `door`: the back glass door, on the baker's side, slides aside as the baker reaches in (a second into the sale, for 1.4 s). On a public lot the baker serves from 7:00 to 18:00, *Buy a pastry* (5 minutes) and *Buy a slice of cake to take to a table*; self-serve elsewhere (tongs). Provides `cake`: the café chair's slice of cake is bought here first (`takeCake`, not chosen on its own). The pastry is eaten sitting on a bench or at a café table nearby (else standing). |
+| `groceryShelf` Grocery shelves | 2x1 · floor | browse:look sandwich:fetch | community / shops | Shelves, Trim | Static | Static. Self-serve, as shelves are: the sandwich is taken and paid for here (the till isn't visited), then eaten sitting on a bench or at a café table nearby (else standing). |
 | `cafeTable` Café table | 1x1 · floor | — | community / shops | Top, Frame | Static | Static. |
-| `cafeChair` Café chair | 1x1 · floor | sit:sit coffee:drink cake:eat | community / shops | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. The coffee is poured at the lot's coffee machine first and the cake taken from its bakery case (content `fetch`, G-67); a cake needs a bakery case on the lot. |
+| `cafeChair` Café chair | 1x1 · floor | sit:sit coffee:drink cake:eat | community / shops | Frame, Seat | Static | Static. Pulled in to the table it faces while sat on, as far as the knees fit under it. The coffee is fetched from the lot's coffee machine first and the cake from its bakery case (content `fetch`, G-67): at the café the barista makes the coffee and the baker serves the cake while they're open (the coffee 7:00–19:00, the cake 7:00–18:00), and *Have a coffee* is refused once the machine's post is shut; a cake needs a bakery case on the lot. |
 
 **In play** (signed off 2026-10-16):
 - Checked indoors: the till drawer (held 1.5 s) and the bakery case's back door (held 2 s) for their uses, the
@@ -147,6 +152,12 @@ rides.
 - The shop counter's "Counter" colours its front panels, "Trim" the walnut top and frame.
 - Since the authenticity review (G-43): two at the shop counter, the bakery case or the grocery shelves stand one in
   front of each half, facing it; one alone at its middle (I-community-08).
+- With vendors (0.5.0, I-community-09; `vendors-cafe`, `vendors-bakery`, `vendors-grocer`): the café's and the
+  bakery's counters, cases and coffee machines stand a tile in from the back wall so their staff stand behind them;
+  the café's barista keeps the counter and the coffee machine (they're 1.5 m apart: `service.share`) and steps over
+  to the machine for a coffee; the bakery has two (its first case and the coffee machine, its second case and the
+  counter); the grocer's shopkeeper stands between the counter and the front window. The baker reaches in through the
+  case's back door and hands the pastry over the top; the shopkeeper's till drawer pops as they take the money.
 
 ## CM5. Farm (8)
 

@@ -53,8 +53,9 @@ rider's rocks on the saddle, the merry-go-round's goes round sitting on the plat
 - **Climbing frame** (2 × 2): a wooden fort, deck at 1.1 m, railings on three sides, a pitched roof with a flag, a rope
   net up the front and a fireman's pole beside it (the content's description).
 - **Ping-pong table** (3 × 2): a green top at the ITTF's 2.74 × 1.525 m, 0.76 m up, with white lines, on two concrete
-  legs, a steel net 15.25 cm high reaching 15.25 cm past each side, two bats and a ball; the players stand at its
-  ends (`places` ±1.8 m; it was 1.9 × 0.94 m on 2 × 1, its top 0.78).
+  legs, a steel net 15.25 cm high reaching 15.25 cm past each side, and a ball; the players stand at its
+  ends (`places` ±1.8 m; it was 1.9 × 0.94 m on 2 × 1, its top 0.78). The bats are in the players' hands (held.py
+  `tool.bat`; 2026-10-26, review I-community-06: two lay on the top while it was played).
   All plain finishes: one draw call.
 
 ## Far versions
@@ -71,7 +72,7 @@ build of its own (`parkChessTableFar`): the table, the squares and the stools at
 | `model.springRider` | 0.40 × 0.95 × 0.96 m | 3,172 (792) → 3,768 (936) | 2 | Horse, Saddle, Spring |
 | `model.merryGoRound` | 1.96 × 1.04 × 1.96 m | 2,924 (714) → 4,044 (1,003) | 2 | Platform, Rails, Stripes |
 | `model.basketballHoop` | 1.20 × 3.70 × 0.97 m | 2,912 (714) → 3,804 (944) | 2 | Frame, Backboard, Hoop |
-| `model.pingPongTable` | 2.74 × 0.92 × 1.83 m | 1,148 (276) → 1,688 (396) | 1 | Table, Legs |
+| `model.pingPongTable` | 2.74 × 0.92 × 1.83 m | 1,148 (276) → 1,688 (396) → 1,088 (258) | 1 | Table, Legs |
 | `model.parkChessTable` | 1.45 × 0.85 × 0.70 m | 3,468 (1,216) → 5,544 (1,784) | 2 | Table, Stools |
 
 ## Detail pass (2026-10-22)
@@ -102,8 +103,7 @@ the saddle, handles and pegs of the spring rider, the merry-go-round's rail curv
   collar, bent arms with a strut, the board in a moulded steel frame with a pad along its foot, the shooter's square
   one outline, a flanged rim bracket and spring housing, net hooks; the net's strands each one cord (`swish` as before).
 - **Ping-pong table**: a steel band round the top's edge and an apron under it, tapered concrete piers with an arch
-  through them and steel caps, the net as a plate with slots, a band, posts and clamps; bats with a wooden blade,
-  rubber face and flared handle.
+  through them and steel caps, the net as a plate with slots, a band, posts and clamps (the bats are held.py's).
 - **Park chess table**: a moulded pedestal, a top with a chamfered edge and a band under it, the board in a border,
   turned stools; knights and bishops join the game (a knight's head swept), a cross-barred king, a taken pawn beside
   the board. The far version builds from the same pedestal, top and stools at 12 sides.

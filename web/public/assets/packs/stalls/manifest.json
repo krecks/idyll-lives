@@ -42,9 +42,12 @@
       },
       "motions": {
         "uses": {
-          "iceCream": "lid_open"
-        },
-        "hold": 2
+          "iceCream": {
+            "clip": "lid_open",
+            "delay": 1.0,
+            "hold": 1.4
+          }
+        }
       },
       "paint": [
         {
@@ -102,7 +105,11 @@
       },
       "motions": {
         "uses": {
-          "hotDog": "lid_open"
+          "hotDog": {
+            "clip": "lid_open",
+            "delay": 1.0,
+            "hold": 1.4
+          }
         }
       },
       "paint": [

@@ -46,7 +46,7 @@ export interface PrimitivePart {
   bone?: 'head' | 'armL' | 'armR' | 'legL' | 'legR' | 'shinL' | 'shinR';
   /**
    * Mirror glass (a thin box, or a disc: a flat cylinder): the face towards the model's front
-   * (+z) or back reflects the room live (see `render/babylon/mirrors.ts`).
+   * (+z) or back reflects the room live (see `render/pc/mirrors.ts`).
    */
   mirror?: 'front' | 'back';
 }
@@ -135,7 +135,7 @@ export interface PaletteEntry {
 
 /**
  * Rigged characters (`model.sim`, `model.hair.*`): `url` is a character set (`rig.json`: skeleton,
- * bodies, hairstyles and animation clips, see `render/babylon/characters`). `part` picks a mesh
+ * bodies, hairstyles and animation clips, see `render/shared/characters`). `part` picks a mesh
  * part of each body (e.g. `hair.long`); without it the entry is the set itself.
  */
 export interface CharacterEntry {

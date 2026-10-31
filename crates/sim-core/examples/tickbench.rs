@@ -9,9 +9,14 @@ const LOT: &str = include_str!("../../../web/public/content/lots/starter.json");
 
 /// base.json plus every file in its `"include"` list, merged the way the game loads them.
 fn content() -> String {
-    let read = |name: &str| std::fs::read_to_string(format!("{DIR}{name}")).unwrap_or_else(|e| panic!("{name}: {e}"));
+    let read = |name: &str| {
+        std::fs::read_to_string(format!("{DIR}{name}")).unwrap_or_else(|e| panic!("{name}: {e}"))
+    };
     let base = read("base.json");
-    let includes: Vec<String> = serde_json::from_value(serde_json::from_str::<serde_json::Value>(&base).unwrap()["include"].clone()).unwrap();
+    let includes: Vec<String> = serde_json::from_value(
+        serde_json::from_str::<serde_json::Value>(&base).unwrap()["include"].clone(),
+    )
+    .unwrap();
     let parts: Vec<String> = includes.iter().map(|n| read(n)).collect();
     let parts: Vec<&str> = parts.iter().map(String::as_str).collect();
     sim_core::merge_content(&base, &parts).unwrap_or_else(|e| panic!("{e}"))

@@ -4,8 +4,9 @@
 # They stand on town lots, seen from far and by the dozen, so each has a far version (a quarter of the triangles, E7).
 # The parts are placed in game axes (`F`), where the game places them: the counter, the case and the
 # shelves sit back on their 2 x 1 tiles as theirs do (`G.settle(centre=False)` and `centre=` on the
-# Model), the café chair's seat 2 cm forward. Two clips: the till's cash drawer slides out to the front
-# for `treat` (`till`), and the bakery case's back glass door slides aside for `pastry` (`door`).
+# Model), the café chair's seat 2 cm forward. Two clips: the till's cash drawer slides out to the back, to the
+# shopkeeper, for `treat` (`till`), and the bakery case's back glass door, on the baker's side, slides aside for
+# `pastry` and `takeCake` (`door`), each as the game's vendor reaches for it.
 #
 # Run:  cargo art shops [--preview]
 import json
@@ -65,9 +66,11 @@ M = G.Palette(
 )
 
 TILL_SECONDS = 0.8   # the cash drawer pops out this fast
-TILL_HOLD = 1.5      # and shuts again this long after the use starts
+TILL_DELAY = 3.9     # as the shopkeeper takes the money (the game's `sell` clip, clips/serve.ts: paid at 4.2 s)
+TILL_HOLD = 1.1      # and shuts again this long after it opened
 DOOR_SECONDS = 1.0   # the bakery case's back door slides aside this long
-DOOR_HOLD = 2.0      # and shuts again this long after the use starts
+DOOR_DELAY = 1.0     # as the baker reaches in (`sell`: 1.5-2.1 s)
+DOOR_HOLD = 1.4      # and shuts again this long after it opened
 
 # Heights the content names (community.json): kept here and checked against it.
 TABLE_TOP = 0.745    # cafeTable surface.height
@@ -151,20 +154,21 @@ def shopCounter():
                 part.rotation_euler[2] = math.pi               # facing the back
             G.kit.knob(F, f'back_knob{i}', x - 0.36 * (1 if x > 0 else -1), 0.74, Z - 0.367, 0.014, M.trim).rotation_euler[0] = \
                 math.radians(-90)
-        # the till: a case holding the drawer, a keypad sloping up to the back and a display on a post, a receipt
-        # printer with its paper curling out
+        # the till, the shopkeeper's: a case holding the drawer, a keypad sloping up to the front (to the shopkeeper
+        # behind the counter) and the customer's display on a post at its front, a receipt printer with its paper
+        # curling out
         F.box('till_case', 0.38, 0.09, 0.34, (TX, TOP + 0.045, TZ), M.till, bevel=0.008)
-        kc = (TX, TOP + 0.115, TZ - 0.04)
-        F.box('till_keypad', 0.34, 0.05, 0.2, kc, M.till, bevel=0.008, rot=(12, 0, 0))
+        kc = (TX, TOP + 0.115, TZ + 0.04)
+        F.box('till_keypad', 0.34, 0.05, 0.2, kc, M.till, bevel=0.008, rot=(-12, 0, 0))
         for r in range(3):
             for c in range(4):
-                at = _tilted(TX - 0.105 + c * 0.07, kc[1], kc[2], 12, 0.06 - r * 0.05, 0.03)
+                at = _tilted(TX - 0.105 + c * 0.07, kc[1], kc[2], -12, -(0.06 - r * 0.05), 0.03)
                 F.box(f'key{r}{c}', 0.05, 0.012, 0.035, (at[0], at[1], at[2]),
-                      M.key2 if (r, c) == (0, 3) else M.keys, bevel=0.003, rot=(12, 0, 0))
-        F.cyl('till_post', 0.015, 0.1, (TX, TOP + 0.17, TZ - 0.13), M.till, verts=8)
-        F.box('till_display', 0.22, 0.1, 0.03, (TX, TOP + 0.255, TZ - 0.13), M.till, bevel=0.006, rot=(-15, 0, 0))
+                      M.key2 if (r, c) == (0, 3) else M.keys, bevel=0.003, rot=(-12, 0, 0))
+        F.cyl('till_post', 0.015, 0.1, (TX, TOP + 0.17, TZ + 0.13), M.till, verts=8)
+        F.box('till_display', 0.22, 0.1, 0.03, (TX, TOP + 0.255, TZ + 0.13), M.till, bevel=0.006, rot=(-15, 0, 0))
         # its screen on the display's face, which leans back 15 degrees
-        F.box('till_screen', 0.18, 0.07, 0.006, (TX, TOP + 0.255 + 0.0047, TZ - 0.13 + 0.0174), M.screen, rot=(-15, 0, 0))
+        F.box('till_screen', 0.18, 0.07, 0.006, (TX, TOP + 0.255 + 0.0047, TZ + 0.13 + 0.0174), M.screen, rot=(-15, 0, 0))
         F.box('printer', 0.12, 0.08, 0.12, (TX - 0.27, TOP + 0.04, TZ - 0.05), M.till, bevel=0.012)
         F.sweep('receipt', [(TX - 0.27, TOP + 0.075, TZ - 0.07), (TX - 0.27, TOP + 0.11, TZ - 0.06),
                             (TX - 0.27, TOP + 0.12, TZ - 0.02), (TX - 0.27, TOP + 0.1, TZ + 0.01)], None, M.page,
@@ -202,23 +206,25 @@ def shopCounter():
                   rot=(-15, 0, 0))
     G.join(still, 'counter', origin=(0, 0, 0))
 
-    # the cash drawer: a front under the keypad and a tray of notes and coins hidden in the case at rest
-    DZ = TZ + 0.17   # the case's front face
+    # the cash drawer, opening to the shopkeeper: a front under the keypad and a tray of notes and coins hidden in
+    # the case at rest
+    DZ = TZ - 0.17   # the case's back face
     with G.new_parts() as drawer:
-        F.box('drawer_front', 0.35, 0.065, 0.014, (TX, TOP + 0.042, DZ + 0.007), M.till, bevel=0.004)
-        F.box('drawer_lip', 0.12, 0.012, 0.012, (TX, TOP + 0.06, DZ + 0.018), M.keys, bevel=0.003)
-        F.box('drawer_tray', 0.33, 0.045, 0.3, (TX, TOP + 0.03, DZ - 0.15), M.keys, bevel=0.003)
+        F.box('drawer_front', 0.35, 0.065, 0.014, (TX, TOP + 0.042, DZ - 0.007), M.till, bevel=0.004)
+        F.box('drawer_lip', 0.12, 0.012, 0.012, (TX, TOP + 0.06, DZ - 0.018), M.keys, bevel=0.003)
+        F.box('drawer_tray', 0.33, 0.045, 0.3, (TX, TOP + 0.03, DZ + 0.15), M.keys, bevel=0.003)
         for i in range(3):
-            F.box(f'divider{i}', 0.006, 0.012, 0.28, (TX - 0.09 + i * 0.09, TOP + 0.058, DZ - 0.15), M.till)
+            F.box(f'divider{i}', 0.006, 0.012, 0.28, (TX - 0.09 + i * 0.09, TOP + 0.058, DZ + 0.15), M.till)
         for i in range(4):
-            F.box(f'notes{i}', 0.07, 0.008, 0.13, (TX - 0.135 + i * 0.09, TOP + 0.056, DZ - 0.22), M.note)
+            F.box(f'notes{i}', 0.07, 0.008, 0.13, (TX - 0.135 + i * 0.09, TOP + 0.056, DZ + 0.22), M.note)
             for j in range(2):
-                F.cyl(f'coin{i}{j}', 0.012, 0.006, (TX - 0.15 + i * 0.09 + j * 0.03, TOP + 0.055, DZ - 0.07),
+                F.cyl(f'coin{i}{j}', 0.012, 0.006, (TX - 0.15 + i * 0.09 + j * 0.03, TOP + 0.055, DZ + 0.07),
                       M.coin, verts=8)
     drawer = G.join(drawer, 'cash_drawer', origin=F.at(TX, TOP + 0.03, DZ))
 
     G.settle(centre=False)  # back on its tiles, where the game places it
-    G.slide(drawer, 'till', (0, -0.2, 0), seconds=TILL_SECONDS)
+    # (10 cm, to the worktop's back: against a wall at home it stops at the wall's face.)
+    G.slide(drawer, 'till', (0, 0.1, 0), seconds=TILL_SECONDS)
 
 
 # --- the bakery case: 2x1, a cream cabinet under a glass display, its back doors sliding ------------
@@ -532,12 +538,12 @@ def _far(build, ratio=_FAR):
 FAMILY = G.Family(
     'shops', M,
     [G.Model('shopCounter', shopCounter, size=(1.96, 1.276, 0.78), key='model.shopCounter', centre=(0, -0.04),
-             # buying a little something pops the till's drawer
-             motions={'uses': {'treat': 'till'}, 'hold': TILL_HOLD},
+             # buying a little something: the shopkeeper's till drawer pops as they take the money
+             motions={'uses': {'treat': {'clip': 'till', 'delay': TILL_DELAY, 'hold': TILL_HOLD}}},
              paint=[('counter', 'Counter'), ('walnut', 'Trim')], far=_far(shopCounter)),
      G.Model('bakeryCase', bakeryCase, size=(1.94, 1.29, 0.86), key='model.bakeryCase', centre=(0, 0.0),
-             # buying a pastry slides the back door aside
-             motions={'uses': {'pastry': 'door'}, 'hold': DOOR_HOLD},
+             # buying a pastry or a slice of cake: the baker slides the back door aside to reach in
+             motions={'uses': {use: {'clip': 'door', 'delay': DOOR_DELAY, 'hold': DOOR_HOLD} for use in ('pastry', 'takeCake')}},
              paint=[('case', 'Counter'), ('rim', 'Trim')], far=_far(bakeryCase)),
      G.Model('groceryShelf', groceryShelf, size=(1.92, 1.72, 0.48), key='model.groceryShelf', centre=(0, -0.19),
              paint=[('shelf', 'Shelves'), ('trim', 'Trim')], far=_far(groceryShelf)),

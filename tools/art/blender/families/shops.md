@@ -19,14 +19,18 @@ seat (0.47 m, 2 cm forward) against `content/community.json` before it builds.
 
 An oak counter (`wood`) on a walnut plinth: a walnut worktop with a rounded nose and a cove under it, three
 frame-and-panel bays in front (`kit.shaker`, walnut frames round raised oak panels), two shaker cupboard doors with
-turned knobs at the back. On the worktop a till (keypad sloping back, a display on a post), a receipt printer with its
+turned knobs at the back. On the worktop a till (the keypad sloping to the shopkeeper, the customer's display on a post), a receipt printer with its
 paper curling out, a chrome service bell, a sweet jar with a shoulder and a domed lid, and a magazine rack with shaped
-ends, a lip and four magazines. One moving part:
+ends, a lip and four magazines. The till is the shopkeeper's (0.5.0, I-community-09): its keypad slopes up to the
+front, to whoever stands behind the counter, and the customer's display stands on its post at the till's front.
+One moving part:
 
-- **The cash drawer** (`cash_drawer`): its front under the keypad and a tray of notes and coins hidden in the till's
-  case at rest. `till` slides it 20 cm out to the front (towards the resident) in 0.8 s.
+- **The cash drawer** (`cash_drawer`): its front under the keypad, at the back, and a tray of notes and coins hidden
+  in the till's case at rest. `till` slides it 10 cm out to the back (to the shopkeeper; at home against a wall it
+  stops at the wall's face) in 0.8 s.
 
-`motions`: `{'uses': {'treat': 'till'}, 'hold': 1.5}` (the interaction id: its `idle` tag is shared). The sweet jar is
+`motions`: `{'uses': {'treat': {'clip': 'till', 'delay': 3.9, 'hold': 1.1}}}`: as the game's shopkeeper takes the
+money (`characters/clips/serve.ts`, paid at 4.2 s). The sweet jar is
 opaque gloss with the sweets pressed into its sides, as if seen through it: real glass would have been a fourth draw
 call.
 
@@ -40,8 +44,8 @@ crescent croissants (one swept piece each, plump in the middle) and cupcakes in 
 - **The back door** (`back_door`): the right-hand pane (as seen from the front), in the front track. `door` slides
   it 84 cm left, in front of the fixed pane, in 1 s.
 
-`motions`: `{'uses': {'pastry': 'door'}, 'hold': 2.0}`. The table gives no hold; 2 s shuts the door again while the
-resident is still eating. The door is plain glass with no handle, so the model stays at 3 draws.
+`motions`: `pastry` and `takeCake` each `{'clip': 'door', 'delay': 1.0, 'hold': 1.4}`: the baker reaches in through
+it a second into the sale (`characters/clips/serve.ts`), and it shuts as they hand the pastry over. The door is plain glass with no handle, so the model stays at 3 draws.
 
 ## The rest
 

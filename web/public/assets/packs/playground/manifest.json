@@ -246,11 +246,14 @@
       },
       "motions": {
         "uses": {
-          "shoot": {
-            "clip": "swish",
-            "delay": 1.4,
-            "every": 3.2
-          }
+          "shoot": [
+            {
+              "clip": "swish",
+              "delay": 1.4,
+              "every": 3.2
+            },
+            "ball_taken"
+          ]
         }
       },
       "paint": [
@@ -273,15 +276,6 @@
       "type": "model",
       "url": "../../models/playground/pingPongTable.glb",
       "materials": {
-        "bat": {
-          "finish": "material.finish.gloss"
-        },
-        "bat_blue": {
-          "finish": "material.finish.gloss"
-        },
-        "bat_handle": {
-          "finish": "material.finish.satin"
-        },
         "concrete": {
           "finish": "material.finish.matte"
         },

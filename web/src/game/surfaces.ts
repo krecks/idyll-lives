@@ -218,6 +218,34 @@ export function frontTile(x: number, z: number, w: number, d: number, rot: numbe
   return fronts[rot % 4];
 }
 
+/**
+ * The tiles a 1×1 thing at (`x`, `z`) turned `rot` reaches over beside its own (content `overhang`, `[right,
+ * front]` as it's turned: an arc lamp's shade), as the simulation has them (`ObjectInstance::overhang_tiles`).
+ */
+export function overhangTiles(overhang: readonly (readonly [number, number])[] | undefined, x: number, z: number, rot: number): [number, number][] {
+  const [[rx, rz], [fx, fz]] = [
+    [[1, 0], [0, 1]],
+    [[0, -1], [1, 0]],
+    [[-1, 0], [0, -1]],
+    [[0, 1], [-1, 0]],
+  ][rot % 4];
+  return (overhang ?? []).map(([r, f]) => [x + r * rx + f * fx, z + r * rz + f * fz]);
+}
+
+/** The pairs of neighbouring tiles an arm from (`x`, `z`) to each of `tiles` crosses, along the row then the column (sim-core `overhang_edges`): no wall may stand between them. */
+export function overhangEdges(tiles: readonly (readonly [number, number])[], x: number, z: number): [[number, number], [number, number]][] {
+  const edges: [[number, number], [number, number]][] = [];
+  for (const [tx, tz] of tiles) {
+    let at: [number, number] = [x, z];
+    while (at[0] !== tx || at[1] !== tz) {
+      const next: [number, number] = at[0] !== tx ? [at[0] + Math.sign(tx - at[0]), at[1]] : [at[0], at[1] + Math.sign(tz - at[1])];
+      edges.push([at, next]);
+      at = next;
+    }
+  }
+  return edges;
+}
+
 /** A tile a resident could use a footprint from, and the tile of its own it's next to. */
 type Approach = { tile: [number, number]; inner: [number, number] };
 

@@ -15,7 +15,7 @@
  */
 
 /**
- * The bundled voices: Supertonic 3's voice styles (`F1`…`M5`, fetched by `tools/voice/fetch.mjs`).
+ * The bundled voices: Supertonic 3's voice styles (`F1`…`M5`, fetched by `cargo fetch-voice`).
  * Names are what the creator shows (ours; the model only numbers them); `sex` picks who a voice
  * fits. Saves store the name.
  */

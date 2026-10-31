@@ -10,6 +10,11 @@ fast the game was played.
 Measured first (sections below), then fixed; see [What was fixed](#what-was-fixed) for the changes and
 the after numbers.
 
+*All of this was measured on the Babylon.js 9.30 renderer, which drew the game until 0.3.2. The
+files and lines named (`BabylonRenderer.ts` and the rest of `web/src/render/babylon/`) were removed
+by the move to PlayCanvas; they are in git history up to f15b839b. The engine comparison that chose
+PlayCanvas, and the port's own measurements, are in [The PlayCanvas port](#the-playcanvas-port).*
+
 ## How it was measured
 
 Two instruments, both in a real browser on the real GPU, 1920×1080 at device pixel ratio 1:
@@ -210,3 +215,307 @@ now), and the mirror no longer makes a pipeline in play.
 
 The remaining big win would be patching streamed models into the stand-in meshes instead of building
 again; the patch path above makes that less urgent.
+
+## Steady state: the shadow map and the mirror picking (2026-10-22)
+
+The floor above is draw-call bound: 476 draws at about 8.5 µs each (5.8 ms of the frame), while 1.5 M
+triangles cost 0.30 ms (`diag=nonature`) and MSAA 0.18 ms (`diag=noaa`). Two of those costs were paid
+for nothing.
+
+**The sun's map was drawn every frame.** `SunShadows` draws it again when something in it moved, and
+a Sim's every pose counts as a move; the pose redraws were capped only by `?shadowrate`, which
+defaulted to 0 (every change). So 181 casters, 0.9 ms of CPU and 0.25–0.6 ms of the GPU, every frame
+of play. The presets now carry `shadowRate` (Low 15 Hz, Medium and High 30 Hz); `?shadowrate` still
+overrides it. The sun's step, the walls, a thing placed or hidden still draw it at once, and nothing
+draws it while the game is paused.
+
+**The mirrors picked their glasses every frame.** `Mirrors.update` placed every mirror in the world,
+ranked them, worked out which the camera could see and which reflections to redraw — on every frame,
+though a reflection is drawn at most `rate` times a second (10 on Medium) and none of that work is
+needed on the frames between. It now returns at once unless a reflection is due and the camera (or a
+resident in its view) moved since it was drawn; `changed` (the light, lamps, things placed, a door
+opening) is never held back, so a glass still follows its door. A held reflection is looked up
+through the camera it was drawn for, so it stays on the glass.
+
+Interleaved A/B, three runs each, production build, village orbit by day, no vsync:
+
+| | fps | p50 ms | CPU draw ms | GPU ms | draws (shadow) |
+|---|---|---|---|---|---|
+| before | 162.9 / 167.2 / 175.6 | 5.6–6.0 | 5.18 / 5.44 / 5.55 | 4.33 / 4.43 / 4.72 | 476 (181) |
+| after | 183.9 / 205.3 / 205.9 | 4.7–5.4 | 4.37 / 4.41 / 4.91 | 3.68 / 3.76 / 4.23 | 328–331 (33–37) |
+
+About a millisecond of the frame and 22 fps back, and the picture at rest is unchanged: the mirror
+camera's frame differs in 337 of 2 073 600 pixels (0.016 %), none of them on the glass. The mirror
+scene (`cam=mirror`) went from 145.7 fps to 161–180.
+
+## The PlayCanvas port
+
+After 0.3.2 the renderer moved from Babylon.js 9.30 to PlayCanvas 2.23 (how it is built: [graphics.md](graphics.md#the-renderer)). Two sets of numbers led there and followed it: the engine comparison that chose PlayCanvas, and the checkpoints the port was held to (main-thread time at or below Babylon's, GPU time within +10 %).
+
+### Babylon.js against PlayCanvas: the engine comparison (2026-10-23)
+
+`engines.html` (dev only, `web/src/debug/engines/`, removed after the port; in git history up to f15b839b, first in da009b41) drew the same scene with both engines, each run in a fresh frame of its own so they never shared a page or a GPU device: the game's furniture as glTF (20 models a room, about 220 mesh parts and 95 k triangles, laid out on a grid, without the game's finishes or soft look), a sun and a flat ambient, an orbiting camera. It measured the main thread's time for a whole engine frame (Babylon's `beginFrame`/`render`/`endFrame`, PlayCanvas's `update`/`render`), the time between frames, draw calls, and the load; not the GPU's own time. 1600×900 drawn pixels, 8 s measured after 3 s, on a Mac (Apple GPU, Metal 3, 12 cores; Chrome 156).
+
+The cases: `furniture`, 8 rooms of the models each its own mesh; `instanced`, each model's copies as hardware instances of one mesh (Babylon's thin instances); `lamps`, 32 clustered spot lamps over the rooms; `shadows`, the sun's shadows (one 2048² map, 3×3 PCF); `game`, lamps and shadows together. The game-sized cases are one house's furniture with a garden, 300 instanced trees, 8 of the game's own residents walking (skinned on the GPU by each engine from `rig.json` and the `.bin` bodies), 8 lamps, sun shadows and the game's post-processing (MSAA into an HDR target, tone mapping, vignette, colour grading) at the game's camera distance: `lot`; `lot-nopost` without the post-processing; `lot-bloom` with bloom added; `lot-crowd` with 32 residents.
+
+Chromium, vsync at 120 Hz (main-thread ms a frame, average, and p95):
+
+| Case | Draws | WebGPU CPU ms, Babylon → PlayCanvas | WebGL2 CPU ms, Babylon → PlayCanvas | WebGPU fps | WebGL2 fps |
+|---|---|---|---|---|---|
+| `furniture` | 1609 | 6.61 → 0.96 (p95 7.63 → 1.67) | 3.73 → 1.07 (p95 4.57 → 1.29) | 120.0 → 120.0 | 120.0 → 120.0 |
+| `instanced` | 202 | 1.15 → 0.39 (p95 1.40 → 0.52) | 0.90 → 0.49 (p95 1.52 → 0.82) | 120.0 → 120.0 | 120.0 → 120.0 |
+| `lamps` | 1610 | 8.56 → 0.86 (p95 9.39 → 1.35) | 4.95 → 1.00 (p95 5.47 → 1.27) | 115.3 → 120.0 | 120.0 → 120.0 |
+| `shadows` | 3217 | 12.57 → 1.12 (p95 14.38 → 1.46) | 8.72 → 1.88 (p95 10.34 → 2.49) | 78.8 → 120.0 | 113.3 → 120.0 |
+| `game` | 3218 | 14.77 → 1.44 (p95 15.93 → 1.83) | 8.84 → 1.97 (p95 10.75 → 2.46) | 67.2 → 120.0 | 111.4 → 120.0 |
+
+| Case | Draws | WebGPU CPU ms, Babylon → PlayCanvas | WebGL2 CPU ms, Babylon → PlayCanvas |
+|---|---|---|---|
+| `lot` | 675 | 3.23 → 1.03 (p95 3.84 → 1.61) | 2.58 → 1.00 (p95 3.20 → 1.35) |
+| `lot-nopost` | 674 | 3.02 → 1.15 (p95 3.68 → 1.75) | 2.62 → 0.97 (p95 3.05 → 1.19) |
+| `lot-bloom` | 679 | 3.49 → 0.90 (p95 4.13 → 1.22) | 2.75 → 1.02 (p95 3.34 → 1.31) |
+| `lot-crowd` | 1059 | 6.89 → 1.82 (p95 8.11 → 2.07) | 4.63 → 1.74 (p95 5.37 → 2.17) |
+
+The same game-sized cases without vsync (frames as fast as they come; with the display no longer the limit, fps shows the GPU too):
+
+| Case | Draws | WebGPU CPU ms, Babylon → PlayCanvas | WebGL2 CPU ms, Babylon → PlayCanvas | WebGPU fps | WebGL2 fps |
+|---|---|---|---|---|---|
+| `lot` | 675 | 3.70 → 1.08 (p95 4.30 → 1.52) | 4.00 → 2.85 (p95 4.79 → 4.60) | 262.1 → 860.1 | 240.0 → 335.0 |
+| `lot-nopost` | 674 | 3.44 → 0.95 (p95 4.18 → 1.44) | 3.45 → 2.68 (p95 4.16 → 4.56) | 281.6 → 958.4 | 268.5 → 356.1 |
+| `lot-bloom` | 679 | 4.65 → 1.20 (p95 6.32 → 1.67) | 4.37 → 3.01 (p95 5.10 → 4.72) | 210.0 → 746.6 | 221.7 → 319.3 |
+| `lot-crowd` | 1059 | 6.92 → 1.60 (p95 8.01 → 1.92) | 5.39 → 3.25 (p95 6.29 → 4.95) | 142.1 → 582.2 | 179.4 → 292.4 |
+
+WebKit (Safari's engine, WebGPU, 60 Hz; each run in a freshly started browser, as WebKit 26.5 slows down for good after a few runs in one; the files don't record the machine):
+
+| Case | Draws | WebGPU CPU ms, Babylon → PlayCanvas | WebGPU fps |
+|---|---|---|---|
+| `furniture` | 1609 | 26.59 → 1.94 (p95 27.72 → 2.66) | 29.4 → 60.0 |
+| `instanced` | 202 | 3.58 → 1.11 (p95 4.52 → 1.70) | 60.0 → 60.0 |
+| `lamps` | 1610 | 30.35 → 1.77 (p95 31.58 → 2.52) | 26.5 → 60.0 |
+| `shadows` | 3217 | 50.62 → 1.73 (p95 52.42 → 2.06) | 16.8 → 60.0 |
+| `game` | 3218 | 51.71 → 2.00 (p95 53.42 → 2.76) | 16.8 → 60.0 |
+
+| Case | Draws | WebGPU CPU ms, Babylon → PlayCanvas | WebGPU fps |
+|---|---|---|---|
+| `lot` | 675 | 14.92 → 1.73 (p95 16.12 → 2.12) | 59.8 → 60.0 |
+| `lot-nopost` | 674 | 12.23 → 1.58 (p95 12.92 → 1.90) | 60.0 → 60.0 |
+| `lot-bloom` | 679 | 15.00 → 1.86 (p95 15.90 → 2.68) | 60.0 → 59.7 |
+| `lot-crowd` | 1059 | 23.16 → 2.15 (p95 24.50 → 2.96) | 40.0 → 60.0 |
+
+On a game-sized scene PlayCanvas took about a third of Babylon's main-thread time in Chromium (WebGPU; two fifths on WebGL2) and about a ninth in WebKit, where Babylon fell below 60 fps with 32 residents and with the furniture cases' 1,600–3,200 draws. Where draws dominate (`furniture`, `lamps`, `shadows`, `game`), Babylon's main thread took 3.5–11 times PlayCanvas's in Chromium.
+
+### Checkpoints during the port
+
+`render.mjs` on a production build, the `village` scene at 1920×1080 and device pixel ratio 1, vsync, 20 s after a 5 s warm-up, one run per cell, on the M3 Pro (Chrome 156); Medium and High on both backends. CPU is the main thread's frame (the game's update and the renderer's draw), GPU the frame's GPU time as each renderer measures it (Babylon: its timestamp span from the first pass to the last; PlayCanvas: its GPU profiler), draws all passes. Every cell ran at 116–120 fps, held by vsync. The PlayCanvas runs' split of draws and triangles by pass (shadow, mirror) wasn't reported yet.
+
+**Stages 5 and 6, without residents** (`diag=nosims`): Babylon (measured alongside Stage 5) against Stage 5 (33cf3230: the lot without its residents; no lamps, post-processing or night grade yet, the sun's shadows as Stage 3 had them) and Stage 6 (eed0cdfb: lighting, shadows and the look). High's two mirrors are in Babylon's numbers (13 draws) and in neither stage's (mirrors came in Stage 9).
+
+| Preset, backend, scenario | CPU ms: Babylon → Stage 5 → Stage 6 | GPU ms: Babylon → Stage 5 → Stage 6 | Draws: Babylon → Stage 5 → Stage 6 |
+|---|---|---|---|
+| Medium, WebGPU, orbit-day | 4.32 → 1.03 → 1.31 | 7.47 → 4.01 → 3.87 | 302 → 191 → 191 |
+| Medium, WebGPU, orbit-night | 4.40 → 1.07 → 1.37 | 7.31 → 4.00 → 3.62 | 310 → 197 → 197 |
+| Medium, WebGPU, dusk | 4.80 → 1.69 → 1.63 | 7.05 → 3.31 → 3.13 | 354 → 227 → 229 |
+| Medium, WebGPU, build | 4.27 → 1.05 → 1.29 | 7.51 → 3.92 → 3.40 | 288 → 179 → 180 |
+| Medium, WebGPU, wide | 4.79 → 1.22 → 1.33 | 7.22 → 4.41 → 4.01 | 352 → 241 → 242 |
+| High, WebGPU, orbit-day | 4.68 → 1.08 → 1.34 | 7.48 → 4.05 → 3.91 | 314 → 190 → 192 |
+| High, WebGPU, orbit-night | 5.02 → 1.16 → 1.34 | 7.38 → 4.07 → 3.64 | 322 → 197 → 197 |
+| High, WebGPU, dusk | 5.38 → 1.68 → 1.68 | 7.02 → 3.19 → 3.42 | 365 → 229 → 230 |
+| High, WebGPU, build | 4.29 → 1.11 → 1.30 | 7.53 → 3.97 → 3.69 | 288 → 179 → 180 |
+| High, WebGPU, wide | 4.77 → 1.10 → 1.35 | 7.54 → 4.14 → 4.15 | 353 → 241 → 242 |
+| Medium, WebGL2, orbit-day | 2.50 → 0.82 → 0.82 | 5.29 → 4.51 → 4.84 | 302 → 190 → 191 |
+| Medium, WebGL2, orbit-night | 2.78 → 0.81 → 0.90 | 5.82 → 4.44 → 4.91 | 310 → 197 → 198 |
+| Medium, WebGL2, dusk | 3.22 → 1.36 → 1.13 | 5.23 → 4.24 → 4.58 | 353 → 227 → 228 |
+| Medium, WebGL2, build | 2.11 → 0.76 → 0.73 | 4.90 → 4.60 → 5.13 | 288 → 179 → 180 |
+| Medium, WebGL2, wide | 2.93 → 0.79 → 0.92 | 5.98 → 4.66 → 4.73 | 353 → 241 → 242 |
+| High, WebGL2, orbit-day | 2.53 → 0.76 → 0.79 | 5.30 → 4.59 → 4.99 | 314 → 190 → 192 |
+| High, WebGL2, orbit-night | 3.14 → 0.81 → 0.80 | 5.82 → 4.43 → 4.90 | 323 → 197 → 198 |
+| High, WebGL2, dusk | 3.41 → 1.34 → 1.22 | 5.61 → 3.81 → 4.58 | 365 → 229 → 230 |
+| High, WebGL2, build | 2.00 → 0.80 → 0.76 | 4.94 → 4.53 → 4.89 | 288 → 179 → 180 |
+| High, WebGL2, wide | 2.95 → 0.78 → 0.93 | 6.00 → 4.62 → 4.62 | 353 → 241 → 242 |
+
+**Stage 7, with the residents** (6439e874): Babylon's baseline taken before the port (`diag` none; its run log wasn't kept, its matrix and flags are the same) against Stage 7. Again no mirrors on PlayCanvas yet, so High's reflections are only in Babylon's.
+
+| Preset, backend, scenario | CPU ms: Babylon → Stage 7 | GPU ms: Babylon → Stage 7 | Draws: Babylon → Stage 7 |
+|---|---|---|---|
+| Medium, WebGPU, orbit-day | 4.74 → 1.70 | 7.33 → 4.60 | 346 → 307 |
+| Medium, WebGPU, orbit-night | 4.90 → 1.54 | 7.18 → 4.54 | 355 → 313 |
+| Medium, WebGPU, dusk | 5.36 → 2.08 | 6.97 → 3.71 | 370 → 326 |
+| Medium, WebGPU, build | 4.29 → 1.40 | 7.51 → 4.20 | 295 → 256 |
+| Medium, WebGPU, wide | 4.89 → 1.56 | 7.38 → 4.52 | 392 → 352 |
+| High, WebGPU, orbit-day | 5.01 → 1.68 | 7.28 → 4.39 | 357 → 307 |
+| High, WebGPU, orbit-night | 5.03 → 1.58 | 6.90 → 4.20 | 367 → 313 |
+| High, WebGPU, dusk | 5.59 → 2.07 | 7.03 → 3.44 | 381 → 325 |
+| High, WebGPU, build | 4.27 → 1.47 | 7.51 → 3.78 | 295 → 256 |
+| High, WebGPU, wide | 4.86 → 1.61 | 7.39 → 3.72 | 392 → 352 |
+| Medium, WebGL2, orbit-day | 2.48 → 1.14 | 5.10 → 4.57 | 345 → 307 |
+| Medium, WebGL2, orbit-night | 2.91 → 0.98 | 5.89 → 4.78 | 355 → 313 |
+| Medium, WebGL2, dusk | 3.36 → 1.73 | 5.40 → 4.40 | 368 → 324 |
+| Medium, WebGL2, build | 1.99 → 1.03 | 4.67 → 4.29 | 295 → 256 |
+| Medium, WebGL2, wide | 2.99 → 0.97 | 5.93 → 4.68 | 389 → 352 |
+| High, WebGL2, orbit-day | 2.65 → 1.15 | 5.26 → 4.56 | 356 → 307 |
+| High, WebGL2, orbit-night | 3.09 → 0.97 | 6.08 → 4.77 | 366 → 313 |
+| High, WebGL2, dusk | 3.68 → 1.73 | 5.57 → 4.34 | 380 → 321 |
+| High, WebGL2, build | 1.88 → 1.00 | 4.56 → 4.30 | 295 → 256 |
+| High, WebGL2, wide | 3.00 → 1.01 | 5.95 → 4.71 | 390 → 352 |
+
+So by Stage 7 the main thread did about a third of Babylon's work on WebGPU and a third to a half on WebGL2, with 39–56 fewer draws (High's count Babylon's reflections), and the GPU time was lower in every cell (3.4–4.6 ms against 6.9–7.5 on WebGPU, 4.3–4.8 against 4.6–6.1 on WebGL2). Stage 6, with the lamps, shadows and post-processing it added, put up to 0.3 ms back on WebGPU's main thread and up to 0.8 ms on WebGL2's GPU (High at dusk) over Stage 5.
+
+### Final checkpoint (Stage 11)
+
+2026-10-24, the finished port (no Babylon left) against the Babylon renderer: `render.mjs --preview --build --runs 1`, the village with its 41 residents, 1920×1080 at DPR 1, vsync at 120 Hz, 20 s after a 5 s warm-up, M3 Pro (Apple GPU, Metal 3). Babylon's Medium and High are the Stage 0 baseline (`bench-results/baseline-babylon/perf`); Babylon's Low was measured the same day from the Babylon reference checkout (the tree as of Stage 2, `bench-results/stage11/perf-babylon-low`). Main thread is the whole frame (update + draw), ms; GPU is WebGPU's pass span or WebGL2's frame timer, ms; draws are all passes; p99 is the frame interval's 99th percentile, ms. One run each, so single cells move by a few tenths of a millisecond between runs.
+
+| preset | backend | scenario | main thread Babylon | main thread PlayCanvas | GPU Babylon | GPU PlayCanvas | draws Babylon | draws PlayCanvas | p99 Babylon | p99 PlayCanvas |
+|---|---|---|---|---|---|---|---|---|---|---|
+| low | WebGPU | orbit-day | 3.80 | 1.50 | 4.92 | 3.72 | 286 | 274 | 10.0 | 10.3 |
+| low | WebGPU | orbit-night | 3.97 | 1.53 | 4.86 | 3.63 | 293 | 280 | 10.2 | 10.3 |
+| low | WebGPU | dusk | 4.27 | 1.84 | 4.80 | 3.37 | 285 | 276 | 10.1 | 10.3 |
+| low | WebGPU | build | 3.62 | 1.46 | 3.38 | 3.81 | 284 | 273 | 10.1 | 10.3 |
+| low | WebGPU | wide | 4.24 | 1.53 | 5.23 | 3.78 | 331 | 320 | 10.1 | 10.3 |
+| low | WebGL2 | orbit-day | 2.44 | 1.25 | 3.83 | 4.42 | 286 | 274 | 10.2 | 10.3 |
+| low | WebGL2 | orbit-night | 2.46 | 1.23 | 3.96 | 4.34 | 293 | 280 | 10.2 | 10.3 |
+| low | WebGL2 | dusk | 3.03 | 1.55 | 4.16 | 4.23 | 286 | 276 | 10.3 | 10.2 |
+| low | WebGL2 | build | 2.35 | 1.21 | 3.69 | 3.88 | 284 | 273 | 10.2 | 10.3 |
+| low | WebGL2 | wide | 2.29 | 1.21 | 4.03 | 4.34 | 331 | 320 | 10.2 | 10.3 |
+| medium | WebGPU | orbit-day | 4.74 | 1.59 | 7.33 | 3.54 | 346 | 334 | 9.3 | 10.3 |
+| medium | WebGPU | orbit-night | 4.90 | 1.56 | 7.18 | 3.88 | 355 | 339 | 9.3 | 10.2 |
+| medium | WebGPU | dusk | 5.36 | 2.06 | 6.97 | 3.50 | 370 | 352 | 9.3 | 10.2 |
+| medium | WebGPU | build | 4.29 | 1.51 | 7.51 | 3.81 | 295 | 282 | 9.1 | 10.3 |
+| medium | WebGPU | wide | 4.89 | 1.58 | 7.38 | 3.92 | 392 | 379 | 16.7 | 10.3 |
+| medium | WebGL2 | orbit-day | 2.48 | 1.29 | 5.10 | 4.77 | 345 | 333 | 9.3 | 10.3 |
+| medium | WebGL2 | orbit-night | 2.91 | 1.08 | 5.89 | 4.77 | 355 | 339 | 9.1 | 10.3 |
+| medium | WebGL2 | dusk | 3.36 | 1.95 | 5.40 | 4.49 | 368 | 350 | 9.3 | 10.3 |
+| medium | WebGL2 | build | 1.99 | 1.01 | 4.67 | 4.27 | 295 | 282 | 9.1 | 10.3 |
+| medium | WebGL2 | wide | 2.99 | 1.13 | 5.93 | 4.88 | 389 | 379 | 10.2 | 10.2 |
+| high | WebGPU | orbit-day | 5.01 | 1.61 | 7.28 | 3.69 | 357 | 342 | 8.9 | 10.3 |
+| high | WebGPU | orbit-night | 5.03 | 1.57 | 6.90 | 3.97 | 367 | 348 | 9.2 | 10.3 |
+| high | WebGPU | dusk | 5.59 | 2.13 | 7.03 | 4.28 | 381 | 361 | 16.6 | 10.3 |
+| high | WebGPU | build | 4.27 | 1.47 | 7.51 | 3.95 | 295 | 282 | 9.3 | 10.2 |
+| high | WebGPU | wide | 4.86 | 1.58 | 7.39 | 4.05 | 392 | 379 | 16.7 | 10.3 |
+| high | WebGL2 | orbit-day | 2.65 | 1.34 | 5.26 | 5.24 | 356 | 342 | 10.2 | 10.3 |
+| high | WebGL2 | orbit-night | 3.09 | 1.12 | 6.08 | 4.94 | 366 | 348 | 10.2 | 10.2 |
+| high | WebGL2 | dusk | 3.68 | 1.92 | 5.57 | 4.70 | 380 | 361 | 10.3 | 10.2 |
+| high | WebGL2 | build | 1.88 | 1.07 | 4.56 | 4.44 | 295 | 282 | 10.2 | 10.2 |
+| high | WebGL2 | wide | 3.00 | 1.30 | 5.95 | 5.44 | 390 | 379 | 10.0 | 10.3 |
+
+- **Main thread:** PlayCanvas needs 2.3–3.2× less on WebGPU and 1.7–2.8× less on WebGL2, on every preset and scenario.
+- **GPU:** on WebGPU, 1.6–2.1× less on Medium and High and 24–30 % less on Low (except Build, 3.4 → 3.8 ms). On WebGL2, Medium and High are equal or lower; Low is 2–15 % higher (orbit-day 3.83 → 4.42 ms), the one place past the plan's +10 % bound. Profiled for 0.4.1 (below): not the FXAA; nature's share is the one that stands out.
+- **Frames:** both hold 120 fps everywhere. PlayCanvas drops none (p99 at most 10.3 ms), where Babylon dropped a few in the wide view on High and Medium (p99 16.7 ms); its frame intervals do jitter more around 8.33 ms (p95 about 10 ms against Babylon's 8.4–9.9), with the same average.
+- **Shader compiles in play:** after `warmGame`, a scripted session (play, night, a mirror, walls, Build mode, the catalog, buying) compiles 1 shader and 1 pipeline, for the model bought for the first time (before the warm-up was ported: 32 shaders and 340 pipelines on WebGPU, which stalled the first seconds of play). `?diag=shaders` logs them.
+- The pictures, against Babylon's: the 54 lit benchmark shots differ by a median 0.74 % of pixels by more than 16 (2.5 of 255 on average), the albedo and normals views by 0.08 %, the mirror poses by 1.1 %, and the 15 Build-mode states replayed with Babylon's pointer by 0.06–1.6 % (`bench-results/stage11/`).
+
+### Low on WebGL2, profiled (0.4.1)
+
+2026-10-24, the same machine and method (`render.mjs --preview`, windows at 120 Hz, median of 3 runs; `bench-results/0.4.1/`). Low on WebGL2 against Babylon's single run: orbit-day 4.07–4.24 ms against 3.83 (+6–11 %), orbit-night 4.22 against 3.96, dusk 4.25 against 4.16, build 3.77 against 3.69, wide 4.67–4.76 against 4.03 (+16–18 %). Runs of one build differ by 0.2–0.3 ms, so only the wide view's gap is well clear of the noise. Passes, pixel samples, draws and triangles are Babylon's (4 passes, 7.3 M samples; 320 against 331 draws, 1.97 against 2.01 M triangles in the wide view): the difference is in what a pixel or a vertex costs, not in how much is drawn.
+
+What each part costs, one left out at a time (`diag=`, and on the dev server the preset's own knobs one by one):
+
+- **Nature** (`nonature`): −0.75 ms in the wide view (4.76 → 4.01), −0.06 ms in orbit-day. The only part whose cost stands out, and the view with the largest gap.
+- **Within the noise** (under 0.3 ms either way): the FXAA (`noaa`, −0.1 ms: not the suspect it was), the sun's shadows (`noshadows`) and its map's size (1024 or 2048), the lamps (`nolamps`; clustered or forward, `lights=forward`), anisotropy (4 or 1), merged shadow casters, the soft look against classic shading, the night grade and glass.
+
+Left for later (done for 0.5.0, below): nature has no switches of its own yet (the woods, the lawn's tufts, the terrain), so which of them costs more than on Babylon isn't known. The Babylon reference checkout is gone, so Babylon can't be measured again beside it; the comparison is with the recorded runs.
+
+### Low on WebGL2, the woods (0.5.0)
+
+2026-10-26, the same machine, with up to ten agents sharing it (`bench-results/0.5.0/`). Under that load the method above stopped measuring: with vsync, one cell's GPU time came out at about 3 ms in some runs and about 6 ms in others (Low, WebGL2, the wide view: 5.99, 3.07, 6.54 ms), flipping between rounds, the Apple GPU's clocks following how busy the machine was rather than what was drawn. So the numbers here are from runs without vsync (`--throughput`, the GPU always busy, about ±0.2 ms), each change against its base in the same round and the rounds interleaved, and from an in-page A/B (one bench page, the variants switched every 2 s along the camera path, each window's GPU time against the base window next to it, 30–40 rounds), which cancels the slow drift altogether. Triangles and draws don't depend on the load.
+
+Nature's parts, one left out at a time (the new `diag=nowoods,nofarwoods,noflowers,nograss`; Low, WebGL2, the wide view):
+
+| left out | triangles (M) | draws | GPU ms, without vsync (median of 3) |
+|---|---|---|---|
+| nothing | 1.80 | 316 | 3.3 |
+| all nature (`nonature`) | 0.77 | 270 | 2.5 |
+| the far woods (`nofarwoods`) | 1.00 | 280 | 2.8 |
+| the woods near the town (`nowoods`) | 1.62 | 306 | 2.9 (6 rounds later: within the noise) |
+| the lawn's flowers (`noflowers`) | 1.74 | 315 | not timed apart (with vsync, within the noise) |
+| the grass (`nograss`) | 1.80 | 316 | nothing: none is in reach of the wide view's eye |
+
+So the far woods (the far versions of the trees from 28 m past the town's edge to the horizon) are nearly all of nature's cost. What a far tree costs, from the in-page A/B against the far woods as they were (GPU ms, median of the paired differences): thinning them to 60 % −0.15 and to 40 % −0.26, leaving them out −0.40 to −0.42; without their normal and ARM maps −0.02, without the wind −0.10, without receiving the sun's shadows 0.00, against a copy of their materials +0.08 (the copy itself, a control). So the cost goes with the number of trees drawn, not with how each is shaded.
+
+And most of the trees drawn weren't on screen. The game drew the woods in eight sectors round the town, each from the town's edge to the horizon, and a sector with one tree in view draws all of its trees. Counted along the wide view's path (nine moments, each far tree's foot and crown projected to the screen): about 50 of the 2291 far trees on screen, about 700 drawn (fourteen times as many). Drawn in squares they would be: 100 m, about 180 (3.6×); 80 m, about 155; 60 m, about 115.
+
+**The change:** Low draws the woods in 100 m squares (`QualitySettings.woodsCell`; `?woodscell=<m>` sets it, 0 the sectors). The same trees in the same places: Low's 18 benchmark shots on both backends with sectors and with squares are the same to the pixel, but for a car on the far road in the two wide night shots (at most 0.018 % of the pixels). Medium and High keep the sectors (`woodsCell: 0`), so nothing about them changes. Tried and not kept: the woods near the town in their far versions (no gain to be seen), the far woods without the sun's shadows (none), and thinning the far woods (−0.26 ms at 40 %, but a visibly thinner forest; the squares save as much and change nothing on screen).
+
+Low on WebGL2, the production build, before (sectors) and after (squares), and with `fix/rendering-open` (each lamp kept to its room on Low too) merged in, 4 interleaved rounds without vsync, GPU ms (median; the change against the base in the same round, median):
+
+| scenario | base | squares | room mask | both | triangles (M) | draws |
+|---|---|---|---|---|---|---|
+| orbit-day | 3.03 | −0.11 | +0.09 | −0.25 | 1.30 → 1.04 | 275 → 266 |
+| orbit-night | 3.07 | −0.13 | +0.12 | 0.00 | 1.31 → 1.05 | 281 → 272 |
+| wide | 2.86 | −0.33 | +0.03 | −0.27 | 1.79 → 1.21 | 315 → 311 |
+
+The room mask's cost on Low with WebGL2 is within the noise (0.0–0.1 ms here; the 5.2 → 4.4 ms seen at its merge was most likely the clocks flipping, as above). The squares' cost is on the main thread: 446 more meshes (the far woods' 72 group draws become 518), each culled every frame, +0.17–0.20 ms of main-thread time in every round of a separate vsync check (orbit-day, 5 rounds: 1.44 → 1.62 ms without the room mask, 1.44 → 1.63 ms with it; the room mask itself +0.00–0.03). Low is the preset for older laptops' integrated graphics, which wait on the GPU, so the trade is worth it there; Medium and High, whose main thread is the busier one on WebGPU, keep the sectors.
+
+Against Babylon: its runs were with vsync, at whatever clocks the GPU chose then, so they can't be set beside these. The 0.4.1 gap (wide view +0.6–0.7 ms) was about nature's cost then (−0.75 ms); the squares take about 40 % of nature's cost away (−0.33 of −0.8 ms without vsync), so the wide view may now be within the plan's +10 %, but that can only be checked on a quiet machine with the 0.4.1 method.
+
+### Low on WebGL2 on a quiet machine, and the world boxes (0.5.0)
+
+2026-10-29, the same machine with nothing else running (no process but the window server above 10 % of a core), PlayCanvas 2.23.3, the 0.4.1 method: the production build, windows at 120 Hz with vsync, 20 s after a 5 s warm-up, three rounds, each the squares and then the sectors (`?woodscell=0`) beside them. A first set as the branch stood (`bench-results/0.5.0/quiet-*`), a second with the world boxes below (`boxes-*`).
+
+Even on a quiet machine the GPU time with vsync still spreads: the wide view with squares came out at 5.39, 4.55 and 3.89 ms in the first set's three rounds, 4.32, 4.22 and 4.17 in the second's. Low on WebGL2 against Babylon's single run, GPU ms (median of 3):
+
+| scenario | Babylon | 0.4.1 | first set: squares / sectors | second set: squares / sectors |
+|---|---|---|---|---|
+| orbit-day | 3.83 | 4.07–4.24 | 4.42 (+15 %) / 4.39 | 4.32 (+13 %) / 4.36 |
+| orbit-night | 3.96 | 4.22 | 4.59 (+16 %) / 5.32 | 4.39 (+11 %) / 4.79 |
+| dusk | 4.16 | 4.25 | 4.11 (−1 %) / 4.54 | 4.24 (+2 %) / 4.29 |
+| build | 3.69 | 3.77 | 3.60 (−3 %) / 3.87 | 3.77 (+2 %) / 3.85 |
+| wide | 4.03 | 4.67–4.76 | 4.55 (+13 %) / 4.27 | 4.22 (+5 %) / 4.22 |
+
+So the wide view, +16–18 % in 0.4.1 and the one gap clear of the noise then, is +5 % in the steadier second set. Dusk and Build are at Babylon's. The orbits stay 11–16 % over in both sets, 0.4–0.6 ms; that is past the plan's +10 %, but it isn't the woods (squares and sectors alike: 4.32 and 4.36 ms), and with three rounds spreading by up to 0.5 ms it is about the size of the noise. What else costs more there isn't known yet. Under vsync the squares' own GPU saving (−0.11 to −0.33 ms without vsync, above) doesn't show past the noise.
+
+**The world boxes.** A CPU profile of the bench page (Low, WebGL2, orbit-day, 12 s, twice each way) put most of the squares' main-thread cost in one function: PlayCanvas works out a draw's world box again every frame when it has a box of its own (`setCustomAabb`, which every culled `Instances` draw sets), and the woods' 518 draws took that from 0.08 to 0.19 ms a frame. The woods, the street's things and the flowers never move. `Instances` now keeps the world box until the box or the entity's place changes (`_updateAabbFunc`, against the node's `_aabbVer`; both in `check:chunks`), and the function's share fell to under 0.001 ms. Test: `tests/instancesBox.test.ts`, on the engine's null device. Low and Medium's 36 benchmark shots on both backends are the same to the pixel before and after, but for the car on the far road in the wide night shots (at most 0.032 %).
+
+Main thread, ms (median of 3; the squares' cost is against the sectors of the same set):
+
+| scenario | first set: squares / sectors (cost) | second set: squares / sectors (cost) |
+|---|---|---|
+| orbit-day | 1.43 / 1.27 (+0.16) | 1.29 / 1.17 (+0.12) |
+| orbit-night | 1.47 / 1.35 (+0.12) | 1.29 / 1.23 (+0.06) |
+| dusk | 1.79 / 1.61 (+0.18) | 1.68 / 1.57 (+0.12) |
+| build | 1.44 / 1.21 (+0.23) | 1.31 / 1.22 (+0.09) |
+| wide | 1.55 / 1.23 (+0.31) | 1.31 / 1.19 (+0.13) |
+
+The squares now cost the main thread about half what they did, and Low with squares is 0.06–0.24 ms lighter than before. Every preset gains a little, since all culled instanced draws keep their box (the sectors here 0.04–0.12 ms). What is left of the squares' cost is the 446 more entities walked each frame (`syncHierarchy`, about +0.02 ms) and the GL state of the draws (texture binds and uniforms).
+
+### The production build again (0.5.0)
+
+2026-10-26, the Stage 11 matrix again on the production build as it stands for 0.5.0 (its objects from the authenticity review, `fix/rendering-open` and the woods' squares on Low): `render.mjs` against `vite preview`, the village with its 41 residents, 1920×1080 at DPR 1, vsync at 120 Hz, 20 s after a 5 s warm-up, one run per cell (`bench-results/0.5.0/production`). The machine was shared, so the GPU column is the clocks' as much as the frame's (see above: one cell's GPU time can be 3 or 6 ms from one run to the next); the main thread, draws and frames are the comparison.
+
+| preset | backend | scenario | main thread ms, Stage 11 → now | GPU ms, Stage 11 → now | draws, Stage 11 → now | p99 ms, Stage 11 → now |
+|---|---|---|---|---|---|---|
+| low | WebGPU | orbit-day | 1.50 → 1.90 | 3.72 → 2.22 | 274 → 266 | 10.3 → 9.3 |
+| low | WebGPU | orbit-night | 1.53 → 1.91 | 3.63 → 2.39 | 280 → 272 | 10.3 → 9.3 |
+| low | WebGPU | dusk | 1.84 → 2.00 | 3.37 → 2.02 | 276 → 268 | 10.3 → 9.3 |
+| low | WebGPU | build | 1.46 → 1.78 | 3.81 → 2.44 | 273 → 265 | 10.3 → 9.3 |
+| low | WebGPU | wide | 1.53 → 1.77 | 3.78 → 3.77 | 320 → 311 | 10.3 → 9.3 |
+| medium | WebGPU | orbit-day | 1.59 → 1.85 | 3.54 → 4.25 | 334 → 336 | 10.3 → 9.3 |
+| medium | WebGPU | orbit-night | 1.56 → 2.26 | 3.88 → 4.50 | 339 → 342 | 10.2 → 9.3 |
+| medium | WebGPU | dusk | 2.06 → 2.41 | 3.50 → 3.15 | 352 → 352 | 10.2 → 9.3 |
+| medium | WebGPU | build | 1.51 → 1.71 | 3.81 → 2.90 | 282 → 284 | 10.3 → 9.3 |
+| medium | WebGPU | wide | 1.58 → 2.00 | 3.92 → 2.76 | 379 → 377 | 10.3 → 9.3 |
+| high | WebGPU | orbit-day | 1.61 → 2.90 | 3.69 → 3.30 | 342 → 344 | 10.3 → 9.3 |
+| high | WebGPU | orbit-night | 1.57 → 3.10 | 3.97 → 3.75 | 348 → 351 | 10.3 → 9.3 |
+| high | WebGPU | dusk | 2.13 → 2.52 | 4.28 → 3.10 | 361 → 364 | 10.3 → 9.3 |
+| high | WebGPU | build | 1.47 → 1.66 | 3.95 → 2.96 | 282 → 284 | 10.2 → 9.3 |
+| high | WebGPU | wide | 1.58 → 1.86 | 4.05 → 2.92 | 379 → 379 | 10.3 → 9.3 |
+| low | WebGL2 | orbit-day | 1.25 → 1.56 | 4.42 → 3.24 | 274 → 266 | 10.3 → 9.3 |
+| low | WebGL2 | orbit-night | 1.23 → 1.72 | 4.34 → 3.63 | 280 → 272 | 10.3 → 9.3 |
+| low | WebGL2 | dusk | 1.55 → 2.36 | 4.23 → 5.52 | 276 → 268 | 10.2 → 9.3 |
+| low | WebGL2 | build | 1.21 → 1.69 | 3.88 → 4.70 | 273 → 265 | 10.3 → 9.3 |
+| low | WebGL2 | wide | 1.21 → 1.91 | 4.34 → 4.36 | 320 → 311 | 10.3 → 9.3 |
+| medium | WebGL2 | orbit-day | 1.29 → 1.81 | 4.77 → 5.09 | 333 → 336 | 10.3 → 9.3 |
+| medium | WebGL2 | orbit-night | 1.08 → 2.11 | 4.77 → 5.66 | 339 → 341 | 10.3 → 9.3 |
+| medium | WebGL2 | dusk | 1.95 → 2.42 | 4.49 → 5.09 | 350 → 353 | 10.3 → 9.3 |
+| medium | WebGL2 | build | 1.01 → 1.45 | 4.27 → 5.00 | 282 → 284 | 10.3 → 9.3 |
+| medium | WebGL2 | wide | 1.13 → 1.61 | 4.88 → 4.33 | 379 → 377 | 10.2 → 9.3 |
+| high | WebGL2 | orbit-day | 1.34 → 1.74 | 5.24 → 5.16 | 342 → 344 | 10.3 → 9.3 |
+| high | WebGL2 | orbit-night | 1.12 → 1.94 | 4.94 → 6.07 | 348 → 350 | 10.2 → 9.2 |
+| high | WebGL2 | dusk | 1.92 → 2.46 | 4.70 → 5.38 | 361 → 365 | 10.2 → 9.2 |
+| high | WebGL2 | build | 1.07 → 1.44 | 4.44 → 4.89 | 282 → 284 | 10.2 → 9.3 |
+| high | WebGL2 | wide | 1.30 → 1.68 | 5.44 → 4.63 | 379 → 378 | 10.3 → 9.3 |
+
+- **Frames:** 120 fps in every cell, p99 9.2–9.3 ms (Stage 11: 10.2–10.3), no long tasks.
+- **Main thread:** more than Stage 11 in every cell, mostly by 0.2–0.5 ms and by up to 1.0 ms (Medium WebGL2 orbit-night 1.08 → 2.11 ms; Low WebGPU orbit-day 1.50 → 1.90). Low's squares are 0.2 ms of it (above), and Low on WebGL2 measured 1.44 ms in orbit-day before them against Stage 11's 1.25; the rest is the shared machine (a busy machine moves the main thread too) or what was added since, which only a Stage 11 build measured beside this one on a quiet machine can tell apart. Still below Babylon's in every cell. High on WebGPU's orbits (2.90 and 3.10 ms in this run) were noise: three runs each again beside Medium, both 1.7–1.9 ms.
+- **Draws:** Low 8–9 fewer (the woods' squares), Medium and High from 2 fewer to 4 more.
+
+The town overview behind the menus, not looked at before at full night or close up (`__renderer.setTownShot` with `minute` 23:00 and 02:00 under `?debug`, on the production build, Medium on WebGPU and Low on WebGL2): at night the streetlights, porch lamps and windows glow and the rest goes dark as in the game; close to a lot, the gardens' and street's far versions (trees, benches, cars, the fire pit, lamp posts, fences) stand whole, in their places and colours, with no gaps or boxes. Nothing to fix.
+

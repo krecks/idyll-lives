@@ -309,7 +309,7 @@
           </label>
           <div class="grades" role="group" aria-label="Filter by grade">
             {#each catalog.grades as g (g.id)}
-              <button class="gchip" class:on={grades.includes(g.id)} aria-pressed={grades.includes(g.id)} title="{g.label} · {money(g.payPerHour)}/h" onclick={() => toggleGrade(g.id)}>{g.id}</button>
+              <button class="gchip" class:on={grades.includes(g.id)} aria-pressed={grades.includes(g.id)} title="Grade {g.id} · {g.label}" onclick={() => toggleGrade(g.id)}>{g.id}</button>
             {/each}
             {#if grades.length}
               <button class="gclear" onclick={() => (grades = [])}>All</button>
@@ -518,7 +518,7 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: 220px 1fr;
+    grid-template-columns: 236px 1fr;
     border-top: 1px solid var(--hairline);
   }
   .cats {
@@ -563,9 +563,7 @@
   .clabel {
     flex: 1;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.25;
   }
   .count {
     min-width: 22px;

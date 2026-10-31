@@ -2,8 +2,10 @@
 //! categories and flags written into a shell's fields, the sleeve parameter's scale, and the
 //! landmarks (heights on the base body) the cuts are made from.
 //!
-//! Shell fields: (hem distance (m), flag, category, 0); categories 0 top, 1 bottom, 2 shoes; flags
-//! 1 sole (drawn darker), 2 waistband, 3 skirt.
+//! Shell fields: (hem distance (m), flag, category, w); categories 0 top, 1 bottom, 2 shoes; flags
+//! 1 sole (drawn darker), 2 waistband, 3 skirt, 4 light midsole, 5 polished (glossier). On a shoe, a
+//! negative hem distance is its lining (drawn dark) and w the distance (m) across the instep from its
+//! middle (over 1 off the front).
 
 use super::V3;
 use super::rig::{NB, b};
@@ -12,9 +14,11 @@ use super::rig::{NB, b};
 pub const TOP: f64 = 0.0;
 pub const BOTTOM: f64 = 1.0;
 pub const SHOES: f64 = 2.0;
-/// Part flags (fields.y): 1 = sole / welt, 2 = waistband, 3 = skirt.
+/// Part flags (fields.y): 1 = sole / welt, 2 = waistband, 3 = skirt, 4 = light midsole, 5 = polished.
 pub const FLAG_SOLE: f64 = 1.0;
 pub const FLAG_SKIRT: f64 = 3.0;
+pub const FLAG_MIDSOLE: f64 = 4.0;
+pub const FLAG_POLISHED: f64 = 5.0;
 /// The sleeve parameter is scaled to metres in the predicates (about an arm's length).
 pub const ARM_M: f64 = 0.55;
 

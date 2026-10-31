@@ -540,15 +540,15 @@ def phoneBooth():
         for k, (x, z, w, d) in enumerate(((0, 0.47, 0.6, 0.012), (0, -0.47, 0.6, 0.012),
                                           (0.47, 0, 0.012, 0.6), (-0.47, 0, 0.012, 0.6))):
             F.box(f'sign{k}', w, 0.1, d, (x, 2.38, z), M.sign)
-        # the phone on a panel at the back: its case, a dial, the handset on its cradle, the coin box under it, a
+        # the phone on a panel at the back: its case, a dial, the hook for the handset, the coin box under it, a
         # coiled cord; a shelf of directories under it
         F.box('phone_panel', 0.4, 0.5, 0.02, (0, 1.35, -0.39), red, bevel=0.006)
         F.box('phone', 0.16, 0.2, 0.09, (0, 1.42, -0.335), M.dark, bevel=0.012)
         F.cyl('dial', 0.04, 0.01, (0, 1.44, -0.287), M.chrome, verts=12, rot=(90, 0, 0))
         F.box('coin_box', 0.14, 0.12, 0.08, (0, 1.26, -0.34), M.dark, bevel=0.008)
         F.box('coin_slot', 0.04, 0.006, 0.01, (0, 1.29, -0.299), M.chrome)
-        F.sweep('handset', [(-0.1, 1.33, -0.32), (-0.105, 1.42, -0.31), (-0.1, 1.51, -0.32)], None, M.dark,
-                profile=G.rounded_rect(0.04, 0.025, 0.008, corner=1), up=(1, 0, 0), resolution=2, scale=[1.4, 0.8, 1.4])
+        # (The handset on its hook is drawn by code, in the caller's hand while they call: held.py `receiver`,
+        # actions.ts `REST_PROPS`. A part of its own here would be a fifth draw.)
         F.sweep('cord', [(-0.1, 1.33, -0.32), (-0.08, 1.25, -0.33), (-0.06, 1.2, -0.34), (-0.07, 1.26, -0.35)], 0.006,
                 M.dark, verts=5, resolution=3)
         F.box('shelf', 0.4, 0.03, 0.18, (0, 1.06, -0.3), M.dark, bevel=0.006)

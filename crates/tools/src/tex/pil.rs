@@ -77,14 +77,25 @@ pub fn coeffs(in_size: usize, out_size: usize, filter: Filter) -> Vec<(usize, Ve
             let center = (xx as f64 + 0.5) * scale;
             let xmin = ((center - support + 0.5) as i64).max(0) as usize;
             let xmax = ((center + support + 0.5) as i64).min(in_size as i64) as usize - xmin;
-            let mut k: Vec<f64> = (0..xmax).map(|x| filter.weight(((x + xmin) as f64 - center + 0.5) * ss)).collect();
+            let mut k: Vec<f64> = (0..xmax)
+                .map(|x| filter.weight(((x + xmin) as f64 - center + 0.5) * ss))
+                .collect();
             let ww: f64 = k.iter().sum();
             if ww != 0.0 {
                 for v in &mut k {
                     *v /= ww;
                 }
             }
-            let fixed = k.iter().map(|&v| if v < 0.0 { (-0.5 + v * (1 << PRECISION_BITS) as f64) as i32 } else { (0.5 + v * (1 << PRECISION_BITS) as f64) as i32 }).collect();
+            let fixed = k
+                .iter()
+                .map(|&v| {
+                    if v < 0.0 {
+                        (-0.5 + v * (1 << PRECISION_BITS) as f64) as i32
+                    } else {
+                        (0.5 + v * (1 << PRECISION_BITS) as f64) as i32
+                    }
+                })
+                .collect();
             (xmin, fixed)
         })
         .collect()
@@ -96,7 +107,12 @@ fn clip8(v: i32) -> u8 {
 
 impl Img {
     pub fn new(w: usize, h: usize, ch: usize, fill: u8) -> Img {
-        Img { w, h, ch, px: vec![fill; w * h * ch] }
+        Img {
+            w,
+            h,
+            ch,
+            px: vec![fill; w * h * ch],
+        }
     }
 
     /// Decodes a PNG or JPEG as Pillow's `Image.open` would hold it: greyscale as L, colour as RGB (an alpha
@@ -115,9 +131,26 @@ impl Img {
             .map_err(|e| format!("{}: {e}", path.display()))?;
         let (w, h) = (im.width() as usize, im.height() as usize);
         Ok(match im {
-            image::DynamicImage::ImageLuma8(b) => Img { w, h, ch: 1, px: b.into_raw() },
-            image::DynamicImage::ImageLumaA8(_) | image::DynamicImage::ImageLuma16(_) | image::DynamicImage::ImageLumaA16(_) => Img { w, h, ch: 1, px: im.to_luma8().into_raw() },
-            other => Img { w, h, ch: 3, px: other.to_rgb8().into_raw() },
+            image::DynamicImage::ImageLuma8(b) => Img {
+                w,
+                h,
+                ch: 1,
+                px: b.into_raw(),
+            },
+            image::DynamicImage::ImageLumaA8(_)
+            | image::DynamicImage::ImageLuma16(_)
+            | image::DynamicImage::ImageLumaA16(_) => Img {
+                w,
+                h,
+                ch: 1,
+                px: im.to_luma8().into_raw(),
+            },
+            other => Img {
+                w,
+                h,
+                ch: 3,
+                px: other.to_rgb8().into_raw(),
+            },
         })
     }
 
@@ -126,7 +159,12 @@ impl Img {
         if self.ch == 3 {
             return self;
         }
-        Img { w: self.w, h: self.h, ch: 3, px: self.px.iter().flat_map(|&v| [v, v, v]).collect() }
+        Img {
+            w: self.w,
+            h: self.h,
+            ch: 3,
+            px: self.px.iter().flat_map(|&v| [v, v, v]).collect(),
+        }
     }
 
     /// `convert('L')` (and `ImageOps.grayscale`): ITU-R 601-2 luma in Pillow's fixed point.
@@ -134,8 +172,19 @@ impl Img {
         if self.ch == 1 {
             return self.clone();
         }
-        let px = self.px.as_chunks::<3>().0.iter().map(|p| luma(p[0], p[1], p[2])).collect();
-        Img { w: self.w, h: self.h, ch: 1, px }
+        let px = self
+            .px
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|p| luma(p[0], p[1], p[2]))
+            .collect();
+        Img {
+            w: self.w,
+            h: self.h,
+            ch: 1,
+            px,
+        }
     }
 
     pub fn histogram(&self) -> [u64; 256] {
@@ -148,18 +197,29 @@ impl Img {
 
     /// `point(lut)`, the same table on every channel.
     pub fn point(&self, lut: &[u8; 256]) -> Img {
-        Img { px: self.px.iter().map(|&v| lut[v as usize]).collect(), ..self.clone() }
+        Img {
+            px: self.px.iter().map(|&v| lut[v as usize]).collect(),
+            ..self.clone()
+        }
     }
 
     /// One channel as an L image (`split()[c]`).
     pub fn channel(&self, c: usize) -> Img {
-        Img { w: self.w, h: self.h, ch: 1, px: self.px.iter().skip(c).step_by(self.ch).copied().collect() }
+        Img {
+            w: self.w,
+            h: self.h,
+            ch: 1,
+            px: self.px.iter().skip(c).step_by(self.ch).copied().collect(),
+        }
     }
 
     /// `Image.merge('RGB', (r, g, b))`.
     pub fn merge(chs: [&Img; 3]) -> Img {
         let (w, h) = (chs[0].w, chs[0].h);
-        assert!(chs.iter().all(|c| c.ch == 1 && c.w == w && c.h == h), "merge: L images of one size");
+        assert!(
+            chs.iter().all(|c| c.ch == 1 && c.w == w && c.h == h),
+            "merge: L images of one size"
+        );
         let mut px = Vec::with_capacity(w * h * 3);
         for i in 0..w * h {
             px.extend(chs.iter().map(|c| c.px[i]));
@@ -173,14 +233,24 @@ impl Img {
 
     /// `transpose(FLIP_TOP_BOTTOM)`.
     pub fn flip_tb(&self) -> Img {
-        let px = (0..self.h).rev().flat_map(|y| self.row(y).iter().copied()).collect();
+        let px = (0..self.h)
+            .rev()
+            .flat_map(|y| self.row(y).iter().copied())
+            .collect();
         Img { px, ..self.clone() }
     }
 
     /// `crop((x, y, x + w, y + h))` inside the image.
     pub fn crop(&self, x: usize, y: usize, w: usize, h: usize) -> Img {
-        let px = (y..y + h).flat_map(|r| self.row(r)[x * self.ch..(x + w) * self.ch].iter().copied()).collect();
-        Img { w, h, ch: self.ch, px }
+        let px = (y..y + h)
+            .flat_map(|r| self.row(r)[x * self.ch..(x + w) * self.ch].iter().copied())
+            .collect();
+        Img {
+            w,
+            h,
+            ch: self.ch,
+            px,
+        }
     }
 
     /// `n` x `m` copies side by side (what pasting the image into a bigger one at every cell makes).
@@ -193,7 +263,12 @@ impl Img {
                 }
             }
         }
-        Img { w: self.w * n, h: self.h * m, ch: self.ch, px }
+        Img {
+            w: self.w * n,
+            h: self.h * m,
+            ch: self.ch,
+            px,
+        }
     }
 
     /// `resize((w, h), filter)`: Pillow's two-pass fixed-point convolution, horizontal first.
@@ -221,13 +296,23 @@ impl Img {
                         o.copy_from_slice(&s.map(clip8));
                     } else {
                         for (c, oc) in o.iter_mut().enumerate() {
-                            let s = src.iter().skip(c).step_by(ch).zip(ks).fold(HALF, |s, (&p, &kv)| s + p as i32 * kv);
+                            let s = src
+                                .iter()
+                                .skip(c)
+                                .step_by(ch)
+                                .zip(ks)
+                                .fold(HALF, |s, (&p, &kv)| s + p as i32 * kv);
                             *oc = clip8(s);
                         }
                     }
                 }
             }
-            cur = Img { w, h: self.h, ch, px };
+            cur = Img {
+                w,
+                h: self.h,
+                ch,
+                px,
+            };
         }
         if h != self.h {
             let k = coeffs(self.h, h, filter);
@@ -272,10 +357,16 @@ impl Img {
         let mut px = vec![0u8; self.px.len()];
         for y in 0..self.h {
             for x in 0..self.w {
-                px[(x * self.h + y) * ch..][..ch].copy_from_slice(&self.px[(y * self.w + x) * ch..][..ch]);
+                px[(x * self.h + y) * ch..][..ch]
+                    .copy_from_slice(&self.px[(y * self.w + x) * ch..][..ch]);
             }
         }
-        Img { w: self.h, h: self.w, ch, px }
+        Img {
+            w: self.h,
+            h: self.w,
+            ch,
+            px,
+        }
     }
 
     /// `ImagingHorizontalBoxBlur`.
@@ -295,10 +386,14 @@ impl Img {
                 for x in 0..edge_a.saturating_sub(1) {
                     acc = acc.wrapping_add(p(x));
                 }
-                acc = acc.wrapping_add(p(lastx).wrapping_mul((radius as i64 - edge_a as i64 + 1) as u32));
+                acc = acc.wrapping_add(
+                    p(lastx).wrapping_mul((radius as i64 - edge_a as i64 + 1) as u32),
+                );
                 let mut step = |x: usize, sub: usize, add: usize, left: usize, right: usize| {
                     acc = acc.wrapping_add(p(add).wrapping_sub(p(sub)));
-                    let bulk = acc.wrapping_mul(ww).wrapping_add((p(left) + p(right)).wrapping_mul(fw));
+                    let bulk = acc
+                        .wrapping_mul(ww)
+                        .wrapping_add((p(left) + p(right)).wrapping_mul(fw));
                     out[x * ch + c] = (bulk.wrapping_add(1 << 23) >> 24) as u8;
                 };
                 if edge_a <= edge_b {
@@ -306,7 +401,13 @@ impl Img {
                         step(x, 0, x + radius, 0, x + radius + 1);
                     }
                     for x in edge_a..edge_b {
-                        step(x, x - radius - 1, x + radius, x - radius - 1, x + radius + 1);
+                        step(
+                            x,
+                            x - radius - 1,
+                            x + radius,
+                            x - radius - 1,
+                            x + radius + 1,
+                        );
                     }
                     for x in edge_b..=lastx {
                         step(x, x - radius - 1, lastx, x - radius - 1, lastx);
@@ -401,7 +502,12 @@ mod tests {
 
     #[test]
     fn flip() {
-        let tall = Img { w: 1, h: 2, ch: 1, px: vec![1, 2] };
+        let tall = Img {
+            w: 1,
+            h: 2,
+            ch: 1,
+            px: vec![1, 2],
+        };
         assert_eq!(tall.flip_tb().px, [2, 1]);
     }
 }

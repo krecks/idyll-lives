@@ -4,7 +4,7 @@
 #
 # Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
 # `Model`), one moving part each: the jukebox's record swings up into the window (`record`), the microphone
-# rises on its stand (`mic_up`), the cocktail shaker tips (`shake`), the hammock sways with its sleeper
+# rises on its stand (`mic_up`), the cocktail shaker is taken off the cart (`shake`), the hammock sways with its sleeper
 # (`sway`, a loop they ride), the sun rises in the lamp's frame (`sunrise`; its sky glows at night) and the
 # booth's side curtain is drawn aside (`curtain`).
 #
@@ -555,7 +555,8 @@ def mocktailCart():
         for i, m in enumerate((M.drink_pink, M.drink_teal, M.drink_sun)):
             _bottle(F, _name('syrup'), 0.12 + i * 0.09, 0.315, -0.12, 0.033, 0.24, m, M.chrome)
     G.join(still, 'body', origin=(0, 0, 0))
-    # The cocktail shaker, hinged on its foot's left edge: `shake` tips it over the pink drink.
+    # The cocktail shaker, hinged on its foot's left edge: `shake` takes it off the cart (squashed away) while the
+    # resident shakes held.py's `tool.shaker` in both hands (review I-kitchen-13).
     sx, sz = SHAKER
     with G.new_parts() as shaker:
         G.revolve('shaker', [(0, 0), (0.034, 0), (0.036, 0.004), (0.042, 0.12), (0.044, 0.124), (0.038, 0.13),
@@ -565,7 +566,7 @@ def mocktailCart():
                 minor_segments=3)
     shaker = G.hinged(G.join(shaker, 'shaker'), F.at(sx - 0.036, TOP, sz))
     objs = G.settle(centre=False)
-    G.swing(shaker, 'shake', 35, seconds=0.6, axis='Y')
+    G.squash(shaker, 'shake', 0.001, seconds=0.2)
     return objs
 
 
@@ -843,7 +844,7 @@ FAMILY = G.Family(
     comment='Blender-built cheerful pack models (tools/art/blender/families/pack_cheerful.py). Listed in '
             'the base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one '
             'draw call per finish group. Each has one moving part: the record swings up, the microphone '
-            'rises, the shaker tips, the hammock sways (a loop its sleeper rides), the sun rises (its sky '
+            'rises, the shaker is taken off the cart, the hammock sways (a loop its sleeper rides), the sun rises (its sky '
             'glowing at night) and the curtain is drawn.',
 )
 

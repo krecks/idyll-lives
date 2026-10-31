@@ -48,7 +48,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S2
 - **Rubric:** A1, A2
 - **Fix class:** clip
-- **Where:** `web/src/render/babylon/characters/furniture.json:55` (`beds.weightBench`, read as `BEDS` at `characters.ts:260`), `web/src/render/babylon/characters/clips/lie.ts`
+- **Where:** `web/src/render/shared/characters/furniture.json:55` (`beds.weightBench`, read as `BEDS` at `characters.ts:260`), `web/src/render/shared/characters/clips/lie.ts`
 - **Evidence:** The lifter lies along the bench and the legs stretch out past its end in mid-air; in a real bench press the feet are on the floor either side. Needs a bespoke feet-down lie pose, not a data tweak. Deferred from 0.3.0.
   Pilot: `play/weightBench-lift-02.png`: the legs lie straight along the pad and the heels rest on the leg-roller pads, not on the floor; the bar is in the hands over the chest and gone from the rack (`bar_off` after 0.8 s). Same for the child and elder (`play-child/`, `play-elder/`). The `BEDS` row is now in `furniture.json` (the old `characters.ts:315` line no longer holds it).
 - **Status:** fixed (60890be0, 8b6b2364)
@@ -60,7 +60,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** M2
 - **Fix class:** model
-- **Where:** `tools/art/blender/families/fitness.py:111` (`weightBench`); `web/src/render/babylon/characters/furniture.json:55` (`beds.weightBench` 0.5)
+- **Where:** `tools/art/blender/families/fitness.py:111` (`weightBench`); `web/src/render/shared/characters/furniture.json:55` (`beds.weightBench` 0.5)
 - **Evidence:** `sizes-fitness.md` measures the lie height 0.50 m; `reference.json` `weightBench` gives a seat of 0.40–0.48 (a bench press bench is about 43–45 cm so the lifter's feet reach the floor). The sizes table can't measure it as a seat ("no seat to measure"): the content gives it a lie, not a seat. Lowering the pad goes with A-fitness-01's feet-down pose.
 - **Status:** fixed (8b6b2364)
 - **After:** a flat bench, the pad's top at 0.44 m (`fitness.py` `PAD_TOP`; `characters/furniture.json` `beds.weightBench` 0.44, was 0.5), the leg-roller arm gone; `cargo review sizes`: mattress 0.44, inside 0.40–0.48. `fixes/blender-hobbies/gallery/gallery-weightBench.png`, `play/adult-weightBench-lift-01.png`. The feet-down pose is A-fitness-01's clip.

@@ -24,7 +24,8 @@ const TOWN: &str = r#"{"width":20,"depth":10,
     "relationships":[{"a":1,"b":0,"preset":"parent"}]}"#;
 
 fn spawn(name: &str, age: f32) -> SimSpawn {
-    serde_json::from_value(serde_json::json!({"name": name, "x": 15.5, "z": 9.5, "age": age})).unwrap()
+    serde_json::from_value(serde_json::json!({"name": name, "x": 15.5, "z": 9.5, "age": age}))
+        .unwrap()
 }
 
 #[test]
@@ -34,13 +35,37 @@ fn parents_children_and_siblings() {
     assert_eq!(w.relationships.kin(0, 1), Kin::Child, "Bo is Ada's son");
     assert_eq!(w.relationships.get(0, 1).friendship, 50.0);
     // Family chat, but no flirting.
-    assert!(w.apply(Command::Social { sim: 1, target: 0, social: 1 }).is_err());
-    assert!(w.apply(Command::Social { sim: 1, target: 0, social: 0 }).is_ok());
+    assert!(
+        w.apply(Command::Social {
+            sim: 1,
+            target: 0,
+            social: 1
+        })
+        .is_err()
+    );
+    assert!(
+        w.apply(Command::Social {
+            sim: 1,
+            target: 0,
+            social: 0
+        })
+        .is_ok()
+    );
 
     // Siblings moving in next door.
-    let bonds = serde_json::from_value(serde_json::json!([{"a": 0, "b": 1, "preset": "siblings"}])).unwrap();
-    w.apply(Command::MoveIn { household: 1, name: None, sims: vec![spawn("Cy", 30.0), spawn("Di", 28.0)], bonds }).unwrap();
-    assert_eq!((w.relationships.kin(2, 3), w.relationships.kin(3, 2)), (Kin::Sibling, Kin::Sibling));
+    let bonds = serde_json::from_value(serde_json::json!([{"a": 0, "b": 1, "preset": "siblings"}]))
+        .unwrap();
+    w.apply(Command::MoveIn {
+        household: 1,
+        name: None,
+        sims: vec![spawn("Cy", 30.0), spawn("Di", 28.0)],
+        bonds,
+    })
+    .unwrap();
+    assert_eq!(
+        (w.relationships.kin(2, 3), w.relationships.kin(3, 2)),
+        (Kin::Sibling, Kin::Sibling)
+    );
 
     // Kept in saves.
     let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();

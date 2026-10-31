@@ -25,9 +25,17 @@ fn century(seed: u64, lod: bool, days: Option<u32>) -> Long {
     let content = common::content();
     let town = common::town(&content, seed, 3);
     let mut w = World::from_json(&content, &town, seed as u32).expect("town loads");
-    let per_year = w.lifespan.days_per_year(w.content.life.days_per_year).expect("residents age");
+    let per_year = w
+        .lifespan
+        .days_per_year(w.content.life.days_per_year)
+        .expect("residents age");
     let days = days.unwrap_or((YEARS * per_year) as u32);
-    let home = w.households.iter().find(|h| h.player).and_then(|h| h.plot).expect("the player has a home");
+    let home = w
+        .households
+        .iter()
+        .find(|h| h.player)
+        .and_then(|h| h.plot)
+        .expect("the player has a home");
     let look = |w: &mut World| {
         w.lod = lod;
         if lod {
@@ -38,10 +46,20 @@ fn century(seed: u64, lod: bool, days: Option<u32>) -> Long {
     let mut long = Long::new(&w, 8..=64);
     let end = clock::tick_at(days + 1, 0.0).unwrap();
     // (A short run saves and loads on its last day.)
-    let reload_days: Vec<u32> = if days < RELOADS[0] { vec![days] } else { RELOADS.iter().copied().filter(|&d| d <= days).collect() };
-    let reloads: Vec<u64> = reload_days.iter().map(|&d| clock::tick_at(d, 13.0 * 60.0 + 37.0).unwrap()).collect();
+    let reload_days: Vec<u32> = if days < RELOADS[0] {
+        vec![days]
+    } else {
+        RELOADS.iter().copied().filter(|&d| d <= days).collect()
+    };
+    let reloads: Vec<u64> = reload_days
+        .iter()
+        .map(|&d| clock::tick_at(d, 13.0 * 60.0 + 37.0).unwrap())
+        .collect();
     let started = std::time::Instant::now();
-    let label = format!("seed {seed}, lower detail {}", if lod { "on" } else { "off" });
+    let label = format!(
+        "seed {seed}, lower detail {}",
+        if lod { "on" } else { "off" }
+    );
     let run = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         while w.tick < end {
             w.tick_once();
@@ -53,7 +71,12 @@ fn century(seed: u64, lod: bool, days: Option<u32>) -> Long {
         }
     }));
     if run.is_err() {
-        eprintln!("{label}: failed on day {} at {:.2} h (tick {})", clock::day(w.tick), clock::hour(w.tick), w.tick);
+        eprintln!(
+            "{label}: failed on day {} at {:.2} h (tick {})",
+            clock::day(w.tick),
+            clock::hour(w.tick),
+            w.tick
+        );
     }
     let here = w.sims.iter().filter(|s| s.here()).count();
     eprintln!(
@@ -83,7 +106,11 @@ fn century(seed: u64, lod: bool, days: Option<u32>) -> Long {
 /// Lives begin and end, and the rent is paid.
 fn whole_story(long: &Long) {
     for kind in ["Born", "Died", "PaidRent"] {
-        assert!(long.told(kind), "nobody {kind} in a hundred years: {:?}", long.story);
+        assert!(
+            long.told(kind),
+            "nobody {kind} in a hundred years: {:?}",
+            long.story
+        );
     }
 }
 
@@ -122,21 +149,35 @@ fn the_checks_catch_a_town_gone_wrong() {
         ("someone 151 years old", |w| w.sims[0].age = 151.0),
         ("a skill past the top", |w| w.sims[0].skills[0] = 99.0),
         ("a grade past 100", |w| w.sims[0].grade = 100.5),
-        ("a mood that's no number", |w| w.sims[0].needs[1] = f32::INFINITY),
-        ("friendship past 100", |w| w.relationships.get_mut(0, 1).friendship = 150.0),
+        ("a mood that's no number", |w| {
+            w.sims[0].needs[1] = f32::INFINITY
+        }),
+        ("friendship past 100", |w| {
+            w.relationships.get_mut(0, 1).friendship = 150.0
+        }),
         ("something worn past broken", |w| w.objects[0].wear = 1.5),
         ("dirt that's no number", |w| w.dirt[0] = f32::NAN),
-        ("a billion in the bank", |w| w.households[0].funds = 1_000_000_000),
-        ("a home on a plot there isn't", |w| w.households[0].plot = Some(999)),
-        ("two households in one house", |w| w.households[1].plot = w.households[0].plot),
+        ("a billion in the bank", |w| {
+            w.households[0].funds = 1_000_000_000
+        }),
+        ("a home on a plot there isn't", |w| {
+            w.households[0].plot = Some(999)
+        }),
+        ("two households in one house", |w| {
+            w.households[1].plot = w.households[0].plot
+        }),
         ("a baby on the way from someone who isn't there", |w| {
-            w.households[0].expecting = Some(sim_core::world::Expecting { parents: [0, 999], due: 3 })
+            w.households[0].expecting = Some(sim_core::world::Expecting {
+                parents: [0, 999],
+                due: 3,
+            })
         }),
     ];
     for (what, wrong) in wrongs {
         let mut w = World::from_json(&content, &town, 7).unwrap();
         wrong(&mut w);
-        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| common::check(&w))).is_err();
+        let caught =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| common::check(&w))).is_err();
         assert!(caught, "check doesn't catch {what}");
     }
 }
@@ -153,14 +194,37 @@ fn the_checks_see_a_follow_up() {
     let mut w = World::from_json(&common::content(), town, 1).unwrap();
     w.autonomy = false;
     for (def, x) in [("toilet", 3), ("sink", 6)] {
-        let cmd = sim_core::Command::Buy { household: 0, object: def.into(), at: Some([x, 3, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None };
+        let cmd = sim_core::Command::Buy {
+            household: 0,
+            object: def.into(),
+            at: Some([x, 3, 0]),
+            colors: Default::default(),
+            turn: None,
+            offset: None,
+            size: None,
+            tall: None,
+        };
         w.apply(cmd).unwrap();
     }
     let (toilet, sink) = (0, 1);
-    let bladder = w.content.needs.iter().position(|n| n.id == "bladder").unwrap();
+    let bladder = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "bladder")
+        .unwrap();
     w.sims[0].needs[bladder] = 0.3;
-    let interaction = w.content.objects[w.objects[toilet].def].interactions.iter().position(|i| i.id == "use").unwrap();
-    w.apply(sim_core::Command::Use { sim: 0, object: toilet as u32, interaction }).unwrap();
+    let interaction = w.content.objects[w.objects[toilet].def]
+        .interactions
+        .iter()
+        .position(|i| i.id == "use")
+        .unwrap();
+    w.apply(sim_core::Command::Use {
+        sim: 0,
+        object: toilet as u32,
+        interaction,
+    })
+    .unwrap();
     let mut next = None;
     for _ in 0..common::TICKS_PER_HOUR {
         w.tick_once();
@@ -188,11 +252,18 @@ fn the_watch_sees_residents_stuck() {
         w.tick_once();
         watch.sample(&w);
     }
-    let seen = |who: usize, state: &str| watch.stuck.iter().any(|s| s.sim as usize == who && s.state.starts_with(state) && s.name == w.sims[who].name);
+    let seen = |who: usize, state: &str| {
+        watch.stuck.iter().any(|s| {
+            s.sim as usize == who && s.state.starts_with(state) && s.name == w.sims[who].name
+        })
+    };
     assert!(seen(0, "Idle"), "{:?}", watch.stuck);
     assert!(seen(1, "Away"), "{:?}", watch.stuck);
     let idle = watch.stuck.iter().find(|s| s.sim == 0).unwrap();
-    assert!((idle.tick - idle.since) as f32 * sim_core::MINUTES_PER_TICK > 6.0 * 60.0, "after 6 hours: {idle}");
+    assert!(
+        (idle.tick - idle.since) as f32 * sim_core::MINUTES_PER_TICK > 6.0 * 60.0,
+        "after 6 hours: {idle}"
+    );
 }
 
 #[test]

@@ -204,18 +204,34 @@ pub fn float_repr(v: f64) -> String {
         return if v > 0.0 { "inf".into() } else { "-inf".into() };
     }
     if v == 0.0 {
-        return if v.is_sign_negative() { "-0.0".into() } else { "0.0".into() };
+        return if v.is_sign_negative() {
+            "-0.0".into()
+        } else {
+            "0.0".into()
+        };
     }
     // Rust's `{:e}` gives the shortest round-trip digits too: "-1.2345e-5".
     let e = format!("{v:e}");
     let (mantissa, exp) = e.split_once('e').unwrap();
     let exp: i32 = exp.parse().unwrap();
-    let (sign, mantissa) = mantissa.strip_prefix('-').map(|m| ("-", m)).unwrap_or(("", mantissa));
+    let (sign, mantissa) = mantissa
+        .strip_prefix('-')
+        .map(|m| ("-", m))
+        .unwrap_or(("", mantissa));
     let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
     let point = exp + 1; // digits are 0.d1d2… x 10^point
     if !(-4 < point && point <= 16) {
-        let rest = if digits.len() > 1 { format!(".{}", &digits[1..]) } else { String::new() };
-        return format!("{sign}{}{rest}e{}{:02}", &digits[..1], if exp < 0 { '-' } else { '+' }, exp.abs());
+        let rest = if digits.len() > 1 {
+            format!(".{}", &digits[1..])
+        } else {
+            String::new()
+        };
+        return format!(
+            "{sign}{}{rest}e{}{:02}",
+            &digits[..1],
+            if exp < 0 { '-' } else { '+' },
+            exp.abs()
+        );
     }
     let n = digits.len() as i32;
     if point <= 0 {
@@ -223,13 +239,21 @@ pub fn float_repr(v: f64) -> String {
     } else if point >= n {
         format!("{sign}{digits}{}.0", "0".repeat((point - n) as usize))
     } else {
-        format!("{sign}{}.{}", &digits[..point as usize], &digits[point as usize..])
+        format!(
+            "{sign}{}.{}",
+            &digits[..point as usize],
+            &digits[point as usize..]
+        )
     }
 }
 
 /// `repr(s)` of a string.
 pub fn repr_str(s: &str) -> String {
-    let quote = if s.contains('\'') && !s.contains('"') { '"' } else { '\'' };
+    let quote = if s.contains('\'') && !s.contains('"') {
+        '"'
+    } else {
+        '\''
+    };
     let mut out = String::with_capacity(s.len() + 2);
     out.push(quote);
     for c in s.chars() {
@@ -242,7 +266,9 @@ pub fn repr_str(s: &str) -> String {
                 out.push('\\');
                 out.push(c)
             }
-            c if (c as u32) < 0x20 || (0x7f..0xa0).contains(&(c as u32)) => out.push_str(&format!("\\x{:02x}", c as u32)),
+            c if (c as u32) < 0x20 || (0x7f..0xa0).contains(&(c as u32)) => {
+                out.push_str(&format!("\\x{:02x}", c as u32))
+            }
             c if !printable(c) => {
                 let n = c as u32;
                 if n <= 0xff {
@@ -266,7 +292,9 @@ fn printable(c: char) -> bool {
     if c == ' ' {
         return true;
     }
-    !(c.is_control() || c.is_whitespace() || matches!(c as u32, 0xad | 0x200b..=0x200f | 0x2028..=0x202e | 0x2060..=0x206f | 0xfeff | 0xfff9..=0xfffb | 0xe000..=0xf8ff))
+    !(c.is_control()
+        || c.is_whitespace()
+        || matches!(c as u32, 0xad | 0x200b..=0x200f | 0x2028..=0x202e | 0x2060..=0x206f | 0xfeff | 0xfff9..=0xfffb | 0xe000..=0xf8ff))
 }
 
 /// `repr(v)`.
@@ -279,7 +307,13 @@ pub fn repr(v: &J) -> String {
         J::Float(f) => float_repr(*f),
         J::Str(s) => repr_str(s),
         J::Arr(a) => format!("[{}]", a.iter().map(repr).collect::<Vec<_>>().join(", ")),
-        J::Obj(o) => format!("{{{}}}", o.iter().map(|(k, v)| format!("{}: {}", repr_str(k), repr(v))).collect::<Vec<_>>().join(", ")),
+        J::Obj(o) => format!(
+            "{{{}}}",
+            o.iter()
+                .map(|(k, v)| format!("{}: {}", repr_str(k), repr(v)))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
     }
 }
 
@@ -328,7 +362,10 @@ pub fn json_str(s: &str) -> String {
 /// of squares (and so can differ from it in the last bit).
 pub fn hypot(v: &[f64]) -> f64 {
     let mut abs: Vec<f64> = v.iter().map(|x| x.abs()).collect();
-    let max = abs.iter().cloned().fold(0.0, |m: f64, x| if x > m { x } else { m });
+    let max = abs
+        .iter()
+        .cloned()
+        .fold(0.0, |m: f64, x| if x > m { x } else { m });
     let nan = abs.iter().any(|x| x.is_nan());
     vector_norm(&mut abs, max, nan)
 }
@@ -336,7 +373,10 @@ pub fn hypot(v: &[f64]) -> f64 {
 /// `math.dist(p, q)`.
 pub fn dist(p: &[f64], q: &[f64]) -> f64 {
     let mut d: Vec<f64> = p.iter().zip(q).map(|(a, b)| (a - b).abs()).collect();
-    let max = d.iter().cloned().fold(0.0, |m: f64, x| if x > m { x } else { m });
+    let max = d
+        .iter()
+        .cloned()
+        .fold(0.0, |m: f64, x| if x > m { x } else { m });
     let nan = d.iter().any(|x| x.is_nan());
     vector_norm(&mut d, max, nan)
 }
@@ -404,7 +444,11 @@ fn frexp_exp(x: f64) -> i32 {
 
 /// 2^e, for -1074 <= e <= 1023.
 fn ldexp1(e: i32) -> f64 {
-    if e >= -1022 { f64::from_bits(((e + 1023) as u64) << 52) } else { f64::from_bits(1u64 << (e + 1074)) }
+    if e >= -1022 {
+        f64::from_bits(((e + 1023) as u64) << 52)
+    } else {
+        f64::from_bits(1u64 << (e + 1074))
+    }
 }
 
 /// Python's `round(x)` to an int: halves to even.
@@ -455,7 +499,11 @@ pub fn join(a: &str, b: &str) -> String {
 pub fn dirname(p: &str) -> String {
     let i = p.rfind('/').map(|i| i + 1).unwrap_or(0);
     let head = &p[..i];
-    if !head.is_empty() && head != "/".repeat(head.len()) { head.trim_end_matches('/').into() } else { head.into() }
+    if !head.is_empty() && head != "/".repeat(head.len()) {
+        head.trim_end_matches('/').into()
+    } else {
+        head.into()
+    }
 }
 
 /// `os.path.relpath(path, start)` for two absolute, normalised paths.
@@ -465,7 +513,11 @@ pub fn relpath(path: &str, start: &str) -> String {
     let common = p.iter().zip(&s).take_while(|(a, b)| a == b).count();
     let mut out: Vec<&str> = vec![".."; s.len() - common];
     out.extend(&p[common..]);
-    if out.is_empty() { ".".into() } else { out.join("/") }
+    if out.is_empty() {
+        ".".into()
+    } else {
+        out.join("/")
+    }
 }
 
 /// An OSError's text: `[Errno 2] No such file or directory: '/path'`.
@@ -484,22 +536,43 @@ mod tests {
 
     #[test]
     fn float_repr_is_pythons() {
-        for (v, s) in [(0.0, "0.0"), (-0.0, "-0.0"), (1.0, "1.0"), (-0.43, "-0.43"), (0.1, "0.1"), (1e-5, "1e-05"), (0.0001, "0.0001"),
-            (1e16, "1e+16"), (1e15, "1000000000000000.0"), (123.456, "123.456"), (1.5e-7, "1.5e-07"), (2.5e20, "2.5e+20")] {
+        for (v, s) in [
+            (0.0, "0.0"),
+            (-0.0, "-0.0"),
+            (1.0, "1.0"),
+            (-0.43, "-0.43"),
+            (0.1, "0.1"),
+            (1e-5, "1e-05"),
+            (0.0001, "0.0001"),
+            (1e16, "1e+16"),
+            (1e15, "1000000000000000.0"),
+            (123.456, "123.456"),
+            (1.5e-7, "1.5e-07"),
+            (2.5e20, "2.5e+20"),
+        ] {
             assert_eq!(float_repr(v), s, "{v}");
         }
     }
 
     #[test]
     fn repr_is_pythons() {
-        let v: J = super::super::json::loads_text(br#"{"a": [1, 2.0, null, true, "it's"], "b": {"c": "x\ny"}}"#).unwrap();
-        assert_eq!(repr(&v), r#"{'a': [1, 2.0, None, True, "it's"], 'b': {'c': 'x\ny'}}"#);
+        let v: J = super::super::json::loads_text(
+            br#"{"a": [1, 2.0, null, true, "it's"], "b": {"c": "x\ny"}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            repr(&v),
+            r#"{'a': [1, 2.0, None, True, "it's"], 'b': {'c': 'x\ny'}}"#
+        );
     }
 
     #[test]
     fn objects_keep_their_order() {
         let v = super::super::json::loads_text(br#"{"z": 1, "a": 2, "z": 3}"#).unwrap();
-        assert_eq!(v, J::Obj(vec![("z".into(), J::Int(3)), ("a".into(), J::Int(2))]));
+        assert_eq!(
+            v,
+            J::Obj(vec![("z".into(), J::Int(3)), ("a".into(), J::Int(2))])
+        );
     }
 
     #[test]
@@ -521,9 +594,18 @@ mod tests {
     #[test]
     fn paths_as_os_path() {
         assert_eq!(normpath("/a/b/../c/./d.glb"), "/a/c/d.glb");
-        assert_eq!(normpath("/a/packs/x/../../models/f/m.glb"), "/a/models/f/m.glb");
+        assert_eq!(
+            normpath("/a/packs/x/../../models/f/m.glb"),
+            "/a/models/f/m.glb"
+        );
         assert_eq!(dirname("/a/b/manifest.json"), "/a/b");
         assert_eq!(join("/a/b", "../c"), "/a/b/../c");
-        assert_eq!(relpath("/r/web/public/assets/packs/x/manifest.json", "/r/web/public"), "assets/packs/x/manifest.json");
+        assert_eq!(
+            relpath(
+                "/r/web/public/assets/packs/x/manifest.json",
+                "/r/web/public"
+            ),
+            "assets/packs/x/manifest.json"
+        );
     }
 }

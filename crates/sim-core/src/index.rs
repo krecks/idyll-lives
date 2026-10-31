@@ -74,7 +74,17 @@ mod tests {
     use super::*;
 
     fn plot(id: u32, public: bool) -> Plot {
-        Plot { id, name: String::new(), x: 0, z: 0, w: 1, d: 1, public, entry: None, roof: None }
+        Plot {
+            id,
+            name: String::new(),
+            x: 0,
+            z: 0,
+            w: 1,
+            d: 1,
+            public,
+            entry: None,
+            roof: None,
+        }
     }
 
     #[test]

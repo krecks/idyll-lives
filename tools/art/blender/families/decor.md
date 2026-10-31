@@ -90,7 +90,11 @@ pendulum. Since 2026-10-21 (review A-decor-01) its walnut is a polished satin, n
 the draw back for the pendulum: a brass rod and bob, its origin on its top under the hood, that swings ±4° a beat
 each 0.8 s, all the time near the camera (`pendulum`, `idle`, `G.rock`; at rest on Low), seen through the trunk
 door's window. The trunk door stays still: the clock is wound at its dial (`wind`), and a fifth draw would be over
-the budget. The curtains'
+the budget. Looked at again on 2026-10-26 (review §9.2, A-decor-01) and left shut: the gate fails a model over 4
+draws, and none of the four parts can take the door in (the hands are each held by the game's time, the pendulum
+swings on its own; the door joined to any of them would turn with it), so a door of its own is a fifth; and no use
+would open it, since an eight-day longcase is wound with a crank through the dial's holes, and its trunk door is
+opened only to start or regulate the pendulum, which the game doesn't do. The curtains'
 tabs are their own fabric, so the moving panels cost one draw call each.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |

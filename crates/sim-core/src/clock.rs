@@ -100,12 +100,25 @@ mod tests {
             assert_eq!(minute_of_day(t), 0.0, "day {d}");
             assert_eq!(day(t - 1), d - 1, "the tick before day {d}'s midnight");
             assert!(at_minute(t, 0.0), "day {d}");
-            assert!(!at_minute(t - 1, 0.0) && !at_minute(t + 1, 0.0), "only one tick of day {d} is midnight");
-            for minute in [0.05, 6.0 * 60.0, 9.5 * 60.0, 12.0 * 60.0, 23.9 * 60.0, 1439.95] {
+            assert!(
+                !at_minute(t - 1, 0.0) && !at_minute(t + 1, 0.0),
+                "only one tick of day {d} is midnight"
+            );
+            for minute in [
+                0.05,
+                6.0 * 60.0,
+                9.5 * 60.0,
+                12.0 * 60.0,
+                23.9 * 60.0,
+                1439.95,
+            ] {
                 let at = tick_at(d, minute).unwrap();
                 assert_eq!(day(at), d, "{minute} on day {d}");
                 assert!(at_minute(at, minute), "{minute} on day {d}");
-                assert!(!at_minute(at + 1, minute), "{minute} on day {d}, a tick later");
+                assert!(
+                    !at_minute(at + 1, minute),
+                    "{minute} on day {d}, a tick later"
+                );
             }
         }
     }
@@ -115,7 +128,10 @@ mod tests {
         for d in [2u32, 1167, 2329, 6000, 1_000_000] {
             let t = tick_at(d, 0.0).unwrap();
             for t in t - 3..t + 3 {
-                assert!((0.0..1440.0).contains(&minute_of_day(t)), "day {d}, tick {t}");
+                assert!(
+                    (0.0..1440.0).contains(&minute_of_day(t)),
+                    "day {d}, tick {t}"
+                );
                 assert!(hour(t) < 24.0);
                 assert!(day(t + 1) >= day(t));
             }

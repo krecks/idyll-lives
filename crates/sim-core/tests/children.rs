@@ -34,24 +34,61 @@ const TOWN: &str = r#"{"width":20,"depth":10,
             {"name":"Cy","x":6.5,"z":3.5,"age":17},{"name":"Dee","x":3.5,"z":3.5,"age":0.5}]}"#;
 
 fn spawn(name: &str, age: f32) -> SimSpawn {
-    serde_json::from_value(serde_json::json!({"name": name, "x": 15.5, "z": 9.5, "age": age})).unwrap()
+    serde_json::from_value(serde_json::json!({"name": name, "x": 15.5, "z": 9.5, "age": age}))
+        .unwrap()
 }
 
 #[test]
 fn children_and_teens_are_not_grown_ups() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     assert!(w.sims[0].adult(&w.content) && !w.sims[1].adult(&w.content));
-    assert!(w.sims[1].job.is_none(), "a teen placed in a job doesn't get it");
-    let err = w.apply(Command::JoinCareer { sim: 1, career: 0, level: 0 }).unwrap_err();
+    assert!(
+        w.sims[1].job.is_none(),
+        "a teen placed in a job doesn't get it"
+    );
+    let err = w
+        .apply(Command::JoinCareer {
+            sim: 1,
+            career: 0,
+            level: 0,
+        })
+        .unwrap_err();
     assert!(err.to_string().contains("too young"), "{err}");
     // Teens chat, but don't flirt (not even with each other).
-    assert!(w.apply(Command::Social { sim: 1, target: 2, social: 1 }).is_err());
-    assert!(w.apply(Command::Social { sim: 1, target: 2, social: 0 }).is_ok());
+    assert!(
+        w.apply(Command::Social {
+            sim: 1,
+            target: 2,
+            social: 1
+        })
+        .is_err()
+    );
+    assert!(
+        w.apply(Command::Social {
+            sim: 1,
+            target: 2,
+            social: 0
+        })
+        .is_ok()
+    );
 
     // Children can't move in on their own; with a grown-up they can.
-    let err = w.apply(Command::MoveIn { household: 1, name: None, sims: vec![spawn("Eli", 9.0)], bonds: vec![] }).unwrap_err();
+    let err = w
+        .apply(Command::MoveIn {
+            household: 1,
+            name: None,
+            sims: vec![spawn("Eli", 9.0)],
+            bonds: vec![],
+        })
+        .unwrap_err();
     assert!(err.to_string().contains("grown-up"), "{err}");
-    w.apply(Command::MoveIn { household: 1, name: None, sims: vec![spawn("Fay", 40.0), spawn("Eli", 9.0)], bonds: vec![] }).unwrap();
+    w.apply(Command::MoveIn {
+        household: 1,
+        name: None,
+        sims: vec![spawn("Fay", 40.0), spawn("Eli", 9.0)],
+        bonds: vec![],
+    })
+    .unwrap();
 }
 
 #[test]
@@ -62,7 +99,10 @@ fn babies_do_nothing_on_their_own() {
         w.tick_once();
     }
     assert!(w.sims[3].current().is_none(), "the baby didn't go and play");
-    assert!(w.sims[2].current().is_some() || w.sims[0].current().is_some(), "the others did something");
+    assert!(
+        w.sims[2].current().is_some() || w.sims[0].current().is_some(),
+        "the others did something"
+    );
 }
 
 const SCHOOL: &str = r#"{
@@ -87,7 +127,11 @@ fn children_go_to_school_on_school_days() {
     // Day 1 (Monday) from 08:00: off to school until 15:00, a little cleverer.
     let at = |w: &mut World, hour: f32| {
         let day = sim_core::clock::day(w.tick);
-        let target = sim_core::clock::tick_at(day + u32::from(sim_core::clock::hour(w.tick) >= hour), hour * 60.0).unwrap();
+        let target = sim_core::clock::tick_at(
+            day + u32::from(sim_core::clock::hour(w.tick) >= hour),
+            hour * 60.0,
+        )
+        .unwrap();
         while w.tick < target {
             w.tick_once();
         }
@@ -96,11 +140,20 @@ fn children_go_to_school_on_school_days() {
     assert!(w.sims[1].away_until.is_some(), "at school at 10:00");
     assert!(w.sims[0].away_until.is_none(), "the grown-up has no school");
     let ui: serde_json::Value = serde_json::from_str(&sim_core::view::ui_state_json(&w)).unwrap();
-    let kit = ui["sims"].as_array().unwrap().iter().find(|s| s["name"] == "Kit").unwrap();
+    let kit = ui["sims"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["name"] == "Kit")
+        .unwrap();
     assert_eq!(kit["actions"][0]["label"], "At school");
     at(&mut w, 17.0);
     assert!(w.sims[1].away_until.is_none(), "home after school");
-    assert!(w.sims[1].skills[0] > 0.2, "learned something: {}", w.sims[1].skills[0]);
+    assert!(
+        w.sims[1].skills[0] > 0.2,
+        "learned something: {}",
+        w.sims[1].skills[0]
+    );
     // The weekend (day 6, Saturday): no school.
     for _ in 0..5 {
         at(&mut w, 10.0);
@@ -124,13 +177,30 @@ fn teens_grow_up_into_young_adults() {
         "objects":[], "exits":[[5.5,9.9]],
         "sims":[{"name":"Ada","x":4.5,"z":3.5,"age":45},{"name":"Kit","x":5.5,"z":3.5,"age":17.6}]}"#;
     let mut w = World::from_json(&content, town, 1).unwrap();
-    assert!(w.apply(Command::JoinCareer { sim: 1, career: 0, level: 0 }).is_err(), "17: too young to work");
+    assert!(
+        w.apply(Command::JoinCareer {
+            sim: 1,
+            career: 0,
+            level: 0
+        })
+        .is_err(),
+        "17: too young to work"
+    );
     for _ in 0..24 * 60 * 20 {
         w.tick_once();
     }
     assert!(w.sims[1].adult(&w.content), "18 now");
-    assert!(w.events.iter().any(|e| e.kind == EventKind::GrewOlder && e.a == 1));
-    w.apply(Command::JoinCareer { sim: 1, career: 0, level: 0 }).unwrap();
+    assert!(
+        w.events
+            .iter()
+            .any(|e| e.kind == EventKind::GrewOlder && e.a == 1)
+    );
+    w.apply(Command::JoinCareer {
+        sim: 1,
+        career: 0,
+        level: 0,
+    })
+    .unwrap();
     // School is over: a weekday morning finds them at home (their shift starts at 13:00).
     let day = sim_core::clock::day(w.tick);
     let ten = sim_core::clock::tick_at(day + 2, 10.0 * 60.0).unwrap();
@@ -156,19 +226,36 @@ fn school_grades_homework_and_finishing_school() {
         "objects":[{"def":"desk","x":2,"z":2}], "exits":[[5.5,9.9]],
         "sims":[{"name":"Ada","x":4.5,"z":3.5,"age":35},{"name":"Kit","x":5.5,"z":3.5,"age":12}]}"#;
     let mut w = World::from_json(&content, town, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     assert_eq!(w.sims[1].grade, 60.0);
     // A day at school.
     for _ in 0..24 * 60 * 20 {
         w.tick_once();
     }
-    assert!((w.sims[1].grade - 62.0).abs() < 0.01, "a school day: {}", w.sims[1].grade);
+    assert!(
+        (w.sims[1].grade - 62.0).abs() < 0.01,
+        "a school day: {}",
+        w.sims[1].grade
+    );
     // After the second school day, homework helps.
     for _ in 0..9 * 60 * 20 {
         w.tick_once();
     }
-    assert!((w.sims[1].grade - 64.0).abs() < 0.01, "two school days: {}", w.sims[1].grade);
-    w.apply(Command::Use { sim: 1, object: 0, interaction: 0 }).unwrap();
+    assert!(
+        (w.sims[1].grade - 64.0).abs() < 0.01,
+        "two school days: {}",
+        w.sims[1].grade
+    );
+    w.apply(Command::Use {
+        sim: 1,
+        object: 0,
+        interaction: 0,
+    })
+    .unwrap();
     for _ in 0..60 * 20 {
         w.tick_once();
     }
@@ -179,10 +266,19 @@ fn school_grades_homework_and_finishing_school() {
     for _ in 0..24 * 60 * 20 {
         w.tick_once();
     }
-    let done = w.events.iter().find(|e| e.kind == EventKind::Graduated).expect("finished school");
+    let done = w
+        .events
+        .iter()
+        .find(|e| e.kind == EventKind::Graduated)
+        .expect("finished school");
     assert_eq!(done.a, 1);
     assert!(done.n.unwrap() >= 70);
-    assert!(w.sims[1].feelings.iter().any(|f| w.content.feelings[f.def].id == "proud"));
+    assert!(
+        w.sims[1]
+            .feelings
+            .iter()
+            .any(|f| w.content.feelings[f.def].id == "proud")
+    );
 }
 
 #[test]
@@ -198,13 +294,21 @@ fn a_save_and_load_after_school_costs_no_missed_day() {
         "objects":[], "exits":[[5.5,9.9]],
         "sims":[{"name":"Ada","x":4.5,"z":3.5,"age":35},{"name":"Kit","x":5.5,"z":3.5,"age":12}]}"#;
     let mut w = World::from_json(&content, town, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     // Home from Monday's school by 18:00, a day's grade the better.
     let evening = sim_core::clock::tick_at(sim_core::clock::day(w.tick), 18.0 * 60.0).unwrap();
     while w.tick < evening {
         w.tick_once();
     }
-    assert!((w.sims[1].grade - 62.0).abs() < 0.01, "a school day: {}", w.sims[1].grade);
+    assert!(
+        (w.sims[1].grade - 62.0).abs() < 0.01,
+        "a school day: {}",
+        w.sims[1].grade
+    );
     let saved: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
     assert_eq!(saved["version"], sim_core::save::SAVE_VERSION);
     let after_load = |save: &serde_json::Value| {
@@ -215,12 +319,20 @@ fn a_save_and_load_after_school_costs_no_missed_day() {
         back.sims[1].grade
     };
     // Loaded, the day is still the one they went to school, not one missed.
-    assert!((after_load(&saved) - 62.0).abs() < 0.01, "after a load: {}", after_load(&saved));
+    assert!(
+        (after_load(&saved) - 62.0).abs() < 0.01,
+        "after a load: {}",
+        after_load(&saved)
+    );
     // A save from before the school day was kept (v31): after school has begun, today counts as seen to.
     let mut v31 = saved.clone();
     v31["version"] = 31.into();
     for s in v31["sims"].as_array_mut().unwrap() {
         s.as_object_mut().unwrap().remove("schoolDay");
     }
-    assert!((after_load(&v31) - 62.0).abs() < 0.01, "after loading a v31 save: {}", after_load(&v31));
+    assert!(
+        (after_load(&v31) - 62.0).abs() < 0.01,
+        "after loading a v31 save: {}",
+        after_load(&v31)
+    );
 }

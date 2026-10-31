@@ -17,16 +17,39 @@ const TOWN: &str = r#"{"width":24,"depth":12,
 #[test]
 fn the_roof_takes_a_style_and_colour() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-    assert_eq!(w.plots[0].roof, None, "the town's own look until the player picks one");
-    w.apply(Command::SetRoof { household: 0, style: 2, color: 1 }).unwrap();
+    assert_eq!(
+        w.plots[0].roof, None,
+        "the town's own look until the player picks one"
+    );
+    w.apply(Command::SetRoof {
+        household: 0,
+        style: 2,
+        color: 1,
+    })
+    .unwrap();
     let roof = w.plots[0].roof.unwrap();
     assert_eq!((roof.style, roof.color), (2, 1));
     assert_eq!(w.households[0].funds, 1000, "free");
     assert_eq!(w.plots[1].roof, None, "only the home's");
-    assert!(w.apply(Command::SetRoof { household: 0, style: 3, color: 0 }).is_err());
-    assert!(w.apply(Command::SetRoof { household: 0, style: 0, color: 2 }).is_err());
+    assert!(
+        w.apply(Command::SetRoof {
+            household: 0,
+            style: 3,
+            color: 0
+        })
+        .is_err()
+    );
+    assert!(
+        w.apply(Command::SetRoof {
+            household: 0,
+            style: 0,
+            color: 2
+        })
+        .is_err()
+    );
 
-    let view: serde_json::Value = serde_json::from_str(&sim_core::view::structure_json(&w)).unwrap();
+    let view: serde_json::Value =
+        serde_json::from_str(&sim_core::view::structure_json(&w)).unwrap();
     assert_eq!(view["plots"][0]["roof"], serde_json::json!([2, 1]));
 
     // Saved by id.
@@ -36,7 +59,12 @@ fn the_roof_takes_a_style_and_colour() {
     assert_eq!(loaded.plots[0].roof, w.plots[0].roof);
 
     // Undo and redo.
-    w.apply(Command::SetRoof { household: 0, style: 1, color: 0 }).unwrap();
+    w.apply(Command::SetRoof {
+        household: 0,
+        style: 1,
+        color: 0,
+    })
+    .unwrap();
     w.apply(Command::Undo { household: 0 }).unwrap();
     assert_eq!(w.plots[0].roof.map(|r| r.style), Some(2));
     w.apply(Command::Redo { household: 0 }).unwrap();

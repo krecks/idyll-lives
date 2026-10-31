@@ -4,6 +4,7 @@
 //! ignores them; they are resolved by the asset registry on the web side.
 
 use std::collections::{HashMap, HashSet};
+use std::ops::RangeInclusive;
 
 use serde::Deserialize;
 
@@ -21,6 +22,15 @@ pub const MAX_TAGS: usize = 64;
 pub const MAX_GENDERS: usize = 32;
 /// Fastest a trait, perk, feeling or anything else may make someone walk (times the normal pace).
 pub const MAX_WALK_SPEED: f32 = 10.0;
+/// The range a grade's `payPerHour` may be in: pay becomes shift pay and promotion bonuses, so a
+/// pack's figure must stay a number the game can add up (the base game pays $12–60).
+const PAY_PER_HOUR: RangeInclusive<f32> = 0.0..=10_000.0;
+/// How far a `payFactor` may bend pay: within this a track's pay still resembles its field (the
+/// base game keeps to 0.5–1.83), and a pack beyond it would make pay meaningless.
+const PAY_FACTOR: RangeInclusive<f32> = 0.25..=3.0;
+/// How short of the level a job is hired at on probation: more than a level is never close enough,
+/// and a negative shortfall would ask for skills above the job's own.
+const PROBATION: RangeInclusive<f32> = 0.0..=1.0;
 /// Bitmask of indices into `Content::tags`.
 pub type TagMask = u64;
 /// Bitmask of indices into `LifeRules::stages` (content `stages` rules: who may use what).
@@ -213,6 +223,37 @@ pub struct Interaction {
     /// same object, by id; index into its `interactions`): trick shots at the pool table, a
     /// chess problem. Without one the order is refused.
     pub alone: Option<usize>,
+    /// Puts a load in the object, which then runs on its own (content `loads`, on an object that
+    /// `runs`: the washing put in the washer): only while it's empty, and it runs once the use
+    /// ends (see `machines.rs`).
+    pub loads: bool,
+    /// Takes the load out once the run is done (content `unloads`): only then, and it's empty
+    /// again as the use ends.
+    pub unloads: bool,
+    /// Leaves the household a load to work on next (content `makes`: the wet washing taken out
+    /// of the washer, to dry; the dry washing off the line, to fold), as the use ends; then on
+    /// with it to the nearest thing that works on it (`machines::carry_on`).
+    pub makes: Option<WorkOn>,
+    /// Carried in the arms on the way to it (content `brings`, an item; index into
+    /// `Content::items`): the basket of wet washing to the dryer. Only shown (the snapshot's
+    /// `held`): nothing is put down.
+    pub brings: Option<usize>,
+    /// Held in the hands while it's done (content `holds`, an item): a shirt being folded.
+    /// Only shown, as `brings`.
+    pub holds: Option<usize>,
+    /// Done behind a shut door (content `private`; see `privacy.rs`): while it lasts the room
+    /// it's done in is kept shut, and others wait outside it or go elsewhere.
+    pub private: bool,
+    /// Where partners try for a baby (content `conceive`: a double bed's *Try for a baby*): a
+    /// game for two (`partner`) done behind a shut door (`private`), started only by the social
+    /// whose success has the `conceive` effect, with the one it was with. A baby may come of it
+    /// once it has run its time (`lifecycle::conceive`).
+    pub conceive: bool,
+    /// Sold by someone at the object (content `selfServe`, the label and anim for where nobody
+    /// serves): on a public lot whose `staff` has a server, they order, are handed it and pay,
+    /// and it's closed outside the post's hours; elsewhere (a household's own cart) they help
+    /// themselves, as the `selfServe` label says (`staff.rs`).
+    pub served: Option<crate::staff::SelfServe>,
 }
 
 /// Something a use works on (content `workOn`), which must be there for it to start.
@@ -224,12 +265,20 @@ pub enum WorkOn {
     /// A load of the household's dirty washing (`Household::laundry`, content `laundry`): the
     /// use washes it, and it waits to be dried (`Washed`).
     Laundry,
-    /// A load the household washed (`Household::washed`): the use dries and folds it.
+    /// A load the household washed, wet (`Household::laundry[1]`): the use dries it (a dryer, a
+    /// washing line).
     Washed,
+    /// A load dried (`Household::laundry[2]`): the use folds it.
+    Dried,
 }
 
 impl WorkOn {
-    pub const ALL: [WorkOn; 3] = [WorkOn::Dishes, WorkOn::Laundry, WorkOn::Washed];
+    pub const ALL: [WorkOn; 4] = [
+        WorkOn::Dishes,
+        WorkOn::Laundry,
+        WorkOn::Washed,
+        WorkOn::Dried,
+    ];
 
     /// Its bit in a mask of what there is to work on (`world::work_waiting`).
     pub fn bit(self) -> u8 {
@@ -242,6 +291,18 @@ impl WorkOn {
             WorkOn::Dishes => "there are no dishes to wash",
             WorkOn::Laundry => "there's no washing to do",
             WorkOn::Washed => "there's no washed laundry to dry",
+            WorkOn::Dried => "there's no dry laundry to fold",
+        }
+    }
+
+    /// Which of a household's loads of washing it is (`Household::laundry`): dirty, washed,
+    /// dried. None for the dishes.
+    pub fn load(self) -> Option<usize> {
+        match self {
+            WorkOn::Dishes => None,
+            WorkOn::Laundry => Some(0),
+            WorkOn::Washed => Some(1),
+            WorkOn::Dried => Some(2),
         }
     }
 }
@@ -249,7 +310,11 @@ impl WorkOn {
 /// Whether `hour` (0..24) is in the window `[from, to]` (past midnight when `from` > `to`).
 pub fn in_hours(window: [f32; 2], hour: f32) -> bool {
     let [from, to] = window;
-    if from <= to { (from..to).contains(&hour) } else { hour >= from || hour < to }
+    if from <= to {
+        (from..to).contains(&hour)
+    } else {
+        hour >= from || hour < to
+    }
 }
 
 /// Dirty washing piling up (content `laundry`): what the laundry's uses work on
@@ -258,7 +323,8 @@ pub fn in_hours(window: [f32; 2], hour: f32) -> bool {
 pub struct LaundryRules {
     /// Loads of washing each resident at home makes a day.
     pub per_day: f32,
-    /// Most loads that pile up (dirty, and washed waiting to dry, each).
+    /// Most loads that pile up (dirty, washed waiting to dry, and dried waiting to be folded,
+    /// each).
     pub most: f32,
 }
 
@@ -290,7 +356,9 @@ impl Interaction {
 
     /// Bitmask of the needs this fills (a gain above 0).
     pub fn fills(&self) -> u32 {
-        (0..MAX_NEEDS).filter(|&n| self.total_gain[n] > 0.0).fold(0, |m, n| m | 1 << n)
+        (0..MAX_NEEDS)
+            .filter(|&n| self.total_gain[n] > 0.0)
+            .fold(0, |m, n| m | 1 << n)
     }
 
     pub fn trains_skills(&self) -> bool {
@@ -304,11 +372,33 @@ impl Interaction {
 
     /// Whether finishing after `elapsed` minutes earns the feeling.
     pub fn earns_feeling(&self, elapsed: f32, skills: &[f32; MAX_SKILLS]) -> Option<usize> {
+        self.earns_feeling_over(self.minutes, elapsed, skills)
+    }
+
+    /// Whether finishing after `elapsed` of `minutes` earns the feeling.
+    pub fn earns_feeling_over(
+        &self,
+        minutes: f32,
+        elapsed: f32,
+        skills: &[f32; MAX_SKILLS],
+    ) -> Option<usize> {
         let skilled = self
             .skill
             .is_none_or(|s| skills[s].floor() >= self.feeling_min_skill);
-        self.feeling
-            .filter(|_| skilled && elapsed >= self.minutes * 0.5)
+        self.feeling.filter(|_| skilled && elapsed >= minutes * 0.5)
+    }
+
+    /// How long this takes at an object where `served` (someone serves at it), or where nobody
+    /// does: a sold use's own `minutes` are the ordering, the hand-over and the paying; helping
+    /// oneself where there's nobody to serve is `selfServe.minutes` (a coffee poured at home).
+    pub fn minutes_where(&self, served: bool) -> f32 {
+        if served {
+            return self.minutes;
+        }
+        self.served
+            .as_ref()
+            .and_then(|s| s.minutes)
+            .unwrap_or(self.minutes)
     }
 }
 
@@ -336,6 +426,9 @@ pub struct ObjectDef {
     pub places: Vec<SlotPlace>,
     /// Can only be placed outdoors (trees, flower beds, ponds).
     pub outdoors: bool,
+    /// The household's own (content `private`: a wardrobe, a dresser, a bath): a visitor uses none
+    /// of it, chosen or told (`world::guest_may`).
+    pub private: bool,
     /// A flight of stairs up to the storey above (one tile wide, climbed from the front; see
     /// `path::Stair`). Residents walk on it instead of around it.
     pub stairs: bool,
@@ -396,6 +489,15 @@ pub struct ObjectDef {
     /// file), picked by interactions that leave it "picked", then fallow, planted again and
     /// growing (see `ObjectInstance::growth`).
     pub grows: Option<Growth>,
+    /// A machine that runs on its own (content `runs`: `{"minutes": 60}`): loaded by a use that
+    /// `loads`, it runs this many game minutes with nobody at it, then waits, done, for a use
+    /// that `unloads` it (see `machines.rs`, `ObjectInstance::run`).
+    pub runs: Option<f32>,
+    /// A machine filled a dirty thing at a time (content `rack`: how many fill it; a
+    /// dishwasher): what's washed up at it goes in and waits (`ObjectInstance::rack`), and it runs
+    /// once full, or once the washing up is done with it a third full (`machines::rack_in`). 0:
+    /// none (a sink washes up there and then).
+    pub rack: u8,
     /// Things on a wall: it belongs over a window (content `overWindow`: curtains, blinds), so
     /// its back may be on a window as well as on a plain wall. Everything else on a wall needs
     /// plain wall behind it.
@@ -427,6 +529,9 @@ pub struct ObjectDef {
     /// a lamp at head height (`head_height`), furniture may stand there and nobody walks there
     /// (`ObjectInstance::overhang_tiles`).
     pub overhang: Vec<(i32, i32)>,
+    /// Someone serves here on a public lot (content `staff`): where they stand behind it and the
+    /// hours it's open (`staff.rs`).
+    pub staff: Option<crate::staff::Post>,
 }
 
 impl ObjectDef {
@@ -460,25 +565,41 @@ impl ObjectDef {
 
 /// Whether `stage` is one of `mask`'s.
 pub fn stage_in(mask: StageMask, stage: usize) -> bool {
-    1u32.checked_shl(stage as u32).is_some_and(|bit| mask & bit != 0)
+    1u32.checked_shl(stage as u32)
+        .is_some_and(|bit| mask & bit != 0)
 }
 
 /// Whether every stage of `mask` is older than `stage` (someone of `stage` is too young for it;
 /// else too old, or too big).
 pub fn all_older(mask: StageMask, stage: usize) -> bool {
-    mask != 0 && mask & 1u32.checked_shl(stage as u32 + 1).map_or(u32::MAX, |b| b - 1) == 0
+    mask != 0
+        && mask
+            & 1u32
+                .checked_shl(stage as u32 + 1)
+                .map_or(u32::MAX, |b| b - 1)
+            == 0
 }
 
 /// Life-stage ids (`stages` rules) as a mask of `stage_ids`, content `life.stages` in order.
-pub(crate) fn stage_mask(stage_ids: &[&str], ids: &Option<Vec<String>>, ctx: &str) -> Result<Option<StageMask>, Error> {
+pub(crate) fn stage_mask(
+    stage_ids: &[&str],
+    ids: &Option<Vec<String>>,
+    ctx: &str,
+) -> Result<Option<StageMask>, Error> {
     let Some(ids) = ids else { return Ok(None) };
     if ids.is_empty() {
-        return Err(Error::new(format!("{ctx}: `stages` names at least one life stage")));
+        return Err(Error::new(format!(
+            "{ctx}: `stages` names at least one life stage"
+        )));
     }
     ids.iter()
-        .try_fold(0, |m: StageMask, id| match stage_ids.iter().position(|s| s == id) {
-            Some(i) => Ok(m | 1 << i),
-            None => Err(Error::new(format!("{ctx}: unknown life stage '{id}' (see life.stages)"))),
+        .try_fold(0, |m: StageMask, id| {
+            match stage_ids.iter().position(|s| s == id) {
+                Some(i) => Ok(m | 1 << i),
+                None => Err(Error::new(format!(
+                    "{ctx}: unknown life stage '{id}' (see life.stages)"
+                ))),
+            }
         })
         .map(Some)
 }
@@ -764,7 +885,11 @@ pub struct DeathRules {
 impl DeathRules {
     /// The chance of passing away within a year at `age`.
     pub fn yearly_chance(&self, age: f32) -> f32 {
-        if age < self.from { 0.0 } else { (self.per_year * (self.growth * (age - self.from)).exp()).min(1.0) }
+        if age < self.from {
+            0.0
+        } else {
+            (self.per_year * (self.growth * (age - self.from)).exp()).min(1.0)
+        }
     }
 }
 
@@ -868,6 +993,14 @@ pub struct RoomKind {
     /// Else (no kind's tags offered in it), a room is of this kind if people pass through it:
     /// two doors or more, or stairs (a hallway).
     pub passage: bool,
+    /// Kept shut while someone is in it (content `private`: a bathroom; see `privacy.rs`):
+    /// others wait outside or go elsewhere, and its doors stay shut to them.
+    pub private: bool,
+    /// A private room of this kind is its people's own (content `claimed`: a bedroom): whoever has
+    /// a place in it — somewhere to lie, or a baby's place and the care of it, with their partner
+    /// and children — comes and goes, and its door keeps everyone else out (`privacy.rs`). Only
+    /// with `private`, which is what keeps the door shut at all, and never a passage.
+    pub claimed: bool,
 }
 
 /// How rooms are scored (content `roomRules`; see `rooms.rs`).
@@ -1478,7 +1611,9 @@ impl BuildRules {
 
     /// A metre of fence in `style`.
     pub fn fence_price(&self, style: u8) -> i64 {
-        self.fences.get(style as usize).map_or(self.fence, |s| s.price)
+        self.fences
+            .get(style as usize)
+            .map_or(self.fence, |s| s.price)
     }
 
     /// A gate in `style`: a metre of that fence plus the gate.
@@ -1562,6 +1697,9 @@ pub struct Content {
     pub cuddle_anim: Option<usize>,
     /// Whether any feeling has `effects` (Sims then fold them into their modifiers).
     pub buff_feelings: bool,
+    /// Whether any object has a use for trying for a baby (`Interaction::conceive`): then the
+    /// social of the `conceive` effect goes on in bed, and needs one (`privacy.rs`).
+    pub conceive_beds: bool,
     /// What routine blocks can be for, how plans steer residents, and life goals.
     pub activities: Vec<crate::planner::ActivityDef>,
     pub planner: crate::planner::PlannerRules,
@@ -1574,6 +1712,8 @@ pub struct Content {
     /// Everyone's smartphone: who has one and what they do with it (content `phone`; see
     /// `phone.rs`).
     pub phone: crate::phone::PhoneRules,
+    /// How the town's vendors serve (content `service`; see `staff.rs`).
+    pub service: crate::staff::ServiceRules,
     /// How dirty washing piles up (content `laundry`; None: it never does, and nothing works
     /// on it).
     pub laundry: Option<LaundryRules>,
@@ -1675,6 +1815,8 @@ struct ContentFile {
     #[serde(default)]
     phone: crate::phone::PhoneRaw,
     #[serde(default)]
+    service: Option<crate::staff::ServiceRaw>,
+    #[serde(default)]
     laundry: Option<LaundryRaw>,
 }
 
@@ -1719,6 +1861,20 @@ struct GradeRaw {
     skill_level: f32,
 }
 
+/// Content's `value`, refused rather than clamped when it is outside `range`. `what` names the
+/// figure (with the id or rule it belongs to), so the error tells a pack author exactly what to
+/// fix.
+fn checked_range(value: f32, what: &str, range: RangeInclusive<f32>) -> Result<f32, Error> {
+    if !range.contains(&value) {
+        return Err(Error::new(format!(
+            "{what} {value} must be {}..{}",
+            range.start(),
+            range.end()
+        )));
+    }
+    Ok(value)
+}
+
 #[derive(Deserialize, Clone, Copy)]
 struct ShiftRaw {
     start: f32,
@@ -1749,6 +1905,7 @@ impl<'de> Deserialize<'de> for Days {
 struct CategoryRaw {
     id: String,
     label: String,
+    /// Pay for the whole field relative to the grades' own rates (1 = the grades' rates).
     #[serde(default = "one")]
     pay_factor: f32,
     shift: ShiftRaw,
@@ -1758,10 +1915,16 @@ struct CategoryRaw {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct TrackRaw {
     id: String,
     label: String,
     skills: HashMap<String, f32>,
+    /// Pay at the top of this track relative to the category's `payFactor` (1 = the
+    /// category's rate). Pay rises in a straight line from the entry grade, which pays the
+    /// category's rate.
+    #[serde(default = "one")]
+    pay_factor: f32,
     #[serde(default)]
     shift: Option<ShiftRaw>,
     titles: Vec<String>,
@@ -2034,6 +2197,10 @@ struct RoomKindRaw {
     exclusive: bool,
     #[serde(default)]
     passage: bool,
+    #[serde(default)]
+    private: bool,
+    #[serde(default)]
+    claimed: bool,
 }
 
 #[derive(Deserialize, Default)]
@@ -2263,6 +2430,9 @@ struct ObjectRaw {
     places: Vec<PlaceRaw>,
     #[serde(default)]
     outdoors: bool,
+    /// The household's own (see `ObjectDef::private`).
+    #[serde(default)]
+    private: bool,
     #[serde(default)]
     stairs: bool,
     /// Buy catalog category (decides free rotation, see `objectRules.freeRotation`).
@@ -2307,6 +2477,12 @@ struct ObjectRaw {
     /// A crop that grows (see `ObjectDef::grows`).
     #[serde(default)]
     grows: Option<GrowsRaw>,
+    /// A machine that runs on its own (see `ObjectDef::runs`).
+    #[serde(default)]
+    runs: Option<RunsRaw>,
+    /// How many dirty things fill it (see `ObjectDef::rack`).
+    #[serde(default)]
+    rack: u8,
     #[serde(default, rename = "overWindow")]
     over_window: bool,
     #[serde(default, rename = "fillsWall")]
@@ -2329,6 +2505,9 @@ struct ObjectRaw {
     footstool: bool,
     #[serde(default)]
     overhang: Vec<[i32; 2]>,
+    /// Someone serves here on a public lot (see `ObjectDef::staff`).
+    #[serde(default)]
+    staff: Option<crate::staff::PostRaw>,
 }
 
 /// A slot's place: `{"at": [-0.3, 0.7], "facing": 180}` (m off the middle, to its right and front;
@@ -2346,6 +2525,12 @@ struct GrowsRaw {
     days: f32,
     #[serde(default = "half_a_day")]
     fallow: f32,
+}
+
+/// An object's `runs`: `{"minutes": 60}` (and, for the renderer, the `sound` it makes running).
+#[derive(Deserialize)]
+struct RunsRaw {
+    minutes: f32,
 }
 
 fn half_a_day() -> f32 {
@@ -2493,6 +2678,31 @@ struct InteractionRaw {
     /// The use done instead with nobody to play (see `Interaction::alone`).
     #[serde(default)]
     alone: Option<String>,
+    /// Loads the machine (see `Interaction::loads`).
+    #[serde(default)]
+    loads: bool,
+    /// Empties the machine once it's done (see `Interaction::unloads`).
+    #[serde(default)]
+    unloads: bool,
+    /// A load it leaves to work on next (see `Interaction::makes`).
+    #[serde(default)]
+    makes: Option<WorkOn>,
+    /// An item carried to it (see `Interaction::brings`).
+    #[serde(default)]
+    brings: Option<String>,
+    /// An item held while it's done (see `Interaction::holds`).
+    #[serde(default)]
+    holds: Option<String>,
+    /// Done behind a shut door (see `Interaction::private`).
+    #[serde(default)]
+    private: bool,
+    /// Where partners try for a baby (see `Interaction::conceive`).
+    #[serde(default)]
+    conceive: bool,
+    /// Sold by someone at the object, and how it's done where nobody serves (see
+    /// `Interaction::served`).
+    #[serde(default)]
+    self_serve: Option<crate::staff::SelfServeRaw>,
 }
 
 /// Content `laundry` (see `LaundryRules`).
@@ -2598,10 +2808,20 @@ pub(crate) fn build_modifiers(
     let tag = |t: &str| lookup(ix.tags, t, ctx, "tag");
     // Multipliers (decay, gain, preference, skill gain) are at least 0, everything a number.
     let factor = |v: f32, what: &str| {
-        if v >= 0.0 && v.is_finite() { Ok(v) } else { Err(Error::new(format!("{ctx}: {what} {v} must be a number ≥ 0"))) }
+        if v >= 0.0 && v.is_finite() {
+            Ok(v)
+        } else {
+            Err(Error::new(format!(
+                "{ctx}: {what} {v} must be a number ≥ 0"
+            )))
+        }
     };
     let number = |v: f32, what: &str| {
-        if v.is_finite() { Ok(v) } else { Err(Error::new(format!("{ctx}: {what} must be a number"))) }
+        if v.is_finite() {
+            Ok(v)
+        } else {
+            Err(Error::new(format!("{ctx}: {what} must be a number")))
+        }
     };
     let mut m = Modifiers::default();
     for (need, v) in &raw.need_decay {
@@ -2626,7 +2846,11 @@ pub(crate) fn build_modifiers(
     m.walk_speed = match raw.walk_speed {
         None => 1.0,
         Some(v) if v > 0.0 && v <= MAX_WALK_SPEED => v,
-        Some(v) => return Err(Error::new(format!("{ctx}: walkSpeed {v} must be above 0 and at most {MAX_WALK_SPEED}"))),
+        Some(v) => {
+            return Err(Error::new(format!(
+                "{ctx}: walkSpeed {v} must be above 0 and at most {MAX_WALK_SPEED}"
+            )));
+        }
     };
     m.mood = number(raw.mood, "mood")?;
     Ok(m)
@@ -2706,8 +2930,15 @@ impl Content {
             )));
         }
         // (Needs only fall over time: a negative decay would push one past full.)
-        if let Some(n) = raw.needs.iter().find(|n| !(n.decay_per_hour >= 0.0 && n.decay_per_hour.is_finite())) {
-            return Err(Error::new(format!("need '{}': decayPerHour {} must be a number ≥ 0", n.id, n.decay_per_hour)));
+        if let Some(n) = raw
+            .needs
+            .iter()
+            .find(|n| !(n.decay_per_hour >= 0.0 && n.decay_per_hour.is_finite()))
+        {
+            return Err(Error::new(format!(
+                "need '{}': decayPerHour {} must be a number ≥ 0",
+                n.id, n.decay_per_hour
+            )));
         }
 
         let needs: Vec<NeedDef> = raw
@@ -2755,7 +2986,12 @@ impl Content {
         // Built-in tag for visiting other households (schedules and traits can refer to it).
         intern(&mut tags, VISIT_TAG)?;
         // Tidying up is an action without an object; its tags exist all the same.
-        let clean_tags = raw.room_rules.clean.tags.clone().unwrap_or_else(|| vec!["chores".into(), "cleaning".into()]);
+        let clean_tags = raw
+            .room_rules
+            .clean
+            .tags
+            .clone()
+            .unwrap_or_else(|| vec!["chores".into(), "cleaning".into()]);
         for t in &clean_tags {
             intern(&mut tags, t)?;
         }
@@ -2857,7 +3093,12 @@ impl Content {
             &raw.cooking,
             &raw.items,
             &raw.recipes,
-            &crate::cooking::Lookups { needs: &need_index, tags: &tag_index, feelings: &feeling_index, animations: &animations },
+            &crate::cooking::Lookups {
+                needs: &need_index,
+                tags: &tag_index,
+                feelings: &feeling_index,
+                animations: &animations,
+            },
         )?;
 
         let lamp_tiles = raw.room_rules.lamp_tiles.unwrap_or(10.0).max(0.1);
@@ -2867,11 +3108,23 @@ impl Content {
         if life_stages.len() > MAX_STAGES {
             return Err(Error::new(format!("life: at most {MAX_STAGES} stages")));
         }
-        let every_stage: StageMask = if life_stages.is_empty() { StageMask::MAX } else { StageMask::MAX >> (MAX_STAGES - life_stages.len()) };
-        let babies: StageMask = life_stages.iter().enumerate().filter(|(_, s)| s.baby).fold(0, |m, (i, _)| m | 1 << i);
+        let every_stage: StageMask = if life_stages.is_empty() {
+            StageMask::MAX
+        } else {
+            StageMask::MAX >> (MAX_STAGES - life_stages.len())
+        };
+        let babies: StageMask = life_stages
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.baby)
+            .fold(0, |m, (i, _)| m | 1 << i);
         let stage_ids: Vec<&str> = life_stages.iter().map(|s| s.id.as_str()).collect();
         let stages_of = |ids: &Option<Vec<String>>, ctx: &str| stage_mask(&stage_ids, ids, ctx);
-        let recipe_stages = raw.recipes.iter().map(|r| stages_of(&r.stages, &format!("recipe '{}'", r.id))).collect::<Result<Vec<_>, _>>()?;
+        let recipe_stages = raw
+            .recipes
+            .iter()
+            .map(|r| stages_of(&r.stages, &format!("recipe '{}'", r.id)))
+            .collect::<Result<Vec<_>, _>>()?;
         let mut objects = Vec::with_capacity(raw.objects.len());
         let mut object_index = HashMap::new();
         for obj in &raw.objects {
@@ -2883,10 +3136,22 @@ impl Content {
             }
             // (Nothing bigger can be bought, see `World::check_size`.)
             if obj.footprint.iter().any(|&f| f > crate::world::MAX_SIZE) {
-                return Err(Error::new(format!("object '{}': a footprint is at most {MAX} × {MAX} tiles", obj.id, MAX = crate::world::MAX_SIZE)));
+                return Err(Error::new(format!(
+                    "object '{}': a footprint is at most {MAX} × {MAX} tiles",
+                    obj.id,
+                    MAX = crate::world::MAX_SIZE
+                )));
             }
-            if let Some((i, it)) = obj.interactions.iter().enumerate().find(|(i, it)| obj.interactions[..*i].iter().any(|o| o.id == it.id)) {
-                return Err(Error::new(format!("object '{}': interaction {i} repeats the id '{}'", obj.id, it.id)));
+            if let Some((i, it)) = obj
+                .interactions
+                .iter()
+                .enumerate()
+                .find(|(i, it)| obj.interactions[..*i].iter().any(|o| o.id == it.id))
+            {
+                return Err(Error::new(format!(
+                    "object '{}': interaction {i} repeats the id '{}'",
+                    obj.id, it.id
+                )));
             }
             let object_stages = stages_of(&obj.stages, &format!("object '{}'", obj.id))?;
             let mut interactions = Vec::with_capacity(obj.interactions.len());
@@ -2895,12 +3160,21 @@ impl Content {
                 let recipe = it
                     .recipe
                     .as_deref()
-                    .map(|r| recipes.iter().position(|d| d.id == r).ok_or_else(|| Error::new(format!("{ctx}: unknown recipe '{r}'"))))
+                    .map(|r| {
+                        recipes
+                            .iter()
+                            .position(|d| d.id == r)
+                            .ok_or_else(|| Error::new(format!("{ctx}: unknown recipe '{r}'")))
+                    })
                     .transpose()?;
                 // Its own stages, else its recipe's, else its object's; a baby's place is a baby's.
-                let stages = stages_of(&it.stages, &ctx)?.or(recipe.and_then(|r| recipe_stages.get(r).copied().flatten())).or(object_stages);
+                let stages = stages_of(&it.stages, &ctx)?
+                    .or(recipe.and_then(|r| recipe_stages.get(r).copied().flatten()))
+                    .or(object_stages);
                 if it.baby && stages.is_some_and(|s| s & !babies != 0) {
-                    return Err(Error::new(format!("{ctx}: a `baby` use is a baby's only: no other `stages`")));
+                    return Err(Error::new(format!(
+                        "{ctx}: a `baby` use is a baby's only: no other `stages`"
+                    )));
                 }
                 let stages = stages.unwrap_or(if !it.baby {
                     every_stage & !babies
@@ -2931,17 +3205,27 @@ impl Content {
                 // all the same.
                 let eats = match &it.eat {
                     Some(_) if recipe.is_some() => {
-                        return Err(Error::new(format!("{ctx}: `eat` and `recipe` don't go together")));
+                        return Err(Error::new(format!(
+                            "{ctx}: `eat` and `recipe` don't go together"
+                        )));
                     }
                     Some(_) if it.yields.is_some() => {
-                        return Err(Error::new(format!("{ctx}: `eat` and `yields` don't go together")));
+                        return Err(Error::new(format!(
+                            "{ctx}: `eat` and `yields` don't go together"
+                        )));
                     }
                     Some(e) => {
                         let mut eaten = [0.0; MAX_NEEDS];
-                        for (own, eat) in own_gain.iter_mut().zip(eaten.iter_mut()).filter(|(g, _)| **g > 0.0) {
+                        for (own, eat) in own_gain
+                            .iter_mut()
+                            .zip(eaten.iter_mut())
+                            .filter(|(g, _)| **g > 0.0)
+                        {
                             *eat = std::mem::take(own);
                         }
-                        recipes.push(crate::cooking::eat_recipe(&ctx, &it.label, &items, &e.item, e.minutes, eaten)?);
+                        recipes.push(crate::cooking::eat_recipe(
+                            &ctx, &it.label, &items, &e.item, e.minutes, eaten,
+                        )?);
                         Some(recipes.len() - 1)
                     }
                     None => None,
@@ -2950,16 +3234,31 @@ impl Content {
                 // `eat`), and residents weigh it all the same.
                 let yields = match &it.yields {
                     Some(_) if recipe.is_some() => {
-                        return Err(Error::new(format!("{ctx}: `yields` and `recipe` don't go together")));
+                        return Err(Error::new(format!(
+                            "{ctx}: `yields` and `recipe` don't go together"
+                        )));
                     }
-                    Some(y) if y.servings == 0 => return Err(Error::new(format!("{ctx}: yields: servings must be at least 1"))),
+                    Some(y) if y.servings == 0 => {
+                        return Err(Error::new(format!(
+                            "{ctx}: yields: servings must be at least 1"
+                        )));
+                    }
                     Some(y) => {
                         let mut eaten = [0.0; MAX_NEEDS];
-                        for (own, eat) in own_gain.iter_mut().zip(eaten.iter_mut()).filter(|(g, _)| **g > 0.0) {
+                        for (own, eat) in own_gain
+                            .iter_mut()
+                            .zip(eaten.iter_mut())
+                            .filter(|(g, _)| **g > 0.0)
+                        {
                             *eat = std::mem::take(own);
                         }
-                        recipes.push(crate::cooking::eat_recipe(&ctx, &it.label, &items, &y.item, y.minutes, eaten)?);
-                        Some(Yield { recipe: recipes.len() - 1, servings: y.servings })
+                        recipes.push(crate::cooking::eat_recipe(
+                            &ctx, &it.label, &items, &y.item, y.minutes, eaten,
+                        )?);
+                        Some(Yield {
+                            recipe: recipes.len() - 1,
+                            servings: y.servings,
+                        })
                     }
                     None => None,
                 };
@@ -2967,11 +3266,28 @@ impl Content {
                     return Err(Error::new(format!("{ctx}: tends must be 0..=1")));
                 }
                 if it.tends > 0.0 && obj.grows.is_none() {
-                    return Err(Error::new(format!("{ctx}: `tends` brings a crop on: the object needs `grows`")));
+                    return Err(Error::new(format!(
+                        "{ctx}: `tends` brings a crop on: the object needs `grows`"
+                    )));
                 }
-                if it.carried && (it.care.values().all(|&g| g <= 0.0) || !obj.interactions.iter().any(|i| i.baby)) {
-                    return Err(Error::new(format!("{ctx}: `carried` is for a baby's care (`care`) where a baby has a place (`baby`)")));
+                if it.carried
+                    && (it.care.values().all(|&g| g <= 0.0)
+                        || !obj.interactions.iter().any(|i| i.baby))
+                {
+                    return Err(Error::new(format!(
+                        "{ctx}: `carried` is for a baby's care (`care`) where a baby has a place (`baby`)"
+                    )));
                 }
+                // An item only shown in the arms (`brings`, `holds`).
+                let shown_item = |id: &Option<String>, key: &str| -> Result<Option<usize>, Error> {
+                    id.as_ref()
+                        .map(|id| {
+                            items.iter().position(|i| &i.id == id).ok_or_else(|| {
+                                Error::new(format!("{ctx}: {key}: unknown item '{id}'"))
+                            })
+                        })
+                        .transpose()
+                };
                 let after = match it.after.as_deref() {
                     Some(t) => 1 << lookup(&tag_index, t, &ctx, "tag")?,
                     None => 0,
@@ -2998,7 +3314,11 @@ impl Content {
                     None => None,
                     Some("front") => Some(SeatFacing::Front),
                     Some("around") => Some(SeatFacing::Around),
-                    Some(other) => return Err(Error::new(format!("{ctx}: unknown seatFacing '{other}' (front or around)"))),
+                    Some(other) => {
+                        return Err(Error::new(format!(
+                            "{ctx}: unknown seatFacing '{other}' (front or around)"
+                        )));
+                    }
                 };
                 if seat_facing.is_some() && it.seat_near <= 0.0 {
                     return Err(Error::new(format!("{ctx}: seatFacing needs a seatNear")));
@@ -3096,6 +3416,18 @@ impl Content {
                     work_on: it.work_on,
                     partner: it.partner,
                     alone: None,
+                    loads: it.loads,
+                    unloads: it.unloads,
+                    makes: it.makes,
+                    brings: shown_item(&it.brings, "brings")?,
+                    holds: shown_item(&it.holds, "holds")?,
+                    private: it.private || it.conceive,
+                    conceive: it.conceive,
+                    served: it
+                        .self_serve
+                        .as_ref()
+                        .map(|r| crate::staff::self_serve(r, &anim_index, &ctx))
+                        .transpose()?,
                 });
                 // A game for two: at an object with two places, one each, used there as any use.
                 if it.partner
@@ -3114,36 +3446,95 @@ impl Content {
                         "{ctx}: a game for two (`partner`) is played at an object with two places (`slots`: 2), one each (no whole, inside, seatNear, recipe, eat, yields, carried or needsTable)"
                     )));
                 }
+                // Trying for a baby: two in a bed, started by the social, nothing else.
+                if it.conceive
+                    && (!it.partner || it.autonomous || it.pose != Pose::Lie || it.alone.is_some())
+                {
+                    return Err(Error::new(format!(
+                        "{ctx}: `conceive` is a use for two lying down (`partner`, `\"pose\": \"lie\"`), not chosen on its own (`\"autonomous\": false`), with no `alone`"
+                    )));
+                }
                 if it.alone.is_some() && !it.partner {
-                    return Err(Error::new(format!("{ctx}: `alone` is what's done with nobody to play: it needs `partner`")));
+                    return Err(Error::new(format!(
+                        "{ctx}: `alone` is what's done with nobody to play: it needs `partner`"
+                    )));
                 }
                 if it.fetch.is_some() && it.requires.is_empty() {
-                    return Err(Error::new(format!("{ctx}: `fetch` fetches what it `requires`: it requires nothing")));
+                    return Err(Error::new(format!(
+                        "{ctx}: `fetch` fetches what it `requires`: it requires nothing"
+                    )));
                 }
                 if it.gradual && !matches!(it.leaves, Some(OpenState::Open | OpenState::Closed)) {
-                    return Err(Error::new(format!("{ctx}: `gradual` is for a use that leaves it open or closed")));
+                    return Err(Error::new(format!(
+                        "{ctx}: `gradual` is for a use that leaves it open or closed"
+                    )));
                 }
                 if let Some(h) = it.hours
                     && (!h.iter().all(|v| (0.0..=24.0).contains(v)) || h[0] == h[1])
                 {
-                    return Err(Error::new(format!("{ctx}: `hours` is [from, to], two different hours of the day (0 to 24)")));
+                    return Err(Error::new(format!(
+                        "{ctx}: `hours` is [from, to], two different hours of the day (0 to 24)"
+                    )));
                 }
-                if matches!(it.work_on, Some(WorkOn::Laundry | WorkOn::Washed)) && raw.laundry.is_none() {
-                    return Err(Error::new(format!("{ctx}: `workOn` laundry needs content `laundry` (how the washing piles up)")));
+                if matches!(
+                    it.work_on,
+                    Some(WorkOn::Laundry | WorkOn::Washed | WorkOn::Dried)
+                ) && raw.laundry.is_none()
+                {
+                    return Err(Error::new(format!(
+                        "{ctx}: `workOn` laundry needs content `laundry` (how the washing piles up)"
+                    )));
+                }
+                match it.makes {
+                    Some(WorkOn::Dishes) => {
+                        return Err(Error::new(format!(
+                            "{ctx}: `makes` is a load of washing: laundry, washed or dried"
+                        )));
+                    }
+                    Some(_) if raw.laundry.is_none() => {
+                        return Err(Error::new(format!(
+                            "{ctx}: `makes` needs content `laundry` (how the washing piles up)"
+                        )));
+                    }
+                    _ => {}
+                }
+                if obj.rack > 0 && it.loads {
+                    return Err(Error::new(format!(
+                        "{ctx}: a machine with a `rack` is filled by washing up at it, not by a use that `loads`"
+                    )));
+                }
+                if (it.loads || it.unloads) && obj.runs.is_none() {
+                    return Err(Error::new(format!(
+                        "{ctx}: `loads` and `unloads` are a machine's: give the object `runs`"
+                    )));
+                }
+                if it.loads && it.unloads {
+                    return Err(Error::new(format!(
+                        "{ctx}: a use `loads` the machine or `unloads` it, not both"
+                    )));
                 }
                 if it.close_after
                     && (it.leaves != Some(OpenState::Open)
-                        || !obj.interactions.iter().any(|i| i.leaves == Some(OpenState::Closed)))
+                        || !obj
+                            .interactions
+                            .iter()
+                            .any(|i| i.leaves == Some(OpenState::Closed)))
                 {
                     return Err(Error::new(format!(
                         "{ctx}: `closeAfter` is for a use that leaves it open, on an object with a use that leaves it closed"
                     )));
                 }
                 if it.when == Some(OpenState::Picked) || it.leaves == Some(OpenState::Ripe) {
-                    return Err(Error::new(format!("{ctx}: `when` takes open, closed or ripe; `leaves` open, closed or picked")));
+                    return Err(Error::new(format!(
+                        "{ctx}: `when` takes open, closed or ripe; `leaves` open, closed or picked"
+                    )));
                 }
-                if (it.when == Some(OpenState::Ripe) || it.leaves == Some(OpenState::Picked)) && obj.grows.is_none() {
-                    return Err(Error::new(format!("{ctx}: \"ripe\" and \"picked\" are a crop's: give the object `grows`")));
+                if (it.when == Some(OpenState::Ripe) || it.leaves == Some(OpenState::Picked))
+                    && obj.grows.is_none()
+                {
+                    return Err(Error::new(format!(
+                        "{ctx}: \"ripe\" and \"picked\" are a crop's: give the object `grows`"
+                    )));
                 }
             }
             // A game's use for one (`alone`): another of this object's, not a game, done where
@@ -3152,10 +3543,15 @@ impl Content {
                 let Some(alone) = &it.alone else { continue };
                 let ctx = format!("{}.{}", obj.id, it.id);
                 let Some(a) = interactions.iter().position(|i| &i.id == alone) else {
-                    return Err(Error::new(format!("{ctx}: `alone` names no use of '{}': '{alone}'", obj.id)));
+                    return Err(Error::new(format!(
+                        "{ctx}: `alone` names no use of '{}': '{alone}'",
+                        obj.id
+                    )));
                 };
                 if interactions[a].partner || interactions[a].pose != interactions[k].pose {
-                    return Err(Error::new(format!("{ctx}: `alone` is a use for one (no `partner`), done in the same pose as the game")));
+                    return Err(Error::new(format!(
+                        "{ctx}: `alone` is a use for one (no `partner`), done in the same pose as the game"
+                    )));
                 }
                 interactions[k].alone = Some(a);
             }
@@ -3172,7 +3568,10 @@ impl Content {
                 return Err(Error::new(format!("object '{}': negative price", obj.id)));
             }
             // (A spare bed's night doesn't make its room a bedroom.)
-            let offered = interactions.iter().filter(|it| !it.spare).fold(0, |m: TagMask, it| m | it.tags);
+            let offered = interactions
+                .iter()
+                .filter(|it| !it.spare)
+                .fold(0, |m: TagMask, it| m | it.tags);
             let mut provides = 0;
             for t in &obj.provides {
                 provides |= 1 << tag_index[t.as_str()];
@@ -3192,7 +3591,10 @@ impl Content {
                 }
             };
             if obj.hangs_low && obj.head_height {
-                return Err(Error::new(format!("object '{}': `hangsLow` or `headHeight`, not both", obj.id)));
+                return Err(Error::new(format!(
+                    "object '{}': `hangsLow` or `headHeight`, not both",
+                    obj.id
+                )));
             }
             for (set, flag, on) in [
                 (obj.over_window, "overWindow", Layer::Wall),
@@ -3207,20 +3609,45 @@ impl Content {
                         Layer::Floor => "the floor",
                         _ => "the ceiling",
                     };
-                    return Err(Error::new(format!("object '{}': `{flag}` is for things on {on}", obj.id)));
+                    return Err(Error::new(format!(
+                        "object '{}': `{flag}` is for things on {on}",
+                        obj.id
+                    )));
                 }
             }
-            if !obj.overhang.is_empty() && (layer != Layer::Floor || obj.footprint != [1, 1] || obj.overhang.iter().any(|&[r, f]| (r, f) == (0, 0) || r.abs() > 2 || f.abs() > 2)) {
-                return Err(Error::new(format!("object '{}': `overhang` is for a 1×1 thing on the floor, over tiles up to 2 from its own", obj.id)));
+            if !obj.overhang.is_empty()
+                && (layer != Layer::Floor
+                    || obj.footprint != [1, 1]
+                    || obj
+                        .overhang
+                        .iter()
+                        .any(|&[r, f]| (r, f) == (0, 0) || r.abs() > 2 || f.abs() > 2))
+            {
+                return Err(Error::new(format!(
+                    "object '{}': `overhang` is for a 1×1 thing on the floor, over tiles up to 2 from its own",
+                    obj.id
+                )));
             }
-            if layer == Layer::Surface && (obj.footprint != [1, 1] || obj.slots != 1 || obj.stairs) {
-                return Err(Error::new(format!("object '{}': things on a surface are 1×1, with one slot", obj.id)));
+            if layer == Layer::Surface && (obj.footprint != [1, 1] || obj.slots != 1 || obj.stairs)
+            {
+                return Err(Error::new(format!(
+                    "object '{}': things on a surface are 1×1, with one slot",
+                    obj.id
+                )));
             }
             // A thing on a top is used from beside its top (`surface::rider_tiles`), standing, at
             // a seat pulled up to the top or on one near (`seatNear`): not lain on, stood in,
             // cooked at as a station or dined at.
             if layer == Layer::Surface
-                && let Some(it) = interactions.iter().find(|i| i.pose == Pose::Lie || i.inside || i.whole || i.baby || i.cares() || i.needs_table || i.recipe.is_some())
+                && let Some(it) = interactions.iter().find(|i| {
+                    i.pose == Pose::Lie
+                        || i.inside
+                        || i.whole
+                        || i.baby
+                        || i.cares()
+                        || i.needs_table
+                        || i.recipe.is_some()
+                })
             {
                 return Err(Error::new(format!(
                     "{}.{}: a thing on a surface is used standing or sitting at its top (no lie, inside, whole, baby, care, needsTable or recipe)",
@@ -3280,7 +3707,10 @@ impl Content {
             let mut stations = 0;
             for name in &obj.stations {
                 stations |= cooking.station(name).ok_or_else(|| {
-                    Error::new(format!("object '{}': unknown station '{name}' (see cooking.stations)", obj.id))
+                    Error::new(format!(
+                        "object '{}': unknown station '{name}' (see cooking.stations)",
+                        obj.id
+                    ))
                 })?;
             }
             if obj.bunk && (obj.slots != 2 || layer.mounted()) {
@@ -3289,21 +3719,62 @@ impl Content {
                     obj.id
                 )));
             }
-            let upper_stages = stages_of(&obj.upper_stages, &format!("object '{}' upperStages", obj.id))?;
+            let upper_stages = stages_of(
+                &obj.upper_stages,
+                &format!("object '{}' upperStages", obj.id),
+            )?;
             if upper_stages.is_some() && !obj.bunk {
-                return Err(Error::new(format!("object '{}': `upperStages` is a bunk bed's", obj.id)));
+                return Err(Error::new(format!(
+                    "object '{}': `upperStages` is a bunk bed's",
+                    obj.id
+                )));
             }
             if obj.stairs && layer.mounted() {
-                return Err(Error::new(format!("object '{}': stairs stand on the floor", obj.id)));
+                return Err(Error::new(format!(
+                    "object '{}': stairs stand on the floor",
+                    obj.id
+                )));
             }
             if !obj.places.is_empty() {
                 let half = obj.footprint.map(|f| f as f32 / 2.0 + PLACE_REACH);
-                if obj.places.len() != obj.slots as usize || obj.bunk || !matches!(layer, Layer::Floor | Layer::Wall) {
-                    return Err(Error::new(format!("object '{}': `places` gives one place a slot, on the floor or a wall (not for a bunk bed)", obj.id)));
+                if obj.places.len() != obj.slots as usize
+                    || obj.bunk
+                    || !matches!(layer, Layer::Floor | Layer::Wall)
+                {
+                    return Err(Error::new(format!(
+                        "object '{}': `places` gives one place a slot, on the floor or a wall (not for a bunk bed)",
+                        obj.id
+                    )));
                 }
-                if obj.places.iter().any(|p| !p.facing.is_finite() || (0..2).any(|k| !p.at[k].is_finite() || p.at[k].abs() > half[k])) {
-                    return Err(Error::new(format!("object '{}': a place is more than {PLACE_REACH} m off its footprint", obj.id)));
+                if obj.places.iter().any(|p| {
+                    !p.facing.is_finite()
+                        || (0..2).any(|k| !p.at[k].is_finite() || p.at[k].abs() > half[k])
+                }) {
+                    return Err(Error::new(format!(
+                        "object '{}': a place is more than {PLACE_REACH} m off its footprint",
+                        obj.id
+                    )));
                 }
+            }
+            // Things on a wall hang square to it; things on a surface always turn.
+            let turns = obj.free_rotation.unwrap_or_else(|| {
+                layer == Layer::Surface
+                    || layer != Layer::Wall
+                        && obj.footprint == [1, 1]
+                        && obj.category.as_ref().is_some_and(|c| {
+                            raw.object_rules
+                                .free_rotation
+                                .iter()
+                                .flatten()
+                                .any(|f| f == c)
+                        })
+            });
+            // (Its shade's tiles turn with it in quarter turns: turned between, it would hang over one not kept for it.)
+            if turns && !obj.overhang.is_empty() {
+                return Err(Error::new(format!(
+                    "object '{}': `overhang` turns in quarter turns only (`freeRotation`: false)",
+                    obj.id
+                )));
             }
             objects.push(ObjectDef {
                 id: obj.id.clone(),
@@ -3314,16 +3785,9 @@ impl Content {
                 slots: obj.slots,
                 places: obj.places.iter().map(|p| SlotPlace { at: p.at, facing: p.facing.to_radians() }).collect(),
                 outdoors: obj.outdoors,
+                private: obj.private,
                 stairs: obj.stairs,
-                // Things on a wall hang square to it; things on a surface always turn.
-                turns: obj.free_rotation.unwrap_or_else(|| {
-                    layer == Layer::Surface
-                        || layer != Layer::Wall
-                        && obj.footprint == [1, 1]
-                        && obj.category.as_ref().is_some_and(|c| {
-                            raw.object_rules.free_rotation.iter().flatten().any(|f| f == c)
-                        })
-                }),
+                turns,
                 decor: obj
                     .decor
                     .or_else(|| {
@@ -3359,6 +3823,18 @@ impl Content {
                 stations,
                 stores: obj.stores,
                 group: obj.group.clone().unwrap_or_default(),
+                runs: match &obj.runs {
+                    Some(r) if r.minutes > 0.0 && r.minutes.is_finite() => Some(r.minutes),
+                    Some(_) => return Err(Error::new(format!("object '{}': `runs` needs minutes > 0", obj.id))),
+                    None => None,
+                },
+                rack: match obj.rack {
+                    0 => 0,
+                    _ if obj.runs.is_none() || !obj.stations.iter().any(|s| s == "dishes") => {
+                        return Err(Error::new(format!("object '{}': a `rack` is a machine's that is washed up at: give it `runs` and the `dishes` station", obj.id)));
+                    }
+                    n => n,
+                },
                 grows: match &obj.grows {
                     Some(g) if g.days > 0.0 && g.fallow >= 0.0 => Some(Growth { days: g.days, fallow_days: g.fallow }),
                     Some(_) => {
@@ -3374,6 +3850,7 @@ impl Content {
                 reach: obj.reach.max(0.0),
                 footstool: obj.footstool,
                 overhang: obj.overhang.iter().map(|&[r, f]| (r, f)).collect(),
+                staff: obj.staff.as_ref().map(|r| crate::staff::post(r, obj.footprint, &obj.id)).transpose()?,
             });
         }
 
@@ -3408,19 +3885,33 @@ impl Content {
             return Err(Error::new("duplicate social id"));
         }
         for (id, p) in &raw.bond_presets {
-            if !((-100.0..=100.0).contains(&p.friendship) && (-100.0..=100.0).contains(&p.romance)) {
-                return Err(Error::new(format!("bond preset '{id}': friendship and romance are -100..100")));
+            if !((-100.0..=100.0).contains(&p.friendship) && (-100.0..=100.0).contains(&p.romance))
+            {
+                return Err(Error::new(format!(
+                    "bond preset '{id}': friendship and romance are -100..100"
+                )));
             }
         }
         let social_rules = social::parse_rules(&raw.social_rules, &raw.bond_presets, &ix)?;
-        let chats = socials.iter().flat_map(|s| s.actor_gain.iter().chain(&s.target_gain).enumerate());
+        let chats = socials
+            .iter()
+            .flat_map(|s| s.actor_gain.iter().chain(&s.target_gain).enumerate());
         let urgent = raw
             .autonomy
             .urgent
             .as_ref()
-            .map(|list| list.iter().try_fold(0u32, |m, id| Ok::<_, Error>(m | 1 << lookup(&need_index, id, "autonomy.urgent", "need")?)))
+            .map(|list| {
+                list.iter().try_fold(0u32, |m, id| {
+                    Ok::<_, Error>(m | 1 << lookup(&need_index, id, "autonomy.urgent", "need")?)
+                })
+            })
             .transpose()?;
-        let autonomy = raw.autonomy.rules(urgent, chats.filter(|(_, g)| **g > 0.0).fold(0, |m, (n, _)| m | 1 << n));
+        let autonomy = raw.autonomy.rules(
+            urgent,
+            chats
+                .filter(|(_, g)| **g > 0.0)
+                .fold(0, |m, (n, _)| m | 1 << n),
+        );
 
         let need_array =
             |map: &HashMap<String, f32>, ctx: &str| -> Result<[f32; MAX_NEEDS], Error> {
@@ -3455,19 +3946,31 @@ impl Content {
                 adult: st.adult.unwrap_or(!st.baby && !st.school),
                 baby: st.baby,
                 school: st.school,
-                scale: st.scale.filter(|s| s.is_finite() && *s > 0.0).unwrap_or(1.0),
+                scale: st
+                    .scale
+                    .filter(|s| s.is_finite() && *s > 0.0)
+                    .unwrap_or(1.0),
             });
         }
         let start_age = raw.life.start_age.unwrap_or([25.0, 50.0]);
         let basic_pension = raw.life.basic_pension.unwrap_or(0);
         if basic_pension < 0 {
-            return Err(Error::new(format!("life.basicPension {basic_pension} must be ≥ 0")));
+            return Err(Error::new(format!(
+                "life.basicPension {basic_pension} must be ≥ 0"
+            )));
         }
         let life = LifeRules {
             days_per_year: raw.life.days_per_year.unwrap_or(2.0).max(0.1),
-            not_baby: if stages.is_empty() { 0 } else { every_stage & !babies },
+            not_baby: if stages.is_empty() {
+                0
+            } else {
+                every_stage & !babies
+            },
             stages,
-            start_age: [start_age[0].min(start_age[1]), start_age[0].max(start_age[1])],
+            start_age: [
+                start_age[0].min(start_age[1]),
+                start_age[0].max(start_age[1]),
+            ],
             retire_at: raw.life.retire_at,
             pension: raw.life.pension.unwrap_or(0.0).max(0.0),
             basic_pension,
@@ -3504,7 +4007,11 @@ impl Content {
                     Some(SchoolRules {
                         start: sc.start.clamp(0.0, 23.0),
                         hours: sc.hours.clamp(0.5, 12.0),
-                        days: sc.days.iter().filter(|&&d| d < 7).fold(0, |m, d| m | (1 << d)),
+                        days: sc
+                            .days
+                            .iter()
+                            .filter(|&&d| d < 7)
+                            .fold(0, |m, d| m | (1 << d)),
                         skills,
                         attend: g.attend.unwrap_or(1.0),
                         mood: g.mood.unwrap_or(3.0),
@@ -3523,8 +4030,15 @@ impl Content {
                 max_age: p.max_age.unwrap_or(50.0),
             }),
             adoption_cost: raw.life.adoption.as_ref().map(|a| a.cost.max(0)),
-            adoption_chance: raw.life.adoption.as_ref().map_or(0.0, |a| a.neighbours.clamp(0.0, 1.0)),
-            childcare: raw.life.childcare.as_ref().map(|c| ChildcareRules { cost: c.cost.max(0), below: c.below.unwrap_or(0.45).clamp(0.0, 1.0) }),
+            adoption_chance: raw
+                .life
+                .adoption
+                .as_ref()
+                .map_or(0.0, |a| a.neighbours.clamp(0.0, 1.0)),
+            childcare: raw.life.childcare.as_ref().map(|c| ChildcareRules {
+                cost: c.cost.max(0),
+                below: c.below.unwrap_or(0.45).clamp(0.0, 1.0),
+            }),
             newcomers: raw.life.newcomers.as_ref().map(|n| NewcomerRules {
                 hour: n.hour.unwrap_or(12.0).clamp(0.0, 23.9),
                 days: n.days.unwrap_or(3.0).max(1.0),
@@ -3570,6 +4084,10 @@ impl Content {
         }
 
         // Career categories: every track becomes a career with one level per grade.
+        for g in &raw.grades {
+            let what = format!("grade '{}': payPerHour", g.id);
+            checked_range(g.pay_per_hour, &what, PAY_PER_HOUR)?;
+        }
         let grades: Vec<GradeDef> = raw
             .grades
             .iter()
@@ -3582,6 +4100,11 @@ impl Content {
             .collect();
         let mut career_categories = Vec::with_capacity(raw.career_categories.len());
         for (ci, cat) in raw.career_categories.iter().enumerate() {
+            let field_pay = checked_range(
+                cat.pay_factor,
+                &format!("career category '{}': payFactor", cat.id),
+                PAY_FACTOR,
+            )?;
             let work_effects = need_array(&cat.work_effects, &cat.id)?;
             for track in &cat.tracks {
                 if track.titles.is_empty() || track.titles.len() > grades.len() {
@@ -3596,22 +4119,36 @@ impl Content {
                     return Err(Error::new(format!("track '{}': invalid shift", track.id)));
                 }
                 let skills = skill_list(&track.skills, &track.id)?;
+                let track_pay = checked_range(
+                    track.pay_factor,
+                    &format!("track '{}': payFactor", track.id),
+                    PAY_FACTOR,
+                )?;
+                // Pay climbs in a straight line from the field's rate at the entry grade to the
+                // track's factor at the top one: senior pay differs between tracks, entry pay never
+                // does. A one-grade track has no top to reach: `top_grade` is 1 and the factor does
+                // nothing to it.
+                let top_grade = track.titles.len().saturating_sub(1).max(1) as f32;
                 let levels = track
                     .titles
                     .iter()
                     .zip(&grades)
                     .enumerate()
-                    .map(|(gi, (title, grade))| CareerLevel {
-                        title: title.clone(),
-                        grade: Some(gi),
-                        pay: (grade.pay_per_hour * cat.pay_factor * shift.hours).round() as i64,
-                        start_hour: shift.start,
-                        hours: shift.hours,
-                        days: shift.days.0,
-                        requires: skills
-                            .iter()
-                            .map(|&(s, w)| (s, (grade.skill_level * w).round()))
-                            .collect(),
+                    .map(|(gi, (title, grade))| {
+                        let step = (track_pay - 1.0) * gi as f32 / top_grade;
+                        CareerLevel {
+                            title: title.clone(),
+                            grade: Some(gi),
+                            pay: (grade.pay_per_hour * field_pay * (1.0 + step) * shift.hours)
+                                .round() as i64,
+                            start_hour: shift.start,
+                            hours: shift.hours,
+                            days: shift.days.0,
+                            requires: skills
+                                .iter()
+                                .map(|&(s, w)| (s, (grade.skill_level * w).round()))
+                                .collect(),
+                        }
                     })
                     .collect();
                 careers.push(CareerDef {
@@ -3648,14 +4185,22 @@ impl Content {
             })
             .collect();
         workweek.sort_by(|a, b| a.fit.total_cmp(&b.fit));
+        let probation_levels = checked_range(
+            cr.probation_levels.unwrap_or(0.0),
+            "careerRules.probationLevels",
+            PROBATION,
+        )?;
         let career_rules = CareerRules {
-            commute_minutes: time(cr.commute_minutes.unwrap_or(30.0), "careerRules.commuteMinutes")?,
+            commute_minutes: time(
+                cr.commute_minutes.unwrap_or(30.0),
+                "careerRules.commuteMinutes",
+            )?,
             late_minutes: cr.late_minutes.unwrap_or(60.0),
             missed_penalty: cr.missed_penalty.unwrap_or(20.0),
             performance_per_shift: cr.performance_per_shift.unwrap_or(12.0),
             performance_per_fit: cr.performance_per_fit.unwrap_or(0.0),
             performance_per_mood: cr.performance_per_mood.unwrap_or(15.0),
-            probation_levels: cr.probation_levels.unwrap_or(0.0),
+            probation_levels,
             workweek,
             promotion_feeling: feeling(&cr.promotion_feeling, "careerRules")?,
             missed_feeling: feeling(&cr.missed_feeling, "careerRules")?,
@@ -3690,23 +4235,37 @@ impl Content {
         let dr = &raw.day_rhythm;
         // Tags content names here must exist (a typo would quietly switch something off).
         let tag_mask = |tags: &[String], ctx: &str| -> Result<TagMask, Error> {
-            tags.iter().try_fold(0, |m: TagMask, t| Ok(m | (1 << lookup(&tag_index, t, ctx, "tag")?)))
+            tags.iter().try_fold(0, |m: TagMask, t| {
+                Ok(m | (1 << lookup(&tag_index, t, ctx, "tag")?))
+            })
         };
         let multipliers =
             |map: &HashMap<String, f32>, ctx: &str| -> Result<[f32; MAX_NEEDS], Error> {
                 let mut out = [1.0; MAX_NEEDS];
                 for (k, v) in map {
                     if !(*v >= 0.0 && v.is_finite()) {
-                        return Err(Error::new(format!("{ctx}: the {k} multiplier {v} must be a number ≥ 0")));
+                        return Err(Error::new(format!(
+                            "{ctx}: the {k} multiplier {v} must be a number ≥ 0"
+                        )));
                     }
                     out[lookup(&need_index, k, ctx, "need")?] = *v;
                 }
                 Ok(out)
             };
         // What's fetched (`fetch`) is fetched with an interaction of something that provides it.
-        for (o, inter) in objects.iter().flat_map(|o: &ObjectDef| o.interactions.iter().map(move |i| (o, i))) {
-            let Some(fetch) = inter.fetch.as_deref() else { continue };
-            let source = |d: &ObjectDef| d.provides & inter.requires == inter.requires && d.interactions.iter().any(|i| i.id == fetch && i.recipe.is_none() && i.eats.is_none());
+        for (o, inter) in objects
+            .iter()
+            .flat_map(|o: &ObjectDef| o.interactions.iter().map(move |i| (o, i)))
+        {
+            let Some(fetch) = inter.fetch.as_deref() else {
+                continue;
+            };
+            let source = |d: &ObjectDef| {
+                d.provides & inter.requires == inter.requires
+                    && d.interactions
+                        .iter()
+                        .any(|i| i.id == fetch && i.recipe.is_none() && i.eats.is_none())
+            };
             if !objects.iter().any(source) {
                 return Err(Error::new(format!(
                     "object '{}' interaction '{}': fetches with '{fetch}', which nothing that provides what it requires has (a plain use: no recipe, no eat)",
@@ -3715,11 +4274,23 @@ impl Content {
             }
         }
         let sleep_tags = tag_mask(&dr.sleep_tags, "dayRhythm.sleepTags")?;
-        if let Some((o, i)) = objects.iter().find_map(|o: &ObjectDef| o.interactions.iter().find(|i| i.spare && i.tags & sleep_tags == 0).map(|i| (o, i))) {
-            return Err(Error::new(format!("{}.{}: `spare` is for a night's sleep (a `dayRhythm.sleepTags` tag)", o.id, i.id)));
+        if let Some((o, i)) = objects.iter().find_map(|o: &ObjectDef| {
+            o.interactions
+                .iter()
+                .find(|i| i.spare && i.tags & sleep_tags == 0)
+                .map(|i| (o, i))
+        }) {
+            return Err(Error::new(format!(
+                "{}.{}: `spare` is for a night's sleep (a `dayRhythm.sleepTags` tag)",
+                o.id, i.id
+            )));
         }
         let mut slept = [0.0f32; MAX_NEEDS];
-        for inter in objects.iter().flat_map(|o: &ObjectDef| &o.interactions).filter(|i| i.tags & sleep_tags != 0) {
+        for inter in objects
+            .iter()
+            .flat_map(|o: &ObjectDef| &o.interactions)
+            .filter(|i| i.tags & sleep_tags != 0)
+        {
             for (n, g) in inter.total_gain.iter().enumerate() {
                 slept[n] += g.max(0.0);
             }
@@ -3738,7 +4309,9 @@ impl Content {
                 })?,
             },
             wake_before_work_minutes: dr.wake_before_work_minutes.unwrap_or(75.0),
-            rest_need: (0..MAX_NEEDS).filter(|&n| slept[n] > 0.0).max_by(|&a, &b| slept[a].total_cmp(&slept[b])),
+            rest_need: (0..MAX_NEEDS)
+                .filter(|&n| slept[n] > 0.0)
+                .max_by(|&a, &b| slept[a].total_cmp(&slept[b])),
             lie_in_hours: dr.lie_in_hours.unwrap_or(0.5),
             sleep_quality_bonus: dr.sleep_quality_bonus.unwrap_or(0.06),
             nap_tags: tag_mask(&dr.nap_tags, "dayRhythm.napTags")?,
@@ -3749,7 +4322,11 @@ impl Content {
                 .iter()
                 .map(|h| {
                     let need = lookup(&need_index, &h.need, "dayRhythm.habits", "need")?;
-                    Ok::<_, Error>(Habit { at: h.at, need, below: h.below.clamp(0.0, 1.0) })
+                    Ok::<_, Error>(Habit {
+                        at: h.at,
+                        need,
+                        below: h.below.clamp(0.0, 1.0),
+                    })
                 })
                 .collect::<Result<_, _>>()?,
             ready_minutes: dr.ready_minutes.unwrap_or(30.0).max(0.0),
@@ -3759,7 +4336,12 @@ impl Content {
                 .map(|b| {
                     let need = lookup(&need_index, &b.need, "dayRhythm.workBreaks", "need")?;
                     let below = b.below.clamp(0.0, 1.0);
-                    Ok::<_, Error>(WorkBreak { need, below, gain: b.gain.max(0.0), cost: b.cost.max(0) })
+                    Ok::<_, Error>(WorkBreak {
+                        need,
+                        below,
+                        gain: b.gain.max(0.0),
+                        cost: b.cost.max(0),
+                    })
                 })
                 .collect::<Result<_, _>>()?,
             baby_wakes: dr
@@ -3767,9 +4349,13 @@ impl Content {
                 .as_ref()
                 .map(|b| {
                     let mask = match &b.needs {
-                        None => (0..needs.len()).filter(|&n| !needs[n].room).fold(0u32, |m, n| m | 1 << n),
+                        None => (0..needs.len())
+                            .filter(|&n| !needs[n].room)
+                            .fold(0u32, |m, n| m | 1 << n),
                         Some(list) => list.iter().try_fold(0u32, |m, id| {
-                            Ok::<_, Error>(m | 1 << lookup(&need_index, id, "dayRhythm.babyWakes", "need")?)
+                            Ok::<_, Error>(
+                                m | 1 << lookup(&need_index, id, "dayRhythm.babyWakes", "need")?,
+                            )
                         })?,
                     };
                     let below = b.below.unwrap_or(0.3).clamp(0.0, 1.0);
@@ -3777,7 +4363,13 @@ impl Content {
                         needs: mask,
                         below,
                         tend_below: b.tend_below.unwrap_or(0.6).clamp(below, 1.0),
-                        cooldown_ticks: (time(b.cooldown_minutes.unwrap_or(90.0), "dayRhythm.babyWakes.cooldownMinutes")?.max(0.0) / crate::MINUTES_PER_TICK) as u64,
+                        cooldown_ticks: (time(
+                            b.cooldown_minutes.unwrap_or(90.0),
+                            "dayRhythm.babyWakes.cooldownMinutes",
+                        )?
+                        .max(0.0)
+                            / crate::MINUTES_PER_TICK)
+                            as u64,
                         finish_minutes: b.finish_minutes.unwrap_or(15.0).max(0.0),
                         feeling: feeling(&b.feeling, "dayRhythm.babyWakes")?,
                     })
@@ -3857,6 +4449,16 @@ impl Content {
             .iter()
             .map(|k| {
                 let ctx = format!("room kind '{}'", k.id);
+                if k.claimed && k.passage {
+                    return Err(Error::new(format!(
+                        "{ctx}: a 'claimed' room is somebody's own: it can't be a passage (see privacy.rs)"
+                    )));
+                }
+                if k.claimed && !k.private {
+                    return Err(Error::new(format!(
+                        "{ctx}: a 'claimed' room is one kept shut: it needs 'private' too (see privacy.rs)"
+                    )));
+                }
                 Ok(RoomKind {
                     id: k.id.clone(),
                     label: k.label.clone().unwrap_or_else(|| k.id.clone()),
@@ -3865,6 +4467,8 @@ impl Content {
                     size: k.size.unwrap_or([4.0, 9.0]),
                     exclusive: k.exclusive,
                     passage: k.passage,
+                    private: k.private,
+                    claimed: k.claimed,
                 })
             })
             .collect::<Result<_, Error>>()?;
@@ -3883,8 +4487,16 @@ impl Content {
             love_feeling: feeling(&rr.love_feeling, "roomRules")?,
             dislike_feeling: feeling(&rr.dislike_feeling, "roomRules")?,
             dirt: {
-                let mut d: Vec<(TagMask, f32)> =
-                    rr.dirt.iter().map(|(t, &v)| Ok((tag_mask(std::slice::from_ref(t), "roomRules.dirt")?, v.max(0.0)))).collect::<Result<_, Error>>()?;
+                let mut d: Vec<(TagMask, f32)> = rr
+                    .dirt
+                    .iter()
+                    .map(|(t, &v)| {
+                        Ok((
+                            tag_mask(std::slice::from_ref(t), "roomRules.dirt")?,
+                            v.max(0.0),
+                        ))
+                    })
+                    .collect::<Result<_, Error>>()?;
                 d.sort_by_key(|e| e.0);
                 d
             },
@@ -3902,7 +4514,12 @@ impl Content {
         for o in &mut objects {
             for it in &mut o.interactions {
                 if it.dirt < 0.0 {
-                    it.dirt = room_rules.dirt.iter().filter(|(m, _)| it.tags & m != 0).map(|(_, v)| *v).fold(0.0, f32::max);
+                    it.dirt = room_rules
+                        .dirt
+                        .iter()
+                        .filter(|(m, _)| it.tags & m != 0)
+                        .map(|(_, v)| *v)
+                        .fold(0.0, f32::max);
                 }
             }
         }
@@ -3913,7 +4530,11 @@ impl Content {
             repair: RepairRules {
                 label: rp.label.clone().unwrap_or_else(|| "Repair".into()),
                 minutes: rp.minutes.unwrap_or(45.0).max(1.0),
-                skill: rp.skill.as_deref().map(|s| lookup(&skill_index, s, "objectRules.repair", "skill")).transpose()?,
+                skill: rp
+                    .skill
+                    .as_deref()
+                    .map(|s| lookup(&skill_index, s, "objectRules.repair", "skill"))
+                    .transpose()?,
                 skill_gain: rp.skill_gain_per_hour.unwrap_or(0.3),
                 chance: rp.chance.unwrap_or(0.5),
                 chance_per_level: rp.chance_per_level.unwrap_or(0.08),
@@ -3933,10 +4554,16 @@ impl Content {
         };
         // (Selling for more than was paid would be a money machine; an upgrade costs something.)
         if !(0.0..=1.0).contains(&object_rules.resale) {
-            return Err(Error::new(format!("objectRules.resale {} must be 0..1 (a share of what was paid)", object_rules.resale)));
+            return Err(Error::new(format!(
+                "objectRules.resale {} must be 0..1 (a share of what was paid)",
+                object_rules.resale
+            )));
         }
         if !(object_rules.upgrade_cost >= 0.0 && object_rules.upgrade_cost.is_finite()) {
-            return Err(Error::new(format!("objectRules.upgradeCost {} must be a number ≥ 0", object_rules.upgrade_cost)));
+            return Err(Error::new(format!(
+                "objectRules.upgradeCost {} must be a number ≥ 0",
+                object_rules.upgrade_cost
+            )));
         }
         let build = BuildRules {
             wall: raw.build.wall.unwrap_or(40),
@@ -3970,9 +4597,7 @@ impl Content {
         let visits = VisitRules {
             gains: need_array(&v.needs, "visits")?,
             hours: v.hours.unwrap_or(3.0),
-            directed_hours: v
-                .directed_hours
-                .unwrap_or(v.hours.unwrap_or(3.0) * 2.0),
+            directed_hours: v.directed_hours.unwrap_or(v.hours.unwrap_or(3.0) * 2.0),
             min_friendship: v.min_friendship.unwrap_or(15.0),
             earliest_hour: v.earliest_hour.unwrap_or(9.0),
             latest_hour: v.latest_hour.unwrap_or(21.0),
@@ -3982,7 +4607,11 @@ impl Content {
             farewell: v
                 .farewell
                 .iter()
-                .map(|id| socials.iter().position(|s| &s.id == id).ok_or_else(|| Error::new(format!("visits.farewell: unknown social '{id}'"))))
+                .map(|id| {
+                    socials.iter().position(|s| &s.id == id).ok_or_else(|| {
+                        Error::new(format!("visits.farewell: unknown social '{id}'"))
+                    })
+                })
                 .collect::<Result<_, _>>()?,
             farewell_minutes: v.farewell_minutes.unwrap_or(10.0).max(1.0),
             door: match &v.door {
@@ -3992,19 +4621,20 @@ impl Content {
                     welcome_friendship: d.welcome_friendship.unwrap_or(-20.0),
                     greet: match &d.greet {
                         None => None,
-                        Some(id) => Some(
-                            socials
-                                .iter()
-                                .position(|s| &s.id == id)
-                                .ok_or_else(|| Error::new(format!("visits.door: unknown social '{id}'")))?,
-                        ),
+                        Some(id) => {
+                            Some(socials.iter().position(|s| &s.id == id).ok_or_else(|| {
+                                Error::new(format!("visits.door: unknown social '{id}'"))
+                            })?)
+                        }
                     },
                     turned_away: feeling(&d.turned_away_feeling, "visits.door")?,
                     knock_anim: match &d.knock_anim {
                         None => None,
-                        Some(a) => Some(
-                            anim_index(a).ok_or_else(|| Error::new(format!("visits.door: unknown anim '{a}' (declare it in \"animations\")")))?,
-                        ),
+                        Some(a) => Some(anim_index(a).ok_or_else(|| {
+                            Error::new(format!(
+                                "visits.door: unknown anim '{a}' (declare it in \"animations\")"
+                            ))
+                        })?),
                     },
                 }),
             },
@@ -4066,14 +4696,38 @@ impl Content {
             .collect();
 
         let buff_feelings = feelings.iter().any(|m| m.effects.is_some());
+        let conceive_beds = objects
+            .iter()
+            .any(|o: &ObjectDef| o.interactions.iter().any(|i| i.conceive));
         let talk_anim = anim_index(TALK_ANIM);
         let cuddle_anim = anim_index("cuddle");
-        let (activities, planner, goals) =
-            crate::planner::parse(&raw.activities, &raw.planner, &raw.goals, &tag_index, &feelings)?;
+        let (activities, planner, goals) = crate::planner::parse(
+            &raw.activities,
+            &raw.planner,
+            &raw.goals,
+            &tag_index,
+            &feelings,
+        )?;
         let phone = crate::phone::parse(&raw.phone, &ix, &animations, &life.stages)?;
+        let service = crate::staff::rules(raw.service.as_ref(), &anim_index)?;
+        crate::staff::validate(&objects)?;
         let laundry = match &raw.laundry {
-            Some(l) if l.per_day > 0.0 && l.per_day.is_finite() && l.most >= 1.0 && l.most.is_finite() => Some(LaundryRules { per_day: l.per_day, most: l.most }),
-            Some(_) => return Err(Error::new("laundry: `perDay` above 0 and `most` at least 1 (loads)")),
+            Some(l)
+                if l.per_day > 0.0
+                    && l.per_day.is_finite()
+                    && l.most >= 1.0
+                    && l.most.is_finite() =>
+            {
+                Some(LaundryRules {
+                    per_day: l.per_day,
+                    most: l.most,
+                })
+            }
+            Some(_) => {
+                return Err(Error::new(
+                    "laundry: `perDay` above 0 and `most` at least 1 (loads)",
+                ));
+            }
             None => None,
         };
         Ok(Self {
@@ -4112,6 +4766,7 @@ impl Content {
             talk_anim,
             cuddle_anim,
             buff_feelings,
+            conceive_beds,
             activities,
             planner,
             goals,
@@ -4119,6 +4774,7 @@ impl Content {
             items,
             recipes,
             phone,
+            service,
             laundry,
             object_index,
         })
@@ -4246,7 +4902,11 @@ impl Content {
 /// A time content gives (minutes or hours): a number (1e39 reads as infinity, which would
 /// overflow the ticks it becomes).
 fn time(v: f32, ctx: &str) -> Result<f32, Error> {
-    if v.is_finite() { Ok(v) } else { Err(Error::new(format!("{ctx}: times must be numbers"))) }
+    if v.is_finite() {
+        Ok(v)
+    } else {
+        Err(Error::new(format!("{ctx}: times must be numbers")))
+    }
 }
 
 fn lookup(index: &HashMap<&str, usize>, key: &str, ctx: &str, kind: &str) -> Result<usize, Error> {
@@ -4325,6 +4985,42 @@ mod tests {
         assert_eq!(c.feelings[0].emotion, Some(0));
         assert_eq!(c.social_rules.busy_tags, 1);
         assert_eq!(c.social_rules.default_bond.unwrap().friendship, 25.0);
+    }
+
+    #[test]
+    fn track_pay_rises_to_the_top_and_probation_stops_at_one_level() {
+        let c = Content::from_json(
+            r#"{
+            "needs":[{"id":"fun","label":"Fun","decayPerHour":0.06}],
+            "objects":[],
+            "skills":[{"id":"writing","label":"Writing"}],
+            "grades":[{"id":"A","label":"Entry","payPerHour":10,"skillLevel":0},
+                      {"id":"B","label":"Junior","payPerHour":20,"skillLevel":2},
+                      {"id":"C","label":"Senior","payPerHour":30,"skillLevel":4}],
+            "careerCategories":[{"id":"words","label":"Words","payFactor":1.0,
+              "shift":{"start":9,"hours":8,"days":[0]},
+              "tracks":[
+                {"id":"words.low","label":"Low","skills":{"writing":1},"payFactor":0.5,
+                 "titles":["Low A","Low B","Low C"]},
+                {"id":"words.high","label":"High","skills":{"writing":1},"payFactor":1.5,
+                 "titles":["High A","High B","High C"]},
+                {"id":"words.one","label":"One","skills":{"writing":1},"payFactor":2.0,
+                 "titles":["One A"]}]}],
+            "careerRules":{"probationLevels":1}
+        }"#,
+        )
+        .unwrap();
+        let pay = |id: &str| -> Vec<i64> {
+            let career = &c.careers[c.career_index(id).unwrap()];
+            career.levels.iter().map(|l| l.pay).collect()
+        };
+        // Entry pay is the field's rate whatever the track, and pay climbs in a straight line to
+        // the track's own factor at the top grade (8h × the grade's rate, `words` paying 1).
+        assert_eq!(pay("words.low"), [80, 120, 120]);
+        assert_eq!(pay("words.high"), [80, 200, 360]);
+        // A track with one grade has no top to reach: it pays the field's rate.
+        assert_eq!(pay("words.one"), [80]);
+        assert_eq!(c.career_rules.probation_levels, 1.0);
     }
 
     #[test]
@@ -4447,11 +5143,18 @@ mod tests {
         c["careerRules"] = json!({"market": {"hour": 30}});
         c["planner"] = json!({"reviewHour": -1});
         let c = Content::from_json(&c.to_string()).unwrap();
-        let hours = [c.rent.as_ref().unwrap().hour, c.career_rules.market.as_ref().unwrap().hour, c.planner.review_hour];
+        let hours = [
+            c.rent.as_ref().unwrap().hour,
+            c.career_rules.market.as_ref().unwrap().hour,
+            c.planner.review_hour,
+        ];
         assert_eq!(hours, [23.9, 23.9, 0.0]);
         for h in hours {
             let t = crate::clock::tick_at(3, h * 60.0).unwrap();
-            assert!(crate::clock::at_minute(t, h * 60.0) && crate::clock::day(t) == 3, "hour {h} comes on day 3");
+            assert!(
+                crate::clock::at_minute(t, h * 60.0) && crate::clock::day(t) == 3,
+                "hour {h} comes on day 3"
+            );
         }
     }
 
@@ -4472,47 +5175,174 @@ mod tests {
         };
         // (1e39 is past what an f32 holds: it reads as infinity.)
         let inf = || json!(1e39);
-        refused(&|c| c["traits"][3]["effects"]["walkSpeed"] = json!(0), "lazy: walkSpeed 0 must be above 0");
-        refused(&|c| c["traits"][3]["effects"]["walkSpeed"] = json!(-1.0), "walkSpeed -1 must be above 0");
-        refused(&|c| c["perks"][1]["effects"]["walkSpeed"] = json!(11), "at most 10");
-        refused(&|c| c["perks"][1]["effects"]["walkSpeed"] = inf(), "fast: walkSpeed inf");
-        refused(&|c| c["emotions"][0]["effects"]["walkSpeed"] = json!(0), "happy: walkSpeed");
-        refused(&|c| c["feelings"][0]["effects"] = json!({"walkSpeed": 0}), "goodChat: walkSpeed");
-        refused(&|c| c["needs"][0]["decayPerHour"] = json!(-0.1), "need 'hunger': decayPerHour -0.1");
-        refused(&|c| c["traits"][0]["effects"]["needDecay"]["hunger"] = json!(-1), "foodie: needDecay -1");
-        refused(&|c| c["perks"][0]["effects"]["needGain"] = json!({"hunger": -1}), "iron: needGain -1");
-        refused(&|c| c["emotions"][0]["effects"]["tagPreference"]["friendly"] = json!(-1), "happy: tagPreference -1");
-        refused(&|c| c["dayRhythm"] = json!({"nightDecay": {"hunger": -0.5}}), "dayRhythm: the hunger multiplier -0.5");
-        refused(&|c| c["genders"] = (0..33).map(|i| json!({"id": format!("g{i}"), "label": "G"})).collect(), "at most 32 genders");
-        refused(&|c| c["objectRules"] = json!({"resale": 1.5}), "objectRules.resale 1.5 must be 0..1");
-        refused(&|c| c["objectRules"] = json!({"resale": -0.5}), "objectRules.resale");
-        refused(&|c| c["objectRules"] = json!({"upgradeCost": -0.3}), "objectRules.upgradeCost -0.3");
-        refused(&|c| c["life"] = json!({"basicPension": -5}), "life.basicPension -5 must be ≥ 0");
-        refused(&|c| c["objects"][1]["footprint"] = json!([7, 1]), "object 'tv': a footprint is at most 6 × 6 tiles");
+        refused(
+            &|c| c["traits"][3]["effects"]["walkSpeed"] = json!(0),
+            "lazy: walkSpeed 0 must be above 0",
+        );
+        refused(
+            &|c| c["traits"][3]["effects"]["walkSpeed"] = json!(-1.0),
+            "walkSpeed -1 must be above 0",
+        );
+        refused(
+            &|c| c["perks"][1]["effects"]["walkSpeed"] = json!(11),
+            "at most 10",
+        );
+        refused(
+            &|c| c["perks"][1]["effects"]["walkSpeed"] = inf(),
+            "fast: walkSpeed inf",
+        );
+        refused(
+            &|c| c["emotions"][0]["effects"]["walkSpeed"] = json!(0),
+            "happy: walkSpeed",
+        );
+        refused(
+            &|c| c["feelings"][0]["effects"] = json!({"walkSpeed": 0}),
+            "goodChat: walkSpeed",
+        );
+        refused(
+            &|c| c["needs"][0]["decayPerHour"] = json!(-0.1),
+            "need 'hunger': decayPerHour -0.1",
+        );
+        refused(
+            &|c| c["traits"][0]["effects"]["needDecay"]["hunger"] = json!(-1),
+            "foodie: needDecay -1",
+        );
+        refused(
+            &|c| c["perks"][0]["effects"]["needGain"] = json!({"hunger": -1}),
+            "iron: needGain -1",
+        );
+        refused(
+            &|c| c["emotions"][0]["effects"]["tagPreference"]["friendly"] = json!(-1),
+            "happy: tagPreference -1",
+        );
+        refused(
+            &|c| c["dayRhythm"] = json!({"nightDecay": {"hunger": -0.5}}),
+            "dayRhythm: the hunger multiplier -0.5",
+        );
+        refused(
+            &|c| {
+                c["genders"] = (0..33)
+                    .map(|i| json!({"id": format!("g{i}"), "label": "G"}))
+                    .collect()
+            },
+            "at most 32 genders",
+        );
+        refused(
+            &|c| c["objectRules"] = json!({"resale": 1.5}),
+            "objectRules.resale 1.5 must be 0..1",
+        );
+        refused(
+            &|c| c["objectRules"] = json!({"resale": -0.5}),
+            "objectRules.resale",
+        );
+        refused(
+            &|c| c["objectRules"] = json!({"upgradeCost": -0.3}),
+            "objectRules.upgradeCost -0.3",
+        );
+        refused(
+            &|c| c["life"] = json!({"basicPension": -5}),
+            "life.basicPension -5 must be ≥ 0",
+        );
+        refused(
+            &|c| c["objects"][1]["footprint"] = json!([7, 1]),
+            "object 'tv': a footprint is at most 6 × 6 tiles",
+        );
         refused(
             &|c| {
                 let it = c["objects"][0]["interactions"][0].clone();
-                c["objects"][0]["interactions"].as_array_mut().unwrap().push(it);
+                c["objects"][0]["interactions"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(it);
             },
             "object 'fridge': interaction 1 repeats the id 'snack'",
         );
-        refused(&|c| c["needs"].as_array_mut().unwrap().push(json!({"id": "fun", "label": "Fun", "decayPerHour": 0.1})), "duplicate need id");
-        refused(&|c| c["emotions"].as_array_mut().unwrap().push(json!({"id": "happy", "label": "Happy"})), "duplicate emotion id");
-        refused(&|c| c["feelings"].as_array_mut().unwrap().push(json!({"id": "goodChat", "label": "Good", "hours": 1})), "duplicate feeling id");
-        refused(&|c| c["bondPresets"]["roommates"]["friendship"] = json!(150), "bond preset 'roommates': friendship and romance are -100..100");
-        refused(&|c| c["bondPresets"]["roommates"]["romance"] = json!(-101), "bond preset 'roommates'");
-        refused(&|c| c["socialRules"]["busyTags"] = json!(["food", "nonexistent"]), "socialRules.busyTags: unknown tag 'nonexistent'");
-        refused(&|c| c["socialRules"]["guestTags"] = json!(["bathrom"]), "socialRules.guestTags: unknown tag 'bathrom'");
-        refused(&|c| c["dayRhythm"] = json!({"sleepTags": ["slep"]}), "dayRhythm.sleepTags: unknown tag 'slep'");
-        refused(&|c| c["dayRhythm"] = json!({"napTags": ["nap"]}), "dayRhythm.napTags: unknown tag 'nap'");
-        refused(&|c| c["roomKinds"] = json!([{"id": "den", "tags": ["screen"], "essentials": [["scren"]]}]), "room kind 'den': unknown tag 'scren'");
-        refused(&|c| c["roomRules"] = json!({"dirt": {"fod": 0.1}}), "roomRules.dirt: unknown tag 'fod'");
-        refused(&|c| c["objectRules"] = json!({"repair": {"skill": "handiness"}}), "objectRules.repair: unknown skill 'handiness'");
-        refused(&|c| c["objectRules"] = json!({"repair": {"tags": ["chore"]}}), "objectRules.repair: unknown tag 'chore'");
-        refused(&|c| c["accidents"] = json!([{"id": "doze", "need": "fun", "rest": {"label": "Doze", "minutes": 10, "anim": "snooze"}}]), "accident 'doze': unknown anim 'snooze'");
-        refused(&|c| c["accidents"] = json!([{"id": "doze", "need": "fun", "rest": {"label": "Doze", "minutes": 10, "tags": ["sleep"]}}]), "accident 'doze': unknown tag 'sleep'");
-        refused(&|c| c["activities"] = json!([{"id": "tv", "label": "TV", "tags": ["scren"]}]), "activity 'tv': unknown tag 'scren'");
-        refused(&|c| c["cooking"] = json!({"eatTags": ["fod"]}), "cooking.eatTags: unknown tag 'fod'");
+        refused(
+            &|c| {
+                c["needs"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!({"id": "fun", "label": "Fun", "decayPerHour": 0.1}))
+            },
+            "duplicate need id",
+        );
+        refused(
+            &|c| {
+                c["emotions"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!({"id": "happy", "label": "Happy"}))
+            },
+            "duplicate emotion id",
+        );
+        refused(
+            &|c| {
+                c["feelings"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!({"id": "goodChat", "label": "Good", "hours": 1}))
+            },
+            "duplicate feeling id",
+        );
+        refused(
+            &|c| c["bondPresets"]["roommates"]["friendship"] = json!(150),
+            "bond preset 'roommates': friendship and romance are -100..100",
+        );
+        refused(
+            &|c| c["bondPresets"]["roommates"]["romance"] = json!(-101),
+            "bond preset 'roommates'",
+        );
+        refused(
+            &|c| c["socialRules"]["busyTags"] = json!(["food", "nonexistent"]),
+            "socialRules.busyTags: unknown tag 'nonexistent'",
+        );
+        refused(
+            &|c| c["socialRules"]["guestTags"] = json!(["bathrom"]),
+            "socialRules.guestTags: unknown tag 'bathrom'",
+        );
+        refused(
+            &|c| c["dayRhythm"] = json!({"sleepTags": ["slep"]}),
+            "dayRhythm.sleepTags: unknown tag 'slep'",
+        );
+        refused(
+            &|c| c["dayRhythm"] = json!({"napTags": ["nap"]}),
+            "dayRhythm.napTags: unknown tag 'nap'",
+        );
+        refused(
+            &|c| {
+                c["roomKinds"] =
+                    json!([{"id": "den", "tags": ["screen"], "essentials": [["scren"]]}])
+            },
+            "room kind 'den': unknown tag 'scren'",
+        );
+        refused(
+            &|c| c["roomRules"] = json!({"dirt": {"fod": 0.1}}),
+            "roomRules.dirt: unknown tag 'fod'",
+        );
+        refused(
+            &|c| c["objectRules"] = json!({"repair": {"skill": "handiness"}}),
+            "objectRules.repair: unknown skill 'handiness'",
+        );
+        refused(
+            &|c| c["objectRules"] = json!({"repair": {"tags": ["chore"]}}),
+            "objectRules.repair: unknown tag 'chore'",
+        );
+        refused(
+            &|c| c["accidents"] = json!([{"id": "doze", "need": "fun", "rest": {"label": "Doze", "minutes": 10, "anim": "snooze"}}]),
+            "accident 'doze': unknown anim 'snooze'",
+        );
+        refused(
+            &|c| c["accidents"] = json!([{"id": "doze", "need": "fun", "rest": {"label": "Doze", "minutes": 10, "tags": ["sleep"]}}]),
+            "accident 'doze': unknown tag 'sleep'",
+        );
+        refused(
+            &|c| c["activities"] = json!([{"id": "tv", "label": "TV", "tags": ["scren"]}]),
+            "activity 'tv': unknown tag 'scren'",
+        );
+        refused(
+            &|c| c["cooking"] = json!({"eatTags": ["fod"]}),
+            "cooking.eatTags: unknown tag 'fod'",
+        );
         refused(
             &|c| {
                 c["items"] = json!([{"id": "pot", "label": "Pot"}]);
@@ -4521,20 +5351,123 @@ mod tests {
             },
             "recipe 'stew': 1 to 255 steps",
         );
-        refused(&|c| c["feelings"][0]["hours"] = inf(), "goodChat: hours must be > 0");
-        refused(&|c| c["objects"][0]["interactions"][0]["minutes"] = inf(), "fridge.snack: minutes must be > 0");
-        refused(&|c| c["socials"][0]["minutes"] = inf(), "chat: minutes must be > 0");
-        refused(&|c| c["careerRules"] = json!({"commuteMinutes": 1e39}), "careerRules.commuteMinutes: times must be numbers");
-        refused(&|c| c["accidents"] = json!([{"id": "doze", "need": "fun", "cooldownHours": 1e39}]), "accident 'doze': times must be numbers");
-        refused(&|c| c["dayRhythm"] = json!({"babyWakes": {"cooldownMinutes": 1e39}}), "dayRhythm.babyWakes.cooldownMinutes");
-        refused(&|c| c["cooking"] = json!({"inviteMinutes": 1e39}), "cooking.inviteMinutes must be a number");
-        refused(&|c| c["objects"][0]["interactions"][0]["hours"] = json!([20, 20]), "fridge.snack: `hours` is [from, to]");
-        refused(&|c| c["objects"][0]["interactions"][0]["hours"] = json!([20, 25]), "fridge.snack: `hours`");
-        refused(&|c| c["objects"][0]["interactions"][0]["workOn"] = json!("laundry"), "fridge.snack: `workOn` laundry needs content `laundry`");
-        refused(&|c| c["laundry"] = json!({"perDay": 0, "most": 4}), "laundry: `perDay` above 0");
+        refused(
+            &|c| c["feelings"][0]["hours"] = inf(),
+            "goodChat: hours must be > 0",
+        );
+        refused(
+            &|c| c["objects"][0]["interactions"][0]["minutes"] = inf(),
+            "fridge.snack: minutes must be > 0",
+        );
+        refused(
+            &|c| c["socials"][0]["minutes"] = inf(),
+            "chat: minutes must be > 0",
+        );
+        refused(
+            &|c| c["careerRules"] = json!({"commuteMinutes": 1e39}),
+            "careerRules.commuteMinutes: times must be numbers",
+        );
+        // Careers: pay and probation stay within what the game can pay out.
+        let career = |c: &mut serde_json::Value| {
+            c["skills"] = json!([{"id": "writing", "label": "Writing"}]);
+            c["grades"] = json!([{"id": "A", "label": "Entry", "payPerHour": 10, "skillLevel": 0}]);
+            c["careerRules"] = json!({});
+            c["careerCategories"] = json!([{
+                "id": "words", "label": "Words", "payFactor": 1.0,
+                "shift": {"start": 9, "hours": 8, "days": [0]},
+                "tracks": [{"id": "words.low", "label": "Low", "skills": {"writing": 1},
+                            "payFactor": 1.0, "titles": ["Low A"]}]}]);
+        };
+        // Each row: where the one field is set, the value put there, and what it is refused for.
+        for (path, value, says) in [
+            (
+                "/grades/0/payPerHour",
+                json!(-1),
+                "grade 'A': payPerHour -1 must be 0..10000",
+            ),
+            (
+                "/grades/0/payPerHour",
+                json!(1e39),
+                "grade 'A': payPerHour inf must be 0..10000",
+            ),
+            (
+                "/careerCategories/0/payFactor",
+                json!(0.1),
+                "career category 'words': payFactor 0.1 must be 0.25..3",
+            ),
+            (
+                "/careerCategories/0/tracks/0/payFactor",
+                json!(4),
+                "track 'words.low': payFactor 4 must be 0.25..3",
+            ),
+            (
+                "/careerRules",
+                json!({"probationLevels": 2}),
+                "careerRules.probationLevels 2 must be 0..1",
+            ),
+        ] {
+            refused(
+                &|c| {
+                    career(c);
+                    *c.pointer_mut(path).unwrap() = value.clone()
+                },
+                says,
+            );
+        }
+        refused(
+            &|c| c["accidents"] = json!([{"id": "doze", "need": "fun", "cooldownHours": 1e39}]),
+            "accident 'doze': times must be numbers",
+        );
+        refused(
+            &|c| c["dayRhythm"] = json!({"babyWakes": {"cooldownMinutes": 1e39}}),
+            "dayRhythm.babyWakes.cooldownMinutes",
+        );
+        refused(
+            &|c| c["cooking"] = json!({"inviteMinutes": 1e39}),
+            "cooking.inviteMinutes must be a number",
+        );
+        refused(
+            &|c| c["objects"][0]["interactions"][0]["hours"] = json!([20, 20]),
+            "fridge.snack: `hours` is [from, to]",
+        );
+        refused(
+            &|c| c["objects"][0]["interactions"][0]["hours"] = json!([20, 25]),
+            "fridge.snack: `hours`",
+        );
+        refused(
+            &|c| c["objects"][0]["interactions"][0]["workOn"] = json!("laundry"),
+            "fridge.snack: `workOn` laundry needs content `laundry`",
+        );
+        refused(
+            &|c| c["laundry"] = json!({"perDay": 0, "most": 4}),
+            "laundry: `perDay` above 0",
+        );
+        // Sold by someone: at an object someone serves at, standing near it (`staff.rs`).
+        refused(
+            &|c| c["objects"][0]["interactions"][0]["selfServe"] = json!({"label": "Take one"}),
+            "`selfServe` is for something sold, at an object with `staff`",
+        );
+        refused(
+            &|c| c["objects"][0]["staff"] = json!({"at": [0, -3], "hours": [8, 18]}),
+            "object 'fridge': `staff.at` is more than 1.5 m off its footprint",
+        );
+        refused(
+            &|c| c["objects"][0]["staff"] = json!({"at": [0, -0.8], "hours": [8, 8]}),
+            "object 'fridge': `staff.hours`",
+        );
+        refused(
+            &|c| c["service"] = json!({"waitMinutes": 0}),
+            "service: `share` at least 0 and `waitMinutes` above 0",
+        );
         // A game for two: two places, and its use for one another of the object's, alike.
-        refused(&|c| c["objects"][1]["interactions"][0]["partner"] = json!(true), "tv.watch: a game for two (`partner`) is played at an object with two places");
-        refused(&|c| c["objects"][1]["interactions"][0]["alone"] = json!("watch"), "tv.watch: `alone` is what's done with nobody to play: it needs `partner`");
+        refused(
+            &|c| c["objects"][1]["interactions"][0]["partner"] = json!(true),
+            "tv.watch: a game for two (`partner`) is played at an object with two places",
+        );
+        refused(
+            &|c| c["objects"][1]["interactions"][0]["alone"] = json!("watch"),
+            "tv.watch: `alone` is what's done with nobody to play: it needs `partner`",
+        );
         let game = |alone: &str, pose: &str| {
             let alone = alone.to_owned();
             let pose = pose.to_owned();
@@ -4545,14 +5478,24 @@ mod tests {
                 c["objects"][1]["interactions"].as_array_mut().unwrap().push(json!({"id":"solo","label":"Solo","minutes":10,"pose":pose,"effects":{"fun":0.1}}));
             }
         };
-        refused(&game("nothing", "stand"), "tv.watch: `alone` names no use of 'tv': 'nothing'");
-        refused(&game("watch", "stand"), "tv.watch: `alone` is a use for one (no `partner`), done in the same pose as the game");
+        refused(
+            &game("nothing", "stand"),
+            "tv.watch: `alone` names no use of 'tv': 'nothing'",
+        );
+        refused(
+            &game("watch", "stand"),
+            "tv.watch: `alone` is a use for one (no `partner`), done in the same pose as the game",
+        );
         refused(&game("solo", "sit"), "tv.watch: `alone` is a use for one");
         let mut c: serde_json::Value = serde_json::from_str(CONTENT).unwrap();
         game("solo", "stand")(&mut c);
         let content = Content::from_json(&c.to_string()).unwrap();
         let tv = content.objects.iter().find(|o| o.id == "tv").unwrap();
-        assert!(tv.interactions[0].partner && tv.interactions[0].alone == Some(1) && !tv.interactions[1].partner);
+        assert!(
+            tv.interactions[0].partner
+                && tv.interactions[0].alone == Some(1)
+                && !tv.interactions[1].partner
+        );
         refused(
             &|c| {
                 c["objects"][1]["layer"] = json!("surface");
@@ -4561,8 +5504,10 @@ mod tests {
             },
             "a thing on a surface is used standing or sitting at its top",
         );
-        // (Each of these on its own is fine.)
+        // (Each of these on its own is fine.) A careers block left to its defaults, one grade and
+        // all, is accepted with them.
         let mut c: serde_json::Value = serde_json::from_str(CONTENT).unwrap();
+        career(&mut c);
         c["objectRules"] = json!({"resale": 1.0, "upgradeCost": 0.0});
         c["bondPresets"]["roommates"]["friendship"] = json!(-100);
         c["perks"][1]["effects"]["walkSpeed"] = json!(10);

@@ -72,7 +72,10 @@ fn workday(w: &mut World) -> (f32, f32) {
 
 /// Story events of `kind` on `day`.
 fn told(w: &World, kind: EventKind, day: u32) -> Vec<&sim_core::social::SocialEvent> {
-    w.events.iter().filter(|e| e.kind == kind && clock::day(e.tick) == day).collect()
+    w.events
+        .iter()
+        .filter(|e| e.kind == kind && clock::day(e.tick) == day)
+        .collect()
 }
 
 #[test]
@@ -81,19 +84,37 @@ fn a_babysitter_looks_after_the_baby_while_both_parents_work() {
     until(&mut w, 2, 7.0);
     let funds = w.households[0].funds;
     until(&mut w, 2, 12.0);
-    assert!(w.sims[0].away_until.is_some() && w.sims[1].away_until.is_some(), "both at work");
+    assert!(
+        w.sims[0].away_until.is_some() && w.sims[1].away_until.is_some(),
+        "both at work"
+    );
     let booked = told(&w, EventKind::Babysitter, 2);
     assert_eq!(booked.len(), 1, "a babysitter for the day");
-    assert_eq!((booked[0].b, booked[0].n), (2, Some(40)), "for Cleo, for $40");
+    assert_eq!(
+        (booked[0].b, booked[0].n),
+        (2, Some(40)),
+        "for Cleo, for $40"
+    );
     assert_eq!(w.households[0].funds, funds - 40, "paid from the household");
 
     let (lowest, average) = workday(&mut w);
-    assert!(average > 0.5 && lowest > 0.25, "Cleo was looked after: average {average:.2}, lowest {lowest:.2}");
+    assert!(
+        average > 0.5 && lowest > 0.25,
+        "Cleo was looked after: average {average:.2}, lowest {lowest:.2}"
+    );
     // Booked once for the day, and again the next workday.
     until(&mut w, 3, 12.0);
     assert_eq!(told(&w, EventKind::Babysitter, 2).len(), 1, "once a day");
-    assert_eq!(told(&w, EventKind::Babysitter, 3).len(), 1, "and again the next workday");
-    assert!(!w.events.iter().any(|e| e.kind == EventKind::StayedHome || e.kind == EventKind::MissedWork));
+    assert_eq!(
+        told(&w, EventKind::Babysitter, 3).len(),
+        1,
+        "and again the next workday"
+    );
+    assert!(
+        !w.events
+            .iter()
+            .any(|e| e.kind == EventKind::StayedHome || e.kind == EventKind::MissedWork)
+    );
 }
 
 #[test]
@@ -101,9 +122,18 @@ fn a_grandparent_at_home_looks_after_the_baby_for_free() {
     let grandma = r#",{"name":"Dora","x":6.5,"z":8.5,"age":70}"#;
     let mut w = World::from_json(CONTENT, &town(grandma), 1).unwrap();
     let (lowest, average) = workday(&mut w);
-    assert!(w.sims[0].away_until.is_some() && w.sims[1].away_until.is_some(), "both at work");
-    assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter), "no babysitter with Dora at home");
-    assert!(average > 0.5 && lowest > 0.25, "Dora looked after Cleo: average {average:.2}, lowest {lowest:.2}");
+    assert!(
+        w.sims[0].away_until.is_some() && w.sims[1].away_until.is_some(),
+        "both at work"
+    );
+    assert!(
+        !w.events.iter().any(|e| e.kind == EventKind::Babysitter),
+        "no babysitter with Dora at home"
+    );
+    assert!(
+        average > 0.5 && lowest > 0.25,
+        "Dora looked after Cleo: average {average:.2}, lowest {lowest:.2}"
+    );
 }
 
 #[test]
@@ -112,14 +142,26 @@ fn without_money_for_a_babysitter_someone_stays_home() {
     until(&mut w, 2, 7.0);
     w.households[0].funds = 10;
     let (lowest, average) = workday(&mut w);
-    assert!(told(&w, EventKind::Babysitter, 2).is_empty(), "no money for one");
+    assert!(
+        told(&w, EventKind::Babysitter, 2).is_empty(),
+        "no money for one"
+    );
     let stayed = told(&w, EventKind::StayedHome, 2);
     assert_eq!(stayed.len(), 1, "one of them stayed home");
     let (home, away) = if stayed[0].a == 0 { (0, 1) } else { (1, 0) };
     assert_eq!(stayed[0].b, 2, "to look after Cleo");
-    assert!(w.sims[home].away_until.is_none() && w.sims[away].away_until.is_some(), "the other went to work");
-    assert!(!w.events.iter().any(|e| e.kind == EventKind::MissedWork), "not held against them");
-    assert!(average > 0.5 && lowest > 0.25, "Cleo was looked after: average {average:.2}, lowest {lowest:.2}");
+    assert!(
+        w.sims[home].away_until.is_none() && w.sims[away].away_until.is_some(),
+        "the other went to work"
+    );
+    assert!(
+        !w.events.iter().any(|e| e.kind == EventKind::MissedWork),
+        "not held against them"
+    );
+    assert!(
+        average > 0.5 && lowest > 0.25,
+        "Cleo was looked after: average {average:.2}, lowest {lowest:.2}"
+    );
 }
 
 // ---- Going out ----------------------------------------------------------------------------
@@ -227,7 +269,10 @@ fn the_only_grown_up_at_home_with_a_baby_does_not_go_out() {
 
     let mut w = street_world(true, "");
     assert_eq!(lonely_day(&mut w), 0, "Ada stays home with Cleo");
-    assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter), "nobody needed");
+    assert!(
+        !w.events.iter().any(|e| e.kind == EventKind::Babysitter),
+        "nobody needed"
+    );
 }
 
 #[test]
@@ -243,9 +288,16 @@ fn sent_out_visiting_the_last_grown_up_gets_a_babysitter() {
     assert!(visited, "Ada went to Bo's");
     let booked = told(&w, EventKind::Babysitter, 1);
     assert_eq!(booked.len(), 1, "a babysitter for the day");
-    assert_eq!((booked[0].a, booked[0].b, booked[0].n), (0, 1, Some(40)), "for Cleo, for $40");
+    assert_eq!(
+        (booked[0].a, booked[0].b, booked[0].n),
+        (0, 1, Some(40)),
+        "for Cleo, for $40"
+    );
     assert_eq!(w.households[0].funds, funds - 40, "paid from the household");
-    assert!(average > 0.5 && lowest > 0.25, "Cleo was looked after: average {average:.2}, lowest {lowest:.2}");
+    assert!(
+        average > 0.5 && lowest > 0.25,
+        "Cleo was looked after: average {average:.2}, lowest {lowest:.2}"
+    );
 
     // Out again the same day: still the one booking.
     until(&mut w, 1, 15.0);
@@ -272,8 +324,20 @@ fn without_money_for_a_babysitter_the_last_grown_up_cannot_be_sent_out() {
 /// out (null: it isn't).
 fn going_out_ui(w: &World) -> (serde_json::Value, serde_json::Value) {
     let ui: serde_json::Value = serde_json::from_str(&sim_core::view::ui_state_json(w)).unwrap();
-    let ada = ui["sims"].as_array().unwrap().iter().find(|s| s["id"] == 0).expect("Ada").clone();
-    let bo = ada["phone"]["contacts"].as_array().unwrap().iter().find(|c| c["id"] == 2).expect("Bo in her phone").clone();
+    let ada = ui["sims"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["id"] == 0)
+        .expect("Ada")
+        .clone();
+    let bo = ada["phone"]["contacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"] == 2)
+        .expect("Bo in her phone")
+        .clone();
     (ada["homebound"].clone(), bo["why"][0].clone())
 }
 
@@ -284,15 +348,28 @@ fn the_ui_says_why_the_last_grown_up_cannot_be_sent_out() {
     // With money for a babysitter: the visit and asking Bo are both on.
     assert_eq!(sim_core::life::homebound(&w, 0), None);
     assert_eq!(sim_core::phone::refusal(&w, 0, 0, Some(2)), None);
-    assert_eq!(going_out_ui(&w), (serde_json::Value::Null, serde_json::Value::Null));
+    assert_eq!(
+        going_out_ui(&w),
+        (serde_json::Value::Null, serde_json::Value::Null)
+    );
     // Without: greyed out, saying why, exactly as the orders are refused.
     w.households[0].funds = 10;
     let why = sim_core::life::NO_SITTER;
     assert_eq!(sim_core::life::homebound(&w, 0), Some(why));
     assert_eq!(sim_core::phone::refusal(&w, 0, 0, Some(2)), Some(why));
-    assert_eq!(going_out_ui(&w), (serde_json::json!(why), serde_json::json!(why)));
+    assert_eq!(
+        going_out_ui(&w),
+        (serde_json::json!(why), serde_json::json!(why))
+    );
     assert!(w.apply(Command::Visit { sim: 0, plot: 2 }).is_err());
-    assert!(w.apply(Command::Phone { sim: 0, action: 0, contact: Some(2) }).is_err());
+    assert!(
+        w.apply(Command::Phone {
+            sim: 0,
+            action: 0,
+            contact: Some(2)
+        })
+        .is_err()
+    );
     // A grandparent home: on again, as the orders go ahead.
     let grandma = r#",{"name":"Dora","household":0,"x":6.5,"z":8.5,"age":70}"#;
     let mut w = street_world(true, grandma);
@@ -300,8 +377,16 @@ fn the_ui_says_why_the_last_grown_up_cannot_be_sent_out() {
     w.households[0].free_will = false;
     until(&mut w, 1, 10.0);
     w.households[0].funds = 10;
-    assert_eq!(going_out_ui(&w), (serde_json::Value::Null, serde_json::Value::Null));
-    w.apply(Command::Phone { sim: 0, action: 0, contact: Some(2) }).unwrap();
+    assert_eq!(
+        going_out_ui(&w),
+        (serde_json::Value::Null, serde_json::Value::Null)
+    );
+    w.apply(Command::Phone {
+        sim: 0,
+        action: 0,
+        contact: Some(2),
+    })
+    .unwrap();
     w.apply(Command::Visit { sim: 0, plot: 2 }).unwrap();
 }
 
@@ -315,8 +400,14 @@ fn with_a_grandparent_at_home_nobody_books_a_babysitter_for_a_visit() {
     w.apply(Command::Visit { sim: 0, plot: 2 }).unwrap();
     let (lowest, average, visited) = while_out(&mut w);
     assert!(visited, "Ada went to Bo's");
-    assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter), "no babysitter with Dora at home");
-    assert!(average > 0.5 && lowest > 0.25, "Dora looked after Cleo: average {average:.2}, lowest {lowest:.2}");
+    assert!(
+        !w.events.iter().any(|e| e.kind == EventKind::Babysitter),
+        "no babysitter with Dora at home"
+    );
+    assert!(
+        average > 0.5 && lowest > 0.25,
+        "Dora looked after Cleo: average {average:.2}, lowest {lowest:.2}"
+    );
 }
 
 /// From now until `hour` on day 1: whether Ada was ever in the park (plot 1).
@@ -337,18 +428,64 @@ fn without_money_for_a_babysitter_the_last_grown_up_cannot_be_sent_anywhere_else
     let mut w = street_world(true, "");
     until(&mut w, 1, 10.0);
     w.households[0].funds = 10;
-    let refused = |err: sim_core::Error| assert_eq!(err.to_string(), "nobody to look after Cleo: not enough money for a babysitter ($40)");
+    let refused = |err: sim_core::Error| {
+        assert_eq!(
+            err.to_string(),
+            "nobody to look after Cleo: not enough money for a babysitter ($40)"
+        )
+    };
     // The bench in the park, a walk to the park, a chat with Bo at his, asking Bo on the phone
     // to come over to his.
-    refused(w.apply(Command::Use { sim: 0, object: 3, interaction: 0 }).unwrap_err());
-    refused(w.apply(Command::MoveTo { sim: 0, x: 17.5, z: 6.5 }).unwrap_err());
-    refused(w.apply(Command::Social { sim: 0, target: 2, social: 0 }).unwrap_err());
-    refused(w.apply(Command::Phone { sim: 0, action: 0, contact: Some(2) }).unwrap_err());
-    assert!(!at_the_park_until(&mut w, 12.0) && !out(&w, 0), "Ada stayed home");
+    refused(
+        w.apply(Command::Use {
+            sim: 0,
+            object: 3,
+            interaction: 0,
+        })
+        .unwrap_err(),
+    );
+    refused(
+        w.apply(Command::MoveTo {
+            sim: 0,
+            x: 17.5,
+            z: 6.5,
+        })
+        .unwrap_err(),
+    );
+    refused(
+        w.apply(Command::Social {
+            sim: 0,
+            target: 2,
+            social: 0,
+        })
+        .unwrap_err(),
+    );
+    refused(
+        w.apply(Command::Phone {
+            sim: 0,
+            action: 0,
+            contact: Some(2),
+        })
+        .unwrap_err(),
+    );
+    assert!(
+        !at_the_park_until(&mut w, 12.0) && !out(&w, 0),
+        "Ada stayed home"
+    );
     assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter));
     // Things at home are fine.
-    w.apply(Command::MoveTo { sim: 0, x: 6.5, z: 6.5 }).unwrap();
-    w.apply(Command::Use { sim: 0, object: 1, interaction: 0 }).unwrap();
+    w.apply(Command::MoveTo {
+        sim: 0,
+        x: 6.5,
+        z: 6.5,
+    })
+    .unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: 1,
+        interaction: 0,
+    })
+    .unwrap();
 }
 
 #[test]
@@ -356,11 +493,20 @@ fn sent_to_the_park_the_last_grown_up_gets_a_babysitter() {
     let mut w = street_world(true, "");
     until(&mut w, 1, 10.0);
     w.households[0].funds = 500;
-    w.apply(Command::Use { sim: 0, object: 3, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: 3,
+        interaction: 0,
+    })
+    .unwrap();
     assert!(at_the_park_until(&mut w, 12.0), "Ada went to the park");
     let booked = told(&w, EventKind::Babysitter, 1);
     assert_eq!(booked.len(), 1, "a babysitter for the day");
-    assert_eq!((booked[0].a, booked[0].b, booked[0].n), (0, 1, Some(40)), "for Cleo, for $40");
+    assert_eq!(
+        (booked[0].a, booked[0].b, booked[0].n),
+        (0, 1, Some(40)),
+        "for Cleo, for $40"
+    );
     assert_eq!(w.households[0].funds, 460, "paid from the household");
 }
 
@@ -370,9 +516,17 @@ fn with_a_grandparent_at_home_the_last_parent_goes_to_the_park_without_a_babysit
     let mut w = street_world(true, grandma);
     until(&mut w, 1, 10.0);
     w.households[0].funds = 10;
-    w.apply(Command::Use { sim: 0, object: 3, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: 3,
+        interaction: 0,
+    })
+    .unwrap();
     assert!(at_the_park_until(&mut w, 12.0), "Ada went to the park");
-    assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter), "no babysitter with Dora at home");
+    assert!(
+        !w.events.iter().any(|e| e.kind == EventKind::Babysitter),
+        "no babysitter with Dora at home"
+    );
 }
 
 // ---- Two grown-ups sent out ---------------------------------------------------------------
@@ -402,30 +556,66 @@ fn without_money_two_quick_orders_out_leave_someone_home() {
     // Ada is still walking off the lot: Dan is the last one home.
     assert!(!out(&w, 0), "Ada hasn't left yet");
     let err = w.apply(Command::Visit { sim: 3, plot: 2 }).unwrap_err();
-    assert_eq!(err.to_string(), "nobody to look after Cleo: not enough money for a babysitter ($40)");
-    w.apply(Command::Use { sim: 3, object: 3, interaction: 0 }).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "nobody to look after Cleo: not enough money for a babysitter ($40)"
+    );
+    w.apply(Command::Use {
+        sim: 3,
+        object: 3,
+        interaction: 0,
+    })
+    .unwrap_err();
     let mut visited = false;
     while clock::hour(w.tick) < 13.0 {
         for _ in 0..5 * 20 {
             w.tick_once();
         }
         visited |= w.sims[0].visiting.is_some_and(|v| v.plot == 2);
-        assert!(!(out(&w, 0) && out(&w, 3)), "Cleo left alone at {:.2}", clock::hour(w.tick));
+        assert!(
+            !(out(&w, 0) && out(&w, 3)),
+            "Cleo left alone at {:.2}",
+            clock::hour(w.tick)
+        );
     }
     assert!(visited, "Ada went to Bo's");
-    assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter), "no money for one");
+    assert!(
+        !w.events.iter().any(|e| e.kind == EventKind::Babysitter),
+        "no money for one"
+    );
 }
 
 #[test]
 fn any_order_off_the_lot_counts_as_leaving() {
-    let refused = |err: sim_core::Error| assert_eq!(err.to_string(), "nobody to look after Cleo: not enough money for a babysitter ($40)");
+    let refused = |err: sim_core::Error| {
+        assert_eq!(
+            err.to_string(),
+            "nobody to look after Cleo: not enough money for a babysitter ($40)"
+        )
+    };
     // The bench in the park, a chat with Bo at his, a walk down the street, asking Bo on the
     // phone to come over to his. (Bo's fridge isn't Ada's to use.)
     let orders = [
-        Command::Use { sim: 0, object: 3, interaction: 0 },
-        Command::Social { sim: 0, target: 2, social: 0 },
-        Command::MoveTo { sim: 0, x: 30.5, z: 11.0 },
-        Command::Phone { sim: 0, action: 0, contact: Some(2) },
+        Command::Use {
+            sim: 0,
+            object: 3,
+            interaction: 0,
+        },
+        Command::Social {
+            sim: 0,
+            target: 2,
+            social: 0,
+        },
+        Command::MoveTo {
+            sim: 0,
+            x: 30.5,
+            z: 11.0,
+        },
+        Command::Phone {
+            sim: 0,
+            action: 0,
+            contact: Some(2),
+        },
     ];
     for order in orders {
         let mut w = two_at_home(10);
@@ -433,9 +623,21 @@ fn any_order_off_the_lot_counts_as_leaving() {
         w.apply(order).unwrap_or_else(|e| panic!("{what}: {e}"));
         // Ada on her way out: Dan can't be sent out after her.
         refused(w.apply(Command::Visit { sim: 3, plot: 2 }).unwrap_err());
-        refused(w.apply(Command::Use { sim: 3, object: 3, interaction: 0 }).unwrap_err());
+        refused(
+            w.apply(Command::Use {
+                sim: 3,
+                object: 3,
+                interaction: 0,
+            })
+            .unwrap_err(),
+        );
         // Things at home are fine.
-        w.apply(Command::Use { sim: 3, object: 1, interaction: 0 }).unwrap_or_else(|e| panic!("after {what}: {e}"));
+        w.apply(Command::Use {
+            sim: 3,
+            object: 1,
+            interaction: 0,
+        })
+        .unwrap_or_else(|e| panic!("after {what}: {e}"));
     }
 }
 
@@ -445,7 +647,12 @@ fn with_money_both_go_out_and_a_babysitter_is_booked_once() {
     w.sims[1].needs[0] = 0.5;
     w.sims[1].needs[1] = 0.5;
     w.apply(Command::Visit { sim: 0, plot: 2 }).unwrap();
-    w.apply(Command::Use { sim: 3, object: 3, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 3,
+        object: 3,
+        interaction: 0,
+    })
+    .unwrap();
     let (mut visited, mut park, mut both) = (false, false, false);
     while clock::hour(w.tick) < 12.0 {
         for _ in 0..5 * 20 {
@@ -456,9 +663,16 @@ fn with_money_both_go_out_and_a_babysitter_is_booked_once() {
         park |= w.plot_at(x, z) == Some(1);
         both |= out(&w, 0) && out(&w, 3);
     }
-    assert!(visited && park && both, "Ada went to Bo's and Dan to the park, both out at once");
+    assert!(
+        visited && park && both,
+        "Ada went to Bo's and Dan to the park, both out at once"
+    );
     let booked = told(&w, EventKind::Babysitter, 1);
     assert_eq!(booked.len(), 1, "one babysitter for the day");
-    assert_eq!((booked[0].b, booked[0].n), (1, Some(40)), "for Cleo, for $40");
+    assert_eq!(
+        (booked[0].b, booked[0].n),
+        (1, Some(40)),
+        "for Cleo, for $40"
+    );
     assert_eq!(w.households[0].funds, 460, "paid once");
 }

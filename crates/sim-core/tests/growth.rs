@@ -26,7 +26,11 @@ const HARVEST: usize = 1;
 
 fn world() -> World {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     w
 }
 
@@ -44,67 +48,166 @@ fn until(w: &mut World, minutes: u64, mut done: impl FnMut(&World) -> bool) -> O
 #[test]
 fn picked_it_lies_fallow_then_grows_back_ripe() {
     let mut w = world();
-    assert_eq!(w.objects[0].growth_stage(), GrowthStage::Ripe, "it comes ripe");
+    assert_eq!(
+        w.objects[0].growth_stage(),
+        GrowthStage::Ripe,
+        "it comes ripe"
+    );
 
     let version = w.structure_version();
-    w.apply(Command::Use { sim: 0, object: 0, interaction: HARVEST }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: 0,
+        interaction: HARVEST,
+    })
+    .unwrap();
     // Picked as the hands go: ripe through the harvest, picked once it's done.
     let mut ripe_while_picking = false;
     let took = until(&mut w, 40, |w| {
-        ripe_while_picking |= w.sims[0].current().is_some_and(|a| matches!(a.phase, Phase::Using { elapsed } if elapsed > 10.0)) && w.objects[0].ripe();
+        ripe_while_picking |= w.sims[0]
+            .current()
+            .is_some_and(|a| matches!(a.phase, Phase::Using { elapsed } if elapsed > 10.0))
+            && w.objects[0].ripe();
         w.objects[0].growth_stage() == GrowthStage::Picked
     });
     assert!(ripe_while_picking, "still ripe halfway through the harvest");
-    assert!(took.is_some_and(|m| m >= 20), "picked when the harvest ends, {took:?} minutes in");
+    assert!(
+        took.is_some_and(|m| m >= 20),
+        "picked when the harvest ends, {took:?} minutes in"
+    );
     assert_ne!(w.structure_version(), version, "the patch looks different");
-    assert!(until(&mut w, 30, |w| w.sims[0].current().is_none()).is_some(), "the harvest is over");
-    let err = w.apply(Command::Use { sim: 0, object: 0, interaction: HARVEST }).unwrap_err();
+    assert!(
+        until(&mut w, 30, |w| w.sims[0].current().is_none()).is_some(),
+        "the harvest is over"
+    );
+    let err = w
+        .apply(Command::Use {
+            sim: 0,
+            object: 0,
+            interaction: HARVEST,
+        })
+        .unwrap_err();
     assert!(err.to_string().contains("isn't ripe yet"), "{err}");
-    w.apply(Command::Use { sim: 0, object: 0, interaction: TEND }).expect("tending it still works");
+    w.apply(Command::Use {
+        sim: 0,
+        object: 0,
+        interaction: TEND,
+    })
+    .expect("tending it still works");
 
     // Fallow for half a day, then planted, growing from a third of the day, and ripe a day later.
-    let fallow = until(&mut w, 24 * 60, |w| w.objects[0].growth_stage() == GrowthStage::Planted).expect("planted again");
+    let fallow = until(&mut w, 24 * 60, |w| {
+        w.objects[0].growth_stage() == GrowthStage::Planted
+    })
+    .expect("planted again");
     assert!((690..=750).contains(&fallow), "fallow {fallow} minutes");
-    let planted = until(&mut w, 24 * 60, |w| w.objects[0].growth_stage() == GrowthStage::Growing).expect("growing");
-    assert!((460..=500).contains(&planted), "just planted for {planted} minutes");
+    let planted = until(&mut w, 24 * 60, |w| {
+        w.objects[0].growth_stage() == GrowthStage::Growing
+    })
+    .expect("growing");
+    assert!(
+        (460..=500).contains(&planted),
+        "just planted for {planted} minutes"
+    );
     let version = w.structure_version();
     let growing = until(&mut w, 24 * 60, |w| w.objects[0].ripe()).expect("ripe");
-    assert!((940..=990).contains(&growing), "growing for {growing} minutes");
+    assert!(
+        (940..=990).contains(&growing),
+        "growing for {growing} minutes"
+    );
     assert_ne!(w.structure_version(), version, "ripe looks different");
-    w.apply(Command::Use { sim: 0, object: 0, interaction: HARVEST }).expect("ripe again: picked again");
+    w.apply(Command::Use {
+        sim: 0,
+        object: 0,
+        interaction: HARVEST,
+    })
+    .expect("ripe again: picked again");
 }
 
 #[test]
 fn nobody_picks_it_unripe_of_their_own_accord() {
     let mut w = world();
     w.objects[0].growth = 0.5;
-    w.apply(Command::SetAutonomy { enabled: true, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: true,
+        household: None,
+    })
+    .unwrap();
     w.sims[0].needs[0] = 0.05;
     for _ in 0..3 * 60 * TICKS_PER_MINUTE {
         w.tick_once();
         if let Some(a) = w.sims[0].current() {
-            assert!(!matches!(a.task.kind, sim_core::world::TaskKind::Use { interaction: HARVEST, .. }), "picking it unripe");
+            assert!(
+                !matches!(
+                    a.task.kind,
+                    sim_core::world::TaskKind::Use {
+                        interaction: HARVEST,
+                        ..
+                    }
+                ),
+                "picking it unripe"
+            );
         }
     }
     // Ripe, the hungry one goes for it.
     w.objects[0].growth = 1.0;
-    let picked = until(&mut w, 6 * 60, |w| w.objects[0].growth_stage() == GrowthStage::Picked);
-    assert!(picked.is_some(), "a hungry resident harvests the ripe patch");
+    let picked = until(&mut w, 6 * 60, |w| {
+        w.objects[0].growth_stage() == GrowthStage::Picked
+    });
+    assert!(
+        picked.is_some(),
+        "a hungry resident harvests the ripe patch"
+    );
 }
 
 #[test]
 fn a_crop_bought_new_is_just_planted_and_ripens_over_its_days() {
     let mut w = world();
-    w.apply(Command::Buy { household: 0, object: "vegPatch".into(), at: Some([7, 2, 0]), colors: Default::default(), turn: None, offset: None, size: None, tall: None }).unwrap();
+    w.apply(Command::Buy {
+        household: 0,
+        object: "vegPatch".into(),
+        at: Some([7, 2, 0]),
+        colors: Default::default(),
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .unwrap();
     let bought = w.objects.len() - 1;
-    assert_eq!(w.objects[bought].growth_stage(), GrowthStage::Planted, "bought, it's just planted");
-    assert_eq!(w.objects[0].growth_stage(), GrowthStage::Ripe, "the one the lot came with is ripe");
-    let err = w.apply(Command::Use { sim: 0, object: bought as u32, interaction: HARVEST }).unwrap_err();
+    assert_eq!(
+        w.objects[bought].growth_stage(),
+        GrowthStage::Planted,
+        "bought, it's just planted"
+    );
+    assert_eq!(
+        w.objects[0].growth_stage(),
+        GrowthStage::Ripe,
+        "the one the lot came with is ripe"
+    );
+    let err = w
+        .apply(Command::Use {
+            sim: 0,
+            object: bought as u32,
+            interaction: HARVEST,
+        })
+        .unwrap_err();
     assert!(err.to_string().contains("isn't ripe yet"), "{err}");
 
     // Moving it keeps how far it's grown.
     w.objects[bought].growth = 0.5;
-    w.apply(Command::MoveObject { household: 0, object: bought as u32, x: 8, z: 4, rot: 0, turn: None, offset: None, size: None, tall: None }).unwrap();
+    w.apply(Command::MoveObject {
+        household: 0,
+        object: bought as u32,
+        x: 8,
+        z: 4,
+        rot: 0,
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .unwrap();
     let moved = w.objects.len() - 1;
     assert_eq!(w.objects[moved].growth, 0.5);
     let ripe = until(&mut w, 24 * 60, |w| w.objects[moved].ripe()).expect("ripe in half a day");
@@ -131,10 +234,26 @@ fn its_growth_is_saved() {
 #[test]
 fn the_shipped_crops_grow() {
     let content = sim_core::content::Content::from_json(&common::content()).unwrap();
-    for id in ["garden.vegPatch", "garden.tomatoes", "garden.strawberries", "garden.pumpkins", "raisedBed"] {
-        let def = content.objects.iter().find(|o| o.id == id).unwrap_or_else(|| panic!("{id}"));
+    for id in [
+        "garden.vegPatch",
+        "garden.tomatoes",
+        "garden.strawberries",
+        "garden.pumpkins",
+        "raisedBed",
+    ] {
+        let def = content
+            .objects
+            .iter()
+            .find(|o| o.id == id)
+            .unwrap_or_else(|| panic!("{id}"));
         assert!(def.grows.is_some(), "{id} grows");
-        assert!(def.interactions.iter().any(|i| i.ripe && i.picks), "{id}: its harvest wants it ripe and picks it");
-        assert!(def.interactions.iter().any(|i| !i.ripe), "{id}: tending it any time");
+        assert!(
+            def.interactions.iter().any(|i| i.ripe && i.picks),
+            "{id}: its harvest wants it ripe and picks it"
+        );
+        assert!(
+            def.interactions.iter().any(|i| !i.ripe),
+            "{id}: tending it any time"
+        );
     }
 }

@@ -27,7 +27,10 @@ fn need(w: &World, id: &str) -> usize {
 fn using(w: &World) -> Option<(u32, usize)> {
     match w.sims[0].current() {
         Some(a) if matches!(a.phase, Phase::Using { .. }) => match a.task.kind {
-            TaskKind::Use { object, interaction } => Some((object, interaction)),
+            TaskKind::Use {
+                object,
+                interaction,
+            } => Some((object, interaction)),
             _ => None,
         },
         _ => None,
@@ -40,8 +43,17 @@ fn after_the_toilet(w: &mut World, toilet: u32) -> Option<(u32, usize, f32)> {
     let (bladder, hygiene) = (need(w, "bladder"), need(w, "hygiene"));
     w.sims[0].needs[bladder] = 0.3;
     w.sims[0].needs[hygiene] = 1.0;
-    let use_it = w.content.objects[w.objects[toilet as usize].def].interactions.iter().position(|i| i.id == "use").unwrap();
-    w.apply(Command::Use { sim: 0, object: toilet, interaction: use_it }).unwrap();
+    let use_it = w.content.objects[w.objects[toilet as usize].def]
+        .interactions
+        .iter()
+        .position(|i| i.id == "use")
+        .unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: toilet,
+        interaction: use_it,
+    })
+    .unwrap();
     let ticks = (60.0 / MINUTES_PER_TICK) as u32;
     let mut on = false;
     for _ in 0..ticks {
@@ -57,7 +69,9 @@ fn after_the_toilet(w: &mut World, toilet: u32) -> Option<(u32, usize, f32)> {
     for _ in 0..ticks {
         match (using(w), next) {
             (Some((o, i)), None) => next = Some((o, i, 0.0)),
-            (Some((o, i)), Some((n, j, minutes))) if (o, i) == (n, j) => next = Some((n, j, minutes + MINUTES_PER_TICK)),
+            (Some((o, i)), Some((n, j, minutes))) if (o, i) == (n, j) => {
+                next = Some((n, j, minutes + MINUTES_PER_TICK))
+            }
             (_, Some(_)) => break,
             _ => {}
         }
@@ -72,11 +86,16 @@ fn after_the_toilet_hands_are_washed_at_the_nearest_sink() {
     let toilet = buy(&mut w, "toilet", 3, 3);
     buy(&mut w, "sink", 12, 3);
     let sink = buy(&mut w, "sink", 5, 3);
-    let (object, interaction, minutes) = after_the_toilet(&mut w, toilet).expect("something follows the toilet");
+    let (object, interaction, minutes) =
+        after_the_toilet(&mut w, toilet).expect("something follows the toilet");
     assert_eq!(object, sink, "the nearer sink");
     let wash = &w.content.objects[w.objects[sink as usize].def].interactions[interaction];
     assert_eq!(wash.id, "wash");
-    assert!(minutes >= wash.minutes - 0.1, "washed for {minutes} of {} minutes, though already clean", wash.minutes);
+    assert!(
+        minutes >= wash.minutes - 0.1,
+        "washed for {minutes} of {} minutes, though already clean",
+        wash.minutes
+    );
     assert!(w.sims[0].current().is_none(), "and then nothing more");
     common::check(&w);
 }
@@ -89,13 +108,25 @@ fn a_toilet_visit_given_up_at_once_has_no_hand_washing_after() {
     // Sent with nothing to go for: off the toilet the moment they're on it.
     let bladder = need(&w, "bladder");
     w.sims[0].needs[bladder] = 1.0;
-    let use_it = w.content.objects[w.objects[toilet as usize].def].interactions.iter().position(|i| i.id == "use").unwrap();
-    w.apply(Command::Use { sim: 0, object: toilet, interaction: use_it }).unwrap();
+    let use_it = w.content.objects[w.objects[toilet as usize].def]
+        .interactions
+        .iter()
+        .position(|i| i.id == "use")
+        .unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: toilet,
+        interaction: use_it,
+    })
+    .unwrap();
     let mut sat = 0;
     for _ in 0..(10.0 / MINUTES_PER_TICK) as u32 {
         w.tick_once();
         sat += usize::from(using(&w).is_some_and(|(o, _)| o == toilet));
-        assert!(using(&w).is_none_or(|(o, _)| o == toilet), "went to wash their hands after a toilet visit that didn't happen");
+        assert!(
+            using(&w).is_none_or(|(o, _)| o == toilet),
+            "went to wash their hands after a toilet visit that didn't happen"
+        );
     }
     assert!((1..=2).contains(&sat), "on the toilet for {sat} ticks");
     assert!(w.sims[0].current().is_none() && w.sims[0].queue().next().is_none());

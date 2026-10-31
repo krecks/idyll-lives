@@ -99,7 +99,7 @@ Family: `tools/art/blender/families/pack_energetic.py`.
 | `energetic.boulderingWall` Home bouldering wall | OK | I-packs-03 | I-packs-03 | I-packs-03 S2 clip | `packs/sheets/obj-energetic.boulderingWall.png`, `packs/play/chunk2/energetic.boulderingWall-climb-01.png` |
 | `energetic.spinBike` Interactive spin bike | M-packs-09 | OK | OK | M-packs-09 S3 decision | `packs/sheets/obj-energetic.spinBike.png`, `packs/sheets/age-energetic.spinBike.png` |
 | `energetic.trampoline` Rebound trampoline | OK | OK | OK | | `packs/sheets/obj-energetic.trampoline.png` |
-| `energetic.streetballHoop` Streetball hoop | OK | OK | I-packs-12 | I-packs-12 S3 content | `packs/sheets/obj-energetic.streetballHoop.png` |
+| `energetic.streetballHoop` Streetball hoop | OK | OK | I-packs-12 | I-packs-12 S3 content (fixed, 0.5.0) | `packs/sheets/obj-energetic.streetballHoop.png` |
 | `energetic.powerBlender` Power blender station | OK | A-packs-02 | I-packs-19 | A-packs-02 S3 motion (seeded; confirmed); I-packs-19 S3 code | `packs/sheets/obj-energetic.powerBlender.png` |
 | `energetic.contrastShower` Contrast rain shower | OK | A-bathroom-01 | I-bathroom-02 | A-bathroom-01 S2 model (bathroom ledger: the glass door never opens); I-bathroom-02 S3 clip (residents ledger) | `packs/sheets/obj-energetic.contrastShower.png` |
 | `energetic.recoveryPod` Recovery pod | OK | OK | OK | | `packs/sheets/obj-energetic.recoveryPod.png`, `packs/play/chunk2/energetic.recoveryPod-recover-01.png` |
@@ -111,7 +111,7 @@ Family: `tools/art/blender/families/pack_energetic.py`.
 | `energetic.boulderingWall` | climb problems on the wall, rest on the mat | climb (60) | climbed on the floor beside the mat (I-packs-03) |
 | `energetic.spinBike` | a cycling class or ride | ride (45, seated, pedalling) | OK as a recumbent (M-packs-09) |
 | `energetic.trampoline` | bounce, play | bounce (30, on the mat) | OK |
-| `energetic.streetballHoop` | shoot hoops, play one on one | shoot hoops (40, 2 slots) | OK; shot from under the board (I-packs-12) |
+| `energetic.streetballHoop` | shoot hoops, play one on one | shoot hoops (40, 2 slots) | OK; shot from under the board (I-packs-12, fixed: from 2.2 m out) |
 | `energetic.powerBlender` | blend a smoothie and drink it | blend (4) | OK; the `cook` median (33) is for cooked meals, a smoothie is 2–5 |
 | `energetic.contrastShower` | shower, hot and cold | rinse (15) | OK |
 | `energetic.recoveryPod` | lie back under the canopy to recover | recover (45, lying) | OK |
@@ -141,7 +141,7 @@ Family: `tools/art/blender/families/pack_foodie.py`.
 | `foodie.herbGarden` Windowsill herb garden | OK | I-packs-06 | I-packs-06 | I-packs-06 S2 renderer-table | `packs/sheets/obj-foodie.herbGarden.png`, `packs/play/chunk1/foodie.herbGarden-tendHerbs-01.png` |
 | `foodie.deliPantry` Deli pantry | OK | OK | I-packs-19 | I-packs-19 S3 code | `packs/sheets/obj-foodie.deliPantry.png` |
 | `foodie.espressoBar` Espresso bar | OK | OK | I-held-01 | I-held-01 S2 code (held ledger: no cup) | `packs/sheets/obj-foodie.espressoBar.png` |
-| `foodie.cookbookLectern` Cookbook lectern | OK | OK | I-packs-12 | I-packs-12 S3 content | `packs/sheets/obj-foodie.cookbookLectern.png` |
+| `foodie.cookbookLectern` Cookbook lectern | OK | OK | I-packs-12 | I-packs-12 S3 content (fixed, 0.5.0) | `packs/sheets/obj-foodie.cookbookLectern.png` |
 | `foodie.pizzaOven` Wood-fired pizza oven | OK | OK | OK | | `packs/sheets/obj-foodie.pizzaOven.png`, `packs/extra/night/night-foodie.pizzaOven-bakePizza-01.png` |
 | `foodie.chefsIsland` Chef's island | M-packs-04 | OK | M-packs-04 | M-packs-04 S2 model | `packs/sheets/obj-foodie.chefsIsland.png`, `packs/sheets/age-foodie.chefsIsland.png` |
 
@@ -152,7 +152,7 @@ Family: `tools/art/blender/families/pack_foodie.py`.
 | `foodie.herbGarden` | water and trim herbs, pick some for cooking | tend herbs (20) | OK; the pose is the flower bed's kneel (I-packs-06) |
 | `foodie.deliPantry` | take out a snack or ingredients, make a board | nibble (2), cheese board (5) | OK; 5 min for a board is real (the `cook` median is for cooked meals) |
 | `foodie.espressoBar` | pull an espresso, steam milk, latte art | espresso (10), latte art (30) | OK |
-| `foodie.cookbookLectern` | follow a recipe while cooking, browse cookbooks | study recipes (60), food magazines (45), standing | OK; the open book isn't the one read (I-packs-12) |
+| `foodie.cookbookLectern` | follow a recipe while cooking, browse cookbooks | study recipes (60), food magazines (45), standing | OK; the open book isn't the one read (I-packs-12, fixed: read at the lectern) |
 | `foodie.pizzaOven` | fire it up, bake pizza, warm up by it | bake pizza (43), warm up (30) | OK |
 | `foodie.chefsIsland` | prepare and cook, eat at the counter on the stools | tasting menu (78), bar bite (20, on a stool) | OK; the stools are chair height (M-packs-04) |
 
@@ -261,7 +261,7 @@ Family: `tools/art/blender/families/pack_loner.py`.
 | `loner.quietPod` Hush-shell reading pod | OK | OK | I-held-01 | I-held-01 S2 code (held ledger: no book) | `packs/sheets/obj-loner.quietPod.png`, `packs/sheets/age-loner.quietPod.png` |
 | `loner.shortwaveRadio` Shortwave radio desk | OK | OK | OK | | `packs/sheets/obj-loner.shortwaveRadio.png`, `packs/sheets/age-loner.shortwaveRadio.png` |
 | `loner.puzzleTable` Jigsaw puzzle table | OK | OK | OK | | `packs/sheets/obj-loner.puzzleTable.png`, `packs/sheets/age-loner.puzzleTable.png` |
-| `loner.bonsaiBench` Bonsai potting bench | OK | OK | I-packs-12 | I-packs-12 S3 content | `packs/sheets/obj-loner.bonsaiBench.png` |
+| `loner.bonsaiBench` Bonsai potting bench | OK | OK | I-packs-12 | I-packs-12 S3 content (fixed, 0.5.0) | `packs/sheets/obj-loner.bonsaiBench.png` |
 | `loner.soloSauna` Cedar sauna for one | OK | I-packs-17 | I-packs-17, I-systems-04 | I-packs-17 S3 model; I-systems-04 S2 code (systems ledger: a child takes the sauna) | `packs/sheets/obj-loner.soloSauna.png`, `packs/play/chunk4/loner.soloSauna-sweat-02.png`, `packs/sheets/age-loner.soloSauna.png` |
 | `loner.deliveryHatch` No-knock delivery hatch | OK | OK | OK | | `packs/sheets/obj-loner.deliveryHatch.png` |
 
@@ -272,7 +272,7 @@ Family: `tools/art/blender/families/pack_loner.py`.
 | `loner.quietPod` | sit shut away, read | retreat (40), read (45) | OK |
 | `loner.shortwaveRadio` | tune the bands, talk to other operators | airwaves (45), tune (60) | OK |
 | `loner.puzzleTable` | work on a jigsaw | a piece (45), new puzzle (90) | OK |
-| `loner.bonsaiBench` | prune and wire the tree, water and mist it | shape (60), tend (15) | OK; worked from the bench's corner (I-packs-12) |
+| `loner.bonsaiBench` | prune and wire the tree, water and mist it | shape (60), tend (15) | OK; worked from the bench's corner (I-packs-12, fixed: at the tree) |
 | `loner.soloSauna` | sit and sweat, door shut | sweat (40) | OK; the door opens 1.5 s and shuts; the feet (I-packs-17) |
 | `loner.deliveryHatch` | take in a delivery without opening the door | order (5), treat (2) | OK |
 
@@ -309,7 +309,7 @@ Family: `tools/art/blender/families/pack_neat.py`.
 | Item | M | A | I | Findings | Shots |
 |---|---|---|---|---|---|
 | `neat.steamMopDock` Steam mop dock | OK | OK | OK | | `packs/sheets/obj-neat.steamMopDock.png` |
-| `neat.laundryCenter` Stacked laundry centre | OK | A-packs-03 | I-packs-18 | A-packs-03 S2 motion; I-packs-18 S3 content | `packs/sheets/obj-neat.laundryCenter.png`, `packs/play/chunk2/neat.laundryCenter-laundry-01.png` |
+| `neat.laundryCenter` Stacked laundry centre | OK | OK | OK | A-packs-03 fixed (d2c9f0de); I-packs-18 fixed (eaca9ed8); since 2026-10-26 a machine that runs on its own | `packs/sheets/obj-neat.laundryCenter.png`, `packs/play/chunk2/neat.laundryCenter-laundry-01.png` |
 | `neat.rainShowerTower` Rainfall steam shower | OK | A-bathroom-01 | I-bathroom-02 | A-bathroom-01 S2 model (bathroom ledger: the glass door never opens); I-bathroom-02 S3 clip (residents ledger) | `packs/sheets/obj-neat.rainShowerTower.png` |
 | `neat.organizerDesk` Label-and-sort organizer desk | M-packs-05 | OK | OK | M-packs-05 S2 model | `packs/sheets/obj-neat.organizerDesk.png`, `packs/sheets/age-neat.organizerDesk.png` |
 | `neat.robotVacuumDock` Robot vacuum and dock | OK | I-packs-15 | I-packs-15, I-packs-05 | I-packs-15 S3 motion; I-packs-05 S2 content | `packs/sheets/obj-neat.robotVacuumDock.png` |
@@ -320,7 +320,7 @@ Family: `tools/art/blender/families/pack_neat.py`.
 | Item | Real uses | Content uses (minutes) | Verdict |
 |---|---|---|---|
 | `neat.steamMopDock` | take the mop and mop the floor | mop (30, the mop in hand) | OK |
-| `neat.laundryCenter` | load the washer, move it to the dryer, fold on the counter | laundry (45), fold (60) | OK; folding an hour (I-packs-18); the porthole stays open (A-packs-03) |
+| `neat.laundryCenter` | load the washer, move it to the dryer, fold on the counter | load (5), run alone (90), unload (5), fold (20) | OK; folding an hour (I-packs-18, fixed); the porthole stays open (A-packs-03, fixed); since 2026-10-26 the load runs on its own |
 | `neat.rainShowerTower` | shower, steam | steam shower (25) | OK |
 | `neat.organizerDesk` | sort and label, do the accounts | sort (40), ledger (60) | OK |
 | `neat.robotVacuumDock` | set a schedule and let it clean | program a routine (45) | the robot never cleans (I-packs-15); setting it is 45 on foot (I-packs-05) |
@@ -361,7 +361,7 @@ Family: `tools/art/blender/families/pack_romantic.py`.
 | `romantic.vanity` Rose-gold vanity | OK | OK | I-packs-08 | I-packs-08 S2 content | `packs/sheets/obj-romantic.vanity.png` |
 | `romantic.gramophone` Moonlight gramophone | OK | OK | I-packs-05 | I-packs-05 S2 content | `packs/sheets/obj-romantic.gramophone.png` |
 | `romantic.letterBureau` Love-letter bureau | M-packs-05 | OK | OK | M-packs-05 S2 model | `packs/sheets/obj-romantic.letterBureau.png`, `packs/sheets/age-romantic.letterBureau.png` |
-| `romantic.roseArbourSwing` Rose-arbour swing | OK | OK | I-packs-12 | I-packs-12 S3 content | `packs/sheets/obj-romantic.roseArbourSwing.png`, `packs/sheets/age-romantic.roseArbourSwing.png` |
+| `romantic.roseArbourSwing` Rose-arbour swing | OK | OK | I-packs-12 | I-packs-12 S3 content (fixed, 0.5.0) | `packs/sheets/obj-romantic.roseArbourSwing.png`, `packs/sheets/age-romantic.roseArbourSwing.png` |
 
 ### Real uses against the content's (I1)
 
@@ -372,7 +372,7 @@ Family: `tools/art/blender/families/pack_romantic.py`.
 | `romantic.vanity` | sit at the mirror, make up, do the hair | primp (20, standing) | the stool is never sat on (I-packs-08); 20 vs the `wash` median 2 is getting ready, not a hand wash: not filed |
 | `romantic.gramophone` | put a record on, listen, dance | listen (45), waltz (30) | listening is 45 on foot (I-packs-05) |
 | `romantic.letterBureau` | write a letter or a poem | write a letter (60), a poem (45) | OK |
-| `romantic.roseArbourSwing` | swing for two, tend the roses | swing (40, 2 slots), tend roses (30) | OK; the roses tended at the seat (I-packs-12) |
+| `romantic.roseArbourSwing` | swing for two, tend the roses | swing (40, 2 slots), tend roses (30) | OK; the roses tended at the seat (I-packs-12, fixed: at a front post) |
 
 ## P16. Slob (6)
 
@@ -444,7 +444,7 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Severity:** S2
 - **Rubric:** A1, M2
 - **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters/furniture.json:10-12` (`seats` `gloomy.soakingTub` 0.25, `romantic.heartTub` 0.35, `hotHeaded.coldPlunge` 0.35) and `:56-58` (`beds`, the same); `tools/art/blender/families/pack_romantic.py:205` (`heartTub`), `pack_hotHeaded.py:384` (`coldPlunge`), `pack_gloomy.py:417` (`soakingTub`)
+- **Where:** `web/src/render/shared/characters/furniture.json:10-12` (`seats` `gloomy.soakingTub` 0.25, `romantic.heartTub` 0.35, `hotHeaded.coldPlunge` 0.35) and `:56-58` (`beds`, the same); `tools/art/blender/families/pack_romantic.py:205` (`heartTub`), `pack_hotHeaded.py:384` (`coldPlunge`), `pack_gloomy.py:417` (`soakingTub`)
 - **Evidence:** `packs/sheets/obj-romantic.heartTub.png` (play: the knees come up over and through the near wall), `packs/sheets/age-romantic.heartTub.png`; the heights check (`heights.txt`): the heart tub's floor is at 0.20 under a 0.35 seat (15 cm), the soaking tub's at 0.095 under 0.25 (15.5 cm). `packs/play/chunk5/hotHeaded.coldPlunge-plunge-01.png`, `packs/sheets/age-hotHeaded.coldPlunge.png`: the plunger's shins and feet pass through the tub's front and show on the floor outside it at every stage but the child (the plunge is 0.86 × 1.39 with the seat in the middle; the heights check measures 0.596 there, the water). Seated bathers in a short tub need the legs drawn up inside or the seat moved back (`fwd`), each checked at every stage.
 - **Status:** fixed (96d54386)
 - **After:** The pack tubs sit on their floors at the back (soaking tub 0.10, heart tub 0.20, cold plunge 0.10) with the legs out and drawn up to a new `Seat.room` (0.7, 0.35, 0.5 m ahead of the hips): no shin or foot through a wall at the adult, teen, child or elder (`fixes/tables/after/heart-sheet.png`, `tubs-sheet.png`, `play-b/`). Their dead `beds` rows (no use lies in them) out; heights warnings gone. A turn towards each other in the heart tub waits for a facing per slot (G-62).
@@ -488,7 +488,7 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Severity:** S2
 - **Rubric:** M1, A1, A5
 - **Fix class:** decision
-- **Where:** `tools/art/blender/families/pack_cheerful.py:424-434` (`rainbowHammock`: `SLING_END, SLING_LOW`), `pack_natureLover.py:354-359` (`gardenHammock`: hooks at x 0.88); `web/src/render/babylon/characters/furniture.json:68-69` (`beds`, `across`, `sling`); `web/public/content/packs/cheerful.json:116`, `natureLover.json:144` (2 × 1 footprints)
+- **Where:** `tools/art/blender/families/pack_cheerful.py:424-434` (`rainbowHammock`: `SLING_END, SLING_LOW`), `pack_natureLover.py:354-359` (`gardenHammock`: hooks at x 0.88); `web/src/render/shared/characters/furniture.json:68-69` (`beds`, `across`, `sling`); `web/public/content/packs/cheerful.json:116`, `natureLover.json:144` (2 × 1 footprints)
 - **Evidence:** `packs/sheets/age-cheerful.rainbowHammock.png`, `packs/sheets/age-natureLover.gardenHammock.png`: the adult, the teen and the elder lie with the knees bent up and the feet at the far post; only the child fits. A hammock on a stand is 2.7–4 m long (`reference.md` `hammock`; space-saving stands 2.4–2.8). A 2 × 1 footprint can't hold one: a 3 × 1 footprint (model and content), a sitting-swinging pose, or accepting the knees is the owner's call.
 - **Status:** fixed (9e8bfe3b, 14de632d)
 - **After:** Q-07: both stand on 3 × 1 (content footprints), their slings 2 m between the spreader bars at ±1.0 (stands 2.84 and 2.88 m), `furniture.json` `sling` half 1.015 / 1.0, head 0.75 / 0.76: the adult, the teen and the elder lie near flat, the feet short of the bar (`fixes/blender-packs/poses/beds-adult.png`, `beds-teen.png`, `beds-elder.png`, `beds-child.png`; `play/day-cheerful.rainbowHammock-swing-01.png`, `day-natureLover.gardenHammock-doze-01.png`). 3 draws each.
@@ -565,7 +565,7 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Severity:** S3
 - **Rubric:** M2, A1
 - **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters/furniture.json:51` (`defaultSeat` 0.45, used by `hotHeaded.thunderDrums`), `:13` (`seats` `hotHeaded.coolDownCushion` 0.40), `:59` (`beds` `hotHeaded.coolDownCushion` 0.2, for a use that never lies), `:77` (`beds` `kind.hearthSettee` 0.44)
+- **Where:** `web/src/render/shared/characters/furniture.json:51` (`defaultSeat` 0.45, used by `hotHeaded.thunderDrums`), `:13` (`seats` `hotHeaded.coolDownCushion` 0.40), `:59` (`beds` `hotHeaded.coolDownCushion` 0.2, for a use that never lies), `:77` (`beds` `kind.hearthSettee` 0.44)
 - **Evidence:** The heights check (`heights.txt`): the drum stool's mesh is 0.475 under a 0.45 seat (2.5 cm into it), the pouf 0.45 under 0.40 (5 cm into it), the settee's cushion 0.36 under a 0.44 lie (8 cm over it: `packs/play/chunk5/kind.hearthSettee-quiltNap-01.png`). Each is small in the shots; together they are the three-way M2 check failing.
 - **Status:** fixed (a920f174)
 - **After:** The drum stool its own seat at 0.475 (was `defaultSeat` 0.45), the cool-down cushion's seat 0.45 and its dead `beds` row out (no use lies on it), the hearth settee's bed 0.36 (its cushion). The four heights warnings gone; `fixes/tables/play-b/b-hotHeaded.thunderDrums-drum-01.png`, `b-hotHeaded.coolDownCushion-breathe-01.png`, `b-kind.hearthSettee-quiltNap-02.png`.
@@ -598,7 +598,7 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Severity:** S2
 - **Rubric:** A1, I3
 - **Fix class:** renderer-table
-- **Where:** `web/src/render/babylon/characters/furniture.json:76` (`beds` `gloomy.windowSeat`: `h` 0.45, `across`), `web/public/content/packs/gloomy.json:193` (`doze`: `pose: lie`)
+- **Where:** `web/src/render/shared/characters/furniture.json:76` (`beds` `gloomy.windowSeat`: `h` 0.45, `across`), `web/public/content/packs/gloomy.json:193` (`doze`: `pose: lie`)
 - **Evidence:** `packs/play/chunk3/gloomy.windowSeat-doze-01.png`: the dozer lies prone, diagonally over the back of the cushion, the face on the window glass, the feet at the left pillow. `across` should lay them along the seat on the back, head to its left, as `kind.hearthSettee` does (`packs/play/chunk5/kind.hearthSettee-quiltNap-01.png`). The cushion between the two pillows is about 1.3 m clear, short for an adult lying flat (a curled-up side lie fits a window seat).
 - **Status:** fixed (0f613d59)
 - **After:** Played again after the merge (`fixes/tables/play-a/a-gloomy.windowSeat-doze-00.png`, `-01.png`): the dozer lies on the back along the cushion, head on the right-hand pillow, as on the hearth settee; no table row changed. The 1.3 m between the pillows is still short for a grown-up lying flat (the feet on the left pillow): a curled-up side lie is a clip for the resident-clip wave. Then (fix: clips-reach) checked again first: `poses.html?beds=gloomy.windowSeat:doze` at each stage still lay them flat on the back, the head on the right-hand pillow and a grown-up's feet over the left one; the face-down, across-the-cushion pose didn't reproduce (`fixes/clips-reach/poses/poses-windowSeat-doze-flat-before.png`). The window seat is now a `CURLED_BEDS` bed: its dozer plays `lieCurl` (clips/self.ts), curled up on the left side facing the room, the knees drawn up on the cushion, the head on the right-hand pillow on the forearm, about 1.1 m long for a grown-up (`fixes/clips-reach/poses/poses-windowSeat-doze-stages.png`, adult, teen, child, elder; play `play-a/a-gloomy.windowSeat-doze-01.png`, `play-teen/`, `play-child/`, `play-elder/`; `compare/A-packs-05.png`).
@@ -701,7 +701,7 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Severity:** S2
 - **Rubric:** I3, I2
 - **Fix class:** content
-- **Where:** `web/public/content/packs/romantic.json:101` (`vanity`: `primp` `pose: stand`, no `seat`); compare `web/src/render/babylon/characters/furniture.json:31` (`dressingTable`: seated facing the mirror, `back: true`)
+- **Where:** `web/public/content/packs/romantic.json:101` (`vanity`: `primp` `pose: stand`, no `seat`); compare `web/src/render/shared/characters/furniture.json:31` (`dressingTable`: seated facing the mirror, `back: true`)
 - **Evidence:** `packs/sheets/obj-romantic.vanity.png` (play): 20 minutes standing beside the pink pouf, half a metre from the mirror. A vanity is sat at, facing the mirror; the base `dressingTable` already does it.
 - **Status:** fixed (0cc15781)
 - **After:** Seat 0.44 m, forward 0.17, `facing: back`, primp `pose: sit`: sat on the pouf facing the mirror (`bench-results/review/fixes/content/g02/after-romantic.vanity-primp-01.png`).
@@ -747,8 +747,8 @@ Seeded from earlier docs first; then the review's, in the same form.
 - **Fix class:** content
 - **Where:** `web/public/content/packs/loner.json:109` (`bonsaiBench`), `romantic.json:160` (`roseArbourSwing` `tendRoses`), `foodie.json:102` (`cookbookLectern`, and `web/src/render/babylon/characters.ts:475`: `ACTIONS.read` holds a book that isn't there), `energetic.json:80` (`streetballHoop`)
 - **Evidence:** `packs/sheets/obj-loner.bonsaiBench.png`: the pruner stands at the bench's left corner by the soil bag, not at the tree in the middle; `packs/sheets/obj-romantic.roseArbourSwing.png` (tendRoses): the roses are on the posts and the top, the hands at the seat cushion; `packs/sheets/obj-foodie.cookbookLectern.png`: a step off the lectern, reading a mimed book at the chest beside the open one; `packs/sheets/obj-energetic.streetballHoop.png`: shooting from under the board, at the pole. Slot offsets (`slot_position`, `approach`) or a lectern-reading hand pose.
-- **Status:** open (needs code: G-62's per-slot place or a stand offset; the lectern's reading hand pose is a clip)
-- **After:** Not fixed in the content band: content has no field that moves a standing user along an object (slot positions are spread across the width; `stand` has no offset).
+- **Status:** fixed (f679389b)
+- **After:** Not fixed in the content band: content had no field that moves a standing user along an object. In 0.5.0, with G-62's `places`: the bonsai bench's user stands 0.6 m out (was 1 m; the bench's front 0.32 m out), the hands over the tree in its tray. The lectern's reader stands 0.52 m out and reads the book on it (`readLectern177`, `147`, `112`: the hands on the pages' lower corners, the head bowed, the left hand turning a page over once a loop), not a mimed one at the chest. The streetball hoop's two shoot from 2.2 m out (were 1 m, under the board), turned in to the rim, with the park hoop's jump shot fitted to this rim at 2.4 m (`streetShot177`, `147`, `112`). The arbour's roses can't take `places` (a place serves every use of its slot, and the swing's sitters are on the footprint), so *Tend the climbing roses* steps in to a front post instead (`STEP_IN` lanes at -0.84 and 0.84 m, 0.75 m out, a child 0.58) and reaches to the bloom there twice a loop (`cutRose177`, `147`, `112`); the bloom that is cut came down to 1.15 m (was 1.36) so a child reaches it too, and shrinks only for the one at its post (`slot` 0). `bench-results/release-0.5.0/F1/after/packs/``after-*.png`, and `before/packs/` the same uses before.
 - **Source:** wave: packs
 
 ### I-packs-13 — Smashing plates is a boxing combination in the air

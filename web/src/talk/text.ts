@@ -18,5 +18,5 @@ export function loadTalk(language: string, content?: Content): Promise<TalkText 
     files.set(language, file);
   }
   const packs = content?.talk[language];
-  return packs ? file.then((t) => (t ? (mergeDeep(t as unknown as Record<string, unknown>, packs as Record<string, unknown>) as unknown as TalkText) : null)) : file;
+  return packs ? file.then((t) => (t ? mergeDeep(t, packs) : null)) : file;
 }

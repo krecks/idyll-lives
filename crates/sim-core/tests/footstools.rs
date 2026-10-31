@@ -28,12 +28,25 @@ const TOWN: &str = r#"{"width":16,"depth":16,
 
 fn world() -> World {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     w
 }
 
 fn buy(w: &mut World, def: &str, x: i32, z: i32, rot: i32) -> Result<(), sim_core::Error> {
-    w.apply(Command::Buy { household: 0, object: def.into(), at: Some([x, z, rot]), colors: Default::default(), turn: None, offset: None, size: None, tall: None })
+    w.apply(Command::Buy {
+        household: 0,
+        object: def.into(),
+        at: Some([x, z, rot]),
+        colors: Default::default(),
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
 }
 
 #[test]
@@ -41,7 +54,12 @@ fn an_armchair_with_a_footstool_in_front_is_sat_in_from_beside_it() {
     let mut w = world();
     buy(&mut w, "armchair", 6, 6, 0).unwrap();
     buy(&mut w, "pouf", 6, 7, 0).expect("a footstool in front of the armchair");
-    w.apply(Command::Use { sim: 0, object: 0, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: 0,
+        interaction: 0,
+    })
+    .unwrap();
     let mut sat = false;
     for _ in 0..10 * TICKS_PER_MINUTE {
         w.tick_once();
@@ -52,7 +70,10 @@ fn an_armchair_with_a_footstool_in_front_is_sat_in_from_beside_it() {
     }
     assert!(sat, "sat in the armchair");
     let p = w.sims[0].pos;
-    assert!((p[0] - 6.5).abs() < 0.3 && (p[1] - 6.5).abs() < 0.3, "in the armchair, not on the pouf: {p:?}");
+    assert!(
+        (p[0] - 6.5).abs() < 0.3 && (p[1] - 6.5).abs() < 0.3,
+        "in the armchair, not on the pouf: {p:?}"
+    );
 
     // Bought the other way round too: the footstool first.
     let mut w = world();
@@ -60,7 +81,10 @@ fn an_armchair_with_a_footstool_in_front_is_sat_in_from_beside_it() {
     buy(&mut w, "armchair", 6, 6, 0).expect("an armchair behind a footstool");
     // Walled in on both sides as well, there's no way in.
     buy(&mut w, "fridge", 5, 6, 0).unwrap();
-    assert!(buy(&mut w, "fridge", 7, 6, 0).is_err(), "the armchair's last way in kept free");
+    assert!(
+        buy(&mut w, "fridge", 7, 6, 0).is_err(),
+        "the armchair's last way in kept free"
+    );
 }
 
 #[test]
@@ -68,7 +92,9 @@ fn a_desk_stands_with_its_screen_to_the_wall_between_other_things() {
     // Against a wall (along z 2), facing it, a fridge either side: sat at from behind.
     let walled = || {
         let mut w = world();
-        let wall: Vec<EdgeEdit> = (3..11).map(|x| EdgeEdit::new(EdgeAxis::H, x, 2, EdgeKind::Wall)).collect();
+        let wall: Vec<EdgeEdit> = (3..11)
+            .map(|x| EdgeEdit::new(EdgeAxis::H, x, 2, EdgeKind::Wall))
+            .collect();
         w.build(0, &wall).unwrap();
         buy(&mut w, "fridge", 5, 2, 0).unwrap();
         buy(&mut w, "fridge", 8, 2, 0).unwrap();
@@ -76,8 +102,18 @@ fn a_desk_stands_with_its_screen_to_the_wall_between_other_things() {
     };
     let mut w = walled();
     buy(&mut w, "desk", 6, 2, 2).expect("a desk with its screen to the wall");
-    let desk = w.objects.iter().find(|o| w.content.objects[o.def].id == "desk").unwrap().id;
-    w.apply(Command::Use { sim: 0, object: desk, interaction: 0 }).unwrap();
+    let desk = w
+        .objects
+        .iter()
+        .find(|o| w.content.objects[o.def].id == "desk")
+        .unwrap()
+        .id;
+    w.apply(Command::Use {
+        sim: 0,
+        object: desk,
+        interaction: 0,
+    })
+    .unwrap();
     let mut from = None;
     for _ in 0..10 * TICKS_PER_MINUTE {
         if w.sims[0].pose == Pose::Sit {
@@ -101,14 +137,27 @@ fn a_desk_with_its_back_to_the_wall_is_sat_at_from_the_other_half_of_its_front()
     // front tile: the other middle tile in front of it is as good (a generated house turned round
     // swaps which is the front; "dense" 314192 had a writing desk with only that one free).
     let mut w = world();
-    let wall: Vec<EdgeEdit> = (3..11).map(|x| EdgeEdit::new(EdgeAxis::H, x, 6, EdgeKind::Wall)).collect();
+    let wall: Vec<EdgeEdit> = (3..11)
+        .map(|x| EdgeEdit::new(EdgeAxis::H, x, 6, EdgeKind::Wall))
+        .collect();
     w.build(0, &wall).unwrap();
     buy(&mut w, "fridge", 5, 6, 0).unwrap();
     buy(&mut w, "fridge", 8, 6, 0).unwrap();
     buy(&mut w, "desk", 6, 6, 0).unwrap();
-    buy(&mut w, "pouf", 6, 7, 0).expect("a chair on the desk's front tile, the other half still free");
-    let desk = w.objects.iter().find(|o| w.content.objects[o.def].id == "desk").unwrap().id;
-    w.apply(Command::Use { sim: 0, object: desk, interaction: 0 }).unwrap();
+    buy(&mut w, "pouf", 6, 7, 0)
+        .expect("a chair on the desk's front tile, the other half still free");
+    let desk = w
+        .objects
+        .iter()
+        .find(|o| w.content.objects[o.def].id == "desk")
+        .unwrap()
+        .id;
+    w.apply(Command::Use {
+        sim: 0,
+        object: desk,
+        interaction: 0,
+    })
+    .unwrap();
     let mut from = None;
     for _ in 0..10 * TICKS_PER_MINUTE {
         if w.sims[0].pose == Pose::Sit {
@@ -120,12 +169,18 @@ fn a_desk_with_its_back_to_the_wall_is_sat_at_from_the_other_half_of_its_front()
     assert_eq!(w.sims[0].pose, Pose::Sit, "sat at the desk");
     assert_eq!(from, Some((7, 7)), "from the other half of its front");
     // With that taken too, nowhere to sit down from.
-    assert!(buy(&mut w, "pouf", 7, 7, 0).is_err(), "the desk's last way in kept free");
+    assert!(
+        buy(&mut w, "pouf", 7, 7, 0).is_err(),
+        "the desk's last way in kept free"
+    );
 }
 
 #[test]
 fn other_things_still_need_their_front_free() {
     let mut w = world();
     buy(&mut w, "pouf", 6, 7, 0).unwrap();
-    assert!(buy(&mut w, "fridge", 6, 6, 0).is_err(), "a fridge facing a pouf would block the way");
+    assert!(
+        buy(&mut w, "fridge", 6, 6, 0).is_err(),
+        "a fridge facing a pouf would block the way"
+    );
 }

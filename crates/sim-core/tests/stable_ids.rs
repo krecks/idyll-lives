@@ -25,7 +25,11 @@ const TOWN: &str = r#"{"width":14,"depth":14,
 
 fn world() -> World {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     w
 }
 
@@ -51,9 +55,28 @@ fn moving_selling_and_reloading_keeps_every_other_id() {
     let c = buy(&mut w, "chair", 6, 2);
     assert_eq!([a, b, c].into_iter().collect::<HashSet<_>>().len(), 3);
 
-    w.apply(Command::MoveObject { household: 0, object: a, x: 2, z: 4, rot: 0, turn: None, offset: None, size: None, tall: None }).unwrap();
-    w.apply(Command::Sell { household: 0, object: b }).unwrap();
-    assert_eq!((at(&w, c).x, at(&w, c).z), (6, 2), "the third chair didn't move");
+    w.apply(Command::MoveObject {
+        household: 0,
+        object: a,
+        x: 2,
+        z: 4,
+        rot: 0,
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .unwrap();
+    w.apply(Command::Sell {
+        household: 0,
+        object: b,
+    })
+    .unwrap();
+    assert_eq!(
+        (at(&w, c).x, at(&w, c).z),
+        (6, 2),
+        "the third chair didn't move"
+    );
     assert_eq!(at(&w, a).stable, a, "the moved chair kept its id");
 
     // Undo and redo keep the ids too: first the sale, then the move.
@@ -78,28 +101,62 @@ fn a_queued_order_still_names_the_same_object_after_an_edit_and_a_reload() {
     let extra = buy(&mut w, "table", 1, 1);
     let a = buy(&mut w, "chair", 2, 2);
     let b = buy(&mut w, "chair", 4, 2);
-    w.apply(Command::Use { sim: 0, object: a, interaction: 0 }).unwrap();
-    w.apply(Command::Use { sim: 0, object: b, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: a,
+        interaction: 0,
+    })
+    .unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: b,
+        interaction: 0,
+    })
+    .unwrap();
     for _ in 0..5 {
         w.tick_once();
     }
 
     // Selling something listed before them shifts their places in the list.
-    w.apply(Command::Sell { household: 0, object: extra }).unwrap();
+    w.apply(Command::Sell {
+        household: 0,
+        object: extra,
+    })
+    .unwrap();
     let current = w.sims[0].current().expect("walking to the first chair");
-    assert_eq!(task_object(&current.task.kind).map(|i| w.objects[i as usize].stable), Some(a));
-    let queued = w.sims[0].queue().next().expect("the second chair is queued");
-    assert_eq!(task_object(&queued.kind).map(|i| w.objects[i as usize].stable), Some(b));
+    assert_eq!(
+        task_object(&current.task.kind).map(|i| w.objects[i as usize].stable),
+        Some(a)
+    );
+    let queued = w.sims[0]
+        .queue()
+        .next()
+        .expect("the second chair is queued");
+    assert_eq!(
+        task_object(&queued.kind).map(|i| w.objects[i as usize].stable),
+        Some(b)
+    );
 
     // Saved and loaded, both still point at the same chairs.
     let mut loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     for _ in 0..5 {
         loaded.tick_once();
     }
-    let current = loaded.sims[0].current().expect("walking to the first chair");
-    assert_eq!(task_object(&current.task.kind).map(|i| loaded.objects[i as usize].stable), Some(a));
-    let queued = loaded.sims[0].queue().next().expect("the second chair is queued");
-    assert_eq!(task_object(&queued.kind).map(|i| loaded.objects[i as usize].stable), Some(b));
+    let current = loaded.sims[0]
+        .current()
+        .expect("walking to the first chair");
+    assert_eq!(
+        task_object(&current.task.kind).map(|i| loaded.objects[i as usize].stable),
+        Some(a)
+    );
+    let queued = loaded.sims[0]
+        .queue()
+        .next()
+        .expect("the second chair is queued");
+    assert_eq!(
+        task_object(&queued.kind).map(|i| loaded.objects[i as usize].stable),
+        Some(b)
+    );
 }
 
 #[test]
@@ -114,7 +171,11 @@ fn an_old_save_without_ids_gets_them_on_load() {
     }
     let mut loaded = World::from_save_json(CONTENT, &save.to_string()).unwrap();
     let ids: Vec<u32> = loaded.objects.iter().map(|o| o.stable).collect();
-    assert_eq!(ids.into_iter().collect::<HashSet<_>>().len(), loaded.objects.len(), "all different");
+    assert_eq!(
+        ids.into_iter().collect::<HashSet<_>>().len(),
+        loaded.objects.len(),
+        "all different"
+    );
     assert_eq!((at(&loaded, a).x, at(&loaded, a).z), (2, 2));
     assert_eq!((at(&loaded, b).x, at(&loaded, b).z), (4, 2));
 
@@ -129,7 +190,11 @@ fn a_sold_highest_id_is_not_reused_after_a_reload() {
     let mut w = world();
     let _a = buy(&mut w, "chair", 2, 2);
     let b = buy(&mut w, "chair", 4, 2);
-    w.apply(Command::Sell { household: 0, object: b }).unwrap();
+    w.apply(Command::Sell {
+        household: 0,
+        object: b,
+    })
+    .unwrap();
     let mut loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     let c = buy(&mut loaded, "chair", 6, 2);
     assert!(c > b, "the sold chair's id stays retired ({c} after {b})");

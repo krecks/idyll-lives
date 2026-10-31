@@ -27,7 +27,11 @@ const TOWN: &str = r#"{"width":12,"depth":10,
 
 fn world() -> World {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-    w.apply(Command::SetAutonomy { enabled: false, household: None }).unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
     w.sims[0].needs = [0.05, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0];
     w
 }
@@ -42,23 +46,52 @@ fn hours(w: &mut World, h: f32) {
 fn with_no_toilet_it_ends_in_a_puddle() {
     let mut w = world();
     hours(&mut w, 0.2);
-    let accidents: Vec<_> = w.events.iter().filter(|e| e.kind == EventKind::Accident).map(|e| e.n).collect();
+    let accidents: Vec<_> = w
+        .events
+        .iter()
+        .filter(|e| e.kind == EventKind::Accident)
+        .map(|e| e.n)
+        .collect();
     assert_eq!(accidents, [Some(0)]);
     assert!(w.sims[0].needs[0] > 0.8, "relieved");
-    assert!((w.sims[0].needs[3] - 0.4).abs() < 0.01, "but grubby: hygiene {}", w.sims[0].needs[3]);
-    assert_eq!(w.dirt[w.lot.tile_index(4, 3)], 1.0, "a puddle where it happened");
-    assert!(w.sims[0].feelings.iter().any(|f| w.content.feelings[f.def].id == "hadAccident"));
+    assert!(
+        (w.sims[0].needs[3] - 0.4).abs() < 0.01,
+        "but grubby: hygiene {}",
+        w.sims[0].needs[3]
+    );
+    assert_eq!(
+        w.dirt[w.lot.tile_index(4, 3)],
+        1.0,
+        "a puddle where it happened"
+    );
+    assert!(
+        w.sims[0]
+            .feelings
+            .iter()
+            .any(|f| w.content.feelings[f.def].id == "hadAccident")
+    );
     // Not again right away.
     w.sims[0].needs[0] = 0.0;
     hours(&mut w, 0.5);
-    assert_eq!(w.events.iter().filter(|e| e.kind == EventKind::Accident).count(), 1);
+    assert_eq!(
+        w.events
+            .iter()
+            .filter(|e| e.kind == EventKind::Accident)
+            .count(),
+        1
+    );
 }
 
 #[test]
 fn on_the_toilet_at_zero_is_no_accident() {
     let mut w = world();
     w.place_object("toilet", 4, 4, 0).unwrap();
-    w.apply(Command::Use { sim: 0, object: 0, interaction: 0 }).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: 0,
+        interaction: 0,
+    })
+    .unwrap();
     hours(&mut w, 0.5);
     assert!(!w.events.iter().any(|e| e.kind == EventKind::Accident));
 }
@@ -68,13 +101,29 @@ fn exhausted_they_sleep_on_the_floor_and_hungry_they_order_takeout() {
     let mut w = world();
     w.sims[0].needs = [1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0];
     w.tick_once();
-    assert_eq!(w.sims[0].pose, sim_core::content::Pose::Lie, "asleep where they stood");
+    assert_eq!(
+        w.sims[0].pose,
+        sim_core::content::Pose::Lie,
+        "asleep where they stood"
+    );
     hours(&mut w, 2.1);
-    assert!((w.sims[0].needs[1] - 0.45).abs() < 0.02, "energy {}", w.sims[0].needs[1]);
-    assert!(w.events.iter().any(|e| e.kind == EventKind::Accident && e.n == Some(1)));
+    assert!(
+        (w.sims[0].needs[1] - 0.45).abs() < 0.02,
+        "energy {}",
+        w.sims[0].needs[1]
+    );
+    assert!(
+        w.events
+            .iter()
+            .any(|e| e.kind == EventKind::Accident && e.n == Some(1))
+    );
 
     w.sims[0].needs[2] = 0.0;
     hours(&mut w, 0.5);
-    assert!((w.sims[0].needs[2] - 0.7).abs() < 0.02, "hunger {}", w.sims[0].needs[2]);
+    assert!(
+        (w.sims[0].needs[2] - 0.7).abs() < 0.02,
+        "hunger {}",
+        w.sims[0].needs[2]
+    );
     assert_eq!(w.households[0].funds, 975, "takeout costs");
 }

@@ -14,15 +14,17 @@ import { fetchOnce, forget, gunzipText, openCache, prune } from '../ml/assets';
 import { configureOrt, hasWebGpu, importOrt, ORT_WASM, sessionOptions } from '../ml/ort';
 import init, { Voice } from './wasm-pkg/voice_wasm.js';
 import wasmUrl from './wasm-pkg/voice_wasm_bg.wasm?url';
-import { parseStyle, STYLE_IDS, synthesizeLine, type Config, type Engine, type Phonemizer, type Session, type StyleFile } from './supertonic';
+import { parseStyle, STYLE_IDS, synthesizeLine, type Config, type Engine, type Session, type StyleFile } from './supertonic';
 import type { FromVoiceWorker, ToVoiceWorker, VoiceDevice } from './protocol';
 import type { VoiceParams } from './voices';
 
 interface WorkerScope {
   onmessage: ((e: MessageEvent<ToVoiceWorker>) => void) | null;
   postMessage(message: FromVoiceWorker, transfer?: Transferable[]): void;
+  /** Called by the wasm runtime just before a Rust panic traps; set below, where the runtime looks for it. */
+  __wasmPanic?(message: string): void;
 }
-const scope = self as unknown as WorkerScope;
+const scope = self as WorkerScope;
 
 /** Bumped when the files change; older caches are deleted. (New files under new names don't need it.) */
 const CACHE_PREFIX = 'littlelives-voice-';
@@ -31,24 +33,24 @@ const CACHE = `${CACHE_PREFIX}v5`;
 const OLD_VOICES_PREFIX = 'littlelives-voices-';
 
 /**
- * Files under `voice/` (made by `tools/voice/fetch.mjs`), with sizes in bytes for the progress
+ * Files under `voice/` (made by `cargo fetch-voice`), with sizes in bytes for the progress
  * bar. The graphs come with their weights in 16-bit floats, gzipped (`.onnxz`: unpacked by
  * `fetchOnce`).
  */
 type File = [name: string, bytes: number];
 const MODEL_DIR = 'supertonic-3/';
 const MODELS = {
-  duration: ['duration_predictor.onnxz', 1_628_944],
-  text: ['text_encoder.onnxz', 16_780_989],
-  vector: ['vector_estimator.onnxz', 119_568_968],
-  vocoder: ['vocoder.onnxz', 47_204_410],
+  duration: ['duration_predictor.onnxz', 1_633_681],
+  text: ['text_encoder.onnxz', 16_783_293],
+  vector: ['vector_estimator.onnxz', 119_556_677],
+  vocoder: ['vocoder.onnxz', 47_191_753],
 } satisfies Record<keyof Engine['sessions'], File>;
 /** A voice style file is about 291 KB. */
 const STYLE_BYTES = 291_500;
 const SMALL: File[] = [
   [`${MODEL_DIR}tts.json`, 8_253],
   [`${MODEL_DIR}unicode_indexer.json`, 277_676],
-  ['en-us.lexz', 1_320_518],
+  ['en-us.lexz', 1_310_821],
 ];
 const VOICE_WASM_BYTES = 162_000;
 
@@ -59,7 +61,7 @@ let queue: Promise<void> = Promise.resolve();
 /** What our WebAssembly said as it panicked (its panic hook calls `__wasmPanic` just before the trap). */
 let panicked: string | null = null;
 
-(self as unknown as { __wasmPanic: (message: string) => void }).__wasmPanic = (message) => {
+scope.__wasmPanic = (message) => {
   panicked = message;
   console.error(`[voice] ${message}`);
 };
@@ -95,7 +97,9 @@ async function speak(id: number, text: string, voice: VoiceParams): Promise<void
     if (err instanceof WebAssembly.RuntimeError) {
       engine = null;
       loading = null;
-      scope.postMessage({ type: 'error', message: panicked ?? String(err), restart: true });
+      const said = panicked;
+      panicked = null;
+      scope.postMessage({ type: 'error', message: said ?? String(err), restart: true });
     }
   }
 }
@@ -150,18 +154,15 @@ async function load(base: string, device: VoiceDevice): Promise<void> {
   // between its passes and goes straight into the vocoder, and the other graphs hand back the few
   // numbers we need on the CPU; on the processor everything comes back as CPU tensors.
   for (const [i, k] of names.entries()) {
-    sessions[k] = (await ort.InferenceSession.create(
-      new Uint8Array(models[i]),
-      sessionOptions(device, k === 'vector' ? 'gpu-buffer' : undefined),
-    )) as unknown as Session;
+    sessions[k] = await ort.InferenceSession.create(new Uint8Array(models[i]), sessionOptions(device, k === 'vector' ? 'gpu-buffer' : undefined));
   }
   engine = {
-    ort: ort as unknown as Engine['ort'],
+    ort,
     sessions,
     config: json<Config>(config),
     indexer: json<number[]>(indexer),
     styles: new Map(STYLE_IDS.map((id, i) => [id, parseStyle(json<StyleFile>(styles[i]))])),
-    phonemizer: new Voice(await gunzipText(lexicon)) as unknown as Phonemizer,
+    phonemizer: new Voice(await gunzipText(lexicon)),
   };
   // The sessions and the engine have their own copies.
   for (const f of files) forget(f.url);

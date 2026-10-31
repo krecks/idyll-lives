@@ -1,7 +1,7 @@
 /**
  * Dev-only pose bench (`bun run dev`, then /poses.html): Sims at real furniture, driven through the
  * game's own `Characters` with a synthetic snapshot, to check activity animations without
- * setting up a game. Not part of the build.
+ * setting up a game. Drawn by PlayCanvas (`pcStage.ts`). Not part of the build.
  *
  * Each station is one object and one Sim (two for social interactions) doing an activity tag;
  * a station with a `script` cycles through poses (sitting down, getting into bed, ...).
@@ -19,39 +19,30 @@
  * it), `?beds=wallBed,sofaBed:doze` (the same, the first use lying down unless one is named),
  * `?clip=walk` (every Sim plays that clip: `__characters.force`), `?clip=walk&strip=8` (a filmstrip:
  * the clip held at 8 times through it, on a man, a woman, a child, a teen and an elder; no stations),
- * `?bottom=bottom.skirt` (everyone who can wears that bottom),
+ * `?bottom=bottom.skirt` (everyone who can wears that bottom; `?top=top.jacket` the same for a top;
+ * `?hair=braid` the same for a hairstyle, else women wear it long and men short),
  * `?stage=teen` (a life stage: baby, child, teen, youngAdult, adult or elder) everyone placed is at,
  * where sim-core lets that stage take the place (a baby only lies in a crib; children and teens
  * don't care for a baby, flirt or kiss), with the game's look for it (stoop, grey hair); with
- * `strip`, the rows are a man and a woman at that stage.
+ * `strip`, the rows are a man and a woman at that stage. `?renderer=webgl` draws with WebGL2 (default
+ * WebGPU); `?ground=0` leaves the floor out (e.g. to compare diag views); `?plate=mealPlate` (a content item) is what
+ * every station eats (the fork, spoon or chopsticks for it).
  */
 
-import {
-  ArcRotateCamera,
-  Color3,
-  Color4,
-  DirectionalLight,
-  Engine,
-  HemisphericLight,
-  ImageProcessingConfiguration,
-  Matrix,
-  MeshBuilder,
-  PBRMaterial,
-  Scene,
-  ShadowGenerator,
-  Vector3,
-} from '../render/babylon/core';
-import { AssetRegistry } from '../assets/registry';
+import { createStage } from './pcStage';
 import { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import type { ObjectPlacement, SimInfo } from '../core/protocol';
-import { Pose, type SnapshotLayout } from '../core/snapshot';
-import { lookAtStage, palette } from '../game/household';
-import { Characters, MAX_CHARACTERS } from '../render/babylon/characters';
-import { MaterialLibrary } from '../render/babylon/materials';
-import { buildModel, motionsOf, partPose } from '../render/babylon/models';
-import { slotPlace } from '../render/babylon/objectMotion';
-import { installNature } from '../render/babylon/nature';
+import { Pose, simFields, type SnapshotLayout } from '../core/snapshot';
+import { lookAtStage, palette, type HairStyle } from '../game/household';
+import { Characters, MAX_CHARACTERS } from '../render/pc/characters';
+import { Instances } from '../render/pc/instancing';
+import { buildModel } from '../render/pc/models';
+import { windStill } from '../render/pc/nature';
+import { multiply, translation } from '../render/shared/math';
+import { partPose } from '../render/shared/modelClips';
+import { motionsOf } from '../render/shared/modelEntry';
+import { slotPlace } from '../render/shared/objectMotion';
 
 const P = Pose;
 /** Conversation animation codes (`social::ANIMATIONS` + 1). */
@@ -77,6 +68,8 @@ interface Station {
   stage?: string;
   /** Carries this item (content `items` id). */
   held?: string;
+  /** Eats this (content `items` id): the cutlery for it (`?plate=` for every station). */
+  plate?: string;
   /** Walks to and fro across the cell. */
   walk?: boolean;
   /** A baby lies (awake, or 'asleep') in the object's first slot (a crib); the station's Sim sees to them from the front. */
@@ -188,6 +181,30 @@ const STATIONS: Station[] = [
   { label: 'eat (fridge)', def: 'fridge', tag: 'eat' },
   { label: 'drink (espresso)', def: 'foodie.espressoBar', tag: 'drink', female: true },
   { label: 'eat seated', def: 'romantic.candlelitTable', tag: 'eat', pose: P.Sit },
+  // Props in hand (G-70): a fork, a cup at the table, a can, wine, a shaker, a coin, seed for the birds
+  { label: 'eat with a fork', def: 'diningChair', tag: 'eat', pose: P.Sit, plate: 'mealPlate' },
+  { label: 'ice cream with a spoon', def: 'diningChair', tag: 'eat', pose: P.Sit, plate: 'iceCream', stage: 'child' },
+  { label: 'coffee seated', def: 'diningChair', tag: 'drink', pose: P.Sit, female: true },
+  { label: 'coffee standing', def: 'coffeeMachine', tag: 'drink' },
+  { label: 'cold drink', def: 'fridge', tag: 'drink', female: true },
+  { label: 'wine', def: 'wineFridge', tag: 'drink' },
+  { label: 'shake a cocktail', def: 'barCart', tag: 'drink', female: true },
+  { label: 'wish at the fountain', def: 'fountainTown', tag: 'look' },
+  { label: 'feed the birds', def: 'parkBench', tag: 'feed', pose: P.Sit, female: true },
+  // The rest of G-70: the tools, the post box's card, the basketball, the café's cake, the baby's bottle
+  { label: 'water the plant', def: 'plant', tag: 'water', female: true },
+  { label: 'water the flowers', def: 'planterBox', tag: 'water' },
+  { label: 'trim the shrub', def: 'bush', tag: 'prune' },
+  { label: 'paint with a brush', def: 'kidsEasel', tag: 'paint', stage: 'child' },
+  { label: 'draw with chalk', def: 'kidsChalkboard', tag: 'paint', stage: 'child', female: true },
+  { label: 'post a card', def: 'postBox', tag: 'write', female: true },
+  { label: 'write with a pen', def: 'deskWriting', tag: 'write', pose: P.Sit },
+  { label: 'homework with a pencil', def: 'kidsDesk', tag: 'write', pose: P.Sit, stage: 'child', female: true },
+  { label: 'plan on the whiteboard', def: 'whiteboard', tag: 'paint', female: true },
+  { label: 'call from the phone box', def: 'phoneBooth', tag: 'phone' },
+  { label: 'shoot hoops', def: 'basketballHoop', tag: 'exercise' },
+  { label: 'cake at the café', def: 'cafeChair', tag: 'eat', pose: P.Sit, held: 'cakeSlice', plate: 'cakeSlice', female: true },
+  { label: 'bottle feed', def: 'crib', script: CUDDLING, baby: true, plate: 'babyBottle' },
   // Seated
   { label: 'relax recliner', def: 'couchPotato.recliner', tag: 'relax', pose: P.Sit },
   { label: 'bath', def: 'whirlpoolTub', tag: 'bath', pose: P.Sit, female: true },
@@ -197,6 +214,7 @@ const STATIONS: Station[] = [
   { label: 'type', def: 'computerDesk', tag: 'type', pose: P.Sit, female: true },
   { label: 'piano', def: 'piano', tag: 'music', pose: P.Sit },
   { label: 'chaise feet up', def: 'chaise', tag: 'relax', pose: P.Sit, female: true },
+  { label: 'daybed on its side', def: 'bedDaybed', tag: 'relax', pose: P.Lie, female: true },
   { label: 'exercise bike', def: 'exerciseBike', tag: 'exercise', pose: P.Sit },
   { label: 'cello', def: 'gloomy.cello', tag: 'music', pose: P.Sit, female: true },
   { label: 'drums', def: 'hotHeaded.thunderDrums', tag: 'music', pose: P.Sit },
@@ -306,6 +324,8 @@ function seatStation(spec: string, lie: boolean): Station {
 const seats = params.get('seats')?.split(',').filter(Boolean);
 const beds = params.get('beds')?.split(',').filter(Boolean);
 const bottom = params.get('bottom');
+const top = params.get('top');
+const hair = params.get('hair') as HairStyle | null;
 /** `?only=`: stations whose label, object id or activity tag is one of these. */
 const named = (o: string, s: Station) => o === s.label || o === s.def || o === s.tag;
 const stations: Station[] = strip
@@ -319,32 +339,14 @@ for (const o of only && !strip && !seats && !beds ? only : []) {
   if (!STATIONS.some((s) => named(o, s))) problems.push(`only=${o}: no station with that label, object id or tag`);
 }
 
-const canvas = document.getElementById('c') as HTMLCanvasElement;
-const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
-const scene = new Scene(engine);
-scene.clearColor = new Color4(0.62, 0.77, 0.9, 1);
-scene.imageProcessingConfiguration.toneMappingEnabled = true;
-scene.imageProcessingConfiguration.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
-scene.imageProcessingConfiguration.exposure = 1.1;
-installNature(scene);
-const sky = new HemisphericLight('sky', new Vector3(0, 1, 0), scene);
-sky.intensity = 0.6;
-sky.groundColor = new Color3(0.32, 0.36, 0.25);
-const sun = new DirectionalLight('sun', new Vector3(-0.45, -1, -0.35), scene);
-sun.intensity = 3;
-sun.diffuse = new Color3(1, 0.96, 0.88);
-const shadowGen = new ShadowGenerator(2048, sun);
-shadowGen.usePercentageCloserFiltering = true;
-shadowGen.bias = 0.002;
-
-const assets = await AssetRegistry.load(`${base}assets/manifest.json`, params.getAll('pack'));
-const lib = MaterialLibrary.for(scene).setAssets(assets);
-const env = assets.get('environment.sky', 'image');
-if (env?.url) await lib.loadEnvironment(env.url);
-
-// The animation tags, and those the stations use that the content doesn't list.
-const actions = [...content.animations];
-for (const s of stations) for (const t of [s.tag, ...(s.script ?? []).map((x) => x.tag)]) if (t && !actions.includes(t)) actions.push(t);
+/** A station by its index, label or object id (the first with it); -1 if there's none. */
+function stationOf(at: number | string): number {
+  const n = typeof at === 'number' || /^\d+$/.test(at) ? Number(at) : stations.findIndex((s) => s.label === at || s.def === at);
+  return n >= 0 && n < stations.length ? n : -1;
+}
+const focusParam = params.get('focus');
+const focus = focusParam === null ? -1 : stationOf(focusParam);
+if (focusParam !== null && focus < 0) problems.push(`focus=${focusParam}: no such station (an index 0–${stations.length - 1}, a label or an object id)`);
 
 // Layout: stations in a grid, each object at its cell's centre facing +z.
 const cols = Number(params.get('cols')) || (strip ? strip : Math.ceil(Math.sqrt(stations.length * 1.4)));
@@ -352,13 +354,24 @@ const cols = Number(params.get('cols')) || (strip ? strip : Math.ceil(Math.sqrt(
 const largest = Math.max(0, ...stations.filter((s) => s.seated).map((s) => Math.max(...(content.object(s.def!)?.footprint ?? [1, 1]))));
 const gap = Number(params.get('gap')) || (strip ? 1.1 : Math.max(3.4, largest + 1.6));
 const rows = Math.ceil(stations.length / cols);
-const ground = MeshBuilder.CreateGround('ground', { width: cols * gap + 6, height: rows * gap + 6 }, scene);
-const gm = new PBRMaterial('ground', scene);
-gm.albedoColor = Color3.FromHexString('#8E9A7A').toLinearSpace();
-gm.roughness = 1;
-gm.metallic = 0;
-ground.material = gm;
-ground.receiveShadows = true;
+
+const bench = await createStage({
+  sky: 0.6,
+  sun: [-0.45, -1, -0.35],
+  sunIntensity: 3,
+  environment: 1,
+  alpha: Number(params.get('alpha') ?? Math.PI / 2 + 0.5),
+  beta: Number(params.get('beta') ?? 1.15),
+  radius: Number(params.get('radius')) || (focus >= 0 ? 4 : Math.max(cols, rows) * gap * 1.05),
+  near: 0.05,
+  wheelPrecision: 30,
+});
+const { app, assets, lib, orbit } = bench;
+bench.lawn(cols * gap + 6, rows * gap + 6, '#8E9A7A');
+
+// The animation tags, and those the stations use that the content doesn't list.
+const actions = [...content.animations];
+for (const s of stations) for (const t of [s.tag, ...(s.script ?? []).map((x) => x.tag)]) if (t && !actions.includes(t)) actions.push(t);
 
 interface Actor {
   station: number;
@@ -382,9 +395,11 @@ interface Actor {
 const objects: ObjectPlacement[] = [];
 const actors: Actor[] = [];
 const labels = document.getElementById('labels')!;
-const spots: { at: Vector3; el: HTMLSpanElement }[] = [];
-const centres: Vector3[] = [];
+const spots: { at: [number, number, number]; el: HTMLSpanElement }[] = [];
+const centres: [number, number, number][] = [];
 const posed = new Float32Array(16);
+const place = new Float32Array(16);
+const matrix = new Float32Array(16);
 const look = (id: number, female: boolean, stage?: string, height = 1, build = 1): SimInfo => ({
   id,
   name: '',
@@ -395,11 +410,12 @@ const look = (id: number, female: boolean, stage?: string, height = 1, build = 1
     body: female ? '#C9725F' : '#5F86C9',
     skin: ['#C08A64', '#8D5A3B', '#E8C0A0', '#6B4430'][id % 4],
     hair: ['#2B2320', '#7A4A2A', '#C9A15A', '#1A1A1A'][id % 4],
-    hairStyle: female ? 'long' : 'short',
+    hairStyle: hair ?? (female ? 'long' : 'short'),
     height,
     build,
     ...(stage ? { stage } : {}),
     ...(bottom ? { bottom } : {}),
+    ...(top ? { top } : {}),
   },
   traits: [],
   perks: [],
@@ -409,9 +425,9 @@ await Promise.all(
   stations.map(async (s, n) => {
     const cx = ((n % cols) - (cols - 1) / 2) * gap;
     const cz = -(Math.floor(n / cols) - (rows - 1) / 2) * gap;
-    centres.push(new Vector3(cx, 0, cz));
+    centres[n] = [cx, 0, cz];
     // Its label on the floor just in front of it: of its object, else of where its Sims stand.
-    let labelAt = new Vector3(cx, 0, cz + 1);
+    let labelAt: [number, number, number] = [cx, 0, cz + 1];
     if (s.strip !== undefined) {
       actors.push({ station: n, x: cx, z: cz, yaw: 0, object: -1, partner: -1, role: 0 });
     } else if (s.social) {
@@ -426,7 +442,7 @@ await Promise.all(
       objects.push({ id, def: s.def, x: ox, z: oz, rot: 0, w, d, quality: 0, sellValue: null, ...(s.open ? { open: true } : {}) });
       const key = def?.model ?? `model.${s.def}`;
       const entry = assets.get(key, 'model');
-      const template = await buildModel(scene, key, entry, [w, d]);
+      const template = await buildModel(app, key, entry, [w, d]);
       // Open (a wall bed folded down) and the use's own clips held open, as the game holds them.
       const motions = motionsOf(entry);
       // (Each clip once: a sofa bed's `open` is its pull-out use's clip too.)
@@ -435,13 +451,13 @@ await Promise.all(
         const clip = template.motion?.clips.get(name);
         return clip ? [{ clip, time: clip.duration, kind: 'use' }] : [];
       });
-      const place = Matrix.Translation(ox + w / 2, 0, oz + d / 2);
-      for (const [i, mesh] of template.meshes.entries()) {
+      translation(ox + w / 2, 0, oz + d / 2, place);
+      for (const [i, m] of template.meshes.entries()) {
         const part = template.motion ? template.motion.parts[i] : -1;
-        const m = part >= 0 && playing.length && partPose(playing, part, posed) ? Matrix.FromArray(posed).multiply(place) : place;
-        mesh.thinInstanceSetBuffer('matrix', m.asArray() as unknown as Float32Array, 16, true);
-        mesh.receiveShadows = true;
-        shadowGen.addShadowCaster(mesh);
+        const draw = new Instances(bench.device, bench.root, m.mesh, m.material, { name: m.name });
+        draw.setMatrices(part >= 0 && playing.length && partPose(playing, part, posed) ? multiply(posed, place, matrix) : place, 1);
+        draw.update();
+        windStill(draw.meshInstance, m);
       }
       // Standing use: centred on the front tile, facing the object (or at its slot's own place); sitting /
       // lying (or standing inside, a shower): on the slot, facing out or as its place says (as sim-core
@@ -461,7 +477,7 @@ await Promise.all(
       }
       if (s.baby) actors.push({ station: n, ...slot(0), object: id, partner: -1, role: 0, baby: true });
       if (s.pair) actors.push({ station: n, ...slot(1), object: id, partner: -1, role: 0, female: true });
-      labelAt = new Vector3(ox + w / 2, 0, oz + d + 0.1);
+      labelAt = [ox + w / 2, 0, oz + d + 0.1];
     } else {
       actors.push({ station: n, x: cx, z: cz, yaw: 0, object: -1, partner: -1, role: 0 });
     }
@@ -489,10 +505,9 @@ for (let i = 0; i < actors.length; i++) {
   if (a.partner >= 0) a.partner = actors[i].role === 1 ? i + 1 : i - 1;
 }
 
-const characters = new Characters(scene, assets, lib, content);
+const characters = new Characters(app, bench.root, assets, lib, content);
 if (!(await characters.init())) throw new Error('characters unavailable');
 await characters.build({ sims: actorSims, objects });
-for (const m of characters.casters()) shadowGen.addShadowCaster(m);
 if (strip) {
   // Each frame of the strip holds the clip at its share of the clip's length.
   const clip = forced ?? 'idle';
@@ -501,7 +516,8 @@ if (strip) {
   characters.force = forced;
 }
 
-const FIELDS = ['id', 'x', 'z', 'yaw', 'pose', 'moving', 'social', 'outcome', 'partner', 'anim', 'emotion', 'role', 'away', 'object', 'action', 'mood', 'held'] as const;
+const FIELDS = ['id', 'x', 'z', 'yaw', 'pose', 'moving', 'social', 'outcome', 'partner', 'anim', 'emotion', 'role', 'away', 'object', 'action', 'mood', 'held', 'plate'] as const;
+const plateParam = params.get('plate');
 const items = content.items.map((it) => it.id);
 const HEADER_LEN = 6;
 const STRIDE = FIELDS.length;
@@ -512,7 +528,7 @@ const layout: SnapshotLayout = {
   maxSims: MAX_CHARACTERS,
   ticksPerSecond: 20,
   header: { tick: 0, day: 1, minute: 2, speed: 3, simCount: 4, structureVersion: 5 },
-  sim: Object.fromEntries(FIELDS.map((f, i) => [f, i])) as unknown as SnapshotLayout['sim'],
+  sim: simFields(FIELDS),
   actions,
   items,
 };
@@ -561,6 +577,8 @@ function writeSnapshot(): void {
       snap[o + k.moving] = 1;
     }
     snap[o + k.held!] = s.held && !a.baby ? items.indexOf(s.held) + 1 : 0;
+    const plate = s.plate ?? plateParam;
+    snap[o + k.plate!] = plate && !a.baby ? items.indexOf(plate) + 1 : 0;
     const social = s.social ? SOCIAL[s.social] : 0;
     snap[o + k.social] = social ? 1 : 0;
     snap[o + k.anim] = social;
@@ -575,36 +593,15 @@ function writeSnapshot(): void {
   });
 }
 
-/** A station by its index, label or object id (the first with it); -1 if there's none. */
-function stationOf(at: number | string): number {
-  const n = typeof at === 'number' || /^\d+$/.test(at) ? Number(at) : stations.findIndex((s) => s.label === at || s.def === at);
-  return n >= 0 && n < stations.length ? n : -1;
-}
-const focusParam = params.get('focus');
-const focus = focusParam === null ? -1 : stationOf(focusParam);
-if (focusParam !== null && focus < 0) problems.push(`focus=${focusParam}: no such station (an index 0–${stations.length - 1}, a label or an object id)`);
-const target = focus >= 0 ? centres[focus].add(new Vector3(0.3, 0.7, 0.75)) : Vector3.Zero();
-const camera = new ArcRotateCamera(
-  'cam',
-  Number(params.get('alpha') ?? Math.PI / 2 + 0.5),
-  Number(params.get('beta') ?? 1.15),
-  Number(params.get('radius')) || (focus >= 0 ? 4 : Math.max(cols, rows) * gap * 1.05),
-  target,
-  scene,
-);
-camera.attachControl(canvas, true);
-camera.minZ = 0.05;
-camera.wheelPrecision = 30;
+/** Looks at station `n` close up: a little right of, above and in front of its middle. */
+const aimAt = (n: number): void => {
+  const [x, y, z] = centres[n];
+  Object.assign(orbit.target, { x: x + 0.3, y: y + 0.7, z: z + 0.75 });
+};
+if (focus >= 0) aimAt(focus);
 
-scene.onAfterRenderObservable.add(() => {
-  const vp = camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight());
-  const m = scene.getTransformMatrix();
-  for (const s of spots) {
-    const p = Vector3.Project(s.at, Matrix.IdentityReadOnly, m, vp);
-    s.el.style.left = `${(p.x / engine.getRenderWidth()) * canvas.clientWidth}px`;
-    s.el.style.top = `${(p.y / engine.getRenderHeight()) * canvas.clientHeight}px`;
-  }
-});
+// The sun's shadow over the floor.
+bench.shadows.setSquare(0, 0, Math.hypot(cols * gap + 6, rows * gap + 6) / 2);
 
 if (problems.length) {
   const el = document.createElement('span');
@@ -621,37 +618,44 @@ function step(dt: number): void {
   frame.now = clock * 1000;
   characters.update(frame, () => true, shadowMatrices);
 }
-let last = performance.now();
-engine.runRenderLoop(() => {
-  if (!manual) {
-    const now = performance.now();
-    step(Math.min(0.1, (now - last) / 1000));
-    last = now;
+const projected = { x: 0, y: 0 };
+// Manual: the app's own clock stands still too (the wind), so only `advance` moves anything.
+bench.run((dt) => {
+  if (!manual) step(dt);
+  for (const s of spots) {
+    if (!bench.project(s.at[0], s.at[1], s.at[2], projected)) continue;
+    s.el.style.left = `${projected.x}px`;
+    s.el.style.top = `${projected.y}px`;
   }
-  scene.render();
-});
-addEventListener('resize', () => engine.resize());
+}, manual);
 
-Object.assign(window, {
-  __poses: {
-    stations: stations.map((s) => s.label),
-    /** Advances the bench by `seconds` in 1/30 s steps (manual mode). */
-    advance(seconds: number) {
-      for (let t = 0; t < seconds - 1e-6; t += 1 / 30) step(1 / 30);
-    },
-    /** Frames a station (index, label or object id) close up; throws if there's no such station. */
-    focus(at: number | string, radius = 4, alpha?: number, beta?: number) {
-      const n = stationOf(at);
-      if (n < 0) throw new Error(`no station ${at} (an index 0–${stations.length - 1}, a label or an object id)`);
-      camera.target = centres[n].add(new Vector3(0.3, 0.7, 0.75));
-      camera.radius = radius;
-      if (alpha !== undefined) camera.alpha = alpha;
-      if (beta !== undefined) camera.beta = beta;
-    },
-    /** What the page couldn't do as asked (also shown on it), or null. */
-    error: problems.length ? problems.join('; ') : null,
-    characters,
-    camera,
-  },
-  __ready: true,
-});
+// (Two frames drawn before saying so: the shadow's and the picture's.)
+requestAnimationFrame(() =>
+  requestAnimationFrame(() =>
+    Object.assign(window, {
+      __app: app,
+      __scene: app.scene,
+      __poses: {
+        stations: stations.map((s) => s.label),
+        /** Advances the bench by `seconds` in 1/30 s steps (manual mode). */
+        advance(seconds: number) {
+          for (let t = 0; t < seconds - 1e-6; t += 1 / 30) step(1 / 30);
+        },
+        /** Frames a station (index, label or object id) close up; throws if there's no such station. */
+        focus(at: number | string, radius = 4, alpha?: number, beta?: number) {
+          const n = stationOf(at);
+          if (n < 0) throw new Error(`no station ${at} (an index 0–${stations.length - 1}, a label or an object id)`);
+          aimAt(n);
+          orbit.radius = radius;
+          if (alpha !== undefined) orbit.alpha = alpha;
+          if (beta !== undefined) orbit.beta = beta;
+        },
+        /** What the page couldn't do as asked (also shown on it), or null. */
+        error: problems.length ? problems.join('; ') : null,
+        characters,
+        camera: orbit,
+      },
+      __ready: true,
+    }),
+  ),
+);

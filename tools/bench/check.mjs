@@ -20,7 +20,7 @@
  *             sends each use, waits until the resident is at it and using it, takes pictures
  *             framing the object, then sells it and goes on to the next, all on one page. In the
  *             page, every animation frame, it logs the clips playing on the object
- *             (`__renderer.motion`) and the resident's pose and animation (`__sims()`). One JSON
+ *             (`__renderer.objectClips`, `RendererDebugHooks` in web/src/render/types.ts) and the resident's pose and animation (`__sims()`). One JSON
  *             line per use goes to `<out>/play-<run>.jsonl`.
  *               --objects toilet,fridge@23,14,0   which objects (`def` or `def@x,z,rot`), or
  *               --objects-file <path>   one a line (`#` comments), each
@@ -33,6 +33,11 @@
  *               --use-existing crib,garden.tomatoes   the state's own (the first of each kind: the
  *                 crib with the baby, `review-garden`'s ripe crops), run first, never sold
  *               --skills cooking=5,creativity=3   the resident's skills, set as the state opens
+ *               --needs bladder=0.1,all=0.6   needs, set as the state opens (`setNeed`)
+ *               --bond 0:1:friendship=60/romance=40/chemistry=0.5/partners   two residents' bond (`setBond`)
+ *               --sims 0,1   each of these does the use, the first watched (pairs: the seesaw, ping-pong)
+ *               --social chat,joke | --phone call,text   no object: the first of --sims starts each with the
+ *                 second (socials by content id; phone actions, the second the contact)
  *               --use all|<id>|<index>   (default all)  --sim 0  --colors body:12  --turn 0
  *               --state bathroom-check  --shots 3 --every 1000 (ms)  --wait 60 (s, from the use
  *                 sent to the resident using it)
@@ -62,7 +67,7 @@
  *            `<what>-<run>.json`, default the time it started, so runs into one `--out` keep theirs;
  *            given, `play`'s pictures start with it too);  --quality low|medium|high;  --renderer webgl;
  *            --size 1280x800;  --extra 'k=v&k=v' (more URL flags);  --headed (a window: only to
- *            measure timing).
+ *            measure timing);  --fresh (no kept browser profile: nothing cached between pages or runs).
  *
  * The setup fails loudly: the wasm and the asset manifest are fetched through the server first
  * (each must answer 200), and every HTTP error, failed request, page error and console error is
@@ -160,11 +165,26 @@ async function playwright() {
   }
 }
 const { chromium } = await playwright();
-const browser = await chromium.launch({
+const launchOptions = {
   headless: !has('headed'),
   ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }),
   args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'],
-});
+};
+/**
+ * The browser keeps a profile under `bench-results/.browser/` (one per kind and port, as
+ * `render.mjs`'s): its HTTP cache and compiled GPU shaders carry over between pages and runs, while
+ * the site's own storage is cleared before every page. `--fresh`: a new context per page, nothing kept.
+ */
+const fresh = has('fresh');
+const browser = fresh ? await chromium.launch(launchOptions) : null;
+const kept = fresh
+  ? null
+  : await chromium.launchPersistentContext(join(ROOT, 'bench-results', '.browser', `check-${has('headed') ? 'window' : 'headless'}-${port || 'sheet'}`), { ...launchOptions, viewport: { width, height }, deviceScaleFactor: 1 });
+if (kept) {
+  await setUp(kept);
+  // Its first window stays open (the browser with it); each page gets a window of its own (`newWindow`).
+  if (!kept.pages().length) await kept.newPage();
+}
 
 /** The job running (a picture, an object's use): what goes wrong in the page is logged with it. */
 let job = null;
@@ -207,9 +227,9 @@ function pageHelpers() {
   function sample() {
     const t = Math.round(performance.now() - w.t0);
     w.frames++;
-    const states = window.__renderer?.motion?.states?.get(w.id);
-    for (const [name, c] of states ?? []) {
-      const duration = c.clip.duration;
+    const clips = window.__renderer?.objectClips?.(w.id);
+    for (const [name, c] of clips ?? []) {
+      const duration = c.duration;
       const clip = (w.clips[name] ??= { kind: c.kind, duration: +duration.toFixed(2), first: t, max: 0, state: 'rest', events: [] });
       clip.max = Math.max(clip.max, +c.time.toFixed(2));
       const state = c.time <= 1e-3 ? 'rest' : c.time >= duration - 1e-3 ? 'open' : 'moving';
@@ -217,7 +237,7 @@ function pageHelpers() {
       clip.state = state;
     }
     for (const [name, clip] of Object.entries(w.clips)) {
-      if (states?.has(name) || clip.state === 'rest') continue;
+      if (clips?.has(name) || clip.state === 'rest') continue;
       clip.state = 'rest';
       if (clip.events.length < MAX_EVENTS) clip.events.push([t, 'rest']);
     }
@@ -243,20 +263,7 @@ function pageHelpers() {
    * boxes: a box turned with the model is far bigger than a round crown.
    */
   function points(id) {
-    const pop = window.__renderer?.placed?.find((p) => p.id === id)?.pop;
-    if (!pop?.matrices) return null;
-    const m = pop.matrices.subarray(pop.index * 16, pop.index * 16 + 16);
-    const all = [];
-    for (const mesh of pop.meshes) {
-      const v = mesh.getVerticesData?.('position');
-      if (!v) continue;
-      const step = 3 * Math.max(1, Math.floor(v.length / 3 / 50_000));
-      for (let i = 0; i < v.length; i += step) {
-        const [x, y, z] = [v[i], v[i + 1], v[i + 2]];
-        all.push(x * m[0] + y * m[4] + z * m[8] + m[12], x * m[1] + y * m[5] + z * m[9] + m[13], x * m[2] + y * m[6] + z * m[10] + m[14]);
-      }
-    }
-    return all.length ? all : null;
+    return window.__renderer?.objectPoints?.(id, 50_000) ?? null;
   }
   /** The corners of what `points` gives (`lo`, `hi`: x, y, z), or null. */
   function bounds(id) {
@@ -278,7 +285,7 @@ function pageHelpers() {
    */
   function fit(id, { target, alpha, beta, keep = [0.9, 0.75] }) {
     const p = points(id);
-    const cam = window.__scene?.activeCamera;
+    const cam = window.__renderer?.cameraInfo?.();
     if (!p || !cam) return 0;
     const [sa, ca, sb, cb] = [Math.sin(alpha), Math.cos(alpha), Math.sin(beta), Math.cos(beta)];
     const tanUp = Math.tan(cam.fov / 2) * keep[1];
@@ -325,13 +332,17 @@ function pageHelpers() {
   };
 }
 
-/**
- * A page at 1 % volume, the camera never taking over on its own (the director's delay 0), and free
- * will off unless `--free-will` (the game's setting applies to the player's household as a game
- * opens, over what a state says). Reused for every job of a run.
- */
-async function newPage() {
-  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+/** A new page in a window of its own (a kept browser's `newPage` opens a tab in its first window instead). */
+async function newWindow(context) {
+  const cdp = await context.newCDPSession(context.pages()[0]);
+  const page = context.waitForEvent('page');
+  await cdp.send('Target.createTarget', { url: 'about:blank', newWindow: true });
+  await cdp.detach();
+  return page;
+}
+
+/** The scripts every page of a context runs before the game's: quiet, the run's settings, the helpers. */
+async function setUp(context) {
   await context.addInitScript(quiet);
   await context.addInitScript((autonomy) => {
     const key = 'open-sims-wasm.settings';
@@ -344,7 +355,26 @@ async function newPage() {
     localStorage.setItem(key, JSON.stringify({ ...settings, directorDelay: 0, autonomy }));
   }, has('free-will'));
   await context.addInitScript(pageHelpers);
-  const page = await context.newPage();
+}
+
+/**
+ * A page at 1 % volume, the camera never taking over on its own (the director's delay 0), and free
+ * will off unless `--free-will` (the game's setting applies to the player's household as a game
+ * opens, over what a state says). Reused for every job of a run.
+ */
+async function newPage() {
+  let context = kept;
+  if (!context) {
+    context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+    await setUp(context);
+  }
+  const page = kept ? await newWindow(kept) : await context.newPage();
+  // (A kept browser's site storage: cleared, so each page starts as a new player's would.)
+  if (kept && served) {
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Storage.clearDataForOrigin', { origin: new URL(base).origin, storageTypes: 'cookies,file_systems,indexeddb,local_storage,service_workers,cache_storage' });
+    await cdp.detach();
+  }
   page.on('pageerror', (err) => noteError(`page error: ${err.message}`));
   page.on('console', (m) => {
     if (m.type() === 'error' || (m.type() === 'warning' && /lights only|unavailable|failed/i.test(m.text()))) noteError(`console ${m.type()}: ${m.text()}`);
@@ -468,6 +498,12 @@ if (what === 'play') {
     if (at === 'existing') return { def, existing: true, at: null, helpers };
     return { def, at: place(at, line) ?? place(flag('at'), '--at'), helpers };
   };
+  /**
+   * `--social chat,joke` / `--phone call,text`: no object; the first of `sims` starts each social (content `socials` id)
+   * with the second, or each phone action (content `phone.actions` id) with the second as the contact (none for
+   * `browse`), the state opened afresh for each. Pictures follow the first.
+   */
+  const talks = [...list('social').map((id) => ({ kind: 'social', id })), ...list('phone').map((id) => ({ kind: 'phone', id }))];
   const things = batch
     ? [
         ...items(flag('use-existing', '')).map((def) => parse(`${def}@existing`)),
@@ -476,15 +512,48 @@ if (what === 'play') {
           .filter(Boolean)
           .map(parse),
       ]
-    : [{ def: need('object'), at: place(flag('at', '23,14,0'), '--at'), helpers: withAll }];
+    : talks.length
+      ? []
+      : [{ def: need('object'), at: place(flag('at', '23,14,0'), '--at'), helpers: withAll }];
+  /** `--<name> k=v,k=v`: each pair as `{ [key]: k, [value]: v }`, `v` a number (`what` names it in the message). */
+  const pairs = (name, key, value, what) =>
+    items(flag(name, '')).map((p) => {
+      const [k, v] = p.split('=');
+      if (!k || !v?.trim() || !Number.isFinite(Number(v))) fail(`'${p}' in --${name} isn't <${key}>=<${what}>`);
+      return { [key]: k, [value]: Number(v) };
+    });
   /** `--skills cooking=5,creativity=3`: the resident's, set each time the state opens. */
-  const skills = items(flag('skills', '')).map((p) => {
-    const [skill, level] = p.split('=');
-    if (!skill || !Number.isFinite(Number(level))) fail(`'${p}' in --skills isn't <skill>=<level>`);
-    return { skill, level: Number(level) };
+  const skills = pairs('skills', 'skill', 'level', 'level');
+  /**
+   * `--sims 0,1`: the residents who each do the use (a pair on the seesaw, two at a pool table, at the climbing frame),
+   * one after the other a moment apart; the first is the one watched, framed and logged as `before`/`after`, the others
+   * in `others`. `--sim 3` alone: that one (the default 0).
+   */
+  const sims = flag('sims') ? list('sims').map(Number) : [num('sim', 0)];
+  if (!sims.length || sims.some((s) => !Number.isInteger(s) || s < 0)) fail(`--sims takes resident ids: '${flag('sims')}'`);
+  const sim = sims[0];
+  /** `--needs bladder=0.1,all=0.6`: needs set for each of `sims` as the state opens (`setNeed`; `all` first, then the rest). */
+  const needs = pairs('needs', 'need', 'value', '0..1').sort((a, b) => (a.need === 'all' ? -1 : b.need === 'all' ? 1 : 0));
+  /**
+   * `--bond 0:1:friendship=60/romance=40/chemistry=0.5/partners`: how two residents stand with each other, set as the
+   * state opens (`setBond`, both ways); several with commas.
+   */
+  const bonds = items(flag('bond', '')).map((p) => {
+    const [a, b, set = ''] = p.split(':');
+    const bond = { type: 'setBond', a: Number(a), b: Number(b) };
+    for (const part of set.split('/').filter(Boolean)) {
+      const [k, v] = part.split('=');
+      if (k === 'partners') bond.partners = v === undefined ? true : v !== 'false';
+      else if (['friendship', 'romance', 'chemistry'].includes(k) && Number.isFinite(Number(v))) bond[k] = Number(v);
+      else fail(`'${part}' in --bond isn't friendship=, romance=, chemistry= or partners`);
+    }
+    if (!Number.isInteger(bond.a) || !Number.isInteger(bond.b)) fail(`'${p}' in --bond doesn't start <a>:<b>:`);
+    return bond;
   });
-  const sim = num('sim', 0);
+  if (talks.some((t) => t.kind === 'social') && sims.length < 2) fail('--social needs two residents: --sims <who>,<with whom>');
   const which = flag('use', batch ? 'all' : '0');
+  /** The camera following the resident: `--radius` (else `radius`), `--beta`, `--alpha`, `--y`, the ones given. */
+  const view = (radius) => Object.fromEntries(Object.entries({ radius: num('radius', radius), beta: num('beta'), alpha: num('alpha'), y: num('y') }).filter(([, v]) => Number.isFinite(v)));
   const shots = num('shots', batch ? 3 : 6);
   const every = num('every', batch ? 1000 : 500);
   const cap = num('wait', 60) * 1000;
@@ -518,32 +587,47 @@ if (what === 'play') {
     await page.waitForFunction(() => typeof window.__sims === 'function' && window.__world?.() && window.__sims().length > 0, null, { timeout: 90_000 });
     await loaded();
     await settle(page, 1500);
-    const unknown = await page.evaluate(({ freeWill, sim, skills }) => {
+    const [sent, unknown] = await page.evaluate(({ freeWill, sims, skills, needs, bonds }) => {
+      const sent = window.__check.now();
       window.__send({ type: 'setAutonomy', enabled: freeWill, household: 0 });
       window.__addFunds(1_000_000);
       const known = window.__content.skills.map((s) => s.id);
-      for (const s of skills) if (known.includes(s.skill)) window.__send({ type: 'setSkill', sim, skill: s.skill, level: s.level });
-      return skills.map((s) => s.skill).filter((s) => !known.includes(s));
-    }, { freeWill: has('free-will'), sim, skills });
-    if (unknown.length) fail(`no skill ${unknown.join(', ')} in the content`);
-    const s = await resident();
-    if (!s) throw new Error(`no resident ${sim} in ${state}`);
-    park = [s.x, s.z];
+      const needIds = [...window.__content.needs.map((n) => n.id), 'all'];
+      for (const sim of sims) {
+        for (const s of skills) if (known.includes(s.skill)) window.__send({ type: 'setSkill', sim, skill: s.skill, level: s.level });
+        for (const n of needs) if (needIds.includes(n.need)) window.__send({ type: 'setNeed', sim, need: n.need, value: n.value });
+      }
+      for (const b of bonds) window.__send(b);
+      return [sent, [...skills.map((s) => s.skill).filter((s) => !known.includes(s)), ...needs.map((n) => n.need).filter((n) => !needIds.includes(n))]];
+    }, { freeWill: has('free-will'), sims, skills, needs, bonds });
+    if (unknown.length) fail(`no skill or need ${unknown.join(', ')} in the content`);
+    // (A bond the game won't have, a child or family in love, says so in a toast.)
+    if (bonds.length) {
+      await settle(page, 300);
+      const said = await page.evaluate((sent) => window.__check.toasts(sent), sent);
+      if (said.length) fail(`--bond refused in ${state}: ${said.join('; ')}`);
+    }
+    parks.clear();
+    for (const who of sims) {
+      const s = await resident(who);
+      if (!s) throw new Error(`no resident ${who} in ${state}`);
+      parks.set(who, [s.x, s.z]);
+    }
     return Date.now() - t0;
   }
-  /** Where the resident stood as the state opened: they go back there after each object, out of the way of the next. */
-  let park = null;
+  /** Where each resident stood as the state opened: they go back there after each object, out of the way of the next. */
+  const parks = new Map();
   async function goPark() {
-    await page.evaluate(({ sim, walk, park }) => {
+    await page.evaluate(({ parks, walk }) => {
       window.__send({ type: 'setSpeed', speed: walk });
-      window.__send({ type: 'moveTo', sim, x: park[0], z: park[1] });
-    }, { sim, walk, park });
+      for (const [sim, [x, z]] of parks) window.__send({ type: 'moveTo', sim, x, z });
+    }, { parks: [...parks], walk });
     await page
-      .waitForFunction(({ sim, park }) => {
+      .waitForFunction((parks) => parks.every(([sim, park]) => {
         const s = window.__sims().find((x) => x.id === sim);
         return s && !s.moving && Math.hypot(s.x - park[0], s.z - park[1]) < 1;
-      }, { sim, park }, { timeout: 15_000, polling: 200 })
-      .catch(() => noteError(`not back at ${park} after 15 s`));
+      }), [...parks], { timeout: 15_000, polling: 200 })
+      .catch(() => noteError(`not all back where they started after 15 s`));
     await page.evaluate(() => window.__send({ type: 'setSpeed', speed: 1 }));
   }
 
@@ -575,7 +659,7 @@ if (what === 'play') {
       const [fw, fd] = d?.footprint ?? [1, 1];
       const [w, dd] = o.rot % 2 ? [fd, fw] : [fw, fd];
       const box = window.__renderer?.objectBox?.(id) ?? null;
-      return { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open), growth: o.growth ?? null, mid: [o.x + w / 2, o.z + dd / 2], size: [w, dd], layer: d?.layer ?? 'floor', box, bounds: window.__check.bounds(id), fov: window.__scene?.activeCamera?.fov ?? 0.7 };
+      return { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open), growth: o.growth ?? null, mid: [o.x + w / 2, o.z + dd / 2], size: [w, dd], layer: d?.layer ?? 'floor', box, bounds: window.__check.bounds(id), fov: window.__renderer?.cameraInfo?.().fov ?? 0.7 };
     }, id);
 
   /** Models up to this tall (m) are looked at from the usual height; taller ones at their middle. */
@@ -613,19 +697,19 @@ if (what === 'play') {
     const took = await page.evaluate((view) => {
       window.__controls.follow(null);
       const pose = window.__camera(view);
-      const cam = window.__scene?.activeCamera;
-      return { ...pose, radius: Math.min(Math.max(pose.radius, cam?.lowerRadiusLimit ?? 0), cam?.upperRadiusLimit ?? Infinity) };
+      const [lo, hi] = window.__renderer?.cameraInfo?.().radius ?? [0, Infinity];
+      return { ...pose, radius: Math.min(Math.max(pose.radius, lo), hi) };
     }, view);
     const round = (v) => v.map((x) => +x.toFixed(2));
     return { alpha: +took.alpha.toFixed(3), beta: +took.beta.toFixed(3), radius: +took.radius.toFixed(2), target: round(took.target), height: +height.toFixed(2), bottom: +bottom.toFixed(2), from, ...(bounds ? { bounds: { lo: round(bounds.lo), hi: round(bounds.hi) } } : {}) };
   }
 
-  /** The resident as `__sims()` has them (null: not there). */
-  const resident = () =>
+  /** A resident (the first of `sims` by default) as `__sims()` has them (null: not there). */
+  const resident = (who = sim) =>
     page.evaluate((sim) => {
       const s = window.__sims().find((x) => x.id === sim);
-      return s && { pose: s.pose, using: s.using, object: s.object, interaction: s.interaction, action: s.action, doing: s.doing, queue: s.queue, x: +s.x.toFixed(2), z: +s.z.toFixed(2), needs: s.needs };
-    }, sim);
+      return s && { id: s.id, pose: s.pose, using: s.using, object: s.object, interaction: s.interaction, action: s.action, partner: s.partner, doing: s.doing, queue: s.queue, x: +s.x.toFixed(2), z: +s.z.toFixed(2), needs: s.needs };
+    }, who);
 
   /** Buys `def` (at `at`, or where the game finds room); its id and where it stands, or an error. */
   async function buy(def, at) {
@@ -664,15 +748,15 @@ if (what === 'play') {
   /** Stops what the resident does and waits until they're free (and the object's use clips at rest, but for `held` ones). */
   async function stop(id, held) {
     for (let i = 0; i < 3; i++) {
-      await page.evaluate((sim) => {
+      await page.evaluate((sims) => {
         window.__send({ type: 'setSpeed', speed: 1 });
-        window.__send({ type: 'cancel', sim, index: 0 });
-      }, sim);
+        for (const sim of sims) window.__send({ type: 'cancel', sim, index: 0 });
+      }, sims);
       const free = await page
-        .waitForFunction((sim) => {
+        .waitForFunction((sims) => sims.every((sim) => {
           const s = window.__sims().find((x) => x.id === sim);
           return s && !s.doing && !s.queue.length && !s.using;
-        }, sim, { timeout: 8_000, polling: 200 })
+        }), sims, { timeout: 8_000, polling: 200 })
         .then(() => true)
         .catch(() => false);
       if (free) break;
@@ -680,7 +764,7 @@ if (what === 'play') {
     // A use's clips close as it ends (a door swinging shut): wait for them, a few seconds at most.
     await page
       .waitForFunction(
-        ({ id, held }) => ![...(window.__renderer?.motion?.states?.get(id) ?? [])].some(([name, c]) => ['use', 'loop', 'repeat'].includes(c.kind) && c.time > 1e-3 && !held.includes(name)),
+        ({ id, held }) => ![...(window.__renderer?.objectClips?.(id) ?? [])].some(([name, c]) => ['use', 'loop', 'repeat'].includes(c.kind) && c.time > 1e-3 && !held.includes(name)),
         { id, held },
         { timeout: 5_000, polling: 'raf' },
       )
@@ -690,7 +774,7 @@ if (what === 'play') {
   /** The clips that always run, or run without a use (ambient, growth, night, clock hands): not "a clip played". */
   const background = (id) =>
     page.evaluate((id) => {
-      const m = window.__renderer?.motion?.objects?.get(id)?.motions;
+      const m = window.__renderer?.objectMotions?.(id);
       return { names: m ? [m.idle, m.growth, m.night, m.clock?.hour, m.clock?.minute].filter(Boolean) : [], open: m?.open ?? null, any: Boolean(m) };
     }, id);
 
@@ -718,8 +802,13 @@ if (what === 'play') {
         window.__send({ type: 'use', sim, object: id, interaction });
         if (follow) window.__controls.follow(sim, view);
       },
-      { id: bought.id, sim, interaction: use.index, walk, near, follow, view: Object.fromEntries(Object.entries({ radius: num('radius', 7), beta: num('beta'), alpha: num('alpha'), y: num('y') }).filter(([, v]) => v)) },
+      { id: bought.id, sim, interaction: use.index, walk, near, follow, view: view(7) },
     );
+    // The others (`--sims`): the same use, each a moment after the one before (two at once would ask for one slot).
+    for (const other of sims.slice(1)) {
+      await settle(page, 300);
+      await page.evaluate(({ id, sim, interaction }) => window.__send({ type: 'use', sim, object: id, interaction }), { id: bought.id, sim: other, interaction: use.index });
+    }
     // Using it (seen in a frame), not taken (nothing to do for 4 s), or out of time.
     record.outcome = await page
       .waitForFunction(
@@ -735,6 +824,22 @@ if (what === 'play') {
       .then((h) => h.jsonValue())
       .catch((err) => `error: ${err.message.split('\n')[0]}`);
     record.usingAfter = (await page.evaluate(() => window.__check.watched()?.usingAt)) ?? null;
+    // With others: until they're all at it too (or out of time); who was, and who wasn't.
+    if (sims.length > 1 && record.outcome === 'using') {
+      const all = await page
+        .waitForFunction(
+          ({ sims, id }) => {
+            const all = window.__sims();
+            return sims.every((sim) => all.some((x) => x.id === sim && x.using && x.object === id));
+          },
+          { sims, id: bought.id },
+          { timeout: cap, polling: 200 },
+        )
+        .then(() => true)
+        .catch(() => false);
+      record.together = all;
+      if (!all) noteError(`not all of ${sims.join(', ')} at ${thing.def} / ${use.id}`);
+    }
     if (record.outcome !== 'using') record.screen = await screenText();
     // What the game said meanwhile (a use refused: "needs a table", "isn't ripe yet").
     record.toasts = await page.evaluate((sent) => window.__check.toasts(sent), sent);
@@ -744,20 +849,25 @@ if (what === 'play') {
         record.view = (await aim(bought.id, use)) ?? undefined;
         await settle(page, 120);
         const info = await page.evaluate(
-          ({ sim, id }) => {
-            const s = window.__sims().find((x) => x.id === sim);
-            const clips = window.__renderer?.motion?.states?.get(id);
+          ({ sim, id, others }) => {
+            const all = window.__sims();
+            const clips = window.__renderer?.objectClips?.(id);
+            const at = (who) => {
+              const o = all.find((x) => x.id === who);
+              return o && { id: who, pose: o.pose, using: o.using && o.object === id, interaction: o.interaction, action: o.action, x: +o.x.toFixed(2), z: +o.z.toFixed(2) };
+            };
             const o = window.__world().objects.find((x) => x.id === id);
             // Each clip playing on it: how far in (s), of how long, and how it plays.
-            const playing = clips ? Object.fromEntries([...clips].map(([name, c]) => [name, { time: +c.time.toFixed(2), duration: +c.clip.duration.toFixed(2), kind: c.kind }])) : null;
+            const playing = clips ? Object.fromEntries([...clips].map(([name, c]) => [name, { time: +c.time.toFixed(2), duration: +c.duration.toFixed(2), kind: c.kind }])) : null;
             return {
               t: Math.round(window.__check.watched()?.t ?? 0),
               object: o ? { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open) } : null,
-              sim: s && { pose: s.pose, using: s.using && s.object === id, interaction: s.interaction, action: s.action, x: +s.x.toFixed(2), z: +s.z.toFixed(2) },
+              sim: at(sim),
+              ...(others.length ? { others: others.map(at) } : {}),
               clips: playing,
             };
           },
-          { sim, id: bought.id },
+          { sim, id: bought.id, others: sims.slice(1) },
         );
         const file = await shot(page, batch ? `${name}-${String(i).padStart(2, '0')}` : `${prefix}play-${thing.def}-${bought.where.x}-${bought.where.z}-${bought.where.rot}-${String(i).padStart(2, '0')}`, info);
         record.shots.push({ file, ...info });
@@ -768,6 +878,7 @@ if (what === 'play') {
     await stop(bought.id, [...bg.names, ...(bg.open ? [bg.open] : [])]);
     const watched = await page.evaluate(() => window.__check.stop());
     record.after = await resident();
+    if (sims.length > 1) record.others = await Promise.all(sims.slice(1).map((who) => resident(who)));
     record.clips = watched?.clips ?? {};
     // Played: a clip of a use (not the ambient, growth, night or clock ones) that moved.
     record.played = Object.entries(record.clips)
@@ -884,6 +995,84 @@ if (what === 'play') {
     return { failed, bought: true };
   }
 
+  /**
+   * One social or phone action (`--social`, `--phone`): the first of `sims` starts it (with the second), the camera
+   * following them; until it's under way (a social: they're talking with the other, the snapshot's `partner`; the phone:
+   * its animation playing) or out of time, then `shots` pictures `every` ms apart, then stopped. One record.
+   */
+  async function runTalk(talk) {
+    const j = startJob(`${talk.kind}/${talk.id}`);
+    const with_ = sims[1] ?? null;
+    const index = await page.evaluate(
+      ({ kind, id }) => (kind === 'social' ? window.__content.socials : window.__content.phoneActions).findIndex((x) => x.id === id),
+      talk,
+    );
+    const record = { [talk.kind]: talk.id, sim, with: with_, outcome: null, shots: [], errors: [] };
+    if (index < 0) {
+      record.outcome = `no ${talk.kind} '${talk.id}' in the content`;
+      noteError(record.outcome);
+      write(record);
+      return { outcome: record.outcome };
+    }
+    record.before = await resident();
+    // The camera on them first: a kiss is over in seconds, before a glide from across the lot would arrive.
+    await page.evaluate(
+      ({ sim, view }) => window.__controls.follow(sim, view),
+      { sim, view: view(5) },
+    );
+    await settle(page, 1500);
+    const sent = await page.evaluate(() => window.__check.now());
+    await page.evaluate(
+      ({ talk, index, sim, with_ }) => {
+        window.__send({ type: 'setSpeed', speed: 1 });
+        if (talk.kind === 'social') window.__send({ type: 'social', sim, target: with_, social: index });
+        else window.__send({ type: 'phone', sim, action: index, ...(with_ !== null && talk.id !== 'browse' ? { contact: with_ } : {}) });
+      },
+      { talk, index, sim, with_ },
+    );
+    const t0 = Date.now();
+    record.outcome = await page
+      .waitForFunction(
+        ({ kind, sim, with_, sent }) => {
+          const s = window.__sims().find((x) => x.id === sim);
+          if (!s) return false;
+          const going = kind === 'social' ? s.partner === with_ && 'talking' : (s.action === 'phone' || s.action === 'phoneScreen') && 'on the phone';
+          if (going) return going;
+          // (Not under way and the game said why: refused, no need to wait it out.)
+          const said = window.__check.toasts(sent);
+          return said.length ? `refused: ${said.join('; ')}` : false;
+        },
+        { kind: talk.kind, sim, with_, sent },
+        { timeout: cap, polling: 200 },
+      )
+      .then((h) => h.jsonValue())
+      .catch(() => 'timeout');
+    record.startedAfter = (Date.now() - t0) / 1000;
+    record.toasts = await page.evaluate((sent) => window.__check.toasts(sent), sent);
+    if (record.outcome.startsWith('refused')) noteError(`${talk.kind} ${talk.id}: ${record.outcome}`);
+    else if (record.outcome !== 'timeout') {
+      for (let i = 0; i < shots; i++) {
+        await settle(page, 120);
+        const info = await page.evaluate((who) => {
+          const all = window.__sims();
+          return who.map((w) => {
+            const s = all.find((x) => x.id === w);
+            return s && { id: w, pose: s.pose, partner: s.partner, action: s.action, x: +s.x.toFixed(2), z: +s.z.toFixed(2) };
+          });
+        }, sims);
+        const file = await shot(page, `${prefix}${talk.kind}-${slug(talk.id)}-${String(i).padStart(2, '0')}`, { sims: info });
+        record.shots.push({ file, sims: info });
+        if (i < shots - 1) await settle(page, every);
+      }
+    } else record.screen = await screenText();
+    await stop(-1, []);
+    record.others = await Promise.all(sims.slice(1).map((who) => resident(who)));
+    record.errors = [...j.errors];
+    write(record);
+    console.log(`${talk.kind} ${talk.id}${with_ !== null ? ` with ${with_}` : ''}: ${record.outcome}${record.outcome === 'talking' || record.outcome === 'on the phone' ? ` after ${record.startedAfter.toFixed(1)} s` : ''}`);
+    return { outcome: record.outcome };
+  }
+
   const pickUse = (u) => (which === 'all' ? true : /^\d+$/.test(which) ? u.index === Number(which) : u.id === which);
   const timings = [];
   log.setup.open = await openState();
@@ -913,6 +1102,17 @@ if (what === 'play') {
       }
     }
     timings.push({ object: thing.def, seconds: Math.round((Date.now() - t0) / 100) / 10 });
+  }
+  for (const talk of talks) {
+    const t0 = Date.now();
+    try {
+      log.setup[`opened-${talk.kind}-${talk.id}`] = await openState();
+      timings.push({ [talk.kind]: talk.id, seconds: Math.round((Date.now() - t0) / 100) / 10, ...(await runTalk(talk)) });
+    } catch (err) {
+      noteError(`${talk.kind} ${talk.id}: ${err.message.split('\n')[0]}`);
+      write({ [talk.kind]: talk.id, outcome: `error: ${err.message.split('\n')[0]}` });
+      if (page.isClosed()) page = await newPage();
+    }
   }
   log.timings = timings;
 }
@@ -1026,7 +1226,8 @@ if (what === 'sheet') {
     return { tiles, ages };
   }
 
-  const page = await (await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 })).newPage();
+  const page = kept ? await newWindow(kept) : await (await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 })).newPage();
+  if (kept) await page.setViewportSize({ width: 1600, height: 1000 });
   const html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   /**
    * One sheet: `tiles` in a grid under `title`, each picture whole and labelled with its file; 1600
@@ -1084,5 +1285,5 @@ if (what === 'sheet') {
 
 writeFileSync(join(out, `${what}-${run}.json`), JSON.stringify(log, null, 2));
 console.log(`check: ${join(out, `${what}-${run}.json`)}`);
-await browser.close();
+await (kept ?? browser).close();
 vite?.kill();

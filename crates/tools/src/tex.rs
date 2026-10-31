@@ -26,7 +26,8 @@ pub fn main_with(args: &[String]) -> i32 {
     let res = match a.as_slice() {
         ["clouds", out] => clouds(Path::new(out)),
         ["synth", only @ ..] => synth::run(only),
-        ["materials"] => std::fs::write("materials.json", materials_json()).map_err(|e| format!("materials.json: {e}")),
+        ["materials"] => std::fs::write("materials.json", materials_json())
+            .map_err(|e| format!("materials.json: {e}")),
         ["-h" | "--help" | "help", ..] => {
             println!("{USAGE}");
             return 0;
@@ -134,8 +135,16 @@ fn tile_noise(rng: &mut Pcg64, cells_x: usize, cells_y: usize) -> Vec<f64> {
     let smooth = |t: f64| t * t * (3.0 - 2.0 * t);
     let x0: Vec<usize> = xs.iter().map(|&v| v as usize).collect();
     let y0: Vec<usize> = ys.iter().map(|&v| v as usize).collect();
-    let fx: Vec<f64> = xs.iter().zip(&x0).map(|(&v, &i)| smooth(v - i as f64)).collect();
-    let fy: Vec<f64> = ys.iter().zip(&y0).map(|(&v, &i)| smooth(v - i as f64)).collect();
+    let fx: Vec<f64> = xs
+        .iter()
+        .zip(&x0)
+        .map(|(&v, &i)| smooth(v - i as f64))
+        .collect();
+    let fy: Vec<f64> = ys
+        .iter()
+        .zip(&y0)
+        .map(|(&v, &i)| smooth(v - i as f64))
+        .collect();
     let mut out = vec![0.0f64; CW * CH];
     for (r, (&yi, &fyv)) in y0.iter().zip(&fy).enumerate() {
         for (c, (&xi, &fxv)) in x0.iter().zip(&fx).enumerate() {
@@ -184,9 +193,13 @@ fn clouds(out: &Path) -> Result<(), String> {
     use image::ImageEncoder;
     let rgba = clouds_rgba();
     let f = std::fs::File::create(out).map_err(|e| format!("{}: {e}", out.display()))?;
-    image::codecs::png::PngEncoder::new_with_quality(std::io::BufWriter::new(f), image::codecs::png::CompressionType::Best, image::codecs::png::FilterType::Adaptive)
-        .write_image(&rgba, CW as u32, CH as u32, image::ExtendedColorType::Rgba8)
-        .map_err(|e| format!("{}: {e}", out.display()))?;
+    image::codecs::png::PngEncoder::new_with_quality(
+        std::io::BufWriter::new(f),
+        image::codecs::png::CompressionType::Best,
+        image::codecs::png::FilterType::Adaptive,
+    )
+    .write_image(&rgba, CW as u32, CH as u32, image::ExtendedColorType::Rgba8)
+    .map_err(|e| format!("{}: {e}", out.display()))?;
     println!("wrote {}", out.display());
     Ok(())
 }
@@ -196,39 +209,72 @@ fn clouds(out: &Path) -> Result<(), String> {
 /// `lin`/`srgb` for the detail maps, in Python floats.
 pub fn lin(v: f64) -> f64 {
     let c = v / 255.0;
-    if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+    if c <= 0.04045 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
 }
 
 pub fn srgb(c: f64) -> f64 {
-    if c <= 0.0031308 { 12.92 * c } else { 1.055 * c.powf(1.0 / 2.4) - 0.055 }
+    if c <= 0.0031308 {
+        12.92 * c
+    } else {
+        1.055 * c.powf(1.0 / 2.4) - 0.055
+    }
 }
 
 /// The point LUT that maps greyscale to a detail map with linear mean `target`, given the histogram.
 pub fn detail_lut(hist: &[u64; 256], target: f64) -> [u8; 256] {
     let total: u64 = hist.iter().sum();
-    let mean_lin = py_fsum(hist.iter().enumerate().map(|(v, &n)| lin(v as f64) * n as f64)) / total as f64;
+    let mean_lin = py_fsum(
+        hist.iter()
+            .enumerate()
+            .map(|(v, &n)| lin(v as f64) * n as f64),
+    ) / total as f64;
     let k = target / mean_lin;
-    std::array::from_fn(|v| (srgb((lin(v as f64) * k).min(1.0)) * 255.0).round_ties_even().clamp(0.0, 255.0) as u8)
+    std::array::from_fn(|v| {
+        (srgb((lin(v as f64) * k).min(1.0)) * 255.0)
+            .round_ties_even()
+            .clamp(0.0, 255.0) as u8
+    })
 }
 
 fn to_lin(a: f64) -> f64 {
-    if a <= 0.04045 { a / 12.92 } else { ((a + 0.055) / 1.055).powf(2.4) }
+    if a <= 0.04045 {
+        a / 12.92
+    } else {
+        ((a + 0.055) / 1.055).powf(2.4)
+    }
 }
 
 fn to_srgb(a: f64) -> f64 {
-    if a <= 0.0031308 { 12.92 * a } else { 1.055 * a.powf(1.0 / 2.4) - 0.055 }
+    if a <= 0.0031308 {
+        12.92 * a
+    } else {
+        1.055 * a.powf(1.0 / 2.4) - 0.055
+    }
 }
 
 /// Gaussian blur that wraps around the edges, so tiling stays seamless (blur a 3x3 tiling, keep the middle).
 pub fn wrap_blur(img: &Img, radius: f32) -> Img {
-    img.tile(3, 3).gaussian_blur(radius).crop(img.w, img.h, img.w, img.h)
+    img.tile(3, 3)
+        .gaussian_blur(radius)
+        .crop(img.w, img.h, img.w, img.h)
 }
 
 /// The detail map's grey levels before the soft clip's gain is solved: linear, contrast applied.
 fn detail_linear(g: &Img, contrast: f64, flatten: f32) -> Vec<f64> {
-    let mut lin: Vec<f64> = g.px.iter().map(|&v| to_lin(v as f64 / 255.0).max(1e-4)).collect();
+    let mut lin: Vec<f64> =
+        g.px.iter()
+            .map(|&v| to_lin(v as f64 / 255.0).max(1e-4))
+            .collect();
     if flatten > 0.0 {
-        let low: Vec<f64> = wrap_blur(g, flatten).px.iter().map(|&v| to_lin(v as f64 / 255.0)).collect();
+        let low: Vec<f64> = wrap_blur(g, flatten)
+            .px
+            .iter()
+            .map(|&v| to_lin(v as f64 / 255.0))
+            .collect();
         let low_mean = np_mean(&low);
         for (l, &lo) in lin.iter_mut().zip(&low) {
             *l = *l / lo.max(1e-4) * low_mean;
@@ -237,7 +283,9 @@ fn detail_linear(g: &Img, contrast: f64, flatten: f32) -> Vec<f64> {
     let logs: Vec<f64> = lin.iter().map(|v| v.ln()).collect();
     let m = np_mean(&logs).exp();
     let lm = m.ln();
-    logs.iter().map(|&ll| (lm + contrast * (ll - lm)).exp()).collect()
+    logs.iter()
+        .map(|&ll| (lm + contrast * (ll - lm)).exp())
+        .collect()
 }
 
 /// `grey_detail`: luminance-only detail map with linear mean ~`target`; `contrast` < 1
@@ -245,15 +293,30 @@ fn detail_linear(g: &Img, contrast: f64, flatten: f32) -> Vec<f64> {
 pub fn grey_detail(im: &Img, target: f64, contrast: f64, flatten: f32) -> Img {
     let g = im.grey();
     let lin = detail_linear(&g, contrast, flatten);
-    let soft = |x: f64| if x < 0.9 { x } else { 0.9 + 0.1 * (1.0 - (-(x - 0.9) / 0.1).exp()) };
+    let soft = |x: f64| {
+        if x < 0.9 {
+            x
+        } else {
+            0.9 + 0.1 * (1.0 - (-(x - 0.9) / 0.1).exp())
+        }
+    };
     let mut k = 1.0f64;
     let mut y = Vec::new();
     for _ in 0..30 {
         y = lin.iter().map(|&l| soft(l * k)).collect();
         k *= target / np_mean(&y);
     }
-    let px = y.iter().map(|&v| (to_srgb(v.clamp(0.0, 1.0)) * 255.0).round_ties_even() as u8).collect();
-    Img { w: g.w, h: g.h, ch: 1, px }.rgb()
+    let px = y
+        .iter()
+        .map(|&v| (to_srgb(v.clamp(0.0, 1.0)) * 255.0).round_ties_even() as u8)
+        .collect();
+    Img {
+        w: g.w,
+        h: g.h,
+        ch: 1,
+        px,
+    }
+    .rgb()
 }
 
 // --- materials.py ---------------------------------------------------------------------------------
@@ -270,7 +333,9 @@ pub enum J {
 
 impl J {
     fn set(&mut self, key: &'static str, v: J) {
-        let J::Obj(m) = self else { panic!("set on a non-object") };
+        let J::Obj(m) = self else {
+            panic!("set on a non-object")
+        };
         match m.iter_mut().find(|(k, _)| *k == key) {
             Some(slot) => slot.1 = v,
             None => m.push((key, v)),
@@ -306,7 +371,11 @@ impl J {
 /// Python's `repr(float)` for the plain values used here (shortest round-trip, always with a point).
 pub fn py_float(f: f64) -> String {
     let s = format!("{f}");
-    if s.contains(['.', 'e', 'i', 'N']) { s } else { format!("{s}.0") }
+    if s.contains(['.', 'e', 'i', 'N']) {
+        s
+    } else {
+        format!("{s}.0")
+    }
 }
 
 fn surf(color: &'static str, tex: &str, uv: f64, kw: &[(&'static str, J)]) -> J {
@@ -338,50 +407,245 @@ pub fn materials() -> J {
         e
     };
     let mut e = J::Obj(vec![
-        ("environment.sky", J::Obj(vec![("type", s("image")), ("url", s("env/belfast_open_field.env"))])),
-        ("material.wall", surf("#F4F0E8", "wall_plaster", 0.5, &[("normalStrength", f(0.7))])),
-        ("material.floor", surf("#FFFFFF", "floor_laminate", 0.55, &[])),
-        ("material.ground", with(surf("#FFFFFF", "grass", 0.3, &[("normalStrength", f(0.8)), ("projection", s("xz"))]), "sideColor", s("#C9B391"))),
-        ("material.road", surf("#FFFFFF", "road_asphalt", 0.2, &[("projection", s("xz"))])),
-        ("material.path", surf("#FFFFFF", "path_hexpaving", 0.7, &[("projection", s("xz"))])),
+        (
+            "environment.sky",
+            J::Obj(vec![
+                ("type", s("image")),
+                ("url", s("env/belfast_open_field.env")),
+            ]),
+        ),
+        (
+            "material.wall",
+            surf(
+                "#F4F0E8",
+                "wall_plaster",
+                0.5,
+                &[("normalStrength", f(0.7))],
+            ),
+        ),
+        (
+            "material.floor",
+            surf("#FFFFFF", "floor_laminate", 0.55, &[]),
+        ),
+        (
+            "material.ground",
+            with(
+                surf(
+                    "#FFFFFF",
+                    "grass",
+                    0.3,
+                    &[("normalStrength", f(0.8)), ("projection", s("xz"))],
+                ),
+                "sideColor",
+                s("#C9B391"),
+            ),
+        ),
+        (
+            "material.road",
+            surf("#FFFFFF", "road_asphalt", 0.2, &[("projection", s("xz"))]),
+        ),
+        (
+            "material.path",
+            surf("#FFFFFF", "path_hexpaving", 0.7, &[("projection", s("xz"))]),
+        ),
         // Farm fields (town.ts `farmstead`): tilled earth, the greyscale grain tinted; furrows darker.
-        ("material.soil", surf("#8A6646", "grass", 0.5, &[("projection", s("xz")), ("roughness", i(1))])),
-        ("material.furrow", surf("#664A33", "grass", 0.5, &[("projection", s("xz")), ("roughness", i(1))])),
-        ("material.finish.matte", plain("#FFFFFF", &[("roughness", f(0.75))])),
-        ("material.finish.satin", plain("#FFFFFF", &[("roughness", f(0.42))])),
-        ("material.finish.gloss", plain("#FFFFFF", &[("roughness", f(0.12))])),
-        ("material.finish.metal", plain("#FFFFFF", &[("roughness", f(0.32)), ("metallic", i(1))])),
-        ("material.finish.chrome", plain("#FFFFFF", &[("roughness", f(0.1)), ("metallic", i(1))])),
-        ("material.finish.fabric", surf("#FFFFFF", "fabric_linen", 2.5, &[("roughness", i(1)), ("metallic", i(0))])),
-        ("material.finish.wood", surf("#FFFFFF", "wood_oak", 1.2, &[("roughness", f(0.8)), ("metallic", i(0))])),
-        ("material.finish.bark", surf("#FFFFFF", "bark", 1.0, &[("metallic", i(0))])),
-        ("material.finish.foliage", surf("#FFFFFF", "foliage", 0.8, &[("roughness", f(0.9)), ("metallic", i(0))])),
-        ("material.finish.glass", plain("#DCE6E8", &[("roughness", f(0.05)), ("alpha", f(0.28))])),
-        ("material.finish.skin", plain("#FFFFFF", &[("roughness", f(0.55))])),
+        (
+            "material.soil",
+            surf(
+                "#8A6646",
+                "grass",
+                0.5,
+                &[("projection", s("xz")), ("roughness", i(1))],
+            ),
+        ),
+        (
+            "material.furrow",
+            surf(
+                "#664A33",
+                "grass",
+                0.5,
+                &[("projection", s("xz")), ("roughness", i(1))],
+            ),
+        ),
+        (
+            "material.finish.matte",
+            plain("#FFFFFF", &[("roughness", f(0.75))]),
+        ),
+        (
+            "material.finish.satin",
+            plain("#FFFFFF", &[("roughness", f(0.42))]),
+        ),
+        (
+            "material.finish.gloss",
+            plain("#FFFFFF", &[("roughness", f(0.12))]),
+        ),
+        (
+            "material.finish.metal",
+            plain("#FFFFFF", &[("roughness", f(0.32)), ("metallic", i(1))]),
+        ),
+        (
+            "material.finish.chrome",
+            plain("#FFFFFF", &[("roughness", f(0.1)), ("metallic", i(1))]),
+        ),
+        (
+            "material.finish.fabric",
+            surf(
+                "#FFFFFF",
+                "fabric_linen",
+                2.5,
+                &[("roughness", i(1)), ("metallic", i(0))],
+            ),
+        ),
+        (
+            "material.finish.wood",
+            surf(
+                "#FFFFFF",
+                "wood_oak",
+                1.2,
+                &[("roughness", f(0.8)), ("metallic", i(0))],
+            ),
+        ),
+        (
+            "material.finish.bark",
+            surf("#FFFFFF", "bark", 1.0, &[("metallic", i(0))]),
+        ),
+        (
+            "material.finish.foliage",
+            surf(
+                "#FFFFFF",
+                "foliage",
+                0.8,
+                &[("roughness", f(0.9)), ("metallic", i(0))],
+            ),
+        ),
+        (
+            "material.finish.glass",
+            plain("#DCE6E8", &[("roughness", f(0.05)), ("alpha", f(0.28))]),
+        ),
+        (
+            "material.finish.skin",
+            plain("#FFFFFF", &[("roughness", f(0.55))]),
+        ),
     ]);
     // House exterior/interior surfaces. uvScale = 1 / real-world tile size in metres; greyscale detail maps
     // (colour #FFFFFF) are tinted by the game per house/room; roughness multiplies the arm map's roughness.
     let house = [
-        ("material.wall.siding", surf("#FFFFFF", "siding_wood", 0.4, &[("roughness", i(1)), ("normalStrength", i(1))])),
-        ("material.wall.brick", surf("#FFFFFF", "brick", 1.0, &[("roughness", i(1)), ("normalStrength", i(1))])),
-        ("material.roof", surf("#FFFFFF", "roof_shingles", 0.667, &[("roughness", i(1)), ("normalStrength", i(1))])),
-        ("material.wall.stone", surf("#FFFFFF", "stone_foundation", 0.667, &[("roughness", i(1)), ("normalStrength", i(1))])),
-        ("material.floor.wood", surf("#FFFFFF", "floor_wood", 0.53, &[("roughness", i(1)), ("normalStrength", f(0.8))])),
-        ("material.floor.tile", surf("#FFFFFF", "floor_tile", 0.5, &[("roughness", f(0.7)), ("normalStrength", i(1))])),
-        ("material.floor.carpet", surf("#FFFFFF", "carpet", 1.0, &[("roughness", i(1)), ("normalStrength", f(0.8))])),
-        ("material.wall.interior", surf("#FFFFFF", "wallpaper", 0.5, &[("roughness", i(1)), ("normalStrength", f(0.5))])),
-        ("material.trim", surf("#FFFFFF", "painted_wood", 1.0, &[("roughness", i(1)), ("normalStrength", f(0.6))])),
+        (
+            "material.wall.siding",
+            surf(
+                "#FFFFFF",
+                "siding_wood",
+                0.4,
+                &[("roughness", i(1)), ("normalStrength", i(1))],
+            ),
+        ),
+        (
+            "material.wall.brick",
+            surf(
+                "#FFFFFF",
+                "brick",
+                1.0,
+                &[("roughness", i(1)), ("normalStrength", i(1))],
+            ),
+        ),
+        (
+            "material.roof",
+            surf(
+                "#FFFFFF",
+                "roof_shingles",
+                0.667,
+                &[("roughness", i(1)), ("normalStrength", i(1))],
+            ),
+        ),
+        (
+            "material.wall.stone",
+            surf(
+                "#FFFFFF",
+                "stone_foundation",
+                0.667,
+                &[("roughness", i(1)), ("normalStrength", i(1))],
+            ),
+        ),
+        (
+            "material.floor.wood",
+            surf(
+                "#FFFFFF",
+                "floor_wood",
+                0.53,
+                &[("roughness", i(1)), ("normalStrength", f(0.8))],
+            ),
+        ),
+        (
+            "material.floor.tile",
+            surf(
+                "#FFFFFF",
+                "floor_tile",
+                0.5,
+                &[("roughness", f(0.7)), ("normalStrength", i(1))],
+            ),
+        ),
+        (
+            "material.floor.carpet",
+            surf(
+                "#FFFFFF",
+                "carpet",
+                1.0,
+                &[("roughness", i(1)), ("normalStrength", f(0.8))],
+            ),
+        ),
+        (
+            "material.wall.interior",
+            surf(
+                "#FFFFFF",
+                "wallpaper",
+                0.5,
+                &[("roughness", i(1)), ("normalStrength", f(0.5))],
+            ),
+        ),
+        (
+            "material.trim",
+            surf(
+                "#FFFFFF",
+                "painted_wood",
+                1.0,
+                &[("roughness", i(1)), ("normalStrength", f(0.6))],
+            ),
+        ),
     ];
     for (k, v) in house {
         e.set(k, v);
     }
     // Lawn: greyscale, blotch-flattened Grass004 (1.4 m) shown at 2 m for the 10-60 m camera; vertex colours tint it.
-    e.set("material.ground", with(surf("#FFFFFF", "grass_lush", 0.5, &[("normalStrength", f(0.8)), ("projection", s("xz"))]), "sideColor", s("#C9B391")));
+    e.set(
+        "material.ground",
+        with(
+            surf(
+                "#FFFFFF",
+                "grass_lush",
+                0.5,
+                &[("normalStrength", f(0.8)), ("projection", s("xz"))],
+            ),
+            "sideColor",
+            s("#C9B391"),
+        ),
+    );
     // Character and house finishes without textures (glossy hair, window glass).
-    e.set("material.finish.hair", plain("#FFFFFF", &[("roughness", f(0.34))]));
-    e.set("material.finish.skin", plain("#FFFFFF", &[("roughness", f(0.48))]));
-    e.set("material.window", plain("#22303E", &[("roughness", f(0.05)), ("metallic", f(0.1))]));
-    e.set("material.window.inner", plain("#D8E8F4", &[("roughness", f(0.25))]));
+    e.set(
+        "material.finish.hair",
+        plain("#FFFFFF", &[("roughness", f(0.34))]),
+    );
+    e.set(
+        "material.finish.skin",
+        plain("#FFFFFF", &[("roughness", f(0.48))]),
+    );
+    e.set(
+        "material.window",
+        plain("#22303E", &[("roughness", f(0.05)), ("metallic", f(0.1))]),
+    );
+    e.set(
+        "material.window.inner",
+        plain("#D8E8F4", &[("roughness", f(0.25))]),
+    );
     e
 }
 
@@ -417,7 +681,9 @@ mod tests {
 
     #[test]
     fn sums_like_numpy_and_python() {
-        let a: Vec<f64> = (0..1000).map(|i| (i as f64 * 0.37).sin() * 10f64.powi(i % 9)).collect();
+        let a: Vec<f64> = (0..1000)
+            .map(|i| (i as f64 * 0.37).sin() * 10f64.powi(i % 9))
+            .collect();
         // Pairwise by blocks of 8 below 128 elements: (r0+r1)+(r2+r3) ...
         assert_eq!(np_sum(&a[..16]), {
             let r: Vec<f64> = (0..8).map(|j| a[j] + a[j + 8]).collect();
@@ -430,7 +696,10 @@ mod tests {
     /// `tests/fixtures/tex/materials.json` is what materials.py wrote.
     #[test]
     fn materials_bytes() {
-        assert_eq!(materials_json(), include_str!("../tests/fixtures/tex/materials.json"));
+        assert_eq!(
+            materials_json(),
+            include_str!("../tests/fixtures/tex/materials.json")
+        );
         assert_eq!(py_float(0.667), "0.667");
         assert_eq!(py_float(2.0), "2.0");
     }
@@ -443,5 +712,4 @@ mod tests {
         assert_eq!(committed.dimensions(), (CW as u32, CH as u32));
         assert!(committed.into_raw() == clouds_rgba());
     }
-
 }

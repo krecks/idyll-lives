@@ -675,6 +675,9 @@
         "ingredients"
       ],
       "description": "Two tall doors over a freezer drawer: room for everything, from snacks to a gourmet spread.",
+      "sounds": {
+        "fetch": "fridgeDoor"
+      },
       "interactions": [
         {
           "id": "snack",
@@ -748,6 +751,7 @@
           "id": "coldDrink",
           "label": "Pour a cold drink",
           "anim": "drink",
+          "sound": "fridgeDoor",
           "minutes": 5,
           "effects": {
             "comfort": 0.05,
@@ -776,6 +780,9 @@
         "ingredients"
       ],
       "description": "A rounded fifties fridge in mint green with a chrome lever handle.",
+      "sounds": {
+        "fetch": "fridgeDoor"
+      },
       "interactions": [
         {
           "id": "snack",
@@ -813,6 +820,7 @@
           "id": "coldDrink",
           "label": "Pour a cold drink",
           "anim": "drink",
+          "sound": "fridgeDoor",
           "minutes": 5,
           "effects": {
             "comfort": 0.05,
@@ -841,6 +849,9 @@
         "ingredients"
       ],
       "description": "A pastel-pink mini fridge with brass feet and a unicorn sticker on the door: a treat for a kid's room or a corner bar.",
+      "sounds": {
+        "fetch": "fridgeDoor"
+      },
       "interactions": [
         {
           "id": "snack",
@@ -878,6 +889,7 @@
           "id": "coldDrink",
           "label": "Pour a cold drink",
           "anim": "drink",
+          "sound": "fridgeDoor",
           "minutes": 5,
           "effects": {
             "comfort": 0.05,
@@ -923,6 +935,7 @@
           "id": "wine",
           "label": "Pour a glass of wine",
           "anim": "drink",
+          "sound": "fridgeDoor",
           "minutes": 10,
           "effects": {
             "comfort": 0.1,
@@ -961,15 +974,20 @@
       "stations": [
         "dishes"
       ],
-      "description": "A dishwasher with a stainless door, under a worktop.",
+      "description": "A slimline dishwasher with a stainless door, under a worktop: the washing up goes in and waits, and it washes by itself once it's full or the washing up is done.",
       "sounds": {
         "clean": "crockery",
         "wash": "crockery"
       },
+      "runs": {
+        "minutes": 75,
+        "sound": "dishwasher"
+      },
+      "rack": 8,
       "interactions": [
         {
           "id": "dishes",
-          "label": "Run the dishwasher",
+          "label": "Load the dishwasher",
           "workOn": "dishes",
           "anim": "clean",
           "minutes": 10,
@@ -981,6 +999,20 @@
             "cleaning"
           ],
           "autonomous": false
+        },
+        {
+          "id": "unload",
+          "label": "Empty the dishwasher",
+          "unloads": true,
+          "anim": "clean",
+          "minutes": 5,
+          "effects": {
+            "comfort": 0.03
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ]
         }
       ]
     },
@@ -999,6 +1031,9 @@
       "stations": [
         "bin"
       ],
+      "sounds": {
+        "clean": "binLid"
+      },
       "interactions": []
     },
     {

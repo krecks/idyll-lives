@@ -89,7 +89,7 @@
           "id": "sing",
           "label": "Sing your heart out",
           "anim": "sing",
-          "sound": "music",
+          "sound": "singing",
           "minutes": 60,
           "pose": "stand",
           "autonomous": true,

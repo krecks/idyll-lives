@@ -69,18 +69,38 @@ fn world(sims: &str) -> World {
 }
 
 fn order(w: &mut World, sim: u32, object: u32, interaction: usize) -> Result<(), String> {
-    w.apply(Command::Use { sim, object, interaction }).map_err(|e| e.to_string())
+    w.apply(Command::Use {
+        sim,
+        object,
+        interaction,
+    })
+    .map_err(|e| e.to_string())
 }
 
 /// What `sim` is doing: `(object, interaction, elapsed)`, elapsed None while on their way.
 fn doing(w: &World, sim: u32) -> Option<(u32, usize, Option<f32>)> {
     let a = w.sims[sim as usize].current()?;
-    let TaskKind::Use { object, interaction } = a.task.kind else { return None };
-    Some((object, interaction, if let Phase::Using { elapsed } = a.phase { Some(elapsed) } else { None }))
+    let TaskKind::Use {
+        object,
+        interaction,
+    } = a.task.kind
+    else {
+        return None;
+    };
+    Some((
+        object,
+        interaction,
+        if let Phase::Using { elapsed } = a.phase {
+            Some(elapsed)
+        } else {
+            None
+        },
+    ))
 }
 
 fn playing(w: &World, sim: u32, object: u32, interaction: usize) -> bool {
-    doing(w, sim).is_some_and(|(o, i, e)| (o, i) == (object, interaction) && e.is_some_and(|e| e > 0.0))
+    doing(w, sim)
+        .is_some_and(|(o, i, e)| (o, i) == (object, interaction) && e.is_some_and(|e| e > 0.0))
 }
 
 /// The snapshot's action for `sim` (-1: none drawn).
@@ -108,15 +128,26 @@ fn until(w: &mut World, minutes: u64, mut done: impl FnMut(&World) -> bool) -> b
             if !w.content.objects[w.objects[o as usize].def].interactions[i].partner {
                 continue;
             }
-            let with = (0..w.sims.len() as u32).any(|t| t != s && doing(w, t).is_some_and(|(to, ti, te)| (to, ti) == (o, i) && te.is_some()));
+            let with = (0..w.sims.len() as u32).any(|t| {
+                t != s && doing(w, t).is_some_and(|(to, ti, te)| (to, ti) == (o, i) && te.is_some())
+            });
             if elapsed > 0.0 && !with {
                 alone[s as usize] += 1;
-                assert!(alone[s as usize] <= 2, "{} plays on alone", w.sims[s as usize].name);
+                assert!(
+                    alone[s as usize] <= 2,
+                    "{} plays on alone",
+                    w.sims[s as usize].name
+                );
             } else {
                 alone[s as usize] = 0;
             }
             if elapsed == 0.0 && !with {
-                assert_eq!(drawn(w, s), -1.0, "{} waits, not drawn playing", w.sims[s as usize].name);
+                assert_eq!(
+                    drawn(w, s),
+                    -1.0,
+                    "{} waits, not drawn playing",
+                    w.sims[s as usize].name
+                );
             }
         }
     }
@@ -129,23 +160,52 @@ fn a_partner_is_fetched_to_the_other_place_and_both_get_what_it_gives() {
     let before = [ADA, BO].map(|s| w.sims[s as usize].needs);
     order(&mut w, ADA, POOL, 0).unwrap();
     // Bo, the nearest one free, comes to the other end; it doesn't start until both are there.
-    assert!(until(&mut w, 2, |w| doing(w, BO).is_some_and(|(o, i, _)| (o, i) == (POOL, 0))), "Bo is fetched");
+    assert!(
+        until(&mut w, 2, |w| doing(w, BO)
+            .is_some_and(|(o, i, _)| (o, i) == (POOL, 0))),
+        "Bo is fetched"
+    );
     for s in [DEE, CY] {
         assert!(doing(&w, s).is_none(), "only one is fetched");
     }
-    assert!(until(&mut w, 15, |w| playing(w, ADA, POOL, 0) && playing(w, BO, POOL, 0)), "they play");
+    assert!(
+        until(&mut w, 15, |w| playing(w, ADA, POOL, 0)
+            && playing(w, BO, POOL, 0)),
+        "they play"
+    );
     let table = &w.objects[POOL as usize];
-    assert!(table.users[0].is_some() && table.users[1].is_some() && table.users[0] != table.users[1], "a place each");
-    let gap = (w.sims[ADA as usize].pos[0] - w.sims[BO as usize].pos[0]).hypot(w.sims[ADA as usize].pos[1] - w.sims[BO as usize].pos[1]);
+    assert!(
+        table.users[0].is_some() && table.users[1].is_some() && table.users[0] != table.users[1],
+        "a place each"
+    );
+    let gap = (w.sims[ADA as usize].pos[0] - w.sims[BO as usize].pos[0])
+        .hypot(w.sims[ADA as usize].pos[1] - w.sims[BO as usize].pos[1]);
     assert!(gap > 2.0, "across the table from each other: {gap}");
     // Both play to the end together, and both get its fun and social.
-    let (ea, eb) = (doing(&w, ADA).unwrap().2.unwrap(), doing(&w, BO).unwrap().2.unwrap());
+    let (ea, eb) = (
+        doing(&w, ADA).unwrap().2.unwrap(),
+        doing(&w, BO).unwrap().2.unwrap(),
+    );
     assert!((ea - eb).abs() < 0.2, "in step: {ea} {eb}");
-    assert!(until(&mut w, 40, |w| doing(w, ADA).is_none() && doing(w, BO).is_none()), "the game ends");
+    assert!(
+        until(&mut w, 40, |w| doing(w, ADA).is_none()
+            && doing(w, BO).is_none()),
+        "the game ends"
+    );
     for (k, s) in [ADA, BO].into_iter().enumerate() {
         let now = w.sims[s as usize].needs;
-        assert!(now[0] > before[k][0] + 0.3, "{s}: fun {} -> {}", before[k][0], now[0]);
-        assert!(now[1] > before[k][1] + 0.05, "{s}: social {} -> {}", before[k][1], now[1]);
+        assert!(
+            now[0] > before[k][0] + 0.3,
+            "{s}: fun {} -> {}",
+            before[k][0],
+            now[0]
+        );
+        assert!(
+            now[1] > before[k][1] + 0.05,
+            "{s}: social {} -> {}",
+            before[k][1],
+            now[1]
+        );
     }
 }
 
@@ -155,28 +215,65 @@ fn whoever_is_fetched_drops_what_they_picked_but_not_what_they_were_told() {
     // Bo told to sit: not free. Dee, the next nearest, is fetched instead.
     order(&mut w, BO, SOFA, 0).unwrap();
     order(&mut w, ADA, POOL, 0).unwrap();
-    assert!(until(&mut w, 2, |w| doing(w, DEE).is_some_and(|(o, i, _)| (o, i) == (POOL, 0))), "Dee is fetched");
-    assert!(until(&mut w, 30, |w| playing(w, ADA, POOL, 0) && playing(w, DEE, POOL, 0)), "Ada and Dee play");
+    assert!(
+        until(&mut w, 2, |w| doing(w, DEE)
+            .is_some_and(|(o, i, _)| (o, i) == (POOL, 0))),
+        "Dee is fetched"
+    );
+    assert!(
+        until(&mut w, 30, |w| playing(w, ADA, POOL, 0)
+            && playing(w, DEE, POOL, 0)),
+        "Ada and Dee play"
+    );
     assert_eq!(doing(&w, BO).map(|d| d.0), Some(SOFA), "Bo still sits");
     // Two told to play the same game play it together.
     let mut w = world(EVERYONE);
     order(&mut w, ADA, PING_PONG, 0).unwrap();
     order(&mut w, CY, PING_PONG, 0).unwrap();
-    assert!(until(&mut w, 30, |w| playing(w, ADA, PING_PONG, 0) && playing(w, CY, PING_PONG, 0)), "Ada and Cy play");
-    assert!(doing(&w, BO).is_none() && doing(&w, DEE).is_none(), "nobody else is fetched");
+    assert!(
+        until(&mut w, 30, |w| playing(w, ADA, PING_PONG, 0)
+            && playing(w, CY, PING_PONG, 0)),
+        "Ada and Cy play"
+    );
+    assert!(
+        doing(&w, BO).is_none() && doing(&w, DEE).is_none(),
+        "nobody else is fetched"
+    );
 }
 
 #[test]
 fn with_nobody_free_an_order_does_the_use_for_one_or_is_refused() {
     let mut w = world(r#"{"name":"Ada","x":4.5,"z":9.5,"age":35}"#);
     let err = order(&mut w, ADA, PING_PONG, 0).unwrap_err();
-    assert!(err.contains("nobody is free to play ping-pong with Ada"), "{err}");
-    assert!(w.sims[0].queue().next().is_none(), "nothing refused was queued");
+    assert!(
+        err.contains("nobody is free to play ping-pong with Ada"),
+        "{err}"
+    );
+    assert!(
+        w.sims[0].queue().next().is_none(),
+        "nothing refused was queued"
+    );
     // The pool table's game has trick shots for one: Ada practises, and the story says so.
     order(&mut w, ADA, POOL, 0).unwrap();
-    assert!(until(&mut w, 15, |w| doing(w, ADA).is_some_and(|(o, i, e)| (o, i) == (POOL, 1) && e.is_some_and(|e| e > 0.0))), "trick shots");
-    assert!(w.events.iter().any(|e| e.kind == EventKind::PlayedAlone && e.a == ADA), "told in the story");
-    assert!(EventKind::PlayedAlone.importance() >= 1 && EventKind::NoPartner.importance() >= 1, "in the feed");
+    assert!(
+        until(&mut w, 15, |w| doing(w, ADA).is_some_and(|(o, i, e)| (
+            o, i
+        ) == (
+            POOL, 1
+        )
+            && e.is_some_and(|e| e > 0.0))),
+        "trick shots"
+    );
+    assert!(
+        w.events
+            .iter()
+            .any(|e| e.kind == EventKind::PlayedAlone && e.a == ADA),
+        "told in the story"
+    );
+    assert!(
+        EventKind::PlayedAlone.importance() >= 1 && EventKind::NoPartner.importance() >= 1,
+        "in the feed"
+    );
 
     // Everyone else busy with what they were told: the same.
     let mut w = world(EVERYONE);
@@ -187,7 +284,10 @@ fn with_nobody_free_an_order_does_the_use_for_one_or_is_refused() {
     let err = order(&mut w, ADA, PING_PONG, 0).unwrap_err();
     assert!(err.contains("nobody is free"), "{err}");
     // Someone at the table already (Cy practising): the game isn't started there.
-    assert!(until(&mut w, 15, |w| doing(w, CY).is_some_and(|d| d.2.is_some())), "Cy practises");
+    assert!(
+        until(&mut w, 15, |w| doing(w, CY).is_some_and(|d| d.2.is_some())),
+        "Cy practises"
+    );
     let err = order(&mut w, ADA, POOL, 0).unwrap_err();
     assert!(err.contains("someone is using the pool table"), "{err}");
 }
@@ -198,14 +298,26 @@ fn free_will_plays_a_game_for_two_only_with_someone() {
     let mut w = world(r#"{"name":"Ada","x":4.5,"z":9.5,"age":35}"#);
     w.autonomy = true;
     w.sims[0].needs[0] = 0.1;
-    assert!(!until(&mut w, 240, |w| doing(w, ADA).is_some_and(|(o, i, _)| (o, i) == (POOL, 0) || o == PING_PONG)), "no game alone");
+    assert!(
+        !until(&mut w, 240, |w| doing(w, ADA).is_some_and(|(o, i, _)| (
+            o, i
+        )
+            == (POOL, 0)
+            || o == PING_PONG)),
+        "no game alone"
+    );
     // Two bored grown-ups: they play together.
-    let mut w = world(r#"{"name":"Ada","x":4.5,"z":9.5,"age":35},{"name":"Bo","x":10.5,"z":7.5,"age":35}"#);
+    let mut w =
+        world(r#"{"name":"Ada","x":4.5,"z":9.5,"age":35},{"name":"Bo","x":10.5,"z":7.5,"age":35}"#);
     w.autonomy = true;
     for s in &mut w.sims {
         s.needs[0] = 0.1;
     }
-    let game = |w: &World| [(POOL, 0), (PING_PONG, 0)].into_iter().any(|(o, i)| playing(w, ADA, o, i) && playing(w, BO, o, i));
+    let game = |w: &World| {
+        [(POOL, 0), (PING_PONG, 0)]
+            .into_iter()
+            .any(|(o, i)| playing(w, ADA, o, i) && playing(w, BO, o, i))
+    };
     assert!(until(&mut w, 240, game), "a game together");
     // (And a while on, nobody ever plays on alone: `until` checks it.)
     until(&mut w, 240, |_| false);
@@ -218,24 +330,42 @@ fn only_someone_its_age_is_for_is_fetched() {
     let err = order(&mut w, ADA, SEESAW, 0).unwrap_err();
     assert!(err.contains("too big"), "{err}");
     order(&mut w, DEE, SEESAW, 0).unwrap();
-    assert!(until(&mut w, 30, |w| playing(w, DEE, SEESAW, 0) && playing(w, CY, SEESAW, 0)), "Dee and Cy ride");
-    assert!(doing(&w, ADA).is_none() && doing(&w, BO).is_none(), "no grown-up fetched");
+    assert!(
+        until(&mut w, 30, |w| playing(w, DEE, SEESAW, 0)
+            && playing(w, CY, SEESAW, 0)),
+        "Dee and Cy ride"
+    );
+    assert!(
+        doing(&w, ADA).is_none() && doing(&w, BO).is_none(),
+        "no grown-up fetched"
+    );
     // Cy busy: nobody may ride it with Dee.
     let mut w = world(EVERYONE);
     order(&mut w, CY, SOFA, 0).unwrap();
     let err = order(&mut w, DEE, SEESAW, 0).unwrap_err();
-    assert!(err.contains("nobody is free to ride the seesaw with Dee"), "{err}");
+    assert!(
+        err.contains("nobody is free to ride the seesaw with Dee"),
+        "{err}"
+    );
 }
 
 #[test]
 fn a_game_saved_halfway_goes_on_after_a_load() {
     let mut w = world(EVERYONE);
     order(&mut w, ADA, POOL, 0).unwrap();
-    assert!(until(&mut w, 15, |w| playing(w, ADA, POOL, 0) && playing(w, BO, POOL, 0)), "they play");
+    assert!(
+        until(&mut w, 15, |w| playing(w, ADA, POOL, 0)
+            && playing(w, BO, POOL, 0)),
+        "they play"
+    );
     let mut w = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     w.autonomy = false;
     // (Each sets off for their place again, and they play on together.)
-    assert!(until(&mut w, 15, |w| playing(w, ADA, POOL, 0) && playing(w, BO, POOL, 0)), "they play on");
+    assert!(
+        until(&mut w, 15, |w| playing(w, ADA, POOL, 0)
+            && playing(w, BO, POOL, 0)),
+        "they play on"
+    );
     for s in [DEE, CY] {
         assert!(doing(&w, s).is_none(), "nobody else is fetched");
     }
@@ -245,19 +375,39 @@ fn a_game_saved_halfway_goes_on_after_a_load() {
 fn one_stopping_ends_it_for_both() {
     let mut w = world(EVERYONE);
     order(&mut w, ADA, POOL, 0).unwrap();
-    assert!(until(&mut w, 15, |w| playing(w, ADA, POOL, 0) && playing(w, BO, POOL, 0)), "they play");
+    assert!(
+        until(&mut w, 15, |w| playing(w, ADA, POOL, 0)
+            && playing(w, BO, POOL, 0)),
+        "they play"
+    );
     w.apply(Command::Cancel { sim: ADA, index: 0 }).unwrap();
-    assert!(until(&mut w, 1, |w| doing(w, BO).is_none()), "over for Bo too");
-    assert!(w.objects[POOL as usize].users.iter().all(Option::is_none), "the table is free");
+    assert!(
+        until(&mut w, 1, |w| doing(w, BO).is_none()),
+        "over for Bo too"
+    );
+    assert!(
+        w.objects[POOL as usize].users.iter().all(Option::is_none),
+        "the table is free"
+    );
 
     // Before it starts: the one fetched called off, Ada (told to) practises instead; at a game
     // with nothing for one, she gives up.
     for (object, then) in [(POOL, Some(1)), (PING_PONG, None)] {
         let mut w = world(EVERYONE);
         order(&mut w, ADA, object, 0).unwrap();
-        assert!(until(&mut w, 2, |w| doing(w, BO).is_some_and(|(o, ..)| o == object)), "Bo is fetched");
+        assert!(
+            until(&mut w, 2, |w| doing(w, BO)
+                .is_some_and(|(o, ..)| o == object)),
+            "Bo is fetched"
+        );
         w.apply(Command::Cancel { sim: BO, index: 0 }).unwrap();
-        assert!(until(&mut w, 15, |w| doing(w, ADA).is_none_or(|(o, i, e)| o != object || i != 0 || e.is_some_and(|e| e > 0.0))), "not waiting on");
+        assert!(
+            until(&mut w, 15, |w| doing(w, ADA)
+                .is_none_or(|(o, i, e)| o != object
+                    || i != 0
+                    || e.is_some_and(|e| e > 0.0))),
+            "not waiting on"
+        );
         assert_eq!(doing(&w, ADA).map(|(_, i, _)| i), then, "{object}");
         assert!(!playing(&w, ADA, object, 0), "never the game alone");
     }

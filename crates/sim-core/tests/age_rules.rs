@@ -63,12 +63,23 @@ fn world() -> World {
 
 /// The `n`th object of kind `def`.
 fn object(w: &World, def: &str, n: usize) -> u32 {
-    w.objects.iter().filter(|o| w.content.objects[o.def].id == def).nth(n).unwrap().id
+    w.objects
+        .iter()
+        .filter(|o| w.content.objects[o.def].id == def)
+        .nth(n)
+        .unwrap()
+        .id
 }
 
 fn order(w: &mut World, sim: u32, def: &str, interaction: usize) -> Result<(), String> {
     let object = object(w, def, 0);
-    w.apply(Command::Use { sim, object, interaction }).map(|_| ()).map_err(|e| e.to_string())
+    w.apply(Command::Use {
+        sim,
+        object,
+        interaction,
+    })
+    .map(|_| ())
+    .map_err(|e| e.to_string())
 }
 
 fn refused(w: &mut World, sim: u32, def: &str, interaction: usize, why: &str) {
@@ -81,7 +92,14 @@ fn uses(w: &World) -> Vec<(u32, String, usize)> {
     w.sims
         .iter()
         .filter_map(|s| match s.current()?.task.kind {
-            TaskKind::Use { object, interaction } => Some((s.id, w.content.objects[w.objects[object as usize].def].id.clone(), interaction)),
+            TaskKind::Use {
+                object,
+                interaction,
+            } => Some((
+                s.id,
+                w.content.objects[w.objects[object as usize].def].id.clone(),
+                interaction,
+            )),
             _ => None,
         })
         .collect()
@@ -90,25 +108,58 @@ fn uses(w: &World) -> Vec<(u32, String, usize)> {
 #[test]
 fn an_order_out_of_their_age_is_refused_and_never_starts() {
     let mut w = world();
-    refused(&mut w, DEE, "wine", 0, "Dee is too young to pour a glass of wine");
+    refused(
+        &mut w,
+        DEE,
+        "wine",
+        0,
+        "Dee is too young to pour a glass of wine",
+    );
     refused(&mut w, CY, "wine", 0, "too young");
-    refused(&mut w, ADA, "rider", 0, "Ada is too big for the spring rider");
+    refused(
+        &mut w,
+        ADA,
+        "rider",
+        0,
+        "Ada is too big for the spring rider",
+    );
     refused(&mut w, GRAN, "rider", 0, "too big");
     refused(&mut w, ADA, "crib", 0, "too big for the crib");
     refused(&mut w, DEE, "crib", 0, "too big for the crib");
-    refused(&mut w, DEE, "crib", 1, "Dee is too young to look after a baby");
+    refused(
+        &mut w,
+        DEE,
+        "crib",
+        1,
+        "Dee is too young to look after a baby",
+    );
     refused(&mut w, CY, "crib", 1, "too young to look after a baby");
     refused(&mut w, ADA, "desk", 0, "Ada has no homework to do");
     refused(&mut w, BO, "rider", 0, "too young");
     // Caring for a baby needs one there: the second crib is empty.
     let empty = object(&w, "crib", 1);
-    let err = w.apply(Command::Use { sim: ADA, object: empty, interaction: 1 }).unwrap_err();
+    let err = w
+        .apply(Command::Use {
+            sim: ADA,
+            object: empty,
+            interaction: 1,
+        })
+        .unwrap_err();
     assert!(err.to_string().contains("no baby in the crib"), "{err}");
-    assert!(w.sims.iter().all(|s| s.queue().next().is_none()), "nothing refused was queued");
+    assert!(
+        w.sims.iter().all(|s| s.queue().next().is_none()),
+        "nothing refused was queued"
+    );
     for _ in 0..600 {
         w.tick_once();
         for (sim, def, i) in uses(&w) {
-            assert!(!matches!((sim, def.as_str(), i), (DEE | CY, "wine", _) | (ADA | GRAN, "rider", _) | (ADA, "desk", _)), "{sim} at the {def}");
+            assert!(
+                !matches!(
+                    (sim, def.as_str(), i),
+                    (DEE | CY, "wine", _) | (ADA | GRAN, "rider", _) | (ADA, "desk", _)
+                ),
+                "{sim} at the {def}"
+            );
         }
     }
 
@@ -138,13 +189,24 @@ fn free_will_never_picks_what_their_age_is_not_for() {
                 "crib" => (i == 0) != (sim == BO) || (i == 1 && (sim == DEE || sim == CY)),
                 _ => false,
             };
-            assert!(!bad, "{} on their own at the {def} ({i})", w.sims[sim as usize].name);
+            assert!(
+                !bad,
+                "{} on their own at the {def} ({i})",
+                w.sims[sim as usize].name
+            );
             seen.push((sim, def));
         }
     }
     // (Not for want of trying: the grown-ups pour wine, the child rides.)
-    assert!(seen.iter().any(|(s, d)| *s == DEE && d == "rider"), "Dee rode the spring rider");
-    assert!(seen.iter().any(|(s, d)| (*s == ADA || *s == GRAN) && d == "wine"), "a grown-up poured some wine");
+    assert!(
+        seen.iter().any(|(s, d)| *s == DEE && d == "rider"),
+        "Dee rode the spring rider"
+    );
+    assert!(
+        seen.iter()
+            .any(|(s, d)| (*s == ADA || *s == GRAN) && d == "wine"),
+        "a grown-up poured some wine"
+    );
 }
 
 #[test]
@@ -158,14 +220,40 @@ fn nobody_starts_a_fight_with_a_child() {
         }
     }
     let fight = 1;
-    let offered = |w: &World, a: usize, b: usize| sim_core::conversation::options(w, a, b).iter().any(|&(s, _)| s == fight);
-    assert!(!offered(&w, ADA as usize, DEE as usize) && !offered(&w, CY as usize, DEE as usize), "no fight with the child on offer");
-    assert!(!offered(&w, DEE as usize, ADA as usize), "nor the child starting one");
-    assert!(offered(&w, ADA as usize, CY as usize), "a grown-up and a teen who can't stand each other");
+    let offered = |w: &World, a: usize, b: usize| {
+        sim_core::conversation::options(w, a, b)
+            .iter()
+            .any(|&(s, _)| s == fight)
+    };
+    assert!(
+        !offered(&w, ADA as usize, DEE as usize) && !offered(&w, CY as usize, DEE as usize),
+        "no fight with the child on offer"
+    );
+    assert!(
+        !offered(&w, DEE as usize, ADA as usize),
+        "nor the child starting one"
+    );
+    assert!(
+        offered(&w, ADA as usize, CY as usize),
+        "a grown-up and a teen who can't stand each other"
+    );
     for (a, b) in [(ADA, DEE), (CY, DEE), (GRAN, DEE), (DEE, CY)] {
-        assert!(w.apply(Command::Social { sim: a, target: b, social: fight }).is_err(), "{a} and {b}");
+        assert!(
+            w.apply(Command::Social {
+                sim: a,
+                target: b,
+                social: fight
+            })
+            .is_err(),
+            "{a} and {b}"
+        );
     }
-    w.apply(Command::Social { sim: ADA, target: CY, social: fight }).unwrap();
+    w.apply(Command::Social {
+        sim: ADA,
+        target: CY,
+        social: fight,
+    })
+    .unwrap();
 
     // Nor on their own.
     let mut w = world();
@@ -184,7 +272,11 @@ fn nobody_starts_a_fight_with_a_child() {
         w.tick_once();
         for s in &w.sims {
             if let Some(TaskKind::Social { target, social }) = s.current().map(|a| a.task.kind) {
-                assert!(social != fight || (s.id != DEE && target != DEE && target != BO), "{} started a fight with {target}", s.name);
+                assert!(
+                    social != fight || (s.id != DEE && target != DEE && target != BO),
+                    "{} started a fight with {target}",
+                    s.name
+                );
             }
         }
     }
@@ -201,7 +293,10 @@ fn an_elder_doesnt_climb_to_the_upper_bunk() {
         }
         w.tick_once();
     }
-    assert!(w.objects[bunk as usize].users().any(|u| u == DEE), "Dee took the lower bunk");
+    assert!(
+        w.objects[bunk as usize].users().any(|u| u == DEE),
+        "Dee took the lower bunk"
+    );
     refused(&mut w, GRAN, "bunk", 0, "Gran is too old for the top bunk");
     order(&mut w, ADA, "bunk", 0).unwrap();
 }
@@ -211,8 +306,15 @@ fn up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else() {
     use sim_core::content::Pose;
     let mut w = world();
     let bunk = object(&w, "bunk", 0);
-    let energy = w.content.needs.iter().position(|n| n.id == "energy").unwrap();
-    let lying = |w: &World, sim: u32| w.objects[bunk as usize].users().any(|u| u == sim) && w.sims[sim as usize].pose == Pose::Lie;
+    let energy = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "energy")
+        .unwrap();
+    let lying = |w: &World, sim: u32| {
+        w.objects[bunk as usize].users().any(|u| u == sim) && w.sims[sim as usize].pose == Pose::Lie
+    };
     for (sim, slot) in [(DEE, 0), (ADA, 1)] {
         w.sims[sim as usize].needs[energy] = 0.2;
         order(&mut w, sim, "bunk", 0).unwrap();
@@ -222,7 +324,10 @@ fn up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else() {
             }
             w.tick_once();
         }
-        assert!(lying(&w, sim) && w.objects[bunk as usize].users[slot] == Some(sim), "{sim} in bunk {slot}");
+        assert!(
+            lying(&w, sim) && w.objects[bunk as usize].users[slot] == Some(sim),
+            "{sim} in bunk {slot}"
+        );
     }
     // Both rested: Dee is up out of the lower bunk and off at once; Ada climbs down from the upper one first.
     for sim in [DEE, ADA] {
@@ -242,10 +347,16 @@ fn up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else() {
         w.tick_once();
         waited += 1;
         if waited == 10 {
-            assert!(w.sims[DEE as usize].current().is_some(), "Dee is on her way");
+            assert!(
+                w.sims[DEE as usize].current().is_some(),
+                "Dee is on her way"
+            );
         }
     }
-    assert!((110..=140).contains(&waited), "Ada was off the ladder after {waited} ticks");
+    assert!(
+        (110..=140).contains(&waited),
+        "Ada was off the ladder after {waited} ticks"
+    );
     // Woken by the player (the sleep cancelled) it's the same.
     for (sim, slot) in [(DEE, 0), (ADA, 1)] {
         w.apply(Command::Cancel { sim, index: 0 }).unwrap();
@@ -257,7 +368,10 @@ fn up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else() {
             }
             w.tick_once();
         }
-        assert!(lying(&w, sim) && w.objects[bunk as usize].users[slot] == Some(sim), "{sim} back in bunk {slot}");
+        assert!(
+            lying(&w, sim) && w.objects[bunk as usize].users[slot] == Some(sim),
+            "{sim} back in bunk {slot}"
+        );
     }
     w.apply(Command::Cancel { sim: ADA, index: 0 }).unwrap();
     order(&mut w, ADA, "wine", 0).unwrap();
@@ -266,7 +380,10 @@ fn up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else() {
         w.tick_once();
         waited += 1;
     }
-    assert!((110..=140).contains(&waited), "woken, Ada was off the ladder after {waited} ticks");
+    assert!(
+        (110..=140).contains(&waited),
+        "woken, Ada was off the ladder after {waited} ticks"
+    );
 }
 
 const DINING: &str = r#"{
@@ -287,41 +404,80 @@ fn a_child_has_a_snack_at_the_kids_table_and_a_grown_up_never_does() {
         {"def":"kidsTable","x":10,"z":10},{"def":"kidsChair","x":10,"z":9}]}"#;
     let w = World::from_json(DINING, lot, 1).unwrap();
     let (chair, kids_chair) = (object(&w, "chair", 0), object(&w, "kidsChair", 0));
-    let nav = NavGrid { lot: &w.lot, blocked: w.blocked(), stairs: w.stair_map() };
+    let nav = NavGrid {
+        lot: &w.lot,
+        blocked: w.blocked(),
+        stairs: w.stair_map(),
+    };
     let links = Links::new(&w.content, &w.objects, &nav);
     let all: Vec<u32> = w.objects.iter().map(|o| o.id).collect();
     // From beside the dining table, the child still goes to the kids' table.
     let from = [3.5, 0.5];
     let (child, adult) = (1, 2);
-    assert_eq!(dining_seat(&w.content, &w.objects, &links, &all, from, child).map(|d| d.object), Some(kids_chair));
-    assert_eq!(dining_seat(&w.content, &w.objects, &links, &all, [10.5, 8.5], adult).map(|d| d.object), Some(chair));
+    assert_eq!(
+        dining_seat(&w.content, &w.objects, &links, &all, from, child).map(|d| d.object),
+        Some(kids_chair)
+    );
+    assert_eq!(
+        dining_seat(&w.content, &w.objects, &links, &all, [10.5, 8.5], adult).map(|d| d.object),
+        Some(chair)
+    );
     let kids_only = [object(&w, "kidsTable", 0), kids_chair];
-    assert!(dining_seat(&w.content, &w.objects, &links, &kids_only, from, adult).is_none(), "the kids' chair is no seat for a grown-up");
+    assert!(
+        dining_seat(&w.content, &w.objects, &links, &kids_only, from, adult).is_none(),
+        "the kids' chair is no seat for a grown-up"
+    );
 }
 
 #[test]
 fn shipped_content_keeps_the_kids_things_the_alcohol_and_the_stove_to_their_ages() {
     let c = Content::from_json(&common::content()).unwrap();
     let stage = |id: &str| c.life.stages.iter().position(|s| s.id == id).unwrap();
-    let (baby, child, teen, young, adult, elder) = (stage("baby"), stage("child"), stage("teen"), stage("youngAdult"), stage("adult"), stage("elder"));
+    let (baby, child, teen, young, adult, elder) = (
+        stage("baby"),
+        stage("child"),
+        stage("teen"),
+        stage("youngAdult"),
+        stage("adult"),
+        stage("elder"),
+    );
     let use_of = |obj: &str, it: &str| {
         let def = &c.objects[c.object_index(obj).unwrap_or_else(|| panic!("{obj}"))];
-        def.interactions.iter().find(|i| i.id == it).unwrap_or_else(|| panic!("{obj}.{it}"))
+        def.interactions
+            .iter()
+            .find(|i| i.id == it)
+            .unwrap_or_else(|| panic!("{obj}.{it}"))
     };
     let only = |obj: &str, it: &str, stages: &[usize]| {
         let i = use_of(obj, it);
         for s in [baby, child, teen, young, adult, elder] {
-            assert_eq!(i.for_stage(s), stages.contains(&s), "{obj}.{it} for {}", c.life.stages[s].id);
+            assert_eq!(
+                i.for_stage(s),
+                stages.contains(&s),
+                "{obj}.{it} for {}",
+                c.life.stages[s].id
+            );
         }
     };
     let grown = [young, adult, elder];
     let cooks = [teen, young, adult, elder];
     let everyone = [child, teen, young, adult, elder];
     // The kids' furniture and the playground.
-    for (obj, it) in [("kidsBedCar", "sleep"), ("rockingHorse", "ride"), ("kidsChair", "sit"), ("kidsChair", "homework"), ("kidsDesk", "homework"),
-        ("beanBagKids", "flop"), ("ballPit", "jump"), ("playTent", "play"), ("toyBox", "play"), ("toyChest", "play"),
-        ("springRider", "ride"), ("slide", "slide"), ("climbingFrame", "climb")]
-    {
+    for (obj, it) in [
+        ("kidsBedCar", "sleep"),
+        ("rockingHorse", "ride"),
+        ("kidsChair", "sit"),
+        ("kidsChair", "homework"),
+        ("kidsDesk", "homework"),
+        ("beanBagKids", "flop"),
+        ("ballPit", "jump"),
+        ("playTent", "play"),
+        ("toyBox", "play"),
+        ("toyChest", "play"),
+        ("springRider", "ride"),
+        ("slide", "slide"),
+        ("climbingFrame", "climb"),
+    ] {
         only(obj, it, &[child]);
     }
     only("seesaw", "seesaw", &[child, teen]);
@@ -332,35 +488,75 @@ fn shipped_content_keeps_the_kids_things_the_alcohol_and_the_stove_to_their_ages
     only("barCart", "mix", &grown);
     only("outgoing.partyBar", "mixDrinks", &grown);
     only("outgoing.partyBar", "soda", &everyone);
-    for (obj, it) in [("fridge", "meal"), ("stoveGas", "gourmet"), ("stoveElectric", "bake"), ("grill", "cook"), ("wallOven", "roast"), ("foodie.pizzaOven", "bakePizza")] {
+    for (obj, it) in [
+        ("fridge", "meal"),
+        ("stoveGas", "gourmet"),
+        ("stoveElectric", "bake"),
+        ("grill", "cook"),
+        ("wallOven", "roast"),
+        ("foodie.pizzaOven", "bakePizza"),
+    ] {
         only(obj, it, &cooks);
     }
     only("counter", "sandwich", &everyone);
     only("deskStanding", "browse", &cooks);
     // The loaded bar, the adult dumbbells, the ice bath and the sauna: teens and up.
-    for (obj, it) in [("weightBench", "lift"), ("dumbbells", "lift"), ("hotHeaded.coldPlunge", "plunge"), ("loner.soloSauna", "sweat")] {
+    for (obj, it) in [
+        ("weightBench", "lift"),
+        ("dumbbells", "lift"),
+        ("hotHeaded.coldPlunge", "plunge"),
+        ("loner.soloSauna", "sweat"),
+    ] {
         only(obj, it, &cooks);
     }
     // A pupil's homework is anyone's to take by stage; the pupils-only rule is the code's.
     only("bookshelf", "homework", &everyone);
     // The upper bunk: not an elder's.
     let bunk = &c.objects[c.object_index("bedBunk").unwrap()];
-    assert!(sim_core::content::stage_in(bunk.upper_stages, child) && !sim_core::content::stage_in(bunk.upper_stages, elder));
+    assert!(
+        sim_core::content::stage_in(bunk.upper_stages, child)
+            && !sim_core::content::stage_in(bunk.upper_stages, elder)
+    );
     // The climbing frame is a toy, as the other rides are (teens and up hardly choose them).
     let toys = c.tags.iter().position(|t| t == "toys").unwrap();
     assert_ne!(use_of("climbingFrame", "climb").tags & (1 << toys), 0);
     // A fight: never with a child.
     let fight = c.socials.iter().find(|s| s.id == "fight").unwrap();
-    assert!(!sim_core::content::stage_in(fight.target_stages, child) && sim_core::content::stage_in(fight.target_stages, teen));
+    assert!(
+        !sim_core::content::stage_in(fight.target_stages, child)
+            && sim_core::content::stage_in(fight.target_stages, teen)
+    );
 }
 
 #[test]
 fn a_stage_rule_names_life_stages_content_has() {
-    let with = |object: &str| CONTENT.replacen(r#"{"id":"rider","name":"Spring rider","stages":["child"],"#, object, 1);
+    let with = |object: &str| {
+        CONTENT.replacen(
+            r#"{"id":"rider","name":"Spring rider","stages":["child"],"#,
+            object,
+            1,
+        )
+    };
     let err = |c: String| Content::from_json(&c).unwrap_err().to_string();
-    assert!(err(with(r#"{"id":"rider","name":"Spring rider","stages":["toddler"],"#)).contains("unknown life stage 'toddler'"));
-    assert!(err(with(r#"{"id":"rider","name":"Spring rider","stages":[],"#)).contains("at least one"));
-    assert!(err(with(r#"{"id":"rider","name":"Spring rider","upperStages":["child"],"#)).contains("bunk bed"));
-    let baby = CONTENT.replacen(r#""baby":true,"effects""#, r#""baby":true,"stages":["child"],"effects""#, 1);
+    assert!(
+        err(with(
+            r#"{"id":"rider","name":"Spring rider","stages":["toddler"],"#
+        ))
+        .contains("unknown life stage 'toddler'")
+    );
+    assert!(
+        err(with(r#"{"id":"rider","name":"Spring rider","stages":[],"#)).contains("at least one")
+    );
+    assert!(
+        err(with(
+            r#"{"id":"rider","name":"Spring rider","upperStages":["child"],"#
+        ))
+        .contains("bunk bed")
+    );
+    let baby = CONTENT.replacen(
+        r#""baby":true,"effects""#,
+        r#""baby":true,"stages":["child"],"effects""#,
+        1,
+    );
     assert!(err(baby).contains("a baby's only"));
 }

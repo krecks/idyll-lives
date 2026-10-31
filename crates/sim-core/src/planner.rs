@@ -23,12 +23,12 @@ use std::collections::{HashMap, VecDeque};
 
 use serde::Deserialize;
 
+use crate::Error;
 use crate::clock;
 use crate::content::{Content, Interaction, TagMask};
 use crate::social::FeelingDef;
 use crate::social::{self, EventKind};
 use crate::world::{Layout, Phase, Sim, TaskKind, World};
-use crate::Error;
 
 // ---- Content ------------------------------------------------------------------------------
 
@@ -250,7 +250,9 @@ pub(crate) fn parse(
             return Err(Error::new(format!("duplicate activity '{}'", a.id)));
         }
         let tags = a.tags.iter().try_fold(0, |m: TagMask, t| {
-            let i = tag_index.get(t.as_str()).ok_or_else(|| Error::new(format!("activity '{}': unknown tag '{t}'", a.id)))?;
+            let i = tag_index
+                .get(t.as_str())
+                .ok_or_else(|| Error::new(format!("activity '{}': unknown tag '{t}'", a.id)))?;
             Ok::<_, Error>(m | (1 << i))
         })?;
         out.push(ActivityDef {
@@ -281,7 +283,10 @@ pub(crate) fn parse(
         kept_feeling: feeling(&planner.kept_feeling, "planner")?,
         no_place_feeling: feeling(&planner.no_place_feeling, "planner")?,
         goal_feeling: feeling(&planner.goal_feeling, "planner")?,
-        review_hour: planner.review_hour.unwrap_or(d.review_hour).clamp(0.0, 23.9),
+        review_hour: planner
+            .review_hour
+            .unwrap_or(d.review_hour)
+            .clamp(0.0, 23.9),
         max_goals: planner.max_goals.unwrap_or(d.max_goals),
         max_suggestions: planner.max_suggestions.unwrap_or(d.max_suggestions),
         goal_falloff: planner.goal_falloff.unwrap_or(d.goal_falloff).max(0.0),
@@ -452,8 +457,19 @@ pub struct Goal {
 impl Goal {
     /// The same goal (what, which skill or field, how far), whenever it was taken on.
     pub fn same(&self, other: &Goal) -> bool {
-        (self.def, self.skill, self.category, self.object, self.target)
-            == (other.def, other.skill, other.category, other.object, other.target)
+        (
+            self.def,
+            self.skill,
+            self.category,
+            self.object,
+            self.target,
+        ) == (
+            other.def,
+            other.skill,
+            other.category,
+            other.object,
+            other.target,
+        )
     }
 }
 
@@ -508,7 +524,11 @@ pub struct PurchaseRequest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HomeWish {
     /// A better room of this kind (`garden`: the garden), in this factor (`rooms::FACTORS`).
-    Room { kind: Option<usize>, garden: bool, factor: u8 },
+    Room {
+        kind: Option<usize>,
+        garden: bool,
+        factor: u8,
+    },
     /// A broken object fixed (object type).
     Fix { def: usize },
     /// Another room of this kind (a second bathroom).
@@ -575,7 +595,12 @@ impl HouseOffer {
 
 /// The block running for a resident at `day`/`minute`: their own first, then the household's
 /// (unless skipped). Returns the routine, whether it's the household's, and its start day.
-pub fn running(sim: &Sim, household: &[Routine], day: u32, minute: f32) -> Option<(Routine, bool, u32)> {
+pub fn running(
+    sim: &Sim,
+    household: &[Routine],
+    day: u32,
+    minute: f32,
+) -> Option<(Routine, bool, u32)> {
     let p = &sim.planner;
     p.routines
         .iter()
@@ -590,7 +615,13 @@ pub fn running(sim: &Sim, household: &[Routine], day: u32, minute: f32) -> Optio
 
 /// For residents who plan their sleep: whether it's their night now (inside a sleep block), or
 /// `None` when they have no sleep block today (the usual day rhythm applies).
-pub fn planned_night(content: &Content, sim: &Sim, household: &[Routine], day: u32, minute: f32) -> Option<bool> {
+pub fn planned_night(
+    content: &Content,
+    sim: &Sim,
+    household: &[Routine],
+    day: u32,
+    minute: f32,
+) -> Option<bool> {
     let p = &sim.planner;
     let sleep = |r: &&Routine| content.activities.get(r.activity).is_some_and(|a| a.sleep);
     let own = p.routines.iter().filter(sleep);
@@ -621,7 +652,11 @@ pub fn adherence(content: &Content, sim: &Sim) -> f32 {
 /// Chance a resident skips a block of `activity` when it starts: less with discipline and a
 /// good mood, more when their traits dislike the activity.
 pub fn skip_chance(content: &Content, sim: &Sim, activity: &ActivityDef) -> f32 {
-    let liking = if activity.tags != 0 { sim.mods.preference(activity.tags) } else { 1.0 };
+    let liking = if activity.tags != 0 {
+        sim.mods.preference(activity.tags)
+    } else {
+        1.0
+    };
     let base = content.planner.skip_chance / adherence(content, sim).max(0.05);
     (base + (1.0 - liking).max(0.0) * 0.5).min(0.9)
 }
@@ -643,7 +678,11 @@ pub(crate) fn update(w: &mut World) {
             let h = w.sims[i].household as usize;
             let now = running(&w.sims[i], &w.households[h].routines, day, minute);
             let current = w.sims[i].planner.run;
-            let same = |r: &BlockRun| now.is_some_and(|(n, household, d)| n.id == r.routine && household == r.household && d == r.day);
+            let same = |r: &BlockRun| {
+                now.is_some_and(|(n, household, d)| {
+                    n.id == r.routine && household == r.household && d == r.day
+                })
+            };
             if let Some(run) = current
                 && !same(&run)
             {
@@ -697,7 +736,11 @@ fn refresh_offers(w: &mut World) {
                 if !here || o.broken() {
                     continue;
                 }
-                for inter in content.objects[o.def].interactions.iter().filter(|i| i.autonomous) {
+                for inter in content.objects[o.def]
+                    .interactions
+                    .iter()
+                    .filter(|i| i.autonomous)
+                {
                     for (a, def) in content.activities.iter().enumerate() {
                         if inter.tags & def.tags != 0 {
                             offer.activities |= 1 << a;
@@ -739,7 +782,11 @@ fn begin(w: &mut World, i: usize, routine: Routine, household: bool, day: u32) {
     let Some(activity) = content.activities.get(routine.activity).cloned() else {
         return;
     };
-    let offer = w.offers.get(w.sims[i].household as usize).copied().unwrap_or_default();
+    let offer = w
+        .offers
+        .get(w.sims[i].household as usize)
+        .copied()
+        .unwrap_or_default();
     let sim = &w.sims[i];
     let away = sim.away_until.is_some() || (sim.visiting.is_some() && !activity.visit);
     let no_place = !offer.has(&activity, routine.activity, routine.skill);
@@ -806,14 +853,15 @@ fn begin(w: &mut World, i: usize, routine: Routine, household: bool, day: u32) {
     }
     // Time for it: stop what they picked for themselves (not a needed sleep, a conversation,
     // work or a trip, and not something the player asked for).
-    let rested = sim.needs[..content.needs.len()]
-        .iter()
-        .all(|&n| n >= 0.5);
+    let rested = sim.needs[..content.needs.len()].iter().all(|&n| n >= 0.5);
     let interruptible = sim.engaged_with.is_none()
         && sim.current().is_some_and(|a| {
             !a.task.directed
                 && (a.tags & content.day_rhythm.sleep_tags == 0 || rested)
-                && matches!(a.task.kind, TaskKind::Use { .. } | TaskKind::MoveTo { .. } | TaskKind::Clean { .. })
+                && matches!(
+                    a.task.kind,
+                    TaskKind::Use { .. } | TaskKind::MoveTo { .. } | TaskKind::Clean { .. }
+                )
                 && !fits(content, objects, &run, sim)
         });
     if interruptible {
@@ -854,7 +902,12 @@ fn follow(w: &mut World, i: usize) {
 }
 
 /// Whether what the resident is doing right now is the block's activity.
-fn fits(content: &Content, objects: &[crate::world::ObjectInstance], run: &BlockRun, sim: &Sim) -> bool {
+fn fits(
+    content: &Content,
+    objects: &[crate::world::ObjectInstance],
+    run: &BlockRun,
+    sim: &Sim,
+) -> bool {
     let Some(a) = content.activities.get(run.activity) else {
         return false;
     };
@@ -870,7 +923,13 @@ fn fits(content: &Content, objects: &[crate::world::ObjectInstance], run: &Block
     match (act.task.kind, &act.phase) {
         (TaskKind::Social { .. } | TaskKind::Join { .. }, Phase::Conversing { .. }) => a.social,
         // Walking over to it counts too.
-        (TaskKind::Use { object, interaction }, Phase::Using { .. } | Phase::Routing { .. }) => objects
+        (
+            TaskKind::Use {
+                object,
+                interaction,
+            },
+            Phase::Using { .. } | Phase::Routing { .. },
+        ) => objects
             .get(object as usize)
             .and_then(|o| content.objects[o.def].interactions.get(interaction))
             .is_some_and(|inter| a.fits(inter, run.skill)),
@@ -881,12 +940,20 @@ fn fits(content: &Content, objects: &[crate::world::ObjectInstance], run: &Block
         // Cooking is what the recipe's interaction is (all along, between stations too); eating
         // and washing up are what their tags say.
         (TaskKind::Cook { recipe, origin, .. }, _) => {
-            crate::cooking::origin_interaction(content, objects, origin, recipe).is_some_and(|inter| a.fits(inter, run.skill))
+            crate::cooking::origin_interaction(content, objects, origin, recipe)
+                .is_some_and(|inter| a.fits(inter, run.skill))
         }
         (TaskKind::Eat { .. }, _) => run.skill.is_none() && a.tags & content.cooking.eat_tags != 0,
-        (TaskKind::Dishes { .. }, _) => run.skill.is_none() && a.tags & content.cooking.dishes_tags != 0,
+        (TaskKind::Dishes { .. }, _) => {
+            run.skill.is_none() && a.tags & content.cooking.dishes_tags != 0
+        }
         // On the phone with someone is socialising.
-        (TaskKind::Phone { contact: Some(_), .. }, Phase::Using { .. }) => a.social,
+        (
+            TaskKind::Phone {
+                contact: Some(_), ..
+            },
+            Phase::Using { .. },
+        ) => a.social,
         _ => false,
     }
 }
@@ -904,9 +971,21 @@ fn finish(w: &mut World, i: usize, run: BlockRun) {
     } else if run.done >= run.minutes as f32 * content.planner.kept_share {
         (Outcome::Kept, None)
     } else if run.done > 0.0 {
-        (Outcome::Cut, run.pulled.map(Reason::Need).or(run.late.then_some(Reason::Away)).or(Some(Reason::Mood)))
+        (
+            Outcome::Cut,
+            run.pulled
+                .map(Reason::Need)
+                .or(run.late.then_some(Reason::Away))
+                .or(Some(Reason::Mood)),
+        )
     } else {
-        (Outcome::Skipped, run.pulled.map(Reason::Need).or(run.late.then_some(Reason::Away)).or(Some(Reason::Mood)))
+        (
+            Outcome::Skipped,
+            run.pulled
+                .map(Reason::Need)
+                .or(run.late.then_some(Reason::Away))
+                .or(Some(Reason::Mood)),
+        )
     };
     if outcome == Outcome::Kept {
         if let Some(f) = content.planner.kept_feeling {
@@ -941,7 +1020,10 @@ pub fn progress(w: &World, i: usize, g: &Goal) -> f32 {
     let content = &w.content;
     let sim = &w.sims[i];
     let target = g.target.max(1e-3);
-    let job_ok = |c: usize| g.category.is_none_or(|cat| content.careers[c].category == Some(cat));
+    let job_ok = |c: usize| {
+        g.category
+            .is_none_or(|cat| content.careers[c].category == Some(cat))
+    };
     let p = match content.goals[g.def].kind {
         GoalKind::HasJob => sim.job.as_ref().is_some_and(|j| job_ok(j.career)) as u8 as f32,
         GoalKind::JobLevel => sim
@@ -958,7 +1040,11 @@ pub fn progress(w: &World, i: usize, g: &Goal) -> f32 {
                 let ready = if needs.is_empty() {
                     1.0
                 } else {
-                    needs.iter().map(|&(s, l)| (sim.skills[s] / l).min(1.0)).sum::<f32>() / needs.len() as f32
+                    needs
+                        .iter()
+                        .map(|&(s, l)| (sim.skills[s] / l).min(1.0))
+                        .sum::<f32>()
+                        / needs.len() as f32
                 };
                 (ready + j.performance / 100.0) * 0.5 * 0.9
             }
@@ -994,7 +1080,9 @@ pub fn progress(w: &World, i: usize, g: &Goal) -> f32 {
 /// Skill levels a career goal takes (the next level's for a promotion; every level's up to the
 /// target for a job level, in their current job), highest per skill.
 pub fn goal_skills(content: &Content, sim: &Sim, g: &Goal) -> Vec<(usize, f32)> {
-    let Some(job) = &sim.job else { return Vec::new() };
+    let Some(job) = &sim.job else {
+        return Vec::new();
+    };
     let career = &content.careers[job.career];
     let levels = match content.goals[g.def].kind {
         GoalKind::Promoted => job.level + 1..job.level + 2,
@@ -1040,7 +1128,9 @@ fn check_goals(w: &mut World, i: usize) {
         let content = &w.content;
         let sim = &mut w.sims[i];
         sim.planner.goals.remove(k);
-        let feeling = content.goals[goal.def].feeling.or(content.planner.goal_feeling);
+        let feeling = content.goals[goal.def]
+            .feeling
+            .or(content.planner.goal_feeling);
         if let Some(f) = feeling {
             social::add_feeling(&mut sim.feelings, f, &content.feelings, tick);
         }
@@ -1049,7 +1139,11 @@ fn check_goals(w: &mut World, i: usize) {
             if let Some(f) = content.planner.wish_feeling {
                 social::add_feeling(&mut sim.feelings, f, &content.feelings, tick);
             }
-            if sim.planner.purchase.is_some_and(|p| Some(p.object) == goal.object) {
+            if sim
+                .planner
+                .purchase
+                .is_some_and(|p| Some(p.object) == goal.object)
+            {
                 sim.planner.purchase = None;
             }
         }
@@ -1100,7 +1194,9 @@ fn review_goals(w: &mut World, i: usize, day: u32) {
     if w.rng.next_f32() < 0.5 {
         return;
     }
-    let Some(goal) = suggest(w, i, day) else { return };
+    let Some(goal) = suggest(w, i, day) else {
+        return;
+    };
     let tick = w.tick;
     let sim = &mut w.sims[i];
     if player {
@@ -1113,7 +1209,11 @@ fn review_goals(w: &mut World, i: usize, day: u32) {
 
 /// A goal that suits the resident now, weighted by their traits.
 fn suggest(w: &mut World, i: usize, day: u32) -> Option<Goal> {
-    let wanted = if w.content.goals.iter().any(|d| d.kind == GoalKind::Own) { wanted_object(w, i) } else { None };
+    let wanted = if w.content.goals.iter().any(|d| d.kind == GoalKind::Own) {
+        wanted_object(w, i)
+    } else {
+        None
+    };
     let content = &w.content;
     let sim = &w.sims[i];
     let taken = |kind: GoalKind, skill: Option<usize>| {
@@ -1121,7 +1221,9 @@ fn suggest(w: &mut World, i: usize, day: u32) -> Option<Goal> {
             .goals
             .iter()
             .chain(&sim.planner.suggestions)
-            .any(|g| content.goals[g.def].kind == kind && (kind != GoalKind::Skill || g.skill == skill))
+            .any(|g| {
+                content.goals[g.def].kind == kind && (kind != GoalKind::Skill || g.skill == skill)
+            })
     };
     let friends = (0..w.sims.len())
         .filter(|&j| j != i && w.relationships.get(i, j).friendship >= 50.0)
@@ -1171,7 +1273,11 @@ fn suggest(w: &mut World, i: usize, day: u32) -> Option<Goal> {
                 _ => continue,
             },
             GoalKind::Skill => match skill {
-                Some(s) => make(Some(s), (sim.skills[s].floor() + 2.0).min(content.skill_rules.max_level), 0.0),
+                Some(s) => make(
+                    Some(s),
+                    (sim.skills[s].floor() + 2.0).min(content.skill_rules.max_level),
+                    0.0,
+                ),
                 None => continue,
             },
             GoalKind::Friends => make(None, friends + 2.0, 0.0),
@@ -1191,7 +1297,12 @@ fn suggest(w: &mut World, i: usize, day: u32) -> Option<Goal> {
         if taken(def.kind, goal.skill) {
             continue;
         }
-        let weight = def.weight + sim.traits.iter().filter_map(|t| def.traits.get(t)).sum::<f32>();
+        let weight = def.weight
+            + sim
+                .traits
+                .iter()
+                .filter_map(|t| def.traits.get(t))
+                .sum::<f32>();
         if weight > 0.0 {
             options.push((weight, goal));
         }
@@ -1211,8 +1322,13 @@ fn suggest(w: &mut World, i: usize, day: u32) -> Option<Goal> {
 
 /// Whether household `h` has an object of type `def` at home.
 pub fn has_at_home(w: &World, h: usize, def: usize) -> bool {
-    let Some(plot) = w.households[h].plot else { return false };
-    w.objects.iter().zip(&w.object_plot).any(|(o, p)| *p == Some(plot) && o.def == def)
+    let Some(plot) = w.households[h].plot else {
+        return false;
+    };
+    w.objects
+        .iter()
+        .zip(&w.object_plot)
+        .any(|(o, p)| *p == Some(plot) && o.def == def)
 }
 
 /// Two object types for the same thing (a better bed for a bed): the same catalog group and
@@ -1221,7 +1337,9 @@ fn same_kind(content: &Content, a: usize, b: usize) -> bool {
     let (a, b) = (&content.objects[a], &content.objects[b]);
     !a.group.is_empty()
         && a.group == b.group
-        && a.interactions.iter().any(|x| b.interactions.iter().any(|y| x.id == y.id))
+        && a.interactions
+            .iter()
+            .any(|x| b.interactions.iter().any(|y| x.id == y.id))
 }
 
 /// Whether object type `new` does all `old` does: every use of it (by id), the cooking stations
@@ -1229,7 +1347,9 @@ fn same_kind(content: &Content, a: usize, b: usize) -> bool {
 /// no fridge: selling the fridge for it would leave no snacks and no ingredients.
 fn covers(content: &Content, new: usize, old: usize) -> bool {
     let (new, old) = (&content.objects[new], &content.objects[old]);
-    old.interactions.iter().all(|x| new.interactions.iter().any(|y| x.id == y.id))
+    old.interactions
+        .iter()
+        .all(|x| new.interactions.iter().any(|y| x.id == y.id))
         && old.stations & !new.stations == 0
         && (new.stores || !old.stores)
 }
@@ -1241,7 +1361,12 @@ fn replaces(w: &World, h: usize, def: usize) -> Option<u32> {
     w.objects
         .iter()
         .zip(&w.object_plot)
-        .filter(|(o, p)| **p == Some(plot) && o.def != def && same_kind(&w.content, o.def, def) && covers(&w.content, def, o.def))
+        .filter(|(o, p)| {
+            **p == Some(plot)
+                && o.def != def
+                && same_kind(&w.content, o.def, def)
+                && covers(&w.content, def, o.def)
+        })
         .filter(|(o, _)| w.content.objects[o.def].price.is_some_and(|p| p < price))
         .min_by_key(|(o, _)| w.content.objects[o.def].price)
         .map(|(o, _)| o.id)
@@ -1271,20 +1396,39 @@ fn wanted_object(w: &mut World, i: usize) -> Option<usize> {
         if price <= 0
             || price as f32 > reach
             || home.contains(&d)
-            || sim.planner.goals.iter().chain(&sim.planner.suggestions).any(|g| g.object == Some(d))
+            || sim
+                .planner
+                .goals
+                .iter()
+                .chain(&sim.planner.suggestions)
+                .any(|g| g.object == Some(d))
         {
             continue;
         }
-        let uses: Vec<&Interaction> = def.interactions.iter().filter(|it| it.autonomous && !it.baby).collect();
+        let uses: Vec<&Interaction> = def
+            .interactions
+            .iter()
+            .filter(|it| it.autonomous && !it.baby)
+            .collect();
         if uses.is_empty() {
             continue;
         }
         // Something as good for the same thing at home already: no need.
-        let same: Vec<usize> = home.iter().copied().filter(|&o| same_kind(content, o, d)).collect();
-        if same.iter().any(|&o| content.objects[o].price.unwrap_or(0) >= price) {
+        let same: Vec<usize> = home
+            .iter()
+            .copied()
+            .filter(|&o| same_kind(content, o, d))
+            .collect();
+        if same
+            .iter()
+            .any(|&o| content.objects[o].price.unwrap_or(0) >= price)
+        {
             continue;
         }
-        let liking = uses.iter().map(|it| sim.mods.preference(it.tags)).fold(0.0f32, f32::max);
+        let liking = uses
+            .iter()
+            .map(|it| sim.mods.preference(it.tags))
+            .fold(0.0f32, f32::max);
         let mut score = (liking - 1.0).max(0.0) * 2.0;
         for it in &uses {
             for (s, &gain) in it.skill_gain.iter().enumerate() {
@@ -1347,18 +1491,30 @@ fn ask_to_buy(w: &mut World, i: usize, day: u32) {
     }
     let mut request = match sim.planner.purchase {
         Some(p) if p.object == object => p,
-        _ => PurchaseRequest { object, open: false, day, declines: 0 },
+        _ => PurchaseRequest {
+            object,
+            open: false,
+            day,
+            declines: 0,
+        },
     };
     // Waiting for an answer since today, or after a no.
     if request.open && request.day == day
-        || !request.open && request.declines > 0 && day < request.day + content.planner.ask_again_days
+        || !request.open
+            && request.declines > 0
+            && day < request.day + content.planner.ask_again_days
     {
         return;
     }
     if !w.households[h].player {
         // Nobody to ask: they go ahead (and try again in a few days if there's no room).
         if buy_wanted(w, i, object).is_err() {
-            w.sims[i].planner.purchase = Some(PurchaseRequest { object, open: false, day, declines: 1 });
+            w.sims[i].planner.purchase = Some(PurchaseRequest {
+                object,
+                open: false,
+                day,
+                declines: 1,
+            });
         }
         return;
     }
@@ -1368,38 +1524,38 @@ fn ask_to_buy(w: &mut World, i: usize, day: u32) {
     let sim = &mut w.sims[i];
     sim.planner.purchase = Some(request);
     think(sim, ThoughtKind::WantsToBuy, object, tick);
-    w.events.push_object(tick, EventKind::WantsToBuy, i, object, Some(price));
+    w.events
+        .push_object(tick, EventKind::WantsToBuy, i, object, Some(price));
 }
 
-/// Buys `object` for resident `i`'s home: in place of the cheaper one it replaces if there is
-/// one (sold, the new one where it stood if there's no other room), else at a free spot.
+/// Buys `object` for resident `i`'s home: over the cheaper one it replaces, if there is one, in
+/// the place that one stood (their old bed goes, sold, and the new one stands where it stood, so
+/// the room they know stays as it was). Only where they can't be swapped there does the old one
+/// go and the new one find a free spot somewhere else.
 pub(crate) fn buy_wanted(w: &mut World, i: usize, object: usize) -> Result<u32, Error> {
     let h = w.sims[i].household;
     let id = w.content.objects[object].id.clone();
     let old = replaces(w, h as usize, object);
-    let bought = match w.buy_at(h, &id, None, Default::default(), Default::default()) {
-        Ok(new) => {
-            // The old one goes (ids after it shift down).
-            match old {
-                Some(o) if w.sell(h, o).is_ok() && o < new => Ok(new - 1),
-                _ => Ok(new),
-            }
-        }
-        Err(e) => match old {
-            Some(o) => swap_in(w, h, o, &id).ok_or(e),
-            None => Err(e),
-        },
+    // Their own thing goes first, and where it stood: not a new bed into some free corner.
+    let bought = match old.and_then(|o| swap_in(w, h, o, &id)) {
+        Some(new) => Ok(new),
+        None => at_a_free_spot(w, h, object, &id),
     }?;
-    w.events.push_object(w.tick, EventKind::Bought, i, object, None);
+    w.events
+        .push_object(w.tick, EventKind::Bought, i, object, None);
     w.sims[i].planner.recheck = true;
     Ok(bought)
 }
 
-/// No free spot: sells `old` and puts `id` where it stood (or anywhere now free). If even that
-/// doesn't fit, `old` goes back as it was. Only for something nothing stands on and nobody uses.
+/// Swaps `old` out for `id`: `old` is sold and `id` bought over the tiles it stood on, so the new
+/// thing stands in the old one's place. If it won't go there, it's put anywhere now free; if even
+/// that doesn't fit, `old` goes back as it was. Only for something nothing stands on and nobody
+/// uses.
 fn swap_in(w: &mut World, h: u32, old: u32, id: &str) -> Option<u32> {
     let o = w.objects.get(old as usize)?.clone();
-    if o.users.iter().any(Option::is_some) || !crate::surface::riders(&w.content, &w.objects, old).is_empty() {
+    if o.users.iter().any(Option::is_some)
+        || !crate::surface::riders(&w.content, &w.objects, old).is_empty()
+    {
         return None;
     }
     let (hh, plot) = w.home_of(h).ok()?;
@@ -1407,7 +1563,13 @@ fn swap_in(w: &mut World, h: u32, old: u32, id: &str) -> Option<u32> {
     w.sell(h, old).ok()?;
     let refund = w.households[hh].funds - before;
     let placed = w
-        .buy_at(h, id, Some([o.x, o.z, o.rot as i32]), Default::default(), Default::default())
+        .buy_at(
+            h,
+            id,
+            Some([o.x, o.z, o.rot as i32]),
+            Default::default(),
+            Default::default(),
+        )
         .or_else(|_| w.buy_at(h, id, None, Default::default(), Default::default()));
     if let Ok(new) = placed {
         return Some(new);
@@ -1418,10 +1580,27 @@ fn swap_in(w: &mut World, h: u32, old: u32, id: &str) -> Option<u32> {
     None
 }
 
+/// The new one goes where there's room rather than over their old one: buys `id` at any free spot
+/// and then sells what it replaces, if the household has one. Returns the new object's id (the
+/// old one going shifts the ids after it down). Called when swapping them in their own place can't
+/// be done, and when there's nothing at home to take the place of.
+fn at_a_free_spot(w: &mut World, h: u32, object: usize, id: &str) -> Result<u32, Error> {
+    let old = replaces(w, h as usize, object);
+    let new = w.buy_at(h, id, None, Default::default(), Default::default())?;
+    // The old one goes too (ids after it shift down).
+    match old {
+        Some(o) if w.sell(h, o).is_ok() && o < new => Ok(new - 1),
+        _ => Ok(new),
+    }
+}
+
 /// The player says yes to what resident `i` asked for: it's bought (their goal is reached).
 pub(crate) fn accept_purchase(w: &mut World, i: usize) -> Result<(), Error> {
     let Some(request) = w.sims[i].planner.purchase.filter(|p| p.open) else {
-        return Err(Error::new(format!("{} isn't asking for anything", w.sims[i].name)));
+        return Err(Error::new(format!(
+            "{} isn't asking for anything",
+            w.sims[i].name
+        )));
     };
     buy_wanted(w, i, request.object)?;
     w.sims[i].planner.purchase = None;
@@ -1437,7 +1616,10 @@ pub(crate) fn decline_purchase(w: &mut World, i: usize) -> Result<(), Error> {
     let content = &w.content;
     let sim = &mut w.sims[i];
     let Some(request) = sim.planner.purchase.as_mut().filter(|p| p.open) else {
-        return Err(Error::new(format!("{} isn't asking for anything", sim.name)));
+        return Err(Error::new(format!(
+            "{} isn't asking for anything",
+            sim.name
+        )));
     };
     request.open = false;
     request.day = day;
@@ -1448,7 +1630,13 @@ pub(crate) fn decline_purchase(w: &mut World, i: usize) -> Result<(), Error> {
         && let Some(&f) = denied.get((declines as usize - 2).min(denied.len().saturating_sub(1)))
     {
         social::add_feeling(&mut sim.feelings, f, &content.feelings, tick);
-        w.events.push_object(tick, EventKind::DeniedAgain, i, object, Some(declines as i64));
+        w.events.push_object(
+            tick,
+            EventKind::DeniedAgain,
+            i,
+            object,
+            Some(declines as i64),
+        );
     }
     Ok(())
 }
@@ -1478,7 +1666,12 @@ fn scaled(full: f32, strength: f32) -> f32 {
 
 /// Multiplier for an object interaction while planning: (factor, floor score). `night` is
 /// `planned_night` (residents who plan their sleep don't go to bed outside it unless exhausted).
-pub(crate) fn object_factor(content: &Content, sim: &Sim, inter: &Interaction, night: Option<bool>) -> (f32, f32) {
+pub(crate) fn object_factor(
+    content: &Content,
+    sim: &Sim,
+    inter: &Interaction,
+    night: Option<bool>,
+) -> (f32, f32) {
     let mut factor = 1.0;
     if night == Some(false) && inter.tags & content.day_rhythm.sleep_tags != 0 {
         let exhausted = (0..content.needs.len())
@@ -1488,7 +1681,10 @@ pub(crate) fn object_factor(content: &Content, sim: &Sim, inter: &Interaction, n
         }
     }
     if inter.cost > 0 {
-        factor *= scaled(0.3, kind_strength(content, sim, &[GoalKind::Funds, GoalKind::Own]));
+        factor *= scaled(
+            0.3,
+            kind_strength(content, sim, &[GoalKind::Funds, GoalKind::Own]),
+        );
     }
     let Some(run) = active(sim) else {
         return (factor, 0.0);
@@ -1499,7 +1695,14 @@ pub(crate) fn object_factor(content: &Content, sim: &Sim, inter: &Interaction, n
     }
     let urgent = (0..content.needs.len())
         .any(|n| sim.needs[n] < content.planner.urgent_below && inter.total_gain[n] > 0.0);
-    (if urgent { factor } else { factor * content.planner.off_block }, 0.0)
+    (
+        if urgent {
+            factor
+        } else {
+            factor * content.planner.off_block
+        },
+        0.0,
+    )
 }
 
 /// `(factor, floor)` for an action without an object (tidying up) with these tags: favoured
@@ -1517,7 +1720,14 @@ pub(crate) fn tags_factor(content: &Content, sim: &Sim, tags: TagMask) -> (f32, 
 
 /// Multiplier for a social with someone (`romantic`: it's a romantic social; `friendly`: it
 /// builds friendship; `friendship` toward them; `single`: they're free to date).
-pub(crate) fn social_factor(content: &Content, sim: &Sim, romantic: bool, friendly: bool, friendship: f32, single: bool) -> f32 {
+pub(crate) fn social_factor(
+    content: &Content,
+    sim: &Sim,
+    romantic: bool,
+    friendly: bool,
+    friendship: f32,
+    single: bool,
+) -> f32 {
     let mut factor = 1.0;
     if friendly && friendship < 50.0 {
         factor *= scaled(1.5, kind_strength(content, sim, &[GoalKind::Friends]));
@@ -1527,7 +1737,13 @@ pub(crate) fn social_factor(content: &Content, sim: &Sim, romantic: bool, friend
     }
     match active(sim) {
         Some(run) if content.activities[run.activity].social => factor * run.boost,
-        Some(_) if content.needs.iter().zip(&sim.needs).all(|(d, &n)| d.room || n >= content.planner.urgent_below) => {
+        Some(_)
+            if content
+                .needs
+                .iter()
+                .zip(&sim.needs)
+                .all(|(d, &n)| d.room || n >= content.planner.urgent_below) =>
+        {
             factor * content.planner.off_block
         }
         _ => factor,
@@ -1536,12 +1752,26 @@ pub(crate) fn social_factor(content: &Content, sim: &Sim, romantic: bool, friend
 
 /// Whether a block other than socialising or visiting starts within `minutes` from now (a
 /// resident with plans doesn't set off to visit just before them).
-pub(crate) fn plans_soon(content: &Content, sim: &Sim, household: &[Routine], day: u32, minute: f32, minutes: f32) -> bool {
+pub(crate) fn plans_soon(
+    content: &Content,
+    sim: &Sim,
+    household: &[Routine],
+    day: u32,
+    minute: f32,
+    minutes: f32,
+) -> bool {
     let mut m = 15.0;
     while m <= minutes {
-        let (d, t) = if minute + m >= 1440.0 { (day + 1, minute + m - 1440.0) } else { (day, minute + m) };
+        let (d, t) = if minute + m >= 1440.0 {
+            (day + 1, minute + m - 1440.0)
+        } else {
+            (day, minute + m)
+        };
         if let Some((r, ..)) = running(sim, household, d, t)
-            && content.activities.get(r.activity).is_some_and(|a| !a.social && !a.visit)
+            && content
+                .activities
+                .get(r.activity)
+                .is_some_and(|a| !a.social && !a.visit)
         {
             return true;
         }
@@ -1555,7 +1785,10 @@ pub(crate) fn visit_factor(content: &Content, sim: &Sim, soon: bool) -> f32 {
     if soon && active(sim).is_none() {
         return content.planner.off_block;
     }
-    let factor = scaled(1.5, kind_strength(content, sim, &[GoalKind::Friends, GoalKind::Partner]));
+    let factor = scaled(
+        1.5,
+        kind_strength(content, sim, &[GoalKind::Friends, GoalKind::Partner]),
+    );
     match active(sim) {
         Some(run) if content.activities[run.activity].visit => factor * run.boost,
         Some(_) => factor * content.planner.off_block,
@@ -1611,7 +1844,10 @@ pub(crate) fn job_search(content: &Content, sim: &Sim) -> (f32, Option<usize>) {
         .position(|g| content.goals[g.def].kind == GoalKind::HasJob)
         .map_or((1.0, None), |rank| {
             let g = &sim.planner.goals[rank];
-            (scaled(3.0, goal_strength(&content.planner, rank)), g.category)
+            (
+                scaled(3.0, goal_strength(&content.planner, rank)),
+                g.category,
+            )
         })
 }
 
@@ -1666,7 +1902,11 @@ pub(crate) fn routines_from(content: &Content, list: &[RoutineIn]) -> Result<Vec
             ),
             _ => None,
         };
-        let longest = if def.sleep { rules.max_sleep_minutes } else { rules.max_minutes };
+        let longest = if def.sleep {
+            rules.max_sleep_minutes
+        } else {
+            rules.max_minutes
+        };
         if r.days & 0x7f == 0 || r.start >= 1440 || r.minutes < 15 || r.minutes > longest {
             return Err(Error::new(format!(
                 "{}: pick at least one day and 15 min to {} h",
@@ -1711,7 +1951,11 @@ pub(crate) fn goal_from(content: &Content, g: &GoalIn, sim: &Sim, day: u32) -> R
     let skill = g
         .skill
         .as_deref()
-        .map(|s| content.skill_index(s).ok_or_else(|| Error::new(format!("unknown skill '{s}'"))))
+        .map(|s| {
+            content
+                .skill_index(s)
+                .ok_or_else(|| Error::new(format!("unknown skill '{s}'")))
+        })
         .transpose()?;
     if kind == GoalKind::Skill && skill.is_none() {
         return Err(Error::new("pick a skill"));
@@ -1730,13 +1974,22 @@ pub(crate) fn goal_from(content: &Content, g: &GoalIn, sim: &Sim, day: u32) -> R
     let object = g
         .object
         .as_deref()
-        .map(|o| content.object_index(o).ok_or_else(|| Error::new(format!("unknown object '{o}'"))))
+        .map(|o| {
+            content
+                .object_index(o)
+                .ok_or_else(|| Error::new(format!("unknown object '{o}'")))
+        })
         .transpose()?;
     let price = match (kind, object) {
         (GoalKind::Own, None) => return Err(Error::new("pick an item")),
         (GoalKind::Own, Some(o)) => match content.objects[o].price {
             Some(p) => Some(p as f32),
-            None => return Err(Error::new(format!("{} isn't for sale", content.objects[o].name))),
+            None => {
+                return Err(Error::new(format!(
+                    "{} isn't for sale",
+                    content.objects[o].name
+                )));
+            }
         },
         _ => None,
     };

@@ -17,7 +17,11 @@ const TOWN: &str = r#"{"width":16,"depth":16,
         {"name":"Ed","household":0,"x":11.5,"z":10.5,"traits":["neat"]}]}"#;
 
 fn interaction(w: &World, object: u32, id: &str) -> usize {
-    w.content.objects[w.objects[object as usize].def].interactions.iter().position(|i| i.id == id).unwrap_or_else(|| panic!("{id}"))
+    w.content.objects[w.objects[object as usize].def]
+        .interactions
+        .iter()
+        .position(|i| i.id == id)
+        .unwrap_or_else(|| panic!("{id}"))
 }
 
 #[test]
@@ -26,13 +30,38 @@ fn showering_bathing_washing_up_and_laundry_at_once() {
     w.autonomy = false;
     // A dirty plate to wash up (washing up needs dishes to wash, content `workOn`).
     let plate = w.content.item_index("plateDirty").unwrap();
-    w.items.add(sim_core::items::ItemInstance { id: 0, def: plate, at: sim_core::items::ItemAt::Floor { x: 1, z: 1, offset: [0, 0] }, servings: 0, quality: 1.0, made_at: 0, household: 0, spoiled: false, recipe: None });
-    let uses = [("showerStall", 2, 3, "shower", "shower"), ("bathtub", 5, 3, "bath", "bath"), ("sink", 9, 3, "wash", "wash"), ("farmhouseSink", 11, 3, "washUp", "wash"), ("laundryWasher", 13, 3, "laundry", "clean")];
+    w.items.add(sim_core::items::ItemInstance {
+        id: 0,
+        def: plate,
+        at: sim_core::items::ItemAt::Floor {
+            x: 1,
+            z: 1,
+            offset: [0, 0],
+        },
+        servings: 0,
+        quality: 1.0,
+        made_at: 0,
+        household: 0,
+        spoiled: false,
+        recipe: None,
+    });
+    let uses = [
+        ("showerStall", 2, 3, "shower", "shower"),
+        ("bathtub", 5, 3, "bath", "bath"),
+        ("sink", 9, 3, "wash", "wash"),
+        ("farmhouseSink", 11, 3, "washUp", "wash"),
+        ("laundryWasher", 13, 3, "laundry", "clean"),
+    ];
     let mut wanted = Vec::new();
     for (i, (def, x, z, id, anim)) in uses.into_iter().enumerate() {
         let object = buy(&mut w, def, x, z);
         let interaction = interaction(&w, object, id);
-        w.apply(Command::Use { sim: i as u32, object, interaction }).unwrap();
+        w.apply(Command::Use {
+            sim: i as u32,
+            object,
+            interaction,
+        })
+        .unwrap();
         wanted.push((object, interaction, anim));
     }
     common::dump_state(&w, "water-sounds");
@@ -42,9 +71,16 @@ fn showering_bathing_washing_up_and_laundry_at_once() {
     for _ in 0..(10.0 / MINUTES_PER_TICK) as u32 {
         w.tick_once();
         for (i, &(object, interaction, anim)) in wanted.iter().enumerate() {
-            let Some(a) = w.sims[i].current() else { continue };
-            if matches!(a.phase, Phase::Using { .. }) && matches!(a.task.kind, TaskKind::Use { object: o, interaction: n } if o == object && n == interaction) {
-                let shown = w.content.objects[w.objects[object as usize].def].interactions[interaction].anim.map(|a| w.content.animations[a].as_str());
+            let Some(a) = w.sims[i].current() else {
+                continue;
+            };
+            if matches!(a.phase, Phase::Using { .. })
+                && matches!(a.task.kind, TaskKind::Use { object: o, interaction: n } if o == object && n == interaction)
+            {
+                let shown = w.content.objects[w.objects[object as usize].def].interactions
+                    [interaction]
+                    .anim
+                    .map(|a| w.content.animations[a].as_str());
                 assert_eq!(shown, Some(anim), "{}", w.sims[i].name);
                 at_it[i] = true;
             }

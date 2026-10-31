@@ -78,6 +78,7 @@
           "id": "arcade",
           "label": "Play arcade games",
           "anim": "play",
+          "sound": "arcade",
           "minutes": 30,
           "effects": {
             "fun": 0.55
@@ -114,6 +115,7 @@
           "id": "throw",
           "label": "Throw a pot",
           "anim": "tinker",
+          "sound": "potteryWheel",
           "minutes": 60,
           "pose": "sit",
           "effects": {

@@ -36,12 +36,20 @@ pub struct Stair {
 
 impl Stair {
     pub fn top(&self) -> (i32, i32) {
-        (self.bottom.0 + self.dir.0 * (self.len - 1), self.bottom.1 + self.dir.1 * (self.len - 1))
+        (
+            self.bottom.0 + self.dir.0 * (self.len - 1),
+            self.bottom.1 + self.dir.1 * (self.len - 1),
+        )
     }
 
     /// Which step a tile is (0 the bottom one), if it is one.
     pub fn step(&self, x: i32, z: i32) -> Option<i32> {
-        (0..self.len).find(|&i| (self.bottom.0 + self.dir.0 * i, self.bottom.1 + self.dir.1 * i) == (x, z))
+        (0..self.len).find(|&i| {
+            (
+                self.bottom.0 + self.dir.0 * i,
+                self.bottom.1 + self.dir.1 * i,
+            ) == (x, z)
+        })
     }
 }
 
@@ -58,7 +66,11 @@ pub struct StairMap {
 }
 
 /// No storeys, no stairs.
-pub static NO_STAIRS: StairMap = StairMap { depth: 0, basement: 0, stairs: Vec::new() };
+pub static NO_STAIRS: StairMap = StairMap {
+    depth: 0,
+    basement: 0,
+    stairs: Vec::new(),
+};
 
 impl StairMap {
     /// The storey a row is on (0: the ground, -1: the basement).
@@ -93,12 +105,18 @@ impl StairMap {
 
     /// The same place on the ground storey's rows.
     pub fn ground_z(&self, z: i32) -> i32 {
-        if self.depth > 0 { z.rem_euclid(self.depth) } else { z }
+        if self.depth > 0 {
+            z.rem_euclid(self.depth)
+        } else {
+            z
+        }
     }
 
     /// The flight a tile is a step of, and which step.
     pub fn step(&self, x: i32, z: i32) -> Option<(&Stair, i32)> {
-        self.stairs.iter().find_map(|s| s.step(x, z).map(|i| (s, i)))
+        self.stairs
+            .iter()
+            .find_map(|s| s.step(x, z).map(|i| (s, i)))
     }
 
     /// Where a stair links to from this tile: the landing from the top step, or back.
@@ -120,7 +138,10 @@ impl StairMap {
             return (a[0] - b[0]).hypot(a[1] - b[1]);
         }
         let d = self.depth as f32;
-        let (ka, kb) = (self.storey(a[1].floor() as i32), self.storey(b[1].floor() as i32));
+        let (ka, kb) = (
+            self.storey(a[1].floor() as i32),
+            self.storey(b[1].floor() as i32),
+        );
         let flat = (a[0] - b[0]).hypot(a[1].rem_euclid(d) - b[1].rem_euclid(d));
         flat + (ka - kb).abs() as f32 * STOREY_WALK
     }
@@ -133,6 +154,12 @@ const ORTHO: u32 = 10;
 const DIAG: u32 = 14;
 /// Extra cost of stepping onto a tile of someone else's plot: twenty tiles of walking.
 const TRESPASS: u32 = ORTHO * 20;
+/// Extra cost of stepping straight from one plot into another beside a garden (`Grounds::fenced`):
+/// three hundred tiles, so a garden is entered from the street at its front wherever there is one,
+/// and only crossed into where there isn't. Gardens are kept apart all round, though the renderer
+/// draws their fences and hedges (`shared/street.ts`) only from the house's front back, and none
+/// round some: next door is by the street, as a visitor would go.
+const OVER_THE_FENCE: u32 = ORTHO * 300;
 
 /// Which plots one resident may walk across (their home, public places, where they're going);
 /// the rest are other people's gardens, kept off unless there's no other way.
@@ -141,6 +168,9 @@ pub struct Grounds<'a> {
     pub tile_plot: &'a [Option<u32>],
     /// Per plot (by id): whether this resident may walk across it.
     pub open: Vec<bool>,
+    /// Per plot (by id): whether its sides are fenced off from the plots beside it (a garden; a
+    /// public place isn't).
+    pub fenced: Vec<bool>,
 }
 
 impl Grounds<'_> {
@@ -150,12 +180,22 @@ impl Grounds<'_> {
         if x < 0 || z < 0 || x >= nav.lot.width as i32 {
             return None;
         }
-        self.tile_plot.get(z as usize * nav.lot.width + x as usize).copied().flatten()
+        self.tile_plot
+            .get(z as usize * nav.lot.width + x as usize)
+            .copied()
+            .flatten()
     }
 
-    /// The plot a tile is on, if it's one this resident shouldn't walk across.
-    fn foreign(&self, nav: &NavGrid, x: i32, z: i32) -> Option<u32> {
-        self.plot(nav, x, z).filter(|&p| !self.open.get(p as usize).copied().unwrap_or(true))
+    /// Whether plot `p` (a tile's) is one this resident shouldn't walk across.
+    fn foreign(&self, p: Option<u32>) -> bool {
+        p.is_some_and(|p| !self.open.get(p as usize).copied().unwrap_or(true))
+    }
+
+    /// A step from plot `a` straight into plot `b` (tiles'), over the fence between them, open
+    /// or not: a garden's side or back, not between two public places.
+    fn over_the_fence(&self, a: Option<u32>, b: Option<u32>) -> bool {
+        let fenced = |p: u32| self.fenced.get(p as usize).copied().unwrap_or(false);
+        matches!((a, b), (Some(a), Some(b)) if a != b && (fenced(a) || fenced(b)))
     }
 }
 
@@ -173,7 +213,9 @@ impl NavGrid<'_> {
         self.lot.in_bounds(x, z)
             && !self.blocked[self.lot.tile_index(x, z)]
             && !self.lot.diag_blocks(x, z)
-            && (self.stairs.depth == 0 || z < self.stairs.depth || self.lot.room_at(x, z) != OUTDOORS)
+            && (self.stairs.depth == 0
+                || z < self.stairs.depth
+                || self.lot.room_at(x, z) != OUTDOORS)
     }
 
     /// Whether a single step from `a` to the neighbouring tile `b` is allowed.
@@ -236,7 +278,12 @@ impl NavGrid<'_> {
 
     /// `find_path`, round other people's gardens when there are `grounds` to mind. (Their
     /// cost only adds to a step's, so the heuristic still never overestimates.)
-    pub fn find_path_with(&self, start: (i32, i32), goal: (i32, i32), grounds: Option<&Grounds>) -> Option<Vec<(i32, i32)>> {
+    pub fn find_path_with(
+        &self,
+        start: (i32, i32),
+        goal: (i32, i32),
+        grounds: Option<&Grounds>,
+    ) -> Option<Vec<(i32, i32)>> {
         let lot = self.lot;
         if !lot.in_bounds(start.0, start.1) || !self.tile_free(goal.0, goal.1) {
             return None;
@@ -247,9 +294,17 @@ impl NavGrid<'_> {
         SCRATCH.with_borrow_mut(|scratch| {
             // (Every storey's rows: the lot's whole depth.)
             let search = scratch.start(lot.width * lot.depth);
-            let Scratch { g, came, stamp, open, .. } = scratch;
+            let Scratch {
+                g,
+                came,
+                stamp,
+                open,
+                ..
+            } = scratch;
             // Costs from earlier searches don't count.
-            let cost_to = |g: &[u32], stamp: &[u32], i: usize| if stamp[i] == search { g[i] } else { u32::MAX };
+            let cost_to = |g: &[u32], stamp: &[u32], i: usize| {
+                if stamp[i] == search { g[i] } else { u32::MAX }
+            };
             let s = lot.tile_index(start.0, start.1);
             let goal_i = lot.tile_index(goal.0, goal.1);
             (g[s], came[s], stamp[s]) = (0, u32::MAX, search);
@@ -265,17 +320,35 @@ impl NavGrid<'_> {
                 if f > g[i] + heuristic((x, z), goal) {
                     continue; // stale heap entry
                 }
-                let link = self.stairs.link(x, z).filter(|&(lx, lz)| self.tile_free(lx, lz));
-                for (dx, dz) in NEIGHBOURS.into_iter().chain(link.map(|(lx, lz)| (lx - x, lz - z))) {
+                let link = self
+                    .stairs
+                    .link(x, z)
+                    .filter(|&(lx, lz)| self.tile_free(lx, lz));
+                let here = grounds.and_then(|gr| gr.plot(self, x, z));
+                for (dx, dz) in NEIGHBOURS
+                    .into_iter()
+                    .chain(link.map(|(lx, lz)| (lx - x, lz - z)))
+                {
                     let (nx, nz) = (x + dx, z + dz);
                     let linked = Some((nx, nz)) == link;
                     if !linked && ((dx.abs() > 1 || dz.abs() > 1) || !self.can_step(x, z, nx, nz)) {
                         continue;
                     }
                     let ni = lot.tile_index(nx, nz);
-                    let mut cost = g[i] + if dx != 0 && dz != 0 && !linked { DIAG } else { ORTHO };
-                    if grounds.is_some_and(|gr| gr.foreign(self, nx, nz).is_some()) {
-                        cost += TRESPASS;
+                    let mut cost = g[i]
+                        + if dx != 0 && dz != 0 && !linked {
+                            DIAG
+                        } else {
+                            ORTHO
+                        };
+                    if let Some(gr) = grounds {
+                        let there = gr.plot(self, nx, nz);
+                        if gr.foreign(there) {
+                            cost += TRESPASS;
+                        }
+                        if !linked && gr.over_the_fence(here, there) {
+                            cost += OVER_THE_FENCE;
+                        }
                     }
                     if cost < cost_to(g, stamp, ni) {
                         (g[ni], came[ni], stamp[ni]) = (cost, i as u32, search);
@@ -294,7 +367,10 @@ impl NavGrid<'_> {
 
     /// Tiles a resident can walk to from `(x, z)` in one step: neighbours, and up or down stairs.
     pub fn neighbours(&self, x: i32, z: i32) -> impl Iterator<Item = (i32, i32)> + '_ {
-        let link = self.stairs.link(x, z).filter(|&(lx, lz)| self.tile_free(lx, lz));
+        let link = self
+            .stairs
+            .link(x, z)
+            .filter(|&(lx, lz)| self.tile_free(lx, lz));
         NEIGHBOURS
             .into_iter()
             .map(move |(dx, dz)| (x + dx, z + dz))
@@ -336,13 +412,15 @@ impl NavGrid<'_> {
     }
 
     /// `line_walkable`, and with `grounds`, the line keeps off other people's plots, except
-    /// the one either end is on (someone already in a garden walks straight out of it).
+    /// the one either end is on (someone already in a garden walks straight out of it), and
+    /// never goes straight from one plot into another (a path that had to keeps that step).
     pub fn line_walkable_with(&self, a: [f32; 2], b: [f32; 2], grounds: Option<&Grounds>) -> bool {
         let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
         let steps = ((dx.abs().max(dz.abs())) / 0.1).ceil().max(1.0) as i32;
         let (mut tx, mut tz) = (a[0].floor() as i32, a[1].floor() as i32);
         let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
-        let ends = grounds.map(|g| [tile(a), tile(b)].map(|(x, z)| g.foreign(self, x, z)));
+        // (The plots the ends are on: crossing them is never trespassing.)
+        let ends = grounds.map(|g| [tile(a), tile(b)].map(|(x, z)| g.plot(self, x, z)));
         for s in 1..=steps {
             let t = s as f32 / steps as f32;
             let (nx, nz) = (
@@ -353,11 +431,12 @@ impl NavGrid<'_> {
                 if (nx - tx).abs() > 1 || (nz - tz).abs() > 1 || !self.can_step(tx, tz, nx, nz) {
                     return false;
                 }
-                if let (Some(g), Some(ends)) = (grounds, ends)
-                    && let Some(p) = g.foreign(self, nx, nz)
-                    && !ends.contains(&Some(p))
-                {
-                    return false;
+                if let (Some(g), Some(ends)) = (grounds, ends) {
+                    let (from, to) = (g.plot(self, tx, tz), g.plot(self, nx, nz));
+                    let trespass = g.foreign(to) && !ends.contains(&to);
+                    if trespass || g.over_the_fence(from, to) {
+                        return false;
+                    }
                 }
                 (tx, tz) = (nx, nz);
             }
@@ -430,12 +509,14 @@ impl Reach {
     /// search itself decides, as before. A walker standing where something now stands (a wall
     /// built over them) counts as able to reach the region of any tile they can step onto.
     pub fn reaches(&self, nav: &NavGrid, a: (i32, i32), b: (i32, i32)) -> bool {
-        let Some(to) = self.of(nav.lot, b) else { return true };
+        let Some(to) = self.of(nav.lot, b) else {
+            return true;
+        };
         match self.of(nav.lot, a) {
             Some(from) => from == to,
-            None if nav.lot.in_bounds(a.0, a.1) => {
-                nav.neighbours(a.0, a.1).any(|n| self.of(nav.lot, n) == Some(to))
-            }
+            None if nav.lot.in_bounds(a.0, a.1) => nav
+                .neighbours(a.0, a.1)
+                .any(|n| self.of(nav.lot, n) == Some(to)),
             None => true,
         }
     }
@@ -456,7 +537,12 @@ impl Scratch {
     /// Gets ready for a search over `tiles` tiles; returns its stamp.
     fn start(&mut self, tiles: usize) -> u32 {
         if self.g.len() != tiles {
-            *self = Self { g: vec![0; tiles], came: vec![0; tiles], stamp: vec![0; tiles], ..Self::default() };
+            *self = Self {
+                g: vec![0; tiles],
+                came: vec![0; tiles],
+                stamp: vec![0; tiles],
+                ..Self::default()
+            };
         }
         self.search = self.search.wrapping_add(1);
         if self.search == 0 {
@@ -760,7 +846,9 @@ mod tests {
     fn three_gardens(walls: &str) -> (Lot, Vec<Option<u32>>) {
         let json = format!(r#"{{"width":30,"depth":14,"walls":[{walls}]}}"#);
         let lot = Lot::from_file(&serde_json::from_str::<LotFile>(&json).unwrap()).unwrap();
-        let tile_plot = (0..30 * 14).map(|i| (i / 30 < 10).then_some((i % 30 / 10) as u32)).collect();
+        let tile_plot = (0..30 * 14)
+            .map(|i| (i / 30 < 10).then_some((i % 30 / 10) as u32))
+            .collect();
         (lot, tile_plot)
     }
 
@@ -772,28 +860,101 @@ mod tests {
     fn residents_go_round_by_the_street_not_through_the_neighbours_garden() {
         let (lot, tile_plot) = three_gardens("");
         let blocked = nav_of(&lot);
-        let nav = NavGrid { lot: &lot, blocked: &blocked, stairs: &NO_STAIRS };
+        let nav = NavGrid {
+            lot: &lot,
+            blocked: &blocked,
+            stairs: &NO_STAIRS,
+        };
         // Without plots to mind, straight across the middle garden.
         let direct = nav.find_path((5, 8), (25, 8)).unwrap();
         assert!(direct.iter().any(|&t| in_middle_garden(t)), "{direct:?}");
         // From the front of the first to the front of the third: the middle one isn't theirs.
-        let grounds = Grounds { tile_plot: &tile_plot, open: vec![true, false, true] };
+        let grounds = Grounds {
+            tile_plot: &tile_plot,
+            open: vec![true, false, true],
+            fenced: vec![true; 3],
+        };
         let path = nav.find_path_with((5, 8), (25, 8), Some(&grounds)).unwrap();
         assert_walkable(&nav, &path);
-        assert!(!path.iter().any(|&t| in_middle_garden(t)), "through the neighbours' garden: {path:?}");
-        assert!(path.iter().any(|&(_, z)| z >= 10), "by the street: {path:?}");
+        assert!(
+            !path.iter().any(|&t| in_middle_garden(t)),
+            "through the neighbours' garden: {path:?}"
+        );
+        assert!(
+            path.iter().any(|&(_, z)| z >= 10),
+            "by the street: {path:?}"
+        );
         // The smoothed line doesn't cut back across it either.
         let smooth = nav.smooth_with(&path, Some(&grounds));
         for w in smooth.windows(2) {
             assert!(nav.line_walkable_with(w[0], w[1], Some(&grounds)), "{w:?}");
             for k in 0..=100 {
                 let t = k as f32 / 100.0;
-                let p = [w[0][0] + (w[1][0] - w[0][0]) * t, w[0][1] + (w[1][1] - w[0][1]) * t];
-                assert!(!in_middle_garden((p[0].floor() as i32, p[1].floor() as i32)), "smoothed across at {p:?}");
+                let p = [
+                    w[0][0] + (w[1][0] - w[0][0]) * t,
+                    w[0][1] + (w[1][1] - w[0][1]) * t,
+                ];
+                assert!(
+                    !in_middle_garden((p[0].floor() as i32, p[1].floor() as i32)),
+                    "smoothed across at {p:?}"
+                );
             }
         }
         assert!(!nav.line_walkable_with([5.5, 8.5], [25.5, 8.5], Some(&grounds)));
-        assert!(nav.line_walkable([5.5, 8.5], [25.5, 8.5]), "only the plots stand in the way");
+        assert!(
+            nav.line_walkable([5.5, 8.5], [25.5, 8.5]),
+            "only the plots stand in the way"
+        );
+    }
+
+    #[test]
+    fn into_the_garden_next_door_by_the_street_not_over_the_hedge() {
+        let (lot, tile_plot) = three_gardens("");
+        let blocked = nav_of(&lot);
+        let nav = NavGrid {
+            lot: &lot,
+            blocked: &blocked,
+            stairs: &NO_STAIRS,
+        };
+        // From their own garden to the neighbours' (both open to them: they're going there), the
+        // two side by side: out at the front, along the street and in at the neighbours' front.
+        let grounds = Grounds {
+            tile_plot: &tile_plot,
+            open: vec![true, true, false],
+            fenced: vec![true; 3],
+        };
+        let path = nav.find_path_with((8, 3), (12, 3), Some(&grounds)).unwrap();
+        assert_walkable(&nav, &path);
+        assert!(
+            path.windows(2)
+                .all(|w| (w[0].0 < 10) == (w[1].0 < 10) || w[0].1 >= 10),
+            "over the boundary between the gardens: {path:?}"
+        );
+        assert!(
+            path.iter().any(|&(_, z)| z >= 10),
+            "by the street: {path:?}"
+        );
+        let smooth = nav.smooth_with(&path, Some(&grounds));
+        for w in smooth.windows(2) {
+            assert!(nav.line_walkable_with(w[0], w[1], Some(&grounds)), "{w:?}");
+        }
+        assert!(
+            !nav.line_walkable_with([8.5, 3.5], [12.5, 3.5], Some(&grounds)),
+            "no straight line over it"
+        );
+        // Between plots nobody fences (public places side by side), straight across.
+        let grounds = Grounds {
+            tile_plot: &tile_plot,
+            open: vec![true; 3],
+            fenced: vec![false; 3],
+        };
+        assert_eq!(
+            nav.find_path_with((8, 3), (12, 3), Some(&grounds))
+                .unwrap()
+                .len(),
+            5
+        );
+        assert!(nav.line_walkable_with([8.5, 3.5], [12.5, 3.5], Some(&grounds)));
     }
 
     #[test]
@@ -801,17 +962,37 @@ mod tests {
         // The street is closed off in front of the middle garden.
         let (lot, tile_plot) = three_gardens("[10,10,10,14],[20,10,20,14]");
         let blocked = nav_of(&lot);
-        let nav = NavGrid { lot: &lot, blocked: &blocked, stairs: &NO_STAIRS };
-        let grounds = Grounds { tile_plot: &tile_plot, open: vec![true, false, true] };
-        let path = nav.find_path_with((5, 12), (25, 12), Some(&grounds)).expect("through the garden");
+        let nav = NavGrid {
+            lot: &lot,
+            blocked: &blocked,
+            stairs: &NO_STAIRS,
+        };
+        let grounds = Grounds {
+            tile_plot: &tile_plot,
+            open: vec![true, false, true],
+            fenced: vec![true; 3],
+        };
+        let path = nav
+            .find_path_with((5, 12), (25, 12), Some(&grounds))
+            .expect("through the garden");
         assert_walkable(&nav, &path);
         assert!(path.iter().any(|&t| in_middle_garden(t)));
         // Someone standing in a garden they shouldn't be in can still get out of it, the
         // shortest way (not across the gardens either side).
-        let grounds = Grounds { tile_plot: &tile_plot, open: vec![false; 3] };
-        let out = nav.find_path_with((15, 2), (15, 12), Some(&grounds)).expect("out to the street");
+        let grounds = Grounds {
+            tile_plot: &tile_plot,
+            open: vec![false; 3],
+            fenced: vec![true; 3],
+        };
+        let out = nav
+            .find_path_with((15, 2), (15, 12), Some(&grounds))
+            .expect("out to the street");
         assert_eq!(out.len(), 11, "straight down: {out:?}");
-        assert_eq!(nav.smooth_with(&out, Some(&grounds)).len(), 2, "in one straight line");
+        assert_eq!(
+            nav.smooth_with(&out, Some(&grounds)).len(),
+            2,
+            "in one straight line"
+        );
     }
 
     #[test]
@@ -822,10 +1003,21 @@ mod tests {
         let mut tall = lot_with_wall();
         tall.grow_depth(30);
         let (bs, bt) = (nav_of(&small), nav_of(&tall));
-        let flat = NavGrid { lot: &small, blocked: &bs, stairs: &NO_STAIRS };
-        let up = NavGrid { lot: &tall, blocked: &bt, stairs: &NO_STAIRS };
+        let flat = NavGrid {
+            lot: &small,
+            blocked: &bs,
+            stairs: &NO_STAIRS,
+        };
+        let up = NavGrid {
+            lot: &tall,
+            blocked: &bt,
+            stairs: &NO_STAIRS,
+        };
         let first = flat.find_path((2, 2), (7, 2)).unwrap();
-        assert!(up.find_path((2, 22), (7, 22)).is_some(), "rows on the third storey are searched");
+        assert!(
+            up.find_path((2, 22), (7, 22)).is_some(),
+            "rows on the third storey are searched"
+        );
         assert_eq!(flat.find_path((2, 2), (7, 2)).unwrap(), first);
     }
 }

@@ -399,7 +399,10 @@
       "motions": {
         "uses": {
           "espresso": "brew",
-          "pour": "brew"
+          "pour": {
+            "clip": "brew",
+            "delay": 1.0
+          }
         },
         "hold": 2.0
       },
