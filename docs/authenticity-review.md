@@ -665,16 +665,31 @@ Also from the plan: S1 is fixed now unless the owner says otherwise (§7.2).
 From the coordinator's notes and each wave's `review-log.md`, deduplicated; the fixed ones are left out.
 
 **`cargo review sizes` (T3, `crates/tools/src/review.rs`)**
-- It measures the wrong face at some kinds:
-  - basins: the drain or the slab's underside, so the vessel basins' 1.00 m rims were missed (M-bathroom-02);
-  - toilets: the closed lid;
-  - the kettle grill: a point under the grate;
-  - the pool table: the cloth, not the rail.
-  It wants the top up-facing rim of a basin kind, and the uses' open clips played.
-- Its sizes include things that aren't the object's: the dresser's picture, the dressing table's stool, the climbing frame's flag, the desks' built-in chairs, the toy box's blocks, the yoga mat rolled up.
-- Wrong kinds or ranges in `reference.json`: the seesaw's W and D swapped; the bakery case measured as a counter; `recoveryPod`, `quietPod` and `spinBike`; the WC range has no boxed-in cistern.
-- No stool line for counter stools, so the chef's island stools (M-packs-04) weren't flagged.
-- "No top to measure" where content has no `surface` (the workbench, the chess table).
+- ~~It measures the wrong face at some kinds: the kettle grill's coals instead of its grate; the closed lid of
+  `toiletClassic`; the bakery case's display deck read as a counter's top.~~ The grill and the case were
+  content/kind gaps, not the probe's: the grill's grate is a `surface` in its content now (0.77 m, measured
+  at the grate), and a display case has its own kind (`displayCase`, deck 70–85 cm) since a case's deck sits
+  below a counter's worktop. The toilet's 0.47 m is the closed lid's top — inside 0.40–0.485 by 1.5 cm, so
+  nothing warns; the seat itself is 0.44 (`lid_up` lifts the lid before anyone sits, `docs/review/bathroom.md:51`).
+  Still open: the top is the highest up-face near the middle that doesn't stand on another, so a face over
+  open air wins — `marketStall`'s canopy (2.04 m) and `crib`'s rail (1.01 m) read "no top to measure", and a
+  vessel basin's rim is still not the face it takes (its worktop 0.78 m is in range, so nothing warns).
+- ~~Wrong kinds or ranges in `reference.json`: the seesaw's W and D swapped; the bakery case measured as a
+  counter; `recoveryPod`, `quietPod` and `spinBike`; the WC range has no boxed-in cistern.~~ Fixed
+  2026-10-31: `seesaw` and `pingPongTable` have their long axis in `w` (as `poolTable` and `foosball`
+  already did), `chessTable` allows a 0.45 m depth (a seat at each end of its length) and `recoveryLounger`
+  0.75 m (a pod is sat in), `bakeryCase` has `displayCase`; `energetic.spinBike` and `energetic.recoveryPod`
+  had no seat at all in `characters/furniture.json`, so neither was in the gate (the spin bike was absent
+  from the table entirely) — both have one now (0.44 / 0.49 m, in their kinds' ranges). Still open: the WC
+  range has no boxed-in cistern (`toiletSmart` H 1.20, `toiletWallHung` 1.10, their roll arms 0.59–0.60 W).
+- ~~No stool line for counter stools, so the chef's island stools (M-packs-04) weren't flagged.~~ A seat line
+  exists (`kinds.counterStool` 58–71 cm) and the island's 0.65 m seat is measured; `barStool`'s 0.734 m is
+  2.4 cm over the line — a real small out, recorded, not changed.
+- ~~"No top to measure" where content has no `surface` (the workbench, the chess table).~~ The chess table
+  reads 0.74 m now; a `surface` is only needed where the model's top is not the middle's highest face (see
+  the grill above).
+- Its sizes still include things that aren't the object's: the dresser's picture, the dressing table's stool,
+  the climbing frame's flag, the desks' built-in chairs, the toy box's blocks, the yoga mat rolled up.
 
 **`cargo check-glb` heights (T1, T2)**
 - ~~It probes one point, so a gap between slats, planks or cushions gives a false warning.~~ Fixed 2026-10-31:

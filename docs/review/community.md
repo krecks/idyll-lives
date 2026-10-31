@@ -26,7 +26,7 @@ Family: `tools/art/blender/families/playground.py`.
 Notes:
 - `slide`: deck 1.40 m, chute run-out 0.28 m, 0.75 × 2.36 × 1.93 m (D 3 % under 2.0, inside ±10 %).
 - `climbingFrame`: the sizes table's H 3.45 m is the flag on its pole (`playground.py:238`); the roof's ridge is 2.74 m and the deck 1.1 m, inside the range. A tool artefact, no finding.
-- `seesaw`: the sizes table's W 2.50 > 0.66 and D 0.42 < 2.16 are the plank built along the object's width, the reference along its depth: an artefact. The seats are at 0.56 m (40–75 cm), the handles inboard of them (`playground.py:285-290`), the plank rocks ±12° and carries both riders (`ride`).
+- `seesaw`: the plank is built along the object's width (2.50 m) and the reference had it along its depth; the reference was swapped to match on 2026-10-31 (`w` 2.4–4, `d` 0.3–0.6), so it reads in range. The seats are at 0.56 m (40–75 cm), the handles inboard of them (`playground.py:285-290`), the plank rocks ±12° and carries both riders (`ride`).
 - `parkChessTable`: top 0.76 m (70–76 cm), stools 0.47 m (42–48 cm), both inside; the board and pieces read from Live. The two stools stand side by side behind the table (I-community-02), against the content's own "a stool either side" (`community.json:629`).
 
 ### Real uses against the content's (I1)
@@ -122,7 +122,7 @@ Family: `tools/art/blender/families/shops.py`.
 | `cafeChair` Café chair | OK | OK | I-community-09, I-held-01 | I-community-09 S2 code; I-held-01 S2 code (held ledger: no cup, cake or plate) | `community/sheets/obj-cafeChair.png`, `community/extra/cafe/cafe-cafeChair-coffee-01.png`, `community/extra/cafe/cafe-cafeChair-cake-01.png` |
 
 Notes:
-- `shopCounter`: top 0.97 m (90–110 cm). `bakeryCase`: the sizes table's "top 0.78 < 0.90" is the display deck behind the glass, where a real case keeps its trays; the case is 1.29 m high, a counter's height. Measured against a counter's range (kind `shopCounter`), a tool artefact.
+- `shopCounter`: top 0.97 m (90–110 cm). `bakeryCase`: its 0.78 m "top" is the display deck behind the glass, where a real case keeps its trays; the case is 1.29 m high, a counter's height. It has its own kind since 2026-10-31 (`displayCase`, deck 70–85 cm), so the deck reads in range instead of being measured against a counter's worktop.
 - `cafeTable` 0.75 m and `cafeChair` 0.47 m agree with the content (0.745, 0.47) and are in range (71–76, 42–48 cm).
 - Lead (café chair coffee needs a table and a coffee source): on `review-stage` with a café table in front, sit, coffee and cake are all taken (`extra/cafe/`, the stage's kitchen has a coffee machine); on the park plot of `shops-town` coffee is refused for want of one, as the content says. The café lot in `houses.json:1126` has its machine. Working as designed; what it looks like is I-community-09 and I-held-01.
 
@@ -195,7 +195,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Where:** `tools/art/blender/families/playground.py:438-441` (`pingPongTable`: `top = 0.78`, the top 1.9 × 0.94 m); `web/public/content/community.json:576` (footprint 2 × 1)
 - **Evidence:** `tables/sizes-community.md`: 1.90 × 0.95 × 0.99 m against a table tennis table's 2.74 × 0.76 × 1.525 m (ITTF; `reference.json` `pingPongTable` 1.5–1.6 × 2.7–2.8 m): 69 % of the length, 62 % of the width, well outside ±10 %, and the top 2 cm over the fixed 0.76 m. `sheets/obj-pingPongTable.png`: beside the adult it is a dining table with a net. A full table needs a 3 × 2 footprint (with its ends clear for the players, I-community-02).
 - **Status:** fixed (57bf91a8)
-- **After:** the ITTF's table: a 2.74 × 1.525 m top at 0.76 m, the net 15.25 cm high reaching 15.25 cm past each side, on 3 × 2 tiles (content `footprint`), the players at its two ends (`places` ±1.8 m). `fixes/blender-outdoor/gallery/gallery-pingPongTable.png` (beside the residents), `poses/poses-seats-*-pingPongTable_pingPong.png`. `cargo review sizes` still flags its W and D: the reference has the length along the depth, the model across, as the seesaw's (an artefact). The park lot's table at (17, 17) fits (sim tests).
+- **After:** the ITTF's table: a 2.74 × 1.525 m top at 0.76 m, the net 15.25 cm high reaching 15.25 cm past each side, on 3 × 2 tiles (content `footprint`), the players at its two ends (`places` ±1.8 m). `fixes/blender-outdoor/gallery/gallery-pingPongTable.png` (beside the residents), `poses/poses-seats-*-pingPongTable_pingPong.png`. `cargo review sizes` flagged its W and D because the reference had the length along the depth, as the seesaw's did; both were swapped on 2026-10-31, so only its depth (1.83 m, the frame's splay) is out now. The park lot's table at (17, 17) fits (sim tests).
 - **Source:** community wave (sizes table, gallery)
 
 ### M-community-02 — The basketball rim is 11 cm low and the backboard small
@@ -231,7 +231,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
   - `farm.tractor` W 1.98 > 1.76 m (a compact tractor, 1.0–1.6 m wide): the model is a utility tractor, right in its own scale beside residents (`sheets/obj-farm.tractor.png`), called "Little tractor". A decision as much as a model change: a narrower compact, or a utility tractor in the name and the reference.
   - `parkBench` W 2.86 > 2.75 m (1.8–2.5 m): three seats a metre apart on its three tiles.
   - `busStop` D 0.98 < 1.08 m (1.2–1.8 m): the bench fills the shelter's depth.
-  The climbing frame's H (3.45 m, the flag) and the seesaw's W and D (the plank along the width) are tool artefacts, not in this finding.
+  The climbing frame's H (3.45 m, the flag) is a tool artefact, and the seesaw's W and D were the reference's (swapped 2026-10-31), not in this finding.
 - **Status:** fixed (f3e747a1)
 - **After:** the round bale is 1.2 m across and 1.2 m long (chest-high on an adult), on 2 × 2 tiles (`town.ts` `farmstead` places it on the fallow field by its footprint); the little tractor is a compact one, 1.62 m over its rear fenders (the name kept); the long park bench is 2.5 m on its three tiles; the bus shelter is 1.2 m deep, its bench at the back (`seat.forward` -0.3, the timetable reader stepping in to 0.05). `fixes/blender-outdoor/gallery/gallery-{farm.hayBale,farm.tractor,parkBench,busStop}.png`, `poses/poses-seats-*-{parkBench,busStop_wait}.png`; `cargo review sizes`: all four in range.
 - **Source:** community wave (sizes table, gallery)

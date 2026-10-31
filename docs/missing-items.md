@@ -143,8 +143,9 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
   (idle 22:02: no light; cooking 22:34: the wall, the hob and the floor under the hood lit) and
   `hood-day-final` (cooking 10:40: the wall under the hood lit by day too).
 
-- `cargo review sizes` measures the wrong face (basin drain/underside, closed toilet lid, kettle grate,
-  pool cloth) and includes non-object geometry.
+- `cargo review sizes` takes the highest up-face near the middle that doesn't stand on another, so a canopy
+  or a rail over open air wins (`marketStall`, `crib` read "no top to measure") and a vessel basin's rim is
+  not the face it takes; its sizes also include non-object geometry.
 - `check.mjs play`: no whole-recipe following (it records clips only on the object used, not on the
   helpers a recipe walks to), no `--views` (one camera per run; `--top` since 2026-10-30); needs carry
   over between uses. (`--use ripe` and the crop stage in the record came 2026-10-31.)
@@ -152,6 +153,28 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
 - CI runs clips, the GLB gate, `cargo check-glb` (since 2026-10-31) and, since 2026-10-30,
   `review sizes` (a content object no kind covers fails); still not `review uses` (it always exits 0) or
   the browser checks.
+
+**Done 2026-10-31 (`review sizes`: the faces it measured, and the kinds that were wrong):**
+
+- The grill and the bakery case were not the probe's fault. The kettle grill's grate is a `surface` in its
+  content now (0.77 m, `web/public/content/furniture.json`), so `cargo review sizes` reads the grate (0.77)
+  instead of the coals under it (0.69); a display case has its own kind, `displayCase` (deck 70–85 cm), since
+  a case's deck sits below a shop counter's 90–110 cm worktop (`bakeryCase` 0.78, was "out").
+- Five rows of `docs/review/reference.json` were the wrong way round or too narrow, and each showed up as an
+  "out" that no model change could fix: `seesaw` and `pingPongTable` keep their long axis in `w` (as
+  `poolTable` and `foosball` already did), `chessTable` allows a 0.45 m depth (its seats are at the two ends
+  of its length), `recoveryLounger` a 0.75 m depth (a pod is sat in, not stretched out on).
+- `energetic.spinBike` and `energetic.recoveryPod` had no seat in `web/src/render/shared/characters/
+  furniture.json`, so neither was in the gate at all — the spin bike never appeared in the table, the
+  recovery pod read "no seat to measure". Both have one now (0.44 / 0.49 m, inside their kinds' ranges), and
+  a resident on either sits at the right height.
+- 125 out rows → 119, and the six that went were all the ones above. What is left is real or recorded: the
+  closed lid of `toiletClassic` (0.47 m, inside the range by 1.5 cm), `barStool` 2.4 cm over, `highChair`
+  5 mm over, `natureLover.pottingBench` 3 cm, `pingPongTable` 7 cm deep (the frame's splay), `climbingFrame`
+  3.45 m tall, the WC's boxed cistern, and the "no top to measure" cases where a canopy or a rail hangs over
+  open air (`marketStall`, `crib`) — the probe's remaining blind spot, filed here.
+- The review ledgers' own notes said as much (`docs/review/community.md:29`, `:125`, `:198`: "an artefact"),
+  so this was the reference catching up with them, not a new measurement.
 
 **Done 2026-10-31 (`review uses`: the odd sound, and what the decor list silences):**
 
