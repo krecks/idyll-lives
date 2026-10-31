@@ -93,9 +93,25 @@ bed is missing a real use any more.
 
 | Item | Why it is open |
 |---|---|
-| Sounds by ear (G-53) | All 34 were checked by spectrum, timing and level, never listened to |
-| Low on WebGL2 orbits | 11–16 % over Babylon's GPU time (0.4–0.6 ms; budget 10 %), about noise level |
-| `lampFloorArc` overhang | Fixed in 0.5.0; the lamp build check still only checks light height, not `at` |
+| Sounds by ear (G-53) | All 45 were checked by spectrum, timing and level, never listened to. `bun run sounds` now writes every one to a WAV at the level the game plays it, with its content and numbers (`tools/audio/listen.ts`) — the listening itself is the reviewer's |
+| Low on WebGL2 orbits | 11–16 % over Babylon's GPU time (0.4–0.6 ms; budget 10 %), about noise level; a headless run's GPU time is SwiftShader's, so this needs a real GPU |
+
+**Done 2026-10-31 (`lampFloorArc`'s `at` check):** the lamp build does check `light.at`, not only the bulb's
+height: `tools/art/blender/families/lighting.py` `_check_at` (called from `_m` for every lighting model,
+the bulb's faces in its material against the content's `light.at` within `AT_TOLERANCE`) — and the arc
+lamp passes it: `cargo art lighting --only lampFloorArc` → `ok model.lampFloorArc … 0.61 x 2.05 x 1.61 m`,
+1 model, 0 failed. The line that said otherwise was left over from before 2026-10-26.
+
+**Done 2026-10-31 (`bun run sounds`: every sound to a WAV, at the level the game plays it):**
+`tools/audio/listen.ts` (also `web/package.json`'s `sounds`) renders all 45 synthesised sounds to
+`bench-results/sounds/<kind>.wav` with `index.md`: its length, whether it loops or is played once, the
+mixer's level, peak and RMS at that level (dBFS), its spectral centroid, and the objects and uses of the
+content that sound it (a dash: no content names it — it comes from the animation's tag). The levels come
+from `world.ts`'s `LOOPS` and `ONCE_LEVEL` read as `web/tests/sounds.test.ts` reads them, so one sound
+against another sounds as it does in the game; the peaks land in the ledger's range (-18.0 to -11.3 dBFS,
+0.13–0.27 linear). Nothing was changed by it — it is the ear's part made a five-minute listen instead of an
+afternoon's. Two to hear first, from the numbers: `smash` (crockery smashed in a bin) sits at a 454 Hz
+centroid, low for shards, and `tools` at 217 Hz (hammer and saw thuds, as expected).
 
 **Done 2026-10-30:** `curtainsWide` checked in play on the stage's two-wide window: closed over both edges at
 22:00, stacked at each end by day at 10:00, WebGPU and WebGL2. Its "In play" line is in
