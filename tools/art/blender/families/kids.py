@@ -705,11 +705,13 @@ def toyBox():
                   bevel=0.003, bevel_segments=1)
         F.extrude(f'shape{k}', outline, 0.012, (x, 0.24, 0.074), m, bevel=0.003, bevel_segments=1)
     _toys_inside(0.46, z)
-    # blocks left out on the floor in front
-    _block('floor_block0', 0.32, 0.0, 0.25, 0.1, M.toy_green, M.toy_yellow)
-    _block('floor_block1', 0.2, 0.0, 0.3, 0.1, M.toy_red, M.paper, turn=30)
-    _block('floor_block2', 0.27, 0.1, 0.27, 0.1, M.toy_blue, M.toy_yellow, turn=12)
     _still('body')
+    # blocks left out on the floor in front: drawn with the toy box, not part of its size (the box is 0.5 m deep)
+    with G.new_parts() as carried:
+        _block('floor_block0', 0.32, 0.0, 0.25, 0.1, M.toy_green, M.toy_yellow)
+        _block('floor_block1', 0.2, 0.0, 0.3, 0.1, M.toy_red, M.paper, turn=30)
+        _block('floor_block2', 0.27, 0.1, 0.27, 0.1, M.toy_blue, M.toy_yellow, turn=12)
+    G.aside(carried, 'blocks')
     with G.new_parts() as parts:
         # the lid: a rounded board, a finger notch in its front edge, a piano hinge along its back
         notch = [(0.05 - 0.1 * i / 8, 0.25 - 0.022 * math.sin(math.pi * i / 8)) for i in range(9)]
@@ -1704,7 +1706,8 @@ FAMILY = G.Family(
                 motions={'uses': {'sit': {'clip': 'tray_out', 'hold': 1.0, 'out': 1.2}}},
                 paint=[('chair_white', 'Frame'), ('chair_cushion', 'Bedding')]),
         # KD2
-        G.Model('toyBox', toyBox, size=(0.82, 0.51, 0.802), key='model.toyBox', centre=(0.0, -0.0389),
+        # its own size: the blocks left out in front of it are drawn with it, not measured (the box is 0.5 m deep)
+        G.Model('toyBox', toyBox, size=(0.82, 0.51, 0.518), key='model.toyBox', centre=(0.0, -0.0389),
                 motions=LID, paint=[('toybox', 'Body'), ('toybox_lid', 'Lid')]),
         G.Model('toyChest', toyChest, size=(0.846, 0.534, 0.513), key='model.toyChest', centre=(0.0, -0.1735),
                 motions=LID, paint=[('chest', 'Body'), ('chest_trim', 'Trim')]),

@@ -77,6 +77,18 @@ The rest of §9.2 of the authenticity review (chess table for two, low apples, f
 overhang, washing line piece by piece, high-chair tray, kettle/bread-bin/laptop lid clips, bakery-case
 door) shipped in 0.5.0 — see open.md, "Fixed in 0.5.0".
 
+**Done 2026-10-31 (a model's own size):** what a model only carries is drawn but no longer counted in its
+size. `G.aside(parts, name)` (`tools/art/blender/gamekit/parts.py`) joins those parts into one node named
+`<name>_aside`; `G.Model(size=…)` measures the rest (`gamekit.parts.own`), and so does `cargo check-glb`
+(`model()` skips `*_aside` nodes, `crates/tools/src/checkglb.rs`). Seven families rebuilt: the dressing
+table's pouf out in front (depth 0.858 → 0.418 m), the chest of drawers' picture, vase and jewellery box
+(height 1.349 → 0.89 m), the toy box's blocks (depth 0.802 → 0.518 m), the yoga mat's block and bottle
+(0.919 × 0.233 × 0.27 → 0.623 × 0.132 × 0.132 m), the three desks' chairs (height 1.215/1.114/1.009 →
+0.752/0.752/0.773 m) and the climbing frame's flag (height 3.45 → 2.808 m). The content's heights follow the
+furniture itself (the dresser's `surface.height` stays 0.89 m). Test: `cargo check-glb`'s unit test
+`what_a_model_carries_is_drawn_but_not_its_size`; `cargo check-glb` 629 models, 0 failed; `cargo test -p
+ll-tools --release` passes. Docs: `docs/design/objects.md` ("Scale, axes, origin and footprint").
+
 ## 3. Behaviours not in the game yet
 
 | Item | What is missing | Source | Effort |

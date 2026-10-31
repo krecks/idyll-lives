@@ -80,6 +80,12 @@ gate below, so the review does.
   lantern's hexagon 15 % wider than deep and squashed the boulders to 75 % of their depth and 120 % of
   their height, until the garden decor was rebuilt at real size (2026-10-14). It, and the manifest's
   `fit`, are for third-party files only.
+- **What a model carries is drawn, not its size.** A desk's chair, the picture, vase and jewellery box on a
+  chest of drawers, the blocks in front of a toy box, the flag on a climbing frame and the block and bottle
+  beside a rolled mat are drawn with the model but stand outside the piece's own box: `G.aside(parts, name)`
+  joins them into one node named `<name>_aside`, `G.Model(size=…)` measures the rest (`gamekit.parts.own`),
+  and so does `cargo check-glb` (`model()` skips those nodes). The content's heights follow the furniture
+  itself: the dresser's `surface.height` is the chest's top, 0.89 m, not the picture's 1.35.
 - **Heights the content names** come from the model: `seat.height`, `surface.height` and its
   rectangle (`size`, `at`), `light.height`, and `slots` spread across the width (or each slot's `places`). Mark them in
   Blender with empties named `top`, `seat`, `seat.1` …, `light` (not exported), and have the

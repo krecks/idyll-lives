@@ -348,8 +348,9 @@ def _spiral(r0, r1, turns, width, n=40):
 
 def yogaMat():
     F = G.GameFrame()
-    with G.new_parts() as still:
-        # a foam block, its edges soft, and a bottle with a loop on its cap
+    # a foam block, its edges soft, and a bottle with a loop on its cap: drawn beside the mat, not part of
+    # its size (the mat is 0.61 m wide rolled; the block stands 0.41 m out to the side)
+    with G.new_parts() as carried:
         F.soft('block', 0.15, 0.12, 0.24, (0.41, 0.06, BACK + 0.15), M.block, round=0.02, round_segments=2)
         G.revolve('bottle', [(0, 0), (0.03, 0), (0.035, 0.008), (0.035, 0.16), (0.03, 0.18), (0.02, 0.19), (0.02, 0.2),
                              (0, 0.2)], at=F.at(-0.4, 0.0, BACK + 0.13), material=M.bottle, segments=14)
@@ -357,7 +358,7 @@ def yogaMat():
         F.cyl('bottle_cap', 0.022, 0.035, (-0.4, 0.2125, BACK + 0.13), M.dark, verts=12, bevel=0.004, bevel_segments=1)
         G.torus('bottle_loop', 0.012, 0.0025, at=F.at(-0.4, 0.2305, BACK + 0.13 - 0.018), material=M.dark,
                 major_segments=10, minor_segments=4)
-    G.join(still, 'body', origin=(0, 0, 0))
+    G.aside(carried, 'beside')
     # The roll lies at the back, its origin on the floor under its axis: it shrinks onto the floor as it goes. Its
     # ends show the mat's spiral; two straps round it.
     roll_z = BACK + ROLL_R
@@ -464,7 +465,8 @@ FAMILY = G.Family(
              motions={'uses': {'lift': {'clip': 'bar_off', 'delay': BAR_DELAY}}}, paint=[('frame', 'Frame'), ('pads', 'Pads')]),
      G.Model('exerciseBike', exerciseBike, size=(0.53, 1.107, 0.9), centre=(0, 0.02), key='model.exerciseBike',
              motions={'loops': {'cycle': 'pedals_turn'}}, paint=FRAME_PADS),
-     G.Model('yogaMat', yogaMat, size=(0.919, 0.233, 0.27), key='model.yogaMat', centre=(0.025, BACK + 0.135),
+     # its own size, rolled up as it stands: the block and bottle beside it are drawn, not measured
+     G.Model('yogaMat', yogaMat, size=(0.623, 0.132, 0.132), key='model.yogaMat', centre=(0.025, BACK + 0.135),
              motions={'uses': {'yoga': 'unroll'}}, paint=[('mat', 'Mat')]),
      G.Model('dumbbells', dumbbells, size=(0.77, 0.717, 0.93), key='model.dumbbells', centre=(0, 0.035),
              motions={'uses': {'lift': 'pair_off'}}, paint=[('frame', 'Rack'), ('plate', 'Weights')])],

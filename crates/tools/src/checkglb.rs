@@ -1581,15 +1581,39 @@ type Bounds = ([Num; 3], [Num; 3]);
 /// Each moving part's bounds (None: the still body), in the order they're met.
 type PartBounds = Vec<(Option<usize>, Bounds)>;
 
+/// A model's nodes drawn but not part of its own size (`gamekit.parts.ASIDE`): a desk's chair, a chest of
+/// drawers' picture, the blocks left out in front of a toy box, the flag on a climbing frame, the block and
+/// bottle beside a rolled mat. The game draws them; `model()` leaves them out of the size it measures.
+pub const ASIDE: &str = "_aside";
+
+/// The nodes of the file named as `aside` (their names end with `ASIDE`).
+fn aside_nodes(gltf: &J) -> HashSet<usize> {
+    gltf.get("nodes")
+        .and_then(J::list)
+        .unwrap_or(&[])
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| {
+            n.get("name")
+                .map(J::key)
+                .is_some_and(|name| name.ends_with(ASIDE))
+        })
+        .map(|(i, _)| i)
+        .collect()
+}
+
 /// The file's bounds in game axes (glTF x -> game -x, as `render/pc/models.ts` bakes a file), from
 /// each primitive's box through its node, and each moving part's (None: the still body), in the order
-/// they're met.
-fn bounds(gltf: &J, pose: &Pose) -> R<(Bounds, PartBounds)> {
+/// they're met; the nodes in `skip` left out.
+fn bounds(gltf: &J, pose: &Pose, skip: &HashSet<usize>) -> R<(Bounds, PartBounds)> {
     let accessors = gltf.get("accessors").cloned().unwrap_or(J::Arr(Vec::new()));
     let (inf, ninf) = (Num::F(f64::INFINITY), Num::F(f64::NEG_INFINITY));
     let (mut lo, mut hi) = ([inf; 3], [ninf; 3]);
     let mut parts: PartBounds = Vec::new();
     for p in node_matrices(gltf, Some(pose), None)? {
+        if skip.contains(&p.node) {
+            continue;
+        }
         let at = match parts.iter().position(|(part, _)| *part == p.part) {
             Some(at) => at,
             None => {
@@ -3269,7 +3293,7 @@ fn check_file(
         &g,
         &[motions.opt("open").cloned(), motions.opt("night").cloned()],
     )?;
-    let ((slo, shi), sparts) = bounds(gltf, &pose)?;
+    let ((slo, shi), sparts) = bounds(gltf, &pose, &HashSet::new())?;
     let (slo, shi) = (slo.map(|v| v * scale), shi.map(|v| v * scale));
     if !fit && !entry.get("offset").is_some_and(J::truthy) {
         // On the floor (y = 0). A model the game sinks may reach below it by its `sink` (the woods' rock, the marker).
@@ -3800,7 +3824,8 @@ pub struct Measures {
 /// Reads and measures a model file of the manifests (`path`) with its entry: its size at rest, times `scale`.
 fn model(entry: &J, path: &str) -> R<Model> {
     let file = parse_glb(&std::fs::read(path).map_err(|e| py::os_error(&e, path))?)?;
-    let ((lo, hi), _) = bounds(&file.gltf, &HashMap::new())?;
+    // Its own size: what it carries (`ASIDE`) is drawn but isn't the piece of furniture.
+    let ((lo, hi), _) = bounds(&file.gltf, &HashMap::new(), &aside_nodes(&file.gltf))?;
     let fit = entry.get("fit").is_some_and(J::truthy);
     let scale = if fit {
         1.0
@@ -3940,6 +3965,29 @@ mod tests {
             .collect();
         assert_eq!(c.len(), read.entries().unwrap().len(), "a key twice");
         assert_eq!(centres_text(&c), text);
+    }
+
+    /// A model's carried decoration (`<name>_aside`: the picture on a chest of drawers) is drawn but left out of
+    /// its own size: the chest is 0.45 m tall, the picture stands 0.9 m above it.
+    #[test]
+    fn what_a_model_carries_is_drawn_but_not_its_size() {
+        let json = r#"{"asset": {"version": "2.0"}, "scenes": [{"nodes": [0, 1]}],
+            "nodes": [{"name": "body", "mesh": 0}, {"name": "picture_aside", "mesh": 0, "translation": [0, 0.9, 0]}],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+            "bufferViews": [{"byteOffset": 0, "byteLength": 36}],
+            "accessors": [{"bufferView": 0, "componentType": 5126, "type": "VEC3", "count": 3, "min": [0, 0, 0], "max": [0.5, 0.45, 0.5]}]}"#;
+        let bin: Vec<u8> = [0f32, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5]
+            .iter()
+            .flat_map(|c| c.to_le_bytes())
+            .collect();
+        let g = parse_glb(&glb::tests::glb(json, &bin)).unwrap();
+        let aside = aside_nodes(&g.gltf);
+        assert_eq!(aside, HashSet::from([1]), "the picture's node");
+        let ((_, drawn), _) = bounds(&g.gltf, &HashMap::new(), &HashSet::new()).unwrap();
+        assert!((drawn[1].f() - 1.35).abs() < 1e-6, "drawn {drawn:?}");
+        let ((lo, own), _) = bounds(&g.gltf, &HashMap::new(), &aside).unwrap();
+        assert!(lo[1].f().abs() < 1e-6, "own {lo:?}");
+        assert!((own[1].f() - 0.45).abs() < 1e-6, "own {own:?}");
     }
 
     #[test]
