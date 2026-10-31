@@ -147,11 +147,23 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
   or a rail over open air wins (`marketStall`, `crib` read "no top to measure") and a vessel basin's rim is
   not the face it takes; its sizes also include non-object geometry.
 - `check.mjs play`: no whole-recipe following (it records clips only on the object used, not on the
-  helpers a recipe walks to), no `--views` (one camera per run; `--top` since 2026-10-30); needs carry
-  over between uses. (`--use ripe` and the crop stage in the record came 2026-10-31.)
+  helpers a recipe walks to); needs carry over between uses. (`--use ripe` and the crop stage in the
+  record came 2026-10-31, `--views` 2026-10-31.)
 - `check.mjs sheet`, `poses.html`, gallery and previews each have known blind spots (see §7).
 - CI runs clips, the GLB gate, `cargo check-glb` (since 2026-10-31), `review sizes` (2026-10-30) and
   `review uses --check` (2026-10-31); still not the browser checks.
+
+**Done 2026-10-31 (`check.mjs play --views`: several angles of the same picture):**
+
+- One camera per run meant a use that is only wrong from behind, from above or from the floor was a
+  second run. `--views 2`–`4` takes that many angles of each use-loop picture off the aimed one: the
+  front as before, then round the back (a use from behind the thing), above at 1.35 rad (a seat, a top,
+  what the hands are at) and low at 0.35 rad (a door's foot, a drawer's runner, a chair's legs).
+- The first picture keeps its name, so an existing folder's `<object>-00.png` is still the front; the
+  others are `<object>-00-v2.png`… and each record's `angle` says which. `--views 1` (the default) is
+  exactly the old run.
+- `bench-results/check-views/chairWood-sit-0{0,1}{,-v2,-v3}.png` is the run that proves it: six pictures,
+  three angles, one page.
 
 **Done 2026-10-31 (`review uses --check`: a use the renderer can't play fails CI):**
 

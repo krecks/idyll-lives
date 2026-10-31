@@ -737,8 +737,9 @@ From the coordinator's notes and each wave's `review-log.md`, deduplicated; the 
 - The free-spot rule keys on `fillsWall`, so the wall bed was put mid-floor.
 - The camera:
   - it is sized by the footprint, so it cuts tall trees and sits inside the phone box;
-  - one camera per run (wanted: `--views a,b,c`); `--top` added 2026-10-30 (looking down; the game
-    camera stops at 1.35 rad);
+  - ~~one camera per run~~: `--views 2`–`4` since 2026-10-31 (that many angles of each use-loop picture:
+    front, back, above, low; `<object>-v2`…); `--top` added 2026-10-30 (looking down; the game camera
+    stops at 1.35 rad);
   - ~~no shot of an object as bought~~: `--shot-idle` added 2026-10-30 (one picture before any use;
     a night one needs the `*-night` state).
   - ~~nothing of the walk to the use, so a door's swing (0.45 s) is over before the first picture~~:

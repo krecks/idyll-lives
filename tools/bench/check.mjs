@@ -47,6 +47,8 @@
  *               --walk 3 (speed walking there, at most 3 = 10×)  --speed 1 (from 3 tiles off)
  *               --radius --beta --alpha --y (the camera; default from the model's size and facing)
  *               --top (the camera above, looking down: who sits where at a table)
+ *               --views 2 (up to 4 camera angles per picture, on the use loop: the front, then round
+ *                 the back, above and low; `<object>-v2`, `-v3`, `-v4`, the first as it always was)
  *               --shot-idle (a picture of it as bought, before any use: `<object>-idle`)
  *               --walk-shots 40 (pictures on the way there, before the use begins: `<object>-walk-00`,
  *                 the walk and a door's swing; with `--every 0` as fast as the page draws)
@@ -568,6 +570,8 @@ if (what === 'play') {
   const shotIdle = has('shot-idle');
   /** The camera above, looking down (`--top`), instead of the usual three-quarter view. */
   const top = has('top');
+  // Angles per picture on the use loop (`--views`): the front as aimed, then round the back, above, low.
+  const views = Math.max(1, Math.min(4, num('views', 1)));
   const every = num('every', batch ? 1000 : 500);
   const cap = num('wait', 60) * 1000;
   const speed = num('speed', 1);
@@ -716,6 +720,23 @@ if (what === 'play') {
     const round = (v) => v.map((x) => +x.toFixed(2));
     return { alpha: +took.alpha.toFixed(3), beta: +took.beta.toFixed(3), radius: +took.radius.toFixed(2), target: round(took.target), height: +height.toFixed(2), bottom: +bottom.toFixed(2), from, ...(bounds ? { bounds: { lo: round(bounds.lo), hi: round(bounds.hi) } } : {}) };
   }
+
+  /**
+   * The other angles of `--views`, off the aimed one: the back (a use from behind the thing), above
+   * (a seat, a top, what the resident's hands are at), low (a door's foot, a drawer's runner). The
+   * first is the aimed view itself, so one picture is unchanged.
+   */
+  const viewPoses = (v) => {
+    if (!v || views === 1) return [[0, null]];
+    const { alpha, beta, radius, target } = v;
+    const poses = [
+      { alpha, beta, radius, target },
+      { alpha: alpha + Math.PI, beta, radius, target },
+      { alpha, beta: 1.35, radius: radius * 1.15, target },
+      { alpha: alpha - 0.5, beta: 0.35, radius: radius * 0.9, target },
+    ];
+    return poses.slice(0, views).map((p, i) => [i, p]);
+  };
 
   /** A resident (the first of `sims` by default) as `__sims()` has them (null: not there). */
   const resident = (who = sim) =>
@@ -886,37 +907,41 @@ if (what === 'play') {
     if (record.outcome === 'using' && !helper) {
       for (let i = 0; i < shots; i++) {
         await loaded();
-        record.view = (await aim(bought.id, use)) ?? undefined;
-        await settle(page, 120);
-        const info = await page.evaluate(
-          ({ sim, id, others }) => {
-            const all = window.__sims();
-            const clips = window.__renderer?.objectClips?.(id);
-            const at = (who) => {
-              const o = all.find((x) => x.id === who);
-              return o && { id: who, pose: o.pose, using: o.using && o.object === id, interaction: o.interaction, action: o.action, x: +o.x.toFixed(2), z: +o.z.toFixed(2) };
-            };
-            const o = window.__world().objects.find((x) => x.id === id);
-            // Each clip playing on it: how far in (s), of how long, and how it plays.
-            const playing = clips ? Object.fromEntries([...clips].map(([name, c]) => [name, { time: +c.time.toFixed(2), duration: +c.duration.toFixed(2), kind: c.kind }])) : null;
-            return {
-              t: Math.round(window.__check.watched()?.t ?? 0),
-              object: o ? { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open) } : null,
-              sim: at(sim),
-              ...(others.length ? { others: others.map(at) } : {}),
-              clips: playing,
-            };
-          },
-          { sim, id: bought.id, others: sims.slice(1) },
-        );
-        // How far from the object's nearest face the resident stands (a use from the back or the side says so).
-        const [fw, fd] = bought.where.size;
-        const face = (p) =>
-          p && +Math.hypot(Math.max(bought.where.x - p.x, 0, p.x - (bought.where.x + fw)), Math.max(bought.where.z - p.z, 0, p.z - (bought.where.z + fd))).toFixed(2);
-        if (info.sim) info.sim.distance = face(info.sim);
-        for (const other of info.others ?? []) other.distance = face(other);
-        const file = await shot(page, batch ? `${name}-${String(i).padStart(2, '0')}` : `${prefix}play-${thing.def}-${bought.where.x}-${bought.where.z}-${bought.where.rot}-${String(i).padStart(2, '0')}`, info);
-        record.shots.push({ file, ...info });
+        const aimed = await aim(bought.id, use);
+        record.view = aimed ?? undefined;
+        for (const [angle, pose] of viewPoses(aimed)) {
+          if (pose) await page.evaluate((v) => window.__camera(v), pose);
+          await settle(page, pose ? 60 : 120);
+          const info = await page.evaluate(
+            ({ sim, id, others }) => {
+              const all = window.__sims();
+              const clips = window.__renderer?.objectClips?.(id);
+              const at = (who) => {
+                const o = all.find((x) => x.id === who);
+                return o && { id: who, pose: o.pose, using: o.using && o.object === id, interaction: o.interaction, action: o.action, x: +o.x.toFixed(2), z: +o.z.toFixed(2) };
+              };
+              const o = window.__world().objects.find((x) => x.id === id);
+              // Each clip playing on it: how far in (s), of how long, and how it plays.
+              const playing = clips ? Object.fromEntries([...clips].map(([name, c]) => [name, { time: +c.time.toFixed(2), duration: +c.duration.toFixed(2), kind: c.kind }])) : null;
+              return {
+                t: Math.round(window.__check.watched()?.t ?? 0),
+                object: o ? { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open) } : null,
+                sim: at(sim),
+                ...(others.length ? { others: others.map(at) } : {}),
+                clips: playing,
+              };
+            },
+            { sim, id: bought.id, others: sims.slice(1) },
+          );
+          // How far from the object's nearest face the resident stands (a use from the back or the side says so).
+          const [fw, fd] = bought.where.size;
+          const face = (p) =>
+            p && +Math.hypot(Math.max(bought.where.x - p.x, 0, p.x - (bought.where.x + fw)), Math.max(bought.where.z - p.z, 0, p.z - (bought.where.z + fd))).toFixed(2);
+          if (info.sim) info.sim.distance = face(info.sim);
+          for (const other of info.others ?? []) other.distance = face(other);
+          const file = await shot(page, `${batch ? `${name}-${String(i).padStart(2, '0')}` : `${prefix}play-${thing.def}-${bought.where.x}-${bought.where.z}-${bought.where.rot}-${String(i).padStart(2, '0')}`}${angle ? `-v${angle + 1}` : ''}`, angle ? { ...info, angle } : info);
+          record.shots.push({ file, ...info, ...(angle ? { angle } : {}) });
+        }
         if (i < shots - 1) await settle(page, every);
       }
     }
