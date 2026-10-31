@@ -36,8 +36,6 @@ So what is missing is not objects — it is **uses, clips, behaviours and polish
 
 | Object | Part | What is missing | Source | Effort |
 |---|---|---|---|---|
-| `nestingTables` Nesting tables | `small_table` | Small table never slides out; still decorative | decor decision 4 | S |
-| `displayCabinet` Display cabinet | `door` | Glass door never swings; still decorative | decor decision 4 | S |
 | `deskExecutive` Executive desk | drawer | Drawer modelled but static — **won't fix** | I-office-02, Q-19 | — |
 | `grandfatherClock` Grandfather clock | trunk door | Not a part of its own; clock is wound at the dial — **won't fix** | A-decor-01 | — |
 
@@ -45,8 +43,28 @@ No modelled part is left unbuilt. The laundry basket has no lid by design (bathr
 clean washing is heaped above its rim, and the lidded one is the bedroom's `laundryHamper`. The 2026-10-30 check
 that listed a basket lid here was reading a stale line in `open.md`, now corrected.
 
-These are the only remaining "(+use)" parts. Kettle lid, bread-bin roll-top, laptop lid and the high
-chair's tray were closed in 0.5.0 (I-tabletop-01, I-kids-01).
+That is the only remaining "(+use)" part, and it stays decorative. Kettle lid, bread-bin roll-top, laptop lid and
+the high chair's tray were closed in 0.5.0 (I-tabletop-01, I-kids-01); the nesting tables' small table and the
+display cabinet's door were built on 2026-10-31 (below).
+
+**Done 2026-10-31 (74e88f70: the last two decorative parts get their uses).** Both were closed as decor under owner decision
+4; that decision was reopened for these two parts only.
+- `nestingTables`: `small_out` slides the oak table 42 cm out from under the white one (`G.slide` after `G.settle`,
+  `living.py` `nesting_tables()`), with content uses `pullOut` ("Pull out the small table", 1 min) and `pushIn`
+  ("Push the small table back", 1 min, `motions.uses` `{'clip': 'small_out', 'over': -1}`), `leaves: open`/`closed`,
+  `motions.open`. Both are the owner's (`autonomous: false`).
+- `displayCabinet`: `door_open` swings the brass-framed glass door 100° on its left hinge (`G.swing` about
+  `DOOR_HINGE`, already `G.hinged`), with content uses `openDoor` (1 min) and `shutDoor` (1 min, `over: -1`).
+- `cargo check-glb`: `model.nestingTables` 1,128 tris, 3 draws, 1 moving part, 1 clip; `model.displayCabinet`
+  3,536 tris, 1 moving part, 1 clip — and 4 draws, one more than the still door's 3 (an animated node is exported as
+  its own primitives), which is the gate's limit, so the trunk door's "fifth draw" still holds for the clock. `cargo review uses`: no `motions key` and no
+  "opens, no motions.open" flags, living's "no use" count 10 → 8.
+- In play: `bench-results/check-parts/parts-nestingTables-{pullOut,pushIn}-01.png`,
+  `parts-displayCabinet-{openDoor,shutDoor}-01.png` (`play --state review-stage --objects nestingTables,displayCabinet
+  --use all`); each use played its clip (`played small_out`, `played door_open`).
+- Docs: `docs/objects/living.md` (both rows, in-play bullets), `docs/review/living.md` (I1 rows, I-living-01 and
+  I-living-02 statuses, both "After" paragraphs), `docs/objects/open.md`, `tools/art/blender/families/living.md`,
+  `docs/authenticity-review.md` §9.1.
 
 ## 2. Model work still accepted as incomplete
 

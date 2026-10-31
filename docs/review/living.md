@@ -87,7 +87,7 @@ Family: `tools/art/blender/families/living.py`.
 | `sideTable` Side table | OK | n/a | OK | | `living/sheets/obj-sideTable.png` |
 | `coffeeTableRound` Round coffee table | OK | n/a | OK | | `living/sheets/obj-coffeeTableRound.png` |
 | `coffeeTableLong` Long coffee table | M-living-03 | n/a | OK | M-living-03 S3 decision | `living/sheets/obj-coffeeTableLong.png` |
-| `nestingTables` Nesting tables | OK | n/a | OK | I-living-01 S3 decision (seeded; closed by owner decision 4) | `living/sheets/obj-nestingTables.png` |
+| `nestingTables` Nesting tables | OK | OK | OK | I-living-01 S3 decision (seeded; closed by owner decision 4, reopened 2026-10-31: the small table slides out) | `living/sheets/obj-nestingTables.png`, `bench-results/check-parts/parts-nestingTables-pullOut-01.png` |
 | `sideTableRound` Round side table | OK | n/a | OK | | `living/sheets/obj-sideTableRound.png` |
 | `consoleTable` Console table | M-living-03, M-living-06 | n/a | OK | M-living-03 S3 decision; M-living-06 S3 content | `living/sheets/obj-consoleTable.png` |
 
@@ -97,7 +97,8 @@ Family: `tools/art/blender/families/living.py`.
 |---|---|---|---|
 | `coffeeTable`, `coffeeTableGlass`, `coffeeTableMarble` | put drinks and snacks down, leaf through a magazine from the sofa, play a board game | flip through a magazine (15, standing at the table); a low `surface` at 0.42 | standing for the magazine (I-living-03) |
 | `coffeeTableRound`, `coffeeTableLong` | put drinks down, a magazine | none; a low `surface` | OK (decor, owner decision 4) |
-| `sideTable`, `sideTableRound`, `nestingTables` | a drink or a lamp beside the sofa | none; a low `surface` | OK (decor) |
+| `sideTable`, `sideTableRound` | a drink or a lamp beside the sofa | none; a low `surface` | OK (decor) |
+| `nestingTables` | a drink or a lamp, and a second small table when a guest comes | pull out the small table (1), push it back (1); a low `surface` at 0.51 | OK (the small table slides out, 2026-10-31; the two uses are the owner's, not the resident's) |
 | `consoleTable` | drop the keys and the post, a lamp in the hall | none; a `surface` at 0.80 | OK (decor) |
 
 ## L4. Media (8)
@@ -142,7 +143,7 @@ Family: `tools/art/blender/families/living.py`.
 | `bookcaseCorner` Corner bookcase | OK | OK | I-living-03 | I-living-03 S2 content; I-held-01 S2 code (held ledger) | `living/sheets/obj-bookcaseCorner.png` |
 | `cubeShelf` Cube shelf | OK | n/a | OK | | `living/sheets/obj-cubeShelf.png` |
 | `ladderShelf` Ladder shelf | M-living-07 | n/a | OK | M-living-07 S3 code | `living/sheets/obj-ladderShelf.png`, `living/play/chunk3/ladderShelf-no-uses.png` |
-| `displayCabinet` Display cabinet | OK | n/a | OK | I-living-02 S3 motion (seeded; closed by owner decision 4) | `living/sheets/obj-displayCabinet.png` |
+| `displayCabinet` Display cabinet | OK | OK | OK | I-living-02 S3 motion (seeded; closed by owner decision 4, reopened 2026-10-31: the door swings) | `living/sheets/obj-displayCabinet.png`, `bench-results/check-parts/parts-displayCabinet-openDoor-01.png` |
 
 ### Real uses against the content's (I1)
 
@@ -155,7 +156,7 @@ Family: `tools/art/blender/families/living.py`.
 | `bookcaseCorner` | take a book and read | read (45, standing) | standing to read (I-living-03) |
 | `shelvingIndustrial`, `cubeShelf` | store boxes and books | none; a `surface` on top | OK (decor) |
 | `ladderShelf` | show plants and books | none | OK (decor) |
-| `displayCabinet` | show off china and glass, take out the good plates | none | OK (decor, owner decision 4; I-living-02 closed) |
+| `displayCabinet` | show off china and glass, take out the good plates | open the cabinet (1), shut it (1) | OK (the door swings open, 2026-10-31; taking the china out is still missing, and the two uses are the owner's) |
 
 ## L6. Stairs (1)
 
@@ -214,10 +215,12 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** I1
 - **Fix class:** decision
-- **Where:** `tools/art/blender/families/living.py:925`, `web/public/content/catalog2/living.json:735`
+- **Where:** `tools/art/blender/families/living.py:1329`, `web/public/content/catalog2/living.json:757`
 - **Evidence:** A modelled part with no clip, left decorative for 0.3.0 (pulling the small table out has no use to play it).
   Living wave: the small table stands under the big one and reads as a nest (`living/sheets/obj-nestingTables.png`). Side tables need no use of their own (owner decision 4, §9); the part stays ready for one.
-- **Status:** closed (owner decision 4: decor stays decor)
+  Reopened 2026-10-31: the part got its use — "Pull out the small table" slides it 42 cm out from under the big one
+  (`small_out`) and "Push the small table back" runs the clip back. Both are the owner's (`autonomous: false`).
+- **Status:** fixed (74e88f70, 2026-10-31: the small table slides out, `motions.uses` `pullOut`/`pushIn`; owner decision 4 reopened for this part)
 - **Source:** `docs/objects/open.md` Still open › Content and sim; `plan/release-0.3.0.md` §2.5
 
 ### I-living-02 — The display cabinet's door has no use
@@ -225,10 +228,12 @@ Seeded from earlier docs first; add new findings after them in the same form.
 - **Severity:** S3
 - **Rubric:** I1, I7
 - **Fix class:** motion
-- **Where:** `tools/art/blender/families/living.py:1309`, `web/public/content/catalog2/living.json:971`
+- **Where:** `tools/art/blender/families/living.py:1758`, `web/public/content/catalog2/living.json:1022`
 - **Evidence:** A modelled door with no clip, left decorative for 0.3.0.
   Living wave: a glazed cabinet with china behind the door, decor like the other shelves with no use (`living/sheets/obj-displayCabinet.png`). Taking out the good plates would need a use that the dining table's meal doesn't have.
-- **Status:** closed (owner decision 4: decor stays decor)
+  Reopened 2026-10-31: the door swings 100° on its left hinge for "Open the cabinet" and back for "Shut the
+  cabinet" (`door_open`, `motions.uses` `over: -1`). The plates' use is still the open one.
+- **Status:** fixed (74e88f70, 2026-10-31: the door swings, `motions.uses` `openDoor`/`shutDoor`; owner decision 4 reopened for this part)
 - **Source:** `docs/objects/open.md` Still open › Content and sim; `plan/release-0.3.0.md` §2.5
 
 ### I-living-03 — Reading at the bookshelf, and TV without a seat, are an hour on foot

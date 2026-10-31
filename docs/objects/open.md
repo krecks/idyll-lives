@@ -135,9 +135,10 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
   heard (`bench-results/review/fixes/sounds/wav/`).
 - **Cut flowers for a vase:** done 2026-10-30 (Q-18): the raised bed's "Cut some flowers" and the bought empty
   vase that takes the bunch. Cutting the individual beds (tulips, daffodils, lilies, cosmos, daisies) is still open.
-- **Parts with no use, left decorative:** the executive desk's drawer (I-office-02, won't fix); the nesting tables'
-  small table and the display cabinet's door (decor, decision 4). These are modelled parts without a clip, so no
-  clip is orphaned. The laundry basket has no lid and none is planned: it holds clean washing heaped above its
+- **Parts with no use, left decorative:** the executive desk's drawer (I-office-02, won't fix) — the last one. The
+  nesting tables' small table slides out for "Pull out the small table" and the display cabinet's door swings for
+  "Open the cabinet" (2026-10-31; both were decor under decision 4, now built), so no modelled part is left without
+  a clip. The laundry basket has no lid and none is planned: it holds clean washing heaped above its
   rim (bathroom review, 2026-10-21); the lidded one is the bedroom's `laundryHamper`, whose lid lifts for sorting.
   The grandfather clock's trunk door is not a part of its own (A-decor-01, won't fix): it would be a fifth draw,
   over what the gate passes, and the clock is wound at its dial.
@@ -225,7 +226,8 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
 - **Models:** the arc lamp reaching over the next tile, placed so by build mode and the house generator
   (M-lighting-06); the hot tub's cover folding back in two halves (A-outdoor-01, a fourth draw).
 - **Moving parts with a use:** the kettle's lid, the bread bin's roll-top and the laptop's lid open for their uses
-  (I-tabletop-01); the high chair's tray slides out as the baby is put in (I-kids-01).
+  (I-tabletop-01); the high chair's tray slides out as the baby is put in (I-kids-01); the nesting tables' small
+  table slides out and the display cabinet's door swings open (2026-10-31, I-living-01 and I-living-02).
 - **Sounds** (I-bathroom-04, G-53): the uses that were silent sound like their things, synthesised
   (`web/src/audio/things.ts`): the treadmill and bikes, the workbench and the bike stand, pool, foosball, ping-pong,
   darts, the arcade cabinets, the sewing machine, the chemistry set, the pottery wheel, the coffee machines, the

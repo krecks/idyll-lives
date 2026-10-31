@@ -1343,6 +1343,7 @@ def nesting_tables():
                     None, M.black_metal, profile=G.rounded_rect(0.018, 0.018, 0.004, corner=1), up=(1, 0, 0), angle=60)
     G.join(small, 'small_table')
     G.settle(centre=False)
+    G.slide(bpy.data.objects['small_table'], 'small_out', (0, -0.42, 0), seconds=0.9)
 
 
 def side_table_round():
@@ -1800,6 +1801,7 @@ def display_cabinet():
         F.cyl('knob_stem', 0.005, 0.016, (0.36, 1.0, hz + 0.012), M.brass, rot=(90, 0, 0), verts=8)
     G.hinged(G.join(parts, 'door'), F.at(hx, 1.015, hz))
     G.settle(centre=False)
+    G.swing(bpy.data.objects['door'], 'door_open', -100, seconds=1.0)
 
 
 SECTIONAL = [('greige', 'Upholstery'), ('greige_cushion', 'Cushions'), ('espresso_legs', 'Legs')]
@@ -1893,6 +1895,7 @@ FAMILY = G.Family(
      G.Model('coffeeTableLong', coffee_table_long, key='model.coffeeTableLong', size=(1.66, 0.42, 0.72),
              paint=[('walnut_warm', 'Top'), ('black_metal', 'Legs')]),
      G.Model('nestingTables', nesting_tables, key='model.nestingTables', size=(0.57, 0.512, 0.55), centre=(0.005, 0.025),
+             motions={'uses': {'pullOut': 'small_out', 'pushIn': {'clip': 'small_out', 'over': -1}}, 'open': 'small_out'},
              paint=[('white_gloss', 'Top'), ('oak', 'Small table'), ('black_metal', 'Legs')]),
      G.Model('sideTableRound', side_table_round, key='model.sideTableRound', size=(0.52, 0.56, 0.52),
              paint=[('stone_top', 'Top'), ('brass', 'Base')]),
@@ -1918,6 +1921,7 @@ FAMILY = G.Family(
      G.Model('ladderShelf', ladder_shelf, key='model.ladderShelf', size=(0.635, 1.8, 0.356), centre=(0, -0.252),
              paint=[('oak', 'Frame'), ('oak_shelf', 'Shelves')]),
      G.Model('displayCabinet', display_cabinet, key='model.displayCabinet', size=(0.86, 1.91, 0.45), centre=(0, -0.205),
+             motions={'uses': {'openDoor': 'door_open', 'shutDoor': {'clip': 'door_open', 'over': -1}}, 'open': 'door_open'},
              paint=[('vitrine', 'Frame'), ('vitrine_back', 'Back')])],
     comment='Blender-built living room models (tools/art/blender/families/living.py). The materials map '
             'onto the game\'s finishes so a model costs one draw call per finish group.',
