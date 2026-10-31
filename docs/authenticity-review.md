@@ -34,7 +34,7 @@ A `decision` finding takes the severity of its worse outcome. Line numbers refer
 | open | | | 3 | 3 |
 | **Total** | **8** | **118** | **216** | **342** |
 
-Every S1 is fixed. Of the S2s, everything is fixed but the four that wait for props in hand and body language (G-70, G-71, owner decision 3) and the vendors' half of I-community-09. What is left, and why, is in §9.
+Every S1 is fixed. Of the S2s, everything is fixed but the four that wait for props in hand and body language (G-70, G-71, owner decision 3) and the vendors' apron — the one part of I-community-09 left, since no apron, coat or vest is in the character set (they walk in and out at their hours and wear a white shirt and dark trousers since 2026-10-30). What is left, and why, is in §9.
 
 **What Phase 4 changed**
 - **Age rules (G-45):** content `stages` on objects, recipes and uses, and on socials (`stages`, `targetStages`); one rule for free will and the player's orders alike, and the pie menu greys out what the selected resident may not use. Children don't pour wine, cook at a hob, lift weights or start a fight; grown-ups don't ride the toddlers' things or lie in the cot; the upper bunk has `upperStages`; coffee is for teens and up; a child eats at the kids' table and isn't sent to a wall cupboard out of reach (`reach`).
@@ -917,7 +917,7 @@ Planned separately, after this review (§11.1).
 | A-residents-03 (in part) | S3 | Feet slide 56–78 % of the way at speeds 4 and 5. | Won't fix: no gait steps at 45–90 m/s without strobing. |
 | M-lighting-08 (fixed) | S3 | On Low the four forward lamps aren't kept to their room, nor are tiles split by a diagonal wall. | The same room mask in the forward lights' shader (§11.3 e). M. Done for 0.5.0: the mask on every preset, a room per half of a split tile. |
 | I-kitchen-09 (fixed) | S3 | The range hood's light and hum while the hob below is in use. | Done 2026-10-30: the light comes on with the cooking (`light.while`, sim-core `lights.rs`), by day as at night, and off when it's done; the hum was already in. S. |
-| I-garden-08 (fixed) | S3 | No flower can be cut for a vase. | Done 2026-10-30 (Q-18): the raised bed's "Cut some flowers" (6 min) and the empty vase that takes the bunch ("Put the flowers in", 3 min), standing open with them in it; the same clip runs back to take them out. M. |
+| I-garden-08 (fixed) | S3 | No flower can be cut for a vase. | Done 2026-10-30 (Q-18): the raised bed's "Cut some flowers" (6 min) and the empty vase that takes the bunch ("Put the flowers in", 3 min), standing open with them in it; the same clip runs back to take them out. The five beds cut for a vase (tulips, daffodils, lilies, cosmos, daisies) followed the same day. M. |
 
 The tooling left to improve is in §7.
 

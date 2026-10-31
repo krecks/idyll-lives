@@ -2,7 +2,8 @@
  * The town's vendors and shopkeepers (sim-core `staff.rs`): staff who come in to work at the public
  * places, not residents. The simulation says where each stands and what they do (snapshot rows after
  * the residents', `header.staffCount`); here they get a look, made from their seed as a newcomer's is,
- * and become residents for the renderer only (rows `sims.length + k`, never listed, picked or saved).
+ * in a uniform, and become residents for the renderer only (rows `sims.length + k`, never listed,
+ * picked or saved).
  *
  * Also what the pie menu needs of them: whether someone serves at a thing (a post), and whether it's
  * open at a time of day (its content `staff.hours`).
@@ -13,6 +14,22 @@ import type { Content, ObjectDef } from '../content/content';
 import type { SimInfo, WorldStructure } from '../core/protocol';
 import { lookAtStage, lookFromSeed, palette } from './household';
 
+/**
+ * What they wear at work: a white shirt (its collar a shell of its own) over dark trousers and dark
+ * shoes, whatever their own clothes are. Their face, hair and skin are their own.
+ *
+ * The apron a counter hand would wear over it is still open: the character set has no apron garment,
+ * and one is a shell of its own (`docs/objects/open.md`).
+ */
+const UNIFORM = {
+  top: 'top.shirt',
+  body: '#F2EFE8',
+  bottom: 'bottom.trousers',
+  bottomColor: '#2B2D33',
+  shoes: 'shoes.sneakers',
+  shoesColor: '#2B2D33',
+} as const;
+
 /** The servers of `world` as residents drawn after its own (ids from `sims.length` on). */
 export function staffResidents(content: Content, assets: AssetRegistry, world: Pick<WorldStructure, 'sims' | 'staff'>): SimInfo[] {
   const stages = content.adultStages.filter((s) => s.id !== 'elder');
@@ -21,7 +38,9 @@ export function staffResidents(content: Content, assets: AssetRegistry, world: P
     const seed = Math.imul(s.seed + 1, 0x9e3779b1) >>> 0;
     const gender = genders[seed % genders.length];
     const stage = stages[(seed >>> 8) % Math.max(1, stages.length)];
-    const appearance = lookAtStage(lookFromSeed(assets, gender, seed), stage, palette(assets, 'palette.hair'));
+    const look = lookAtStage(lookFromSeed(assets, gender, seed), stage, palette(assets, 'palette.hair'));
+    // (A garment the body hasn't got is passed over for one it has, `outfit.ts` `chosen`.)
+    const appearance = { ...look, ...UNIFORM };
     return { id: world.sims.length + k, name: `staff ${s.seed}`, household: -1, gender, attractedTo: [], appearance, traits: [], perks: [], stage: stage?.id };
   });
 }

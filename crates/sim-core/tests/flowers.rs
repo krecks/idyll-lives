@@ -16,7 +16,7 @@ const TOWN: &str = r#"{"width":14,"depth":14,
   "walls":[[1,1,9,1],[1,1,1,7],[1,7,9,7],[9,1,9,7]],
   "doors":[{"x":4,"z":7,"axis":"x"}],
   "objects":[{"def":"sideTableRound","x":4,"z":3},{"def":"vaseEmpty","x":4,"z":3},
-             {"def":"flowerbed","x":12,"z":12}],
+             {"def":"flowerbed","x":12,"z":12},{"def":"garden.tulips","x":10,"z":12}],
   "sims":[{"name":"Ada","x":6,"z":10,"traits":["cheerful"]}]}"#;
 
 fn world() -> (World, String) {
@@ -177,5 +177,64 @@ fn the_garden_gives_a_bunch_and_the_vase_takes_it() {
         until(&mut w, 20, |w| !w.objects[o].open
             && w.sims[0].current().is_none()),
         "taken out, and shut"
+    );
+}
+
+#[test]
+fn a_bed_of_tulips_gives_a_bunch_too() {
+    let (mut w, _content) = world();
+    let bed = object(&w, "garden.tulips");
+    let cut = interaction(&w, bed, "cut");
+    w.apply(Command::Use {
+        sim: 0,
+        object: bed,
+        interaction: cut,
+    })
+    .unwrap();
+    let mut in_hand = false;
+    for _ in 0..40 * TICKS_PER_MINUTE {
+        if using(&w, cut) {
+            in_hand |= shown(&w).as_deref() == Some("cutFlowers");
+        }
+        if in_hand && w.sims[0].current().is_none() {
+            break;
+        }
+        w.tick_once();
+    }
+    assert!(in_hand, "the tulips in hand as they're cut");
+}
+
+/// Every bed of flowers the garden sells can be cut for a vase, and each cut is the same act: the bunch
+/// in the hand, the shears' work (`tend`), and never something a resident chooses on their own.
+#[test]
+fn every_bed_can_be_cut() {
+    let content = sim_core::content::Content::from_json(&common::content()).unwrap();
+    let tend = content
+        .animations
+        .iter()
+        .position(|a| a == "tend")
+        .expect("the shears' work is an animation");
+    let bunch = content
+        .items
+        .iter()
+        .position(|i| i.id == "cutFlowers")
+        .expect("the bunch is an item");
+    let mut beds = 0;
+    for def in &content.objects {
+        if !def.id.starts_with("garden.") || def.group != "flowers" {
+            continue;
+        }
+        let Some(cut) = def.interactions.iter().find(|i| i.id == "cut") else {
+            continue;
+        };
+        beds += 1;
+        assert_eq!(cut.anim, Some(tend), "{}", def.id);
+        assert_eq!(cut.holds, Some(bunch), "{}", def.id);
+        assert!(!cut.autonomous, "{}: cutting is not a habit", def.id);
+        assert!(cut.minutes > 0.0 && cut.minutes <= 10.0, "{}", def.id);
+    }
+    assert_eq!(
+        beds, 5,
+        "the five beds of flowers: tulips, daffodils, lilies, cosmos, daisies"
     );
 }

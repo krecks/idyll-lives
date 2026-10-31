@@ -63,12 +63,13 @@ door) shipped in 0.5.0 — see open.md, "Fixed in 0.5.0".
 
 | Item | What is missing | Source | Effort |
 |---|---|---|---|
-| Servers | No apron; they appear at their post at opening time instead of walking in | open.md, "Content and sim" | S–M |
+| Servers' apron | No apron, coat or vest garment exists in the character set, so a white shirt and dark trousers stand in | open.md, "Content and sim" | M (a garment shell) |
 | Furniture resizing | Resize arrows stay off (`RESIZING`, `buildmode.ts`); moving parts do not follow a resize yet | PLAN.md roadmap "later" | L |
 | Smarter thoughts | No LLM re-rank of the utility AI's top-3; research only | PLAN.md roadmap "later", [design/smarter-thoughts.md](design/smarter-thoughts.md) | L (research) |
 
-Flowers cut for a vase left this list on 2026-10-30 (below). Cutting the individual beds — the tulips',
-daffodils', lilies', cosmos' and daisies' "cut a bunch" — is still open, stood in for by the raised bed's one use.
+Flowers cut for a vase left this list on 2026-10-30 (below), on the raised bed and then on the five beds cut for a
+vase (tulips, daffodils, lilies, cosmos, daisies). The daisies' "make a daisy chain" is the one real use of a bed
+still missing.
 
 ## 4. Not yet checked (not known broken)
 
@@ -164,12 +165,34 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
   closed, carries the bunch in the arms on the way, opens, keeps it open through a save and load, closes when
   they are taken out). In play: `bench-results/check-flowers/` (`cut3-flowerbed-cut-00.png`,
   `vase2-vaseEmpty-{idle,putFlowers-01}.png`; `flowers3-*` the take-out run).
+- The five beds cut for a vase gained the same use the same day: "Cut some tulips" / daffodils / lilies /
+  cosmos / daisies (6 min, `anim: tend`, `holds: cutFlowers`, never chosen on their own) — `garden.json`;
+  `crates/sim-core/tests/flowers.rs` cuts a bed of tulips and checks that every bed of flowers the garden sells
+  has the use and holds the same bunch. In play: `bench-results/check-flowers/beds-*.png`.
 - Docs: `docs/objects/tabletop.md` (40 things, `vaseEmpty` in TT3), `docs/review/tabletop.md`,
-  `docs/objects/garden.md` and `docs/review/garden.md` (`flowerbed`'s `cut`), `docs/authenticity-review.md`
+  `docs/objects/garden.md` and `docs/review/garden.md` (`flowerbed`'s `cut`, the five beds'), `docs/authenticity-review.md`
   (Q-18, G-10, G-68, §9.1 I-garden-08).
+
+**Done 2026-10-30 (servers walk in):**
+
+- A server now comes in to work instead of standing at their post from the first minute: `Server.home` is the
+  lot's door (`Plot::arrival_point()`, the same door a visitor uses), they are placed there off shift, and at
+  opening they walk to their post at the game's walking speed (`crates/sim-core/src/staff.rs`, `walk`). At
+  closing they walk back out and are gone once they reach the door, so the cart stands unstaffed afterwards.
+- Tests: `crates/sim-core/tests/public_places.rs` — `a_vendor_walks_in_at_opening_and_out_at_closing` (at the
+  door before ten, drawn walking in, not at the post a minute later, there within ten minutes; back at the door
+  and still after 21:30) and `the_barista_steps_over_to_the_machine_and_the_cafe_closes` (on the way from the
+  door at a minute past ten, then at the machine).
+- They wear a uniform the game can make without new art: a white shirt, dark trousers and dark shoes over their
+  own face, hair and skin (`web/src/game/staff.ts`, `UNIFORM`). No apron, coat or vest exists to give them.
+- In play: `bench-results/check-staff/staff-cart-before-opening.png` (the ice cream cart unstaffed at 09:55),
+  `staff-cart-arrived.png` (the vendor at it in the uniform), `staff-posts.png` (three posts staffed at once).
+  The walk itself is 18 seconds of game time, a frame or two at a bench's clock, so the stills show the cart
+  empty and then staffed; the path between is the sim's (the test above), drawn with the residents' own walk.
+- Docs: `docs/objects/open.md` ("Content and sim"), `docs/review/community.md` (I-community-09's After).
 
 ## Suggested next items
 
 Nothing from the review ledgers is left unbuilt: the remaining work is the not-yet-checked list in §4, the
-tooling in §6, and the per-bed cutting that Q-18 left open (the tulips', daffodils', lilies', cosmos' and
-daisies' "cut a bunch", which the raised bed's one use stands in for).
+tooling in §6, the daisies' "make a daisy chain" (the one real use of a bed the game still lacks), and the
+servers' apron, which wants a garment the character set doesn't have.
