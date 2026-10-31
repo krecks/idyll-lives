@@ -904,8 +904,8 @@ Planned separately, after this review (§11.1).
 | I-kids-01 (fixed) | — | The high chair's tray doesn't slide out for the baby. | A tray clip in `kids.py`. S. |
 | I-community-09 (fixed, 0.5.0) | — | The bakery case's sliding door is on the baker's side. | The baker uses it (`feat/vendors`). |
 | I-tabletop-01 (fixed) | — | The kettle's lid, the bread bin's roll-top and the laptop's lid have uses since G-63 but no clip. | A clip each in `tabletop.py`. S. |
-| I-living-01 (fixed 2026-10-31, 74e88f70) | — | The nesting tables' small table never slid out: decor under decision 4. | Done 2026-10-31: `small_out` slides it 42 cm out (`living.py` `nesting_tables()`), with content `pullOut`/`pushIn` (1 min each, the owner's, `over: -1` back in) and `motions.open`. S. |
-| I-living-02 (fixed 2026-10-31, 74e88f70) | — | The display cabinet's glass door never swung: decor under decision 4. | Done 2026-10-31: `door_open` swings it 100° on its left hinge (`G.swing` about `DOOR_HINGE`), with content `openDoor`/`shutDoor` (1 min each, the owner's, `over: -1` shut). S. |
+| I-living-01 (fixed 2026-10-31, e14b4874) | — | The nesting tables' small table never slid out: decor under decision 4. | Done 2026-10-31: `small_out` slides it 42 cm out (`living.py` `nesting_tables()`), with content `pullOut`/`pushIn` (1 min each, the owner's, `over: -1` back in) and `motions.open`. S. |
+| I-living-02 (fixed 2026-10-31, e14b4874) | — | The display cabinet's glass door never swung: decor under decision 4. | Done 2026-10-31: `door_open` swings it 100° on its left hinge (`G.swing` about `DOOR_HINGE`), with content `openDoor`/`shutDoor` (1 min each, the owner's, `over: -1` shut). S. |
 
 ### 9.3 Small leftovers
 

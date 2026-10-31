@@ -47,7 +47,7 @@ That is the only remaining "(+use)" part, and it stays decorative. Kettle lid, b
 the high chair's tray were closed in 0.5.0 (I-tabletop-01, I-kids-01); the nesting tables' small table and the
 display cabinet's door were built on 2026-10-31 (below).
 
-**Done 2026-10-31 (74e88f70: the last two decorative parts get their uses).** Both were closed as decor under owner decision
+**Done 2026-10-31 (e14b4874: the last two decorative parts get their uses).** Both were closed as decor under owner decision
 4; that decision was reopened for these two parts only.
 - `nestingTables`: `small_out` slides the oak table 42 cm out from under the white one (`G.slide` after `G.settle`,
   `living.py` `nesting_tables()`), with content uses `pullOut` ("Pull out the small table", 1 min) and `pushIn`

@@ -220,7 +220,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
   Living wave: the small table stands under the big one and reads as a nest (`living/sheets/obj-nestingTables.png`). Side tables need no use of their own (owner decision 4, §9); the part stays ready for one.
   Reopened 2026-10-31: the part got its use — "Pull out the small table" slides it 42 cm out from under the big one
   (`small_out`) and "Push the small table back" runs the clip back. Both are the owner's (`autonomous: false`).
-- **Status:** fixed (74e88f70, 2026-10-31: the small table slides out, `motions.uses` `pullOut`/`pushIn`; owner decision 4 reopened for this part)
+- **Status:** fixed (e14b4874, 2026-10-31: the small table slides out, `motions.uses` `pullOut`/`pushIn`; owner decision 4 reopened for this part)
 - **Source:** `docs/objects/open.md` Still open › Content and sim; `plan/release-0.3.0.md` §2.5
 
 ### I-living-02 — The display cabinet's door has no use
@@ -233,7 +233,7 @@ Seeded from earlier docs first; add new findings after them in the same form.
   Living wave: a glazed cabinet with china behind the door, decor like the other shelves with no use (`living/sheets/obj-displayCabinet.png`). Taking out the good plates would need a use that the dining table's meal doesn't have.
   Reopened 2026-10-31: the door swings 100° on its left hinge for "Open the cabinet" and back for "Shut the
   cabinet" (`door_open`, `motions.uses` `over: -1`). The plates' use is still the open one.
-- **Status:** fixed (74e88f70, 2026-10-31: the door swings, `motions.uses` `openDoor`/`shutDoor`; owner decision 4 reopened for this part)
+- **Status:** fixed (e14b4874, 2026-10-31: the door swings, `motions.uses` `openDoor`/`shutDoor`; owner decision 4 reopened for this part)
 - **Source:** `docs/objects/open.md` Still open › Content and sim; `plan/release-0.3.0.md` §2.5
 
 ### I-living-03 — Reading at the bookshelf, and TV without a seat, are an hour on foot
