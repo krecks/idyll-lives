@@ -93,8 +93,6 @@ bed is missing a real use any more.
 
 | Item | Why it is open |
 |---|---|
-| Six held foods no test recipe makes: tasting board, pizza, pie, slices, sandwich, grill platter | Never checked in hand |
-| A meal from the fridge eaten at a pulled-in chair | Eating was only checked with the café's cake |
 | Sounds by ear (G-53) | All 34 were checked by spectrum, timing and level, never listened to |
 | Low on WebGL2 orbits | 11–16 % over Babylon's GPU time (0.4–0.6 ms; budget 10 %), about noise level |
 | `lampFloorArc` overhang | Fixed in 0.5.0; the lamp build check still only checks light height, not `at` |
@@ -102,6 +100,21 @@ bed is missing a real use any more.
 **Done 2026-10-30:** `curtainsWide` checked in play on the stage's two-wide window: closed over both edges at
 22:00, stacked at each end by day at 10:00, WebGPU and WebGL2. Its "In play" line is in
 [objects/decor.md](objects/decor.md) D3.
+
+**Done 2026-10-31 (the six held foods):** `crates/sim-core/tests/held_foods.rs` cooks each dish in a
+one-room house with the shipped appliances, a dining table with two chairs pulled up and a picnic table in
+the yard, and reads the hand off the snapshot (`sim::HELD`): a tasting board, a pizza, a pie, a tray of baked
+treats, a barbecue platter and a sandwich each end up in the hand, and the dish is then on the table the
+household eats at (the picnic table for the two cooked outdoors), with the sandwich eaten where it is made
+(`eatNow`) and its dirty plate left there. A serving taken from the pizza is a `pizzaSlice` in the hand
+(`a_serving_taken_from_a_pizza_is_a_slice_in_the_hand`). A pot of food from the fridge is the full path —
+`ingredients`, `prepBowl`, `mealPot`, `mealPlate` — and the plate is left on the table the household sits at
+(`a_meal_from_the_fridge_is_carried_to_the_table`). In play (`bench-results/check-foods/`): Ada bakes a
+wood-fired pizza at a bought oven in the garden and carries it across the grass to the table
+(`pizza-walk-00.png` … `pizza-walk-07.png`), a slice on a plate once it is down (`pizza-slice.png`), and a
+sandwich carried from the counter to a chair (`sandwich-walk-04.png`). The dish is only carried when the
+household's table is one they can sit at: with no chair pulled up the dish is put down on a free surface
+within `cooking.serveRange` (6 tiles) instead, which is why the test buys chairs.
 
 ## 5. Accepted / won't fix
 
