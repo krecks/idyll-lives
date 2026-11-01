@@ -218,14 +218,17 @@ class MenuScene {
   }
 
   private baseShot(shot: Shot, world: WorldStructure, duration: number): TownShot {
-    const town = { x: 0, z: 0, w: world.width, d: groundDepth(world) };
+    // A big world's main town (its first area); else the whole town.
+    const main = world.meta?.areas?.[0];
+    const town = main ? { x: main.x, z: main.z, w: main.w, d: main.d } : { x: 0, z: 0, w: world.width, d: groundDepth(world) };
+    const inTown = main ? world.plots.filter((p) => p.x + p.w / 2 >= main.x && p.x + p.w / 2 <= main.x + main.w && p.z + p.d / 2 >= main.z && p.z + p.d / 2 <= main.z + main.d) : world.plots;
     // The built-up part (plots and street), without the empty margin.
-    const plots = world.plots.length
+    const plots = inTown.length
       ? {
-          x: Math.min(...world.plots.map((p) => p.x)),
-          z: Math.min(...world.plots.map((p) => p.z)),
-          w: Math.max(...world.plots.map((p) => p.x + p.w)) - Math.min(...world.plots.map((p) => p.x)),
-          d: Math.max(...world.plots.map((p) => p.z + p.d)) - Math.min(...world.plots.map((p) => p.z)),
+          x: Math.min(...inTown.map((p) => p.x)),
+          z: Math.min(...inTown.map((p) => p.z)),
+          w: Math.max(...inTown.map((p) => p.x + p.w)) - Math.min(...inTown.map((p) => p.x)),
+          d: Math.max(...inTown.map((p) => p.z + p.d)) - Math.min(...inTown.map((p) => p.z)),
         }
       : town;
     const W = window.innerWidth;
