@@ -5,7 +5,7 @@
  */
 
 import { AssetRegistry } from '../assets/registry';
-import { prefetch, prefetchNow, planStream, whenStreamSettled } from '../assets/stream';
+import { prefetch, prefetchNow, planStream, reprioritize, whenStreamSettled } from '../assets/stream';
 import { Content } from '../content/content';
 import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
@@ -42,7 +42,7 @@ import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, ty
 import { clockTime, openAt, staffed, staffResidents } from './staff';
 import { PointerInput } from './input';
 import { assembleTown, loadTemplates, useTownContent, type NeighbourhoodDraft } from './town';
-import { gameAssetPlan } from './streamPlan';
+import { gameAssetPlan, streamRanks } from './streamPlan';
 import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
@@ -1180,8 +1180,13 @@ export async function startSession(
   });
   // What the camera streams in is the sim's full-detail area: in a big world (a town of today's sizes
   // keeps its full detail on the viewed lot, as it always had).
+  // The files still to stream come by where the camera is: the focus lot's, those round the camera, the rest nearest first.
   renderer.onWatch((rect) => {
     if (world?.meta?.world?.size === 'big') bridge.setWatch(rect);
+    if (!world) return;
+    const p = viewPlot === null ? null : world.plots[viewPlot];
+    const ranks = streamRanks(content, assets, world, p ? { x: p.x, z: p.z, w: p.w, d: p.d } : null, { x: rect[0], z: rect[1], w: rect[2] - rect[0], d: rect[3] - rect[1] });
+    reprioritize((url) => ranks.get(url) ?? Infinity);
   });
   controls.setWallMode(game.wallMode);
 

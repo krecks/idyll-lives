@@ -8,7 +8,7 @@
 
 import type { AssetRegistry } from '../assets/registry';
 import { optimizedUrl } from '../assets/registry';
-import { withBuild } from '../assets/build';
+import { withBuild, withoutBuild } from '../assets/build';
 import type { Content } from '../content/content';
 import type { WorldStructure } from '../core/protocol';
 
@@ -138,4 +138,25 @@ export function gameAssetPlan(
   for (const item of content.items) if (item.model) add(modelUrl(assets, item.model));
 
   return { home: [...home], rest: [...all].filter((url) => !home.has(url)) };
+}
+
+/**
+ * How soon each model file of the town's things should stream in, by where the camera is (the open
+ * world's priorities, `assets/stream.ts` `reprioritize`): 0 for the focus lot's (`view`), 1 and up
+ * for those in the chunks streamed in round the camera (`watch`), 2 and up for the rest, nearer
+ * first within each. Keyed as the stream keys its files (without the build's query).
+ */
+export function streamRanks(content: Content, assets: AssetRegistry, world: Pick<WorldStructure, 'objects'>, view: Rect | null, watch: Rect | null): Map<string, number> {
+  const ranks = new Map<string, number>();
+  const cx = watch ? watch.x + watch.w / 2 : view ? view.x + view.w / 2 : 0;
+  const cz = watch ? watch.z + watch.d / 2 : view ? view.z + view.d / 2 : 0;
+  for (const o of world.objects) {
+    const url = modelUrl(assets, content.object(o.def)?.model ?? `model.${o.def}`);
+    if (!url) continue;
+    const d = Math.hypot(o.x - cx, o.z - cz) / 10_000;
+    const rank = view && inView(o, view) ? 0 : watch && inView(o, watch) ? 1 + d : 2 + d;
+    const k = withoutBuild(url);
+    if (rank < (ranks.get(k) ?? Infinity)) ranks.set(k, rank);
+  }
+  return ranks;
 }
