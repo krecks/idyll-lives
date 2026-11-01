@@ -76,6 +76,8 @@ export interface StreetPlant {
 const WINDOWS_EVERY_MS = 1000;
 /** The far LOD's houses past this distance (m) from the camera's target aren't drawn. */
 const FAR_CULL = 650;
+/** Plans kept per chunk (`planned`): the focus lot's chunks with it and without it, and one more. */
+const PLANS_KEPT = 3;
 
 /** A chunk as built: its plan, and each of its meshes' vertex arrays (by draw name), made once. */
 interface BuiltChunk {
@@ -128,8 +130,8 @@ export class Street {
   /** The chunks to draw (null: every one the town has). */
   private wanted: ReadonlySet<number> | null = null;
   private readonly chunks = new Map<number, BuiltChunk>();
-  /** Every chunk planned so far (drawn or not), by id: a chunk streamed in again with the same key is taken from here. */
-  private readonly planned = new Map<number, BuiltChunk>();
+  /** Every chunk planned so far (drawn or not), by id, its last `PLANS_KEPT` plans, newest first: a chunk streamed in again (or planned again for a focus lot just left) with the same key is taken from here. */
+  private readonly planned = new Map<number, BuiltChunk[]>();
   /** Draw groups whose chunks changed, waiting for their meshes. */
   private readonly dirtyGroups = new Set<number>();
   /** Whether every chunk of the town has been planned (the first build while streaming does it). */
@@ -277,11 +279,14 @@ export class Street {
     }
     let planned = 0;
     const planOf = (id: number, key: string): BuiltChunk => {
-      const kept = this.planned.get(id);
-      if (kept?.key === key) return kept;
-      const plan = town.chunk(id, focus);
-      const built = { key, plan, data: chunkData(plan) };
-      this.planned.set(id, built);
+      // (The last few plans of each chunk kept: back on a lot the camera just left, its chunks are planned already.)
+      const kept = this.planned.get(id) ?? [];
+      const at = kept.findIndex((k) => k.key === key);
+      const built = at >= 0 ? kept[at] : (() => {
+        const plan = town.chunk(id, focus);
+        return { key, plan, data: chunkData(plan) };
+      })();
+      if (at !== 0) this.planned.set(id, [built, ...kept.filter((k) => k !== built)].slice(0, PLANS_KEPT));
       return built;
     };
     for (const id of wanted) {
