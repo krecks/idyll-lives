@@ -564,6 +564,9 @@ export class TownStreet {
   private openingsOf: Opening[] | undefined | null = null;
   private objectsOf: ObjectPlacement[] | null = null;
   private roomsOf: ArrayLike<number> | null = null;
+  /** The things' poses and the garages as last taken (`setWorld`). */
+  private poses: Int32Array | null = null;
+  private garagesKey = '';
   private garagesOf: WorldStructure['garages'] | null = null;
   private blocked = new RectGrid<Blocker>(4);
   private objectsByPlot = new Map<number, ObjectPlacement[]>();
@@ -697,6 +700,22 @@ export class TownStreet {
     });
     // (The same things, the same garages: their grid stands.)
     if (!relaid && world.objects === this.objectsOf && world.garages === this.garagesOf) return;
+    // (A new message with the same things where they were, the same garages: the grid stands too.)
+    const poses = new Int32Array(world.objects.length * 3);
+    world.objects.forEach((o, i) => {
+      poses[i * 3] = poseHash(o);
+      poses[i * 3 + 1] = o.w * 1024 + o.d;
+      poses[i * 3 + 2] = o.id;
+    });
+    const garagesKey = JSON.stringify(world.garages ?? null);
+    const samePoses = !!this.poses && this.poses.length === poses.length && this.poses.every((v, i) => v === poses[i]);
+    this.poses = poses;
+    if (!relaid && samePoses && garagesKey === this.garagesKey) {
+      this.objectsOf = world.objects;
+      this.garagesOf = world.garages;
+      return;
+    }
+    this.garagesKey = garagesKey;
     this.version++;
     this.objectsOf = world.objects;
     this.garagesOf = world.garages;
