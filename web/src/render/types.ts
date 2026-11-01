@@ -398,6 +398,16 @@ export interface Renderer {
   birdSings(id: number, seconds: number): void;
   /** Centres the camera on a world point. */
   focus(x: number, z: number): void;
+  /** Flies the camera to a world point, smoothly (the town map's "look here"; `shared/focus.ts` `Flight`). */
+  flyTo(x: number, z: number): void;
+  /**
+   * The lot the roaming camera has settled on (a plot index), to be shown in full: the listener says
+   * whether it takes it (it shows it with `setWorld` of its view, the camera left where it is), or
+   * keeps its own (build mode). Not called while the camera follows someone or the director films.
+   */
+  onFocusLot(listener: ((plot: number) => boolean) | null): void;
+  /** The ground rectangle (tiles x0, z0, x1, z1) the camera streams in, for the sim's full-detail area (the worker's `setWatch`); called when it changes. */
+  onWatch(listener: ((rect: [number, number, number, number]) => void) | null): void;
   setHoverTile(tile: { x: number; z: number } | null): void;
   setSelectedSim(id: number | null): void;
   setWallMode(mode: WallMode): void;

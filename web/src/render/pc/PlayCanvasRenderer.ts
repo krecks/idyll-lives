@@ -73,6 +73,8 @@ import { GrassPush } from '../shared/grass';
 import { houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
 import { compose, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
 import { OrbitControls } from '../shared/orbit';
+import { Flight, panBounds, Roam, type FocusPlot } from '../shared/focus';
+import { CHUNK, chunkCoords } from '../shared/chunks';
 import { ModelRefresh } from '../shared/modelRefresh';
 import { OverviewCamera } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
@@ -82,7 +84,7 @@ import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
-import { lowestStorey, storeyOfRow, storeyRow, storeyShown, type FenceEdge, type ItemPlacement, type ObjectPlacement, type StoreyLayout, type WorldStructure } from '../../core/protocol';
+import { groundDepth, lowestStorey, storeyOfRow, storeyRow, storeyShown, type FenceEdge, type ItemPlacement, type ObjectPlacement, type StoreyLayout, type WorldStructure } from '../../core/protocol';
 import type { VisemeTrack } from '../../voice/visemes';
 import type {
   BuildEffect,
@@ -189,6 +191,20 @@ const NO_HOUSES: readonly (readonly [number, number, number, number])[] = [];
  */
 function objectKey(o: ObjectPlacement): string {
   return JSON.stringify([o.id, o.def, o.x, o.z, o.rot, o.turn, o.offset, o.size, o.tall, o.lift, o.w, o.d, o.colors]);
+}
+
+/** `?stream=1`: the street streams its chunks round the camera in any town (else only in a big world's). */
+const STREAM_FLAG = typeof location !== 'undefined' && new URLSearchParams(location.search).get('stream') === '1';
+
+/** The plot (by index) under a ground point, else the nearest within `reach` m. */
+function plotNear(world: WorldStructure, x: number, z: number, reach: number): FocusPlot | null {
+  let best: FocusPlot | null = null;
+  let bestD = reach;
+  world.plots.forEach((p, i) => {
+    const d = Math.hypot(Math.max(p.x - x, 0, x - (p.x + p.w)), Math.max(p.z - z, 0, z - (p.z + p.d)));
+    if (d < bestD || (d === 0 && !best)) [best, bestD] = [{ id: i, x: p.x, z: p.z, w: p.w, d: p.d }, d];
+  });
+  return best;
 }
 
 /** The same part of the town in view (the messages make a new rect each time). */
@@ -419,6 +435,20 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private lastFrame: FrameState | null = null;
   private readonly markerHead = { x: 0, y: 0, z: 0 };
   private followIndex: number | null = null;
+  /** The roaming camera's stream of chunks and its focus lot (`shared/focus.ts`), a flight across the world (`flyTo`). */
+  private readonly roam = new Roam();
+  private readonly flight = new Flight();
+  private readonly flightPose = { x: 0, z: 0, radius: 0 };
+  private focusLotListener: ((plot: number) => boolean) | null = null;
+  /** The lot (index) the roaming camera settled on last and the game took (it is not framed: `buildSims`). */
+  private roamedTo: number | null = null;
+  private watchListener: ((rect: [number, number, number, number]) => void) | null = null;
+  /** The street building the chunks streamed in, between world builds; another stream change waits for it. */
+  private streaming: Promise<void> | null = null;
+  private streamDue = false;
+  private streamSlice = 0;
+  /** Whether the stream limits what the street draws (a big world, or `?stream=1`); else the whole town is drawn, as it always was. */
+  private streamOn = false;
   /** Whether the camera has caught up with the resident it follows (`keepUp`: then it stays near them). */
   private followCaught = false;
   private readonly followHead = { x: 0, y: 0, z: 0 };
@@ -600,6 +630,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     o.wheelDeltaPercentage = 0.012;
     o.panningSensibility = 90;
     o.mapPanning = true;
+    o.panRadius = 24;
     o.inertia = 0.82;
     o.panningInertia = 0.82;
     this.detachOrbit = o.attach(canvas);
@@ -673,7 +704,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.onFrame?.(this.pacer.frameTime || performance.now());
       updated = performance.now();
       if (this.townMode) this.townFrame(dt);
-      else this.orbit.step(dt, Math.max(0.05, (dt * 60) / 1000));
+      else {
+        this.orbit.step(dt, Math.max(0.05, (dt * 60) / 1000));
+        this.roamFrame(dt);
+      }
       this.sunShadows.frame();
       this.applyCamera();
       this.pushGrass(dt);
@@ -764,10 +798,117 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   focus(x: number, z: number): void {
     // Keep the viewing angle; move the camera with its target.
     const o = this.orbit;
+    this.flight.stop();
     o.target.x = x;
     o.target.y = 0;
     o.target.z = z;
     o.radius = Math.min(o.radius, 32);
+  }
+
+  flyTo(x: number, z: number): void {
+    const o = this.orbit;
+    o.stopInertia();
+    this.flight.start(o.target.x, o.target.z, o.radius, x, z, Math.min(Math.max(o.radius, 24), 40));
+  }
+
+  onFocusLot(listener: ((plot: number) => boolean) | null): void {
+    this.focusLotListener = listener;
+  }
+
+  onWatch(listener: ((rect: [number, number, number, number]) => void) | null): void {
+    this.watchListener = listener;
+  }
+
+  /**
+   * Each frame, after the camera's input: a flight under way, then the chunks round the camera
+   * (streamed into the street) and the lot it has settled on (`onFocusLot`).
+   */
+  private roamFrame(dt: number): void {
+    const o = this.orbit;
+    if (this.flight.step(dt / 1000, this.flightPose)) {
+      o.target.x = this.flightPose.x;
+      o.target.z = this.flightPose.z;
+      o.radius = this.flightPose.radius;
+      o.checkLimits();
+    }
+    const world = this.builtWorld;
+    if (!world || !this.street.layout) return;
+    this.followShadows();
+    this.roam.pinned = this.followIndex !== null || this.gameRig.active || this.flight.active;
+    const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
+    const fovH = 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect);
+    const changed = this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha: o.alpha, fovH }, performance.now(), (x, z, reach) => plotNear(world, x, z, reach), (plot) => {
+      const taken = !!this.focusLotListener?.(plot.id);
+      if (taken) this.roamedTo = plot.id;
+      return taken;
+    });
+    if (!changed) return;
+    if (this.streamOn && this.street.setChunks(this.roam.chunks)) this.streamStreet();
+    this.reportWatch();
+  }
+
+  /**
+   * The sun's shadow square: round the viewed lot while the camera looks at it (`buildWorld`); once
+   * it roams off it, round the camera's target, snapped to 8 m (it moves in steps, drawn again
+   * each), half a side of `clamp(0.9 · radius + 15, 30, 70)` m.
+   */
+  private followShadows(): void {
+    const v = this.view;
+    const t = this.orbit.target;
+    if (!v) return;
+    const onLot = (t.x >= v.x - 4 && t.z >= v.z - 4 && t.x <= v.x + v.w + 4 && t.z <= v.z + v.d + 4);
+    const square = onLot ? `lot` : `${Math.round(t.x / 8) * 8},${Math.round(t.z / 8) * 8},${Math.round(Math.min(70, Math.max(30, 0.9 * this.orbit.radius + 15)) / 8)}`;
+    if (square === this.shadowSquare) return;
+    this.shadowSquare = square;
+    if (onLot) this.sunShadows.setSquare(v.x + v.w / 2, v.z + v.d / 2, Math.hypot(v.w, v.d) / 2 + SHADOW_MARGIN);
+    else this.sunShadows.setSquare(Math.round(t.x / 8) * 8, Math.round(t.z / 8) * 8, Math.min(70, Math.max(30, 0.9 * this.orbit.radius + 15)));
+  }
+  private shadowSquare = 'lot';
+
+  /** The sim's full-detail area: the chunks streamed in, as a tile rectangle on the ground (`onWatch`). */
+  private reportWatch(): void {
+    const world = this.builtWorld;
+    if (!world || !this.watchListener || !this.roam.chunks.size) return;
+    let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const id of this.roam.chunks) {
+      const [cx, cz] = chunkCoords(id);
+      x0 = Math.min(x0, cx * CHUNK);
+      z0 = Math.min(z0, cz * CHUNK);
+      x1 = Math.max(x1, (cx + 1) * CHUNK);
+      z1 = Math.max(z1, (cz + 1) * CHUNK);
+    }
+    const d = groundDepth(world);
+    this.watchListener([Math.max(0, x0), Math.max(0, z0), Math.min(world.width, x1), Math.min(d, z1)]);
+  }
+
+  /** The street builds the chunks streamed in (between world builds; a world build builds them itself). */
+  private streamStreet(): void {
+    if (this.worldBuilding || this.streaming) {
+      this.streamDue = true;
+      return;
+    }
+    const world = this.builtWorld;
+    if (!world) return;
+    this.streaming = (async () => {
+      do {
+        this.streamDue = false;
+        this.streamSlice = performance.now();
+        await this.street.build(world, this.view, () => this.streamPace());
+        if (this.disposed) return;
+        this.sunShadows.moved();
+      } while (this.streamDue && !this.worldBuilding);
+    })()
+      .catch((err: unknown) => console.error('[render] streaming the street failed', err))
+      .finally(() => {
+        this.streaming = null;
+      });
+  }
+
+  /** A stream's build gives the frame back every 4 ms of main-thread time (the camera is moving: a frame it takes shows). */
+  private async streamPace(): Promise<void> {
+    if (performance.now() - this.streamSlice < 4) return;
+    await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    this.streamSlice = performance.now();
   }
 
   setGameShot(shot: GameShot | null, cut = false): void {
@@ -917,6 +1058,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.builtStorey = this.storey;
     } finally {
       this.worldBuilding = false;
+      // (A stream change while it built: the street catches up.)
+      if (this.streamDue) this.streamStreet();
     }
   }
 
@@ -946,10 +1089,26 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const [cx, cz] = [view ? view.x + view.w / 2 : width / 2, view ? view.z + view.d / 2 : depth / 2];
     // The sun's shadows cover a fixed square round the lot (`sunShadows.ts`).
     this.sunShadows.setSquare(cx, cz, Math.hypot(view?.w ?? width, view?.d ?? depth) / 2 + SHADOW_MARGIN);
+    this.shadowSquare = 'lot';
     if (!this.cameraPlaced) {
       this.aimAt(cx, cz);
       this.cameraPlaced = true;
     }
+    // The camera roams the land (a big world's, or the town and 60 m round it); the street streams
+    // its chunks round it in a big world, else draws the whole town as ever. The lot in view is the focus.
+    this.orbit.panBounds = panBounds(world);
+    this.orbit.checkLimits();
+    this.streamOn = world.meta?.world?.size === 'big' || STREAM_FLAG;
+    const pb = this.orbit.panBounds;
+    this.roam.setBounds({ x0: pb.x0 - 300, z0: pb.z0 - 300, x1: pb.x1 + 300, z1: pb.z1 + 300 });
+    const viewIndex = view ? world.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
+    this.roam.setFocus(viewIndex >= 0 ? viewIndex : null);
+    if (this.streamOn) {
+      const o = this.orbit;
+      const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
+      this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha: o.alpha, fovH: 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect) }, performance.now(), () => null, () => false);
+      this.street.setChunks(this.roam.chunks);
+    } else this.street.setChunks(null);
     // (lotContents.ts: the landscape, with its country roads.)
     await this.lot.buildNature(world, (roads, parent) => drawRoads(this.app, roads, parent));
 
@@ -1001,7 +1160,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const key = v ? `${v.x},${v.z},${v.w},${v.d}` : '';
     const framing = !!v && key !== this.framedView;
     if (framing) this.framedView = key;
-    if (framing && this.followIndex === null) {
+    // (Not a lot the roaming camera settled on: the camera stays as the player has it.)
+    const roamed = !!v && this.roamedTo !== null && world.plots[this.roamedTo]?.x === v.x && world.plots[this.roamedTo]?.z === v.z;
+    if (framing && this.followIndex === null && !roamed) {
       const entry = world.plots.find((p) => p.x === v.x && p.z === v.z)?.entry;
       const dx = entry ? entry[0] - (v.x + v.w / 2) : 0;
       const dz = entry ? entry[1] - (v.z + v.d / 2) : 0;

@@ -521,8 +521,9 @@ export async function startSession(
       game.townOpen = false;
     },
     lookAt(x, z) {
-      // The renderer branch turns this into a flight across the world (`flyTo`).
-      renderer.focus(x, z);
+      // A flight across the world; the lot it settles on becomes the focus (`onFocusLot`).
+      if (game.follow !== null) controls.follow(null);
+      renderer.flyTo(x, z);
     },
     socialize(target, social) {
       if (game.mode !== 'live') return;
@@ -1158,14 +1159,26 @@ export async function startSession(
    * Switches the view to a lot: the worker sends that lot's geometry, then the scene is rebuilt.
    * The camera moves to its middle, unless it is going along with someone the player follows.
    */
-  function showPlot(plot: number) {
+  function showPlot(plot: number, aim = true) {
     const p = world?.plots[plot];
     if (!p) return;
     viewPlot = plot;
     game.viewPlot = plot;
-    if (game.follow === null) renderer.focus(p.x + p.w / 2, p.z + p.d / 2);
+    if (aim && game.follow === null) renderer.focus(p.x + p.w / 2, p.z + p.d / 2);
     bridge.setView([p.x, p.z, p.x + p.w, p.z + p.d]);
   }
+  // The roaming camera settles on a lot: it is shown in full, the camera left where it is (in live
+  // mode, not following anyone; build mode keeps the lot it builds on).
+  renderer.onFocusLot((plot) => {
+    if (game.mode !== 'live' || game.follow !== null || director.active || !world?.plots[plot]) return false;
+    if (plot !== viewPlot) showPlot(plot, false);
+    return true;
+  });
+  // What the camera streams in is the sim's full-detail area: in a big world (a town of today's sizes
+  // keeps its full detail on the viewed lot, as it always had).
+  renderer.onWatch((rect) => {
+    if (world?.meta?.world?.size === 'big') bridge.setWatch(rect);
+  });
   controls.setWallMode(game.wallMode);
 
   const inLot = (x: number, z: number) => !!world && x >= 0 && z >= 0 && x < world.width && z < world.depth;
