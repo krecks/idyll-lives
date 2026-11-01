@@ -687,6 +687,9 @@ pub struct Reach {
     part: Vec<u16>,
     /// Per chunk: how many parts it has.
     parts: Vec<u16>,
+    /// Per chunk: plain ground (every tile free, nothing built, no stairs): one part, joined
+    /// to its plain neighbours without trying the steps.
+    plain: Vec<bool>,
     /// Per chunk: the joins from its parts to other chunks' parts, `(part, chunk, part)`, sorted.
     joins: Vec<Vec<(u16, u32, u16)>>,
     /// Per chunk: the index of its first part in `region` (refreshed with the joins).
@@ -750,12 +753,28 @@ impl Reach {
             self.all_dirty = true;
         }
         self.part.resize(lot.tile_slots(), NO_PART);
+        // Chunks a flight of stairs is in (steps, feet, tops and landings): never plain.
+        let mut stairs: Vec<u32> = nav
+            .stairs
+            .stairs
+            .iter()
+            .flat_map(|s| {
+                (0..s.len)
+                    .map(|i| (s.bottom.0 + s.dir.0 * i, s.bottom.1 + s.dir.1 * i))
+                    .chain([s.foot, s.landing])
+            })
+            .filter(|&(x, z)| lot.in_bounds(x, z))
+            .map(|(x, z)| lot.chunk_at(x, z) as u32)
+            .collect();
+        stairs.sort_unstable();
+        stairs.dedup();
         if self.all_dirty {
             self.parts = vec![0; chunks];
+            self.plain = vec![false; chunks];
             self.joins = vec![Vec::new(); chunks];
             self.part.fill(NO_PART);
             for c in 0..chunks {
-                self.label(nav, c);
+                self.label(nav, c, &stairs);
             }
             for c in 0..chunks {
                 self.join(nav, c);
@@ -765,7 +784,7 @@ impl Reach {
             dirty.sort_unstable();
             dirty.dedup();
             for &c in &dirty {
-                self.label(nav, c as usize);
+                self.label(nav, c as usize, &stairs);
             }
             // The joins out of the chunks labelled again, and into them from round about.
             let (cols, rows) = grid;
@@ -801,8 +820,23 @@ impl Reach {
     }
 
     /// Labels the parts of chunk `c`: its free tiles, joined by the steps within it.
-    fn label(&mut self, nav: &NavGrid, c: usize) {
+    fn label(&mut self, nav: &NavGrid, c: usize, stairs: &[u32]) {
         let lot = nav.lot;
+        // Plain ground: every step inside it is open (no edge or diagonal built, nothing
+        // blocking, no stairs), so it is one part.
+        self.plain[c] = lot.chunk_allocated(c)
+            && !lot.chunk_built(c)
+            && stairs.binary_search(&(c as u32)).is_err()
+            && lot.chunk_tiles(c).all(|(x, z, _)| nav.tile_free(x, z));
+        if self.plain[c] {
+            let mut any = false;
+            for (_, _, s) in lot.chunk_tiles(c) {
+                self.part[s] = 0;
+                any = true;
+            }
+            self.parts[c] = u16::from(any);
+            return;
+        }
         for (_, _, s) in lot.chunk_tiles(c) {
             self.part[s] = NO_PART;
         }
@@ -836,7 +870,28 @@ impl Reach {
     fn join(&mut self, nav: &NavGrid, c: usize) {
         let lot = nav.lot;
         let mut joins = Vec::new();
-        if self.parts[c] > 0 {
+        let (cols, rows) = self.grid;
+        let (cx, cz) = (c % cols, c / cols);
+        let around: Vec<usize> = (cz.saturating_sub(1)..=(cz + 1).min(rows - 1))
+            .flat_map(|nz| {
+                (cx.saturating_sub(1)..=(cx + 1).min(cols - 1)).map(move |nx| nz * cols + nx)
+            })
+            .filter(|&n| n != c)
+            .collect();
+        // Plain among plain (or open air, or off the lot): every step across is open.
+        let easy = |n: usize| {
+            self.plain[n] || !lot.chunk_allocated(n) || {
+                let [x0, z0, x1, z1] = lot.chunk_rect(n);
+                x0 >= x1 || z0 >= z1
+            }
+        };
+        if self.plain[c] && self.parts[c] > 0 && around.iter().all(|&n| easy(n)) {
+            joins = around
+                .iter()
+                .filter(|&&n| self.plain[n] && self.parts[n] > 0)
+                .map(|&n| (0, n as u32, 0))
+                .collect();
+        } else if self.parts[c] > 0 {
             let link_tiles = nav
                 .stairs
                 .stairs

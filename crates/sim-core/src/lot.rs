@@ -951,6 +951,11 @@ impl Lot {
         self.chunk_of(x as usize, z as usize)
     }
 
+    /// Whether anything (a wall, door, window, fence, gate or diagonal) is built in chunk `c`.
+    pub fn chunk_built(&self, c: usize) -> bool {
+        self.built.get(c).is_some_and(|&n| n > 0)
+    }
+
     /// Whether chunk `c` is allocated.
     pub fn chunk_allocated(&self, c: usize) -> bool {
         self.base.get(c).is_some_and(|&b| b != 0)
