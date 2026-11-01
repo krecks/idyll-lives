@@ -311,6 +311,7 @@ pub(crate) fn update(w: &mut World) {
     let tick = w.tick;
     let day = clock::day(tick);
     let hour = clock::hour(tick);
+    let mut refreshed = false;
     for i in 0..w.sims.len() {
         // (In lots nobody watches, on their turn; see `lod.rs`.)
         if !w.sims[i].here() || w.sims[i].steps == 0 {
@@ -344,7 +345,13 @@ pub(crate) fn update(w: &mut World) {
                 });
             }
         } else {
-            refresh_commute(w, i, day);
+            // (The day's commutes: those with yesterday's to go by can wait a tick when the
+            // searches are over budget, one a tick at least.)
+            if w.sims[i].commute.is_none() || !w.over_search_budget() || !refreshed {
+                let before = w.sims[i].commute;
+                refresh_commute(w, i, day);
+                refreshed |= w.sims[i].commute != before;
+            }
             schedule_work(w, i, day);
             schedule_school(w, i, day);
             end_visit_if_due(w, i, hour);

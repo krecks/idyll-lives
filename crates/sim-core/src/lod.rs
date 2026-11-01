@@ -116,8 +116,9 @@ pub(crate) fn plan(w: &mut World) {
             LOD_TICKS
         };
         let s = &mut w.sims[i];
-        // Off to work or school (or told to do something): no waiting for their turn.
-        let called = s.queue.front().is_some_and(|t| t.directed);
+        // Off to work or school (or told to do something): no waiting for their turn. Nor for
+        // one whose turn last tick waited for this one (`Sim::deferred`).
+        let called = s.queue.front().is_some_and(|t| t.directed) || s.deferred;
         if full || called || (tick + i as u64).is_multiple_of(every) {
             s.steps = s.owed + 1;
             s.owed = 0;

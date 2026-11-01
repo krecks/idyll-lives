@@ -1155,6 +1155,10 @@ pub struct Sim {
     pub(crate) steps: u32,
     /// Ticks since their last turn.
     pub(crate) owed: u32,
+    /// Their turn last tick waited for the next, the tick's searches being over budget
+    /// (`SEARCH_BUDGET`): this tick they go whatever it costs (`lod::plan` gives them a turn).
+    /// Not saved.
+    pub(crate) deferred: bool,
 }
 
 impl Sim {
@@ -1727,6 +1731,12 @@ pub struct World {
     /// The last changes to walking and where they were (`nav_changed_in`), so walkers far from
     /// them keep their way.
     pub(crate) nav_log: crate::path::NavLog,
+    /// `path::nodes_searched` as this tick began: what its searches cost so far is the
+    /// difference (`over_search_budget`). Not saved.
+    pub(crate) search_mark: u64,
+    /// The tiles a tick's searches may expand before turns that may search wait for the next
+    /// (`SEARCH_BUDGET`; open-world towns only). Not saved.
+    pub search_budget: u64,
     /// Bumped when objects come, go or move (or walls change), not when only a car parks: the
     /// objects-by-plot index, the links and the staff plan follow it.
     pub(crate) objects_version: u32,
@@ -2097,6 +2107,8 @@ impl World {
             structure_version: 1,
             nav_version: 1,
             nav_log: Default::default(),
+            search_mark: 0,
+            search_budget: SEARCH_BUDGET,
             objects_version: 1,
             reach: Default::default(),
             reach_version: 0,
@@ -2769,6 +2781,7 @@ impl World {
             social_waited: 0,
             called: false,
             nav_seen: 0,
+            deferred: false,
             commute: None,
             on_trail: None,
             game: None,
@@ -3494,6 +3507,13 @@ impl World {
         }
     }
 
+    /// Whether this tick's searches so far have expanded more than `search_budget` tiles in an
+    /// open-world town: what can wait for the next tick does (residents' turns, the day's
+    /// commutes worked out again).
+    pub(crate) fn over_search_budget(&self) -> bool {
+        self.travel.open && crate::path::nodes_searched() - self.search_mark > self.search_budget
+    }
+
     /// The most residents this town grows to by births and newcomers: `MAX_SIMS` in a big
     /// world, else `TOWN_SIMS` (cosy and normal towns, and towns and saves without a size).
     pub fn population_cap(&self) -> usize {
@@ -3718,6 +3738,7 @@ impl World {
         }
         self.tick += 1;
         let tick = self.tick;
+        self.search_mark = crate::path::nodes_searched();
 
         crate::partners::refresh(self);
         crate::staff::update(self);
@@ -3773,6 +3794,22 @@ impl World {
         self.briefs = briefs;
         crate::privacy::refresh(self);
         crate::lod::plan(self);
+        // Those who go first when the tick's searches run over budget: the player's household
+        // and whoever is watched (open-world towns only; see `SEARCH_BUDGET`).
+        let first: Vec<bool> = if self.travel.open {
+            (0..self.sims.len())
+                .map(|i| {
+                    self.full_detail(i)
+                        || self
+                            .households
+                            .get(self.sims[i].household as usize)
+                            .is_some_and(|h| h.player)
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let (search_mark, budget) = (self.search_mark, self.search_budget);
         let hour = crate::clock::hour(tick);
         let mut work = std::mem::take(&mut self.work);
         self.fill_work_waiting(&mut work);
@@ -3841,6 +3878,19 @@ impl World {
             };
             // (In lots nobody watches, only those whose turn it is; see `lod.rs`.)
             for sim in sims.iter_mut().filter(|s| s.here() && s.steps > 0) {
+                // The tick's searches over budget: one who may look for a way now waits for
+                // the next tick, unless they go first or waited last tick.
+                if first.get(sim.id as usize) == Some(&false)
+                    && !sim.deferred
+                    && crate::path::nodes_searched() - search_mark > budget
+                    && may_search(sim, &ctx)
+                {
+                    sim.owed += sim.steps;
+                    sim.steps = 0;
+                    sim.deferred = true;
+                    continue;
+                }
+                sim.deferred = false;
                 step_sim(sim, &ctx, objects, items, rng);
             }
         }
@@ -5130,6 +5180,22 @@ pub(crate) fn practise(
     if after.floor() > before.floor() {
         sim.skill_ups |= 1 << skill;
         sim.planner.recheck = true;
+    }
+}
+
+/// The tiles a tick's searches may expand (`path::nodes_searched`) before those who may look for a
+/// way wait for the next tick (open-world towns: a whole hamlet setting off at once). The
+/// player's household and whoever is watched never wait, nor anyone who waited last tick.
+pub const SEARCH_BUDGET: u64 = 150_000;
+
+/// Whether `sim`'s turn may look for a way somewhere: they're choosing or starting something,
+/// or walking a way a change since may lie across. (Someone at something, talking or waiting
+/// won't, until it ends.)
+fn may_search(sim: &Sim, ctx: &Ctx) -> bool {
+    match sim.current.as_ref().map(|a| &a.phase) {
+        None => true,
+        Some(Phase::Routing { .. }) => sim.nav_seen != ctx.nav_version && route_touched(sim, ctx),
+        Some(_) => false,
     }
 }
 
