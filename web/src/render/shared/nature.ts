@@ -22,6 +22,8 @@ export const RING = 150;
 const WORLD_RING = 260;
 /** Flat apron around the town before the hills start. */
 export const APRON = 6;
+/** A big world's distance-from-built grid (m a cell; `distanceToTown`). */
+const BUILT_CELL = 2;
 const TERRAIN_STEP = 2.5;
 /** At most this many terrain quads across (a wider landscape gets coarser ones). */
 const TERRAIN_SEGMENTS = 260;
@@ -385,6 +387,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     this.d = groundDepth(world);
     this.land = { ...DEFAULT_LANDSCAPE, ...world.meta?.world?.landscape };
     this.ring = world.meta?.world ? WORLD_RING : RING;
+    this.built = world.meta?.world?.size === 'big' ? LandscapeLayout.builtField(world, this.w, this.d) : null;
     this.passes = townExits(world);
     this.roads = makeRoads(
       { seed: this.seed, w: this.w, d: this.d, ring: this.ring, ground: (x, z) => this.ground(x, z), waterEdge: (x, z) => this.waterEdge(x, z), distanceToTown: (x, z) => this.distanceToTown(x, z) },
@@ -438,7 +441,70 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   distanceToTown(x: number, z: number): number {
     const dx = Math.max(0 - x, 0, x - this.w);
     const dz = Math.max(0 - z, 0, z - this.d);
-    return Math.hypot(dx, dz);
+    if (!this.built) return Math.hypot(dx, dz);
+    // A big world: from what is built (its lots, roads and trails), the land between rising as round a town.
+    const b = this.built;
+    const cx = Math.max(0, Math.min(b.gw - 1, Math.floor(Math.min(this.w, Math.max(0, x)) / BUILT_CELL)));
+    const cz = Math.max(0, Math.min(b.gd - 1, Math.floor(Math.min(this.d, Math.max(0, z)) / BUILT_CELL)));
+    return Math.hypot(dx, dz) + b.dist[cz * b.gw + cx];
+  }
+
+  /**
+   * A big world's distance (m) from anything built, on a `BUILT_CELL` m grid over it: its lots, and
+   * its roads and trails with a verge, so every hamlet gets the flat apron a town has and the land
+   * rises between them (two chamfer passes, ~2 % off the true distance). Null: not a big world.
+   */
+  private readonly built: { gw: number; gd: number; dist: Float32Array } | null;
+
+  private static builtField(world: WorldStructure, w: number, d: number): { gw: number; gd: number; dist: Float32Array } {
+    const gw = Math.ceil(w / BUILT_CELL);
+    const gd = Math.ceil(d / BUILT_CELL);
+    const dist = new Float32Array(gw * gd).fill(1e9);
+    const mark = (x0: number, z0: number, x1: number, z1: number) => {
+      for (let cz = Math.max(0, Math.floor(z0 / BUILT_CELL)); cz <= Math.min(gd - 1, Math.floor(z1 / BUILT_CELL)); cz++) {
+        for (let cx = Math.max(0, Math.floor(x0 / BUILT_CELL)); cx <= Math.min(gw - 1, Math.floor(x1 / BUILT_CELL)); cx++) dist[cz * gw + cx] = 0;
+      }
+    };
+    for (const p of world.plots) mark(p.x, p.z, p.x + p.w, p.z + p.d);
+    for (const r of world.meta?.roads ?? []) {
+      const half = r.width / 2 + 2;
+      for (let i = 0; i + 1 < r.points.length; i++) {
+        const [[ax, az], [bx, bz]] = [r.points[i], r.points[i + 1]];
+        const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / BUILT_CELL));
+        for (let k = 0; k <= n; k++) {
+          const [x, z] = [ax + ((bx - ax) * k) / n, az + ((bz - az) * k) / n];
+          mark(x - half, z - half, x + half, z + half);
+        }
+      }
+    }
+    const c = BUILT_CELL;
+    const diag = c * Math.SQRT2;
+    const relax = (i: number, j: number, cost: number) => {
+      if (dist[j] + cost < dist[i]) dist[i] = dist[j] + cost;
+    };
+    for (let z = 0; z < gd; z++) {
+      for (let x = 0; x < gw; x++) {
+        const i = z * gw + x;
+        if (x > 0) relax(i, i - 1, c);
+        if (z > 0) {
+          relax(i, i - gw, c);
+          if (x > 0) relax(i, i - gw - 1, diag);
+          if (x < gw - 1) relax(i, i - gw + 1, diag);
+        }
+      }
+    }
+    for (let z = gd - 1; z >= 0; z--) {
+      for (let x = gw - 1; x >= 0; x--) {
+        const i = z * gw + x;
+        if (x < gw - 1) relax(i, i + 1, c);
+        if (z < gd - 1) {
+          relax(i, i + gw, c);
+          if (x < gw - 1) relax(i, i + gw + 1, diag);
+          if (x > 0) relax(i, i + gw - 1, diag);
+        }
+      }
+    }
+    return { gw, gd, dist };
   }
 
   /** Height of the land, levelled under the roads out of town. */

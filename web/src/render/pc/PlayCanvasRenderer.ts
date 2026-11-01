@@ -879,6 +879,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!world || !this.street.layout) return;
     this.followShadows();
     this.street.frame(o.target.x, o.target.z);
+    this.lot.landscape?.frameTiles(o.target.x, o.target.z);
     this.roam.pinned = this.followIndex !== null || this.gameRig.active || this.flight.active;
     const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
     const fovH = 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect);

@@ -145,7 +145,7 @@ export class Grass {
   /** The town's ground in metres (the mask's size), and from how far round it to how far the lawn's tone fades out on the ground. */
   private readonly townSize = new Float32Array(4);
   /** The town's ground draw (`onGround`): it reads the mask too. */
-  private ground: pc.MeshInstance | null = null;
+  private grounds: pc.MeshInstance[] = [];
   /** A patch's bounds, with room for the eye to move by `SLACK` before they're chosen again. */
   private readonly sphere = new pc.BoundingSphere(new pc.Vec3(), GRASS.patch * 0.75 + 0.4 + SLACK);
   private readonly matrix = new Float32Array(16);
@@ -211,7 +211,7 @@ export class Grass {
     const n = GRASS.townTexels;
     this.townSize[0] = f.townW / n;
     this.townSize[1] = f.townD / n;
-    for (const on of [this.material, this.ground]) {
+    for (const on of [this.material, ...this.grounds]) {
       on?.setParameter('game_grassTown', this.town);
       on?.setParameter('game_grassTownSize', this.townSize);
     }
@@ -222,11 +222,14 @@ export class Grass {
    * grows, and its shade near the eye (the town's mask too, `refresh`); the lawn's tone and gusts
    * go on past the field, fading out (`GRASS.toneFade`).
    */
-  onGround(meshInstance: pc.MeshInstance): void {
-    this.ground = meshInstance;
-    meshInstance.setParameter('game_grassEye', this.eye);
-    meshInstance.setParameter('game_grassColour', this.colour);
-    meshInstance.setParameter('game_grassArea', this.area);
+  onGround(meshInstances: pc.MeshInstance | readonly pc.MeshInstance[]): void {
+    // (A big world's ground is tiles: each draw of it.)
+    this.grounds = Array.isArray(meshInstances) ? [...meshInstances] : [meshInstances as pc.MeshInstance];
+    for (const mi of this.grounds) {
+      mi.setParameter('game_grassEye', this.eye);
+      mi.setParameter('game_grassColour', this.colour);
+      mi.setParameter('game_grassArea', this.area);
+    }
     this.setTown();
   }
 

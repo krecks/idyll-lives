@@ -547,6 +547,8 @@ export class TownStreet {
   readonly plots: PlotLayout[];
   private world: WorldStructure;
   private readonly roads: RoadPlan[];
+  /** A big world's ways between its areas: country roads (a surface, no sidewalks) and trails (a narrow path). */
+  private readonly ways: { country: RoadPlan[]; trail: RoadPlan[] };
   private readonly index: RoadIndex;
   private readonly paths: Rect[];
   private readonly fields: Rect[];
@@ -576,7 +578,7 @@ export class TownStreet {
   private readonly kerbUnits = new Map<string, { hash: number; out: KerbOut }>();
   private readonly fieldUnits = new Map<string, { hash: number; out: Parts }>();
   /** The street's own: sidewalks, the road's surface, fountains, the menus' parked cars (by chunk). */
-  private statics: Map<number, { parts: Parts; road: Geo }> | null = null;
+  private statics: Map<number, { parts: Parts; road: Geo; trail: Geo }> | null = null;
   /** Kerbs by road side, and which plots front each. */
   private readonly rows = new Map<string, number[]>();
   readonly footprints = new Map<string, [number, number]>();
@@ -590,7 +592,11 @@ export class TownStreet {
   ) {
     this.world = world;
     const streets = (world.meta?.streets ?? []).filter((s) => s.w >= s.d);
-    this.roads = townRoads(world);
+    // Streets and lanes get sidewalks and kerbside furniture; a big world's country roads only their
+    // surface, its trails a narrow path (`ways`).
+    const all = townRoads(world);
+    this.roads = all.filter((r) => r.kind !== 'country' && r.kind !== 'trail');
+    this.ways = { country: all.filter((r) => r.kind === 'country'), trail: all.filter((r) => r.kind === 'trail') };
     this.index = roadIndex(this.roads);
     this.paths = world.meta?.paths ?? [];
     this.fields = world.meta?.world?.fields ?? [];
@@ -1309,20 +1315,23 @@ export class TownStreet {
   }
 
   /** Sidewalks and kerbs, the road's surface (the game's), the fountains on roundabouts, the menus' parked cars: by chunk, planned once. */
-  private staticParts(): Map<number, { parts: Parts; road: Geo }> {
+  private staticParts(): Map<number, { parts: Parts; road: Geo; trail: Geo }> {
     if (this.statics) return this.statics;
-    const out = new Map<number, { parts: Parts; road: Geo }>();
+    const out = new Map<number, { parts: Parts; road: Geo; trail: Geo }>();
     const at = (x: number, z: number) => {
       const id = chunkAt(x, z);
       let c = out.get(id);
-      if (!c) out.set(id, (c = { parts: new Parts(this.options.has), road: new Geo() }));
+      if (!c) out.set(id, (c = { parts: new Parts(this.options.has), road: new Geo(), trail: new Geo() }));
       return c;
     };
     // Sidewalks, kerbs and the road, each piece in the chunk its middle is in.
     const walk = new RoutedGeo((x, z) => at(x, z).parts.walk);
     const shadows = new RoutedGeo((x, z) => at(x, z).parts.shadows).color('#000000');
     roadMeshes(this.roads, null, 0, { walk, shadows }, 'sidewalks');
-    if (this.options.ground) roadMeshes(this.roads, null, 0, { surface: new RoutedGeo((x, z) => at(x, z).road) }, 'surface');
+    if (this.options.ground) {
+      roadMeshes([...this.roads, ...this.ways.country], null, 0, { surface: new RoutedGeo((x, z) => at(x, z).road) }, 'surface');
+      roadMeshes(this.ways.trail, null, 0, { surface: new RoutedGeo((x, z) => at(x, z).trail) }, 'surface');
+    }
     // A fountain in the middle of every roundabout, flowers round it.
     for (const road of this.roads) {
       if (road.island !== 'fountain') continue;
@@ -1405,6 +1414,8 @@ export class TownStreet {
       const mine = (r: Rect) => chunkAt(r.x + r.w / 2, r.z + r.d / 2) === id && !onLot(r);
       const road = this.staticParts().get(id)?.road;
       if (road && !road.empty) ground.push({ name: 'streets', material: 'material.road', geo: road });
+      const trail = this.staticParts().get(id)?.trail;
+      if (trail && !trail.empty) ground.push({ name: 'trails', material: 'material.path', geo: trail });
       for (const [name, all, material, y] of this.groundRects()) {
         const list = all.filter(mine);
         if (!list.length) continue;

@@ -105,8 +105,9 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
 
   async build(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder): Promise<NatureResult> {
     const draws: pc.Entity[] = [];
-    const ground = await perfTimeAsync('nature: terrain', () => this.terrain(app, parent, pace));
-    draws.push(ground);
+    // A big world's ground in 128 m tiles of three levels of detail; a town of today's sizes one mesh, as ever.
+    const grounds = world.meta?.world?.size === 'big' ? await perfTimeAsync('nature: terrain tiles', () => this.terrainTiles(app, parent, pace)) : [await perfTimeAsync('nature: terrain', () => this.terrain(app, parent, pace))];
+    draws.push(...grounds);
     if (this.watered) draws.push(perfTime('nature: water', () => this.water(app, parent)));
     if (buildRoads) draws.push(...perfTime('nature: roads', () => buildRoads(this.roads, parent)));
     for (const e of draws) e.enabled = false;
@@ -116,7 +117,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     await perfTimeAsync('nature: lawns', () => this.plantLawns(app, parent, assets, world, pace));
     const field = await perfTimeAsync('nature: grass field', () => grassField(world, this, pace, this.ring));
     const grass = (this.grass = new Grass(app, parent, field, this.grassQuality));
-    grass.onGround(ground.render!.meshInstances[0]);
+    grass.onGround(grounds.map((g) => g.render!.meshInstances[0]));
     const plants = gather(this.batches);
     return { draws: [...draws, ...plants.draws, ...grass.draws.map((d) => d.entity)], casters: plants.casters, only: plants.only };
   }
@@ -198,6 +199,62 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.lawnMask = lawnMask(world);
     hideLawn(this.lawn, this.lawnMask, uploadLawn);
     this.grass?.refresh(world);
+  }
+
+  /**
+   * A big world's ground: the landscape's square in `TILE` m tiles, each with three meshes (64, 32
+   * and 16 quads across) and a skirt hanging from its edges (no cracks where neighbours differ), one
+   * draw each, the mesh it draws chosen by distance from the camera's target (`frameTiles`). Only
+   * the finest grid is shaded (heights and colours, a ring past the tile for its normals); the
+   * coarser take every second and fourth of its points.
+   */
+  private async terrainTiles(app: pc.AppBase, parent: pc.Entity, pace?: () => Promise<void>): Promise<pc.Entity[]> {
+    const { size } = this.terrainGrid();
+    const x0 = this.w / 2 - size / 2;
+    const z0 = this.d / 2 - size / 2;
+    const count = Math.ceil(size / TILE);
+    const material = MaterialLibrary.for(app).surface('material.ground', { vertexColors: true, variant: 'grass' });
+    grassGround(app.graphicsDevice, material);
+    const out: pc.Entity[] = [];
+    this.tiles = [];
+    const S = TILE_LODS[0];
+    const c = TILE / S;
+    const n = S + 3; // (a ring of one past the tile for the normals)
+    for (let j = 0; j < count; j++) {
+      for (let i = 0; i < count; i++) {
+        const tx = x0 + i * TILE;
+        const tz = z0 + j * TILE;
+        // Grid point (col, row) of the finest level, col and row from -1 to S + 1; row 0 at the tile's far (max z) edge.
+        const positions = new Float32Array(n * n * 3);
+        for (let row = -1, v = 0; row <= S + 1; row++) for (let col = -1; col <= S + 1; col++, v++) [positions[v * 3], positions[v * 3 + 2]] = [tx + col * c, tz + (S - row) * c];
+        const colors = new Float32Array(n * n * 4);
+        await this.shadeTerrain(positions, colors, pace);
+        const at = (col: number, row: number) => (row + 1) * n + col + 1;
+        const meshes = TILE_LODS.map((segs) => tileMesh(app, positions, colors, at, segs, S / segs, c, x0, z0, size));
+        const mi = new pc.MeshInstance(meshes[1], material);
+        const entity = new pc.Entity(`terrain${i},${j}`, app);
+        entity.addComponent('render', { meshInstances: [mi], castShadows: false, receiveShadows: true });
+        entity.enabled = false;
+        parent.addChild(entity);
+        out.push(entity);
+        this.tiles.push({ mi, meshes, x: tx + TILE / 2, z: tz + TILE / 2, lod: 1 });
+      }
+    }
+    return out;
+  }
+
+  /** A big world's ground tiles: each one's draw, its meshes by level, where its middle is and the level drawn. */
+  private tiles: { mi: pc.MeshInstance; meshes: pc.Mesh[]; x: number; z: number; lod: number }[] = [];
+
+  /** Each frame (the game's): each ground tile draws the level for its distance from (`x`, `z`), the camera's target. */
+  frameTiles(x: number, z: number): void {
+    for (const t of this.tiles) {
+      const d = Math.hypot(t.x - x, t.z - z);
+      const lod = d < TILE_NEAR ? 0 : d < TILE_MID ? 1 : 2;
+      if (lod === t.lod) continue;
+      t.lod = lod;
+      t.mi.mesh = t.meshes[lod];
+    }
   }
 
   /** The ground: a regular grid over the landscape's square, lifted to the land and coloured. */
@@ -303,6 +360,82 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
 }
 
 /** An entity of `app` drawing `mesh` with `material`, switched off, under `parent`; it receives shadows and casts none. */
+/** A big world's ground tiles (m), their levels' quads across, and the distances (m from the camera's target, to a tile's middle) they change at. */
+const TILE = 128;
+const TILE_LODS = [64, 32, 16];
+const TILE_NEAR = 200;
+const TILE_MID = 460;
+
+/**
+ * One level of a ground tile from the finest level's shaded points (`at(col, row)` into `positions`
+ * and `colors`, `c` m apart): every `step`th of them, `segs` quads across, normals from the
+ * finest heights round each point, and a skirt down from the edges. UVs as the one-mesh ground's
+ * (over the landscape's square from `x0`, `z0`, `size` across).
+ */
+function tileMesh(app: pc.AppBase, positions: Float32Array, colors: Float32Array, at: (col: number, row: number) => number, segs: number, step: number, c: number, x0: number, z0: number, size: number): pc.Mesh {
+  const m = segs + 1;
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uv: number[] = [];
+  const col: number[] = [];
+  const idx: number[] = [];
+  const vertex = (k: number, drop = 0) => {
+    const [x, y, z] = [positions[k * 3], positions[k * 3 + 1], positions[k * 3 + 2]];
+    pos.push(x, y - drop, z);
+    uv.push((x - x0) / size, (z - z0) / size);
+    col.push(colors[k * 4], colors[k * 4 + 1], colors[k * 4 + 2], colors[k * 4 + 3]);
+    return pos.length / 3 - 1;
+  };
+  const normal = (cc: number, rr: number) => {
+    const h = (a: number, b: number) => positions[at(a, b) * 3 + 1];
+    // (Rows run towards -z: the slope along z is the other way round.)
+    const dx = (h(cc + 1, rr) - h(cc - 1, rr)) / (2 * c);
+    const dz = (h(cc, rr - 1) - h(cc, rr + 1)) / (2 * c);
+    const l = Math.hypot(dx, 1, dz);
+    nor.push(-dx / l, 1 / l, -dz / l);
+  };
+  for (let row = 0; row < m; row++) {
+    for (let cc = 0; cc < m; cc++) {
+      vertex(at(cc * step, row * step));
+      normal(cc * step, row * step);
+    }
+  }
+  for (let row = 0; row < segs; row++) {
+    for (let cc = 0; cc < segs; cc++) {
+      idx.push(cc + 1 + (row + 1) * m, cc + 1 + row * m, cc + row * m, cc + (row + 1) * m, cc + 1 + (row + 1) * m, cc + row * m);
+    }
+  }
+  // The skirt: each edge's points again, a cell and a metre lower, joined to the edge both ways round.
+  const drop = c * step + 1;
+  const edges = [Array.from({ length: m }, (_, k) => k), Array.from({ length: m }, (_, k) => segs * m + k), Array.from({ length: m }, (_, k) => k * m), Array.from({ length: m }, (_, k) => k * m + segs)];
+  for (const edge of edges) {
+    const low = edge.map((v) => {
+      const k = vertex(0);
+      // (A copy of the edge point, lowered: overwrite what `vertex(0)` wrote.)
+      pos[k * 3] = pos[v * 3];
+      pos[k * 3 + 1] = pos[v * 3 + 1] - drop;
+      pos[k * 3 + 2] = pos[v * 3 + 2];
+      uv[k * 2] = uv[v * 2];
+      uv[k * 2 + 1] = uv[v * 2 + 1];
+      for (let q = 0; q < 4; q++) col[k * 4 + q] = col[v * 4 + q];
+      nor.push(nor[v * 3], nor[v * 3 + 1], nor[v * 3 + 2]);
+      return k;
+    });
+    for (let k = 0; k + 1 < edge.length; k++) {
+      const [a, b, la, lb] = [edge[k], edge[k + 1], low[k], low[k + 1]];
+      idx.push(a, b, lb, a, lb, la, a, lb, b, a, la, lb);
+    }
+  }
+  const mesh = new pc.Mesh(app.graphicsDevice);
+  mesh.setPositions(pos);
+  mesh.setNormals(nor);
+  mesh.setUvs(0, uv);
+  mesh.setColors(col);
+  mesh.setIndices(pos.length / 3 > 65535 ? new Uint32Array(idx) : new Uint16Array(idx));
+  mesh.update(pc.PRIMITIVE_TRIANGLES);
+  return mesh;
+}
+
 function drawOf(app: pc.AppBase, parent: pc.Entity, name: string, mesh: pc.Mesh, material: pc.Material): pc.Entity {
   const entity = new pc.Entity(name, app);
   entity.addComponent('render', { meshInstances: [new pc.MeshInstance(mesh, material)], castShadows: false, receiveShadows: true });
