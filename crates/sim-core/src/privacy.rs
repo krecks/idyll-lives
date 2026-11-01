@@ -388,7 +388,9 @@ fn room_hash(w: &World, room: u16, presence: u64) -> u64 {
         mix(&mut h, o.open as u64);
         mix(&mut h, o.ripe() as u64);
         mix(&mut h, o.run.map_or(0, |m| if m > 0.0 { 1 } else { 2 }));
-        mix(&mut h, o.closed_users);
+        for &w in o.closed_users.words() {
+            mix(&mut h, w);
+        }
         let mut n = 0;
         for u in o.users() {
             mix(&mut h, u as u64);

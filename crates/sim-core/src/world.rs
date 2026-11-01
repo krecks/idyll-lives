@@ -17,7 +17,46 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-pub const MAX_SIMS: usize = 64;
+pub const MAX_SIMS: usize = 160;
+
+/// A set of residents by slot (`MAX_SIMS` of them, a bit each).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct SimSet([u64; SIM_WORDS]);
+
+/// Words in a `SimSet`.
+const SIM_WORDS: usize = MAX_SIMS.div_ceil(64);
+
+impl SimSet {
+    pub fn insert(&mut self, sim: u32) {
+        if let Some(w) = self.0.get_mut(sim as usize / 64) {
+            *w |= 1 << (sim % 64);
+        }
+    }
+
+    pub fn remove(&mut self, sim: u32) {
+        if let Some(w) = self.0.get_mut(sim as usize / 64) {
+            *w &= !(1 << (sim % 64));
+        }
+    }
+
+    pub fn contains(&self, sim: u32) -> bool {
+        self.0
+            .get(sim as usize / 64)
+            .is_some_and(|w| w & (1 << (sim % 64)) != 0)
+    }
+
+    /// Whether anyone but `sim` is in it.
+    pub fn any_but(&self, sim: u32) -> bool {
+        let mut rest = *self;
+        rest.remove(sim);
+        rest.0.iter().any(|&w| w != 0)
+    }
+
+    /// The set's words, lowest residents first (for fingerprints).
+    pub fn words(&self) -> &[u64] {
+        &self.0
+    }
+}
 pub const MAX_QUEUE: usize = 6;
 /// How many things a resident remembers they couldn't get to (`Sim::unreachable`).
 pub(crate) const UNREACHABLE: usize = 4;
@@ -153,7 +192,7 @@ pub struct ObjectInstance {
     /// Residents whose current use needs it closed (bits by sim id), so opening it under them is
     /// refused (`allows`). Derived from their tasks: set when the use reserves a slot, cleared
     /// when it ends; not saved (a reloaded use starts again and sets it).
-    pub(crate) closed_users: u64,
+    pub(crate) closed_users: SimSet,
 }
 
 /// A crop's stage, from its `growth`: what's offered (`when`: "ripe") and what the renderer
@@ -198,7 +237,7 @@ impl ObjectInstance {
             && (inter.work_on != Some(crate::content::WorkOn::Dishes) || self.run.is_none())
             && (!inter.unloads || self.done())
             && (inter.leaves != Some(false) || self.users().all(|u| u == me))
-            && (inter.leaves != Some(true) || self.closed_users & !(1 << me) == 0)
+            && (inter.leaves != Some(true) || !self.closed_users.any_but(me))
     }
 
     /// Whether `inter` would close it on someone other than `me` using it (or on their way to):
@@ -401,7 +440,7 @@ impl ObjectInstance {
     /// Passes `reserved` on; a place taken for a use that needs it `closed` keeps it so under `sim`.
     fn kept_closed(&mut self, sim: u32, reserved: bool, closed: bool) -> bool {
         if reserved && closed {
-            self.closed_users |= 1 << sim;
+            self.closed_users.insert(sim);
         }
         reserved
     }
@@ -450,7 +489,7 @@ impl ObjectInstance {
     }
 
     pub(crate) fn release(&mut self, sim: u32) {
-        self.closed_users &= !(1 << sim);
+        self.closed_users.remove(sim);
         for u in &mut self.users {
             if *u == Some(sim) {
                 *u = None;
@@ -1697,9 +1736,9 @@ pub struct World {
     pub(crate) car_tiles: Vec<usize>,
     /// The `nav_version` the cars' parking spots were last checked at (`cars::update`).
     pub(crate) cars_nav: u32,
-    /// Which cars (a bit each) stood parked when `car_tiles` was worked out; None: work it out
-    /// again (`cars::reblock`).
-    pub(crate) cars_parked: Option<u64>,
+    /// Which cars (a bit each, 64 to a word) stood parked when `car_tiles` was worked out; None:
+    /// work it out again (`cars::reblock`).
+    pub(crate) cars_parked: Option<Vec<u64>>,
     /// Opaque presentation data from the lot/town file, saved unchanged.
     pub meta: serde_json::Value,
     /// Build and buy edits that can be taken back, oldest first (see `World::undo`).
@@ -2190,7 +2229,7 @@ impl World {
                 .unwrap_or(kind_size(self.content.objects[def].footprint)),
             tall: layout.tall,
             users: [None; MAX_SLOTS],
-            closed_users: 0,
+            closed_users: SimSet::default(),
             quality: 0,
             colors: Colors::new(),
             value: 0,

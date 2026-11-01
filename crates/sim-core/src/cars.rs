@@ -41,7 +41,7 @@ use crate::world::{
 };
 
 /// Most cars in a town (the snapshot's rows).
-pub const MAX_CARS: usize = 64;
+pub const MAX_CARS: usize = 128;
 /// Doors: 0 front left (the driver's), 1 front right, 2 back left, 3 back right.
 pub const DOORS: usize = 4;
 /// How long the driver waits in the car for the others setting off at the same time.
@@ -1313,14 +1313,15 @@ fn refresh(w: &mut World) {
 /// (`World::blocked`; things never stand on them, see `refresh`). Walkers find their way again
 /// when that changes (the walkable regions, not the views: `nav_version` only).
 pub(crate) fn reblock(w: &mut World) {
-    // (Nothing to do while the same cars stand parked: `MAX_CARS` bits.)
-    let parked = (0..w.cars.len())
-        .filter(|&c| present(w, c))
-        .fold(0u64, |m, c| m | 1 << c);
-    if w.cars_parked == Some(parked) {
+    // (Nothing to do while the same cars stand parked: a bit each.)
+    let mut parked = vec![0u64; w.cars.len().div_ceil(64)];
+    for c in (0..w.cars.len()).filter(|&c| present(w, c)) {
+        parked[c / 64] |= 1 << (c % 64);
+    }
+    if w.cars_parked.as_ref() == Some(&parked) {
         return;
     }
-    w.cars_parked = Some(parked);
+    w.cars_parked = Some(parked.clone());
     let mut tiles: Vec<usize> = Vec::new();
     // (Garages too, as they stand.)
     for g in &w.garages {
@@ -1331,7 +1332,7 @@ pub(crate) fn reblock(w: &mut World) {
         }
     }
     for c in 0..w.cars.len() {
-        if parked & 1 << c != 0 {
+        if parked[c / 64] & 1 << (c % 64) != 0 {
             for (x, z) in w.cars[c].tiles() {
                 if w.lot.in_bounds(x, z) {
                     tiles.push(w.lot.tile_index(x, z));
