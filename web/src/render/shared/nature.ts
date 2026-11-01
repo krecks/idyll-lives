@@ -27,6 +27,8 @@ export const APRON = 6;
 const BUILT_CELL = 2;
 /** A big world's woods are drawn in squares this wide (m), those far off left out (`pc/nature.ts` `frameTiles`). */
 export const BIG_WOODS_CELL = 256;
+/** A big world's lawn flowers are drawn in squares this wide (m), those far off left out (`pc/nature.ts` `frameTiles`). */
+export const BIG_FLOWERS_CELL = 128;
 /** A big world's woods past this far (m) from anything built are half as dense. */
 const BIG_WOODS_THIN = 40;
 const TERRAIN_STEP = 2.5;
@@ -172,6 +174,8 @@ export interface LawnPlacement {
   key: string;
   matrices: Float32Array[];
   tiles: number[];
+  /** Which group an instance at (x, z) is drawn in (a big world's: squares the game leaves out past a distance); none: one draw. */
+  cell?: (x: number, z: number) => string;
 }
 
 /** Lawn flowers as drawn: each instance's original matrix and town tile (-1 outside the town), its matrix as drawn (`shown`) and whether it's hidden. */
@@ -774,8 +778,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     // A lighter lawn keeps every so many of them, the same ones each time (the placement above is unchanged).
     const d = this.lawnDensity;
     const thin = <T>(list: T[]) => (d >= 1 ? list : list.filter((_, k) => Math.floor((k + 1) * d) > Math.floor(k * d)));
-    // (Flowers are sparse: too few triangles for groups to pay.)
-    return [{ key: 'model.flowers', matrices: thin(flowers), tiles: thin(flowerTiles) }];
+    // (Flowers are sparse: too few triangles for groups to pay; but a big world's are a kilometre of them, in squares.)
+    const cell = this.built ? (x: number, z: number) => `${Math.floor(x / BIG_FLOWERS_CELL)}:${Math.floor(z / BIG_FLOWERS_CELL)}` : undefined;
+    return [{ key: 'model.flowers', matrices: thin(flowers), tiles: thin(flowerTiles), ...(cell ? { cell } : {}) }];
   }
 }
 

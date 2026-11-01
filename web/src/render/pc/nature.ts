@@ -114,11 +114,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.others = draws;
     this.batches = [];
     await perfTimeAsync('nature: forests', () => this.forests(app, parent, assets, pace));
-    // A big world's woods squares, by where they are: those far from the camera are left out (`frameTiles`).
-    this.woodsSquares = this.built
-      ? this.batches.flatMap((b) => b.built.cells.flatMap((c) => c.draws.map((d) => d.entity.render?.meshInstances[0]))).filter((mi) => !!mi).map((mi) => ({ mi, x: mi.aabb.center.x, z: -mi.aabb.center.z }))
-      : [];
     await perfTimeAsync('nature: lawns', () => this.plantLawns(app, parent, assets, world, pace));
+    this.findSquares();
     const field = await perfTimeAsync('nature: grass field', () => grassField(world, this, pace, this.ring));
     const grass = (this.grass = new Grass(app, parent, field, this.grassQuality));
     grass.onGround(grounds.map((g) => g.render!.meshInstances[0]));
@@ -153,6 +150,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
         this.lawn.push(...layers);
         if (this.lawnMask) hideLawn(layers, this.lawnMask, uploadLawn);
       });
+      this.findSquares();
     };
     return { ...gather(fresh), replaced, commit, discard: () => fresh.forEach((b) => release(b.built)) };
   }
@@ -247,14 +245,25 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return out;
   }
 
+  /** A big world's woods and flower squares, by where they are: those far from the camera are left out (`frameTiles`). */
+  private findSquares(): void {
+    const of = (parts: readonly NaturePart[]) =>
+      this.built ? this.batches.filter((b) => parts.includes(b.part)).flatMap((b) => b.built.cells.flatMap((c) => c.draws.map((d) => d.meshInstance))).map((mi) => ({ mi, x: mi.aabb.center.x, z: -mi.aabb.center.z })) : [];
+    this.woodsSquares = of(['woods', 'farWoods']);
+    this.flowerSquares = of(['flowers']);
+  }
+
   /** A big world's woods squares: each one's draw and where its middle is (game space). */
   private woodsSquares: { mi: pc.MeshInstance; x: number; z: number }[] = [];
+  /** A big world's lawn flowers' squares, as the woods'. */
+  private flowerSquares: { mi: pc.MeshInstance; x: number; z: number }[] = [];
   /** A big world's ground tiles: each one's draw, its meshes by level, where its middle is and the level drawn. */
   private tiles: { mi: pc.MeshInstance; meshes: pc.Mesh[]; x: number; z: number; lod: number }[] = [];
 
   /** Each frame (the game's): each ground tile draws the level for its distance from (`x`, `z`), the camera's target. */
   frameTiles(x: number, z: number): void {
     for (const w of this.woodsSquares) w.mi.visible = Math.hypot(w.x - x, w.z - z) < WOODS_FAR;
+    for (const f of this.flowerSquares) f.mi.visible = Math.hypot(f.x - x, f.z - z) < FLOWERS_FAR;
     for (const t of this.tiles) {
       const d = Math.hypot(t.x - x, t.z - z);
       const lod = d < TILE_NEAR ? 0 : d < TILE_MID ? 1 : 2;
@@ -356,10 +365,10 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /** The lawn's flowers (`lawns`), instanced. */
   private async plantLawns(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>): Promise<void> {
     this.lawn = [];
-    for (const { key, matrices, tiles } of await this.lawns(world, pace)) {
+    for (const { key, matrices, tiles, cell } of await this.lawns(world, pace)) {
       const lod = this.lawnLod;
-      const built = await instanced(app, parent, assets, key, matrices, lod, undefined, pace);
-      this.batches.push(batch({ key, matrices, lod, tiles }, false, 'flowers', built));
+      const built = await instanced(app, parent, assets, key, matrices, lod, cell, pace);
+      this.batches.push(batch({ key, matrices, lod, cell, tiles }, false, 'flowers', built));
       this.lawn.push(...lawnLayers(built, matrices, tiles));
     }
     this.refreshLawn(world);
@@ -373,6 +382,8 @@ const TILE_NEAR = 200;
 const TILE_MID = 460;
 /** A big world's woods squares further than this (m, middle to the camera's target) aren't drawn (the haze has them). */
 const WOODS_FAR = 560;
+/** A big world's lawn flowers' squares further than this (m, middle to the camera's target) aren't drawn (a flower is a few pixels by then). */
+const FLOWERS_FAR = 170;
 
 /**
  * One level of a ground tile from the finest level's shaded points (`at(col, row)` into `positions`
