@@ -4,6 +4,9 @@
 //! for free; and without the money for a babysitter, the last grown-up stays home. Nor does the
 //! last grown-up at home go out on their own: sent out by the player, a babysitter comes too.
 
+mod common;
+
+use common::run_to;
 use sim_core::social::EventKind;
 use sim_core::{Command, World, clock};
 
@@ -46,16 +49,9 @@ fn town(extra: &str) -> String {
     )
 }
 
-fn until(w: &mut World, day: u32, hour: f32) {
-    let end = clock::tick_at(day, hour * 60.0).unwrap();
-    while w.tick < end {
-        w.tick_once();
-    }
-}
-
 /// The baby's needs (the lowest and the average) each quarter hour from 10:00 to 16:00 on day 2 (a Tuesday).
 fn workday(w: &mut World) -> (f32, f32) {
-    until(w, 2, 10.0);
+    run_to(w, 2, 10.0);
     let (mut lowest, mut sum, mut n) = (1.0f32, 0.0, 0);
     while clock::hour(w.tick) < 16.0 {
         for _ in 0..15 * 20 {
@@ -81,9 +77,9 @@ fn told(w: &World, kind: EventKind, day: u32) -> Vec<&sim_core::social::SocialEv
 #[test]
 fn a_babysitter_looks_after_the_baby_while_both_parents_work() {
     let mut w = World::from_json(CONTENT, &town(""), 1).unwrap();
-    until(&mut w, 2, 7.0);
+    run_to(&mut w, 2, 7.0);
     let funds = w.households[0].funds;
-    until(&mut w, 2, 12.0);
+    run_to(&mut w, 2, 12.0);
     assert!(
         w.sims[0].away_until.is_some() && w.sims[1].away_until.is_some(),
         "both at work"
@@ -103,7 +99,7 @@ fn a_babysitter_looks_after_the_baby_while_both_parents_work() {
         "Cleo was looked after: average {average:.2}, lowest {lowest:.2}"
     );
     // Booked once for the day, and again the next workday.
-    until(&mut w, 3, 12.0);
+    run_to(&mut w, 3, 12.0);
     assert_eq!(told(&w, EventKind::Babysitter, 2).len(), 1, "once a day");
     assert_eq!(
         told(&w, EventKind::Babysitter, 3).len(),
@@ -139,7 +135,7 @@ fn a_grandparent_at_home_looks_after_the_baby_for_free() {
 #[test]
 fn without_money_for_a_babysitter_someone_stays_home() {
     let mut w = World::from_json(CONTENT, &town(""), 1).unwrap();
-    until(&mut w, 2, 7.0);
+    run_to(&mut w, 2, 7.0);
     w.households[0].funds = 10;
     let (lowest, average) = workday(&mut w);
     assert!(
@@ -231,7 +227,7 @@ fn out(w: &World, i: usize) -> bool {
 
 /// From 9:00 to 21:00 on day 1, lonely: how many quarter hours Ada was out.
 fn lonely_day(w: &mut World) -> usize {
-    until(w, 1, 9.0);
+    run_to(w, 1, 9.0);
     let mut away = 0;
     while clock::hour(w.tick) < 21.0 {
         w.sims[0].needs[3] = w.sims[0].needs[3].min(0.3);
@@ -278,7 +274,7 @@ fn the_only_grown_up_at_home_with_a_baby_does_not_go_out() {
 #[test]
 fn sent_out_visiting_the_last_grown_up_gets_a_babysitter() {
     let mut w = street_world(true, "");
-    until(&mut w, 1, 10.0);
+    run_to(&mut w, 1, 10.0);
     let funds = w.households[0].funds;
     // Cleo is getting hungry and wet: she'll need looking after while Ada's out.
     w.sims[1].needs[0] = 0.5;
@@ -300,10 +296,10 @@ fn sent_out_visiting_the_last_grown_up_gets_a_babysitter() {
     );
 
     // Out again the same day: still the one booking.
-    until(&mut w, 1, 15.0);
+    run_to(&mut w, 1, 15.0);
     assert!(!out(&w, 0), "back home");
     w.apply(Command::Visit { sim: 0, plot: 2 }).unwrap();
-    until(&mut w, 1, 17.0);
+    run_to(&mut w, 1, 17.0);
     assert!(w.sims[0].visiting.is_some(), "out again");
     assert_eq!(told(&w, EventKind::Babysitter, 1).len(), 1, "once a day");
 }
@@ -311,11 +307,11 @@ fn sent_out_visiting_the_last_grown_up_gets_a_babysitter() {
 #[test]
 fn without_money_for_a_babysitter_the_last_grown_up_cannot_be_sent_out() {
     let mut w = street_world(true, "");
-    until(&mut w, 1, 10.0);
+    run_to(&mut w, 1, 10.0);
     w.households[0].funds = 10;
     let err = w.apply(Command::Visit { sim: 0, plot: 2 }).unwrap_err();
     assert!(err.to_string().contains("Cleo"), "told why: {err}");
-    until(&mut w, 1, 12.0);
+    run_to(&mut w, 1, 12.0);
     assert!(!out(&w, 0), "Ada stayed home");
     assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter));
 }
@@ -344,7 +340,7 @@ fn going_out_ui(w: &World) -> (serde_json::Value, serde_json::Value) {
 #[test]
 fn the_ui_says_why_the_last_grown_up_cannot_be_sent_out() {
     let mut w = street_world(true, "");
-    until(&mut w, 1, 10.0);
+    run_to(&mut w, 1, 10.0);
     // With money for a babysitter: the visit and asking Bo are both on.
     assert_eq!(sim_core::life::homebound(&w, 0), None);
     assert_eq!(sim_core::phone::refusal(&w, 0, 0, Some(2)), None);
@@ -375,7 +371,7 @@ fn the_ui_says_why_the_last_grown_up_cannot_be_sent_out() {
     let mut w = street_world(true, grandma);
     // (Ada would go over to Bo's on her own.)
     w.households[0].free_will = false;
-    until(&mut w, 1, 10.0);
+    run_to(&mut w, 1, 10.0);
     w.households[0].funds = 10;
     assert_eq!(
         going_out_ui(&w),
@@ -394,7 +390,7 @@ fn the_ui_says_why_the_last_grown_up_cannot_be_sent_out() {
 fn with_a_grandparent_at_home_nobody_books_a_babysitter_for_a_visit() {
     let grandma = r#",{"name":"Dora","household":0,"x":6.5,"z":8.5,"age":70}"#;
     let mut w = street_world(true, grandma);
-    until(&mut w, 1, 10.0);
+    run_to(&mut w, 1, 10.0);
     w.sims[1].needs[0] = 0.5;
     w.sims[1].needs[1] = 0.5;
     w.apply(Command::Visit { sim: 0, plot: 2 }).unwrap();
@@ -426,7 +422,7 @@ fn at_the_park_until(w: &mut World, hour: f32) -> bool {
 #[test]
 fn without_money_for_a_babysitter_the_last_grown_up_cannot_be_sent_anywhere_else() {
     let mut w = street_world(true, "");
-    until(&mut w, 1, 10.0);
+    run_to(&mut w, 1, 10.0);
     w.households[0].funds = 10;
     let refused = |err: sim_core::Error| {
         assert_eq!(
@@ -491,7 +487,7 @@ fn without_money_for_a_babysitter_the_last_grown_up_cannot_be_sent_anywhere_else
 #[test]
 fn sent_to_the_park_the_last_grown_up_gets_a_babysitter() {
     let mut w = street_world(true, "");
-    until(&mut w, 1, 10.0);
+    run_to(&mut w, 1, 10.0);
     w.households[0].funds = 500;
     w.apply(Command::Use {
         sim: 0,
@@ -514,7 +510,7 @@ fn sent_to_the_park_the_last_grown_up_gets_a_babysitter() {
 fn with_a_grandparent_at_home_the_last_parent_goes_to_the_park_without_a_babysitter() {
     let grandma = r#",{"name":"Dora","household":0,"x":6.5,"z":8.5,"age":70}"#;
     let mut w = street_world(true, grandma);
-    until(&mut w, 1, 10.0);
+    run_to(&mut w, 1, 10.0);
     w.households[0].funds = 10;
     w.apply(Command::Use {
         sim: 0,
@@ -542,7 +538,7 @@ const DAN: &str = r#",{"name":"Dan","household":0,"x":6.5,"z":8.5,"age":33}"#;
 fn two_at_home(funds: i64) -> World {
     let mut w = street_world(true, DAN);
     w.households[0].free_will = false;
-    until(&mut w, 1, 10.0);
+    run_to(&mut w, 1, 10.0);
     w.households[0].free_will = true;
     w.households[0].funds = funds;
     assert!(!out(&w, 0) && !out(&w, 3), "both home");

@@ -1341,9 +1341,9 @@ def nesting_tables():
         for x in (-0.11, 0.27):
             F.sweep(f'small_legs{x}', _fillet([(x, 0.0, -0.04), (x, 0.371, -0.04), (x, 0.371, 0.28), (x, 0.0, 0.28)], 0.016),
                     None, M.black_metal, profile=G.rounded_rect(0.018, 0.018, 0.004, corner=1), up=(1, 0, 0), angle=60)
-    G.join(small, 'small_table')
+    small = G.join(small, 'small_table')
     G.settle(centre=False)
-    G.slide(bpy.data.objects['small_table'], 'small_out', (0, -0.42, 0), seconds=0.9)
+    G.slide(small, 'small_out', (0, -0.42, 0), seconds=0.9)
 
 
 def side_table_round():
@@ -1799,9 +1799,9 @@ def display_cabinet():
         F.box('pane', 0.758, 1.628, 0.005, (0, 1.015, hz), M.glass)
         F.sphere('knob', 0.013, (0.36, 1.0, hz + 0.022), M.brass, segments=12, rings=8)
         F.cyl('knob_stem', 0.005, 0.016, (0.36, 1.0, hz + 0.012), M.brass, rot=(90, 0, 0), verts=8)
-    G.hinged(G.join(parts, 'door'), F.at(hx, 1.015, hz))
+    door = G.hinged(G.join(parts, 'door'), F.at(hx, 1.015, hz))
     G.settle(centre=False)
-    G.swing(bpy.data.objects['door'], 'door_open', -100, seconds=1.0)
+    G.swing(door, 'door_open', -100, seconds=1.0)
 
 
 SECTIONAL = [('greige', 'Upholstery'), ('greige_cushion', 'Cushions'), ('espresso_legs', 'Legs')]

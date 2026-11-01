@@ -99,8 +99,8 @@ pub mod sim {
     pub const WAY_X: usize = 24;
     pub const WAY_Z: usize = 25;
     /// While walking, where their way is `AHEAD` metres on from where they are (or its end;
-    /// not past a step onto another storey); else where they stand. With `WAY_X`, the renderer
-    /// opens a door or a gate only for someone about to go through it.
+    /// not past a step onto another storey); else where they stand. From it the renderer opens
+    /// a door or a gate only for someone about to go through it (`doors.ts` `goingThrough`).
     pub const AHEAD_X: usize = 26;
     pub const AHEAD_Z: usize = 27;
     /// The baby they hold in the arms (`carry::carrying`: lifting them out of the crib, or on

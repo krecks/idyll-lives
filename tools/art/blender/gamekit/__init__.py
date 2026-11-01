@@ -11,17 +11,17 @@ from .forms import circle, cut, extrude, jitter, loft, mirrored, ring, rounded_r
 from .materials import FINISHES, Palette, mat
 from .motion import attach, clips, grow, grow_in_turn, path, rock, scroll, slide, spin, squash, stages, swing, turns
 from . import kit, perch
-from .parts import (ASIDE, aside, check_size, fit, game_size, hinged, join, join_all, measure, new_parts, own,
-                    set_origin, settle, turn)
+from .parts import (aside, check_size, fit, game_size, hinged, join, join_all, measure, new_parts, set_origin,
+                    settle, turn)
 from .place import GameFrame
 from .preview import preview, preview_clips, preview_perches
 from .scene import ASSETS, PREVIEWS, TAU, cosd, meshes, reset, sind
 from .shapes import boulder, cone, cube, cylinder, revolve, rod, sphere, torus
 
 __all__ = [
-    'ASIDE', 'ASSETS', 'FINISHES', 'PREVIEWS', 'TAU', 'Family', 'GameFrame', 'Model', 'Palette', 'aside', 'attach', 'boulder', 'check_size', 'clips',
+    'ASSETS', 'FINISHES', 'PREVIEWS', 'TAU', 'Family', 'GameFrame', 'Model', 'Palette', 'aside', 'attach', 'boulder', 'check_size', 'clips',
     'circle', 'cone', 'cosd', 'cut', 'extrude', 'cube', 'cylinder', 'export_glb', 'far_of', 'fit', 'game_size', 'grow', 'grow_in_turn', 'hinged', 'is_low', 'jitter', 'join',
-    'join_all', 'kit', 'loft', 'low', 'mat', 'materials_used', 'measure', 'meshes', 'mirrored', 'new_parts', 'own', 'path', 'perch', 'preview', 'preview_clips', 'preview_perches', 'reset', 'revolve', 'ring', 'rock', 'rounded_rect',
+    'join_all', 'kit', 'loft', 'low', 'mat', 'materials_used', 'measure', 'meshes', 'mirrored', 'new_parts', 'path', 'perch', 'preview', 'preview_clips', 'preview_perches', 'reset', 'revolve', 'ring', 'rock', 'rounded_rect',
     'rod', 'scroll', 'set_origin', 'settle', 'sind', 'slide', 'smooth_outline', 'soft_box', 'sphere', 'spin', 'squash', 'stages', 'stats', 'sweep', 'swing', 'torus', 'turn', 'turns',
     'write_pack',
 ]

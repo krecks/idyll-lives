@@ -119,7 +119,11 @@ def measure(objs=None):
 
 def game_size(objs=None):
     """(width, height, depth) in metres, the game's way round."""
-    lo, hi = measure(objs)
+    return _extent(*measure(objs))
+
+
+def _extent(lo, hi):
+    """(width, height, depth) of the Blender bounds `lo`..`hi`, the game's way round."""
     return hi[0] - lo[0], hi[2] - lo[2], hi[1] - lo[1]
 
 
@@ -153,10 +157,12 @@ def check_size(size, tolerance=0.02, objs=None, name='model', centre=(0.0, 0.0),
     that stands off the middle of its tiles. `floor=False` skips the floor: for a thing on a wall, built
     at its real height. Returns the measured size.
     """
+    objs = objs if objs is not None else meshes()
     lo, hi = measure(objs)
+    drawn = _extent(lo, hi)
     # The size is the model's own: what it carries (`G.aside`) is drawn but isn't the piece of furniture.
-    got = game_size(own(objs))
-    drawn = game_size(objs)
+    mine = own(objs)
+    got = drawn if len(mine) == len(objs) else game_size(mine)
     # What it measures, said when a check fails, so `size` and `centre=` can be copied from it.
     measured = (f'measured {got[0]:.3f} x {got[1]:.3f} x {got[2]:.3f} m (w x h x d), '
                 f'centred on game ({-(lo[0] + hi[0]) / 2:.4f}, {-(lo[1] + hi[1]) / 2:.4f}) (x, depth)')

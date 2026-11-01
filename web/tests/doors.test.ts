@@ -6,21 +6,20 @@
 // lead now follows the game's rate, and the resident's hand goes out with the leaf, so the door opens
 // as the hand reaches the handle.)
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { GAME_RATE } from '../src/render/shared/gameSpeed';
-import { DOOR_SWING, MOVER, doorLead, goingThrough } from '../src/render/shared/doors';
-
-/** Metres a Sim walks per second at game speed 1 (sim-core `world::WALK_SPEED`). */
-const WALK = 1.5;
+import { WALK_PER_TICK } from '../src/render/shared/characters/actions';
+import { DOOR_SWING, MOVER, PACE, doorLead, goingThrough } from '../src/render/shared/doors';
 
 /**
- * Walkers from `from` to `to` (x, z) as the renderer packs them: where they are, the waypoint, the point
- * `ahead` m on, their row.
+ * Walkers at (x, z) heading for (wx, wz), as the renderer packs them: where they are, the point `ahead` m on
+ * towards it, their row.
  */
 function movers(...who: [number, number, number, number, number][]): number[] {
   const out: number[] = [];
   who.forEach(([x, z, wx, wz, ahead], i) => {
     const len = Math.hypot(wx - x, wz - z) || 1;
-    out.push(x, z, wx, wz, x + ((wx - x) / len) * ahead, z + ((wz - z) / len) * ahead, i);
+    out.push(x, z, x + ((wx - x) / len) * ahead, z + ((wz - z) / len) * ahead, i);
   });
   return out;
 }
@@ -29,13 +28,24 @@ describe('doors', () => {
   const door: [number, number] = [0, 0];
   const lead = doorLead(1);
 
+  test('the pace is how fast sim-core walks them (`world::WALK_SPEED`, m a second), and the residents step it', () => {
+    const sim = (file: string) => readFileSync(new URL(`../../crates/sim-core/src/${file}`, import.meta.url), 'utf8');
+    const walk = /const WALK_SPEED: f32 = ([\d.]+) \/ TICKS_PER_SECOND/.exec(sim('world.rs'));
+    const ticks = /pub const TICKS_PER_SECOND: u32 = (\d+);/.exec(sim('lib.rs'));
+    expect(walk).not.toBeNull();
+    expect(ticks).not.toBeNull();
+    expect(PACE).toBe(Number(walk![1]));
+    // (characters/actions.ts: the residents' walk, a tick's worth.)
+    expect(WALK_PER_TICK).toBeCloseTo(PACE / Number(ticks![1]), 9);
+  });
+
   test('a hand reaches the leaf: the lead is a hand at speed 1, and the swing fits in it', () => {
     expect(lead).toBeCloseTo(0.75, 6);
     // A walker at the ordinary pace: the leaf is open by the time they are.
-    expect(lead / WALK).toBeGreaterThanOrEqual(DOOR_SWING);
+    expect(lead / PACE).toBeGreaterThanOrEqual(DOOR_SWING);
     // The quickest (traits and perks, 1.38x) push it open as they go through: four fifths of the way
     // by the time they arrive, which is what a hand on a swinging door does.
-    const fast = lead / (WALK * 1.38);
+    const fast = lead / (PACE * 1.38);
     expect(fast / DOOR_SWING).toBeGreaterThan(0.75);
   });
 
@@ -43,12 +53,12 @@ describe('doors', () => {
     for (const s of [1, 2, 3, 4, 5]) {
       const rate = GAME_RATE[s];
       const l = doorLead(rate);
-      const arrive = l / (WALK * rate);
+      const arrive = l / (PACE * rate);
       // In game time the leaf needs DOOR_SWING; the renderer scales its step by the rate, up to 10x.
       const swing = DOOR_SWING / Math.min(Math.max(rate, 1), 10);
       expect(swing).toBeLessThanOrEqual(arrive + 1e-9);
       // And never opens further off than the swing needs, nor nearer than the hand.
-      expect(l).toBeCloseTo(Math.max(0.75, WALK * rate * DOOR_SWING), 6);
+      expect(l).toBeCloseTo(Math.max(0.75, PACE * rate * DOOR_SWING), 6);
     }
   });
 

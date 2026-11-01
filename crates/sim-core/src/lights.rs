@@ -48,63 +48,84 @@ pub fn dark_at(minute: f32) -> bool {
     !(DARK_UNTIL..DARK_FROM).contains(&minute)
 }
 
-/// Whether object kind `def` is a lamp that can be switched.
+/// Whether object kind `def` is a lamp that can be switched (a light that follows a use has no
+/// switch: content loading leaves its `switch` off).
 pub fn switchable(world: &World, def: usize) -> bool {
-    let def = &world.content.objects[def];
-    def.switch && def.while_anims.is_empty()
+    world.content.objects[def].switch
 }
 
-/// Whether a light that follows a use (content `light.while`) is lit now: someone is doing that
-/// animation at an object on its tiles (a cooker hood's light while the hob under it cooks).
-/// Any task counts, not only a plain use: cooking a recipe is `TaskKind::Cook`, its step's
-/// animation the one the hood watches.
-pub fn while_on(world: &World, o: &crate::world::ObjectInstance) -> bool {
-    let tags = &world.content.objects[o.def].while_anims;
-    if tags.is_empty() {
-        return false;
-    }
-    let anims: Vec<usize> = world
-        .content
-        .animations
+/// The lights that follow a use (content `light.while`) lit now (stable ids): someone is doing one
+/// of their animations at an object on their tiles, or standing on them (a cooker hood's light
+/// while the hob under it cooks). Any task counts, not only a plain use: cooking a recipe is
+/// `TaskKind::Cook`, its step's animation the one the hood watches.
+fn while_lit(world: &World) -> Vec<u32> {
+    let content = &world.content;
+    let lights: Vec<_> = world
+        .objects
         .iter()
-        .enumerate()
-        .filter(|(_, a)| tags.contains(a))
-        .map(|(i, _)| i)
+        .filter(|o| !content.objects[o.def].while_anims.is_empty())
         .collect();
-    let tiles: Vec<(i32, i32)> = o.tiles(&world.content).collect();
-    let on_tiles = |x: i32, z: i32| tiles.contains(&(x, z));
-    world.sims.iter().any(|s| {
-        let doing = crate::snapshot::doing(world, s);
-        if doing.action < 0.0 || !anims.contains(&(doing.action as usize)) {
-            return false;
-        }
-        // At a station on the tiles, or standing on them (a hob with no station to speak of).
-        let at = world.index_of(doing.object as u32).map(|i| {
-            world.objects[i]
-                .tiles(&world.content)
-                .any(|t| on_tiles(t.0, t.1))
-        });
-        at == Some(true) || on_tiles(s.pos[0].floor() as i32, s.pos[1].floor() as i32)
-    })
+    if lights.is_empty() {
+        return Vec::new();
+    }
+    // The animations any of them watches (a handful: most lights are of one kind).
+    let mut watched: Vec<usize> = lights
+        .iter()
+        .flat_map(|o| content.objects[o.def].while_anims.iter().copied())
+        .collect();
+    watched.sort_unstable();
+    watched.dedup();
+    // Each sim doing one of them (once a tick, not once a light): the animation, the footprint of
+    // the object they're at (none when at no object: `object` is -1), and the tile they stand on.
+    let doing: Vec<_> = world
+        .sims
+        .iter()
+        .filter_map(|s| {
+            let d = crate::snapshot::doing(world, s);
+            (d.action >= 0.0 && watched.binary_search(&(d.action as usize)).is_ok()).then(|| {
+                let at = (d.object >= 0.0)
+                    .then(|| world.index_of(d.object as u32))
+                    .flatten()
+                    .map(|i| footprint(&world.objects[i], content));
+                (
+                    d.action as usize,
+                    at,
+                    (s.pos[0].floor() as i32, s.pos[1].floor() as i32),
+                )
+            })
+        })
+        .collect();
+    if doing.is_empty() {
+        return Vec::new();
+    }
+    lights
+        .into_iter()
+        .filter(|o| {
+            let anims = &content.objects[o.def].while_anims;
+            let [x0, z0, x1, z1] = footprint(o, content);
+            let on = |(x, z): (i32, i32)| x >= x0 && x < x1 && z >= z0 && z < z1;
+            doing.iter().any(|&(anim, at, here)| {
+                anims.contains(&anim)
+                    && (on(here)
+                        || at.is_some_and(|[a0, b0, a1, b1]| {
+                            a0 < x1 && x0 < a1 && b0 < z1 && z0 < b1
+                        }))
+            })
+        })
+        .map(|o| o.stable)
+        .collect()
+}
+
+/// The tiles `o` stands on as `[x0, z0, x1, z1]` (x1, z1 past the last).
+fn footprint(o: &crate::world::ObjectInstance, content: &crate::content::Content) -> [i32; 4] {
+    let (w, d) = o.size(content);
+    [o.x, o.z, o.x + w, o.z + d]
 }
 
 /// Keeps `World::while_lit` (the lights that follow a use) up to date, telling the renderer when
 /// one comes on or goes off.
 pub(crate) fn update_while(world: &mut World) {
-    if !world
-        .content
-        .objects
-        .iter()
-        .any(|o| !o.while_anims.is_empty())
-    {
-        return;
-    }
-    let lit: Vec<u32> = world
-        .objects
-        .iter()
-        .filter(|o| while_on(world, o))
-        .map(|o| o.stable)
-        .collect();
+    let lit = while_lit(world);
     if lit != world.while_lit {
         world.while_lit = lit;
         world.lights_version = world.lights_version.wrapping_add(1);

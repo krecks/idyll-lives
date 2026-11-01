@@ -6,9 +6,11 @@
 
 mod common;
 
+use common::{interaction, until};
+
 use sim_core::social::EventKind;
 use sim_core::world::TaskKind;
-use sim_core::{Command, TICKS_PER_MINUTE, World, clock};
+use sim_core::{Command, World};
 
 const CONTENT: &str = r#"{
     "needs":[{"id":"energy","label":"Energy","decayPerHour":0.01}],
@@ -52,17 +54,6 @@ fn at_it(w: &World, sim: usize, i: usize) -> bool {
         && w.sims[sim]
             .current()
             .is_some_and(|a| matches!(a.phase, sim_core::world::Phase::Using { .. }))
-}
-
-/// Ticks `w` for up to `minutes`, until `done`; true if it got there.
-fn until(w: &mut World, minutes: u64, mut done: impl FnMut(&World) -> bool) -> bool {
-    for _ in 0..minutes * TICKS_PER_MINUTE {
-        if done(w) {
-            return true;
-        }
-        w.tick_once();
-    }
-    done(w)
 }
 
 #[test]
@@ -217,24 +208,12 @@ fn shipped() -> (World, String) {
         household: None,
     })
     .unwrap();
-    let morning = clock::tick_at(1, 9.0 * 60.0).unwrap();
-    while w.tick < morning {
-        w.tick_once();
-    }
+    common::run_to(&mut w, 1, 9.0);
     let n = w.content.needs.len();
     for s in &mut w.sims {
         s.needs[..n].fill(1.0);
     }
     (w, content)
-}
-
-fn interaction(w: &World, object: u32, id: &str) -> usize {
-    let def = w.objects[object as usize].def;
-    w.content.objects[def]
-        .interactions
-        .iter()
-        .position(|i| i.id == id)
-        .unwrap_or_else(|| panic!("no {id}"))
 }
 
 fn energy(w: &World) -> usize {

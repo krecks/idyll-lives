@@ -721,6 +721,16 @@ if (what === 'play') {
     return { alpha: +took.alpha.toFixed(3), beta: +took.beta.toFixed(3), radius: +took.radius.toFixed(2), target: round(took.target), height: +height.toFixed(2), bottom: +bottom.toFixed(2), from, ...(bounds ? { bounds: { lo: round(bounds.lo), hi: round(bounds.hi) } } : {}) };
   }
 
+  /** Aims at `id` and lets the picture settle, twice (the first aim moves the camera, the second frames it once the
+   * object is drawn); the view. */
+  async function aimStill(id) {
+    await aim(id);
+    await settle(page, 300);
+    const view = await aim(id);
+    await settle(page, 300);
+    return view;
+  }
+
   /**
    * The other angles of `--views`, off the aimed one: the back (a use from behind the thing), above
    * (a seat, a top, what the resident's hands are at), low (a door's foot, a drawer's runner). The
@@ -1036,19 +1046,13 @@ if (what === 'play') {
     const chosen = uses.filter(pick);
     if (shotIdle && chosen.length) {
       // As bought: before any use moves it (a wall bed folded down, a table's chairs pulled out).
-      await aim(bought.id);
-      await settle(page, 300);
-      const view = await aim(bought.id);
-      await settle(page, 300);
+      const view = await aimStill(bought.id);
       await shot(page, `${baseName(thing, bought)}-idle`, { object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], idle: true, view });
     }
     if (!chosen.length) {
       // Decor (no uses): bought, one picture, sold.
       const offered = uses.map((u) => u.id);
-      await aim(bought.id);
-      await settle(page, 300);
-      const view = await aim(bought.id);
-      await settle(page, 300);
+      const view = await aimStill(bought.id);
       const file = await shot(page, `${prefix}${slug(thing.def)}-${uses.length ? 'no-such-use' : 'no-uses'}`);
       write({ object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], use: which, attempt, ...about(thing, bought), outcome: uses.length ? 'no such use' : 'no uses', offers: offered, view, shots: [{ file }] });
       console.warn(uses.length ? `${thing.def} has no interaction '${which}' (it offers: ${offered.join(', ')})` : `${thing.def} has no uses: one picture`);

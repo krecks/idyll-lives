@@ -3,8 +3,11 @@
 //! with `seatFacing` takes only a seat that looks at the thing (no sofa with its back to the TV,
 //! a chair round the fire pit), else is used standing (at a place round the pit).
 
+mod common;
+
+use common::until;
 use sim_core::content::Pose;
-use sim_core::{Command, TICKS_PER_MINUTE, World};
+use sim_core::{Command, World};
 use std::f32::consts::{FRAC_PI_2, PI};
 
 const CONTENT: &str = r#"{
@@ -38,17 +41,6 @@ fn lot(objects: &str, sims: &str) -> String {
 
 fn world(objects: &str, sims: &str) -> World {
     World::from_json(CONTENT, &lot(objects, sims), 3).unwrap()
-}
-
-/// Ticks `w` for up to `minutes`, until `done`; true if it got there.
-fn until(w: &mut World, minutes: u64, mut done: impl FnMut(&World) -> bool) -> bool {
-    for _ in 0..minutes * TICKS_PER_MINUTE {
-        if done(w) {
-            return true;
-        }
-        w.tick_once();
-    }
-    done(w)
 }
 
 fn near(a: [f32; 2], b: [f32; 2]) -> bool {

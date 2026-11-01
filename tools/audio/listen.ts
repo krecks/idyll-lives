@@ -22,7 +22,9 @@ import { MADE, ONCE_THINGS, type MadeKind } from '../../web/src/audio/things';
 import { ONCE, type WaterKind } from '../../web/src/audio/water';
 
 const RATE = 48_000;
-const OUT = resolve(import.meta.dir, '../../bench-results/sounds');
+/** The checkout. */
+const ROOT = resolve(import.meta.dir, '../..');
+const OUT = join(ROOT, 'bench-results/sounds');
 
 /** The kinds played once rather than looped (a use starting or ending, a flush). */
 const ONCE_KINDS = new Set<string>([...ONCE, ...ONCE_THINGS]);
@@ -67,39 +69,68 @@ function level_(l: Float32Array, r: Float32Array): { peak: number; rms: number }
   return { peak: db(peak), rms: db(Math.sqrt(sum / Math.max(1, n * 2))) };
 }
 
+/** The DFT of `re` + i·`im`, in place (radix-2: the length a power of two). */
+function fft(re: Float64Array, im: Float64Array): void {
+  const n = re.length;
+  // Bit-reversed order, then the butterflies, each stage twice as wide.
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      [re[i], re[j]] = [re[j], re[i]];
+      [im[i], im[j]] = [im[j], im[i]];
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const half = len >> 1;
+    const step = (-2 * Math.PI) / len;
+    for (let k = 0; k < half; k++) {
+      const wr = Math.cos(step * k);
+      const wi = Math.sin(step * k);
+      for (let i = k; i < n; i += len) {
+        const j = i + half;
+        const tr = re[j] * wr - im[j] * wi;
+        const ti = re[j] * wi + im[j] * wr;
+        re[j] = re[i] - tr;
+        im[j] = im[i] - ti;
+        re[i] += tr;
+        im[i] += ti;
+      }
+    }
+  }
+}
+
 /**
- * The spectral centroid (Hz): where the sound's energy sits on average, from a plain DFT over the
+ * The spectral centroid (Hz): where the sound's energy sits on average, from the spectrum of the
  * middle 4096 samples of the mono mix. A fan sits low, a hi-hat high; a sound whose centroid is
  * where its kind should not be is the first thing to hear.
  */
 function centroid(l: Float32Array, r: Float32Array): number {
   const N = 4096;
-  const start = Math.max(0, Math.floor((Math.min(l.length, r.length) - N) / 2));
-  const x: number[] = [];
-  for (let i = 0; i < N; i++) x.push((l[start + i] + r[start + i]) / 2);
-  // A Hann window, so a steady tone does not smear across the whole band.
-  for (let i = 0; i < N; i++) x[i] *= 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1));
+  const len = Math.min(l.length, r.length);
+  const start = Math.max(0, Math.floor((len - N) / 2));
+  const re = new Float64Array(N);
+  const im = new Float64Array(N);
+  // A Hann window, so a steady tone does not smear across the whole band; a sound shorter than N
+  // is padded with silence.
+  for (let i = 0; i < Math.min(N, len - start); i++) {
+    re[i] = ((l[start + i] + r[start + i]) / 2) * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1)));
+  }
+  fft(re, im);
   let sum = 0;
   let weighted = 0;
   for (let k = 1; k < N / 2; k++) {
-    let re = 0;
-    let im = 0;
-    for (let i = 0; i < N; i++) {
-      const a = (2 * Math.PI * k * i) / N;
-      re += x[i] * Math.cos(a);
-      im -= x[i] * Math.sin(a);
-    }
-    const mag = Math.hypot(re, im);
-    const hz = (k * RATE) / N;
+    const mag = Math.hypot(re[k], im[k]);
     sum += mag;
-    weighted += mag * hz;
+    weighted += (mag * k * RATE) / N;
   }
   return sum > 0 ? weighted / sum : 0;
 }
 
 /** The level the game plays each sound at (`world.ts`; 1 where it names none). */
 function levels(): Map<string, number> {
-  const world = readFileSync(resolve(import.meta.dir, '../../web/src/audio/world.ts'), 'utf8');
+  const world = readFileSync(join(ROOT, 'web/src/audio/world.ts'), 'utf8');
   const out = new Map<string, number>();
   const loops = world.slice(world.indexOf('const LOOPS'), world.indexOf('\n};', world.indexOf('const LOOPS')));
   for (const m of loops.matchAll(/^ {2}(\w+): \{([^}]*)\}/gm)) {
@@ -120,10 +151,10 @@ function users(): Map<string, string[]> {
     found.set(kind, list);
   };
   const files = new Bun.Glob('web/public/content/**/*.json');
-  for (const file of files.scanSync({ cwd: resolve(import.meta.dir, '../..') })) {
+  for (const file of files.scanSync({ cwd: ROOT })) {
     let json: unknown;
     try {
-      json = JSON.parse(require('node:fs').readFileSync(join(resolve(import.meta.dir, '../..'), file), 'utf8'));
+      json = JSON.parse(readFileSync(join(ROOT, file), 'utf8'));
     } catch {
       continue;
     }
@@ -133,7 +164,6 @@ function users(): Map<string, string[]> {
       const o = node as Record<string, unknown>;
       const name = typeof o.id === 'string' ? o.id : id;
       for (const key of ['sound', 'endSound', 'ambient']) if (typeof o[key] === 'string') add(o[key] as string, name);
-      if (Array.isArray(o.sounds)) for (const s of o.sounds) if (typeof s === 'string') add(s, name);
       if (o.sounds && typeof o.sounds === 'object') for (const s of Object.values(o.sounds)) if (typeof s === 'string') add(s, name);
       for (const [k, v] of Object.entries(o)) if (k !== 'id') walk(v, name);
     };

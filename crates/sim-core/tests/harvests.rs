@@ -4,9 +4,11 @@
 
 mod common;
 
+use common::{interaction, until};
+
 use sim_core::items::ItemAt;
 use sim_core::world::{GrowthStage, TaskKind};
-use sim_core::{Command, TICKS_PER_MINUTE, World};
+use sim_core::{Command, World};
 
 /// A fridge by the house wall, a vegetable patch, an apple tree and a lemon tree.
 const TOWN: &str = r#"{"width":20,"depth":16,
@@ -31,26 +33,6 @@ fn world(town: &str) -> World {
     let n = w.content.needs.len();
     w.sims[0].needs[..n].fill(1.0);
     w
-}
-
-fn interaction(w: &World, object: u32, id: &str) -> usize {
-    let def = w.objects[object as usize].def;
-    w.content.objects[def]
-        .interactions
-        .iter()
-        .position(|i| i.id == id)
-        .unwrap_or_else(|| panic!("no {id}"))
-}
-
-/// Ticks `w` for up to `minutes`, until `done`; true if it got there.
-fn until(w: &mut World, minutes: u64, mut done: impl FnMut(&World) -> bool) -> bool {
-    for _ in 0..minutes * TICKS_PER_MINUTE {
-        if done(w) {
-            return true;
-        }
-        w.tick_once();
-    }
-    done(w)
 }
 
 fn produce(w: &World) -> usize {

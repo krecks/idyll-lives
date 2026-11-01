@@ -49,19 +49,14 @@
 
 mod common;
 
+use common::run_to;
+
 use serde_json::{Value, json};
 use sim_core::{Command, MINUTES_PER_TICK, World, clock};
 
 const SEED: u64 = 21;
 /// Money for buying everything a check needs.
 const FUNDS: i64 = 1_000_000;
-
-fn until(w: &mut World, day: u32, hour: f32) {
-    let target = clock::tick_at(day, hour * 60.0).unwrap();
-    while w.tick < target {
-        w.tick_once();
-    }
-}
 
 /// Resident 0 stops what they're doing and drops their queue (and puts down what they carry):
 /// a `use` sent from the page starts at once.
@@ -117,7 +112,7 @@ fn house(hour: f32, free_will: bool) -> World {
     let h = w.sims[0].household as usize;
     w.households[h].free_will = false;
     w.households[h].funds = FUNDS;
-    until(&mut w, 1, hour);
+    run_to(&mut w, 1, hour);
     free_up(&mut w);
     w.households[h].free_will = free_will;
     w
@@ -147,7 +142,7 @@ fn bathroom_check() {
     common::dump_state(&w, "bathroom-check");
     // An hour on, still nothing pulls them away.
     let day = clock::day(w.tick);
-    until(&mut w, day, 11.0);
+    run_to(&mut w, day, 11.0);
     assert!(
         w.sims[0]
             .needs
@@ -335,7 +330,7 @@ fn town_things_world(street: i64, hour: f32) -> World {
         "every thing loads where it was put"
     );
     world.households[0].free_will = false;
-    until(&mut world, 1, hour);
+    run_to(&mut world, 1, hour);
     free_up(&mut world);
     set_needs(&mut world, 0, 0.8, &[]);
     world
@@ -564,11 +559,7 @@ fn review_baby() {
         .find(|o| world.content.objects[o.def].id == "crib")
         .unwrap()
         .stable;
-    let feed = world.content.objects[world.objects[0].def]
-        .interactions
-        .iter()
-        .position(|i| i.id == "feed")
-        .unwrap();
+    let feed = common::interaction(&world, 0, "feed");
     world
         .apply(Command::Use {
             sim: 0,
@@ -665,11 +656,7 @@ fn crowded_garden() {
     let (object, at) = (lounger.stable, lounger.id);
     common::dump_state(&world, "crowded-garden");
     // Ada gets onto it all the same, from its foot.
-    let sunbathe = world.content.objects[world.objects[at as usize].def]
-        .interactions
-        .iter()
-        .position(|i| i.id == "sunbathe")
-        .unwrap();
+    let sunbathe = common::interaction(&world, at, "sunbathe");
     world
         .apply(Command::Use {
             sim: 0,

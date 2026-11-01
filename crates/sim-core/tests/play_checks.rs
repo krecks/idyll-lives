@@ -20,17 +20,12 @@
 
 mod common;
 
+use common::run_to;
+
 use serde_json::json;
-use sim_core::{Command, MINUTES_PER_TICK, World, clock};
+use sim_core::{Command, MINUTES_PER_TICK, World};
 
 const FUNDS: i64 = 1_000_000;
-
-fn until(w: &mut World, day: u32, hour: f32) {
-    let target = clock::tick_at(day, hour * 60.0).unwrap();
-    while w.tick < target {
-        w.tick_once();
-    }
-}
 
 /// Resident `i` stops what they're doing and drops their queue.
 fn free_up(w: &mut World, i: usize) {
@@ -145,7 +140,7 @@ fn family_check() {
         s.job_search_from = u32::MAX;
     }
     w.households[0].free_will = false;
-    until(&mut w, 1, 16.5);
+    run_to(&mut w, 1, 16.5);
     for i in 0..5 {
         free_up(&mut w, i);
     }

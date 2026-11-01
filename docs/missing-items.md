@@ -83,7 +83,8 @@ writes `"draws": 5` into the pack entry (`gamekit/family.py`), and `checkglb::dr
 the entry says otherwise, a whole number from 3 to 8, anything else an error (`a_model_may_allow_itself_more_draws`).
 - **Grandfather clock** (A-decor-01): the trunk door was joined into the body and never opened. It is a moving
   part now, hinged on its left edge and swung open 100° in 0.8 s (`door_open`), on "Wind the clock"
-  (`motions.uses.wind`). 6,394 triangles, 5 draws, 6 materials, 4 moving parts, 4 clips
+  (`motions.uses.wind`); winding, the resident stands up to the dial (`STEP_IN`), no longer stepped twice into the
+  case by a leftover `STAND_BACK` entry as well. 6,394 triangles, 5 draws, 6 materials, 4 moving parts, 4 clips
   (`previews/decor/grandfatherClock@door_open.png`); the only model with a `draws` allowance.
   Docs: `docs/objects/decor.md`, `docs/review/decor.md`, `tools/art/blender/families/decor.md`,
   `docs/design/objects.md` (draw calls).
@@ -146,7 +147,8 @@ the numbers ever justify it.
 the body (its cut the shirt's: long sleeves, `crew -0.012`, over the trousers) under an apron shell over the front
 of the trousers, from the waistband to just above the knee. The shell is clipped from the body's own torso and leg
 surface inside a ±1.28 rad span round the front, arms excluded, and turned back on every open edge
-(`apron_layout`/`apron`, `crates/tools/src/characters/clothes.rs`), in the top's colour with the hem band the
+(`apron_layout`/`apron`, `crates/tools/src/characters/clothes.rs`), in the top's colour (the shirt under it white:
+`SHIRTS.apron`, `outfit.ts`, painted over the whole top by the character shader) with the hem band the
 skirt's flag (`fields.y = 3`) gives it, and with the skirt's seated corrective (`seated_tone`, 8 mm clear of the
 skin). One garment, two parts: `top.apron` (267 vertices) and `lod.top.apron` (112). In `WORKWEAR` (`outfit.ts`),
 a list of its own so it is never picked for a resident but counts as a garment of both bodies (`check.rs`); the
@@ -240,7 +242,7 @@ not a wrong model. The gaps the coordinator's notes and the waves' review logs l
 - The other three flags stay the reviewer's: a missing use (a table with no use of its own is still a table
   the sim uses as a station — 50 of the 100 are flagged today, and that is the review's business), a
   duration out of its median, and an odd sound.
-- `Flag::hard` is the rule, `all_flags` is the list the gate and the table both read, and the CI step
+- `Flag::hard` is the rule, `uses()` returns the table and the hard flags from one pass, and the CI step
   **Object uses** sits after **Object sizes**. `the_shipped_content_reads` asserts the shipped content has
   no hard flag, so the gate can't quietly start failing on a change that only touched content.
 
@@ -377,7 +379,9 @@ not a wrong model. The gaps the coordinator's notes and the waves' review logs l
 **Done 2026-10-30 (cut flowers for a vase):**
 
 - The raised flower bed gains **"Cut some flowers"** (`cut`, 6 min, `anim: tend`, the bunch in the hand):
-  `web/public/content/base.json`.
+  `web/public/content/base.json`. Tending and cutting, they kneel up against its box and work over the rim
+  (`STEP_IN.flowerbed`, `actions.ts`; the `kneelBed` clip, `clips/garden.ts`), not at the grass in front of it;
+  smelling its flowers, knelt there too and leant in over the rim (`flowerbed:smell`, `smellBed`).
 - **`vaseEmpty`** ("Empty vase", bought, price 15, tabletop / plants) takes the bunch: "Put the flowers in"
   (3 min, `brings: cutFlowers`, `leaves: open`) grows the vase's own bunch up out of the mouth over 0.9 s
   (`flowers_open`) and it stays up while the vase is open, saved that way; "Take the flowers out" (2 min) runs
@@ -408,7 +412,7 @@ not a wrong model. The gaps the coordinator's notes and the waves' review logs l
   door before ten, drawn walking in, not at the post a minute later, there within ten minutes; back at the door
   and still after 21:30) and `the_barista_steps_over_to_the_machine_and_the_cafe_closes` (on the way from the
   door at a minute past ten, then at the machine).
-- They wear a uniform: a white shirt under a white apron (`top.apron`), dark trousers and dark shoes over their
+- They wear a uniform: a white shirt under a green apron (`top.apron`), dark trousers and dark shoes over their
   own face, hair and skin (`web/src/game/staff.ts`, `UNIFORM`). The apron is a garment of the character set since
   2026-10-31 (§3 above).
 - In play: `bench-results/check-staff/staff-cart-before-opening.png` (the ice cream cart unstaffed at 09:55),

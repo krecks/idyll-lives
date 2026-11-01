@@ -10,8 +10,8 @@
 
 mod common;
 
+use common::shown_held;
 use sim_core::items::ItemAt;
-use sim_core::snapshot::{self, HEADER_LEN, sim};
 use sim_core::{Command, World};
 
 /// A one-room house with the shipped appliances each recipe asks for, and a yard for the two that are
@@ -62,19 +62,7 @@ fn offers(w: &World, recipe: &str) -> (u32, usize) {
     panic!("no object in the lot offers the {recipe} recipe");
 }
 
-/// What the snapshot says the resident is holding, or `None`.
-fn held(w: &World) -> Option<String> {
-    let mut buf = vec![0.0; snapshot::CAPACITY];
-    snapshot::write(w, &mut buf);
-    let n = buf[HEADER_LEN + sim::HELD];
-    if n <= 0.0 {
-        return None;
-    }
-    Some(w.content.items[n as usize - 1].id.clone())
-}
-
-/// Whether the dish is standing on the dining table at `(10, 8)` (2 × 1 tiles), which is where the
-/// carrying out of the kitchen ends.
+/// Where every one of the dish is (for a failing assert's message).
 fn where_is(w: &World, dish: &str) -> String {
     let def = w.content.item_index(dish).unwrap();
     w.items
@@ -86,27 +74,27 @@ fn where_is(w: &World, dish: &str) -> String {
         .join(", ")
 }
 
-fn on_the_table(w: &World, dish: &str) -> bool {
+/// Whether the dish is standing on a surface on the tiles `xs` × `zs`.
+fn on(w: &World, dish: &str, xs: std::ops::Range<i32>, zs: std::ops::Range<i32>) -> bool {
     let def = w.content.item_index(dish).unwrap();
     w.items.list.iter().any(|it| {
         let (x, z) = it.at.tile();
         it.def == def
             && matches!(it.at, ItemAt::Surface { .. })
-            && (10..12).contains(&x)
-            && (8..9).contains(&z)
+            && xs.contains(&x)
+            && zs.contains(&z)
     })
+}
+
+/// Whether the dish is standing on the dining table at `(10, 8)` (2 × 1 tiles), which is where the
+/// carrying out of the kitchen ends.
+fn on_the_table(w: &World, dish: &str) -> bool {
+    on(w, dish, 10..12, 8..9)
 }
 
 /// Whether the dish is standing on the picnic table at `(19, 12)` (3 × 2 tiles).
 fn on_the_picnic(w: &World, dish: &str) -> bool {
-    let def = w.content.item_index(dish).unwrap();
-    w.items.list.iter().any(|it| {
-        let (x, z) = it.at.tile();
-        it.def == def
-            && matches!(it.at, ItemAt::Surface { .. })
-            && (19..22).contains(&x)
-            && (12..14).contains(&z)
-    })
+    on(w, dish, 19..22, 12..14)
 }
 
 /// Cook a recipe and give back every item the resident held on the way, in order.
@@ -122,7 +110,7 @@ fn cook(w: &mut World, recipe: &str, minutes: u32) -> Vec<String> {
     for _ in 0..(u64::from(minutes) * sim_core::TICKS_PER_MINUTE) {
         w.tick_once();
         common::check(w);
-        if let Some(id) = held(w)
+        if let Some(id) = shown_held(w)
             && carried.last() != Some(&id)
         {
             carried.push(id);
@@ -131,91 +119,55 @@ fn cook(w: &mut World, recipe: &str, minutes: u32) -> Vec<String> {
     carried
 }
 
+/// Cooks `recipe` for `minutes` in a fresh world: the last thing the resident carries is `dish`, and `left` (the
+/// dish, or what is left of it) ends up on the table `on` asks about.
+fn carried_out(recipe: &str, minutes: u32, dish: &str, left: &str, on: fn(&World, &str) -> bool) {
+    let mut w = world();
+    let carried = cook(&mut w, recipe, minutes);
+    assert_eq!(
+        carried.last().map(String::as_str),
+        Some(dish),
+        "carried the {dish}: {carried:?}"
+    );
+    assert!(on(&w, left), "the {left} is at {}", where_is(&w, left));
+}
+
 #[test]
 fn a_tasting_board_is_carried_out_of_the_kitchen() {
-    let mut w = world();
-    let carried = cook(&mut w, "tastingMenu", 120);
-    assert!(
-        carried.last() == Some(&"tastingBoard".to_string()),
-        "carried the board: {carried:?}"
-    );
-    assert!(
-        on_the_table(&w, "tastingBoard"),
-        "the board is on the table"
+    carried_out(
+        "tastingMenu",
+        120,
+        "tastingBoard",
+        "tastingBoard",
+        on_the_table,
     );
 }
 
 #[test]
 fn a_pizza_is_carried_out_of_the_kitchen() {
-    let mut w = world();
-    let carried = cook(&mut w, "pizza", 120);
-    assert!(
-        carried.last() == Some(&"pizza".to_string()),
-        "carried the pizza: {carried:?}"
-    );
     // A wood-fired pizza is cooked outdoors: it goes out to the picnic table.
-    assert!(
-        on_the_picnic(&w, "pizza"),
-        "the pizza is at {}",
-        where_is(&w, "pizza")
-    );
+    carried_out("pizza", 120, "pizza", "pizza", on_the_picnic);
 }
 
 #[test]
 fn a_pie_is_carried_out_of_the_kitchen() {
-    let mut w = world();
-    let carried = cook(&mut w, "pie", 120);
-    assert!(
-        carried.last() == Some(&"pieDish".to_string()),
-        "carried the pie: {carried:?}"
-    );
-    assert!(
-        on_the_table(&w, "pieDish"),
-        "the pie is at {}",
-        where_is(&w, "pieDish")
-    );
+    carried_out("pie", 120, "pieDish", "pieDish", on_the_table);
 }
 
 #[test]
 fn a_sandwich_is_carried_out_of_the_kitchen() {
-    let mut w = world();
-    let carried = cook(&mut w, "sandwich", 60);
-    assert!(
-        carried.last() == Some(&"sandwich".to_string()),
-        "carried the sandwich: {carried:?}"
-    );
     // A sandwich is eaten where it is made (`eatNow`): the dirty plate is what is left on the table.
-    assert!(
-        on_the_table(&w, "plateDirty"),
-        "the plate is at {}",
-        where_is(&w, "plateDirty")
-    );
+    carried_out("sandwich", 60, "sandwich", "plateDirty", on_the_table);
 }
 
 #[test]
 fn a_tray_of_baked_treats_is_carried_out_of_the_kitchen() {
-    let mut w = world();
-    let carried = cook(&mut w, "bakedTreats", 120);
-    assert!(
-        carried.last() == Some(&"bakingTray".to_string()),
-        "carried the tray: {carried:?}"
-    );
-    assert!(on_the_table(&w, "bakingTray"), "the tray is on the table");
+    carried_out("bakedTreats", 120, "bakingTray", "bakingTray", on_the_table);
 }
 
 #[test]
 fn a_barbecue_is_carried_out_of_the_kitchen() {
-    let mut w = world();
-    let carried = cook(&mut w, "bbq", 120);
-    assert!(
-        carried.last() == Some(&"grillPlatter".to_string()),
-        "carried the platter: {carried:?}"
-    );
-    assert!(
-        on_the_picnic(&w, "grillPlatter"),
-        "the platter is at {}",
-        where_is(&w, "grillPlatter")
-    );
+    carried_out("bbq", 120, "grillPlatter", "grillPlatter", on_the_picnic);
 }
 
 #[test]
@@ -242,8 +194,9 @@ fn a_serving_taken_from_a_pizza_is_a_slice_in_the_hand() {
     // Hungry, so that once the pizza is on the table they have some of it.
     w.sims[0].needs[0] = 0.2;
     let carried = cook(&mut w, "pizza", 200);
-    assert!(
-        carried.last() == Some(&"pizzaSlice".to_string()),
+    assert_eq!(
+        carried.last().map(String::as_str),
+        Some("pizzaSlice"),
         "carried a slice: {carried:?}"
     );
 }

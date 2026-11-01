@@ -17,7 +17,7 @@ import type { ObjectDef, RoomKindDef } from '../../content/content';
  */
 export const DOOR_SWING = 0.45;
 /** How fast residents walk at 1× (m/s; sim-core `WALK_SPEED`, 1.5 m a second). */
-const PACE = 1.5;
+export const PACE = 1.5;
 /** The nearest a leaf starts for: a walker's hand reaching it (m). */
 const DOOR_HAND = 0.75;
 /** The reach the hand comes out over, once the leaf starts (m of the walker's way). */
@@ -25,10 +25,10 @@ const HAND_FADE = 0.5;
 const DOORWAY = 0.35;
 const DOOR_CLEAR = 1.1;
 /**
- * Floats per resident in `movers`: where they are, the waypoint they walk to, where their way is
- * `lead` on, and which resident they are (their row, for `hand`; only walkers are in it).
+ * Floats per resident in `movers`: where they are, where their way is the snapshot's `ahead` on,
+ * and which resident they are (their row, for `hand`; only walkers are in it).
  */
-export const MOVER = 7;
+export const MOVER = 5;
 /** Smoothstep: eases 0..1 in and out. */
 export function ease(t: number): number {
   return t * t * (3 - 2 * t);
@@ -71,8 +71,8 @@ export function goingThrough(
     const pn = movers[i + iN] - cn;
     // Where their way is `lead` m on: along the direction the snapshot gives (its ahead point, which
     // follows the path round corners), never past it.
-    let wa = movers[i + 4 + ia] - ca;
-    let wn = movers[i + 4 + iN] - cn;
+    let wa = movers[i + 2 + ia] - ca;
+    let wn = movers[i + 2 + iN] - cn;
     const far = Math.hypot(wa - pa, wn - pn);
     if (far > 0) {
       const f = Math.min(1, lead / far);
@@ -80,24 +80,15 @@ export function goingThrough(
       wn = pn + (wn - pn) * f;
     }
     const here = Math.abs(pa) <= 0.5 && Math.abs(pn) < DOORWAY;
-    if (here || (open && pa * pa + pn * pn < DOOR_CLEAR * DOOR_CLEAR)) {
-      const across = wn >= pn ? 1 : -1;
-      if (!way) way = across;
-      if (hand) {
-        const w = handAt(Math.abs(pn), lead);
-        const who = movers[i + 6] | 0;
-        if (w > hand[who]) hand[who] = w;
-      }
-      continue;
-    }
-    const across = crosses(pa, pn, wa, wn);
+    const across =
+      here || (open && pa * pa + pn * pn < DOOR_CLEAR * DOOR_CLEAR) ? (wn >= pn ? 1 : -1) : crosses(pa, pn, wa, wn);
     if (!across) continue;
     if (!way) way = across;
-    if (hand) {
-      const w = handAt(Math.abs(pn), lead);
-      const who = movers[i + 6] | 0;
-      if (w > hand[who]) hand[who] = w;
-    }
+    // (With no hands to fill, the first one through is all that's asked.)
+    if (!hand) return way;
+    const w = handAt(Math.abs(pn), lead);
+    const who = movers[i + 4] | 0;
+    if (w > hand[who]) hand[who] = w;
   }
   return way;
 }

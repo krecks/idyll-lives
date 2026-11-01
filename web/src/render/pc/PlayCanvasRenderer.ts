@@ -1457,12 +1457,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const pz = curr[o + k.z];
       if (curr[o + k.moving] !== 0) {
         // (An older layout without the way ahead: where they are, so only a doorway they're in opens.)
-        const wx = k.wayX;
-        const wz = k.wayZ;
         const ax = k.aheadX;
         const az = k.aheadZ;
-        if (wx === undefined || wz === undefined || ax === undefined || az === undefined) movers.push(px, pz, px, pz, px, pz, i);
-        else movers.push(px, pz, curr[o + wx], curr[o + wz], curr[o + ax], curr[o + az], i);
+        if (ax === undefined || az === undefined) movers.push(px, pz, px, pz, i);
+        else movers.push(px, pz, curr[o + ax], curr[o + az], i);
       }
       const asleep = curr[o + k.pose] === Pose.Lie && sleeping.has(curr[o + k.action] | 0);
       const baby = babies.has(world.sims[i]?.stage ?? '');
@@ -1532,7 +1530,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const engaged = leaf.shuts.some((r) => this.shutRooms.has(r));
       const swings = leaf.front || engaged;
       // (Both in lot rows: the storey is in the row.) A door that stands open has no handle to reach.
-      const going = goingThrough(movers, leaf.axis, leaf.centre, door.open === 1, lead, swings ? hand : undefined) !== 0;
+      const going = swings && goingThrough(movers, leaf.axis, leaf.centre, door.open === 1, lead, hand) !== 0;
       const target = going || !swings ? 1 : 0;
       const open = door.open < 0 ? target : target > door.open ? Math.min(target, door.open + step) : Math.max(target, door.open - step);
       if (open === door.open) continue;

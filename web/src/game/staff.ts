@@ -15,13 +15,13 @@ import type { SimInfo, WorldStructure } from '../core/protocol';
 import { lookAtStage, lookFromSeed, palette } from './household';
 
 /**
- * What they wear at work: a white shirt under a white apron (`top.apron`: the shirt painted on the body, the
- * apron a shell over the front of the trousers), dark trousers and dark shoes, whatever their own clothes are.
- * Their face, hair and skin are their own.
+ * What they wear at work: a white shirt under a green apron (`top.apron`: the shirt painted on the body in white,
+ * outfit.ts `SHIRTS.apron`; the apron a shell over the front of the trousers in the top's colour, `body`), dark
+ * trousers and dark shoes, whatever their own clothes are. Their face, hair and skin are their own.
  */
 const UNIFORM = {
   top: 'top.apron',
-  body: '#F2EFE8',
+  body: '#3F6B52',
   bottom: 'bottom.trousers',
   bottomColor: '#2B2D33',
   shoes: 'shoes.sneakers',

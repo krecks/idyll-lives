@@ -6,6 +6,8 @@
 
 mod common;
 
+use common::interaction;
+
 use std::collections::{BTreeSet, VecDeque};
 
 use serde_json::{Value, json};
@@ -267,14 +269,6 @@ fn object(w: &World, id: &str) -> u32 {
         .find(|o| w.content.objects[o.def].id == id)
         .unwrap_or_else(|| panic!("a {id}"))
         .id
-}
-
-fn interaction(w: &World, object: u32, id: &str) -> usize {
-    w.content.objects[w.objects[object as usize].def]
-        .interactions
-        .iter()
-        .position(|i| i.id == id)
-        .unwrap()
 }
 
 fn minutes(w: &mut World, n: u32) {

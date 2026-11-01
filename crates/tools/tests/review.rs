@@ -641,7 +641,7 @@ fn each_uses_flag() {
     // The whole table: the vase is decor by the reference (its group `ornaments`), the crate isn't.
     let sounds = BTreeMap::from([("wash".to_string(), "tap".to_string())]);
     let r = reference();
-    let (text, files) = review::uses(&objects, &motions, &actions, &sounds, Some(&r));
+    let (text, files, _) = review::uses(&objects, &motions, &actions, &sounds, Some(&r));
     assert!(
         text.contains("| kitchen | 2 | 2 | 0 | 1 | 2 | 0 | 1 | 0 |"),
         "{text}"
@@ -665,7 +665,7 @@ fn each_uses_flag() {
         living.contains("| uses doze→bed_out, pullOut→bed_out |"),
         "{living}"
     );
-    let (text, _) = review::uses(&objects, &motions, &actions, &sounds, None);
+    let (text, _, _) = review::uses(&objects, &motions, &actions, &sounds, None);
     assert!(
         text.contains("No docs/review/reference.json yet")
             && text.contains("| decor | 2 | 2 | 2 | 0 |"),
@@ -804,23 +804,14 @@ fn the_shipped_content_reads() {
     )
     .unwrap();
     assert_eq!(sounds.get("shower").map(String::as_str), Some("shower"));
-    let (text, files) = review::uses(&objects, &motions, &actions, &sounds, None);
+    let (text, files, _) = review::uses(&objects, &motions, &actions, &sounds, None);
     assert!(text.contains("| **all** | 543 |"), "{text}");
     assert_eq!(files.len(), 15);
 
     // The gate CI runs (`cargo review uses --check`): no use the renderer can't play, no `motions` key
     // no use answers to, no open without its clip. A missing use is the review's to weigh, not the gate's.
-    let reference = std::fs::read_to_string(format!("{root}/docs/review/reference.json")).unwrap();
+    let reference = std::fs::read_to_string(format!("{root}/{}", review::REFERENCE)).unwrap();
     let reference = review::Reference::parse(&reference).unwrap();
-    let hard: Vec<String> =
-        review::all_flags(&objects, &motions, &actions, &sounds, Some(&reference))
-            .into_iter()
-            .flat_map(|(id, flags)| {
-                flags
-                    .into_iter()
-                    .filter(review::Flag::hard)
-                    .map(move |f| format!("{id}: {}", f.text()))
-            })
-            .collect();
+    let (_, _, hard) = review::uses(&objects, &motions, &actions, &sounds, Some(&reference));
     assert!(hard.is_empty(), "{hard:?}");
 }

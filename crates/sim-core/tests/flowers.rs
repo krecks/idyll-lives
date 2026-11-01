@@ -5,9 +5,9 @@
 
 mod common;
 
-use sim_core::snapshot::{self, HEADER_LEN, sim};
+use common::{interaction, shown_held, until};
 use sim_core::world::{Phase, TaskKind};
-use sim_core::{Command, TICKS_PER_MINUTE, World, clock};
+use sim_core::{Command, TICKS_PER_MINUTE, World};
 
 /// A room with a side table to stand the vase on, and a flower bed out in the garden.
 const TOWN: &str = r#"{"width":14,"depth":14,
@@ -28,10 +28,7 @@ fn world() -> (World, String) {
         household: None,
     })
     .unwrap();
-    let morning = clock::tick_at(1, 10.0 * 60.0).unwrap();
-    while w.tick < morning {
-        w.tick_once();
-    }
+    common::run_to(&mut w, 1, 10.0);
     let n = w.content.needs.len();
     for s in &mut w.sims {
         s.needs[..n].fill(1.0);
@@ -44,25 +41,6 @@ fn object(w: &World, id: &str) -> u32 {
         .iter()
         .position(|o| w.content.objects[o.def].id == id)
         .unwrap_or_else(|| panic!("no {id}")) as u32
-}
-
-fn interaction(w: &World, object: u32, id: &str) -> usize {
-    let def = w.objects[object as usize].def;
-    w.content.objects[def]
-        .interactions
-        .iter()
-        .position(|i| i.id == id)
-        .unwrap_or_else(|| panic!("no {id}"))
-}
-
-/// The item Sim 0 is shown holding this tick (the snapshot's `held`: what they carry, or what the use
-/// they're on has them bring or hold), as an id.
-fn shown(w: &World) -> Option<String> {
-    let mut out = vec![0.0; snapshot::CAPACITY];
-    snapshot::write(w, &mut out);
-    let at = HEADER_LEN + sim::HELD;
-    let n = out[at] as usize;
-    (n > 0).then(|| w.content.items[n - 1].id.clone())
 }
 
 fn using(w: &World, i: usize) -> bool {
@@ -79,17 +57,6 @@ fn at(w: &World, i: usize, which: impl Fn(&Phase) -> bool) -> bool {
         matches!(a.task.kind, TaskKind::Use { interaction, .. } if interaction == i)
             && which(&a.phase)
     })
-}
-
-/// Ticks `w` for up to `minutes`, until `done`; true if it got there.
-fn until(w: &mut World, minutes: u64, mut done: impl FnMut(&World) -> bool) -> bool {
-    for _ in 0..minutes * TICKS_PER_MINUTE {
-        if done(w) {
-            return true;
-        }
-        w.tick_once();
-    }
-    done(w)
 }
 
 #[test]
@@ -124,7 +91,7 @@ fn the_garden_gives_a_bunch_and_the_vase_takes_it() {
     let (mut in_hand, mut finished) = (false, false);
     for _ in 0..40 * TICKS_PER_MINUTE {
         if using(&w, cut) {
-            in_hand |= shown(&w).as_deref() == Some("cutFlowers");
+            in_hand |= shown_held(&w).as_deref() == Some("cutFlowers");
         }
         // The command lands on the next tick, so nothing yet is not the use being over.
         if in_hand && w.sims[0].current().is_none() {
@@ -135,7 +102,11 @@ fn the_garden_gives_a_bunch_and_the_vase_takes_it() {
     }
     assert!(finished, "the cutting done");
     assert!(in_hand, "the flowers in hand as they're cut");
-    assert_eq!(shown(&w), None, "the bunch is only shown while it is cut");
+    assert_eq!(
+        shown_held(&w),
+        None,
+        "the bunch is only shown while it is cut"
+    );
 
     // The vase: the bunch in the arms on the way there, the vase's own bunch grown up as it goes in.
     w.apply(Command::Use {
@@ -146,8 +117,8 @@ fn the_garden_gives_a_bunch_and_the_vase_takes_it() {
     .unwrap();
     let (mut carried, mut empty_handed, mut opened) = (false, false, false);
     for _ in 0..40 * TICKS_PER_MINUTE {
-        carried |= routing(&w, put) && shown(&w).as_deref() == Some("cutFlowers");
-        empty_handed |= using(&w, put) && shown(&w).is_none();
+        carried |= routing(&w, put) && shown_held(&w).as_deref() == Some("cutFlowers");
+        empty_handed |= using(&w, put) && shown_held(&w).is_none();
         opened |= w.objects[o].open;
         if opened && w.sims[0].current().is_none() {
             break;
@@ -161,7 +132,7 @@ fn the_garden_gives_a_bunch_and_the_vase_takes_it() {
     );
     assert!(opened, "put the flowers in");
     assert!(w.objects[o].open, "it stands open with the flowers in it");
-    assert_eq!(shown(&w), None, "nothing in hand once they're in");
+    assert_eq!(shown_held(&w), None, "nothing in hand once they're in");
 
     // Still open after saving and loading, and the flowers come back out.
     let mut w = common::reload(&w, &content);
@@ -195,7 +166,7 @@ fn a_bed_of_tulips_gives_a_bunch_too() {
     let mut in_hand = false;
     for _ in 0..40 * TICKS_PER_MINUTE {
         if using(&w, cut) {
-            in_hand |= shown(&w).as_deref() == Some("cutFlowers");
+            in_hand |= shown_held(&w).as_deref() == Some("cutFlowers");
         }
         if in_hand && w.sims[0].current().is_none() {
             break;
@@ -221,7 +192,7 @@ fn the_daisies_make_a_daisy_chain() {
     let (mut in_hand, mut finished) = (false, false);
     for _ in 0..40 * TICKS_PER_MINUTE {
         if using(&w, make) {
-            in_hand |= shown(&w).as_deref() == Some("daisyChain");
+            in_hand |= shown_held(&w).as_deref() == Some("daisyChain");
         }
         if in_hand && w.sims[0].current().is_none() {
             finished = true;
@@ -231,7 +202,11 @@ fn the_daisies_make_a_daisy_chain() {
     }
     assert!(finished, "the chain made");
     assert!(in_hand, "the chain in hand as it's made");
-    assert_eq!(shown(&w), None, "the chain is only shown while it is made");
+    assert_eq!(
+        shown_held(&w),
+        None,
+        "the chain is only shown while it is made"
+    );
 }
 
 /// Every bed of flowers the garden sells can be cut for a vase, and each cut is the same act: the bunch

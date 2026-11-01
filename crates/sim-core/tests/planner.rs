@@ -3,23 +3,18 @@
 
 mod common;
 
+use common::run_to;
+
 use serde_json::json;
 use sim_core::planner::{self, Outcome, Reason};
 use sim_core::social::EventKind;
-use sim_core::{Command, World, clock};
+use sim_core::{Command, World};
 
 /// A town with one newcomer (resident 0) in the player's house; free will on.
 fn town(seed: u64) -> World {
     let content = common::content();
     let file = common::town(&content, seed, 1);
     World::from_json(&content, &file, seed as u32).unwrap()
-}
-
-fn until(w: &mut World, day: u32, hour: f32) {
-    let target = clock::tick_at(day, hour * 60.0).unwrap();
-    while w.tick < target {
-        w.tick_once();
-    }
 }
 
 fn routines(w: &mut World, sim: u32, list: serde_json::Value) {
@@ -54,7 +49,7 @@ fn a_planned_workout_happens_most_days() {
                         0,
                         json!([{"activity": "train", "skill": "strength", "days": EVERY_DAY, "start": 18 * 60, "minutes": 60}]),
                     );
-                    until(&mut w, 6, 20.0);
+                    run_to(&mut w, 6, 20.0);
                     w
                 })
             })
@@ -104,7 +99,7 @@ fn nowhere_to_do_it_becomes_a_wish_until_it_is_bought() {
         json!([{"activity": "train", "skill": "dexterity", "days": EVERY_DAY, "start": 10 * 60, "minutes": 60}]),
     );
     // Nothing at home or in the park trains dexterity... unless the park has it.
-    until(&mut w, 1, 11.5);
+    run_to(&mut w, 1, 11.5);
     let last = *w.sims[0].planner.history.back().expect("the block ran");
     if last.outcome != Outcome::NoPlace {
         eprintln!("the park trains dexterity; nothing to test");
@@ -135,7 +130,7 @@ fn urgent_needs_still_come_first() {
         0,
         json!([{"activity": "fun", "days": EVERY_DAY, "start": 10 * 60, "minutes": 120}]),
     );
-    until(&mut w, 1, 10.0);
+    run_to(&mut w, 1, 10.0);
     let bladder = w
         .content
         .needs
@@ -201,9 +196,9 @@ fn planned_sleep_moves_bedtime() {
     // need can still wake them).
     let (mut up, mut asleep) = (0, 0);
     for day in 1..6 {
-        until(&mut w, day, 23.5);
+        run_to(&mut w, day, 23.5);
         up += !w.sims[0].asleep(&w.content) as u32;
-        until(&mut w, day + 1, 7.5);
+        run_to(&mut w, day + 1, 7.5);
         asleep += w.sims[0].asleep(&w.content) as u32;
     }
     assert!(
@@ -228,7 +223,7 @@ fn household_routines_apply_to_everyone_who_does_not_skip_them() {
         skip: true,
     })
     .unwrap();
-    until(&mut w, 1, 20.5);
+    run_to(&mut w, 1, 20.5);
     assert!(w.sims[0].planner.run.is_some_and(|r| r.household));
     assert!(w.sims[1].planner.run.is_none());
 }
@@ -250,7 +245,7 @@ fn a_job_goal_finds_work_and_completes() {
     w.sims[0].job = None;
     let cmd = json!({"type": "addGoal", "sim": 0, "goal": {"def": "getJob"}}).to_string();
     w.apply(Command::from_json(&cmd).unwrap()).unwrap();
-    until(&mut w, 3, 12.0);
+    run_to(&mut w, 3, 12.0);
     assert!(w.sims[0].job.is_some());
     assert!(w.sims[0].planner.goals.is_empty(), "done goals are removed");
     assert!(
@@ -264,7 +259,7 @@ fn a_job_goal_finds_work_and_completes() {
 fn residents_suggest_goals_and_neighbours_take_theirs_on() {
     let mut w = town(12);
     // Two weeks: an idea comes about every other day, so a week can go by without one.
-    until(&mut w, 15, 8.0);
+    run_to(&mut w, 15, 8.0);
     assert!(
         !w.sims[0].planner.suggestions.is_empty()
             || w.events.iter().any(|e| e.kind == EventKind::GoalSuggested)
@@ -286,7 +281,7 @@ fn plans_survive_saving() {
     );
     let cmd = json!({"type": "addGoal", "sim": 0, "goal": {"def": "skill", "skill": "cooking", "target": 4}}).to_string();
     w.apply(Command::from_json(&cmd).unwrap()).unwrap();
-    until(&mut w, 2, 20.0);
+    run_to(&mut w, 2, 20.0);
     let loaded = World::from_save_json(&common::content(), &w.save_json()).unwrap();
     let (a, b) = (&w.sims[0].planner, &loaded.sims[0].planner);
     assert_eq!(a.routines, b.routines);

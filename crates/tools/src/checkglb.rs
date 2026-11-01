@@ -2524,6 +2524,14 @@ struct Seat {
     front: Option<f64>,
 }
 
+/// Whether any of the object's uses is a baby's (content `baby`).
+fn for_baby(object: &J) -> bool {
+    object
+        .get("interactions")
+        .and_then(J::list)
+        .is_some_and(|l| l.iter().any(|i| i.get("baby").is_some_and(J::truthy)))
+}
+
 /// Each slot's place of content object `object` (sim-core `slot_position`, `slot_yaw`), `fwd` m ahead of it the
 /// way its user faces (m right of the footprint's middle and forward of it): its `places`, else spread across
 /// its width, facing its front.
@@ -2545,11 +2553,7 @@ fn slot_points(object: &J, fwd: f64) -> Vec<[f64; 2]> {
     }
     // A baby's place is the middle, however many slots it has (sim-core `place_at`: a baby is put at the object's
     // centre, not spread across its width), so a crib's mattress is one mattress and a high chair one seat.
-    let baby = object
-        .get("interactions")
-        .and_then(J::list)
-        .is_some_and(|l| l.iter().any(|i| i.get("baby").is_some_and(J::truthy)));
-    if baby {
+    if for_baby(object) {
         return vec![[0.0, fwd]];
     }
     let n = object
@@ -2820,11 +2824,8 @@ fn heights(
                     ),
                 };
                 // (A baby lies at its slot, on its back along the bed, even on one lain on across: characters.ts.)
-                let baby = object
-                    .get("interactions")
-                    .and_then(J::list)
-                    .is_some_and(|l| l.iter().any(|i| i.get("baby").is_some_and(J::truthy)));
-                let across = !baby && bed.and_then(|b| b.get("across")).is_some_and(J::truthy);
+                let across =
+                    !for_baby(object) && bed.and_then(|b| b.get("across")).is_some_and(J::truthy);
                 let slots = slot_points(object, fwd);
                 let n = if every_slot { slots.len() } else { 1 };
                 let points: Vec<[f64; 2]> = if across {

@@ -265,11 +265,11 @@ fn rim(
     nor: &[V3],
     idx: &[usize],
     depth: f64,
-    skip: &[bool],
+    skip: Option<&[bool]>,
 ) -> (Vec<V3>, Vec<usize>, Vec<usize>) {
     let be: Vec<[usize; 2]> = boundary_edges(idx)
         .into_iter()
-        .filter(|e| !(skip[e[0]] && skip[e[1]]))
+        .filter(|e| skip.is_none_or(|k| !(k[e[0]] && k[e[1]])))
         .collect();
     let verts = unique(&be.concat());
     let mut newi = vec![usize::MAX; pos.len()];
@@ -285,8 +285,8 @@ fn rim(
     (p, out, verts)
 }
 
-fn jacket(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
-    let lay = jacket_layout(family, gid, lod);
+/// A shell's positions, unit normals and skinning on `stage`'s body, from its source edges `src` on the base body.
+fn shell_on(family: &str, stage: &str, src: &Src, lod: bool) -> (Vec<V3>, Vec<V3>, Vec<Dense>) {
     let s = surface(family, stage);
     let (bpos, bidx, dense): (&[V3], Vec<usize>, &[Dense]) = if lod {
         (&s.lod_pos, topology().lod_tris.concat(), &s.lod_dense)
@@ -294,11 +294,14 @@ fn jacket(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
         (&s.pos, tris(family).to_vec(), &s.dense)
     };
     let bnor = smooth_normals(bpos, &bidx);
-    let pos = lerp_src(&lay.src, bpos);
-    let nor: Vec<V3> = lerp_src(&lay.src, &bnor)
-        .iter()
-        .map(|n| n / n.norm())
-        .collect();
+    let pos = lerp_src(src, bpos);
+    let nor = lerp_src(src, &bnor).iter().map(|n| n / n.norm()).collect();
+    (pos, nor, shell_dense(src, dense))
+}
+
+fn jacket(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
+    let lay = jacket_layout(family, gid, lod);
+    let (pos, nor, mut d) = shell_on(family, stage, &lay.src, lod);
     let cut = &lay.cut;
     let h = proportions(family, stage).h;
     let k = h / 1.7;
@@ -329,12 +332,17 @@ fn jacket(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
             pos = over_skirt(&pos, family, stage, &cuts, 0.005 * k, !flared);
         }
         let n0 = pos.len();
-        let (pos, idx, verts) = rim(&pos, &nor, &lay.idx, 0.6 * jacket_lift(gid) * k, &skip);
+        let (pos, idx, verts) = rim(
+            &pos,
+            &nor,
+            &lay.idx,
+            0.6 * jacket_lift(gid) * k,
+            Some(&skip),
+        );
         (pos, idx, verts, n0)
     };
     let (pos, idx, verts, n0) = shape(true);
     let nor_all = smooth_normals(&pos, &idx);
-    let mut d = shell_dense(&lay.src, dense);
     let extra: Vec<Dense> = verts.iter().map(|&v| d[v]).collect();
     d.extend(extra);
     // The hem distance (m, on the base body, so every stage shares it): from each vertex to the nearest open
@@ -438,38 +446,26 @@ fn apron_layout(family: &str, lod: bool) -> Arc<ApronLayout> {
 }
 
 /// The apron's shell: the body's own front surface from the waistband to above the knees, lifted off the trousers,
-/// its edges turned back to the cloth's thickness. It is painted in the top's colour (the shirt's white), with the
-/// shirt painted on the body under it; the waist tie is the top edge's band.
+/// its edges turned back to the cloth's thickness. It is painted in the top's colour, with the shirt painted on the
+/// body under it in white (the runtime's `SHIRTS.apron`); the waist tie is the top edge's band.
 fn apron(family: &str, stage: &str, lod: bool) -> Mesh {
     let lay = apron_layout(family, lod);
-    let s = surface(family, stage);
-    let (bpos, bidx, dense): (&[V3], Vec<usize>, &[Dense]) = if lod {
-        (&s.lod_pos, topology().lod_tris.concat(), &s.lod_dense)
-    } else {
-        (&s.pos, tris(family).to_vec(), &s.dense)
-    };
-    let bnor = smooth_normals(bpos, &bidx);
-    let pos = lerp_src(&lay.src, bpos);
-    let nor: Vec<V3> = lerp_src(&lay.src, &bnor)
-        .iter()
-        .map(|n| n / n.norm())
-        .collect();
+    let (pos, nor, mut d) = shell_on(family, stage, &lay.src, lod);
     let k = proportions(family, stage).h / 1.7;
     // A hand's breadth off the trousers, and it hangs straight (no flare).
     let lift = 0.008 * k;
     let hang: Vec<V3> = pos.iter().zip(&nor).map(|(q, n)| *q + *n * lift).collect();
     let n0 = hang.len();
     // Every edge is open (the hem, the sides, the waistband): all of them turn back to the cloth's thickness.
-    let (pos, idx, verts) = rim(&hang, &nor, &lay.idx, 0.5 * lift, &vec![false; n0]);
+    let (pos, idx, verts) = rim(&hang, &nor, &lay.idx, 0.5 * lift, None);
     let nor_all = smooth_normals(&pos, &idx);
-    let mut d = shell_dense(&lay.src, dense);
     let extra: Vec<Dense> = verts.iter().map(|&v| d[v]).collect();
     d.extend(extra);
     // The distance to the nearest open edge (m, on the base body, so every stage shares it) for the shader's band.
     let edge_d = edge_distance(family, &lay.src, &lay.idx, lod, None);
     let n = pos.len();
-    // In the top's colour (the shirt's white, over dark trousers), with a hem band (fields y = 3: the skirt's
-    // flag for one).
+    // In the top's colour (the shirt under it is white: the runtime's `SHIRTS.apron`), with a hem band (fields y =
+    // 3: the skirt's flag for one).
     let fields = (0..n)
         .map(|i| [if i < n0 { edge_d[i] } else { 0.0 }, 3.0, TOP, 0.0])
         .collect();
