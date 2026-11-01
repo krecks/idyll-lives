@@ -386,6 +386,50 @@ export interface RoadPlan {
   lots?: 1 | -1;
   /** What stands in the middle of a ring this small (a roundabout). */
   island?: 'fountain';
+  /** What kind of way it is (default `street`; see docs/design/open-world.md). */
+  kind?: RoadKind;
+  /** The area (`OpenWorldTownFields.areas` index) it belongs to; absent for ways between areas. */
+  area?: number;
+}
+
+/** `street` (default) · `lane` · `country` (between areas) · `trail` (2 m, on foot only). */
+export type RoadKind = 'street' | 'lane' | 'country' | 'trail';
+
+/** How big a world is (docs/design/open-world.md); towns without one are `cosy`. */
+export type WorldSize = 'cosy' | 'normal' | 'big';
+
+/** Run-length mask over the ground grid, row-major from tile (0, 0): `[run, value(0|1), run, value, ...]`. */
+export type Rle = number[];
+
+/** A hamlet (area 0: the main town) or a stretch of countryside. */
+export interface TownArea {
+  name: string;
+  kind: 'hamlet' | 'countryside';
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+}
+
+/** Where people leave town: a road out (`[x, z]` is a road exit) or a bus stop people on foot use. */
+export type TownExit = [number, number] | { x: number; z: number; kind: 'road' | 'stop' };
+
+/** Land the renderer draws and the generator keeps building off. */
+export interface WorldZone {
+  kind: 'woods' | 'meadow' | 'water' | 'hill' | 'fields';
+  poly: [number, number][];
+}
+
+/** The town file's open-world fields (all optional; absent: today's behaviour). */
+export interface OpenWorldTownFields {
+  size?: WorldSize;
+  /** The roads for the sim (the same objects as `meta.roads`). */
+  roads?: RoadPlan[];
+  areas?: TownArea[];
+  exits?: TownExit[];
+  terrain?: { water?: Rle; blocked?: Rle };
+  /** Public parking for car trips between areas. */
+  parking?: { x: number; z: number; rot: number; area: number }[];
 }
 
 export interface WorldMeta {
@@ -405,11 +449,19 @@ export interface WorldMeta {
   world?: WorldLook;
   /** The menus' town preview only: the plot drawn as the player's house, as the game shows it (its car on the driveway, no garage or garden dressing). */
   home?: number | null;
+  /** Big worlds: woods, meadows, water, hills and fields across the world. */
+  zones?: WorldZone[];
+  /** Big worlds: the height (m) each outdoor plot off the flat town land is levelled to, by plot index. */
+  pads?: Record<number, number>;
+  /** The areas (hamlets) as the generator laid them out, for the map and the camera. */
+  areas?: TownArea[];
 }
 
 /** The world a town stands in (`game/world.ts`): its kind, its land, and farm fields in town. */
 export interface WorldLook {
   kind: string;
+  /** How big the world is (missing: `cosy`). */
+  size?: WorldSize;
   landscape: LandscapeParams;
   /** Tilled fields on farm lots (town tiles): drawn as soil, fenced in. */
   fields?: { x: number; z: number; w: number; d: number }[];
