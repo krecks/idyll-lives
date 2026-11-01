@@ -1834,6 +1834,9 @@ enum Choice {
     /// Joining the conversation this Sim started.
     Join(u32),
     Visit(u32),
+    /// Open-world towns: off to a public place out of reach (`autonomy.reach`), a countryside
+    /// spot, the park in the next hamlet; they go as visitors (`TaskKind::Visit`).
+    Outing(u32),
     /// A phone action, with someone or not (`phone.rs`).
     Phone(usize, Option<u32>),
 }
@@ -3321,7 +3324,28 @@ impl World {
     /// Rebuilds the objects-by-plot index if objects were added, removed or changed since.
     pub(crate) fn refresh_index(&mut self) {
         if self.object_index.version != self.nav_version {
-            self.object_index = ObjectIndex::new(&self.object_plot, &self.plots, self.nav_version);
+            self.object_index = if self.travel.open {
+                let centres: Vec<[f32; 2]> = self
+                    .objects
+                    .iter()
+                    .map(|o| o.centre(&self.content))
+                    .collect();
+                let ground = if self.stairs.depth > 0 {
+                    self.stairs.depth as usize
+                } else {
+                    self.lot.depth
+                };
+                let size = [self.lot.width as f32, ground as f32];
+                ObjectIndex::open(
+                    &self.object_plot,
+                    &self.plots,
+                    &centres,
+                    size,
+                    self.nav_version,
+                )
+            } else {
+                ObjectIndex::new(&self.object_plot, &self.plots, self.nav_version)
+            };
             let nav = NavGrid {
                 lot: &self.lot,
                 blocked: &self.blocked,
@@ -5548,12 +5572,8 @@ fn pick_autonomous(
     let rested = (!before_dawn(sim, ctx) && rhythm.rest_need.is_some_and(|n| needs[n] >= 0.95))
         || getting_up(sim, ctx);
     // Only what they may use: at home and in public places, or where they're a guest.
-    let usable = match sim.visiting {
-        Some(visit) => ctx.index.on(visit.plot),
-        None => ctx
-            .index
-            .usable_from(ctx.households[sim.household as usize].plot),
-    };
+    let usable = usable_here(sim, ctx);
+    let usable: &[u32] = &usable;
     // Cooking: the stations they have (recipes need theirs), and whether food is ready.
     let stations = crate::cooking::station_mask(sim, ctx, objects);
     let fresh = items
@@ -6171,6 +6191,51 @@ fn pick_autonomous(
         }
     }
 
+    // An outing: in an open-world town, a public place out of reach, for the best it has, the
+    // less the longer the way (`OUTING_K`), with time for there and back and an hour there.
+    if ctx.travel.open
+        && sim.visiting.is_none()
+        && here.is_some()
+        && here == household.plot
+        && !minding
+        && (visits.earliest_hour..visits.latest_hour).contains(&ctx.hour)
+    {
+        let reach = content.autonomy.reach;
+        let free = until_leave.unwrap_or(f32::INFINITY);
+        for p in ctx.plots.iter().filter(|p| p.public) {
+            let door = p.arrival_point();
+            if (door[0] - sim.pos[0]).hypot(door[1] - sim.pos[1]) <= reach {
+                continue;
+            }
+            let eta = ctx
+                .travel
+                .eta(sim.pos, door, crate::travel::Mode::Foot, walk_per_minute);
+            if free < 2.0 * eta + OUTING_STAY_MINUTES {
+                continue;
+            }
+            // The best the place has for each need, as one day out.
+            let mut best = [0.0f32; crate::content::MAX_NEEDS];
+            for i in ctx
+                .index
+                .on(p.id)
+                .iter()
+                .map(|&o| &objects[o as usize])
+                .filter(|o| !o.broken())
+                .flat_map(|o| &content.objects[o.def].interactions)
+                .filter(|i| unfit(content, sim.age, i).is_none())
+            {
+                for (b, &g) in best.iter_mut().zip(&i.total_gain) {
+                    *b = b.max(g);
+                }
+            }
+            let score = ai::score_felt(needs, &felt, &best, 0.0) * feel(visits.tags)
+                / (1.0 + OUTING_K * eta);
+            if score > MIN_AUTONOMY_SCORE {
+                candidates.push((score, Choice::Outing(p.id)));
+            }
+        }
+    }
+
     // Not what they couldn't get to a moment ago (and would try again and again, each time
     // looking for a way there).
     for kind in sim.unreachable_now(ctx.tick) {
@@ -6186,7 +6251,7 @@ fn pick_autonomous(
             (Choice::Clean(x, z), TaskKind::Clean { x: cx, z: cz }) => (x, z) != (cx, cz),
             (Choice::Repair(o), TaskKind::Repair { object }) => o != object,
             (Choice::Dishes(it), TaskKind::Dishes { item, .. }) => it != item,
-            (Choice::Visit(p), TaskKind::Visit { plot }) => p != plot,
+            (Choice::Visit(p) | Choice::Outing(p), TaskKind::Visit { plot }) => p != plot,
             (Choice::Social(t, s), TaskKind::Social { target, social }) => {
                 (t, s) != (target, social)
             }
@@ -6244,7 +6309,7 @@ fn pick_autonomous(
             },
             Choice::Social(target, social) => TaskKind::Social { target, social },
             Choice::Join(leader) => TaskKind::Join { leader },
-            Choice::Visit(plot) => TaskKind::Visit { plot },
+            Choice::Visit(plot) | Choice::Outing(plot) => TaskKind::Visit { plot },
             Choice::Clean(x, z) => TaskKind::Clean { x, z },
             Choice::Repair(object) => TaskKind::Repair { object },
             Choice::Eat(item) => TaskKind::Eat {
@@ -6592,7 +6657,12 @@ fn start_task(
             let knock = (content.visits.door.is_some() && !p.public)
                 .then(|| crate::life::knock_spot(nav, p))
                 .flatten();
-            let door = p.arrival_point();
+            let mut door = p.arrival_point();
+            // A public place without an entry (open-world towns): the open ground nearest its
+            // middle, not whatever stands there.
+            if ctx.travel.open && p.public && p.entry.is_none() {
+                door = open_ground_near(nav, p, door).unwrap_or(door);
+            }
             match knock {
                 Some((t, at, _)) => (at, t, content.visits.tags),
                 None => (
@@ -8300,12 +8370,8 @@ pub(crate) fn nearest(
     if access(ctx, sim, plot) == Access::None {
         return None;
     }
-    let usable = match sim.visiting {
-        Some(visit) => ctx.index.on(visit.plot),
-        None => ctx
-            .index
-            .usable_from(ctx.households[sim.household as usize].plot),
-    };
+    let usable = usable_here(sim, ctx);
+    let usable: &[u32] = &usable;
     let approach = |o: &ObjectInstance| {
         ctx.index
             .links
@@ -8467,6 +8533,39 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
 pub fn wrap_angle(a: f32) -> f32 {
     (a + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
 }
+
+/// What `sim` may use where they are: on the plot they're a guest at, else at home and the
+/// public things (within `autonomy.reach` in an open-world town).
+pub(crate) fn usable_here<'a>(sim: &Sim, ctx: &Ctx<'a>) -> std::borrow::Cow<'a, [u32]> {
+    match sim.visiting {
+        Some(visit) => std::borrow::Cow::Borrowed(ctx.index.on(visit.plot)),
+        None => ctx.index.usable_near(
+            ctx.households[sim.household as usize].plot,
+            sim.pos,
+            ctx.content.autonomy.reach,
+        ),
+    }
+}
+
+/// The middle of the free tile on plot `p` nearest `at` (rings outwards), if any.
+fn open_ground_near(nav: &NavGrid, p: &Plot, at: [f32; 2]) -> Option<[f32; 2]> {
+    let (cx, cz) = (at[0].floor() as i32, at[1].floor() as i32);
+    let inside = |x: i32, z: i32| x >= p.x && z >= p.z && x < p.x + p.w && z < p.z + p.d;
+    (0..p.w.max(p.d)).find_map(|r| {
+        (-r..=r)
+            .flat_map(|dz| (-r..=r).map(move |dx| (dx, dz)))
+            .filter(|&(dx, dz)| dx.abs() == r || dz.abs() == r)
+            .map(|(dx, dz)| (cx + dx, cz + dz))
+            .find(|&(x, z)| inside(x, z) && nav.tile_free(x, z))
+            .map(|(x, z)| [x as f32 + 0.5, z as f32 + 0.5])
+    })
+}
+
+/// An outing (`Choice::Outing`) needs at least this long there besides the way there and
+/// back (minutes); the way puts them off this much a minute (less than a walk across the room
+/// does, `ai::falloff`: it's a day out).
+const OUTING_STAY_MINUTES: f32 = 60.0;
+const OUTING_K: f32 = 0.01;
 
 /// The way out of town `sim` takes on foot: the nearest by straight line, or in an open-world
 /// town the quickest (`travel::Travel::eta`), bus stops included.
