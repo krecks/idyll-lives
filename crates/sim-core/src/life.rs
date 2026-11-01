@@ -76,6 +76,11 @@ pub enum Transition {
     /// Set off to visit a plot (guest status starts now, so an interrupted trip still ends at home).
     /// Visits the player asked for last longer.
     Visit { plot: u32, directed: bool },
+    /// At their car's door, beyond walking range of the place they're off to: they drive there
+    /// (`cars::start_trip`).
+    Drive { car: u32, plot: u32, directed: bool },
+    /// At their car parked out on a trip: they drive home (`cars::drive_home`).
+    DriveHome { car: u32 },
     /// Reached home.
     Home,
     /// Reached the front door to answer `guest`'s knock.
@@ -920,6 +925,15 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             if w.sims[i].away_until.is_some() {
                 crate::cars::board(w, i, car);
             }
+        }
+        Transition::Drive {
+            car,
+            plot,
+            directed,
+        } => crate::cars::start_trip(w, i, car, plot, directed),
+        Transition::DriveHome { car } => {
+            w.sims[i].visiting = None;
+            crate::cars::drive_home(w, i, car);
         }
         Transition::Home => w.sims[i].visiting = None,
         Transition::Answered { guest } => answer(w, i, guest as usize),

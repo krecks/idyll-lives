@@ -23,6 +23,13 @@
 //! - **Arriving.** The car drives back in, nose first, and parks; its doors open and they get out
 //!   and walk to the house.
 //!
+//! A trip by car (open-world towns, `Trip`): someone off to a place beyond walking range
+//! (`autonomy.reach`; a visit or an outing) with the household's car at home and public parking
+//! near the place (the town file's `parking`) walks to the driver's door instead (`trip_car`),
+//! gets in and drives off along the roads (`Phase::Driving`, sat at the wheel), parks at the spot
+//! (`CarState::Out`) and walks on. Going home they walk back to it and drive home, and get out
+//! as after work. Only the driver goes. The trip is saved with the car.
+//!
 //! A parked car takes up the tiles under it: nobody walks through it and nothing can be put there
 //! (`World::blocked`, `reblock`). A car whose parking spot has been built over (a wall, a fence, a
 //! thing put there while it was out) stays where it is, unused (`Car::blocked`), and the renderer
@@ -103,6 +110,9 @@ const JUNCTION_SPEED: f32 = 3.5;
 const JUNCTION_REACH: f32 = 8.0;
 const ROUTE_STEP: f32 = 4.0;
 const ROUTE_TOLERANCE: f32 = 0.08;
+/// A trip by car (`Trip`) parks at the town's public parking spot nearest the place, if one is
+/// this close to it (m).
+const TRIP_PARK_REACH: f32 = 120.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -117,6 +127,27 @@ pub enum CarState {
     Away,
     /// Driving back (`Car::since`: when it set off).
     Arriving,
+    /// Parked away from home on a trip (`Car::trip`): at a public parking spot in another
+    /// hamlet while its driver is out there.
+    Out,
+}
+
+/// A drive to a place beyond walking range and back (`Car::trip`; open-world towns): out of the
+/// driveway along the roads to a public parking spot near it (the town file's `parking`), parked
+/// there (`CarState::Out`) while the driver walks to the place and is there, then back the same
+/// way and home. Only the driver goes.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Trip {
+    /// Who drives (and goes).
+    pub driver: u32,
+    /// Where they're going (a plot), and whether the player sent them.
+    pub plot: u32,
+    #[serde(default)]
+    pub directed: bool,
+    /// Where it parks there, and which way it faces parked.
+    pub at: [f32; 2],
+    pub yaw: f32,
 }
 
 /// A household's car.
@@ -172,6 +203,9 @@ pub struct Car {
     /// How far along its drive it is (ticks of its route: it stops for people in its way).
     #[serde(default, skip_serializing_if = "is_zero_f32")]
     pub progress: f32,
+    /// On a trip to another hamlet (`Trip`); its routes then go to its parking spot and back.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trip: Option<Trip>,
     /// Ticks it has waited for people in its way (not saved).
     #[serde(skip)]
     waited: u32,
@@ -258,6 +292,16 @@ fn covered_tiles(x0: f32, z0: f32, x1: f32, z1: f32) -> Vec<(i32, i32)> {
     out
 }
 
+/// The point `along` the length (forward) and `left` across (to the left) of a car standing at
+/// `spot` facing `yaw`.
+fn local_at(spot: [f32; 2], yaw: f32, along: f32, left: f32) -> [f32; 2] {
+    let (s, c) = yaw.sin_cos();
+    [
+        spot[0] + s * along + c * left,
+        spot[1] + c * along - s * left,
+    ]
+}
+
 impl Car {
     pub(crate) fn from_raw(raw: &CarRaw, household: u32) -> Self {
         Self {
@@ -282,6 +326,7 @@ impl Car {
             meets: None,
             out_ticks: 0.0,
             progress: 0.0,
+            trip: None,
             waited: 0,
             shown: None,
         }
@@ -295,11 +340,38 @@ impl Car {
     /// The point `along` its length (forward) and `left` across it (to its left) from its middle,
     /// parked.
     fn local(&self, along: f32, left: f32) -> [f32; 2] {
-        let (s, c) = self.yaw.sin_cos();
-        [
-            self.spot[0] + s * along + c * left,
-            self.spot[1] + c * along - s * left,
-        ]
+        local_at(self.spot, self.yaw, along, left)
+    }
+
+    /// The car as it stands parked at `spot` facing `yaw` (its doors and seats there): a copy
+    /// without its routes or who is in it.
+    fn posed(&self, spot: [f32; 2], yaw: f32) -> Car {
+        Car {
+            plot: self.plot,
+            household: self.household,
+            spot,
+            yaw,
+            street: self.street,
+            len: self.len,
+            wid: self.wid,
+            body: self.body,
+            paint: self.paint,
+            owners: Vec::new(),
+            state: self.state,
+            since: self.since,
+            driver: self.driver,
+            aboard: Vec::new(),
+            done: Vec::new(),
+            ready_at: self.ready_at,
+            blocked: self.blocked,
+            route: None,
+            meets: self.meets,
+            out_ticks: self.out_ticks,
+            progress: self.progress,
+            trip: self.trip,
+            waited: self.waited,
+            shown: self.shown,
+        }
     }
 
     /// Door `d`'s side (+1 left, -1 right) and how far along the car it is.
@@ -396,6 +468,7 @@ impl Car {
         match self.state {
             CarState::Parked | CarState::Boarding => Some((self.spot, self.yaw, false)),
             CarState::Away => None,
+            CarState::Out => self.trip.map(|t| (t.at, t.yaw, false)),
             CarState::Leaving | CarState::Arriving => {
                 let t = self.progress;
                 let route = self.route(exits, travel, self.state == CarState::Arriving);
@@ -515,15 +588,27 @@ impl Route {
         let mp = g.point(m);
         let t = g.roads[m.road as usize].tangent(m.s);
         let n = [-t[1], t[0]];
-        // The quickest way out by car.
-        let (_, path) = (0..exits.len())
-            .filter(|&i| !travel.is_stop(i))
-            .filter_map(|i| {
-                let e = *g.near(exits[i], ROAD_REACH, 1, Mode::Car).first()?;
-                let path = g.path(m, e, Mode::Car, travel.country_speed)?;
-                Some((i, path))
-            })
-            .min_by(|a, b| a.1.cost.total_cmp(&b.1.cost).then(a.0.cmp(&b.0)))?;
+        // Where to: the parking spot of its trip, or the quickest way out by car.
+        let (path, park) = match car.trip {
+            Some(trip) => {
+                let p = *g.near(trip.at, ROAD_REACH, 1, Mode::Car).first()?;
+                (
+                    g.path(m, p, Mode::Car, travel.country_speed)?,
+                    Some(trip.at),
+                )
+            }
+            None => {
+                let (_, path) = (0..exits.len())
+                    .filter(|&i| !travel.is_stop(i))
+                    .filter_map(|i| {
+                        let e = *g.near(exits[i], ROAD_REACH, 1, Mode::Car).first()?;
+                        let path = g.path(m, e, Mode::Car, travel.country_speed)?;
+                        Some((i, path))
+                    })
+                    .min_by(|a, b| a.1.cost.total_cmp(&b.1.cost).then(a.0.cmp(&b.0)))?;
+                (path, None)
+            }
+        };
         if path.pts.len() < 2 {
             return None;
         }
@@ -540,14 +625,17 @@ impl Route {
         // Which way along the road it goes from the driveway.
         let ahead = local(path.pts[(path.pts.len() - 1).min(3)].0);
         let d = if ahead[0] >= 0.0 { 1.0 } else { -1.0 };
-        // The lane: right of the middle line, on past the exit.
+        // The lane: right of the middle line, on past the exit (to the parking spot's side of
+        // the road on a trip).
         let mut centre: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
         let (a, b) = (centre[centre.len() - 2], centre[centre.len() - 1]);
         let len = dist(a, b).max(1e-3);
-        centre.push([
-            b[0] + (b[0] - a[0]) / len * OVERSHOOT,
-            b[1] + (b[1] - a[1]) / len * OVERSHOOT,
-        ]);
+        if park.is_none() {
+            centre.push([
+                b[0] + (b[0] - a[0]) / len * OVERSHOOT,
+                b[1] + (b[1] - a[1]) / len * OVERSHOOT,
+            ]);
+        }
         if home {
             centre.reverse();
         }
@@ -584,6 +672,10 @@ impl Route {
         if home {
             let lane_in = -d * LANE;
             let r = TURN.min((lane_in - z0).abs()).max(0.5);
+            // (On a trip: pulling out of the parking spot first.)
+            if let Some(at) = park {
+                legs.push(at, false, SLOW);
+            }
             for &p in &lane {
                 if near(p, r) {
                     break;
@@ -628,8 +720,14 @@ impl Route {
                 }
                 legs.push(p, false, top(p));
             }
+            // (On a trip: into the parking spot at the end.)
+            if let Some(at) = park {
+                let from = legs.last().unwrap_or(at);
+                legs.line(from, at, false, SLOW);
+            }
         }
-        Some(legs.timed(!home, home))
+        let trip = park.is_some();
+        Some(legs.timed(!home || trip, home || trip))
     }
 
     /// Out of the driveway to the nearest end of town along its street, or (`home`) back in
@@ -1031,6 +1129,16 @@ pub(crate) fn update(w: &mut World) {
         let gone = |w: &World, s: u32| w.sims.get(s as usize).is_none_or(|s| !s.here());
         // Nobody to drive it home (the driver died or moved away while out): it's back.
         if !w.cars[c].at_home() && w.cars[c].driver.is_none_or(|d| gone(w, d)) {
+            if w.cars[c].trip.take().is_some() {
+                let World {
+                    cars,
+                    exits,
+                    travel,
+                    ..
+                } = &mut *w;
+                cars[c].route = None;
+                cars[c].settle(exits, Some(travel));
+            }
             let car = &mut w.cars[c];
             let left = std::mem::take(&mut car.done);
             car.aboard.clear();
@@ -1042,9 +1150,15 @@ pub(crate) fn update(w: &mut World) {
             }
             continue;
         }
+        if w.cars[c].trip.is_some() {
+            trip_update(w, c);
+            continue;
+        }
         let state = w.cars[c].state;
         let since = w.cars[c].since;
         match state {
+            // (Only on a trip, above.)
+            CarState::Out => {}
             CarState::Parked => {
                 // An owner on their way to drive it: the others setting off now come along.
                 let bound = |s: &Sim| {
@@ -1186,10 +1300,15 @@ fn drive_on(w: &mut World, c: usize) {
             s.current()
                 .is_some_and(|a| matches!(a.phase, Phase::Using { .. }))
         };
+        let at_a_wheel = || {
+            s.current()
+                .is_some_and(|a| matches!(a.phase, Phase::Driving))
+        };
         if !s.here()
             || s.away_until.is_some()
             || !car.covers(at, yaw, s.pos, ahead, behind)
             || busy()
+            || at_a_wheel()
         {
             continue;
         }
@@ -1341,6 +1460,8 @@ fn arrive(w: &mut World, c: usize) {
     let car = &mut cars[c];
     car.state = CarState::Parked;
     car.since = tick;
+    car.trip = None;
+    car.route = None;
     car.yaw = car.nose_in_on(Some(travel));
     car.settle(exits, Some(travel));
     let driver = car.driver.take();
@@ -1648,7 +1769,14 @@ pub(crate) fn load(w: &mut World, saved: &[Car], drives: &[Drive], garages: &[Ga
         car.owners.retain(|&o| o < sims);
         car.aboard.retain(|&o| o < sims);
         car.done.retain(|o| car.aboard.contains(o));
-        car.driver = car.driver.filter(|d| car.aboard.contains(d));
+        car.trip = car
+            .trip
+            .filter(|t| t.driver < sims && (t.plot as usize) < w.plots.len());
+        // (On a trip, its driver even while they're out of it, parked out there.)
+        let trip = car.trip.map(|t| t.driver);
+        car.driver = car
+            .driver
+            .filter(|d| car.aboard.contains(d) || Some(*d) == trip);
     }
     settle_all(w);
 }
@@ -1698,6 +1826,361 @@ fn settle_all(w: &mut World) {
     refresh(w);
     reblock(w);
     poses(w);
+}
+
+// ---- Trips by car (`Trip`) ---------------------------------------------------------------
+
+/// The public parking spot (`parking`) nearest `door` within `TRIP_PARK_REACH`: where it is and
+/// which way a car faces parked there.
+fn parking_for(travel: &Travel, door: [f32; 2]) -> Option<([f32; 2], f32)> {
+    travel
+        .file
+        .parking
+        .iter()
+        .map(|p| ([p.x, p.z], p.rot))
+        .filter(|(at, _)| at.iter().all(|v| v.is_finite()))
+        .map(|(at, rot)| (crate::travel::dist(at, door), at, rot))
+        .filter(|&(d, ..)| d <= TRIP_PARK_REACH)
+        .min_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(_, at, rot)| (at, rot))
+}
+
+/// Whether there's public parking near `door` for a trip by car (`TRIP_PARK_REACH`).
+pub(crate) fn parks_near(travel: &Travel, door: [f32; 2]) -> bool {
+    parking_for(travel, door).is_some()
+}
+
+/// Whether `sim` could drive somewhere now (`trip_car` without the place): an open-world town
+/// with parking, a grown-up owner at home with the household's car parked there.
+pub(crate) fn could_drive(ctx: &crate::world::Ctx, sim: &Sim) -> bool {
+    let Some(home) = ctx
+        .households
+        .get(sim.household as usize)
+        .and_then(|h| h.plot)
+    else {
+        return false;
+    };
+    ctx.travel.open
+        && !ctx.travel.file.parking.is_empty()
+        && sim.visiting.is_none()
+        && ctx
+            .briefs
+            .get(sim.id as usize)
+            .is_some_and(|b| b.adult && b.plot == Some(home))
+        && ctx.cars.iter().any(|car| {
+            car.household == sim.household
+                && car.plot == home
+                && car.state == CarState::Parked
+                && car.trip.is_none()
+                && !car.blocked
+                && car.owners.contains(&sim.id)
+        })
+}
+
+/// Whether `car`'s driveway has a way by road to `at`.
+fn drives_to(car: &Car, travel: &Travel, at: [f32; 2]) -> bool {
+    let g = &travel.graph;
+    let (Some(m), Some(&p)) = (
+        car.mouth(travel),
+        g.near(at, ROAD_REACH, 1, Mode::Car).first(),
+    ) else {
+        return false;
+    };
+    g.path(m, p, Mode::Car, travel.country_speed).is_some()
+}
+
+/// The car `sim` drives to plot `plot` in an open-world town, and the door they get in by and
+/// where they stand for it: the place is out of walking range (`autonomy.reach`), there's
+/// public parking near it and a way there by road, and they're a grown-up owner at home with
+/// the household's car parked there and nobody else heading for it. None: they walk.
+pub(crate) fn trip_car(
+    ctx: &crate::world::Ctx,
+    sim: &Sim,
+    plot: u32,
+) -> Option<(u32, usize, [f32; 2])> {
+    let travel = ctx.travel;
+    if !travel.open || travel.file.parking.is_empty() || sim.visiting.is_some() {
+        return None;
+    }
+    let me = ctx.briefs.get(sim.id as usize)?;
+    let home = ctx.households.get(sim.household as usize)?.plot?;
+    if !me.adult || me.plot != Some(home) {
+        return None;
+    }
+    let door = ctx.plots.get(plot as usize)?.arrival_point();
+    if crate::travel::dist(sim.pos, door) <= ctx.content.autonomy.reach {
+        return None;
+    }
+    let (at, _) = parking_for(travel, door)?;
+    let (c, car) = ctx.cars.iter().enumerate().find(|(_, car)| {
+        car.household == sim.household
+            && car.plot == home
+            && car.state == CarState::Parked
+            && car.trip.is_none()
+            && !car.blocked
+            && car.owners.contains(&sim.id)
+    })?;
+    let c = c as u32;
+    if ctx.briefs.iter().any(|b| b.bound_for_car == Some(c)) || !drives_to(car, travel, at) {
+        return None;
+    }
+    let (d, stand) = car.door(&ctx.nav, 0)?;
+    Some((c, d, stand))
+}
+
+/// Whether `sim` can set off in car `c` now (at its door, as `trip_car` found it).
+pub(crate) fn may_set_off(cars: &[Car], c: u32, sim: u32) -> bool {
+    cars.get(c as usize).is_some_and(|car| {
+        car.state == CarState::Parked
+            && car.trip.is_none()
+            && !car.blocked
+            && car.owners.contains(&sim)
+    })
+}
+
+/// The car `sim` is at the wheel of, on a trip there or back (`Leaving`, `Arriving`).
+pub(crate) fn driving(cars: &[Car], sim: u32) -> Option<u32> {
+    cars.iter()
+        .position(|car| {
+            car.trip.is_some_and(|t| t.driver == sim)
+                && matches!(car.state, CarState::Leaving | CarState::Arriving)
+        })
+        .map(|c| c as u32)
+}
+
+/// Whether car `c` is parked out on a trip `sim` drives.
+pub(crate) fn parked_out(cars: &[Car], c: u32, sim: u32) -> bool {
+    cars.get(c as usize)
+        .is_some_and(|car| car.state == CarState::Out && car.trip.is_some_and(|t| t.driver == sim))
+}
+
+/// `sim`'s car parked out on a trip, the door they get in by and where they stand for it: where
+/// they go home from.
+pub(crate) fn car_out_for(ctx: &crate::world::Ctx, sim: &Sim) -> Option<(u32, usize, [f32; 2])> {
+    let (c, car) = ctx
+        .cars
+        .iter()
+        .enumerate()
+        .find(|(c, _)| parked_out(ctx.cars, *c as u32, sim.id))?;
+    let trip = car.trip?;
+    let (d, stand) = car.posed(trip.at, trip.yaw).door(&ctx.nav, 0)?;
+    Some((c as u32, d, stand))
+}
+
+/// `i` gets in at car `c`'s door and drives off to plot `plot` (`Transition::Drive`): out of the
+/// driveway, along the roads to the parking spot near it. Gone or taken since: they walk.
+pub(crate) fn start_trip(w: &mut World, i: usize, c: u32, plot: u32, directed: bool) {
+    let visit = Task {
+        kind: TaskKind::Visit { plot },
+        directed,
+        routine: false,
+    };
+    let door = w.plots.get(plot as usize).map(|p| p.arrival_point());
+    let park = door.and_then(|d| parking_for(&w.travel, d));
+    let (Some((at, yaw)), true) = (park, may_set_off(&w.cars, c, i as u32)) else {
+        w.sims[i].bound_for_car = None;
+        w.sims[i].queue.push_front(visit);
+        return;
+    };
+    let tick = w.tick;
+    let World {
+        cars,
+        exits,
+        travel,
+        ..
+    } = &mut *w;
+    let car = &mut cars[c as usize];
+    car.trip = Some(Trip {
+        driver: i as u32,
+        plot,
+        directed,
+        at,
+        yaw,
+    });
+    car.route = None;
+    if Route::on_roads(car, exits, travel, false).is_none() {
+        car.trip = None;
+        car.settle(exits, Some(travel));
+        w.sims[i].bound_for_car = None;
+        w.sims[i].queue.push_front(visit);
+        return;
+    }
+    car.state = CarState::Leaving;
+    car.since = tick;
+    car.progress = 0.0;
+    car.driver = Some(i as u32);
+    car.aboard = vec![i as u32];
+    car.done.clear();
+    let sim = &mut w.sims[i];
+    sim.bound_for_car = Some(c);
+    sim.current = Some(crate::world::Activity {
+        task: visit,
+        phase: Phase::Driving,
+        tags: Default::default(),
+    });
+    seat_driver(w, c as usize);
+}
+
+/// `i` gets into car `c` parked out on their trip and drives home (`Transition::DriveHome`).
+pub(crate) fn drive_home(w: &mut World, i: usize, c: u32) {
+    if !parked_out(&w.cars, c, i as u32) {
+        w.sims[i].bound_for_car = None;
+        walk_home(w, i, None);
+        return;
+    }
+    let tick = w.tick;
+    let car = &mut w.cars[c as usize];
+    car.state = CarState::Arriving;
+    car.since = tick;
+    car.progress = 0.0;
+    car.route = None;
+    car.driver = Some(i as u32);
+    car.aboard = vec![i as u32];
+    let sim = &mut w.sims[i];
+    sim.bound_for_car = Some(c);
+    sim.current = Some(crate::world::Activity {
+        task: Task {
+            kind: TaskKind::GoHome,
+            directed: false,
+            routine: false,
+        },
+        phase: Phase::Driving,
+        tags: Default::default(),
+    });
+    seat_driver(w, c as usize);
+}
+
+/// The driver of car `c` sat at the wheel where it is now.
+fn seat_driver(w: &mut World, c: usize) {
+    let World {
+        cars,
+        exits,
+        travel,
+        sims,
+        ..
+    } = &mut *w;
+    let car = &mut cars[c];
+    let Some(d) = car.trip.map(|t| t.driver as usize) else {
+        return;
+    };
+    let pose = car.pose_on(exits, Some(travel));
+    let Some((at, yaw, _)) = pose.or(car.trip.map(|t| (t.at, t.yaw, false))) else {
+        return;
+    };
+    if let Some(s) = sims.get_mut(d) {
+        s.pos = car.posed(at, yaw).seat_at(0, 0);
+        s.yaw = yaw;
+        s.pose = crate::content::Pose::Sit;
+    }
+}
+
+/// Once a tick for a car on a trip: on along the roads, parked out there, or back home.
+fn trip_update(w: &mut World, c: usize) {
+    let Some(trip) = w.cars[c].trip else { return };
+    let d = trip.driver as usize;
+    // At the wheel; or (just loaded, or not their turn yet) about to be.
+    let phase = w.sims[d].current().map(|a| a.phase.clone());
+    let at_wheel = matches!(phase, None | Some(Phase::Driving));
+    match w.cars[c].state {
+        CarState::Leaving => {
+            let ticks = route_ticks(w, c, false);
+            if at_wheel {
+                drive_on(w, c);
+                seat_driver(w, c);
+            } else {
+                // (Called away at the wheel, as they can't be: the car is there.)
+                w.cars[c].progress = ticks;
+            }
+            if w.cars[c].progress >= ticks {
+                park_out(w, c);
+            }
+        }
+        CarState::Arriving => {
+            let ticks = route_ticks(w, c, true);
+            if at_wheel {
+                drive_on(w, c);
+                seat_driver(w, c);
+            } else {
+                w.cars[c].progress = ticks;
+            }
+            if w.cars[c].progress >= ticks {
+                let car = &mut w.cars[c];
+                car.done = if at_wheel { vec![d as u32] } else { Vec::new() };
+                car.driver = Some(d as u32);
+                arrive(w, c);
+            }
+        }
+        CarState::Out => {
+            // Home some other way (and not on their way back to it): it's home too.
+            let home = w
+                .households
+                .get(w.sims[d].household as usize)
+                .and_then(|h| h.plot);
+            let there = home.is_some() && w.briefs.get(d).and_then(|b| b.plot) == home;
+            if there && w.sims[d].bound_for_car != Some(c as u32) {
+                let car = &mut w.cars[c];
+                car.done.clear();
+                car.aboard.clear();
+                arrive(w, c);
+            }
+        }
+        // (A trip on a car that isn't on its way, out or back: done with.)
+        CarState::Parked | CarState::Boarding | CarState::Away => {
+            let World {
+                cars,
+                exits,
+                travel,
+                ..
+            } = &mut *w;
+            cars[c].trip = None;
+            cars[c].route = None;
+            cars[c].settle(exits, Some(travel));
+        }
+    }
+}
+
+/// Car `c` is at its trip's parking spot: parked there (`CarState::Out`), and its driver gets
+/// out beside it and walks on to the place.
+fn park_out(w: &mut World, c: usize) {
+    let Some(trip) = w.cars[c].trip else { return };
+    let tick = w.tick;
+    let at_wheel = matches!(
+        w.sims[trip.driver as usize].current().map(|a| &a.phase),
+        None | Some(Phase::Driving)
+    );
+    let (at, yaw) = {
+        let World {
+            cars,
+            exits,
+            travel,
+            ..
+        } = &mut *w;
+        let route = cars[c].route(exits, Some(travel), false);
+        let (p, yaw, _) = route.at(route.ticks());
+        (p, yaw)
+    };
+    let car = &mut w.cars[c];
+    car.state = CarState::Out;
+    car.since = tick;
+    car.route = None;
+    car.aboard.clear();
+    car.trip = Some(Trip { at, yaw, ..trip });
+    let posed = car.posed(at, yaw);
+    if !at_wheel {
+        return;
+    }
+    let door = posed.door(&w.nav(), 0).map(|(_, p)| p);
+    let sim = &mut w.sims[trip.driver as usize];
+    sim.pos = door.unwrap_or(posed.door_at(0));
+    sim.yaw = yaw;
+    sim.pose = crate::content::Pose::Stand;
+    sim.bound_for_car = None;
+    sim.current = None;
+    sim.queue.push_front(Task {
+        kind: TaskKind::Visit { plot: trip.plot },
+        directed: trip.directed,
+        routine: false,
+    });
 }
 
 #[cfg(test)]

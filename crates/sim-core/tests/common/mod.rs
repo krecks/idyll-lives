@@ -800,7 +800,7 @@ fn state(w: &World, s: &Sim) -> State {
             }
         }
         Phase::Conversing { .. } => State::Busy(d),
-        Phase::Routing { .. } => State::Routing(d),
+        Phase::Routing { .. } | Phase::Driving => State::Routing(d),
         Phase::Calling { .. }
         | Phase::Waiting { .. }
         | Phase::Queued { .. }

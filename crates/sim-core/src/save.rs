@@ -69,7 +69,8 @@
 //! that aren't as new (no `chemistry` of their own), and the town file's open-world fields are
 //! kept as they came (`openWorld`, `travel::OpenWorld`: size, roads, areas, terrain masks,
 //! parking, which exits are bus stops, plots' areas and kinds; driveways keep their `road` and
-//! `s` in `drives`). Absent: a `cosy` town, as before: no road network from the meta's roads (the
+//! `s` in `drives`); a car on a trip between hamlets keeps it (`cars[].trip`, state `out` while
+//! it's parked there). Absent: a `cosy` town, as before: no road network from the meta's roads (the
 //! open-world rules are for `normal` and `big` towns, `travel::Travel::open`)
 
 use std::collections::{BTreeMap, HashMap, HashSet};

@@ -934,6 +934,9 @@ pub enum Phase {
     Alighting {
         ticks: u32,
     },
+    /// At the wheel of their car on a trip to another hamlet or back (`cars::Trip`, a `Visit`
+    /// or `GoHome` task): the car drives (`cars::update`), they sit in it.
+    Driving,
 }
 
 #[derive(Debug, Clone)]
@@ -6556,14 +6559,23 @@ fn pick_autonomous(
     {
         let reach = content.autonomy.reach;
         let free = until_leave.unwrap_or(f32::INFINITY);
+        let drives = crate::cars::could_drive(ctx, sim);
         for p in ctx.plots.iter().filter(|p| p.public) {
             let door = p.arrival_point();
             if (door[0] - sim.pos[0]).hypot(door[1] - sim.pos[1]) <= reach {
                 continue;
             }
-            let eta = ctx
-                .travel
-                .eta(sim.pos, door, crate::travel::Mode::Foot, walk_per_minute);
+            // By car where they can drive there (`cars::trip_car`): a drive's seconds are the
+            // game's minutes, and a few more to and from the car.
+            let eta = if drives && crate::cars::parks_near(ctx.travel, door) {
+                ctx.travel
+                    .eta(sim.pos, door, crate::travel::Mode::Car, walk_per_minute)
+                    * 60.0
+                    + CAR_TRIP_MINUTES
+            } else {
+                ctx.travel
+                    .eta(sim.pos, door, crate::travel::Mode::Foot, walk_per_minute)
+            };
             if free < 2.0 * eta + OUTING_STAY_MINUTES {
                 continue;
             }
@@ -6721,6 +6733,19 @@ fn start_task(
 ) {
     let content = ctx.content;
     let nav = &ctx.nav;
+    // At the wheel of a car on a trip (on their way there or back, as a game was loaded): they
+    // drive on.
+    if matches!(task.kind, TaskKind::Visit { .. } | TaskKind::GoHome)
+        && let Some(car) = crate::cars::driving(ctx.cars, sim.id)
+    {
+        sim.bound_for_car = Some(car);
+        sim.current = Some(Activity {
+            task,
+            phase: Phase::Driving,
+            tags: Default::default(),
+        });
+        return;
+    }
     // (Fetched for this use, if it's the one: see `Sim::fetched`; sent to play with someone,
     // `Sim::joins`.)
     let fetched = sim.fetched.take();
@@ -7005,6 +7030,20 @@ fn start_task(
             }
         }
         // (Their visit starts once there's a way there: see below.)
+        // Beyond walking range, with the household's car at home: to its driver's door first,
+        // to drive there (`cars::trip_car`).
+        TaskKind::Visit { plot }
+            if let Some((car, door, at)) = crate::cars::trip_car(ctx, sim, plot) =>
+        {
+            sim.bound_for_car = Some(car);
+            sim.car_seat = 0;
+            sim.car_door = door as u8;
+            (
+                at,
+                (at[0].floor() as i32, at[1].floor() as i32),
+                content.visits.tags,
+            )
+        }
         TaskKind::Visit { plot } => {
             // At a house with door rules, up to its front door to knock (`life::knock_spot`).
             let p = &ctx.plots[plot as usize];
@@ -7025,6 +7064,13 @@ fn start_task(
                     content.visits.tags,
                 ),
             }
+        }
+        // Their car parked out on a trip: back to it, to drive home (`cars::car_out_for`).
+        TaskKind::GoHome if let Some((car, door, at)) = crate::cars::car_out_for(ctx, sim) => {
+            sim.bound_for_car = Some(car);
+            sim.car_seat = 0;
+            sim.car_door = door as u8;
+            (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
         }
         TaskKind::GoHome => {
             let home = ctx.households[sim.household as usize].plot;
@@ -7542,6 +7588,8 @@ fn progress(
             *waited += ticks;
             false
         }
+        // At the wheel: the car takes them (`cars::update`).
+        Phase::Driving => return,
         // Getting into the car: in, and off to work (`life`, `cars::board`).
         Phase::Boarding { ticks: waited } => {
             *waited += ticks;
@@ -8249,7 +8297,22 @@ fn arrive(
                 sim.transition = Some(crate::life::Transition::Work);
             }
         },
+        // At their car's door, to drive there (`cars::start_trip`).
+        TaskKind::Visit { plot }
+            if sim
+                .bound_for_car
+                .is_some_and(|c| crate::cars::may_set_off(ctx.cars, c, sim.id)) =>
+        {
+            let (car, directed) = (sim.bound_for_car.expect("just looked"), act.task.directed);
+            sim.current = None;
+            sim.transition = Some(crate::life::Transition::Drive {
+                car,
+                plot,
+                directed,
+            });
+        }
         TaskKind::Visit { plot } => {
+            sim.bound_for_car = None;
             // At a house (not a park) with door rules: knock and wait (`life::doors`).
             if content.visits.door.is_some() && !ctx.plots[plot as usize].public {
                 // Facing the door, at it (else towards the middle of the lot).
@@ -8276,6 +8339,16 @@ fn arrive(
             }
             sim.current = None;
             sim.transition = Some(crate::life::Transition::Answered { guest });
+        }
+        // At their car parked out on a trip: in, and home.
+        TaskKind::GoHome
+            if sim
+                .bound_for_car
+                .is_some_and(|c| crate::cars::parked_out(ctx.cars, c, sim.id)) =>
+        {
+            let car = sim.bound_for_car.expect("just looked");
+            sim.current = None;
+            sim.transition = Some(crate::life::Transition::DriveHome { car });
         }
         TaskKind::GoHome => {
             sim.current = None;
@@ -8997,6 +9070,8 @@ fn open_ground_near(nav: &NavGrid, p: &Plot, at: [f32; 2]) -> Option<[f32; 2]> {
 /// back (minutes); the way puts them off this much a minute (less than a walk across the room
 /// does, `ai::falloff`: it's a day out).
 const OUTING_STAY_MINUTES: f32 = 60.0;
+/// An outing by car: minutes besides the drive, to the car and from it at either end.
+const CAR_TRIP_MINUTES: f32 = 10.0;
 const OUTING_K: f32 = 0.01;
 
 /// The way out of town `sim` takes on foot: the nearest by straight line, or in an open-world
