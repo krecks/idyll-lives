@@ -152,6 +152,8 @@ const PIT_MARGIN = 0.3;
 const ROOF_MIN_DISTANCE = 15;
 /** Main-thread time (ms) a world build runs before the frames it runs behind get one (`pace`). */
 const BUILD_SLICE_MS = 8;
+/** The same while the camera roams (a big world, or once it has settled on a lot of its own). */
+const ROAM_SLICE_MS = 4;
 /**
  * Daylight doesn't reach under the ground or into a room without windows: no sun, only this much
  * of the sky fill and the environment (as seen, intensity times exposure: the same by day and by
@@ -1246,7 +1248,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /** A world build (or the overview's) gives the frames it runs behind one every `BUILD_SLICE_MS` of main-thread time. */
   private async pace(): Promise<void> {
-    if ((!this.worldBuilding && this.townBuilds === 0) || performance.now() - this.sliceStart < BUILD_SLICE_MS) return;
+    // (Shorter slices once the camera roams: the frames go on moving behind the build, and one it takes shows.)
+    const slice = this.townBuilds === 0 && (this.streamOn || this.roamedTo !== null) ? ROAM_SLICE_MS : BUILD_SLICE_MS;
+    if ((!this.worldBuilding && this.townBuilds === 0) || performance.now() - this.sliceStart < slice) return;
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     this.sliceStart = performance.now();
   }
