@@ -24,6 +24,8 @@ const WORLD_RING = 260;
 export const APRON = 6;
 /** A big world's distance-from-built grid (m a cell; `distanceToTown`). */
 const BUILT_CELL = 2;
+/** A big world's woods are drawn in squares this wide (m), those far off left out (`pc/nature.ts` `frameTiles`). */
+export const BIG_WOODS_CELL = 160;
 const TERRAIN_STEP = 2.5;
 /** At most this many terrain quads across (a wider landscape gets coarser ones). */
 const TERRAIN_SEGMENTS = 260;
@@ -454,7 +456,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * its roads and trails with a verge, so every hamlet gets the flat apron a town has and the land
    * rises between them (two chamfer passes, ~2 % off the true distance). Null: not a big world.
    */
-  private readonly built: { gw: number; gd: number; dist: Float32Array } | null;
+  protected readonly built: { gw: number; gd: number; dist: Float32Array } | null;
 
   private static builtField(world: WorldStructure, w: number, d: number): { gw: number; gd: number; dist: Float32Array } {
     const gw = Math.ceil(w / BUILT_CELL);
@@ -750,7 +752,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       }
     }
     const [cx, cz] = [this.w / 2, this.d / 2];
-    const cell = this.woodsCell;
+    // (A big world's woods in squares, whatever the preset: sectors from its middle would each reach a kilometre.)
+    const cell = this.built ? BIG_WOODS_CELL : this.woodsCell;
     const sector = cell > 0 ? (x: number, z: number) => `${Math.floor(x / cell)}:${Math.floor(z / cell)}` : (x: number, z: number) => `${Math.floor((Math.atan2(z - cz, x - cx) / (Math.PI * 2) + 1) * FOREST_SECTORS) % FOREST_SECTORS}`;
     return { near, far, sector };
   }

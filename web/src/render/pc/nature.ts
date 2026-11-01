@@ -114,6 +114,10 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.others = draws;
     this.batches = [];
     await perfTimeAsync('nature: forests', () => this.forests(app, parent, assets, pace));
+    // A big world's woods squares, by where they are: those far from the camera are left out (`frameTiles`).
+    this.woodsSquares = this.built
+      ? this.batches.flatMap((b) => b.built.cells.flatMap((c) => c.draws.map((d) => d.entity.render?.meshInstances[0]))).filter((mi) => !!mi).map((mi) => ({ mi, x: mi.aabb.center.x, z: -mi.aabb.center.z }))
+      : [];
     await perfTimeAsync('nature: lawns', () => this.plantLawns(app, parent, assets, world, pace));
     const field = await perfTimeAsync('nature: grass field', () => grassField(world, this, pace, this.ring));
     const grass = (this.grass = new Grass(app, parent, field, this.grassQuality));
@@ -243,11 +247,14 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return out;
   }
 
+  /** A big world's woods squares: each one's draw and where its middle is (game space). */
+  private woodsSquares: { mi: pc.MeshInstance; x: number; z: number }[] = [];
   /** A big world's ground tiles: each one's draw, its meshes by level, where its middle is and the level drawn. */
   private tiles: { mi: pc.MeshInstance; meshes: pc.Mesh[]; x: number; z: number; lod: number }[] = [];
 
   /** Each frame (the game's): each ground tile draws the level for its distance from (`x`, `z`), the camera's target. */
   frameTiles(x: number, z: number): void {
+    for (const w of this.woodsSquares) w.mi.visible = Math.hypot(w.x - x, w.z - z) < WOODS_FAR;
     for (const t of this.tiles) {
       const d = Math.hypot(t.x - x, t.z - z);
       const lod = d < TILE_NEAR ? 0 : d < TILE_MID ? 1 : 2;
@@ -359,12 +366,13 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   }
 }
 
-/** An entity of `app` drawing `mesh` with `material`, switched off, under `parent`; it receives shadows and casts none. */
 /** A big world's ground tiles (m), their levels' quads across, and the distances (m from the camera's target, to a tile's middle) they change at. */
 const TILE = 128;
 const TILE_LODS = [64, 32, 16];
 const TILE_NEAR = 200;
 const TILE_MID = 460;
+/** A big world's woods squares further than this (m, middle to the camera's target) aren't drawn (the haze has them). */
+const WOODS_FAR = 700;
 
 /**
  * One level of a ground tile from the finest level's shaded points (`at(col, row)` into `positions`
@@ -436,6 +444,7 @@ function tileMesh(app: pc.AppBase, positions: Float32Array, colors: Float32Array
   return mesh;
 }
 
+/** An entity of `app` drawing `mesh` with `material`, switched off, under `parent`; it receives shadows and casts none. */
 function drawOf(app: pc.AppBase, parent: pc.Entity, name: string, mesh: pc.Mesh, material: pc.Material): pc.Entity {
   const entity = new pc.Entity(name, app);
   entity.addComponent('render', { meshInstances: [new pc.MeshInstance(mesh, material)], castShadows: false, receiveShadows: true });
