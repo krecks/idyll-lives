@@ -290,12 +290,6 @@ def climbingFrame():
                       bevel_segments=1)
         F.sweep('ridge', [(0, 2.77, -0.97), (0, 2.77, 0.97)], None, M.shingle,
                 profile=G.rounded_rect(0.06, 0.12, 0.025, corner=2), up=(0, 0, 1))
-        # the flag on the ridge, at the back: a pole with a ball, the flag rippling out from it
-        F.cyl('flagpole', 0.018, 0.82, (0, 3.04, -0.85), M.rail, verts=8)
-        F.sphere('flag_ball', 0.03, (0, 3.45 - 0.03, -0.85), M.flag, segments=8, rings=5)
-        F.sweep('flag', [(0.01, 3.33, -0.85), (0.1, 3.33, -0.82), (0.2, 3.32, -0.87), (0.3, 3.31, -0.84)], None, M.flag,
-                profile=[(-0.1, -0.004), (0.1, -0.004), (0.1, 0.004), (-0.1, 0.004)], up=(0, 0, 1), resolution=3,
-                scale=[1.0, 0.98, 0.95, 0.9])
         # the rope net up the front, from the deck's edge down to the ground a little out: a rope through each row of
         # knots, the knots where they cross, a bar along the top and stakes at its foot
         top, bottom = (deck - 0.02, 0.86), (0.04, 0.96)
@@ -320,6 +314,15 @@ def climbingFrame():
         F.box('pole_bracket', 0.08, 0.1, 0.03, (0.55, 2.2, 0.83), M.steel, bevel=0.004, bevel_segments=1)
         F.cyl('pole_foot', 0.06, 0.02, (0.55, 0.01, 0.95), M.steel, verts=10)
     G.join_all('climbingFrame')
+    # the flag on the ridge, at the back: a pole with a ball, the flag rippling out from it. Drawn with the
+    # frame, not part of its size (the frame is 2.86 m tall; the pole stands 0.59 m above the ridge)
+    with G.new_parts() as carried:
+        F.cyl('flagpole', 0.018, 0.82, (0, 3.04, -0.85), M.rail, verts=8)
+        F.sphere('flag_ball', 0.03, (0, 3.45 - 0.03, -0.85), M.flag, segments=8, rings=5)
+        F.sweep('flag', [(0.01, 3.33, -0.85), (0.1, 3.33, -0.82), (0.2, 3.32, -0.87), (0.3, 3.31, -0.84)], None, M.flag,
+                profile=[(-0.1, -0.004), (0.1, -0.004), (0.1, 0.004), (-0.1, 0.004)], up=(0, 0, 1), resolution=3,
+                scale=[1.0, 0.98, 0.95, 0.9])
+    G.aside(carried, 'flag')
     G.settle(centre=False)
     return G.meshes()
 
@@ -782,7 +785,8 @@ FAMILY = G.Family(
     'playground', M,
     [G.Model('slide', slide, size=(0.75, 2.805, 1.934), key='model.slide', centre=(0, 0.0024), far=0.25,
              paint=[('body', 'Frame'), ('chute', 'Slide'), ('roof', 'Roof')]),
-     G.Model('climbingFrame', climbingFrame, size=(1.814, 3.45, 1.99), key='model.climbingFrame', centre=(0, 0.015),
+     # its own size: the flag on the ridge is drawn with it, not measured (the frame is 2.81 m tall)
+     G.Model('climbingFrame', climbingFrame, size=(1.814, 2.808, 1.99), key='model.climbingFrame', centre=(0, 0.015),
              far=0.25, paint=[('timber', 'Frame'), ('shingle', 'Roof'), ('rope', 'Net')]),
      G.Model('seesaw', seesaw, size=(2.5, 0.846, 0.42), key='model.seesaw', motions=SEESAW, far=0.25,
              paint=[('body', 'Frame'), ('seat', 'Seats'), ('plank', 'Plank')]),

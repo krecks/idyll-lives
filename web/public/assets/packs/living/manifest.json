@@ -1136,6 +1136,16 @@
           "finish": "material.finish.gloss"
         }
       },
+      "motions": {
+        "uses": {
+          "pullOut": "small_out",
+          "pushIn": {
+            "clip": "small_out",
+            "over": -1
+          }
+        },
+        "open": "small_out"
+      },
       "paint": [
         {
           "material": "white_gloss",
@@ -1778,6 +1788,16 @@
         "vitrine_back": {
           "finish": "material.finish.wood"
         }
+      },
+      "motions": {
+        "uses": {
+          "openDoor": "door_open",
+          "shutDoor": {
+            "clip": "door_open",
+            "over": -1
+          }
+        },
+        "open": "door_open"
       },
       "paint": [
         {

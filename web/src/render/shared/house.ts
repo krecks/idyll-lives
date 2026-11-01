@@ -232,8 +232,10 @@ export interface RoomLight {
   /** Lamps: reach in metres and relative brightness (content `light`). */
   range?: number;
   power?: number;
-  /** A lamp with a switch (or a fire): its object id, to follow it on and off. */
+  /** A lamp with a switch (or a fire, or one that follows a use): its object id, to follow it on and off. */
   lamp?: number;
+  /** Lit as bright by day as at night: it follows a use, so it's on when it's needed, not only after dark. */
+  always?: boolean;
   /** Where its shade sends the light (content `light.aim`): a unit direction for a lamp that lights one side only (none: all round). */
   dir?: [number, number, number];
 }
@@ -287,8 +289,9 @@ export function placeLights(world: WorldStructure, inView: (x: number, z: number
     }
   };
   const lights = [
-    ...lamps.map((l): RoomLight => ({ x: l.x, z: l.z, ...aimed(l), room: l.room, area: areaOf(l.room), kind: 'lamp', power: l.light.intensity, ...(l.light.switch === false ? {} : { lamp: l.id }) })),
-    ...[...rooms.entries()].filter(([r]) => !lamps.some((l) => l.room === r)).map(([r, t]): RoomLight => ({ x: t.sx / t.n, y: 2.45, z: t.sz / t.n, room: r, area: t.n, kind: 'fill' })),
+    ...lamps.map((l): RoomLight => ({ x: l.x, z: l.z, ...aimed(l), room: l.room, area: areaOf(l.room), kind: 'lamp', power: l.light.intensity, ...(l.light.switch === false && l.light.while === undefined ? {} : { lamp: l.id }), ...(l.light.while === undefined ? {} : { always: true }) })),
+    // (A light that follows a use isn't the room's lamp: a room whose only light is a hood still gets its dim fill.)
+    ...[...rooms.entries()].filter(([r]) => !lamps.some((l) => l.room === r && l.light.while === undefined)).map(([r, t]): RoomLight => ({ x: t.sx / t.n, y: 2.45, z: t.sz / t.n, room: r, area: t.n, kind: 'fill' })),
   ];
   // How many lights of its room come before each.
   const nth = new Map<RoomLight, number>();
@@ -312,6 +315,8 @@ export interface LampLight {
   switch?: boolean;
   /** A fire: lit and put out as a lamp is switched (sim-core `lights.rs`), its flames burning while it's lit. */
   fire?: boolean;
+  /** Lit only while someone does one of these animations at an object on its tiles (sim-core `lights.rs`). */
+  while?: string | string[];
   /** Where its shade sends the light (`ObjectDef.light.aim`). */
   aim?: LightAim;
 }

@@ -61,7 +61,7 @@ answer 200 (a missing or linked wasm package otherwise gives pictures of an empt
 |---|---|
 | `gallery` | `/gallery.html?keys=…` from the front right. `--alpha --beta --radius --target --cols`; `--each`: one picture per key, `gallery-<key>.png`, on one page; `--scale adult\|child\|all` stands residents beside each model; `--camera game` takes one picture per model with the game's Live camera aimed at it |
 | `clips` | `/clips.html?keys=…` held at each of `--times` (default `0,0.3,0.6,1,99`; 99 is open), one picture each. `--each`: each key on its own, `clips-<key>-<clip>-t<t>.png`, one page for all. `--clip --colors --target` |
-| `play` | Opens `?state=<--state, default bathroom-check>&debug`, adds money (and `--skills`), then for each of `--use-existing a,b` and `--objects a,b@x,z,rot,…` (or `--objects-file <path>`, below) on the same page: buys its `--with` helpers and it (or takes the state's own), runs each `--use` (`all`, the default, an interaction id or an index) for `--sim`, takes `--shots` (3) pictures `--every` (1000) ms once the resident is using it, framing the object, then sells what it bought and the resident walks back to where they started. One JSON line per use in `<out>/play-<run>.jsonl`. |
+| `play` | Opens `?state=<--state, default bathroom-check>&debug`, adds money (and `--skills`), then for each of `--use-existing a,b` and `--objects a,b@x,z,rot,…` (or `--objects-file <path>`, below) on the same page: buys its `--with` helpers and it (or takes the state's own), runs each `--use` (`all`, the default, an interaction id, an index, or `ripe` for the uses offered only when a crop is ripe) for `--sim`, takes `--shots` (3) pictures `--every` (1000) ms once the resident is using it, framing the object (or with `--shot-idle` a picture of it as bought first, and `--top` the camera above; `--views` 2–4 takes that many angles per picture), then sells what it bought and the resident walks back to where they started. One JSON line per use in `<out>/play-<run>.jsonl`. |
 | `sheet` | Contact sheets of an evidence folder, for reading it a sheet at a time rather than shot by shot: `--dir bench-results/review/<cat>` writes `<dir>/sheets/obj-<id>.png` per object (up to 6 of its pictures, 2 × 2 or 3 × 2: gallery, game camera, a play shot in use, the clip held open, then a close-up, a night shot, other clip framings and the other uses) and `age-<id>.png` (`-2`, `-3`, …) with its `poses.html` shots, and play shots from folders named for a life stage, side by side by stage. Each picture is labelled with its path. Pictures are found by the names `gallery`, `clips`, `play` and the pose shots give them (`gallery-<model>`, `gallery-game-<model>`, `clips-<model>-<clip>-t<t>`, `<id>-<use>-NN`, `poses-…-<stage>-…-<id>`, or ending in one of `poses.html`'s own station labels, `poses-only-child-4-feed_baby`: the crib's), anywhere in the folder, the newest of a name taken twice; the objects from `--ids` or `--ids-file`, else `../lists/<cat>.txt` (or `.models.txt`), else the ids in backticks that open `index.md`'s rows. Composed as a page of `<img>` tiles in the headless browser and screenshotted (no ffmpeg, no server: no `--port`); 1600 wide, about 1000 high for 2 × 2 and 700 for 3 × 2. About 0.2 s a sheet. |
 
 `play` in more detail:
@@ -116,17 +116,24 @@ answer 200 (a missing or linked wasm package otherwise gives pictures of an empt
   resident's pose, `using`, animation and use. A record holds the object, the use (and its pose and anim),
   where it stands, `outcome` (`using`, `not taken`, `timeout`, `skipped`, `not bought`, `no uses`), when
   they were using it, `played` (clips that moved, not the ambient, growth, night or clock ones), each
-  picture's file with the pose, clips and the object's place then, the needs before and after, timings,
+  picture's file with the pose, how far they stand from its nearest face (`distance`), the clips and the object's place then, the needs before and after, timings,
   fps and errors.
 - **Open things.** A use that needs the object open or closed (`when`) is set up with the use that
   leaves it so (fold the wall bed down first), and anything left open is shut before it is sold. The
   helper uses are records too (`helper: open|close`).
 - **Failures.** Each object gets one retry of what failed (afresh from the state unless all were uses not
   taken); then the failure is recorded and the run goes on. A crop's "when ripe" uses are skipped unless
-  it is ripe (bought new, it is just planted: `--use-existing` it on `review-garden`). The state is
-  opened again when the resident's lowest need is below 0.25.
+  it is ripe (bought new, it is just planted: `--use-existing garden.vegPatch --use ripe` on
+  `review-garden`, whose crops are ripe); asked for by name they run anyway and the game says why not
+  ("the vegetable patch isn't ripe yet"). Each record says the crop's stage it found (`growth`: 0
+  planted, 1 growing, 2 ripe, 3 picked). The state is opened again when the resident's lowest need is
+  below 0.25.
 - **Camera.** `__controls.follow(null)`, aimed at the footprint's middle from in front and 0.7 rad to the
-  side, set again before each picture; `--alpha --beta --radius --y` override. The radius is the
+  side, set again before each picture; `--alpha --beta --radius --y` override, and `--top` looks down
+  from above (who sits where at a table; the game camera stops at 1.35 rad). `--views 2`–`4` takes that
+  many angles of each use-loop picture off the aimed one — the front, then round the back (a use from
+  behind the thing), above (a seat, a top, what the hands are at) and low (a door's foot, a drawer's
+  runner) — named `<object>-v2`… and each record's `angle` says which; the first is unchanged. The radius is the
   larger of what the footprint needs and what the model as drawn needs to be whole in the picture
   inside the HUD (`__check.fit` over its vertices: a tree's crown, a wardrobe, a shower); a model over
   1.6 m is looked at halfway up. Not drawn yet: its height from `__renderer.objectBox`, else a guess.
@@ -135,7 +142,12 @@ answer 200 (a missing or linked wasm package otherwise gives pictures of an empt
   --use sit`, 6 shots 500 ms apart) still follows the resident, as does `--follow`.
 - **Light.** `--hour 12` fixes the renderer's light (the state sets the clock); on a `*-night` state
   there's no default, so the light is the sim's clock's; `--hour state` for that anywhere.
-- **Names.** Pictures are `<def>-<use>-<n>.png` (a kind used twice in a run: with its place); with
+- **On the way.** `--walk-shots <n>` takes up to `n` pictures before the use begins
+  (`<def>-<use>-walk-00.png`), `--every` ms apart, stopping as the resident starts using it: the walk
+  itself, and a door's swing as their hand takes the handle (`0.45 s`, over by the first picture of a
+  use). With `--every 0` they are as fast as the page draws, a frame every ~0.07 s on `review-stage`.
+- **Names.** Pictures are `<def>-<use>-<n>.png` (a kind used twice in a run: with its place; its
+  `--with` helpers after it, `chair-with-coffeeTable-sit-01.png`); with
   `--name <run>` they start with it, so runs (an adult's, then a child's) into one `--out` keep theirs.
   A picture written over from an earlier run is said once.
 
@@ -158,6 +170,7 @@ bun tools/bench/check.mjs play --port 5227 --state crowded-garden --use-existing
 bun tools/bench/check.mjs play --port 5227 --state crowded-garden --social chat,hug,kiss --sims 0,1 --bond 0:1:friendship=80/romance=70/partners
 bun tools/bench/check.mjs play --port 5227 --state bathroom-check --phone call,text --sims 0,1 --bond 0:1:friendship=50 --needs all=0.6
 bun tools/bench/check.mjs play --port 5227 --state review-garden --use-existing garden.tomatoes,raisedBed --use harvest
+bun tools/bench/check.mjs play --port 5227 --state review-garden --use-existing garden.vegPatch --use ripe   # every use offered only when ripe
 bun tools/bench/check.mjs play --port 5227 --state review-stage-night --objects telescope@10,22,0,lamp
 bun tools/bench/check.mjs play --port 5227 --object toiletClassic --at 23,14,0 --use use --shots 6 --every 500
 bun tools/bench/check.mjs play --port 5227 --object toiletClassic --at 24,17,1 --state office-night --renderer webgl --quality low

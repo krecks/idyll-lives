@@ -81,20 +81,21 @@ small from the game camera, on a wall thing most houses have several of. Revisit
 |---|---|---|---|
 | `wallClock`, `grandfatherClock` | `hour_hand`, `minute_hand` | `clock` (`at` 610) | the hands tell the game's time: each clip turns its hand once round clockwise (`G.spin`, 12 s), and the game holds it where the time has it (ten past ten at rest, the catalogue picture). No second hand: at normal speed a game minute is a real second |
 | `grandfatherClock` | `pendulum` | `idle` | the pendulum swings ±4° about its top, a beat each 0.8 s (`G.rock`, 1.6 s a round), all the time near the camera (2026-10-21) |
+| `grandfatherClock` | `door_open` | use `wind` | the trunk door swings open 100° on its left edge (seen from the front) as the clock is wound, and back when the use ends (`G.swing`, 0.8 s) |
 | `hangingPlant` | `sway` | use `water`, `hold` 0.8 s | the plant, pot and hanger swing 5° out about the ceiling hook (`G.swing`, eased) and, played back after the hold, home: one sway (it was a `G.rock`, which played back swung twice) |
 | `fireplace` | `flames` | use `relax` | an ember bed and tongues of flame (gloss) grow from nothing on the logs (`G.grow`) for the whole use; the light is the content's |
 | `curtains`, `curtainsWide`, `curtainsLong` | `close` | night | the two pleated panels, gathered open at the sides, widen from their outer ends until they meet (`G.squash` in x, about the rail end) |
 
-The grandfather clock takes **4 draw calls** (the most allowed): its body, all plain (1), the two hands and the
-pendulum. Since 2026-10-21 (review A-decor-01) its walnut is a polished satin, not the textured wood, which gives
-the draw back for the pendulum: a brass rod and bob, its origin on its top under the hood, that swings ±4° a beat
-each 0.8 s, all the time near the camera (`pendulum`, `idle`, `G.rock`; at rest on Low), seen through the trunk
-door's window. The trunk door stays still: the clock is wound at its dial (`wind`), and a fifth draw would be over
-the budget. Looked at again on 2026-10-26 (review §9.2, A-decor-01) and left shut: the gate fails a model over 4
-draws, and none of the four parts can take the door in (the hands are each held by the game's time, the pendulum
-swings on its own; the door joined to any of them would turn with it), so a door of its own is a fifth; and no use
-would open it, since an eight-day longcase is wound with a crank through the dial's holes, and its trunk door is
-opened only to start or regulate the pendulum, which the game doesn't do. The curtains'
+The grandfather clock takes **5 draw calls**, the one model whose entry says so (`draws=5`): its body, all plain (1),
+the two hands, the pendulum and the trunk door. Since 2026-10-21 (review A-decor-01) its walnut is a polished satin,
+not the textured wood, which gave the draw back for the pendulum: a brass rod and bob, its origin on its top under the
+hood, that swings ±4° a beat each 0.8 s, all the time near the camera (`pendulum`, `idle`, `G.rock`; at rest on Low),
+seen through the trunk door's window. The trunk door was left shut on 2026-10-26 (review §9.2, A-decor-01) for the
+fifth draw, with no use to open it; on 2026-10-31 it opens while the clock is wound (`wind`, `door_open`), the weights
+behind it, and the pack entry's `draws` allows this one model the fifth (`cargo check-glb`; every other model keeps
+the four). The door is a part of its own, its origin on its left edge: the hands are each held by the game's time and
+the pendulum swings on its own, so none of them can carry it. The curtains'
+tabs are their own fabric, so the moving panels cost one draw call each.
 tabs are their own fabric, so the moving panels cost one draw call each.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
@@ -105,7 +106,7 @@ tabs are their own fabric, so the moving panels cost one draw call each.
 | `model.canvasAbstract` | 1.50 × 0.90 × 0.05 m | 1,200 | 2 | Frame |
 | `model.wallClock` | 0.36 × 0.36 × 0.07 m | 2,144 | 3 | Case, Face |
 | `model.wallShelf` | 0.90 × 0.66 × 0.24 m | 3,272 | 3 | Shelves |
-| `model.grandfatherClock` | 0.60 × 2.12 × 0.40 m | 6,394 | 4 | Case, Face |
+| `model.grandfatherClock` | 0.60 × 2.12 × 0.40 m | 6,394 | 5 | Case, Face |
 | `model.vaseTall` | 0.33 × 1.27 × 0.23 m | 3,318 | 2 | Body |
 | `model.urnPorcelain` | 0.36 × 0.63 × 0.36 m | 3,940 | 1 | Body |
 | `model.vasePedestal` | 0.40 × 1.60 × 0.40 m | 3,292 | 2 | Vase, Pedestal |

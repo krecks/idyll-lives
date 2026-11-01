@@ -334,7 +334,7 @@ chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't appl
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `outgoing.partyBar` Home party bar | 2x1 · floor | mixDrinks:drink soda:drink barDrink:drink | kitchen / — | Body, Upholstery, Back bar | Use | `tap`: the beer tap lever pulls for mixDrinks and soda (`hold` 2 s). Have a drink at the bar, sat on its stools facing the counter (content `seat` 0.74 m, forward 0.5, `facing: back`). "Back bar" colours the shelves too. |
+| `outgoing.partyBar` Home party bar | 2x1 · floor | mixDrinks:drink soda:drink barDrink:drink | kitchen / — | Body, Upholstery, Back bar | Use | `tap`: the beer tap lever pulls for mixDrinks and soda (`hold` 2 s). Have a drink at the bar, sat on its stools facing the counter (content `seat` 0.74 m, forward 0.28 — where the stools stand — `facing: back`). "Back bar" colours the shelves too. |
 | `outgoing.conversationSectional` Conversation sectional | 2x2 · floor | hangOut:relax | living / — | Body, Upholstery | Use | `sink_in`: the seat cushions press down for hangOut. |
 | `outgoing.karaokeStage` Karaoke stage | 2x1 · floor | practise:sing perform:sing | hobbies / — | Body, Speakers | Use | `mic_up`: the mic stands rise for practise and perform. Sung up on the stage, between the mics (content `stand`, 0.146 m). The screen and lyrics glow while used. |
 | `outgoing.videoCallNook` Video-call corner | 1x1 · floor | call:phone | office / — | Body, Upholstery, Wood | Use | `ring_light`: the ring light swings up for call. The ring light and laptop screen glow during the call. |

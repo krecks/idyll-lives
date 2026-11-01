@@ -313,6 +313,12 @@ export interface SimRig {
   toweled: number;
   /** The shower they were last under (`toweled`), for its door as they step out (`startWalk`). */
   shower: PlacedObject | null;
+  /**
+   * A hand out to the handle of the door or gate they're going through this frame, 0..1 (the renderer's
+   * `doorHand`: the leaf's swing is timed to it). 0 for a door that stands open, and for anyone not
+   * walking.
+   */
+  doorHand: number;
   sitX: number;
   sitZ: number;
   /**

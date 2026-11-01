@@ -2,8 +2,11 @@
 //! both places, so it starts only with nobody else on the seat, and nobody sits down beside the
 //! napper until they get up. Sitting on it is still for two at once.
 
+mod common;
+
+use common::until;
 use sim_core::world::TaskKind;
-use sim_core::{Command, TICKS_PER_MINUTE, World};
+use sim_core::{Command, World};
 
 const CONTENT: &str = r#"{
     "needs":[{"id":"energy","label":"Energy","decayPerHour":0.01},{"id":"fun","label":"Fun","decayPerHour":0.01}],
@@ -41,17 +44,6 @@ fn using(w: &World, sim: usize) -> Option<usize> {
 /// On the seat (holding a place on it).
 fn on_seat(w: &World, sim: u32) -> bool {
     w.objects[0].users().any(|u| u == sim)
-}
-
-/// Ticks `w` for up to `minutes`, until `done`; true if it got there.
-fn until(w: &mut World, minutes: u64, mut done: impl FnMut(&World) -> bool) -> bool {
-    for _ in 0..minutes * TICKS_PER_MINUTE {
-        if done(w) {
-            return true;
-        }
-        w.tick_once();
-    }
-    done(w)
 }
 
 #[test]

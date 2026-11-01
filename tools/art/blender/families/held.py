@@ -202,6 +202,13 @@ M = G.Palette(
     marker=('#F2F0EA', 'satin'),       # a whiteboard marker's body
     marker_cap=('#2A5FB8', 'satin'),
     handset=('#1E2120', 'satin'),      # the phone box's receiver (street_furniture.py `phoneBooth`'s `dark`)
+    # the cut flowers a vase takes (Q-18): the bunch's heads, eyes and stems
+    petal_white=('#F2F0EA', 'satin'),
+    petal_blush=('#E4B8AE', 'satin'),
+    petal_rose=('#E07B7B', 'satin'),
+    petal_yellow=('#F2C14E', 'satin'),
+    flower_eye=('#E8A62A', 'matte'),
+    stem_green=('#4E8A3A', 'satin'),   # a cut stem, a shade lighter than `leaf`
 )
 
 # Built in the game's axes (x, height, depth; front +depth), as the old parts are.
@@ -1554,6 +1561,67 @@ def secateurs():
     return done('secateurs')
 
 
+# The bunch's heads, as in the vase of flowers (`tabletop.py` `VASE_HEADS`), standing: (x, height, depth, petal,
+# kind, size, tip, yaw), in game axes. A hand takes the stems at the origin, so the bunch stands up out of the fist.
+BUNCH = ((0.0, 0.32, 0.030, 'petal_white', 'daisy', 0.026, 6, 0),
+         (-0.046, 0.29, 0.050, 'petal_rose', 'tulip', 0.015, 0, 12),
+         (0.043, 0.272, 0.020, 'petal_yellow', 'daisy', 0.024, -5, 0),
+         (-0.018, 0.334, 0.060, 'petal_blush', 'tulip', 0.014, 0, -8),
+         (0.026, 0.302, 0.045, 'petal_white', 'small', 0.017, 4, 0),
+         (-0.048, 0.252, 0.015, 'petal_rose', 'daisy', 0.019, -7, 0))
+GRIP = (0.0, 0.0, 0.02)  # where the stems are gathered, the middle of the bunch's base
+
+
+def _star(r, inner, n=6):
+    """A flower's petals as a flat outline: `n` petals `r` out, `inner` of that between them (0.42: a daisy)."""
+    return [(r * (1 if k % 2 == 0 else inner) * math.cos(math.pi * k / n),
+             r * (1 if k % 2 == 0 else inner) * math.sin(math.pi * k / n)) for k in range(2 * n)]
+
+
+def cutFlowers():
+    """A bunch of cut flowers for a vase, 36 cm from the stems' cut ends to the tallest bloom, standing: the stems
+    gathered at the origin where a hand takes them and curving up to six heads (three daisies with an eye, two tulip
+    buds, a small daisy) and four leaves. The same heads as the vase of flowers has, so a bunch cut in the garden and
+    one bought arranged look alike (G-10, Q-18)."""
+    for i, (x, y, z, petal, kind, r, tip, yaw) in enumerate(BUNCH):
+        F.sweep(f'stem{i}', [GRIP, (x * 0.45, GRIP[1] + (y - GRIP[1]) * 0.55, GRIP[2] + (z - GRIP[2]) * 0.55),
+                             (x, y - 0.004, z)], 0.0028, M.stem_green, verts=4, resolution=1)
+        if kind == 'tulip':
+            # (A closed bud: a cup swelling from the stem and closing over the top.)
+            lathe(f'bud{i}', [(0, 0), (0.005, 0.001), (0.012, 0.008), (0.0145, 0.018), (0.0135, 0.028),
+                              (0.008, 0.036), (0, 0.038)], getattr(M, petal), at=(x, y - 0.002, z),
+                  segments=6, rot=(tip, 0, yaw))
+            continue
+        F.extrude(f'face{i}', _star(r, 0.42), 0.004, (x, y, z), getattr(M, petal), plane='front',
+                  rot=(tip, 0, yaw))
+        ball(f'eye{i}', r * 0.34, (x, y + 0.003, z), M.flower_eye, scale=(1, 1, 0.5), seg=6, rings=3)
+    for i, (x, y, z, yaw) in enumerate(((0.012, 0.10, 0.02, 40), (-0.03, 0.07, 0.03, -30),
+                                        (0.035, 0.16, 0.04, 20), (-0.014, 0.19, 0.05, -55))):
+        leaf(f'leaf{i}', (x, y, z), 0.05, 0.017, yaw, M.leaf)
+    return done('cutFlowers')
+
+
+def daisyChain():
+    """A daisy chain, 16 cm across, coiled flat in the hand: a ring of plaited stems with eleven daisies round it,
+    heads up, and the two stem ends showing where the chain was closed (Q-18, the daisies' one real use left)."""
+    r = 0.062
+    F.sweep('chain', [(r * math.cos(math.tau * k / 24), 0.004, r * math.sin(math.tau * k / 24)) for k in range(25)],
+            0.0034, M.stem_green, verts=5, resolution=1)
+    for k in range(11):
+        a = math.tau * k / 11
+        x, z = r * math.cos(a), r * math.sin(a)
+        F.extrude(f'face{k}', _star(0.019, 0.42), 0.003, (x, 0.009, z), M.petal_white, plane='top',
+                  rot=(0, 0, 18 * k))
+        ball(f'eye{k}', 0.0065, (x, 0.0115, z), M.flower_eye, scale=(1, 0.5, 1), seg=6, rings=3)
+    # the ends, plaited back under the last daisies
+    for i, (a, sgn) in enumerate(((0.0, 1), (math.pi, -1))):
+        F.sweep(f'end{i}', [(r * 0.92 * math.cos(a), 0.006, r * 0.92 * math.sin(a)),
+                            (r * 1.14 * math.cos(a), 0.004, r * 1.14 * math.sin(a)),
+                            (r * 1.1 * math.cos(a + sgn * 0.35), 0.003, r * 1.1 * math.sin(a + sgn * 0.35))],
+                0.0026, M.stem_green, verts=4, resolution=1)
+    return done('daisyChain')
+
+
 def paintbrush():
     """An artist's brush, 24 cm long, lying along the depth, its bristles to the front (+depth), held at the origin
     6 cm behind the ferrule: a lacquered wooden handle swelling and tapering, a steel ferrule, bristles dipped in
@@ -1824,6 +1892,8 @@ FAMILY = G.Family(
         I('crisps', crisps, (0.132, 0.049, 0.223), 'item.crisps', centre=(0.0, 0.0093)),
         I('apple', apple, (0.074, 0.081, 0.073), 'item.apple'),
         I('pastryBag', pastryBag, (0.128, 0.198, 0.072), 'item.pastryBag'),
+        I('cutFlowers', cutFlowers, (0.134, 0.370, 0.070), 'item.cutFlowers', centre=(0.0, 0.0387)),
+        I('daisyChain', daisyChain, (0.159, 0.014, 0.159), 'item.daisyChain'),
     ],
     comment='Blender-built things residents carry and cook with (tools/art/blender/families/held.py): the '
             'models of content `items`, the props drawn on a station while cooking and those in the hands '

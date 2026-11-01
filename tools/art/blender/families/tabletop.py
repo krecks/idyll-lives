@@ -879,35 +879,65 @@ def _facing(x, y):
     return 90 - math.degrees(math.atan2(y, x)) if (x or y) else 0.0
 
 
-def vaseFlowers():
-    """A glazed vase swelling at its belly with a flared lip, a mixed bunch on curving stems: white and yellow daisies
-    (ray petals round a raised eye), two tulips and a pink cosmos, leaves at the neck."""
-    turned('vase', [(0.04, 0.0), (0.044, 0.004), (0.06, 0.05), (0.065, 0.11), (0.052, 0.18), (0.032, 0.215),
-                    (0.036, 0.24), (0.03, 0.24), (0.027, 0.225)], M.vase, verts=16)
-    heads = ((0.0, 0.0, 0.392, M.white, 'daisy'), (-0.066, 0.03, 0.345, M.blush, 'tulip'),
-             (0.064, -0.02, 0.355, M.yellow, 'daisy'), (0.03, 0.06, 0.37, M.rose, 'tulip'),
-             (-0.042, -0.05, 0.335, M.white, 'daisy'), (0.05, 0.042, 0.325, M.blush, 'cosmos'),
-             (-0.022, 0.05, 0.372, M.white, 'small'), (0.022, -0.052, 0.352, M.rose, 'tulip'),
-             (-0.068, -0.008, 0.31, M.yellow, 'small'), (0.066, 0.01, 0.3, M.white, 'small'))
-    for i, (x, y, z, petal, kind) in enumerate(heads):
+# The bunch of a vase (x, depth, height, petal colour, kind): the same heads in the vase of flowers and in the empty
+# vase once flowers are put in it, so a bunch cut in the garden looks like one bought arranged (G-10, Q-18). The
+# colours are named, not taken from `M` here: a material is made afresh for each model built.
+VASE_HEADS = ((0.0, 0.0, 0.392, 'white', 'daisy'), (-0.066, 0.03, 0.345, 'blush', 'tulip'),
+              (0.064, -0.02, 0.355, 'yellow', 'daisy'), (0.03, 0.06, 0.37, 'rose', 'tulip'),
+              (-0.042, -0.05, 0.335, 'white', 'daisy'), (0.05, 0.042, 0.325, 'blush', 'cosmos'),
+              (-0.022, 0.05, 0.372, 'white', 'small'), (0.022, -0.052, 0.352, 'rose', 'tulip'),
+              (-0.068, -0.008, 0.31, 'yellow', 'small'), (0.066, 0.01, 0.3, 'white', 'small'))
+VASE_BODY = [(0.04, 0.0), (0.044, 0.004), (0.06, 0.05), (0.065, 0.11), (0.052, 0.18), (0.032, 0.215),
+             (0.036, 0.24), (0.03, 0.24), (0.027, 0.225)]
+
+
+def _bunch(water=0.2, neck=0.232):
+    """The vase's bunch: `VASE_HEADS` on curving stems from the water at `water`, leaves at the neck."""
+    for i, (x, y, z, colour, kind) in enumerate(VASE_HEADS):
+        petal = getattr(M, colour)
         yaw, tilt = _facing(x, y), 25 if (x or y) else 0
-        twig(f'stem{i}', [(x * 0.15, y * 0.15, 0.2), (x * 0.55, y * 0.55, (0.24 + z) / 2), (x, y, z - 0.004)], 0.0032,
-             0.0026, M.leaf, verts=4, res=1)
+        twig(f'stem{i}', [(x * 0.15, y * 0.15, water), (x * 0.55, y * 0.55, (neck + z) / 2), (x, y, z - 0.004)],
+             0.0032, 0.0026, M.leaf, verts=4, res=1)
         if kind == 'tulip':
             tulip_head(f'flower{i}', (x, y, z - 0.012), 0.017, 0.042, petal, yaw, tilt * 0.6)
         else:
             n, r, width = {'daisy': (12, 0.03, 0.7), 'small': (10, 0.021, 0.7), 'cosmos': (8, 0.028, 0.95)}[kind]
             rays(f'flower{i}', (x, y, z), r, n, petal, yaw, tilt, inner=0.25, cup=0.12, width=width, thick=0.004)
-            dome(f'eye{i}', (x, y, z), r * 0.3, 0.006, M.orange if petal is M.yellow else M.yellow, yaw, tilt)
+            dome(f'eye{i}', (x, y, z), r * 0.3, 0.006, M.orange if colour == 'yellow' else M.yellow, yaw, tilt)
         if i % 2:                              # a leaf part way up the stem
             mx, my = x * 0.55, y * 0.55
-            leaf(f'stem_leaf{i}', (mx, my, (0.24 + z) / 2 - 0.01), _facing(x, y) + 40, 35, 0.05, 0.018, M.leaf_light,
+            leaf(f'stem_leaf{i}', (mx, my, (neck + z) / 2 - 0.01), _facing(x, y) + 40, 35, 0.05, 0.018, M.leaf_light,
                  shape='lance', droop=0.3, thick=0.003, rows=3, ring=4)
     for i, a in enumerate((20, 140, 260)):
         bx, by = 0.022 * G.cosd(a), 0.022 * G.sind(a)
-        leaf(f'leaf{i}', (bx, by, 0.232), _facing(bx, by), 40, 0.075, 0.03, M.leaf, shape='lance', droop=0.3, thick=0.004,
+        leaf(f'leaf{i}', (bx, by, neck), _facing(bx, by), 40, 0.075, 0.03, M.leaf, shape='lance', droop=0.3, thick=0.004,
              rows=4, ring=4)
+
+
+def vaseFlowers():
+    """A glazed vase swelling at its belly with a flared lip, a mixed bunch on curving stems: white and yellow daisies
+    (ray petals round a raised eye), two tulips and a pink cosmos, leaves at the neck."""
+    turned('vase', VASE_BODY, M.vase, verts=16)
+    _bunch()
     return done('vaseFlowers')
+
+
+def vaseEmpty():
+    """The same glazed vase, empty: a mouth 6 cm across and no flowers. The bunch it takes is a part of its own,
+    built small in the water and hidden inside the vase, which `flowers_open` grows up out of the mouth over 0.9 s
+    (the game holds it there while the vase is open: `motions.open`), so the flowers come from the garden and not
+    from the shop. The bunch is the vase of flowers' own (`VASE_HEADS`)."""
+    with G.new_parts() as body:
+        turned('vase', VASE_BODY, M.vase, verts=16)
+    G.join(body, 'vase', origin=(0, 0, 0))
+    with G.new_parts() as part:
+        _bunch()
+    flowers = G.join(part, 'flowers', origin=(0, 0, 0.2))
+    flowers.scale = (0.001, 0.001, 0.001)
+    objs = G.settle(centre=False)
+    for axis in 'XYZ':
+        G.grow(flowers, 'flowers_open', seconds=0.9, axis=axis)
+    return objs
 
 
 def vaseSmall():
@@ -1444,6 +1474,12 @@ FAMILY = G.Family(
           [('brass', 'Bookends'), ('book_a', 'Book 1'), ('book_c', 'Book 2'), ('book_b', 'Book 3'),
            ('book_e', 'Book 4'), ('book_d', 'Book 5')]),
         T('vaseFlowers', vaseFlowers, (0.179, 0.41, 0.172), [('vase', BODY)]),
+        # the flowers are a part of their own, hidden until they are put in (two draw calls once they are);
+        # taken out, the same clip goes back along the use, so they come out as they're lifted
+        T('vaseEmpty', vaseEmpty, (0.13, 0.24, 0.13), [('vase', BODY)],
+          motions={'uses': {'putFlowers': 'flowers_open',
+                            'takeOut': {'clip': 'flowers_open', 'over': -1}},
+                   'open': 'flowers_open'}),
         T('vaseSmall', vaseSmall, (0.08, 0.277, 0.08), [('bud_vase', BODY)]),
         T('potSucculent', potSucculent, (0.164, 0.136, 0.164), [('pot_pale', BODY)]),
         T('potCactus', potCactus, (0.184, 0.324, 0.132), [('terracotta', BODY)]),

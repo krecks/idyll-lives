@@ -67,11 +67,14 @@ class Model:
                  metres; `cargo check-glb` checks them against the file
       habitat    what its perches are on, the entry's `habitat` beside them, so the game's birds needn't guess it from
                  the key: 'tree' (broadleaved and fruit trees), 'conifer', 'bush' (shrubs) or 'hedge'
+      draws      the most draw calls the model may take, the entry's `draws` (`cargo check-glb`): 4 for every model
+                 unless one says otherwise, for a model whose moving parts can't fit in four (the grandfather clock's
+                 trunk door, which swings open while it is wound)
     Perches the build finds (`gamekit/perch.py`: a tree's outer twigs) are written as the entry's `perches`.
     """
 
     def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, parts=None,
-                 centre=(0.0, 0.0), floor=True, far=None, sink=0.0, code=False, bird=None, habitat=None):
+                 centre=(0.0, 0.0), floor=True, far=None, sink=0.0, code=False, bird=None, habitat=None, draws=None):
         self.id, self.build, self.size, self.key = id, build, size, key
         self.tolerance, self.motions, self.paint = tolerance, motions, paint
         self.parts = parts
@@ -80,6 +83,7 @@ class Model:
         self.code = code
         self.bird = bird
         self.habitat = habitat
+        self.draws = draws
 
 
 class Family:
@@ -186,6 +190,8 @@ class Family:
             if model.habitat:
                 assert perches, f'{model.id}: `habitat` says what its perches are on, and it has none'
                 entry['habitat'] = model.habitat
+            if model.draws:
+                entry['draws'] = model.draws
             if model.far:
                 far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), self.make_far(model, objs))
                 entry['far'] = f'../../models/{self.name}/{model.id}.far.glb'

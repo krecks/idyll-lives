@@ -1581,15 +1581,39 @@ type Bounds = ([Num; 3], [Num; 3]);
 /// Each moving part's bounds (None: the still body), in the order they're met.
 type PartBounds = Vec<(Option<usize>, Bounds)>;
 
+/// A model's nodes drawn but not part of its own size (`gamekit.parts.ASIDE`): a desk's chair, a chest of
+/// drawers' picture, the blocks left out in front of a toy box, the flag on a climbing frame, the block and
+/// bottle beside a rolled mat. The game draws them; `model()` leaves them out of the size it measures.
+pub const ASIDE: &str = "_aside";
+
+/// The nodes of the file named as `aside` (their names end with `ASIDE`).
+fn aside_nodes(gltf: &J) -> HashSet<usize> {
+    gltf.get("nodes")
+        .and_then(J::list)
+        .unwrap_or(&[])
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| {
+            n.get("name")
+                .map(J::key)
+                .is_some_and(|name| name.ends_with(ASIDE))
+        })
+        .map(|(i, _)| i)
+        .collect()
+}
+
 /// The file's bounds in game axes (glTF x -> game -x, as `render/pc/models.ts` bakes a file), from
 /// each primitive's box through its node, and each moving part's (None: the still body), in the order
-/// they're met.
-fn bounds(gltf: &J, pose: &Pose) -> R<(Bounds, PartBounds)> {
+/// they're met; the nodes in `skip` left out.
+fn bounds(gltf: &J, pose: &Pose, skip: &HashSet<usize>) -> R<(Bounds, PartBounds)> {
     let accessors = gltf.get("accessors").cloned().unwrap_or(J::Arr(Vec::new()));
     let (inf, ninf) = (Num::F(f64::INFINITY), Num::F(f64::NEG_INFINITY));
     let (mut lo, mut hi) = ([inf; 3], [ninf; 3]);
     let mut parts: PartBounds = Vec::new();
     for p in node_matrices(gltf, Some(pose), None)? {
+        if skip.contains(&p.node) {
+            continue;
+        }
         let at = match parts.iter().position(|(part, _)| *part == p.part) {
             Some(at) => at,
             None => {
@@ -2110,6 +2134,11 @@ const SAME: f64 = 0.005;
 /// below the seat's height (a cushion's rounded front), and how far the model's may be from what the table says.
 const FRONT_DROP: f64 = 0.06;
 const FRONT_OFF: f64 = 0.03;
+/// How far (m) around the point a functional height is measured: the widest gap a top may have there and still be
+/// the thing itself (a bench's slats, a table's planks, a cushion's seams). A single point falls between them and
+/// reports nothing under a seat that is right.
+const PROBE: f64 = 0.05;
+
 /// A seat this low (m) is the ground (furniture.json `seats` `shade`: against a tree's trunk), not the model's to measure.
 const GROUND: f64 = 0.02;
 
@@ -2207,6 +2236,30 @@ impl Sampler {
     /// any face. None: nothing there.
     fn top(&self, x: f64, z: f64, near: f64) -> Option<f64> {
         self.top_in(x, z, [near, near])
+    }
+
+    /// `top` over the `PROBE` strip around (x, depth): the faces looking up at the point itself and on a ring round
+    /// it, the one nearest `near` of those (a gap between slats has nothing on the line but its neighbours do).
+    fn top_around(&self, x: f64, z: f64, near: f64) -> Option<f64> {
+        // The point first, then the ring: a tie keeps the point's own face.
+        let mut best = self.top(x, z, near);
+        for (dx, dz) in [
+            (1.0, 0.0),
+            (-1.0, 0.0),
+            (0.0, 1.0),
+            (0.0, -1.0),
+            (0.7, 0.7),
+            (-0.7, 0.7),
+            (0.7, -0.7),
+            (-0.7, -0.7),
+        ] {
+            let found = self.top(x + dx * PROBE, z + dz * PROBE, near);
+            let off = |m: Option<f64>| m.map_or(f64::INFINITY, |m| (m - near).abs());
+            if found.is_some() && off(found) < off(best) {
+                best = found;
+            }
+        }
+        best
     }
 
     /// `top`, nearest the range `[lo, hi]` (of those in it, nearest its middle).
@@ -2471,6 +2524,14 @@ struct Seat {
     front: Option<f64>,
 }
 
+/// Whether any of the object's uses is a baby's (content `baby`).
+fn for_baby(object: &J) -> bool {
+    object
+        .get("interactions")
+        .and_then(J::list)
+        .is_some_and(|l| l.iter().any(|i| i.get("baby").is_some_and(J::truthy)))
+}
+
 /// Each slot's place of content object `object` (sim-core `slot_position`, `slot_yaw`), `fwd` m ahead of it the
 /// way its user faces (m right of the footprint's middle and forward of it): its `places`, else spread across
 /// its width, facing its front.
@@ -2490,6 +2551,11 @@ fn slot_points(object: &J, fwd: f64) -> Vec<[f64; 2]> {
             })
             .collect();
     }
+    // A baby's place is the middle, however many slots it has (sim-core `place_at`: a baby is put at the object's
+    // centre, not spread across its width), so a crib's mattress is one mattress and a high chair one seat.
+    if for_baby(object) {
+        return vec![[0.0, fwd]];
+    }
     let n = object
         .get("slots")
         .and_then(J::num)
@@ -2508,6 +2574,11 @@ fn slot_points(object: &J, fwd: f64) -> Vec<[f64; 2]> {
 /// one sat on), the hips' point `fwd` ahead of each slot's place (`slot_points`; along the object for a bath, `along`).
 /// None: no one sits on it.
 fn seat_of(object: &J, furniture: &Furniture) -> Option<Seat> {
+    // A thing that stands on a top (content `layer: "surface"`) has no seat of its own: a `sit` use of the mugs or
+    // the books is the resident sitting at the table they stand on, not on them.
+    if object.get("layer").is_some_and(|l| l.key() == "surface") {
+        return None;
+    }
     let id = object.get("id").map(J::key).unwrap_or_default();
     let own = object.opt("seat");
     let table = furniture.seats.get(&id);
@@ -2619,7 +2690,7 @@ fn heights(
     let worst = |s: &Sampler, points: &[[f64; 2]], near: f64| -> ([f64; 2], Option<f64>) {
         let mut best: Option<([f64; 2], Option<f64>)> = None;
         for p in points {
-            let m = s.top(p[0], p[1], near);
+            let m = s.top_around(p[0], p[1], near);
             let off = |m: Option<f64>| m.map_or(f64::INFINITY, |m| (m - near).abs());
             if best.is_none_or(|(_, b)| off(m) > off(b)) {
                 best = Some((*p, m));
@@ -2753,11 +2824,8 @@ fn heights(
                     ),
                 };
                 // (A baby lies at its slot, on its back along the bed, even on one lain on across: characters.ts.)
-                let baby = object
-                    .get("interactions")
-                    .and_then(J::list)
-                    .is_some_and(|l| l.iter().any(|i| i.get("baby").is_some_and(J::truthy)));
-                let across = !baby && bed.and_then(|b| b.get("across")).is_some_and(J::truthy);
+                let across =
+                    !for_baby(object) && bed.and_then(|b| b.get("across")).is_some_and(J::truthy);
                 let slots = slot_points(object, fwd);
                 let n = if every_slot { slots.len() } else { 1 };
                 let points: Vec<[f64; 2]> = if across {
@@ -3226,7 +3294,7 @@ fn check_file(
         &g,
         &[motions.opt("open").cloned(), motions.opt("night").cloned()],
     )?;
-    let ((slo, shi), sparts) = bounds(gltf, &pose)?;
+    let ((slo, shi), sparts) = bounds(gltf, &pose, &HashSet::new())?;
     let (slo, shi) = (slo.map(|v| v * scale), shi.map(|v| v * scale));
     if !fit && !entry.get("offset").is_some_and(J::truthy) {
         // On the floor (y = 0). A model the game sinks may reach below it by its `sink` (the woods' rock, the marker).
@@ -3371,11 +3439,18 @@ fn check_file(
             fixed(side.f(), 2)
         ));
     }
-    if groups.len() > DRAWS.1 {
+    let most_draws = match draws_allowed(entry) {
+        Ok(n) => n,
+        Err(e) => {
+            errors.push(e);
+            DRAWS.1
+        }
+    };
+    if groups.len() > most_draws {
         errors.push(format!(
             "{} draw calls, at most {} (one per finish group: map materials to finishes)",
             groups.len(),
-            DRAWS.1
+            most_draws
         ));
     } else if groups.len() > DRAWS.0 {
         warnings.push(format!(
@@ -3754,10 +3829,26 @@ pub struct Measures {
     pub objects: BTreeMap<String, Result<Measure, String>>,
 }
 
+/// The most draw calls a model may take: the pack entry's `draws` for the one model whose moving parts can't fit
+/// in four (the grandfather clock's trunk door, which swings open while it is wound), four for every other.
+fn draws_allowed(entry: &J) -> Result<usize, String> {
+    match entry.get("draws") {
+        None => Ok(DRAWS.1),
+        Some(v) => match v.num().map(|n| n.f()) {
+            Some(n) if n.fract() == 0.0 && (DRAWS.0 as f64..=8.0).contains(&n) => Ok(n as usize),
+            _ => Err(format!(
+                "`draws` is a whole number of draw calls, {} to 8 (one per finish group)",
+                DRAWS.0
+            )),
+        },
+    }
+}
+
 /// Reads and measures a model file of the manifests (`path`) with its entry: its size at rest, times `scale`.
 fn model(entry: &J, path: &str) -> R<Model> {
     let file = parse_glb(&std::fs::read(path).map_err(|e| py::os_error(&e, path))?)?;
-    let ((lo, hi), _) = bounds(&file.gltf, &HashMap::new())?;
+    // Its own size: what it carries (`ASIDE`) is drawn but isn't the piece of furniture.
+    let ((lo, hi), _) = bounds(&file.gltf, &HashMap::new(), &aside_nodes(&file.gltf))?;
     let fit = entry.get("fit").is_some_and(J::truthy);
     let scale = if fit {
         1.0
@@ -3897,6 +3988,47 @@ mod tests {
             .collect();
         assert_eq!(c.len(), read.entries().unwrap().len(), "a key twice");
         assert_eq!(centres_text(&c), text);
+    }
+
+    /// A model's carried decoration (`<name>_aside`: the picture on a chest of drawers) is drawn but left out of
+    /// its own size: the chest is 0.45 m tall, the picture stands 0.9 m above it.
+    #[test]
+    fn what_a_model_carries_is_drawn_but_not_its_size() {
+        let json = r#"{"asset": {"version": "2.0"}, "scenes": [{"nodes": [0, 1]}],
+            "nodes": [{"name": "body", "mesh": 0}, {"name": "picture_aside", "mesh": 0, "translation": [0, 0.9, 0]}],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+            "bufferViews": [{"byteOffset": 0, "byteLength": 36}],
+            "accessors": [{"bufferView": 0, "componentType": 5126, "type": "VEC3", "count": 3, "min": [0, 0, 0], "max": [0.5, 0.45, 0.5]}]}"#;
+        let bin: Vec<u8> = [0f32, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5]
+            .iter()
+            .flat_map(|c| c.to_le_bytes())
+            .collect();
+        let g = parse_glb(&glb::tests::glb(json, &bin)).unwrap();
+        let aside = aside_nodes(&g.gltf);
+        assert_eq!(aside, HashSet::from([1]), "the picture's node");
+        let ((_, drawn), _) = bounds(&g.gltf, &HashMap::new(), &HashSet::new()).unwrap();
+        assert!((drawn[1].f() - 1.35).abs() < 1e-6, "drawn {drawn:?}");
+        let ((lo, own), _) = bounds(&g.gltf, &HashMap::new(), &aside).unwrap();
+        assert!(lo[1].f().abs() < 1e-6, "own {lo:?}");
+        assert!((own[1].f() - 0.45).abs() < 1e-6, "own {own:?}");
+    }
+
+    /// A model may allow itself more draw calls than the four (the grandfather clock's trunk door is a fifth), and
+    /// only a whole number of them: nothing else goes.
+    #[test]
+    fn a_model_may_allow_itself_more_draws() {
+        let allowed = |json: &str| draws_allowed(&json::loads_text(json.as_bytes()).unwrap());
+        assert_eq!(
+            allowed(r#"{"type": "model"}"#),
+            Ok(DRAWS.1),
+            "four by default"
+        );
+        assert_eq!(allowed(r#"{"draws": 5}"#), Ok(5));
+        assert_eq!(allowed(r#"{"draws": 3}"#), Ok(3));
+        assert!(allowed(r#"{"draws": 2}"#).is_err(), "fewer than the aim");
+        assert!(allowed(r#"{"draws": 9}"#).is_err(), "past the eight");
+        assert!(allowed(r#"{"draws": 4.5}"#).is_err(), "a whole number");
+        assert!(allowed(r#"{"draws": "5"}"#).is_err(), "a number");
     }
 
     #[test]

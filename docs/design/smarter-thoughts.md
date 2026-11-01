@@ -1,7 +1,7 @@
 # Smarter thoughts (research)
 
-*Status: research note for 0.3.0. Nothing here ships in 0.3.0; the utility AI keeps deciding and
-saves keep their format.*
+*Status: research note for 0.3.0, measured on 2026-11-01 (§"What was measured"). Nothing here
+ships; the utility AI keeps deciding and saves keep their format.*
 
 Residents already think in fixed kinds: the planner records a `Thought` when a planned block is
 skipped or kept, a goal is reached, a room is loved or disliked, something breaks, a baby cries, or
@@ -92,9 +92,10 @@ existing `Command` enum reused. The model's text stays out of it.
 
 ## Cost and fallback
 
-- **One short call, not one per tick.** A resident makes an autonomous choice every few game
-  minutes at most; at normal speed that is seconds apart. Coalesce: one in flight per resident, and
-  no call while the resident is asleep, away, or already doing something the player asked for.
+- **One short call, not one per tick.** A resident has a shortlist to offer 0.75 times a game
+  hour (measured below), so a household of six asks for a call every ~13 s of play at speed 1,
+  ~4 s at speed 2 and 1.3 s at speed 3. Coalesce: one in flight per resident, and no call while
+  the resident is asleep, away, or already doing something the player asked for.
 - **Only the player's household and the inspected resident.** The same set that has full needs and
   plans in the snapshot (`talk/context.ts`), and the only ones whose thoughts are shown. Neighbours
   keep the utility AI.
@@ -111,19 +112,67 @@ existing `Command` enum reused. The model's text stays out of it.
 - **A manual "Voices › Language model" setting stays the switch.** If the player turned the model
   off, thoughts are not written either. Do not add a second download or a second worker.
 
-## What to measure before building it
+## What was measured (2026-11-01)
+
+The half of this that needs no model can be measured from the simulation alone: how often a
+resident decides, whether it has anything to decide between, and how much room a re-rank has to
+change anything. A temporary probe in `pick_autonomous` (`crates/sim-core/src/world.rs`, just
+before `ai::choose`) recorded every decision's candidate count and its top three scores;
+`common::town` (`crates/sim-core/tests/`) was run for three game days, seed 7, twenty residents
+(the same twenty at the end), free will on, no orders. The probe is not in the tree; the same
+numbers come back from the same run.
+
+| | |
+|---|---|
+| Decisions | 1,736 in three days: **1.21 per resident per game hour** |
+| … of which found nothing to choose | 664 (38 %) |
+| Decisions with a shortlist | 1,072: **0.75 per resident per game hour** |
+| Candidates | median 8, p90 61, most 91 |
+| The top score's share of the top three | median 0.45, p10 0.36, p90 0.74 (1,052 decisions had three) |
+| The top two within 10 % of each other | 223: 13 % of all decisions, **21 % of those with a shortlist** |
+
+What it means:
+
+- **The call rate is low, and the speed is what sets it.** 0.75 decisions with a shortlist per
+  resident per game hour is a household of six worth asking about about four times an hour. A game
+  hour is 60 real seconds at speed 1, 20 at speed 2 and 6 at speed 3 (`TICKS_PER_STEP`), so that
+  household asks for a call about once every 13 s of play at speed 1, every 4 s at speed 2, and
+  every 1.3 s at speed 3 — against the line writer's 3.5 s budget. A re-rank is affordable while
+  the player watches at speed 1 or 2; at speed 3 it must be rate-limited to one call in flight for
+  the household and everything else dropped, which is the "late answers are not inputs" rule doing
+  the work.
+- **Nearly two in five decisions have no shortlist at all.** Nothing scored above
+  `MIN_AUTONOMY_SCORE` (`world.rs`): the resident stands there, waits a game minute and looks
+  again. That is where the game looks stuck, and a re-rank cannot help — there is nothing to rank.
+  Whatever is done about those moments is a different change (content, access, reach), and it is
+  the more valuable one.
+- **The choice is usually not close.** Of the decisions with a shortlist, the top candidate takes
+  45 % of the top three's weight at the median and the second is more than 10 % behind in 79 %. A
+  re-rank has little to reorder: its value would be in the fifth of decisions that are close, and
+  in the choices that are dominant but implausible (the "eat at 3 a.m." problem), not in
+  correcting the ranking.
+- **The prompt's size is set by the rules, not the shortlist.** An interaction's label is 12
+  characters at the median and 43 at the longest (910 labels in the shipped content), an object's
+  name 12 and 25. Three candidate lines are about 200 characters; everything else in the packet is
+  the persona, the needs and the rubric, which the line writer already builds and caches.
+- **Nothing here says the re-rank is worth building.** Describing the utility AI's choice needs no
+  shortlist, no command and no timing: it can ride on the line writer as it is. The numbers above
+  say the re-rank is the expensive half and the least likely to change what the player sees.
+
+## What is left to measure
 
 1. **Latency**: cached prefill and one-letter decode for a 500–900 token decision prompt on the
    reference M3 Pro, and on a machine without WebGPU (the fallback must be the utility AI, not a
-   slow CPU call).
+   slow CPU call). The call rate above is what it has to keep up with: one call in ~13 s of play
+   at speed 1, ~4 s at speed 2.
 2. **Agreement**: how often the model's letter matches the utility AI's choice, and whether the
-   disagreements are plausible rather than destructive (the "eat at 3 a.m." problem).
-3. **Cost per game hour**: calls per resident per hour at normal speed, with coalescing, and the
-   share of frames affected. The line writer's watchdog already pauses voices when the model costs
-   too much; a decision loop needs the same guard, or it will compete with rendering.
-4. **Determinism**: replay a recorded session with the model on, then with it off and the accepted
+   disagreements are plausible rather than destructive. The 21 % of close decisions are where the
+   question lives; the other 79 % measure the model, not the re-rank.
+3. **Determinism**: replay a recorded session with the model on, then with it off and the accepted
    `Choose` commands replayed. The ticks must match. A stale command must be rejected, not applied
    to a different shortlist.
+4. **The watchdog's share**: the line writer pauses voices when the model costs too much; a
+   decision loop needs the same guard, and the two must not starve each other at speed 2 and up.
 
 ## What not to do
 

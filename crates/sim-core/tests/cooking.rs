@@ -3,6 +3,8 @@
 
 mod common;
 
+use common::interaction;
+
 use serde_json::json;
 use sim_core::items::ItemAt;
 use sim_core::social::EventKind;
@@ -114,14 +116,6 @@ fn ticks(w: &mut World, minutes: f32) {
         w.tick_once();
         common::check(w);
     }
-}
-
-fn interaction(w: &World, object: u32, id: &str) -> usize {
-    w.content.objects[w.objects[object as usize].def]
-        .interactions
-        .iter()
-        .position(|i| i.id == id)
-        .unwrap()
 }
 
 fn order(w: &mut World, sim: u32, object: u32, id: &str) {

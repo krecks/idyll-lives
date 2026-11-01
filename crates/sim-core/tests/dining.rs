@@ -4,6 +4,8 @@
 
 mod common;
 
+use common::interaction;
+
 use sim_core::content::Pose;
 use sim_core::path::NavGrid;
 use sim_core::surface::{DiningRank, Links, dining_seat, faced_table, spot_for_seat};
@@ -74,14 +76,6 @@ fn nav(w: &World) -> NavGrid<'_> {
 
 fn table_of(w: &World, seat: u32) -> Option<u32> {
     faced_table(&w.content, &w.objects, &nav(w), seat)
-}
-
-fn interaction(w: &World, object: u32, id: &str) -> usize {
-    w.content.objects[w.objects[object as usize].def]
-        .interactions
-        .iter()
-        .position(|i| i.id == id)
-        .unwrap()
 }
 
 #[test]

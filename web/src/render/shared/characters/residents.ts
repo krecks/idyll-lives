@@ -54,7 +54,7 @@ import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
 import { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, withCutlery } from './actions';
+import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, withCutlery } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { FLOOR_SITS } from './clips/seated';
 import { HANDED } from './clips/serve';
@@ -650,6 +650,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         walkDown: false,
         toweled: -1,
         shower: null,
+        doorHand: 0,
         sitX: 0,
         sitZ: 0,
         inside: null,
@@ -1409,7 +1410,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
    * (one 4x4 per Sim row) are written into `shadows`.
    */
   /** `storey`: the storey in view; residents above it (or, viewing the basement, not in it) aren't drawn. */
-  update(frame: FrameState, inView: (x: number, z: number) => boolean, shadows: Float32Array, storey = Infinity): void {
+  update(frame: FrameState, inView: (x: number, z: number) => boolean, shadows: Float32Array, storey = Infinity, doorHand?: Float32Array): void {
     this.restTaken.clear();
     this.seedCount = 0;
     const set = this.set;
@@ -1489,6 +1490,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const o = H + i * S;
       const cx = curr[o + k.x];
       const cz = this.groundRow(curr[o + k.z]);
+      // The hand out to a door's handle (the renderer's `doorHand`: the leaf's swing is timed to it).
+      if (rig) rig.doorHand = doorHand ? doorHand[i] : 0;
       const pz = this.groundRow(prev[o + k.z]);
       const ch = k.height !== undefined ? curr[o + k.height] : 0;
       let tx = cx;
@@ -1618,7 +1621,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       if (pose !== Pose.Sit) rig.shadeYaw = NaN;
       // Up against a thing at a lane, squared to it (`StepIn.square`).
       // (From the side they use it from: `sides`, the foosball's far player facing the near one.)
-      if (pose === Pose.Stand && useObj && STEP_IN[useObj.def]?.square) faceYaw = wrapAngle(this.stepFacing(rig, useObj, STEP_IN[useObj.def]) + Math.PI);
+      const squared = pose === Pose.Stand && useObj ? stepInFor(useObj.def, rig.tag) : undefined;
+      if (useObj && squared?.square) faceYaw = wrapAngle(this.stepFacing(rig, useObj, squared) + Math.PI);
       // Cuddling: turned to the baby in the crib.
       const cuddled = rig.cuddleT >= 0 && rig.cuddleBaby >= 0 ? this.sims[rig.cuddleBaby] : null;
       if (cuddled) faceYaw = Math.atan2(curr[H + cuddled.id * S + k.x] - rig.x, this.groundRow(curr[H + cuddled.id * S + k.z]) - rig.z);
@@ -2101,7 +2105,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       rig.useObj = obj ?? null;
       // Used from inside or up against it (`STEP_IN`): the clip for their height.
       // (With every lane taken by others, from where sim-core stood them: three at the bus stop's timetable.)
-      const entry = known && obj && (!STEP_IN[obj.def]?.tag || STEP_IN[obj.def].tag === tag) ? STEP_IN[obj.def] : undefined;
+      const entry = known && obj ? stepInFor(obj.def, tag) : undefined;
       const into = entry && obj && (rig.inside === entry || !Number.isNaN(this.freeLane(rig, entry, obj))) ? entry : undefined;
       const fitted = into && obj ? this.stepSeq(rig, into, obj) : undefined;
       // (Bouncing and vibrating on the equipment, content `stand`: the idle with `activityPose` on top.)
@@ -2140,9 +2144,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         key = seq[rig.seq % seq.length];
         repeat = true;
         // Up to the crib's rail to pick the baby up, back from it holding them (`cuddles`).
+        // (Stepped in to a thing, `stepIn` places them: a reach as well would add to it, and walk them into the thing.)
         if (tag === 'cuddle') {
           reach = rig.cuddleStep;
           reachRate = 6;
+        } else if (into) {
+          // (`stepIn`, below.)
         } else if (obj && STAND_BACK[obj.def]) {
           // Back from the door it opens (or in to a small thing), eased like the hug's approach.
           reach = -STAND_BACK[obj.def];
@@ -2884,6 +2891,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         addRotation(add, B.pelvis, 0, 0, 1, roll);
         addRotation(add, B.spine_02, 0, 0, 1, -roll * 0.7);
         addRotation(add, B.spine_03, 0, 0, 1, -roll * 0.4);
+      }
+      // A hand on a door's handle: as the leaf starts to swing, the right arm comes out and across to
+      // the handle's height, and goes down again once they're through (`doorHand`: the leaf's swing is
+      // timed to the hand, so the door opens as it touches it). Not with both arms taken: a baby in the
+      // arms, something held.
+      const door = moving && rig.carryT < 0 && rig.liftW <= 0 ? rig.doorHand : 0;
+      if (door > 0.01) {
+        addRotation(add, B.upperarm_r, 0, 0, 1, -0.16 * door);
+        addRotation(add, B.upperarm_r, 1, 0, 0, -1.02 * door);
+        addRotation(add, B.lowerarm_r, 1, 0, 0, -0.32 * door);
+        addRotation(add, B.spine_03, 0, 1, 0, -0.07 * door);
       }
       if (!dir?.still) {
         // Breathing (a slow lift of the chest, the head kept level; quicker when worked up) and a

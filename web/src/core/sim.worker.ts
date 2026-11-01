@@ -251,6 +251,7 @@ function publish(): void {
   const version = g.structure_version();
   // (Before the world, which the renderer builds with them.)
   const lights = g.lights_version();
+  // (A light that follows a use, a hood over a hob, bumps the version as it comes on or goes off.)
   if (version !== lastStructure || lights !== lastLights) {
     lastLights = lights;
     scope.postMessage({ type: 'lamps', off: JSON.parse(g.lamps_off()) });

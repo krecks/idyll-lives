@@ -1,7 +1,10 @@
 //! Skills, jobs by grade, rent and bills, the day/night rhythm, and build/buy on a small town.
 
+mod common;
+
+use common::run_to;
 use sim_core::social::EventKind;
-use sim_core::{Command, World, clock, life};
+use sim_core::{Command, World, life};
 
 const CONTENT: &str = r#"{
     "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.02},
@@ -40,13 +43,6 @@ const TOWN: &str = r#"{"width":12,"depth":12,
 
 fn world() -> World {
     World::from_json(CONTENT, TOWN, 1).unwrap()
-}
-
-fn until(w: &mut World, day: u32, hour: f32) {
-    let target = clock::tick_at(day, hour * 60.0).unwrap();
-    while w.tick < target {
-        w.tick_once();
-    }
 }
 
 #[test]
@@ -110,7 +106,7 @@ fn work_trains_skills_and_promotion_waits_for_them() {
         level: 0,
     })
     .unwrap();
-    until(&mut w, 4, 14.0);
+    run_to(&mut w, 4, 14.0);
     let s = &w.sims[0];
     assert!(
         s.skills[1] > 0.3,
@@ -129,7 +125,7 @@ fn work_trains_skills_and_promotion_waits_for_them() {
     w.sims[0].skills = [
         1.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
     ];
-    until(&mut w, 5, 14.0);
+    run_to(&mut w, 5, 14.0);
     assert_eq!(
         w.sims[0].job.as_ref().unwrap().level,
         1,
@@ -164,7 +160,7 @@ fn training_objects_raise_skills_and_cost_needs() {
 fn two_sims_share_a_double_bed_and_sleep_until_morning() {
     let mut w = world();
     w.autonomy = false;
-    until(&mut w, 1, 22.0);
+    run_to(&mut w, 1, 22.0);
     for sim in 0..2 {
         w.sims[sim as usize].needs[1] = 0.7;
         w.apply(Command::Use {
@@ -174,12 +170,12 @@ fn two_sims_share_a_double_bed_and_sleep_until_morning() {
         })
         .unwrap();
     }
-    until(&mut w, 2, 5.0);
+    run_to(&mut w, 2, 5.0);
     assert_eq!(w.objects[0].users().count(), 2);
     assert_ne!(w.sims[0].pos, w.sims[1].pos, "each on their own side");
     // Energy is full, but it's still night: they stay in bed.
     assert!(w.sims[0].needs[1] > 0.99);
-    until(&mut w, 2, 7.1);
+    run_to(&mut w, 2, 7.1);
     assert!(!w.objects[0].in_use(), "up in the morning");
 }
 
@@ -189,7 +185,7 @@ fn rent_and_bills_are_charged_weekly_and_debt_hurts() {
     w.autonomy = false;
     // Rent: 100 + 1 per tile of the 12×10 plot. Bills: 20 + 10% of the $1,500 of furniture.
     assert_eq!(life::weekly_costs(&w, 0), Some((220, 170)));
-    until(&mut w, 7, 12.5);
+    run_to(&mut w, 7, 12.5);
     assert_eq!(w.households[0].funds, 1000 - 390);
     assert!(
         w.events
@@ -197,7 +193,7 @@ fn rent_and_bills_are_charged_weekly_and_debt_hurts() {
             .any(|e| e.kind == EventKind::PaidRent && e.n == Some(390))
     );
     w.households[0].funds = 50;
-    until(&mut w, 14, 12.5);
+    run_to(&mut w, 14, 12.5);
     assert_eq!(w.households[0].funds, -340);
     assert!(w.events.iter().any(|e| e.kind == EventKind::RentDebt));
     assert!(!w.sims[0].feelings.is_empty(), "worried about money");

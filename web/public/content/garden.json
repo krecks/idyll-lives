@@ -934,6 +934,27 @@
             "outdoors"
           ],
           "feeling": "garden.sweetScent"
+        },
+        {
+          "id": "cut",
+          "label": "Cut some tulips",
+          "anim": "tend",
+          "minutes": 6,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.06,
+            "hygiene": -0.03
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "cutFlowers"
         }
       ]
     },
@@ -980,6 +1001,27 @@
             "outdoors"
           ],
           "feeling": "garden.sweetScent"
+        },
+        {
+          "id": "cut",
+          "label": "Cut some daffodils",
+          "anim": "tend",
+          "minutes": 6,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.06,
+            "hygiene": -0.03
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "cutFlowers"
         }
       ]
     },
@@ -1026,6 +1068,48 @@
             "outdoors"
           ],
           "feeling": "garden.sweetScent"
+        },
+        {
+          "id": "cut",
+          "label": "Cut some daisies",
+          "anim": "tend",
+          "minutes": 6,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.06,
+            "hygiene": -0.03
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "cutFlowers"
+        },
+        {
+          "id": "daisyChain",
+          "label": "Make a daisy chain",
+          "anim": "tend",
+          "minutes": 12,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.15,
+            "comfort": 0.05
+          },
+          "tags": [
+            "nature",
+            "garden",
+            "outdoors",
+            "cozy"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "daisyChain"
         }
       ]
     },
@@ -1253,6 +1337,27 @@
             "outdoors"
           ],
           "feeling": "garden.sweetScent"
+        },
+        {
+          "id": "cut",
+          "label": "Cut some lilies",
+          "anim": "tend",
+          "minutes": 6,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.06,
+            "hygiene": -0.03
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "cutFlowers"
         }
       ]
     },
@@ -1390,6 +1495,27 @@
             "outdoors"
           ],
           "feeling": "garden.sweetScent"
+        },
+        {
+          "id": "cut",
+          "label": "Cut some cosmos",
+          "anim": "tend",
+          "minutes": 6,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.06,
+            "hygiene": -0.03
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "cutFlowers"
         }
       ]
     },

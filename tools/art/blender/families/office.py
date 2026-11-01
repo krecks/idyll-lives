@@ -558,7 +558,10 @@ def computerDesk():
         # the runners the keyboard tray hangs from
         for x in (-0.18, 0.5):
             F.box(f'runner{x}', 0.015, 0.055, 0.32, (x, 0.69, 0.25), M.frame, bevel=0.003, bevel_segments=1)
-        # the monitor, facing the resident; its back to the room
+    G.join(still, 'computerDesk', origin=(0, 0, 0))
+    # the monitor on it, facing the resident, the mug, lamp, cactus, notebook and pen, and the chair drawn at
+    # it: not part of the desk's size (the monitor stands 1.21 m up, the desk's own top 0.75)
+    with G.new_parts() as carried:
         _monitor('monitor', 0.05, 0.4, 0.62, 0.37, 1.03, M.monitor, M.screen, M.wallpaper, face=-1, foot=(0.22, 0.14))
         F.sweep('monitor_cable', [(0.05, 0.86, 0.44), (0.08, 0.78, 0.443), (0.2, FT + 0.004, 0.435), (0.3, FT + 0.004, 0.43)],
                 0.003, M.pen, verts=5, resolution=3)
@@ -568,7 +571,7 @@ def computerDesk():
         _notebook('notebook', -0.3, FT, 0.26, 0.2, 0.26, 0.015, M.notebook, turn=12)
         _pen('pen', -0.27, FT + 0.015, 0.24, 60)
         _desk_chair(M.chair)
-    G.join(still, 'computerDesk', origin=(0, 0, 0))
+    G.aside(carried, 'carried')
     # the keyboard tray: under the top, sliding 15 cm out to the resident
     with G.new_parts() as parts:
         F.box('tray', 0.66, 0.012, 0.3, (0.16, 0.655, 0.25), M.tray, bevel=0.004, bevel_segments=1)
@@ -589,6 +592,10 @@ def deskWriting():
         _top(1.54)
         _desk_frame(1.54, gap=(-0.1, 0.4))
         F.box('drawer_rails', 0.52, 0.01, 0.38, (0.15, 0.662, 0.24), M.frame)
+    G.join(still, 'deskWriting', origin=(0, 0, 0))
+    # what lies on it and the chair drawn at it: part of the picture, not of the desk's size (a desk is
+    # 1.54 x 0.75 x 0.87 m with its chair's back and the lamp standing over it)
+    with G.new_parts() as carried:
         for k, (x, z, turn, dy) in enumerate(((-0.12, 0.2, 8, 0.0015), (-0.1, 0.22, -4, 0.0045), (-0.13, 0.19, 15, 0.0075))):
             F.box(f'paper{k}', 0.3, 0.003, 0.21, (x, FT + dy, z), M.paper, rot=(0, 0, turn))
         for j in range(5):   # writing on the top sheet
@@ -598,7 +605,7 @@ def deskWriting():
             _notebook(f'notebook{k}', 0.45, FT + 0.025 * k, 0.26, 0.2, 0.27, 0.025, m, turn=6 * k - 3)
         _desk_lamp(-0.57, 0.36)
         _desk_chair(M.chair_sage)
-    G.join(still, 'deskWriting', origin=(0, 0, 0))
+    G.aside(carried, 'carried')
     # the drawer: a front with a turned knob and a box of letters and pencils, sliding out to the resident
     with G.new_parts() as parts:
         _front('drawer', 0.5, 0.05, 0.15, 0.69, 0.051, M.drawers)
@@ -633,13 +640,16 @@ def deskLaptop():
         _laptop_keys(0.02, FT + 0.012, 0.25)
         F.box('laptop_pad', 0.1, 0.0006, 0.06, (0.02, FT + 0.0123, 0.14), M.pad)
         F.cyl('laptop_hinge', 0.004, 0.24, (0.02, FT + 0.012, 0.309), M.pad, rot=(0, 90, 0), verts=8)
+    G.join(still, 'deskLaptop', origin=(0, 0, 0))
+    # the mug, notebook, pen and charger on it, and the chair drawn at it: not part of the desk's size
+    with G.new_parts() as carried:
         _mug(0.32, 0.36)
         _notebook('notebook', -0.28, FT, 0.28, 0.18, 0.24, 0.012, M.notebook, turn=-10)
         _pen('pen', -0.27, FT + 0.012, 0.27, 70)
         F.sweep('charger', [(0.18, FT + 0.006, 0.26), (0.24, FT + 0.004, 0.3), (0.3, FT + 0.004, 0.42), (0.33, FT + 0.004, 0.45)],
                 0.0025, M.pen, verts=4, resolution=3)
         _desk_chair(M.chair)
-    G.join(still, 'deskLaptop', origin=(0, 0, 0))
+    G.aside(carried, 'carried')
     # the lid, shut on the base, hinged along the base's far edge
     with G.new_parts() as parts:
         F.box('lid', 0.32, 0.007, 0.22, (0.02, FT + 0.0165, 0.2), M.aluminium, bevel=0.003, bevel_segments=1)
@@ -1146,13 +1156,16 @@ FAMILY = G.Family(
      G.Model('deskExecutive', deskExecutive, size=(1.8, 0.754, 0.771), key='model.deskExecutive', centre=(0, -0.0445),
              paint=[('walnut', 'Top'), ('walnut_case', 'Frame'), ('walnut2', 'Drawers'), ('brass', 'Handles'),
                     ('inlay', 'Desk pad')]),
-     G.Model('computerDesk', computerDesk, size=(1.54, 1.215, 0.872), key='model.computerDesk', centre=(0, 0.0142),
+     # its own size: the monitor, the things on it and the chair at it are not measured
+     G.Model('computerDesk', computerDesk, size=(1.54, 0.752, 0.391), key='model.computerDesk', centre=(0, 0.0142),
              motions=TYPE,
              paint=[('oak', 'Top'), *DESK, ('tray', 'Keyboard tray'), ('chair', 'Chair')]),
-     G.Model('deskWriting', deskWriting, size=(1.54, 1.114, 0.872), key='model.deskWriting', centre=(0, 0.0142),
+     # its own size: the chair drawn at it and what lies on it are not measured (a desk is 0.75 m tall)
+     G.Model('deskWriting', deskWriting, size=(1.54, 0.752, 0.433), key='model.deskWriting', centre=(0, 0.0142),
              motions={'uses': {'write': 'drawer_open', 'homework': 'drawer_open'}, 'hold': 2.5},
              paint=[('oak', 'Top'), *DESK, ('chair_sage', 'Chair')]),
-     G.Model('deskLaptop', deskLaptop, size=(0.9, 1.009, 0.872), key='model.deskLaptop', centre=(0, 0.0142),
+     # its own size: the chair at it and what lies on it are not measured
+     G.Model('deskLaptop', deskLaptop, size=(0.9, 0.773, 0.429), key='model.deskLaptop', centre=(0, 0.0142),
              motions={'uses': {u: 'lid_open' for u in ('browse', 'code', 'write', 'homework')}},
              paint=[('oak', 'Top'), ('frame', 'Frame'), ('drawers', 'Drawer'), ('aluminium', 'Laptop'),
                     ('chair', 'Chair')]),

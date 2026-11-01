@@ -98,8 +98,8 @@ fn the_sofa_bed_is_measured_held_open_where_furniture_json_has_it() {
     );
 }
 
-/// What `cargo review sizes` measures besides, on the pilot's cases: a crib's mattress at slot 0 (not its changing
-/// pad), the top of a workbench and a sink the content gives none, the dining table without its chairs (what is
+/// What `cargo review sizes` measures besides, on the pilot's cases: a crib's mattress at slot 0, its middle (not
+/// its changing pad), the top of a workbench and a sink the content gives none, the dining table without its chairs (what is
 /// left over its top is the vase's flowers) and the stairs' top step.
 #[test]
 fn the_review_measures_the_pilots_cases() {
@@ -117,7 +117,9 @@ fn the_review_measures_the_pilots_cases() {
         .iter()
         .find(|h| h.what == "mattress")
         .unwrap();
-    assert_eq!(crib.at[0], -0.5, "slot 0");
+    // The middle: a baby is put at the crib's centre (sim-core `place_at`), not spread across its width, so
+    // slot 1's changing pad is not read as a second mattress.
+    assert_eq!(crib.at, [0.0, 0.0], "slot 0");
     assert!((crib.mesh.unwrap() - 0.56).abs() < 0.01, "{:?}", crib.mesh);
     let (_, workbench) = of("workbench").top.unwrap();
     // A standing height since G-29 (review M-hobbies-01: it was a desk at 0.78).

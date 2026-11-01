@@ -12,6 +12,7 @@
 
 import type { Appearance } from '../../../game/household';
 import type { BodyData, GarmentCut } from './data';
+import { SHIRT } from './layout';
 
 const TROUSERS = ['#33415C', '#2B2D33', '#4A5568', '#B9A27E', '#6B5A48', '#3E4A3A', '#E8E2D6', '#5C3B3B'];
 const SKIRTS = ['#2B2D33', '#5C3B3B', '#33415C', '#7A6A8E', '#B9A27E', '#3E4A3A'];
@@ -26,6 +27,12 @@ const BOTTOMS: Record<string, readonly string[]> = {
   male: ['bottom.trousers', 'bottom.trousers', 'bottom.trousers', 'bottom.shorts', 'bottom.suit'],
 };
 const SHOE_PARTS = ['shoes.sneakers', 'shoes.sneakers', 'shoes.trainers', 'shoes.boots', 'shoes.dress'] as const;
+/**
+ * Workwear: worn by the lot's staff (`game/staff.ts`), never picked for a resident. A server's apron is one
+ * garment with two parts: the white shirt painted on the body under it (its cut is the shirt's; `SHIRT.apron`) and
+ * the apron itself a shell over the front in the top's colour (clothes.rs `apron`).
+ */
+export const WORKWEAR = ['top.apron'] as const;
 /**
  * What a baby wears for a skirt: shorts in the top's colour, one piece. A skirt's shell can't follow
  * a baby's legs, drawn up and fallen apart in the crib or in someone's arms.
@@ -66,7 +73,7 @@ export interface OutfitParams {
   shoe: [number, number, number];
   /** 1 if the top is painted over the bottom (its hem below the waistband), else 0. */
   over: number;
-  /** What shows in an open jacket's V (`SHIRTS`; 0: none, the top's own colour). */
+  /** What shows in an open jacket's V (layout.ts `SHIRT`; 0: none, the top's own colour; an apron's: the whole top white). */
   shirt: number;
   /** Its neck line (m, the base body's height; `OutfitFit.neck`): the shirt shows below it, above it only its collar. */
   neck: number;
@@ -125,14 +132,12 @@ function skinColour(hex: string | undefined): [number, number, number] {
 
 const OFF = -10;
 
-/** What shows in an open jacket's V (`OutfitParams.shirt`; their colours are material.ts `SHIRTS`). */
-const SHIRTS = { white: 1, charcoal: 2, grey: 3 } as const;
-
-/** The shirt under `topPart` in `top` (linear): a suit's is white, a jacket's a tee that stands out from it. */
+/** The shirt under `topPart` in `top` (linear): a suit's is white, a jacket's a tee that stands out from it, an apron's white. */
 function shirtUnder(topPart: string, top: readonly number[], r: number): number {
-  if (topPart === 'top.suit') return SHIRTS.white;
+  if (topPart === 'top.apron') return SHIRT.apron;
+  if (topPart === 'top.suit') return SHIRT.white;
   if (topPart !== 'top.jacket') return 0;
-  return luminance(top) > 0.2 ? SHIRTS.charcoal : r < 0.5 ? SHIRTS.white : SHIRTS.grey;
+  return luminance(top) > 0.2 ? SHIRT.charcoal : r < 0.5 ? SHIRT.white : SHIRT.grey;
 }
 
 /**

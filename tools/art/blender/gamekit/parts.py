@@ -82,6 +82,25 @@ def turn(obj, degrees, axis='X'):
     return obj
 
 
+# What a model draws but isn't its own size: the chair at a desk, the picture on a chest of drawers, the
+# blocks left out in front of a toy box, the flag on a climbing frame, the block and bottle beside a rolled
+# mat. `G.aside` joins them into one node named `<what>_aside`; they are drawn and exported as usual, and
+# left out of the size (`check_size` here, `cargo check-glb`'s `model()`: docs/design/objects.md, "Scale, axes,
+# origin and footprint").
+ASIDE = '_aside'
+
+
+def aside(parts, name):
+    """Joins `parts` into the one object the model draws that isn't part of its size (`ASIDE`)."""
+    return join(parts, name + ASIDE)
+
+
+def own(objs=None):
+    """The model's own meshes: every mesh but the `aside` ones (default: every mesh)."""
+    objs = objs if objs is not None else meshes()
+    return [o for o in objs if not o.name.endswith(ASIDE)]
+
+
 def measure(objs=None):
     """(lo, hi): the Blender world bounds of `objs` (default: every mesh), modifiers included."""
     objs = objs if objs is not None else meshes()
@@ -100,7 +119,11 @@ def measure(objs=None):
 
 def game_size(objs=None):
     """(width, height, depth) in metres, the game's way round."""
-    lo, hi = measure(objs)
+    return _extent(*measure(objs))
+
+
+def _extent(lo, hi):
+    """(width, height, depth) of the Blender bounds `lo`..`hi`, the game's way round."""
     return hi[0] - lo[0], hi[2] - lo[2], hi[1] - lo[1]
 
 
@@ -134,8 +157,12 @@ def check_size(size, tolerance=0.02, objs=None, name='model', centre=(0.0, 0.0),
     that stands off the middle of its tiles. `floor=False` skips the floor: for a thing on a wall, built
     at its real height. Returns the measured size.
     """
+    objs = objs if objs is not None else meshes()
     lo, hi = measure(objs)
-    got = game_size(objs)
+    drawn = _extent(lo, hi)
+    # The size is the model's own: what it carries (`G.aside`) is drawn but isn't the piece of furniture.
+    mine = own(objs)
+    got = drawn if len(mine) == len(objs) else game_size(mine)
     # What it measures, said when a check fails, so `size` and `centre=` can be copied from it.
     measured = (f'measured {got[0]:.3f} x {got[1]:.3f} x {got[2]:.3f} m (w x h x d), '
                 f'centred on game ({-(lo[0] + hi[0]) / 2:.4f}, {-(lo[1] + hi[1]) / 2:.4f}) (x, depth)')
@@ -149,7 +176,9 @@ def check_size(size, tolerance=0.02, objs=None, name='model', centre=(0.0, 0.0),
     if floor:
         assert abs(lo[2]) <= 0.002, f'{name}: bottom {lo[2] * 100:.1f} cm off the floor (G.settle)'
     where = 'centred' if centre == (0.0, 0.0) else f'centred on game ({centre[0]:g}, {centre[1]:g})'
-    print(f'[gamekit] {name} {got[0]:.3f} x {got[1]:.3f} x {got[2]:.3f} m (w x h x d), {where}, on the floor')
+    carried = '' if drawn == got else (f'; drawn with what it carries, '
+                                     f'{drawn[0]:.3f} x {drawn[1]:.3f} x {drawn[2]:.3f} m')
+    print(f'[gamekit] {name} {got[0]:.3f} x {got[1]:.3f} x {got[2]:.3f} m (w x h x d), {where}, on the floor{carried}')
     return got
 
 

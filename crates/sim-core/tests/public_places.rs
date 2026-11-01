@@ -6,6 +6,8 @@
 
 mod common;
 
+use common::interaction;
+
 use std::collections::{BTreeSet, VecDeque};
 
 use serde_json::{Value, json};
@@ -267,14 +269,6 @@ fn object(w: &World, id: &str) -> u32 {
         .find(|o| w.content.objects[o.def].id == id)
         .unwrap_or_else(|| panic!("a {id}"))
         .id
-}
-
-fn interaction(w: &World, object: u32, id: &str) -> usize {
-    w.content.objects[w.objects[object as usize].def]
-        .interactions
-        .iter()
-        .position(|i| i.id == id)
-        .unwrap()
 }
 
 fn minutes(w: &mut World, n: u32) {
@@ -701,6 +695,48 @@ fn a_vendor_serves_an_ice_cream() {
     );
 }
 
+/// A vendor comes in at the lot's door when their stall opens and walks out to it at closing: drawn
+/// walking from the door to the post (not standing there before), and gone once they're back at the
+/// door.
+#[test]
+fn a_vendor_walks_in_at_opening_and_out_at_closing() {
+    let (mut w, park) = town_beside("park");
+    w.autonomy = false;
+    let cart = object(&w, "iceCreamCart");
+    minutes(&mut w, 1);
+    let k = w.staff.server_of(cart).unwrap();
+    let door = w.plots[park as usize].arrival_point();
+    let post = sim_core::staff::place(&w.content, &w.objects[cart as usize])
+        .unwrap()
+        .0;
+    assert_eq!(w.staff.servers[k].home, door, "in at the park's door");
+    assert_eq!(staff_row(&w, k).1[sim::AWAY], 1.0, "nobody before ten");
+    assert_eq!(w.staff.servers[k].pos, door, "home is the door");
+    // The door opens: they're there, and on the way over rather than at the cart already.
+    until(&mut w, 9.98);
+    let mut steps = 0;
+    while staff_row(&w, k).1[sim::AWAY] != 0.0 && steps < 5 * TICKS_PER_MINUTE {
+        w.tick_once();
+        steps += 1;
+    }
+    assert_eq!(staff_row(&w, k).1[sim::AWAY], 0.0, "in at ten");
+    assert_ne!(
+        w.staff.servers[k].pos, post,
+        "walking over from the door, not standing at the cart"
+    );
+    let mut arrived = false;
+    for _ in 0..10 * TICKS_PER_MINUTE {
+        w.tick_once();
+        arrived |= w.staff.servers[k].pos == post;
+    }
+    assert!(arrived, "and at the cart a few minutes later");
+    // Shut: out to the door, and gone once there.
+    until(&mut w, 21.5);
+    assert_eq!(staff_row(&w, k).1[sim::AWAY], 1.0, "gone at 21:30");
+    assert_eq!(w.staff.servers[k].pos, door, "home again, at the door");
+    assert!(!w.staff.servers[k].moving, "and not walking anywhere");
+}
+
 /// Before the cart opens (10:00) and after it closes (20:00) nobody's there: the order is refused,
 /// saying when it opens, and a hungry resident doesn't go for one; the snack machine still sells.
 #[test]
@@ -760,8 +796,9 @@ fn off_shift_the_cart_is_closed() {
     .expect("machines sell all night");
 }
 
-/// At the café the barista keeps the counter and the coffee machine: a coffee ordered steps them
-/// over to the machine; once the café shuts, *Have a coffee* at a table is refused.
+/// At the café the barista comes in at the door and keeps the counter and the coffee machine: a
+/// coffee ordered steps them over to the machine; once the café shuts, *Have a coffee* at a table is
+/// refused.
 #[test]
 fn the_barista_steps_over_to_the_machine_and_the_cafe_closes() {
     let (mut w, cafe) = town_beside("cafe");
@@ -772,9 +809,21 @@ fn the_barista_steps_over_to_the_machine_and_the_cafe_closes() {
     let home = sim_core::staff::place(&w.content, &w.objects[counter as usize])
         .unwrap()
         .0;
-    assert_eq!(
+    let door = w.plots[cafe as usize].arrival_point();
+    assert_ne!(
         w.staff.servers[k].pos, home,
-        "at the counter when the café opens"
+        "a minute in, on the way from the door ({door:?}) to the counter"
+    );
+    assert_eq!(staff_row(&w, k).1[sim::AWAY], 0.0, "and drawn walking in");
+    let mut arrived = false;
+    for _ in 0..10 * TICKS_PER_MINUTE {
+        w.tick_once();
+        arrived |= w.staff.servers[k].pos == home;
+    }
+    assert!(
+        arrived,
+        "at the counter a few minutes after the café opens (in at the door, {door:?}; now at {:?})",
+        w.staff.servers[k].pos
     );
     let chair = w
         .objects

@@ -155,11 +155,7 @@ fn on_a_turned_lot_they_get_into_bed_from_the_free_side() {
     let content = common::content();
     let mut w = World::from_json(&content, &town(true), 3).unwrap();
     w.autonomy = false;
-    let sleep = w.content.objects[w.objects[BED as usize].def]
-        .interactions
-        .iter()
-        .position(|i| i.id == "sleep")
-        .unwrap();
+    let sleep = common::interaction(&w, BED, "sleep");
     w.apply(Command::Use {
         sim: 0,
         object: BED,

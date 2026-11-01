@@ -21,6 +21,7 @@
     "devices:llm": "bun ../tools/llm/devices.mjs",
     "check:clips": "bun ../tools/characters/check_clips.ts --body all --stage all",
     "check:chunks": "bun ../tools/render/check_chunks.ts",
+    "sounds": "bun ../tools/audio/listen.ts",
     "assets": "bun ../tools/assets/optimize.mjs",
     "decoders": "cd .. && cargo decoders"
   },

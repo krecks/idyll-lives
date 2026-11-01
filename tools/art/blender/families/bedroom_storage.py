@@ -526,19 +526,22 @@ def dresser():
             _pull(f'pull_top{s}', s * 0.35, 0.75, front + 0.02, 0.1, M.brass, out=0.014)
             _pull(f'pull_low{s}', s * 0.35, 0.27, front + 0.02, 0.1, M.brass, out=0.014)
         _front('drawer_low', 1.36, 0.2, 0, 0.24, front + 0.01, M.oak)
-        # on top: a framed picture on its easel, a turned vase and a box with a lid
-        F.extrude('picture_frame', G.rounded_rect(0.36, 0.46, 0.004, corner=1), 0.03, (0.32, 1.12, -0.3), M.frame,
-                  holes=[G.rounded_rect(0.27, 0.37, 0.004, corner=1)], bevel=0.006, bevel_segments=2, rot=(-6, 0, 0))
-        F.box('picture', 0.268, 0.368, 0.006, (0.32, 1.12, -0.29), M.print1, rot=(-6, 0, 0))
-        F.box('picture_easel', 0.04, 0.3, 0.01, (0.32, 1.0, -0.36), M.frame, rot=(18, 0, 0))
+        _gap('drawer', 1.36, 0.2, 0, 0.48, front, M.ebony)
+    G.join(still, 'dresser', origin=(0, 0, 0))
+    # what stands on the top: a framed picture on its easel, a turned vase and a box with a lid. Drawn with the
+    # dresser, not part of its size (the chest of drawers is 0.89 m tall; the picture stands 0.46 m above it).
+    with G.new_parts() as carried:
         G.revolve('vase', [(0, 0), (0.042, 0), (0.046, 0.006), (0.06, 0.06), (0.05, 0.15), (0.027, 0.195),
                            (0.026, 0.21), (0.034, 0.22), (0.022, 0.222), (0.02, 0.17), (0, 0.17)],
                   at=F.at(-0.45, 0.89, -0.2), material=M.vase, segments=18)
         F.soft('jewellery_box', 0.22, 0.055, 0.16, (-0.12, 0.9175, -0.16), M.pull, round=0.008, round_segments=1)
         F.soft('jewellery_lid', 0.226, 0.018, 0.166, (-0.12, 0.951, -0.16), M.pull, round=0.007, round_segments=1)
         F.box('jewellery_clasp', 0.024, 0.02, 0.004, (-0.12, 0.94, -0.078), M.brass, bevel=0.0015, bevel_segments=1)
-        _gap('drawer', 1.36, 0.2, 0, 0.48, front, M.ebony)
-    G.join(still, 'dresser', origin=(0, 0, 0))
+        F.extrude('picture_frame', G.rounded_rect(0.36, 0.46, 0.004, corner=1), 0.03, (0.32, 1.12, -0.3), M.frame,
+                  holes=[G.rounded_rect(0.27, 0.37, 0.004, corner=1)], bevel=0.006, bevel_segments=2, rot=(-6, 0, 0))
+        F.box('picture', 0.268, 0.368, 0.006, (0.32, 1.12, -0.29), M.print1, rot=(-6, 0, 0))
+        F.box('picture_easel', 0.04, 0.3, 0.01, (0.32, 1.0, -0.36), M.frame, rot=(18, 0, 0))
+    G.aside(carried, 'onTop')
     drawer = _drawer('drawer', 1.36, 0.2, 0, 0.48, front, 0.44, M.oak,
                      pulls=[(_pull, (f'pull_mid{s}', s * 0.35, 0.51, front + 0.02, 0.1, M.brass, 0.006, 0.014))
                             for s in (-1, 1)],
@@ -776,7 +779,8 @@ FAMILY = G.Family(
      G.Model('benchBedEnd', benchBedEnd, size=(1.6, 0.471, 0.42), key=_key('benchBedEnd'),
              paint=[('brass', 'Frame'), ('olive', 'Cushion')]),
      # BR3: each opens while a resident picks an outfit
-     G.Model('dresser', dresser, size=(1.44, 1.349, 0.54), key=_key('dresser'), centre=(0, -0.16),
+     # its own size: the picture, vase and jewellery box it carries stand on it (0.89 m is the chest itself)
+     G.Model('dresser', dresser, size=(1.44, 0.89, 0.54), key=_key('dresser'), centre=(0, -0.16),
              motions=CHANGE_DRAWER, paint=[('oak', 'Body'), ('brass', 'Handles')]),
      G.Model('wardrobe', wardrobe, size=(1.84, 2.41, 0.626), key=_key('wardrobe'), centre=(0, -0.117),
              motions=CHANGE_DOORS,

@@ -80,6 +80,12 @@ gate below, so the review does.
   lantern's hexagon 15 % wider than deep and squashed the boulders to 75 % of their depth and 120 % of
   their height, until the garden decor was rebuilt at real size (2026-10-14). It, and the manifest's
   `fit`, are for third-party files only.
+- **What a model carries is drawn, not its size.** A desk's chair, the picture, vase and jewellery box on a
+  chest of drawers, the blocks in front of a toy box, the flag on a climbing frame and the block and bottle
+  beside a rolled mat are drawn with the model but stand outside the piece's own box: `G.aside(parts, name)`
+  joins them into one node named `<name>_aside`, `G.Model(size=…)` measures the rest (`gamekit.parts.own`),
+  and so does `cargo check-glb` (`model()` skips those nodes). The content's heights follow the furniture
+  itself: the dresser's `surface.height` is the chest's top, 0.89 m, not the picture's 1.35.
 - **Heights the content names** come from the model: `seat.height`, `surface.height` and its
   rectangle (`size`, `at`), `light.height`, and `slots` spread across the width (or each slot's `places`). Mark them in
   Blender with empties named `top`, `seat`, `seat.1` …, `light` (not exported), and have the
@@ -105,6 +111,9 @@ instances, so these costs are per kind of object in view, plus the triangles of 
 - **Draw calls:** one per finish group (below). Aim for 1–3, at most 4. Each also draws once more
   in the sun's shadow map, which in live play is redrawn every frame while residents are in view
   (graphics.md; on Low a still part shares the lot's one merged shadow draw). Map every material to a finish: six garden models took 30 draws unmapped, 9 mapped.
+  A model whose moving parts can't fit in four says so in its pack entry, `"draws": 5`
+  (`G.Model(draws=5)`), and the gate allows it there: the grandfather clock, whose trunk door swings
+  open while it is wound (families/decor.md). It is the one such model; nothing else should need it.
 - **Textures:** none by default; the finishes bring their own tiling textures. A texture of its
   own (a painting, a label) is one per object, at most 512 px a side (1024 for something over
   2.5 m), PNG or JPEG in the file; the build turns it into KTX2.

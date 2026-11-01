@@ -45,6 +45,8 @@
     "lazy.napPod": { "h": 0.45, "fwd": 0.05, "front": 0.42 },
     "lazy.quiltTable": { "h": 0.45, "fwd": -0.2 },
     "loner.quietPod": { "h": 0.45, "fwd": 0, "front": 0.32 },
+    "energetic.spinBike": { "h": 0.44, "fwd": 0 },
+    "energetic.recoveryPod": { "h": 0.49, "fwd": 0 },
     "bookworm.firesideLounge": { "h": 0.45, "fwd": 0, "front": 0.29 },
     "fireplaceElectric": { "h": 0.14, "fwd": 0.36, "back": true },
     "dressingTable": { "h": 0.45, "fwd": 0.22, "back": true },
