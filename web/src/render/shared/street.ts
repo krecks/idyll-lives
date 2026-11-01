@@ -562,6 +562,8 @@ export class TownStreet {
   /** Openings by where they lie on the ground (cells of 8 m). */
   private openingGrid = new RectGrid<Rect & { o: Opening; i: number }>(8);
   private openingsOf: Opening[] | undefined | null = null;
+  private objectsOf: ObjectPlacement[] | null = null;
+  private garagesOf: WorldStructure['garages'] | null = null;
   private blocked = new RectGrid<Blocker>(4);
   private objectsByPlot = new Map<number, ObjectPlacement[]>();
   private garages = new Map<number, SilhouetteSpec['garage']>();
@@ -670,13 +672,24 @@ export class TownStreet {
       });
       this.openingGrid = grid;
     }
+    const index = new Map(world.plots.map((p, i) => [p.id, i]));
+    const same = (a: PlotInfo, b: PlotInfo) => a.public === b.public && a.storeys === b.storeys && String(a.house) === String(b.house) && String(a.roof) === String(b.roof);
     this.plots.forEach((L) => {
-      const info = world.plots.find((p) => p.id === L.info.id);
+      const i = index.get(L.info.id);
+      const info = i === undefined ? undefined : world.plots[i];
       if (!info || info === L.info) return;
+      if (same(info, L.info)) {
+        L.info = info;
+        return;
+      }
       // A house built, grown or re-roofed: laid out again (its place and its paths are the layout's).
-      const fresh = layout({ ...world, plots: [info] } as WorldStructure, (world.meta?.streets ?? []).filter((s) => s.w >= s.d), this.paths, world.meta?.facing?.[world.plots.indexOf(info)])[0];
+      const fresh = layout({ ...world, plots: [info] } as WorldStructure, (world.meta?.streets ?? []).filter((s) => s.w >= s.d), this.paths, world.meta?.facing?.[i!])[0];
       if (fresh) Object.assign(L, { info: fresh.info, house: fresh.house, plot: fresh.plot, base: fresh.base, kind: fresh.base });
     });
+    // (The same things, the same garages: their grid stands.)
+    if (world.objects === this.objectsOf && world.garages === this.garagesOf && this.blocked) return;
+    this.objectsOf = world.objects;
+    this.garagesOf = world.garages;
     const blocked = new RectGrid<Blocker>(4);
     const byPlot = new Map<number, ObjectPlacement[]>();
     for (const o of world.objects) {
