@@ -1729,6 +1729,7 @@ impl World {
         // Its tiles are free again, but for what else takes them: the table under a lamp at head
         // height, the lamp over a sofa.
         let freed = self.blocking_tiles(&obj);
+        let rect = self.object_rect(&obj);
         for &(x, z) in &freed {
             let i = self.lot.tile_index(x, z);
             if i != crate::lot::VOID {
@@ -1745,8 +1746,10 @@ impl World {
         }
         if self.content.objects[obj.def].stairs {
             self.refresh_stairs();
+            self.nav_changed();
+        } else {
+            self.objects_changed_in(rect);
         }
-        self.nav_changed();
         self.rooms_layout_changed();
         obj
     }

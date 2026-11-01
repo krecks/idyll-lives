@@ -1653,6 +1653,12 @@ pub struct World {
     /// bump it, so the walkable regions (and the objects-by-plot index) needn't be rebuilt for
     /// them. `structure_version` stays the one views and offers follow.
     pub(crate) nav_version: u32,
+    /// The last changes to walking and where they were (`nav_changed_in`), so walkers far from
+    /// them keep their way.
+    pub(crate) nav_log: crate::path::NavLog,
+    /// Bumped when objects come, go or move (or walls change), not when only a car parks: the
+    /// objects-by-plot index, the links and the staff plan follow it.
+    pub(crate) objects_version: u32,
     /// The walkable regions of the lot at `reach_version` (see `path::Reach`).
     pub(crate) reach: crate::path::Reach,
     pub(crate) reach_version: u32,
@@ -1757,6 +1763,8 @@ pub(crate) struct Ctx<'a> {
     pub reach: &'a crate::path::Reach,
     /// Bumped when the house changes in a way that can cut a walker's route short.
     pub nav_version: u32,
+    /// Where those changes were (`World::nav_log`).
+    pub nav_log: &'a crate::path::NavLog,
     pub rels: &'a Relationships,
     pub briefs: &'a [SimBrief],
     pub households: &'a [Household],
@@ -1995,6 +2003,8 @@ impl World {
             seed: 0,
             structure_version: 1,
             nav_version: 1,
+            nav_log: Default::default(),
+            objects_version: 1,
             reach: Default::default(),
             reach_version: 0,
             lot_version: 1,
@@ -2485,11 +2495,14 @@ impl World {
         }
         self.object_plot.push(self.plot_at(x, z));
         let stairs = self.content.objects[def].stairs;
+        let rect = self.object_rect(&obj);
         self.objects.push(obj);
         if stairs {
             self.refresh_stairs();
+            self.nav_changed();
+        } else {
+            self.objects_changed_in(rect);
         }
-        self.nav_changed();
         self.rooms_layout_changed();
         Ok(self.objects.len() as u32 - 1)
     }
@@ -3308,8 +3321,9 @@ impl World {
 
     /// Rebuilds the objects-by-plot index if objects were added, removed or changed since.
     pub(crate) fn refresh_index(&mut self) {
-        if self.object_index.version != self.nav_version {
-            self.object_index = ObjectIndex::new(&self.object_plot, &self.plots, self.nav_version);
+        if self.object_index.version != self.objects_version {
+            self.object_index =
+                ObjectIndex::new(&self.object_plot, &self.plots, self.objects_version);
             let nav = NavGrid {
                 lot: &self.lot,
                 blocked: &self.blocked,
@@ -3320,6 +3334,33 @@ impl World {
         }
     }
 
+    /// The tiles `[x0, z0, x1, z1)` an object takes up or blocks, for `objects_changed_in`.
+    pub(crate) fn object_rect(&self, obj: &ObjectInstance) -> [i32; 4] {
+        let mut r = [i32::MAX, i32::MAX, i32::MIN, i32::MIN];
+        for (x, z) in obj.tiles(&self.content).chain(self.blocking_tiles(obj)) {
+            r = [r[0].min(x), r[1].min(z), r[2].max(x + 1), r[3].max(z + 1)];
+        }
+        if r[0] > r[2] {
+            [obj.x, obj.z, obj.x + 1, obj.z + 1]
+        } else {
+            r
+        }
+    }
+
+    /// The navigation version: bumped whenever something walkers can or can't step through
+    /// changes (see `nav_changed_in`).
+    pub fn nav_version(&self) -> u32 {
+        self.nav_version
+    }
+
+    /// Whether walking may have changed within tiles `[x0, z0, x1, z1)` (stacked rows, as
+    /// positions are) since navigation version `seen`: a change there was logged since, or the
+    /// log (`path::NAV_LOG` changes) doesn't go back that far. A walker whose way lies outside
+    /// every change since it planned it can keep it.
+    pub fn nav_changed_since(&self, seen: u32, rect: [i32; 4]) -> bool {
+        self.nav_log.changed_since(seen, self.nav_version, rect)
+    }
+
     /// Catches up on what changed for walking since the last tick (the walkable regions, the
     /// objects-by-plot index and the links), as the next tick would: for benchmarks and tools.
     pub fn refresh_navigation(&mut self) {
@@ -3327,28 +3368,55 @@ impl World {
         self.refresh_index();
     }
 
+    /// Catches up on the walkable regions only (`refresh_navigation` without the indexes).
+    pub fn refresh_walkable(&mut self) {
+        self.refresh_reach();
+    }
+
     /// Labels the walkable regions of the lot again if the navigation changed (see
     /// `path::Reach`): an unreachable goal is then refused before a search can flood the town.
     fn refresh_reach(&mut self) {
-        if self.reach_version == self.nav_version {
+        if self.reach_version == self.nav_version && !self.reach.stale() {
             return;
         }
-        let reach = {
-            let nav = NavGrid {
-                lot: &self.lot,
-                blocked: &self.blocked,
-                stairs: &self.stairs,
-            };
-            crate::path::Reach::build(&nav)
+        if !self.reach.stale() {
+            // (Bumped without saying where: anywhere.)
+            self.reach.mark_all();
+        }
+        let nav = NavGrid {
+            lot: &self.lot,
+            blocked: &self.blocked,
+            stairs: &self.stairs,
         };
-        self.reach = reach;
+        self.reach.refresh(&nav);
         self.reach_version = self.nav_version;
     }
 
-    /// Notes that something walkers can or can't step through changed, which views also see.
+    /// Notes that something walkers can or can't step through changed, anywhere (walls, storeys,
+    /// stairs, an undo), which views and the objects' indexes also see.
     pub(crate) fn nav_changed(&mut self) {
         self.structure_version = self.structure_version.wrapping_add(1);
+        self.objects_version = self.objects_version.wrapping_add(1);
+        let all = [0, 0, self.lot.width as i32 + 1, self.lot.depth as i32 + 1];
+        self.nav_changed_in(all);
+        self.reach.mark_all();
+    }
+
+    /// Notes that an object came, went or moved over tiles `[x0, z0, x1, z1)`: views and the
+    /// objects' indexes see it, walkers near it find their way again.
+    pub(crate) fn objects_changed_in(&mut self, rect: [i32; 4]) {
+        self.structure_version = self.structure_version.wrapping_add(1);
+        self.objects_version = self.objects_version.wrapping_add(1);
+        self.nav_changed_in(rect);
+    }
+
+    /// Notes that walking changed within tiles `[x0, z0, x1, z1)` only (a car parked): the
+    /// walkable regions are labelled again there, and walkers whose way goes near it find their
+    /// way again (`nav_changed_since`). Views and the objects' indexes don't follow it.
+    pub(crate) fn nav_changed_in(&mut self, rect: [i32; 4]) {
         self.nav_version = self.nav_version.wrapping_add(1);
+        self.nav_log.push(self.nav_version, rect);
+        self.reach.mark(&self.lot, rect);
     }
 
     /// Notes that the lot's rooms or their scores changed structurally (walls, coverings,
@@ -3554,6 +3622,7 @@ impl World {
                 stairs,
                 reach,
                 nav_version,
+                nav_log,
                 shut,
                 rooms,
                 staff,
@@ -3570,6 +3639,7 @@ impl World {
                 },
                 reach,
                 nav_version: *nav_version,
+                nav_log,
                 rels: relationships,
                 briefs,
                 households,
@@ -4883,6 +4953,30 @@ pub(crate) fn practise(
     }
 }
 
+/// The tiles `[x0, z0, x1, z1)` round the rest of a walker's way (where they stand and the
+/// waypoints still ahead, a tile round), if they're on their way somewhere.
+fn route_rect(sim: &Sim) -> Option<[i32; 4]> {
+    let Phase::Routing { waypoints, next } = &sim.current.as_ref()?.phase else {
+        return None;
+    };
+    let ahead = waypoints.get(next.saturating_sub(1)..).unwrap_or_default();
+    let mut r = [sim.pos[0], sim.pos[1], sim.pos[0], sim.pos[1]];
+    for p in ahead {
+        r = [
+            r[0].min(p[0]),
+            r[1].min(p[1]),
+            r[2].max(p[0]),
+            r[3].max(p[1]),
+        ];
+    }
+    Some([
+        r[0].floor() as i32 - 1,
+        r[1].floor() as i32 - 1,
+        r[2].floor() as i32 + 2,
+        r[3].floor() as i32 + 2,
+    ])
+}
+
 /// A wall or something they walk through moved while they were on their way: their waypoints
 /// may cross it now. Route again from where they stand, and if there's no way there any more,
 /// give up (remembering it, if they chose it themselves).
@@ -4983,8 +5077,13 @@ fn step_sim(
     // The house changed under them since their last turn: a wall where they were going, or a
     // door opened.
     if sim.nav_seen != ctx.nav_version {
+        // (Only if a change since may touch the way they're going.)
+        let near = route_rect(sim)
+            .is_none_or(|r| ctx.nav_log.changed_since(sim.nav_seen, ctx.nav_version, r));
         sim.nav_seen = ctx.nav_version;
-        reroute_after_change(sim, ctx, objects);
+        if near {
+            reroute_after_change(sim, ctx, objects);
+        }
     }
 
     // A baby whose needs run low cries for someone (a thought bubble).

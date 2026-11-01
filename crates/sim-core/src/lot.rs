@@ -619,6 +619,57 @@ impl Lot {
         self.ensure(x as usize, z as usize, x as usize + 1, z as usize + 1)
     }
 
+    /// The chunk grid: chunks across and down (one tile more than the lot each way).
+    pub fn chunk_grid(&self) -> (usize, usize) {
+        (self.cols, self.rows)
+    }
+
+    /// The chunk (row-major over `chunk_grid`) holding tile `(x, z)`, which must be on the
+    /// chunk grid.
+    pub fn chunk_at(&self, x: i32, z: i32) -> usize {
+        self.chunk_of(x as usize, z as usize)
+    }
+
+    /// Whether chunk `c` is allocated.
+    pub fn chunk_allocated(&self, c: usize) -> bool {
+        self.base.get(c).is_some_and(|&b| b != 0)
+    }
+
+    /// The tiles `[x0, z0, x1, z1)` chunk `c` covers on the lot (empty past its sides).
+    pub fn chunk_rect(&self, c: usize) -> [i32; 4] {
+        let (x0, z0) = ((c % self.cols) * CHUNK, (c / self.cols) * CHUNK);
+        [
+            x0 as i32,
+            z0 as i32,
+            (x0 + CHUNK).min(self.width) as i32,
+            (z0 + CHUNK).min(self.depth) as i32,
+        ]
+    }
+
+    /// The tiles of chunk `c` on the lot, row by row: `(x, z, slot)` (none if it isn't
+    /// allocated).
+    pub fn chunk_tiles(&self, c: usize) -> impl Iterator<Item = (i32, i32, usize)> + '_ {
+        let b = self.base.get(c).copied().unwrap_or(0) as usize;
+        let [x0, z0, x1, z1] = if b == 0 { [0; 4] } else { self.chunk_rect(c) };
+        (z0..z1).flat_map(move |z| {
+            (x0..x1).map(move |x| {
+                (
+                    x,
+                    z,
+                    b + ((z as usize & MASK) << SHIFT | (x as usize & MASK)),
+                )
+            })
+        })
+    }
+
+    /// The tiles round the sides of chunk `c` on the lot (none if it isn't allocated).
+    pub fn chunk_rim(&self, c: usize) -> impl Iterator<Item = (i32, i32)> + '_ {
+        let [x0, z0, x1, z1] = self.chunk_rect(c);
+        self.chunk_tiles(c)
+            .filter(move |&(x, z, _)| x == x0 || z == z0 || x == x1 - 1 || z == z1 - 1)
+            .map(|(x, z, _)| (x, z))
+    }
+
     /// Whether tile `(x, z)`'s chunk is allocated.
     pub fn allocated(&self, x: i32, z: i32) -> bool {
         self.tile_index(x, z) != VOID

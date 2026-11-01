@@ -94,7 +94,7 @@ impl World {
             .iter()
             .filter_map(|o| stair_of(&self.content, o, &self.stairs))
             .collect();
-        self.stairs.stairs = stairs;
+        self.stairs.set_stairs(stairs);
     }
 
     /// The tiles an object takes from walking: its footprint, or for stairs the stairwell above

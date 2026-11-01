@@ -21,7 +21,7 @@ use std::cell::RefCell;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
-use crate::lot::{Lot, OUTDOORS};
+use crate::lot::{CHUNK, Lot, OUTDOORS};
 
 /// One flight of stairs, one tile wide: entered at `bottom` from `foot`, climbed along `dir`
 /// for `len` steps; the top step leads to `landing` on the storey above.
@@ -62,7 +62,15 @@ pub struct StairMap {
     /// storeys 0, 1, …; blocks after it (storeys added later) are one storey lower than their
     /// place.
     pub basement: i32,
+    /// The flights (set with `set_stairs`, which indexes them).
     pub stairs: Vec<Stair>,
+    /// Every step by tile key (`tile_key`), sorted: `(key, flight, step)`; the first flight
+    /// listed wins a tile two claim, as a scan of `stairs` would find it.
+    steps: Vec<(u64, u32, i32)>,
+    /// Where each flight's top and landing link to by tile key, sorted: `(key, order, to)`.
+    links: Vec<(u64, u32, (i32, i32))>,
+    /// Whether `steps` and `links` index `stairs` (else they're scanned).
+    indexed: bool,
 }
 
 /// No storeys, no stairs.
@@ -70,7 +78,15 @@ pub static NO_STAIRS: StairMap = StairMap {
     depth: 0,
     basement: 0,
     stairs: Vec::new(),
+    steps: Vec::new(),
+    links: Vec::new(),
+    indexed: true,
 };
+
+/// A tile's key in the stairs' index.
+fn tile_key(x: i32, z: i32) -> u64 {
+    (u64::from(z as u32) << 32) | u64::from(x as u32)
+}
 
 impl StairMap {
     /// The storey a row is on (0: the ground, -1: the basement).
@@ -112,24 +128,67 @@ impl StairMap {
         }
     }
 
+    /// Sets the flights and indexes their steps and ends by tile, so `step` and `link` cost a
+    /// lookup, not a scan of every flight (they're asked for every step a search tries).
+    pub fn set_stairs(&mut self, stairs: Vec<Stair>) {
+        let mut steps: Vec<(u64, u32, i32)> = Vec::new();
+        let mut links: Vec<(u64, u32, (i32, i32))> = Vec::new();
+        for (f, s) in stairs.iter().enumerate() {
+            for i in 0..s.len {
+                let (x, z) = (s.bottom.0 + s.dir.0 * i, s.bottom.1 + s.dir.1 * i);
+                steps.push((tile_key(x, z), f as u32, i));
+            }
+            let top = s.top();
+            links.push((tile_key(top.0, top.1), 2 * f as u32, s.landing));
+            links.push((tile_key(s.landing.0, s.landing.1), 2 * f as u32 + 1, top));
+        }
+        // (By tile, then in the order a scan would meet them; the first one counts.)
+        steps.sort_by_key(|&(k, f, _)| (k, f));
+        steps.dedup_by_key(|e| e.0);
+        links.sort_by_key(|&(k, o, _)| (k, o));
+        links.dedup_by_key(|e| e.0);
+        self.stairs = stairs;
+        self.steps = steps;
+        self.links = links;
+        self.indexed = true;
+    }
+
     /// The flight a tile is a step of, and which step.
     pub fn step(&self, x: i32, z: i32) -> Option<(&Stair, i32)> {
-        self.stairs
-            .iter()
-            .find_map(|s| s.step(x, z).map(|i| (s, i)))
+        if self.stairs.is_empty() {
+            return None;
+        }
+        if !self.indexed {
+            return self
+                .stairs
+                .iter()
+                .find_map(|s| s.step(x, z).map(|i| (s, i)));
+        }
+        let k = tile_key(x, z);
+        let at = self.steps.binary_search_by_key(&k, |e| e.0).ok()?;
+        let (_, f, i) = self.steps[at];
+        Some((&self.stairs[f as usize], i))
     }
 
     /// Where a stair links to from this tile: the landing from the top step, or back.
     pub fn link(&self, x: i32, z: i32) -> Option<(i32, i32)> {
-        self.stairs.iter().find_map(|s| {
-            if s.top() == (x, z) {
-                Some(s.landing)
-            } else if s.landing == (x, z) {
-                Some(s.top())
-            } else {
-                None
-            }
-        })
+        if self.stairs.is_empty() {
+            return None;
+        }
+        if !self.indexed {
+            return self.stairs.iter().find_map(|s| {
+                if s.top() == (x, z) {
+                    Some(s.landing)
+                } else if s.landing == (x, z) {
+                    Some(s.top())
+                } else {
+                    None
+                }
+            });
+        }
+        let k = tile_key(x, z);
+        let at = self.links.binary_search_by_key(&k, |e| e.0).ok()?;
+        Some(self.links[at].2)
     }
 
     /// How far apart two points are for someone walking (storeys counted as a few metres).
@@ -284,6 +343,11 @@ impl NavGrid<'_> {
 
     /// `find_path`, round other people's gardens when there are `grounds` to mind. (Their
     /// cost only adds to a step's, so the heuristic still never overestimates.)
+    ///
+    /// A search stops after `NODE_CAP` tiles. Past that the goal is far or behind a long way
+    /// round: a coarse search over the lot's chunks finds the chunks the way goes through, and
+    /// the search runs again kept to them and the chunks round them. Only if that finds nothing
+    /// does it search the whole lot, as before, so a way that exists is always found.
     pub fn find_path_with(
         &self,
         start: (i32, i32),
@@ -297,6 +361,34 @@ impl NavGrid<'_> {
         if start == goal {
             return Some(vec![start]);
         }
+        match self.search(start, goal, grounds, NODE_CAP, None) {
+            Search::Found(path) => return Some(path),
+            Search::NoWay => return None,
+            Search::Capped => {}
+        }
+        if let Some(corridor) = self.corridor(start, goal)
+            && let Search::Found(path) =
+                self.search(start, goal, grounds, CORRIDOR_CAP, Some(&corridor))
+        {
+            return Some(path);
+        }
+        match self.search(start, goal, grounds, u64::MAX, None) {
+            Search::Found(path) => Some(path),
+            _ => None,
+        }
+    }
+
+    /// One A* search from `start` to `goal`, giving up after `cap` tiles, kept to the chunks
+    /// marked in `corridor` if there is one.
+    fn search(
+        &self,
+        start: (i32, i32),
+        goal: (i32, i32),
+        grounds: Option<&Grounds>,
+        cap: u64,
+        corridor: Option<&[bool]>,
+    ) -> Search {
+        let lot = self.lot;
         SCRATCH.with_borrow_mut(|scratch| {
             // (Every storey's rows: the lot's whole depth, by slot.)
             let search = scratch.start(lot.tile_slots());
@@ -324,17 +416,20 @@ impl NavGrid<'_> {
             let mut expanded = 0u64;
             let found = loop {
                 let Some(Reverse((f, k))) = open.pop() else {
-                    break None;
+                    break Search::NoWay;
                 };
                 let (x, z) = ((k % width) as i32, (k / width) as i32);
                 let i = lot.tile_index(x, z);
                 if i == goal_i {
-                    break Some(reconstruct(lot, came, (x, z)));
+                    break Search::Found(reconstruct(lot, came, (x, z)));
                 }
                 if f > g[i] + heuristic((x, z), goal) {
                     continue; // stale heap entry
                 }
                 expanded += 1;
+                if expanded > cap {
+                    break Search::Capped;
+                }
                 let link = self
                     .stairs
                     .link(x, z)
@@ -347,6 +442,9 @@ impl NavGrid<'_> {
                     let (nx, nz) = (x + dx, z + dz);
                     let linked = Some((nx, nz)) == link;
                     if !linked && ((dx.abs() > 1 || dz.abs() > 1) || !self.can_step(x, z, nx, nz)) {
+                        continue;
+                    }
+                    if corridor.is_some_and(|c| !c[lot.chunk_at(nx, nz)]) {
                         continue;
                     }
                     let ni = lot.tile_index(nx, nz);
@@ -373,6 +471,115 @@ impl NavGrid<'_> {
             };
             STATS.with_borrow_mut(|s| s.add(expanded));
             found
+        })
+    }
+
+    /// The chunks a way from `start` to `goal` may go through, and the chunks round them: a
+    /// coarse A* over the lot's chunks, from one to the next wherever a step crosses between
+    /// them (or a stair links them). None if the coarse search finds no way.
+    fn corridor(&self, start: (i32, i32), goal: (i32, i32)) -> Option<Vec<bool>> {
+        let lot = self.lot;
+        let (cols, rows) = lot.chunk_grid();
+        let flat = |c: usize| {
+            let [x0, z0, ..] = lot.chunk_rect(c);
+            (x0 / CHUNK as i32, self.stairs.ground_z(z0) / CHUNK as i32)
+        };
+        let (from, to) = (lot.chunk_at(start.0, start.1), lot.chunk_at(goal.0, goal.1));
+        let target = flat(to);
+        let h = |c: usize| heuristic(flat(c), target);
+        let mut g = std::collections::HashMap::new();
+        let mut came: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+        let mut open = BinaryHeap::new();
+        g.insert(from, 0u32);
+        open.push(Reverse((h(from), from)));
+        // Chunks a stair links each chunk to.
+        let mut linked: Vec<(usize, usize)> = Vec::new();
+        for s in &self.stairs.stairs {
+            let (t, l) = (s.top(), s.landing);
+            if self.tile_free(t.0, t.1) && self.tile_free(l.0, l.1) {
+                let (a, b) = (lot.chunk_at(t.0, t.1), lot.chunk_at(l.0, l.1));
+                linked.push((a, b));
+                linked.push((b, a));
+            }
+        }
+        let mut found = false;
+        while let Some(Reverse((f, c))) = open.pop() {
+            if c == to {
+                found = true;
+                break;
+            }
+            let gc = g[&c];
+            if f > gc + h(c) {
+                continue;
+            }
+            let (cx, cz) = ((c % cols) as i32, (c / cols) as i32);
+            let next = NEIGHBOURS
+                .into_iter()
+                .map(|(dx, dz)| (cx + dx, cz + dz))
+                .filter(|&(nx, nz)| {
+                    nx >= 0 && nz >= 0 && (nx as usize) < cols && (nz as usize) < rows
+                })
+                .map(|(nx, nz)| nz as usize * cols + nx as usize)
+                .filter(|&n| self.crosses(c, n))
+                .chain(linked.iter().filter(|l| l.0 == c).map(|l| l.1));
+            for n in next {
+                let cost = gc + heuristic(flat(c), flat(n)).max(ORTHO);
+                if g.get(&n).is_none_or(|&old| cost < old) {
+                    g.insert(n, cost);
+                    came.insert(n, c);
+                    open.push(Reverse((cost + h(n), n)));
+                }
+            }
+        }
+        if !found {
+            return None;
+        }
+        let mut corridor = vec![false; cols * rows];
+        let mut c = to;
+        loop {
+            let (cx, cz) = (c % cols, c / cols);
+            for nz in cz.saturating_sub(1)..=(cz + 1).min(rows - 1) {
+                for nx in cx.saturating_sub(1)..=(cx + 1).min(cols - 1) {
+                    corridor[nz * cols + nx] = true;
+                }
+            }
+            match came.get(&c) {
+                Some(&p) => c = p,
+                None => break,
+            }
+        }
+        // (Both ends' storeys at stairs: the chunks a stair links to the corridor.)
+        for &(a, b) in &linked {
+            if corridor[a] {
+                corridor[b] = true;
+            }
+        }
+        Some(corridor)
+    }
+
+    /// Whether a single step leads from a tile of chunk `a` into the neighbouring chunk `b`.
+    fn crosses(&self, a: usize, b: usize) -> bool {
+        let lot = self.lot;
+        if !lot.chunk_allocated(a) || !lot.chunk_allocated(b) {
+            return false;
+        }
+        let [ax0, az0, ax1, az1] = lot.chunk_rect(a);
+        let [bx0, bz0, bx1, bz1] = lot.chunk_rect(b);
+        // The tiles of `a` next to `b`.
+        let (x0, x1) = ((bx0 - 1).max(ax0), bx1.min(ax1 - 1) + 1);
+        let (z0, z1) = ((bz0 - 1).max(az0), bz1.min(az1 - 1) + 1);
+        (z0..z1).any(|z| {
+            (x0..x1).any(|x| {
+                self.tile_free(x, z)
+                    && NEIGHBOURS.into_iter().any(|(dx, dz)| {
+                        let (nx, nz) = (x + dx, z + dz);
+                        nx >= bx0
+                            && nx < bx1
+                            && nz >= bz0
+                            && nz < bz1
+                            && self.can_step(x, z, nx, nz)
+                    })
+            })
         })
     }
 
@@ -461,45 +668,245 @@ impl NavGrid<'_> {
     }
 }
 
-/// Which walkable tiles can reach which: a label per tile, shared by every tile in one
-/// connected region. A goal in another region has no path, so a search for it is refused
-/// before it can flood the town (P3-08).
+/// Which walkable tiles can reach which, in two levels: per storage chunk (`lot::CHUNK`), the
+/// tiles joined by steps inside it (a label per tile); over the town, which chunks' parts join
+/// across chunk sides, diagonal corners and stairs (a union-find over the parts). A goal in
+/// another region has no path, so a search for it is refused before it can flood the town
+/// (P3-08).
 ///
-/// Labels are only meaningful against the `NavGrid` they were built from; `World` rebuilds
+/// A change to walking is marked by the rectangle it touched (`mark`); `refresh` then labels
+/// only the chunks it reached again (and the joins of the chunks round them) and joins the parts
+/// up again, which costs what a few chunks cost, not the town. `mark_all` (or a lot of another
+/// size) labels every chunk, as a fresh `build` does.
+///
+/// Labels are only meaningful against the `NavGrid` they were refreshed for; `World` refreshes
 /// them when the navigation version changes.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Reach {
-    label: Vec<u32>,
+    /// Per slot: its part within its chunk (`NO_PART`: nobody can stand there).
+    part: Vec<u16>,
+    /// Per chunk: how many parts it has.
+    parts: Vec<u16>,
+    /// Per chunk: the joins from its parts to other chunks' parts, `(part, chunk, part)`, sorted.
+    joins: Vec<Vec<(u16, u32, u16)>>,
+    /// Per chunk: the index of its first part in `region` (refreshed with the joins).
+    first: Vec<u32>,
+    /// Per part (by `first`): its region.
+    region: Vec<u32>,
     regions: u32,
+    /// The chunk grid it was built over (`Lot::chunk_grid`): chunks across and down.
+    grid: (usize, usize),
+    /// Chunks to label again (`mark`), and whether all of them are.
+    dirty: Vec<u32>,
+    all_dirty: bool,
 }
 
+const NO_PART: u16 = u16::MAX;
+
 impl Reach {
-    /// Labels the walkable regions of `nav`. One pass over the lot, in the same steps a walker
-    /// may take (so diagonal walls and stairs are respected), costs what one failed search
-    /// costs but is paid once per change to the house instead of once per unreachable goal.
+    /// Labels the walkable regions of `nav` from scratch.
     pub fn build(nav: &NavGrid) -> Reach {
+        let mut reach = Reach {
+            all_dirty: true,
+            ..Default::default()
+        };
+        reach.refresh(nav);
+        reach
+    }
+
+    /// Notes that walking changed within tiles `[x0, x1) × [z0, z1)`: the chunks within a tile of
+    /// it are labelled again at the next `refresh` (a step's corner tiles count for it).
+    pub fn mark(&mut self, lot: &Lot, [x0, z0, x1, z1]: [i32; 4]) {
+        if self.all_dirty || lot.chunk_grid() != self.grid {
+            self.all_dirty = true;
+            return;
+        }
+        let (cols, rows) = self.grid;
+        let c = |v: i32, n: usize| (v.max(0) as usize / CHUNK).min(n - 1);
+        for cz in c(z0 - 1, rows)..=c(z1, rows) {
+            for cx in c(x0 - 1, cols)..=c(x1, cols) {
+                self.dirty.push((cz * cols + cx) as u32);
+            }
+        }
+    }
+
+    /// Notes that walking may have changed anywhere.
+    pub fn mark_all(&mut self) {
+        self.all_dirty = true;
+    }
+
+    /// Whether a `refresh` has work to do.
+    pub fn stale(&self) -> bool {
+        self.all_dirty || !self.dirty.is_empty()
+    }
+
+    /// Labels the chunks marked since the last refresh again, and joins every chunk's parts up.
+    pub fn refresh(&mut self, nav: &NavGrid) {
         let lot = nav.lot;
-        let mut label = vec![u32::MAX; lot.tile_slots()];
+        let grid = lot.chunk_grid();
+        let chunks = grid.0 * grid.1;
+        if grid != self.grid || self.parts.len() != chunks {
+            self.grid = grid;
+            self.all_dirty = true;
+        }
+        self.part.resize(lot.tile_slots(), NO_PART);
+        if self.all_dirty {
+            self.parts = vec![0; chunks];
+            self.joins = vec![Vec::new(); chunks];
+            self.part.fill(NO_PART);
+            for c in 0..chunks {
+                self.label(nav, c);
+            }
+            for c in 0..chunks {
+                self.join(nav, c);
+            }
+        } else if !self.dirty.is_empty() {
+            let mut dirty = std::mem::take(&mut self.dirty);
+            dirty.sort_unstable();
+            dirty.dedup();
+            for &c in &dirty {
+                self.label(nav, c as usize);
+            }
+            // The joins out of the chunks labelled again, and into them from round about.
+            let (cols, rows) = grid;
+            let mut near: Vec<u32> = Vec::new();
+            for &c in &dirty {
+                let (cx, cz) = (c as usize % cols, c as usize / cols);
+                for nz in cz.saturating_sub(1)..=(cz + 1).min(rows - 1) {
+                    for nx in cx.saturating_sub(1)..=(cx + 1).min(cols - 1) {
+                        near.push((nz * cols + nx) as u32);
+                    }
+                }
+            }
+            // (Stairs join chunks far apart: the chunks at their other ends too.)
+            for s in &nav.stairs.stairs {
+                for (a, b) in [(s.top(), s.landing), (s.landing, s.top())] {
+                    if lot.in_bounds(a.0, a.1) && lot.in_bounds(b.0, b.1) {
+                        let ca = lot.chunk_at(a.0, a.1) as u32;
+                        if dirty.binary_search(&ca).is_ok() {
+                            near.push(lot.chunk_at(b.0, b.1) as u32);
+                        }
+                    }
+                }
+            }
+            near.sort_unstable();
+            near.dedup();
+            for &c in &near {
+                self.join(nav, c as usize);
+            }
+        }
+        self.all_dirty = false;
+        self.dirty.clear();
+        self.unite(chunks);
+    }
+
+    /// Labels the parts of chunk `c`: its free tiles, joined by the steps within it.
+    fn label(&mut self, nav: &NavGrid, c: usize) {
+        let lot = nav.lot;
+        for (_, _, s) in lot.chunk_tiles(c) {
+            self.part[s] = NO_PART;
+        }
+        let mut parts = 0u16;
         let mut queue = Vec::new();
-        let mut regions = 0;
-        for (x, z, start) in lot.tiles() {
-            if label[start] != u32::MAX || !nav.tile_free(x, z) {
+        for (x, z, s) in lot.chunk_tiles(c) {
+            if self.part[s] != NO_PART || !nav.tile_free(x, z) {
                 continue;
             }
-            label[start] = regions;
+            self.part[s] = parts;
             queue.push((x, z));
             while let Some((x, z)) = queue.pop() {
                 for (nx, nz) in nav.neighbours(x, z) {
+                    if lot.chunk_at(nx, nz) != c {
+                        continue;
+                    }
                     let n = lot.tile_index(nx, nz);
-                    if label[n] == u32::MAX {
-                        label[n] = regions;
+                    if self.part[n] == NO_PART {
+                        self.part[n] = parts;
                         queue.push((nx, nz));
                     }
                 }
             }
-            regions += 1;
+            parts += 1;
         }
-        Reach { label, regions }
+        self.parts[c] = parts;
+    }
+
+    /// Finds the joins out of chunk `c`: steps from its tiles on its sides (and up or down
+    /// stairs) into other chunks.
+    fn join(&mut self, nav: &NavGrid, c: usize) {
+        let lot = nav.lot;
+        let mut joins = Vec::new();
+        if self.parts[c] > 0 {
+            let link_tiles = nav
+                .stairs
+                .stairs
+                .iter()
+                .flat_map(|s| [s.top(), s.landing])
+                .filter(|&(x, z)| lot.in_bounds(x, z) && lot.chunk_at(x, z) == c);
+            for (x, z) in lot.chunk_rim(c).chain(link_tiles) {
+                let p = self.part[lot.tile_index(x, z)];
+                if p == NO_PART {
+                    continue;
+                }
+                for (nx, nz) in nav.neighbours(x, z) {
+                    let nc = lot.chunk_at(nx, nz);
+                    if nc == c {
+                        continue;
+                    }
+                    let q = self.part[lot.tile_index(nx, nz)];
+                    if q != NO_PART {
+                        joins.push((p, nc as u32, q));
+                    }
+                }
+            }
+            joins.sort_unstable();
+            joins.dedup();
+        }
+        self.joins[c] = joins;
+    }
+
+    /// Joins every chunk's parts into regions (a union-find over the joins).
+    fn unite(&mut self, chunks: usize) {
+        self.first.clear();
+        let mut n = 0u32;
+        for c in 0..chunks {
+            self.first.push(n);
+            n += u32::from(self.parts[c]);
+        }
+        let mut parent: Vec<u32> = (0..n).collect();
+        fn root(parent: &mut [u32], mut a: u32) -> u32 {
+            while parent[a as usize] != a {
+                let up = parent[parent[a as usize] as usize];
+                parent[a as usize] = up;
+                a = up;
+            }
+            a
+        }
+        for c in 0..chunks {
+            for &(p, nc, q) in &self.joins[c] {
+                // (A join into a part a chunk no longer has is left over: the chunk changed.)
+                if q >= self.parts[nc as usize] || p >= self.parts[c] {
+                    continue;
+                }
+                let a = root(&mut parent, self.first[c] + u32::from(p));
+                let b = root(&mut parent, self.first[nc as usize] + u32::from(q));
+                if a != b {
+                    parent[a.max(b) as usize] = a.min(b);
+                }
+            }
+        }
+        let mut region = vec![u32::MAX; n as usize];
+        let mut regions = 0;
+        for i in 0..n {
+            let r = root(&mut parent, i) as usize;
+            if region[r] == u32::MAX {
+                region[r] = regions;
+                regions += 1;
+            }
+            region[i as usize] = region[r];
+        }
+        self.region = region;
+        self.regions = regions;
     }
 
     /// How many separate walkable regions the lot has (an open lot has one).
@@ -512,10 +919,14 @@ impl Reach {
         if !lot.in_bounds(x, z) {
             return None;
         }
-        match self.label[lot.tile_index(x, z)] {
-            u32::MAX => None,
-            l => Some(l),
+        let p = *self.part.get(lot.tile_index(x, z))?;
+        if p == NO_PART {
+            return None;
         }
+        let c = lot.chunk_at(x, z);
+        self.region
+            .get((*self.first.get(c)? + u32::from(p)) as usize)
+            .copied()
     }
 
     /// Whether `nav` can get from `a` to `b`. Unknown or out-of-bounds ends answer `true`: the
@@ -534,6 +945,68 @@ impl Reach {
         }
     }
 }
+
+/// The last changes to walking (`World::nav_changed_in`), each with the navigation version it
+/// made and the tiles `[x0, z0, x1, z1)` it touched: a walker whose way doesn't go near any
+/// change since it last looked needn't find its way again.
+#[derive(Debug, Clone, Default)]
+pub struct NavLog {
+    entries: Vec<(u32, [i32; 4])>,
+    next: usize,
+}
+
+/// Changes `NavLog` keeps.
+pub const NAV_LOG: usize = 32;
+
+impl NavLog {
+    /// Notes the change that made navigation version `version`.
+    pub fn push(&mut self, version: u32, rect: [i32; 4]) {
+        if self.entries.len() < NAV_LOG {
+            self.entries.push((version, rect));
+        } else {
+            self.entries[self.next] = (version, rect);
+        }
+        self.next = (self.next + 1) % NAV_LOG;
+    }
+
+    /// Whether a change after version `seen`, up to `now`, may touch tiles `[x0, z0, x1, z1)`:
+    /// one does, or the log doesn't go back that far (then any might).
+    pub fn changed_since(&self, seen: u32, now: u32, rect: [i32; 4]) -> bool {
+        let since = now.wrapping_sub(seen);
+        if since == 0 {
+            return false;
+        }
+        let mut found = 0;
+        for &(v, r) in &self.entries {
+            if now.wrapping_sub(v) < since {
+                found += 1;
+                if overlaps(r, rect) {
+                    return true;
+                }
+            }
+        }
+        found < since
+    }
+}
+
+/// Whether two tile rectangles `[x0, z0, x1, z1)` share a tile.
+pub fn overlaps(a: [i32; 4], b: [i32; 4]) -> bool {
+    a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]
+}
+
+/// How a search ended.
+enum Search {
+    Found(Vec<(i32, i32)>),
+    /// Every tile it could reach was tried.
+    NoWay,
+    /// It gave up at its cap.
+    Capped,
+}
+
+/// The most tiles a search tries before it looks for a corridor (`NavGrid::find_path_with`).
+pub const NODE_CAP: u64 = 30_000;
+/// The most a search kept to a corridor tries.
+const CORRIDOR_CAP: u64 = 4 * NODE_CAP;
 
 /// Search state kept between searches: a big town is tens of thousands of tiles, too many to
 /// allocate and clear for every route. An entry counts only if stamped by the current search.
@@ -1038,6 +1511,60 @@ mod tests {
             2,
             "in one straight line"
         );
+    }
+
+    #[test]
+    fn a_long_way_round_is_found_through_a_corridor() {
+        // A wall down the middle of a big open lot with one gap at the far end: straight at the
+        // goal, a search would try most of the near half before turning back.
+        let mut lot = Lot::new(400, 400);
+        for z in 0..396 {
+            lot.set_v(200, z, crate::lot::Edge::Wall);
+        }
+        lot.compute_rooms();
+        let blocked = nav_of(&lot);
+        let nav = NavGrid {
+            lot: &lot,
+            blocked: &blocked,
+            stairs: &NO_STAIRS,
+        };
+        take_search_stats();
+        let path = nav.find_path((100, 10), (300, 10)).expect("round the end");
+        assert_walkable(&nav, &path);
+        assert!(path.iter().any(|&(_, z)| z >= 396), "through the gap");
+        let stats = take_search_stats();
+        assert!(
+            stats.searches >= 2,
+            "capped, then kept to a corridor: {stats:?}"
+        );
+        assert!(stats.max_nodes <= CORRIDOR_CAP + 1, "{stats:?}");
+        // As long as the full search's, near enough (the corridor holds the best way here).
+        let shortest = 2 * 386 + 200;
+        assert!(path.len() <= shortest + 40, "{} tiles", path.len());
+    }
+
+    #[test]
+    fn stairs_are_found_by_tile() {
+        let mut map = StairMap {
+            depth: 10,
+            ..Default::default()
+        };
+        let flight = |x| Stair {
+            foot: (x, 6),
+            bottom: (x, 5),
+            dir: (0, -1),
+            len: 3,
+            landing: (x, 12),
+        };
+        map.set_stairs(vec![flight(2), flight(5)]);
+        assert_eq!(
+            map.step(5, 4).map(|(s, i)| (s.bottom, i)),
+            Some(((5, 5), 1))
+        );
+        assert_eq!(map.step(5, 2), None);
+        assert_eq!(map.link(2, 3), Some((2, 12)));
+        assert_eq!(map.link(2, 12), Some((2, 3)));
+        assert_eq!(map.link(3, 3), None);
     }
 
     #[test]

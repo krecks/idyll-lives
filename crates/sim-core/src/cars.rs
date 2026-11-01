@@ -1344,6 +1344,17 @@ pub(crate) fn reblock(w: &mut World) {
     if tiles == w.car_tiles {
         return;
     }
+    // Only where cars came or went: walkers elsewhere keep their way.
+    let mut rect = [i32::MAX, i32::MAX, i32::MIN, i32::MIN];
+    for &i in w.car_tiles.iter().chain(&tiles) {
+        let (x, z) = w.lot.tile_xz(i);
+        rect = [
+            rect[0].min(x),
+            rect[1].min(z),
+            rect[2].max(x + 1),
+            rect[3].max(z + 1),
+        ];
+    }
     for &i in &w.car_tiles {
         w.blocked[i] = false;
     }
@@ -1351,7 +1362,7 @@ pub(crate) fn reblock(w: &mut World) {
         w.blocked[i] = true;
     }
     w.car_tiles = tiles;
-    w.nav_version = w.nav_version.wrapping_add(1);
+    w.nav_changed_in(rect);
     w.cars_nav = w.nav_version;
 }
 

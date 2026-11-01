@@ -236,7 +236,7 @@ pub struct Server {
 /// The town's servers (`World::staff`).
 #[derive(Debug, Clone, Default)]
 pub struct Staff {
-    /// The `World::nav_version` they were found for.
+    /// The `World::objects_version` they were found for.
     built: Option<u32>,
     pub servers: Vec<Server>,
     /// Server per object index (posts only).
@@ -294,7 +294,7 @@ pub fn place(content: &Content, o: &ObjectInstance) -> Option<([f32; 2], f32)> {
 
 /// Finds the town's posts and their servers again if the objects or the walls changed.
 pub(crate) fn refresh(w: &mut World) {
-    if w.staff.built == Some(w.nav_version) {
+    if w.staff.built == Some(w.objects_version) {
         return;
     }
     let mut staff = plan(w);
@@ -382,7 +382,7 @@ pub fn plan(w: &World) -> Staff {
         of[o as usize] = Some(k as u16);
     }
     Staff {
-        built: Some(w.nav_version),
+        built: Some(w.objects_version),
         servers,
         of,
     }

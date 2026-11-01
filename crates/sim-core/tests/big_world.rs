@@ -119,6 +119,15 @@ fn big_world_benchmark() {
     w.lod = true;
     w.set_view(Some(hamlets[0]));
     sim_core::path::take_search_stats();
+    // The first tick finds the rooms, the walkable regions and the indexes from scratch: part of
+    // starting the game, timed on its own.
+    let t = Instant::now();
+    w.tick_once();
+    eprintln!(
+        "first tick {:.1} ms (load and first tick {:.1} ms)",
+        ms(t.elapsed()),
+        ms(load + t.elapsed())
+    );
     let ticks = hours * 60 * sim_core::TICKS_PER_MINUTE;
     let mut times = Vec::with_capacity(ticks as usize);
     let run = Instant::now();
@@ -129,6 +138,15 @@ fn big_world_benchmark() {
     }
     let total = run.elapsed();
     let searches = sim_core::path::take_search_stats();
+    let mut slowest: Vec<(Duration, usize)> = times.iter().copied().zip(0..).collect();
+    slowest.sort_unstable_by(|a, b| b.cmp(a));
+    eprintln!(
+        "slowest ticks (ms, tick): {:?}",
+        slowest[..5.min(slowest.len())]
+            .iter()
+            .map(|(d, t)| (format!("{:.2}", ms(*d)), *t))
+            .collect::<Vec<_>>()
+    );
     times.sort_unstable();
     let p99 = times[(times.len() * 99 / 100).min(times.len() - 1)];
     let max = *times.last().unwrap();
@@ -179,14 +197,18 @@ fn big_world_benchmark() {
     });
     if placed {
         let t = Instant::now();
+        w.refresh_walkable();
+        let reach = t.elapsed();
+        let t = Instant::now();
         w.refresh_navigation();
-        let nav = t.elapsed();
+        let index = t.elapsed();
         let t = Instant::now();
         w.refresh_rooms();
         let rooms = t.elapsed();
         eprintln!(
-            "one object placed: navigation catches up in {:.3} ms, rooms in {:.3} ms",
-            ms(nav),
+            "one object placed: walkable regions catch up in {:.3} ms, objects' index and links in {:.3} ms, rooms in {:.3} ms",
+            ms(reach),
+            ms(index),
             ms(rooms)
         );
     } else {
