@@ -44,13 +44,12 @@ export function tileWorld(world: WorldStructure, n: number): WorldStructure {
   plots.forEach((p, i) => (p.id = i));
   const P = world.plots.length;
   const objects = many(world.objects, (o, tx, tz, k): ObjectPlacement => ({ ...o, id: o.id + k * ID_STRIDE, x: o.x + tx * W, z: row(o.z, tz) }));
-  const rooms = new Array<number>(W * n * D2 * blocks).fill(0);
+  // (A typed array, row by row: the open world's sim sends rooms as a Uint16Array too.)
+  const rooms = new Uint16Array(W * n * D2 * blocks);
+  const src = Uint16Array.from(world.rooms);
   for (let z = 0; z < world.depth; z++) {
-    for (let x = 0; x < W; x++) {
-      const r = world.rooms[z * W + x];
-      if (!r) continue;
-      for (const [tx, tz] of copies) rooms[row(z, tz) * W * n + x + tx * W] = r;
-    }
+    const line = src.subarray(z * W, z * W + W);
+    for (const [tx, tz] of copies) rooms.set(line, row(z, tz) * W * n + tx * W);
   }
   const m = world.meta;
   const shift = <R extends { x: number; z: number }>(r: R, tx: number, tz: number): R => ({ ...r, x: r.x + tx * W, z: r.z + tz * D });
@@ -71,7 +70,8 @@ export function tileWorld(world: WorldStructure, n: number): WorldStructure {
     storeyDepth: world.storeyDepth === undefined ? undefined : D2,
     plots,
     objects,
-    rooms,
+    // (`rooms` is typed `number[]` until the sim-grid branch makes it the contract's Uint16Array; read by index alike.)
+    rooms: rooms as unknown as number[],
     meta,
     // The player's household on the first copy (its plot index is the original's).
     households: world.households,
