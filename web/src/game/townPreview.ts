@@ -94,6 +94,8 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
   });
 
   const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths: layout.paths, facing: layout.facing, seed: town.seed ?? 1, world: worldLook(town, layout.fields), home: playerSlot };
+  // A big world's land and areas, as the town file carries them (`assembleTown`).
+  if (town.open) Object.assign(meta, { zones: town.open.zones, pads: town.open.pads, areas: town.open.areas });
   return {
     version: 0,
     lotVersion: 0,

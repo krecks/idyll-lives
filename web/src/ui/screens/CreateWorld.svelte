@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { menuScene } from '../../game/menuScene';
-  import { generateWorld, loadTemplates, type NeighbourhoodDraft, type Templates } from '../../game/town';
-  import { WORLD_KINDS, WORLDS, worldName, type WorldKind } from '../../game/world';
+  import { generateWorld, loadTemplates, neighbourCap, type NeighbourhoodDraft, type Templates } from '../../game/town';
+  import { WORLD_KINDS, WORLDS, worldName, type WorldKind, type WorldSize } from '../../game/world';
   import { app } from '../app.svelte';
   import { lifespanHint } from '../format';
   import Icon from '../Icon.svelte';
@@ -14,6 +14,14 @@
   let templates = $state.raw<Templates | null>(null);
   let world = $state.raw<NeighbourhoodDraft | null>(app.world);
   let kind = $state<WorldKind>(app.world?.world?.kind ?? 'medium');
+  /** How big a world (docs/design/open-world.md); Big only with the dev flag `?big=1` until the simulation takes it. */
+  let size = $state<WorldSize>(app.world?.world?.size ?? 'cosy');
+  const bigAllowed = typeof location !== 'undefined' && new URLSearchParams(location.search).get('big') === '1';
+  const sizeOptions = [
+    { value: 'cosy' as const, label: 'Cosy' },
+    { value: 'normal' as const, label: 'Normal' },
+    ...(bigAllowed || app.world?.world?.size === 'big' ? [{ value: 'big' as const, label: 'Big' }] : []),
+  ];
   let name = $state(app.world?.name ?? '');
   /** The name was typed or rolled here (kept when the world is made again). */
   let named = $state(false);
@@ -24,6 +32,9 @@
   const farms = $derived(world ? world.slots.filter((s) => s.lot === 'farm').length : 0);
   const places = $derived(world ? world.slots.filter((s) => s.kind !== 'house').length : 0);
   const roadCount = $derived(world ? world.roads.length : 0);
+  const hamlets = $derived(world?.open ? world.open.areas.length - 1 : 0);
+  /** The chosen size in a line: homes, land, how many residents it holds. */
+  const sizeHint = $derived(world ? `${homes} homes${hamlets ? ` in a town and ${hamlets} hamlets` : ''} · ${world.width} × ${world.depth} m · up to ${neighbourCap(size)} neighbours` : '');
 
   // Public places and farms have their names on them; plain houses are left untagged (the town reads better).
   const labels = $derived<LotLabel[]>(
@@ -35,9 +46,15 @@
   /** A new world of the chosen kind (a new seed: a different place every time). */
   function make() {
     if (!templates) return;
-    world = generateWorld(content, templates, kind, undefined, named && name.trim() ? name.trim() : undefined);
+    world = generateWorld(content, templates, kind, undefined, named && name.trim() ? name.trim() : undefined, size);
     name = world.name;
     focus = null;
+  }
+
+  function resize(s: WorldSize) {
+    if (s === (world?.world?.size ?? 'cosy') && world) return;
+    size = s;
+    make();
   }
 
   function choose(k: WorldKind) {
@@ -55,7 +72,7 @@
     if (!world) return;
     const chosen = { ...world, name: name.trim() || world.name };
     // The same world as before (back and forth): its neighbours stay.
-    const same = app.town && app.town.seed === chosen.seed && app.town.world?.kind === chosen.world?.kind;
+    const same = app.town && app.town.seed === chosen.seed && app.town.world?.kind === chosen.world?.kind && app.town.world?.size === chosen.world?.size;
     app.town = same && app.town ? { ...app.town, name: chosen.name } : null;
     app.world = chosen;
     app.screen = 'neighbourhood';
@@ -148,6 +165,11 @@
               ]}
             />
             <span class="hint">{app.mode === 'creative' ? 'Building is free. No rent or bills at home.' : 'Your residents earn the money to build with.'}</span>
+          </div>
+          <div class="control">
+            <span class="eyebrow">Size</span>
+            <Segmented label="Size" value={size} options={sizeOptions} onchange={resize} />
+            <span class="hint">{sizeHint}</span>
           </div>
           <div class="control">
             <span class="eyebrow">Lifespan</span>
