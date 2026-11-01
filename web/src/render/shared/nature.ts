@@ -14,6 +14,7 @@ import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
 import { fbm, hash, smoothstep, valueNoise } from '../../game/noise';
+import { ZoneField } from './zones';
 
 /**
  * How far the landscape extends beyond the town (metres): towns of older code, and worlds (which
@@ -31,6 +32,8 @@ export const BIG_WOODS_CELL = 256;
 export const BIG_FLOWERS_CELL = 128;
 /** A big world's woods past this far (m) from anything built are half as dense. */
 const BIG_WOODS_THIN = 40;
+/** A big world's hill zones rise this high (m) at most (between what is built: the land there stays flat). */
+const BIG_HILLS = 16;
 const TERRAIN_STEP = 2.5;
 /** At most this many terrain quads across (a wider landscape gets coarser ones). */
 const TERRAIN_SEGMENTS = 260;
@@ -359,6 +362,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     this.land = { ...DEFAULT_LANDSCAPE, ...world.meta?.world?.landscape };
     this.ring = world.meta?.world ? WORLD_RING : RING;
     this.built = world.meta?.world?.size === 'big' ? LandscapeLayout.builtField(world, this.w, this.d) : null;
+    this.zones = this.built && world.meta?.zones?.length ? new ZoneField(world.meta.zones, this.w, this.d) : null;
     this.passes = townExits(world);
     this.roads = makeRoads(
       { seed: this.seed, w: this.w, d: this.d, ring: this.ring, ground: (x, z) => this.ground(x, z), waterEdge: (x, z) => this.waterEdge(x, z), distanceToTown: (x, z) => this.distanceToTown(x, z) },
@@ -379,9 +383,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     return !!this.land.mountains;
   }
 
-  /** Whether there is a sea or a lake. */
+  /** Whether there is a sea or a lake (a big world's: water zones). */
   get watered(): boolean {
-    return !!this.land.water;
+    return !!this.land.water || !!this.zones?.has('water');
   }
 
   /** Identity of a town's landscape (built once per town and kept while it is shown). */
@@ -397,7 +401,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   waterEdge(x: number, z: number): number {
     const water = this.land.water;
-    if (!water) return -Infinity;
+    // (A big world's water is its zones'.)
+    if (!water) return this.zones ? this.zones.edge('water', x, z) - (fbm(x * 0.03, z * 0.03, this.seed + 61, 3) - 0.45) * 6 : -Infinity;
     if (water.kind === 'sea') {
       const past = water.side === 'zmin' ? -z : z - this.d;
       return past - water.shore - fbm(x * 0.02, 3.7, this.seed + 61, 3) * 8;
@@ -426,6 +431,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * rises between them (two chamfer passes, ~2 % off the true distance). Null: not a big world.
    */
   protected readonly built: { gw: number; gd: number; dist: Float32Array } | null;
+
+  /** A big world's zones (`meta.zones`): its water, its hills, and where woods, meadows and fields are. Null elsewhere. */
+  protected readonly zones: ZoneField | null;
 
   private static builtField(world: WorldStructure, w: number, d: number): { gw: number; gd: number; dist: Float32Array } {
     const gw = Math.ceil(w / BUILT_CELL);
@@ -516,17 +524,21 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   ground(x: number, z: number): number {
     const dist = this.distanceToTown(x, z);
     const L = this.land;
+    const water = this.watered;
     let h = 0;
     if (dist > APRON) {
       const rise = smoothstep(APRON, APRON + L.rise, dist);
       // Among mountains the near side of the valley (towards the menus' camera) stays low.
       const open = L.mountains ? this.openness(z) : 1;
       const hills = (fbm(x * 0.018, z * 0.018, this.seed) * L.hills - (L.hills * 4) / 14) * (0.15 + 0.85 * open);
-      const rim = Math.pow(Math.max(0, dist - L.rimFrom) / RING, 2) * L.rim * open;
+      // (A big world's rim rises round the world, past its edge; between its hamlets its hill zones do.)
+      const rimFrom = this.zones ? Math.hypot(Math.max(0 - x, 0, x - this.w), Math.max(0 - z, 0, z - this.d)) : dist - L.rimFrom;
+      const rim = Math.pow(Math.max(0, rimFrom) / RING, 2) * L.rim * open;
+      const zoned = this.zones ? this.zones.share('hill', x, z, 40) * BIG_HILLS * (0.55 + 0.9 * fbm(x * 0.008 + 5, z * 0.008, this.seed + 303, 3)) : 0;
       // By water the land stays above it (no puddles in the hollows).
-      h = Math.max(L.water ? 0 : -0.4, rise * hills + rim) + this.mountain(x, z, dist);
+      h = Math.max(water ? 0 : -0.4, rise * (hills + zoned) + rim) + this.mountain(x, z, dist);
     }
-    if (!L.water || dist === 0) return h;
+    if (!water || dist === 0) return h;
     // Down a sandy bank to the shore, then under the water.
     const e = this.waterEdge(x, z);
     if (e < -BEACH * 1.5) return h;
@@ -589,6 +601,11 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     lerp(P.lush, P.grass, smoothstep(0.3, 0.55, fine), out);
     lerp(out, P.meadow, smoothstep(0.5, 0.75, patch), out);
     lerp(out, P.hill, smoothstep(1, 10, h), out);
+    // A big world's meadows paler and flowery, its woods' floor the hills' deeper green.
+    if (this.zones) {
+      lerp(out, P.meadow, this.zones.share('meadow', x, z, 8) * 0.75, out);
+      lerp(out, P.hill, this.zones.share('woods', x, z, 10) * 0.6, out);
+    }
     // Worn, earthy patches: sparse, and more common on the flat ground near the town.
     const bare = smoothstep(0.66, 0.8, fbm(x * 0.09 + 13, z * 0.09 - 7, this.seed + 5, 3)) * (1 - smoothstep(2, 8, h));
     lerp(out, P.dirt, bare * 0.85, out);
@@ -639,11 +656,13 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * with distance and up the hills) and whether the point is by a hedgerow at its edge. Null elsewhere.
    */
   private fieldCell(x: number, z: number): { kind: number; v: number; weight: number; hedge: boolean } | null {
-    const f = this.land.fields;
+    // (A big world's fields are its field zones: the patchwork in them only, wherever they are.)
+    const zones = this.zones;
+    const f = zones ? (zones.has('fields') ? (this.land.fields ?? { size: 34, angle: hash(3, 5, this.seed) * Math.PI }) : null) : this.land.fields;
     if (!f) return null;
     const dist = this.distanceToTown(x, z);
     if (dist < APRON + 3) return null;
-    const weight = (1 - smoothstep(this.ring * 0.6, this.ring * 0.85, dist)) * smoothstep(APRON + 3, APRON + 6, dist);
+    const weight = (zones ? zones.share('fields', x, z, 4) : 1 - smoothstep(this.ring * 0.6, this.ring * 0.85, dist)) * smoothstep(APRON + 3, APRON + 6, dist);
     if (weight <= 0) return null;
     const c = Math.cos(f.angle);
     const s = Math.sin(f.angle);
@@ -683,10 +702,16 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         if (dist < APRON + L.treeline) continue;
         const forest = fbm(x * 0.025, z * 0.025, this.seed + 7, 3);
         let density = smoothstep(0.42 - L.forest, 0.62 - L.forest, forest) * 0.85 + 0.06 + L.forest * 0.25 - (dist < 14 ? 0.05 : 0);
+        // A big world's woods are its woods zones (the odd tree in the open, fewer on its meadows).
+        if (this.zones) {
+          const wood = this.zones.share('woods', x, z, 8);
+          density = wood * (0.6 + 0.3 * smoothstep(0.3, 0.6, forest)) + (1 - wood) * (0.05 + 0.2 * smoothstep(0.42, 0.7, forest));
+          density *= 1 - 0.85 * this.zones.share('meadow', x, z, 6);
+        }
         // Fields are open, with hedgerows and the odd tree along their edges; nothing grows in the water or on the beach.
         const cell = this.fieldCell(x, z);
         if (cell) density = cell.hedge ? 0.55 : density * (1 - cell.weight);
-        if (L.water && this.waterEdge(x, z) > -BEACH * 0.8) continue;
+        if (this.watered && this.waterEdge(x, z) > -BEACH * 0.8) continue;
         // Bare tops on mountains.
         if (L.mountains && this.heightAt(x, z) > TREELINE + forest * 10) continue;
         // Nothing on the roads or right by them.
@@ -751,7 +776,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         // (Where the tufts were, before the grass: one or two a tile.)
         const n = rand() < 0.5 ? 2 : 1;
         for (let k = 0; k < n * TUFT_DRAWS; k++) rand();
-        if (rand() < 0.06) {
+        // (A big world's water is on its tiles: no flowers in it.)
+        if (rand() < 0.06 && !(this.zones && this.waterEdge(x + 0.5, z + 0.5) > -BEACH * 0.6)) {
           flowers.push(scatter(x, z, rand, 0.8 + rand() * 0.5));
           flowerTiles.push(i);
         }
