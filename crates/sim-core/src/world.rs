@@ -17,7 +17,12 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
+/// The most residents a town holds (a town file may start with this many; saves, slots, the
+/// snapshot's layout).
 pub const MAX_SIMS: usize = 160;
+/// The most a town grows to by births and newcomers (`World::population_cap`), but for a big
+/// world: as many as towns always had.
+pub const TOWN_SIMS: usize = 64;
 
 /// A set of residents by slot (`MAX_SIMS` of them, a bit each).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
@@ -2979,8 +2984,9 @@ impl World {
                 "at most {most} residents per household"
             )));
         }
-        if self.sims.iter().filter(|s| s.here()).count() + sims.len() > MAX_SIMS {
-            return Err(Error::new(format!("at most {MAX_SIMS} residents per town")));
+        let cap = self.population_cap();
+        if self.sims.iter().filter(|s| s.here()).count() + sims.len() > cap {
+            return Err(Error::new(format!("at most {cap} residents in this town")));
         }
         if bonds.iter().any(|b| b.a >= sims.len() || b.b >= sims.len()) {
             return Err(Error::new("a bond refers to someone who isn't moving in"));
@@ -3486,6 +3492,12 @@ impl World {
         } else {
             r
         }
+    }
+
+    /// The most residents this town grows to by births and newcomers: `MAX_SIMS` in a big
+    /// world, else `TOWN_SIMS` (cosy and normal towns, and towns and saves without a size).
+    pub fn population_cap(&self) -> usize {
+        self.travel.population_cap()
     }
 
     /// The navigation version: bumped whenever something walkers can or can't step through
@@ -8974,7 +8986,7 @@ fn could_conceive(ctx: &Ctx, a: usize, b: usize) -> bool {
         && y.household == x.household
         && ctx.households[h].expecting.is_none()
         && members < ctx.content.rules.max_household
-        && ctx.briefs.iter().filter(|s| s.here).count() < MAX_SIMS
+        && ctx.briefs.iter().filter(|s| s.here).count() < ctx.travel.population_cap()
 }
 
 /// The colours a player gives an object's parts, 0xRRGGBB by the name of the model's material

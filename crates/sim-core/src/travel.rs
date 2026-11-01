@@ -932,6 +932,14 @@ impl Travel {
         }
     }
 
+    /// The most residents the town grows to (`World::population_cap`).
+    pub fn population_cap(&self) -> usize {
+        match self.size {
+            WorldSize::Big => crate::world::MAX_SIMS,
+            WorldSize::Cosy | WorldSize::Normal => crate::world::TOWN_SIMS,
+        }
+    }
+
     /// Whether tile `i` (`Lot::tile_index`) is blocked by the land itself (`base_blocked`).
     pub fn ground_blocked(&self, i: usize) -> bool {
         self.base_blocked.binary_search(&i).is_ok()
