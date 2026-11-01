@@ -3296,6 +3296,13 @@ impl World {
         }
     }
 
+    /// Catches up on what changed for walking since the last tick (the walkable regions, the
+    /// objects-by-plot index and the links), as the next tick would: for benchmarks and tools.
+    pub fn refresh_navigation(&mut self) {
+        self.refresh_reach();
+        self.refresh_index();
+    }
+
     /// Labels the walkable regions of the lot again if the navigation changed (see
     /// `path::Reach`): an unreachable goal is then refused before a search can flood the town.
     fn refresh_reach(&mut self) {

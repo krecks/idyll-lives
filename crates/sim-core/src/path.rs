@@ -311,15 +311,20 @@ impl NavGrid<'_> {
             let heuristic = |a: (i32, i32), b: (i32, i32)| heuristic(self.flat(a), self.flat(b));
             open.push(Reverse((heuristic(start, goal), s as u32)));
 
-            while let Some(Reverse((f, i))) = open.pop() {
+            let mut expanded = 0u64;
+            let found = loop {
+                let Some(Reverse((f, i))) = open.pop() else {
+                    break None;
+                };
                 let i = i as usize;
                 if i == goal_i {
-                    return Some(reconstruct(lot, came, i));
+                    break Some(reconstruct(lot, came, i));
                 }
                 let (x, z) = ((i % lot.width) as i32, (i / lot.width) as i32);
                 if f > g[i] + heuristic((x, z), goal) {
                     continue; // stale heap entry
                 }
+                expanded += 1;
                 let link = self
                     .stairs
                     .link(x, z)
@@ -355,8 +360,9 @@ impl NavGrid<'_> {
                         open.push(Reverse((cost + heuristic((nx, nz), goal), ni as u32)));
                     }
                 }
-            }
-            None
+            };
+            STATS.with_borrow_mut(|s| s.add(expanded));
+            found
         })
     }
 
@@ -556,6 +562,30 @@ impl Scratch {
 
 thread_local! {
     static SCRATCH: RefCell<Scratch> = RefCell::default();
+    static STATS: RefCell<SearchStats> = RefCell::default();
+}
+
+/// What the searches on this thread cost since the last `take_search_stats`: for benchmarks.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SearchStats {
+    /// A* searches run (refused ones, unreachable or with a blocked goal, don't count).
+    pub searches: u64,
+    /// Tiles expanded over all of them, and by the biggest one.
+    pub nodes: u64,
+    pub max_nodes: u64,
+}
+
+impl SearchStats {
+    fn add(&mut self, nodes: u64) {
+        self.searches += 1;
+        self.nodes += nodes;
+        self.max_nodes = self.max_nodes.max(nodes);
+    }
+}
+
+/// The search costs on this thread since the last call (and starts counting again).
+pub fn take_search_stats() -> SearchStats {
+    STATS.with_borrow_mut(std::mem::take)
 }
 
 const NEIGHBOURS: [(i32, i32); 8] = [
