@@ -128,6 +128,12 @@ export class Street {
   /** The chunks to draw (null: every one the town has). */
   private wanted: ReadonlySet<number> | null = null;
   private readonly chunks = new Map<number, BuiltChunk>();
+  /** Every chunk planned so far (drawn or not), by id: a chunk streamed in again with the same key is taken from here. */
+  private readonly planned = new Map<number, BuiltChunk>();
+  /** Draw groups whose chunks changed, waiting for their meshes. */
+  private readonly dirtyGroups = new Set<number>();
+  /** Whether every chunk of the town has been planned (the first build while streaming does it). */
+  private prepared = false;
   private readonly groups = new Map<number, Group>();
   /** The focus lot's own (its garage), as built, and from which chunk key. */
   private lotMeshes: pc.Entity[] = [];
@@ -261,32 +267,54 @@ export class Street {
     const focus = this.focus;
     const all = town.chunkIds();
     const wanted = this.wanted ? all.filter((id) => this.wanted!.has(id)) : all;
-    const dirty = new Set<number>();
-    // Chunks no longer drawn go.
+    const dirty = this.dirtyGroups;
+    const wantedSet = new Set(wanted);
+    // Chunks no longer drawn go (their plans are kept: streamed in again, they cost only their group's meshes).
     for (const id of [...this.chunks.keys()]) {
-      if (wanted.includes(id)) continue;
+      if (wantedSet.has(id)) continue;
       this.chunks.delete(id);
       dirty.add(groupOf(id));
     }
     let planned = 0;
+    const planOf = (id: number, key: string): BuiltChunk => {
+      const kept = this.planned.get(id);
+      if (kept?.key === key) return kept;
+      const plan = town.chunk(id, focus);
+      const built = { key, plan, data: chunkData(plan) };
+      this.planned.set(id, built);
+      return built;
+    };
     for (const id of wanted) {
       const key = town.chunkKey(id, focus);
-      if (this.chunks.get(id)?.key === key) continue;
-      const plan = town.chunk(id, focus);
-      this.chunks.set(id, { key, plan, data: chunkData(plan) });
-      dirty.add(groupOf(id));
-      planned++;
+      if (this.chunks.get(id)?.key !== key) {
+        this.chunks.set(id, planOf(id, key));
+        dirty.add(groupOf(id));
+        planned++;
+      }
       await pace?.();
       if (stale()) return;
+    }
+    // Streaming: every other chunk planned now too (at load, between frames), so the camera
+    // roaming later only merges and uploads them.
+    if (this.wanted && !this.prepared) {
+      for (const id of all) {
+        if (wantedSet.has(id)) continue;
+        planOf(id, town.chunkKey(id, focus));
+        await pace?.();
+        if (stale()) return;
+      }
+      this.prepared = true;
     }
     perfEnd(span);
     if (planned || dirty.size) this.instancesDue = true;
 
     const meshesSpan = perfStart('street: meshes');
-    for (const g of dirty) {
-      this.buildGroup(g);
-      await pace?.();
+    // (A group left by a build a newer one stopped stays dirty for that one.)
+    const rebuilt = dirty.size > 0;
+    for (const g of [...dirty]) {
+      await this.buildGroup(g, pace, stale);
       if (stale()) return;
+      dirty.delete(g);
     }
     // The focus lot's garage (apart: it goes with the lot's ground).
     const focusChunk = town.focusChunk(focus);
@@ -317,7 +345,7 @@ export class Street {
         add(lot.pools, 'streetLotPools', this.poolMat, { colors: false, receiveShadows: false, alphaIndex: 5 });
       }
     }
-    if (dirty.size) this.gatherHomes();
+    if (rebuilt) this.gatherHomes();
     this.buildFar(town, all, focus);
     perfEnd(meshesSpan);
 
@@ -536,17 +564,16 @@ export class Street {
   }
 
   /** A draw group's meshes again, from its chunks' vertex arrays (one mesh a material), and its window glass. */
-  private buildGroup(id: number): void {
-    let g = this.groups.get(id);
-    if (g) for (const e of g.meshes) e.destroy();
+  private async buildGroup(id: number, pace?: () => Promise<void>, stale?: () => boolean): Promise<void> {
     const members = [...this.chunks.entries()].filter(([c]) => groupOf(c) === id).sort(([a], [b]) => a - b);
+    let g = this.groups.get(id);
     if (!members.length) {
-      if (g) for (const w of g.windows) w.entity.destroy();
+      if (g) for (const e of [...g.meshes, ...g.windows.map((w) => w.entity)]) e.destroy();
       this.groups.delete(id);
       return;
     }
-    if (!g) this.groups.set(id, (g = { meshes: [], windows: [], windowsDue: false }));
-    g.meshes = [];
+    // The new meshes built hidden, a material at a time between frames, then put in place of the old at once.
+    const fresh: pc.Entity[] = [];
     const draws = new Map<string, Draw>();
     for (const [, c] of members) for (const [k, d] of this.draws(c.plan)) if (!draws.has(k)) draws.set(k, d);
     for (const [name, d] of draws) {
@@ -562,8 +589,19 @@ export class Street {
       if (d.lit) {
         if (this.layers && entity.render) entity.render.layers = this.layers;
       } else this.dress(entity, d.cast);
-      g.meshes.push(entity);
+      entity.enabled = false;
+      fresh.push(entity);
+      await pace?.();
+      if (stale?.()) {
+        for (const e of fresh) e.destroy();
+        return;
+      }
     }
+    g = this.groups.get(id);
+    if (g) for (const e of g.meshes) e.destroy();
+    else this.groups.set(id, (g = { meshes: [], windows: [], windowsDue: false }));
+    for (const e of fresh) e.enabled = true;
+    g.meshes = fresh;
     g.windowsDue = true;
   }
 
@@ -605,6 +643,9 @@ export class Street {
     }
     this.groups.clear();
     this.chunks.clear();
+    this.planned.clear();
+    this.prepared = false;
+    this.dirtyGroups.clear();
     for (const g of this.farGroups.values()) g.entity?.destroy();
     this.farGroups.clear();
     this.farData.clear();

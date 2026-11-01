@@ -665,7 +665,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         const close = dist < SHADOW_RANGE && kind !== 'model.rock';
         if (close) this.nearWoods.push({ key: kind, x, y, z, sx: scale, sy: up, sz: scale, yaw });
         const bucket = close ? near : far;
-        bucket.set(kind, [...(bucket.get(kind) ?? []), m]);
+        let list = bucket.get(kind);
+        if (!list) bucket.set(kind, (list = []));
+        list.push(m);
       }
     }
     const [cx, cz] = [this.w / 2, this.d / 2];
@@ -783,7 +785,11 @@ export function decorPlants(decor: readonly [string, Decor][]): PlantPlacement[]
  */
 export function natureDecor(key: string, items: Decor, world?: WorldStructure, view?: { x: number; z: number; w: number; d: number } | null): [string, Decor][] {
   const out = new Map<string, Decor>();
-  const put = (k: string, item: [number, number, number, number]) => out.set(k, [...(out.get(k) ?? []), item]);
+  const put = (k: string, item: [number, number, number, number]) => {
+    const list = out.get(k);
+    if (list) list.push(item);
+    else out.set(k, [item]);
+  };
   if (key === 'model.tree') {
     for (const item of items) {
       const h = hash(Math.floor(item[0] * 7), Math.floor(item[1] * 7), 91);
