@@ -990,6 +990,9 @@ pub struct Sim {
     /// resident nobody watches takes a turn only every so often, and a change between two of
     /// them still catches up with them. Not saved (after a load, a walker routes again once).
     pub(crate) nav_seen: u32,
+    /// Open-world towns: how long the way to work or school takes them today, worked out once
+    /// a day (`life::refresh_commute`); None: as `careerRules.commuteMinutes` says. Not saved.
+    pub(crate) commute: Option<crate::life::Commute>,
     /// The game for two (`Interaction::partner`) they're at, or on their way to, next: its
     /// object and interaction, and whether they're at their place. Set as each tick starts
     /// (`partners::refresh`), not saved (the task it comes from is).
@@ -1131,6 +1134,11 @@ impl Sim {
 
     pub fn current(&self) -> Option<&Activity> {
         self.current.as_ref()
+    }
+
+    /// How long their way to work or school takes today in an open-world town (`life::Commute`).
+    pub fn commute(&self) -> Option<crate::life::Commute> {
+        self.commute
     }
 
     /// Eating sitting down (at the table, on the sofa), not talking.
@@ -2635,6 +2643,7 @@ impl World {
             social_waited: 0,
             called: false,
             nav_seen: 0,
+            commute: None,
             game: None,
             wants_partner: false,
             joins: None,
@@ -6569,7 +6578,7 @@ fn start_task(
                 (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
             } else {
                 // Nearest way out of town; with no exits, work starts on the spot.
-                let Some(exit) = nearest_exit(ctx.exits, sim.pos) else {
+                let Some(exit) = exit_on_foot(ctx, sim) else {
                     sim.transition = Some(crate::life::Transition::Work);
                     return;
                 };
@@ -8171,7 +8180,7 @@ pub(crate) fn leave_at(sim: &Sim, content: &Content, tick: u64) -> Option<u64> {
         .as_ref()
         .and_then(|job| crate::life::shift_today(content, job, &sim.skills, tick))
         .or_else(|| crate::life::school_today(content, sim, tick))
-        .map(|(leave, ..)| leave)
+        .map(|(leave, start, _)| crate::life::leave_for(sim, leave, start))
         .filter(|&leave| leave > tick)
 }
 
@@ -8457,6 +8466,51 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
 /// `a` (radians) as a facing from -PI to PI.
 pub(crate) fn wrap_angle(a: f32) -> f32 {
     (a + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
+}
+
+/// The way out of town `sim` takes on foot: the nearest by straight line, or in an open-world
+/// town the quickest (`travel::Travel::eta`), bus stops included.
+pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
+    if !ctx.travel.open {
+        return nearest_exit(ctx.exits, sim.pos);
+    }
+    // From home, the way their commute was timed by.
+    let home = ctx
+        .households
+        .get(sim.household as usize)
+        .and_then(|h| h.plot);
+    if let Some(c) = sim.commute
+        && c.home == home
+        && let Some(&exit) = ctx.exits.get(c.exit)
+        && ctx
+            .briefs
+            .get(sim.id as usize)
+            .is_some_and(|b| b.plot.is_none() || b.plot == home)
+    {
+        return Some(exit);
+    }
+    quickest_exit(ctx.travel, ctx.exits, sim.pos, true).map(|i| ctx.exits[i])
+}
+
+/// The exit (an index into `exits`) quickest to get to from `pos`, on foot (bus stops too) or
+/// by car (roads out only).
+pub(crate) fn quickest_exit(
+    travel: &crate::travel::Travel,
+    exits: &[[f32; 2]],
+    pos: [f32; 2],
+    on_foot: bool,
+) -> Option<usize> {
+    let mode = if on_foot {
+        crate::travel::Mode::Foot
+    } else {
+        crate::travel::Mode::Car
+    };
+    (0..exits.len())
+        .filter(|&i| on_foot || !travel.is_stop(i))
+        .filter(|&i| exits[i].iter().all(|v| v.is_finite()))
+        .map(|i| (i, travel.eta(pos, exits[i], mode, 1.5)))
+        .min_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)))
+        .map(|(i, _)| i)
 }
 
 /// The town's way out (`World::exits`) nearest `pos`, if it has any.
