@@ -520,6 +520,10 @@ export async function startSession(
       bridge.send({ type: 'goHome', sim: game.selected });
       game.townOpen = false;
     },
+    lookAt(x, z) {
+      // The renderer branch turns this into a flight across the world (`flyTo`).
+      renderer.focus(x, z);
+    },
     socialize(target, social) {
       if (game.mode !== 'live') return;
       bridge.send({ type: 'social', sim: game.selected, target, social });

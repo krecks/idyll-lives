@@ -50,6 +50,8 @@ export interface GameControls {
   /** Send the selected Sim to another plot. */
   visit(plot: number): void;
   goHome(): void;
+  /** The camera goes to look at a world point (the town map's "look here"; docs/design/open-world.md). */
+  lookAt(x: number, z: number): void;
   /** The selected Sim starts social interaction `social` with `target`. */
   socialize(target: number, social: number): void;
   /** The selected Sim uses their phone: `action` (content `phone.actions` index), with `contact` or on their own. */
