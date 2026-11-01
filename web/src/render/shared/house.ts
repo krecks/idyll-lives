@@ -627,10 +627,12 @@ export class HousePlanner {
     /** Whether a wall stands on an edge and is drawn here (a preview's own, not one standing round it). */
     const drawn = (axis: 'h' | 'v', x: number, z: number): boolean => !!(own ?? edges).get(axis, x, z) && !!edges.get(axis, x, z);
     // Looks: face coverings and form from the wall list, the style from the opening.
+    // (Only round the view: the lookups never leave it, and a big world's walls are thousands.)
+    const nearView = (e: { x: number; z: number }) => !view || (e.x >= view.x - 2 && e.z >= view.z - 2 && e.x <= view.x + view.w + 2 && e.z <= view.z + view.d + 2);
     const looks = new Map<string, Look>();
-    for (const e of [...standingWalls, ...world.walls]) if (e.faces || e.form) looks.set(`${e.axis}:${e.x}:${e.z}`, { faces: e.faces, form: e.form });
+    for (const e of [...standingWalls, ...world.walls]) if ((e.faces || e.form) && nearView(e)) looks.set(`${e.axis}:${e.x}:${e.z}`, { faces: e.faces, form: e.form });
     for (const o of [...standingOpenings, ...world.openings]) {
-      if (o.style || o.sill !== undefined || o.head !== undefined) looks.set(`${o.axis}:${o.x}:${o.z}`, { ...looks.get(`${o.axis}:${o.x}:${o.z}`), style: o.style, sill: o.sill, head: o.head });
+      if ((o.style || o.sill !== undefined || o.head !== undefined) && nearView(o)) looks.set(`${o.axis}:${o.x}:${o.z}`, { ...looks.get(`${o.axis}:${o.x}:${o.z}`), style: o.style, sill: o.sill, head: o.head });
     }
     const lookOf = (axis: 'h' | 'v', x: number, z: number): Look => looks.get(`${axis}:${x}:${z}`) ?? {};
     /** A door's top on an edge (m): the player's, else the usual. */

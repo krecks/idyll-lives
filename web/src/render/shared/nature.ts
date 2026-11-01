@@ -233,7 +233,20 @@ export function splitHalf(axis: 'dp' | 'dn', fx: number, fz: number): 0 | 1 {
  * split tile: only that half), and 1 on its streets, paths and fields (`unlawned`) and its patios
  * (floor coverings outdoors). The grass's mask (`shared/grass.ts`) and the birds' lawn read it.
  */
-export function bareTiles(world: WorldStructure, mask: LawnMask = lawnMask(world)): Uint8Array {
+export function bareTiles(world: WorldStructure, mask?: LawnMask): Uint8Array {
+  // (Asked again for a world whose lawn is as it was, the birds' after a focus lot shown: the same answer.)
+  if (!mask) {
+    const inputs = lawnInputs(world);
+    if (lastBare && sameLawnInputs(lastBare.inputs, inputs)) return lastBare.bare;
+    const bare = bareTilesOf(world, lawnMask(world));
+    lastBare = { inputs, bare };
+    return bare;
+  }
+  return bareTilesOf(world, mask);
+}
+let lastBare: { inputs: LawnInputs; bare: Uint8Array } | null = null;
+
+function bareTilesOf(world: WorldStructure, mask: LawnMask): Uint8Array {
   const w = world.width;
   const d = groundDepth(world);
   const bare = mask.hidden.slice(0, w * d);
@@ -883,4 +896,36 @@ export function windDirection(yaw: number, sx: number, sz: number, out: { x: num
   const across = (dx * s + dz * c) * (sz / sx) ** 2;
   out.x = along * c + across * s;
   out.z = -along * s + across * c;
+}
+
+/** What the lawn grows round (`lawnMask`, `bareTiles`, the grass's walls): rooms, things, walls, diagonals, floors, paths and fields. */
+export interface LawnInputs {
+  width: number;
+  rooms: ArrayLike<number>;
+  things: Int32Array;
+  defs: string;
+  edges: string;
+  meta: unknown;
+}
+
+export function lawnInputs(world: WorldStructure): LawnInputs {
+  const things = new Int32Array(world.objects.length * 5);
+  world.objects.forEach((o, i) => things.set([o.x, o.z, o.w, o.d, o.rot], i * 5));
+  return {
+    width: world.width,
+    rooms: world.rooms,
+    things,
+    defs: world.objects.map((o) => o.def).join(),
+    edges: JSON.stringify([world.walls.length, world.diagonals, world.floors, world.walls.map((e) => `${e.axis}${e.x},${e.z}`).join()]),
+    meta: [world.meta?.paths, world.meta?.streets, world.meta?.roads, world.meta?.world?.fields],
+  };
+}
+
+export function sameLawnInputs(a: LawnInputs, b: LawnInputs): boolean {
+  if (a.width !== b.width || a.rooms.length !== b.rooms.length || a.things.length !== b.things.length || a.defs !== b.defs || a.edges !== b.edges) return false;
+  const [am, bm] = [a.meta as unknown[], b.meta as unknown[]];
+  if (am.some((v, i) => v !== bm[i] && JSON.stringify(v) !== JSON.stringify(bm[i]))) return false;
+  for (let i = 0; i < a.things.length; i++) if (a.things[i] !== b.things[i]) return false;
+  if (a.rooms !== b.rooms) for (let i = 0; i < a.rooms.length; i++) if (a.rooms[i] !== b.rooms[i]) return false;
+  return true;
 }

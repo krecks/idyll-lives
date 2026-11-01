@@ -33,7 +33,7 @@ import type { Lighting } from '../shared/environment';
 import { grassField, type GrassQuality } from '../shared/grass';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
-import { groupInstances, hideLawn, LandscapeLayout, lawnLayer, lawnMask, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnLayer, type LawnMask } from '../shared/nature';
+import { groupInstances, hideLawn, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
 import type { BenchDiag } from '../../debug/benchFlags';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
@@ -759,34 +759,3 @@ export class Sky {
   }
 }
 
-/** What the lawn grows round (`lawnMask`, `bareTiles`, the grass's walls): rooms, things, walls, diagonals, floors, paths and fields. */
-interface LawnInputs {
-  width: number;
-  rooms: ArrayLike<number>;
-  things: Int32Array;
-  defs: string;
-  edges: string;
-  meta: unknown;
-}
-
-function lawnInputs(world: WorldStructure): LawnInputs {
-  const things = new Int32Array(world.objects.length * 5);
-  world.objects.forEach((o, i) => things.set([o.x, o.z, o.w, o.d, o.rot], i * 5));
-  return {
-    width: world.width,
-    rooms: world.rooms,
-    things,
-    defs: world.objects.map((o) => o.def).join(),
-    edges: JSON.stringify([world.walls.length, world.diagonals, world.floors, world.walls.map((e) => `${e.axis}${e.x},${e.z}`).join()]),
-    meta: [world.meta?.paths, world.meta?.streets, world.meta?.roads, world.meta?.world?.fields],
-  };
-}
-
-function sameLawnInputs(a: LawnInputs, b: LawnInputs): boolean {
-  if (a.width !== b.width || a.rooms.length !== b.rooms.length || a.things.length !== b.things.length || a.defs !== b.defs || a.edges !== b.edges) return false;
-  const [am, bm] = [a.meta as unknown[], b.meta as unknown[]];
-  if (am.some((v, i) => v !== bm[i] && JSON.stringify(v) !== JSON.stringify(bm[i]))) return false;
-  for (let i = 0; i < a.things.length; i++) if (a.things[i] !== b.things[i]) return false;
-  if (a.rooms !== b.rooms) for (let i = 0; i < a.rooms.length; i++) if (a.rooms[i] !== b.rooms[i]) return false;
-  return true;
-}
