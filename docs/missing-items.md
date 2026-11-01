@@ -124,7 +124,7 @@ skirt's flag (`fields.y = 3`) gives it, and with the skirt's seated corrective (
 skin). One garment, two parts: `top.apron` (267 vertices) and `lod.top.apron` (112). In `WORKWEAR` (`outfit.ts`),
 a list of its own so it is never picked for a resident but counts as a garment of both bodies (`check.rs`); the
 town's staff wear it with dark trousers and dark shoes (`web/src/game/staff.ts`, `UNIFORM`), and it is drawn in
-play (`bench-results/review/fixes/apron/`). `cargo characters build` → check ok (2 bodies, 58 channels).
+play (`bench-results/check-apron/`). `cargo characters build` → check ok (2 bodies, 58 channels).
 Docs: `docs/characters-format.md` (shells, the hem band, garment ids), `docs/objects/open.md`,
 `docs/authenticity-review.md`, `docs/review/community.md`.
 
