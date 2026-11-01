@@ -208,7 +208,12 @@ within `cooking.serveRange` (6 tiles) instead, which is why the test buys chairs
 
 ## 6. Tooling not there yet
 
-Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value gaps:
+Full list: [authenticity-review.md](authenticity-review.md) §7. Everything that section listed as a gap is
+closed, and the three notes it still carries are `cargo review sizes` probe heuristics rather than tools that are
+missing: a face over open air wins the "top" (the market stall's canopy, the crib's rail read "no top to
+measure"), a vessel basin's rim is not the face it takes, the WC range has no boxed-in cistern, and a tub is
+measured at its water rather than its floor — each of them only a wrong measurement where nothing is drawn wrong.
+The gaps the coordinator's notes and the waves' review logs listed, in reverse order:
 
 **Done 2026-10-30 (content):**
 
