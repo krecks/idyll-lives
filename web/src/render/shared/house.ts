@@ -744,8 +744,10 @@ export class HousePlanner {
       t.sz += cz * n;
       roomTiles.set(r, t);
     };
-    for (let z = 0; z < D; z++) {
-      for (let x = 0; x < W; x++) {
+    // (Only the view's tiles: a big world's grid is a million a storey.)
+    const [z0, z1, x0, x1] = view ? [Math.max(0, view.z), Math.min(D, view.z + view.d), Math.max(0, view.x), Math.min(W, view.x + view.w)] : [0, D, 0, W];
+    for (let z = z0; z < z1; z++) {
+      for (let x = x0; x < x1; x++) {
         const r = room(x, z);
         if (r === 0 || !inView(x, z)) continue;
         const d = diagonal(x, z);
