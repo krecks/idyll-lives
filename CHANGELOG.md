@@ -13,6 +13,8 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 - **Grass past the edge of town:** the lawn's grass no longer stops in a line a little way out of town. Its blades grow on over the whole landscape round the town, however far out the camera goes, thinning out with distance from the camera as they do in town, and the land beyond keeps the lawn's colour and its gusts of wind, fading gently into the far hills.
 - **A basement you can see:** looking at the basement, your lot's garage, car, driveway and garden paths go with the rest of the ground instead of floating over the dug-out lot, the earth round the basement is earth-brown instead of a near-black slab, and rooms nobody is in (their lamps off) are softly lit enough to see what's in them, still well below a room with its lamps on. That soft light is as bright at night as by day, with no moonlight's blue down there. A new game's lamps are on only in rooms someone is in (they all came on before, and stayed on in a basement nobody went down to); residents switch them as they come and go, as before. The basement's walls have clean tops: no dark stone ledge along them and no dark notches at every post, which showed once it was lit.
 
+- **Textures:** every surface map, the 19 texture sets and the sidewalk, is now generated in code by `cargo tex synth` (`crates/tools/src/tex/synth.rs`) from tileable height fields, and is original CC0. The download/process pipeline for them is gone; `web/public/assets/CREDITS.md` and `tools/art/README.md` describe the new flow.
+
 ### Also
 - **Saves:** format 34 (where every car is, who owns it, every house's driveway and the garages). Older saves open with no cars in the simulation: their neighbours' cars stay parked, as before.
 
