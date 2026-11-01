@@ -77,3 +77,71 @@ fn v0_4_2s_chess_tables_come_through_at_their_new_size() {
     // (Both had room to grow to 2 x 1: none was sold back.)
     assert_eq!(w.objects.iter().filter(|o| o.def == def).count(), 2);
 }
+
+#[test]
+fn a_town_saved_as_v34_plays_on() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves/v034_town.json");
+    let content = common::content();
+    let mut w = World::from_save_json(&content, &std::fs::read_to_string(path).unwrap()).unwrap();
+    assert_eq!(w.seed, 11, "a v34 save knows its seed");
+    common::check(&w);
+    w.lod = false;
+    let end = w.tick + TICKS_PER_DAY;
+    while w.tick < end {
+        w.tick_once();
+        if w.tick.is_multiple_of(600) {
+            common::check(&w);
+        }
+    }
+    common::reload(&w, &content);
+}
+
+/// A v34 save (dense edge strings, chemistry per pair, no open-world fields) loads, saves as
+/// v35 (run-length edges, chemistry packed, the town's fields made up) and loads back the same.
+#[test]
+fn a_v34_save_comes_through_v35_unchanged() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves/v034_town.json");
+    let old_json = std::fs::read_to_string(path).unwrap();
+    let old: serde_json::Value = serde_json::from_str(&old_json).unwrap();
+    assert_eq!(old["version"], 34);
+    let content = common::content();
+    let w = World::from_save_json(&content, &old_json).unwrap();
+    // Made up from what the old save had: one hamlet over the town, its exits as roads out.
+    assert_eq!(w.town.size, sim_core::lot::WorldSize::Cosy);
+    assert_eq!(w.town.areas.len(), 1);
+    assert_eq!(w.town.exits.len(), w.exits.len());
+    let json = w.save_json();
+    let new: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(new["version"], sim_core::save::SAVE_VERSION);
+    assert!(new["lot"]["hEdges"].as_str().unwrap().starts_with('~'));
+    assert!(new["chemistry"].as_str().is_some_and(|c| !c.is_empty()));
+    assert!(
+        new["relationships"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|r| r.get("chemistry").is_none())
+    );
+    assert!(
+        json.len() < old_json.len(),
+        "{} vs {}",
+        json.len(),
+        old_json.len()
+    );
+    let back = World::from_save_json(&content, &json).unwrap();
+    assert_eq!(back.lot, w.lot);
+    assert_eq!(back.town, w.town);
+    let n = w.sims.len();
+    for a in 0..n {
+        for b in 0..n {
+            assert_eq!(back.relationships.get(a, b), w.relationships.get(a, b));
+            assert_eq!(
+                back.relationships.chemistry(a, b).to_bits(),
+                w.relationships.chemistry(a, b).to_bits(),
+                "{a}, {b}"
+            );
+        }
+    }
+    assert_eq!(back.dirt, w.dirt);
+    assert_eq!(back.save_json(), json, "saves the same again");
+}

@@ -16,7 +16,7 @@
 
 use std::collections::{BTreeMap, VecDeque};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::Error;
 
@@ -191,9 +191,10 @@ pub struct LotFile {
     /// Starting relationships between Sims (indices into `sims`).
     #[serde(default)]
     pub relationships: Vec<BondRaw>,
-    /// Where Sims leave town (for work) and come back. Optional.
+    /// Where Sims leave town (for work) and come back: `[x, z]` (a road out) or `{ x, z, kind }`
+    /// (`road` or `stop`, a bus stop for people on foot). Optional.
     #[serde(default)]
-    pub exits: Vec<[f32; 2]>,
+    pub exits: Vec<TownExit>,
     /// Households' cars on their driveways (`cars.rs`). Optional.
     #[serde(default)]
     pub cars: Vec<crate::cars::CarRaw>,
@@ -206,6 +207,22 @@ pub struct LotFile {
     /// Opaque data for the presentation layer (streets, scenery seed...). Saved unchanged.
     #[serde(default)]
     pub meta: serde_json::Value,
+    /// The open-world fields (docs/design/open-world.md; kept in `TownPlan`). How big the world
+    /// is (absent: `cosy`).
+    #[serde(default)]
+    pub size: Option<WorldSize>,
+    /// The roads, for the sim (the same objects as `meta.roads`).
+    #[serde(default)]
+    pub roads: Vec<RoadPlan>,
+    /// The hamlets (area 0: the main town) and stretches of countryside.
+    #[serde(default)]
+    pub areas: Vec<TownArea>,
+    /// Water and blocked land, as run-length masks over the ground grid.
+    #[serde(default)]
+    pub terrain: Option<Terrain>,
+    /// Public parking for car trips between areas.
+    #[serde(default)]
+    pub parking: Vec<ParkingSpot>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -220,6 +237,12 @@ pub struct PlotRaw {
     /// Where visitors arrive (in front of the door).
     #[serde(default)]
     pub entry: Option<[f32; 2]>,
+    /// The area (`LotFile::areas` index) it is in.
+    #[serde(default)]
+    pub area: Option<u32>,
+    /// What it is for.
+    #[serde(default)]
+    pub kind: Option<PlotKind>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -320,6 +343,304 @@ pub struct SimSpawn {
     pub skills: std::collections::HashMap<String, f32>,
     pub x: f32,
     pub z: f32,
+}
+
+/// How big a world is (docs/design/open-world.md); towns without one are `cosy`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WorldSize {
+    #[default]
+    Cosy,
+    Normal,
+    Big,
+}
+
+/// What kind of way a road is: `street` (the default), `lane`, `country` (between areas) or
+/// `trail` (2 m, on foot only).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RoadKind {
+    #[default]
+    Street,
+    Lane,
+    Country,
+    Trail,
+}
+
+/// A road of the town (`RoadPlan` in `web/src/core/protocol.ts`): its middle, a point about
+/// every metre (town tiles), its width with the sidewalks, its kind and the area it belongs to.
+/// What the sim doesn't use of it (the side its lots are on, a roundabout's island) stays in
+/// `meta.roads` for the renderer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RoadPlan {
+    pub points: Vec<[f32; 2]>,
+    pub width: f32,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub kind: RoadKind,
+    /// The area (`TownPlan::areas` index) it belongs to; absent between areas.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub area: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// What is at each end: `out`, `dead`, `join` or `loop`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ends: Option<[String; 2]>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AreaKind {
+    #[default]
+    Hamlet,
+    Countryside,
+}
+
+/// A hamlet (area 0: the main town) or a stretch of countryside.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TownArea {
+    pub name: String,
+    #[serde(default)]
+    pub kind: AreaKind,
+    pub x: i32,
+    pub z: i32,
+    pub w: i32,
+    pub d: i32,
+}
+
+/// A way out of town: a road out, or a bus stop that counts as one for people on foot.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExitKind {
+    #[default]
+    Road,
+    Stop,
+}
+
+/// Where people leave town; a town file gives `[x, z]` (a road out) or `{ x, z, kind }`.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct TownExit {
+    pub x: f32,
+    pub z: f32,
+    pub kind: ExitKind,
+}
+
+impl<'de> Deserialize<'de> for TownExit {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Raw {
+            Point([f32; 2]),
+            Typed {
+                x: f32,
+                z: f32,
+                #[serde(default)]
+                kind: ExitKind,
+            },
+        }
+        Ok(match Raw::deserialize(d)? {
+            Raw::Point([x, z]) => TownExit {
+                x,
+                z,
+                kind: ExitKind::Road,
+            },
+            Raw::Typed { x, z, kind } => TownExit { x, z, kind },
+        })
+    }
+}
+
+/// Run-length masks over the ground grid, row by row from tile (0, 0): `[run, value, run,
+/// value, ...]` with value 0 or 1. Set tiles are water, or blocked, for walkers.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Terrain {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub water: Option<Vec<u32>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blocked: Option<Vec<u32>>,
+}
+
+impl Terrain {
+    /// A mask's tiles (`width × depth`, row by row; past its runs, unset). None without one.
+    pub fn mask(rle: Option<&[u32]>, width: usize, depth: usize) -> Option<Vec<bool>> {
+        let rle = rle?;
+        let mut out = vec![false; width * depth];
+        let mut at = 0usize;
+        for pair in rle.chunks(2) {
+            let (run, value) = (pair[0] as usize, pair.get(1).copied().unwrap_or(0));
+            let end = (at + run).min(out.len());
+            out[at..end].fill(value != 0);
+            at = end;
+        }
+        Some(out)
+    }
+
+    /// Where nobody walks: water or blocked land (`width × depth`); None without either mask.
+    pub fn unwalkable(&self, width: usize, depth: usize) -> Option<Vec<bool>> {
+        let water = Self::mask(self.water.as_deref(), width, depth);
+        let blocked = Self::mask(self.blocked.as_deref(), width, depth);
+        match (water, blocked) {
+            (None, None) => None,
+            (Some(m), None) | (None, Some(m)) => Some(m),
+            (Some(a), Some(b)) => Some(a.iter().zip(&b).map(|(a, b)| *a || *b).collect()),
+        }
+    }
+}
+
+/// A public parking spot for car trips between areas.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ParkingSpot {
+    pub x: f32,
+    pub z: f32,
+    #[serde(default)]
+    pub rot: f32,
+    #[serde(default)]
+    pub area: u32,
+}
+
+/// What a plot is for (`plots[].kind`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PlotKind {
+    Home,
+    Farm,
+    Public,
+    Shop,
+    Countryside,
+}
+
+/// The road a driveway meets and how far along its line (m), from `drives[].road` / `.s`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+pub struct DriveRoad {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub road: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub s: Option<f32>,
+}
+
+/// The open-world fields of a town (docs/design/open-world.md), as the sim keeps them: read
+/// from the town file, saved with the game, and made up for towns and saves from before them
+/// (`TownPlan::fill_in`). How travel uses them is `travel.rs`'s; the terrain masks are kept as
+/// given (`Terrain::unwalkable`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TownPlan {
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub size: WorldSize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roads: Vec<RoadPlan>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub areas: Vec<TownArea>,
+    /// Every way out, with its kind (`World::exits` has their places).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exits: Vec<TownExit>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub terrain: Terrain,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parking: Vec<ParkingSpot>,
+    /// Per plot (by id): its area and kind, if the file gave them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plot_areas: Vec<Option<u32>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plot_kinds: Vec<Option<PlotKind>>,
+    /// Per driveway (as `World::drives`): the road it meets.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub drive_roads: Vec<DriveRoad>,
+}
+
+fn is_default<T: Default + PartialEq>(v: &T) -> bool {
+    *v == T::default()
+}
+
+impl TownPlan {
+    /// The fields a town file gives (the rest are made up by `fill_in`).
+    pub fn from_file(file: &LotFile) -> Self {
+        let any = |f: &dyn Fn(&PlotRaw) -> bool| file.plots.iter().any(f);
+        TownPlan {
+            size: file.size.unwrap_or_default(),
+            roads: file.roads.clone(),
+            areas: file.areas.clone(),
+            exits: file.exits.clone(),
+            terrain: file.terrain.clone().unwrap_or_default(),
+            parking: file.parking.clone(),
+            plot_areas: if any(&|p| p.area.is_some()) {
+                file.plots.iter().map(|p| p.area).collect()
+            } else {
+                Vec::new()
+            },
+            plot_kinds: if any(&|p| p.kind.is_some()) {
+                file.plots.iter().map(|p| p.kind).collect()
+            } else {
+                Vec::new()
+            },
+            drive_roads: Vec::new(),
+        }
+    }
+
+    /// Fills in what a town or save from before these fields lacks, from what it has: the roads
+    /// from `meta.roads` (or the straight `meta.streets` of older towns, by their middle lines),
+    /// one hamlet over the whole town (`ground` rows deep), the exits as roads out, and a size
+    /// from the town's: past 256 m it's `big`, else `cosy` (sizes came with these fields).
+    pub fn fill_in(
+        &mut self,
+        meta: &serde_json::Value,
+        exits: &[[f32; 2]],
+        width: usize,
+        ground: usize,
+        had_size: bool,
+    ) {
+        if !had_size && (width > 256 || ground > 256) {
+            self.size = WorldSize::Big;
+        }
+        if self.roads.is_empty() {
+            if let Some(roads) = meta.get("roads").and_then(|r| r.as_array()) {
+                self.roads = roads
+                    .iter()
+                    .filter_map(|r| serde_json::from_value(r.clone()).ok())
+                    .collect();
+            } else if let Some(streets) = meta.get("streets").and_then(|r| r.as_array()) {
+                let num = |v: &serde_json::Value, k: &str| v.get(k).and_then(|n| n.as_f64());
+                self.roads = streets
+                    .iter()
+                    .filter_map(|s| {
+                        let (x, z, w, d) = (num(s, "x")?, num(s, "z")?, num(s, "w")?, num(s, "d")?);
+                        let mid = (z + d / 2.0) as f32;
+                        Some(RoadPlan {
+                            points: vec![[x as f32, mid], [(x + w) as f32, mid]],
+                            width: d as f32,
+                            kind: RoadKind::Street,
+                            area: Some(0),
+                            name: None,
+                            ends: None,
+                        })
+                    })
+                    .collect();
+            }
+        }
+        if self.areas.is_empty() {
+            let name = meta
+                .get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or("Town")
+                .to_string();
+            self.areas.push(TownArea {
+                name,
+                kind: AreaKind::Hamlet,
+                x: 0,
+                z: 0,
+                w: width as i32,
+                d: ground as i32,
+            });
+        }
+        if self.exits.len() != exits.len() {
+            self.exits = exits
+                .iter()
+                .map(|&[x, z]| TownExit {
+                    x,
+                    z,
+                    kind: ExitKind::Road,
+                })
+                .collect();
+        }
+    }
 }
 
 pub const OUTDOORS: u16 = 0;

@@ -1726,6 +1726,9 @@ pub struct World {
     work: Vec<u8>,
     /// Where Sims leave town for work.
     pub exits: Vec<[f32; 2]>,
+    /// The town's open-world fields: size, roads, areas, typed exits, terrain, parking, plots'
+    /// areas and kinds, driveways' roads (see `lot::TownPlan`).
+    pub town: crate::lot::TownPlan,
     /// Households' cars (see `cars.rs`), and every house's driveway (where a car goes when its
     /// household moves).
     pub cars: Vec<crate::cars::Car>,
@@ -1877,7 +1880,19 @@ impl World {
     pub fn from_json(content_json: &str, lot_json: &str, seed: u32) -> Result<Self, Error> {
         let content = Content::from_json(content_json)?;
         let lot_file: LotFile = serde_json::from_str(lot_json)?;
-        Self::new(content, &lot_file, seed)
+        let mut world = Self::new(content, &lot_file, seed)?;
+        // (The roads driveways meet, read on their own: `cars::Drive` is travel's.)
+        if !lot_file.drives.is_empty() && lot_json.contains("\"road\"") {
+            #[derive(serde::Deserialize)]
+            struct Drives {
+                #[serde(default)]
+                drives: Vec<crate::lot::DriveRoad>,
+            }
+            if let Ok(d) = serde_json::from_str::<Drives>(lot_json) {
+                world.town.drive_roads = d.drives;
+            }
+        }
+        Ok(world)
     }
 
     pub fn new(content: Content, lot_file: &LotFile, seed: u32) -> Result<Self, Error> {
@@ -1896,7 +1911,15 @@ impl World {
         world.mode = lot_file.mode;
         world.lifespan = lot_file.lifespan;
         world.meta = lot_file.meta.clone();
-        world.exits = lot_file.exits.clone();
+        world.exits = lot_file.exits.iter().map(|e| [e.x, e.z]).collect();
+        world.town = crate::lot::TownPlan::from_file(lot_file);
+        world.town.fill_in(
+            &world.meta,
+            &world.exits,
+            lot_file.width as usize,
+            lot_file.depth as usize,
+            lot_file.size.is_some(),
+        );
         world.plots = lot_file
             .plots
             .iter()
@@ -2055,6 +2078,7 @@ impl World {
             claimants_cache: Vec::new(),
             work: Vec::new(),
             exits: Vec::new(),
+            town: Default::default(),
             cars: Vec::new(),
             drives: Vec::new(),
             garages: Vec::new(),

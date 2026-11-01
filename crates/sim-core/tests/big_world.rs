@@ -169,6 +169,18 @@ fn big_world_benchmark() {
         mb(PEAK.load(Ordering::Relaxed) - before)
     );
 
+    let t = Instant::now();
+    let json = w.save_json();
+    let saved = t.elapsed();
+    let t = Instant::now();
+    World::from_save_json(&content, &json).expect("the save loads");
+    eprintln!(
+        "save {:.0} KB in {:.1} ms, loaded back in {:.1} ms",
+        json.len() as f64 / 1024.0,
+        ms(saved),
+        ms(t.elapsed())
+    );
+
     // One object placed in the player's garden, then what catching up costs: the walkable
     // regions, the objects-by-plot index and the links (`refresh_navigation`), and the rooms.
     let home = w
