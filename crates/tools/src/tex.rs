@@ -1,10 +1,8 @@
 //! `cargo tex`: the texture scripts (was `tools/art/*.py`), one subcommand each, with their arguments and paths.
 //!
 //! - `clouds <out.png>`: the sky's tileable cloud layer (`clouds.py`).
-//! - `process <src_root> <dst_root>`: Poly Haven / ambientCG maps -> the game's albedo/normal/arm JPGs (`process.py`).
-//! - `house <src_root> <dst_root> [set...]`: the house and interior textures (`process_house.py`).
+//! - `synth [set...]`: the procedural albedo/normal/arm maps (`synth.rs`); no downloads.
 //! - `materials`: writes `materials.json` in the current directory (`materials.py`).
-//! - `ph <outdir> <res> <maps,comma> <id>...`: downloads Poly Haven maps (`ph_tex.py`).
 //!
 //! The numbers follow numpy and Pillow step by step (float64 as numpy evaluates it, numpy's pairwise sums and
 //! Python's compensated `sum()`, Pillow's fixed-point resampling and box blur, libjpeg-turbo's decoder and
@@ -12,28 +10,24 @@
 
 mod jpeg;
 pub mod pil;
+pub mod synth;
 
 use crate::pcg64::Pcg64;
-use pil::{Filter, Img};
+use pil::Img;
 use std::fmt::Write as _;
 use std::path::Path;
 
 pub const USAGE: &str = "usage: cargo tex <command> ...
   clouds <out.png>                          the sky's tileable cloud layer
-  process <src_root> <dst_root>             Poly Haven/ambientCG maps -> albedo/normal/arm JPGs
-  house <src_root> <dst_root> [set...]      the house and interior textures
-  materials                                 writes materials.json (PBR material + environment entries)
-  ph <outdir> <res> <maps,comma> <id>...    downloads Poly Haven texture maps (CC0)";
-
+  synth [set...]                            procedural albedo/normal/arm maps (no downloads)
+  materials                                 writes materials.json (PBR material + environment entries)";
 pub fn main_with(args: &[String]) -> i32 {
     let a: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
     let res = match a.as_slice() {
         ["clouds", out] => clouds(Path::new(out)),
-        ["process", src, dst] => process(Path::new(src), Path::new(dst)),
-        ["house", src, dst, only @ ..] => house(Path::new(src), Path::new(dst), only),
+        ["synth", only @ ..] => synth::run(only),
         ["materials"] => std::fs::write("materials.json", materials_json())
             .map_err(|e| format!("materials.json: {e}")),
-        ["ph", out, res, maps, ids @ ..] => ph(Path::new(out), res, maps, ids),
         ["-h" | "--help" | "help", ..] => {
             println!("{USAGE}");
             return 0;
@@ -210,9 +204,9 @@ fn clouds(out: &Path) -> Result<(), String> {
     Ok(())
 }
 
-// --- process.py -----------------------------------------------------------------------------------
+// --- detail maps ----------------------------------------------------------------------------------
 
-/// `lin`/`srgb` of process.py, in Python floats.
+/// `lin`/`srgb` for the detail maps, in Python floats.
 pub fn lin(v: f64) -> f64 {
     let c = v / 255.0;
     if c <= 0.04045 {
@@ -245,121 +239,6 @@ pub fn detail_lut(hist: &[u64; 256], target: f64) -> [u8; 256] {
             .clamp(0.0, 255.0) as u8
     })
 }
-
-/// process.py's `grey_detail`: luminance-only, linear mean ~`target`, as RGB.
-fn grey_detail_lut(im: &Img, target: f64) -> Img {
-    let g = im.grey();
-    g.point(&detail_lut(&g.histogram(), target)).rgb()
-}
-
-fn save(im: &Img, path: &Path, size: usize, q: u8) -> Result<(), String> {
-    im.resize(size, size, Filter::Lanczos)
-        .save_jpeg(path, q, true)
-}
-
-fn mkdir(p: &Path) -> Result<(), String> {
-    std::fs::create_dir_all(p).map_err(|e| format!("{}: {e}", p.display()))
-}
-
-/// `os.walk(dst)` top-down, printing each file's path less `dst` and its size, as process.py ends.
-fn print_tree(dst: &Path) -> Result<(), String> {
-    fn walk(dir: &Path, dst: &str, out: &mut String) -> Result<(), String> {
-        let mut dirs = Vec::new();
-        for e in std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))? {
-            let e = e.map_err(|e| e.to_string())?;
-            let p = e.path();
-            if p.is_dir() {
-                dirs.push(p);
-            } else {
-                let size = e.metadata().map_err(|e| e.to_string())?.len();
-                let _ = writeln!(out, "{} {size}", p.display().to_string().replace(dst, ""));
-            }
-        }
-        for d in dirs {
-            walk(&d, dst, out)?;
-        }
-        Ok(())
-    }
-    let mut out = String::new();
-    walk(dst, &dst.display().to_string(), &mut out)?;
-    print!("{out}");
-    Ok(())
-}
-
-/// name, source dir, albedo size, normal size, greyscale.
-const PROCESS_SETS: [(&str, &str, usize, usize, bool); 8] = [
-    ("floor_laminate", "ph/laminate_floor_02", 1024, 1024, false),
-    ("wall_plaster", "ph/painted_plaster_wall", 1024, 512, true),
-    ("foliage", "ph/forest_leaves_03", 512, 512, true),
-    ("road_asphalt", "ph/asphalt_02", 1024, 1024, false),
-    (
-        "path_hexpaving",
-        "ph/hexagonal_concrete_paving",
-        1024,
-        1024,
-        false,
-    ),
-    ("fabric_linen", "ph/rough_linen", 512, 512, true),
-    ("wood_oak", "ph/oak_veneer_01", 512, 512, true),
-    ("bark", "ph/bark_brown_02", 512, 512, false),
-];
-
-fn process(src: &Path, dst: &Path) -> Result<(), String> {
-    for (name, d, asize, nsize, grey) in PROCESS_SETS {
-        let out = dst.join(name);
-        mkdir(&out)?;
-        let s = src.join(d);
-        let diff = Img::open(&s.join("Diffuse.jpg"))?.rgb();
-        save(
-            &if grey {
-                grey_detail_lut(&diff, 0.8)
-            } else {
-                diff
-            },
-            &out.join("albedo.jpg"),
-            asize,
-            85,
-        )?;
-        save(
-            &Img::open(&s.join("nor_gl.jpg"))?.rgb(),
-            &out.join("normal.jpg"),
-            nsize,
-            88,
-        )?;
-        save(
-            &Img::open(&s.join("arm.jpg"))?.rgb(),
-            &out.join("arm.jpg"),
-            512,
-            85,
-        )?;
-    }
-    // ambientCG grass: greyscale detail + packed AO/roughness.
-    let g = src.join("acg/Grass001");
-    let out = dst.join("grass");
-    mkdir(&out)?;
-    save(
-        &grey_detail_lut(&Img::open(&g.join("Color.jpg"))?.rgb(), 0.75),
-        &out.join("albedo.jpg"),
-        1024,
-        85,
-    )?;
-    save(
-        &Img::open(&g.join("NormalGL.jpg"))?.rgb(),
-        &out.join("normal.jpg"),
-        1024,
-        88,
-    )?;
-    let ao = Img::open(&g.join("AmbientOcclusion.jpg"))?
-        .grey()
-        .resize(512, 512, Filter::Bicubic);
-    let ro = Img::open(&g.join("Roughness.jpg"))?
-        .grey()
-        .resize(512, 512, Filter::Bicubic);
-    Img::merge([&ao, &ro, &Img::new(512, 512, 1, 0)]).save_jpeg(&out.join("arm.jpg"), 85, false)?;
-    print_tree(dst)
-}
-
-// --- process_house.py -----------------------------------------------------------------------------
 
 fn to_lin(a: f64) -> f64 {
     if a <= 0.04045 {
@@ -409,7 +288,7 @@ fn detail_linear(g: &Img, contrast: f64, flatten: f32) -> Vec<f64> {
         .collect()
 }
 
-/// process_house.py's `grey_detail`: luminance-only detail map with linear mean ~`target`; `contrast` < 1
+/// `grey_detail`: luminance-only detail map with linear mean ~`target`; `contrast` < 1
 /// softens the detail, `flatten` > 0 divides out blotches larger than ~`flatten` px; highlights soft-clipped.
 pub fn grey_detail(im: &Img, target: f64, contrast: f64, flatten: f32) -> Img {
     let g = im.grey();
@@ -438,279 +317,6 @@ pub fn grey_detail(im: &Img, target: f64, contrast: f64, flatten: f32) -> Img {
         px,
     }
     .rgb()
-}
-
-#[derive(Clone, Copy)]
-enum Op {
-    FlipV,
-    Stagger(&'static [usize], u32),
-    Stack2V,
-}
-
-/// `np.roll(a, shift, axis=1)` on rows `r0..r1` of an RGB/L image, in place from `src`.
-fn roll_rows_x(src: &Img, dst: &mut Img, r0: usize, r1: usize, shift: usize) {
-    let (w, ch) = (src.w, src.ch);
-    for y in r0..r1 {
-        for x in 0..w {
-            let to = (x + shift) % w;
-            dst.px[(y * w + to) * ch..][..ch].copy_from_slice(&src.px[(y * w + x) * ch..][..ch]);
-        }
-    }
-}
-
-/// `np.roll(a, shift, axis=0)`.
-fn roll_y(im: &Img, shift: i64) -> Img {
-    let h = im.h as i64;
-    let stride = im.w * im.ch;
-    let mut px = vec![0u8; im.px.len()];
-    for y in 0..h {
-        let to = (y + shift).rem_euclid(h) as usize;
-        px[to * stride..(to + 1) * stride]
-            .copy_from_slice(&im.px[y as usize * stride..(y as usize + 1) * stride]);
-    }
-    Img { px, ..im.clone() }
-}
-
-fn orient(im: Img, op: Op, normal: bool) -> Img {
-    match op {
-        Op::FlipV => {
-            let im = im.flip_tb();
-            if normal {
-                let inv: [u8; 256] = std::array::from_fn(|v| 255 - v as u8);
-                Img::merge([&im.channel(0), &im.channel(1).point(&inv), &im.channel(2)])
-            } else {
-                im
-            }
-        }
-        Op::Stagger(cuts, seed) => {
-            // Shift each board strip sideways by its own amount (wrapping, so it stays seamless); the same seed
-            // gives every map the same shifts.
-            let (h, w) = (im.h, im.w);
-            let a = roll_y(&im, -(cuts[0] as i64));
-            let mut rows: Vec<usize> = cuts.iter().map(|c| c - cuts[0]).collect();
-            rows.push(h);
-            let mut rng = Pcg64::new(seed);
-            let mut out = a.clone();
-            for r in rows.windows(2) {
-                let shift = rng.integers((w / 8) as i64, (w - w / 8) as i64) as usize;
-                roll_rows_x(&a, &mut out, r[0], r[1], shift);
-            }
-            roll_y(&out, cuts[0] as i64)
-        }
-        Op::Stack2V => im.tile(1, 2),
-    }
-}
-
-fn save_house(im: &Img, path: &Path, size: usize, q: u8) -> Result<(), String> {
-    let im = if (im.w, im.h) != (size, size) {
-        im.resize(size, size, Filter::Lanczos)
-    } else {
-        im.clone()
-    };
-    im.save_jpeg(path, q, true)
-}
-
-fn load_maps(src: &Path, kind: &str, d: &str) -> Result<(Img, Img, Img), String> {
-    let s = src.join(kind).join(d);
-    if kind == "ph" {
-        return Ok((
-            Img::open(&s.join("Diffuse.jpg"))?.rgb(),
-            Img::open(&s.join("nor_gl.jpg"))?.rgb(),
-            Img::open(&s.join("arm.jpg"))?.rgb(),
-        ));
-    }
-    let rough = Img::open(&s.join("Roughness.jpg"))?.grey();
-    let ao_path = s.join("AmbientOcclusion.jpg");
-    let mut ao = if ao_path.exists() {
-        Img::open(&ao_path)?.grey()
-    } else {
-        Img::new(rough.w, rough.h, 1, 255)
-    };
-    if (ao.w, ao.h) != (rough.w, rough.h) {
-        ao = ao.resize(rough.w, rough.h, Filter::Lanczos);
-    }
-    let arm = Img::merge([&ao, &rough, &Img::new(rough.w, rough.h, 1, 0)]); // AO, roughness, metal 0
-    Ok((
-        Img::open(&s.join("Color.jpg"))?.rgb(),
-        Img::open(&s.join("NormalGL.jpg"))?.rgb(),
-        arm,
-    ))
-}
-
-/// WoodSiding009 is 1024x512 with 8 boards; board edges (steepest displacement drop) at these rows, and again
-/// 512 lower once stacked.
-const SIDING_CUTS: [usize; 16] = [
-    3, 66, 131, 195, 257, 319, 386, 452, 515, 578, 643, 707, 769, 831, 898, 964,
-];
-
-struct HouseSet {
-    name: &'static str,
-    /// "ph" (Poly Haven) or "acg" (ambientCG).
-    kind: &'static str,
-    src: &'static str,
-    albedo: usize,
-    normal: usize,
-    /// Greyscale detail (target linear mean, contrast, flatten radius), or None to keep the colour.
-    grey: Option<(f64, f64, f32)>,
-    ops: &'static [Op],
-}
-
-const fn set(
-    name: &'static str,
-    kind: &'static str,
-    src: &'static str,
-    albedo: usize,
-    normal: usize,
-    grey: Option<(f64, f64, f32)>,
-    ops: &'static [Op],
-) -> HouseSet {
-    HouseSet {
-        name,
-        kind,
-        src,
-        albedo,
-        normal,
-        grey,
-        ops,
-    }
-}
-
-const HOUSE_SETS: [HouseSet; 10] = [
-    set(
-        "siding_wood",
-        "acg",
-        "WoodSiding009",
-        1024,
-        1024,
-        Some((0.68, 1.0, 0.0)),
-        &[Op::Stack2V, Op::Stagger(&SIDING_CUTS, 7), Op::FlipV],
-    ),
-    set("brick", "ph", "red_brick_03", 1024, 1024, None, &[]),
-    set(
-        "roof_shingles",
-        "ph",
-        "grey_roof_tiles_02",
-        1024,
-        1024,
-        Some((0.6, 1.0, 0.0)),
-        &[Op::FlipV],
-    ),
-    set(
-        "stone_foundation",
-        "ph",
-        "rustic_stone_wall_02",
-        1024,
-        1024,
-        None,
-        &[],
-    ),
-    set("floor_wood", "acg", "WoodFloor040", 1024, 1024, None, &[]),
-    set("floor_tile", "acg", "Tiles141", 1024, 1024, None, &[]),
-    set(
-        "carpet",
-        "acg",
-        "Carpet012",
-        512,
-        512,
-        Some((0.6, 1.0, 48.0)),
-        &[],
-    ),
-    set(
-        "wallpaper",
-        "acg",
-        "Plaster001",
-        1024,
-        512,
-        Some((0.75, 0.6, 0.0)),
-        &[],
-    ),
-    set(
-        "painted_wood",
-        "acg",
-        "PaintedWood008A",
-        512,
-        512,
-        Some((0.75, 0.45, 0.0)),
-        &[],
-    ),
-    set(
-        "grass_lush",
-        "acg",
-        "Grass004",
-        1024,
-        1024,
-        Some((0.7, 1.0, 40.0)),
-        &[],
-    ),
-];
-
-/// Roughness remap (arm G, min..max -> lo..hi): the scanned maps of these read too glossy.
-const ROUGH: [(&str, f64, f64); 2] = [("grass_lush", 0.75, 1.0), ("brick", 0.7, 0.95)];
-
-pub fn remap_rough(arm: &Img, lo: f64, hi: f64) -> Img {
-    let g: Vec<f64> = arm
-        .px
-        .iter()
-        .skip(1)
-        .step_by(3)
-        .map(|&v| v as f64)
-        .collect();
-    let (min, max) = g
-        .iter()
-        .fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), &v| {
-            (a.min(v), b.max(v))
-        });
-    let span = (max - min).max(1.0);
-    let mut out = arm.clone();
-    for (i, v) in g.iter().enumerate() {
-        out.px[i * 3 + 1] = ((lo + (v - min) / span * (hi - lo)) * 255.0)
-            .clamp(0.0, 255.0)
-            .round_ties_even() as u8;
-    }
-    out
-}
-
-fn house(src: &Path, dst: &Path, only: &[&str]) -> Result<(), String> {
-    for HouseSet {
-        name,
-        kind,
-        src: d,
-        albedo: asize,
-        normal: nsize,
-        grey,
-        ops,
-    } in HOUSE_SETS
-    {
-        if !only.is_empty() && !only.contains(&name) {
-            continue;
-        }
-        let out = dst.join(name);
-        mkdir(&out)?;
-        let (mut alb, mut nor, mut arm) = load_maps(src, kind, d)?;
-        for &op in ops {
-            alb = orient(alb, op, false);
-            nor = orient(nor, op, true);
-            arm = orient(arm, op, false);
-        }
-        if let Some((target, contrast, flatten)) = grey {
-            alb = grey_detail(&alb, target, contrast, flatten);
-        }
-        if let Some(&(_, lo, hi)) = ROUGH.iter().find(|r| r.0 == name) {
-            arm = remap_rough(&arm, lo, hi);
-        }
-        save_house(&alb, &out.join("albedo.jpg"), asize, 85)?;
-        save_house(&nor, &out.join("normal.jpg"), nsize, 88)?;
-        save_house(&arm, &out.join("arm.jpg"), 512, 85)?;
-        let mut sz = 0;
-        for e in std::fs::read_dir(&out).map_err(|e| format!("{}: {e}", out.display()))? {
-            sz += e
-                .and_then(|e| e.metadata())
-                .map_err(|e| e.to_string())?
-                .len();
-        }
-        println!("{name:<18} {kind}:{d:<22} {} KB", sz / 1024);
-    }
-    Ok(())
 }
 
 // --- materials.py ---------------------------------------------------------------------------------
@@ -921,7 +527,7 @@ pub fn materials() -> J {
             plain("#FFFFFF", &[("roughness", f(0.55))]),
         ),
     ]);
-    // House exterior/interior surfaces (house). uvScale = 1 / real-world tile size in metres; greyscale detail maps
+    // House exterior/interior surfaces. uvScale = 1 / real-world tile size in metres; greyscale detail maps
     // (colour #FFFFFF) are tinted by the game per house/room; roughness multiplies the arm map's roughness.
     let house = [
         (
@@ -1050,59 +656,6 @@ pub fn materials_json() -> String {
     out
 }
 
-// --- ph_tex.py ------------------------------------------------------------------------------------
-
-const UA: &str = "idyll-lives-asset-fetch/1.0";
-
-fn get(agent: &ureq::Agent, url: &str) -> Result<Vec<u8>, String> {
-    let mut resp = agent
-        .get(url)
-        .header("User-Agent", UA)
-        .call()
-        .map_err(|e| format!("{url}: {e}"))?;
-    resp.body_mut()
-        .with_config()
-        .limit(u64::MAX)
-        .read_to_vec()
-        .map_err(|e| format!("{url}: {e}"))
-}
-
-fn ph(out: &Path, res: &str, maps: &str, ids: &[&str]) -> Result<(), String> {
-    let t = Some(std::time::Duration::from_secs(60));
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_connect(t)
-        .timeout_send_request(t)
-        .timeout_recv_response(t)
-        .build()
-        .into();
-    for id in ids {
-        let files: serde_json::Value = serde_json::from_slice(&get(
-            &agent,
-            &format!("https://api.polyhaven.com/files/{id}"),
-        )?)
-        .map_err(|e| format!("{id}: {e}"))?;
-        let dir = out.join(id);
-        mkdir(&dir)?;
-        for m in maps.split(',') {
-            let Some(entry) = files.get(m) else {
-                println!("missing {id} {m}");
-                continue;
-            };
-            let u = entry
-                .get(res)
-                .and_then(|r| r.get("jpg"))
-                .and_then(|j| j.get("url"))
-                .and_then(|u| u.as_str())
-                .ok_or_else(|| format!("{id}: no {res} jpg of {m}"))?;
-            let dst = dir.join(format!("{m}.jpg"));
-            let bytes = get(&agent, u)?;
-            std::fs::write(&dst, &bytes).map_err(|e| format!("{}: {e}", dst.display()))?;
-            println!("{id} {m} {} {u}", bytes.len());
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1158,25 +711,5 @@ mod tests {
         let committed = image::open(path).unwrap().to_rgba8();
         assert_eq!(committed.dimensions(), (CW as u32, CH as u32));
         assert!(committed.into_raw() == clouds_rgba());
-    }
-
-    #[test]
-    fn stagger_rolls_strips() {
-        let im = Img {
-            w: 16,
-            h: 4,
-            ch: 1,
-            px: (0..64).map(|v| v as u8).collect(),
-        };
-        const CUTS: [usize; 2] = [1, 3];
-        let out = orient(im.clone(), Op::Stagger(&CUTS, 7), false);
-        // Every row keeps its pixels, rotated.
-        for y in 0..4 {
-            let mut a = im.px[y * 16..][..16].to_vec();
-            let mut b = out.px[y * 16..][..16].to_vec();
-            a.sort();
-            b.sort();
-            assert_eq!(a, b);
-        }
     }
 }

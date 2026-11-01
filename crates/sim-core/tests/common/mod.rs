@@ -804,7 +804,9 @@ fn state(w: &World, s: &Sim) -> State {
         Phase::Calling { .. }
         | Phase::Waiting { .. }
         | Phase::Queued { .. }
-        | Phase::Knocking { .. } => State::Waiting(d),
+        | Phase::Knocking { .. }
+        | Phase::Boarding { .. }
+        | Phase::Alighting { .. } => State::Waiting(d),
     }
 }
 

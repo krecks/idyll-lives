@@ -4,7 +4,14 @@
     options,
     label,
     onchange,
-  }: { value: T; options: readonly { value: T; label: string }[]; label: string; /** Picked (by click or arrow keys). */ onchange?: (value: T) => void } = $props();
+  }: {
+    value: T;
+    /** `disabled`: shown, not to be picked (arrow keys pass over it). */
+    options: readonly { value: T; label: string; disabled?: boolean }[];
+    label: string;
+    /** Picked (by click or arrow keys). */
+    onchange?: (value: T) => void;
+  } = $props();
 
   function pick(v: T) {
     value = v;
@@ -17,7 +24,12 @@
     if (!step) return;
     e.preventDefault();
     const at = options.findIndex((o) => o.value === value);
-    const next = (at + step + options.length) % options.length;
+    let next = at;
+    for (let k = 1; k <= options.length; k++) {
+      next = (at + step * k + options.length * k) % options.length;
+      if (!options[next].disabled) break;
+    }
+    if (next === at || options[next].disabled) return;
     pick(options[next].value);
     ((e.currentTarget as HTMLElement).children[next] as HTMLElement | undefined)?.focus();
   }
@@ -29,6 +41,7 @@
       role="radio"
       aria-checked={value === option.value}
       class:active={value === option.value}
+      disabled={option.disabled}
       tabindex={value === option.value || (i === 0 && !options.some((o) => o.value === value)) ? 0 : -1}
       onclick={() => pick(option.value)}
     >
@@ -52,6 +65,10 @@
     color: var(--text-muted);
     font-weight: 600;
     transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+  }
+  button:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
   button.active {
     background: var(--surface);

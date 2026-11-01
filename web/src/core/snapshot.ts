@@ -29,7 +29,14 @@ export interface SnapshotLayout {
      * each laid out as a resident's, `away` while off work (missing in older layouts: none).
      */
     staffCount?: number;
+    /** Households' cars (sim-core `cars.rs`): rows from `carBase`, each laid out as `car` (missing in older layouts: none). */
+    carCount?: number;
   };
+  /** Where the cars' rows start, and floats per car (missing in older layouts). */
+  carBase?: number;
+  carStride?: number;
+  /** A car's row: `shown` 0 out of sight, 1 parked, 2 driving; where its middle is and which way it faces; its open doors (bit `d` for door `d`, `shared/cars.ts` `DOORS`). */
+  car?: { shown: number; x: number; z: number; yaw: number; doors?: number };
   sim: {
     id: number;
     x: number;

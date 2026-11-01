@@ -23,9 +23,12 @@
  *    there are children, and spare bedrooms (and playrooms) as guest rooms, studies and such.
  *
  * Seeded: the same seed, lot size and config always give the same house (laid out the same for
- * any residents), so a town keeps only `gen:<lot size>:<seed>` per lot (see `town.ts`). Output
- * is a `HouseTemplate` in the layouts' frame (drawn for a medium lot, front to the street at
- * z = 0), with `upper` for storey 1 and `basement` for storey -1 (both on the same rows as the ground).
+ * any residents), so a town keeps only `gen:<lot size>:<seed>[:<garden>]` per lot (see `town.ts`).
+ * With a `GardenSize` the lot is cut to fit the house (`fitLot`): a front yard, a garden behind
+ * and beside it in proportion to the house, room for a driveway on one side; the house's `lot`
+ * says how big it came out, and the layout is in that lot's frame. Without one (older ids) it is
+ * in the layouts' frame (drawn for a medium lot). Front to the street at z = 0, with `upper` for
+ * storey 1 and `basement` for storey -1 (both on the same rows as the ground).
  */
 
 import type { ObjectDef, SurfaceKind } from '../content/content';
@@ -37,6 +40,8 @@ export interface HouseGenConfig {
   /** Class weights per lot size. */
   lots: Record<string, Record<string, number>>;
   margins: { front: [number, number]; back: number; side: number };
+  /** How much garden a lot cut to fit its house gets (`fitLot`). */
+  gardens?: Record<GardenSize, GardenSpec>;
   rooms: Record<Kind, RoomSpec>;
   /** Rooms besides bedrooms, kitchen, bathroom and living room, where the house has more floor than its rooms may take. */
   extras?: ExtraRoom[];
@@ -45,7 +50,7 @@ export interface HouseGenConfig {
   windows: { spacing: [number, number]; daylight?: number };
   stairs: string;
   /** `washingLine`: put in the garden of a home that washes with nowhere to dry the washing (`washesWithoutDrying`). */
-  garden: { objects: string[]; count: [number, number]; sets?: TableSet[]; washingLine?: string };
+  garden: { objects: string[]; count: [number, number]; sets?: TableSet[]; washingLine?: string; area?: number };
   /** Ceiling lights for rooms whose own `ceiling` slots have none (the upstairs hall, the basement's). */
   lights?: string[];
   basement?: BasementSpec;
@@ -64,6 +69,23 @@ export interface Residents {
   adults: number;
   children: number;
   babies: number;
+}
+
+/** How much garden a house's lot has round it (see `fitLot`). */
+export type GardenSize = 'snug' | 'roomy' | 'big';
+export const GARDEN_SIZES: readonly GardenSize[] = ['snug', 'roomy', 'big'];
+
+/**
+ * A lot cut to fit its house: `back`, the garden behind it as a share of the house's depth (a
+ * range, and at least and at most `backMin`..`backMax` m); `side`, the garden beside it (m, a
+ * range); `drive`, the least on the driveway's side.
+ */
+export interface GardenSpec {
+  back: [number, number];
+  backMin: number;
+  backMax: number;
+  side: [number, number];
+  drive: number;
 }
 
 /** A key for `residents` (empty: undefined). */
@@ -310,7 +332,19 @@ export function random(seed: number): () => number {
  * `lampTiles`: tiles a lamp lights at night unless its `light.tiles` says (content
  * `roomRules.lampTiles`); every room gets lights enough for all of it. `windowTiles`: tiles one window lights by day (`roomRules.windowTiles`).
  */
-export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, medium: { width: number }, lotSize: string, seed: number, lampTiles = 10, windowTiles = 6, residents?: Residents): HouseTemplate | null {
+export function generateHouse(
+  cfg: HouseGenConfig,
+  info: ObjectInfos,
+  lot: { width: number; depth: number },
+  medium: { width: number },
+  lotSize: string,
+  seed: number,
+  lampTiles = 10,
+  windowTiles = 6,
+  residents?: Residents,
+  garden?: GardenSize,
+): HouseTemplate | null {
+  const spec = garden ? cfg.gardens?.[garden] : undefined;
   // Rooms as narrow as their kind may be on this size of lot.
   const sized = (s: RoomSpec): RoomSpec => (s.minSideOn?.[lotSize] === undefined ? s : { ...s, minSide: s.minSideOn[lotSize] });
   cfg = { ...cfg, rooms: Object.fromEntries(Object.entries(cfg.rooms).map(([k, s]) => [k, sized(s)])) };
@@ -319,11 +353,16 @@ export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { wid
     // The basement draws numbers of its own: a house without one is laid out as it was before
     // there were any (as is one whose stairs down leave no room for its furniture, without them).
     const n = seed * 31 + attempt;
-    let house = attemptHouse(cfg, info, lot, lotSize, random(n), random(n ^ 0x5bd1e995), lampTiles, windowTiles, residents);
-    if (house === 'basement') house = attemptHouse(cfg, info, lot, lotSize, random(n), null, lampTiles, windowTiles, residents);
+    // The lot's cut draws numbers of its own, the same whoever lives there.
+    const fit = spec && { spec, seed: n ^ 0x6a09e667 };
+    let house = attemptHouse(cfg, info, lot, lotSize, random(n), random(n ^ 0x5bd1e995), lampTiles, windowTiles, residents, fit);
+    if (house === 'basement') house = attemptHouse(cfg, info, lot, lotSize, random(n), null, lampTiles, windowTiles, residents, fit);
     if (!house || house === 'basement') continue;
-    // Into the layouts' frame (centred on lots of other widths by `onLot`).
-    const dx = -Math.floor((lot.width - medium.width) / 2);
+    // Into its own lot's frame, else the layouts' (centred on lots of other widths by `onLot`).
+    const cut = house.cut;
+    delete house.cut;
+    const dx = cut ? -cut.x : -Math.floor((lot.width - medium.width) / 2);
+    if (cut) house.lot = { width: cut.width, depth: cut.depth };
     const shift = (h: { walls: Wall[]; doors: Door[]; windows?: Door[]; objects: Placement[]; rooms?: PlannedRoom[] }) => {
       h.walls = h.walls.map(([x0, z0, x1, z1]) => [x0 + dx, z0, x1 + dx, z1]);
       h.doors = h.doors.map((d) => ({ ...d, x: d.x + dx }));
@@ -335,7 +374,7 @@ export function generateHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { wid
     if (house.upper) shift(house.upper);
     if (house.basement) shift(house.basement);
     house.spawns = house.spawns.map(([x, z]) => [x + dx, z]);
-    house.id = `gen:${lotSize}:${seed}`;
+    house.id = `gen:${lotSize}:${seed}${spec ? `:${garden}` : ''}`;
     return house;
   }
   return null;
@@ -361,7 +400,8 @@ function between(rng: () => number, [a, b]: readonly [number, number]): number {
   return a + Math.floor(rng() * (b - a + 1));
 }
 
-function weighted(rng: () => number, weights: Record<string, number>): string | null {
+/** One of the keys of `weights`, as likely as its weight (null: none weighs anything). */
+export function weighted(rng: () => number, weights: Record<string, number>): string | null {
   const entries = Object.entries(weights).filter(([, w]) => w > 0);
   const total = entries.reduce((n, [, w]) => n + w, 0);
   let r = rng() * total;
@@ -373,7 +413,18 @@ function weighted(rng: () => number, weights: Record<string, number>): string | 
  * `belowRng`: the random numbers for the basement (null: no basement). `'basement'`: there's no
  * room for the house's furniture with the stairs down (it may do without a basement).
  */
-function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: number; depth: number }, lotSize: string, rng: () => number, belowRng: (() => number) | null, lampTiles: number, windowTiles: number, residents: Residents | undefined): HouseTemplate | null | 'basement' {
+function attemptHouse(
+  cfg: HouseGenConfig,
+  info: ObjectInfos,
+  lot: { width: number; depth: number },
+  lotSize: string,
+  rng: () => number,
+  belowRng: (() => number) | null,
+  lampTiles: number,
+  windowTiles: number,
+  residents: Residents | undefined,
+  fit?: { spec: GardenSpec; seed: number },
+): Cut | null | 'basement' {
   const className = weighted(rng, cfg.lots[lotSize] ?? cfg.lots.medium ?? {});
   const cls = className ? cfg.classes[className] : undefined;
   if (!cls) return null;
@@ -460,7 +511,7 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
   }
   const has = new Set([...ground, ...upstairs]);
   // What the rooms become for the people living here (a draw of its own: the rest of the house is the same for anyone).
-  const fit = fitFor(cfg, info, random((rng() * 2 ** 32) >>> 0), [...g.rooms, ...(up?.rooms ?? [])], residents);
+  const furnishing = fitFor(cfg, info, random((rng() * 2 ** 32) >>> 0), [...g.rooms, ...(up?.rooms ?? [])], residents);
   // A basement, if the house gets one and it fits (fewer rooms down there if they don't); with
   // `belowRng` null, none.
   let basement: Floor | null = null;
@@ -477,7 +528,7 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
     }
     const plans = [...Array.from({ length: n }, (_, i) => order.slice(0, n - i)), ...order.slice(n).map((k) => [k])].filter((p) => p.length);
     for (const kinds of plans) {
-      basement = basementFloor(cfg, info, belowRng, house, g, kinds, new Set([...has, ...kinds]), lampTiles, fit);
+      basement = basementFloor(cfg, info, belowRng, house, g, kinds, new Set([...has, ...kinds]), lampTiles, furnishing);
       if (!basement) continue;
       below.push(...kinds);
       break;
@@ -488,13 +539,17 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
   windows(cfg, rng, g, house, windowTiles);
   if (up) windows(cfg, rng, up, house, windowTiles);
   // A stairwell that leaves the ground floor without room for what must be there: try the house without a basement.
-  if (!furnish(cfg, info, rng, g, has, lampTiles, fit)) return basement ? 'basement' : null;
-  if (up && !furnish(cfg, info, rng, up, has, lampTiles, fit)) return null;
-  garden(cfg, info, rng, g, house, lot, washesWithoutDrying(info, [g, up, basement]));
-
-  // Spawns in front of the front door.
+  if (!furnish(cfg, info, rng, g, has, lampTiles, furnishing)) return basement ? 'basement' : null;
+  if (up && !furnish(cfg, info, rng, up, has, lampTiles, furnishing)) return null;
   const door = [...g.edges].find(([k, v]) => v === 'door' && k === `h:${k.split(':')[1]}:${house.z}`);
   const doorX = door ? Number(door[0].split(':')[1]) : house.x + Math.floor(W / 2);
+  // Named before the garden is laid out (a bigger garden draws more numbers: the same house keeps its name).
+  const name = `${pick(rng, cfg.names.first)} ${pick(rng, cfg.names.second[cls.label] ?? ['House'])}`;
+  // The lot: the whole one, or one cut to fit the house.
+  const plot = fit ? fitLot(fit.spec, random(fit.seed), house, doorX) : { x: 0, width: lot.width, depth: lot.depth };
+  garden(cfg, info, rng, g, house, plot, washesWithoutDrying(info, [g, up, basement]));
+
+  // Spawns in front of the front door.
   const spawns: [number, number][] = [
     [doorX + 0.5, house.z - 1.5],
     [doorX + 1.5, house.z - 1.5],
@@ -502,7 +557,6 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
     [doorX + 2.5, house.z - 1.5],
   ];
 
-  const name = `${pick(rng, cfg.names.first)} ${pick(rng, cfg.names.second[cls.label] ?? ['House'])}`;
   const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six'];
   const parts = [
     `${words[bedrooms] ?? bedrooms} bedroom${bedrooms === 1 ? '' : 's'}`,
@@ -524,12 +578,30 @@ function attemptHouse(cfg: HouseGenConfig, info: ObjectInfos, lot: { width: numb
     id: '',
     name,
     description,
+    class: cls.label,
     bedrooms,
     ...out(g),
     spawns,
     ...(up ? { upper: out(up) } : {}),
     ...(basement ? { basement: out(basement) } : {}),
+    ...(fit ? { cut: plot } : {}),
   };
+}
+
+/** A house as `attemptHouse` lays it out, with the lot cut to fit it (`fitLot`; lot coordinates). */
+type Cut = HouseTemplate & { cut?: { x: number; width: number; depth: number } };
+
+/**
+ * A lot cut to fit `house` (lot coordinates, its front yard before it): garden behind it in
+ * proportion to its depth, a little beside it, and room for the driveway on the side away from
+ * the front door (where `driveway` in `town.ts` puts it). `x`: where the lot starts.
+ */
+export function fitLot(spec: GardenSpec, rng: () => number, house: Rect, doorX: number): { x: number; width: number; depth: number } {
+  const side = () => between(rng, spec.side);
+  const [left, right] = doorX < house.x + house.w / 2 ? [side(), Math.max(spec.drive, side())] : [Math.max(spec.drive, side()), side()];
+  const share = spec.back[0] + rng() * (spec.back[1] - spec.back[0]);
+  const back = Math.max(spec.backMin, Math.min(spec.backMax, Math.round(house.d * share)));
+  return { x: house.x - left, width: left + house.w + right, depth: house.z + house.d + back };
 }
 
 /** `a, b and c`. */
@@ -1848,10 +1920,11 @@ function washesWithoutDrying(info: ObjectInfos, floors: (Floor | null)[]): boole
  * (`line`: behind the house or to its sides, out on the lawn with a clear tile all round, by the
  * garden door if it fits), then tables with chairs round them, then a few things.
  */
-function garden(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, g: Floor, house: Rect, lot: { width: number; depth: number }, line = false): void {
-  const clear = (x: number, z: number) => x >= 0 && z >= 0 && x < lot.width && z < lot.depth && (x < house.x - 1 || x > house.x + house.w || z < house.z - 1 || z > house.z + house.d) && !g.taken.has(key(x, z));
+function garden(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, g: Floor, house: Rect, lot: { x: number; width: number; depth: number }, line = false): void {
+  const clear = (x: number, z: number) =>
+    x >= lot.x && z >= 0 && x < lot.x + lot.width && z < lot.depth && (x < house.x - 1 || x > house.x + house.w || z < house.z - 1 || z > house.z + house.d) && !g.taken.has(key(x, z));
   // Behind the house or to its sides (the front garden is left for the path and drive).
-  const spot = (w: number, d: number): [number, number] => [Math.floor(rng() * (lot.width - w)), house.z + Math.floor(rng() * (lot.depth - house.z - d))];
+  const spot = (w: number, d: number): [number, number] => [lot.x + Math.floor(rng() * (lot.width - w)), house.z + Math.floor(rng() * (lot.depth - house.z - d))];
   // Just outside the garden door, if there is one (else anywhere).
   const back = house.z + house.d;
   const gardenDoor = [...g.edges].find(([e, v]) => v === 'door' && e.startsWith('h:') && Number(e.split(':')[2]) === back)?.[0];
@@ -1898,7 +1971,10 @@ function garden(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, g: Fl
       break;
     }
   }
-  const count = between(rng, cfg.garden.count);
+  // As many as the garden has room for (`area` m² of it each), within `count`.
+  const open = lot.width * (lot.depth - house.z) - (house.w + 2) * (house.d + 1);
+  const [few, most] = cfg.garden.count;
+  const count = cfg.garden.area ? Math.max(few, Math.min(most, Math.round(open / cfg.garden.area))) : between(rng, cfg.garden.count);
   for (let n = 0, tries = 0; n < count && tries < 40; tries++) {
     const def = pick(rng, cfg.garden.objects);
     const fp = info(def)?.footprint;

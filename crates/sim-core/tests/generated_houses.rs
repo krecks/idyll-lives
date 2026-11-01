@@ -9,13 +9,14 @@
 //! door. A good share of houses on medium and large lots have a basement: under the house, no
 //! windows, its rooms lit and reached by stairs down that come up inside a living room, an
 //! entrance hall, a dining room or a kitchen. A home with a washer has somewhere to dry the
-//! washing: a dryer, or a washing line in the garden that can be reached.
+//! washing: a dryer, or a washing line in the garden that can be reached. The houses come turned
+//! to face a street on each side in turn, as towns lay their lots.
 //!
 //! With `DUMP_STATES=1`, the first house with a basement is written to `debug-states/` as
 //! `generated-basement` (with a resident at the door), to open in the game with
 //! `?state=generated-basement`.
 //!
-//! Make the houses first: `node --experimental-strip-types tools/housegen/sample.ts houses.json`,
+//! Make the houses first: `bun tools/housegen/sample.ts houses.json`,
 //! then `HOUSES=houses.json cargo test -p sim-core --test generated_houses -- --ignored --nocapture`.
 
 mod common;
@@ -51,7 +52,8 @@ fn cooks_or_washes(
 #[test]
 #[ignore]
 fn generated_houses_are_livable() {
-    let path = std::env::var("HOUSES").expect("set HOUSES to a file made by `node --experimental-strip-types tools/housegen/sample.ts houses.json`");
+    let path = std::env::var("HOUSES")
+        .expect("set HOUSES to a file made by `bun tools/housegen/sample.ts houses.json`");
     let houses: Vec<serde_json::Value> =
         serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     let content = common::content();
@@ -68,7 +70,10 @@ fn generated_houses_are_livable() {
     let mut dumped = false;
     let (mut washers, mut dryers, mut lines) = (0, 0, 0);
     for h in &houses {
-        let label = format!("{} {} ({})", h["size"], h["seed"], h["description"]);
+        let label = format!(
+            "{} {} facing {} ({})",
+            h["size"], h["seed"], h["facing"], h["description"]
+        );
         let w = match World::from_json(&content, &h["town"].to_string(), 1) {
             Ok(w) => w,
             Err(e) => {

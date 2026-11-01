@@ -23,6 +23,7 @@
     nextLabel="Move in →"
     avoidNames={neighbours}
     draft={null}
+    work={false}
     onback={() => services.controls.setMode('live')}
     onnext={moveIn}
   />
