@@ -26,6 +26,8 @@ export const APRON = 6;
 const BUILT_CELL = 2;
 /** A big world's woods are drawn in squares this wide (m), those far off left out (`pc/nature.ts` `frameTiles`). */
 export const BIG_WOODS_CELL = 256;
+/** A big world's woods past this far (m) from anything built are half as dense. */
+const BIG_WOODS_THIN = 40;
 const TERRAIN_STEP = 2.5;
 /** At most this many terrain quads across (a wider landscape gets coarser ones). */
 const TERRAIN_SEGMENTS = 260;
@@ -725,6 +727,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         if (road && road.dist < road.width / 2 + 2.5) continue;
         // The far woods of a wide world thinner (seen through haze; fewer trees to draw).
         if (this.ring > RING && dist > RING && rand() < 0.45) continue;
+        // (A big world's woods between its hamlets: half of them, away from what is built; the GPU draws a kilometre of them.)
+        if (this.built && dist > BIG_WOODS_THIN && rand() < 0.5) continue;
         if (rand() > density) continue;
         // Species: conifers in the dense cores, birches in groves at the edges, broadleaves elsewhere.
         const grove = fbm(x * 0.06 + 40, z * 0.06 - 15, this.seed + 3, 2);
@@ -743,7 +747,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         const yaw = rand() * Math.PI * 2;
         const y = this.heightAt(x, z) - 0.05;
         const m = placed(scale, up, scale, yaw, x, y, z);
-        const close = dist < SHADOW_RANGE && kind !== 'model.rock';
+        // (A big world's: all far versions, none casting. Its roads and trails run everywhere, and every tree
+        // along them would be a full model in the sun's shadows.)
+        const close = !this.built && dist < SHADOW_RANGE && kind !== 'model.rock';
         if (close) this.nearWoods.push({ key: kind, x, y, z, sx: scale, sy: up, sz: scale, yaw });
         const bucket = close ? near : far;
         let list = bucket.get(kind);
