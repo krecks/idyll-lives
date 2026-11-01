@@ -215,6 +215,9 @@ function plotNear(world: WorldStructure, x: number, z: number, reach: number): F
   return best;
 }
 
+/** A world build stopped because the roaming camera settled on another lot before it was done (`pace`). */
+class BuildSuperseded extends Error {}
+
 /** The same part of the town in view (the messages make a new rect each time). */
 function sameView(a: ViewRect | null, b: ViewRect | null): boolean {
   return a === b || (!!a && !!b && a.x === b.x && a.z === b.z && a.w === b.w && a.d === b.d);
@@ -1082,7 +1085,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
           await this.buildOne(next.world, next.view);
           error = null;
         } catch (err) {
-          error = err;
+          // (Stopped for a newer lot: what it left half built is built again, the lot layer first.)
+          if (err instanceof BuildSuperseded) {
+            this.lotKey = '';
+            error = null;
+          } else error = err;
         }
       }
     } finally {
@@ -1253,6 +1260,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if ((!this.worldBuilding && this.townBuilds === 0) || performance.now() - this.sliceStart < slice) return;
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     this.sliceStart = performance.now();
+    // A roaming camera has settled on another lot meanwhile: this lot's build stops here, the next one's starts.
+    const next = this.nextWorld;
+    if (this.worldBuilding && this.townBuilds === 0 && slice === ROAM_SLICE_MS && next && !sameView(next.view, this.view)) throw new BuildSuperseded();
   }
 
   /**
