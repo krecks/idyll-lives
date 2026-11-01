@@ -4,8 +4,9 @@
 //! Residents only use what's at home, in public places and off the plots, or, as guests, what's
 //! on the plot they're visiting (see `world::access`). The index lists exactly those objects per
 //! plot, in id order, so choices come out as they did from a scan of the whole town. It is
-//! derived from `World::object_plot` and rebuilt when the navigation changes (objects bought,
-//! sold or moved, walls built, a game loaded); see `World::refresh_index`.
+//! derived from `World::object_plot` and rebuilt when `World::objects_version` moves (objects
+//! bought, sold or moved, walls built, a game loaded; not a car parking); see
+//! `World::refresh_index`.
 //!
 //! In an open-world town (`travel::Travel::open`) public and off-plot objects aren't copied into
 //! every plot's list: they're kept in `CELL` m cells, and residents look at those within reach
@@ -29,7 +30,7 @@ pub(crate) struct ObjectIndex {
     shared: Vec<u32>,
     /// Seats at tables and the like (`surface::Links`), set by `World::refresh_index`.
     pub links: crate::surface::Links,
-    /// The `World::nav_version` it was built for.
+    /// The `World::objects_version` it was built for.
     pub version: u32,
     /// Open-world towns: `shared` by `CELL` m cell (row-major, `cols` a row), each in id order;
     /// `usable` then holds only each plot's own.
