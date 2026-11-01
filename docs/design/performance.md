@@ -585,3 +585,18 @@ Building the big world (the village tiled, headless, measured once): the landsca
 grass field 3.4 s, a texel a metre over the land), the street 4.4 s (every chunk of the town
 planned up front, so streaming only merges and uploads). The village's street: 43 ms planned
 whole from fresh, against the old 24 ms per view (it is planned once now, not per view).
+
+**A real Big world** (after merging the worldgen branch: `?bench=bigworld` draws Agent 3's Big
+"small" world, 896 m, generated in the page; the roam goes from hamlet to hamlet). The land is
+now chunked too: the ground in 128 m tiles of three levels, flat round everything built with
+hills and woods between the hamlets, the woods in 256 m squares left out past 560 m, all of them
+far versions and half as dense away from what is built. Roaming it (Medium and High, two runs
+each): 0 frames over 33 ms, 68–74 fps, but GPU-bound at 11–12 ms a frame (32–35 M triangles,
+the woods' most), interval p95 17.5–25 ms, and 640–870 draws (123–361 of them the sun's shadow):
+over the 550 / 650 budgets. Low on the real Big world lost its WebGPU device as the page started
+in 5 of 6 first runs (not the woods or the grass: with `nonature` and `nograss` the same; the
+tiled village on Low runs at 117 fps), not found yet; when it starts (CPU ×3), 106 fps, 0 frames
+over 33 ms, 552 draws. Today's scenes after all of it (village Medium/High orbit, wide and roam,
+forest Medium; two runs each): 120 fps (the village orbit once 118), 0 frames over 33 ms, draws
+as before (370 / 430 / 384 / 431, roam 288), the village's focus switches 76–152 ms; pictures
+against the base: at most 0.052 % of a picture's pixels (the shrubs), forest 0.018 %.
