@@ -88,9 +88,11 @@ a single object does is on its category page ([README.md](README.md)); this page
 - **Mirrors reflect on every preset:** the nearest on screen on Low (1024×512, 10 a second) and Medium (4× MSAA, 30 a
   second), redrawn only when something it shows changes; two live on High. Medium with a mirror in view and
   something moving costs about 6 % fps and 1 ms CPU on the M3.
-- **Kept at 4 draws:** the washer and dryer, the phone box, the potting bench, the grandfather clock (hands and pendulum
-  moving, the door still), the base and pack showers (their sliding doors, Q-05), the jukebox, the bunk, the greenhouse, the stereo, and the eight pack models `chefStove`,
-  `whirlpoolTub`, `pizzaOven`, `recordCabinet`, `lavaLamp`, `soloSauna`, `glasshouse`, `veggieBed`.
+- **Kept at 4 draws:** the washer and dryer, the phone box, the potting bench, the base and pack showers (their sliding
+  doors, Q-05), the jukebox, the bunk, the greenhouse, the stereo, and the eight pack models `chefStove`,
+  `whirlpoolTub`, `pizzaOven`, `recordCabinet`, `lavaLamp`, `soloSauna`, `glasshouse`, `veggieBed`. A model may ask for
+  more: `"draws": N` in its pack entry (3–8, 4 unless it says), which the grandfather clock is the only one to use
+  (5: hands, pendulum and its trunk door, which opens as the clock is wound since 2026-10-31).
 - **Kept as they are:** pictures as flat shapes (a texture would double their draws); one sitter sinking every sofa
   cushion; pillows not following; the curtains stretching to close; standing mirrors upright; the retired `@modern`/`@cozy`/`@minimal` style variants.
 - **Colour parts:** the wardrobe has three (Body, Doors, Handles); the sewing table's legs, apron and drawer have

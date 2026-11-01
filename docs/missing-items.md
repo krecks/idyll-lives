@@ -37,15 +37,16 @@ So what is missing is not objects — it is **uses, clips, behaviours and polish
 | Object | Part | What is missing | Source | Effort |
 |---|---|---|---|---|
 | `deskExecutive` Executive desk | drawer | Drawer modelled but static — **won't fix** | I-office-02, Q-19 | — |
-| `grandfatherClock` Grandfather clock | trunk door | Not a part of its own; clock is wound at the dial — **won't fix** | A-decor-01 | — |
 
-No modelled part is left unbuilt. The laundry basket has no lid by design (bathroom review, 2026-10-21):
-clean washing is heaped above its rim, and the lidded one is the bedroom's `laundryHamper`. The 2026-10-30 check
-that listed a basket lid here was reading a stale line in `open.md`, now corrected.
+No modelled part is left unbuilt. The grandfather clock's trunk door, the other row that stood here as a
+"won't fix", opens since 2026-10-31 (A-decor-01, §2 below: hinged on its left edge, swung on *Wind the clock*).
+The laundry basket has no lid by design (bathroom review, 2026-10-21): clean washing is heaped above its rim, and
+the lidded one is the bedroom's `laundryHamper`. The 2026-10-30 check that listed a basket lid here was reading a
+stale line in `open.md`, now corrected.
 
-That is the only remaining "(+use)" part, and it stays decorative. Kettle lid, bread-bin roll-top, laptop lid and
-the high chair's tray were closed in 0.5.0 (I-tabletop-01, I-kids-01); the nesting tables' small table and the
-display cabinet's door were built on 2026-10-31 (below).
+The executive desk's drawer is the only row left, and it stays decorative (Q-19). Kettle lid, bread-bin roll-top,
+laptop lid and the high chair's tray were closed in 0.5.0 (I-tabletop-01, I-kids-01); the nesting tables' small
+table and the display cabinet's door were built on 2026-10-31 (below).
 
 **Done 2026-10-31 (e14b4874: the last two decorative parts get their uses).** Both were closed as decor under owner decision
 4; that decision was reopened for these two parts only.

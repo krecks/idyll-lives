@@ -806,7 +806,7 @@ Phase 4, by band and group. Commits are from each finding's Status line in its l
 |---|---|---|---|
 | G-16 | I-kitchen-05, A-kitchen-02, A-kitchen-01 | 2dcc4ea0 | Ovens and microwaves bake (a recipe step's `animAt`), mixing has a bowl, the dishwasher stays open while it is loaded. |
 | G-17 | A-packs-03, A-bathroom-03, A-hobbies-02, A-kitchen-03 | d2c9f0de, 2dcc4ea0 | Moving parts in time with the hand: the washer's door held, then the drum; a tap per basin of the double sink; the hobbies' parts after the sit. |
-| G-18 | A-hobbies-03, A-packs-02, A-fitness-02, A-decor-01 (in part), A-outdoor-03, I-living-08, I-packs-15, A-bedroom-01 | abfc32d9 | The pool rack lifted off, the robot vacuum's round, the power blender's blades, the treadmill's belt at its speed, the clock's pendulum, the fountain's water, the stereo's record, quilts turned down along the bed. |
+| G-18 | A-hobbies-03, A-packs-02, A-fitness-02, A-decor-01, A-outdoor-03, I-living-08, I-packs-15, A-bedroom-01 | abfc32d9, 2026-10-31 | The pool rack lifted off, the robot vacuum's round, the power blender's blades, the treadmill's belt at its speed, the clock's pendulum (and, 2026-10-31, its trunk door on a fifth draw), the fountain's water, the stereo's record, quilts turned down along the bed. |
 
 ### 8.3 Resident clips
 
@@ -944,7 +944,7 @@ Planned separately, after this review (§11.1).
 | M-lighting-06 (in part) | S3 | The sim lets a shade reach over the next tile (`overhang`); the arc lamp's model still stops at its own. | Rebuild `lampFloorArc` reaching over the next tile, then `overhang: [[0, 1]]`, its `light.at`, and build mode's and `housegen.ts`'s placing; recorded in `lighting.md`. M. |
 | A-outdoor-01 (fixed) | S2 | The hot tub's cover folds back as one part, squashed about its back edge, not in two halves. | Two halves are a fourth draw call, as the shower's door was (Q-05). S once the draw is allowed. |
 | A-outdoor-02 (in part) | S3 | The washing comes down onto the line all together, not piece by piece. | A part per line takes the model to five draws: a rebuild that keeps the still body to one finish. M. |
-| A-decor-01 (in part) | S3 | The grandfather clock's trunk door never opens. | A fifth draw call; the clock is wound at its dial, so it can stay shut. |
+| A-decor-01 (fixed 2026-10-31) | S3 | The grandfather clock's trunk door never opens. | Done 2026-10-31: the entry asks for the fifth draw (`"draws": 5`, `G.Model(draws=5)`, `checkglb::draws_allowed`), so the door is a part of its own, hinged on its left edge, and `door_open` swings it 100° as the clock is wound (`motions.uses.wind`). S. |
 | I-kids-01 (fixed) | — | The high chair's tray doesn't slide out for the baby. | A tray clip in `kids.py`. S. |
 | I-community-09 (fixed, 0.5.0) | — | The bakery case's sliding door is on the baker's side. | The baker uses it (`feat/vendors`). |
 | I-tabletop-01 (fixed) | — | The kettle's lid, the bread bin's roll-top and the laptop's lid have uses since G-63 but no clip. | A clip each in `tabletop.py`. S. |
@@ -1210,7 +1210,7 @@ Balance after the last fix (`sweep-sim`, 180 days): median weekly savings $407, 
 **(f) Other judgement calls in the fix logs:**
 - **Brushing teeth gives less hygiene** (`content`): at 0.05 the busy soak's town had no birth in 120 hours; 0.03 (under washing hands' rate) passes. *Recommendation:* accept; the soak's threshold is the real question, with (b)'s baby chance.
 - **Feet slide at speeds 4 and 5** (A-residents-03): won't fix, as no gait steps at 45–90 m/s without strobing. *Recommendation:* accept.
-- **The draw budget over moving parts:** the hot tub's cover folds as one squashed part, the washing comes down in one piece, the grandfather clock's trunk door stays shut, all to stay within four draws (§9.2). *Recommendation:* accept now; allow a fourth draw for the hot tub's cover with its next rebuild, as for the shower (Q-05).
+- **The draw budget over moving parts:** the washing comes down in one piece and the hot tub's cover folded as one squashed part, both to stay within four draws (§9.2). *Recommendation:* accept now; allow a fourth draw for the hot tub's cover with its next rebuild, as for the shower (Q-05). *Since:* the cover is two halves at four draws (2bb30dba), and a model may ask for more: `"draws": N` in its pack entry, the grandfather clock the only one so far (5, its trunk door, 2026-10-31).
 - **Town food is self-serve:** nobody serves, so the labels and descriptions say tin, honesty box, tongs or self-service till (G-67, Q-17). *Recommendation:* accept until vendors. *Since 0.5.0:* vendors and shopkeepers serve (I-community-09); the self-serve labels stay for a household's own cart.
 - **Games for two without a partner:** the seesaw, ping-pong and park chess are refused with nobody free; pool and foosball are practised alone; the home chess table stays a game for one (M-hobbies-11). *Recommendation:* accept.
 - **Harvests go to the fridge** (G-68 read with Q-18): crops still replant themselves; "Pick an apple" and the nature lover's veggie bed stay nibbles eaten on the spot, as does a harvest with no fridge. *Recommendation:* accept.
