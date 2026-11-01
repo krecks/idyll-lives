@@ -1806,6 +1806,11 @@ pub struct World {
     /// objects added or removed). Unlike `structure_version`, a cupboard opening or a crop
     /// growing doesn't bump it, so a busy town needn't rebuild every room for a change of looks.
     pub(crate) room_layout_version: u32,
+    /// Things came, went, broke, were mended or upgraded since the rooms were scored
+    /// (`rooms_things_changed`).
+    pub(crate) rooms_things: bool,
+    /// Per room id: it has a door to the outside (`privacy::doors_out`, found with the rooms).
+    pub(crate) rooms_out: Vec<bool>,
     /// A room's scores changed without the layout changing (a thing broke, was repaired or
     /// upgraded); the next tick recomputes the rooms once.
     pub(crate) rooms_dirty: bool,
@@ -2138,6 +2143,8 @@ impl World {
             rooms: Vec::new(),
             rooms_version: 0,
             room_layout_version: 1,
+            rooms_things: false,
+            rooms_out: Vec::new(),
             rooms_dirty: false,
             rooms_rescore: false,
             room_score: Vec::new(),
@@ -2639,7 +2646,7 @@ impl World {
         } else {
             self.objects_changed_in(rect);
         }
-        self.rooms_layout_changed();
+        self.rooms_things_changed();
         Ok(self.objects.len() as u32 - 1)
     }
 
@@ -3179,6 +3186,18 @@ impl World {
     }
 
     /// Every room and garden of the town with its scores (current as of the last refresh).
+    /// Everything found with the rooms, for tests that compare two ways of finding them: the
+    /// rooms, the score per tile, the private and claimed rooms and the places in those.
+    #[doc(hidden)]
+    pub fn room_state(&self) -> (Vec<crate::rooms::RoomInfo>, Vec<f32>, Vec<u16>, Vec<u16>) {
+        (
+            self.rooms.clone(),
+            self.room_score.clone(),
+            self.private_rooms.clone(),
+            self.claimed_rooms.clone(),
+        )
+    }
+
     pub fn rooms(&self) -> &[crate::rooms::RoomInfo] {
         &self.rooms
     }
@@ -3230,7 +3249,7 @@ impl World {
             if let Some(news) = self.sims[i].news.take() {
                 // Broken or mended: what the house offers and how it looks change.
                 self.structure_version = self.structure_version.wrapping_add(1);
-                self.rooms_need_rescore();
+                self.rooms_things_changed();
                 let (kind, n) = match news {
                     News::Broke(o) => (
                         social::EventKind::Broke,
@@ -3616,16 +3635,23 @@ impl World {
         self.reach.mark(&self.lot, rect);
     }
 
-    /// Notes that the lot's rooms or their scores changed structurally (walls, coverings,
-    /// objects added or removed): the next tick recomputes the rooms.
+    /// Notes that the lot's rooms changed (walls, storeys, a blueprint, an undo): the next tick
+    /// finds and scores the rooms again.
     pub(crate) fn rooms_layout_changed(&mut self) {
         self.room_layout_version = self.room_layout_version.wrapping_add(1);
     }
 
-    /// Notes that a room's scores changed without its layout (something broke, was repaired
-    /// or upgraded): the next tick recomputes the rooms once.
+    /// Notes that a room's scores changed without its layout (a wall painted, a floor covered):
+    /// the next tick recomputes the rooms once.
     pub(crate) fn rooms_need_rescore(&mut self) {
         self.rooms_dirty = true;
+    }
+
+    /// Notes that things came, went (or moved), broke, were mended or upgraded, and nothing else
+    /// about the rooms changed: the next tick scores the rooms again for what stands in them
+    /// (`refresh_room_things`) without finding them again.
+    pub(crate) fn rooms_things_changed(&mut self) {
+        self.rooms_things = true;
     }
 
     /// Notes that only cleanliness may have changed (a crop grew, a thing opened): the next
@@ -3641,19 +3667,11 @@ impl World {
         self.map_plots();
         let (rooms, cells) = crate::rooms::compute(self);
         self.rooms = rooms;
-        let (private, claimed) =
-            crate::privacy::private_rooms(&self.content, &self.plots, &self.rooms, &self.lot);
-        self.private_rooms = private;
-        self.claimed_rooms = claimed;
-        self.claimed_places = crate::privacy::claimed_places(
-            &self.content,
-            &self.lot,
-            &self.claimed_rooms,
-            &self.objects,
-        );
-        self.claimants_cache.clear();
+        self.rooms_out = crate::privacy::doors_out(&self.content, &self.rooms, &self.lot);
+        self.refresh_privacy();
         self.rooms_version = self.room_layout_version;
         self.rooms_dirty = false;
+        self.rooms_things = false;
         self.rooms_rescore = false;
         // The room (index into `rooms`) whose score each tile takes: its plot's garden, then
         // indoor tiles anywhere their room; off the plots, none (`roomRules.away`).
@@ -3703,6 +3721,50 @@ impl World {
         self.room_tiles = crate::rooms::RoomTiles::new(cells, &source);
     }
 
+    /// Scores the rooms again for what stands in them, the rooms themselves as they are (things
+    /// came, went, broke, were mended or upgraded, and nothing was built: `rooms_things_changed`).
+    /// The same as `refresh_rooms` would give, at the cost of the things and the rooms' dirt,
+    /// not of finding the rooms and walking every tile.
+    fn refresh_room_things(&mut self) {
+        let mut rooms = std::mem::take(&mut self.rooms);
+        let mut tiles = std::mem::take(&mut self.room_tiles);
+        let mut score = std::mem::take(&mut self.room_score);
+        crate::rooms::rescore_things(self, &mut rooms, &mut tiles, &mut score);
+        (self.rooms, self.room_tiles, self.room_score) = (rooms, tiles, score);
+        self.refresh_privacy();
+        self.rooms_things = false;
+        self.rooms_rescore = false;
+    }
+
+    /// The rooms kept shut and the claimed ones among them, and the places in those (`privacy`),
+    /// from the rooms as they are.
+    fn refresh_privacy(&mut self) {
+        let (private, claimed) =
+            crate::privacy::private_rooms(&self.content, &self.plots, &self.rooms, &self.rooms_out);
+        self.private_rooms = private;
+        self.claimed_rooms = claimed;
+        self.claimed_places = crate::privacy::claimed_places(
+            &self.content,
+            &self.lot,
+            &self.claimed_rooms,
+            &self.objects,
+        );
+        self.claimants_cache.clear();
+    }
+
+    /// Catches up on the rooms as the next tick would (found again, scored again for what stands
+    /// in them, or for their dirt), for benchmarks and tools.
+    pub fn catch_up_rooms(&mut self) {
+        if self.rooms_version != self.room_layout_version || self.rooms_dirty {
+            self.refresh_rooms();
+        } else if self.rooms_things {
+            self.refresh_room_things();
+        } else if self.rooms_rescore {
+            self.rooms_rescore = false;
+            self.rescore_rooms();
+        }
+    }
+
     /// Scores cleanliness again in rooms that had a mess since: between structure changes
     /// only the dirt changes, so the rooms needn't be found again (a whole-town job).
     fn rescore_rooms(&mut self) {
@@ -3721,6 +3783,8 @@ impl World {
         self.redo.clear();
         if self.rooms_version != self.room_layout_version || self.rooms_dirty {
             self.refresh_rooms();
+        } else if self.rooms_things {
+            self.refresh_room_things();
         } else if self.rooms_rescore {
             self.rooms_rescore = false;
             self.rescore_rooms();
@@ -4179,12 +4243,7 @@ impl World {
                 | Command::DeclinePurchase { .. }
         );
         self.apply_command(cmd)?;
-        if self.rooms_version != self.room_layout_version || self.rooms_dirty {
-            self.refresh_rooms();
-        } else if self.rooms_rescore {
-            self.rooms_rescore = false;
-            self.rescore_rooms();
-        }
+        self.catch_up_rooms();
         // Someone an order or an edit stopped (the sink they carried dishes to was moved) puts
         // down what they carry now, not when time moves on (Build mode stands still).
         if self.sims.iter().any(|s| s.held.is_some()) {
@@ -8977,12 +9036,25 @@ pub(crate) fn quickest_exit(
     } else {
         crate::travel::Mode::Car
     };
-    (0..exits.len())
+    // Nearest first by the straight line, which no way along the roads beats: past the first
+    // whose straight line takes longer than the quickest found, none can be quicker.
+    let mut order: Vec<(f32, usize)> = (0..exits.len())
         .filter(|&i| on_foot || !travel.is_stop(i))
         .filter(|&i| exits[i].iter().all(|v| v.is_finite()))
-        .map(|i| (i, travel.eta(pos, exits[i], mode, 1.5)))
-        .min_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)))
-        .map(|(i, _)| i)
+        .map(|i| (travel.eta_at_least(pos, exits[i], mode, 1.5), i))
+        .collect();
+    order.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+    let mut best: Option<(f32, usize)> = None;
+    for (least, i) in order {
+        if best.is_some_and(|(eta, _)| least > eta) {
+            break;
+        }
+        let eta = travel.eta(pos, exits[i], mode, 1.5);
+        if best.is_none_or(|(b, j)| eta.total_cmp(&b).then(i.cmp(&j)).is_lt()) {
+            best = Some((eta, i));
+        }
+    }
+    best.map(|(_, i)| i)
 }
 
 /// The town's way out (`World::exits`) nearest `pos`, if it has any.

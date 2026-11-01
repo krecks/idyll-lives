@@ -189,6 +189,8 @@ pub(crate) fn update(world: &mut World) {
     let dark = dark_at(crate::clock::minute_of_day(world.tick));
     let lot_version = world.lot_version();
     let mut watch = std::mem::take(&mut world.light_watch);
+    // (The lamps by room, found once for all the rooms looked at.)
+    let mut lamps: Option<Lamps> = None;
     if watch.fresh && world.autonomy {
         let rooms: Vec<u16> = world
             .rooms()
@@ -196,10 +198,11 @@ pub(crate) fn update(world: &mut World) {
             .filter(|r| !r.garden && r.id != OUTDOORS)
             .map(|r| r.id)
             .collect();
+        let lamps = lamps.get_or_insert_with(|| Lamps::new(world));
         for room in rooms {
-            switch_room(world, room, false);
-            if awake.binary_search(&room).is_ok() && room_dark(world, room, dark) {
-                switch_room(world, room, true);
+            switch_room(world, lamps, room, false);
+            if awake.binary_search(&room).is_ok() && room_dark(world, lamps, room, dark) {
+                switch_room(world, lamps, room, true);
             }
         }
         watch.fresh = false;
@@ -216,13 +219,16 @@ pub(crate) fn update(world: &mut World) {
             .copied()
             .filter(|r| awake.binary_search(r).is_err())
             .collect();
-        for room in came {
-            if room_dark(world, room, dark) {
-                switch_room(world, room, true);
+        if !came.is_empty() || !left.is_empty() {
+            let lamps = lamps.get_or_insert_with(|| Lamps::new(world));
+            for room in came {
+                if room_dark(world, lamps, room, dark) {
+                    switch_room(world, lamps, room, true);
+                }
             }
-        }
-        for room in left {
-            switch_room(world, room, false);
+            for room in left {
+                switch_room(world, lamps, room, false);
+            }
         }
     }
     // Morning: the fires left burning have burnt down.
@@ -246,8 +252,9 @@ pub(crate) fn update(world: &mut World) {
 
 /// Whether `room` is dark: it is night (or the room is in the basement, or has no windows) and
 /// none of its lamps is on (a fire burning there isn't lit for its light).
-fn room_dark(world: &World, room: u16, night: bool) -> bool {
-    let mut lamps = lamps_in(world, room)
+fn room_dark(world: &World, lamps: &Lamps, room: u16, night: bool) -> bool {
+    let mut lamps = lamps
+        .in_room(room)
         .filter(|&id| !world.content.objects[world.objects[id as usize].def].fire)
         .peekable();
     let Some(&first) = lamps.peek() else {
@@ -267,24 +274,42 @@ pub fn windowless(world: &World, room: u16) -> bool {
         .is_some_and(|r| r.windows == 0)
 }
 
-/// The switchable lamps standing in `room`.
-fn lamps_in(world: &World, room: u16) -> impl Iterator<Item = u32> + '_ {
-    world
-        .objects
-        .iter()
-        .filter(move |o| {
-            switchable(world, o.def) && {
+/// The switchable lamps by the room they stand in (`room_at` their middle), each room's in id
+/// order: found once for a pass over the rooms rather than every lamp for every room.
+struct Lamps {
+    by_room: Vec<(u16, u32)>,
+}
+
+impl Lamps {
+    fn new(world: &World) -> Self {
+        let mut by_room: Vec<(u16, u32)> = world
+            .objects
+            .iter()
+            .filter(|o| switchable(world, o.def))
+            .map(|o| {
                 let [x, z] = o.centre(&world.content);
-                world.lot.room_at(x.floor() as i32, z.floor() as i32) == room
-            }
-        })
-        .map(|o| o.id)
+                (world.lot.room_at(x.floor() as i32, z.floor() as i32), o.id)
+            })
+            .collect();
+        by_room.sort_unstable();
+        Self { by_room }
+    }
+
+    /// The switchable lamps standing in `room`, in id order.
+    fn in_room(&self, room: u16) -> impl Iterator<Item = u32> + '_ {
+        let from = self.by_room.partition_point(|&(r, _)| r < room);
+        self.by_room[from..]
+            .iter()
+            .take_while(move |&&(r, _)| r == room)
+            .map(|&(_, id)| id)
+    }
 }
 
 /// A resident switches every lamp in `room`, unless the household living there has free will off
 /// (and puts out a fire there, but doesn't light one).
-fn switch_room(world: &mut World, room: u16, on: bool) {
-    let lamps: Vec<u32> = lamps_in(world, room)
+fn switch_room(world: &mut World, lamps: &Lamps, room: u16, on: bool) {
+    let lamps: Vec<u32> = lamps
+        .in_room(room)
         .filter(|&id| !on || !world.content.objects[world.objects[id as usize].def].fire)
         .collect();
     let Some(&first) = lamps.first() else { return };

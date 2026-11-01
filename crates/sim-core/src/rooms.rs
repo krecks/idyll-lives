@@ -83,13 +83,9 @@ struct Acc {
     cells: Vec<(u32, f32)>,
     windows: u16,
     doors: u16,
-    lamps: u16,
-    lit: f32,
     outside: bool,
-    decor: f32,
-    tags: TagMask,
-    /// Stairs stand in it.
-    stairs: bool,
+    /// What stands in it.
+    things: Things,
     floors: f32,
     faces: f32,
     covered_faces: f32,
@@ -173,6 +169,164 @@ impl RoomTiles {
             }
         }
     }
+}
+
+/// What the things standing in a room (or a garden) give it.
+#[derive(Default, Clone, Copy)]
+struct Things {
+    decor: f32,
+    lamps: u16,
+    lit: f32,
+    tags: TagMask,
+    /// Stairs stand in it.
+    stairs: bool,
+}
+
+impl Things {
+    fn add(&mut self, w: &World, o: &crate::world::ObjectInstance) {
+        let content = &w.content;
+        let def = &content.objects[o.def];
+        self.decor += def.decor * content.object_rules.quality_factor(o.quality);
+        self.lamps += u16::from(def.lamp > 0.0);
+        self.lit += def.lamp;
+        // Broken things don't do what they're for (a broken shower is no shower).
+        if !o.broken() {
+            self.tags |= def.tags;
+        }
+        self.stairs |= def.stairs;
+    }
+}
+
+/// A room's (or garden's) kind and scores but cleanliness, from its tiles, walls and coverings
+/// (as `compute` found them) and what stands in it (`things`).
+fn score_things(room: &mut RoomInfo, a: &Things, content: &crate::content::Content) {
+    let rules = &content.room_rules;
+    room.lamps = a.lamps;
+    room.lit = a.lit;
+    room.decor = a.decor;
+    room.tags = a.tags;
+    if room.garden {
+        let decor = (a.decor / (room.tiles * rules.garden_decor_per_tile)).min(1.0);
+        room.scores = RoomScores {
+            size: 1.0,
+            light: 1.0,
+            decor,
+            clean: 1.0,
+            function: 1.0,
+            overall: 0.0,
+        };
+        return;
+    }
+    let tiles = room.tiles;
+    let kinds = &content.room_kinds;
+    // By what's done there, else whether it's a way through.
+    let passage = room.doors >= 2 || a.stairs;
+    let kind = kinds
+        .iter()
+        .position(|k| a.tags & k.tags != 0)
+        .or_else(|| kinds.iter().position(|k| k.passage).filter(|_| passage));
+    let exclusive = kinds
+        .iter()
+        .filter(|k| k.exclusive && a.tags & k.tags != 0)
+        .count();
+    let missing = kind.and_then(|k| kinds[k].essentials.iter().position(|&e| a.tags & e == 0));
+    let [cramped, comfy] = kind.map_or([4.0, 9.0], |k| kinds[k].size);
+    let size = if tiles < cramped {
+        0.5 * tiles / cramped.max(1e-3)
+    } else if tiles < comfy {
+        0.5 + 0.5 * (tiles - cramped) / (comfy - cramped).max(1e-3)
+    } else {
+        1.0
+    };
+    let day = (f32::from(room.windows) * rules.window_tiles / tiles).min(1.0);
+    let night = (a.lit / tiles).min(1.0);
+    // No window could light a room with no outside wall: its lamps are all its light, by day too.
+    let day = if room.outside { day } else { night };
+    let decor = (a.decor / (tiles * rules.decor_per_tile) * 0.8 + room.coverings * 0.4).min(1.0);
+    let function = match (kind, exclusive > 1, missing) {
+        (None, _, _) => 0.4,
+        (Some(_), true, _) => 0.6,
+        (Some(_), false, Some(_)) => 0.7,
+        _ => 1.0,
+    };
+    room.kind = kind;
+    room.mixed = exclusive > 1;
+    room.missing = missing;
+    room.scores = RoomScores {
+        size,
+        light: (day + night) / 2.0,
+        decor,
+        clean: 1.0,
+        function,
+        overall: 0.0,
+    };
+}
+
+/// The rooms scored again for what stands in them, with their tiles, walls and coverings as
+/// they were (`World::refresh_room_things`: things came, went, broke, were mended or upgraded,
+/// and nothing was built): exactly what `compute` would give, without finding the rooms or
+/// walking their tiles but to add up their dirt. Then the score per tile follows.
+pub(crate) fn rescore_things(
+    w: &World,
+    rooms: &mut [RoomInfo],
+    tiles: &mut RoomTiles,
+    room_score: &mut [f32],
+) {
+    let lot = &w.lot;
+    let rules = &w.content.room_rules;
+    let most = rooms
+        .iter()
+        .filter(|r| !r.garden)
+        .map(|r| r.id as usize)
+        .max()
+        .unwrap_or(0);
+    let mut by_id = vec![usize::MAX; most + 1];
+    let mut by_plot = vec![usize::MAX; w.plots.len()];
+    for (k, r) in rooms.iter().enumerate() {
+        match (r.garden, r.plot) {
+            (true, Some(p)) => {
+                if let Some(slot) = by_plot.get_mut(p as usize) {
+                    *slot = k;
+                }
+            }
+            (true, None) => {}
+            (false, _) => by_id[r.id as usize] = k,
+        }
+    }
+    let mut things = vec![Things::default(); rooms.len()];
+    for o in &w.objects {
+        let r = if lot.in_bounds(o.x, o.z) {
+            lot.room_at(o.x, o.z)
+        } else {
+            OUTDOORS
+        };
+        let k = if r == OUTDOORS {
+            let Some(plot) = w.plot_at(o.x, o.z) else {
+                continue;
+            };
+            by_plot.get(plot as usize).copied().unwrap_or(usize::MAX)
+        } else {
+            by_id.get(r as usize).copied().unwrap_or(usize::MAX)
+        };
+        if let Some(t) = things.get_mut(k) {
+            t.add(w, o);
+        }
+    }
+    let dirt_at = |i: u32| w.dirt.get(i as usize).copied().unwrap_or(0.0);
+    for (k, room) in rooms.iter_mut().enumerate() {
+        let before = room.scores.overall;
+        score_things(room, &things[k], &w.content);
+        let dirt = tiles.cells[k]
+            .iter()
+            .fold(0.0, |s, &(i, weight)| s + dirt_at(i) * weight);
+        score_dirt(room, dirt, rules);
+        if room.scores.overall.to_bits() != before.to_bits() {
+            for &i in &tiles.scored[k] {
+                room_score[i as usize] = room.scores.overall;
+            }
+        }
+    }
+    tiles.stale.fill(false);
 }
 
 /// Weighted overall score (content `roomRules.weights`).
@@ -316,7 +470,6 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
 
     // What stands in each room.
     for o in &w.objects {
-        let def = &content.objects[o.def];
         let r = room(o.x, o.z);
         let acc = if r == OUTDOORS {
             let Some(plot) = w.plot_at(o.x, o.z) else {
@@ -329,79 +482,33 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             };
             acc
         };
-        acc.decor += def.decor * content.object_rules.quality_factor(o.quality);
-        acc.lamps += u16::from(def.lamp > 0.0);
-        acc.lit += def.lamp;
-        // Broken things don't do what they're for (a broken shower is no shower).
-        if !o.broken() {
-            acc.tags |= def.tags;
-        }
-        acc.stairs |= def.stairs;
+        acc.things.add(w, o);
     }
 
     let mut out: Vec<(RoomInfo, Vec<(u32, f32)>)> = Vec::with_capacity(rooms.len() + gardens.len());
     for (id, a) in rooms.into_iter().enumerate().filter(|(_, a)| a.tiles > 0.0) {
-        let id = id as u16;
-        let kinds = &content.room_kinds;
-        // By what's done there, else whether it's a way through.
-        let passage = a.doors >= 2 || a.stairs;
-        let kind = kinds
-            .iter()
-            .position(|k| a.tags & k.tags != 0)
-            .or_else(|| kinds.iter().position(|k| k.passage).filter(|_| passage));
-        let exclusive = kinds
-            .iter()
-            .filter(|k| k.exclusive && a.tags & k.tags != 0)
-            .count();
-        let missing = kind.and_then(|k| kinds[k].essentials.iter().position(|&e| a.tags & e == 0));
-        let [cramped, comfy] = kind.map_or([4.0, 9.0], |k| kinds[k].size);
-        let size = if a.tiles < cramped {
-            0.5 * a.tiles / cramped.max(1e-3)
-        } else if a.tiles < comfy {
-            0.5 + 0.5 * (a.tiles - cramped) / (comfy - cramped).max(1e-3)
-        } else {
-            1.0
-        };
-        let day = (f32::from(a.windows) * rules.window_tiles / a.tiles).min(1.0);
-        let night = (a.lit / a.tiles).min(1.0);
-        // No window could light a room with no outside wall: its lamps are all its light, by day too.
-        let day = if a.outside { day } else { night };
         let coverings = 0.5 * (a.floors / a.tiles) + 0.5 * (a.covered_faces / a.faces.max(1.0));
-        let decor = (a.decor / (a.tiles * rules.decor_per_tile) * 0.8 + coverings * 0.4).min(1.0);
-        let function = match (kind, exclusive > 1, missing) {
-            (None, _, _) => 0.4,
-            (Some(_), true, _) => 0.6,
-            (Some(_), false, Some(_)) => 0.7,
-            _ => 1.0,
-        };
-        let scores = RoomScores {
-            size,
-            light: (day + night) / 2.0,
-            decor,
-            clean: 1.0,
-            function,
-            overall: 0.0,
-        };
         let mut room = RoomInfo {
-            id,
+            id: id as u16,
             plot: w.plot_at(a.first.0, a.first.1),
             garden: false,
-            kind,
-            mixed: exclusive > 1,
-            missing,
+            kind: None,
+            mixed: false,
+            missing: None,
             tiles: a.tiles,
             windows: a.windows,
             doors: a.doors,
-            lamps: a.lamps,
-            lit: a.lit,
+            lamps: 0,
+            lit: 0.0,
             outside: a.outside,
-            decor: a.decor,
+            decor: 0.0,
             coverings,
             dirt: 0.0,
             centre: [a.sx / a.tiles, a.sz / a.tiles],
-            tags: a.tags,
-            scores,
+            tags: 0,
+            scores: RoomScores::default(),
         };
+        score_things(&mut room, &a.things, content);
         score_dirt(&mut room, a.dirt, rules);
         out.push((room, a.cells));
     }
@@ -410,19 +517,9 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
         .enumerate()
         .filter(|(_, a)| a.tiles > 0.0)
     {
-        let plot = plot as u32;
-        let decor = (a.decor / (a.tiles * rules.garden_decor_per_tile)).min(1.0);
-        let scores = RoomScores {
-            size: 1.0,
-            light: 1.0,
-            decor,
-            clean: 1.0,
-            function: 1.0,
-            overall: 0.0,
-        };
         let mut garden = RoomInfo {
             id: OUTDOORS,
-            plot: Some(plot),
+            plot: Some(plot as u32),
             garden: true,
             kind: None,
             mixed: false,
@@ -430,16 +527,17 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             tiles: a.tiles,
             windows: 0,
             doors: 0,
-            lamps: a.lamps,
-            lit: a.lit,
+            lamps: 0,
+            lit: 0.0,
             outside: true,
-            decor: a.decor,
+            decor: 0.0,
             coverings: 0.0,
             dirt: 0.0,
             centre: [a.sx / a.tiles, a.sz / a.tiles],
-            tags: a.tags,
-            scores,
+            tags: 0,
+            scores: RoomScores::default(),
         };
+        score_things(&mut garden, &a.things, content);
         score_dirt(&mut garden, a.dirt, rules);
         out.push((garden, a.cells));
     }

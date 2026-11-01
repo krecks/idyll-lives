@@ -85,35 +85,37 @@ fn private_room(
     content: &Content,
     plots: &[crate::world::Plot],
     r: &crate::rooms::RoomInfo,
-    outside: &[u16],
+    outside: &[bool],
 ) -> bool {
     !r.garden
         && r.id != OUTDOORS
         && !r.mixed
         && r.kind.is_some_and(|k| content.room_kinds[k].private)
-        && !outside.contains(&r.id)
+        && !outside.get(r.id as usize).copied().unwrap_or(false)
         && r.plot
             .is_none_or(|p| plots.get(p as usize).is_none_or(|p| !p.public))
 }
 
-/// The rooms of `rooms` kept shut while anyone is in them (`private_room`), sorted, and the claimed
-/// (`roomKinds[].claimed`: bedrooms, `Shut::claimants`) ones among them, sorted.
-pub(crate) fn private_rooms(
+/// Per room id (up to the highest of `rooms`): whether it has a door to the outside (such a
+/// room isn't private: `private_room`). Found with the rooms (`World::rooms_out`).
+pub(crate) fn doors_out(
     content: &Content,
-    plots: &[crate::world::Plot],
     rooms: &[crate::rooms::RoomInfo],
     lot: &Lot,
-) -> (Vec<u16>, Vec<u16>) {
+) -> Vec<bool> {
     if !content.room_kinds.iter().any(|k| k.private) {
-        return (Vec::new(), Vec::new());
+        return Vec::new();
     }
-    // Rooms with a door to the outside.
-    let mut outside = Vec::new();
+    let most = rooms.iter().map(|r| r.id as usize).max().unwrap_or(0);
+    let mut outside = vec![false; most + 1];
     let room = |x: i32, z: i32| lot.room_at(x, z);
     let mut door = |a: u16, b: u16| {
         for (r, across) in [(a, b), (b, a)] {
-            if r != OUTDOORS && across == OUTDOORS && !outside.contains(&r) {
-                outside.push(r);
+            if r != OUTDOORS
+                && across == OUTDOORS
+                && let Some(o) = outside.get_mut(r as usize)
+            {
+                *o = true;
             }
         }
     };
@@ -130,11 +132,26 @@ pub(crate) fn private_rooms(
             _ => {}
         }
     }
+    outside
+}
+
+/// The rooms of `rooms` kept shut while anyone is in them (`private_room`; `outside`: per room
+/// id, a door to the outside, `doors_out`), sorted, and the claimed (`roomKinds[].claimed`:
+/// bedrooms, `Shut::claimants`) ones among them, sorted.
+pub(crate) fn private_rooms(
+    content: &Content,
+    plots: &[crate::world::Plot],
+    rooms: &[crate::rooms::RoomInfo],
+    outside: &[bool],
+) -> (Vec<u16>, Vec<u16>) {
+    if !content.room_kinds.iter().any(|k| k.private) {
+        return (Vec::new(), Vec::new());
+    }
     let mut ids = Vec::new();
     let mut claimed = Vec::new();
     for r in rooms
         .iter()
-        .filter(|r| private_room(content, plots, r, &outside))
+        .filter(|r| private_room(content, plots, r, outside))
     {
         ids.push(r.id);
         if r.kind.is_some_and(|k| content.room_kinds[k].claimed) {

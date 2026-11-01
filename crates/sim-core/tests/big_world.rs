@@ -189,8 +189,9 @@ fn big_world_benchmark() {
         ms(t.elapsed())
     );
 
-    // One object placed in the player's garden, then what catching up costs: the walkable
-    // regions, the objects-by-plot index and the links (`refresh_navigation`), and the rooms.
+    // One object placed in the player's garden (the rooms are scored again for it as it's
+    // placed: `catch_up_rooms`), then what catching up costs: the walkable regions, the
+    // objects-by-plot index and the links (`refresh_navigation`).
     let home = w
         .households
         .iter()
@@ -201,7 +202,9 @@ fn big_world_benchmark() {
         .flat_map(|z| (plot.x..plot.x + plot.w).map(move |x| [x, z, 0]))
         .collect();
     let mut tried = None;
+    let mut placing = Duration::ZERO;
     let placed = spots.iter().any(|&at| {
+        let t = Instant::now();
         let r = w.apply(sim_core::Command::Buy {
             household: home as u32,
             object: "plant".into(),
@@ -212,6 +215,7 @@ fn big_world_benchmark() {
             size: None,
             tall: None,
         });
+        placing = t.elapsed();
         tried = r.as_ref().err().map(|e| e.to_string());
         r.is_ok()
     });
@@ -222,14 +226,16 @@ fn big_world_benchmark() {
         let t = Instant::now();
         w.refresh_navigation();
         let index = t.elapsed();
+        // (And finding every room again, as a wall built does.)
         let t = Instant::now();
         w.refresh_rooms();
-        let rooms = t.elapsed();
+        let all_rooms = t.elapsed();
         eprintln!(
-            "one object placed: walkable regions catch up in {:.3} ms, objects' index and links in {:.3} ms, rooms in {:.3} ms",
+            "one object placed in {:.3} ms (its rooms scored again), then walkable regions catch up in {:.3} ms, objects' index and links in {:.3} ms (all the rooms found again: {:.3} ms)",
+            ms(placing),
             ms(reach),
             ms(index),
-            ms(rooms)
+            ms(all_rooms)
         );
     } else {
         eprintln!("one object placed: nowhere to put it ({tried:?})");

@@ -986,6 +986,17 @@ impl Travel {
         }
     }
 
+    /// At least as many minutes as `eta` says the trip takes: the straight line at the fastest
+    /// way along it (no search at all). For finding the quickest of several without working
+    /// out every one (`world::quickest_exit`).
+    pub fn eta_at_least(&self, from: [f32; 2], to: [f32; 2], mode: Mode, walk: f32) -> f32 {
+        let d = dist(from, to);
+        match mode {
+            Mode::Foot => d / walk.max(1e-3),
+            Mode::Car => d / TOWN_SPEED.max(self.country_speed) / 60.0,
+        }
+    }
+
     /// Along the roads from `from` to `to`: the metres on foot (tile legs with a detour), and the
     /// seconds by car (`mode`).
     fn road_estimate(&self, from: [f32; 2], to: [f32; 2], mode: Mode) -> Option<(f32, f32)> {

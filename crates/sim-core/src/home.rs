@@ -1146,7 +1146,7 @@ impl World {
         self.pay(h, cost);
         self.objects[object as usize].wear = 0.0;
         self.structure_version = self.structure_version.wrapping_add(1);
-        self.rooms_need_rescore();
+        self.rooms_things_changed();
         Ok(())
     }
 
@@ -1176,7 +1176,7 @@ impl World {
         obj.value += cost;
         let quality = obj.quality;
         self.structure_version = self.structure_version.wrapping_add(1);
-        self.rooms_need_rescore();
+        self.rooms_things_changed();
         // Told about the household's first resident (nobody may live there yet).
         if let Some(member) = self
             .sims
@@ -1766,7 +1766,7 @@ impl World {
         } else {
             self.objects_changed_in(rect);
         }
-        self.rooms_layout_changed();
+        self.rooms_things_changed();
         obj
     }
 }
