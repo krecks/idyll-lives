@@ -73,7 +73,7 @@ import { GrassPush } from '../shared/grass';
 import { houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
 import { compose, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
 import { OrbitControls } from '../shared/orbit';
-import { Flight, panBounds, Roam, type FocusPlot } from '../shared/focus';
+import { Flight, panBounds, Roam, warmLots, type FocusPlot } from '../shared/focus';
 import { CHUNK, chunkCoords } from '../shared/chunks';
 import { ModelRefresh } from '../shared/modelRefresh';
 import { OverviewCamera } from '../shared/overviewCamera';
@@ -126,6 +126,8 @@ declare global {
 
 /** The game camera's zoom and tilt limits. */
 const RADIUS_LIMITS = [6, 95] as const;
+/** A big world's warm-up builds and draws this many lots besides the one in view (`warmGame`). */
+const WARM_LOTS = 6;
 const BETA_LIMITS = [0.3, 1.35] as const;
 /** Its lens: vertical field of view (a slightly long lens flattens the perspective: the dollhouse look), near and far (m). */
 // (The near plane a fiftieth of the camera's distance, never under 0.3 m: from the town overview's 200–300 m at 0.3 m
@@ -1934,6 +1936,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const t0 = performance.now();
     await this.framesRendered(1);
     this.shaderWatch.note(`warm-up frame done in ${Math.round(performance.now() - t0)} ms`);
+    // A big world: the camera roams to lots of every kind, each drawn in full once it settles. A few
+    // that between them have most of what its houses are made of are built and drawn here too, so
+    // those lots make few pipelines in play (each first one costs its frame tens of ms); then the lot
+    // in view again. (Load time for smooth roaming: about a second more.)
+    const world = this.lastWorld;
+    const home = this.view;
+    if (world?.meta?.world?.size === 'big' && home && !this.disposed) {
+      for (const lot of warmLots(world, home, WARM_LOTS)) {
+        await this.setWorld(world, lot);
+        this.warmNext = true;
+        await this.framesRendered(1);
+      }
+      await this.setWorld(this.lastWorld ?? world, home);
+      this.shaderWatch.note(`warm-up lots done in ${Math.round(performance.now() - t0)} ms`);
+    }
     this.shaderWatch.phase = this.townMode ? 'town' : 'game';
   }
 
@@ -1961,7 +1978,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sunShadows.moved(true);
     const hidden = this.drawHidden();
     const red = this.drawRedCopies();
-    const mirrors = this.mirrors.warm();
+    const mirrors = this.mirrors.warm(this.streamOn);
     return () => {
       mirrors();
       red();

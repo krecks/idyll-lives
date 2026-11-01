@@ -5,7 +5,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { chunkAt, CHUNK } from '../src/render/shared/chunks';
-import { Flight, HYSTERESIS, panBounds, Roam, SETTLE_MS, streamRadius, type FocusPlot } from '../src/render/shared/focus';
+import { Flight, HYSTERESIS, panBounds, Roam, SETTLE_MS, streamRadius, warmLots, type FocusPlot } from '../src/render/shared/focus';
 import { OrbitControls } from '../src/render/shared/orbit';
 
 const cam = (x: number, z: number, radius = 30) => ({ x, z, radius, alpha: 0, fovH: 1.1 });
@@ -99,5 +99,31 @@ describe('roaming', () => {
     o.checkLimits();
     expect([o.target.x, o.target.z]).toEqual([-60, 210]);
     expect(panBounds({ width: 1000, depth: 1000, meta: { world: { size: 'big' } } })).toEqual({ x0: -20, z0: -20, x1: 1020, z1: 1020 });
+  });
+});
+
+describe('warm-up lots', () => {
+  const plot = (x: number) => ({ x, z: 0, w: 10, d: 10, house: [x, 0, x + 5, 5] });
+  test('the lots adding the most not yet seen, the home and houseless lots left out, none that add nothing', () => {
+    const world = {
+      plots: [plot(0), plot(10), plot(20), { ...plot(30), house: null }, plot(40)],
+      depth: 10,
+      walls: [
+        { x: 1, z: 1, faces: [1, 2] },
+        { x: 11, z: 1, faces: [1, 2] },
+        { x: 21, z: 1, faces: [3, 4] },
+        { x: 41, z: 11, faces: [5, 5] },
+      ],
+      openings: [
+        { x: 22, z: 1, kind: 'window', style: 2 },
+        { x: 23, z: 1, kind: 'door' },
+      ],
+      floors: [[12, 2, 7]],
+      objects: [{ x: 31, z: 1, def: 'sofa' }],
+    };
+    // Lot 20 adds 4 (two faces, a window style, a door), lot 40 (upstairs, row 11) two, lot 10 one (its floor: its
+    // faces are the home's, lot 0, seen already).
+    expect(warmLots(world, { x: 0, z: 0 }, 5).map((p) => p.x)).toEqual([20, 40, 10]);
+    expect(warmLots(world, { x: 0, z: 0 }, 1).map((p) => p.x)).toEqual([20]);
   });
 });

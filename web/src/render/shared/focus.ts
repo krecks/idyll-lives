@@ -217,3 +217,54 @@ export class Flight {
     return true;
   }
 }
+
+/** What `warmLots` reads of a world: its lots and what stands on them (rows of upper storeys below the ground's, `storeyDepth` apart). */
+export interface WarmWorld {
+  plots: readonly { x: number; z: number; w: number; d: number; house: unknown }[];
+  storeyDepth?: number;
+  depth: number;
+  walls?: readonly { x: number; z: number; faces?: readonly number[]; form?: unknown }[];
+  openings?: readonly { x: number; z: number; kind: string; style?: number }[];
+  floors?: readonly (readonly number[])[];
+  objects: readonly { x: number; z: number; def: string }[];
+}
+
+/**
+ * Up to `max` lots with houses (besides `home`) that between them show the most of what a big
+ * world's houses are made of (wall coverings, half walls, floors, door and window styles, things):
+ * each in turn the one adding the most not yet seen (none once a lot adds nothing). The warm-up
+ * builds each in full behind the loading veil, so a lot the roaming camera settles on later makes
+ * few pipelines in play (`PlayCanvasRenderer.warmGame`).
+ */
+export function warmLots(world: WarmWorld, home: { x: number; z: number } | null, max: number): { x: number; z: number; w: number; d: number }[] {
+  const D = world.storeyDepth ?? world.depth;
+  const isHome = (p: { x: number; z: number }) => !!home && p.x === home.x && p.z === home.z;
+  const lots = world.plots.filter((p) => p.house || isHome(p));
+  const at = (p: { x: number; z: number; w: number; d: number }, x: number, z: number) => x >= p.x && x < p.x + p.w && z % D >= p.z && z % D < p.z + p.d;
+  const what = lots.map((p) => {
+    const s = new Set<string>();
+    for (const e of world.walls ?? []) if (at(p, e.x, e.z)) for (const [i, f] of (e.faces ?? [0, 0]).entries()) s.add(`f${i}:${f}${e.form ? ':half' : ''}`);
+    for (const o of world.openings ?? []) if (at(p, o.x, o.z)) s.add(`o${o.kind}:${o.style ?? 0}`);
+    for (const f of world.floors ?? []) if (at(p, f[0], f[1])) s.add(`c${f[2]}`);
+    for (const o of world.objects) if (at(p, o.x, o.z)) s.add(`t${o.def}`);
+    return s;
+  });
+  // (The home's own is warmed anyway.)
+  const seen = new Set<string>(lots.flatMap((p, i) => (isHome(p) ? [...what[i]] : [])));
+  const out: { x: number; z: number; w: number; d: number }[] = [];
+  while (out.length < max) {
+    let best = -1;
+    let gain = 0;
+    what.forEach((s, i) => {
+      if (isHome(lots[i])) return;
+      let n = 0;
+      for (const k of s) if (!seen.has(k)) n++;
+      if (n > gain) [best, gain] = [i, n];
+    });
+    if (best < 0) break;
+    for (const k of what[best]) seen.add(k);
+    const p = lots[best];
+    out.push({ x: p.x, z: p.z, w: p.w, d: p.d });
+  }
+  return out;
+}
