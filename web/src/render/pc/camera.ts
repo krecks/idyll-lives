@@ -131,6 +131,15 @@ export class GameCamera {
   }
 
   /**
+   * The camera's view-projection as it stands now (PlayCanvas space: a game point's z turned round
+   * goes in), the same array each call: for testing many points against the view in a frame.
+   */
+  viewProjection(): Float32Array {
+    this.view.copy(this.entity.getWorldTransform()).invert();
+    return this.viewProj.mul2(this.camera.camera.projectionMatrix, this.view).data;
+  }
+
+  /**
    * Where the game-space point (x, y, z) shows on a canvas `width` × `height` CSS pixels: false when
    * it is behind the camera, past its far plane or not a point.
    */

@@ -173,6 +173,10 @@ const NOON_SKY_LUMA = skyLuma(lightingAt(13 * 60, LOOK, createLighting()));
 
 /** Residents this far (m) outside the viewed lot are still drawn (walking up to it). */
 const SIM_VIEW_MARGIN = 2;
+/** Residents further than this (m) from the camera's target, off the viewed lot, have no contact shadow. */
+const FAR_SHADOW = 40;
+/** `?residents=lot`: residents drawn only on the viewed lot, as before life on every lot. */
+const RESIDENTS_LOT_ONLY = typeof location !== 'undefined' && new URLSearchParams(location.search).get('residents') === 'lot';
 
 /** The camera's layers besides the world's that it keeps while the menus' town is shown (`showLayers`). */
 const TOWN_CAMERA_LAYERS: readonly number[] = [pc.LAYERID_DEPTH, pc.LAYERID_IMMEDIATE, pc.LAYERID_UI];
@@ -453,7 +457,37 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private followCaught = false;
   private readonly followHead = { x: 0, y: 0, z: 0 };
   private framedView = '';
-  private readonly simInView = (x: number, z: number) => !this.diag.has('nosims') && this.inView(x, z, SIM_VIEW_MARGIN);
+  /**
+   * Whether a resident at ground point (x, z) is drawn: on the viewed lot (and just round it) as
+   * ever; elsewhere outdoors within the preset's `residentRadius` of the camera's target and in the
+   * view (life on every lot), not indoors on a lot not in view (its house is a silhouette there).
+   * `?residents=lot`: only the viewed lot's, as before.
+   */
+  private readonly simInView = (x: number, z: number): boolean => {
+    if (this.diag.has('nosims')) return false;
+    if (this.inView(x, z, SIM_VIEW_MARGIN)) return true;
+    const vp = this.simViewProj;
+    const world = this.lastWorld;
+    if (RESIDENTS_LOT_ONLY || !vp || !world) return false;
+    const t = this.orbit.target;
+    const r = this.quality.residentRadius;
+    const dx = x - t.x;
+    const dz = z - t.z;
+    if (dx * dx + dz * dz > r * r) return false;
+    const ix = Math.floor(x);
+    const iz = Math.floor(z);
+    if (ix >= 0 && iz >= 0 && ix < world.width && iz < groundDepth(world) && world.rooms[iz * world.width + ix]) return false;
+    // In the view (a point a metre up, with some slack round the edges for the body).
+    const y = 1;
+    const wz = -z;
+    const cw = vp[3] * x + vp[7] * y + vp[11] * wz + vp[15];
+    if (!(cw > 0)) return false;
+    const cx = vp[0] * x + vp[4] * y + vp[8] * wz + vp[12];
+    const cy = vp[1] * x + vp[5] * y + vp[9] * wz + vp[13];
+    return Math.abs(cx) <= cw * 1.15 && Math.abs(cy) <= cw * 1.3;
+  };
+  /** The camera's view-projection for this frame's `simInView` (null: none yet). */
+  private simViewProj: Float32Array | null = null;
 
   private readonly cssSize = { width: 1, height: 1 };
   private sizeWatch: ResizeObserver | null = null;
@@ -1796,7 +1830,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (With the vendors and shopkeepers drawn after them.)
     const count = Math.min(this.simCount + (layout.header.staffCount === undefined ? 0 : curr[layout.header.staffCount]), MAX_CHARACTERS);
     const shadows = this.simShadowMatrices;
+    this.simViewProj = this.camera.viewProjection();
     this.characters.update(frame, this.simInView, shadows, this.storey, this.doorHand);
+    // Contact shadows only near the camera (the sun's shadow square is no bigger): none past `FAR_SHADOW` m off the viewed lot.
+    const t = this.orbit.target;
+    for (let i = 0; i < count; i++) {
+      const o = i * 16;
+      if (shadows[o + 15] === 0) continue;
+      const sx = shadows[o + 12];
+      const sz = shadows[o + 14];
+      if (Math.hypot(sx - t.x, sz - t.z) > FAR_SHADOW && !this.inView(sx, sz, SIM_VIEW_MARGIN)) shadows.fill(0, o, o + 16);
+    }
     this.lot.pullChairs(this.characters.pulled, this.placing.held); // (not the one in hand.)
     this.lot.takeRestProps(this.characters.restTaken);
     if (this.characters.posed && this.quality.characterShadows) this.sunShadows.moved(false);
