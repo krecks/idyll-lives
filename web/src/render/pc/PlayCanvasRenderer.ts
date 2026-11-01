@@ -2480,7 +2480,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       diag: [...this.diag],
       passes,
       // The town drawn (the bench's roam loops over it) and the street's chunks.
-      world: this.builtWorld ? { width: this.builtWorld.width, depth: groundDepth(this.builtWorld), size: this.builtWorld.meta?.world?.size ?? 'cosy' } : undefined,
+      world: this.builtWorld ? { width: this.builtWorld.width, depth: groundDepth(this.builtWorld), size: this.builtWorld.meta?.world?.size ?? 'cosy', areas: this.builtWorld.meta?.areas?.map((a) => [a.x + a.w / 2, a.z + a.d / 2]) } : undefined,
       street: this.street.stats(),
       focusSwitches: [...this.focusSwitches],
       scene: {

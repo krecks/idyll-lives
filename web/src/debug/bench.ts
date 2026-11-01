@@ -57,14 +57,26 @@ const MIRROR_PATH = { distance: 4.4, radius: 6, beta: 0.8, turn: -0.4, swing: 0.
  */
 const ROAM = { speed: 12, radius: 30, beta: 0.95, inset: 30, every: 8, hold: 2 };
 
-function roamPose(t: number, b: { x0: number; z0: number; x1: number; z1: number; from: [number, number, number] }): { alpha: number; beta: number; radius: number; target: [number, number, number] } {
+function roamPose(t: number, b: { x0: number; z0: number; x1: number; z1: number; from: [number, number, number]; areas?: [number, number][] }): { alpha: number; beta: number; radius: number; target: [number, number, number] } {
+  const moving = Math.floor(t / ROAM.every) * (ROAM.every - ROAM.hold) + Math.min(t % ROAM.every, ROAM.every - ROAM.hold);
+  // A big world's: from hamlet to hamlet (its areas' middles, round and back to the first).
+  if (b.areas) {
+    const pts = [...b.areas, b.areas[0]];
+    const lens = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]));
+    let s = (ROAM.speed * moving) % lens.reduce((a, l) => a + l, 0);
+    let i = 0;
+    while (s > lens[i]) s -= lens[i++];
+    const [a, c] = [pts[i], pts[i + 1]];
+    const k = s / (lens[i] || 1);
+    const [hx, hz] = [(c[0] - a[0]) / (lens[i] || 1), (c[1] - a[1]) / (lens[i] || 1)];
+    return { alpha: Math.atan2(-hz, -hx), beta: ROAM.beta, radius: ROAM.radius, target: [a[0] + (c[0] - a[0]) * k, 0, a[1] + (c[1] - a[1]) * k] };
+  }
   const cx = (b.x0 + b.x1) / 2;
   const cz = (b.z0 + b.z1) / 2;
   const a = Math.max(20, (b.x1 - b.x0) / 2 - ROAM.inset);
   const c = Math.max(20, (b.z1 - b.z0) / 2 - ROAM.inset);
   // Starting where the home lot is round the loop; at about `speed` m/s along it (the ellipse's mean radius).
   const start = Math.atan2((b.from[2] - cz) / c, (b.from[0] - cx) / a);
-  const moving = Math.floor(t / ROAM.every) * (ROAM.every - ROAM.hold) + Math.min(t % ROAM.every, ROAM.every - ROAM.hold);
   const th = start + (ROAM.speed * moving) / ((a + c) / 2);
   const x = cx + a * Math.cos(th);
   const z = cz + c * Math.sin(th);
@@ -206,8 +218,8 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
   const centre: [number, number, number] = plot ? [plot.x + plot.w / 2, 0, plot.z + plot.d / 2] : [0, 0, 0];
   const path = PATHS[b.cam === 'wide' ? 'wide' : 'orbit'];
   // The roam's loop: over the town (tiled, the big world's), from the home lot's side.
-  const town = renderer.benchInfo().world as { width: number; depth: number } | undefined;
-  const bounds = { x0: 0, z0: 0, x1: town?.width ?? 100, z1: town?.depth ?? 100, from: centre };
+  const town = renderer.benchInfo().world as { width: number; depth: number; areas?: [number, number][] } | undefined;
+  const bounds = { x0: 0, z0: 0, x1: town?.width ?? 100, z1: town?.depth ?? 100, from: centre, areas: town?.areas && town.areas.length > 1 ? town.areas : undefined };
   const frozen = b.diag.has('freeze');
   const mirror = b.cam === 'mirror' || b.cam === 'mirror-still' ? mirrorView(renderer.benchInfo().scene as { mirrorSpots?: Spot[] }, plot) : null;
   if (mirror) controls.setWallMode('up');
