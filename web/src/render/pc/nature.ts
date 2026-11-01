@@ -372,7 +372,7 @@ const TILE_LODS = [64, 32, 16];
 const TILE_NEAR = 200;
 const TILE_MID = 460;
 /** A big world's woods squares further than this (m, middle to the camera's target) aren't drawn (the haze has them). */
-const WOODS_FAR = 700;
+const WOODS_FAR = 560;
 
 /**
  * One level of a ground tile from the finest level's shaded points (`at(col, row)` into `positions`

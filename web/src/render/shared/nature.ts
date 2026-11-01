@@ -25,7 +25,7 @@ export const APRON = 6;
 /** A big world's distance-from-built grid (m a cell; `distanceToTown`). */
 const BUILT_CELL = 2;
 /** A big world's woods are drawn in squares this wide (m), those far off left out (`pc/nature.ts` `frameTiles`). */
-export const BIG_WOODS_CELL = 160;
+export const BIG_WOODS_CELL = 256;
 const TERRAIN_STEP = 2.5;
 /** At most this many terrain quads across (a wider landscape gets coarser ones). */
 const TERRAIN_SEGMENTS = 260;
