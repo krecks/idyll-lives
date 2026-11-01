@@ -110,7 +110,6 @@ pub(crate) fn private_rooms(
     // Rooms with a door to the outside.
     let mut outside = Vec::new();
     let room = |x: i32, z: i32| lot.room_at(x, z);
-    let (w, d) = (lot.width as i32, lot.depth as i32);
     let mut door = |a: u16, b: u16| {
         for (r, across) in [(a, b), (b, a)] {
             if r != OUTDOORS && across == OUTDOORS && !outside.contains(&r) {
@@ -118,18 +117,17 @@ pub(crate) fn private_rooms(
             }
         }
     };
-    for z in 0..=d {
-        for x in 0..w {
-            if lot.h_edge(x as usize, z as usize) == crate::lot::Edge::Door {
+    for (at, e) in lot.walls() {
+        match at {
+            crate::lot::EdgeRef::H(x, z) if e == crate::lot::Edge::Door => {
+                let (x, z) = (i32::from(x), i32::from(z));
                 door(room(x, z - 1), room(x, z));
             }
-        }
-    }
-    for z in 0..d {
-        for x in 0..=w {
-            if lot.v_edge(x as usize, z as usize) == crate::lot::Edge::Door {
+            crate::lot::EdgeRef::V(x, z) if e == crate::lot::Edge::Door => {
+                let (x, z) = (i32::from(x), i32::from(z));
                 door(room(x - 1, z), room(x, z));
             }
+            _ => {}
         }
     }
     let mut ids = Vec::new();

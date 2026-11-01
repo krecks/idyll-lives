@@ -3549,7 +3549,8 @@ impl World {
         for (k, r) in rooms.iter().enumerate().filter(|(_, r)| !r.garden) {
             by_id[r.id as usize] = Some(k);
         }
-        for (i, &id) in self.lot.rooms().iter().enumerate() {
+        for (_, _, i) in self.lot.indoor_tiles() {
+            let id = self.lot.rooms()[i];
             if let Some(Some(k)) = by_id
                 .get(id as usize)
                 .filter(|_| id != crate::lot::OUTDOORS)

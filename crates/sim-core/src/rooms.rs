@@ -221,7 +221,7 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             [(r0, 0.5), (r1, 0.5)]
         }
     };
-    for (x, z, i) in lot.tiles() {
+    for (x, z, i) in lot.indoor_tiles() {
         for (r, weight) in parts(halves[i]) {
             if r == OUTDOORS || weight == 0.0 {
                 continue;

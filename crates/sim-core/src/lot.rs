@@ -687,6 +687,8 @@ pub struct Lot {
     order: Vec<u32>,
     /// Per chunk: edges and diagonals in it that aren't open (whole-lot wall scans skip the rest).
     built: Vec<u16>,
+    /// Per chunk: tiles in it with a room (either half), from the last `compute_rooms`.
+    indoor: Vec<u16>,
     /// Per slot: the horizontal edge on the tile's `-z` side (`h_edge(x, z)`).
     h_edges: Vec<Edge>,
     /// Per slot: the vertical edge on the tile's `-x` side (`v_edge(x, z)`).
@@ -752,6 +754,7 @@ impl Lot {
             base: vec![0; cols * rows],
             order: Vec::new(),
             built: vec![0; cols * rows],
+            indoor: vec![0; cols * rows],
             h_edges: vec![Edge::Open],
             v_edges: vec![Edge::Open],
             diags: vec![None],
@@ -873,6 +876,7 @@ impl Lot {
         self.rows = depth / CHUNK + 1;
         self.base.resize(self.cols * self.rows, 0);
         self.built.resize(self.cols * self.rows, 0);
+        self.indoor.resize(self.cols * self.rows, 0);
         self.depth = depth;
         self.compute_rooms();
     }
@@ -1013,6 +1017,21 @@ impl Lot {
             ((c % self.cols) * CHUNK + (local & MASK)) as i32,
             ((c / self.cols) * CHUNK + (local >> SHIFT)) as i32,
         )
+    }
+
+    /// Every tile of the chunks with a room in them, row by row: `(x, z, slot)` (outdoor tiles
+    /// of those chunks too). Whole-lot passes over rooms cost the houses, not the land.
+    pub fn indoor_tiles(&self) -> impl Iterator<Item = (i32, i32, usize)> + '_ {
+        (0..self.depth).flat_map(move |z| {
+            let first = (z >> SHIFT) * self.cols;
+            (0..self.cols)
+                .filter(move |&cx| self.indoor[first + cx] > 0)
+                .flat_map(move |cx| {
+                    let b = self.base[first + cx] as usize + ((z & MASK) << SHIFT);
+                    (cx * CHUNK..(cx * CHUNK + CHUNK).min(self.width))
+                        .map(move |x| (x as i32, z as i32, b + (x & MASK)))
+                })
+        })
     }
 
     /// Every allocated tile on the lot, row by row: `(x, z, slot)`.
@@ -1439,6 +1458,7 @@ impl Lot {
                 }
             }
         }
+        self.indoor.fill(0);
         for (i, h) in self.halves.iter_mut().enumerate() {
             if h[0] == UNSET {
                 // The void slot, and tiles of edge chunks off the lot.
@@ -1448,6 +1468,9 @@ impl Lot {
                 h[1] = h[0];
             }
             self.rooms[i] = if h[0] != OUTDOORS { h[0] } else { h[1] };
+            if self.rooms[i] != OUTDOORS {
+                self.indoor[self.order[(i - 1) / CHUNK_TILES] as usize] += 1;
+            }
         }
     }
 
