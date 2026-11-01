@@ -242,10 +242,12 @@ pub struct Road {
     pub width: f32,
     pub kind: RoadKind,
     pub area: Option<u32>,
+    /// Its index in the town file's `roads` (`drives[].road` refers to it).
+    pub source: u32,
 }
 
 impl Road {
-    fn new(raw: &RoadRaw) -> Option<Self> {
+    fn new(raw: &RoadRaw, source: usize) -> Option<Self> {
         let mut pts: Vec<[f32; 2]> = Vec::with_capacity(raw.points.len());
         for &p in &raw.points {
             if !(p[0].is_finite() && p[1].is_finite()) {
@@ -276,6 +278,7 @@ impl Road {
             },
             kind: raw.kind,
             area: raw.area,
+            source: source as u32,
         })
     }
 
@@ -417,7 +420,11 @@ pub struct RoadPath {
 impl Graph {
     /// The network of `roads` (see the module notes); empty without any.
     pub fn build(raw: &[RoadRaw]) -> Self {
-        let roads: Vec<Road> = raw.iter().filter_map(Road::new).collect();
+        let roads: Vec<Road> = raw
+            .iter()
+            .enumerate()
+            .filter_map(|(i, r)| Road::new(r, i))
+            .collect();
         let mut g = Graph {
             roads,
             ..Default::default()
@@ -581,6 +588,33 @@ impl Graph {
 
     pub fn is_empty(&self) -> bool {
         self.edges.is_empty()
+    }
+
+    /// Where three or more stretches of road meet.
+    pub fn junctions(&self) -> impl Iterator<Item = [f32; 2]> + '_ {
+        self.adj
+            .iter()
+            .zip(&self.nodes)
+            .filter(|(a, _)| a.len() >= 3)
+            .map(|(_, &p)| p)
+    }
+
+    /// The place `s` m along the town file's road `source` (`drives[].road/s`), if it's in the
+    /// network.
+    pub fn at_source(&self, source: u32, s: f32) -> Option<RoadPoint> {
+        let road = self.roads.iter().position(|r| r.source == source)? as u32;
+        let s = s.clamp(0.0, self.roads[road as usize].len());
+        Some(RoadPoint {
+            edge: self.edge_at(road, s),
+            road,
+            s,
+            off: 0.0,
+        })
+    }
+
+    /// The point on the road at `p`.
+    pub fn point(&self, p: RoadPoint) -> [f32; 2] {
+        self.roads[p.road as usize].at(p.s)
     }
 
     fn index(&mut self) {
@@ -956,9 +990,27 @@ fn walk_side(pts: &[([f32; 2], f32, RoadKind)]) -> Vec<[f32; 2]> {
         .collect()
 }
 
+/// `pts` moved `off` m to the right (looking the way they run).
+pub fn offset_right(pts: &[[f32; 2]], off: f32) -> Vec<[f32; 2]> {
+    let n = pts.len();
+    (0..n)
+        .map(|i| {
+            let (a, b) = (pts[i.saturating_sub(1)], pts[(i + 1).min(n - 1)]);
+            let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
+            let d = dx.hypot(dz).max(1e-6);
+            [pts[i][0] - dz / d * off, pts[i][1] + dx / d * off]
+        })
+        .collect()
+}
+
 /// A line of points about a metre apart, cut down to one every `THIN_STEP` m at most and at
 /// every bend (where a straight step would stray more than `THIN_TOLERANCE` from it).
 pub fn thin(pts: &[[f32; 2]]) -> Vec<[f32; 2]> {
+    thin_with(pts, THIN_STEP, THIN_TOLERANCE)
+}
+
+/// `thin` with its own longest step and tolerance (m).
+pub fn thin_with(pts: &[[f32; 2]], step: f32, tolerance: f32) -> Vec<[f32; 2]> {
     if pts.len() <= 2 {
         return pts.to_vec();
     }
@@ -968,8 +1020,8 @@ pub fn thin(pts: &[[f32; 2]]) -> Vec<[f32; 2]> {
     while i < pts.len() {
         let a = pts[from];
         let b = pts[i];
-        let strays = (from + 1..i).any(|k| line_distance(pts[k], a, b) > THIN_TOLERANCE);
-        if strays || dist(a, b) > THIN_STEP {
+        let strays = (from + 1..i).any(|k| line_distance(pts[k], a, b) > tolerance);
+        if strays || dist(a, b) > step {
             from = (i - 1).max(from + 1);
             out.push(pts[from]);
             i = from + 1;

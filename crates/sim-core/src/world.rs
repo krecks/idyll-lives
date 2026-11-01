@@ -8464,7 +8464,7 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
 }
 
 /// `a` (radians) as a facing from -PI to PI.
-pub(crate) fn wrap_angle(a: f32) -> f32 {
+pub fn wrap_angle(a: f32) -> f32 {
     (a + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
 }
 

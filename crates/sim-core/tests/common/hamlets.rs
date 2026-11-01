@@ -195,3 +195,49 @@ pub fn two_hamlets(content: &str, seed: u64) -> Hamlets {
         (256, 128),
     )
 }
+
+/// `h` with a driveway in the front corner of every house's plot (the strip clear of the house
+/// layouts) and a car on each, every other one parked nose in.
+pub fn with_cars(h: &Hamlets) -> String {
+    let mut town: Value = serde_json::from_str(&h.town).unwrap();
+    let (mut drives, mut cars) = (Vec::new(), Vec::new());
+    let plots = town["plots"].as_array().unwrap().clone();
+    for (i, p) in plots.iter().enumerate() {
+        if p["public"].as_bool() == Some(true) {
+            continue;
+        }
+        let area = p["area"].as_u64().unwrap() as usize;
+        let street = h.streets[area].0;
+        let (x, z, w, d) = (
+            p["x"].as_f64().unwrap(),
+            p["z"].as_f64().unwrap(),
+            p["w"].as_f64().unwrap(),
+            p["d"].as_f64().unwrap(),
+        );
+        // The street in front: the north row (turned) faces +z, the south row -z.
+        let north = z + d <= street;
+        let (cx, inner, front) = if north {
+            (x + w - 1.5, z + d - 5.5, 1.0)
+        } else {
+            (x + 1.5, z + 5.5, -1.0)
+        };
+        let (len, gap) = (4.4, 0.45);
+        let spot = inner + front * (gap + len / 2.0);
+        // Facing the street (yaw π heads -z), or nose in.
+        let facing_street = if front > 0.0 {
+            0.0
+        } else {
+            std::f64::consts::PI
+        };
+        let yaw = if i % 2 == 0 {
+            facing_street
+        } else {
+            facing_street - std::f64::consts::PI
+        };
+        drives.push(json!({"plot": i, "x": cx, "z": inner, "front": front, "street": street}));
+        cars.push(json!({"plot": i, "x": cx, "z": spot, "yaw": yaw, "street": street, "len": len, "wid": 1.8, "body": i % 3, "paint": i % 5}));
+    }
+    town["drives"] = Value::Array(drives);
+    town["cars"] = Value::Array(cars);
+    town.to_string()
+}

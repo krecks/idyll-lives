@@ -36,6 +36,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::TICKS_PER_SECOND;
 use crate::lot::OUTDOORS;
+use crate::travel::{Mode, RoadPoint, Travel};
 use crate::world::{
     Household, Phase, Sim, SimBrief, Task, TaskKind, World, nearest_exit, wrap_angle,
 };
@@ -94,6 +95,14 @@ const SEATS: usize = 5;
 const CALL_REACH: f32 = 15.0;
 /// Clearance from the inner end of a driveway to the car (m), as the town parks them.
 const PARK_GAP: f32 = 0.45;
+/// On the town's roads (`Route::on_roads`): how far from the road a driveway or exit may be (m),
+/// how slow cars take junctions (m/s) within how far of them (m), and the longest straight step
+/// between a route's points and how far a step may stray from the lane (m).
+const ROAD_REACH: f32 = 30.0;
+const JUNCTION_SPEED: f32 = 3.5;
+const JUNCTION_REACH: f32 = 8.0;
+const ROUTE_STEP: f32 = 4.0;
+const ROUTE_TOLERANCE: f32 = 0.08;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -153,6 +162,10 @@ pub struct Car {
     /// Its route out or (true) home, worked out once (not saved).
     #[serde(skip)]
     route: Option<(bool, Route)>,
+    /// Where its driveway meets the road network, as the town file says (`Drive::road`, `s`);
+    /// None: the nearest road (not saved).
+    #[serde(skip)]
+    meets: Option<(u32, f32)>,
     /// Ticks the drive out of town takes from where it parks (`settle`; not saved).
     #[serde(skip)]
     out_ticks: f32,
@@ -199,6 +212,17 @@ pub struct Drive {
     pub z: f32,
     pub front: f32,
     pub street: f32,
+    /// Open-world towns: the road (`roads` index) the driveway meets and how far along it (m).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub road: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub s: Option<f32>,
+}
+
+impl Drive {
+    fn meets(&self) -> Option<(u32, f32)> {
+        Some((self.road?, self.s.filter(|s| s.is_finite())?))
+    }
 }
 
 /// A garage at the inner end of a house's driveway (`LotFile::garages`, as the town placed it:
@@ -255,6 +279,7 @@ impl Car {
             ready_at: 0,
             blocked: false,
             route: None,
+            meets: None,
             out_ticks: 0.0,
             progress: 0.0,
             waited: 0,
@@ -359,12 +384,21 @@ impl Car {
     /// Where it is and which way it faces now, and whether it's moving; None while it's out
     /// of town.
     pub fn pose(&mut self, exits: &[[f32; 2]]) -> Option<([f32; 2], f32, bool)> {
+        self.pose_on(exits, None)
+    }
+
+    /// `pose`, on the town's roads (`travel.rs`) where it has them.
+    pub fn pose_on(
+        &mut self,
+        exits: &[[f32; 2]],
+        travel: Option<&Travel>,
+    ) -> Option<([f32; 2], f32, bool)> {
         match self.state {
             CarState::Parked | CarState::Boarding => Some((self.spot, self.yaw, false)),
             CarState::Away => None,
             CarState::Leaving | CarState::Arriving => {
                 let t = self.progress;
-                let route = self.route(exits, self.state == CarState::Arriving);
+                let route = self.route(exits, travel, self.state == CarState::Arriving);
                 (t < route.ticks()).then(|| {
                     let (p, yaw, _) = route.at(t);
                     (p, yaw, true)
@@ -374,18 +408,42 @@ impl Car {
     }
 
     /// Its route out of town or (`home`) back (worked out when first asked for).
-    fn route(&mut self, exits: &[[f32; 2]], home: bool) -> &Route {
+    fn route(&mut self, exits: &[[f32; 2]], travel: Option<&Travel>, home: bool) -> &Route {
         if self.route.as_ref().is_none_or(|(h, _)| *h != home) {
-            self.route = Some((home, Route::new(self, exits, home)));
+            self.route = Some((home, Route::build(self, exits, travel, home)));
         }
         &self.route.as_ref().expect("just made").1
     }
 
     /// Works out again what follows from where it parks (after it came home, moved, or loaded).
-    fn settle(&mut self, exits: &[[f32; 2]]) {
-        let out = Route::new(self, exits, false);
+    fn settle(&mut self, exits: &[[f32; 2]], travel: Option<&Travel>) {
+        let out = Route::build(self, exits, travel, false);
         self.out_ticks = out.ticks();
         self.route = Some((false, out));
+    }
+
+    /// Where its driveway meets the road (`meets`, else the nearest road it can drive on).
+    fn mouth(&self, travel: &Travel) -> Option<RoadPoint> {
+        let g = &travel.graph;
+        self.meets
+            .and_then(|(road, s)| g.at_source(road, s))
+            .filter(|p| g.roads[p.road as usize].kind != crate::travel::RoadKind::Trail)
+            .or_else(|| g.near(self.spot, ROAD_REACH, 1, Mode::Car).first().copied())
+    }
+
+    /// The yaw it parks with after coming home, nose in: facing away from the road it meets
+    /// (the street, in towns with no roads).
+    fn nose_in_on(&self, travel: Option<&Travel>) -> f32 {
+        if let Some(m) = travel
+            .filter(|t| !t.graph.is_empty())
+            .and_then(|t| self.mouth(t).map(|m| t.graph.point(m)))
+        {
+            let (dx, dz) = (self.spot[0] - m[0], self.spot[1] - m[1]);
+            if dx.hypot(dz) > 0.5 {
+                return dx.atan2(dz);
+            }
+        }
+        self.nose_in()
     }
 
     /// The yaw it parks with after coming home: nose in, facing away from the street.
@@ -419,9 +477,164 @@ struct Route {
 }
 
 impl Route {
-    /// Out of the driveway to the nearest end of town along its street, or (`home`) back in
-    /// from there, nose first.
+    /// The route on the town's roads (`on_roads`) where it has a network the car's driveway
+    /// meets, else `legacy` (to a road out of town, not a bus stop).
+    fn build(car: &Car, exits: &[[f32; 2]], travel: Option<&Travel>, home: bool) -> Route {
+        if let Some(t) = travel.filter(|t| !t.graph.is_empty())
+            && let Some(route) = Self::on_roads(car, exits, t, home)
+        {
+            return route;
+        }
+        match travel {
+            Some(t) if t.stops.iter().any(|&s| s) => {
+                let roads: Vec<[f32; 2]> = (0..exits.len())
+                    .filter(|&i| !t.is_stop(i))
+                    .map(|i| exits[i])
+                    .collect();
+                Self::legacy(car, &roads, home)
+            }
+            _ => Self::legacy(car, exits, home),
+        }
+    }
+
+    #[cfg(test)]
     fn new(car: &Car, exits: &[[f32; 2]], home: bool) -> Route {
+        Self::legacy(car, exits, home)
+    }
+
+    /// Out of the driveway onto the road it meets and along the roads to the way out of town
+    /// quickest by car, past it (`OVERSHOOT`), or (`home`) back in from there, nose first. The
+    /// driveway's part as `legacy` lays it out, in the frame of the road at the driveway's
+    /// mouth; the lanes `LANE` right of the roads' middle lines; `FAST` in the hamlets,
+    /// `Travel::country_speed` on country roads, slower at junctions. Sampled more where it
+    /// bends (`ROUTE_TOLERANCE`). None: no road near, or no way out by road.
+    fn on_roads(car: &Car, exits: &[[f32; 2]], travel: &Travel, home: bool) -> Option<Route> {
+        use crate::travel::{RoadKind, dist};
+        let g = &travel.graph;
+        let m = car.mouth(travel)?;
+        let mp = g.point(m);
+        let t = g.roads[m.road as usize].tangent(m.s);
+        let n = [-t[1], t[0]];
+        // The quickest way out by car.
+        let (_, path) = (0..exits.len())
+            .filter(|&i| !travel.is_stop(i))
+            .filter_map(|i| {
+                let e = *g.near(exits[i], ROAD_REACH, 1, Mode::Car).first()?;
+                let path = g.path(m, e, Mode::Car, travel.country_speed)?;
+                Some((i, path))
+            })
+            .min_by(|a, b| a.1.cost.total_cmp(&b.1.cost).then(a.0.cmp(&b.0)))?;
+        if path.pts.len() < 2 {
+            return None;
+        }
+        let local = |p: [f32; 2]| {
+            let (dx, dz) = (p[0] - mp[0], p[1] - mp[1]);
+            [dx * t[0] + dz * t[1], dx * n[0] + dz * n[1]]
+        };
+        let world = |q: [f32; 2]| {
+            [
+                mp[0] + q[0] * t[0] + q[1] * n[0],
+                mp[1] + q[0] * t[1] + q[1] * n[1],
+            ]
+        };
+        // Which way along the road it goes from the driveway.
+        let ahead = local(path.pts[(path.pts.len() - 1).min(3)].0);
+        let d = if ahead[0] >= 0.0 { 1.0 } else { -1.0 };
+        // The lane: right of the middle line, on past the exit.
+        let mut centre: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
+        let (a, b) = (centre[centre.len() - 2], centre[centre.len() - 1]);
+        let len = dist(a, b).max(1e-3);
+        centre.push([
+            b[0] + (b[0] - a[0]) / len * OVERSHOOT,
+            b[1] + (b[1] - a[1]) / len * OVERSHOOT,
+        ]);
+        if home {
+            centre.reverse();
+        }
+        let lane = crate::travel::thin_with(
+            &crate::travel::offset_right(&centre, LANE),
+            ROUTE_STEP,
+            ROUTE_TOLERANCE,
+        );
+        let junctions: Vec<[f32; 2]> = g.junctions().collect();
+        let top = |p: [f32; 2]| {
+            let kind = path
+                .pts
+                .iter()
+                .min_by(|x, y| dist(x.0, p).total_cmp(&dist(y.0, p)))
+                .map_or(RoadKind::Street, |x| x.2);
+            let fast = if kind == RoadKind::Country {
+                travel.country_speed
+            } else {
+                FAST
+            };
+            if junctions.iter().any(|&j| dist(j, p) < JUNCTION_REACH) {
+                fast.min(JUNCTION_SPEED)
+            } else {
+                fast
+            }
+        };
+        let [x0, z0] = local(car.spot);
+        // The side of the road the driveway is on.
+        let s = if z0 <= 0.0 { 1.0 } else { -1.0 };
+        let mut legs = Legs::default();
+        // Near the driveway: points of the lane before (or after) the turn.
+        let near =
+            |p: [f32; 2], r: f32| (local(p)[0] - x0) * d < r + 0.5 && dist(p, mp) < 2.0 * r + 4.0;
+        if home {
+            let lane_in = -d * LANE;
+            let r = TURN.min((lane_in - z0).abs()).max(0.5);
+            for &p in &lane {
+                if near(p, r) {
+                    break;
+                }
+                legs.push(p, false, top(p));
+            }
+            let turn = world([x0 + d * r, lane_in]);
+            let from = legs.last().unwrap_or(turn);
+            legs.line(from, turn, false, JUNCTION_SPEED);
+            legs.arc(
+                world([x0 + d * r, lane_in - s * r]),
+                r,
+                turn,
+                world([x0, lane_in - s * r]),
+                false,
+            );
+            legs.line(world([x0, lane_in - s * r]), car.spot, false, SLOW);
+        } else {
+            let lane_out = d * LANE;
+            let r = TURN.min((lane_out - z0).abs()).max(0.5);
+            let facing = [car.yaw.sin(), car.yaw.cos()];
+            let facing_street = (facing[0] * n[0] + facing[1] * n[1]) * s > 0.0;
+            let k = if facing_street { d } else { -d };
+            let reverse = !facing_street;
+            legs.line(car.spot, world([x0, lane_out - s * r]), reverse, SLOW);
+            let turned = world([x0 + k * r, lane_out]);
+            legs.arc(
+                world([x0 + k * r, lane_out - s * r]),
+                r,
+                world([x0, lane_out - s * r]),
+                turned,
+                reverse,
+            );
+            let mut on = false;
+            for &p in &lane {
+                if !on && near(p, r) {
+                    continue;
+                }
+                if !on {
+                    legs.line(turned, p, false, JUNCTION_SPEED);
+                    on = true;
+                }
+                legs.push(p, false, top(p));
+            }
+        }
+        Some(legs.timed(!home, home))
+    }
+
+    /// Out of the driveway to the nearest end of town along its street, or (`home`) back in
+    /// from there, nose first: straight along x (towns with no roads).
+    fn legacy(car: &Car, exits: &[[f32; 2]], home: bool) -> Route {
         let [x0, z0] = car.spot;
         // The side of the street the driveway is on, and the way out of town.
         let s = if car.street >= z0 { 1.0 } else { -1.0 };
@@ -507,6 +720,10 @@ struct Legs {
 }
 
 impl Legs {
+    fn last(&self) -> Option<[f32; 2]> {
+        self.pts.last().map(|p| p.0)
+    }
+
     fn push(&mut self, p: [f32; 2], reverse: bool, top: f32) {
         if self
             .pts
@@ -705,7 +922,17 @@ pub(crate) fn lead_ticks(w: &World, i: usize, start: u64) -> u64 {
         + u64::from(GET_IN_TICKS)
         + BOARD_MIN_TICKS
         + car.out_ticks.ceil() as u64
-        + OFF_MAP_TICKS
+        + off_map_ticks(w)
+}
+
+/// The drive between the end of town and work: in an open-world town `commuteMinutes` (the
+/// part of the way off the map), else `OFF_MAP_TICKS` as ever.
+fn off_map_ticks(w: &World) -> u64 {
+    if w.travel.open {
+        (w.content.career_rules.commute_minutes / crate::MINUTES_PER_TICK) as u64
+    } else {
+        OFF_MAP_TICKS
+    }
 }
 
 /// When `j`'s work (or school) starts today, if they have it.
@@ -923,8 +1150,13 @@ pub(crate) fn update(w: &mut World) {
 
 /// Ticks car `c`'s drive out of town or (`home`) back takes.
 fn route_ticks(w: &mut World, c: usize, home: bool) -> f32 {
-    let World { cars, exits, .. } = w;
-    cars[c].route(exits, home).ticks()
+    let World {
+        cars,
+        exits,
+        travel,
+        ..
+    } = w;
+    cars[c].route(exits, Some(travel), home).ticks()
 }
 
 /// A tick further along its drive, unless someone is in its way: it waits for them. Someone
@@ -937,6 +1169,7 @@ fn drive_on(w: &mut World, c: usize) {
     let World {
         cars,
         exits,
+        travel,
         sims,
         lot,
         blocked,
@@ -944,7 +1177,7 @@ fn drive_on(w: &mut World, c: usize) {
         ..
     } = w;
     let car = &mut cars[c];
-    let (at, yaw, reverse) = car.route(exits, home).at(t);
+    let (at, yaw, reverse) = car.route(exits, Some(travel), home).at(t);
     // (Ahead is behind it while it backs up.)
     let (ahead, behind) = if reverse { (0.2, AHEAD) } else { (AHEAD, 0.2) };
     let mut waiting = false;
@@ -1070,13 +1303,18 @@ pub(crate) fn poses(w: &mut World) {
         }
     }
     let present: Vec<bool> = (0..w.cars.len()).map(|c| present(w, c)).collect();
-    let World { cars, exits, .. } = w;
+    let World {
+        cars,
+        exits,
+        travel,
+        ..
+    } = w;
     for (c, car) in cars.iter_mut().enumerate() {
         let open = doors[c];
         car.shown = if car.at_home() && !present[c] {
             None
         } else {
-            car.pose(exits)
+            car.pose_on(exits, Some(travel))
                 .map(|(p, yaw, moving)| (p, yaw, moving, if moving { 0 } else { open }))
         };
     }
@@ -1094,12 +1332,17 @@ fn keep_away(w: &mut World, c: usize, until: u64) {
 /// The car is home: it parks, nose in, its doors open and they get out and walk to the house.
 fn arrive(w: &mut World, c: usize) {
     let tick = w.tick;
-    let World { cars, exits, .. } = &mut *w;
+    let World {
+        cars,
+        exits,
+        travel,
+        ..
+    } = &mut *w;
     let car = &mut cars[c];
     car.state = CarState::Parked;
     car.since = tick;
-    car.yaw = car.nose_in();
-    car.settle(exits);
+    car.yaw = car.nose_in_on(Some(travel));
+    car.settle(exits, Some(travel));
     let driver = car.driver.take();
     let mut out = std::mem::take(&mut car.done);
     car.aboard.clear();
@@ -1265,13 +1508,19 @@ fn relocate(w: &mut World, c: usize) {
     if taken {
         return;
     }
-    let World { cars, exits, .. } = &mut *w;
+    let World {
+        cars,
+        exits,
+        travel,
+        ..
+    } = &mut *w;
     let car = &mut cars[c];
     car.plot = home;
     car.street = drive.street;
+    car.meets = drive.meets();
     car.spot = [drive.x, drive.z + drive.front * (PARK_GAP + car.len / 2.0)];
-    car.yaw = car.nose_in();
-    car.settle(exits);
+    car.yaw = car.nose_in_on(Some(travel));
+    car.settle(exits, Some(travel));
     // (Parked as it was, somewhere else: its tiles are worked out again.)
     w.cars_parked = None;
     refresh(w);
@@ -1418,9 +1667,19 @@ pub(crate) fn from_file(w: &mut World, raw: &[CarRaw], drives: &[Drive], garages
 /// After the cars were made or loaded: their routes' lengths, what's built over, the tiles they
 /// take up, where they are.
 fn settle_all(w: &mut World) {
-    let World { cars, exits, .. } = &mut *w;
+    let World {
+        cars,
+        exits,
+        travel,
+        drives,
+        ..
+    } = &mut *w;
     for car in cars.iter_mut() {
-        car.settle(exits);
+        car.meets = drives
+            .iter()
+            .find(|d| d.plot == car.plot)
+            .and_then(Drive::meets);
+        car.settle(exits, Some(travel));
     }
     w.car_tiles.clear();
     w.cars_parked = None;
