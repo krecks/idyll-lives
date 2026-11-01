@@ -868,6 +868,9 @@ pub struct Travel {
     pub open: bool,
     /// Cars' top speed on country roads (m/s; content `cars.countrySpeed`).
     pub country_speed: f32,
+    /// The tiles the town file's `terrain` masks (water, rock): blocked under everything, so a
+    /// tile freed of what stood on it stays blocked (`World::set_travel`). Sorted tile indices.
+    pub base_blocked: Vec<usize>,
 }
 
 impl Travel {
@@ -886,7 +889,13 @@ impl Travel {
             stops,
             open,
             country_speed: COUNTRY_SPEED,
+            base_blocked: Vec::new(),
         }
+    }
+
+    /// Whether tile `i` (`Lot::tile_index`) is blocked by the land itself (`base_blocked`).
+    pub fn ground_blocked(&self, i: usize) -> bool {
+        self.base_blocked.binary_search(&i).is_ok()
     }
 
     /// Whether exit `i` is a bus stop.

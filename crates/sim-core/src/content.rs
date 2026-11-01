@@ -1724,6 +1724,9 @@ pub struct Content {
     pub laundry: Option<LaundryRules>,
     /// How cars drive (content `cars`; see `cars.rs`, `travel.rs`).
     pub cars: CarRules,
+    /// The uses (object def, interaction) with `"trail": true`: done walking out along the trail
+    /// the thing stands at and back (a trailhead's *Walk the trail*; `world::trail_step`).
+    pub trail_walks: Vec<(usize, usize)>,
     object_index: HashMap<String, usize>,
 }
 
@@ -2592,6 +2595,9 @@ fn one_slot() -> u8 {
 struct InteractionRaw {
     id: String,
     label: String,
+    /// Walked along the trail it stands at (`Content::trail_walks`).
+    #[serde(default)]
+    trail: bool,
     /// Not needed with a `recipe` (its steps take their own time).
     #[serde(default)]
     minutes: f32,
@@ -3157,6 +3163,7 @@ impl Content {
             .collect::<Result<Vec<_>, _>>()?;
         let mut objects = Vec::with_capacity(raw.objects.len());
         let mut object_index = HashMap::new();
+        let mut trail_walks = Vec::new();
         for obj in &raw.objects {
             if obj.footprint[0] == 0 || obj.footprint[1] == 0 {
                 return Err(Error::new(format!(
@@ -3821,6 +3828,13 @@ impl Content {
                 })
             })
             .collect::<Result<Vec<usize>, Error>>()?;
+            trail_walks.extend(
+                obj.interactions
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, it)| it.trail)
+                    .map(|(k, _)| (objects.len(), k)),
+            );
             objects.push(ObjectDef {
                 id: obj.id.clone(),
                 name: obj.name.clone(),
@@ -4822,6 +4836,7 @@ impl Content {
             phone,
             service,
             laundry,
+            trail_walks,
             cars: CarRules {
                 country_speed: match raw.cars.country_speed {
                     Some(v) if v.is_finite() && v > 0.0 => v.min(60.0),

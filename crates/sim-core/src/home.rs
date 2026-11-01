@@ -1726,7 +1726,7 @@ impl World {
         let freed = self.blocking_tiles(&obj);
         for &(x, z) in &freed {
             let i = self.lot.tile_index(x, z);
-            self.blocked[i] = false;
+            self.blocked[i] = self.travel.ground_blocked(i);
         }
         for o in 0..self.objects.len() {
             for (x, z) in self.blocking_tiles(&self.objects[o]) {

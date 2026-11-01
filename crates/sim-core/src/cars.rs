@@ -1594,7 +1594,7 @@ pub(crate) fn reblock(w: &mut World) {
         return;
     }
     for &i in &w.car_tiles {
-        w.blocked[i] = false;
+        w.blocked[i] = w.travel.ground_blocked(i);
     }
     for &i in &tiles {
         w.blocked[i] = true;

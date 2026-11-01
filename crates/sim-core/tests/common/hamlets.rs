@@ -241,3 +241,60 @@ pub fn with_cars(h: &Hamlets) -> String {
     town["cars"] = Value::Array(cars);
     town.to_string()
 }
+
+/// Where `with_countryside` puts its countryside plot (`x, z, w, d`), its trail and its pond.
+pub const MEADOW: (i64, i64, i64, i64) = (100, 44, 24, 36);
+pub const POND: [(i64, i64); 4] = [(104, 50), (105, 50), (104, 51), (105, 51)];
+
+/// The trail of `with_countryside`: from the country road west across the meadow, then south.
+pub fn trail() -> Vec<[f64; 2]> {
+    let mut pts = line([126.0, 60.5], [102.5, 60.5]);
+    pts.extend(line([102.5, 60.5], [102.5, 77.5]).into_iter().skip(1));
+    pts
+}
+
+/// `town` (a `two_hamlets` town file) with a stretch of countryside beside the country road
+/// near the first hamlet: a public countryside plot with one of each countryside spot, a trail
+/// from the road across it, and a pond in the terrain's water mask.
+pub fn with_countryside(town: &str) -> String {
+    let mut town: Value = serde_json::from_str(town).unwrap();
+    let (x, z, w, d) = MEADOW;
+    town["plots"].as_array_mut().unwrap().push(json!({
+        "name": "Meadow", "x": x, "z": z, "w": w, "d": d, "public": true,
+        "entry": [123.5, 61.5], "kind": "countryside", "area": 2,
+    }));
+    for (def, ox, oz, rot) in [
+        ("countryside.fishingSpot", 106, 46, 0),
+        ("countryside.lookout", 110, 52, 0),
+        ("countryside.picnicSpot", 114, 66, 0),
+        ("countryside.berryBush", 118, 48, 0),
+        ("countryside.trailhead", 121, 58, 0),
+    ] {
+        town["objects"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"def": def, "x": ox, "z": oz, "rot": rot}));
+    }
+    let trail = json!({"points": trail(), "width": 2, "ends": ["join", "dead"], "kind": "trail"});
+    town["roads"].as_array_mut().unwrap().push(trail.clone());
+    town["meta"]["roads"].as_array_mut().unwrap().push(trail);
+    town["areas"].as_array_mut().unwrap().push(json!({
+        "name": "Meadow", "kind": "countryside", "x": x, "z": z, "w": w, "d": d,
+    }));
+    // The pond: water in the terrain mask (row-major runs over the ground).
+    let width = town["width"].as_i64().unwrap();
+    let depth = town["depth"].as_i64().unwrap();
+    let mut rle = Vec::new();
+    let (mut last, mut run) = (false, 0);
+    for i in 0..width * depth {
+        let wet = POND.contains(&(i % width, i / width));
+        if wet != last {
+            rle.extend([run, last as i64]);
+            (last, run) = (wet, 0);
+        }
+        run += 1;
+    }
+    rle.extend([run, last as i64]);
+    town["terrain"] = json!({"water": rle});
+    town.to_string()
+}

@@ -49,7 +49,7 @@ fn residents_leave_by_their_walk_and_are_never_late() {
             day = clock::day(w.tick);
             days = vec![Day::default(); w.sims.len()];
         }
-        for i in 0..w.sims.len() {
+        for (i, day) in days.iter_mut().enumerate() {
             let s = &w.sims[i];
             if !s.here() {
                 continue;
@@ -57,11 +57,14 @@ fn residents_leave_by_their_walk_and_are_never_late() {
             let working = s
                 .current()
                 .is_some_and(|a| matches!(a.task.kind, TaskKind::Work));
-            if working && days[i].left.is_none() {
-                days[i].left = Some(w.tick);
+            if working && day.left.is_none() {
+                day.left = Some(w.tick);
             }
-            if s.away_until.is_some() && days[i].left.is_some() && days[i].there.is_none() {
-                days[i].there = Some(w.tick);
+            if let Some(left) = day.left
+                && s.away_until.is_some()
+                && day.there.is_none()
+            {
+                day.there = Some(w.tick);
                 // (By car, the drive is timed by `cars::lead_ticks`, not the walk.)
                 let Some(start) = start_today(&w, i) else {
                     continue;
@@ -70,7 +73,6 @@ fn residents_leave_by_their_walk_and_are_never_late() {
                 if w.cars.iter().any(|car| car.aboard.contains(&(i as u32))) {
                     continue;
                 }
-                let left = days[i].left.unwrap();
                 // (Not those due to set off before the game began.)
                 if start < begun + c.ticks {
                     continue;

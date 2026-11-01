@@ -993,6 +993,9 @@ pub struct Sim {
     /// Open-world towns: how long the way to work or school takes them today, worked out once
     /// a day (`life::refresh_commute`); None: as `careerRules.commuteMinutes` says. Not saved.
     pub(crate) commute: Option<crate::life::Commute>,
+    /// The trailhead (object id) whose trail they last walked (`trail_step`); they're walking it
+    /// while they use it (`on_trail`). Not saved.
+    pub(crate) on_trail: Option<u32>,
     /// The game for two (`Interaction::partner`) they're at, or on their way to, next: its
     /// object and interaction, and whether they're at their place. Set as each tick starts
     /// (`partners::refresh`), not saved (the task it comes from is).
@@ -1118,12 +1121,28 @@ impl Sim {
     /// Walking: on their way somewhere, and not waiting outside a room kept shut (`kept_out`).
     pub fn is_moving(&self) -> bool {
         self.kept_out == 0
-            && matches!(
+            && (matches!(
                 self.current,
                 Some(Activity {
                     phase: Phase::Routing { .. },
                     ..
                 })
+            ) || self.on_trail())
+    }
+
+    /// Walking a trail (`Content::trail_walks`): shown walking though it's a use.
+    pub fn on_trail(&self) -> bool {
+        self.on_trail.is_some()
+            && matches!(
+                self.current,
+                Some(Activity {
+                    phase: Phase::Using { .. },
+                    task: Task {
+                        kind: TaskKind::Use { object, .. },
+                        ..
+                    },
+                    ..
+                }) if Some(object) == self.on_trail
             )
     }
 
@@ -2073,6 +2092,28 @@ impl World {
     pub(crate) fn set_travel(&mut self, file: crate::travel::OpenWorld) {
         let mut travel = crate::travel::Travel::new(file, &self.meta, self.exits.len());
         travel.country_speed = self.content.cars.country_speed;
+        // Water and other ground nobody walks on: blocked underneath everything (`base_blocked`).
+        if let Some(terrain) = &travel.file.terrain {
+            let (w, d) = (
+                self.lot.width,
+                if self.stairs.depth > 0 {
+                    self.stairs.depth as usize
+                } else {
+                    self.lot.depth
+                },
+            );
+            let mask = terrain.mask(w, d);
+            travel.base_blocked = (0..mask.len())
+                .filter(|&i| mask[i])
+                .map(|i| self.lot.tile_index((i % w) as i32, (i / w) as i32))
+                .collect();
+            travel.base_blocked.sort_unstable();
+            for &i in &travel.base_blocked {
+                if let Some(b) = self.blocked.get_mut(i) {
+                    *b = true;
+                }
+            }
+        }
         self.travel = travel;
     }
 
@@ -2647,6 +2688,7 @@ impl World {
             called: false,
             nav_seen: 0,
             commute: None,
+            on_trail: None,
             game: None,
             wants_partner: false,
             joins: None,
@@ -7385,6 +7427,33 @@ fn progress(
                 *elapsed += minutes;
             }
             let elapsed = *elapsed;
+            // A walk along a trail (`Content::trail_walks`): out along it and back while it lasts.
+            if let TaskKind::Use {
+                object,
+                interaction,
+            } = act.task.kind
+            {
+                let def = objects[object as usize].def;
+                if content
+                    .trail_walks
+                    .binary_search(&(def, interaction))
+                    .is_ok()
+                {
+                    let total = content.objects[def].interactions[interaction].minutes;
+                    let at = objects[object as usize].centre(content);
+                    if let Some((p, yaw)) = trail_step(
+                        ctx.travel,
+                        at,
+                        elapsed,
+                        total,
+                        WALK_SPEED * walk / MINUTES_PER_TICK,
+                    ) {
+                        sim.pos = p;
+                        sim.yaw = yaw;
+                        sim.on_trail = Some(object);
+                    }
+                }
+            }
             match act.task.kind {
                 TaskKind::Use {
                     object,
@@ -8545,6 +8614,57 @@ pub(crate) fn usable_here<'a>(sim: &Sim, ctx: &Ctx<'a>) -> std::borrow::Cow<'a, 
             ctx.content.autonomy.reach,
         ),
     }
+}
+
+/// How far from a trailhead its trail may start (m).
+const TRAIL_REACH: f32 = 30.0;
+
+/// Where someone walking the trail nearest `at` is `elapsed` of `total` minutes in, at `walk` m a
+/// minute, and which way they face: out along it (the longer way from where it starts near `at`)
+/// for the first half, back for the second, turning at its end (round and round a loop). None:
+/// no trail near.
+pub(crate) fn trail_step(
+    travel: &crate::travel::Travel,
+    at: [f32; 2],
+    elapsed: f32,
+    total: f32,
+    walk: f32,
+) -> Option<([f32; 2], f32)> {
+    let g = &travel.graph;
+    let road = g
+        .roads
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.kind == crate::travel::RoadKind::Trail)
+        .map(|(i, r)| (i, r.project(at)))
+        .filter(|(_, (_, d))| *d <= TRAIL_REACH)
+        .min_by(|a, b| a.1.1.total_cmp(&b.1.1).then(a.0.cmp(&b.0)))
+        .map(|(i, (s0, _))| (&g.roads[i], s0))?;
+    let (r, s0) = road;
+    let len = r.len();
+    if len < 1.0 {
+        return None;
+    }
+    let ring = crate::travel::dist(r.pts[0], *r.pts.last()?) < 1.0;
+    let out = if s0 < len / 2.0 { 1.0 } else { -1.0 };
+    let half = total.max(0.0) / 2.0;
+    let back = elapsed > half;
+    let along = walk * elapsed.min(total - elapsed).clamp(0.0, half);
+    let raw = s0 + out * along;
+    // Off the end: round a loop, back along a trail that stops.
+    let (s, turned) = if ring {
+        (raw.rem_euclid(len), false)
+    } else {
+        let m = raw.rem_euclid(2.0 * len);
+        if m > len {
+            (2.0 * len - m, true)
+        } else {
+            (m, false)
+        }
+    };
+    let t = r.tangent(s);
+    let k = out * if back != turned { -1.0 } else { 1.0 };
+    Some((r.at(s), (t[0] * k).atan2(t[1] * k)))
 }
 
 /// The middle of the free tile on plot `p` nearest `at` (rings outwards), if any.
