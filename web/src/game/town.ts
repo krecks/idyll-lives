@@ -14,14 +14,14 @@
 
 import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
-import type { GameKind, LandscapeParams, Lifespan, WorldLook } from '../core/protocol';
+import type { GameKind, LandscapeParams, Lifespan, WorldLook, WorldSize } from '../core/protocol';
 import { fetchText } from '../content/content';
 import { bedroomsNeeded, householdBonds, householdSpawns, randomHousehold, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { homePrice } from './price';
 import { generateHouse, objectInfos, random, residentsKey, weighted, type GardenSize, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
 import { cropRoads, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Pt, type RoadPlan } from './roads';
 import { householdFunds, savingsOf } from './wealth';
-import { streetNames, WORLDS, worldName, worldTagline, type WorldKind } from './world';
+import { extend, streetNames, WORLDS, worldName, worldTagline, type WorldKind } from './world';
 import { garageFor } from '../render/shared/cars';
 
 export type Wall = [number, number, number, number];
@@ -180,11 +180,15 @@ export interface NeighbourhoodDraft {
   seed?: number;
   /** The world the town is in (missing in drafts from older code: the classic valley). */
   world?: WorldInfo;
+  /** What the layout couldn't do: lots that found no room along the roads (left out of the town). */
+  diagnostics?: { dropped: { name: string; kind: PlotSlot['kind']; lot?: LotSize }[] };
 }
 
 /** What kind of world a town is in, one line about it, and how its land looks. */
 export interface WorldInfo {
   kind: WorldKind;
+  /** How big the world is (missing in drafts from older code: `cosy`). */
+  size?: WorldSize;
   tagline: string;
   landscape: LandscapeParams;
 }
@@ -533,8 +537,14 @@ export function withLot(town: NeighbourhoodDraft, slot: number, template: string
   return { ...town, slots: town.slots.map((s) => (s.index === slot ? { ...s, template } : s)) };
 }
 
-/** Residents the neighbours number at most (sim-core holds 64 Sims: room for the player's household and babies). */
-const MAX_NEIGHBOURS = 48;
+/**
+ * Residents the neighbours number at most in a world of `size` (docs/design/open-world.md: the
+ * sim holds 64 Sims in a cosy or normal world, 160 in a big one; room left for the player's
+ * household and babies).
+ */
+export function neighbourCap(size: WorldSize = 'cosy'): number {
+  return size === 'big' ? 140 : 48;
+}
 
 /**
  * Lays out a world of `kind` from `seed` (the same kind and seed always give the same town): its
@@ -544,19 +554,22 @@ const MAX_NEIGHBOURS = 48;
  * each turned to face its road, with a gap or a stretch of meadow between some. The town is cut
  * to the land its lots and roads take. Nobody lives there yet (see `populate`).
  */
-export function generateWorld(content: Content, t: Templates, kind: WorldKind, seed = (Math.random() * 2 ** 31) >>> 0, name?: string): NeighbourhoodDraft {
+export function generateWorld(content: Content, t: Templates, kind: WorldKind, seed = (Math.random() * 2 ** 31) >>> 0, name?: string, size: WorldSize = 'cosy'): NeighbourhoodDraft {
   const recipe = WORLDS[kind];
+  const spec = recipe.sizes[size];
   const rand = random(seed);
   // Rolled whether used or not, so a name typed in leaves the rest of the world as it was.
   const rolledName = worldName(content, kind, rand);
   const tagline = worldTagline(content, kind, rand);
-  const { box } = recipe;
-  const layout = recipe.roads(rand, box);
+  const { box } = spec;
+  const layout = recipe.roads(rand, box, spec.scale);
+  // (A bigger town: lanes off its lanes too.)
+  const laid = spec.extend ? extend(rand, layout.roads, box, spec.extend, spec.scale) : layout.roads;
   // Dead ends stop short of the edge of the land (the roads out of town go on past it); lanes
   // begin at the kerb of the road they join.
   const within = ([x, z]: Pt) => x > 14 && z > 14 && x < box.w - 14 && z < box.d - 14;
   const roads = trimJoins(
-    layout.roads.map((r) => {
+    laid.map((r) => {
       const out = r.ends[1] === 'dead' ? r.points.findIndex((p, i) => i >= 2 && !within(p)) : -1;
       return out < 0 ? r : { ...r, points: r.points.slice(0, out) };
     }),
@@ -566,14 +579,14 @@ export function generateWorld(content: Content, t: Templates, kind: WorldKind, s
   const centre = layout.centre ?? roads[0].points[Math.floor(roads[0].points.length / 2)];
 
   // What goes on the lots: the park and the other public places, farms, houses.
-  const [fewest, most] = recipe.places;
+  const [fewest, most] = spec.places ?? recipe.places;
   const count = fewest + Math.floor(rand() * (most - fewest + 1));
   // The places this kind of world would rather have first, in no particular order, then the rest.
   const prefer = recipe.prefer ?? [];
   const others = shuffled(t.parks.slice(1), rand)
     .sort((a, b) => Number(!prefer.includes(a.id)) - Number(!prefer.includes(b.id)))
     .slice(0, count);
-  const [fewFarms, mostFarms] = recipe.farms ?? [0, 0];
+  const [fewFarms, mostFarms] = spec.farms ?? recipe.farms ?? [0, 0];
   const farmCount = t.lotSizes?.farm ? fewFarms + Math.floor(rand() * (mostFarms - fewFarms + 1)) : 0;
   const farmWords = shuffled(content.names.worlds?.farm?.start ?? ['Meadow', 'Barley', 'Clover'], rand);
   const lotSize = (): LotSize => {
@@ -588,7 +601,7 @@ export function generateWorld(content: Content, t: Templates, kind: WorldKind, s
     ...[t.parks[0], ...others].map((p): Unplaced => ({ kind: p.kind ?? 'park', template: p.id, name: p.name, lot: 'medium', w: t.plot.width, d: t.plot.depth })),
     ...Array.from({ length: farmCount }, (_, i): Unplaced => ({ kind: 'house', name: `${farmWords[i % farmWords.length]} Farm`, lot: 'farm', ...houseFor(t, 'farm', gardenSize(), rand) })),
   ];
-  while (wanted.length < recipe.lots) {
+  while (wanted.length < spec.lots) {
     const lot = lotSize();
     wanted.push({ kind: 'house', name: '', lot, ...houseFor(t, lot, gardenSize(), rand) });
   }
@@ -622,6 +635,7 @@ export function generateWorld(content: Content, t: Templates, kind: WorldKind, s
     const r = rand();
     ground.take(plotRect(t, slot), r < meadow ? 5 + Math.floor(rand() * 6) : r < meadow + gap ? 1 + Math.floor(rand() * 2) : 0);
   };
+  const dropped: NonNullable<NeighbourhoodDraft['diagnostics']>['dropped'] = [];
   for (const u of wanted) {
     const { width, depth } = slotDims(t, u);
     // The park on the green, facing the road nearest it, if it fits there.
@@ -638,12 +652,15 @@ export function generateWorld(content: Content, t: Templates, kind: WorldKind, s
         continue;
       }
     }
+    let found = false;
     for (const f of u.lot === 'farm' ? outskirts : frontage) {
       const at = lotAt(ground, roads[f.road], f, width, depth);
       if (!at) continue;
       put(u, at, f);
+      found = true;
       break;
     }
+    if (!found) dropped.push({ name: u.name, kind: u.kind, lot: u.lot });
   }
 
   // House numbers along each road: odd on its left, even on its right.
@@ -679,7 +696,8 @@ export function generateWorld(content: Content, t: Templates, kind: WorldKind, s
     greens: greens.map((g) => g.map(([x, z]): Pt => [Math.round((x - x0) * 100) / 100, Math.round((z - z0) * 100) / 100])),
     households: [],
     seed,
-    world: { kind, tagline, landscape },
+    world: { kind, size, tagline, landscape },
+    diagnostics: { dropped },
   };
 }
 
@@ -695,6 +713,7 @@ const RICH_FOR = 4;
  * and filled dearest first; one no household turns up for stays for sale.
  */
 export function populate(content: Content, assets: AssetRegistry, t: Templates, town: NeighbourhoodDraft, count?: number): NeighbourhoodDraft {
+  const MAX_NEIGHBOURS = neighbourCap(town.world?.size);
   const houses = town.slots.filter((s) => s.kind === 'house');
   const wanted = Math.max(0, Math.min(count ?? houses.length - 2, houses.length - 1));
   const price = new Map(houses.map((s) => [s.index, homePrice(content, t, s)]));
@@ -759,7 +778,7 @@ function householdFor(
 export function rehouse(content: Content, assets: AssetRegistry, t: Templates, town: NeighbourhoodDraft, slot: number, size: number, avoidNames: readonly string[]): HouseholdDraft {
   const s = town.slots[slot];
   const bedrooms = (s && houseTemplate(t, s.template)?.bedrooms) ?? 1;
-  return (s && householdFor(content, assets, bedrooms, homePrice(content, t, s), MAX_NEIGHBOURS, avoidNames)) ?? randomHousehold(content, assets, size, avoidNames);
+  return (s && householdFor(content, assets, bedrooms, homePrice(content, t, s), neighbourCap(town.world?.size), avoidNames)) ?? randomHousehold(content, assets, size, avoidNames);
 }
 
 /** A town of one of the older sizes with its neighbours (a large one is a dense town now). */
@@ -1055,7 +1074,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
 
 /** What the renderer needs to know about a town's world (it survives save/load in `meta`). */
 export function worldLook(town: NeighbourhoodDraft, fields: Rect[]): WorldLook | undefined {
-  return town.world && { kind: town.world.kind, landscape: town.world.landscape, ...(fields.length ? { fields } : {}) };
+  return town.world && { kind: town.world.kind, size: town.world.size ?? 'cosy', landscape: town.world.landscape, ...(fields.length ? { fields } : {}) };
 }
 
 export interface AssembleOptions {
