@@ -1067,6 +1067,47 @@ impl Lot {
         )
     }
 
+    /// The walls, doors, windows, fences, gates and diagonals stored on tiles `[x0, z0, x1, z1)`
+    /// (a tile holds the edges on its `-z` and `-x` sides; far edges are on the tiles one past the
+    /// lot), chunk by chunk and row by row in each: what `structure_rect` sends.
+    pub fn walls_in(&self, [x0, z0, x1, z1]: [i32; 4]) -> Vec<(EdgeRef, Edge)> {
+        let (x0, z0) = (x0.max(0) as usize, z0.max(0) as usize);
+        let (x1, z1) = (
+            (x1.max(0) as usize).min(self.width + 1),
+            (z1.max(0) as usize).min(self.depth + 1),
+        );
+        let mut out = Vec::new();
+        if x0 >= x1 || z0 >= z1 {
+            return out;
+        }
+        for cz in z0 >> SHIFT..=(z1 - 1) >> SHIFT {
+            for cx in x0 >> SHIFT..=(x1 - 1) >> SHIFT {
+                let c = cz * self.cols + cx;
+                if self.built[c] == 0 {
+                    continue;
+                }
+                let b = self.base[c] as usize;
+                for z in (cz * CHUNK).max(z0)..(cz * CHUNK + CHUNK).min(z1) {
+                    for x in (cx * CHUNK).max(x0)..(cx * CHUNK + CHUNK).min(x1) {
+                        let s = b + ((z & MASK) << SHIFT | (x & MASK));
+                        let (xu, zu) = (x as u16, z as u16);
+                        if x < self.width && self.h_edges[s] != Edge::Open {
+                            out.push((EdgeRef::H(xu, zu), self.h_edges[s]));
+                        }
+                        if z < self.depth && self.v_edges[s] != Edge::Open {
+                            out.push((EdgeRef::V(xu, zu), self.v_edges[s]));
+                        }
+                        if let Some(d) = self.diags[s].filter(|_| x < self.width && z < self.depth)
+                        {
+                            out.push((EdgeRef::Diag(xu, zu), d.edge));
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
     /// Every diagonal wall, row by row: `(x, z, diagonal)`.
     pub fn diagonal_walls(&self) -> impl Iterator<Item = (usize, usize, Diagonal)> + '_ {
         (0..self.depth).flat_map(move |z| {
