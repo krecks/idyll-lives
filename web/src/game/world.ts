@@ -243,7 +243,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   small: {
     label: 'Small town',
     blurb: 'Homes along one winding street, a park and a shop or two.',
-    sizes: sizes({ w: 150, d: 110, lots: 10 }, { box: { w: 190, d: 140 }, lots: 16, scale: 1.25, extend: 1 }, { box: { w: 256, d: 200 }, lots: 34, scale: 1.5, extend: 3, places: [2, 3] }),
+    sizes: sizes({ w: 150, d: 110, lots: 10 }, { box: { w: 190, d: 140 }, lots: 16, scale: 1.25, extend: 1 }, { box: { w: 270, d: 210 }, lots: 46, scale: 1.5, extend: 4, places: [2, 3] }),
     gaps: [0.4, 0.1],
     roads: highStreet,
     small: 0.25,
@@ -255,7 +255,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   medium: {
     label: 'Medium town',
     blurb: 'A crescent of homes round the village green, lanes off the main road.',
-    sizes: sizes({ w: 200, d: 190, lots: 20 }, { box: { w: 252, d: 240 }, lots: 32, scale: 1.25, extend: 2, places: [3, 4] }, { box: { w: 300, d: 280 }, lots: 48, scale: 1.45, extend: 4, places: [4, 4] }),
+    sizes: sizes({ w: 200, d: 190, lots: 20 }, { box: { w: 252, d: 240 }, lots: 32, scale: 1.25, extend: 2, places: [3, 4] }, { box: { w: 300, d: 280 }, lots: 54, scale: 1.45, extend: 4, places: [4, 4] }),
     gaps: [0.35, 0.08],
     roads: crescentTown,
     small: 0.25,
@@ -280,7 +280,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   farm: {
     label: 'Farm',
     blurb: 'A country road, farmsteads with fields and barns, open land all round.',
-    sizes: sizes({ w: 240, d: 170, lots: 10 }, { box: { w: 256, d: 256 }, lots: 16, scale: 1.3, extend: 1, farms: [5, 6] }, { box: { w: 250, d: 250 }, lots: 30, scale: 1.1, extend: 2, places: [2, 3], farms: [0, 0] }),
+    sizes: sizes({ w: 240, d: 170, lots: 10 }, { box: { w: 256, d: 256 }, lots: 16, scale: 1.3, extend: 1, farms: [5, 6] }, { box: { w: 270, d: 270 }, lots: 40, scale: 1.15, extend: 4, places: [2, 3], farms: [0, 0] }),
     gaps: [0.5, 0.3],
     roads: countryLane,
     small: 0.1,
@@ -303,7 +303,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   seaside: {
     label: 'Seaside village',
     blurb: 'Homes above a sandy shore, a café and the smell of the sea.',
-    sizes: sizes({ w: 220, d: 130, lots: 14 }, { box: { w: 256, d: 180 }, lots: 22, scale: 1.25, extend: 3, places: [3, 4] }, { box: { w: 320, d: 210 }, lots: 40, scale: 1.45, extend: 3, places: [4, 4] }),
+    sizes: sizes({ w: 220, d: 130, lots: 14 }, { box: { w: 256, d: 180 }, lots: 22, scale: 1.25, extend: 3, places: [3, 4] }, { box: { w: 340, d: 230 }, lots: 54, scale: 1.45, extend: 7, places: [4, 4] }),
     gaps: [0.3, 0.08],
     roads: shoreRoad,
     small: 0.4,
@@ -324,7 +324,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   mountain: {
     label: 'Mountain hamlet',
     blurb: 'A few big gardens in a high valley, pines on steep slopes all round.',
-    sizes: sizes({ w: 170, d: 150, lots: 8 }, { box: { w: 215, d: 190 }, lots: 13, scale: 1.25, extend: 1 }, { box: { w: 270, d: 230 }, lots: 34, scale: 1.45, extend: 3, places: [2, 3] }),
+    sizes: sizes({ w: 170, d: 150, lots: 8 }, { box: { w: 215, d: 190 }, lots: 13, scale: 1.25, extend: 1 }, { box: { w: 290, d: 250 }, lots: 48, scale: 1.45, extend: 7, places: [2, 3] }),
     gaps: [0.45, 0.25],
     roads: switchback,
     small: 0.05,
@@ -349,7 +349,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   lakeside: {
     label: 'Lakeside',
     blurb: 'A town by still water, reeds and a sandy bank, gentle hills.',
-    sizes: sizes({ w: 210, d: 170, lots: 20 }, { box: { w: 256, d: 224 }, lots: 30, scale: 1.25, extend: 4, places: [3, 3] }, { box: { w: 300, d: 240 }, lots: 44, scale: 1.4, extend: 3, places: [3, 4] }),
+    sizes: sizes({ w: 210, d: 170, lots: 20 }, { box: { w: 256, d: 224 }, lots: 30, scale: 1.25, extend: 4, places: [3, 3] }, { box: { w: 320, d: 260 }, lots: 56, scale: 1.4, extend: 7, places: [3, 4] }),
     gaps: [0.35, 0.1],
     roads: lakeRoad,
     small: 0.2,
@@ -370,7 +370,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   forest: {
     label: 'Forest clearing',
     blurb: 'A clearing in deep woods: big gardens, few neighbours, birdsong.',
-    sizes: sizes({ w: 170, d: 150, lots: 10 }, { box: { w: 215, d: 190 }, lots: 16, scale: 1.25, extend: 3, places: [1, 2] }, { box: { w: 256, d: 230 }, lots: 32, scale: 1.4, extend: 3, places: [2, 2] }),
+    sizes: sizes({ w: 170, d: 150, lots: 10 }, { box: { w: 215, d: 190 }, lots: 16, scale: 1.25, extend: 3, places: [1, 2] }, { box: { w: 280, d: 250 }, lots: 44, scale: 1.4, extend: 7, places: [2, 2] }),
     gaps: [0.45, 0.2],
     roads: clearing,
     small: 0,
