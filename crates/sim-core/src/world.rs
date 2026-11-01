@@ -7045,6 +7045,8 @@ fn start_task(
             )
         }
         TaskKind::Visit { plot } => {
+            // (On foot: not to a car, whatever they were heading for before.)
+            sim.bound_for_car = None;
             // At a house with door rules, up to its front door to knock (`life::knock_spot`).
             let p = &ctx.plots[plot as usize];
             let knock = (content.visits.door.is_some() && !p.public)
