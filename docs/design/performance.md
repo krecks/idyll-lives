@@ -519,3 +519,69 @@ The squares now cost the main thread about half what they did, and Low with squa
 
 The town overview behind the menus, not looked at before at full night or close up (`__renderer.setTownShot` with `minute` 23:00 and 02:00 under `?debug`, on the production build, Medium on WebGPU and Low on WebGL2): at night the streetlights, porch lamps and windows glow and the rest goes dark as in the game; close to a lot, the gardens' and street's far versions (trees, benches, cars, the fire pit, lamp posts, fences) stand whole, in their places and colours, with no gaps or boxes. Nothing to fix.
 
+
+## The open world: a street in chunks, a camera that roams (2026-11-01)
+
+The open world's renderer work (`docs/design/open-world.md`, branch `feat/open-world-render`):
+the street is planned once per town, view-independent, per 64 m chunk (`render/shared/street.ts`
+`TownStreet`, `shared/chunks.ts`) and drawn merged per 128 m draw group (`render/pc/street.ts`);
+the camera roams the land (`shared/focus.ts`), streaming the chunks round it in a big world, with
+houses past the stream as boxes with roofs (far LOD), and the lot it settles on becomes the focus.
+Measured on an M3-class Mac, Chromium (Playwright's), WebGPU, 1920 × 1080 at DPR 1, a 120 Hz
+display, vsync, medians of 2 runs unless said (`tools/bench/render.mjs`).
+
+**Today's towns, before → after** (the base built from the commit before the work; same machine,
+back to back):
+
+| scene | preset | scenario | draws | shadow draws | CPU ms / frame | GPU ms |
+|---|---|---|---|---|---|---|
+| village | medium | orbit-day | 369 → 369 | 60 → 59 | 1.57 → 1.69 | 4.43 → 4.37 |
+| village | medium | wide | 430 → 429 | 60 → 59 | 1.64 → 1.72 | 4.55 → 4.88 |
+| village | high | orbit-day | 384 → 382 | 61 → 59 | 1.64 → 1.66 | 4.76 → 4.77 |
+| village | high | wide | 431 → 430 | 60 → 59 | 1.77 → 1.48 | 4.75 → 4.70 |
+| forest | medium | orbit-day | 402 → 400 | 90 → 88 | 1.69 → 1.36 | 4.88 → 4.55 |
+
+120 fps in every cell, no long tasks. Pictures (`--shots`, then `--compare` with the base's):
+identical but for the flower beds' shrubs the old street lost (a model both planted as foliage
+and placed on another lot had its first batch written over): at most 0.069 % of a picture's
+pixels, all at those shrubs; with `residents=lot` (residents only on the viewed lot, as before)
+the same. Planning the street for a focus lot: every view of both scenes gives the same vertices
+and instances as the old `planStreet`; a focus moving to the next lot plans 2–4 of the village's
+6 chunks again (4–30 ms) instead of the whole street.
+
+**Roaming** (`cam=roam`: the camera's target round a loop over the town at 12 m/s, stopping
+2 s every 8 s so the lot under it becomes the focus):
+
+- The village (Medium): 119.6 fps, 288 draws, 0–1 frames over 33 ms in 20 s; a focus lot
+  settled on is drawn in full 75–175 ms after the camera stops (`render.focusSwitches`).
+- `?bench=bigworld` (the village tiled 5 × 5 for the renderer, ~930 × 740 m, a big world):
+  see the table below (the first round, before the fixes that followed it, had 96 fps on Medium
+  and long tasks of 0.6–0.9 s at each focus switch: `tableRooms` matching every seat of the town
+  against every thing, and the town's grass mask made again whole; both fixed).
+
+The big world after the fixes (two runs each, 20 s; `over 33`: frames over 33 ms in the 20 s;
+streamed: 18 chunks in detail in 8 draw groups and 42 far groups while roaming):
+
+| preset | scenario | fps | interval p95 / p99 / max ms | over 33 | draws (shadow) | CPU p50 / p95 ms | long tasks |
+|---|---|---|---|---|---|---|---|
+| low | roam | 117.4 / 117.3 | 9.8–10.3 / 10.3 / 66–109 | 6 / 8 | 241 (0) | 1.3–1.8 / 1.7–2.4 | 1–2, ≤ 59 ms |
+| medium | roam | 115.9 / 117.1 | 10.1–10.2 / 16.4–16.7 / 82–93 | 6 / 5 | 334 (47) | 1.5 / 2.3–2.4 | 0–1, ≤ 50 ms |
+| high | roam | 112.6 / 111.6 | 10.3–15.3 / 17.0 / 67–92 | 8 / 7 | 336–339 (48–51) | 2.1–2.2 / 3.0–3.1 | 1–2, ≤ 55 ms |
+| low | orbit-day | 120.0 | 9.8–10.3 / 10.3 / 10.3 | 0 | 290 (2) | 1.4–2.1 / 1.7–2.6 | 0 |
+| medium | orbit-day | 120.0 | 9.7–10.2 / 10.1–10.3 / 10.4 | 0 | 382 (61) | 1.7–2.3 / 2.5–3.2 | 0 |
+| high | orbit-day | 115.6–116.2 | 10.3 / 16.7 / 18.7 | 0 | 395 (62) | 1.5–1.8 / 2.0–2.6 | 0 |
+| low, CPU ×3 | roam | 110.0 | 10.2 / 25.2 / 191 | 20 | 241 (0) | 3.9 / 5.1 | 10, ≤ 163 ms |
+
+No shader or pipeline is made while it roams (`diag=shaders`: 84 shaders, 134 pipelines at the
+start and the end). What is left behind a focus switch, from a CPU profile of the roam (each
+under 50 ms, but together the frames over 33 ms): the focus house's storeys (`HousePlanner.build`,
+25–40 ms a storey, paced between storeys only), the lot layer's key (`lotKeyOf`, the town's walls
+strung), the residents' and the birds' rebuilds, and the bench's own tiling of each world message
+(`debug/tileWorld.ts`, ~10 ms). A cached lot layer (the focus lot plus the 2 last, built in
+slices that a newer focus cancels) is what would take them off the roaming camera's frames; it is
+not done.
+
+Building the big world (the village tiled, headless, measured once): the landscape 4.7 s (its
+grass field 3.4 s, a texel a metre over the land), the street 4.4 s (every chunk of the town
+planned up front, so streaming only merges and uploads). The village's street: 43 ms planned
+whole from fresh, against the old 24 ms per view (it is planned once now, not per view).
