@@ -2584,6 +2584,18 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lot.pushGrass(push.end(dt / 1000));
   }
 
+  simSpot(index: number, out: { x: number; z: number }): boolean {
+    const f = this.lastFrame;
+    if (!f || index >= this.simCount) return false;
+    const o = f.layout.headerLen + index * f.layout.simStride;
+    if (f.curr[o + f.layout.sim.away] !== 0) return false;
+    const z = f.curr[o + f.layout.sim.z];
+    out.x = f.curr[o + f.layout.sim.x];
+    // (Upstairs rows back to the ground's.)
+    out.z = z - this.rowOf(this.storeyOf(Math.floor(z)));
+    return true;
+  }
+
   simHead(index: number, out: { x: number; y: number; z: number }): boolean {
     return index < this.simCount && !!this.characters?.head(index, out);
   }

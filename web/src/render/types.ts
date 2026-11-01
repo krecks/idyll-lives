@@ -390,6 +390,8 @@ export interface Renderer {
   pickPlane(height: number): { x: number; z: number } | null;
   /** Projects a world point to canvas CSS pixels into `out`; false if behind the camera. */
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean;
+  /** Where Sim `index` is on the ground (town tiles, from the last update, drawn or not); false if away or unknown. */
+  simSpot(index: number, out: { x: number; z: number }): boolean;
   /** Interpolated world position above Sim `index`'s head from the last update; false if unknown. */
   simHead(index: number, out: { x: number; y: number; z: number }): boolean;
   /** The garden birds drawn about the viewed lot (render/shared/birds.ts), for the world's sound: kept and refilled, read it at once. */

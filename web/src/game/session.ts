@@ -9,7 +9,8 @@ import { prefetch, prefetchNow, planStream, reprioritize, whenStreamSettled } fr
 import { Content } from '../content/content';
 import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
-import { lowestStorey } from '../core/protocol';
+import { groundDepth, lowestStorey } from '../core/protocol';
+import { townMap } from '../ui/townMap.svelte';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
 import { tileWorld } from '../debug/tileWorld';
@@ -1039,6 +1040,8 @@ export async function startSession(
       if (added.length) director.noteBuilt(added.map((o) => o.id), performance.now());
     }
     world = w;
+    // The town map: the town's ground and its presentation data (roads, zones, areas), as it changes.
+    if (townMap.world?.meta !== w.meta || townMap.world?.width !== w.width) townMap.world = { width: w.width, depth: groundDepth(w), meta: w.meta };
     worldView = viewPlot;
     game.storeys = w.storeys ?? 1;
     game.lowestStorey = lowestStorey(w);
@@ -1169,6 +1172,24 @@ export async function startSession(
     if (aim && game.follow === null) renderer.focus(p.x + p.w / 2, p.z + p.d / 2);
     bridge.setView([p.x, p.z, p.x + p.w, p.z + p.d]);
   }
+  // The town map's live layer: residents where they are drawn (or simulated), and where the camera looks.
+  const mapHead = { x: 0, y: 0, z: 0 };
+  townMap.source = {
+    dots() {
+      if (!world) return [];
+      const mine = new Set(playerSims());
+      const out: { x: number; z: number; mine: boolean }[] = [];
+      for (const s of world.sims) {
+        if (s.gone || !renderer.simSpot(s.id, mapHead)) continue;
+        out.push({ x: mapHead.x, z: mapHead.z, mine: mine.has(s.id) });
+      }
+      return out;
+    },
+    camera() {
+      const t = renderer.cameraPose().target;
+      return [t[0], t[2]];
+    },
+  };
   // The roaming camera settles on a lot: it is shown in full, the camera left where it is (in live
   // mode, not following anyone; build mode keeps the lot it builds on).
   renderer.onFocusLot((lot) => {
@@ -1685,6 +1706,10 @@ export async function startSession(
       await building;
       renderer.clear();
       bridge.dispose();
+      townMap.world = null;
+      townMap.source = {};
+      renderer.onFocusLot(null);
+      renderer.onWatch(null);
     },
   };
   session.applySettings(settings);
