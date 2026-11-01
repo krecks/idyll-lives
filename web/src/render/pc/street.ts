@@ -34,7 +34,7 @@ import type { RGB } from '../shared/environment';
 import type { Geo, MeshData } from '../shared/geometry';
 import type { HousePart } from '../shared/house';
 import type { StandIn } from '../shared/modelEntry';
-import { groupOf } from '../shared/chunks';
+import { chunkCoords, groupOf, SUPERCHUNK } from '../shared/chunks';
 import { castsShadow, FOLIAGE, instanceMatrix, NO_FOCUS, TownStreet, type ChunkPlan, type Inst, type ObjectLook } from '../shared/street';
 import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
 
@@ -74,6 +74,8 @@ export interface StreetPlant {
 
 /** How often (ms) at most the neighbours' window glass is redrawn as they go to bed or get up. */
 const WINDOWS_EVERY_MS = 1000;
+/** The far LOD's houses past this distance (m) from the camera's target aren't drawn. */
+const FAR_CULL = 650;
 
 /** A chunk as built: its plan, and each of its meshes' vertex arrays (by draw name), made once. */
 interface BuiltChunk {
@@ -316,6 +318,7 @@ export class Street {
       }
     }
     if (dirty.size) this.gatherHomes();
+    this.buildFar(town, all, focus);
     perfEnd(meshesSpan);
 
     if (!this.instancesDue) return;
@@ -401,6 +404,11 @@ export class Street {
     this.poolTexture.destroy();
   }
 
+  /** What is drawn now: chunks in detail, draw groups, far groups (for the bench). */
+  stats(): { chunks: number; groups: number; far: number; streamed: boolean } {
+    return { chunks: this.chunks.size, groups: this.groups.size, far: [...this.farGroups.values()].filter((g) => g.entity?.enabled).length, streamed: this.wanted !== null };
+  }
+
   /** Shows or hides the viewed lot's own (its garage): it stands on the lot's ground, hidden while its basement is in view. */
   showLot(on: boolean): void {
     this.lotRoot.enabled = on;
@@ -456,6 +464,60 @@ export class Street {
       }
     }
   }
+
+  /**
+   * Each frame (the game's): far groups past `FAR_CULL` m of the camera's target (`x`, `z`) are
+   * left out (the fog has them by then).
+   */
+  frame(x: number, z: number): void {
+    for (const g of this.farGroups.values()) {
+      if (!g.entity) continue;
+      g.entity.enabled = Math.hypot(g.x - x, g.z - z) <= FAR_CULL + SUPERCHUNK * 0.71;
+    }
+  }
+
+  /**
+   * The far LOD: the houses of the chunks not streamed in (`setChunks`), as boxes with their roofs,
+   * one mesh a draw group (a 128 m superchunk), built again only when which of its chunks are far
+   * changes. None while every chunk is drawn.
+   */
+  private buildFar(town: TownStreet, all: readonly number[], focus: number): void {
+    const parts = new Map<number, { keys: string[]; data: MeshData[] }>();
+    if (this.wanted) {
+      for (const id of all) {
+        if (this.wanted.has(id)) continue;
+        const far = town.farChunk(id, focus);
+        if (!far) continue;
+        const g = groupOf(id);
+        let p = parts.get(g);
+        if (!p) parts.set(g, (p = { keys: [], data: [] }));
+        p.keys.push(far.key);
+        p.data.push((this.farData.get(far.key) ?? this.farData.set(far.key, far.geo.meshData({ colors: true })).get(far.key))!);
+      }
+    }
+    for (const [g, old] of this.farGroups) {
+      if (parts.has(g)) continue;
+      old.entity?.destroy();
+      this.farGroups.delete(g);
+    }
+    for (const [g, p] of parts) {
+      const key = p.keys.join('|');
+      const old = this.farGroups.get(g);
+      if (old?.key === key) continue;
+      old?.entity?.destroy();
+      const data = concatMeshData(p.data);
+      const mesh = data && meshFrom(this.device, data);
+      const entity = mesh ? drawMesh(this.root, 'streetFar', mesh, this.lib.plainFinish(), { castShadows: false, ...(this.layers ? { layers: this.layers } : {}) }) : null;
+      if (entity) this.dress(entity, false);
+      const [gx, gz] = chunkCoords(g);
+      this.farGroups.set(g, { key, entity, x: (gx + 0.5) * SUPERCHUNK, z: (gz + 0.5) * SUPERCHUNK });
+    }
+    // (Vertex arrays of far chunks no group draws any more go.)
+    if (this.farData.size > 4 * all.length) this.farData.clear();
+  }
+  /** Far LOD meshes by draw group, where it is, and what it was made from; far chunks' vertex arrays by key. */
+  private readonly farGroups = new Map<number, { key: string; entity: pc.Entity | null; x: number; z: number }>();
+  private readonly farData = new Map<string, MeshData>();
 
   // ---- helpers ----------------------------------------------------------------------------
 
@@ -543,6 +605,9 @@ export class Street {
     }
     this.groups.clear();
     this.chunks.clear();
+    for (const g of this.farGroups.values()) g.entity?.destroy();
+    this.farGroups.clear();
+    this.farData.clear();
     for (const e of this.lotMeshes) e.destroy();
     this.lotMeshes = [];
     this.lotKey = '';

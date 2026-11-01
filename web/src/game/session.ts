@@ -12,6 +12,7 @@ import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, S
 import { lowestStorey } from '../core/protocol';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
+import { tileWorld } from '../debug/tileWorld';
 import { recentLog } from '../debug/log';
 import { deliverReport, gpuInfo, takePendingPose, within, type DebugReport } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
@@ -1100,7 +1101,8 @@ export async function startSession(
     const build = homeAssets.then(async () => {
       const buildSpan = perfStart('session: renderer setWorld');
       try {
-        return await renderer.setWorld(w, view);
+        // (`?bench=bigworld`: the town tiled for the renderer, a big world: `debug/tileWorld.ts`.)
+        return await renderer.setWorld(BENCH && BENCH.tile > 1 ? tileWorld(w, BENCH.tile) : w, view);
       } finally {
         perfEnd(buildSpan);
       }
@@ -1169,7 +1171,9 @@ export async function startSession(
   }
   // The roaming camera settles on a lot: it is shown in full, the camera left where it is (in live
   // mode, not following anyone; build mode keeps the lot it builds on).
-  renderer.onFocusLot((plot) => {
+  renderer.onFocusLot((lot) => {
+    // (The bench's tiled big world: a copy's lot is the town's own, `debug/tileWorld.ts`.)
+    const plot = BENCH && BENCH.tile > 1 && world ? lot % world.plots.length : lot;
     if (game.mode !== 'live' || game.follow !== null || director.active || !world?.plots[plot]) return false;
     if (plot !== viewPlot) showPlot(plot, false);
     return true;

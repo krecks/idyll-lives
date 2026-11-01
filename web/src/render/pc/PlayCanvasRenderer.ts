@@ -131,6 +131,8 @@ const BETA_LIMITS = [0.3, 1.35] as const;
 // (The near plane a fiftieth of the camera's distance, never under 0.3 m: from the town overview's 200–300 m at 0.3 m
 // the roads, 1.2 cm over the ground, fought it in green patches. Close up nothing changes: 0.3 m to 15 m out.)
 const LENS = { fov: 0.7, near: 0.3, far: 1600, nearShare: 1 / 50 };
+/** The far plane in a big world (m). */
+const BIG_FAR = 2600;
 /** Light is recomputed when the game's clock moved this many minutes (fast: the preset's `lightingStep`), at most every `LIGHT_MIN_MS`. */
 const LIGHT_STEP = 0.5;
 const LIGHT_MIN_MS = 100;
@@ -868,6 +870,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const world = this.builtWorld;
     if (!world || !this.street.layout) return;
     this.followShadows();
+    this.street.frame(o.target.x, o.target.z);
     this.roam.pinned = this.followIndex !== null || this.gameRig.active || this.flight.active;
     const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
     const fovH = 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect);
@@ -1133,6 +1136,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.orbit.panBounds = panBounds(world);
     this.orbit.checkLimits();
     this.streamOn = world.meta?.world?.size === 'big' || STREAM_FLAG;
+    // A big world's land reaches further: its far plane too (its far LOD's houses to 650 m, the hills beyond).
+    const far = world.meta?.world?.size === 'big' ? BIG_FAR : LENS.far;
+    if (this.camera.camera.farClip !== far) this.camera.setLens({ ...LENS, far });
     const pb = this.orbit.panBounds;
     this.roam.setBounds({ x0: pb.x0 - 300, z0: pb.z0 - 300, x1: pb.x1 + 300, z1: pb.z1 + 300 });
     const viewIndex = view ? world.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
@@ -2455,6 +2461,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       quality: { ...this.quality, mirrors: this.mirrors.capacity, clusteredLamps: true, postSamples: this.post?.samples ?? 1, fxaa: this.post?.options.fxaa ?? false },
       diag: [...this.diag],
       passes,
+      // The town drawn (the bench's roam loops over it) and the street's chunks.
+      world: this.builtWorld ? { width: this.builtWorld.width, depth: groundDepth(this.builtWorld), size: this.builtWorld.meta?.world?.size ?? 'cosy' } : undefined,
+      street: this.street.stats(),
       scene: {
         ...scene,
         textures: d.textures.size,

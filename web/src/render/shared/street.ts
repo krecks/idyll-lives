@@ -1290,6 +1290,25 @@ export class TownStreet {
     return out;
   }
 
+  /**
+   * Chunk `id` far off (the far LOD, past the chunks streamed in): its houses as boxes with their
+   * roofs (`HousePlanner.farHouse`), the focus lot's left out, in one plain-finish geometry, with
+   * what it was made from. Null when it has none.
+   */
+  farChunk(id: number, focus: number): { key: string; geo: Geo } | null {
+    const houses = (this.plotsByChunk().get(id) ?? []).filter((L) => L.info.house && L.info.id !== focus && (L.base === 'house' || L.base === 'shop'));
+    if (!houses.length) return null;
+    const key = `${id}|${houses.map((L) => `${L.info.id}:${L.info.house!.join(',')}:${L.info.roof?.join(',') ?? ''}:${L.info.storeys ?? 1}`).join(';')}`;
+    const cached = this.far.get(id);
+    if (cached?.key === key) return cached;
+    const geo = new Geo();
+    for (const L of houses) this.planner.farHouse(geo, { x: L.info.x, z: L.info.z, house: L.info.house!, roof: L.info.roof, storeys: L.info.storeys });
+    const out = { key, geo };
+    this.far.set(id, out);
+    return out;
+  }
+  private readonly far = new Map<number, { key: string; geo: Geo }>();
+
   /** What chunk `id` is planned from with lot `focus` in view (`ChunkPlan.key`), without planning it. */
   chunkKey(id: number, focus: number): string {
     return this.gather(id, focus).key;

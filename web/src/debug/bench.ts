@@ -49,6 +49,29 @@ const PATHS = {
  * lamp beside the glass, not in front of it.
  */
 const MIRROR_PATH = { distance: 4.4, radius: 6, beta: 0.8, turn: -0.4, swing: 0.2, period: 20 };
+/**
+ * `cam=roam`: the camera's target along a loop over the town at `ROAM.speed` m/s (an ellipse
+ * through the home lot, inset from the edge), looking the way it goes from `radius` m up and
+ * behind: the street streams in ahead and the focus lot changes as it goes.
+ */
+const ROAM = { speed: 12, radius: 30, beta: 0.95, inset: 30 };
+
+function roamPose(t: number, b: { x0: number; z0: number; x1: number; z1: number; from: [number, number, number] }): { alpha: number; beta: number; radius: number; target: [number, number, number] } {
+  const cx = (b.x0 + b.x1) / 2;
+  const cz = (b.z0 + b.z1) / 2;
+  const a = Math.max(20, (b.x1 - b.x0) / 2 - ROAM.inset);
+  const c = Math.max(20, (b.z1 - b.z0) / 2 - ROAM.inset);
+  // Starting where the home lot is round the loop; at about `speed` m/s along it (the ellipse's mean radius).
+  const start = Math.atan2((b.from[2] - cz) / c, (b.from[0] - cx) / a);
+  const th = start + (ROAM.speed * t) / ((a + c) / 2);
+  const x = cx + a * Math.cos(th);
+  const z = cz + c * Math.sin(th);
+  // Heading along the loop; the eye behind it (the arc camera's eye is at target + (cos α, sin α) · …).
+  const hx = -a * Math.sin(th);
+  const hz = c * Math.cos(th);
+  return { alpha: Math.atan2(-hz, -hx), beta: ROAM.beta, radius: ROAM.radius, target: [x, 0, z] };
+}
+
 /** Where every path starts (the game's own opening angle). */
 const START_ALPHA = -Math.PI * 0.62;
 /** Longest wait for the game to start (loading, shaders). */
@@ -157,7 +180,8 @@ export async function runBench(): Promise<void> {
 }
 
 async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
-  const saveId = await loadState(await sceneText(b.scene), `bench ${b.scene}`);
+  // (The big world is the village's, tiled for the renderer: `tile`.)
+  const saveId = await loadState(await sceneText(b.scene === 'bigworld' ? 'village' : b.scene), `bench ${b.scene}`);
   app.start({ kind: 'load', saveId });
   // Live once the game screen shows its interface (the session is revealed by then).
   const until = performance.now() + START_LIMIT_MS;
@@ -177,6 +201,9 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
   const plot = home == null ? null : game.plots[home];
   const centre: [number, number, number] = plot ? [plot.x + plot.w / 2, 0, plot.z + plot.d / 2] : [0, 0, 0];
   const path = PATHS[b.cam === 'wide' ? 'wide' : 'orbit'];
+  // The roam's loop: over the town (tiled, the big world's), from the home lot's side.
+  const town = renderer.benchInfo().world as { width: number; depth: number } | undefined;
+  const bounds = { x0: 0, z0: 0, x1: town?.width ?? 100, z1: town?.depth ?? 100, from: centre };
   const frozen = b.diag.has('freeze');
   const mirror = b.cam === 'mirror' || b.cam === 'mirror-still' ? mirrorView(renderer.benchInfo().scene as { mirrorSpots?: Spot[] }, plot) : null;
   if (mirror) controls.setWallMode('up');
@@ -202,6 +229,8 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
         const s = Math.sin(m.beta);
         const g = mirror.glass;
         renderer.setCameraPose({ alpha, beta: m.beta, radius: m.radius, target: [g[0] + k * Math.cos(alpha) * s, g[1] + k * Math.cos(m.beta), g[2] + k * Math.sin(alpha) * s] });
+      } else if (b.cam === 'roam') {
+        renderer.setCameraPose(roamPose(t, bounds));
       } else {
         const o = b.orbit;
         renderer.setCameraPose({ alpha: START_ALPHA + (2 * Math.PI * t) / path.period, beta: o.beta ?? path.beta, radius: o.radius ?? path.radius, target: [centre[0] + o.tx, centre[1], centre[2] + o.tz] });

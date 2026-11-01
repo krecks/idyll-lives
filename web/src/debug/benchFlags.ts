@@ -10,14 +10,16 @@
  * without tone mapping, exposure or grading: the light compared without the image processing.
  */
 
-export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk' | 'mirror' | 'mirror-still';
+export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk' | 'mirror' | 'mirror-still' | 'roam';
 
 export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders'] as const;
 export type BenchDiag = (typeof BENCH_DIAGS)[number];
 
 export interface BenchFlags {
-  /** `public/bench/<scene>.json.gz`: the game state to play. */
+  /** `public/bench/<scene>.json.gz`: the game state to play (`bigworld`: the village's, tiled 5 × 5: `tile`). */
   scene: string;
+  /** The scene's town laid out `tile × tile` times for the renderer, as a big world (`debug/tileWorld.ts`); 1: as it is. */
+  tile: number;
   /** `?quality=` (the presets in `render/quality.ts`; the renderer reads it itself). */
   quality: 'low' | 'medium' | 'high' | null;
   /** `?hour=`: the lighting held at that hour (the renderer reads it itself); null: the game's clock. */
@@ -66,10 +68,11 @@ function parse(): BenchFlags | null {
   const cam = params.get('cam');
   const diag = benchDiag();
   const res = params.get('res');
-  const camera: BenchCamera = cam === 'wide' || cam === 'build' || cam === 'dusk' || cam === 'mirror' || cam === 'mirror-still' ? cam : 'orbit';
+  const camera: BenchCamera = cam === 'wide' || cam === 'build' || cam === 'dusk' || cam === 'mirror' || cam === 'mirror-still' || cam === 'roam' ? cam : 'orbit';
   const frozen = diag.has('freeze');
   return {
     scene,
+    tile: num('tile', scene === 'bigworld' ? 5 : 1, 1, 6),
     quality: quality === 'low' || quality === 'medium' || quality === 'high' ? quality : null,
     hour: params.has('hour') && Number.isFinite(Number(params.get('hour'))) ? Number(params.get('hour')) : null,
     cam: camera,

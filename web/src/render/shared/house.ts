@@ -1618,6 +1618,43 @@ export class HousePlanner {
   }
 
   /**
+   * A house far off (the street's far LOD, past the chunks streamed in): its box of walls in its
+   * colour and its roof as `silhouettes` tops it (`roofTop`: a ridge along the longer side, or
+   * flat), into `geo` in the plain finish (rough, not metal). A few dozen triangles a house.
+   */
+  farHouse(geo: Geo, plot: { x: number; z: number; house: [number, number, number, number]; roof?: [number, number]; storeys?: number }): void {
+    const s = this.schemeWith(houseScheme(plot.x, plot.z), plot.roof);
+    const [x0, z0, x1, z1] = plot.house;
+    const [a0, b0, a1, b1] = [x0 - T, z0 - T, x1 + T, z1 + T];
+    const h = WALL_HEIGHT * (plot.storeys ?? 1);
+    const finish = 0.4;
+    geo.color(s.wall, finish).box(a0, 0, b0, a1, h, b1, 'ny py');
+    geo.color(s.roof, finish);
+    if (s.shape === 'flat') {
+      geo.box(a0 - 0.1, h, b0 - 0.1, a1 + 0.1, h + 0.2, b1 + 0.1, 'ny');
+      return;
+    }
+    const top = this.roofTop(plot);
+    const e = 0.3;
+    const alongX = a1 - a0 >= b1 - b0;
+    if (alongX) {
+      const mz = (b0 + b1) / 2;
+      geo.poly([[a0 - e, h, b0 - e], [a1 + e, h, b0 - e], [a1 + e, top, mz], [a0 - e, top, mz]], facing([a0, h, b0], [a1, h, b0], [a1, top, mz], [0, 1, -1]));
+      geo.poly([[a0 - e, h, b1 + e], [a0 - e, top, mz], [a1 + e, top, mz], [a1 + e, h, b1 + e]], facing([a0, h, b1], [a0, top, mz], [a1, top, mz], [0, 1, 1]));
+      geo.color(s.wall, finish);
+      geo.poly([[a0, h, b0], [a0, top, mz], [a0, h, b1]], [-1, 0, 0]);
+      geo.poly([[a1, h, b0], [a1, h, b1], [a1, top, mz]], [1, 0, 0]);
+    } else {
+      const mx = (a0 + a1) / 2;
+      geo.poly([[a0 - e, h, b0 - e], [mx, top, b0 - e], [mx, top, b1 + e], [a0 - e, h, b1 + e]], facing([a0, h, b0], [mx, top, b0], [mx, top, b1], [-1, 1, 0]));
+      geo.poly([[a1 + e, h, b0 - e], [a1 + e, h, b1 + e], [mx, top, b1 + e], [mx, top, b0 - e]], facing([a1, h, b0], [a1, h, b1], [mx, top, b1], [1, 1, 0]));
+      geo.color(s.wall, finish);
+      geo.poly([[a0, h, b0], [a1, h, b0], [mx, top, b0]], [0, 0, -1]);
+      geo.poly([[a0, h, b1], [mx, top, b1], [a1, h, b1]], [0, 0, 1]);
+    }
+  }
+
+  /**
    * Neighbouring houses as dressed boxes: the house's own doors and windows where they lie on
    * the box outline (framed, with muntins, curtains and shutters), corner boards, a porch with a
    * gabled canopy over the front door, a chimney on some roofs, and a garage at the end of the
