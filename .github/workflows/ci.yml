@@ -56,7 +56,9 @@ jobs:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
         run: |
           bun tools/housegen/sample.ts /tmp/houses.json
-          bun tools/worlds/sample.ts /tmp/worlds.json
+          # Cosy and Normal worlds for the sim; Big ones (one per kind) are only checked here and
+          # written to /tmp/worlds-big.json until the sim takes towns over 256 m (docs/design/open-world.md).
+          bun tools/worlds/sample.ts /tmp/worlds.json 3 --sizes cosy,normal,big --big-per-kind 1 --big-out /tmp/worlds-big.json
           HOUSES=/tmp/houses.json WORLDS=/tmp/worlds.json cargo test -p sim-core --release --locked --test generated_houses --test generated_worlds -- --ignored
 
       # The residents' clips on both bodies at every life stage; the known failures are in
