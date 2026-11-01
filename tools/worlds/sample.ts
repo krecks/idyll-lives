@@ -290,7 +290,7 @@ writeFileSync(out, JSON.stringify(worlds));
 console.log(`${worlds.length} worlds → ${out}`);
 if (bigWorlds.length) {
   writeFileSync(bigOut, JSON.stringify(bigWorlds));
-  console.log(`${bigWorlds.length} big worlds → ${bigOut} (not for the sim until it loads towns over 256 m)`);
+  console.log(`${bigWorlds.length} big worlds → ${bigOut}`);
 }
 if (problems.length) {
   console.log(`${problems.length} problems:`);
