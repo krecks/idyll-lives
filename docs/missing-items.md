@@ -68,10 +68,22 @@ display cabinet's door were built on 2026-10-31 (below).
 
 ## 2. Model work still accepted as incomplete
 
-| Object | What is left | Source | Effort |
-|---|---|---|---|
-| Hot tub | Cover folds back as one squashed part, not two halves (a fourth draw call) | A-outdoor-01 | S once the draw is allowed |
-| Grandfather clock | Trunk door never opens (fifth draw call) | A-decor-01 | — (accepted) |
+Nothing is left. The two rows that stood here (the hot tub's cover, the grandfather clock's trunk door) are
+done, below.
+
+**Done 2026-10-31 (a moving part that costs a draw):** the draw-call gate allowed 3 draws a model, 4 with a
+warning, so a piece of furniture that wanted a fourth moving part could not have one. `G.Model(draws=5)` now
+writes `"draws": 5` into the pack entry (`gamekit/family.py`), and `checkglb::draws_allowed` reads it: 4 unless
+the entry says otherwise, a whole number from 3 to 8, anything else an error (`a_model_may_allow_itself_more_draws`).
+- **Grandfather clock** (A-decor-01): the trunk door was joined into the body and never opened. It is a moving
+  part now, hinged on its left edge and swung open 100° in 0.8 s (`door_open`), on "Wind the clock"
+  (`motions.uses.wind`). 6,394 triangles, 5 draws, 6 materials, 4 moving parts, 4 clips
+  (`previews/decor/grandfatherClock@door_open.png`); the only model with a `draws` allowance.
+  Docs: `docs/objects/decor.md`, `docs/review/decor.md`, `tools/art/blender/families/decor.md`,
+  `docs/design/objects.md` (draw calls).
+- **Hot tub** (A-outdoor-01): the cover folds in two halves — the back half hinged on the tub's rim and the front
+  flap on their seam, turned down and hung on the folded edge — and had been since `2bb30dba`, the row being
+  stale: 4,368 triangles, 4 draws, 3 moving parts, 2 clips (`previews/outdoor/hotTubCedar@cover_off.png`).
 
 The rest of §9.2 of the authenticity review (chess table for two, low apples, food wrappers, arc-lamp
 overhang, washing line piece by piece, high-chair tray, kettle/bread-bin/laptop lid clips, bakery-case
@@ -93,13 +105,28 @@ ll-tools --release` passes. Docs: `docs/design/objects.md` ("Scale, axes, origin
 
 | Item | What is missing | Source | Effort |
 |---|---|---|---|
-| Servers' apron | No apron, coat or vest garment exists in the character set, so a white shirt and dark trousers stand in | open.md, "Content and sim" | M (a garment shell) |
 | Furniture resizing | Resize arrows stay off (`RESIZING`, `buildmode.ts`); moving parts do not follow a resize yet | PLAN.md roadmap "later" | L |
 | Smarter thoughts | No LLM re-rank of the utility AI's top-3; research only | PLAN.md roadmap "later", [design/smarter-thoughts.md](design/smarter-thoughts.md) | L (research) |
+
+The servers' apron left this list on 2026-10-31 (below): `top.apron` is a garment of the character set, and the
+staff wear it.
 
 Flowers cut for a vase left this list on 2026-10-30 (below), on the raised bed and then on the five beds cut for a
 vase (tulips, daffodils, lilies, cosmos, daisies). The daisies' "make a daisy chain" followed on 2026-10-31, so no
 bed is missing a real use any more.
+
+**Done 2026-10-31 (the servers' apron):** `top.apron` is a garment of the character set — a white shirt painted on
+the body (its cut the shirt's: long sleeves, `crew -0.012`, over the trousers) under an apron shell over the front
+of the trousers, from the waistband to just above the knee. The shell is clipped from the body's own torso and leg
+surface inside a ±1.28 rad span round the front, arms excluded, and turned back on every open edge
+(`apron_layout`/`apron`, `crates/tools/src/characters/clothes.rs`), in the top's colour with the hem band the
+skirt's flag (`fields.y = 3`) gives it, and with the skirt's seated corrective (`seated_tone`, 8 mm clear of the
+skin). One garment, two parts: `top.apron` (267 vertices) and `lod.top.apron` (112). In `WORKWEAR` (`outfit.ts`),
+a list of its own so it is never picked for a resident but counts as a garment of both bodies (`check.rs`); the
+town's staff wear it with dark trousers and dark shoes (`web/src/game/staff.ts`, `UNIFORM`), and it is drawn in
+play (`bench-results/review/fixes/apron/`). `cargo characters build` → check ok (2 bodies, 58 channels).
+Docs: `docs/characters-format.md` (shells, the hem band, garment ids), `docs/objects/open.md`,
+`docs/authenticity-review.md`, `docs/review/community.md`.
 
 ## 4. Not yet checked (not known broken)
 

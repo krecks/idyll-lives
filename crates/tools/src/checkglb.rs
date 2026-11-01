@@ -3438,11 +3438,18 @@ fn check_file(
             fixed(side.f(), 2)
         ));
     }
-    if groups.len() > DRAWS.1 {
+    let most_draws = match draws_allowed(entry) {
+        Ok(n) => n,
+        Err(e) => {
+            errors.push(e);
+            DRAWS.1
+        }
+    };
+    if groups.len() > most_draws {
         errors.push(format!(
             "{} draw calls, at most {} (one per finish group: map materials to finishes)",
             groups.len(),
-            DRAWS.1
+            most_draws
         ));
     } else if groups.len() > DRAWS.0 {
         warnings.push(format!(
@@ -3821,6 +3828,21 @@ pub struct Measures {
     pub objects: BTreeMap<String, Result<Measure, String>>,
 }
 
+/// The most draw calls a model may take: the pack entry's `draws` for the one model whose moving parts can't fit
+/// in four (the grandfather clock's trunk door, which swings open while it is wound), four for every other.
+fn draws_allowed(entry: &J) -> Result<usize, String> {
+    match entry.get("draws") {
+        None => Ok(DRAWS.1),
+        Some(v) => match v.num().map(|n| n.f()) {
+            Some(n) if n.fract() == 0.0 && (DRAWS.0 as f64..=8.0).contains(&n) => Ok(n as usize),
+            _ => Err(format!(
+                "`draws` is a whole number of draw calls, {} to 8 (one per finish group)",
+                DRAWS.0
+            )),
+        },
+    }
+}
+
 /// Reads and measures a model file of the manifests (`path`) with its entry: its size at rest, times `scale`.
 fn model(entry: &J, path: &str) -> R<Model> {
     let file = parse_glb(&std::fs::read(path).map_err(|e| py::os_error(&e, path))?)?;
@@ -3988,6 +4010,24 @@ mod tests {
         let ((lo, own), _) = bounds(&g.gltf, &HashMap::new(), &aside).unwrap();
         assert!(lo[1].f().abs() < 1e-6, "own {lo:?}");
         assert!((own[1].f() - 0.45).abs() < 1e-6, "own {own:?}");
+    }
+
+    /// A model may allow itself more draw calls than the four (the grandfather clock's trunk door is a fifth), and
+    /// only a whole number of them: nothing else goes.
+    #[test]
+    fn a_model_may_allow_itself_more_draws() {
+        let allowed = |json: &str| draws_allowed(&json::loads_text(json.as_bytes()).unwrap());
+        assert_eq!(
+            allowed(r#"{"type": "model"}"#),
+            Ok(DRAWS.1),
+            "four by default"
+        );
+        assert_eq!(allowed(r#"{"draws": 5}"#), Ok(5));
+        assert_eq!(allowed(r#"{"draws": 3}"#), Ok(3));
+        assert!(allowed(r#"{"draws": 2}"#).is_err(), "fewer than the aim");
+        assert!(allowed(r#"{"draws": 9}"#).is_err(), "past the eight");
+        assert!(allowed(r#"{"draws": 4.5}"#).is_err(), "a whole number");
+        assert!(allowed(r#"{"draws": "5"}"#).is_err(), "a number");
     }
 
     #[test]

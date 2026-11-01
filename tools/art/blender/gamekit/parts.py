@@ -86,7 +86,7 @@ def turn(obj, degrees, axis='X'):
 # blocks left out in front of a toy box, the flag on a climbing frame, the block and bottle beside a rolled
 # mat. `G.aside` joins them into one node named `<what>_aside`; they are drawn and exported as usual, and
 # left out of the size (`check_size` here, `cargo check-glb`'s `model()`: docs/design/objects.md, "Scale, axes,
-origin and footprint").
+# origin and footprint").
 ASIDE = '_aside'
 
 
