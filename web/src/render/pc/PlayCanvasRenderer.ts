@@ -78,7 +78,6 @@ import { OverviewCamera } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
 import { standInOf } from '../shared/modelEntry';
 import { renderScale, watchPixelRatio } from '../shared/resolution';
-import { roadMeshes, townRoads } from '../shared/roads';
 import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
@@ -143,8 +142,6 @@ const MAX_FRAME_MS = 100;
 const HOLD_FRAMES = 2;
 /** Metres the sun's shadow square reaches past the viewed lot. */
 const SHADOW_MARGIN = 10;
-/** How far the road (and garden paths) is drawn beyond the viewed lot: the whole street. */
-const STREET_MARGIN = 500;
 /** The basement's pit (and the ground dug away over it) reaches this far past the plot (m), clear of walls on its edge. */
 const PIT_MARGIN = 0.3;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
@@ -563,6 +560,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       },
       lod: this.quality.streetLod,
       shadows: this.quality.streetShadows,
+      ground: true,
     });
     this.cars = new Cars(this.app, this.root, this.quality.streetShadows);
     this.characters.setCarSeat((x, z) => this.cars.seatAt(x, z));
@@ -1039,42 +1037,26 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   /**
-   * Roads, garden paths and farm fields from the town metadata, each a flat mesh. Those on the
-   * viewed lot (its garden paths and driveway, a farm's fields) are a mesh of their own, on its
-   * ground: hidden with it while the basement is in view.
+   * The viewed lot's garden paths, driveway and a farm's fields, each a flat mesh on its ground:
+   * hidden with it while the basement is in view. (The road and the rest of the town's are the
+   * street's, chunk by chunk: `pc/street.ts`.)
    */
   private buildStreets(world: WorldStructure): void {
-    // Only the stretch of road near the viewed lot.
-    const road = meshFrom(this.device, roadMeshes(townRoads(world), this.view, STREET_MARGIN, {}, 'surface').surface.meshData());
-    if (road) this.lotEntities.push({ entity: drawMesh(this.root, 'streets', road, this.lotMaterial('material.road')) });
     const layers: [string, { x: number; z: number; w: number; d: number }[] | undefined, string, number][] = [
       ['paths', world.meta?.paths, 'material.path', 0.014],
       ...fieldLayers(world.meta?.world?.fields, ''),
     ];
     const v = this.view;
-    const onLot = (r: { x: number; z: number; w: number; d: number }) => !!v && r.x >= v.x && r.z >= v.z && r.x + r.w <= v.x + v.w && r.z + r.d <= v.z + v.d;
+    if (!v) return;
+    const onLot = (r: { x: number; z: number; w: number; d: number }) => r.x >= v.x && r.z >= v.z && r.x + r.w <= v.x + v.w && r.z + r.d <= v.z + v.d;
     for (const [name, all, material, y] of layers) {
-      // Only the stretch of road in front of the viewed lot.
-      const rects = all?.map((r) => this.clipToView(r, STREET_MARGIN)).filter((r) => r !== null);
-      if (!rects?.length) continue;
-      for (const [list, storey] of [[rects.filter(onLot), 0], [rects.filter((r) => !onLot(r)), undefined]] as const) {
-        if (!list.length) continue;
-        const geo = new Geo();
-        for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-        const mesh = meshFrom(this.device, geo.meshData());
-        if (mesh) this.lotEntities.push({ entity: drawMesh(this.root, name, mesh, this.lotMaterial(material)), storey });
-      }
+      const list = all?.filter(onLot) ?? [];
+      if (!list.length) continue;
+      const geo = new Geo();
+      for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+      const mesh = meshFrom(this.device, geo.meshData());
+      if (mesh) this.lotEntities.push({ entity: drawMesh(this.root, name, mesh, this.lotMaterial(material)), storey: 0 });
     }
-  }
-
-  private clipToView(r: { x: number; z: number; w: number; d: number }, margin: number) {
-    const v = this.view;
-    if (!v) return r;
-    const x0 = Math.max(r.x, v.x - margin);
-    const z0 = Math.max(r.z, v.z - margin);
-    const x1 = Math.min(r.x + r.w, v.x + v.w + margin);
-    const z1 = Math.min(r.z + r.d, v.z + v.d + margin);
-    return x1 > x0 && z1 > z0 ? { x: x0, z: z0, w: x1 - x0, d: z1 - z0 } : null;
   }
 
   /** Whether a world point is inside the viewed lot (expanded by `margin`). */
