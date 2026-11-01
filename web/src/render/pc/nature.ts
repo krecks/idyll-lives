@@ -87,6 +87,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private lawn: LawnLayer<Instances>[] = [];
   /** The lawn's grass (built with the rest; none before). */
   private grass: Grass | null = null;
+  /** What the lawn was last fitted to (`refreshLawn`). */
+  private lawnInputs: LawnInputs | null = null;
   /** What `refreshLawn` last hid, for the lawn built again since (`rebuild`). */
   private lawnMask: LawnMask | null = null;
   /** Each model's plants as built, to build again when a file they were built without comes (`rebuild`). */
@@ -189,6 +191,10 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
    * the flowers (on a tile split by a diagonal wall, each follows the half it stands in) and the grass.
    */
   refreshLawn(world: WorldStructure): void {
+    // (A world message that changed nothing the lawn grows round, a focus lot shown: nothing to do.)
+    const inputs = lawnInputs(world);
+    if (this.lawnInputs && sameLawnInputs(this.lawnInputs, inputs)) return;
+    this.lawnInputs = inputs;
     this.lawnMask = lawnMask(world);
     hideLawn(this.lawn, this.lawnMask, uploadLawn);
     this.grass?.refresh(world);
@@ -751,4 +757,36 @@ export class Sky {
   destroy(): void {
     this.dome.destroy();
   }
+}
+
+/** What the lawn grows round (`lawnMask`, `bareTiles`, the grass's walls): rooms, things, walls, diagonals, floors, paths and fields. */
+interface LawnInputs {
+  width: number;
+  rooms: ArrayLike<number>;
+  things: Int32Array;
+  defs: string;
+  edges: string;
+  meta: unknown;
+}
+
+function lawnInputs(world: WorldStructure): LawnInputs {
+  const things = new Int32Array(world.objects.length * 5);
+  world.objects.forEach((o, i) => things.set([o.x, o.z, o.w, o.d, o.rot], i * 5));
+  return {
+    width: world.width,
+    rooms: world.rooms,
+    things,
+    defs: world.objects.map((o) => o.def).join(),
+    edges: JSON.stringify([world.walls.length, world.diagonals, world.floors, world.walls.map((e) => `${e.axis}${e.x},${e.z}`).join()]),
+    meta: [world.meta?.paths, world.meta?.streets, world.meta?.roads, world.meta?.world?.fields],
+  };
+}
+
+function sameLawnInputs(a: LawnInputs, b: LawnInputs): boolean {
+  if (a.width !== b.width || a.rooms.length !== b.rooms.length || a.things.length !== b.things.length || a.defs !== b.defs || a.edges !== b.edges) return false;
+  const [am, bm] = [a.meta as unknown[], b.meta as unknown[]];
+  if (am.some((v, i) => v !== bm[i] && JSON.stringify(v) !== JSON.stringify(bm[i]))) return false;
+  for (let i = 0; i < a.things.length; i++) if (a.things[i] !== b.things[i]) return false;
+  if (a.rooms !== b.rooms) for (let i = 0; i < a.rooms.length; i++) if (a.rooms[i] !== b.rooms[i]) return false;
+  return true;
 }

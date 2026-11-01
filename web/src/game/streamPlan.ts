@@ -148,14 +148,17 @@ export function gameAssetPlan(
  */
 export function streamRanks(content: Content, assets: AssetRegistry, world: Pick<WorldStructure, 'objects'>, view: Rect | null, watch: Rect | null): Map<string, number> {
   const ranks = new Map<string, number>();
+  const keys = new Map<string, string>();
   const cx = watch ? watch.x + watch.w / 2 : view ? view.x + view.w / 2 : 0;
   const cz = watch ? watch.z + watch.d / 2 : view ? view.z + view.d / 2 : 0;
+  const urls = new Map<string, string | null>();
   for (const o of world.objects) {
-    const url = modelUrl(assets, content.object(o.def)?.model ?? `model.${o.def}`);
+    let url = urls.get(o.def);
+    if (url === undefined) urls.set(o.def, (url = modelUrl(assets, content.object(o.def)?.model ?? `model.${o.def}`)));
     if (!url) continue;
     const d = Math.hypot(o.x - cx, o.z - cz) / 10_000;
     const rank = view && inView(o, view) ? 0 : watch && inView(o, watch) ? 1 + d : 2 + d;
-    const k = withoutBuild(url);
+    const k = keys.get(url) ?? keys.set(url, withoutBuild(url)).get(url)!;
     if (rank < (ranks.get(k) ?? Infinity)) ranks.set(k, rank);
   }
   return ranks;

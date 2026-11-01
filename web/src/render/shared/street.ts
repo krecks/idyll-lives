@@ -563,6 +563,7 @@ export class TownStreet {
   private openingGrid = new RectGrid<Rect & { o: Opening; i: number }>(8);
   private openingsOf: Opening[] | undefined | null = null;
   private objectsOf: ObjectPlacement[] | null = null;
+  private roomsOf: ArrayLike<number> | null = null;
   private garagesOf: WorldStructure['garages'] | null = null;
   private blocked = new RectGrid<Blocker>(4);
   private objectsByPlot = new Map<number, ObjectPlacement[]>();
@@ -658,6 +659,11 @@ export class TownStreet {
   /** Takes the world's things, houses and rooms as they are now (the layout stays: see `layoutKey`). */
   setWorld(world: WorldStructure): void {
     this.world = world;
+    // (Rooms decide which things are outdoors: another rooms array, keys worked out again.)
+    if (world.rooms !== this.roomsOf) {
+      this.roomsOf = world.rooms;
+      this.version++;
+    }
     // Doors and windows (a window put in on the focus lot): found again by where they are; each
     // plot's share notices those round its house (`plotOut`).
     if (world.openings !== this.openingsOf) {
@@ -671,8 +677,10 @@ export class TownStreet {
         grid.add({ x: o.x - 1, z: z - 1, w: 2, d: 2, o, i });
       });
       this.openingGrid = grid;
+      this.version++;
     }
     const index = new Map(world.plots.map((p, i) => [p.id, i]));
+    let relaid = false;
     const same = (a: PlotInfo, b: PlotInfo) => a.public === b.public && a.storeys === b.storeys && String(a.house) === String(b.house) && String(a.roof) === String(b.roof);
     this.plots.forEach((L) => {
       const i = index.get(L.info.id);
@@ -685,9 +693,11 @@ export class TownStreet {
       // A house built, grown or re-roofed: laid out again (its place and its paths are the layout's).
       const fresh = layout({ ...world, plots: [info] } as WorldStructure, (world.meta?.streets ?? []).filter((s) => s.w >= s.d), this.paths, world.meta?.facing?.[i!])[0];
       if (fresh) Object.assign(L, { info: fresh.info, house: fresh.house, plot: fresh.plot, base: fresh.base, kind: fresh.base });
+      relaid = true;
     });
     // (The same things, the same garages: their grid stands.)
-    if (world.objects === this.objectsOf && world.garages === this.garagesOf && this.blocked) return;
+    if (!relaid && world.objects === this.objectsOf && world.garages === this.garagesOf) return;
+    this.version++;
     this.objectsOf = world.objects;
     this.garagesOf = world.garages;
     const blocked = new RectGrid<Blocker>(4);
@@ -1334,8 +1344,17 @@ export class TownStreet {
 
   /** What chunk `id` is planned from with lot `focus` in view (`ChunkPlan.key`), without planning it. */
   chunkKey(id: number, focus: number): string {
-    return this.gather(id, focus).key;
+    // (Kept until the world changes what the street stands among: `setWorld` moves `version` on.)
+    const memo = `${id}|${focus}`;
+    const known = this.keys.get(memo);
+    if (known && known.version === this.version) return known.key;
+    const key = this.gather(id, focus).key;
+    this.keys.set(memo, { version: this.version, key });
+    return key;
   }
+  private readonly keys = new Map<string, { version: number; key: string }>();
+  /** Moved on whenever `setWorld` takes a world that changes anything the street is planned from. */
+  private version = 0;
 
   private gather(id: number, focus: number): { key: string; plots: PlotOut[]; kerbs: Parts[]; fields: Parts[]; ground: GroundLayer[] } {
     const keys: string[] = [];
