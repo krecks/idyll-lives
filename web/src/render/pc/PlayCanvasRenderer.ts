@@ -1021,6 +1021,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   // --- the world -----------------------------------------------------------------------
 
   setWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
+    // A big world is never built whole in full detail (no view: every house's storeys and every
+    // thing, hundreds of MB of buffers; Low's merged object shadows alone 260 MB, which lost the
+    // WebGPU device): with no lot given, the focus stays the lot built, else the one nearest the camera.
+    if (!view && world.meta?.world?.size === 'big') view = this.view ?? this.nearestLot(world);
     if (this.rebuildNext) this.rebuildNext = false;
     else if (this.patchable(world, view)) {
       this.patchWorld(world);
@@ -1029,6 +1033,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lastWorld = world;
     this.nextWorld = { world, view };
     return (this.worldBuilds ??= this.buildWorlds());
+  }
+
+  /** The lot nearest the camera's target (before the camera is placed: the main town's middle), as a view; null without lots. */
+  private nearestLot(world: WorldStructure): ViewRect | null {
+    const main = world.meta?.areas?.[0];
+    const [x, z] = this.cameraPlaced ? [this.orbit.target.x, this.orbit.target.z] : main ? [main.x + main.w / 2, main.z + main.d / 2] : [world.width / 2, groundDepth(world) / 2];
+    const p = plotNear(world, x, z, Infinity);
+    return p && { x: p.x, z: p.z, w: p.w, d: p.d };
   }
 
   /**
