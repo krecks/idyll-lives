@@ -1027,20 +1027,22 @@ impl NavLog {
     /// Whether a change after version `seen`, up to `now`, may touch tiles `[x0, z0, x1, z1)`:
     /// one does, or the log doesn't go back that far (then any might).
     pub fn changed_since(&self, seen: u32, now: u32, rect: [i32; 4]) -> bool {
+        self.changes_since(seen, now)
+            .is_none_or(|mut changes| changes.any(|r| overlaps(r, rect)))
+    }
+
+    /// The tiles each change after version `seen`, up to `now`, touched; None if the log doesn't
+    /// go back that far (any tile may have changed).
+    pub fn changes_since(&self, seen: u32, now: u32) -> Option<impl Iterator<Item = [i32; 4]>> {
         let since = now.wrapping_sub(seen);
-        if since == 0 {
-            return false;
-        }
-        let mut found = 0;
-        for &(v, r) in &self.entries {
-            if now.wrapping_sub(v) < since {
-                found += 1;
-                if overlaps(r, rect) {
-                    return true;
-                }
-            }
-        }
-        found < since
+        let after = move |v: u32| now.wrapping_sub(v) < since;
+        let found = self.entries.iter().filter(|&&(v, _)| after(v)).count();
+        (found as u32 >= since).then(|| {
+            self.entries
+                .iter()
+                .filter(move |&&(v, _)| after(v))
+                .map(|&(_, r)| r)
+        })
     }
 }
 

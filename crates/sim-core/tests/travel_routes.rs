@@ -4,6 +4,7 @@
 mod common;
 
 use common::hamlets::{Hamlets, two_hamlets};
+use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind};
 use sim_core::world::Phase;
 use sim_core::{Command, World};
 
@@ -162,12 +163,11 @@ fn short_trips_are_found_over_the_tiles_as_before() {
     assert!(route.len() <= smooth.len() + 1, "{route:?} vs {smooth:?}");
 }
 
-/// Pending sim-grid's `nav_changed_in`: until the town records where it changed, any change
-/// re-routes everyone on their way (`world::route_touched`).
+/// The town records where walking changed (`World::nav_changed_since`, a build by the tiles it
+/// was on): a walker whose way lies far from it keeps their way (`world::route_touched`), even
+/// with the change inside the box round the rest of the trip, in a back garden it passes by.
 #[test]
-#[ignore = "needs nav_changed_in (feat/open-world-sim-grid)"]
 fn a_far_away_change_does_not_reroute() {
-    use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind};
     let (mut w, h) = world();
     let i = 0;
     let goal_plot = h.plots[1].clone().find(|&p| !w.plots[p].public).unwrap() as u32;
@@ -188,29 +188,54 @@ fn a_far_away_change_does_not_reroute() {
     };
     let (before, at) = (waypoints(&w, i), next(&w));
     assert!(at > 0);
-    // A wall far from their way: across the back garden of the other hamlet's last house, by its
-    // household.
+    let ahead = &before[at..];
+    let pos = w.sims[i].pos;
+    let lo = |k: usize| ahead.iter().map(|q| q[k]).fold(pos[k], f32::min);
+    let hi = |k: usize| ahead.iter().map(|q| q[k]).fold(pos[k], f32::max);
+    // A wall across the back garden of a house in their own hamlet that they're still to pass
+    // (on the street's far side from it), and one in the other hamlet's last house.
+    let behind_the_street = h.plots[0]
+        .clone()
+        .find(|&p| {
+            let p = &w.plots[p];
+            !p.public && p.z as f32 > h.streets[0].0 as f32 && (p.x as f32) > pos[0] + 10.0
+        })
+        .expect("a house on the street's south side ahead of them")
+        as u32;
     let last = h.plots[1]
         .clone()
         .rev()
         .find(|&p| !w.plots[p].public)
         .unwrap() as u32;
-    let household = w
-        .households
-        .iter()
-        .find(|hh| hh.plot == Some(last))
-        .unwrap()
-        .id;
-    let p = w.plots[last as usize].clone();
-    w.apply(Command::Build {
-        household,
-        edits: (0..3)
-            .map(|k| EdgeEdit::new(EdgeAxis::V, p.x + 2, p.z + 1 + k, EdgeKind::Wall))
-            .collect(),
-    })
-    .unwrap();
-    w.tick_once();
-    // Not routed again from where they are (that starts a new list of waypoints).
-    assert_eq!(waypoints(&w, i), before, "re-routed for a wall far away");
-    assert!(next(&w) >= at, "re-routed for a wall far away");
+    for plot in [behind_the_street, last] {
+        let p = w.plots[plot as usize].clone();
+        let (x, z) = (p.x + 2, p.z + p.d - 4);
+        if plot == behind_the_street {
+            let inside = (x as f32) > lo(0) && (x as f32) < hi(0);
+            let inside = inside && (z as f32) > lo(1) && (z as f32) < hi(1);
+            assert!(inside, "the wall at {x}, {z} is inside the trip's box");
+        }
+        let household = w
+            .households
+            .iter()
+            .find(|hh| hh.plot == Some(plot))
+            .unwrap()
+            .id;
+        w.apply(Command::Build {
+            household,
+            edits: (0..3)
+                .map(|k| EdgeEdit::new(EdgeAxis::V, x, z + k, EdgeKind::Wall))
+                .collect(),
+        })
+        .unwrap_or_else(|e| panic!("a wall on {}: {e}", p.name));
+        w.tick_once();
+        // Not routed again from where they are (that starts a new list of waypoints).
+        assert_eq!(
+            waypoints(&w, i),
+            before,
+            "re-routed for a wall on {}",
+            p.name
+        );
+        assert!(next(&w) >= at, "re-routed for a wall on {}", p.name);
+    }
 }

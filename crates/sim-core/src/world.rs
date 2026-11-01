@@ -3551,6 +3551,30 @@ impl World {
         self.nav_changed_in(rect);
     }
 
+    /// Notes that walls, doors, windows, fences or diagonals were built or taken down on plot
+    /// `plot`, on the grid lines round tiles `edits` (`[x0, z0, x1, z1)`, stacked rows): as
+    /// `objects_changed_in` there, and over the plot on every block of rows past the ground's (its
+    /// rooms say where there's floor above them), so the walkable regions are labelled again only
+    /// there and walkers whose way doesn't pass it keep their way.
+    pub(crate) fn walls_changed_on(&mut self, plot: u32, edits: [i32; 4]) {
+        let Some(p) = self.plots.get(plot as usize) else {
+            self.nav_changed();
+            return;
+        };
+        let (x0, z0, x1, z1) = (p.x - 1, p.z - 1, p.x + p.w + 1, p.z + p.d + 1);
+        let ground = if self.stairs.depth > 0 {
+            self.stairs.depth
+        } else {
+            self.lot.depth as i32
+        };
+        let blocks = (self.lot.depth as i32 / ground.max(1)).max(1);
+        self.objects_changed_in(edits);
+        for b in 1..blocks {
+            let dz = b * ground;
+            self.nav_changed_in([x0, z0 + dz, x1, z1 + dz]);
+        }
+    }
+
     /// Notes that walking changed within tiles `[x0, z0, x1, z1)` only (a car parked): the
     /// walkable regions are labelled again there, and walkers whose way goes near it find their
     /// way again (`nav_changed_since`). Views and the objects' indexes don't follow it.
@@ -5097,28 +5121,36 @@ pub(crate) fn practise(
     }
 }
 
-/// The tiles `[x0, z0, x1, z1)` round the rest of a walker's way (where they stand and the
-/// waypoints still ahead, a tile round), if they're on their way somewhere.
-fn route_rect(sim: &Sim) -> Option<[i32; 4]> {
-    let Phase::Routing { waypoints, next } = &sim.current.as_ref()?.phase else {
-        return None;
+/// Whether a change to walking since they last looked (`Sim::nav_seen`, `World::nav_log`) may
+/// lie across the rest of a walker's way: a tile round any stretch of it still ahead (from where
+/// they stand to the next waypoint, and on between the waypoints), so a long walk by road isn't
+/// planned again for a change far off it, even inside the box round all of it. Not walking:
+/// true (nothing to keep).
+fn route_touched(sim: &Sim, ctx: &Ctx) -> bool {
+    let Some(Activity {
+        phase: Phase::Routing { waypoints, next },
+        ..
+    }) = sim.current.as_ref()
+    else {
+        return true;
     };
-    let ahead = waypoints.get(next.saturating_sub(1)..).unwrap_or_default();
-    let mut r = [sim.pos[0], sim.pos[1], sim.pos[0], sim.pos[1]];
-    for p in ahead {
-        r = [
-            r[0].min(p[0]),
-            r[1].min(p[1]),
-            r[2].max(p[0]),
-            r[3].max(p[1]),
-        ];
-    }
-    Some([
-        r[0].floor() as i32 - 1,
-        r[1].floor() as i32 - 1,
-        r[2].floor() as i32 + 2,
-        r[3].floor() as i32 + 2,
-    ])
+    let Some(changes) = ctx.nav_log.changes_since(sim.nav_seen, ctx.nav_version) else {
+        return true;
+    };
+    let changes: Vec<[i32; 4]> = changes.collect();
+    let ahead = waypoints.get(*next..).unwrap_or_default();
+    std::iter::once(&sim.pos)
+        .chain(ahead)
+        .zip(ahead)
+        .any(|(a, b)| {
+            let r = [
+                a[0].min(b[0]).floor() as i32 - 1,
+                a[1].min(b[1]).floor() as i32 - 1,
+                a[0].max(b[0]).floor() as i32 + 2,
+                a[1].max(b[1]).floor() as i32 + 2,
+            ];
+            changes.iter().any(|&c| crate::path::overlaps(c, r))
+        })
 }
 
 /// A wall or something they walk through moved while they were on their way: their waypoints
@@ -5222,8 +5254,7 @@ fn step_sim(
     // door opened.
     if sim.nav_seen != ctx.nav_version {
         // (Only if a change since may touch the way they're going.)
-        let near = route_rect(sim)
-            .is_none_or(|r| ctx.nav_log.changed_since(sim.nav_seen, ctx.nav_version, r));
+        let near = route_touched(sim, ctx);
         sim.nav_seen = ctx.nav_version;
         if near {
             reroute_after_change(sim, ctx, objects);

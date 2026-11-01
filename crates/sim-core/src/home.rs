@@ -1451,7 +1451,23 @@ impl World {
             return Err(e);
         }
         self.pay(h, cost);
-        self.nav_changed();
+        // The tiles either side of every edge built on (a diagonal's own tile), and upstairs the
+        // plot (its rooms say where there's floor).
+        let rect = edits
+            .iter()
+            .fold([i32::MAX, i32::MAX, i32::MIN, i32::MIN], |r, e| {
+                [
+                    r[0].min(e.x - 1),
+                    r[1].min(e.z - 1),
+                    r[2].max(e.x + 2),
+                    r[3].max(e.z + 2),
+                ]
+            });
+        if edits.is_empty() {
+            self.nav_changed();
+        } else {
+            self.walls_changed_on(plot, rect);
+        }
         self.rooms_layout_changed();
         Ok(())
     }
