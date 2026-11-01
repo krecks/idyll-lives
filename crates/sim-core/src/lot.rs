@@ -577,19 +577,15 @@ impl TownPlan {
 
     /// Fills in what a town or save from before these fields lacks, from what it has: the roads
     /// from `meta.roads` (or the straight `meta.streets` of older towns, by their middle lines),
-    /// one hamlet over the whole town (`ground` rows deep), the exits as roads out, and a size
-    /// from the town's: past 256 m it's `big`, else `cosy` (sizes came with these fields).
+    /// one hamlet over the whole town (`ground` rows deep) and the exits as roads out. The size
+    /// stays as given: a town or save without one is `cosy` (and plays as it always did).
     pub fn fill_in(
         &mut self,
         meta: &serde_json::Value,
         exits: &[[f32; 2]],
         width: usize,
         ground: usize,
-        had_size: bool,
     ) {
-        if !had_size && (width > 256 || ground > 256) {
-            self.size = WorldSize::Big;
-        }
         if self.roads.is_empty() {
             if let Some(roads) = meta.get("roads").and_then(|r| r.as_array()) {
                 self.roads = roads

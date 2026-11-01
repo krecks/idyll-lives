@@ -69,7 +69,7 @@
 //! that aren't as new (no `chemistry` of their own), and the town's open-world fields are kept
 //! (`town`: size, roads, areas, typed exits, terrain masks, parking, plots' areas and kinds,
 //! driveways' roads; absent: made up from the meta's roads or streets, one hamlet over the town,
-//! and a size from its own)
+//! and size `cosy`)
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -1071,10 +1071,9 @@ impl World {
         } else {
             save.lot.depth
         };
-        let had_size = save.town.is_some();
         world
             .town
-            .fill_in(&save.meta, &world.exits, save.lot.width, ground, had_size);
+            .fill_in(&save.meta, &world.exits, save.lot.width, ground);
         world.plots = save
             .plots
             .iter()

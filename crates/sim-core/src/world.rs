@@ -1918,7 +1918,6 @@ impl World {
             &world.exits,
             lot_file.width as usize,
             lot_file.depth as usize,
-            lot_file.size.is_some(),
         );
         world.plots = lot_file
             .plots

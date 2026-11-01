@@ -1060,7 +1060,18 @@ impl SearchStats {
         self.searches += 1;
         self.nodes += nodes;
         self.max_nodes = self.max_nodes.max(nodes);
+        NODES.set(NODES.get() + nodes);
     }
+}
+
+thread_local! {
+    static NODES: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Tiles every search on this thread has expanded so far (never reset): for a budget per tick,
+/// read it before and after (`find_path_with` counts its capped, corridor and full passes).
+pub fn nodes_searched() -> u64 {
+    NODES.get()
 }
 
 /// The search costs on this thread since the last call (and starts counting again).
@@ -1529,10 +1540,16 @@ mod tests {
             stairs: &NO_STAIRS,
         };
         take_search_stats();
+        let before = nodes_searched();
         let path = nav.find_path((100, 10), (300, 10)).expect("round the end");
         assert_walkable(&nav, &path);
         assert!(path.iter().any(|&(_, z)| z >= 396), "through the gap");
         let stats = take_search_stats();
+        assert_eq!(
+            nodes_searched() - before,
+            stats.nodes,
+            "the budget counter follows"
+        );
         assert!(
             stats.searches >= 2,
             "capped, then kept to a corridor: {stats:?}"
