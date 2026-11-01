@@ -448,6 +448,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private focusLotListener: ((plot: number) => boolean) | null = null;
   /** The lot (index) the roaming camera settled on last and the game took (it is not framed: `buildSims`). */
   private roamedTo: number | null = null;
+  /** When the roaming camera's last focus lot was taken, and how long each took to be built in full (ms; the bench reads them). */
+  private focusAsked: { plot: number; at: number } | null = null;
+  private readonly focusSwitches: number[] = [];
   private watchListener: ((rect: [number, number, number, number]) => void) | null = null;
   /** The street building the chunks streamed in, between world builds; another stream change waits for it. */
   private streaming: Promise<void> | null = null;
@@ -876,7 +879,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const fovH = 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect);
     const changed = this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha: o.alpha, fovH }, performance.now(), (x, z, reach) => plotNear(world, x, z, reach), (plot) => {
       const taken = !!this.focusLotListener?.(plot.id);
-      if (taken) this.roamedTo = plot.id;
+      if (taken) {
+        this.roamedTo = plot.id;
+        this.focusAsked = { plot: plot.id, at: performance.now() };
+      }
       return taken;
     });
     if (!changed) return;
@@ -1183,6 +1189,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.applyStoreys();
     void this.birdLife.settle(world, view, this.fixedHour !== null ? this.fixedHour * 60 : this.lastMinute, { landscape: this.lot.landscape, street: this.street.plants, roofs: this.roofs, houseTop: (plot) => this.house.roofTop(plot) }); // (where the birds live.)
     this.lastLightMinute = -1;
+    // A focus lot the roaming camera settled on, now drawn in full.
+    const asked = this.focusAsked;
+    const p = asked && world.plots[asked.plot];
+    if (asked && p && view && p.x === view.x && p.z === view.z) {
+      this.focusSwitches.push(performance.now() - asked.at);
+      if (this.focusSwitches.length > 100) this.focusSwitches.shift();
+      this.focusAsked = null;
+    }
     if (this.debug) console.info(`[render] setWorld ${(performance.now() - started).toFixed(1)} ms${lotBuilt ? '' : ' (lot kept)'}`);
   }
 
@@ -2464,6 +2478,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // The town drawn (the bench's roam loops over it) and the street's chunks.
       world: this.builtWorld ? { width: this.builtWorld.width, depth: groundDepth(this.builtWorld), size: this.builtWorld.meta?.world?.size ?? 'cosy' } : undefined,
       street: this.street.stats(),
+      focusSwitches: [...this.focusSwitches],
       scene: {
         ...scene,
         textures: d.textures.size,

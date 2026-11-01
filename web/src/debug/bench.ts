@@ -52,9 +52,10 @@ const MIRROR_PATH = { distance: 4.4, radius: 6, beta: 0.8, turn: -0.4, swing: 0.
 /**
  * `cam=roam`: the camera's target along a loop over the town at `ROAM.speed` m/s (an ellipse
  * through the home lot, inset from the edge), looking the way it goes from `radius` m up and
- * behind: the street streams in ahead and the focus lot changes as it goes.
+ * behind: the street streams in ahead. It stops for `hold` s every `every` s, so the lot it stops
+ * over becomes the focus (built in full) while it waits, and it moves on.
  */
-const ROAM = { speed: 12, radius: 30, beta: 0.95, inset: 30 };
+const ROAM = { speed: 12, radius: 30, beta: 0.95, inset: 30, every: 8, hold: 2 };
 
 function roamPose(t: number, b: { x0: number; z0: number; x1: number; z1: number; from: [number, number, number] }): { alpha: number; beta: number; radius: number; target: [number, number, number] } {
   const cx = (b.x0 + b.x1) / 2;
@@ -63,7 +64,8 @@ function roamPose(t: number, b: { x0: number; z0: number; x1: number; z1: number
   const c = Math.max(20, (b.z1 - b.z0) / 2 - ROAM.inset);
   // Starting where the home lot is round the loop; at about `speed` m/s along it (the ellipse's mean radius).
   const start = Math.atan2((b.from[2] - cz) / c, (b.from[0] - cx) / a);
-  const th = start + (ROAM.speed * t) / ((a + c) / 2);
+  const moving = Math.floor(t / ROAM.every) * (ROAM.every - ROAM.hold) + Math.min(t % ROAM.every, ROAM.every - ROAM.hold);
+  const th = start + (ROAM.speed * moving) / ((a + c) / 2);
   const x = cx + a * Math.cos(th);
   const z = cz + c * Math.sin(th);
   // Heading along the loop; the eye behind it (the arc camera's eye is at target + (cos α, sin α) · …).
@@ -115,6 +117,8 @@ export interface BenchResult {
   /** Reflections drawn a second (all mirrors). */
   reflectionsPerSecond: number;
   longTasks: { count: number; maxMs: number; totalMs: number };
+  /** Frames that took longer than two at 60 Hz (33 ms between them). */
+  over33?: number;
   render: Record<string, unknown>;
   /**
    * Scene counts at the start (meshes, materials, shadow casters and their triangles, plant instances,
@@ -313,7 +317,8 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
       lightingPerSecond: ((end.scene as { lightingUpdates: number }).lightingUpdates - lighting0) / secs,
       reflectionsPerSecond: ((end.scene as { mirrorDraws: number }).mirrorDraws - reflections0) / secs,
       longTasks: { count: long.length, maxMs: Math.max(0, ...long), totalMs: long.reduce((a, x) => a + x, 0) },
-      render: { ...info, end: end.scene },
+      over33: intervals.filter((ms) => ms > 33.4).length,
+      render: { ...info, end: end.scene, endStreet: end.street, focusSwitches: end.focusSwitches },
       fingerprint,
     };
   } finally {
