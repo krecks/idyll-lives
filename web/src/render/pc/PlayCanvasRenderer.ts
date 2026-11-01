@@ -2523,6 +2523,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       world: this.builtWorld ? { width: this.builtWorld.width, depth: groundDepth(this.builtWorld), size: this.builtWorld.meta?.world?.size ?? 'cosy', areas: this.builtWorld.meta?.areas?.map((a) => [a.x + a.w / 2, a.z + a.d / 2]) } : undefined,
       street: this.street.stats(),
       focusSwitches: [...this.focusSwitches],
+      // What is being built now (the bench notes it at each slow frame): a world (a focus lot), the street streaming, both or nothing.
+      building: [this.worldBuilding ? 'world' : '', this.streaming ? 'stream' : ''].filter(Boolean).join('+'),
       scene: {
         ...scene,
         textures: d.textures.size,

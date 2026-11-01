@@ -131,6 +131,8 @@ export interface BenchResult {
   longTasks: { count: number; maxMs: number; totalMs: number };
   /** Frames that took longer than two at 60 Hz (33 ms between them). */
   over33?: number;
+  /** Those frames: when (s into the measurement), how long (ms), and what the renderer was building then. */
+  slow?: { at: number; ms: number; building: string }[];
   render: Record<string, unknown>;
   /**
    * Scene counts at the start (meshes, materials, shadow casters and their triangles, plant instances,
@@ -286,11 +288,14 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
       : null;
     observer?.observe({ type: 'longtask' });
     let last = 0;
+    const slow: { at: number; ms: number; building: string }[] = [];
     let rafCount = 0;
     let stop = false;
     const raf = (time: number) => {
       if (stop) return;
       if (last) intervals.push(time - last);
+      // (When the slow ones came, s into the measurement, and what the frame's build was then: `slow`.)
+      if (last && time - last > 33.4) slow.push({ at: Math.round(time - started) / 1000, ms: Math.round(time - last), building: renderer.benchInfo().building as string });
       last = time;
       rafCount++;
       requestAnimationFrame(raf);
@@ -330,6 +335,7 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
       reflectionsPerSecond: ((end.scene as { mirrorDraws: number }).mirrorDraws - reflections0) / secs,
       longTasks: { count: long.length, maxMs: Math.max(0, ...long), totalMs: long.reduce((a, x) => a + x, 0) },
       over33: intervals.filter((ms) => ms > 33.4).length,
+      slow,
       render: { ...info, end: end.scene, endStreet: end.street, focusSwitches: end.focusSwitches },
       fingerprint,
     };
