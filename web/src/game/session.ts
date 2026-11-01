@@ -14,6 +14,7 @@ import { townMap } from '../ui/townMap.svelte';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
 import { tileWorld } from '../debug/tileWorld';
+import { benchBigWorld } from '../debug/bigTown';
 import { recentLog } from '../debug/log';
 import { deliverReport, gpuInfo, takePendingPose, within, type DebugReport } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
@@ -247,6 +248,9 @@ export async function startSession(
   let lastSpeed = 1;
   let focused = false;
   let viewPlot: number | null = null;
+  // `?bench=bigworld`: a real Big world for the renderer, made in the page, and its focus lot.
+  const benchBig = BENCH?.big ? benchBigWorld(content, assets, BENCH.big) : null;
+  let benchView: { x: number; z: number; w: number; d: number } | null = null;
   let lastEvent = -1;
   /** Whether the first update's story (the history, empty in a new game) has been seen. */
   let storySeen = false;
@@ -1105,6 +1109,7 @@ export async function startSession(
       const buildSpan = perfStart('session: renderer setWorld');
       try {
         // (`?bench=bigworld`: the town tiled for the renderer, a big world: `debug/tileWorld.ts`.)
+        if (benchBig) return await renderer.setWorld(await benchBig, benchView);
         return await renderer.setWorld(BENCH && BENCH.tile > 1 ? tileWorld(w, BENCH.tile) : w, view);
       } finally {
         perfEnd(buildSpan);
@@ -1193,6 +1198,16 @@ export async function startSession(
   // The roaming camera settles on a lot: it is shown in full, the camera left where it is (in live
   // mode, not following anyone; build mode keeps the lot it builds on).
   renderer.onFocusLot((lot) => {
+    // (The bench's real big world: its own focus, drawn at once: `debug/bigTown.ts`.)
+    if (benchBig) {
+      void benchBig.then((big) => {
+        const p = big.plots[lot];
+        if (!p) return;
+        benchView = { x: p.x, z: p.z, w: p.w, d: p.d };
+        return renderer.setWorld(big, benchView);
+      });
+      return true;
+    }
     // (The bench's tiled big world: a copy's lot is the town's own, `debug/tileWorld.ts`.)
     const plot = BENCH && BENCH.tile > 1 && world ? lot % world.plots.length : lot;
     if (game.mode !== 'live' || game.follow !== null || director.active || !world?.plots[plot]) return false;

@@ -16,10 +16,12 @@ export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwo
 export type BenchDiag = (typeof BENCH_DIAGS)[number];
 
 export interface BenchFlags {
-  /** `public/bench/<scene>.json.gz`: the game state to play (`bigworld`: the village's, tiled 5 × 5: `tile`). */
+  /** `public/bench/<scene>.json.gz`: the game state to play (`bigworld`: the village's, with a real Big world drawn: `big`). */
   scene: string;
   /** The scene's town laid out `tile × tile` times for the renderer, as a big world (`debug/tileWorld.ts`); 1: as it is. */
   tile: number;
+  /** A real Big world of this kind for the renderer (`debug/bigTown.ts`; `bench=bigworld`: `big=` or 'small'); null: the scene's town. */
+  big: string | null;
   /** `?quality=` (the presets in `render/quality.ts`; the renderer reads it itself). */
   quality: 'low' | 'medium' | 'high' | null;
   /** `?hour=`: the lighting held at that hour (the renderer reads it itself); null: the game's clock. */
@@ -72,7 +74,8 @@ function parse(): BenchFlags | null {
   const frozen = diag.has('freeze');
   return {
     scene,
-    tile: num('tile', scene === 'bigworld' ? 5 : 1, 1, 6),
+    tile: num('tile', 1, 1, 6),
+    big: scene === 'bigworld' ? (params.get('big') ?? 'small') : params.get('big'),
     quality: quality === 'low' || quality === 'medium' || quality === 'high' ? quality : null,
     hour: params.has('hour') && Number.isFinite(Number(params.get('hour'))) ? Number(params.get('hour')) : null,
     cam: camera,
