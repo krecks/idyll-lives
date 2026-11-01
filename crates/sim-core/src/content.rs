@@ -1722,7 +1722,30 @@ pub struct Content {
     /// How dirty washing piles up (content `laundry`; None: it never does, and nothing works
     /// on it).
     pub laundry: Option<LaundryRules>,
+    /// How cars drive (content `cars`; see `cars.rs`, `travel.rs`).
+    pub cars: CarRules,
     object_index: HashMap<String, usize>,
+}
+
+/// How cars drive (content `cars`).
+#[derive(Debug, Clone)]
+pub struct CarRules {
+    /// Top speed on country roads (m/s at 1×; `countrySpeed`, default 16).
+    pub country_speed: f32,
+}
+
+impl Default for CarRules {
+    fn default() -> Self {
+        Self {
+            country_speed: crate::travel::COUNTRY_SPEED,
+        }
+    }
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct CarsRaw {
+    country_speed: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -1823,6 +1846,8 @@ struct ContentFile {
     service: Option<crate::staff::ServiceRaw>,
     #[serde(default)]
     laundry: Option<LaundryRaw>,
+    #[serde(default)]
+    cars: CarsRaw,
 }
 
 #[derive(Deserialize)]
@@ -4797,6 +4822,17 @@ impl Content {
             phone,
             service,
             laundry,
+            cars: CarRules {
+                country_speed: match raw.cars.country_speed {
+                    Some(v) if v.is_finite() && v > 0.0 => v.min(60.0),
+                    Some(v) => {
+                        return Err(Error::new(format!(
+                            "cars.countrySpeed: {v} must be a positive number"
+                        )));
+                    }
+                    None => crate::travel::COUNTRY_SPEED,
+                },
+            },
             object_index,
         })
     }

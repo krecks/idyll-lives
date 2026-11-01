@@ -1681,6 +1681,8 @@ pub struct World {
     work: Vec<u8>,
     /// Where Sims leave town for work.
     pub exits: Vec<[f32; 2]>,
+    /// The road network, bus stops and the town file's other open-world fields (`travel.rs`).
+    pub travel: crate::travel::Travel,
     /// Households' cars (see `cars.rs`), and every house's driveway (where a car goes when its
     /// household moves).
     pub cars: Vec<crate::cars::Car>,
@@ -1849,7 +1851,7 @@ impl World {
         world.mode = lot_file.mode;
         world.lifespan = lot_file.lifespan;
         world.meta = lot_file.meta.clone();
-        world.exits = lot_file.exits.clone();
+        world.exits = lot_file.exits.iter().map(|e| e.point()).collect();
         world.plots = lot_file
             .plots
             .iter()
@@ -1909,6 +1911,20 @@ impl World {
                 h.name
             )));
         }
+        // The road network and the town's other open-world fields (`travel.rs`).
+        let mut open_world = lot_file.open_world.clone();
+        open_world.stops = (0..lot_file.exits.len() as u32)
+            .filter(|&i| lot_file.exits[i as usize].kind() == crate::travel::ExitKind::Stop)
+            .collect();
+        if lot_file
+            .plots
+            .iter()
+            .any(|p| p.area.is_some() || p.kind.is_some())
+        {
+            open_world.plot_areas = lot_file.plots.iter().map(|p| p.area).collect();
+            open_world.plot_kinds = lot_file.plots.iter().map(|p| p.kind).collect();
+        }
+        world.set_travel(open_world);
         for p in &lot_file.objects {
             let def = world
                 .content
@@ -2006,6 +2022,7 @@ impl World {
             claimants_cache: Vec::new(),
             work: Vec::new(),
             exits: Vec::new(),
+            travel: Default::default(),
             cars: Vec::new(),
             drives: Vec::new(),
             garages: Vec::new(),
@@ -2036,6 +2053,14 @@ impl World {
             while_lit: Vec::new(),
             staff: Default::default(),
         }
+    }
+
+    /// The road network and the rest of the travel state from the town file's open-world
+    /// fields (on load too: the graph isn't saved).
+    pub(crate) fn set_travel(&mut self, file: crate::travel::OpenWorld) {
+        let mut travel = crate::travel::Travel::new(file, &self.meta, self.exits.len());
+        travel.country_speed = self.content.cars.country_speed;
+        self.travel = travel;
     }
 
     /// Bumped whenever walls or objects change, so renderers know to rebuild.

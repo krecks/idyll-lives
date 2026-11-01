@@ -146,6 +146,10 @@ pub struct SaveFile {
     pub drives: Vec<crate::cars::Drive>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub garages: Vec<crate::cars::Garage>,
+    /// The town file's open-world fields (`travel::OpenWorld`): roads, areas, terrain, parking,
+    /// which exits are bus stops, plots' areas and kinds (absent: none).
+    #[serde(default, skip_serializing_if = "crate::travel::OpenWorld::is_empty")]
+    pub open_world: crate::travel::OpenWorld,
 }
 
 /// Food or a dish somewhere, by content id (unknown ones are dropped on load).
@@ -965,6 +969,20 @@ impl World {
             cars: self.cars.clone(),
             drives: self.drives.clone(),
             garages: self.garages.clone(),
+            open_world: {
+                let mut file = self.travel.file.clone();
+                // (Indices into the exits as saved: those that are numbers.)
+                file.stops = self
+                    .exits
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, e)| e.iter().all(|v| v.is_finite()))
+                    .enumerate()
+                    .filter(|&(_, (i, _))| self.travel.is_stop(i))
+                    .map(|(k, _)| k as u32)
+                    .collect();
+                file
+            },
             items: self
                 .items
                 .list
@@ -1044,6 +1062,7 @@ impl World {
         world.player_moves = save.player_moves.unwrap_or(true);
         world.meta = save.meta.clone();
         world.exits = save.exits.clone();
+        world.set_travel(save.open_world.clone());
         world.plots = save
             .plots
             .iter()

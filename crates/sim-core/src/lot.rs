@@ -191,9 +191,10 @@ pub struct LotFile {
     /// Starting relationships between Sims (indices into `sims`).
     #[serde(default)]
     pub relationships: Vec<BondRaw>,
-    /// Where Sims leave town (for work) and come back. Optional.
+    /// Where Sims leave town (for work) and come back. Optional. `[x, z]`, or (open-world towns)
+    /// `{ x, z, kind }` with `kind` `road` or `stop` (`travel::ExitRaw`).
     #[serde(default)]
-    pub exits: Vec<[f32; 2]>,
+    pub exits: Vec<crate::travel::ExitRaw>,
     /// Households' cars on their driveways (`cars.rs`). Optional.
     #[serde(default)]
     pub cars: Vec<crate::cars::CarRaw>,
@@ -206,6 +207,10 @@ pub struct LotFile {
     /// Opaque data for the presentation layer (streets, scenery seed...). Saved unchanged.
     #[serde(default)]
     pub meta: serde_json::Value,
+    // ---- Open world (sim-travel; docs/design/open-world.md) -------------------------------
+    /// `size`, `roads`, `areas`, `terrain` and `parking` (`travel.rs`). All optional.
+    #[serde(flatten)]
+    pub open_world: crate::travel::OpenWorld,
 }
 
 #[derive(Debug, Deserialize)]
@@ -220,6 +225,12 @@ pub struct PlotRaw {
     /// Where visitors arrive (in front of the door).
     #[serde(default)]
     pub entry: Option<[f32; 2]>,
+    // ---- Open world (sim-travel) ----
+    /// The area (`areas` index) it is in, and what kind of plot it is.
+    #[serde(default)]
+    pub area: Option<u32>,
+    #[serde(default)]
+    pub kind: Option<crate::travel::PlotKind>,
 }
 
 #[derive(Debug, Deserialize)]
