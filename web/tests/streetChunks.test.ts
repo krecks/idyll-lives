@@ -109,6 +109,21 @@ describe('the street in chunks', async () => {
     expect(without.props.pos.length).toBeLessThan(withIt.props.pos.length);
   });
 
+  test('far off, a chunk’s houses are boxes with roofs, the focus lot’s left out', () => {
+    const world = town(objects);
+    const street = new TownStreet(new HousePlanner(), world, options, 'game');
+    const id = chunkAt(world.plots[4].x + 10, 10);
+    const all = street.farChunk(id, NO_FOCUS)!;
+    const without = street.farChunk(id, 4)!;
+    expect(all.geo.pos.length).toBeGreaterThan(0);
+    expect(without.geo.pos.length).toBeLessThan(all.geo.pos.length);
+    // (Kept: asked again, the same.)
+    expect(street.farChunk(id, NO_FOCUS)!.key).toBe(all.key);
+    // A box and a roof: a few dozen triangles a house, not a silhouette's hundreds.
+    const houses = world.plots.filter((p) => p.house && chunkAt(p.x + 10, p.z + 10) === id).length;
+    expect(all.geo.idx.length / 3 / houses).toBeLessThan(40);
+  });
+
   test('a thing moved in a garden plans only its lot’s chunk again', () => {
     const street = new TownStreet(new HousePlanner(), town(objects), options, 'game');
     const ids = street.chunkIds();
