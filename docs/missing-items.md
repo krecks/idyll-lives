@@ -106,14 +106,35 @@ ll-tools --release` passes. Docs: `docs/design/objects.md` ("Scale, axes, origin
 | Item | What is missing | Source | Effort |
 |---|---|---|---|
 | Furniture resizing | Resize arrows stay off (`RESIZING`, `buildmode.ts`); moving parts do not follow a resize yet | PLAN.md roadmap "later" | L |
-| Smarter thoughts | No LLM re-rank of the utility AI's top-3; research only | PLAN.md roadmap "later", [design/smarter-thoughts.md](design/smarter-thoughts.md) | L (research) |
 
-The servers' apron left this list on 2026-10-31 (below): `top.apron` is a garment of the character set, and the
-staff wear it.
+Smarter thoughts left this list on 2026-11-01 (below): the research is done and written down, and it says the
+re-rank is the expensive half for the least gain. The servers' apron left it on 2026-10-31 (below): `top.apron` is
+a garment of the character set, and the staff wear it.
 
 Flowers cut for a vase left this list on 2026-10-30 (below), on the raised bed and then on the five beds cut for a
 vase (tulips, daffodils, lilies, cosmos, daisies). The daisies' "make a daisy chain" followed on 2026-10-31, so no
 bed is missing a real use any more.
+
+**Done 2026-11-01 (smarter thoughts, the research):** what it would take to let the model re-rank the utility
+AI's top three is written down in [design/smarter-thoughts.md](design/smarter-thoughts.md), and the half that needs
+no model is now measured rather than guessed. A temporary probe in `pick_autonomous` (before `ai::choose`) over
+three game days of `common::town` (seed 7, twenty residents, free will on) recorded every decision's candidate
+count and its top three scores: **1.21 decisions per resident per game hour**, but 664 of the 1,736 (38 %) found
+nothing to choose, so only **0.75 per resident per game hour** have a shortlist at all; 8 candidates at the median
+(61 at the p90); the top candidate taking 45 % of the top three's weight, the second more than 10 % behind in 79 %
+of the decisions that had one, and within 10 % in 223 (21 %). So a household of six asks for a call about once
+every 13 s of play at speed 1, every 4 s at speed 2 and every 1.3 s at speed 3 (a game hour is 60, 20 and 6 real
+seconds, `TICKS_PER_STEP`) — affordable while the player watches at 1 or 2, and rate-limited to one call in flight
+at 3 — while the choice is rarely close, so a re-rank has little to reorder beyond the fifth that are close and the
+odd dominant-but-implausible pick. The two findings that matter for what to do next: the re-rank is the expensive
+half for the least gain, and the 38 % of decisions with nothing to choose are a different problem (content,
+access, reach) that no model can help with. The packet is cheap too: an interaction's label is 12 characters at
+the median (43 at the longest of 910), so the shortlist costs about 200 characters and the prompt's size is the
+rules', which the line writer already caches. Still unmeasured, and listed in the note: the letter's latency on the
+reference machine and without WebGPU, the model's agreement with the utility AI on the close decisions, a replay
+with the model on and off, and how a decision loop shares the watchdog with the voices. Nothing was built and no
+save or format changed: `sim-core` still decides, and the note's "Next step" is a prototype behind a debug flag if
+the numbers ever justify it.
 
 **Done 2026-10-31 (the servers' apron):** `top.apron` is a garment of the character set — a white shirt painted on
 the body (its cut the shirt's: long sleeves, `crew -0.012`, over the trousers) under an apron shell over the front
@@ -389,4 +410,5 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
 ## Suggested next items
 
 Nothing from the review ledgers is left unbuilt: the remaining work is the not-yet-checked list in §4 and the
-tooling in §6. Every flower bed now has its real uses.
+tooling in §6, plus the two behaviours in §3 the owner has kept for later (furniture resizing, and smarter
+thoughts, whose research is done and argues against the re-rank). Every flower bed now has its real uses.
