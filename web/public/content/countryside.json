@@ -21,6 +21,15 @@
           "effects": { "fun": 0.35, "comfort": 0.2 },
           "tags": ["nature", "outdoors"],
           "skills": { "perception": 0.1 }
+        },
+        {
+          "id": "feedFish",
+          "label": "Feed the fish",
+          "anim": "garden",
+          "minutes": 5,
+          "effects": { "fun": 0.08 },
+          "tags": ["nature", "outdoors"],
+          "cost": 2
         }
       ]
     },
