@@ -125,7 +125,7 @@ Every body has:
 | `teeth`, `tongue` | teeth; the mouth plate (dark, tone.y = 1) and tongue | Head | `mouth` |
 | `hair.<style>` | every hairstyle but `none` (`short crop layered tousled sideSwept afro bob long ponytail braid bun`) | Head, blending to neck_01 / spine_03 below the jaw | `hair` |
 | `hair.beard` | facial hair (male only; hidden for baby, child, teen) | Head; follows the mouth's morphs | `hair` |
-| `top.*`, `bottom.*`, `shoes.*` | shells, only where the silhouette needs one: jacket and suit (torso and upper arms, open in a V; the sleeves are painted), the collars of polo and shirt, the skirt, every shoe (below) | from the body | `cloth` (flat colour) |
+| `top.*`, `bottom.*`, `shoes.*` | shells, only where the silhouette needs one: jacket and suit (torso and upper arms, open in a V; the sleeves are painted), the collars of polo and shirt, the skirt, the server's apron (the front from the waist to above the knees), every shoe (below) | from the body | `cloth` (flat colour) |
 | `lod.<shell>` | a low-detail copy of every shell | | `cloth` |
 
 `hair.none` has no part: a bald resident's scalp keeps the skin colour (appearance texel 7 w = 0).
@@ -219,7 +219,7 @@ hairline and chin as before.
 | Part | x | y | z | w |
 |---|---|---|---|---|
 | body | sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, > 1 hand) | height (m, base body) | crew neckline (m, > 0 covered: distance from the neck's axis plus depth below a curve round the neck's base); head: -1 - scalp weight | scoop neckline (women: round and low in front; men: a V); head: -1 - scalp weight |
-| shells | hem distance (m; a shoe's from its collar, negative on its lining) | flag: 1 sole, 2 waistband, 3 skirt, 4 light midsole, 5 polished | category: 0 top, 1 bottom, 2 shoes | shoes: across the instep (m from its middle; over 1 off its front), else 0 |
+| shells | hem distance (m; a shoe's from its collar, negative on its lining) | flag: 1 sole, 2 waistband, 3 skirt or apron (a hem band), 4 light midsole, 5 polished | category: 0 top, 1 bottom, 2 shoes | shoes: across the instep (m from its middle; over 1 off its front), else 0 |
 | eyes | offset from the iris centre on the eye's front (m), x | y | iris radius (m) | pupil radius (m) |
 | hair | 0.1 (unused) | | | |
 
@@ -257,14 +257,15 @@ The shader takes the colour (after the painted clothes, on the body) times `1 - 
 dark as the furniture's at most, reached once two thirds of the sky are hidden (k = 1.5; on the
 body 1.5 + 0.6 age, appearance texel 4 g, so elders' creases are deeper).
 
-The jacket, suit and skirt shells use their tone's xyz for their seated shape instead (m, in the
+The jacket, suit, skirt and apron shells use their tone's xyz for their seated shape instead (m, in the
 rest space, before skinning; w is still the occlusion): what moves each vertex from where a seated
 pose (`seated_pose` with the thighs turned 76° forward, as `sit` has them) skins it to where its
 seated shape is skinned (the skirt without its flare, its hollows between the legs bridged, the
-jacket without its hem's flare), out of the seated skin and no lower than the seat (`seated_tone`, clothes.rs). The runtime
+jacket without its hem's flare, the apron as it hangs), out of the seated skin and no lower than the
+seat (`seated_tone`, clothes.rs). The runtime
 adds it as far as the thighs are turned forward (`writeSit`: from 15° to 76°, the mean of both, at
-the body's size; appearance texel 4 b), so a seated skirt lies on the lap and the jacket's hem on it
-instead of standing out round the seat as they hang standing.
+the body's size; appearance texel 4 b), so a seated skirt lies on the lap, and the jacket's hem and
+the apron on it, instead of standing out round the seat as they hang standing.
 
 ## Clothes
 
@@ -287,10 +288,11 @@ little darker (lighter on dark cloth), with a thin stitch line in it. The band i
 2.4 cm at a top's or a leg's hem, a 1.6 cm rib at a crew neck, a 1.1 cm binding at a scoop, a 3.4 cm
 waistband and a 1.2 cm cuff at the sock's top (m on the fields, as the cuts). Bands and stitches fade
 out as they come under a few pixels: they show at the closest game camera (6 m) and are gone at the
-default one (24 m). The skirt's, the jacket's and the suit's shells have the hem band too, from
-their `fields.x`: the distance from the hem (the jacket's: from its nearest open edge, the hem, the
-lapels and the neck, not the sleeves' ends; 0 on the turned rim). The collars have none (0.05: out
-of reach).
+default one (24 m). The skirt's, the jacket's, the suit's and the apron's shells have the hem band
+too, from their `fields.x`: the distance from the hem (the jacket's and the apron's: from their
+nearest open edge — the hem, the lapels and the neck for the jacket, the hem, the sides and the
+waistband for the apron — not the sleeves' ends; 0 on the turned rim). The collars have none (0.05:
+out of reach).
 
 The shirt under an open jacket or suit has its own colour (outfit.ts `shirtUnder`): white under a
 suit, a charcoal tee under a light jacket, a white or grey one under a dark one. It is painted on the
@@ -335,7 +337,9 @@ Garment ids per family (outfit.ts):
 
 - male: `top.tee top.vneck top.polo top.long top.shirt top.jacket top.suit`, `bottom.trousers bottom.shorts bottom.suit`;
 - female: `top.tee top.tank top.blouse top.long top.shirt top.jacket`, `bottom.trousers bottom.shorts bottom.capri bottom.skirt`;
-- both: `shoes.sneakers shoes.trainers shoes.boots shoes.dress`.
+- both: `shoes.sneakers shoes.trainers shoes.boots shoes.dress`;
+- workwear, worn by the town's staff and never picked for a resident (`WORKWEAR`): `top.apron`, a white shirt
+  painted on the body under an apron shell (`clothes.rs` `apron`), its own colour the top's.
 
 ## Appearance texels (per resident, after the bone matrices)
 

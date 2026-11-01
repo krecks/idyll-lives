@@ -27,6 +27,12 @@ const BOTTOMS: Record<string, readonly string[]> = {
 };
 const SHOE_PARTS = ['shoes.sneakers', 'shoes.sneakers', 'shoes.trainers', 'shoes.boots', 'shoes.dress'] as const;
 /**
+ * Workwear: worn by the lot's staff (`game/staff.ts`), never picked for a resident. A server's apron is one
+ * garment with two parts: the white shirt painted on the body under it (its cut is the shirt's) and the apron
+ * itself a shell over the front (clothes.rs `apron`).
+ */
+export const WORKWEAR = ['top.apron'] as const;
+/**
  * What a baby wears for a skirt: shorts in the top's colour, one piece. A skirt's shell can't follow
  * a baby's legs, drawn up and fallen apart in the crib or in someone's arms.
  */

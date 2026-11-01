@@ -377,8 +377,9 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
   door before ten, drawn walking in, not at the post a minute later, there within ten minutes; back at the door
   and still after 21:30) and `the_barista_steps_over_to_the_machine_and_the_cafe_closes` (on the way from the
   door at a minute past ten, then at the machine).
-- They wear a uniform the game can make without new art: a white shirt, dark trousers and dark shoes over their
-  own face, hair and skin (`web/src/game/staff.ts`, `UNIFORM`). No apron, coat or vest exists to give them.
+- They wear a uniform: a white shirt under a white apron (`top.apron`), dark trousers and dark shoes over their
+  own face, hair and skin (`web/src/game/staff.ts`, `UNIFORM`). The apron is a garment of the character set since
+  2026-10-31 (below).
 - In play: `bench-results/check-staff/staff-cart-before-opening.png` (the ice cream cart unstaffed at 09:55),
   `staff-cart-arrived.png` (the vendor at it in the uniform), `staff-posts.png` (three posts staffed at once).
   The walk itself is 18 seconds of game time, a frame or two at a bench's clock, so the stills show the cart
@@ -387,6 +388,5 @@ Full list: [authenticity-review.md](authenticity-review.md) §7. Highest-value g
 
 ## Suggested next items
 
-Nothing from the review ledgers is left unbuilt: the remaining work is the not-yet-checked list in §4, the
-tooling in §6, and the servers' apron, which wants a garment the character set doesn't have. Every flower bed now
-has its real uses.
+Nothing from the review ledgers is left unbuilt: the remaining work is the not-yet-checked list in §4 and the
+tooling in §6. Every flower bed now has its real uses.

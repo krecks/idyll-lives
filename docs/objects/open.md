@@ -128,9 +128,12 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
   check's baseline (`tools/characters/clip-baseline.json`) is empty: it reports nothing to keep.
 
 ### Content and sim
-- **Servers wear no apron:** no apron, coat or vest is in the character set (`crates/tools/src/characters/contract.rs`),
-  so a white shirt, dark trousers and dark shoes stand in. They do walk in: since 2026-10-30 a server comes in at
-  the lot's door at opening and walks to their post, and walks back out at closing (`staff.rs`).
+- **Servers' apron:** done 2026-10-31. `top.apron` is a garment of the character set (`contract.rs`, both bodies):
+  a white shirt painted on the body under an apron shell over the front of the trousers, from the waistband to just
+  above the knee (`crates/tools/src/characters/clothes.rs` `apron_layout`/`apron`), its own list in `outfit.ts`
+  (`WORKWEAR`, never picked for a resident). The staff wear it with dark trousers and dark shoes. They walk in too:
+  since 2026-10-30 a server comes in at the lot's door at opening and walks to their post, and back out at closing
+  (`staff.rs`). Stills: `bench-results/check-apron/`.
 - **The sounds want a listen by ear** (G-53): each was rendered and checked by its spectrum, timing and level, not
   heard (`bench-results/review/fixes/sounds/wav/`).
 - **Cut flowers for a vase:** done 2026-10-30 (Q-18): the raised bed's "Cut some flowers" and the bought empty

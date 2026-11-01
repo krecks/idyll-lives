@@ -15,14 +15,12 @@ import type { SimInfo, WorldStructure } from '../core/protocol';
 import { lookAtStage, lookFromSeed, palette } from './household';
 
 /**
- * What they wear at work: a white shirt (its collar a shell of its own) over dark trousers and dark
- * shoes, whatever their own clothes are. Their face, hair and skin are their own.
- *
- * The apron a counter hand would wear over it is still open: the character set has no apron garment,
- * and one is a shell of its own (`docs/objects/open.md`).
+ * What they wear at work: a white shirt under a white apron (`top.apron`: the shirt painted on the body, the
+ * apron a shell over the front of the trousers), dark trousers and dark shoes, whatever their own clothes are.
+ * Their face, hair and skin are their own.
  */
 const UNIFORM = {
-  top: 'top.shirt',
+  top: 'top.apron',
   body: '#F2EFE8',
   bottom: 'bottom.trousers',
   bottomColor: '#2B2D33',

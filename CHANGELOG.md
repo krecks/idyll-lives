@@ -12,6 +12,10 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
   open for a moment instead of only the pendulum's door above. A piece of furniture that wants a fifth moving part
   can now say so (`"draws": 5` in its pack entry), where the draw-call gate used to allow four at most.
 
+- **An apron for the servers:** the town's vendors and shopkeepers wear a white apron over their white shirt and
+  dark trousers, as a counter hand would. It is a garment of its own (`top.apron`), so it is never picked for a
+  resident: a shell over the front from the waistband to just above the knee, turned back on every edge, and it
+  lies on the lap when they sit.
 ### Also
 - **Saves:** unchanged (format 33).
 
