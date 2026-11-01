@@ -1,5 +1,5 @@
-//! The big-world benchmark: a synthetic open world of hamlets (`common::hamlets`: streets of the
-//! shipped houses, with the content's storeys and basement, and open country between them) as
+//! The big-world benchmark: a synthetic open world of hamlets (`common::hamlets::grid`: streets of
+//! the shipped houses, with the content's storeys and basement, and open country between them) as
 //! big as a town file may be, with as many residents as a town holds. It measures what the open
 //! world costs the simulation: how long the world takes to load, how much memory it holds (a
 //! counting allocator), how fast it ticks with lower detail on and the view on one hamlet (ticks
@@ -9,7 +9,9 @@
 //! Timing depends on the machine, so it is opt-in and prints its numbers:
 //! `cargo test --release -p sim-core --test big_world -- --ignored --nocapture`
 //! with `SIZE=1024` (default 256), `RESIDENTS=160` (default: as many as a town holds) and
-//! `HOURS=6` (game hours to run, default 4) in the environment.
+//! `HOURS=6` (game hours to run, default 4) in the environment. The world is a `big` town with
+//! roads, areas and bus stops; `OPEN=0` makes it one without them (a cosy town, as the first
+//! baseline was measured on).
 
 mod common;
 
@@ -80,8 +82,9 @@ fn big_world_benchmark() {
     let size = env("SIZE", 256) as i64;
     let residents = env("RESIDENTS", MAX_SIMS);
     let hours = env("HOURS", 4) as u64;
+    let open = env("OPEN", 1) != 0;
     let content = common::content();
-    let (town, hamlets) = common::hamlets(&content, 7, size, 6, residents);
+    let (town, hamlets) = common::hamlets::grid(&content, 7, size, 6, residents, open);
 
     // Loading: the town file to a world, as a new game does.
     let before = HELD.load(Ordering::Relaxed);
@@ -94,7 +97,12 @@ fn big_world_benchmark() {
         PEAK.load(Ordering::Relaxed) - before,
     );
     eprintln!(
-        "{size}²: {} hamlets, {} plots, {} objects, {} residents, grid {}×{} ({} storeys{})",
+        "{size}² ({}): {} hamlets, {} plots, {} objects, {} residents, grid {}×{} ({} storeys{})",
+        if open {
+            "big, with roads"
+        } else {
+            "no open-world fields"
+        },
         hamlets.len(),
         w.plots.len(),
         w.objects.len(),

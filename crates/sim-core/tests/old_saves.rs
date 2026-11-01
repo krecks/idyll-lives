@@ -97,7 +97,7 @@ fn a_town_saved_as_v34_plays_on() {
 }
 
 /// A v34 save (dense edge strings, chemistry per pair, no open-world fields) loads, saves as
-/// v35 (run-length edges, chemistry packed, the town's fields made up) and loads back the same.
+/// v35 (run-length edges, chemistry packed, still a cosy town) and loads back the same.
 #[test]
 fn a_v34_save_comes_through_v35_unchanged() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves/v034_town.json");
@@ -106,10 +106,12 @@ fn a_v34_save_comes_through_v35_unchanged() {
     assert_eq!(old["version"], 34);
     let content = common::content();
     let w = World::from_save_json(&content, &old_json).unwrap();
-    // Made up from what the old save had: one hamlet over the town, its exits as roads out.
-    assert_eq!(w.town.size, sim_core::lot::WorldSize::Cosy);
-    assert_eq!(w.town.areas.len(), 1);
-    assert_eq!(w.town.exits.len(), w.exits.len());
+    // A cosy town, as it always was: no open-world fields, no road network (whatever roads its
+    // meta has), every exit a road out.
+    assert_eq!(w.travel.size, sim_core::travel::WorldSize::Cosy);
+    assert!(!w.travel.open && w.travel.graph.is_empty());
+    assert!(w.travel.file.is_empty());
+    assert!((0..w.exits.len()).all(|i| !w.travel.is_stop(i)));
     let json = w.save_json();
     let new: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(new["version"], sim_core::save::SAVE_VERSION);
@@ -130,7 +132,8 @@ fn a_v34_save_comes_through_v35_unchanged() {
     );
     let back = World::from_save_json(&content, &json).unwrap();
     assert_eq!(back.lot, w.lot);
-    assert_eq!(back.town, w.town);
+    assert!(new.get("openWorld").is_none());
+    assert!(!back.travel.open && back.travel.file.is_empty());
     let n = w.sims.len();
     for a in 0..n {
         for b in 0..n {

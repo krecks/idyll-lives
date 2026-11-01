@@ -1733,7 +1733,7 @@ impl World {
         for &(x, z) in &freed {
             let i = self.lot.tile_index(x, z);
             if i != crate::lot::VOID {
-                self.blocked[i] = false;
+                self.blocked[i] = self.travel.ground_blocked(i);
             }
         }
         for o in 0..self.objects.len() {

@@ -1722,7 +1722,33 @@ pub struct Content {
     /// How dirty washing piles up (content `laundry`; None: it never does, and nothing works
     /// on it).
     pub laundry: Option<LaundryRules>,
+    /// How cars drive (content `cars`; see `cars.rs`, `travel.rs`).
+    pub cars: CarRules,
+    /// The uses (object def, interaction) with `"trail": true`: done walking out along the trail
+    /// the thing stands at and back (a trailhead's *Walk the trail*; `world::trail_step`).
+    pub trail_walks: Vec<(usize, usize)>,
     object_index: HashMap<String, usize>,
+}
+
+/// How cars drive (content `cars`).
+#[derive(Debug, Clone)]
+pub struct CarRules {
+    /// Top speed on country roads (m/s at 1×; `countrySpeed`, default 16).
+    pub country_speed: f32,
+}
+
+impl Default for CarRules {
+    fn default() -> Self {
+        Self {
+            country_speed: crate::travel::COUNTRY_SPEED,
+        }
+    }
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct CarsRaw {
+    country_speed: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -1823,6 +1849,8 @@ struct ContentFile {
     service: Option<crate::staff::ServiceRaw>,
     #[serde(default)]
     laundry: Option<LaundryRaw>,
+    #[serde(default)]
+    cars: CarsRaw,
 }
 
 #[derive(Deserialize)]
@@ -2567,6 +2595,9 @@ fn one_slot() -> u8 {
 struct InteractionRaw {
     id: String,
     label: String,
+    /// Walked along the trail it stands at (`Content::trail_walks`).
+    #[serde(default)]
+    trail: bool,
     /// Not needed with a `recipe` (its steps take their own time).
     #[serde(default)]
     minutes: f32,
@@ -3132,6 +3163,7 @@ impl Content {
             .collect::<Result<Vec<_>, _>>()?;
         let mut objects = Vec::with_capacity(raw.objects.len());
         let mut object_index = HashMap::new();
+        let mut trail_walks = Vec::new();
         for obj in &raw.objects {
             if obj.footprint[0] == 0 || obj.footprint[1] == 0 {
                 return Err(Error::new(format!(
@@ -3796,6 +3828,13 @@ impl Content {
                 })
             })
             .collect::<Result<Vec<usize>, Error>>()?;
+            trail_walks.extend(
+                obj.interactions
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, it)| it.trail)
+                    .map(|(k, _)| (objects.len(), k)),
+            );
             objects.push(ObjectDef {
                 id: obj.id.clone(),
                 name: obj.name.clone(),
@@ -4797,6 +4836,18 @@ impl Content {
             phone,
             service,
             laundry,
+            trail_walks,
+            cars: CarRules {
+                country_speed: match raw.cars.country_speed {
+                    Some(v) if v.is_finite() && v > 0.0 => v.min(60.0),
+                    Some(v) => {
+                        return Err(Error::new(format!(
+                            "cars.countrySpeed: {v} must be a positive number"
+                        )));
+                    }
+                    None => crate::travel::COUNTRY_SPEED,
+                },
+            },
             object_index,
         })
     }

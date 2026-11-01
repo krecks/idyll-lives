@@ -1,13 +1,13 @@
 //! A town file's open-world fields (docs/design/open-world.md) are read, kept on the world
-//! (`World::town`) and saved with the game: size, roads, areas, typed exits, terrain masks,
-//! parking, plots' areas and kinds, driveways' roads. A town without them gets them made up from
-//! what it has.
+//! (`World::travel`, `travel::OpenWorld`) and saved with the game: size, roads, areas, typed
+//! exits, terrain masks, parking, plots' areas and kinds, driveways' roads. A town without them
+//! is `cosy` and plays as before: no road network, even with roads in its meta.
 
 mod common;
 
 use serde_json::json;
 use sim_core::World;
-use sim_core::lot::{AreaKind, ExitKind, PlotKind, RoadKind, Terrain, WorldSize};
+use sim_core::travel::{AreaKind, PlotKind, RoadKind, Terrain, WorldSize};
 
 #[test]
 fn open_world_fields_are_read_kept_and_saved() {
@@ -29,43 +29,53 @@ fn open_world_fields_are_read_kept_and_saved() {
     town["plots"][0]["area"] = json!(0);
     town["plots"][0]["kind"] = json!("home");
     let mut world = World::from_json(&content, &town.to_string(), 5).unwrap();
-    let t = &world.town;
+    let t = &world.travel;
     assert_eq!(t.size, WorldSize::Normal);
-    assert_eq!(t.roads.len(), 2);
-    assert_eq!(t.roads[0].kind, RoadKind::Street);
-    assert_eq!(t.roads[1].kind, RoadKind::Trail);
-    assert_eq!(t.roads[1].area, Some(0));
-    assert_eq!(t.areas[0].kind, AreaKind::Hamlet);
-    assert_eq!(t.exits[0].kind, ExitKind::Road);
-    assert_eq!(t.exits[1].kind, ExitKind::Stop);
+    assert!(t.open);
+    let f = &t.file;
+    assert_eq!(f.roads.len(), 2);
+    assert_eq!(f.roads[0].kind, RoadKind::Street);
+    assert_eq!(f.roads[1].kind, RoadKind::Trail);
+    assert_eq!(f.roads[1].area, Some(0));
+    assert_eq!(t.graph.roads.len(), 2);
+    assert_eq!(f.areas[0].kind, AreaKind::Hamlet);
+    assert!(!t.is_stop(0));
+    assert!(t.is_stop(1));
     assert_eq!(world.exits, vec![[0.5, 30.0], [20.0, 31.0]]);
-    assert_eq!(t.parking.len(), 1);
-    assert_eq!(t.plot_areas[0], Some(0));
-    assert_eq!(t.plot_kinds[0], Some(PlotKind::Home));
-    assert_eq!(t.plot_kinds[1], None);
-    let water = Terrain::mask(t.terrain.water.as_deref(), w as usize, d as usize).unwrap();
+    assert_eq!(f.parking.len(), 1);
+    assert_eq!(f.plot_areas[0], Some(0));
+    assert_eq!(f.plot_kinds[0], Some(PlotKind::Home));
+    assert_eq!(f.plot_kinds[1], None);
+    let water = Terrain::mask(f.terrain.as_ref().unwrap(), w as usize, d as usize);
     let wet: Vec<usize> = (0..water.len()).filter(|&i| water[i]).collect();
     let row = 2 * w as usize;
     assert_eq!(wet, vec![row, row + 1, row + 2]);
     // Saved and loaded back as they were.
     world.tick_once();
     let back = World::from_save_json(&content, &world.save_json()).unwrap();
-    assert_eq!(back.town, world.town);
+    let json = |w: &World| serde_json::to_value(&w.travel.file).unwrap();
+    assert_eq!(json(&back), json(&world));
+    assert_eq!(back.travel.size, WorldSize::Normal);
+    assert!(back.travel.is_stop(1));
+    assert_eq!(back.travel.graph.roads.len(), 2);
 }
 
 #[test]
-fn a_town_without_them_gets_them_made_up() {
+fn a_town_without_them_is_cosy_and_plays_as_before() {
     let content = common::content();
     let mut town: serde_json::Value = serde_json::from_str(&common::town(&content, 5, 2)).unwrap();
-    town["meta"] = json!({"name": "Elmbury", "streets": [{"x": 0, "z": 30, "w": 80, "d": 6}]});
+    town["meta"] = json!({"name": "Elmbury", "streets": [{"x": 0, "z": 30, "w": 80, "d": 6}],
+        "roads": [{"points": [[0, 33], [80, 33]], "width": 6}]});
     let world = World::from_json(&content, &town.to_string(), 5).unwrap();
-    let t = &world.town;
+    let t = &world.travel;
     assert_eq!(t.size, WorldSize::Cosy);
-    assert_eq!(t.areas.len(), 1);
-    assert_eq!(t.areas[0].name, "Elmbury");
-    assert_eq!(t.roads.len(), 1);
-    assert_eq!(t.roads[0].points, vec![[0.0, 33.0], [80.0, 33.0]]);
-    assert_eq!(t.roads[0].width, 6.0);
-    assert!(t.exits.iter().all(|e| e.kind == ExitKind::Road));
-    assert_eq!(t.exits.len(), world.exits.len());
+    assert!(!t.open);
+    assert!(t.graph.is_empty(), "no network for a cosy town");
+    assert!(t.file.is_empty());
+    assert!((0..world.exits.len()).all(|i| !t.is_stop(i)));
+    // Saved without them, and still cosy after a load.
+    let json: serde_json::Value = serde_json::from_str(&world.save_json()).unwrap();
+    assert!(json.get("openWorld").is_none());
+    let back = World::from_save_json(&content, &world.save_json()).unwrap();
+    assert!(!back.travel.open && back.travel.graph.is_empty());
 }

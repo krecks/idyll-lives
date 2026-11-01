@@ -66,10 +66,11 @@
 //! run-length coded (a `~` and then `<char><count>` runs split by commas; dense strings still
 //! load), chemistry is one string for every pair (`chemistry`: base64 of the upper triangle,
 //! `(0, 1), (0, 2), …, (1, 2), …`, as little-endian f32s) and relationships list only the pairs
-//! that aren't as new (no `chemistry` of their own), and the town's open-world fields are kept
-//! (`town`: size, roads, areas, typed exits, terrain masks, parking, plots' areas and kinds,
-//! driveways' roads; absent: made up from the meta's roads or streets, one hamlet over the town,
-//! and size `cosy`)
+//! that aren't as new (no `chemistry` of their own), and the town file's open-world fields are
+//! kept as they came (`openWorld`, `travel::OpenWorld`: size, roads, areas, terrain masks,
+//! parking, which exits are bus stops, plots' areas and kinds; driveways keep their `road` and
+//! `s` in `drives`). Absent: a `cosy` town, as before: no road network from the meta's roads (the
+//! open-world rules are for `normal` and `big` towns, `travel::Travel::open`)
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -158,9 +159,10 @@ pub struct SaveFile {
     /// of the upper triangle as little-endian f32s (`pack_chemistry`).
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub chemistry: String,
-    /// The town's open-world fields (absent before v35: made up, `TownPlan::fill_in`).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub town: Option<crate::lot::TownPlan>,
+    /// The town file's open-world fields (`travel::OpenWorld`): roads, areas, terrain, parking,
+    /// which exits are bus stops, plots' areas and kinds (absent: none).
+    #[serde(default, skip_serializing_if = "crate::travel::OpenWorld::is_empty")]
+    pub open_world: crate::travel::OpenWorld,
 }
 
 /// Food or a dish somewhere, by content id (unknown ones are dropped on load).
@@ -954,7 +956,6 @@ impl World {
                 .collect(),
             relationships,
             chemistry,
-            town: Some(self.town.clone()),
             meta: self.meta.clone(),
             exits: self
                 .exits
@@ -979,6 +980,20 @@ impl World {
             cars: self.cars.clone(),
             drives: self.drives.clone(),
             garages: self.garages.clone(),
+            open_world: {
+                let mut file = self.travel.file.clone();
+                // (Indices into the exits as saved: those that are numbers.)
+                file.stops = self
+                    .exits
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, e)| e.iter().all(|v| v.is_finite()))
+                    .enumerate()
+                    .filter(|&(_, (i, _))| self.travel.is_stop(i))
+                    .map(|(k, _)| k as u32)
+                    .collect();
+                file
+            },
             items: self
                 .items
                 .list
@@ -1065,15 +1080,7 @@ impl World {
         world.player_moves = save.player_moves.unwrap_or(true);
         world.meta = save.meta.clone();
         world.exits = save.exits.clone();
-        world.town = save.town.clone().unwrap_or_default();
-        let ground = if stacked {
-            save.lot.depth / blocks
-        } else {
-            save.lot.depth
-        };
-        world
-            .town
-            .fill_in(&save.meta, &world.exits, save.lot.width, ground);
+        world.set_travel(save.open_world.clone());
         world.plots = save
             .plots
             .iter()

@@ -1029,6 +1029,12 @@ pub struct Sim {
     /// resident nobody watches takes a turn only every so often, and a change between two of
     /// them still catches up with them. Not saved (after a load, a walker routes again once).
     pub(crate) nav_seen: u32,
+    /// Open-world towns: how long the way to work or school takes them today, worked out once
+    /// a day (`life::refresh_commute`); None: as `careerRules.commuteMinutes` says. Not saved.
+    pub(crate) commute: Option<crate::life::Commute>,
+    /// The trailhead (object id) whose trail they last walked (`trail_step`); they're walking it
+    /// while they use it (`on_trail`). Not saved.
+    pub(crate) on_trail: Option<u32>,
     /// The game for two (`Interaction::partner`) they're at, or on their way to, next: its
     /// object and interaction, and whether they're at their place. Set as each tick starts
     /// (`partners::refresh`), not saved (the task it comes from is).
@@ -1154,12 +1160,28 @@ impl Sim {
     /// Walking: on their way somewhere, and not waiting outside a room kept shut (`kept_out`).
     pub fn is_moving(&self) -> bool {
         self.kept_out == 0
-            && matches!(
+            && (matches!(
                 self.current,
                 Some(Activity {
                     phase: Phase::Routing { .. },
                     ..
                 })
+            ) || self.on_trail())
+    }
+
+    /// Walking a trail (`Content::trail_walks`): shown walking though it's a use.
+    pub fn on_trail(&self) -> bool {
+        self.on_trail.is_some()
+            && matches!(
+                self.current,
+                Some(Activity {
+                    phase: Phase::Using { .. },
+                    task: Task {
+                        kind: TaskKind::Use { object, .. },
+                        ..
+                    },
+                    ..
+                }) if Some(object) == self.on_trail
             )
     }
 
@@ -1170,6 +1192,11 @@ impl Sim {
 
     pub fn current(&self) -> Option<&Activity> {
         self.current.as_ref()
+    }
+
+    /// How long their way to work or school takes today in an open-world town (`life::Commute`).
+    pub fn commute(&self) -> Option<crate::life::Commute> {
+        self.commute
     }
 
     /// Eating sitting down (at the table, on the sofa), not talking.
@@ -1726,9 +1753,8 @@ pub struct World {
     work: Vec<u8>,
     /// Where Sims leave town for work.
     pub exits: Vec<[f32; 2]>,
-    /// The town's open-world fields: size, roads, areas, typed exits, terrain, parking, plots'
-    /// areas and kinds, driveways' roads (see `lot::TownPlan`).
-    pub town: crate::lot::TownPlan,
+    /// The road network, bus stops and the town file's other open-world fields (`travel.rs`).
+    pub travel: crate::travel::Travel,
     /// Households' cars (see `cars.rs`), and every house's driveway (where a car goes when its
     /// household moves).
     pub cars: Vec<crate::cars::Car>,
@@ -1817,6 +1843,8 @@ pub(crate) struct Ctx<'a> {
     /// Objects by plot (`World::object_index`).
     pub index: &'a ObjectIndex,
     pub exits: &'a [[f32; 2]],
+    /// The road network and bus stops (`World::travel`).
+    pub travel: &'a crate::travel::Travel,
     /// Households' cars (`World::cars`).
     pub cars: &'a [crate::cars::Car],
     pub autonomy: bool,
@@ -1872,6 +1900,9 @@ enum Choice {
     /// Joining the conversation this Sim started.
     Join(u32),
     Visit(u32),
+    /// Open-world towns: off to a public place out of reach (`autonomy.reach`), a countryside
+    /// spot, the park in the next hamlet; they go as visitors (`TaskKind::Visit`).
+    Outing(u32),
     /// A phone action, with someone or not (`phone.rs`).
     Phone(usize, Option<u32>),
 }
@@ -1880,18 +1911,7 @@ impl World {
     pub fn from_json(content_json: &str, lot_json: &str, seed: u32) -> Result<Self, Error> {
         let content = Content::from_json(content_json)?;
         let lot_file: LotFile = serde_json::from_str(lot_json)?;
-        let mut world = Self::new(content, &lot_file, seed)?;
-        // (The roads driveways meet, read on their own: `cars::Drive` is travel's.)
-        if !lot_file.drives.is_empty() && lot_json.contains("\"road\"") {
-            #[derive(serde::Deserialize)]
-            struct Drives {
-                #[serde(default)]
-                drives: Vec<crate::lot::DriveRoad>,
-            }
-            if let Ok(d) = serde_json::from_str::<Drives>(lot_json) {
-                world.town.drive_roads = d.drives;
-            }
-        }
+        let world = Self::new(content, &lot_file, seed)?;
         Ok(world)
     }
 
@@ -1911,14 +1931,7 @@ impl World {
         world.mode = lot_file.mode;
         world.lifespan = lot_file.lifespan;
         world.meta = lot_file.meta.clone();
-        world.exits = lot_file.exits.iter().map(|e| [e.x, e.z]).collect();
-        world.town = crate::lot::TownPlan::from_file(lot_file);
-        world.town.fill_in(
-            &world.meta,
-            &world.exits,
-            lot_file.width as usize,
-            lot_file.depth as usize,
-        );
+        world.exits = lot_file.exits.iter().map(|e| e.point()).collect();
         world.plots = lot_file
             .plots
             .iter()
@@ -1978,6 +1991,20 @@ impl World {
                 h.name
             )));
         }
+        // The road network and the town's other open-world fields (`travel.rs`).
+        let mut open_world = lot_file.open_world.clone();
+        open_world.stops = (0..lot_file.exits.len() as u32)
+            .filter(|&i| lot_file.exits[i as usize].kind() == crate::travel::ExitKind::Stop)
+            .collect();
+        if lot_file
+            .plots
+            .iter()
+            .any(|p| p.area.is_some() || p.kind.is_some())
+        {
+            open_world.plot_areas = lot_file.plots.iter().map(|p| p.area).collect();
+            open_world.plot_kinds = lot_file.plots.iter().map(|p| p.kind).collect();
+        }
+        world.set_travel(open_world);
         for p in &lot_file.objects {
             let def = world
                 .content
@@ -2077,7 +2104,7 @@ impl World {
             claimants_cache: Vec::new(),
             work: Vec::new(),
             exits: Vec::new(),
-            town: Default::default(),
+            travel: Default::default(),
             cars: Vec::new(),
             drives: Vec::new(),
             garages: Vec::new(),
@@ -2108,6 +2135,36 @@ impl World {
             while_lit: Vec::new(),
             staff: Default::default(),
         }
+    }
+
+    /// The road network and the rest of the travel state from the town file's open-world
+    /// fields (on load too: the graph isn't saved).
+    pub(crate) fn set_travel(&mut self, file: crate::travel::OpenWorld) {
+        let mut travel = crate::travel::Travel::new(file, &self.meta, self.exits.len());
+        travel.country_speed = self.content.cars.country_speed;
+        // Water and other ground nobody walks on: blocked underneath everything (`base_blocked`).
+        if let Some(terrain) = &travel.file.terrain {
+            let (w, d) = (
+                self.lot.width,
+                if self.stairs.depth > 0 {
+                    self.stairs.depth as usize
+                } else {
+                    self.lot.depth
+                },
+            );
+            let mask = terrain.mask(w, d);
+            travel.base_blocked = (0..mask.len())
+                .filter(|&i| mask[i])
+                .map(|i| self.lot.tile_index((i % w) as i32, (i / w) as i32))
+                .collect();
+            travel.base_blocked.sort_unstable();
+            for &i in &travel.base_blocked {
+                if let Some(b) = self.blocked.get_mut(i) {
+                    *b = true;
+                }
+            }
+        }
+        self.travel = travel;
     }
 
     /// Bumped whenever walls or objects change, so renderers know to rebuild.
@@ -2707,6 +2764,8 @@ impl World {
             social_waited: 0,
             called: false,
             nav_seen: 0,
+            commute: None,
+            on_trail: None,
             game: None,
             wants_partner: false,
             joins: None,
@@ -3384,8 +3443,28 @@ impl World {
     /// Rebuilds the objects-by-plot index if objects were added, removed or changed since.
     pub(crate) fn refresh_index(&mut self) {
         if self.object_index.version != self.objects_version {
-            self.object_index =
-                ObjectIndex::new(&self.object_plot, &self.plots, self.objects_version);
+            self.object_index = if self.travel.open {
+                let centres: Vec<[f32; 2]> = self
+                    .objects
+                    .iter()
+                    .map(|o| o.centre(&self.content))
+                    .collect();
+                let ground = if self.stairs.depth > 0 {
+                    self.stairs.depth as usize
+                } else {
+                    self.lot.depth
+                };
+                let size = [self.lot.width as f32, ground as f32];
+                ObjectIndex::open(
+                    &self.object_plot,
+                    &self.plots,
+                    &centres,
+                    size,
+                    self.objects_version,
+                )
+            } else {
+                ObjectIndex::new(&self.object_plot, &self.plots, self.objects_version)
+            };
             let nav = NavGrid {
                 lot: &self.lot,
                 blocked: &self.blocked,
@@ -3679,6 +3758,7 @@ impl World {
                 object_plot,
                 object_index,
                 exits,
+                travel,
                 cars,
                 room_score,
                 dirt,
@@ -3711,6 +3791,7 @@ impl World {
                 object_plot,
                 index: object_index,
                 exits,
+                travel,
                 cars,
                 autonomy: *autonomy,
                 hour,
@@ -5677,12 +5758,8 @@ fn pick_autonomous(
     let rested = (!before_dawn(sim, ctx) && rhythm.rest_need.is_some_and(|n| needs[n] >= 0.95))
         || getting_up(sim, ctx);
     // Only what they may use: at home and in public places, or where they're a guest.
-    let usable = match sim.visiting {
-        Some(visit) => ctx.index.on(visit.plot),
-        None => ctx
-            .index
-            .usable_from(ctx.households[sim.household as usize].plot),
-    };
+    let usable = usable_here(sim, ctx);
+    let usable: &[u32] = &usable;
     // Cooking: the stations they have (recipes need theirs), and whether food is ready.
     let stations = crate::cooking::station_mask(sim, ctx, objects);
     let fresh = items
@@ -6300,6 +6377,51 @@ fn pick_autonomous(
         }
     }
 
+    // An outing: in an open-world town, a public place out of reach, for the best it has, the
+    // less the longer the way (`OUTING_K`), with time for there and back and an hour there.
+    if ctx.travel.open
+        && sim.visiting.is_none()
+        && here.is_some()
+        && here == household.plot
+        && !minding
+        && (visits.earliest_hour..visits.latest_hour).contains(&ctx.hour)
+    {
+        let reach = content.autonomy.reach;
+        let free = until_leave.unwrap_or(f32::INFINITY);
+        for p in ctx.plots.iter().filter(|p| p.public) {
+            let door = p.arrival_point();
+            if (door[0] - sim.pos[0]).hypot(door[1] - sim.pos[1]) <= reach {
+                continue;
+            }
+            let eta = ctx
+                .travel
+                .eta(sim.pos, door, crate::travel::Mode::Foot, walk_per_minute);
+            if free < 2.0 * eta + OUTING_STAY_MINUTES {
+                continue;
+            }
+            // The best the place has for each need, as one day out.
+            let mut best = [0.0f32; crate::content::MAX_NEEDS];
+            for i in ctx
+                .index
+                .on(p.id)
+                .iter()
+                .map(|&o| &objects[o as usize])
+                .filter(|o| !o.broken())
+                .flat_map(|o| &content.objects[o.def].interactions)
+                .filter(|i| unfit(content, sim.age, i).is_none())
+            {
+                for (b, &g) in best.iter_mut().zip(&i.total_gain) {
+                    *b = b.max(g);
+                }
+            }
+            let score = ai::score_felt(needs, &felt, &best, 0.0) * feel(visits.tags)
+                / (1.0 + OUTING_K * eta);
+            if score > MIN_AUTONOMY_SCORE {
+                candidates.push((score, Choice::Outing(p.id)));
+            }
+        }
+    }
+
     // Not what they couldn't get to a moment ago (and would try again and again, each time
     // looking for a way there).
     for kind in sim.unreachable_now(ctx.tick) {
@@ -6315,7 +6437,7 @@ fn pick_autonomous(
             (Choice::Clean(x, z), TaskKind::Clean { x: cx, z: cz }) => (x, z) != (cx, cz),
             (Choice::Repair(o), TaskKind::Repair { object }) => o != object,
             (Choice::Dishes(it), TaskKind::Dishes { item, .. }) => it != item,
-            (Choice::Visit(p), TaskKind::Visit { plot }) => p != plot,
+            (Choice::Visit(p) | Choice::Outing(p), TaskKind::Visit { plot }) => p != plot,
             (Choice::Social(t, s), TaskKind::Social { target, social }) => {
                 (t, s) != (target, social)
             }
@@ -6373,7 +6495,7 @@ fn pick_autonomous(
             },
             Choice::Social(target, social) => TaskKind::Social { target, social },
             Choice::Join(leader) => TaskKind::Join { leader },
-            Choice::Visit(plot) => TaskKind::Visit { plot },
+            Choice::Visit(plot) | Choice::Outing(plot) => TaskKind::Visit { plot },
             Choice::Clean(x, z) => TaskKind::Clean { x, z },
             Choice::Repair(object) => TaskKind::Repair { object },
             Choice::Eat(item) => TaskKind::Eat {
@@ -6707,7 +6829,7 @@ fn start_task(
                 (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
             } else {
                 // Nearest way out of town; with no exits, work starts on the spot.
-                let Some(exit) = nearest_exit(ctx.exits, sim.pos) else {
+                let Some(exit) = exit_on_foot(ctx, sim) else {
                     sim.transition = Some(crate::life::Transition::Work);
                     return;
                 };
@@ -6721,7 +6843,12 @@ fn start_task(
             let knock = (content.visits.door.is_some() && !p.public)
                 .then(|| crate::life::knock_spot(nav, p))
                 .flatten();
-            let door = p.arrival_point();
+            let mut door = p.arrival_point();
+            // A public place without an entry (open-world towns): the open ground nearest its
+            // middle, not whatever stands there.
+            if ctx.travel.open && p.public && p.entry.is_none() {
+                door = open_ground_near(nav, p, door).unwrap_or(door);
+            }
             match knock {
                 Some((t, at, _)) => (at, t, content.visits.tags),
                 None => (
@@ -7084,15 +7211,110 @@ pub(crate) fn walk_route(
         sim,
         goal,
     );
-    route(
+    trip(
         &ctx.nav,
         Some(ctx.reach),
+        ctx.travel,
         sim.pos,
         sim.tile(),
         goal,
         target,
         Some(&grounds),
     )
+}
+
+/// `route`, by road for a long trip in a town with a road network (`travel.rs`): a tile leg to
+/// the road, along it, and a tile leg off it to `target`; A* over the tiles as ever for the rest
+/// (or when there's no way by road).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn trip(
+    nav: &NavGrid,
+    reach: Option<&crate::path::Reach>,
+    travel: &crate::travel::Travel,
+    pos: [f32; 2],
+    start: (i32, i32),
+    goal: (i32, i32),
+    target: [f32; 2],
+    grounds: Option<&Grounds>,
+) -> Option<Vec<[f32; 2]>> {
+    if travel.by_road(pos, target)
+        && let Some(waypoints) = road_route(nav, reach, travel, pos, start, goal, target, grounds)
+    {
+        return Some(waypoints);
+    }
+    route(nav, reach, pos, start, goal, target, grounds)
+}
+
+/// A long walk by road (see `trip`): None if the goal can't be reached, or not by road.
+#[allow(clippy::too_many_arguments)]
+fn road_route(
+    nav: &NavGrid,
+    reach: Option<&crate::path::Reach>,
+    travel: &crate::travel::Travel,
+    pos: [f32; 2],
+    start: (i32, i32),
+    goal: (i32, i32),
+    target: [f32; 2],
+    grounds: Option<&Grounds>,
+) -> Option<Vec<[f32; 2]>> {
+    if let Some(reach) = reach
+        && !reach.reaches(nav, start, goal)
+    {
+        return None;
+    }
+    let plan = travel.walk_plan(pos, target)?;
+    let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
+    let at = |p: &crate::travel::RoadPoint| travel.graph.roads[p.road as usize].at(p.s);
+    // Off the road where the last leg can get to the goal from, then on it where the first can
+    // get to from here (the nearest stretches first).
+    // (Straight to and from the walkers' side of the road where that's open ground, else to
+    // and from its middle.)
+    let open = |p: [f32; 2]| {
+        let (x, z) = tile(p);
+        nav.tile_free(x, z) && reach.is_none_or(|r| r.reaches(nav, (x, z), goal))
+    };
+    let (off, tail) = plan.offs.iter().find_map(|off| {
+        let q = at(off);
+        let leg = route(nav, reach, q, tile(q), goal, target, grounds)?;
+        Some((*off, leg))
+    })?;
+    let (head, mut road) = plan.ons.iter().find_map(|on| {
+        let (road, _) = travel.walk_between(*on, off)?;
+        let p = road.first().copied().filter(|&p| open(p)).unwrap_or(at(on));
+        let head = route(nav, reach, pos, start, tile(p), p, grounds)?;
+        Some((head, road))
+    })?;
+    if road.len() > 1
+        && head
+            .last()
+            .is_some_and(|&h| crate::travel::dist(h, road[0]) < 0.05)
+    {
+        road.remove(0);
+    }
+    let mut waypoints = head;
+    // Along the road: where something stands in the way (a thing on the pavement), round it.
+    for &p in &road {
+        let from = *waypoints.last().unwrap_or(&pos);
+        if crate::travel::dist(from, p) < 0.05 {
+            continue;
+        }
+        if !nav.line_walkable_with(from, p, grounds) {
+            let around = route(nav, reach, from, tile(from), tile(p), p, grounds)?;
+            waypoints.extend(around);
+        } else {
+            waypoints.push(p);
+        }
+    }
+    let from = *waypoints.last().unwrap_or(&pos);
+    match tail.first() {
+        Some(&first) if !nav.line_walkable_with(from, first, grounds) => {
+            let q = tail[0];
+            waypoints.extend(route(nav, reach, from, tile(from), tile(q), q, grounds)?);
+            waypoints.extend(tail.into_iter().skip(1));
+        }
+        _ => waypoints.extend(tail),
+    }
+    Some(waypoints)
 }
 
 /// Smoothed waypoints from `pos` to `target`, or None if unreachable; round the gardens
@@ -7349,6 +7571,33 @@ fn progress(
                 *elapsed += minutes;
             }
             let elapsed = *elapsed;
+            // A walk along a trail (`Content::trail_walks`): out along it and back while it lasts.
+            if let TaskKind::Use {
+                object,
+                interaction,
+            } = act.task.kind
+            {
+                let def = objects[object as usize].def;
+                if content
+                    .trail_walks
+                    .binary_search(&(def, interaction))
+                    .is_ok()
+                {
+                    let total = content.objects[def].interactions[interaction].minutes;
+                    let at = objects[object as usize].centre(content);
+                    if let Some((p, yaw)) = trail_step(
+                        ctx.travel,
+                        at,
+                        elapsed,
+                        total,
+                        WALK_SPEED * walk / MINUTES_PER_TICK,
+                    ) {
+                        sim.pos = p;
+                        sim.yaw = yaw;
+                        sim.on_trail = Some(object);
+                    }
+                }
+            }
             match act.task.kind {
                 TaskKind::Use {
                     object,
@@ -8214,7 +8463,7 @@ pub(crate) fn leave_at(sim: &Sim, content: &Content, tick: u64) -> Option<u64> {
         .as_ref()
         .and_then(|job| crate::life::shift_today(content, job, &sim.skills, tick))
         .or_else(|| crate::life::school_today(content, sim, tick))
-        .map(|(leave, ..)| leave)
+        .map(|(leave, start, _)| crate::life::leave_for(sim, leave, start))
         .filter(|&leave| leave > tick)
 }
 
@@ -8334,12 +8583,8 @@ pub(crate) fn nearest(
     if access(ctx, sim, plot) == Access::None {
         return None;
     }
-    let usable = match sim.visiting {
-        Some(visit) => ctx.index.on(visit.plot),
-        None => ctx
-            .index
-            .usable_from(ctx.households[sim.household as usize].plot),
-    };
+    let usable = usable_here(sim, ctx);
+    let usable: &[u32] = &usable;
     let approach = |o: &ObjectInstance| {
         ctx.index
             .links
@@ -8498,8 +8743,137 @@ pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [Obje
 }
 
 /// `a` (radians) as a facing from -PI to PI.
-pub(crate) fn wrap_angle(a: f32) -> f32 {
+pub fn wrap_angle(a: f32) -> f32 {
     (a + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
+}
+
+/// What `sim` may use where they are: on the plot they're a guest at, else at home and the
+/// public things (within `autonomy.reach` in an open-world town).
+pub(crate) fn usable_here<'a>(sim: &Sim, ctx: &Ctx<'a>) -> std::borrow::Cow<'a, [u32]> {
+    match sim.visiting {
+        Some(visit) => std::borrow::Cow::Borrowed(ctx.index.on(visit.plot)),
+        None => ctx.index.usable_near(
+            ctx.households[sim.household as usize].plot,
+            sim.pos,
+            ctx.content.autonomy.reach,
+        ),
+    }
+}
+
+/// How far from a trailhead its trail may start (m).
+const TRAIL_REACH: f32 = 30.0;
+
+/// Where someone walking the trail nearest `at` is `elapsed` of `total` minutes in, at `walk` m a
+/// minute, and which way they face: out along it (the longer way from where it starts near `at`)
+/// for the first half, back for the second, turning at its end (round and round a loop). None:
+/// no trail near.
+pub(crate) fn trail_step(
+    travel: &crate::travel::Travel,
+    at: [f32; 2],
+    elapsed: f32,
+    total: f32,
+    walk: f32,
+) -> Option<([f32; 2], f32)> {
+    let g = &travel.graph;
+    let road = g
+        .roads
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.kind == crate::travel::RoadKind::Trail)
+        .map(|(i, r)| (i, r.project(at)))
+        .filter(|(_, (_, d))| *d <= TRAIL_REACH)
+        .min_by(|a, b| a.1.1.total_cmp(&b.1.1).then(a.0.cmp(&b.0)))
+        .map(|(i, (s0, _))| (&g.roads[i], s0))?;
+    let (r, s0) = road;
+    let len = r.len();
+    if len < 1.0 {
+        return None;
+    }
+    let ring = crate::travel::dist(r.pts[0], *r.pts.last()?) < 1.0;
+    let out = if s0 < len / 2.0 { 1.0 } else { -1.0 };
+    let half = total.max(0.0) / 2.0;
+    let back = elapsed > half;
+    let along = walk * elapsed.min(total - elapsed).clamp(0.0, half);
+    let raw = s0 + out * along;
+    // Off the end: round a loop, back along a trail that stops.
+    let (s, turned) = if ring {
+        (raw.rem_euclid(len), false)
+    } else {
+        let m = raw.rem_euclid(2.0 * len);
+        if m > len {
+            (2.0 * len - m, true)
+        } else {
+            (m, false)
+        }
+    };
+    let t = r.tangent(s);
+    let k = out * if back != turned { -1.0 } else { 1.0 };
+    Some((r.at(s), (t[0] * k).atan2(t[1] * k)))
+}
+
+/// The middle of the free tile on plot `p` nearest `at` (rings outwards), if any.
+fn open_ground_near(nav: &NavGrid, p: &Plot, at: [f32; 2]) -> Option<[f32; 2]> {
+    let (cx, cz) = (at[0].floor() as i32, at[1].floor() as i32);
+    let inside = |x: i32, z: i32| x >= p.x && z >= p.z && x < p.x + p.w && z < p.z + p.d;
+    (0..p.w.max(p.d)).find_map(|r| {
+        (-r..=r)
+            .flat_map(|dz| (-r..=r).map(move |dx| (dx, dz)))
+            .filter(|&(dx, dz)| dx.abs() == r || dz.abs() == r)
+            .map(|(dx, dz)| (cx + dx, cz + dz))
+            .find(|&(x, z)| inside(x, z) && nav.tile_free(x, z))
+            .map(|(x, z)| [x as f32 + 0.5, z as f32 + 0.5])
+    })
+}
+
+/// An outing (`Choice::Outing`) needs at least this long there besides the way there and
+/// back (minutes); the way puts them off this much a minute (less than a walk across the room
+/// does, `ai::falloff`: it's a day out).
+const OUTING_STAY_MINUTES: f32 = 60.0;
+const OUTING_K: f32 = 0.01;
+
+/// The way out of town `sim` takes on foot: the nearest by straight line, or in an open-world
+/// town the quickest (`travel::Travel::eta`), bus stops included.
+pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
+    if !ctx.travel.open {
+        return nearest_exit(ctx.exits, sim.pos);
+    }
+    // From home, the way their commute was timed by.
+    let home = ctx
+        .households
+        .get(sim.household as usize)
+        .and_then(|h| h.plot);
+    if let Some(c) = sim.commute
+        && c.home == home
+        && let Some(&exit) = ctx.exits.get(c.exit)
+        && ctx
+            .briefs
+            .get(sim.id as usize)
+            .is_some_and(|b| b.plot.is_none() || b.plot == home)
+    {
+        return Some(exit);
+    }
+    quickest_exit(ctx.travel, ctx.exits, sim.pos, true).map(|i| ctx.exits[i])
+}
+
+/// The exit (an index into `exits`) quickest to get to from `pos`, on foot (bus stops too) or
+/// by car (roads out only).
+pub(crate) fn quickest_exit(
+    travel: &crate::travel::Travel,
+    exits: &[[f32; 2]],
+    pos: [f32; 2],
+    on_foot: bool,
+) -> Option<usize> {
+    let mode = if on_foot {
+        crate::travel::Mode::Foot
+    } else {
+        crate::travel::Mode::Car
+    };
+    (0..exits.len())
+        .filter(|&i| on_foot || !travel.is_stop(i))
+        .filter(|&i| exits[i].iter().all(|v| v.is_finite()))
+        .map(|i| (i, travel.eta(pos, exits[i], mode, 1.5)))
+        .min_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)))
+        .map(|(i, _)| i)
 }
 
 /// The town's way out (`World::exits`) nearest `pos`, if it has any.

@@ -4069,7 +4069,8 @@
         {"id": "street", "label": "Street & square", "outside": true},
         {"id": "food", "label": "Carts & machines", "outside": true},
         {"id": "shops", "label": "Shop & café", "outside": false},
-        {"id": "farm", "label": "Farm", "outside": true}
+        {"id": "farm", "label": "Farm", "outside": true},
+        {"id": "countryside", "label": "Countryside", "outside": true}
       ]
     }
   ],
@@ -4897,6 +4898,7 @@
     "garden.json",
     "furniture.json",
     "community.json",
+    "countryside.json",
     "catalog2/kitchen.json",
     "catalog2/dining.json",
     "catalog2/living.json",

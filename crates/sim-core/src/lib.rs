@@ -40,6 +40,7 @@ pub mod social;
 pub mod staff;
 pub mod storeys;
 pub mod surface;
+pub mod travel;
 pub mod view;
 pub mod world;
 
