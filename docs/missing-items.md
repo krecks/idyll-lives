@@ -2,7 +2,8 @@
 
 *Checked 2026-10-30 against `main` (58f4b1a1) + `feat/new-items`. Sources: content JSON, asset
 manifests, `docs/objects/*.md`, [objects/open.md](objects/open.md), [authenticity-review.md](authenticity-review.md)
-§7 and §9, and [PLAN.md](../PLAN.md) §8.*
+§7 and §9, and [PLAN.md](../PLAN.md) §8. A closed item is never deleted: it keeps a
+`**Done <date> (<topic>):**` block in its section, and each section's blocks run newest first.*
 
 ## Verdict: no catalog item is missing
 
@@ -30,23 +31,27 @@ were named as the one object not in the 2026-10-17 play check.
 The empty vase, added 2026-10-30, brings both counts to **543** (tabletop 39 → 40); `item` ids to **43**
 (the bunch of cut flowers), and the daisy chain, added 2026-10-31, to **44**.
 
+The counts are hand-taken from the files in each row, not printed by a command, so a row is only as good as the
+date above. The row that matters is the id match, and on 2026-11-01 every one of the 543 doc ids was found in the
+content, and every buyable content object (an entry with a `model` and a `category`) was in a doc: 541 of them,
+none unaccounted for.
+
 So what is missing is not objects — it is **uses, clips, behaviours and polish** around them.
 
-## 1. Modelled parts with no use or clip
+## 1. Modelled parts with no use or clip (nothing left to build)
 
 | Object | Part | What is missing | Source | Effort |
 |---|---|---|---|---|
 | `deskExecutive` Executive desk | drawer | Drawer modelled but static — **won't fix** | I-office-02, Q-19 | — |
 
-No modelled part is left unbuilt. The grandfather clock's trunk door, the other row that stood here as a
-"won't fix", opens since 2026-10-31 (A-decor-01, §2 below: hinged on its left edge, swung on *Wind the clock*).
+The executive desk's drawer is the only row left, and it stays decorative (Q-19). The grandfather clock's trunk
+door, the other row that stood here, opens since 2026-10-31 (§2 below). Kettle lid, bread-bin roll-top, laptop lid
+and the high chair's tray were closed in 0.5.0 (I-tabletop-01, I-kids-01); the nesting tables' small table and the
+display cabinet's door were built on 2026-10-31 (below).
+
 The laundry basket has no lid by design (bathroom review, 2026-10-21): clean washing is heaped above its rim, and
 the lidded one is the bedroom's `laundryHamper`. The 2026-10-30 check that listed a basket lid here was reading a
 stale line in `open.md`, now corrected.
-
-The executive desk's drawer is the only row left, and it stays decorative (Q-19). Kettle lid, bread-bin roll-top,
-laptop lid and the high chair's tray were closed in 0.5.0 (I-tabletop-01, I-kids-01); the nesting tables' small
-table and the display cabinet's door were built on 2026-10-31 (below).
 
 **Done 2026-10-31 (e14b4874: the last two decorative parts get their uses).** Both were closed as decor under owner decision
 4; that decision was reopened for these two parts only.
@@ -67,7 +72,7 @@ table and the display cabinet's door were built on 2026-10-31 (below).
   I-living-02 statuses, both "After" paragraphs), `docs/objects/open.md`, `tools/art/blender/families/living.md`,
   `docs/authenticity-review.md` §9.1.
 
-## 2. Model work still accepted as incomplete
+## 2. Model work (nothing left)
 
 Nothing is left. The two rows that stood here (the hot tub's cover, the grandfather clock's trunk door) are
 done, below.
@@ -112,9 +117,9 @@ Smarter thoughts left this list on 2026-11-01 (below): the research is done and 
 re-rank is the expensive half for the least gain. The servers' apron left it on 2026-10-31 (below): `top.apron` is
 a garment of the character set, and the staff wear it.
 
-Flowers cut for a vase left this list on 2026-10-30 (below), on the raised bed and then on the five beds cut for a
-vase (tulips, daffodils, lilies, cosmos, daisies). The daisies' "make a daisy chain" followed on 2026-10-31, so no
-bed is missing a real use any more.
+Flowers cut for a vase left this list on 2026-10-30 (§6, with the tooling), on the raised bed and then on the five
+beds cut for a vase (tulips, daffodils, lilies, cosmos, daisies). The daisies' "make a daisy chain" followed on
+2026-10-31, so no bed is missing a real use any more.
 
 **Done 2026-11-01 (smarter thoughts, the research):** what it would take to let the model re-rank the utility
 AI's top three is written down in [design/smarter-thoughts.md](design/smarter-thoughts.md), and the half that needs
@@ -154,7 +159,7 @@ Docs: `docs/characters-format.md` (shells, the hem band, garment ids), `docs/obj
 
 | Item | Why it is open |
 |---|---|
-| Sounds by ear (G-53) | All 45 were checked by spectrum, timing and level, never listened to. `bun run sounds` now writes every one to a WAV at the level the game plays it, with its content and numbers (`tools/audio/listen.ts`) — the listening itself is the reviewer's |
+| Sounds by ear (G-53) | All 45 were checked by spectrum, timing and level, never listened to. `bun run sounds` now writes every one to a WAV at the level the game plays it, with its content and numbers (`tools/audio/listen.ts`) — so it waits on a listener, not on a command |
 | Low on WebGL2 orbits | 11–16 % over Babylon's GPU time (0.4–0.6 ms; budget 10 %), about noise level; a headless run's GPU time is SwiftShader's, so this needs a real GPU |
 
 **Done 2026-10-31 (`lampFloorArc`'s `at` check):** the lamp build does check `light.at`, not only the bulb's
@@ -174,10 +179,6 @@ against another sounds as it does in the game; the peaks land in the ledger's ra
 afternoon's. Two to hear first, from the numbers: `smash` (crockery smashed in a bin) sits at a 454 Hz
 centroid, low for shards, and `tools` at 217 Hz (hammer and saw thuds, as expected).
 
-**Done 2026-10-30:** `curtainsWide` checked in play on the stage's two-wide window: closed over both edges at
-22:00, stacked at each end by day at 10:00, WebGPU and WebGL2. Its "In play" line is in
-[objects/decor.md](objects/decor.md) D3.
-
 **Done 2026-10-31 (the six held foods):** `crates/sim-core/tests/held_foods.rs` cooks each dish in a
 one-room house with the shipped appliances, a dining table with two chairs pulled up and a picnic table in
 the yard, and reads the hand off the snapshot (`sim::HELD`): a tasting board, a pizza, a pie, a tray of baked
@@ -193,6 +194,10 @@ sandwich carried from the counter to a chair (`sandwich-walk-04.png`). The dish 
 household's table is one they can sit at: with no chair pulled up the dish is put down on a free surface
 within `cooking.serveRange` (6 tiles) instead, which is why the test buys chairs.
 
+**Done 2026-10-30:** `curtainsWide` checked in play on the stage's two-wide window: closed over both edges at
+22:00, stacked at each end by day at 10:00, WebGPU and WebGL2. Its "In play" line is in
+[objects/decor.md](objects/decor.md) D3.
+
 ## 5. Accepted / won't fix
 
 | Item | Why |
@@ -206,34 +211,13 @@ within `cooking.serveRange` (6 tiles) instead, which is why the test buys chairs
 | Cactus trio and succulent bowl are floor pots | Q-08 |
 | Flat kerb | Q-13 |
 
-## 6. Tooling not there yet
+## 6. Tooling (all gaps closed)
 
-Full list: [authenticity-review.md](authenticity-review.md) §7. Everything that section listed as a gap is
-closed, and the three notes it still carries are `cargo review sizes` probe heuristics rather than tools that are
-missing: a face over open air wins the "top" (the market stall's canopy, the crib's rail read "no top to
-measure"), a vessel basin's rim is not the face it takes, the WC range has no boxed-in cistern, and a tub is
-measured at its water rather than its floor — each of them only a wrong measurement where nothing is drawn wrong.
-The gaps the coordinator's notes and the waves' review logs listed, in reverse order:
-
-**Done 2026-10-30 (content):**
-
-- Range-hood light: the hood comes on while the hob under it cooks (`light.while`,
-  `["stir", "bake"]`), by day as at night, and goes off when the cooking is done. It has no switch of
-  its own; the simulation decides (`lights.rs`). Any task counts, not only a plain use: a recipe's
-  Cook step is `TaskKind::Cook`, so the light watches the step's animation at the station
-  (`crates/sim-core/tests/hood.rs`). Evidence: `bench-results/check-hood/` — `hood-night-final`
-  (idle 22:02: no light; cooking 22:34: the wall, the hob and the floor under the hood lit) and
-  `hood-day-final` (cooking 10:40: the wall under the hood lit by day too).
-
-- `cargo review sizes` takes the highest up-face near the middle that doesn't stand on another, so a canopy
-  or a rail over open air wins (`marketStall`, `crib` read "no top to measure") and a vessel basin's rim is
-  not the face it takes; its sizes also include non-object geometry.
-- `check.mjs play`: no whole-recipe following (it records clips only on the object used, not on the
-  helpers a recipe walks to); needs carry over between uses. (`--use ripe` and the crop stage in the
-  record came 2026-10-31, `--views` 2026-10-31.)
-- `check.mjs sheet`, `poses.html`, gallery and previews each have known blind spots (see §7).
-- CI runs clips, the GLB gate, `cargo check-glb` (since 2026-10-31), `review sizes` (2026-10-30) and
-  `review uses --check` (2026-10-31); still not the browser checks.
+Full list: [authenticity-review.md](authenticity-review.md) §7. Every gap it listed is closed; what it still
+carries are `cargo review sizes` probe heuristics — a face over open air wins the "top" (the market stall's
+canopy, the crib's rail read "no top to measure"), a vessel basin's rim is not the face it takes, the WC range
+has no boxed-in cistern, and a tub is measured at its water rather than its floor. Each is a wrong measurement,
+not a wrong model. The gaps the coordinator's notes and the waves' review logs listed:
 
 **Done 2026-10-31 (`check.mjs play --views`: several angles of the same picture):**
 
@@ -327,6 +311,43 @@ The gaps the coordinator's notes and the waves' review logs listed, in reverse o
   isn't ripe, the use runs and the game says why not ("the vegetable patch isn't ripe yet"), instead of
   the harness skipping it silently (`tools/bench/check.mjs`, `tools/bench/README.md`).
 
+**Done 2026-10-31 (the daisies' daisy chain):**
+
+- The daisies' bed gains **"Make a daisy chain"** (`daisyChain`, 12 min, `anim: tend`, `holds: daisyChain`,
+  never chosen on its own) — `web/public/content/garden.json`. It was the one real use of a flower bed the
+  garden still lacked (`docs/review/garden.md`, I-garden-08's After).
+- One new held item: **`item.daisyChain`** (`hold: hand`, 16 cm across, 1,034 tris, one draw, three materials) —
+  a ring of plaited green stems with eleven white daisies round it, heads up, the stem ends tucked back under
+  where the chain was closed; the daisies are the beds' own white and amber (`tools/art/blender/families/held.py`,
+  `daisyChain()`). `item` ids: 43 → **44**.
+- Test: `crates/sim-core/tests/flowers.rs` `the_daisies_make_a_daisy_chain` (the chain in the hand while it is
+  made, and only then).
+- In play: `bench-results/check-chain/chain-garden.daisies-daisyChain-01.png` (Ada kneeling at the daisies, the
+  chain coiled in her hand), `play-chain.json` (used after 3.9 s; `tend` has no clip, as the other cuts).
+- Docs: `tools/art/blender/families/held.md` (the item), `docs/objects/garden.md` (daisies row, in play),
+  `docs/review/garden.md` (I1 row, I-garden-08's After), `docs/authenticity-review.md` (Q-18, I-garden-08),
+  `docs/objects/open.md`.
+
+**Done 2026-10-30 (content):**
+
+- Range-hood light: the hood comes on while the hob under it cooks (`light.while`,
+  `["stir", "bake"]`), by day as at night, and goes off when the cooking is done. It has no switch of
+  its own; the simulation decides (`lights.rs`). Any task counts, not only a plain use: a recipe's
+  Cook step is `TaskKind::Cook`, so the light watches the step's animation at the station
+  (`crates/sim-core/tests/hood.rs`). Evidence: `bench-results/check-hood/` — `hood-night-final`
+  (idle 22:02: no light; cooking 22:34: the wall, the hob and the floor under the hood lit) and
+  `hood-day-final` (cooking 10:40: the wall under the hood lit by day too).
+
+- `cargo review sizes` takes the highest up-face near the middle that doesn't stand on another, so a canopy
+  or a rail over open air wins (`marketStall`, `crib` read "no top to measure") and a vessel basin's rim is
+  not the face it takes; its sizes also include non-object geometry.
+- `check.mjs play`: no whole-recipe following (it records clips only on the object used, not on the
+  helpers a recipe walks to); needs carry over between uses. (`--use ripe` and the crop stage in the
+  record came 2026-10-31, `--views` 2026-10-31.)
+- `check.mjs sheet`, `poses.html`, gallery and previews each have known blind spots (see §7).
+- CI runs clips, the GLB gate, `cargo check-glb` (since 2026-10-31), `review sizes` (2026-10-30) and
+  `review uses --check` (2026-10-31); still not the browser checks.
+
 **Done 2026-10-30 (tooling):**
 
 - `play --shot-idle`: a picture of each thing as bought, before any use moves it (`<object>-idle.png`).
@@ -377,23 +398,6 @@ The gaps the coordinator's notes and the waves' review logs listed, in reverse o
   `docs/objects/garden.md` and `docs/review/garden.md` (`flowerbed`'s `cut`, the five beds'), `docs/authenticity-review.md`
   (Q-18, G-10, G-68, §9.1 I-garden-08).
 
-**Done 2026-10-31 (the daisies' daisy chain):**
-
-- The daisies' bed gains **"Make a daisy chain"** (`daisyChain`, 12 min, `anim: tend`, `holds: daisyChain`,
-  never chosen on its own) — `web/public/content/garden.json`. It was the one real use of a flower bed the
-  garden still lacked (`docs/review/garden.md`, I-garden-08's After).
-- One new held item: **`item.daisyChain`** (`hold: hand`, 16 cm across, 1,034 tris, one draw, three materials) —
-  a ring of plaited green stems with eleven white daisies round it, heads up, the stem ends tucked back under
-  where the chain was closed; the daisies are the beds' own white and amber (`tools/art/blender/families/held.py`,
-  `daisyChain()`). `item` ids: 43 → **44**.
-- Test: `crates/sim-core/tests/flowers.rs` `the_daisies_make_a_daisy_chain` (the chain in the hand while it is
-  made, and only then).
-- In play: `bench-results/check-chain/chain-garden.daisies-daisyChain-01.png` (Ada kneeling at the daisies, the
-  chain coiled in her hand), `play-chain.json` (used after 3.9 s; `tend` has no clip, as the other cuts).
-- Docs: `tools/art/blender/families/held.md` (the item), `docs/objects/garden.md` (daisies row, in play),
-  `docs/review/garden.md` (I1 row, I-garden-08's After), `docs/authenticity-review.md` (Q-18, I-garden-08),
-  `docs/objects/open.md`.
-
 **Done 2026-10-30 (servers walk in):**
 
 - A server now comes in to work instead of standing at their post from the first minute: `Server.home` is the
@@ -406,7 +410,7 @@ The gaps the coordinator's notes and the waves' review logs listed, in reverse o
   door at a minute past ten, then at the machine).
 - They wear a uniform: a white shirt under a white apron (`top.apron`), dark trousers and dark shoes over their
   own face, hair and skin (`web/src/game/staff.ts`, `UNIFORM`). The apron is a garment of the character set since
-  2026-10-31 (below).
+  2026-10-31 (§3 above).
 - In play: `bench-results/check-staff/staff-cart-before-opening.png` (the ice cream cart unstaffed at 09:55),
   `staff-cart-arrived.png` (the vendor at it in the uniform), `staff-posts.png` (three posts staffed at once).
   The walk itself is 18 seconds of game time, a frame or two at a bench's clock, so the stills show the cart
