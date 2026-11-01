@@ -521,6 +521,14 @@ function mergeSilhouettes(into: SilhouettePlan, s: SilhouettePlan): void {
   into.lamps.push(...s.lamps);
 }
 
+/** A part of `TownStreet.layoutKey`, strung once per object. */
+const keys = new WeakMap<object, string>();
+function keyOf(of: object, make: () => string): string {
+  let k = keys.get(of);
+  if (k === undefined) keys.set(of, (k = make()));
+  return k;
+}
+
 /** Mixes numbers into a 32-bit hash. */
 const mix = (h: number, v: number) => Math.imul(h ^ (v | 0), 16777619);
 
@@ -552,7 +560,8 @@ export class TownStreet {
   private readonly fronting: ({ L: PlotLayout; road: number; side: 1 | -1; at: (u: number) => [number, number] } | null)[];
   private readonly meeting: { p: Rect; road: number; side: 1 | -1 }[];
   /** Openings by where they lie on the ground (cells of 8 m). */
-  private readonly openingGrid = new RectGrid<Rect & { o: Opening; i: number }>(8);
+  private openingGrid = new RectGrid<Rect & { o: Opening; i: number }>(8);
+  private openingsOf: Opening[] | undefined | null = null;
   private blocked = new RectGrid<Blocker>(4);
   private objectsByPlot = new Map<number, ObjectPlacement[]>();
   private garages = new Map<number, SilhouetteSpec['garage']>();
@@ -619,13 +628,6 @@ export class TownStreet {
     this.fronting.forEach((f, i) => {
       if (f) this.rows.get(`${f.road}|${f.side}`)!.push(i);
     });
-    (world.openings ?? []).forEach((o, i) => {
-      // (On the ground's rows: an opening upstairs on the face of the house below it; none of the basement's shows.)
-      const k = storeyOfRow(world, o.z);
-      if (k < 0) return;
-      const z = k > 0 ? o.z - storeyRow(world, k) : o.z;
-      this.openingGrid.add({ x: o.x - 1, z: z - 1, w: 2, d: 2, o, i });
-    });
     this.setWorld(world);
   }
 
@@ -636,30 +638,38 @@ export class TownStreet {
    */
   static layoutKey(world: WorldStructure, mode: 'game' | 'town'): string {
     const m = world.meta;
-    return JSON.stringify([
+    // (Each part strung once per object: a world message brings the same meta and lists again.)
+    return [
       mode,
-      m?.seed ?? 0,
       world.width,
       world.depth,
       world.storeyDepth,
       world.storeys,
       world.basement,
-      m?.streets,
-      m?.roads,
-      m?.paths,
-      m?.facing,
-      m?.world?.fields,
-      m?.home,
-      world.garages,
-      world.openings,
-      mode === 'town' ? world.cars : !!world.cars,
-      world.plots.map((p) => [p.id, p.x, p.z, p.w, p.d, p.public, p.entry]),
-    ]);
+      m ? keyOf(m, () => JSON.stringify([m.seed ?? 0, m.streets, m.roads, m.paths, m.facing, m.world?.fields, m.home])) : '-',
+      world.garages ? keyOf(world.garages, () => JSON.stringify(world.garages)) : '-',
+      mode === 'town' ? (world.cars ? keyOf(world.cars, () => JSON.stringify(world.cars)) : '-') : !!world.cars,
+      keyOf(world.plots, () => JSON.stringify(world.plots.map((p) => [p.id, p.x, p.z, p.w, p.d, p.public, p.entry]))),
+    ].join('|');
   }
 
   /** Takes the world's things, houses and rooms as they are now (the layout stays: see `layoutKey`). */
   setWorld(world: WorldStructure): void {
     this.world = world;
+    // Doors and windows (a window put in on the focus lot): found again by where they are; each
+    // plot's share notices those round its house (`plotOut`).
+    if (world.openings !== this.openingsOf) {
+      this.openingsOf = world.openings;
+      const grid = new RectGrid<Rect & { o: Opening; i: number }>(8);
+      (world.openings ?? []).forEach((o, i) => {
+        // (On the ground's rows: an opening upstairs on the face of the house below it; none of the basement's shows.)
+        const k = storeyOfRow(world, o.z);
+        if (k < 0) return;
+        const z = k > 0 ? o.z - storeyRow(world, k) : o.z;
+        grid.add({ x: o.x - 1, z: z - 1, w: 2, d: 2, o, i });
+      });
+      this.openingGrid = grid;
+    }
     this.plots.forEach((L) => {
       const info = world.plots.find((p) => p.id === L.info.id);
       if (!info || info === L.info) return;
