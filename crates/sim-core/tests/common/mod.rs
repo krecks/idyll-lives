@@ -1773,3 +1773,4 @@ pub fn run_to(w: &mut World, day: u32, hour: f32) {
 pub fn apart(p: [f32; 2], q: [f32; 2]) -> f32 {
     (p[0] - q[0]).hypot(p[1] - q[1])
 }
+pub mod hamlets;

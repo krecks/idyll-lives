@@ -1769,6 +1769,8 @@ pub(crate) struct Ctx<'a> {
     /// Objects by plot (`World::object_index`).
     pub index: &'a ObjectIndex,
     pub exits: &'a [[f32; 2]],
+    /// The road network and bus stops (`World::travel`).
+    pub travel: &'a crate::travel::Travel,
     /// Households' cars (`World::cars`).
     pub cars: &'a [crate::cars::Car],
     pub autonomy: bool,
@@ -3538,6 +3540,7 @@ impl World {
                 object_plot,
                 object_index,
                 exits,
+                travel,
                 cars,
                 room_score,
                 dirt,
@@ -3568,6 +3571,7 @@ impl World {
                 object_plot,
                 index: object_index,
                 exits,
+                travel,
                 cars,
                 autonomy: *autonomy,
                 hour,
@@ -4873,6 +4877,33 @@ pub(crate) fn practise(
     }
 }
 
+/// Whether what changed since `nav_version` `since` may lie across the rest of `sim`'s way: the
+/// box round their remaining waypoints (a margin for the tile legs' detours). Without a record
+/// of where the town changed (`nav_changed_in`, sim-grid) any change may.
+fn route_touched(sim: &Sim, ctx: &Ctx, since: u32) -> bool {
+    let Some(Activity {
+        phase: Phase::Routing { waypoints, next },
+        ..
+    }) = sim.current.as_ref()
+    else {
+        return true;
+    };
+    let (mut x0, mut z0, mut x1, mut z1) = (sim.pos[0], sim.pos[1], sim.pos[0], sim.pos[1]);
+    for p in waypoints.iter().skip(*next) {
+        (x0, z0, x1, z1) = (x0.min(p[0]), z0.min(p[1]), x1.max(p[0]), z1.max(p[1]));
+    }
+    const MARGIN: f32 = 8.0;
+    let _rect = [
+        (x0 - MARGIN).floor() as i32,
+        (z0 - MARGIN).floor() as i32,
+        (x1 + MARGIN).ceil() as i32,
+        (z1 + MARGIN).ceil() as i32,
+    ];
+    let _ = (ctx, since);
+    // Once sim-grid records where the town changed: `ctx.nav_changed_in(_rect, since)`.
+    true
+}
+
 /// A wall or something they walk through moved while they were on their way: their waypoints
 /// may cross it now. Route again from where they stand, and if there's no way there any more,
 /// give up (remembering it, if they chose it themselves).
@@ -4973,8 +5004,11 @@ fn step_sim(
     // The house changed under them since their last turn: a wall where they were going, or a
     // door opened.
     if sim.nav_seen != ctx.nav_version {
+        let since = sim.nav_seen;
         sim.nav_seen = ctx.nav_version;
-        reroute_after_change(sim, ctx, objects);
+        if route_touched(sim, ctx, since) {
+            reroute_after_change(sim, ctx, objects);
+        }
     }
 
     // A baby whose needs run low cries for someone (a thought bubble).
@@ -6912,15 +6946,110 @@ pub(crate) fn walk_route(
         sim,
         goal,
     );
-    route(
+    trip(
         &ctx.nav,
         Some(ctx.reach),
+        ctx.travel,
         sim.pos,
         sim.tile(),
         goal,
         target,
         Some(&grounds),
     )
+}
+
+/// `route`, by road for a long trip in a town with a road network (`travel.rs`): a tile leg to
+/// the road, along it, and a tile leg off it to `target`; A* over the tiles as ever for the rest
+/// (or when there's no way by road).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn trip(
+    nav: &NavGrid,
+    reach: Option<&crate::path::Reach>,
+    travel: &crate::travel::Travel,
+    pos: [f32; 2],
+    start: (i32, i32),
+    goal: (i32, i32),
+    target: [f32; 2],
+    grounds: Option<&Grounds>,
+) -> Option<Vec<[f32; 2]>> {
+    if travel.by_road(pos, target)
+        && let Some(waypoints) = road_route(nav, reach, travel, pos, start, goal, target, grounds)
+    {
+        return Some(waypoints);
+    }
+    route(nav, reach, pos, start, goal, target, grounds)
+}
+
+/// A long walk by road (see `trip`): None if the goal can't be reached, or not by road.
+#[allow(clippy::too_many_arguments)]
+fn road_route(
+    nav: &NavGrid,
+    reach: Option<&crate::path::Reach>,
+    travel: &crate::travel::Travel,
+    pos: [f32; 2],
+    start: (i32, i32),
+    goal: (i32, i32),
+    target: [f32; 2],
+    grounds: Option<&Grounds>,
+) -> Option<Vec<[f32; 2]>> {
+    if let Some(reach) = reach
+        && !reach.reaches(nav, start, goal)
+    {
+        return None;
+    }
+    let plan = travel.walk_plan(pos, target)?;
+    let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
+    let at = |p: &crate::travel::RoadPoint| travel.graph.roads[p.road as usize].at(p.s);
+    // Off the road where the last leg can get to the goal from, then on it where the first can
+    // get to from here (the nearest stretches first).
+    // (Straight to and from the walkers' side of the road where that's open ground, else to
+    // and from its middle.)
+    let open = |p: [f32; 2]| {
+        let (x, z) = tile(p);
+        nav.tile_free(x, z) && reach.is_none_or(|r| r.reaches(nav, (x, z), goal))
+    };
+    let (off, tail) = plan.offs.iter().find_map(|off| {
+        let q = at(off);
+        let leg = route(nav, reach, q, tile(q), goal, target, grounds)?;
+        Some((*off, leg))
+    })?;
+    let (head, mut road) = plan.ons.iter().find_map(|on| {
+        let (road, _) = travel.walk_between(*on, off)?;
+        let p = road.first().copied().filter(|&p| open(p)).unwrap_or(at(on));
+        let head = route(nav, reach, pos, start, tile(p), p, grounds)?;
+        Some((head, road))
+    })?;
+    if road.len() > 1
+        && head
+            .last()
+            .is_some_and(|&h| crate::travel::dist(h, road[0]) < 0.05)
+    {
+        road.remove(0);
+    }
+    let mut waypoints = head;
+    // Along the road: where something stands in the way (a thing on the pavement), round it.
+    for &p in &road {
+        let from = *waypoints.last().unwrap_or(&pos);
+        if crate::travel::dist(from, p) < 0.05 {
+            continue;
+        }
+        if !nav.line_walkable_with(from, p, grounds) {
+            let around = route(nav, reach, from, tile(from), tile(p), p, grounds)?;
+            waypoints.extend(around);
+        } else {
+            waypoints.push(p);
+        }
+    }
+    let from = *waypoints.last().unwrap_or(&pos);
+    match tail.first() {
+        Some(&first) if !nav.line_walkable_with(from, first, grounds) => {
+            let q = tail[0];
+            waypoints.extend(route(nav, reach, from, tile(from), tile(q), q, grounds)?);
+            waypoints.extend(tail.into_iter().skip(1));
+        }
+        _ => waypoints.extend(tail),
+    }
+    Some(waypoints)
 }
 
 /// Smoothed waypoints from `pos` to `target`, or None if unreachable; round the gardens
