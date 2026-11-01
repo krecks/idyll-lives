@@ -236,6 +236,7 @@ impl World {
         self.objects = s.objects;
         self.object_plot = s.object_plot;
         self.blocked = s.blocked;
+        self.sync_tile_arrays();
         self.sims = s.sims;
         self.households = s.households;
         self.plots = s.plots;
@@ -443,7 +444,7 @@ impl World {
                 && x < p.x + p.w + REACH_MARGIN
                 && z < p.z + p.d + REACH_MARGIN
         };
-        let mut seen = vec![false; lot.width * lot.depth];
+        let mut seen = vec![false; lot.tile_slots()];
         let entry = p.arrival_point();
         let start = (entry[0].floor() as i32, entry[1].floor() as i32);
         if !nav.tile_free(start.0, start.1) {
@@ -508,7 +509,8 @@ impl World {
             let gz = self.ground_z(z);
             let on_plot = x >= p.x && gz >= p.z && x < p.x + p.w && gz < p.z + p.d;
             let i = self.lot.tile_index(x, z);
-            s.away_until.is_some() || !on_plot || !before.1[i] || after.1[i]
+            let seen = |s: &[bool]| s.get(i).copied().unwrap_or(false);
+            s.away_until.is_some() || !on_plot || !seen(&before.1) || seen(&after.1)
         });
         objects_ok && sims_ok
     }
@@ -1432,8 +1434,10 @@ impl World {
         }
         // Rooms first: upstairs, where there's floor depends on them.
         self.lot.compute_rooms();
+        self.sync_tile_arrays();
         if !self.keeps_reach(plot, &before, None) {
             self.lot = saved;
+            self.sync_tile_arrays();
             return Err(Error::new(
                 "that would shut a resident or an object in — add a door or a gate",
             ));
@@ -1443,6 +1447,7 @@ impl World {
             .and_then(|()| self.walls_still_hold(plot))
         {
             self.lot = saved;
+            self.sync_tile_arrays();
             return Err(e);
         }
         self.pay(h, cost);
@@ -1726,12 +1731,14 @@ impl World {
         let freed = self.blocking_tiles(&obj);
         for &(x, z) in &freed {
             let i = self.lot.tile_index(x, z);
-            self.blocked[i] = false;
+            if i != crate::lot::VOID {
+                self.blocked[i] = false;
+            }
         }
         for o in 0..self.objects.len() {
             for (x, z) in self.blocking_tiles(&self.objects[o]) {
                 if freed.contains(&(x, z)) {
-                    let i = self.lot.tile_index(x, z);
+                    let i = self.tile_slot_mut(x, z);
                     self.blocked[i] = true;
                 }
             }

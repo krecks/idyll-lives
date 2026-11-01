@@ -324,20 +324,58 @@ pub struct SimSpawn {
 
 pub const OUTDOORS: u16 = 0;
 
-#[derive(Debug, Clone, PartialEq)]
+/// Tiles along each side of a storage chunk (see `Lot`).
+pub const CHUNK: usize = 16;
+const SHIFT: usize = 4;
+const MASK: usize = CHUNK - 1;
+/// Tiles (slots) per chunk.
+pub const CHUNK_TILES: usize = CHUNK * CHUNK;
+/// The slot every tile of a chunk that isn't allocated reads (see `Lot`): open edges, no
+/// diagonal, outdoors. Nothing is ever written there.
+pub const VOID: usize = 0;
+/// The widest a town file may be, and the deepest (each storey is as deep again).
+pub const MAX_SIDE: usize = 1024;
+/// The deepest a saved grid may be: the ground, three storeys above it and a basement (and one
+/// more for content with more storeys).
+pub const MAX_ROWS: usize = MAX_SIDE * 5;
+
+/// The tile grid, stored in chunks of `CHUNK × CHUNK` tiles.
+///
+/// Every per-tile value (the edges on a tile's `-z` and `-x` sides, its diagonal, its rooms) is
+/// kept by *slot*: [`Lot::tile_index`] maps a tile to its slot, and per-tile arrays elsewhere
+/// (`World::blocked`, `World::dirt`, search buffers) are indexed by the same slots, sized
+/// [`Lot::tile_slots`]. The ground storey's chunks are always there; chunks of the rows past it
+/// (the storeys above and the basement, see `storeys.rs`) are allocated on first write, and
+/// until then every tile of theirs reads slot [`VOID`]: all open, outdoors, nothing standing
+/// there. Slots only ever grow (a new chunk's go on the end), so a slot keeps its tile. Whole-grid
+/// passes go row by row ([`Lot::tiles`]), so what they find (room numbers, orders) doesn't
+/// depend on where chunks are stored.
+///
+/// The chunk grid is one tile wider and deeper than the lot, for the edges along its far sides
+/// (`h_edge(x, depth)`, `v_edge(width, z)`).
+#[derive(Debug, Clone)]
 pub struct Lot {
     pub width: usize,
     pub depth: usize,
-    /// `(width) × (depth + 1)` horizontal edges.
+    /// Chunks across and down.
+    cols: usize,
+    rows: usize,
+    /// Per chunk (row-major): its first slot, 0 while it isn't allocated.
+    base: Vec<u32>,
+    /// The allocated chunks in slot order.
+    order: Vec<u32>,
+    /// Per chunk: edges and diagonals in it that aren't open (whole-lot wall scans skip the rest).
+    built: Vec<u16>,
+    /// Per slot: the horizontal edge on the tile's `-z` side (`h_edge(x, z)`).
     h_edges: Vec<Edge>,
-    /// `(width + 1) × (depth)` vertical edges.
+    /// Per slot: the vertical edge on the tile's `-x` side (`v_edge(x, z)`).
     v_edges: Vec<Edge>,
-    /// Diagonal wall per tile, if any.
+    /// Diagonal wall per slot, if any.
     diags: Vec<Option<Diagonal>>,
-    /// Room id per tile; `OUTDOORS` for outside. A tile split by a diagonal reports the
+    /// Room id per slot; `OUTDOORS` for outside. A tile split by a diagonal reports the
     /// room of an indoor half if it has one (see `halves` for both).
     rooms: Vec<u16>,
-    /// Room id of each half of each tile (equal for tiles without a diagonal).
+    /// Room id of each half of each slot (equal for tiles without a diagonal).
     halves: Vec<[u16; 2]>,
     /// Looks of the walls that aren't plain (absent: the default look).
     looks: BTreeMap<EdgeRef, EdgeLook>,
@@ -346,29 +384,76 @@ pub struct Lot {
     floors: BTreeMap<(u16, u16), u8>,
 }
 
+impl PartialEq for Lot {
+    fn eq(&self, o: &Self) -> bool {
+        if (self.width, self.depth) != (o.width, o.depth)
+            || self.looks != o.looks
+            || self.floors != o.floors
+        {
+            return false;
+        }
+        if self.base == o.base {
+            return self.h_edges == o.h_edges
+                && self.v_edges == o.v_edges
+                && self.diags == o.diags
+                && self.halves == o.halves
+                && self.rooms == o.rooms;
+        }
+        // Stored differently: tile by tile, far edges included.
+        (0..=self.depth).all(|z| {
+            (0..=self.width).all(|x| {
+                let (a, b) = (self.slot(x, z), o.slot(x, z));
+                self.h_edges[a] == o.h_edges[b]
+                    && self.v_edges[a] == o.v_edges[b]
+                    && self.diags[a] == o.diags[b]
+                    && self.halves[a] == o.halves[b]
+                    && self.rooms[a] == o.rooms[b]
+            })
+        })
+    }
+}
+
 impl Lot {
+    /// An open lot whose every row is ground (all its chunks allocated).
     pub fn new(width: usize, depth: usize) -> Self {
-        Self {
+        Self::with_ground(width, depth, depth)
+    }
+
+    /// An open lot whose first `ground` rows are always there; the rows past them are
+    /// allocated chunk by chunk as they're built on.
+    pub fn with_ground(width: usize, depth: usize, ground: usize) -> Self {
+        let (cols, rows) = (width / CHUNK + 1, depth / CHUNK + 1);
+        let mut lot = Self {
             width,
             depth,
-            h_edges: vec![Edge::Open; width * (depth + 1)],
-            v_edges: vec![Edge::Open; (width + 1) * depth],
-            diags: vec![None; width * depth],
-            rooms: vec![OUTDOORS; width * depth],
-            halves: vec![[OUTDOORS; 2]; width * depth],
+            cols,
+            rows,
+            base: vec![0; cols * rows],
+            order: Vec::new(),
+            built: vec![0; cols * rows],
+            h_edges: vec![Edge::Open],
+            v_edges: vec![Edge::Open],
+            diags: vec![None],
+            rooms: vec![OUTDOORS],
+            halves: vec![[OUTDOORS; 2]],
             looks: BTreeMap::new(),
             floors: BTreeMap::new(),
-        }
+        };
+        lot.ensure(0, 0, width, ground.min(depth));
+        lot
     }
 
     pub fn from_file(file: &LotFile) -> Result<Self, Error> {
         let (w, d) = (file.width as usize, file.depth as usize);
-        if w == 0 || d == 0 || w > 256 || d > 256 {
-            return Err(Error::new("lot size must be within 1..=256"));
+        if w == 0 || d == 0 || w > MAX_SIDE || d > MAX_SIDE {
+            return Err(Error::new(format!(
+                "lot size must be within 1..={MAX_SIDE}"
+            )));
         }
         // Every storey's rows, and the basement's after them (see `storeys.rs`).
+        let ground = d;
         let d = d * (file.storeys.unwrap_or(1).clamp(1, 4) as usize + usize::from(file.basement));
-        let mut lot = Self::new(w, d);
+        let mut lot = Self::with_ground(w, d, ground);
         for &[x0, z0, x1, z1] in &file.walls {
             let (x0, z0, x1, z1) = (x0 as usize, z0 as usize, x1 as usize, z1 as usize);
             if z0 == z1 && z0 <= d && x0.max(x1) <= w {
@@ -419,68 +504,233 @@ impl Lot {
         Ok(lot)
     }
 
-    /// Rebuilds a lot from saved edge arrays (see `edges`) and diagonals (see `diagonals`;
-    /// empty for saves made before diagonal walls existed).
+    /// Rebuilds a lot from saved edge arrays (row-major, as `h_edge` / `v_edge` number them:
+    /// `width × (depth + 1)` and `(width + 1) × depth`) and diagonals (row-major per tile; empty
+    /// for saves made before diagonal walls existed). The first `ground` rows are always there.
     pub fn from_edges(
         width: usize,
         depth: usize,
+        ground: usize,
         h: Vec<Edge>,
         v: Vec<Edge>,
         diags: Vec<Option<Diagonal>>,
     ) -> Result<Self, Error> {
         // Deeper than a town file may be: the storeys above the ground are rows too.
-        if width == 0 || depth == 0 || width > 256 || depth > 1024 {
+        if width == 0 || depth == 0 || width > MAX_SIDE || depth > MAX_ROWS {
             return Err(Error::new("saved lot size is out of range"));
         }
         if h.len() != width * (depth + 1) || v.len() != (width + 1) * depth {
             return Err(Error::new("saved lot edges have the wrong size"));
         }
-        let diags = match diags.len() {
-            0 => vec![None; width * depth],
-            n if n == width * depth => diags,
-            _ => return Err(Error::new("saved diagonal walls have the wrong size")),
-        };
+        if !diags.is_empty() && diags.len() != width * depth {
+            return Err(Error::new("saved diagonal walls have the wrong size"));
+        }
         if diags.iter().flatten().any(|d| d.edge == Edge::Open) {
             return Err(Error::new("corrupt diagonal walls in save"));
         }
-        let mut lot = Self {
-            width,
-            depth,
-            h_edges: h,
-            v_edges: v,
-            diags,
-            rooms: vec![OUTDOORS; width * depth],
-            halves: vec![[OUTDOORS; 2]; width * depth],
-            looks: BTreeMap::new(),
-            floors: BTreeMap::new(),
-        };
+        let mut lot = Self::with_ground(width, depth, ground.clamp(1, depth));
+        for (i, &e) in h.iter().enumerate().filter(|(_, e)| **e != Edge::Open) {
+            lot.set_h(i % width, i / width, e);
+        }
+        for (i, &e) in v.iter().enumerate().filter(|(_, e)| **e != Edge::Open) {
+            lot.set_v(i % (width + 1), i / (width + 1), e);
+        }
+        for (i, &d) in diags.iter().enumerate().filter(|(_, d)| d.is_some()) {
+            lot.set_diag(i % width, i / width, d);
+        }
         lot.compute_rooms();
         Ok(lot)
     }
 
     /// Adds rows at the far end, all open (room for the storeys above the ground; see
-    /// `World::storeys`). Edges and tiles already there keep their places.
+    /// `World::storeys`). Edges and tiles already there keep their places, and nothing is
+    /// allocated for the new rows until something is built there.
     pub fn grow_depth(&mut self, depth: usize) {
         if depth <= self.depth {
             return;
         }
-        self.h_edges.resize(self.width * (depth + 1), Edge::Open);
-        self.v_edges.resize((self.width + 1) * depth, Edge::Open);
-        self.diags.resize(self.width * depth, None);
-        self.rooms.resize(self.width * depth, OUTDOORS);
-        self.halves.resize(self.width * depth, [OUTDOORS; 2]);
+        self.rows = depth / CHUNK + 1;
+        self.base.resize(self.cols * self.rows, 0);
+        self.built.resize(self.cols * self.rows, 0);
         self.depth = depth;
         self.compute_rooms();
     }
 
-    /// Horizontal and vertical edge arrays, for saving.
+    /// The chunk holding tile `(x, z)` (either may be one past the lot, for far edges).
+    fn chunk_of(&self, x: usize, z: usize) -> usize {
+        (z >> SHIFT) * self.cols + (x >> SHIFT)
+    }
+
+    /// The slot of tile `(x, z)` (either may be one past the lot); `VOID` if its chunk isn't
+    /// allocated.
+    fn slot(&self, x: usize, z: usize) -> usize {
+        match self.base[self.chunk_of(x, z)] as usize {
+            0 => VOID,
+            b => b + ((z & MASK) << SHIFT | (x & MASK)),
+        }
+    }
+
+    /// Allocates chunk `c` (its slots go on the end, all open and outdoors).
+    fn alloc(&mut self, c: usize) {
+        if self.base[c] != 0 {
+            return;
+        }
+        self.base[c] = (1 + self.order.len() * CHUNK_TILES) as u32;
+        self.order.push(c as u32);
+        let n = self.h_edges.len() + CHUNK_TILES;
+        self.h_edges.resize(n, Edge::Open);
+        self.v_edges.resize(n, Edge::Open);
+        self.diags.resize(n, None);
+        self.rooms.resize(n, OUTDOORS);
+        self.halves.resize(n, [OUTDOORS; 2]);
+    }
+
+    /// The slot of tile `(x, z)` to write to, allocating its chunk first.
+    fn slot_mut(&mut self, x: usize, z: usize) -> usize {
+        let c = self.chunk_of(x, z);
+        self.alloc(c);
+        let s = self.slot(x, z);
+        debug_assert!(s != VOID, "never written: the void slot");
+        s
+    }
+
+    /// Makes sure the chunks over tiles `[x0, x1) × [z0, z1)` are allocated (clamped to the lot,
+    /// far edges included). Returns whether any was new: per-tile arrays elsewhere must then
+    /// grow to `tile_slots` (`World::sync_tile_arrays`).
+    pub fn ensure(&mut self, x0: usize, z0: usize, x1: usize, z1: usize) -> bool {
+        let (x1, z1) = (x1.min(self.width + 1), z1.min(self.depth + 1));
+        if x0 >= x1 || z0 >= z1 {
+            return false;
+        }
+        let before = self.order.len();
+        for cz in z0 >> SHIFT..=(z1 - 1) >> SHIFT {
+            for cx in x0 >> SHIFT..=(x1 - 1) >> SHIFT {
+                self.alloc(cz * self.cols + cx);
+            }
+        }
+        self.order.len() != before
+    }
+
+    /// `ensure` for one tile (one past the lot either way is fine, for far edges).
+    pub fn ensure_tile(&mut self, x: i32, z: i32) -> bool {
+        if x < 0 || z < 0 {
+            return false;
+        }
+        self.ensure(x as usize, z as usize, x as usize + 1, z as usize + 1)
+    }
+
+    /// Whether tile `(x, z)`'s chunk is allocated.
+    pub fn allocated(&self, x: i32, z: i32) -> bool {
+        self.tile_index(x, z) != VOID
+    }
+
+    /// How many slots per-tile arrays need (the void slot and every allocated chunk's).
+    pub fn tile_slots(&self) -> usize {
+        1 + self.order.len() * CHUNK_TILES
+    }
+
+    /// The tile a slot holds (`(-1, -1)` for the void slot). It may be past the lot's sides: a
+    /// chunk on the edge has slots for tiles off the lot, which stay open and outdoors.
+    pub fn tile_xz(&self, slot: usize) -> (i32, i32) {
+        if slot == VOID || slot >= self.tile_slots() {
+            return (-1, -1);
+        }
+        let c = self.order[(slot - 1) / CHUNK_TILES] as usize;
+        let local = (slot - 1) % CHUNK_TILES;
+        (
+            ((c % self.cols) * CHUNK + (local & MASK)) as i32,
+            ((c / self.cols) * CHUNK + (local >> SHIFT)) as i32,
+        )
+    }
+
+    /// Every allocated tile on the lot, row by row: `(x, z, slot)`.
+    pub fn tiles(&self) -> impl Iterator<Item = (i32, i32, usize)> + '_ {
+        (0..self.depth).flat_map(move |z| self.row(z, self.width))
+    }
+
+    /// The allocated tiles of row `z` with `x < width`, left to right: `(x, z, slot)`.
+    fn row(&self, z: usize, width: usize) -> impl Iterator<Item = (i32, i32, usize)> + '_ {
+        let first = (z >> SHIFT) * self.cols;
+        (0..self.cols)
+            .filter_map(move |cx| match self.base[first + cx] as usize {
+                0 => None,
+                b => Some((cx, b + ((z & MASK) << SHIFT))),
+            })
+            .flat_map(move |(cx, b)| {
+                (cx * CHUNK..(cx * CHUNK + CHUNK).min(width))
+                    .map(move |x| (x as i32, z as i32, b + (x & MASK)))
+            })
+    }
+
+    /// Row `z`'s slots with `x < width` in chunks with something built, left to right.
+    fn built_row(&self, z: usize, width: usize) -> impl Iterator<Item = (usize, usize)> + '_ {
+        let first = (z >> SHIFT) * self.cols;
+        (0..self.cols)
+            .filter(move |&cx| self.built[first + cx] > 0)
+            .flat_map(move |cx| {
+                let b = self.base[first + cx] as usize + ((z & MASK) << SHIFT);
+                (cx * CHUNK..(cx * CHUNK + CHUNK).min(width)).map(move |x| (x, b + (x & MASK)))
+            })
+    }
+
+    /// Every wall, door, window, fence and gate, row by row: the horizontal edges first (`z` to
+    /// `depth`), then the vertical ones (`x` to `width`), then the diagonals. Chunks with
+    /// nothing built are skipped, so this costs what's built, not the lot's size.
+    pub fn walls(&self) -> impl Iterator<Item = (EdgeRef, Edge)> + '_ {
+        let h = (0..=self.depth).flat_map(move |z| {
+            self.built_row(z, self.width).filter_map(move |(x, s)| {
+                let e = self.h_edges[s];
+                (e != Edge::Open).then_some((EdgeRef::H(x as u16, z as u16), e))
+            })
+        });
+        let v = (0..self.depth).flat_map(move |z| {
+            self.built_row(z, self.width + 1).filter_map(move |(x, s)| {
+                let e = self.v_edges[s];
+                (e != Edge::Open).then_some((EdgeRef::V(x as u16, z as u16), e))
+            })
+        });
+        h.chain(v).chain(
+            self.diagonal_walls()
+                .map(|(x, z, d)| (EdgeRef::Diag(x as u16, z as u16), d.edge)),
+        )
+    }
+
+    /// Every diagonal wall, row by row: `(x, z, diagonal)`.
+    pub fn diagonal_walls(&self) -> impl Iterator<Item = (usize, usize, Diagonal)> + '_ {
+        (0..self.depth).flat_map(move |z| {
+            self.built_row(z, self.width)
+                .filter_map(move |(x, s)| self.diags[s].map(|d| (x, z, d)))
+        })
+    }
+
+    /// Horizontal and vertical edges per slot (each tile's `-z` and `-x` side), for counting.
     pub fn edges(&self) -> (&[Edge], &[Edge]) {
         (&self.h_edges, &self.v_edges)
     }
 
-    /// Diagonal wall per tile (row-major), for saving.
+    /// Diagonal wall per slot (see `tile_index`).
     pub fn diagonals(&self) -> &[Option<Diagonal>] {
         &self.diags
+    }
+
+    /// Every edge and diagonal row by row, as `from_edges` takes them (for saving): the
+    /// horizontal edges `width × (depth + 1)`, the vertical ones `(width + 1) × depth`, the
+    /// diagonals `width × depth`.
+    pub fn row_major_edges(&self) -> (Vec<Edge>, Vec<Edge>, Vec<Option<Diagonal>>) {
+        let (w, d) = (self.width, self.depth);
+        let mut h = vec![Edge::Open; w * (d + 1)];
+        let mut v = vec![Edge::Open; (w + 1) * d];
+        let mut diags = vec![None; w * d];
+        for (e, edge) in self.walls() {
+            match e {
+                EdgeRef::H(x, z) => h[z as usize * w + x as usize] = edge,
+                EdgeRef::V(x, z) => v[z as usize * (w + 1) + x as usize] = edge,
+                EdgeRef::Diag(x, z) => {
+                    diags[z as usize * w + x as usize] = self.diags[self.slot(x.into(), z.into())]
+                }
+            }
+        }
+        (h, v, diags)
     }
 
     /// The diagonal wall across tile `(x, z)`, if any (none off the lot).
@@ -492,9 +742,25 @@ impl Lot {
         }
     }
 
+    /// Notes a change between built and open in chunk `c`.
+    fn count(&mut self, c: usize, was: bool, is: bool) {
+        match (was, is) {
+            (false, true) => self.built[c] += 1,
+            (true, false) => self.built[c] -= 1,
+            _ => {}
+        }
+    }
+
     /// Sets or clears (`None`) the diagonal across a tile. Call `compute_rooms` afterwards.
     pub fn set_diag(&mut self, x: usize, z: usize, d: Option<Diagonal>) {
-        self.diags[z * self.width + x] = d.filter(|d| d.edge != Edge::Open);
+        let d = d.filter(|d| d.edge != Edge::Open);
+        let c = self.chunk_of(x, z);
+        if d.is_none() && self.base[c] == 0 {
+            return;
+        }
+        let s = self.slot_mut(x, z);
+        let was = std::mem::replace(&mut self.diags[s], d).is_some();
+        self.count(c, was, d.is_some());
     }
 
     /// Whether a diagonal wall or window stands across the tile: nobody can stand on it.
@@ -527,25 +793,37 @@ impl Lot {
         }
     }
 
-    /// Rooms of both halves of every tile (row-major; equal for tiles without a diagonal).
+    /// Rooms of both halves of every slot (see `tile_index`; equal for tiles without a diagonal).
     pub fn half_rooms(&self) -> &[[u16; 2]] {
         &self.halves
     }
 
     pub fn h_edge(&self, x: usize, z: usize) -> Edge {
-        self.h_edges[z * self.width + x]
+        self.h_edges[self.slot(x, z)]
     }
 
     pub fn v_edge(&self, x: usize, z: usize) -> Edge {
-        self.v_edges[z * (self.width + 1) + x]
+        self.v_edges[self.slot(x, z)]
     }
 
     pub fn set_h(&mut self, x: usize, z: usize, e: Edge) {
-        self.h_edges[z * self.width + x] = e;
+        let c = self.chunk_of(x, z);
+        if e == Edge::Open && self.base[c] == 0 {
+            return;
+        }
+        let s = self.slot_mut(x, z);
+        let was = std::mem::replace(&mut self.h_edges[s], e) != Edge::Open;
+        self.count(c, was, e != Edge::Open);
     }
 
     pub fn set_v(&mut self, x: usize, z: usize, e: Edge) {
-        self.v_edges[z * (self.width + 1) + x] = e;
+        let c = self.chunk_of(x, z);
+        if e == Edge::Open && self.base[c] == 0 {
+            return;
+        }
+        let s = self.slot_mut(x, z);
+        let was = std::mem::replace(&mut self.v_edges[s], e) != Edge::Open;
+        self.count(c, was, e != Edge::Open);
     }
 
     /// How the wall at `e` looks (the default look where there's no wall).
@@ -590,8 +868,19 @@ impl Lot {
         x >= 0 && z >= 0 && (x as usize) < self.width && (z as usize) < self.depth
     }
 
+    /// The slot of tile `(x, z)` (see `Lot`): where per-tile arrays keep its values. A tile
+    /// whose chunk isn't allocated, or off the chunk grid, has the void slot.
     pub fn tile_index(&self, x: i32, z: i32) -> usize {
-        z as usize * self.width + x as usize
+        let (x, z) = (x as usize, z as usize);
+        let c = (z >> SHIFT)
+            .wrapping_mul(self.cols)
+            .wrapping_add(x >> SHIFT);
+        match self.base.get(c).copied().unwrap_or(0) as usize {
+            b if b != 0 && x <= self.width && z <= self.depth => {
+                b + ((z & MASK) << SHIFT | (x & MASK))
+            }
+            _ => VOID,
+        }
     }
 
     /// Edge between two orthogonally adjacent in-bounds tiles.
@@ -618,68 +907,183 @@ impl Lot {
         }
     }
 
+    /// Room id per slot (see `tile_index`).
     pub fn rooms(&self) -> &[u16] {
         &self.rooms
     }
 
+    /// Room id per tile, row by row (`width × depth`), for views.
+    pub fn rooms_row_major(&self) -> Vec<u16> {
+        let mut out = vec![OUTDOORS; self.width * self.depth];
+        for (x, z, s) in self.tiles() {
+            out[z as usize * self.width + x as usize] = self.rooms[s];
+        }
+        out
+    }
+
     /// Flood-fills rooms over tile halves. Walls, doors and windows (straight or diagonal)
-    /// separate rooms; any area touching the lot border is outdoors.
+    /// separate rooms; any area touching the lot border is outdoors. Rooms are numbered in the
+    /// order of their first tile row by row, as if every chunk were there: a chunk that isn't
+    /// is one open square, walked across as a whole, and allocated if it turns out to be inside
+    /// a room.
     pub fn compute_rooms(&mut self) {
-        const UNSET: u16 = u16::MAX;
+        struct Region {
+            key: u64,
+            nodes: std::ops::Range<usize>,
+            voids: std::ops::Range<usize>,
+        }
         self.halves.fill([UNSET; 2]);
-        // A tile without a diagonal is one node (half 0); its half 1 copies it at the end.
-        let split = |lot: &Lot, i: usize| lot.diags[i].is_some();
-        let mut next_room = 1;
+        let width = self.width;
+        let key = |x: i32, z: i32, h: usize| (z as u64 * width as u64 + x as u64) * 2 + h as u64;
+        let mut void_seen = vec![false; self.base.len()];
+        let mut regions: Vec<Region> = Vec::new();
+        let (mut nodes, mut voids) = (Vec::new(), Vec::new());
         let mut queue = VecDeque::new();
-        let mut nodes = Vec::new();
-        for start in 0..self.halves.len() * 2 {
-            let (si, sh) = (start / 2, start % 2);
-            if (sh == 1 && !split(self, si)) || self.halves[si][sh] != UNSET {
-                continue;
-            }
-            nodes.clear();
-            let mut touches_border = false;
-            self.halves[si][sh] = next_room;
-            queue.push_back((si, sh));
-            while let Some((i, h)) = queue.pop_front() {
-                nodes.push((i, h));
-                let (x, z) = ((i % self.width) as i32, (i / self.width) as i32);
-                for side in Side::ALL {
-                    if split(self, i) && self.half_at_side(x, z, side) != h {
-                        continue;
-                    }
-                    let (dx, dz) = side.offset();
-                    let (nx, nz) = (x + dx, z + dz);
-                    if !self.in_bounds(nx, nz) {
-                        touches_border = true;
-                        continue;
-                    }
-                    if self.edge_between(x, z, nx, nz).is_wall() {
-                        continue;
-                    }
-                    let n = self.tile_index(nx, nz);
-                    let nh = self.half_at_side(nx, nz, side.opposite());
-                    if self.halves[n][nh] == UNSET {
-                        self.halves[n][nh] = next_room;
-                        queue.push_back((n, nh));
+        for z in 0..self.depth {
+            for cx in 0..self.cols {
+                let b = self.base[(z >> SHIFT) * self.cols + cx] as usize;
+                if b == 0 {
+                    continue;
+                }
+                for x in cx * CHUNK..(cx * CHUNK + CHUNK).min(width) {
+                    let si = b + ((z & MASK) << SHIFT | (x & MASK));
+                    for sh in 0..2 {
+                        if (sh == 1 && self.diags[si].is_none()) || self.halves[si][sh] != UNSET {
+                            continue;
+                        }
+                        let (n0, v0) = (nodes.len(), voids.len());
+                        let mut border = false;
+                        let mut first = u64::MAX;
+                        self.halves[si][sh] = SEEN;
+                        queue.push_back(RoomNode::Tile(si, sh, x as i32, z as i32));
+                        while let Some(node) = queue.pop_front() {
+                            let mut go = |lot: &mut Lot, x: i32, z: i32, side: Side| {
+                                border |= lot.flood_step(x, z, side, &mut queue, &mut void_seen);
+                            };
+                            match node {
+                                RoomNode::Tile(i, h, tx, tz) => {
+                                    nodes.push((i, h));
+                                    first = first.min(key(tx, tz, h));
+                                    for side in Side::ALL {
+                                        if self.diags[i].is_none()
+                                            || self.half_at_side(tx, tz, side) == h
+                                        {
+                                            go(self, tx, tz, side);
+                                        }
+                                    }
+                                }
+                                RoomNode::Void(c) => {
+                                    voids.push(c);
+                                    let (x0, z0) =
+                                        ((c % self.cols) * CHUNK, (c / self.cols) * CHUNK);
+                                    let (x1, z1) =
+                                        ((x0 + CHUNK).min(width), (z0 + CHUNK).min(self.depth));
+                                    first = first.min(key(x0 as i32, z0 as i32, 0));
+                                    for tz in z0 as i32..z1 as i32 {
+                                        go(self, x0 as i32, tz, Side::NegX);
+                                        go(self, x1 as i32 - 1, tz, Side::PosX);
+                                    }
+                                    for tx in x0 as i32..x1 as i32 {
+                                        go(self, tx, z0 as i32, Side::NegZ);
+                                        go(self, tx, z1 as i32 - 1, Side::PosZ);
+                                    }
+                                }
+                            }
+                        }
+                        if border {
+                            for &(i, h) in &nodes[n0..] {
+                                self.halves[i][h] = OUTDOORS;
+                            }
+                            nodes.truncate(n0);
+                            voids.truncate(v0);
+                        } else {
+                            regions.push(Region {
+                                key: first,
+                                nodes: n0..nodes.len(),
+                                voids: v0..voids.len(),
+                            });
+                        }
                     }
                 }
             }
-            if touches_border {
-                for &(i, h) in &nodes {
-                    self.halves[i][h] = OUTDOORS;
+        }
+        // Numbered by their first tile, row by row.
+        regions.sort_unstable_by_key(|r| r.key);
+        for (k, r) in regions.iter().enumerate() {
+            let id = k as u16 + 1;
+            for &(i, h) in &nodes[r.nodes.clone()] {
+                self.halves[i][h] = id;
+            }
+            // A chunk inside a room has a floor to stand on: it's there from now on.
+            for &c in &voids[r.voids.clone()] {
+                self.alloc(c);
+                let b = self.base[c] as usize;
+                let (x0, z0) = ((c % self.cols) * CHUNK, (c / self.cols) * CHUNK);
+                for tz in z0..(z0 + CHUNK).min(self.depth) {
+                    for tx in x0..(x0 + CHUNK).min(width) {
+                        self.halves[b + ((tz & MASK) << SHIFT | (tx & MASK))] = [id, UNSET];
+                    }
                 }
-            } else {
-                next_room += 1;
             }
         }
         for (i, h) in self.halves.iter_mut().enumerate() {
+            if h[0] == UNSET {
+                // The void slot, and tiles of edge chunks off the lot.
+                *h = [OUTDOORS; 2];
+            }
             if self.diags[i].is_none() {
                 h[1] = h[0];
             }
             self.rooms[i] = if h[0] != OUTDOORS { h[0] } else { h[1] };
         }
     }
+
+    /// One step of the room flood: from tile `(x, z)` across `side`. Queues the tile there (or
+    /// its chunk, if that isn't allocated) unless a wall is in the way or it was seen already;
+    /// returns whether the step leaves the lot.
+    fn flood_step(
+        &mut self,
+        x: i32,
+        z: i32,
+        side: Side,
+        queue: &mut VecDeque<RoomNode>,
+        void_seen: &mut [bool],
+    ) -> bool {
+        let (dx, dz) = side.offset();
+        let (nx, nz) = (x + dx, z + dz);
+        if !self.in_bounds(nx, nz) {
+            return true;
+        }
+        if self.edge_between(x, z, nx, nz).is_wall() {
+            return false;
+        }
+        let nc = self.chunk_of(nx as usize, nz as usize);
+        if self.base[nc] == 0 {
+            if !std::mem::replace(&mut void_seen[nc], true) {
+                queue.push_back(RoomNode::Void(nc));
+            }
+            return false;
+        }
+        let n = self.tile_index(nx, nz);
+        let nh = self.half_at_side(nx, nz, side.opposite());
+        if self.halves[n][nh] == UNSET {
+            self.halves[n][nh] = SEEN;
+            queue.push_back(RoomNode::Tile(n, nh, nx, nz));
+        }
+        false
+    }
+}
+
+/// Room flood markers (`Lot::compute_rooms`): not reached yet, and reached by this flood.
+const UNSET: u16 = u16::MAX;
+const SEEN: u16 = u16::MAX - 1;
+
+/// A node of the room flood: half `h` of the tile in slot `i` at `(x, z)`, or a whole chunk
+/// that isn't allocated (all open).
+#[derive(Clone, Copy)]
+enum RoomNode {
+    Tile(usize, usize, i32, i32),
+    Void(usize),
 }
 
 #[cfg(test)]
@@ -800,6 +1204,77 @@ mod tests {
         let lot = Lot::from_file(&file).unwrap();
         assert!(lot.half_rooms().iter().all(|h| *h == [OUTDOORS; 2]));
         assert!(lot.rooms().iter().all(|&r| r == OUTDOORS));
+    }
+
+    /// The same walls on a lot whose rows past `ground` are chunks allocated as they're built
+    /// on, and on one with every chunk there: the same rooms, numbered the same.
+    fn both_ways(width: usize, depth: usize, ground: usize, walls: &[[usize; 4]]) -> (Lot, Lot) {
+        let mut lazy = Lot::with_ground(width, depth, ground);
+        let mut dense = Lot::new(width, depth);
+        for lot in [&mut lazy, &mut dense] {
+            for &[x0, z0, x1, z1] in walls {
+                if z0 == z1 {
+                    (x0..x1).for_each(|x| lot.set_h(x, z0, Edge::Wall));
+                } else {
+                    (z0..z1).for_each(|z| lot.set_v(x0, z, Edge::Wall));
+                }
+            }
+            lot.compute_rooms();
+        }
+        (lazy, dense)
+    }
+
+    #[test]
+    fn rooms_over_chunks_not_yet_there_are_found_and_numbered_as_if_they_were() {
+        // Upstairs (rows 40..), a hall 40 tiles square: whole chunks inside it have no walls,
+        // so they aren't allocated until the rooms are found. A small room beside it starts on
+        // a later row than the hall's first tile.
+        let walls = [
+            [4, 44, 44, 44],
+            [4, 84, 44, 84],
+            [4, 44, 4, 84],
+            [44, 44, 44, 84],
+            [50, 46, 54, 46],
+            [50, 50, 54, 50],
+            [50, 46, 50, 50],
+            [54, 46, 54, 50],
+        ];
+        let (lazy, dense) = both_ways(64, 100, 40, &walls);
+        assert_eq!(lazy, dense);
+        assert!(lazy.tile_slots() < dense.tile_slots(), "less is stored");
+        let hall = lazy.room_at(20, 60);
+        assert_ne!(hall, OUTDOORS, "the middle of the hall is a room");
+        assert!(lazy.allocated(20, 60), "and is there now");
+        assert_eq!(hall, dense.room_at(20, 60));
+        assert_eq!(lazy.room_at(52, 48), dense.room_at(52, 48));
+        assert_ne!(lazy.room_at(52, 48), hall);
+        assert_eq!(lazy.rooms_row_major(), dense.rooms_row_major());
+        assert!(!lazy.allocated(60, 90), "open air stays unallocated");
+        assert_eq!(lazy.room_at(60, 90), OUTDOORS);
+    }
+
+    #[test]
+    fn slots_map_back_to_their_tiles() {
+        let (lot, _) = both_ways(40, 60, 20, &[[3, 30, 9, 30]]);
+        for (x, z, s) in lot.tiles() {
+            assert_eq!(lot.tile_index(x, z), s);
+            assert_eq!(lot.tile_xz(s), (x, z));
+            assert_ne!(s, VOID);
+        }
+        assert_eq!(lot.tile_index(30, 50), VOID, "nothing built there");
+        assert_eq!(lot.tile_index(-1, 3), VOID);
+        let rows: Vec<i32> = lot.tiles().map(|(_, z, _)| z).collect();
+        assert!(rows.windows(2).all(|w| w[0] <= w[1]), "row by row");
+        let walls: Vec<_> = lot.walls().collect();
+        assert_eq!(walls.len(), 6);
+        assert!(
+            walls
+                .iter()
+                .all(|(e, w)| matches!(e, EdgeRef::H(_, 30)) && *w == Edge::Wall)
+        );
+        let (h, v, _) = lot.row_major_edges();
+        let again = Lot::from_edges(40, 60, 20, h, v, Vec::new()).unwrap();
+        assert_eq!(again, lot);
     }
 
     #[test]

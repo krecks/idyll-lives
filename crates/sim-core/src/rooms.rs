@@ -113,14 +113,17 @@ pub(crate) struct RoomTiles {
 }
 
 const NONE: u32 = u32::MAX;
+/// No room sets a tile's score (`World::refresh_rooms`, `RoomTiles::new`).
+pub(crate) const NO_ROOM: u32 = NONE;
 
 impl RoomTiles {
-    /// `cells` per room from `compute`; `source` per tile: the room that sets its score.
-    pub fn new(cells: Vec<Vec<(u32, f32)>>, source: &[Option<usize>]) -> Self {
+    /// `cells` per room from `compute`; `source` per tile slot: the room that sets its score
+    /// (`NO_ROOM`: none).
+    pub fn new(cells: Vec<Vec<(u32, f32)>>, source: &[u32]) -> Self {
         let mut scored = vec![Vec::new(); cells.len()];
-        for (i, s) in source.iter().enumerate() {
-            if let Some(r) = *s {
-                scored[r].push(i as u32);
+        for (i, &r) in source.iter().enumerate() {
+            if r != NO_ROOM {
+                scored[r as usize].push(i as u32);
             }
         }
         let mut of_tile = vec![[NONE; 2]; source.len()];
@@ -218,18 +221,15 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             [(r0, 0.5), (r1, 0.5)]
         }
     };
-    for z in 0..lot.depth as i32 {
-        for x in 0..lot.width as i32 {
-            let i = lot.tile_index(x, z);
-            for (r, weight) in parts(halves[i]) {
-                if r == OUTDOORS || weight == 0.0 {
-                    continue;
-                }
-                let acc = &mut rooms[r as usize];
-                add(acc, x, z, i, weight);
-                if lot.floor(x as u16, z as u16) != 0 {
-                    acc.floors += weight;
-                }
+    for (x, z, i) in lot.tiles() {
+        for (r, weight) in parts(halves[i]) {
+            if r == OUTDOORS || weight == 0.0 {
+                continue;
+            }
+            let acc = &mut rooms[r as usize];
+            add(acc, x, z, i, weight);
+            if lot.floor(x as u16, z as u16) != 0 {
+                acc.floors += weight;
             }
         }
     }
@@ -280,7 +280,6 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             }
         }
     };
-    let (w_, d_) = (lot.width as i32, lot.depth as i32);
     let room = |x: i32, z: i32| {
         if lot.in_bounds(x, z) {
             lot.room_at(x, z)
@@ -288,37 +287,30 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             OUTDOORS
         }
     };
-    for z in 0..=d_ {
-        for x in 0..w_ {
-            let e = lot.h_edge(x as usize, z as usize);
-            if !e.is_wall() {
-                continue;
-            }
-            let look = lot.look(EdgeRef::H(x as u16, z as u16));
-            let (a, b) = (room(x, z - 1), room(x, z));
-            boundary(a, b, z - 1, e, look.sides[0] != 0);
-            boundary(b, a, z, e, look.sides[1] != 0);
+    for (at, e) in lot.walls() {
+        if !e.is_wall() {
+            continue;
         }
-    }
-    for z in 0..d_ {
-        for x in 0..=w_ {
-            let e = lot.v_edge(x as usize, z as usize);
-            if !e.is_wall() {
-                continue;
+        let look = lot.look(at);
+        match at {
+            EdgeRef::H(x, z) => {
+                let (x, z) = (x as i32, z as i32);
+                let (a, b) = (room(x, z - 1), room(x, z));
+                boundary(a, b, z - 1, e, look.sides[0] != 0);
+                boundary(b, a, z, e, look.sides[1] != 0);
             }
-            let look = lot.look(EdgeRef::V(x as u16, z as u16));
-            let (a, b) = (room(x - 1, z), room(x, z));
-            boundary(a, b, z, e, look.sides[0] != 0);
-            boundary(b, a, z, e, look.sides[1] != 0);
-        }
-    }
-    for z in 0..d_ {
-        for x in 0..w_ {
-            let Some(d) = lot.diag(x, z) else { continue };
-            let look = lot.look(EdgeRef::Diag(x as u16, z as u16));
-            let [h0, h1] = halves[lot.tile_index(x, z)];
-            boundary(h0, h1, z, d.edge, look.sides[0] != 0);
-            boundary(h1, h0, z, d.edge, look.sides[1] != 0);
+            EdgeRef::V(x, z) => {
+                let (x, z) = (x as i32, z as i32);
+                let (a, b) = (room(x - 1, z), room(x, z));
+                boundary(a, b, z, e, look.sides[0] != 0);
+                boundary(b, a, z, e, look.sides[1] != 0);
+            }
+            EdgeRef::Diag(x, z) => {
+                let (x, z) = (x as i32, z as i32);
+                let [h0, h1] = halves[lot.tile_index(x, z)];
+                boundary(h0, h1, z, e, look.sides[0] != 0);
+                boundary(h1, h0, z, e, look.sides[1] != 0);
+            }
         }
     }
 

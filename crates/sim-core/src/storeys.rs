@@ -78,9 +78,7 @@ impl World {
             blocks += 1;
         }
         self.lot.grow_depth(depth * blocks);
-        let tiles = self.lot.width * self.lot.depth;
-        self.blocked.resize(tiles, false);
-        self.dirt.resize(tiles, 0.0);
+        self.sync_tile_arrays();
         self.storeys = want;
         self.stairs.depth = depth as i32;
         self.refresh_stairs();

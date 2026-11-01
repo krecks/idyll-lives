@@ -164,8 +164,9 @@ const OVER_THE_FENCE: u32 = ORTHO * 300;
 /// Which plots one resident may walk across (their home, public places, where they're going);
 /// the rest are other people's gardens, kept off unless there's no other way.
 pub struct Grounds<'a> {
-    /// Plot per tile of the ground storey (upper storeys are over the same ground).
-    pub tile_plot: &'a [Option<u32>],
+    /// Plot per tile of the ground storey, row by row (upper storeys are over the same ground;
+    /// `NO_PLOT` off the plots).
+    pub tile_plot: &'a [u16],
     /// Per plot (by id): whether this resident may walk across it.
     pub open: Vec<bool>,
     /// Per plot (by id): whether its sides are fenced off from the plots beside it (a garden; a
@@ -182,8 +183,8 @@ impl Grounds<'_> {
         }
         self.tile_plot
             .get(z as usize * nav.lot.width + x as usize)
-            .copied()
-            .flatten()
+            .filter(|&&p| p != NO_PLOT)
+            .map(|&p| u32::from(p))
     }
 
     /// Whether plot `p` (a tile's) is one this resident shouldn't walk across.
@@ -199,6 +200,9 @@ impl Grounds<'_> {
     }
 }
 
+/// No plot (`Grounds::tile_plot`, `World::tile_plot`).
+pub const NO_PLOT: u16 = u16::MAX;
+
 /// Read-only view of what is walkable: lot edges plus tiles blocked by objects, storeys and stairs.
 pub struct NavGrid<'a> {
     pub lot: &'a Lot,
@@ -210,7 +214,9 @@ impl NavGrid<'_> {
     /// Whether a resident can stand on the tile: on the lot, no furniture, no diagonal wall;
     /// off the ground (upstairs or in the basement), only in a room (where there's a floor).
     pub fn tile_free(&self, x: i32, z: i32) -> bool {
+        // (A tile whose chunk isn't allocated is open air off the ground: nobody stands there.)
         self.lot.in_bounds(x, z)
+            && self.lot.allocated(x, z)
             && !self.blocked[self.lot.tile_index(x, z)]
             && !self.lot.diag_blocks(x, z)
             && (self.stairs.depth == 0
@@ -292,8 +298,8 @@ impl NavGrid<'_> {
             return Some(vec![start]);
         }
         SCRATCH.with_borrow_mut(|scratch| {
-            // (Every storey's rows: the lot's whole depth.)
-            let search = scratch.start(lot.width * lot.depth);
+            // (Every storey's rows: the lot's whole depth, by slot.)
+            let search = scratch.start(lot.tile_slots());
             let Scratch {
                 g,
                 came,
@@ -305,22 +311,26 @@ impl NavGrid<'_> {
             let cost_to = |g: &[u32], stamp: &[u32], i: usize| {
                 if stamp[i] == search { g[i] } else { u32::MAX }
             };
+            // Costs, where from and stamps by slot; the open list by row-major key (`z * width +
+            // x`), so ties break the same way however the tiles are stored.
+            let width = lot.width as u32;
+            let key = |(x, z): (i32, i32)| z as u32 * width + x as u32;
             let s = lot.tile_index(start.0, start.1);
             let goal_i = lot.tile_index(goal.0, goal.1);
             (g[s], came[s], stamp[s]) = (0, u32::MAX, search);
             let heuristic = |a: (i32, i32), b: (i32, i32)| heuristic(self.flat(a), self.flat(b));
-            open.push(Reverse((heuristic(start, goal), s as u32)));
+            open.push(Reverse((heuristic(start, goal), key(start))));
 
             let mut expanded = 0u64;
             let found = loop {
-                let Some(Reverse((f, i))) = open.pop() else {
+                let Some(Reverse((f, k))) = open.pop() else {
                     break None;
                 };
-                let i = i as usize;
+                let (x, z) = ((k % width) as i32, (k / width) as i32);
+                let i = lot.tile_index(x, z);
                 if i == goal_i {
-                    break Some(reconstruct(lot, came, i));
+                    break Some(reconstruct(lot, came, (x, z)));
                 }
-                let (x, z) = ((i % lot.width) as i32, (i / lot.width) as i32);
                 if f > g[i] + heuristic((x, z), goal) {
                     continue; // stale heap entry
                 }
@@ -356,8 +366,8 @@ impl NavGrid<'_> {
                         }
                     }
                     if cost < cost_to(g, stamp, ni) {
-                        (g[ni], came[ni], stamp[ni]) = (cost, i as u32, search);
-                        open.push(Reverse((cost + heuristic((nx, nz), goal), ni as u32)));
+                        (g[ni], came[ni], stamp[ni]) = (cost, k, search);
+                        open.push(Reverse((cost + heuristic((nx, nz), goal), key((nx, nz)))));
                     }
                 }
             };
@@ -469,24 +479,21 @@ impl Reach {
     /// costs but is paid once per change to the house instead of once per unreachable goal.
     pub fn build(nav: &NavGrid) -> Reach {
         let lot = nav.lot;
-        let tiles = lot.width * lot.depth;
-        let mut label = vec![u32::MAX; tiles];
+        let mut label = vec![u32::MAX; lot.tile_slots()];
         let mut queue = Vec::new();
         let mut regions = 0;
-        for start in 0..tiles {
-            let (x, z) = ((start % lot.width) as i32, (start / lot.width) as i32);
+        for (x, z, start) in lot.tiles() {
             if label[start] != u32::MAX || !nav.tile_free(x, z) {
                 continue;
             }
             label[start] = regions;
-            queue.push(start);
-            while let Some(t) = queue.pop() {
-                let (x, z) = ((t % lot.width) as i32, (t / lot.width) as i32);
+            queue.push((x, z));
+            while let Some((x, z)) = queue.pop() {
                 for (nx, nz) in nav.neighbours(x, z) {
                     let n = lot.tile_index(nx, nz);
                     if label[n] == u32::MAX {
                         label[n] = regions;
-                        queue.push(n);
+                        queue.push((nx, nz));
                     }
                 }
             }
@@ -605,13 +612,15 @@ fn heuristic(a: (i32, i32), b: (i32, i32)) -> u32 {
     ORTHO * dx.max(dz) + (DIAG - ORTHO) * dx.min(dz)
 }
 
-fn reconstruct(lot: &Lot, came: &[u32], mut i: usize) -> Vec<(i32, i32)> {
+/// The path to `at`, back along `came` (by slot: the row-major key of the tile before).
+fn reconstruct(lot: &Lot, came: &[u32], mut at: (i32, i32)) -> Vec<(i32, i32)> {
+    let width = lot.width as u32;
     let mut out = Vec::new();
     loop {
-        out.push(((i % lot.width) as i32, (i / lot.width) as i32));
-        match came[i] {
+        out.push(at);
+        match came[lot.tile_index(at.0, at.1)] {
             u32::MAX => break,
-            prev => i = prev as usize,
+            prev => at = ((prev % width) as i32, (prev / width) as i32),
         }
     }
     out.reverse();
@@ -688,7 +697,7 @@ mod tests {
     #[test]
     fn routes_around_wall() {
         let lot = lot_with_wall();
-        let blocked = vec![false; 100];
+        let blocked = nav_of(&lot);
         let nav = NavGrid {
             lot: &lot,
             blocked: &blocked,
@@ -707,7 +716,7 @@ mod tests {
     #[test]
     fn smoothing_keeps_walkability() {
         let lot = lot_with_wall();
-        let blocked = vec![false; 100];
+        let blocked = nav_of(&lot);
         let nav = NavGrid {
             lot: &lot,
             blocked: &blocked,
@@ -722,7 +731,7 @@ mod tests {
     }
 
     fn nav_of(lot: &Lot) -> Vec<bool> {
-        vec![false; lot.width * lot.depth]
+        vec![false; lot.tile_slots()]
     }
 
     /// Every step of a path is allowed and no tile on it is crossed by a diagonal wall.
@@ -862,7 +871,7 @@ mod tests {
         )
         .unwrap();
         let lot = Lot::from_file(&file).unwrap();
-        let blocked = vec![false; 36];
+        let blocked = nav_of(&lot);
         let nav = NavGrid {
             lot: &lot,
             blocked: &blocked,
@@ -873,11 +882,17 @@ mod tests {
 
     /// Three gardens side by side, x 0..10, 10..20 and 20..30 (plots 0, 1, 2) over rows
     /// 0..10, with the street along rows 10..14. No fences: only the plots tell them apart.
-    fn three_gardens(walls: &str) -> (Lot, Vec<Option<u32>>) {
+    fn three_gardens(walls: &str) -> (Lot, Vec<u16>) {
         let json = format!(r#"{{"width":30,"depth":14,"walls":[{walls}]}}"#);
         let lot = Lot::from_file(&serde_json::from_str::<LotFile>(&json).unwrap()).unwrap();
         let tile_plot = (0..30 * 14)
-            .map(|i| (i / 30 < 10).then_some((i % 30 / 10) as u32))
+            .map(|i| {
+                if i / 30 < 10 {
+                    (i % 30 / 10) as u16
+                } else {
+                    NO_PLOT
+                }
+            })
             .collect();
         (lot, tile_plot)
     }
@@ -1032,6 +1047,8 @@ mod tests {
         let small = lot_with_wall();
         let mut tall = lot_with_wall();
         tall.grow_depth(30);
+        // (The new rows are built on: their chunks are there.)
+        tall.ensure(0, 10, 10, 30);
         let (bs, bt) = (nav_of(&small), nav_of(&tall));
         let flat = NavGrid {
             lot: &small,

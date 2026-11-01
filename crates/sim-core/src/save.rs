@@ -690,7 +690,7 @@ pub struct RelationshipSave {
 impl World {
     pub fn to_save(&self) -> SaveFile {
         let content = &self.content;
-        let (h, v) = self.lot.edges();
+        let (h, v, diagonals) = self.lot.row_major_edges();
         let minutes_left = |until: u64| until.saturating_sub(self.tick) as f32 * MINUTES_PER_TICK;
         let objects = self
             .objects
@@ -857,16 +857,11 @@ impl World {
             version: SAVE_VERSION,
             mode: self.mode,
             dirt: self
-                .dirt
-                .iter()
-                .enumerate()
-                .filter(|(_, d)| **d >= 1.0 / 255.0)
-                .map(|(i, d)| {
-                    [
-                        (i % self.lot.width) as u16,
-                        (i / self.lot.width) as u16,
-                        (d * 255.0).round() as u16,
-                    ]
+                .lot
+                .tiles()
+                .filter_map(|(x, z, i)| {
+                    let d = self.dirt.get(i).copied().unwrap_or(0.0);
+                    (d >= 1.0 / 255.0).then(|| [x as u16, z as u16, (d * 255.0).round() as u16])
                 })
                 .collect(),
             tick: self.tick,
@@ -881,9 +876,9 @@ impl World {
             lot: LotSave {
                 width: self.lot.width,
                 depth: self.lot.depth,
-                h_edges: encode(h),
-                v_edges: encode(v),
-                diagonals: encode_diagonals(self.lot.diagonals()),
+                h_edges: encode(&h),
+                v_edges: encode(&v),
+                diagonals: encode_diagonals(&diagonals),
                 looks: encode_looks(&self.lot, &self.content),
                 floors: encode_floors(&self.lot, &self.content),
             },
@@ -1013,9 +1008,21 @@ impl World {
                 save.version
             )));
         }
+        // Storeys before the furniture: what may stand upstairs depends on them.
+        let storeys = save.storeys.unwrap_or(1).max(1);
+        // The basement's block comes after the ground's, at most one past the storeys above.
+        let basement = save.basement.filter(|&b| b > 0 && b <= storeys);
+        let blocks = storeys as usize + usize::from(basement.is_some());
+        let stacked = blocks > 1 && save.lot.depth.is_multiple_of(blocks);
+        let ground = if stacked {
+            save.lot.depth / blocks
+        } else {
+            save.lot.depth
+        };
         let mut lot = Lot::from_edges(
             save.lot.width,
             save.lot.depth,
+            ground,
             decode(&save.lot.h_edges)?,
             decode(&save.lot.v_edges)?,
             decode_diagonals(&save.lot.diagonals)?,
@@ -1023,12 +1030,7 @@ impl World {
         decode_looks(&mut lot, &content, &save.lot.looks);
         decode_floors(&mut lot, &content, &save.lot.floors);
         let mut world = World::empty(content, lot, Rng::new(save.rng));
-        // Storeys before the furniture: what may stand upstairs depends on them.
-        let storeys = save.storeys.unwrap_or(1).max(1);
-        // The basement's block comes after the ground's, at most one past the storeys above.
-        let basement = save.basement.filter(|&b| b > 0 && b <= storeys);
-        let blocks = storeys as usize + usize::from(basement.is_some());
-        if blocks > 1 && world.lot.depth.is_multiple_of(blocks) {
+        if stacked {
             world.storeys = storeys;
             world.stairs.depth = (world.lot.depth / blocks) as i32;
             world.stairs.basement = basement.map_or(0, i32::from);
@@ -1504,10 +1506,11 @@ impl World {
         });
         world.events = social::EventLog::restore(save.next_event_id, events);
         world.former = save.former.clone();
-        world.dirt = vec![0.0; world.lot.width * world.lot.depth];
+        world.dirt = vec![0.0; world.lot.tile_slots()];
         for &[x, z, d] in &save.dirt {
-            if world.lot.in_bounds(x as i32, z as i32) {
-                let i = world.lot.tile_index(x as i32, z as i32);
+            let (x, z) = (x as i32, z as i32);
+            if world.lot.in_bounds(x, z) {
+                let i = world.tile_slot_mut(x, z);
                 world.dirt[i] = (f32::from(d) / 255.0).min(1.0);
             }
         }

@@ -1500,7 +1500,7 @@ struct StructureView<'a> {
     plots: Vec<PlotView<'a>>,
     exits: &'a [[f32; 2]],
     #[serde(skip_serializing_if = "Option::is_none")]
-    rooms: Option<&'a [u16]>,
+    rooms: Option<Vec<u16>>,
     /// Every edge with a wall on it (plain walls, and walls with a door or window).
     #[serde(skip_serializing_if = "Option::is_none")]
     walls: Option<Vec<EdgeView>>,
@@ -1598,12 +1598,10 @@ impl LookView {
 }
 
 fn diagonals(lot: &crate::lot::Lot) -> Vec<DiagonalView> {
-    let mut out = Vec::new();
-    for (i, d) in lot.diagonals().iter().enumerate() {
-        let Some(d) = d else { continue };
-        out.push(DiagonalView {
-            x: i % lot.width,
-            z: i / lot.width,
+    lot.diagonal_walls()
+        .map(|(x, z, d)| DiagonalView {
+            x,
+            z,
             axis: match d.dir {
                 crate::lot::DiagDir::Dp => "dp",
                 crate::lot::DiagDir::Dn => "dn",
@@ -1613,14 +1611,10 @@ fn diagonals(lot: &crate::lot::Lot) -> Vec<DiagonalView> {
                 Edge::Window => "window",
                 _ => "wall",
             },
-            rooms: lot.half_rooms()[i],
-            look: LookView::of(
-                lot,
-                crate::lot::EdgeRef::Diag((i % lot.width) as u16, (i / lot.width) as u16),
-            ),
-        });
-    }
-    out
+            rooms: lot.half_rooms()[lot.tile_index(x as i32, z as i32)],
+            look: LookView::of(lot, crate::lot::EdgeRef::Diag(x as u16, z as u16)),
+        })
+        .collect()
 }
 
 /// A wall edge: `h` runs from `(x, z)` to `(x + 1, z)`, `v` from `(x, z)` to `(x, z + 1)`.
@@ -1711,14 +1705,11 @@ fn wall_edges(lot: &crate::lot::Lot) -> (Vec<EdgeView>, Vec<OpeningView>, Vec<Fe
             head: look.head,
         });
     };
-    for z in 0..=lot.depth {
-        for x in 0..lot.width {
-            add("h", x, z, lot.h_edge(x, z));
-        }
-    }
-    for z in 0..lot.depth {
-        for x in 0..=lot.width {
-            add("v", x, z, lot.v_edge(x, z));
+    for (at, e) in lot.walls() {
+        match at {
+            crate::lot::EdgeRef::H(x, z) => add("h", x.into(), z.into(), e),
+            crate::lot::EdgeRef::V(x, z) => add("v", x.into(), z.into(), e),
+            crate::lot::EdgeRef::Diag(..) => {}
         }
     }
     (walls, openings, fences)
@@ -1873,7 +1864,7 @@ fn surface_lifts(world: &World) -> Vec<Option<f32>> {
     // The top over each tile (furniture never shares tiles), checked against where each thing's
     // middle is; a thing over the edge of its tile's top looks through them all.
     let lot = &world.lot;
-    let mut tops = vec![u32::MAX; lot.width * lot.depth];
+    let mut tops = vec![u32::MAX; lot.tile_slots()];
     for o in world
         .objects
         .iter()
@@ -2090,7 +2081,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
         households,
         plots,
         exits: &world.exits,
-        rooms: lot.then(|| world.lot.rooms()),
+        rooms: lot.then(|| world.lot.rooms_row_major()),
         walls,
         openings,
         fences,

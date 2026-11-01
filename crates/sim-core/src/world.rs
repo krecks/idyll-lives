@@ -1625,8 +1625,8 @@ pub struct World {
     pub sims: Vec<Sim>,
     pub households: Vec<Household>,
     pub plots: Vec<Plot>,
-    /// Plot per tile (see `map_plots`).
-    pub(crate) tile_plot: Vec<Option<u32>>,
+    /// Plot per ground tile, row by row (see `map_plots`; `path::NO_PLOT` off the plots).
+    pub(crate) tile_plot: Vec<u16>,
     pub relationships: Relationships,
     pub events: EventLog,
     pub(crate) blocked: Vec<bool>,
@@ -1762,7 +1762,7 @@ pub(crate) struct Ctx<'a> {
     pub households: &'a [Household],
     pub plots: &'a [Plot],
     /// Plot per ground tile (`World::tile_plot`).
-    pub tile_plot: &'a [Option<u32>],
+    pub tile_plot: &'a [u16],
     pub object_plot: &'a [Option<u32>],
     /// Objects by plot (`World::object_index`).
     pub index: &'a ObjectIndex,
@@ -1967,7 +1967,7 @@ impl World {
     }
 
     pub(crate) fn empty(content: Content, lot: Lot, rng: Rng) -> Self {
-        let tiles = lot.width * lot.depth;
+        let tiles = lot.tile_slots();
         Self {
             content,
             mode: GameMode::Living,
@@ -2057,6 +2057,29 @@ impl World {
         &self.blocked
     }
 
+    /// Sizes the per-tile arrays (by slot: `Lot::tile_index`) to the lot's slots, after the lot
+    /// got new chunks (or was put back as it was before some, by an undo): new slots start
+    /// unblocked and clean.
+    pub(crate) fn sync_tile_arrays(&mut self) {
+        let slots = self.lot.tile_slots();
+        if self.blocked.len() != slots {
+            self.blocked.resize(slots, false);
+        }
+        if self.dirt.len() != slots {
+            self.dirt.resize(slots, 0.0);
+        }
+    }
+
+    /// The slot of tile `(x, z)` to write a per-tile value to (`blocked`, `dirt`): its chunk is
+    /// allocated first if it wasn't, and the per-tile arrays follow. Off the lot, the void slot
+    /// (which nothing may write to).
+    pub(crate) fn tile_slot_mut(&mut self, x: i32, z: i32) -> usize {
+        if self.lot.in_bounds(x, z) && self.lot.ensure_tile(x, z) {
+            self.sync_tile_arrays();
+        }
+        self.lot.tile_index(x, z)
+    }
+
     /// Whether someone at `b` hears someone at `a` call their name (see
     /// `conversation::within_earshot`).
     pub fn within_earshot(&self, a: [f32; 2], b: [f32; 2]) -> bool {
@@ -2077,7 +2100,7 @@ impl World {
             && z >= 0
             && let Some(&plot) = self.tile_plot.get((z * width + x) as usize)
         {
-            return plot;
+            return (plot != crate::path::NO_PLOT).then_some(plot as u32);
         }
         self.plots.iter().find(|p| p.contains(x, z)).map(|p| p.id)
     }
@@ -2089,11 +2112,11 @@ impl World {
         if self.tile_plot.len() == (width * depth) as usize {
             return;
         }
-        self.tile_plot = vec![None; (width * depth) as usize];
+        self.tile_plot = vec![crate::path::NO_PLOT; (width * depth) as usize];
         for p in self.plots.iter().rev() {
             for z in p.z.max(0)..(p.z + p.d).min(depth) {
                 for x in p.x.max(0)..(p.x + p.w).min(width) {
-                    self.tile_plot[(z * width + x) as usize] = Some(p.id);
+                    self.tile_plot[(z * width + x) as usize] = p.id as u16;
                 }
             }
         }
@@ -2456,7 +2479,8 @@ impl World {
         obj.quality = quality.min(self.content.object_rules.max_quality);
         obj.value = value;
         for (tx, tz) in self.blocking_tiles(&obj) {
-            let i = self.lot.tile_index(tx, tz);
+            let i = self.tile_slot_mut(tx, tz);
+            debug_assert!(i != crate::lot::VOID);
             self.blocked[i] = true;
         }
         self.object_plot.push(self.plot_at(x, z));
@@ -3091,7 +3115,7 @@ impl World {
                     } else {
                         0.25
                     };
-                    let t = self.lot.tile_index(tx, tz);
+                    let t = self.tile_slot_mut(tx, tz);
                     self.dirt[t] = (self.dirt[t] + amount * share).clamp(0.0, 1.0);
                     self.room_tiles.touch(t);
                 }
@@ -3348,9 +3372,7 @@ impl World {
     /// Recomputes rooms and their scores (see `rooms.rs`). Call it after changing `dirt`
     /// directly; messes residents make are rescored on their own.
     pub fn refresh_rooms(&mut self) {
-        if self.dirt.len() != self.lot.width * self.lot.depth {
-            self.dirt = vec![0.0; self.lot.width * self.lot.depth];
-        }
+        self.sync_tile_arrays();
         self.map_plots();
         let (rooms, cells) = crate::rooms::compute(self);
         self.rooms = rooms;
@@ -3371,11 +3393,12 @@ impl World {
         // The room (index into `rooms`) whose score each tile takes: its plot's garden, then
         // indoor tiles anywhere their room; off the plots, none (`roomRules.away`).
         let rooms = &self.rooms;
-        let mut source = vec![None; self.lot.width * self.lot.depth];
+        let mut source = vec![crate::rooms::NO_ROOM; self.lot.tile_slots()];
         for (pi, p) in self.plots.iter().enumerate() {
             let garden = rooms
                 .iter()
-                .position(|r| r.garden && r.plot == Some(pi as u32));
+                .position(|r| r.garden && r.plot == Some(pi as u32))
+                .map_or(crate::rooms::NO_ROOM, |k| k as u32);
             for z in p.z..p.z + p.d {
                 for x in p.x..p.x + p.w {
                     if self.lot.in_bounds(x, z) {
@@ -3384,6 +3407,7 @@ impl World {
                 }
             }
         }
+        source[crate::lot::VOID] = crate::rooms::NO_ROOM;
         let max_id = rooms
             .iter()
             .filter(|r| !r.garden)
@@ -3399,13 +3423,16 @@ impl World {
                 .get(id as usize)
                 .filter(|_| id != crate::lot::OUTDOORS)
             {
-                source[i] = Some(*k);
+                source[i] = *k as u32;
             }
         }
         let away = self.content.room_rules.away;
         self.room_score = source
             .iter()
-            .map(|s| s.map_or(away, |k| rooms[k].scores.overall))
+            .map(|&k| match k {
+                crate::rooms::NO_ROOM => away,
+                k => rooms[k as usize].scores.overall,
+            })
             .collect();
         self.room_tiles = crate::rooms::RoomTiles::new(cells, &source);
     }
@@ -3422,6 +3449,7 @@ impl World {
     }
 
     pub fn tick_once(&mut self) {
+        self.sync_tile_arrays();
         // Time moves on: edits can no longer be taken back.
         self.undo.clear();
         self.redo.clear();
@@ -6852,7 +6880,7 @@ const SEAT_IN_FRONT: f32 = std::f32::consts::FRAC_PI_3;
 /// they're a guest at, public places, the plot they're on now (nobody is stuck in a garden)
 /// and the one they're heading for. Everyone else's garden only when there's no other way.
 pub(crate) fn grounds<'a>(
-    tile_plot: &'a [Option<u32>],
+    tile_plot: &'a [u16],
     plots: &[Plot],
     households: &[Household],
     nav: &NavGrid,

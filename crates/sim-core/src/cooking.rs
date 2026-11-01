@@ -2847,8 +2847,10 @@ fn update(w: &mut World) {
         if it.to_clear(content) && !matches!(it.at, ItemAt::Stored { .. }) && w.lot.in_bounds(x, z)
         {
             let t = w.lot.tile_index(x, z);
-            w.dirt[t] = (w.dirt[t] + rules.dirty_dirt_per_hour * minutes / 60.0).min(1.0);
-            w.room_tiles.touch(t);
+            if t != crate::lot::VOID {
+                w.dirt[t] = (w.dirt[t] + rules.dirty_dirt_per_hour * minutes / 60.0).min(1.0);
+                w.room_tiles.touch(t);
+            }
         }
         keep.push(it);
     }
