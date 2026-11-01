@@ -14,7 +14,7 @@
 
 import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
-import type { GameKind, LandscapeParams, Lifespan, WorldLook, WorldSize } from '../core/protocol';
+import type { GameKind, LandscapeParams, Lifespan, TownArea, TownExit, WorldLook, WorldMeta, WorldSize } from '../core/protocol';
 import { fetchText } from '../content/content';
 import { bedroomsNeeded, householdBonds, householdSpawns, randomHousehold, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { homePrice } from './price';
@@ -217,6 +217,10 @@ export interface TownMeta {
   world?: WorldLook;
   /** The menus' preview only (`previewWorld`): the plot drawn as the player's house. */
   home?: number | null;
+  /** Big worlds (docs/design/open-world.md). */
+  zones?: WorldMeta['zones'];
+  pads?: WorldMeta['pads'];
+  areas?: WorldMeta['areas'];
 }
 
 /** Open land round a town's lots (m). */
@@ -1028,6 +1032,8 @@ export interface TownLayout {
   fields: Rect[];
   /** Garages at the inner ends of driveways (`garageFor`: wall centre lines; `plot`: the slot's index). */
   garages: { plot: number; x0: number; z0: number; x1: number; z1: number }[];
+  /** Each house's driveway: the middle of its inner end and of its end at the street (town tiles). */
+  drives: { plot: number; inner: Pt; street: Pt; facing: Facing }[];
   plots: { name: string; x: number; z: number; w: number; d: number; public: boolean; entry: [number, number]; storeys: number }[];
   /** Each plot's `Facing` (as `TownMeta.facing`). */
   facing: Facing[];
@@ -1052,6 +1058,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
   const paths: Rect[] = [];
   const fields: Rect[] = [];
   const garages: TownLayout['garages'] = [];
+  const drives: TownLayout['drives'] = [];
   const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
 
   /** Things of a layout onto the town, `lift` rows up (see `TownLayout.storeys`). */
@@ -1144,6 +1151,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     if (!drive) continue;
     paths.push(turnOnto(t, s).rect(drive));
     verge(s, drive);
+    drives.push({ plot: s.index, inner: turnOnto(t, s).point([drive.x + drive.w / 2, drive.d]), street: turnOnto(t, s).point([drive.x + drive.w / 2, 0]), facing: s.facing });
     // A garage at its inner end, clear of what's in the garden (as the street draws it): laid out
     // as the plot is (its street at z = 0), at the plot's place on the town (so each plot decides
     // its own), then turned onto the town.
@@ -1162,7 +1170,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       garages.push({ plot: s.index, x0: r.x, z0: r.z, x1: r.x + r.w, z1: r.z + r.d });
     }
   }
-  return { walls, doors, windows, objects, paths, fields, garages, plots, facing: town.slots.map((s) => s.facing), storeys, basement };
+  return { walls, doors, windows, objects, paths, fields, garages, drives, plots, facing: town.slots.map((s) => s.facing), storeys, basement };
 }
 
 /** What the renderer needs to know about a town's world (it survives save/load in `meta`). */
@@ -1191,7 +1199,7 @@ export function assembleTown(
   playerSlot: number,
   { existing = false, mode = 'living', lifespan = 'normal' }: AssembleOptions = {},
 ): string {
-  const { walls, doors, windows, objects, paths, fields, garages, plots, facing, storeys, basement } = layoutTown(content, t, town, playerSlot, existing ? undefined : player);
+  const { walls, doors, windows, objects, paths, fields, garages, drives, plots, facing, storeys, basement } = layoutTown(content, t, town, playerSlot, existing ? undefined : player);
   const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
 
   if (existing && !town.households.some((h) => h.slot === playerSlot)) throw new Error('Nobody lives in that house.');
@@ -1242,7 +1250,65 @@ export function assembleTown(
   }
 
   const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths, facing, seed: town.seed ?? (Math.random() * 2 ** 31) >>> 0, world: worldLook(town, fields) };
-  // Residents leave town (for work) where its roads lead out of it.
-  const exits = roadExits(town.roads, town.width, town.depth);
-  return JSON.stringify({ mode, lifespan, width: town.width, depth: town.depth, storeys, ...(basement ? { basement } : {}), walls, doors, windows, objects, plots, households, sims, relationships, exits, garages, meta });
+  const open = openWorldFields(town, drives);
+  if (open.meta) Object.assign(meta, open.meta);
+  // Residents leave town (for work) where its roads lead out of it (in a big world, also from its bus stops).
+  const exits = open.exits ?? roadExits(town.roads, town.width, town.depth);
+  const plotKinds = town.slots.map((s): PlotKind => (s.kind === 'house' ? (s.lot === 'farm' ? 'farm' : 'home') : s.kind === 'shop' ? 'shop' : s.kind === 'outdoor' ? 'countryside' : 'public'));
+  const filed = plots.map((p, i) => ({ ...p, area: town.slots[i].area ?? 0, kind: plotKinds[i] }));
+  return JSON.stringify({
+    mode,
+    lifespan,
+    // (docs/design/open-world.md: all optional, a cosy or normal town's only additions the size, the roads and its one area.)
+    size: town.world?.size ?? 'cosy',
+    width: town.width,
+    depth: town.depth,
+    storeys,
+    ...(basement ? { basement } : {}),
+    walls,
+    doors,
+    windows,
+    objects,
+    plots: filed,
+    households,
+    sims,
+    relationships,
+    exits,
+    garages,
+    roads: town.roads,
+    areas: open.areas,
+    ...(open.file ?? {}),
+    meta,
+  });
+}
+
+/** What a plot is, for the simulation (docs/design/open-world.md). */
+type PlotKind = 'home' | 'farm' | 'public' | 'shop' | 'countryside';
+
+/**
+ * The town file's open-world fields (docs/design/open-world.md): its areas (a cosy or normal town
+ * is one), and in a big world its typed exits (the roads out, the bus stops), the water, public
+ * parking, where each driveway meets its road, and the zones, pads and areas for the renderer.
+ */
+function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives']) {
+  const areas: TownArea[] = town.open?.areas ?? [{ name: town.name, kind: 'hamlet', x: 0, z: 0, w: town.width, d: town.depth }];
+  const open = town.open;
+  if (!open) return { areas };
+  const roads = roadIndex(town.roads);
+  const ways = town.roads.filter((r) => r.kind !== 'trail');
+  const exits: TownExit[] = [...roadExits(ways, town.width, town.depth).map(([x, z]): TownExit => ({ x, z, kind: 'road' })), ...open.stops.map(({ x, z }): TownExit => ({ x, z, kind: 'stop' }))];
+  // Where each driveway meets the road it leads to (not a trail), and the way out along it.
+  const filed = drives.flatMap(({ plot, inner, street, facing }) => {
+    const near = roads.nearest(street[0], street[1], 24);
+    const road = near && town.roads[near.road].kind === 'trail' ? null : near;
+    const at = road ? pointAt(town.roads[road.road].points, road.s).p : street;
+    const r2 = (v: number) => Math.round(v * 100) / 100;
+    return [{ plot, x: r2(inner[0]), z: r2(inner[1]), front: facing === 0 ? -1 : facing === 2 ? 1 : 0, street: r2(at[1]), ...(road ? { road: road.road, s: r2(road.s) } : {}) }];
+  });
+  return {
+    areas,
+    exits,
+    file: { terrain: { water: open.water }, parking: open.parking, drives: filed },
+    meta: { zones: open.zones, pads: open.pads, areas },
+  };
 }
