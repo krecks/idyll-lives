@@ -12,8 +12,11 @@
  * Sizes (docs/design/open-world.md): `--sizes cosy,normal,big` (default cosy). Big worlds don't load
  * in the simulation until the open-world sim branches are in, so they're written to a file of
  * their own (`--big-out`, default worlds-big.json beside the output), `--big-per-kind` of each
- * (default 1). Besides the checks above: the roads joined up (as the sim joins them: an end within
- * half the other's width and a metre of it) and every area reaching a way out, nothing on the
+ * (default 1). Besides the checks above, for every size: the roads (country roads and trails too)
+ * one network as the sim joins them (an end within half the wider road's width and a metre of the
+ * other's middle), every way out on it, no more courts (dead ends) than an area keeps, none
+ * reaching more than 45 m past the last road it meets, and no country road the layout found no
+ * way for. And for big worlds: every area reaching a way out, nothing on the
  * water, every outdoor place at a trail's end and near its area, no trail through a lot, areas
  * apart, hamlets of four lots or more, every house near a stop or a way out, residents within the
  * cap, every road named (no two alike), the file under 4 MB, and the time a big world takes (its
@@ -40,12 +43,12 @@ const { Content } = await import('../../web/src/content/content.ts');
 const { AssetRegistry } = await import('../../web/src/assets/registry.ts');
 const { objectInfos } = await import('../../web/src/game/housegen.ts');
 const { randomHousehold } = await import('../../web/src/game/household.ts');
-const { assembleTown, generateStats, generateWorld, houseTemplate, neighbourCap, populate, turner, vacantSlots } = await import('../../web/src/game/town.ts');
+const { assembleTown, BIG_COURTS, COURTS, generateStats, generateWorld, houseTemplate, neighbourCap, populate, turner, vacantSlots } = await import('../../web/src/game/town.ts');
 const { WORLD_KINDS, WORLD_SIZES } = await import('../../web/src/game/world.ts');
 const { unrle } = await import('../../web/src/game/macro.ts');
 const { homePrice } = await import('../../web/src/game/price.ts');
 const { savingsOf } = await import('../../web/src/game/wealth.ts');
-const { nearest, roadMask } = await import('../../web/src/game/roads.ts');
+const { COURT, lengths, nearest, roadMask } = await import('../../web/src/game/roads.ts');
 
 type Rect = { x: number; z: number; w: number; d: number };
 type Pt = [number, number];
@@ -77,13 +80,18 @@ const MAX_FILE = 4e6;
 function openProblems(town: TownFile): string[] {
   const out: string[] = [];
   const roads = town.roads ?? town.meta.roads ?? [];
-  // Joined as the sim joins them: an end within half the other road's width and a metre of its middle.
+  // Joined as the sim joins them (travel.rs `Graph::build`): an end within half the wider road's width and a metre of the other's middle.
   const parent = roads.map((_, i) => i);
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  /** Per road, where along it the other roads' ends meet it (m). */
+  const joins: number[][] = roads.map(() => []);
   roads.forEach((r, i) => {
     for (const end of [r.points[0], r.points[r.points.length - 1]]) {
       roads.forEach((o, j) => {
-        if (j !== i && nearest(o.points, end[0], end[1]).dist <= o.width / 2 + 1) parent[find(i)] = find(j);
+        const near = j === i ? null : nearest(o.points, end[0], end[1]);
+        if (!near || near.dist > Math.max(o.width, r.width) / 2 + 1) return;
+        parent[find(i)] = find(j);
+        joins[j].push(near.s);
       });
     }
   });
@@ -91,7 +99,31 @@ function openProblems(town: TownFile): string[] {
   roads.forEach((r, i) => {
     if (!leaves.has(find(i))) out.push(`${r.kind ?? 'street'} ${r.name ?? i} doesn't join a road out of town`);
   });
+  // One network: every road (country roads and trails too) and every way out on it.
+  const networks = new Set(roads.map((_, i) => find(i)));
+  if (networks.size > 1) out.push(`the roads are ${networks.size} networks, not one`);
+  for (const e of town.exits) {
+    const [x, z] = exitAt(e);
+    if (roads.length && !roads.some((r) => nearest(r.points, x, z).dist <= r.width / 2 + 1.5)) out.push(`the way out at ${x}, ${z} is off the roads`);
+  }
   const areas = town.areas ?? [{ name: 'the town', x: 0, z: 0, w: town.width, d: town.depth }];
+  // Courts (dead ends but the trails'): a few per area, none reaching more than `COURT` m past the last road it meets.
+  const courts = areas.map(() => 0);
+  roads.forEach((r, i) => {
+    if (r.kind === 'trail') return;
+    const L = lengths(r.points).at(-1)!;
+    for (const e of [0, 1] as const) {
+      if (r.ends[e] !== 'dead') continue;
+      courts[r.area ?? 0]++;
+      const met = joins[i].map((s) => (e === 1 ? s : L - s));
+      const stub = L - Math.max(0, ...met);
+      if (stub > COURT + 0.5) out.push(`${r.name ?? `road ${i}`} ends ${stub.toFixed(0)} m past the last road it meets (a court reaches ${COURT} m)`);
+    }
+  });
+  courts.forEach((n, k) => {
+    const most = town.size === 'big' && k === 0 ? BIG_COURTS : COURTS;
+    if (n > most) out.push(`${areas[k].name} has ${n} courts (at most ${most})`);
+  });
   areas.forEach((a, k) => {
     if (!roads.some((r, i) => (r.area ?? 0) === k && leaves.has(find(i)))) out.push(`${a.name} has no way out`);
   });
@@ -213,6 +245,8 @@ const SETTLED_AGE = 35;
 /** Grade F, Senior. */
 const SENIOR = 5;
 const forSale: Record<string, number> = {};
+/** Per size: worlds, courts in all and the most in one world. */
+const courtsOf: Record<string, [number, number, number]> = {};
 for (const size of sizes) {
   for (const kind of WORLD_KINDS) {
     for (let i = 1; i <= (size === 'big' ? bigPerKind : perKind); i++) {
@@ -233,7 +267,7 @@ for (const size of sizes) {
       const file = JSON.parse(text);
       const worst = (slowest[size] ??= [0, 0, 0]);
       [worst[0], worst[1], worst[2]] = [Math.max(worst[0], layout), Math.max(worst[1], houses), Math.max(worst[2], assemble)];
-      for (const p of layoutProblems(file)) problems.push(`${tag}: ${p}`);
+      for (const p of [...layoutProblems(file), ...(world.diagnostics?.roads ?? [])]) problems.push(`${tag}: ${p}`);
       if (text.length > MAX_FILE) problems.push(`${tag}: the town file is ${(text.length / 1e6).toFixed(1)} MB`);
       if (size === 'big' && layout > LAYOUT_BUDGET * 2) problems.push(`${tag}: laid out in ${layout.toFixed(0)} ms (budget ${LAYOUT_BUDGET})`);
       if (size === 'big' && assemble > ASSEMBLE_BUDGET * 2) problems.push(`${tag}: assembled in ${assemble.toFixed(0)} ms (budget ${ASSEMBLE_BUDGET})`);
@@ -265,8 +299,11 @@ for (const size of sizes) {
       const basements = town.slots.filter((s) => s.kind === 'house' && houseTemplate(templates, s.template)?.basement).length;
       const spots = town.slots.filter((s) => s.kind === 'outdoor').length;
       const dropped = world.diagnostics?.dropped.length ?? 0;
+      const courts = town.roads.filter((r) => r.kind !== 'trail').reduce((n, r) => n + r.ends.filter((e) => e === 'dead').length, 0);
+      const c = (courtsOf[size] ??= [0, 0, 0]);
+      [c[0], c[1], c[2]] = [c[0] + 1, c[1] + courts, Math.max(c[2], courts)];
       console.log(
-        `${tag}: ${town.name} (${town.world?.tagline}) ${town.width}×${town.depth}, ${town.roads.length} road(s), ` +
+        `${tag}: ${town.name} (${town.world?.tagline}) ${town.width}×${town.depth}, ${town.roads.length} road(s) (${courts} courts), ` +
           `${town.open ? `${town.open.areas.length} areas, ${spots} outdoor places, ` : ''}` +
           `${town.slots.filter((s) => s.kind === 'house').length} houses${farms ? ` (${farms} farms)` : ''}${dropped ? `, ${dropped} lots left out` : ''}, ${basements} with a basement, ${town.households.length} households, ` +
           `${file.sims.length} residents, ${file.objects.length} things, ${(text.length / 1e6).toFixed(2)} MB; ${layout.toFixed(0)} ms + ${houses.toFixed(0)} ms houses, file ${assemble.toFixed(0)} ms`,
@@ -285,6 +322,7 @@ for (const cls of [...HOUSE_CLASSES, ...Object.keys(owned).filter((c) => !HOUSE_
     `  ${cls.padEnd(13)} ${String(n).padStart(3)} lived in, ${String(forSale[cls] ?? 0).padStart(3)} for sale: age ${mean(o?.age ?? 0)}, grade ${mean(o?.level ?? 0)}, ${n ? Math.round((100 * o!.settled) / n) : '-'}% settled, price ${dollars(o?.price ?? 0)}, saved ${dollars(o?.savings ?? 0)}`,
   );
 }
+for (const [size, [n, all, most]] of Object.entries(courtsOf)) console.log(`Courts ${size}: ${all} in ${n} worlds (${(all / n).toFixed(1)} a world, ${most} at most)`);
 for (const [size, [layout, houses, assemble]] of Object.entries(slowest)) console.log(`Slowest ${size}: layout ${layout.toFixed(0)} ms, houses ${houses.toFixed(0)} ms, file ${assemble.toFixed(0)} ms`);
 writeFileSync(out, JSON.stringify(worlds));
 console.log(`${worlds.length} worlds → ${out}`);
