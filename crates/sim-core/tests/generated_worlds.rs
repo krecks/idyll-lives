@@ -20,6 +20,38 @@ use sim_core::{MINUTES_PER_TICK, World};
 
 const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
 
+/// `check` for each of `items`, a few at a time (one per core: each world plays on its own, and a
+/// path search's budget counts on its own thread), the results in the items' order.
+fn each_world<I: Sync, T: Send>(items: &[I], check: impl Fn(&I) -> T + Sync) -> Vec<T> {
+    let threads = std::thread::available_parallelism()
+        .map_or(1, |n| n.get())
+        .min(items.len())
+        .max(1);
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let mut out: Vec<Option<T>> = items.iter().map(|_| None).collect();
+    std::thread::scope(|scope| {
+        let workers: Vec<_> = (0..threads)
+            .map(|_| {
+                scope.spawn(|| {
+                    let mut done = Vec::new();
+                    loop {
+                        let k = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some(item) = items.get(k) else { break };
+                        done.push((k, check(item)));
+                    }
+                    done
+                })
+            })
+            .collect();
+        for worker in workers {
+            for (k, t) in worker.join().expect("a world's check panicked") {
+                out[k] = Some(t);
+            }
+        }
+    });
+    out.into_iter().map(|t| t.expect("checked")).collect()
+}
+
 #[test]
 #[ignore]
 fn generated_worlds_are_livable() {
@@ -28,14 +60,15 @@ fn generated_worlds_are_livable() {
     let worlds: Vec<serde_json::Value> =
         serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     let content = common::content();
-    let mut failures = Vec::new();
-    for (i, world) in worlds.iter().enumerate() {
+    let items: Vec<(usize, &serde_json::Value)> = worlds.iter().enumerate().collect();
+    let failures: Vec<String> = each_world(&items, |&(i, world)| {
+        let mut failures = Vec::new();
         let label = format!("{} {} ({})", world["kind"], world["seed"], world["name"]);
         let mut w = match World::from_json(&content, &world["town"].to_string(), i as u32 + 1) {
             Ok(w) => w,
             Err(e) => {
                 failures.push(format!("{label}: {e}"));
-                continue;
+                return failures;
             }
         };
         if w.sims.len() > MAX_SIMS {
@@ -204,7 +237,11 @@ fn generated_worlds_are_livable() {
             w.sims.len(),
             w.objects.len()
         );
-    }
+        failures
+    })
+    .into_iter()
+    .flatten()
+    .collect();
     eprintln!(
         "{} worlds checked, {} problems",
         worlds.len(),
@@ -344,17 +381,25 @@ fn generated_worlds_cars_keep_to_the_roads() {
         let (seed, plot) = v.split_once(':')?;
         Some((seed.parse().ok()?, plot.parse().ok()?))
     });
-    let mut failures = Vec::new();
     // Per size: worlds driven, cars, cars with no way out, drives to work, trips to another hamlet.
     let mut sizes: std::collections::BTreeMap<String, [usize; 5]> = Default::default();
-    for (i, world) in worlds.iter().enumerate() {
+    // (The first `CAR_WORLDS` of each size, every big one.)
+    let mut picked: std::collections::BTreeMap<String, usize> = Default::default();
+    let items: Vec<(usize, &serde_json::Value)> = worlds
+        .iter()
+        .enumerate()
+        .filter(|(_, world)| {
+            let size = world["town"]["size"].as_str().unwrap_or("cosy");
+            let n = picked.entry(size.to_string()).or_default();
+            *n += 1;
+            size == "big" || *n <= CAR_WORLDS
+        })
+        .collect();
+    let results = each_world(&items, |&(i, world)| {
+        let mut failures = Vec::new();
         let size = world["town"]["size"].as_str().unwrap_or("cosy").to_string();
         let big = size == "big";
-        let tally = sizes.entry(size.clone()).or_default();
-        if !big && tally[0] >= CAR_WORLDS {
-            continue;
-        }
-        tally[0] += 1;
+        let mut tally = [1usize, 0, 0, 0, 0];
         let label = format!(
             "{size} {} {} ({})",
             world["kind"], world["seed"], world["name"]
@@ -365,7 +410,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
             Ok(w) => w,
             Err(e) => {
                 failures.push(format!("{label}: {e}"));
-                continue;
+                return (size, tally, failures);
             }
         };
         let filed = world["town"]["cars"].as_array().map_or(0, Vec::len);
@@ -561,6 +606,15 @@ fn generated_worlds_cars_keep_to_the_roads() {
             watch.stuck.len(),
             started.elapsed().as_secs_f32()
         );
+        (size, tally, failures)
+    });
+    let mut failures = Vec::new();
+    for (size, tally, mut found) in results {
+        let sum = sizes.entry(size).or_default();
+        for (s, t) in sum.iter_mut().zip(tally) {
+            *s += t;
+        }
+        failures.append(&mut found);
     }
     for (size, [n, cars, stay, commutes, trips]) in &sizes {
         eprintln!(
