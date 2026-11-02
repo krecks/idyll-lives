@@ -49,7 +49,8 @@ export class ModelFiles<F> {
     private evict: ((file: F, url: string) => void) | null = null,
     private readonly idleLimit = IDLE_FILES,
   ) {
-    if (typeof window !== 'undefined') window.addEventListener('online', this.online);
+    // (Not in a worker without one, nor a test's stand-in page.)
+    globalThis.addEventListener?.('online', this.online);
   }
 
   /** Back online: what failed (in an outage, most likely) is tried again from the start. */
@@ -65,7 +66,7 @@ export class ModelFiles<F> {
   /** The scene or app has gone: no more tries, nobody to tell. */
   dispose(): void {
     this.evict = null;
-    if (typeof window !== 'undefined') window.removeEventListener('online', this.online);
+    globalThis.removeEventListener?.('online', this.online);
     for (const f of this.failed.values()) clearTimeout(f.timer);
     this.failed.clear();
     this.arrived.clear();

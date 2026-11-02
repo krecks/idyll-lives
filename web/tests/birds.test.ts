@@ -36,7 +36,7 @@ function hash(a: ArrayLike<number>, from = 0, to = a.length): string {
 }
 
 describe('garden birds', async () => {
-  // --- the page's world in bun: the assets from web/public; Math.random fixed (the birds' code takes it as it loads) ---
+  // --- the page's world in bun: the assets from web/public; Math.random fixed (the birds' code asks it at each call) ---
   Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
   const realFetch = globalThis.fetch;
   globalThis.fetch = (async (input: string | URL | Request) => {
