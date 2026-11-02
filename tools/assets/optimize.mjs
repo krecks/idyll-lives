@@ -29,8 +29,8 @@ const CACHE = path.join(WEB, '.assets/cache');
 /** Copied into dist/assets by the build: `optimized.json` and the `opt/` tree. */
 export const OUT = path.join(WEB, '.assets/out');
 
-/** Bump when the encoding changes, so cached outputs are rebuilt. */
-const VERSION = 2;
+/** Bump a kind's when its encoding changes, so only its cached outputs are rebuilt. */
+const VERSION = { model: 2, texture: 1, gzip: 1 };
 
 /** Left as they are: not loaded by the game, or drawn in a way KTX2 can't (flipped on upload). */
 const SKIP = new Set([
@@ -74,13 +74,13 @@ function textureRole(rel) {
 export async function optimizeAssets({ force = false, jobs = Math.max(1, os.availableParallelism() - 1), log = console.log } = {}) {
   const started = performance.now();
   const files = walk(SRC).map((abs) => path.relative(SRC, abs).split(path.sep).join('/'));
-  const settings = JSON.stringify({ VERSION, KTX2, SKIP: [...SKIP] });
+  const settings = (kind) => JSON.stringify({ VERSION: VERSION[kind], KTX2, SKIP: [...SKIP] });
   const tasks = [];
   for (const rel of files) {
     const p = plan(rel);
     if (!p) continue;
     const bytes = fs.readFileSync(path.join(SRC, rel));
-    const key = createHash('sha256').update(settings).update(p.kind).update(p.role ?? '').update(bytes).digest('hex').slice(0, 24);
+    const key = createHash('sha256').update(settings(p.kind)).update(p.kind).update(p.role ?? '').update(bytes).digest('hex').slice(0, 24);
     const cached = path.join(CACHE, key + path.extname(p.out));
     // Only the gzip pass below reads the bytes again (the workers read their own file): keep no others.
     tasks.push({ rel, ...p, size: bytes.length, cached, ...(p.kind === 'gzip' ? { bytes } : {}) });
@@ -178,9 +178,9 @@ async function workerMain() {
   const sharp = (await load('sharp')).default;
   // (ESM only, and its Node build isn't reachable through require.)
   const { encodeToKTX2 } = await import(pathToFileURL(path.join(WEB, 'node_modules/ktx2-encoder/dist/node/index.js')).href);
-  const { Accessor, Logger, NodeIO } = await load('@gltf-transform/core');
+  const { Logger, NodeIO } = await load('@gltf-transform/core');
   const { ALL_EXTENSIONS, EXTMeshoptCompression, KHRTextureBasisu } = await load('@gltf-transform/extensions');
-  const { reorder } = await load('@gltf-transform/functions');
+  const { quantize, reorder } = await load('@gltf-transform/functions');
   const { MeshoptEncoder } = await load('meshoptimizer');
   await MeshoptEncoder.ready;
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
@@ -201,34 +201,6 @@ async function workerMain() {
     if (slots.some((s) => /normal/i.test(s))) return 'normal';
     return 'data';
   };
-
-  /**
-   * The baked shading (COLOR_0) as normalised bytes, RGBA: Blender writes it as 16-bit (or float) RGBA, a
-   * fifth of a model's bytes, for a grey of 32 levels (gamekit/shade.py `LEVELS`) that 8 bits hold to within
-   * 1/510. The game reads either (models.ts `readAccessor`).
-   */
-  function bytesShading(doc) {
-    const done = new Map();
-    for (const mesh of doc.getRoot().listMeshes()) {
-      for (const prim of mesh.listPrimitives()) {
-        const color = prim.getAttribute('COLOR_0');
-        if (!color || color.getComponentType() === Accessor.ComponentType.UNSIGNED_BYTE) continue;
-        if (!done.has(color)) {
-          const n = color.getCount();
-          const k = color.getElementSize();
-          const out = new Uint8Array(n * 4);
-          const el = [];
-          for (let i = 0; i < n; i++) {
-            color.getElement(i, el);
-            for (let c = 0; c < 4; c++) out[i * 4 + c] = Math.round(Math.min(1, Math.max(0, c < k ? el[c] : 1)) * 255);
-          }
-          done.set(color, doc.createAccessor().setType(Accessor.Type.VEC4).setArray(out).setNormalized(true).setBuffer(color.getBuffer()));
-        }
-        prim.setAttribute('COLOR_0', done.get(color));
-      }
-    }
-    for (const old of done.keys()) if (!old.listParents().some((p) => p.propertyType !== 'Root')) old.dispose();
-  }
 
   async function model(src, rel) {
     const doc = await io.read(src);
@@ -258,7 +230,8 @@ async function workerMain() {
       doc.createExtension(KHRTextureBasisu).setRequired(true);
       for (const ext of root.listExtensionsUsed()) if (ext.extensionName === 'EXT_texture_webp') ext.dispose();
     }
-    bytesShading(doc);
+    // The baked shading (COLOR_0, a grey of 32 levels: gamekit/shade.py) from 16 bits to 8, which keep every level.
+    await doc.transform(quantize({ pattern: /^COLOR_0$/, quantizeColor: 8 }));
     // Vertex order that compresses (and caches) best, then meshopt over every buffer view. The
     // data is encoded as it is (no further quantisation): the foliage cards keep float attributes.
     await doc.transform(reorder({ encoder: MeshoptEncoder, target: 'size' }));
