@@ -6,7 +6,7 @@
 import { describe, expect, test } from 'bun:test';
 import { chunkAt, CHUNK } from '../src/render/shared/chunks';
 import { Flight, HYSTERESIS, panBounds, Roam, SETTLE_MS, streamRadius, warmLots, type FocusPlot } from '../src/render/shared/focus';
-import { OrbitControls } from '../src/render/shared/orbit';
+import { OrbitControls, pointerInteraction } from '../src/render/shared/orbit';
 
 const cam = (x: number, z: number, radius = 30) => ({ x, z, radius, alpha: 0, fovH: 1.1 });
 const none = () => null;
@@ -89,6 +89,23 @@ describe('roaming', () => {
     expect(out.x).toBeCloseTo(600, 5);
     expect(out.radius).toBeCloseTo(30, 5);
     expect(peak).toBeGreaterThan(60);
+  });
+
+  test('with Reduce motion a flight is a cut: there on the next step, without rising', () => {
+    const f = new Flight();
+    f.start(0, 0, 30, 600, 0, 40, true);
+    const out = { x: 0, z: 0, radius: 0 };
+    expect(f.step(1 / 60, out)).toBe(true);
+    expect(out).toEqual({ x: 600, z: 0, radius: 40 });
+    expect(f.active).toBe(false);
+  });
+
+  test('the middle button turns the camera (as while the left draws walls), the right pans', () => {
+    expect(pointerInteraction(1, false)).toBe('rotate');
+    expect(pointerInteraction(0, false)).toBe('rotate');
+    expect(pointerInteraction(0, true)).toBe('pan');
+    expect(pointerInteraction(2, false)).toBe('pan');
+    expect(pointerInteraction(3, false)).toBe(null);
   });
 
   test('the target stays on the land: the town and 60 m round it, a big world’s land and 20 m', () => {
