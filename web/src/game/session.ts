@@ -202,7 +202,8 @@ export async function startSession(
   }
 
   progress('Starting the simulation', 0.15);
-  const bridge = await perfTimeAsync('session: SimBridge.start', () => SimBridge.start(content.json, source)).catch(async (err: unknown) => {
+  // (Paused from the first step: the clock is held until the player enters the game.)
+  const bridge = await perfTimeAsync('session: SimBridge.start', () => SimBridge.start(content.json, source, 0)).catch(async (err: unknown) => {
     // A save the game can't open is set aside (kept if it's from a newer version, else removed).
     if (err instanceof SaveRefused && saved) throw new UnloadableSave(saved.id, err.problem, await refuseSave(saved, err.problem));
     throw err;

@@ -938,7 +938,8 @@ export type GameSource = { lot: string; seed: number } | { save: string };
 export type SaveProblem = 'tooNew' | 'tooOld' | 'corrupt' | 'failed';
 
 export type ToWorker =
-  | { type: 'init'; content: string; source: GameSource }
+  /** `speed`: the clock's speed from the first step (0: the game starts paused). */
+  | { type: 'init'; content: string; source: GameSource; speed?: number }
   /** Only checks that a save opens (an imported file); answered with `checked`. */
   | { type: 'check'; content: string; save: string }
   | { type: 'command'; command: Command }

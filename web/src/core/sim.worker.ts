@@ -77,7 +77,7 @@ scope.onmessage = (e) => {
   const requestId = 'requestId' in msg ? msg.requestId : undefined;
   try {
     if (msg.type === 'init') {
-      void start(msg.content, msg.source).catch((err) => fail(err, true));
+      void start(msg.content, msg.source, msg.speed).catch((err) => fail(err, true));
     } else if (msg.type === 'check') {
       void check(msg.content, msg.save).catch((err) => fail(err, true));
     } else if (requestId !== undefined && !game) {
@@ -126,7 +126,7 @@ scope.onmessage = (e) => {
   }
 };
 
-async function start(content: string, source: GameSource): Promise<void> {
+async function start(content: string, source: GameSource, speed: number | undefined): Promise<void> {
   // Each phase after the download says it's under way (the main thread gives up on a start only
   // when it stalls; it started waiting when it sent `init`).
   memory = (await init({ module_or_path: fetchWasm() })).memory;
@@ -139,6 +139,8 @@ async function start(content: string, source: GameSource): Promise<void> {
     scope.postMessage({ type: 'error', message, fatal: true, problem: problem ?? undefined });
     return;
   }
+  // (Before the first step: a game that starts paused runs none.)
+  if (speed !== undefined) game.command(JSON.stringify({ type: 'setSpeed', speed }));
   watch(game);
   const layout: SnapshotLayout = JSON.parse(game.snapshot_layout());
 
