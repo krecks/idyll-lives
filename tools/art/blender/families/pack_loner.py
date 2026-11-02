@@ -524,7 +524,7 @@ def soloSauna():
             F.cyl(_name('pull_rose'), 0.02, 0.006, (0.3, y, FRONT + 0.011), M.cedar_dark, rot=(90, 0, 0), verts=10)
     door = G.hinged(G.join(door, 'door'), F.at(hx, 1.0, FRONT))
     objs = G.settle(centre=False)
-    G.swing(door, 'door_open', 60, seconds=0.8)
+    G.swing(door, 'door_open', 60, seconds=0.8, ease='back_out')
     return objs
 
 

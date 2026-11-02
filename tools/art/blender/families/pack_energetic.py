@@ -640,7 +640,7 @@ def contrastShower():
     door = G.hinged(G.join(door, 'door'), F.at(DOOR_HALF, 0.09, 0.437))
     objs = G.settle()      # on its Model centre: the back on the wall face
     G.grow(rain, 'water_on', seconds=0.5)
-    G.swing(door, 'door_open', -95, seconds=0.8)
+    G.swing(door, 'door_open', -95, seconds=0.8, ease='back_out')
     return objs
 
 

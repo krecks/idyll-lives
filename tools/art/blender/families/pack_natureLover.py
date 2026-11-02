@@ -855,7 +855,7 @@ def glasshouse():
         F.box('vent_glass', vl, 0.014, 2 * vz, (GW / 2 * t, HR - (HR - HW) * t + 0.025, 0), M.glass, rot=(0, -slope, 0))
     vent = G.hinged(G.join(vent, 'vent'), F.at(0.0, HR + 0.01, 0))
     objs = G.settle(centre=False)
-    G.swing(door, 'door_open', 70, seconds=0.9)
+    G.swing(door, 'door_open', 70, seconds=0.9, ease='back_out')
     G.swing(vent, 'vent_open', 25, seconds=0.9, axis='Y')
     return objs
 

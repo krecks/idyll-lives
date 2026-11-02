@@ -667,7 +667,7 @@ def grandfatherClock():
     G.settle(centre=False)
     _clock_clips(*hands)
     G.rock(pendulum, 'pendulum', 4, seconds=1.6, axis='Y')
-    G.swing(door, 'door_open', -100, seconds=0.8)
+    G.swing(door, 'door_open', -100, seconds=0.8, ease='back_out')
     return G.meshes()
 
 

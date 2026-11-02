@@ -423,7 +423,7 @@ def deliveryLocker():
         _locker_door(F, 'locker_door', x, y, h, 1, M.accent)
     door = G.hinged(G.join(door, 'locker_door'), F.at(x - 0.13, y, FRONT + 0.01))
     objs = G.settle(centre=False)
-    G.swing(door, 'door_open', 105, seconds=0.7)
+    G.swing(door, 'door_open', 105, seconds=0.7, ease='back_out')
     return objs
 
 

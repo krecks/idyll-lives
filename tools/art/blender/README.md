@@ -53,6 +53,7 @@ cargo art kitchen                  # build, export, register, check
 cargo art kitchen --only fridge    # one model
 cargo art garden_decor --preview   # previews/garden_decor/<id>.png (+ <id>@<clip>.png), no export
 cargo art living --preview --lit   # and <id>.lit.png: EEVEE, sun and sky, the finishes' textures (judge detail here)
+cargo art kitchen --preview --sheet  # and <id>.sheet.png: four sides, the baked shading, each clip at 0/25/50/75/100 %
 cargo art kitchen --no-pack        # export without writing the pack
 cargo art --all                    # every family (not _template)
 cargo art _template --preview      # the template only previews
@@ -152,9 +153,11 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      item (a held `tool.*`, a `model.street.*` prop, the woods' rock), takes `code=True` so its first
      build isn't refused; once its pack has it, it builds either way.
    - `far=0.25` also writes `<id>.far.glb`, its far version: the model at rest, joined and decimated
-     to a quarter of the triangles (all but what stands within 1 cm of the floor, so it keeps its
-     feet), drawn where it's only seen from afar (the town overview, the far woods). For what is placed
-     by the hundred or seen far off: trees, hedges, street props, the farm's buildings.
+     to a quarter of the triangles (`G.decimated`: vertices sitting on one another merged first, all but
+     what stands within 1 cm of the floor or 3 mm of its box, so it keeps its feet and its size, and each
+     face the decimation turned round turned back), drawn where it's only seen from afar (the town
+     overview, the far woods). For what is placed by the hundred or seen far off: trees, hedges, street
+     props, the farm's buildings.
      `far=build_function` builds one by hand instead. `--preview` renders `<id>.far.png`.
    - `far=G.far_of(build)` builds it by hand from the model's own build, run again at low detail: the
      build asks `G.low(full, reduced)` for each count, segment number or bevel, and `G.is_low()` for what
@@ -214,17 +217,25 @@ The clips gamekit makes:
 
 | Clip | Does | For |
 |---|---|---|
-| `G.swing(part, clip, degrees, seconds, axis='Z')` | turns from rest by `degrees` | doors, lids, a bed folding down |
-| `G.slide(part, clip, (x, y, z), seconds)` | moves from rest | drawers, a cover sliding off |
+| `G.swing(part, clip, degrees, seconds, axis='Z', ease='smooth')` | turns from rest by `degrees`; `ease='back_out'` swings `overshoot` (4 %) past open and settles | doors (`back_out`), lids, a bed folding down |
+| `G.slide(part, clip, (x, y, z), seconds, ease='smooth')` | moves from rest | drawers, a cover sliding off |
 | `G.grow(part, clip, seconds, axis='Z')` | scales from how it was built (small, hidden) to full size | water, flames, washing on a line |
-| `G.squash(part, clip, scale, seconds, back=False)` | scales from rest to `scale` (a number or Blender (x, y, z)); `back`: and home again | a cushion sinking, a bag flattening, something hidden while held (0.001) |
+| `G.squash(part, clip, scale, seconds, back=False, split=0.5)` | scales from rest to `scale` (a number or Blender (x, y, z)); `back`: and home again, the turn `split` of the way through | a cushion sinking, a bag flattening, something hidden while held (0.001) |
 | `G.spin(part, clip, turns, seconds, axis='Z')` | whole turns at an even speed, ending at rest | wheels, platters, fans, the train |
 | `G.rock(part, clip, degrees, seconds, axis='X')` | out, back past rest and home, as a pendulum | rocking chairs, swings, the seesaw |
 | `G.scroll(part, clip, (x, y, z), seconds)` | moves by one repeat of a pattern at an even speed; the game jumps it home unseen | a treadmill's belt slats, a conveyor |
 | `G.turns(parts, clip, (x, y, z), seconds)` | the parts take turns moving out and back, ending at rest | a dance floor's tiles lifting in two sets |
 | `G.path(part, clip, [(seconds, (x, y, z), (rx, ry, rz)), …], linear=False)` | moves and turns from rest through keys (offsets in metres, turns in degrees, Blender axes; the first key is rest at 0 s); `linear`: an even speed, for a loop | the pool rack lifted off and hung up, the robot vacuum's round |
 | `G.stages(part, clip, picked, growing, planted, seconds, sink)` | a crop's scale at each growth stage, ripe at rest; `sink`: how far down into the soil at each | vegetables, fruit, a veggie bed |
+| `G.wobble(part, clip, degrees, seconds, axis='X', swings=3, delay=0)` | knocked out by `degrees`, swinging back and forth smaller each time, home at rest | what hangs or stands loose beside a part that moves: a towel on a door, a pan on its hook |
+| `G.keys(part, clip, prop, index, [(seconds, value[, ease]), …])` | keys one channel (`'location'`, `'rotation_euler'`, `'scale'`, Blender axis 0–2) at those times, the first at 0 s at rest; each key's ease to the next | a clip none of the others make: water rising after the tap, a koi surfacing |
 | `G.attach(part, parent)` | (no clip) puts a part inside another, to move with it and by its own clips | a lever on a door, a label on a record |
+
+`ease` is one of `G.EASES`: `'smooth'` (the default, slow out of each key and into the next), `'linear'`, `'out'`,
+`'in'`, `'in_out'`, `'expo_out'`, `'back_out'` (past the end and back) and `'bounce_out'`. A use's clip plays back
+to close, so its curve runs the other way round then: a door that overshoots opening opens a hair further, then
+swings shut and stops. Overshoot only where there's room past open (a door, not a lid against a wall or a bed
+onto the floor).
 
 The first four go from rest to open: the game holds them open and plays them back. `spin` and `rock`
 end where they start, so they also loop (`motions.loops`, `idle`), as does `turns`. `scroll` loops too: it ends one slat on,
@@ -299,7 +310,10 @@ How the parts work:
   a warning to check. A part a clip grows (darts, a pot thrown) is measured grown, not at rest; one flattened to
   nothing at rest warns if its flat shape shows (traps).
 - **Previews.** `--preview` renders each clip open on its own: `previews/<family>/<id>@<clip>.png` (a `spin` half
-  way round, a `rock` at its furthest).
+  way round, a `rock` at its furthest). `--sheet` adds `<id>.sheet.png`: its four sides (front and back
+  three-quarter, side, top) and its baked shading on the first row, then a row per clip at 0, 25, 50, 75 and 100 %
+  of the way through (a door through the cabinet half way, a lid closing past rest). Previews draw faces from the
+  front only, as the game does: one built inside out shows as a hole.
 - **In the game's renderer.** The clips bench, `/clips.html?keys=model.<id>` (below), plays every clip
   of the model as the game does.
 - **Examples.**

@@ -658,8 +658,8 @@ def pantry():
     G.join(still, 'body', origin=(0, 0, 0))
     doors = _tall_doors(F, 0.456, 1.88, 1.06, 0.14, 1.0, 1.05, 0.3, M.chrome)
     G.settle()
-    G.swing(doors[0], 'doors_open', 100, seconds=DOOR_SECONDS)
-    G.swing(doors[1], 'doors_open', -100, seconds=DOOR_SECONDS)
+    G.swing(doors[0], 'doors_open', 100, seconds=DOOR_SECONDS, ease='back_out')
+    G.swing(doors[1], 'doors_open', -100, seconds=DOOR_SECONDS, ease='back_out')
 
 
 # --- the tall larder: 1x1, two doors over two drawers, a basket on top ---------------------------------
@@ -679,8 +679,8 @@ def pantryTall():
     G.join(still, 'body', origin=(0, 0, 0))
     doors = _tall_doors(F, 0.453, 1.44, 1.34, 0.21, 1.36, 0.8, 0.3, M.brass)
     G.settle()
-    G.swing(doors[0], 'doors_open', 100, seconds=DOOR_SECONDS)
-    G.swing(doors[1], 'doors_open', -100, seconds=DOOR_SECONDS)
+    G.swing(doors[0], 'doors_open', 100, seconds=DOOR_SECONDS, ease='back_out')
+    G.swing(doors[1], 'doors_open', -100, seconds=DOOR_SECONDS, ease='back_out')
 
 
 def _strip_light(F, w, y, z):
@@ -710,8 +710,8 @@ def wallCabinet():
             _pull(F, f'door{s}_pull', s * 0.034, 1.56, WALL + 0.36, 0.14, vertical=True)   # on the doors, near their bottom
         doors.append(G.join(parts, f'door{s}', origin=F.at(s * 0.487, 1.81, WALL + 0.34)))
     G.settle(centre=False, floor=False)
-    G.swing(doors[0], 'doors_open', 100, seconds=WALL_DOOR_SECONDS)
-    G.swing(doors[1], 'doors_open', -100, seconds=WALL_DOOR_SECONDS)
+    G.swing(doors[0], 'doors_open', 100, seconds=WALL_DOOR_SECONDS, ease='back_out')
+    G.swing(doors[1], 'doors_open', -100, seconds=WALL_DOOR_SECONDS, ease='back_out')
 
 
 def _tumbler(F, name, x, y, z, r, h, verts=10):
@@ -757,7 +757,7 @@ def wallCabinetGlass():
         doors.append(G.join(parts, f'door{s}', origin=F.at(s * 0.48, 1.81, WALL + 0.36)))
     G.settle(centre=False, floor=False)
     # only the right door, in front of the plates, swings open: each glazed door is two draws (frame, glass)
-    G.swing(doors[1], 'door_open', -100, seconds=WALL_DOOR_SECONDS)
+    G.swing(doors[1], 'door_open', -100, seconds=WALL_DOOR_SECONDS, ease='back_out')
 
 
 # --- the corner wall cabinet: 1x1, a door on one side and open shelves on the other -------------------
@@ -790,7 +790,7 @@ def wallCabinetCorner():
         _pull(F, 'door_pull', 0.06, 1.6, WALL + 0.38, 0.14, vertical=True, reach=0.026)
     door = G.join(parts, 'door', origin=F.at(-0.47, 1.81, WALL + 0.36))
     G.settle(centre=False, floor=False)
-    G.swing(door, 'door_open', 100, seconds=WALL_DOOR_SECONDS)
+    G.swing(door, 'door_open', 100, seconds=WALL_DOOR_SECONDS, ease='back_out')
 
 
 def _rect_ring(F, x0, x1, z0, z1, y):

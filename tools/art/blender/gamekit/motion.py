@@ -17,6 +17,35 @@ import bpy
 from .scene import meshes
 
 
+# How a clip eases between its keys (`ease=`): Blender's interpolation and easing for each key to the next. The
+# exporter samples every frame, so the game plays the curve as made. Played back (closing), a curve runs the other
+# way round: a door that overshoots and settles opening first opens a hair further, then swings shut.
+EASES = {
+    'smooth': None,                          # Blender's default: slow out of each key and into the next
+    'linear': ('LINEAR', 'AUTO'),            # an even speed (spins, scrolls, loops)
+    'out': ('QUAD', 'EASE_OUT'),             # quick off, slowing into the end
+    'in': ('QUAD', 'EASE_IN'),
+    'in_out': ('QUAD', 'EASE_IN_OUT'),
+    'expo_out': ('EXPO', 'EASE_OUT'),        # a snap off, a long glide in (a drawer let run)
+    'back_out': ('BACK', 'EASE_OUT'),        # past the end and back (`overshoot`): a door swung open, settling
+    'bounce_out': ('BOUNCE', 'EASE_OUT'),    # dropping onto the end and bouncing (a lid let fall)
+}
+OVERSHOOT = 0.04   # how far past its end `back_out` goes, as a share of the move (4°: a door opened 100°)
+
+
+def back_amount(overshoot):
+    """Blender's `back` for a BACK ease-out that goes `overshoot` (a share of the move) past its end: the peak of
+    1 + (s + 1)u³ + su² (u = t - 1), found by halving."""
+    def peak(s):
+        u = -2 * s / (3 * (s + 1))
+        return (s + 1) * u ** 3 + s * u * u
+    lo, hi = 0.0, 10.0
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if peak(mid) < overshoot else (lo, mid)
+    return (lo + hi) / 2
+
+
 def fps():
     scene = bpy.context.scene
     return scene.render.fps / scene.render.fps_base
@@ -42,22 +71,25 @@ def attach(obj, parent):
     return obj
 
 
-def swing(obj, clip, degrees, seconds=1.0, axis='Z'):
+def swing(obj, clip, degrees, seconds=1.0, axis='Z', ease='smooth', overshoot=OVERSHOOT):
     """A clip `clip` turning `obj` about its own `axis` ('X', 'Y' or 'Z', Blender) by `degrees` from
-    rest. A door hinged on its right edge (seen from the front) opens with a negative angle about Z."""
+    rest. A door hinged on its right edge (seen from the front) opens with a negative angle about Z. `ease`
+    (`EASES`): 'back_out' swings `overshoot` past open and settles back, as a door let go does; only where
+    there's room past open (not a lid against a wall, a bed onto the floor)."""
     i = 'XYZ'.index(axis)
     obj.rotation_mode = 'XYZ'
     rest = obj.rotation_euler[i]
-    return _clip(obj, clip, 'rotation_euler', i, rest, rest + math.radians(degrees), seconds)
+    return _clip(obj, clip, 'rotation_euler', i, rest, rest + math.radians(degrees), seconds, ease=ease,
+                 overshoot=overshoot)
 
 
-def slide(obj, clip, offset, seconds=1.0):
+def slide(obj, clip, offset, seconds=1.0, ease='smooth'):
     """A clip `clip` moving `obj` by `offset` (Blender x, y, z, metres) from rest: a drawer pulls out
-    to the front with a negative y."""
+    to the front with a negative y. `ease`: how it eases (`EASES`)."""
     for i, d in enumerate(offset):
         if d:
             rest = obj.location[i]
-            _clip(obj, clip, 'location', i, rest, rest + d, seconds)
+            _clip(obj, clip, 'location', i, rest, rest + d, seconds, ease=ease)
     return obj
 
 
@@ -100,21 +132,23 @@ def rock(obj, clip, degrees, seconds=1.0, axis='X'):
     return _peak(obj, clip, 1 + (end - 1) / 4)
 
 
-def squash(obj, clip, scale, seconds=0.6, back=False):
+def squash(obj, clip, scale, seconds=0.6, back=False, split=0.5):
     """A clip `clip` scaling `obj` about its own origin from rest to `scale` times its size: a number for
     every axis, or (x, y, z) Blender. A cushion sinking (0.7 along Z), a bag flattening, a held instrument
     or weight hidden while in the hands (0.001). The game plays a use's clip back on its own; `back` makes
-    the clip come back to rest by itself (a bounce, for a loop)."""
+    the clip come back to rest by itself (a bounce, for a loop), at `split` of the way through (0.3: down
+    quickly, up slowly, as a cushion recovers)."""
     factors = scale if isinstance(scale, (tuple, list)) else (scale,) * 3
     end = last_frame(seconds)
+    mid = min(end - 1, max(2, round(1 + (end - 1) * split)))
     for i, k in enumerate(factors):
         if k == 1:
             continue
         rest = obj.scale[i]
-        keys = [(1, rest), ((1 + end) // 2, rest * k), (end, rest)] if back else [(1, rest), (end, rest * k)]
+        keys = [(1, rest), (mid, rest * k), (end, rest)] if back else [(1, rest), (end, rest * k)]
         _clip(obj, clip, 'scale', i, keys)
     assert obj.animation_data and obj.animation_data.nla_tracks.get(clip), f'squash {clip!r}: a scale of 1 does nothing'
-    return _peak(obj, clip, (1 + end) // 2 if back else end)
+    return _peak(obj, clip, mid if back else end)
 
 
 def turns(objs, clip, offset, seconds=1.0):
@@ -177,6 +211,37 @@ def path(obj, clip, keys, linear=False):
     return _peak(obj, clip, frames[len(frames) // 2])
 
 
+def wobble(obj, clip, degrees, seconds=1.0, axis='X', swings=3, delay=0.0):
+    """A clip `clip` that knocks `obj` swinging about its own `axis` ('X', 'Y' or 'Z', Blender) and lets it die
+    away: out by `degrees`, back past rest, `swings` times, each smaller, ending at rest, `delay` seconds in. The
+    give in what hangs or stands loose (a towel on its rail, a lamp's shade, a pan on its hook) as something
+    beside it moves: `G.attach` it to a part that moves and give both clips the same name."""
+    i = 'XYZ'.index(axis)
+    obj.rotation_mode = 'XYZ'
+    rest = obj.rotation_euler[i]
+    start, end = last_frame(delay) if delay else 1, last_frame(delay + seconds)
+    a = math.radians(degrees)
+    keys = [(1, rest)] + ([(start, rest)] if start > 1 else [])
+    span = end - start
+    for f in range(start + 1, end):
+        t = (f - start) / span
+        keys.append((f, rest + a * math.exp(-3 * t) * math.sin(math.pi * swings * t)))
+    keys.append((end, rest))
+    _clip(obj, clip, 'rotation_euler', i, keys, linear=True)
+    return _peak(obj, clip, start + max(1, round(span / (2 * swings))))
+
+
+def keys(obj, clip, prop, index, points):
+    """A clip `clip` keying `obj`.`prop` ('location', 'rotation_euler' or 'scale'; `index` 0, 1 or 2, Blender
+    axes) at `points`, [(seconds, value), …] or [(seconds, value, ease), …] with the ease (`EASES`) from that key to
+    the next; the first at 0 s is rest. Values as Blender has them (metres, radians, scale). For a clip none of the
+    others make: water filling a bath from 0.5 s, a koi surfacing and diving."""
+    assert points and points[0][0] == 0, f'keys {clip!r}: the first key is at 0 s (rest)'
+    frames = [(last_frame(p[0]) if p[0] else 1, *p[1:]) for p in points]
+    assert all(b[0] > a[0] for a, b in zip(frames, frames[1:])), f'keys {clip!r}: keys a frame or more apart, in order'
+    return _clip(obj, clip, prop, index, frames)
+
+
 def grow(obj, clip, seconds=0.4, axis='Z'):
     """A clip `clip` scaling `obj` about its own origin along `axis` ('X', 'Y' or 'Z', Blender) from
     where it is (built small and hidden) to full size (scale 1): a part that appears while a resident
@@ -200,24 +265,35 @@ def grow_in_turn(objs, clip, seconds=1.5, axis='Z'):
     return _peak(objs[-1], clip, end)
 
 
-def _clip(obj, clip, path, index, a, b=None, seconds=None, linear=False):
+def _clip(obj, clip, path, index, a, b=None, seconds=None, linear=False, ease='smooth', overshoot=OVERSHOOT):
     """Keys `obj`.`path`[`index`] from `a` (frame 1) to `b` at the end of `seconds`, or at the frames of
-    `a` when it is a list of (frame, value); in an action pushed to the NLA track `clip` (one action per
-    track; several channels of one clip share it). `linear`: an even speed between keys (else eased)."""
+    `a` when it is a list of (frame, value) or (frame, value, ease); in an action pushed to the NLA track `clip`
+    (one action per track; several channels of one clip share it). `ease` (`EASES`) from each key to the next,
+    unless the key names its own; `linear`: 'linear'. `overshoot`: how far 'back_out' goes past the key it eases
+    into, a share of the move."""
     keys = a if isinstance(a, list) else [(1, a), (last_frame(seconds), b)]
+    ease = 'linear' if linear else ease
+    eases = [k[2] if len(k) > 2 else ease for k in keys]
+    for e in eases:
+        assert e in EASES, f'{clip!r}: ease {e!r} is none of {sorted(EASES)}'
     obj.animation_data_create()
     track = obj.animation_data.nla_tracks.get(clip)
     action = track.strips[0].action if track else bpy.data.actions.new(f'{obj.name}.{clip}')
     obj.animation_data.action = action
     end = keys[-1][0]
-    for frame, value in keys:
+    for frame, value, *_ in keys:
         getattr(obj, path)[index] = value
         obj.keyframe_insert(path, index=index, frame=frame)
-    if linear:
+    if any(EASES[e] for e in eases):
+        by_frame = {k[0]: e for k, e in zip(keys, eases)}
         for fc in _fcurves(action, obj):
             if fc.data_path == path and fc.array_index == index:
                 for k in fc.keyframe_points:
-                    k.interpolation = 'LINEAR'
+                    e = EASES[by_frame.get(round(k.co[0]), 'smooth')]
+                    if e:
+                        k.interpolation, k.easing = e
+                        if e[0] == 'BACK':
+                            k.back = back_amount(overshoot)
     getattr(obj, path)[index] = keys[0][1]
     if not track:
         track = obj.animation_data.nla_tracks.new()

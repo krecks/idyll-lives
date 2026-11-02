@@ -1801,7 +1801,7 @@ def display_cabinet():
         F.cyl('knob_stem', 0.005, 0.016, (0.36, 1.0, hz + 0.012), M.brass, rot=(90, 0, 0), verts=8)
     door = G.hinged(G.join(parts, 'door'), F.at(hx, 1.015, hz))
     G.settle(centre=False)
-    G.swing(door, 'door_open', -100, seconds=1.0)
+    G.swing(door, 'door_open', -100, seconds=1.0, ease='back_out')
 
 
 SECTIONAL = [('greige', 'Upholstery'), ('greige_cushion', 'Cushions'), ('espresso_legs', 'Legs')]

@@ -6,10 +6,11 @@
 # Blender +X into the game's -X: Blender (x, y, z) is the game's (-x, z, -y). `GameFrame` converts.
 from .export import export_glb, materials_used, stats, write_pack
 from .family import Family, Model
-from .far import far_of, is_low, low
+from .far import decimated, far_of, is_low, low
 from .forms import circle, cut, extrude, jitter, loft, mirrored, ring, rounded_rect, smooth_outline, soft_box, sweep
 from .materials import FINISHES, Palette, mat
-from .motion import attach, clips, grow, grow_in_turn, path, rock, scroll, slide, spin, squash, stages, swing, turns
+from .motion import (EASES, attach, clips, grow, grow_in_turn, keys, path, rock, scroll, slide, spin, squash, stages, swing,
+                     turns, wobble)
 from . import kit, perch
 from .parts import (aside, check_size, fit, game_size, hinged, join, join_all, measure, new_parts, set_origin,
                     settle, turn)
@@ -19,9 +20,9 @@ from .scene import ASSETS, PREVIEWS, TAU, cosd, meshes, reset, sind
 from .shapes import SHARP, bevel_edges, boulder, cone, cube, cylinder, revolve, rod, round_angle, shade, sphere, torus
 
 __all__ = [
-    'ASSETS', 'FINISHES', 'PREVIEWS', 'SHARP', 'TAU', 'bevel_edges', 'round_angle', 'shade', 'Family', 'GameFrame', 'Model', 'Palette', 'aside', 'attach', 'boulder', 'check_size', 'clips',
-    'circle', 'cone', 'cosd', 'cut', 'extrude', 'cube', 'cylinder', 'export_glb', 'far_of', 'fit', 'game_size', 'grow', 'grow_in_turn', 'hinged', 'is_low', 'jitter', 'join',
+    'ASSETS', 'EASES', 'FINISHES', 'PREVIEWS', 'SHARP', 'TAU', 'bevel_edges', 'round_angle', 'shade', 'Family', 'GameFrame', 'Model', 'Palette', 'aside', 'attach', 'boulder', 'check_size', 'clips',
+    'circle', 'cone', 'cosd', 'cut', 'extrude', 'cube', 'cylinder', 'decimated', 'export_glb', 'far_of', 'fit', 'game_size', 'grow', 'grow_in_turn', 'hinged', 'is_low', 'jitter', 'join',
     'join_all', 'kit', 'loft', 'low', 'mat', 'materials_used', 'measure', 'meshes', 'mirrored', 'new_parts', 'path', 'perch', 'preview', 'preview_clips', 'preview_perches', 'reset', 'revolve', 'ring', 'rock', 'rounded_rect',
-    'rod', 'scroll', 'set_origin', 'settle', 'sind', 'slide', 'smooth_outline', 'soft_box', 'sphere', 'spin', 'squash', 'stages', 'stats', 'sweep', 'swing', 'torus', 'turn', 'turns',
+    'rod', 'scroll', 'set_origin', 'settle', 'sind', 'slide', 'smooth_outline', 'soft_box', 'sphere', 'spin', 'squash', 'stages', 'stats', 'sweep', 'swing', 'torus', 'turn', 'turns', 'keys', 'wobble',
     'write_pack',
 ]

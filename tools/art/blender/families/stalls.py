@@ -616,12 +616,8 @@ FAR_FEET = 0.01      # (m) a far version keeps every vertex this close to the fl
 
 
 def _far(build, ratio=FAR):
-    """A far version as gamekit's `far=ratio` (the model at rest, still, joined, decimated to `ratio`, its feet
-    kept), but with the vertices that sit on one another merged first: the cans' turned ends meet on their axis in
-    many vertices, and decimating them unmerged tore the drinks machine's cabinet into spikes 26 cm below the floor
-    (and the café table's legs away);
-    and its outermost faces kept, so its box stays the model's."""
-    import bmesh
+    """A far version as gamekit's `far=ratio` (gamekit/far.py `decimated`: vertices on one another merged, its feet and
+    outermost faces kept, turned faces turned back), from a build of its own."""
     import bpy
 
     def far():
@@ -629,24 +625,7 @@ def _far(build, ratio=FAR):
         bpy.context.scene.frame_set(1)
         for o in G.meshes():
             o.animation_data_clear()
-        obj = G.join(G.meshes(), f'{build.__name__}_far', origin=(0, 0, 0))
-        bm = bmesh.new()
-        bm.from_mesh(obj.data)
-        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
-        bm.to_mesh(obj.data)
-        bm.free()
-        # its feet and its outermost faces are kept whole, so it stands and measures as the model does
-        lo = [min(v.co[i] for v in obj.data.vertices) for i in range(3)]
-        hi = [max(v.co[i] for v in obj.data.vertices) for i in range(3)]
-
-        def free(v):
-            return v.co.z > FAR_FEET and all(lo[i] + 0.003 < v.co[i] < hi[i] - 0.003 for i in range(3))
-        keep = obj.vertex_groups.new(name='decimate')
-        keep.add([v.index for v in obj.data.vertices if free(v)], 1.0, 'REPLACE')
-        decimate = obj.modifiers.new('far', 'DECIMATE')
-        decimate.ratio = ratio
-        decimate.vertex_group = 'decimate'
-        return [obj]
+        return [G.decimated(G.join(G.meshes(), f'{build.__name__}_far', origin=(0, 0, 0)), ratio, feet=FAR_FEET)]
     far.__name__ = f'{build.__name__}_far'
     return far
 

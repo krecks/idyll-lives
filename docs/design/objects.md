@@ -416,9 +416,12 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   key on the command line that no manifest has; a `url` that isn't a `.glb`; more than 4 draw calls
   after the `materials` mapping (each moving part's counted apart), triangles over the most for the
   model's size, a model below the floor, extensions the game can't read, skins, morph targets, a clip
-  that animates anything but a node's transform or doesn't start at rest, a `motions` clip the file
-  doesn't have, textures over 1024 px, a mapping to a finish that doesn't exist. Warnings: a clip no
-  use plays, over 3 draws or the triangle target, unmapped, double-sided, see-through or emissive
+  that animates anything but a node's transform or doesn't start at rest or at 0 s (the game holds it at
+  rest until its first key: a pause each round of a loop), a `motions` clip the file doesn't have,
+  textures over 1024 px, a mapping to a finish that doesn't exist. Warnings: a clip no use plays, a clip
+  with cubic-spline keys (played as straight lines), a part turning over 12° in 1/30 s (the game's samples
+  blended that far apart shrink it), faces over 1 cm² whose normals are turned against their winding
+  (lit as if from behind), over 3 draws or the triangle target, unmapped, double-sided, see-through or emissive
   materials, unused UVs, a floating origin, a Blender-built model off its `Model`'s `centre` (the
   middle, or the `centre` it gives; `tools/art/blender/centres.json`, which the build writes for the gate
   only) by over 2 cm at rest (not its far version), one that reaches over 1 cm into the wall, one

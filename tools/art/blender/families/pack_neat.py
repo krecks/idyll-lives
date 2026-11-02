@@ -283,7 +283,7 @@ def laundryCenter():
         _porthole(F, 'door', cy, zf)
     door = G.hinged(G.join(door, 'door'), F.at(WX - 0.235, cy, zf + 0.005))
     objs = G.settle(centre=False)
-    G.swing(door, 'door_open', 100, seconds=0.8)
+    G.swing(door, 'door_open', 100, seconds=0.8, ease='back_out')
     return objs
 
 
@@ -374,7 +374,7 @@ def rainShowerTower():
     door = G.hinged(G.join(door, 'door'), F.at(DOOR_HALF, T, S - 0.012))
     objs = G.settle()      # on its Model centre: the back on the wall face
     G.grow(rain, 'water_on', seconds=0.6)
-    G.swing(door, 'door_open', -95, seconds=0.8)
+    G.swing(door, 'door_open', -95, seconds=0.8, ease='back_out')
     return objs
 
 

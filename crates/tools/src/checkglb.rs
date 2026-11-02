@@ -61,6 +61,13 @@ const WALL: f64 = 0.07;
 const FLOOR_TOP: f64 = 0.012;
 /// A use's clip longer than this (s) reads as slow ("about 1 s"); loops and ambient clips keep their own pace.
 const USE_CLIP: f64 = 3.0;
+/// The game samples a clip 30 times a second and blends the samples' matrices (modelClips.ts `clipPose`), which
+/// shrinks a part turning fast between them: degrees a part may turn in 1/30 s (12°: a turn a second).
+const TURN_STEP: f64 = 12.5;
+/// A clip whose first key is later than this (s) starts late: the game holds it at rest until then.
+const CLIP_START: f64 = 1e-4;
+/// Faces smaller than this (m²) aren't checked for normals turned against their winding.
+const FLIPPED_AREA: f64 = 1e-4;
 /// How far (m) a model may reach past its footprint at rest (its parts' boxes: a handle, a knob), and how far a
 /// part that goes round may sweep past it (measured from its vertices, so tighter: a fan's blades whose axis
 /// stood 3.3 cm off the middle swept 1.97 cm past).
@@ -1368,6 +1375,25 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
     let clip_name = |a: &J| a.get("name").cloned().unwrap_or(J::Str(String::new()));
     for a in animations {
         let name = repr(&clip_name(a));
+        // When it starts and how its keys are read: the game plays a cubic spline's keys as straight lines.
+        let (mut late, mut cubic) = (0.0_f64, false);
+        for s in key(a, "samplers")?.list().unwrap_or(&[]) {
+            if let Some(t) = first_value(g, key(s, "input")?, false)? {
+                late = late.max(t[0]);
+            }
+            cubic |= s.get("interpolation") == Some(&J::Str("CUBICSPLINE".into()));
+        }
+        if late > CLIP_START {
+            errors.push(format!(
+                "clip {name} starts {} s in: the game holds it at rest until then, a pause each round of a loop (its first key at 0 s: gamekit/export.py)",
+                fixed(late, 3)
+            ));
+        }
+        if cubic {
+            warnings.push(format!(
+                "clip {name} has cubic-spline keys: the game plays them as straight lines between the keys (export it sampled, as gamekit does)"
+            ));
+        }
         for c in key(a, "channels")?.list().unwrap_or(&[]) {
             let target = key(c, "target")?;
             let (path, node) = (target.get("path"), target.opt("node"));
@@ -1404,6 +1430,17 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
             };
             if away {
                 errors.push(format!("clip {name} starts {} away from where the file has it (the first key is the rest pose)", node_name(nodes, node)));
+            }
+            if path == "rotation" {
+                let s = sampler(a, c)?;
+                let fastest = turn_per_step(g, s)?;
+                if fastest > TURN_STEP {
+                    warnings.push(format!(
+                        "clip {name} turns {} {}° in 1/30 s: the game blends its samples 1/30 s apart, which shrinks a part turning that fast (keep it under a turn a second)",
+                        node_name(nodes, node),
+                        fixed(fastest, 0)
+                    ));
+                }
             }
         }
     }
@@ -1522,6 +1559,95 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
         }
     }
     Ok((errors, warnings))
+}
+
+/// The most a rotation channel turns its node between two of the game's samples, 1/30 s apart (degrees).
+fn turn_per_step(g: &Glb, sampler: &J) -> R<f64> {
+    let times = values(g, key(sampler, "input")?)?;
+    let keys = values(g, key(sampler, "output")?)?;
+    let mut fastest = 0.0_f64;
+    for k in 1..times.len().min(keys.len()) {
+        let dt = times[k][0] - times[k - 1][0];
+        if dt <= 1e-6 || keys[k].len() < 4 || keys[k - 1].len() < 4 {
+            continue;
+        }
+        let dot = keys[k]
+            .iter()
+            .zip(&keys[k - 1])
+            .fold(0.0, |s, (x, y)| s + x * y);
+        let turned = 2.0 * f64::min(1.0, dot.abs()).acos() * (180.0 / PI);
+        fastest = fastest.max(turned / dt / 30.0);
+    }
+    Ok(fastest)
+}
+
+/// [(mesh, faces)] for the meshes with faces over `FLIPPED_AREA` whose stored normals all point against the
+/// face's winding: lit as if from behind (dark where the light falls), the way a bevel's arc miter turned a
+/// frame's inner corners round. In each mesh's own space.
+fn flipped_faces(g: &Glb) -> R<Vec<(String, usize)>> {
+    let mut out = Vec::new();
+    for mesh in g.gltf.get("meshes").and_then(J::list).unwrap_or(&[]) {
+        let mut bad = 0;
+        for prim in key(mesh, "primitives")?.list().unwrap_or(&[]) {
+            if !prim
+                .get("mode")
+                .is_none_or(|m| m.num().is_some_and(|n| n.f() == 4.0))
+            {
+                continue;
+            }
+            let at = key(prim, "attributes")?;
+            let Some(normal) = at.get("NORMAL") else {
+                continue;
+            };
+            let (Some(pos), Some(nrm)) = (accessor(g, key(at, "POSITION")?)?, accessor(g, normal)?)
+            else {
+                continue;
+            };
+            let idx: Vec<usize> = match prim.get("indices") {
+                Some(i) => match accessor(g, i)? {
+                    Some(v) => v.iter().map(|x| x[0].f() as usize).collect(),
+                    None => continue,
+                },
+                None => (0..pos.len()).collect(),
+            };
+            let p = |i: usize| -> Option<[f64; 3]> {
+                let v = pos.get(i)?;
+                Some([v[0].f(), v[1].f(), v[2].f()])
+            };
+            for t in idx.chunks_exact(3) {
+                let (Some(a), Some(b), Some(c)) = (p(t[0]), p(t[1]), p(t[2])) else {
+                    continue;
+                };
+                let (e1, e2) = (
+                    [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+                    [c[0] - a[0], c[1] - a[1], c[2] - a[2]],
+                );
+                let f = [
+                    e1[1] * e2[2] - e1[2] * e2[1],
+                    e1[2] * e2[0] - e1[0] * e2[2],
+                    e1[0] * e2[1] - e1[1] * e2[0],
+                ];
+                let len = (f[0] * f[0] + f[1] * f[1] + f[2] * f[2]).sqrt();
+                if len / 2.0 < FLIPPED_AREA {
+                    continue;
+                }
+                let against = t.iter().all(|&i| {
+                    nrm.get(i).is_some_and(|n| {
+                        n.len() >= 3
+                            && (n[0].f() * f[0] + n[1].f() * f[1] + n[2].f() * f[2]) / len < -0.5
+                    })
+                });
+                bad += against as usize;
+            }
+        }
+        if bad > 0 {
+            out.push((
+                mesh.get("name").and_then(J::str).unwrap_or("").to_string(),
+                bad,
+            ));
+        }
+    }
+    Ok(out)
 }
 
 /// The parts a clip scales up from rest (G.grow: darts, a pot thrown, water), at their largest key, so what
@@ -3010,6 +3136,12 @@ fn check_file(
     if gltf.get("cameras").is_some_and(J::truthy) {
         warnings.push("has cameras; the game drops them".into());
     }
+    for (mesh, faces) in flipped_faces(&g)? {
+        warnings.push(format!(
+            "mesh {}: {faces} faces over 1 cm² have normals turned against their winding, lit as if from behind (a face built inside out, or a bevel's arc miter)",
+            repr_str(&mesh)
+        ));
+    }
     let (clip_errors, clip_warnings) = check_clips(&g, entry)?;
     errors.extend(clip_errors);
     warnings.extend(clip_warnings);
@@ -4011,6 +4143,83 @@ mod tests {
         let ((lo, own), _) = bounds(&g.gltf, &HashMap::new(), &aside).unwrap();
         assert!(lo[1].f().abs() < 1e-6, "own {lo:?}");
         assert!((own[1].f() - 0.45).abs() < 1e-6, "own {own:?}");
+    }
+
+    /// A one-key-a-frame turn of `degrees` about y over 1/30 s, its first key at `start` seconds.
+    fn turning_clip(start: f32, degrees: f32) -> Glb {
+        let json = r#"{"asset": {"version": "2.0"}, "nodes": [{"name": "door"}],
+            "animations": [{"name": "open", "channels": [{"sampler": 0, "target": {"node": 0, "path": "rotation"}}],
+                "samplers": [{"input": 0, "output": 1}]}],
+            "bufferViews": [{"byteOffset": 0, "byteLength": 8}, {"byteOffset": 8, "byteLength": 32}],
+            "accessors": [{"bufferView": 0, "componentType": 5126, "type": "SCALAR", "count": 2},
+                {"bufferView": 1, "componentType": 5126, "type": "VEC4", "count": 2}]}"#;
+        let half = (degrees / 2.0).to_radians();
+        let bin: Vec<u8> = [
+            start,
+            start + 1.0 / 30.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            half.sin(),
+            0.0,
+            half.cos(),
+        ]
+        .iter()
+        .flat_map(|c| c.to_le_bytes())
+        .collect();
+        parse_glb(&glb::tests::glb(json, &bin)).unwrap()
+    }
+
+    /// A clip that starts after 0 s is held at rest by the game until then: every loop paused a frame each round when
+    /// clips started at 1/24 s.
+    #[test]
+    fn a_clip_starts_at_0_s() {
+        let late = |start| {
+            let (errors, _) = check_clips(&turning_clip(start, 5.0), &J::Obj(Vec::new())).unwrap();
+            errors
+                .iter()
+                .any(|e| e.contains("s in: the game holds it at rest"))
+        };
+        assert!(late(1.0 / 24.0), "a frame late");
+        assert!(!late(0.0), "on time");
+    }
+
+    /// The game blends a clip's samples 1/30 s apart, which shrinks a part turning far between them.
+    #[test]
+    fn a_part_turning_too_fast_is_warned_of() {
+        let fast = |degrees| {
+            let (_, warnings) =
+                check_clips(&turning_clip(0.0, degrees), &J::Obj(Vec::new())).unwrap();
+            warnings.iter().any(|w| w.contains("in 1/30 s"))
+        };
+        assert!(fast(30.0), "30° in a frame");
+        assert!(!fast(12.0), "a turn a second");
+    }
+
+    /// A face whose normals point against its winding is lit from behind (a bevel's arc miter did it to a frame).
+    #[test]
+    fn faces_lit_from_behind_are_found() {
+        let flipped = |nz: f32| {
+            let json = r#"{"asset": {"version": "2.0"}, "nodes": [{"name": "body", "mesh": 0}],
+                "meshes": [{"name": "body", "primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1}}]}],
+                "bufferViews": [{"byteOffset": 0, "byteLength": 36}, {"byteOffset": 36, "byteLength": 36}],
+                "accessors": [{"bufferView": 0, "componentType": 5126, "type": "VEC3", "count": 3, "min": [0, 0, 0], "max": [0.1, 0.1, 0]},
+                    {"bufferView": 1, "componentType": 5126, "type": "VEC3", "count": 3}]}"#;
+            let bin: Vec<u8> = [0f32, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1, 0.0]
+                .iter()
+                .chain([0f32, 0.0, nz].iter().cycle().take(9))
+                .flat_map(|c| c.to_le_bytes())
+                .collect();
+            flipped_faces(&parse_glb(&glb::tests::glb(json, &bin)).unwrap()).unwrap()
+        };
+        assert_eq!(
+            flipped(-1.0),
+            vec![("body".to_string(), 1)],
+            "normals down, winding up"
+        );
+        assert!(flipped(1.0).is_empty(), "both up");
     }
 
     /// A model may allow itself more draw calls than the four (the grandfather clock's trunk door is a fifth), and
