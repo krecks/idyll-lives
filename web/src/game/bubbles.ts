@@ -15,7 +15,6 @@ import type { FrameState } from '../core/bridge';
 import type { Renderer } from '../render/types';
 import { game } from '../ui/state.svelte';
 
-const MAX_SIMS = 64;
 /** Thought kinds (snapshot `thought`) to bubble tones. */
 const THOUGHT_TONES = ['', 'bad', 'wish', 'good', 'love', 'good', 'bad', 'bad', 'bad', 'bad', 'good', 'wish'];
 
@@ -71,7 +70,8 @@ export class BubbleLayer {
   update(frame: FrameState): void {
     const { curr, layout } = frame;
     const k = layout.sim;
-    const count = Math.min(curr[layout.header.simCount], MAX_SIMS);
+    // (Every resident the snapshot holds: a big world's 160, not the 64 a town held once.)
+    const count = Math.min(curr[layout.header.simCount], layout.maxSims);
     const now = performance.now();
     for (const [id, s] of this.said) if (s.until < now) this.said.delete(id);
     for (let i = 0; i < count; i++) {
