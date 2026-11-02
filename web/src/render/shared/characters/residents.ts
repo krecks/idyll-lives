@@ -86,6 +86,13 @@ export { MAX_CHARACTERS } from './rig';
 export { EXPRESSIONS, FRIENDLY, STANCE, type StageDirection } from './expressions';
 export type { Face } from './face';
 
+/**
+ * Where someone the newest snapshot has sat at (x, z), facing `yaw`, sits in a car that drives (or,
+ * `aboard`: rode in last frame, till it has come to a stop), as the car is drawn this frame (`out`: x,
+ * z, yaw); false when they aren't in one (`pc/cars.ts` `ride`).
+ */
+export type CarRide = (frame: FrameState, x: number, z: number, yaw: number, aboard: boolean, out: { x: number; z: number; yaw: number }) => boolean;
+
 /** How fast an upper-layer clip fades in over the one it replaces (per second; a quarter of a second, less when the
  * action runs fast: scaled by `animRate` like the lower fade). */
 const UPPER_FADE_RATE = 4;
@@ -151,6 +158,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private rideOf: ((objectId: number) => ArrayLike<number> | null) | null = null;
   /** The seat of a car someone sits in at (x, z), getting in or out (`setCarSeat`). */
   private carSeatAt: ((x: number, z: number) => Seat | null) | null = null;
+  /** Where someone the newest snapshot has sat at (x, z), facing `yaw`, sits in a car driving as it's drawn this frame (`setCarRide`). */
+  private carRide: CarRide | null = null;
+  /** Scratch for `carRide`. */
+  private readonly rideAt = { x: 0, z: 0, yaw: 0 };
   /** Scratch for `riding`: the placement as a matrix, then moved by the ride. */
   private readonly rideM = new Float32Array(16);
   /** The lanes others have taken on what `freeLane` looks at (scratch). */
@@ -255,6 +266,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private readonly shadowMeshes = new Map<string, PartMesh<M>>();
   private readonly castsShadows: boolean;
   readonly visible = new Uint8Array(MAX_CHARACTERS);
+  /** Per row: sat in a car that drives last frame (`setCarRide`; they stay with it till it has stopped where the snapshot has it). */
+  private readonly inCar = new Uint8Array(MAX_CHARACTERS);
   private lastNow = 0;
   /** Seconds of animation played: stands still while the game is paused (Sims hold their pose). */
   private clock = 0;
@@ -1507,6 +1520,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * alpha;
         tyaw = lerpAngle(prev[o + k.yaw], tyaw, alpha);
       }
+      // Sat in a car that drives: in its seat where the car is drawn (`setCarRide`).
+      const riding = curr[o + k.pose] === Pose.Sit && !!this.carRide?.(frame, cx, cz, curr[o + k.yaw], this.inCar[i] === 1, this.rideAt);
+      this.inCar[i] = riding ? 1 : 0;
+      if (riding) [tx, tz, tyaw] = [this.rideAt.x, this.rideAt.z, this.rideAt.yaw];
       const away = curr[o + k.away] !== 0;
       this.spots[i * 2] = away ? NaN : tx;
       this.spots[i * 2 + 1] = tz;
@@ -1576,11 +1593,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const dx = gx - rig.x;
       const dz = gz - rig.z;
       const dist = Math.hypot(dx, dz);
-      if (dt > 0) {
+      if (riding) rig.speed = 0;
+      else if (dt > 0) {
         const inst = dist / dt;
         rig.speed += (Math.min(inst, 20) - rig.speed) * (1 - Math.exp(-dt * 10));
       }
-      if (moving || dist > SNAP_DISTANCE || appeared) {
+      if (moving || riding || dist > SNAP_DISTANCE || appeared) {
         rig.x = gx;
         rig.z = gz;
         rig.walkT = -1;
@@ -1665,7 +1683,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // snapshot turns them, not the way the frames between snapshots have got to: sized for the whole turn.)
       const goal = faceYaw === tyaw ? curr[o + k.yaw] : faceYaw;
       const onSpot = dir || turned !== null ? null : turnOnSpot(set, rig, this.standsFree(rig, i, pose, moving, social, useObj, appeared), goal, rig.body.stage === 'child');
-      rig.yaw = dir ? wrapAngle(faceYaw) : turned !== null ? wrapAngle(turned) : onSpot !== null ? onSpot : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
+      rig.yaw = dir || riding ? wrapAngle(faceYaw) : turned !== null ? wrapAngle(turned) : onSpot !== null ? onSpot : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
       rig.visible = true;
       this.visible[i] = 1;
       rig.tx = cx;
@@ -2761,6 +2779,14 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** The seat of the car at a spot, for those sitting there with no object under them (getting in or out of it: `pc/cars.ts`). */
   setCarSeat(seatAt: ((x: number, z: number) => Seat | null) | null): void {
     this.carSeatAt = seatAt;
+  }
+
+  /**
+   * Where those sat in a car that drives sit as it is drawn this frame (`pc/cars.ts` `ride`): with it
+   * rigidly, every frame, turns and all, not easing after it (which left them behind it at speed).
+   */
+  setCarRide(ride: CarRide | null): void {
+    this.carRide = ride;
   }
 
   /** Where residents sitting or lying on an object are carried by its moving seat (`ObjectMotion.ride`). */
