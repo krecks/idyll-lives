@@ -1134,7 +1134,9 @@ impl NavLog {
         (found >= u64::from(since)).then(|| {
             self.entries
                 .iter()
-                .flat_map(move |e| e.rects[..e.len].iter())
+                // (A place whose last change is older skips its patches at once.)
+                .filter(move |e| now.wrapping_sub(e.last) < since)
+                .flat_map(|e| e.rects[..e.len].iter())
                 .filter(move |r| now.wrapping_sub(r.1) < since)
                 .map(|r| r.0)
         })

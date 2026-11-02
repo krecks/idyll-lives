@@ -19,6 +19,7 @@ use std::collections::{BTreeMap, VecDeque};
 use serde::Deserialize;
 
 use crate::Error;
+use crate::path::join;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Edge {
@@ -1065,7 +1066,7 @@ impl Lot {
                 LotChange::Diag(x, z, _) | LotChange::Floor(x, z, _) => edge(EdgeRef::Diag(x, z)),
                 LotChange::Look(e, _) => edge(e),
             };
-            self.changes.rect = Some(self.changes.rect.map_or(at, |r| crate::path::join(r, at)));
+            self.changes.rect = Some(self.changes.rect.map_or(at, |r| join(r, at)));
         }
         if let Some(log) = &mut self.log {
             log.push(change);

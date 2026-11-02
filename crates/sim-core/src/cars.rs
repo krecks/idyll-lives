@@ -60,6 +60,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::TICKS_PER_SECOND;
 use crate::lot::OUTDOORS;
+use crate::path::join;
 use crate::travel::{Mode, RoadPoint, Travel};
 use crate::world::{
     Household, Phase, Sim, SimBrief, Task, TaskKind, World, nearest_exit, wrap_angle,
@@ -2310,16 +2311,12 @@ fn patches(tiles: &[(i32, i32)]) -> Vec<[i32; 4]> {
         let mut r = [x, z, x + 1, z + 1];
         // (Joining two patches can bring a third near: gather until none is.)
         while let Some(k) = out.iter().position(|&o| near(o, r)) {
-            r = crate::path::join(r, out.swap_remove(k));
+            r = join(r, out.swap_remove(k));
         }
         out.push(r);
     }
     if out.len() > MOST_PATCHES {
-        let all = out
-            .iter()
-            .copied()
-            .reduce(crate::path::join)
-            .unwrap_or_default();
+        let all = out.iter().copied().reduce(join).unwrap_or_default();
         return vec![all];
     }
     out
