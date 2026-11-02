@@ -1559,19 +1559,20 @@ export async function startSession(
       if (e.key === ' ' || e.key === 'Tab' || e.key === 'F3' || e.key === 'F8') e.preventDefault();
       return;
     }
-    // Escape closes the pause menu first, whatever is behind it (it must not act on what the menu covers).
-    if (e.key === 'Escape' && game.pauseMenu && !app.overlay) {
-      game.pauseMenu = false;
+    // Escape closes the pause menu first, whatever is behind it (it must not act on what the menu
+    // covers); a window over the menu (its settings) closes itself. Past here Escape has no pause menu to mind.
+    if (e.key === 'Escape' && game.pauseMenu) {
+      if (!app.overlay) game.pauseMenu = false;
       return;
     }
     // The colour studio: its keys are its own (Escape closes it, as Cancel).
     if (game.customising) {
-      if (e.key === 'Escape' && !game.pauseMenu) game.customising = null;
+      if (e.key === 'Escape') game.customising = null;
       return;
     }
     // Creation: its keys are its own (Escape goes back to Live).
     if (game.mode === 'create') {
-      if (e.key === 'Escape' && !game.pauseMenu) controls.setMode('live');
+      if (e.key === 'Escape') controls.setMode('live');
       return;
     }
     const route = routeKey(e, {
