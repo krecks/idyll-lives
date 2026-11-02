@@ -33,6 +33,8 @@ function requestKey(r: StartRequest): string {
 /** Seconds the camera takes to fly from the menu's view of a lot into the game. */
 const FLY_IN = 1.3;
 const VEIL_MS = 260;
+/** The loading bar's share before the warm-up, for a session prepared without it (the warm-up comes once it's started). */
+const BEFORE_WARM = 0.9;
 
 interface Entry {
   key: string;
@@ -46,8 +48,12 @@ interface Entry {
   ready: boolean;
   /** Where its loading is (shown as the loading screen once it is live). */
   progress: Progress;
-  /** The session's own look (and the mirror's clip-plane shaders) has been drawn once. */
+  /** The session's own look (and the mirror's clip-plane shaders) has been drawn once (or is being drawn: `warming`). */
   warmed: boolean;
+  /** Prepared without its warm-up (behind the menus): it gets it when it's started, the loading bar's last part. */
+  deferred: boolean;
+  /** The session once its warm-up, put off until it was started, is done. */
+  warming?: Promise<GameSession>;
   /** The session, once it exists. */
   instance?: GameSession;
 }
@@ -147,23 +153,28 @@ class GameHost {
     // (Unless its simulation stopped while it waited behind the menus: then a new one.)
     if (this.current?.key === key && this.current.instance?.alive !== false) {
       const entry = this.current;
-      const session = entry.session;
-      if (!warm || entry.warmed) return session;
-      // Prepared in the background without its own look drawn: draw it now, behind a loading screen.
-      return session.then(async (s) => {
-        if (entry.warmed) return s;
-        entry.warmed = true;
-        if (entry.live) app.loading = { label: 'Warming up', value: 0.95 };
+      if (!warm || (entry.warmed && !entry.warming)) return entry.session;
+      // Prepared in the background without its own look drawn: draw it now, behind the loading screen
+      // (the same one, its bar going on from where the preparing left it). Asked twice, drawn once.
+      entry.warmed = true;
+      entry.warming ??= entry.session.then(async (s) => {
+        const report = (label: string, value: number) => {
+          if (this.current !== entry) return;
+          entry.progress = { label, value: BEFORE_WARM + (1 - BEFORE_WARM) * value };
+          if (entry.live) app.loading = entry.progress;
+        };
+        report('Warming up', 0);
         // Let the loading screen paint before the warm's long frame.
         await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
-        await perfTimeAsync('host: warm', () => s.warm());
-        if (this.current === entry) app.loading = null;
+        await perfTimeAsync('host: warm', () => s.warm(report));
+        report('Ready', 1);
         return s;
       });
+      return entry.warming;
     }
     this.release();
     const previous = this.teardown;
-    const entry = { key, live: false, ready: false, warmed: warm, progress: { label: 'Getting ready', value: 0 } } as Entry;
+    const entry = { key, live: false, ready: false, warmed: warm, deferred: !warm, progress: { label: 'Getting ready', value: 0 } } as Entry;
     entry.started = (async () => {
       const renderer = await this.rendererFor(settings);
       // One session at a time on the shared renderer: a replaced one must finish clearing it first.
@@ -177,7 +188,8 @@ class GameHost {
         settings,
         (label, value) => {
           if (this.current !== entry || entry.ready) return;
-          entry.progress = { label, value };
+          // (One bar from Play to the game: a session whose warm-up comes later leaves room for it.)
+          entry.progress = { label, value: entry.deferred ? value * BEFORE_WARM : value };
           if (entry.live) app.loading = entry.progress;
         },
         warm,
@@ -187,7 +199,7 @@ class GameHost {
       entry.instance = s;
       await s.ready;
       entry.ready = true;
-      if (this.current === entry) app.loading = null;
+      // (The loading screen stays until `start` has what it waits for: the warm-up too.)
       // Warmed up: stop drawing unless it's shown (as the game, or the menus' town is).
       if (this.current === entry) this.syncActive(await this.renderer);
       return s;
@@ -211,6 +223,7 @@ class GameHost {
       if (!entry.ready) app.loading = entry.progress;
     }
     const session = await perfTimeAsync('host: prepare (start)', () => pending);
+    if (this.current === entry) app.loading = null;
     const renderer = await this.renderer;
     if (!renderer || this.current !== entry) return session;
     this.played = session;
