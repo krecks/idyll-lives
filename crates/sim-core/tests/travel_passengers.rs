@@ -73,9 +73,21 @@ fn on_plot(w: &World, i: usize) -> Option<u32> {
     w.plot_at(x, z)
 }
 
-/// A household of three in the first hamlet sent to the park in the next: one car there and back.
-fn goes_in_one_car(driver_first: bool) {
-    let content = common::content();
+/// A household of three in the first hamlet, all there in their car at the park in the next.
+struct There {
+    w: World,
+    c: usize,
+    who: [usize; 3],
+    home: u32,
+    riders: Vec<u32>,
+    parked_at: [f32; 2],
+    /// Minutes the ride took, and the walk would have.
+    minutes: f32,
+    walk: f32,
+}
+
+/// A household of three in the first hamlet sent to the park in the next: one car there.
+fn ride_there(driver_first: bool) -> There {
     let (mut w, _, family_of) = (5..40)
         .find_map(|seed| {
             let (w, h, park) = world(seed);
@@ -198,6 +210,31 @@ fn goes_in_one_car(driver_first: bool) {
     expect.sort_unstable();
     assert_eq!(riders, expect, "the two who came along ride home with it");
     assert_eq!(cars_of_home, 1);
+    There {
+        w,
+        c,
+        who,
+        home,
+        riders,
+        parked_at,
+        minutes,
+        walk,
+    }
+}
+
+/// A household of three in the first hamlet sent to the park in the next: one car there and back.
+fn goes_in_one_car(driver_first: bool) {
+    let content = common::content();
+    let There {
+        w,
+        c,
+        who,
+        home,
+        riders,
+        parked_at,
+        minutes,
+        walk,
+    } = ride_there(driver_first);
 
     // Saved and loaded there: the car still parked out with who came in it.
     let mut w = common::reload(&w, &content);
@@ -266,4 +303,52 @@ fn a_household_off_to_the_next_hamlet_goes_in_one_car_and_comes_back_in_it() {
 #[test]
 fn those_already_on_their_way_on_foot_turn_round_for_the_car() {
     goes_in_one_car(false);
+}
+
+#[test]
+fn riders_waiting_for_a_driver_at_work_make_their_own_way_home() {
+    let There {
+        mut w,
+        c,
+        who,
+        home,
+        riders,
+        ..
+    } = ride_there(true);
+    let trip = w.cars[c].trip.expect("on a trip");
+    // The driver off to work from there (off the map for the afternoon); one of the others goes
+    // home: back to the car, in, and (the driver not coming) out again and home on foot.
+    let driver = trip.driver as usize;
+    w.sims[driver].away_until = Some(w.tick + 8 * common::TICKS_PER_HOUR);
+    let rider = *riders.last().expect("riders");
+    w.apply(Command::GoHome { sim: rider }).unwrap();
+    let others: Vec<usize> = who.iter().copied().filter(|&i| i != driver).collect();
+    let mut sat = 0;
+    let mut home_by = None;
+    for t in 0..20 * 60 * 20 {
+        w.tick_once();
+        sat = sat.max(w.cars[c].aboard.len());
+        assert_eq!(
+            w.cars[c].state,
+            CarState::Out,
+            "it stays out there for its driver"
+        );
+        if others.iter().all(|&i| on_plot(&w, i) == Some(home)) {
+            home_by = Some(t);
+            break;
+        }
+    }
+    assert!(
+        home_by.is_some(),
+        "they never got home: aboard {:?}, riders {:?}, where {:?}",
+        w.cars[c].aboard,
+        w.cars[c].riders,
+        others.iter().map(|&i| on_plot(&w, i)).collect::<Vec<_>>()
+    );
+    assert_eq!(sat, 0, "nobody sat waiting in it for the driver");
+    assert!(
+        w.cars[c].riders.is_empty(),
+        "nobody left to ride home in it"
+    );
+    assert_eq!(w.cars[c].trip.map(|t| t.driver), Some(trip.driver));
 }

@@ -39,7 +39,8 @@
 //! parking spot they all get out and walk on to where they're going. When one of them goes home
 //! (the driver or not) the others go home too (`call_party_home`): back to the car, in, and it
 //! drives home once they're all in (or waited for long enough), where they get out as after work.
-//! Anyone who misses it makes their own way.
+//! Anyone who misses it makes their own way, as do those in it waiting for a driver who can't come
+//! (at work, out of town) or hasn't come in `TRIP_WAIT_TICKS`.
 //!
 //! A parked car takes up the tiles under it: nobody walks through it and nothing can be put there
 //! (`World::blocked`, `reblock`). A car whose parking spot has been built over (a wall, a fence, a
@@ -2822,12 +2823,27 @@ fn trip_update(w: &mut World, c: usize) {
                 return;
             }
             // One of them in it, or on their way to it, to go home: the rest go home too.
-            if !car.aboard.is_empty()
+            let going = !car.aboard.is_empty()
                 || car
                     .riders
                     .iter()
-                    .any(|&r| w.sims[r as usize].bound_for_car == Some(c as u32))
-            {
+                    .any(|&r| w.sims[r as usize].bound_for_car == Some(c as u32));
+            // Unless the driver can't come (at work, out of town), or hasn't come for as long as
+            // a driver waits for them (`TRIP_WAIT_TICKS` since the first of them got in): those
+            // in it get out and make their own way, and the rest of them too.
+            let driver_away = w.sims[d].away_until.is_some() || !w.sims[d].here();
+            let waited = !car.aboard.is_empty() && w.tick - car.since >= TRIP_WAIT_TICKS;
+            if going && (driver_away || waited) {
+                let aboard = std::mem::take(&mut w.cars[c].aboard);
+                for &a in &aboard {
+                    let_out(w, a as usize);
+                }
+                if driver_away {
+                    w.cars[c].riders.clear();
+                } else {
+                    w.cars[c].riders.retain(|r| !aboard.contains(r));
+                }
+            } else if going {
                 call_party_home(w, c);
             }
             seat_party(w, c);
@@ -3106,7 +3122,12 @@ pub(crate) fn ride(w: &mut World, i: usize, c: u32, plot: Option<u32>, directed:
         w.sims[i].queue.push_front(task);
         return;
     }
+    let tick = w.tick;
     let car = &mut w.cars[c as usize];
+    // (Parked out there, the first of them in to go home: how long they've waited for the driver.)
+    if plot.is_none() && car.aboard.is_empty() {
+        car.since = tick;
+    }
     car.aboard.push(me);
     if plot.is_some() && !car.riders.contains(&me) {
         car.riders.push(me);
