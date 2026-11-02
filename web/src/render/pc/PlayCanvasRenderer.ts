@@ -76,7 +76,7 @@ import { houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces
 import { compose, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
 import { OrbitControls } from '../shared/orbit';
 import { Flight, panBounds, Roam, warmLots, type FocusPlot } from '../shared/focus';
-import { CHUNK, chunkCoords } from '../shared/chunks';
+import { CHUNK, chunkCoords, RectGrid } from '../shared/chunks';
 import { ModelRefresh } from '../shared/modelRefresh';
 import { OverviewCamera } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
@@ -238,7 +238,7 @@ function sameObject(a: ObjectPlacement, b: ObjectPlacement): boolean {
 /** `?stream=1`: the street streams its chunks round the camera in any town (else only in a big world's). */
 const STREAM_FLAG = typeof location !== 'undefined' && new URLSearchParams(location.search).get('stream') === '1';
 
-/** The plot (by index) under a ground point, else the nearest within `reach` m. */
+/** The plot (by index) under a ground point, else the nearest within `reach` m (every plot looked at: see `PlotFinder` for each frame's). */
 function plotNear(world: WorldStructure, x: number, z: number, reach: number): FocusPlot | null {
   let best: FocusPlot | null = null;
   let bestD = reach;
@@ -247,6 +247,43 @@ function plotNear(world: WorldStructure, x: number, z: number, reach: number): F
     if (d < bestD || (d === 0 && !best)) [best, bestD] = [{ id: i, x: p.x, z: p.z, w: p.w, d: p.d }, d];
   });
   return best;
+}
+
+/**
+ * `plotNear` for the roaming camera, each frame: the plots in a grid of 16 m cells (made once a
+ * world), and the last answer kept while the point, the reach and the world are the same (a still
+ * camera asks nothing of the grid). The same plot as `plotNear` gives for a finite reach.
+ */
+class PlotFinder {
+  private world: WorldStructure | null = null;
+  private grid = new RectGrid<{ x: number; z: number; w: number; d: number; i: number }>(16);
+  private readonly asked = { x: NaN, z: NaN, reach: NaN };
+  private answer: FocusPlot | null = null;
+
+  find(world: WorldStructure, x: number, z: number, reach: number): FocusPlot | null {
+    if (world !== this.world) {
+      this.world = world;
+      this.grid = new RectGrid(16);
+      world.plots.forEach((p, i) => this.grid.add({ x: p.x, z: p.z, w: p.w, d: p.d, i }));
+      this.asked.x = NaN;
+    }
+    const a = this.asked;
+    if (x === a.x && z === a.z && reach === a.reach) return this.answer;
+    a.x = x;
+    a.z = z;
+    a.reach = reach;
+    if (!Number.isFinite(reach)) return (this.answer = plotNear(world, x, z, reach));
+    // (In plot order, as `plotNear` goes: the first of plots as near wins.)
+    let best = -1;
+    let bestD = reach;
+    for (const c of this.grid.near({ x, z, w: 0, d: 0 }, reach)) {
+      const d = Math.hypot(Math.max(c.x - x, 0, x - (c.x + c.w)), Math.max(c.z - z, 0, z - (c.z + c.d)));
+      if (d < bestD || (d === bestD && c.i < best) || (d === 0 && best < 0)) [best, bestD] = [c.i, d];
+    }
+    const p = best >= 0 ? world.plots[best] : null;
+    if (p?.x === this.answer?.x && p?.z === this.answer?.z && this.answer?.id === best) return this.answer;
+    return (this.answer = p && { id: best, x: p.x, z: p.z, w: p.w, d: p.d });
+  }
 }
 
 /** A world build stopped because the roaming camera settled on another lot before it was done (`pace`). */
@@ -487,6 +524,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private followIndex: number | null = null;
   /** The roaming camera's stream of chunks and its focus lot (`shared/focus.ts`), a flight across the world (`flyTo`). */
   private readonly roam = new Roam();
+  /** The plot under the roaming camera's target (`roamFrame`). */
+  private readonly plots = new PlotFinder();
   private readonly flight = new Flight();
   private readonly flightPose = { x: 0, z: 0, radius: 0 };
   private focusLotListener: ((plot: number) => boolean) | null = null;
@@ -923,7 +962,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.roam.pinned = this.followIndex !== null || this.gameRig.active || this.flight.active;
     const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
     const fovH = 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect);
-    const changed = this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha: o.alpha, fovH }, performance.now(), (x, z, reach) => plotNear(world, x, z, reach), (plot) => {
+    const changed = this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha: o.alpha, fovH }, performance.now(), (x, z, reach) => this.plots.find(world, x, z, reach), (plot) => {
       const taken = !!this.focusLotListener?.(plot.id);
       if (taken) {
         this.roamedTo = plot.id;
@@ -946,13 +985,29 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const t = this.orbit.target;
     if (!v) return;
     const onLot = (t.x >= v.x - 4 && t.z >= v.z - 4 && t.x <= v.x + v.w + 4 && t.z <= v.z + v.d + 4);
-    const square = onLot ? `lot` : `${Math.round(t.x / 8) * 8},${Math.round(t.z / 8) * 8},${Math.round(Math.min(70, Math.max(30, 0.9 * this.orbit.radius + 15)) / 8)}`;
-    if (square === this.shadowSquare) return;
-    this.shadowSquare = square;
-    if (onLot) this.sunShadows.setSquare(v.x + v.w / 2, v.z + v.d / 2, Math.hypot(v.w, v.d) / 2 + SHADOW_MARGIN);
-    else this.sunShadows.setSquare(Math.round(t.x / 8) * 8, Math.round(t.z / 8) * 8, Math.min(70, Math.max(30, 0.9 * this.orbit.radius + 15)));
+    if (onLot) {
+      if (this.shadowSquare === 'lot') return;
+      this.shadowSquare = 'lot';
+      this.sunShadows.setSquare(v.x + v.w / 2, v.z + v.d / 2, Math.hypot(v.w, v.d) / 2 + SHADOW_MARGIN);
+      return;
+    }
+    // (Numbers compared, not a key made: this runs every frame.)
+    const x = Math.round(t.x / 8) * 8;
+    const z = Math.round(t.z / 8) * 8;
+    const half = Math.min(70, Math.max(30, 0.9 * this.orbit.radius + 15));
+    const step = Math.round(half / 8);
+    const at = this.roamSquare;
+    if (this.shadowSquare === 'roam' && at[0] === x && at[1] === z && at[2] === step) return;
+    this.shadowSquare = 'roam';
+    at[0] = x;
+    at[1] = z;
+    at[2] = step;
+    this.sunShadows.setSquare(x, z, half);
   }
-  private shadowSquare = 'lot';
+  /** The shadow square round the viewed lot (`lot`; `buildWorld` sets it there) or round the roaming camera's target (`roam`, `roamSquare`). */
+  private shadowSquare: 'lot' | 'roam' = 'lot';
+  /** The roaming square's middle (8 m steps) and half side (8 m steps), as last set. */
+  private readonly roamSquare = new Float64Array(3);
 
   /** The sim's full-detail area: the chunks streamed in, as a tile rectangle on the ground (`onWatch`). */
   private reportWatch(): void {

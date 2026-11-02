@@ -40,6 +40,42 @@ describe('roaming', () => {
     expect(behind).toBeGreaterThan(0);
   });
 
+  test("a preset's share of the stream radius streams fewer chunks", () => {
+    expect(streamRadius(60, 0.7)).toBeCloseTo(152 * 0.7);
+    const full = new Roam();
+    const low = new Roam();
+    low.streamScale = 0.7;
+    full.update(cam(1000, 1000, 60), 0, none, take);
+    low.update(cam(1000, 1000, 60), 0, none, take);
+    expect(low.chunks.size).toBeLessThan(full.chunks.size);
+    for (const id of low.chunks) expect(full.chunks.has(id)).toBe(true);
+  });
+
+  test('a still camera keeps the same set, and a camera that moved works it out again', () => {
+    const roam = new Roam();
+    roam.update(cam(500, 500), 0, none, take);
+    const first = roam.chunks;
+    // (Unchanged: not even a new set.)
+    expect(roam.update(cam(500, 500), 16, none, take)).toBe(false);
+    expect(roam.update(cam(500.001, 500), 32, none, take)).toBe(false);
+    expect(roam.chunks).toBe(first);
+    // Creeping by less than the threshold a frame still gets there: the comparison is with where it was last worked out.
+    let x = 500;
+    for (let t = 48; x < 500 + CHUNK * 3; t += 16) {
+      x += 0.004;
+      roam.update(cam(x, 500), t, none, take);
+      if (roam.chunks !== first) break;
+    }
+    expect(roam.chunks).not.toBe(first);
+    const moved = new Roam();
+    moved.update(cam(500, 500), 0, none, take);
+    moved.update(cam(x, 500), 16, none, take);
+    expect([...roam.chunks].sort()).toEqual([...moved.chunks].sort());
+    // A big move: the chunks follow.
+    expect(roam.update(cam(900, 500), 2000, none, take)).toBe(true);
+    expect(roam.chunks.has(chunkAt(900, 500))).toBe(true);
+  });
+
   test('more is streamed ahead of the camera than behind it', () => {
     const roam = new Roam();
     roam.update(cam(1000, 1000, 60), 0, none, take);

@@ -3,7 +3,8 @@
  * streamed in round the camera, and which lot is the focus, the one drawn in full (its house's
  * rooms, its things, the residents indoors).
  *
- * - Stream radius: `clamp(radius · 1.2 + 80, 120, 260)` m round the camera's target, the disc
+ * - Stream radius: `clamp(radius · 1.2 + 80, 120, 260)` m round the camera's target (times the
+ *   preset's share, `OpenWorldQuality.stream`: Low's 0.7), the disc
  *   stretched ahead along the view (the far side of the frustum shows more of the town than the
  *   near side): a chunk whose nearest point is within the radius (ahead: 1.5 × the radius, inside
  *   the view's angle) comes in; it goes only once it is `HYSTERESIS` m further out, so a camera
@@ -27,10 +28,13 @@ export const SETTLE_MS = 350;
 /** The camera's target moving slower than this (m/s) has settled. */
 const SETTLED_SPEED = 3;
 
-/** The stream radius (m) for a camera this far from its target. */
-export function streamRadius(radius: number): number {
-  return Math.min(260, Math.max(120, radius * 1.2 + 80));
+/** The stream radius (m) for a camera this far from its target, `scale` the preset's share of it (`OpenWorldQuality.stream`). */
+export function streamRadius(radius: number, scale = 1): number {
+  return Math.min(260, Math.max(120, radius * 1.2 + 80)) * scale;
 }
+
+/** The camera moving less than this (m, and radians of its turn) since the chunks were last worked out leaves them as they are. */
+const STILL = 0.01;
 
 /** A lot as the focus needs it: its id and rectangle (tiles = m). */
 export interface FocusPlot {
@@ -78,6 +82,12 @@ function inReach(id: number, cam: StreamCamera, r: number, ahead: number): boole
   return angle <= cam.fovH / 2 + widen + 0.15;
 }
 
+/** Whether every id of `a` is in `b` (no array made). */
+function sameIds(a: ReadonlySet<number>, b: ReadonlySet<number>): boolean {
+  for (const id of a) if (!b.has(id)) return false;
+  return true;
+}
+
 export class Roam {
   /** The chunks streamed in (ids, `shared/chunks.ts`); a new set when it changes. */
   chunks: ReadonlySet<number> = new Set();
@@ -93,10 +103,15 @@ export class Roam {
   readonly heading = { x: 0, z: 0 };
   /** The bounds of what the stream covers (the town's chunks, and some way round): chunks outside are never streamed. */
   private bounds: { x0: number; z0: number; x1: number; z1: number } | null = null;
+  /** The preset's share of the stream radius (`OpenWorldQuality.stream`). */
+  streamScale = 1;
+  /** The camera the chunks were last worked out for (x, z, radius, alpha, fovH, scale; NaN: never): a camera standing still costs nothing. */
+  private readonly streamedFor = new Float64Array(6).fill(NaN);
 
   /** Chunks are streamed only within this rectangle (m; null: anywhere). */
   setBounds(b: { x0: number; z0: number; x1: number; z1: number } | null): void {
     this.bounds = b;
+    this.streamedFor[0] = NaN;
   }
 
   /**
@@ -118,7 +133,11 @@ export class Roam {
         this.heading.z += (dz / l - this.heading.z) * k;
       }
     }
-    this.last = { x: cam.x, z: cam.z, t: now };
+    if (this.last) {
+      this.last.x = cam.x;
+      this.last.z = cam.z;
+      this.last.t = now;
+    } else this.last = { x: cam.x, z: cam.z, t: now };
 
     const changed = this.stream(cam);
 
@@ -144,9 +163,21 @@ export class Roam {
     this.candidate = id;
   }
 
-  /** The chunks round the camera, with hysteresis. True when the set changed. */
+  /**
+   * The chunks round the camera, with hysteresis. True when the set changed. Worked out again only
+   * once the camera moved (`STILL`): for the same camera the answer is the same set (a chunk kept by
+   * the hysteresis is kept again), so a still camera skips the couple of hundred chunks it would test.
+   */
   private stream(cam: StreamCamera): boolean {
-    const r = streamRadius(cam.radius);
+    const f = this.streamedFor;
+    if (Math.abs(cam.x - f[0]) < STILL && Math.abs(cam.z - f[1]) < STILL && Math.abs(cam.radius - f[2]) < STILL && Math.abs(cam.alpha - f[3]) < STILL * 0.1 && cam.fovH === f[4] && this.streamScale === f[5]) return false;
+    f[0] = cam.x;
+    f[1] = cam.z;
+    f[2] = cam.radius;
+    f[3] = cam.alpha;
+    f[4] = cam.fovH;
+    f[5] = this.streamScale;
+    const r = streamRadius(cam.radius, this.streamScale);
     const reach = r * 1.5 + HYSTERESIS;
     const b = this.bounds;
     const x0 = Math.floor((Math.max(cam.x - reach, b ? b.x0 : -Infinity)) / CHUNK);
@@ -161,7 +192,7 @@ export class Roam {
         if (inReach(id, cam, had ? r + HYSTERESIS : r, 1.5)) next.add(id);
       }
     }
-    if (next.size === this.chunks.size && [...next].every((id) => this.chunks.has(id))) return false;
+    if (next.size === this.chunks.size && sameIds(next, this.chunks)) return false;
     this.chunks = next;
     return true;
   }
