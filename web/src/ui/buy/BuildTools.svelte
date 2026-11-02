@@ -23,6 +23,7 @@
       { id: 'room', label: 'Room', icon: 'icon.ui.room', unit: '/m', hint: 'Drag out a rectangle, then add a door', note: "An empty room can be closed off; residents and furniture can't be shut in." },
       { id: 'fence', label: 'Fence', icon: 'icon.ui.fence', unit: '/m', hint: 'Drag along the grid, then add a gate', note: 'Fences keep a garden outdoors (no floor, no roof); leave a gate so nobody is shut in.' },
       { id: 'gate', label: 'Gate', icon: 'icon.ui.gate', unit: '', hint: 'Click a fence (or open ground) to fit a gate', note: 'Leave a gate so nobody is shut in.' },
+      { id: 'garage', label: 'Garage', icon: 'icon.ui.garage', unit: '', hint: 'Click the driveway for one at its end, or anywhere on your lot · R turns it · click your garage to take it down', note: 'A garage for the car, outdoors on the ground. The car parks in front of one at the end of the driveway. One per home; taken down, it sells back like furniture.' },
       { id: 'stairs', label: 'Stairs', icon: 'icon.ui.stairs', unit: '', hint: 'Click where the stairs start · R turns them · click your stairs to move them', note: 'Build the storey above first. Stairs placed in the basement lead up into a room on the ground floor. Stairs are climbed from the front; nothing can stand on the steps or where they come up.' },
       { id: 'roof', label: 'Roof', icon: 'icon.ui.roof', unit: '', hint: 'Pick a shape and a colour: the whole roof changes at once', note: 'The roof covers every room of the house. Changing it is free.' },
     ],
@@ -46,6 +47,8 @@
   /** Tools with nothing to do in the basement (no windows, gardens or roof underground). */
   const aboveGround = new Set<BuildTool>(['window', 'fence', 'gate', 'roof']);
   const underground = (id: BuildTool) => game.storey < 0 && aboveGround.has(id);
+  /** Tools for the ground only (a garage stands on it). */
+  const upstairs = (id: BuildTool) => game.storey !== 0 && id === 'garage';
   /** What the tool costs with the look picked (per metre for walls, per face for paint, per tile for floors). */
   const price = (id: BuildTool): string => {
     if (!prices) return '';
@@ -80,6 +83,9 @@
       case 'window':
         p = content.windowStyles[look.window]?.price ?? prices.window;
         break;
+      case 'garage':
+        p = prices.garage ?? 0;
+        break;
       case 'remove':
         p = prices.remove;
         break;
@@ -97,7 +103,7 @@
   );
   const tool = $derived(tools.find((t) => t.id === game.buildTool) ?? tools[0]);
   /** Tools that draw (and so can be cancelled half-way). */
-  const draws = $derived(!['roof', 'blueprint', 'stairs'].includes(tool.id));
+  const draws = $derived(!['roof', 'blueprint', 'stairs', 'garage'].includes(tool.id));
 
   function pick(id: BuildTool) {
     play('tab');
@@ -127,8 +133,8 @@
                 role="radio"
                 aria-checked={game.buildTool === t.id}
                 class:active={game.buildTool === t.id}
-                disabled={underground(t.id)}
-                title="{t.label}{costLabel(t)} — {underground(t.id) ? 'Not in the basement.' : t.note}{t.id === 'wall' ? diagonal : ''}"
+                disabled={underground(t.id) || upstairs(t.id)}
+                title="{t.label}{costLabel(t)} — {underground(t.id) ? 'Not in the basement.' : upstairs(t.id) ? 'Only on the ground.' : t.note}{t.id === 'wall' ? diagonal : ''}"
                 onclick={() => pick(t.id)}
               >
                 <span class="badge"><Icon name={t.icon} size={18} /></span>

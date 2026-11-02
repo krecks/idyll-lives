@@ -16,6 +16,7 @@ pub mod content;
 pub mod conversation;
 pub mod cooking;
 pub mod error;
+pub mod garages;
 pub mod home;
 mod index;
 pub mod items;

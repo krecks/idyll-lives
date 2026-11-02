@@ -84,7 +84,7 @@ import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
-import { groundDepth, lowestStorey, storeyOfRow, storeyRow, storeyShown, type FenceEdge, type ItemPlacement, type ObjectPlacement, type StoreyLayout, type WorldStructure } from '../../core/protocol';
+import { groundDepth, lowestStorey, storeyOfRow, storeyRow, storeyShown, type FenceEdge, type GarageInfo, type ItemPlacement, type ObjectPlacement, type StoreyLayout, type WorldStructure } from '../../core/protocol';
 import type { VisemeTrack } from '../../voice/visemes';
 import type {
   BuildEffect,
@@ -97,6 +97,7 @@ import type {
   LotHighlight,
   ObjectBackgroundClips,
   ObjectClipInfo,
+  GaragePreview,
   PaintPreviewFace,
   PickResult,
   PlacementGhost,
@@ -194,6 +195,16 @@ const IDENTITY = Float32Array.of(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)
 
 /** No neighbours' houses (to look through). */
 const NO_HOUSES: readonly (readonly [number, number, number, number])[] = [];
+
+/** Whether two worlds' garages are the same (field by field, as `sameObject`). */
+function sameGarages(a: readonly GarageInfo[] | undefined, b: readonly GarageInfo[] | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((g, i) => {
+    const h = b[i];
+    return g.plot === h.plot && g.x0 === h.x0 && g.z0 === h.z0 && g.x1 === h.x1 && g.z1 === h.z1 && g.rot === h.rot;
+  });
+}
 
 /**
  * Whether two placements draw the same: everything an object is drawn from, but its open state and
@@ -1095,6 +1106,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (built.storeyDepth !== world.storeyDepth || built.basement !== world.basement) return 'storeys';
     // The lot itself (walls, rooms, floors, fences) is what costs a build; a lean message never has it.
     if (built.lotVersion !== world.lotVersion) return 'lot';
+    // (A garage built or taken down: the street draws it.)
+    if (!sameGarages(built.garages, world.garages)) return 'garages';
     if (built.objects.length !== world.objects.length) return 'object count';
     for (let i = 0; i < world.objects.length; i++) {
       if (!sameObject(built.objects[i], world.objects[i])) return `object ${world.objects[i].id} ${world.objects[i].def}`;
@@ -2741,6 +2754,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   setFloorPreview(tiles: readonly { x: number; z: number }[], floor: number | null): void {
     this.previews.setFloorPreview(tiles, floor);
+  }
+
+  setGaragePreview(garage: GaragePreview | null): void {
+    this.previews.setGaragePreview(garage);
   }
 
   setRoomOverlay(tiles: readonly RoomOverlayTile[]): void {

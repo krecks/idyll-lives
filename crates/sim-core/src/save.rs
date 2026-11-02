@@ -73,7 +73,11 @@
 //! it's parked there) and who rides with it (`cars[].riders`; absent: nobody, as in files written
 //! before passengers, so no new version). Absent: a `cosy` town, as before: no road network from
 //! the meta's roads (the open-world rules are for `normal` and `big` towns,
-//! `travel::Travel::open`)
+//! `travel::Travel::open`). Still 35: a garage the player built (Build mode's Garage tool) keeps
+//! the way its door faces (`garages[].rot`, a thing's facing; absent: towards the street, as the
+//! town placed it), and a car parked in front of one where it parked before
+//! (`cars[].driveSpot`, `[x, z, yaw]`; absent: where it parks is its own spot). Both are left out
+//! when absent, so a game without a garage of the player's saves as it did.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 

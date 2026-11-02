@@ -28,6 +28,9 @@
     services.controls.setRoof(style, color);
   }
   const prices = $derived(game.catalog?.build);
+  /** A garage's price in this game, and what taking one down brings back (as furniture sold does). */
+  const garagePrice = $derived(game.creative ? 0 : (prices?.garage ?? 0));
+  const refund = $derived(Math.round((prices?.garage ?? 0) * (game.catalog?.objectRules.resale ?? 0) * (game.creative ? 0 : 1)));
 
   /** Rough colour of each finish's texture, so a swatch shows what the tint does to it. */
   const BASE: Record<WallCoveringDef['finish'], string> = {
@@ -254,6 +257,18 @@
     </div>
     <span class="chosen"><b>{roof ? `${roofs[roof[0]]?.label ?? ''} · ${roofColors[roof[1]]?.label ?? ''}` : 'The house’s own roof'}</b><small> · free</small></span>
   </div>
+{:else if tool === 'garage'}
+  <div class="row">
+    {#if game.homeGarage}
+      <button class="btn act" onclick={() => (play('tab'), services.controls.sellGarage())}>Take down the garage{#if refund}<small class="tabular"> · +{money(refund)}</small>{/if}</button>
+      <span class="chosen"><small>One garage per home</small></span>
+    {:else}
+      <button class="btn act" disabled={!game.drivewayGarage || !game.affords(garagePrice)} title={game.drivewayGarage ? 'Build one where the driveway ends, beside the house' : 'No driveway with room at its end'} onclick={() => (play('tab'), services.controls.buildGarageAtDrive())}
+        >At the end of the driveway</button
+      >
+      <span class="chosen"><b class="tabular">{garagePrice ? money(garagePrice) : 'Free'}</b><small> · or click your lot · R turns its door</small></span>
+    {/if}
+  </div>
 {:else if tool === 'remove'}
   <p class="row muted">Tearing down walls, doors, windows and fences is free.</p>
 {/if}
@@ -429,5 +444,11 @@
   }
   .muted {
     color: var(--text-muted);
+  }
+  .act {
+    flex: none;
+    height: 30px;
+    padding: 0 12px;
+    font-size: 12px;
   }
 </style>

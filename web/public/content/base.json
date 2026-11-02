@@ -3770,6 +3770,7 @@
     "window": 120,
     "fence": 25,
     "gate": 80,
+    "garage": 2500,
     "remove": 0,
     "storeys": 3,
     "basement": true

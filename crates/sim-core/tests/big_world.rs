@@ -282,4 +282,56 @@ fn big_world_benchmark() {
     } else {
         eprintln!("one wall built: nowhere to put it ({tried:?})");
     }
+
+    // A garage built on the player's lot (only its tiles' walking changes: `cars::garages_changed`),
+    // then what catching up costs, as for the object.
+    let mut tried: std::collections::BTreeMap<String, usize> = Default::default();
+    let mut garaging = Duration::ZERO;
+    let home_plot = w.households[home].plot.expect("a home");
+    w.apply(sim_core::Command::AddFunds {
+        household: home as u32,
+        amount: 100_000,
+    })
+    .expect("money for it");
+    let built = w.garages.iter().all(|g| g.plot != home_plot)
+        && spots.iter().any(|&[x, z, _]| {
+            [0u8, 1].into_iter().any(|rot| {
+                // (On 4 × 6 tiles from (x, z), or 6 × 4 turned, its walls in the middle of them.)
+                let (gw, gd) = if rot == 0 { (3.2, 5.4) } else { (5.4, 3.2) };
+                let (x0, z0) = (
+                    x as f32 + (if rot == 0 { 4.0 } else { 6.0 } - gw) / 2.0,
+                    z as f32 + (if rot == 0 { 6.0 } else { 4.0 } - gd) / 2.0,
+                );
+                let t = Instant::now();
+                let r = w.apply(sim_core::Command::BuildGarage {
+                    household: home as u32,
+                    x0,
+                    z0,
+                    x1: x0 + gw,
+                    z1: z0 + gd,
+                    rot,
+                });
+                garaging = t.elapsed();
+                if let Err(e) = &r {
+                    *tried.entry(e.to_string()).or_default() += 1;
+                }
+                r.is_ok()
+            })
+        });
+    if built {
+        let t = Instant::now();
+        w.refresh_walkable();
+        let reach = t.elapsed();
+        let t = Instant::now();
+        w.refresh_navigation();
+        let index = t.elapsed();
+        eprintln!(
+            "one garage built in {:.3} ms, then walkable regions catch up in {:.3} ms, objects' index and links in {:.3} ms",
+            ms(garaging),
+            ms(reach),
+            ms(index)
+        );
+    } else {
+        eprintln!("one garage built: nowhere to put it ({tried:?})");
+    }
 }

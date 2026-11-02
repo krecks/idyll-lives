@@ -210,7 +210,7 @@ const CARPET = ['#B8AE9C', '#9FAAB8', '#B49C8C', '#A8B29A', '#C4B4A8'];
 /** Curtain colours seen through neighbours' windows. */
 const CURTAINS = ['#F2EDE0', '#E8D9B8', '#C9D6E2', '#E2C4BE', '#F4F1EA', '#E6E0C8'];
 /** Wall height of a garage (lower than the house). */
-const GARAGE_HEIGHT = 2.5;
+export const GARAGE_HEIGHT = 2.5;
 
 type RoomKind = 'living' | 'bedroom' | 'bath' | 'kitchen';
 
@@ -411,8 +411,8 @@ export interface SilhouetteSpec {
   front: [number, number];
   /** Centre of the front door along the front wall (x, or z on a wall along z), where the garden path meets the house, if known. */
   door: number | null;
-  /** Garage beside the house (wall centre lines), its door facing the street. */
-  garage: { x0: number; z0: number; x1: number; z1: number } | null;
+  /** Garage beside the house (wall centre lines), its door facing the street, or `door` (its outward normal: one the player built). */
+  garage: { x0: number; z0: number; x1: number; z1: number; door?: [number, number] } | null;
   /** The roof the player chose (`PlotInfo.roof`); absent: the house's own look. */
   roof?: [number, number];
   /** Storeys the house has (absent: one). */
@@ -1697,7 +1697,7 @@ export class HousePlanner {
       roof.color(s.roof);
       addRoofShaped(g, s, roof, trim, walls, GARAGE_HEIGHT, 0.3);
       // Sectional door on the street side (whichever wall that is), with a coach lamp beside it.
-      const [fx, fz] = b.front;
+      const [fx, fz] = g.door ?? b.front;
       const axis = fz ? 'h' : 'v';
       const plane = fz ? (fz > 0 ? g.z1 + T : g.z0 - T) : fx > 0 ? g.x1 + T : g.x0 - T;
       const n: V3 = [fx, 0, fz];

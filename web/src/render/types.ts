@@ -165,6 +165,21 @@ export interface LiveRenderOptions {
 
 /** Translucent preview of an object being placed in buy mode. */
 /** Buy-mode feedback played in the world (see `render/shared/buildFx.ts`). */
+/**
+ * Build mode's Garage tool preview: a garage's walls' centre lines (ground rows) and the way its door
+ * faces (`rot`, as a thing's: 0 towards +z, 1 +x, 2 -z, 3 -x); `valid` tints it; `sell`: the garage
+ * standing there, to be taken down.
+ */
+export interface GaragePreview {
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+  rot: number;
+  valid: boolean;
+  sell?: boolean;
+}
+
 export interface BuildEffect {
   kind: 'place' | 'upgrade' | 'sell' | 'build' | 'remove';
   /** Tile rectangle it covers. */
@@ -444,6 +459,8 @@ export interface Renderer {
   setPaintPreview(faces: readonly PaintPreviewFace[], cover: number | null): void;
   /** Build mode's Floor tool: the tiles it would cover, laid with floor covering `floor` (0: the automatic look; null: none). */
   setFloorPreview(tiles: readonly { x: number; z: number }[], floor: number | null): void;
+  /** Build mode's Garage tool: the garage it would build or (`sell`) take down (null: none). Cheap; call on every pointer move. */
+  setGaragePreview(garage: GaragePreview | null): void;
   /** Build mode's room-score overlay: a film over each tile in its colour (`rgb` 0..1); empty hides it. */
   setRoomOverlay(tiles: readonly RoomOverlayTile[]): void;
   /** Build/buy mode: subtle tile grid over a tile rectangle (null hides it). */
