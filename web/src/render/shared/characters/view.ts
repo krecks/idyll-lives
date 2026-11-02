@@ -32,12 +32,11 @@ export interface ResidentProp {
 }
 
 /**
- * How a part's rows changed (`ResidentView.partRows`): only how many are drawn (`count`), the array last given
- * rewritten in place (`rows`: the parts drawn by distance and detail, per frame), or rows that stay till they
- * change again (`new`: the parts drawn whatever the distance, and the shadow-only copies, when who is drawn
- * changes or someone's clothes do).
+ * How a part's rows changed (`ResidentView.partRows`): the array last given rewritten in place (`rows`: the parts
+ * drawn by distance and detail, per frame), or rows that stay till they change again (`new`: the parts drawn
+ * whatever the distance, and the shadow-only copies, when who is drawn changes or someone's clothes do).
  */
-export type RowChange = 'count' | 'rows' | 'new';
+export type RowChange = 'rows' | 'new';
 
 /**
  * The engine's side of the residents. `M`: a part mesh (one per body and part, drawn instanced, one instance per

@@ -242,6 +242,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** Per Sim row: what it holds of the object it uses (content `held`), in the left and the right hand (or both). */
   private readonly leftProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
   private readonly rightProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
+  /** The slots above, which a pose carried along takes with it (`carryPose`). */
+  private readonly carriedProps = [this.heldProp, this.toolProp, this.leftProp, this.rightProp];
   /** Per Sim row: the prop in their hand for what they do (`ACTIONS[tag].prop`: a book, a cup, a phone). */
   private readonly handProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
   /** Scratch for `writeHand`: the hands as just posed. */
@@ -1126,6 +1128,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private readonly aimAt = new Float32Array(3);
   /** Each row's head joint as last posed (x, y, z): where a baby fed from a bottle has their mouth. */
   private readonly headJoints = new Float32Array(MAX_CHARACTERS * 3);
+  /** The heads and their joints, which a pose carried along takes with it (`carryPose`). */
+  private readonly carriedHeads = [this.heads, this.headJoints];
 
   /** Whether prop `p` is in the hand now: while one of its clips plays (or, seated, its upper layer), in its `during`. */
   private handShown(rig: SimRig, p: HandProp): boolean {
@@ -1577,7 +1581,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       if (every > 1 && rig.visible && !stalled && (this.frameNo + i) % every !== 0 && rig.lag < FAR_LAG && curr[o + k.pose] !== Pose.Lie && rig.walkT < 0 && rig.cuddleBaby < 0 && this.heldBy[i] < 0 && !this.onPadOf[i] && !this.handProp[i]) {
         rig.lag += frameDt;
         const moved = curr[o + k.moving] > 0 || riding;
-        const [dx, dy, dz] = moved ? [tx - rig.x, th * WALL_HEIGHT - rig.floorY, tz - rig.z] : [0, 0, 0];
+        const dx = moved ? tx - rig.x : 0;
+        const dy = moved ? th * WALL_HEIGHT - rig.floorY : 0;
+        const dz = moved ? tz - rig.z : 0;
         if (frameDt > 0) rig.speed += (Math.min(Math.hypot(dx, dz) / frameDt, 20) - rig.speed) * (1 - Math.exp(-frameDt * 10));
         if (dx || dy || dz) this.carryPose(rig, i, dx, dy, dz, shadows);
         continue;
@@ -2844,12 +2850,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       shadows[m + 13] += dy;
       shadows[m + 14] += dz;
     }
-    for (const h of [this.heads, this.headJoints]) {
+    for (const h of this.carriedHeads) {
       h[i * 3] += dx;
       h[i * 3 + 1] += dy;
       h[i * 3 + 2] += dz;
     }
-    for (const slot of [this.heldProp, this.toolProp, this.leftProp, this.rightProp]) {
+    for (const slot of this.carriedProps) {
       const key = slot[i];
       const p = key ? this.props.built(key)?.matrices : null;
       if (!p) continue;
@@ -4319,25 +4325,32 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     for (const pm of this.meshes.values()) {
       if (!pm.enabled || (!all && !pm.detail && pm.range === Range.Always)) continue;
       const perFrame = !!pm.detail || pm.range !== Range.Always;
-      this.listRows(pm, perFrame ? 'rows' : 'new', (id) => shown[id] === 1 && px[id] >= pm.detail && (pm.range === Range.Always || (far[id] === 1) !== (pm.range === Range.Near)) && !(pm.shell & this.bare[id]));
+      this.listRows(pm, perFrame ? 'rows' : 'new', true);
     }
     // The shadow-only copies: who is drawn, wearing the shells (they keep their rows till either changes).
     if (!all && !this.shadowsBare) return;
     this.shadowsBare = false;
     for (const pm of this.shadowMeshes.values()) {
-      if (pm.enabled) this.listRows(pm, 'new', (id) => shown[id] === 1 && !(pm.shell & this.bare[id]));
+      if (pm.enabled) this.listRows(pm, 'new', false);
     }
   }
 
-  /** The rows of `pm`'s Sims (`all`) that `draws` keeps, written where they changed (`change`: as `setInstances` set it, per frame or not). */
-  private listRows(pm: PartMesh<M>, change: 'rows' | 'new', draws: (id: number) => boolean): void {
-    const all = pm.all;
-    const out = pm.settings;
+  /**
+   * The rows of `pm`'s Sims (`all`) drawn now, written where they changed (`change`: as `setInstances` set it, per
+   * frame or not): those shown, not wearing clothes that leave the part out, and (`byDistance`) with a face big
+   * enough for its detail, at its range.
+   */
+  private listRows(pm: PartMesh<M>, change: 'rows' | 'new', byDistance: boolean): void {
+    const { all, settings: out, detail, range, shell } = pm;
+    const { visible: shown, facePx: px, far, bare } = this;
+    const anyRange = range === Range.Always;
+    const near = range === Range.Near;
     let n = 0;
     let changed = false;
     for (let j = 0; j < all.length; j += 4) {
       const id = all[j];
-      if (!draws(id)) continue;
+      if (shown[id] !== 1 || shell & bare[id]) continue;
+      if (byDistance && (!(px[id] >= detail) || (!anyRange && (far[id] === 1) === near))) continue;
       if (out[n * 4] !== id) {
         out[n * 4] = out[n * 4 + 1] = id;
         changed = true;
