@@ -787,8 +787,8 @@ export function concatMeshData(list: readonly MeshData[]): MeshData | null {
   const positions = new Float32Array(verts * 3);
   const normals = new Float32Array(verts * 3);
   const uvs = new Float32Array(verts * 2);
-  const colors = list[0].colors ? new Float32Array(verts * 4) : undefined;
-  const cut = list[0].cut ? new Float32Array(verts * 4) : undefined;
+  const colors = list[0].colors ? new Uint8Array(verts * 4) : undefined;
+  const cut = list[0].cut ? new Uint8Array(verts * 4) : undefined;
   const indices = verts > 65535 ? new Uint32Array(tris) : new Uint16Array(tris);
   let v = 0;
   let t = 0;
