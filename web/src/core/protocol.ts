@@ -677,6 +677,11 @@ export interface SimView {
   /** Minute of day they come back from work, if away. */
   awayUntil: number | null;
   visiting: number | null;
+  /**
+   * On their way somewhere (a visit, home, home from work by car): the plot, and about when they're
+   * there (minute of day, in 5-minute steps). Null or absent when they aren't (absent from older workers).
+   */
+  trip?: { to: number; at: number } | null;
   job: JobView | null;
   /** A pupil's school grade (0..100, in tenths). */
   grade?: number;

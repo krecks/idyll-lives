@@ -9528,7 +9528,7 @@ fn open_ground_near(nav: &NavGrid, p: &Plot, at: [f32; 2]) -> Option<[f32; 2]> {
 /// does, `ai::falloff`: it's a day out).
 const OUTING_STAY_MINUTES: f32 = 60.0;
 /// An outing by car: minutes besides the drive, to the car and from it at either end.
-const CAR_TRIP_MINUTES: f32 = 10.0;
+pub(crate) const CAR_TRIP_MINUTES: f32 = 10.0;
 const OUTING_K: f32 = 0.01;
 
 /// The way out of town `sim` takes on foot: the nearest by straight line, or in an open-world

@@ -676,6 +676,7 @@ struct SimSent {
     plot: u64,
     away_until: u64,
     visiting: u64,
+    trip: u64,
     job: u64,
     /// Reset when the details stop (the UI drops them).
     details: DetailsSent,
@@ -999,6 +1000,7 @@ fn sim_patch(world: &World, s: &Sim, detail: bool, sent: &mut SimSent, o: &mut O
         &mut sent.away_until,
     );
     o.changed("visiting", &s.visiting.map(|v| v.plot), &mut sent.visiting);
+    o.changed_opt("trip", trip_view(world, s).as_ref(), &mut sent.trip);
     o.changed("job", &job_view(content, s), &mut sent.job);
     if !detail {
         return;
@@ -1431,6 +1433,63 @@ fn feelings<'a>(world: &'a World, s: &Sim) -> Vec<FeelingView<'a>> {
             }
         })
         .collect()
+}
+
+/// On their way somewhere (`SimView.trip`): to which plot, and about when they're there.
+#[derive(Serialize)]
+struct TripView {
+    to: u32,
+    /// Minute of day, in steps of `TRIP_STEP` (it's an estimate: and the UI isn't sent a new one
+    /// every few ticks as they go).
+    at: u32,
+}
+
+/// Minutes the arrival time of a trip is rounded to.
+const TRIP_STEP: f32 = 5.0;
+
+/// Where resident `s` is on their way to: a visit or home (until they're on that plot), or home
+/// from work in the household's car (back when the car is); with the time they're there, from
+/// `Travel::eta` (by car where they're bound for it). Read only: nothing here changes the game.
+fn trip_view(world: &World, s: &Sim) -> Option<TripView> {
+    let home = world.households.get(s.household as usize)?.plot;
+    let step = |tick: u64| {
+        let m = (clock::minute_of_day(tick) / TRIP_STEP).round() * TRIP_STEP;
+        (m as u32) % (24 * 60)
+    };
+    if let Some(until) = s.away_until {
+        let riding = world.cars.iter().any(|c| {
+            c.state == crate::cars::CarState::Arriving
+                && (c.driver == Some(s.id) || c.aboard.contains(&s.id) || c.done.contains(&s.id))
+        });
+        return riding.then_some(home).flatten().map(|to| TripView {
+            to,
+            at: step(until),
+        });
+    }
+    let to = match s.current()?.task.kind {
+        TaskKind::Visit { plot } => plot,
+        TaskKind::GoHome => home?,
+        _ => return None,
+    };
+    let (x, z) = s.tile();
+    if world.plot_at(x, z) == Some(to) {
+        return None;
+    }
+    let door = world.plots.get(to as usize)?.arrival_point();
+    let walk = crate::world::WALK_SPEED * s.walk_speed(&world.content) / MINUTES_PER_TICK;
+    let minutes = if s.bound_for_car.is_some() {
+        world
+            .travel
+            .eta(s.pos, door, crate::travel::Mode::Car, walk)
+            * 60.0
+            + crate::world::CAR_TRIP_MINUTES
+    } else {
+        world
+            .travel
+            .eta(s.pos, door, crate::travel::Mode::Foot, walk)
+    };
+    let at = world.tick + (minutes.max(0.0) * crate::TICKS_PER_MINUTE as f32) as u64;
+    Some(TripView { to, at: step(at) })
 }
 
 fn job_view<'a>(content: &'a Content, s: &Sim) -> Option<JobView<'a>> {
