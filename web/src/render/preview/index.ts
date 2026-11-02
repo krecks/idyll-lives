@@ -4,6 +4,10 @@
  * to draw. It is destroyed a few seconds after the last of either, except while a game keeps it
  * (`keep`): then it only stops drawing, and new faces in play find its shaders compiled (portraits
  * are cached for the page).
+ *
+ * Portraits asked for ahead of time (`prefetch`: a whole town's) are drawn the first few at once
+ * (the household's, who the caller puts first: behind the loading screen), the rest a few at a time
+ * in idle moments, not a town's worth in the first seconds of play.
  */
 
 import type { AssetRegistry } from '../../assets/registry';
@@ -15,6 +19,12 @@ import { Studio, type StudioDeps } from './studio';
 
 /** Idle time (ms) before the app is released. */
 const RELEASE_AFTER = 4000;
+/** Of the looks `prefetch` is given, the first this many are drawn at once; the rest in idle moments. */
+const PREFETCH_NOW = 8;
+/** Portraits asked for per idle moment (one small batch, drawn before the next is asked for). */
+const PER_IDLE = 4;
+/** Longest wait (ms) for an idle moment: a page that never idles still gets its portraits, slowly. */
+const IDLE_TIMEOUT = 2000;
 
 export function createSimPreviews(deps: StudioDeps): SimPreviews {
   return new Previews(deps);
@@ -29,6 +39,9 @@ class Previews implements SimPreviews {
   private looping = false;
   private releaseTimer = 0;
   private kept = false;
+  /** Looks to draw in idle moments (`prefetch`), by look key, in the order asked. */
+  private readonly ahead = new Map<string, SimLook>();
+  private drawingAhead = false;
 
   constructor(private readonly deps: StudioDeps) {
     // `?debug`: inspect from the console / test harness (`__previews.live` is the studio, if any).
@@ -70,7 +83,32 @@ class Previews implements SimPreviews {
   }
 
   prefetch(looks: readonly SimLook[]): void {
-    for (const look of looks) void this.portrait(look);
+    looks.forEach((look, i) => {
+      const key = lookKey(look);
+      if (cached(key)) return;
+      if (i < PREFETCH_NOW) {
+        this.ahead.delete(key);
+        void this.portrait(look);
+      } else if (!this.ahead.has(key)) this.ahead.set(key, look);
+    });
+    void this.drawAhead();
+  }
+
+  /** Draws the looks `prefetch` left for later: a few per idle moment, once the portraits asked for before are drawn. */
+  private async drawAhead(): Promise<void> {
+    if (this.drawingAhead) return;
+    this.drawingAhead = true;
+    try {
+      while (this.ahead.size && !this.unavailable) {
+        await idle();
+        if (this.portraits.busy) continue;
+        const next = [...this.ahead].slice(0, PER_IDLE);
+        for (const [key] of next) this.ahead.delete(key);
+        await Promise.all(next.map(([, look]) => this.portrait(look)));
+      }
+    } finally {
+      this.drawingAhead = false;
+    }
   }
 
   keep(on: boolean): void {
@@ -140,6 +178,14 @@ class Previews implements SimPreviews {
       studio.dispose();
     }, RELEASE_AFTER);
   }
+}
+
+/** The next idle moment (or a short wait where there are none). */
+function idle(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(() => resolve(), { timeout: IDLE_TIMEOUT });
+    else setTimeout(resolve, 100);
+  });
 }
 
 function loadSet(assets: AssetRegistry) {

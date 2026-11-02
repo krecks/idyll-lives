@@ -102,8 +102,12 @@ export async function optimizeAssets({ force = false, jobs = Math.max(1, os.avai
   // The output tree: only copies that help (a gzip that doesn't shrink is dropped).
   fs.rmSync(OUT, { recursive: true, force: true });
   const index = {};
+  // Each source's content hash (its encoding's too): what the game keys things drawn from it by
+  // across releases (the catalog's pictures, `contentHash` in web/src/assets/registry.ts).
+  const hashes = {};
   const totals = new Map();
   for (const t of tasks) {
+    hashes[t.rel] = path.basename(t.cached, path.extname(t.cached)).slice(0, 12);
     const size = fs.statSync(t.cached).size;
     if (t.kind === 'gzip' && size >= t.size) continue;
     const dest = path.join(OUT, 'opt', t.out);
@@ -117,7 +121,7 @@ export async function optimizeAssets({ force = false, jobs = Math.max(1, os.avai
     sum.after += size;
     totals.set(group, sum);
   }
-  fs.writeFileSync(path.join(OUT, 'optimized.json'), JSON.stringify({ version: VERSION, files: index }));
+  fs.writeFileSync(path.join(OUT, 'optimized.json'), JSON.stringify({ version: VERSION, files: index, hashes }));
   // Forget outputs of files that changed or went away (keeps the CI cache from growing).
   const live = new Set(tasks.map((t) => path.basename(t.cached)));
   for (const file of fs.readdirSync(CACHE)) if (!live.has(file)) fs.rmSync(path.join(CACHE, file));
