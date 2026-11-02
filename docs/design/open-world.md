@@ -80,7 +80,11 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   (`drives[].road`, only in towns made since) — the sim builds the graph for its cars only
   (`cars::settle_all`; nobody walks it, commutes are timed as before). A cosy town or save
   without it drives straight along x as ever. A driveway meeting its road more than 60° from
-  square (alongside it rather than onto it) keeps its car parked (`Car::no_way`).
+  square (alongside it rather than onto it) keeps its car parked (`Car::no_way`). Cars turn onto
+  the road at the kerb, not across the sidewalk; a big world's parking bays are turned into nose
+  first and backed out of like driveways. Garden fences keep a metre off every driveway's sides
+  (room for the doors) and start behind where a garage could go at its end (Build mode's Garage
+  tool); kerbside furniture keeps 1.2 m off a driveway's mouth where the world has cars.
 - `garages[].rot?: 0 | 1 | 2 | 3` — a garage the player built (Build mode's Garage tool,
   `Command::BuildGarage`): the way its door faces, as a thing's facing (0 towards +z, 1 +x,
   2 -z, 3 -x). Absent: towards the street, as the town places garages. The same field is in the
