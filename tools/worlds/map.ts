@@ -4,7 +4,7 @@
  * (public ones blue, farms' fields yellow, outdoor places orange; a tick on the side they face),
  * garden paths and driveways, the ground floor's walls, the things standing about and the ways
  * out of town (red; bus stops white with a red ring). A big world also shows its land (water,
- * woods, hills, meadows, fields), its country roads and trails (dashed), and its areas' names.
+ * woods, hills, meadows, fields, orchards), its country roads and trails (dashed), and its areas' names.
  * An index.html shows them all on one page.
  *
  * Run: bun tools/worlds/map.ts worlds.json out-dir [more.json ...]   (e.g. worlds-big.json from `sample.ts --sizes big`)
@@ -40,7 +40,7 @@ const worlds = [input, ...more].flatMap((f) => JSON.parse(readFileSync(f, 'utf8'
 mkdirSync(dir, { recursive: true });
 const rect = (r: Rect, style: string) => `<rect x="${r.x}" y="${r.z}" width="${r.w}" height="${r.d}" ${style}/>`;
 const line = (pts: Pt[]) => pts.map((p) => p.join(',')).join(' ');
-const ZONE: Record<string, string> = { water: '#7fb2d9', woods: '#5d8a46', hill: '#b7c48a', meadow: '#c3d98f', fields: '#e2c86b' };
+const ZONE: Record<string, string> = { water: '#7fb2d9', woods: '#5d8a46', hill: '#b7c48a', meadow: '#c3d98f', fields: '#e2c86b', orchard: '#7fa653' };
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const cards: string[] = [];
 for (const { kind, size, seed, name, town } of worlds) {
@@ -52,7 +52,7 @@ for (const { kind, size, seed, name, town } of worlds) {
   const ground = (z: number) => z <= town.depth;
   const roads = town.meta?.roads ?? [];
   const exits = (town.exits ?? []).map((e) => (Array.isArray(e) ? { x: e[0], z: e[1], kind: 'road' } : e));
-  const order = ['meadow', 'fields', 'hill', 'woods', 'water'];
+  const order = ['meadow', 'fields', 'hill', 'woods', 'orchard', 'water'];
   const zones = [...(town.meta?.zones ?? [])].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
   const parts = [
     `<rect width="${town.width}" height="${town.depth}" fill="#9fc27a"/>`,

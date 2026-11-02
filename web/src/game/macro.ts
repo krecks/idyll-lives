@@ -1,9 +1,11 @@
 /**
- * A big world (docs/design/open-world.md, size `big`): 768 to 1024 m of land with a main town (the
- * kind's own shape, larger than a Normal town), two to four hamlets or farmsteads 250 to 450 m
- * from each other, country roads between them and out of the world, and countryside: woods,
- * meadows, hills, water, fields, and outdoor places (a picnic meadow, a fishing jetty, a lookout,
- * a campfire, an orchard, a hammock grove) reached by trails from the nearest hamlet.
+ * A big world (docs/design/open-world.md, size `big`): 896 to 1024 m of land with a main town (the
+ * kind's own shape, larger than a Normal town, its streets reaching all of its box), five to seven
+ * hamlets 170 m or more from each other and spread over the whole world, country roads between
+ * them and out of the world with farmsteads and cottages along them, and countryside: woods in
+ * copses, meadows, hills, water, farmland and orchards round the hamlets and farmsteads, and
+ * outdoor places (a picnic meadow, a fishing jetty, a lookout, a campfire, an orchard, a hammock
+ * grove) reached by trails from the nearest hamlet.
  *
  * The land is a cost grid of 8 m cells rolled from noise (how steep, how wooded, where the water
  * is); the areas go where it is flat and dry, far enough apart (a Poisson disc); country roads
@@ -18,8 +20,8 @@ import type { Rle, TownArea, WorldZone } from '../core/protocol';
 import { random } from './housegen';
 import { fbm } from './noise';
 import { centroid, cropRoads, curve, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, type Box, type Pt, type RoadPlan } from './roads';
-import { BIG_COURTS, COURTS, frontageOf, Ground, joinUp, LotPlacer, plotRect, settleRoads, slotDims, turner, wantedLots, type Facing, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates } from './town';
-import { clearing, countryLane, crossroads, highStreet, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
+import { BIG_COURTS, COURTS, frontageOf, Ground, houseFor, joinUp, LotPlacer, plotRect, settleRoads, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates } from './town';
+import { clearing, countryLane, crescentTown, crossroads, highStreet, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
 
 type Rand = () => number;
 type Shape = (rand: Rand, box: Box, scale?: number) => RoadLayout;
@@ -44,7 +46,8 @@ interface Character {
   world: [number, number];
   /** Hamlets besides the main town. */
   hamlets: [number, number];
-  hamlet: { shape: Shape; box: Box; lots: [number, number]; farms?: [number, number]; places: [number, number] };
+  /** A hamlet: its shapes (each hamlet one of them), its box, lots, how far its lanes reach (`SizeSpec.scale`), its streets out into its box and cross streets (`fill`, `extend`). */
+  hamlet: { shapes: Shape[]; box: Box; lots: [number, number]; farms?: [number, number]; places: [number, number]; scale: number; fill?: number; extend?: number };
   /** The main town's shape, if not the kind's own. */
   main?: Shape;
   water: 'sea' | 'lake' | 'ponds';
@@ -53,40 +56,41 @@ interface Character {
   hills: number;
   /** A valley down the middle, mountains either side. */
   valley?: boolean;
-  /** Farmland round the farms. */
-  fields?: boolean;
+  /** Farmland round the areas and the farmsteads, as far as this past an area's box (m). */
+  fields?: number;
   /** Outdoor places, in the order areas take them (`PublicTemplate` ids), and how many each area has. */
   spots: string[];
   spotsPerArea: [number, number];
 }
 
-const HAMLET = { shape: highStreet, box: { w: 160, d: 115 }, lots: [9, 10] as [number, number], places: [1, 1] as [number, number] };
+/** A hamlet: a high street with a back lane, or a crescent round a green, its streets reaching all of its box. */
+const HAMLET: Character['hamlet'] = { shapes: [highStreet, crescentTown], box: { w: 220, d: 160 }, lots: [16, 24], places: [1, 1], scale: 1.1, fill: 2, extend: 1 };
 
 const CHARACTER: Record<WorldKind, Character> = {
-  small: { world: [832, 896], hamlets: [4, 4], hamlet: HAMLET, water: 'ponds', woods: 0.3, hills: 14, spots: ['picnicMeadow', 'lookout', 'orchard', 'hammockGrove', 'fishingJetty'], spotsPerArea: [1, 1] },
-  medium: { world: [832, 896], hamlets: [3, 4], hamlet: HAMLET, water: 'ponds', woods: 0.3, hills: 14, spots: ['picnicMeadow', 'fishingJetty', 'lookout', 'orchard', 'hammockGrove'], spotsPerArea: [1, 1] },
-  dense: { world: [896, 1024], hamlets: [3, 3], hamlet: HAMLET, water: 'ponds', woods: 0.22, hills: 10, spots: ['picnicMeadow', 'orchard', 'lookout', 'fishingJetty'], spotsPerArea: [1, 1] },
+  small: { world: [896, 960], hamlets: [5, 6], hamlet: HAMLET, water: 'ponds', woods: 0.42, hills: 14, fields: 100, spots: ['picnicMeadow', 'lookout', 'orchard', 'hammockGrove', 'fishingJetty'], spotsPerArea: [1, 1] },
+  medium: { world: [896, 960], hamlets: [5, 6], hamlet: HAMLET, water: 'ponds', woods: 0.42, hills: 14, fields: 100, spots: ['picnicMeadow', 'fishingJetty', 'lookout', 'orchard', 'hammockGrove'], spotsPerArea: [1, 1] },
+  dense: { world: [896, 1024], hamlets: [5, 7], hamlet: HAMLET, water: 'ponds', woods: 0.34, hills: 10, fields: 100, spots: ['picnicMeadow', 'orchard', 'lookout', 'fishingJetty'], spotsPerArea: [1, 1] },
   farm: {
     world: [960, 1024],
-    hamlets: [4, 4],
-    hamlet: { shape: countryLane, box: { w: 240, d: 170 }, lots: [9, 10], farms: [2, 3], places: [0, 0] },
+    hamlets: [5, 7],
+    hamlet: { shapes: [countryLane], box: { w: 250, d: 180 }, lots: [16, 20], farms: [2, 3], places: [0, 0], scale: 1, fill: 2 },
     main: crossroads,
     water: 'ponds',
-    woods: 0.14,
+    woods: 0.26,
     hills: 7,
-    fields: true,
+    fields: 150,
     spots: ['orchard', 'picnicMeadow', 'fishingJetty', 'lookout'],
     spotsPerArea: [1, 1],
   },
-  seaside: { world: [896, 960], hamlets: [4, 4], hamlet: HAMLET, water: 'sea', woods: 0.2, hills: 14, spots: ['fishingJetty', 'lookout', 'picnicMeadow', 'hammockGrove'], spotsPerArea: [1, 1] },
-  mountain: { world: [896, 960], hamlets: [4, 4], hamlet: HAMLET, water: 'ponds', woods: 0.42, hills: 10, valley: true, spots: ['lookout', 'campfire', 'hammockGrove', 'fishingJetty'], spotsPerArea: [1, 1] },
-  lakeside: { world: [896, 960], hamlets: [4, 4], hamlet: HAMLET, water: 'lake', woods: 0.28, hills: 10, spots: ['fishingJetty', 'picnicMeadow', 'hammockGrove', 'lookout'], spotsPerArea: [1, 1] },
+  seaside: { world: [960, 1024], hamlets: [5, 6], hamlet: HAMLET, water: 'sea', woods: 0.32, hills: 14, fields: 90, spots: ['fishingJetty', 'lookout', 'picnicMeadow', 'hammockGrove'], spotsPerArea: [1, 1] },
+  mountain: { world: [960, 1024], hamlets: [5, 6], hamlet: HAMLET, water: 'ponds', woods: 0.54, hills: 10, valley: true, spots: ['lookout', 'campfire', 'hammockGrove', 'fishingJetty'], spotsPerArea: [1, 1] },
+  lakeside: { world: [960, 1024], hamlets: [5, 6], hamlet: HAMLET, water: 'lake', woods: 0.4, hills: 10, fields: 90, spots: ['fishingJetty', 'picnicMeadow', 'hammockGrove', 'lookout'], spotsPerArea: [1, 1] },
   forest: {
-    world: [896, 960],
-    hamlets: [4, 4],
-    hamlet: { shape: clearing, box: { w: 180, d: 160 }, lots: [10, 11], places: [1, 1] },
+    world: [960, 1024],
+    hamlets: [5, 6],
+    hamlet: { shapes: [clearing], box: { w: 220, d: 190 }, lots: [16, 20], places: [1, 1], scale: 1.2, fill: 2 },
     water: 'ponds',
-    woods: 0.68,
+    woods: 0.78,
     hills: 12,
     spots: ['campfire', 'hammockGrove', 'lookout', 'fishingJetty', 'picnicMeadow'],
     spotsPerArea: [1, 2],
@@ -95,16 +99,31 @@ const CHARACTER: Record<WorldKind, Character> = {
 
 /** The land's cells (m). */
 const CELL = 8;
-/** Areas this far apart at least (their middles, m), and as far as this from the one they join. */
-const AREA_APART = 235;
+/** Areas this far apart at least (their middles, m), and as far as this from the one they join; best this far from the nearest. */
+const AREA_APART = 170;
 const AREA_REACH = 440;
-/** No area nearer the world's edge than this (m). */
-const EDGE = 70;
+const AREA_AIM = 230;
+/** No area nearer the world's edge than this (m), nor nearer another's box. */
+const EDGE = 50;
+const BOX_GAP = 24;
 /** Country roads' width (m), trails'. */
 const COUNTRY_WIDTH = 6;
 const TRAIL_WIDTH = 2;
 /** Houses as far as this from a stop get one of their own (m). */
 const STOP_REACH = 105;
+/** Houses with no room in any area go along a country road, as far as this from their own area's box (m). */
+const SPILL = 140;
+/** Along a country road: a farmstead every so far (m), and none nearer an area's box than this. */
+const FARM_EVERY: [number, number] = [150, 200];
+const FARM_OFF = 25;
+/** Cottages by the country roads: so many where each leaves an area or meets another, within this of the spot (m). */
+const COTTAGES: [number, number] = [2, 4];
+const COTTAGE_REACH = 70;
+/** Land steeper than this (rise per m) is no place for a farmstead or a cottage. */
+const STEEP = 0.25;
+/** An orchard beside a farmstead: this deep from the lot's side (m), a gap of this from it. */
+const ORCHARD = 26;
+const ORCHARD_GAP = 3;
 
 const range = (rand: Rand, lo: number, hi: number) => lo + (hi - lo) * rand();
 const between = (rand: Rand, [lo, hi]: [number, number]) => lo + Math.floor(rand() * (hi - lo + 1));
@@ -533,8 +552,11 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   // ---- hamlets: where it's dry and flat, far enough from the others, near enough to one --------
   const mainCentre = plans[0].centre;
   const hamlets = between(rand, ch.hamlets);
-  const candidates: Pt[] = Array.from({ length: 500 }, (): Pt => [range(rand, EDGE + 80, W - EDGE - 80), range(rand, EDGE + 60, D - EDGE - 60)]);
+  const candidates: Pt[] = Array.from({ length: 700 }, (): Pt => [range(rand, EDGE + 80, W - EDGE - 80), range(rand, EDGE + 60, D - EDGE - 60)]);
+  /** Which quarter of the world a point is in: the hamlets go first to those without an area. */
+  const quarter = (p: Pt) => (p[0] < W / 2 ? 0 : 1) + (p[1] < D / 2 ? 0 : 2);
   for (let n = 0, relax = 0; n < hamlets; n++) {
+    const held = new Set(plans.map((a) => quarter(a.centre)));
     const swap = rand() < 0.35;
     const hb = ch.hamlet.box;
     const [bw, bd] = swap ? [hb.d, hb.w] : [hb.w, hb.d];
@@ -546,12 +568,12 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       const near = Math.min(...plans.map((a) => dist(a.centre, p)));
       if (near < AREA_APART || near > AREA_REACH + relax * 90) continue;
       // Clear of the other areas' boxes, dry, not too steep.
-      if (plans.some((a) => rect.x < a.rect.x + a.rect.w + 30 && a.rect.x < rect.x + rect.w + 30 && rect.z < a.rect.z + a.rect.d + 30 && a.rect.z < rect.z + rect.d + 30)) continue;
+      if (plans.some((a) => rect.x < a.rect.x + a.rect.w + BOX_GAP && a.rect.x < rect.x + rect.w + BOX_GAP && rect.z < a.rect.z + a.rect.d + BOX_GAP && a.rect.z < rect.z + rect.d + BOX_GAP)) continue;
       if (land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 30)) continue;
       let steep = 0;
       for (let z = rect.z; z < rect.z + bd; z += CELL * 2) for (let x = rect.x; x < rect.x + bw; x += CELL * 2) steep = Math.max(steep, land.slope(land.cell(x, z)));
       if (steep > 0.35 - relax * 0.1 && !relax) continue;
-      let score = Math.abs(near - 320) / 40 + steep * 40 + land.at(p[0], p[1]) * (ch.valley ? 0.08 : 0.02);
+      let score = Math.abs(near - AREA_AIM) / 40 + steep * 40 + land.at(p[0], p[1]) * (ch.valley ? 0.08 : 0.02) + (held.has(quarter(p)) ? 0 : -5);
       // A fishing cove on the shore; a hamlet across the lake from the town.
       if (n === 0 && ch.water === 'sea') score += land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 70) ? -6 : 6;
       if (n === 0 && ch.water === 'lake') score += ((p[0] - lake[0]) * (mainCentre[0] - lake[0]) + (p[1] - lake[1]) * (mainCentre[1] - lake[1]) < 0 ? -6 : 6) + (land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 60) ? -3 : 3);
@@ -562,18 +584,19 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       if (relax++ < 1) n--;
       continue;
     }
-    const local = ch.hamlet.shape(rand, hb, 1);
-    const laid = settleRoads(joinUp(rand, local, { box: hb, lots: 0, scale: 1 }, COURTS), hb);
+    const { shapes, scale: hs, fill, extend } = ch.hamlet;
+    const local = shapes[(plans.length - 1) % shapes.length](rand, hb, hs);
+    const laid = settleRoads(joinUp(rand, local, { box: hb, lots: 0, scale: hs, fill, extend }, COURTS), hb);
     let areaName = worldName(content, kind, rand);
     for (let k = 0; k < 12 && [...plans.map((a) => a.name)].includes(areaName); k++) areaName = worldName(content, kind, rand);
     if (plans.some((a) => a.name === areaName)) areaName = `${areaName} End`;
-    const spec: SizeSpec = { box: hb, lots: between(rand, ch.hamlet.lots), scale: 1, places: ch.hamlet.places, farms: ch.hamlet.farms ?? [0, 0] };
+    const spec: SizeSpec = { box: hb, lots: between(rand, ch.hamlet.lots), scale: hs, places: ch.hamlet.places, farms: ch.hamlet.farms ?? [0, 0] };
     addArea(areaName, laid, hb, Math.round(best.p[0] - bw / 2), Math.round(best.p[1] - bd / 2), swap, spec, local.greens ?? [], local.centre ?? [hb.w / 2, hb.d / 2]);
   }
 
-  // Hamlets that found no room: their houses go to the others (the main town first; `LotPlacer` spills them on).
-  const missing = hamlets - (plans.length - 1);
-  if (missing > 0) plans[0].spec = { ...mainSpec, lots: mainSpec.lots + missing * ch.hamlet.lots[1] };
+  // Fewer hamlets than a world of this kind has at least: their houses go to the others (the main town first; `LotPlacer` spills them on).
+  const missing = ch.hamlets[0] - (plans.length - 1);
+  if (missing > 0) plans[0].spec = { ...mainSpec, lots: mainSpec.lots + missing * ch.hamlet.lots[0] };
 
   // ---- country roads: between the areas (a tree of them and one more for a loop), and out ----
   const areaBlock = new Uint8Array(gw * gd);
@@ -583,6 +606,8 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       for (let x = Math.floor((r.x - 6) / CELL); x <= Math.floor((r.x + r.w + 6) / CELL); x++) if (x >= 0 && z >= 0 && x < gw && z < gd) areaBlock[z * gw + x] = a + 1;
     }
   }
+  const rim = new Uint8Array(gw * gd);
+  for (let i = 0; i < gw * gd; i++) if (i % gw < 2 || i % gw >= gw - 2 || i < gw * 2 || i >= gw * (gd - 2)) rim[i] = 1;
   const wetNear = new Uint8Array(gw * gd);
   for (let i = 0; i < gw * gd; i++) if (land.water[i]) for (const d of [0, -1, 1, -gw, gw, -gw - 1, -gw + 1, gw - 1, gw + 1]) if (i + d >= 0 && i + d < gw * gd) wetNear[i + d] = 1;
   const roadCost = (from: Pt | null, to: Pt | null) => (i: number) => {
@@ -591,7 +616,8 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       const c = land.centre(i);
       if (!((from && dist(c, from) < 26) || (to && dist(c, to) < 26))) return Infinity;
     }
-    return 1 + land.slope(i) * 40 + land.woods[i] * 0.3;
+    // (Not along the world's edge: smoothed, it would wander out of the world and back.)
+    return 1 + land.slope(i) * 40 + land.woods[i] * 0.3 + (rim[i] ? 12 : 0);
   };
   /** As `roadCost`, but along the water's edge too (not over it), and less put off by the slope: for when that finds no way. */
   const relaxedCost = (from: Pt | null, to: Pt | null) => {
@@ -609,14 +635,16 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     const lead = (q: { p: Pt; dir: Pt }, k: number): Pt => [q.p[0] + q.dir[0] * k, q.p[1] + q.dir[1] * k];
     // Near an end, only the way's points out in front of it (no doubling back to it: a kink).
     const before = (q: { p: Pt; dir: Pt }, p: Pt, near: number) => dist(p, q.p) > near && (dist(p, q.p) > 48 || q.dir[0] * (p[0] - q.p[0]) + q.dir[1] * (p[1] - q.p[1]) > dist(p, q.p) * 0.5);
+    // (No lead out over the water: a port on the shore is come to from the land.)
+    const leads = (q: { p: Pt; dir: Pt }, k: number): Pt[] => (land.wet(...lead(q, k), 4) ? [] : [lead(q, k)]);
     const make = (k: number) => {
-      const tail: Pt[] = b ? [lead(b, k), b.p] : [];
-      const ctrl = [a.p, lead(a, k), ...mid.filter((p) => before(a, p, k + 8) && (!b || before(b, p, k + 8))), ...tail];
+      const tail: Pt[] = b ? [...leads(b, k), b.p] : [];
+      const ctrl = [a.p, ...leads(a, k), ...mid.filter((p) => before(a, p, k + 8) && (!b || before(b, p, k + 8))), ...tail];
       return curve(ctrl);
     };
     // (Shorter leads if the longer ones swing it out over the water.)
     let points = make(14);
-    if (points.some(([x, z]) => land.wet(x, z, 2))) points = make(7);
+    for (const k of [7, 3]) if (points.some(([x, z]) => land.wet(x, z, 2))) points = make(k);
     return { points, width: COUNTRY_WIDTH, ends, kind: 'country', name: roadName };
   };
   const portOf = (from: number, to: Pt) =>
@@ -650,7 +678,8 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     edges.push([best![0], best![1]]);
     inTree.push(best![1]);
   }
-  if (plans.length >= 3) {
+  // (A loop or two: more of them in a world of more areas.)
+  for (let loops = plans.length >= 6 ? 2 : plans.length >= 3 ? 1 : 0; loops > 0; loops--) {
     let extra: [number, number, number] | null = null;
     for (let a = 0; a < plans.length; a++) {
       for (let b = a + 1; b < plans.length; b++) {
@@ -823,7 +852,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   const woodsNoise = new Float32Array(gw * gd);
   for (let i = 0; i < gw * gd; i++) {
     const [x, z] = land.centre(i);
-    woodsNoise[i] = fbm(x / 150, z / 150, nseed + 7, 4) + (ch.valley ? Math.min(0.25, land.height[i] / 400) : 0);
+    woodsNoise[i] = fbm(x / 105, z / 105, nseed + 7, 4) + (ch.valley ? Math.min(0.25, land.height[i] / 400) : 0);
   }
   const cut = [...woodsNoise].sort((a, b) => b - a)[Math.floor(ch.woods * gw * gd)] ?? 1;
   for (let i = 0; i < gw * gd; i++) land.woods[i] = woodsNoise[i] > cut && !land.water[i] ? 1 : 0;
@@ -855,10 +884,11 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     country ??= frontageOf(worldRoads, worldRoads.flatMap((r, i) => (r.kind === 'country' ? [i] : [])), plans[0].centre, rand);
     const r = plans[from].rect;
     const off = (p: Pt) => Math.hypot(Math.max(r.x - p[0], 0, p[0] - r.x - r.w), Math.max(r.z - p[1], 0, p[1] - r.z - r.d));
-    const near = country.filter((f) => off(f.p) < 70).sort((x, y) => dist(x.p, plans[from].centre) - dist(y.p, plans[from].centre));
+    const near = country.filter((f) => off(f.p) < SPILL).sort((x, y) => dist(x.p, plans[from].centre) - dist(y.p, plans[from].centre));
     if (u.kind === 'house' && !lots.place([u], near, [], plans[from].centre, from, true).length) continue;
     lots.dropped.push({ name: u.name, kind: u.kind, lot: u.lot });
   }
+  const farmsteads = alongCountryRoads(content, t, lots, plans, worldRoads, land, rand);
   lots.number(names);
   const slots = lots.slots;
   const rectOf = (s: PlotSlot) => plotRect(t, s);
@@ -934,6 +964,22 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     }
   }
 
+  // ---- orchards: rows of fruit trees beside each farm (behind it, else to one side) ------------
+  const orchards: Rect[] = [];
+  const wetIn = (r: Rect) => [0, 0.5, 1].some((u) => [0, 0.5, 1].some((v) => land.wet(r.x + r.w * u, r.z + r.d * v, 0)));
+  for (const s of slots) {
+    if (s.lot !== 'farm') continue;
+    const r = rectOf(s);
+    const [g, o] = [ORCHARD_GAP, ORCHARD];
+    // Behind the lot (away from its road: the front is its min z, min x, max z, max x as it faces 0..3), then its sides.
+    const back = [{ x: r.x, z: r.z + r.d + g, w: r.w, d: o }, { x: r.x + r.w + g, z: r.z, w: o, d: r.d }, { x: r.x, z: r.z - g - o, w: r.w, d: o }, { x: r.x - g - o, z: r.z, w: o, d: r.d }];
+    const tries = [back[s.facing], back[(s.facing + 1) % 4], back[(s.facing + 3) % 4]];
+    const at = tries.find((q) => ground.free(q, 8) && !wetIn(q));
+    if (!at) continue;
+    ground.take(at, 2);
+    orchards.push(at);
+  }
+
   // ---- zones -------------------------------------------------------------------------------
   const clearAround = (mask: Uint8Array, r: Rect, grow: number) => {
     for (let z = Math.floor((r.z - grow) / CELL); z <= Math.floor((r.z + r.d + grow) / CELL); z++) for (let x = Math.floor((r.x - grow) / CELL); x <= Math.floor((r.x + r.w + grow) / CELL); x++) if (x >= 0 && z >= 0 && x < gw && z < gd) mask[z * gw + x] = 0;
@@ -941,18 +987,28 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   const woods = land.woods.slice();
   for (const plan of plans) clearAround(woods, plan.rect, 10);
   for (const s of slots) clearAround(woods, rectOf(s), 4);
+  for (const r of orchards) clearAround(woods, r, 4);
   for (const road of worldRoads) for (let i = 0; i < road.points.length; i += 3) clearAround(woods, { x: road.points[i][0], z: road.points[i][1], w: 0, d: 0 }, road.width / 2 + 3);
   const heights = [...land.height].sort((x, y) => x - y);
   const hillCut = heights[Math.floor(heights.length * (ch.valley ? 0.62 : 0.82))];
   const hills = new Uint8Array(gw * gd);
   const meadow = new Uint8Array(gw * gd);
   const fields = new Uint8Array(gw * gd);
+  /** Farmland: round each area's box (as far as `ch.fields` past it) and each farmstead (a little less from its middle). */
+  const reach = ch.fields ?? 0;
+  const farmMiddles = farmsteads.map((s): Pt => {
+    const r = rectOf(s);
+    return [r.x + r.w / 2, r.z + r.d / 2];
+  });
+  const offRect = (r: Rect, [x, z]: Pt) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
+  const nearFarmland = (p: Pt) =>
+    plans.some((a) => offRect(a.rect, p) < reach) || farmMiddles.some((m) => dist(m, p) < reach * 1.1);
   for (let i = 0; i < gw * gd; i++) {
     if (land.water[i]) continue;
     const [x, z] = land.centre(i);
     if (land.height[i] > hillCut) hills[i] = 1;
     if (!woods[i] && !areaBlock[i] && fbm(x / 70, z / 70, nseed + 11, 3) > 0.58) meadow[i] = 1;
-    if (ch.fields && !woods[i] && !areaBlock[i] && !meadow[i] && plans.some((p) => dist(p.centre, [x, z]) < 230) && fbm(x / 110, z / 110, nseed + 13, 3) > 0.4) fields[i] = 1;
+    if (ch.fields && !woods[i] && !areaBlock[i] && !meadow[i] && nearFarmland([x, z]) && fbm(x / 110, z / 110, nseed + 13, 3) > (kind === 'farm' ? 0.32 : 0.4)) fields[i] = 1;
   }
   for (const plan of plans) clearAround(hills, plan.rect, 0);
   for (const road of worldRoads) {
@@ -962,9 +1018,9 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       clearAround(meadow, at, road.width / 2 + 1);
     }
   }
-  for (const s of slots) {
-    clearAround(fields, rectOf(s), 2);
-    clearAround(meadow, rectOf(s), 2);
+  for (const r of [...slots.map(rectOf), ...orchards]) {
+    clearAround(fields, r, 2);
+    clearAround(meadow, r, 2);
   }
   const zones: WorldZone[] = [
     ...waterPolys.map((poly): WorldZone => ({ kind: 'water', poly })),
@@ -972,6 +1028,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     ...outlines(fields, gw, gd, 10).map((poly): WorldZone => ({ kind: 'fields', poly })),
     ...outlines(meadow, gw, gd, 6).map((poly): WorldZone => ({ kind: 'meadow', poly })),
     ...outlines(woods, gw, gd, 8).map((poly): WorldZone => ({ kind: 'woods', poly })),
+    ...orchards.map((r): WorldZone => ({ kind: 'orchard', poly: [[r.x, r.z], [r.x + r.w, r.z], [r.x + r.w, r.z + r.d], [r.x, r.z + r.d]] })),
   ];
 
   const areas: TownArea[] = plans.map((p) => ({ name: p.name, kind: 'hamlet', x: p.rect.x, z: p.rect.z, w: p.rect.w, d: p.rect.d }));
@@ -990,6 +1047,98 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     diagnostics: { dropped: lots.dropped, ...(failed.length ? { roads: failed } : {}) },
     open: { areas, zones, water: rle(waterMask), pads, stops, parking },
   };
+}
+
+/**
+ * Homes along the country roads, on purpose: 2 to 4 cottages where each road leaves an area and
+ * where it meets another out in the country, then a farmstead (a farm lot: its fields, its barn
+ * and yard) every 150 to 200 m of road, each clear of the areas, the water and steep land, and of
+ * the area it is nearest. The farmsteads placed.
+ */
+function alongCountryRoads(content: Content, t: Templates, lots: LotPlacer, plans: readonly Plan[], roads: readonly RoadPlan[], land: Land, rand: Rand): PlotSlot[] {
+  const country = roads.flatMap((r, i) => (r.kind === 'country' ? [i] : []));
+  const byRoad = new Map<number, Frontage[]>();
+  for (const f of frontageOf(roads, country, plans[0].centre, rand)) {
+    const list = byRoad.get(f.road);
+    if (list) list.push(f);
+    else byRoad.set(f.road, [f]);
+  }
+  /** Clear of every area's box by `by` m. */
+  const outside = (p: Pt, by: number) => plans.every((a) => p[0] < a.rect.x - by || p[1] < a.rect.z - by || p[0] > a.rect.x + a.rect.w + by || p[1] > a.rect.z + a.rect.d + by);
+  /** Well inside the world (a road out leaves it there). */
+  const within = (p: Pt) => Math.min(p[0], p[1], land.W - p[0], land.D - p[1]) > 30;
+  const homeArea = (p: Pt) => plans.reduce((k, a, i) => (dist(a.centre, p) < dist(plans[k].centre, p) ? i : k), 0);
+  /** Dry and not steep within `r` m of `p`. */
+  const buildable = (p: Pt, r: number) => {
+    if (land.wet(p[0], p[1], r)) return false;
+    for (let dz = -r; dz <= r; dz += CELL * 2) for (let dx = -r; dx <= r; dx += CELL * 2) if (land.slope(land.cell(p[0] + dx, p[1] + dz)) > STEEP) return false;
+    return true;
+  };
+  const house = (lot: 'small' | 'farm', name: string, area: number) => ({ kind: 'house' as const, name, lot, area, ...houseFor(t, lot, lot === 'farm' ? 'roomy' : rand() < 0.5 ? 'snug' : 'roomy', rand) });
+
+  // Cottages: where each country road leaves an area (a little way out along it), and where one meets another.
+  const spots: { p: Pt; roads: number[] }[] = [];
+  for (const r of country) {
+    const pts = roads[r].points;
+    const L = lengths(pts).at(-1)!;
+    for (const e of [0, 1] as const) {
+      if (roads[r].ends[e] === 'out') continue;
+      const end = e === 0 ? pts[0] : pts[pts.length - 1];
+      if (!outside(end, 20)) {
+        const s = range(rand, 45, 80);
+        if (L > s + 30) spots.push({ p: pointAt(pts, e === 0 ? s : L - s).p, roads: [r] });
+      } else {
+        const other = country.find((o) => o !== r && nearest(roads[o].points, end[0], end[1]).dist < roads[o].width / 2 + 2);
+        spots.push({ p: end, roads: other === undefined ? [r] : [r, other] });
+      }
+    }
+  }
+  for (const spot of spots) {
+    if (!buildable(spot.p, 24)) continue;
+    const fronts = spot.roads
+      .flatMap((r) => byRoad.get(r) ?? [])
+      .filter((f) => dist(f.p, spot.p) > 10 && dist(f.p, spot.p) < COTTAGE_REACH && outside(f.p, 14) && within(f.p))
+      .sort((a, b) => dist(a.p, spot.p) - dist(b.p, spot.p));
+    if (!fronts.length) continue;
+    const area = homeArea(spot.p);
+    for (let k = between(rand, COTTAGES); k > 0; k--) if (lots.place([house('small', '', area)], fronts, [], spot.p, area, true).length) break;
+  }
+
+  // Farmsteads along the way, each named for a word of the farmland's (none twice).
+  const words = content.names.worlds?.farm?.start ?? ['Meadow', 'Barley', 'Clover'];
+  const named = new Set(lots.slots.filter((s) => s.lot === 'farm').map((s) => s.name));
+  const farmName = () => {
+    for (let k = 0; k < 24; k++) {
+      const n = `${words[Math.floor(rand() * words.length)]} Farm`;
+      if (!named.has(n)) return n;
+    }
+    return `${words[named.size % words.length]} Farm ${named.size + 1}`;
+  };
+  const farms: PlotSlot[] = [];
+  for (const r of country) {
+    const pts = roads[r].points;
+    const L = lengths(pts).at(-1)!;
+    const fronts = byRoad.get(r) ?? [];
+    for (let s = range(rand, 50, 110); s < L - 30; ) {
+      const p = pointAt(pts, s).p;
+      if (!outside(p, FARM_OFF) || !within(p) || !buildable(p, 36) || farms.some((f) => dist([f.x, f.z], p) < 110)) {
+        s += 16;
+        continue;
+      }
+      // (Farms go on the frontage furthest down the list first: the nearest last here.)
+      const near = fronts.filter((f) => Math.abs(f.s - s) < 24).sort((a, b) => Math.abs(b.s - s) - Math.abs(a.s - s));
+      const area = homeArea(p);
+      const name = farmName();
+      if (lots.place([house('farm', name, area)], near, [], p, area, true).length) {
+        s += 16;
+        continue;
+      }
+      named.add(name);
+      farms.push(lots.slots[lots.slots.length - 1]);
+      s += range(rand, ...FARM_EVERY);
+    }
+  }
+  return farms;
 }
 
 /**

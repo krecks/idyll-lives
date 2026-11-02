@@ -420,7 +420,8 @@ export type TownExit = [number, number] | { x: number; z: number; kind: 'road' |
 
 /** Land the renderer draws and the generator keeps building off. */
 export interface WorldZone {
-  kind: 'woods' | 'meadow' | 'water' | 'hill' | 'fields';
+  /** What the land is (an orchard: fruit trees in rows beside a farmstead). */
+  kind: 'woods' | 'meadow' | 'water' | 'hill' | 'fields' | 'orchard';
   poly: [number, number][];
 }
 
