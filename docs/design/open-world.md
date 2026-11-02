@@ -67,7 +67,20 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   The sim treats set tiles as a base blocked layer; the renderer draws water from `meta.zones`.
 - `parking: { x, z, rot, area }[]` — public parking spots for car trips between areas.
 - `drives[].road?: number`, `drives[].s?: number` — the road a driveway meets and the distance
-  along its polyline (m).
+  along its polyline (m): where the driveway's line, on across the verge, comes onto it.
+  `drives[].frontX?: 1 | -1` — a driveway running along x (its house's street east or west of
+  it; `front` then 0). Absent: along z, as before.
+- `drives` and `cars` in towns of every size (`game/town.ts`): every house's driveway, and the
+  households' cars on them where the street drew its parked cars (`shared/cars.ts` `houseCar`:
+  the same houses, about four in five, the same bodies and paints; the player's home always has
+  one when its driveway reaches the road). The renderer draws the sim's cars and no others when
+  the structure has `cars`; towns and saves without them keep the street's parked ones.
+  Cars drive the road network in every such town: in `normal` and `big` ones as the open world
+  does, and in a `cosy` one too when its driveways say where they meet their roads
+  (`drives[].road`, only in towns made since) — the sim builds the graph for its cars only
+  (`cars::settle_all`; nobody walks it, commutes are timed as before). A cosy town or save
+  without it drives straight along x as ever. A driveway meeting its road more than 60° from
+  square (alongside it rather than onto it) keeps its car parked (`Car::no_way`).
 - `garages[].rot?: 0 | 1 | 2 | 3` — a garage the player built (Build mode's Garage tool,
   `Command::BuildGarage`): the way its door faces, as a thing's facing (0 towards +z, 1 +x,
   2 -z, 3 -x). Absent: towards the street, as the town places garages. The same field is in the

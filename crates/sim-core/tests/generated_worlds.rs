@@ -215,3 +215,276 @@ fn generated_worlds_are_livable() {
     }
     assert!(failures.is_empty());
 }
+
+/// Cosy and normal worlds of the file whose cars are driven (each for a day), the first of each
+/// size; every big one is (for two days).
+const CAR_WORLDS: usize = 99;
+/// Hours a resident may be on their way to a car, or sat in one standing parked, at most (the
+/// walk to it, and a trip's driver waits up to two hours for the others: `cars::TRIP_WAIT_TICKS`).
+const CAR_HOURS: u64 = 4;
+/// The most of a size's cars that may have no way onto the road.
+const NO_WAY: f32 = 0.1;
+/// How far the middle of a car on the move may be off the paving (m): the roads, the driveways
+/// and their way across the verge (`meta.paths`), a parking spot.
+const OFF_PAVING: f32 = 1.0;
+
+/// How far `at` is off the paving (m): from the nearest road's edge, a path (a driveway and its
+/// way across the verge) or the parking spot of the car's trip, whichever is nearest. 0 off the
+/// map (past a way out of town).
+fn off_paving(w: &World, car: &sim_core::cars::Car, at: [f32; 2], paths: &[[f32; 4]]) -> f32 {
+    if at[0] < 0.0 || at[1] < 0.0 || at[0] >= w.lot.width as f32 || at[1] >= w.storey_depth() as f32
+    {
+        return 0.0;
+    }
+    let g = &w.travel.graph;
+    let road = g
+        .near(at, 30.0, 1, sim_core::travel::Mode::Car)
+        .first()
+        .map_or(f32::INFINITY, |p| {
+            (p.off - g.roads[p.road as usize].width / 2.0).max(0.0)
+        });
+    let path = paths
+        .iter()
+        .map(|&[x, z, pw, pd]| {
+            let dx = (x - at[0]).max(at[0] - x - pw).max(0.0);
+            let dz = (z - at[1]).max(at[1] - z - pd).max(0.0);
+            dx.hypot(dz)
+        })
+        .fold(f32::INFINITY, f32::min);
+    let park = car.trip.map_or(f32::INFINITY, |t| {
+        ((t.at[0] - at[0]).hypot(t.at[1] - at[1]) - car.len / 2.0).max(0.0)
+    });
+    road.min(path).min(park)
+}
+
+/// The households' cars of generated worlds (`town.ts` writes them where the street drew them,
+/// with the road each driveway meets): every one loads parked on its driveway on its lot, nothing
+/// built over it, and few stay parked for want of a way onto the road (`NO_WAY`, a driveway that
+/// comes alongside its road: `Car::no_way`); driven for a day (two in a big world), the
+/// cars on the move keep to the paving (`OFF_PAVING`), some drive to work (and in a big world some
+/// go on trips to another hamlet), and at three in the morning every car is parked at home, parked
+/// out at a public spot, or away with someone at work in it; nobody waits for a car for hours
+/// (`CAR_HOURS`), and in a cosy or normal town nobody is stuck at all (`common::Watch`; a big
+/// world's long stretches away or walking are about as many without cars).
+#[test]
+#[ignore]
+fn generated_worlds_cars_keep_to_the_roads() {
+    use sim_core::cars::CarState;
+    use sim_core::clock;
+    let path = std::env::var("WORLDS")
+        .expect("set WORLDS to a file made by `bun tools/worlds/sample.ts worlds.json`");
+    let worlds: Vec<serde_json::Value> =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let content = common::content();
+    let trace: Option<(u64, u32)> = std::env::var("CARS_TRACE").ok().and_then(|v| {
+        let (seed, plot) = v.split_once(':')?;
+        Some((seed.parse().ok()?, plot.parse().ok()?))
+    });
+    let mut failures = Vec::new();
+    // Per size: worlds driven, cars, cars with no way out, drives to work, trips to another hamlet.
+    let mut sizes: std::collections::BTreeMap<String, [usize; 5]> = Default::default();
+    for (i, world) in worlds.iter().enumerate() {
+        let size = world["town"]["size"].as_str().unwrap_or("cosy").to_string();
+        let big = size == "big";
+        let tally = sizes.entry(size.clone()).or_default();
+        if !big && tally[0] >= CAR_WORLDS {
+            continue;
+        }
+        tally[0] += 1;
+        let label = format!(
+            "{size} {} {} ({})",
+            world["kind"], world["seed"], world["name"]
+        );
+        let mut w = match World::from_json(&content, &world["town"].to_string(), i as u32 + 1) {
+            Ok(w) => w,
+            Err(e) => {
+                failures.push(format!("{label}: {e}"));
+                continue;
+            }
+        };
+        let filed = world["town"]["cars"].as_array().map_or(0, Vec::len);
+        tally[1] += w.cars.len();
+        if w.cars.len() != filed {
+            failures.push(format!(
+                "{label}: {} cars of the file's {filed}",
+                w.cars.len()
+            ));
+        }
+        for car in &w.cars {
+            let at = |p: [f32; 2]| format!("{:.1},{:.1}", p[0], p[1]);
+            if car.blocked {
+                failures.push(format!(
+                    "{label}: the car at {} is built over",
+                    at(car.spot)
+                ));
+            }
+            tally[2] += usize::from(car.no_way);
+            if !w.plots[car.plot as usize]
+                .contains(car.spot[0].floor() as i32, car.spot[1].floor() as i32)
+            {
+                failures.push(format!(
+                    "{label}: the car at {} isn't on its lot",
+                    at(car.spot)
+                ));
+            }
+        }
+        let paths: Vec<[f32; 4]> = w.meta["paths"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .map(|r| ["x", "z", "w", "d"].map(|k| r[k].as_f64().unwrap_or(0.0) as f32))
+                    .collect()
+            })
+            .unwrap_or_default();
+        // (A normal town is 256 m across, a big world 1 km: walks across them take hours.)
+        let mut watch = common::Watch::new().routing_hours(if size == "cosy" { 4.0 } else { 8.0 });
+        let days = if big { 2 } else { 1 };
+        let end = clock::tick_at(clock::day(w.tick) + days, 3.0 * 60.0).unwrap();
+        let mut was: Vec<CarState> = w.cars.iter().map(|c| c.state).collect();
+        // Per resident: since when they've been on their way to a car, or sat in one standing
+        // parked (none: neither).
+        let mut held: Vec<Option<u64>> = vec![None; w.sims.len()];
+        let mut worst = (0.0f32, String::new());
+        let started = std::time::Instant::now();
+        while w.tick < end {
+            w.tick_once();
+            watch.sample(&w);
+            if w.tick % 4 != 0 {
+                continue;
+            }
+            held.resize(w.sims.len(), None);
+            for (i, s) in w.sims.iter().enumerate() {
+                // (On their way to it or in it while it stands: not while it drives.)
+                let standing = w.cars.iter().enumerate().any(|(c, car)| {
+                    (car.aboard.contains(&(i as u32)) || s.car_bound() == Some(c as u32))
+                        && matches!(
+                            car.state,
+                            CarState::Parked | CarState::Boarding | CarState::Out
+                        )
+                });
+                if !standing {
+                    held[i] = None;
+                    continue;
+                }
+                let since = *held[i].get_or_insert(w.tick);
+                if w.tick - since == CAR_HOURS * TICKS_PER_HOUR {
+                    failures.push(format!(
+                        "{label}: {} (#{i}) has waited for a car since day {} {:05.2}h",
+                        s.name,
+                        clock::day(since),
+                        clock::hour(since)
+                    ));
+                }
+            }
+            for (c, car) in w.cars.iter().enumerate() {
+                if was[c] != car.state {
+                    if car.state == CarState::Leaving {
+                        tally[if car.trip.is_some() { 4 } else { 3 }] += 1;
+                    }
+                    was[c] = car.state;
+                }
+                let Some((at, _, true, _)) = car.shown else {
+                    continue;
+                };
+                let off = off_paving(&w, car, at, &paths);
+                // (CARS_TRACE=seed:plot: that car's way, a point every second.)
+                if trace == Some((world["seed"].as_u64().unwrap_or(0), car.plot))
+                    && w.tick % 20 == 0
+                {
+                    let (_, yaw, ..) = car.shown.unwrap();
+                    eprintln!(
+                        "    {:?} {:.1},{:.1} yaw {:.2} off {off:.2}",
+                        car.state, at[0], at[1], yaw
+                    );
+                }
+                if off > worst.0 {
+                    worst = (
+                        off,
+                        format!(
+                            "the car of plot {} {:?}{} at {:.1},{:.1} day {} {:05.2}h",
+                            car.plot,
+                            car.state,
+                            if car.trip.is_some() { " (a trip)" } else { "" },
+                            at[0],
+                            at[1],
+                            clock::day(w.tick),
+                            clock::hour(w.tick)
+                        ),
+                    );
+                }
+            }
+        }
+        if worst.0 > OFF_PAVING {
+            failures.push(format!(
+                "{label}: {} is {:.2} m off the paving",
+                worst.1, worst.0
+            ));
+        }
+        // At three in the morning: parked at home, parked out, or away at work with someone; or
+        // on its way (a drive across a big world takes game hours: one that has stood waiting
+        // for an hour of it, or someone getting in for longer than a trip waits, is stuck).
+        for car in &w.cars {
+            let home = w.households[car.household as usize].plot;
+            let since = w.tick.saturating_sub(car.since);
+            let wrong = match car.state {
+                CarState::Parked => home.is_some_and(|h| h != car.plot),
+                CarState::Out => !car.trip.is_some_and(|t| {
+                    w.travel
+                        .file
+                        .parking
+                        .iter()
+                        .any(|p| (p.x - t.at[0]).hypot(p.z - t.at[1]) < 0.1)
+                }),
+                CarState::Away => car.aboard.is_empty(),
+                CarState::Boarding => since > CAR_HOURS * TICKS_PER_HOUR,
+                CarState::Leaving | CarState::Arriving => {
+                    since as f32 - car.progress > TICKS_PER_HOUR as f32
+                }
+            };
+            if wrong {
+                failures.push(format!(
+                    "{label}: the car of plot {} is {:?} at three in the morning (since day {} {:05.2}h)",
+                    car.plot,
+                    car.state,
+                    clock::day(car.since),
+                    clock::hour(car.since)
+                ));
+            }
+        }
+        // (A big world's residents away or walking for long are about as many with cars as
+        // without: only those waiting for a car count there, above.)
+        if !big {
+            for s in &watch.stuck {
+                failures.push(format!("{label}: {s}"));
+            }
+        }
+        eprintln!(
+            "  {label}: {} cars, worst {:.2} m off the paving, {} long stretches, {:.1} s",
+            w.cars.len(),
+            worst.0,
+            watch.stuck.len(),
+            started.elapsed().as_secs_f32()
+        );
+    }
+    for (size, [n, cars, stay, commutes, trips]) in &sizes {
+        eprintln!(
+            "{size}: {n} worlds, {cars} cars ({stay} with no way out), {commutes} drives to work, {trips} trips"
+        );
+        if *cars == 0 || *stay as f32 > *cars as f32 * NO_WAY {
+            failures.push(format!(
+                "{size}: {stay} of {cars} cars have no way out by road"
+            ));
+        }
+        if *n > 0 && *commutes == 0 {
+            failures.push(format!("{size}: nobody drove to work"));
+        }
+        if size == "big" && *n > 0 && *trips == 0 {
+            failures.push(format!("{size}: nobody drove to another hamlet"));
+        }
+    }
+    eprintln!("{} problems", failures.len());
+    for f in failures.iter().take(400) {
+        eprintln!("  {f}");
+    }
+    assert!(failures.is_empty());
+}
