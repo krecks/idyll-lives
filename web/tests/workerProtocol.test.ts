@@ -1,9 +1,10 @@
 // The sim worker's messages on the main thread: world updates merged (`core/bridge.ts` `mergeWorld`),
-// and the shared snapshot's triple buffer (`core/snapshot.ts`).
+// the shared snapshot's triple buffer (`core/snapshot.ts`), and the newest thing a snapshot's
+// residents use (`newestObjectUsed`: a world the main thread lacks goes at once).
 import { describe, expect, test } from 'bun:test';
 import { mergeWorld } from '../src/core/bridge';
-import type { ObjectPlacement, WorldUpdate } from '../src/core/protocol';
-import { createSharedSnapshot, SharedSnapshotReader, SharedSnapshotWriter, type SnapshotLayout } from '../src/core/snapshot';
+import { newestObjectUsed, type ObjectPlacement, type WorldUpdate } from '../src/core/protocol';
+import { createSharedSnapshot, SharedSnapshotReader, SharedSnapshotWriter, simFields, type SnapshotLayout } from '../src/core/snapshot';
 
 const thing = (id: number, open = false): ObjectPlacement => ({ id, def: 'door', x: id, z: 0, rot: 0, w: 1, d: 1, quality: 0, sellValue: null, open });
 const meshes = () => {
@@ -118,5 +119,20 @@ describe('shared snapshot', () => {
       expect(into[0]).toBe(reader.step);
       expect(reader.step).toBe(round * 10 + (round % 4));
     }
+  });
+});
+
+describe('newestObjectUsed', () => {
+  const layout = { headerLen: 2, simStride: 3, header: { simCount: 0 }, sim: simFields(['id', 'x', 'object']) } as SnapshotLayout;
+  /** A snapshot of residents using these things (-1: none), with a stale row past the count. */
+  const snapshot = (...objects: number[]) => [objects.length, 0, ...objects.flatMap((object, id) => [id, 0, object]), 0, 0, 99];
+
+  test('the highest id any resident uses or walks to', () => {
+    expect(newestObjectUsed(snapshot(4, -1, 17, 9), layout)).toBe(17);
+  });
+
+  test('none: -1 (nobody uses anything, or nobody is there); rows past the count are not read', () => {
+    expect(newestObjectUsed(snapshot(-1, -1), layout)).toBe(-1);
+    expect(newestObjectUsed(snapshot(), layout)).toBe(-1);
   });
 });

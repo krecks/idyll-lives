@@ -1016,6 +1016,18 @@ export type FromWorker =
   /** A save `check`ed: `problem` null if it opens. */
   | { type: 'checked'; problem: SaveProblem | null; message: string };
 
+/**
+ * The newest thing (highest object id) a resident in `snapshot` uses or walks to, -1 if none. Ids
+ * are never reused (sim-core `next_object_id`), so one above the highest the main thread was sent
+ * is a thing it hasn't heard of yet (`sim.worker.ts` then sends the world at once).
+ */
+export function newestObjectUsed(snapshot: ArrayLike<number>, layout: SnapshotLayout): number {
+  let newest = -1;
+  const count = snapshot[layout.header.simCount] | 0;
+  for (let i = 0; i < count; i++) newest = Math.max(newest, snapshot[layout.headerLen + i * layout.simStride + layout.sim.object] | 0);
+  return newest;
+}
+
 /** Rows of the town itself (the ground storey; see `WorldStructure.storeyDepth`). */
 export function groundDepth(world: { depth: number; storeyDepth?: number }): number {
   return world.storeyDepth ?? world.depth;

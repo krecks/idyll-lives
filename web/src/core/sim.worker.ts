@@ -8,7 +8,7 @@
  */
 
 import init, { Game, LoadError } from './wasm-pkg/sim_wasm.js';
-import type { FromWorker, GameSource, MeshArrays, SaveProblem, ToWorker, WorldUpdate } from './protocol';
+import { newestObjectUsed, type FromWorker, type GameSource, type MeshArrays, type SaveProblem, type ToWorker, type WorldUpdate } from './protocol';
 import { createSharedSnapshot, SharedSnapshotWriter, type SnapshotLayout } from './snapshot';
 
 interface WorkerScope {
@@ -23,7 +23,8 @@ const UI_INTERVAL_MS = 100;
 /**
  * The structure (and the lamps and food that go with it) is sent at most this often as time goes
  * by: a busy town changes it every few steps at speed 3 (a door opened, a crop grown, food put
- * down), and the main thread applies each message. A command's or a new view's is sent at once.
+ * down), and the main thread applies each message. A command's or a new view's is sent at once,
+ * and so is one with a thing a resident already uses in the snapshots (`sentObject`).
  */
 const WORLD_INTERVAL_MS = 100;
 const STATS_INTERVAL_MS = 1000;
@@ -39,6 +40,7 @@ const MAX_CATCH_UP = 2;
 
 let game: Game | null = null;
 let memory: WebAssembly.Memory;
+let layout: SnapshotLayout;
 let writer: SharedSnapshotWriter | null = null;
 let lastStructure = -1;
 let lastItems = -1;
@@ -51,6 +53,11 @@ let viewSeq = 0;
 /** When the structure, and the food, were last sent. */
 let worldAt = -Infinity;
 let itemsAt = -Infinity;
+/**
+ * The highest object id the main thread has had a world with (or was sent a world for at once):
+ * a resident using a newer one (just bought) would otherwise use a thing that isn't there yet.
+ */
+let sentObject = -1;
 /** Tile rectangle whose walls and floors are sent to the renderer (null = whole town). */
 let region: [number, number, number, number] | null = null;
 /** Tile rectangle the camera streams in: the sim's full-detail area (null: the view's). */
@@ -145,7 +152,7 @@ async function start(content: string, source: GameSource, speed: number | undefi
   const ui = JSON.parse(game.ui_update());
   // (Before the first step: a game that starts paused runs none.)
   if (speed !== undefined) game.command(JSON.stringify({ type: 'setSpeed', speed }));
-  const layout: SnapshotLayout = JSON.parse(game.snapshot_layout());
+  layout = JSON.parse(game.snapshot_layout());
 
   const shared = typeof SharedArrayBuffer !== 'undefined' && self.crossOriginIsolated ? createSharedSnapshot(layout) : null;
   writer = shared ? new SharedSnapshotWriter(shared, layout.capacity) : null;
@@ -266,8 +273,13 @@ function runLoop(stepMs: number): void {
 /** `now`: send what changed at once (a command's effect, the first world), not waiting for `WORLD_INTERVAL_MS`. */
 function publish(now = false): void {
   const g = game!;
+  const version = g.structure_version();
   // Re-create the view each time: WASM memory growth detaches old views.
   const view = new Float32Array(memory.buffer, g.snapshot_ptr(), g.snapshot_len());
+  // A thing the main thread hasn't heard of, used already (one just bought, walked to at once):
+  // its world goes now, not up to `WORLD_INTERVAL_MS` after the snapshots that name it. (Read
+  // here: a later call into the simulation may grow its memory, which detaches `view`.)
+  const newest = version !== lastStructure ? newestObjectUsed(view, layout) : -1;
   if (writer) {
     writer.write(view, simSteps);
   } else {
@@ -275,8 +287,7 @@ function publish(now = false): void {
     scope.postMessage({ type: 'snapshot', data: copy, step: simSteps }, [copy.buffer]);
   }
   const at = performance.now();
-  const due = now || at - worldAt >= WORLD_INTERVAL_MS;
-  const version = g.structure_version();
+  const due = now || at - worldAt >= WORLD_INTERVAL_MS || newest > sentObject;
   // (Before the world, which the renderer builds with them.)
   const lights = g.lights_version();
   // (A light that follows a use, a hood over a hob, bumps the version as it comes on or goes off.)
@@ -285,7 +296,11 @@ function publish(now = false): void {
     worldAt = at;
     scope.postMessage({ type: 'lamps', off: JSON.parse(g.lamps_off()) });
   }
-  if (due && version !== lastStructure) postWorld();
+  if (due && version !== lastStructure) {
+    postWorld();
+    // (Once for each: an id the world doesn't list doesn't send every change at once.)
+    sentObject = Math.max(sentObject, newest);
+  }
   const items = g.items_version();
   if (items !== lastItems && (now || at - itemsAt >= WORLD_INTERVAL_MS)) {
     lastItems = items;
@@ -310,6 +325,7 @@ function postWorld(): void {
   lastLot = lot;
   lastRegion = area;
   const world: WorldUpdate = JSON.parse(g.structure_update(lotChanged));
+  for (const o of world.objects ?? []) sentObject = Math.max(sentObject, o.id);
   const message: Extract<FromWorker, { type: 'world' }> = { type: 'world', view: viewSeq, world };
   const transfer: Transferable[] = [];
   if (lotChanged) {
