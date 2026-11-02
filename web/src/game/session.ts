@@ -60,6 +60,8 @@ const SIM_PICK_RADIUS = 32;
 const STATS_INTERVAL_MS = 500;
 /** After the player picks a storey, the view stays on it this long before following residents again. */
 const STOREY_STAY_MS = 8000;
+/** The storey in view follows residents only while the camera's target is within this many metres of the viewed lot. */
+const STOREY_NEAR = 40;
 const THUMBNAIL = { width: 320, height: 200 };
 /** Longest wait for a save's picture (it needs a drawn frame); the save then keeps the last one. */
 const THUMBNAIL_WAIT_MS = 1000;
@@ -276,6 +278,11 @@ export async function startSession(
     if (id === null || layout.sim.height === undefined || id >= snap[layout.header.simCount]) return;
     const o = layout.headerLen + id * layout.simStride;
     if (snap[o + layout.sim.away] > 0 || game.sims.find((s) => s.id === id)?.plot !== viewPlot) return;
+    // (Not while the camera is away from the lot, roaming a big world: a storey changed is a build of
+    // the lot's objects and residents, 20-60 ms of frames, for a cutaway nobody sees.)
+    const lot = viewPlot === null ? null : world?.plots[viewPlot];
+    const at = renderer.cameraPose().target;
+    if (lot && Math.max(lot.x - at[0], at[0] - lot.x - lot.w, lot.z - at[2], at[2] - lot.z - lot.d) > STOREY_NEAR) return;
     const storey = Math.floor(snap[o + layout.sim.height] + 0.01);
     if (storey !== game.storey) setStorey(storey);
   };
