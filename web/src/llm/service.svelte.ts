@@ -8,6 +8,7 @@
  * residents' lines with it).
  */
 
+import { inferenceSlot, whenModelsMayStart } from '../ml/schedule.svelte';
 import type { ChatMessage } from './chat';
 import type { GenParams, GenResult } from './generate';
 import { MODEL } from './models';
@@ -50,7 +51,10 @@ export interface LlmStats {
 
 let worker: Worker | null = null;
 let nextId = 1;
-const pending = new Map<number, { resolve: (r: GenResult | null) => void; reject: (e: Error) => void }>();
+/** Replies being written, each with its turn on the graphics card (`ml/schedule.svelte.ts`) to give back. */
+const pending = new Map<number, { resolve: (r: GenResult | null) => void; reject: (e: Error) => void; free: () => void }>();
+/** Times the model was unloaded: a start still waiting for its turn is then void. */
+let stops = 0;
 let waiters: { resolve: () => void; reject: (e: Error) => void }[] = [];
 const BUSY_WINDOW_MS = 5000;
 const counters = { loadMs: 0, replies: 0, skipped: 0, lastPrefillMs: 0, lastCachedShare: 0, lastTokPerS: 0, tokens: 0, decodeMs: 0, recent: [] as { at: number; ms: number }[] };
@@ -79,16 +83,13 @@ function onMessage(msg: FromLlmWorker): void {
     const now = performance.now();
     counters.recent.push({ at: now, ms: r.prefillMs + r.decodeMs });
     while (counters.recent.length && counters.recent[0].at < now - BUSY_WINDOW_MS) counters.recent.shift();
-    pending.get(msg.id)?.resolve(r);
-    pending.delete(msg.id);
+    settle(msg.id)?.resolve(r);
   } else if (msg.type === 'skipped') {
     counters.skipped++;
-    pending.get(msg.id)?.resolve(null);
-    pending.delete(msg.id);
+    settle(msg.id)?.resolve(null);
   } else if (msg.type === 'error') {
     if (msg.id !== undefined) {
-      pending.get(msg.id)?.reject(new Error(msg.message));
-      pending.delete(msg.id);
+      settle(msg.id)?.reject(new Error(msg.message));
       return;
     }
     llmStatus.error = msg.message;
@@ -99,9 +100,27 @@ function onMessage(msg: FromLlmWorker): void {
   }
 }
 
-/** Starts the worker and the model's download if needed; resolves when it can write. */
-export function ensureLlm(): Promise<void> {
-  if (llmStatus.state === 'ready' && worker) return Promise.resolve();
+/** A reply's entry, taken off the list, its turn on the card given back. */
+function settle(id: number) {
+  const p = pending.get(id);
+  pending.delete(id);
+  p?.free();
+  return p;
+}
+
+/**
+ * Starts the worker and the model's download if needed; resolves when it can write. A start
+ * waits until models may start (`whenModelsMayStart`: the page has booted, no game is loading).
+ */
+export async function ensureLlm(): Promise<void> {
+  if (llmStatus.state === 'ready' && worker) return;
+  if (!worker) {
+    const stopped = stops;
+    await whenModelsMayStart();
+    if (stops !== stopped) throw new Error('language model unloaded');
+    // (Another call started it meanwhile.)
+    if (llmStatus.state === 'ready' && worker) return;
+  }
   if (!worker) {
     worker = new Worker(new URL('./llm.worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (e: MessageEvent<FromLlmWorker>) => onMessage(e.data);
@@ -134,14 +153,34 @@ export async function generateText(
   options: { reply?: string; lead?: string; deadline?: number; signal?: AbortSignal } = {},
 ): Promise<GenResult | null> {
   await ensureLlm();
+  // Its turn on the graphics card (never beside a line being spoken), unless the deadline passes
+  // or it is aborted first.
+  const deadline = options.deadline ?? Number.MAX_SAFE_INTEGER;
+  const waiting = new AbortController();
+  const timer = deadline < Number.MAX_SAFE_INTEGER ? setTimeout(() => waiting.abort(), Math.max(0, deadline - Date.now())) : undefined;
+  const abort = () => waiting.abort();
+  options.signal?.addEventListener('abort', abort, { once: true });
+  if (options.signal?.aborted) waiting.abort();
+  const free = await inferenceSlot('gpu', waiting.signal);
+  clearTimeout(timer);
+  options.signal?.removeEventListener('abort', abort);
+  if (!free || options.signal?.aborted) {
+    free?.();
+    counters.skipped++;
+    return null;
+  }
+  if (!llmReady()) {
+    free();
+    throw new Error('language model unloaded');
+  }
   const id = nextId++;
   return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject });
+    pending.set(id, { resolve, reject, free });
     if (options.signal) {
       if (options.signal.aborted) post({ type: 'abort', id });
       else options.signal.addEventListener('abort', () => post({ type: 'abort', id }), { once: true });
     }
-    post({ type: 'generate', id, messages, reply: options.reply ?? '', lead: options.lead ?? '', params: { ...MODEL.defaults, ...params }, deadline: options.deadline ?? Number.MAX_SAFE_INTEGER });
+    post({ type: 'generate', id, messages, reply: options.reply ?? '', lead: options.lead ?? '', params: { ...MODEL.defaults, ...params }, deadline });
   });
 }
 
@@ -163,6 +202,7 @@ export function llmStats(): LlmStats {
 
 /** Stops the worker and frees the model's memory (files stay in the browser cache). */
 export function unloadLlm(): void {
+  stops++;
   stop();
   llmStatus.state = 'off';
   llmStatus.progress = 0;
@@ -172,7 +212,10 @@ function stop(): void {
   worker?.terminate();
   worker = null;
   Object.assign(counters, { loadMs: 0, replies: 0, skipped: 0, lastPrefillMs: 0, lastCachedShare: 0, lastTokPerS: 0, tokens: 0, decodeMs: 0, recent: [] });
-  for (const p of pending.values()) p.reject(new Error('language model unloaded'));
+  for (const p of pending.values()) {
+    p.free();
+    p.reject(new Error('language model unloaded'));
+  }
   pending.clear();
   waiters.forEach((w) => w.reject(new Error('language model unloaded')));
   waiters = [];

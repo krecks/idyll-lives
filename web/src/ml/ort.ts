@@ -37,12 +37,21 @@ export async function hasWebGpu(): Promise<boolean> {
 export type OrtDevice = 'gpu' | 'cpu';
 
 /**
+ * Threads for the runtime on the processor: two, so a line still comes faster than it plays, but
+ * only beside the three the game keeps busy (the page, the simulation, the browser's compositor):
+ * on four cores one, so speech doesn't take the game's.
+ */
+export function cpuThreads(cores = navigator.hardwareConcurrency ?? 1): number {
+  return Math.min(2, Math.max(1, cores - 3));
+}
+
+/**
  * Sets the runtime up: its WASM binary (already downloaded), errors only in the log. On the GPU
- * one thread is enough (it does the work); on the processor two, where the page can share memory
- * between threads, so a line still comes faster than it plays.
+ * one thread is enough (it does the work); on the processor `cpuThreads`, where the page can
+ * share memory between threads.
  */
 export function configureOrt(ort: OrtModule, wasmBinary: ArrayBuffer, device: OrtDevice = 'gpu'): void {
-  ort.env.wasm.numThreads = device === 'cpu' && crossOriginIsolated ? Math.min(2, navigator.hardwareConcurrency ?? 1) : 1;
+  ort.env.wasm.numThreads = device === 'cpu' && crossOriginIsolated ? cpuThreads() : 1;
   ort.env.wasm.proxy = false;
   ort.env.wasm.wasmPaths = { wasm: ORT_WASM.url };
   ort.env.wasm.wasmBinary = wasmBinary;

@@ -50,6 +50,8 @@ class MenuScene {
   private world: WorldStructure | null = null;
   private worldOf: NeighbourhoodDraft | null = null;
   private worldHome: number | null = null;
+  /** Previews made elsewhere (the town worker: `townJobs.ts`), by draft, with no home. */
+  private readonly prepared = new WeakMap<NeighbourhoodDraft, WorldStructure>();
   private shotKey = '';
   private wanted: { shot: Shot; duration: number } | null = null;
   /** When the camera's glide to the current shot ends (performance.now() ms). */
@@ -101,7 +103,8 @@ class MenuScene {
     perfPhase('menu: show town');
     this.templates ??= await perfTimeAsync('menu: loadTemplates', loadTemplates);
     const templates = this.templates;
-    const world = this.world && this.worldOf === draft && this.worldHome === home ? this.world : perfTime('menu: previewWorld', () => previewWorld(services.content, templates, draft, home));
+    const made = home === null ? this.prepared.get(draft) : undefined;
+    const world = this.world && this.worldOf === draft && this.worldHome === home ? this.world : (made ?? perfTime('menu: previewWorld', () => previewWorld(services.content, templates, draft, home)));
     const renderer = await host.rendererNow({ ...settings });
     if (this.draft !== draft || this.home !== home) return;
     this.world = world;
@@ -111,6 +114,11 @@ class MenuScene {
     for (const [plot, label] of this.labels) this.anchor(plot, label);
     this.applyShot();
     await perfTimeAsync('menu: showTown (renderer)', () => host.showTown(world, MENU_MINUTE, { ...settings }));
+  }
+
+  /** A draft's preview (`previewWorld` with no home), already made: `show` uses it. */
+  prepare(draft: NeighbourhoodDraft, world: WorldStructure): void {
+    this.prepared.set(draft, world);
   }
 
   /** The town currently shown. */

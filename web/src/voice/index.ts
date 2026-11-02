@@ -20,8 +20,9 @@
 
 import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
-import type { WorldStructure } from '../core/protocol';
-import { llmReady, llmStatus, unloadLlm } from '../llm';
+import type { SimThreadStats, WorldStructure } from '../core/protocol';
+import { llmReady, llmStats, llmStatus, unloadLlm } from '../llm';
+import { heldSince, inferenceHeld } from '../ml/schedule.svelte';
 import type { Renderer } from '../render/types';
 import { settings } from '../settings/settings.svelte';
 import { deviceTest, llmWrites, LlmWriter, loadTalk, WRITE_MS } from '../talk';
@@ -29,7 +30,7 @@ import { game, toast } from '../ui/state.svelte';
 import { fill, loadLines, Lines, speechPieces, type Line } from './lines';
 import { playClip, updateVoiceVolume, type Playing } from './player';
 import { SAMPLE_RATE } from './protocol';
-import { hasClip, pauseVoice, resumeVoice, speak, stepDownVoice, voiceReady, voiceStatus, type Clip } from './service.svelte';
+import { hasClip, pauseVoice, resumeVoice, speak, stepDownVoice, voiceReady, voiceStatus, voiceThreadStats, type Clip } from './service.svelte';
 import type { VisemeTrack } from './visemes';
 import { voiceFor, withTone, type VoiceParams } from './voices';
 import { scripted, type LineRequest } from './writer';
@@ -52,6 +53,17 @@ const LATE_RUN = 3;
 const SLOW_FRAME_MS = 50;
 const SLOW_SHARE = 0.1;
 const FRAME_WINDOW = 120;
+/** Frames this soon after the game let speech go again still carry its work (a scene being built). */
+const HELD_GRACE_MS = 500;
+/**
+ * The simulation falling behind (fewer steps a second than `SIM_BEHIND` of its rate), in this
+ * share of the seconds speech was being made in, pauses them too: the voices take its processor.
+ */
+const SIM_BEHIND = 0.9;
+const SIM_SHARE = 0.3;
+const SIM_WINDOW = 20;
+/** Speech is being made in a second when its workers were busy this share of the last few. */
+const MAKING_SHARE = 0.1;
 /** An answer waits this long at most for the other side to finish their line. */
 const ANSWER_WAIT_MS = 15000;
 /** A subtitle stays this long after its line ends. */
@@ -101,6 +113,8 @@ export interface VoiceSources {
   /** The lot in view (rooms, for where residents are). */
   world: () => WorldStructure | null;
   subtitles?: Subtitles;
+  /** The simulation worker's latest report on how it keeps up (`SimBridge.threadStats`). */
+  sim?: () => SimThreadStats | null;
 }
 
 interface Speaking {
@@ -143,6 +157,9 @@ export class VoiceDirector {
   private lastFrame = 0;
   /** Frames drawn while speech was being made, and those over `SLOW_FRAME_MS`; the same while not. */
   private readonly frames = { busy: 0, busySlow: 0, idle: 0, idleSlow: 0 };
+  /** The same for the simulation's reports (a second each): while speech was being made and not, and those behind. */
+  private readonly simSeconds = { busy: 0, busyBehind: 0, idle: 0, idleBehind: 0 };
+  private lastSim: SimThreadStats | null = null;
   private lastTick = 0;
   private counter = 0;
   private disposed = false;
@@ -192,6 +209,7 @@ export class VoiceDirector {
   update(frame: FrameState): void {
     const now = frame.now;
     this.watchFrames(now);
+    this.watchSim();
     if (now - this.lastTick < TICK_MS) return;
     this.lastTick = now;
     if (!settings.voices || this.paused) {
@@ -241,8 +259,9 @@ export class VoiceDirector {
       else if (talk.started || now > talk.until) this.playerTalk = null;
     }
 
-    // Nothing is said while the device test runs (it measures the voices and the model).
-    const quiet = game.mode !== 'live' || document.hidden || !this.lines || deviceTest.running;
+    // Nothing is said while the device test runs (it measures the voices and the model), nor
+    // while the game holds speech off (`ml/schedule.svelte.ts`: loading, a focus switch).
+    const quiet = game.mode !== 'live' || document.hidden || !this.lines || deviceTest.running || inferenceHeld();
     const fast = game.speed >= 3;
     for (let i = 0; i < count; i++) {
       const o = row(i);
@@ -299,8 +318,9 @@ export class VoiceDirector {
   private watchFrames(now: number): void {
     const dt = now - this.lastFrame;
     this.lastFrame = now;
-    // Gaps from a hidden tab or a paused game say nothing about voices.
-    if (dt <= 0 || dt > 1000 || document.hidden || this.paused) return;
+    // Gaps from a hidden tab or a paused game say nothing about voices, nor do the game's own
+    // slow frames while it holds speech off (and just after).
+    if (dt <= 0 || dt > 1000 || document.hidden || this.paused || heldSince(now - HELD_GRACE_MS)) return;
     const f = this.frames;
     const slow = dt > SLOW_FRAME_MS ? 1 : 0;
     if ((this.inFlight > 0 && voiceStatus.state === 'ready') || this.writing.size > 0) {
@@ -320,15 +340,44 @@ export class VoiceDirector {
 
   private resetFrames(): void {
     Object.assign(this.frames, { busy: 0, busySlow: 0, idle: 0, idleSlow: 0 });
+    Object.assign(this.simSeconds, { busy: 0, busyBehind: 0, idle: 0, idleBehind: 0 });
+  }
+
+  /**
+   * Counts the simulation's seconds behind its rate while speech is being made, against those
+   * while it isn't (its reports come once a second); as with frames, only when speech makes it
+   * worse.
+   */
+  private watchSim(): void {
+    const s = this.sources.sim?.() ?? null;
+    if (!s || s === this.lastSim) return;
+    this.lastSim = s;
+    if (document.hidden || this.paused || heldSince(performance.now() - 1000 - HELD_GRACE_MS) || s.targetPerSecond <= 0) return;
+    const behind = s.stepsPerSecond < s.targetPerSecond * SIM_BEHIND ? 1 : 0;
+    const making = voiceThreadStats().busy + llmStats().busy > MAKING_SHARE;
+    const c = this.simSeconds;
+    if (making) {
+      c.busy++;
+      c.busyBehind += behind;
+    } else {
+      c.idle++;
+      c.idleBehind += behind;
+    }
+    if (c.busy < SIM_WINDOW) return;
+    const busyShare = c.busyBehind / c.busy;
+    const idleShare = c.idle ? c.idleBehind / c.idle : 0;
+    if (busyShare > SIM_SHARE && busyShare > idleShare * 2) this.pause('sim');
+    Object.assign(c, { busy: 0, busyBehind: 0, idle: 0, idleBehind: 0 });
   }
 
   /**
    * Speech is late or slow. Auto first steps the engine down to the processor (the card was too
    * slow); if that is not the case, or it cannot start, voices pause for the session.
    */
-  private pause(why: 'late' | 'frames'): void {
+  private pause(why: 'late' | 'frames' | 'sim'): void {
     if (this.paused || this.steppingDown) return;
-    if (settings.voiceDevice === 'auto' && voiceStatus.device === 'gpu') {
+    // (A simulation short of processor would only be worse with the voices on it.)
+    if (why !== 'sim' && settings.voiceDevice === 'auto' && voiceStatus.device === 'gpu') {
       this.steppingDown = true;
       void stepDownVoice()
         .then((stepped) => {
@@ -353,14 +402,16 @@ export class VoiceDirector {
     this.pauseForSession(why);
   }
 
-  private pauseForSession(why: 'late' | 'frames'): void {
+  private pauseForSession(why: 'late' | 'frames' | 'sim'): void {
     this.paused = true;
     pauseVoice();
     if (llmStatus.state !== 'off') unloadLlm();
     toast(
       why === 'late'
         ? 'Resident voices are paused for now: speech came too slowly on this computer.'
-        : 'Resident voices are paused for now: making speech slowed the game down.',
+        : why === 'sim'
+          ? 'Resident voices are paused for now: making speech held the simulation back.'
+          : 'Resident voices are paused for now: making speech slowed the game down.',
       6000,
     );
   }
@@ -536,7 +587,7 @@ export class VoiceDirector {
         if (control.signal.aborted || this.disposed) return;
         if (!line) {
           // Not written in time counts as late; a line that didn't pass doesn't.
-          if (performance.now() - requested >= WRITE_MS) this.timed(Infinity, MAX_WAIT_LLM_MS);
+          if (performance.now() - requested >= WRITE_MS) this.timed(requested, Infinity, MAX_WAIT_LLM_MS);
           else this.dropped++;
           return;
         }
@@ -577,7 +628,7 @@ export class VoiceDirector {
     if (!cached) {
       this.inFlight++;
       void Promise.allSettled(clips).then(() => this.inFlight--);
-      void clips[0].then(() => this.timed(performance.now() - requested, budget)).catch(() => {});
+      void clips[0].then(() => this.timed(requested, performance.now() - requested, budget)).catch(() => {});
     }
     let entry: Speaking | null = null;
     let ended = () => {};
@@ -647,8 +698,12 @@ export class VoiceDirector {
       .finally(() => this.inFlight--);
   }
 
-  /** How long a line took to make (waiting included); too many late ones in a row pause voices. */
-  private timed(ms: number, budget: number): void {
+  /**
+   * How long a line asked for at `requested` took to make (waiting included); too many late ones
+   * in a row pause voices. One the game held up (`holdInference`) says nothing about the engine.
+   */
+  private timed(requested: number, ms: number, budget: number): void {
+    if (ms > budget && heldSince(requested)) return;
     this.lateRun = ms > budget ? this.lateRun + 1 : 0;
     if (this.lateRun >= LATE_RUN) this.pause('late');
   }

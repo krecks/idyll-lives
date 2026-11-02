@@ -33,6 +33,7 @@ import { aboutUs } from '../ui/story';
 import { BubbleLayer } from './bubbles';
 import { RoomOverlay } from './roomOverlay';
 import { VoiceDirector } from '../voice';
+import { holdInference, holdInferenceWhile } from '../ml/schedule.svelte';
 import { endSoundOf, soundOf, WorldSound } from '../audio/world';
 import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
@@ -43,9 +44,10 @@ import { play } from '../ui/sfx';
 import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { clockTime, openAt, staffed, staffResidents } from './staff';
 import { PointerInput, routeKey } from './input';
-import { assembleTown, loadTemplates, useTownContent, type NeighbourhoodDraft } from './town';
+import { useTownContent, type NeighbourhoodDraft } from './town';
+import { townJob } from './townJobs';
 import { gameAssetPlan, parseAheadFiles, streamRanks } from './streamPlan';
-import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
+import { perfEnd, perfPhase, perfStart, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
 declare global {
@@ -199,6 +201,8 @@ export async function startSession(
     report(label, value);
   };
   const started = perfStart('session: start→ready');
+  // No voices or language model start or speak while the game loads (and, once revealed, while its town streams in).
+  let releaseInference = holdInference('loading a game');
   progress(request.kind === 'load' ? 'Reading your save' : 'Laying out the neighbourhood', 0.05);
   const { content, assets } = await perfTimeAsync('session: loadGameData', loadGameData);
 
@@ -209,10 +213,12 @@ export async function startSession(
   /** The game this is (its saves carry it): new at New game, the save's own when loading (a save from before games had one is a game of its own). */
   let gameId: string;
   if (request.kind === 'new') {
-    const templates = await perfTimeAsync('session: loadTemplates', loadTemplates);
-    const lot = perfTime('session: assembleTown', () =>
-      assembleTown(content, templates, request.town, request.household, request.slot, { existing: request.existing, mode: request.mode, lifespan: request.lifespan }),
+    // (In the town worker: a big world's file takes most of a second to put together.)
+    const made = await perfTimeAsync('session: assembleTown', () =>
+      townJob(content, { kind: 'assemble', town: request.town, player: request.household, slot: request.slot, options: { existing: request.existing, mode: request.mode, lifespan: request.lifespan }, random: (Math.random() * 2 ** 32) >>> 0 }),
     );
+    if (made.kind !== 'assemble') throw new Error('The town file could not be made.');
+    const lot = made.lot;
     source = { lot, seed: Number(params.get('seed')) || (Math.random() * 2 ** 31) >>> 0 };
     household = request.household.name.trim();
     gameId = crypto.randomUUID();
@@ -267,8 +273,8 @@ export async function startSession(
     failReady = reject;
   });
   void ready.then(
-    () => perfEnd(started),
-    () => perfEnd(started),
+    () => (perfEnd(started), releaseInference()),
+    () => (perfEnd(started), releaseInference()),
   );
   // The first world build's steps, and the warm-up's, on the loading screen (until the game is ready).
   renderer.onLoadStep((label, done) => progress(label, 0.65 + 0.25 * done));
@@ -341,7 +347,7 @@ export async function startSession(
     buildBuy.modeChanged();
     refreshRoomOverlay();
   }
-  const voices = new VoiceDirector(content, renderer, { world: () => world, subtitles: bubbles });
+  const voices = new VoiceDirector(content, renderer, { world: () => world, subtitles: bubbles, sim: () => bridge.threadStats });
   const worldSound = new WorldSound(renderer, content);
   const buildBuy = new BuildBuyInput(renderer, content, (command) => bridge.send(command));
   buildBuy.showStorey = (storey) => {
@@ -1257,6 +1263,7 @@ export async function startSession(
       }
     });
     building = build.catch(() => {});
+    holdInferenceWhile('building the scene', building);
     if (feedback?.effects.length) void build.then(() => feedback.effects.forEach((fx) => renderer.buildEffect(fx)), () => {});
     build
       .then(async () => {
@@ -1806,6 +1813,8 @@ export async function startSession(
       perfPhase(`session: reveal ${game.mode} ${game.buildTab} storey ${game.storey} walls ${game.wallMode}`);
       // The house is cached by now: stream the rest of the town while the player is in it. Its
       // models are built into the world once the stream is over (each settle used to rebuild it).
+      releaseInference();
+      releaseInference = holdInference('streaming the town');
       void (async () => {
         await homeAssets;
         if (disposed) return;
@@ -1815,6 +1824,7 @@ export async function startSession(
         // The catalog's pictures are built only once the stream is quiet, in idle moments.
         await whenStreamSettled();
         renderer.holdModelRefresh(false);
+        releaseInference();
         if (disposed || BENCH) return;
         prefetchTimer = setTimeout(() => {
           // (Not while benchmarking: drawing the pictures would show in the measurements.)
@@ -1857,6 +1867,7 @@ export async function startSession(
     },
     async dispose() {
       disposed = true;
+      releaseInference();
       ideas.clear();
       clearInterval(statsTimer);
       clearInterval(autosaveTimer);
