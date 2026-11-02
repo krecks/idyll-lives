@@ -12,6 +12,7 @@
  */
 
 import { untrack } from 'svelte';
+import { idleMoment } from '../render/shared/idle';
 
 export type InferenceDevice = 'gpu' | 'cpu';
 
@@ -151,8 +152,7 @@ export function startModelsAfter(booting: () => boolean): void {
       if (booting()) return;
       untrack(() => {
         queueMicrotask(stop);
-        if ('requestIdleCallback' in window) requestIdleCallback(startModels, { timeout: 3000 });
-        else setTimeout(startModels, 200);
+        void idleMoment(3000).then(startModels);
       });
     });
   });

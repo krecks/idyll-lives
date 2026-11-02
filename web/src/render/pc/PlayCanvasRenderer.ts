@@ -73,6 +73,7 @@ import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/e
 import { GAME_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
 import { GrassPush } from '../shared/grass';
+import { idleMoment } from '../shared/idle';
 import { coveringSurface, houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
 import { compose, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
 import { OrbitControls } from '../shared/orbit';
@@ -869,11 +870,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.parsing = true;
     try {
       while (!this.disposed && this.parseQueue.length) {
-        const spare = await idleMoment();
+        const spare = (await idleMoment()).timeRemaining();
         if (this.disposed) return;
-        if (spare < PARSE_IDLE_MS || this.worldBuilding || this.streaming || this.townMode) continue;
-        const i = this.parseQueue.findIndex((f) => fetched(f.file));
-        // (None downloaded yet: the stream brings them; look again in a while.)
+        const held = this.worldBuilding || this.streaming || this.townMode;
+        if (!held && spare < PARSE_IDLE_MS) continue;
+        const i = held ? -1 : this.parseQueue.findIndex((f) => fetched(f.file));
+        // (Held, or none downloaded yet, the stream bringing them: look again in a while.)
         if (i < 0) {
           await new Promise((resolve) => setTimeout(resolve, 1000));
           continue;
@@ -3064,12 +3066,4 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.shaderWatch?.destroy();
     if (this.app) destroyApp(this.app);
   }
-}
-
-/** The next idle moment, and how much of it is left (ms; 0 without idle callbacks: a short wait instead). */
-function idleMoment(): Promise<number> {
-  return new Promise((resolve) => {
-    if (typeof requestIdleCallback === 'function') requestIdleCallback((deadline) => resolve(deadline.timeRemaining()));
-    else setTimeout(() => resolve(PARSE_IDLE_MS), 50);
-  });
 }
