@@ -68,5 +68,8 @@ describe('place names', () => {
     expect(tripText({ to: 1, at: 17 * 60 + 40 }, 1, plots, households, time)).toBe('On the way home · back about 17:40');
     expect(tripText({ to: 0, at: 14 * 60 + 20 }, 1, plots, households, time)).toBe('On the way to the Smiths · there about 14:20');
     expect(tripText({ to: 2, at: 9 * 60 }, 1, plots, households, time)).toBe('On the way to Village green · there about 9:00');
+    // (The time only comes with a resident's details.)
+    expect(tripText({ to: 1 }, 1, plots, households, time)).toBe('On the way home');
+    expect(tripText({ to: 0 }, 1, plots, households, time)).toBe('On the way to the Smiths');
   });
 });
