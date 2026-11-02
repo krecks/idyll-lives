@@ -18,7 +18,7 @@ import type { GameKind, LandscapeParams, Lifespan, TownArea, TownExit, WorldLook
 import { fetchText } from '../content/content';
 import { bedroomsNeeded, householdBonds, householdSpawns, randomHousehold, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { homePrice } from './price';
-import { generateHouse, objectInfos, random, residentsKey, weighted, type GardenSize, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
+import { crownClear, generateHouse, objectInfos, random, residentsKey, weighted, type GardenSize, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
 import { cropRoads, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Box, type Pt, type RoadPlan } from './roads';
 import { householdFunds, savingsOf } from './wealth';
 import { extend, streetNames, WORLDS, worldName, worldTagline, type SizeSpec, type WorldKind } from './world';
@@ -1177,8 +1177,45 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       garages.push({ plot: s.index, x0: r.x, z0: r.z, x1: r.x + r.w, z1: r.z + r.d });
     }
   }
+  dropCrowdedTrees(content, walls, objects, town.depth);
   const fences = gardenFencesOf(content, town, { walls, objects, paths, fields, garages, plots }, driveOf);
   return { walls, doors, windows, objects, paths, fields, garages, drives, plots, facing: town.slots.map((s) => s.facing), storeys, basement, fences };
+}
+
+/**
+ * Takes out the trees whose crowns would grow into a house, their own lot's or a neighbour's
+ * (content `crown`, `crownClear`; the game refuses to plant one there too): the town's ground-storey
+ * walls (`walls`, town rows; those below `depth` are upper storeys and the basement).
+ */
+export function dropCrowdedTrees(content: Content, walls: readonly (readonly [number, number, number, number])[], objects: Placement[], depth: number): void {
+  const crowned = objects.some((o) => (content.object(o.def)?.crown ?? 0) > 0);
+  if (!crowned) return;
+  const edges = new Map<string, string>();
+  for (const [x0, z0, x1, z1] of walls) {
+    if (Math.max(z0, z1) > depth) continue;
+    if (z0 === z1) for (let x = Math.min(x0, x1); x < Math.max(x0, x1); x++) edges.set(`h:${x}:${z0}`, 'wall');
+    else for (let z = Math.min(z0, z1); z < Math.max(z0, z1); z++) edges.set(`v:${x0}:${z}`, 'wall');
+  }
+  // Only the walls round each tree are looked at.
+  const near = new Map<string, Map<string, string>>();
+  const cell = (x: number, z: number) => `${Math.floor(x / 8)}:${Math.floor(z / 8)}`;
+  for (const [e, v] of edges) {
+    const [, xs, zs] = e.split(':');
+    const c = cell(Number(xs), Number(zs));
+    (near.get(c) ?? near.set(c, new Map()).get(c)!).set(e, v);
+  }
+  for (let i = objects.length - 1; i >= 0; i--) {
+    const o = objects[i];
+    const def = content.object(o.def);
+    const crown = def?.crown ?? 0;
+    if (crown <= 0 || o.z >= depth) continue;
+    const [fw, fd] = def?.footprint ?? [1, 1];
+    const [w, d] = (o.rot ?? 0) % 2 ? [fd, fw] : [fw, fd];
+    const [cx, cz] = [o.x + w / 2, o.z + d / 2];
+    const round = new Map<string, string>();
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) for (const [e, v] of near.get(`${Math.floor(cx / 8) + dx}:${Math.floor(cz / 8) + dz}`) ?? []) round.set(e, v);
+    if (!crownClear({ edges: round }, cx, cz, crown)) objects.splice(i, 1);
+  }
 }
 
 /** The town's garden fences, hedges and field fences (`gardenFences.ts`), from its layout (the player's lot's too: theirs to change). */

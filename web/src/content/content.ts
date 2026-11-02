@@ -262,6 +262,8 @@ export interface ObjectDef {
   staff?: { at: [number, number]; hours: [number, number] };
   /** Can only be placed outdoors (trees, flower beds, ponds). */
   outdoors?: boolean;
+  /** How far a tree's crown reaches out from its middle (m): no house wall may stand closer (sim-core `home.rs`, `game/housegen.ts`). */
+  crown?: number;
   /** The household's own (a wardrobe, a dresser): visitors don't use it (sim-core `world::guest_may`). */
   private?: boolean;
   /** A flight of stairs to the storey above (sim-core `storeys.rs`). */

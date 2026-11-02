@@ -3014,6 +3014,7 @@
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
+      "crown": 2.6,
       "description": "A broad, rounded shade tree. Its crown spreads about five metres across."
     },
     {
@@ -3030,6 +3031,7 @@
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
+      "crown": 3.0,
       "description": "A tall evergreen pine."
     },
     {

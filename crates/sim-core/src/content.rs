@@ -426,6 +426,9 @@ pub struct ObjectDef {
     pub places: Vec<SlotPlace>,
     /// Can only be placed outdoors (trees, flower beds, ponds).
     pub outdoors: bool,
+    /// How far a tree's crown reaches out from its middle (m, content `crown`; 0: no crown): no
+    /// house wall may stand closer, or the crown grows into the house (`home.rs`).
+    pub crown: f32,
     /// The household's own (content `private`: a wardrobe, a dresser, a bath): a visitor uses none
     /// of it, chosen or told (`world::guest_may`).
     pub private: bool,
@@ -2467,6 +2470,9 @@ struct ObjectRaw {
     places: Vec<PlaceRaw>,
     #[serde(default)]
     outdoors: bool,
+    /// See `ObjectDef::crown`.
+    #[serde(default)]
+    crown: f32,
     /// The household's own (see `ObjectDef::private`).
     #[serde(default)]
     private: bool,
@@ -3848,6 +3854,7 @@ impl Content {
                 slots: obj.slots,
                 places: obj.places.iter().map(|p| SlotPlace { at: p.at, facing: p.facing.to_radians() }).collect(),
                 outdoors: obj.outdoors,
+                crown: obj.crown.max(0.0),
                 private: obj.private,
                 stairs: obj.stairs,
                 turns,

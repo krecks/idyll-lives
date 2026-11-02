@@ -632,6 +632,12 @@ impl World {
         if self.content.objects[def].outdoors && !self.all_outdoors(&obj) {
             return Err(Error::new("that has to go outside"));
         }
+        let crown = self.content.objects[def].crown;
+        if crown > 0.0 && self.crown_meets_wall(&obj, crown) {
+            return Err(Error::new(
+                "its crown would grow into the house: plant it further from the walls",
+            ));
+        }
         // Residents walk under pictures and lamps and over rugs (not into a plant hanging low, nor
         // under a lamp at head height).
         let d = &self.content.objects[def];
@@ -820,6 +826,57 @@ impl World {
         )?;
         self.objects[id as usize].carry_state(old);
         Ok(id)
+    }
+
+    /// Whether a house wall (with a door or window or not, on any storey above ground) stands
+    /// closer than `crown` metres to the middle of `obj` (a tree: its crown would grow into it).
+    pub(crate) fn crown_meets_wall(&self, obj: &ObjectInstance, crown: f32) -> bool {
+        let (mut sx, mut sz, mut n) = (0.0f32, 0.0f32, 0u32);
+        for (x, z) in obj.tiles(&self.content) {
+            sx += x as f32 + 0.5;
+            sz += z as f32 + 0.5;
+            n += 1;
+        }
+        if n == 0 {
+            return false;
+        }
+        let (cx, cz) = (sx / n as f32, sz / n as f32);
+        // On the storey's own rows: the same place on every storey above.
+        let lz = cz - self.storey_row(self.storey_of(cz as i32)) as f32;
+        let (width, depth) = (self.lot.width as i32, self.storey_depth());
+        // How far (cx, lz) is from the unit edge from (x0, z0) along x (`along_x`) or z.
+        let dist = |x0: f32, z0: f32, along_x: bool| {
+            let (dx, dz) = if along_x {
+                ((cx - cx.clamp(x0, x0 + 1.0)), lz - z0)
+            } else {
+                (cx - x0, lz - lz.clamp(z0, z0 + 1.0))
+            };
+            (dx * dx + dz * dz).sqrt()
+        };
+        let (x0, x1) = (
+            ((cx - crown).floor() as i32).max(0),
+            ((cx + crown).ceil() as i32).min(width),
+        );
+        let (z0, z1) = (
+            ((lz - crown).floor() as i32).max(0),
+            ((lz + crown).ceil() as i32).min(depth),
+        );
+        (0..self.storeys as i32).any(|k| {
+            let row = self.storey_row(k);
+            (z0..=z1).any(|z| {
+                (x0..=x1).any(|x| {
+                    let (ux, uz) = (x as usize, (row + z) as usize);
+                    (x < width
+                        && z <= depth
+                        && self.lot.h_edge(ux, uz).is_wall()
+                        && dist(x as f32, z as f32, true) < crown)
+                        || (x <= width
+                            && z < depth
+                            && self.lot.v_edge(ux, uz).is_wall()
+                            && dist(x as f32, z as f32, false) < crown)
+                })
+            })
+        })
     }
 
     /// Whether every tile of `obj` is outdoors (a tile split by a diagonal wall counts as indoors
