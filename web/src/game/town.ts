@@ -21,7 +21,7 @@ import { homePrice } from './price';
 import { crownClear, generateHouse, objectInfos, random, residentsKey, weighted, type GardenSize, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
 import { connect, cropRoads, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Box, type Pt, type RoadPlan } from './roads';
 import { householdFunds, savingsOf } from './wealth';
-import { extend, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
+import { extend, fill, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
 import { generateBigWorld, type OpenWorldDraft } from './macro';
 import { garageAt, garageFor, houseCar, type ParkedCar } from '../render/shared/cars';
 import { fenceRuns, townFences, type TownFence } from './gardenFences';
@@ -645,12 +645,14 @@ export const BIG_COURTS = 3;
 
 /**
  * A town's roads as its recipe laid them out, joined up (`roads.ts` `connect`: its lanes' dead
- * ends go on to another road, `courts` of them at most left as courts), with `spec.extend` cross
- * streets between them (a bigger town's blocks).
+ * ends go on to another road, `courts` of them at most left as courts), streets out into what
+ * of its box they leave empty (`spec.fill`: a big town's), and `spec.extend` cross streets between
+ * them (a bigger town's blocks).
  */
 export function joinUp(rand: Rand, layout: RoadLayout, spec: SizeSpec, courts = COURTS): RoadPlan[] {
   const fit = { box: spec.box, greens: layout.greens };
-  const joined = connect(layout.roads, fit, courts);
+  let joined = connect(layout.roads, fit, courts);
+  if (spec.fill) joined = connect(fill(rand, joined, spec.box, spec.fill, spec.scale, layout.greens), fit, courts);
   return spec.extend ? connect(extend(rand, joined, spec.box, spec.extend, spec.scale, layout.greens), fit, courts) : joined;
 }
 
