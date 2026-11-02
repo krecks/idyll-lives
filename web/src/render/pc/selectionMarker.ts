@@ -14,7 +14,7 @@
 import * as pc from './engine';
 import { Instances } from './instancing';
 import { GAME_FRONT_FACE } from './materials';
-import { buildModel, onModelFileArrived, uploadData } from './models';
+import { buildModel, disposeTemplate, onModelFileArrived, uploadData } from './models';
 import type { AssetRegistry } from '../../assets/registry';
 import { LOOK } from '../look';
 import { toLinear } from '../shared/math';
@@ -170,8 +170,8 @@ export class SelectionMarker {
         outline.push(this.draw('markerOutline', hull, this.outlineMaterial, this.outlineColor));
       }
     }
-    for (const m of template.meshes) m.mesh.destroy();
-    for (const g of template.glows ?? []) g.mesh.mesh.destroy();
+    // (Its own copies drawn with its own materials: the template and its file are let go of.)
+    disposeTemplate(template);
     // (The draws hold their meshes: destroying a draw lets go of its mesh.)
     for (const m of made) m.decRefCount();
     if (this.destroyed) return;
