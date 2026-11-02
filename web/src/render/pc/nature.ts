@@ -37,7 +37,7 @@ import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
 import { groupInstances, hideLawn, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
-import { QUALITY, type OpenWorldQuality } from '../quality';
+import type { OpenWorldQuality } from '../quality';
 import type { BenchDiag } from '../../debug/benchFlags';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
@@ -106,7 +106,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private offThread: OffThreadLand | null = null;
 
   /** `grassQuality`: how the grass is drawn (the preset's, `QualitySettings.grass`); `open`: a big world's distances (`QualitySettings.openWorld`). */
-  constructor(world: WorldStructure, lawnDensity: number, lawnLod: 0 | 1, woodsCell: number, private readonly grassQuality: GrassQuality, private readonly open: OpenWorldDistances = OPEN_WORLD) {
+  constructor(world: WorldStructure, lawnDensity: number, lawnLod: 0 | 1, woodsCell: number, private readonly grassQuality: GrassQuality, private readonly open: OpenWorldQuality) {
     super(world, (land, w, name) => new CountryRoads(land, w, name), lawnDensity, lawnLod, woodsCell, open.woodsCell);
   }
 
@@ -417,15 +417,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
 /** A big world's ground tiles (m), and their levels' quads across (the distances they change at are the preset's, `OpenWorldQuality.tiles`). */
 const TILE = 128;
 const TILE_LODS = [64, 32, 16];
-
-/** What the landscape takes of a preset's open-world distances (`OpenWorldQuality`). */
-export type OpenWorldDistances = Pick<OpenWorldQuality, 'woodsFar' | 'woodsCell' | 'flowersFar' | 'tiles'>;
-
-/**
- * Medium's: a big world's woods squares further than 560 m (middle to the camera's target) aren't
- * drawn (the haze has them), its lawn flowers' past 170 m (a flower is a few pixels by then).
- */
-const OPEN_WORLD: OpenWorldDistances = QUALITY.medium.openWorld;
 
 /**
  * One level of a ground tile from the finest level's shaded points (`at(col, row)` into `positions`

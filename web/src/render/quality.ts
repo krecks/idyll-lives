@@ -180,11 +180,11 @@ export interface OpenWorldQuality {
   stream: number;
   /** The far LOD's houses past this (m, a draw group's middle from the camera's target) aren't drawn (`pc/street.ts`). */
   farCull: number;
-  /** The woods' squares further than this (m, middle to the camera's target) aren't drawn (`pc/nature.ts`). */
+  /** The woods' squares further than this (m, middle to the camera's target) aren't drawn (`pc/nature.ts`): the haze has them. */
   woodsFar: number;
   /** The side (m) of the woods' squares (`shared/nature.ts`): smaller ones leave out more trees off screen, at a draw each. */
   woodsCell: number;
-  /** The lawn flowers' squares further than this (m) aren't drawn. */
+  /** The lawn flowers' squares further than this (m) aren't drawn: a flower is a few pixels by then. */
   flowersFar: number;
   /** The ground tiles' finest and middle levels within these (m, a tile's middle to the camera's target; past them the coarsest). */
   tiles: readonly [number, number];
