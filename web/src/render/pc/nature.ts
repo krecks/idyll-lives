@@ -31,6 +31,7 @@ import type { WorldStructure } from '../../core/protocol';
 import { CountryRoads } from '../shared/countryRoads';
 import type { Lighting } from '../shared/environment';
 import { grassField, type GrassQuality } from '../shared/grass';
+import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
 import { groupInstances, hideLawn, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
@@ -98,12 +99,25 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /** The water's material and the library that adopted it (its own: it goes with the landscape). */
   private waterMaterial: { material: pc.StandardMaterial; lib: MaterialLibrary } | null = null;
 
+  /** The land in the render data worker while `build` runs: the terrain's shading and the grass field are made there. */
+  private offThread: OffThreadLand | null = null;
+
   /** `grassQuality`: how the grass is drawn (the preset's, `QualitySettings.grass`). */
   constructor(world: WorldStructure, lawnDensity: number, lawnLod: 0 | 1, woodsCell: number, private readonly grassQuality: GrassQuality) {
     super(world, (land, w, name) => new CountryRoads(land, w, name), lawnDensity, lawnLod, woodsCell);
   }
 
   async build(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder): Promise<NatureResult> {
+    this.offThread = OffThreadLand.open(world);
+    try {
+      return await this.buildAll(app, parent, assets, world, pace, buildRoads);
+    } finally {
+      this.offThread?.close();
+      this.offThread = null;
+    }
+  }
+
+  private async buildAll(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder): Promise<NatureResult> {
     const draws: pc.Entity[] = [];
     // A big world's ground in 128 m tiles of three levels of detail; a town of today's sizes one mesh, as ever.
     const grounds = world.meta?.world?.size === 'big' ? await perfTimeAsync('nature: terrain tiles', () => this.terrainTiles(app, parent, pace)) : [await perfTimeAsync('nature: terrain', () => this.terrain(app, parent, pace))];
@@ -113,14 +127,25 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     for (const e of draws) e.enabled = false;
     this.others = draws;
     this.batches = [];
+    // (The grass field's land is made in the worker meanwhile; its town mask here.)
+    const grassLand = this.offThread?.grass(this.ring) ?? Promise.resolve(null);
     await perfTimeAsync('nature: forests', () => this.forests(app, parent, assets, pace));
     await perfTimeAsync('nature: lawns', () => this.plantLawns(app, parent, assets, world, pace));
     this.findSquares();
-    const field = await perfTimeAsync('nature: grass field', () => grassField(world, this, pace, this.ring));
+    const field = await perfTimeAsync('nature: grass field', async () => {
+      const land = await grassLand;
+      return land ? withTownGrass(land, world) : grassField(world, this, pace, this.ring);
+    });
     const grass = (this.grass = new Grass(app, parent, field, this.grassQuality));
     grass.onGround(grounds.map((g) => g.render!.meshInstances[0]));
     const plants = gather(this.batches);
     return { draws: [...draws, ...plants.draws, ...grass.draws.map((d) => d.entity)], casters: plants.casters, only: plants.only };
+  }
+
+  /** The terrain's heights and colours: made in the worker while it runs (the same numbers), else here. */
+  protected override async shadeTerrain(positions: Float32Array | number[], colors: Float32Array, pace?: () => Promise<void>): Promise<void> {
+    if (positions instanceof Float32Array && (await this.offThread?.shade(positions, colors))) return;
+    return super.shadeTerrain(positions, colors, pace);
   }
 
   /**
