@@ -47,18 +47,24 @@ pub(crate) struct Watch {
     primed: bool,
     /// A new game's lot, not looked at yet: its rooms' lamps are switched for who's in them.
     pub(crate) fresh: bool,
-    /// The lights that follow a use, found once for the objects as they stand (`WhileLights`).
-    while_lights: Option<WhileLights>,
-    /// The lamps by room, found once for the objects and the rooms as they stand.
-    lamps: Option<(u32, u32, usize, Lamps)>,
+    /// The lights that follow a use (`WhileLights`), found for the objects as they stood
+    /// (`World::objects_version`, which changes whenever objects come, go or move).
+    while_lights: Option<(u32, WhileLights)>,
+    /// The lamps by room, found for the objects and the rooms as they stood (`objects_version`
+    /// and `lot_version`).
+    lamps: Option<((u32, u32), Lamps)>,
+}
+
+/// What `cached` holds if it was found for `key` (the versions it's kept for, `Watch`).
+fn kept<K: PartialEq, T>(cached: Option<(K, T)>, key: K) -> Option<T> {
+    cached.filter(|c| c.0 == key).map(|c| c.1)
 }
 
 /// The lights that follow a use (content `light.while`; object ids, in id order) and the
-/// animations any of them watches (sorted), for `World::objects_version` (and the number of
-/// objects): a big town has thousands of objects and a handful of these, looked at every tick.
+/// animations any of them watches (sorted): a big town has thousands of objects and a handful
+/// of these, looked at every tick.
 #[derive(Debug, Clone)]
 struct WhileLights {
-    version: (u32, usize),
     lights: Vec<u32>,
     watched: Vec<usize>,
 }
@@ -84,11 +90,7 @@ impl WhileLights {
             .collect();
         watched.sort_unstable();
         watched.dedup();
-        Self {
-            version: (world.objects_version, world.objects.len()),
-            lights,
-            watched,
-        }
+        Self { lights, watched }
     }
 }
 
@@ -165,13 +167,11 @@ fn footprint(o: &crate::world::ObjectInstance, content: &crate::content::Content
 /// Keeps `World::while_lit` (the lights that follow a use) up to date, telling the renderer when
 /// one comes on or goes off.
 pub(crate) fn update_while(world: &mut World) {
-    let version = (world.objects_version, world.objects.len());
-    let cached = match world.light_watch.while_lights.take() {
-        Some(c) if c.version == version => c,
-        _ => WhileLights::new(world),
-    };
+    let version = world.objects_version;
+    let cached = kept(world.light_watch.while_lights.take(), version)
+        .unwrap_or_else(|| WhileLights::new(world));
     let lit = while_lit(world, &cached);
-    world.light_watch.while_lights = Some(cached);
+    world.light_watch.while_lights = Some((version, cached));
     if lit != world.while_lit {
         world.while_lit = lit;
         world.lights_version = world.lights_version.wrapping_add(1);
@@ -231,12 +231,8 @@ pub(crate) fn update(world: &mut World) {
     let mut watch = std::mem::take(&mut world.light_watch);
     // (The lamps by room, found once for all the rooms looked at, and kept while the objects and
     // the rooms stand as they did.)
-    let key = (world.objects_version, lot_version, world.objects.len());
-    let mut lamps: Option<Lamps> = watch
-        .lamps
-        .take()
-        .filter(|&(o, l, n, _)| (o, l, n) == key)
-        .map(|(_, _, _, lamps)| lamps);
+    let key = (world.objects_version, lot_version);
+    let mut lamps = kept(watch.lamps.take(), key);
     if watch.fresh && world.autonomy {
         let rooms: Vec<u16> = world
             .rooms()
@@ -289,7 +285,7 @@ pub(crate) fn update(world: &mut World) {
             set(world, id, false);
         }
     }
-    watch.lamps = lamps.map(|lamps| (key.0, key.1, key.2, lamps));
+    watch.lamps = lamps.map(|lamps| (key, lamps));
     watch.awake = awake;
     watch.dark = dark;
     watch.lot_version = lot_version;
