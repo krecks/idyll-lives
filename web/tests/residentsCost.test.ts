@@ -2,7 +2,8 @@
 // (hidden, away, out of view) is in no part's rows, the parts drawn whatever the distance and the shadow-only copies
 // included, so nothing skins them to nothing; and only residents posed inside the sun's shadow square draw its map
 // again (`posed`). And the pose texture's three texels a bone (`layout.ts` `BONE_TEXELS`) are the skinning matrices'
-// rows, number for number. `bun test`.
+// rows, number for number; and residents far off are posed in full only every few frames, carried along where they
+// are between. `bun test`.
 //
 // (What this caught when written: the hair, the eyes and the shadow-only copies kept every resident built, drawn or
 // not, and one hidden counted as far off, so its low-detail body was drawn too; and anyone posed within the preset's
@@ -212,6 +213,63 @@ describe('residents not drawn', async () => {
       const off = run(30);
       expect(off.posed).toBeGreaterThan(20);
       expect(off.shadowPosed).toBe(0);
+    } finally {
+      performance.now = realNow;
+    }
+  }, 30_000);
+
+  test('far off, posed in full every few frames, and carried along between', async () => {
+    const realNow = performance.now;
+    let now = 0;
+    performance.now = () => now;
+    try {
+      const characters = new Characters(view, assets, content, { castsShadows: true });
+      expect(await characters.init()).toBe(true);
+      await characters.build({ sims, objects: [] });
+      const prev = new Float32Array(layout.capacity);
+      const curr = new Float32Array(layout.capacity);
+      const frame: FrameState = { prev, curr, alpha: 0, steps: 1, layout, now: 0 };
+      const shadows = new Float32Array(MAX_CHARACTERS * 16);
+      const rigs = (characters as unknown as { sims: { lag: number }[] }).sims;
+      // Walking along x at 2 m/s, a snapshot every third frame, the camera 120 m off (all of them far).
+      cam[2] = 120;
+      let t = 0;
+      const walk = (snap: Float32Array) => {
+        write(snap, -1);
+        for (let i = 0; i < N; i++) {
+          const o = layout.headerLen + i * layout.simStride;
+          snap[o + k.x] = i * 1.5 + t * 2;
+          snap[o + k.moving] = 1;
+          snap[o + k.yaw] = Math.PI / 2;
+        }
+      };
+      walk(prev);
+      walk(curr);
+      let lagging = 0;
+      let worst = 0;
+      for (let f = 0; f < 240; f++) {
+        if (f % 3 === 0) {
+          prev.set(curr);
+          t += 0.05;
+          walk(curr);
+        }
+        frame.alpha = (f % 3) / 3;
+        now += 1000 / 60;
+        frame.now = now;
+        characters.update(frame, () => true, shadows);
+        if (f < 30) continue;
+        for (let i = 0; i < N; i++) {
+          const o = layout.headerLen + i * layout.simStride;
+          const x = prev[o + k.x] + (curr[o + k.x] - prev[o + k.x]) * frame.alpha;
+          // Where the snapshot has them, every frame (their contact shadow under them), posed in full or not.
+          worst = Math.max(worst, Math.abs(shadows[i * 16 + 12] - x));
+          if (rigs[i].lag > 0) lagging++;
+          expect(rigs[i].lag).toBeLessThan(4.5 / 60);
+        }
+      }
+      // Most frames, most of them not posed in full; always where they are.
+      expect(lagging / (210 * N)).toBeGreaterThan(0.5);
+      expect(worst).toBeLessThan(1e-3);
     } finally {
       performance.now = realNow;
     }

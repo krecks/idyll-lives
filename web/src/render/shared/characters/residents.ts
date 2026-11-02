@@ -100,6 +100,14 @@ const UPPER_FADE_RATE = 4;
 /** How far outside the sun's shadow square a resident posed still draws its map again (m): a long evening shadow's reach into it. */
 const SHADOW_REACH = 8;
 
+/**
+ * Residents far off (in low detail: `faceDetail`'s `far`) are posed in full every this many frames, not every frame
+ * (staggered by row, so as many each frame): every second frame, every fourth with their faces at half the low-detail
+ * size. Between, the pose goes along with them as it is (`carryPose`). And never more than `FAR_LAG` s apart.
+ */
+const FAR_EVERY = [2, 4] as const;
+const FAR_LAG = 0.25;
+
 /** How fast a rise cut short (`SimRig.riseK`) finishes its step off the seat (per second: a quarter of a second, less
  * when the action runs fast). */
 const RISE_CATCH_UP = 4;
@@ -283,6 +291,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private lastNow = 0;
   /** Seconds of animation played: stands still while the game is paused (Sims hold their pose). */
   private clock = 0;
+  /** Frames posed (`update`): those far off are posed in full on their turn (`FAR_EVERY`, staggered by row). */
+  private frameNo = 0;
+  /** Every resident posed in full every frame (`FAR_EVERY` off: to compare, from the console or a test). */
+  everyFrame = false;
   /** Sit / lie pelvis offsets per body (computed once from the clips). */
   private readonly sitPelvis = new Map<string, SeatFit>();
   /** The same for the floor clips (`sitFloor`), per body, then floor sit (`FloorSit.name`). */
@@ -656,6 +668,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         riseX: 0,
         riseZ: 0,
         riseK: 1,
+        lag: 0,
         riseViaX: NaN,
         riseViaZ: NaN,
         walkT: -1,
@@ -1464,6 +1477,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (gameSpeed === 0 && this.debugRate === null) dt = 0;
     this.clock += dt;
     const time = this.clock;
+    const frameDt = dt;
+    this.frameNo++;
     // The residents, then the town's vendors and shopkeepers (sim-core `staff.rs`), in rows of the same layout.
     const count = Math.min(curr[layout.header.simCount] + (layout.header.staffCount === undefined ? 0 : curr[layout.header.staffCount]), MAX_CHARACTERS);
     const H = layout.headerLen;
@@ -1558,6 +1573,21 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         this.writeProp(this.handProp, i, null);
         continue;
       }
+      // Far off (in low detail), posed in full only every `FAR_EVERY` frames (staggered by row): between, the pose
+      // goes along with them as it is (`carryPose`). Not those whose pose others' depend on, nor those moving in ways
+      // a pose carried along wouldn't follow (stepping in, lying under a blanket, a prop of a thing in hand).
+      const every = this.everyFrame || !this.far[i] || this.directions[i] ? 1 : this.facePx[i] < LOD_FAR_PX / 2 ? FAR_EVERY[1] : FAR_EVERY[0];
+      if (every > 1 && rig.visible && !stalled && (this.frameNo + i) % every !== 0 && rig.lag < FAR_LAG && curr[o + k.pose] !== Pose.Lie && rig.walkT < 0 && rig.cuddleBaby < 0 && this.heldBy[i] < 0 && !this.onPadOf[i] && !this.handProp[i]) {
+        rig.lag += frameDt;
+        const moved = curr[o + k.moving] > 0 || riding;
+        const [dx, dy, dz] = moved ? [tx - rig.x, th * WALL_HEIGHT - rig.floorY, tz - rig.z] : [0, 0, 0];
+        if (frameDt > 0) rig.speed += (Math.min(Math.hypot(dx, dz) / frameDt, 20) - rig.speed) * (1 - Math.exp(-frameDt * 10));
+        if (dx || dy || dz) this.carryPose(rig, i, dx, dy, dz, shadows);
+        continue;
+      }
+      // (Posed in full: as far on as the frames since it last was.)
+      const dt = Math.min(FAR_LAG, frameDt + rig.lag);
+      rig.lag = 0;
       const dir = (rig.dir = this.directions[i] ?? null);
       rig.floorY = th * WALL_HEIGHT;
       const pose = curr[o + k.pose];
@@ -1779,8 +1809,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       }
       const worn = rig.outfits?.[wear];
       if (worn && worn !== rig.worn) this.wear(rig, i, worn);
-      // Hand pose: the clips clench fists; open them according to the activity.
-      blendInto(this.qA, this.pA, set.sourceRestQ, this.pA, rig.hands, this.fingerMask);
+      // Hand pose: the clips clench fists; open them according to the activity. (Not far off: the hands are a pixel or two.)
+      if (!this.far[i] || this.everyFrame || dir) blendInto(this.qA, this.pA, set.sourceRestQ, this.pA, rig.hands, this.fingerMask);
 
       // Procedural layers.
       resetAdditive(this.add);
@@ -2788,6 +2818,47 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       if (!rig?.visible || rig.tuckSeat < 0 || rig.tuck <= 0.001) continue;
       const was = this.pulled.get(rig.tuckSeat);
       this.pulled.set(rig.tuckSeat, was === undefined ? rig.tuck : Math.min(was, rig.tuck));
+    }
+  }
+
+  /**
+   * Sim row `i`, not posed in full this frame (far off, `FAR_EVERY`), moved by (dx, dy, dz) (m) as it is: its skinning
+   * matrices, its contact shadow, its head and the things in its hands carried along, the pose itself kept.
+   */
+  private carryPose(rig: SimRig, i: number, dx: number, dy: number, dz: number, shadows: Float32Array): void {
+    const d = this.data;
+    const row = this.row(i);
+    const NB = this.set!.bones.length;
+    // (The translation is each row's fourth number: `BONE_TEXELS`.)
+    for (let b = 0; b < NB; b++) {
+      const o = row + b * BONE_FLOATS;
+      d[o + 3] += dx;
+      d[o + 7] += dy;
+      d[o + 11] += dz;
+    }
+    rig.x += dx;
+    rig.z += dz;
+    rig.floorY += dy;
+    this.posedAt[i * 2] += dx;
+    this.posedAt[i * 2 + 1] += dz;
+    const m = i * 16;
+    if (shadows[m + 15]) {
+      shadows[m + 12] += dx;
+      shadows[m + 13] += dy;
+      shadows[m + 14] += dz;
+    }
+    for (const h of [this.heads, this.headJoints]) {
+      h[i * 3] += dx;
+      h[i * 3 + 1] += dy;
+      h[i * 3 + 2] += dz;
+    }
+    for (const slot of [this.heldProp, this.toolProp, this.leftProp, this.rightProp]) {
+      const key = slot[i];
+      const p = key ? this.props.built(key)?.matrices : null;
+      if (!p) continue;
+      p[m + 12] += dx;
+      p[m + 13] += dy;
+      p[m + 14] += dz;
     }
   }
 
