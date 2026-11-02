@@ -96,5 +96,8 @@ fn a_hood_hung_again_lights_too() {
             lit += 1;
         }
     }
-    assert!(lit > TICKS_PER_MINUTE * 10, "the light came on: {lit} ticks");
+    assert!(
+        lit > TICKS_PER_MINUTE * 10,
+        "the light came on: {lit} ticks"
+    );
 }
