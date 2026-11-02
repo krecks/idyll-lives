@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
-  import { settings } from '../../settings/settings.svelte';
+  import { settings, systemMotion } from '../../settings/settings.svelte';
   import { money } from '../format';
+  import { MoneyFloats, moneyChange } from '../moneyFloats.svelte';
   import { services } from '../services';
   import { game } from '../state.svelte';
 
@@ -13,8 +13,6 @@
   let x = $state(0);
   let y = $state(0);
   let onCanvas = $state(false);
-  let floats = $state<{ id: number; amount: number; x: number; y: number }[]>([]);
-  let nextId = 0;
 
   function move(e: PointerEvent) {
     // The HUD is zoomed by the UI scale; positions inside it are in its own pixels.
@@ -104,22 +102,15 @@
   });
 
   // Money moved by an edit floats up from the pointer (time stands still in Build mode, so the
-  // funds only change through buying, selling and building).
-  let lastFunds: number | null = null;
-  $effect(() => {
-    const funds = game.funds;
-    const buying = game.mode === 'build';
-    const prev = lastFunds;
-    lastFunds = funds;
-    if (!buying || prev === null || funds === prev) return;
-    const id = ++nextId;
-    const k = settings.uiScale || 1;
-    untrack(() => {
-      const at = onCanvas ? { x, y } : { x: window.innerWidth / k / 2, y: window.innerHeight / k / 2 };
-      floats = [...floats, { id, amount: funds - prev, ...at }];
-    });
-    setTimeout(() => (floats = floats.filter((f) => f.id !== id)), 1400);
-  });
+  // funds only change through buying, selling and building). With Reduce motion it stays put.
+  const floats = new MoneyFloats<{ x: number; y: number }>(1400);
+  const still = $derived(settings.reducedMotion || systemMotion.reduced);
+  $effect(() =>
+    floats.note(game.funds, game.mode === 'build', () => {
+      const k = settings.uiScale || 1;
+      return onCanvas ? { x, y } : { x: window.innerWidth / k / 2, y: window.innerHeight / k / 2 };
+    }),
+  );
 </script>
 
 <svelte:window onpointermove={move} />
@@ -133,8 +124,8 @@
     </div>
   {/key}
 {/if}
-{#each floats as f (f.id)}
-  <div class="float tabular" class:gain={f.amount > 0} style="left:{f.x}px;top:{f.y}px">{f.amount > 0 ? '+' : '−'}{money(Math.abs(f.amount))}</div>
+{#each floats.shown as f (f.id)}
+  <div class="float tabular" class:gain={f.amount > 0} class:still style="left:{f.x}px;top:{f.y}px">{moneyChange(f.amount)}</div>
 {/each}
 
 <style>
@@ -213,6 +204,9 @@
   }
   .float.gain {
     color: var(--good);
+  }
+  .float.still {
+    animation: none;
   }
   @keyframes rise {
     0% {
