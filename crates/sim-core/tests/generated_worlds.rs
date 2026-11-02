@@ -225,8 +225,9 @@ const CAR_HOURS: u64 = 4;
 /// The most of a size's cars that may have no way onto the road.
 const NO_WAY: f32 = 0.1;
 /// How far the middle of a car on the move may be off the paving (m): the roads, the driveways
-/// and their way across the verge (`meta.paths`), a parking spot.
-const OFF_PAVING: f32 = 1.0;
+/// and their way across the verge (`meta.paths`), a parking spot. (Its body is about a metre
+/// either side: turning at a dead end's cap, or out of a driveway at a bend, it may cut the edge.)
+const OFF_PAVING: f32 = 1.5;
 
 /// How far `at` is off the paving (m): from the nearest road's edge, a path (a driveway and its
 /// way across the verge) or the parking spot of the car's trip, whichever is nearest. 0 off the
@@ -319,6 +320,19 @@ fn generated_worlds_cars_keep_to_the_roads() {
                 ));
             }
             tally[2] += usize::from(car.no_way);
+            // A door with room to open, clear of the house, a garden fence or gate and things:
+            // the driver's own or another (`Car::door`).
+            let nav = NavGrid {
+                lot: &w.lot,
+                blocked: w.blocked(),
+                stairs: w.stair_map(),
+            };
+            if car.door(&nav, 0).is_none() {
+                failures.push(format!(
+                    "{label}: the car at {} has no door with room to open",
+                    at(car.spot)
+                ));
+            }
             if !w.plots[car.plot as usize]
                 .contains(car.spot[0].floor() as i32, car.spot[1].floor() as i32)
             {
