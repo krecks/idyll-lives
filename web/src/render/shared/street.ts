@@ -46,7 +46,7 @@ import { groundDepth, objectCentre, storeyOfRow, storeyRow, type FenceEdge, type
 import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
 import { CARS, CAR_PAINT, garageAt, garageFor, hash, paintCar, parkCar, pick, type CarBody } from './cars';
-import { chunkAt, chunkCoords, chunkId, hashNumbers, hashString, RectGrid } from './chunks';
+import { chunkAt, chunkCoords, chunkId, distanceToRect, hashNumbers, hashString, RectGrid } from './chunks';
 import type { HousePlanner, SilhouettePlan, SilhouetteSpec } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
@@ -789,9 +789,7 @@ export class TownStreet {
     let bestD = reach;
     for (const { L } of this.plotGrid.near({ x, z, w: 0, d: 0 }, reach)) {
       const r = L.info;
-      const dx = Math.max(r.x - x, 0, x - (r.x + r.w));
-      const dz = Math.max(r.z - z, 0, z - (r.z + r.d));
-      const d = Math.hypot(dx, dz);
+      const d = distanceToRect(x, z, r.x, r.z, r.w, r.d);
       if (d <= bestD) [best, bestD] = [r, d];
     }
     return best;

@@ -19,6 +19,7 @@
 
 import type { Content } from '../content/content';
 import type { Rle, TownArea, WorldZone } from '../core/protocol';
+import { distanceToRect } from '../render/shared/chunks';
 import { random } from './housegen';
 import { fbm } from './noise';
 import { centroid, cropRoads, curve, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, sharpestTurn, straightAround, tangent, type Box, type Pt, type RoadPlan } from './roads';
@@ -436,7 +437,7 @@ function evenly(pts: readonly Pt[], most: number): Pt[] {
 }
 
 /** How far `p` is from rectangle `r` (0 inside it). */
-const offRect = (r: Rect, [x, z]: Pt) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
+const offRect = (r: Rect, [x, z]: Pt) => distanceToRect(x, z, r.x, r.z, r.w, r.d);
 
 /** Whether `p` is clear of every area's box by more than `by` m. */
 const clearOf = (plans: readonly { rect: Rect }[], p: Pt, by: number) => plans.every((a) => p[0] < a.rect.x - by || p[1] < a.rect.z - by || p[0] > a.rect.x + a.rect.w + by || p[1] > a.rect.z + a.rect.d + by);

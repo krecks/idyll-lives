@@ -77,7 +77,7 @@ import { coveringSurface, houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, t
 import { compose, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
 import { OrbitControls } from '../shared/orbit';
 import { Flight, panBounds, Roam, warmLots, type FocusPlot } from '../shared/focus';
-import { CHUNK, chunkCoords, RectGrid } from '../shared/chunks';
+import { CHUNK, chunkCoords, distanceToRect, RectGrid } from '../shared/chunks';
 import { ModelRefresh } from '../shared/modelRefresh';
 import { OverviewCamera } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
@@ -250,7 +250,7 @@ function plotNear(world: WorldStructure, x: number, z: number, reach: number): F
   let best: FocusPlot | null = null;
   let bestD = reach;
   world.plots.forEach((p, i) => {
-    const d = Math.hypot(Math.max(p.x - x, 0, x - (p.x + p.w)), Math.max(p.z - z, 0, z - (p.z + p.d)));
+    const d = distanceToRect(x, z, p.x, p.z, p.w, p.d);
     if (d < bestD || (d === 0 && !best)) [best, bestD] = [{ id: i, x: p.x, z: p.z, w: p.w, d: p.d }, d];
   });
   return best;
@@ -284,7 +284,7 @@ class PlotFinder {
     let best = -1;
     let bestD = reach;
     for (const c of this.grid.near({ x, z, w: 0, d: 0 }, reach)) {
-      const d = Math.hypot(Math.max(c.x - x, 0, x - (c.x + c.w)), Math.max(c.z - z, 0, z - (c.z + c.d)));
+      const d = distanceToRect(x, z, c.x, c.z, c.w, c.d);
       if (d < bestD || (d === bestD && c.i < best) || (d === 0 && best < 0)) [best, bestD] = [c.i, d];
     }
     const p = best >= 0 ? world.plots[best] : null;

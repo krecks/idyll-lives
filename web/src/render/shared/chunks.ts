@@ -30,6 +30,11 @@ export const groupOf = (id: number): number => {
   return chunkId(Math.floor(cx / k), Math.floor(cz / k));
 };
 
+/** How far (m) a ground point (`x`, `z`) is from the rectangle from (`x0`, `z0`), `w` by `d` m (0 on it). */
+export function distanceToRect(x: number, z: number, x0: number, z0: number, w: number, d: number): number {
+  return Math.hypot(Math.max(x0 - x, 0, x - (x0 + w)), Math.max(z0 - z, 0, z - (z0 + d)));
+}
+
 /** A chunk's rectangle (m). */
 export function chunkRect(id: number): { x: number; z: number; w: number; d: number } {
   const [cx, cz] = chunkCoords(id);

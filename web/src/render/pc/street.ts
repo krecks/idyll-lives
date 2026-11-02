@@ -38,7 +38,7 @@ import type { RGB } from '../shared/environment';
 import type { Geo, MeshData } from '../shared/geometry';
 import type { HousePart } from '../shared/house';
 import type { StandIn } from '../shared/modelEntry';
-import { chunkAt, chunkCoords, groupOf, SUPERCHUNK } from '../shared/chunks';
+import { chunkAt, chunkCoords, distanceToRect, groupOf, SUPERCHUNK } from '../shared/chunks';
 import { groupInstances } from '../shared/nature';
 import { castsShadow, FOLIAGE, instanceMatrix, NO_FOCUS, TownStreet, type ChunkPlan, type Inst, type ObjectLook } from '../shared/street';
 import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
@@ -570,9 +570,7 @@ export class Street {
     for (const [k, p] of this.placed) {
       if (!p.far || !this.used.has(k)) continue;
       for (const c of p.cells.values()) {
-        const dx = Math.max(c.x - x, 0, x - (c.x + SUPERCHUNK));
-        const dz = Math.max(c.z - z, 0, z - (c.z + SUPERCHUNK));
-        const far = Math.hypot(dx, dz) > FAR_MODELS;
+        const far = distanceToRect(x, z, c.x, c.z, SUPERCHUNK, SUPERCHUNK) > FAR_MODELS;
         if (far === c.farNow) continue;
         c.farNow = far;
         showCell(c);
