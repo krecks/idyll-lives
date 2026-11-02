@@ -196,6 +196,29 @@ export async function startSession(
   progress: ProgressReport = () => {},
   warm = true,
 ): Promise<GameSession> {
+  // No voices or language model start or speak while the game loads (and, once revealed, while its town streams in).
+  const loading = holdInference('loading a game');
+  try {
+    return await openSession(loading, renderer, canvas, overlay, request, settings, progress, warm);
+  } catch (err) {
+    // A start that failed (a save gone or refused, a town or a simulation that didn't start) lets
+    // go at once, not when the hold runs out two minutes later (the voices quiet until then).
+    loading();
+    throw err;
+  }
+}
+
+/** `startSession`, holding inference with `loading` until the game is ready. */
+async function openSession(
+  loading: () => void,
+  renderer: Renderer,
+  canvas: HTMLCanvasElement,
+  overlay: HTMLElement,
+  request: StartRequest,
+  settings: Settings,
+  progress: ProgressReport,
+  warm: boolean,
+): Promise<GameSession> {
   const params = new URLSearchParams(location.search);
   // Every loading step names the work in the perf report (a long task or a dropped frame then says which).
   const report = progress;
@@ -204,8 +227,7 @@ export async function startSession(
     report(label, value);
   };
   const started = perfStart('session: start→ready');
-  // No voices or language model start or speak while the game loads (and, once revealed, while its town streams in).
-  let releaseInference = holdInference('loading a game');
+  let releaseInference = loading;
   progress(request.kind === 'load' ? 'Reading your save' : 'Laying out the neighbourhood', 0.05);
   const { content, assets } = await perfTimeAsync('session: loadGameData', loadGameData);
 
@@ -255,7 +277,6 @@ export async function startSession(
     return bridge.frame(performance.now());
   };
   progress('Building the world', 0.3);
-  let resumeSpeed: number | null = null;
   let revealed = false;
   let warmed = false;
   /** The world has been built once: later ones are patches or rare rebuilds, and need no warm-up. */
@@ -429,12 +450,13 @@ export async function startSession(
   };
   /**
    * The player's speed, held at 0 while the game loads, in Build and Create, and while a menu is
-   * open (`setMenuPause`): given back when nothing holds it any more.
+   * open (`setMenuPause`): given back when nothing holds it any more. Play starts at the speed the
+   * game was saved at.
    */
   const speed = new GameSpeed((running) => {
     bridge.send({ type: 'setSpeed', speed: running });
     game.speed = running;
-  });
+  }, bridge.savedSpeed);
   /**
    * The catalog's pictures are drawn ahead of time in Build and Create, not in Live's frames
    * (`holdAhead`). A house nobody lives in opens on the catalog: they're drawn behind its loading screen.
@@ -1004,8 +1026,6 @@ export async function startSession(
     // the objects of everything that didn't.
     const changed = mirror.apply(ui);
     if (!changed) return;
-    // The first update carries the speed the game was saved at.
-    resumeSpeed ??= ui.speed > 0 ? ui.speed : 1;
     game.day = ui.day;
     game.minute = ui.minute;
     game.speed = ui.speed;
@@ -1787,7 +1807,7 @@ export async function startSession(
       // The camera starts watching once it has flown in (unless watching on its own is off).
       if (liveSettings.directorDelay > 0) watchAt = lastInput + START_WATCH_MS;
       // (A benchmark runs at its own speed.)
-      speed.choose(BENCH?.speed ?? resumeSpeed ?? 1);
+      if (BENCH) speed.choose(BENCH.speed);
       // Nobody lives here yet, or there's no house (an empty lot): the game starts with
       // building (time stands still until Live).
       const home = homePlot();
@@ -1805,15 +1825,22 @@ export async function startSession(
       releaseInference();
       releaseInference = holdInference('streaming the town');
       void (async () => {
-        await homeAssets;
-        if (disposed) return;
-        renderer.holdModelRefresh(true);
-        prefetch(restUrls);
-        readAhead();
-        // The catalog's pictures are built only once the stream is quiet, in idle moments.
-        await whenStreamSettled();
-        renderer.holdModelRefresh(false);
-        releaseInference();
+        // (Let go of however this ends: a house whose files failed holds the voices no longer.)
+        try {
+          await homeAssets;
+          if (disposed) return;
+          renderer.holdModelRefresh(true);
+          try {
+            prefetch(restUrls);
+            readAhead();
+            // The catalog's pictures are built only once the stream is quiet, in idle moments.
+            await whenStreamSettled();
+          } finally {
+            renderer.holdModelRefresh(false);
+          }
+        } finally {
+          releaseInference();
+        }
         if (disposed || BENCH) return;
         prefetchTimer = setTimeout(() => {
           // (Not while benchmarking: drawing the pictures would show in the measurements.)

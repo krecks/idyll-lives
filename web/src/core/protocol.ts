@@ -985,7 +985,11 @@ export interface SimThreadStats {
 export type FromWorker =
   /** A start is under way and making progress (before `ready`; repeated while the simulation downloads). */
   | { type: 'starting' }
-  | { type: 'ready'; layout: SnapshotLayout; shared: SharedArrayBuffer | null; catalog: Catalog }
+  /**
+   * `speed`: the game's own speed as it opened (a save's: the one it was saved at), before the
+   * `init` speed held it: what play resumes at.
+   */
+  | { type: 'ready'; layout: SnapshotLayout; shared: SharedArrayBuffer | null; catalog: Catalog; speed: number }
   /**
    * What changed of the world structure (`WorldUpdate`), with the lot's rooms when the lot changed
    * and its meshes when the lot or the view did. `view`: the `seq` of the view it was built for.
@@ -1011,6 +1015,18 @@ export type FromWorker =
   | { type: 'error'; message: string; fatal: boolean; problem?: SaveProblem }
   /** A save `check`ed: `problem` null if it opens. */
   | { type: 'checked'; problem: SaveProblem | null; message: string };
+
+/**
+ * The newest thing (highest object id) a resident in `snapshot` uses or walks to, -1 if none. Ids
+ * are never reused (sim-core `next_object_id`), so one above the highest the main thread was sent
+ * is a thing it hasn't heard of yet (`sim.worker.ts` then sends the world at once).
+ */
+export function newestObjectUsed(snapshot: ArrayLike<number>, layout: SnapshotLayout): number {
+  let newest = -1;
+  const count = snapshot[layout.header.simCount] | 0;
+  for (let i = 0; i < count; i++) newest = Math.max(newest, snapshot[layout.headerLen + i * layout.simStride + layout.sim.object] | 0);
+  return newest;
+}
 
 /** Rows of the town itself (the ground storey; see `WorldStructure.storeyDepth`). */
 export function groundDepth(world: { depth: number; storeyDepth?: number }): number {
