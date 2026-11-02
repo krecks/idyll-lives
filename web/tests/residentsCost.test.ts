@@ -12,6 +12,8 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { readFileSync, existsSync } from 'node:fs';
 
 const WEB = new URL('../', import.meta.url).pathname;
+/** A shadow test as `SunShadows.reaches` gives it: a square round (x, z), with a long shadow's 8 m round it. */
+const square = (x: number, z: number, half: number) => (px: number, pz: number) => Math.abs(px - x) <= half + 8 && Math.abs(pz - z) <= half + 8;
 
 describe('residents not drawn', async () => {
   const realLocation = globalThis.location;
@@ -206,10 +208,10 @@ describe('residents not drawn', async () => {
       // Without a square (it covers everything), and with one round them: as they breathe and blink.
       run(10);
       expect(run(30).shadowPosed).toBeGreaterThan(20);
-      characters.setShadowSquare({ x: 3, z: 0, half: 30 });
+      characters.setShadowTest(square(3, 0, 30));
       expect(run(30).shadowPosed).toBeGreaterThan(20);
       // The square 100 m off: they still pose (a mirror would show them), the map isn't drawn again for them.
-      characters.setShadowSquare({ x: 100, z: 0, half: 30 });
+      characters.setShadowTest(square(100, 0, 30));
       const off = run(30);
       expect(off.posed).toBeGreaterThan(20);
       expect(off.shadowPosed).toBe(0);

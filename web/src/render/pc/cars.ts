@@ -38,8 +38,6 @@ const CAR_SEAT: Seat = { h: 0.3, fwd: 0 };
 
 /** Cars further than this from the camera's target aren't drawn (m): past the fog, a dot at most. */
 const FAR = 650;
-/** How far outside the sun's shadow square a car's moving still draws the shadows again (m): its own length and its shadow's reach. */
-const SHADOW_REACH = 6;
 /** How far the front wheels steer at most (rad), and how quickly they follow the way the car turns (per second). */
 const STEER_MAX = 0.5;
 const STEER_RATE = 8;
@@ -120,8 +118,8 @@ export class Cars {
   /** The chunks streamed in (null: all of them) and the camera's target: cars outside them, or further than `FAR` from it, aren't drawn (`setView`). */
   private chunks: ReadonlySet<number> | null = null;
   private eye: { x: number; z: number } | null = null;
-  /** The sun's shadow square (x0, z0, x1, z1, `SHADOW_REACH` round it; null: everywhere): only a car moving in it draws the map again. */
-  private shadowRect: readonly [number, number, number, number] | null = null;
+  /** Whether a car at (x, z) could cast into the sun's map (`SunShadows.reaches`; null: anywhere): only one moving there draws it again. */
+  private inMap: ((x: number, z: number) => boolean) | null = null;
   /** The frame the cars were last placed for (`pose`: the residents riding in them ask first). */
   private posedAt = NaN;
   private posedCurr: Float32Array | null = null;
@@ -242,13 +240,9 @@ export class Cars {
     this.apply();
   }
 
-  /**
-   * The sun's shadow square (its middle, game space, and half side, m; null: the map covers
-   * everything): a car moving outside it (and `SHADOW_REACH` round it) doesn't draw the map again.
-   */
-  setShadowSquare(square: { x: number; z: number; half: number } | null): void {
-    const r = square ? square.half + SHADOW_REACH : 0;
-    this.shadowRect = square ? [square.x - r, square.z - r, square.x + r, square.z + r] : null;
+  /** Whether a spot can cast into the sun's map (`SunShadows.reaches`; null: anywhere): a car moving elsewhere doesn't draw it again. */
+  setShadowTest(inMap: ((x: number, z: number) => boolean) | null): void {
+    this.inMap = inMap;
   }
 
   /** The seat of a car at (x, z) where it's drawn (someone sat in it, parked or driving), else null: for `Residents.setCarSeat`. */
@@ -374,10 +368,9 @@ export class Cars {
     return car.pitch !== pitch;
   }
 
-  /** Whether a car at (x, z) is in the sun's shadow square (and `SHADOW_REACH` round it). */
+  /** Whether a car at (x, z) can cast into the sun's map (`setShadowTest`). */
   private inShadows(x: number, z: number): boolean {
-    const r = this.shadowRect;
-    return !r || (x >= r[0] && x <= r[2] && z >= r[1] && z <= r[3]);
+    return !this.inMap || this.inMap(x, z);
   }
 
   /** Whether a car is drawn: in town, near, and not standing where cars are hidden (`hideOn`). */

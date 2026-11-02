@@ -267,6 +267,12 @@ export class SunShadows {
     return this.overview || (r.x1 >= g.x0 - reach && r.x0 <= g.x1 + reach && r.z1 >= g.z0 - reach && r.z0 <= g.z1 + reach);
   }
 
+  /** `touches` for one caster at (x, z), with no rectangle made: what the cars and residents ask of each that moved. */
+  reaches(x: number, z: number, reach = CASTER_REACH): boolean {
+    const g = this.ground;
+    return this.overview || (x >= g.x0 - reach && x <= g.x1 + reach && z >= g.z0 - reach && z <= g.z1 + reach);
+  }
+
   /**
    * Casters moved (`moved(urgent)`): `true` anywhere, `false`/null nothing, or the rectangle round
    * those that moved (game space), drawn again only when it `touches` the square: a car or a

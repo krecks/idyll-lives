@@ -97,9 +97,6 @@ export type CarRide = (frame: FrameState, x: number, z: number, yaw: number, abo
  * action runs fast: scaled by `animRate` like the lower fade). */
 const UPPER_FADE_RATE = 4;
 
-/** How far outside the sun's shadow square a resident posed still draws its map again (m): a long evening shadow's reach into it. */
-const SHADOW_REACH = 8;
-
 /**
  * Residents far off (in low detail: `faceDetail`'s `far`) are posed in full every this many frames, not every frame
  * (staggered by row, so as many each frame): every second frame, every fourth with their faces at half the low-detail
@@ -144,12 +141,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** The last `update` changed how a drawn Sim looks (moved, breathed, blinked …): a mirror showing them draws again. */
   posed = false;
   /**
-   * The last `update` changed how a Sim looks inside the sun's shadow square (`setShadowSquare`; anywhere, without
+   * The last `update` changed how a Sim looks where it casts into the sun's map (`setShadowTest`; anywhere, without
    * one), or one there came or went: their shadows are drawn again. (One posed outside it casts nothing into the map.)
    */
   shadowPosed = false;
-  /** The sun's shadow square (x0, z0, x1, z1), `SHADOW_REACH` round it; null: the map covers everything. */
-  private shadowRect: readonly [number, number, number, number] | null = null;
+  /** Whether a Sim at (x, z) casts into the sun's map (the renderer's `SunShadows.reaches`); null: the map covers everything. */
+  private inMap: ((x: number, z: number) => boolean) | null = null;
   /** Per Sim row: where it was last posed (x, z on the ground), for `shadowPosed`. */
   private readonly posedAt = new Float32Array(MAX_CHARACTERS * 2);
   private width = 0;
@@ -2863,13 +2860,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   }
 
   /**
-   * The sun's shadow square (its middle, game space, and half side, m; null: the map covers everything): only
-   * residents posed in it (and `SHADOW_REACH` round it, their shadows falling into it) draw its map again
-   * (`shadowPosed`).
+   * Whether a spot casts into the sun's map (the renderer's `SunShadows.reaches`, its square and a long shadow's
+   * reach round it; null: everywhere): only residents posed there draw the map again (`shadowPosed`).
    */
-  setShadowSquare(square: { x: number; z: number; half: number } | null): void {
-    const r = square ? square.half + SHADOW_REACH : 0;
-    this.shadowRect = square ? [square.x - r, square.z - r, square.x + r, square.z + r] : null;
+  setShadowTest(inMap: ((x: number, z: number) => boolean) | null): void {
+    this.inMap = inMap;
   }
 
   /** The seat of the car at a spot, for those sitting there with no object under them (getting in or out of it: `pc/cars.ts`). */
@@ -3905,7 +3900,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     let lo = -1;
     let hi = -1;
     let shadowed = false;
-    const r = this.shadowRect;
+    const inMap = this.inMap;
     for (let i = 0; i < MAX_CHARACTERS; i++) {
       if (!this.visible[i] && !this.uploadedVisible[i]) continue;
       this.uploadedVisible[i] = this.visible[i];
@@ -3917,8 +3912,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       if (lo < 0) lo = i;
       hi = i;
       if (shadowed) continue;
-      const [x, z] = [this.posedAt[i * 2], this.posedAt[i * 2 + 1]];
-      shadowed = !r || (x >= r[0] && x <= r[2] && z >= r[1] && z <= r[3]);
+      shadowed = !inMap || inMap(this.posedAt[i * 2], this.posedAt[i * 2 + 1]);
     }
     this.posed = lo >= 0;
     this.shadowPosed = shadowed;

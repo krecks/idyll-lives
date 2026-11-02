@@ -58,10 +58,20 @@ describe("the sun's shadow square", () => {
     expect(drawn()).toBe(true);
   });
 
+  test('says whether one caster reaches it (the cars and residents ask for each that moved)', () => {
+    const { shadows } = sun();
+    shadows.setSquare(100, 200, 40);
+    expect(shadows.reaches(130, 230)).toBe(true);
+    expect(shadows.reaches(140 + CASTER_REACH - 1, 200)).toBe(true);
+    expect(shadows.reaches(140 + CASTER_REACH + 1, 200)).toBe(false);
+    expect(shadows.reaches(500, 500)).toBe(false);
+  });
+
   test("in the menus' town everything counts (the map follows the view)", () => {
     const { shadows } = sun();
     shadows.setOverview(true);
     expect(shadows.rect).toBeNull();
     expect(shadows.touches({ x0: 9000, z0: 9000, x1: 9001, z1: 9001 })).toBe(true);
+    expect(shadows.reaches(9000, 9000)).toBe(true);
   });
 });

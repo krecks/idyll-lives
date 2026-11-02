@@ -736,6 +736,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.roam.streamScale = this.quality.openWorld.stream;
     this.cars = new Cars(this.app, this.root, this.quality.streetShadows);
     this.characters.setCarSeat((x, z) => this.cars.seatAt(x, z));
+    // Only cars and residents moving where they cast into the sun's map draw it again.
+    const inMap = (x: number, z: number) => this.sunShadows.reaches(x, z);
+    this.cars.setShadowTest(inMap);
+    this.characters.setShadowTest(inMap);
     this.characters.setCarRide((frame, x, z, yaw, aboard, out) => this.cars.ride(frame, x, z, yaw, aboard, out));
     this.decorTemplates = new TemplateCache(this.app);
     this.storeyLayer = new pc.Entity('storeyLayer');
@@ -2124,8 +2128,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.placing.frame(this.frameDt); // (the effects, the thing in hand.)
     this.updateSims(frame);
     this.cars.update(frame);
-    // (A car's shadow goes with it: `moved` true, or the rectangle round the cars that moved, which draws the map
-    // again only if it reaches the shadow square: `SunShadows.movedIn`, `rect`.)
+    // (A car's shadow goes with it: `moved` only for a car that moved where it casts into the map, `setShadowTest`.)
     this.sunShadows.movedIn(this.cars.moved);
     this.birdLife.update(frame, minute, this.frameDt, this.characters, this.simCount); // (after the residents, who scare them.)
     if (this.roofs.length && this.roofVisible() !== this.roofShown) {
@@ -2158,8 +2161,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     this.lot.pullChairs(this.characters.pulled, this.placing.held); // (not the one in hand.)
     this.lot.takeRestProps(this.characters.restTaken);
-    // (`posed`: true, or the rectangle round those posed, as the cars' `moved`.)
-    if (this.quality.characterShadows) this.sunShadows.movedIn(this.characters.posed);
+    // (Only residents posed where they cast into the map: `shadowPosed`, as the cars' `moved`.)
+    if (this.quality.characterShadows) this.sunShadows.movedIn(this.characters.shadowPosed);
     const blobs = this.simShadow;
     blobs.setCount(count);
     for (let i = 0; i < count; i++) blobs.setMatrix(i, shadows, i * 16);
