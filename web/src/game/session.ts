@@ -1799,8 +1799,11 @@ export async function startSession(
       lastInput = performance.now();
       // The camera starts watching once it has flown in (unless watching on its own is off).
       if (liveSettings.directorDelay > 0) watchAt = lastInput + START_WATCH_MS;
-      // (A benchmark runs at its own speed.)
-      bridge.send({ type: 'setSpeed', speed: BENCH?.speed ?? resumeSpeed ?? 1 });
+      // (A benchmark runs at its own speed.) Time held already (the window left while loading, with
+      // pausing on blur): the hold gives this speed back when it ends, not the loading's 0.
+      const startSpeed = BENCH?.speed ?? resumeSpeed ?? 1;
+      if (heldSpeed !== null) heldSpeed = startSpeed;
+      else bridge.send({ type: 'setSpeed', speed: startSpeed });
       // Nobody lives here yet, or there's no house (an empty lot): the game starts with
       // building (time stands still until Live).
       const home = homePlot();

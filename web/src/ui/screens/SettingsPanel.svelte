@@ -319,7 +319,7 @@
         </SettingRow>
         <SettingRow
           title="Resolution"
-          hint={settings.resolution === 'auto' ? 'Full detail up to 1920×1080; bigger screens are scaled up.' : 'Lower is softer, but much faster.'}
+          hint={settings.resolution === 'auto' ? (settings.graphics === 'low' ? 'Low draws three quarters of 1920×1080; bigger screens are scaled up.' : 'Full detail up to 1920×1080; bigger screens are scaled up.') : 'Lower is softer, but much faster.'}
           details="Auto keeps 4K and Retina screens about as fast as a 1080p one. Custom draws that share of the screen's own resolution."
         >
           <Segmented
