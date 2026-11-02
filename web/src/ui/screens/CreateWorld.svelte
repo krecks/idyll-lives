@@ -14,13 +14,12 @@
   let templates = $state.raw<Templates | null>(null);
   let world = $state.raw<NeighbourhoodDraft | null>(app.world);
   let kind = $state<WorldKind>(app.world?.world?.kind ?? 'medium');
-  /** How big a world (docs/design/open-world.md); Big only with the dev flag `?big=1` until the simulation takes it. */
+  /** How big a world (docs/design/open-world.md). */
   let size = $state<WorldSize>(app.world?.world?.size ?? 'cosy');
-  const bigAllowed = typeof location !== 'undefined' && new URLSearchParams(location.search).get('big') === '1';
   const sizeOptions = [
     { value: 'cosy' as const, label: 'Cosy' },
     { value: 'normal' as const, label: 'Normal' },
-    ...(bigAllowed || app.world?.world?.size === 'big' ? [{ value: 'big' as const, label: 'Big' }] : []),
+    { value: 'big' as const, label: 'Big' },
   ];
   let name = $state(app.world?.name ?? '');
   /** The name was typed or rolled here (kept when the world is made again). */

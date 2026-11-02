@@ -98,4 +98,4 @@ is home. Full interiors are drawn for the focus lot (the one under the camera) p
 - New sim tests are separate files under `crates/sim-core/tests/`, written to move into
   `tests/sim/` unchanged once PR #43 lands.
 - Before merging, run every `ci.yml` step locally.
-- Big stays behind the dev flag `?big=1` (UI) until all four branches are in.
+- Big was behind the dev flag `?big=1` (UI) until all four branches were in; it is now offered on Create World.
