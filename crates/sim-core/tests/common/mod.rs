@@ -843,7 +843,7 @@ fn describe(w: &World, st: State) -> String {
         Doing(k, a, b) => {
             let kinds = [
                 "Use", "MoveTo", "Social", "Join", "Work", "Visit", "GoHome", "Answer", "Clean",
-                "Repair", "Spot", "Cook", "Eat", "Dishes", "Phone",
+                "Repair", "Spot", "Cook", "Eat", "Dishes", "Phone", "Carry",
             ];
             format!("{} {a} {b}", kinds[k as usize])
         }

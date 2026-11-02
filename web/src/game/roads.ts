@@ -78,6 +78,36 @@ export function pointAt(pts: readonly Pt[], s: number, ls = lengths(pts)): { p: 
   return { p: [lerp(a[0], b[0], f), lerp(a[1], b[1], f)], t: tangent(pts, f < 0.5 ? i : i + 1), i };
 }
 
+/**
+ * The sharpest a polyline turns over two spans of `span` m: at each arc length `s` (a metre
+ * apart), the angle (radians) between its chords from `s - span` to `s` and from `s` to
+ * `s + span`. The worst, and where (`s`); 0 for a line shorter than two spans.
+ */
+export function sharpestTurn(pts: readonly Pt[], span = 20): { angle: number; s: number } {
+  const ls = lengths(pts);
+  const L = ls[ls.length - 1];
+  let i = 0;
+  // (Walking along: each `s` asked for is further than the last.)
+  const at = (s: number, from: number): [Pt, number] => {
+    let k = from;
+    while (k < ls.length - 2 && ls[k + 1] < s) k++;
+    const f = Math.max(0, Math.min(1, (s - ls[k]) / (ls[k + 1] - ls[k] || 1)));
+    const [a, b] = [pts[k], pts[k + 1] ?? pts[k]];
+    return [[lerp(a[0], b[0], f), lerp(a[1], b[1], f)], k];
+  };
+  let [j, k] = [0, 0];
+  let best = { angle: 0, s: 0 };
+  for (let s = span; s <= L - span; s++) {
+    const [p0, i0] = at(s - span, i);
+    const [p1, i1] = at(s, j);
+    const [p2, i2] = at(s + span, k);
+    [i, j, k] = [i0, i1, i2];
+    const turn = Math.abs(Math.atan2((p1[0] - p0[0]) * (p2[1] - p1[1]) - (p1[1] - p0[1]) * (p2[0] - p1[0]), (p1[0] - p0[0]) * (p2[0] - p1[0]) + (p1[1] - p0[1]) * (p2[1] - p1[1])));
+    if (turn > best.angle) best = { angle: turn, s };
+  }
+  return best;
+}
+
 /** The nearest point of a polyline: its distance, arc length and which side (+1: the left). */
 export function nearest(pts: readonly Pt[], x: number, z: number, ls = lengths(pts)): { dist: number; s: number; side: 1 | -1 } {
   let best = { dist: Infinity, s: 0, side: 1 as 1 | -1 };
