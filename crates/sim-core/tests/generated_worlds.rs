@@ -219,20 +219,26 @@ fn generated_worlds_are_livable() {
 /// Cosy and normal worlds of the file whose cars are driven (each for a day), the first of each
 /// size; every big one is (for two days).
 const CAR_WORLDS: usize = 99;
-/// Hours a resident may be on their way to a car, or sat in one standing parked, at most (the
-/// walk to it, and a trip's driver waits up to two hours for the others: `cars::TRIP_WAIT_TICKS`).
+/// Hours a resident may be sat in a car standing parked, or bound for one but not on their way, at
+/// most (a trip's driver waits up to two hours for the others: `cars::TRIP_WAIT_TICKS`).
 const CAR_HOURS: u64 = 4;
 /// The most of a size's cars that may have no way onto the road.
 const NO_WAY: f32 = 0.1;
 /// How far the middle of a car on the move may be off the paving (m): the roads, the driveways
-/// and their way across the verge (`meta.paths`), a parking spot. (Its body is about a metre
-/// either side: turning at a dead end's cap, or out of a driveway at a bend, it may cut the edge.)
+/// and their way across the verge (`meta.paths`), a dead end's turning circle, a parking spot.
+/// (Its body is about a metre either side: out of a driveway at a bend it may cut the edge.)
 const OFF_PAVING: f32 = 1.5;
 
 /// How far `at` is off the paving (m): from the nearest road's edge, a path (a driveway and its
 /// way across the verge) or the parking spot of the car's trip, whichever is nearest. 0 off the
 /// map (past a way out of town).
-fn off_paving(w: &World, car: &sim_core::cars::Car, at: [f32; 2], paths: &[[f32; 4]]) -> f32 {
+fn off_paving(
+    w: &World,
+    car: &sim_core::cars::Car,
+    at: [f32; 2],
+    paths: &[[f32; 4]],
+    caps: &[([f32; 2], f32)],
+) -> f32 {
     if at[0] < 0.0 || at[1] < 0.0 || at[0] >= w.lot.width as f32 || at[1] >= w.storey_depth() as f32
     {
         return 0.0;
@@ -255,7 +261,64 @@ fn off_paving(w: &World, car: &sim_core::cars::Car, at: [f32; 2], paths: &[[f32;
     let park = car.trip.map_or(f32::INFINITY, |t| {
         ((t.at[0] - at[0]).hypot(t.at[1] - at[1]) - car.len / 2.0).max(0.0)
     });
-    road.min(path).min(park)
+    let cap = caps
+        .iter()
+        .map(|&(c, r)| ((c[0] - at[0]).hypot(c[1] - at[1]) - r).max(0.0))
+        .fold(f32::INFINITY, f32::min);
+    road.min(path).min(park).min(cap)
+}
+
+/// Whether a fence or gate stands where `car`'s doors would swing out (within 1.7 m of its sides,
+/// along its length).
+fn fenced_in(w: &World, car: &sim_core::cars::Car) -> bool {
+    let (s, c) = car.yaw.sin_cos();
+    (-4..=4).any(|a| {
+        [-1.0f32, 1.0].into_iter().any(|k| {
+            (1..=7).any(|o| {
+                let along = a as f32 * car.len / 8.0;
+                let left = k * (car.wid / 2.0 + o as f32 * 0.25);
+                let p = [
+                    car.spot[0] + s * along + c * left,
+                    car.spot[1] + c * along - s * left,
+                ];
+                let (x, z) = (p[0].floor() as i32, p[1].floor() as i32);
+                // (The edges round the tile: `h_edge(x, z)` is its north side, `v_edge(x, z)` its west.)
+                let fence = |e: sim_core::lot::Edge| e.is_fence();
+                w.lot.in_bounds(x, z)
+                    && w.lot.in_bounds(x + 1, z + 1)
+                    && (fence(w.lot.h_edge(x as usize, z as usize))
+                        || fence(w.lot.h_edge(x as usize, z as usize + 1))
+                        || fence(w.lot.v_edge(x as usize, z as usize))
+                        || fence(w.lot.v_edge(x as usize + 1, z as usize)))
+            })
+        })
+    })
+}
+
+/// A town's dead ends' turning circles (as `render/shared/roads.ts` paves them, to the sidewalk's
+/// outer edge: half the road's width and `TURNING` more): their middles and radii.
+fn turning_circles(town: &serde_json::Value) -> Vec<([f32; 2], f32)> {
+    const TURNING: f32 = 2.4;
+    let pt = |p: &serde_json::Value| {
+        [
+            p[0].as_f64().unwrap_or(0.0) as f32,
+            p[1].as_f64().unwrap_or(0.0) as f32,
+        ]
+    };
+    let mut out = Vec::new();
+    for r in town["roads"].as_array().into_iter().flatten() {
+        let (Some(points), Some(width)) = (r["points"].as_array(), r["width"].as_f64()) else {
+            continue;
+        };
+        for (k, end) in [points.first(), points.last()].into_iter().enumerate() {
+            if let Some(end) = end
+                && r["ends"][k].as_str() == Some("dead")
+            {
+                out.push((pt(end), width as f32 / 2.0 + TURNING));
+            }
+        }
+    }
+    out
 }
 
 /// The households' cars of generated worlds (`town.ts` writes them where the street drew them,
@@ -296,7 +359,9 @@ fn generated_worlds_cars_keep_to_the_roads() {
             "{size} {} {} ({})",
             world["kind"], world["seed"], world["name"]
         );
-        let mut w = match World::from_json(&content, &world["town"].to_string(), i as u32 + 1) {
+        // (Seeded by the world's own seed: one picked out of the file runs the same alone.)
+        let seed = world["seed"].as_u64().unwrap_or(i as u64) as u32;
+        let mut w = match World::from_json(&content, &world["town"].to_string(), seed + 1) {
             Ok(w) => w,
             Err(e) => {
                 failures.push(format!("{label}: {e}"));
@@ -319,20 +384,23 @@ fn generated_worlds_cars_keep_to_the_roads() {
                     at(car.spot)
                 ));
             }
-            tally[2] += usize::from(car.no_way);
             // A door with room to open, clear of the house, a garden fence or gate and things:
-            // the driver's own or another (`Car::door`).
+            // the driver's own or another (`Car::door`). A town's fences keep clear of every
+            // driveway's sides (`gardenFences.ts`), so only a house on one side and a tree or a
+            // thing next door on the other leave a car none (it stays parked: they walk).
             let nav = NavGrid {
                 lot: &w.lot,
                 blocked: w.blocked(),
                 stairs: w.stair_map(),
             };
-            if car.door(&nav, 0).is_none() {
+            let shut = car.door(&nav, 0).is_none();
+            if shut && fenced_in(&w, car) {
                 failures.push(format!(
-                    "{label}: the car at {} has no door with room to open",
+                    "{label}: a fence leaves the car at {} no door with room to open",
                     at(car.spot)
                 ));
             }
+            tally[2] += usize::from(car.no_way || shut);
             if !w.plots[car.plot as usize]
                 .contains(car.spot[0].floor() as i32, car.spot[1].floor() as i32)
             {
@@ -350,6 +418,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
                     .collect()
             })
             .unwrap_or_default();
+        let caps = turning_circles(&world["town"]);
         // (A normal town is 256 m across, a big world 1 km: walks across them take hours.)
         let mut watch = common::Watch::new().routing_hours(if size == "cosy" { 4.0 } else { 8.0 });
         let days = if big { 2 } else { 1 };
@@ -368,9 +437,14 @@ fn generated_worlds_cars_keep_to_the_roads() {
             }
             held.resize(w.sims.len(), None);
             for (i, s) in w.sims.iter().enumerate() {
-                // (On their way to it or in it while it stands: not while it drives.)
+                // (Sat in it, or bound for it but not walking there, while it stands: not while
+                // it drives, nor on a long walk back to it, which `Watch` follows.)
+                let walking = s
+                    .current()
+                    .is_some_and(|a| matches!(a.phase, sim_core::world::Phase::Routing { .. }));
                 let standing = w.cars.iter().enumerate().any(|(c, car)| {
-                    (car.aboard.contains(&(i as u32)) || s.car_bound() == Some(c as u32))
+                    (car.aboard.contains(&(i as u32))
+                        || (s.car_bound() == Some(c as u32) && !walking))
                         && matches!(
                             car.state,
                             CarState::Parked | CarState::Boarding | CarState::Out
@@ -382,11 +456,17 @@ fn generated_worlds_cars_keep_to_the_roads() {
                 }
                 let since = *held[i].get_or_insert(w.tick);
                 if w.tick - since == CAR_HOURS * TICKS_PER_HOUR {
+                    let car = w.cars.iter().enumerate().find(|(c, car)| {
+                        car.aboard.contains(&(i as u32)) || s.car_bound() == Some(*c as u32)
+                    });
                     failures.push(format!(
-                        "{label}: {} (#{i}) has waited for a car since day {} {:05.2}h",
+                        "{label}: {} (#{i}) has waited for a car since day {} {:05.2}h ({}, {}, the car {:?})",
                         s.name,
                         clock::day(since),
-                        clock::hour(since)
+                        clock::hour(since),
+                        format!("{:?}", s.current().map(|a| (&a.task.kind, &a.phase))).chars().take(120).collect::<String>(),
+                        if s.car_bound().is_some() { "on their way" } else { "in it" },
+                        car.map(|(c, car)| (c, car.plot, car.state, car.trip.is_some(), &car.aboard, car.driver))
                     ));
                 }
             }
@@ -400,7 +480,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
                 let Some((at, _, true, _)) = car.shown else {
                     continue;
                 };
-                let off = off_paving(&w, car, at, &paths);
+                let off = off_paving(&w, car, at, &paths, &caps);
                 // (CARS_TRACE=seed:plot: that car's way, a point every second.)
                 if trace == Some((world["seed"].as_u64().unwrap_or(0), car.plot))
                     && w.tick % 20 == 0
@@ -435,8 +515,10 @@ fn generated_worlds_cars_keep_to_the_roads() {
             ));
         }
         // At three in the morning: parked at home, parked out, or away at work with someone; or
-        // on its way (a drive across a big world takes game hours: one that has stood waiting
-        // for an hour of it, or someone getting in for longer than a trip waits, is stuck).
+        // on its way (a drive across a big world takes game hours, and it gives way to everyone
+        // in front of it for a few minutes each, a crowd at the way out of town too: one that
+        // has stood for two hours of it, or someone getting in for longer than a trip waits, is
+        // stuck).
         for car in &w.cars {
             let home = w.households[car.household as usize].plot;
             let since = w.tick.saturating_sub(car.since);
@@ -452,7 +534,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
                 CarState::Away => car.aboard.is_empty(),
                 CarState::Boarding => since > CAR_HOURS * TICKS_PER_HOUR,
                 CarState::Leaving | CarState::Arriving => {
-                    since as f32 - car.progress > TICKS_PER_HOUR as f32
+                    since as f32 - car.progress > 2.0 * TICKS_PER_HOUR as f32
                 }
             };
             if wrong {
@@ -482,7 +564,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
     }
     for (size, [n, cars, stay, commutes, trips]) in &sizes {
         eprintln!(
-            "{size}: {n} worlds, {cars} cars ({stay} with no way out), {commutes} drives to work, {trips} trips"
+            "{size}: {n} worlds, {cars} cars ({stay} with no way out or no door to open), {commutes} drives to work, {trips} trips"
         );
         if *cars == 0 || *stay as f32 > *cars as f32 * NO_WAY {
             failures.push(format!(

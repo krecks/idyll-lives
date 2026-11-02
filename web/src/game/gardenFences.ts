@@ -20,8 +20,8 @@
  * - none on public places, empty lots or the countryside.
  *
  * Kept clear of what residents need: front gardens stay open, and no edge goes on a wall, across a
- * path or driveway, through a thing or a garage, or beside a thing residents use (its tile fills the
- * gap); every garden
+ * path or driveway, along a driveway's side within a metre of it (a car's doors open there), through
+ * a thing or a garage, or beside a thing residents use (its tile fills the gap); every garden
  * is reached through a gate or past the end of its house.
  */
 
@@ -70,6 +70,8 @@ export interface FenceInput {
 const NARROW_GAP = 3;
 /** Fences keep this far (m) from beside another plot's driveway or garage, and start behind it (room for a car's doors). */
 const BESIDE_DRIVE = 1.5;
+/** No fence along a driveway's side nearer than this (m), whosever it is (a back fence beside the next plot's): a car parked on it has room to open its doors (sim-core `cars::SWING`). */
+const DOOR_ROOM = 1;
 
 /** The fence styles the town uses (content `fenceStyles` ids). */
 export const TOWN_FENCE = { picket: 'picket', hedge: 'hedge', rail: 'rails' } as const;
@@ -122,8 +124,16 @@ export function townFences(input: FenceInput): TownFence[] {
     const thin: Rect = axis === 'h' ? { x: x + 0.05, z: z - 0.1, w: 0.9, d: 0.2 } : { x: x - 0.1, z: z + 0.05, w: 0.2, d: 0.9 };
     if (blockedNear(thin, axis)) return false;
     const across = (r: Rect) => (axis === 'h' ? r.x < x + 1 && r.x + r.w > x && r.z < z - 0.01 && r.z + r.d > z + 0.01 : r.z < z + 1 && r.z + r.d > z && r.x < x - 0.01 && r.x + r.w > x + 0.01);
-    return !input.paths.some(across);
+    return !input.paths.some(across) && !besideDrive(axis, x, z);
   };
+  /** Whether unit edge (axis, x, z) runs along a driveway's side within `DOOR_ROOM` of it: the car parked on it opens its doors there. */
+  const besideDrive = (axis: 'h' | 'v', x: number, z: number) =>
+    input.plots.some(({ drive: r }) => {
+      if (!r) return false;
+      // (Along its length: a driveway runs from the street into the plot, its longer way.)
+      if (axis === 'v') return r.d >= r.w && z < r.z + r.d && z + 1 > r.z && (x <= r.x ? r.x - x : x - (r.x + r.w)) <= DOOR_ROOM;
+      return r.w > r.d && x < r.x + r.w && x + 1 > r.x && (z <= r.z ? r.z - z : z - (r.z + r.d)) <= DOOR_ROOM;
+    });
   const put = (axis: 'h' | 'v', x: number, z: number, style: string, kind: 'fence' | 'gate' = 'fence') => {
     if (!allowed(axis, x, z)) return false;
     out.set(`${axis}:${x}:${z}`, { axis, x, z, kind, style });

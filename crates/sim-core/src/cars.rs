@@ -1418,6 +1418,16 @@ pub(crate) fn update(w: &mut World) {
         w.cars_parked = None;
         refresh(w);
     }
+    // Someone who set off for a car and turned to using something instead isn't coming: the car
+    // doesn't wait for them, nor is it kept from the others.
+    for s in &mut w.sims {
+        if s.bound_for_car.is_some()
+            && s.current()
+                .is_some_and(|a| matches!(a.phase, Phase::Using { .. }))
+        {
+            s.bound_for_car = None;
+        }
+    }
     for c in 0..w.cars.len() {
         owners(w, c);
         relocate(w, c);
@@ -2743,6 +2753,16 @@ fn trip_update(w: &mut World, c: usize) {
             }
         }
         CarState::Out => {
+            // (The driver, in it to go home, called away after all, to work say: out of it. They
+            // come back to it going home, or it goes home when they get there.)
+            if !at_wheel && w.cars[c].aboard.contains(&(d as u32)) {
+                w.cars[c].aboard.retain(|&a| a != d as u32);
+                let sim = &mut w.sims[d];
+                if sim.bound_for_car == Some(c as u32) {
+                    sim.bound_for_car = None;
+                }
+                sim.pose = crate::content::Pose::Stand;
+            }
             let car = &w.cars[c];
             let driver_in = at_wheel && car.aboard.contains(&(d as u32));
             if driver_in {
