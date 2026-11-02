@@ -23,32 +23,44 @@ VIEWS = {
 }
 
 
-def preview(path, view='three_quarter', size=640):
-    """Renders the scene to `path` from the front three-quarter view (Blender -Y, the game's front), or another of
-    `VIEWS`, `size` pixels square."""
+def _workbench(path, view, size, light, color_type, shadows):
+    """A Workbench render of the scene to `path`, faces drawn from the front only (as the game draws them)."""
     scene = bpy.context.scene
     scene.render.engine = 'BLENDER_WORKBENCH'
-    scene.display.shading.light = 'STUDIO'
-    scene.display.shading.color_type = 'MATERIAL'
-    scene.display.shading.show_shadows = True
-    scene.display.shading.show_backface_culling = True
+    shading = scene.display.shading
+    shading.light, shading.color_type, shading.show_shadows = light, color_type, shadows
+    shading.show_backface_culling = True
     return _render(path, view, size=size)
 
 
-def baked(path, view='three_quarter', size=640):
+def preview(path, view='three_quarter', size=640):
+    """Renders the scene to `path` from the front three-quarter view (Blender -Y, the game's front), or another of
+    `VIEWS`, `size` pixels square."""
+    return _workbench(path, view, size, 'STUDIO', 'MATERIAL', True)
+
+
+def baked(path, size=640):
     """Renders the baked shading alone (the `ao` colour, gamekit/shade.py: white open, darker in creases), unlit, to
-    `path`: where a crease shades a face all over, or a sliver triangle streaks it."""
+    `path` from the front three-quarter: where a crease shades a face all over, or a sliver triangle streaks it."""
+    return _workbench(path, 'three_quarter', size, 'FLAT', 'VERTEX', False)
+
+
+def _each_clip():
+    """[(clip, its last frame)] for each clip in turn, played on its own from rest; back to rest after."""
     scene = bpy.context.scene
-    scene.render.engine = 'BLENDER_WORKBENCH'
-    scene.display.shading.light = 'FLAT'
-    scene.display.shading.color_type = 'VERTEX'
-    scene.display.shading.show_shadows = False
-    scene.display.shading.show_backface_culling = True
+    ends = {}
+    for _, name, end in motion.clips():
+        ends[name] = max(end, ends.get(name, 1))
     try:
-        return _render(path, view, size=size)
+        for clip, end in ends.items():
+            # back to rest first: a muted track leaves its part where it last put it
+            motion.solo(None)
+            scene.frame_set(1)
+            motion.solo(clip)
+            yield clip, end
     finally:
-        scene.display.shading.light = 'STUDIO'
-        scene.display.shading.color_type = 'MATERIAL'
+        motion.solo(None)
+        scene.frame_set(1)
 
 
 SHEET_VIEWS = ('three_quarter', 'back_three_quarter', 'side', 'top')
@@ -67,20 +79,12 @@ def sheet(path):
     try:
         rows = [[preview(os.path.join(work, f'{v}.png'), v, SHEET_TILE) for v in SHEET_VIEWS]
                 + [baked(os.path.join(work, 'ao.png'), size=SHEET_TILE)]]
-        ends = {}
-        for _, name, end in motion.clips():
-            ends[name] = max(end, ends.get(name, 1))
-        for clip, end in ends.items():
-            motion.solo(None)
-            scene.frame_set(1)
-            motion.solo(clip)
+        for clip, end in _each_clip():
             row = []
             for k, along in enumerate(SHEET_ALONG):
                 scene.frame_set(round(1 + along * (end - 1)))
                 row.append(preview(os.path.join(work, f'{clip}.{k}.png'), size=SHEET_TILE))
             rows.append(row)
-        motion.solo(None)
-        scene.frame_set(1)
         return _compose(rows, path)
     finally:
         shutil.rmtree(work, ignore_errors=True)
@@ -258,15 +262,9 @@ def preview_clips(stem):
     middle of a clip that comes home: `spin`, `rock`), then goes back to rest."""
     scene = bpy.context.scene
     paths = []
-    for clip in dict.fromkeys(name for _, name, _ in motion.clips()):
-        # back to rest first: a muted track leaves its part where it last put it
-        motion.solo(None)
-        scene.frame_set(1)
-        motion.solo(clip)
+    for clip, _ in _each_clip():
         scene.frame_set(motion.peak(clip))
         paths.append(preview(f'{stem}@{clip}.png'))
-    motion.solo(None)
-    scene.frame_set(1)
     return paths
 
 

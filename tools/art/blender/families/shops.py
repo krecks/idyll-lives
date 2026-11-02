@@ -496,22 +496,6 @@ def cafeChair():
 
 
 _FAR = 0.25   # placed on town lots, seen from afar: a quarter of the triangles (E7)
-FAR_FEET = 0.01      # (m) a far version keeps every vertex this close to the floor, as gamekit's far= does
-
-
-def _far(build, ratio=_FAR):
-    """A far version as gamekit's `far=ratio` (gamekit/far.py `decimated`: vertices on one another merged, its feet and
-    outermost faces kept, turned faces turned back), from a build of its own."""
-    import bpy
-
-    def far():
-        build()
-        bpy.context.scene.frame_set(1)
-        for o in G.meshes():
-            o.animation_data_clear()
-        return [G.decimated(G.join(G.meshes(), f'{build.__name__}_far', origin=(0, 0, 0)), ratio, feet=FAR_FEET)]
-    far.__name__ = f'{build.__name__}_far'
-    return far
 
 
 FAMILY = G.Family(
@@ -519,17 +503,17 @@ FAMILY = G.Family(
     [G.Model('shopCounter', shopCounter, size=(1.96, 1.276, 0.78), key='model.shopCounter', centre=(0, -0.04),
              # buying a little something: the shopkeeper's till drawer pops as they take the money
              motions={'uses': {'treat': {'clip': 'till', 'delay': TILL_DELAY, 'hold': TILL_HOLD}}},
-             paint=[('counter', 'Counter'), ('walnut', 'Trim')], far=_far(shopCounter)),
+             paint=[('counter', 'Counter'), ('walnut', 'Trim')], far=_FAR),
      G.Model('bakeryCase', bakeryCase, size=(1.94, 1.29, 0.86), key='model.bakeryCase', centre=(0, 0.0),
              # buying a pastry or a slice of cake: the baker slides the back door aside to reach in
              motions={'uses': {use: {'clip': 'door', 'delay': DOOR_DELAY, 'hold': DOOR_HOLD} for use in ('pastry', 'takeCake')}},
-             paint=[('case', 'Counter'), ('rim', 'Trim')], far=_far(bakeryCase)),
+             paint=[('case', 'Counter'), ('rim', 'Trim')], far=_FAR),
      G.Model('groceryShelf', groceryShelf, size=(1.92, 1.72, 0.48), key='model.groceryShelf', centre=(0, -0.19),
-             paint=[('shelf', 'Shelves'), ('trim', 'Trim')], far=_far(groceryShelf)),
+             paint=[('shelf', 'Shelves'), ('trim', 'Trim')], far=_FAR),
      G.Model('cafeTable', cafeTable, size=(0.62, 0.745, 0.62), key='model.cafeTable',
              paint=[('marble', 'Top'), ('iron', 'Frame')], far=G.far_of(cafeTable)),
      G.Model('cafeChair', cafeChair, size=(0.446, 0.952, 0.472), key='model.cafeChair', centre=(0, -0.008),
-             paint=[('bentwood', 'Frame'), ('cane', 'Seat')], far=_far(cafeChair))],
+             paint=[('bentwood', 'Frame'), ('cane', 'Seat')], far=_FAR)],
     comment='Blender-built shop fittings and café furniture for the town '
             '(tools/art/blender/families/shops.py). Listed in the base manifest\'s packs. Each has a far '
             'version for the town overview. The till\'s cash drawer slides out (`till`) while a resident '

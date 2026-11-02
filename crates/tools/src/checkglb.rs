@@ -1519,8 +1519,7 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
             let clip = repr(key(a, "name")?);
             let path = target.get("path");
             if path == Some(&J::Str("rotation".into())) {
-                let dot = first.iter().zip(&last).fold(0.0, |s, (x, y)| s + x * y);
-                let turned = (2.0 * f64::min(1.0, dot.abs()).acos()) * (180.0 / PI);
+                let turned = turn_between(&first, &last);
                 if turned < 0.1 {
                     continue;
                 }
@@ -1562,6 +1561,12 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
     Ok((errors, warnings))
 }
 
+/// The turn (degrees) from one rotation (a quaternion, x y z w) to another.
+fn turn_between(a: &[f64], b: &[f64]) -> f64 {
+    let dot = a.iter().zip(b).fold(0.0, |s, (x, y)| s + x * y);
+    2.0 * f64::min(1.0, dot.abs()).acos() * (180.0 / PI)
+}
+
 /// The most a rotation channel turns its node between two of the game's samples, 1/60 s apart (degrees).
 fn turn_per_step(g: &Glb, sampler: &J) -> R<f64> {
     let times = values(g, key(sampler, "input")?)?;
@@ -1572,12 +1577,7 @@ fn turn_per_step(g: &Glb, sampler: &J) -> R<f64> {
         if dt <= 1e-6 || keys[k].len() < 4 || keys[k - 1].len() < 4 {
             continue;
         }
-        let dot = keys[k]
-            .iter()
-            .zip(&keys[k - 1])
-            .fold(0.0, |s, (x, y)| s + x * y);
-        let turned = 2.0 * f64::min(1.0, dot.abs()).acos() * (180.0 / PI);
-        fastest = fastest.max(turned / dt / 60.0);
+        fastest = fastest.max(turn_between(&keys[k - 1], &keys[k]) / dt / 60.0);
     }
     Ok(fastest)
 }
@@ -1628,7 +1628,7 @@ fn flipped_faces(g: &Glb) -> R<Vec<(String, usize)>> {
                     e1[2] * e2[0] - e1[0] * e2[2],
                     e1[0] * e2[1] - e1[1] * e2[0],
                 ];
-                let len = (f[0] * f[0] + f[1] * f[1] + f[2] * f[2]).sqrt();
+                let len = py::hypot(&f);
                 if len / 2.0 < FLIPPED_AREA {
                     continue;
                 }

@@ -51,10 +51,15 @@ def fps():
     return scene.render.fps / scene.render.fps_base
 
 
+def frame(seconds):
+    """The frame `seconds` into a clip: frame 1 is 0 s (the export slides each clip to start at 0), halves rounded up
+    (a clip is never a frame short)."""
+    return 1 + math.floor(seconds * fps() + 0.5)
+
+
 def last_frame(seconds):
-    """The frame of a clip's last key, for a clip that ends `seconds` in: frame 1 is 0 s (the export slides each
-    clip to start at 0), so this is also the frame `seconds` into any clip."""
-    return max(2, 1 + math.floor(seconds * fps() + 0.5))   # halves up: a clip is never a frame short
+    """The frame of a clip's last key, for a clip that ends `seconds` in (`frame`, at least the second)."""
+    return max(2, frame(seconds))
 
 
 def attach(obj, parent):
@@ -197,7 +202,7 @@ def path(obj, clip, keys, linear=False):
     carried over the rail and hung on the table's end; the robot vacuum's round (a loop: it ends at rest, its
     heading a whole turn on, either way; `linear` keeps an even speed between the keys, else each eases)."""
     assert keys[0][0] == 0 and not any(keys[0][1]) and not any(keys[0][2]), f'path {clip!r}: the first key is rest, at 0 s'
-    frames = [last_frame(s) if s else 1 for s, _, _ in keys]
+    frames = [frame(s) for s, _, _ in keys]
     assert all(b > a for a, b in zip(frames, frames[1:])), f'path {clip!r}: keys a frame or more apart, in order'
     obj.rotation_mode = 'XYZ'
     moved = False
@@ -219,7 +224,7 @@ def wobble(obj, clip, degrees, seconds=1.0, axis='X', swings=3, delay=0.0):
     i = 'XYZ'.index(axis)
     obj.rotation_mode = 'XYZ'
     rest = obj.rotation_euler[i]
-    start, end = last_frame(delay) if delay else 1, last_frame(delay + seconds)
+    start, end = frame(delay), last_frame(delay + seconds)
     a = math.radians(degrees)
     keys = [(1, rest)] + ([(start, rest)] if start > 1 else [])
     span = end - start
@@ -237,7 +242,7 @@ def keys(obj, clip, prop, index, points):
     the next; the first at 0 s is rest. Values as Blender has them (metres, radians, scale). For a clip none of the
     others make: water filling a bath from 0.5 s, a koi surfacing and diving."""
     assert points and points[0][0] == 0, f'keys {clip!r}: the first key is at 0 s (rest)'
-    frames = [(last_frame(p[0]) if p[0] else 1, *p[1:]) for p in points]
+    frames = [(frame(p[0]), *p[1:]) for p in points]
     assert all(b[0] > a[0] for a, b in zip(frames, frames[1:])), f'keys {clip!r}: keys a frame or more apart, in order'
     return _clip(obj, clip, prop, index, frames)
 
@@ -286,6 +291,7 @@ def _clip(obj, clip, path, index, a, b=None, seconds=None, linear=False, ease='s
         obj.keyframe_insert(path, index=index, frame=frame)
     if any(EASES[e] for e in eases):
         by_frame = {k[0]: e for k, e in zip(keys, eases)}
+        back = back_amount(overshoot)
         for fc in _fcurves(action, obj):
             if fc.data_path == path and fc.array_index == index:
                 for k in fc.keyframe_points:
@@ -293,7 +299,7 @@ def _clip(obj, clip, path, index, a, b=None, seconds=None, linear=False, ease='s
                     if e:
                         k.interpolation, k.easing = e
                         if e[0] == 'BACK':
-                            k.back = back_amount(overshoot)
+                            k.back = back
     getattr(obj, path)[index] = keys[0][1]
     if not track:
         track = obj.animation_data.nla_tracks.new()

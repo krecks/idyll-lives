@@ -612,41 +612,26 @@ def marketStall():
 
 
 FAR = 0.25
-FAR_FEET = 0.01      # (m) a far version keeps every vertex this close to the floor, as gamekit's far= does
 
-
-def _far(build, ratio=FAR):
-    """A far version as gamekit's `far=ratio` (gamekit/far.py `decimated`: vertices on one another merged, its feet and
-    outermost faces kept, turned faces turned back), from a build of its own."""
-    import bpy
-
-    def far():
-        build()
-        bpy.context.scene.frame_set(1)
-        for o in G.meshes():
-            o.animation_data_clear()
-        return [G.decimated(G.join(G.meshes(), f'{build.__name__}_far', origin=(0, 0, 0)), ratio, feet=FAR_FEET)]
-    far.__name__ = f'{build.__name__}_far'
-    return far
 
 FAMILY = G.Family(
     'stalls', M,
     [G.Model('iceCreamCart', iceCreamCart, size=(1.729, 2.355, 0.966), key='model.iceCreamCart', centre=(-0.0235, 0.0023),
              # the seller slides the freezer's lid open to scoop (the game's `sell` clip: 1.5-2.1 s in)
-             motions={'uses': {'iceCream': {'clip': 'lid_open', 'delay': 1.0, 'hold': 1.4}}}, far=_far(iceCreamCart),
+             motions={'uses': {'iceCream': {'clip': 'lid_open', 'delay': 1.0, 'hold': 1.4}}}, far=FAR,
              paint=[('cart', 'Body'), ('parasol', 'Parasol'), ('stripe', 'Bands')]),
      G.Model('hotDogStand', hotDogStand, size=(1.577, 2.387, 0.981), key='model.hotDogStand', centre=(-0.0915, 0.0033),
              # the vendor lifts the hot plate's lid for a sausage
-             motions={'uses': {'hotDog': {'clip': 'lid_open', 'delay': 1.0, 'hold': 1.4}}}, far=_far(hotDogStand),
+             motions={'uses': {'hotDog': {'clip': 'lid_open', 'delay': 1.0, 'hold': 1.4}}}, far=FAR,
              paint=[('stand', 'Body'), ('awning', 'Awning')]),
      G.Model('vendingSnack', vendingSnack, size=(0.9, 1.88, 0.748), key='model.vendingSnack', centre=(0, -0.056),
-             motions={'uses': {'snack': 'drop'}}, far=_far(vendingSnack),
+             motions={'uses': {'snack': 'drop'}}, far=FAR,
              paint=[('snack_red', 'Body')]),
      G.Model('vendingDrink', vendingDrink, size=(0.9, 1.88, 0.785), key='model.vendingDrink', centre=(0, -0.0375),
-             motions={'uses': {'drink': 'drop'}}, far=_far(vendingDrink),
+             motions={'uses': {'drink': 'drop'}}, far=FAR,
              paint=[('drink_blue', 'Body')]),
      G.Model('marketStall', marketStall, size=(1.841, 2.148, 0.983), key='model.marketStall', centre=(0.0005, 0.02),
-             far=_far(marketStall), paint=[('timber', 'Body'), ('awning_green', 'Awning')])],
+             far=FAR, paint=[('timber', 'Body'), ('awning_green', 'Awning')])],
     comment='Blender-built food stalls and vending machines (tools/art/blender/families/stalls.py). '
             'Listed in the base manifest\'s packs. The materials map onto the game\'s finishes so a model '
             'costs one draw call per finish group. The ice cream cart slides its freezer lid open and the '
