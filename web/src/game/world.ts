@@ -9,7 +9,7 @@
 import type { Content, WorldNames } from '../content/content';
 import { DEFAULT_LANDSCAPE, type LandscapeParams, type WorldSize } from '../core/protocol';
 import type { GardenSize } from './housegen';
-import { branch, centroid, crossing, cutAround, lane, lengths, loop, range, ring, RoadIndex, roundabout, through, type Box, type Pt, type RoadPlan } from './roads';
+import { branch, centroid, crossing, crossStreet, cutAround, lane, leftOf, lengths, loop, nearest, pointAt, range, ring, RoadIndex, roundabout, through, type Box, type Pt, type RoadPlan } from './roads';
 
 export type { WorldSize };
 export const WORLD_SIZES: readonly WorldSize[] = ['cosy', 'normal', 'big'];
@@ -42,7 +42,7 @@ export interface SizeSpec {
   lots: number;
   /** Lengths of lanes, crescents and the like (not widths) times this. */
   scale: number;
-  /** Lanes off the lanes (`extend`). */
+  /** Cross streets between the roads (`extend`): a bigger town's blocks. */
   extend?: number;
   /** Public places besides the park, and farm lots, if not the recipe's. */
   places?: [number, number];
@@ -107,40 +107,89 @@ const valley = (rand: Rand): LandscapeParams => ({
 const side = (rand: Rand): 1 | -1 => (rand() < 0.5 ? 1 : -1);
 const lengthOf = (r: RoadPlan) => lengths(r.points).at(-1)!;
 
-/** One winding high street, a short cul-de-sac off it. */
+/**
+ * A lane off `parent` at arc length `s` on its `side`, `length` m long, curling `curl` radians
+ * whichever way brings its end nearer `target` (a dead end, for `connect` to take on).
+ */
+function toward(parent: RoadPlan, s: number, side: 1 | -1, length: number, curl: number, target: Pt): RoadPlan {
+  const lanes = [branch(parent, s, side, length, curl), branch(parent, s, side, length, -curl)];
+  const gap = (r: RoadPlan) => Math.hypot(r.points[r.points.length - 1][0] - target[0], r.points[r.points.length - 1][1] - target[1]);
+  return gap(lanes[0]) <= gap(lanes[1]) ? lanes[0] : lanes[1];
+}
+
+/** One winding high street, a back lane looping off it and back, a short lane off the other side. */
 export function highStreet(rand: Rand, box: Box, scale = 1): RoadLayout {
   const main = through(rand, box, { amp: range(rand, 6, 11), bends: 2 });
   const L = lengthOf(main);
-  const culDeSac = branch(main, L * range(rand, 0.4, 0.6), side(rand), range(rand, 28, 40) * scale, range(rand, -0.7, 0.7));
-  return { roads: [main, culDeSac] };
+  const s = side(rand);
+  const s0 = L * range(rand, 0.28, 0.4);
+  const back = loop(main, s0, Math.min(L - 30, s0 + range(rand, 70, 90) * scale), s, range(rand, 30, 38) * scale);
+  const lane = branch(main, L * range(rand, 0.45, 0.65), -s as 1 | -1, range(rand, 28, 40) * scale, range(rand, -0.7, 0.7));
+  return { roads: [main, back.road, lane] };
 }
 
-/** A through road with a crescent round a green, and lanes off it. */
+/** A through road with a crescent round a green; lanes off it joined up into a back street and to the crescent. */
 function crescentTown(rand: Rand, box: Box, scale = 1): RoadLayout {
   const main = through(rand, box, { at: 0.55, amp: range(rand, 6, 10), bends: 2 });
   const L = lengthOf(main);
   const mid = L * range(rand, 0.42, 0.55);
   const s = side(rand);
-  const crescent = loop(main, mid - range(rand, 24, 30) * scale, mid + range(rand, 24, 30) * scale, s, range(rand, 34, 42) * scale);
+  const half = range(rand, 24, 30) * scale;
+  const crescent = loop(main, mid - half, mid + half, s, range(rand, 34, 42) * scale);
+  const top = pointAt(crescent.road.points, lengthOf(crescent.road) / 2).p;
+  // Across the road from the crescent, two lanes curling towards each other (a back street, once joined).
+  const apart = range(rand, 30, 40) * scale;
+  const behind: Pt = (() => {
+    const { p, t } = pointAt(main.points, mid);
+    const n = leftOf(t);
+    return [p[0] - n[0] * s * 60 * scale, p[1] - n[1] * s * 60 * scale];
+  })();
   const lanes = [
-    branch(main, mid + range(rand, -10, 10), -s as 1 | -1, range(rand, 50, 65) * scale, range(rand, -0.8, 0.8)),
-    branch(main, L * range(rand, 0.17, 0.24), side(rand), range(rand, 40, 55) * scale, range(rand, -0.7, 0.7)),
-    branch(main, L * range(rand, 0.76, 0.83), side(rand), range(rand, 40, 55) * scale, range(rand, -0.7, 0.7)),
+    toward(main, mid - apart, -s as 1 | -1, range(rand, 50, 62) * scale, range(rand, 0.6, 0.9), behind),
+    toward(main, mid + apart, -s as 1 | -1, range(rand, 50, 62) * scale, range(rand, 0.6, 0.9), behind),
+    // Further out on the crescent's side, lanes curling in towards it.
+    toward(main, L * range(rand, 0.17, 0.24), s, range(rand, 40, 55) * scale, range(rand, 0.4, 0.8), top),
+    toward(main, L * range(rand, 0.76, 0.83), s, range(rand, 40, 55) * scale, range(rand, 0.4, 0.8), top),
   ];
   return { roads: [main, crescent.road, ...lanes], greens: [crescent.green], centre: centroid(crescent.green) };
 }
 
-/** A crossroads with a roundabout (a fountain in the middle), crooked lanes off both roads either side. */
+/**
+ * A crossroads with a roundabout (a fountain in the middle) and a loose grid of blocks round it:
+ * in three or four of its quarters a street from one road round to the other, and further out
+ * lanes off each road for `connect` to join up.
+ */
 export function crossroads(rand: Rand, box: Box, scale = 1): RoadLayout {
   const main = through(rand, box, { amp: range(rand, 4, 8), bends: 2 });
   const cross = through(rand, box, { along: 'z', amp: range(rand, 4, 8), bends: 2 });
-  const [L, C] = [lengthOf(main), lengthOf(cross)];
   const at = crossing(main, cross) ?? ([box.w / 2, box.d / 2] as Pt);
   const R = 6.5;
   const roads: RoadPlan[] = [...cutAround(main, at, R), ...cutAround(cross, at, R), roundabout(at[0], at[1], R)];
-  for (const [parent, len, at] of [[main, L, 0.24], [main, L, 0.76], [cross, C, 0.24], [cross, C, 0.76]] as const) {
-    roads.push(branch(parent, len * (at + range(rand, -0.04, 0.04)), 1, range(rand, 45, 60) * scale, range(rand, -1.1, 1.1)));
-    roads.push(branch(parent, len * (at + range(rand, -0.06, 0.06)), -1, range(rand, 40, 55) * scale, range(rand, -1.1, 1.1)));
+  const sm = nearest(main.points, at[0], at[1]).s;
+  const sc = nearest(cross.points, at[0], at[1]).s;
+  const quarters: [1 | -1, 1 | -1][] = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+  for (let i = quarters.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [quarters[i], quarters[j]] = [quarters[j], quarters[i]];
+  }
+  const blocks = rand() < 0.5 ? 3 : 4;
+  for (const [qx, qz] of quarters.slice(0, blocks)) {
+    // From the main road `ra` m out from the middle, round the corner, to the cross road `rb` m out.
+    const [ra, rb] = [range(rand, 44, 60) * scale, range(rand, 44, 60) * scale];
+    const a = pointAt(main.points, sm + qx * ra).p;
+    const b = pointAt(cross.points, sc + qz * rb).p;
+    const corner: Pt = [a[0] + (at[0] - a[0]) * 0.1, b[1] + (at[1] - b[1]) * 0.1];
+    const mid = (p: Pt, k: number): Pt => [p[0] + (corner[0] - p[0]) * k, p[1] + (corner[1] - p[1]) * k];
+    roads.push(lane([a, mid(a, 0.5), corner, mid(b, 0.5), b], ['join', 'join']));
+  }
+  // Further out: a lane off each arm, for `connect` to take round to the next.
+  for (const [r, s0] of [[main, sm], [cross, sc]] as const) {
+    const len = lengthOf(r);
+    for (const k of [1, -1] as const) {
+      const s = s0 + k * range(rand, 0.6, 0.75) * (k > 0 ? len - s0 : s0);
+      if (s < 20 || s > len - 20) continue;
+      roads.push(toward(r, s, side(rand), range(rand, 45, 60) * scale, range(rand, 0.5, 1), at));
+    }
   }
   return { roads, centre: at };
 }
@@ -167,29 +216,48 @@ function waterfront(rand: Rand, box: Box, at: number, amp: [number, number]) {
   return { main, water, land, centre, L: lengthOf(main) } as const;
 }
 
-/** A road along the shore (homes on its landward side only), a lane climbing inland, a crescent up the hill. */
+/**
+ * A road along the shore (homes on its landward side only), a crescent up the hill at one end of
+ * the village, two lanes climbing inland for `connect` to join into an upper street.
+ */
 function shoreRoad(rand: Rand, box: Box, scale = 1): RoadLayout {
   const { main, water, land, centre, L } = waterfront(rand, box, 0.12, [3, 6]);
-  const climb = branch(main, L * range(rand, 0.42, 0.58), land, range(rand, 55, 70) * scale, range(rand, -0.8, 0.8));
-  // A crescent up the hill at one end of the village.
-  const at = rand() < 0.5 ? L * 0.22 : L * 0.78;
-  const crescent = loop(main, at - 22 * scale, at + 22 * scale, land, range(rand, 30, 38) * scale);
-  return { roads: [main, climb, crescent.road], water, centre };
+  const end = rand() < 0.5 ? 0.22 : 0.78;
+  const crescent = loop(main, L * end - 22 * scale, L * end + 22 * scale, land, range(rand, 30, 38) * scale);
+  const climbs = [0.5, 1 - end].map((at) => L * (at + range(rand, -0.04, 0.04)));
+  const up = inland(main, (climbs[0] + climbs[1]) / 2, land, 75 * scale);
+  const lanes = climbs.map((s) => toward(main, s, land, range(rand, 55, 66) * scale, range(rand, 0.2, 0.45), up));
+  return { roads: [main, crescent.road, ...lanes], water, centre };
 }
 
-/** A lane winding up the valley in tight bends, tracks off it. */
+/** The point `depth` m inland of road `r` at arc length `s` (on its `land` side). */
+function inland(r: RoadPlan, s: number, land: 1 | -1, depth: number): Pt {
+  const { p, t } = pointAt(r.points, s);
+  const n = leftOf(t);
+  return [p[0] + n[0] * land * depth, p[1] + n[1] * land * depth];
+}
+
+/** A lane winding up the valley in tight bends, tracks off it (round to it again where the land allows). */
 function switchback(rand: Rand, box: Box, scale = 1): RoadLayout {
   const main = through(rand, box, { amp: range(rand, 16, 24), bends: 3, width: 6 });
   const L = lengthOf(main);
-  const tracks = [branch(main, L * range(rand, 0.3, 0.45), side(rand), range(rand, 24, 34) * scale, range(rand, -0.8, 0.8)), branch(main, L * range(rand, 0.55, 0.7), side(rand), range(rand, 24, 34) * scale, range(rand, -0.8, 0.8))];
+  const tracks = [0.3, 0.6].map((at) => {
+    const s = L * (at + range(rand, 0, 0.12));
+    const ahead = pointAt(main.points, Math.min(L, s + 70 * scale)).p;
+    return toward(main, s, side(rand), range(rand, 26, 36) * scale, range(rand, 0.5, 0.9), ahead);
+  });
   return { roads: [main, ...tracks], centre: [box.w / 2, box.d / 2] };
 }
 
-/** A road round the lake's end of town (homes on its landward side), a crescent and lanes off it inland. */
+/**
+ * A road round the lake's end of town (homes on its landward side), a crescent off it, and lanes
+ * either side of it climbing inland for `connect` to join into an upper street over the crescent.
+ */
 function lakeRoad(rand: Rand, box: Box, scale = 1): RoadLayout {
   const { main, water, land, centre, L } = waterfront(rand, box, 0.14, [5, 9]);
   const crescent = loop(main, L * 0.5 - 24 * scale, L * 0.5 + 24 * scale, land, range(rand, 34, 42) * scale);
-  const lanes = [0.22, 0.78].map((at) => branch(main, L * (at + range(rand, -0.04, 0.04)), land, range(rand, 75, 95) * scale, range(rand, -0.9, 0.9)));
+  const up = inland(main, L * 0.5, land, 95 * scale);
+  const lanes = [0.3, 0.7].map((at) => toward(main, L * (at + range(rand, -0.03, 0.03)), land, range(rand, 68, 80) * scale, range(rand, 0.25, 0.5), up));
   return { roads: [main, crescent.road, ...lanes], water, centre };
 }
 
@@ -203,30 +271,42 @@ export function clearing(rand: Rand, box: Box, scale = 1): RoadLayout {
   const out = lane([bottom, [bottom[0] + wander * 0.4, bottom[1] + 22], [bottom[0] + wander, box.d + 24]], ['join', 'out'], 6);
   const top = round.points.reduce((a, b) => (b[1] < a[1] ? b : a));
   const track = lane([top, [top[0] + range(rand, -14, 14) * scale, top[1] - 20 * scale], [top[0] + range(rand, -24, 24) * scale, top[1] - 34 * scale]], ['join', 'dead']);
-  return { roads: [round, out, track], greens: [round.points], centre: [cx, cz] };
+  // A bigger clearing: a lane off its side too, curling round (to the clearing again, where it can).
+  const lanes: RoadPlan[] = [];
+  if (scale > 1) {
+    const ls = lengths(round.points);
+    const east = rand() < 0.5;
+    const at = round.points.reduce((k, q, i) => ((east ? q[0] > round.points[k][0] : q[0] < round.points[k][0]) ? i : k), 0);
+    const { p, t } = pointAt(round.points, ls[at], ls);
+    const n = leftOf(t);
+    const away: 1 | -1 = n[0] * (p[0] - cx) + n[1] * (p[1] - cz) > 0 ? 1 : -1;
+    const ahead = pointAt(round.points, (ls[at] + ls[ls.length - 1] * 0.22) % ls[ls.length - 1], ls).p;
+    lanes.push(toward(round, ls[at], away, range(rand, 40, 50) * scale, range(rand, 1.2, 1.6), ahead));
+  }
+  return { roads: [round, out, track, ...lanes], greens: [round.points], centre: [cx, cz] };
 }
 
 /**
- * `count` more lanes off the lanes (second-order: off roads that join another), each where it
- * keeps clear of the other roads and inside the box (a few tries each; fewer if none fit).
+ * `count` cross streets, each from a road across to the next one along, 30 to 110 m (times
+ * `scale`) away: blocks between them. Each keeps clear of the other roads, 18 m from those it runs
+ * alongside, inside the box and off the greens (a few tries each; fewer if none fit).
  */
-export function extend(rand: Rand, roads: readonly RoadPlan[], box: Box, count: number, scale = 1): RoadPlan[] {
+export function extend(rand: Rand, roads: readonly RoadPlan[], box: Box, count: number, scale = 1, greens: readonly Pt[][] = []): RoadPlan[] {
   const out = [...roads];
-  for (let n = 0, tries = 0; n < count && tries < count * 12; tries++) {
-    const parents = out.filter((r) => r.ends[0] === 'join' && !r.island && lengthOf(r) > 36);
+  const fit = { box, greens };
+  for (let n = 0, tries = 0; n < count && tries < count * 40; tries++) {
+    const parents = out.filter((r) => !r.island && r.kind !== 'trail' && lengthOf(r) > 40);
     if (!parents.length) break;
     const parent = parents[Math.floor(rand() * parents.length)];
-    const L = lengthOf(parent);
-    const lane = branch(parent, L * range(rand, 0.35, 0.8), side(rand), range(rand, 32, 48) * scale, range(rand, -0.6, 0.6));
-    const others = new RoadIndex(out);
     const from = out.indexOf(parent);
-    const fits = lane.points.every(([x, z], i) => {
-      if (x < 16 || z < 16 || x > box.w - 16 || z > box.d - 16) return false;
-      // Clear of the other roads (room for a lot between), and of its parent past where it leaves it.
-      return !others.onRoad(x, z, 18, from) && (i < 24 || !others.onRoad(x, z, 18));
-    });
-    if (!fits) continue;
-    out.push(lane);
+    const { p, t } = pointAt(parent.points, lengthOf(parent) * range(rand, 0.1, 0.9));
+    const sd = parent.lots ?? side(rand);
+    const n0 = leftOf(t);
+    const a = range(rand, -0.3, 0.3);
+    const dir: Pt = [(n0[0] * Math.cos(a) - n0[1] * Math.sin(a)) * sd, (n0[0] * Math.sin(a) + n0[1] * Math.cos(a)) * sd];
+    const street = crossStreet(out, new RoadIndex(out), from, p, dir, fit, 110 * scale);
+    if (!street) continue;
+    out.push(street);
     n++;
   }
   return out;

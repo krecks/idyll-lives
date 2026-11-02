@@ -19,9 +19,9 @@ import { fetchText } from '../content/content';
 import { bedroomsNeeded, householdBonds, householdSpawns, randomHousehold, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { homePrice } from './price';
 import { crownClear, generateHouse, objectInfos, random, residentsKey, weighted, type GardenSize, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
-import { cropRoads, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Box, type Pt, type RoadPlan } from './roads';
+import { connect, cropRoads, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Box, type Pt, type RoadPlan } from './roads';
 import { householdFunds, savingsOf } from './wealth';
-import { extend, streetNames, WORLDS, worldName, worldTagline, type SizeSpec, type WorldKind } from './world';
+import { extend, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
 import { generateBigWorld, type OpenWorldDraft } from './macro';
 import { garageFor } from '../render/shared/cars';
 import { fenceRuns, townFences, type TownFence } from './gardenFences';
@@ -190,8 +190,11 @@ export interface NeighbourhoodDraft {
   world?: WorldInfo;
   /** A big world's hamlets, land, stops and parking (`macro.ts`); missing in a cosy or normal one. */
   open?: OpenWorldDraft;
-  /** What the layout couldn't do: lots that found no room along the roads (left out of the town). */
-  diagnostics?: { dropped: { name: string; kind: PlotSlot['kind']; lot?: LotSize }[] };
+  /**
+   * What the layout couldn't do: lots that found no room along the roads (left out of the town),
+   * and (a big world) the country roads it found no way for (`roads`: which, and between what).
+   */
+  diagnostics?: { dropped: { name: string; kind: PlotSlot['kind']; lot?: LotSize }[]; roads?: string[] };
 }
 
 /** What kind of world a town is in, one line about it, and how its land looks. */
@@ -593,9 +596,7 @@ export function generateWorld(content: Content, t: Templates, kind: WorldKind, s
   const tagline = worldTagline(content, kind, rand);
   const { box } = spec;
   const layout = recipe.roads(rand, box, spec.scale);
-  // (A bigger town: lanes off its lanes too.)
-  const laid = spec.extend ? extend(rand, layout.roads, box, spec.extend, spec.scale) : layout.roads;
-  const roads = settleRoads(laid, box);
+  const roads = settleRoads(joinUp(rand, layout, spec), box);
   const names = streetNames(content, kind, rand, roads.length);
   const greens = layout.greens ?? [];
   const centre = layout.centre ?? roads[0].points[Math.floor(roads[0].points.length / 2)];
@@ -636,6 +637,21 @@ export function generateWorld(content: Content, t: Templates, kind: WorldKind, s
     world: { kind, size, tagline, landscape },
     diagnostics: { dropped },
   };
+}
+
+/** Courts (lanes left with a dead end) a town keeps at most; a big world's main town, `BIG_COURTS`. */
+export const COURTS = 2;
+export const BIG_COURTS = 3;
+
+/**
+ * A town's roads as its recipe laid them out, joined up (`roads.ts` `connect`: its lanes' dead
+ * ends go on to another road, `courts` of them at most left as courts), with `spec.extend` cross
+ * streets between them (a bigger town's blocks).
+ */
+export function joinUp(rand: Rand, layout: RoadLayout, spec: SizeSpec, courts = COURTS): RoadPlan[] {
+  const fit = { box: spec.box, greens: layout.greens };
+  const joined = connect(layout.roads, fit, courts);
+  return spec.extend ? connect(extend(rand, joined, spec.box, spec.extend, spec.scale, layout.greens), fit, courts) : joined;
 }
 
 /**
