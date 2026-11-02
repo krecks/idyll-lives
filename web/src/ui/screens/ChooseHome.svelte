@@ -152,6 +152,11 @@
 
   onMount(async () => {
     templates = await loadTemplates();
+    // Start on a home they can buy (prices are known now): the first, if the one chosen is too dear.
+    if (lot === 'house' && selected && !affordable(selected)) {
+      const first = vacant.find(affordable);
+      if (first) selectedIndex = first.index;
+    }
   });
 
   // The 3D town shows the chosen lot as the game will (cleared when starting on an empty lot).
@@ -284,6 +289,7 @@
                   class:on={v.index === selected.index}
                   class:dear={!affordable(v)}
                   title={affordable(v) ? undefined : 'Too expensive for them'}
+                  aria-label={affordable(v) ? v.name : `${v.name}, too expensive`}
                   onmouseenter={() => (hover = v.index)}
                   onmouseleave={() => (hover = null)}
                   onclick={() => choose(v.index)}
@@ -292,6 +298,9 @@
                 </button>
               {/each}
             </div>
+            {#if vacant.some((v) => !affordable(v))}
+              <small class="dear-note"><span class="chip-key" aria-hidden="true"></span>Dashed: more than the {money(savings)} they've saved (an empty lot there may not be)</small>
+            {/if}
           </div>
         {/if}
       {:else}
@@ -529,9 +538,32 @@
     background: var(--accent);
     color: #fff;
   }
-  /* More than the household has saved: still there to look at. */
+  /* More than the household has saved: still there to look at, set apart by a dashed edge (not
+     by fading, which left the name too faint to read), and said why under the chips. */
   .chip.dear {
-    opacity: 0.45;
+    background: transparent;
+    border: 1px dashed rgba(29, 34, 48, 0.45);
+    padding: 6px 11px;
+    color: var(--text-muted);
+  }
+  .chip.dear.on {
+    background: var(--accent);
+    border-color: transparent;
+    color: #fff;
+  }
+  .dear-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .chip-key {
+    flex: none;
+    width: 18px;
+    height: 10px;
+    border-radius: var(--radius-pill);
+    border: 1px dashed rgba(29, 34, 48, 0.45);
   }
   .parts {
     display: block;

@@ -892,7 +892,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   flyTo(x: number, z: number): void {
     const o = this.orbit;
     o.stopInertia();
-    this.flight.start(o.target.x, o.target.z, o.radius, x, z, Math.min(Math.max(o.radius, 24), 40));
+    this.flight.start(o.target.x, o.target.z, o.radius, x, z, Math.min(Math.max(o.radius, 24), 40), !!this.options.reducedMotion);
   }
 
   onFocusLot(listener: ((plot: number) => boolean) | null): void {

@@ -1,7 +1,8 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import { clock, money, WEEKDAYS } from './format';
-  import { settings } from '../settings/settings.svelte';
+  import { untrack } from 'svelte';
+  import { settings, systemMotion } from '../settings/settings.svelte';
   import { services } from './services';
   import { game, nextWallMode } from './state.svelte';
 
@@ -28,6 +29,28 @@
       return `Household funds · rent ${money(game.rent)} + bills ${money(game.bills ?? 0)} every ${WEEKDAYS[rent.weekday]} at ${clock(rent.hour * 60, settings.clock24h)}. Bills grow with the value of everything you own and with how many of you there are.`;
     }
     return 'Household funds';
+  });
+
+  /**
+   * Live: the money each change brings or takes (wages, rent, a takeout), floating off the funds
+   * for a moment (Build's purchases have their own, by the cursor: `buy/BuyFx.svelte`). With
+   * Reduce motion it shows where it is, without moving.
+   */
+  let floats = $state<{ id: number; amount: number }[]>([]);
+  let nextFloat = 0;
+  let lastFunds: number | null = null;
+  const still = $derived(settings.reducedMotion || systemMotion.reduced);
+  $effect(() => {
+    const funds = game.funds;
+    const live = game.mode === 'live';
+    untrack(() => {
+      const amount = lastFunds === null ? 0 : funds - lastFunds;
+      lastFunds = funds;
+      if (!live || game.creative || Math.round(amount) === 0) return;
+      const id = nextFloat++;
+      floats = [...floats.slice(-2), { id, amount }];
+      setTimeout(() => (floats = floats.filter((f) => f.id !== id)), 1600);
+    });
   });
 
   function storeyLabel(storey: number): string {
@@ -58,7 +81,7 @@
     {#if game.mode === 'live'}
       <div class="segmented speeds">
         {#each speeds as s (s.value)}
-          <button class:active={game.speed === s.value} title={s.label} aria-label={s.label} onclick={() => services.controls.setSpeed(s.value)}>
+          <button class:active={game.speed === s.value} title={s.label} aria-label={s.label} aria-pressed={game.speed === s.value} onclick={() => services.controls.setSpeed(s.value)}>
             <Icon name={s.icon} size={15} />
           </button>
         {/each}
@@ -90,6 +113,9 @@
 
     <span class="funds tabular" class:debt={game.funds < 0} title={fundsTitle}>
       <Icon name="icon.ui.funds" size={16} />{money(game.funds)}
+      {#each floats as f (f.id)}
+        <span class="float" class:gain={f.amount > 0} class:still aria-hidden="true">{f.amount > 0 ? '+' : '−'}{money(Math.abs(f.amount))}</span>
+      {/each}
     </span>
 
     {#if game.storeys - game.lowestStorey > 1}
@@ -263,6 +289,7 @@
     background: var(--hairline);
   }
   .funds {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -273,6 +300,44 @@
   }
   .funds.debt {
     color: var(--bad);
+  }
+  /* A change of funds, floating down off them (under the bar, over the game). */
+  .float {
+    position: absolute;
+    top: 100%;
+    right: 8px;
+    margin-top: 6px;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--glass-strong);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-sm);
+    color: var(--bad);
+    font-size: 12px;
+    font-weight: 750;
+    pointer-events: none;
+    animation: drift 1.6s var(--ease) forwards;
+  }
+  .float.gain {
+    color: var(--good);
+  }
+  .float.still {
+    animation: none;
+  }
+  @keyframes drift {
+    0% {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    15%,
+    70% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(10px);
+    }
   }
   .storeys {
     display: flex;

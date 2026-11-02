@@ -75,7 +75,7 @@ impl Mirror {
                             .or_insert_with(|| Value::Object(Map::new()));
                         plan.as_object_mut().unwrap().extend(parts.clone());
                     }
-                    ("plan" | "pension" | "grade", Value::Null) => {
+                    ("plan" | "pension" | "grade" | "trip", Value::Null) => {
                         sim.remove(key);
                     }
                     _ => {

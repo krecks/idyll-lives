@@ -42,7 +42,7 @@ import { colorValues } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
 import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { clockTime, openAt, staffed, staffResidents } from './staff';
-import { PointerInput } from './input';
+import { PointerInput, routeKey } from './input';
 import { assembleTown, loadTemplates, useTownContent, type NeighbourhoodDraft } from './town';
 import { gameAssetPlan, streamRanks } from './streamPlan';
 import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
@@ -378,9 +378,28 @@ export async function startSession(
     clearTimeout(hudTimer);
     hudTimer = setTimeout(() => (game.hudAwake = false), HUD_AWAKE_MS);
   };
-  let speedBeforeMenu: number | null = null;
-  /** Build and Create pause the game; the speed to restore back in Live. */
-  let speedBeforeBuy: number | null = null;
+  /**
+   * Time stands still in Build and Create, and while a menu is open (`setMenuPause`): the player's
+   * speed is held once, however many of them hold it, and given back when none does. (Two holds
+   * kept apart gave back each other's 0: Build left behind the pause menu ran the world under
+   * "Paused", and Live came back stuck at a standstill.)
+   */
+  let heldSpeed: number | null = null;
+  let menuHolds = false;
+  function holdTime() {
+    if (heldSpeed !== null) return;
+    heldSpeed = game.speed;
+    bridge.send({ type: 'setSpeed', speed: 0 });
+    game.speed = 0;
+  }
+  function releaseTime() {
+    if (heldSpeed === null || menuHolds || game.mode !== 'live') return;
+    const speed = heldSpeed;
+    heldSpeed = null;
+    if (speed > 0) lastSpeed = speed;
+    bridge.send({ type: 'setSpeed', speed });
+    game.speed = speed;
+  }
   let autosaveTimer: ReturnType<typeof setInterval> | undefined;
   let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
   /** The viewed house's files (the second loading screen); made once, on the first built view. */
@@ -404,6 +423,8 @@ export async function startSession(
       speed = Math.max(0, Math.min(MAX_SPEED, speed));
       if (speed > 0) lastSpeed = speed;
       slowedFrom = null;
+      // Under a menu: the speed it gives back.
+      if (heldSpeed !== null) return void (heldSpeed = speed);
       bridge.send({ type: 'setSpeed', speed });
     },
     togglePause() {
@@ -431,16 +452,17 @@ export async function startSession(
         takeBack();
         const plot = game.sims.find((s) => s.id === id)?.plot;
         if (plot != null && plot !== viewPlot) showPlot(plot);
-      } else {
-        const home = buildBuy.home();
-        if (home && viewPlot !== home.id) showPlot(home.id);
       }
+      // Letting go leaves the camera where it is: the lot under it becomes the focus as the
+      // camera roams (`onFocusLot`), rather than a jump home before a "look here" flies off.
     },
     frameHouse() {
       takeBack();
       if (game.follow !== null) controls.follow(null);
       const plot = world && homePlot() !== null ? world.plots[homePlot()!] : null;
       if (!plot) return;
+      // (Drawn at once, not when the camera settles there.)
+      if (viewPlot !== plot.id) showPlot(plot.id, false);
       const [x0, z0, x1, z1] = plot.house ?? [plot.x, plot.z, plot.x + plot.w, plot.z + plot.d];
       renderer.setGameShot({ target: { x: (x0 + x1) / 2, z: (z0 + z1) / 2 }, beta: 0.72, radius: Math.min(60, Math.max(x1 - x0, z1 - z0) * 1.25 + 8), duration: liveSettings.reducedMotion ? 0 : 1.6 });
       // The shot lands, then the camera is the player's again.
@@ -527,8 +549,15 @@ export async function startSession(
       bridge.send({ type: 'quitCareer', sim: game.selected });
     },
     visit(plot) {
+      const who = game.sims.find((s) => s.id === game.selected);
       bridge.send({ type: 'visit', sim: game.selected, plot });
       game.townOpen = false;
+      // The view goes along with them (Esc lets go).
+      if (game.mode === 'live' && who) {
+        controls.follow(who.id);
+        const hosts = game.households.find((h) => h.plot === plot && !game.plots[plot]?.public);
+        toast(`${who.name} is on the way to ${hosts ? `the ${hosts.name}s` : (game.plots[plot]?.name ?? 'visit')}.`);
+      }
     },
     goHome() {
       bridge.send({ type: 'goHome', sim: game.selected });
@@ -576,7 +605,11 @@ export async function startSession(
       game.socialMenu = null;
     },
     openPauseMenu() {
+      // Nothing stays open under it, for its Escape to close behind it.
       game.menu = null;
+      game.socialMenu = null;
+      game.townOpen = false;
+      game.journalOpen = false;
       game.pauseMenu = true;
     },
     setMode(mode) {
@@ -584,6 +617,7 @@ export async function startSession(
       if (game.mode === mode || (mode === 'create' && game.occupied)) return;
       takeBack();
       game.customising = null;
+      // (Build and Create happen at home: see below.)
       if (mode !== 'live' && game.follow !== null) controls.follow(null);
       const fromLive = game.mode === 'live';
       buildBuy.cancel();
@@ -598,24 +632,15 @@ export async function startSession(
       game.socialMenu = null;
       // Build and Create pause the game (and close Live's panels); back in Live the speed returns.
       if (mode !== 'live') {
-        if (fromLive) {
-          speedBeforeBuy = game.speed;
-          bridge.send({ type: 'setSpeed', speed: 0 });
-        }
+        holdTime();
         game.townOpen = false;
         game.jobBoardOpen = false;
         game.plannerOpen = false;
-      } else if (speedBeforeBuy !== null) {
-        if (speedBeforeBuy > 0) lastSpeed = speedBeforeBuy;
-        bridge.send({ type: 'setSpeed', speed: speedBeforeBuy });
-        speedBeforeBuy = null;
-      }
+      } else releaseTime();
       // Building happens at home, with the walls down so the floor plan is visible.
       const home = buildBuy.home();
-      if (mode === 'build' && home) {
-        if (viewPlot !== home.id) showPlot(home.id);
-        controls.setWallMode('down');
-      }
+      if (mode !== 'live' && home && viewPlot !== home.id) showPlot(home.id);
+      if (mode === 'build' && home) controls.setWallMode('down');
       buildBuy.modeChanged();
     },
     setBuildTab(tab) {
@@ -1154,7 +1179,7 @@ export async function startSession(
       // First the house (the loading screen waits for it), then the rest of the town (streamed
       // after Play). Planning once keeps a later world update from restarting the indicator.
       const plan = gameAssetPlan(content, assets, w, view);
-      planStream([...plan.home, ...plan.rest], 'Game data');
+      planStream([...plan.home, ...plan.rest], 'Loading the town nearby…');
       restUrls = plan.rest;
       homeAssets = prefetchNow(plan.home, (done, total) => {
         progress(`Fetching your home (${done}/${total})`, 0.3 + 0.35 * (done / Math.max(1, total)));
@@ -1471,6 +1496,11 @@ export async function startSession(
       if (e.key === ' ' || e.key === 'Tab' || e.key === 'F3' || e.key === 'F8') e.preventDefault();
       return;
     }
+    // Escape closes the pause menu first, whatever is behind it (it must not act on what the menu covers).
+    if (e.key === 'Escape' && game.pauseMenu && !app.overlay) {
+      game.pauseMenu = false;
+      return;
+    }
     // The colour studio: its keys are its own (Escape closes it, as Cancel).
     if (game.customising) {
       if (e.key === 'Escape' && !game.pauseMenu) game.customising = null;
@@ -1481,9 +1511,14 @@ export async function startSession(
       if (e.key === 'Escape' && !game.pauseMenu) controls.setMode('live');
       return;
     }
-    if (e.key === 'Escape') {
+    const route = routeKey(e, {
+      paused: game.pauseMenu,
+      dialog: (game.plannerOpen && game.mode === 'live') || game.jobBoardOpen || app.overlay !== null,
+      onScene: !(t instanceof Element) || t === document.body || t === document.documentElement || t instanceof HTMLCanvasElement,
+    });
+    if (route === 'none') return;
+    if (route === 'escape') {
       if (game.townOpen) return void (game.townOpen = false);
-      if (game.jobBoardOpen) return void (game.jobBoardOpen = false);
       if (game.eyedropper) return controls.toggleEyedropper();
       // Step back: drop what's in hand, then leave Build mode.
       if (buildBuy.cancel()) return;
@@ -1492,17 +1527,11 @@ export async function startSession(
       if (game.journalOpen) return void (game.journalOpen = false);
       if (game.follow !== null) return controls.follow(null);
       if (game.inspected !== null && liveSettings.directControl !== 'always') return controls.inspect(null);
-      game.pauseMenu = !game.pauseMenu;
-      return;
+      return controls.openPauseMenu();
     }
-    if (game.pauseMenu) return;
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+    if (route === 'undo' || route === 'redo') {
       e.preventDefault();
-      return e.shiftKey ? controls.redo() : controls.undo();
-    }
-    if (e.ctrlKey && (e.key === 'y' || e.key === 'Y')) {
-      e.preventDefault();
-      return controls.redo();
+      return route === 'redo' ? controls.redo() : controls.undo();
     }
     switch (e.key) {
       case ' ':
@@ -1535,8 +1564,7 @@ export async function startSession(
         return;
       case 'c':
       case 'C':
-        // Construct: Build mode's walls, rooms and paint (again: back to Live). Not Ctrl/⌘+C: that copies.
-        if (e.ctrlKey || e.metaKey) return;
+        // Construct: Build mode's walls, rooms and paint (again: back to Live). (Not Ctrl/⌘+C: that copies, `routeKey`.)
         if (game.mode === 'build' && game.buildTab === 'build') return controls.setMode('live');
         return controls.setBuildTab('build');
       case 'o':
@@ -1595,10 +1623,12 @@ export async function startSession(
       case 'L':
         return controls.setMode('live');
       case 'Tab': {
+        // On the page or the canvas: the next resident of the household (Shift: the one before).
         e.preventDefault();
         const ids = playerSims();
         if (!ids.length) return;
-        const next = ids[(ids.indexOf(game.inspected ?? game.selected) + 1) % ids.length];
+        const at = ids.indexOf(game.inspected ?? game.selected);
+        const next = at < 0 ? ids[0] : ids[(at + (e.shiftKey ? ids.length - 1 : 1)) % ids.length];
         controls.selectSim(next);
         controls.inspect(next);
         return;
@@ -1743,13 +1773,9 @@ export async function startSession(
       }
     },
     setMenuPause(paused) {
-      if (paused && speedBeforeMenu === null) {
-        speedBeforeMenu = game.speed;
-        bridge.send({ type: 'setSpeed', speed: 0 });
-      } else if (!paused && speedBeforeMenu !== null) {
-        bridge.send({ type: 'setSpeed', speed: speedBeforeMenu });
-        speedBeforeMenu = null;
-      }
+      menuHolds = paused;
+      if (paused) holdTime();
+      else releaseTime();
     },
     async dispose() {
       disposed = true;

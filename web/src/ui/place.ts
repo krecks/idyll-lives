@@ -1,0 +1,69 @@
+/**
+ * Where a point of the town is, in words (the place pill under the top bar, `PlacePill.svelte`):
+ * the lot there, named as the town map names it, and the area (a big world's hamlet) round it.
+ */
+
+/** A lot as `placeAt` needs it. */
+export interface PlacePlot {
+  id: number;
+  name: string;
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+  public: boolean;
+}
+
+/** An area (a hamlet) as `placeAt` needs it. */
+export interface PlaceArea {
+  name: string;
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+}
+
+/** A lot this near (m) still names the place when the point is just off it (the roaming camera's `FOCUS_REACH`). */
+const REACH = 12;
+
+/** How far (m) a point is from a rectangle (0 inside). */
+function distance(x: number, z: number, r: { x: number; z: number; w: number; d: number }): number {
+  return Math.hypot(Math.max(r.x - x, 0, x - (r.x + r.w)), Math.max(r.z - z, 0, z - (r.z + r.d)));
+}
+
+/** The lot's name: a public place's own, a household's ("The Smiths"), else its address. */
+export function lotTitle(p: PlacePlot, households: readonly { name: string; plot: number | null }[]): string {
+  if (p.public) return p.name;
+  const hh = households.find((h) => h.plot === p.id);
+  return hh ? `The ${hh.name}s` : p.name;
+}
+
+/** "The Smiths · Millbrook": the lot at (or near) `x`, `z` and the area round it; '' when it's neither. */
+export function placeAt(x: number, z: number, plots: readonly PlacePlot[], households: readonly { name: string; plot: number | null }[], areas: readonly PlaceArea[]): string {
+  let lot: PlacePlot | null = null;
+  let best = REACH;
+  for (const p of plots) {
+    const d = distance(x, z, p);
+    if (d >= best) continue;
+    best = d;
+    lot = p;
+    if (d === 0) break;
+  }
+  const parts: string[] = [];
+  if (lot) parts.push(lotTitle(lot, households));
+  const area = areas.find((a) => distance(x, z, a) === 0);
+  if (area && area.name !== parts[0]) parts.push(area.name);
+  return parts.join(' · ');
+}
+
+/**
+ * A resident on their way somewhere (`SimView.trip`), in words: "On the way home · back about
+ * 17:40", "On the way to the Smiths · there about 14:20". `home`: their household's plot; `time`
+ * writes a minute of day as the player's clock does.
+ */
+export function tripText(trip: { to: number; at: number }, home: number | null, plots: readonly PlacePlot[], households: readonly { name: string; plot: number | null }[], time: (minute: number) => string): string {
+  if (trip.to === home) return `On the way home · back about ${time(trip.at)}`;
+  const p = plots[trip.to];
+  const name = p ? lotTitle(p, households) : 'somewhere';
+  return `On the way to ${p && !p.public ? name.replace(/^The /, 'the ') : name} · there about ${time(trip.at)}`;
+}

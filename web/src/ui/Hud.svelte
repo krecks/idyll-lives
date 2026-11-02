@@ -3,6 +3,7 @@
   import PieMenu from './PieMenu.svelte';
   import SimPanel from './SimPanel.svelte';
   import EventFeed from './EventFeed.svelte';
+  import PlacePill from './PlacePill.svelte';
   import HouseholdStrip from './HouseholdStrip.svelte';
   import Journal from './Journal.svelte';
   import JobBoard from './JobBoard.svelte';
@@ -22,6 +23,7 @@
 <div class="hud" class:quiet={game.watching && settings.hideHudWhileWatching && !game.hudAwake}>
   <TopBar />
   {#if game.mode === 'live'}
+    <PlacePill />
     <HouseholdStrip />
     <SimPanel />
     <Journal />

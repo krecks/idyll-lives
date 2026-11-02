@@ -189,11 +189,12 @@ export class Flight {
   private duration = 0;
   active = false;
 
-  start(fromX: number, fromZ: number, fromRadius: number, toX: number, toZ: number, toRadius: number): void {
+  /** `cut`: Reduce motion is on: the camera is there on the next step, without the flight. */
+  start(fromX: number, fromZ: number, fromRadius: number, toX: number, toZ: number, toRadius: number, cut = false): void {
     this.from = { x: fromX, z: fromZ, radius: fromRadius };
     this.to = { x: toX, z: toZ, radius: toRadius };
     const d = Math.hypot(toX - fromX, toZ - fromZ);
-    this.duration = Math.min(2.2, 0.6 + d / 400);
+    this.duration = cut ? 0 : Math.min(2.2, 0.6 + d / 400);
     this.t = 0;
     this.active = true;
   }
@@ -205,11 +206,11 @@ export class Flight {
   /** Steps the flight by `dt` s: where the target and radius are now. */
   step(dt: number, out: { x: number; z: number; radius: number }): boolean {
     if (!this.active) return false;
-    this.t = Math.min(1, this.t + dt / this.duration);
+    this.t = this.duration > 0 ? Math.min(1, this.t + dt / this.duration) : 1;
     const s = this.t * this.t * (3 - 2 * this.t);
     const d = Math.hypot(this.to.x - this.from.x, this.to.z - this.from.z);
     // Up and over a long way: the camera rises by up to a third of the distance, half way.
-    const lift = Math.min(60, d / 3) * Math.sin(Math.PI * s);
+    const lift = this.t >= 1 ? 0 : Math.min(60, d / 3) * Math.sin(Math.PI * s);
     out.x = this.from.x + (this.to.x - this.from.x) * s;
     out.z = this.from.z + (this.to.z - this.from.z) * s;
     out.radius = this.from.radius + (this.to.radius - this.from.radius) * s + lift;

@@ -144,3 +144,42 @@ export class PointerInput {
     if (this.taken) this.cancelTaken();
   };
 }
+
+/** What `routeKey` reads of a key press. */
+export interface KeyPress {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+}
+
+/** What is open over the game when a key comes (`routeKey`). */
+export interface KeyContext {
+  /** The pause menu is open. */
+  paused: boolean;
+  /** A dialog is over the game (the planner, the job board, a settings or load window). */
+  dialog: boolean;
+  /** Focus is on the page or the canvas, not on a control: Tab is the game's then. */
+  onScene: boolean;
+}
+
+/**
+ * What the game does with a key press: `escape` (step back, or close the pause menu), `undo` and
+ * `redo`, `game` (its shortcuts), or `none` (the key is the browser's or the dialog's).
+ *
+ * Behind a dialog or the pause menu the world's keys rest (Space would run time behind the
+ * planner, Tab change who the job board's Join is for); only the debug keys (F3, F8) work there.
+ * With Ctrl, ⌘ or Alt held a key is the browser's (⌘V pastes, Ctrl+P prints), but for undo and
+ * redo. Tab moves focus as usual unless it's on the page or the canvas.
+ */
+export function routeKey(e: KeyPress, c: KeyContext): 'escape' | 'undo' | 'redo' | 'game' | 'none' {
+  if (e.key === 'Escape') return c.dialog ? 'none' : 'escape';
+  if (c.paused || c.dialog) return e.key === 'F3' || e.key === 'F8' ? 'game' : 'none';
+  const command = e.ctrlKey || e.metaKey;
+  if (command && !e.altKey && (e.key === 'z' || e.key === 'Z')) return e.shiftKey ? 'redo' : 'undo';
+  if (e.ctrlKey && !e.altKey && !e.metaKey && (e.key === 'y' || e.key === 'Y')) return 'redo';
+  if (command || e.altKey) return 'none';
+  if (e.key === 'Tab' && !c.onScene) return 'none';
+  return 'game';
+}

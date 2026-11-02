@@ -35,10 +35,12 @@ Build a home and watch the people who live in it.
 | Input | Action |
 |---|---|
 | Left-click | A resident: their panel · an object: what to do with it · the floor: walk there |
-| Left-drag / right-drag / wheel | Rotate / pan / zoom |
+| Left- or middle-drag / right-drag / wheel | Rotate / pan / zoom (arrow keys and + / − too, once the view has the focus) |
 | Space, 0–5 | Pause, game speed |
 | L / B | Live / Build |
 | F · H · J · P · M | Follow · whole house · journal · planner · town map |
+| Tab, double-click a card | Look at the next resident, follow one |
+| E · Page Up/Down · Ctrl+Z/Y | Eyedropper · storeys · undo/redo (Build) |
 | W | Walls up → cutaway → down |
 | Esc | Step back, then the pause menu (save, load, settings) |
 
