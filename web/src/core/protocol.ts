@@ -917,6 +917,8 @@ export type ToWorker =
   | { type: 'resync' }
   /** Which part of the town to build geometry for (tile rectangle); null = everything. */
   | { type: 'view'; region: [number, number, number, number] | null }
+  /** The camera's stream rectangle: the sim's full-detail area (docs/design/open-world.md `setWatch`). */
+  | { type: 'watch'; region: [number, number, number, number] | null }
   /** `?debug`'s `__crash`: the next step panics, an error nobody catches, or the worker hangs. */
   | { type: 'debugCrash'; what: 'panic' | 'throw' | 'hang' };
 

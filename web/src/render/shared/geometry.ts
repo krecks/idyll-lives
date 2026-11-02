@@ -103,6 +103,21 @@ export class Geo {
     return this;
   }
 
+  /** Adds `other`'s geometry as it is, its own colours and cutaway data (`append` paints it in this one's colour). */
+  merge(other: Geo): this {
+    const base = this.pos.length / 3;
+    const push = (to: number[], from: readonly number[]) => {
+      for (let i = 0; i < from.length; i++) to.push(from[i]);
+    };
+    push(this.pos, other.pos);
+    push(this.nor, other.nor);
+    push(this.uv, other.uv);
+    push(this.col, other.col);
+    push(this.cut, other.cut);
+    for (let i = 0; i < other.idx.length; i++) this.idx.push(base + other.idx[i]);
+    return this;
+  }
+
   /** Axis-aligned box; `skip` lists faces to omit ('px', 'nx', 'py', 'ny', 'pz', 'nz'). */
   box(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, skip = ''): this {
     if (!skip.includes('py')) this.poly([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [0, 1, 0]);

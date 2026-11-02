@@ -49,13 +49,16 @@ const KEEP_AHEAD = 2.5;
  */
 export function tableRooms(world: WorldStructure, content: Content, drawn: (id: number) => DrawnObject | undefined, floor: (o: ObjectPlacement) => number): Map<number, TableRoom> {
   const rooms = new Map<number, TableRoom>();
-  const seats = world.objects.filter((o) => content.object(o.def)?.seatAt?.length);
+  // Only what is drawn (the lot in view's things): a seat or a table not drawn has no room to read, and
+  // a whole town's seats against a whole town's things would cost a big world seconds.
+  const shown = world.objects.filter((o) => drawn(o.id));
+  const seats = shown.filter((o) => content.object(o.def)?.seatAt?.length);
   if (!seats.length) return rooms;
   const walls = new Set(world.walls.map((w) => `${w.axis}:${w.x}:${w.z}`));
   const wallBetween = (ax: number, az: number, bx: number, bz: number) => walls.has(bx !== ax ? `v:${Math.max(ax, bx)}:${az}` : `h:${ax}:${Math.max(az, bz)}`);
   const v = [0, 0, 0];
   for (const seat of seats) {
-    const table = facedTable(content, world.objects, seat, wallBetween, world.storeyDepth ?? 0) as ObjectPlacement | null;
+    const table = facedTable(content, shown, seat, wallBetween, world.storeyDepth ?? 0) as ObjectPlacement | null;
     const surface = table && content.object(table.def)?.surface;
     const there = table && drawn(table.id);
     const own = drawn(seat.id);

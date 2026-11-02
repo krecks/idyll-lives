@@ -189,6 +189,11 @@ export class SimBridge {
     this.worker.postMessage({ type: 'view', region } satisfies ToWorker);
   }
 
+  /** The tile rectangle the camera streams in: the sim's full-detail area (until sent: the view's; null = the view's again). */
+  setWatch(region: [number, number, number, number] | null): void {
+    this.worker.postMessage({ type: 'watch', region } satisfies ToWorker);
+  }
+
   /** Serialized game state, taken between two sim steps. */
   requestSave(): Promise<string> {
     return this.request<string>((requestId) => ({ type: 'save', requestId }));

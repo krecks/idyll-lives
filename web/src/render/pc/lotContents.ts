@@ -1003,6 +1003,7 @@ export class LotContents {
         this.hooks.shadowsMoved(true);
       }
     }
+    this.objectShadows?.flush();
   }
 
   /** The tables the seats in the new world face (`tableRooms`), for the residents to pull their chairs up to; none pulled in yet. */

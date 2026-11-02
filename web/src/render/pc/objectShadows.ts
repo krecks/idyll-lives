@@ -88,12 +88,27 @@ export class ObjectShadows {
     this.parent.addChild(entity);
   }
 
-  /** An object's copy written anew (hidden, shown, moved): its vertices in the caster follow. */
+  /**
+   * An object's copy written anew (hidden, shown, moved): its vertices in the caster follow,
+   * uploaded once for all the copies written in the same task, or at `flush` (the cutaway moves every
+   * wall item at once: one upload of the whole caster each was 10 ms on a big lot).
+   */
   bake(target: PopTarget): void {
     const parts = this.parts.get(target.matrices);
-    const mesh = this.mesh;
-    if (!parts || !mesh) return;
+    if (!parts || !this.mesh) return;
     for (const part of parts) if (target.index < part.count) this.bakeCopy(part, target.index);
+    if (this.uploadDue) return;
+    this.uploadDue = true;
+    queueMicrotask(() => this.flush());
+  }
+  private uploadDue = false;
+
+  /** The copies written since the last upload, uploaded now (a caller writing many at once, in a frame, ends with it). */
+  flush(): void {
+    if (!this.uploadDue) return;
+    this.uploadDue = false;
+    const mesh = this.mesh;
+    if (!mesh) return;
     mesh.setPositions(this.positions);
     mesh.update(pc.PRIMITIVE_TRIANGLES, false);
   }
