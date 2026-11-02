@@ -5,6 +5,8 @@
 
 use crate::common;
 
+use common::run_to;
+
 use sim_core::world::{Phase, TaskKind};
 use sim_core::{Command, MINUTES_PER_TICK, World, clock, life};
 
@@ -26,20 +28,13 @@ const BED: u32 = 4;
 fn world(seed: u32, start: f32) -> World {
     let mut w = World::from_json(&common::content(), TOWN, seed).unwrap();
     w.autonomy = false;
-    until(&mut w, 1, start);
+    run_to(&mut w, 1, start);
     w.autonomy = true;
     w
 }
 
 fn need(w: &World, id: &str) -> usize {
     w.content.needs.iter().position(|n| n.id == id).unwrap()
-}
-
-fn until(w: &mut World, day: u32, hour: f32) {
-    let target = clock::tick_at(day, hour * 60.0).unwrap();
-    while w.tick < target {
-        w.tick_once();
-    }
 }
 
 /// Everything full but these needs.
@@ -124,12 +119,7 @@ fn a_film_they_chose_is_left_for_the_toilet_before_the_bladder_runs_out() {
 fn a_film_the_player_asked_for_goes_on() {
     let mut w = world(1, 14.0);
     full_but(&mut w, &[("fun", 0.0)]);
-    let def = w.objects[CINEMA as usize].def;
-    let film = w.content.objects[def]
-        .interactions
-        .iter()
-        .position(|i| i.id == "film")
-        .unwrap();
+    let film = common::interaction(&w, CINEMA, "film");
     w.apply(Command::Use {
         sim: 0,
         object: CINEMA,
@@ -181,7 +171,7 @@ fn the_toilet_before_leaving_for_work() {
         level: 0,
     })
     .unwrap();
-    until(&mut w, 2, 0.5);
+    run_to(&mut w, 2, 0.5);
     let job = w.sims[0].job.clone().unwrap();
     let (leave, ..) =
         life::shift_today(&w.content, &job, &w.sims[0].skills, w.tick).expect("a workday");

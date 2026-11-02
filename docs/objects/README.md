@@ -1,8 +1,9 @@
 # Objects
 
-Every object in the game, 541 of them, has a model built in Blender (`tools/art/blender`), exported as a `.glb`,
+Every object in the game, 543 of them, has a model built in Blender (`tools/art/blender`), exported as a `.glb`,
 with the moving parts it can show. Blender is the only source: the primitive parts the models replaced are gone, and
-the keys never changed, so saves and content need no migration. All 541 were built and checked in play by 2026-10-17,
+the keys never changed, so saves and content need no migration. All but the wide curtains, added 2026-10-21, and the empty
+vase, added 2026-10-30, were built and checked in play by 2026-10-17,
 as were the 36 models that aren't buyable: the 20 things residents carry and cook with (`families/held.py`), the 9 street props
 (`families/street.py`), and the lawn's grass tufts and wildflowers, the woods' rocks and the selection marker
 (`families/ground.py`). Every model key in the manifests has a `.glb`.
@@ -26,7 +27,7 @@ what is still open.
 | Fitness | [fitness.md](fitness.md) | 5 | F1 Home gym (5) |
 | Hobbies | [hobbies.md](hobbies.md) | 19 | H1 Music (6), H2 Games (6), H3 Crafts and science (7) |
 | Decor | [decor.md](decor.md) | 23 | D1 Wall art and clocks (6), D2 Ornaments (10), D3 Textiles (7) |
-| Tabletop | [tabletop.md](tabletop.md) | 39 | TT1 Kitchenware (11), TT2 Tableware (7), TT3 Books and small plants (7), TT4 Small ornaments (6), TT5 Bath, desk and toys (8) |
+| Tabletop | [tabletop.md](tabletop.md) | 40 | TT1 Kitchenware (11), TT2 Tableware (7), TT3 Books and small plants (8), TT4 Small ornaments (6), TT5 Bath, desk and toys (8) |
 | Lighting | [lighting.md](lighting.md) | 21 | LT1 Ceiling lights (7), LT2 Wall lights (3), LT3 Floor lamps (5), LT4 Table lamps (6) |
 | Outdoor | [outdoor.md](outdoor.md) | 43 | OU1 Patio seating and tables (11), OU2 Loungers, swings and the hot tub (5), OU3 Grills and fire (3), OU4 Play and yard (9), OU5 Pond, small garden things and lights (9), Garden decor (6) |
 | Garden plants and trees | [garden.md](garden.md) | 53 | G1 Houseplants (10), G2 Flowers (15), G3 Shrubs (11), G4 Edibles (5), G5 Trees (12) |

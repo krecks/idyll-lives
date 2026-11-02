@@ -22,7 +22,6 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import bpy  # noqa: E402
 import gamekit as G  # noqa: E402
-from gamekit.motion import _clip, last_frame  # noqa: E402
 from gamekit.shapes import _recalc_normals  # noqa: E402
 from mathutils import Vector  # noqa: E402
 
@@ -1108,10 +1107,9 @@ def _inside_at(sections, y):
 def _fill(stream, water):
     """The clips: the stream runs out (`tap_on`), the water waits for it and rises (`fill`)."""
     G.grow(stream, 'tap_on', seconds=BATH_TAP)
-    start, end = last_frame(BATH_TAP), last_frame(BATH_TAP + BATH_FILL)
     for axis in range(3):
         rest = water.scale[axis]
-        _clip(water, 'fill', 'scale', axis, [(1, rest), (start, rest), (end, 1.0)])
+        G.keys(water, 'fill', 'scale', axis, [(0, rest), (BATH_TAP, rest), (BATH_TAP + BATH_FILL, 1.0)])
 
 
 def _tub(sections, rim, floor_y):
@@ -1368,7 +1366,7 @@ def mirrorCabinet():
                   bevel_segments=1)
     door = G.hinged(G.join(parts, 'door'), F.at(-(w - 0.02) / 2, y0 + h / 2, front))
     G.settle(centre=False, floor=False)
-    G.swing(door, 'door_open', 100, seconds=0.8)
+    G.swing(door, 'door_open', 100, seconds=0.8, ease='back_out')
     return G.meshes()
 
 
@@ -1436,7 +1434,7 @@ def bathCabinetTall():
         _pull(F, 'pull', 0.15, niche[1] + 0.1, front + 0.02, 0.12, M.chrome, r=0.005, stand=0.015)
     door = G.hinged(G.join(parts, 'door'), F.at(-0.2, (niche[1] + top) / 2, front))
     G.settle(centre=False)
-    G.swing(door, 'door_open', 100, seconds=0.8)
+    G.swing(door, 'door_open', 100, seconds=0.8, ease='back_out')
     return G.meshes()
 
 

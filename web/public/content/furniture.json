@@ -885,6 +885,15 @@
       "description": "A chimney hood for the wall above the stove.",
       "ambient": "hood",
       "ambientWhile": "sizzle",
+      "light": {
+        "range": 1.6,
+        "intensity": 1,
+        "height": 1.4,
+        "tiles": 0,
+        "switch": false,
+        "aim": "down",
+        "while": ["stir", "bake"]
+      },
       "interactions": []
     },
     {
@@ -4790,6 +4799,14 @@
       "freeRotation": true,
       "group": "cooking",
       "outdoors": true,
+      "surface": {
+        "height": 0.77,
+        "kind": "counter",
+        "size": [
+          0.56,
+          0.56
+        ]
+      },
       "description": "A kettle grill for the garden: dinner with smoke and a bit of fun. Trains Cooking.",
       "interactions": [
         {

@@ -214,11 +214,7 @@ fn the_checks_see_a_follow_up() {
         .position(|n| n.id == "bladder")
         .unwrap();
     w.sims[0].needs[bladder] = 0.3;
-    let interaction = w.content.objects[w.objects[toilet].def]
-        .interactions
-        .iter()
-        .position(|i| i.id == "use")
-        .unwrap();
+    let interaction = common::interaction(&w, toilet as u32, "use");
     w.apply(sim_core::Command::Use {
         sim: 0,
         object: toilet as u32,

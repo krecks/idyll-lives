@@ -1052,11 +1052,7 @@ fn a_baby_with_a_grown_up_at_home_is_cuddled_and_stays_comfortable() {
         .iter()
         .position(|n| n.id == "comfort")
         .unwrap();
-    let cuddle = w.content.objects[w.objects[0].def]
-        .interactions
-        .iter()
-        .position(|i| i.id == "cuddle")
-        .unwrap();
+    let cuddle = common::interaction(&w, 0, "cuddle");
     // Two days, Ada at home (no job): she sees to Bea, cuddling her when she needs it.
     let (mut sum, mut lowest, mut n, mut cuddled) = (0.0, 1.0f32, 0, false);
     for _ in 0..2 * 24 * 4 {
@@ -1134,7 +1130,8 @@ fn a_baby_loaded_from_a_save_lies_back_in_the_crib() {
     }
 }
 
-/// A town as full as it gets (`MAX_SIMS`): partners don't keep trying for a baby that can't come.
+/// A town as full as it grows (`TOWN_SIMS`, a town without a size): partners don't keep trying
+/// for a baby that can't come.
 #[test]
 fn partners_in_a_full_town_dont_keep_trying_for_a_baby() {
     let content = r#"{
@@ -1191,8 +1188,8 @@ fn partners_in_a_full_town_dont_keep_trying_for_a_baby() {
     };
     // (Both towns at once: each is a crowd of 63 or 64 to simulate.)
     let (room, full) = std::thread::scope(|s| {
-        let room = s.spawn(|| tries(sim_core::world::MAX_SIMS - 1, true));
-        let full = s.spawn(|| tries(sim_core::world::MAX_SIMS, false));
+        let room = s.spawn(|| tries(sim_core::world::TOWN_SIMS - 1, true));
+        let full = s.spawn(|| tries(sim_core::world::TOWN_SIMS, false));
         (room.join().unwrap(), full.join().unwrap())
     });
     assert!(room > 0, "with room in town they do");

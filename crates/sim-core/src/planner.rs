@@ -710,48 +710,70 @@ pub(crate) fn update(w: &mut World) {
     }
 }
 
-/// Recomputes what each household's home offers when walls or objects changed.
+/// Recomputes what each household's home offers when walls or objects changed: what each kind
+/// of object offers (its autonomous uses), then each plot's objects that aren't broken, then
+/// each household's home with the public places (a pass over the objects, not one per
+/// household).
 fn refresh_offers(w: &mut World) {
     if w.offers_version == w.structure_version && w.offers.len() == w.households.len() {
         return;
     }
     w.offers_version = w.structure_version;
     let content = &w.content;
-    let public: Vec<bool> = w.plots.iter().map(|p| p.public).collect();
+    let by_def: Vec<HouseOffer> = content
+        .objects
+        .iter()
+        .map(|def| {
+            let mut offer = HouseOffer::default();
+            for inter in def.interactions.iter().filter(|i| i.autonomous) {
+                for (a, act) in content.activities.iter().enumerate() {
+                    if inter.tags & act.tags != 0 {
+                        offer.activities |= 1 << a;
+                    }
+                }
+                for (s, &g) in inter.skill_gain.iter().enumerate() {
+                    if g > 0.0 {
+                        offer.skills |= 1 << s;
+                    }
+                }
+            }
+            offer
+        })
+        .collect();
+    let mut on_plot = vec![HouseOffer::default(); w.plots.len()];
+    let mut public = HouseOffer::default();
+    for (o, plot) in w.objects.iter().zip(&w.object_plot) {
+        let Some(p) = plot.map(|p| p as usize) else {
+            continue;
+        };
+        if o.broken() {
+            continue;
+        }
+        let d = by_def[o.def];
+        let to = if w.plots[p].public {
+            &mut public
+        } else {
+            &mut on_plot[p]
+        };
+        to.activities |= d.activities;
+        to.skills |= d.skills;
+    }
+    // There is always something to tidy at home.
+    let mut tidy = 0u64;
+    for (a, def) in content.activities.iter().enumerate() {
+        if def.tags & content.room_rules.clean.tags != 0 && !def.social && !def.visit {
+            tidy |= 1 << a;
+        }
+    }
     w.offers = w
         .households
         .iter()
         .map(|h| {
-            let mut offer = HouseOffer::default();
-            // There is always something to tidy at home.
-            if h.plot.is_some() {
-                for (a, def) in content.activities.iter().enumerate() {
-                    if def.tags & content.room_rules.clean.tags != 0 && !def.social && !def.visit {
-                        offer.activities |= 1 << a;
-                    }
-                }
-            }
-            for (o, plot) in w.objects.iter().zip(&w.object_plot) {
-                let here = plot.is_some_and(|p| Some(p) == h.plot || public[p as usize]);
-                if !here || o.broken() {
-                    continue;
-                }
-                for inter in content.objects[o.def]
-                    .interactions
-                    .iter()
-                    .filter(|i| i.autonomous)
-                {
-                    for (a, def) in content.activities.iter().enumerate() {
-                        if inter.tags & def.tags != 0 {
-                            offer.activities |= 1 << a;
-                        }
-                    }
-                    for (s, &g) in inter.skill_gain.iter().enumerate() {
-                        if g > 0.0 {
-                            offer.skills |= 1 << s;
-                        }
-                    }
-                }
+            let mut offer = public;
+            if let Some(p) = h.plot {
+                let own = on_plot[p as usize];
+                offer.activities |= own.activities | tidy;
+                offer.skills |= own.skills;
             }
             offer
         })

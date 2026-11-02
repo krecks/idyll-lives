@@ -120,8 +120,8 @@ pub mod sim {
     pub const WAY_X: usize = 24;
     pub const WAY_Z: usize = 25;
     /// While walking, where their way is `AHEAD` metres on from where they are (or its end;
-    /// not past a step onto another storey); else where they stand. With `WAY_X`, the renderer
-    /// opens a door or a gate only for someone about to go through it.
+    /// not past a step onto another storey); else where they stand. From it the renderer opens
+    /// a door or a gate only for someone about to go through it (`doors.ts` `goingThrough`).
     pub const AHEAD_X: usize = 26;
     pub const AHEAD_Z: usize = 27;
     /// The baby they hold in the arms (`carry::carrying`: lifting them out of the crib, or on
@@ -161,11 +161,11 @@ const _: () = assert!(
 
 /// What a Sim does for the snapshot; see `sim::OBJECT`, `sim::ACTION`, `sim::OBJECT_DEF` and
 /// `sim::INTERACTION`.
-struct Doing {
-    object: f32,
-    action: f32,
-    def: f32,
-    interaction: f32,
+pub(crate) struct Doing {
+    pub(crate) object: f32,
+    pub(crate) action: f32,
+    pub(crate) def: f32,
+    pub(crate) interaction: f32,
 }
 
 impl Doing {
@@ -209,7 +209,7 @@ fn eating(world: &World, s: &Sim) -> Option<usize> {
         .or(s.held.map(|h| h.def))
 }
 
-fn doing(world: &World, s: &Sim) -> Doing {
+pub(crate) fn doing(world: &World, s: &Sim) -> Doing {
     if s.away_until.is_some() {
         return Doing::NOTHING;
     }

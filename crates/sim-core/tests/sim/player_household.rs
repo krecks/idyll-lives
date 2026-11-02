@@ -2,8 +2,11 @@
 //! first one, not the last) as the player's. Everything the player's household gets must follow
 //! the flag, never the household's position in the list.
 
+use crate::common;
+
+use common::run_to;
 use sim_core::social::EventKind;
-use sim_core::{World, clock, life};
+use sim_core::{World, life};
 
 const CONTENT: &str = r#"{
     "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.02}],
@@ -28,13 +31,6 @@ const TOWN: &str = r#"{"width":36,"depth":12,
             {"name":"Ben","household":1,"x":18.5,"z":5.5},
             {"name":"Cy","household":2,"x":29.5,"z":5.5}]}"#;
 
-fn until(w: &mut World, day: u32, hour: f32) {
-    let target = clock::tick_at(day, hour * 60.0).unwrap();
-    while w.tick < target {
-        w.tick_once();
-    }
-}
-
 #[test]
 fn a_neighbour_household_can_be_the_players() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
@@ -57,7 +53,7 @@ fn a_neighbour_household_can_be_the_players() {
     // Rent and bills for their home, paid from their own funds (every household's payment is
     // in the story log).
     let (rent, bills) = life::weekly_costs(&w, 1).unwrap();
-    until(&mut w, 7, 12.5);
+    run_to(&mut w, 7, 12.5);
     let paid: Vec<i64> = w
         .events
         .iter()

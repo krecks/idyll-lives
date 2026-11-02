@@ -36,7 +36,7 @@
  * `select`s and `mix`es.
  */
 
-import { APPEARANCE_TEXELS, MORPH_TEXELS } from '../../shared/characters/layout';
+import { APPEARANCE_TEXELS, MORPH_TEXELS, SHIRT } from '../../shared/characters/layout';
 import type { Language, ShaderFeature } from './chunks';
 
 /** Microsurface (1 - roughness) of painted clothes; skin keeps the material's. */
@@ -50,8 +50,12 @@ const POLISH_MICRO = '0.55';
  * stitch line's distance from the edge (m on the fields).
  */
 const BAND = { cuff: '0.022, 0.012', hem: '0.024, 0.013', rib: '0.016, 0.015', binding: '0.011, 0.007', waistband: '0.034, 0.03', welt: '0.012, 0.008' };
-/** What shows in an open jacket's V (texel 4 r = 1 + n + its neck line / 4; outfit.ts `SHIRTS`): 1 white, 2 charcoal, 3 grey (linear). */
+/** The shirts' colours (texel 4 r = 1 + n + its neck line / 4; layout.ts `SHIRT` n): white, charcoal, grey (linear). */
 const SHIRTS = ['0.78, 0.78, 0.74', '0.036, 0.039, 0.046', '0.357, 0.376, 0.406'];
+/** Whether shirt `shirtN` is white: a suit's, a jacket's white tee, or an apron's. */
+const SHIRT_WHITE = `(shirtN < ${SHIRT.white + 0.5} || shirtN > ${SHIRT.apron - 0.5})`;
+/** How much of the top is the shirt: an open jacket's V from the waist to its neck line (`inV`), an apron's all of it. */
+const SHIRT_MIX = `step(0.5, shirtN) * max(step(${SHIRT.apron - 0.5}, shirtN), (1.0 - smoothstep(0.1, 0.3, simF.x)) * smoothstep(0.0, 0.01, simF.y - simT4.w) * inV)`;
 /** The baked occlusion (tone.w): down to x (1 - AO_DARK) at most, at AO_GAIN per unit; the body's deepen with age (texel 4 g). */
 const AO_DARK = '0.8';
 const AO_GAIN = '1.5';
@@ -341,12 +345,13 @@ const PS_GLSL = {
 			vec3 cBottom = simTexel(2).rgb;
 			vec3 cShoe = simTexel(6).rgb;
 			// An open jacket's shirt (texel 4 r = 1 + n + its neck line / 4) on the torso, from the waist to the
-			// neck line and in a collar above it (the jacket shell covers the rest); then the bands.
+			// neck line and in a collar above it (the jacket shell covers the rest); an apron's (n 4) all over the
+			// top, sleeves too (the apron shell takes the top's colour); then the bands.
 			float shirtN = floor(simT4.x) - 1.0;
-			vec3 shirt = shirtN < 1.5 ? vec3(${SHIRTS[0]}) : shirtN < 2.5 ? vec3(${SHIRTS[1]}) : vec3(${SHIRTS[2]});
+			vec3 shirt = ${SHIRT_WHITE} ? vec3(${SHIRTS[0]}) : shirtN < ${SHIRT.charcoal + 0.5} ? vec3(${SHIRTS[1]}) : vec3(${SHIRTS[2]});
 			float neckY = fract(simT4.x) * 4.0;
 			float inV = max(1.0 - smoothstep(neckY - 0.008, neckY, simF.y), 1.0 - smoothstep(0.01, 0.014, simF.z - c2));
-			cTop = simFabric(mix(cTop, shirt, step(0.5, shirtN) * (1.0 - smoothstep(0.1, 0.3, simF.x)) * smoothstep(0.0, 0.01, simF.y - simT4.w) * inV), simHemTop);
+			cTop = simFabric(mix(cTop, shirt, ${SHIRT_MIX}), simHemTop);
 			cBottom = simFabric(cBottom, simHemBottom);
 			cShoe = simFabric(cShoe, simHemShoe);
 			vec3 topOver = mix(mix(skin, cBottom, simBottom), cTop, simTop);
@@ -494,10 +499,10 @@ const PS_WGSL = {
 			var cBottom = simTexel(2).rgb;
 			var cShoe = simTexel(6).rgb;
 			let shirtN = floor(simT4.x) - 1.0;
-			let shirt = select(select(vec3f(${SHIRTS[2]}), vec3f(${SHIRTS[1]}), shirtN < 2.5), vec3f(${SHIRTS[0]}), shirtN < 1.5);
+			let shirt = select(select(vec3f(${SHIRTS[2]}), vec3f(${SHIRTS[1]}), shirtN < ${SHIRT.charcoal + 0.5}), vec3f(${SHIRTS[0]}), ${SHIRT_WHITE});
 			let neckY = fract(simT4.x) * 4.0;
 			let inV = max(1.0 - smoothstep(neckY - 0.008, neckY, simF.y), 1.0 - smoothstep(0.01, 0.014, simF.z - c2));
-			cTop = simFabric(mix(cTop, shirt, step(0.5, shirtN) * (1.0 - smoothstep(0.1, 0.3, simF.x)) * smoothstep(0.0, 0.01, simF.y - simT4.w) * inV), simHemTop);
+			cTop = simFabric(mix(cTop, shirt, ${SHIRT_MIX}), simHemTop);
 			cBottom = simFabric(cBottom, simHemBottom);
 			cShoe = simFabric(cShoe, simHemShoe);
 			let topOver = mix(mix(skin, cBottom, simBottom), cTop, simTop);

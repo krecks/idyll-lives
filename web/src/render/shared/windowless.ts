@@ -49,7 +49,17 @@ export function windowlessRooms(world: WorldStructure, was: Windowless): Windowl
   }
   for (const d of world.diagonals ?? []) if (d.kind === 'window') for (const r of d.rooms) lit.add(r);
   const rooms = new Set<number>();
-  for (const r of world.rooms) if (r !== 0 && !lit.has(r)) rooms.add(r);
+  // (Which rooms there are, marked in a typed array: a big world's rows are millions of tiles.)
+  const seen = new Uint8Array(65536);
+  const all = world.rooms;
+  let other = false;
+  for (let i = 0; i < all.length; i++) {
+    const r = all[i];
+    if (r > 0 && r < 65536) seen[r] = 1;
+    else if (r !== 0) other = true;
+  }
+  for (let r = 1; r < 65536; r++) if (seen[r] && !lit.has(r)) rooms.add(r);
+  if (other) for (const r of all) if (r !== 0 && !lit.has(r)) rooms.add(r);
   for (const d of world.diagonals ?? []) for (const r of d.rooms) if (r !== 0 && !lit.has(r)) rooms.add(r);
   return { rooms, of };
 }

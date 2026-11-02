@@ -8,9 +8,11 @@
 
 use crate::common;
 
+use common::interaction;
+
 use sim_core::content::Pose;
 use sim_core::world::{Phase, TaskKind};
-use sim_core::{Command, TICKS_PER_MINUTE, World, clock};
+use sim_core::{Command, TICKS_PER_MINUTE, World};
 
 /// A crib, a dining table with the high chair pulled up to it, and a parent with her baby.
 const HOME: &str = r#"{"width":16,"depth":12,
@@ -24,15 +26,6 @@ const HOME: &str = r#"{"width":16,"depth":12,
 const CRIB: u32 = 0;
 const HIGH_CHAIR: u32 = 2;
 
-fn interaction(w: &World, object: u32, id: &str) -> usize {
-    let def = w.objects[object as usize].def;
-    w.content.objects[def]
-        .interactions
-        .iter()
-        .position(|i| i.id == id)
-        .unwrap_or_else(|| panic!("no {id}"))
-}
-
 /// The shipped content and `town` at `hour` on day 1, everyone's needs full, nobody choosing for
 /// themselves; Bea in her crib.
 fn home(town: &str, hour: f32) -> World {
@@ -42,10 +35,7 @@ fn home(town: &str, hour: f32) -> World {
         household: None,
     })
     .unwrap();
-    let at = clock::tick_at(1, hour * 60.0).unwrap();
-    while w.tick < at {
-        w.tick_once();
-    }
+    common::run_to(&mut w, 1, hour);
     let n = w.content.needs.len();
     for s in &mut w.sims {
         s.needs[..n].fill(1.0);

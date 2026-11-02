@@ -800,7 +800,7 @@ fn state(w: &World, s: &Sim) -> State {
             }
         }
         Phase::Conversing { .. } => State::Busy(d),
-        Phase::Routing { .. } => State::Routing(d),
+        Phase::Routing { .. } | Phase::Driving => State::Routing(d),
         Phase::Calling { .. }
         | Phase::Waiting { .. }
         | Phase::Queued { .. }
@@ -843,7 +843,7 @@ fn describe(w: &World, st: State) -> String {
         Doing(k, a, b) => {
             let kinds = [
                 "Use", "MoveTo", "Social", "Join", "Work", "Visit", "GoHome", "Answer", "Clean",
-                "Repair", "Spot", "Cook", "Eat", "Dishes", "Phone",
+                "Repair", "Spot", "Cook", "Eat", "Dishes", "Phone", "Carry",
             ];
             format!("{} {a} {b}", kinds[k as usize])
         }
@@ -1634,9 +1634,7 @@ pub fn household_of_three() -> (World, Vec<usize>, String) {
         .collect();
     assert_eq!(home.len(), 3);
     w.autonomy = false;
-    while w.tick < clock::tick_at(1, 9.0 * 60.0).unwrap() {
-        w.tick_once();
-    }
+    run_to(&mut w, 1, 9.0);
     for &i in &home {
         let n = w.content.needs.len();
         w.sims[i].needs[..n].fill(1.0);
@@ -1732,7 +1730,47 @@ pub fn sit_on_the_sofa(w: World, content: &str, who: &[usize]) -> World {
     w
 }
 
+/// The item Sim 0 is shown holding this tick (the snapshot's `held`: what they carry, or what the
+/// use they're on has them bring or hold), as an id.
+pub fn shown_held(w: &World) -> Option<String> {
+    use sim_core::snapshot::{self, HEADER_LEN, sim};
+    let mut out = vec![0.0; snapshot::CAPACITY];
+    snapshot::write(w, &mut out);
+    let n = out[HEADER_LEN + sim::HELD] as usize;
+    (n > 0).then(|| w.content.items[n - 1].id.clone())
+}
+
+/// The index of interaction `id` on object `object`'s kind.
+pub fn interaction(w: &World, object: u32, id: &str) -> usize {
+    let def = w.objects[object as usize].def;
+    w.content.objects[def]
+        .interactions
+        .iter()
+        .position(|i| i.id == id)
+        .unwrap_or_else(|| panic!("no {id}"))
+}
+
+/// Ticks `w` for up to `minutes`, until `done`; true if it got there.
+pub fn until(w: &mut World, minutes: u64, mut done: impl FnMut(&World) -> bool) -> bool {
+    for _ in 0..minutes * sim_core::TICKS_PER_MINUTE {
+        if done(w) {
+            return true;
+        }
+        w.tick_once();
+    }
+    done(w)
+}
+
+/// Ticks `w` on to `hour` of `day`.
+pub fn run_to(w: &mut World, day: u32, hour: f32) {
+    let target = clock::tick_at(day, hour * 60.0).unwrap();
+    while w.tick < target {
+        w.tick_once();
+    }
+}
+
 /// Metres between two points.
 pub fn apart(p: [f32; 2], q: [f32; 2]) -> f32 {
     (p[0] - q[0]).hypot(p[1] - q[1])
 }
+pub mod hamlets;

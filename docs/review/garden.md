@@ -80,18 +80,18 @@ Notes:
 
 | Item | Real uses | Content uses (minutes) | Verdict |
 |---|---|---|---|
-| `flowerbed` | water, weed and tend, smell the flowers, cut some | tend the flowers (20), smell the flowers (5) | OK |
-| `garden.tulips` | water, cut a bunch for a vase, deadhead | water (10), smell (5) | cutting missing (I-garden-08) |
-| `garden.daffodils` | water, cut a bunch, smell (light scent) | water (10), smell (5) | cutting missing (I-garden-08) |
-| `garden.daisies` | water, pick a few, make a daisy chain | water (10), smell (5) | picking missing (I-garden-08) |
+| `flowerbed` | water, weed and tend, smell the flowers, cut some | tend the flowers (20), smell the flowers (5), cut some flowers (6, a bunch for a vase) | OK (cutting added 2026-10-30, Q-18) |
+| `garden.tulips` | water, cut a bunch for a vase, deadhead | water (10), smell (5), cut some tulips (6, a bunch for a vase) | OK (cutting added 2026-10-30, Q-18) |
+| `garden.daffodils` | water, cut a bunch, smell (light scent) | water (10), smell (5), cut some daffodils (6) | OK (cutting added 2026-10-30, Q-18) |
+| `garden.daisies` | water, pick a few, make a daisy chain | water (10), smell (5), cut some daisies (6), make a daisy chain (12) | OK (picking added 2026-10-30, the chain 2026-10-31, Q-18) |
 | `garden.sunflowers` | water, admire (look up), cut a head, save seeds | water (10), admire (5, looks down: I-garden-07) | pose wrong |
 | `garden.poppies` | water, admire (no scent to speak of) | water (10), smell (5, "Sweet scent") | smell on a scentless flower (I-garden-08) |
 | `garden.marigolds` | water, deadhead (pungent leaves) | water (10), smell (5, "Sweet scent") | smell is sharp, not sweet (I-garden-08) |
 | `garden.pansies` | water, deadhead | water (10), smell (5) | OK |
-| `garden.lilies` | water, smell (heady scent), cut for a vase | water (10), smell (5) | cutting missing (I-garden-08) |
+| `garden.lilies` | water, smell (heady scent), cut for a vase | water (10), smell (5), cut some lilies (6) | OK (cutting added 2026-10-30, Q-18) |
 | `garden.lupins` | water, admire, deadhead | water (10), smell (5) | OK |
 | `garden.forgetMeNots` | water, admire (scentless) | water (10), smell (5, "Sweet scent") | smell on a scentless flower (I-garden-08) |
-| `garden.cosmos` | water, cut for a vase | water (10), smell (5) | cutting missing (I-garden-08) |
+| `garden.cosmos` | water, cut for a vase | water (10), smell (5), cut some cosmos (6) | OK (cutting added 2026-10-30, Q-18) |
 | `garden.meadow` | walk or lie in it, pick wildflowers, watch the bees | pick a wildflower (5) | OK |
 | `garden.geraniums` | water, deadhead, smell the leaves | water (5), smell (5) | OK |
 | `garden.flowerBox` | water, deadhead, smell | water (5), smell (5) | OK |
@@ -364,10 +364,10 @@ Causes shared beyond this ledger, moved at the consolidation (2026-10-21): I-gar
 - **Severity:** S3
 - **Rubric:** I1
 - **Fix class:** content
-- **Where:** `web/public/content/garden.json:1052` (poppies `smell`, `feeling: garden.sweetScent`), `:1098` (marigolds), `:1282` (forget-me-nots), `:337-339` (magnolia "Smell the magnolia": `anim: admire`); the cut-flower uses would go beside the tulips', daffodils', lilies', cosmos' and daisies' (`:869`, `:915`, `:1190`, `:1328`, `:961`)
+- **Where:** `web/public/content/garden.json:1052` (poppies `smell`, `feeling: garden.sweetScent`), `:1098` (marigolds), `:1282` (forget-me-nots), `:337-339` (magnolia "Smell the magnolia": `anim: admire`); the cut-flower uses sit beside the tulips', daffodils', lilies', cosmos' and daisies' (`:869`, `:915`, `:1190`, `:1328`, `:961`), and the daisies' chain at `:1094`
 - **Evidence:** `cargo review uses` (`tables/uses-garden.md`): the 11 beds have the same two uses. Poppies and forget-me-nots have no scent to speak of and marigolds' is sharp, yet each gives "Sweet scent". The magnolia's smell is looking up at flowers about 3 m above the nose (`sheets/obj-garden.magnolia.png`). The reference's real uses for a bed (`reference.json` `flowerBed`: water, smell, pick a few) include cutting, which the game has nowhere: the meadow's "Pick a wildflower" is the only picking. Make the scentless beds' second use "Admire" (anim `look`), relabel the magnolia's "Admire the magnolia", and decide at triage whether cut flowers (for a vase) are wanted.
-- **Status:** fixed (a45e65a2); cut flowers later (Q-18)
-- **After:** Poppies, marigolds and forget-me-nots: "Admire the …" (`look`), no Sweet scent feeling; the magnolia's reads "Admire the magnolia". Played on `review-garden`.
+- **Status:** fixed (a45e65a2; the cutting on 2026-10-30)
+- **After:** Poppies, marigolds and forget-me-nots: "Admire the …" (`look`), no Sweet scent feeling; the magnolia's reads "Admire the magnolia". Played on `review-garden`. Cutting (2026-10-30, Q-18) came first as a use of the raised bed ("Cut some flowers", 6 min, `anim: tend`, the bunch in the hand), taken by the bought empty vase ("Put the flowers in"), and then on each bed that is cut for a vase: the tulips', daffodils', lilies', cosmos' and daisies' "Cut some …" (6 min, same clip, the bunch in the hand, `holds: cutFlowers`). The daisies' "make a daisy chain" came last (2026-10-31): 12 min at the bed, the chain of eleven daisies in the hand as it is made (`holds: daisyChain`, `chain-garden.daisies-daisyChain-01.png`), which closes the last real use the garden had missing.
 - **Source:** wave: garden
 
 ### I-garden-09 — The bonsai is pruned for 45 minutes standing, stooped over a knee-high table

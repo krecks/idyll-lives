@@ -5856,15 +5856,15 @@
       "label": "Chess / games table with seats",
       "w": [
         0.6,
-        1.6
+        1.9
       ],
       "h": [
         0.7,
         1
       ],
       "d": [
-        0.6,
-        1.6
+        0.45,
+        1
       ],
       "seat": [
         0.42,
@@ -6608,7 +6608,7 @@
         1.6
       ],
       "d": [
-        0.9,
+        0.75,
         2
       ],
       "seat": [
@@ -9279,16 +9279,16 @@
     "seesaw": {
       "label": "Seesaw",
       "w": [
-        0.3,
-        0.6
+        2.4,
+        4
       ],
       "h": [
         0.5,
         1
       ],
       "d": [
-        2.4,
-        4
+        0.3,
+        0.6
       ],
       "seat": [
         0.4,
@@ -9422,16 +9422,16 @@
     "pingPongTable": {
       "label": "Table tennis table",
       "w": [
-        1.5,
-        1.6
+        2.7,
+        2.8
       ],
       "h": [
         0.76,
         0.95
       ],
       "d": [
-        2.7,
-        2.8
+        1.5,
+        1.6
       ],
       "surface": [
         0.76,
@@ -9551,7 +9551,7 @@
       ]
     },
     "shopCounter": {
-      "label": "Shop counter or bakery case",
+      "label": "Shop counter",
       "w": [
         1.2,
         2.5
@@ -9571,6 +9571,42 @@
       "uses": [
         "buy a treat",
         "pay"
+      ],
+      "minutes": {
+        "treat": [
+          2,
+          10
+        ],
+        "pastry": [
+          2,
+          10
+        ]
+      },
+      "sources": [
+        "neufert"
+      ]
+    },
+    "displayCase": {
+      "label": "Bakery / deli display case",
+      "w": [
+        1.2,
+        2.5
+      ],
+      "h": [
+        0.9,
+        1.4
+      ],
+      "d": [
+        0.6,
+        1
+      ],
+      "surface": [
+        0.7,
+        0.85
+      ],
+      "uses": [
+        "buy a pastry",
+        "choose a cake"
       ],
       "minutes": {
         "treat": [
@@ -11794,6 +11830,11 @@
     "steppingStones": "steppingStones",
     "garden.fountain": "gardenFountain",
     "garden.pond": "pond",
+    "countryside.fishingSpot": "pond",
+    "countryside.lookout": "parkBench",
+    "countryside.picnicSpot": "picnicTable",
+    "countryside.berryBush": "clippedShrub",
+    "countryside.trailhead": "noticeBoard",
     "garden.boulder": "boulders",
     "model.rock": "boulders",
     "tree": "shadeTree",
@@ -11879,7 +11920,7 @@
     "vendingDrink": "vendingMachine",
     "marketStall": "marketStall",
     "shopCounter": "shopCounter",
-    "bakeryCase": "shopCounter",
+    "bakeryCase": "displayCase",
     "groceryShelf": "groceryShelf",
     "street.mailbox": "mailbox",
     "street.hydrant": "hydrant",
@@ -11918,6 +11959,7 @@
     "booksUpright": "books",
     "vaseFlowers": "vase",
     "vaseSmall": "vase",
+    "vaseEmpty": "vase",
     "photoFrame": "photoFrame",
     "tableClock": "alarmClock",
     "globe": "globe",

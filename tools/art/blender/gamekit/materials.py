@@ -95,7 +95,10 @@ class Palette:
         on a flat part; gloss, as mirrors always were (only High reflects live);
       a lamp's shade or a screen that glows, in a colour: `shade=('#F2E6CC', 'fabric',
         {'glow': '#FFD9A0'})`; a screen that's lit only while it's used adds `screen`: `{'glow':
-        '#7FC4FF', 'screen': True}`.
+        '#7FC4FF', 'screen': True}`;
+      a plain finish (matte, satin, gloss, metal, chrome) shining more or less than the finish does:
+        `marble=('#EDEAE4', 'gloss', {'roughness': 0.3})` (polished stone, not a mirror), and `metallic`
+        (0 or 1). Same draw call: the game keeps a plain part's roughness per vertex.
     """
 
     def __init__(self, **colours):
@@ -113,7 +116,8 @@ class Palette:
         if name not in colours:
             raise AttributeError(f'no colour {name!r} in the palette')
         color, finish = colours[name][:2]
-        m = mat(name, color, **FINISHES[finish])
+        own = _extra(name, colours[name][2:])
+        m = mat(name, color, **{k: own.get(k, v) for k, v in FINISHES[finish].items()})
         m['finish'] = finish  # for the lit previews; not exported (no glTF extras)
         return m
 
@@ -134,9 +138,13 @@ def _extra(name, more):
     if not more:
         return {}
     extra = {'mirror': more[0]} if isinstance(more[0], str) else dict(more[0])
-    unknown = set(extra) - {'mirror', 'glow', 'screen'}
+    unknown = set(extra) - {'mirror', 'glow', 'screen', 'roughness', 'metallic'}
     if len(more) > 1 or unknown:
-        raise ValueError(f'{name}: after the finish, a mirror\'s side or {{"mirror", "glow", "screen"}}, not {more}')
+        raise ValueError(f'{name}: after the finish, a mirror\'s side or {{"mirror", "glow", "screen", "roughness", '
+                         f'"metallic"}}, not {more}')
+    for k in ('roughness', 'metallic'):
+        if k in extra and not (isinstance(extra[k], (int, float)) and 0 <= extra[k] <= 1):
+            raise ValueError(f'{name}: `{k}` is a number from 0 to 1, not {extra[k]!r}')
     if extra.get('mirror') not in (None, 'front', 'back'):
         raise ValueError(f'{name}: a mirror reflects to the front or the back, not {extra["mirror"]!r}')
     if 'screen' in extra:

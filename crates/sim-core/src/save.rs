@@ -62,6 +62,25 @@
 //! parked for good. Older files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
+//! 35 = open worlds (docs/design/open-world.md): the lot's edge and diagonal strings may be
+//! run-length coded (a `~` and then `<char><count>` runs split by commas; dense strings still
+//! load), chemistry is one string for every pair (`chemistry`: base64 of the upper triangle,
+//! `(0, 1), (0, 2), …, (1, 2), …`, as little-endian f32s) and relationships list only the pairs
+//! that aren't as new (no `chemistry` of their own), and the town file's open-world fields are
+//! kept as they came (`openWorld`, `travel::OpenWorld`: size, roads, areas, terrain masks,
+//! parking, which exits are bus stops, plots' areas and kinds; driveways keep their `road` and
+//! `s` in `drives`); a car on a trip between hamlets keeps it (`cars[].trip`, state `out` while
+//! it's parked there) and who rides with it (`cars[].riders`; absent: nobody, as in files written
+//! before passengers, so no new version). Absent: a `cosy` town, as before: no road network from
+//! the meta's roads (the open-world rules are for `normal` and `big` towns,
+//! `travel::Travel::open`). Still 35: a garage the player built (Build mode's Garage tool) keeps
+//! the way its door faces (`garages[].rot`, a thing's facing; absent: towards the street, as the
+//! town placed it), and a car parked in front of one where it parked before
+//! (`cars[].driveSpot`, `[x, z, yaw]`; absent: where it parks is its own spot). Both are left out
+//! when absent, so a game without a garage of the player's saves as it did. Still 35: a driveway
+//! running along x keeps the way it runs (`drives[].frontX`, ±1; absent: along z, `front`), so
+//! files without one save as they did; a cosy town's driveways with the road each meets
+//! (`drives[].road`) are what has its cars drive its roads (`cars::settle_all`).
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -77,7 +96,7 @@ use crate::social::{self, Relationship};
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 34;
+pub const SAVE_VERSION: u32 = 35;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -146,6 +165,14 @@ pub struct SaveFile {
     pub drives: Vec<crate::cars::Drive>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub garages: Vec<crate::cars::Garage>,
+    /// Chemistry between every pair of residents (absent before v35: in `relationships`): base64
+    /// of the upper triangle as little-endian f32s (`pack_chemistry`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub chemistry: String,
+    /// The town file's open-world fields (`travel::OpenWorld`): roads, areas, terrain, parking,
+    /// which exits are bus stops, plots' areas and kinds (absent: none).
+    #[serde(default, skip_serializing_if = "crate::travel::OpenWorld::is_empty")]
+    pub open_world: crate::travel::OpenWorld,
 }
 
 /// Food or a dish somewhere, by content id (unknown ones are dropped on load).
@@ -684,13 +711,15 @@ pub struct RelationshipSave {
     pub b: u32,
     #[serde(flatten)]
     pub rel: Relationship,
-    pub chemistry: f32,
+    /// Before v35 (since: in `SaveFile::chemistry`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chemistry: Option<f32>,
 }
 
 impl World {
     pub fn to_save(&self) -> SaveFile {
         let content = &self.content;
-        let (h, v) = self.lot.edges();
+        let (h, v, diagonals) = self.lot.row_major_edges();
         let minutes_left = |until: u64| until.saturating_sub(self.tick) as f32 * MINUTES_PER_TICK;
         let objects = self
             .objects
@@ -837,8 +866,7 @@ impl World {
         for a in 0..n {
             for b in 0..n {
                 let rel = *self.relationships.get(a, b);
-                let chemistry = self.relationships.chemistry(a, b);
-                if a != b && (rel != Relationship::default() || chemistry != 0.0) {
+                if a != b && rel != Relationship::default() {
                     let rel = Relationship {
                         friendship: finite(rel.friendship, 0.0),
                         romance: finite(rel.romance, 0.0),
@@ -848,25 +876,21 @@ impl World {
                         a: a as u32,
                         b: b as u32,
                         rel,
-                        chemistry: finite(chemistry, 0.0),
+                        chemistry: None,
                     });
                 }
             }
         }
+        let chemistry = pack_chemistry(n, |a, b| finite(self.relationships.chemistry(a, b), 0.0));
         SaveFile {
             version: SAVE_VERSION,
             mode: self.mode,
             dirt: self
-                .dirt
-                .iter()
-                .enumerate()
-                .filter(|(_, d)| **d >= 1.0 / 255.0)
-                .map(|(i, d)| {
-                    [
-                        (i % self.lot.width) as u16,
-                        (i / self.lot.width) as u16,
-                        (d * 255.0).round() as u16,
-                    ]
+                .lot
+                .tiles()
+                .filter_map(|(x, z, i)| {
+                    let d = self.dirt.get(i).copied().unwrap_or(0.0);
+                    (d >= 1.0 / 255.0).then(|| [x as u16, z as u16, (d * 255.0).round() as u16])
                 })
                 .collect(),
             tick: self.tick,
@@ -881,9 +905,9 @@ impl World {
             lot: LotSave {
                 width: self.lot.width,
                 depth: self.lot.depth,
-                h_edges: encode(h),
-                v_edges: encode(v),
-                diagonals: encode_diagonals(self.lot.diagonals()),
+                h_edges: run_length(&encode(&h)),
+                v_edges: run_length(&encode(&v)),
+                diagonals: run_length(&encode_diagonals(&diagonals)),
                 looks: encode_looks(&self.lot, &self.content),
                 floors: encode_floors(&self.lot, &self.content),
             },
@@ -941,6 +965,7 @@ impl World {
                 })
                 .collect(),
             relationships,
+            chemistry,
             meta: self.meta.clone(),
             exits: self
                 .exits
@@ -965,6 +990,20 @@ impl World {
             cars: self.cars.clone(),
             drives: self.drives.clone(),
             garages: self.garages.clone(),
+            open_world: {
+                let mut file = self.travel.file.clone();
+                // (Indices into the exits as saved: those that are numbers.)
+                file.stops = self
+                    .exits
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, e)| e.iter().all(|v| v.is_finite()))
+                    .enumerate()
+                    .filter(|&(_, (i, _))| self.travel.is_stop(i))
+                    .map(|(k, _)| k as u32)
+                    .collect();
+                file
+            },
             items: self
                 .items
                 .list
@@ -1013,22 +1052,29 @@ impl World {
                 save.version
             )));
         }
-        let mut lot = Lot::from_edges(
-            save.lot.width,
-            save.lot.depth,
-            decode(&save.lot.h_edges)?,
-            decode(&save.lot.v_edges)?,
-            decode_diagonals(&save.lot.diagonals)?,
-        )?;
-        decode_looks(&mut lot, &content, &save.lot.looks);
-        decode_floors(&mut lot, &content, &save.lot.floors);
-        let mut world = World::empty(content, lot, Rng::new(save.rng));
         // Storeys before the furniture: what may stand upstairs depends on them.
         let storeys = save.storeys.unwrap_or(1).max(1);
         // The basement's block comes after the ground's, at most one past the storeys above.
         let basement = save.basement.filter(|&b| b > 0 && b <= storeys);
         let blocks = storeys as usize + usize::from(basement.is_some());
-        if blocks > 1 && world.lot.depth.is_multiple_of(blocks) {
+        let stacked = blocks > 1 && save.lot.depth.is_multiple_of(blocks);
+        let ground = if stacked {
+            save.lot.depth / blocks
+        } else {
+            save.lot.depth
+        };
+        let mut lot = Lot::from_edges(
+            save.lot.width,
+            save.lot.depth,
+            ground,
+            decode(&expand(&save.lot.h_edges)?)?,
+            decode(&expand(&save.lot.v_edges)?)?,
+            decode_diagonals(&expand(&save.lot.diagonals)?)?,
+        )?;
+        decode_looks(&mut lot, &content, &save.lot.looks);
+        decode_floors(&mut lot, &content, &save.lot.floors);
+        let mut world = World::empty(content, lot, Rng::new(save.rng));
+        if stacked {
             world.storeys = storeys;
             world.stairs.depth = (world.lot.depth / blocks) as i32;
             world.stairs.basement = basement.map_or(0, i32::from);
@@ -1044,6 +1090,7 @@ impl World {
         world.player_moves = save.player_moves.unwrap_or(true);
         world.meta = save.meta.clone();
         world.exits = save.exits.clone();
+        world.set_travel(save.open_world.clone());
         world.plots = save
             .plots
             .iter()
@@ -1473,7 +1520,21 @@ impl World {
                         ..r.rel
                     };
                     world.relationships.set(a, b, rel);
-                    world.relationships.set_chemistry(a, b, r.chemistry);
+                    if let Some(c) = r.chemistry {
+                        world.relationships.set_chemistry(a, b, c);
+                    }
+                }
+            }
+        }
+        if !save.chemistry.is_empty() {
+            let chemistry = unpack_chemistry(&save.chemistry, n)?;
+            let mut k = 0;
+            for a in 0..n {
+                for b in a + 1..n {
+                    world
+                        .relationships
+                        .set_chemistry(a, b, finite(chemistry[k], 0.0));
+                    k += 1;
                 }
             }
         }
@@ -1504,10 +1565,11 @@ impl World {
         });
         world.events = social::EventLog::restore(save.next_event_id, events);
         world.former = save.former.clone();
-        world.dirt = vec![0.0; world.lot.width * world.lot.depth];
+        world.dirt = vec![0.0; world.lot.tile_slots()];
         for &[x, z, d] in &save.dirt {
-            if world.lot.in_bounds(x as i32, z as i32) {
-                let i = world.lot.tile_index(x as i32, z as i32);
+            let (x, z) = (x as i32, z as i32);
+            if world.lot.in_bounds(x, z) {
+                let i = world.tile_slot_mut(x, z);
                 world.dirt[i] = (f32::from(d) / 255.0).min(1.0);
             }
         }
@@ -1637,6 +1699,131 @@ impl World {
             | TaskKind::Carry { .. } => return None,
         })
     }
+}
+
+/// Runs of a character longer than this are given a count (`run_length`).
+const RUN: usize = 1;
+/// Strings of edges or diagonals this long or shorter stay as they are (`run_length`).
+const DENSE: usize = 4096;
+
+/// A string of edge or diagonal characters, run-length coded (v35) when it is long and that makes
+/// it shorter: `~` and then `<char><count>` runs split by commas (`~0120,1,04` is 120 `0`s, a `1`
+/// and four `0`s). Short ones (a single lot's) stay dense, as before.
+fn run_length(dense: &str) -> String {
+    if dense.len() <= DENSE {
+        return dense.to_string();
+    }
+    let mut out = String::from("~");
+    let bytes = dense.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        let mut j = i + 1;
+        while j < bytes.len() && bytes[j] == c {
+            j += 1;
+        }
+        if i > 0 {
+            out.push(',');
+        }
+        out.push(char::from(c));
+        if j - i > RUN {
+            out.push_str(&(j - i).to_string());
+        }
+        i = j;
+    }
+    if out.len() < dense.len() {
+        out
+    } else {
+        dense.to_string()
+    }
+}
+
+/// The dense string a saved one stands for: run-length coded (`~`, v35) or as it is (older).
+fn expand(s: &str) -> Result<std::borrow::Cow<'_, str>, Error> {
+    let Some(runs) = s.strip_prefix('~') else {
+        return Ok(std::borrow::Cow::Borrowed(s));
+    };
+    let corrupt = || Error::new("corrupt lot edges in save");
+    let mut out = String::new();
+    for run in runs.split(',').filter(|r| !r.is_empty()) {
+        let mut chars = run.chars();
+        let c = chars.next().ok_or_else(corrupt)?;
+        let count: usize = match chars.as_str() {
+            "" => 1,
+            n => n.parse().map_err(|_| corrupt())?,
+        };
+        // (No lot is bigger than this: a corrupt count can't ask for more.)
+        if out.len() + count > (crate::lot::MAX_SIDE + 1) * (crate::lot::MAX_ROWS + 1) {
+            return Err(corrupt());
+        }
+        out.extend(std::iter::repeat_n(c, count));
+    }
+    Ok(std::borrow::Cow::Owned(out))
+}
+
+const BASE64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+fn base64(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let b = [
+            chunk[0],
+            *chunk.get(1).unwrap_or(&0),
+            *chunk.get(2).unwrap_or(&0),
+        ];
+        let n = u32::from(b[0]) << 16 | u32::from(b[1]) << 8 | u32::from(b[2]);
+        for k in 0..4 {
+            if k <= chunk.len() {
+                out.push(char::from(BASE64[(n >> (18 - 6 * k) & 63) as usize]));
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
+}
+
+fn unbase64(s: &str) -> Option<Vec<u8>> {
+    let mut out = Vec::with_capacity(s.len() / 4 * 3);
+    let digit = |c: u8| BASE64.iter().position(|&d| d == c).map(|v| v as u32);
+    for chunk in s.as_bytes().chunks(4) {
+        if chunk.len() != 4 {
+            return None;
+        }
+        let pad = chunk.iter().rev().take_while(|&&c| c == b'=').count();
+        let mut n = 0u32;
+        for &c in &chunk[..4 - pad] {
+            n = n << 6 | digit(c)?;
+        }
+        n <<= 6 * pad as u32;
+        let bytes = [(n >> 16) as u8, (n >> 8) as u8, n as u8];
+        out.extend_from_slice(&bytes[..3 - pad]);
+    }
+    Some(out)
+}
+
+/// Chemistry between every pair `a < b` of `n` residents, row by row, as base64 of little-endian
+/// f32s (empty for fewer than two).
+fn pack_chemistry(n: usize, chemistry: impl Fn(usize, usize) -> f32) -> String {
+    let mut bytes = Vec::with_capacity(n * n.saturating_sub(1) * 2);
+    for a in 0..n {
+        for b in a + 1..n {
+            bytes.extend_from_slice(&chemistry(a, b).to_le_bytes());
+        }
+    }
+    base64(&bytes)
+}
+
+fn unpack_chemistry(s: &str, n: usize) -> Result<Vec<f32>, Error> {
+    let corrupt = || Error::new("corrupt chemistry in save");
+    let bytes = unbase64(s).ok_or_else(corrupt)?;
+    if bytes.len() != n * n.saturating_sub(1) / 2 * 4 {
+        return Err(corrupt());
+    }
+    Ok(bytes
+        .chunks(4)
+        .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+        .collect())
 }
 
 fn encode(edges: &[Edge]) -> String {

@@ -6,7 +6,6 @@
  * summary.md to `--out` (default <repo>/bench-results/tools-<time>/).
  *
  *   bun tools/bench/tools.mjs [--runs 5] [--only characters-build,check-glb] [--out <dir>]
- *                              [--tex-src <dir>]   (Poly Haven/ambientCG sources for `tex process`)
  *                              [--content <dir>]   (content with a Validate category, for `content`)
  *                              [--content-id <id> --content-group <group>]   (`content in --dry-run`)
  *
@@ -32,7 +31,6 @@ const runs = Number(flag('runs', 5));
 const only = flag('only', '').split(',').filter(Boolean);
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const out = flag('out', join(ROOT, 'bench-results', `tools-${stamp}`));
-const texSrc = flag('tex-src');
 const contentId = flag('content-id');
 const contentGroup = flag('content-group', 'bench');
 const contentDir = flag('content');
@@ -53,7 +51,6 @@ const CASES = [
   contentId && { name: 'content-in', note: `in ${contentId} --dry-run`, python: () => py('tools/content/validate.py', 'in', contentId, '--group', contentGroup, '--dry-run', ...withContent), rust: () => rs('content', 'in', contentId, '--group', contentGroup, '--dry-run', ...withContent) },
   { name: 'tex-clouds', note: '1024x256 PNG', python: (d) => py('tools/art/clouds.py', join(d, 'clouds.png')), rust: (d) => rs('tex', 'clouds', join(d, 'clouds.png')) },
   { name: 'tex-materials', note: 'materials.json', cwd: true, python: () => py('tools/art/materials.py'), rust: () => rs('tex', 'materials') },
-  texSrc && { name: 'tex-process', note: 'albedo/normal/arm JPGs', python: (d) => py('tools/art/process.py', texSrc, d), rust: (d) => rs('tex', 'process', texSrc, d) },
 ].filter(Boolean).filter((c) => !only.length || only.includes(c.name));
 
 function once(argv, cwd) {

@@ -613,6 +613,14 @@ export function pushTri(pos: ArrayLike<number>, nor: ArrayLike<number>, out: num
   else out.push(a, c, b);
 }
 
+/** Whether `data` has a UV for each of its `count` vertices, not one throughout (a plain part's, joined with textured ones). */
+function hasUVs(data: VData, count: number): boolean {
+  const uvs = data.uvs;
+  if (!uvs || uvs.length < count * 2) return false;
+  for (let i = 2; i < count * 2; i++) if (uvs[i] !== uvs[i % 2]) return true;
+  return false;
+}
+
 /** World-aligned planar UVs (metres) by dominant normal axis, so textures keep their scale. */
 export function boxProjectUVs(data: VData): void {
   const pos = data.positions;
@@ -922,9 +930,9 @@ export function restNormals(data: VData, local: ArrayLike<number> | null | undef
  * `base` (the file material's, sRGB) without one, times the shading the file bakes into its vertex
  * colours. `full`, the same geometry where a part grown from nothing is grown, gives the normals,
  * winding and UVs its flat rest shape can't (a textured finish's normal map draws nothing on UVs
- * collapsed along an axis).
+ * collapsed along an axis). `fileUVs`: the finish is textured, so the file's UVs (if it has them) are kept.
  */
-export function restyledData(data: VData, base: readonly [number, number, number], ov: MaterialOverride, alpha: number, full?: VData): VData {
+export function restyledData(data: VData, base: readonly [number, number, number], ov: MaterialOverride, alpha: number, full?: VData, fileUVs = false): VData {
   const shape = full ?? data;
   const positions = shape.positions;
   const indices = data.indices;
@@ -938,7 +946,10 @@ export function restyledData(data: VData, base: readonly [number, number, number
   const wound: number[] = [];
   for (let i = 0; i + 2 < indices.length; i += 3) pushTri(positions, normals, wound, indices[i], indices[i + 1], indices[i + 2]);
   const out: VData = { positions: Float32Array.from(positions), normals: Float32Array.from(normals), indices: Uint32Array.from(wound) };
-  boxProjectUVs(out);
+  // A textured finish takes the file's UVs where it has them (metres, made for each part in its own frame by
+  // gamekit/uv.py: the grain along a leg, bark round a trunk); else, or for a plain finish, they're projected here.
+  if (fileUVs && hasUVs(data, positions.length / 3)) out.uvs = Float32Array.from(data.uvs!);
+  else boxProjectUVs(out);
   if (full) {
     out.positions = Float32Array.from(data.positions);
     // (Normals at rest that the instance's pose turns into the grown shape's: `restNormals`.)

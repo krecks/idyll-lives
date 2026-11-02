@@ -6,9 +6,12 @@
 
 use crate::common;
 
+use common::interaction;
+
+use common::shown_held;
 use sim_core::content::Content;
 use sim_core::world::{Phase, TaskKind};
-use sim_core::{Command, World, clock, snapshot};
+use sim_core::{Command, World};
 
 /// The shipped laundry on one plot without walls: the washer, the dryer, the basket and the line.
 const TOWN: &str = r#"{"width":18,"depth":14,
@@ -33,10 +36,7 @@ fn world() -> (World, String) {
         household: None,
     })
     .unwrap();
-    let morning = clock::tick_at(1, 9.0 * 60.0).unwrap();
-    while w.tick < morning {
-        w.tick_once();
-    }
+    common::run_to(&mut w, 1, 9.0);
     fill(&mut w);
     (w, content)
 }
@@ -46,15 +46,6 @@ fn fill(w: &mut World) {
     for s in &mut w.sims {
         s.needs[..n].fill(1.0);
     }
-}
-
-fn interaction(w: &World, object: u32, id: &str) -> usize {
-    let def = w.objects[object as usize].def;
-    w.content.objects[def]
-        .interactions
-        .iter()
-        .position(|i| i.id == id)
-        .unwrap_or_else(|| panic!("no {id}"))
 }
 
 fn order(w: &mut World, object: u32, id: &str) -> Result<(), String> {
@@ -98,14 +89,6 @@ fn doing(w: &World) -> Option<(u32, String, bool)> {
 
 fn using(w: &World, object: u32, id: &str) -> bool {
     doing(w).is_some_and(|(o, i, at)| o == object && i == id && at)
-}
-
-/// What the snapshot shows Ada carrying (an item id).
-fn shown_held(w: &World) -> Option<String> {
-    let mut buf = vec![0.0; snapshot::CAPACITY];
-    snapshot::write(w, &mut buf);
-    let held = buf[snapshot::HEADER_LEN + snapshot::sim::HELD] as usize;
-    (held > 0).then(|| w.content.items[held - 1].id.clone())
 }
 
 #[test]
@@ -270,10 +253,7 @@ fn the_washing_line_dries_in_the_sun_and_is_taken_in_to_fold() {
     let line = &w.objects[LINE as usize];
     assert!(!line.open && line.run.is_none(), "the line empty");
     // Not hung out at night.
-    let night = clock::tick_at(1, 22.0 * 60.0).unwrap();
-    while w.tick < night {
-        w.tick_once();
-    }
+    common::run_to(&mut w, 1, 22.0);
     assert!(order(&mut w, LINE, "washing").is_err());
 }
 

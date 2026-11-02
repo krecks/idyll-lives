@@ -539,9 +539,11 @@ export class Mirrors {
    * the loading veil, not in the frame a mirror first shows (a pipeline first used in play costs that frame tens of milliseconds;
    * `warmGame` calls it). If no mirror reflects yet, the first ones take the slots. From the game
    * camera's pose (what it sees doesn't matter: nothing is culled). Returns the undo, to run once
-   * the frame has drawn. None in a world without mirrors.
+   * the frame has drawn. None in a world without mirrors, unless `alone`: then the first slot's
+   * reflection is drawn without a glass (a big world's lots the camera roams to have mirrors the
+   * first lot may not: their pipelines made here, all but the glass's own).
    */
-  warm(): () => void {
+  warm(alone = false): () => void {
     const forced: Item[] = [];
     const drawn: Reflection[] = [];
     for (let i = 0; i < this.items.length && drawn.length < this.pool.length; i++) {
@@ -569,6 +571,20 @@ export class Mirrors {
         d.material = r.material;
         d.enabled = true;
       }
+      drawn.push(r);
+    }
+    if (alone && !drawn.length && this.pool.length) {
+      const r = this.reflection(0);
+      r.used = performance.now();
+      r.viewInv.copy(this.game.entity.getWorldTransform());
+      r.proj.copy(this.game.camera.projectionMatrix);
+      r.rect.set(0, 0, 1, 0.5);
+      r.camera.rect = r.rect;
+      r.camera.scissorRect = r.rect;
+      r.camera.frustumCulling = false;
+      r.shows.fill(RESIDENT_ROWS_ALL);
+      r.showsAnyone = true;
+      r.entity.enabled = true;
       drawn.push(r);
     }
     this.warming = drawn.length > 0;

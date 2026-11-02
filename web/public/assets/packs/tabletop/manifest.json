@@ -1232,6 +1232,52 @@
           "label": "Block 3"
         }
       ]
+    },
+    "model.vaseEmpty": {
+      "type": "model",
+      "url": "../../models/tabletop/vaseEmpty.glb",
+      "materials": {
+        "blush": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "leaf_light": {
+          "finish": "material.finish.satin"
+        },
+        "orange": {
+          "finish": "material.finish.satin"
+        },
+        "rose": {
+          "finish": "material.finish.satin"
+        },
+        "vase": {
+          "finish": "material.finish.gloss"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        },
+        "yellow": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "putFlowers": "flowers_open",
+          "takeOut": {
+            "clip": "flowers_open",
+            "over": -1
+          }
+        },
+        "open": "flowers_open"
+      },
+      "paint": [
+        {
+          "material": "vase",
+          "label": "Body"
+        }
+      ]
     }
   }
 }

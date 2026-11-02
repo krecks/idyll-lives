@@ -5,7 +5,7 @@
 use crate::common;
 
 use sim_core::social::EventKind;
-use sim_core::{Command, World, clock};
+use sim_core::{Command, World};
 
 const CONTENT: &str = r#"{
     "needs":[{"id":"energy","label":"Energy","decayPerHour":0.02}],
@@ -54,18 +54,11 @@ fn beds(w: &World, from_x: i32) -> usize {
         .count()
 }
 
-fn until(w: &mut World, day: u32) {
-    let end = clock::tick_at(day, 0.0).unwrap();
-    while w.tick < end {
-        w.tick_once();
-    }
-}
-
 #[test]
 fn neighbours_buy_a_bed_for_a_child_out_of_the_crib() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     let funds = w.households[1].funds;
-    until(&mut w, 2);
+    common::run_to(&mut w, 2, 0.0);
     assert!(!w.content.life.baby(w.sims[3].age), "Dot is a child now");
     assert_eq!(beds(&w, 12), 2, "a bed for Dot next door");
     assert_eq!(
@@ -85,7 +78,7 @@ fn neighbours_buy_a_bed_for_a_child_out_of_the_crib() {
 fn the_player_is_told_once_that_a_child_has_no_bed() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     let funds = w.households[0].funds;
-    until(&mut w, 2);
+    common::run_to(&mut w, 2, 0.0);
     assert!(!w.content.life.baby(w.sims[1].age), "Bea is a child now");
     assert_eq!(beds(&w, 0), 1, "nothing bought for the player");
     assert_eq!(w.households[0].funds, funds);
@@ -97,7 +90,7 @@ fn the_player_is_told_once_that_a_child_has_no_bed() {
     };
     assert_eq!(told(&w), 1, "the player is told Bea has no bed");
     assert!(EventKind::NoBed.importance() >= 1, "it shows in the feed");
-    until(&mut w, 4);
+    common::run_to(&mut w, 4, 0.0);
     assert_eq!(told(&w), 1, "once, not every night");
 }
 
@@ -163,7 +156,7 @@ fn a_crowded_home_is_told_which_sleepers_have_no_bed() {
 fn neighbours_short_of_money_dont_buy_into_debt() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     w.households[1].funds = 300;
-    until(&mut w, 2);
+    common::run_to(&mut w, 2, 0.0);
     assert!(!w.content.life.baby(w.sims[3].age), "Dot is a child now");
     assert_eq!(beds(&w, 12), 1, "no bed they can't pay for");
     assert_eq!(w.households[1].funds, 300);

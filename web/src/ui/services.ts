@@ -50,6 +50,8 @@ export interface GameControls {
   /** Send the selected Sim to another plot. */
   visit(plot: number): void;
   goHome(): void;
+  /** The camera goes to look at a world point (the town map's "look here"; docs/design/open-world.md). */
+  lookAt(x: number, z: number): void;
   /** The selected Sim starts social interaction `social` with `target`. */
   socialize(target: number, social: number): void;
   /** The selected Sim uses their phone: `action` (content `phone.actions` index), with `contact` or on their own. */
@@ -92,6 +94,10 @@ export interface GameControls {
   toggleEyedropper(): void;
   /** Which storey is in view (0: the ground, -1: the basement); higher ones are hidden, and building happens on it. */
   setStorey(storey: number): void;
+  /** Build mode's Garage tool: a garage at the end of the home's driveway (where one fits). */
+  buildGarageAtDrive(): void;
+  /** Build mode's Garage tool: takes down the home's garage (sold back). */
+  sellGarage(): void;
   /** Build mode: the roof over the home (a roof style and colour). */
   setRoof(style: number, color: number): void;
   /** Build mode: keeps the home as a blueprint (in this browser) under `name`. */

@@ -8,9 +8,11 @@
 
 use crate::common;
 
+use common::until;
+
 use sim_core::content::Pose;
 use sim_core::world::Phase;
-use sim_core::{Command, TICKS_PER_MINUTE, World};
+use sim_core::{Command, World};
 use std::f32::consts::{FRAC_PI_2, PI};
 
 const CONTENT: &str = r#"{
@@ -49,17 +51,6 @@ fn world(walls: &str, objects: &str, sims: &str) -> World {
     let mut w = World::from_json(CONTENT, &lot, 3).unwrap();
     w.autonomy = false;
     w
-}
-
-/// Ticks `w` for up to `minutes`, until `done`; true if it got there.
-fn until(w: &mut World, minutes: u64, mut done: impl FnMut(&World) -> bool) -> bool {
-    for _ in 0..minutes * TICKS_PER_MINUTE {
-        if done(w) {
-            return true;
-        }
-        w.tick_once();
-    }
-    done(w)
 }
 
 fn using(w: &World, sim: usize) -> bool {

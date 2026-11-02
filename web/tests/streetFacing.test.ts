@@ -1,7 +1,8 @@
 /**
  * Neighbours' houses on lots that face a street on any side (`WorldMeta.facing`): a street of
  * houses turned a quarter, the whole town with it, is dressed the same way turned a quarter
- * (gardens, fences, cars, flower beds; the houses' fronts, doors and garages).
+ * (gardens, cars, flower beds; the houses' fronts, doors and garages). The fences round gardens are
+ * the town's, on the grid (`gardenFences.test.ts`): this town has none.
  */
 import { describe, expect, test } from 'bun:test';
 import type { PlotInfo, WorldStructure } from '../src/core/protocol';
@@ -44,7 +45,7 @@ function town(turn: boolean): WorldStructure {
     households: [],
     sims: [],
     exits: [],
-    meta: { kind: 'town', name: 'Test', streets: [], paths, facing, seed: 1 },
+    meta: { kind: 'town', name: 'Test', streets: [], paths, facing, seed: 1, gardenFences: true },
   } as unknown as WorldStructure;
 }
 
@@ -82,7 +83,7 @@ describe('street dressing on lots facing any side', async () => {
       if (s.garage && t.garage) expect([t.garage.x0, t.garage.z0, t.garage.x1, t.garage.z1]).toEqual([-s.garage.z1, s.garage.x0, -s.garage.z0, s.garage.x1]);
     }
     expect(a.specs.some((s) => s.garage)).toBe(true);
-    // Fences, cars, flower beds, shrubs and pots: the same, turned.
+    // Cars, flower beds, shrubs and pots: the same, turned.
     expect(points(b.props.pos, true)).toEqual(points(a.props.pos, false));
     expect(points(b.shadows.pos, true)).toEqual(points(a.shadows.pos, false));
     expect(places(b, true)).toEqual(places(a, false));

@@ -686,6 +686,7 @@ fn phase_name(p: &Phase) -> &'static str {
         Phase::Knocking { .. } => "Knocking",
         Phase::Boarding { .. } => "Boarding",
         Phase::Alighting { .. } => "Alighting",
+        Phase::Driving => "Driving",
     }
 }
 

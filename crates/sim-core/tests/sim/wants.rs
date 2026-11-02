@@ -3,6 +3,8 @@
 
 use crate::common;
 
+use common::run_to;
+
 use serde_json::json;
 use sim_core::content::Layer;
 use sim_core::planner::{self, GoalKind};
@@ -14,13 +16,6 @@ fn town(seed: u64) -> World {
     let content = common::content();
     let file = common::town(&content, seed, 1);
     World::from_json(&content, &file, seed as u32).unwrap()
-}
-
-fn until(w: &mut World, day: u32, hour: f32) {
-    let target = clock::tick_at(day, hour * 60.0).unwrap();
-    while w.tick < target {
-        w.tick_once();
-    }
 }
 
 fn apply(w: &mut World, cmd: serde_json::Value) -> Result<(), sim_core::Error> {
@@ -70,7 +65,7 @@ fn wants(w: &mut World, object: usize) {
 
 fn review(w: &mut World) {
     let day = clock::day(w.tick) + 1;
-    until(w, day, w.content.planner.review_hour + 0.1);
+    run_to(w, day, w.content.planner.review_hour + 0.1);
 }
 
 #[test]
@@ -204,7 +199,7 @@ fn neighbours_buy_what_they_want_themselves() {
             .any(|e| e.kind == EventKind::Bought && e.a == i as u32)
     );
     let (day, hour) = (clock::day(w.tick), w.content.planner.review_hour + 0.5);
-    until(&mut w, day, hour);
+    run_to(&mut w, day, hour);
     assert!(
         !w.sims[i]
             .planner
@@ -466,7 +461,7 @@ fn wants_and_requests_survive_saving() {
 #[test]
 fn residents_come_up_with_things_to_want() {
     let mut w = town(27);
-    until(&mut w, 10, 8.0);
+    run_to(&mut w, 10, 8.0);
     let wanted = w.sims.iter().any(|s| {
         s.planner
             .goals

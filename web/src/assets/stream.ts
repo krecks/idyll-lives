@@ -19,7 +19,11 @@ const FOREGROUND_PARALLEL = 4;
 
 let foregroundLoads = 0;
 let backgroundLoads = 0;
-const waiting: (() => void)[] = [];
+/** Background loads waiting their turn: what starts each, the file it fetches (if known), and when it was asked for. */
+const waiting: { start: () => void; url: string | null; order: number }[] = [];
+let asked = 0;
+/** How soon a waiting file should come (lower first; `reprioritize`); null: in the order asked. */
+let rank: ((url: string) => number) | null = null;
 
 /** Runs a load someone is waiting for; background downloads hold back while it runs. */
 export async function foreground<T>(load: () => Promise<T>): Promise<T> {
@@ -35,17 +39,36 @@ export async function foreground<T>(load: () => Promise<T>): Promise<T> {
 function next(): void {
   while (foregroundLoads === 0 && backgroundLoads < BACKGROUND_PARALLEL && waiting.length) {
     backgroundLoads++;
-    waiting.shift()!();
+    let best = 0;
+    if (rank) {
+      let bestRank = Infinity;
+      for (let i = 0; i < waiting.length; i++) {
+        const w = waiting[i];
+        const r = w.url === null ? Infinity : rank(w.url);
+        if (r < bestRank || (r === bestRank && w.order < waiting[best].order)) [best, bestRank] = [i, r];
+      }
+    }
+    waiting.splice(best, 1)[0].start();
   }
+}
+
+/**
+ * Orders the files waiting to stream in the background by `by` (lower first; ties and files it
+ * doesn't know, Infinity, in the order asked): the game ranks them by where the camera is (the
+ * open world's priorities: the focus lot, then the models in the chunks streamed in, then the rest
+ * by distance). Null: in the order asked again.
+ */
+export function reprioritize(by: ((url: string) => number) | null): void {
+  rank = by;
 }
 
 /**
  * Runs a load nobody is waiting for (a file fetched ahead of time, one that failed tried again): it
  * waits until none of the loads someone is waiting for is running, a couple at a time.
  */
-export function background<T>(load: () => Promise<T>): Promise<T> {
+export function background<T>(load: () => Promise<T>, url: string | null = null): Promise<T> {
   return new Promise<void>((resolve) => {
-    waiting.push(resolve);
+    waiting.push({ start: resolve, url, order: asked++ });
     next();
   })
     .then(load)
@@ -173,7 +196,7 @@ export function prefetch(urls: Iterable<string>): void {
     const k = key(url);
     if (requested.has(k) || finished.has(k)) continue;
     requested.add(k);
-    void background(() => load(k, 'low'))
+    void background(() => load(k, 'low'), k)
       .then(() => settle(k, true))
       .catch(() => {
         requested.delete(k);

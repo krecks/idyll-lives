@@ -262,6 +262,8 @@ export interface ObjectDef {
   staff?: { at: [number, number]; hours: [number, number] };
   /** Can only be placed outdoors (trees, flower beds, ponds). */
   outdoors?: boolean;
+  /** How far a tree's crown reaches out from its middle (m): no house wall may stand closer (sim-core `home.rs`, `game/housegen.ts`). */
+  crown?: number;
   /** The household's own (a wardrobe, a dresser): visitors don't use it (sim-core `world::guest_may`). */
   private?: boolean;
   /** A flight of stairs to the storey above (sim-core `storeys.rs`). */
@@ -274,9 +276,11 @@ export interface ObjectDef {
    * `down` (a pendant's dome, a desk lamp), `up` (a sconce's open cup: a wash up the wall), `out`
    * (a wall light: away from its wall and down, none behind it) or `ceiling` (an uplighter: up
    * at the ceiling, which lights the room). `switch: false`: no switch, lit every night; `fire`:
-   * a fire, lit to sit by (sim-core `lights.rs`), its flames burning while it's lit.
+   * a fire, lit to sit by (sim-core `lights.rs`), its flames burning while it's lit. `while`: lit
+   * only while someone does one of these animations at an object on its tiles (a cooker hood's
+   * light over the hob: `['stir', 'bake']`; sim-core `lights.rs`), by day as at night.
    */
-  light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean; fire?: boolean; aim?: LightAim };
+  light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean; fire?: boolean; aim?: LightAim; while?: string | string[] };
   /**
    * What's done at it sounds like this, by animation tag (world sound keys or `none`, as an
    * interaction's `sound`), for its uses without a `sound` and the cooking steps at it as a
@@ -469,7 +473,8 @@ export interface RoofColorDef {
 export interface FenceStyleDef {
   id: string;
   label: string;
-  kind: 'picket' | 'rails' | 'slats' | 'iron' | 'stone';
+  /** `hedge`: a clipped hedge, drawn from the hedge model (no posts; a gate in it a wooden one). */
+  kind: 'picket' | 'rails' | 'slats' | 'iron' | 'stone' | 'hedge';
   color: string;
   /** Height in metres. */
   height?: number;

@@ -15,6 +15,8 @@
 //! Residents always walk real routes and stand where they would at full detail, so a lot that
 //! becomes watched is already in a sensible state; they just catch up on the ticks they owe.
 //!
+//! In a big world, those farther than `FAR` from the view take a turn only every `FAR_TICKS`.
+//!
 //! `World::lod` turns it off; without a view (`World::set_view`) everything counts as watched,
 //! so headless runs and tests are at full detail unless they ask for a view.
 
@@ -22,6 +24,10 @@ use crate::world::World;
 
 /// Ticks between turns for residents nobody watches (a game minute).
 pub const LOD_TICKS: u64 = 20;
+/// ...and for those farther than `FAR` m from the view (big worlds: in another hamlet, out in
+/// the country): three game minutes.
+pub const FAR_TICKS: u64 = 60;
+pub const FAR: f32 = 300.0;
 /// Residents this close to the view (in tiles) are at full detail too: the renderer draws them
 /// a little past the lot's edge, and nobody should see them take turns or catch up.
 const VIEW_MARGIN: f32 = 5.0;
@@ -57,6 +63,23 @@ impl World {
                 && x <= x1 as f32 + m
                 && z <= z1 as f32 + m)
     }
+
+    /// Whether resident `i` is farther than `FAR` from the view (they take a turn every
+    /// `FAR_TICKS`). Only in open-world towns (`travel::Travel::open`): a cosy town's residents
+    /// keep the turns they always had.
+    pub fn far_away(&self, i: usize) -> bool {
+        let (Some(s), Some([x0, z0, x1, z1])) = (
+            self.sims.get(i),
+            self.view.filter(|_| self.lod && self.travel.open),
+        ) else {
+            return false;
+        };
+        let [x, z] = s.pos;
+        let z = self.ground_z(z.floor() as i32) as f32 + z.fract();
+        let dx = (x0 as f32 - x).max(x - x1 as f32).max(0.0);
+        let dz = (z0 as f32 - z).max(z - z1 as f32).max(0.0);
+        dx.hypot(dz) > FAR
+    }
 }
 
 /// Before residents step (with this tick's briefs): which lots are watched, and how many ticks
@@ -87,10 +110,16 @@ pub(crate) fn plan(w: &mut World) {
     let tick = w.tick;
     for i in 0..w.sims.len() {
         let full = w.full_detail(i);
+        let every = if !full && w.far_away(i) {
+            FAR_TICKS
+        } else {
+            LOD_TICKS
+        };
         let s = &mut w.sims[i];
-        // Off to work or school (or told to do something): no waiting for their turn.
-        let called = s.queue.front().is_some_and(|t| t.directed);
-        if full || called || (tick + i as u64).is_multiple_of(LOD_TICKS) {
+        // Off to work or school (or told to do something): no waiting for their turn. Nor for
+        // one whose turn last tick waited for this one (`Sim::deferred`).
+        let called = s.queue.front().is_some_and(|t| t.directed) || s.deferred;
+        if full || called || (tick + i as u64).is_multiple_of(every) {
             s.steps = s.owed + 1;
             s.owed = 0;
         } else {
@@ -141,6 +170,24 @@ mod tests {
         let behind = lower.sims[1].owed as f32 * crate::MINUTES_PER_TICK / 60.0 * 0.1;
         assert!((full.sims[1].needs[0] - (lower.sims[1].needs[0] - behind)).abs() < 1e-4);
         assert_eq!(full.sims[0].needs, lower.sims[0].needs);
+    }
+
+    #[test]
+    fn far_from_the_view_turns_come_less_often() {
+        let town = r#"{"width":256,"depth":256,"size":"normal",
+            "plots":[{"name":"Near","x":0,"z":0,"w":20,"d":10},{"name":"Far","x":230,"z":230,"w":20,"d":20}],
+            "households":[{"name":"Player","plot":0,"player":true},{"name":"Npc","plot":1}],
+            "sims":[{"name":"Ada","household":0,"x":5.5,"z":5.5},{"name":"Ben","household":1,"x":240.5,"z":240.5}]}"#;
+        let mut w = World::from_json(CONTENT, town, 3).unwrap();
+        w.autonomy = false;
+        w.set_view(Some([0, 0, 20, 10]));
+        let mut turns = 0;
+        for _ in 0..FAR_TICKS * 5 {
+            w.tick_once();
+            turns += usize::from(w.sims[1].steps > 0);
+        }
+        assert!(w.far_away(1) && !w.far_away(0));
+        assert_eq!(turns, 5, "a turn every {FAR_TICKS} ticks");
     }
 
     #[test]

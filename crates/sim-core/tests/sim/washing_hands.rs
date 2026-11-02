@@ -43,11 +43,7 @@ fn after_the_toilet(w: &mut World, toilet: u32) -> Option<(u32, usize, f32)> {
     let (bladder, hygiene) = (need(w, "bladder"), need(w, "hygiene"));
     w.sims[0].needs[bladder] = 0.3;
     w.sims[0].needs[hygiene] = 1.0;
-    let use_it = w.content.objects[w.objects[toilet as usize].def]
-        .interactions
-        .iter()
-        .position(|i| i.id == "use")
-        .unwrap();
+    let use_it = common::interaction(w, toilet, "use");
     w.apply(Command::Use {
         sim: 0,
         object: toilet,
@@ -108,11 +104,7 @@ fn a_toilet_visit_given_up_at_once_has_no_hand_washing_after() {
     // Sent with nothing to go for: off the toilet the moment they're on it.
     let bladder = need(&w, "bladder");
     w.sims[0].needs[bladder] = 1.0;
-    let use_it = w.content.objects[w.objects[toilet as usize].def]
-        .interactions
-        .iter()
-        .position(|i| i.id == "use")
-        .unwrap();
+    let use_it = common::interaction(&w, toilet, "use");
     w.apply(Command::Use {
         sim: 0,
         object: toilet,

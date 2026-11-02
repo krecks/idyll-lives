@@ -2,7 +2,7 @@
  * Households' cars in the game on PlayCanvas (sim-core `cars.rs`): parked on their driveways, and
  * driving off to work and back. Each is an entity of its own (its body from `shared/cars.ts`, one
  * mesh per body and paint, shared, and a soft contact shadow) with its four doors as entities on
- * their hinges, placed every frame where the sim's snapshot says it is (`SnapshotLayout.car`),
+ * their hinges (drawn in one piece with its body while they're all shut: a draw, not five), placed every frame where the sim's snapshot says it is (`SnapshotLayout.car`),
  * between two snapshots; hidden while it's out of town or its parking spot has been built over,
  * and while it stands on the viewed lot with its basement in view (`hideOn`: the lot's ground is
  * hidden then).
@@ -38,6 +38,9 @@ interface Drawn {
   at: { x: number; z: number; yaw: number; shown: number };
   /** Its doors on their hinges, which way each opens (+1 or -1), and how far open each is (0..1). */
   doors: { entity: pc.Entity; side: number; open: number }[];
+  /** Drawn in one piece while its doors are shut (`whole`), apart (`apart`: the body without its doors, and the doors) while one is open. */
+  whole: pc.Entity;
+  apart: pc.Entity;
 }
 
 export class Cars {
@@ -80,12 +83,24 @@ export class Cars {
         paintCar(p.at(0, 0, 0, 0.015), shape, paint, true);
         return p.geo;
       });
+      // (Shut, as most are most of the time, one draw instead of five.)
+      const one = this.mesh(`whole ${info.body} ${info.paint}`, () => {
+        const p = new Painter(new Geo());
+        paintCar(p.at(0, 0, 0, 0.015), shape, paint);
+        return p.geo;
+      });
+      const whole = new pc.Entity('carWhole');
+      const apart = new pc.Entity('carApart');
+      entity.addChild(whole);
+      entity.addChild(apart);
+      apart.enabled = false;
+      if (one) drawMesh(whole, 'carBody', one, this.lib.plainFinish(), { castShadows: this.shadows });
       const shadow = this.mesh(`shadow ${info.body}`, () => {
         const g = new Geo().color('#000000');
         blob(g, 0, 0, shape.wid * 0.62, shape.len * 0.56, 0, 0.55, 0.03);
         return g;
       });
-      if (body) drawMesh(entity, 'carBody', body, this.lib.plainFinish(), { castShadows: this.shadows });
+      if (body) drawMesh(apart, 'carBody', body, this.lib.plainFinish(), { castShadows: this.shadows });
       if (shadow) drawMesh(entity, 'carShadow', shadow, this.lib.contactShadow(false));
       const doors: Drawn['doors'] = [];
       for (let d = 0; d < DOORS; d++) {
@@ -96,7 +111,7 @@ export class Cars {
           return p.geo;
         });
         const door = new pc.Entity('carDoor');
-        entity.addChild(door);
+        apart.addChild(door);
         door.setLocalPosition(side * (shape.wid / 2), 0, hinge);
         if (mesh) drawMesh(door, 'carDoorPanel', mesh, this.lib.plainFinish(), { castShadows: this.shadows });
         doors.push({ entity: door, side, open: 0 });
@@ -104,7 +119,7 @@ export class Cars {
       // Out of the house's lamps, as the street is.
       for (const r of entity.findComponents('render') as pc.RenderComponent[]) this.lib.excludeFromLights([], r.meshInstances);
       this.place(entity, info.x, info.z, info.yaw);
-      this.cars.push({ entity, doors, len: shape.len, wid: shape.wid, at: { x: info.x, z: info.z, yaw: info.yaw, shown: 0 } });
+      this.cars.push({ entity, doors, whole, apart, len: shape.len, wid: shape.wid, at: { x: info.x, z: info.z, yaw: info.yaw, shown: 0 } });
     }
   }
 
@@ -123,7 +138,7 @@ export class Cars {
     if (base === undefined || stride === undefined || !f) return;
     const step = dt / DOOR_SWING;
     for (let i = 0; i < this.cars.length; i++) {
-      const { entity, doors, at } = this.cars[i];
+      const { entity, doors, at, whole, apart } = this.cars[i];
       const o = base + i * stride;
       at.shown = i < count ? curr[o + f.shown] : 0;
       if (!at.shown) {
@@ -150,6 +165,11 @@ export class Cars {
         // The rear edge swings out (`paintDoor`).
         door.entity.setLocalEulerAngles(0, -door.side * DOOR_OPEN * ease(door.open), 0);
         this.moved = true;
+      }
+      const shut = doors.every((d) => d.open === 0);
+      if (whole.enabled !== shut) {
+        whole.enabled = shut;
+        apart.enabled = !shut;
       }
     }
   }

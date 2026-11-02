@@ -16,6 +16,7 @@ pub mod content;
 pub mod conversation;
 pub mod cooking;
 pub mod error;
+pub mod garages;
 pub mod home;
 mod index;
 pub mod items;
@@ -40,6 +41,7 @@ pub mod social;
 pub mod staff;
 pub mod storeys;
 pub mod surface;
+pub mod travel;
 pub mod view;
 pub mod world;
 

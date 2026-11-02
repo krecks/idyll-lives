@@ -146,12 +146,7 @@ fn clear(w: &mut World, item: u32) -> Vec<(u8, u32)> {
 }
 
 fn empty_it(w: &mut World) -> Result<(), String> {
-    let def = w.objects[DISHWASHER as usize].def;
-    let interaction = w.content.objects[def]
-        .interactions
-        .iter()
-        .position(|i| i.id == "unload")
-        .unwrap();
+    let interaction = common::interaction(w, DISHWASHER, "unload");
     let object = w.objects[DISHWASHER as usize].stable;
     w.apply(Command::Use {
         sim: 0,
@@ -205,12 +200,7 @@ fn the_washing_up_goes_in_the_rack_and_it_runs_once_its_done_then_someone_emptie
         )),
         "nothing goes in a dishwasher that's running"
     );
-    let def = w.objects[DISHWASHER as usize].def;
-    let load = w.content.objects[def]
-        .interactions
-        .iter()
-        .position(|i| i.id == "dishes")
-        .unwrap();
+    let load = common::interaction(&w, DISHWASHER, "dishes");
     let stable = w.objects[DISHWASHER as usize].stable;
     let refused = w
         .apply(Command::Use {

@@ -60,8 +60,8 @@ export const DEFAULT_FADE = 0.25;
  * mattress, pulled out or folded away, reaches half a metre past it. Negative: steps in to a thing
  * smaller than its tile (the herb planters, 0.4–0.46 m deep, are picked from as from a counter), or to
  * the part used: the toes at a basin or a sink's cabinet, the hands over the water; up to the toaster and
- * the blender on a counter, the chemistry bench pushed back on its tile, onto the dumbbell rack's mat, the clock's trunk door, the
- * giving jar. Back from the statue, to look up at it. In beside the high chair, to feed the baby in it.
+ * the blender on a counter, the chemistry bench pushed back on its tile, onto the dumbbell rack's mat, the
+ * giving jar. (A thing stepped in to, `STEP_IN`, has its step instead.) Back from the statue, to look up at it. In beside the high chair, to feed the baby in it.
  */
 export const STAND_BACK: Record<string, number> = {
   highChair: -0.5,
@@ -80,7 +80,6 @@ export const STAND_BACK: Record<string, number> = {
   breakfastCounter: -0.3,
   chemistrySet: -0.35,
   dumbbells: -0.6,
-  grandfatherClock: -0.6,
   'kind.givingJar': -0.4,
   townStatue: 0.8,
 };
@@ -112,8 +111,8 @@ export const CROUCH_SHOULDER = 0.55;
  * clip `delay`s so that they stand `back` m back from the tile's middle first, clear of the door), and
  * `out` seconds after the use before stepping
  * out (the door opening again, `out` in its motions). `perLane`: the clips are one per lane, not a sequence (each
- * lane's round goes its own way: the climbing frame's, round to its pole and back). `tag`: only for that use
- * (its action tag), the object's other uses as usual. `over`: a rim stepped over on the way in and out (`at` m
+ * lane's round goes its own way: the climbing frame's, round to its pole and back). Keyed by the object (`def`: all its
+ * uses) or by one use (`def:tag`, its action tag: the object's other uses as usual; `stepInFor`). `over`: a rim stepped over on the way in and out (`at` m
  * from the middle, `h` m high: the ball pit's).
  * `square`: they face the way the object faces, squared to it
  * at their lane, not turned to its middle as sim-core stands them (off to one side that turned the step in and the
@@ -127,7 +126,6 @@ export interface StepIn {
   back?: number;
   out?: number;
   perLane?: boolean;
-  tag?: string;
   over?: { at: number; h: number };
   square?: boolean;
 }
@@ -155,22 +153,28 @@ export const STEP_IN: Record<string, StepIn> = {
   // (clips/reach.ts); up to the wall cupboards over the worktop and the china cabinet, the doors opened and the
   // clean things put away up in them; to the clock's hood, winding it at the dial (a child at the trunk's chains).
   whiteboard: { by: bySize(BOARD) },
-  ...Object.fromEntries(Object.entries(CUPBOARD_OF).map(([def, name]): [string, StepIn] => [def, { by: bySize(PUT_AWAY[name]), tag: 'fetch' }])),
-  grandfatherClock: { by: bySize(CLOCK), tag: 'tinker' },
+  ...Object.fromEntries(Object.entries(CUPBOARD_OF).map(([def, name]): [string, StepIn] => [`${def}:fetch`, { by: bySize(PUT_AWAY[name]) }])),
+  'grandfatherClock:tinker': { by: bySize(CLOCK) },
+  // Knelt up against the raised flower bed's box (its front 0.47 m from the middle), tending or cutting over its rim
+  // (clips/garden.ts `kneelBed`), not at the grass in front of it.
+  'flowerbed:tend': { by: [[0, ['kneelBed'], { to: 0.78 }]] },
+  // Smelling its flowers knelt up against it too, leant in over the rim (clips/garden.ts `smellBed`), not crouched a
+  // tile back: a use's own entry (`def:tag`, `stepInFor`).
+  'flowerbed:smell': { by: [[0, ['smellBed'], { to: 0.78 }]] },
   // Out on the court (2.5 m from the hoop's middle, a lane each for two), shooting (clips/shot.ts).
-  basketballHoop: { by: bySize(SHOT), lanes: [-0.45, 0.45], tag: 'exercise' },
+  'basketballHoop:exercise': { by: bySize(SHOT), lanes: [-0.45, 0.45] },
   // The streetball hoop's shot from its two places 2.2 m out, a pace apart (content `places`; clips/shot.ts).
-  'energetic.streetballHoop': { by: bySize(STREET_SHOT), lanes: [-0.45, 0.45], tag: 'exercise' },
+  'energetic.streetballHoop:exercise': { by: bySize(STREET_SHOT), lanes: [-0.45, 0.45] },
   // The arbour's roses tended at its front posts, the bloom there cut (clips/uses.ts), not at the seat.
-  'romantic.roseArbourSwing': { by: bySize(CUT_ROSE), lanes: [-0.84, 0.84], tag: 'prune' },
+  'romantic.roseArbourSwing:prune': { by: bySize(CUT_ROSE), lanes: [-0.84, 0.84] },
   // Reading the cookbook open on the lectern, the hands on it (clips/uses.ts), from its place 0.52 m out.
-  'foodie.cookbookLectern': { by: bySize(LECTERN), tag: 'read' },
+  'foodie.cookbookLectern:read': { by: bySize(LECTERN) },
   // Kneeling at the low train table's edge, the hands on its track and its little town, a lane each (clips/low.ts).
-  trainTable: { by: bySize(KNEEL_TABLE), lanes: KNEEL_LANES, tag: 'play' },
+  'trainTable:play': { by: bySize(KNEEL_TABLE), lanes: KNEEL_LANES },
   // Into the shelter at the timetable's end, on the back glass past the bench.
   busStop: { by: [[0, [], { to: 0.05 }]], lanes: [-0.95] },
   // At the feeder's post, at its back left, clear of the bird bath: its house filled from a scoop (clips/reach.ts).
-  'kind.songbirdFeeder': { by: bySize(FEEDER), lanes: [-0.2], tag: 'garden' },
+  'kind.songbirdFeeder:garden': { by: bySize(FEEDER), lanes: [-0.2] },
   // At the microwave on the counter's right, the hands at its door.
   microwave: { by: [[0, [], { to: 0.55 }]], lanes: [-0.2] },
   // At the mic stand, singing into it.
@@ -178,11 +182,11 @@ export const STEP_IN: Record<string, StepIn> = {
   // Up on the stage, each at a mic stand.
   'outgoing.karaokeStage': { by: [[0, [], { to: 0.36, up: 0.146 }]], lanes: [-0.36, 0.36] },
   // Bent down to the eyepiece of the tube aimed up (clips/uses.ts), from nearer than the tile.
-  telescope: { by: bySize(EYEPIECE), tag: 'look' },
+  'telescope:look': { by: bySize(EYEPIECE) },
   // Picking the fruit hanging at the front (clips/uses.ts, fitted to where it hangs), then eating it; lemons are
   // picked for the kitchen (G-68), one after another.
-  'garden.apple': { by: bySize(PICK_APPLE, (clip) => [clip, ...EAT_FRUIT]), tag: 'eat' },
-  'garden.lemonTree': { by: bySize(PICK_LEMON), tag: 'harvest' },
+  'garden.apple:eat': { by: bySize(PICK_APPLE, (clip) => [clip, ...EAT_FRUIT]) },
+  'garden.lemonTree:harvest': { by: bySize(PICK_LEMON) },
   // Children's play (`clips/play.ts`): over the ball pit's rim into its middle, wading, jumping and sitting in the
   // balls; down at the play tent's door, crawling in to play on its mat and back out.
   ballPit: { by: bySize(BALL_PIT), over: BALL_PIT[0].fit.over },
@@ -192,6 +196,24 @@ export const STEP_IN: Record<string, StepIn> = {
 export const LANE_SEQ = new Map<string, readonly string[]>();
 /** How far (s) into someone else's round on the same thing one stepped in may still start theirs (`inTurn`). */
 export const LANE_SYNC = 0.4;
+
+/** `STEP_IN` by object: its entry for all its uses and those for one use (`def:tag`), so a frame's lookup builds no key. */
+const STEP_IN_OF = new Map<string, { all?: StepIn; uses: Map<string, StepIn> }>();
+for (const [key, entry] of Object.entries(STEP_IN)) {
+  const at = key.indexOf(':');
+  const def = at < 0 ? key : key.slice(0, at);
+  let of = STEP_IN_OF.get(def);
+  if (!of) STEP_IN_OF.set(def, (of = { uses: new Map() }));
+  if (at < 0) of.all = entry;
+  else of.uses.set(key.slice(at + 1), entry);
+}
+
+/** The `STEP_IN` entry for using `def` with action `tag`: the use's own (`def:tag`), else the object's. */
+export function stepInFor(def: string, tag: string): StepIn | undefined {
+  const of = STEP_IN_OF.get(def);
+  return of && (of.uses.get(tag) ?? of.all);
+}
+
 /** Stepping in (m/s, game time) and out again (s). */
 export const STEP_IN_SPEED = 1.05;
 export const STEP_OUT_S = 1.1;

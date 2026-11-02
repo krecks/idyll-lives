@@ -8,7 +8,8 @@
  *   2: bottom colour rgb, top: crew neckline cut
  *   3: hair colour rgb, top: scoop neckline cut
  *   4: r = 1 if the top is painted over the bottom (1 + n + y / 4: shirt n shows in an open
- *      jacket's V, `SHIRTS`, below its neck line y m), 0 if not, -1 if not and plain (no bands: the
+ *      jacket's V, `SHIRT`, below its neck line y m; n 4: a white shirt over the whole top, under an
+ *      apron), 0 if not, -1 if not and plain (no bands: the
  *      towel, swimwear); g = age (deeper creases: elders 1), b = how far the shells take their
  *      seated shape (characters.ts `writeSit`), bottom: waist height
  *   5: skin reference colour rgb (the skin is tinted relative to it; 1), bottom: leg cut
@@ -20,6 +21,12 @@
 
 /** Appearance texels per resident, after its bone matrices. */
 export const APPEARANCE_TEXELS = 8;
+
+/**
+ * The shirts of texel 4 r (`n`; their colours: the character shader's `SHIRTS`): what shows in an open jacket's V, white,
+ * charcoal or grey; `apron`, a white shirt over the whole top (the apron shell alone in the top's colour).
+ */
+export const SHIRT = { white: 1, charcoal: 2, grey: 3, apron: 4 } as const;
 /** Face morph weights per Sim: (channel, weight) pairs, two per texel. */
 export const MORPH_TEXELS = 12;
 export const MORPH_PAIRS = MORPH_TEXELS * 2;

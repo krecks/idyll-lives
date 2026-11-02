@@ -192,7 +192,7 @@ def _machine(dryer):
     drum = _drum(F, washing, 1 if dryer else 0)
     door = _door(F, ring)
     G.settle(centre=False)
-    G.swing(door, 'door_open', 110, seconds=1.0)
+    G.swing(door, 'door_open', 110, seconds=1.0, ease='back_out')
     # (The dryer tumbles slower than the washer turns.)
     G.spin(drum, 'drum_spin', turns=1, seconds=1.8 if dryer else 1.2, axis='Y')
     return G.meshes()

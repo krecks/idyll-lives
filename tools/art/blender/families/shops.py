@@ -44,7 +44,7 @@ M = G.Palette(
     glass=('#DDEBF0', 'glass'),      # the display's glass and its back doors
     tray=('#ECE8DF', 'gloss'),       # paper doilies and trays
     bun=('#C98F4E', 'satin'), crust=('#B97A40', 'satin'), pastry=('#D9A35F', 'satin'),
-    jam=('#C0392B', 'gloss'), lemon=('#F2C14E', 'gloss'), sponge=('#F2E1C1', 'satin'),
+    jam=('#C0392B', 'gloss'), lemon=('#F2C14E', 'gloss', {'roughness': 0.4}), sponge=('#F2E1C1', 'satin'),
     icing=('#E9A6B4', 'gloss'), choc=('#5A3B26', 'gloss'), cream=('#F7F3EA', 'gloss'),
     # the grocery shelves
     shelf=('#D3D4D2', 'metal'),      # the frame and shelves; the main part the player colours
@@ -58,7 +58,7 @@ M = G.Palette(
     tinLid=('#B9BDC1', 'metal'),     # tins' and jars' lids
     bell=('#C8CCD0', 'chrome'),      # the counter's service bell
     # the café table and chair
-    marble=('#EDEAE4', 'gloss'),     # the table's top; its main part
+    marble=('#EDEAE4', 'gloss', {'roughness': 0.28}),     # the table's top; its main part
     vein=('#BDB8AF', 'gloss'),       # the grey veins in its marble
     iron=('#2B302E', 'metal'),       # its cast-iron foot
     bentwood=('#5A3B26', 'wood'),    # the chair's frame; its main part
@@ -496,43 +496,6 @@ def cafeChair():
 
 
 _FAR = 0.25   # placed on town lots, seen from afar: a quarter of the triangles (E7)
-FAR_FEET = 0.01      # (m) a far version keeps every vertex this close to the floor, as gamekit's far= does
-
-
-def _far(build, ratio=_FAR):
-    """A far version as gamekit's `far=ratio` (the model at rest, still, joined, decimated to `ratio`, its feet
-    kept), but with the vertices that sit on one another merged first: the cans' turned ends meet on their axis in
-    many vertices, and decimating them unmerged tore the drinks machine's cabinet into spikes 26 cm below the floor
-    (and the café table's legs away);
-    and its outermost faces kept, so its box stays the model's."""
-    import bmesh
-    import bpy
-
-    def far():
-        build()
-        bpy.context.scene.frame_set(1)
-        for o in G.meshes():
-            o.animation_data_clear()
-        obj = G.join(G.meshes(), f'{build.__name__}_far', origin=(0, 0, 0))
-        bm = bmesh.new()
-        bm.from_mesh(obj.data)
-        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
-        bm.to_mesh(obj.data)
-        bm.free()
-        # its feet and its outermost faces are kept whole, so it stands and measures as the model does
-        lo = [min(v.co[i] for v in obj.data.vertices) for i in range(3)]
-        hi = [max(v.co[i] for v in obj.data.vertices) for i in range(3)]
-
-        def free(v):
-            return v.co.z > FAR_FEET and all(lo[i] + 0.003 < v.co[i] < hi[i] - 0.003 for i in range(3))
-        keep = obj.vertex_groups.new(name='decimate')
-        keep.add([v.index for v in obj.data.vertices if free(v)], 1.0, 'REPLACE')
-        decimate = obj.modifiers.new('far', 'DECIMATE')
-        decimate.ratio = ratio
-        decimate.vertex_group = 'decimate'
-        return [obj]
-    far.__name__ = f'{build.__name__}_far'
-    return far
 
 
 FAMILY = G.Family(
@@ -540,17 +503,17 @@ FAMILY = G.Family(
     [G.Model('shopCounter', shopCounter, size=(1.96, 1.276, 0.78), key='model.shopCounter', centre=(0, -0.04),
              # buying a little something: the shopkeeper's till drawer pops as they take the money
              motions={'uses': {'treat': {'clip': 'till', 'delay': TILL_DELAY, 'hold': TILL_HOLD}}},
-             paint=[('counter', 'Counter'), ('walnut', 'Trim')], far=_far(shopCounter)),
+             paint=[('counter', 'Counter'), ('walnut', 'Trim')], far=_FAR),
      G.Model('bakeryCase', bakeryCase, size=(1.94, 1.29, 0.86), key='model.bakeryCase', centre=(0, 0.0),
              # buying a pastry or a slice of cake: the baker slides the back door aside to reach in
              motions={'uses': {use: {'clip': 'door', 'delay': DOOR_DELAY, 'hold': DOOR_HOLD} for use in ('pastry', 'takeCake')}},
-             paint=[('case', 'Counter'), ('rim', 'Trim')], far=_far(bakeryCase)),
+             paint=[('case', 'Counter'), ('rim', 'Trim')], far=_FAR),
      G.Model('groceryShelf', groceryShelf, size=(1.92, 1.72, 0.48), key='model.groceryShelf', centre=(0, -0.19),
-             paint=[('shelf', 'Shelves'), ('trim', 'Trim')], far=_far(groceryShelf)),
+             paint=[('shelf', 'Shelves'), ('trim', 'Trim')], far=_FAR),
      G.Model('cafeTable', cafeTable, size=(0.62, 0.745, 0.62), key='model.cafeTable',
              paint=[('marble', 'Top'), ('iron', 'Frame')], far=G.far_of(cafeTable)),
      G.Model('cafeChair', cafeChair, size=(0.446, 0.952, 0.472), key='model.cafeChair', centre=(0, -0.008),
-             paint=[('bentwood', 'Frame'), ('cane', 'Seat')], far=_far(cafeChair))],
+             paint=[('bentwood', 'Frame'), ('cane', 'Seat')], far=_FAR)],
     comment='Blender-built shop fittings and café furniture for the town '
             '(tools/art/blender/families/shops.py). Listed in the base manifest\'s packs. Each has a far '
             'version for the town overview. The till\'s cash drawer slides out (`till`) while a resident '

@@ -29,8 +29,8 @@ import { GAME_FRONT_FACE, MaterialLibrary } from './materials';
 import { setWallHole, wallHoleFor, type WallHole } from './wallHole';
 import type { Content } from '../../content/content';
 import type { DiagonalWall, Opening, WallEdge, WorldStructure } from '../../core/protocol';
-import type { EdgePreview, PaintPreviewFace, RoomOverlayTile, ViewRect, WallMode } from '../types';
-import { HALF_WALL_HEIGHT, WALL_HEIGHT, type HouseSurfaces } from '../shared/house';
+import type { EdgePreview, GaragePreview, PaintPreviewFace, RoomOverlayTile, ViewRect, WallMode } from '../types';
+import { GARAGE_HEIGHT, HALF_WALL_HEIGHT, WALL_HEIGHT, type HouseSurfaces } from '../shared/house';
 import { toLinear } from '../shared/math';
 
 /** Fences and gates previewed as films: as tall as this (m). */
@@ -47,6 +47,12 @@ const FILM_LOOK: Record<FilmKind, { color: string; alpha: number }> = {
   window: { color: '#7FE0F2', alpha: 0.55 },
   open: { color: '#E5484D', alpha: 0.5 },
 };
+/** The Garage tool's film where it fits (green, as a thing in hand that fits), and its door's. */
+const GARAGE_VALID = '#8CE69A';
+const GARAGE_DOOR = '#F2F0EA';
+/** A garage's door in the preview: as wide and tall as a single garage's (`house.ts`). */
+const GARAGE_DOOR_WIDTH = 2.4;
+const GARAGE_DOOR_HEIGHT = 2.12;
 const INVALID = '#E5484D';
 
 /** A box of size 1: its corners, normals and triangles, face by face. */
@@ -178,6 +184,11 @@ export class BuildPreviews {
   private readonly paint: Film;
   private readonly floor: Film;
 
+  // The Garage tool: its body and its door, and what they show.
+  private readonly garage: [Film, Film];
+  private readonly garageDoor: [Film, Film];
+  private garageShown = '';
+
   // The room overlay, and the tile grid.
   private overlay: OverlayDraw | null = null;
   private readonly grid: GridDraw;
@@ -213,7 +224,49 @@ export class BuildPreviews {
     // Paint tool: one film per face; Floor tool: one per tile; tinted with the covering.
     this.paint = film('preview-paint', this.box, 0.6, pc.CULLFACE_BACK, 64, '#FFFFFF');
     this.floor = film('preview-floor', this.ground, 0.6, pc.CULLFACE_BACK, 64, '#FFFFFF');
+    // (A film for each colour: the colour a draw starts with is the one it keeps.)
+    this.garage = [film('preview-garage', this.box, 0.34, pc.CULLFACE_NONE, 1, GARAGE_VALID), film('preview-garage-invalid', this.box, 0.34, pc.CULLFACE_NONE, 1, INVALID)];
+    this.garageDoor = [film('preview-garage-door', this.box, 0.7, pc.CULLFACE_NONE, 1, GARAGE_DOOR), film('preview-garage-door-invalid', this.box, 0.7, pc.CULLFACE_NONE, 1, INVALID)];
     this.grid = this.makeGrid();
+  }
+
+  setGaragePreview(g: GaragePreview | null): void {
+    const shown = g ? `${g.x0},${g.z0},${g.x1},${g.z1},${g.rot},${g.valid},${!!g.sell}` : '';
+    if (shown === this.garageShown) return;
+    this.garageShown = shown;
+    for (const f of [...this.garage, ...this.garageDoor]) f.draw.enabled = false;
+    if (!g) return;
+    // The garage as a film box over its walls' outer faces, as tall as its walls; its door a
+    // slab standing out of the wall it's in (none on one to be taken down: all of it goes red).
+    const k = g.valid ? 0 : 1;
+    const t = 0.07;
+    const [x0, z0, x1, z1] = [g.x0 - t, g.z0 - t, g.x1 + t, g.z1 + t];
+    const h = GARAGE_HEIGHT;
+    this.slab(this.garage[k], [(x0 + x1) / 2, h / 2, (z0 + z1) / 2], [x1 - x0, h, z1 - z0]);
+    if (g.sell) return;
+    const [nx, nz] = ([[0, 1], [1, 0], [0, -1], [-1, 0]] as const)[((g.rot % 4) + 4) % 4];
+    const [cx, cz] = [nx > 0 ? x1 : nx < 0 ? x0 : (x0 + x1) / 2, nz > 0 ? z1 : nz < 0 ? z0 : (z0 + z1) / 2];
+    const dh = GARAGE_DOOR_HEIGHT;
+    const [dw, dd] = nz ? [GARAGE_DOOR_WIDTH, 0.08] : [0.08, GARAGE_DOOR_WIDTH];
+    this.slab(this.garageDoor[k], [cx + nx * 0.04, dh / 2, cz + nz * 0.04], [dw, dh, dd]);
+  }
+
+  /** A film's one box: its middle and size. */
+  private slab(f: Film, [x, y, z]: readonly number[], [sx, sy, sz]: readonly number[]): void {
+    const m = this.m;
+    m.fill(0);
+    m[0] = sx;
+    m[5] = sy;
+    m[10] = sz;
+    m[12] = x;
+    m[13] = y;
+    m[14] = z;
+    m[15] = 1;
+    f.draw.reserve(1);
+    f.draw.setMatrix(0, m);
+    f.draw.setCount(1);
+    f.draw.update(false);
+    f.draw.enabled = true;
   }
 
   /** The viewed house's surfaces (`HouseBuild.surfaces`, every storey's; null: no house), for the Paint and Floor tools. */
@@ -364,6 +417,7 @@ export class BuildPreviews {
     this.setPaintPreview([], null);
     this.setFloorPreview([], null);
     this.setRoomOverlay([]);
+    this.setGaragePreview(null);
     this.setBuildGrid(null);
     this.surfaces = null;
   }
@@ -371,7 +425,7 @@ export class BuildPreviews {
   destroy(): void {
     this.dropBuilt();
     for (const slot of Object.values(this.laid)) slot.entity?.destroy();
-    for (const f of [...Object.values(this.films), this.paint, this.floor]) {
+    for (const f of [...Object.values(this.films), this.paint, this.floor, ...this.garage, ...this.garageDoor]) {
       f.draw.destroy();
       f.material.destroy();
     }
@@ -401,7 +455,7 @@ export class BuildPreviews {
     const next = new pc.Entity('preview-built');
     let hole: WallHole | null = null;
     const fences = edges.flatMap((e) => ((e.kind === 'fence' || e.kind === 'gate') && (e.axis === 'h' || e.axis === 'v') ? [{ axis: e.axis, x: e.x, z: e.z, kind: e.kind, style: e.style }] : []));
-    buildFences(this.app, next, fences, this.host.content.fenceStyles);
+    buildFences(this.app, next, fences, this.host.content.fenceStyles, { hedgeBoxes: true });
     // A lot with just these walls (in the rooms as they are), the walls they go into keeping their looks.
     const W = world.width;
     const walls: WallEdge[] = [];

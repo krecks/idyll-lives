@@ -119,6 +119,13 @@ pub struct Game {
     snapshot: Box<[f32]>,
     /// What the UI was last sent (it gets changes only).
     ui: view::UiSync,
+    /// The focus lot (`set_view`), and the area simulated in full detail if the view sent one
+    /// (`set_watch`; else the focus lot's).
+    view: Option<[i32; 4]>,
+    watch: Option<[i32; 4]>,
+    /// Per storage chunk: its fingerprint and version, as of `chunks_at` (`chunk_versions`).
+    chunks: Vec<(u64, u32)>,
+    chunks_at: Option<u32>,
 }
 
 #[wasm_bindgen]
@@ -225,15 +232,76 @@ impl Game {
         view::structure_json_with(&self.world, lot)
     }
 
-    /// The part of the town being looked at, a tile rectangle: lots it touches are simulated
-    /// in full detail, lots nobody watches in less (see `sim_core::lod`).
+    /// The focus lot, a tile rectangle: the lot whose walls and floors are drawn in full. Until
+    /// the view sends `set_watch`, it is also what's simulated in full detail (lots it touches;
+    /// lots nobody watches in less, see `sim_core::lod`).
     pub fn set_view(&mut self, x0: i32, z0: i32, x1: i32, z1: i32) {
-        self.world.set_view(Some([x0, z0, x1, z1]));
+        self.view = Some([x0, z0, x1, z1]);
+        self.world.set_view(self.watch.or(self.view));
     }
 
     /// The whole town is looked at: everything in full detail.
     pub fn clear_view(&mut self) {
+        self.view = None;
+        self.watch = None;
         self.world.set_view(None);
+    }
+
+    /// The camera's stream rectangle (tiles): simulated in full detail, lots it touches too, from
+    /// now on instead of the focus lot (`set_view`).
+    pub fn set_watch(&mut self, x0: i32, z0: i32, x1: i32, z1: i32) {
+        self.watch = Some([x0, z0, x1, z1]);
+        self.world.set_view(self.watch);
+    }
+
+    /// Back to the focus lot as the area simulated in full detail.
+    pub fn clear_watch(&mut self) {
+        self.watch = None;
+        self.world.set_view(self.view);
+    }
+
+    /// The room id of every tile, row by row (`width × depth` of the structure; 0 outdoors), as a
+    /// `Uint16Array` (the structure's `rooms`, without the JSON).
+    pub fn rooms(&self) -> Vec<u16> {
+        self.world.lot.rooms_row_major()
+    }
+
+    /// The walls, doors, windows, fences, diagonals, floor coverings and objects inside the tile
+    /// rectangle `[x0, z0, x1, z1)` (stacked rows, as the structure's; JSON, see
+    /// `sim_core::view::structure_rect_json`).
+    pub fn structure_rect(&self, x0: i32, z0: i32, x1: i32, z1: i32) -> String {
+        view::structure_rect_json(&self.world, [x0, z0, x1, z1])
+    }
+
+    /// Versions of the storage chunks (`sim_core::lot::CHUNK` tiles square, stacked rows): the
+    /// chunks across and down, then a version per chunk, row by row (`Uint32Array`). A chunk's
+    /// version changes when something in it does (its walls, floors, objects); fetch it again
+    /// with `structure_rect`.
+    pub fn chunk_versions(&mut self) -> Vec<u32> {
+        let version = self.world.structure_version();
+        let (cols, rows, prints) = if self.chunks_at == Some(version) {
+            let (cols, rows) = self.world.lot.chunk_grid();
+            (cols, rows, Vec::new())
+        } else {
+            view::chunk_fingerprints(&self.world)
+        };
+        if self.chunks_at != Some(version) {
+            if self.chunks.len() != prints.len() {
+                self.chunks = prints.iter().map(|&p| (p, 1)).collect();
+            } else {
+                for (c, &p) in self.chunks.iter_mut().zip(&prints) {
+                    if c.0 != p {
+                        *c = (p, c.1.wrapping_add(1));
+                    }
+                }
+            }
+            self.chunks_at = Some(version);
+        }
+        let mut out = Vec::with_capacity(2 + self.chunks.len());
+        out.push(cols as u32);
+        out.push(rows as u32);
+        out.extend(self.chunks.iter().map(|c| c.1));
+        out
     }
 
     /// Food and dishes on tables, counters and floors (JSON; see `sim_core::view::items_json`).
@@ -296,6 +364,10 @@ impl Game {
             world,
             snapshot: vec![0.0; snapshot::CAPACITY].into_boxed_slice(),
             ui: view::UiSync::new(),
+            view: None,
+            watch: None,
+            chunks: Vec::new(),
+            chunks_at: None,
         };
         snapshot::write(&game.world, &mut game.snapshot);
         game

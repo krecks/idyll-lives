@@ -1027,7 +1027,8 @@
           "finish": "material.finish.matte"
         },
         "marble": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.28
         },
         "marble_vein": {
           "finish": "material.finish.gloss"
@@ -1135,6 +1136,16 @@
         "white_gloss": {
           "finish": "material.finish.gloss"
         }
+      },
+      "motions": {
+        "uses": {
+          "pullOut": "small_out",
+          "pushIn": {
+            "clip": "small_out",
+            "over": -1
+          }
+        },
+        "open": "small_out"
       },
       "paint": [
         {
@@ -1778,6 +1789,16 @@
         "vitrine_back": {
           "finish": "material.finish.wood"
         }
+      },
+      "motions": {
+        "uses": {
+          "openDoor": "door_open",
+          "shutDoor": {
+            "clip": "door_open",
+            "over": -1
+          }
+        },
+        "open": "door_open"
       },
       "paint": [
         {

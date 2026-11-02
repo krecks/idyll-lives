@@ -1,11 +1,14 @@
 //! The builder's start (0.9): Creative or Living per game, a home with nobody living in it yet
 //! (build first), and a family moving in later. Build and buy are addressed to the household.
 
+use crate::common;
+
+use common::run_to;
 use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind};
 use sim_core::lot::{BondRaw, SimSpawn};
 use sim_core::social::EventKind;
 use sim_core::world::GameMode;
-use sim_core::{Command, World, clock, life};
+use sim_core::{Command, World, life};
 
 const CONTENT: &str = r#"{
     "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.02}],
@@ -37,13 +40,6 @@ fn world(mode: &str) -> World {
     })
     .unwrap();
     w
-}
-
-fn until(w: &mut World, day: u32, hour: f32) {
-    let target = clock::tick_at(day, hour * 60.0).unwrap();
-    while w.tick < target {
-        w.tick_once();
-    }
 }
 
 /// A 3×3 room in the corner of the player's lot, with a door.
@@ -134,7 +130,7 @@ fn an_empty_home_can_be_built_and_furnished() {
         household: None,
     })
     .unwrap();
-    until(&mut w, 8, 13.0);
+    run_to(&mut w, 8, 13.0);
     assert_eq!(w.households[0].funds, funds);
     assert!(
         w.sims
@@ -196,7 +192,7 @@ fn creative_building_is_free_and_the_home_pays_no_bills() {
     assert_eq!(life::weekly_costs(&w, 0), None);
     assert!(life::weekly_costs(&w, 1).is_some());
     let neighbours = w.households[1].funds;
-    until(&mut w, 7, 12.5);
+    run_to(&mut w, 7, 12.5);
     assert!(w.households[1].funds < neighbours, "the Brooks paid");
     assert!(w.households[0].funds >= 5000, "the player's home didn't");
 }
@@ -249,7 +245,7 @@ fn a_family_moves_in_later() {
 
     // Once someone lives there, the home pays rent and bills.
     assert!(life::weekly_costs(&w, 0).is_some());
-    until(&mut w, 7, 12.5);
+    run_to(&mut w, 7, 12.5);
     assert!(w.households[0].funds < funds);
 
     // Save and load: the mode, the household and its new residents stay.

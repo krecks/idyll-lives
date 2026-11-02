@@ -69,6 +69,7 @@ The first `bun run dev` or `bun run build` downloads the voice model (398 MB as 
 | `bun run lint` | Lint the web code |
 | `bun run test` | The renderer's engine-neutral tests (`web/tests`, `bun test`) |
 | `bun run check:chunks` | Check that the PlayCanvas internals the renderer patches or reads are still there (`tools/render/check_chunks.ts`; run it after a PlayCanvas upgrade) |
+| `bun run sounds` | Render every synthesised sound of the world to a WAV with its length, level and spectral centroid, and the content that sounds it (`tools/audio/listen.ts`; for listening to them, `G-53`) |
 | `bun run test:sim` | Run the Rust simulation tests |
 | `bun run test:voice` | Run the voice crate's tests (needs `bun run voice` for the dictionary) |
 | `bun run check:voice` | Check the voices in Bun against golden hashes (`tools/voice/check.mjs`) |

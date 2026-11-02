@@ -5,13 +5,16 @@
  */
 
 import { AssetRegistry } from '../assets/registry';
-import { prefetch, prefetchNow, planStream, whenStreamSettled } from '../assets/stream';
+import { prefetch, prefetchNow, planStream, reprioritize, whenStreamSettled } from '../assets/stream';
 import { Content } from '../content/content';
 import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
-import { lowestStorey } from '../core/protocol';
+import { groundDepth, lowestStorey } from '../core/protocol';
+import { townMap } from '../ui/townMap.svelte';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
+import { tileWorld } from '../debug/tileWorld';
+import { benchBigWorld } from '../debug/bigTown';
 import { recentLog } from '../debug/log';
 import { deliverReport, gpuInfo, takePendingPose, within, type DebugReport } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
@@ -41,7 +44,7 @@ import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, ty
 import { clockTime, openAt, staffed, staffResidents } from './staff';
 import { PointerInput } from './input';
 import { assembleTown, loadTemplates, useTownContent, type NeighbourhoodDraft } from './town';
-import { gameAssetPlan } from './streamPlan';
+import { gameAssetPlan, streamRanks } from './streamPlan';
 import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
@@ -57,6 +60,8 @@ const SIM_PICK_RADIUS = 32;
 const STATS_INTERVAL_MS = 500;
 /** After the player picks a storey, the view stays on it this long before following residents again. */
 const STOREY_STAY_MS = 8000;
+/** The storey in view follows residents only while the camera's target is within this many metres of the viewed lot. */
+const STOREY_NEAR = 40;
 const THUMBNAIL = { width: 320, height: 200 };
 /** Longest wait for a save's picture (it needs a drawn frame); the save then keeps the last one. */
 const THUMBNAIL_WAIT_MS = 1000;
@@ -245,6 +250,9 @@ export async function startSession(
   let lastSpeed = 1;
   let focused = false;
   let viewPlot: number | null = null;
+  // `?bench=bigworld`: a real Big world for the renderer, made in the page, and its focus lot.
+  const benchBig = BENCH?.big ? benchBigWorld(content, assets, BENCH.big) : null;
+  let benchView: { x: number; z: number; w: number; d: number } | null = null;
   let lastEvent = -1;
   /** Whether the first update's story (the history, empty in a new game) has been seen. */
   let storySeen = false;
@@ -270,6 +278,11 @@ export async function startSession(
     if (id === null || layout.sim.height === undefined || id >= snap[layout.header.simCount]) return;
     const o = layout.headerLen + id * layout.simStride;
     if (snap[o + layout.sim.away] > 0 || game.sims.find((s) => s.id === id)?.plot !== viewPlot) return;
+    // (Not while the camera is away from the lot, roaming a big world: a storey changed is a build of
+    // the lot's objects and residents, 20-60 ms of frames, for a cutaway nobody sees.)
+    const lot = viewPlot === null ? null : world?.plots[viewPlot];
+    const at = renderer.cameraPose().target;
+    if (lot && Math.max(lot.x - at[0], at[0] - lot.x - lot.w, lot.z - at[2], at[2] - lot.z - lot.d) > STOREY_NEAR) return;
     const storey = Math.floor(snap[o + layout.sim.height] + 0.01);
     if (storey !== game.storey) setStorey(storey);
   };
@@ -520,6 +533,11 @@ export async function startSession(
       bridge.send({ type: 'goHome', sim: game.selected });
       game.townOpen = false;
     },
+    lookAt(x, z) {
+      // A flight across the world; the lot it settles on becomes the focus (`onFocusLot`).
+      if (game.follow !== null) controls.follow(null);
+      renderer.flyTo(x, z);
+    },
     socialize(target, social) {
       if (game.mode !== 'live') return;
       bridge.send({ type: 'social', sim: game.selected, target, social });
@@ -571,6 +589,8 @@ export async function startSession(
       game.eyedropper = false;
       game.pickHint = null;
       game.mode = mode;
+      // (The catalog's pictures are drawn ahead of time in Build and Create, not in Live's frames.)
+      services.items.holdAhead(mode === 'live');
       refreshRoomOverlay();
       play(mode === 'live' ? 'close' : fromLive ? 'open' : 'tab');
       game.menu = null;
@@ -630,6 +650,11 @@ export async function startSession(
       game.placing = { def: obj.def, rot: obj.rot, turn: obj.turn ?? 0, objectId, size: ownSize(content, obj), tall: obj.tall ?? 0 };
     },
     rotatePlacing(fine = false) {
+      if (buildBuy.garageTool()) {
+        buildBuy.rotateGarage();
+        play('rotate');
+        return;
+      }
       if (!game.furnishing && !buildBuy.stairsTool()) return;
       // Facing and turn as one angle: a quarter turn, or 15° for things that turn freely.
       const turned = (def: string, rot: number, turn: number) => {
@@ -713,6 +738,12 @@ export async function startSession(
         buildBuy.clearPreviews();
       }
       play('tab');
+    },
+    buildGarageAtDrive() {
+      buildBuy.buildDrivewayGarage();
+    },
+    sellGarage() {
+      buildBuy.sellGarage();
     },
     setRoof(style, color) {
       bridge.send({ type: 'setRoof', household: game.home, style, color });
@@ -1033,6 +1064,8 @@ export async function startSession(
       if (added.length) director.noteBuilt(added.map((o) => o.id), performance.now());
     }
     world = w;
+    // The town map: the town's ground and its presentation data (roads, zones, areas), as it changes.
+    if (townMap.world?.meta !== w.meta || townMap.world?.width !== w.width) townMap.world = { width: w.width, depth: groundDepth(w), meta: w.meta };
     worldView = viewPlot;
     game.storeys = w.storeys ?? 1;
     game.lowestStorey = lowestStorey(w);
@@ -1095,7 +1128,9 @@ export async function startSession(
     const build = homeAssets.then(async () => {
       const buildSpan = perfStart('session: renderer setWorld');
       try {
-        return await renderer.setWorld(w, view);
+        // (`?bench=bigworld`: the town tiled for the renderer, a big world: `debug/tileWorld.ts`.)
+        if (benchBig) return await renderer.setWorld(await benchBig, benchView);
+        return await renderer.setWorld(BENCH && BENCH.tile > 1 ? tileWorld(w, BENCH.tile) : w, view);
       } finally {
         perfEnd(buildSpan);
       }
@@ -1154,14 +1189,61 @@ export async function startSession(
    * Switches the view to a lot: the worker sends that lot's geometry, then the scene is rebuilt.
    * The camera moves to its middle, unless it is going along with someone the player follows.
    */
-  function showPlot(plot: number) {
+  function showPlot(plot: number, aim = true) {
     const p = world?.plots[plot];
     if (!p) return;
     viewPlot = plot;
     game.viewPlot = plot;
-    if (game.follow === null) renderer.focus(p.x + p.w / 2, p.z + p.d / 2);
+    if (aim && game.follow === null) renderer.focus(p.x + p.w / 2, p.z + p.d / 2);
     bridge.setView([p.x, p.z, p.x + p.w, p.z + p.d]);
   }
+  // The town map's live layer: residents where they are drawn (or simulated), and where the camera looks.
+  const mapHead = { x: 0, y: 0, z: 0 };
+  townMap.source = {
+    dots() {
+      if (!world) return [];
+      const mine = new Set(playerSims());
+      const out: { x: number; z: number; mine: boolean }[] = [];
+      for (const s of world.sims) {
+        if (s.gone || !renderer.simSpot(s.id, mapHead)) continue;
+        out.push({ x: mapHead.x, z: mapHead.z, mine: mine.has(s.id) });
+      }
+      return out;
+    },
+    camera() {
+      const t = renderer.cameraPose().target;
+      return [t[0], t[2]];
+    },
+  };
+  // The roaming camera settles on a lot: it is shown in full, the camera left where it is (in live
+  // mode, not following anyone; build mode keeps the lot it builds on).
+  renderer.onFocusLot((lot) => {
+    // (The bench's real big world: its own focus, drawn at once: `debug/bigTown.ts`.)
+    if (benchBig) {
+      void benchBig.then((big) => {
+        const p = big.plots[lot];
+        if (!p) return;
+        benchView = { x: p.x, z: p.z, w: p.w, d: p.d };
+        return renderer.setWorld(big, benchView);
+      });
+      return true;
+    }
+    // (The bench's tiled big world: a copy's lot is the town's own, `debug/tileWorld.ts`.)
+    const plot = BENCH && BENCH.tile > 1 && world ? lot % world.plots.length : lot;
+    if (game.mode !== 'live' || game.follow !== null || director.active || !world?.plots[plot]) return false;
+    if (plot !== viewPlot) showPlot(plot, false);
+    return true;
+  });
+  // What the camera streams in is the sim's full-detail area: in a big world (a town of today's sizes
+  // keeps its full detail on the viewed lot, as it always had).
+  // The files still to stream come by where the camera is: the focus lot's, those round the camera, the rest nearest first.
+  renderer.onWatch((rect) => {
+    if (world?.meta?.world?.size === 'big') bridge.setWatch(rect);
+    if (!world) return;
+    const p = viewPlot === null ? null : world.plots[viewPlot];
+    const ranks = streamRanks(content, assets, world, p ? { x: p.x, z: p.z, w: p.w, d: p.d } : null, { x: rect[0], z: rect[1], w: rect[2] - rect[0], d: rect[3] - rect[1] });
+    reprioritize((url) => ranks.get(url) ?? Infinity);
+  });
   controls.setWallMode(game.wallMode);
 
   const inLot = (x: number, z: number) => !!world && x >= 0 && z >= 0 && x < world.width && z < world.depth;
@@ -1460,6 +1542,7 @@ export async function startSession(
         return controls.toggleEyedropper();
       case 'Delete':
       case 'Backspace':
+        if (buildBuy.garageTool()) return controls.sellGarage();
         if (game.furnishing || buildBuy.stairsTool()) {
           const target = game.placing?.objectId ?? game.buySelection;
           if (target !== null) controls.sell(target);
@@ -1593,6 +1676,8 @@ export async function startSession(
         prefetchTimer = setTimeout(() => {
           // (Not while benchmarking: drawing the pictures would show in the measurements.)
           if (disposed || BENCH) return;
+          // (In Live they wait for Build: `holdAhead`.)
+          services.items.holdAhead(game.mode === 'live');
           services.items.prefetch(content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
         }, PREFETCH_PICTURES_MS);
       })();
@@ -1637,6 +1722,7 @@ export async function startSession(
       clearInterval(statsTimer);
       clearInterval(autosaveTimer);
       clearTimeout(prefetchTimer);
+      services.items.holdAhead(false);
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pagehide', onLeave);
@@ -1659,6 +1745,10 @@ export async function startSession(
       await building;
       renderer.clear();
       bridge.dispose();
+      townMap.world = null;
+      townMap.source = {};
+      renderer.onFocusLot(null);
+      renderer.onWatch(null);
     },
   };
   session.applySettings(settings);

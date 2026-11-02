@@ -4,6 +4,8 @@
 
 use crate::common;
 
+use common::{interaction, run_to};
+
 use sim_core::social::EventKind;
 use sim_core::world::TaskKind;
 use sim_core::{Command, World, clock, life};
@@ -25,22 +27,6 @@ fn world() -> World {
 
 fn need(w: &World, id: &str) -> usize {
     w.content.needs.iter().position(|n| n.id == id).unwrap()
-}
-
-fn interaction(w: &World, object: u32, id: &str) -> usize {
-    let def = w.objects[object as usize].def;
-    w.content.objects[def]
-        .interactions
-        .iter()
-        .position(|i| i.id == id)
-        .unwrap()
-}
-
-fn until(w: &mut World, day: u32, hour: f32) {
-    let target = clock::tick_at(day, hour * 60.0).unwrap();
-    while w.tick < target {
-        w.tick_once();
-    }
 }
 
 /// Everything full but energy (nothing else to do, nothing to wake them).
@@ -74,7 +60,7 @@ fn night(object: u32, quality: u8, energy: f32, bedtime: f32) -> f32 {
     let mut w = world();
     w.autonomy = false;
     w.objects[object as usize].quality = quality;
-    until(&mut w, 1, bedtime);
+    run_to(&mut w, 1, bedtime);
     rested_but(&mut w, energy);
     let sleep = interaction(&w, object, "sleep");
     w.apply(Command::Use {
@@ -138,7 +124,7 @@ fn exhausted_in_the_evening_they_go_to_bed_not_for_a_nap() {
     for seed in 0..4 {
         let mut w = World::from_json(&common::content(), TOWN, seed).unwrap();
         w.autonomy = false;
-        until(&mut w, 1, 18.0);
+        run_to(&mut w, 1, 18.0);
         rested_but(&mut w, 0.15);
         w.autonomy = true;
         let mut chose = None;
@@ -158,7 +144,7 @@ fn exhausted_in_the_evening_they_go_to_bed_not_for_a_nap() {
 fn a_nap_is_not_followed_by_another() {
     let mut w = world();
     w.autonomy = false;
-    until(&mut w, 1, 13.0);
+    run_to(&mut w, 1, 13.0);
     rested_but(&mut w, 0.35);
     let nap = interaction(&w, BED, "nap");
     w.apply(Command::Use {
@@ -209,7 +195,7 @@ fn a_late_night_doesnt_make_them_miss_work() {
     })
     .unwrap();
     // To bed worn out at 1 am: rested only mid-morning, but work comes first.
-    until(&mut w, 2, 1.0);
+    run_to(&mut w, 2, 1.0);
     rested_but(&mut w, 0.0);
     let sleep = interaction(&w, BED, "sleep");
     w.apply(Command::Use {

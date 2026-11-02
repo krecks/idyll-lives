@@ -426,6 +426,9 @@ pub struct ObjectDef {
     pub places: Vec<SlotPlace>,
     /// Can only be placed outdoors (trees, flower beds, ponds).
     pub outdoors: bool,
+    /// How far a tree's crown reaches out from its middle (m, content `crown`; 0: no crown): no
+    /// house wall may stand closer, or the crown grows into the house (`home.rs`).
+    pub crown: f32,
     /// The household's own (content `private`: a wardrobe, a dresser, a bath): a visitor uses none
     /// of it, chosen or told (`world::guest_may`).
     pub private: bool,
@@ -448,6 +451,11 @@ pub struct ObjectDef {
     /// use of it lights it when it's dark) or the player, never by coming into the room; it burns
     /// down by morning (see `lights.rs`).
     pub fire: bool,
+    /// A light that follows a use (content `light.while`, animation tags): it's lit only while
+    /// someone does one of those animations at an object on its tiles (a cooker hood's light over
+    /// a hob: `["stir", "bake"]`). It has no switch of its own; the simulation decides
+    /// (`lights.rs`). Animation indices, resolved at load.
+    pub while_anims: Vec<usize>,
     /// Wear per finished use (it breaks at 1; see `ObjectRules::wear_per_quality`).
     pub wear_per_use: f32,
     /// Every tag its interactions have (what the room it stands in can be used for).
@@ -1582,6 +1590,8 @@ pub struct BuildRules {
     /// A metre of fence, and a gate, when there are no fence styles.
     pub fence: i64,
     pub gate: i64,
+    /// A garage on the home lot (Build mode's Garage tool; sold back for `objectRules.resale` of it).
+    pub garage: i64,
     /// Fence styles (`fenceStyles`): picket, ranch rails, slats... A fence's (or gate's) style is
     /// an index into this list; its `price` is per metre, a gate costs `gate` on top of it.
     pub fences: Vec<BuildStyle>,
@@ -1717,7 +1727,33 @@ pub struct Content {
     /// How dirty washing piles up (content `laundry`; None: it never does, and nothing works
     /// on it).
     pub laundry: Option<LaundryRules>,
+    /// How cars drive (content `cars`; see `cars.rs`, `travel.rs`).
+    pub cars: CarRules,
+    /// The uses (object def, interaction) with `"trail": true`: done walking out along the trail
+    /// the thing stands at and back (a trailhead's *Walk the trail*; `world::trail_step`).
+    pub trail_walks: Vec<(usize, usize)>,
     object_index: HashMap<String, usize>,
+}
+
+/// How cars drive (content `cars`).
+#[derive(Debug, Clone)]
+pub struct CarRules {
+    /// Top speed on country roads (m/s at 1×; `countrySpeed`, default 16).
+    pub country_speed: f32,
+}
+
+impl Default for CarRules {
+    fn default() -> Self {
+        Self {
+            country_speed: crate::travel::COUNTRY_SPEED,
+        }
+    }
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct CarsRaw {
+    country_speed: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -1818,6 +1854,8 @@ struct ContentFile {
     service: Option<crate::staff::ServiceRaw>,
     #[serde(default)]
     laundry: Option<LaundryRaw>,
+    #[serde(default)]
+    cars: CarsRaw,
 }
 
 #[derive(Deserialize)]
@@ -2279,6 +2317,8 @@ struct BuildRaw {
     /// Fence per metre and gate, without fence styles.
     fence: Option<i64>,
     gate: Option<i64>,
+    /// A garage on the home lot.
+    garage: Option<i64>,
     storeys: Option<u8>,
     #[serde(default)]
     basement: bool,
@@ -2430,6 +2470,9 @@ struct ObjectRaw {
     places: Vec<PlaceRaw>,
     #[serde(default)]
     outdoors: bool,
+    /// See `ObjectDef::crown`.
+    #[serde(default)]
+    crown: f32,
     /// The household's own (see `ObjectDef::private`).
     #[serde(default)]
     private: bool,
@@ -2562,6 +2605,9 @@ fn one_slot() -> u8 {
 struct InteractionRaw {
     id: String,
     label: String,
+    /// Walked along the trail it stands at (`Content::trail_walks`).
+    #[serde(default)]
+    trail: bool,
     /// Not needed with a `recipe` (its steps take their own time).
     #[serde(default)]
     minutes: f32,
@@ -3127,6 +3173,7 @@ impl Content {
             .collect::<Result<Vec<_>, _>>()?;
         let mut objects = Vec::with_capacity(raw.objects.len());
         let mut object_index = HashMap::new();
+        let mut trail_walks = Vec::new();
         for obj in &raw.objects {
             if obj.footprint[0] == 0 || obj.footprint[1] == 0 {
                 return Err(Error::new(format!(
@@ -3776,6 +3823,28 @@ impl Content {
                     obj.id
                 )));
             }
+            let while_anims = match obj.light.as_ref().and_then(|l| l.get("while")) {
+                Some(serde_json::Value::String(s)) => vec![s.as_str()],
+                Some(serde_json::Value::Array(a)) => a.iter().filter_map(serde_json::Value::as_str).collect(),
+                _ => Vec::new(),
+            }
+            .into_iter()
+            .map(|a| {
+                anim_index(a).ok_or_else(|| {
+                    Error::new(format!(
+                        "object '{}': light.while: unknown anim '{a}' (declare it in \"animations\")",
+                        obj.id
+                    ))
+                })
+            })
+            .collect::<Result<Vec<usize>, Error>>()?;
+            trail_walks.extend(
+                obj.interactions
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, it)| it.trail)
+                    .map(|(k, _)| (objects.len(), k)),
+            );
             objects.push(ObjectDef {
                 id: obj.id.clone(),
                 name: obj.name.clone(),
@@ -3785,6 +3854,7 @@ impl Content {
                 slots: obj.slots,
                 places: obj.places.iter().map(|p| SlotPlace { at: p.at, facing: p.facing.to_radians() }).collect(),
                 outdoors: obj.outdoors,
+                crown: obj.crown.max(0.0),
                 private: obj.private,
                 stairs: obj.stairs,
                 turns,
@@ -3799,8 +3869,9 @@ impl Content {
                 lamp: obj.light.as_ref().map_or(0.0, |l| {
                     l.get("tiles").and_then(serde_json::Value::as_f64).map_or(lamp_tiles, |t| t as f32).max(0.1)
                 }),
-                switch: obj.light.as_ref().is_some_and(|l| l.get("switch").and_then(serde_json::Value::as_bool) != Some(false)),
+                switch: obj.light.as_ref().is_some_and(|l| l.get("switch").and_then(serde_json::Value::as_bool) != Some(false) && l.get("while").is_none()),
                 fire: obj.light.as_ref().is_some_and(|l| l.get("fire").and_then(serde_json::Value::as_bool) == Some(true) && l.get("switch").and_then(serde_json::Value::as_bool) != Some(false)),
+                while_anims,
                 // Things nobody uses up (scenery, plants, decor) never wear out.
                 wear_per_use: if !used {
                     0.0
@@ -4572,6 +4643,7 @@ impl Content {
             remove: raw.build.remove.unwrap_or(10),
             fence: raw.build.fence.unwrap_or(25),
             gate: raw.build.gate.unwrap_or(100),
+            garage: raw.build.garage.unwrap_or(2500),
             fences: build_styles(&raw.fence_styles, "fence style")?,
             roofs: build_styles(&raw.roof_styles, "roof style")?,
             roof_colors: build_styles(&raw.roof_colors, "roof colour")?,
@@ -4776,6 +4848,18 @@ impl Content {
             phone,
             service,
             laundry,
+            trail_walks,
+            cars: CarRules {
+                country_speed: match raw.cars.country_speed {
+                    Some(v) if v.is_finite() && v > 0.0 => v.min(60.0),
+                    Some(v) => {
+                        return Err(Error::new(format!(
+                            "cars.countrySpeed: {v} must be a positive number"
+                        )));
+                    }
+                    None => crate::travel::COUNTRY_SPEED,
+                },
+            },
             object_index,
         })
     }

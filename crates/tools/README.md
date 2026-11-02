@@ -19,7 +19,7 @@ Every tool's `src/<name>.rs` opens with what it does and its arguments; this pag
 | `cargo fetch-voice` | The voice model and the pronunciation dictionary into `web/public/voice/` (was `tools/voice/fetch.mjs`, `fp16.mjs`). |
 | `cargo fetch-llm` | The language model into `web/public/llm/` (was `tools/llm/fetch.mjs`). |
 | `cargo review` | The authenticity review's first pass over every buyable object: `sizes`, `uses`. |
-| `cargo tex` | The texture scripts: `clouds`, `process`, `house`, `materials` (was `tools/art/*.py`). |
+| `cargo tex` | The texture scripts: `clouds`, `synth` (every surface map, generated in code), `materials` (was `tools/art/*.py`). |
 | `cargo release-version` | One version for the whole game. Prints it and fails if `web/package.json`, `Cargo.toml` and `Cargo.lock` differ (CI runs this); with an argument, sets all of them. Not `cargo version`: that is cargo's own. |
 | `cargo licenses` | `dist/THIRD-PARTY-LICENSES.txt`, written by production builds (`web/vite.config.ts`). |
 | `cargo wasm-opt` | Optimises the simulation's and the voice's WebAssembly for release, with the pinned binaryen. |

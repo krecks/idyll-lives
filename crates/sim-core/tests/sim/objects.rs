@@ -5,6 +5,8 @@
 
 use crate::common;
 
+use common::interaction;
+
 use common::buy;
 use sim_core::world::{Phase, TaskKind};
 use sim_core::{Command, MINUTES_PER_TICK, World};
@@ -23,14 +25,6 @@ fn world() -> World {
 
 fn need(w: &World, id: &str) -> usize {
     w.content.needs.iter().position(|n| n.id == id).unwrap()
-}
-
-fn interaction(w: &World, object: u32, id: &str) -> usize {
-    w.content.objects[w.objects[object as usize].def]
-        .interactions
-        .iter()
-        .position(|i| i.id == id)
-        .unwrap()
 }
 
 /// Uses the toilet until the tick it's done with it: then washing hands at the sink is the

@@ -254,6 +254,23 @@ export interface ObjectInfo extends Shape {
   /** Content category and group (`residents.kidsOnly`: things only for a home with children). */
   category?: string;
   group?: string;
+  /** How far a tree's crown reaches out from its middle (m, content `crown`): no wall closer (`crownClear`). */
+  crown?: number;
+}
+
+/**
+ * Whether no wall of floor `g` (with a door or window or not) stands closer than `crown` m to the
+ * point (`x`, `z`): a tree's crown there doesn't grow into the house (as the game's `home.rs`
+ * `crown_meets_wall` refuses).
+ */
+export function crownClear(g: { edges: Map<string, string> }, x: number, z: number, crown: number): boolean {
+  for (const e of g.edges.keys()) {
+    const [axis, xs, zs] = e.split(':');
+    const [ex, ez] = [Number(xs), Number(zs)];
+    const [dx, dz] = axis === 'h' ? [x - Math.min(Math.max(x, ex), ex + 1), z - ez] : [x - ex, z - Math.min(Math.max(z, ez), ez + 1)];
+    if (Math.hypot(dx, dz) < crown) return false;
+  }
+  return true;
 }
 
 /** Whether object type `o` is a hob, a grill or a sink (see `ObjectInfo.keepClear`). */
@@ -1984,6 +2001,9 @@ function garden(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, g: Fl
     const tiles: [number, number][] = [];
     for (let dz = -1; dz <= d; dz++) for (let dx = -1; dx <= w; dx++) tiles.push([x + dx, z + dz]);
     if (!tiles.every(([tx, tz]) => clear(tx, tz))) continue;
+    // A tree's crown keeps clear of the house.
+    const crown = info(def)?.crown ?? 0;
+    if (crown > 0 && !crownClear(g, x + w / 2, z + d / 2, crown)) continue;
     for (const [tx, tz] of tiles) g.taken.add(key(tx, tz));
     g.objects.push({ def, x, z, rot: Math.floor(rng() * 4) & 2 });
     g.fronts.push(null);

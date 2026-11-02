@@ -5,8 +5,10 @@
 
 use crate::common;
 
+use common::run_to;
+
 use sim_core::social::EventKind;
-use sim_core::{Command, World, clock};
+use sim_core::{Command, World};
 
 /// A clerk earns 100 a week (40 %: 40, below the basic pension of 150), a manager 1,000 (40 %:
 /// 400). A year a day.
@@ -50,13 +52,6 @@ fn world(sims: &[&str]) -> World {
 
 fn days(w: &mut World, d: u32) {
     for _ in 0..d * 24 * 60 * 20 {
-        w.tick_once();
-    }
-}
-
-fn until(w: &mut World, day: u32, hour: f32) {
-    let end = clock::tick_at(day, hour * 60.0).unwrap();
-    while w.tick < end {
         w.tick_once();
     }
 }
@@ -162,13 +157,13 @@ fn the_job_market_doesnt_hire_from_the_retirement_age() {
     .unwrap();
     w.apply(Command::QuitCareer { sim: 0 }).unwrap();
     assert!(!w.sims[0].retired && w.sims[0].job.is_none());
-    until(&mut w, 1, 11.0);
+    run_to(&mut w, 1, 11.0);
     assert!(w.sims[1].job.is_some(), "the job market hires at 40");
     assert!(w.sims[0].job.is_none(), "not at 70");
     // At midnight they retire again, on the basic pension; no job comes after that either.
-    until(&mut w, 2, 0.5);
+    run_to(&mut w, 2, 0.5);
     assert_eq!((w.sims[0].retired, w.sims[0].pension), (true, 150));
-    until(&mut w, 8, 0.5);
+    run_to(&mut w, 8, 0.5);
     assert!(w.sims[0].job.is_none() && w.sims[0].retired);
     assert!(
         !w.events
@@ -244,7 +239,7 @@ fn the_basic_pension_pays_for_a_home_of_one() {
     // pushes the first weeks' out of it by day 29.
     let mut paid = std::collections::HashSet::new();
     for day in [8, 15, 22, 29] {
-        until(&mut w, day, 0.0);
+        run_to(&mut w, day, 0.0);
         paid.extend(
             w.events
                 .iter()

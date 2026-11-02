@@ -50,18 +50,18 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `flowerbed` Raised flower bed | 1x1 · floor | tend:tend smell:smell | garden / flowers | Box | Static | Static. |
-| `garden.tulips` Tulips | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
-| `garden.daffodils` Daffodils | 1x1 · floor | water:water smell:smell | garden / flowers | Bed, Petals | Static | Static. |
-| `garden.daisies` Daisies | 1x1 · floor | water:water smell:smell | garden / flowers | Bed, Petals | Static | Static. |
+| `flowerbed` Raised flower bed | 1x1 · floor | tend:tend smell:smell cut:tend | garden / flowers | Box | Static | Static. Cut flowers for a vase (`cut`, 6 min, the bunch in the hand: Q-18, 2026-10-30). |
+| `garden.tulips` Tulips | 1x1 · floor | water:water smell:smell cut:tend | garden / flowers | Bed | Static | Static. Cut some for a vase (`cut`, 6 min, the bunch in the hand: Q-18). |
+| `garden.daffodils` Daffodils | 1x1 · floor | water:water smell:smell cut:tend | garden / flowers | Bed, Petals | Static | Static. Cut some for a vase (`cut`, 6 min, the bunch in the hand: Q-18). |
+| `garden.daisies` Daisies | 1x1 · floor | water:water smell:smell cut:tend daisyChain:tend | garden / flowers | Bed, Petals | Static | Static. Cut some for a vase (`cut`, 6 min, the bunch in the hand) or make a daisy chain (`daisyChain`, 12 min, the chain in the hand: Q-18). |
 | `garden.sunflowers` Sunflowers | 1x1 · floor | water:water admire:admire | garden / flowers | Bed, Petals | Static | Static. Admired looking up at the heads (`anim: admire`), not down at the soil. |
 | `garden.poppies` Poppies | 1x1 · floor | water:water admire:look | garden / flowers | Bed, Petals | Static | Static. Admired (`look`), not smelled: no scent, no Sweet scent feeling. |
 | `garden.marigolds` Marigolds | 1x1 · floor | water:water admire:look | garden / flowers | Bed | Static | Static. Admired (`look`), not smelled: no Sweet scent feeling. |
 | `garden.pansies` Pansies | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static; each face on a thin stem over the leaves. |
-| `garden.lilies` Lilies | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
+| `garden.lilies` Lilies | 1x1 · floor | water:water smell:smell cut:tend | garden / flowers | Bed | Static | Static. Cut some for a vase (`cut`, 6 min, the bunch in the hand: Q-18). |
 | `garden.lupins` Lupins | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
 | `garden.forgetMeNots` Forget-me-nots | 1x1 · floor | water:water admire:look | garden / flowers | Bed | Static | Static. Admired (`look`), not smelled: no Sweet scent feeling. |
-| `garden.cosmos` Cosmos | 1x1 · floor | water:water smell:smell | garden / flowers | Bed | Static | Static. |
+| `garden.cosmos` Cosmos | 1x1 · floor | water:water smell:smell cut:tend | garden / flowers | Bed | Static | Static. Cut some for a vase (`cut`, 6 min, the bunch in the hand: Q-18). |
 | `garden.meadow` Wildflower meadow | 1x1 · floor | pickFlower:harvest | garden / flowers | — | Use | `pick`: one flower (a white daisy) shrinks away for pickFlower and grows back after. Long grass, 64 blades up to 0.5 m and stalks gone to seed, over low tussocks (G-38). |
 | `garden.geraniums` Potted geraniums | 1x1 · floor | water:water smell:smell | garden / flowers | Pot, Flowers | Static | Static. |
 | `garden.flowerBox` Flower box | 1x1 · floor | water:water smell:smell | garden / flowers | Box | Static | Static. |
@@ -73,6 +73,15 @@ herb planter, which doesn't grow, has `harvest` for `pickHerbs`.
   bed's boards and the flower box.
 - The geraniums' "Flowers" colours all six clusters (all on the painted material).
 - Each pansy face stands on a thin stem over its leaves, at the same size and draw calls.
+- The raised bed's "Cut some flowers" (2026-10-30, Q-18) was checked in play outdoors: the resident holds the bunch
+  of six heads, blooms up, in the hand it is cut with (`cut3-flowerbed-cut-00.png`), and it is the same bunch the
+  empty vase takes (`docs/objects/tabletop.md`, TT3).
+- The five beds' own cutting ("Cut some tulips", daffodils, lilies, cosmos, daisies: 6 min, the bunch in the hand,
+  added the same day) was checked on `review-garden`: each one cut at the bed, the bunch in the left hand at her side
+  (`beds-garden.tulips-cut-00.png`, and the daisies', lilies', cosmos' and daffodils' beside it).
+- The daisies' "Make a daisy chain" (2026-10-31, Q-18) was checked on `review-garden`: Ada kneels at the bed for
+  twelve minutes and comes away with the chain of eleven daisies coiled flat in her hand
+  (`chain-garden.daisies-daisyChain-01.png`; the item is 16 cm across, one draw, `item.daisyChain`).
 - Known, not changed: the marigolds' back poms sit a little above the leaves, but read as one mass of flowers.
 - Since the authenticity review (G-14): flowers that bloom above about 0.7 m (cosmos, the flower box, lavender,
   lilies, lupins, roses, the wheelbarrow) are smelt standing, a bloom held to the nose (`pick`); the low beds and pots

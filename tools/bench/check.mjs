@@ -38,11 +38,20 @@
  *               --sims 0,1   each of these does the use, the first watched (pairs: the seesaw, ping-pong)
  *               --social chat,joke | --phone call,text   no object: the first of --sims starts each with the
  *                 second (socials by content id; phone actions, the second the contact)
- *               --use all|<id>|<index>   (default all)  --sim 0  --colors body:12  --turn 0
+ *               --use all|<id>|<index>|ripe   (default all)  --sim 0  --colors body:12  --turn 0
+ *                 (`ripe`: every use offered only when the crop is ripe — the veggie bed's
+ *                 `pickSnack` — on a state whose crops are, `review-garden`'s; the record's
+ *                 `growth` says which stage it found: 2 ripe)
  *               --state bathroom-check  --shots 3 --every 1000 (ms)  --wait 60 (s, from the use
  *                 sent to the resident using it)
  *               --walk 3 (speed walking there, at most 3 = 10×)  --speed 1 (from 3 tiles off)
  *               --radius --beta --alpha --y (the camera; default from the model's size and facing)
+ *               --top (the camera above, looking down: who sits where at a table)
+ *               --views 2 (up to 4 camera angles per picture, on the use loop: the front, then round
+ *                 the back, above and low; `<object>-v2`, `-v3`, `-v4`, the first as it always was)
+ *               --shot-idle (a picture of it as bought, before any use: `<object>-idle`)
+ *               --walk-shots 40 (pictures on the way there, before the use begins: `<object>-walk-00`,
+ *                 the walk and a door's swing; with `--every 0` as fast as the page draws)
  *               --hour 12 (the renderer's light only; the state sets the clock; on a `*-night`
  *                 state none, the light the sim's clock gives; `--hour state` for none anywhere)
  *               --free-will (leave it on: with `needy-check`, to watch them go on their own)
@@ -555,6 +564,14 @@ if (what === 'play') {
   /** The camera following the resident: `--radius` (else `radius`), `--beta`, `--alpha`, `--y`, the ones given. */
   const view = (radius) => Object.fromEntries(Object.entries({ radius: num('radius', radius), beta: num('beta'), alpha: num('alpha'), y: num('y') }).filter(([, v]) => Number.isFinite(v)));
   const shots = num('shots', batch ? 3 : 6);
+  // Pictures on the way there (`--walk-shots`): before the use begins, as fast as the page draws.
+  const walkShots = num('walk-shots', 0);
+  /** A picture of each thing as bought, before its uses (`--shot-idle`). */
+  const shotIdle = has('shot-idle');
+  /** The camera above, looking down (`--top`), instead of the usual three-quarter view. */
+  const top = has('top');
+  // Angles per picture on the use loop (`--views`): the front as aimed, then round the back, above, low.
+  const views = Math.max(1, Math.min(4, num('views', 1)));
   const every = num('every', batch ? 1000 : 500);
   const cap = num('wait', 60) * 1000;
   const speed = num('speed', 1);
@@ -681,11 +698,11 @@ if (what === 'play') {
     // resident at it hides less of it).
     const facing = [Math.PI / 2, 0, -Math.PI / 2, Math.PI][rot % 4];
     const alpha = num('alpha', facing + 0.7);
-    const beta = num('beta', layer === 'ceiling' ? 1.3 : 0.95);
+    const beta = top ? 1.35 : num('beta', layer === 'ceiling' ? 1.3 : 0.95);
     const [bottom, height, from] = bounds ? [bounds.lo[1], bounds.hi[1], 'bounds'] : box ? [box.bottom, box.height, 'box'] : [0, layer === 'floor' ? 1 + 0.5 * Math.max(...size) : 0.8, 'guess'];
     const tall = layer !== 'ceiling' && height - bottom > TALL;
     const usual = layer === 'wall' ? 1.3 : layer === 'ceiling' ? 1.9 : use?.pose === 'lie' ? 0.5 : 0.7;
-    const target = [mid[0], num('y', tall ? (bottom + height) / 2 : usual), mid[1]];
+    const target = [mid[0], top ? 0.2 : num('y', tall ? (bottom + height) / 2 : usual), mid[1]];
     // At least as far as the footprint needs (with room for the resident at it); further when the
     // model's vertices need it (`__check.fit`), or without them a tall one's height as seen from
     // `beta`. (The game camera never comes nearer than its own limit, 6.)
@@ -703,6 +720,33 @@ if (what === 'play') {
     const round = (v) => v.map((x) => +x.toFixed(2));
     return { alpha: +took.alpha.toFixed(3), beta: +took.beta.toFixed(3), radius: +took.radius.toFixed(2), target: round(took.target), height: +height.toFixed(2), bottom: +bottom.toFixed(2), from, ...(bounds ? { bounds: { lo: round(bounds.lo), hi: round(bounds.hi) } } : {}) };
   }
+
+  /** Aims at `id` and lets the picture settle, twice (the first aim moves the camera, the second frames it once the
+   * object is drawn); the view. */
+  async function aimStill(id) {
+    await aim(id);
+    await settle(page, 300);
+    const view = await aim(id);
+    await settle(page, 300);
+    return view;
+  }
+
+  /**
+   * The other angles of `--views`, off the aimed one: the back (a use from behind the thing), above
+   * (a seat, a top, what the resident's hands are at), low (a door's foot, a drawer's runner). The
+   * first is the aimed view itself, so one picture is unchanged.
+   */
+  const viewPoses = (v) => {
+    if (!v || views === 1) return [[0, null]];
+    const { alpha, beta, radius, target } = v;
+    const poses = [
+      { alpha, beta, radius, target },
+      { alpha: alpha + Math.PI, beta, radius, target },
+      { alpha, beta: 1.35, radius: radius * 1.15, target },
+      { alpha: alpha - 0.5, beta: 0.35, radius: radius * 0.9, target },
+    ];
+    return poses.slice(0, views).map((p, i) => [i, p]);
+  };
 
   /** A resident (the first of `sims` by default) as `__sims()` has them (null: not there). */
   const resident = (who = sim) =>
@@ -778,20 +822,28 @@ if (what === 'play') {
       return { names: m ? [m.idle, m.growth, m.night, m.clock?.hour, m.clock?.minute].filter(Boolean) : [], open: m?.open ?? null, any: Boolean(m) };
     }, id);
 
+  /** A picture's name part for `thing` as `bought`: its id, the place if it's bought twice, its helpers (`--with`). */
+  const baseName = (thing, bought) => {
+    const twice = things.filter((t) => t.def === thing.def).length > 1 ? `-${bought.where.x}-${bought.where.z}-${bought.where.rot}` : '';
+    const helps = (bought.with ?? []).map((h) => `with-${slug(h.split('@')[0])}`).join('-');
+    return `${prefix}${slug(thing.def)}${twice}${helps ? `-${helps}` : ''}`;
+  };
+
   /**
    * One use: watched from the frame it's sent, walking fast and slowing down near the object, up
    * to `cap` ms until the resident is using it, then `shots` pictures `every` ms apart framing the
    * object, then stopped. One record in `play-<run>.jsonl`.
    */
   async function runUse(thing, bought, use, attempt, helper = null) {
-    // (A kind used twice in a run, in two places: the place in its pictures' names too.)
-    const twice = things.filter((t) => t.def === thing.def).length > 1 ? `-${bought.where.x}-${bought.where.z}-${bought.where.rot}` : '';
-    const name = `${prefix}${slug(thing.def)}${twice}-${slug(use.id)}`;
-    const record = { object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], use: use.id, index: use.index, label: use.label, pose: use.pose ?? null, anim: use.anim ?? null, attempt, ...(helper ? { helper } : {}), ...about(thing, bought), outcome: null, shots: [], errors: [] };
+    const name = `${baseName(thing, bought)}-${slug(use.id)}`;
+    const record = { object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], use: use.id, index: use.index, label: use.label, pose: use.pose ?? null, anim: use.anim ?? null, attempt, ...(helper ? { helper } : {}), ...about(thing, bought), outcome: null, walk: [], shots: [], errors: [] };
     const j = startJob(`${thing.def}/${use.id}`, { attempt });
     const t0 = Date.now();
     await loaded();
     const bg = await background(bought.id);
+    // A crop's stage as the use begins (0 planted, 1 growing, 2 ripe, 3 picked): what a `when:
+    // ripe` use needs, and what the record says it found.
+    record.growth = (await placed(bought.id))?.growth ?? null;
     record.before = await resident();
     const near = { x: bought.where.mid[0], z: bought.where.mid[1], r: 3 + Math.max(...bought.where.size) / 2, speed };
     const sent = await page.evaluate(() => window.__check.now());
@@ -808,6 +860,25 @@ if (what === 'play') {
     for (const other of sims.slice(1)) {
       await settle(page, 300);
       await page.evaluate(({ id, sim, interaction }) => window.__send({ type: 'use', sim, object: id, interaction }), { id: bought.id, sim: other, interaction: use.index });
+    }
+    // On the way (`--walk-shots`): pictures before they get there — the walk itself, and a door's
+    // swing as their hand takes its handle (`residents.ts`, `doorHand`), which is over by the time
+    // they're using anything. As fast as the page draws, so a 0.45 s swing lands in one.
+    if (walkShots > 0) {
+      for (let i = 0; i < walkShots; i++) {
+        const arrived = await page.evaluate(() => window.__check.watched()?.usingAt !== null);
+        if (arrived) break;
+        await loaded();
+        const info = await page.evaluate(({ sim, id }) => {
+          const all = window.__sims();
+          const o = all.find((x) => x.id === sim);
+          const w = window.__check.watched();
+          return { t: Math.round(w?.t ?? 0), sim: o && { id: o.id, x: +o.x.toFixed(2), z: +o.z.toFixed(2), moving: o.moving, pose: o.pose, using: o.using && o.object === id } };
+        }, { sim, id: bought.id });
+        const file = await shot(page, `${name}-walk-${String(i).padStart(2, '0')}`, info);
+        record.walk.push({ file, ...info });
+        await settle(page, every);
+      }
     }
     // Using it (seen in a frame), not taken (nothing to do for 4 s), or out of time.
     record.outcome = await page
@@ -846,31 +917,41 @@ if (what === 'play') {
     if (record.outcome === 'using' && !helper) {
       for (let i = 0; i < shots; i++) {
         await loaded();
-        record.view = (await aim(bought.id, use)) ?? undefined;
-        await settle(page, 120);
-        const info = await page.evaluate(
-          ({ sim, id, others }) => {
-            const all = window.__sims();
-            const clips = window.__renderer?.objectClips?.(id);
-            const at = (who) => {
-              const o = all.find((x) => x.id === who);
-              return o && { id: who, pose: o.pose, using: o.using && o.object === id, interaction: o.interaction, action: o.action, x: +o.x.toFixed(2), z: +o.z.toFixed(2) };
-            };
-            const o = window.__world().objects.find((x) => x.id === id);
-            // Each clip playing on it: how far in (s), of how long, and how it plays.
-            const playing = clips ? Object.fromEntries([...clips].map(([name, c]) => [name, { time: +c.time.toFixed(2), duration: +c.duration.toFixed(2), kind: c.kind }])) : null;
-            return {
-              t: Math.round(window.__check.watched()?.t ?? 0),
-              object: o ? { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open) } : null,
-              sim: at(sim),
-              ...(others.length ? { others: others.map(at) } : {}),
-              clips: playing,
-            };
-          },
-          { sim, id: bought.id, others: sims.slice(1) },
-        );
-        const file = await shot(page, batch ? `${name}-${String(i).padStart(2, '0')}` : `${prefix}play-${thing.def}-${bought.where.x}-${bought.where.z}-${bought.where.rot}-${String(i).padStart(2, '0')}`, info);
-        record.shots.push({ file, ...info });
+        const aimed = await aim(bought.id, use);
+        record.view = aimed ?? undefined;
+        for (const [angle, pose] of viewPoses(aimed)) {
+          if (pose) await page.evaluate((v) => window.__camera(v), pose);
+          await settle(page, pose ? 60 : 120);
+          const info = await page.evaluate(
+            ({ sim, id, others }) => {
+              const all = window.__sims();
+              const clips = window.__renderer?.objectClips?.(id);
+              const at = (who) => {
+                const o = all.find((x) => x.id === who);
+                return o && { id: who, pose: o.pose, using: o.using && o.object === id, interaction: o.interaction, action: o.action, x: +o.x.toFixed(2), z: +o.z.toFixed(2) };
+              };
+              const o = window.__world().objects.find((x) => x.id === id);
+              // Each clip playing on it: how far in (s), of how long, and how it plays.
+              const playing = clips ? Object.fromEntries([...clips].map(([name, c]) => [name, { time: +c.time.toFixed(2), duration: +c.duration.toFixed(2), kind: c.kind }])) : null;
+              return {
+                t: Math.round(window.__check.watched()?.t ?? 0),
+                object: o ? { x: o.x, z: o.z, rot: o.rot, open: Boolean(o.open) } : null,
+                sim: at(sim),
+                ...(others.length ? { others: others.map(at) } : {}),
+                clips: playing,
+              };
+            },
+            { sim, id: bought.id, others: sims.slice(1) },
+          );
+          // How far from the object's nearest face the resident stands (a use from the back or the side says so).
+          const [fw, fd] = bought.where.size;
+          const face = (p) =>
+            p && +Math.hypot(Math.max(bought.where.x - p.x, 0, p.x - (bought.where.x + fw)), Math.max(bought.where.z - p.z, 0, p.z - (bought.where.z + fd))).toFixed(2);
+          if (info.sim) info.sim.distance = face(info.sim);
+          for (const other of info.others ?? []) other.distance = face(other);
+          const file = await shot(page, `${batch ? `${name}-${String(i).padStart(2, '0')}` : `${prefix}play-${thing.def}-${bought.where.x}-${bought.where.z}-${bought.where.rot}-${String(i).padStart(2, '0')}`}${angle ? `-v${angle + 1}` : ''}`, angle ? { ...info, angle } : info);
+          record.shots.push({ file, ...info, ...(angle ? { angle } : {}) });
+        }
         if (i < shots - 1) await settle(page, every);
       }
     }
@@ -963,13 +1044,15 @@ if (what === 'play') {
     bought.with = helpers.map((h) => `${h.def}@${h.at.join(',')}`);
     const uses = await usesOf(thing.def);
     const chosen = uses.filter(pick);
+    if (shotIdle && chosen.length) {
+      // As bought: before any use moves it (a wall bed folded down, a table's chairs pulled out).
+      const view = await aimStill(bought.id);
+      await shot(page, `${baseName(thing, bought)}-idle`, { object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], idle: true, view });
+    }
     if (!chosen.length) {
       // Decor (no uses): bought, one picture, sold.
       const offered = uses.map((u) => u.id);
-      await aim(bought.id);
-      await settle(page, 300);
-      const view = await aim(bought.id);
-      await settle(page, 300);
+      const view = await aimStill(bought.id);
       const file = await shot(page, `${prefix}${slug(thing.def)}-${uses.length ? 'no-such-use' : 'no-uses'}`);
       write({ object: thing.def, id: bought.id, at: [bought.where.x, bought.where.z, bought.where.rot], use: which, attempt, ...about(thing, bought), outcome: uses.length ? 'no such use' : 'no uses', offers: offered, view, shots: [{ file }] });
       console.warn(uses.length ? `${thing.def} has no interaction '${which}' (it offers: ${offered.join(', ')})` : `${thing.def} has no uses: one picture`);
@@ -977,8 +1060,9 @@ if (what === 'play') {
     const failed = [];
     for (const use of chosen) {
       // A crop bought new is just planted, one picked lies fallow: its "when ripe" uses aren't
-      // offered (`review-garden`'s are ripe: `--use-existing`).
-      if (use.when === 'ripe' && (await placed(bought.id))?.growth !== 2) {
+      // offered (`review-garden`'s are ripe: `--use-existing`, or `--use ripe`). Asked for them by
+      // name, it is run anyway and the game says why not ("isn't ripe yet").
+      if (use.when === 'ripe' && which !== 'ripe' && (await placed(bought.id))?.growth !== 2) {
         const reason = thing.existing ? 'only when ripe (not ripe now)' : 'only when ripe (bought new, a crop is just planted: --use-existing it on review-garden)';
         write({ object: thing.def, use: use.id, index: use.index, attempt, ...about(thing, bought), outcome: 'skipped', reason });
         continue;
@@ -1073,7 +1157,8 @@ if (what === 'play') {
     return { outcome: record.outcome };
   }
 
-  const pickUse = (u) => (which === 'all' ? true : /^\d+$/.test(which) ? u.index === Number(which) : u.id === which);
+  const pickUse = (u) =>
+    which === 'all' ? true : which === 'ripe' ? u.when === 'ripe' : /^\d+$/.test(which) ? u.index === Number(which) : u.id === which;
   const timings = [];
   log.setup.open = await openState();
   for (const thing of things) {

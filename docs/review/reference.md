@@ -350,7 +350,7 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `poolTable` | Pool table (7-9 ft) | 1.9–2.8 × 0.74–0.82 × 1.1–1.55 | top 74–79 | play a game of pool; practise trick shots | pool 10–30 |  | wpa | `poolTable` |
 | `foosball` | Foosball table | 1.2–1.45 × 0.86–0.95 × 0.7–1.2 |  | play a quick game for two or four | foosball 5–20 | rodSpin 0–360° | foosball | `foosball` |
 | `dartboard` | Dartboard on the wall | 0.45–0.7 × 0.45–0.7 × 0.04–0.12 |  | throw darts from the oche | darts 5–30 | cabinetDoor 90–180° | darts | `dartboard` |
-| `chessTable` | Chess / games table with seats | 0.6–1.6 × 0.7–1 × 0.6–1.6 | seat 42–48, top 70–76 | play chess or a board game | chess 10–60 |  | dimCafeTables, dimSideChairs | `chessTable` `parkChessTable` |
+| `chessTable` | Chess / games table with a seat at each end | 0.6–1.9 × 0.7–1 × 0.45–1 | seat 42–48, top 70–76 | play chess or a board game | chess 10–60 |  | dimCafeTables, dimSideChairs | `chessTable` `parkChessTable` |
 | `jigsawTable` | Jigsaw / puzzle table | 0.7–1 × 0.7–1 × 0.6–1 | seat 42–48, top 70–78 | work on a jigsaw | jigsaw 20–120 |  | dimDiningTables, dimSideChairs | `puzzleTable` `loner.puzzleTable` |
 | `arcadeCabinet` | Upright arcade cabinet | 0.6–0.85 × 1.55–1.85 × 0.7–0.9 |  | play a quick round; chase the high score | arcade 5–30 |  | arcade | `arcadeCabinet` `slob.arcadeCabinet` |
 | `easel` | Studio easel | 0.5–0.8 × 1.5–2.1 × 0.5–0.9 |  | paint a canvas | paint 30–180 |  | neufert | `easel` |
@@ -378,7 +378,7 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `boulderingWall` | Home bouldering wall with crash mat | 1.8–3 × 2.2–2.8 × 0.8–2 |  | climb a problem; drop onto the mat | climb 20–90 |  | neufert | `energetic.boulderingWall` |
 | `trampoline` | Garden trampoline | 1.8–3.7 × 0.6–2.7 × 1.8–3.7 |  | bounce | bounce 10–40 |  | neufert | `energetic.trampoline` |
 | `vibrationPlate` | Vibration plate | 0.45–0.85 × 0.15–1.3 × 0.45–0.85 |  | stand on it while it shakes | shake 10–15 |  | neufert | `lazy.vibePlate` |
-| `recoveryLounger` | Padded lounger / pod (recovery or nap) | 0.7–1 × 0.8–1.6 × 0.9–2 | seat 35–50 | lie back and recover; take a power nap | recover 15–45, powerNap 10–30 | canopy 0–90° | neufert, nsf | `energetic.recoveryPod` `lazy.napPod` `loner.quietPod` |
+| `recoveryLounger` | Padded lounger / pod (recovery or nap) | 0.7–1 × 0.8–1.6 × 0.75–2 | seat 35–50 | lie back and recover; take a power nap | recover 15–45, powerNap 10–30 | canopy 0–90° | neufert, nsf | `energetic.recoveryPod` `lazy.napPod` `loner.quietPod` |
 
 ### Decor
 
@@ -496,15 +496,16 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `townStatue` | Statue on a plinth | 1–2.5 × 2–4.5 × 1–2.5 |  | admire it; meet beside it *(decor)* | admire 1–10 |  | neufert | `townStatue` |
 | `slide` | Playground slide | 0.5–1 × 1.5–2.6 × 2–4 |  | climb up and slide down | slide 5–20 |  | en1176, neufert | `slide` |
 | `climbingFrame` | Climbing frame | 1.5–3 × 1.5–2.6 × 1.5–3 |  | climb; hang from the bars | climb 10–30 |  | en1176, neufert | `climbingFrame` |
-| `seesaw` | Seesaw | 0.3–0.6 × 0.5–1 × 2.4–4 | seat 40–75 | seesaw with a friend | seesaw 5–15 | tilt 10–25° | en1176, neufert | `seesaw` |
+| `seesaw` | Seesaw (the plank across, a seat at each end) | 2.4–4 × 0.5–1 × 0.3–0.6 | seat 40–75 | seesaw with a friend | seesaw 5–15 | tilt 10–25° | en1176, neufert | `seesaw` |
 | `springRider` | Spring rider | 0.25–0.5 × 0.7–1.1 × 0.7–1.1 | seat 40–70 | bounce and rock | ride 3–10 | rock 10–25° | en1176, neufert | `springRider` |
 | `roundabout` | Playground roundabout (merry-go-round) | 1.5–2.5 × 0.3–1 × 1.5–2.5 | seat 25–45 | spin round; push it | spin 3–15 | spin 0–360° | en1176, neufert | `merryGoRound` |
 | `basketballHoop` | Basketball hoop on a pole | 0.9–1.8 × 3.2–4 × 0.8–2 |  | shoot hoops; play one-on-one | shoot 10–60 |  | fiba | `basketballHoop` `energetic.streetballHoop` |
-| `pingPongTable` | Table tennis table | 1.5–1.6 × 0.76–0.95 × 2.7–2.8 | top 76–76 | play table tennis | pingPong 10–40 |  | ittf | `pingPongTable` |
+| `pingPongTable` | Table tennis table | 2.7–2.8 × 0.76–0.95 × 1.5–1.6 | top 76–76 | play table tennis | pingPong 10–40 |  | ittf | `pingPongTable` |
 | `foodCart` | Street food cart (ice cream, hot dogs) | 1.2–2.2 × 1.8–2.6 × 0.7–1.2 | top 90–105 | buy an ice cream or a hot dog | iceCream 3–15, hotDog 5–15 | lid 80–110° | neufert | `iceCreamCart` `hotDogStand` |
 | `vendingMachine` | Vending machine | 0.7–1 × 1.75–1.95 × 0.7–0.95 |  | buy a snack or a drink | snack 1–3 |  | neufert | `vendingSnack` `vendingDrink` |
 | `marketStall` | Market stall with awning | 1.5–3 × 2–2.6 × 0.8–1.5 | top 80–100 | browse the produce; buy fruit | browse 5–20 |  | neufert | `marketStall` |
-| `shopCounter` | Shop counter or bakery case | 1.2–2.5 × 0.95–1.4 × 0.6–1 | top 90–110 | buy a treat; pay | treat 2–10, pastry 2–10 |  | neufert | `shopCounter` `bakeryCase` |
+| `shopCounter` | Shop counter | 1.2–2.5 × 0.95–1.4 × 0.6–1 | top 90–110 | buy a treat; pay | treat 2–10, pastry 2–10 |  | neufert | `shopCounter` |
+| `displayCase` | Bakery / deli display case | 1.2–2.5 × 0.9–1.4 × 0.6–1 | deck 70–85 | buy a pastry; choose a cake | treat 2–10, pastry 2–10 |  | neufert | `bakeryCase` |
 | `groceryShelf` | Supermarket shelving (gondola) | 1–2.5 × 1.4–2.2 × 0.4–1.2 |  | browse and pick groceries | browse 5–20 |  | neufert | `groceryShelf` |
 | `mailbox` | Kerbside mailbox on a post | 0.15–0.3 × 1.04–1.4 × 0.4–0.6 |  | post or collect letters | post 0–2 | door 90–180° | usps | `street.mailbox` |
 | `hydrant` | Fire hydrant (pillar) | 0.25–0.5 × 0.6–1 × 0.25–0.5 |  | (firefighters connect hoses) |  |  | hydrant, hydrantNj | `street.hydrant` |

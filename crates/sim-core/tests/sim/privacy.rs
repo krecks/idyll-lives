@@ -8,6 +8,8 @@
 
 use crate::common;
 
+use common::interaction;
+
 use sim_core::social::EventKind;
 use sim_core::world::{Phase, TaskKind};
 use sim_core::{Command, MINUTES_PER_TICK, World, snapshot};
@@ -103,14 +105,6 @@ fn room_of(w: &World, i: usize) -> u16 {
 
 fn need(w: &World, id: &str) -> usize {
     w.content.needs.iter().position(|n| n.id == id).unwrap()
-}
-
-fn interaction(w: &World, object: u32, id: &str) -> usize {
-    w.content.objects[w.objects[object as usize].def]
-        .interactions
-        .iter()
-        .position(|i| i.id == id)
-        .unwrap()
 }
 
 /// What resident `i` is using now (not on their way to): the object and the interaction's id.

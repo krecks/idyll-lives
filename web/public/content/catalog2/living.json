@@ -778,7 +778,28 @@
         ]
       },
       "description": "Two little tables, one tucked under the other.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "pullOut",
+          "label": "Pull out the small table",
+          "anim": "fetch",
+          "minutes": 1,
+          "pose": "stand",
+          "autonomous": false,
+          "when": "closed",
+          "leaves": "open"
+        },
+        {
+          "id": "pushIn",
+          "label": "Push the small table back",
+          "anim": "fetch",
+          "minutes": 1,
+          "pose": "stand",
+          "autonomous": false,
+          "when": "open",
+          "leaves": "closed"
+        }
+      ]
     },
     {
       "id": "sideTableRound",
@@ -1011,7 +1032,34 @@
       "group": "shelves",
       "decor": 0.9,
       "description": "A walnut vitrine with glass shelves for treasured ornaments.",
-      "interactions": []
+      "interactions": [
+        {
+          "id": "openDoor",
+          "label": "Open the cabinet",
+          "anim": "fetch",
+          "minutes": 1,
+          "pose": "stand",
+          "autonomous": false,
+          "when": "closed",
+          "leaves": "open",
+          "effects": {
+            "fun": 0.05
+          },
+          "tags": [
+            "cozy"
+          ]
+        },
+        {
+          "id": "shutDoor",
+          "label": "Shut the cabinet",
+          "anim": "fetch",
+          "minutes": 1,
+          "pose": "stand",
+          "autonomous": false,
+          "when": "open",
+          "leaves": "closed"
+        }
+      ]
     },
     {
       "id": "fireplaceElectric",
