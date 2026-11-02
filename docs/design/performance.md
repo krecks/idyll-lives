@@ -600,3 +600,71 @@ over 33 ms, 552 draws. Today's scenes after all of it (village Medium/High orbit
 forest Medium; two runs each): 120 fps (the village orbit once 118), 0 frames over 33 ms, draws
 as before (370 / 430 / 384 / 431, roam 288), the village's focus switches 76–152 ms; pictures
 against the base: at most 0.052 % of a picture's pixels (the shrubs), forest 0.018 %.
+
+### The real Big world again: its own focus lot, its zones, its warm-up (2026-11-02)
+
+Same machine and method (`tools/bench/render.mjs`, each run on a copy of the code made for it, so
+the code changing meanwhile doesn't reload the page under it). The roam is 60 s now (20 s covered
+little more than the way from the main town to the first hamlet: no focus switch at all); `over 33`
+is frames over 33 ms in those 60 s, `slow` in the result says when each came and what was being
+built (`bench.ts`).
+
+What the 640–870 draws and 11–12 ms of GPU time were: the bench's Big world starts with no lot in
+view, and a null view meant the whole town in full detail, every house's storeys (a 68 MB vertex
+buffer) and every thing in the world. On Low the things' merged shadow caster took them all too
+(a 134 MB vertex and a 128 MB index buffer), and that is what lost Low's WebGPU device (Chromium's
+GPU process went down: "A valid external Instance reference no longer exists", then no adapter).
+A big world given no view now builds the lot nearest the camera (`setWorld`). Then:
+
+- the lawn's flowers, one draw over the whole world (46,861 of them, 12.5 M triangles), in 128 m
+  squares left out past 170 m;
+- a house's rooms found over its lot's tiles, not the world's million a storey;
+- the warm-up builds and draws up to 6 more lots that between them have most of what the world's
+  houses are made of, and a reflection (`warmLots`): roaming made 49 shaders and pipelines in
+  play before, 30 of them in the frame the first mirror showed; 0 now;
+- Low's merged object shadows uploaded once for all the wall items the cutaway moves together;
+- the street keeps each chunk's last three plans (a lot just left is planned already).
+
+Land from the zones (`render/shared/zones.ts`): water (the Big worlds had none), woods, meadows,
+fields and hills as the generator laid them out; everything built stays flat at y = 0 (roads,
+country roads and trails flat corridors with their verges), so residents and clicks need no lift;
+`meta.pads` is not read (countryside plots are built land at 0).
+
+Roaming the real Big worlds now (60 s, one run each; before: the Big small world, 20 s, 2 runs):
+
+| world | preset | fps | interval p95 / p99 / max ms | over 33 | draws (shadow) | triangles M | GPU ms | CPU p50 / p95 ms | focus switches ms |
+|---|---|---|---|---|---|---|---|---|---|
+| small, before | medium | 71.6 | 17.5 / 25.0 / – | 0 | 692 (175) | 32.7 | 11.1 | 2.2 | – |
+| small, before | high | 68.0 | 17.5 / 25.0 / – | 0 | 642 (123) | 31.9 | 11.0 | 2.9 | – |
+| small, before | low | device lost in 5 of 6 starts | | | | | | | |
+| small | low | 119.9 | 9.0 / 9.3 / 25.0 | 0 | 132 (0.1) | 1.3 | 4.4 | 1.3 / 1.9 | 82, 96 |
+| small | medium | 119.9 | 9.0 / 9.3 / 25.0 | 0 | 152 (3.6) | 3.0 | 4.7 | 1.3 / 2.0 | 79, 91 |
+| small | high | 119.9 | 9.1 / 9.3 / 25.0 | 0 | 156 (2.1) | 3.1 | 4.6 | 1.3 / 2.0 | 79, 90 |
+| lakeside | low | 119.9 | 9.8 / 10.3 / 33.4 | 0 | 111 (0.1) | 1.3 | 4.3 | 1.5 / 2.8 | 106, 77, 73 |
+| lakeside | medium | 120.0 | 9.8 / 10.3 / 24.7 | 0 | 132 (10.5) | 2.9 | 4.5 | 1.4 / 2.7 | 83, 73, 64 |
+| lakeside | high | 120.0 | 9.8 / 10.3 / 16.7 | 0 | 137 (10.4) | 2.9 | 4.4 | 1.4 / 2.6 | 78, 63, 62 |
+| forest | low | 119.9 | 9.7 / 10.2 / 33.3 | 0 | 189 (0.3) | 2.1 | 4.7 | 1.6 / 2.1 | 73, 53, 80 |
+| forest | medium | 119.9 | 9.6 / 10.2 / 25.1 | 0 | 206 (6.7) | 4.5 | 4.8 | 1.5 / 2.2 | 95, 65, 57 |
+| forest | high | 119.9 | 9.7 / 10.2 / 33.3 | 0 | 236 (6.6) | 5.3 | 5.0 | 1.6 / 2.3 | 78, 53, 85 |
+| small, CPU ×3 | low | 119.3 | 10.0 / 10.3 / 107 | 2 | 131 | 1.3 | 4.0 | 1.5 / 2.7 | 215, 252 |
+| lakeside, CPU ×3 | low | 119.3 | 10.0 / 10.3 / 107 | 4 | 110 | 1.3 | 4.0 | 1.4 / 2.6 | 223, 217, 149 |
+| forest, CPU ×3 | low | 119.4 | 10.0 / 10.3 / 100 | 4 | 188 | 2.1 | 4.4 | 2.0 / 3.4 | 220, 141, 199 |
+
+Low starts every time (10 of 10 on the Big small world, and every run since). With the CPU
+throttled 3× the slow frames come with no build under way (`slow`: building '' for all but one),
+long tasks 83–87 ms: not found yet. The street's chunk plans (`TownStreet.chunk`) and a storey's
+`HousePlanner.build` are still each one synchronous step (12–16 ms on Low at 1×).
+
+Today's scenes, base (the commit before the open-world work) → now, back to back (2 runs):
+
+| scene | preset | scenario | draws (shadow) | CPU ms | GPU ms |
+|---|---|---|---|---|---|
+| village | medium | orbit-day | 370 (60) → 369 (59) | 1.72 → 1.69 | 4.61 → 4.20 |
+| village | medium | wide | 430 (60) → 430 (59) | 1.84 → 1.81 | 4.50 → 4.13 |
+| village | high | orbit-day | 382 (59) → 383 (59) | 1.78 → 1.70 | 4.89 → 4.13 |
+| village | high | wide | 430 (59) → 431 (59) | 1.88 → 1.84 | 4.71 → 4.21 |
+| forest | medium | orbit-day | 400 (88) → 400 (88) | 1.54 → 1.53 | 4.30 → 4.23 |
+
+120 fps in every cell; the village's roam 119.6 fps, 287 draws. Pictures against the base's: the
+village at most 0.061 % of a picture's pixels (the flower beds' shrubs, as before; 51 of 54
+pictures, 3 timed out loading in the headless browser), the forest 0.018 %.
