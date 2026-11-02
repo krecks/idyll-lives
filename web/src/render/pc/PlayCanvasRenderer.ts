@@ -29,6 +29,8 @@ import { GameCamera } from './camera';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { createApp, createDevice, destroyApp } from './device';
 import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
+import { fenceHedges } from '../shared/fences';
+import { shownFences } from '../shared/shownFences';
 import { gardenPool, GardenPools } from './gardenPools';
 import { HoverTile, ResizeHandles } from './handles';
 import { HeldFrames } from './heldFrames';
@@ -65,7 +67,7 @@ import { benchDiag } from '../../debug/benchFlags';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
-import { DOOR_SWING, doorLead, ease, goingThrough, shutDefs } from '../shared/doors';
+import { DOOR_SWING, doorLead, ease, goingThrough, MOVER, shutDefs } from '../shared/doors';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
 import { GAME_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
@@ -151,6 +153,8 @@ const HOLD_FRAMES = 2;
 const SHADOW_MARGIN = 10;
 /** The basement's pit (and the ground dug away over it) reaches this far past the plot (m), clear of walls on its edge. */
 const PIT_MARGIN = 0.3;
+/** Cells (m) the residents on the move are sorted into for the gates (`swingDoors`). */
+const GATE_CELL = 8;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
 const ROOF_MIN_DISTANCE = 15;
 /** Main-thread time (ms) a world build runs before the frames it runs behind get one (`pace`). */
@@ -416,6 +420,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private stairwells: ViewRect[] = [];
   /** The house's garden trees and shrubs (`placeDecor`): a draw per model mesh, hidden while its basement is in view. */
   private decorTemplates!: TemplateCache<ModelTemplate>;
+  /** The viewed lot's hedges (its fences in the hedge style), planted with its garden's shrubs ([x, z, scale, yaw]). */
+  private lotHedges: [number, number, number, number][] = [];
   private readonly decor = new Map<string, { template: ModelTemplate; draws: Instances[] }>();
   /** The viewed lot's door leaves that swing, each with how far open it stands (1 open, as drawn; -1 not placed yet). */
   private doors: { leaf: HouseDoor; open: number }[] = [];
@@ -451,6 +457,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** Object kinds that make a room one that can be kept shut (`shutDefs`). */
   private shutDefs: ReadonlySet<string> = new Set();
   private readonly movers: number[] = [];
+  /** The cells (`GATE_CELL`) someone on the move is in this frame. */
+  private readonly moverCells = new Set<number>();
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
   private readonly neighboursUp: boolean[] = [];
   /** Indices of the snapshot layout's sleeping action tags, and the life stages of babies. */
@@ -666,6 +674,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       lod: this.quality.streetLod,
       shadows: this.quality.streetShadows,
       ground: true,
+      fenceStyles: c.fenceStyles,
     });
     this.cars = new Cars(this.app, this.root, this.quality.streetShadows);
     this.characters.setCarSeat((x, z) => this.cars.seatAt(x, z));
@@ -1191,11 +1200,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const m = world.meta;
       this.lotParts = { refs, key: JSON.stringify([m?.seed, m?.streets, m?.roads, m?.paths, world.walls, world.openings, world.diagonals, world.floors, world.fences]) };
     }
+    // (An older town's fences, planned from what stands round them, are part of the lot's too.)
+    const planned = shownFences(world, this.deps.content.fenceStyles);
     return JSON.stringify([
       view,
       world.width,
       world.depth,
       this.lotParts.key,
+      planned === (world.fences ?? planned) ? 0 : planned.length,
       world.plots.map((p) => [p.house, p.roof]),
       world.households.find((h) => h.player)?.plot,
       houseObjectKey(world, view, (def) => !!this.deps.content.object(def)?.stairs, this.shutDefs),
@@ -1238,17 +1250,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
     const lotKey = this.lotKeyOf(world, view);
     const lotBuilt = lotKey !== this.lotKey;
+    const v = view;
+    const onLot = (f: FenceEdge) => !!v && f.x >= v.x && f.z >= v.z && f.x + (f.axis === 'h' ? 1 : 0) <= v.x + v.w && f.z + (f.axis === 'v' ? 1 : 0) <= v.z + v.d;
+    const shown = shownFences(world, this.deps.content.fenceStyles);
+    const lotFences = lotBuilt ? shown.filter(onLot) : [];
     if (lotBuilt) {
       this.clearLot();
       this.lotKey = lotKey;
+      this.lotHedges = fenceHedges(lotFences, this.deps.content.fenceStyles).map(([x, z, s, , yaw]): [number, number, number, number] => [x, z, s, yaw]);
       this.buildStreets(world);
       await this.pace();
       await this.buildLot(world);
       await this.pace();
-      // The viewed lot's fences stand on the ground (hidden with it while the basement is in view); other lots' stay.
-      const v = view;
-      const onLot = (f: FenceEdge) => !!v && f.x >= v.x && f.z >= v.z && f.x + (f.axis === 'h' ? 1 : 0) <= v.x + v.w && f.z + (f.axis === 'v' ? 1 : 0) <= v.z + v.d;
-      for (const [list, storey] of [[(world.fences ?? []).filter(onLot), 0], [(world.fences ?? []).filter((f) => !onLot(f)), undefined]] as const) {
+      // The viewed lot's fences stand on the ground (hidden with it while the basement is in view, its
+      // hedges with the garden's shrubs: `lotHedges`); other lots' are the street's, but for their gates, which swing.
+      for (const [list, storey] of [[lotFences, 0], [shown.filter((f) => !onLot(f) && f.kind === 'gate'), undefined]] as const) {
         const fences = buildFences(this.app, this.root, list, this.deps.content.fenceStyles);
         if (!fences) continue;
         this.lotEntities.push({ entity: fences.entity, storey });
@@ -1448,8 +1464,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.wallsLow = add('wallsLow', world.meshes.wallsLow, wall);
       return;
     }
-    // Garden dressing split into species (hedges or mixed shrub borders, varied lot trees).
+    // Garden dressing split into species (hedges or mixed shrub borders, varied lot trees), and the lot's hedges round its garden (its fences').
     const decor = [...natureDecor('model.bush', ground.shrubs), ...natureDecor('model.tree', ground.trees, world, this.view)];
+    if (this.lotHedges.length) {
+      const hedges = decor.find(([k]) => k === 'model.hedge');
+      if (hedges) hedges[1] = [...hedges[1], ...this.lotHedges];
+      else decor.push(['model.hedge', this.lotHedges]);
+    }
     this.birdLife.setDecor(decor); // (the birds live in it.)
     for (const [key, items] of decor) {
       await this.pace();
@@ -1857,7 +1878,19 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const lead = doorLead(rate);
     const step = Math.min(1, (this.frameDt / 1000 / DOOR_SWING) * Math.min(Math.max(rate, 1), 10));
     let moved = false;
+    // (A town has a gate in most gardens: one standing shut with nobody within a cell of it isn't asked.)
+    const near = this.moverCells;
+    near.clear();
+    const cell = (cx: number, cz: number) => (cx + 1024) * 4096 + cz + 1024;
+    for (let i = 0; i < movers.length; i += MOVER) near.add(cell(Math.floor(movers[i] / GATE_CELL), Math.floor(movers[i + 1] / GATE_CELL)));
+    const anyone = (x: number, z: number) => {
+      if (!near.size) return false;
+      const [cx, cz] = [Math.floor(x / GATE_CELL), Math.floor(z / GATE_CELL)];
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (near.has(cell(cx + dx, cz + dz))) return true;
+      return false;
+    };
     for (const gate of this.gates) {
+      if (gate.open === 0 && lead < GATE_CELL && !anyone(gate.leaf.centre[0], gate.leaf.centre[1])) continue;
       const way = goingThrough(movers, gate.leaf.axis, gate.leaf.centre, gate.open === 1, lead, hand);
       // It opens away from the one coming through, and shuts the way it opened.
       if (way && gate.open === 0) gate.towards = way;

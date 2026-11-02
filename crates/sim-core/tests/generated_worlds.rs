@@ -10,7 +10,7 @@
 
 mod common;
 
-use sim_core::lot::OUTDOORS;
+use sim_core::lot::{Edge, OUTDOORS};
 use sim_core::path::NavGrid;
 use sim_core::surface;
 use sim_core::world::MAX_SIMS;
@@ -65,6 +65,50 @@ fn generated_worlds_are_livable() {
                         ));
                     }
                 }
+            }
+            // No garden shut off by the town's fences: every tile of the ground walked to from the
+            // way into town with the fences gone is walked to with them standing.
+            let reach = |through_fences: bool| {
+                let (wd, dd) = (w.lot.width as i32, w.storey_depth());
+                let mut seen = vec![false; (wd * dd) as usize];
+                let (sx, sz) = exits[0];
+                let mut stack = vec![(sx, sz)];
+                while let Some((x, z)) = stack.pop() {
+                    if x < 0 || z < 0 || x >= wd || z >= dd || seen[(z * wd + x) as usize] {
+                        continue;
+                    }
+                    seen[(z * wd + x) as usize] = true;
+                    for (nx, nz) in [(x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1)] {
+                        if nx < 0 || nz < 0 || nx >= wd || nz >= dd || !nav.tile_free(nx, nz) {
+                            continue;
+                        }
+                        let edge = if nx != x {
+                            w.lot.v_edge(x.max(nx) as usize, z as usize)
+                        } else {
+                            w.lot.h_edge(x as usize, z.max(nz) as usize)
+                        };
+                        if !edge.blocks() || (through_fences && edge == Edge::Fence) {
+                            stack.push((nx, nz));
+                        }
+                    }
+                }
+                seen
+            };
+            let (fenced, open) = (reach(false), reach(true));
+            let mut shut = std::collections::BTreeMap::<&str, (usize, (i32, i32))>::new();
+            for (i, (&f, &o)) in fenced.iter().zip(&open).enumerate() {
+                let (x, z) = (i as i32 % w.lot.width as i32, i as i32 / w.lot.width as i32);
+                if o && !f && w.lot.room_at(x, z) == OUTDOORS {
+                    let name = w
+                        .plot_at(x, z)
+                        .map_or("the street", |p| &w.plots[p as usize].name);
+                    shut.entry(name).or_insert((0, (x, z))).0 += 1;
+                }
+            }
+            for (name, (n, at)) in shut {
+                failures.push(format!(
+                    "{label}: {n} tiles of {name} shut off by fences (one at {at:?})"
+                ));
             }
             // Everything outdoors that residents use.
             let start = exits[0];

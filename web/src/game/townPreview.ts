@@ -7,7 +7,7 @@
  */
 
 import type { Content } from '../content/content';
-import type { ObjectPlacement, Opening, PlotInfo, WallEdge, WorldStructure } from '../core/protocol';
+import type { FenceEdge, ObjectPlacement, Opening, PlotInfo, WallEdge, WorldStructure } from '../core/protocol';
 import { layoutTown, worldLook, type NeighbourhoodDraft, type Templates, type TownMeta } from './town';
 
 const EMPTY_MESH = { positions: new Float32Array(0), normals: new Float32Array(0), uvs: new Float32Array(0), indices: new Uint32Array(0) };
@@ -93,7 +93,11 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     return { id, def: o.def, x: o.x, z: o.z, rot: o.rot, turn: o.turn, offset: o.offset, w, d, quality: 0, sellValue: null };
   });
 
-  const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths: layout.paths, facing: layout.facing, seed: town.seed ?? 1, world: worldLook(town, layout.fields), home: playerSlot };
+  // The town's garden fences, as the simulation reports them (styles by index).
+  const style = (id: string) => Math.max(0, content.fenceStyles.findIndex((f) => f.id === id));
+  const fences: FenceEdge[] = layout.fences.map((f) => ({ axis: f.axis, x: f.x, z: f.z, kind: f.kind, style: style(f.style) }));
+
+  const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths: layout.paths, facing: layout.facing, seed: town.seed ?? 1, world: worldLook(town, layout.fields), home: playerSlot, gardenFences: true };
   // A big world's land and areas, as the town file carries them (`assembleTown`).
   if (town.open) Object.assign(meta, { zones: town.open.zones, pads: town.open.pads, areas: town.open.areas });
   return {
@@ -110,6 +114,7 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     rooms,
     walls,
     openings,
+    fences,
     meta,
     meshes: { walls: EMPTY_MESH, wallsLow: EMPTY_MESH, floors: EMPTY_MESH },
     garages: layout.garages,

@@ -72,6 +72,11 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   `cars[].driveSpot?: [x, z, yaw]`, where a car parked before it parked in front of such a garage at
   the end of its driveway. Both are left out when absent, so towns and saves without a garage of
   the player's stay byte for byte as they were.
+- `fences: { line: [x0, z0, x1, z1], style?: string, gate?: true }[]` — garden fences, hedges and
+  field fences the town puts up (`game/gardenFences.ts`), runs along grid lines on the ground storey
+  in a `fenceStyles` id, never on a wall: real `Edge::Fence` / `Edge::Gate` edges, saved like the
+  player's. With them `meta.gardenFences: true`; a town or save without it gets the same plan drawn
+  only (`render/shared/shownFences.ts`).
 - `meta.zones: { kind: 'woods' | 'meadow' | 'water' | 'hill' | 'fields', poly: [x, z][] }[]`
 - `meta.pads: Record<plotIndex, y>` — the height an off-town outdoor plot is levelled to (m).
 - `meta.world.size` mirrors `size` for the renderer.
@@ -103,7 +108,9 @@ Walking is 1.5 m per game minute (`WALK_SPEED`), so 1 km takes ~11 game hours on
 ## Life on every lot
 
 Residents outdoors are drawn on every lot within the draw radius, and window glow follows who
-is home. Full interiors are drawn for the focus lot (the one under the camera) plus 2 cached ones.
+is home. The fences round gardens are the world's (`WorldStructure.fences`), so residents on every
+lot walk round them; they are drawn the same whichever lot is the focus (the focus lot's with the
+lot, the rest merged into the street's chunks, every gate by the game so it swings). Full interiors are drawn for the focus lot (the one under the camera) plus 2 cached ones.
 
 ## Integration rules
 

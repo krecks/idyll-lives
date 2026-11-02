@@ -453,6 +453,12 @@ export interface WorldMeta {
   world?: WorldLook;
   /** The menus' town preview only: the plot drawn as the player's house, as the game shows it (its car on the driveway, no garage or garden dressing). */
   home?: number | null;
+  /**
+   * The town put its garden fences, hedges and farm field fences up as real fences (`fences`, see
+   * `game/gardenFences.ts`): the street draws none of its own. Missing in older towns and saves,
+   * whose street still dresses neighbours' gardens and fields with fences of its own.
+   */
+  gardenFences?: boolean;
   /** Big worlds: woods, meadows, water, hills and fields across the world. */
   zones?: WorldZone[];
   /** Big worlds: the height (m) each outdoor plot off the flat town land is levelled to, by plot index. */

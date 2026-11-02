@@ -3926,7 +3926,8 @@
     {"id": "rails", "label": "Ranch rails", "kind": "rails", "color": "#8A6440", "height": 1.1, "price": 20},
     {"id": "slats", "label": "Modern slats", "kind": "slats", "color": "#3E4247", "height": 1.4, "price": 45},
     {"id": "iron", "label": "Wrought iron", "kind": "iron", "color": "#25272A", "height": 1.2, "price": 55},
-    {"id": "stone", "label": "Low stone wall", "kind": "stone", "color": "#9C968C", "height": 0.7, "price": 60}
+    {"id": "stone", "label": "Low stone wall", "kind": "stone", "color": "#9C968C", "height": 0.7, "price": 60},
+    {"id": "hedge", "label": "Clipped hedge", "kind": "hedge", "color": "#41683A", "height": 1.1, "price": 35}
   ],
   "windowStyles": [
     {"id": "classic", "label": "Classic", "panes": "cross", "sill": 0.9, "head": 2.1, "inset": 0.12, "shutters": "house", "price": 120},
