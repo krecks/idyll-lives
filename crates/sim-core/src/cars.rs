@@ -2237,8 +2237,9 @@ pub(crate) fn garages_changed(w: &mut World, plot: u32) {
 }
 
 /// The most separate patches of changed tiles one `restand` notes for walkers (more: the box
-/// round them all). Each takes a place in the navigation log (`path::NAV_LOG`), which walkers
-/// that fall too far behind it re-plan for.
+/// round them all). The navigation log keeps a tick's patches together (`path::NavLog`), so
+/// however many cars come and go in a tick, walkers that last looked a few ticks ago still find
+/// what changed there rather than re-planning for anything.
 const MOST_PATCHES: usize = 8;
 
 /// Tiles of change this close together (or closer) make one patch.

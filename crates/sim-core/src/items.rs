@@ -196,12 +196,9 @@ pub fn holder(content: &Content, objects: &[ObjectInstance], at: &ItemAt) -> Opt
 
 /// `holder` of each of `ats`, in one pass over the objects rather than one for each: a big town
 /// has thousands of objects, and the sweep over its items (`cooking::update`) asks for every one.
-/// The same answers, the first object (by id) over each tile.
-pub(crate) fn holders(
-    content: &Content,
-    objects: &[ObjectInstance],
-    ats: &[ItemAt],
-) -> Vec<Option<u32>> {
+/// The same answers, the first object (by id) over each tile (the sim tests check it against
+/// `holder`: `common::check_lookups`).
+pub fn holders(content: &Content, objects: &[ObjectInstance], ats: &[ItemAt]) -> Vec<Option<u32>> {
     use std::collections::HashMap;
     // The tiles asked about, on a top and put away, and the first object found for each.
     let mut tops: HashMap<(i32, i32), Option<u32>> = HashMap::new();
@@ -233,19 +230,11 @@ pub(crate) fn holders(
             }
         }
     }
-    let found: Vec<Option<u32>> = ats
-        .iter()
+    ats.iter()
         .map(|at| match *at {
             ItemAt::Surface { x, z, .. } => tops[&(x, z)],
             ItemAt::Stored { x, z } => stores[&(x, z)],
             ItemAt::Floor { .. } => None,
         })
-        .collect();
-    // (In the tests, the same as asking for each.)
-    debug_assert!(
-        ats.iter()
-            .zip(&found)
-            .all(|(at, &h)| holder(content, objects, at) == h)
-    );
-    found
+        .collect()
 }

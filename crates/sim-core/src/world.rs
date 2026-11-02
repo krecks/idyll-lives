@@ -3666,7 +3666,7 @@ impl World {
     /// way again (`nav_changed_since`). Views and the objects' indexes don't follow it.
     pub(crate) fn nav_changed_in(&mut self, rect: [i32; 4]) {
         self.nav_version = self.nav_version.wrapping_add(1);
-        self.nav_log.push(self.nav_version, rect);
+        self.nav_log.push(self.tick, self.nav_version, rect);
         self.reach.mark(&self.lot, rect);
     }
 

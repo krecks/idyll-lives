@@ -1012,25 +1012,110 @@ impl Reach {
     }
 }
 
-/// The last changes to walking (`World::nav_changed_in`), each with the navigation version it
-/// made and the tiles `[x0, z0, x1, z1)` it touched: a walker whose way doesn't go near any
-/// change since it last looked needn't find its way again.
+/// The last changes to walking (`World::nav_changed_in`), with the navigation versions they made
+/// and the tiles `[x0, z0, x1, z1)` they touched: a walker whose way doesn't go near any change
+/// since it last looked needn't find its way again. The changes of one tick share a place (cars
+/// coming and going, a build: several patches each), so the log goes back `NAV_LOG` ticks with
+/// changes however many there were in each.
 #[derive(Debug, Clone, Default)]
 pub struct NavLog {
-    entries: Vec<(u32, [i32; 4])>,
+    entries: Vec<NavChanges>,
     next: usize,
 }
 
-/// Changes `NavLog` keeps.
-pub const NAV_LOG: usize = 32;
+/// Places `NavLog` keeps: at least as many ticks as a resident far from the view waits between
+/// turns (`lod::FAR_TICKS`), so one that keeps walking while cars come and go every tick still
+/// finds what changed since its last turn.
+pub const NAV_LOG: usize = 64;
+const _: () = assert!(NAV_LOG as u64 >= crate::lod::FAR_TICKS);
+
+/// The most separate patches one place in `NavLog` keeps (more: the two earlier ones whose box
+/// round them grows least share one).
+const NAV_LOG_PATCHES: usize = 16;
+
+/// The changes to walking made in one tick (`group`): navigation versions `first..=last`, over
+/// tiles `rects[..len]`, each with the last version that touched them.
+#[derive(Debug, Clone, Copy)]
+struct NavChanges {
+    group: u64,
+    first: u32,
+    last: u32,
+    rects: [([i32; 4], u32); NAV_LOG_PATCHES],
+    len: usize,
+}
+
+impl NavChanges {
+    /// Adds the change that made `version`, over tiles `r`. (With no room, two earlier patches
+    /// make room, so the new one is kept as it is and a walker that looked between them isn't
+    /// told of a box round older ones.)
+    fn add(&mut self, r: [i32; 4], version: u32) {
+        if self.len < NAV_LOG_PATCHES {
+            self.rects[self.len] = (r, version);
+            self.len += 1;
+            return;
+        }
+        let area = |a: [i32; 4]| i64::from(a[2] - a[0]) * i64::from(a[3] - a[1]);
+        let cost = |a: [i32; 4], b: [i32; 4]| {
+            let both = area(join(a, b));
+            (both - area(a) - area(b), both)
+        };
+        let rects = &mut self.rects;
+        let (mut bi, mut bj) = (0, 1);
+        let mut best = cost(rects[0].0, rects[1].0);
+        for i in 0..NAV_LOG_PATCHES {
+            for j in i + 1..NAV_LOG_PATCHES {
+                let c = cost(rects[i].0, rects[j].0);
+                if c < best {
+                    (bi, bj, best) = (i, j, c);
+                }
+            }
+        }
+        let ((a, va), (b, vb)) = (rects[bi], rects[bj]);
+        // (The later of the two: the closer to `version`.)
+        let later = if version.wrapping_sub(va) < version.wrapping_sub(vb) {
+            va
+        } else {
+            vb
+        };
+        rects[bi] = (join(a, b), later);
+        rects[bj] = (r, version);
+    }
+}
+
+/// The box round two tile rectangles.
+fn join(a: [i32; 4], b: [i32; 4]) -> [i32; 4] {
+    [
+        a[0].min(b[0]),
+        a[1].min(b[1]),
+        a[2].max(b[2]),
+        a[3].max(b[3]),
+    ]
+}
 
 impl NavLog {
-    /// Notes the change that made navigation version `version`.
-    pub fn push(&mut self, version: u32, rect: [i32; 4]) {
+    /// Notes the change that made navigation version `version`, over tiles `rect`, in tick
+    /// `group`: with the tick's other changes if it follows on from them.
+    pub fn push(&mut self, group: u64, version: u32, rect: [i32; 4]) {
+        if !self.entries.is_empty() {
+            let newest = &mut self.entries[(self.next + NAV_LOG - 1) % NAV_LOG];
+            if newest.group == group && newest.last.wrapping_add(1) == version {
+                newest.last = version;
+                newest.add(rect, version);
+                return;
+            }
+        }
+        let mut place = NavChanges {
+            group,
+            first: version,
+            last: version,
+            rects: [([0; 4], 0); NAV_LOG_PATCHES],
+            len: 0,
+        };
+        place.add(rect, version);
         if self.entries.len() < NAV_LOG {
-            self.entries.push((version, rect));
+            self.entries.push(place);
         } else {
-            self.entries[self.next] = (version, rect);
+            self.entries[self.next] = place;
         }
         self.next = (self.next + 1) % NAV_LOG;
     }
@@ -1042,17 +1127,30 @@ impl NavLog {
             .is_none_or(|mut changes| changes.any(|r| overlaps(r, rect)))
     }
 
-    /// The tiles each change after version `seen`, up to `now`, touched; None if the log doesn't
-    /// go back that far (any tile may have changed).
+    /// The tiles the changes after version `seen`, up to `now`, touched (and maybe a few more,
+    /// where a tick's patches were joined); None if the log doesn't go back that far (any tile
+    /// may have changed).
     pub fn changes_since(&self, seen: u32, now: u32) -> Option<impl Iterator<Item = [i32; 4]>> {
         let since = now.wrapping_sub(seen);
-        let after = move |v: u32| now.wrapping_sub(v) < since;
-        let found = self.entries.iter().filter(|&&(v, _)| after(v)).count();
-        (found as u32 >= since).then(|| {
+        // (How many of the versions after `seen` each place made.)
+        let after = move |e: &NavChanges| {
+            let newest = now.wrapping_sub(e.last);
+            if newest >= since {
+                return 0;
+            }
+            now.wrapping_sub(e.first).min(since - 1) - newest + 1
+        };
+        let found: u64 = self.entries.iter().map(|e| u64::from(after(e))).sum();
+        (found >= u64::from(since)).then(|| {
             self.entries
                 .iter()
-                .filter(move |&&(v, _)| after(v))
-                .map(|&(_, r)| r)
+                .filter(move |e| after(e) > 0)
+                .flat_map(move |e| {
+                    let rects = e.rects[..e.len].iter();
+                    rects
+                        .filter(move |r| now.wrapping_sub(r.1) < since)
+                        .map(|r| r.0)
+                })
         })
     }
 }
@@ -1681,5 +1779,33 @@ mod tests {
             "rows on the third storey are searched"
         );
         assert_eq!(flat.find_path((2, 2), (7, 2)).unwrap(), first);
+    }
+
+    #[test]
+    fn a_ticks_changes_to_walking_share_a_place_in_the_log() {
+        let mut log = NavLog::default();
+        let far = [500, 500, 501, 501];
+        // Tick 1: more patches than a place keeps, all round (0, 0) to (40, 0), then one at
+        // (100, 0).
+        for v in 1..=40u32 {
+            let x = v as i32;
+            log.push(1, v, [x, 0, x + 1, 1]);
+        }
+        log.push(1, 41, [100, 0, 101, 1]);
+        assert!(log.changed_since(0, 41, [100, 0, 101, 1]));
+        assert!(!log.changed_since(0, 41, far));
+        // Looked after the first 40: only the newest is news.
+        assert!(!log.changed_since(40, 41, [0, 0, 41, 1]));
+        assert!(log.changed_since(40, 41, [100, 0, 101, 1]));
+        // More ticks of changes than the log keeps: anything may have changed since tick 1.
+        for t in 0..NAV_LOG as u32 {
+            log.push(2 + u64::from(t), 42 + t, [0, 0, 1, 1]);
+        }
+        let now = 41 + NAV_LOG as u32;
+        assert!(!log.changed_since(41, now, far), "every tick since is kept");
+        assert!(log.changed_since(40, now, far), "tick 1 isn't");
+        // A change nobody noted where (the version bumped without the log): anything.
+        assert!(log.changed_since(now, now + 1, far));
+        assert!(!log.changed_since(now, now, far), "nothing since");
     }
 }

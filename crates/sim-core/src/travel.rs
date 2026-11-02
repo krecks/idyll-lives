@@ -1057,13 +1057,10 @@ impl Travel {
     }
 
     /// `entry` for the door `door` of public place `plot`, as noted (`note_doors`), or found.
+    /// (The sim tests check it against `entry`: `common::check_lookups`.)
     pub fn door_entry(&self, plot: u32, door: [f32; 2], mode: Mode) -> Option<RoadPoint> {
         match self.doors.get(plot as usize) {
-            Some(Some((at, entries))) if *at == door.map(f32::to_bits) => {
-                // (In the tests, the same as finding it.)
-                debug_assert_eq!(entries[mode as usize], self.entry(door, mode));
-                entries[mode as usize]
-            }
+            Some(Some((at, entries))) if *at == door.map(f32::to_bits) => entries[mode as usize],
             _ => self.entry(door, mode),
         }
     }
