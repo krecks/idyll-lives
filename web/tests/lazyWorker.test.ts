@@ -1,7 +1,8 @@
 // A worker started when first asked and stopped once idle (`core/lazyWorker.ts`, the town and render
 // data workers'): answers matched to asks by id; where no worker can start, or once one broke, asks go
 // to the page's fallback (those waiting too); an aborted ask the worker is on stops it, and the asks
-// behind it go to a fresh one.
+// behind it go to a fresh one (or to the page, where what they handed over, or what was posted, went
+// with the old one).
 import { describe, expect, jest, test } from 'bun:test';
 import { LazyWorker, Superseded, type WorkerAnswer, type WorkerAsk } from '../src/core/lazyWorker';
 
@@ -11,6 +12,7 @@ class FakeWorker {
   onmessage: ((e: { data: WorkerAnswer<string> }) => void) | null = null;
   onerror: ((e: { message: string; preventDefault(): void }) => void) | null = null;
   postMessage(message: WorkerAsk<string>): void {
+    if (message.message === 'uncloneable') throw new DOMException('could not be cloned', 'DataCloneError');
     this.sent.push(message);
   }
   terminate(): void {
@@ -121,5 +123,87 @@ describe('lazy worker', () => {
     const gone = new AbortController();
     gone.abort();
     await expect(w.ask('d', page('d'), { signal: gone.signal })).rejects.toBeInstanceOf(Superseded);
+  });
+
+  test('a post with nothing else to do lets it stop once idle; asks and holds still keep it', async () => {
+    jest.useFakeTimers();
+    try {
+      const { w, workers } = lazy();
+      w.post('open');
+      jest.advanceTimersByTime(1000);
+      expect(workers[0].terminated).toBe(true);
+      expect(w.run).toBe(0);
+
+      const a = w.ask('a', page('a'));
+      w.post('more');
+      jest.advanceTimersByTime(5000);
+      expect(workers[1].terminated).toBe(false);
+      workers[1].answer({ id: workers[1].sent[0].id, answer: 'A' });
+      expect(await a).toBe('A');
+
+      const release = w.hold();
+      w.post('more');
+      jest.advanceTimersByTime(5000);
+      expect(workers[1].terminated).toBe(false);
+      release();
+      jest.advanceTimersByTime(1000);
+      expect(workers[1].terminated).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('aborting the ask it is on hands those that transferred something to the page', async () => {
+    const { w, workers } = lazy();
+    const first = new AbortController();
+    const a = w.ask('a', page('a'), { signal: first.signal });
+    const b = w.ask('b', page('b'), { transfer: [new ArrayBuffer(8)] });
+    const c = w.ask('c', page('c'));
+    first.abort();
+    await expect(a).rejects.toBeInstanceOf(Superseded);
+    expect(await b).toBe('page b');
+    expect(workers[1].sent.map((s) => s.message)).toEqual(['c']);
+    workers[1].answer({ id: workers[1].sent[0].id, answer: 'C' });
+    expect(await c).toBe('C');
+  });
+
+  test('aborting the ask it is on, after a post, hands all those behind to the page', async () => {
+    const { w, workers } = lazy();
+    w.post('open');
+    const first = new AbortController();
+    const a = w.ask('a', page('a'), { signal: first.signal });
+    const b = w.ask('b', page('b'));
+    first.abort();
+    await expect(a).rejects.toBeInstanceOf(Superseded);
+    expect(await b).toBe('page b');
+    expect(workers.length).toBe(1);
+    expect(w.run).toBe(0);
+    // A fresh worker later starts clean: what went before it is not counted against it.
+    const d = w.ask('d', page('d'));
+    expect(workers.length).toBe(2);
+    workers[1].answer({ id: workers[1].sent[0].id, answer: 'D' });
+    expect(await d).toBe('D');
+  });
+
+  test('an ask that cannot be sent is rejected, not left waiting', async () => {
+    jest.useFakeTimers();
+    try {
+      const { w, workers } = lazy();
+      await expect(w.ask('uncloneable', page('x'))).rejects.toThrow('could not be cloned');
+      jest.advanceTimersByTime(1000);
+      expect(workers[0].terminated).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('a fallback that throws, once the worker broke, still settles the ask', async () => {
+    const { w, workers } = lazy();
+    const thrown = () => {
+      throw new Error('no page either');
+    };
+    const a = w.ask('a', thrown as () => Promise<string>);
+    workers[0].answer({ id: workers[0].sent[0].id, error: 'no content', broken: true });
+    await expect(a).rejects.toThrow('no page either');
   });
 });
