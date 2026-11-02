@@ -197,10 +197,12 @@ fn a_cosy_town_never_drives_to_a_visit() {
     }
 }
 
-/// The trip in the UI's view of a resident (`SimView.trip`): where to and about when, while on
-/// the way; gone once there.
+/// The trip in the UI's view of a resident (`SimView.trip`), their panel open: where to and about
+/// when, while on the way; gone once there.
 fn trip_in_view(w: &World, i: usize) -> Option<(u64, u64)> {
-    let view: Value = serde_json::from_str(&sim_core::view::ui_state_json(w)).unwrap();
+    let mut sync = sim_core::view::UiSync::new();
+    sync.inspect(Some(i as u32));
+    let view: Value = serde_json::from_str(&sync.update_json(w)).unwrap();
     let s = view["sims"]
         .as_array()?
         .iter()

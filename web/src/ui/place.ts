@@ -64,11 +64,13 @@ export function placeAt(x: number, z: number, plots: readonly PlacePlot[], house
 
 /**
  * A resident on their way somewhere (`SimView.trip`), in words: "On the way home · back about
- * 17:40", "On the way to the Smiths · there about 14:20". `home`: their household's plot; `time`
- * writes a minute of day as the player's clock does.
+ * 17:40", "On the way to the Smiths · there about 14:20"; without the time when it isn't known
+ * (the sim works it out only for residents whose details are shown). `home`: their household's
+ * plot; `time` writes a minute of day as the player's clock does.
  */
-export function tripText(trip: { to: number; at: number }, home: number | null, plots: readonly PlacePlot[], households: readonly { name: string; plot: number | null }[], time: (minute: number) => string): string {
-  if (trip.to === home) return `On the way home · back about ${time(trip.at)}`;
+export function tripText(trip: { to: number; at?: number }, home: number | null, plots: readonly PlacePlot[], households: readonly { name: string; plot: number | null }[], time: (minute: number) => string): string {
+  const when = (word: string) => (trip.at === undefined ? '' : ` · ${word} about ${time(trip.at)}`);
+  if (trip.to === home) return `On the way home${when('back')}`;
   const p = plots[trip.to];
-  return `On the way to ${p ? lotInSentence(p, households) : 'somewhere'} · there about ${time(trip.at)}`;
+  return `On the way to ${p ? lotInSentence(p, households) : 'somewhere'}${when('there')}`;
 }
