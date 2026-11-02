@@ -8,9 +8,12 @@
  * It also keeps the files the build made (`assets/<name>-<hash>.<ext>`: scripts, styles, the
  * simulation's wasm, fonts), which never change under their names, in a cache of this build's
  * own: a returning player loads them without asking the server again (Pages lets the browser
- * keep files for only 10 minutes). Everything else, the page itself included, comes from the
- * network as before. A new build is a new version of this file (the build writes its id below),
- * and the new worker deletes the old build's cache.
+ * keep files for only 10 minutes). So does the game's data fetched with this build's query
+ * (`?v=<build id>`, `src/assets/build.ts`: models, textures, the content and manifests, `bundle.json`),
+ * which never changes within a build either: a returning player's game loads from the cache, not
+ * the network. Everything else, the page itself included, comes from the network as before. A new
+ * build is a new version of this file (the build writes its id below), and the new worker deletes
+ * the old build's cache.
  *
  * Cross-origin downloads (models from Hugging Face) are fetched with CORS, which
  * `require-corp` accepts.
@@ -50,9 +53,12 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(built(request, url) ? fromCache(event, request) : fetch(request).then(isolated));
 });
 
-/** One of this build's own files: never changes under its name. */
+/** One of this build's own files, or game data with its query: never changes under its name. */
 function built(request, url) {
-  if (request.method !== 'GET' || request.headers.has('range') || url.search || !url.pathname.startsWith(ASSETS)) return false;
+  if (request.method !== 'GET' || request.headers.has('range') || request.cache === 'no-store') return false;
+  // (Game data: only this build's. The dev server's 'dev' build never has the worker.)
+  if (url.search) return url.searchParams.get('v') === BUILD && BUILD !== 'dev';
+  if (!url.pathname.startsWith(ASSETS)) return false;
   const name = url.pathname.slice(ASSETS.length);
   return HASHED.test(name) && !KEPT_ELSEWHERE.test(name);
 }

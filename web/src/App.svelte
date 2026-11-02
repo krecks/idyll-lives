@@ -219,6 +219,23 @@
     };
   });
 
+  /**
+   * The catalog's pictures, drawn while the player sets up a new game (one per idle moment, kept
+   * between visits): the game's catalog opens with them, and play draws none on its second device.
+   * Held from Play on (the game lets them go on in Build, or when its house opens on the catalog).
+   */
+  $effect(() => {
+    if (!app.dataReady || app.booting || BENCH) return;
+    const screen = app.screen;
+    if (screen === 'game') {
+      services.items?.holdAhead(true);
+      return;
+    }
+    if (!['world', 'neighbourhood', 'create', 'home', 'play'].includes(screen)) return;
+    services.items?.holdAhead(false);
+    services.items?.prefetch(services.content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
+  });
+
   // Live render settings (style, effects; the system's reduce motion too) while no game is running.
   $effect(() => {
     const s = $state.snapshot(settings);
@@ -279,7 +296,7 @@
   <MenuBackdrop />
   <CrashScreen crash={{ kind: 'data', detail: app.fatal }} />
 {:else if app.booting}
-  <LoadingScreen progress={app.boot} />
+  <!-- (The loading screen, below.) -->
 {:else if app.screen === 'game'}
   {#if GameView}
     {#key app.sessionKey}
@@ -288,8 +305,6 @@
         {#snippet failed()}{/snippet}
       </svelte:boundary>
     {/key}
-  {:else}
-    <LoadingScreen progress={app.loading ?? { label: 'Moving in', value: 0 }} />
   {/if}
 {:else}
   {#if !app.liveBackdrop}<MenuBackdrop />{/if}
@@ -306,9 +321,16 @@
   {:else}
     <MainMenu />
   {/if}
-  {#if app.loading}
-    <LoadingScreen progress={app.loading} />
-  {/if}
+{/if}
+
+<!--
+  The one loading screen: start-up's, then a game's from Play to the game (its bar never runs back
+  while it shows; a new one for each). A game that takes long to load can be left for the menu.
+-->
+{#if !app.fatal && (app.booting || app.loading || (app.screen === 'game' && !GameView))}
+  {#key app.booting ? 'boot' : `game:${app.sessionKey}`}
+    <LoadingScreen progress={app.booting ? app.boot : (app.loading ?? { label: 'Moving in', value: 0 })} onback={app.booting ? undefined : () => app.toMenu()} />
+  {/key}
 {/if}
 
 {#if app.overlay}

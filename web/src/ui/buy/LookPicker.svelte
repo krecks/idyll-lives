@@ -102,6 +102,7 @@
             class:active={look.cover === i + 1}
             style={swatch(c)}
             title="{c.label}{c.price ? ` · ${money(c.price)} a face` : ' · free'}"
+            onmouseenter={() => services.prepare?.(c.finish, 'wall')}
             onclick={() => set({ cover: i + 1 })}
           ></button>
         {/each}
@@ -125,6 +126,7 @@
           class:active={look.floor === i + 1}
           style={floorSwatch(c)}
           title="{c.label}{c.price ? ` · ${money(c.price)} a tile` : ' · free'}"
+          onmouseenter={() => services.prepare?.(c.finish, 'floor')}
           onclick={() => set({ floor: i + 1 })}
         ></button>
       {/each}

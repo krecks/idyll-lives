@@ -44,7 +44,7 @@ import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, ty
 import { clockTime, openAt, staffed, staffResidents } from './staff';
 import { PointerInput, routeKey } from './input';
 import { assembleTown, loadTemplates, useTownContent, type NeighbourhoodDraft } from './town';
-import { gameAssetPlan, streamRanks } from './streamPlan';
+import { gameAssetPlan, parseAheadFiles, streamRanks } from './streamPlan';
 import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
@@ -105,6 +105,12 @@ const PORTRAIT_WAIT_MS = 8000;
 const FIRST_FRAME_WAIT_MS = 1500;
 /** After this long in the game, the catalog's pictures are drawn in idle moments (the catalog then opens with them). */
 const PREFETCH_PICTURES_MS = 4000;
+/** Longest wait for the simulation compiled at boot (`compileSim`) before a game's worker compiles its own. */
+const SIM_COMPILE_WAIT_MS = 15_000;
+/** Longest wait for the street to build the chunks round the camera before the warm-up's frame (a big world). */
+const STREAM_WAIT_MS = 4000;
+/** Longest wait for the textures asked for to load before the warm-up's frame (it then uploads them). */
+const TEXTURES_WAIT_MS = 5000;
 /** Story events the journal keeps: as many as the simulation does (`EVENT_LOG_CAPACITY`). */
 const JOURNAL_SIZE = 300;
 /** Keys that act again while held (R turns, PageUp/PageDown change storey, Ctrl+Z/Y undo and redo); the rest act once per press. */
@@ -129,12 +135,27 @@ export interface GameSession {
    * instant. Rejects if the simulation stops before that.
    */
   readonly ready: Promise<void>;
-  /** Compiles and draws the game's own look (the mirror's clip-plane shaders too), if not done yet. */
-  warm(): Promise<void>;
+  /** Compiles and draws the game's own look (the mirror's clip-plane shaders too), if not done yet; `progress` hears its steps (0..1). */
+  warm(progress?: ProgressReport): Promise<void>;
   /** Unpauses the game and attaches input. */
   reveal(): void;
   /** Ends the session; resolves once it has let go of the renderer, which is kept for the next one. */
   dispose(): Promise<void>;
+}
+
+/** The simulation's wasm, compiled once a page (from boot on) and handed to each game's worker; null if it couldn't be (the worker then fetches it). */
+let simModule: Promise<WebAssembly.Module | null> | null = null;
+export function compileSim(): Promise<WebAssembly.Module | null> {
+  simModule ??= (async () => {
+    const url = new URL('../core/wasm-pkg/sim_wasm_bg.wasm', import.meta.url);
+    try {
+      return await (typeof WebAssembly.compileStreaming === 'function' ? WebAssembly.compileStreaming(fetch(url)) : WebAssembly.compile(await (await fetch(url)).arrayBuffer()));
+    } catch (err) {
+      console.warn('[session] the simulation could not be compiled ahead; each game compiles its own', err);
+      return null;
+    }
+  })();
+  return simModule;
 }
 
 /** Shared, immutable data: loaded once per page. */
@@ -151,6 +172,8 @@ export function loadGameData(): Promise<{ content: Content; assets: AssetRegistr
     useTownContent(content);
     services.previews = createSimPreviews({ assets, emotions: content.emotions.map((e) => e.id), backend: () => liveSettings.renderer });
     services.items = createItemPreviews(assets, () => liveSettings.renderer);
+    // (The simulation compiles meanwhile, once: every game's worker takes it as it is.)
+    void compileSim();
     return { content, assets };
   });
   return shared;
@@ -202,8 +225,13 @@ export async function startSession(
   }
 
   progress('Starting the simulation', 0.15);
+  // What every game needs whatever its world (the surfaces, the garden, the street, the residents,
+  // the birds) downloads while the simulation starts; the house's own things come with its world.
+  void prefetchNow(gameAssetPlan(content, assets, { objects: [] }, null).home);
+  // (Not for long: a download that hangs is the worker's to notice, `SimBridge.start`.)
+  const simWasm = await Promise.race([compileSim(), new Promise<null>((resolve) => setTimeout(() => resolve(null), SIM_COMPILE_WAIT_MS))]);
   // (Paused from the first step: the clock is held until the player enters the game.)
-  const bridge = await perfTimeAsync('session: SimBridge.start', () => SimBridge.start(content.json, source, 0)).catch(async (err: unknown) => {
+  const bridge = await perfTimeAsync('session: SimBridge.start', () => SimBridge.start(content.json, source, 0, simWasm)).catch(async (err: unknown) => {
     // A save the game can't open is set aside (kept if it's from a newer version, else removed).
     if (err instanceof SaveRefused && saved) throw new UnloadableSave(saved.id, err.problem, await refuseSave(saved, err.problem));
     throw err;
@@ -242,6 +270,23 @@ export async function startSession(
     () => perfEnd(started),
     () => perfEnd(started),
   );
+  // The first world build's steps, and the warm-up's, on the loading screen (until the game is ready).
+  renderer.onLoadStep((label, done) => progress(label, 0.65 + 0.25 * done));
+  void ready.then(
+    () => renderer.onLoadStep(null),
+    () => renderer.onLoadStep(null),
+  );
+  /**
+   * Before the warm-up's frame: the street's chunks round the camera built (a big world) and the
+   * textures asked for loaded, each for a while at most, so that frame draws and uploads what play
+   * shows first (they used to land in its first seconds).
+   */
+  const beforeWarm = async (report: ProgressReport) => {
+    report('Building the street', 0);
+    await perfTimeAsync('session: street streamed', () => renderer.streamSettled(STREAM_WAIT_MS));
+    report('Loading textures', 0.5);
+    await perfTimeAsync('session: textures', () => Promise.race([renderer.texturesReady(), new Promise((resolve) => setTimeout(resolve, TEXTURES_WAIT_MS))]));
+  };
   /** `?debug`'s `__crash('render')`: every frame fails. */
   let failFrames = false;
 
@@ -406,6 +451,18 @@ export async function startSession(
   let homeAssets: Promise<void> | null = null;
   /** Everything after the house: streamed once the game is revealed. */
   let restUrls: string[] = [];
+  /** The tile rectangle the camera streams in last (`onWatch`; null: none yet). */
+  let watched: { x: number; z: number; w: number; d: number } | null = null;
+  /**
+   * In play, the model files of the things round the camera (then the rest of the town's, nearest
+   * first) are read in idle moments once downloaded: a lot the camera settles on next is built from
+   * them without reading each file in the frame that needs it.
+   */
+  const readAhead = () => {
+    if (!revealed || disposed || !world) return;
+    const p = viewPlot === null ? null : world.plots[viewPlot];
+    renderer.parseAhead(parseAheadFiles(content, assets, world, p ? { x: p.x, z: p.z, w: p.w, d: p.d } : null, watched));
+  };
   let autosaveMinutes = -1;
   /** The performance overlay setting last applied (F3 opens and closes the overlay in between). */
   let showFps: boolean | null = null;
@@ -876,6 +933,10 @@ export async function startSession(
     },
   };
   services.controls = controls;
+  // A catalog card or a covering pointed at: its model read, or its surface made, before it's placed.
+  services.prepare = (key, kind) => {
+    if (!disposed) renderer.prepareAsset(key, kind);
+  };
   // `?debug`: drive the game from the console / test harness (and look at any lot: `__showPlot(i)`, `__world().plots`;
   // `__send(command)` sends any simulation command, `__items()` the food and dishes about). `__world().objects` carry
   // a lamp's (or a fire's) `off`, which the world itself doesn't (the snapshot has it: `bridge.lampOff`).
@@ -1199,12 +1260,12 @@ export async function startSession(
     if (feedback?.effects.length) void build.then(() => feedback.effects.forEach((fx) => renderer.buildEffect(fx)), () => {});
     build
       .then(async () => {
-        progress('Warming up', 0.75);
         // Compile the game's own look (its lighting and cutaway) while the menu still covers it.
         // (When the game is only prepared in the background, it waits until it is started: the
         // mirror's clip-plane shaders take a long frame, which must not land on a visible menu.)
         if (warm && !warmed) {
           warmed = true;
+          await beforeWarm((label, done) => progress(label, 0.8 + 0.01 * done));
           const frame = await perfTimeAsync('session: first frame', firstFrame);
           if (frame) await perfTimeAsync('session: warm game', () => renderer.warmGame(frame));
           else perfPhase('session: warm game (no frame)');
@@ -1217,6 +1278,12 @@ export async function startSession(
       })
       .then(() => {
         progress('Drawing portraits', 0.9);
+        // A house nobody lives in opens on the catalog: its pictures (mostly drawn in the menus, and
+        // kept) are drawn now, behind the loading screen, rather than as it opens.
+        if (!game.occupied && !BENCH && !disposed) {
+          services.items.holdAhead(false);
+          services.items.prefetch(content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
+        }
         return perfTimeAsync('session: portraits', () => Promise.race([portraits, new Promise((resolve) => setTimeout(resolve, PORTRAIT_WAIT_MS))]));
       })
       .then(() => {
@@ -1299,10 +1366,12 @@ export async function startSession(
   // The files still to stream come by where the camera is: the focus lot's, those round the camera, the rest nearest first.
   renderer.onWatch((rect) => {
     if (world?.meta?.world?.size === 'big') bridge.setWatch(rect);
+    watched = { x: rect[0], z: rect[1], w: rect[2] - rect[0], d: rect[3] - rect[1] };
     if (!world) return;
     const p = viewPlot === null ? null : world.plots[viewPlot];
-    const ranks = streamRanks(content, assets, world, p ? { x: p.x, z: p.z, w: p.w, d: p.d } : null, { x: rect[0], z: rect[1], w: rect[2] - rect[0], d: rect[3] - rect[1] });
+    const ranks = streamRanks(content, assets, world, p ? { x: p.x, z: p.z, w: p.w, d: p.d } : null, watched);
     reprioritize((url) => ranks.get(url) ?? Infinity);
+    readAhead();
   });
   controls.setWallMode(game.wallMode);
 
@@ -1685,12 +1754,20 @@ export async function startSession(
       return bridge.alive;
     },
     ready,
-    async warm() {
+    async warm(report = () => {}) {
       if (warmed) return;
       warmed = true;
+      await beforeWarm((label, done) => report(label, 0.1 * done));
       const frame = await perfTimeAsync('session: first frame', firstFrame);
-      if (frame) await perfTimeAsync('session: warm game', () => renderer.warmGame(frame));
-      else perfPhase('session: warm game (no frame)');
+      // (The renderer's warm-up steps run from 0.65 to 1 of its loading: `warmGame`.)
+      renderer.onLoadStep((label, done) => report(label, 0.1 + 0.8 * Math.max(0, (done - 0.65) / 0.35)));
+      try {
+        if (frame) await perfTimeAsync('session: warm game', () => renderer.warmGame(frame));
+        else perfPhase('session: warm game (no frame)');
+      } finally {
+        renderer.onLoadStep(null);
+      }
+      report('Warming up', 0.9);
       await perfTimeAsync('session: warm frames', () => renderer.framesRendered(WARM_FRAMES));
       // A save's picture is drawn into its own target: compile its shaders now, not at the first autosave.
       await perfTimeAsync('session: warm thumbnail', () => renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height));
@@ -1734,6 +1811,7 @@ export async function startSession(
         if (disposed) return;
         renderer.holdModelRefresh(true);
         prefetch(restUrls);
+        readAhead();
         // The catalog's pictures are built only once the stream is quiet, in idle moments.
         await whenStreamSettled();
         renderer.holdModelRefresh(false);
@@ -1784,6 +1862,7 @@ export async function startSession(
       clearInterval(autosaveTimer);
       clearTimeout(prefetchTimer);
       services.items.holdAhead(false);
+      services.prepare = undefined;
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pagehide', onLeave);

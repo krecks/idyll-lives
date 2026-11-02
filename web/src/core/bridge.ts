@@ -167,8 +167,11 @@ export class SimBridge {
     this.watchdog = setInterval(this.watch, WATCHDOG_MS);
   }
 
-  /** `speed`: the clock's speed from the first step (0: it starts paused). */
-  static start(content: string, source: GameSource, speed?: number): Promise<SimBridge> {
+  /**
+   * `speed`: the clock's speed from the first step (0: it starts paused). `module`: the simulation's
+   * wasm, compiled already (else the worker fetches and compiles it).
+   */
+  static start(content: string, source: GameSource, speed?: number, module?: WebAssembly.Module | null): Promise<SimBridge> {
     const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
     return new Promise((resolve, reject) => {
       // A start that failed doesn't leave its worker (and the simulation's memory) behind.
@@ -192,7 +195,7 @@ export class SimBridge {
         } else if (msg.type === 'error') failed(msg.problem ? new SaveRefused(msg.problem, msg.message) : new Error(msg.message));
       };
       arm();
-      worker.postMessage({ type: 'init', content, source, speed } satisfies ToWorker);
+      worker.postMessage({ type: 'init', content, source, speed, ...(module ? { module } : {}) } satisfies ToWorker);
     });
   }
 

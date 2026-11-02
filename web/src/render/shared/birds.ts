@@ -193,6 +193,9 @@ const SPECIES: Species[] = [
   },
 ];
 
+/** The birds' model keys (`model.bird.<species>`): fetched with the house (`game/streamPlan.ts`). */
+export const BIRD_MODELS: readonly string[] = SPECIES.map((sp) => `model.bird.${sp.id}`);
+
 /**
  * How much faster the birds' clock runs at each game speed (`GAME_RATE`'s index): they keep to the
  * game (still while it's paused) but don't go frantic in a time-lapse.

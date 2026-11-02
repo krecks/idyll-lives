@@ -943,8 +943,11 @@ export type GameSource = { lot: string; seed: number } | { save: string };
 export type SaveProblem = 'tooNew' | 'tooOld' | 'corrupt' | 'failed';
 
 export type ToWorker =
-  /** `speed`: the clock's speed from the first step (0: the game starts paused). */
-  | { type: 'init'; content: string; source: GameSource; speed?: number }
+  /**
+   * `speed`: the clock's speed from the first step (0: the game starts paused). `module`: the
+   * simulation's wasm, compiled once a page (`game/session.ts` `compileSim`); else the worker fetches it.
+   */
+  | { type: 'init'; content: string; source: GameSource; speed?: number; module?: WebAssembly.Module }
   /** Only checks that a save opens (an imported file); answered with `checked`. */
   | { type: 'check'; content: string; save: string }
   | { type: 'command'; command: Command }

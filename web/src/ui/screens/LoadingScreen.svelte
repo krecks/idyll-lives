@@ -1,18 +1,28 @@
 <script lang="ts">
   /**
    * Full-screen loading: the menu backdrop, the game's name, what is loading and a progress bar.
-   * Covers the 3D scene, so nothing is seen half-built; fades out when it goes.
+   * Covers the 3D scene, so nothing is seen half-built; fades out when it goes. A load that takes
+   * long (a connection that hangs) offers a way back (`onback`).
    */
+  import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
   import { reducedMotion } from '../../game/host';
   import type { Progress } from '../app.svelte';
   import MenuBackdrop from './MenuBackdrop.svelte';
 
-  let { progress }: { progress: Progress } = $props();
+  let { progress, onback }: { progress: Progress; onback?: () => void } = $props();
   /** The bar never runs backwards (a step may report less than an earlier estimate). */
   let shown = $state(0);
   $effect(() => {
     shown = Math.max(shown, Math.min(1, progress.value));
+  });
+
+  /** After this long (ms), a way back to the menu is offered. */
+  const SLOW_MS = 30_000;
+  let slow = $state(false);
+  onMount(() => {
+    const timer = setTimeout(() => (slow = true), SLOW_MS);
+    return () => clearTimeout(timer);
   });
 </script>
 
@@ -23,6 +33,10 @@
       <h1>Idyll Lives</h1>
       <div class="bar"><div class="fill" style:transform="scaleX({shown})"></div></div>
       <p class="label">{progress.label}{shown < 1 ? "…" : ""}</p>
+      {#if slow && onback && shown < 1}
+        <p class="slow">This is taking a while.</p>
+        <button class="btn" onclick={onback}>Back to menu</button>
+      {/if}
     </div>
   </div>
 </div>
@@ -82,6 +96,11 @@
     font-size: 13px;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
+  }
+  .slow {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--text-muted);
   }
   :global(.reduce-motion) .card,
   :global(.reduce-motion) .fill {

@@ -77,7 +77,7 @@ scope.onmessage = (e) => {
   const requestId = 'requestId' in msg ? msg.requestId : undefined;
   try {
     if (msg.type === 'init') {
-      void start(msg.content, msg.source, msg.speed).catch((err) => fail(err, true));
+      void start(msg.content, msg.source, msg.speed, msg.module).catch((err) => fail(err, true));
     } else if (msg.type === 'check') {
       void check(msg.content, msg.save).catch((err) => fail(err, true));
     } else if (requestId !== undefined && !game) {
@@ -126,10 +126,10 @@ scope.onmessage = (e) => {
   }
 };
 
-async function start(content: string, source: GameSource, speed: number | undefined): Promise<void> {
+async function start(content: string, source: GameSource, speed: number | undefined, module?: WebAssembly.Module): Promise<void> {
   // Each phase after the download says it's under way (the main thread gives up on a start only
-  // when it stalls; it started waiting when it sent `init`).
-  memory = (await init({ module_or_path: fetchWasm() })).memory;
+  // when it stalls; it started waiting when it sent `init`). A wasm the page compiled already is used as it is.
+  memory = (await init({ module_or_path: module ?? fetchWasm() })).memory;
   starting();
   try {
     game = 'save' in source ? Game.fromSave(content, source.save) : new Game(content, source.lot, source.seed);
