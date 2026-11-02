@@ -47,6 +47,7 @@ import { PointerInput, routeKey } from './input';
 import { useTownContent, type NeighbourhoodDraft } from './town';
 import { townJob } from './townJobs';
 import { gameAssetPlan, parseAheadFiles, streamRanks } from './streamPlan';
+import { GameSpeed } from './speed';
 import { perfEnd, perfPhase, perfStart, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
@@ -254,8 +255,6 @@ export async function startSession(
     return bridge.frame(performance.now());
   };
   progress('Building the world', 0.3);
-  // Hold the clock until the player actually enters the game.
-  bridge.send({ type: 'setSpeed', speed: 0 });
   let resumeSpeed: number | null = null;
   let revealed = false;
   let warmed = false;
@@ -299,7 +298,6 @@ export async function startSession(
   let world: WorldStructure | null = null;
   /** The lot the last world structure showed (edit feedback compares worlds of the same lot). */
   let worldView: number | null = null;
-  let lastSpeed = 1;
   let focused = false;
   let viewPlot: number | null = null;
   // `?bench=bigworld`: a real Big world for the renderer, made in the page, and its focus lot.
@@ -430,27 +428,13 @@ export async function startSession(
     hudTimer = setTimeout(() => (game.hudAwake = false), HUD_AWAKE_MS);
   };
   /**
-   * Time stands still in Build and Create, and while a menu is open (`setMenuPause`): the player's
-   * speed is held once, however many of them hold it, and given back when none does. (Two holds
-   * kept apart gave back each other's 0: Build left behind the pause menu ran the world under
-   * "Paused", and Live came back stuck at a standstill.)
+   * The player's speed, held at 0 while the game loads, in Build and Create, and while a menu is
+   * open (`setMenuPause`): given back when nothing holds it any more.
    */
-  let heldSpeed: number | null = null;
-  let menuHolds = false;
-  function holdTime() {
-    if (heldSpeed !== null) return;
-    heldSpeed = game.speed;
-    bridge.send({ type: 'setSpeed', speed: 0 });
-    game.speed = 0;
-  }
-  function releaseTime() {
-    if (heldSpeed === null || menuHolds || game.mode !== 'live') return;
-    const speed = heldSpeed;
-    heldSpeed = null;
-    if (speed > 0) lastSpeed = speed;
-    bridge.send({ type: 'setSpeed', speed });
-    game.speed = speed;
-  }
+  const speed = new GameSpeed((running) => {
+    bridge.send({ type: 'setSpeed', speed: running });
+    game.speed = running;
+  });
   let autosaveTimer: ReturnType<typeof setInterval> | undefined;
   let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
   /** The viewed house's files (the second loading screen); made once, on the first built view. */
@@ -480,18 +464,15 @@ export async function startSession(
   let autonomy: boolean | null = params.has('state') ? settings.autonomy : null;
 
   const controls: GameControls = {
-    setSpeed(speed) {
+    setSpeed(to) {
       // Time stands still in Build and Create.
       if (game.mode !== 'live') return;
-      speed = Math.max(0, Math.min(MAX_SPEED, speed));
-      if (speed > 0) lastSpeed = speed;
       slowedFrom = null;
-      // Under a menu: the speed it gives back.
-      if (heldSpeed !== null) return void (heldSpeed = speed);
-      bridge.send({ type: 'setSpeed', speed });
+      // (Under a menu: the speed it gives back.)
+      speed.choose(Math.max(0, Math.min(MAX_SPEED, to)));
     },
     togglePause() {
-      controls.setSpeed(game.speed === 0 ? lastSpeed : 0);
+      controls.setSpeed(game.speed === 0 ? speed.last : 0);
     },
     selectSim(id) {
       if (!playerSims().includes(id)) return;
@@ -694,12 +675,12 @@ export async function startSession(
       game.menu = null;
       game.socialMenu = null;
       // Build and Create pause the game (and close Live's panels); back in Live the speed returns.
+      speed.hold('build', mode !== 'live');
       if (mode !== 'live') {
-        holdTime();
         game.townOpen = false;
         game.jobBoardOpen = false;
         game.plannerOpen = false;
-      } else releaseTime();
+      }
       // Building happens at home, with the walls down so the floor plan is visible.
       const home = buildBuy.home();
       if (mode !== 'live' && home && viewPlot !== home.id) showPlot(home.id);
@@ -1741,9 +1722,10 @@ export async function startSession(
       watchAt = 0;
       startWatching(now);
     }
-    // After a big moment, back to the speed the player had (unless they picked another).
+    // After a big moment, back to the speed the player had (unless they picked another; under a
+    // menu or in Build, once that lets go).
     if (slowedFrom !== null && now > slowUntil) {
-      if (game.speed === 1 && game.mode === 'live') bridge.send({ type: 'setSpeed', speed: slowedFrom });
+      speed.choose(slowedFrom);
       slowedFrom = null;
     }
   }, () => {
@@ -1799,20 +1781,19 @@ export async function startSession(
       lastInput = performance.now();
       // The camera starts watching once it has flown in (unless watching on its own is off).
       if (liveSettings.directorDelay > 0) watchAt = lastInput + START_WATCH_MS;
-      // (A benchmark runs at its own speed.) Time held already (the window left while loading, with
-      // pausing on blur): the hold gives this speed back when it ends, not the loading's 0.
-      const startSpeed = BENCH?.speed ?? resumeSpeed ?? 1;
-      if (heldSpeed !== null) heldSpeed = startSpeed;
-      else bridge.send({ type: 'setSpeed', speed: startSpeed });
+      // (A benchmark runs at its own speed.)
+      speed.choose(BENCH?.speed ?? resumeSpeed ?? 1);
       // Nobody lives here yet, or there's no house (an empty lot): the game starts with
       // building (time stands still until Live).
       const home = homePlot();
       if (!game.occupied || (home !== null && !game.plots[home]?.house)) {
-        game.speed = resumeSpeed ?? 1;
         // No house yet: the Build tab; a house nobody lives in: the catalog to furnish it.
         if (home !== null && !game.plots[home]?.house) controls.setBuildTool(game.buildTool);
         else controls.setBuildTab('furnish');
       }
+      // Time runs from here (at the speed chosen), unless something else holds it (a menu, the
+      // window left while loading with pausing on blur, Build).
+      speed.hold('loading', false);
       perfPhase(`session: reveal ${game.mode} ${game.buildTab} storey ${game.storey} walls ${game.wallMode}`);
       // The house is cached by now: stream the rest of the town while the player is in it. Its
       // models are built into the world once the stream is over (each settle used to rebuild it).
@@ -1864,9 +1845,7 @@ export async function startSession(
       }
     },
     setMenuPause(paused) {
-      menuHolds = paused;
-      if (paused) holdTime();
-      else releaseTime();
+      speed.hold('menu', paused);
     },
     async dispose() {
       disposed = true;
