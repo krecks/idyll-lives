@@ -25,7 +25,7 @@ import { createItemPreviews } from '../render/preview/items';
 import type { CameraPose, Renderer, WallMode } from '../render/types';
 import { settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
-import { services, type GameControls } from '../ui/services';
+import { prefetchCatalog, services, type GameControls } from '../ui/services';
 import { game, nextWallMode, toast } from '../ui/state.svelte';
 import { saveDebugReport } from '../ui/debugReport';
 import { ideaToasts } from '../ui/planner/ideaToasts';
@@ -435,6 +435,11 @@ export async function startSession(
     bridge.send({ type: 'setSpeed', speed: running });
     game.speed = running;
   });
+  /**
+   * The catalog's pictures are drawn ahead of time in Build and Create, not in Live's frames
+   * (`holdAhead`). A house nobody lives in opens on the catalog: they're drawn behind its loading screen.
+   */
+  const catalogAhead = () => services.items.holdAhead(revealed ? game.mode === 'live' : game.occupied);
   let autosaveTimer: ReturnType<typeof setInterval> | undefined;
   let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
   /** The viewed house's files (the second loading screen); made once, on the first built view. */
@@ -668,8 +673,7 @@ export async function startSession(
       game.eyedropper = false;
       game.pickHint = null;
       game.mode = mode;
-      // (The catalog's pictures are drawn ahead of time in Build and Create, not in Live's frames.)
-      services.items.holdAhead(mode === 'live');
+      catalogAhead();
       refreshRoomOverlay();
       play(mode === 'live' ? 'close' : fromLive ? 'open' : 'tab');
       game.menu = null;
@@ -1269,8 +1273,8 @@ export async function startSession(
         // A house nobody lives in opens on the catalog: its pictures (mostly drawn in the menus, and
         // kept) are drawn now, behind the loading screen, rather than as it opens.
         if (!game.occupied && !BENCH && !disposed) {
-          services.items.holdAhead(false);
-          services.items.prefetch(content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
+          catalogAhead();
+          prefetchCatalog();
         }
         return perfTimeAsync('session: portraits', () => Promise.race([portraits, new Promise((resolve) => setTimeout(resolve, PORTRAIT_WAIT_MS))]));
       })
@@ -1813,9 +1817,9 @@ export async function startSession(
         prefetchTimer = setTimeout(() => {
           // (Not while benchmarking: drawing the pictures would show in the measurements.)
           if (disposed || BENCH) return;
-          // (In Live they wait for Build: `holdAhead`.)
-          services.items.holdAhead(game.mode === 'live');
-          services.items.prefetch(content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
+          // (In Live they wait for Build.)
+          catalogAhead();
+          prefetchCatalog();
         }, PREFETCH_PICTURES_MS);
       })();
     },

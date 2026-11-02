@@ -12,7 +12,7 @@
   import { latestSave, UnloadableSave } from './persistence/saves';
   import { settings, systemMotion } from './settings/settings.svelte';
   import { app } from './ui/app.svelte';
-  import { services } from './ui/services';
+  import { prefetchCatalog, services } from './ui/services';
   import { game, toast } from './ui/state.svelte';
   import Modal from './ui/kit/Modal.svelte';
   import ChooseHome from './ui/screens/ChooseHome.svelte';
@@ -233,7 +233,7 @@
     }
     if (!['world', 'neighbourhood', 'create', 'home', 'play'].includes(screen)) return;
     services.items?.holdAhead(false);
-    services.items?.prefetch(services.content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
+    prefetchCatalog();
   });
 
   // Live render settings (style, effects; the system's reduce motion too) while no game is running.
