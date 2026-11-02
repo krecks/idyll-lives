@@ -4,7 +4,8 @@
 //! world costs the simulation: how long the world takes to load, how much memory it holds (a
 //! counting allocator), how fast it ticks with lower detail on and the view on one hamlet (ticks
 //! per second, the 99th percentile and the slowest tick), what the searches cost (tiles expanded
-//! per A* search), and how long the town takes to catch up after one object is placed.
+//! per A* search), and how long the town takes to catch up after one object is placed and after
+//! one wall is built.
 //!
 //! Timing depends on the machine, so it is opt-in and prints its numbers:
 //! `cargo test --release -p sim-core --test big_world -- --ignored --nocapture`
@@ -239,5 +240,46 @@ fn big_world_benchmark() {
         );
     } else {
         eprintln!("one object placed: nowhere to put it ({tried:?})");
+    }
+
+    // One wall built in the player's garden (the rooms found again round it as it's built,
+    // then scored), then what catching up costs, as for the object.
+    let mut tried = None;
+    let mut building = Duration::ZERO;
+    let built = spots.iter().any(|&[x, z, _]| {
+        if w.lot.room_at(x, z) != sim_core::lot::OUTDOORS
+            || w.lot.room_at(x, z - 1) != sim_core::lot::OUTDOORS
+        {
+            return false;
+        }
+        let t = Instant::now();
+        let r = w.apply(sim_core::Command::Build {
+            household: home as u32,
+            edits: vec![sim_core::command::EdgeEdit::new(
+                sim_core::command::EdgeAxis::H,
+                x,
+                z,
+                sim_core::command::EdgeKind::Wall,
+            )],
+        });
+        building = t.elapsed();
+        tried = r.as_ref().err().map(|e| e.to_string());
+        r.is_ok()
+    });
+    if built {
+        let t = Instant::now();
+        w.refresh_walkable();
+        let reach = t.elapsed();
+        let t = Instant::now();
+        w.refresh_navigation();
+        let index = t.elapsed();
+        eprintln!(
+            "one wall built in {:.3} ms (its rooms found and scored again), then walkable regions catch up in {:.3} ms, objects' index and links in {:.3} ms",
+            ms(building),
+            ms(reach),
+            ms(index)
+        );
+    } else {
+        eprintln!("one wall built: nowhere to put it ({tried:?})");
     }
 }

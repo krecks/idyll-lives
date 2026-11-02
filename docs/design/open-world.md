@@ -82,7 +82,13 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
 
 Walking is 1.5 m per game minute (`WALK_SPEED`), so 1 km takes ~11 game hours on foot.
 
-- Hamlets are 250–450 m apart; trips between them are by car.
+- Hamlets are 250–450 m apart; trips between them are by car. The household setting off with
+  the driver for somewhere the car parks near goes in it too (`Car::riders`, saved with the car
+  as `cars[].riders`): it waits in the driveway for them, they ride there and get out at the
+  parking spot, and when one of them goes home they all go back to it and home together.
+  Renderer contract unchanged: the car is a snapshot car row as ever, and everyone in it (the
+  driver, and now the passengers) is a resident sitting in their seat (`pos`, pose sit, not
+  away), so no new snapshot field.
 - Every house is within ~120 m of a stop or exit.
 - Countryside spots are within ~150 m of their hamlet, reached by trail.
 - `careerRules.commuteMinutes` means only the off-map part; the on-map part comes from the ETA.
