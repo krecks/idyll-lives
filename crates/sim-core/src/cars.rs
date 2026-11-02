@@ -28,7 +28,18 @@
 //! near the place (the town file's `parking`) walks to the driver's door instead (`trip_car`),
 //! gets in and drives off along the roads (`Phase::Driving`, sat at the wheel), parks at the spot
 //! (`CarState::Out`) and walks on. Going home they walk back to it and drive home, and get out
-//! as after work. Only the driver goes. The trip is saved with the car.
+//! as after work. The trip is saved with the car.
+//!
+//! Passengers (`Car::riders`): the household setting off at the same time for somewhere the car
+//! parks near (the same parking spot) comes along. The driver gets in and waits in the driveway
+//! (`CarState::Boarding` on a trip) while any of them is on the way to it (those already walking
+//! off turn round while they're close by: `call_trip_riders`), up to `TRIP_WAIT_TICKS`; each gets
+//! in by a door of their own (`trip_ride`, `ride`) and sits in their seat as it drives
+//! (`Phase::Driving`, like the driver, drawn there by the renderer as anyone sitting). At the
+//! parking spot they all get out and walk on to where they're going. When one of them goes home
+//! (the driver or not) the others go home too (`call_party_home`): back to the car, in, and it
+//! drives home once they're all in (or waited for long enough), where they get out as after work.
+//! Anyone who misses it makes their own way.
 //!
 //! A parked car takes up the tiles under it: nobody walks through it and nothing can be put there
 //! (`World::blocked`, `reblock`). A car whose parking spot has been built over (a wall, a fence, a
@@ -56,6 +67,9 @@ pub const DOORS: usize = 4;
 const BOARD_WAIT_TICKS: u64 = 4 * crate::TICKS_PER_MINUTE;
 /// How long getting in takes before the car can go (the doors, the belt).
 const BOARD_MIN_TICKS: u64 = crate::TICKS_PER_MINUTE / 2;
+/// On a trip, the longest the driver waits in the car for the others coming along while they are
+/// on their way to it (from the house; from the place, up to `TRIP_PARK_REACH` off, to go home).
+const TRIP_WAIT_TICKS: u64 = 2 * 60 * crate::TICKS_PER_MINUTE;
 /// Getting in (`Phase::Boarding`): at the door while it opens, a step in to the seat, then sat
 /// while it shuts (the renderer swings a door in about 9 ticks at any speed), and in. Getting
 /// out (`Phase::Alighting`): sat while the door opens, a step out to beside it, and off (it
@@ -135,7 +149,7 @@ pub enum CarState {
 /// A drive to a place beyond walking range and back (`Car::trip`; open-world towns): out of the
 /// driveway along the roads to a public parking spot near it (the town file's `parking`), parked
 /// there (`CarState::Out`) while the driver walks to the place and is there, then back the same
-/// way and home. Only the driver goes.
+/// way and home. Whoever of the household sets off with the driver rides along (`Car::riders`).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Trip {
@@ -206,6 +220,9 @@ pub struct Car {
     /// On a trip to another hamlet (`Trip`); its routes then go to its parking spot and back.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trip: Option<Trip>,
+    /// On a trip: who rides with its driver (besides them), there and home again with it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub riders: Vec<u32>,
     /// Ticks it has waited for people in its way (not saved).
     #[serde(skip)]
     waited: u32,
@@ -327,6 +344,7 @@ impl Car {
             out_ticks: 0.0,
             progress: 0.0,
             trip: None,
+            riders: Vec::new(),
             waited: 0,
             shown: None,
         }
@@ -369,6 +387,7 @@ impl Car {
             out_ticks: self.out_ticks,
             progress: self.progress,
             trip: self.trip,
+            riders: Vec::new(),
             waited: self.waited,
             shown: self.shown,
         }
@@ -930,7 +949,13 @@ pub(crate) fn seat(
         // At home, or still close by on the street.
         let near = me.plot == Some(home)
             || (sim.pos[0] - car.spot[0]).hypot(sim.pos[1] - car.spot[1]) < CALL_REACH;
-        if car.household != sim.household || car.plot != home || car.blocked || !near {
+        // (Not one setting off on a trip: `trip_ride`.)
+        if car.household != sim.household
+            || car.plot != home
+            || car.blocked
+            || !near
+            || car.trip.is_some()
+        {
             return None;
         }
         let c = c as u32;
@@ -1130,6 +1155,11 @@ pub(crate) fn update(w: &mut World) {
         // Nobody to drive it home (the driver died or moved away while out): it's back.
         if !w.cars[c].at_home() && w.cars[c].driver.is_none_or(|d| gone(w, d)) {
             if w.cars[c].trip.take().is_some() {
+                // (Those riding with them get out and make their own way.)
+                let aboard = w.cars[c].aboard.clone();
+                for s in aboard {
+                    let_out(w, s as usize);
+                }
                 let World {
                     cars,
                     exits,
@@ -1137,6 +1167,7 @@ pub(crate) fn update(w: &mut World) {
                     ..
                 } = &mut *w;
                 cars[c].route = None;
+                cars[c].riders.clear();
                 cars[c].settle(exits, Some(travel));
             }
             let car = &mut w.cars[c];
@@ -1461,6 +1492,7 @@ fn arrive(w: &mut World, c: usize) {
     car.state = CarState::Parked;
     car.since = tick;
     car.trip = None;
+    car.riders.clear();
     car.route = None;
     car.yaw = car.nose_in_on(Some(travel));
     car.settle(exits, Some(travel));
@@ -1772,6 +1804,10 @@ pub(crate) fn load(w: &mut World, saved: &[Car], drives: &[Drive], garages: &[Ga
         car.trip = car
             .trip
             .filter(|t| t.driver < sims && (t.plot as usize) < w.plots.len());
+        car.riders.retain(|&o| o < sims);
+        if car.trip.is_none() {
+            car.riders.clear();
+        }
         // (On a trip, its driver even while they're out of it, parked out there.)
         let trip = car.trip.map(|t| t.driver);
         car.driver = car
@@ -1938,12 +1974,14 @@ pub(crate) fn may_set_off(cars: &[Car], c: u32, sim: u32) -> bool {
     })
 }
 
-/// The car `sim` is at the wheel of, on a trip there or back (`Leaving`, `Arriving`).
+/// The car `sim` is at the wheel of, on a trip there or back (`Leaving`, `Arriving`), or sat in
+/// on one (driving or riding, or waiting in it for the others).
 pub(crate) fn driving(cars: &[Car], sim: u32) -> Option<u32> {
     cars.iter()
         .position(|car| {
-            car.trip.is_some_and(|t| t.driver == sim)
-                && matches!(car.state, CarState::Leaving | CarState::Arriving)
+            (car.trip.is_some_and(|t| t.driver == sim)
+                && matches!(car.state, CarState::Leaving | CarState::Arriving))
+                || (car.trip.is_some() && car.aboard.contains(&sim))
         })
         .map(|c| c as u32)
 }
@@ -2005,12 +2043,15 @@ pub(crate) fn start_trip(w: &mut World, i: usize, c: u32, plot: u32, directed: b
         w.sims[i].queue.push_front(visit);
         return;
     }
-    car.state = CarState::Leaving;
     car.since = tick;
     car.progress = 0.0;
     car.driver = Some(i as u32);
     car.aboard = vec![i as u32];
+    car.riders.clear();
     car.done.clear();
+    // Those of the household setting off for somewhere it parks near now come along: it waits
+    // for them in the driveway (`CarState::Boarding`).
+    car.state = CarState::Boarding;
     let sim = &mut w.sims[i];
     sim.bound_for_car = Some(c);
     sim.current = Some(crate::world::Activity {
@@ -2018,10 +2059,14 @@ pub(crate) fn start_trip(w: &mut World, i: usize, c: u32, plot: u32, directed: b
         phase: Phase::Driving,
         tags: Default::default(),
     });
-    seat_driver(w, c as usize);
+    if !call_trip_riders(w, c as usize) {
+        w.cars[c as usize].state = CarState::Leaving;
+    }
+    seat_party(w, c as usize);
 }
 
-/// `i` gets into car `c` parked out on their trip and drives home (`Transition::DriveHome`).
+/// `i` gets into car `c` parked out on their trip and drives home (`Transition::DriveHome`):
+/// at once, or once those who came with them are in (`call_party_home`).
 pub(crate) fn drive_home(w: &mut World, i: usize, c: u32) {
     if !parked_out(&w.cars, c, i as u32) {
         w.sims[i].bound_for_car = None;
@@ -2030,12 +2075,12 @@ pub(crate) fn drive_home(w: &mut World, i: usize, c: u32) {
     }
     let tick = w.tick;
     let car = &mut w.cars[c as usize];
-    car.state = CarState::Arriving;
     car.since = tick;
-    car.progress = 0.0;
     car.route = None;
     car.driver = Some(i as u32);
-    car.aboard = vec![i as u32];
+    // (At the wheel, before any of the others in already.)
+    car.aboard.retain(|&a| a != i as u32);
+    car.aboard.insert(0, i as u32);
     let sim = &mut w.sims[i];
     sim.bound_for_car = Some(c);
     sim.current = Some(crate::world::Activity {
@@ -2047,11 +2092,33 @@ pub(crate) fn drive_home(w: &mut World, i: usize, c: u32) {
         phase: Phase::Driving,
         tags: Default::default(),
     });
-    seat_driver(w, c as usize);
+    if !call_party_home(w, c as usize) {
+        set_off_home(w, c as usize);
+    }
+    seat_party(w, c as usize);
 }
 
-/// The driver of car `c` sat at the wheel where it is now.
-fn seat_driver(w: &mut World, c: usize) {
+/// Car `c`, parked out on a trip with its driver in, sets off home with whoever is in it (the
+/// rest of those who came make their own way).
+fn set_off_home(w: &mut World, c: usize) {
+    let tick = w.tick;
+    let car = &mut w.cars[c];
+    car.state = CarState::Arriving;
+    car.since = tick;
+    car.progress = 0.0;
+    car.route = None;
+    let aboard = car.aboard.clone();
+    car.riders.retain(|r| aboard.contains(r));
+}
+
+/// The door the one in seat `seat` gets in by on their own side (as `Car::door` tries first).
+fn own_door(seat: usize) -> usize {
+    [0, 1, 3, 2][seat.min(DOORS - 1)]
+}
+
+/// Those in car `c` on a trip sat in their seats where it is now: the driver at the wheel, the
+/// others a seat each in the order they got in.
+fn seat_party(w: &mut World, c: usize) {
     let World {
         cars,
         exits,
@@ -2060,17 +2127,20 @@ fn seat_driver(w: &mut World, c: usize) {
         ..
     } = &mut *w;
     let car = &mut cars[c];
-    let Some(d) = car.trip.map(|t| t.driver as usize) else {
+    if car.trip.is_none() {
         return;
-    };
+    }
     let pose = car.pose_on(exits, Some(travel));
     let Some((at, yaw, _)) = pose.or(car.trip.map(|t| (t.at, t.yaw, false))) else {
         return;
     };
-    if let Some(s) = sims.get_mut(d) {
-        s.pos = car.posed(at, yaw).seat_at(0, 0);
-        s.yaw = yaw;
-        s.pose = crate::content::Pose::Sit;
+    let posed = car.posed(at, yaw);
+    for (seat, &a) in car.aboard.iter().enumerate() {
+        if let Some(s) = sims.get_mut(a as usize) {
+            s.pos = posed.seat_at(seat, own_door(seat));
+            s.yaw = yaw;
+            s.pose = crate::content::Pose::Sit;
+        }
     }
 }
 
@@ -2081,12 +2151,65 @@ fn trip_update(w: &mut World, c: usize) {
     // At the wheel; or (just loaded, or not their turn yet) about to be.
     let phase = w.sims[d].current().map(|a| a.phase.clone());
     let at_wheel = matches!(phase, None | Some(Phase::Driving));
+    // (Those riding with them who left town or were called away get out.)
+    let gone: Vec<u32> = w.cars[c]
+        .aboard
+        .iter()
+        .copied()
+        .filter(|&a| {
+            a != trip.driver
+                && w.sims.get(a as usize).is_none_or(|s| {
+                    !s.here()
+                        || !s
+                            .current()
+                            .is_some_and(|a| matches!(a.phase, Phase::Driving))
+                })
+        })
+        .collect();
+    if !gone.is_empty() {
+        w.cars[c].aboard.retain(|a| !gone.contains(a));
+        w.cars[c].riders.retain(|a| !gone.contains(a));
+    }
     match w.cars[c].state {
+        // In the driveway, the driver in: waiting for the others coming along.
+        CarState::Boarding => {
+            let waited = w.tick - w.cars[c].since;
+            if !at_wheel || !w.sims[d].here() {
+                // (The driver called away after all: the trip is off.)
+                let aboard = std::mem::take(&mut w.cars[c].aboard);
+                for a in aboard {
+                    let_out(w, a as usize);
+                }
+                let World {
+                    cars,
+                    exits,
+                    travel,
+                    ..
+                } = &mut *w;
+                let car = &mut cars[c];
+                car.state = CarState::Parked;
+                car.trip = None;
+                car.riders.clear();
+                car.driver = None;
+                car.route = None;
+                car.settle(exits, Some(travel));
+                return;
+            }
+            let expected = call_trip_riders(w, c);
+            if (!expected && waited >= BOARD_MIN_TICKS) || waited >= TRIP_WAIT_TICKS {
+                let tick = w.tick;
+                let car = &mut w.cars[c];
+                car.state = CarState::Leaving;
+                car.since = tick;
+                car.progress = 0.0;
+            }
+            seat_party(w, c);
+        }
         CarState::Leaving => {
             let ticks = route_ticks(w, c, false);
             if at_wheel {
                 drive_on(w, c);
-                seat_driver(w, c);
+                seat_party(w, c);
             } else {
                 // (Called away at the wheel, as they can't be: the car is there.)
                 w.cars[c].progress = ticks;
@@ -2099,18 +2222,47 @@ fn trip_update(w: &mut World, c: usize) {
             let ticks = route_ticks(w, c, true);
             if at_wheel {
                 drive_on(w, c);
-                seat_driver(w, c);
+                seat_party(w, c);
             } else {
                 w.cars[c].progress = ticks;
             }
             if w.cars[c].progress >= ticks {
                 let car = &mut w.cars[c];
-                car.done = if at_wheel { vec![d as u32] } else { Vec::new() };
+                // Everyone in it gets out at home, the driver first (`arrive`).
+                car.done = car
+                    .aboard
+                    .iter()
+                    .copied()
+                    .filter(|&a| at_wheel || a != d as u32)
+                    .collect();
                 car.driver = Some(d as u32);
                 arrive(w, c);
             }
         }
         CarState::Out => {
+            let car = &w.cars[c];
+            let driver_in = at_wheel && car.aboard.contains(&(d as u32));
+            if driver_in {
+                // The driver in to go home: once the others who came are in too (or have been
+                // waited for long enough).
+                let waited = w.tick - w.cars[c].since;
+                let expected = call_party_home(w, c);
+                if !expected || waited >= TRIP_WAIT_TICKS {
+                    set_off_home(w, c);
+                }
+                seat_party(w, c);
+                return;
+            }
+            // One of them in it, or on their way to it, to go home: the rest go home too.
+            if !car.aboard.is_empty()
+                || car
+                    .riders
+                    .iter()
+                    .any(|&r| w.sims[r as usize].bound_for_car == Some(c as u32))
+            {
+                call_party_home(w, c);
+            }
+            seat_party(w, c);
             // Home some other way (and not on their way back to it): it's home too.
             let home = w
                 .households
@@ -2119,13 +2271,17 @@ fn trip_update(w: &mut World, c: usize) {
             let there = home.is_some() && w.briefs.get(d).and_then(|b| b.plot) == home;
             if there && w.sims[d].bound_for_car != Some(c as u32) {
                 let car = &mut w.cars[c];
-                car.done.clear();
+                car.done = car.aboard.clone();
                 car.aboard.clear();
                 arrive(w, c);
             }
         }
         // (A trip on a car that isn't on its way, out or back: done with.)
-        CarState::Parked | CarState::Boarding | CarState::Away => {
+        CarState::Parked | CarState::Away => {
+            let aboard = std::mem::take(&mut w.cars[c].aboard);
+            for a in aboard {
+                let_out(w, a as usize);
+            }
             let World {
                 cars,
                 exits,
@@ -2133,10 +2289,271 @@ fn trip_update(w: &mut World, c: usize) {
                 ..
             } = &mut *w;
             cars[c].trip = None;
+            cars[c].riders.clear();
             cars[c].route = None;
             cars[c].settle(exits, Some(travel));
         }
     }
+}
+
+/// `i`, sat in a car on a trip that won't take them now, gets out where they are and goes on
+/// their own way (on foot).
+fn let_out(w: &mut World, i: usize) {
+    let Some(sim) = w.sims.get_mut(i) else {
+        return;
+    };
+    if let Some(a) = sim.current.take_if(|a| matches!(a.phase, Phase::Driving)) {
+        sim.queue.push_front(a.task);
+    }
+    sim.bound_for_car = None;
+    sim.pose = crate::content::Pose::Stand;
+}
+
+/// Whether household member `j` sets off now for somewhere car `c`, about to leave on a trip,
+/// parks near (`Trip::at`): at home (or still close by), on their way there on foot, or about to
+/// be. The place they're off to.
+fn sets_off_with(w: &World, j: usize, c: usize) -> Option<(u32, bool)> {
+    let car = &w.cars[c];
+    let trip = car.trip?;
+    let s = &w.sims[j];
+    if s.household != car.household
+        || j as u32 == trip.driver
+        || !s.here()
+        || s.away_until.is_some()
+        || car.aboard.contains(&(j as u32))
+        || w.briefs.get(j).is_none_or(|b| b.baby)
+    {
+        return None;
+    }
+    let near = w.briefs.get(j).and_then(|b| b.plot) == Some(car.plot)
+        || crate::travel::dist(s.pos, car.spot) < CALL_REACH;
+    let task = match s.current() {
+        Some(a) if matches!(a.phase, Phase::Routing { .. }) => a.task,
+        Some(_) => return None,
+        None => *s.queue.front()?,
+    };
+    let TaskKind::Visit { plot } = task.kind else {
+        return None;
+    };
+    // (A guest there already as they set off from home: `Transition::Visit`; not from a visit
+    // elsewhere.)
+    if s.visiting.is_some_and(|v| v.plot != plot) {
+        return None;
+    }
+    let door = w.plots.get(plot as usize)?.arrival_point();
+    let far = crate::travel::dist(s.pos, door) > w.content.autonomy.reach;
+    let parks = parking_for(&w.travel, door).is_some_and(|(at, _)| at == trip.at);
+    (near && far && parks).then_some((plot, task.directed))
+}
+
+/// While car `c` waits in the driveway on a trip: the rest of the household setting off now for
+/// somewhere it parks near is called to it (those on their way on foot turn round, while they're
+/// still close by), as many as it has seats. Whether anyone is on their way to it.
+fn call_trip_riders(w: &mut World, c: usize) -> bool {
+    let me = c as u32;
+    let mut coming = 0;
+    for j in 0..w.sims.len() {
+        let s = &w.sims[j];
+        if s.bound_for_car == Some(me)
+            && !w.cars[c].aboard.contains(&(j as u32))
+            && s.here()
+            && s.current()
+                .is_some_and(|a| matches!(a.task.kind, TaskKind::Visit { .. }))
+        {
+            coming += 1;
+        }
+    }
+    for j in 0..w.sims.len() {
+        if w.cars[c].aboard.len() + coming >= SEATS {
+            break;
+        }
+        if w.sims[j].bound_for_car == Some(me) || sets_off_with(w, j, c).is_none() {
+            continue;
+        }
+        // To the car instead (`trip_ride` picks it now).
+        let sim = &mut w.sims[j];
+        if let Some(a) = sim.current.take() {
+            sim.queue.push_front(a.task);
+        }
+        coming += 1;
+    }
+    coming > 0
+}
+
+/// Car `c` parked out on a trip, one of those who came in it (or on their way to it) to go home:
+/// the others who came go home too (with it: `ride_home_for`), leaving what they chose to do.
+/// Whether any of them is still to get in.
+fn call_party_home(w: &mut World, c: usize) -> bool {
+    let me = c as u32;
+    let Some(trip) = w.cars[c].trip else {
+        return false;
+    };
+    let party: Vec<u32> = std::iter::once(trip.driver)
+        .chain(w.cars[c].riders.iter().copied())
+        .collect();
+    let home = w
+        .households
+        .get(w.cars[c].household as usize)
+        .and_then(|h| h.plot);
+    let mut expected = false;
+    for j in party {
+        if w.cars[c].aboard.contains(&j) {
+            continue;
+        }
+        let i = j as usize;
+        // (Home some other way already: not coming.)
+        if j != trip.driver && home.is_some() && w.briefs.get(i).and_then(|b| b.plot) == home {
+            w.cars[c].riders.retain(|&r| r != j);
+            continue;
+        }
+        let World {
+            sims,
+            content,
+            objects,
+            ..
+        } = &mut *w;
+        let Some(s) = sims
+            .get_mut(i)
+            .filter(|s| s.here() && s.away_until.is_none())
+        else {
+            continue;
+        };
+        let homeward = |t: &Task| matches!(t.kind, TaskKind::GoHome);
+        let going = s.current().is_some_and(|a| homeward(&a.task)) || s.queue.iter().any(homeward);
+        if j != trip.driver {
+            expected = true;
+        }
+        if s.bound_for_car == Some(me) || going {
+            continue;
+        }
+        // What they chose for themselves ends; what they were told to do comes first.
+        if s.current.as_ref().is_some_and(|a| !a.task.directed) {
+            crate::world::end_activity(s, content, objects);
+        }
+        s.queue.push_front(Task {
+            kind: TaskKind::GoHome,
+            directed: false,
+            routine: false,
+        });
+    }
+    expected
+}
+
+/// The car `sim` rides in to plot `plot` in an open-world town, their seat in it, and the door
+/// they get in by and where they stand for it: their household's car waiting in the driveway on
+/// a trip to park near there (`CarState::Boarding`), with a seat for them, the place out of
+/// walking range and they at home (or still close by). None: they walk (or drive: `trip_car`).
+pub(crate) fn trip_ride(
+    ctx: &crate::world::Ctx,
+    sim: &Sim,
+    plot: u32,
+) -> Option<(u32, usize, usize, [f32; 2])> {
+    let travel = ctx.travel;
+    // (A guest there already as they set off from home: `Transition::Visit`.)
+    if !travel.open
+        || travel.file.parking.is_empty()
+        || sim.visiting.is_some_and(|v| v.plot != plot)
+    {
+        return None;
+    }
+    let me = ctx.briefs.get(sim.id as usize)?;
+    let home = ctx.households.get(sim.household as usize)?.plot?;
+    let door = ctx.plots.get(plot as usize)?.arrival_point();
+    if me.baby || crate::travel::dist(sim.pos, door) <= ctx.content.autonomy.reach {
+        return None;
+    }
+    let (at, _) = parking_for(travel, door)?;
+    let (c, car) = ctx.cars.iter().enumerate().find(|(_, car)| {
+        car.household == sim.household
+            && car.plot == home
+            && car.state == CarState::Boarding
+            && car.trip.is_some_and(|t| t.driver != sim.id && t.at == at)
+            && !car.blocked
+            && !car.aboard.contains(&sim.id)
+    })?;
+    let near = me.plot == Some(home) || crate::travel::dist(sim.pos, car.spot) < CALL_REACH;
+    let c = c as u32;
+    // A seat of their own: after those in it and on their way to it.
+    let seat = car.aboard.len()
+        + ctx
+            .briefs
+            .iter()
+            .enumerate()
+            .filter(|(j, b)| {
+                *j as u32 != sim.id && b.trip_car == Some(c) && !car.aboard.contains(&(*j as u32))
+            })
+            .count();
+    if !near || seat >= SEATS {
+        return None;
+    }
+    let (d, stand) = car.door(&ctx.nav, seat)?;
+    Some((c, seat, d, stand))
+}
+
+/// Whether `sim` can get into car `c` now to ride along on its trip: out (`home` false), it
+/// waits in the driveway for them; home, it's parked out there and they came in it.
+pub(crate) fn may_ride(cars: &[Car], c: u32, sim: u32, home: bool) -> bool {
+    cars.get(c as usize).is_some_and(|car| {
+        car.trip.is_some_and(|t| t.driver != sim)
+            && car.aboard.len() < SEATS
+            && !car.aboard.contains(&sim)
+            && if home {
+                car.state == CarState::Out && car.riders.contains(&sim)
+            } else {
+                car.state == CarState::Boarding
+            }
+    })
+}
+
+/// The car `sim` came in on a trip, parked out there, to ride home in: the car, their seat,
+/// the door they get in by and where they stand for it.
+pub(crate) fn ride_home_for(
+    ctx: &crate::world::Ctx,
+    sim: &Sim,
+) -> Option<(u32, usize, usize, [f32; 2])> {
+    let (c, car) = ctx
+        .cars
+        .iter()
+        .enumerate()
+        .find(|(c, _)| may_ride(ctx.cars, *c as u32, sim.id, true))?;
+    let trip = car.trip?;
+    let seat = 1 + car.riders.iter().position(|&r| r == sim.id)?;
+    let (d, stand) = car
+        .posed(trip.at, trip.yaw)
+        .door(&ctx.nav, seat.min(SEATS - 1))?;
+    Some((c as u32, seat, d, stand))
+}
+
+/// `i` at car `c`'s door gets in to ride along (`Transition::Ride`): off to `plot` with it, or
+/// (None) home in it. Gone since, or full: they make their own way.
+pub(crate) fn ride(w: &mut World, i: usize, c: u32, plot: Option<u32>, directed: bool) {
+    let task = Task {
+        kind: plot.map_or(TaskKind::GoHome, |plot| TaskKind::Visit { plot }),
+        directed,
+        routine: false,
+    };
+    let me = i as u32;
+    if !may_ride(&w.cars, c, me, plot.is_none()) {
+        w.sims[i].bound_for_car = None;
+        w.sims[i].queue.push_front(task);
+        return;
+    }
+    let car = &mut w.cars[c as usize];
+    car.aboard.push(me);
+    if plot.is_some() && !car.riders.contains(&me) {
+        car.riders.push(me);
+    }
+    let sim = &mut w.sims[i];
+    if plot.is_none() {
+        sim.visiting = None;
+    }
+    sim.bound_for_car = Some(c);
+    sim.current = Some(crate::world::Activity {
+        task,
+        phase: Phase::Driving,
+        tags: Default::default(),
+    });
+    seat_party(w, c as usize);
 }
 
 /// Car `c` is at its trip's parking spot: parked there (`CarState::Out`), and its driver gets
@@ -2163,9 +2580,29 @@ fn park_out(w: &mut World, c: usize) {
     car.state = CarState::Out;
     car.since = tick;
     car.route = None;
-    car.aboard.clear();
+    let aboard = std::mem::take(&mut car.aboard);
     car.trip = Some(Trip { at, yaw, ..trip });
     let posed = car.posed(at, yaw);
+    // Those who came along get out by their doors and walk on to where they're going (they come
+    // home with it: `Car::riders`).
+    let riders: Vec<(usize, u32)> = aboard
+        .iter()
+        .copied()
+        .enumerate()
+        .filter(|&(_, a)| a != trip.driver)
+        .collect();
+    w.cars[c].riders = riders.iter().map(|&(_, a)| a).collect();
+    for (seat, a) in riders {
+        let door = posed.door(&w.nav(), seat).map(|(_, p)| p);
+        let sim = &mut w.sims[a as usize];
+        sim.pos = door.unwrap_or(posed.door_at(own_door(seat)));
+        sim.yaw = yaw;
+        sim.pose = crate::content::Pose::Stand;
+        sim.bound_for_car = None;
+        if let Some(act) = sim.current.take() {
+            sim.queue.push_front(act.task);
+        }
+    }
     if !at_wheel {
         return;
     }

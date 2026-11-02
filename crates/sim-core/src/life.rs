@@ -81,6 +81,13 @@ pub enum Transition {
     Drive { car: u32, plot: u32, directed: bool },
     /// At their car parked out on a trip: they drive home (`cars::drive_home`).
     DriveHome { car: u32 },
+    /// At the door of their household's car on a trip: they get in to ride along to `plot`, or
+    /// (None) home (`cars::ride`).
+    Ride {
+        car: u32,
+        plot: Option<u32>,
+        directed: bool,
+    },
     /// Reached home.
     Home,
     /// Reached the front door to answer `guest`'s knock.
@@ -935,6 +942,11 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             w.sims[i].visiting = None;
             crate::cars::drive_home(w, i, car);
         }
+        Transition::Ride {
+            car,
+            plot,
+            directed,
+        } => crate::cars::ride(w, i, car, plot, directed),
         Transition::Home => w.sims[i].visiting = None,
         Transition::Answered { guest } => answer(w, i, guest as usize),
     }

@@ -1687,6 +1687,8 @@ pub(crate) struct SimBrief {
     pub free: bool,
     /// On their way to this car for work or school (`Sim::bound_for_car`).
     pub bound_for_car: Option<u32>,
+    /// On their way to this car for a trip, or in it (`cars::Trip`: a `Visit` or `GoHome`).
+    pub trip_car: Option<u32>,
 }
 
 pub struct World {
@@ -4185,6 +4187,11 @@ impl World {
                 bound_for_car: s.bound_for_car.filter(|_| {
                     s.current()
                         .is_some_and(|a| matches!(a.task.kind, TaskKind::Work))
+                }),
+                trip_car: s.bound_for_car.filter(|_| {
+                    s.current().is_some_and(|a| {
+                        matches!(a.task.kind, TaskKind::Visit { .. } | TaskKind::GoHome)
+                    })
                 }),
             });
         }
@@ -7393,6 +7400,20 @@ fn start_task(
                 content.visits.tags,
             )
         }
+        // Or to a seat in it, the household's car waiting in the driveway to drive near there
+        // (`cars::trip_ride`).
+        TaskKind::Visit { plot }
+            if let Some((car, seat, door, at)) = crate::cars::trip_ride(ctx, sim, plot) =>
+        {
+            sim.bound_for_car = Some(car);
+            sim.car_seat = seat as u8;
+            sim.car_door = door as u8;
+            (
+                at,
+                (at[0].floor() as i32, at[1].floor() as i32),
+                content.visits.tags,
+            )
+        }
         TaskKind::Visit { plot } => {
             // (On foot: not to a car, whatever they were heading for before.)
             sim.bound_for_car = None;
@@ -7420,6 +7441,16 @@ fn start_task(
         TaskKind::GoHome if let Some((car, door, at)) = crate::cars::car_out_for(ctx, sim) => {
             sim.bound_for_car = Some(car);
             sim.car_seat = 0;
+            sim.car_door = door as u8;
+            (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
+        }
+        // The car they came in on a trip, parked out there: back to it, to ride home
+        // (`cars::ride_home_for`).
+        TaskKind::GoHome
+            if let Some((car, seat, door, at)) = crate::cars::ride_home_for(ctx, sim) =>
+        {
+            sim.bound_for_car = Some(car);
+            sim.car_seat = seat as u8;
             sim.car_door = door as u8;
             (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
         }
@@ -8662,6 +8693,27 @@ fn arrive(
                 directed,
             });
         }
+        // At their household's car's door, to ride along there (`cars::ride`).
+        TaskKind::Visit { plot }
+            if sim
+                .bound_for_car
+                .is_some_and(|c| crate::cars::may_ride(ctx.cars, c, sim.id, false)) =>
+        {
+            let (car, directed) = (sim.bound_for_car.expect("just looked"), act.task.directed);
+            sim.current = None;
+            sim.transition = Some(crate::life::Transition::Ride {
+                car,
+                plot: Some(plot),
+                directed,
+            });
+        }
+        // At a car that went without them (open-world towns): on foot after all.
+        TaskKind::Visit { .. } if sim.bound_for_car.is_some() && ctx.travel.open => {
+            sim.bound_for_car = None;
+            if let Some(a) = sim.current.take() {
+                sim.queue.push_front(a.task);
+            }
+        }
         TaskKind::Visit { plot } => {
             sim.bound_for_car = None;
             // At a house (not a park) with door rules: knock and wait (`life::doors`).
@@ -8700,6 +8752,27 @@ fn arrive(
             let car = sim.bound_for_car.expect("just looked");
             sim.current = None;
             sim.transition = Some(crate::life::Transition::DriveHome { car });
+        }
+        // At the car they came in, parked out there: in, to ride home.
+        TaskKind::GoHome
+            if sim
+                .bound_for_car
+                .is_some_and(|c| crate::cars::may_ride(ctx.cars, c, sim.id, true)) =>
+        {
+            let car = sim.bound_for_car.expect("just looked");
+            sim.current = None;
+            sim.transition = Some(crate::life::Transition::Ride {
+                car,
+                plot: None,
+                directed: false,
+            });
+        }
+        // At a car that went without them (open-world towns): home on foot after all.
+        TaskKind::GoHome if sim.bound_for_car.is_some() && ctx.travel.open => {
+            sim.bound_for_car = None;
+            if let Some(a) = sim.current.take() {
+                sim.queue.push_front(a.task);
+            }
         }
         TaskKind::GoHome => {
             sim.current = None;

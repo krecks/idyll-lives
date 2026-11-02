@@ -70,8 +70,10 @@
 //! kept as they came (`openWorld`, `travel::OpenWorld`: size, roads, areas, terrain masks,
 //! parking, which exits are bus stops, plots' areas and kinds; driveways keep their `road` and
 //! `s` in `drives`); a car on a trip between hamlets keeps it (`cars[].trip`, state `out` while
-//! it's parked there). Absent: a `cosy` town, as before: no road network from the meta's roads (the
-//! open-world rules are for `normal` and `big` towns, `travel::Travel::open`)
+//! it's parked there) and who rides with it (`cars[].riders`; absent: nobody, as in files written
+//! before passengers, so no new version). Absent: a `cosy` town, as before: no road network from
+//! the meta's roads (the open-world rules are for `normal` and `big` towns,
+//! `travel::Travel::open`)
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
