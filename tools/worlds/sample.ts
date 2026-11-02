@@ -17,8 +17,9 @@
  * other's middle), every way out on it, no more courts (dead ends) than an area keeps, none
  * reaching more than 45 m past the last road it meets, and no country road the layout found no
  * way for. And for big worlds: every area reaching a way out, nothing on the
- * water, every outdoor place at a trail's end and near its area, no trail through a lot, areas
- * apart, hamlets of four lots or more, every house near a stop or a way out, residents within the
+ * water, every outdoor place at a trail's end and near its area, no trail through a lot, no
+ * country road turning further than 70° over 40 m (no hairpins: `COUNTRY_TURN`), areas apart,
+ * hamlets of four lots or more, every house near a stop or a way out, residents within the
  * cap, the world filled (a quarter of it or more built and farmed, at most a tenth of its 100 m
  * squares with nothing in them, every quarter of it with an area or homes out in the country),
  * every road named (no two alike), the file under 4 MB, and the time a big world takes (its
@@ -47,10 +48,10 @@ const { objectInfos } = await import('../../web/src/game/housegen.ts');
 const { randomHousehold } = await import('../../web/src/game/household.ts');
 const { assembleTown, BIG_COURTS, COURTS, generateStats, generateWorld, houseTemplate, neighbourCap, populate, turner, vacantSlots } = await import('../../web/src/game/town.ts');
 const { WORLD_KINDS, WORLD_SIZES } = await import('../../web/src/game/world.ts');
-const { unrle } = await import('../../web/src/game/macro.ts');
+const { COUNTRY_TURN, unrle } = await import('../../web/src/game/macro.ts');
 const { homePrice } = await import('../../web/src/game/price.ts');
 const { savingsOf } = await import('../../web/src/game/wealth.ts');
-const { COURT, lengths, nearest, roadMask } = await import('../../web/src/game/roads.ts');
+const { COURT, lengths, nearest, pointAt, roadMask, sharpestTurn } = await import('../../web/src/game/roads.ts');
 
 type Rect = { x: number; z: number; w: number; d: number };
 type Pt = [number, number];
@@ -235,6 +236,16 @@ function openProblems(town: TownFile): string[] {
         if (j > i && d < AREAS_APART) out.push(`${areas[i].name} and ${areas[j].name} ${d.toFixed(0)} m apart`);
       }),
     );
+    // Country roads without hairpins: none turning further than `COUNTRY_TURN` over 40 m of its own
+    // middle line (two spans of 20 m: a steady bend of 16 m radius or more), where it meets
+    // another road aside.
+    for (const r of roads) {
+      if (r.kind !== 'country') continue;
+      const { angle, s } = sharpestTurn(r.points, 20);
+      const [x, z] = pointAt(r.points, s).p;
+      const deg = (a: number) => ((a * 180) / Math.PI).toFixed(0);
+      if (angle > COUNTRY_TURN + 1e-3) out.push(`country road ${r.name} turns ${deg(angle)}° over 40 m at ${x.toFixed(0)}, ${z.toFixed(0)} (${deg(COUNTRY_TURN)}° at most)`);
+    }
     const fill = fillOf(town);
     if (fill.built < BUILT_SHARE) out.push(`${(fill.built * 100).toFixed(0)}% of the world built and farmed (${BUILT_SHARE * 100}% or more wanted)`);
     if (fill.empty > EMPTY_SHARE) out.push(`${(fill.empty * 100).toFixed(0)}% of its 100 m squares hold nothing (${EMPTY_SHARE * 100}% at most)`);

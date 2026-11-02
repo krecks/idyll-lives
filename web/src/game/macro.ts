@@ -9,8 +9,10 @@
  *
  * The land is a cost grid of 8 m cells rolled from noise (how steep, how wooded, where the water
  * is); the areas go where it is flat and dry, far enough apart (a Poisson disc); country roads
- * are A* paths over the grid, smoothed into curves; trails are A* paths on a finer grid round
- * the lots. One `Ground` covers the whole world, and each area's lots go along its own roads,
+ * leave an area by a street's end straight on or by a T square off a street, and are paths over
+ * the grid that turn as a road does (`steer`: wide bends, never back on themselves), smoothed
+ * into curves with no hairpins (`COUNTRY_TURN`); trails are A* paths on a finer grid round the
+ * lots. One `Ground` covers the whole world, and each area's lots go along its own roads,
  * nearest its middle first (`town.ts` `LotPlacer`). Every area has a bus stop or two, so every
  * house is within ~120 m of a way out of town for people on foot.
  */
@@ -19,7 +21,7 @@ import type { Content } from '../content/content';
 import type { Rle, TownArea, WorldZone } from '../core/protocol';
 import { random } from './housegen';
 import { fbm } from './noise';
-import { centroid, cropRoads, curve, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, type Box, type Pt, type RoadPlan } from './roads';
+import { centroid, cropRoads, curve, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, sharpestTurn, tangent, type Box, type Pt, type RoadPlan } from './roads';
 import { BIG_COURTS, COURTS, frontageOf, Ground, houseFor, joinUp, LotPlacer, plotRect, settleRoads, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates } from './town';
 import { clearing, countryLane, crescentTown, crossroads, highStreet, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
 
@@ -124,6 +126,40 @@ const STEEP = 0.25;
 /** An orchard beside a farmstead: this deep from the lot's side (m), a gap of this from it. */
 const ORCHARD = 26;
 const ORCHARD_GAP = 3;
+/**
+ * A country road leaves an area by a port within `SWING` (radians) of the way it is going, else
+ * swinging round costs it `SWING_COST` m a radian more; a T off a street facing within
+ * `SIDE_FACING` of the way costs `SIDE_COST` m more than a port, and keeps `SIDE_APART` m from the
+ * area's other roads where it leaves its street and `SIDE_DEPTH` m (a lot's depth) as it crosses.
+ */
+const SWING = Math.PI / 6;
+const SWING_COST = 120;
+const SIDE_FACING = Math.PI / 4;
+const SIDE_COST = 30;
+const SIDE_APART = 24;
+const SIDE_DEPTH = 16;
+/** Leaving off a country road that leaves a port already (`via`) costs this much more (m): a port nobody has taken yet goes first. */
+const VIA_COST = 40;
+/** A road on from a port nobody took goes to what lies within this (radians) of straight on from it, rather than what lies nearer off to the side. */
+const AHEAD = Math.PI / 3;
+/** What going on to something off to the side of such a port or behind it costs, more than to what lies ahead (cells of flat open land). */
+const ASIDE = 30;
+/** How many of the likeliest ways out of each area (`waysOut`) a country road between two looks at. */
+const WAYS = 5;
+/** A country road's course, before it is smoothed into a curve, has a point at least this often (m): see `evenly`. */
+const CTRL_APART = 16;
+/** A country road between two areas goes straight on from a way out of one to a street of the other this near (m), where that street bends less than `STRAIGHT_BEND` (radians) over 28 m. */
+const STRAIGHT_ON = 160;
+const STRAIGHT_BEND = 0.6;
+/** A country road between two areas tries this many pairs of ways for one that doesn't wind round further than `WINDING` (radians) within `WINDING_OVER` m (a loop). */
+const TRIES = 4;
+const WINDING = Math.PI;
+const WINDING_OVER = 150;
+/** A country road turns no sharper than this (radians) over any 40 m of it: as a steady bend, one of 16 m radius or more; no hairpins. */
+export const COUNTRY_TURN = (70 * Math.PI) / 180;
+/** An area's lots keep their middles this far along their road from where it meets another (m), and off where it turns more than `TIGHT_BEND` (radians) over as far (a bend of 20 m radius or less). */
+const CORNER = 18;
+const TIGHT_BEND = 0.9;
 /** A home by a country road stands where it turns less than `BEND_MOST` (radians) over `BEND` m either side. */
 const BEND = 16;
 const BEND_MOST = 0.3;
@@ -273,6 +309,90 @@ function astar(gw: number, gd: number, cost: (i: number) => number, starts: read
   return null;
 }
 
+/** The eight ways a cell steps to its neighbours, in turn round the compass, an eighth of a turn apart. */
+const STEPS: readonly Pt[] = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+/** The step nearest heading `d`. */
+const octant = ([x, z]: Pt) => (((Math.round(Math.atan2(z, x) / (Math.PI / 4)) % 8) + 8) % 8);
+/** How nearly step `h` heads along `d` (a unit vector): the cosine between them. */
+const along = (h: number, d: Pt) => (STEPS[h][0] * d[0] + STEPS[h][1] * d[1]) / Math.hypot(...STEPS[h]);
+
+/**
+ * The cheapest way over a `gw` × `gd` grid as a road runs, not as a walker does: heading one of
+ * eight ways, turning an eighth of a turn at a time, two cells or more straight on between turns
+ * the same way (a curve of 25 m radius or more, never back on itself) and one between turns back
+ * the other way (a bend round something). From whichever of `starts` (a cell, the way it heads,
+ * and what starting there costs already) to a cell and heading `goal` accepts (what it costs to
+ * end there; -1 if it is no end). Cost per cell `cost` (Infinity where blocked), plus `TURN_COST`
+ * a turn and `TIGHT_COST` more for one only a cell after the last, `h` guessing the rest. Given
+ * `toward`, it never heads back the other way (so never round in a loop). The cells, start first;
+ * which start; the heading it ends on.
+ */
+function steer(gw: number, gd: number, cost: Float32Array, starts: readonly { cell: number; h: number; g: number }[], goal: (i: number, h: number) => number, h: (i: number) => number, toward?: Pt, limit = 400000): { cells: number[]; start: number; h: number } | null {
+  // A state: a cell, a heading and how it came there: (0, 1) by a turn one way or the other, (2, 3)
+  // a cell straight on after one, (4) two or more (or from the start).
+  const K = 5;
+  const n = gw * gd * 8 * K;
+  const g = new Float32Array(n).fill(Infinity);
+  const from = new Int32Array(n).fill(-1);
+  const closed = new Uint8Array(n);
+  const open = new Heap();
+  for (const s of starts) {
+    const k = (s.cell * 8 + s.h) * K + 4;
+    if (cost[s.cell] === Infinity || g[k] <= s.g) continue;
+    g[k] = s.g;
+    open.push(k, s.g + h(s.cell));
+  }
+  // (The best end yet, with what ending there costs: none better once the open states all cost more.)
+  let done = { k: -1, g: Infinity };
+  for (let steps = 0; open.size && steps < limit; steps++) {
+    const k = open.pop();
+    if (closed[k]) continue;
+    closed[k] = 1;
+    if (g[k] + h(Math.floor(k / K / 8)) >= done.g) break;
+    const c = k % K;
+    const hd = Math.floor(k / K) % 8;
+    const i = Math.floor(k / K / 8);
+    const end = goal(i, hd);
+    if (end >= 0 && g[k] + end < done.g) done = { k, g: g[k] + end };
+    const [x, z] = [i % gw, Math.floor(i / gw)];
+    for (const turn of c === 4 ? [0, 1, -1] : c === 2 ? [0, -1] : c === 3 ? [0, 1] : [0]) {
+      const nh = (hd + turn + 8) % 8;
+      if (toward && along(nh, toward) < -0.8) continue;
+      const [dx, dz] = STEPS[nh];
+      const [nx, nz] = [x + dx, z + dz];
+      if (nx < 0 || nz < 0 || nx >= gw || nz >= gd) continue;
+      const j = nz * gw + nx;
+      if (cost[j] === Infinity) continue;
+      // (No cutting a blocked corner.)
+      if (dx && dz && (cost[z * gw + nx] === Infinity || cost[nz * gw + x] === Infinity)) continue;
+      const nk = (j * 8 + nh) * K + (turn ? (turn > 0 ? 0 : 1) : c < 2 ? c + 2 : 4);
+      if (closed[nk]) continue;
+      const ng = g[k] + ((cost[i] + cost[j]) / 2) * (dx && dz ? Math.SQRT2 : 1) + (turn ? TURN_COST + (c < 4 ? TIGHT_COST : 0) : 0);
+      if (ng < g[nk]) {
+        g[nk] = ng;
+        from[nk] = k;
+        open.push(nk, ng + h(j));
+      }
+    }
+  }
+  if (done.k < 0) return null;
+  const path = [done.k];
+  while (from[path[path.length - 1]] >= 0) path.push(from[path[path.length - 1]]);
+  path.reverse();
+  const first = path[0];
+  const start = starts.findIndex((s) => (s.cell * 8 + s.h) * K + 4 === first);
+  return { cells: path.map((k) => Math.floor(k / K / 8)), start, h: Math.floor(done.k / K) % 8 };
+}
+/** What `steer` adds for a turn, and for one soon after the last (a cell's worth of flat open land is 1): a road keeps straight where it may, and to wide curves. */
+const TURN_COST = 1;
+const TIGHT_COST = 2;
+/** What a cell a country road may only go through when there is no other way costs it more (cells of flat open land). */
+const DETOUR = 20;
+/** How far `route` looks (states) for a way that may head any way, once one that doesn't head back has found none. */
+const LOOSE_LIMIT = 200000;
+/** What coming into a way more loosely (`route`) costs more (cells of flat open land). */
+const LOOSE_COST = 12;
+
 /** A polyline with the points that hardly change its course taken out (Douglas-Peucker, `tol` m). */
 function simplify(pts: readonly Pt[], tol: number): Pt[] {
   if (pts.length < 3) return [...pts];
@@ -294,6 +414,55 @@ function simplify(pts: readonly Pt[], tol: number): Pt[] {
     }
   }
   return pts.filter((_, i) => keep[i]);
+}
+
+/**
+ * A polyline with points put in along its longer stretches, none longer than `most` m: what
+ * `curve` makes of it keeps to it (a long stretch beside a short one swings the curve out past
+ * the short one's end and back, a kink).
+ */
+function evenly(pts: readonly Pt[], most: number): Pt[] {
+  const out: Pt[] = pts.length ? [pts[0]] : [];
+  for (let i = 1; i < pts.length; i++) {
+    const n = Math.ceil(dist(pts[i - 1], pts[i]) / most);
+    for (let k = 1; k < n; k++) out.push([pts[i - 1][0] + ((pts[i][0] - pts[i - 1][0]) * k) / n, pts[i - 1][1] + ((pts[i][1] - pts[i - 1][1]) * k) / n]);
+    out.push(pts[i]);
+  }
+  return out;
+}
+
+/**
+ * A polyline relaxed until it turns no sharper than `most` (radians) over any two spans of 20 m
+ * (`sharpestTurn`), its ends where they were: points every 2 m, each pulled towards the middle of
+ * its neighbours, again and again (as far as `tries` times). Null if it still turns too sharply.
+ */
+function unkink(pts: readonly Pt[], most: number, tries = 600): Pt[] | null {
+  const ls = lengths(pts);
+  const L = ls[ls.length - 1];
+  const n = Math.max(2, Math.ceil(L / 2));
+  let line = Array.from({ length: n + 1 }, (_, k): Pt => pointAt(pts, (L * k) / n, ls).p);
+  for (let k = 0; k < tries; k++) {
+    if (k % 20 === 0 && sharpestTurn(line, 20).angle <= most) return line;
+    line = line.map((p, i): Pt => (i === 0 || i === n ? p : [(p[0] * 2 + line[i - 1][0] + line[i + 1][0]) / 4, (p[1] * 2 + line[i - 1][1] + line[i + 1][1]) / 4]));
+  }
+  return sharpestTurn(line, 20).angle <= most ? line : null;
+}
+
+/** The most a polyline's heading (along it 10 m at a time) changes, one way, within `over` m of it (radians). */
+function winding(pts: readonly Pt[], over: number): number {
+  const ls = lengths(pts);
+  const L = ls[ls.length - 1];
+  const heads: number[] = [];
+  for (let s = 0; s + 10 <= L; s += 10) {
+    const [a, b] = [pointAt(pts, s, ls).p, pointAt(pts, s + 10, ls).p];
+    let h = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    // (Unwrapped: each within half a turn of the last.)
+    if (heads.length) h += Math.round((heads[heads.length - 1] - h) / (2 * Math.PI)) * 2 * Math.PI;
+    heads.push(h);
+  }
+  let most = 0;
+  for (let i = 0; i < heads.length; i++) for (let j = i + 1; j < heads.length && j - i <= over / 10; j++) most = Math.max(most, Math.abs(heads[j] - heads[i]));
+  return most;
 }
 
 /** A closed polygon simplified as `simplify` does a polyline: in two halves, from its first point and the point furthest from it. */
@@ -430,6 +599,28 @@ export function unrle(runs: Rle, size: number): Uint8Array {
   return mask;
 }
 
+/** A road end that led out of an area's box (`Plan.ports`): where, which way out, and whether a country road goes on from it yet. */
+interface Port {
+  road: number;
+  end: 0 | 1;
+  area: number;
+  p: Pt;
+  dir: Pt;
+  used: boolean;
+}
+
+/**
+ * Where a country road leaves an area or comes into it: from `p` heading `dir`, straight on for
+ * `reach` m (across the area's own land, from a T off one of its streets) before it may turn; the
+ * port it goes on from (or off the country road from), if any.
+ */
+interface Way {
+  p: Pt;
+  dir: Pt;
+  reach?: number;
+  port?: Port;
+}
+
 /** An area as it is laid out: its box on the world, its roads (indices into the world's), its middle. */
 interface Plan {
   name: string;
@@ -439,7 +630,7 @@ interface Plan {
   greens: Pt[][];
   spec: SizeSpec;
   /** Its ways on: road ends that led out of its box. */
-  ports: { road: number; end: 0 | 1; p: Pt; dir: Pt; used: boolean }[];
+  ports: Port[];
 }
 
 /**
@@ -545,7 +736,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
         if (r.ends[e] !== 'out') continue;
         const [p, q] = e === 0 ? [points[0], points[1]] : [points[points.length - 1], points[points.length - 2]];
         const l = dist(p, q) || 1;
-        plan.ports.push({ road: at, end: e, p, dir: [(p[0] - q[0]) / l, (p[1] - q[1]) / l], used: false });
+        plan.ports.push({ road: at, end: e, area: index, p, dir: [(p[0] - q[0]) / l, (p[1] - q[1]) / l], used: false });
       }
     });
     plans.push(plan);
@@ -613,65 +804,256 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   for (let i = 0; i < gw * gd; i++) if (i % gw < 2 || i % gw >= gw - 2 || i < gw * 2 || i >= gw * (gd - 2)) rim[i] = 1;
   const wetNear = new Uint8Array(gw * gd);
   for (let i = 0; i < gw * gd; i++) if (land.water[i]) for (const d of [0, -1, 1, -gw, gw, -gw - 1, -gw + 1, gw - 1, gw + 1]) if (i + d >= 0 && i + d < gw * gd) wetNear[i + d] = 1;
-  const roadCost = (from: Pt | null, to: Pt | null) => (i: number) => {
+  /** What a cell costs a country road (Infinity where it may not go: on or by the water, in an area but within 26 m of `ends`, its ways in and out). */
+  const roadCost = (ends: readonly Pt[]) => (i: number) => {
     if (wetNear[i]) return Infinity;
     if (areaBlock[i]) {
       const c = land.centre(i);
-      if (!((from && dist(c, from) < 26) || (to && dist(c, to) < 26))) return Infinity;
+      if (!ends.some((e) => dist(c, e) < 26)) return Infinity;
     }
     // (Not along the world's edge: smoothed, it would wander out of the world and back.)
     return 1 + land.slope(i) * 40 + land.woods[i] * 0.3 + (rim[i] ? 12 : 0);
   };
   /** As `roadCost`, but along the water's edge too (not over it), and less put off by the slope: for when that finds no way. */
-  const relaxedCost = (from: Pt | null, to: Pt | null) => {
-    const strict = roadCost(from, to);
+  const relaxedCost = (ends: readonly Pt[]) => {
+    const strict = roadCost(ends);
     return (i: number) => (land.water[i] ? Infinity : wetNear[i] ? 30 + land.slope(i) * 15 : Math.min(strict(i), 1 + land.slope(i) * 15 + land.woods[i] * 0.3));
   };
-  /** The way `astar` finds with `roadCost`; if none, with `relaxedCost`. */
-  const route = (from: Pt | null, to: Pt | null, starts: number[], goal: (i: number) => boolean, h: (i: number) => number) =>
-    astar(gw, gd, roadCost(from, to), starts, goal, h) ?? astar(gw, gd, relaxedCost(from, to), starts, goal, h);
+  /**
+   * The way a country road goes from any of `from` (a port, or a T off a road), heading its way,
+   * to a cell `goal` accepts (and a heading it accepts, when it is given one, more loosely if
+   * asked: what ending there costs, -1 if it doesn't): as `steer` finds it over `cost`, or where
+   * that finds no way over `fallback` (each such cell `DETOUR` more), never heading back against
+   * `toward`, else coming in more loosely, else heading any way; else as `astar` does (`steered`
+   * false). Its cells, which of `from` it leaves by and the heading it ends on.
+   */
+  const route = (cost: (i: number) => number, fallback: (i: number) => number, from: readonly Way[], goal: (i: number, h?: number, loose?: boolean) => number, h: (i: number) => number, toward?: Pt): { cells: number[]; from: number; h?: number; steered: boolean } | null => {
+    const starts = from.map((w) => ({ cell: outCell(w), h: octant(w.dir), g: wayCost(w) }));
+    const grid = Float32Array.from({ length: gw * gd }, (_, i) => {
+      const c = cost(i);
+      return c < Infinity ? c : fallback(i) + DETOUR;
+    });
+    // (Coming in loosely costs it more.)
+    const either = (i: number, hd: number) => {
+      const e = goal(i, hd);
+      if (e >= 0) return e;
+      const l = goal(i, hd, true);
+      return l >= 0 ? l + LOOSE_COST : -1;
+    };
+    const found = (toward && steer(gw, gd, grid, starts, either, h, toward)) || steer(gw, gd, grid, starts, goal, h, undefined, LOOSE_LIMIT);
+    if (found) return { cells: found.cells, from: found.start, h: found.h, steered: true };
+    for (const c of [cost, fallback]) {
+      const cells = astar(gw, gd, c, [starts[0].cell], (i) => goal(i) >= 0, h);
+      if (cells) return { cells, from: 0, steered: false };
+    }
+    return null;
+  };
+  /** What leaving by a way costs `steer` (in cells) before it is out over the land: its lead, and more for a T than a port, and for a port taken already. */
+  const wayCost = (w: Way) => ((w.reach ?? CELL) + (w.reach ? SIDE_COST : 0) + (w.port?.used ? (w.p === w.port.p ? 240 : VIA_COST) : 0)) / CELL;
+  /** The cell a country road's way over the land starts from, leaving by `w` (or ends on, coming in by it): a cell out in front of it, or where its reach ends. */
+  const outCell = (w: Way) => land.cell(w.p[0] + w.dir[0] * (w.reach ?? CELL), w.p[1] + w.dir[1] * (w.reach ?? CELL));
+  /** A way's way in, from its `outCell`: heading back into it, give or take a twelfth of a turn (`loose`: three sixteenths). */
+  const into = (q: Way) => (h?: number, loose = false) => h === undefined || along(h, [-q.dir[0], -q.dir[1]]) > (loose ? 0.38 : 0.85);
+  /** The world's edges (north, east, south, west): outwards. */
+  const FACING: readonly Pt[] = [[0, -1], [1, 0], [0, 1], [-1, 0]];
   /** Country roads the layout found no way for. */
   const failed: string[] = [];
-  /** A country road from `a` (a port) along `cells`, to `b`: smoothed into a curve, leaving and arriving straight. */
-  const countryRoad = (a: { p: Pt; dir: Pt }, cells: number[], b: { p: Pt; dir: Pt } | null, ends: RoadPlan['ends'], roadName: string): RoadPlan => {
+  /** A country road from `a` along `cells`, to `b`: smoothed into a curve, leaving and arriving straight (on across an area's land from a T). */
+  const countryRoad = (a: Way, cells: number[], b: Way | null, ends: RoadPlan['ends'], roadName: string): RoadPlan => {
     const mid = simplify(cells.map((i) => land.centre(i)), 5).slice(1, b ? -1 : undefined);
-    const lead = (q: { p: Pt; dir: Pt }, k: number): Pt => [q.p[0] + q.dir[0] * k, q.p[1] + q.dir[1] * k];
+    const lead = (q: Way, k: number): Pt => [q.p[0] + q.dir[0] * k, q.p[1] + q.dir[1] * k];
+    const len = (q: Way, k: number) => Math.max(k, q.reach ?? 0);
     // Near an end, only the way's points out in front of it (no doubling back to it: a kink).
-    const before = (q: { p: Pt; dir: Pt }, p: Pt, near: number) => dist(p, q.p) > near && (dist(p, q.p) > 48 || q.dir[0] * (p[0] - q.p[0]) + q.dir[1] * (p[1] - q.p[1]) > dist(p, q.p) * 0.5);
+    const before = (q: Way, p: Pt, near: number) => dist(p, q.p) > near && (dist(p, q.p) > 48 || q.dir[0] * (p[0] - q.p[0]) + q.dir[1] * (p[1] - q.p[1]) > dist(p, q.p) * 0.5);
     // (No lead out over the water: a port on the shore is come to from the land.)
-    const leads = (q: { p: Pt; dir: Pt }, k: number): Pt[] => (land.wet(...lead(q, k), 4) ? [] : [lead(q, k)]);
+    const leads = (q: Way, k: number): Pt[] => (land.wet(...lead(q, len(q, k)), 4) ? [] : [lead(q, len(q, k))]);
     const make = (k: number) => {
       const tail: Pt[] = b ? [...leads(b, k), b.p] : [];
-      const ctrl = [a.p, ...leads(a, k), ...mid.filter((p) => before(a, p, k + 8) && (!b || before(b, p, k + 8))), ...tail];
-      return curve(ctrl);
+      const ctrl = [a.p, ...leads(a, k), ...mid.filter((p) => before(a, p, len(a, k) + 8) && (!b || before(b, p, len(b, k) + 8))), ...tail];
+      return curve(evenly(ctrl, CTRL_APART));
     };
     // (Shorter leads if the longer ones swing it out over the water.)
     let points = make(14);
     for (const k of [7, 3]) if (points.some(([x, z]) => land.wet(x, z, 2))) points = make(k);
     return { points, width: COUNTRY_WIDTH, ends, kind: 'country', name: roadName };
   };
-  const portOf = (from: number, to: Pt) =>
-    plans[from].ports
-      .map((q) => ({ q, score: dist(q.p, to) - (q.dir[0] * (to[0] - q.p[0]) + q.dir[1] * (to[1] - q.p[1])) / (dist(q.p, to) || 1) * 60 + (q.used ? 120 : 0) }))
-      .sort((x, y) => x.score - y.score)[0]?.q;
   /**
    * Where a country road leaves port `q` towards `toward`: the port itself; one another country
    * road leaves already, off that road 30 m out from it, square to it (rather than both from the
    * port, running together a while).
    */
-  const via = (q: { p: Pt; dir: Pt; used: boolean }, toward: Pt): { p: Pt; dir: Pt } => {
-    if (!q.used) return q;
+  const via = (q: Port, toward: Pt): Way => {
+    if (!q.used) return { p: q.p, dir: q.dir, port: q };
     const r = roads.find((o) => o.kind === 'country' && [o.points[0], o.points[o.points.length - 1]].some((e) => dist(e, q.p) < 1));
-    if (!r) return q;
+    if (!r) return { p: q.p, dir: q.dir, port: q };
     const ls = lengths(r.points);
     const L = ls[ls.length - 1];
-    if (L < 70) return q;
+    if (L < 70) return { p: q.p, dir: q.dir, port: q };
     const s = dist(r.points[0], q.p) < 1 ? 30 : L - 30;
     const { p, t } = pointAt(r.points, s, ls);
     const n = leftOf(t);
     const k = n[0] * (toward[0] - p[0]) + n[1] * (toward[1] - p[1]) >= 0 ? 1 : -1;
-    return { p, dir: [n[0] * k, n[1] * k] };
+    return { p, dir: [n[0] * k, n[1] * k], port: q };
   };
+  /** How far a way heading `dir` from `p` is from heading for `toward`, as metres of road: nothing within `SWING`, then more the more it would have to swing round. */
+  const swing = (p: Pt, dir: Pt, toward: Pt) => {
+    const l = dist(p, toward) || 1;
+    const cos = (dir[0] * (toward[0] - p[0]) + dir[1] * (toward[1] - p[1])) / l;
+    return Math.max(0, Math.acos(Math.max(-1, Math.min(1, cos))) - SWING) * SWING_COST;
+  };
+  /**
+   * Which of `list` (roads) pass within `R` m of a point round `rect` (to 40 m out): -1 none, the
+   * road if only one does, -2 if more.
+   */
+  const roadsNear = (list: readonly number[], rect: Rect, R: number) => {
+    const G = 2;
+    const [x0, z0] = [rect.x - 40, rect.z - 40];
+    const [w, d] = [Math.ceil((rect.w + 80) / G), Math.ceil((rect.d + 80) / G)];
+    const grid = new Int32Array(w * d).fill(-1);
+    const reach = Math.ceil(R / G);
+    const add = (i: number) => {
+      const pts = roads[i].points;
+      for (let k = 0; k + 1 < pts.length; k++) {
+        const steps = Math.max(1, Math.ceil(dist(pts[k], pts[k + 1]) / G));
+        for (let j = 0; j <= steps; j++) {
+          const [px, pz] = [pts[k][0] + ((pts[k + 1][0] - pts[k][0]) * j) / steps, pts[k][1] + ((pts[k + 1][1] - pts[k][1]) * j) / steps];
+          const [cx, cz] = [Math.floor((px - x0) / G), Math.floor((pz - z0) / G)];
+          for (let z = Math.max(0, cz - reach); z <= Math.min(d - 1, cz + reach); z++) {
+            const dz = z0 + (z + 0.5) * G - pz;
+            for (let x = Math.max(0, cx - reach); x <= Math.min(w - 1, cx + reach); x++) {
+              const at = z * w + x;
+              const dx = x0 + (x + 0.5) * G - px;
+              if (grid[at] === i || grid[at] === -2 || dx * dx + dz * dz >= R * R) continue;
+              grid[at] = grid[at] === -1 ? i : -2;
+            }
+          }
+        }
+      }
+    };
+    list.forEach(add);
+    const at = ([px, pz]: Pt) => {
+      const [x, z] = [Math.floor((px - x0) / G), Math.floor((pz - z0) / G)];
+      return x < 0 || z < 0 || x >= w || z >= d ? -1 : grid[z * w + x];
+    };
+    return { at, add };
+  };
+  /** Per area, `roadsNear` its own roads, and how many of the world's roads it has been told about. */
+  const sideGrids = new Map<number, { roads: number; apart: ReturnType<typeof roadsNear>; depth: ReturnType<typeof roadsNear> }>();
+  /** Which of area `a`'s roads (and the country roads into it) pass within `SIDE_APART` and `SIDE_DEPTH` of a point. */
+  const gridsOf = (a: number) => {
+    const r = plans[a].rect;
+    let grids = sideGrids.get(a);
+    if (!grids) sideGrids.set(a, (grids = { roads: roads.length, apart: roadsNear(plans[a].roads, r, SIDE_APART), depth: roadsNear(plans[a].roads, r, SIDE_DEPTH) }));
+    // (Country roads into the area since: from a T.)
+    for (; grids.roads < roads.length; grids.roads++) {
+      if (roads[grids.roads].kind === 'country' && roads[grids.roads].points.some(([x, z]) => x > r.x - 30 && z > r.z - 30 && x < r.x + r.w + 30 && z < r.z + r.d + 30)) grids.depth.add(grids.roads);
+    }
+    return { apart: grids.apart.at, depth: grids.depth.at };
+  };
+  /**
+   * Where way `w` (out of another area), straight on, comes to one of area `b`'s roads within
+   * `STRAIGHT_ON` m: square to it give or take `SIDE_FACING`, where it runs straight and not by a
+   * junction, over dry land and nobody else's area, clear of `b`'s other roads by a lot's depth.
+   * The point (on the road's middle) and how far; null if it doesn't.
+   */
+  const straightOn = (w: Way, b: number): { p: Pt; len: number } | null => {
+    const { apart, depth } = gridsOf(b);
+    let to = -1;
+    for (let d = 2; d <= STRAIGHT_ON; d += 2) {
+      const q: Pt = [w.p[0] + w.dir[0] * d, w.p[1] + w.dir[1] * d];
+      const owner = areaBlock[land.cell(q[0], q[1])];
+      if (land.wet(q[0], q[1], 3) || (owner && owner !== b + 1 && owner !== (w.port?.area ?? -2) + 1)) return null;
+      const by = depth(q);
+      if (by === -1) continue;
+      // (The first of its roads it comes near is the one it meets, and nothing else on the way.)
+      if (by === -2 || !plans[b].roads.includes(by) || (to >= 0 && by !== to)) return null;
+      to = by;
+      const pts = roads[by].points;
+      const ls = lengths(pts);
+      const at = nearest(pts, q[0], q[1], ls);
+      if (at.dist > 2) continue;
+      const { p, t } = pointAt(pts, at.s, ls);
+      const [t0, t1] = [pointAt(pts, at.s - 14, ls).t, pointAt(pts, at.s + 14, ls).t];
+      const ok = Math.abs(t[0] * w.dir[0] + t[1] * w.dir[1]) <= Math.sin(SIDE_FACING) && t0[0] * t1[0] + t0[1] * t1[1] >= Math.cos(STRAIGHT_BEND) && [-1, by].includes(apart(p)) && at.s > 20 && at.s < ls[ls.length - 1] - 20;
+      return ok ? { p, len: dist(w.p, p) } : null;
+    }
+    return null;
+  };
+  /**
+   * A way out of area `a` towards `toward` by a T off one of its streets or lanes: where it runs
+   * straight (and not by a junction), square to it on the side facing `toward` (within
+   * `SIDE_FACING`), straight on across the area's land clear of its other roads, its lots' depth
+   * from them, and of the water. The nearest such to `toward` with the least to cross first, none
+   * two within `SIDE_APART` of each other.
+   */
+  const sideT = (a: number, toward: Pt): (Way & { score: number })[] => {
+    const plan = plans[a];
+    const r = plan.rect;
+    const near = (p: Pt, m: number) => p[0] > r.x - m && p[1] > r.z - m && p[0] < r.x + r.w + m && p[1] < r.z + r.d + m;
+    const { apart, depth } = gridsOf(a);
+    const found: (Way & { score: number })[] = [];
+    for (const ri of plan.roads) {
+      const pts = roads[ri].points;
+      const ls = lengths(pts);
+      const L = ls[ls.length - 1];
+      for (let s = 20; s <= L - 20; s += 4) {
+        const { p, t } = pointAt(pts, s, ls);
+        const [t0, t1] = [pointAt(pts, s - 14, ls).t, pointAt(pts, s + 14, ls).t];
+        if (t0[0] * t1[0] + t0[1] * t1[1] < Math.cos(0.3)) continue;
+        const l = dist(p, toward) || 1;
+        const u: Pt = [(toward[0] - p[0]) / l, (toward[1] - p[1]) / l];
+        const left = leftOf(t);
+        const k = left[0] * u[0] + left[1] * u[1] >= 0 ? 1 : -1;
+        const n: Pt = [left[0] * k, left[1] * k];
+        if (n[0] * u[0] + n[1] * u[1] < Math.cos(SIDE_FACING)) continue;
+        if (![-1, ri].includes(apart(p))) continue;
+        let reach = 0;
+        for (let d = 4; d < 200; d += 4) {
+          const q: Pt = [p[0] + n[0] * d, p[1] + n[1] * d];
+          const by = depth(q);
+          if (land.wet(q[0], q[1], 4) || (by !== -1 && (by !== ri || d > SIDE_DEPTH))) break;
+          const cell = land.cell(q[0], q[1]);
+          if (!near(q, 0) && !areaBlock[cell]) {
+            // (Over the land beyond, first.)
+            if (roadCost([])(cell) < Infinity) reach = d;
+            break;
+          }
+        }
+        if (!reach) continue;
+        const out: Pt = [p[0] + n[0] * reach, p[1] + n[1] * reach];
+        found.push({ p, dir: n, reach, score: reach + dist(out, toward) + swing(out, n, toward) + SIDE_COST });
+      }
+    }
+    found.sort((x, y) => x.score - y.score);
+    return found.filter((w, i) => found.slice(0, i).every((o) => dist(o.p, w.p) >= SIDE_APART));
+  };
+  /**
+   * The way a country road leaves area `a` towards `toward` (or comes into it from there): the
+   * port nearest it that faces it (a port with a country road on from it already, off that road),
+   * else a T off one of its streets facing it (`sideT`) if that swings round less.
+   */
+  const waysOut = (a: number, toward: Pt): (Way & { score: number })[] => {
+    const ports = plans[a].ports.map((q) => {
+      const w = via(q, toward);
+      return { ...w, score: dist(w.p, toward) + swing(w.p, w.dir, toward) + (q.used ? (w.p === q.p ? 240 : VIA_COST) : 0) };
+    });
+    return [...ports, ...sideT(a, toward).slice(0, 3)].sort((x, y) => x.score - y.score);
+  };
+  /**
+   * What is wrong with a country road's course (where it meets another road aside), worst first:
+   * 3 if it runs over the water, 2 if it turns sharper than `COUNTRY_TURN` over 40 m anywhere, 1
+   * if it winds round further than `WINDING` within `WINDING_OVER` m (a loop), else 0.
+   */
+  const fault = (road: RoadPlan) =>
+    road.points.some(([x, z]) => land.wet(x, z, 1)) ? 3 : sharpestTurn(road.points, 20).angle > COUNTRY_TURN - 0.01 ? 2 : winding(road.points, WINDING_OVER) > WINDING ? 1 : 0;
+  /** A country road that turns too sharply (`fault` 2) relaxed till it doesn't (`unkink`), if that keeps it off the water; else as it was. */
+  const settle = (road: RoadPlan): RoadPlan => {
+    if (fault(road) !== 2) return road;
+    const points = unkink(road.points, COUNTRY_TURN - 0.02);
+    return points && !points.some(([x, z]) => land.wet(x, z, 1)) ? { ...road, points: points.map(([x, z]): Pt => [round2(x), round2(z)]) } : road;
+  };
+  /** Whether `p` lies ahead of way `w`, within `angle` (radians) of straight on. */
+  const inFront = (w: Way, p: Pt, angle: number) => w.dir[0] * (p[0] - w.p[0]) + w.dir[1] * (p[1] - w.p[1]) >= dist(p, w.p) * Math.cos(angle);
   // Prim's tree over the areas, then the shortest edge it left out.
   const inTree = [0];
   const edges: [number, number][] = [];
@@ -700,21 +1082,60 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     return pick;
   };
   for (const [a, b] of edges) {
-    const qa = portOf(a, plans[b].centre);
-    const qb = portOf(b, plans[a].centre);
-    if (!qa || !qb) continue;
-    const [pa, pb] = [via(qa, qb.p), via(qb, qa.p)];
-    const goal = land.cell(pb.p[0] + pb.dir[0] * 8, pb.p[1] + pb.dir[1] * 8);
-    const [gx, gz] = land.centre(goal);
-    const cells = route(qa.p, qb.p, [land.cell(pa.p[0] + pa.dir[0] * 8, pa.p[1] + pa.dir[1] * 8)], (i) => i === goal, (i) => dist(land.centre(i), [gx, gz]) / CELL);
-    if (!cells) {
+    // The likeliest ways out of each towards the other, the cheapest way between any of them;
+    // if it turns too sharply (its ends, smoothed), again without the way it came in by, then without the one it left by.
+    let outs = waysOut(a, plans[b].centre).slice(0, WAYS);
+    let ins = waysOut(b, plans[a].centre).slice(0, WAYS);
+    type Made = { road: RoadPlan; pa: Way; pb: Way; bad: number };
+    let made = null as Made | null;
+    // Near enough, a way out of one straight on to a street of the other, meeting it in a T.
+    const direct = [...outs.map((w) => ({ w, to: b })), ...ins.map((w) => ({ w, to: a }))]
+      .map(({ w, to }) => ({ w, hit: straightOn(w, to) }))
+      .flatMap(({ w, hit }) => (hit ? [{ w, hit, cost: hit.len + wayCost(w) * CELL }] : []))
+      .sort((x, y) => x.cost - y.cost)[0];
+    if (direct) {
+      const pts = curve(evenly([direct.w.p, direct.hit.p], CTRL_APART));
+      made = { road: { points: pts, width: COUNTRY_WIDTH, ends: ['join', 'join'], kind: 'country', name: '' }, pa: direct.w, pb: { p: direct.hit.p, dir: [-direct.w.dir[0], -direct.w.dir[1]] }, bad: 0 };
+    }
+    for (let tries = 0; tries < TRIES && outs.length && ins.length && (!made || made.bad > 0); tries++) {
+      // (Into the areas by their ports, or off a road by one, if it comes to it.)
+      const ends = [...outs, ...ins].flatMap((w) => (w.port ? [w.port.p, w.p] : []));
+      const goals = ins.map((w) => ({ w, cell: outCell(w), into: into(w), extra: wayCost(w) }));
+      // (Coming in by the cheapest of them that ends there, heading in.)
+      const goal = (i: number, h?: number, loose?: boolean) => {
+        let best = -1;
+        for (const o of goals) if (o.cell === i && o.into(h, loose) && (best < 0 || o.extra < best)) best = o.extra;
+        return best;
+      };
+      const goalAt = goals.map((o) => land.centre(o.cell));
+      const guess = (i: number) => {
+        const c = land.centre(i);
+        let near = Infinity;
+        for (const e of goalAt) near = Math.min(near, dist(c, e));
+        return near / CELL;
+      };
+      const span = dist(plans[a].centre, plans[b].centre) || 1;
+      const found = route(roadCost(ends), relaxedCost(ends), outs, goal, guess, [(plans[b].centre[0] - plans[a].centre[0]) / span, (plans[b].centre[1] - plans[a].centre[1]) / span]);
+      if (!found) break;
+      const end = found.cells[found.cells.length - 1];
+      const pb = goals.filter((o) => o.cell === end && o.into(found.h, true)).sort((x, y) => x.extra - y.extra)[0]?.w ?? goals.find((o) => o.cell === end)!.w;
+      const pa = outs[found.from];
+      const road = countryRoad(pa, found.cells, pb, ['join', 'join'], '');
+      const bad = fault(road);
+      if (!made || bad < made.bad) made = { road, pa, pb, bad };
+      // (No way it steers between any of them: none without them either.)
+      if (!bad || !found.steered) break;
+      if (tries % 2 === 0) ins = ins.filter((w) => w !== pb);
+      else outs = outs.filter((w) => w !== pa);
+    }
+    if (!made) {
       failed.push(`no country road between ${plans[a].name} and ${plans[b].name}`);
       continue;
     }
     const far = b === 0 ? a : a === 0 ? b : dist(plans[a].centre, mainCentre) > dist(plans[b].centre, mainCentre) ? a : b;
     const near = far === a ? b : a;
-    roads.push(countryRoad(pa, cells, pb, ['join', 'join'], uniqueName(`${plans[far].name} Road`, `${plans[near].name} Lane`)));
-    qa.used = qb.used = true;
+    roads.push({ ...settle(made.road), name: uniqueName(`${plans[far].name} Road`, `${plans[near].name} Lane`) });
+    for (const w of [made.pa, made.pb]) if (w.port) w.port.used = true;
   }
   // Two or three ways out of the world: from the ports left over (else any), to the nearest edge.
   const outs = 2 + Math.floor(rand() * 2);
@@ -737,27 +1158,31 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     for (const q of ports) {
       for (const [side, d] of [q.p[1], W - q.p[0], D - q.p[1], q.p[0]].entries()) {
         if (!dryEdge[side] || noWay.get(q)?.has(side)) continue;
-        const facing = [[0, -1], [1, 0], [0, 1], [-1, 0]][side];
+        const facing = FACING[side];
         const score = d - (q.dir[0] * facing[0] + q.dir[1] * facing[1]) * 80 + (q.used ? 400 : 0) + (usedEdges.has(side) ? 500 : 0);
         if (!best || score < best.d) best = { q, side, d: score };
       }
     }
     if (!best) break;
     const { q, side } = best;
-    const from = via(q, [q.p[0] + [0, 400, 0, -400][side], q.p[1] + [-400, 0, 400, 0][side]]);
+    const toward: Pt = [q.p[0] + FACING[side][0] * 400, q.p[1] + FACING[side][1] * 400];
+    // (A T off a street facing the edge, if the port doesn't.)
+    const tee = q.dir[0] * FACING[side][0] + q.dir[1] * FACING[side][1] < Math.cos(SIDE_FACING) ? sideT(q.area, toward)[0] : undefined;
+    const from: Way = tee ?? via(q, toward);
     const onEdge = (i: number) => [Math.floor(i / gw) === 0, i % gw === gw - 1, Math.floor(i / gw) === gd - 1, i % gw === 0][side];
-    const cells = route(q.p, null, [land.cell(from.p[0] + from.dir[0] * 8, from.p[1] + from.dir[1] * 8)], onEdge, (i) => [Math.floor(i / gw), gw - 1 - (i % gw), gd - 1 - Math.floor(i / gw), i % gw][side]);
-    if (!cells) {
+    const ends = from.port ? [from.port.p, from.p] : [];
+    const found = route(roadCost(ends), relaxedCost(ends), [from], (i, h) => (onEdge(i) && (h === undefined || along(h, FACING[side]) > 0.9) ? 0 : -1), (i) => [Math.floor(i / gw), gw - 1 - (i % gw), gd - 1 - Math.floor(i / gw), i % gw][side], FACING[side]);
+    if (!found) {
       // (Another port or edge, then.)
       noWay.set(q, (noWay.get(q) ?? new Set()).add(side));
       continue;
     }
-    const last = land.centre(cells[cells.length - 1]);
+    const last = land.centre(found.cells[found.cells.length - 1]);
     const beyond: Pt = [last[0] + [0, 40, 0, -40][side], last[1] + [-40, 0, 40, 0][side]];
-    const road = countryRoad(from, [...cells], null, ['join', 'out'], uniqueName(`${edgeName[side]} Road`, `${edgeName[side]} Lane`));
-    road.points = curve([...simplify(road.points, 0.3), beyond]);
-    roads.push(road);
-    q.used = true;
+    const road = countryRoad(from, found.cells, null, ['join', 'out'], uniqueName(`${edgeName[side]} Road`, `${edgeName[side]} Lane`));
+    road.points = curve(evenly([...simplify(road.points, 0.3), beyond], CTRL_APART));
+    roads.push(settle(road));
+    if (from.port) q.used = true;
     usedEdges.add(side);
     made++;
   }
@@ -769,48 +1194,70 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   for (const [k, plan] of plans.entries()) {
     for (const q of plan.ports) {
       if (q.used) continue;
-      const country = new Map<number, number>();
+      /** Country roads' cells out in the country, and which way the road runs there. */
+      const country = new Map<number, { road: number; t: Pt }>();
       roads.forEach((r, i) => {
-        if (r.kind === 'country') for (const p of r.points) if (plain(p)) country.set(land.cell(p[0], p[1]), i);
+        if (r.kind === 'country') r.points.forEach((p, j) => plain(p) && country.set(land.cell(p[0], p[1]), { road: i, t: tangent(r.points, j) }));
       });
       const others = plans.flatMap((o, a) => (a === k ? [] : o.ports.filter((x) => !x.used)));
-      const portAt = new Map(others.map((x) => [land.cell(x.p[0] + x.dir[0] * 8, x.p[1] + x.dir[1] * 8), x]));
-      const goal = (i: number) => country.has(i) || portAt.has(i) || edgeOf(i) >= 0;
+      const portAt = new Map(others.map((x) => [land.cell(x.p[0] + x.dir[0] * CELL, x.p[1] + x.dir[1] * CELL), x]));
+      // A country road met square to it (give or take an eighth of a turn), a port head on, the
+      // world's edge heading straight out of it; what lies off to the side or behind the port
+      // costs more (a road swinging round to it).
+      const meets = (i: number, h?: number) => {
+        const on = country.get(i);
+        if (on) return h === undefined || Math.abs(along(h, on.t)) < 0.75;
+        const port = portAt.get(i);
+        if (port) return into(port)(h);
+        const side = edgeOf(i);
+        return side >= 0 && (h === undefined || along(h, FACING[side]) > 0.9);
+      };
+      const banned = new Set<number>();
+      const goal = (i: number, h?: number) => (banned.has(i) || !meets(i, h) ? -1 : inFront(q, land.centre(i), AHEAD) ? 0 : ASIDE);
       // (Into the other areas only by their ports.)
       const cost = (strict: boolean) => {
-        const c = (strict ? roadCost : relaxedCost)(q.p, null);
+        const c = (strict ? roadCost : relaxedCost)([q.p]);
         return (i: number) => (areaBlock[i] && others.some((x) => dist(land.centre(i), x.p) < 26) ? 1 : c(i));
       };
-      const start = [land.cell(q.p[0] + q.dir[0] * 8, q.p[1] + q.dir[1] * 8)];
-      const cells = astar(gw, gd, cost(true), start, goal, () => 0) ?? astar(gw, gd, cost(false), start, goal, () => 0);
-      const end = cells?.[cells.length - 1];
-      if (!cells || end === undefined) {
+      const from: Way = { p: q.p, dir: q.dir, port: q };
+      // The nearest; if the road there turns too sharply or winds round, the nearest somewhere else.
+      let made: { road: RoadPlan; to?: Port; bad: number } | null = null;
+      for (let tries = 0; tries < TRIES && (!made || made.bad > 0); tries++) {
+        const cells = route(cost(true), cost(false), [from], goal, () => 0)?.cells;
+        const end = cells?.[cells.length - 1];
+        if (!cells || end === undefined) break;
+        const to = portAt.get(end);
+        const other = country.get(end)?.road;
+        let road: RoadPlan;
+        if (to) road = countryRoad(q, cells, to, ['join', 'join'], '');
+        else if (other !== undefined) {
+          // Into the other road square to it, ending on its middle.
+          // (Met from the side the way comes from: the last cell but one or two before it.)
+          const c = cells.length >= 3 ? land.centre(cells[cells.length - 3]) : q.p;
+          const pts = roads[other].points;
+          const at = nearest(pts, c[0], c[1]);
+          const T = pointAt(pts, at.s).p;
+          const n = leftOf(pointAt(pts, at.s).t);
+          road = countryRoad(q, cells.slice(0, -1), { p: T, dir: [n[0] * at.side, n[1] * at.side] }, ['join', 'join'], '');
+        } else {
+          const side = edgeOf(end);
+          const last = land.centre(end);
+          const beyond: Pt = [last[0] + [0, 40, 0, -40][side], last[1] + [-40, 0, 40, 0][side]];
+          road = countryRoad(q, cells, null, ['join', 'out'], '');
+          road.points = curve(evenly([...simplify(road.points, 0.3), beyond], CTRL_APART));
+        }
+        const bad = fault(road);
+        if (!made || bad < made.bad) made = { road, to, bad };
+        // (Not there again.)
+        const [ex, ez] = [end % gw, Math.floor(end / gw)];
+        for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) if (ex + dx >= 0 && ez + dz >= 0 && ex + dx < gw && ez + dz < gd) banned.add((ez + dz) * gw + ex + dx);
+      }
+      if (!made) {
         failed.push(`no country road on from ${plan.name}`);
         continue;
       }
-      const roadName = uniqueName(`${plan.name} Road`, `${plan.name} Lane`);
-      const to = portAt.get(end);
-      const other = country.get(end);
-      if (to) {
-        roads.push(countryRoad(q, cells, to, ['join', 'join'], roadName));
-        to.used = true;
-      } else if (other !== undefined) {
-        // Into the other road square to it, ending on its middle.
-        // (Met from the side the way comes from: the last cell but one or two before it.)
-        const c = cells.length >= 3 ? land.centre(cells[cells.length - 3]) : q.p;
-        const pts = roads[other].points;
-        const at = nearest(pts, c[0], c[1]);
-        const T = pointAt(pts, at.s).p;
-        const n = leftOf(pointAt(pts, at.s).t);
-        roads.push(countryRoad(q, cells.slice(0, -1), { p: T, dir: [n[0] * at.side, n[1] * at.side] }, ['join', 'join'], roadName));
-      } else {
-        const side = edgeOf(end);
-        const last = land.centre(end);
-        const beyond: Pt = [last[0] + [0, 40, 0, -40][side], last[1] + [-40, 0, 40, 0][side]];
-        const road = countryRoad(q, cells, null, ['join', 'out'], roadName);
-        road.points = curve([...simplify(road.points, 0.3), beyond]);
-        roads.push(road);
-      }
+      roads.push({ ...settle(made.road), name: uniqueName(`${plan.name} Road`, `${plan.name} Lane`) });
+      if (made.to) made.to.used = true;
       q.used = true;
     }
   }
@@ -869,9 +1316,33 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   const names: (string | undefined)[] = worldRoads.map((r) => r.name);
   const fronts = new Map<number, ReturnType<typeof frontageOf>>();
   const left: { u: Parameters<typeof lots.place>[0][number]; from: number }[] = [];
+  // Where each area road meets another (arc lengths along it): no lot's middle within `CORNER` m of
+  // one, so no driveway comes out right at a junction (a car turning out of it there swings across the corner).
+  const meets = new Map<number, number[]>();
+  const areaRoads = new Set(plans.flatMap((plan) => plan.roads));
+  for (const r of areaRoads) {
+    const ls = lengths(worldRoads[r].points);
+    meets.set(r, worldRoads[r].ends.flatMap((e, k) => (e === 'join' ? [k ? ls[ls.length - 1] : 0] : [])));
+  }
+  // (Where another road's end joins it, or another road runs by it, close enough to touch.)
+  const byRoad = new RoadIndex(worldRoads);
+  worldRoads.forEach((o, j) => {
+    for (const [x, z] of evenly(o.points, 2)) {
+      for (const [r, hit] of byRoad.around(x, z, 10)) {
+        if (r !== j && areaRoads.has(r) && hit.dist <= (o.width + worldRoads[r].width) / 2 + 2) meets.get(r)!.push(hit.s);
+      }
+    }
+  });
+  // (Nor on a tight bend: out of a driveway there a car swings off the road.)
+  const offCorners = (f: Frontage) => {
+    if (!(meets.get(f.road) ?? []).every((s) => Math.abs(f.s - s) >= CORNER)) return false;
+    const pts = worldRoads[f.road].points;
+    const [a, b] = [pointAt(pts, f.s - CORNER / 2).t, pointAt(pts, f.s + CORNER / 2).t];
+    return a[0] * b[0] + a[1] * b[1] >= Math.cos(TIGHT_BEND);
+  };
   for (const [a, plan] of plans.entries()) {
     const wanted = wantedLots(content, t, kind, plan.spec, rand, { park: a === 0, avoid: a === 0 ? [] : ['market'] });
-    fronts.set(a, frontageOf(worldRoads, plan.roads, plan.centre, rand));
+    fronts.set(a, frontageOf(worldRoads, plan.roads, plan.centre, rand).filter(offCorners));
     for (const u of lots.place(wanted, fronts.get(a)!, plan.greens, plan.centre, a, true)) left.push({ u, from: a });
     const streets = streetNames(content, kind, rand, plan.roads.length, [...takenNames, ...roadNames], plan.name);
     takenNames.push(...streets);

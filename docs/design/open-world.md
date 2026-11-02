@@ -59,6 +59,13 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
 - `roads: RoadPlan[]` (top level, for the sim; same objects as `meta.roads`). `RoadPlan.kind`:
   `'street'` (default) · `'lane'` · `'country'` (between areas) · `'trail'` (2 m, foot only).
   `RoadPlan.area`: index into `areas` (absent for country roads and trails between areas).
+  A Big world's country roads (`game/macro.ts`) leave an area by a street's end straight on, by
+  a T square off one of its streets or off a country road leaving it already, or run straight on
+  from one area to a street of the next; out in the country they never turn more than 70° over
+  40 m of their own line (`COUNTRY_TURN`: no hairpins; where two roads meet doesn't count),
+  checked by `tools/worlds/sample.ts`. Homes along them stand only where they run straight
+  (`BEND`), and an area's lots keep 18 m from its junctions and off its tight bends (`CORNER`,
+  `TIGHT_BEND`), so cars turn in and out on the paving.
   The sim builds its graph from the polylines: endpoints, plus joins snapped within
   `max(width) / 2 + 1` m of the other road's middle. A new world's roads (every size) are one
   network by that rule (`game/roads.ts` `connect`: lanes go on to another road; a court or two
