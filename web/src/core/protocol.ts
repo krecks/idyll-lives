@@ -926,7 +926,7 @@ export type GameSource = { lot: string; seed: number } | { save: string };
 export type SaveProblem = 'tooNew' | 'tooOld' | 'corrupt' | 'failed';
 
 export type ToWorker =
-  | { type: 'init'; content: string; source: GameSource }
+  | { type: 'init'; content: string; source: GameSource; /** The simulation's wasm, compiled once a page (`game/session.ts` `compileSim`); else the worker fetches it. */ module?: WebAssembly.Module }
   /** Only checks that a save opens (an imported file); answered with `checked`. */
   | { type: 'check'; content: string; save: string }
   | { type: 'command'; command: Command }
