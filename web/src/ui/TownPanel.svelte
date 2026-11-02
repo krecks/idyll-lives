@@ -47,6 +47,16 @@
   /** Screen pixels a metre: a size in pixels divided by this stays that size whatever the zoom. */
   const ppm = $derived(screenW / viewW);
   const px = (n: number) => n / ppm;
+  /**
+   * Where a label's middle goes (m): at `x`, `z`, or as far in from the map's edges as all of `text`
+   * at `size` px needs (its width guessed from its length): a place by the edge kept its name cut
+   * off there.
+   */
+  const labelX = (x: number, text: string, size: number) => {
+    const half = px(size * text.length * 0.31 + 4);
+    return Math.max(-MARGIN + half, Math.min(width + MARGIN - half, x));
+  };
+  const labelZ = (z: number, size: number) => Math.max(-MARGIN + px(size + 2), Math.min(depth + MARGIN - px(4), z));
 
   // ---- layers, worked out once per town ----
   const ZONE_ORDER = ['meadow', 'fields', 'hill', 'woods', 'water'];
@@ -191,9 +201,10 @@
             {/if}
             <!-- Names where there's room for them on screen (outdoor places always). -->
             {#if p.w * ppm > 46 || spots.has(p.id)}
-              <text x={p.x + p.w / 2} y={p.z + p.d / 2 + px(4)} font-size={px(11)} text-anchor="middle">{p.public ? p.name : hh ? `The ${hh.name}s` : 'Empty'}</text>
+              {@const name = p.public ? p.name : hh ? `The ${hh.name}s` : 'Empty'}
+              <text x={labelX(p.x + p.w / 2, name, 11)} y={labelZ(p.z + p.d / 2 + px(4), 11)} font-size={px(11)} text-anchor="middle">{name}</text>
               {#if homeCount(p.id) && p.w * ppm > 46}
-                <text class="count" x={p.x + p.w / 2} y={p.z + p.d / 2 + px(17)} font-size={px(9)} text-anchor="middle">{homeCount(p.id)} here</text>
+                <text class="count" x={labelX(p.x + p.w / 2, `${homeCount(p.id)} here`, 9)} y={labelZ(p.z + p.d / 2 + px(17), 9)} font-size={px(9)} text-anchor="middle">{homeCount(p.id)} here</text>
               {/if}
             {/if}
           </g>
@@ -202,7 +213,7 @@
           <circle class="dot" class:mine={d.mine} cx={d.x} cy={d.z} r={px(d.mine ? 4 : 3)} />
         {/each}
         {#each areas as a, i (i)}
-          <text class="area" x={a.x + a.w / 2} y={a.z + a.d / 2} font-size={px(14)} stroke-width={px(3)} text-anchor="middle">{a.name}</text>
+          <text class="area" x={labelX(a.x + a.w / 2, a.name, 14)} y={labelZ(a.z + a.d / 2, 14)} font-size={px(14)} stroke-width={px(3)} text-anchor="middle">{a.name}</text>
         {/each}
         {#if camera}
           <circle class="camera" cx={camera[0]} cy={camera[1]} r={px(7)} stroke-width={px(2)} />
