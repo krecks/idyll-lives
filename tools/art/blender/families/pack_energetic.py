@@ -67,7 +67,7 @@ M = G.Palette(
     blend_cab=('#DDEFE6', 'satin'),       # the cabinet; its main part
     blend_door=('#CDE6DA', 'satin'),
     plinth=('#B9C7C0', 'satin'),
-    worktop=('#F4F4F2', 'gloss'),
+    worktop=('#F4F4F2', 'gloss', {'roughness': 0.3}),
     chrome=('#D0D3D6', 'chrome'),
     motor=('#F2F2F0', 'gloss'),
     lime=('#8CC63F', 'gloss'),
@@ -640,7 +640,7 @@ def contrastShower():
     door = G.hinged(G.join(door, 'door'), F.at(DOOR_HALF, 0.09, 0.437))
     objs = G.settle()      # on its Model centre: the back on the wall face
     G.grow(rain, 'water_on', seconds=0.5)
-    G.swing(door, 'door_open', -95, seconds=0.8)
+    G.swing(door, 'door_open', -95, seconds=0.8, ease='back_out')
     return objs
 
 

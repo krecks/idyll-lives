@@ -8,7 +8,8 @@
 //     block-compressed (BC7/BC1, ETC2 or ASTC, whatever it has), 4-8x less memory than RGBA.
 //   models (.glb)           -> meshopt geometry (EXT_meshopt_compression, lossless on the
 //     already quantised data), embedded textures to KTX2 (KHR_texture_basisu); references to
-//     shared textures (the foliage atlas) point at their KTX2 copies.
+//     shared textures (the foliage atlas) point at their KTX2 copies. The baked shading (COLOR_0,
+//     a grey of 32 levels: gamekit/shade.py) goes from 16 bits or floats to 8, which keeps every level.
 //   character binaries      -> gzip (the browser inflates them; most hosts don't compress .bin).
 //
 // Outputs are cached by content hash in web/.assets/cache, so only changed files are encoded.
@@ -28,8 +29,8 @@ const CACHE = path.join(WEB, '.assets/cache');
 /** Copied into dist/assets by the build: `optimized.json` and the `opt/` tree. */
 export const OUT = path.join(WEB, '.assets/out');
 
-/** Bump when the encoding changes, so cached outputs are rebuilt. */
-const VERSION = 1;
+/** Bump a kind's when its encoding changes, so only its cached outputs are rebuilt. */
+const VERSION = { model: 2, texture: 1, gzip: 1 };
 
 /** Left as they are: not loaded by the game, or drawn in a way KTX2 can't (flipped on upload). */
 const SKIP = new Set([
@@ -73,13 +74,13 @@ function textureRole(rel) {
 export async function optimizeAssets({ force = false, jobs = Math.max(1, os.availableParallelism() - 1), log = console.log } = {}) {
   const started = performance.now();
   const files = walk(SRC).map((abs) => path.relative(SRC, abs).split(path.sep).join('/'));
-  const settings = JSON.stringify({ VERSION, KTX2, SKIP: [...SKIP] });
+  const settings = (kind) => JSON.stringify({ VERSION: VERSION[kind], KTX2, SKIP: [...SKIP] });
   const tasks = [];
   for (const rel of files) {
     const p = plan(rel);
     if (!p) continue;
     const bytes = fs.readFileSync(path.join(SRC, rel));
-    const key = createHash('sha256').update(settings).update(p.kind).update(p.role ?? '').update(bytes).digest('hex').slice(0, 24);
+    const key = createHash('sha256').update(settings(p.kind)).update(p.kind).update(p.role ?? '').update(bytes).digest('hex').slice(0, 24);
     const cached = path.join(CACHE, key + path.extname(p.out));
     // Only the gzip pass below reads the bytes again (the workers read their own file): keep no others.
     tasks.push({ rel, ...p, size: bytes.length, cached, ...(p.kind === 'gzip' ? { bytes } : {}) });
@@ -179,7 +180,7 @@ async function workerMain() {
   const { encodeToKTX2 } = await import(pathToFileURL(path.join(WEB, 'node_modules/ktx2-encoder/dist/node/index.js')).href);
   const { Logger, NodeIO } = await load('@gltf-transform/core');
   const { ALL_EXTENSIONS, EXTMeshoptCompression, KHRTextureBasisu } = await load('@gltf-transform/extensions');
-  const { reorder } = await load('@gltf-transform/functions');
+  const { quantize, reorder } = await load('@gltf-transform/functions');
   const { MeshoptEncoder } = await load('meshoptimizer');
   await MeshoptEncoder.ready;
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
@@ -229,6 +230,8 @@ async function workerMain() {
       doc.createExtension(KHRTextureBasisu).setRequired(true);
       for (const ext of root.listExtensionsUsed()) if (ext.extensionName === 'EXT_texture_webp') ext.dispose();
     }
+    // The baked shading (COLOR_0, a grey of 32 levels: gamekit/shade.py) from 16 bits to 8, which keep every level.
+    await doc.transform(quantize({ pattern: /^COLOR_0$/, quantizeColor: 8 }));
     // Vertex order that compresses (and caches) best, then meshopt over every buffer view. The
     // data is encoded as it is (no further quantisation): the foliage cards keep float attributes.
     await doc.transform(reorder({ encoder: MeshoptEncoder, target: 'size' }));

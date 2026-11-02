@@ -69,6 +69,7 @@ export interface MaterialOverride {
   finish?: string;
   /** sRGB hex: the finish colour, or (without `finish`) a multiplier on the file's base colour. */
   color?: string;
+  /** With `finish`, a plain finish's own roughness and metalness (0..1) in place of the finish's; without, the file material's. */
   roughness?: number;
   metallic?: number;
   /** Drop the meshes that use this material. */

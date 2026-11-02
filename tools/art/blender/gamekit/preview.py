@@ -1,8 +1,10 @@
 # Previews: Workbench renders for eyeballing a build (not part of the pipeline; previews/ is ignored by
-# git), and `lit` ones, lit and textured roughly as the game draws them. The game is the real check:
-# docs/design/objects.md, "Validation".
+# git), and `lit` ones, lit and textured roughly as the game draws them, and a `sheet` of each model: four sides,
+# the baked shading, and each clip at five points along it. The game is the real check: docs/design/objects.md,
+# "Validation". Faces are drawn from the front only, as the game draws them: one built inside out shows as a hole.
 import math
 import os
+import shutil
 
 import bpy
 from mathutils import Vector
@@ -14,21 +16,103 @@ from .parts import measure
 # Where `preview` looks from: (x, y, z) times the model's largest side, from its middle.
 VIEWS = {
     'three_quarter': (0.95, -1.05, 0.75),   # the front three-quarter (Blender -Y, the game's front), from the right
+    'back_three_quarter': (-0.95, 1.05, 0.75),   # the back three-quarter, from the left: the game turns things all four ways
     'side': (1.6, 0.0, 0.0),                # from its left (Blender +X; a bird's left, its wing.L)
     'front': (0.0, -1.6, 0.0),
     'top': (0.0, -0.0001, 1.6),             # straight down, its front at the bottom of the picture
 }
 
 
-def preview(path, view='three_quarter'):
-    """Renders the scene to `path` from the front three-quarter view (Blender -Y, the game's front), or another of
-    `VIEWS`."""
+def _workbench(path, view, size, light, color_type, shadows):
+    """A Workbench render of the scene to `path`, faces drawn from the front only (as the game draws them)."""
     scene = bpy.context.scene
     scene.render.engine = 'BLENDER_WORKBENCH'
-    scene.display.shading.light = 'STUDIO'
-    scene.display.shading.color_type = 'MATERIAL'
-    scene.display.shading.show_shadows = True
-    return _render(path, view)
+    shading = scene.display.shading
+    shading.light, shading.color_type, shading.show_shadows = light, color_type, shadows
+    shading.show_backface_culling = True
+    return _render(path, view, size=size)
+
+
+def preview(path, view='three_quarter', size=640):
+    """Renders the scene to `path` from the front three-quarter view (Blender -Y, the game's front), or another of
+    `VIEWS`, `size` pixels square."""
+    return _workbench(path, view, size, 'STUDIO', 'MATERIAL', True)
+
+
+def baked(path, size=640):
+    """Renders the baked shading alone (the `ao` colour, gamekit/shade.py: white open, darker in creases), unlit, to
+    `path` from the front three-quarter: where a crease shades a face all over, or a sliver triangle streaks it."""
+    return _workbench(path, 'three_quarter', size, 'FLAT', 'VERTEX', False)
+
+
+def _each_clip():
+    """[(clip, its last frame)] for each clip in turn, played on its own from rest; back to rest after."""
+    scene = bpy.context.scene
+    ends = {}
+    for _, name, end in motion.clips():
+        ends[name] = max(end, ends.get(name, 1))
+    try:
+        for clip, end in ends.items():
+            # back to rest first: a muted track leaves its part where it last put it
+            motion.solo(None)
+            scene.frame_set(1)
+            motion.solo(clip)
+            yield clip, end
+    finally:
+        motion.solo(None)
+        scene.frame_set(1)
+
+
+SHEET_VIEWS = ('three_quarter', 'back_three_quarter', 'side', 'top')
+SHEET_TILE = 320
+SHEET_ALONG = (0.0, 0.25, 0.5, 0.75, 1.0)
+
+
+def sheet(path):
+    """A contact sheet of the model to `path`, tiles `SHEET_TILE` square: the first row its four sides
+    (`SHEET_VIEWS`) and its baked shading (`baked`, so bake it first), then a row per clip, from the front
+    three-quarter at 0, 25, 50, 75 and 100 % of the way through it (a door through the cabinet half way, a lid
+    that closes past its rest), each clip on its own."""
+    scene = bpy.context.scene
+    work = path[:-4] + '.tiles'
+    os.makedirs(work, exist_ok=True)
+    try:
+        rows = [[preview(os.path.join(work, f'{v}.png'), v, SHEET_TILE) for v in SHEET_VIEWS]
+                + [baked(os.path.join(work, 'ao.png'), size=SHEET_TILE)]]
+        for clip, end in _each_clip():
+            row = []
+            for k, along in enumerate(SHEET_ALONG):
+                scene.frame_set(round(1 + along * (end - 1)))
+                row.append(preview(os.path.join(work, f'{clip}.{k}.png'), size=SHEET_TILE))
+            rows.append(row)
+        return _compose(rows, path)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def _compose(rows, path, gap=4):
+    """The PNGs of `rows` (lists of paths, tiles the same size) side by side, row under row, to `path`."""
+    import numpy as np
+    images = [[bpy.data.images.load(p) for p in row] for row in rows]
+    w, h = images[0][0].size
+    cols = max(len(r) for r in images)
+    out_w, out_h = cols * w + (cols - 1) * gap, len(images) * h + (len(images) - 1) * gap
+    canvas = np.ones((out_h, out_w, 4), dtype=np.float32)
+    for r, row in enumerate(images):
+        for c, im in enumerate(row):
+            px = np.empty(w * h * 4, dtype=np.float32)
+            im.pixels.foreach_get(px)
+            # (Blender's rows run bottom up: the first row of tiles goes at the top of the picture.)
+            y = out_h - (r + 1) * h - r * gap
+            canvas[y:y + h, c * (w + gap):c * (w + gap) + w] = px.reshape(h, w, 4)
+            bpy.data.images.remove(im)
+    out = bpy.data.images.new('sheet', out_w, out_h, alpha=True)
+    out.pixels.foreach_set(canvas.ravel())
+    out.filepath_raw = path
+    out.file_format = 'PNG'
+    out.save()
+    bpy.data.images.remove(out)
+    return path
 
 
 def lit(path, view='three_quarter'):
@@ -146,10 +230,10 @@ def _shaded(m):
     links.new(next(s for s in mix.outputs if s.identifier == 'Result_Color'), base)
 
 
-def _render(path, view, bounds=None):
+def _render(path, view, bounds=None, size=640):
     scene = bpy.context.scene
-    scene.render.resolution_x = 640
-    scene.render.resolution_y = 640
+    scene.render.resolution_x = size
+    scene.render.resolution_y = size
     scene.render.film_transparent = False
 
     lo, hi = bounds or (Vector(v) for v in measure())
@@ -158,7 +242,7 @@ def _render(path, view, bounds=None):
     loc = target + Vector(VIEWS[view]) * span
     cam = bpy.data.cameras.new('preview')
     cam.type = 'ORTHO'
-    cam.ortho_scale = span * (1.55 if view == 'three_quarter' else 1.15)
+    cam.ortho_scale = span * (1.55 if 'three_quarter' in view else 1.15)
     obj = bpy.data.objects.new('preview', cam)
     bpy.context.collection.objects.link(obj)
     obj.location = loc
@@ -178,15 +262,9 @@ def preview_clips(stem):
     middle of a clip that comes home: `spin`, `rock`), then goes back to rest."""
     scene = bpy.context.scene
     paths = []
-    for clip in dict.fromkeys(name for _, name, _ in motion.clips()):
-        # back to rest first: a muted track leaves its part where it last put it
-        motion.solo(None)
-        scene.frame_set(1)
-        motion.solo(clip)
+    for clip, _ in _each_clip():
         scene.frame_set(motion.peak(clip))
         paths.append(preview(f'{stem}@{clip}.png'))
-    motion.solo(None)
-    scene.frame_set(1)
     return paths
 
 

@@ -123,7 +123,8 @@
           "finish": "material.finish.gloss"
         },
         "lemon": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.4
         },
         "pastry": {
           "finish": "material.finish.satin"
@@ -237,7 +238,8 @@
           "finish": "material.finish.metal"
         },
         "marble": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.28
         },
         "vein": {
           "finish": "material.finish.gloss"

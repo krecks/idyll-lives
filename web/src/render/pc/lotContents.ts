@@ -24,10 +24,11 @@
  */
 
 import * as pc from './engine';
-import { Instances, INSTANCE_COLOR } from './instancing';
+import { Instances, INSTANCE_COLOR, type InstanceStream } from './instancing';
 import { ItemLayer } from './items';
 import { shadowOnlyLayer } from './layers';
 import { MaterialLibrary } from './materials';
+import { ATLAS_TILE_SEMANTIC, installGameChunks } from './shaders/chunks';
 import { buildModel, disposeTemplate, glowByInstance, type MirrorSurface, type ModelTemplate } from './models';
 import type { GrassPusher } from './grass';
 import { installNature, Landscape, NATURE_DIAGS, setWind, Sky, windStill, type RoadBuilder } from './nature';
@@ -44,6 +45,7 @@ import type { Lighting } from '../shared/environment';
 import { LOOK as CUT } from '../shared/geometry';
 import { compose, multiply, quatYawPitchRoll, type Quat } from '../shared/math';
 import { REST_PROPS } from '../shared/characters/actions';
+import { contactAtlas, type ContactShape } from '../shared/contactShadow';
 import { motionsOf, paintColors, painted, placementVariation, standInOf, type Motions } from '../shared/modelEntry';
 import { restPoses, slotOf } from '../shared/objectMotion';
 import type { TableRoom } from '../shared/tableTuck';
@@ -203,9 +205,11 @@ export class LotContents {
   /** The objects residents use this frame (screens are lit by it) and when that was. */
   private readonly screenOn = new Set<number>();
   private screenTime = 0;
-  /** Contact shadows under the objects: the blob and this world's draw of it. */
-  private readonly blob: { mesh: pc.Mesh; material: pc.StandardMaterial };
-  private blobs: Instances | null = null;
+  /** Contact shadows under the objects: their material (`objectShadowMaterial`, its opacity this world's atlas of their shapes) and this world's draw. */
+  private readonly shadowMaterial: pc.StandardMaterial;
+  private shadowDraw: Instances | null = null;
+  /** The shapes in the shadows' atlas now, in its order, and their tiles (`buildContactShadows`). */
+  private shadowAtlas: { shapes: ContactShape[]; rects: Float32Array[] } | null = null;
   /** Low's one sun-shadow caster for the objects' bodies (`QualitySettings.mergedObjectShadows`, `objectShadows.ts`); null on the others. */
   private readonly objectShadows: ObjectShadows | null;
   /** Lamps (and fires) switched off, by object id (the sim's `lampsOff`). */
@@ -236,7 +240,7 @@ export class LotContents {
     this.items = new ItemLayer(app, root, deps.assets, deps.content);
     this.templates = new TemplateCache(app);
     this.motion.setAmbientRange(quality.ambientRange);
-    this.blob = contactBlob(app);
+    this.shadowMaterial = objectShadowMaterial(app.graphicsDevice);
   }
 
   // --- the landscape -------------------------------------------------------------------
@@ -494,7 +498,7 @@ export class LotContents {
     if (colors && colorsKey(colors)) this.paintedTemplates.add(id);
     // Without its file, a box in its place, so it can still be seen and clicked, until the file comes
     // (`refreshModels`). Shaped by the first kind built with this model; no two kinds share one today.
-    return [id, () => buildModel(this.app, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { resize, standIn: standInOf(this.deps.content, def) })];
+    return [id, () => buildModel(this.app, key, painted(this.deps.assets.get(key, 'model'), colors), def?.footprint ?? [1, 1], { resize, standIn: standInOf(this.deps.content, def), contact: ['floor', 'surface'].includes(def?.layer ?? 'floor') })];
   }
 
   /** Cached template by key; marks it as used by the world being built. */
@@ -749,40 +753,69 @@ export class LotContents {
     this.hooks.shadowsMoved(true);
   }
 
-  /** Soft contact shadows under every object, sized to its footprint (one instanced draw). */
+  /**
+   * Soft contact shadows under the things on the floor or a top, each shaped like it (its template's `contact`, `objectTemplate`)
+   * and placed as it is: one instanced draw, each copy reading its tile of this world's atlas (`ATLAS_TILE`).
+   */
   private buildContactShadows(shown: readonly ObjectPlacement[]): void {
-    this.blobs?.destroy();
-    this.blobs = null;
+    this.shadowDraw?.destroy();
+    this.shadowDraw = null;
     if (!shown.length) return;
-    const v = this.view;
-    const blobs = new Float32Array(shown.length * 16);
+    const placed = new Map(this.placed.map((p) => [p.id, p]));
+    const draw = (this.shadowDraw = new Instances(this.app.graphicsDevice, this.root, contactBlob(this.app).mesh, this.shadowMaterial, { name: 'objectShadows', streams: [ATLAS_TILE], castShadows: false, receiveShadows: false, capacity: shown.length }));
+    const matrices = new Float32Array(shown.length * 16);
+    // Each shape's copies (each shape a tile of the atlas).
+    const byShape = new Map<ContactShape, number[]>();
+    const local = new Float32Array(16);
     shown.forEach((o, i) => {
       const k = i * 16;
-      const s = v.storeyOf(o.z);
-      const D = v.rowOf(s);
-      // Nothing on a wall, the ceiling or the floor's surface (rugs) sits on a contact shadow;
-      // things on a top get a small one there, the size of what they take on it.
-      const def = this.deps.content.object(o.def);
-      const layer = def?.layer ?? 'floor';
-      const flat = layer === 'floor' || layer === 'surface' ? 1 : 0;
-      const [sw, sd] = layer === 'surface' ? [this.deps.content.radius(def) * 2.3, this.deps.content.radius(def) * 2.3] : [o.w * 1.15, o.d * 1.15];
-      blobs[k] = sw * flat;
-      blobs[k + 5] = flat;
-      blobs[k + 10] = sd * flat;
-      const centre = objectCentre(o);
-      blobs[k + 12] = centre.x;
-      blobs[k + 13] = 0.018 + s * WALL_HEIGHT + (o.lift ?? 0);
-      blobs[k + 14] = centre.z - D;
-      blobs[k + 15] = 1;
+      const p = placed.get(o.id);
+      if (!p) {
+        matrices[k + 15] = 1;
+        return;
+      }
+      p.shadow = { meshes: [draw], matrices, index: i };
+      const at = p.pop.matrices.subarray(p.pop.index * 16, p.pop.index * 16 + 16);
+      // What has none (on a wall, the ceiling or the floor's surface, or drawing nothing): flat to nothing where it stands.
+      const shape = p.built?.template.contact;
+      if (!shape) {
+        matrices.set(at, k);
+        matrices.fill(0, k, k + 12);
+        return;
+      }
+      const copies = byShape.get(shape);
+      if (copies) copies.push(i);
+      else byShape.set(shape, [i]);
+      // The shape's rectangle of the model's floor, placed as the object is.
+      compose(shape.maxX - shape.minX, 1, shape.maxZ - shape.minZ, NO_TURN, (shape.minX + shape.maxX) / 2, CONTACT_LIFT, (shape.minZ + shape.maxZ) / 2, local);
+      multiply(local, at, matrices.subarray(k, k + 16));
     });
-    const draw = (this.blobs = new Instances(this.app.graphicsDevice, this.root, this.blob.mesh, this.blob.material, { name: 'objectShadows', castShadows: false, receiveShadows: false, capacity: shown.length }));
-    draw.setMatrices(blobs, shown.length);
+    draw.setMatrices(matrices, shown.length);
+    const shapes = [...byShape.keys()];
+    // (The same shapes as the last build, in the same order: its atlas as it is, not made and uploaded again.)
+    const last = this.shadowAtlas;
+    const same = !!last && !!this.shadowMaterial.opacityMap && last.shapes.length === shapes.length && last.shapes.every((s, n) => s === shapes[n]);
+    const atlas = same ? null : contactAtlas(shapes.map((shape) => shape.alpha));
+    const rects = atlas ? atlas.rects : last!.rects;
+    this.shadowAtlas = { shapes, rects };
+    [...byShape.values()].forEach((copies, tile) => copies.forEach((i) => draw.set(ATLAS_TILE, i, rects[tile])));
     draw.update();
-    const index = new Map(shown.map((o, i) => [o.id, i]));
-    for (const p of this.placed) {
-      const i = index.get(p.id);
-      if (i !== undefined) p.shadow = { meshes: [draw], matrices: blobs, index: i };
-    }
+    if (!atlas) return;
+    this.shadowMaterial.opacityMap?.destroy();
+    this.shadowMaterial.opacityMap = new pc.Texture(this.app.graphicsDevice, {
+      name: 'objectShadows',
+      width: atlas.width,
+      height: atlas.height,
+      format: pc.PIXELFORMAT_R8,
+      // (No mipmaps: the smaller levels would run the tiles into each other.)
+      mipmaps: false,
+      minFilter: pc.FILTER_LINEAR,
+      magFilter: pc.FILTER_LINEAR,
+      addressU: pc.ADDRESS_CLAMP_TO_EDGE,
+      addressV: pc.ADDRESS_CLAMP_TO_EDGE,
+      levels: [atlas.texels],
+    });
+    this.shadowMaterial.update();
   }
 
   /**
@@ -945,8 +978,8 @@ export class LotContents {
         draw.enabled = false;
       }
     }
-    this.blobs?.destroy();
-    this.blobs = null;
+    this.shadowDraw?.destroy();
+    this.shadowDraw = null;
     this.objectShadows?.clear();
     this.templatesInUse.clear();
     this.retireTemplates();
@@ -1193,6 +1226,8 @@ export class LotContents {
     this.items.dispose();
     this.sky.destroy();
     this.objectShadows?.destroy();
+    this.shadowMaterial.opacityMap?.destroy();
+    this.shadowMaterial.destroy();
   }
 
   /** Writes an object's copy anew (`write`): build mode's hand hides one and shows it again (`placing.ts`). */
@@ -1207,11 +1242,52 @@ export class LotContents {
   }
 }
 
+/** How far over the floor a contact shadow lies (m). */
+const CONTACT_LIFT = 0.018;
+const NO_TURN: Quat = [0, 0, 0, 1];
+
+/** An object's contact shadow's tile in the atlas (u, v, width, height: `ContactAtlas.rects`), per copy. */
+const ATLAS_TILE: InstanceStream = { semantic: ATLAS_TILE_SEMANTIC, components: 4 };
+
+/** A contact shadow's material: unlit and black, its opacity `map`'s `channel`, drawn over the floor without writing depth. */
+function shadowMaterial(name: string, map: pc.Texture | null, channel: string): pc.StandardMaterial {
+  const material = new pc.StandardMaterial();
+  material.name = name;
+  material.useLighting = false;
+  material.useSkybox = false;
+  material.diffuse.set(0, 0, 0);
+  material.emissive.set(0, 0, 0);
+  material.opacityMap = map;
+  material.opacityMapChannel = channel;
+  material.blendType = pc.BLEND_NORMAL;
+  material.depthWrite = false;
+  // (Its depth pulled towards the camera, off the floor it lies on.)
+  material.slopeDepthBias = -3;
+  material.cull = pc.CULLFACE_NONE;
+  material.update();
+  return material;
+}
+
+/**
+ * The objects' contact shadows' material: its opacity a world's atlas of their shapes (one byte a texel, set by
+ * `buildContactShadows`), each copy reading its own tile (`ATLAS_TILE`, through the game's `uv0VS`).
+ */
+function objectShadowMaterial(device: pc.GraphicsDevice): pc.StandardMaterial {
+  const material = shadowMaterial('objectShadow', null, 'r');
+  installGameChunks(material, device);
+  // (Unlit: none of the look.)
+  material.setDefine('GAME_LOOK', false);
+  material.setAttribute('game_atlasTile', ATLAS_TILE.semantic);
+  material.setDefine('GAME_ATLAS_TILE', '');
+  material.update();
+  return material;
+}
+
 const blobs = new WeakMap<pc.AppBase, { mesh: pc.Mesh; material: pc.StandardMaterial }>();
 
 /**
- * Soft round contact shadows (objects per world; residents per frame) from one radial
- * texture: a flat square, black, its alpha the texture's, drawn over the floor without writing depth.
+ * Soft round contact shadows (the residents', per frame) from one radial texture: a flat square, black, its
+ * alpha the texture's, drawn over the floor without writing depth. Its square is the objects' shadows' too.
  */
 export function contactBlob(app: pc.AppBase): { mesh: pc.Mesh; material: pc.StandardMaterial } {
   const known = blobs.get(app);
@@ -1228,20 +1304,7 @@ export function contactBlob(app: pc.AppBase): { mesh: pc.Mesh; material: pc.Stan
   ctx.fillRect(0, 0, 64, 64);
   const texture = new pc.Texture(device, { name: 'blob', width: 64, height: 64, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE });
   texture.setSource(canvas);
-  const material = new pc.StandardMaterial();
-  material.name = 'blobShadow';
-  material.useLighting = false;
-  material.useSkybox = false;
-  material.diffuse.set(0, 0, 0);
-  material.emissive.set(0, 0, 0);
-  material.opacityMap = texture;
-  material.opacityMapChannel = 'a';
-  material.blendType = pc.BLEND_NORMAL;
-  material.depthWrite = false;
-  // (Its depth pulled towards the camera, off the floor it lies on.)
-  material.slopeDepthBias = -3;
-  material.cull = pc.CULLFACE_NONE;
-  material.update();
+  const material = shadowMaterial('blobShadow', texture, 'a');
   // A 1 m square on the floor, u along +x and v along +z.
   const mesh = new pc.Mesh(device);
   mesh.setPositions([-0.5, 0, 0.5, 0.5, 0, 0.5, -0.5, 0, -0.5, 0.5, 0, -0.5]);

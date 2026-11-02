@@ -21,7 +21,7 @@ M = G.Palette(
     enamel=('#F4F3EF', 'gloss'),     # a white cooker body; the main part the player colours (`paint`)
     enamel2=('#EFE5D3', 'gloss'),    # a cream range cooker
     cab=('#EDEBE6', 'satin'),        # cabinet fronts (the oven tower, the hob counter)
-    worktop=('#E8E6E1', 'gloss'),    # a counter worktop
+    worktop=('#E8E6E1', 'gloss', {'roughness': 0.3}),    # a counter worktop
     dark=('#2B2C2E', 'satin'),       # oven fronts, plinths and control strips
     hob=('#1B1E22', 'gloss'),        # a ceramic/induction hob and an oven window (opaque, glossy black)
     glass=('#1D2228', 'glass'),      # the microwave's see-through window
@@ -513,7 +513,7 @@ def microwave():
         F.cyl('soup', 0.048, 0.004, (-0.12, 1.012, -0.26), M.fruit, verts=14)
     turn = G.join(parts, 'turntable', origin=F.at(-0.14, 0.978, -0.27))
     G.settle()
-    G.swing(door, 'door_open', -100, seconds=1.0, axis='Z')
+    G.swing(door, 'door_open', -100, seconds=1.0, axis='Z', ease='back_out')
     G.spin(turn, 'turntable', turns=1, seconds=2.0)
 
 

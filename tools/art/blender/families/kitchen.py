@@ -214,8 +214,8 @@ def fridge():
     freezer = G.join([freezer, *stock], 'door_freezer')
     door = G.join([door, *stock2], 'door_fridge')
     G.settle()   # where the game places it (`centre`), its back on the wall
-    G.swing(freezer, 'freezer_open', FREEZER_ANGLE, DOOR_SECONDS)
-    G.swing(door, 'fridge_open', FRIDGE_ANGLE, DOOR_SECONDS)
+    G.swing(freezer, 'freezer_open', FREEZER_ANGLE, DOOR_SECONDS, ease='back_out')
+    G.swing(door, 'fridge_open', FRIDGE_ANGLE, DOOR_SECONDS, ease='back_out')
 
 
 # --- the sinks ----------------------------------------------------------------------------------------
@@ -515,7 +515,7 @@ def _fridgeMini():
         _jar(Fm, 'door_jar', 0.07, 0.51, 0.205, 0.03, 0.08, M.egg, M.trim, verts=10)
     door = G.hinged(G.join(parts, 'door'), Fm.at(-0.29, 0.40, 0.27))
     G.settle()
-    G.swing(door, 'fridge_open', 100, seconds=1.6)
+    G.swing(door, 'fridge_open', 100, seconds=1.6, ease='back_out')
 
 
 def _fridgeBuiltIn():
@@ -606,8 +606,8 @@ def _fridgeBuiltIn():
         Fb.box('freezer_liner', 0.70, 0.52, 0.008, (0, 0.50, 0.284), M.liner)
     freezer = G.hinged(G.join(parts, 'freezer_door'), Fb.at(-0.39, 0.50, 0.30))
     G.settle()
-    G.swing(fridge_door, 'fridge_open', 100, seconds=DOOR_SECONDS)
-    G.swing(freezer, 'freezer_open', 100, seconds=DOOR_SECONDS)
+    G.swing(fridge_door, 'fridge_open', 100, seconds=DOOR_SECONDS, ease='back_out')
+    G.swing(freezer, 'freezer_open', 100, seconds=DOOR_SECONDS, ease='back_out')
 
 
 def _fridgeFrenchDoor():
@@ -704,8 +704,8 @@ def _fridgeFrenchDoor():
         Ff.box('peas', 0.13, 0.06, 0.2, (0.15, 0.166, -0.03), M.peas, bevel=0.015, bevel_segments=1)
     drawer = G.join(parts, 'drawer', origin=Ff.at(0, 0.38, 0.345))
     G.settle()
-    G.swing(door_left, 'fridge_open', 100, seconds=DOOR_SECONDS)
-    G.swing(door_right, 'fridge_open', -100, seconds=DOOR_SECONDS)
+    G.swing(door_left, 'fridge_open', 100, seconds=DOOR_SECONDS, ease='back_out')
+    G.swing(door_right, 'fridge_open', -100, seconds=DOOR_SECONDS, ease='back_out')
     G.swing(door_right, 'door_right', -100, seconds=DOOR_SECONDS)
     G.slide(drawer, 'freezer_open', (0, -0.35, 0), seconds=DOOR_SECONDS)
 
@@ -784,7 +784,7 @@ def _fridgeRetro():
     G.settle()
     G.attach(lever, door)
     G.swing(lever, 'lever', -30, seconds=LEVER_SECONDS, axis='X')   # its foot out to the front
-    G.swing(door, 'fridge_open', 100, seconds=DOOR_SECONDS)
+    G.swing(door, 'fridge_open', 100, seconds=DOOR_SECONDS, ease='back_out')
 
 
 # The retro mini fridge's die-cut unicorn sticker, drawn in the reference photo's pixels (1024² image,
@@ -998,7 +998,7 @@ def _fridgeMiniRetro():
         _unicorn(Fp, (-0.06, 0.44, front))
     door = G.hinged(G.join(parts, 'door'), Fp.at(-0.2775, 0.4525, front - 0.0225))
     G.settle()
-    G.swing(door, 'fridge_open', 100, seconds=1.6)
+    G.swing(door, 'fridge_open', 100, seconds=1.6, ease='back_out')
 
 
 def _wineFridge():
@@ -1042,7 +1042,7 @@ def _wineFridge():
         _wine_row(Fw, 'wine_rack', WINE_ROWS[-1], len(WINE_ROWS) - 1)
     rack = G.join(parts, 'wine_rack', origin=Fw.at(-0.22, WINE_ROWS[-1], -0.14))
     G.settle()
-    G.swing(door, 'door_open', 100, seconds=1.5)
+    G.swing(door, 'door_open', 100, seconds=1.5, ease='back_out')
     G.slide(rack, 'rack_out', (0, -0.15, 0), seconds=0.8)
 
 

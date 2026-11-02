@@ -286,7 +286,8 @@
           "finish": "material.finish.satin"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "motions": {

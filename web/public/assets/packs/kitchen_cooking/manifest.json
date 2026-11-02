@@ -263,7 +263,8 @@
           "finish": "material.finish.metal"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "motions": {
@@ -322,7 +323,8 @@
           "finish": "material.finish.gloss"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "motions": {
@@ -393,7 +395,8 @@
           "finish": "material.finish.metal"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "motions": {
@@ -462,7 +465,8 @@
           "finish": "material.finish.gloss"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "motions": {

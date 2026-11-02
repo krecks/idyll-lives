@@ -41,6 +41,7 @@ import type { ModelEntry, PrimitivePart, Vec3 } from '../../assets/types';
 import { compose, invert, multiply, transformPoint, translation, type Mat4, type Quat } from '../shared/math';
 import { CLIP_RATE, type ModelClip } from '../shared/modelClips';
 import { entrySpace, namedFinish, tintInName, type BoneName, type MaterialOverride, type ModelExtras, type Resize, type StandIn, type TintSlot } from '../shared/modelEntry';
+import { contactShape, type ContactShape } from '../shared/contactShadow';
 import { ModelFiles } from '../shared/modelFiles';
 import { deviceDestroyed } from './device';
 import {
@@ -97,6 +98,8 @@ export interface ModelTemplate {
   outline?: { minX: number; maxX: number; minZ: number; maxZ: number };
   /** Its moving parts (a file's animated nodes: a fridge's doors) and the clips that move them. */
   motion?: ModelMotion;
+  /** Its contact shadow's shape, at rest (`BuildOptions.contact`: things on the floor or a top; none without triangles). */
+  contact?: ContactShape;
   /**
    * What glows (materials with `glow`: a lamp's shade at night, a screen while it's watched): a copy
    * of those faces drawn added on top, per moving part (-1: the still body), off until the renderer
@@ -168,6 +171,8 @@ export interface BuildOptions {
    * where each node is at rest (a missing one at the origin); the file's own clips are left out.
    */
   parts?: readonly string[];
+  /** Work out its contact shadow's shape (`ModelTemplate.contact`): placed objects on the floor or a top. */
+  contact?: boolean;
 }
 
 export async function buildModel(app: pc.AppBase, name: string, entry: ModelEntry | undefined, footprint: [number, number], options: BuildOptions = {}): Promise<ModelTemplate> {
@@ -189,7 +194,7 @@ export async function buildModel(app: pc.AppBase, name: string, entry: ModelEntr
         continue;
       }
       try {
-        const template = buildGltf(app, name, entry, options.parts ? splitParts(file, options.parts) : file, footprint, options.resize);
+        const template = buildGltf(app, name, entry, options.parts ? splitParts(file, options.parts) : file, footprint, options);
         return failed.length ? { ...template, failed } : template;
       } catch (err) {
         // One that loads but can't be built won't build when tried again either: not `failed`.
@@ -200,7 +205,7 @@ export async function buildModel(app: pc.AppBase, name: string, entry: ModelEntr
   }
   // No file (the registry said so, once per key), it failed to load or to build: nothing, or the box
   // asked for. A cache keeps either; one whose file failed to load is built again when it comes.
-  const template: ModelTemplate = options.standIn ? { ...standIn(app, name, options.resize?.size ?? footprint, options.standIn, options.resize), boxed: true } : { meshes: [], tints: [], bones: [], height: 0 };
+  const template: ModelTemplate = options.standIn ? { ...standIn(app, name, options.resize?.size ?? footprint, options.standIn, options), boxed: true } : { meshes: [], tints: [], bones: [], height: 0 };
   return failed.length ? { ...template, failed } : template;
 }
 
@@ -222,6 +227,22 @@ function splitParts(file: LoadedFile, names: readonly string[]): LoadedFile {
   };
 }
 
+/** Contact shadows' shapes worked out from a file, by model and size (`fileContact`): its paint doesn't change them. */
+const contactShapes = new WeakMap<LoadedFile, Map<string, ContactShape | undefined>>();
+
+/**
+ * Model `name`'s contact shadow's shape at `resize`, from `file`'s geometry at rest (`pieces`: the moving parts
+ * at rest are in model space too, their draws starting where the body's are): worked out once, its painted
+ * copies sharing it.
+ */
+function fileContact(file: LoadedFile, name: string, resize: Resize | undefined, pieces: () => VData[]): ContactShape | undefined {
+  let byModel = contactShapes.get(file);
+  if (!byModel) contactShapes.set(file, (byModel = new Map()));
+  const key = `${name}|${JSON.stringify(resize ?? null)}`;
+  if (!byModel.has(key)) byModel.set(key, contactShape(pieces()));
+  return byModel.get(key);
+}
+
 /** Files whose failure has been warned about (once per file for the page). */
 const warnedFiles = new Set<string>();
 
@@ -231,7 +252,7 @@ const warnedFiles = new Set<string>();
  * for an item: food, a dish, something in a hand), a panel at eye height on the wall face, a block
  * hanging from the ceiling; taller as the player made it.
  */
-function standIn(app: pc.AppBase, name: string, [w, d]: [number, number], { layer, radius }: StandIn, resize?: Resize): ModelTemplate {
+function standIn(app: pc.AppBase, name: string, [w, d]: [number, number], { layer, radius }: StandIn, { resize, contact }: BuildOptions): ModelTemplate {
   // Its height as the player changed it, never flat or inside out (things shrink by up to a metre).
   const tall = (h: number) => Math.max(0.1, h + (resize?.tall ?? 0) / 100);
   const box = (size: Vec3, at: Vec3): PrimitivePart => ({ shape: 'box', size, at, color: '#B8B2AA' });
@@ -249,7 +270,7 @@ function standIn(app: pc.AppBase, name: string, [w, d]: [number, number], { laye
   groups.addPart(part, 0, 0);
   const { meshes, tints, bones } = groups.build(name);
   const { lo, hi } = partBox(part);
-  return { meshes, tints, bones, height: groups.height, bottom: groups.bottom, outline: { minX: lo[0], maxX: hi[0], minZ: lo[2], maxZ: hi[2] } };
+  return { meshes, tints, bones, height: groups.height, bottom: groups.bottom, outline: { minX: lo[0], maxX: hi[0], minZ: lo[2], maxZ: hi[2] }, contact: contact ? contactShape([partData(part, 0, 0, 1)]) : undefined };
 }
 
 /** Group key for parts drawn with the shared plain finish. */
@@ -269,10 +290,16 @@ class PartGroups {
     this.lib = MaterialLibrary.for(app);
   }
 
-  /** Vertex alpha and group finish for a finish key. */
-  finish(key: string): { alpha: number; group: string } {
+  /**
+   * Vertex alpha and group finish for a finish key. A plain finish takes the material's own roughness and metalness
+   * where its entry gives them (`own`: polished marble, not the mirror gloss is): they go in the vertex alpha, so it
+   * stays in the one shared draw.
+   */
+  finish(key: string, own?: { roughness?: number; metallic?: number }): { alpha: number; group: string; textured: boolean } {
     const info = this.lib.finishInfo(key);
-    return info.plain ? { alpha: encodeFinish(info.roughness, info.metallic), group: PLAIN } : { alpha: 1, group: key };
+    return info.plain
+      ? { alpha: encodeFinish(own?.roughness ?? info.roughness, own?.metallic ?? info.metallic), group: PLAIN, textured: false }
+      : { alpha: 1, group: key, textured: info.textured };
   }
 
   addPart(part: PrimitivePart, lod: 0 | 1, index: number): void {
@@ -906,10 +933,10 @@ function fileMaterial(app: pc.AppBase, lib: MaterialLibrary, material: pc.Standa
 }
 
 /** A template from a file read (`filesOf`); throws if the build fails, having let go of what it made. */
-function buildGltf(app: pc.AppBase, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], resize: Resize | undefined): ModelTemplate {
+function buildGltf(app: pc.AppBase, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], options: BuildOptions): ModelTemplate {
   const made: pc.Mesh[] = [];
   try {
-    return buildFromFile(app, name, entry, file, footprint, resize, made);
+    return buildFromFile(app, name, entry, file, footprint, options, made);
   } catch (err) {
     for (const mesh of made) mesh.destroy();
     throw err;
@@ -917,7 +944,7 @@ function buildGltf(app: pc.AppBase, name: string, entry: ModelEntry, file: Loade
 }
 
 /** `buildGltf`'s build; what it uploads goes into `made`. */
-function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], resize: Resize | undefined, made: pc.Mesh[]): ModelTemplate {
+function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], { resize, contact }: BuildOptions, made: pc.Mesh[]): ModelTemplate {
   const extras = entry as ModelEntry & ModelExtras;
   const fit = extras.fit;
   const [ox, oy, oz] = entry.offset ?? [0, 0, 0];
@@ -964,9 +991,9 @@ function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: L
       bottom = Math.min(bottom, boxes[i].lo[1]);
       const ov = overrideFor(source);
       if (ov?.finish) {
-        const finish = groups.finish(ov.finish);
+        const finish = groups.finish(ov.finish, ov);
         const base: [number, number, number] = source.material ? [source.material.diffuse.r, source.material.diffuse.g, source.material.diffuse.b] : [1, 1, 1];
-        groups.add(restyledData(data, base, ov, finish.alpha, full), tintInName(source.materialName), finish.group, null);
+        groups.add(restyledData(data, base, ov, finish.alpha, full, finish.textured), tintInName(source.materialName), finish.group, null);
         return;
       }
       const material = fileMaterial(app, lib, source.material, ov);
@@ -1019,6 +1046,8 @@ function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: L
       material: glowMaterial(app),
     },
   }));
+  // (The primitive parts drawn with the file shade the floor too: legs, a base.)
+  const shape = contact ? fileContact(file, name, resize, () => [...pieces.map((p) => p.data), ...(extras.parts ?? []).map((p, i) => partData(p, 0, i, 1))]) : undefined;
   return {
     meshes,
     tints,
@@ -1028,6 +1057,7 @@ function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: L
     outline,
     ...(mirrors.length ? { mirrors } : {}),
     ...(glows.length ? { glows } : {}),
+    contact: shape,
     // (A file's parts are what its clips move; `BuildOptions.parts` names its own, without clips.)
     ...(file.parts.length
       ? { motion: { parts, clips: buildClips(file.clips, space, shifts), names: file.parts.map((p) => p.name), rests: file.parts.map((p) => multiply(p.rest, space, new Float32Array(16)) as Float32Array) } }

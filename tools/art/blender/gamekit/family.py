@@ -8,9 +8,10 @@ import bpy
 
 from . import motion, parts, perch
 from .export import export_glb, materials_used, stats, write_pack
+from .far import decimated
 from .manifest import known_keys, played, write_centres  # the keys, `motions` and centres as the gate reads them
 from .parts import check_size, join
-from .preview import lit, preview, preview_clips, preview_perches
+from .preview import lit, preview, preview_clips, preview_perches, sheet
 from .shade import bake_ao
 from .scene import ASSETS, PREVIEWS, meshes, reset
 
@@ -51,6 +52,8 @@ class Model:
                  stays on its top: the fridge, 0.722 deep, takes (0, -0.069). Written into centres.json (the
                  middle too), for the gate only (`cargo check-glb`: centred there, and against the wall)
       floor      False for a thing on a wall: built at its real height, not stood on the floor
+      ground     whether the floor it stands on shades the foot of it (gamekit/shade.py); default: on the floor
+                 and not a bird. False for what isn't on the ground where it's seen (a held thing)
       sink       how far the model may reach below the floor (default 0), for the few the game sinks
                  (the woods' rock, the selection marker the game centres on a resident)
       code       True for a model the game draws by code, not for a content object or item (a held tool.*,
@@ -74,7 +77,8 @@ class Model:
     """
 
     def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, parts=None,
-                 centre=(0.0, 0.0), floor=True, far=None, sink=0.0, code=False, bird=None, habitat=None, draws=None):
+                 centre=(0.0, 0.0), floor=True, far=None, sink=0.0, code=False, bird=None, habitat=None, draws=None,
+                 ground=None):
         self.id, self.build, self.size, self.key = id, build, size, key
         self.tolerance, self.motions, self.paint = tolerance, motions, paint
         self.parts = parts
@@ -84,6 +88,7 @@ class Model:
         self.bird = bird
         self.habitat = habitat
         self.draws = draws
+        self.ground = (floor and not bird) if ground is None else ground
 
 
 class Family:
@@ -125,6 +130,8 @@ class Family:
           --only a,b         just these ids (the pack keeps the others' entries)
           --preview          render previews/<family>/<id>.png (and <id>@<clip>.png) instead of exporting
           --lit              with --preview: <id>.lit.png too, lit and textured as the game draws it
+          --sheet            with --preview: <id>.sheet.png too, its four sides, its baked shading and each
+                             clip at five points along it
           --no-pack          export without writing the pack
         """
         args = argv[argv.index('--') + 1:] if '--' in argv else []
@@ -157,9 +164,12 @@ class Family:
                 stem = os.path.join(PREVIEWS, self.name, model.id)
                 os.makedirs(os.path.dirname(stem), exist_ok=True)
                 preview(stem + '.png')
+                if '--lit' in args or '--sheet' in args:
+                    bake_ao(objs, ground=model.ground)
                 if '--lit' in args:
-                    bake_ao(objs)
                     lit(stem + '.lit.png')
+                if '--sheet' in args:
+                    sheet(stem + '.sheet.png')
                 preview_clips(stem)
                 print(f'[gamekit] previewed {self.key(model)} -> {stem}.png')
                 if perches:
@@ -170,7 +180,8 @@ class Family:
                     preview(stem + '.far.png')
                 continue
             clips = motion.clips(objs)
-            path = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.glb'), objs, clips=bool(clips))
+            path = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.glb'), objs, clips=bool(clips),
+                              ground=model.ground)
             self._check_motions(model, clips)
             entry = {'url': f'../../models/{self.name}/{model.id}.glb',
                      'materials': self.palette.finishes(materials_used(objs))}
@@ -193,7 +204,8 @@ class Family:
             if model.draws:
                 entry['draws'] = model.draws
             if model.far:
-                far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), self.make_far(model, objs))
+                far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), self.make_far(model, objs),
+                                 ground=model.ground)
                 entry['far'] = f'../../models/{self.name}/{model.id}.far.glb'
                 print(f'[gamekit] built its far version -> {os.path.relpath(far, ASSETS)}')
             entries[self.key(model)] = entry
@@ -223,18 +235,11 @@ class Family:
         for o in hidden:
             bpy.data.objects.remove(o, do_unlink=True)
         far = join([o for o in objs if o not in hidden], f'{model.id}_far', origin=(0, 0, 0))
-        # What stands on the floor is left whole: decimating it lifted things off the ground (a tractor's
-        # wheels 1.7 cm, a fountain's slab 4 cm) and pulled their feet in. The rest is decimated.
-        bottom = min(v.co.z for v in far.data.vertices) if far.data.vertices else 0.0
-        keep = far.vertex_groups.new(name='decimate')
-        keep.add([v.index for v in far.data.vertices if v.co.z > bottom + FAR_FEET], 1.0, 'REPLACE')
-        decimate = far.modifiers.new('far', 'DECIMATE')
-        decimate.ratio = model.far
-        decimate.vertex_group = 'decimate'
-        mesh = far.evaluated_get(bpy.context.evaluated_depsgraph_get()).to_mesh()
-        mesh.calc_loop_triangles()
-        print(f'[gamekit] {model.id}.far: {len(mesh.loop_triangles)} triangles ({model.far:.0%} kept)')
-        far.evaluated_get(bpy.context.evaluated_depsgraph_get()).to_mesh_clear()
+        # Its feet and outermost faces left whole, the rest decimated, faces the collapse turned round turned back
+        # (gamekit/far.py `decimated`).
+        decimated(far, model.far, feet=FAR_FEET)
+        far.data.calc_loop_triangles()
+        print(f'[gamekit] {model.id}.far: {len(far.data.loop_triangles)} triangles ({model.far:.0%} kept)')
         return [far]
 
     def _check_motions(self, model, clips):

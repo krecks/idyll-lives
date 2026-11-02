@@ -73,7 +73,7 @@ M = G.Palette(
     green_dark=('#4F8A45', 'satin'),
     stem=('#5C7A3A', 'satin'),
     # fruit, flowers and birds
-    tomato=('#D9483B', 'gloss'),
+    tomato=('#D9483B', 'gloss', {'roughness': 0.3}),
     carrot=('#F28C28', 'satin'),
     courgette=('#4F7D3A', 'satin'),
     pink=('#F28DB2', 'satin'),
@@ -855,7 +855,7 @@ def glasshouse():
         F.box('vent_glass', vl, 0.014, 2 * vz, (GW / 2 * t, HR - (HR - HW) * t + 0.025, 0), M.glass, rot=(0, -slope, 0))
     vent = G.hinged(G.join(vent, 'vent'), F.at(0.0, HR + 0.01, 0))
     objs = G.settle(centre=False)
-    G.swing(door, 'door_open', 70, seconds=0.9)
+    G.swing(door, 'door_open', 70, seconds=0.9, ease='back_out')
     G.swing(vent, 'vent_open', 25, seconds=0.9, axis='Y')
     return objs
 

@@ -483,7 +483,7 @@ def snackFridge():
         G.kit.pull(F, 'handle', x - w / 2 + 0.06, 0.2, z1 + 0.018, 0.16, M.chrome, r=0.007, out=0.0345, upright=True)
     door = G.hinged(G.join(door, 'door'), F.at(hx, 0.2, z1 + 0.003))
     objs = G.settle(centre=False)
-    G.swing(door, 'fridge_open', -100, seconds=0.9)
+    G.swing(door, 'fridge_open', -100, seconds=0.9, ease='back_out')
     return objs
 
 

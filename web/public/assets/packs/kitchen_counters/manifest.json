@@ -22,7 +22,8 @@
           "finish": "material.finish.metal"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "motions": {
@@ -69,7 +70,8 @@
           "finish": "material.finish.metal"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "motions": {
@@ -125,7 +127,8 @@
           "finish": "material.finish.gloss"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "paint": [
@@ -166,7 +169,8 @@
           "finish": "material.finish.satin"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         },
         "yellow": {
           "finish": "material.finish.satin"
@@ -207,7 +211,8 @@
           "finish": "material.finish.metal"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "motions": {
@@ -260,7 +265,8 @@
           "finish": "material.finish.gloss"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "paint": [
@@ -338,7 +344,8 @@
           "finish": "material.finish.satin"
         },
         "marble": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.28
         },
         "navy": {
           "finish": "material.finish.satin"
@@ -409,7 +416,8 @@
           "finish": "material.finish.gloss"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         },
         "yellow": {
           "finish": "material.finish.satin"
@@ -467,7 +475,8 @@
           "finish": "material.finish.gloss"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         },
         "yellow": {
           "finish": "material.finish.satin"
@@ -544,7 +553,8 @@
           "finish": "material.finish.gloss"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "motions": {
@@ -860,7 +870,8 @@
           "finish": "material.finish.metal"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "motions": {
@@ -894,7 +905,8 @@
           "finish": "material.finish.satin"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "paint": [
@@ -922,7 +934,8 @@
           "finish": "material.finish.metal"
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "paint": [
