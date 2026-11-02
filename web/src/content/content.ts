@@ -471,7 +471,8 @@ export interface RoofColorDef {
 export interface FenceStyleDef {
   id: string;
   label: string;
-  kind: 'picket' | 'rails' | 'slats' | 'iron' | 'stone';
+  /** `hedge`: a clipped hedge, drawn from the hedge model (no posts; a gate in it a wooden one). */
+  kind: 'picket' | 'rails' | 'slats' | 'iron' | 'stone' | 'hedge';
   color: string;
   /** Height in metres. */
   height?: number;

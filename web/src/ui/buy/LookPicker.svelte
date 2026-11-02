@@ -207,6 +207,9 @@
           {:else if f.kind === 'iron'}
             <path d="M0 {top + 4}h30M0 32h30" stroke={f.color} stroke-width="1.4" />
             {#each [3, 7, 11, 15, 19, 23, 27] as x (x)}<path d="M{x} 33V{top + 1}" stroke={f.color} stroke-width="1" /><circle cx={x} cy={top} r="1" fill={f.color} />{/each}
+          {:else if f.kind === 'hedge'}
+            <rect x="1" y={top + 1} width="28" height={33 - top} rx="4" fill={f.color} />
+            {#each [5, 12, 19, 26] as x (x)}<circle cx={x} cy={top + 3} r="3.4" fill={f.color} /><circle cx={x - 2} cy={top + 9} r="1.6" fill="#000" fill-opacity=".14" />{/each}
           {:else}
             <rect x="0" y={top} width="30" height={34 - top} rx="1" fill={f.color} />
             <path d="M0 {top + 5}h30M10 {top}v5M22 {top + 5}v5M5 {top + 5}v{29 - top}" stroke="#000" stroke-opacity=".18" stroke-width=".8" />

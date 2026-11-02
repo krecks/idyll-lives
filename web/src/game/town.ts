@@ -24,6 +24,7 @@ import { householdFunds, savingsOf } from './wealth';
 import { extend, streetNames, WORLDS, worldName, worldTagline, type SizeSpec, type WorldKind } from './world';
 import { generateBigWorld, type OpenWorldDraft } from './macro';
 import { garageFor } from '../render/shared/cars';
+import { fenceRuns, townFences, type TownFence } from './gardenFences';
 
 export type Wall = [number, number, number, number];
 export interface Door {
@@ -217,6 +218,8 @@ export interface TownMeta {
   world?: WorldLook;
   /** The menus' preview only (`previewWorld`): the plot drawn as the player's house. */
   home?: number | null;
+  /** See `WorldMeta.gardenFences`. */
+  gardenFences?: boolean;
   /** Big worlds (docs/design/open-world.md). */
   zones?: WorldMeta['zones'];
   pads?: WorldMeta['pads'];
@@ -1041,6 +1044,8 @@ export interface TownLayout {
   storeys: number;
   /** Whether a house has a basement: then basements are on the block of rows after the storeys', `storeys * depth ..`. */
   basement: boolean;
+  /** Garden fences, hedges and farm field fences on the ground storey (`gardenFences.ts`). */
+  fences: TownFence[];
 }
 
 /**
@@ -1113,6 +1118,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
   });
   const storeys = Math.max(1, ...plots.map((p) => p.storeys));
   let basement = false;
+  const driveOf = new Map<number, Rect>();
   for (const s of town.slots) {
     if (s.kind !== 'house') {
       const place = placeOf(s);
@@ -1150,6 +1156,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     const drive = driveway(h, pw, pd, footprint);
     if (!drive) continue;
     paths.push(turnOnto(t, s).rect(drive));
+    driveOf.set(s.index, turnOnto(t, s).rect(drive));
     verge(s, drive);
     drives.push({ plot: s.index, inner: turnOnto(t, s).point([drive.x + drive.w / 2, drive.d]), street: turnOnto(t, s).point([drive.x + drive.w / 2, 0]), facing: s.facing });
     // A garage at its inner end, clear of what's in the garden (as the street draws it): laid out
@@ -1170,7 +1177,66 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       garages.push({ plot: s.index, x0: r.x, z0: r.z, x1: r.x + r.w, z1: r.z + r.d });
     }
   }
-  return { walls, doors, windows, objects, paths, fields, garages, drives, plots, facing: town.slots.map((s) => s.facing), storeys, basement };
+  const fences = gardenFencesOf(content, town, { walls, objects, paths, fields, garages, plots }, driveOf);
+  return { walls, doors, windows, objects, paths, fields, garages, drives, plots, facing: town.slots.map((s) => s.facing), storeys, basement, fences };
+}
+
+/** The town's garden fences, hedges and field fences (`gardenFences.ts`), from its layout (the player's lot's too: theirs to change). */
+function gardenFencesOf(
+  content: Content,
+  town: NeighbourhoodDraft,
+  layout: Pick<TownLayout, 'walls' | 'objects' | 'paths' | 'fields' | 'garages' | 'plots'>,
+  driveOf: ReadonlyMap<number, Rect>,
+): TownFence[] {
+  const D = town.depth;
+  // Wall edges on the ground storey (and the edges in front of things, below): no fence there. Each
+  // plot's house: its walls' box there (sim-core `house_bounds`).
+  const walls = new Set<string>();
+  for (const [x0, z0, x1, z1] of layout.walls) {
+    if (Math.max(z0, z1) > D) continue;
+    if (z0 === z1) for (let x = Math.min(x0, x1); x < Math.max(x0, x1); x++) walls.add(`h:${x}:${z0}`);
+    else for (let z = Math.min(z0, z1); z < Math.max(z0, z1); z++) walls.add(`v:${x0}:${z}`);
+  }
+  const houseIn = (r: Rect): [number, number, number, number] | null => {
+    let box: [number, number, number, number] | null = null;
+    for (const [x0, z0, x1, z1] of layout.walls) {
+      if (Math.max(z0, z1) > D || Math.min(x0, x1) < r.x || Math.max(x0, x1) > r.x + r.w || Math.min(z0, z1) < r.z || Math.max(z0, z1) > r.z + r.d) continue;
+      const [ax, az, bx, bz] = [Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1)];
+      box = box ? [Math.min(box[0], ax), Math.min(box[1], az), Math.max(box[2], bx), Math.max(box[3], bz)] : [ax, az, bx, bz];
+    }
+    return box;
+  };
+  // What stands on the ground (not a rug, nor what hangs on a wall or stands on a top), and the garages.
+  const blockers: (Rect & { use?: boolean })[] = layout.garages.map((g) => ({ x: g.x0, z: g.z0, w: g.x1 - g.x0, d: g.z1 - g.z0 }));
+  for (const o of layout.objects) {
+    if (o.z >= D) continue;
+    const def = content.object(o.def);
+    if (def?.layer && def.layer !== 'floor') continue;
+    const [fw, fd] = def?.footprint ?? [1, 1];
+    const [w, d] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
+    blockers.push({ x: o.x, z: o.z, w, d, use: !!def?.interactions?.length });
+    // Nor between a thing and the tiles in front of it (sim-core: no fence between it and where it's
+    // used from), nor round one set off its tile's middle.
+    const sides: ['h' | 'v', number, number, number][] = [
+      ['h', o.z + d, o.x, w],
+      ['v', o.x + w, o.z, d],
+      ['h', o.z, o.x, w],
+      ['v', o.x, o.z, d],
+    ];
+    for (const [k, [axis, line, from, n]] of sides.entries()) {
+      if (k !== o.rot % 4 && !o.offset) continue;
+      for (let i = 0; i < n; i++) walls.add(axis === 'h' ? `h:${from + i}:${line}` : `v:${line}:${from + i}`);
+    }
+  }
+  const plots = town.slots.map((s, i) => {
+    const rect = layout.plots[i];
+    const home = s.kind === 'house';
+    const g = layout.garages.find((g) => g.plot === s.index);
+    const garage = g ? { x: g.x0, z: g.z0, w: g.x1 - g.x0, d: g.z1 - g.z0 } : null;
+    return { rect, facing: s.facing, house: home ? houseIn(rect) : null, home, drive: driveOf.get(s.index) ?? null, garage, fenced: true };
+  });
+  const roads = roadIndex(town.roads);
+  return townFences({ plots, fields: layout.fields, walls, blockers, paths: layout.paths, onRoad: (x, z) => roads.onRoad(x, z) });
 }
 
 /** What the renderer needs to know about a town's world (it survives save/load in `meta`). */
@@ -1199,7 +1265,7 @@ export function assembleTown(
   playerSlot: number,
   { existing = false, mode = 'living', lifespan = 'normal' }: AssembleOptions = {},
 ): string {
-  const { walls, doors, windows, objects, paths, fields, garages, drives, plots, facing, storeys, basement } = layoutTown(content, t, town, playerSlot, existing ? undefined : player);
+  const { walls, doors, windows, objects, paths, fields, garages, drives, plots, facing, storeys, basement, fences } = layoutTown(content, t, town, playerSlot, existing ? undefined : player);
   const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
 
   if (existing && !town.households.some((h) => h.slot === playerSlot)) throw new Error('Nobody lives in that house.');
@@ -1249,7 +1315,7 @@ export function assembleTown(
     }
   }
 
-  const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths, facing, seed: town.seed ?? (Math.random() * 2 ** 31) >>> 0, world: worldLook(town, fields) };
+  const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths, facing, seed: town.seed ?? (Math.random() * 2 ** 31) >>> 0, world: worldLook(town, fields), gardenFences: true };
   const open = openWorldFields(town, drives);
   if (open.meta) Object.assign(meta, open.meta);
   // Residents leave town (for work) where its roads lead out of it (in a big world, also from its bus stops).
@@ -1268,6 +1334,7 @@ export function assembleTown(
     walls,
     doors,
     windows,
+    fences: fenceRuns(fences),
     objects,
     plots: filed,
     households,
