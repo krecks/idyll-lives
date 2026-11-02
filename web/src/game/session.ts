@@ -16,7 +16,8 @@ import { BENCH } from '../debug/benchFlags';
 import { tileWorld } from '../debug/tileWorld';
 import { benchBigWorld } from '../debug/bigTown';
 import { recentLog } from '../debug/log';
-import { deliverReport, gpuInfo, takePendingPose, within, type DebugReport } from '../debug/report';
+import { deliverReport, gpuInfo, takePendingPose, type DebugReport } from '../debug/report';
+import { within } from '../core/async';
 import { plainState } from '../debug/snapshot.svelte';
 import { liveSims } from '../debug/sims';
 import { threadStats } from '../debug/threads';
@@ -25,9 +26,10 @@ import { createItemPreviews } from '../render/preview/items';
 import type { CameraPose, Renderer, WallMode } from '../render/types';
 import { settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
-import { services, type GameControls } from '../ui/services';
+import { prefetchCatalog, services, type GameControls } from '../ui/services';
 import { game, nextWallMode, toast } from '../ui/state.svelte';
 import { saveDebugReport } from '../ui/debugReport';
+import { lotInSentence } from '../ui/place';
 import { ideaToasts } from '../ui/planner/ideaToasts';
 import { aboutUs } from '../ui/story';
 import { BubbleLayer } from './bubbles';
@@ -47,6 +49,7 @@ import { PointerInput, routeKey } from './input';
 import { useTownContent, type NeighbourhoodDraft } from './town';
 import { townJob } from './townJobs';
 import { gameAssetPlan, parseAheadFiles, streamRanks } from './streamPlan';
+import { GameSpeed } from './speed';
 import { perfEnd, perfPhase, perfStart, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
@@ -217,9 +220,7 @@ export async function startSession(
     const made = await perfTimeAsync('session: assembleTown', () =>
       townJob(content, { kind: 'assemble', town: request.town, player: request.household, slot: request.slot, options: { existing: request.existing, mode: request.mode, lifespan: request.lifespan }, random: (Math.random() * 2 ** 32) >>> 0 }),
     );
-    if (made.kind !== 'assemble') throw new Error('The town file could not be made.');
-    const lot = made.lot;
-    source = { lot, seed: Number(params.get('seed')) || (Math.random() * 2 ** 31) >>> 0 };
+    source = { lot: made.lot, seed: Number(params.get('seed')) || (Math.random() * 2 ** 31) >>> 0 };
     household = request.household.name.trim();
     gameId = crypto.randomUUID();
   } else {
@@ -235,7 +236,7 @@ export async function startSession(
   // the birds) downloads while the simulation starts; the house's own things come with its world.
   void prefetchNow(gameAssetPlan(content, assets, { objects: [] }, null).home);
   // (Not for long: a download that hangs is the worker's to notice, `SimBridge.start`.)
-  const simWasm = await Promise.race([compileSim(), new Promise<null>((resolve) => setTimeout(() => resolve(null), SIM_COMPILE_WAIT_MS))]);
+  const simWasm = await within(compileSim(), SIM_COMPILE_WAIT_MS, null);
   // (Paused from the first step: the clock is held until the player enters the game.)
   const bridge = await perfTimeAsync('session: SimBridge.start', () => SimBridge.start(content.json, source, 0, simWasm)).catch(async (err: unknown) => {
     // A save the game can't open is set aside (kept if it's from a newer version, else removed).
@@ -254,8 +255,6 @@ export async function startSession(
     return bridge.frame(performance.now());
   };
   progress('Building the world', 0.3);
-  // Hold the clock until the player actually enters the game.
-  bridge.send({ type: 'setSpeed', speed: 0 });
   let resumeSpeed: number | null = null;
   let revealed = false;
   let warmed = false;
@@ -291,7 +290,7 @@ export async function startSession(
     report('Building the street', 0);
     await perfTimeAsync('session: street streamed', () => renderer.streamSettled(STREAM_WAIT_MS));
     report('Loading textures', 0.5);
-    await perfTimeAsync('session: textures', () => Promise.race([renderer.texturesReady(), new Promise((resolve) => setTimeout(resolve, TEXTURES_WAIT_MS))]));
+    await perfTimeAsync('session: textures', () => within(renderer.texturesReady(), TEXTURES_WAIT_MS, undefined));
   };
   /** `?debug`'s `__crash('render')`: every frame fails. */
   let failFrames = false;
@@ -299,7 +298,6 @@ export async function startSession(
   let world: WorldStructure | null = null;
   /** The lot the last world structure showed (edit feedback compares worlds of the same lot). */
   let worldView: number | null = null;
-  let lastSpeed = 1;
   let focused = false;
   let viewPlot: number | null = null;
   // `?bench=bigworld`: a real Big world for the renderer, made in the page, and its focus lot.
@@ -430,27 +428,18 @@ export async function startSession(
     hudTimer = setTimeout(() => (game.hudAwake = false), HUD_AWAKE_MS);
   };
   /**
-   * Time stands still in Build and Create, and while a menu is open (`setMenuPause`): the player's
-   * speed is held once, however many of them hold it, and given back when none does. (Two holds
-   * kept apart gave back each other's 0: Build left behind the pause menu ran the world under
-   * "Paused", and Live came back stuck at a standstill.)
+   * The player's speed, held at 0 while the game loads, in Build and Create, and while a menu is
+   * open (`setMenuPause`): given back when nothing holds it any more.
    */
-  let heldSpeed: number | null = null;
-  let menuHolds = false;
-  function holdTime() {
-    if (heldSpeed !== null) return;
-    heldSpeed = game.speed;
-    bridge.send({ type: 'setSpeed', speed: 0 });
-    game.speed = 0;
-  }
-  function releaseTime() {
-    if (heldSpeed === null || menuHolds || game.mode !== 'live') return;
-    const speed = heldSpeed;
-    heldSpeed = null;
-    if (speed > 0) lastSpeed = speed;
-    bridge.send({ type: 'setSpeed', speed });
-    game.speed = speed;
-  }
+  const speed = new GameSpeed((running) => {
+    bridge.send({ type: 'setSpeed', speed: running });
+    game.speed = running;
+  });
+  /**
+   * The catalog's pictures are drawn ahead of time in Build and Create, not in Live's frames
+   * (`holdAhead`). A house nobody lives in opens on the catalog: they're drawn behind its loading screen.
+   */
+  const catalogAhead = () => services.items.holdAhead(revealed ? game.mode === 'live' : game.occupied);
   let autosaveTimer: ReturnType<typeof setInterval> | undefined;
   let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
   /** The viewed house's files (the second loading screen); made once, on the first built view. */
@@ -464,11 +453,12 @@ export async function startSession(
    * first) are read in idle moments once downloaded: a lot the camera settles on next is built from
    * them without reading each file in the frame that needs it.
    */
-  const readAhead = () => {
+  const readAhead = (ranks?: ReadonlyMap<string, number>) => {
     if (!revealed || disposed || !world) return;
-    const p = viewPlot === null ? null : world.plots[viewPlot];
-    renderer.parseAhead(parseAheadFiles(content, assets, world, p ? { x: p.x, z: p.z, w: p.w, d: p.d } : null, watched));
+    renderer.parseAhead(parseAheadFiles(content, assets, world, ranks ?? fileRanks(world)));
   };
+  /** How soon each of the town's model files is wanted, by the lot in view and where the camera looks (`streamRanks`). */
+  const fileRanks = (w: WorldStructure) => streamRanks(content, assets, w, viewPlot === null ? null : (w.plots[viewPlot] ?? null), watched);
   let autosaveMinutes = -1;
   /** The performance overlay setting last applied (F3 opens and closes the overlay in between). */
   let showFps: boolean | null = null;
@@ -480,18 +470,15 @@ export async function startSession(
   let autonomy: boolean | null = params.has('state') ? settings.autonomy : null;
 
   const controls: GameControls = {
-    setSpeed(speed) {
+    setSpeed(to) {
       // Time stands still in Build and Create.
       if (game.mode !== 'live') return;
-      speed = Math.max(0, Math.min(MAX_SPEED, speed));
-      if (speed > 0) lastSpeed = speed;
       slowedFrom = null;
-      // Under a menu: the speed it gives back.
-      if (heldSpeed !== null) return void (heldSpeed = speed);
-      bridge.send({ type: 'setSpeed', speed });
+      // (Under a menu: the speed it gives back.)
+      speed.choose(Math.max(0, Math.min(MAX_SPEED, to)));
     },
     togglePause() {
-      controls.setSpeed(game.speed === 0 ? lastSpeed : 0);
+      controls.setSpeed(game.speed === 0 ? speed.last : 0);
     },
     selectSim(id) {
       if (!playerSims().includes(id)) return;
@@ -618,8 +605,8 @@ export async function startSession(
       // The view goes along with them (Esc lets go).
       if (game.mode === 'live' && who) {
         controls.follow(who.id);
-        const hosts = game.households.find((h) => h.plot === plot && !game.plots[plot]?.public);
-        toast(`${who.name} is on the way to ${hosts ? `the ${hosts.name}s` : (game.plots[plot]?.name ?? 'visit')}.`);
+        const p = game.plots[plot];
+        toast(`${who.name} is on the way to ${p ? lotInSentence(p, game.households) : 'visit'}.`);
       }
     },
     goHome() {
@@ -687,19 +674,18 @@ export async function startSession(
       game.eyedropper = false;
       game.pickHint = null;
       game.mode = mode;
-      // (The catalog's pictures are drawn ahead of time in Build and Create, not in Live's frames.)
-      services.items.holdAhead(mode === 'live');
+      catalogAhead();
       refreshRoomOverlay();
       play(mode === 'live' ? 'close' : fromLive ? 'open' : 'tab');
       game.menu = null;
       game.socialMenu = null;
       // Build and Create pause the game (and close Live's panels); back in Live the speed returns.
+      speed.hold('build', mode !== 'live');
       if (mode !== 'live') {
-        holdTime();
         game.townOpen = false;
         game.jobBoardOpen = false;
         game.plannerOpen = false;
-      } else releaseTime();
+      }
       // Building happens at home, with the walls down so the floor plan is visible.
       const home = buildBuy.home();
       if (mode !== 'live' && home && viewPlot !== home.id) showPlot(home.id);
@@ -1065,7 +1051,7 @@ export async function startSession(
   const store = async (name: string, id: string, autosave: boolean): Promise<string> => {
     const picture = document.hidden
       ? Promise.resolve(null)
-      : Promise.race([perfTimeAsync('save: picture', () => renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height)), new Promise<null>((resolve) => setTimeout(resolve, THUMBNAIL_WAIT_MS, null))]);
+      : within(perfTimeAsync('save: picture', () => renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height)), THUMBNAIL_WAIT_MS, null);
     const [data, taken] = await Promise.all([perfTimeAsync('save: data', () => bridge.requestSave()), picture]);
     thumbnail = taken ?? thumbnail;
     const record: SaveRecord = {
@@ -1288,10 +1274,10 @@ export async function startSession(
         // A house nobody lives in opens on the catalog: its pictures (mostly drawn in the menus, and
         // kept) are drawn now, behind the loading screen, rather than as it opens.
         if (!game.occupied && !BENCH && !disposed) {
-          services.items.holdAhead(false);
-          services.items.prefetch(content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
+          catalogAhead();
+          prefetchCatalog();
         }
-        return perfTimeAsync('session: portraits', () => Promise.race([portraits, new Promise((resolve) => setTimeout(resolve, PORTRAIT_WAIT_MS))]));
+        return perfTimeAsync('session: portraits', () => within(portraits ?? Promise.resolve(), PORTRAIT_WAIT_MS, undefined));
       })
       .then(() => {
         progress('Ready', 1);
@@ -1375,10 +1361,9 @@ export async function startSession(
     if (world?.meta?.world?.size === 'big') bridge.setWatch(rect);
     watched = { x: rect[0], z: rect[1], w: rect[2] - rect[0], d: rect[3] - rect[1] };
     if (!world) return;
-    const p = viewPlot === null ? null : world.plots[viewPlot];
-    const ranks = streamRanks(content, assets, world, p ? { x: p.x, z: p.z, w: p.w, d: p.d } : null, watched);
+    const ranks = fileRanks(world);
     reprioritize((url) => ranks.get(url) ?? Infinity);
-    readAhead();
+    readAhead(ranks);
   });
   controls.setWallMode(game.wallMode);
 
@@ -1572,19 +1557,20 @@ export async function startSession(
       if (e.key === ' ' || e.key === 'Tab' || e.key === 'F3' || e.key === 'F8') e.preventDefault();
       return;
     }
-    // Escape closes the pause menu first, whatever is behind it (it must not act on what the menu covers).
-    if (e.key === 'Escape' && game.pauseMenu && !app.overlay) {
-      game.pauseMenu = false;
+    // Escape closes the pause menu first, whatever is behind it (it must not act on what the menu
+    // covers); a window over the menu (its settings) closes itself. Past here Escape has no pause menu to mind.
+    if (e.key === 'Escape' && game.pauseMenu) {
+      if (!app.overlay) game.pauseMenu = false;
       return;
     }
     // The colour studio: its keys are its own (Escape closes it, as Cancel).
     if (game.customising) {
-      if (e.key === 'Escape' && !game.pauseMenu) game.customising = null;
+      if (e.key === 'Escape') game.customising = null;
       return;
     }
     // Creation: its keys are its own (Escape goes back to Live).
     if (game.mode === 'create') {
-      if (e.key === 'Escape' && !game.pauseMenu) controls.setMode('live');
+      if (e.key === 'Escape') controls.setMode('live');
       return;
     }
     const route = routeKey(e, {
@@ -1741,9 +1727,10 @@ export async function startSession(
       watchAt = 0;
       startWatching(now);
     }
-    // After a big moment, back to the speed the player had (unless they picked another).
+    // After a big moment, back to the speed the player had (unless they picked another; under a
+    // menu or in Build, once that lets go).
     if (slowedFrom !== null && now > slowUntil) {
-      if (game.speed === 1 && game.mode === 'live') bridge.send({ type: 'setSpeed', speed: slowedFrom });
+      speed.choose(slowedFrom);
       slowedFrom = null;
     }
   }, () => {
@@ -1799,20 +1786,19 @@ export async function startSession(
       lastInput = performance.now();
       // The camera starts watching once it has flown in (unless watching on its own is off).
       if (liveSettings.directorDelay > 0) watchAt = lastInput + START_WATCH_MS;
-      // (A benchmark runs at its own speed.) Time held already (the window left while loading, with
-      // pausing on blur): the hold gives this speed back when it ends, not the loading's 0.
-      const startSpeed = BENCH?.speed ?? resumeSpeed ?? 1;
-      if (heldSpeed !== null) heldSpeed = startSpeed;
-      else bridge.send({ type: 'setSpeed', speed: startSpeed });
+      // (A benchmark runs at its own speed.)
+      speed.choose(BENCH?.speed ?? resumeSpeed ?? 1);
       // Nobody lives here yet, or there's no house (an empty lot): the game starts with
       // building (time stands still until Live).
       const home = homePlot();
       if (!game.occupied || (home !== null && !game.plots[home]?.house)) {
-        game.speed = resumeSpeed ?? 1;
         // No house yet: the Build tab; a house nobody lives in: the catalog to furnish it.
         if (home !== null && !game.plots[home]?.house) controls.setBuildTool(game.buildTool);
         else controls.setBuildTab('furnish');
       }
+      // Time runs from here (at the speed chosen), unless something else holds it (a menu, the
+      // window left while loading with pausing on blur, Build).
+      speed.hold('loading', false);
       perfPhase(`session: reveal ${game.mode} ${game.buildTab} storey ${game.storey} walls ${game.wallMode}`);
       // The house is cached by now: stream the rest of the town while the player is in it. Its
       // models are built into the world once the stream is over (each settle used to rebuild it).
@@ -1832,9 +1818,9 @@ export async function startSession(
         prefetchTimer = setTimeout(() => {
           // (Not while benchmarking: drawing the pictures would show in the measurements.)
           if (disposed || BENCH) return;
-          // (In Live they wait for Build: `holdAhead`.)
-          services.items.holdAhead(game.mode === 'live');
-          services.items.prefetch(content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
+          // (In Live they wait for Build.)
+          catalogAhead();
+          prefetchCatalog();
         }, PREFETCH_PICTURES_MS);
       })();
     },
@@ -1864,9 +1850,7 @@ export async function startSession(
       }
     },
     setMenuPause(paused) {
-      menuHolds = paused;
-      if (paused) holdTime();
-      else releaseTime();
+      speed.hold('menu', paused);
     },
     async dispose() {
       disposed = true;

@@ -1,8 +1,8 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import { clock, money, WEEKDAYS } from './format';
-  import { untrack } from 'svelte';
   import { settings, systemMotion } from '../settings/settings.svelte';
+  import { MoneyFloats, moneyChange } from './moneyFloats.svelte';
   import { services } from './services';
   import { game, nextWallMode } from './state.svelte';
 
@@ -36,22 +36,9 @@
    * for a moment (Build's purchases have their own, by the cursor: `buy/BuyFx.svelte`). With
    * Reduce motion it shows where it is, without moving.
    */
-  let floats = $state<{ id: number; amount: number }[]>([]);
-  let nextFloat = 0;
-  let lastFunds: number | null = null;
+  const floats = new MoneyFloats(1600, 3);
   const still = $derived(settings.reducedMotion || systemMotion.reduced);
-  $effect(() => {
-    const funds = game.funds;
-    const live = game.mode === 'live';
-    untrack(() => {
-      const amount = lastFunds === null ? 0 : funds - lastFunds;
-      lastFunds = funds;
-      if (!live || game.creative || Math.round(amount) === 0) return;
-      const id = nextFloat++;
-      floats = [...floats.slice(-2), { id, amount }];
-      setTimeout(() => (floats = floats.filter((f) => f.id !== id)), 1600);
-    });
-  });
+  $effect(() => floats.note(game.funds, game.mode === 'live' && !game.creative));
 
   function storeyLabel(storey: number): string {
     if (storey < 0) return 'Basement';
@@ -113,8 +100,8 @@
 
     <span class="funds tabular" class:debt={game.funds < 0} title={fundsTitle}>
       <Icon name="icon.ui.funds" size={16} />{money(game.funds)}
-      {#each floats as f (f.id)}
-        <span class="float" class:gain={f.amount > 0} class:still aria-hidden="true">{f.amount > 0 ? '+' : '−'}{money(Math.abs(f.amount))}</span>
+      {#each floats.shown as f (f.id)}
+        <span class="float" class:gain={f.amount > 0} class:still aria-hidden="true">{moneyChange(f.amount)}</span>
       {/each}
     </span>
 

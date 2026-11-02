@@ -7,7 +7,7 @@ import { beforeAll, describe, expect, test } from 'bun:test';
 import type { AssetRegistry } from '../src/assets/registry';
 import type { Content } from '../src/content/content';
 import type { ObjectPlacement } from '../src/core/protocol';
-import { gameAssetPlan, parseAheadFiles } from '../src/game/streamPlan';
+import { gameAssetPlan, parseAheadFiles, streamRanks } from '../src/game/streamPlan';
 import { BIRD_MODELS } from '../src/render/shared/birds';
 
 beforeAll(() => {
@@ -41,10 +41,11 @@ describe('stream plan', () => {
     const objects = [at('chair', 1, 1), at('table', 50, 50), at('bed', 200, 5), at('lamp', 52, 50), at('sofa', 90, 5), at('table', 51, 50)];
     const view = { x: 0, z: 0, w: 10, d: 10 };
     const watch = { x: 40, z: 40, w: 20, d: 20 };
-    const files = parseAheadFiles(content, assets, { objects }, view, watch);
+    const ranks = streamRanks(content, assets, { objects }, view, watch);
+    const files = parseAheadFiles(content, assets, { objects }, ranks);
     expect(files.map((f) => f.url.replace('https://game.test/assets/model.', ''))).toEqual(['table.glb', 'lamp.glb', 'sofa.glb', 'bed.glb']);
     // (Keyed for the stream as it keys its downloads: without the build's query.)
     expect(files[0].file).toBe('https://game.test/assets/model.table.glb');
-    expect(parseAheadFiles(content, assets, { objects }, view, watch, 2)).toHaveLength(2);
+    expect(parseAheadFiles(content, assets, { objects }, ranks, 2)).toHaveLength(2);
   });
 });

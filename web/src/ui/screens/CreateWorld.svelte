@@ -57,7 +57,7 @@
     const typed = named && name.trim() ? name.trim() : undefined;
     try {
       const made = await townJob(content, { kind: 'world', world: kind, seed: (Math.random() * 2 ** 31) >>> 0, name: typed, size }, control.signal);
-      if (job !== control || made.kind !== 'world') return;
+      if (job !== control) return;
       // Its houses and preview come with it: the menu draws it without making them again.
       keepHouses(made);
       menuScene.prepare(made.draft, made.preview);

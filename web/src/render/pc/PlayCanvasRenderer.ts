@@ -65,6 +65,7 @@ import { TemplateCache } from './templateCache';
 import { Thumbnails } from './thumbnail';
 import { benchDiag } from '../../debug/benchFlags';
 import { fetched } from '../../assets/stream';
+import { within } from '../../core/async';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
@@ -840,7 +841,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   async streamSettled(limitMs: number): Promise<void> {
     const until = performance.now() + limitMs;
     // (A frame first: the camera's last turn may stream more chunks in.)
-    await Promise.race([this.framesRendered(1), new Promise((resolve) => setTimeout(resolve, Math.min(limitMs, 250)))]);
+    await within(this.framesRendered(1), Math.min(limitMs, 250), undefined);
     while (!this.disposed && (this.streaming || this.streamDue || this.worldBuilds) && performance.now() < until) {
       await new Promise((resolve) => setTimeout(resolve, 30));
     }
@@ -1449,7 +1450,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // built): they popped in in the first seconds of play. Later builds let them come when they come.
       this.birdsWaited = true;
       this.loadStep('Finding the birds', 0.6);
-      await Promise.race([birds.catch((err: unknown) => console.warn('[render] the birds failed to settle', err)), new Promise((resolve) => setTimeout(resolve, BIRDS_WAIT_MS))]);
+      await within(birds.catch((err: unknown) => console.warn('[render] the birds failed to settle', err)), BIRDS_WAIT_MS, undefined);
     } else void birds;
     this.lastLightMinute = -1;
     // A focus lot the roaming camera settled on, now drawn in full.

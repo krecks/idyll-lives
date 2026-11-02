@@ -31,11 +31,17 @@ function distance(x: number, z: number, r: { x: number; z: number; w: number; d:
   return Math.hypot(Math.max(r.x - x, 0, x - (r.x + r.w)), Math.max(r.z - z, 0, z - (r.z + r.d)));
 }
 
-/** The lot's name: a public place's own, a household's ("The Smiths"), else its address. */
-export function lotTitle(p: PlacePlot, households: readonly { name: string; plot: number | null }[]): string {
+/** The lot's name: a public place's own, a household's ("The Smiths"), else `empty` (its address). */
+export function lotTitle(p: PlacePlot, households: readonly { name: string; plot: number | null }[], empty = p.name): string {
   if (p.public) return p.name;
   const hh = households.find((h) => h.plot === p.id);
-  return hh ? `The ${hh.name}s` : p.name;
+  return hh ? `The ${hh.name}s` : empty;
+}
+
+/** `lotTitle` within a sentence: "on the way to the Smiths". */
+export function lotInSentence(p: PlacePlot, households: readonly { name: string; plot: number | null }[]): string {
+  const name = lotTitle(p, households);
+  return p.public ? name : name.replace(/^The /, 'the ');
 }
 
 /** "The Smiths · Millbrook": the lot at (or near) `x`, `z` and the area round it; '' when it's neither. */
@@ -64,6 +70,5 @@ export function placeAt(x: number, z: number, plots: readonly PlacePlot[], house
 export function tripText(trip: { to: number; at: number }, home: number | null, plots: readonly PlacePlot[], households: readonly { name: string; plot: number | null }[], time: (minute: number) => string): string {
   if (trip.to === home) return `On the way home · back about ${time(trip.at)}`;
   const p = plots[trip.to];
-  const name = p ? lotTitle(p, households) : 'somewhere';
-  return `On the way to ${p && !p.public ? name.replace(/^The /, 'the ') : name} · there about ${time(trip.at)}`;
+  return `On the way to ${p ? lotInSentence(p, households) : 'somewhere'} · there about ${time(trip.at)}`;
 }

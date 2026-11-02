@@ -7,7 +7,7 @@
   import { game } from './state.svelte';
   import { townMap } from './townMap.svelte';
   import { mapScale, screenToMap } from './mapView';
-  import { tripText } from './place';
+  import { lotTitle, tripText } from './place';
   import { settings } from '../settings/settings.svelte';
 
   /**
@@ -159,10 +159,6 @@
     if (picked === id) lookHere();
     else pickPlot(id);
   }
-  const lotName = (p: (typeof plots)[number]) => {
-    const hh = game.households.find((h) => h.plot === p.id);
-    return p.public ? p.name : hh ? `The ${hh.name}s` : 'Empty';
-  };
 
   function status(s: (typeof game.sims)[number]): string {
     if (s.trip) return tripText(s.trip, game.households[s.household]?.plot ?? null, game.plots, game.households, (m) => clock(m, settings.clock24h));
@@ -232,7 +228,7 @@
           {/each}
         </g>
         {#each plots as p (p.id)}
-          {@const name = lotName(p)}
+          {@const name = lotTitle(p, game.households, 'Empty')}
           <g
             class="plot"
             class:mine={p.id === homePlot}

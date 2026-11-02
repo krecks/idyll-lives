@@ -6,13 +6,14 @@
   import { watchLog } from './debug/log';
   import { perfEnd, perfPhase, perfStart, perfTimeAsync } from './debug/perf';
   import { fetchState, loadDebugReport } from './debug/report';
+  import { within } from './core/async';
   import { loadGameData } from './game/session';
   import { prefetchNow, streamGameData } from './assets/stream';
   import { gameDataUrls, menuAssetUrls } from './game/streamPlan';
   import { latestSave, UnloadableSave } from './persistence/saves';
   import { settings, systemMotion } from './settings/settings.svelte';
   import { app } from './ui/app.svelte';
-  import { services } from './ui/services';
+  import { prefetchCatalog, services } from './ui/services';
   import { game, toast } from './ui/state.svelte';
   import Modal from './ui/kit/Modal.svelte';
   import ChooseHome from './ui/screens/ChooseHome.svelte';
@@ -73,7 +74,8 @@
   const STEP_LIMIT_MS = 45_000;
   /** Portraits draw in the background; the menu must not wait long for them. */
   const PORTRAIT_LIMIT_MS = 8_000;
-  const within = (p: Promise<unknown>) => Promise.race([p, new Promise((resolve) => setTimeout(resolve, STEP_LIMIT_MS))]);
+  /** A start-up step, or nothing once it has taken `STEP_LIMIT_MS`. */
+  const inTime = <T,>(p: Promise<T>) => within(p, STEP_LIMIT_MS, undefined);
 
   /**
    * Start-up behind the loading screen: game data, the renderer and the menu's town (its shaders
@@ -102,7 +104,7 @@
       let reportingMenuAssets = true;
       try {
         await perfTimeAsync('boot: menu assets', () =>
-          within(
+          inTime(
             prefetchNow(menuAssetUrls(data.assets), (done, total) => {
               if (!reportingMenuAssets) return;
               step(`Loading menu assets (${done}/${total})`, 0.08 + 0.06 * (done / Math.max(1, total)));
@@ -120,10 +122,10 @@
     try {
       const snapshot = $state.snapshot(settings);
       step('Starting the renderer', 0.15);
-      await perfTimeAsync('boot: renderer', () => within(host.rendererNow(snapshot)));
+      await perfTimeAsync('boot: renderer', () => inTime(host.rendererNow(snapshot)));
       step('Building the neighbourhood', 0.3);
-      const draft = (await perfTimeAsync('boot: menu town', () =>
-        within(
+      const draft = await perfTimeAsync('boot: menu town', () =>
+        inTime(
           menuScene.showcaseDraft().then(async (draft) => {
             menuScene.highlight({});
             menuScene.shoot({ kind: 'menu' }, 2.4);
@@ -131,7 +133,7 @@
             return draft;
           }),
         ),
-      )) as Awaited<ReturnType<typeof menuScene.showcaseDraft>> | undefined;
+      );
       // The menu's household cards show portraits: draw them behind the loading screen, not on
       // the first menu frames (each new look compiles a set of character shaders).
       if (draft) {
@@ -139,14 +141,15 @@
         // The cards show the portraits as they arrive; booting the menu should not wait for a
         // slow first shader compile (or a missing environment texture).
         await perfTimeAsync('boot: portraits', () =>
-          Promise.race([
+          within(
             Promise.all(
               draft.households.flatMap((h) =>
                 h.household.members.map((m) => services.previews?.portrait({ gender: m.gender, appearance: m.appearance }) ?? Promise.resolve(null)),
               ),
             ),
-            new Promise((resolve) => setTimeout(resolve, PORTRAIT_LIMIT_MS)),
-          ]),
+            PORTRAIT_LIMIT_MS,
+            undefined,
+          ),
         );
       }
     } catch (err) {
@@ -233,7 +236,7 @@
     }
     if (!['world', 'neighbourhood', 'create', 'home', 'play'].includes(screen)) return;
     services.items?.holdAhead(false);
-    services.items?.prefetch(services.content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
+    prefetchCatalog();
   });
 
   // Live render settings (style, effects; the system's reduce motion too) while no game is running.
