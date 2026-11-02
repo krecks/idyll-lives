@@ -196,11 +196,28 @@ const IDENTITY = Float32Array.of(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)
 const NO_HOUSES: readonly (readonly [number, number, number, number])[] = [];
 
 /**
- * Everything an object is drawn from, but its open state and growth (drawn without a build: see
- * `patchable`). (Wear, quality and what it's worth don't change the model.)
+ * Whether two placements draw the same: everything an object is drawn from, but its open state and
+ * growth (drawn without a build: see `patchable`). (Wear, quality and what it's worth don't change the model.)
  */
-function objectKey(o: ObjectPlacement): string {
-  return JSON.stringify([o.id, o.def, o.x, o.z, o.rot, o.turn, o.offset, o.size, o.tall, o.lift, o.w, o.d, o.colors]);
+function sameObject(a: ObjectPlacement, b: ObjectPlacement): boolean {
+  // (Field by field: a big world's lot sends 6 000 objects with every opened door, and their keys as JSON
+  // took 4-5 ms of each such message.)
+  const pair = (u: readonly number[] | undefined, v: readonly number[] | undefined) => u === v || (!!u && !!v && u[0] === v[0] && u[1] === v[1]);
+  return (
+    a.id === b.id &&
+    a.def === b.def &&
+    a.x === b.x &&
+    a.z === b.z &&
+    a.rot === b.rot &&
+    a.turn === b.turn &&
+    pair(a.offset, b.offset) &&
+    pair(a.size, b.size) &&
+    a.tall === b.tall &&
+    a.lift === b.lift &&
+    a.w === b.w &&
+    a.d === b.d &&
+    (a.colors === b.colors || (!!a.colors && !!b.colors && JSON.stringify(a.colors) === JSON.stringify(b.colors)))
+  );
 }
 
 /** `?stream=1`: the street streams its chunks round the camera in any town (else only in a big world's). */
@@ -329,7 +346,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private lastWorld: WorldStructure | null = null;
   private builtWorld: WorldStructure | null = null;
   private builtStorey = 0;
-  private nextWorld: { world: WorldStructure; view: ViewRect | null } | null = null;
+  /** The world to build next, and whether only its residents are (`sims`: the rest is as built, patched). */
+  private nextWorld: { world: WorldStructure; view: ViewRect | null; sims?: boolean } | null = null;
   /** The builds running (one after another), and whether the next is a build whatever it is (a file came: `refreshStreet`). */
   private worldBuilds: Promise<void> | null = null;
   private worldBuilding = false;
@@ -1031,6 +1049,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     else if (this.patchable(world, view)) {
       this.patchWorld(world);
       return Promise.resolve();
+    } else if (!this.worldBuilds && !this.unpatchable(world, view, false)) {
+      // Only the residents differ (one came or went, grew up, looks different): they are built again,
+      // the rest patched. A big world built the whole lot, street, cars and birds again for it (a
+      // town's staff coming on, a visitor): frames of 70-110 ms.
+      this.lastWorld = world;
+      this.nextWorld = { world, view, sims: true };
+      return (this.worldBuilds = this.buildWorlds());
     }
     this.lastWorld = world;
     this.nextWorld = { world, view };
@@ -1058,8 +1083,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return false;
   }
 
-  /** What keeps `world` from being patched into what's on screen (null: nothing, it can be). */
-  private unpatchable(world: WorldStructure, view: ViewRect | null): string | null {
+  /** What keeps `world` from being patched into what's on screen (null: nothing, it can be); `sims` false: its residents left out. */
+  private unpatchable(world: WorldStructure, view: ViewRect | null, sims = true): string | null {
     const built = this.builtWorld;
     if (!built) return 'never built';
     if (this.worldBuilding) return 'building';
@@ -1071,10 +1096,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // The lot itself (walls, rooms, floors, fences) is what costs a build; a lean message never has it.
     if (built.lotVersion !== world.lotVersion) return 'lot';
     if (built.objects.length !== world.objects.length) return 'object count';
-    if (built.sims.length !== world.sims.length) return 'sim count';
     for (let i = 0; i < world.objects.length; i++) {
-      if (objectKey(built.objects[i]) !== objectKey(world.objects[i])) return `object ${world.objects[i].id} ${world.objects[i].def}`;
+      if (!sameObject(built.objects[i], world.objects[i])) return `object ${world.objects[i].id} ${world.objects[i].def}`;
     }
+    if (!sims) return null;
+    if (built.sims.length !== world.sims.length) return 'sim count';
     for (let i = 0; i < world.sims.length; i++) {
       const [a, b] = [built.sims[i], world.sims[i]];
       if (a.id !== b.id || a.gender !== b.gender || a.stage !== b.stage || a.name !== b.name) return `sim ${b.id}`;
@@ -1097,7 +1123,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       for (let next = this.nextWorld; next; next = this.nextWorld) {
         this.nextWorld = null;
         try {
-          await this.buildOne(next.world, next.view);
+          await (next.sims ? this.buildSimsOnly(next.world) : this.buildOne(next.world, next.view));
           error = null;
         } catch (err) {
           // (Stopped for a newer lot: what it left half built is built again, the lot layer first.)
@@ -1126,6 +1152,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     } finally {
       this.worldBuilding = false;
       // (A stream change while it built: the street catches up.)
+      if (this.streamDue) this.streamStreet();
+    }
+  }
+
+  /** A world whose residents only differ from the one built (`setWorld`): the objects patched, the residents built again. */
+  private async buildSimsOnly(world: WorldStructure): Promise<void> {
+    this.worldBuilding = true;
+    this.sliceStart = performance.now();
+    try {
+      this.lot.patch(world);
+      await this.buildSims(world);
+      this.builtWorld = world;
+      if (this.debug) console.info('[render] world patched, residents built again');
+    } finally {
+      this.worldBuilding = false;
       if (this.streamDue) this.streamStreet();
     }
   }
