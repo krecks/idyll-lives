@@ -1310,6 +1310,11 @@ impl Sim {
                 .map_or(1.0, |e| content.emotions[e].mods.walk_speed)
     }
 
+    /// How many metres they walk in a minute (`walk_speed`), as `travel::Travel::eta` asks.
+    pub(crate) fn walk_per_minute(&self, content: &Content) -> f32 {
+        WALK_SPEED * self.walk_speed(content) / MINUTES_PER_TICK
+    }
+
     /// Recomputes `mods` when the set of active feelings with effects has changed.
     pub(crate) fn refresh_buffs(&mut self, content: &Content) {
         let defs = &content.feelings;
@@ -6317,7 +6322,7 @@ fn pick_autonomous(
     let short: u32 = (0..content.needs.len())
         .filter(|&n| !content.needs[n].room && needs[n] < low)
         .fold(0, |m, n| m | 1 << n);
-    let walk_per_minute = WALK_SPEED * sim.walk_speed(content) / MINUTES_PER_TICK;
+    let walk_per_minute = sim.walk_per_minute(content);
     let urgent = urgent_needs(sim, ctx, objects);
     let fillable = home_needs(
         sim,
@@ -6944,8 +6949,7 @@ fn pick_autonomous(
             if (door[0] - pos[0]).hypot(door[1] - pos[1]) <= reach {
                 continue;
             }
-            // By car where they can drive there (`cars::trip_car`): a drive's seconds are the
-            // game's minutes, and a few more to and from the car.
+            // By car where they can drive there (`cars::trip_car`).
             let car = drives && crate::cars::parks_near(ctx.travel, door);
             let mode = if car {
                 crate::travel::Mode::Car
@@ -6961,11 +6965,7 @@ fn pick_autonomous(
                 || *from.get_or_insert_with(|| ctx.travel.entry(pos, mode)),
                 || ctx.travel.door_entry(p.id, door, mode),
             );
-            let eta = if car {
-                eta * 60.0 + CAR_TRIP_MINUTES
-            } else {
-                eta
-            };
+            let eta = trip_minutes(eta, car);
             if free < 2.0 * eta + OUTING_STAY_MINUTES {
                 continue;
             }
@@ -9538,8 +9538,18 @@ fn open_ground_near(nav: &NavGrid, p: &Plot, at: [f32; 2]) -> Option<[f32; 2]> {
 /// does, `ai::falloff`: it's a day out).
 const OUTING_STAY_MINUTES: f32 = 60.0;
 /// An outing by car: minutes besides the drive, to the car and from it at either end.
-pub(crate) const CAR_TRIP_MINUTES: f32 = 10.0;
+const CAR_TRIP_MINUTES: f32 = 10.0;
 const OUTING_K: f32 = 0.01;
+
+/// The game minutes a trip takes that `Travel::eta` says takes `eta` (by car, `car`): a drive's
+/// seconds are the game's minutes, and a few more to and from the car.
+pub(crate) fn trip_minutes(eta: f32, car: bool) -> f32 {
+    if car {
+        eta * 60.0 + CAR_TRIP_MINUTES
+    } else {
+        eta
+    }
+}
 
 /// The way out of town `sim` takes on foot: the nearest by straight line, or in an open-world
 /// town the quickest (`travel::Travel::eta`), bus stops included.

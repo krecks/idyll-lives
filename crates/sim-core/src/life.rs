@@ -228,7 +228,7 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
         && !heading_out(sim)
         && let Some(&exit) = w.exits.get(c.exit)
     {
-        let walk = crate::world::WALK_SPEED * sim.walk_speed(&w.content) / MINUTES_PER_TICK;
+        let walk = sim.walk_per_minute(&w.content);
         // (From over the ground: a commute timed from bed upstairs had them setting off for
         // work in the middle of the night.)
         let from = w.stairs.ground_pos(sim.pos);
@@ -302,7 +302,7 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
         return;
     };
     let target = w.exits[exit];
-    let walk = crate::world::WALK_SPEED * sim.walk_speed(&w.content) / MINUTES_PER_TICK;
+    let walk = sim.walk_per_minute(&w.content);
     // The way they'd walk it (in the house's grounds and the public ways), or the estimate.
     let nav = w.nav();
     let goal = (target[0].floor() as i32, target[1].floor() as i32);
@@ -1513,8 +1513,7 @@ pub(crate) fn farewell(w: &World, i: usize, plot: u32) -> Option<(usize, usize)>
         return None;
     }
     let household = w.households.iter().position(|h| h.plot == Some(plot))?;
-    let reach = crate::world::WALK_SPEED * guest.walk_speed(content) / MINUTES_PER_TICK
-        * rules.farewell_minutes;
+    let reach = guest.walk_per_minute(content) * rules.farewell_minutes;
     w.sims
         .iter()
         .enumerate()

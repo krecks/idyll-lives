@@ -766,6 +766,16 @@ impl UiSync {
             })
             .collect();
 
+        // (Who is in a car on the way home, `trip_view`: found once, not for everyone away.)
+        let mut riders: Vec<u32> = world
+            .cars
+            .iter()
+            .filter(|c| c.state == crate::cars::CarState::Arriving)
+            .flat_map(|c| c.driver.iter().chain(&c.aboard).chain(&c.done))
+            .copied()
+            .collect();
+        riders.sort_unstable();
+
         let (mut sims, mut gone) = (List::default(), List::default());
         if self.sims.len() < world.sims.len() {
             self.sims.resize_with(world.sims.len(), || None);
@@ -781,7 +791,7 @@ impl UiSync {
             let mark = (sims.out.len(), sims.len);
             let mut o = Obj::open(sims.next());
             o.field("id", &s.id);
-            sim_patch(world, s, detailed[i], sent, &mut o);
+            sim_patch(world, s, detailed[i], &riders, sent, &mut o);
             if o.close() == 1 {
                 sims.out.truncate(mark.0);
                 sims.len = mark.1;
@@ -961,7 +971,14 @@ pub fn ui_state_json(world: &World) -> String {
 
 /// Writes the fields of resident `s` that changed (`SimView` in `protocol.ts`); with `detail`
 /// false only the summary (who, where, which job), the details being the UI's defaults.
-fn sim_patch(world: &World, s: &Sim, detail: bool, sent: &mut SimSent, o: &mut Obj) {
+fn sim_patch(
+    world: &World,
+    s: &Sim,
+    detail: bool,
+    riders: &[u32],
+    sent: &mut SimSent,
+    o: &mut Obj,
+) {
     let content = &world.content;
     if sent.detailed && !detail {
         sent.details = DetailsSent::default();
@@ -1000,7 +1017,8 @@ fn sim_patch(world: &World, s: &Sim, detail: bool, sent: &mut SimSent, o: &mut O
         &mut sent.away_until,
     );
     o.changed("visiting", &s.visiting.map(|v| v.plot), &mut sent.visiting);
-    o.changed_opt("trip", trip_view(world, s).as_ref(), &mut sent.trip);
+    let trip = trip_view(world, s, riders);
+    o.changed_opt("trip", trip.as_ref(), &mut sent.trip);
     o.changed("job", &job_view(content, s), &mut sent.job);
     if !detail {
         return;
@@ -1448,19 +1466,17 @@ struct TripView {
 const TRIP_STEP: f32 = 5.0;
 
 /// Where resident `s` is on their way to: a visit or home (until they're on that plot), or home
-/// from work in the household's car (back when the car is); with the time they're there, from
-/// `Travel::eta` (by car where they're bound for it). Read only: nothing here changes the game.
-fn trip_view(world: &World, s: &Sim) -> Option<TripView> {
+/// from work in the household's car (back when the car is, `riders`: who is in one on the way
+/// home, sorted); with the time they're there, from `Travel::eta` (by car where they're bound
+/// for it). Read only: nothing here changes the game.
+fn trip_view(world: &World, s: &Sim, riders: &[u32]) -> Option<TripView> {
     let home = world.households.get(s.household as usize)?.plot;
     let step = |tick: u64| {
         let m = (clock::minute_of_day(tick) / TRIP_STEP).round() * TRIP_STEP;
         (m as u32) % (24 * 60)
     };
     if let Some(until) = s.away_until {
-        let riding = world.cars.iter().any(|c| {
-            c.state == crate::cars::CarState::Arriving
-                && (c.driver == Some(s.id) || c.aboard.contains(&s.id) || c.done.contains(&s.id))
-        });
+        let riding = riders.binary_search(&s.id).is_ok();
         return riding.then_some(home).flatten().map(|to| TripView {
             to,
             at: step(until),
@@ -1476,17 +1492,16 @@ fn trip_view(world: &World, s: &Sim) -> Option<TripView> {
         return None;
     }
     let door = world.plots.get(to as usize)?.arrival_point();
-    let walk = crate::world::WALK_SPEED * s.walk_speed(&world.content) / MINUTES_PER_TICK;
     // (From over the ground, upstairs too.)
     let from = world.stairs.ground_pos(s.pos);
-    let minutes = if s.bound_for_car.is_some() {
-        world.travel.eta(from, door, crate::travel::Mode::Car, walk) * 60.0
-            + crate::world::CAR_TRIP_MINUTES
+    let car = s.bound_for_car.is_some();
+    let mode = if car {
+        crate::travel::Mode::Car
     } else {
-        world
-            .travel
-            .eta(from, door, crate::travel::Mode::Foot, walk)
+        crate::travel::Mode::Foot
     };
+    let walk = s.walk_per_minute(&world.content);
+    let minutes = crate::world::trip_minutes(world.travel.eta(from, door, mode, walk), car);
     let at = world.tick + (minutes.max(0.0) * crate::TICKS_PER_MINUTE as f32) as u64;
     Some(TripView { to, at: step(at) })
 }
