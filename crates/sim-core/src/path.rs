@@ -1076,26 +1076,29 @@ pub const NODE_CAP: u64 = 30_000;
 /// The most a search kept to a corridor tries.
 const CORRIDOR_CAP: u64 = 4 * NODE_CAP;
 
-/// Search state kept between searches: a big town is tens of thousands of tiles, too many to
-/// allocate and clear for every route. An entry counts only if stamped by the current search.
+/// Search state kept between searches: a big town is tens of thousands of tiles (and a big
+/// world's roads thousands of nodes, `travel::Graph`), too many to allocate and clear for every
+/// search. An entry counts only if stamped by the current search. By tile or node: the cost
+/// there (`G`), where from (`C`); and the open list (`K`).
 #[derive(Default)]
-struct Scratch {
-    g: Vec<u32>,
-    came: Vec<u32>,
-    stamp: Vec<u32>,
+pub(crate) struct Scratch<G, C, K: Ord> {
+    pub g: Vec<G>,
+    pub came: Vec<C>,
+    pub stamp: Vec<u32>,
     search: u32,
-    open: BinaryHeap<Reverse<(u32, u32)>>,
+    pub open: BinaryHeap<Reverse<K>>,
 }
 
-impl Scratch {
-    /// Gets ready for a search over `tiles` tiles; returns its stamp.
-    fn start(&mut self, tiles: usize) -> u32 {
-        if self.g.len() != tiles {
+impl<G: Clone + Default, C: Clone + Default, K: Ord> Scratch<G, C, K> {
+    /// Gets ready for a search over `n` tiles or nodes; returns its stamp.
+    pub fn start(&mut self, n: usize) -> u32 {
+        if self.g.len() != n {
             *self = Self {
-                g: vec![0; tiles],
-                came: vec![0; tiles],
-                stamp: vec![0; tiles],
-                ..Self::default()
+                g: vec![G::default(); n],
+                came: vec![C::default(); n],
+                stamp: vec![0; n],
+                search: 0,
+                open: BinaryHeap::new(),
             };
         }
         self.search = self.search.wrapping_add(1);
@@ -1109,7 +1112,7 @@ impl Scratch {
 }
 
 thread_local! {
-    static SCRATCH: RefCell<Scratch> = RefCell::default();
+    static SCRATCH: RefCell<Scratch<u32, u32, (u32, u32)>> = RefCell::default();
     static STATS: RefCell<SearchStats> = RefCell::default();
 }
 
