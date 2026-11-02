@@ -273,10 +273,12 @@
           "finish": "material.finish.wood"
         },
         "lemon": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.4
         },
         "orange": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.45
         },
         "slate": {
           "finish": "material.finish.matte"
@@ -288,7 +290,8 @@
           "finish": "material.finish.wood"
         },
         "tomato": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "paint": [

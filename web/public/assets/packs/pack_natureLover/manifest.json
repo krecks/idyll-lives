@@ -40,7 +40,8 @@
           "finish": "material.finish.satin"
         },
         "tomato": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         },
         "yellow": {
           "finish": "material.finish.satin"

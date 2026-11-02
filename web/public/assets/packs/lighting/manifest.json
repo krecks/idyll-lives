@@ -367,7 +367,8 @@
           "glow": "#FFD9A0"
         },
         "marble": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.28
         }
       },
       "paint": [
