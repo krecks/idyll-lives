@@ -4,11 +4,12 @@
  */
 
 import type { WorldStructure } from '../../core/protocol';
-import { Land, type FromRenderData, type ToRenderData } from './renderData';
+import type { WorkerAnswer, WorkerAsk } from '../../core/lazyWorker';
+import { Land, type RenderDataAnswer, type ToRenderData } from './renderData';
 
 interface WorkerScope {
-  onmessage: ((e: MessageEvent<ToRenderData>) => void) | null;
-  postMessage(message: FromRenderData, transfer?: Transferable[]): void;
+  onmessage: ((e: MessageEvent<WorkerAsk<ToRenderData>>) => void) | null;
+  postMessage(message: WorkerAnswer<RenderDataAnswer>, transfer?: Transferable[]): void;
 }
 const scope = self as unknown as WorkerScope;
 
@@ -23,7 +24,7 @@ function landOf(id: number): { world: WorldStructure; land: Land } {
 }
 
 scope.onmessage = (e) => {
-  const q = e.data;
+  const { id, message: q } = e.data;
   if (q.type === 'open') {
     lands.set(q.land, { world: q.world, land: null });
     return;
@@ -37,13 +38,13 @@ scope.onmessage = (e) => {
       const { world, land } = landOf(q.land);
       if (q.type === 'grass') {
         const field = await land.grass(world, q.margin);
-        scope.postMessage({ id: q.id, type: 'grass', field }, [field.colour.buffer, field.ground.buffer]);
+        scope.postMessage({ id, answer: { type: 'grass', field } }, [field.colour.buffer, field.ground.buffer]);
       } else {
         const colors = await land.shade(q.positions);
-        scope.postMessage({ id: q.id, type: 'shade', positions: q.positions, colors }, [q.positions.buffer, colors.buffer]);
+        scope.postMessage({ id, answer: { type: 'shade', positions: q.positions, colors } }, [q.positions.buffer, colors.buffer]);
       }
     } catch (err) {
-      scope.postMessage({ id: q.id, type: 'error', message: err instanceof Error ? err.message : String(err) });
+      scope.postMessage({ id, error: err instanceof Error ? err.message : String(err) });
     }
   })();
 };

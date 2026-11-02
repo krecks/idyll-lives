@@ -11,6 +11,7 @@ import type { HouseholdDraft } from './household';
 import { assembleTown, generatedHouses, generateWorld, loadTemplates, primeHouses, type AssembleOptions, type HouseTemplate, type NeighbourhoodDraft, type Templates } from './town';
 import { previewWorld } from './townPreview';
 import type { WorldKind } from './world';
+import { LazyWorker, type WorkerAnswer, type WorkerAsk } from '../core/lazyWorker';
 import { mulberry32 } from './noise';
 
 export type TownJob =
@@ -23,9 +24,9 @@ export type TownResult =
   | { kind: 'world'; draft: NeighbourhoodDraft; preview: WorldStructure; houses: [string, HouseTemplate | undefined][] }
   | { kind: 'assemble'; lot: string };
 
-export type ToTownWorker = { id: number; job: TownJob };
+export type ToTownWorker = WorkerAsk<TownJob>;
 /** `broken`: the worker couldn't load the content (every job fails there). */
-export type FromTownWorker = { id: number; result: TownResult } | { id: number; error: string; broken?: boolean };
+export type FromTownWorker = WorkerAnswer<TownResult>;
 
 /**
  * Runs a job. `assembleTown` rolls some dice (who are friends, rivals): they come from the job's
@@ -41,87 +42,14 @@ export function runTownJob(content: Content, t: Templates, job: TownJob): TownRe
 }
 
 /** Raised for a job a newer one replaced (or whose signal aborted it). */
-export class Superseded extends Error {
-  constructor() {
-    super('superseded');
-    this.name = 'Superseded';
-  }
-}
+export { Superseded } from '../core/lazyWorker';
 
-/** The worker goes once it has had nothing to do for this long (its content and houses are freed). */
-const IDLE_MS = 60_000;
-
-interface Pending {
-  job: TownJob;
-  content: Content;
-  resolve: (r: TownResult) => void;
-  reject: (e: unknown) => void;
-}
-
-let worker: Worker | null = null;
-/** Workers can't start here (or one failed): jobs run on the page. */
-let inPage = false;
-let nextId = 1;
-const pending = new Map<number, Pending>();
-let idleTimer: ReturnType<typeof setTimeout> | undefined;
-
-function stopWorker(): void {
-  worker?.terminate();
-  worker = null;
-  clearTimeout(idleTimer);
-}
-
-/** Hands `p` to the worker (started if need be), or runs it on the page when there can be none. */
-function dispatch(id: number, p: Pending): void {
-  const w = worker ?? (inPage ? null : startWorker());
-  if (!w) {
-    pending.delete(id);
-    onPage(p.content, p.job).then(p.resolve, p.reject);
-    return;
-  }
-  clearTimeout(idleTimer);
-  w.postMessage({ id, job: p.job } satisfies ToTownWorker);
-}
-
-function startWorker(): Worker | null {
-  try {
-    worker = new Worker(new URL('./town.worker.ts', import.meta.url), { type: 'module' });
-  } catch {
-    inPage = true;
-    return null;
-  }
-  worker.onmessage = (e: MessageEvent<FromTownWorker>) => {
-    const msg = e.data;
-    if ('broken' in msg && msg.broken) return broke(msg.error);
-    const p = pending.get(msg.id);
-    pending.delete(msg.id);
-    if (p) {
-      if ('error' in msg) p.reject(new Error(msg.error));
-      else p.resolve(msg.result);
-    }
-    if (!pending.size) idle();
-  };
-  worker.onerror = (e) => {
-    e.preventDefault();
-    broke(e.message);
-  };
-  return worker;
-}
-
-/** A worker that can't load (or broke) hands its jobs to the page, and so do later ones. */
-function broke(why: string): void {
-  console.warn('[town] the town worker failed; making towns on the page:', why);
-  inPage = true;
-  stopWorker();
-  for (const [id, p] of [...pending]) dispatch(id, p);
-}
-
-function idle(): void {
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => {
-    if (!pending.size) stopWorker();
-  }, IDLE_MS);
-}
+/** The town worker (`town.worker.ts`); it goes once it has had nothing to do for a minute (its content and houses are freed). */
+const towns = new LazyWorker<TownJob, TownResult>({
+  start: () => new Worker(new URL('./town.worker.ts', import.meta.url), { type: 'module' }),
+  idleMs: 60_000,
+  broke: (why) => console.warn('[town] the town worker failed; making towns on the page:', why),
+});
 
 async function onPage(content: Content, job: TownJob): Promise<TownResult> {
   return runTownJob(content, await loadTemplates(), job);
@@ -133,28 +61,7 @@ async function onPage(content: Content, job: TownJob): Promise<TownResult> {
  * behind it go to a fresh one, so a player rolling world after world waits only for the last.
  */
 export function townJob(content: Content, job: TownJob, signal?: AbortSignal): Promise<TownResult> {
-  if (signal?.aborted) return Promise.reject(new Superseded());
-  return new Promise<TownResult>((resolve, reject) => {
-    const id = nextId++;
-    const p: Pending = { job, content, resolve, reject };
-    pending.set(id, p);
-    signal?.addEventListener(
-      'abort',
-      () => {
-        // (The worker takes jobs in turn: the first waiting is the one it is on.)
-        const running = pending.keys().next().value === id;
-        if (!pending.delete(id)) return;
-        reject(new Superseded());
-        // Stopping the worker is the only way to stop the job it is on (a fresh one loads its
-        // content again). One still waiting is made and thrown away.
-        if (!running || !worker) return;
-        stopWorker();
-        for (const [other, q] of [...pending]) dispatch(other, q);
-      },
-      { once: true },
-    );
-    dispatch(id, p);
-  });
+  return towns.ask(job, () => onPage(content, job), { signal });
 }
 
 /** A world's houses the worker made, kept on the page too (the menu and the screens after need them). */

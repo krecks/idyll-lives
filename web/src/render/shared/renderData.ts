@@ -11,6 +11,7 @@ import type { WorldStructure } from '../../core/protocol';
 import { CountryRoads } from './countryRoads';
 import { grassField, townGrass, type GrassField } from './grass';
 import { LandscapeLayout } from './nature';
+import { LazyWorker } from '../../core/lazyWorker';
 
 /**
  * What of a world the land is laid out from (`LandscapeLayout`, `CountryRoads`, the grass field's
@@ -76,116 +77,70 @@ export function withTownGrass(land: LandGrass, world: WorldStructure): GrassFiel
 export type ToRenderData =
   | { type: 'open'; land: number; world: WorldStructure }
   | { type: 'close'; land: number }
-  | { type: 'grass'; id: number; land: number; margin: number }
-  | { type: 'shade'; id: number; land: number; positions: Float32Array };
+  | { type: 'grass'; land: number; margin: number }
+  | { type: 'shade'; land: number; positions: Float32Array };
 
-export type FromRenderData =
-  | { id: number; type: 'grass'; field: LandGrass }
-  | { id: number; type: 'shade'; positions: Float32Array; colors: Float32Array }
-  | { id: number; type: 'error'; message: string };
+export type RenderDataAnswer = { type: 'grass'; field: LandGrass } | { type: 'shade'; positions: Float32Array; colors: Float32Array };
 
-/** The worker goes once it has had nothing to do for this long. */
-const IDLE_MS = 30_000;
+/** The render data worker (`renderData.worker.ts`); it goes once it has had nothing to do for half a minute. */
+const data = new LazyWorker<ToRenderData, RenderDataAnswer>({
+  start: () => new Worker(new URL('./renderData.worker.ts', import.meta.url), { type: 'module' }),
+  idleMs: 30_000,
+  broke: (why) => console.warn('[render] the render data worker failed; building on the page:', why),
+});
 
-let worker: Worker | null = null;
-/** No worker can run here (or one failed): everything is built on the page. */
-let broken = false;
-let nextId = 1;
 let nextLand = 1;
-let open = 0;
-const pending = new Map<number, (reply: FromRenderData | null) => void>();
-let idleTimer: ReturnType<typeof setTimeout> | undefined;
-
-function stop(): void {
-  worker?.terminate();
-  worker = null;
-  clearTimeout(idleTimer);
-  for (const answer of pending.values()) answer(null);
-  pending.clear();
-}
-
-function start(): Worker | null {
-  if (worker || broken) return worker;
-  try {
-    worker = new Worker(new URL('./renderData.worker.ts', import.meta.url), { type: 'module' });
-  } catch {
-    broken = true;
-    return null;
-  }
-  worker.onmessage = (e: MessageEvent<FromRenderData>) => {
-    const answer = pending.get(e.data.id);
-    pending.delete(e.data.id);
-    answer?.(e.data.type === 'error' ? null : e.data);
-  };
-  worker.onerror = (e) => {
-    e.preventDefault();
-    console.warn('[render] the render data worker failed; building on the page:', e.message);
-    broken = true;
-    stop();
-  };
-  return worker;
-}
-
-function ask(w: Worker, message: ToRenderData & { id: number }, transfer: Transferable[] = []): Promise<FromRenderData | null> {
-  return new Promise((resolve) => {
-    pending.set(message.id, resolve);
-    w.postMessage(message, transfer);
-  });
-}
+/** No answer from the worker: the caller builds it on the page. */
+const none = () => Promise.resolve(null);
 
 /**
- * A world's land in the worker, for one build (`close` when done). Each call resolves to null
- * when the worker can't give the answer: the caller builds it on the page.
+ * A world's land in the worker, for one build (`close` when done; the worker stays meanwhile). Each
+ * call resolves to null when the worker can't give the answer: the caller builds it on the page.
  */
 export class OffThreadLand {
-  private readonly id = nextLand++;
   private closed = false;
 
-  private constructor(private readonly w: Worker) {}
+  private constructor(
+    private readonly id: number,
+    /** The worker it was sent to (`LazyWorker.run`): another (after one broke) doesn't have it. */
+    private readonly run: number,
+    private readonly release: () => void,
+  ) {}
 
   /** The world's land sent to the worker; null where no worker can run. */
   static open(world: WorldStructure): OffThreadLand | null {
-    const w = start();
-    if (!w) return null;
-    clearTimeout(idleTimer);
-    open++;
-    const land = new OffThreadLand(w);
-    w.postMessage({ type: 'open', land: land.id, world: landWorld(world) } satisfies ToRenderData);
-    return land;
+    const id = nextLand++;
+    const run = data.post({ type: 'open', land: id, world: landWorld(world) });
+    return run ? new OffThreadLand(id, run, data.hold()) : null;
+  }
+
+  private get there(): boolean {
+    return !this.closed && data.run === this.run;
   }
 
   /** The grass field's land part, `margin` m round the town (`grassField`). */
   async grass(margin: number): Promise<LandGrass | null> {
-    if (this.closed || worker !== this.w) return null;
-    const reply = await ask(this.w, { type: 'grass', id: nextId++, land: this.id, margin });
+    if (!this.there) return null;
+    const reply = await data.ask({ type: 'grass', land: this.id, margin }, none).catch(none);
     return reply?.type === 'grass' ? reply.field : null;
   }
 
   /**
-   * The terrain's heights and colours for `positions` (x, y, z: y set in place) into `colors`
-   * (`LandscapeLayout.shadeTerrain`); false if they weren't made (nothing is changed then).
+   * The terrain's heights and colours for the grid `positions` (x, y, z: y set;
+   * `LandscapeLayout.shadeTerrain`). `positions` goes over to the worker (the caller's copy is
+   * empty after): the arrays come back with the answer.
    */
-  async shade(positions: Float32Array, colors: Float32Array): Promise<boolean> {
-    if (this.closed || worker !== this.w) return false;
-    // (A copy goes: the caller's arrays are its own until the answer is in.)
-    const sent = positions.slice();
-    const reply = await ask(this.w, { type: 'shade', id: nextId++, land: this.id, positions: sent }, [sent.buffer]);
-    if (reply?.type !== 'shade' || reply.positions.length !== positions.length || reply.colors.length !== colors.length) return false;
-    positions.set(reply.positions);
-    colors.set(reply.colors);
-    return true;
+  async shade(positions: Float32Array): Promise<{ positions: Float32Array; colors: Float32Array } | null> {
+    if (!this.there) return null;
+    const reply = await data.ask({ type: 'shade', land: this.id, positions }, none, { transfer: [positions.buffer] }).catch(none);
+    return reply?.type === 'shade' ? reply : null;
   }
 
   /** Done with this world: the worker forgets its land (and goes once idle). */
   close(): void {
     if (this.closed) return;
+    if (this.there) data.post({ type: 'close', land: this.id });
     this.closed = true;
-    if (worker !== this.w) return;
-    this.w.postMessage({ type: 'close', land: this.id } satisfies ToRenderData);
-    if (--open > 0) return;
-    clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => {
-      if (!open && !pending.size) stop();
-    }, IDLE_MS);
+    this.release();
   }
 }
