@@ -16,7 +16,6 @@ const EXACT_BAND = 32;
 
 export type ZoneKind = WorldZone['kind'];
 
-
 /** `ZoneField.share` from what `ZoneField.edge` gave there (metres inside the zones): 0..1, over a soft edge `soft` m each side. */
 export function shareAt(edge: number, soft: number): number {
   if (edge === -Infinity) return 0;
