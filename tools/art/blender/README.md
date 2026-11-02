@@ -240,7 +240,7 @@ onto the floor).
 The first four go from rest to open: the game holds them open and plays them back. `spin` and `rock`
 end where they start, so they also loop (`motions.loops`, `idle`), as does `turns`. `scroll` loops too: it ends one slat on,
 so hide the part's ends under covers (the treadmill's hood and rear cap). Keep a spin under about a turn a
-second: the game blends between samples 1/30 s apart. A part that looks the same turned (a fan's four
+second (two at most): the game blends between samples 1/60 s apart (`cargo check-glb` warns past 12° in that). A part that looks the same turned (a fan's four
 blades) can turn by less (a quarter) and loop.
 
 A part that is easier to build open (a bed that folds down) is built in its open pose and `hinged`. It's

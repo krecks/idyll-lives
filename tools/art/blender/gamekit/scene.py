@@ -15,13 +15,14 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # tools/art/
 ASSETS = os.path.normpath(os.path.join(HERE, '..', '..', '..', 'web', 'public', 'assets'))
 PREVIEWS = os.path.join(HERE, 'previews')
 
-# Frames a second the clips are keyed at: the game's own sampling rate, so its samples fall on the keys.
+# Frames a second the clips are keyed at: half the game's sampling rate, so its samples fall on the keys.
 FPS = 30
 
 
 def reset():
     """Empty scene (no default cube, camera or light, no materials or clips), metres, frame 1, clips keyed at
-    `FPS` (the game samples clips 30 times a second, `CLIP_RATE` in web/src/render/shared/modelClips.ts)."""
+    `FPS` (the game samples clips at twice that, `CLIP_RATE` in web/src/render/shared/modelClips.ts, so its
+    samples fall on the keys and between them)."""
     if bpy.context.object and bpy.context.object.mode != 'OBJECT':
         bpy.ops.object.mode_set(mode='OBJECT')
     for obj in list(bpy.data.objects):

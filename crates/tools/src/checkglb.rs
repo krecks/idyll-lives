@@ -61,8 +61,9 @@ const WALL: f64 = 0.07;
 const FLOOR_TOP: f64 = 0.012;
 /// A use's clip longer than this (s) reads as slow ("about 1 s"); loops and ambient clips keep their own pace.
 const USE_CLIP: f64 = 3.0;
-/// The game samples a clip 30 times a second and blends the samples' matrices (modelClips.ts `clipPose`), which
-/// shrinks a part turning fast between them: degrees a part may turn in 1/30 s (12°: a turn a second).
+/// The game samples a clip 60 times a second and blends the samples' matrices (modelClips.ts `clipPose`), which
+/// shrinks a part turning fast between them (1 - cos of half the turn): degrees a part may turn in 1/60 s (12°: two
+/// turns a second, 0.5 %).
 const TURN_STEP: f64 = 12.5;
 /// A clip whose first key is later than this (s) starts late: the game holds it at rest until then.
 const CLIP_START: f64 = 1e-4;
@@ -1436,7 +1437,7 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
                 let fastest = turn_per_step(g, s)?;
                 if fastest > TURN_STEP {
                     warnings.push(format!(
-                        "clip {name} turns {} {}° in 1/30 s: the game blends its samples 1/30 s apart, which shrinks a part turning that fast (keep it under a turn a second)",
+                        "clip {name} turns {} {}° in 1/60 s: the game blends its samples 1/60 s apart, which shrinks a part turning that fast (keep it under two turns a second)",
                         node_name(nodes, node),
                         fixed(fastest, 0)
                     ));
@@ -1561,7 +1562,7 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
     Ok((errors, warnings))
 }
 
-/// The most a rotation channel turns its node between two of the game's samples, 1/30 s apart (degrees).
+/// The most a rotation channel turns its node between two of the game's samples, 1/60 s apart (degrees).
 fn turn_per_step(g: &Glb, sampler: &J) -> R<f64> {
     let times = values(g, key(sampler, "input")?)?;
     let keys = values(g, key(sampler, "output")?)?;
@@ -1576,7 +1577,7 @@ fn turn_per_step(g: &Glb, sampler: &J) -> R<f64> {
             .zip(&keys[k - 1])
             .fold(0.0, |s, (x, y)| s + x * y);
         let turned = 2.0 * f64::min(1.0, dot.abs()).acos() * (180.0 / PI);
-        fastest = fastest.max(turned / dt / 30.0);
+        fastest = fastest.max(turned / dt / 60.0);
     }
     Ok(fastest)
 }
@@ -4186,16 +4187,16 @@ mod tests {
         assert!(!late(0.0), "on time");
     }
 
-    /// The game blends a clip's samples 1/30 s apart, which shrinks a part turning far between them.
+    /// The game blends a clip's samples 1/60 s apart, which shrinks a part turning far between them.
     #[test]
     fn a_part_turning_too_fast_is_warned_of() {
         let fast = |degrees| {
             let (_, warnings) =
                 check_clips(&turning_clip(0.0, degrees), &J::Obj(Vec::new())).unwrap();
-            warnings.iter().any(|w| w.contains("in 1/30 s"))
+            warnings.iter().any(|w| w.contains("in 1/60 s"))
         };
-        assert!(fast(30.0), "30° in a frame");
-        assert!(!fast(12.0), "a turn a second");
+        assert!(fast(30.0), "30° in a frame (15° in 1/60 s)");
+        assert!(!fast(24.0), "two turns a second");
     }
 
     /// A face whose normals point against its winding is lit from behind (a bevel's arc miter did it to a frame).

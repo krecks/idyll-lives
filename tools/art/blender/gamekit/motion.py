@@ -9,7 +9,7 @@
 # closed. Only the node's rotation, location or scale move. `swing`, `slide`, `grow` and `squash` go from
 # rest to open (the game plays them back); `spin` and `rock` come home to rest within the clip, so they
 # also serve as loops (`motions.loops`, `idle`), and `scroll` moves one repeat on, home unseen. `G.run` exports the clips when a model has any; the
-# exporter samples every frame (30 a second, scene.FPS) from frame 1 as 0 s, and the game samples the clip 30 times a second.
+# exporter samples every frame (30 a second, scene.FPS) from frame 1 as 0 s, and the game samples the clip 60 times a second (twice each key).
 import math
 
 import bpy
@@ -140,7 +140,7 @@ def squash(obj, clip, scale, seconds=0.6, back=False, split=0.5):
     quickly, up slowly, as a cushion recovers)."""
     factors = scale if isinstance(scale, (tuple, list)) else (scale,) * 3
     end = last_frame(seconds)
-    mid = min(end - 1, max(2, round(1 + (end - 1) * split)))
+    mid = min(end - 1, max(2, 1 + math.floor((end - 1) * split)))   # (split 0.5: (1 + end) // 2, as it always was)
     for i, k in enumerate(factors):
         if k == 1:
             continue

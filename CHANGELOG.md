@@ -29,6 +29,12 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
   and caps (a table's top, a lamp's base, a can's lid) stay flat to their rim instead of shading into their side,
   rounded edges read as rounded instead of as a flat facet, thin round legs and tubes look round, and furniture
   darkens a little where it meets the floor. The models are about 18 % smaller for the same triangles.
+- **Doors that swing like doors:** cupboard, wardrobe, fridge and cabinet doors (45 of them) open with a quick swing
+  that carries a little past open and settles back, and close with a hair more opening before they swing shut,
+  instead of the same slow-in, slow-out as everything else. Moving parts are sampled 60 times a second, so a
+  quick swing or a fast spin no longer shrinks a hair between samples. Far versions of shop counters, stalls,
+  playground rides and street props no longer have faces turned inside out, which showed dark where the sun
+  fell on them.
 ### Also
 - **Saves:** format 34 (where every car is, who owns it, every house's driveway and the garages). Older saves open with no cars in the simulation: their neighbours' cars stay parked, as before.
 

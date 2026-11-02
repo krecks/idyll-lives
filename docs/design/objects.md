@@ -404,7 +404,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 | Vertex colours | the baked shading only (`ao` as COLOR_0) | The game multiplies it in; nothing else may colour a vertex |
 | Materials | exported, one-sided | Their names and colours drive the finishes |
 | Compression | none (no Draco) | The build adds meshopt; the game ships no Draco decoder |
-| Clips | moving parts only (`clips=True`): node rotation, translation or scale, first key at rest and at 0 s (`export_anim_slide_to_zero`), keyed 30 a second | Thin instances move whole nodes, not bones (below); the game samples clips 30 times a second, and held a clip starting later at rest until then (a pause each round of a loop) |
+| Clips | moving parts only (`clips=True`): node rotation, translation or scale, first key at rest and at 0 s (`export_anim_slide_to_zero`), keyed 30 a second | Thin instances move whole nodes, not bones (below); the game samples clips 60 times a second (`CLIP_RATE`), and held a clip starting later at rest until then (a pause each round of a loop) |
 | Skins, morphs | none | Placed things are thin instances without bones |
 
 ## Validation
@@ -419,7 +419,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   that animates anything but a node's transform or doesn't start at rest or at 0 s (the game holds it at
   rest until its first key: a pause each round of a loop), a `motions` clip the file doesn't have,
   textures over 1024 px, a mapping to a finish that doesn't exist. Warnings: a clip no use plays, a clip
-  with cubic-spline keys (played as straight lines), a part turning over 12° in 1/30 s (the game's samples
+  with cubic-spline keys (played as straight lines), a part turning over 12° in 1/60 s (the game's samples
   blended that far apart shrink it), faces over 1 cm² whose normals are turned against their winding
   (lit as if from behind), over 3 draws or the triangle target, unmapped, double-sided, see-through or emissive
   materials, unused UVs, a floating origin, a Blender-built model off its `Model`'s `centre` (the
