@@ -17,9 +17,9 @@ import type { Content } from '../content/content';
 import type { Rle, TownArea, WorldZone } from '../core/protocol';
 import { random } from './housegen';
 import { fbm } from './noise';
-import { centroid, cropRoads, curve, inside, lengths, nearest, RoadIndex, roadEnds, type Box, type Pt, type RoadPlan } from './roads';
-import { frontageOf, Ground, LotPlacer, plotRect, settleRoads, slotDims, turner, wantedLots, type Facing, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates } from './town';
-import { clearing, countryLane, crossroads, extend, highStreet, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
+import { centroid, cropRoads, curve, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, type Box, type Pt, type RoadPlan } from './roads';
+import { BIG_COURTS, COURTS, frontageOf, Ground, joinUp, LotPlacer, plotRect, settleRoads, slotDims, turner, wantedLots, type Facing, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates } from './town';
+import { clearing, countryLane, crossroads, highStreet, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
 
 type Rand = () => number;
 type Shape = (rand: Rand, box: Box, scale?: number) => RoadLayout;
@@ -449,7 +449,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   const mainSpec = recipe.sizes.big;
   const mainShape = ch.main ?? recipe.roads;
   const layout = mainShape(rand, mainSpec.box, mainSpec.scale);
-  const mainRoads = settleRoads(mainSpec.extend ? extend(rand, layout.roads, mainSpec.box, mainSpec.extend, mainSpec.scale) : layout.roads, mainSpec.box);
+  const mainRoads = settleRoads(joinUp(rand, layout, mainSpec, BIG_COURTS), mainSpec.box);
   const box = mainSpec.box;
   const waterSide = layout.water ?? (rand() < 0.5 ? 'zmin' : 'zmax');
 
@@ -563,7 +563,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       continue;
     }
     const local = ch.hamlet.shape(rand, hb, 1);
-    const laid = settleRoads(local.roads, hb);
+    const laid = settleRoads(joinUp(rand, local, { box: hb, lots: 0, scale: 1 }, COURTS), hb);
     let areaName = worldName(content, kind, rand);
     for (let k = 0; k < 12 && [...plans.map((a) => a.name)].includes(areaName); k++) areaName = worldName(content, kind, rand);
     if (plans.some((a) => a.name === areaName)) areaName = `${areaName} End`;
@@ -593,18 +593,54 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     }
     return 1 + land.slope(i) * 40 + land.woods[i] * 0.3;
   };
+  /** As `roadCost`, but along the water's edge too (not over it), and less put off by the slope: for when that finds no way. */
+  const relaxedCost = (from: Pt | null, to: Pt | null) => {
+    const strict = roadCost(from, to);
+    return (i: number) => (land.water[i] ? Infinity : wetNear[i] ? 30 + land.slope(i) * 15 : Math.min(strict(i), 1 + land.slope(i) * 15 + land.woods[i] * 0.3));
+  };
+  /** The way `astar` finds with `roadCost`; if none, with `relaxedCost`. */
+  const route = (from: Pt | null, to: Pt | null, starts: number[], goal: (i: number) => boolean, h: (i: number) => number) =>
+    astar(gw, gd, roadCost(from, to), starts, goal, h) ?? astar(gw, gd, relaxedCost(from, to), starts, goal, h);
+  /** Country roads the layout found no way for. */
+  const failed: string[] = [];
   /** A country road from `a` (a port) along `cells`, to `b`: smoothed into a curve, leaving and arriving straight. */
   const countryRoad = (a: { p: Pt; dir: Pt }, cells: number[], b: { p: Pt; dir: Pt } | null, ends: RoadPlan['ends'], roadName: string): RoadPlan => {
     const mid = simplify(cells.map((i) => land.centre(i)), 5).slice(1, b ? -1 : undefined);
     const lead = (q: { p: Pt; dir: Pt }, k: number): Pt => [q.p[0] + q.dir[0] * k, q.p[1] + q.dir[1] * k];
-    const tail: Pt[] = b ? [lead(b, 14), b.p] : [];
-    const ctrl = [a.p, lead(a, 14), ...mid.filter((p) => dist(p, a.p) > 22 && (!b || dist(p, b.p) > 22)), ...tail];
-    return { points: curve(ctrl), width: COUNTRY_WIDTH, ends, kind: 'country', name: roadName };
+    // Near an end, only the way's points out in front of it (no doubling back to it: a kink).
+    const before = (q: { p: Pt; dir: Pt }, p: Pt, near: number) => dist(p, q.p) > near && (dist(p, q.p) > 48 || q.dir[0] * (p[0] - q.p[0]) + q.dir[1] * (p[1] - q.p[1]) > dist(p, q.p) * 0.5);
+    const make = (k: number) => {
+      const tail: Pt[] = b ? [lead(b, k), b.p] : [];
+      const ctrl = [a.p, lead(a, k), ...mid.filter((p) => before(a, p, k + 8) && (!b || before(b, p, k + 8))), ...tail];
+      return curve(ctrl);
+    };
+    // (Shorter leads if the longer ones swing it out over the water.)
+    let points = make(14);
+    if (points.some(([x, z]) => land.wet(x, z, 2))) points = make(7);
+    return { points, width: COUNTRY_WIDTH, ends, kind: 'country', name: roadName };
   };
   const portOf = (from: number, to: Pt) =>
     plans[from].ports
       .map((q) => ({ q, score: dist(q.p, to) - (q.dir[0] * (to[0] - q.p[0]) + q.dir[1] * (to[1] - q.p[1])) / (dist(q.p, to) || 1) * 60 + (q.used ? 120 : 0) }))
       .sort((x, y) => x.score - y.score)[0]?.q;
+  /**
+   * Where a country road leaves port `q` towards `toward`: the port itself; one another country
+   * road leaves already, off that road 30 m out from it, square to it (rather than both from the
+   * port, running together a while).
+   */
+  const via = (q: { p: Pt; dir: Pt; used: boolean }, toward: Pt): { p: Pt; dir: Pt } => {
+    if (!q.used) return q;
+    const r = roads.find((o) => o.kind === 'country' && [o.points[0], o.points[o.points.length - 1]].some((e) => dist(e, q.p) < 1));
+    if (!r) return q;
+    const ls = lengths(r.points);
+    const L = ls[ls.length - 1];
+    if (L < 70) return q;
+    const s = dist(r.points[0], q.p) < 1 ? 30 : L - 30;
+    const { p, t } = pointAt(r.points, s, ls);
+    const n = leftOf(t);
+    const k = n[0] * (toward[0] - p[0]) + n[1] * (toward[1] - p[1]) >= 0 ? 1 : -1;
+    return { p, dir: [n[0] * k, n[1] * k] };
+  };
   // Prim's tree over the areas, then the shortest edge it left out.
   const inTree = [0];
   const edges: [number, number][] = [];
@@ -632,27 +668,43 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     return pick;
   };
   for (const [a, b] of edges) {
-    const pa = portOf(a, plans[b].centre);
-    const pb = portOf(b, plans[a].centre);
-    if (!pa || !pb) continue;
+    const qa = portOf(a, plans[b].centre);
+    const qb = portOf(b, plans[a].centre);
+    if (!qa || !qb) continue;
+    const [pa, pb] = [via(qa, qb.p), via(qb, qa.p)];
     const goal = land.cell(pb.p[0] + pb.dir[0] * 8, pb.p[1] + pb.dir[1] * 8);
     const [gx, gz] = land.centre(goal);
-    const cells = astar(gw, gd, roadCost(pa.p, pb.p), [land.cell(pa.p[0] + pa.dir[0] * 8, pa.p[1] + pa.dir[1] * 8)], (i) => i === goal, (i) => dist(land.centre(i), [gx, gz]) / CELL);
-    if (!cells) continue;
+    const cells = route(qa.p, qb.p, [land.cell(pa.p[0] + pa.dir[0] * 8, pa.p[1] + pa.dir[1] * 8)], (i) => i === goal, (i) => dist(land.centre(i), [gx, gz]) / CELL);
+    if (!cells) {
+      failed.push(`no country road between ${plans[a].name} and ${plans[b].name}`);
+      continue;
+    }
     const far = b === 0 ? a : a === 0 ? b : dist(plans[a].centre, mainCentre) > dist(plans[b].centre, mainCentre) ? a : b;
     const near = far === a ? b : a;
     roads.push(countryRoad(pa, cells, pb, ['join', 'join'], uniqueName(`${plans[far].name} Road`, `${plans[near].name} Lane`)));
-    pa.used = pb.used = true;
+    qa.used = qb.used = true;
   }
   // Two or three ways out of the world: from the ports left over (else any), to the nearest edge.
   const outs = 2 + Math.floor(rand() * 2);
   const edgeName = ['North', 'East', 'South', 'West'];
   const usedEdges = new Set<number>();
-  for (let n = 0; n < outs; n++) {
+  /** Ways out tried that found no way (a port, an edge: across the sea, say). */
+  const noWay = new Map<object, Set<number>>();
+  let made = 0;
+  /** Each edge of the world (north, east, south, west): whether any of it is dry land. */
+  const dryEdge = [0, 1, 2, 3].map((side) => {
+    for (let k = 0; k < (side % 2 ? gd : gw); k++) {
+      const i = [k, k * gw + gw - 1, (gd - 1) * gw + k, k * gw][side];
+      if (!wetNear[i]) return true;
+    }
+    return false;
+  });
+  for (let tries = 0; made < outs && tries < outs + 12; tries++) {
     const ports = plans.flatMap((plan) => plan.ports).sort((x, y) => Number(x.used) - Number(y.used));
     let best: { q: (typeof ports)[number]; side: number; d: number } | null = null;
     for (const q of ports) {
       for (const [side, d] of [q.p[1], W - q.p[0], D - q.p[1], q.p[0]].entries()) {
+        if (!dryEdge[side] || noWay.get(q)?.has(side)) continue;
         const facing = [[0, -1], [1, 0], [0, 1], [-1, 0]][side];
         const score = d - (q.dir[0] * facing[0] + q.dir[1] * facing[1]) * 80 + (q.used ? 400 : 0) + (usedEdges.has(side) ? 500 : 0);
         if (!best || score < best.d) best = { q, side, d: score };
@@ -660,18 +712,77 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     }
     if (!best) break;
     const { q, side } = best;
+    const from = via(q, [q.p[0] + [0, 400, 0, -400][side], q.p[1] + [-400, 0, 400, 0][side]]);
     const onEdge = (i: number) => [Math.floor(i / gw) === 0, i % gw === gw - 1, Math.floor(i / gw) === gd - 1, i % gw === 0][side];
-    const cells = astar(gw, gd, roadCost(q.p, null), [land.cell(q.p[0] + q.dir[0] * 8, q.p[1] + q.dir[1] * 8)], onEdge, (i) => [Math.floor(i / gw), gw - 1 - (i % gw), gd - 1 - Math.floor(i / gw), i % gw][side]);
-    if (!cells) continue;
+    const cells = route(q.p, null, [land.cell(from.p[0] + from.dir[0] * 8, from.p[1] + from.dir[1] * 8)], onEdge, (i) => [Math.floor(i / gw), gw - 1 - (i % gw), gd - 1 - Math.floor(i / gw), i % gw][side]);
+    if (!cells) {
+      // (Another port or edge, then.)
+      noWay.set(q, (noWay.get(q) ?? new Set()).add(side));
+      continue;
+    }
     const last = land.centre(cells[cells.length - 1]);
     const beyond: Pt = [last[0] + [0, 40, 0, -40][side], last[1] + [-40, 0, 40, 0][side]];
-    const road = countryRoad(q, [...cells], null, ['join', 'out'], uniqueName(`${edgeName[side]} Road`, `${edgeName[side]} Lane`));
+    const road = countryRoad(from, [...cells], null, ['join', 'out'], uniqueName(`${edgeName[side]} Road`, `${edgeName[side]} Lane`));
     road.points = curve([...simplify(road.points, 0.3), beyond]);
     roads.push(road);
     q.used = true;
     usedEdges.add(side);
+    made++;
   }
-  // Ports nobody took: their roads end there.
+  if (made < 2) failed.push(`${made} ways out of the world (two or more wanted)`);
+  // Ports nobody took: a country road on from each, to the nearest country road, another area's
+  // port nobody took or the edge of the world, whichever is nearest (a dead end only if none is).
+  const plain = (p: Pt) => plans.every((a) => p[0] < a.rect.x - 30 || p[1] < a.rect.z - 30 || p[0] > a.rect.x + a.rect.w + 30 || p[1] > a.rect.z + a.rect.d + 30);
+  const edgeOf = (i: number) => [Math.floor(i / gw) === 0, i % gw === gw - 1, Math.floor(i / gw) === gd - 1, i % gw === 0].indexOf(true);
+  for (const [k, plan] of plans.entries()) {
+    for (const q of plan.ports) {
+      if (q.used) continue;
+      const country = new Map<number, number>();
+      roads.forEach((r, i) => {
+        if (r.kind === 'country') for (const p of r.points) if (plain(p)) country.set(land.cell(p[0], p[1]), i);
+      });
+      const others = plans.flatMap((o, a) => (a === k ? [] : o.ports.filter((x) => !x.used)));
+      const portAt = new Map(others.map((x) => [land.cell(x.p[0] + x.dir[0] * 8, x.p[1] + x.dir[1] * 8), x]));
+      const goal = (i: number) => country.has(i) || portAt.has(i) || edgeOf(i) >= 0;
+      // (Into the other areas only by their ports.)
+      const cost = (strict: boolean) => {
+        const c = (strict ? roadCost : relaxedCost)(q.p, null);
+        return (i: number) => (areaBlock[i] && others.some((x) => dist(land.centre(i), x.p) < 26) ? 1 : c(i));
+      };
+      const start = [land.cell(q.p[0] + q.dir[0] * 8, q.p[1] + q.dir[1] * 8)];
+      const cells = astar(gw, gd, cost(true), start, goal, () => 0) ?? astar(gw, gd, cost(false), start, goal, () => 0);
+      const end = cells?.[cells.length - 1];
+      if (!cells || end === undefined) {
+        failed.push(`no country road on from ${plan.name}`);
+        continue;
+      }
+      const roadName = uniqueName(`${plan.name} Road`, `${plan.name} Lane`);
+      const to = portAt.get(end);
+      const other = country.get(end);
+      if (to) {
+        roads.push(countryRoad(q, cells, to, ['join', 'join'], roadName));
+        to.used = true;
+      } else if (other !== undefined) {
+        // Into the other road square to it, ending on its middle.
+        // (Met from the side the way comes from: the last cell but one or two before it.)
+        const c = cells.length >= 3 ? land.centre(cells[cells.length - 3]) : q.p;
+        const pts = roads[other].points;
+        const at = nearest(pts, c[0], c[1]);
+        const T = pointAt(pts, at.s).p;
+        const n = leftOf(pointAt(pts, at.s).t);
+        roads.push(countryRoad(q, cells.slice(0, -1), { p: T, dir: [n[0] * at.side, n[1] * at.side] }, ['join', 'join'], roadName));
+      } else {
+        const side = edgeOf(end);
+        const last = land.centre(end);
+        const beyond: Pt = [last[0] + [0, 40, 0, -40][side], last[1] + [-40, 0, 40, 0][side]];
+        const road = countryRoad(q, cells, null, ['join', 'out'], roadName);
+        road.points = curve([...simplify(road.points, 0.3), beyond]);
+        roads.push(road);
+      }
+      q.used = true;
+    }
+  }
+  // Ports still nobody's (no way on from them): their roads end there.
   for (const plan of plans) {
     for (const q of plan.ports) {
       const road = roads[q.road];
@@ -876,7 +987,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     households: [],
     seed,
     world: { kind, size: 'big', tagline, landscape },
-    diagnostics: { dropped: lots.dropped },
+    diagnostics: { dropped: lots.dropped, ...(failed.length ? { roads: failed } : {}) },
     open: { areas, zones, water: rle(waterMask), pads, stops, parking },
   };
 }

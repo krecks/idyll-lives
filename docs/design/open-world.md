@@ -53,7 +53,10 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   `'street'` (default) · `'lane'` · `'country'` (between areas) · `'trail'` (2 m, foot only).
   `RoadPlan.area`: index into `areas` (absent for country roads and trails between areas).
   The sim builds its graph from the polylines: endpoints, plus joins snapped within
-  `width / 2 + 1` m.
+  `max(width) / 2 + 1` m of the other road's middle. A new world's roads (every size) are one
+  network by that rule (`game/roads.ts` `connect`: lanes go on to another road; a court or two
+  per area at most, none longer than 45 m), checked by `tools/worlds/sample.ts` and
+  `generated_worlds.rs`.
 - `areas: { name, kind: 'hamlet' | 'countryside', x, z, w, d }[]` — area 0 is the main town.
 - `plots[].area?: number`, `plots[].kind?: 'home' | 'farm' | 'public' | 'shop' | 'countryside'`.
   Countryside plots are public, unfenced, with an `entry` at their trail end.

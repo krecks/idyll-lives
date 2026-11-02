@@ -620,6 +620,33 @@ impl Graph {
         self.edges.is_empty()
     }
 
+    /// How many networks the roads make, none reaching another (0 without roads): a town whose
+    /// roads all join up is one.
+    pub fn networks(&self) -> usize {
+        let mut seen = vec![false; self.nodes.len()];
+        let mut count = 0;
+        for start in 0..self.nodes.len() {
+            if seen[start] || self.adj[start].is_empty() {
+                continue;
+            }
+            count += 1;
+            seen[start] = true;
+            let mut stack = vec![start];
+            while let Some(n) = stack.pop() {
+                for &e in &self.adj[n] {
+                    let edge = &self.edges[e as usize];
+                    for m in [edge.a as usize, edge.b as usize] {
+                        if !seen[m] {
+                            seen[m] = true;
+                            stack.push(m);
+                        }
+                    }
+                }
+            }
+        }
+        count
+    }
+
     /// Where three or more stretches of road meet.
     pub fn junctions(&self) -> impl Iterator<Item = [f32; 2]> + '_ {
         self.adj
@@ -1174,6 +1201,14 @@ mod tests {
         assert_eq!(g.edges.len(), 4);
         let degree: Vec<usize> = g.adj.iter().map(Vec::len).collect();
         assert_eq!(degree.iter().filter(|&&d| d == 3).count(), 1, "{degree:?}");
+        assert_eq!(g.networks(), 1);
+        // A lane ending 5 m short of the street is a network of its own.
+        let apart = Graph::build(&[
+            road(&line([0.0, 10.0], [100.0, 10.0]), 6.0, RoadKind::Street),
+            road(&line([50.0, 18.0], [50.0, 60.0]), 6.0, RoadKind::Lane),
+        ]);
+        assert_eq!(apart.networks(), 2);
+        assert_eq!(Graph::default().networks(), 0);
     }
 
     #[test]
