@@ -237,6 +237,18 @@ export interface CarPose {
   yaw: number;
 }
 
+/** Where the point `inCar` last looked at is in the car (m): along it (+: towards its front) and across it (+: towards +x at yaw 0). */
+const inside = { along: 0, across: 0 };
+
+/** Whether (x, z) is in `body` standing at `pose` (its box seen from above): someone sat in it (`pc/cars.ts` `seatAt`, `carriedAlong`). */
+export function inCar(body: CarBody, pose: CarPose, x: number, z: number): boolean {
+  const [dx, dz] = [x - pose.x, z - pose.z];
+  const [s, c] = [Math.sin(pose.yaw), Math.cos(pose.yaw)];
+  inside.along = dx * s + dz * c;
+  inside.across = dx * c - dz * s;
+  return Math.abs(inside.along) < body.len / 2 && Math.abs(inside.across) < body.wid / 2;
+}
+
 /**
  * Someone at (x, z) facing `yaw` with `body` at `from`: where they are with it at `to` instead
  * (`out`), carried along rigidly, turned with it; false (`out` untouched) when they aren't in it.
@@ -244,11 +256,8 @@ export interface CarPose {
  * drawn (`pc/cars.ts` `ride`).
  */
 export function carriedAlong(body: CarBody, from: CarPose, to: CarPose, x: number, z: number, yaw: number, out: CarPose): boolean {
-  const [dx, dz] = [x - from.x, z - from.z];
-  const [s, c] = [Math.sin(from.yaw), Math.cos(from.yaw)];
-  const along = dx * s + dz * c;
-  const across = dx * c - dz * s;
-  if (Math.abs(along) >= body.len / 2 || Math.abs(across) >= body.wid / 2) return false;
+  if (!inCar(body, from, x, z)) return false;
+  const { along, across } = inside;
   const [s1, c1] = [Math.sin(to.yaw), Math.cos(to.yaw)];
   out.x = to.x + across * c1 + along * s1;
   out.z = to.z - across * s1 + along * c1;
