@@ -37,10 +37,10 @@
  */
 
 import type { ModelEntry } from '../../assets/types';
-import { groundDepth, objectCentre, storeyOfRow, storeyRow, type ObjectPlacement, type Opening, type PlotInfo, type RoadPlan, type WorldStructure } from '../../core/protocol';
+import { groundDepth, objectCentre, storeyOfRow, storeyRow, type GarageInfo, type ObjectPlacement, type Opening, type PlotInfo, type RoadPlan, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
-import { CARS, CAR_PAINT, garageFor, hash, paintCar, parkCar, pick, type CarBody } from './cars';
+import { CARS, CAR_PAINT, garageAt, garageFor, hash, paintCar, parkCar, pick, type CarBody } from './cars';
 import { chunkAt, hashNumbers, hashString, RectGrid } from './chunks';
 import type { HousePlanner, SilhouettePlan, SilhouetteSpec } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
@@ -659,7 +659,9 @@ export class TownStreet {
       world.storeys,
       world.basement,
       m ? keyOf(m, () => JSON.stringify([m.seed ?? 0, m.streets, m.roads, m.paths, m.facing, m.world?.fields, m.home])) : '-',
-      world.garages ? keyOf(world.garages, () => JSON.stringify(world.garages)) : '-',
+      // (Whether the town has them: which garages and where is `setWorld`'s, so one built or sold
+      // plans only the chunks round it again.)
+      world.garages ? 'garages' : '-',
       mode === 'town' ? (world.cars ? keyOf(world.cars, () => JSON.stringify(world.cars)) : '-') : !!world.cars,
       keyOf(world.plots, () => JSON.stringify(world.plots.map((p) => [p.id, p.x, p.z, p.w, p.d, p.public, p.entry]))),
     ].join('|');
@@ -742,16 +744,17 @@ export class TownStreet {
     this.legacy.clear();
     const garages = new Map<number, SilhouetteSpec['garage']>();
     for (const L of this.plots) {
-      if (!L.house || L.base === 'shop' || L.base === 'park') continue;
+      if (L.base === 'shop' || L.base === 'park') continue;
       if (world.garages) {
+        // (One the player built stands on a lot with no house yet too, its door any way round.)
         const g = world.garages.find((g) => g.plot === L.plot.id);
-        if (g) garages.set(L.info.id, { x0: g.x0, z0: g.z0, x1: g.x1, z1: g.z1 });
-      } else if (L.base === 'house') {
+        if (g && (L.house || g.rot !== undefined)) garages.set(L.info.id, { x0: g.x0, z0: g.z0, x1: g.x1, z1: g.z1, ...(g.rot !== undefined ? { door: garageDoor(g.rot) } : {}) });
+      } else if (L.base === 'house' && L.house) {
         garages.set(L.info.id, this.legacyGarage(L, NO_FOCUS));
       }
     }
     for (const [plot, g] of garages) {
-      if (g) blocked.add({ x: g.x0 - T, z: g.z0 - T, w: g.x1 - g.x0 + 2 * T, d: g.z1 - g.z0 + 2 * T, plot, kind: world.garages ? 'garage' : 'legacyGarage', hash: mix(mix(g.x0 * 100, g.z0 * 100), mix(g.x1 * 100, g.z1 * 100)) });
+      if (g) blocked.add({ x: g.x0 - T, z: g.z0 - T, w: g.x1 - g.x0 + 2 * T, d: g.z1 - g.z0 + 2 * T, plot, kind: world.garages ? 'garage' : 'legacyGarage', hash: mix(mix(mix(g.x0 * 100, g.z0 * 100), mix(g.x1 * 100, g.z1 * 100)), g.door ? g.door[0] * 3 + g.door[1] + 5 : 0) });
     }
     this.garages = garages;
   }
@@ -938,10 +941,12 @@ export class TownStreet {
     let lot: StreetPlan['lot'] = null;
 
     // ---- its house (the player's in the menus' town a shell; the viewed lot's only its garage) ----
-    if ((kind === 'house' || kind === 'shop' || home) && L.house) {
+    // (A garage the player built on their lot before any house: it stands there alone.)
+    const lone = home && game && !L.house ? (this.garages.get(L.info.id) ?? null) : null;
+    if ((kind === 'house' || kind === 'shop' || home) && (L.house || lone)) {
       const g = kind === 'shop' ? null : world.garages ? (this.garages.get(L.info.id) ?? null) : home ? null : this.legacyGarage(L, focus);
       if (!(home && game && !g)) {
-        const [x0, z0, x1, z1] = L.info.house!;
+        const [x0, z0, x1, z1] = L.info.house ?? [lone!.x0, lone!.z0, lone!.x1, lone!.z1];
         const front: [number, number] = L.turned ? [-L.front, 0] : [0, L.front];
         spec = { x0, z0, x1, z1, lot: L.info, home, garageOnly: home && game, front, door: L.door, garage: g, roof: L.plot.roof, storeys: L.plot.storeys, lived: kind === 'house' && this.options.lived };
         // The openings on and round its walls, in the town's order (upstairs ones found on the ground's rows).
@@ -1633,6 +1638,33 @@ function layout(world: WorldStructure, streets: Rect[], paths: Rect[], facingOf?
 /** A garage at the inner end of the driveway, beside the house, when it fits clear of `blocked` (the town's; `garageFor`): as laid out. */
 function garage(L: PlotLayout, blocked: Rect[]): SilhouetteSpec['garage'] {
   return L.drive && L.house ? garageFor(L.plot, L.house, L.drive, L.front, blocked.map((b) => localRect(L.turned, b))) : null;
+}
+
+/** The outward normal (x, z) of a garage's door facing `rot` (as a thing's: 0 towards +z, 1 +x, 2 -z, 3 -x). */
+export function garageDoor(rot: number): [number, number] {
+  return ([[0, 1], [1, 0], [0, -1], [-1, 0]] as [number, number][])[((rot % 4) + 4) % 4];
+}
+
+/** A garage door's outward normal as a facing (`garageDoor` back). */
+function doorRot([x, z]: readonly [number, number]): number {
+  return z > 0 ? 0 : x > 0 ? 1 : z < 0 ? 2 : 3;
+}
+
+/**
+ * The garage plot `plotId` could have at the inner end of its driveway, beside its house, its door
+ * towards the street: where the town puts one (`garageAt`, on any house, not only seven in ten),
+ * clear of `blocked` (things, on the town) by a tile. On the town, with the way its door faces
+ * (`rot`) and the driveway. Null: no house, no driveway, or no room for it there.
+ */
+export function drivewayGarage(world: WorldStructure, plotId: number, blocked: readonly Rect[]): { garage: Omit<GarageInfo, 'plot' | 'rot'>; rot: number; drive: Rect } | null {
+  const i = world.plots.findIndex((p) => p.id === plotId);
+  if (i < 0) return null;
+  const streets = (world.meta?.streets ?? []).filter((s) => s.w >= s.d);
+  const L = layout({ ...world, plots: [world.plots[i]] } as WorldStructure, streets, world.meta?.paths ?? [], world.meta?.facing?.[i])[0];
+  if (!L?.drive || !L.house) return null;
+  const g = garageAt(L.plot, L.house, L.drive, L.front, blocked.map((b) => localRect(L.turned, b)));
+  if (!g) return null;
+  return { garage: townBox(L.turned, g), rot: doorRot(L.turned ? [-L.front, 0] : [0, L.front]), drive: townRect(L.turned, L.drive) };
 }
 
 /** A fence or hedge along a line, skipping stretches that would run through objects. */

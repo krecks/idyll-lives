@@ -60,6 +60,10 @@ export type Command =
   | { type: 'buildBlueprint'; household: number; blueprint: unknown }
   /** Moves the room around tile (x, z) by (dx, dz) tiles, with what stands in it. */
   | { type: 'moveRoom'; household: number; x: number; z: number; dx: number; dz: number }
+  /** A garage on the home lot: its walls' centre lines, its door facing `rot` (as a thing's: 0 towards +z, 1 +x, 2 -z, 3 -x); content `build.garage`. */
+  | { type: 'buildGarage'; household: number; x0: number; z0: number; x1: number; z1: number; rot: number }
+  /** Takes down the home lot's garage (sold back for `objectRules.resale` of its price). */
+  | { type: 'sellGarage'; household: number }
   /** New residents move into the household's home (`bonds` index into `sims`); `name` renames the household. */
   | { type: 'moveIn'; household: number; name?: string; sims: SimSpawn[]; bonds: { a: number; b: number; preset: string }[] }
   /** The resident's own routine blocks (the whole list). */
@@ -596,7 +600,21 @@ export interface WorldStructure {
    */
   cars?: CarInfo[];
   /** Garages at the inner ends of driveways (sim-core `cars::Garage`: wall centre lines, by plot). Absent: a game from before them (the street places neighbours' own). */
-  garages?: { plot: number; x0: number; z0: number; x1: number; z1: number }[];
+  garages?: GarageInfo[];
+}
+
+/**
+ * A garage (`WorldStructure.garages`): its walls' centre lines, and for one the player built (Build
+ * mode's Garage tool) the way its door faces (`rot`, as a thing's: 0 towards +z, 1 +x, 2 -z, 3 -x).
+ * No `rot`: its door faces the street, as the town placed it.
+ */
+export interface GarageInfo {
+  plot: number;
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+  rot?: number;
 }
 
 /** A household's car (`WorldStructure.cars`): where it parks (its middle, which way it faces: 0 towards +z) and its look (`shared/cars.ts`: its size is its body's). */
@@ -750,7 +768,7 @@ export interface Catalog {
     upgradeSkillPerLevel: number;
     resale: number;
   };
-  build: { wall: number; door: number; window: number; remove: number; diagonalWall?: number; fence?: number; gate?: number };
+  build: { wall: number; door: number; window: number; remove: number; diagonalWall?: number; fence?: number; gate?: number; garage?: number };
 }
 
 export interface CareerEntry {

@@ -650,6 +650,11 @@ export async function startSession(
       game.placing = { def: obj.def, rot: obj.rot, turn: obj.turn ?? 0, objectId, size: ownSize(content, obj), tall: obj.tall ?? 0 };
     },
     rotatePlacing(fine = false) {
+      if (buildBuy.garageTool()) {
+        buildBuy.rotateGarage();
+        play('rotate');
+        return;
+      }
       if (!game.furnishing && !buildBuy.stairsTool()) return;
       // Facing and turn as one angle: a quarter turn, or 15° for things that turn freely.
       const turned = (def: string, rot: number, turn: number) => {
@@ -733,6 +738,12 @@ export async function startSession(
         buildBuy.clearPreviews();
       }
       play('tab');
+    },
+    buildGarageAtDrive() {
+      buildBuy.buildDrivewayGarage();
+    },
+    sellGarage() {
+      buildBuy.sellGarage();
     },
     setRoof(style, color) {
       bridge.send({ type: 'setRoof', household: game.home, style, color });
@@ -1531,6 +1542,7 @@ export async function startSession(
         return controls.toggleEyedropper();
       case 'Delete':
       case 'Backspace':
+        if (buildBuy.garageTool()) return controls.sellGarage();
         if (game.furnishing || buildBuy.stairsTool()) {
           const target = game.placing?.objectId ?? game.buySelection;
           if (target !== null) controls.sell(target);

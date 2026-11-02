@@ -284,8 +284,8 @@ export function parkCar(plot: Rect, spot: DriveEnd): ParkedCar | null {
 // ---- garages ---------------------------------------------------------------------------
 
 /** A garage's depth, and its least width between its wall lines: 3 m inside, a single garage's (its door 2.4 m). */
-const GARAGE_DEPTH = 5.4;
-const GARAGE_WIDTH = 3.14;
+export const GARAGE_DEPTH = 5.4;
+export const GARAGE_WIDTH = 3.14;
 /** Half a wall's thickness (as in `house.ts`). */
 const WALL_HALF = 0.07;
 /** How far a garage keeps from the things on the lot (m): a tile, to use them from and walk round them by. */
@@ -307,6 +307,14 @@ export interface Garage {
  */
 export function garageFor(plot: Rect, h: { x0: number; z0: number; x1: number; z1: number }, d: Rect, front: 1 | -1, blocked: readonly Rect[]): Garage | null {
   if (hash(plot.x, plot.z, 50) > 0.7) return null;
+  return garageAt(plot, h, d, front, blocked);
+}
+
+/**
+ * The garage `garageFor` gives a house that has one, on any house (the player builds it: Build
+ * mode's Garage tool, at the end of their driveway): null when it doesn't fit there.
+ */
+export function garageAt(plot: Rect, h: { x0: number; z0: number; x1: number; z1: number }, d: Rect, front: 1 | -1, blocked: readonly Rect[]): Garage | null {
   // As wide as the drive and a little more, at least a single garage's `GARAGE_WIDTH`, moved
   // (off the drive's middle if it must) to stand clear of the house and the plot's edge.
   const toRight = d.x >= h.x1;
