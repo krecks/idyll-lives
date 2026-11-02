@@ -454,11 +454,12 @@ export async function startSession(
    * first) are read in idle moments once downloaded: a lot the camera settles on next is built from
    * them without reading each file in the frame that needs it.
    */
-  const readAhead = () => {
+  const readAhead = (ranks?: ReadonlyMap<string, number>) => {
     if (!revealed || disposed || !world) return;
-    const p = viewPlot === null ? null : world.plots[viewPlot];
-    renderer.parseAhead(parseAheadFiles(content, assets, world, p ? { x: p.x, z: p.z, w: p.w, d: p.d } : null, watched));
+    renderer.parseAhead(parseAheadFiles(content, assets, world, ranks ?? fileRanks(world)));
   };
+  /** How soon each of the town's model files is wanted, by the lot in view and where the camera looks (`streamRanks`). */
+  const fileRanks = (w: WorldStructure) => streamRanks(content, assets, w, viewPlot === null ? null : (w.plots[viewPlot] ?? null), watched);
   let autosaveMinutes = -1;
   /** The performance overlay setting last applied (F3 opens and closes the overlay in between). */
   let showFps: boolean | null = null;
@@ -1361,10 +1362,9 @@ export async function startSession(
     if (world?.meta?.world?.size === 'big') bridge.setWatch(rect);
     watched = { x: rect[0], z: rect[1], w: rect[2] - rect[0], d: rect[3] - rect[1] };
     if (!world) return;
-    const p = viewPlot === null ? null : world.plots[viewPlot];
-    const ranks = streamRanks(content, assets, world, p ? { x: p.x, z: p.z, w: p.w, d: p.d } : null, watched);
+    const ranks = fileRanks(world);
     reprioritize((url) => ranks.get(url) ?? Infinity);
-    readAhead();
+    readAhead(ranks);
   });
   controls.setWallMode(game.wallMode);
 

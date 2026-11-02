@@ -61,10 +61,15 @@ function inView(o: { x: number; z: number; w: number; d: number }, view: Rect | 
   return x >= view.x && z >= view.z && x <= view.x + view.w && z <= view.z + view.d;
 }
 
+/** A model's file as its entry names it (what a build loads); null if there's none. */
+function modelFile(assets: AssetRegistry, key: string): string | null {
+  return assets.has(key, 'model') ? (assets.get(key, 'model')?.url ?? null) : null;
+}
+
+/** A model's file as it's downloaded. */
 function modelUrl(assets: AssetRegistry, key: string): string | null {
-  if (!assets.has(key, 'model')) return null;
-  const entry = assets.get(key, 'model');
-  return entry?.url ? optimizedUrl(entry.url) : null;
+  const url = modelFile(assets, key);
+  return url ? optimizedUrl(url) : null;
 }
 
 /** Icons and character sets the menus and character creation show (boot's first loading screen). */
@@ -172,19 +177,24 @@ const PARSE_AHEAD = 24;
 
 /**
  * The model files of the town's things to read ahead of time, in idle moments (`Renderer.parseAhead`):
- * those round the camera, then the rest, nearest first (`streamRanks` 1 and up; the focus lot's are
- * built anyway), at most `limit`. Each as its entry names it (`url`, what a build loads) and as the
- * stream keys its download (`file`).
+ * those round the camera, then the rest, nearest first (`ranks`, from `streamRanks`: 1 and up; the
+ * focus lot's are built anyway), at most `limit`. Each as its entry names it (`url`, what a build
+ * loads) and as the stream keys its download (`file`).
  */
-export function parseAheadFiles(content: Content, assets: AssetRegistry, world: Pick<WorldStructure, 'objects'>, view: Rect | null, watch: Rect | null, limit = PARSE_AHEAD): { url: string; file: string }[] {
-  const ranks = streamRanks(content, assets, world, view, watch);
+export function parseAheadFiles(
+  content: Content,
+  assets: AssetRegistry,
+  world: Pick<WorldStructure, 'objects'>,
+  ranks: ReadonlyMap<string, number>,
+  limit = PARSE_AHEAD,
+): { url: string; file: string }[] {
   const out: { url: string; file: string; rank: number }[] = [];
   const seen = new Set<string>();
   for (const o of world.objects) {
     const key = content.object(o.def)?.model ?? `model.${o.def}`;
-    if (seen.has(key) || !assets.has(key, 'model')) continue;
+    if (seen.has(key)) continue;
     seen.add(key);
-    const url = assets.get(key, 'model')?.url;
+    const url = modelFile(assets, key);
     if (!url) continue;
     const file = withoutBuild(optimizedUrl(url));
     const rank = ranks.get(file);
