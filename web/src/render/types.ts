@@ -596,6 +596,13 @@ export interface ItemPreviews {
   thumbnail(model: string, footprint: [number, number], priority?: 'now' | 'idle', signal?: AbortSignal): Promise<string | null>;
   /** Draws pictures ahead of time, in idle moments (opening the catalog is then instant). */
   prefetch(models: readonly { model: string; footprint: [number, number] }[]): void;
+  /**
+   * Holds the pictures drawn ahead of time (`idle`) while `hold` is set: in Live, where the camera
+   * moves and every frame counts (a picture is a model built, its shaders made and a read-back on a
+   * device of its own, beside the game's: big worlds' frames held up 50–200 ms by them). Those on
+   * screen (`now`) are drawn all the same.
+   */
+  holdAhead(hold: boolean): void;
   /** The cached picture, if it has been drawn. */
   cachedThumbnail(model: string): string | null;
   /** The cached turntable, if it has been drawn. */

@@ -582,6 +582,8 @@ export async function startSession(
       game.eyedropper = false;
       game.pickHint = null;
       game.mode = mode;
+      // (The catalog's pictures are drawn ahead of time in Build and Create, not in Live's frames.)
+      services.items.holdAhead(mode === 'live');
       refreshRoomOverlay();
       play(mode === 'live' ? 'close' : fromLive ? 'open' : 'tab');
       game.menu = null;
@@ -1655,6 +1657,8 @@ export async function startSession(
         prefetchTimer = setTimeout(() => {
           // (Not while benchmarking: drawing the pictures would show in the measurements.)
           if (disposed || BENCH) return;
+          // (In Live they wait for Build: `holdAhead`.)
+          services.items.holdAhead(game.mode === 'live');
           services.items.prefetch(content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
         }, PREFETCH_PICTURES_MS);
       })();
@@ -1699,6 +1703,7 @@ export async function startSession(
       clearInterval(statsTimer);
       clearInterval(autosaveTimer);
       clearTimeout(prefetchTimer);
+      services.items.holdAhead(false);
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pagehide', onLeave);
