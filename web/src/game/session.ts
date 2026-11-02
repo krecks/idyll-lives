@@ -29,6 +29,7 @@ import { app } from '../ui/app.svelte';
 import { prefetchCatalog, services, type GameControls } from '../ui/services';
 import { game, nextWallMode, toast } from '../ui/state.svelte';
 import { saveDebugReport } from '../ui/debugReport';
+import { lotInSentence } from '../ui/place';
 import { ideaToasts } from '../ui/planner/ideaToasts';
 import { aboutUs } from '../ui/story';
 import { BubbleLayer } from './bubbles';
@@ -606,8 +607,8 @@ export async function startSession(
       // The view goes along with them (Esc lets go).
       if (game.mode === 'live' && who) {
         controls.follow(who.id);
-        const hosts = game.households.find((h) => h.plot === plot && !game.plots[plot]?.public);
-        toast(`${who.name} is on the way to ${hosts ? `the ${hosts.name}s` : (game.plots[plot]?.name ?? 'visit')}.`);
+        const p = game.plots[plot];
+        toast(`${who.name} is on the way to ${p ? lotInSentence(p, game.households) : 'visit'}.`);
       }
     },
     goHome() {
