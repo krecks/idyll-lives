@@ -228,7 +228,8 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
         && let Some(&exit) = w.exits.get(c.exit)
     {
         let walk = crate::world::WALK_SPEED * sim.walk_speed(&w.content) / MINUTES_PER_TICK;
-        let minutes = w.travel.eta(sim.pos, exit, crate::travel::Mode::Foot, walk) * WALK_MARGIN
+        let from = on_ground(w, sim.pos);
+        let minutes = w.travel.eta(from, exit, crate::travel::Mode::Foot, walk) * WALK_MARGIN
             + OUT_OF_THE_HOUSE;
         let total = ticks(minutes + w.content.career_rules.commute_minutes);
         if total > c.ticks
@@ -240,6 +241,18 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
         }
     }
     planned
+}
+
+/// Where `p` is over the ground: upstairs and the basement are rows away in the stacked grid
+/// (`path::StairMap::depth`), not that far to walk (a commute timed from bed upstairs had them
+/// setting off for work in the middle of the night).
+fn on_ground(w: &World, p: [f32; 2]) -> [f32; 2] {
+    let depth = w.stairs.depth as f32;
+    if depth > 0.0 {
+        [p[0], p[1].rem_euclid(depth)]
+    } else {
+        p
+    }
 }
 
 /// Minutes added to the walk from the front door for getting out of the house to it, and a
@@ -302,10 +315,15 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
         target,
         Some(&grounds),
     )
-    .map(|wp| crate::travel::length(from, &wp));
+    .map(|wp| {
+        let wp: Vec<[f32; 2]> = wp.iter().map(|&p| on_ground(w, p)).collect();
+        crate::travel::length(on_ground(w, from), &wp)
+    });
     let minutes = match metres {
         Some(m) => m / walk.max(1e-3),
-        None => w.travel.eta(from, target, crate::travel::Mode::Foot, walk),
+        None => w
+            .travel
+            .eta(on_ground(w, from), target, crate::travel::Mode::Foot, walk),
     } * WALK_MARGIN
         + OUT_OF_THE_HOUSE;
     let total = minutes + w.content.career_rules.commute_minutes;

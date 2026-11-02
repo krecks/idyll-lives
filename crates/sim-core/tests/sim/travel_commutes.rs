@@ -154,3 +154,41 @@ fn the_walk_is_timed_to_the_quickest_way_out() {
         walkers.len()
     );
 }
+
+/// A walk worked out from upstairs (in bed at night, say) is timed along the ground, not across
+/// the rows the storeys stack in (which had people setting off for work in the small hours).
+#[test]
+fn walks_from_upstairs_are_timed_on_the_ground() {
+    let content = common::content();
+    // A two-storey house (the same room on both, stairs inside, the upper storey on rows 32..)
+    // in an open-world town, its way out at the foot of the lot: Ada, off to work, upstairs and
+    // Ben, the same, downstairs.
+    let town = |z: f32| {
+        format!(
+            r#"{{"width":24,"depth":32,"storeys":2,"size":"big",
+            "walls":[[4,2,12,2],[4,10,12,10],[4,2,4,10],[12,2,12,10],[4,34,12,34],[4,42,12,42],[4,34,4,42],[12,34,12,42]],
+            "doors":[{{"x":6,"z":10,"axis":"x"}}],
+            "plots":[{{"name":"Home","x":2,"z":1,"w":16,"d":16,"entry":[9.5,16.5]}}],
+            "households":[{{"name":"Player","plot":0,"player":true}}],
+            "objects":[{{"def":"stairs","x":11,"z":3,"rot":0}}],
+            "exits":[[9.5,31.5]],
+            "sims":[{{"name":"Ada","age":30,"traits":["cheerful"],"x":6.5,"z":{z},"job":{{"career":"journalism.print","level":0}}}},
+                    {{"name":"Ben","age":30,"traits":["cheerful"],"x":6.5,"z":5.5,"job":{{"career":"journalism.print","level":0}}}}]}}"#
+        )
+    };
+    let walk = |z: f32| {
+        let mut w = World::from_json(&content, &town(z), 1).unwrap();
+        assert_eq!(w.stair_map().depth, 32);
+        w.tick_once();
+        let c = w.sims[0].commute().expect("a commute");
+        (c.walk, w.sims[1].commute().unwrap().walk)
+    };
+    let (upstairs, ben) = walk(5.5 + 32.0);
+    let (downstairs, _) = walk(5.5);
+    assert_eq!(downstairs, ben);
+    // Up the stairs and down again: a few metres more, not a storey's rows (32 m, 20 minutes).
+    assert!(
+        upstairs > downstairs && upstairs < downstairs + 10.0,
+        "{upstairs:.1} minutes from upstairs, {downstairs:.1} from downstairs"
+    );
+}
