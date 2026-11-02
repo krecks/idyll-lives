@@ -139,17 +139,21 @@ async function start(content: string, source: GameSource, speed: number | undefi
     scope.postMessage({ type: 'error', message, fatal: true, problem: problem ?? undefined });
     return;
   }
+  watch(game);
+  // The first UI view is taken before the start's speed holds the game: it carries the game's own
+  // speed (a save's), which play resumes at.
+  const ui = JSON.parse(game.ui_update());
   // (Before the first step: a game that starts paused runs none.)
   if (speed !== undefined) game.command(JSON.stringify({ type: 'setSpeed', speed }));
-  watch(game);
   const layout: SnapshotLayout = JSON.parse(game.snapshot_layout());
 
   const shared = typeof SharedArrayBuffer !== 'undefined' && self.crossOriginIsolated ? createSharedSnapshot(layout) : null;
   writer = shared ? new SharedSnapshotWriter(shared, layout.capacity) : null;
-  scope.postMessage({ type: 'ready', layout, shared, catalog: JSON.parse(game.catalog()) });
+  scope.postMessage({ type: 'ready', layout, shared, catalog: JSON.parse(game.catalog()), speed: ui.speed });
 
   publish(true);
-  postUi();
+  // (The next update says the speed it's held at.)
+  scope.postMessage({ type: 'ui', ui });
   runLoop(1000 / layout.ticksPerSecond);
 }
 

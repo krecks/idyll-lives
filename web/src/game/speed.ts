@@ -13,16 +13,22 @@ export type SpeedHold = 'loading' | 'menu' | 'build';
 
 export class GameSpeed {
   /** The speed the player chose (0: paused). */
-  chosen = 1;
+  chosen: number;
   /** The last speed above 0 (Space resumes at it). */
-  last = 1;
+  last: number;
   private readonly holds = new Set<SpeedHold>(['loading']);
 
   /**
    * `send`: runs the simulation at a speed (and shows it), each time that changes. Loading holds
-   * time from the start (the simulation starts paused: `SimBridge.start`).
+   * time from the start (the simulation starts paused: `SimBridge.start`). `saved`: the speed the
+   * game was saved at, which play resumes at (a game saved paused, under a menu or in Build: at 1).
    */
-  constructor(private readonly send: (speed: number) => void) {}
+  constructor(
+    private readonly send: (speed: number) => void,
+    saved = 1,
+  ) {
+    this.chosen = this.last = saved > 0 ? saved : 1;
+  }
 
   /** The speed the simulation runs at. */
   get running(): number {

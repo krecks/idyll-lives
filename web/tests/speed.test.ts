@@ -5,10 +5,10 @@
 import { describe, expect, test } from 'bun:test';
 import { GameSpeed } from '../src/game/speed';
 
-/** A speed, and what it sent the simulation. */
-function speed(): { speed: GameSpeed; sent: number[] } {
+/** A speed (for a game saved at `saved`), and what it sent the simulation. */
+function speed(saved?: number): { speed: GameSpeed; sent: number[] } {
   const sent: number[] = [];
-  return { speed: new GameSpeed((s) => sent.push(s)), sent };
+  return { speed: new GameSpeed((s) => sent.push(s), saved), sent };
 }
 
 describe('game speed', () => {
@@ -77,6 +77,24 @@ describe('game speed', () => {
     s.hold('menu', false);
     s.hold('menu', false);
     expect(sent).toEqual([2, 0, 2]);
+  });
+
+  test('a loaded game resumes at the speed it was saved at, held still until it is shown', () => {
+    const { speed: s, sent } = speed(3);
+    expect(s.running).toBe(0);
+    s.hold('loading', false);
+    expect(sent).toEqual([3]);
+    s.choose(0);
+    expect(s.last).toBe(3);
+  });
+
+  test('a game saved paused (under a menu, in Build) resumes at 1; a new one starts at 1', () => {
+    const paused = speed(0);
+    paused.speed.hold('loading', false);
+    expect(paused.sent).toEqual([1]);
+    const fresh = speed();
+    fresh.speed.hold('loading', false);
+    expect(fresh.sent).toEqual([1]);
   });
 
   test('pausing keeps the last speed to resume at', () => {

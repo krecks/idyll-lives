@@ -985,7 +985,11 @@ export interface SimThreadStats {
 export type FromWorker =
   /** A start is under way and making progress (before `ready`; repeated while the simulation downloads). */
   | { type: 'starting' }
-  | { type: 'ready'; layout: SnapshotLayout; shared: SharedArrayBuffer | null; catalog: Catalog }
+  /**
+   * `speed`: the game's own speed as it opened (a save's: the one it was saved at), before the
+   * `init` speed held it: what play resumes at.
+   */
+  | { type: 'ready'; layout: SnapshotLayout; shared: SharedArrayBuffer | null; catalog: Catalog; speed: number }
   /**
    * What changed of the world structure (`WorldUpdate`), with the lot's rooms when the lot changed
    * and its meshes when the lot or the view did. `view`: the `seq` of the view it was built for.

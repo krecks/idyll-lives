@@ -143,6 +143,8 @@ export class SimBridge {
     shared: SharedArrayBuffer | null,
     /** Careers and build/buy rules, as the simulation expanded them. */
     readonly catalog: Catalog,
+    /** The game's own speed as it opened (a save's: the one it was saved at), before `start`'s held it. */
+    readonly savedSpeed: number,
   ) {
     this.worker = worker;
     this.layout = layout;
@@ -190,7 +192,7 @@ export class SimBridge {
         if (msg.type === 'starting') arm();
         else if (msg.type === 'ready') {
           clearTimeout(timer);
-          resolve(new SimBridge(worker, msg.layout, msg.shared, msg.catalog));
+          resolve(new SimBridge(worker, msg.layout, msg.shared, msg.catalog, msg.speed));
         } else if (msg.type === 'error') failed(msg.problem ? new SaveRefused(msg.problem, msg.message) : new Error(msg.message));
       };
       arm();

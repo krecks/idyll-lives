@@ -277,7 +277,6 @@ async function openSession(
     return bridge.frame(performance.now());
   };
   progress('Building the world', 0.3);
-  let resumeSpeed: number | null = null;
   let revealed = false;
   let warmed = false;
   /** The world has been built once: later ones are patches or rare rebuilds, and need no warm-up. */
@@ -451,12 +450,13 @@ async function openSession(
   };
   /**
    * The player's speed, held at 0 while the game loads, in Build and Create, and while a menu is
-   * open (`setMenuPause`): given back when nothing holds it any more.
+   * open (`setMenuPause`): given back when nothing holds it any more. Play starts at the speed the
+   * game was saved at.
    */
   const speed = new GameSpeed((running) => {
     bridge.send({ type: 'setSpeed', speed: running });
     game.speed = running;
-  });
+  }, bridge.savedSpeed);
   /**
    * The catalog's pictures are drawn ahead of time in Build and Create, not in Live's frames
    * (`holdAhead`). A house nobody lives in opens on the catalog: they're drawn behind its loading screen.
@@ -1026,8 +1026,6 @@ async function openSession(
     // the objects of everything that didn't.
     const changed = mirror.apply(ui);
     if (!changed) return;
-    // The first update carries the speed the game was saved at.
-    resumeSpeed ??= ui.speed > 0 ? ui.speed : 1;
     game.day = ui.day;
     game.minute = ui.minute;
     game.speed = ui.speed;
@@ -1809,7 +1807,7 @@ async function openSession(
       // The camera starts watching once it has flown in (unless watching on its own is off).
       if (liveSettings.directorDelay > 0) watchAt = lastInput + START_WATCH_MS;
       // (A benchmark runs at its own speed.)
-      speed.choose(BENCH?.speed ?? resumeSpeed ?? 1);
+      if (BENCH) speed.choose(BENCH.speed);
       // Nobody lives here yet, or there's no house (an empty lot): the game starts with
       // building (time stands still until Live).
       const home = homePlot();
