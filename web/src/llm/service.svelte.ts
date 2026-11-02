@@ -164,7 +164,8 @@ export async function generateText(
   const free = await inferenceSlot('gpu', waiting.signal);
   clearTimeout(timer);
   options.signal?.removeEventListener('abort', abort);
-  if (!free) {
+  if (!free || options.signal?.aborted) {
+    free?.();
     counters.skipped++;
     return null;
   }
