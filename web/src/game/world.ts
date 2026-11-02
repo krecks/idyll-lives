@@ -9,7 +9,7 @@
 import type { Content, WorldNames } from '../content/content';
 import { DEFAULT_LANDSCAPE, type LandscapeParams, type WorldSize } from '../core/protocol';
 import type { GardenSize } from './housegen';
-import { branch, centroid, crossing, crossStreet, cutAround, lane, leftOf, lengths, loop, nearest, pointAt, range, ring, RoadIndex, roundabout, through, type Box, type Pt, type RoadPlan } from './roads';
+import { branch, centroid, clearOf, crossing, crossStreet, cutAround, inside, lane, leftOf, lengths, loop, nearest, pointAt, range, ring, RoadIndex, roomAt, roundabout, through, type Box, type Pt, type RoadPlan } from './roads';
 
 export type { WorldSize };
 export const WORLD_SIZES: readonly WorldSize[] = ['cosy', 'normal', 'big'];
@@ -44,6 +44,8 @@ export interface SizeSpec {
   scale: number;
   /** Cross streets between the roads (`extend`): a bigger town's blocks. */
   extend?: number;
+  /** Streets out into the parts of the box the roads leave empty (`fill`): a big town's outer blocks. */
+  fill?: number;
   /** Public places besides the park, and farm lots, if not the recipe's. */
   places?: [number, number];
   farms?: [number, number];
@@ -129,7 +131,7 @@ export function highStreet(rand: Rand, box: Box, scale = 1): RoadLayout {
 }
 
 /** A through road with a crescent round a green; lanes off it joined up into a back street and to the crescent. */
-function crescentTown(rand: Rand, box: Box, scale = 1): RoadLayout {
+export function crescentTown(rand: Rand, box: Box, scale = 1): RoadLayout {
   const main = through(rand, box, { at: 0.55, amp: range(rand, 6, 10), bends: 2 });
   const L = lengthOf(main);
   const mid = L * range(rand, 0.42, 0.55);
@@ -312,6 +314,70 @@ export function extend(rand: Rand, roads: readonly RoadPlan[], box: Box, count: 
   return out;
 }
 
+/** A part of a town's box this far (m) from every road is empty: room for a street and its lots each side. */
+const EMPTY = 58;
+
+/**
+ * Up to `count` streets out into the parts of `box` the roads leave empty (a big town's outer
+ * blocks, so its streets reach all of its box), the emptiest first: a crescent off the road
+ * nearest each, bowing out into it, where one fits as `connect`'s lanes do (inside the box, off
+ * the greens, clear of the other roads, room at both its junctions); else a lane towards it for
+ * `connect` to join up.
+ */
+export function fill(rand: Rand, roads: readonly RoadPlan[], box: Box, count: number, scale = 1, greens: readonly Pt[][] = []): RoadPlan[] {
+  const out = [...roads];
+  const fit = { box, greens };
+  const tried: Pt[] = [];
+  for (let n = 0, tries = 0; n < count && tries < count * 4; tries++) {
+    const index = new RoadIndex(out);
+    let best: { p: Pt; d: number } | null = null;
+    for (let z = 34; z <= box.d - 34; z += 10) {
+      for (let x = 34; x <= box.w - 34; x += 10) {
+        if (tried.some((t) => Math.hypot(t[0] - x, t[1] - z) < 40) || greens.some((g) => inside(g, x, z))) continue;
+        // (Most points are near a road: asked how near only when not.)
+        if (index.nearest(x, z, EMPTY)) continue;
+        const d = index.nearest(x, z, 200)?.dist ?? 200;
+        if (!best || d > best.d) best = { p: [x, z], d };
+      }
+    }
+    if (!best) break;
+    const p = best.p;
+    tried.push(p);
+    // The nearest road it can come off (not a roundabout, nor a short one).
+    const near = [...index.around(p[0], p[1], best.d + 40)].filter(([r]) => !out[r].island && out[r].kind !== 'trail' && lengthOf(out[r]) > 70).sort((a, b) => a[1].dist - b[1].dist)[0];
+    if (!near) continue;
+    const [r, at] = near;
+    const parent = out[r];
+    const L = lengthOf(parent);
+    const sideOf: 1 | -1 = (() => {
+      const q = pointAt(parent.points, at.s).p;
+      const nn = leftOf(at.t);
+      return (p[0] - q[0]) * nn[0] + (p[1] - q[1]) * nn[1] >= 0 ? 1 : -1;
+    })();
+    const depth = Math.min(at.dist * range(rand, 0.8, 0.95), 85 * scale);
+    let made: RoadPlan | null = null;
+    for (const span of [range(rand, 70, 95) * scale, range(rand, 50, 65) * scale]) {
+      const [s0, s1] = [at.s - span / 2, at.s + span / 2];
+      if (s0 < 12 || s1 > L - 12) continue;
+      const { road } = loop(parent, s0, s1, sideOf, depth);
+      const [a, b] = [road.points[0], road.points[road.points.length - 1]];
+      if (!roomAt(index, a, [r]) || !roomAt(index, b, [r])) continue;
+      if (!clearOf(road.points, road.width, out, index, fit, r, r, 26)) continue;
+      made = road;
+      break;
+    }
+    // Else a lane towards it (`connect` takes it on, or cuts it back).
+    if (!made) {
+      const lane = branch(parent, Math.min(L - 15, Math.max(15, at.s)), sideOf, Math.min(at.dist + 20, 110 * scale), range(rand, -0.5, 0.5));
+      if (roomAt(index, lane.points[0], [r]) && clearOf(lane.points, lane.width, out, index, fit, r, -1)) made = lane;
+    }
+    if (!made) continue;
+    out.push(made);
+    n++;
+  }
+  return out;
+}
+
 /** Each size's town: the cosy recipe's box and lots (as they always were), Normal's, and Big's main town. */
 const sizes = (cosy: Box & { lots: number }, normal: SizeSpec, big: SizeSpec): Record<WorldSize, SizeSpec> => ({
   cosy: { box: { w: cosy.w, d: cosy.d }, lots: cosy.lots, scale: 1 },
@@ -323,7 +389,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   small: {
     label: 'Small town',
     blurb: 'Homes along one winding street, a park and a shop or two.',
-    sizes: sizes({ w: 150, d: 110, lots: 10 }, { box: { w: 190, d: 140 }, lots: 16, scale: 1.25, extend: 1 }, { box: { w: 270, d: 210 }, lots: 46, scale: 1.5, extend: 4, places: [2, 3] }),
+    sizes: sizes({ w: 150, d: 110, lots: 10 }, { box: { w: 190, d: 140 }, lots: 16, scale: 1.25, extend: 1 }, { box: { w: 330, d: 256 }, lots: 70, scale: 1.5, extend: 5, fill: 4, places: [2, 3] }),
     gaps: [0.4, 0.1],
     roads: highStreet,
     small: 0.25,
@@ -335,7 +401,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   medium: {
     label: 'Medium town',
     blurb: 'A crescent of homes round the village green, lanes off the main road.',
-    sizes: sizes({ w: 200, d: 190, lots: 20 }, { box: { w: 252, d: 240 }, lots: 32, scale: 1.25, extend: 2, places: [3, 4] }, { box: { w: 300, d: 280 }, lots: 54, scale: 1.45, extend: 4, places: [4, 4] }),
+    sizes: sizes({ w: 200, d: 190, lots: 20 }, { box: { w: 252, d: 240 }, lots: 32, scale: 1.25, extend: 2, places: [3, 4] }, { box: { w: 366, d: 340 }, lots: 82, scale: 1.45, extend: 6, fill: 5, places: [4, 4] }),
     gaps: [0.35, 0.08],
     roads: crescentTown,
     small: 0.25,
@@ -347,7 +413,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   dense: {
     label: 'Dense town',
     blurb: 'A crossroads and crooked lanes of small lots, shops on every corner.',
-    sizes: sizes({ w: 230, d: 230, lots: 42 }, { box: { w: 256, d: 256 }, lots: 60, scale: 1.12, extend: 3, places: [6, 6] }, { box: { w: 320, d: 320 }, lots: 72, scale: 1.3, extend: 5, places: [6, 6] }),
+    sizes: sizes({ w: 230, d: 230, lots: 42 }, { box: { w: 256, d: 256 }, lots: 60, scale: 1.12, extend: 3, places: [6, 6] }, { box: { w: 390, d: 390 }, lots: 110, scale: 1.3, extend: 7, fill: 6, places: [6, 6] }),
     gaps: [0.12, 0.02],
     roads: crossroads,
     small: 0.6,
@@ -360,7 +426,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   farm: {
     label: 'Farm',
     blurb: 'A country road, farmsteads with fields and barns, open land all round.',
-    sizes: sizes({ w: 240, d: 170, lots: 10 }, { box: { w: 256, d: 256 }, lots: 16, scale: 1.3, extend: 1, farms: [5, 6] }, { box: { w: 270, d: 270 }, lots: 40, scale: 1.15, extend: 4, places: [2, 3], farms: [0, 0] }),
+    sizes: sizes({ w: 240, d: 170, lots: 10 }, { box: { w: 256, d: 256 }, lots: 16, scale: 1.3, extend: 1, farms: [5, 6] }, { box: { w: 330, d: 330 }, lots: 60, scale: 1.15, extend: 5, fill: 4, places: [2, 3], farms: [0, 0] }),
     gaps: [0.5, 0.3],
     roads: countryLane,
     small: 0.1,
@@ -383,7 +449,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   seaside: {
     label: 'Seaside village',
     blurb: 'Homes above a sandy shore, a café and the smell of the sea.',
-    sizes: sizes({ w: 220, d: 130, lots: 14 }, { box: { w: 256, d: 180 }, lots: 22, scale: 1.25, extend: 3, places: [3, 4] }, { box: { w: 340, d: 230 }, lots: 54, scale: 1.45, extend: 7, places: [4, 4] }),
+    sizes: sizes({ w: 220, d: 130, lots: 14 }, { box: { w: 256, d: 180 }, lots: 22, scale: 1.25, extend: 3, places: [3, 4] }, { box: { w: 410, d: 280 }, lots: 82, scale: 1.45, extend: 8, fill: 4, places: [4, 4] }),
     gaps: [0.3, 0.08],
     roads: shoreRoad,
     small: 0.4,
@@ -404,7 +470,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   mountain: {
     label: 'Mountain hamlet',
     blurb: 'A few big gardens in a high valley, pines on steep slopes all round.',
-    sizes: sizes({ w: 170, d: 150, lots: 8 }, { box: { w: 215, d: 190 }, lots: 13, scale: 1.25, extend: 1 }, { box: { w: 290, d: 250 }, lots: 48, scale: 1.45, extend: 7, places: [2, 3] }),
+    sizes: sizes({ w: 170, d: 150, lots: 8 }, { box: { w: 215, d: 190 }, lots: 13, scale: 1.25, extend: 1 }, { box: { w: 354, d: 305 }, lots: 72, scale: 1.45, extend: 8, fill: 4, places: [2, 3] }),
     gaps: [0.45, 0.25],
     roads: switchback,
     small: 0.05,
@@ -429,7 +495,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   lakeside: {
     label: 'Lakeside',
     blurb: 'A town by still water, reeds and a sandy bank, gentle hills.',
-    sizes: sizes({ w: 210, d: 170, lots: 20 }, { box: { w: 256, d: 224 }, lots: 30, scale: 1.25, extend: 4, places: [3, 3] }, { box: { w: 320, d: 260 }, lots: 56, scale: 1.4, extend: 7, places: [3, 4] }),
+    sizes: sizes({ w: 210, d: 170, lots: 20 }, { box: { w: 256, d: 224 }, lots: 30, scale: 1.25, extend: 4, places: [3, 3] }, { box: { w: 390, d: 316 }, lots: 84, scale: 1.4, extend: 8, fill: 5, places: [3, 4] }),
     gaps: [0.35, 0.1],
     roads: lakeRoad,
     small: 0.2,
@@ -450,7 +516,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   forest: {
     label: 'Forest clearing',
     blurb: 'A clearing in deep woods: big gardens, few neighbours, birdsong.',
-    sizes: sizes({ w: 170, d: 150, lots: 10 }, { box: { w: 215, d: 190 }, lots: 16, scale: 1.25, extend: 3, places: [1, 2] }, { box: { w: 280, d: 250 }, lots: 44, scale: 1.4, extend: 7, places: [2, 2] }),
+    sizes: sizes({ w: 170, d: 150, lots: 10 }, { box: { w: 215, d: 190 }, lots: 16, scale: 1.25, extend: 3, places: [1, 2] }, { box: { w: 340, d: 305 }, lots: 66, scale: 1.4, extend: 8, fill: 4, places: [2, 2] }),
     gaps: [0.45, 0.2],
     roads: clearing,
     small: 0,

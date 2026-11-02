@@ -312,7 +312,7 @@ export function clearOf(pts: readonly Pt[], width: number, roads: readonly RoadP
 }
 
 /** Whether no road but `except` comes within `ROOM` m of `p` (room for a junction there). */
-function roomAt(index: RoadIndex, p: Pt, except: readonly number[]): boolean {
+export function roomAt(index: RoadIndex, p: Pt, except: readonly number[]): boolean {
   for (const r of index.around(p[0], p[1], ROOM).keys()) if (!except.includes(r)) return false;
   return true;
 }

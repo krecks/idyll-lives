@@ -59,7 +59,7 @@
   const labelZ = (z: number, size: number) => Math.max(-MARGIN + px(size + 2), Math.min(depth + MARGIN - px(4), z));
 
   // ---- layers, worked out once per town ----
-  const ZONE_ORDER = ['meadow', 'fields', 'hill', 'woods', 'water'];
+  const ZONE_ORDER = ['meadow', 'fields', 'hill', 'woods', 'orchard', 'water'];
   const line = (pts: [number, number][]) => pts.map(([x, z]) => `${x},${z}`).join(' ');
   const zones = $derived(
     (meta?.zones ?? []).map((z) => ({ kind: z.kind, d: `M${z.poly.map(([x, zz]) => `${x},${zz}`).join('L')}Z` })).sort((a, b) => ZONE_ORDER.indexOf(a.kind) - ZONE_ORDER.indexOf(b.kind)),
@@ -339,6 +339,9 @@
   }
   .zone.fields {
     fill: #e4cf7f;
+  }
+  .zone.orchard {
+    fill: #8fb25e;
   }
   .land {
     pointer-events: none;

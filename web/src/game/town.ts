@@ -21,7 +21,7 @@ import { homePrice } from './price';
 import { crownClear, generateHouse, objectInfos, random, residentsKey, weighted, type GardenSize, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
 import { connect, cropRoads, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Box, type Pt, type RoadPlan } from './roads';
 import { householdFunds, savingsOf } from './wealth';
-import { extend, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
+import { extend, fill, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
 import { generateBigWorld, type OpenWorldDraft } from './macro';
 import { garageAt, garageFor, houseCar, type ParkedCar } from '../render/shared/cars';
 import { fenceRuns, townFences, type TownFence } from './gardenFences';
@@ -526,7 +526,7 @@ export function facingFrom([nx, nz]: Pt): Facing {
  * `road` at frontage `f`: turned to face the road, set back a little more if it must (on a bend);
  * null if it doesn't fit there.
  */
-export function lotAt(ground: Ground, road: RoadPlan, f: Frontage, w: number, d: number): { x: number; z: number; facing: Facing; anchor: number } | null {
+export function lotAt(ground: Ground, road: RoadPlan, f: Frontage, w: number, d: number, snug = false): { x: number; z: number; facing: Facing; anchor: number } | null {
   const facing = facingFrom(f.n);
   const [W, D] = facing % 2 ? [d, w] : [w, d];
   const reach = road.width / 2 + VERGE;
@@ -539,7 +539,13 @@ export function lotAt(ground: Ground, road: RoadPlan, f: Frontage, w: number, d:
     // The front edge on the first tile line past the verge (further on, the further back).
     const front = facing < 2 ? Math.ceil(across) + back : Math.floor(across) - back;
     const r = fronting(facing, front, along, W, D);
-    if (ground.free(r)) return { x: r.x, z: r.z, facing, anchor: along };
+    if (!ground.free(r)) continue;
+    // (`snug`: the road along all of its front, not bending away from a corner, where a driveway would end short of it.)
+    if (snug) {
+      const corners: Pt[] = facing === 0 ? [[r.x, r.z], [r.x + r.w, r.z]] : facing === 1 ? [[r.x, r.z], [r.x, r.z + r.d]] : facing === 2 ? [[r.x, r.z + r.d], [r.x + r.w, r.z + r.d]] : [[r.x + r.w, r.z], [r.x + r.w, r.z + r.d]];
+      if (corners.some(([x, z]) => nearest(road.points, x, z).dist > reach + back + SNUG + w / 20)) return null;
+    }
+    return { x: r.x, z: r.z, facing, anchor: along };
   }
   return null;
 }
@@ -553,6 +559,9 @@ function fronting(facing: Facing, front: number, along: number, W: number, D: nu
   const at = [{ x: a, z: front }, { x: front, z: a }, { x: a, z: front - D }, { x: front - W, z: a }][facing];
   return { ...at, w: W, d: D };
 }
+
+/** A `snug` lot's front corners are at most this much further from its road than its middle (m; a twentieth of its width more). */
+const SNUG = 3;
 
 /** Template id of a lot with nothing on it yet (no house template has it): build from the ground up. */
 export const EMPTY_LOT = 'empty';
@@ -645,12 +654,14 @@ export const BIG_COURTS = 3;
 
 /**
  * A town's roads as its recipe laid them out, joined up (`roads.ts` `connect`: its lanes' dead
- * ends go on to another road, `courts` of them at most left as courts), with `spec.extend` cross
- * streets between them (a bigger town's blocks).
+ * ends go on to another road, `courts` of them at most left as courts), streets out into what
+ * of its box they leave empty (`spec.fill`: a big town's), and `spec.extend` cross streets between
+ * them (a bigger town's blocks).
  */
 export function joinUp(rand: Rand, layout: RoadLayout, spec: SizeSpec, courts = COURTS): RoadPlan[] {
   const fit = { box: spec.box, greens: layout.greens };
-  const joined = connect(layout.roads, fit, courts);
+  let joined = connect(layout.roads, fit, courts);
+  if (spec.fill) joined = connect(fill(rand, joined, spec.box, spec.fill, spec.scale, layout.greens), fit, courts);
   return spec.extend ? connect(extend(rand, joined, spec.box, spec.extend, spec.scale, layout.greens), fit, courts) : joined;
 }
 
@@ -748,6 +759,8 @@ export class LotPlacer {
     private readonly roads: readonly RoadPlan[],
     private readonly gaps: [number, number],
     private readonly rand: Rand,
+    /** Only where the road runs along all of a lot's front (`lotAt`; a big world's). */
+    private readonly snug = false,
   ) {}
 
   /** A lot on the town at `at` (and the land it takes, a gap or a meadow after it). */
@@ -791,7 +804,7 @@ export class LotPlacer {
       }
       let found = false;
       for (const f of u.lot === 'farm' ? outskirts : frontage) {
-        const at = lotAt(ground, roads[f.road], f, width, depth);
+        const at = lotAt(ground, roads[f.road], f, width, depth, this.snug);
         if (!at) continue;
         this.put(u, at, f);
         found = true;
@@ -1446,8 +1459,9 @@ function meetsRoad(list: readonly RoadPlan[], roads: ReturnType<typeof roadIndex
     }
     return { road: near.road, s: roads.along(near.road, ...at(kb)) };
   }
-  const near = roads.nearest(street[0], street[1], 24);
-  return near && list[near.road].kind !== 'trail' ? { road: near.road, s: near.s } : null;
+  // (Else the nearest road, passing over a trail nearer it.)
+  const near = [...roads.around(street[0], street[1], 24)].filter(([r]) => list[r].kind !== 'trail').sort((x, y) => x[1].dist - y[1].dist)[0];
+  return near ? { road: near[0], s: near[1].s } : null;
 }
 
 /** What a plot is, for the simulation (docs/design/open-world.md). */

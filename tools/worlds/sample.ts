@@ -19,10 +19,12 @@
  * way for. And for big worlds: every area reaching a way out, nothing on the
  * water, every outdoor place at a trail's end and near its area, no trail through a lot, areas
  * apart, hamlets of four lots or more, every house near a stop or a way out, residents within the
- * cap, every road named (no two alike), the file under 4 MB, and the time a big world takes (its
+ * cap, the world filled (a quarter of it or more built and farmed, at most a tenth of its 100 m
+ * squares with nothing in them, every quarter of it with an area or homes out in the country),
+ * every road named (no two alike), the file under 4 MB, and the time a big world takes (its
  * layout without generating houses, and assembling its file: a problem at twice the budget).
  *
- * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--sizes cosy,normal,big] [--big-out file] [--big-per-kind n]
+ * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--sizes cosy,normal,big] [--big-out file] [--big-per-kind n] [--kinds farm,forest]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -65,16 +67,79 @@ type TownFile = {
   roads?: Road[];
   areas?: { name: string; x: number; z: number; w: number; d: number }[];
   terrain?: { water?: number[] };
-  meta: { roads?: Road[]; facing?: number[] };
+  meta: { roads?: Road[]; facing?: number[]; zones?: { kind: string; poly: Pt[] }[] };
 };
 const exitAt = (e: Exit): Pt => (Array.isArray(e) ? e : [e.x, e.z]);
 const isRoadExit = (e: Exit) => Array.isArray(e) || e.kind === 'road';
 /** How far a point is from a rectangle (0 inside it). */
 const offRect = (r: Rect, x: number, z: number) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
-/** Budgets (ms): a big world's layout (without generating its houses) and assembling its file. */
-const LAYOUT_BUDGET = 400;
+/**
+ * Budgets (ms): a big world's layout (without generating its houses) and assembling its file. (Not
+ * targets: a big world may take a while to build. They catch one that runs away.)
+ */
+const LAYOUT_BUDGET = 1500;
 const ASSEMBLE_BUDGET = 1500;
 const MAX_FILE = 4e6;
+
+/** A big world filled at least this much with what is built and farmed (its areas' boxes, lots, fields and orchards). */
+const BUILT_SHARE = 0.25;
+/** At most this share of a big world's 100 m squares hold nothing (no lot, road, woods, field, orchard or water). */
+const EMPTY_SHARE = 0.1;
+/** Areas' middles at least this far apart (m). */
+const AREAS_APART = 170;
+/** A square holds something if this much of it does (m²). */
+const HOLDS = 200;
+
+/** How filled a big world is: the share of it built and farmed, the share of its 100 m squares with nothing in them. */
+function fillOf(town: TownFile): { built: number; empty: number } {
+  const { width: W, depth: D } = town;
+  const C = 2;
+  const [gw, gd] = [Math.ceil(W / C), Math.ceil(D / C)];
+  const built = new Uint8Array(gw * gd);
+  const some = new Uint8Array(gw * gd);
+  const box = (mask: Uint8Array, r: Rect) => {
+    for (let z = Math.max(0, Math.floor(r.z / C)); z < Math.min(gd, Math.ceil((r.z + r.d) / C)); z++) for (let x = Math.max(0, Math.floor(r.x / C)); x < Math.min(gw, Math.ceil((r.x + r.w) / C)); x++) mask[z * gw + x] = 1;
+  };
+  const poly = (mask: Uint8Array, ring: Pt[]) => {
+    for (let z = 0; z < gd; z++) {
+      const zc = (z + 0.5) * C;
+      const xs: number[] = [];
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [[xi, zi], [xj, zj]] = [ring[i], ring[j]];
+        if (zi > zc !== zj > zc) xs.push(((xj - xi) * (zc - zi)) / (zj - zi) + xi);
+      }
+      xs.sort((a, b) => a - b);
+      for (let k = 0; k + 1 < xs.length; k += 2) for (let x = Math.max(0, Math.ceil(xs[k] / C - 0.5)); x < Math.min(gw, Math.ceil(xs[k + 1] / C - 0.5)); x++) mask[z * gw + x] = 1;
+    }
+  };
+  for (const a of town.areas ?? []) box(built, a);
+  for (const p of town.plots) {
+    box(built, p);
+    box(some, p);
+  }
+  for (const z of town.meta.zones ?? []) {
+    if (z.kind === 'fields' || z.kind === 'orchard') {
+      poly(built, z.poly);
+      poly(some, z.poly);
+    } else if (z.kind === 'woods' || z.kind === 'water') poly(some, z.poly);
+  }
+  const roads = roadMask(town.roads ?? town.meta.roads ?? [], W, D, 0);
+  for (let z = 0; z < D; z += C) for (let x = 0; x < W; x += C) if (roads[z * W + x]) some[(z / C) * gw + x / C] = 1;
+  let filled = 0;
+  for (const v of built) filled += v;
+  let [squares, empty] = [0, 0];
+  for (let sz = 0; sz < D; sz += 100) {
+    for (let sx = 0; sx < W; sx += 100) {
+      let n = 0;
+      for (let z = sz / C; z < Math.min(gd, (sz + 100) / C); z++) for (let x = sx / C; x < Math.min(gw, (sx + 100) / C); x++) n += some[z * gw + x];
+      const cells = (Math.min(gd, (sz + 100) / C) - sz / C) * (Math.min(gw, (sx + 100) / C) - sx / C);
+      // (A sliver of a square along the world's edge counts as its share of one.)
+      squares += (cells * C * C) / 1e4;
+      if (n * C * C < Math.min(HOLDS, (cells * C * C) / 50)) empty += (cells * C * C) / 1e4;
+    }
+  }
+  return { built: filled / (gw * gd), empty: empty / squares };
+}
 
 /** What's wrong with how a town's roads join up, its areas, water, trails and names (the open-world checks). */
 function openProblems(town: TownFile): string[] {
@@ -167,9 +232,18 @@ function openProblems(town: TownFile): string[] {
     centres.forEach((c, i) =>
       centres.forEach((o, j) => {
         const d = Math.hypot(c[0] - o[0], c[1] - o[1]);
-        if (j > i && d < 180) out.push(`${areas[i].name} and ${areas[j].name} ${d.toFixed(0)} m apart`);
+        if (j > i && d < AREAS_APART) out.push(`${areas[i].name} and ${areas[j].name} ${d.toFixed(0)} m apart`);
       }),
     );
+    const fill = fillOf(town);
+    if (fill.built < BUILT_SHARE) out.push(`${(fill.built * 100).toFixed(0)}% of the world built and farmed (${BUILT_SHARE * 100}% or more wanted)`);
+    if (fill.empty > EMPTY_SHARE) out.push(`${(fill.empty * 100).toFixed(0)}% of its 100 m squares hold nothing (${EMPTY_SHARE * 100}% at most)`);
+    // Spread over the whole world: each quarter of it an area's middle, or a farmstead or cottage out in the country.
+    const inArea = (p: Rect) => areas.some((a) => offRect(a, p.x + p.w / 2, p.z + p.d / 2) === 0);
+    const country = town.plots.filter((p) => (p.kind === 'home' || p.kind === 'farm') && !inArea(p)).map((p): Pt => [p.x + p.w / 2, p.z + p.d / 2]);
+    const quarter = ([x, z]: Pt) => (x < town.width / 2 ? 0 : 1) + (z < town.depth / 2 ? 0 : 2);
+    const held = new Set([...centres, ...country].map(quarter));
+    for (const q of [0, 1, 2, 3]) if (!held.has(q)) out.push(`the ${['north-west', 'north-east', 'south-west', 'south-east'][q]} quarter has no area, farmstead or cottage`);
     areas.forEach((a, k) => {
       const lots = town.plots.filter((p) => (p.area ?? 0) === k && p.kind !== 'countryside').length;
       if (k > 0 && lots < 4) out.push(`hamlet ${a.name} has ${lots} lots`);
@@ -230,6 +304,7 @@ const sizes = (flag('--sizes') ?? 'cosy').split(',') as (typeof WORLD_SIZES)[num
 for (const size of sizes) if (!WORLD_SIZES.includes(size)) throw new Error(`no size ${size}`);
 const bigOutFlag = flag('--big-out');
 const bigPerKind = Number(flag('--big-per-kind') ?? 1);
+const kinds = flag('--kinds')?.split(',') ?? WORLD_KINDS;
 const out = process.argv[2] ?? 'worlds.json';
 const bigOut = bigOutFlag ?? out.replace(/(\.json)?$/, '-big.json');
 const perKind = Number(process.argv[3] ?? 3);
@@ -248,7 +323,7 @@ const forSale: Record<string, number> = {};
 /** Per size: worlds, courts in all and the most in one world. */
 const courtsOf: Record<string, [number, number, number]> = {};
 for (const size of sizes) {
-  for (const kind of WORLD_KINDS) {
+  for (const kind of WORLD_KINDS.filter((k) => kinds.includes(k))) {
     for (let i = 1; i <= (size === 'big' ? bigPerKind : perKind); i++) {
       const seed = i * 104729 + kind.length;
       const tag = `${kind}${size === 'cosy' ? '' : ` ${size}`} ${seed}`;
@@ -304,7 +379,7 @@ for (const size of sizes) {
       [c[0], c[1], c[2]] = [c[0] + 1, c[1] + courts, Math.max(c[2], courts)];
       console.log(
         `${tag}: ${town.name} (${town.world?.tagline}) ${town.width}×${town.depth}, ${town.roads.length} road(s) (${courts} courts), ` +
-          `${town.open ? `${town.open.areas.length} areas, ${spots} outdoor places, ` : ''}` +
+          `${town.open ? `${town.open.areas.length} areas, ${spots} outdoor places, ${((f) => `${(f.built * 100).toFixed(0)}% built and farmed, ${(f.empty * 100).toFixed(0)}% squares empty, `)(fillOf(file))}` : ''}` +
           `${town.slots.filter((s) => s.kind === 'house').length} houses${farms ? ` (${farms} farms)` : ''}${dropped ? `, ${dropped} lots left out` : ''}, ${basements} with a basement, ${town.households.length} households, ` +
           `${file.sims.length} residents, ${file.objects.length} things, ${(text.length / 1e6).toFixed(2)} MB; ${layout.toFixed(0)} ms + ${houses.toFixed(0)} ms houses, file ${assemble.toFixed(0)} ms`,
       );

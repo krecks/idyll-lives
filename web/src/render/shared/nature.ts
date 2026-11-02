@@ -9,7 +9,7 @@
  * Placements are matrices in game space (the layout of `math.ts`): 16 floats each.
  */
 
-import { DEFAULT_LANDSCAPE, groundDepth, type LandscapeParams, type WorldStructure } from '../../core/protocol';
+import { DEFAULT_LANDSCAPE, groundDepth, type LandscapeParams, type WorldStructure, type WorldZone } from '../../core/protocol';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
@@ -30,8 +30,9 @@ const BUILT_CELL = 2;
 export const BIG_WOODS_CELL = 256;
 /** A big world's lawn flowers are drawn in squares this wide (m), those far off left out (`pc/nature.ts` `frameTiles`). */
 export const BIG_FLOWERS_CELL = 128;
-/** A big world's woods past this far (m) from anything built are half as dense. */
-const BIG_WOODS_THIN = 40;
+/** A big world's orchards: fruit trees in rows this far apart (m), and this far apart along a row. */
+const ORCHARD_ROWS = 6;
+const ORCHARD_STEP = 5;
 /** A big world's hill zones rise this high (m) at most (between what is built: the land there stays flat). */
 const BIG_HILLS = 16;
 const TERRAIN_STEP = 2.5;
@@ -363,6 +364,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     this.ring = world.meta?.world ? WORLD_RING : RING;
     this.built = world.meta?.world?.size === 'big' ? LandscapeLayout.builtField(world, this.w, this.d) : null;
     this.zones = this.built && world.meta?.zones?.length ? new ZoneField(world.meta.zones, this.w, this.d) : null;
+    this.orchards = this.zones ? (world.meta?.zones ?? []).filter((z) => z.kind === 'orchard') : [];
     this.passes = townExits(world);
     this.roads = makeRoads(
       { seed: this.seed, w: this.w, d: this.d, ring: this.ring, ground: (x, z) => this.ground(x, z), waterEdge: (x, z) => this.waterEdge(x, z), distanceToTown: (x, z) => this.distanceToTown(x, z) },
@@ -432,8 +434,10 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   protected readonly built: { gw: number; gd: number; dist: Float32Array } | null;
 
-  /** A big world's zones (`meta.zones`): its water, its hills, and where woods, meadows and fields are. Null elsewhere. */
+  /** A big world's zones (`meta.zones`): its water, its hills, and where woods, meadows, fields and orchards are. Null elsewhere. */
   protected readonly zones: ZoneField | null;
+  /** A big world's orchards (`meta.zones`), each a rectangle. */
+  private readonly orchards: readonly WorldZone[];
 
   private static builtField(world: WorldStructure, w: number, d: number): { gw: number; gd: number; dist: Float32Array } {
     const gw = Math.ceil(w / BUILT_CELL);
@@ -673,7 +677,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const kind = hash(cu, cv, this.seed + 77);
     if (kind > 0.82) return null;
     const edge = Math.min(u - cu, cu + 1 - u, v - cv, cv + 1 - v) * f.size * 0.7;
-    return { kind: kind / 0.82, v: (v - cv) * f.size * 0.7, weight, hedge: edge < 1.6 };
+    // (A hedgerow along the patchwork's lines, and along a big world's field zones' edges.)
+    return { kind: kind / 0.82, v: (v - cv) * f.size * 0.7, weight, hedge: edge < 1.6 || (!!zones && Math.abs(zones.edge('fields', x, z)) < 1.2) };
   }
 
   /**
@@ -702,11 +707,13 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         if (dist < APRON + L.treeline) continue;
         const forest = fbm(x * 0.025, z * 0.025, this.seed + 7, 3);
         let density = smoothstep(0.42 - L.forest, 0.62 - L.forest, forest) * 0.85 + 0.06 + L.forest * 0.25 - (dist < 14 ? 0.05 : 0);
-        // A big world's woods are its woods zones (the odd tree in the open, fewer on its meadows).
+        // A big world's woods are its woods zones (trees dotted about the open land, fewer on its
+        // meadows), and its orchards their own (rows of fruit trees, below).
         if (this.zones) {
+          if (this.zones.edge('orchard', x, z) > -3) continue;
           const wood = this.zones.share('woods', x, z, 8);
-          density = wood * (0.6 + 0.3 * smoothstep(0.3, 0.6, forest)) + (1 - wood) * (0.05 + 0.2 * smoothstep(0.42, 0.7, forest));
-          density *= 1 - 0.85 * this.zones.share('meadow', x, z, 6);
+          density = wood * (0.6 + 0.3 * smoothstep(0.3, 0.6, forest)) + (1 - wood) * (0.12 + 0.08 * smoothstep(0.42, 0.7, forest));
+          density *= 1 - 0.6 * this.zones.share('meadow', x, z, 6);
         }
         // Fields are open, with hedgerows and the odd tree along their edges; nothing grows in the water or on the beach.
         const cell = this.fieldCell(x, z);
@@ -719,15 +726,14 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         if (road && road.dist < road.width / 2 + 2.5) continue;
         // The far woods of a wide world thinner (seen through haze; fewer trees to draw).
         if (this.ring > RING && dist > RING && rand() < 0.45) continue;
-        // (A big world's woods between its hamlets: half of them, away from what is built; the GPU draws a kilometre of them.)
-        if (this.built && dist > BIG_WOODS_THIN && rand() < 0.5) continue;
         if (rand() > density) continue;
         // Species: conifers in the dense cores, birches in groves at the edges, broadleaves elsewhere.
         const grove = fbm(x * 0.06 + 40, z * 0.06 - 15, this.seed + 3, 2);
         const roll = rand();
         let kind: string;
         if (roll < 0.08) kind = 'model.rock';
-        else if (roll < 0.2) kind = 'model.bush';
+        // (A hedgerow mostly bushes.)
+        else if (roll < 0.2 || (cell?.hedge && roll < 0.55)) kind = 'model.bush';
         else if (roll < 0.26) kind = 'model.bush.small';
         else if ((forest > 0.56 && rand() < Math.min(1, (0.62 * L.conifers) / 0.5)) || (L.conifers > 0.5 && rand() < (L.conifers - 0.5) * 1.6)) kind = rand() < 0.4 ? 'model.spruce' : 'model.pine';
         else if (grove > 0.55 - Math.max(0, L.birches - 0.5) * 0.3 && rand() < Math.min(1, (0.7 * L.birches) / 0.5)) kind = 'model.tree.birch';
@@ -747,6 +753,29 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         let list = bucket.get(kind);
         if (!list) bucket.set(kind, (list = []));
         list.push(m);
+      }
+    }
+    // A big world's orchards: fruit trees in rows across each (its own draws, so the woods above are as they were).
+    for (const zone of this.zones ? this.orchards : []) {
+      const xs = zone.poly.map((p) => p[0]);
+      const zs = zone.poly.map((p) => p[1]);
+      const [x0o, x1o, z0o, z1o] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
+      // Rows along the orchard's longer side.
+      const along = x1o - x0o >= z1o - z0o;
+      const [len, across] = along ? [x1o - x0o, z1o - z0o] : [z1o - z0o, x1o - x0o];
+      const rows = Math.max(1, Math.floor((across - 2) / ORCHARD_ROWS));
+      const per = Math.max(1, Math.floor((len - 2) / ORCHARD_STEP));
+      for (let r = 0; r < rows; r++) {
+        for (let k = 0; k < per; k++) {
+          const u = (len - (per - 1) * ORCHARD_STEP) / 2 + k * ORCHARD_STEP + (rand() - 0.5) * 0.6;
+          const v = (across - (rows - 1) * ORCHARD_ROWS) / 2 + r * ORCHARD_ROWS + (rand() - 0.5) * 0.6;
+          const [x, z] = along ? [x0o + u, z0o + v] : [x0o + v, z0o + u];
+          const scale = 0.85 + rand() * 0.3;
+          const m = placed(scale, scale * (0.95 + rand() * 0.1), scale, rand() * Math.PI * 2, x, this.heightAt(x, z) - 0.05, z);
+          let list = far.get('model.tree.fruit');
+          if (!list) far.set('model.tree.fruit', (list = []));
+          list.push(m);
+        }
       }
     }
     const [cx, cz] = [this.w / 2, this.d / 2];

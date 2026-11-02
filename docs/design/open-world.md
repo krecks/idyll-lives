@@ -29,8 +29,15 @@ ground storey. Row blocks for upper storeys and the basement keep today's stacke
 
 - Town file: `width`, `depth` ≤ 1024. Saved grid: width ≤ 1024, depth ≤ 1024 × 5.
 - `MAX_SIMS` 160, `MAX_STAFF` 48, `MAX_CARS` 128 (sim-grid). The renderer's `MAX_CHARACTERS`
-  comes from `snapshot_layout` (maxSims + maxStaff = 208), not a constant.
-- Neighbours per size: `neighbourCap('cosy' | 'normal') = 48`, `neighbourCap('big') = 140`.
+  is the snapshot layout's maxSims + maxStaff (208, `render/shared/characters/rig.ts`); the speech
+  bubbles follow the layout's `maxSims`.
+- Neighbours per size: `neighbourCap('cosy' | 'normal') = 48`, `neighbourCap('big') = 140` (a Big
+  world starts with ~120: `BIG_START`). Kept when Big worlds were filled (2026-11-02, about 2.5
+  times the homes: the rest are for sale). 240 residents were tried: the big-world bench at 1024 m
+  (`SIZE=1024 RESIDENTS=240`, 4 game hours, 4 runs) ticks at 8,000–9,000 a second, p99 0.78–0.84
+  ms, the slowest tick 3.9–4.0 ms, the heap 59 MB (160: 13,000 a second, p99 0.55 ms, 4.3 ms, 58
+  MB), within budget; but a real Big game with ~170 had 16 frames over 33 ms (up to 299 ms) as the
+  town got its jobs at 09:30 against 2 with 118.
 
 ## Sizes
 
@@ -38,7 +45,7 @@ ground storey. Row blocks for upper storeys and the basement keep today's stacke
 |---|---|---|---|
 | `cosy` | today's recipe, unchanged | today's | none |
 | `normal` | ≤ 256 m, ~1.6× cosy's box area | ~1.6× | none |
-| `big` | 768–1024 m | main town (kind's shape at normal scale) + 2–4 hamlets/farmsteads, ~120 starting residents | all sim branches |
+| `big` | 896–1024 m | main town (kind's shape, ~1.5× a Normal town's lots, its streets reaching all of its box) + 5–7 hamlets of 16–24 lots, farmsteads and cottages along the country roads, ~120 starting residents | all sim branches |
 
 Saves and towns without `size` are `cosy` and must look and behave exactly as before: every
 new land rule is gated on `size === 'big'`.
@@ -114,7 +121,8 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
 
 Walking is 1.5 m per game minute (`WALK_SPEED`), so 1 km takes ~11 game hours on foot.
 
-- Hamlets are 250–450 m apart; trips between them are by car. The household setting off with
+- Areas are 170 m or more apart (best ~230 m from the nearest, every quarter of the world with
+  one or with homes out in the country); trips between them are by car. The household setting off with
   the driver for somewhere the car parks near goes in it too (`Car::riders`, saved with the car
   as `cars[].riders`): it waits in the driveway for them, they ride there and get out at the
   parking spot, and when one of them goes home they all go back to it and home together.
