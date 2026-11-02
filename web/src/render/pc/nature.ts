@@ -608,8 +608,8 @@ async function instanced(
   // Without its file, nothing, until the file comes (`Landscape.rebuild`).
   const template = await perfTimeAsync(`nature: model ${key}`, () => buildModel(app, key, assets.get(key, 'model'), [1, 1], { lod }));
   await pace?.();
-  const groups = groupInstances(matrices, cell);
-  const split = groups.size > 1 ? template.meshes.filter((m) => (indexCount(m) / 3) * matrices.length >= SPLIT_TRIANGLES) : [];
+  const groups = cell ? groupInstances(matrices, (m) => cell(m[12], m[14])) : new Map<string, number[]>();
+  const split = groups.size > 1 ? template.meshes.filter((m) => splitsByGroup(m, matrices.length)) : [];
   const span = perfStart(`nature: instances ${key}`);
   const draw = (m: ModelMesh, indices: readonly number[], name: string): Instances => {
     const d = new Instances(app.graphicsDevice, parent, m.mesh, m.material, { name, castShadows: false, receiveShadows: true, capacity: indices.length });
@@ -642,9 +642,10 @@ async function instanced(
   };
 }
 
-/** A mesh's triangle corners (its indices drawn). */
-function indexCount(m: ModelMesh): number {
-  return m.mesh.primitive[0]?.count ?? 0;
+/** Whether a mesh drawn `copies` times is drawn per draw group (where there are groups): `SPLIT_TRIANGLES` or more triangles over them all. As the street's (`pc/street.ts`). */
+export function splitsByGroup(m: ModelMesh, copies: number): boolean {
+  // (Its indices drawn, three a triangle.)
+  return ((m.mesh.primitive[0]?.count ?? 0) / 3) * copies >= SPLIT_TRIANGLES;
 }
 
 // ---- Wind and foliage shading -----------------------------------------------------------
