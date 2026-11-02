@@ -2129,7 +2129,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.updateSims(frame);
     this.cars.update(frame);
     // (A car's shadow goes with it: `moved` only for a car that moved where it casts into the map, `setShadowTest`.)
-    this.sunShadows.movedIn(this.cars.moved);
+    if (this.cars.moved) this.sunShadows.moved(false);
     this.birdLife.update(frame, minute, this.frameDt, this.characters, this.simCount); // (after the residents, who scare them.)
     if (this.roofs.length && this.roofVisible() !== this.roofShown) {
       this.roofShown = !this.roofShown;
@@ -2162,7 +2162,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lot.pullChairs(this.characters.pulled, this.placing.held); // (not the one in hand.)
     this.lot.takeRestProps(this.characters.restTaken);
     // (Only residents posed where they cast into the map: `shadowPosed`, as the cars' `moved`.)
-    if (this.quality.characterShadows) this.sunShadows.movedIn(this.characters.shadowPosed);
+    if (this.quality.characterShadows && this.characters.shadowPosed) this.sunShadows.moved(false);
     const blobs = this.simShadow;
     blobs.setCount(count);
     for (let i = 0; i < count; i++) blobs.setMatrix(i, shadows, i * 16);
