@@ -96,6 +96,29 @@ fn private_room(
             .is_none_or(|p| plots.get(p as usize).is_none_or(|p| !p.public))
 }
 
+/// Whether room `id` has a door to the outside, as `doors_out` finds it, over the edges round
+/// its tiles only (`Lot::room_rect`).
+pub(crate) fn door_out(lot: &Lot, id: u16) -> bool {
+    let Some([x0, z0, x1, z1]) = lot.room_rect(id) else {
+        return false;
+    };
+    let room = |x: i32, z: i32| lot.room_at(x, z);
+    let out = |a: u16, b: u16| (a == id && b == OUTDOORS) || (b == id && a == OUTDOORS);
+    lot.walls_in([x0, z0, x1 + 1, z1 + 1])
+        .into_iter()
+        .any(|(at, e)| match at {
+            crate::lot::EdgeRef::H(x, z) if e == crate::lot::Edge::Door => {
+                let (x, z) = (i32::from(x), i32::from(z));
+                out(room(x, z - 1), room(x, z))
+            }
+            crate::lot::EdgeRef::V(x, z) if e == crate::lot::Edge::Door => {
+                let (x, z) = (i32::from(x), i32::from(z));
+                out(room(x - 1, z), room(x, z))
+            }
+            _ => false,
+        })
+}
+
 /// Per room id (up to the highest of `rooms`): whether it has a door to the outside (such a
 /// room isn't private: `private_room`). Found with the rooms (`World::rooms_out`).
 pub(crate) fn doors_out(
@@ -268,17 +291,23 @@ pub(crate) fn claimed_places(
     objects: &[ObjectInstance],
 ) -> Vec<(u16, Vec<u32>)> {
     let mut out: Vec<(u16, Vec<u32>)> = claimed.iter().map(|&r| (r, Vec::new())).collect();
+    if claimed.is_empty() {
+        return out;
+    }
+    // (What kinds of thing offer a place, once: most don't, and needn't be found a room.)
+    let places: Vec<bool> = content
+        .objects
+        .iter()
+        .map(|def| def.interactions.iter().any(|i| offers_place(content, i)))
+        .collect();
     for (i, o) in objects.iter().enumerate() {
+        if !places.get(o.def).copied().unwrap_or(false) {
+            continue;
+        }
         // Broken ones are listed too: `room_claimants` skips them while they're broken, and a
         // repair shouldn't need the rooms rebuilt.
         let room = room_of_object(content, lot, o);
-        let Ok(k) = claimed.binary_search(&room) else {
-            continue;
-        };
-        let Some(def) = content.objects.get(o.def) else {
-            continue;
-        };
-        if def.interactions.iter().any(|i| offers_place(content, i)) {
+        if let Ok(k) = claimed.binary_search(&room) {
             out[k].1.push(i as u32);
         }
     }

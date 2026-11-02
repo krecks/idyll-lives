@@ -32,7 +32,11 @@ const UNDO_DEPTH: usize = 30;
 #[derive(Debug, Clone)]
 pub(crate) struct HomeSnapshot {
     household: usize,
-    lot: crate::lot::Lot,
+    /// Where the lot's log stood when it was taken (`Lot::log_begin`), and once the edit is
+    /// done (`remember`), what it changed on the lot, as it was before: walls, looks and floors
+    /// (the rooms follow from them). A big world's lot is too big to copy for every edit.
+    lot_mark: crate::lot::LogMark,
+    lot: Option<Vec<crate::lot::LotChange>>,
     objects: Vec<ObjectInstance>,
     object_plot: Vec<Option<u32>>,
     blocked: Vec<bool>,
@@ -111,13 +115,21 @@ fn shift_objects(t: &mut TaskKind, id: u32) {
     }
 }
 
+impl HomeSnapshot {
+    /// Where the lot's log stood when it was taken.
+    pub(crate) fn lot_mark(&self) -> crate::lot::LogMark {
+        self.lot_mark
+    }
+}
+
 impl World {
     /// The state a build or buy edit by `household` may change (None if it has no home).
-    pub(crate) fn home_snapshot(&self, household: u32) -> Option<HomeSnapshot> {
+    pub(crate) fn home_snapshot(&mut self, household: u32) -> Option<HomeSnapshot> {
         let (household, _) = self.home_of(household).ok()?;
         Some(HomeSnapshot {
             household,
-            lot: self.lot.clone(),
+            lot_mark: self.lot.log_begin(),
+            lot: None,
             objects: self.objects.clone(),
             object_plot: self.object_plot.clone(),
             blocked: self.blocked.clone(),
@@ -134,7 +146,9 @@ impl World {
     /// drawing a wall where one stands, leaves no step).
     pub(crate) fn remember(&mut self, mut before: HomeSnapshot) {
         let h = before.household;
-        let lot_changed = before.lot != self.lot;
+        let changes = self.lot.log_end(before.lot_mark);
+        let lot_changed = !changes.is_empty();
+        before.lot = Some(changes);
         if lot_changed {
             self.lot_version = self.lot_version.wrapping_add(1);
         }
@@ -184,8 +198,9 @@ impl World {
         // What the edit told goes from the story (and comes back with a redo).
         now.story = self.events.take(&s.story);
         self.keep_orders(&mut s);
-        self.redo.push(now);
         self.restore(s);
+        now.lot = Some(self.lot.log_end(now.lot_mark));
+        self.redo.push(now);
         Ok(())
     }
 
@@ -201,8 +216,9 @@ impl World {
         let mut s = self.redo.pop().expect("checked above");
         now.story = self.events.put_back(std::mem::take(&mut s.story));
         self.keep_orders(&mut s);
-        self.undo.push(now);
         self.restore(s);
+        now.lot = Some(self.lot.log_end(now.lot_mark));
+        self.undo.push(now);
         Ok(())
     }
 
@@ -229,10 +245,19 @@ impl World {
     }
 
     pub(crate) fn restore(&mut self, s: HomeSnapshot) {
-        if s.lot != self.lot {
+        let changed = match &s.lot {
+            // A finished edit taken back (undo, redo): what it changed goes back.
+            Some(changes) => {
+                self.lot.put_back(changes);
+                !changes.is_empty()
+            }
+            // An edit under way given up: what it changed since it began goes back.
+            None => self.lot.log_rollback(s.lot_mark),
+        };
+        if changed {
             self.lot_version = self.lot_version.wrapping_add(1);
         }
-        self.lot = s.lot;
+        self.lot.compute_rooms();
         self.objects = s.objects;
         self.object_plot = s.object_plot;
         self.blocked = s.blocked;
@@ -247,6 +272,7 @@ impl World {
         self.refresh_stairs();
         self.nav_changed();
         self.rooms_layout_changed();
+        self.rooms_things_changed_everywhere();
     }
 
     /// The roof over the household's home: a style and a colour (free; only for looks).
@@ -1146,7 +1172,8 @@ impl World {
         self.pay(h, cost);
         self.objects[object as usize].wear = 0.0;
         self.structure_version = self.structure_version.wrapping_add(1);
-        self.rooms_things_changed();
+        let o = &self.objects[object as usize];
+        self.rooms_things_changed((o.x, o.z));
         Ok(())
     }
 
@@ -1176,7 +1203,8 @@ impl World {
         obj.value += cost;
         let quality = obj.quality;
         self.structure_version = self.structure_version.wrapping_add(1);
-        self.rooms_things_changed();
+        let o = &self.objects[object as usize];
+        self.rooms_things_changed((o.x, o.z));
         // Told about the household's first resident (nobody may live there yet).
         if let Some(member) = self
             .sims
@@ -1412,7 +1440,8 @@ impl World {
         }
         self.can_pay(h, cost, || "not enough money to build that".into())?;
         let before = self.reach_signature(plot);
-        let saved = self.lot.clone();
+        // (What it changes is put back if it turns out it can't stand.)
+        let mark = self.lot.log_begin();
         for e in edits {
             let target = edge_kind(e.kind);
             match e.axis {
@@ -1436,7 +1465,8 @@ impl World {
         self.lot.compute_rooms();
         self.sync_tile_arrays();
         if !self.keeps_reach(plot, &before, None) {
-            self.lot = saved;
+            self.lot.log_rollback(mark);
+            self.lot.compute_rooms();
             self.sync_tile_arrays();
             return Err(Error::new(
                 "that would shut a resident or an object in — add a door or a gate",
@@ -1446,10 +1476,12 @@ impl World {
             .storeys_stand(plot)
             .and_then(|()| self.walls_still_hold(plot))
         {
-            self.lot = saved;
+            self.lot.log_rollback(mark);
+            self.lot.compute_rooms();
             self.sync_tile_arrays();
             return Err(e);
         }
+        self.lot.log_forget(mark);
         self.pay(h, cost);
         // The tiles either side of every edge built on (a diagonal's own tile), and upstairs the
         // plot (its rooms say where there's floor).
@@ -1766,7 +1798,7 @@ impl World {
         } else {
             self.objects_changed_in(rect);
         }
-        self.rooms_things_changed();
+        self.rooms_things_changed((obj.x, obj.z));
         obj
     }
 }

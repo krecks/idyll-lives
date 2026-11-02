@@ -96,17 +96,28 @@ struct Acc {
 /// again (see `World::refresh_rooms`): which tiles' dirt counts towards each room and garden,
 /// in the order `compute` adds it up (so scores come out exactly the same), which tiles take
 /// each one's score, and which had a mess since they were last scored.
+///
+/// Each room's lists are kept under a handle that stays while other rooms come and go (rooms
+/// found again round a wall: `World::refresh_rooms_near`); `handle` gives each room's.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct RoomTiles {
-    /// Per room (index into `World::rooms`): tiles and weights.
+    /// Per room (index into `World::rooms`): its handle (index into the lists below).
+    handle: Vec<u32>,
+    /// Per handle: tiles and weights.
     cells: Vec<Vec<(u32, f32)>>,
-    /// Per room: the tiles whose `World::room_score` is its overall score.
+    /// Per handle: the tiles whose `World::room_score` is its overall score.
     scored: Vec<Vec<u32>>,
-    /// Per tile: the rooms its dirt counts towards (`NONE`: none).
+    /// Per tile: the handles of the rooms its dirt counts towards (`NONE`: none).
     of_tile: Vec<[u32; 2]>,
-    /// Rooms whose dirt changed since they were scored.
+    /// Per handle: its dirt changed since it was scored.
     stale: Vec<bool>,
+    /// Handles no room has.
+    free: Vec<u32>,
 }
+
+/// What `RoomTiles::summary` gives: per room its tiles (weights as bits) and the tiles taking its
+/// score, and per tile the rooms its dirt counts towards.
+pub(crate) type RoomTilesSummary = (Vec<(Vec<(u32, u32)>, Vec<u32>)>, Vec<Vec<u32>>);
 
 const NONE: u32 = u32::MAX;
 /// No room sets a tile's score (`World::refresh_rooms`, `RoomTiles::new`).
@@ -132,10 +143,12 @@ impl RoomTiles {
         }
         let stale = vec![false; cells.len()];
         Self {
+            handle: (0..cells.len() as u32).collect(),
             cells,
             scored,
             of_tile,
             stale,
+            free: Vec::new(),
         }
     }
 
@@ -157,16 +170,105 @@ impl RoomTiles {
         room_score: &mut [f32],
     ) {
         for (r, room) in w.iter_mut().enumerate() {
-            if !std::mem::take(&mut self.stale[r]) {
+            let h = self.handle[r] as usize;
+            if !std::mem::take(&mut self.stale[h]) {
                 continue;
             }
-            let sum = self.cells[r].iter().fold(0.0, |s, &(i, weight)| {
+            let sum = self.cells[h].iter().fold(0.0, |s, &(i, weight)| {
                 s + dirt.get(i as usize).copied().unwrap_or(0.0) * weight
             });
             score_dirt(room, sum, rules);
-            for &i in &self.scored[r] {
+            for &i in &self.scored[h] {
                 room_score[i as usize] = room.scores.overall;
             }
+        }
+    }
+
+    /// The handles of the rooms, in order (see `set_handles`).
+    pub fn take_handles(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.handle)
+    }
+
+    /// The handles of the rooms, in the order the rooms now have.
+    pub fn set_handles(&mut self, handles: Vec<u32>) {
+        self.handle = handles;
+    }
+
+    /// Room `h` went (or is found again): its lists go.
+    pub fn drop_room(&mut self, h: u32) {
+        let cells = std::mem::take(&mut self.cells[h as usize]);
+        for &(i, _) in &cells {
+            if let Some(slot) = self.of_tile.get_mut(i as usize) {
+                for r in slot.iter_mut().filter(|r| **r == h) {
+                    *r = NONE;
+                }
+            }
+        }
+        self.scored[h as usize] = Vec::new();
+        self.stale[h as usize] = false;
+        self.free.push(h);
+    }
+
+    /// A room found (again) with its tiles: its handle.
+    pub fn add_room(&mut self, cells: Vec<(u32, f32)>, scored: Vec<u32>) -> u32 {
+        let h = self.free.pop().unwrap_or_else(|| {
+            self.cells.push(Vec::new());
+            self.scored.push(Vec::new());
+            self.stale.push(false);
+            self.cells.len() as u32 - 1
+        });
+        for &(i, _) in &cells {
+            let slot = &mut self.of_tile[i as usize];
+            let k = usize::from(slot[0] != NONE);
+            slot[k] = h;
+        }
+        self.cells[h as usize] = cells;
+        self.scored[h as usize] = scored;
+        self.stale[h as usize] = false;
+        h
+    }
+
+    /// Per room (in order): its tiles and weights, the tiles taking its score (sorted), and per
+    /// tile the rooms (indices, sorted) its dirt counts towards: what these lists say, however
+    /// they're kept (for `World::check_rooms`).
+    pub fn summary(&self) -> RoomTilesSummary {
+        let mut index = vec![NONE; self.cells.len()];
+        for (r, &h) in self.handle.iter().enumerate() {
+            index[h as usize] = r as u32;
+        }
+        let rooms = self
+            .handle
+            .iter()
+            .map(|&h| {
+                let cells = self.cells[h as usize]
+                    .iter()
+                    .map(|&(i, w)| (i, w.to_bits()))
+                    .collect();
+                let mut scored = self.scored[h as usize].clone();
+                scored.sort_unstable();
+                (cells, scored)
+            })
+            .collect();
+        let tiles = self
+            .of_tile
+            .iter()
+            .map(|slot| {
+                let mut rs: Vec<u32> = slot
+                    .iter()
+                    .filter(|&&h| h != NONE)
+                    .map(|&h| index[h as usize])
+                    .collect();
+                rs.sort_unstable();
+                rs
+            })
+            .collect();
+        (rooms, tiles)
+    }
+
+    /// The per-tile list follows the lot's slots (chunks allocated since).
+    pub fn grow(&mut self, slots: usize) {
+        if self.of_tile.len() < slots {
+            self.of_tile.resize(slots, [NONE; 2]);
         }
     }
 }
@@ -265,13 +367,17 @@ fn score_things(room: &mut RoomInfo, a: &Things, content: &crate::content::Conte
 /// The rooms scored again for what stands in them, with their tiles, walls and coverings as
 /// they were (`World::refresh_room_things`: things came, went, broke, were mended or upgraded,
 /// and nothing was built): exactly what `compute` would give, without finding the rooms or
-/// walking their tiles but to add up their dirt. Then the score per tile follows.
+/// walking their tiles but to add up their dirt. Then the score per tile follows. With `only`
+/// (per room: whether things changed in it), only those rooms are scored again for their
+/// things, and the rest only for their dirt where there was a mess, as `RoomTiles::rescore`.
 pub(crate) fn rescore_things(
     w: &World,
     rooms: &mut [RoomInfo],
     tiles: &mut RoomTiles,
     room_score: &mut [f32],
+    only: Option<&[bool]>,
 ) {
+    let picked = |k: usize| only.is_none_or(|o| o.get(k).copied().unwrap_or(false));
     let lot = &w.lot;
     let rules = &w.content.room_rules;
     let most = rooms
@@ -293,6 +399,8 @@ pub(crate) fn rescore_things(
             (false, _) => by_id[r.id as usize] = k,
         }
     }
+    // (Only the gardens picked need the plot of what stands outdoors.)
+    let any_garden = only.is_none() || by_plot.iter().any(|&k| picked(k));
     let mut things = vec![Things::default(); rooms.len()];
     for o in &w.objects {
         let r = if lot.in_bounds(o.x, o.z) {
@@ -301,6 +409,9 @@ pub(crate) fn rescore_things(
             OUTDOORS
         };
         let k = if r == OUTDOORS {
+            if !any_garden {
+                continue;
+            }
             let Some(plot) = w.plot_at(o.x, o.z) else {
                 continue;
             };
@@ -308,25 +419,36 @@ pub(crate) fn rescore_things(
         } else {
             by_id.get(r as usize).copied().unwrap_or(usize::MAX)
         };
-        if let Some(t) = things.get_mut(k) {
+        if picked(k)
+            && let Some(t) = things.get_mut(k)
+        {
             t.add(w, o);
         }
     }
     let dirt_at = |i: u32| w.dirt.get(i as usize).copied().unwrap_or(0.0);
     for (k, room) in rooms.iter_mut().enumerate() {
+        if !picked(k) {
+            continue;
+        }
+        let h = tiles.handle[k] as usize;
         let before = room.scores.overall;
         score_things(room, &things[k], &w.content);
-        let dirt = tiles.cells[k]
+        let dirt = tiles.cells[h]
             .iter()
             .fold(0.0, |s, &(i, weight)| s + dirt_at(i) * weight);
         score_dirt(room, dirt, rules);
+        tiles.stale[h] = false;
         if room.scores.overall.to_bits() != before.to_bits() {
-            for &i in &tiles.scored[k] {
+            for &i in &tiles.scored[h] {
                 room_score[i as usize] = room.scores.overall;
             }
         }
     }
-    tiles.stale.fill(false);
+    if only.is_some() {
+        tiles.rescore(rooms, rules, &w.dirt, room_score);
+    } else {
+        tiles.stale.fill(false);
+    }
 }
 
 /// Weighted overall score (content `roomRules.weights`).
@@ -350,8 +472,6 @@ fn score_dirt(room: &mut RoomInfo, dirt: f32, rules: &crate::content::RoomRules)
 /// Every room and garden of the town, with scores, and each one's tiles (as `RoomTiles::cells`).
 pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
     let lot = &w.lot;
-    let content = &w.content;
-    let rules = &content.room_rules;
     // Rooms by lot id, gardens by plot.
     let halves = lot.half_rooms();
     let max_id = halves.iter().flatten().copied().max().unwrap_or(0) as usize;
@@ -487,63 +607,250 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
 
     let mut out: Vec<(RoomInfo, Vec<(u32, f32)>)> = Vec::with_capacity(rooms.len() + gardens.len());
     for (id, a) in rooms.into_iter().enumerate().filter(|(_, a)| a.tiles > 0.0) {
-        let coverings = 0.5 * (a.floors / a.tiles) + 0.5 * (a.covered_faces / a.faces.max(1.0));
-        let mut room = RoomInfo {
-            id: id as u16,
-            plot: w.plot_at(a.first.0, a.first.1),
-            garden: false,
-            kind: None,
-            mixed: false,
-            missing: None,
-            tiles: a.tiles,
-            windows: a.windows,
-            doors: a.doors,
-            lamps: 0,
-            lit: 0.0,
-            outside: a.outside,
-            decor: 0.0,
-            coverings,
-            dirt: 0.0,
-            centre: [a.sx / a.tiles, a.sz / a.tiles],
-            tags: 0,
-            scores: RoomScores::default(),
-        };
-        score_things(&mut room, &a.things, content);
-        score_dirt(&mut room, a.dirt, rules);
-        out.push((room, a.cells));
+        out.push(finish_room(w, id as u16, a));
     }
     for (plot, a) in gardens
         .into_iter()
         .enumerate()
         .filter(|(_, a)| a.tiles > 0.0)
     {
-        let mut garden = RoomInfo {
-            id: OUTDOORS,
-            plot: Some(plot as u32),
-            garden: true,
-            kind: None,
-            mixed: false,
-            missing: None,
-            tiles: a.tiles,
-            windows: 0,
-            doors: 0,
-            lamps: 0,
-            lit: 0.0,
-            outside: true,
-            decor: 0.0,
-            coverings: 0.0,
-            dirt: 0.0,
-            centre: [a.sx / a.tiles, a.sz / a.tiles],
-            tags: 0,
-            scores: RoomScores::default(),
-        };
-        score_things(&mut garden, &a.things, content);
-        score_dirt(&mut garden, a.dirt, rules);
-        out.push((garden, a.cells));
+        out.push(finish_garden(w, plot as u32, a));
     }
     // Deterministic order: by plot, gardens last, then by room id.
-    out.sort_by_key(|(r, _)| (r.plot.unwrap_or(u32::MAX), r.garden, r.id));
+    out.sort_by_key(|(r, _)| room_order(r));
     out.into_iter().unzip()
+}
+
+/// The order `compute` gives the rooms in: by plot, gardens last, then by room id.
+pub(crate) fn room_order(r: &RoomInfo) -> (u32, bool, u16) {
+    (r.plot.unwrap_or(u32::MAX), r.garden, r.id)
+}
+
+/// Room `id` from what was added up over its tiles, walls and things.
+fn finish_room(w: &World, id: u16, a: Acc) -> (RoomInfo, Vec<(u32, f32)>) {
+    let content = &w.content;
+    let coverings = 0.5 * (a.floors / a.tiles) + 0.5 * (a.covered_faces / a.faces.max(1.0));
+    let mut room = RoomInfo {
+        id,
+        plot: w.plot_at(a.first.0, a.first.1),
+        garden: false,
+        kind: None,
+        mixed: false,
+        missing: None,
+        tiles: a.tiles,
+        windows: a.windows,
+        doors: a.doors,
+        lamps: 0,
+        lit: 0.0,
+        outside: a.outside,
+        decor: 0.0,
+        coverings,
+        dirt: 0.0,
+        centre: [a.sx / a.tiles, a.sz / a.tiles],
+        tags: 0,
+        scores: RoomScores::default(),
+    };
+    score_things(&mut room, &a.things, content);
+    score_dirt(&mut room, a.dirt, &content.room_rules);
+    (room, a.cells)
+}
+
+/// Plot `plot`'s garden from what was added up over its outdoor tiles and things.
+fn finish_garden(w: &World, plot: u32, a: Acc) -> (RoomInfo, Vec<(u32, f32)>) {
+    let content = &w.content;
+    let mut garden = RoomInfo {
+        id: OUTDOORS,
+        plot: Some(plot),
+        garden: true,
+        kind: None,
+        mixed: false,
+        missing: None,
+        tiles: a.tiles,
+        windows: 0,
+        doors: 0,
+        lamps: 0,
+        lit: 0.0,
+        outside: true,
+        decor: 0.0,
+        coverings: 0.0,
+        dirt: 0.0,
+        centre: [a.sx / a.tiles, a.sz / a.tiles],
+        tags: 0,
+        scores: RoomScores::default(),
+    };
+    score_things(&mut garden, &a.things, content);
+    score_dirt(&mut garden, a.dirt, &content.room_rules);
+    (garden, a.cells)
+}
+
+/// Rooms `ids` (lot ids, each once) and the gardens of `plots` (each once), exactly as `compute`
+/// finds them, walking only the tiles round each (`Lot::room_rect`) and the plots: for
+/// `World::refresh_rooms_near`, after a wall was built. A room or garden with no tiles is left
+/// out, as `compute` leaves it out; the rest come in no particular order.
+pub(crate) fn compute_near(
+    w: &World,
+    ids: &[u16],
+    plots: &[u32],
+) -> Vec<(RoomInfo, Vec<(u32, f32)>)> {
+    let lot = &w.lot;
+    let halves = lot.half_rooms();
+    let most = ids.iter().copied().max().unwrap_or(0) as usize;
+    let mut room_of = vec![usize::MAX; most + 1];
+    for (k, &id) in ids.iter().enumerate() {
+        room_of[id as usize] = k;
+    }
+    let mut garden_of = vec![usize::MAX; w.plots.len()];
+    for (k, &p) in plots.iter().enumerate() {
+        garden_of[p as usize] = k;
+    }
+    let mut rooms: Vec<Acc> = ids.iter().map(|_| Acc::default()).collect();
+    let mut gardens: Vec<Acc> = plots.iter().map(|_| Acc::default()).collect();
+    let dirt_at = |i: usize| w.dirt.get(i).copied().unwrap_or(0.0);
+    let add = |acc: &mut Acc, x: i32, z: i32, i: usize, weight: f32| {
+        if acc.tiles == 0.0 {
+            acc.first = (x, z);
+        }
+        acc.tiles += weight;
+        acc.sx += (x as f32 + 0.5) * weight;
+        acc.sz += (z as f32 + 0.5) * weight;
+        acc.dirt += dirt_at(i) * weight;
+        acc.cells.push((i as u32, weight));
+    };
+    let room = |x: i32, z: i32| {
+        if lot.in_bounds(x, z) {
+            lot.room_at(x, z)
+        } else {
+            OUTDOORS
+        }
+    };
+    for (&id, acc) in ids.iter().zip(&mut rooms) {
+        let Some([x0, z0, x1, z1]) = lot.room_rect(id) else {
+            continue;
+        };
+        // Its tiles, row by row (as `compute` adds them up).
+        for z in z0..z1 {
+            for x in x0..x1 {
+                let i = lot.tile_index(x, z);
+                if i == crate::lot::VOID {
+                    continue;
+                }
+                let [r0, r1] = halves[i];
+                if r0 != id && r1 != id {
+                    continue;
+                }
+                let weight = if r0 == r1 { 1.0 } else { 0.5 };
+                add(acc, x, z, i, weight);
+                if lot.floor(x as u16, z as u16) != 0 {
+                    acc.floors += weight;
+                }
+            }
+        }
+        // Its walls, doors and windows, and whether one is an outside wall (as `compute`).
+        let mut boundary = |r: u16, across: u16, z: i32, edge: Edge, covered: bool| {
+            if r != id {
+                return;
+            }
+            if across == OUTDOORS
+                && matches!(edge, Edge::Wall | Edge::Window)
+                && w.storey_of(z) >= 0
+            {
+                acc.outside = true;
+            }
+            match edge {
+                Edge::Window => acc.windows += 1,
+                Edge::Door => acc.doors += 1,
+                _ => {}
+            }
+            if edge.is_wall() {
+                acc.faces += 1.0;
+                if covered {
+                    acc.covered_faces += 1.0;
+                }
+            }
+        };
+        for (at, e) in lot.walls_in([x0, z0, x1 + 1, z1 + 1]) {
+            if !e.is_wall() {
+                continue;
+            }
+            let look = lot.look(at);
+            match at {
+                EdgeRef::H(x, z) => {
+                    let (x, z) = (x as i32, z as i32);
+                    let (a, b) = (room(x, z - 1), room(x, z));
+                    boundary(a, b, z - 1, e, look.sides[0] != 0);
+                    boundary(b, a, z, e, look.sides[1] != 0);
+                }
+                EdgeRef::V(x, z) => {
+                    let (x, z) = (x as i32, z as i32);
+                    let (a, b) = (room(x - 1, z), room(x, z));
+                    boundary(a, b, z, e, look.sides[0] != 0);
+                    boundary(b, a, z, e, look.sides[1] != 0);
+                }
+                EdgeRef::Diag(x, z) => {
+                    let (x, z) = (x as i32, z as i32);
+                    let [h0, h1] = halves[lot.tile_index(x, z)];
+                    boundary(h0, h1, z, e, look.sides[0] != 0);
+                    boundary(h1, h0, z, e, look.sides[1] != 0);
+                }
+            }
+        }
+    }
+    // Gardens: each plot's outdoor tiles (as `compute`).
+    for (&pi, acc) in plots.iter().zip(&mut gardens) {
+        let p = &w.plots[pi as usize];
+        for z in p.z..p.z + p.d {
+            for x in p.x..p.x + p.w {
+                if !lot.in_bounds(x, z) {
+                    continue;
+                }
+                let i = lot.tile_index(x, z);
+                let [r0, r1] = halves[i];
+                let half = |r: u16| if r == OUTDOORS { 0.5 } else { 0.0 };
+                let outdoor = if r0 == r1 {
+                    2.0 * half(r0)
+                } else {
+                    half(r0) + half(r1)
+                };
+                if outdoor > 0.0 {
+                    add(acc, x, z, i, outdoor);
+                }
+            }
+        }
+    }
+    // What stands in each.
+    for o in &w.objects {
+        let r = room(o.x, o.z);
+        let acc = if r == OUTDOORS {
+            if plots.is_empty() {
+                continue;
+            }
+            let Some(plot) = w.plot_at(o.x, o.z) else {
+                continue;
+            };
+            match garden_of.get(plot as usize) {
+                Some(&k) if k != usize::MAX => &mut gardens[k],
+                _ => continue,
+            }
+        } else {
+            match room_of.get(r as usize) {
+                Some(&k) if k != usize::MAX => &mut rooms[k],
+                _ => continue,
+            }
+        };
+        acc.things.add(w, o);
+    }
+    let mut out = Vec::with_capacity(ids.len() + plots.len());
+    for (&id, a) in ids.iter().zip(rooms) {
+        if a.tiles > 0.0 {
+            out.push(finish_room(w, id, a));
+        }
+    }
+    for (&plot, a) in plots.iter().zip(gardens) {
+        if a.tiles > 0.0 {
+            out.push(finish_garden(w, plot, a));
+        }
+    }
+    out
 }
 
 /// Thought subject for a room: its kind (garden 0, kind + 1, or 63 for a room nothing marks)

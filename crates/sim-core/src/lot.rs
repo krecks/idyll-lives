@@ -395,7 +395,77 @@ pub struct Lot {
     /// Floor covering per tile `(x, z)` (a floor covering + 1; absent: the automatic look). Kept
     /// when the room around it is torn down, so rebuilding it brings the floor back.
     floors: BTreeMap<(u16, u16), u8>,
+    /// Per room id from 1 (index `id - 1`): the key rooms are numbered by and the tiles round
+    /// it, from the last `compute_rooms`.
+    room_meta: Vec<RoomMeta>,
+    /// The edges whose wall-ness changed, and the diagonals put up, taken down or turned, since
+    /// the rooms were last found: `compute_rooms` finds them again only round these (see
+    /// `lot/rooms_near.rs`). None: everywhere.
+    pending: Option<Vec<EdgeRef>>,
+    /// How the rooms changed since `take_room_changes` (for the rooms' scores).
+    changes: RoomChanges,
+    /// While an edit can be taken back: what it changed, as it was before (`log_begin`).
+    log: Option<Vec<LotChange>>,
 }
+
+/// A room's numbering key (its first tile half, row by row: `compute_rooms`) and the tiles
+/// `[x0, z0, x1, z1)` round it.
+#[derive(Debug, Clone, Copy)]
+struct RoomMeta {
+    key: u64,
+    /// (Tiles fit in 16 bits: `MAX_SIDE`, `MAX_ROWS`.)
+    rect: [u16; 4],
+}
+
+impl RoomMeta {
+    fn new(key: u64, rect: [i32; 4]) -> Self {
+        Self {
+            key,
+            rect: rect.map(|v| v.clamp(0, u16::MAX as i32) as u16),
+        }
+    }
+
+    fn rect(&self) -> [i32; 4] {
+        self.rect.map(i32::from)
+    }
+}
+
+/// How the rooms changed since they were last taken (`Lot::take_room_changes`), for whatever
+/// scores them (`World::refresh_rooms`): found everywhere again, or only round `rect`, with the
+/// rooms elsewhere as they were, renumbered by `remap`.
+#[derive(Debug, Clone, Default)]
+pub struct RoomChanges {
+    /// Found everywhere again: nothing else here says anything.
+    pub full: bool,
+    /// The tiles `[x0, z0, x1, z1)` (stacked rows) whose room may have changed: every room found
+    /// again lies inside, and every room that went lay inside.
+    pub rect: Option<[i32; 4]>,
+    /// Per room id as it was (index), the id it has now; `OUTDOORS` for a room that went (or
+    /// was found again, inside `rect`). None: every id is as it was.
+    pub remap: Option<Vec<u16>>,
+}
+
+/// One change to the lot, as it was before (see `Lot::log_begin`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LotChange {
+    H(u16, u16, Edge),
+    V(u16, u16, Edge),
+    Diag(u16, u16, Option<Diagonal>),
+    Look(EdgeRef, EdgeLook),
+    Floor(u16, u16, u8),
+}
+
+/// Where the log of an edit started (`Lot::log_begin`).
+#[derive(Debug, Clone, Copy)]
+pub struct LogMark {
+    at: usize,
+    /// This mark turned the log on (and ends it).
+    started: bool,
+}
+
+/// At most this many edges wait for `compute_rooms` before it finds every room again instead
+/// (a whole house laid at once, a lot loaded).
+const PENDING_MAX: usize = 4096;
 
 impl PartialEq for Lot {
     fn eq(&self, o: &Self) -> bool {
@@ -452,6 +522,13 @@ impl Lot {
             halves: vec![[OUTDOORS; 2]],
             looks: BTreeMap::new(),
             floors: BTreeMap::new(),
+            room_meta: Vec::new(),
+            pending: None,
+            changes: RoomChanges {
+                full: true,
+                ..Default::default()
+            },
+            log: None,
         };
         lot.ensure(0, 0, width, ground.min(depth));
         lot
@@ -568,6 +645,7 @@ impl Lot {
         self.built.resize(self.cols * self.rows, 0);
         self.indoor.resize(self.cols * self.rows, 0);
         self.depth = depth;
+        self.pending = None;
         self.compute_rooms();
     }
 
@@ -886,8 +964,136 @@ impl Lot {
             return;
         }
         let s = self.slot_mut(x, z);
-        let was = std::mem::replace(&mut self.diags[s], d).is_some();
-        self.count(c, was, d.is_some());
+        let old = std::mem::replace(&mut self.diags[s], d);
+        self.count(c, old.is_some(), d.is_some());
+        if old.map(|d| d.dir) != d.map(|d| d.dir) {
+            self.note(EdgeRef::Diag(x as u16, z as u16));
+        }
+        if old != d {
+            self.changed(LotChange::Diag(x as u16, z as u16, old));
+        }
+    }
+
+    /// Notes an edge whose wall-ness changed (or a diagonal): the rooms round it are found again.
+    fn note(&mut self, e: EdgeRef) {
+        if let Some(p) = &mut self.pending {
+            if p.len() >= PENDING_MAX {
+                self.pending = None;
+            } else {
+                p.push(e);
+            }
+        }
+    }
+
+    /// Something changed: the tiles round it may score differently (`RoomChanges::rect`), and
+    /// while the log is on it keeps what was there.
+    fn changed(&mut self, change: LotChange) {
+        if !self.changes.full {
+            let edge = |e: EdgeRef| match e {
+                EdgeRef::H(x, z) => [x as i32, z as i32 - 1, x as i32 + 1, z as i32 + 1],
+                EdgeRef::V(x, z) => [x as i32 - 1, z as i32, x as i32 + 1, z as i32 + 1],
+                EdgeRef::Diag(x, z) => [x as i32, z as i32, x as i32 + 1, z as i32 + 1],
+            };
+            let at = match change {
+                LotChange::H(x, z, _) => edge(EdgeRef::H(x, z)),
+                LotChange::V(x, z, _) => edge(EdgeRef::V(x, z)),
+                LotChange::Diag(x, z, _) | LotChange::Floor(x, z, _) => edge(EdgeRef::Diag(x, z)),
+                LotChange::Look(e, _) => edge(e),
+            };
+            self.changes.rect = Some(self.changes.rect.map_or(at, |r| union(r, at)));
+        }
+        if let Some(log) = &mut self.log {
+            log.push(change);
+        }
+    }
+
+    /// Starts keeping what's changed on the lot, as it was before (the log may be on already:
+    /// an edit within an edit). `log_end` gives what changed since, `log_rollback` puts it back.
+    pub fn log_begin(&mut self) -> LogMark {
+        match &self.log {
+            Some(log) => LogMark {
+                at: log.len(),
+                started: false,
+            },
+            None => {
+                self.log = Some(Vec::new());
+                LogMark {
+                    at: 0,
+                    started: true,
+                }
+            }
+        }
+    }
+
+    /// What changed since `mark`, as it was before, oldest first; the log goes off if `mark`
+    /// turned it on.
+    pub fn log_end(&mut self, mark: LogMark) -> Vec<LotChange> {
+        if mark.started {
+            return self.log.take().unwrap_or_default();
+        }
+        self.log
+            .as_ref()
+            .and_then(|log| log.get(mark.at..))
+            .map(<[LotChange]>::to_vec)
+            .unwrap_or_default()
+    }
+
+    /// Puts back what changed since `mark` (call `compute_rooms` afterwards), and says whether
+    /// anything had; the log goes off if `mark` turned it on.
+    pub fn log_rollback(&mut self, mark: LogMark) -> bool {
+        let changes = match &mut self.log {
+            Some(log) if mark.at <= log.len() => log.split_off(mark.at),
+            _ => Vec::new(),
+        };
+        let log = self.log.take();
+        self.put_back(&changes);
+        self.log = if mark.started { None } else { log };
+        !changes.is_empty()
+    }
+
+    /// The edit begun at `mark` stands and nobody keeps it: the log goes off if `mark` turned
+    /// it on.
+    pub fn log_forget(&mut self, mark: LogMark) {
+        if mark.started {
+            self.log = None;
+        }
+    }
+
+    /// Stops the log (time moves on: edits can no longer be taken back).
+    pub fn log_off(&mut self) {
+        self.log = None;
+    }
+
+    /// Puts back changes as `log_end` gave them, newest first (call `compute_rooms` afterwards).
+    /// With the log on, it keeps what they replace: the changes that make them again.
+    pub fn put_back(&mut self, changes: &[LotChange]) {
+        for c in changes.iter().rev() {
+            match *c {
+                LotChange::H(x, z, e) => self.set_h(x.into(), z.into(), e),
+                LotChange::V(x, z, e) => self.set_v(x.into(), z.into(), e),
+                LotChange::Diag(x, z, d) => self.set_diag(x.into(), z.into(), d),
+                LotChange::Look(at, look) => self.set_look(at, look),
+                LotChange::Floor(x, z, covering) => self.set_floor(x, z, covering),
+            }
+        }
+    }
+
+    /// How the rooms changed since this was last asked (see `RoomChanges`).
+    pub fn take_room_changes(&mut self) -> RoomChanges {
+        std::mem::take(&mut self.changes)
+    }
+
+    /// The tiles `[x0, z0, x1, z1)` round room `id` (stacked rows), if there is one.
+    pub fn room_rect(&self, id: u16) -> Option<[i32; 4]> {
+        (id as usize)
+            .checked_sub(1)
+            .and_then(|k| self.room_meta.get(k))
+            .map(RoomMeta::rect)
+    }
+
+    /// How many rooms the lot has (their ids are `1..=room_count`).
+    pub fn room_count(&self) -> usize {
+        self.room_meta.len()
     }
 
     /// Whether a diagonal wall or window stands across the tile: nobody can stand on it.
@@ -939,8 +1145,14 @@ impl Lot {
             return;
         }
         let s = self.slot_mut(x, z);
-        let was = std::mem::replace(&mut self.h_edges[s], e) != Edge::Open;
-        self.count(c, was, e != Edge::Open);
+        let old = std::mem::replace(&mut self.h_edges[s], e);
+        self.count(c, old != Edge::Open, e != Edge::Open);
+        if old.is_wall() != e.is_wall() {
+            self.note(EdgeRef::H(x as u16, z as u16));
+        }
+        if old != e {
+            self.changed(LotChange::H(x as u16, z as u16, old));
+        }
     }
 
     pub fn set_v(&mut self, x: usize, z: usize, e: Edge) {
@@ -949,8 +1161,14 @@ impl Lot {
             return;
         }
         let s = self.slot_mut(x, z);
-        let was = std::mem::replace(&mut self.v_edges[s], e) != Edge::Open;
-        self.count(c, was, e != Edge::Open);
+        let old = std::mem::replace(&mut self.v_edges[s], e);
+        self.count(c, old != Edge::Open, e != Edge::Open);
+        if old.is_wall() != e.is_wall() {
+            self.note(EdgeRef::V(x as u16, z as u16));
+        }
+        if old != e {
+            self.changed(LotChange::V(x as u16, z as u16, old));
+        }
     }
 
     /// How the wall at `e` looks (the default look where there's no wall).
@@ -960,6 +1178,10 @@ impl Lot {
 
     /// Sets the look of the wall at `e` (the default look is not stored).
     pub fn set_look(&mut self, e: EdgeRef, look: EdgeLook) {
+        let old = self.look(e);
+        if old != look {
+            self.changed(LotChange::Look(e, old));
+        }
         if look == EdgeLook::default() {
             self.looks.remove(&e);
         } else {
@@ -979,6 +1201,10 @@ impl Lot {
 
     /// Sets the floor covering of tile `(x, z)` (0, the automatic look, is not stored).
     pub fn set_floor(&mut self, x: u16, z: u16, covering: u8) {
+        let old = self.floor(x, z);
+        if old != covering {
+            self.changed(LotChange::Floor(x, z, old));
+        }
         if covering == 0 {
             self.floors.remove(&(x, z));
         } else {
@@ -1048,12 +1274,25 @@ impl Lot {
         out
     }
 
+    /// Finds the rooms: over the whole lot the first time (`compute_all_rooms`), then only round
+    /// the walls built or taken down since (`rooms_near`, the same rooms numbered the same).
+    pub fn compute_rooms(&mut self) {
+        let done = match self.pending.take() {
+            Some(edges) => self.rooms_near(&edges),
+            None => false,
+        };
+        if !done {
+            self.compute_all_rooms();
+        }
+        self.pending = Some(Vec::new());
+    }
+
     /// Flood-fills rooms over tile halves. Walls, doors and windows (straight or diagonal)
     /// separate rooms; any area touching the lot border is outdoors. Rooms are numbered in the
     /// order of their first tile row by row, as if every chunk were there: a chunk that isn't
     /// is one open square, walked across as a whole, and allocated if it turns out to be inside
     /// a room.
-    pub fn compute_rooms(&mut self) {
+    pub fn compute_all_rooms(&mut self) {
         struct Region {
             key: u64,
             nodes: std::ops::Range<usize>,
@@ -1167,6 +1406,34 @@ impl Lot {
                 self.indoor[self.order[(i - 1) / CHUNK_TILES] as usize] += 1;
             }
         }
+        // Each room's key and the tiles round it, over the chunks with rooms in them.
+        let mut rects = vec![[i32::MAX, i32::MAX, i32::MIN, i32::MIN]; regions.len()];
+        for c in 0..self.indoor.len() {
+            if self.indoor[c] == 0 {
+                continue;
+            }
+            let [x0, z0, x1, z1] = self.chunk_rect(c);
+            let b = self.base[c] as usize;
+            for z in z0..z1 {
+                for x in x0..x1 {
+                    let s = b + ((z as usize & MASK) << SHIFT | (x as usize & MASK));
+                    for id in self.halves[s] {
+                        if id != OUTDOORS {
+                            grow(&mut rects[id as usize - 1], x, z);
+                        }
+                    }
+                }
+            }
+        }
+        self.room_meta = regions
+            .iter()
+            .zip(rects)
+            .map(|(r, rect)| RoomMeta::new(r.key, rect))
+            .collect();
+        self.changes = RoomChanges {
+            full: true,
+            ..Default::default()
+        };
     }
 
     /// One step of the room flood: from tile `(x, z)` across `side`. Queues the tile there (or
@@ -1215,6 +1482,26 @@ const SEEN: u16 = u16::MAX - 1;
 enum RoomNode {
     Tile(usize, usize, i32, i32),
     Void(usize),
+}
+
+mod rooms_near;
+
+/// Grows tiles `r` (`[x0, z0, x1, z1)`) over tile `(x, z)`.
+fn grow(r: &mut [i32; 4], x: i32, z: i32) {
+    r[0] = r[0].min(x);
+    r[1] = r[1].min(z);
+    r[2] = r[2].max(x + 1);
+    r[3] = r[3].max(z + 1);
+}
+
+/// The tiles round both `a` and `b`.
+fn union(a: [i32; 4], b: [i32; 4]) -> [i32; 4] {
+    [
+        a[0].min(b[0]),
+        a[1].min(b[1]),
+        a[2].max(b[2]),
+        a[3].max(b[3]),
+    ]
 }
 
 #[cfg(test)]
