@@ -167,8 +167,9 @@ The four causes and the blind spot, on this branch:
    (`pickBox`, now shared with the build) and `objectMotion.patch` moves `open`/`stage` on the live
    motions — the clips are read each frame, so doors swing and crops advance with no rebuild. The
    comparison ignores what does not shape the mesh (`wear`, `quality`, `sellValue`, `repairCost`) and
-   the lot by `lotVersion` only (lean world messages re-parse `plots`/`meta`, so references never
-   match). A patch costs **0.2–0.6 ms**; rebuilds in play at 5× went from 14 a minute to 0.
+   the lot by `lotVersion` only. (Since 0.6.0 world messages carry only what changed,
+   `view::StructureSync`: the bridge keeps every unchanged part, and each unchanged thing, the same
+   object, so most of the comparison is by reference.) A patch costs **0.2–0.6 ms**; rebuilds in play at 5× went from 14 a minute to 0.
 2. **Hold the stream's rebuilds until the town has streamed**, then build once
    (`renderer.holdModelRefresh` from the reveal tail in `web/src/game/session.ts`), and **pre-build the
    arrived templates a frame at a time** before that rebuild, so the models that came with the stream
@@ -731,3 +732,27 @@ cell but Low's shadow draws in the forest (4 → 5); CPU within 0.05 ms; GPU 0.1
 ±1 ms the M3 varies by between runs. Pictures against the base's: the village at most 0.059 % of a picture's pixels, the
 forest 0.000 %. The bench's Big lakeside and forest roams: the same draws, fps and slow frames
 (one 35–42 ms frame on Low at the same moment in both).
+
+### The worker's world messages (0.6.0)
+
+A Big world's structure changed with every door opened, crop grown or thing worn: some 250 times a
+game day, several times a real second at speed 3. Each change sent the whole world without its lot
+(2.2 MB of JSON: 16 000 things, every plot with its house scanned, 230 KB of `meta`), and each focus
+lot the whole lot as well (11 MB, 7.2 MB of it `rooms` as a JSON array of 3.7 million numbers, 0.85%
+of them not zero). The main thread parsed and cloned each, and after a long frame ran the whole
+handler once per message queued. Now (`view::StructureSync`, `core/bridge.ts` `mergeWorld`):
+
+- **Only what changed is sent**: the parts that changed, things by index while the list of things
+  is the same, `meta` once. The bridge keeps everything else the same object, so the session and
+  the renderer compare by reference (residents' looks are kept per resident and look the same object
+  while they're made from the same seed and stage). Per change, measured in Bun on the sample Big
+  farm world: 2.2 MB → 2.6 KB; parse 3.5 ms → 0.02 ms, clone 11 ms → 0.04 ms. The worker makes an
+  update in about the time it made the lean world (5–6 ms in wasm, 2.5 ms native; the plots are made
+  again only when the lot or a plot changes).
+- **A new focus lot sends only its meshes** (the walls, rooms and floors are the whole town's, which
+  the main thread has); **the rooms go as a transferred `Uint16Array`** when the lot changes. A lot
+  change's JSON is 1.4 MB (walls, openings, fences, diagonals, floors) instead of 11 MB.
+- **At most every 100 ms** from the worker (a command's and a new view's at once), and **applied
+  once a frame** on the main thread (`sync`), the newest merged; without frames, 100 ms later.
+- **World messages say which view they were built for** (`setView`'s `seq`): one built for the lot
+  before is held until the new lot's comes, instead of being shown as the new lot's.
