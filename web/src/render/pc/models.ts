@@ -122,9 +122,29 @@ export function withGlows(t: ModelTemplate): ModelMesh[] {
   return [...t.meshes, ...(t.glows ?? []).map((g) => g.mesh)];
 }
 
-/** Lets go of a template's meshes (its materials are shared and stay). */
+/** Lets go of a template's meshes (its materials are shared and stay), and of its hold on the file it was built from. */
 export function disposeTemplate(t: { meshes: ModelMesh[]; glows?: { mesh: ModelMesh }[] }): void {
   for (const m of [...t.meshes, ...(t.glows ?? []).map((g) => g.mesh)]) if (!deviceDestroyed(m.mesh.device)) m.mesh.destroy();
+  const use = fileUses.get(t.meshes);
+  if (!use) return;
+  fileUses.delete(t.meshes);
+  fileUsers.set(use.file, (fileUsers.get(use.file) ?? 1) - 1);
+  appFiles.get(use.app)?.release(use.url);
+}
+
+/**
+ * The file each template from a file was built from, by its meshes (a template is copied with its
+ * meshes, `{ ...template, failed }`, and some are disposed as `{ meshes }`): `disposeTemplate` lets go of it.
+ */
+const fileUses = new WeakMap<ModelMesh[], { app: pc.AppBase; url: string; file: LoadedFile }>();
+/** How many templates built from each file are still about (a file let go of keeps its textures until none is). */
+const fileUsers = new WeakMap<LoadedFile, number>();
+
+/** A template built from `file` holds it (until `disposeTemplate`). */
+function holdFile(app: pc.AppBase, url: string, file: LoadedFile, template: ModelTemplate): void {
+  filesOf(app).use(url);
+  fileUsers.set(file, (fileUsers.get(file) ?? 0) + 1);
+  fileUses.set(template.meshes, { app, url, file });
 }
 
 /**
@@ -195,6 +215,7 @@ export async function buildModel(app: pc.AppBase, name: string, entry: ModelEntr
       }
       try {
         const template = buildGltf(app, name, entry, options.parts ? splitParts(file, options.parts) : file, footprint, options);
+        holdFile(app, url, file, template);
         return failed.length ? { ...template, failed } : template;
       } catch (err) {
         // One that loads but can't be built won't build when tried again either: not `failed`.
@@ -224,6 +245,7 @@ function splitParts(file: LoadedFile, names: readonly string[]): LoadedFile {
     parts: names.map((n, i) => ({ name: n, pivot: [rests[i][12], rests[i][13], rests[i][14]], rest: rests[i] })),
     clips: new Map(),
     named: file.named,
+    textures: file.textures,
   };
 }
 
@@ -369,6 +391,8 @@ interface LoadedFile {
   clips: Map<string, ModelClip>;
   /** Every named node's place at rest in model space (`BuildOptions.parts` makes moving parts of some by name). */
   named: Map<string, Float32Array>;
+  /** Its own textures (each file loads its own), destroyed with it once it's let go of (`releaseFile`). */
+  textures: pc.Asset[];
 }
 
 interface FilePiece {
@@ -395,6 +419,7 @@ function filesOf(app: pc.AppBase): ModelFiles<LoadedFile> {
   const files = new ModelFiles<LoadedFile>(
     (url, now) => importFile(app, url, now),
     () => gone,
+    (file) => releaseFile(app, file),
   );
   appFiles.set(app, files);
   app.once('destroy', () => {
@@ -402,6 +427,49 @@ function filesOf(app: pc.AppBase): ModelFiles<LoadedFile> {
     files.dispose();
   });
   return files;
+}
+
+/** How long (ms) a file let go of keeps its textures, in case a template built from it is still about. */
+const RELEASE_TEXTURES_MS = 10_000;
+
+/**
+ * A file nothing used for a while (`ModelFiles`' idle files) let go of: its decoded geometry goes with
+ * it, and, once no template built from it is left, its textures and its materials' copies.
+ */
+function releaseFile(app: pc.AppBase, file: LoadedFile): void {
+  setTimeout(() => {
+    if ((fileUsers.get(file) ?? 0) > 0 || deviceDestroyed(app.graphicsDevice)) return;
+    const lib = MaterialLibrary.for(app);
+    for (const p of file.pieces) {
+      if (!p.material) continue;
+      for (const copy of materialCopies.get(p.material)?.values() ?? []) lib.release(copy);
+      materialCopies.delete(p.material);
+    }
+    for (const asset of file.textures) {
+      app.assets.remove(asset);
+      asset.unload();
+    }
+  }, RELEASE_TEXTURES_MS);
+}
+
+/**
+ * Imports the file at `url` for `app` ahead of time (in idle moments, `PlayCanvasRenderer.parseAhead`),
+ * so the build that wants it finds it read. Resolves either way.
+ */
+export async function importAhead(app: pc.AppBase, url: string): Promise<void> {
+  await filesOf(app)
+    .load(url, false)
+    .catch(() => {});
+}
+
+/** Whether the file at `url` is imported (or being imported) for `app`. */
+export function fileImported(app: pc.AppBase, url: string): boolean {
+  return appFiles.get(app)?.has(url) ?? false;
+}
+
+/** Resolves once no model file is being imported for `app` (with its textures: a container loads with them). */
+export function modelFilesSettled(app: pc.AppBase): Promise<void> {
+  return appFiles.get(app)?.settled() ?? Promise.resolve();
 }
 
 /**
@@ -438,16 +506,17 @@ function hexString(c: pc.Color): string {
   return `#${hex(c.r)}${hex(c.g)}${hex(c.b)}`;
 }
 
-/** What PlayCanvas's container gives of a glTF file: the JSON, its buffer views decoded, its materials. */
+/** What PlayCanvas's container gives of a glTF file: the JSON, its buffer views decoded, its materials and their textures. */
 interface Container {
   gltf: Gltf;
   views: (Uint8Array | undefined)[];
   materials: (pc.StandardMaterial | null)[];
+  textures: pc.Asset[];
 }
 
 /**
  * The file at `url` through PlayCanvas's glTF container (`containerOptions`: meshopt, KTX2), its
- * buffer views kept as they're decoded. PlayCanvas's own meshes of it are let go of at once: the
+ * buffer views kept as they're decoded. PlayCanvas makes none of its own meshes (`skipMeshes`): the
  * geometry is read from the views (`importFile`); its materials stay.
  */
 function loadContainer(app: pc.AppBase, url: string): Promise<Container> {
@@ -456,14 +525,22 @@ function loadContainer(app: pc.AppBase, url: string): Promise<Container> {
   const options = {
     ...containerOptions,
     bufferView: { ...containerOptions.bufferView, postprocess: (view: object, data: Uint8Array) => decoded.set(view, data) },
+    // (Its meshes would be uploaded only to be let go of: the geometry is read from the views here.
+    // Without them a skinned node has no mesh to skin: skins aren't read here either.)
+    skipMeshes: true,
+    global: {
+      preprocess: (gltf: { nodes?: { skin?: number }[] }) => {
+        for (const node of gltf.nodes ?? []) delete node.skin;
+      },
+    },
   };
   return new Promise((resolve, reject) => {
     const asset = new pc.Asset(url, 'container', { url }, undefined, options as never);
     asset.once('load', () => {
-      const resource = asset.resource as pc.ContainerResource & { data: { gltf: Gltf; materials: pc.StandardMaterial[] } };
+      const resource = asset.resource as pc.ContainerResource & { data: { gltf: Gltf; materials: pc.StandardMaterial[]; textures?: pc.Asset[] } };
       const gltf = resource.data.gltf;
-      const container = { gltf, views: (gltf.bufferViews ?? []).map((v) => decoded.get(v)), materials: resource.data.materials.map((m) => m ?? null) };
-      // The meshes go (their GPU buffers with them); the materials (and their textures) stay with the file.
+      const container = { gltf, views: (gltf.bufferViews ?? []).map((v) => decoded.get(v)), materials: resource.data.materials.map((m) => m ?? null), textures: [...(resource.data.textures ?? [])] };
+      // (No meshes were made, `skipMeshes`); the materials (and their textures) stay with the file.
       for (const render of resource.renders) {
         render.unload();
         app.assets.remove(render);
@@ -711,7 +788,7 @@ async function importFile(app: pc.AppBase, url: string, now: boolean): Promise<L
       return [group.name, clip];
     }),
   );
-  return { pieces, parts, clips, named };
+  return { pieces, parts, clips, named, textures: file.textures };
 }
 
 /** A primitive's vertex arrays (positions, normals, UVs, RGBA colours, tangents, triangles) as the file has them. */
