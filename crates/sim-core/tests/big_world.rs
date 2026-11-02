@@ -14,6 +14,7 @@
 //! roads, areas and bus stops; `OPEN=0` makes it one without them (a cosy town, as the first
 //! baseline was measured on).
 
+#[path = "sim/common/mod.rs"]
 mod common;
 
 use std::alloc::{GlobalAlloc, Layout, System};

@@ -1,6 +1,6 @@
 // The tiles a thing reaches over beside its own (content `overhang`: the arc lamp's shade), as build mode and the
 // house generator find them: the same as the simulation's `ObjectInstance::overhang_tiles` and `overhang_edges`
-// (`crates/sim-core/tests/layers.rs` `an_arc_lamp_reaches_over_the_sofa_in_front_of_it`).
+// (`crates/sim-core/tests/sim/layers.rs` `an_arc_lamp_reaches_over_the_sofa_in_front_of_it`).
 import { describe, expect, test } from 'bun:test';
 import { overhangEdges, overhangTiles } from '../src/game/surfaces';
 

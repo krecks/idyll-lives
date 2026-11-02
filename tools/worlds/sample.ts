@@ -2,7 +2,7 @@
  * Makes sample worlds of every kind (web/src/game/world.ts) with the shipped content, the way a
  * new game does (a world, its neighbours, a player household moving into an empty house), and
  * writes their town files for the simulation to check
- * (`cargo test -p sim-core --test generated_worlds -- --ignored`, reading WORLDS). Checks the
+ * (`cargo test -p sim-core --test sim generated_worlds:: -- --ignored`, reading WORLDS). Checks the
  * layout first: lots inside the town, apart from each other and off the roads, each by its road (a
  * park may stand on a green),
  * the ways out of town on its edge. And the neighbours: every household's savings cover its

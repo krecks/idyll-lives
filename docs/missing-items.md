@@ -181,7 +181,7 @@ against another sounds as it does in the game; the peaks land in the ledger's ra
 afternoon's. Two to hear first, from the numbers: `smash` (crockery smashed in a bin) sits at a 454 Hz
 centroid, low for shards, and `tools` at 217 Hz (hammer and saw thuds, as expected).
 
-**Done 2026-10-31 (the six held foods):** `crates/sim-core/tests/held_foods.rs` cooks each dish in a
+**Done 2026-10-31 (the six held foods):** `crates/sim-core/tests/sim/held_foods.rs` cooks each dish in a
 one-room house with the shipped appliances, a dining table with two chairs pulled up and a picnic table in
 the yard, and reads the hand off the snapshot (`sim::HELD`): a tasting board, a pizza, a pie, a tray of baked
 treats, a barbecue platter and a sandwich each end up in the hand, and the dish is then on the table the
@@ -322,7 +322,7 @@ not a wrong model. The gaps the coordinator's notes and the waves' review logs l
   a ring of plaited green stems with eleven white daisies round it, heads up, the stem ends tucked back under
   where the chain was closed; the daisies are the beds' own white and amber (`tools/art/blender/families/held.py`,
   `daisyChain()`). `item` ids: 43 → **44**.
-- Test: `crates/sim-core/tests/flowers.rs` `the_daisies_make_a_daisy_chain` (the chain in the hand while it is
+- Test: `crates/sim-core/tests/sim/flowers.rs` `the_daisies_make_a_daisy_chain` (the chain in the hand while it is
   made, and only then).
 - In play: `bench-results/check-chain/chain-garden.daisies-daisyChain-01.png` (Ada kneeling at the daisies, the
   chain coiled in her hand), `play-chain.json` (used after 3.9 s; `tend` has no clip, as the other cuts).
@@ -336,7 +336,7 @@ not a wrong model. The gaps the coordinator's notes and the waves' review logs l
   `["stir", "bake"]`), by day as at night, and goes off when the cooking is done. It has no switch of
   its own; the simulation decides (`lights.rs`). Any task counts, not only a plain use: a recipe's
   Cook step is `TaskKind::Cook`, so the light watches the step's animation at the station
-  (`crates/sim-core/tests/hood.rs`). Evidence: `bench-results/check-hood/` — `hood-night-final`
+  (`crates/sim-core/tests/sim/hood.rs`). Evidence: `bench-results/check-hood/` — `hood-night-final`
   (idle 22:02: no light; cooking 22:34: the wall, the hob and the floor under the hood lit) and
   `hood-day-final` (cooking 10:40: the wall under the hood lit by day too).
 
@@ -390,13 +390,13 @@ not a wrong model. The gaps the coordinator's notes and the waves' review logs l
 - The bunch is one new held item (`item.cutFlowers`, `hold: hand`, 0.37 m, 624 tris, one draw) built from the
   same six heads as the vase of flowers (`VASE_HEADS` / `BUNCH`), so a bunch cut in the garden and one bought
   arranged look alike (G-10); the empty vase shares the filled one's body (`VASE_BODY`).
-- Tests: `crates/sim-core/tests/flowers.rs` (the bed gives a bunch in hand, the vase refuses `takeOut` while
+- Tests: `crates/sim-core/tests/sim/flowers.rs` (the bed gives a bunch in hand, the vase refuses `takeOut` while
   closed, carries the bunch in the arms on the way, opens, keeps it open through a save and load, closes when
   they are taken out). In play: `bench-results/check-flowers/` (`cut3-flowerbed-cut-00.png`,
   `vase2-vaseEmpty-{idle,putFlowers-01}.png`; `flowers3-*` the take-out run).
 - The five beds cut for a vase gained the same use the same day: "Cut some tulips" / daffodils / lilies /
   cosmos / daisies (6 min, `anim: tend`, `holds: cutFlowers`, never chosen on their own) — `garden.json`;
-  `crates/sim-core/tests/flowers.rs` cuts a bed of tulips and checks that every bed of flowers the garden sells
+  `crates/sim-core/tests/sim/flowers.rs` cuts a bed of tulips and checks that every bed of flowers the garden sells
   has the use and holds the same bunch. In play: `bench-results/check-flowers/beds-*.png`.
 - Docs: `docs/objects/tabletop.md` (40 things, `vaseEmpty` in TT3), `docs/review/tabletop.md`,
   `docs/objects/garden.md` and `docs/review/garden.md` (`flowerbed`'s `cut`, the five beds'), `docs/authenticity-review.md`
@@ -408,7 +408,7 @@ not a wrong model. The gaps the coordinator's notes and the waves' review logs l
   lot's door (`Plot::arrival_point()`, the same door a visitor uses), they are placed there off shift, and at
   opening they walk to their post at the game's walking speed (`crates/sim-core/src/staff.rs`, `walk`). At
   closing they walk back out and are gone once they reach the door, so the cart stands unstaffed afterwards.
-- Tests: `crates/sim-core/tests/public_places.rs` — `a_vendor_walks_in_at_opening_and_out_at_closing` (at the
+- Tests: `crates/sim-core/tests/sim/public_places.rs` — `a_vendor_walks_in_at_opening_and_out_at_closing` (at the
   door before ten, drawn walking in, not at the post a minute later, there within ten minutes; back at the door
   and still after 21:30) and `the_barista_steps_over_to_the_machine_and_the_cafe_closes` (on the way from the
   door at a minute past ten, then at the machine).
