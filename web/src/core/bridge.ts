@@ -104,14 +104,13 @@ export class SimBridge {
   private pendingStep = 0;
   private readonly frameState: FrameState;
 
-  /** The world as the worker's messages built it up, and as its listeners last got it (`mergeWorld`). */
+  /** The world as the worker's messages built it up, and as its listeners last got it (`mergeWorld`: a message always leaves the two apart, until the world is handed over). */
   private world: WorldStructure | null = null;
   private shownWorld: WorldStructure | null = null;
   /** The view (`setView`'s `seq`) `world` was built for, and the latest view asked for: a world for an older one waits for the newer. */
   private worldView = 0;
   private viewSeq = 0;
-  /** What the listeners haven't had yet, and the timer that hands it over without frames. */
-  private worldDue = false;
+  /** What the listeners haven't had yet (the world: `world` not `shownWorld`), and the timer that hands it over without frames. */
   private itemsDue = false;
   private lampsDue = false;
   private deliverTimer: ReturnType<typeof setTimeout> | null = null;
@@ -461,8 +460,7 @@ export class SimBridge {
       notify(this.itemListeners, this.items);
     }
     // (A world built for a view before the latest waits: the latest view's comes next.)
-    if (this.worldDue && this.world && this.worldView === this.viewSeq) {
-      this.worldDue = false;
+    if (this.world && this.world !== this.shownWorld && this.worldView === this.viewSeq) {
       this.shownWorld = this.world;
       notify(this.worldListeners, this.world);
     }
@@ -478,7 +476,6 @@ export class SimBridge {
       case 'world':
         this.world = mergeWorld(this.world, this.shownWorld, msg);
         this.worldView = msg.view;
-        this.worldDue = true;
         this.deliverSoon();
         break;
       case 'items':
