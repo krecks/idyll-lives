@@ -23,7 +23,7 @@ import { connect, cropRoads, inside, leftOf, lengths, nearest, pointAt, roadExit
 import { householdFunds, savingsOf } from './wealth';
 import { extend, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
 import { generateBigWorld, type OpenWorldDraft } from './macro';
-import { garageFor, houseCar, type ParkedCar } from '../render/shared/cars';
+import { garageAt, garageFor, houseCar, type ParkedCar } from '../render/shared/cars';
 import { fenceRuns, townFences, type TownFence } from './gardenFences';
 
 export type Wall = [number, number, number, number];
@@ -1146,6 +1146,8 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
   const storeys = Math.max(1, ...plots.map((p) => p.storeys));
   let basement = false;
   const driveOf = new Map<number, Rect>();
+  /** Where a garage the player builds at the end of a driveway would stand, on a house the town gave none (`garageAt`): the fences start behind it too. */
+  const roomFor = new Map<number, Rect>();
   for (const s of town.slots) {
     if (s.kind !== 'house') {
       const place = placeOf(s);
@@ -1202,13 +1204,19 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       return shift(o.rot % 2 === 0 ? { x: o.x, z: o.z, w: fw, d: fd } : { x: o.x, z: o.z, w: fd, d: fw });
     });
     const garage = xs.length ? garageFor({ x: ox, z: oz, w: pw, d: pd }, box, shift(drive), -1, things) : null;
+    const onTown = (g: { x0: number; z0: number; x1: number; z1: number }) => turnOnto(t, s).rect({ x: g.x0 - ox, z: g.z0 - oz, w: g.x1 - g.x0, d: g.z1 - g.z0 });
     if (garage) {
-      const r = turnOnto(t, s).rect({ x: garage.x0 - ox, z: garage.z0 - oz, w: garage.x1 - garage.x0, d: garage.z1 - garage.z0 });
+      const r = onTown(garage);
       garages.push({ plot: s.index, x0: r.x, z0: r.z, x1: r.x + r.w, z1: r.z + r.d });
+    } else {
+      // (As Build mode finds it, `drivewayGarage`: clear of the things outdoors, not those indoors.)
+      const outdoors = things.filter((r) => r.x + r.w <= box.x0 || r.x >= box.x1 || r.z + r.d <= box.z0 || r.z >= box.z1);
+      const room = xs.length ? garageAt({ x: ox, z: oz, w: pw, d: pd }, box, shift(drive), -1, outdoors) : null;
+      if (room) roomFor.set(s.index, onTown(room));
     }
   }
   dropCrowdedTrees(content, walls, objects, town.depth);
-  const fences = gardenFencesOf(content, town, { walls, objects, paths, fields, garages, plots }, driveOf);
+  const fences = gardenFencesOf(content, town, { walls, objects, paths, fields, garages, plots }, driveOf, roomFor);
   return { walls, doors, windows, objects, paths, fields, garages, drives, cars, plots, facing: town.slots.map((s) => s.facing), storeys, basement, fences };
 }
 
@@ -1254,6 +1262,7 @@ function gardenFencesOf(
   town: NeighbourhoodDraft,
   layout: Pick<TownLayout, 'walls' | 'objects' | 'paths' | 'fields' | 'garages' | 'plots'>,
   driveOf: ReadonlyMap<number, Rect>,
+  roomFor: ReadonlyMap<number, Rect>,
 ): TownFence[] {
   const D = town.depth;
   // Wall edges on the ground storey (and the edges in front of things, below): no fence there. Each
@@ -1299,7 +1308,8 @@ function gardenFencesOf(
     const rect = layout.plots[i];
     const home = s.kind === 'house';
     const g = layout.garages.find((g) => g.plot === s.index);
-    const garage = g ? { x: g.x0, z: g.z0, w: g.x1 - g.x0, d: g.z1 - g.z0 } : null;
+    // (The town's garage, or where the player could build one: Build mode's Garage tool.)
+    const garage = g ? { x: g.x0, z: g.z0, w: g.x1 - g.x0, d: g.z1 - g.z0 } : (roomFor.get(s.index) ?? null);
     return { rect, facing: s.facing, house: home ? houseIn(rect) : null, home, drive: driveOf.get(s.index) ?? null, garage, fenced: true };
   });
   const roads = roadIndex(town.roads);

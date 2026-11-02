@@ -13,7 +13,8 @@
  *   edge; corners meet, and a side or back shared with another plot gets one fence (the left plot's,
  *   as laid out with its street along x, or the right one's when the left has none);
  * - the cross fences stand at the house front line, or behind the inner end of a driveway (and its
- *   garage) beside the house or beside it next door, so a car's doors open clear of them; on a
+ *   garage, or where the player could build one at its end: `town.ts`) beside the house or beside
+ *   it next door, so a car's doors open clear of them and a garage goes up there; on a
  *   shared side both plots' at the same depth, so the side fence meets both;
  * - a farm's sides and back are fenced (its land is open in front of them), and its fields all
  *   round, a gate in the middle of the side towards the farmhouse;
