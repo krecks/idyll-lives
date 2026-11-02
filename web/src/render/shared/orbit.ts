@@ -32,9 +32,13 @@ const ALL_KEYS = new Set([...KEY.up, ...KEY.down, ...KEY.left, ...KEY.right, ...
 
 type Interaction = 'rotate' | 'pan' | 'zoom';
 
-/** What a pointer drag does (the original's default input map): Ctrl+left pans, left turns, right pans; the middle button nothing. */
-function pointerInteraction(button: number, ctrl: boolean): Interaction | null {
+/**
+ * What a pointer drag does: Ctrl+left pans, left turns, right pans (the original's default input
+ * map), and the middle button turns too: it's how the camera turns while the left button draws walls.
+ */
+export function pointerInteraction(button: number, ctrl: boolean): Interaction | null {
   if (button === 0) return ctrl ? 'pan' : 'rotate';
+  if (button === 1) return 'rotate';
   return button === 2 ? 'pan' : null;
 }
 
@@ -238,6 +242,8 @@ export class OrbitControls {
   attach(element: HTMLElement): () => void {
     const down = (e: PointerEvent) => {
       if (!this.enabled || !this.buttons.includes(e.button) || this.drag) return;
+      // (A middle press would otherwise start the browser's autoscroll.)
+      if (e.button === 1) e.preventDefault();
       try {
         element.setPointerCapture(e.pointerId);
       } catch {

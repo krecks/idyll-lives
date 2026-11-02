@@ -10,7 +10,8 @@
  * shader compiling.
  *
  * Vertex (`GAME_RESIDENT`):
- * - Skinned from the row, four influences (`game_simJoints`, `game_simWeights`): the model matrix is
+ * - Skinned from the row, four influences (`game_simJoints`, `game_simWeights`; a bone three texels, its
+ *   matrix's affine rows, and one of no weight not read): the model matrix is
  *   `matrix_model · instance · Σ wᵢ · boneᵢ` (`transformInstancingVS`, set per resident material,
  *   `RESIDENT_INSTANCING`), so the world position (`vPositionW`) and the normal (`mat3` of the model
  *   matrix, PlayCanvas's own for instanced draws) are the skinned ones everything after reads: the
@@ -23,7 +24,7 @@
  *   weight) pairs), position and normal (`normalCoreVS`'s `getLocalNormal` wrapped,
  *   `RESIDENT_NORMAL`); on shells (`GAME_SIM_CLOTH`) the seated corrective (tone.xyz, as far as
  *   appearance texel 4 b says).
- * - `game_simLayout`: x the first appearance texel (bones · 4), y the morph texture's width, z the
+ * - `game_simLayout`: x the first appearance texel (bones · `BONE_TEXELS`), y the morph texture's width, z the
  *   texels of a part's morph header. Uniforms, not constants: one program per surface whatever the set.
  *
  * Fragment, by surface: the colours in `getAlbedo` (`albedo` slot, by surface: `GAME_SIM_BODY`,
@@ -36,7 +37,7 @@
  * `select`s and `mix`es.
  */
 
-import { APPEARANCE_TEXELS, MORPH_TEXELS, SHIRT } from '../../shared/characters/layout';
+import { APPEARANCE_TEXELS, BONE_TEXELS, MORPH_TEXELS, SHIRT } from '../../shared/characters/layout';
 import type { Language, ShaderFeature } from './chunks';
 
 /** Microsurface (1 - roughness) of painted clothes; skin keeps the material's. */
@@ -132,15 +133,27 @@ const VS_GLSL = {
 	varying vec4 vSimField;
 	varying vec4 vSimTone;
 	vec3 gameSimMorphN = vec3(0.0);
-	mat4 gameSimBone(int b, int row) {
-		int o = b * 4;
-		return mat4(texelFetch(game_simPoses, ivec2(o, row), 0), texelFetch(game_simPoses, ivec2(o + 1, row), 0), texelFetch(game_simPoses, ivec2(o + 2, row), 0), texelFetch(game_simPoses, ivec2(o + 3, row), 0));
+	// Bone b's skinning matrix's three rows (a texel each, layout.ts BONE_TEXELS), weighted by w, added to r0..r2.
+	void gameSimBone(int b, int row, float w, inout vec4 r0, inout vec4 r1, inout vec4 r2) {
+		int o = b * ${BONE_TEXELS};
+		r0 += texelFetch(game_simPoses, ivec2(o, row), 0) * w;
+		r1 += texelFetch(game_simPoses, ivec2(o + 1, row), 0) * w;
+		r2 += texelFetch(game_simPoses, ivec2(o + 2, row), 0) * w;
 	}
 	mat4 gameSimSkin() {
 		int row = int(game_simRow + 0.5);
 		ivec4 j = ivec4(game_simJoints + 0.5);
 		vec4 w = game_simWeights;
-		return gameSimBone(j.x, row) * w.x + gameSimBone(j.y, row) * w.y + gameSimBone(j.z, row) * w.z + gameSimBone(j.w, row) * w.w;
+		vec4 r0 = vec4(0.0);
+		vec4 r1 = vec4(0.0);
+		vec4 r2 = vec4(0.0);
+		// (A bone of no weight is not read: most vertices have one or two.)
+		gameSimBone(j.x, row, w.x, r0, r1, r2);
+		if (w.y > 0.0) gameSimBone(j.y, row, w.y, r0, r1, r2);
+		if (w.z > 0.0) gameSimBone(j.z, row, w.z, r0, r1, r2);
+		if (w.w > 0.0) gameSimBone(j.w, row, w.w, r0, r1, r2);
+		// (Columns from the rows; the fourth row the weights' sum, as the four matrices' 0 0 0 1 rows weighted.)
+		return mat4(vec4(r0.x, r1.x, r2.x, 0.0), vec4(r0.y, r1.y, r2.y, 0.0), vec4(r0.z, r1.z, r2.z, 0.0), vec4(r0.w, r1.w, r2.w, w.x + w.y + w.z + w.w));
 	}
 	// The rows drawn (16 bits a component, residentRowFilter): 1, or 0 for a row left out (its copy collapses to nothing).
 	uniform vec4 game_simShown;
@@ -213,15 +226,25 @@ const VS_WGSL = {
 	varying vSimField: vec4f;
 	varying vSimTone: vec4f;
 	var<private> gameSimMorphN: vec3f = vec3f(0.0);
-	fn gameSimBone(b: i32, row: i32) -> mat4x4f {
-		let o = b * 4;
-		return mat4x4f(textureLoad(game_simPoses, vec2i(o, row), 0), textureLoad(game_simPoses, vec2i(o + 1, row), 0), textureLoad(game_simPoses, vec2i(o + 2, row), 0), textureLoad(game_simPoses, vec2i(o + 3, row), 0));
+	// Bone b's skinning matrix's three rows (a texel each, layout.ts BONE_TEXELS), weighted by w, added to r.
+	fn gameSimBone(b: i32, row: i32, w: f32, r: ptr<function, array<vec4f, 3>>) {
+		let o = b * ${BONE_TEXELS};
+		(*r)[0] = (*r)[0] + textureLoad(game_simPoses, vec2i(o, row), 0) * w;
+		(*r)[1] = (*r)[1] + textureLoad(game_simPoses, vec2i(o + 1, row), 0) * w;
+		(*r)[2] = (*r)[2] + textureLoad(game_simPoses, vec2i(o + 2, row), 0) * w;
 	}
 	fn gameSimSkin() -> mat4x4f {
 		let row = i32(game_simRow + 0.5);
 		let j = vec4i(game_simJoints + vec4f(0.5));
 		let w = game_simWeights;
-		return gameSimBone(j.x, row) * w.x + gameSimBone(j.y, row) * w.y + gameSimBone(j.z, row) * w.z + gameSimBone(j.w, row) * w.w;
+		var r = array<vec4f, 3>(vec4f(0.0), vec4f(0.0), vec4f(0.0));
+		// (A bone of no weight is not read: most vertices have one or two.)
+		gameSimBone(j.x, row, w.x, &r);
+		if (w.y > 0.0) { gameSimBone(j.y, row, w.y, &r); }
+		if (w.z > 0.0) { gameSimBone(j.z, row, w.z, &r); }
+		if (w.w > 0.0) { gameSimBone(j.w, row, w.w, &r); }
+		// (Columns from the rows; the fourth row the weights' sum, as the four matrices' 0 0 0 1 rows weighted.)
+		return mat4x4f(vec4f(r[0].x, r[1].x, r[2].x, 0.0), vec4f(r[0].y, r[1].y, r[2].y, 0.0), vec4f(r[0].z, r[1].z, r[2].z, 0.0), vec4f(r[0].w, r[1].w, r[2].w, w.x + w.y + w.z + w.w));
 	}
 	// The rows drawn (16 bits a component, residentRowFilter): 1, or 0 for a row left out (its copy collapses to nothing).
 	uniform game_simShown: vec4f;

@@ -14,8 +14,12 @@ import { withBuild, withoutBuild } from './build';
 
 /** Background downloads at once. */
 const BACKGROUND_PARALLEL = 2;
-/** Foreground downloads at once (a loading screen's plan). */
-const FOREGROUND_PARALLEL = 4;
+/** Foreground downloads at once (a loading screen's plan: mostly small files, which a few at a time left the line idle between). */
+const FOREGROUND_PARALLEL = 8;
+/** A download that receives nothing for this long (ms) is given up on, and tried once more. */
+const STALL_MS = 20_000;
+/** Tries per file in one load (`load`): the first, and one more after a stall or a network error. */
+const TRIES = 2;
 
 let foregroundLoads = 0;
 let backgroundLoads = 0;
@@ -87,14 +91,53 @@ const requested = new Set<string>();
 const finished = new Set<string>();
 const inflight = new Map<string, Promise<void>>();
 
-/** Downloads `url` once per page (shared by `prefetch` and `prefetchNow`). */
+/**
+ * Downloads `url` once, giving up when nothing arrives for `STALL_MS` (a connection that hangs would
+ * otherwise hold a loading screen for good). A slow download that keeps coming is never cut off.
+ */
+async function download(url: string, priority: 'high' | 'low'): Promise<void> {
+  const abort = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const alive = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => abort.abort(new Error(`${url}: nothing arrived for ${STALL_MS / 1000} s`)), STALL_MS);
+  };
+  alive();
+  try {
+    const res = await fetch(withBuild(url), { priority, signal: abort.signal });
+    if (!res.ok) throw new HttpError(`${url}: ${res.status}`);
+    const reader = res.body?.getReader();
+    if (!reader) {
+      await res.arrayBuffer();
+      return;
+    }
+    for (;;) {
+      const { done } = await reader.read();
+      if (done) return;
+      alive();
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The server answered, but not with the file: trying again won't help. */
+class HttpError extends Error {}
+
+/** Downloads `url` once per page (shared by `prefetch` and `prefetchNow`): tried again once if it stalls or the network fails. */
 function load(url: string, priority: 'high' | 'low'): Promise<void> {
   const existing = inflight.get(url);
   if (existing) return existing;
   const p = (async () => {
-    const res = await fetch(withBuild(url), { priority });
-    if (!res.ok) throw new Error(`${url}: ${res.status}`);
-    await res.arrayBuffer();
+    for (let tried = 1; ; tried++) {
+      try {
+        await download(url, priority);
+        break;
+      } catch (err) {
+        if (err instanceof HttpError || tried >= TRIES) throw err;
+        console.warn(`[assets] ${url} failed, trying again`, err);
+      }
+    }
     finished.add(url);
   })();
   inflight.set(url, p);
@@ -103,6 +146,11 @@ function load(url: string, priority: 'high' | 'low'): Promise<void> {
   };
   void p.then(forget, forget);
   return p;
+}
+
+/** Whether the file at `url` (a stream key: without the build's query) has been downloaded this page. */
+export function fetched(url: string): boolean {
+  return finished.has(key(url));
 }
 
 /* The plan: the files this session will fetch, and how many are done. */
@@ -170,7 +218,7 @@ export function planStream(urls: Iterable<string>, label: string): void {
  * planned its own (which takes these files in too).
  */
 export function streamGameData(urls: string[]): void {
-  if (planned.size === 0) planStream(urls, 'Game data');
+  if (planned.size === 0) planStream(urls, 'Getting the game ready…');
   prefetch(urls);
 }
 

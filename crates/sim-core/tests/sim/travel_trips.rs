@@ -196,3 +196,64 @@ fn a_cosy_town_never_drives_to_a_visit() {
         assert!(w.cars[c].trip.is_none() && w.cars[c].state == CarState::Parked);
     }
 }
+
+/// The trip in the UI's view of a resident (`SimView.trip`), their panel open: where to and about
+/// when, while on the way; gone once there.
+fn trip_in_view(w: &World, i: usize) -> Option<(u64, u64)> {
+    let mut sync = sim_core::view::UiSync::new();
+    sync.inspect(Some(i as u32));
+    let view: Value = serde_json::from_str(&sync.update_json(w)).unwrap();
+    let s = view["sims"]
+        .as_array()?
+        .iter()
+        .find(|s| s["id"].as_u64() == Some(i as u64))?;
+    let t = &s["trip"];
+    Some((t["to"].as_u64()?, t["at"].as_u64()?))
+}
+
+#[test]
+fn the_ui_says_where_a_trip_goes_and_about_when_they_are_there() {
+    let (mut w, h, park) = world(5);
+    let i = w
+        .cars
+        .iter()
+        .find_map(|car| {
+            let home = w.households[car.household as usize].plot? as usize;
+            h.plots[0].contains(&home).then_some(())?;
+            car.owners.first().map(|&o| o as usize)
+        })
+        .expect("a car owner in the first hamlet");
+    assert_eq!(
+        trip_in_view(&w, i),
+        None,
+        "at home, not on the way anywhere"
+    );
+    w.apply(Command::Visit {
+        sim: i as u32,
+        plot: park,
+    })
+    .unwrap();
+    let mut first = None;
+    for _ in 0..20 * 60 * 20 {
+        w.tick_once();
+        if first.is_none() {
+            first = trip_in_view(&w, i);
+        }
+        let s = &w.sims[i];
+        if w.plot_at(s.tile().0, s.tile().1) == Some(park) {
+            break;
+        }
+    }
+    let (to, at) = first.expect("on the way: the UI has the trip");
+    assert_eq!(to, park as u64);
+    assert_eq!(at % 5, 0, "in 5-minute steps");
+    // About when they got there (an estimate made as they set off, by the roads, without the
+    // car's stops or the walk from the parking spot to the park).
+    let now = sim_core::clock::minute_of_day(w.tick) as i64;
+    let off = (now - at as i64)
+        .rem_euclid(24 * 60)
+        .min((at as i64 - now).rem_euclid(24 * 60));
+    eprintln!("estimated {at}, there at {now} ({off} minutes off)");
+    assert!(off <= 30, "estimated {at}, there at {now}");
+    assert_eq!(trip_in_view(&w, i), None, "there: no longer on the way");
+}

@@ -34,6 +34,7 @@
 import type { ObjectDef, SurfaceKind } from '../content/content';
 import { approachCandidates, covers, freeSpots, frontTile, middleOf, overhangTiles, topOf, type Shape, type Shapes, type Top } from './surfaces';
 import type { Door, HouseTemplate, Placement, PlannedRoom, Wall } from './town';
+import { mulberry32 as random } from './noise';
 
 export interface HouseGenConfig {
   classes: Record<string, HouseClass>;
@@ -333,17 +334,8 @@ interface Floor {
 
 const key = (x: number, z: number) => `${x}:${z}`;
 
-/** A small seeded generator (mulberry32). */
-export function random(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+// (The small seeded generator, `noise.ts`'s mulberry32.)
+export { random };
 
 /**
  * `lampTiles`: tiles a lamp lights at night unless its `light.tiles` says (content

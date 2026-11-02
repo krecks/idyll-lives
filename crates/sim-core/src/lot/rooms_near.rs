@@ -13,7 +13,8 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use super::{CHUNK_TILES, EdgeRef, Lot, OUTDOORS, RoomMeta, RoomNode, Side, VOID, grow, union};
+use super::{CHUNK_TILES, EdgeRef, Lot, OUTDOORS, RoomMeta, RoomNode, Side, VOID, grow};
+use crate::path::join;
 
 /// Past this many tile halves the floods give up and every room is found again (the whole
 /// outdoors split in two would take as long either way).
@@ -123,7 +124,7 @@ impl Lot {
                 f.voids.push(c);
                 let [x0, z0, x1, z1] = self.chunk_rect(c);
                 f.key = f.key.min(self.half_key(x0, z0, 0));
-                f.rect = union(f.rect, [x0, z0, x1, z1]);
+                f.rect = join(f.rect, [x0, z0, x1, z1]);
             }
         }
         f.queue.push_back(n);
@@ -295,7 +296,7 @@ impl Lot {
         // The rooms that went (or are found again) are cleared.
         for &l in &old {
             let rect = self.room_meta[l as usize - 1].rect();
-            touched = union(touched, rect);
+            touched = join(touched, rect);
             for s in self.rect_slots(rect) {
                 let mut h = self.halves[s];
                 for half in &mut h {
@@ -369,7 +370,7 @@ impl Lot {
                 continue;
             };
             let id = k as u16 + 1;
-            touched = union(touched, floods[f].rect);
+            touched = join(touched, floods[f].rect);
             for &c in &floods[f].voids {
                 // A chunk inside a room has a floor to stand on: it's there from now on.
                 self.alloc(c);
@@ -406,7 +407,7 @@ impl Lot {
                 None => None,
             };
             self.changes.rect = Some(match self.changes.rect {
-                Some(r) => union(r, touched),
+                Some(r) => join(r, touched),
                 None => touched,
             });
         }
@@ -438,7 +439,7 @@ fn merge(floods: &mut [Flood], parent: &mut [usize], a: usize, b: usize) -> usiz
     k.tiles.append(&mut g.tiles);
     k.voids.append(&mut g.voids);
     k.key = k.key.min(g.key);
-    k.rect = union(k.rect, g.rect);
+    k.rect = join(k.rect, g.rect);
     k.border |= g.border;
     keep
 }

@@ -19,6 +19,7 @@
 
 import { ensureLlm, generateText, MODEL, unloadLlm } from '../llm';
 import { hasWebGpu } from '../ml/ort';
+import { whenModelsMayStart } from '../ml/schedule.svelte';
 import { settings } from '../settings/settings.svelte';
 import { toast } from '../ui/state.svelte';
 import { speechPieces } from '../voice/lines';
@@ -215,6 +216,8 @@ export async function runDeviceTest(text: TalkText): Promise<DeviceReport | null
   };
   try {
     deviceTest.gpu = await adapterName();
+    // Not beside the game booting or loading (its frames and the model's loading time would be theirs).
+    await whenModelsMayStart();
     deviceTest.step = 'Measuring frames';
     const idle = (await watchFrames(() => new Promise((r) => setTimeout(r, 1000)))).frames;
     // Smooth enough: the slow frames no worse than two and a half typical idle ones (or 40 ms).

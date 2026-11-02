@@ -6,7 +6,8 @@
  * The sun's shadow map in the game: it covers a fixed square round the viewed lot, so its texels
  * keep their size and place while the camera turns and the sun steps, and it is drawn again only
  * when something in it changed (`moved`): the sun's step, a resident's pose (throttled to the
- * preset's `shadowRate`), a thing placed, the walls. Casters outside the square aren't drawn. The menus' town is fitted round the camera's
+ * preset's `shadowRate`), a thing placed, the walls; a car or a resident moving only when it is in
+ * the square or near it (`reaches`). Casters outside the square aren't drawn. The menus' town is fitted round the camera's
  * view instead, and drawn every frame.
  *
  * PlayCanvas fits a directional light's map to the camera's view. For a light with a square, the
@@ -60,6 +61,12 @@ const NORMAL_OFFSET_TEXELS = 0.75;
  * clean at a much smaller number.
  */
 const SHADOW_BIAS = 0.02;
+
+/**
+ * How far (m) past the square's edge a moving caster can still throw its shadow into the map (a
+ * resident or a car with the sun low): one moving further out leaves the map as it is (`reaches`).
+ */
+export const CASTER_REACH = 8;
 
 interface Square {
   /** The middle (PlayCanvas space) and the half side (m). */
@@ -188,6 +195,8 @@ export class SunShadows {
   private overview = false;
   private readonly size: number;
   private readonly square: Square = { centre: new pc.Vec3(), radius: 30 };
+  /** The square on the ground (game space, m): from (`x0`, `z0`) to (`x1`, `z1`). */
+  private readonly ground = { x0: -30, z0: -30, x1: 30, z1: 30 };
   private readonly fadeId: pc.ScopeId;
   private readonly fade: number;
   /** Something in the map changed (`moved`; `urgent`: not a resident's pose), for what else holds a picture of the world (the mirrors). */
@@ -226,8 +235,24 @@ export class SunShadows {
   setSquare(x: number, z: number, radius: number): void {
     toEngine(x, 0, z, this.square.centre);
     this.square.radius = radius;
+    const g = this.ground;
+    g.x0 = x - radius;
+    g.z0 = z - radius;
+    g.x1 = x + radius;
+    g.z1 = z + radius;
     this.applyBias();
     this.moved();
+  }
+
+  /**
+   * Whether a caster moving at (x, z) (game space) could change the map: it is within `CASTER_REACH` m
+   * of the square (always, in the menus' town, whose map follows the view). What the cars and
+   * residents ask of each that moved: one moving across town leaves the map as it is.
+   */
+  reaches(x: number, z: number): boolean {
+    const g = this.ground;
+    const r = CASTER_REACH;
+    return this.overview || (x >= g.x0 - r && x <= g.x1 + r && z >= g.z0 - r && z <= g.z1 + r);
   }
 
   /** The menus' town (fitted round the view, drawn every frame, no fade at its edge) or the game. */

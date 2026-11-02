@@ -6,7 +6,7 @@
 import { describe, expect, test } from 'bun:test';
 import { chunkAt, CHUNK } from '../src/render/shared/chunks';
 import { Flight, HYSTERESIS, panBounds, Roam, SETTLE_MS, streamRadius, warmLots, type FocusPlot } from '../src/render/shared/focus';
-import { OrbitControls } from '../src/render/shared/orbit';
+import { OrbitControls, pointerInteraction } from '../src/render/shared/orbit';
 
 const cam = (x: number, z: number, radius = 30) => ({ x, z, radius, alpha: 0, fovH: 1.1 });
 const none = () => null;
@@ -38,6 +38,42 @@ describe('roaming', () => {
     near.update(cam(edge - r - HYSTERESIS - 4, 500), 32, none, take);
     expect(near.chunks.has(chunkAt(edge + 1, 500))).toBe(false);
     expect(behind).toBeGreaterThan(0);
+  });
+
+  test("a preset's share of the stream radius streams fewer chunks", () => {
+    expect(streamRadius(60, 0.7)).toBeCloseTo(152 * 0.7);
+    const full = new Roam();
+    const low = new Roam();
+    low.streamScale = 0.7;
+    full.update(cam(1000, 1000, 60), 0, none, take);
+    low.update(cam(1000, 1000, 60), 0, none, take);
+    expect(low.chunks.size).toBeLessThan(full.chunks.size);
+    for (const id of low.chunks) expect(full.chunks.has(id)).toBe(true);
+  });
+
+  test('a still camera keeps the same set, and a camera that moved works it out again', () => {
+    const roam = new Roam();
+    roam.update(cam(500, 500), 0, none, take);
+    const first = roam.chunks;
+    // (Unchanged: not even a new set.)
+    expect(roam.update(cam(500, 500), 16, none, take)).toBe(false);
+    expect(roam.update(cam(500.001, 500), 32, none, take)).toBe(false);
+    expect(roam.chunks).toBe(first);
+    // Creeping by less than the threshold a frame still gets there: the comparison is with where it was last worked out.
+    let x = 500;
+    for (let t = 48; x < 500 + CHUNK * 3; t += 16) {
+      x += 0.004;
+      roam.update(cam(x, 500), t, none, take);
+      if (roam.chunks !== first) break;
+    }
+    expect(roam.chunks).not.toBe(first);
+    const moved = new Roam();
+    moved.update(cam(500, 500), 0, none, take);
+    moved.update(cam(x, 500), 16, none, take);
+    expect([...roam.chunks].sort()).toEqual([...moved.chunks].sort());
+    // A big move: the chunks follow.
+    expect(roam.update(cam(900, 500), 2000, none, take)).toBe(true);
+    expect(roam.chunks.has(chunkAt(900, 500))).toBe(true);
   });
 
   test('more is streamed ahead of the camera than behind it', () => {
@@ -89,6 +125,23 @@ describe('roaming', () => {
     expect(out.x).toBeCloseTo(600, 5);
     expect(out.radius).toBeCloseTo(30, 5);
     expect(peak).toBeGreaterThan(60);
+  });
+
+  test('with Reduce motion a flight is a cut: there on the next step, without rising', () => {
+    const f = new Flight();
+    f.start(0, 0, 30, 600, 0, 40, true);
+    const out = { x: 0, z: 0, radius: 0 };
+    expect(f.step(1 / 60, out)).toBe(true);
+    expect(out).toEqual({ x: 600, z: 0, radius: 40 });
+    expect(f.active).toBe(false);
+  });
+
+  test('the middle button turns the camera (as while the left draws walls), the right pans', () => {
+    expect(pointerInteraction(1, false)).toBe('rotate');
+    expect(pointerInteraction(0, false)).toBe('rotate');
+    expect(pointerInteraction(0, true)).toBe('pan');
+    expect(pointerInteraction(2, false)).toBe('pan');
+    expect(pointerInteraction(3, false)).toBe(null);
   });
 
   test('the target stays on the land: the town and 60 m round it, a big world’s land and 20 m', () => {

@@ -11,7 +11,9 @@ import type { MeshData } from '../shared/geometry';
 /**
  * A static mesh from `data` (colours in RGBA, as `Geo` writes them, and the cutaway attribute where
  * it has one: a `cutaway` material needs it); null when there is nothing to draw. `dynamic`: its
- * vertices change later (set again and `update`d).
+ * vertices change later (set again and `update`d). `Geo`'s colours and cutaway are a byte a channel:
+ * the colours read back as 0..1 (normalised), the cutaway as its whole numbers (PlayCanvas converts
+ * them to floats on WebGPU too: `shaders/cutaway.ts` reads them as before).
  */
 export function meshFrom(device: pc.GraphicsDevice, data: MeshArrays | MeshData, dynamic = false): pc.Mesh | null {
   if (data.positions.length === 0) return null;
@@ -20,8 +22,8 @@ export function meshFrom(device: pc.GraphicsDevice, data: MeshArrays | MeshData,
   mesh.setPositions(data.positions);
   mesh.setNormals(data.normals);
   if (data.uvs.length) mesh.setUvs(0, data.uvs);
-  if ('colors' in data && data.colors) mesh.setColors(data.colors);
-  if ('cut' in data && data.cut) mesh.setVertexStream(WALL_CUT_SEMANTIC, data.cut, 4);
+  if ('colors' in data && data.colors) mesh.setColors32(data.colors);
+  if ('cut' in data && data.cut) mesh.setVertexStream(WALL_CUT_SEMANTIC, data.cut, 4, undefined, pc.TYPE_UINT8, false);
   mesh.setIndices(data.indices);
   mesh.update(pc.PRIMITIVE_TRIANGLES);
   return mesh;

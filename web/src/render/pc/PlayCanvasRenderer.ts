@@ -44,7 +44,7 @@ import { ENV_UNITS, SKY_UNITS, SUN_UNITS } from './lightUnits';
 import { MaterialLibrary, SUN_LIGHT_MASK } from './materials';
 import { drawMesh, meshFrom } from './meshes';
 import { Mirrors } from './mirrors';
-import { buildModel, onModelFileArrived, type ModelTemplate } from './models';
+import { buildModel, fileImported, importAhead, modelFilesSettled, onModelFileArrived, type ModelTemplate } from './models';
 import { GameBirds } from './birds';
 import { colorBytes, depthBytes, DrawCounts, GpuTiming, ShaderWatch, type PassKind } from './gpuTiming';
 import { steadyShaderKeys } from './shaderKeys';
@@ -64,6 +64,8 @@ import { SunShadows } from './sunShadows';
 import { TemplateCache } from './templateCache';
 import { Thumbnails } from './thumbnail';
 import { benchDiag } from '../../debug/benchFlags';
+import { fetched } from '../../assets/stream';
+import { within } from '../../core/async';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
@@ -72,16 +74,17 @@ import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/e
 import { GAME_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
 import { GrassPush } from '../shared/grass';
-import { houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
+import { idleMoment } from '../shared/idle';
+import { coveringSurface, houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
 import { compose, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
 import { OrbitControls } from '../shared/orbit';
 import { Flight, panBounds, Roam, warmLots, type FocusPlot } from '../shared/focus';
-import { CHUNK, chunkCoords } from '../shared/chunks';
+import { CHUNK, chunkCoords, distanceToRect, RectGrid } from '../shared/chunks';
 import { ModelRefresh } from '../shared/modelRefresh';
 import { OverviewCamera } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
 import { standInOf } from '../shared/modelEntry';
-import { renderScale, watchPixelRatio } from '../shared/resolution';
+import { PIXEL_BUDGET, renderScale, watchPixelRatio } from '../shared/resolution';
 import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
@@ -131,13 +134,17 @@ declare global {
 const RADIUS_LIMITS = [6, 95] as const;
 /** A big world's warm-up builds and draws this many lots besides the one in view (`warmGame`). */
 const WARM_LOTS = 6;
+/** Longest wait (ms) for the birds of a game's first build (their models built): they'd pop in in play otherwise. */
+const BIRDS_WAIT_MS = 3000;
+/** Idle time (ms) a frame must have left for a model file to be read ahead of time (`parseAhead`). */
+const PARSE_IDLE_MS = 8;
+/** How long (ms) a catalog card must be pointed at before its model is read (`prepareAsset`). */
+const PREPARE_AFTER_MS = 150;
 const BETA_LIMITS = [0.3, 1.35] as const;
 /** Its lens: vertical field of view (a slightly long lens flattens the perspective: the dollhouse look), near and far (m). */
 // (The near plane a fiftieth of the camera's distance, never under 0.3 m: from the town overview's 200–300 m at 0.3 m
 // the roads, 1.2 cm over the ground, fought it in green patches. Close up nothing changes: 0.3 m to 15 m out.)
 const LENS = { fov: 0.7, near: 0.3, far: 1600, nearShare: 1 / 50 };
-/** The far plane in a big world (m). */
-const BIG_FAR = 2600;
 /** Light is recomputed when the game's clock moved this many minutes (fast: the preset's `lightingStep`), at most every `LIGHT_MIN_MS`. */
 const LIGHT_STEP = 0.5;
 const LIGHT_MIN_MS = 100;
@@ -238,15 +245,52 @@ function sameObject(a: ObjectPlacement, b: ObjectPlacement): boolean {
 /** `?stream=1`: the street streams its chunks round the camera in any town (else only in a big world's). */
 const STREAM_FLAG = typeof location !== 'undefined' && new URLSearchParams(location.search).get('stream') === '1';
 
-/** The plot (by index) under a ground point, else the nearest within `reach` m. */
+/** The plot (by index) under a ground point, else the nearest within `reach` m (every plot looked at: see `PlotFinder` for each frame's). */
 function plotNear(world: WorldStructure, x: number, z: number, reach: number): FocusPlot | null {
   let best: FocusPlot | null = null;
   let bestD = reach;
   world.plots.forEach((p, i) => {
-    const d = Math.hypot(Math.max(p.x - x, 0, x - (p.x + p.w)), Math.max(p.z - z, 0, z - (p.z + p.d)));
+    const d = distanceToRect(x, z, p.x, p.z, p.w, p.d);
     if (d < bestD || (d === 0 && !best)) [best, bestD] = [{ id: i, x: p.x, z: p.z, w: p.w, d: p.d }, d];
   });
   return best;
+}
+
+/**
+ * `plotNear` for the roaming camera, each frame: the plots in a grid of 16 m cells (made once a
+ * world), and the last answer kept while the point, the reach and the world are the same (a still
+ * camera asks nothing of the grid). The same plot as `plotNear` gives for a finite reach.
+ */
+class PlotFinder {
+  private world: WorldStructure | null = null;
+  private grid = new RectGrid<{ x: number; z: number; w: number; d: number; i: number }>(16);
+  private readonly asked = { x: NaN, z: NaN, reach: NaN };
+  private answer: FocusPlot | null = null;
+
+  find(world: WorldStructure, x: number, z: number, reach: number): FocusPlot | null {
+    if (world !== this.world) {
+      this.world = world;
+      this.grid = new RectGrid(16);
+      world.plots.forEach((p, i) => this.grid.add({ x: p.x, z: p.z, w: p.w, d: p.d, i }));
+      this.asked.x = NaN;
+    }
+    const a = this.asked;
+    if (x === a.x && z === a.z && reach === a.reach) return this.answer;
+    a.x = x;
+    a.z = z;
+    a.reach = reach;
+    if (!Number.isFinite(reach)) return (this.answer = plotNear(world, x, z, reach));
+    // (In plot order, as `plotNear` goes: the first of plots as near wins.)
+    let best = -1;
+    let bestD = reach;
+    for (const c of this.grid.near({ x, z, w: 0, d: 0 }, reach)) {
+      const d = distanceToRect(x, z, c.x, c.z, c.w, c.d);
+      if (d < bestD || (d === bestD && c.i < best) || (d === 0 && best < 0)) [best, bestD] = [c.i, d];
+    }
+    const p = best >= 0 ? world.plots[best] : null;
+    if (p?.x === this.answer?.x && p?.z === this.answer?.z && this.answer?.id === best) return this.answer;
+    return (this.answer = p && { id: best, x: p.x, z: p.z, w: p.w, d: p.d });
+  }
 }
 
 /** A world build stopped because the roaming camera settled on another lot before it was done (`pace`). */
@@ -487,6 +531,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private followIndex: number | null = null;
   /** The roaming camera's stream of chunks and its focus lot (`shared/focus.ts`), a flight across the world (`flyTo`). */
   private readonly roam = new Roam();
+  /** The plot under the roaming camera's target (`roamFrame`). */
+  private readonly plots = new PlotFinder();
   private readonly flight = new Flight();
   private readonly flightPose = { x: 0, z: 0, radius: 0 };
   private focusLotListener: ((plot: number) => boolean) | null = null;
@@ -570,6 +616,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private shaderWatch!: ShaderWatch;
   /** The warm-up's frame, drawn next (`warmGame`). */
   private warmNext = false;
+  /** The loading screen's listener (`onLoadStep`); the warm-up's own world builds (its lots) don't report. */
+  private loadListener: ((label: string, done: number) => void) | null = null;
+  private warming = false;
+  /** The birds of this game's first build have been waited for (`buildWorld`). */
+  private birdsWaited = false;
+  /** Model files to read ahead of time, nearest first (`parseAhead`), and whether that's under way. */
+  private parseQueue: { url: string; file: string }[] = [];
+  private parsing = false;
+  /** The asset a catalog card points at, read after a moment (`prepareAsset`). */
+  private prepareTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     private readonly deps: RendererDeps,
@@ -625,7 +681,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     cam.layers = cam.layers.filter((id) => id !== pc.LAYERID_SKYBOX);
     // The picture after the light: multisampling or FXAA, the image processing
     // and the night grade (`post.ts`; the diag views and `?diag=linear` without them).
-    this.post = new PostProcessing(this.app, cam, gamePostOptions(this.quality.msaaSamples, this.diag, diagViewActive));
+    this.post = new PostProcessing(this.app, cam, gamePostOptions(this.quality.msaaSamples, this.diag, diagViewActive, this.quality.leanTargets));
     this.post.setLook(gameLook(LOOK));
 
     this.sun = new pc.Entity('sun');
@@ -675,9 +731,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       shadows: this.quality.streetShadows,
       ground: true,
       fenceStyles: c.fenceStyles,
+      farCull: this.quality.openWorld.farCull,
     });
+    this.roam.streamScale = this.quality.openWorld.stream;
     this.cars = new Cars(this.app, this.root, this.quality.streetShadows);
     this.characters.setCarSeat((x, z) => this.cars.seatAt(x, z));
+    // Only cars and residents moving where they cast into the sun's map draw it again.
+    const inMap = (x: number, z: number) => this.sunShadows.reaches(x, z);
+    this.cars.setShadowTest(inMap);
+    this.characters.setShadowTest(inMap);
+    this.characters.setCarRide((frame, x, z, yaw, aboard, out) => this.cars.ride(frame, x, z, yaw, aboard, out));
     this.decorTemplates = new TemplateCache(this.app);
     this.storeyLayer = new pc.Entity('storeyLayer');
     this.root.addChild(this.storeyLayer);
@@ -766,6 +829,77 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         resolve();
       }, FRAME_WAIT_LIMIT_MS);
     });
+  }
+
+  async texturesReady(): Promise<void> {
+    // (A model file's textures load with it; a surface's on their own, and a model may ask for surfaces.)
+    await modelFilesSettled(this.app);
+    await this.lib.texturesReady();
+  }
+
+  async streamSettled(limitMs: number): Promise<void> {
+    const until = performance.now() + limitMs;
+    // (A frame first: the camera's last turn may stream more chunks in.)
+    await within(this.framesRendered(1), Math.min(limitMs, 250), undefined);
+    while (!this.disposed && (this.streaming || this.streamDue || this.worldBuilds) && performance.now() < until) {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    }
+  }
+
+  onLoadStep(fn: ((label: string, done: number) => void) | null): void {
+    this.loadListener = fn;
+  }
+
+  /** A world build's step for the loading screen (not the warm-up's own builds of other lots). */
+  private loadStep(label: string, done: number): void {
+    if (!this.warming) this.loadListener?.(label, done);
+  }
+
+  parseAhead(files: readonly { url: string; file: string }[]): void {
+    this.parseQueue = files.filter((f) => !fileImported(this.app, f.url));
+    void this.parseFiles();
+  }
+
+  /**
+   * Reads the files `parseAhead` asked for, one per idle moment with time to spare, each once it's
+   * downloaded: not while a world builds or the street streams, whose slices have the frames' spare time.
+   */
+  private async parseFiles(): Promise<void> {
+    if (this.parsing) return;
+    this.parsing = true;
+    try {
+      while (!this.disposed && this.parseQueue.length) {
+        const spare = (await idleMoment()).timeRemaining();
+        if (this.disposed) return;
+        const held = this.worldBuilding || this.streaming || this.townMode;
+        if (!held && spare < PARSE_IDLE_MS) continue;
+        const i = held ? -1 : this.parseQueue.findIndex((f) => fetched(f.file));
+        // (Held, or none downloaded yet, the stream bringing them: look again in a while.)
+        if (i < 0) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue;
+        }
+        const [next] = this.parseQueue.splice(i, 1);
+        if (!fileImported(this.app, next.url)) await importAhead(this.app, next.url);
+      }
+    } finally {
+      this.parsing = false;
+    }
+  }
+
+  prepareAsset(key: string, kind: 'model' | 'wall' | 'floor'): void {
+    clearTimeout(this.prepareTimer);
+    this.prepareTimer = setTimeout(() => {
+      if (this.disposed) return;
+      if (kind !== 'model') {
+        // Its surface made (its textures loading), as the house will draw it.
+        const surface = coveringSurface(kind, key);
+        if (surface) this.house.material(surface.key, true, surface.pattern);
+        return;
+      }
+      const url = this.deps.assets.has(key, 'model') ? this.deps.assets.get(key, 'model')?.url : undefined;
+      if (url && !fileImported(this.app, url)) void importAhead(this.app, url);
+    }, PREPARE_AFTER_MS);
   }
 
   private readonly frame = (time: number): void => {
@@ -892,7 +1026,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   flyTo(x: number, z: number): void {
     const o = this.orbit;
     o.stopInertia();
-    this.flight.start(o.target.x, o.target.z, o.radius, x, z, Math.min(Math.max(o.radius, 24), 40));
+    this.flight.start(o.target.x, o.target.z, o.radius, x, z, Math.min(Math.max(o.radius, 24), 40), !!this.options.reducedMotion);
   }
 
   onFocusLot(listener: ((plot: number) => boolean) | null): void {
@@ -923,7 +1057,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.roam.pinned = this.followIndex !== null || this.gameRig.active || this.flight.active;
     const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
     const fovH = 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect);
-    const changed = this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha: o.alpha, fovH }, performance.now(), (x, z, reach) => plotNear(world, x, z, reach), (plot) => {
+    const changed = this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha: o.alpha, fovH }, performance.now(), (x, z, reach) => this.plots.find(world, x, z, reach), (plot) => {
       const taken = !!this.focusLotListener?.(plot.id);
       if (taken) {
         this.roamedTo = plot.id;
@@ -933,6 +1067,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     });
     if (!changed) return;
     if (this.streamOn && this.street.setChunks(this.roam.chunks)) this.streamStreet();
+    this.cars.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
     this.reportWatch();
   }
 
@@ -946,13 +1081,29 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const t = this.orbit.target;
     if (!v) return;
     const onLot = (t.x >= v.x - 4 && t.z >= v.z - 4 && t.x <= v.x + v.w + 4 && t.z <= v.z + v.d + 4);
-    const square = onLot ? `lot` : `${Math.round(t.x / 8) * 8},${Math.round(t.z / 8) * 8},${Math.round(Math.min(70, Math.max(30, 0.9 * this.orbit.radius + 15)) / 8)}`;
-    if (square === this.shadowSquare) return;
-    this.shadowSquare = square;
-    if (onLot) this.sunShadows.setSquare(v.x + v.w / 2, v.z + v.d / 2, Math.hypot(v.w, v.d) / 2 + SHADOW_MARGIN);
-    else this.sunShadows.setSquare(Math.round(t.x / 8) * 8, Math.round(t.z / 8) * 8, Math.min(70, Math.max(30, 0.9 * this.orbit.radius + 15)));
+    if (onLot) {
+      if (this.shadowSquare === 'lot') return;
+      this.shadowSquare = 'lot';
+      this.sunShadows.setSquare(v.x + v.w / 2, v.z + v.d / 2, Math.hypot(v.w, v.d) / 2 + SHADOW_MARGIN);
+      return;
+    }
+    // (Numbers compared, not a key made: this runs every frame.)
+    const x = Math.round(t.x / 8) * 8;
+    const z = Math.round(t.z / 8) * 8;
+    const half = Math.min(70, Math.max(30, 0.9 * this.orbit.radius + 15));
+    const step = Math.round(half / 8);
+    const at = this.roamSquare;
+    if (this.shadowSquare === 'roam' && at[0] === x && at[1] === z && at[2] === step) return;
+    this.shadowSquare = 'roam';
+    at[0] = x;
+    at[1] = z;
+    at[2] = step;
+    this.sunShadows.setSquare(x, z, half);
   }
-  private shadowSquare = 'lot';
+  /** The shadow square round the viewed lot (`lot`; `buildWorld` sets it there) or round the roaming camera's target (`roam`, `roamSquare`). */
+  private shadowSquare: 'lot' | 'roam' = 'lot';
+  /** The roaming square's middle (8 m steps) and half side (8 m steps), as last set. */
+  private readonly roamSquare = new Float64Array(3);
 
   /** The sim's full-detail area: the chunks streamed in, as a tile rectangle on the ground (`onWatch`). */
   private reportWatch(): void {
@@ -1118,22 +1269,25 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (A garage built or taken down: the street draws it.)
     if (!sameGarages(built.garages, world.garages)) return 'garages';
     if (built.objects.length !== world.objects.length) return 'object count';
+    // (A thing that didn't change is the same object: `bridge.ts` `mergeWorld`.)
     for (let i = 0; i < world.objects.length; i++) {
-      if (!sameObject(built.objects[i], world.objects[i])) return `object ${world.objects[i].id} ${world.objects[i].def}`;
+      const [a, b] = [built.objects[i], world.objects[i]];
+      if (a !== b && !sameObject(a, b)) return `object ${b.id} ${b.def}`;
     }
-    if (!sims) return null;
+    if (!sims || built.sims === world.sims) return null;
     if (built.sims.length !== world.sims.length) return 'sim count';
     for (let i = 0; i < world.sims.length; i++) {
       const [a, b] = [built.sims[i], world.sims[i]];
       if (a.id !== b.id || a.gender !== b.gender || a.stage !== b.stage || a.name !== b.name) return `sim ${b.id}`;
-      if (JSON.stringify(a.appearance) !== JSON.stringify(b.appearance)) return `sim look ${b.id}`;
+      // (The session keeps a look that didn't change the same object: compared whole only when it isn't.)
+      if (a.appearance !== b.appearance && JSON.stringify(a.appearance) !== JSON.stringify(b.appearance)) return `sim look ${b.id}`;
     }
     return null;
   }
 
   /** Applies a `patchable` world in place (what's drawn of an object, its open state and growth). */
   private patchWorld(world: WorldStructure): void {
-    this.lot.patch(world); // (objects' clips and picking boxes.)
+    this.lot.patch(world, this.builtWorld); // (objects' clips and picking boxes.)
     this.lastWorld = world;
     this.builtWorld = world;
     if (this.debug) console.info('[render] world patched (no rebuild)');
@@ -1183,7 +1337,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.worldBuilding = true;
     this.sliceStart = performance.now();
     try {
-      this.lot.patch(world);
+      this.lot.patch(world, this.builtWorld);
       await this.buildSims(world);
       this.builtWorld = world;
       if (this.debug) console.info('[render] world patched, residents built again');
@@ -1232,8 +1386,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.orbit.panBounds = panBounds(world);
     this.orbit.checkLimits();
     this.streamOn = world.meta?.world?.size === 'big' || STREAM_FLAG;
-    // A big world's land reaches further: its far plane too (its far LOD's houses to 650 m, the hills beyond).
-    const far = world.meta?.world?.size === 'big' ? BIG_FAR : LENS.far;
+    // A big world's land reaches further: its far plane too (the preset's, `OpenWorldQuality.far`: its far LOD's
+    // houses to 650 m, the hills beyond).
+    const far = world.meta?.world?.size === 'big' ? this.quality.openWorld.far : LENS.far;
     if (this.camera.camera.farClip !== far) this.camera.setLens({ ...LENS, far });
     const pb = this.orbit.panBounds;
     this.roam.setBounds({ x0: pb.x0 - 300, z0: pb.z0 - 300, x1: pb.x1 + 300, z1: pb.z1 + 300 });
@@ -1242,10 +1397,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.streamOn) {
       const o = this.orbit;
       const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
-      this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha: o.alpha, fovH: 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect) }, performance.now(), () => null, () => false);
+      // (The chunks the camera will see once it's turned to frame the lot, `buildSims`: those it looks at now would
+      // stream in again behind the turn, the first frames of play.)
+      const alpha = this.framingAlpha(world) ?? o.alpha;
+      this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha, fovH: 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect) }, performance.now(), () => null, () => false);
       this.street.setChunks(this.roam.chunks);
     } else this.street.setChunks(null);
+    this.cars.setView(this.streamOn ? this.roam.chunks : null, this.orbit.target.x, this.orbit.target.z);
     // (lotContents.ts: the landscape, with its country roads.)
+    this.loadStep('Laying out the land', 0.05);
     await this.lot.buildNature(world, (roads, parent) => drawRoads(this.app, roads, parent));
 
     const lotKey = this.lotKeyOf(world, view);
@@ -1255,6 +1415,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const shown = shownFences(world, this.deps.content.fenceStyles);
     const lotFences = lotBuilt ? shown.filter(onLot) : [];
     if (lotBuilt) {
+      this.loadStep('Building the house', 0.2);
       this.clearLot();
       this.lotKey = lotKey;
       this.lotHedges = fenceHedges(lotFences, this.deps.content.fenceStyles).map(([x, z, s, , yaw]): [number, number, number, number] => [x, z, s, yaw]);
@@ -1273,15 +1434,25 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     this.placeRoomLights(world, view);
     await this.pace();
+    this.loadStep('Building the street', 0.35);
     await this.street.build(world, this.view, () => this.pace());
     this.cars.build(world);
+    this.loadStep('Furnishing the house', 0.45);
     await this.lot.buildObjects(world); // (the objects, their clips, contact shadows, items.)
     this.mirrors.set(this.lot.mirrors);
     this.placing.objectsBuilt(); // (the thing in hand hidden in them.)
+    this.loadStep('Bringing everyone home', 0.55);
     await this.buildSims(world);
     this.applyWallMode();
     this.applyStoreys();
-    void this.birdLife.settle(world, view, this.fixedHour !== null ? this.fixedHour * 60 : this.lastMinute, { landscape: this.lot.landscape, street: this.street.plants, roofs: this.roofs, houseTop: (plot) => this.house.roofTop(plot) }); // (where the birds live.)
+    const birds = this.birdLife.settle(world, view, this.fixedHour !== null ? this.fixedHour * 60 : this.lastMinute, { landscape: this.lot.landscape, street: this.street.plants, roofs: this.roofs, houseTop: (plot) => this.house.roofTop(plot) }); // (where the birds live.)
+    if (!this.birdsWaited && !this.warming) {
+      // The game's first build waits for its birds a little, behind the loading screen (their models
+      // built): they popped in in the first seconds of play. Later builds let them come when they come.
+      this.birdsWaited = true;
+      this.loadStep('Finding the birds', 0.6);
+      await within(birds.catch((err: unknown) => console.warn('[render] the birds failed to settle', err)), BIRDS_WAIT_MS, undefined);
+    } else void birds;
     this.lastLightMinute = -1;
     // A focus lot the roaming camera settled on, now drawn in full.
     const asked = this.focusAsked;
@@ -1305,21 +1476,31 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (The town's vendors and shopkeepers after the residents: `game/staff.ts`.)
     await this.characters.build(world.staffSims?.length ? { ...world, sims: [...world.sims, ...world.staffSims] } : world, 'residents');
     const v = this.view;
-    const key = v ? `${v.x},${v.z},${v.w},${v.d}` : '';
-    const framing = !!v && key !== this.framedView;
-    if (framing) this.framedView = key;
-    // (Not a lot the roaming camera settled on: the camera stays as the player has it.)
-    const roamed = !!v && this.roamedTo !== null && world.plots[this.roamedTo]?.x === v.x && world.plots[this.roamedTo]?.z === v.z;
-    if (framing && this.followIndex === null && !roamed) {
-      const entry = world.plots.find((p) => p.x === v.x && p.z === v.z)?.entry;
-      const dx = entry ? entry[0] - (v.x + v.w / 2) : 0;
-      const dz = entry ? entry[1] - (v.z + v.d / 2) : 0;
-      if (Math.hypot(dx, dz) > 1) this.orbit.alpha = Math.atan2(dz, dx) - Math.PI * 0.12;
-    }
+    const alpha = this.framingAlpha(world);
+    if (v) this.framedView = `${v.x},${v.z},${v.w},${v.d}`;
+    if (alpha !== null) this.orbit.alpha = alpha;
     const emotions = this.deps.content.emotions.map((e) => e.id);
     this.characters.setEmotions(emotions);
     this.marker.setEmotions(emotions);
     this.sunShadows.moved();
+  }
+
+  /**
+   * The angle the camera turns to the first time the lot in view is shown (`buildSims`): from its
+   * entry's side, the cutaway opening the front wall onto the household arriving. Null: it stays as
+   * it is (the lot was framed already, the camera follows someone, the roaming camera settled on it,
+   * or its entry is at its middle).
+   */
+  private framingAlpha(world: WorldStructure): number | null {
+    const v = this.view;
+    if (!v || `${v.x},${v.z},${v.w},${v.d}` === this.framedView || this.followIndex !== null) return null;
+    // (Not a lot the roaming camera settled on: the camera stays as the player has it.)
+    const roamed = this.roamedTo !== null && world.plots[this.roamedTo]?.x === v.x && world.plots[this.roamedTo]?.z === v.z;
+    if (roamed) return null;
+    const entry = world.plots.find((p) => p.x === v.x && p.z === v.z)?.entry;
+    const dx = entry ? entry[0] - (v.x + v.w / 2) : 0;
+    const dz = entry ? entry[1] - (v.z + v.d / 2) : 0;
+    return Math.hypot(dx, dz) > 1 ? Math.atan2(dz, dx) - Math.PI * 0.12 : null;
   }
 
   /** Turns the camera to (`x`, `z`) on the ground from where it is: the eye stays, the radius and angles follow. */
@@ -1676,6 +1857,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     for (const p of this.decor.values()) for (const d of p.draws) d.enabled = false;
     this.lastWorld = this.builtWorld = null;
     this.cameraPlaced = false;
+    this.birdsWaited = false;
+    this.parseQueue = [];
     this.movers.length = 0;
     this.darkRooms.clear();
     this.awakeRooms.clear();
@@ -1947,7 +2130,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.placing.frame(this.frameDt); // (the effects, the thing in hand.)
     this.updateSims(frame);
     this.cars.update(frame);
-    if (this.cars.moved) this.sunShadows.moved(false); // (a car's shadow goes with it.)
+    // (A car's shadow goes with it: `moved` only for a car that moved where it casts into the map, `setShadowTest`.)
+    if (this.cars.moved) this.sunShadows.moved(false);
     this.birdLife.update(frame, minute, this.frameDt, this.characters, this.simCount); // (after the residents, who scare them.)
     if (this.roofs.length && this.roofVisible() !== this.roofShown) {
       this.roofShown = !this.roofShown;
@@ -1979,7 +2163,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     this.lot.pullChairs(this.characters.pulled, this.placing.held); // (not the one in hand.)
     this.lot.takeRestProps(this.characters.restTaken);
-    if (this.characters.posed && this.quality.characterShadows) this.sunShadows.moved(false);
+    // (Only residents posed where they cast into the map: `shadowPosed`, as the cars' `moved`.)
+    if (this.quality.characterShadows && this.characters.shadowPosed) this.sunShadows.moved(false);
     const blobs = this.simShadow;
     blobs.setCount(count);
     for (let i = 0; i < count; i++) blobs.setMatrix(i, shadows, i * 16);
@@ -2008,7 +2193,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    */
   async warmGame(frame: FrameState): Promise<void> {
     if (this.disposed) return;
+    this.warming = true;
+    try {
+      await this.warmGameNow(frame);
+    } finally {
+      this.warming = false;
+    }
+  }
+
+  private async warmGameNow(frame: FrameState): Promise<void> {
     this.shaderWatch.phase = 'warm-up';
+    this.loadListener?.('Warming up', 0.65);
     if (this.townMode) {
       // (The game's camera is the orbit's parked pose; `update` poses the residents for it.)
       this.townMode = false;
@@ -2030,7 +2225,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const world = this.lastWorld;
     const home = this.view;
     if (world?.meta?.world?.size === 'big' && home && !this.disposed) {
-      for (const lot of warmLots(world, home, WARM_LOTS)) {
+      const lots = warmLots(world, home, WARM_LOTS);
+      for (const [i, lot] of lots.entries()) {
+        this.loadListener?.(`Warming up (lot ${i + 1} of ${lots.length})`, 0.75 + (0.25 * i) / lots.length);
         await this.setWorld(world, lot);
         this.warmNext = true;
         await this.framesRendered(1);
@@ -2039,6 +2236,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.shaderWatch.note(`warm-up lots done in ${Math.round(performance.now() - t0)} ms`);
     }
     this.shaderWatch.phase = this.townMode ? 'town' : 'game';
+    this.loadListener?.('Warming up', 1);
   }
 
   /**
@@ -2498,7 +2696,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const dpr = window.devicePixelRatio || 1;
     const w = this.cssSize.width * dpr;
     const h = this.cssSize.height * dpr;
-    const scale = (this.renderScaleNow = renderScale(w, h, this.options.resolution));
+    const scale = (this.renderScaleNow = renderScale(w, h, this.options.resolution, PIXEL_BUDGET * this.quality.pixelBudget));
     this.app.setCanvasResolution(pc.RESOLUTION_FIXED, Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)));
   }
 
@@ -2823,6 +3021,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    clearTimeout(this.prepareTimer);
+    this.parseQueue = [];
     this.characters?.dispose();
     this.birdLife?.dispose();
     this.simShadow?.destroy();

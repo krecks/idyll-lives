@@ -59,9 +59,15 @@
               {services.content.lifeStages.find((s) => s.id === sim.stage)?.label ?? ''} · {sim.age}{#if sim.grade !== undefined}{' · school: '}<b title="{Math.round(sim.grade)} of 100">{gradeLetter(sim.grade)}</b>{/if}
             </div>
           {/if}
+          <!-- (A neighbour's details come a moment after the panel opens: until then, no mood or needs rather than made-up ones.) -->
           <div class="mood">
-            <span class="dot" style="background:{needColor(sim.mood)}"></span>
-            {moodLabel(sim.mood)}
+            {#if sim.detail}
+              <span class="dot" style="background:{needColor(sim.mood)}"></span>
+              {moodLabel(sim.mood)}
+            {:else}
+              <span class="dot pending"></span>
+              <span class="pending-text">Looking closer…</span>
+            {/if}
             {#if emotion}
               <span class="emotion"><Icon name={emotion.icon} size={13} />{emotion.label}</span>
             {/if}
@@ -101,9 +107,10 @@
 
       <div class="needs" aria-label="Needs">
         {#each needs as need, i (need.id)}
-          <div class="need" title="{need.label}: {Math.round(sim.needs[i] * 100)}%">
+          {@const v = sim.needs[i]}
+          <div class="need" title={v === undefined ? need.label : `${need.label}: ${Math.round(v * 100)}%`}>
             <span class="need-label"><Icon name={need.icon} size={13} /><span>{need.label}</span></span>
-            <span class="need-bar"><span style="transform:translateX({(sim.needs[i] - 1) * 100}%);background:{needColor(sim.needs[i])}"></span></span>
+            <span class="need-bar">{#if v !== undefined}<span style="transform:translateX({(v - 1) * 100}%);background:{needColor(v)}"></span>{/if}</span>
           </div>
         {/each}
       </div>
@@ -116,7 +123,9 @@
         {/each}
       </div>
 
-      {#if shown === 'Now'}
+      {#if !sim.detail}
+        <p class="hint">Looking closer…</p>
+      {:else if shown === 'Now'}
         {#if mine && !baby}
           <div class="plan">
             <TodayTimeline {sim} height={14} labels />
@@ -361,6 +370,12 @@
     font-size: 17px;
     font-weight: 650;
     letter-spacing: -0.01em;
+  }
+  .dot.pending {
+    background: rgba(90, 98, 116, 0.3);
+  }
+  .pending-text {
+    color: var(--text-muted);
   }
   .mood {
     display: flex;

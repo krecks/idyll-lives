@@ -53,6 +53,9 @@ describe('residents crossfade continuity', async () => {
   const { slotPlace } = await import('../src/render/shared/objectMotion');
   const rig = await import('../src/render/shared/characters/rig');
   const { LYING } = await import('../src/render/shared/characters/actions');
+  const { boneMatrix } = await import('../src/render/shared/characters/pose');
+  /** Scratch: a bone's skinning matrix read out of the pose texture (`boneMatrix`). */
+  const bone = new Float32Array(16);
   type View = import('../src/render/shared/characters/view').ResidentView<
     object,
     object,
@@ -496,12 +499,12 @@ describe('residents crossfade continuity', async () => {
           // The skinning matrix of each bone, its rotation read out: what the viewer draws.
           const row = i * width * 4;
           for (let b = 0; b < bones.length; b++) {
-            rig.rotationOf(poses.subarray(row + b * 16, row + b * 16 + 16), q);
+            rig.rotationOf(boneMatrix(poses, row, b, bone), q);
             [after[b * 4], after[b * 4 + 1], after[b * 4 + 2], after[b * 4 + 3]] = [q.qx, q.qy, q.qz, q.qw];
           }
           // The pelvis: its rest position (the clips' `sourcePelvis`, near enough on any body) through its skinning
           // matrix, so a root offset that jumps (`rootY` / `rootFwd`, a `frame`) moves it, as it moves the body.
-          const m = poses.subarray(row + pelvis * 16, row + pelvis * 16 + 16);
+          const m = boneMatrix(poses, row, pelvis, bone);
           const [sx, sy, sz] = sourcePelvis;
           const hip = [0, 1, 2].map((k) => m[k] * sx + m[4 + k] * sy + m[8 + k] * sz + m[12 + k]);
           // (The first half second is the build settling, not a fade.)
@@ -530,7 +533,7 @@ describe('residents crossfade continuity', async () => {
           if (turner >= 0) {
             for (const side of ['l', 'r'] as const) {
               const b = bones.indexOf(`foot_${side}`);
-              const fm = poses.subarray(row + b * 16, row + b * 16 + 16);
+              const fm = boneMatrix(poses, row, b, bone);
               const [rx, ry, rz] = restAt(actors[i].stage, `foot_${side}`);
               feet[turner][side].push([0, 1, 2].map((c) => fm[c] * rx + fm[4 + c] * ry + fm[8 + c] * rz + fm[12 + c]));
             }

@@ -112,59 +112,80 @@ export function simFields(fields: readonly (keyof SnapshotLayout['sim'])[]): Sna
 }
 
 /**
- * Bytes reserved before the snapshot floats: the Int32 sequence counter, then the Int32 number of
- * the sim step the snapshot shows (padded).
+ * The shared snapshot is a triple buffer: three slots, each the Int32 number of the sim step it
+ * shows (padded) and then the snapshot's floats. The writer fills a slot of its own, the reader
+ * copies out of a slot of its own, and the third is the newest one written, waiting: each side
+ * swaps its slot for that one with an atomic exchange. Neither ever touches a slot the other has,
+ * so the reader can't see one half written. (A seqlock, checking a counter before and after a
+ * plain copy, isn't safe in JavaScript: nothing keeps the copy's reads between the two checks, and
+ * on ARM they can move past the second.)
  */
+const SLOT_HEADER_BYTES = 16;
+/** Bytes before the slots: the Int32 state, the waiting slot (0..2) plus `FRESH` while it's newer than what the reader has. */
 const SHARED_HEADER_BYTES = 16;
+const FRESH = 4;
+const SLOTS = 3;
+
+function slotBytes(capacity: number): number {
+  return SLOT_HEADER_BYTES + capacity * 4;
+}
 
 export function createSharedSnapshot(layout: SnapshotLayout): SharedArrayBuffer {
-  return new SharedArrayBuffer(SHARED_HEADER_BYTES + layout.capacity * 4);
+  return new SharedArrayBuffer(SHARED_HEADER_BYTES + SLOTS * slotBytes(layout.capacity));
+}
+
+/** A slot's step and floats. */
+function slots(buffer: SharedArrayBuffer, capacity: number): { step: Int32Array; data: Float32Array }[] {
+  return Array.from({ length: SLOTS }, (_, i) => {
+    const at = SHARED_HEADER_BYTES + i * slotBytes(capacity);
+    return { step: new Int32Array(buffer, at, 1), data: new Float32Array(buffer, at + SLOT_HEADER_BYTES, capacity) };
+  });
 }
 
 /**
- * Seqlock writer: the sequence is odd while writing and even when the data is consistent.
- * Lock-free: the reader never blocks the writer.
+ * The writer's side. The buffer starts zeroed: slot 0 waiting (not fresh), the reader holding
+ * slot 1 and the writer slot 2.
  */
 export class SharedSnapshotWriter {
-  /** [sequence, step]. */
-  private readonly seq: Int32Array;
-  private readonly data: Float32Array;
+  private readonly state: Int32Array;
+  private readonly slots: { step: Int32Array; data: Float32Array }[];
+  private own = 2;
 
   constructor(buffer: SharedArrayBuffer, capacity: number) {
-    this.seq = new Int32Array(buffer, 0, 2);
-    this.data = new Float32Array(buffer, SHARED_HEADER_BYTES, capacity);
+    this.state = new Int32Array(buffer, 0, 1);
+    this.slots = slots(buffer, capacity);
   }
 
   /** `step`: the sim step it shows (snapshots published between steps, after a command, repeat it). */
   write(src: Float32Array, step: number): void {
-    Atomics.add(this.seq, 0, 1);
-    this.data.set(src);
-    Atomics.store(this.seq, 1, step);
-    Atomics.add(this.seq, 0, 1);
+    const slot = this.slots[this.own];
+    slot.data.set(src);
+    slot.step[0] = step;
+    // (The exchange publishes the writes before it; the slot that was waiting is the writer's now.)
+    this.own = Atomics.exchange(this.state, 0, this.own | FRESH) & ~FRESH;
   }
 }
 
 export class SharedSnapshotReader {
-  private readonly seq: Int32Array;
-  private readonly data: Float32Array;
-  private lastSeq = 0;
+  private readonly state: Int32Array;
+  private readonly slots: { step: Int32Array; data: Float32Array }[];
+  private own = 1;
   /** The sim step of the snapshot last read. */
   step = 0;
 
   constructor(buffer: SharedArrayBuffer, capacity: number) {
-    this.seq = new Int32Array(buffer, 0, 2);
-    this.data = new Float32Array(buffer, SHARED_HEADER_BYTES, capacity);
+    this.state = new Int32Array(buffer, 0, 1);
+    this.slots = slots(buffer, capacity);
   }
 
-  /** Copies a new consistent snapshot into `into`. Returns false if nothing new (or torn; retried next frame). */
+  /** Copies the newest snapshot into `into`. Returns false if nothing new has been written since the last read. */
   read(into: Float32Array): boolean {
-    const before = Atomics.load(this.seq, 0);
-    if (before === this.lastSeq || before & 1) return false;
-    into.set(this.data);
-    const step = Atomics.load(this.seq, 1);
-    if (Atomics.load(this.seq, 0) !== before) return false;
-    this.lastSeq = before;
-    this.step = step;
+    if (!(Atomics.load(this.state, 0) & FRESH)) return false;
+    // (The exchange sees everything written before the writer's: the slot is whole, and the writer's no more.)
+    this.own = Atomics.exchange(this.state, 0, this.own) & ~FRESH;
+    const slot = this.slots[this.own];
+    into.set(slot.data);
+    this.step = slot.step[0];
     return true;
   }
 }

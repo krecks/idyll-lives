@@ -549,9 +549,20 @@ export interface PlotInfo {
 /** Living: the residents earn the money for building. Creative: building is free. */
 export type GameKind = 'living' | 'creative';
 
-/** The parts of `WorldStructure` that are the lot itself: sent only when `lotVersion` changes. */
-export type LotPart = 'rooms' | 'walls' | 'openings' | 'diagonals' | 'fences' | 'floors' | 'meshes';
-export type LeanWorld = Omit<WorldStructure, LotPart>;
+/**
+ * A `world` message's structure (sim-core `view::StructureSync`): what changed since the last
+ * message, the first time everything. The parts it has replace the last ones, those `unset` names
+ * are gone (the last garage sold), and `objectChanges` are things that changed, by index, while
+ * the list of things stays the same (a door opened, a crop grown). The lot's walls, openings,
+ * diagonals, fences and floors come only when the lot changed; its rooms and meshes come beside it
+ * (typed arrays, transferred).
+ */
+export type WorldUpdate = Partial<Omit<WorldStructure, 'rooms' | 'meshes' | 'staffSims'>> & {
+  version: number;
+  lotVersion: number;
+  objectChanges?: [number, ObjectPlacement][];
+  unset?: (keyof WorldStructure)[];
+};
 
 export interface WorldStructure {
   version: number;
@@ -580,7 +591,8 @@ export interface WorldStructure {
   households: HouseholdInfo[];
   plots: PlotInfo[];
   exits: [number, number][];
-  rooms: number[];
+  /** The room of each tile, row by row (`width × depth`; 0 outdoors): a `Uint16Array` from the simulation. */
+  rooms: Uint16Array | number[];
   /** Every edge with a wall on it (plain, or with a door or window), in grid order. */
   walls: WallEdge[];
   /** Doors and windows. */
@@ -677,6 +689,12 @@ export interface SimView {
   /** Minute of day they come back from work, if away. */
   awayUntil: number | null;
   visiting: number | null;
+  /**
+   * On their way somewhere (a visit, home, home from work by car): the plot, and about when they're
+   * there (minute of day, in 5-minute steps). `at` only with `detail` (it takes a search along the
+   * roads), or home from work by car. Absent when they aren't (and from older workers).
+   */
+  trip?: { to: number; at?: number };
   job: JobView | null;
   /** A pupil's school grade (0..100, in tenths). */
   grade?: number;
@@ -926,7 +944,11 @@ export type GameSource = { lot: string; seed: number } | { save: string };
 export type SaveProblem = 'tooNew' | 'tooOld' | 'corrupt' | 'failed';
 
 export type ToWorker =
-  | { type: 'init'; content: string; source: GameSource }
+  /**
+   * `speed`: the clock's speed from the first step (0: the game starts paused). `module`: the
+   * simulation's wasm, compiled once a page (`game/session.ts` `compileSim`); else the worker fetches it.
+   */
+  | { type: 'init'; content: string; source: GameSource; speed?: number; module?: WebAssembly.Module }
   /** Only checks that a save opens (an imported file); answered with `checked`. */
   | { type: 'check'; content: string; save: string }
   | { type: 'command'; command: Command }
@@ -940,8 +962,8 @@ export type ToWorker =
   | { type: 'inspect'; sim: number | null }
   /** The next UI update sends everything. */
   | { type: 'resync' }
-  /** Which part of the town to build geometry for (tile rectangle); null = everything. */
-  | { type: 'view'; region: [number, number, number, number] | null }
+  /** Which part of the town to build geometry for (tile rectangle); null = everything. `seq` comes back with the worlds built for it. */
+  | { type: 'view'; region: [number, number, number, number] | null; seq: number }
   /** The camera's stream rectangle: the sim's full-detail area (docs/design/open-world.md `setWatch`). */
   | { type: 'watch'; region: [number, number, number, number] | null }
   /** `?debug`'s `__crash`: the next step panics, an error nobody catches, or the worker hangs. */
@@ -964,9 +986,16 @@ export interface SimThreadStats {
 export type FromWorker =
   /** A start is under way and making progress (before `ready`; repeated while the simulation downloads). */
   | { type: 'starting' }
-  | { type: 'ready'; layout: SnapshotLayout; shared: SharedArrayBuffer | null; catalog: Catalog }
-  /** `full`: with the lot; otherwise a `LeanWorld` (the lot is as last sent). */
-  | { type: 'world'; world: WorldStructure | LeanWorld; full: boolean }
+  /**
+   * `speed`: the game's own speed as it opened (a save's: the one it was saved at), before the
+   * `init` speed held it: what play resumes at.
+   */
+  | { type: 'ready'; layout: SnapshotLayout; shared: SharedArrayBuffer | null; catalog: Catalog; speed: number }
+  /**
+   * What changed of the world structure (`WorldUpdate`), with the lot's rooms when the lot changed
+   * and its meshes when the lot or the view did. `view`: the `seq` of the view it was built for.
+   */
+  | { type: 'world'; view: number; world: WorldUpdate; rooms?: Uint16Array; meshes?: WorldStructure['meshes'] }
   /** Food and dishes, whenever they change (`ItemPlacement`). */
   | { type: 'items'; items: ItemPlacement[] }
   /** The lamps switched off (object ids), whenever a lamp is switched or the objects change. */
@@ -987,6 +1016,18 @@ export type FromWorker =
   | { type: 'error'; message: string; fatal: boolean; problem?: SaveProblem }
   /** A save `check`ed: `problem` null if it opens. */
   | { type: 'checked'; problem: SaveProblem | null; message: string };
+
+/**
+ * The newest thing (highest object id) a resident in `snapshot` uses or walks to, -1 if none. Ids
+ * are never reused (sim-core `next_object_id`), so one above the highest the main thread was sent
+ * is a thing it hasn't heard of yet (`sim.worker.ts` then sends the world at once).
+ */
+export function newestObjectUsed(snapshot: ArrayLike<number>, layout: SnapshotLayout): number {
+  let newest = -1;
+  const count = snapshot[layout.header.simCount] | 0;
+  for (let i = 0; i < count; i++) newest = Math.max(newest, snapshot[layout.headerLen + i * layout.simStride + layout.sim.object] | 0);
+  return newest;
+}
 
 /** Rows of the town itself (the ground storey; see `WorldStructure.storeyDepth`). */
 export function groundDepth(world: { depth: number; storeyDepth?: number }): number {

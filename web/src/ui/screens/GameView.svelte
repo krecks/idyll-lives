@@ -7,32 +7,30 @@
   import { app } from '../app.svelte';
   import Hud from '../Hud.svelte';
   import { game } from '../state.svelte';
-  import LoadingScreen from './LoadingScreen.svelte';
   import PauseMenu from './PauseMenu.svelte';
   import Planner from '../planner/Planner.svelte';
   import Creation from '../Creation.svelte';
   import CustomiseColours from '../buy/CustomiseColours.svelte';
 
-  /** The game screen: the canvas lives in the host (behind every screen); this adds the HUD. */
+  /**
+   * The game screen: the canvas lives in the host (behind every screen); this adds the HUD. Its
+   * loading screen is the app's (`App.svelte`, `app.loading`): one bar from Play to the game.
+   */
   let session = $state.raw<GameSession | null>(null);
   let error = $state('');
   let errorTitle = $state("Couldn't start the game");
-  /** The game is loaded (usually already, prepared behind the menus); until then, a loading screen. */
-  let ready = $state(false);
   /** The game has been revealed (the fly-in from the menu is done): the HUD shows. */
   let live = $state(false);
 
   onMount(() => {
     let left = false;
     const snapshot = $state.snapshot(settings);
+    // (Warmed up too, behind the loading screen: `start` waits for the same.)
     host
-      .prepare(app.request!, snapshot, false)
+      .prepare(app.request!, snapshot, true)
       .then((s) => {
         // Mount the HUD now, while the menu's camera flies in, rather than when the game appears.
-        if (!left) {
-          session = s;
-          ready = true;
-        }
+        if (!left) session = s;
       })
       .catch(() => {});
     host
@@ -83,9 +81,6 @@
   <!-- An error in the interface: the crash screen, while the game (still running here) can be saved. -->
   <svelte:boundary onerror={interfaceFailed}>
     <div class="scaled hud-root" class:prelive={!live}><Hud /></div>
-    {#if app.loading}
-      <LoadingScreen progress={app.loading} />
-    {/if}
     {#if game.plannerOpen && game.mode === 'live'}<Planner />{/if}
     {#if game.mode === 'create'}<Creation />{/if}
     {#if game.customising}<CustomiseColours def={game.customising.def} objectId={game.customising.objectId} />{/if}
@@ -100,8 +95,6 @@
       <button class="btn" onclick={() => app.toMenu()}>Back to menu</button>
     </div>
   </div>
-{:else if !ready}
-  <LoadingScreen progress={app.loading ?? { label: 'Moving in', value: 0 }} />
 {/if}
 
 <style>

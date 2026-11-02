@@ -75,7 +75,7 @@ impl Mirror {
                             .or_insert_with(|| Value::Object(Map::new()));
                         plan.as_object_mut().unwrap().extend(parts.clone());
                     }
-                    ("plan" | "pension" | "grade", Value::Null) => {
+                    ("plan" | "pension" | "grade" | "trip", Value::Null) => {
                         sim.remove(key);
                     }
                     _ => {
@@ -133,6 +133,7 @@ fn changes_add_up_to_the_whole_view() {
         .id;
     let mut inspected = None;
     let mut events = Vec::new();
+    let mut trips = (0, 0);
     for step in 0..6000 {
         w.advance();
         // The player looks at a neighbour for a while, then at one of theirs; the UI loses
@@ -155,6 +156,11 @@ fn changes_add_up_to_the_whole_view() {
         if step % 500 == 0 {
             assert_eq!(ui, fresh(&w, inspected), "step {step}");
         }
+        if step % 50 == 0 {
+            let (with, without) = trip_times(&ui);
+            trips.0 += with;
+            trips.1 += without;
+        }
     }
     ui.apply(&sync.update_json(&w));
     assert_eq!(ui, fresh(&w, inspected));
@@ -168,6 +174,30 @@ fn changes_add_up_to_the_whole_view() {
         events.windows(2).filter(|p| p[0] >= p[1]).count() <= 1,
         "in order: {events:?}"
     );
+    assert!(
+        trips.1 > 0,
+        "neighbours seen on the way somewhere: {trips:?}"
+    );
+}
+
+/// Residents on the way somewhere (`SimView.trip`) with the time they're there, and without:
+/// the time (a search along the roads) only for those whose details are shown, or who come home
+/// from work by car (known without one).
+fn trip_times(ui: &Mirror) -> (usize, usize) {
+    let (mut with, mut without) = (0, 0);
+    for (id, sim) in &ui.sims {
+        let Some(trip) = sim.get("trip") else {
+            continue;
+        };
+        let timed = sim["detail"] == true || !sim["awayUntil"].is_null();
+        assert_eq!(trip.get("at").is_some(), timed, "resident {id}: {trip}");
+        if timed {
+            with += 1;
+        } else {
+            without += 1;
+        }
+    }
+    (with, without)
 }
 
 #[test]

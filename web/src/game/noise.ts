@@ -1,8 +1,20 @@
 /**
- * Noise for laying out land: a lattice hash, value noise and fractal noise over it, and a smooth
- * step. The same functions the renderer's landscape uses (`render/shared/nature.ts`, which is to
- * re-export these: note for the renderer branch), so the world's generator and its drawing agree.
+ * Noise for laying out land: a seeded generator, a lattice hash, value noise and fractal noise over
+ * it, and a smooth step. The same functions the renderer's landscape uses (`render/shared/nature.ts`
+ * re-exports these), so the world's generator and its drawing agree.
  */
+
+/** A small seeded generator (mulberry32): numbers 0..1, as `Math.random` gives them. */
+export function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 /** A number 0..1 for a lattice point and a seed. */
 export function hash(x: number, z: number, seed: number): number {

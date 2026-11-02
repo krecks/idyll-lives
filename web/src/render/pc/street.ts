@@ -6,15 +6,18 @@
  * one mesh per material for each group, so a group off the screen (or out of the sun's shadow
  * square) costs nothing, and a chunk planned again (the focus lot changed beside it, a thing moved
  * in it) builds only its group's meshes again. The instanced models (`model.street.*`, the
- * foliage, the town's things) are one `Instances` per model over every chunk drawn (`instancing.ts`:
- * one draw per model mesh), their matrices written again only when the chunks drawn change.
+ * foliage, the town's things) are one `Instances` per model mesh over every chunk drawn
+ * (`instancing.ts`), their matrices written again only when the chunks drawn change; a mesh with many
+ * triangles over all its copies (`SPLIT_TRIANGLES`, as the woods') is drawn per draw group instead,
+ * so a group off the screen or out of the sun's square costs nothing, and a group far off draws the
+ * model's far version (`FAR_MODELS`).
  *
  * View-independent: the town is laid out once; the focus lot (the viewed one) is the game's own, so
  * its chunk is planned without its house and garden, and the lots beside it keep their fences clear
  * of it. `setChunks` limits what is drawn to the chunks round the camera (null: all of them). The
  * models are kept (hidden) between builds in the street's own template cache. The neighbours'
  * window glass glows at night only while someone is up in there (`setUp`), redrawn at most once a
- * second, group by group. The focus lot's garage hangs apart (`lotRoot`), hidden with the lot's
+ * second, group by group. The streetlights' pools of light are drawn only at night. The focus lot's garage hangs apart (`lotRoot`), hidden with the lot's
  * ground while its basement is in view (`showLot`).
  */
 
@@ -23,8 +26,8 @@ import { Instances } from './instancing';
 import type { HouseBuilder, HouseMesh } from './house';
 import { MaterialLibrary, GAME_FRONT_FACE } from './materials';
 import { drawMesh, meshFrom, type DrawOptions } from './meshes';
-import { buildModel, withGlows, type ModelMesh, type ModelTemplate } from './models';
-import { windStill } from './nature';
+import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from './models';
+import { splitsByGroup, windStill } from './nature';
 import { TemplateCache } from './templateCache';
 import type { AssetRegistry } from '../../assets/registry';
 import type { ModelEntry } from '../../assets/types';
@@ -35,7 +38,8 @@ import type { RGB } from '../shared/environment';
 import type { Geo, MeshData } from '../shared/geometry';
 import type { HousePart } from '../shared/house';
 import type { StandIn } from '../shared/modelEntry';
-import { chunkCoords, groupOf, SUPERCHUNK } from '../shared/chunks';
+import { chunkAt, chunkCoords, distanceToRect, groupOf, LookedFrom, SUPERCHUNK } from '../shared/chunks';
+import { groupInstances } from '../shared/nature';
 import { castsShadow, FOLIAGE, instanceMatrix, NO_FOCUS, TownStreet, type ChunkPlan, type Inst, type ObjectLook } from '../shared/street';
 import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
 
@@ -54,13 +58,34 @@ export interface StreetOptions {
   ground?: boolean;
   /** The content's fence styles: the street draws the fences on other lots (`TownStreet`). */
   fenceStyles?: readonly FenceStyleDef[];
+  /** The far LOD's houses past this (m) from the camera's target aren't drawn (`OpenWorldQuality.farCull`; default 650). */
+  farCull?: number;
 }
 
-/** A model the street places: its template, a draw per mesh, and its glows' (with the street's copy of their material). */
+/**
+ * A model the street places: its template, a draw per mesh over every copy (`draws`; none drawn of
+ * a mesh drawn per group), its draws per draw group (`cells`), its far version where the groups far
+ * off draw it (`far`), and its glows' (with the street's copy of their material).
+ */
 interface Placed {
   template: ModelTemplate;
+  far: ModelTemplate | null;
   draws: Instances[];
+  cells: Map<number, Cell>;
   glows: { draw: Instances; material: pc.StandardMaterial }[];
+}
+
+/** A model's copies in one draw group (a 128 m superchunk, `shared/chunks.ts`). */
+interface Cell {
+  /** The group's corner (m). */
+  x: number;
+  z: number;
+  /** Its draws of the template's meshes, by mesh (null: that mesh is drawn whole, `Placed.draws`). */
+  near: (Instances | null)[];
+  /** Its draws of the far version's meshes (none without one): it draws these or `near`'s, never both. */
+  far: Instances[];
+  /** Drawing the far version now. */
+  farNow: boolean;
 }
 
 /** A placed thing in the game: what the birds find in the street (`PlantPlacement` in the landscape). */
@@ -77,8 +102,17 @@ export interface StreetPlant {
 
 /** How often (ms) at most the neighbours' window glass is redrawn as they go to bed or get up. */
 const WINDOWS_EVERY_MS = 1000;
-/** The far LOD's houses past this distance (m) from the camera's target aren't drawn. */
+/** The far LOD's houses past this distance (m) from the camera's target aren't drawn (the preset's, `StreetOptions.farCull`). */
 const FAR_CULL = 650;
+/**
+ * A model's draw group further than this (m, from the camera's target to the group's nearest
+ * point) draws the model's far version, where it has one and the street draws full detail (the
+ * preset's `streetLod` 0). The far version is about a quarter of the triangles; at 100 m off a
+ * tree is a few dozen pixels.
+ */
+const FAR_MODELS = 100;
+/** The cells' far versions and the far LOD's houses are chosen again once the camera's target has moved this far (m). */
+const REFRAME = 1;
 /** Plans kept per chunk (`planned`): the focus lot's chunks with it and without it, and one more. */
 const PLANS_KEPT = 3;
 
@@ -173,15 +207,21 @@ export class Street {
   private readonly shadows: boolean;
   private readonly ground: boolean;
   private readonly fenceStyles: readonly FenceStyleDef[];
+  private readonly farCull: number;
+  /** Where `frame` last chose what is drawn. */
+  private readonly framedAt = new LookedFrom();
+  /** The streetlights' pools are drawn (at night: `setNight`). */
+  private poolsLit = false;
 
   constructor(
     private readonly app: pc.AppBase,
     parent: pc.Entity,
     private readonly assets: AssetRegistry,
     private readonly house: HouseBuilder,
-    { layers, lived = false, look, lod = 0, shadows = true, ground = false, fenceStyles = [] }: StreetOptions = {},
+    { layers, lived = false, look, lod = 0, shadows = true, ground = false, fenceStyles = [], farCull = FAR_CULL }: StreetOptions = {},
   ) {
     this.fenceStyles = fenceStyles;
+    this.farCull = farCull;
     this.layers = layers;
     this.lived = lived;
     this.look = look;
@@ -353,6 +393,7 @@ export class Street {
         add(lot.props, 'streetLotProps', this.lib.plainFinish(), { cast: true });
         add(lot.glow, 'streetLotLamps', this.glowMat, { colors: false });
         add(lot.pools, 'streetLotPools', this.poolMat, { colors: false, receiveShadows: false, alphaIndex: 5 });
+        this.showPools(this.lotMeshes);
       }
     }
     if (rebuilt) this.gatherHomes();
@@ -375,6 +416,9 @@ export class Street {
     // Models from the last build that aren't used now are hidden.
     for (const [k, p] of this.placed) if (!batches.get(k)?.length) this.hide(p);
     this.used = new Set([...batches].filter(([, items]) => items.length).map(([k]) => k));
+    // (Their far versions too, where drawn: a file of one that comes builds it again, `invalidate`. Here those the
+    // last build drew, while this one awaits; `instances` adds those it draws now.)
+    for (const [k, p] of this.placed) if (p.far && this.used.has(k)) this.used.add(farKey(k));
     this.plants = [...batches].flatMap(([k, items]) => items.map(([x, z, s, sy, yaw, y = 0]): StreetPlant => ({ key: k, x, y, z, sx: s, sy, sz: k === FOLIAGE.hedge ? 1 : s, yaw })));
     for (const [k, items] of batches) {
       if (!items.length) continue;
@@ -386,6 +430,7 @@ export class Street {
       await perfTimeAsync(`street: batch ${k}`, () => this.instances(k, items, k === FOLIAGE.hedge, castsShadow(k), town.footprints.get(k), town.standIns.get(k), pace));
     }
     perfEnd(batchesSpan);
+    this.framedAt.forget();
     // What files that came replace (the boxes) is drawn no more.
     this.disposeStale();
     const lamps = this.lamps;
@@ -434,7 +479,7 @@ export class Street {
     this.destroyed = true;
     for (const p of this.placed.values()) this.drop(p);
     this.placed.clear();
-    for (const [, t] of this.templates) void t.then((template) => this.disposeTemplate(template)).catch(() => {});
+    for (const [, t] of this.templates) void t.then((template) => disposeTemplate(template)).catch(() => {});
     this.templates.clear();
     this.root.destroy();
     this.glowMat.destroy();
@@ -493,6 +538,12 @@ export class Street {
     this.glowMat.update();
     this.poolMat.emissive.set(0.62 * g, 0.46 * g, 0.26 * g);
     this.poolMat.update();
+    // By day the pools add black: not drawn at all (each a blended quad over the ground).
+    if (this.poolsLit !== g > 0) {
+      this.poolsLit = g > 0;
+      for (const grp of this.groups.values()) this.showPools(grp.meshes);
+      this.showPools(this.lotMeshes);
+    }
     // The models' glows (the path lights' lenses) with the streetlights: nothing by day.
     for (const [key, p] of this.placed) {
       for (const { draw, material } of p.glows) {
@@ -504,14 +555,30 @@ export class Street {
   }
 
   /**
-   * Each frame (the game's): far groups past `FAR_CULL` m of the camera's target (`x`, `z`) are
-   * left out (the fog has them by then).
+   * Each frame (the game's): far groups past `farCull` m of the camera's target (`x`, `z`) are
+   * left out (the fog has them by then), and the models' draw groups past `FAR_MODELS` draw their
+   * far versions. Chosen again only once the target has moved (`REFRAME`) or the street was built.
    */
   frame(x: number, z: number): void {
+    if (!this.framedAt.moved(x, z, REFRAME)) return;
     for (const g of this.farGroups.values()) {
       if (!g.entity) continue;
-      g.entity.enabled = Math.hypot(g.x - x, g.z - z) <= FAR_CULL + SUPERCHUNK * 0.71;
+      g.entity.enabled = Math.hypot(g.x - x, g.z - z) <= this.farCull + SUPERCHUNK * 0.71;
     }
+    for (const [k, p] of this.placed) {
+      if (!p.far || !this.used.has(k)) continue;
+      for (const c of p.cells.values()) {
+        const far = distanceToRect(x, z, c.x, c.z, SUPERCHUNK, SUPERCHUNK) > FAR_MODELS;
+        if (far === c.farNow) continue;
+        c.farNow = far;
+        showCell(c);
+      }
+    }
+  }
+
+  /** The streetlights' pools among `entities` drawn only at night (`poolsLit`). */
+  private showPools(entities: readonly pc.Entity[]): void {
+    for (const e of entities) if (e.name === 'streetLightPools' || e.name === 'streetLotPools') e.enabled = this.poolsLit;
   }
 
   /**
@@ -613,6 +680,7 @@ export class Street {
     for (const e of fresh) e.enabled = true;
     g.meshes = fresh;
     g.windowsDue = true;
+    this.showPools(fresh);
   }
 
   /** The neighbours' houses whose glass glows, over every chunk drawn (who was up stays so: the lights don't flick on for a frame). */
@@ -677,29 +745,28 @@ export class Street {
 
   private hide(p: Placed): void {
     for (const d of p.draws) d.enabled = false;
+    for (const c of p.cells.values()) for (const d of [...c.near, ...c.far]) if (d) d.enabled = false;
     for (const g of p.glows) g.draw.enabled = false;
   }
 
-  /** Stops drawing a model (its draws go; the template is the cache's). */
+  /** Stops drawing a model (its draws go; the templates are the cache's). */
   private drop(p: Placed): void {
     for (const d of p.draws) d.destroy();
+    for (const c of p.cells.values()) dropCell(c);
+    p.cells.clear();
     for (const g of p.glows) {
       g.draw.destroy();
       g.material.destroy();
     }
   }
 
-  private disposeTemplate(t: ModelTemplate): void {
-    for (const m of withGlows(t)) m.mesh.destroy();
-  }
-
   /** Disposes the templates set aside (or those under `keys`), with the street's draws of them. */
   private disposeStale(keys?: readonly string[]): void {
     for (const [k, p] of this.placed) {
-      if (keys && !keys.includes(k)) continue;
-      // A key whose template was set aside (no longer the cache's): its draws go with it.
+      if (keys && !keys.includes(k) && !keys.includes(farKey(k))) continue;
+      // A key whose template was set aside (no longer the cache's), or its far version's: its draws go with it.
       const now = this.templates.built(k);
-      if (now === p.template) continue;
+      if (now === p.template && (!p.far || this.templates.built(farKey(k)) === p.far)) continue;
       this.drop(p);
       this.placed.delete(k);
     }
@@ -709,20 +776,42 @@ export class Street {
   /**
    * Instances of a model (`flat`: not scaled along z, hedges stretched along their run). Another
    * lot's thing without its file is its box (`standIn`); foliage and kerbside props are left out.
+   * A mesh with `SPLIT_TRIANGLES` or more over all its copies is drawn per draw group (`Cell`), each
+   * culled to the view and the sun's square on its own; where the model has a far version and the
+   * street draws full detail, every mesh of it is, so a group far off draws the far version alone.
    */
   private async instances(key: string, items: Inst[], flat: boolean, cast: boolean, footprint: [number, number] = [1, 1], standIn?: StandIn, pace?: () => Promise<void>): Promise<void> {
-    const template = this.templates.get(key, () => buildModel(this.app, `street:${key}`, this.assets.has(key, 'model') ? (this.assets.get(key, 'model') as ModelEntry) : undefined, footprint, { far: this.layers !== undefined, lod: this.lod, standIn }));
+    const entry = this.assets.has(key, 'model') ? (this.assets.get(key, 'model') as ModelEntry) : undefined;
+    const template = this.templates.get(key, () => buildModel(this.app, `street:${key}`, entry, footprint, { far: this.layers !== undefined, lod: this.lod, standIn }));
     const t = await perfTimeAsync(`street: model ${key}`, () => template);
     await pace?.();
     if (this.destroyed) return;
+    // The copies by draw group, and which meshes are drawn per group.
+    const groups = groupInstances(items, (it) => groupOf(chunkAt(it[0], it[1])));
+    // (Not in the menus' town, which has the whole town in view: as the landscape's, `pc/nature.ts`.)
+    let split = t.meshes.map((m) => this.layers === undefined && groups.size > 1 && splitsByGroup(m, items.length));
+    const grouped = split.some(Boolean);
+    // (The game's full-detail street, a model with a far version: the groups far off draw that.)
+    const farWanted = grouped && this.lod === 0 && this.layers === undefined && !!entry?.far && !t.boxed;
+    const farT = farWanted ? await perfTimeAsync(`street: model ${key} (far)`, () => this.templates.get(farKey(key), () => buildModel(this.app, `street:${key}:far`, entry, footprint, { far: true }))) : null;
+    if (this.destroyed) return;
+    const far = farT && farT.meshes.length ? farT : null;
+    if (far) split = split.map(() => true);
     let p = this.placed.get(key);
     if (p && p.template !== t) {
-      // Built again (a file came): the old draws go with the old template (`disposeStale`), hidden meanwhile.
-      this.hide(p);
+      // Built again (a file came): the old draws go now (the new ones take their place), the old template once the build is done (`disposeStale`).
+      this.drop(p);
       p = undefined;
     }
+    if (p && p.far !== far) {
+      // (Its far version built again, or no longer drawn.)
+      for (const c of p.cells.values()) {
+        for (const d of c.far) d.destroy();
+        c.far = [];
+      }
+    }
     if (!p) {
-      p = { template: t, draws: [], glows: [] };
+      p = { template: t, far, draws: [], cells: new Map(), glows: [] };
       this.placed.set(key, p);
       for (const m of t.meshes) p.draws.push(this.draw(m, m.material, cast));
       for (const { mesh } of t.glows ?? []) {
@@ -732,16 +821,53 @@ export class Street {
         p.glows.push({ draw: this.draw(mesh, material, false), material });
       }
     }
+    p.far = far;
+    // (Its far version is drawn: a file of it that comes builds it again, `invalidate`.)
+    if (far) this.used.add(farKey(key));
     const span = perfStart(`street: matrices ${key}`);
-    for (const d of [...p.draws, ...p.glows.map((g) => g.draw)]) {
-      d.setCount(items.length);
-      for (let i = 0; i < items.length; i++) {
-        instanceMatrix(items[i], flat, this.matrices, 0);
+    const all = items.map((_, i) => i);
+    const fill = (d: Instances, indices: readonly number[]) => {
+      d.setCount(indices.length);
+      for (let i = 0; i < indices.length; i++) {
+        instanceMatrix(items[indices[i]], flat, this.matrices, 0);
         d.setMatrix(i, this.matrices);
       }
       d.update();
+    };
+    // Every copy, in the meshes drawn whole (none of a mesh drawn per group) and in the glows.
+    p.draws.forEach((d, i) => {
+      fill(d, split[i] ? [] : all);
+      d.enabled = !split[i] && items.length > 0;
+    });
+    for (const g of p.glows) fill(g.draw, all);
+    // The groups: those gone go, the rest written again.
+    for (const [id, c] of p.cells) {
+      if (groups.has(id) && grouped) continue;
+      dropCell(c);
+      p.cells.delete(id);
     }
-    for (const d of p.draws) d.enabled = items.length > 0;
+    if (grouped) {
+      for (const [id, indices] of groups) {
+        let c = p.cells.get(id);
+        if (!c) {
+          const [gx, gz] = chunkCoords(id);
+          p.cells.set(id, (c = { x: gx * SUPERCHUNK, z: gz * SUPERCHUNK, near: t.meshes.map(() => null), far: [], farNow: false }));
+        }
+        c.near.forEach((d, i) => {
+          if (split[i]) return;
+          d?.destroy();
+          c.near[i] = null;
+        });
+        t.meshes.forEach((m, i) => {
+          if (!split[i]) return;
+          const d = (c.near[i] ??= this.draw(m, m.material, cast));
+          fill(d, indices);
+        });
+        if (far && !c.far.length) c.far = far.meshes.map((m) => this.draw(m, m.material, cast));
+        for (const d of c.far) fill(d, indices);
+        showCell(c);
+      }
+    }
     // Its glow, off until `setNight` lights it.
     for (const g of p.glows) g.draw.enabled = false;
     perfEnd(span);
@@ -756,6 +882,22 @@ export class Street {
     this.lib.excludeFromLights([], [d.meshInstance]);
     return d;
   }
+}
+
+/** The template cache's key of a model's far version (the street's draw groups far off, `FAR_MODELS`). */
+const farKey = (key: string) => `${key}|far`;
+
+/** A draw group's copies drawn as it is now: its far version's meshes or the template's, never both. */
+function showCell(c: Cell): void {
+  const farNow = c.farNow && c.far.length > 0;
+  for (const d of c.near) if (d) d.enabled = !farNow && d.count > 0;
+  for (const d of c.far) d.enabled = farNow && d.count > 0;
+}
+
+/** A draw group's draws go (the meshes are the templates'). */
+function dropCell(c: Cell): void {
+  for (const d of c.near) d?.destroy();
+  for (const d of c.far) d.destroy();
 }
 
 /** A chunk's meshes as vertex arrays, by draw name (the house parts with their cutaway attribute). */
@@ -787,8 +929,8 @@ export function concatMeshData(list: readonly MeshData[]): MeshData | null {
   const positions = new Float32Array(verts * 3);
   const normals = new Float32Array(verts * 3);
   const uvs = new Float32Array(verts * 2);
-  const colors = list[0].colors ? new Float32Array(verts * 4) : undefined;
-  const cut = list[0].cut ? new Float32Array(verts * 4) : undefined;
+  const colors = list[0].colors ? new Uint8Array(verts * 4) : undefined;
+  const cut = list[0].cut ? new Uint8Array(verts * 4) : undefined;
   const indices = verts > 65535 ? new Uint32Array(tris) : new Uint16Array(tris);
   let v = 0;
   let t = 0;

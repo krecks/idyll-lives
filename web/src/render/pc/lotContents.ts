@@ -275,7 +275,7 @@ export class LotContents {
     const ticket = ++this.natureTicket[layer];
     let set = this.natures.get(key);
     if (!set) {
-      const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod, this.quality.woodsCell, this.quality.grass);
+      const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod, this.quality.woodsCell, this.quality.grass, this.quality.openWorld);
       const created: NatureSet = { key, landscape, draws: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve(), refreshing: Promise.resolve() };
       created.ready = landscape.build(this.app, this.root, this.deps.assets, world, () => this.hooks.pace(), buildRoads).then((nature) => {
         perfTime('nature: meshes', () => {
@@ -913,10 +913,14 @@ export class LotContents {
 
   /**
    * A world that only changed what's drawn of its objects (an opening clip, a crop's stage), applied
-   * in place: their picking boxes, and the clips follow on from here.
+   * in place: their picking boxes, and the clips follow on from here. `before`: the world patched
+   * or built last; when its things are the same list, only those that aren't the same objects
+   * changed (`bridge.ts` `mergeWorld`), and a big world's thousands of others are passed over.
    */
-  patch(world: WorldStructure): void {
-    const byId = new Map(world.objects.map((o) => [o.id, o]));
+  patch(world: WorldStructure, before?: WorldStructure | null): void {
+    const was = before?.objects;
+    const changed = was && was.length === world.objects.length ? world.objects.filter((o, i) => o !== was[i]) : world.objects;
+    const byId = new Map(changed.map((o) => [o.id, o]));
     for (const p of this.placed) {
       const o = byId.get(p.id);
       if (!o || !p.built) continue;
@@ -925,7 +929,7 @@ export class LotContents {
       [p.minX, p.minZ, p.maxX, p.maxZ] = [px, pz, px + pw, pz + pd];
     }
     // The motion reads both live every frame: a door swings, a crop grows, without a build.
-    this.motion.patch(world.objects);
+    this.motion.patch(changed);
     this.showItems();
   }
 

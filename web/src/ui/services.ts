@@ -128,4 +128,11 @@ export const services = {} as {
   /** Catalog pictures of furniture. */
   items: ItemPreviews;
   controls: GameControls;
+  /** The player is about to want model `key` (a catalog card pointed at) or a covering of finish `key`: it's read ahead (a game's renderer; none outside a game). */
+  prepare?: (key: string, kind: 'model' | 'wall' | 'floor') => void;
 };
+
+/** Queues the catalog's pictures to be drawn ahead of time, in idle moments (while not held: `holdAhead`). */
+export function prefetchCatalog(): void {
+  services.items.prefetch(services.content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
+}

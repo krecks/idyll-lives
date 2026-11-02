@@ -80,7 +80,10 @@
     if (e.animationName.includes('shake')) shake = false;
     if (e.animationName.includes('pop')) popped = false;
   }}
-  onmouseenter={(e) => onpoint(e.currentTarget)}
+  onmouseenter={(e) => {
+    onpoint(e.currentTarget);
+    services.prepare?.(model, 'model');
+  }}
   onfocus={(e) => onpoint(e.currentTarget)}
   onblur={() => onblur?.()}
 >

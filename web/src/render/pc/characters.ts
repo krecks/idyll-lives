@@ -160,15 +160,7 @@ export class PlayCanvasResidentView implements ResidentView<PartDraw, QuiltDraw,
     this.writeRows(mesh, rows, rows.length >> 2);
   }
 
-  partRows(mesh: PartDraw, rows: Float32Array, count: number, change: RowChange): void {
-    if (change === 'count') {
-      // (The rows already uploaded: only how many of them are drawn.)
-      mesh.count = mesh.draw.count = count;
-      mesh.rows = rows;
-      mesh.draw.meshInstance.instancingCount = count;
-      this.show(mesh);
-      return;
-    }
+  partRows(mesh: PartDraw, rows: Float32Array, count: number, _change: RowChange): void {
     this.writeRows(mesh, rows, count);
   }
 

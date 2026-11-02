@@ -7,6 +7,7 @@
  * Engine-neutral: the street (`street.ts`) and the moving cars (`pc/cars.ts`) draw them.
  */
 
+import { wrapAngle } from './characters/rig';
 import { facing, type V3 } from './geometry';
 import type { Painter, Rect } from './street';
 
@@ -72,8 +73,10 @@ export function carDoor(body: CarBody, d: number): { side: 1 | -1; hinge: number
 /**
  * A parked car in `p`'s frame (front towards +z), sitting on the ground at `y`. `apart`: without
  * its doors, the inside showing where they go (each drawn on its own, `paintDoor`, to open).
+ * `wheels`: with its wheels (the street's); without, their arches only, the wheels drawn on their
+ * own to turn and steer (`paintWheel`, `wheelAt`: the game's cars).
  */
-export function paintCar(p: Painter, body: CarBody, paint: string, apart = false): void {
+export function paintCar(p: Painter, body: CarBody, paint: string, apart = false, wheels = true): void {
   const { wid, low } = body;
   const hw = wid / 2;
   const inner = hw - 0.045;
@@ -159,6 +162,7 @@ export function paintCar(p: Painter, body: CarBody, paint: string, apart = false
   for (const wz of [body.wheelBase / 2, -body.wheelBase / 2]) {
     for (const side of [-1, 1]) {
       p.paint('#141517', 0.9, 0).tube('x', side * (hw + 0.002), side * (hw + 0.003), r, wz, r + 0.07, r + 0.07, 8, true, 0, Math.PI);
+      if (!wheels) continue;
       p.paint('#1A1A1C', 0.85, 0).tube('x', side * (hw - 0.22), side * (hw + 0.012), r, wz, r, r, 12);
       p.paint('#B4B8BC', 0.3, 1).tube('x', side * (hw + 0.012), side * (hw + 0.02), r, wz, r * 0.6, r * 0.5, 10);
     }
@@ -217,6 +221,64 @@ export function paintDoor(p: Painter, body: CarBody, paint: string, d: number): 
   face([glass(0.08, 0.1), glass(0.92, 0.1), glass(0.92, 0.86), glass(0.08, 0.86)], fn, 0.006);
   const back: V3 = [-fn[0], -fn[1], -fn[2]];
   face([glass(0.08, 0.1), glass(0.92, 0.1), glass(0.92, 0.86), glass(0.08, 0.86)], back, 0.03);
+}
+
+/** Wheel `w` of `body` (0 front right, 1 front left, 2 back right, 3 back left: front ones steer): its side (+1: +x), and where its hub is (x, z; y is its radius). */
+export function wheelAt(body: CarBody, w: number): { side: 1 | -1; x: number; z: number; front: boolean } {
+  const side = w % 2 === 0 ? 1 : -1;
+  const front = w < 2;
+  return { side, x: side * (body.wid / 2 + 0.012), z: front ? body.wheelBase / 2 : -body.wheelBase / 2, front };
+}
+
+/** Where a car is: its middle and which way it faces (0: towards +z). */
+export interface CarPose {
+  x: number;
+  z: number;
+  yaw: number;
+}
+
+/** Where the point `inCar` last looked at is in the car (m): along it (+: towards its front) and across it (+: towards +x at yaw 0). */
+const inside = { along: 0, across: 0 };
+
+/** Whether (x, z) is in `body` standing at `pose` (its box seen from above): someone sat in it (`pc/cars.ts` `seatAt`, `carriedAlong`). */
+export function inCar(body: CarBody, pose: CarPose, x: number, z: number): boolean {
+  const [dx, dz] = [x - pose.x, z - pose.z];
+  const [s, c] = [Math.sin(pose.yaw), Math.cos(pose.yaw)];
+  inside.along = dx * s + dz * c;
+  inside.across = dx * c - dz * s;
+  return Math.abs(inside.along) < body.len / 2 && Math.abs(inside.across) < body.wid / 2;
+}
+
+/**
+ * Someone at (x, z) facing `yaw` with `body` at `from`: where they are with it at `to` instead
+ * (`out`), carried along rigidly, turned with it; false (`out` untouched) when they aren't in it.
+ * Those riding in a car that drives: sat where the snapshot has them in it, drawn where the car is
+ * drawn (`pc/cars.ts` `ride`).
+ */
+export function carriedAlong(body: CarBody, from: CarPose, to: CarPose, x: number, z: number, yaw: number, out: CarPose): boolean {
+  if (!inCar(body, from, x, z)) return false;
+  const { along, across } = inside;
+  const [s1, c1] = [Math.sin(to.yaw), Math.cos(to.yaw)];
+  out.x = to.x + across * c1 + along * s1;
+  out.z = to.z - across * s1 + along * c1;
+  out.yaw = wrapAngle(to.yaw + wrapAngle(yaw - from.yaw));
+  return true;
+}
+
+/**
+ * A wheel of radius 1 (scaled to a car's `wheelR` across y and z: `wheelAt`) in `p`'s frame, turning
+ * about x through its hub at the origin: the tyre in from the hub's face (x 0, facing +x, out from
+ * the car), a hubcap with five holes, so it can be seen to turn. The left wheels are turned round.
+ */
+export function paintWheel(p: Painter): void {
+  p.paint('#1A1A1C', 0.85, 0).tube('x', -0.232, 0, 0, 0, 1, 1, 12);
+  p.paint('#B4B8BC', 0.3, 1).tube('x', 0, 0.008, 0, 0, 0.6, 0.5, 10);
+  p.paint('#2A2C2F', 0.6, 0);
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * Math.PI * 2;
+    const [y, z] = [Math.cos(a) * 0.3, Math.sin(a) * 0.3];
+    p.box(0.008, y - 0.07, z - 0.07, 0.011, y + 0.07, z + 0.07, 'nx');
+  }
 }
 
 /** `q`'s normal (its first three corners), turned to face `towards`. */

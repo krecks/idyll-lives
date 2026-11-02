@@ -22,18 +22,22 @@
 
 import * as pc from './engine';
 import { Grass, grassGround, type GrassPusher } from './grass';
+import { disposeTiles, type GroundTile } from './groundTiles';
 import { Instances } from './instancing';
 import { GAME_FRONT_FACE, MaterialLibrary, textureWithFallback } from './materials';
 import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from './models';
 import { codeFor, float, registerShaderFeature, type ShaderFeature } from './shaders/chunks';
 import type { AssetRegistry } from '../../assets/registry';
 import type { WorldStructure } from '../../core/protocol';
+import { LookedFrom } from '../shared/chunks';
 import { CountryRoads } from '../shared/countryRoads';
 import type { Lighting } from '../shared/environment';
 import { grassField, type GrassQuality } from '../shared/grass';
+import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
 import { groupInstances, hideLawn, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
+import type { OpenWorldQuality } from '../quality';
 import type { BenchDiag } from '../../debug/benchFlags';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
@@ -98,12 +102,25 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /** The water's material and the library that adopted it (its own: it goes with the landscape). */
   private waterMaterial: { material: pc.StandardMaterial; lib: MaterialLibrary } | null = null;
 
-  /** `grassQuality`: how the grass is drawn (the preset's, `QualitySettings.grass`). */
-  constructor(world: WorldStructure, lawnDensity: number, lawnLod: 0 | 1, woodsCell: number, private readonly grassQuality: GrassQuality) {
-    super(world, (land, w, name) => new CountryRoads(land, w, name), lawnDensity, lawnLod, woodsCell);
+  /** The land in the render data worker while `build` runs: the terrain's shading and the grass field are made there. */
+  private offThread: OffThreadLand | null = null;
+
+  /** `grassQuality`: how the grass is drawn (the preset's, `QualitySettings.grass`); `open`: a big world's distances (`QualitySettings.openWorld`). */
+  constructor(world: WorldStructure, lawnDensity: number, lawnLod: 0 | 1, woodsCell: number, private readonly grassQuality: GrassQuality, private readonly open: OpenWorldQuality) {
+    super(world, (land, w, name) => new CountryRoads(land, w, name), lawnDensity, lawnLod, woodsCell, open.woodsCell);
   }
 
   async build(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder): Promise<NatureResult> {
+    this.offThread = OffThreadLand.open(world);
+    try {
+      return await this.buildAll(app, parent, assets, world, pace, buildRoads);
+    } finally {
+      this.offThread?.close();
+      this.offThread = null;
+    }
+  }
+
+  private async buildAll(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder): Promise<NatureResult> {
     const draws: pc.Entity[] = [];
     // A big world's ground in 128 m tiles of three levels of detail; a town of today's sizes one mesh, as ever.
     const grounds = world.meta?.world?.size === 'big' ? await perfTimeAsync('nature: terrain tiles', () => this.terrainTiles(app, parent, pace)) : [await perfTimeAsync('nature: terrain', () => this.terrain(app, parent, pace))];
@@ -113,14 +130,32 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     for (const e of draws) e.enabled = false;
     this.others = draws;
     this.batches = [];
+    // (The grass field's land is made in the worker meanwhile; its town mask here.)
+    const grassLand = this.offThread?.grass(this.ring) ?? Promise.resolve(null);
     await perfTimeAsync('nature: forests', () => this.forests(app, parent, assets, pace));
     await perfTimeAsync('nature: lawns', () => this.plantLawns(app, parent, assets, world, pace));
     this.findSquares();
-    const field = await perfTimeAsync('nature: grass field', () => grassField(world, this, pace, this.ring));
+    const field = await perfTimeAsync('nature: grass field', async () => {
+      const land = await grassLand;
+      return land ? withTownGrass(land, world) : grassField(world, this, pace, this.ring);
+    });
     const grass = (this.grass = new Grass(app, parent, field, this.grassQuality));
     grass.onGround(grounds.map((g) => g.render!.meshInstances[0]));
     const plants = gather(this.batches);
     return { draws: [...draws, ...plants.draws, ...grass.draws.map((d) => d.entity)], casters: plants.casters, only: plants.only };
+  }
+
+  /**
+   * The terrain's heights and colours for the grid `grid` lays out (x and z; y is set): made in the
+   * worker while it runs (the same numbers; the grid goes over to it and comes back), else here.
+   */
+  private async shaded(grid: () => Float32Array, pace?: () => Promise<void>): Promise<{ positions: Float32Array; colors: Float32Array }> {
+    const made = await this.offThread?.shade(grid());
+    if (made) return made;
+    const positions = grid();
+    const colors = new Float32Array((positions.length / 3) * 4);
+    await this.shadeTerrain(positions, colors, pace);
+    return { positions, colors };
   }
 
   /**
@@ -158,6 +193,11 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /** Takes down everything it draws (the plants' templates with their draws). */
   dispose(): void {
     for (const b of this.batches) release(b.built);
+    // A ground tile's levels not drawn now are no draw's: they go here (the one drawn goes with its entity).
+    disposeTiles(this.tiles);
+    this.tiles = [];
+    this.woodsSquares = [];
+    this.flowerSquares = [];
     for (const e of this.others) e.destroy();
     if (this.waterMaterial) {
       this.waterMaterial.lib.release(this.waterMaterial.material);
@@ -222,25 +262,32 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     const S = TILE_LODS[0];
     const c = TILE / S;
     const n = S + 3; // (a ring of one past the tile for the normals)
-    for (let j = 0; j < count; j++) {
-      for (let i = 0; i < count; i++) {
-        const tx = x0 + i * TILE;
-        const tz = z0 + j * TILE;
-        // Grid point (col, row) of the finest level, col and row from -1 to S + 1; row 0 at the tile's far (max z) edge.
-        const positions = new Float32Array(n * n * 3);
-        for (let row = -1, v = 0; row <= S + 1; row++) for (let col = -1; col <= S + 1; col++, v++) [positions[v * 3], positions[v * 3 + 2]] = [tx + col * c, tz + (S - row) * c];
-        const colors = new Float32Array(n * n * 4);
-        await this.shadeTerrain(positions, colors, pace);
-        const at = (col: number, row: number) => (row + 1) * n + col + 1;
-        const meshes = TILE_LODS.map((segs) => tileMesh(app, positions, colors, at, segs, S / segs, c, x0, z0, size));
-        const mi = new pc.MeshInstance(meshes[1], material);
-        const entity = new pc.Entity(`terrain${i},${j}`, app);
-        entity.addComponent('render', { meshInstances: [mi], castShadows: false, receiveShadows: true });
-        entity.enabled = false;
-        parent.addChild(entity);
-        out.push(entity);
-        this.tiles.push({ mi, meshes, x: tx + TILE / 2, z: tz + TILE / 2, lod: 1 });
-      }
+    // Tile k (i across, j down) and its finest level's grid point (col, row), col and row from -1 to
+    // S + 1; row 0 at the tile's far (max z) edge.
+    const corner = (k: number) => [k % count, Math.floor(k / count), x0 + (k % count) * TILE, z0 + Math.floor(k / count) * TILE];
+    const grid = (k: number) => () => {
+      const [, , tx, tz] = corner(k);
+      const positions = new Float32Array(n * n * 3);
+      for (let row = -1, v = 0; row <= S + 1; row++) for (let col = -1; col <= S + 1; col++, v++) [positions[v * 3], positions[v * 3 + 2]] = [tx + col * c, tz + (S - row) * c];
+      return positions;
+    };
+    const at = (col: number, row: number) => (row + 1) * n + col + 1;
+    // The worker shades a few tiles ahead while one's meshes are made here (its round trips overlap);
+    // on the page, one at a time.
+    const ahead = this.offThread ? SHADE_AHEAD : 0;
+    const shading: Promise<{ positions: Float32Array; colors: Float32Array }>[] = [];
+    for (let k = 0; k < count * count; k++) {
+      while (shading.length <= ahead && k + shading.length < count * count) shading.push(this.shaded(grid(k + shading.length), pace));
+      const { positions, colors } = await shading.shift()!;
+      const [i, j, tx, tz] = corner(k);
+      const meshes = TILE_LODS.map((segs) => tileMesh(app, positions, colors, at, segs, S / segs, c, x0, z0, size));
+      const mi = new pc.MeshInstance(meshes[1], material);
+      const entity = new pc.Entity(`terrain${i},${j}`, app);
+      entity.addComponent('render', { meshInstances: [mi], castShadows: false, receiveShadows: true });
+      entity.enabled = false;
+      parent.addChild(entity);
+      out.push(entity);
+      this.tiles.push({ mi, meshes, x: tx + TILE / 2, z: tz + TILE / 2, lod: 1 });
     }
     return out;
   }
@@ -251,6 +298,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.built ? this.batches.filter((b) => parts.includes(b.part)).flatMap((b) => b.built.cells.flatMap((c) => c.draws.map((d) => d.meshInstance))).map((mi) => ({ mi, x: mi.aabb.center.x, z: -mi.aabb.center.z })) : [];
     this.woodsSquares = of(['woods', 'farWoods']);
     this.flowerSquares = of(['flowers']);
+    this.framedAt.forget();
   }
 
   /** A big world's woods squares: each one's draw and where its middle is (game space). */
@@ -258,15 +306,20 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /** A big world's lawn flowers' squares, as the woods'. */
   private flowerSquares: { mi: pc.MeshInstance; x: number; z: number }[] = [];
   /** A big world's ground tiles: each one's draw, its meshes by level, where its middle is and the level drawn. */
-  private tiles: { mi: pc.MeshInstance; meshes: pc.Mesh[]; x: number; z: number; lod: number }[] = [];
+  private tiles: GroundTile[] = [];
+  /** Where `frameTiles` last looked from. */
+  private readonly framedAt = new LookedFrom();
 
   /** Each frame (the game's): each ground tile draws the level for its distance from (`x`, `z`), the camera's target. */
   frameTiles(x: number, z: number): void {
-    for (const w of this.woodsSquares) w.mi.visible = Math.hypot(w.x - x, w.z - z) < WOODS_FAR;
-    for (const f of this.flowerSquares) f.mi.visible = Math.hypot(f.x - x, f.z - z) < FLOWERS_FAR;
+    // (The camera's target still: nothing changes.)
+    if (!this.framedAt.moved(x, z, 0.5)) return;
+    const { woodsFar, flowersFar, tiles: [near, mid] } = this.open;
+    for (const w of this.woodsSquares) w.mi.visible = Math.hypot(w.x - x, w.z - z) < woodsFar;
+    for (const f of this.flowerSquares) f.mi.visible = Math.hypot(f.x - x, f.z - z) < flowersFar;
     for (const t of this.tiles) {
       const d = Math.hypot(t.x - x, t.z - z);
-      const lod = d < TILE_NEAR ? 0 : d < TILE_MID ? 1 : 2;
+      const lod = d < near ? 0 : d < mid ? 1 : 2;
       if (lod === t.lod) continue;
       t.lod = lod;
       t.mi.mesh = t.meshes[lod];
@@ -277,17 +330,24 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private async terrain(app: pc.AppBase, parent: pc.Entity, pace?: () => Promise<void>): Promise<pc.Entity> {
     const { size, segments } = this.terrainGrid();
     const n = segments + 1;
-    const positions = new Float32Array(n * n * 3);
-    const uvs = new Float32Array(n * n * 2);
     // (Rows from the far edge, moved to the town's middle.)
+    const uvs = new Float32Array(n * n * 2);
     for (let row = 0, v = 0; row <= segments; row++) {
       for (let col = 0; col <= segments; col++, v++) {
-        positions[v * 3] = (col * size) / segments - size / 2 + this.w / 2;
-        positions[v * 3 + 2] = ((segments - row) * size) / segments - size / 2 + this.d / 2;
         uvs[v * 2] = col / segments;
         uvs[v * 2 + 1] = 1 - row / segments;
       }
     }
+    const grid = () => {
+      const positions = new Float32Array(n * n * 3);
+      for (let row = 0, v = 0; row <= segments; row++) {
+        for (let col = 0; col <= segments; col++, v++) {
+          positions[v * 3] = (col * size) / segments - size / 2 + this.w / 2;
+          positions[v * 3 + 2] = ((segments - row) * size) / segments - size / 2 + this.d / 2;
+        }
+      }
+      return positions;
+    };
     const indices = new Uint32Array(segments * segments * 6);
     for (let row = 0, k = 0; row < segments; row++) {
       for (let col = 0; col < segments; col++) {
@@ -299,9 +359,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
         indices[k++] = col + row * n;
       }
     }
-    const colors = new Float32Array(n * n * 4);
     // sRGB vertex colours (converted on the GPU) multiply the grass detail texture.
-    await this.shadeTerrain(positions, colors, pace);
+    const { positions, colors } = await this.shaded(grid, pace);
     const normals = new Float32Array(positions.length);
     computeNormals(positions, indices, normals);
     const mesh = new pc.Mesh(app.graphicsDevice);
@@ -375,15 +434,11 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   }
 }
 
-/** A big world's ground tiles (m), their levels' quads across, and the distances (m from the camera's target, to a tile's middle) they change at. */
+/** A big world's ground tiles (m), and their levels' quads across (the distances they change at are the preset's, `OpenWorldQuality.tiles`). */
 const TILE = 128;
 const TILE_LODS = [64, 32, 16];
-const TILE_NEAR = 200;
-const TILE_MID = 460;
-/** A big world's woods squares further than this (m, middle to the camera's target) aren't drawn (the haze has them). */
-const WOODS_FAR = 560;
-/** A big world's lawn flowers' squares further than this (m, middle to the camera's target) aren't drawn (a flower is a few pixels by then). */
-const FLOWERS_FAR = 170;
+/** Ground tiles the render data worker is asked to shade ahead of the one whose meshes are being made. */
+const SHADE_AHEAD = 4;
 
 /**
  * One level of a ground tile from the finest level's shaded points (`at(col, row)` into `positions`
@@ -565,8 +620,8 @@ async function instanced(
   // Without its file, nothing, until the file comes (`Landscape.rebuild`).
   const template = await perfTimeAsync(`nature: model ${key}`, () => buildModel(app, key, assets.get(key, 'model'), [1, 1], { lod }));
   await pace?.();
-  const groups = groupInstances(matrices, cell);
-  const split = groups.size > 1 ? template.meshes.filter((m) => (indexCount(m) / 3) * matrices.length >= SPLIT_TRIANGLES) : [];
+  const groups = cell ? groupInstances(matrices, (m) => cell(m[12], m[14])) : new Map<string, number[]>();
+  const split = groups.size > 1 ? template.meshes.filter((m) => splitsByGroup(m, matrices.length)) : [];
   const span = perfStart(`nature: instances ${key}`);
   const draw = (m: ModelMesh, indices: readonly number[], name: string): Instances => {
     const d = new Instances(app.graphicsDevice, parent, m.mesh, m.material, { name, castShadows: false, receiveShadows: true, capacity: indices.length });
@@ -599,9 +654,10 @@ async function instanced(
   };
 }
 
-/** A mesh's triangle corners (its indices drawn). */
-function indexCount(m: ModelMesh): number {
-  return m.mesh.primitive[0]?.count ?? 0;
+/** Whether a mesh drawn `copies` times is drawn per draw group (where there are groups): `SPLIT_TRIANGLES` or more triangles over them all. As the street's (`pc/street.ts`). */
+export function splitsByGroup(m: ModelMesh, copies: number): boolean {
+  // (Its indices drawn, three a triangle.)
+  return ((m.mesh.primitive[0]?.count ?? 0) / 3) * copies >= SPLIT_TRIANGLES;
 }
 
 // ---- Wind and foliage shading -----------------------------------------------------------

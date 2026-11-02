@@ -163,7 +163,8 @@ export class Grass {
     private readonly quality: GrassQuality,
   ) {
     const device = app.graphicsDevice;
-    this.colour = new pc.Texture(device, { name: 'grassColour', width: field.w, height: field.d, format: pc.PIXELFORMAT_RGBA8, mipmaps: false, minFilter: pc.FILTER_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [field.colour] });
+    // (With mips, trilinear: the ground reads it far off, `shaders/grass.ts`; the blades read its first level.)
+    this.colour = new pc.Texture(device, { name: 'grassColour', width: field.w, height: field.d, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [field.colour] });
     this.town = this.townTexture();
     this.area = new Float32Array([field.x0, field.z0, 1 / field.w, 1 / field.d]);
     this.townSize[2] = field.margin;

@@ -153,6 +153,46 @@ export interface QualitySettings {
    * Past `FAR_POSE_DISTANCE` they're posed less often.
    */
   residentRadius: number;
+  /**
+   * A big world's distances (`docs/design/open-world.md`): what is drawn round the roaming camera.
+   * Medium and High are the open world as it was tuned; Low draws less of it (on WebGL2 the woods and
+   * far houses past the haze cost an older laptop's GPU what it can't spare).
+   */
+  openWorld: OpenWorldQuality;
+  /**
+   * The share of `shared/resolution.ts`'s `PIXEL_BUDGET` the `auto` resolution draws at most (1: a
+   * 1920×1080 screen at 100 %). Low's 0.5625 is 75 % along each side there, as a share of the
+   * fill-rate: the picture a little softer, the scene, its FXAA and its compose about 44 % fewer pixels.
+   */
+  pixelBudget: number;
+  /**
+   * Low's leaner picture chain (`pc/post.ts`): the scene in an 11/11/10-bit float target where the GPU
+   * can draw into one (RGBA16F otherwise), and the FXAA's input 8 bits a channel, the image-processed
+   * colour clamped there. Half the bytes of the two half-float full-size targets. Medium and High
+   * keep the half-float scene (and have no FXAA).
+   */
+  leanTargets: boolean;
+}
+
+/** A big world's distances on a preset (`QualitySettings.openWorld`). */
+export interface OpenWorldQuality {
+  /** The stream radius's share (`shared/focus.ts` `streamRadius`): the chunks streamed in round the camera, and with them the residents and things the sim keeps in full. */
+  stream: number;
+  /** The far LOD's houses past this (m, a draw group's middle from the camera's target) aren't drawn (`pc/street.ts`). */
+  farCull: number;
+  /** The woods' squares further than this (m, middle to the camera's target) aren't drawn (`pc/nature.ts`): the haze has them. */
+  woodsFar: number;
+  /** The side (m) of the woods' squares (`shared/nature.ts`): smaller ones leave out more trees off screen, at a draw each. */
+  woodsCell: number;
+  /** The lawn flowers' squares further than this (m) aren't drawn: a flower is a few pixels by then. */
+  flowersFar: number;
+  /** The ground tiles' finest and middle levels within these (m, a tile's middle to the camera's target; past them the coarsest). */
+  tiles: readonly [number, number];
+  /**
+   * The camera's far plane (m). The haze (`look.ts` `fog`) has everything past about 600 m (the fog
+   * factor under 0.01 % there), so a nearer plane leaves out only the far ground tiles behind it.
+   */
+  far: number;
 }
 
 /** What the renderer is built with: a preset's knobs, and which preset (the F3 overlay shows it). */
@@ -160,10 +200,13 @@ export interface RenderQuality extends QualitySettings {
   preset: GraphicsPreset;
 }
 
+/** The open world as it was tuned (Medium and High). */
+const OPEN_WORLD: OpenWorldQuality = { stream: 1, farCull: 650, woodsFar: 560, woodsCell: 256, flowersFar: 170, tiles: [200, 460], far: 2600 };
+
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
-  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, grass: { radius: 45, density: 0.5, nearest: 1 }, woodsCell: 100, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, holdStillFrames: true, ambientRange: 0, birds: { count: 6, range: 18 }, residentRadius: 90 },
-  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 60, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 40, birds: { count: 24, range: 35 }, residentRadius: 140 },
-  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 90, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 60, birds: { count: 40, range: 50 }, residentRadius: 200 },
+  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, grass: { radius: 45, density: 0.5, nearest: 1 }, woodsCell: 100, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, holdStillFrames: true, ambientRange: 0, birds: { count: 6, range: 18 }, residentRadius: 90, openWorld: { stream: 0.7, farCull: 450, woodsFar: 400, woodsCell: 128, flowersFar: 120, tiles: [150, 350], far: 1800 }, pixelBudget: 0.5625, leanTargets: true },
+  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 60, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 40, birds: { count: 24, range: 35 }, residentRadius: 140, openWorld: OPEN_WORLD, pixelBudget: 1, leanTargets: false },
+  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 90, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 60, birds: { count: 40, range: 50 }, residentRadius: 200, openWorld: OPEN_WORLD, pixelBudget: 1, leanTargets: false },
 };
 
 export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];

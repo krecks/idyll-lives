@@ -3,11 +3,12 @@
  * independent of rendering. Publishes:
  * - a render snapshot every step (shared memory, zero allocations),
  * - a UI view at ~10 Hz,
- * - world structure (geometry, placements) only when it changes.
+ * - world structure (geometry, placements) when it changes: what changed, at most every
+ *   `WORLD_INTERVAL_MS` (`view::StructureSync`).
  */
 
 import init, { Game, LoadError } from './wasm-pkg/sim_wasm.js';
-import type { FromWorker, GameSource, LeanWorld, MeshArrays, SaveProblem, ToWorker, WorldStructure } from './protocol';
+import { newestObjectUsed, type FromWorker, type GameSource, type MeshArrays, type SaveProblem, type ToWorker, type WorldUpdate } from './protocol';
 import { createSharedSnapshot, SharedSnapshotWriter, type SnapshotLayout } from './snapshot';
 
 interface WorkerScope {
@@ -19,6 +20,13 @@ interface WorkerScope {
 const scope = self as WorkerScope;
 
 const UI_INTERVAL_MS = 100;
+/**
+ * The structure (and the lamps and food that go with it) is sent at most this often as time goes
+ * by: a busy town changes it every few steps at speed 3 (a door opened, a crop grown, food put
+ * down), and the main thread applies each message. A command's or a new view's is sent at once,
+ * and so is one with a thing a resident already uses in the snapshots (`sentObject`).
+ */
+const WORLD_INTERVAL_MS = 100;
 const STATS_INTERVAL_MS = 1000;
 /** While the wasm downloads, how often the main thread hears that it's still coming. */
 const START_PROGRESS_MS = 500;
@@ -32,6 +40,7 @@ const MAX_CATCH_UP = 2;
 
 let game: Game | null = null;
 let memory: WebAssembly.Memory;
+let layout: SnapshotLayout;
 let writer: SharedSnapshotWriter | null = null;
 let lastStructure = -1;
 let lastItems = -1;
@@ -39,6 +48,16 @@ let lastLights = -1;
 /** Lot version and region the renderer last got the lot (walls, rooms, meshes) for. */
 let lastLot = -1;
 let lastRegion = '';
+/** The view's `seq` (`view` message): echoed with each world, so the main thread knows which view it was built for. */
+let viewSeq = 0;
+/** When the structure, and the food, were last sent. */
+let worldAt = -Infinity;
+let itemsAt = -Infinity;
+/**
+ * The highest object id the main thread has had a world with (or was sent a world for at once):
+ * a resident using a newer one (just bought) would otherwise use a thing that isn't there yet.
+ */
+let sentObject = -1;
 /** Tile rectangle whose walls and floors are sent to the renderer (null = whole town). */
 let region: [number, number, number, number] | null = null;
 /** Tile rectangle the camera streams in: the sim's full-detail area (null: the view's). */
@@ -65,7 +84,7 @@ scope.onmessage = (e) => {
   const requestId = 'requestId' in msg ? msg.requestId : undefined;
   try {
     if (msg.type === 'init') {
-      void start(msg.content, msg.source).catch((err) => fail(err, true));
+      void start(msg.content, msg.source, msg.speed, msg.module).catch((err) => fail(err, true));
     } else if (msg.type === 'check') {
       void check(msg.content, msg.save).catch((err) => fail(err, true));
     } else if (requestId !== undefined && !game) {
@@ -74,6 +93,7 @@ scope.onmessage = (e) => {
       scope.postMessage({ type: 'saved', requestId: msg.requestId, data: game.save() });
     } else if (msg.type === 'view') {
       region = msg.region;
+      viewSeq = msg.seq;
       if (game) {
         watch(game);
         postWorld();
@@ -102,7 +122,8 @@ scope.onmessage = (e) => {
       scope.postMessage({ type: 'socialOptions', requestId: msg.requestId, options });
     } else if (msg.type === 'command' && game) {
       game.command(JSON.stringify(msg.command));
-      publish();
+      // (What the player did shows at once.)
+      publish(true);
       postUi();
     }
   } catch (err) {
@@ -112,10 +133,10 @@ scope.onmessage = (e) => {
   }
 };
 
-async function start(content: string, source: GameSource): Promise<void> {
+async function start(content: string, source: GameSource, speed: number | undefined, module?: WebAssembly.Module): Promise<void> {
   // Each phase after the download says it's under way (the main thread gives up on a start only
-  // when it stalls; it started waiting when it sent `init`).
-  memory = (await init({ module_or_path: fetchWasm() })).memory;
+  // when it stalls; it started waiting when it sent `init`). A wasm the page compiled already is used as it is.
+  memory = (await init({ module_or_path: module ?? fetchWasm() })).memory;
   starting();
   try {
     game = 'save' in source ? Game.fromSave(content, source.save) : new Game(content, source.lot, source.seed);
@@ -126,14 +147,20 @@ async function start(content: string, source: GameSource): Promise<void> {
     return;
   }
   watch(game);
-  const layout: SnapshotLayout = JSON.parse(game.snapshot_layout());
+  // The first UI view is taken before the start's speed holds the game: it carries the game's own
+  // speed (a save's), which play resumes at.
+  const ui = JSON.parse(game.ui_update());
+  // (Before the first step: a game that starts paused runs none.)
+  if (speed !== undefined) game.command(JSON.stringify({ type: 'setSpeed', speed }));
+  layout = JSON.parse(game.snapshot_layout());
 
   const shared = typeof SharedArrayBuffer !== 'undefined' && self.crossOriginIsolated ? createSharedSnapshot(layout) : null;
   writer = shared ? new SharedSnapshotWriter(shared, layout.capacity) : null;
-  scope.postMessage({ type: 'ready', layout, shared, catalog: JSON.parse(game.catalog()) });
+  scope.postMessage({ type: 'ready', layout, shared, catalog: JSON.parse(game.catalog()), speed: ui.speed });
 
-  publish();
-  postUi();
+  publish(true);
+  // (The next update says the speed it's held at.)
+  scope.postMessage({ type: 'ui', ui });
   runLoop(1000 / layout.ticksPerSecond);
 }
 
@@ -243,52 +270,74 @@ function runLoop(stepMs: number): void {
   setTimeout(step, stepMs);
 }
 
-function publish(): void {
+/** `now`: send what changed at once (a command's effect, the first world), not waiting for `WORLD_INTERVAL_MS`. */
+function publish(now = false): void {
   const g = game!;
+  const version = g.structure_version();
   // Re-create the view each time: WASM memory growth detaches old views.
   const view = new Float32Array(memory.buffer, g.snapshot_ptr(), g.snapshot_len());
+  // A thing the main thread hasn't heard of, used already (one just bought, walked to at once):
+  // its world goes now, not up to `WORLD_INTERVAL_MS` after the snapshots that name it. (Read
+  // here: a later call into the simulation may grow its memory, which detaches `view`.)
+  const newest = version !== lastStructure ? newestObjectUsed(view, layout) : -1;
   if (writer) {
     writer.write(view, simSteps);
   } else {
     const copy = view.slice();
     scope.postMessage({ type: 'snapshot', data: copy, step: simSteps }, [copy.buffer]);
   }
-  const version = g.structure_version();
+  const at = performance.now();
+  const due = now || at - worldAt >= WORLD_INTERVAL_MS || newest > sentObject;
   // (Before the world, which the renderer builds with them.)
   const lights = g.lights_version();
   // (A light that follows a use, a hood over a hob, bumps the version as it comes on or goes off.)
-  if (version !== lastStructure || lights !== lastLights) {
+  if (due && (version !== lastStructure || lights !== lastLights)) {
     lastLights = lights;
+    worldAt = at;
     scope.postMessage({ type: 'lamps', off: JSON.parse(g.lamps_off()) });
   }
-  if (version !== lastStructure) {
-    lastStructure = version;
+  if (due && version !== lastStructure) {
     postWorld();
+    // (Once for each: an id the world doesn't list doesn't send every change at once.)
+    sentObject = Math.max(sentObject, newest);
   }
   const items = g.items_version();
-  if (items !== lastItems) {
+  if (items !== lastItems && (now || at - itemsAt >= WORLD_INTERVAL_MS)) {
     lastItems = items;
+    itemsAt = at;
     scope.postMessage({ type: 'items', items: JSON.parse(g.items()) });
   }
 }
 
+/**
+ * What changed of the structure since the last world sent: the lot (walls, openings, floors, and
+ * the rooms as a typed array) only when it changed, its meshes when it or the viewed region did.
+ * Most changes are a door opened or a thing moved: the main thread keeps the rest.
+ */
 function postWorld(): void {
   const g = game!;
-  // The lot (walls, rooms, floors and their meshes) only when it or the viewed region changed:
-  // most edits move furniture, and the main thread keeps the lot it has.
+  lastStructure = g.structure_version();
+  worldAt = performance.now();
   const lot = g.lot_version();
   const area = JSON.stringify(region);
-  if (lot === lastLot && area === lastRegion) {
-    const world: LeanWorld = JSON.parse(g.structure(false));
-    scope.postMessage({ type: 'world', world, full: false });
-    return;
-  }
+  const lotChanged = lot !== lastLot;
+  const viewChanged = area !== lastRegion;
   lastLot = lot;
   lastRegion = area;
-  const meshes = { walls: mesh(g, 0), wallsLow: mesh(g, 1), floors: mesh(g, 2) };
-  const world: WorldStructure = { ...JSON.parse(g.structure(true)), meshes };
-  const transfer = Object.values(meshes).flatMap((m) => [m.positions.buffer, m.normals.buffer, m.uvs.buffer, m.indices.buffer]);
-  scope.postMessage({ type: 'world', world, full: true }, transfer);
+  const world: WorldUpdate = JSON.parse(g.structure_update(lotChanged));
+  for (const o of world.objects ?? []) sentObject = Math.max(sentObject, o.id);
+  const message: Extract<FromWorker, { type: 'world' }> = { type: 'world', view: viewSeq, world };
+  const transfer: Transferable[] = [];
+  if (lotChanged) {
+    message.rooms = g.rooms();
+    transfer.push(message.rooms.buffer);
+  }
+  if (lotChanged || viewChanged) {
+    const meshes = { walls: mesh(g, 0), wallsLow: mesh(g, 1), floors: mesh(g, 2) };
+    message.meshes = meshes;
+    transfer.push(...Object.values(meshes).flatMap((m) => [m.positions.buffer, m.normals.buffer, m.uvs.buffer, m.indices.buffer]));
+  }
+  scope.postMessage(message, transfer);
 }
 
 /**

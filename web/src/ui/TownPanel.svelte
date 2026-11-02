@@ -6,13 +6,16 @@
   import { services } from './services';
   import { game } from './state.svelte';
   import { townMap } from './townMap.svelte';
+  import { mapScale, screenToMap } from './mapView';
+  import { lotTitle, tripText } from './place';
   import { settings } from '../settings/settings.svelte';
 
   /**
    * In-game town map: who lives where, who's home, and visiting. It pans (drag) and zooms (the
-   * wheel, 1 to 12 times), its labels the same size on screen at any zoom; a big world's land,
-   * country roads, trails (dashed), hamlets and outdoor places are on it too, and residents as
-   * dots. "Look here" takes the camera to the lot or place picked.
+   * wheel or + and −, 1 to 12 times), its labels the same size on screen at any zoom; a big world's
+   * land, country roads, trails (dashed), hamlets and outdoor places are on it too, and residents as
+   * dots. "Look here" (or a double-click) takes the camera to the lot or place picked. The lots take
+   * the keyboard too: Tab to one, Enter picks it, Enter again looks there.
    */
   const plots = $derived(game.plots);
   const meta = $derived(townMap.world?.meta ?? null);
@@ -33,7 +36,9 @@
   // ---- the view: zoom 1..12 round its middle (m); the map's width on screen (px) ----
   let zoom = $state(1);
   let mid = $state<[number, number] | null>(null);
+  /** The frame's size (CSS px): the map is drawn to fit in it (`mapView.ts`). */
   let screenW = $state(432);
+  let screenH = $state(300);
   let wide = $state(false);
   const fullW = $derived(width + MARGIN * 2);
   const fullD = $derived(depth + MARGIN * 2);
@@ -45,7 +50,7 @@
   const x0 = $derived(cx - viewW / 2);
   const z0 = $derived(cz - viewD / 2);
   /** Screen pixels a metre: a size in pixels divided by this stays that size whatever the zoom. */
-  const ppm = $derived(screenW / viewW);
+  const ppm = $derived(mapScale(screenW, screenH, { x: x0, z: z0, w: viewW, d: viewD }));
   const px = (n: number) => n / ppm;
   /**
    * Where a label's middle goes (m): at `x`, `z`, or as far in from the map's edges as all of `text`
@@ -70,18 +75,26 @@
   /** Outdoor places (a big world levels each to a height of its own: `pads`). */
   const spots = $derived(new Set(Object.keys(meta?.pads ?? {}).map(Number)));
 
-  // ---- live: residents and the camera, twice a second while open ----
+  // ---- live: residents twice a second while open; the camera every frame (it flies) ----
   let dots = $state.raw<{ x: number; z: number; mine: boolean }[]>([]);
   let camera = $state.raw<[number, number] | null>(null);
   $effect(() => {
     if (!game.townOpen) return;
-    const poll = () => {
-      dots = townMap.source.dots?.() ?? [];
-      camera = townMap.source.camera?.() ?? null;
-    };
+    const poll = () => (dots = townMap.source.dots?.() ?? []);
     poll();
     const timer = setInterval(poll, 500);
-    return () => clearInterval(timer);
+    let frame = 0;
+    const follow = () => {
+      const c = townMap.source.camera?.() ?? null;
+      // (A new value only when it moved a little: the map isn't drawn again for nothing.)
+      if (!c || !camera || Math.abs(c[0] - camera[0]) > 0.25 || Math.abs(c[1] - camera[1]) > 0.25) camera = c;
+      frame = requestAnimationFrame(follow);
+    };
+    follow();
+    return () => {
+      clearInterval(timer);
+      cancelAnimationFrame(frame);
+    };
   });
 
   // ---- pan (drag) and zoom (wheel) ----
@@ -89,19 +102,19 @@
   let drag = $state.raw<{ x: number; y: number; cx: number; cz: number; moved: boolean } | null>(null);
   /** Whether the last pointer press was a drag (then it isn't a click). */
   let dragged = false;
-  /** Where on the map the pointer is (m). */
-  const at = (e: MouseEvent): [number, number] => {
-    const r = svg!.getBoundingClientRect();
-    return [x0 + ((e.clientX - r.left) / r.width) * viewW, z0 + ((e.clientY - r.top) / r.height) * viewD];
-  };
-  function onwheel(e: WheelEvent) {
-    e.preventDefault();
-    const [mx, mz] = at(e);
-    const next = Math.max(1, Math.min(12, zoom * Math.exp(-e.deltaY * 0.0015)));
-    // The point under the pointer stays under it.
+  /** Where on the map the pointer is (m): the map fits its box, with bands to spare when the box isn't its shape. */
+  const at = (e: MouseEvent): [number, number] => screenToMap(e.clientX, e.clientY, svg!.getBoundingClientRect(), { x: x0, z: z0, w: viewW, d: viewD });
+  /** Zooms by `factor` round `[mx, mz]` (m), which stays where it is on screen. */
+  function zoomBy(factor: number, mx = cx, mz = cz) {
+    const next = Math.max(1, Math.min(12, zoom * factor));
     const k = zoom / next;
     mid = [mx + (cx - mx) * k, mz + (cz - mz) * k];
     zoom = next;
+  }
+  function onwheel(e: WheelEvent) {
+    e.preventDefault();
+    const [mx, mz] = at(e);
+    zoomBy(Math.exp(-e.deltaY * 0.0015), mx, mz);
   }
   function onpointerdown(e: PointerEvent) {
     dragged = false;
@@ -115,7 +128,8 @@
       svg?.setPointerCapture(e.pointerId);
       drag = { ...drag, moved: true };
     }
-    const scale = viewW / (svg?.getBoundingClientRect().width || screenW);
+    const r = svg?.getBoundingClientRect();
+    const scale = 1 / mapScale(r?.width || screenW, r?.height || screenH, { x: x0, z: z0, w: viewW, d: viewD });
     mid = [drag.cx - dx * scale, drag.cz - dy * scale];
   }
   function onpointerup() {
@@ -137,8 +151,17 @@
   function lookHere() {
     if (target) services.controls.lookAt(target[0], target[1]);
   }
+  /** Enter or Space on a lot picks it; again, looks there. (Its own: not the game's Space.) */
+  function lotKey(e: KeyboardEvent, id: number) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (picked === id) lookHere();
+    else pickPlot(id);
+  }
 
   function status(s: (typeof game.sims)[number]): string {
+    if (s.trip) return tripText(s.trip, game.households[s.household]?.plot ?? null, game.plots, game.households, (m) => clock(m, settings.clock24h));
     if (s.awayUntil !== null) return `At work until ${clock(s.awayUntil, settings.clock24h)}`;
     if (s.visiting !== null) return `Visiting ${game.plots[s.visiting]?.name ?? ''}`;
     if (s.plot === null) return 'Out and about';
@@ -161,7 +184,9 @@
       {/if}
       <button class="close" aria-label="Close" onclick={() => (game.townOpen = false)}><Icon name="icon.ui.close" size={14} /></button>
     </header>
-    <div class="frame" bind:clientWidth={screenW} style:aspect-ratio="{fullW} / {fullD}">
+    <!-- The map's own shape, as wide as there's room for and no taller than 70 % of the window. -->
+    <div class="frame" bind:clientWidth={screenW} bind:clientHeight={screenH} style:aspect-ratio="{fullW} / {fullD}" style:width="min(100%, calc(70vh * {fullW} / {fullD}))">
+      <!-- (Pointer-only panning and zooming: the keyboard has the buttons and the lots.) -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <svg
         bind:this={svg}
@@ -175,7 +200,18 @@
         onpointercancel={onpointerup}
       >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <rect x={-MARGIN} y={-MARGIN} width={fullW} height={fullD} fill="#B9D7A2" onclick={pickPoint} />
+        <rect
+          x={-MARGIN}
+          y={-MARGIN}
+          width={fullW}
+          height={fullD}
+          fill="#B9D7A2"
+          onclick={pickPoint}
+          ondblclick={(e) => {
+            pickPoint(e);
+            lookHere();
+          }}
+        />
         <g class="land">
           {#each zones as z, i (i)}
             <path class="zone {z.kind}" d={z.d} fill-rule="evenodd" />
@@ -192,16 +228,30 @@
           {/each}
         </g>
         {#each plots as p (p.id)}
-          {@const hh = game.households.find((h) => h.plot === p.id)}
-          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-          <g class="plot" class:mine={p.id === homePlot} class:picked={p.id === picked} class:viewing={p.id === game.viewPlot} class:spot={spots.has(p.id)} onclick={() => pickPlot(p.id)}>
+          {@const name = lotTitle(p, game.households, 'Empty')}
+          <g
+            class="plot"
+            class:mine={p.id === homePlot}
+            class:picked={p.id === picked}
+            class:viewing={p.id === game.viewPlot}
+            class:spot={spots.has(p.id)}
+            role="button"
+            tabindex="0"
+            aria-label="{name}{p.public || name === 'Empty' ? '' : `, ${p.name}`}"
+            aria-pressed={p.id === picked}
+            onclick={() => pickPlot(p.id)}
+            ondblclick={() => {
+              pickPlot(p.id);
+              lookHere();
+            }}
+            onkeydown={(e) => lotKey(e, p.id)}
+          >
             <rect class="lot" x={p.x + 0.5} y={p.z + 0.5} width={p.w - 1} height={p.d - 1} rx="1" />
             {#if p.house}
               <rect class="house" x={p.house[0]} y={p.house[1]} width={p.house[2] - p.house[0]} height={p.house[3] - p.house[1]} rx="0.5" />
             {/if}
             <!-- Names where there's room for them on screen (outdoor places always). -->
             {#if p.w * ppm > 46 || spots.has(p.id)}
-              {@const name = p.public ? p.name : hh ? `The ${hh.name}s` : 'Empty'}
               <text x={labelX(p.x + p.w / 2, name, 11)} y={labelZ(p.z + p.d / 2 + px(4), 11)} font-size={px(11)} text-anchor="middle">{name}</text>
               {#if homeCount(p.id) && p.w * ppm > 46}
                 <text class="count" x={labelX(p.x + p.w / 2, `${homeCount(p.id)} here`, 9)} y={labelZ(p.z + p.d / 2 + px(17), 9)} font-size={px(9)} text-anchor="middle">{homeCount(p.id)} here</text>
@@ -222,10 +272,22 @@
           <circle class="target" cx={target[0]} cy={target[1]} r={px(5)} stroke-width={px(2)} />
         {/if}
       </svg>
-      {#if zoom > 1}
-        <button class="btn small reset" onclick={() => ((zoom = 1), (mid = null))}>Whole town</button>
-      {/if}
+      <div class="zoom" role="group" aria-label="Zoom">
+        {#if zoom > 1}
+          <button class="btn small" onclick={() => ((zoom = 1), (mid = null))}>Whole town</button>
+        {/if}
+        <button class="btn small square" aria-label="Zoom in" title="Zoom in" disabled={zoom >= 12} onclick={() => zoomBy(1.6)}>+</button>
+        <button class="btn small square" aria-label="Zoom out" title="Zoom out" disabled={zoom <= 1} onclick={() => zoomBy(1 / 1.6)}>−</button>
+      </div>
     </div>
+    <ul class="legend" aria-label="Map key">
+      {#if spots.size}<li><span class="key place"></span>Outdoor place</li>{/if}
+      <li><span class="key home"></span>Your home</li>
+      <li><span class="key dot-mine"></span>Your household</li>
+      <li><span class="key dot-other"></span>Residents</li>
+      <li><span class="key ring-camera"></span>Camera</li>
+      <li><span class="key ring-target"></span>Picked</li>
+    </ul>
 
     {#if plot}
       <section class="details">
@@ -253,7 +315,7 @@
         {/if}
       </section>
     {:else}
-      <p class="muted hint">Click a lot to see who lives there.</p>
+      <p class="muted hint">Click a lot to see who lives there; double-click anywhere to look there.</p>
     {/if}
   </div>
 {/if}
@@ -301,8 +363,8 @@
   }
   .frame {
     position: relative;
-    width: 100%;
-    max-height: 70vh;
+    flex: none;
+    align-self: center;
     overflow: hidden;
     border-radius: var(--radius-md);
   }
@@ -316,10 +378,57 @@
   .map.dragging {
     cursor: grabbing;
   }
-  .reset {
+  .zoom {
     position: absolute;
     right: 8px;
     bottom: 8px;
+    display: flex;
+    gap: 4px;
+  }
+  .square {
+    width: 30px;
+    padding: 0;
+    justify-content: center;
+    font-size: 16px;
+  }
+  .legend {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-top: -4px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .legend li {
+    gap: 5px;
+  }
+  .key {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+  .key.place {
+    border-radius: 2px;
+    background: rgba(242, 179, 102, 0.85);
+  }
+  .key.home {
+    border-radius: 2px;
+    background: var(--accent);
+  }
+  .key.dot-mine {
+    background: var(--accent);
+    border: 1px solid rgba(29, 34, 48, 0.6);
+  }
+  .key.dot-other {
+    background: #f4f1ec;
+    border: 1px solid rgba(29, 34, 48, 0.6);
+  }
+  .key.ring-camera {
+    border: 2px solid #1d2230;
+  }
+  .key.ring-target {
+    border: 2px solid var(--accent);
   }
   .zone {
     opacity: 0.85;
@@ -393,6 +502,11 @@
   }
   .plot {
     cursor: pointer;
+    outline: none;
+  }
+  .plot:focus-visible .lot {
+    stroke: var(--accent);
+    stroke-width: 1.2;
   }
   .lot {
     fill: rgba(255, 255, 255, 0.2);

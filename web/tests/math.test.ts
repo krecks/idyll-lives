@@ -74,3 +74,14 @@ describe('shared/math matches Babylon', () => {
     for (const [c, linear] of B.toLinear) expect(Math.abs(m.toLinear(c) - linear)).toBeLessThan(1e-6);
   });
 });
+
+describe('shared/math as the cars use it', () => {
+  test('a yaw and a pitch composed: turned about x, then about y (a wheel turning on its axle, `pc/cars.ts`)', () => {
+    for (const [yaw, spin, r] of [[0.3, 1.1, 0.33], [-2.7, -0.4, 0.29], [Math.PI, 2.5, 1], [5.9, -3.1, 0.31]]) {
+      const [sy, cy, sp, cp] = [Math.sin(yaw), Math.cos(yaw), Math.sin(spin), Math.cos(spin)];
+      // (As the wheels' matrices were written out by hand: columns x, y (scaled by `r`), z (by `r`), and where.)
+      const byHand = [cy, 0, -sy, 0, sy * sp * r, cp * r, cy * sp * r, 0, sy * cp * r, -sp * r, cy * cp * r, 0, 4, r, -7, 1];
+      close(m.compose(1, r, r, m.quatYawPitchRoll(yaw, spin, 0), 4, r, -7, new Float32Array(16)), byHand, 1e-6);
+    }
+  });
+});

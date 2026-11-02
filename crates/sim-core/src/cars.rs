@@ -60,6 +60,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::TICKS_PER_SECOND;
 use crate::lot::OUTDOORS;
+use crate::path::join;
 use crate::travel::{Mode, RoadPoint, Travel};
 use crate::world::{
     Household, Phase, Sim, SimBrief, Task, TaskKind, World, nearest_exit, wrap_angle,
@@ -2223,8 +2224,7 @@ fn parked_bits(w: &World) -> Vec<u64> {
 }
 
 /// A garage was built or taken down on `plot` (or put back by an undo): its car parks by it
-/// (`park_by_garage`), and walking changes only on the tiles taken up or freed (not over every
-/// garage and car in town, as `reblock` does: a big world's walkers elsewhere keep their way).
+/// (`park_by_garage`), and walking changes only on the tiles taken up or freed (`restand`).
 pub(crate) fn garages_changed(w: &mut World, plot: u32) {
     for c in 0..w.cars.len() {
         if w.cars[c].plot == plot {
@@ -2234,6 +2234,23 @@ pub(crate) fn garages_changed(w: &mut World, plot: u32) {
     let parked = parked_bits(w);
     let tiles = standing_tiles(w, &parked);
     w.cars_parked = Some(parked);
+    restand(w, tiles);
+}
+
+/// The most separate patches of changed tiles one `restand` notes for walkers (more: the box
+/// round them all). The navigation log keeps a tick's patches together (`path::NavLog`), so
+/// however many cars come and go in a tick, walkers that last looked a few ticks ago still find
+/// what changed there rather than re-planning for anything.
+const MOST_PATCHES: usize = 8;
+
+/// Tiles of change this close together (or closer) make one patch.
+const PATCH_GAP: i32 = 2;
+
+/// The garages and parked cars now stand on `tiles` (sorted): walking changes only on the tiles
+/// taken up or freed, each patch of them noted on its own. (One box round every car in town
+/// would have every walker plan again and the walkable regions of most of a big world labelled
+/// again, for one car pulling out of a driveway.)
+fn restand(w: &mut World, tiles: Vec<usize>) {
     // The tiles in one list and not the other (both are sorted).
     let (old, new) = (&w.car_tiles, &tiles);
     let (mut i, mut j) = (0, 0);
@@ -2263,29 +2280,51 @@ pub(crate) fn garages_changed(w: &mut World, plot: u32) {
     if freed.is_empty() && taken.is_empty() {
         return;
     }
-    let mut rect = [i32::MAX, i32::MAX, i32::MIN, i32::MIN];
-    for &i in freed.iter().chain(&taken) {
-        let (x, z) = w.lot.tile_xz(i);
-        rect = [
-            rect[0].min(x),
-            rect[1].min(z),
-            rect[2].max(x + 1),
-            rect[3].max(z + 1),
-        ];
-    }
     for &i in &freed {
         w.blocked[i] = w.travel.ground_blocked(i);
     }
     for &i in &taken {
         w.blocked[i] = true;
     }
-    w.nav_changed_in(rect);
+    let changed: Vec<(i32, i32)> = freed
+        .iter()
+        .chain(&taken)
+        .map(|&i| w.lot.tile_xz(i))
+        .collect();
+    for rect in patches(&changed) {
+        w.nav_changed_in(rect);
+    }
     w.cars_nav = w.nav_version;
+}
+
+/// Tiles `tiles` gathered into patches (`[x0, z0, x1, z1)`, in a fixed order): those within
+/// `PATCH_GAP` of each other share one; past `MOST_PATCHES`, one box round them all.
+fn patches(tiles: &[(i32, i32)]) -> Vec<[i32; 4]> {
+    let near = |a: [i32; 4], b: [i32; 4]| {
+        a[0] - PATCH_GAP < b[2]
+            && b[0] - PATCH_GAP < a[2]
+            && a[1] - PATCH_GAP < b[3]
+            && b[1] - PATCH_GAP < a[3]
+    };
+    let mut out: Vec<[i32; 4]> = Vec::new();
+    for &(x, z) in tiles {
+        let mut r = [x, z, x + 1, z + 1];
+        // (Joining two patches can bring a third near: gather until none is.)
+        while let Some(k) = out.iter().position(|&o| near(o, r)) {
+            r = join(r, out.swap_remove(k));
+        }
+        out.push(r);
+    }
+    if out.len() > MOST_PATCHES {
+        let all = out.iter().copied().reduce(join).unwrap_or_default();
+        return vec![all];
+    }
+    out
 }
 
 /// The tiles parked cars and garages take up: nobody walks through a car or a garage, and nothing is put where one stands
 /// (`World::blocked`; things never stand on them, see `refresh`). Walkers find their way again
-/// when that changes (the walkable regions, not the views: `nav_version` only).
+/// near where that changes (the walkable regions, not the views: `nav_version` only; `restand`).
 pub(crate) fn reblock(w: &mut World) {
     // (Nothing to do while the same cars stand parked: a bit each.)
     let parked = parked_bits(w);
@@ -2295,29 +2334,19 @@ pub(crate) fn reblock(w: &mut World) {
     // (Garages too, as they stand.)
     let tiles = standing_tiles(w, &parked);
     w.cars_parked = Some(parked);
-    if tiles == w.car_tiles {
-        return;
+    restand(w, tiles);
+}
+
+impl World {
+    /// For tests: the tiles parked cars and garages take up (x, z), sorted as stacked rows are:
+    /// nobody walks through them (`reblock`).
+    #[doc(hidden)]
+    pub fn parked_tiles(&self) -> Vec<(i32, i32)> {
+        self.car_tiles
+            .iter()
+            .map(|&i| self.lot.tile_xz(i))
+            .collect()
     }
-    // Only where cars came or went: walkers elsewhere keep their way.
-    let mut rect = [i32::MAX, i32::MAX, i32::MIN, i32::MIN];
-    for &i in w.car_tiles.iter().chain(&tiles) {
-        let (x, z) = w.lot.tile_xz(i);
-        rect = [
-            rect[0].min(x),
-            rect[1].min(z),
-            rect[2].max(x + 1),
-            rect[3].max(z + 1),
-        ];
-    }
-    for &i in &w.car_tiles {
-        w.blocked[i] = w.travel.ground_blocked(i);
-    }
-    for &i in &tiles {
-        w.blocked[i] = true;
-    }
-    w.car_tiles = tiles;
-    w.nav_changed_in(rect);
-    w.cars_nav = w.nav_version;
 }
 
 /// The cars of a saved game: those that still make sense (their plot, household and people are

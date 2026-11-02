@@ -13,7 +13,7 @@ import { DEFAULT_LANDSCAPE, groundDepth, type LandscapeParams, type WorldStructu
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
-import { fbm, hash, smoothstep, valueNoise } from '../../game/noise';
+import { fbm, hash, mulberry32, smoothstep, valueNoise } from '../../game/noise';
 import { shareAt, ZoneField } from './zones';
 
 /**
@@ -26,7 +26,7 @@ const WORLD_RING = 260;
 export const APRON = 6;
 /** A big world's distance-from-built grid (m a cell; `distanceToTown`). */
 const BUILT_CELL = 2;
-/** A big world's woods are drawn in squares this wide (m), those far off left out (`pc/nature.ts` `frameTiles`). */
+/** A big world's woods are drawn in squares this wide (m), those far off left out (`pc/nature.ts` `frameTiles`); the preset's own (`OpenWorldQuality.woodsCell`) where it gives one. */
 export const BIG_WOODS_CELL = 256;
 /** A big world's lawn flowers are drawn in squares this wide (m), those far off left out (`pc/nature.ts` `frameTiles`). */
 export const BIG_FLOWERS_CELL = 128;
@@ -78,19 +78,8 @@ export interface PlantPlacement {
 
 // ---- Deterministic noise ------------------------------------------------------------
 
-export function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-// (The lattice hash, value noise, fractal noise and smooth step: the world generator's own, `game/noise.ts`, so the land it lays out and the land drawn agree.)
-export { fbm, hash, smoothstep, valueNoise };
+// (The seeded generator, lattice hash, value noise, fractal noise and smooth step: the world generator's own, `game/noise.ts`, so the land it lays out and the land drawn agree.)
+export { fbm, hash, mulberry32, smoothstep, valueNoise };
 
 /** Ridged noise, 0..1: sharp crests where plain noise crosses its middle (mountain ridges). */
 function ridged(x: number, z: number, seed: number, octaves = 5): number {
@@ -308,14 +297,13 @@ export function lawnLayer<D>(draws: D[], matrices: readonly ArrayLike<number>[],
   return { draws, base, shown: new Float32Array(base), tiles: Int32Array.from(indices, (k) => tiles[k]), hidden: new Uint8Array(indices.length) };
 }
 
-/** A model's instances grouped by `cell` (each group's indices into `matrices`, in their order); empty without one. */
-export function groupInstances(matrices: readonly ArrayLike<number>[], cell?: (x: number, z: number) => string): Map<string, number[]> {
-  const groups = new Map<string, number[]>();
-  if (!cell) return groups;
-  matrices.forEach((m, i) => {
-    const k = cell(m[12], m[14]);
-    const group = groups.get(k);
-    if (group) group.push(i);
+/** A model's copies grouped by `group` (each group's indices into `items`, in their order): the woods' and the street's draw groups. */
+export function groupInstances<T, K>(items: readonly T[], group: (item: T) => K): Map<K, number[]> {
+  const groups = new Map<K, number[]>();
+  items.forEach((it, i) => {
+    const k = group(it);
+    const list = groups.get(k);
+    if (list) list.push(i);
     else groups.set(k, [i]);
   });
   return groups;
@@ -348,7 +336,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * `lawnDensity`: the share of the lawn's flowers drawn (Low: half); `lawnLod` 1 draws
    * them in their far versions (Low, as the street's models: `QualitySettings.streetLod`); `woodsCell`:
    * the side (m) of the squares the game draws the woods in (0: the `FOREST_SECTORS`;
-   * `QualitySettings.woodsCell`).
+   * `QualitySettings.woodsCell`); `bigWoodsCell`: a big world's (`OpenWorldQuality.woodsCell`).
    */
   constructor(
     world: WorldStructure,
@@ -356,6 +344,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     protected readonly lawnDensity = 1,
     protected readonly lawnLod: 0 | 1 = 0,
     protected readonly woodsCell = 0,
+    protected readonly bigWoodsCell = BIG_WOODS_CELL,
   ) {
     this.seed = world.meta?.seed ?? 1;
     this.w = world.width;
@@ -782,7 +771,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     }
     const [cx, cz] = [this.w / 2, this.d / 2];
     // (A big world's woods in squares, whatever the preset: sectors from its middle would each reach a kilometre.)
-    const cell = this.built ? BIG_WOODS_CELL : this.woodsCell;
+    const cell = this.built ? this.bigWoodsCell : this.woodsCell;
     const sector = cell > 0 ? (x: number, z: number) => `${Math.floor(x / cell)}:${Math.floor(z / cell)}` : (x: number, z: number) => `${Math.floor((Math.atan2(z - cz, x - cx) / (Math.PI * 2) + 1) * FOREST_SECTORS) % FOREST_SECTORS}`;
     return { near, far, sector };
   }

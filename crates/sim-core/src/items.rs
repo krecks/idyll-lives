@@ -193,3 +193,48 @@ pub fn holder(content: &Content, objects: &[ObjectInstance], at: &ItemAt) -> Opt
         ItemAt::Floor { .. } => None,
     }
 }
+
+/// `holder` of each of `ats`, in one pass over the objects rather than one for each: a big town
+/// has thousands of objects, and the sweep over its items (`cooking::update`) asks for every one.
+/// The same answers, the first object (by id) over each tile (the sim tests check it against
+/// `holder`: `common::check_lookups`).
+pub fn holders(content: &Content, objects: &[ObjectInstance], ats: &[ItemAt]) -> Vec<Option<u32>> {
+    use std::collections::HashMap;
+    // The tiles asked about, on a top and put away, and the first object found for each.
+    let mut tops: HashMap<(i32, i32), Option<u32>> = HashMap::new();
+    let mut stores: HashMap<(i32, i32), Option<u32>> = HashMap::new();
+    for at in ats {
+        match *at {
+            ItemAt::Surface { x, z, .. } => tops.insert((x, z), None),
+            ItemAt::Stored { x, z } => stores.insert((x, z), None),
+            ItemAt::Floor { .. } => None,
+        };
+    }
+    for o in objects {
+        let def = &content.objects[o.def];
+        if def.surface.is_some() && !tops.is_empty() {
+            let (w, d) = o.size(content);
+            for z in o.z..o.z + d {
+                for x in o.x..o.x + w {
+                    if let Some(host @ None) = tops.get_mut(&(x, z)) {
+                        *host = Some(o.id);
+                    }
+                }
+            }
+        }
+        if def.stores && !stores.is_empty() {
+            for t in o.tiles(content) {
+                if let Some(host @ None) = stores.get_mut(&t) {
+                    *host = Some(o.id);
+                }
+            }
+        }
+    }
+    ats.iter()
+        .map(|at| match *at {
+            ItemAt::Surface { x, z, .. } => tops[&(x, z)],
+            ItemAt::Stored { x, z } => stores[&(x, z)],
+            ItemAt::Floor { .. } => None,
+        })
+        .collect()
+}

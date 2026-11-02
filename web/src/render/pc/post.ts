@@ -9,6 +9,11 @@
  *   contrast, colour curves) and then the moonlight grade (`nightGrade.ts`).
  * - FXAA on Low (no multisampling): the compose draws into a target of its own and the FXAA pass
  *   draws that onto the canvas, the grade at its end (the order: image processing, FXAA, grade).
+ * - Low's lean targets (`QualitySettings.leanTargets`): the scene in an 11/11/10-bit float target
+ *   where the GPU draws into one, and the FXAA's input 8 bits a channel (the colour image-processed
+ *   and encoded for the screen by then, so a byte a channel holds it as the canvas will; only what
+ *   the contrast pushed past white is clamped a pass sooner). Half the bytes of two half-float
+ *   targets, read and written every frame.
  * - `?diag=albedo|normals` and `?diag=linear` leave the image processing and the grade out (the
  *   colour itself, encoded for the screen); without them only Low's FXAA is left, so Medium and High
  *   draw straight onto the canvas there. `?diag=noaa`: no multisampling, no FXAA; `?diag=nonight`:
@@ -40,6 +45,8 @@ export interface PostOptions {
   imageProcessing: boolean;
   /** The moonlight grade (`nightGrade.ts`). */
   night: boolean;
+  /** Low's lean targets: the scene in 11/11/10-bit float where it can be, the FXAA's input in 8 bits (`QualitySettings.leanTargets`). */
+  lean?: boolean;
 }
 
 /** What the image processing does (`shared/imageProcessing.ts`, ACES always). */
@@ -50,8 +57,8 @@ export interface PostLook {
   curves: ColorCurveSettings;
 }
 
-/** The game's options for `quality` and the bench's `?diag=` flags. */
-export function gamePostOptions(samples: number, diag: ReadonlySet<string>, colourItself: boolean): PostOptions {
+/** The game's options for `quality` and the bench's `?diag=` flags (`lean`: `QualitySettings.leanTargets`). */
+export function gamePostOptions(samples: number, diag: ReadonlySet<string>, colourItself: boolean, lean = false): PostOptions {
   const aa = !diag.has('noaa');
   const imageProcessing = !colourItself && !diag.has('linear');
   return {
@@ -60,6 +67,7 @@ export function gamePostOptions(samples: number, diag: ReadonlySet<string>, colo
     fxaa: aa && samples <= 1,
     imageProcessing,
     night: imageProcessing && !diag.has('nonight'),
+    lean,
   };
 }
 
@@ -76,6 +84,8 @@ export function gameLook(look: { contrast: number; vignette: number; saturation:
 export const PLAIN_LOOK: PostLook = { contrast: 1, vignette: { weight: 0, stretch: 0, color: [0, 0, 0] }, curves: NEUTRAL_CURVES };
 
 const SCENE_FORMATS = [pc.PIXELFORMAT_RGBA16F, pc.PIXELFORMAT_RGBA32F];
+/** Low's: 11/11/10-bit float first (4 bytes a pixel, not 8; no alpha, which the compose doesn't read). */
+const LEAN_SCENE_FORMATS = [pc.PIXELFORMAT_111110F, ...SCENE_FORMATS];
 
 /** The FXAA pass (`shaders/post.ts`): `source` onto the canvas (or `target`). */
 class FxaaPass extends pc.RenderPassShaderQuad {
@@ -122,13 +132,16 @@ function driverInfo(device: pc.GraphicsDevice): string {
   return [d.unmaskedRenderer, info?.vendor, info?.architecture, info?.description].filter(Boolean).join(' ');
 }
 
-/** The half-float FXAA input, `width` × `height`: the compose draws into it, the FXAA pass from it. */
-function fxaaSource(device: pc.GraphicsDevice, width: number, height: number): pc.RenderTarget {
+/**
+ * The FXAA input, `width` × `height`: the compose draws into it, the FXAA pass from it. Half-float
+ * (the colour unclamped above 1, as the Babylon.js chain read it), or with `lean` 8 bits a channel.
+ */
+function fxaaSource(device: pc.GraphicsDevice, width: number, height: number, lean = false): pc.RenderTarget {
   const texture = new pc.Texture(device, {
     name: 'gameFxaaSource',
     width: Math.max(1, width),
     height: Math.max(1, height),
-    format: device.getRenderableHdrFormat([pc.PIXELFORMAT_RGBA16F], true) ?? pc.PIXELFORMAT_RGBA8,
+    format: lean ? pc.PIXELFORMAT_RGBA8 : (device.getRenderableHdrFormat([pc.PIXELFORMAT_RGBA16F], true) ?? pc.PIXELFORMAT_RGBA8),
     mipmaps: false,
     minFilter: pc.FILTER_LINEAR,
     magFilter: pc.FILTER_LINEAR,
@@ -199,7 +212,7 @@ export class PostProcessing {
     }
     if (options.fxaa) {
       // The compose draws into this (the half-float FXAA input), the FXAA pass onto the canvas.
-      this.fxaaTarget = fxaaSource(device, device.width, device.height);
+      this.fxaaTarget = fxaaSource(device, device.width, device.height, options.lean);
       // (Before the frame: its passes take the camera's target, and size the scene by it.)
       camera.renderTarget = this.fxaaTarget;
     }
@@ -220,7 +233,7 @@ export class PostProcessing {
   /** The chain's frame on `camera`: the scene in linear light, multisampled, composed by the image processing. */
   private cameraFrame(app: pc.AppBase, camera: pc.CameraComponent): pc.CameraFrame {
     const frame = new pc.CameraFrame(app, camera);
-    frame.rendering.renderFormats = SCENE_FORMATS;
+    frame.rendering.renderFormats = this.options.lean ? LEAN_SCENE_FORMATS : SCENE_FORMATS;
     frame.rendering.samples = Math.max(1, this.options.samples);
     frame.rendering.toneMapping = pc.TONEMAP_NONE;
     frame.rendering.sharpness = 0;
@@ -242,7 +255,7 @@ export class PostProcessing {
       camera.renderTarget = target;
       return { resize: () => {}, destroy: () => {} };
     }
-    const source = this.options.fxaa ? fxaaSource(this.device, target.width, target.height) : null;
+    const source = this.options.fxaa ? fxaaSource(this.device, target.width, target.height, this.options.lean) : null;
     camera.renderTarget = source ?? target;
     const frame = this.cameraFrame(app, camera);
     let fxaa: FxaaPass | null = null;

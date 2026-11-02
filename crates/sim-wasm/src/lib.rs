@@ -119,6 +119,8 @@ pub struct Game {
     snapshot: Box<[f32]>,
     /// What the UI was last sent (it gets changes only).
     ui: view::UiSync,
+    /// What the renderer was last sent of the structure (`structure_update`: changes only).
+    structure: view::StructureSync,
     /// The focus lot (`set_view`), and the area simulated in full detail if the view sent one
     /// (`set_watch`; else the focus lot's).
     view: Option<[i32; 4]>,
@@ -227,9 +229,11 @@ impl Game {
         view::catalog_json(&self.world.content)
     }
 
-    /// The world structure; with `lot` false, without the lot parts (see `lotVersion`).
-    pub fn structure(&self, lot: bool) -> String {
-        view::structure_json_with(&self.world, lot)
+    /// The next structure update (JSON): what changed since the last one (the first time:
+    /// everything); with `lot`, the lot's walls, openings, diagonals, fences and floors too
+    /// (never the rooms: `rooms`). See `sim_core::view::StructureSync`.
+    pub fn structure_update(&mut self, lot: bool) -> String {
+        self.structure.update_json(&self.world, lot)
     }
 
     /// The focus lot, a tile rectangle: the lot whose walls and floors are drawn in full. Until
@@ -364,6 +368,7 @@ impl Game {
             world,
             snapshot: vec![0.0; snapshot::CAPACITY].into_boxed_slice(),
             ui: view::UiSync::new(),
+            structure: view::StructureSync::default(),
             view: None,
             watch: None,
             chunks: Vec::new(),

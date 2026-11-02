@@ -47,6 +47,51 @@ pub(crate) struct Watch {
     primed: bool,
     /// A new game's lot, not looked at yet: its rooms' lamps are switched for who's in them.
     pub(crate) fresh: bool,
+    /// The lights that follow a use (`WhileLights`), found for the objects as they stood
+    /// (`World::objects_version`, which changes whenever objects come, go or move).
+    while_lights: Option<(u32, WhileLights)>,
+    /// The lamps by room, found for the objects and the rooms as they stood (`objects_version`
+    /// and `lot_version`).
+    lamps: Option<((u32, u32), Lamps)>,
+}
+
+/// What `cached` holds if it was found for `key` (the versions it's kept for, `Watch`).
+fn kept<K: PartialEq, T>(cached: Option<(K, T)>, key: K) -> Option<T> {
+    cached.filter(|c| c.0 == key).map(|c| c.1)
+}
+
+/// The lights that follow a use (content `light.while`; object ids, in id order) and the
+/// animations any of them watches (sorted): a big town has thousands of objects and a handful
+/// of these, looked at every tick.
+#[derive(Debug, Clone)]
+struct WhileLights {
+    lights: Vec<u32>,
+    watched: Vec<usize>,
+}
+
+impl WhileLights {
+    fn new(world: &World) -> Self {
+        let content = &world.content;
+        let lights: Vec<u32> = world
+            .objects
+            .iter()
+            .filter(|o| !content.objects[o.def].while_anims.is_empty())
+            .map(|o| o.id)
+            .collect();
+        // (A handful: most lights are of one kind.)
+        let mut watched: Vec<usize> = lights
+            .iter()
+            .flat_map(|&id| {
+                content.objects[world.objects[id as usize].def]
+                    .while_anims
+                    .iter()
+                    .copied()
+            })
+            .collect();
+        watched.sort_unstable();
+        watched.dedup();
+        Self { lights, watched }
+    }
 }
 
 /// Whether it's dark at `minute` of the day.
@@ -64,23 +109,12 @@ pub fn switchable(world: &World, def: usize) -> bool {
 /// of their animations at an object on their tiles, or standing on them (a cooker hood's light
 /// while the hob under it cooks). Any task counts, not only a plain use: cooking a recipe is
 /// `TaskKind::Cook`, its step's animation the one the hood watches.
-fn while_lit(world: &World) -> Vec<u32> {
+fn while_lit(world: &World, cached: &WhileLights) -> Vec<u32> {
     let content = &world.content;
-    let lights: Vec<_> = world
-        .objects
-        .iter()
-        .filter(|o| !content.objects[o.def].while_anims.is_empty())
-        .collect();
-    if lights.is_empty() {
+    let watched = &cached.watched;
+    if cached.lights.is_empty() {
         return Vec::new();
     }
-    // The animations any of them watches (a handful: most lights are of one kind).
-    let mut watched: Vec<usize> = lights
-        .iter()
-        .flat_map(|o| content.objects[o.def].while_anims.iter().copied())
-        .collect();
-    watched.sort_unstable();
-    watched.dedup();
     // Each sim doing one of them (once a tick, not once a light): the animation, the footprint of
     // the object they're at (none when at no object: `object` is -1), and the tile they stand on.
     let doing: Vec<_> = world
@@ -104,8 +138,10 @@ fn while_lit(world: &World) -> Vec<u32> {
     if doing.is_empty() {
         return Vec::new();
     }
-    lights
-        .into_iter()
+    cached
+        .lights
+        .iter()
+        .map(|&id| &world.objects[id as usize])
         .filter(|o| {
             let anims = &content.objects[o.def].while_anims;
             let [x0, z0, x1, z1] = footprint(o, content);
@@ -131,7 +167,11 @@ fn footprint(o: &crate::world::ObjectInstance, content: &crate::content::Content
 /// Keeps `World::while_lit` (the lights that follow a use) up to date, telling the renderer when
 /// one comes on or goes off.
 pub(crate) fn update_while(world: &mut World) {
-    let lit = while_lit(world);
+    let version = world.objects_version;
+    let cached = kept(world.light_watch.while_lights.take(), version)
+        .unwrap_or_else(|| WhileLights::new(world));
+    let lit = while_lit(world, &cached);
+    world.light_watch.while_lights = Some((version, cached));
     if lit != world.while_lit {
         world.while_lit = lit;
         world.lights_version = world.lights_version.wrapping_add(1);
@@ -189,8 +229,10 @@ pub(crate) fn update(world: &mut World) {
     let dark = dark_at(crate::clock::minute_of_day(world.tick));
     let lot_version = world.lot_version();
     let mut watch = std::mem::take(&mut world.light_watch);
-    // (The lamps by room, found once for all the rooms looked at.)
-    let mut lamps: Option<Lamps> = None;
+    // (The lamps by room, found once for all the rooms looked at, and kept while the objects and
+    // the rooms stand as they did.)
+    let key = (world.objects_version, lot_version);
+    let mut lamps = kept(watch.lamps.take(), key);
     if watch.fresh && world.autonomy {
         let rooms: Vec<u16> = world
             .rooms()
@@ -243,6 +285,7 @@ pub(crate) fn update(world: &mut World) {
             set(world, id, false);
         }
     }
+    watch.lamps = lamps.map(|lamps| (key, lamps));
     watch.awake = awake;
     watch.dark = dark;
     watch.lot_version = lot_version;
@@ -276,6 +319,7 @@ pub fn windowless(world: &World, room: u16) -> bool {
 
 /// The switchable lamps by the room they stand in (`room_at` their middle), each room's in id
 /// order: found once for a pass over the rooms rather than every lamp for every room.
+#[derive(Debug, Clone)]
 struct Lamps {
     by_room: Vec<(u16, u32)>,
 }

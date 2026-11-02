@@ -292,6 +292,23 @@ export function houseTemplate(t: Templates, id: string, residents?: Residents): 
   return t.houses.find((h) => h.id === id);
 }
 
+/**
+ * The generated houses among `ids` as nobody lives in them yet (as a world's lots use them), for
+ * another thread's cache (`primeHouses`): the town worker makes a world's houses, the page needn't
+ * make them again.
+ */
+export function generatedHouses(t: Templates, ids: Iterable<string>): [string, HouseTemplate | undefined][] {
+  return [...new Set(ids)].filter((id) => id.startsWith('gen:')).map((id) => [id, houseTemplate(t, id)]);
+}
+
+/** Houses another thread generated (`generatedHouses`): the same id always gives the same house. */
+export function primeHouses(houses: readonly [string, HouseTemplate | undefined][]): void {
+  for (const [id, house] of houses) {
+    const at = `${id}#${residentsKey(undefined)}`;
+    if (!generated.has(at)) generated.set(at, house);
+  }
+}
+
 /** Width and depth of a lot of this size. */
 export function lotDims(t: Templates, size: LotSize | undefined): { width: number; depth: number } {
   return t.lotSizes?.[size ?? 'medium'] ?? t.plot;
@@ -1346,6 +1363,7 @@ export interface AssembleOptions {
  * neighbours. With `existing`, `player` is the neighbour household already
  * living at `playerSlot`: it stays where it is in the list (with its jobs and history) and only
  * becomes the player's. A new household on an empty lot gets money to build with in Living games.
+ * `rand` rolls its dice (who among the neighbours are friends, rivals).
  */
 export function assembleTown(
   content: Content,
@@ -1354,6 +1372,7 @@ export function assembleTown(
   player: HouseholdDraft,
   playerSlot: number,
   { existing = false, mode = 'living', lifespan = 'normal' }: AssembleOptions = {},
+  rand: Rand = Math.random,
 ): string {
   const { walls, doors, windows, objects, paths, fields, garages, drives, cars, plots, facing, storeys, basement, fences } = layoutTown(content, t, town, playerSlot, existing ? undefined : player);
   const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
@@ -1399,13 +1418,13 @@ export function assembleTown(
   for (let a = newcomers; a < sims.length; a++) {
     for (let b = a + 1; b < sims.length; b++) {
       if (sims[a].household === sims[b].household) continue;
-      const roll = Math.random();
+      const roll = rand();
       const preset = roll < 0.03 ? 'rivals' : roll < 0.09 ? 'friends' : roll < 0.3 ? 'acquaintances' : null;
       if (preset && content.bondPresets.includes(preset)) relationships.push({ a, b, preset });
     }
   }
 
-  const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths, facing, seed: town.seed ?? (Math.random() * 2 ** 31) >>> 0, world: worldLook(town, fields), gardenFences: true };
+  const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths, facing, seed: town.seed ?? (rand() * 2 ** 31) >>> 0, world: worldLook(town, fields), gardenFences: true };
   const open = openWorldFields(town, drives, cars);
   if (open.meta) Object.assign(meta, open.meta);
   // Residents leave town (for work) where its roads lead out of it (in a big world, also from its bus stops).
