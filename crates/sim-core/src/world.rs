@@ -4148,6 +4148,7 @@ impl World {
         }
         self.refresh_reach();
         self.refresh_index();
+        self.travel.note_doors(&self.plots);
         // A new game's first step: the player hears of anyone without a bed (told as the world was
         // made, it would be the story so far, which the view doesn't show as news).
         if self.tick == 0 {
@@ -6933,6 +6934,9 @@ fn pick_autonomous(
         let reach = content.autonomy.reach;
         let free = until_leave.unwrap_or(f32::INFINITY);
         let drives = crate::cars::could_drive(ctx, sim);
+        // (Where they'd get on the roads from here, on foot and by car, found once for all the
+        // places, and each place's door's as noted, `Travel::door_entry`.)
+        let mut on: [Option<Option<crate::travel::RoadPoint>>; 2] = [None, None];
         for p in ctx.plots.iter().filter(|p| p.public) {
             let door = p.arrival_point();
             if (door[0] - sim.pos[0]).hypot(door[1] - sim.pos[1]) <= reach {
@@ -6940,14 +6944,25 @@ fn pick_autonomous(
             }
             // By car where they can drive there (`cars::trip_car`): a drive's seconds are the
             // game's minutes, and a few more to and from the car.
-            let eta = if drives && crate::cars::parks_near(ctx.travel, door) {
-                ctx.travel
-                    .eta(sim.pos, door, crate::travel::Mode::Car, walk_per_minute)
-                    * 60.0
-                    + CAR_TRIP_MINUTES
+            let car = drives && crate::cars::parks_near(ctx.travel, door);
+            let mode = if car {
+                crate::travel::Mode::Car
             } else {
-                ctx.travel
-                    .eta(sim.pos, door, crate::travel::Mode::Foot, walk_per_minute)
+                crate::travel::Mode::Foot
+            };
+            let from = &mut on[mode as usize];
+            let eta = ctx.travel.eta_via(
+                sim.pos,
+                door,
+                mode,
+                walk_per_minute,
+                || *from.get_or_insert_with(|| ctx.travel.entry(sim.pos, mode)),
+                || ctx.travel.door_entry(p.id, door, mode),
+            );
+            let eta = if car {
+                eta * 60.0 + CAR_TRIP_MINUTES
+            } else {
+                eta
             };
             if free < 2.0 * eta + OUTING_STAY_MINUTES {
                 continue;
@@ -9578,11 +9593,20 @@ pub(crate) fn quickest_exit(
         .collect();
     order.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
     let mut best: Option<(f32, usize)> = None;
+    // (Where they'd get on the roads from here, found once for all the ways out.)
+    let mut on = None;
     for (least, i) in order {
         if best.is_some_and(|(eta, _)| least > eta) {
             break;
         }
-        let eta = travel.eta(pos, exits[i], mode, 1.5);
+        let eta = travel.eta_via(
+            pos,
+            exits[i],
+            mode,
+            1.5,
+            || *on.get_or_insert_with(|| travel.entry(pos, mode)),
+            || travel.entry(exits[i], mode),
+        );
         if best.is_none_or(|(b, j)| eta.total_cmp(&b).then(i.cmp(&j)).is_lt()) {
             best = Some((eta, i));
         }

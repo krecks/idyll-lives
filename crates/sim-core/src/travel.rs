@@ -1018,7 +1018,15 @@ pub struct Travel {
     /// The tiles the town file's `terrain` masks (water, rock): blocked under everything, so a
     /// tile freed of what stood on it stays blocked (`World::set_travel`). Sorted tile indices.
     pub base_blocked: Vec<usize>,
+    /// By plot, for the public places: their door and where it gets on the roads on foot and by
+    /// car (`entry`), kept as each tick starts (`note_doors`): a resident weighing an outing asks
+    /// how long the way to every one is. Not saved.
+    doors: Vec<Option<Door>>,
 }
+
+/// A public place's door (its bits) and where it gets on the roads on foot and by car
+/// (`Travel::doors`).
+type Door = ([u32; 2], [Option<RoadPoint>; 2]);
 
 impl Travel {
     pub fn new(file: OpenWorld, meta: &serde_json::Value, exits: usize) -> Self {
@@ -1043,6 +1051,44 @@ impl Travel {
             open,
             country_speed: COUNTRY_SPEED,
             base_blocked: Vec::new(),
+            doors: Vec::new(),
+        }
+    }
+
+    /// Where a trip from or to `p` gets on the roads for `mode` (the nearest road within
+    /// `ENTRY_REACH`), as `eta` finds it.
+    pub fn entry(&self, p: [f32; 2], mode: Mode) -> Option<RoadPoint> {
+        self.graph.near(p, ENTRY_REACH, 1, mode).first().copied()
+    }
+
+    /// Notes the public places' doors and where they get on the roads (`doors`), again only for
+    /// a door that moved.
+    pub(crate) fn note_doors(&mut self, plots: &[crate::world::Plot]) {
+        if !self.open {
+            return;
+        }
+        self.doors.resize(plots.len(), None);
+        for (i, p) in plots.iter().enumerate() {
+            let door = p.arrival_point();
+            let bits = door.map(f32::to_bits);
+            if !p.public {
+                self.doors[i] = None;
+            } else if self.doors[i].is_none_or(|(at, _)| at != bits) {
+                let entries = [self.entry(door, Mode::Foot), self.entry(door, Mode::Car)];
+                self.doors[i] = Some((bits, entries));
+            }
+        }
+    }
+
+    /// `entry` for the door `door` of public place `plot`, as noted (`note_doors`), or found.
+    pub fn door_entry(&self, plot: u32, door: [f32; 2], mode: Mode) -> Option<RoadPoint> {
+        match self.doors.get(plot as usize) {
+            Some(Some((at, entries))) if *at == door.map(f32::to_bits) => {
+                // (In the tests, the same as finding it.)
+                debug_assert_eq!(entries[mode as usize], self.entry(door, mode));
+                entries[mode as usize]
+            }
+            _ => self.entry(door, mode),
         }
     }
 
@@ -1082,19 +1128,40 @@ impl Travel {
     /// or by car. No search of the tiles: the roads for long trips, the straight line (with a
     /// detour) for the rest.
     pub fn eta(&self, from: [f32; 2], to: [f32; 2], mode: Mode, walk: f32) -> f32 {
+        self.eta_via(
+            from,
+            to,
+            mode,
+            walk,
+            || self.entry(from, mode),
+            || self.entry(to, mode),
+        )
+    }
+
+    /// `eta`, with where the trip gets on and off the roads (`entry` of `from` and of `to`, asked
+    /// for only if it goes by road) found by the caller: the same for many trips from one place.
+    pub fn eta_via(
+        &self,
+        from: [f32; 2],
+        to: [f32; 2],
+        mode: Mode,
+        walk: f32,
+        on: impl FnOnce() -> Option<RoadPoint>,
+        off: impl FnOnce() -> Option<RoadPoint>,
+    ) -> f32 {
         let walk = walk.max(1e-3);
         match mode {
             Mode::Foot => {
                 if !self.by_road(from, to) {
                     return octile(from, to) * DETOUR / walk;
                 }
-                self.road_estimate(from, to, Mode::Foot)
+                self.road_estimate(on, off, Mode::Foot)
                     .map_or(octile(from, to) * DETOUR, |(m, _)| m)
                     / walk
             }
             Mode::Car => {
                 let straight = dist(from, to) / TOWN_SPEED / 60.0;
-                self.road_estimate(from, to, Mode::Car)
+                self.road_estimate(on, off, Mode::Car)
                     .map_or(straight, |(_, s)| s / 60.0)
             }
         }
@@ -1111,11 +1178,16 @@ impl Travel {
         }
     }
 
-    /// Along the roads from `from` to `to`: the metres on foot (tile legs with a detour), and the
+    /// Along the roads from where a trip gets on them (`on`) to where it gets off: the metres on foot (tile legs with a detour), and the
     /// seconds by car (`mode`).
-    fn road_estimate(&self, from: [f32; 2], to: [f32; 2], mode: Mode) -> Option<(f32, f32)> {
-        let a = *self.graph.near(from, ENTRY_REACH, 1, mode).first()?;
-        let b = *self.graph.near(to, ENTRY_REACH, 1, mode).first()?;
+    fn road_estimate(
+        &self,
+        on: impl FnOnce() -> Option<RoadPoint>,
+        off: impl FnOnce() -> Option<RoadPoint>,
+        mode: Mode,
+    ) -> Option<(f32, f32)> {
+        let a = on()?;
+        let b = off()?;
         let (len, cost) = self.graph.path_cost(a, b, mode, self.country_speed)?;
         let legs = (a.off + b.off) * DETOUR;
         Some((len + legs, cost + legs / TOWN_SPEED.min(1.5)))
