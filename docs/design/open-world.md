@@ -28,14 +28,16 @@ ground storey. Row blocks for upper storeys and the basement keep today's stacke
 ## Caps
 
 - Town file: `width`, `depth` ≤ 1024. Saved grid: width ≤ 1024, depth ≤ 1024 × 5.
-- `MAX_SIMS` 240, `MAX_STAFF` 48, `MAX_CARS` 128 (sim-grid). The renderer's `MAX_CHARACTERS`
-  is the snapshot layout's maxSims + maxStaff (288, `render/shared/characters/rig.ts`); the speech
+- `MAX_SIMS` 160, `MAX_STAFF` 48, `MAX_CARS` 128 (sim-grid). The renderer's `MAX_CHARACTERS`
+  is the snapshot layout's maxSims + maxStaff (208, `render/shared/characters/rig.ts`); the speech
   bubbles follow the layout's `maxSims`.
-- Neighbours per size: `neighbourCap('cosy' | 'normal') = 48`, `neighbourCap('big') = 200` (a Big
-  world starts with ~170: `BIG_START`). Raised from 160 / 140 / 118 when Big worlds were filled
-  (2026-11-02): the big-world bench at 1024 m with 240 residents (`SIZE=1024 RESIDENTS=240`, 4
-  game hours, 4 runs) ticks at 8,000–9,000 a second, p99 0.78–0.84 ms, the slowest tick 3.9–4.0
-  ms, the heap 59 MB (160 residents: 13,000 a second, p99 0.55 ms, slowest 4.3 ms, 58 MB).
+- Neighbours per size: `neighbourCap('cosy' | 'normal') = 48`, `neighbourCap('big') = 140` (a Big
+  world starts with ~120: `BIG_START`). Kept when Big worlds were filled (2026-11-02, about 2.5
+  times the homes: the rest are for sale). 240 residents were tried: the big-world bench at 1024 m
+  (`SIZE=1024 RESIDENTS=240`, 4 game hours, 4 runs) ticks at 8,000–9,000 a second, p99 0.78–0.84
+  ms, the slowest tick 3.9–4.0 ms, the heap 59 MB (160: 13,000 a second, p99 0.55 ms, 4.3 ms, 58
+  MB), within budget; but a real Big game with ~170 had 16 frames over 33 ms (up to 299 ms) as the
+  town got its jobs at 09:30 against 2 with 118.
 
 ## Sizes
 
@@ -43,7 +45,7 @@ ground storey. Row blocks for upper storeys and the basement keep today's stacke
 |---|---|---|---|
 | `cosy` | today's recipe, unchanged | today's | none |
 | `normal` | ≤ 256 m, ~1.6× cosy's box area | ~1.6× | none |
-| `big` | 896–1024 m | main town (kind's shape, ~1.5× a Normal town's lots, its streets reaching all of its box) + 5–7 hamlets of 16–24 lots, farmsteads and cottages along the country roads, ~170 starting residents | all sim branches |
+| `big` | 896–1024 m | main town (kind's shape, ~1.5× a Normal town's lots, its streets reaching all of its box) + 5–7 hamlets of 16–24 lots, farmsteads and cottages along the country roads, ~120 starting residents | all sim branches |
 
 Saves and towns without `size` are `cosy` and must look and behave exactly as before: every
 new land rule is gated on `size === 'big'`.
