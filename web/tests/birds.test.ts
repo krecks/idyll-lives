@@ -45,8 +45,6 @@ describe('garden birds', async () => {
     return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
   }) as typeof fetch;
   const realRandom = Math.random;
-  let random = realRandom;
-  Math.random = () => random();
   const { Birds, BIRD_PARTS, birdLook, noBirdLook, roofRidge } = await import('../src/render/shared/birds');
   const { AssetRegistry } = await import('../src/assets/registry');
   type BirdLook = import('../src/render/shared/birds').BirdLook;
@@ -143,7 +141,7 @@ describe('garden birds', async () => {
     const realNow = performance.now;
     let now = 0;
     performance.now = () => now;
-    random = numbers(9);
+    Math.random = numbers(9);
     try {
       const birds = new Birds(view, assets, true);
       const inner = birds as unknown as { inUse: Look[] };
@@ -219,7 +217,6 @@ describe('garden birds', async () => {
       birds.dispose();
     } finally {
       performance.now = realNow;
-      random = realRandom;
       Math.random = realRandom;
       globalThis.fetch = realFetch;
     }
@@ -229,7 +226,7 @@ describe('garden birds', async () => {
     const B = fixture<{ fields: string[]; cases: number; inputs: Numbers; parts: Numbers }>('birds');
     const inputs = recorded(B.inputs);
     const want = Array.from(recorded(B.parts));
-    random = numbers(3);
+    Math.random = numbers(3);
     const birds = new Birds(view, assets);
     const restore: (() => void)[] = [];
     try {
@@ -261,7 +258,7 @@ describe('garden birds', async () => {
     } finally {
       for (const undo of restore) undo();
       birds.dispose();
-      random = realRandom;
+      Math.random = realRandom;
     }
   });
 
@@ -269,7 +266,7 @@ describe('garden birds', async () => {
     const realNow = performance.now;
     let now = 0;
     performance.now = () => now;
-    random = numbers(3);
+    Math.random = numbers(3);
     try {
       const birds = new Birds(view, assets, true);
       const camera = { x: 26, y: 14, z: 6 };
@@ -307,7 +304,7 @@ describe('garden birds', async () => {
       birds.dispose();
     } finally {
       performance.now = realNow;
-      random = realRandom;
+      Math.random = realRandom;
     }
   });
 });
