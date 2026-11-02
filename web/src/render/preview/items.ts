@@ -18,7 +18,7 @@
 
 import * as pc from '../pc/engine';
 import { withoutBuild } from '../../assets/build';
-import { contentHash, type AssetRegistry } from '../../assets/registry';
+import { contentHash, materialTextures, type AssetRegistry } from '../../assets/registry';
 import { openCache } from '../../ml/assets';
 import { colorsKey, type PartColors } from '../../core/protocol';
 import { buildModel } from '../pc/models';
@@ -313,7 +313,8 @@ class ItemThumbnails implements ItemPreviews {
       const entry = this.assets.get(key, 'material');
       if (!entry) continue;
       parts.push(key, withoutBuild(JSON.stringify(entry)));
-      for (const url of [entry.texture, entry.texture && entry.normal && new URL(entry.normal, entry.texture).href, entry.texture && entry.arm && new URL(entry.arm, entry.texture).href]) {
+      const textures = materialTextures(entry);
+      for (const url of textures ? [textures.texture, textures.normal, textures.arm] : []) {
         if (!url) continue;
         const h = contentHash(url);
         if (h === null) known = false;
