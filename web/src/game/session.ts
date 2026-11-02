@@ -16,7 +16,8 @@ import { BENCH } from '../debug/benchFlags';
 import { tileWorld } from '../debug/tileWorld';
 import { benchBigWorld } from '../debug/bigTown';
 import { recentLog } from '../debug/log';
-import { deliverReport, gpuInfo, takePendingPose, within, type DebugReport } from '../debug/report';
+import { deliverReport, gpuInfo, takePendingPose, type DebugReport } from '../debug/report';
+import { within } from '../core/async';
 import { plainState } from '../debug/snapshot.svelte';
 import { liveSims } from '../debug/sims';
 import { threadStats } from '../debug/threads';
@@ -236,7 +237,7 @@ export async function startSession(
   // the birds) downloads while the simulation starts; the house's own things come with its world.
   void prefetchNow(gameAssetPlan(content, assets, { objects: [] }, null).home);
   // (Not for long: a download that hangs is the worker's to notice, `SimBridge.start`.)
-  const simWasm = await Promise.race([compileSim(), new Promise<null>((resolve) => setTimeout(() => resolve(null), SIM_COMPILE_WAIT_MS))]);
+  const simWasm = await within(compileSim(), SIM_COMPILE_WAIT_MS, null);
   // (Paused from the first step: the clock is held until the player enters the game.)
   const bridge = await perfTimeAsync('session: SimBridge.start', () => SimBridge.start(content.json, source, 0, simWasm)).catch(async (err: unknown) => {
     // A save the game can't open is set aside (kept if it's from a newer version, else removed).
@@ -290,7 +291,7 @@ export async function startSession(
     report('Building the street', 0);
     await perfTimeAsync('session: street streamed', () => renderer.streamSettled(STREAM_WAIT_MS));
     report('Loading textures', 0.5);
-    await perfTimeAsync('session: textures', () => Promise.race([renderer.texturesReady(), new Promise((resolve) => setTimeout(resolve, TEXTURES_WAIT_MS))]));
+    await perfTimeAsync('session: textures', () => within(renderer.texturesReady(), TEXTURES_WAIT_MS, undefined));
   };
   /** `?debug`'s `__crash('render')`: every frame fails. */
   let failFrames = false;
@@ -1050,7 +1051,7 @@ export async function startSession(
   const store = async (name: string, id: string, autosave: boolean): Promise<string> => {
     const picture = document.hidden
       ? Promise.resolve(null)
-      : Promise.race([perfTimeAsync('save: picture', () => renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height)), new Promise<null>((resolve) => setTimeout(resolve, THUMBNAIL_WAIT_MS, null))]);
+      : within(perfTimeAsync('save: picture', () => renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height)), THUMBNAIL_WAIT_MS, null);
     const [data, taken] = await Promise.all([perfTimeAsync('save: data', () => bridge.requestSave()), picture]);
     thumbnail = taken ?? thumbnail;
     const record: SaveRecord = {
@@ -1276,7 +1277,7 @@ export async function startSession(
           catalogAhead();
           prefetchCatalog();
         }
-        return perfTimeAsync('session: portraits', () => Promise.race([portraits, new Promise((resolve) => setTimeout(resolve, PORTRAIT_WAIT_MS))]));
+        return perfTimeAsync('session: portraits', () => within(portraits ?? Promise.resolve(), PORTRAIT_WAIT_MS, undefined));
       })
       .then(() => {
         progress('Ready', 1);
