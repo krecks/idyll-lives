@@ -26,7 +26,7 @@ const WORLD_RING = 260;
 export const APRON = 6;
 /** A big world's distance-from-built grid (m a cell; `distanceToTown`). */
 const BUILT_CELL = 2;
-/** A big world's woods are drawn in squares this wide (m), those far off left out (`pc/nature.ts` `frameTiles`). */
+/** A big world's woods are drawn in squares this wide (m), those far off left out (`pc/nature.ts` `frameTiles`); the preset's own (`OpenWorldQuality.woodsCell`) where it gives one. */
 export const BIG_WOODS_CELL = 256;
 /** A big world's lawn flowers are drawn in squares this wide (m), those far off left out (`pc/nature.ts` `frameTiles`). */
 export const BIG_FLOWERS_CELL = 128;
@@ -348,7 +348,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * `lawnDensity`: the share of the lawn's flowers drawn (Low: half); `lawnLod` 1 draws
    * them in their far versions (Low, as the street's models: `QualitySettings.streetLod`); `woodsCell`:
    * the side (m) of the squares the game draws the woods in (0: the `FOREST_SECTORS`;
-   * `QualitySettings.woodsCell`).
+   * `QualitySettings.woodsCell`); `bigWoodsCell`: a big world's (`OpenWorldQuality.woodsCell`).
    */
   constructor(
     world: WorldStructure,
@@ -356,6 +356,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     protected readonly lawnDensity = 1,
     protected readonly lawnLod: 0 | 1 = 0,
     protected readonly woodsCell = 0,
+    protected readonly bigWoodsCell = BIG_WOODS_CELL,
   ) {
     this.seed = world.meta?.seed ?? 1;
     this.w = world.width;
@@ -782,7 +783,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     }
     const [cx, cz] = [this.w / 2, this.d / 2];
     // (A big world's woods in squares, whatever the preset: sectors from its middle would each reach a kilometre.)
-    const cell = this.built ? BIG_WOODS_CELL : this.woodsCell;
+    const cell = this.built ? this.bigWoodsCell : this.woodsCell;
     const sector = cell > 0 ? (x: number, z: number) => `${Math.floor(x / cell)}:${Math.floor(z / cell)}` : (x: number, z: number) => `${Math.floor((Math.atan2(z - cz, x - cx) / (Math.PI * 2) + 1) * FOREST_SECTORS) % FOREST_SECTORS}`;
     return { near, far, sector };
   }

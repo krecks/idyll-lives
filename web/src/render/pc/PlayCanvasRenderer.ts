@@ -77,12 +77,12 @@ import { coveringSurface, houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, t
 import { compose, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
 import { OrbitControls } from '../shared/orbit';
 import { Flight, panBounds, Roam, warmLots, type FocusPlot } from '../shared/focus';
-import { CHUNK, chunkCoords } from '../shared/chunks';
+import { CHUNK, chunkCoords, RectGrid } from '../shared/chunks';
 import { ModelRefresh } from '../shared/modelRefresh';
 import { OverviewCamera } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
 import { standInOf } from '../shared/modelEntry';
-import { renderScale, watchPixelRatio } from '../shared/resolution';
+import { PIXEL_BUDGET, renderScale, watchPixelRatio } from '../shared/resolution';
 import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
@@ -143,8 +143,8 @@ const BETA_LIMITS = [0.3, 1.35] as const;
 // (The near plane a fiftieth of the camera's distance, never under 0.3 m: from the town overview's 200–300 m at 0.3 m
 // the roads, 1.2 cm over the ground, fought it in green patches. Close up nothing changes: 0.3 m to 15 m out.)
 const LENS = { fov: 0.7, near: 0.3, far: 1600, nearShare: 1 / 50 };
-/** The far plane in a big world (m). */
-const BIG_FAR = 2600;
+/** The far plane in a big world (m): the preset's (`OpenWorldQuality.far`; Medium's 2600). */
+const bigFar = (quality: RenderQuality) => quality.openWorld.far;
 /** Light is recomputed when the game's clock moved this many minutes (fast: the preset's `lightingStep`), at most every `LIGHT_MIN_MS`. */
 const LIGHT_STEP = 0.5;
 const LIGHT_MIN_MS = 100;
@@ -245,7 +245,7 @@ function sameObject(a: ObjectPlacement, b: ObjectPlacement): boolean {
 /** `?stream=1`: the street streams its chunks round the camera in any town (else only in a big world's). */
 const STREAM_FLAG = typeof location !== 'undefined' && new URLSearchParams(location.search).get('stream') === '1';
 
-/** The plot (by index) under a ground point, else the nearest within `reach` m. */
+/** The plot (by index) under a ground point, else the nearest within `reach` m (every plot looked at: see `PlotFinder` for each frame's). */
 function plotNear(world: WorldStructure, x: number, z: number, reach: number): FocusPlot | null {
   let best: FocusPlot | null = null;
   let bestD = reach;
@@ -254,6 +254,43 @@ function plotNear(world: WorldStructure, x: number, z: number, reach: number): F
     if (d < bestD || (d === 0 && !best)) [best, bestD] = [{ id: i, x: p.x, z: p.z, w: p.w, d: p.d }, d];
   });
   return best;
+}
+
+/**
+ * `plotNear` for the roaming camera, each frame: the plots in a grid of 16 m cells (made once a
+ * world), and the last answer kept while the point, the reach and the world are the same (a still
+ * camera asks nothing of the grid). The same plot as `plotNear` gives for a finite reach.
+ */
+class PlotFinder {
+  private world: WorldStructure | null = null;
+  private grid = new RectGrid<{ x: number; z: number; w: number; d: number; i: number }>(16);
+  private readonly asked = { x: NaN, z: NaN, reach: NaN };
+  private answer: FocusPlot | null = null;
+
+  find(world: WorldStructure, x: number, z: number, reach: number): FocusPlot | null {
+    if (world !== this.world) {
+      this.world = world;
+      this.grid = new RectGrid(16);
+      world.plots.forEach((p, i) => this.grid.add({ x: p.x, z: p.z, w: p.w, d: p.d, i }));
+      this.asked.x = NaN;
+    }
+    const a = this.asked;
+    if (x === a.x && z === a.z && reach === a.reach) return this.answer;
+    a.x = x;
+    a.z = z;
+    a.reach = reach;
+    if (!Number.isFinite(reach)) return (this.answer = plotNear(world, x, z, reach));
+    // (In plot order, as `plotNear` goes: the first of plots as near wins.)
+    let best = -1;
+    let bestD = reach;
+    for (const c of this.grid.near({ x, z, w: 0, d: 0 }, reach)) {
+      const d = Math.hypot(Math.max(c.x - x, 0, x - (c.x + c.w)), Math.max(c.z - z, 0, z - (c.z + c.d)));
+      if (d < bestD || (d === bestD && c.i < best) || (d === 0 && best < 0)) [best, bestD] = [c.i, d];
+    }
+    const p = best >= 0 ? world.plots[best] : null;
+    if (p?.x === this.answer?.x && p?.z === this.answer?.z && this.answer?.id === best) return this.answer;
+    return (this.answer = p && { id: best, x: p.x, z: p.z, w: p.w, d: p.d });
+  }
 }
 
 /** A world build stopped because the roaming camera settled on another lot before it was done (`pace`). */
@@ -494,6 +531,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private followIndex: number | null = null;
   /** The roaming camera's stream of chunks and its focus lot (`shared/focus.ts`), a flight across the world (`flyTo`). */
   private readonly roam = new Roam();
+  /** The plot under the roaming camera's target (`roamFrame`). */
+  private readonly plots = new PlotFinder();
   private readonly flight = new Flight();
   private readonly flightPose = { x: 0, z: 0, radius: 0 };
   private focusLotListener: ((plot: number) => boolean) | null = null;
@@ -642,7 +681,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     cam.layers = cam.layers.filter((id) => id !== pc.LAYERID_SKYBOX);
     // The picture after the light: multisampling or FXAA, the image processing
     // and the night grade (`post.ts`; the diag views and `?diag=linear` without them).
-    this.post = new PostProcessing(this.app, cam, gamePostOptions(this.quality.msaaSamples, this.diag, diagViewActive));
+    this.post = new PostProcessing(this.app, cam, gamePostOptions(this.quality.msaaSamples, this.diag, diagViewActive, this.quality.leanTargets));
     this.post.setLook(gameLook(LOOK));
 
     this.sun = new pc.Entity('sun');
@@ -692,7 +731,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       shadows: this.quality.streetShadows,
       ground: true,
       fenceStyles: c.fenceStyles,
+      farCull: this.quality.openWorld.farCull,
     });
+    this.roam.streamScale = this.quality.openWorld.stream;
     this.cars = new Cars(this.app, this.root, this.quality.streetShadows);
     this.characters.setCarSeat((x, z) => this.cars.seatAt(x, z));
     this.decorTemplates = new TemplateCache(this.app);
@@ -1010,7 +1051,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.roam.pinned = this.followIndex !== null || this.gameRig.active || this.flight.active;
     const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
     const fovH = 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect);
-    const changed = this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha: o.alpha, fovH }, performance.now(), (x, z, reach) => plotNear(world, x, z, reach), (plot) => {
+    const changed = this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha: o.alpha, fovH }, performance.now(), (x, z, reach) => this.plots.find(world, x, z, reach), (plot) => {
       const taken = !!this.focusLotListener?.(plot.id);
       if (taken) {
         this.roamedTo = plot.id;
@@ -1033,13 +1074,29 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const t = this.orbit.target;
     if (!v) return;
     const onLot = (t.x >= v.x - 4 && t.z >= v.z - 4 && t.x <= v.x + v.w + 4 && t.z <= v.z + v.d + 4);
-    const square = onLot ? `lot` : `${Math.round(t.x / 8) * 8},${Math.round(t.z / 8) * 8},${Math.round(Math.min(70, Math.max(30, 0.9 * this.orbit.radius + 15)) / 8)}`;
-    if (square === this.shadowSquare) return;
-    this.shadowSquare = square;
-    if (onLot) this.sunShadows.setSquare(v.x + v.w / 2, v.z + v.d / 2, Math.hypot(v.w, v.d) / 2 + SHADOW_MARGIN);
-    else this.sunShadows.setSquare(Math.round(t.x / 8) * 8, Math.round(t.z / 8) * 8, Math.min(70, Math.max(30, 0.9 * this.orbit.radius + 15)));
+    if (onLot) {
+      if (this.shadowSquare === 'lot') return;
+      this.shadowSquare = 'lot';
+      this.sunShadows.setSquare(v.x + v.w / 2, v.z + v.d / 2, Math.hypot(v.w, v.d) / 2 + SHADOW_MARGIN);
+      return;
+    }
+    // (Numbers compared, not a key made: this runs every frame.)
+    const x = Math.round(t.x / 8) * 8;
+    const z = Math.round(t.z / 8) * 8;
+    const half = Math.min(70, Math.max(30, 0.9 * this.orbit.radius + 15));
+    const step = Math.round(half / 8);
+    const at = this.roamSquare;
+    if (this.shadowSquare === 'roam' && at[0] === x && at[1] === z && at[2] === step) return;
+    this.shadowSquare = 'roam';
+    at[0] = x;
+    at[1] = z;
+    at[2] = step;
+    this.sunShadows.setSquare(x, z, half);
   }
-  private shadowSquare = 'lot';
+  /** The shadow square round the viewed lot (`lot`; `buildWorld` sets it there) or round the roaming camera's target (`roam`, `roamSquare`). */
+  private shadowSquare: 'lot' | 'roam' = 'lot';
+  /** The roaming square's middle (8 m steps) and half side (8 m steps), as last set. */
+  private readonly roamSquare = new Float64Array(3);
 
   /** The sim's full-detail area: the chunks streamed in, as a tile rectangle on the ground (`onWatch`). */
   private reportWatch(): void {
@@ -1323,7 +1380,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.orbit.checkLimits();
     this.streamOn = world.meta?.world?.size === 'big' || STREAM_FLAG;
     // A big world's land reaches further: its far plane too (its far LOD's houses to 650 m, the hills beyond).
-    const far = world.meta?.world?.size === 'big' ? BIG_FAR : LENS.far;
+    const far = world.meta?.world?.size === 'big' ? bigFar(this.quality) : LENS.far;
     if (this.camera.camera.farClip !== far) this.camera.setLens({ ...LENS, far });
     const pb = this.orbit.panBounds;
     this.roam.setBounds({ x0: pb.x0 - 300, z0: pb.z0 - 300, x1: pb.x1 + 300, z1: pb.z1 + 300 });
@@ -2064,7 +2121,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.placing.frame(this.frameDt); // (the effects, the thing in hand.)
     this.updateSims(frame);
     this.cars.update(frame);
-    if (this.cars.moved) this.sunShadows.moved(false); // (a car's shadow goes with it.)
+    // (A car's shadow goes with it: `moved` true, or the rectangle round the cars that moved, which draws the map
+    // again only if it reaches the shadow square: `SunShadows.movedIn`, `rect`.)
+    this.sunShadows.movedIn(this.cars.moved);
     this.birdLife.update(frame, minute, this.frameDt, this.characters, this.simCount); // (after the residents, who scare them.)
     if (this.roofs.length && this.roofVisible() !== this.roofShown) {
       this.roofShown = !this.roofShown;
@@ -2096,7 +2155,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     this.lot.pullChairs(this.characters.pulled, this.placing.held); // (not the one in hand.)
     this.lot.takeRestProps(this.characters.restTaken);
-    if (this.characters.posed && this.quality.characterShadows) this.sunShadows.moved(false);
+    // (`posed`: true, or the rectangle round those posed, as the cars' `moved`.)
+    if (this.quality.characterShadows) this.sunShadows.movedIn(this.characters.posed);
     const blobs = this.simShadow;
     blobs.setCount(count);
     for (let i = 0; i < count; i++) blobs.setMatrix(i, shadows, i * 16);
@@ -2628,7 +2688,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const dpr = window.devicePixelRatio || 1;
     const w = this.cssSize.width * dpr;
     const h = this.cssSize.height * dpr;
-    const scale = (this.renderScaleNow = renderScale(w, h, this.options.resolution));
+    const scale = (this.renderScaleNow = renderScale(w, h, this.options.resolution, PIXEL_BUDGET * this.quality.pixelBudget));
     this.app.setCanvasResolution(pc.RESOLUTION_FIXED, Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)));
   }
 

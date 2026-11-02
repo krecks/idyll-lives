@@ -61,8 +61,12 @@ const LAWN = { root: 0.55, tip: 1.35, saturation: 0.85, under: 0.55, far: 0.8, b
 function grassCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
   const { wgsl, v2, v3, v4, u, decl: d } = codeFor(lang);
   const [u2, u3, i2, uint] = wgsl ? ['vec2u', 'vec3u', 'vec2i', 'u32'] : ['uvec2', 'uvec3', 'ivec2', 'uint'];
-  // (Level 0 everywhere: the textures have no mips, and the ground reads them in a branch.)
+  // (Level 0 in the vertex shader, which has no derivatives, and where the ground reads in a branch (the
+  // town's mask and the gusts have no mips).)
   const tex = (name: string, uv: string) => (wgsl ? `textureSampleLevel(${name}, ${name}Sampler, ${uv}, 0.0)` : `textureLod(${name}, ${uv}, 0.0)`);
+  // The ground's read of the lawn's colour, outside any branch: filtered by its mips, so the field's
+  // texels don't shimmer on the ground far off (a texel a metre, a pixel several metres there).
+  const texMip = (name: string, uv: string) => (wgsl ? `textureSample(${name}, ${name}Sampler, ${uv})` : `texture(${name}, ${uv})`);
   const { patch, perPatch, near } = GRASS;
   const { span, span2, weight2, speed, calm, strong } = GRASS.gust;
   const [gc, gs] = GUST_ROTATION;
@@ -267,7 +271,7 @@ ${windDecl}
 	{
 		${d('ggQ', v3)} = gamePos(vPositionW);
 		// Where the blades grow (the field's grassiness, fading out round its margin).
-		${d('ggCov', 'float', true)} = ${tex('game_grassColour', `(ggQ.xz - ${u('game_grassArea')}.xy) * ${u('game_grassArea')}.zw`)}.a;
+		${d('ggCov', 'float', true)} = ${texMip('game_grassColour', `(ggQ.xz - ${u('game_grassArea')}.xy) * ${u('game_grassArea')}.zw`)}.a;
 		// The lawn's tone: wherever the land is lawn (the terrain's vertex alpha), fading out past the field's margin.
 		#ifdef VARYING_VVERTEXCOLOR
 			${d('ggLawn', 'float', true)} = vVertexColor.a;

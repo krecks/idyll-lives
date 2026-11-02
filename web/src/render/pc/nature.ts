@@ -22,6 +22,7 @@
 
 import * as pc from './engine';
 import { Grass, grassGround, type GrassPusher } from './grass';
+import { disposeTiles, type GroundTile } from './groundTiles';
 import { Instances } from './instancing';
 import { GAME_FRONT_FACE, MaterialLibrary, textureWithFallback } from './materials';
 import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from './models';
@@ -35,6 +36,7 @@ import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
 import { groupInstances, hideLawn, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
+import { QUALITY, type OpenWorldQuality } from '../quality';
 import type { BenchDiag } from '../../debug/benchFlags';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
@@ -102,9 +104,9 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /** The land in the render data worker while `build` runs: the terrain's shading and the grass field are made there. */
   private offThread: OffThreadLand | null = null;
 
-  /** `grassQuality`: how the grass is drawn (the preset's, `QualitySettings.grass`). */
-  constructor(world: WorldStructure, lawnDensity: number, lawnLod: 0 | 1, woodsCell: number, private readonly grassQuality: GrassQuality) {
-    super(world, (land, w, name) => new CountryRoads(land, w, name), lawnDensity, lawnLod, woodsCell);
+  /** `grassQuality`: how the grass is drawn (the preset's, `QualitySettings.grass`); `open`: a big world's distances (`QualitySettings.openWorld`). */
+  constructor(world: WorldStructure, lawnDensity: number, lawnLod: 0 | 1, woodsCell: number, private readonly grassQuality: GrassQuality, private readonly open: OpenWorldDistances = OPEN_WORLD) {
+    super(world, (land, w, name) => new CountryRoads(land, w, name), lawnDensity, lawnLod, woodsCell, open.woodsCell);
   }
 
   async build(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder): Promise<NatureResult> {
@@ -183,6 +185,11 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /** Takes down everything it draws (the plants' templates with their draws). */
   dispose(): void {
     for (const b of this.batches) release(b.built);
+    // A ground tile's levels not drawn now are no draw's: they go here (the one drawn goes with its entity).
+    disposeTiles(this.tiles);
+    this.tiles = [];
+    this.woodsSquares = [];
+    this.flowerSquares = [];
     for (const e of this.others) e.destroy();
     if (this.waterMaterial) {
       this.waterMaterial.lib.release(this.waterMaterial.material);
@@ -276,6 +283,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.built ? this.batches.filter((b) => parts.includes(b.part)).flatMap((b) => b.built.cells.flatMap((c) => c.draws.map((d) => d.meshInstance))).map((mi) => ({ mi, x: mi.aabb.center.x, z: -mi.aabb.center.z })) : [];
     this.woodsSquares = of(['woods', 'farWoods']);
     this.flowerSquares = of(['flowers']);
+    this.framedAt[0] = NaN;
   }
 
   /** A big world's woods squares: each one's draw and where its middle is (game space). */
@@ -283,15 +291,22 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /** A big world's lawn flowers' squares, as the woods'. */
   private flowerSquares: { mi: pc.MeshInstance; x: number; z: number }[] = [];
   /** A big world's ground tiles: each one's draw, its meshes by level, where its middle is and the level drawn. */
-  private tiles: { mi: pc.MeshInstance; meshes: pc.Mesh[]; x: number; z: number; lod: number }[] = [];
+  private tiles: GroundTile[] = [];
+  /** Where `frameTiles` last looked from (NaN: chosen afresh next frame). */
+  private readonly framedAt = new Float64Array(2).fill(NaN);
 
   /** Each frame (the game's): each ground tile draws the level for its distance from (`x`, `z`), the camera's target. */
   frameTiles(x: number, z: number): void {
-    for (const w of this.woodsSquares) w.mi.visible = Math.hypot(w.x - x, w.z - z) < WOODS_FAR;
-    for (const f of this.flowerSquares) f.mi.visible = Math.hypot(f.x - x, f.z - z) < FLOWERS_FAR;
+    // (The camera's target still: nothing changes.)
+    if (Math.abs(x - this.framedAt[0]) < 0.5 && Math.abs(z - this.framedAt[1]) < 0.5) return;
+    this.framedAt[0] = x;
+    this.framedAt[1] = z;
+    const { woodsFar, flowersFar, tiles: [near, mid] } = this.open;
+    for (const w of this.woodsSquares) w.mi.visible = Math.hypot(w.x - x, w.z - z) < woodsFar;
+    for (const f of this.flowerSquares) f.mi.visible = Math.hypot(f.x - x, f.z - z) < flowersFar;
     for (const t of this.tiles) {
       const d = Math.hypot(t.x - x, t.z - z);
-      const lod = d < TILE_NEAR ? 0 : d < TILE_MID ? 1 : 2;
+      const lod = d < near ? 0 : d < mid ? 1 : 2;
       if (lod === t.lod) continue;
       t.lod = lod;
       t.mi.mesh = t.meshes[lod];
@@ -400,15 +415,18 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   }
 }
 
-/** A big world's ground tiles (m), their levels' quads across, and the distances (m from the camera's target, to a tile's middle) they change at. */
+/** A big world's ground tiles (m), and their levels' quads across (the distances they change at are the preset's, `OpenWorldQuality.tiles`). */
 const TILE = 128;
 const TILE_LODS = [64, 32, 16];
-const TILE_NEAR = 200;
-const TILE_MID = 460;
-/** A big world's woods squares further than this (m, middle to the camera's target) aren't drawn (the haze has them). */
-const WOODS_FAR = 560;
-/** A big world's lawn flowers' squares further than this (m, middle to the camera's target) aren't drawn (a flower is a few pixels by then). */
-const FLOWERS_FAR = 170;
+
+/** What the landscape takes of a preset's open-world distances (`OpenWorldQuality`). */
+export type OpenWorldDistances = Pick<OpenWorldQuality, 'woodsFar' | 'woodsCell' | 'flowersFar' | 'tiles'>;
+
+/**
+ * Medium's: a big world's woods squares further than 560 m (middle to the camera's target) aren't
+ * drawn (the haze has them), its lawn flowers' past 170 m (a flower is a few pixels by then).
+ */
+const OPEN_WORLD: OpenWorldDistances = QUALITY.medium.openWorld;
 
 /**
  * One level of a ground tile from the finest level's shaded points (`at(col, row)` into `positions`
