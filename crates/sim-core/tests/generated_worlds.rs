@@ -28,7 +28,7 @@ fn each_world<I: Sync, T: Send>(items: &[I], check: impl Fn(&I) -> T + Sync) -> 
         .min(items.len())
         .max(1);
     let next = std::sync::atomic::AtomicUsize::new(0);
-    let mut out: Vec<Option<T>> = items.iter().map(|_| None).collect();
+    let mut out: Vec<(usize, T)> = Vec::with_capacity(items.len());
     std::thread::scope(|scope| {
         let workers: Vec<_> = (0..threads)
             .map(|_| {
@@ -44,12 +44,11 @@ fn each_world<I: Sync, T: Send>(items: &[I], check: impl Fn(&I) -> T + Sync) -> 
             })
             .collect();
         for worker in workers {
-            for (k, t) in worker.join().expect("a world's check panicked") {
-                out[k] = Some(t);
-            }
+            out.extend(worker.join().expect("a world's check panicked"));
         }
     });
-    out.into_iter().map(|t| t.expect("checked")).collect()
+    out.sort_by_key(|&(k, _)| k);
+    out.into_iter().map(|(_, t)| t).collect()
 }
 
 #[test]
@@ -385,20 +384,21 @@ fn generated_worlds_cars_keep_to_the_roads() {
     let mut sizes: std::collections::BTreeMap<String, [usize; 5]> = Default::default();
     // (The first `CAR_WORLDS` of each size, every big one.)
     let mut picked: std::collections::BTreeMap<String, usize> = Default::default();
-    let items: Vec<(usize, &serde_json::Value)> = worlds
+    let items: Vec<(usize, String, &serde_json::Value)> = worlds
         .iter()
         .enumerate()
-        .filter(|(_, world)| {
+        .filter_map(|(i, world)| {
             let size = world["town"]["size"].as_str().unwrap_or("cosy");
             let n = picked.entry(size.to_string()).or_default();
             *n += 1;
-            size == "big" || *n <= CAR_WORLDS
+            (size == "big" || *n <= CAR_WORLDS).then(|| (i, size.to_string(), world))
         })
         .collect();
-    let results = each_world(&items, |&(i, world)| {
+    let results = each_world(&items, |(i, size, world)| {
+        let (i, size) = (*i, size.clone());
         let mut failures = Vec::new();
-        let size = world["town"]["size"].as_str().unwrap_or("cosy").to_string();
         let big = size == "big";
+        // (Worlds driven, cars, with no way out, drives to work, trips: summed per size below.)
         let mut tally = [1usize, 0, 0, 0, 0];
         let label = format!(
             "{size} {} {} ({})",

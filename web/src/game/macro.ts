@@ -21,7 +21,7 @@ import type { Content } from '../content/content';
 import type { Rle, TownArea, WorldZone } from '../core/protocol';
 import { random } from './housegen';
 import { fbm } from './noise';
-import { centroid, cropRoads, curve, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, sharpestTurn, tangent, type Box, type Pt, type RoadPlan } from './roads';
+import { centroid, cropRoads, curve, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, sharpestTurn, straightAround, tangent, type Box, type Pt, type RoadPlan } from './roads';
 import { BIG_COURTS, COURTS, frontageOf, Ground, houseFor, joinUp, LotPlacer, plotRect, settleRoads, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates } from './town';
 import { clearing, countryLane, crescentTown, crossroads, highStreet, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
 
@@ -102,7 +102,7 @@ const CHARACTER: Record<WorldKind, Character> = {
 /** The land's cells (m). */
 const CELL = 8;
 /** Areas this far apart at least (their middles, m), and as far as this from the one they join; best this far from the nearest. */
-const AREA_APART = 170;
+export const AREA_APART = 170;
 const AREA_REACH = 440;
 const AREA_AIM = 230;
 /** No area nearer the world's edge than this (m), nor nearer another's box. */
@@ -140,6 +140,8 @@ const SIDE_APART = 24;
 const SIDE_DEPTH = 16;
 /** Leaving off a country road that leaves a port already (`via`) costs this much more (m): a port nobody has taken yet goes first. */
 const VIA_COST = 40;
+/** Leaving from a port another country road leaves already, both from it together, costs this much more (m). */
+const RETAKE_COST = 240;
 /** A road on from a port nobody took goes to what lies within this (radians) of straight on from it, rather than what lies nearer off to the side. */
 const AHEAD = Math.PI / 3;
 /** What going on to something off to the side of such a port or behind it costs, more than to what lies ahead (cells of flat open land). */
@@ -163,6 +165,8 @@ const TIGHT_BEND = 0.9;
 /** A home by a country road stands where it turns less than `BEND_MOST` (radians) over `BEND` m either side. */
 const BEND = 16;
 const BEND_MOST = 0.3;
+/** A T leaves a street where it turns less than this (radians) over 14 m either side. */
+const T_BEND = 0.3;
 
 const range = (rand: Rand, lo: number, hi: number) => lo + (hi - lo) * rand();
 const between = (rand: Rand, [lo, hi]: [number, number]) => lo + Math.floor(rand() * (hi - lo + 1));
@@ -430,6 +434,12 @@ function evenly(pts: readonly Pt[], most: number): Pt[] {
   }
   return out;
 }
+
+/** How far `p` is from rectangle `r` (0 inside it). */
+const offRect = (r: Rect, [x, z]: Pt) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
+
+/** Whether `p` is clear of every area's box by more than `by` m. */
+const clearOf = (plans: readonly { rect: Rect }[], p: Pt, by: number) => plans.every((a) => p[0] < a.rect.x - by || p[1] < a.rect.z - by || p[0] > a.rect.x + a.rect.w + by || p[1] > a.rect.z + a.rect.d + by);
 
 /**
  * A polyline relaxed until it turns no sharper than `most` (radians) over any two spans of 20 m
@@ -849,7 +859,9 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     return null;
   };
   /** What leaving by a way costs `steer` (in cells) before it is out over the land: its lead, and more for a T than a port, and for a port taken already. */
-  const wayCost = (w: Way) => ((w.reach ?? CELL) + (w.reach ? SIDE_COST : 0) + (w.port?.used ? (w.p === w.port.p ? 240 : VIA_COST) : 0)) / CELL;
+  /** Leaving by a port taken already: from the port itself (`RETAKE_COST`), or off the road on from it (`VIA_COST`). */
+  const takenCost = (w: Way) => (w.port?.used ? (w.p === w.port.p ? RETAKE_COST : VIA_COST) : 0);
+  const wayCost = (w: Way) => ((w.reach ?? CELL) + (w.reach ? SIDE_COST : 0) + takenCost(w)) / CELL;
   /** The cell a country road's way over the land starts from, leaving by `w` (or ends on, coming in by it): a cell out in front of it, or where its reach ends. */
   const outCell = (w: Way) => land.cell(w.p[0] + w.dir[0] * (w.reach ?? CELL), w.p[1] + w.dir[1] * (w.reach ?? CELL));
   /** A way's way in, from its `outCell`: heading back into it, give or take a twelfth of a turn (`loose`: three sixteenths). */
@@ -877,18 +889,26 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     for (const k of [7, 3]) if (points.some(([x, z]) => land.wet(x, z, 2))) points = make(k);
     return { points, width: COUNTRY_WIDTH, ends, kind: 'country', name: roadName };
   };
+  /** A country road from `a` along `cells` out of the world over edge `side` (`FACING`), 40 m on past its last cell. */
+  const toEdge = (a: Way, cells: number[], side: number, roadName: string): RoadPlan => {
+    const last = land.centre(cells[cells.length - 1]);
+    const road = countryRoad(a, cells, null, ['join', 'out'], roadName);
+    road.points = curve(evenly([...simplify(road.points, 0.3), [last[0] + FACING[side][0] * 40, last[1] + FACING[side][1] * 40]], CTRL_APART));
+    return road;
+  };
   /**
    * Where a country road leaves port `q` towards `toward`: the port itself; one another country
    * road leaves already, off that road 30 m out from it, square to it (rather than both from the
    * port, running together a while).
    */
   const via = (q: Port, toward: Pt): Way => {
-    if (!q.used) return { p: q.p, dir: q.dir, port: q };
+    const self: Way = { p: q.p, dir: q.dir, port: q };
+    if (!q.used) return self;
     const r = roads.find((o) => o.kind === 'country' && [o.points[0], o.points[o.points.length - 1]].some((e) => dist(e, q.p) < 1));
-    if (!r) return { p: q.p, dir: q.dir, port: q };
+    if (!r) return self;
     const ls = lengths(r.points);
     const L = ls[ls.length - 1];
-    if (L < 70) return { p: q.p, dir: q.dir, port: q };
+    if (L < 70) return self;
     const s = dist(r.points[0], q.p) < 1 ? 30 : L - 30;
     const { p, t } = pointAt(r.points, s, ls);
     const n = leftOf(t);
@@ -973,8 +993,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       const at = nearest(pts, q[0], q[1], ls);
       if (at.dist > 2) continue;
       const { p, t } = pointAt(pts, at.s, ls);
-      const [t0, t1] = [pointAt(pts, at.s - 14, ls).t, pointAt(pts, at.s + 14, ls).t];
-      const ok = Math.abs(t[0] * w.dir[0] + t[1] * w.dir[1]) <= Math.sin(SIDE_FACING) && t0[0] * t1[0] + t0[1] * t1[1] >= Math.cos(STRAIGHT_BEND) && [-1, by].includes(apart(p)) && at.s > 20 && at.s < ls[ls.length - 1] - 20;
+      const ok = Math.abs(t[0] * w.dir[0] + t[1] * w.dir[1]) <= Math.sin(SIDE_FACING) && straightAround(pts, at.s, 14, STRAIGHT_BEND, ls) && [-1, by].includes(apart(p)) && at.s > 20 && at.s < ls[ls.length - 1] - 20;
       return ok ? { p, len: dist(w.p, p) } : null;
     }
     return null;
@@ -997,9 +1016,8 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       const ls = lengths(pts);
       const L = ls[ls.length - 1];
       for (let s = 20; s <= L - 20; s += 4) {
+        if (!straightAround(pts, s, 14, T_BEND, ls)) continue;
         const { p, t } = pointAt(pts, s, ls);
-        const [t0, t1] = [pointAt(pts, s - 14, ls).t, pointAt(pts, s + 14, ls).t];
-        if (t0[0] * t1[0] + t0[1] * t1[1] < Math.cos(0.3)) continue;
         const l = dist(p, toward) || 1;
         const u: Pt = [(toward[0] - p[0]) / l, (toward[1] - p[1]) / l];
         const left = leftOf(t);
@@ -1035,7 +1053,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   const waysOut = (a: number, toward: Pt): (Way & { score: number })[] => {
     const ports = plans[a].ports.map((q) => {
       const w = via(q, toward);
-      return { ...w, score: dist(w.p, toward) + swing(w.p, w.dir, toward) + (q.used ? (w.p === q.p ? 240 : VIA_COST) : 0) };
+      return { ...w, score: dist(w.p, toward) + swing(w.p, w.dir, toward) + takenCost(w) };
     });
     return [...ports, ...sideT(a, toward).slice(0, 3)].sort((x, y) => x.score - y.score);
   };
@@ -1177,10 +1195,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       noWay.set(q, (noWay.get(q) ?? new Set()).add(side));
       continue;
     }
-    const last = land.centre(found.cells[found.cells.length - 1]);
-    const beyond: Pt = [last[0] + [0, 40, 0, -40][side], last[1] + [-40, 0, 40, 0][side]];
-    const road = countryRoad(from, found.cells, null, ['join', 'out'], uniqueName(`${edgeName[side]} Road`, `${edgeName[side]} Lane`));
-    road.points = curve(evenly([...simplify(road.points, 0.3), beyond], CTRL_APART));
+    const road = toEdge(from, found.cells, side, uniqueName(`${edgeName[side]} Road`, `${edgeName[side]} Lane`));
     roads.push(settle(road));
     if (from.port) q.used = true;
     usedEdges.add(side);
@@ -1189,7 +1204,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   if (made < 2) failed.push(`${made} ways out of the world (two or more wanted)`);
   // Ports nobody took: a country road on from each, to the nearest country road, another area's
   // port nobody took or the edge of the world, whichever is nearest (a dead end only if none is).
-  const plain = (p: Pt) => plans.every((a) => p[0] < a.rect.x - 30 || p[1] < a.rect.z - 30 || p[0] > a.rect.x + a.rect.w + 30 || p[1] > a.rect.z + a.rect.d + 30);
+  const plain = (p: Pt) => clearOf(plans, p, 30);
   const edgeOf = (i: number) => [Math.floor(i / gw) === 0, i % gw === gw - 1, Math.floor(i / gw) === gd - 1, i % gw === 0].indexOf(true);
   for (const [k, plan] of plans.entries()) {
     for (const q of plan.ports) {
@@ -1240,11 +1255,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
           const n = leftOf(pointAt(pts, at.s).t);
           road = countryRoad(q, cells.slice(0, -1), { p: T, dir: [n[0] * at.side, n[1] * at.side] }, ['join', 'join'], '');
         } else {
-          const side = edgeOf(end);
-          const last = land.centre(end);
-          const beyond: Pt = [last[0] + [0, 40, 0, -40][side], last[1] + [-40, 0, 40, 0][side]];
-          road = countryRoad(q, cells, null, ['join', 'out'], '');
-          road.points = curve(evenly([...simplify(road.points, 0.3), beyond], CTRL_APART));
+          road = toEdge(q, cells, edgeOf(end), '');
         }
         const bad = fault(road);
         if (!made || bad < made.bad) made = { road, to, bad };
@@ -1336,9 +1347,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   // (Nor on a tight bend: out of a driveway there a car swings off the road.)
   const offCorners = (f: Frontage) => {
     if (!(meets.get(f.road) ?? []).every((s) => Math.abs(f.s - s) >= CORNER)) return false;
-    const pts = worldRoads[f.road].points;
-    const [a, b] = [pointAt(pts, f.s - CORNER / 2).t, pointAt(pts, f.s + CORNER / 2).t];
-    return a[0] * b[0] + a[1] * b[1] >= Math.cos(TIGHT_BEND);
+    return straightAround(worldRoads[f.road].points, f.s, CORNER / 2, TIGHT_BEND);
   };
   for (const [a, plan] of plans.entries()) {
     const wanted = wantedLots(content, t, kind, plan.spec, rand, { park: a === 0, avoid: a === 0 ? [] : ['market'] });
@@ -1357,7 +1366,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     // Else along a country road, near its own area's end of it.
     country ??= frontageOf(worldRoads, worldRoads.flatMap((r, i) => (r.kind === 'country' ? [i] : [])), plans[0].centre, rand).filter((f) => straight(worldRoads[f.road].points, f.s, lengths(worldRoads[f.road].points)));
     const r = plans[from].rect;
-    const off = (p: Pt) => Math.hypot(Math.max(r.x - p[0], 0, p[0] - r.x - r.w), Math.max(r.z - p[1], 0, p[1] - r.z - r.d));
+    const off = (p: Pt) => offRect(r, p);
     const near = country.filter((f) => off(f.p) < SPILL).sort((x, y) => dist(x.p, plans[from].centre) - dist(y.p, plans[from].centre));
     if (u.kind === 'house' && !lots.place([u], near, [], plans[from].centre, from, true).length) continue;
     lots.dropped.push({ name: u.name, kind: u.kind, lot: u.lot });
@@ -1479,7 +1488,6 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     const r = rectOf(s);
     return [r.x + r.w / 2, r.z + r.d / 2];
   });
-  const offRect = (r: Rect, [x, z]: Pt) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
   const nearFarmland = (p: Pt) =>
     plans.some((a) => offRect(a.rect, p) < reach) || farmMiddles.some((m) => dist(m, p) < reach * 1.1);
   for (let i = 0; i < gw * gd; i++) {
@@ -1529,11 +1537,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
 }
 
 /** A country road runs nearly straight round arc length `s` (within `BEND` m either way): a car turns in off it without swinging off the road. */
-function straight(pts: readonly Pt[], s: number, ls: number[]): boolean {
-  const L = ls[ls.length - 1];
-  const [a, b] = [pointAt(pts, Math.max(0, s - BEND), ls).t, pointAt(pts, Math.min(L, s + BEND), ls).t];
-  return a[0] * b[0] + a[1] * b[1] > Math.cos(BEND_MOST);
-}
+const straight = (pts: readonly Pt[], s: number, ls: number[]) => straightAround(pts, s, BEND, BEND_MOST, ls);
 
 /**
  * Homes along the country roads, on purpose: 2 to 4 cottages where each road leaves an area and
@@ -1551,8 +1555,7 @@ function alongCountryRoads(content: Content, t: Templates, lots: LotPlacer, plan
     if (list) list.push(f);
     else byRoad.set(f.road, [f]);
   }
-  /** Clear of every area's box by `by` m. */
-  const outside = (p: Pt, by: number) => plans.every((a) => p[0] < a.rect.x - by || p[1] < a.rect.z - by || p[0] > a.rect.x + a.rect.w + by || p[1] > a.rect.z + a.rect.d + by);
+  const outside = (p: Pt, by: number) => clearOf(plans, p, by);
   /** Well inside the world (a road out leaves it there). */
   const within = (p: Pt) => Math.min(p[0], p[1], land.W - p[0], land.D - p[1]) > 30;
   const homeArea = (p: Pt) => plans.reduce((k, a, i) => (dist(a.centre, p) < dist(plans[k].centre, p) ? i : k), 0);
@@ -1728,19 +1731,8 @@ function trailTo(slot: PlotSlot, plan: Plan, roads: readonly RoadPlan[], slots: 
       return s !== slot && x > r.x + 0.05 && x < r.x + r.w - 0.05 && z > r.z + 0.05 && z < r.z + r.d - 0.05;
     }) && !(x >= 0 && z >= 0 && x < W && z < D && water[Math.floor(z) * W + Math.floor(x)]));
   const smooth = curve(simplify(raw, 0.9));
-  const points = clear(smooth) ? smooth : densify(raw);
+  const points = clear(smooth) ? smooth : evenly(raw, 1);
   return { points: points.map(([x, z]): Pt => [round2(x), round2(z)]), width: TRAIL_WIDTH, ends: ['join', 'dead'], kind: 'trail' };
-}
-
-/** A polyline with a point at least every metre. */
-function densify(pts: readonly Pt[]): Pt[] {
-  const out: Pt[] = [];
-  for (let i = 0; i + 1 < pts.length; i++) {
-    const n = Math.max(1, Math.ceil(dist(pts[i], pts[i + 1])));
-    for (let k = 0; k < n; k++) out.push([pts[i][0] + ((pts[i + 1][0] - pts[i][0]) * k) / n, pts[i][1] + ((pts[i + 1][1] - pts[i][1]) * k) / n]);
-  }
-  out.push(pts[pts.length - 1]);
-  return out;
 }
 
 /** The middles of a big world's areas, and a centroid helper for the menus. */

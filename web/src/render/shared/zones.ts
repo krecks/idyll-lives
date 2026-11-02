@@ -16,6 +16,14 @@ const EXACT_BAND = 32;
 
 export type ZoneKind = WorldZone['kind'];
 
+
+/** `ZoneField.share` from what `ZoneField.edge` gave there (metres inside the zones): 0..1, over a soft edge `soft` m each side. */
+export function shareAt(edge: number, soft: number): number {
+  if (edge === -Infinity) return 0;
+  const t = Math.min(1, Math.max(0, (edge + soft) / (2 * soft)));
+  return t * t * (3 - 2 * t);
+}
+
 export class ZoneField {
   private readonly gw: number;
   private readonly gd: number;
@@ -67,10 +75,7 @@ export class ZoneField {
 
   /** How much of a point is in the zones of `kind`, 0..1, over a soft edge `soft` m each side of it. */
   share(kind: ZoneKind, x: number, z: number, soft: number): number {
-    const e = this.edge(kind, x, z);
-    if (e === -Infinity) return 0;
-    const t = Math.min(1, Math.max(0, (e + soft) / (2 * soft)));
-    return t * t * (3 - 2 * t);
+    return shareAt(this.edge(kind, x, z), soft);
   }
 
   /** The cells whose middle is inside an odd number of `polys` (even-odd, as the generator's `rasterize`). */

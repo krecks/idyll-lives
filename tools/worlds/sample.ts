@@ -48,7 +48,7 @@ const { objectInfos } = await import('../../web/src/game/housegen.ts');
 const { randomHousehold } = await import('../../web/src/game/household.ts');
 const { assembleTown, BIG_COURTS, COURTS, generateStats, generateWorld, houseTemplate, neighbourCap, populate, turner, vacantSlots } = await import('../../web/src/game/town.ts');
 const { WORLD_KINDS, WORLD_SIZES } = await import('../../web/src/game/world.ts');
-const { COUNTRY_TURN, unrle } = await import('../../web/src/game/macro.ts');
+const { AREA_APART, COUNTRY_TURN, unrle } = await import('../../web/src/game/macro.ts');
 const { homePrice } = await import('../../web/src/game/price.ts');
 const { savingsOf } = await import('../../web/src/game/wealth.ts');
 const { COURT, lengths, nearest, pointAt, roadMask, sharpestTurn } = await import('../../web/src/game/roads.ts');
@@ -86,13 +86,20 @@ const MAX_FILE = 4e6;
 const BUILT_SHARE = 0.25;
 /** At most this share of a big world's 100 m squares hold nothing (no lot, road, woods, field, orchard or water). */
 const EMPTY_SHARE = 0.1;
-/** Areas' middles at least this far apart (m). */
-const AREAS_APART = 170;
 /** A square holds something if this much of it does (m²). */
 const HOLDS = 200;
 
 /** How filled a big world is: the share of it built and farmed, the share of its 100 m squares with nothing in them. */
 function fillOf(town: TownFile): { built: number; empty: number } {
+  const had = fills.get(town);
+  if (had) return had;
+  const fill = measureFill(town);
+  fills.set(town, fill);
+  return fill;
+}
+/** Each town file's `fillOf`, measured once (the checks and the log line both ask). */
+const fills = new WeakMap<TownFile, { built: number; empty: number }>();
+function measureFill(town: TownFile): { built: number; empty: number } {
   const { width: W, depth: D } = town;
   const C = 2;
   const [gw, gd] = [Math.ceil(W / C), Math.ceil(D / C)];
@@ -233,7 +240,7 @@ function openProblems(town: TownFile): string[] {
     centres.forEach((c, i) =>
       centres.forEach((o, j) => {
         const d = Math.hypot(c[0] - o[0], c[1] - o[1]);
-        if (j > i && d < AREAS_APART) out.push(`${areas[i].name} and ${areas[j].name} ${d.toFixed(0)} m apart`);
+        if (j > i && d < AREA_APART) out.push(`${areas[i].name} and ${areas[j].name} ${d.toFixed(0)} m apart`);
       }),
     );
     // Country roads without hairpins: none turning further than `COUNTRY_TURN` over 40 m of its own
@@ -315,7 +322,8 @@ const sizes = (flag('--sizes') ?? 'cosy').split(',') as (typeof WORLD_SIZES)[num
 for (const size of sizes) if (!WORLD_SIZES.includes(size)) throw new Error(`no size ${size}`);
 const bigOutFlag = flag('--big-out');
 const bigPerKind = Number(flag('--big-per-kind') ?? 1);
-const kinds = flag('--kinds')?.split(',') ?? WORLD_KINDS;
+const kinds = (flag('--kinds')?.split(',') ?? [...WORLD_KINDS]) as (typeof WORLD_KINDS)[number][];
+for (const kind of kinds) if (!WORLD_KINDS.includes(kind)) throw new Error(`no kind ${kind}`);
 const out = process.argv[2] ?? 'worlds.json';
 const bigOut = bigOutFlag ?? out.replace(/(\.json)?$/, '-big.json');
 const perKind = Number(process.argv[3] ?? 3);

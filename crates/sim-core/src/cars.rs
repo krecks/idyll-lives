@@ -1652,8 +1652,13 @@ fn drive_on(w: &mut World, c: usize) {
     } = w;
     let car = &mut cars[c];
     let (at, yaw, reverse) = car.route(exits, Some(travel), home).at(t);
-    // (Ahead is behind it while it backs up.)
-    let (ahead, behind) = if reverse { (0.2, AHEAD) } else { (AHEAD, 0.2) };
+    // (Ahead is behind it while it backs up.) Only those in front of its middle as it goes: it
+    // draws away from anyone behind that, as they may follow it close (on their way the same way).
+    let (ahead, behind) = if reverse {
+        (-car.len / 2.0, AHEAD)
+    } else {
+        (AHEAD, -car.len / 2.0)
+    };
     let mut waiting = false;
     for s in sims.iter_mut() {
         let busy = || {
@@ -1674,20 +1679,12 @@ fn drive_on(w: &mut World, c: usize) {
                 && s.current()
                     .is_some_and(|a| matches!(a.phase, Phase::Routing { .. }))
         };
-        // Behind it as it goes (at its back bumper driving on, its front one backing up): it
-        // draws away from them, as they may follow it close (on their way the same way).
-        let behind_it = || {
-            let (sn, cs) = yaw.sin_cos();
-            let along = (s.pos[0] - at[0]) * sn + (s.pos[1] - at[1]) * cs;
-            if reverse { along > 0.0 } else { along < 0.0 }
-        };
         if !s.here()
             || s.away_until.is_some()
             || !car.covers(at, yaw, s.pos, ahead, behind)
             || busy()
             || at_a_wheel()
             || beside()
-            || behind_it()
         {
             continue;
         }
@@ -2833,23 +2830,26 @@ fn trip_update(w: &mut World, c: usize) {
                     .riders
                     .iter()
                     .any(|&r| w.sims[r as usize].bound_for_car == Some(c as u32));
-            // Unless the driver can't come (at work, out of town), or hasn't come for as long as
-            // a driver waits for them (`TRIP_WAIT_TICKS` since the first of them got in): those
-            // in it get out and make their own way, and the rest of them too.
-            let driver_away = w.sims[d].away_until.is_some() || !w.sims[d].here();
-            let waited = !car.aboard.is_empty() && w.tick - car.since >= TRIP_WAIT_TICKS;
-            if going && (driver_away || waited) {
-                let aboard = std::mem::take(&mut w.cars[c].aboard);
-                for &a in &aboard {
-                    let_out(w, a as usize);
-                }
-                if driver_away {
-                    w.cars[c].riders.clear();
+            // Unless the driver can't come (at work, out of town): those in it get out and make
+            // their own way, and so do the rest of them. Or the driver hasn't come for as long as
+            // a driver waits for them (`TRIP_WAIT_TICKS` since the first of them got in): those in
+            // it get out, and the rest may still ride home with the driver.
+            if going {
+                let driver_away = w.sims[d].away_until.is_some() || !w.sims[d].here();
+                let waited = !car.aboard.is_empty() && w.tick - car.since >= TRIP_WAIT_TICKS;
+                if driver_away || waited {
+                    let aboard = std::mem::take(&mut w.cars[c].aboard);
+                    for &a in &aboard {
+                        let_out(w, a as usize);
+                    }
+                    if driver_away {
+                        w.cars[c].riders.clear();
+                    } else {
+                        w.cars[c].riders.retain(|r| !aboard.contains(r));
+                    }
                 } else {
-                    w.cars[c].riders.retain(|r| !aboard.contains(r));
+                    call_party_home(w, c);
                 }
-            } else if going {
-                call_party_home(w, c);
             }
             seat_party(w, c);
             // Home some other way (and not on their way back to it): it's home too.

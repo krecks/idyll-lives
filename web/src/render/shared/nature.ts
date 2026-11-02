@@ -14,7 +14,7 @@ import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
 import { fbm, hash, smoothstep, valueNoise } from '../../game/noise';
-import { ZoneField } from './zones';
+import { shareAt, ZoneField } from './zones';
 
 /**
  * How far the landscape extends beyond the town (metres): towns of older code, and worlds (which
@@ -666,7 +666,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     if (!f) return null;
     const dist = this.distanceToTown(x, z);
     if (dist < APRON + 3) return null;
-    const weight = (zones ? zones.share('fields', x, z, 4) : 1 - smoothstep(this.ring * 0.6, this.ring * 0.85, dist)) * smoothstep(APRON + 3, APRON + 6, dist);
+    // (How far inside the field zones: their share here, and a hedgerow along their edge.)
+    const inside = zones ? zones.edge('fields', x, z) : 0;
+    const weight = (zones ? shareAt(inside, 4) : 1 - smoothstep(this.ring * 0.6, this.ring * 0.85, dist)) * smoothstep(APRON + 3, APRON + 6, dist);
     if (weight <= 0) return null;
     const c = Math.cos(f.angle);
     const s = Math.sin(f.angle);
@@ -678,7 +680,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     if (kind > 0.82) return null;
     const edge = Math.min(u - cu, cu + 1 - u, v - cv, cv + 1 - v) * f.size * 0.7;
     // (A hedgerow along the patchwork's lines, and along a big world's field zones' edges.)
-    return { kind: kind / 0.82, v: (v - cv) * f.size * 0.7, weight, hedge: edge < 1.6 || (!!zones && Math.abs(zones.edge('fields', x, z)) < 1.2) };
+    return { kind: kind / 0.82, v: (v - cv) * f.size * 0.7, weight, hedge: edge < 1.6 || (!!zones && Math.abs(inside) < 1.2) };
   }
 
   /**

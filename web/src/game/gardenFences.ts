@@ -308,27 +308,26 @@ export function townFences(input: FenceInput): TownFence[] {
   return [...out.values()];
 }
 
-/** A pocket of land no bigger than this (tiles), on no plot, shut in by fences, goes to a garden beside it (a big world's lots, kept off its junctions and bends, leave bigger gaps between them: 90 tiles, say). */
-const POCKET = 400;
-
 /**
- * Small pockets of land on no plot that the fences of gardens round them shut in (a narrow gap
- * between gardens that couldn't go to either): each goes to a garden beside it, the fences between
- * them taken away.
+ * Pockets of land on no plot that the fences of gardens round them shut in (a narrow gap between
+ * gardens that couldn't go to either; a big world's lots, kept off its junctions and bends, leave
+ * wider ones): each goes to a garden beside it, the fences between them taken away. (On a grid one
+ * tile bigger all round than the fences reach: the open land round the town is one region there.)
  */
 function joinPockets(out: Map<string, TownFence>, plots: readonly FencePlot[]): void {
   if (!out.size) return;
   let W = 0;
   let D = 0;
-  for (const f of out.values()) [W, D] = [Math.max(W, f.x + 2), Math.max(D, f.z + 2)];
+  // (Tile (x, z) at (x + 1, z + 1).)
+  for (const f of out.values()) [W, D] = [Math.max(W, f.x + 3), Math.max(D, f.z + 3)];
   const onPlot = new Uint8Array(W * D);
   for (const { rect: r } of plots) {
-    for (let z = Math.max(0, Math.floor(r.z)); z < Math.min(D, Math.ceil(r.z + r.d)); z++) for (let x = Math.max(0, Math.floor(r.x)); x < Math.min(W, Math.ceil(r.x + r.w)); x++) onPlot[z * W + x] = 1;
+    for (let z = Math.max(0, Math.floor(r.z)); z < Math.min(D - 1, Math.ceil(r.z + r.d)); z++) for (let x = Math.max(0, Math.floor(r.x)); x < Math.min(W - 1, Math.ceil(r.x + r.w)); x++) onPlot[(z + 1) * W + x + 1] = 1;
   }
   // Fences (not gates) by edge: `h` (x, z) between tiles (x, z - 1) and (x, z); `v` (x, z) between (x - 1, z) and (x, z).
   const h = new Uint8Array(W * D);
   const v = new Uint8Array(W * D);
-  for (const f of out.values()) if (f.kind === 'fence' && f.x < W && f.z < D) (f.axis === 'h' ? h : v)[f.z * W + f.x] = 1;
+  for (const f of out.values()) if (f.kind === 'fence') (f.axis === 'h' ? h : v)[(f.z + 1) * W + f.x + 1] = 1;
   /** The neighbours of tile i not behind a fence, then those behind one (each with its edge), into `free` and `fenced`. */
   const look = (i: number, each: (j: number, fenced: boolean, axis: 'h' | 'v', e: number) => void) => {
     const x = i % W;
@@ -338,21 +337,19 @@ function joinPockets(out: Map<string, TownFence>, plots: readonly FencePlot[]): 
     if (i + W < W * D) each(i + W, !!h[i + W], 'h', i + W);
   };
   const label = new Int32Array(W * D).fill(-1);
-  const regions: { first: number; size: number; plot: boolean; edge: boolean }[] = [];
+  const regions: { first: number; plot: boolean; open: boolean }[] = [];
   const stack: number[] = [];
   for (let s = 0; s < W * D; s++) {
     if (label[s] >= 0) continue;
     const id = regions.length;
-    const region = { first: s, size: 0, plot: false, edge: false };
+    const region = { first: s, plot: false, open: false };
     regions.push(region);
     label[s] = id;
     stack.push(s);
     while (stack.length) {
       const i = stack.pop()!;
-      region.size++;
       region.plot ||= !!onPlot[i];
-      // (At the edge of the fences' bounds: open land beyond, not shut in.)
-      region.edge ||= i % W === 0 || i % W === W - 1 || i < W || i >= W * (D - 1);
+      region.open ||= i % W === 0 || i < W;
       look(i, (j, fenced) => {
         if (fenced || label[j] >= 0) return;
         label[j] = id;
@@ -361,7 +358,7 @@ function joinPockets(out: Map<string, TownFence>, plots: readonly FencePlot[]): 
     }
   }
   regions.forEach((r, id) => {
-    if (r.plot || r.edge || r.size > POCKET) return;
+    if (r.plot || r.open) return;
     // Its tiles again, and the garden beside it: the first plot's region across one of its fences; the fences between them go.
     const tiles: number[] = [];
     const seen = new Set([r.first]);
@@ -380,7 +377,7 @@ function joinPockets(out: Map<string, TownFence>, plots: readonly FencePlot[]): 
     for (const i of tiles) {
       look(i, (j, fenced, axis, e) => {
         if (!fenced || label[j] !== into) return;
-        out.delete(`${axis}:${e % W}:${Math.floor(e / W)}`);
+        out.delete(`${axis}:${(e % W) - 1}:${Math.floor(e / W) - 1}`);
       });
     }
   });

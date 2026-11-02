@@ -78,6 +78,12 @@ export function pointAt(pts: readonly Pt[], s: number, ls = lengths(pts)): { p: 
   return { p: [lerp(a[0], b[0], f), lerp(a[1], b[1], f)], t: tangent(pts, f < 0.5 ? i : i + 1), i };
 }
 
+/** Whether a polyline turns no more than `most` radians from `half` m before arc length `s` to `half` m after it (its directions there). */
+export function straightAround(pts: readonly Pt[], s: number, half: number, most: number, ls = lengths(pts)): boolean {
+  const [a, b] = [pointAt(pts, s - half, ls).t, pointAt(pts, s + half, ls).t];
+  return a[0] * b[0] + a[1] * b[1] >= Math.cos(most);
+}
+
 /**
  * The sharpest a polyline turns over two spans of `span` m: at each arc length `s` (a metre
  * apart), the angle (radians) between its chords from `s - span` to `s` and from `s` to
