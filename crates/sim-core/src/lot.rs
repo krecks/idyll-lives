@@ -179,6 +179,10 @@ pub struct LotFile {
     /// Diagonal walls (optional), one per tile.
     #[serde(default)]
     pub diagonals: Vec<DiagRaw>,
+    /// Garden fences, hedges and gates the town put up (optional; on the ground storey, never on a
+    /// wall): runs along grid lines, as walls are given.
+    #[serde(default)]
+    pub fences: Vec<FenceRaw>,
     #[serde(default)]
     pub objects: Vec<PlacementRaw>,
     #[serde(default)]
@@ -258,6 +262,18 @@ pub struct BondRaw {
     pub b: usize,
     /// Key into the content's `bondPresets`.
     pub preset: String,
+}
+
+/// A run of fence (or a gate in one) along a grid line, `[x0, z0, x1, z1]` as walls are given,
+/// in a fence style (`fenceStyles` id; an unknown one or none: the first).
+#[derive(Debug, Deserialize)]
+pub struct FenceRaw {
+    pub line: [u16; 4],
+    #[serde(default)]
+    pub style: Option<String>,
+    /// A gate: walked through.
+    #[serde(default)]
+    pub gate: bool,
 }
 
 /// A door or window on the wall edge at `(x, z)` (see `Axis`).
@@ -535,6 +551,11 @@ impl Lot {
     }
 
     pub fn from_file(file: &LotFile) -> Result<Self, Error> {
+        Self::from_file_styled(file, &[])
+    }
+
+    /// `from_file`, its fences' styles found among `fence_styles` (the content's fence style ids).
+    pub fn from_file_styled(file: &LotFile, fence_styles: &[&str]) -> Result<Self, Error> {
         let (w, d) = (file.width as usize, file.depth as usize);
         if w == 0 || d == 0 || w > MAX_SIDE || d > MAX_SIDE {
             return Err(Error::new(format!(
@@ -590,6 +611,50 @@ impl Lot {
                 other => return Err(Error::new(format!("unknown diagonal kind '{other}'"))),
             };
             lot.set_diag(x, z, Some(Diagonal { dir: d.dir, edge }));
+        }
+        // Fences on the ground storey, never on a wall (they make no rooms).
+        for f in &file.fences {
+            let [x0, z0, x1, z1] = f.line.map(usize::from);
+            let edge = if f.gate { Edge::Gate } else { Edge::Fence };
+            let style = f
+                .style
+                .as_deref()
+                .and_then(|id| fence_styles.iter().position(|s| *s == id))
+                .unwrap_or(0) as u8;
+            let edges: Vec<EdgeRef> = if z0 == z1 && z0 <= ground && x0.max(x1) <= w {
+                (x0.min(x1)..x0.max(x1))
+                    .map(|x| EdgeRef::H(x as u16, z0 as u16))
+                    .collect()
+            } else if x0 == x1 && x0 <= w && z0.max(z1) <= ground {
+                (z0.min(z1)..z0.max(z1))
+                    .map(|z| EdgeRef::V(x0 as u16, z as u16))
+                    .collect()
+            } else {
+                return Err(Error::new(format!(
+                    "fence {x0},{z0}-{x1},{z1} is diagonal or off the ground"
+                )));
+            };
+            for e in edges {
+                let (current, x, z) = match e {
+                    EdgeRef::H(x, z) => (lot.h_edge(x as usize, z as usize), x, z),
+                    EdgeRef::V(x, z) => (lot.v_edge(x as usize, z as usize), x, z),
+                    EdgeRef::Diag(..) => unreachable!(),
+                };
+                if current.is_wall() {
+                    return Err(Error::new(format!("fence at {x},{z} is on a wall")));
+                }
+                match e {
+                    EdgeRef::H(..) => lot.set_h(x as usize, z as usize, edge),
+                    _ => lot.set_v(x as usize, z as usize, edge),
+                }
+                lot.set_look(
+                    e,
+                    EdgeLook {
+                        style,
+                        ..EdgeLook::default()
+                    },
+                );
+            }
         }
         lot.compute_rooms();
         Ok(lot)

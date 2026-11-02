@@ -1948,7 +1948,9 @@ impl World {
     }
 
     pub fn new(content: Content, lot_file: &LotFile, seed: u32) -> Result<Self, Error> {
-        let mut world = Self::empty(content, Lot::from_file(lot_file)?, Rng::new(seed));
+        let styles: Vec<&str> = content.build.fences.iter().map(|s| s.id.as_str()).collect();
+        let lot = Lot::from_file_styled(lot_file, &styles)?;
+        let mut world = Self::empty(content, lot, Rng::new(seed));
         world.seed = seed;
         // Storeys from the file before its objects (stairs, furniture upstairs).
         let storeys = lot_file.storeys.unwrap_or(1).clamp(1, 4);
