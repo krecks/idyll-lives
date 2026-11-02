@@ -7,6 +7,7 @@
 
 import { untrack } from 'svelte';
 import { hasWebGpu } from '../ml/ort';
+import { inferenceSlot, whenModelsMayStart } from '../ml/schedule.svelte';
 import { settings } from '../settings/settings.svelte';
 import { SAMPLE_RATE, type FromVoiceWorker, type ToVoiceWorker, type VoiceDevice } from './protocol';
 import type { LineTiming } from './supertonic';
@@ -91,7 +92,8 @@ let worker: Worker | null = null;
 /** The device to use next; null: Auto picks one when voices start. */
 let wantedDevice: VoiceDevice | null = null;
 let nextId = 1;
-const pending = new Map<number, { resolve: (c: Clip) => void; reject: (e: Error) => void }>();
+/** Lines being made, each with its turn on the device (`ml/schedule.svelte.ts`) to give back. */
+const pending = new Map<number, { resolve: (c: Clip) => void; reject: (e: Error) => void; free: () => void }>();
 let waiters: { resolve: () => void; reject: (e: Error) => void }[] = [];
 /** Counters behind `voiceThreadStats` (not reactive: read by the overlay's timer). */
 const BUSY_WINDOW_MS = 5000;
@@ -134,12 +136,16 @@ function onMessage(msg: FromVoiceWorker): void {
     counters.audioSeconds += msg.samples.length / SAMPLE_RATE;
     counters.recent.push({ at: now, ms: msg.ms });
     while (counters.recent.length && counters.recent[0].at < now - BUSY_WINDOW_MS) counters.recent.shift();
-    pending.get(msg.id)?.resolve({ samples: msg.samples, visemes: parseVisemes(msg.visemes) });
+    const p = pending.get(msg.id);
     pending.delete(msg.id);
+    p?.free();
+    p?.resolve({ samples: msg.samples, visemes: parseVisemes(msg.visemes) });
   } else if (msg.type === 'error') {
     if (msg.id !== undefined) {
-      pending.get(msg.id)?.reject(new Error(msg.message));
+      const p = pending.get(msg.id);
       pending.delete(msg.id);
+      p?.free();
+      p?.reject(new Error(msg.message));
       return;
     }
     const failedDevice = voiceStatus.device;
@@ -270,12 +276,22 @@ function clipBytes(c: Clip): number {
   return c.samples.byteLength + c.visemes.times.buffer.byteLength + c.visemes.visemes.byteLength;
 }
 
-/** Audio for one line (24 kHz mono) and its mouth shapes, always made fresh (the speed test). Lines are made one after another in the worker. */
+/**
+ * Audio for one line (24 kHz mono) and its mouth shapes, always made fresh (the speed test).
+ * Lines are made one after another, each in its turn on the device (`inferenceSlot`: on the
+ * graphics card, never beside a line the language model is writing).
+ */
 export async function synthesize(text: string, voice: VoiceParams): Promise<Clip> {
   await ensureVoice();
+  const free = (await inferenceSlot(voiceStatus.device ?? 'gpu'))!;
+  // Unloaded while it waited its turn.
+  if (!voiceReady()) {
+    free();
+    throw new Error('voice unloaded');
+  }
   const id = nextId++;
   return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject });
+    pending.set(id, { resolve, reject, free });
     post({ type: 'speak', id, text, voice: { ...voice } });
   });
 }
@@ -334,7 +350,10 @@ function unload(): void {
     audioSeconds: 0,
     recent: [],
   });
-  for (const p of pending.values()) p.reject(new Error('voice unloaded'));
+  for (const p of pending.values()) {
+    p.free();
+    p.reject(new Error('voice unloaded'));
+  }
   pending.clear();
   waiters.forEach((w) => w.reject(new Error('voice unloaded')));
   waiters = [];
@@ -415,8 +434,27 @@ function readBench(): BenchResult | null {
   }
 }
 
+/** Auto starts asked for: only the latest one goes ahead once models may start. */
+let autoStarts = 0;
+
 /**
- * Loaded from the start while voices are on (the game launching, or switching them on); unloaded
+ * Starts the engine (`ensureVoice(device)`) once models may start (`whenModelsMayStart`: after
+ * the page has booted, not while a game loads), unless the voices were switched off, paused or
+ * started otherwise meanwhile.
+ */
+function autoStart(device?: VoiceDevice): void {
+  const stopped = stops;
+  const asked = ++autoStarts;
+  void whenModelsMayStart()
+    .then(() => {
+      if (stops !== stopped || asked !== autoStarts || !settings.voices || held) return;
+      return ensureVoice(device);
+    })
+    .catch(() => {});
+}
+
+/**
+ * Loaded once the game has booted while voices are on (or when they're switched on); unloaded
  * when they're switched off. A manual device choice restarts the engine on that device; Auto
  * picks one when it starts and otherwise keeps a working engine (it steps down by itself if the
  * card gets too slow, `stepDownVoice`). While the game has paused the voices for its session, nothing starts the engine here.
@@ -438,7 +476,7 @@ $effect.root(() => {
       if (mode !== 'auto') {
         manual = true;
         // (Joins an engine already on that device.)
-        void ensureVoice(mode).catch(() => {});
+        autoStart(mode);
         return;
       }
       const wasManual = manual;
@@ -448,7 +486,7 @@ $effect.root(() => {
       // isn't picked again.
       if (wasManual || voiceStatus.state === 'off' || voiceStatus.state === 'error') {
         wantedDevice = null;
-        void ensureVoice().catch(() => {});
+        autoStart();
       }
     });
   });

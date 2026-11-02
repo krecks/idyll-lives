@@ -33,6 +33,7 @@ import { aboutUs } from '../ui/story';
 import { BubbleLayer } from './bubbles';
 import { RoomOverlay } from './roomOverlay';
 import { VoiceDirector } from '../voice';
+import { holdInference, holdInferenceWhile } from '../ml/schedule.svelte';
 import { endSoundOf, soundOf, WorldSound } from '../audio/world';
 import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
@@ -177,6 +178,8 @@ export async function startSession(
     report(label, value);
   };
   const started = perfStart('session: start→ready');
+  // No voices or language model start or speak while the game loads (and, once revealed, while its town streams in).
+  let releaseInference = holdInference('loading a game');
   progress(request.kind === 'load' ? 'Reading your save' : 'Laying out the neighbourhood', 0.05);
   const { content, assets } = await perfTimeAsync('session: loadGameData', loadGameData);
 
@@ -241,8 +244,8 @@ export async function startSession(
     failReady = reject;
   });
   void ready.then(
-    () => perfEnd(started),
-    () => perfEnd(started),
+    () => (perfEnd(started), releaseInference()),
+    () => (perfEnd(started), releaseInference()),
   );
   /** `?debug`'s `__crash('render')`: every frame fails. */
   let failFrames = false;
@@ -298,7 +301,7 @@ export async function startSession(
     buildBuy.modeChanged();
     refreshRoomOverlay();
   }
-  const voices = new VoiceDirector(content, renderer, { world: () => world, subtitles: bubbles });
+  const voices = new VoiceDirector(content, renderer, { world: () => world, subtitles: bubbles, sim: () => bridge.threadStats });
   const worldSound = new WorldSound(renderer, content);
   const buildBuy = new BuildBuyInput(renderer, content, (command) => bridge.send(command));
   buildBuy.showStorey = (storey) => {
@@ -1139,6 +1142,7 @@ export async function startSession(
       }
     });
     building = build.catch(() => {});
+    holdInferenceWhile('building the scene', building);
     if (feedback?.effects.length) void build.then(() => feedback.effects.forEach((fx) => renderer.buildEffect(fx)), () => {});
     build
       .then(async () => {
@@ -1667,6 +1671,8 @@ export async function startSession(
       perfPhase(`session: reveal ${game.mode} ${game.buildTab} storey ${game.storey} walls ${game.wallMode}`);
       // The house is cached by now: stream the rest of the town while the player is in it. Its
       // models are built into the world once the stream is over (each settle used to rebuild it).
+      releaseInference();
+      releaseInference = holdInference('streaming the town');
       void (async () => {
         await homeAssets;
         if (disposed) return;
@@ -1675,6 +1681,7 @@ export async function startSession(
         // The catalog's pictures are built only once the stream is quiet, in idle moments.
         await whenStreamSettled();
         renderer.holdModelRefresh(false);
+        releaseInference();
         if (disposed || BENCH) return;
         prefetchTimer = setTimeout(() => {
           // (Not while benchmarking: drawing the pictures would show in the measurements.)
@@ -1721,6 +1728,7 @@ export async function startSession(
     },
     async dispose() {
       disposed = true;
+      releaseInference();
       ideas.clear();
       clearInterval(statsTimer);
       clearInterval(autosaveTimer);
