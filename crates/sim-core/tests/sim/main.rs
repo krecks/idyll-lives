@@ -33,6 +33,7 @@ mod diagonal_walls;
 mod dining;
 mod dishwasher;
 mod family;
+mod fast_lookups;
 mod fences;
 mod floor_coverings;
 mod flowers;

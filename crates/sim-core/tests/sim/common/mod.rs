@@ -5,7 +5,9 @@
 #![allow(dead_code)]
 
 use serde_json::{Value, json};
+use sim_core::items::ItemAt;
 use sim_core::social::FORMER;
+use sim_core::travel::Mode;
 use sim_core::world::{Phase, Sim, TaskKind};
 use sim_core::{MINUTES_PER_TICK, World, clock};
 
@@ -241,8 +243,39 @@ pub fn garden_cluster(
     ids
 }
 
+/// The quick answers the simulation keeps or works out in one go agree with asking afresh: what
+/// each item is on or in (`items::holders`, one pass over the objects, against `items::holder`),
+/// and where each public place's door gets on the roads on foot and by car
+/// (`Travel::door_entry`, noted as each tick starts, against `Travel::entry`). Returns how many
+/// items were held by something and how many doors had a way onto the roads (to tell that it
+/// checked something).
+pub fn check_lookups(w: &World) -> (usize, usize) {
+    let ats: Vec<ItemAt> = w.items.list.iter().map(|it| it.at).collect();
+    let quick = sim_core::items::holders(&w.content, &w.objects, &ats);
+    for (at, &held) in ats.iter().zip(&quick) {
+        let afresh = sim_core::items::holder(&w.content, &w.objects, at);
+        assert_eq!(held, afresh, "what the item at {at:?} is on or in");
+    }
+    let mut doors = 0;
+    for p in w.plots.iter().filter(|p| p.public) {
+        let door = p.arrival_point();
+        for mode in [Mode::Foot, Mode::Car] {
+            let noted = w.travel.door_entry(p.id, door, mode);
+            let afresh = w.travel.entry(door, mode);
+            assert_eq!(
+                noted, afresh,
+                "where {}'s door gets on the roads, {mode:?}",
+                p.name
+            );
+            doors += usize::from(noted.is_some());
+        }
+    }
+    (quick.iter().flatten().count(), doors)
+}
+
 /// Everything that must hold at any moment.
 pub fn check(w: &World) {
+    check_lookups(w);
     // Things for outside (content `outdoors`) stand outside.
     for o in &w.objects {
         let def = &w.content.objects[o.def];
