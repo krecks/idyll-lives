@@ -77,7 +77,10 @@
 //! the way its door faces (`garages[].rot`, a thing's facing; absent: towards the street, as the
 //! town placed it), and a car parked in front of one where it parked before
 //! (`cars[].driveSpot`, `[x, z, yaw]`; absent: where it parks is its own spot). Both are left out
-//! when absent, so a game without a garage of the player's saves as it did.
+//! when absent, so a game without a garage of the player's saves as it did. Still 35: a driveway
+//! running along x keeps the way it runs (`drives[].frontX`, ±1; absent: along z, `front`), so
+//! files without one save as they did; a cosy town's driveways with the road each meets
+//! (`drives[].road`) are what has its cars drive its roads (`cars::settle_all`).
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 

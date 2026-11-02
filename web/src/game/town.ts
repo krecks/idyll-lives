@@ -23,7 +23,7 @@ import { connect, cropRoads, inside, leftOf, lengths, nearest, pointAt, roadExit
 import { householdFunds, savingsOf } from './wealth';
 import { extend, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
 import { generateBigWorld, type OpenWorldDraft } from './macro';
-import { garageFor } from '../render/shared/cars';
+import { garageAt, garageFor, houseCar, type ParkedCar } from '../render/shared/cars';
 import { fenceRuns, townFences, type TownFence } from './gardenFences';
 
 export type Wall = [number, number, number, number];
@@ -1001,6 +1001,9 @@ function farmstead(content: Content, t: Templates, slot: PlotSlot, rand: Rand): 
 
 /** Driveways are paths wider than this (garden paths are 1 m); see `driveway`. */
 export const DRIVEWAY_MIN_WIDTH = 1.8;
+/** How far a driveway goes on across the verge to its road at most (m; a garden path's goes 12). */
+const DRIVE_REACH = 30;
+
 /** Driveway length past the front wall of the house: room to park a car beside it. */
 const DRIVEWAY_PAST_FRONT = 5.4;
 
@@ -1053,6 +1056,8 @@ export interface TownLayout {
   garages: { plot: number; x0: number; z0: number; x1: number; z1: number }[];
   /** Each house's driveway: the middle of its inner end and of its end at the street (town tiles). */
   drives: { plot: number; inner: Pt; street: Pt; facing: Facing }[];
+  /** The households' cars (`plot`: the slot's index), parked on their driveways where the street draws them (`houseCar`, town tiles). */
+  cars: (ParkedCar & { plot: number })[];
   plots: { name: string; x: number; z: number; w: number; d: number; public: boolean; entry: [number, number]; storeys: number }[];
   /** Each plot's `Facing` (as `TownMeta.facing`). */
   facing: Facing[];
@@ -1068,8 +1073,9 @@ export interface TownLayout {
  * Stamps every plot's house layout (or its public place: a park, a square, a shop) onto the town,
  * each house with its driveway and maybe a garage, the player's too: their home looks as the town
  * showed it. Each generated house is furnished for its household (`player`: a new one moving in
- * at `playerSlot`). No cars for the simulation to drive yet: it drives them along a straight
- * street, and a town's roads wind (the street draws them parked on the driveways).
+ * at `playerSlot`). A house someone lives in has the household's car on its driveway where the
+ * street draws one (`houseCar`: about four in five, the same houses and the same cars), and the
+ * player's has one whenever it has a driveway; the simulation drives them along the roads.
  */
 export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDraft, playerSlot: number | null, player?: HouseholdDraft): TownLayout {
   const walls: Wall[] = [];
@@ -1080,6 +1086,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
   const fields: Rect[] = [];
   const garages: TownLayout['garages'] = [];
   const drives: TownLayout['drives'] = [];
+  const cars: TownLayout['cars'] = [];
   const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
 
   /** Things of a layout onto the town, `lift` rows up (see `TownLayout.storeys`). */
@@ -1096,17 +1103,21 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
   };
   /**
    * A path's way on from the front of plot `s` to its road, across the verge (`r`: its stretch on the
-   * plot, plot coordinates): as far as the sidewalk, longer where the plot stands back from a bend.
+   * plot, plot coordinates): as far as the sidewalk, longer where the plot stands back from a bend
+   * (`reach` m at most: a driveway's goes further, for the car to get to the road, but not across
+   * another lot). Whether it got there.
    */
   const roads = roadIndex(town.roads);
-  const verge = (s: PlotSlot, r: Rect) => {
+  const verge = (s: PlotSlot, r: Rect, reach = 12): boolean => {
     const turn = turnOnto(t, s);
-    for (let k = 1; k <= 12; k++) {
+    for (let k = 1; k <= reach; k++) {
       const [x, z] = turn.point([r.x + r.w / 2, -k + 0.5]);
+      if (k > 12 && plots.some((p, i) => i !== s.index && x > p.x && x < p.x + p.w && z > p.z && z < p.z + p.d)) return false;
       if (!roads.onRoad(x, z)) continue;
       paths.push(turn.rect({ x: r.x, z: -k, w: r.w, d: k }));
-      return;
+      return true;
     }
+    return false;
   };
   /** A garden path from a front door (plot coordinates) to the street, and on across the verge. */
   const pathTo = (s: PlotSlot, front: Door) => {
@@ -1135,6 +1146,8 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
   const storeys = Math.max(1, ...plots.map((p) => p.storeys));
   let basement = false;
   const driveOf = new Map<number, Rect>();
+  /** Where a garage the player builds at the end of a driveway would stand, on a house the town gave none (`garageAt`): the fences start behind it too. */
+  const roomFor = new Map<number, Rect>();
   for (const s of town.slots) {
     if (s.kind !== 'house') {
       const place = placeOf(s);
@@ -1173,8 +1186,11 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     if (!drive) continue;
     paths.push(turnOnto(t, s).rect(drive));
     driveOf.set(s.index, turnOnto(t, s).rect(drive));
-    verge(s, drive);
+    const reaches = verge(s, drive, DRIVE_REACH);
     drives.push({ plot: s.index, inner: turnOnto(t, s).point([drive.x + drive.w / 2, drive.d]), street: turnOnto(t, s).point([drive.x + drive.w / 2, 0]), facing: s.facing });
+    // The household's car on it (the player's always), where it gets to the road.
+    const car = reaches && (living.has(s.index) || s.index === playerSlot) ? houseCar(plotRect(t, s), s.facing, turnOnto(t, s).rect(drive), s.index === playerSlot) : null;
+    if (car) cars.push({ plot: s.index, ...car });
     // A garage at its inner end, clear of what's in the garden (as the street draws it): laid out
     // as the plot is (its street at z = 0), at the plot's place on the town (so each plot decides
     // its own), then turned onto the town.
@@ -1188,14 +1204,20 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       return shift(o.rot % 2 === 0 ? { x: o.x, z: o.z, w: fw, d: fd } : { x: o.x, z: o.z, w: fd, d: fw });
     });
     const garage = xs.length ? garageFor({ x: ox, z: oz, w: pw, d: pd }, box, shift(drive), -1, things) : null;
+    const onTown = (g: { x0: number; z0: number; x1: number; z1: number }) => turnOnto(t, s).rect({ x: g.x0 - ox, z: g.z0 - oz, w: g.x1 - g.x0, d: g.z1 - g.z0 });
     if (garage) {
-      const r = turnOnto(t, s).rect({ x: garage.x0 - ox, z: garage.z0 - oz, w: garage.x1 - garage.x0, d: garage.z1 - garage.z0 });
+      const r = onTown(garage);
       garages.push({ plot: s.index, x0: r.x, z0: r.z, x1: r.x + r.w, z1: r.z + r.d });
+    } else {
+      // (As Build mode finds it, `drivewayGarage`: clear of the things outdoors, not those indoors.)
+      const outdoors = things.filter((r) => r.x + r.w <= box.x0 || r.x >= box.x1 || r.z + r.d <= box.z0 || r.z >= box.z1);
+      const room = xs.length ? garageAt({ x: ox, z: oz, w: pw, d: pd }, box, shift(drive), -1, outdoors) : null;
+      if (room) roomFor.set(s.index, onTown(room));
     }
   }
   dropCrowdedTrees(content, walls, objects, town.depth);
-  const fences = gardenFencesOf(content, town, { walls, objects, paths, fields, garages, plots }, driveOf);
-  return { walls, doors, windows, objects, paths, fields, garages, drives, plots, facing: town.slots.map((s) => s.facing), storeys, basement, fences };
+  const fences = gardenFencesOf(content, town, { walls, objects, paths, fields, garages, plots }, driveOf, roomFor);
+  return { walls, doors, windows, objects, paths, fields, garages, drives, cars, plots, facing: town.slots.map((s) => s.facing), storeys, basement, fences };
 }
 
 /**
@@ -1240,6 +1262,7 @@ function gardenFencesOf(
   town: NeighbourhoodDraft,
   layout: Pick<TownLayout, 'walls' | 'objects' | 'paths' | 'fields' | 'garages' | 'plots'>,
   driveOf: ReadonlyMap<number, Rect>,
+  roomFor: ReadonlyMap<number, Rect>,
 ): TownFence[] {
   const D = town.depth;
   // Wall edges on the ground storey (and the edges in front of things, below): no fence there. Each
@@ -1285,7 +1308,8 @@ function gardenFencesOf(
     const rect = layout.plots[i];
     const home = s.kind === 'house';
     const g = layout.garages.find((g) => g.plot === s.index);
-    const garage = g ? { x: g.x0, z: g.z0, w: g.x1 - g.x0, d: g.z1 - g.z0 } : null;
+    // (The town's garage, or where the player could build one: Build mode's Garage tool.)
+    const garage = g ? { x: g.x0, z: g.z0, w: g.x1 - g.x0, d: g.z1 - g.z0 } : (roomFor.get(s.index) ?? null);
     return { rect, facing: s.facing, house: home ? houseIn(rect) : null, home, drive: driveOf.get(s.index) ?? null, garage, fenced: true };
   });
   const roads = roadIndex(town.roads);
@@ -1318,7 +1342,7 @@ export function assembleTown(
   playerSlot: number,
   { existing = false, mode = 'living', lifespan = 'normal' }: AssembleOptions = {},
 ): string {
-  const { walls, doors, windows, objects, paths, fields, garages, drives, plots, facing, storeys, basement, fences } = layoutTown(content, t, town, playerSlot, existing ? undefined : player);
+  const { walls, doors, windows, objects, paths, fields, garages, drives, cars, plots, facing, storeys, basement, fences } = layoutTown(content, t, town, playerSlot, existing ? undefined : player);
   const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
 
   if (existing && !town.households.some((h) => h.slot === playerSlot)) throw new Error('Nobody lives in that house.');
@@ -1369,7 +1393,7 @@ export function assembleTown(
   }
 
   const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths, facing, seed: town.seed ?? (Math.random() * 2 ** 31) >>> 0, world: worldLook(town, fields), gardenFences: true };
-  const open = openWorldFields(town, drives);
+  const open = openWorldFields(town, drives, cars);
   if (open.meta) Object.assign(meta, open.meta);
   // Residents leave town (for work) where its roads lead out of it (in a big world, also from its bus stops).
   const exits = open.exits ?? roadExits(town.roads, town.width, town.depth);
@@ -1378,7 +1402,7 @@ export function assembleTown(
   return JSON.stringify({
     mode,
     lifespan,
-    // (docs/design/open-world.md: all optional, a cosy or normal town's only additions the size, the roads and its one area.)
+    // (docs/design/open-world.md: all optional, a cosy or normal town's only additions the size, the roads, its one area, and its driveways and cars.)
     size: town.world?.size ?? 'cosy',
     width: town.width,
     depth: town.depth,
@@ -1397,9 +1421,33 @@ export function assembleTown(
     garages,
     roads: town.roads,
     areas: open.areas,
-    ...(open.file ?? {}),
+    ...open.file,
     meta,
   });
+}
+
+/**
+ * The road a driveway leads onto and how far along it (m): where its line, on from its end at the
+ * plot's edge (`street`, running `way`), comes onto a road (its paving crosses the verge to it:
+ * `layoutTown`'s `verge`), at the middle of that road; else the road nearest that end. Not a
+ * trail. Null: none within 24 m.
+ */
+function meetsRoad(list: readonly RoadPlan[], roads: ReturnType<typeof roadIndex>, street: Pt, way: Pt): { road: number; s: number } | null {
+  const at = (k: number): Pt => [street[0] + way[0] * k, street[1] + way[1] * k];
+  for (let k = 0.5; k <= 24; k += 0.5) {
+    const near = roads.nearest(...at(k), 24);
+    if (!near || list[near.road].kind === 'trail' || near.dist > list[near.road].width / 2) continue;
+    // On it: on along the line while that takes it nearer the road's middle.
+    let [best, kb] = [near.dist, k];
+    for (let j = k + 0.25; j <= k + list[near.road].width; j += 0.25) {
+      const d = roads.distance(near.road, ...at(j), list[near.road].width);
+      if (d >= best) break;
+      [best, kb] = [d, j];
+    }
+    return { road: near.road, s: roads.along(near.road, ...at(kb)) };
+  }
+  const near = roads.nearest(street[0], street[1], 24);
+  return near && list[near.road].kind !== 'trail' ? { road: near.road, s: near.s } : null;
 }
 
 /** What a plot is, for the simulation (docs/design/open-world.md). */
@@ -1407,28 +1455,33 @@ type PlotKind = 'home' | 'farm' | 'public' | 'shop' | 'countryside';
 
 /**
  * The town file's open-world fields (docs/design/open-world.md): its areas (a cosy or normal town
- * is one), and in a big world its typed exits (the roads out, the bus stops), the water, public
- * parking, where each driveway meets its road, and the zones, pads and areas for the renderer.
+ * is one), every house's driveway with where it meets its road and the households' cars on them
+ * (sim-core `cars.rs`: they drive the roads, in a cosy town too), and in a big world its typed
+ * exits (the roads out, the bus stops), the water, public parking, and the zones, pads and areas
+ * for the renderer.
  */
-function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives']) {
+function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'], cars: TownLayout['cars']) {
   const areas: TownArea[] = town.open?.areas ?? [{ name: town.name, kind: 'hamlet', x: 0, z: 0, w: town.width, d: town.depth }];
-  const open = town.open;
-  if (!open) return { areas };
   const roads = roadIndex(town.roads);
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  const r3 = (v: number) => Math.round(v * 1000) / 1000;
+  // Where each driveway meets the road it leads to (not a trail), the way it runs to it (a
+  // driveway of a house facing east or west runs along x: `frontX`), and the way out along it.
+  const filed = drives.map(({ plot, inner, street, facing }) => {
+    const across = facing === 1 ? -1 : facing === 3 ? 1 : 0;
+    const road = meetsRoad(town.roads, roads, street, [across, facing === 0 ? -1 : facing === 2 ? 1 : 0]);
+    const at = road ? pointAt(town.roads[road.road].points, road.s).p : street;
+    return { plot, x: r2(inner[0]), z: r2(inner[1]), front: facing === 0 ? -1 : facing === 2 ? 1 : 0, ...(across ? { frontX: across } : {}), street: r2(at[1]), ...(road ? { road: road.road, s: r2(road.s) } : {}) };
+  });
+  const parked = cars.map(({ plot, x, z, yaw, len, wid, body, paint }) => ({ plot, x: r3(x), z: r3(z), yaw: r3(yaw), street: filed.find((d) => d.plot === plot)?.street ?? r3(z), len, wid, body, paint }));
+  const open = town.open;
+  if (!open) return { areas, file: { drives: filed, cars: parked } };
   const ways = town.roads.filter((r) => r.kind !== 'trail');
   const exits: TownExit[] = [...roadExits(ways, town.width, town.depth).map(([x, z]): TownExit => ({ x, z, kind: 'road' })), ...open.stops.map(({ x, z }): TownExit => ({ x, z, kind: 'stop' }))];
-  // Where each driveway meets the road it leads to (not a trail), and the way out along it.
-  const filed = drives.flatMap(({ plot, inner, street, facing }) => {
-    const near = roads.nearest(street[0], street[1], 24);
-    const road = near && town.roads[near.road].kind === 'trail' ? null : near;
-    const at = road ? pointAt(town.roads[road.road].points, road.s).p : street;
-    const r2 = (v: number) => Math.round(v * 100) / 100;
-    return [{ plot, x: r2(inner[0]), z: r2(inner[1]), front: facing === 0 ? -1 : facing === 2 ? 1 : 0, street: r2(at[1]), ...(road ? { road: road.road, s: r2(road.s) } : {}) }];
-  });
   return {
     areas,
     exits,
-    file: { terrain: { water: open.water }, parking: open.parking, drives: filed },
+    file: { terrain: { water: open.water }, parking: open.parking, drives: filed, cars: parked },
     meta: { zones: open.zones, pads: open.pads, areas },
   };
 }

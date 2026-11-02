@@ -1273,6 +1273,11 @@ impl Sim {
         self.gone.is_none()
     }
 
+    /// The car they're on their way to (or in, on a trip), if any (`bound_for_car`).
+    pub fn car_bound(&self) -> Option<u32> {
+        self.bound_for_car
+    }
+
     pub fn queue(&self) -> impl Iterator<Item = &Task> {
         self.queue.iter()
     }
@@ -7844,7 +7849,17 @@ pub(crate) fn trip(
     target: [f32; 2],
     grounds: Option<&Grounds>,
 ) -> Option<Vec<[f32; 2]>> {
-    if travel.by_road(pos, target)
+    // (How far, along the ground: upstairs or in the basement is rows away in the stacked grid,
+    // not far off, so a walk upstairs at home is no trip by road.)
+    let depth = nav.stairs.depth as f32;
+    let ground = |p: [f32; 2]| {
+        if depth > 0.0 {
+            [p[0], p[1].rem_euclid(depth)]
+        } else {
+            p
+        }
+    };
+    if travel.by_road(ground(pos), ground(target))
         && let Some(waypoints) = road_route(nav, reach, travel, pos, start, goal, target, grounds)
     {
         return Some(waypoints);
@@ -9338,6 +9353,13 @@ fn accident(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], a: usize) 
         crate::planner::think(sim, crate::planner::ThoughtKind::Accident, a, ctx.tick);
     }
     if let Some(rest) = &def.rest {
+        // (Asleep on the way to a car: they don't go on to it, and it doesn't wait for them.)
+        if sim
+            .current()
+            .is_some_and(|a| matches!(a.phase, Phase::Routing { .. }))
+        {
+            sim.bound_for_car = None;
+        }
         end_activity(sim, content, objects);
         sim.queue.retain(|t| t.directed);
         sim.pose = rest.pose;

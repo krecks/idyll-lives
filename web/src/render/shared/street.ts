@@ -70,6 +70,8 @@ export interface Rect {
 
 /** Paths at least this wide are driveways (garden paths are 1 m; see `game/town.ts`). */
 const DRIVEWAY_MIN_WIDTH = 1.8;
+/** How far either side of a driveway's mouth a car coming or going swings across the sidewalk (m): no kerbside furniture there. */
+const CAR_SWING = 1.2;
 /** Half wall thickness (as in house.ts). */
 const T = 0.07;
 
@@ -1090,11 +1092,13 @@ export class TownStreet {
         return { L, kind: this.kindOf(L, focus), s0: Math.min(a, b), s1: Math.max(a, b), door: L.door === null ? null : along(at(L.door)), drive };
       })
       .sort((a, b) => a.s0 - b.s0);
-    // Mouths of garden paths and driveways on this side: keep them clear.
+    // Mouths of garden paths and driveways on this side: keep them clear (a driveway's wider where
+    // the world's cars come and go: they swing across the sidewalk either side of it, `CAR_SWING`).
     const mouths: [number, number][] = [];
     for (const { p } of this.meeting.filter((m) => m.road === r && m.side === side)) {
       const corners = [[p.x, p.z], [p.x + p.w, p.z], [p.x, p.z + p.d], [p.x + p.w, p.z + p.d]].map(([x, z]) => kerb.along(x, z));
-      mouths.push([Math.min(...corners), Math.max(...corners)]);
+      const swing = world.cars?.length && Math.min(p.w, p.d) >= DRIVEWAY_MIN_WIDTH ? CAR_SWING : 0;
+      mouths.push([Math.min(...corners) - swing, Math.max(...corners) + swing]);
     }
     const clear = (s: number, m: number) => s > 1 && s < kerb.length - 1 && kerb.open(s) && !mouths.some(([a, b]) => s > a - m && s < b + m);
     const used: number[] = [];

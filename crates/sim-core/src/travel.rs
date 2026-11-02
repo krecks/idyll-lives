@@ -4,7 +4,9 @@
 //! **Which towns.** Only towns laid out for the open world, `normal` and `big` ones (`size`,
 //! `Travel::open`), have a network, time commutes by the walk, go on outings and keep public
 //! things in cells. A town or save without a size is `cosy` and plays exactly as it always did,
-//! roads in its meta or not.
+//! roads in its meta or not; only its cars drive the network, in a cosy town made since they
+//! drive winding roads (its driveways say where they meet them: `cars::settle_all`), and nobody
+//! walks it (`Travel::by_road`).
 //!
 //! **The network.** The town's roads (the town file's top-level `roads`; else `meta.roads`, or
 //! the centre lines of `meta.streets`; none: no network) become a small graph: a node at each
@@ -924,7 +926,8 @@ pub struct Travel {
     /// The town is laid out for the open world (its `size` is `normal` or `big`): it has a road
     /// network, commutes are timed by the walk (`commuteMinutes` is only the part off the map),
     /// residents go on outings. Cosy towns, and towns and saves without a size, play as before
-    /// (no network, even with roads in their meta).
+    /// (no network, even with roads in their meta; but for their cars in towns made since cars
+    /// drive winding roads, `cars::settle_all`).
     pub open: bool,
     /// Cars' top speed on country roads (m/s; content `cars.countrySpeed`).
     pub country_speed: f32,
@@ -988,7 +991,7 @@ impl Travel {
 
     /// Whether a trip from `a` to `b` on foot goes by road.
     pub fn by_road(&self, a: [f32; 2], b: [f32; 2]) -> bool {
-        !self.graph.is_empty() && octile(a, b) >= ROAD_TRIP_TILES
+        self.open && !self.graph.is_empty() && octile(a, b) >= ROAD_TRIP_TILES
     }
 
     /// About how many minutes a trip from `from` to `to` takes: on foot at `walk` m a minute,

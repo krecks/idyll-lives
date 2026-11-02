@@ -118,5 +118,7 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     meta,
     meshes: { walls: EMPTY_MESH, wallsLow: EMPTY_MESH, floors: EMPTY_MESH },
     garages: layout.garages,
+    // The households' cars where the game parks them (the player's slot has one), as the street drew them.
+    cars: layout.cars.map(({ plot, x, z, yaw, body, paint }) => ({ plot, x, z, yaw, body, paint })),
   };
 }

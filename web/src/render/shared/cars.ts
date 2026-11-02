@@ -263,8 +263,8 @@ export interface ParkedCar {
  * house has none (about one in five). From the plot's place, so the town, the menus and the game
  * agree.
  */
-export function parkCar(plot: Rect, spot: DriveEnd): ParkedCar | null {
-  if (hash(plot.x, plot.z, 20) >= 0.8) return null;
+export function parkCar(plot: Rect, spot: DriveEnd, always = false): ParkedCar | null {
+  if (!always && hash(plot.x, plot.z, 20) >= 0.8) return null;
   const { front, street } = spot;
   const body = Math.floor(hash(plot.x, plot.z, 21) * CARS.length) % CARS.length;
   const { len, wid } = CARS[body];
@@ -279,6 +279,25 @@ export function parkCar(plot: Rect, spot: DriveEnd): ParkedCar | null {
     len,
     wid,
   };
+}
+
+/**
+ * The car of the house on `plot` with the driveway `drive` (both on the town; the plot's street
+ * on its side `facing`, as `TownMeta.facing`: 0 north, 1 west, 2 south, 3 east), on the town:
+ * `parkCar` with the plot laid out as the street lays it out (`street.ts` `layout`: turned a
+ * quarter when its street is east or west of it), so the town's cars (`game/town.ts`, the sim's
+ * `cars`) stand where the street drew them, look as it drew them and go on the same houses (about
+ * four in five). `always`: a car even on a house the street would leave without one.
+ */
+export function houseCar(plot: Rect, facing: number, drive: Rect, always = false): ParkedCar | null {
+  const turned = facing % 2 === 1;
+  // (As `street.ts` `localRect`, `townPoint` and `townYaw`.)
+  const laid = (r: Rect): Rect => (turned ? { x: r.z, z: -(r.x + r.w), w: r.d, d: r.w } : r);
+  const front: 1 | -1 = facing === 2 || facing === 1 ? 1 : -1;
+  const d = laid(drive);
+  const car = parkCar(laid(plot), { x: d.x + d.w / 2, z: front > 0 ? d.z : d.z + d.d, front, street: 0 }, always);
+  if (!car || !turned) return car;
+  return { ...car, x: -car.z, z: car.x, yaw: car.yaw - Math.PI / 2 };
 }
 
 // ---- garages ---------------------------------------------------------------------------
