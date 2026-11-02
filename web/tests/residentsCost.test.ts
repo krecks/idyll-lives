@@ -177,6 +177,46 @@ describe('residents not drawn', async () => {
     }
   }, 30_000);
 
+  test('only those posed in the shadow square draw the sun\'s map again', async () => {
+    const realNow = performance.now;
+    let now = 0;
+    performance.now = () => now;
+    try {
+      const characters = new Characters(view, assets, content, { castsShadows: true });
+      expect(await characters.init()).toBe(true);
+      await characters.build({ sims, objects: [] });
+      const prev = new Float32Array(layout.capacity);
+      const curr = new Float32Array(layout.capacity);
+      const frame: FrameState = { prev, curr, alpha: 0, steps: 1, layout, now: 0 };
+      const shadows = new Float32Array(MAX_CHARACTERS * 16);
+      write(prev, -1);
+      write(curr, -1);
+      const run = (frames: number) => {
+        let [posed, shadowPosed] = [0, 0];
+        for (let f = 0; f < frames; f++) {
+          now += 1000 / 60;
+          frame.now = now;
+          characters.update(frame, () => true, shadows);
+          posed += characters.posed ? 1 : 0;
+          shadowPosed += characters.shadowPosed ? 1 : 0;
+        }
+        return { posed, shadowPosed };
+      };
+      // Without a square (it covers everything), and with one round them: as they breathe and blink.
+      run(10);
+      expect(run(30).shadowPosed).toBeGreaterThan(20);
+      characters.setShadowSquare({ x: 3, z: 0, half: 30 });
+      expect(run(30).shadowPosed).toBeGreaterThan(20);
+      // The square 100 m off: they still pose (a mirror would show them), the map isn't drawn again for them.
+      characters.setShadowSquare({ x: 100, z: 0, half: 30 });
+      const off = run(30);
+      expect(off.posed).toBeGreaterThan(20);
+      expect(off.shadowPosed).toBe(0);
+    } finally {
+      performance.now = realNow;
+    }
+  }, 30_000);
+
   test("the pose texture's rows are the skinning matrices'", async () => {
     const characters = new Characters(view, assets, content, { castsShadows: true });
     expect(await characters.init()).toBe(true);
