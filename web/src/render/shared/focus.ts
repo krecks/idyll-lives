@@ -17,7 +17,7 @@
  * Engine-neutral: the renderer feeds it the camera each frame (`update`).
  */
 
-import { CHUNK, chunkCoords, chunkId } from './chunks';
+import { CHUNK, chunkCoords, chunkId, distanceToRect } from './chunks';
 
 /** Metres past the stream radius a chunk keeps streaming before it goes. */
 export const HYSTERESIS = 32;
@@ -59,11 +59,7 @@ export interface StreamCamera {
 /** Distance (m) from a point to the nearest point of chunk `id`. */
 function chunkDistance(id: number, x: number, z: number): number {
   const [cx, cz] = chunkCoords(id);
-  const x0 = cx * CHUNK;
-  const z0 = cz * CHUNK;
-  const dx = Math.max(x0 - x, 0, x - (x0 + CHUNK));
-  const dz = Math.max(z0 - z, 0, z - (z0 + CHUNK));
-  return Math.hypot(dx, dz);
+  return distanceToRect(x, z, cx * CHUNK, cz * CHUNK, CHUNK, CHUNK);
 }
 
 /** Whether chunk `id` is within `r` of the camera, or within `ahead` · `r` inside its view's angle. */

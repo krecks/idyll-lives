@@ -78,7 +78,7 @@ import { coveringSurface, houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, t
 import { compose, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
 import { OrbitControls } from '../shared/orbit';
 import { Flight, panBounds, Roam, warmLots, type FocusPlot } from '../shared/focus';
-import { CHUNK, chunkCoords, RectGrid } from '../shared/chunks';
+import { CHUNK, chunkCoords, distanceToRect, RectGrid } from '../shared/chunks';
 import { ModelRefresh } from '../shared/modelRefresh';
 import { OverviewCamera } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
@@ -144,8 +144,6 @@ const BETA_LIMITS = [0.3, 1.35] as const;
 // (The near plane a fiftieth of the camera's distance, never under 0.3 m: from the town overview's 200–300 m at 0.3 m
 // the roads, 1.2 cm over the ground, fought it in green patches. Close up nothing changes: 0.3 m to 15 m out.)
 const LENS = { fov: 0.7, near: 0.3, far: 1600, nearShare: 1 / 50 };
-/** The far plane in a big world (m): the preset's (`OpenWorldQuality.far`; Medium's 2600). */
-const bigFar = (quality: RenderQuality) => quality.openWorld.far;
 /** Light is recomputed when the game's clock moved this many minutes (fast: the preset's `lightingStep`), at most every `LIGHT_MIN_MS`. */
 const LIGHT_STEP = 0.5;
 const LIGHT_MIN_MS = 100;
@@ -251,7 +249,7 @@ function plotNear(world: WorldStructure, x: number, z: number, reach: number): F
   let best: FocusPlot | null = null;
   let bestD = reach;
   world.plots.forEach((p, i) => {
-    const d = Math.hypot(Math.max(p.x - x, 0, x - (p.x + p.w)), Math.max(p.z - z, 0, z - (p.z + p.d)));
+    const d = distanceToRect(x, z, p.x, p.z, p.w, p.d);
     if (d < bestD || (d === 0 && !best)) [best, bestD] = [{ id: i, x: p.x, z: p.z, w: p.w, d: p.d }, d];
   });
   return best;
@@ -285,7 +283,7 @@ class PlotFinder {
     let best = -1;
     let bestD = reach;
     for (const c of this.grid.near({ x, z, w: 0, d: 0 }, reach)) {
-      const d = Math.hypot(Math.max(c.x - x, 0, x - (c.x + c.w)), Math.max(c.z - z, 0, z - (c.z + c.d)));
+      const d = distanceToRect(x, z, c.x, c.z, c.w, c.d);
       if (d < bestD || (d === bestD && c.i < best) || (d === 0 && best < 0)) [best, bestD] = [c.i, d];
     }
     const p = best >= 0 ? world.plots[best] : null;
@@ -834,7 +832,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   async texturesReady(): Promise<void> {
     // (A model file's textures load with it; a surface's on their own, and a model may ask for surfaces.)
-    await Promise.all([modelFilesSettled(this.app), this.lib.texturesReady()]);
+    await modelFilesSettled(this.app);
     await this.lib.texturesReady();
   }
 
@@ -1386,8 +1384,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.orbit.panBounds = panBounds(world);
     this.orbit.checkLimits();
     this.streamOn = world.meta?.world?.size === 'big' || STREAM_FLAG;
-    // A big world's land reaches further: its far plane too (its far LOD's houses to 650 m, the hills beyond).
-    const far = world.meta?.world?.size === 'big' ? bigFar(this.quality) : LENS.far;
+    // A big world's land reaches further: its far plane too (the preset's, `OpenWorldQuality.far`: its far LOD's
+    // houses to 650 m, the hills beyond).
+    const far = world.meta?.world?.size === 'big' ? this.quality.openWorld.far : LENS.far;
     if (this.camera.camera.farClip !== far) this.camera.setLens({ ...LENS, far });
     const pb = this.orbit.panBounds;
     this.roam.setBounds({ x0: pb.x0 - 300, z0: pb.z0 - 300, x1: pb.x1 + 300, z1: pb.z1 + 300 });
@@ -2130,7 +2129,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.updateSims(frame);
     this.cars.update(frame);
     // (A car's shadow goes with it: `moved` only for a car that moved where it casts into the map, `setShadowTest`.)
-    this.sunShadows.movedIn(this.cars.moved);
+    if (this.cars.moved) this.sunShadows.moved(false);
     this.birdLife.update(frame, minute, this.frameDt, this.characters, this.simCount); // (after the residents, who scare them.)
     if (this.roofs.length && this.roofVisible() !== this.roofShown) {
       this.roofShown = !this.roofShown;
@@ -2163,7 +2162,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lot.pullChairs(this.characters.pulled, this.placing.held); // (not the one in hand.)
     this.lot.takeRestProps(this.characters.restTaken);
     // (Only residents posed where they cast into the map: `shadowPosed`, as the cars' `moved`.)
-    if (this.quality.characterShadows) this.sunShadows.movedIn(this.characters.shadowPosed);
+    if (this.quality.characterShadows && this.characters.shadowPosed) this.sunShadows.moved(false);
     const blobs = this.simShadow;
     blobs.setCount(count);
     for (let i = 0; i < count; i++) blobs.setMatrix(i, shadows, i * 16);

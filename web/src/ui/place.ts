@@ -3,6 +3,8 @@
  * the lot there, named as the town map names it, and the area (a big world's hamlet) round it.
  */
 
+import { distanceToRect } from '../render/shared/chunks';
+
 /** A lot as `placeAt` needs it. */
 export interface PlacePlot {
   id: number;
@@ -27,9 +29,7 @@ export interface PlaceArea {
 const REACH = 12;
 
 /** How far (m) a point is from a rectangle (0 inside). */
-function distance(x: number, z: number, r: { x: number; z: number; w: number; d: number }): number {
-  return Math.hypot(Math.max(r.x - x, 0, x - (r.x + r.w)), Math.max(r.z - z, 0, z - (r.z + r.d)));
-}
+const distance = (x: number, z: number, r: PlaceArea) => distanceToRect(x, z, r.x, r.z, r.w, r.d);
 
 /** The lot's name: a public place's own, a household's ("The Smiths"), else `empty` (its address). */
 export function lotTitle(p: PlacePlot, households: readonly { name: string; plot: number | null }[], empty = p.name): string {

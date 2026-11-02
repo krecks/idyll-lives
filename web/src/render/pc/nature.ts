@@ -29,6 +29,7 @@ import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from 
 import { codeFor, float, registerShaderFeature, type ShaderFeature } from './shaders/chunks';
 import type { AssetRegistry } from '../../assets/registry';
 import type { WorldStructure } from '../../core/protocol';
+import { LookedFrom } from '../shared/chunks';
 import { CountryRoads } from '../shared/countryRoads';
 import type { Lighting } from '../shared/environment';
 import { grassField, type GrassQuality } from '../shared/grass';
@@ -36,7 +37,7 @@ import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
 import { groupInstances, hideLawn, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
-import { QUALITY, type OpenWorldQuality } from '../quality';
+import type { OpenWorldQuality } from '../quality';
 import type { BenchDiag } from '../../debug/benchFlags';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
@@ -105,7 +106,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private offThread: OffThreadLand | null = null;
 
   /** `grassQuality`: how the grass is drawn (the preset's, `QualitySettings.grass`); `open`: a big world's distances (`QualitySettings.openWorld`). */
-  constructor(world: WorldStructure, lawnDensity: number, lawnLod: 0 | 1, woodsCell: number, private readonly grassQuality: GrassQuality, private readonly open: OpenWorldDistances = OPEN_WORLD) {
+  constructor(world: WorldStructure, lawnDensity: number, lawnLod: 0 | 1, woodsCell: number, private readonly grassQuality: GrassQuality, private readonly open: OpenWorldQuality) {
     super(world, (land, w, name) => new CountryRoads(land, w, name), lawnDensity, lawnLod, woodsCell, open.woodsCell);
   }
 
@@ -283,7 +284,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.built ? this.batches.filter((b) => parts.includes(b.part)).flatMap((b) => b.built.cells.flatMap((c) => c.draws.map((d) => d.meshInstance))).map((mi) => ({ mi, x: mi.aabb.center.x, z: -mi.aabb.center.z })) : [];
     this.woodsSquares = of(['woods', 'farWoods']);
     this.flowerSquares = of(['flowers']);
-    this.framedAt[0] = NaN;
+    this.framedAt.forget();
   }
 
   /** A big world's woods squares: each one's draw and where its middle is (game space). */
@@ -292,15 +293,13 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private flowerSquares: { mi: pc.MeshInstance; x: number; z: number }[] = [];
   /** A big world's ground tiles: each one's draw, its meshes by level, where its middle is and the level drawn. */
   private tiles: GroundTile[] = [];
-  /** Where `frameTiles` last looked from (NaN: chosen afresh next frame). */
-  private readonly framedAt = new Float64Array(2).fill(NaN);
+  /** Where `frameTiles` last looked from. */
+  private readonly framedAt = new LookedFrom();
 
   /** Each frame (the game's): each ground tile draws the level for its distance from (`x`, `z`), the camera's target. */
   frameTiles(x: number, z: number): void {
     // (The camera's target still: nothing changes.)
-    if (Math.abs(x - this.framedAt[0]) < 0.5 && Math.abs(z - this.framedAt[1]) < 0.5) return;
-    this.framedAt[0] = x;
-    this.framedAt[1] = z;
+    if (!this.framedAt.moved(x, z, 0.5)) return;
     const { woodsFar, flowersFar, tiles: [near, mid] } = this.open;
     for (const w of this.woodsSquares) w.mi.visible = Math.hypot(w.x - x, w.z - z) < woodsFar;
     for (const f of this.flowerSquares) f.mi.visible = Math.hypot(f.x - x, f.z - z) < flowersFar;
@@ -418,15 +417,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
 /** A big world's ground tiles (m), and their levels' quads across (the distances they change at are the preset's, `OpenWorldQuality.tiles`). */
 const TILE = 128;
 const TILE_LODS = [64, 32, 16];
-
-/** What the landscape takes of a preset's open-world distances (`OpenWorldQuality`). */
-export type OpenWorldDistances = Pick<OpenWorldQuality, 'woodsFar' | 'woodsCell' | 'flowersFar' | 'tiles'>;
-
-/**
- * Medium's: a big world's woods squares further than 560 m (middle to the camera's target) aren't
- * drawn (the haze has them), its lawn flowers' past 170 m (a flower is a few pixels by then).
- */
-const OPEN_WORLD: OpenWorldDistances = QUALITY.medium.openWorld;
 
 /**
  * One level of a ground tile from the finest level's shaded points (`at(col, row)` into `positions`
@@ -608,8 +598,8 @@ async function instanced(
   // Without its file, nothing, until the file comes (`Landscape.rebuild`).
   const template = await perfTimeAsync(`nature: model ${key}`, () => buildModel(app, key, assets.get(key, 'model'), [1, 1], { lod }));
   await pace?.();
-  const groups = groupInstances(matrices, cell);
-  const split = groups.size > 1 ? template.meshes.filter((m) => (indexCount(m) / 3) * matrices.length >= SPLIT_TRIANGLES) : [];
+  const groups = cell ? groupInstances(matrices, (m) => cell(m[12], m[14])) : new Map<string, number[]>();
+  const split = groups.size > 1 ? template.meshes.filter((m) => splitsByGroup(m, matrices.length)) : [];
   const span = perfStart(`nature: instances ${key}`);
   const draw = (m: ModelMesh, indices: readonly number[], name: string): Instances => {
     const d = new Instances(app.graphicsDevice, parent, m.mesh, m.material, { name, castShadows: false, receiveShadows: true, capacity: indices.length });
@@ -642,9 +632,10 @@ async function instanced(
   };
 }
 
-/** A mesh's triangle corners (its indices drawn). */
-function indexCount(m: ModelMesh): number {
-  return m.mesh.primitive[0]?.count ?? 0;
+/** Whether a mesh drawn `copies` times is drawn per draw group (where there are groups): `SPLIT_TRIANGLES` or more triangles over them all. As the street's (`pc/street.ts`). */
+export function splitsByGroup(m: ModelMesh, copies: number): boolean {
+  // (Its indices drawn, three a triangle.)
+  return ((m.mesh.primitive[0]?.count ?? 0) / 3) * copies >= SPLIT_TRIANGLES;
 }
 
 // ---- Wind and foliage shading -----------------------------------------------------------

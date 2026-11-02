@@ -22,12 +22,13 @@ import { drawMesh, meshFrom } from './meshes';
 import type { FrameState } from '../../core/bridge';
 import type { Seat } from '../shared/characters/seats';
 import type { WorldStructure } from '../../core/protocol';
-import { CARS, CAR_PAINT, carDoor, carriedAlong, DOORS, paintCar, paintDoor, paintWheel, wheelAt, type CarBody, type CarPose } from '../shared/cars';
+import { CARS, CAR_PAINT, carDoor, carriedAlong, DOORS, inCar, paintCar, paintDoor, paintWheel, wheelAt, type CarBody, type CarPose } from '../shared/cars';
 import { chunkAt } from '../shared/chunks';
 import { lerpAngle, wrapAngle } from '../shared/characters/rig';
 import { DOOR_SWING, ease } from '../shared/doors';
 import { Geo } from '../shared/geometry';
 import { GAME_RATE } from '../shared/gameSpeed';
+import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
 import { blob, Painter } from '../shared/street';
 
 /** How wide a door opens (degrees). It swings as a house's door does (`DOOR_SWING`, in game time: about 9 sim ticks, which getting in and out leave it, sim-core `cars::DOOR_OPENS`). */
@@ -51,6 +52,8 @@ const SPEED_RATE = 4;
 const JUMP = 10;
 /** Height of the body and wheels over the ground (as the street's `paintCar`). */
 const LIFT = 0.015;
+/** Each body's four wheels (`wheelAt`), worked out once. */
+const WHEELS = CARS.map((body) => [0, 1, 2, 3].map((w) => wheelAt(body, w)));
 
 /** A car's own entity, while it drives or has a door open. */
 interface Own {
@@ -71,18 +74,21 @@ interface Drawn {
   paint: number;
   /** Where it's drawn now (`shown`: the snapshot's, 0 out of town, 1 parked, 2 moving). */
   at: { x: number; z: number; yaw: number; shown: number };
-  /** Where it was drawn last frame (its wheels turn by the way between). */
-  last: { x: number; z: number; yaw: number };
+  /** Where it was drawn last frame (its wheels turn by the way between), and whether and how (`at.shown`). */
+  last: { x: number; z: number; yaw: number; shown: number };
   /** Where the newest snapshot has it, and whether it drives in either snapshot: those riding in it sit in that frame (`ride`). */
   snap: { x: number; z: number; yaw: number; driving: boolean };
-  /** How far open each door is (0..1), and which way each opens (+1 or -1). */
+  /** How far open each door is (0..1), which way each opens (+1 or -1), and whether any is open at all. */
   open: number[];
   sides: number[];
+  ajar: boolean;
   /** Its own entity, made the first time it drives or opens a door (null till then). */
   own: Own | null;
   /** Whether it is drawn (in town, near, not hidden), and whether by its own entity (else the parked draw for its look). */
   drawn: boolean;
   owned: boolean;
+  /** Its wheels' and contact shadow's place in their draws while drawn (as `writeAround` last wrote them). */
+  slot: number;
   /** The wheels' turn (rad, about their axle), the front ones' steer (rad, +: towards +x), the body's tilt (rad, nose up) and its speed (m/s, smoothed). */
   spin: number;
   steer: number;
@@ -109,8 +115,11 @@ export class Cars {
   private readonly parked = new Map<string, Parked>();
   private wheels: Instances | null = null;
   private shadowDraw: Instances | null = null;
-  /** The wheels and contact shadows are written again (a car drawn moved, or came or went). */
+  /** The wheels and contact shadows are written again: every car's (one came or went), or only those of the cars drawn that moved (`stirred`). */
   private around = true;
+  private readonly stirred: Drawn[] = [];
+  /** The cars in town driving in either snapshot (`pose`): all a resident who wasn't riding can be riding in (`ride`). */
+  private readonly driving: Drawn[] = [];
   /** Whether a car moved in the last frame where it casts a shadow into the sun's map (the map is to be drawn again). */
   moved = false;
   /** Cars standing in here (x0, z0, x1, z1) aren't drawn (`hideOn`). */
@@ -123,8 +132,9 @@ export class Cars {
   /** The frame the cars were last placed for (`pose`: the residents riding in them ask first). */
   private posedAt = NaN;
   private posedCurr: Float32Array | null = null;
-  /** Scratch: a matrix (game space). */
+  /** Scratch: a matrix (game space), and a turn. */
   private readonly m = new Float32Array(16);
+  private readonly q: Quat = [0, 0, 0, 1];
 
   constructor(
     private readonly app: pc.AppBase,
@@ -154,13 +164,15 @@ export class Cars {
         body,
         paint,
         at,
-        last: { x: at.x, z: at.z, yaw: at.yaw },
+        last: { x: at.x, z: at.z, yaw: at.yaw, shown: 0 },
         snap: { x: at.x, z: at.z, yaw: at.yaw, driving: false },
         open: new Array<number>(DOORS).fill(0),
         sides: Array.from({ length: DOORS }, (_, d) => carDoor(shape, d).side),
+        ajar: false,
         own: null,
         drawn: false,
         owned: false,
+        slot: -1,
         spin: 0,
         steer: 0,
         pitch: 0,
@@ -200,25 +212,36 @@ export class Cars {
     for (let i = 0; i < this.cars.length; i++) {
       const car = this.cars[i];
       const { at, last } = car;
-      if (!at.shown) continue;
-      const o = layout.carBase + i * layout.carStride;
-      let changed = at.x !== last.x || at.z !== last.z || at.yaw !== last.yaw;
-      // (Paused, nothing goes on settling.)
-      if (changed) this.roll(car, real);
-      else if (rate > 0) changed = this.settle(car, real);
-      [last.x, last.z, last.yaw] = [at.x, at.z, at.yaw];
-      const open = doorsAt === undefined ? 0 : curr[o + doorsAt];
-      for (let d = 0; d < DOORS; d++) {
-        const target = open & (1 << d) ? 1 : 0;
-        if (car.open[d] === target) continue;
-        car.open[d] = target > car.open[d] ? Math.min(1, car.open[d] + step) : Math.max(0, car.open[d] - step);
-        changed = true;
+      // (Into town or out of it, parked or off driving: drawn another way, `restate`.)
+      const shown = at.shown !== last.shown;
+      last.shown = at.shown;
+      let changed = false;
+      if (at.shown) {
+        const o = layout.carBase + i * layout.carStride;
+        changed = at.x !== last.x || at.z !== last.z || at.yaw !== last.yaw;
+        // (Paused, nothing goes on settling.)
+        if (changed) this.roll(car, real);
+        else if (rate > 0) changed = this.settle(car, real);
+        [last.x, last.z, last.yaw] = [at.x, at.z, at.yaw];
+        const open = doorsAt === undefined ? 0 : curr[o + doorsAt];
+        let ajar = false;
+        for (let d = 0; d < DOORS; d++) {
+          const target = open & (1 << d) ? 1 : 0;
+          if (car.open[d] !== target) {
+            car.open[d] = target > car.open[d] ? Math.min(1, car.open[d] + step) : Math.max(0, car.open[d] - step);
+            changed = true;
+          }
+          if (car.open[d] > 0) ajar = true;
+        }
+        car.ajar = ajar;
       }
-      if (!changed || !car.drawn) continue;
-      this.around = true;
-      if (this.shadows && this.inShadows(at.x, at.z)) this.moved = true;
+      if (changed && car.drawn) {
+        this.stirred.push(car);
+        if (this.shadows && this.inShadows(at.x, at.z)) this.moved = true;
+      }
+      if (changed || shown) this.restate(car);
     }
-    this.apply();
+    this.flush();
   }
 
   /**
@@ -227,7 +250,7 @@ export class Cars {
    */
   hideOn(rect: readonly [number, number, number, number] | null): void {
     this.hidden = rect;
-    this.apply();
+    this.restateAll();
   }
 
   /**
@@ -237,7 +260,7 @@ export class Cars {
   setView(chunks: ReadonlySet<number> | null, x: number, z: number): void {
     this.chunks = chunks;
     this.eye = { x, z };
-    this.apply();
+    this.restateAll();
   }
 
   /** Whether a spot can cast into the sun's map (`SunShadows.reaches`; null: anywhere): a car moving elsewhere doesn't draw it again. */
@@ -247,13 +270,7 @@ export class Cars {
 
   /** The seat of a car at (x, z) where it's drawn (someone sat in it, parked or driving), else null: for `Residents.setCarSeat`. */
   seatAt(x: number, z: number): Seat | null {
-    for (const { shape, at } of this.cars) {
-      if (!at.shown) continue;
-      const [dx, dz] = [x - at.x, z - at.z];
-      const along = dx * Math.sin(at.yaw) + dz * Math.cos(at.yaw);
-      const across = dx * Math.cos(at.yaw) - dz * Math.sin(at.yaw);
-      if (Math.abs(along) < shape.len / 2 && Math.abs(across) < shape.wid / 2) return CAR_SEAT;
-    }
+    for (const { shape, at } of this.cars) if (at.shown && inCar(shape, at, x, z)) return CAR_SEAT;
     return null;
   }
 
@@ -267,8 +284,8 @@ export class Cars {
   ride(frame: FrameState, x: number, z: number, yaw: number, aboard: boolean, out: CarPose): boolean {
     if (!this.cars.length) return false;
     this.pose(frame);
-    for (const { shape, snap, at } of this.cars) {
-      if ((snap.driving || aboard) && at.shown && carriedAlong(shape, snap, at, x, z, yaw, out)) return true;
+    for (const { shape, snap, at } of aboard ? this.cars : this.driving) {
+      if (at.shown && carriedAlong(shape, snap, at, x, z, yaw, out)) return true;
     }
     return false;
   }
@@ -276,6 +293,8 @@ export class Cars {
   clear(): void {
     for (const c of this.cars) c.own?.entity.destroy();
     this.cars = [];
+    this.stirred.length = 0;
+    this.driving.length = 0;
     for (const p of this.parked.values()) p.draw.destroy();
     this.parked.clear();
     this.wheels?.destroy();
@@ -299,6 +318,7 @@ export class Cars {
     if (now === this.posedAt && curr === this.posedCurr) return;
     this.posedAt = now;
     this.posedCurr = curr;
+    this.driving.length = 0;
     const base = layout.carBase;
     const stride = layout.carStride;
     const f = layout.car;
@@ -320,6 +340,7 @@ export class Cars {
       at.yaw = lerpAngle(prev[o + f.yaw], cyaw, k);
       [snap.x, snap.z, snap.yaw] = [cx, cz, cyaw];
       snap.driving = at.shown === 2 || was === 2;
+      if (snap.driving) this.driving.push(this.cars[i]);
     }
   }
 
@@ -383,23 +404,31 @@ export class Cars {
     return !e || Math.hypot(at.x - e.x, at.z - e.z) <= FAR;
   }
 
-  /** How each car is drawn now (by its own entity, in its look's parked draw, or not at all), and the draws written again where that changed. */
-  private apply(): void {
-    for (const car of this.cars) {
-      const drawn = this.visible(car.at);
-      const owned = drawn && (car.at.shown === 2 || car.pitch !== 0 || car.open.some((o) => o > 0));
-      if (drawn !== car.drawn || owned !== car.owned) {
-        // (In or out of a parked draw, and the wheels and shadows with it.)
-        const parked = (car.drawn && !car.owned) || (drawn && !owned) ? this.parkedFor(car) : null;
-        if (parked) parked.dirty = true;
-        this.around = true;
-        if (this.shadows && this.inShadows(car.at.x, car.at.z)) this.moved = true;
-        car.drawn = drawn;
-        car.owned = owned;
-      }
-      if (owned) this.placeOwn(car);
-      else if (car.own?.entity.enabled) car.own.entity.enabled = false;
+  /** How a car is drawn now (by its own entity, in its look's parked draw, or not at all), its own entity placed. */
+  private restate(car: Drawn): void {
+    const drawn = this.visible(car.at);
+    const owned = drawn && (car.at.shown === 2 || car.pitch !== 0 || car.ajar);
+    if (drawn !== car.drawn || owned !== car.owned) {
+      // (In or out of a parked draw; came or went, the wheels and shadows with it.)
+      const parked = (car.drawn && !car.owned) || (drawn && !owned) ? this.parkedFor(car) : null;
+      if (parked) parked.dirty = true;
+      if (drawn !== car.drawn) this.around = true;
+      if (this.shadows && this.inShadows(car.at.x, car.at.z)) this.moved = true;
+      car.drawn = drawn;
+      car.owned = owned;
     }
+    if (owned) this.placeOwn(car);
+    else if (car.own?.entity.enabled) car.own.entity.enabled = false;
+  }
+
+  /** Every car `restate`d (what's hidden or near changed), and the draws written again where that changed. */
+  private restateAll(): void {
+    for (const car of this.cars) this.restate(car);
+    this.flush();
+  }
+
+  /** The parked draws, wheels and contact shadows written again where they changed. */
+  private flush(): void {
     for (const [look, p] of this.parked) {
       if (!p.dirty) continue;
       p.dirty = false;
@@ -409,104 +438,66 @@ export class Cars {
       n = 0;
       for (const car of this.cars) {
         if (car.look !== look || !car.drawn || car.owned) continue;
-        p.draw.setMatrix(n++, this.carMatrix(car.at, 0));
+        p.draw.setMatrix(n++, this.carMatrix(car.at));
       }
       p.draw.update();
       p.draw.enabled = n > 0;
     }
-    if (this.around) this.writeAround();
+    this.writeAround();
   }
 
-  /** Every drawn car's wheels and contact shadow, written again. */
+  /** The drawn cars' wheels and contact shadows written again: all of them when one came or went (`around`), else those that moved (`stirred`). */
   private writeAround(): void {
-    this.around = false;
     const wheels = this.wheels;
     const shadows = this.shadowDraw;
-    let n = 0;
-    for (const car of this.cars) if (car.drawn) n++;
-    wheels?.setCount(n * 4);
-    shadows?.setCount(n);
-    const m = this.m;
-    let j = 0;
-    for (const car of this.cars) {
-      if (!car.drawn) continue;
-      const { at, shape } = car;
-      const [s, c] = [Math.sin(at.yaw), Math.cos(at.yaw)];
-      if (wheels) {
-        const r = shape.wheelR;
-        for (let w = 0; w < 4; w++) {
-          const { side, x, z, front } = wheelAt(shape, w);
-          // The left ones turned round (their hubs face out), turning the other way for it.
-          const yaw = at.yaw + (front ? car.steer : 0) + (side < 0 ? Math.PI : 0);
-          const spin = side < 0 ? -car.spin : car.spin;
-          const [sy, cy, sp, cp] = [Math.sin(yaw), Math.cos(yaw), Math.sin(spin), Math.cos(spin)];
-          // Turned about y (`yaw`), then about x (`spin`), scaled by its radius across y and z.
-          m[0] = cy;
-          m[1] = 0;
-          m[2] = -sy;
-          m[3] = 0;
-          m[4] = sy * sp * r;
-          m[5] = cp * r;
-          m[6] = cy * sp * r;
-          m[7] = 0;
-          m[8] = sy * cp * r;
-          m[9] = -sp * r;
-          m[10] = cy * cp * r;
-          m[11] = 0;
-          m[12] = at.x + x * c + z * s;
-          m[13] = r + LIFT;
-          m[14] = at.z - x * s + z * c;
-          m[15] = 1;
-          wheels.setMatrix(j * 4 + w, m);
-        }
-      }
-      if (shadows) {
-        const [rx, rz] = [shape.wid * 0.62, shape.len * 0.56];
-        m.fill(0);
-        m[0] = c * rx;
-        m[2] = -s * rx;
-        m[5] = 1;
-        m[8] = s * rz;
-        m[10] = c * rz;
-        m[12] = at.x;
-        m[14] = at.z;
-        m[15] = 1;
-        shadows.setMatrix(j, m);
-      }
-      j++;
-    }
+    if (this.around) {
+      this.around = false;
+      let n = 0;
+      for (const car of this.cars) car.slot = car.drawn ? n++ : -1;
+      wheels?.setCount(n * 4);
+      shadows?.setCount(n);
+      for (const car of this.cars) if (car.drawn) this.writeCar(car);
+    } else if (this.stirred.length) {
+      for (const car of this.stirred) this.writeCar(car);
+    } else return;
+    this.stirred.length = 0;
     if (wheels) {
       wheels.update();
-      wheels.enabled = n > 0;
+      wheels.enabled = wheels.count > 0;
     }
     if (shadows) {
       shadows.update();
-      shadows.enabled = n > 0;
+      shadows.enabled = shadows.count > 0;
     }
   }
 
-  /** A car's body in game space (`pitch`: nose up, about its middle on the ground). */
-  private carMatrix(at: Drawn['at'], pitch: number): Float32Array {
-    const m = this.m;
-    const [s, c, sp, cp] = [Math.sin(at.yaw), Math.cos(at.yaw), Math.sin(-pitch), Math.cos(-pitch)];
-    // Turned about y, then (nose up: back about x) tilted.
-    m[0] = c;
-    m[1] = 0;
-    m[2] = -s;
-    m[3] = 0;
-    m[4] = s * sp;
-    m[5] = cp;
-    m[6] = c * sp;
-    m[7] = 0;
-    m[8] = s * cp;
-    m[9] = -sp;
-    m[10] = c * cp;
-    m[11] = 0;
-    m[12] = at.x;
-    m[13] = 0;
-    m[14] = at.z;
-    m[15] = 1;
-    return m;
+  /** A drawn car's four wheels and its contact shadow, at its `slot`. */
+  private writeCar(car: Drawn): void {
+    const { at, shape, slot } = car;
+    const { m, q } = this;
+    const [s, c] = [Math.sin(at.yaw), Math.cos(at.yaw)];
+    const wheels = this.wheels;
+    if (wheels) {
+      const r = shape.wheelR;
+      const four = WHEELS[car.body];
+      for (let w = 0; w < 4; w++) {
+        const { side, x, z, front } = four[w];
+        // The left ones turned round (their hubs face out), turning the other way for it.
+        const yaw = at.yaw + (front ? car.steer : 0) + (side < 0 ? Math.PI : 0);
+        const spin = side < 0 ? -car.spin : car.spin;
+        // Turned about y (`yaw`), then about x (`spin`), scaled by its radius across y and z.
+        compose(1, r, r, quatYawPitchRoll(yaw, spin, 0, q), at.x + x * c + z * s, r + LIFT, at.z - x * s + z * c, m);
+        wheels.setMatrix(slot * 4 + w, m);
+      }
+    }
+    // (A blob of radius 1, stretched to the car's size.)
+    this.shadowDraw?.setMatrix(slot, compose(shape.wid * 0.62, 1, shape.len * 0.56, quatYawPitchRoll(at.yaw, 0, 0, q), at.x, 0, at.z, m));
+  }
+
+  /** A parked car's body in game space (turned about y). */
+  private carMatrix(at: Drawn['at']): Float32Array {
+    compose(1, 1, 1, quatYawPitchRoll(at.yaw, 0, 0, this.q), at.x, 0, at.z, this.m);
+    return this.m;
   }
 
   /** A car drawn by its own entity, placed, tilted, its doors swung, in one piece while they're shut. */
@@ -517,13 +508,9 @@ export class Cars {
     own.entity.setLocalEulerAngles(0, (car.at.yaw * 180) / Math.PI, 0);
     // (Nose up: turned back about x.)
     own.tilt.setLocalEulerAngles((-car.pitch * 180) / Math.PI, 0, 0);
-    let shut = true;
-    for (let d = 0; d < DOORS; d++) {
-      const open = car.open[d];
-      if (open > 0) shut = false;
-      // The rear edge swings out (`paintDoor`).
-      own.doors[d].setLocalEulerAngles(0, -car.sides[d] * DOOR_OPEN * ease(open), 0);
-    }
+    // The rear edge swings out (`paintDoor`).
+    for (let d = 0; d < DOORS; d++) own.doors[d].setLocalEulerAngles(0, -car.sides[d] * DOOR_OPEN * ease(car.open[d]), 0);
+    const shut = !car.ajar;
     if (own.whole.enabled !== shut) {
       own.whole.enabled = shut;
       own.apart.enabled = !shut;

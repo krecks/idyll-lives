@@ -7,7 +7,7 @@
  * keep their size and place while the camera turns and the sun steps, and it is drawn again only
  * when something in it changed (`moved`): the sun's step, a resident's pose (throttled to the
  * preset's `shadowRate`), a thing placed, the walls; a car or a resident moving only when it is in
- * the square or near it (`movedIn`, `rect`). Casters outside the square aren't drawn. The menus' town is fitted round the camera's
+ * the square or near it (`reaches`). Casters outside the square aren't drawn. The menus' town is fitted round the camera's
  * view instead, and drawn every frame.
  *
  * PlayCanvas fits a directional light's map to the camera's view. For a light with a square, the
@@ -62,17 +62,9 @@ const NORMAL_OFFSET_TEXELS = 0.75;
  */
 const SHADOW_BIAS = 0.02;
 
-/** A rectangle on the ground (game space, m): from (`x0`, `z0`) to (`x1`, `z1`). */
-export interface GroundRect {
-  x0: number;
-  z0: number;
-  x1: number;
-  z1: number;
-}
-
 /**
  * How far (m) past the square's edge a moving caster can still throw its shadow into the map (a
- * resident or a car with the sun low): one moving further out leaves the map as it is (`movedIn`).
+ * resident or a car with the sun low): one moving further out leaves the map as it is (`reaches`).
  */
 export const CASTER_REACH = 8;
 
@@ -203,8 +195,8 @@ export class SunShadows {
   private overview = false;
   private readonly size: number;
   private readonly square: Square = { centre: new pc.Vec3(), radius: 30 };
-  /** The square on the ground (game space), as `rect` hands it out. */
-  private readonly ground: GroundRect = { x0: -30, z0: -30, x1: 30, z1: 30 };
+  /** The square on the ground (game space, m): from (`x0`, `z0`) to (`x1`, `z1`). */
+  private readonly ground = { x0: -30, z0: -30, x1: 30, z1: 30 };
   private readonly fadeId: pc.ScopeId;
   private readonly fade: number;
   /** Something in the map changed (`moved`; `urgent`: not a resident's pose), for what else holds a picture of the world (the mirrors). */
@@ -253,34 +245,14 @@ export class SunShadows {
   }
 
   /**
-   * The ground the map covers now (game space, m; the same object, changed in place by `setSquare`),
-   * or null in the menus' town, whose map follows the view and is drawn every frame. A caster
-   * moving outside it (and `CASTER_REACH` round it) changes nothing in the map.
+   * Whether a caster moving at (x, z) (game space) could change the map: it is within `CASTER_REACH` m
+   * of the square (always, in the menus' town, whose map follows the view). What the cars and
+   * residents ask of each that moved: one moving across town leaves the map as it is.
    */
-  get rect(): Readonly<GroundRect> | null {
-    return this.overview ? null : this.ground;
-  }
-
-  /** Whether something moving within `r` (game space) could change the map: it is within `reach` m of the square (always, in the menus' town). */
-  touches(r: Readonly<GroundRect>, reach = CASTER_REACH): boolean {
+  reaches(x: number, z: number): boolean {
     const g = this.ground;
-    return this.overview || (r.x1 >= g.x0 - reach && r.x0 <= g.x1 + reach && r.z1 >= g.z0 - reach && r.z0 <= g.z1 + reach);
-  }
-
-  /** `touches` for one caster at (x, z), with no rectangle made: what the cars and residents ask of each that moved. */
-  reaches(x: number, z: number, reach = CASTER_REACH): boolean {
-    const g = this.ground;
-    return this.overview || (x >= g.x0 - reach && x <= g.x1 + reach && z >= g.z0 - reach && z <= g.z1 + reach);
-  }
-
-  /**
-   * Casters moved (`moved(urgent)`): `true` anywhere, `false`/null nothing, or the rectangle round
-   * those that moved (game space), drawn again only when it `touches` the square: a car or a
-   * resident moving across town leaves the map as it is.
-   */
-  movedIn(what: boolean | Readonly<GroundRect> | null | undefined, urgent = false): void {
-    if (!what) return;
-    if (what === true || this.touches(what)) this.moved(urgent);
+    const r = CASTER_REACH;
+    return this.overview || (x >= g.x0 - r && x <= g.x1 + r && z >= g.z0 - r && z <= g.z1 + r);
   }
 
   /** The menus' town (fitted round the view, drawn every frame, no fade at its edge) or the game. */

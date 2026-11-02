@@ -27,7 +27,7 @@ import type { HouseBuilder, HouseMesh } from './house';
 import { MaterialLibrary, GAME_FRONT_FACE } from './materials';
 import { drawMesh, meshFrom, type DrawOptions } from './meshes';
 import { buildModel, withGlows, type ModelMesh, type ModelTemplate } from './models';
-import { windStill } from './nature';
+import { splitsByGroup, windStill } from './nature';
 import { TemplateCache } from './templateCache';
 import type { AssetRegistry } from '../../assets/registry';
 import type { ModelEntry } from '../../assets/types';
@@ -38,8 +38,8 @@ import type { RGB } from '../shared/environment';
 import type { Geo, MeshData } from '../shared/geometry';
 import type { HousePart } from '../shared/house';
 import type { StandIn } from '../shared/modelEntry';
-import { chunkAt, chunkCoords, groupOf, SUPERCHUNK } from '../shared/chunks';
-import { SPLIT_TRIANGLES } from '../shared/nature';
+import { chunkAt, chunkCoords, distanceToRect, groupOf, LookedFrom, SUPERCHUNK } from '../shared/chunks';
+import { groupInstances } from '../shared/nature';
 import { castsShadow, FOLIAGE, instanceMatrix, NO_FOCUS, TownStreet, type ChunkPlan, type Inst, type ObjectLook } from '../shared/street';
 import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
 
@@ -208,8 +208,8 @@ export class Street {
   private readonly ground: boolean;
   private readonly fenceStyles: readonly FenceStyleDef[];
   private readonly farCull: number;
-  /** Where `frame` last chose what is drawn (NaN: choose again next frame). */
-  private readonly framedAt = new Float64Array(2).fill(NaN);
+  /** Where `frame` last chose what is drawn. */
+  private readonly framedAt = new LookedFrom();
   /** The streetlights' pools are drawn (at night: `setNight`). */
   private poolsLit = false;
 
@@ -416,7 +416,8 @@ export class Street {
     // Models from the last build that aren't used now are hidden.
     for (const [k, p] of this.placed) if (!batches.get(k)?.length) this.hide(p);
     this.used = new Set([...batches].filter(([, items]) => items.length).map(([k]) => k));
-    // (Their far versions too, where drawn: a file of one that comes builds it again, `invalidate`.)
+    // (Their far versions too, where drawn: a file of one that comes builds it again, `invalidate`. Here those the
+    // last build drew, while this one awaits; `instances` adds those it draws now.)
     for (const [k, p] of this.placed) if (p.far && this.used.has(k)) this.used.add(farKey(k));
     this.plants = [...batches].flatMap(([k, items]) => items.map(([x, z, s, sy, yaw, y = 0]): StreetPlant => ({ key: k, x, y, z, sx: s, sy, sz: k === FOLIAGE.hedge ? 1 : s, yaw })));
     for (const [k, items] of batches) {
@@ -429,8 +430,7 @@ export class Street {
       await perfTimeAsync(`street: batch ${k}`, () => this.instances(k, items, k === FOLIAGE.hedge, castsShadow(k), town.footprints.get(k), town.standIns.get(k), pace));
     }
     perfEnd(batchesSpan);
-    for (const [k, p] of this.placed) if (p.far && this.used.has(k)) this.used.add(farKey(k));
-    this.framedAt[0] = NaN;
+    this.framedAt.forget();
     // What files that came replace (the boxes) is drawn no more.
     this.disposeStale();
     const lamps = this.lamps;
@@ -560,9 +560,7 @@ export class Street {
    * far versions. Chosen again only once the target has moved (`REFRAME`) or the street was built.
    */
   frame(x: number, z: number): void {
-    if (Math.abs(x - this.framedAt[0]) < REFRAME && Math.abs(z - this.framedAt[1]) < REFRAME) return;
-    this.framedAt[0] = x;
-    this.framedAt[1] = z;
+    if (!this.framedAt.moved(x, z, REFRAME)) return;
     for (const g of this.farGroups.values()) {
       if (!g.entity) continue;
       g.entity.enabled = Math.hypot(g.x - x, g.z - z) <= this.farCull + SUPERCHUNK * 0.71;
@@ -570,9 +568,7 @@ export class Street {
     for (const [k, p] of this.placed) {
       if (!p.far || !this.used.has(k)) continue;
       for (const c of p.cells.values()) {
-        const dx = Math.max(c.x - x, 0, x - (c.x + SUPERCHUNK));
-        const dz = Math.max(c.z - z, 0, z - (c.z + SUPERCHUNK));
-        const far = Math.hypot(dx, dz) > FAR_MODELS;
+        const far = distanceToRect(x, z, c.x, c.z, SUPERCHUNK, SUPERCHUNK) > FAR_MODELS;
         if (far === c.farNow) continue;
         c.farNow = far;
         showCell(c);
@@ -795,17 +791,12 @@ export class Street {
     await pace?.();
     if (this.destroyed) return;
     // The copies by draw group, and which meshes are drawn per group.
-    const groups = new Map<number, number[]>();
-    items.forEach((it, i) => {
-      const g = groupOf(chunkAt(it[0], it[1]));
-      const list = groups.get(g);
-      if (list) list.push(i);
-      else groups.set(g, [i]);
-    });
+    const groups = groupInstances(items, (it) => groupOf(chunkAt(it[0], it[1])));
     // (Not in the menus' town, which has the whole town in view: as the landscape's, `pc/nature.ts`.)
-    let split = t.meshes.map((m) => this.layers === undefined && groups.size > 1 && (indexCount(m) / 3) * items.length >= SPLIT_TRIANGLES);
+    let split = t.meshes.map((m) => this.layers === undefined && groups.size > 1 && splitsByGroup(m, items.length));
+    const grouped = split.some(Boolean);
     // (The game's full-detail street, a model with a far version: the groups far off draw that.)
-    const farWanted = split.some(Boolean) && this.lod === 0 && this.layers === undefined && !!entry?.far && !t.boxed;
+    const farWanted = grouped && this.lod === 0 && this.layers === undefined && !!entry?.far && !t.boxed;
     const farT = farWanted ? await perfTimeAsync(`street: model ${key} (far)`, () => this.templates.get(farKey(key), () => buildModel(this.app, `street:${key}:far`, entry, footprint, { far: true }))) : null;
     if (this.destroyed) return;
     const far = farT && farT.meshes.length ? farT : null;
@@ -835,6 +826,8 @@ export class Street {
       }
     }
     p.far = far;
+    // (Its far version is drawn: a file of it that comes builds it again, `invalidate`.)
+    if (far) this.used.add(farKey(key));
     const span = perfStart(`street: matrices ${key}`);
     const all = items.map((_, i) => i);
     const fill = (d: Instances, indices: readonly number[]) => {
@@ -853,11 +846,11 @@ export class Street {
     for (const g of p.glows) fill(g.draw, all);
     // The groups: those gone go, the rest written again.
     for (const [id, c] of p.cells) {
-      if (groups.has(id) && split.some(Boolean)) continue;
+      if (groups.has(id) && grouped) continue;
       dropCell(c);
       p.cells.delete(id);
     }
-    if (split.some(Boolean)) {
+    if (grouped) {
       for (const [id, indices] of groups) {
         let c = p.cells.get(id);
         if (!c) {
@@ -897,11 +890,6 @@ export class Street {
 
 /** The template cache's key of a model's far version (the street's draw groups far off, `FAR_MODELS`). */
 const farKey = (key: string) => `${key}|far`;
-
-/** A mesh's triangle corners (its indices drawn). */
-function indexCount(m: ModelMesh): number {
-  return m.mesh.primitive[0]?.count ?? 0;
-}
 
 /** A draw group's copies drawn as it is now: its far version's meshes or the template's, never both. */
 function showCell(c: Cell): void {

@@ -308,14 +308,13 @@ export function lawnLayer<D>(draws: D[], matrices: readonly ArrayLike<number>[],
   return { draws, base, shown: new Float32Array(base), tiles: Int32Array.from(indices, (k) => tiles[k]), hidden: new Uint8Array(indices.length) };
 }
 
-/** A model's instances grouped by `cell` (each group's indices into `matrices`, in their order); empty without one. */
-export function groupInstances(matrices: readonly ArrayLike<number>[], cell?: (x: number, z: number) => string): Map<string, number[]> {
-  const groups = new Map<string, number[]>();
-  if (!cell) return groups;
-  matrices.forEach((m, i) => {
-    const k = cell(m[12], m[14]);
-    const group = groups.get(k);
-    if (group) group.push(i);
+/** A model's copies grouped by `group` (each group's indices into `items`, in their order): the woods' and the street's draw groups. */
+export function groupInstances<T, K>(items: readonly T[], group: (item: T) => K): Map<K, number[]> {
+  const groups = new Map<K, number[]>();
+  items.forEach((it, i) => {
+    const k = group(it);
+    const list = groups.get(k);
+    if (list) list.push(i);
     else groups.set(k, [i]);
   });
   return groups;

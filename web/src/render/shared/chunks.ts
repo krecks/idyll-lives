@@ -30,6 +30,30 @@ export const groupOf = (id: number): number => {
   return chunkId(Math.floor(cx / k), Math.floor(cz / k));
 };
 
+/** How far (m) a ground point (`x`, `z`) is from the rectangle from (`x0`, `z0`), `w` by `d` m (0 on it). */
+export function distanceToRect(x: number, z: number, x0: number, z0: number, w: number, d: number): number {
+  return Math.hypot(Math.max(x0 - x, 0, x - (x0 + w)), Math.max(z0 - z, 0, z - (z0 + d)));
+}
+
+/** A ground point last looked from (the camera's target), so a still camera costs nothing: `moved` once it has gone `by` m or more along x or z. */
+export class LookedFrom {
+  private x = NaN;
+  private z = NaN;
+
+  /** Whether (`x`, `z`) is `by` m or more from the point last looked from along x or z (always, after `forget`): then it is looked from. */
+  moved(x: number, z: number, by: number): boolean {
+    if (Math.abs(x - this.x) < by && Math.abs(z - this.z) < by) return false;
+    this.x = x;
+    this.z = z;
+    return true;
+  }
+
+  /** Looked from afresh next time (what is drawn changed). */
+  forget(): void {
+    this.x = NaN;
+  }
+}
+
 /** A chunk's rectangle (m). */
 export function chunkRect(id: number): { x: number; z: number; w: number; d: number } {
   const [cx, cz] = chunkCoords(id);
