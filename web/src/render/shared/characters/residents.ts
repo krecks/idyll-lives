@@ -1864,7 +1864,6 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     }
     if (this.ghosts.length) this.poseGhosts(count, dt, time);
     this.faceDetail(count + this.ghosts.length);
-    if (this.shadowsBare) this.bareShadows();
     this.writeRing(this.reducedMotion ? 0 : now * 0.001);
     for (let i = count + this.ghosts.length; i < MAX_CHARACTERS; i++) {
       if (!this.visible[i]) continue;
@@ -3931,29 +3930,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     d[row + set.bones.length * 16 + 18] = clamp((flex / 2 - SIT_FROM) / (SIT_FLEX - SIT_FROM), 0, 1) * rig.size;
   }
 
-  /** Someone's `bare` changed: the shells' shadow copies are drawn again for the Sims that wear them now (`bareShadows`). */
+  /** Someone's `bare` changed: the shells' shadow copies are drawn again for the Sims that wear them now (`faceDetail`). */
   private shadowsBare = false;
-
-  /**
-   * The shells' shadow copies drawn for the Sims whose clothes now draw them (the drawn shells are left out
-   * per frame, `faceDetail`; the shadow copies keep their rows, so only when someone's `bare` changes).
-   */
-  private bareShadows(): void {
-    this.shadowsBare = false;
-    for (const pm of this.shadowMeshes.values()) {
-      if (!pm.shell || !pm.enabled) continue;
-      const ids = [...pm.all.filter((_, j) => j % 4 === 0)].filter((id) => !(pm.shell & this.bare[id]));
-      if (ids.length === pm.count && ids.every((id, j) => pm.settings[j * 4] === id)) continue;
-      // (Nobody: not drawn, its rows kept.)
-      if (ids.length) {
-        const settings = new Float32Array(ids.length * 4);
-        ids.forEach((id, j) => (settings[j * 4] = settings[j * 4 + 1] = id));
-        pm.settings = settings;
-      }
-      pm.count = ids.length;
-      this.view.partRows(pm.mesh, pm.settings, pm.count, ids.length ? 'new' : 'count');
-    }
-  }
+  /** Per Sim row: whether it was drawn when the parts' rows were last written (`faceDetail`: who is drawn changed). */
+  private readonly listed = new Uint8Array(MAX_CHARACTERS);
+  /** The parts' rows were all set again (`setInstances`): `faceDetail` leaves out those not drawn, from every one. */
+  private listsStale = true;
 
   /**
    * Blanket over a Sim asleep in a bed: fitted to the slot (half of a double bed, or a single bed)
@@ -4184,17 +4166,23 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     pm.settings = settings;
     pm.all = settings.slice();
     pm.count = n;
+    this.listsStale = true;
     // Parts drawn by distance rewrite their rows each frame.
     this.view.setPartRows(pm.mesh, settings, !(pm.detail === 0 && pm.range === Range.Always));
   }
 
   /**
-   * How big each Sim's face is on screen (`facePx`: px per 5 cm), and the small face parts (teeth,
-   * tongue, lashes, brows) drawn only on the faces big enough to show them.
+   * How big each Sim's face is on screen (`facePx`: px per 5 cm), and the rows each part draws: only
+   * those drawn now (not those hidden, away or out of view: every part, shadow-only copies too, or
+   * they're skinned all the same, to nothing), the small face parts (teeth, tongue, lashes, brows)
+   * only on the faces big enough to show them, the low-detail body or the full one by distance, and
+   * not the shells clothes leave out. Parts drawn whatever the distance are written again only when
+   * who is drawn changes.
    */
   private faceDetail(count: number): void {
     const c = this.cam;
     const px = this.facePx;
+    const shown = this.visible;
     // (No camera, or one without perspective: full detail.)
     if (!this.hasCam || Number.isNaN(c[4])) {
       px.fill(1e6);
@@ -4202,7 +4190,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const k = (0.05 * c[3]) / (2 * Math.tan(c[4] / 2));
       for (let i = 0; i < count; i++) {
         const rig = this.sims[i];
-        if (!rig || !this.visible[i]) {
+        if (!rig || !shown[i]) {
           px[i] = 0;
           continue;
         }
@@ -4215,35 +4203,51 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         px[i] = (k * rig.scale * rig.head) / Math.max(d, 0.05);
       }
     }
-    // Low detail far from the camera (with a gap between switching down and up).
+    // Low detail far from the camera (with a gap between switching down and up); those not drawn keep theirs.
     const far = this.far;
     for (let i = 0; i < count; i++) {
+      if (!shown[i]) continue;
       if (far[i] && px[i] > LOD_NEAR_PX) far[i] = 0;
       else if (!far[i] && px[i] < LOD_FAR_PX && this.hasLod) far[i] = 1;
     }
-    for (const pm of this.meshes.values()) {
-      if ((!pm.detail && pm.range === Range.Always) || !pm.enabled) continue;
-      const all = pm.all;
-      const out = pm.settings;
-      const near = pm.range === Range.Near;
-      const ranged = pm.range !== Range.Always;
-      let n = 0;
-      let changed = false;
-      for (let j = 0; j < all.length; j += 4) {
-        const id = all[j];
-        if (px[id] < pm.detail) continue;
-        if (ranged && (far[id] === 1) === near) continue;
-        if (pm.shell & this.bare[id]) continue;
-        if (out[n * 4] !== id) {
-          out[n * 4] = out[n * 4 + 1] = id;
-          changed = true;
-        }
-        n++;
-      }
-      if (changed || pm.count !== n) {
-        pm.count = n;
-        this.view.partRows(pm.mesh, out, n, 'rows');
-      }
+    // Who is drawn changed (or every part's rows were set again): the parts drawn whatever the distance too.
+    let all = this.listsStale;
+    this.listsStale = false;
+    for (let i = 0; i < MAX_CHARACTERS; i++) {
+      if (shown[i] === this.listed[i]) continue;
+      this.listed[i] = shown[i];
+      all = true;
     }
+    for (const pm of this.meshes.values()) {
+      if (!pm.enabled || (!all && !pm.detail && pm.range === Range.Always)) continue;
+      const perFrame = !!pm.detail || pm.range !== Range.Always;
+      this.listRows(pm, perFrame ? 'rows' : 'new', (id) => shown[id] === 1 && px[id] >= pm.detail && (pm.range === Range.Always || (far[id] === 1) !== (pm.range === Range.Near)) && !(pm.shell & this.bare[id]));
+    }
+    // The shadow-only copies: who is drawn, wearing the shells (they keep their rows till either changes).
+    if (!all && !this.shadowsBare) return;
+    this.shadowsBare = false;
+    for (const pm of this.shadowMeshes.values()) {
+      if (pm.enabled) this.listRows(pm, 'new', (id) => shown[id] === 1 && !(pm.shell & this.bare[id]));
+    }
+  }
+
+  /** The rows of `pm`'s Sims (`all`) that `draws` keeps, written where they changed (`change`: as `setInstances` set it, per frame or not). */
+  private listRows(pm: PartMesh<M>, change: 'rows' | 'new', draws: (id: number) => boolean): void {
+    const all = pm.all;
+    const out = pm.settings;
+    let n = 0;
+    let changed = false;
+    for (let j = 0; j < all.length; j += 4) {
+      const id = all[j];
+      if (!draws(id)) continue;
+      if (out[n * 4] !== id) {
+        out[n * 4] = out[n * 4 + 1] = id;
+        changed = true;
+      }
+      n++;
+    }
+    if (!changed && pm.count === n) return;
+    pm.count = n;
+    this.view.partRows(pm.mesh, out, n, change);
   }
 }
