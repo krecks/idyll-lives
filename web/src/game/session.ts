@@ -43,9 +43,10 @@ import { play } from '../ui/sfx';
 import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { clockTime, openAt, staffed, staffResidents } from './staff';
 import { PointerInput } from './input';
-import { assembleTown, loadTemplates, useTownContent, type NeighbourhoodDraft } from './town';
+import { useTownContent, type NeighbourhoodDraft } from './town';
+import { townJob } from './townJobs';
 import { gameAssetPlan, streamRanks } from './streamPlan';
-import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
+import { perfEnd, perfPhase, perfStart, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
 declare global {
@@ -186,10 +187,12 @@ export async function startSession(
   /** The game this is (its saves carry it): new at New game, the save's own when loading (a save from before games had one is a game of its own). */
   let gameId: string;
   if (request.kind === 'new') {
-    const templates = await perfTimeAsync('session: loadTemplates', loadTemplates);
-    const lot = perfTime('session: assembleTown', () =>
-      assembleTown(content, templates, request.town, request.household, request.slot, { existing: request.existing, mode: request.mode, lifespan: request.lifespan }),
+    // (In the town worker: a big world's file takes most of a second to put together.)
+    const made = await perfTimeAsync('session: assembleTown', () =>
+      townJob(content, { kind: 'assemble', town: request.town, player: request.household, slot: request.slot, options: { existing: request.existing, mode: request.mode, lifespan: request.lifespan }, random: (Math.random() * 2 ** 32) >>> 0 }),
     );
+    if (made.kind !== 'assemble') throw new Error('The town file could not be made.');
+    const lot = made.lot;
     source = { lot, seed: Number(params.get('seed')) || (Math.random() * 2 ** 31) >>> 0 };
     household = request.household.name.trim();
     gameId = crypto.randomUUID();

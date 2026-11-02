@@ -292,6 +292,23 @@ export function houseTemplate(t: Templates, id: string, residents?: Residents): 
   return t.houses.find((h) => h.id === id);
 }
 
+/**
+ * The generated houses among `ids` as nobody lives in them yet (as a world's lots use them), for
+ * another thread's cache (`primeHouses`): the town worker makes a world's houses, the page needn't
+ * make them again.
+ */
+export function generatedHouses(t: Templates, ids: Iterable<string>): [string, HouseTemplate | undefined][] {
+  return [...new Set(ids)].filter((id) => id.startsWith('gen:')).map((id) => [id, houseTemplate(t, id)]);
+}
+
+/** Houses another thread generated (`generatedHouses`): the same id always gives the same house. */
+export function primeHouses(houses: readonly [string, HouseTemplate | undefined][]): void {
+  for (const [id, house] of houses) {
+    const at = `${id}#${residentsKey(undefined)}`;
+    if (!generated.has(at)) generated.set(at, house);
+  }
+}
+
 /** Width and depth of a lot of this size. */
 export function lotDims(t: Templates, size: LotSize | undefined): { width: number; depth: number } {
   return t.lotSizes?.[size ?? 'medium'] ?? t.plot;
