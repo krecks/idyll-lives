@@ -167,11 +167,12 @@
             <dl>
               <dt>Home</dt>
               <dd>{house ? `${house.name}, ${house.bedrooms} bedroom${house.bedrooms === 1 ? '' : 's'}` : address.name}</dd>
-              {#if price !== null}
+              <!-- (A Creative game's homes are free: no price or savings, as when choosing a home.) -->
+              {#if price !== null && app.mode !== 'creative'}
                 <dt>Bought for</dt>
                 <dd>{money(price)}</dd>
               {/if}
-              {#if content.economy.savings}
+              {#if content.economy.savings && app.mode !== 'creative'}
                 <dt>Savings</dt>
                 <dd>{money(Math.max(0, savings - (price ?? 0)))} left of {money(savings)}</dd>
               {/if}

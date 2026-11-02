@@ -1144,7 +1144,7 @@ export async function startSession(
       // First the house (the loading screen waits for it), then the rest of the town (streamed
       // after Play). Planning once keeps a later world update from restarting the indicator.
       const plan = gameAssetPlan(content, assets, w, view);
-      planStream([...plan.home, ...plan.rest], 'Game data');
+      planStream([...plan.home, ...plan.rest], 'Loading the town nearby…');
       restUrls = plan.rest;
       homeAssets = prefetchNow(plan.home, (done, total) => {
         progress(`Fetching your home (${done}/${total})`, 0.3 + 0.35 * (done / Math.max(1, total)));

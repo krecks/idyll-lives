@@ -23,17 +23,18 @@
 {#if shown && streamState.total > 0}
   <div class="stream" role="status" title="Models and textures stream in while you play and stay cached for next time">
     <span class="dot" class:done={!streamState.active}></span>
-    <span class="text">Game Data is streamed and cached</span>
+    <span class="text">{streamState.active ? streamState.label || 'Loading…' : 'Ready, and kept for next time'}</span>
     <span class="pct">{percent}%</span>
     <span class="bar" aria-hidden="true"><span style:transform={`scaleX(${percent / 100})`}></span></span>
   </div>
 {/if}
 
 <style>
-  /* Over the menus' and loading screens' cards (z 50), under the update bar and the toasts. */
+  /* Over the HUD (the household strip below it), under dialogs (the pause menu, the job board: z 40;
+     windows and the loading screen: z 50), the update bar and the toasts. */
   .stream {
     position: fixed;
-    z-index: 52;
+    z-index: 30;
     left: 50%;
     bottom: calc(var(--edge) + 42px);
     transform: translateX(-50%);

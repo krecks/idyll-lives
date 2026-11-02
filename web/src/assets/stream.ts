@@ -170,7 +170,7 @@ export function planStream(urls: Iterable<string>, label: string): void {
  * planned its own (which takes these files in too).
  */
 export function streamGameData(urls: string[]): void {
-  if (planned.size === 0) planStream(urls, 'Game data');
+  if (planned.size === 0) planStream(urls, 'Getting the game ready…');
   prefetch(urls);
 }
 
