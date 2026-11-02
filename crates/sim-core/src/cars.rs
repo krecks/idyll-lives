@@ -2344,8 +2344,9 @@ pub(crate) fn reblock(w: &mut World) {
 }
 
 impl World {
-    /// The tiles parked cars and garages take up (x, z), sorted as stacked rows are: nobody
-    /// walks through them (`reblock`).
+    /// For tests: the tiles parked cars and garages take up (x, z), sorted as stacked rows are:
+    /// nobody walks through them (`reblock`).
+    #[doc(hidden)]
     pub fn parked_tiles(&self) -> Vec<(i32, i32)> {
         self.car_tiles
             .iter()

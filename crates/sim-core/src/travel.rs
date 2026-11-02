@@ -786,8 +786,24 @@ impl Graph {
         mode: Mode,
         country: f32,
     ) -> Option<RoadPath> {
-        let (pieces, len) = self.pieces(from, to, mode, country)?;
-        Some(self.assemble(&pieces, len, mode, country))
+        self.search(from, to, mode, country, |pieces| {
+            let (len, cost) = self.measure(pieces, mode, country);
+            let mut out = RoadPath {
+                len,
+                cost,
+                ..Default::default()
+            };
+            for &(r, s0, s1) in pieces {
+                let road = &self.roads[r as usize];
+                for p in road.slice(s0, s1) {
+                    if out.pts.last().is_some_and(|q| dist(q.0, p) < 0.05) {
+                        continue;
+                    }
+                    out.pts.push((p, road.width, road.kind));
+                }
+            }
+            out
+        })
     }
 
     /// `path`'s length and cost only (as `path` gives them), without the points along it: for
@@ -800,22 +816,30 @@ impl Graph {
         mode: Mode,
         country: f32,
     ) -> Option<(f32, f32)> {
-        let (pieces, len) = self.pieces(from, to, mode, country)?;
-        let mut cost = RoadPath::default().cost;
-        for &(r, s0, s1) in &pieces {
-            cost += Self::cost(self.roads[r as usize].kind, (s1 - s0).abs(), mode, country);
-        }
-        Some((len, cost))
+        self.search(from, to, mode, country, |pieces| {
+            self.measure(pieces, mode, country)
+        })
     }
 
-    /// The stretches of road `path` goes along, and their length.
-    fn pieces(
+    /// The length and cost of the stretches of road `pieces`, one after another.
+    fn measure(&self, pieces: &[Piece], mode: Mode, country: f32) -> (f32, f32) {
+        let len = pieces.iter().map(|p| (p.2 - p.1).abs()).sum();
+        let cost = pieces.iter().fold(0.0, |cost, &(r, s0, s1)| {
+            cost + Self::cost(self.roads[r as usize].kind, (s1 - s0).abs(), mode, country)
+        });
+        (len, cost)
+    }
+
+    /// Finds the cheapest way from `from` to `to` and hands `found` the stretches of road it goes
+    /// along, in order (None: no way).
+    fn search<R>(
         &self,
         from: RoadPoint,
         to: RoadPoint,
         mode: Mode,
         country: f32,
-    ) -> Option<(Vec<Piece>, f32)> {
+        found: impl FnOnce(&[Piece]) -> R,
+    ) -> Option<R> {
         use std::cmp::Reverse;
         let allowed = |e: &Edge| {
             let r = &self.roads[e.road as usize];
@@ -832,8 +856,7 @@ impl Graph {
         let kind = |e: &Edge| self.roads[e.road as usize].kind;
         // The same stretch of road: straight along it.
         if from.road == to.road && from.edge == to.edge {
-            let len = (to.s - from.s).abs();
-            return Some((vec![(from.road, from.s, to.s)], len));
+            return Some(found(&[(from.road, from.s, to.s)]));
         }
         let top = match mode {
             Mode::Foot => 1.0,
@@ -850,15 +873,15 @@ impl Graph {
             }
         };
         ROAD_SCRATCH.with_borrow_mut(|scratch| {
-            let n = self.nodes.len();
-            let stamp = scratch.start(n);
-            let RoadScratch {
+            let RoadScratch { search, pieces } = scratch;
+            let stamp = search.start(self.nodes.len());
+            let crate::path::Scratch {
                 g,
                 came,
-                stamps,
-                heap,
+                stamp: stamps,
+                open: heap,
                 ..
-            } = scratch;
+            } = search;
             // (An entry counts only if stamped by this search: unset, no way there yet.)
             let get = |g: &[f32], stamps: &[u32], v: usize| {
                 if stamps[v] == stamp {
@@ -913,84 +936,37 @@ impl Graph {
             }
             heap.clear();
             let (_, last) = best_end?;
-            // Back from the last node to the first, by edge.
-            let mut chain: Vec<u32> = Vec::new();
+            // Back from the last node to the first, by edge, then the right way round.
+            pieces.clear();
+            pieces.push((to.road, if last == te.a { te.s0 } else { te.s1 }, to.s));
             let mut at = last;
             while let Some(e) = came[at as usize] {
-                chain.push(e);
                 let edge = &self.edges[e as usize];
-                at = if edge.a == at { edge.b } else { edge.a };
-            }
-            chain.reverse();
-            let first = at;
-            let mut pieces: Vec<Piece> = Vec::with_capacity(chain.len() + 2);
-            pieces.push((from.road, from.s, if first == fe.a { fe.s0 } else { fe.s1 }));
-            let mut node = first;
-            for &e in &chain {
-                let edge = &self.edges[e as usize];
-                let (s0, s1, next) = if edge.a == node {
-                    (edge.s0, edge.s1, edge.b)
+                let prev = if edge.a == at { edge.b } else { edge.a };
+                pieces.push(if edge.a == prev {
+                    (edge.road, edge.s0, edge.s1)
                 } else {
-                    (edge.s1, edge.s0, edge.a)
-                };
-                pieces.push((edge.road, s0, s1));
-                node = next;
+                    (edge.road, edge.s1, edge.s0)
+                });
+                at = prev;
             }
-            pieces.push((to.road, if last == te.a { te.s0 } else { te.s1 }, to.s));
-            let len = pieces.iter().map(|p| (p.2 - p.1).abs()).sum();
-            Some((pieces, len))
+            pieces.push((from.road, from.s, if at == fe.a { fe.s0 } else { fe.s1 }));
+            pieces.reverse();
+            Some(found(pieces))
         })
-    }
-
-    fn assemble(&self, pieces: &[(u32, f32, f32)], len: f32, mode: Mode, country: f32) -> RoadPath {
-        let mut out = RoadPath {
-            len,
-            ..Default::default()
-        };
-        for &(r, s0, s1) in pieces {
-            let road = &self.roads[r as usize];
-            out.cost += Self::cost(road.kind, (s1 - s0).abs(), mode, country);
-            for p in road.slice(s0, s1) {
-                if out.pts.last().is_some_and(|q| dist(q.0, p) < 0.05) {
-                    continue;
-                }
-                out.pts.push((p, road.width, road.kind));
-            }
-        }
-        out
     }
 }
 
 /// A stretch of a road: the road, and from and to how far along it (m).
 type Piece = (u32, f32, f32);
 
-/// Road searches' state kept between them (`Graph::pieces`): a big world's network has
-/// thousands of nodes, too many to allocate for every estimate. An entry counts only if stamped
-/// by the current search.
+/// Road searches' state kept between them (`Graph::search`): a big world's network has
+/// thousands of nodes, too many to allocate for every estimate.
 #[derive(Default)]
 struct RoadScratch {
-    g: Vec<f32>,
-    came: Vec<Option<u32>>,
-    stamps: Vec<u32>,
-    search: u32,
-    heap: std::collections::BinaryHeap<std::cmp::Reverse<(u64, u32)>>,
-}
-
-impl RoadScratch {
-    /// Gets ready for a search over `nodes` nodes; returns its stamp.
-    fn start(&mut self, nodes: usize) -> u32 {
-        if self.g.len() != nodes || self.search == u32::MAX {
-            *self = Self {
-                g: vec![f32::INFINITY; nodes],
-                came: vec![None; nodes],
-                stamps: vec![0; nodes],
-                ..Self::default()
-            };
-        }
-        self.heap.clear();
-        self.search += 1;
-        self.search
-    }
+    search: crate::path::Scratch<f32, Option<u32>, (u64, u32)>,
+    /// The stretches of road the way found goes along.
+    pieces: Vec<Piece>,
 }
 
 thread_local! {

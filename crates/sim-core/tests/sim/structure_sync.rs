@@ -42,7 +42,7 @@ fn lean(w: &World) -> Value {
 fn updates_add_up_to_the_structure() {
     let content = common::content();
     let mut w = World::from_json(&content, &common::town(&content, 4, 2), 4).unwrap();
-    let mut sync = StructureSync::new();
+    let mut sync = StructureSync::default();
     let mut view = Value::Object(Default::default());
     // The first has everything, the lot too (but its rooms).
     let first = apply(&mut view, &sync.update_json(&w, true));
@@ -118,7 +118,7 @@ fn updates_add_up_to_the_structure() {
     assert_eq!(view, lean(&w));
 
     // Starting over: everything again.
-    sync.resync();
+    sync = StructureSync::default();
     let again: Value = serde_json::from_str(&sync.update_json(&w, false)).unwrap();
     let mut fresh = again.clone();
     fresh.as_object_mut().unwrap().remove("unset");

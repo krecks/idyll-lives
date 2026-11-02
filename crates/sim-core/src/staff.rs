@@ -312,6 +312,16 @@ pub(crate) fn refresh(w: &mut World) {
     w.staff = staff;
 }
 
+/// The town's posts and their servers as the objects and walls are now: as `refresh` kept them,
+/// or found again (`plan`) if the objects changed since (views, before the next tick has them).
+pub(crate) fn current(w: &World) -> std::borrow::Cow<'_, Staff> {
+    if w.staff.built == Some(w.objects_version) {
+        std::borrow::Cow::Borrowed(&w.staff)
+    } else {
+        std::borrow::Cow::Owned(plan(w))
+    }
+}
+
 /// The town's posts and their servers as the objects and walls are now (nobody at work yet):
 /// what `refresh` keeps, and what views show before the next tick has it.
 pub fn plan(w: &World) -> Staff {
