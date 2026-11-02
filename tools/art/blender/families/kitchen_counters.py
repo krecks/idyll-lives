@@ -28,12 +28,12 @@ import gamekit as G  # noqa: E402
 
 M = G.Palette(
     cab=('#EDEBE6', 'satin'),        # a cabinet carcass and its fronts; the main part the player colours
-    worktop=('#E8E6E1', 'gloss'),    # a laminate worktop
+    worktop=('#E8E6E1', 'gloss', {'roughness': 0.3}),    # a laminate worktop
     dark=('#2F3236', 'satin'),       # plinths
     chrome=('#D0D3D6', 'chrome'),    # handles and pulls
     oak=('#CDB08A', 'wood'),         # a wood end unit, open shelves and a utensil handle
     navy=('#3E5470', 'satin'),       # a painted cabinet (the marble counter)
-    marble=('#F4F3F0', 'gloss'),     # a marble worktop
+    marble=('#F4F3F0', 'gloss', {'roughness': 0.28}),     # a marble worktop
     vein=('#C9CBCC', 'gloss'),       # a vein through the marble
     brass=('#B8925A', 'metal'),      # brass handles
     block=('#B98A5A', 'wood'),       # a butcher-block top

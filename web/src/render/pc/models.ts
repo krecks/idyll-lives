@@ -269,10 +269,16 @@ class PartGroups {
     this.lib = MaterialLibrary.for(app);
   }
 
-  /** Vertex alpha and group finish for a finish key. */
-  finish(key: string): { alpha: number; group: string } {
+  /**
+   * Vertex alpha and group finish for a finish key. A plain finish takes the material's own roughness and metalness
+   * where its entry gives them (`own`: polished marble, not the mirror gloss is): they go in the vertex alpha, so it
+   * stays in the one shared draw.
+   */
+  finish(key: string, own?: { roughness?: number; metallic?: number }): { alpha: number; group: string; textured: boolean } {
     const info = this.lib.finishInfo(key);
-    return info.plain ? { alpha: encodeFinish(info.roughness, info.metallic), group: PLAIN } : { alpha: 1, group: key };
+    return info.plain
+      ? { alpha: encodeFinish(own?.roughness ?? info.roughness, own?.metallic ?? info.metallic), group: PLAIN, textured: false }
+      : { alpha: 1, group: key, textured: info.textured };
   }
 
   addPart(part: PrimitivePart, lod: 0 | 1, index: number): void {
@@ -964,9 +970,9 @@ function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: L
       bottom = Math.min(bottom, boxes[i].lo[1]);
       const ov = overrideFor(source);
       if (ov?.finish) {
-        const finish = groups.finish(ov.finish);
+        const finish = groups.finish(ov.finish, ov);
         const base: [number, number, number] = source.material ? [source.material.diffuse.r, source.material.diffuse.g, source.material.diffuse.b] : [1, 1, 1];
-        groups.add(restyledData(data, base, ov, finish.alpha, full), tintInName(source.materialName), finish.group, null);
+        groups.add(restyledData(data, base, ov, finish.alpha, full, finish.textured), tintInName(source.materialName), finish.group, null);
         return;
       }
       const material = fileMaterial(app, lib, source.material, ov);

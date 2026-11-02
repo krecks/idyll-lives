@@ -119,7 +119,7 @@ instances, so these costs are per kind of object in view, plus the triangles of 
   2.5 m), PNG or JPEG in the file; the build turns it into KTX2.
 - **Download:** follows from the triangles: about 12 bytes a triangle after `optimize.mjs`
   (the six garden models: 445 KB as exported, 280 KB in the build). Untextured models export
-  without UVs.
+  without UVs; textured ones carry them (below, "Export settings").
 - **The presets** draw the same models on the lot. Low trims shadows (the lot's still objects cast
   from one merged mesh), the lawn and lamps, and draws the street's far versions, but not the lot's
   objects; on the M3 Low is limited by geometry (graphics.md), so these budgets are set for Low;
@@ -399,7 +399,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 | Up axis | +Y (`export_yup`) | Blender −Y becomes the game's front, +Z |
 | Modifiers | applied | Bevels and the like are baked in |
 | Selection | the model's mesh objects only | No cameras, lights or helpers in the file |
-| UVs | off unless textured | Nothing reads them; they split vertices and cost bytes |
+| UVs | for parts on textured finishes (wood, fabric, bark, foliage), in metres in each part's own frame (`gamekit/uv.py`); one throughout on the plain parts beside them; none otherwise | The game tiles the finish's texture over them (`uvScale`), so grain runs along a leg and bark up a trunk; without them it projects its own by each vertex's normal, which smeared clumps of leaves |
 | Normals | on | Smooth and hard edges as modelled: edges over 40° sharp (round things' sides and lathes' gentle turns smooth), bevels with hardened normals (`gamekit/shapes.py`) |
 | Vertex colours | the baked shading only (`ao` as COLOR_0) | The game multiplies it in; nothing else may colour a vertex |
 | Materials | exported, one-sided | Their names and colours drive the finishes |
@@ -422,7 +422,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   with cubic-spline keys (played as straight lines), a part turning over 12° in 1/60 s (the game's samples
   blended that far apart shrink it), faces over 1 cm² whose normals are turned against their winding
   (lit as if from behind), over 3 draws or the triangle target, unmapped, double-sided, see-through or emissive
-  materials, unused UVs, a floating origin, a Blender-built model off its `Model`'s `centre` (the
+  materials, UVs on a material neither textured nor on a textured finish (one UV throughout is fine), a floating origin, a Blender-built model off its `Model`'s `centre` (the
   middle, or the `centre` it gives; `tools/art/blender/centres.json`, which the build writes for the gate
   only) by over 2 cm at rest (not its far version), one that reaches over 1 cm into the wall, one
   indoors (on the floor, a wall or the ceiling, without `vary`) that reaches over 2 cm past its

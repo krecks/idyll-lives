@@ -14,6 +14,7 @@ import bpy
 from mathutils import Matrix, Vector
 from mathutils import noise as vnoise
 
+from . import uv
 from .shapes import SHARP, _recalc_normals, bevel_edges, round_angle, shade
 
 
@@ -166,7 +167,8 @@ def sweep(name, points, radius=0.02, profile=None, material=None, verts=12, scal
         faces += [tuple(range(m - 1, -1, -1)), tuple(range((rings - 1) * m, rings * m))]
     if angle is None:
         angle = SHARP if profile else round_angle(verts)
-    return _object(name, vs, faces, material, smooth, angle)
+    obj = _object(name, vs, faces, material, smooth, angle)
+    return uv.along(obj, rings, prof, scales, pts, closed)
 
 
 # ---- lofts -----------------------------------------------------------------------------------------------
@@ -200,6 +202,8 @@ def loft(name, sections, material=None, caps=True, smooth=True, angle=SHARP, at=
     if caps:
         faces += [tuple(range(m - 1, -1, -1)), tuple(range((len(sections) - 1) * m, len(sections) * m))]
     obj = _object(name, vs, faces, material, smooth, angle, merge=True)
+    if all(max(p[2] for p in sec) - min(p[2] for p in sec) < 1e-6 for sec in sections):
+        obj['uv'] = uv.ROUND   # level rings up its z (a drum, a vase): textured round it (gamekit/uv.py)
     obj.location = at
     obj.rotation_euler = tuple(math.radians(a) for a in rot)
     return obj

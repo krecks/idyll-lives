@@ -7,6 +7,7 @@ import re
 import bpy
 
 # The manifests as the game stacks them, and which keys the game draws (read as the gate reads them).
+from . import uv
 from .manifest import known_keys, manifests
 from .scene import ASSETS, meshes
 from .shade import ATTRIBUTE, bake_ao
@@ -15,7 +16,8 @@ from .shade import ATTRIBUTE, bake_ao
 def export_glb(path, objects=None, texcoords=False, clips=False, shade=True, ground=False):
     """
     Writes a .glb (all mesh objects unless given), +Y up so Blender -Y is the game's +Z front.
-    Without textures the UVs stay out (`texcoords`): the game gives flat-coloured parts its own.
+    UVs are written for a model with parts on textured finishes (wood, fabric, bark, foliage: gamekit/uv.py),
+    and otherwise left out (`texcoords` writes them anyway).
     `clips`: a model with moving parts writes its clips, one per NLA track name, and the scene's
     current frame as the rest pose (frame 1, each clip's first key). Each clip starts at 0 s: the game
     holds a clip at its first key until then, which paused every loop at rest for a frame each round.
@@ -24,6 +26,8 @@ def export_glb(path, objects=None, texcoords=False, clips=False, shade=True, gro
     """
     os.makedirs(os.path.dirname(path), exist_ok=True)
     objects = objects if objects is not None else meshes()
+    # The textured finishes' UVs (gamekit/uv.py), made when the parts were joined; a part never joined gets its own.
+    texcoords = uv.ensure(objects) or texcoords
     if shade:
         bake_ao(objects, ground=ground)
     bpy.ops.object.select_all(action='DESELECT')

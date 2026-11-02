@@ -390,6 +390,13 @@ struct Finishes {
 }
 
 impl Finishes {
+    /// Whether `finish` is a textured one (wood, fabric, bark, foliage): neither plain nor see-through.
+    fn textured(&self, finish: &J) -> bool {
+        finish
+            .str()
+            .is_some_and(|f| self.plain.get(f) == Some(&false) && !self.see_through.contains(f))
+    }
+
     fn see_through(&self, finish: Option<&J>) -> bool {
         finish
             .and_then(J::str)
@@ -936,6 +943,17 @@ fn coloured(g: &Glb, prim: &J) -> R<bool> {
     };
     Ok(rows.iter().any(|v| {
         v.len() >= 3 && ((v[0].f() - v[1].f()).abs() > 0.01 || (v[0].f() - v[2].f()).abs() > 0.01)
+    }))
+}
+
+/// Whether an accessor's values are all the same (or can't be read here: compressed): a plain part's UVs, zero
+/// in Blender, (0, 1) once the exporter has turned v round.
+fn constant(g: &Glb, index: &J) -> R<bool> {
+    Ok(accessor(g, index)?.is_none_or(|rows| {
+        rows.first().is_none_or(|first| {
+            rows.iter()
+                .all(|r| r.iter().zip(first).all(|(a, b)| a.f() == b.f()))
+        })
     }))
 }
 
@@ -3316,8 +3334,13 @@ fn check_file(
             } else {
                 None
             };
-            if key(prim, "attributes")?.has("TEXCOORD_0") && (!textured || finish.is_some()) {
-                flags.entry("uvs").or_default().insert(name.clone());
+            // UVs a textured finish draws with (gamekit/uv.py) or the file's own textures read; a plain part joined
+            // with textured ones carries one UV throughout, which costs next to nothing compressed.
+            if let Some(uvs) = key(prim, "attributes")?.get("TEXCOORD_0") {
+                let used = finish.map_or(textured, |f| fin.textured(f));
+                if !used && !constant(&g, uvs)? {
+                    flags.entry("uvs").or_default().insert(name.clone());
+                }
             }
             if coloured(&g, prim)? {
                 flags.entry("coloured").or_default().insert(name.clone());

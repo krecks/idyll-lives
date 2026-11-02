@@ -65,10 +65,10 @@ M = G.Palette(
     board=('#A8754A', 'wood'),          # the table top
     crate=('#CDB08A', 'wood'),          # the fruit crates
     awning_green=('#4E8A5A', 'fabric'),  # the awning's green stripes
-    tomato=('#D9483B', 'gloss'),
-    orange=('#E8902E', 'gloss'),
+    tomato=('#D9483B', 'gloss', {'roughness': 0.3}),
+    orange=('#E8902E', 'gloss', {'roughness': 0.45}),
     apple=('#8DB84A', 'gloss'),
-    lemon=('#F2C14E', 'gloss'),
+    lemon=('#F2C14E', 'gloss', {'roughness': 0.4}),
     slate=('#2A2C30', 'matte'),         # the chalk board
     chalk=('#E8E6E0', 'matte'),
     # shared

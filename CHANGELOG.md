@@ -35,6 +35,10 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
   quick swing or a fast spin no longer shrinks a hair between samples. Far versions of shop counters, stalls,
   playground rides and street props no longer have faces turned inside out, which showed dark where the sun
   fell on them.
+- **Wood, fabric and leaves that follow the shape:** the textured finishes are laid on each part of a model as it
+  was made, not projected along the model's axes: wood grain runs along each leg, rail and board and up a turned
+  base, bark runs up the trunk and round it, and a tree's clumps of leaves are leaves all over instead of smeared
+  into streaks where they turn. Polished marble, worktops and fruit no longer shine like mirrors.
 ### Also
 - **Saves:** format 34 (where every car is, who owns it, every house's driveway and the garages). Older saves open with no cars in the simulation: their neighbours' cars stay parked, as before.
 

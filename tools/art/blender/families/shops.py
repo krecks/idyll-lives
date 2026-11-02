@@ -44,7 +44,7 @@ M = G.Palette(
     glass=('#DDEBF0', 'glass'),      # the display's glass and its back doors
     tray=('#ECE8DF', 'gloss'),       # paper doilies and trays
     bun=('#C98F4E', 'satin'), crust=('#B97A40', 'satin'), pastry=('#D9A35F', 'satin'),
-    jam=('#C0392B', 'gloss'), lemon=('#F2C14E', 'gloss'), sponge=('#F2E1C1', 'satin'),
+    jam=('#C0392B', 'gloss'), lemon=('#F2C14E', 'gloss', {'roughness': 0.4}), sponge=('#F2E1C1', 'satin'),
     icing=('#E9A6B4', 'gloss'), choc=('#5A3B26', 'gloss'), cream=('#F7F3EA', 'gloss'),
     # the grocery shelves
     shelf=('#D3D4D2', 'metal'),      # the frame and shelves; the main part the player colours
@@ -58,7 +58,7 @@ M = G.Palette(
     tinLid=('#B9BDC1', 'metal'),     # tins' and jars' lids
     bell=('#C8CCD0', 'chrome'),      # the counter's service bell
     # the café table and chair
-    marble=('#EDEAE4', 'gloss'),     # the table's top; its main part
+    marble=('#EDEAE4', 'gloss', {'roughness': 0.28}),     # the table's top; its main part
     vein=('#BDB8AF', 'gloss'),       # the grey veins in its marble
     iron=('#2B302E', 'metal'),       # its cast-iron foot
     bentwood=('#5A3B26', 'wood'),    # the chair's frame; its main part

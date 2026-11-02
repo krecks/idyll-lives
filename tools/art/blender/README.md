@@ -125,6 +125,14 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      show their glass, and see-through `glass` would show what is behind it (a frame's backing, a door).
    - A lamp's shade or a screen that glows at night takes its glow's colour:
      `shade=('#F2E6CC', 'fabric', {'glow': '#FFD9A0'})`. Nothing glows by day.
+   - A plain finish may shine more or less than the finish does: `marble=('#EDEAE4', 'gloss', {'roughness':
+     0.28})` (polished stone, not the mirror gloss is), and `metallic` (0 or 1). It goes in the pack entry and
+     the game keeps it per vertex, so it costs no draw call. Worktops, marble and fruit have their own.
+   - Textured finishes (wood, fabric, bark, foliage) get UVs made for each part as it's joined (`gamekit/uv.py`):
+     a box along its own longest sides (wood's grain, up its picture, runs along a leg, a rail, a table's
+     length), round about its own z for cylinders, cones, lathes and level-ringed lofts, along its path for a
+     sweep (bark up a branch). A part built in place at an angle keeps its grain; one built level and turned
+     by `rot=` turns its grain with it.
 3. **Build** in a function, in metres, from `G.cube`/`sphere`/`cylinder`/`cone`/`torus`/`rod`/`revolve`/`boulder`
    (sizes are full extents; `bevel` rounds edges) and the forms (`gamekit/forms.py`), which make what boxes can't:
    - `G.sweep` (`F.sweep`): a round tube or any profile along a path, curved through the points (`resolution`),

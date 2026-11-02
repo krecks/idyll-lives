@@ -6,7 +6,7 @@ import math
 import bpy
 from mathutils import Matrix, Vector
 
-from . import perch
+from . import perch, uv
 from .scene import meshes
 
 # The (game x, depth) the model being built is centred on: its Model's `centre`, set by Family.make, so
@@ -42,6 +42,7 @@ def join(parts, name, origin=None):
     Blender point) if given; the mesh stays where it is either way.
     """
     first = parts[0]
+    uv.ensure(parts)   # each part's UVs in its own frame, before its frame is gone (gamekit/uv.py)
     bpy.ops.object.select_all(action='DESELECT')
     for o in parts:
         o.select_set(True)
