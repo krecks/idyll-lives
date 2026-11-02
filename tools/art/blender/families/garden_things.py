@@ -25,7 +25,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gamekit as G  # noqa: E402
 from plants import LOW, dome, far_of, leaf, low, lump, star  # noqa: E402
-from gamekit.motion import _clip, last_frame  # noqa: E402
 
 SPEC = dict(
     # the pond
@@ -364,9 +363,8 @@ def pond():
     G.slide(koi, 'fish', (0, 0, 0.042), seconds=1.2)
     G.swing(koi, 'fish', 30, seconds=1.2)
     # for watching: up and down again every so often (`every`), from rest to rest
-    end = last_frame(2.4)
-    _clip(koi, 'surface', 'location', 2, [(1, koi.location[2]), (end // 2, koi.location[2] + 0.04),
-                                                     (end, koi.location[2])])
+    z = koi.location[2]
+    G.keys(koi, 'surface', 'location', 2, [(0, z), (1.2, z + 0.04), (2.4, z)])
     return G.meshes()
 
 

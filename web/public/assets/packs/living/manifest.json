@@ -1027,7 +1027,8 @@
           "finish": "material.finish.matte"
         },
         "marble": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.28
         },
         "marble_vein": {
           "finish": "material.finish.gloss"

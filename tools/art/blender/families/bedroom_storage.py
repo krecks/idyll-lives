@@ -606,8 +606,8 @@ def wardrobe():
         doors.append(G.hinged(G.join(parts, f'door{"_left" if s < 0 else "_right"}'),
                               F.at(s * 0.91, 1.085, front + 0.01)))
     G.settle(centre=False)
-    G.swing(doors[0], 'doors_open', 100, seconds=DOOR_SECONDS)
-    G.swing(doors[1], 'doors_open', -100, seconds=DOOR_SECONDS)
+    G.swing(doors[0], 'doors_open', 100, seconds=DOOR_SECONDS, ease='back_out')
+    G.swing(doors[1], 'doors_open', -100, seconds=DOOR_SECONDS, ease='back_out')
 
 
 # --- the tall chest of drawers: linen-white, five drawers with brass bars, on a dark plinth --------------
@@ -682,7 +682,7 @@ def wardrobeSingle():
         _pull('handle', w / 2 - 0.06, 1.1, front + 0.02, 0.44, M.brass, r=0.008, out=0.018, upright=True)
     door = G.hinged(G.join(parts, 'door'), F.at(-(w - 0.02) / 2, 1.045, front + 0.01))
     G.settle(centre=False)
-    G.swing(door, 'door_open', 100, seconds=DOOR_SECONDS)
+    G.swing(door, 'door_open', 100, seconds=DOOR_SECONDS, ease='back_out')
 
 
 # --- the armoire: mahogany, a cornice, raised-panel doors with brass knobs, on bun feet -------------------
@@ -744,8 +744,8 @@ def armoire():
         doors.append(G.hinged(G.join(parts, f'door{"_left" if s < 0 else "_right"}'),
                               F.at(s * 0.82, 1.08, front + 0.0125)))
     G.settle(centre=False)
-    G.swing(doors[0], 'doors_open', 100, seconds=DOOR_SECONDS)
-    G.swing(doors[1], 'doors_open', -100, seconds=DOOR_SECONDS)
+    G.swing(doors[0], 'doors_open', 100, seconds=DOOR_SECONDS, ease='back_out')
+    G.swing(doors[1], 'doors_open', -100, seconds=DOOR_SECONDS, ease='back_out')
 
 
 def _key(id):

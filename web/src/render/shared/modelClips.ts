@@ -17,8 +17,12 @@ export interface ModelClip {
   tracks: { part: number; poses: Float32Array; depth: number }[];
 }
 
-/** Samples per second of a clip's poses. */
-export const CLIP_RATE = 30;
+/**
+ * Samples per second of a clip's poses: twice the 30 a second the clips are keyed at (gamekit), so a part turning
+ * fast (a door swung open, 21° a key) shrinks at most 0.4 % between two samples blended (`clipPose`), where it
+ * shrank 1.7 % at 30.
+ */
+export const CLIP_RATE = 60;
 
 /**
  * Where `clip` puts `part` at `seconds` (clamped to the clip) into `out`, relative to rest: its

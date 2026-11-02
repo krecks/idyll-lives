@@ -5,6 +5,7 @@
 //!   cargo art --all                    every family
 //!   cargo art garden_decor --preview   render previews/ instead of exporting
 //!   cargo art garden_decor --preview --lit   and <id>.lit.png, lit and textured as the game draws it
+//!   cargo art garden_decor --preview --sheet   and <id>.sheet.png: four sides, the baked shading, the clips along
 //!   cargo art kitchen --no-pack        export without writing the pack
 //!   cargo art --centres                write centres.json from every family (gamekit/centres.py, no build)
 //!
@@ -213,7 +214,7 @@ pub fn main(argv: &[String]) -> i32 {
             families(&here).join(", ")
         ));
     }
-    let mut passthrough: Vec<String> = ["--preview", "--lit", "--no-pack"]
+    let mut passthrough: Vec<String> = ["--preview", "--lit", "--sheet", "--no-pack"]
         .iter()
         .filter(|f| has(f))
         .map(|f| f.to_string())

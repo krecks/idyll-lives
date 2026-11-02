@@ -72,8 +72,8 @@ gate below, so the review does.
   ceiling things hang from 2.8 m ([content-packs.md](../content-packs.md#objects), `layer`).
 - **Footprint:** the content's `footprint` is in whole 1 m tiles (`[1, 1]` by default). The model
   stays inside it with a few centimetres to spare, unless it is meant to meet its neighbour (a
-  counter run). The contact shadow (1.15 × the footprint) and buy mode's checks follow the
-  footprint; picking follows the drawn outline.
+  counter run). Buy mode's checks follow the footprint; picking and the contact shadow follow
+  what's drawn (the shadow is the model's own shape on the floor, `render/shared/contactShadow.ts`).
 - **Real size, uniform scale.** Build to the object's real size; `G.settle` stands it on the floor,
   centred, by moving it, and the family's `G.Model(size=…, tolerance=…)` asserts its size (2 % by
   default). `gamekit.fit` scales each axis on its own to hit an exact box: it stretched the garden
@@ -119,7 +119,7 @@ instances, so these costs are per kind of object in view, plus the triangles of 
   2.5 m), PNG or JPEG in the file; the build turns it into KTX2.
 - **Download:** follows from the triangles: about 12 bytes a triangle after `optimize.mjs`
   (the six garden models: 445 KB as exported, 280 KB in the build). Untextured models export
-  without UVs.
+  without UVs; textured ones carry them (below, "Export settings").
 - **The presets** draw the same models on the lot. Low trims shadows (the lot's still objects cast
   from one merged mesh), the lawn and lamps, and draws the street's far versions, but not the lot's
   objects; on the M3 Low is limited by geometry (graphics.md), so these budgets are set for Low;
@@ -179,10 +179,13 @@ room has.
   material left behind each time the model is rebuilt. `cargo check-glb` warns of each one.
 - **Baked shading.** The export bakes how much sky each vertex sees into a grey vertex colour (COLOR_0,
   `gamekit/shade.py`, 32 greys), and the game multiplies it into the part's colour (`restyledMesh`), the
-  player's colour too: creases, seams, the gaps between cushions and drawer reveals darken, with no
-  texture, UV or draw call (about 10 % more download). A part a clip takes away from its rest (a door, a
-  drawer, something grown or hidden) is shaded by itself only, so it doesn't carry the shadow of what it
-  left; the rest are shaded together at rest. `cargo check-glb` fails a COLOR_0 that isn't grey.
+  player's colour too: creases, seams, the gaps between cushions and drawer reveals
+  darken, with no texture, UV or draw call (about 10 % more download; the build stores it in 8 bits). A
+  model on the ground (`Model(ground=)`, by default one on the floor that isn't a bird; a held thing isn't)
+  is shaded by the floor too, within 15 cm of it: the foot of its sides darkens where it meets the floor. A
+  part a clip takes away from its rest (a door, a drawer, something grown or hidden) is shaded by itself
+  only, so it doesn't carry the shadow of what it left; the rest are shaded together at rest. `cargo
+  check-glb` fails a COLOR_0 that isn't grey.
 - **Finishes by name.** A material named `<name>@<finish>` (`stone@matte`, `leaf@foliage`) is drawn
   with that finish without a `materials` entry (one in the entry still wins). Handy for files not made
   with gamekit, whose palettes write the map themselves.
@@ -396,12 +399,12 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 | Up axis | +Y (`export_yup`) | Blender −Y becomes the game's front, +Z |
 | Modifiers | applied | Bevels and the like are baked in |
 | Selection | the model's mesh objects only | No cameras, lights or helpers in the file |
-| UVs | off unless textured | Nothing reads them; they split vertices and cost bytes |
-| Normals | on | Smooth and hard edges as modelled |
+| UVs | for parts on textured finishes (wood, fabric, bark, foliage), in metres in each part's own frame (`gamekit/uv.py`); one throughout on the plain parts beside them; none otherwise | The game tiles the finish's texture over them (`uvScale`), so grain runs along a leg and bark up a trunk; without them it projects its own by each vertex's normal, which smeared clumps of leaves |
+| Normals | on | Smooth and hard edges as modelled: edges over 40° sharp (round things' sides and lathes' gentle turns smooth), bevels with hardened normals (`gamekit/shapes.py`) |
 | Vertex colours | the baked shading only (`ao` as COLOR_0) | The game multiplies it in; nothing else may colour a vertex |
 | Materials | exported, one-sided | Their names and colours drive the finishes |
 | Compression | none (no Draco) | The build adds meshopt; the game ships no Draco decoder |
-| Clips | moving parts only (`clips=True`): node rotation, translation or scale, first key at rest | Thin instances move whole nodes, not bones (below) |
+| Clips | moving parts only (`clips=True`): node rotation, translation or scale, first key at rest and at 0 s (`export_anim_slide_to_zero`), keyed 30 a second | Thin instances move whole nodes, not bones (below); the game samples clips 60 times a second (`CLIP_RATE`), and held a clip starting later at rest until then (a pause each round of a loop) |
 | Skins, morphs | none | Placed things are thin instances without bones |
 
 ## Validation
@@ -413,10 +416,13 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   key on the command line that no manifest has; a `url` that isn't a `.glb`; more than 4 draw calls
   after the `materials` mapping (each moving part's counted apart), triangles over the most for the
   model's size, a model below the floor, extensions the game can't read, skins, morph targets, a clip
-  that animates anything but a node's transform or doesn't start at rest, a `motions` clip the file
-  doesn't have, textures over 1024 px, a mapping to a finish that doesn't exist. Warnings: a clip no
-  use plays, over 3 draws or the triangle target, unmapped, double-sided, see-through or emissive
-  materials, unused UVs, a floating origin, a Blender-built model off its `Model`'s `centre` (the
+  that animates anything but a node's transform or doesn't start at rest or at 0 s (the game holds it at
+  rest until its first key: a pause each round of a loop), a `motions` clip the file doesn't have,
+  textures over 1024 px, a mapping to a finish that doesn't exist. Warnings: a clip no use plays, a clip
+  with cubic-spline keys (played as straight lines), a part turning over 12° in 1/60 s (the game's samples
+  blended that far apart shrink it), faces over 1 cm² whose normals are turned against their winding
+  (lit as if from behind), over 3 draws or the triangle target, unmapped, double-sided, see-through or emissive
+  materials, UVs on a material neither textured nor on a textured finish (one UV throughout is fine), a floating origin, a Blender-built model off its `Model`'s `centre` (the
   middle, or the `centre` it gives; `tools/art/blender/centres.json`, which the build writes for the gate
   only) by over 2 cm at rest (not its far version), one that reaches over 1 cm into the wall, one
   indoors (on the floor, a wall or the ceiling, without `vary`) that reaches over 2 cm past its

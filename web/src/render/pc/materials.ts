@@ -468,11 +468,12 @@ export class MaterialLibrary {
     return !!this.assets?.has(key, 'material');
   }
 
-  /** Whether a finish is untextured and opaque (it can share the plain material), with its roughness and metalness. */
-  finishInfo(key: string): { plain: boolean; roughness: number; metallic: number } {
+  /** Whether a finish is untextured and opaque (it can share the plain material), with its roughness and metalness, and whether it is textured. */
+  finishInfo(key: string): { plain: boolean; textured: boolean; roughness: number; metallic: number } {
     const entry = (this.assets && this.assets.has(key, 'material') && this.assets.get(key, 'material')) || FALLBACK_FINISH;
     return {
       plain: !entry.texture && (entry.alpha ?? 1) >= 1,
+      textured: !!entry.texture,
       roughness: entry.roughness ?? 0.8,
       metallic: entry.metallic ?? 0,
     };
