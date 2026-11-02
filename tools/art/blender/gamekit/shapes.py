@@ -13,6 +13,7 @@ import bpy
 from mathutils import Matrix, Vector
 from mathutils import noise as vnoise
 
+from . import uv
 from .scene import TAU
 
 SHARP = 40  # degrees: an edge turning more than this stays sharp on a smooth part (a profile's 45° chamfer stays crisp)
@@ -70,7 +71,7 @@ def cylinder(name, radius, depth, at=(0, 0, 0), material=None, scale=(1, 1, 1), 
     """A cylinder along z, `depth` long."""
     bpy.ops.mesh.primitive_cylinder_add(vertices=verts, radius=radius, depth=depth)
     _scale_mesh(scale)
-    bpy.context.object['uv'] = 'round'   # (gamekit/uv.py: round about its own z)
+    bpy.context.object['uv'] = uv.ROUND   # (gamekit/uv.py: round about its own z)
     return _finish(name, at, rot, material, smooth, bevel, bevel_segments, round_angle(verts))
 
 
@@ -79,7 +80,7 @@ def cone(name, r1, r2, depth, at=(0, 0, 0), material=None, scale=(1, 1, 1), rot=
     """A cone or frustum along z, radius `r1` at the bottom and `r2` at the top."""
     bpy.ops.mesh.primitive_cone_add(vertices=verts, radius1=r1, radius2=r2, depth=depth)
     _scale_mesh(scale)
-    bpy.context.object['uv'] = 'round'
+    bpy.context.object['uv'] = uv.ROUND
     return _finish(name, at, rot, material, smooth, bevel, bevel_segments, round_angle(verts))
 
 
@@ -134,7 +135,7 @@ def revolve(name, profile, at=(0, 0, 0), material=None, segments=24, scale=(1, 1
         obj.data.materials.append(material)
     _recalc_normals(obj)
     shade(obj, smooth, max(angle, round_angle(segments)))
-    obj['uv'] = 'round'
+    obj['uv'] = uv.ROUND
     obj.location = at
     obj.rotation_euler = tuple(math.radians(a) for a in rot)
     obj.scale = scale

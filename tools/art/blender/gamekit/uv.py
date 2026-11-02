@@ -14,10 +14,15 @@ ROUND = 'round'
 DONE = 'done'
 
 
+def _slots(obj):
+    """For each of `obj`'s material slots, whether its material is on a textured finish."""
+    from .materials import TEXTURES
+    return [bool(s.material and s.material.get('finish') in TEXTURES) for s in obj.material_slots]
+
+
 def textured(obj):
     """Whether any of `obj`'s materials is on a textured finish."""
-    from .materials import TEXTURES
-    return any(s.material and s.material.get('finish') in TEXTURES for s in obj.material_slots)
+    return any(_slots(obj))
 
 
 def _layer(mesh):
@@ -42,7 +47,8 @@ def ensure(objs):
             continue
         mesh = o.data
         layer = _layer(mesh)
-        if textured(o):
+        slots = _slots(o)
+        if any(slots):
             way = o.get('uv')
             if way == DONE:
                 pass
@@ -50,17 +56,14 @@ def ensure(objs):
                 _round(mesh, layer)
             else:
                 _box(mesh, layer)
-        _plain_zero(o, layer)
+        _plain_zero(mesh, layer, slots)
         mesh['uv_metres'] = True
     return True
 
 
-def _plain_zero(obj, layer):
-    """Zeroes the UVs of `obj`'s faces on plain finishes (a cushion's piping on a fabric one, a primitive's own
-    unwrap): nothing reads them, and zeros cost next to nothing compressed."""
-    from .materials import TEXTURES
-    slots = [s.material and s.material.get('finish') in TEXTURES for s in obj.material_slots]
-    mesh = obj.data
+def _plain_zero(mesh, layer, slots):
+    """Zeroes the UVs of `mesh`'s faces on plain finishes (`slots`: each slot's textured or not; a cushion's piping
+    on a fabric one, a primitive's own unwrap): nothing reads them, and zeros cost next to nothing compressed."""
     for p in mesh.polygons:
         if not (p.material_index < len(slots) and slots[p.material_index]):
             for li in p.loop_indices:
