@@ -38,7 +38,7 @@ import type { RGB } from '../shared/environment';
 import type { Geo, MeshData } from '../shared/geometry';
 import type { HousePart } from '../shared/house';
 import type { StandIn } from '../shared/modelEntry';
-import { chunkAt, chunkCoords, distanceToRect, groupOf, SUPERCHUNK } from '../shared/chunks';
+import { chunkAt, chunkCoords, distanceToRect, groupOf, LookedFrom, SUPERCHUNK } from '../shared/chunks';
 import { groupInstances } from '../shared/nature';
 import { castsShadow, FOLIAGE, instanceMatrix, NO_FOCUS, TownStreet, type ChunkPlan, type Inst, type ObjectLook } from '../shared/street';
 import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
@@ -208,8 +208,8 @@ export class Street {
   private readonly ground: boolean;
   private readonly fenceStyles: readonly FenceStyleDef[];
   private readonly farCull: number;
-  /** Where `frame` last chose what is drawn (NaN: choose again next frame). */
-  private readonly framedAt = new Float64Array(2).fill(NaN);
+  /** Where `frame` last chose what is drawn. */
+  private readonly framedAt = new LookedFrom();
   /** The streetlights' pools are drawn (at night: `setNight`). */
   private poolsLit = false;
 
@@ -430,7 +430,7 @@ export class Street {
       await perfTimeAsync(`street: batch ${k}`, () => this.instances(k, items, k === FOLIAGE.hedge, castsShadow(k), town.footprints.get(k), town.standIns.get(k), pace));
     }
     perfEnd(batchesSpan);
-    this.framedAt[0] = NaN;
+    this.framedAt.forget();
     // What files that came replace (the boxes) is drawn no more.
     this.disposeStale();
     const lamps = this.lamps;
@@ -560,9 +560,7 @@ export class Street {
    * far versions. Chosen again only once the target has moved (`REFRAME`) or the street was built.
    */
   frame(x: number, z: number): void {
-    if (Math.abs(x - this.framedAt[0]) < REFRAME && Math.abs(z - this.framedAt[1]) < REFRAME) return;
-    this.framedAt[0] = x;
-    this.framedAt[1] = z;
+    if (!this.framedAt.moved(x, z, REFRAME)) return;
     for (const g of this.farGroups.values()) {
       if (!g.entity) continue;
       g.entity.enabled = Math.hypot(g.x - x, g.z - z) <= this.farCull + SUPERCHUNK * 0.71;

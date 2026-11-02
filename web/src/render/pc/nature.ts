@@ -29,6 +29,7 @@ import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from 
 import { codeFor, float, registerShaderFeature, type ShaderFeature } from './shaders/chunks';
 import type { AssetRegistry } from '../../assets/registry';
 import type { WorldStructure } from '../../core/protocol';
+import { LookedFrom } from '../shared/chunks';
 import { CountryRoads } from '../shared/countryRoads';
 import type { Lighting } from '../shared/environment';
 import { grassField, type GrassQuality } from '../shared/grass';
@@ -283,7 +284,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.built ? this.batches.filter((b) => parts.includes(b.part)).flatMap((b) => b.built.cells.flatMap((c) => c.draws.map((d) => d.meshInstance))).map((mi) => ({ mi, x: mi.aabb.center.x, z: -mi.aabb.center.z })) : [];
     this.woodsSquares = of(['woods', 'farWoods']);
     this.flowerSquares = of(['flowers']);
-    this.framedAt[0] = NaN;
+    this.framedAt.forget();
   }
 
   /** A big world's woods squares: each one's draw and where its middle is (game space). */
@@ -292,15 +293,13 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private flowerSquares: { mi: pc.MeshInstance; x: number; z: number }[] = [];
   /** A big world's ground tiles: each one's draw, its meshes by level, where its middle is and the level drawn. */
   private tiles: GroundTile[] = [];
-  /** Where `frameTiles` last looked from (NaN: chosen afresh next frame). */
-  private readonly framedAt = new Float64Array(2).fill(NaN);
+  /** Where `frameTiles` last looked from. */
+  private readonly framedAt = new LookedFrom();
 
   /** Each frame (the game's): each ground tile draws the level for its distance from (`x`, `z`), the camera's target. */
   frameTiles(x: number, z: number): void {
     // (The camera's target still: nothing changes.)
-    if (Math.abs(x - this.framedAt[0]) < 0.5 && Math.abs(z - this.framedAt[1]) < 0.5) return;
-    this.framedAt[0] = x;
-    this.framedAt[1] = z;
+    if (!this.framedAt.moved(x, z, 0.5)) return;
     const { woodsFar, flowersFar, tiles: [near, mid] } = this.open;
     for (const w of this.woodsSquares) w.mi.visible = Math.hypot(w.x - x, w.z - z) < woodsFar;
     for (const f of this.flowerSquares) f.mi.visible = Math.hypot(f.x - x, f.z - z) < flowersFar;
