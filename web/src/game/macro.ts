@@ -69,7 +69,7 @@ const HAMLET: Character['hamlet'] = { shapes: [highStreet, crescentTown], box: {
 const CHARACTER: Record<WorldKind, Character> = {
   small: { world: [896, 960], hamlets: [5, 6], hamlet: HAMLET, water: 'ponds', woods: 0.42, hills: 14, fields: 100, spots: ['picnicMeadow', 'lookout', 'orchard', 'hammockGrove', 'fishingJetty'], spotsPerArea: [1, 1] },
   medium: { world: [896, 960], hamlets: [5, 6], hamlet: HAMLET, water: 'ponds', woods: 0.42, hills: 14, fields: 100, spots: ['picnicMeadow', 'fishingJetty', 'lookout', 'orchard', 'hammockGrove'], spotsPerArea: [1, 1] },
-  dense: { world: [896, 1024], hamlets: [5, 7], hamlet: HAMLET, water: 'ponds', woods: 0.34, hills: 10, fields: 100, spots: ['picnicMeadow', 'orchard', 'lookout', 'fishingJetty'], spotsPerArea: [1, 1] },
+  dense: { world: [960, 1024], hamlets: [5, 7], hamlet: HAMLET, water: 'ponds', woods: 0.34, hills: 10, fields: 100, spots: ['picnicMeadow', 'orchard', 'lookout', 'fishingJetty'], spotsPerArea: [1, 1] },
   farm: {
     world: [960, 1024],
     hamlets: [5, 7],
