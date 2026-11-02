@@ -126,6 +126,12 @@ const FLOOR_MATERIALS: Record<FloorCoveringDef['finish'], string> = {
 /** The finishes drawn with a pattern over their surface (wall and floor finishes alike). */
 const FINISH_PATTERNS: Partial<Record<WallCoveringDef['finish'] | FloorCoveringDef['finish'], SurfacePattern>> = { wallpaper: 'stripes', whitewash: 'whitewash' };
 
+/** The surface (and its pattern) a wall or floor covering of `finish` is drawn with; null for a finish there isn't. */
+export function coveringSurface(kind: 'wall' | 'floor', finish: string): { key: string; pattern?: SurfacePattern } | null {
+  const key = kind === 'wall' ? FINISH_MATERIALS[finish as WallCoveringDef['finish']] : FLOOR_MATERIALS[finish as FloorCoveringDef['finish']];
+  return key ? { key, pattern: FINISH_PATTERNS[finish as WallCoveringDef['finish']] } : null;
+}
+
 /** How far a covering preview lies off the surface it covers, so it draws over it (metres). */
 const PROUD = 0.004;
 

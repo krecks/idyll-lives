@@ -11,6 +11,7 @@ import { optimizedUrl } from '../assets/registry';
 import { withBuild, withoutBuild } from '../assets/build';
 import type { Content } from '../content/content';
 import type { WorldStructure } from '../core/protocol';
+import { BIRD_MODELS } from '../render/shared/birds';
 
 export interface Rect {
   x: number;
@@ -121,6 +122,8 @@ export function gameAssetPlan(
   }
   for (const key of NATURE) addModel(key);
   for (const key of STREET) addModel(key);
+  // The garden birds (built with the first world, behind the loading screen).
+  for (const key of BIRD_MODELS) addModel(key);
   // The rig and every character set are `character` entries, not models (`model.sim` is one too).
   for (const key of assets.keys('character')) addHome(assets.get(key, 'character')?.url ?? null);
 
@@ -162,4 +165,34 @@ export function streamRanks(content: Content, assets: AssetRegistry, world: Pick
     if (rank < (ranks.get(k) ?? Infinity)) ranks.set(k, rank);
   }
   return ranks;
+}
+
+/** Model files read ahead of time at once at most (`parseAheadFiles`): kept until wanted (`shared/modelFiles.ts` keeps 96 idle ones). */
+const PARSE_AHEAD = 24;
+
+/**
+ * The model files of the town's things to read ahead of time, in idle moments (`Renderer.parseAhead`):
+ * those round the camera, then the rest, nearest first (`streamRanks` 1 and up; the focus lot's are
+ * built anyway), at most `limit`. Each as its entry names it (`url`, what a build loads) and as the
+ * stream keys its download (`file`).
+ */
+export function parseAheadFiles(content: Content, assets: AssetRegistry, world: Pick<WorldStructure, 'objects'>, view: Rect | null, watch: Rect | null, limit = PARSE_AHEAD): { url: string; file: string }[] {
+  const ranks = streamRanks(content, assets, world, view, watch);
+  const out: { url: string; file: string; rank: number }[] = [];
+  const seen = new Set<string>();
+  for (const o of world.objects) {
+    const key = content.object(o.def)?.model ?? `model.${o.def}`;
+    if (seen.has(key) || !assets.has(key, 'model')) continue;
+    seen.add(key);
+    const url = assets.get(key, 'model')?.url;
+    if (!url) continue;
+    const file = withoutBuild(optimizedUrl(url));
+    const rank = ranks.get(file);
+    if (rank === undefined || rank < 1 || out.some((f) => f.url === url)) continue;
+    out.push({ url, file, rank });
+  }
+  return out
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, limit)
+    .map(({ url, file }) => ({ url, file }));
 }

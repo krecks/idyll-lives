@@ -396,6 +396,29 @@ export interface Renderer {
    * so its shaders and pipelines are ready before the game is first shown.
    */
   warmGame(frame: FrameState): Promise<void>;
+  /**
+   * Resolves once the textures asked for so far have loaded (the surfaces' and the model files'),
+   * so the warm-up's frame uploads them rather than the first frames of play.
+   */
+  texturesReady(): Promise<void>;
+  /** Resolves once the street has built the chunks streamed in round the camera, or after `limitMs`. */
+  streamSettled(limitMs: number): Promise<void>;
+  /**
+   * Told (null: no longer) what a world build and the warm-up are at: a step's name and how far
+   * through them both it is (0..1), for the loading screen.
+   */
+  onLoadStep(fn: ((label: string, done: number) => void) | null): void;
+  /**
+   * Model files (as their entries name them) to read ahead of time, nearest first, in idle moments:
+   * each once it's downloaded (`file`: its key in the stream, `assets/stream.ts`). Replaces the last list.
+   */
+  parseAhead(files: readonly { url: string; file: string }[]): void;
+  /**
+   * The player is about to want model `key` (a catalog card under the pointer) or a wall or floor
+   * covering of finish `key`: its file read, or its surface made (its textures loading), now rather
+   * than when it's first placed. The last call wins, after a moment.
+   */
+  prepareAsset(key: string, kind: 'model' | 'wall' | 'floor'): void;
   /** Canvas-relative CSS pixel coordinates. */
   pick(x: number, y: number): PickResult;
   /**
