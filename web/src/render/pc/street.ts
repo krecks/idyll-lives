@@ -28,6 +28,7 @@ import { windStill } from './nature';
 import { TemplateCache } from './templateCache';
 import type { AssetRegistry } from '../../assets/registry';
 import type { ModelEntry } from '../../assets/types';
+import type { FenceStyleDef } from '../../content/content';
 import type { WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import type { RGB } from '../shared/environment';
@@ -51,6 +52,8 @@ export interface StreetOptions {
   shadows?: boolean;
   /** Also draws the road, the garden paths and the fields off the viewed lot (the game's street; `ChunkPlan.ground`). */
   ground?: boolean;
+  /** The content's fence styles: the street draws the fences on other lots (`TownStreet`). */
+  fenceStyles?: readonly FenceStyleDef[];
 }
 
 /** A model the street places: its template, a draw per mesh, and its glows' (with the street's copy of their material). */
@@ -169,14 +172,16 @@ export class Street {
   private readonly lod: 0 | 1;
   private readonly shadows: boolean;
   private readonly ground: boolean;
+  private readonly fenceStyles: readonly FenceStyleDef[];
 
   constructor(
     private readonly app: pc.AppBase,
     parent: pc.Entity,
     private readonly assets: AssetRegistry,
     private readonly house: HouseBuilder,
-    { layers, lived = false, look, lod = 0, shadows = true, ground = false }: StreetOptions = {},
+    { layers, lived = false, look, lod = 0, shadows = true, ground = false, fenceStyles = [] }: StreetOptions = {},
   ) {
+    this.fenceStyles = fenceStyles;
     this.layers = layers;
     this.lived = lived;
     this.look = look;
@@ -257,7 +262,7 @@ export class Street {
     if (!this.town || layoutKey !== this.layoutKey) {
       this.dropChunks();
       const entry = (k: string) => (this.assets.has(k, 'model') ? (this.assets.get(k, 'model') as ModelEntry) : undefined);
-      this.town = new TownStreet(this.house.planner, world, { has: (k) => this.assets.has(k, 'model'), entry, lived: this.lived, look: this.look, ground: this.ground }, mode);
+      this.town = new TownStreet(this.house.planner, world, { has: (k) => this.assets.has(k, 'model'), entry, lived: this.lived, look: this.look, ground: this.ground, fenceStyles: this.fenceStyles }, mode);
       this.layoutKey = layoutKey;
       this.townWorld = world;
     } else if (world !== this.townWorld) {

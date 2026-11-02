@@ -401,7 +401,7 @@ export class BuildPreviews {
     const next = new pc.Entity('preview-built');
     let hole: WallHole | null = null;
     const fences = edges.flatMap((e) => ((e.kind === 'fence' || e.kind === 'gate') && (e.axis === 'h' || e.axis === 'v') ? [{ axis: e.axis, x: e.x, z: e.z, kind: e.kind, style: e.style }] : []));
-    buildFences(this.app, next, fences, this.host.content.fenceStyles);
+    buildFences(this.app, next, fences, this.host.content.fenceStyles, { hedgeBoxes: true });
     // A lot with just these walls (in the rooms as they are), the walls they go into keeping their looks.
     const W = world.width;
     const walls: WallEdge[] = [];

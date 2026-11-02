@@ -3,7 +3,7 @@
  * (`HouseBuilder.silhouettes`, with porches, chimneys and garages), sidewalks with kerbs and
  * a dashed centre line, streetlights that light up at night (with pools of light on the
  * ground), mailboxes, hydrants and bins along the kerb, cars parked on neighbours' driveways,
- * picket fences or hedges around neighbours' back gardens, and flower beds along their house
+ * the fences and hedges round gardens and fields, and flower beds along their house
  * fronts, with pots by the door and little lights along the garden path; the things standing in
  * their gardens. The town's public places seen from another lot: shops as silhouettes with an awning,
  * and the park, playground and market things standing in the open. At the ends of the street a bus
@@ -12,8 +12,7 @@
  * Rules:
  * - Visual only, and kept off where Sims walk: front lawns (Sims cut across them on their way
  *   out of town), garden paths, driveway mouths, the road and the middle of the sidewalk. Kerb
- *   furniture stands on the road side of the sidewalk, fences only run from the house front line
- *   backwards, cars park beside the houses.
+ *   furniture stands on the road side of the sidewalk, cars park beside the houses.
  * - The things outdoors on other lots (neighbours' garden furniture and planters, the park's
  *   benches; not what stands indoors, in the silhouettes) in the game, placed, turned and moved off
  *   their tiles' middle as the lot draws them: the lawn is cleared under every lot's things
@@ -23,6 +22,11 @@
  *   game builds it (no porch, chimney or garden dressing), and nothing else. Its garage, if the
  *   town gave it one (`WorldStructure.garages`), stands on it in the game too, drawn apart
  *   (`StreetPlan.lot`): it goes with the lot's ground while its basement is in view.
+ * - Fences: the world's (`shownFences`: the ones a town puts up round its gardens and fields,
+ *   `game/gardenFences.ts`, the player's, and in an older town the ones it would have put up) on
+ *   other lots, in their styles (`shared/fences.ts`), merged into each chunk's meshes, hedges with
+ *   its plants; the game draws the focus lot's the same way, and every gate (they swing). The same
+ *   fences whichever lot is in view.
  * - Cars: the world's (`WorldStructure.cars`), parked, in the menus' town; in the game they come
  *   and go, drawn by `pc/cars.ts`. A game saved before there were cars gets them by some neighbours'
  *   driveways (`parkCar`), parked for good.
@@ -37,14 +41,17 @@
  */
 
 import type { ModelEntry } from '../../assets/types';
-import { groundDepth, objectCentre, storeyOfRow, storeyRow, type ObjectPlacement, type Opening, type PlotInfo, type RoadPlan, type WorldStructure } from '../../core/protocol';
+import type { FenceStyleDef } from '../../content/content';
+import { groundDepth, objectCentre, storeyOfRow, storeyRow, type FenceEdge, type ObjectPlacement, type Opening, type PlotInfo, type RoadPlan, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
 import { CARS, CAR_PAINT, garageFor, hash, paintCar, parkCar, pick, type CarBody } from './cars';
-import { chunkAt, hashNumbers, hashString, RectGrid } from './chunks';
+import { chunkAt, chunkCoords, chunkId, hashNumbers, hashString, RectGrid } from './chunks';
 import type { HousePlanner, SilhouettePlan, SilhouetteSpec } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
+import { writeFences } from './fences';
+import { shownFences } from './shownFences';
 import { centroid } from '../../game/roads';
 import { Kerb, KERB, roadIndex, roadMeshes, SIDEWALK, townRoads, WALK_Y, type RoadIndex } from './roads';
 
@@ -68,14 +75,6 @@ const T = 0.07;
 
 const MAILBOX = ['#22262A', '#2F4A3A', '#E8E6E0', '#8C2A26', '#2E4568'];
 const BIN = ['#3C6B3A', '#55595E', '#2E5C8A'];
-const FENCE_WHITE = '#F2F0EA';
-/** Weathered wood of the rail fences round farms and their fields. */
-const RAIL_WOOD = '#8A6F52';
-/**
- * How far neighbours' fences (and hedges, their middle) keep from the viewed lot's edge: clear of
- * the pit dug round it while its basement is in view (`PIT_MARGIN` in PlayCanvasRenderer).
- */
-const LOT_CLEARANCE = { picket: 0.4, rail: 0.4, hedge: 0.8 };
 
 /** Model keys of the thin-instanced foliage (the street and trees packs). */
 export const FOLIAGE = { bush: 'model.bush', flowers: 'model.street.flowers', hedge: 'model.hedge' } as const;
@@ -257,44 +256,6 @@ function bin(p: Painter, colour: string): void {
   for (const s of [-1, 1]) p.tube('x', s * 0.22, s * 0.3, 0.1, -0.26, 0.1, 0.1, 10);
 }
 
-/** A white picket fence along an axis-aligned line (posts every ~2 m). */
-function pickets(p: Painter, x0: number, z0: number, x1: number, z1: number): void {
-  const alongX = Math.abs(x1 - x0) >= Math.abs(z1 - z0);
-  const len = alongX ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
-  if (len < 0.5) return;
-  // Local frame: +x along the fence.
-  p.at(x0, z0, alongX ? (x1 > x0 ? 0 : Math.PI) : z1 > z0 ? -Math.PI / 2 : Math.PI / 2);
-  p.paint(FENCE_WHITE, 0.6, 0);
-  const posts = Math.max(1, Math.round(len / 2));
-  for (let i = 0; i <= posts; i++) {
-    const x = (len * i) / posts;
-    p.box(x - 0.045, 0, -0.045, x + 0.045, 0.98, 0.045, 'ny');
-    p.box(x - 0.06, 0.98, -0.06, x + 0.06, 1.02, 0.06, 'ny');
-  }
-  for (const y of [0.25, 0.7]) p.box(0, y, -0.035, len, y + 0.06, -0.012, 'ny');
-  for (let x = 0.09; x < len - 0.05; x += 0.15) {
-    if (Math.abs(((x + 1) % (len / posts)) - 1) < 0.07) continue;
-    for (const [z, n] of [[0.009, 1], [-0.009, -1]] as const) {
-      p.poly([[x - 0.036, 0.05, z], [x + 0.036, 0.05, z], [x + 0.036, 0.84, z], [x, 0.92, z], [x - 0.036, 0.84, z]], [0, 0, n]);
-    }
-  }
-}
-
-/** A rustic rail fence along an axis-aligned line (round-ish posts every ~2.4 m, two split rails). */
-function rails(p: Painter, x0: number, z0: number, x1: number, z1: number): void {
-  const alongX = Math.abs(x1 - x0) >= Math.abs(z1 - z0);
-  const len = alongX ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
-  if (len < 0.5) return;
-  p.at(x0, z0, alongX ? (x1 > x0 ? 0 : Math.PI) : z1 > z0 ? -Math.PI / 2 : Math.PI / 2);
-  p.paint(RAIL_WOOD, 0.9, 0);
-  const posts = Math.max(1, Math.round(len / 2.4));
-  for (let i = 0; i <= posts; i++) {
-    const x = (len * i) / posts;
-    p.box(x - 0.06, 0, -0.06, x + 0.06, 1.08, 0.06, 'ny');
-  }
-  for (const y of [0.42, 0.84]) p.box(0, y, -0.035, len, y + 0.1, 0.035, 'ny');
-}
-
 /**
  * Farm fields as ground layers (`WorldLook.fields`): tilled earth, with darker heaped rows under
  * the crops (every other tile across, from the field's second tile; `town.ts` keeps fields an odd
@@ -379,6 +340,8 @@ export interface StreetSource {
   look?: ObjectLook;
   /** Also the ground layers (`ChunkPlan.ground`: the road, garden paths, fields; the game's street). */
   ground?: boolean;
+  /** The content's fence styles, for the fences on other lots (`WorldStructure.fences`). */
+  fenceStyles?: readonly FenceStyleDef[];
 }
 
 /** The street as laid out, to be drawn. */
@@ -535,8 +498,8 @@ const mix = (h: number, v: number) => Math.imul(h ^ (v | 0), 16777619);
 /**
  * The whole town's street, laid out once, view-independent, and planned per 64 m chunk for a focus
  * lot (`chunk`): the focus lot's house and garden are the game's own (only its garage here, apart in
- * `lot`), and the lots beside it keep their fences clear of it. Each part of the street (a plot, a
- * road side's kerb, a field's fence) is planned on its own and kept, planned again only when what it
+ * `lot`), and its fences the game's too (the world's fences round it are the same whichever lot is
+ * the focus). Each part of the street (a plot, a road side's kerb, a chunk's fences) is planned on its own and kept, planned again only when what it
  * stands among changes (a thing moved near it, the focus next to it), so a focus change or an edit
  * builds one or two chunks again, not the street.
  *
@@ -576,7 +539,13 @@ export class TownStreet {
   /** Things on no plot's ground (on the street, on lots not laid out). */
   private readonly plotUnits = new Map<string, { hash: number; out: PlotOut }>();
   private readonly kerbUnits = new Map<string, { hash: number; out: KerbOut }>();
-  private readonly fieldUnits = new Map<string, { hash: number; out: Parts }>();
+  /** The world's fences by the chunk their middle is in, as last taken (`setWorld`), and each chunk's share of the street. */
+  private fencesOf: FenceEdge[] | null = null;
+  private fencesByChunk = new Map<number, FenceEdge[]>();
+  /** Which chunk draws the post on each grid corner (`x:z`): the first fence's there (in the world's order). */
+  private postOwner = new Map<string, number>();
+  private readonly fenceUnits = new Map<number, { hash: number; out: Parts }>();
+
   /** The street's own: sidewalks, the road's surface, fountains, the menus' parked cars (by chunk). */
   private statics: Map<number, { parts: Parts; road: Geo; trail: Geo }> | null = null;
   /** Kerbs by road side, and which plots front each. */
@@ -658,7 +627,7 @@ export class TownStreet {
       world.storeyDepth,
       world.storeys,
       world.basement,
-      m ? keyOf(m, () => JSON.stringify([m.seed ?? 0, m.streets, m.roads, m.paths, m.facing, m.world?.fields, m.home])) : '-',
+      m ? keyOf(m, () => JSON.stringify([m.seed ?? 0, m.streets, m.roads, m.paths, m.facing, m.world?.fields, m.home, m.gardenFences])) : '-',
       world.garages ? keyOf(world.garages, () => JSON.stringify(world.garages)) : '-',
       mode === 'town' ? (world.cars ? keyOf(world.cars, () => JSON.stringify(world.cars)) : '-') : !!world.cars,
       keyOf(world.plots, () => JSON.stringify(world.plots.map((p) => [p.id, p.x, p.z, p.w, p.d, p.public, p.entry]))),
@@ -668,6 +637,24 @@ export class TownStreet {
   /** Takes the world's things, houses and rooms as they are now (the layout stays: see `layoutKey`). */
   setWorld(world: WorldStructure): void {
     this.world = world;
+    // Fences (one put up or taken down): found again by chunk; each chunk's share notices its own (`fenceOut`).
+    const fences = shownFences(world, this.options.fenceStyles ?? []);
+    if (fences !== this.fencesOf) {
+      this.fencesOf = fences;
+      const by = new Map<number, FenceEdge[]>();
+      const owner = new Map<string, number>();
+      for (const f of fences) {
+        if (f.z > this.D) continue;
+        const id = f.axis === 'h' ? chunkAt(f.x + 0.5, f.z) : chunkAt(f.x, f.z + 0.5);
+        let list = by.get(id);
+        if (!list) by.set(id, (list = []));
+        list.push(f);
+        for (const k of [`${f.x}:${f.z}`, f.axis === 'h' ? `${f.x + 1}:${f.z}` : `${f.x}:${f.z + 1}`]) if (!owner.has(k)) owner.set(k, id);
+      }
+      this.fencesByChunk = by;
+      this.postOwner = owner;
+      this.version++;
+    }
     // (Rooms decide which things are outdoors: another rooms array, keys worked out again.)
     if (world.rooms !== this.roomsOf) {
       this.roomsOf = world.rooms;
@@ -830,11 +817,6 @@ export class TownStreet {
     return clear;
   }
 
-  /** The blockers near a rectangle as a list (the garages' check, the fences'), the focus lot's left out in the game. */
-  private blockersNear(r: Rect, m: number, focus: number): Rect[] {
-    return this.blocked.near(r, m).filter((b) => !this.gone(b, focus));
-  }
-
   /** A hash of the blockers in rectangles (those of the focus lot left out in the game). */
   private blockersHash(rects: readonly Rect[], focus: number, h = 0): number {
     for (const r of rects) {
@@ -884,6 +866,7 @@ export class TownStreet {
     for (const id of this.staticParts().keys()) ids.add(id);
     for (const r of this.rows.keys()) for (const id of this.kerbOf(r, NO_FOCUS).chunks.keys()) ids.add(id);
     for (const f of this.fields) ids.add(chunkAt(f.x + f.w / 2, f.z + f.d / 2));
+    for (const id of this.fencesByChunk.keys()) ids.add(id);
     if (this.options.ground) for (const [, rects] of this.groundRects()) for (const r of rects) ids.add(chunkAt(r.x + r.w / 2, r.z + r.d / 2));
     return [...ids].sort((a, b) => a - b);
   }
@@ -896,7 +879,7 @@ export class TownStreet {
 
   // ---- the parts, each planned on its own and kept ----------------------------------------
 
-  /** The plots a plot's share depends on with the focus there: itself and those beside it (their fences keep clear of it). */
+  /** The plots a plot's share depends on with the focus there: itself and those beside it (what stands round it is the game's there). */
   private plotDeps(L: PlotLayout): PlotLayout[] {
     return this.plotsNear(L.info, 2);
   }
@@ -960,7 +943,7 @@ export class TownStreet {
       }
     }
 
-    // ---- its garden: a car, fences or hedges, flower beds ----
+    // ---- its garden: a car, flower beds ----
     if (kind === 'house' && L.house) this.garden(L, focus, parts);
 
     // ---- a shop's awning; the things outdoors on it ----
@@ -991,17 +974,13 @@ export class TownStreet {
     const { plot, front, turned } = L;
     const h = L.house!;
     const props = parts.props;
-    const neighbour = (o: PlotLayout | undefined) => !!o && this.kindOf(o, focus) === 'house';
     const free = (r: Rect, m = 0) => this.free(r, m, focus);
-    const near = this.blockersNear({ x: L.info.x - 1, z: L.info.z - 1, w: L.info.w + 2, d: L.info.d + 2 }, 0.5, focus);
     // Laid out as the plot is (see `PlotLayout`), drawn on the town.
     const at = (x: number, z: number, yaw = 0, y = 0) => props.at(...townPoint(turned, x, z), townYaw(turned, yaw), y);
     const isFree = (r: Rect, m = 0) => free(townRect(turned, r), m);
     const plant = (kind: FoliageKind, [x, z, sx, sy, yaw]: Inst) => parts.plants[kind].push([...townPoint(turned, x, z), sx, sy, townYaw(turned, yaw)]);
     const putAt = (key: string, x: number, z: number, yaw: number, size?: number) => parts.put(key, ...townPoint(turned, x, z), townYaw(turned, yaw), size);
-    const vz = (v: number) => L.edge - front * v; // depth into the plot -> z
     const frontWall = front > 0 ? h.z1 + T : h.z0 - T;
-    const backEdge = front > 0 ? plot.z : plot.z + plot.d;
 
     // A game without cars of its own (none in `WorldStructure.cars`: towns of winding roads, whose
     // cars stay parked for now, and games from before cars): a car on some driveways, for good.
@@ -1009,26 +988,7 @@ export class TownStreet {
     const car = end ? parkCar(plot, end) : null;
     if (car) parked(parts, ...townPoint(turned, car.x, car.z), townYaw(turned, car.yaw), CARS[car.body], CAR_PAINT[car.paint]);
 
-    // Fences or hedges: sides from the house front line back, and the back edge. A side
-    // shared with another neighbour is drawn once, on the boundary, by the plot on its left.
-    // Farms have rail fences.
-    const farm = this.fields.some((f) => overlaps(f, L.info, -0.01));
-    const style = farm ? 'rail' : hash(plot.x, plot.z, 30) < 0.5 ? 'picket' : hash(plot.x, plot.z, 31) < 0.75 ? 'hedge' : 'none';
-    if (style !== 'none') {
-      const { left, right } = this.sides.get(L) ?? {};
-      const inset = style === 'hedge' ? 0.45 : 0.15;
-      const vStart = Math.max(L.edge * front - frontWall * front, ...[left, right].filter(neighbour).map((o) => (o!.house ? o!.edge * front - (front > 0 ? o!.house.z1 + T : o!.house.z0 - T) * front : 0))) + 0.4;
-      const vEnd = plot.d - inset;
-      const lines: [number, number, number, number][] = [];
-      // Further in beside the viewed lot (see `LOT_CLEARANCE`).
-      const homeAt = (o: PlotLayout | undefined) => !!o && this.kindOf(o, focus) === 'home';
-      const [inL, inR] = [homeAt(left) ? LOT_CLEARANCE[style] : inset, homeAt(right) ? LOT_CLEARANCE[style] : inset];
-      if (!neighbour(left)) lines.push([plot.x + inL, vz(vStart), plot.x + inL, vz(vEnd)]);
-      lines.push(neighbour(right) ? [plot.x + plot.w, vz(vStart), plot.x + plot.w, vz(vEnd)] : [plot.x + plot.w - inR, vz(vStart), plot.x + plot.w - inR, vz(vEnd)]);
-      lines.push([plot.x + inL, backEdge + front * inset, plot.x + plot.w - inR, backEdge + front * inset]);
-      for (const [x0, z0, x1, z1] of lines) edgeRun(style, props, parts.plants.hedge, ...townPoint(turned, x0, z0), ...townPoint(turned, x1, z1), near);
-    }
-
+    // (Its fences and hedges are the world's: `fenceOut`.)
     // Flower beds along the house front, either side of the porch (one along all of it when no path
     // leads to a door).
     const door = L.door;
@@ -1282,36 +1242,32 @@ export class TownStreet {
     return out;
   }
 
-  /** A farm field's rail fence round it, a gate on the side towards the farmhouse (none round a field on the viewed lot). */
-  private fieldOut(i: number, focus: number): { key: string; out: Parts } {
-    const f = this.fields[i];
-    const deps = this.plotsNear(f, 1);
-    const variant = deps.some((d) => d.info.id === focus) ? focus : NO_FOCUS;
-    const id = `${i}|${variant}`;
-    const h = this.blockersHash([{ x: f.x - 1, z: f.z - 1, w: f.w + 2, d: f.d + 2 }], variant, hashString(JSON.stringify(deps.map((d) => d.info.house))));
-    const cached = this.fieldUnits.get(id);
-    if (cached && cached.hash === h) return { key: `f${id}:${h}`, out: cached.out };
+  /**
+   * The world's fences in chunk `id` with lot `focus` in view, in their styles: in the game, not the
+   * focus lot's (on its edges too) nor the gates (the game draws those, swinging); in the menus'
+   * town all of them.
+   */
+  private fenceOut(id: number, focus: number): { key: string; out: Parts } | null {
+    const all = this.fencesByChunk.get(id);
+    if (!all?.length) return null;
+    const F = this.mode === 'game' ? this.byId.get(focus)?.info : undefined;
+    const onLot = (f: FenceEdge) => !!F && f.x >= F.x && f.z >= F.z && f.x + (f.axis === 'h' ? 1 : 0) <= F.x + F.w && f.z + (f.axis === 'v' ? 1 : 0) <= F.z + F.d;
+    const list = all.filter((f) => !onLot(f) && (this.mode === 'town' || f.kind !== 'gate'));
+    if (!list.length) return null;
+    // Each post once: by the chunk of the first fence at its corner (the game draws the focus lot's and the gates' own), in the tallest style there.
+    const [cx, cz] = chunkCoords(id);
+    const round: FenceEdge[] = [];
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) round.push(...(this.fencesByChunk.get(chunkId(cx + dx, cz + dz)) ?? []));
+    const edge = (h: number, f: FenceEdge) => mix(mix(mix(h, f.x * 2 + (f.axis === 'h' ? 1 : 0)), f.z), (f.style ?? 0) * 2 + (f.kind === 'gate' ? 1 : 0));
+    let h = list.reduce(edge, 0);
+    h = round.reduce(edge, mix(h, round.length));
+    const cached = this.fenceUnits.get(id);
+    if (cached && cached.hash === h) return { key: `e${id}:${h}`, out: cached.out };
     const parts = new Parts(this.options.has);
-    const F = this.byId.get(variant);
-    if (!(this.mode === 'game' && F && overlaps(f, F.info, -0.01))) {
-      const house = this.plots.find((L) => L.info.house && overlaps(f, L.info, -0.01))?.info.house;
-      const gateWest = !house || (house[0] + house[2]) / 2 < f.x + f.w / 2;
-      const [x0, z0, x1, z1] = [f.x + 0.3, f.z + 0.3, f.x + f.w - 0.3, f.z + f.d - 0.3];
-      const [gx, ox] = gateWest ? [x0, x1] : [x1, x0];
-      const gate = (z0 + z1) / 2;
-      const near = this.blockersNear({ x: f.x - 1, z: f.z - 1, w: f.w + 2, d: f.d + 2 }, 0.5, variant);
-      for (const [a, b, c, d] of [
-        [x0, z0, x1, z0],
-        [x0, z1, x1, z1],
-        [ox, z0, ox, z1],
-        [gx, z0, gx, gate - 1.3],
-        [gx, gate + 1.3, gx, z1],
-      ] as const) {
-        edgeRun('rail', parts.props, parts.plants.hedge, a, b, c, d, near);
-      }
-    }
-    this.fieldUnits.set(id, { hash: h, out: parts });
-    return { key: `f${id}:${h}`, out: parts };
+    const postHere = (x: number, z: number) => this.postOwner.get(`${x}:${z}`) === id;
+    writeFences(parts.props, list, this.options.fenceStyles ?? [], { gates: null, hedges: parts.plants.hedge, postsFrom: round, postHere });
+    this.fenceUnits.set(id, { hash: h, out: parts });
+    return { key: `e${id}:${h}`, out: parts };
   }
 
   /** Sidewalks and kerbs, the road's surface (the game's), the fountains on roundabouts, the menus' parked cars: by chunk, planned once. */
@@ -1400,12 +1356,11 @@ export class TownStreet {
       kerbs.push(c.parts);
     }
     const fields: Parts[] = [];
-    this.fields.forEach((f, i) => {
-      if (chunkAt(f.x + f.w / 2, f.z + f.d / 2) !== id) return;
-      const { key, out } = this.fieldOut(i, focus);
-      keys.push(key);
-      fields.push(out);
-    });
+    const fence = this.fenceOut(id, focus);
+    if (fence) {
+      keys.push(fence.key);
+      fields.push(fence.out);
+    }
     // Ground layers: garden paths and fields off the focus lot (the lot draws its own, on its ground).
     const ground: GroundLayer[] = [];
     if (this.options.ground) {
@@ -1633,42 +1588,6 @@ function layout(world: WorldStructure, streets: Rect[], paths: Rect[], facingOf?
 /** A garage at the inner end of the driveway, beside the house, when it fits clear of `blocked` (the town's; `garageFor`): as laid out. */
 function garage(L: PlotLayout, blocked: Rect[]): SilhouetteSpec['garage'] {
   return L.drive && L.house ? garageFor(L.plot, L.house, L.drive, L.front, blocked.map((b) => localRect(L.turned, b))) : null;
-}
-
-/** A fence or hedge along a line, skipping stretches that would run through objects. */
-function edgeRun(style: 'picket' | 'hedge' | 'rail', props: Painter, hedges: Inst[], x0: number, z0: number, x1: number, z1: number, blocked: Rect[]): void {
-  const len = Math.hypot(x1 - x0, z1 - z0);
-  if (len < 1) return;
-  const step = 2;
-  const n = Math.max(1, Math.round(len / step));
-  let runStart: number | null = null;
-  const flush = (end: number) => {
-    if (runStart === null) return;
-    const [a, b] = [runStart / n, end / n];
-    const [ax, az, bx, bz] = [x0 + (x1 - x0) * a, z0 + (z1 - z0) * a, x0 + (x1 - x0) * b, z0 + (z1 - z0) * b];
-    if (style === 'picket') pickets(props, ax, az, bx, bz);
-    else if (style === 'rail') rails(props, ax, az, bx, bz);
-    else {
-      const l = Math.hypot(bx - ax, bz - az);
-      const k = Math.max(1, Math.round(l / 1.05));
-      const yaw = Math.abs(bx - ax) >= Math.abs(bz - az) ? 0 : Math.PI / 2;
-      for (let i = 0; i < k; i++) {
-        const t = (i + 0.5) / k;
-        const [x, z] = [ax + (bx - ax) * t, az + (bz - az) * t];
-        hedges.push([x, z, (l / k) / 1.05 * (1 + hash(x, z, 60) * 0.06), 0.85 + hash(x, z, 61) * 0.2, yaw + (hash(x, z, 62) < 0.5 ? 0 : Math.PI)]);
-      }
-    }
-    runStart = null;
-  };
-  for (let i = 0; i < n; i++) {
-    const [a, b] = [i / n, (i + 1) / n];
-    const xs = [x0 + (x1 - x0) * a, x0 + (x1 - x0) * b];
-    const zs = [z0 + (z1 - z0) * a, z0 + (z1 - z0) * b];
-    const r = { x: Math.min(...xs) - 0.1, z: Math.min(...zs) - 0.1, w: Math.abs(xs[1] - xs[0]) + 0.2, d: Math.abs(zs[1] - zs[0]) + 0.2 };
-    if (blocked.some((o) => overlaps(r, o))) flush(i);
-    else runStart ??= i;
-  }
-  flush(n);
 }
 
 /** A soft pool of lamplight on the ground. */

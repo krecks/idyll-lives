@@ -29,6 +29,8 @@ import { GameCamera } from './camera';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { createApp, createDevice, destroyApp } from './device';
 import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
+import { fenceHedges } from '../shared/fences';
+import { shownFences } from '../shared/shownFences';
 import { gardenPool, GardenPools } from './gardenPools';
 import { HoverTile, ResizeHandles } from './handles';
 import { HeldFrames } from './heldFrames';
@@ -405,6 +407,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private stairwells: ViewRect[] = [];
   /** The house's garden trees and shrubs (`placeDecor`): a draw per model mesh, hidden while its basement is in view. */
   private decorTemplates!: TemplateCache<ModelTemplate>;
+  /** The viewed lot's hedges (its fences in the hedge style), planted with its garden's shrubs ([x, z, scale, yaw]). */
+  private lotHedges: [number, number, number, number][] = [];
   private readonly decor = new Map<string, { template: ModelTemplate; draws: Instances[] }>();
   /** The viewed lot's door leaves that swing, each with how far open it stands (1 open, as drawn; -1 not placed yet). */
   private doors: { leaf: HouseDoor; open: number }[] = [];
@@ -655,6 +659,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       lod: this.quality.streetLod,
       shadows: this.quality.streetShadows,
       ground: true,
+      fenceStyles: c.fenceStyles,
     });
     this.cars = new Cars(this.app, this.root, this.quality.streetShadows);
     this.characters.setCarSeat((x, z) => this.cars.seatAt(x, z));
@@ -1178,11 +1183,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const m = world.meta;
       this.lotParts = { refs, key: JSON.stringify([m?.seed, m?.streets, m?.roads, m?.paths, world.walls, world.openings, world.diagonals, world.floors, world.fences]) };
     }
+    // (An older town's fences, planned from what stands round them, are part of the lot's too.)
+    const planned = shownFences(world, this.deps.content.fenceStyles);
     return JSON.stringify([
       view,
       world.width,
       world.depth,
       this.lotParts.key,
+      planned === (world.fences ?? planned) ? 0 : planned.length,
       world.plots.map((p) => [p.house, p.roof]),
       world.households.find((h) => h.player)?.plot,
       houseObjectKey(world, view, (def) => !!this.deps.content.object(def)?.stairs, this.shutDefs),
@@ -1225,17 +1233,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
     const lotKey = this.lotKeyOf(world, view);
     const lotBuilt = lotKey !== this.lotKey;
+    const v = view;
+    const onLot = (f: FenceEdge) => !!v && f.x >= v.x && f.z >= v.z && f.x + (f.axis === 'h' ? 1 : 0) <= v.x + v.w && f.z + (f.axis === 'v' ? 1 : 0) <= v.z + v.d;
+    const shown = shownFences(world, this.deps.content.fenceStyles);
+    const lotFences = lotBuilt ? shown.filter(onLot) : [];
     if (lotBuilt) {
       this.clearLot();
       this.lotKey = lotKey;
+      this.lotHedges = fenceHedges(lotFences, this.deps.content.fenceStyles).map(([x, z, s, , yaw]): [number, number, number, number] => [x, z, s, yaw]);
       this.buildStreets(world);
       await this.pace();
       await this.buildLot(world);
       await this.pace();
-      // The viewed lot's fences stand on the ground (hidden with it while the basement is in view); other lots' stay.
-      const v = view;
-      const onLot = (f: FenceEdge) => !!v && f.x >= v.x && f.z >= v.z && f.x + (f.axis === 'h' ? 1 : 0) <= v.x + v.w && f.z + (f.axis === 'v' ? 1 : 0) <= v.z + v.d;
-      for (const [list, storey] of [[(world.fences ?? []).filter(onLot), 0], [(world.fences ?? []).filter((f) => !onLot(f)), undefined]] as const) {
+      // The viewed lot's fences stand on the ground (hidden with it while the basement is in view, its
+      // hedges with the garden's shrubs: `lotHedges`); other lots' are the street's, but for their gates, which swing.
+      for (const [list, storey] of [[lotFences, 0], [shown.filter((f) => !onLot(f) && f.kind === 'gate'), undefined]] as const) {
         const fences = buildFences(this.app, this.root, list, this.deps.content.fenceStyles);
         if (!fences) continue;
         this.lotEntities.push({ entity: fences.entity, storey });
@@ -1435,8 +1447,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.wallsLow = add('wallsLow', world.meshes.wallsLow, wall);
       return;
     }
-    // Garden dressing split into species (hedges or mixed shrub borders, varied lot trees).
+    // Garden dressing split into species (hedges or mixed shrub borders, varied lot trees), and the lot's hedges round its garden (its fences').
     const decor = [...natureDecor('model.bush', ground.shrubs), ...natureDecor('model.tree', ground.trees, world, this.view)];
+    if (this.lotHedges.length) {
+      const hedges = decor.find(([k]) => k === 'model.hedge');
+      if (hedges) hedges[1] = [...hedges[1], ...this.lotHedges];
+      else decor.push(['model.hedge', this.lotHedges]);
+    }
     this.birdLife.setDecor(decor); // (the birds live in it.)
     for (const [key, items] of decor) {
       await this.pace();
