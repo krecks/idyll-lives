@@ -31,6 +31,7 @@ import { RESIDENT, RESIDENT_INSTANCING, RESIDENT_NORMAL } from './shaders/charac
 import { engineChunk, gameChunks, installGameChunks, registerShaderFeature, replaceOnce, type Language } from './shaders/chunks';
 import { BLANKET_WIDTH, COVER, SHEET } from '../shared/characters/blanket';
 import type { MeshPart, MorphSet } from '../shared/characters/data';
+import { BONE_TEXELS } from '../shared/characters/layout';
 import { surfaceOf, type CharacterSurface } from '../shared/characters/parts';
 
 export { quiltTint } from '../shared/characters/blanket';
@@ -212,7 +213,7 @@ export function setResidentTextures(app: pc.AppBase, textures: ResidentTextures)
   const r = residentsOf(app);
   r.poses = textures.poses;
   if (textures.morphs) r.morphs = textures.morphs;
-  r.layout[0] = textures.bones * 4;
+  r.layout[0] = textures.bones * BONE_TEXELS;
   r.layout[1] = Math.max(1, textures.morphWidth);
   r.layout[2] = textures.morphHeader;
   for (const m of r.materials.values()) bind(r, m);

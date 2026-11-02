@@ -76,7 +76,7 @@ import { type LegSide, SEAT_FIT, feetDown, legTurn, perch, seatSize } from './se
 import { BATH_WEAR, BEDS, BENCH_HIP, BENCH_KNEE, BLANKET_BEDS, BLANKET_MEET, BUNKS, type Bed, CLIP_HEIGHT, CURLED_BEDS, DEFAULT_BED, DEFAULT_SEAT, FEET_UP, FOOTSTOOLS, LEGS_OUT_DROP, LIE_CENTRE, LIE_ENTRY, type LegFit, NO_FEET_UP, ON_FLOOR, PEDAL, type PlacedObject, QUILT_COLOUR, QUILT_PART, REST_BACK, RISING, SEATS, SIDE_BEDS, SIDE_IN, SIT_CLIPS, SIT_FLEX, SIT_FROM, SLING, type Seat, type SeatFit, TUCK, floorSit, seatOf, slingTop } from './seats';
 import { AIM, Anim, EMBRACE, KISS_FIT, REFUSED, gesturesOf } from './socials';
 import { BLANKET_WIDTH, quiltGeometry, quiltTint } from './blanket';
-import { APPEARANCE_TEXELS, MORPH_TEXELS } from './layout';
+import { APPEARANCE_TEXELS, BONE_FLOATS, BONE_TEXELS, MORPH_TEXELS } from './layout';
 import type { TemplateCache } from '../templateCache';
 import { WALL_HEIGHT } from '../walls';
 import type { ResidentProp, ResidentView } from './view';
@@ -86,9 +86,27 @@ export { MAX_CHARACTERS } from './rig';
 export { EXPRESSIONS, FRIENDLY, STANCE, type StageDirection } from './expressions';
 export type { Face } from './face';
 
+/**
+ * Where someone the newest snapshot has sat at (x, z), facing `yaw`, sits in a car that drives (or,
+ * `aboard`: rode in last frame, till it has come to a stop), as the car is drawn this frame (`out`: x,
+ * z, yaw); false when they aren't in one (`pc/cars.ts` `ride`).
+ */
+export type CarRide = (frame: FrameState, x: number, z: number, yaw: number, aboard: boolean, out: { x: number; z: number; yaw: number }) => boolean;
+
 /** How fast an upper-layer clip fades in over the one it replaces (per second; a quarter of a second, less when the
  * action runs fast: scaled by `animRate` like the lower fade). */
 const UPPER_FADE_RATE = 4;
+
+/** How far outside the sun's shadow square a resident posed still draws its map again (m): a long evening shadow's reach into it. */
+const SHADOW_REACH = 8;
+
+/**
+ * Residents far off (in low detail: `faceDetail`'s `far`) are posed in full every this many frames, not every frame
+ * (staggered by row, so as many each frame): every second frame, every fourth with their faces at half the low-detail
+ * size. Between, the pose goes along with them as it is (`carryPose`). And never more than `FAR_LAG` s apart.
+ */
+const FAR_EVERY = [2, 4] as const;
+const FAR_LAG = 0.25;
 
 /** How fast a rise cut short (`SimRig.riseK`) finishes its step off the seat (per second: a quarter of a second, less
  * when the action runs fast). */
@@ -123,8 +141,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** The pose texture as last uploaded, and which rows were drawn then (see `upload`). */
   private uploaded!: Float32Array;
   private readonly uploadedVisible = new Uint8Array(MAX_CHARACTERS);
-  /** The last `update` changed how a drawn Sim looks (moved, breathed, blinked …): their shadows are drawn again. */
+  /** The last `update` changed how a drawn Sim looks (moved, breathed, blinked …): a mirror showing them draws again. */
   posed = false;
+  /**
+   * The last `update` changed how a Sim looks inside the sun's shadow square (`setShadowSquare`; anywhere, without
+   * one), or one there came or went: their shadows are drawn again. (One posed outside it casts nothing into the map.)
+   */
+  shadowPosed = false;
+  /** The sun's shadow square (x0, z0, x1, z1), `SHADOW_REACH` round it; null: the map covers everything. */
+  private shadowRect: readonly [number, number, number, number] | null = null;
+  /** Per Sim row: where it was last posed (x, z on the ground), for `shadowPosed`. */
+  private readonly posedAt = new Float32Array(MAX_CHARACTERS * 2);
   private width = 0;
   /** The per-Sim face morph channel mixer (null for sets without morphs). */
   private mixer: FaceMixer | null = null;
@@ -151,6 +178,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private rideOf: ((objectId: number) => ArrayLike<number> | null) | null = null;
   /** The seat of a car someone sits in at (x, z), getting in or out (`setCarSeat`). */
   private carSeatAt: ((x: number, z: number) => Seat | null) | null = null;
+  /** Where someone the newest snapshot has sat at (x, z), facing `yaw`, sits in a car driving as it's drawn this frame (`setCarRide`). */
+  private carRide: CarRide | null = null;
+  /** Scratch for `carRide`. */
+  private readonly rideAt = { x: 0, z: 0, yaw: 0 };
   /** Scratch for `riding`: the placement as a matrix, then moved by the ride. */
   private readonly rideM = new Float32Array(16);
   /** The lanes others have taken on what `freeLane` looks at (scratch). */
@@ -255,9 +286,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private readonly shadowMeshes = new Map<string, PartMesh<M>>();
   private readonly castsShadows: boolean;
   readonly visible = new Uint8Array(MAX_CHARACTERS);
+  /** Per row: sat in a car that drives last frame (`setCarRide`; they stay with it till it has stopped where the snapshot has it). */
+  private readonly inCar = new Uint8Array(MAX_CHARACTERS);
   private lastNow = 0;
   /** Seconds of animation played: stands still while the game is paused (Sims hold their pose). */
   private clock = 0;
+  /** Frames posed (`update`): those far off are posed in full on their turn (`FAR_EVERY`, staggered by row). */
+  private frameNo = 0;
+  /** Every resident posed in full every frame (`FAR_EVERY` off: to compare, from the console or a test). */
+  everyFrame = false;
   /** Sit / lie pelvis offsets per body (computed once from the clips). */
   private readonly sitPelvis = new Map<string, SeatFit>();
   /** The same for the floor clips (`sitFloor`), per body, then floor sit (`FloorSit.name`). */
@@ -349,7 +386,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     }
     const set = this.set;
     const NB = set.bones.length;
-    this.width = NB * 4 + APPEARANCE_TEXELS + MORPH_TEXELS;
+    this.width = NB * BONE_TEXELS + APPEARANCE_TEXELS + MORPH_TEXELS;
     this.data = new Float32Array(this.width * MAX_CHARACTERS * 4);
     this.uploaded = new Float32Array(this.data.length);
     this.view.init(set, this.data, this.width, MAX_CHARACTERS);
@@ -631,6 +668,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         riseX: 0,
         riseZ: 0,
         riseK: 1,
+        lag: 0,
         riseViaX: NaN,
         riseViaZ: NaN,
         walkT: -1,
@@ -810,7 +848,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       };
       this.sims[id] = rig;
       const look = { body: '#5F86C9', skin: '#C08A64', hair: '#2B2320', hairStyle: 'short' as const, height: 1, top: 'top.tee', bottom: 'bottom.trousers', shoes: 'shoes.sneakers' };
-      writeOutfit(outfitFor(id, body.name, look, body), this.data, this.row(id) + set.bones.length * 16);
+      writeOutfit(outfitFor(id, body.name, look, body), this.data, this.row(id) + set.bones.length * BONE_FLOATS);
     }
     // The ghosts' meshes (and the low-detail ones' shadow copies), even where nobody in the world wears them.
     for (const body of bodies) {
@@ -855,10 +893,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       pl.x = g.x;
       pl.y = 0;
       pl.z = g.z;
+      this.posedAt[i * 2] = g.x;
+      this.posedAt[i * 2 + 1] = g.z;
       pl.scale = rig.scale;
       pl.head = rig.head;
       pl.build = rig.build;
-      skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp);
+      skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp, true);
       this.visible[i] = 1;
     });
   }
@@ -1437,6 +1477,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (gameSpeed === 0 && this.debugRate === null) dt = 0;
     this.clock += dt;
     const time = this.clock;
+    const frameDt = dt;
+    this.frameNo++;
     // The residents, then the town's vendors and shopkeepers (sim-core `staff.rs`), in rows of the same layout.
     const count = Math.min(curr[layout.header.simCount] + (layout.header.staffCount === undefined ? 0 : curr[layout.header.staffCount]), MAX_CHARACTERS);
     const H = layout.headerLen;
@@ -1507,6 +1549,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * alpha;
         tyaw = lerpAngle(prev[o + k.yaw], tyaw, alpha);
       }
+      // Sat in a car that drives: in its seat where the car is drawn (`setCarRide`).
+      const riding = curr[o + k.pose] === Pose.Sit && !!this.carRide?.(frame, cx, cz, curr[o + k.yaw], this.inCar[i] === 1, this.rideAt);
+      this.inCar[i] = riding ? 1 : 0;
+      if (riding) [tx, tz, tyaw] = [this.rideAt.x, this.rideAt.z, this.rideAt.yaw];
       const away = curr[o + k.away] !== 0;
       this.spots[i * 2] = away ? NaN : tx;
       this.spots[i * 2 + 1] = tz;
@@ -1514,7 +1560,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const show = !!rig && !away && inView(tx, tz) && storeyShown(Math.floor(th + 0.01), storey);
       if (!rig || !show) {
         if (this.visible[i]) {
-          this.data.fill(0, this.row(i), this.row(i) + NB * 16);
+          this.data.fill(0, this.row(i), this.row(i) + NB * BONE_FLOATS);
           shadows.fill(0, i * 16, i * 16 + 16);
         }
         if (rig) rig.cover = 0;
@@ -1527,6 +1573,21 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         this.writeProp(this.handProp, i, null);
         continue;
       }
+      // Far off (in low detail), posed in full only every `FAR_EVERY` frames (staggered by row): between, the pose
+      // goes along with them as it is (`carryPose`). Not those whose pose others' depend on, nor those moving in ways
+      // a pose carried along wouldn't follow (stepping in, lying under a blanket, a prop of a thing in hand).
+      const every = this.everyFrame || !this.far[i] || this.directions[i] ? 1 : this.facePx[i] < LOD_FAR_PX / 2 ? FAR_EVERY[1] : FAR_EVERY[0];
+      if (every > 1 && rig.visible && !stalled && (this.frameNo + i) % every !== 0 && rig.lag < FAR_LAG && curr[o + k.pose] !== Pose.Lie && rig.walkT < 0 && rig.cuddleBaby < 0 && this.heldBy[i] < 0 && !this.onPadOf[i] && !this.handProp[i]) {
+        rig.lag += frameDt;
+        const moved = curr[o + k.moving] > 0 || riding;
+        const [dx, dy, dz] = moved ? [tx - rig.x, th * WALL_HEIGHT - rig.floorY, tz - rig.z] : [0, 0, 0];
+        if (frameDt > 0) rig.speed += (Math.min(Math.hypot(dx, dz) / frameDt, 20) - rig.speed) * (1 - Math.exp(-frameDt * 10));
+        if (dx || dy || dz) this.carryPose(rig, i, dx, dy, dz, shadows);
+        continue;
+      }
+      // (Posed in full: as far on as the frames since it last was.)
+      const dt = Math.min(FAR_LAG, frameDt + rig.lag);
+      rig.lag = 0;
       const dir = (rig.dir = this.directions[i] ?? null);
       rig.floorY = th * WALL_HEIGHT;
       const pose = curr[o + k.pose];
@@ -1576,11 +1637,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const dx = gx - rig.x;
       const dz = gz - rig.z;
       const dist = Math.hypot(dx, dz);
-      if (dt > 0) {
+      if (riding) rig.speed = 0;
+      else if (dt > 0) {
         const inst = dist / dt;
         rig.speed += (Math.min(inst, 20) - rig.speed) * (1 - Math.exp(-dt * 10));
       }
-      if (moving || dist > SNAP_DISTANCE || appeared) {
+      if (moving || riding || dist > SNAP_DISTANCE || appeared) {
         rig.x = gx;
         rig.z = gz;
         rig.walkT = -1;
@@ -1665,7 +1727,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // snapshot turns them, not the way the frames between snapshots have got to: sized for the whole turn.)
       const goal = faceYaw === tyaw ? curr[o + k.yaw] : faceYaw;
       const onSpot = dir || turned !== null ? null : turnOnSpot(set, rig, this.standsFree(rig, i, pose, moving, social, useObj, appeared), goal, rig.body.stage === 'child');
-      rig.yaw = dir ? wrapAngle(faceYaw) : turned !== null ? wrapAngle(turned) : onSpot !== null ? onSpot : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
+      rig.yaw = dir || riding ? wrapAngle(faceYaw) : turned !== null ? wrapAngle(turned) : onSpot !== null ? onSpot : wrapAngle(rig.yaw + clamp(dyaw * (1 - Math.exp(-dt * 12 * turn)), -maxTurn, maxTurn));
       rig.visible = true;
       this.visible[i] = 1;
       rig.tx = cx;
@@ -1747,8 +1809,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       }
       const worn = rig.outfits?.[wear];
       if (worn && worn !== rig.worn) this.wear(rig, i, worn);
-      // Hand pose: the clips clench fists; open them according to the activity.
-      blendInto(this.qA, this.pA, set.sourceRestQ, this.pA, rig.hands, this.fingerMask);
+      // Hand pose: the clips clench fists; open them according to the activity. (Not far off: the hands are a pixel or two.)
+      if (!this.far[i] || this.everyFrame || dir) blendInto(this.qA, this.pA, set.sourceRestQ, this.pA, rig.hands, this.fingerMask);
 
       // Procedural layers.
       resetAdditive(this.add);
@@ -1803,13 +1865,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       pl.scale = rig.scale;
       pl.head = rig.head;
       pl.build = rig.build;
+      this.posedAt[i * 2] = pl.x;
+      this.posedAt[i * 2 + 1] = pl.z;
       // Sitting or lying on a seat that moves (a rocking chair, a swing): along with it.
       const ride = (pose === Pose.Sit || pose === Pose.Lie) && usingId >= 0 && this.rideOf ? this.rideOf(usingId) : null;
       if (ride) this.riding(ride);
       const pad = this.onPadOf[i];
       if (pad) onPad(this.place, this.cradleQ, rig, pad);
       if (inArms > 0) cradled(this.place, this.cradleQ, this.cradle, rig, this.sims[this.heldBy[i]]!, this.heldBy[i], inArms);
-      skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp);
+      skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp, true);
       this.writeSit(rig, i);
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) writeCradle(set.bone, this.scratch.worldT, this.cradle, i, rig);
       this.writeBlanket(rig, i, pose, dt, appeared);
@@ -1846,12 +1910,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     }
     if (this.ghosts.length) this.poseGhosts(count, dt, time);
     this.faceDetail(count + this.ghosts.length);
-    if (this.shadowsBare) this.bareShadows();
     this.writeRing(this.reducedMotion ? 0 : now * 0.001);
     for (let i = count + this.ghosts.length; i < MAX_CHARACTERS; i++) {
       if (!this.visible[i]) continue;
       this.visible[i] = 0;
-      this.data.fill(0, this.row(i), this.row(i) + NB * 16);
+      this.data.fill(0, this.row(i), this.row(i) + NB * BONE_FLOATS);
       shadows.fill(0, i * 16, i * 16 + 16);
     }
     for (const b of this.blankets.values()) {
@@ -2758,9 +2821,68 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     }
   }
 
+  /**
+   * Sim row `i`, not posed in full this frame (far off, `FAR_EVERY`), moved by (dx, dy, dz) (m) as it is: its skinning
+   * matrices, its contact shadow, its head and the things in its hands carried along, the pose itself kept.
+   */
+  private carryPose(rig: SimRig, i: number, dx: number, dy: number, dz: number, shadows: Float32Array): void {
+    const d = this.data;
+    const row = this.row(i);
+    const NB = this.set!.bones.length;
+    // (The translation is each row's fourth number: `BONE_TEXELS`.)
+    for (let b = 0; b < NB; b++) {
+      const o = row + b * BONE_FLOATS;
+      d[o + 3] += dx;
+      d[o + 7] += dy;
+      d[o + 11] += dz;
+    }
+    rig.x += dx;
+    rig.z += dz;
+    rig.floorY += dy;
+    this.posedAt[i * 2] += dx;
+    this.posedAt[i * 2 + 1] += dz;
+    const m = i * 16;
+    if (shadows[m + 15]) {
+      shadows[m + 12] += dx;
+      shadows[m + 13] += dy;
+      shadows[m + 14] += dz;
+    }
+    for (const h of [this.heads, this.headJoints]) {
+      h[i * 3] += dx;
+      h[i * 3 + 1] += dy;
+      h[i * 3 + 2] += dz;
+    }
+    for (const slot of [this.heldProp, this.toolProp, this.leftProp, this.rightProp]) {
+      const key = slot[i];
+      const p = key ? this.props.built(key)?.matrices : null;
+      if (!p) continue;
+      p[m + 12] += dx;
+      p[m + 13] += dy;
+      p[m + 14] += dz;
+    }
+  }
+
+  /**
+   * The sun's shadow square (its middle, game space, and half side, m; null: the map covers everything): only
+   * residents posed in it (and `SHADOW_REACH` round it, their shadows falling into it) draw its map again
+   * (`shadowPosed`).
+   */
+  setShadowSquare(square: { x: number; z: number; half: number } | null): void {
+    const r = square ? square.half + SHADOW_REACH : 0;
+    this.shadowRect = square ? [square.x - r, square.z - r, square.x + r, square.z + r] : null;
+  }
+
   /** The seat of the car at a spot, for those sitting there with no object under them (getting in or out of it: `pc/cars.ts`). */
   setCarSeat(seatAt: ((x: number, z: number) => Seat | null) | null): void {
     this.carSeatAt = seatAt;
+  }
+
+  /**
+   * Where those sat in a car that drives sit as it is drawn this frame (`pc/cars.ts` `ride`): with it
+   * rigidly, every frame, turns and all, not easing after it (which left them behind it at speed).
+   */
+  setCarRide(ride: CarRide | null): void {
+    this.carRide = ride;
   }
 
   /** Where residents sitting or lying on an object are carried by its moving seat (`ObjectMotion.ride`). */
@@ -3696,7 +3818,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
     // Morphs: the expression (lids following the eyes), then speech. Faces too small on screen to
     // show them skip their morphs (in the vertex shader too).
-    const morphRow = this.row(i) + set.bones.length * 16 + APPEARANCE_TEXELS * 4;
+    const morphRow = this.row(i) + set.bones.length * BONE_FLOATS + APPEARANCE_TEXELS * 4;
     if (this.facePx[i] < MORPH_PX && !dir && !dbg) {
       mixer.off(this.data, morphRow);
       return;
@@ -3782,6 +3904,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const uploaded = this.uploaded;
     let lo = -1;
     let hi = -1;
+    let shadowed = false;
+    const r = this.shadowRect;
     for (let i = 0; i < MAX_CHARACTERS; i++) {
       if (!this.visible[i] && !this.uploadedVisible[i]) continue;
       this.uploadedVisible[i] = this.visible[i];
@@ -3792,8 +3916,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       uploaded.set(data.subarray(k, end), k);
       if (lo < 0) lo = i;
       hi = i;
+      if (shadowed) continue;
+      const [x, z] = [this.posedAt[i * 2], this.posedAt[i * 2 + 1]];
+      shadowed = !r || (x >= r[0] && x <= r[2] && z >= r[1] && z <= r[3]);
     }
     this.posed = lo >= 0;
+    this.shadowPosed = shadowed;
     if (lo >= 0) this.view.uploadPoseRows(lo, hi - lo + 1);
   }
 
@@ -3877,7 +4005,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** Puts `worn` (one of its `outfits`) on Sim `i`: its appearance texels, and the shells it doesn't draw (`bare`). */
   private wear(rig: SimRig, i: number, worn: OutfitParams): void {
     rig.worn = worn;
-    writeOutfit(worn, this.data, this.row(i) + this.set!.bones.length * 16);
+    writeOutfit(worn, this.data, this.row(i) + this.set!.bones.length * BONE_FLOATS);
     if (this.bare[i] !== worn.bare) this.shadowsBare = true;
     this.bare[i] = worn.bare;
     rig.skirt = worn.parts.includes('bottom.skirt') && !(worn.bare & SHELL_BITS.bottom);
@@ -3892,42 +4020,26 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const set = this.set!;
     const d = this.data;
     const row = this.row(i);
-    const p = row + set.bone.pelvis * 16;
+    const p = row + set.bone.pelvis * BONE_FLOATS;
     let flex = 0;
     for (const thigh of [set.bone.thigh_l, set.bone.thigh_r]) {
-      // The thigh's rest down (0, -1, 0) as posed, in the pelvis' rest frame (columns: the matrices are column-major).
-      const o = row + thigh * 16;
-      const y = -(d[p + 4] * d[o + 4] + d[p + 5] * d[o + 5] + d[p + 6] * d[o + 6]);
-      const z = -(d[p + 8] * d[o + 4] + d[p + 9] * d[o + 5] + d[p + 10] * d[o + 6]);
+      // The thigh's rest down (0, -1, 0) as posed, in the pelvis' rest frame (columns 1 and 2: the rows are a texel
+      // each, `BONE_TEXELS`, so column c is at c, c + 4 and c + 8).
+      const o = row + thigh * BONE_FLOATS;
+      const y = -(d[p + 1] * d[o + 1] + d[p + 5] * d[o + 5] + d[p + 9] * d[o + 9]);
+      const z = -(d[p + 2] * d[o + 1] + d[p + 6] * d[o + 5] + d[p + 10] * d[o + 9]);
       flex += Math.max(0, Math.atan2(z, -y));
     }
     // (From `SIT_FROM`: a stride's swing of the legs leaves the skirt as it hangs.)
-    d[row + set.bones.length * 16 + 18] = clamp((flex / 2 - SIT_FROM) / (SIT_FLEX - SIT_FROM), 0, 1) * rig.size;
+    d[row + set.bones.length * BONE_FLOATS + 18] = clamp((flex / 2 - SIT_FROM) / (SIT_FLEX - SIT_FROM), 0, 1) * rig.size;
   }
 
-  /** Someone's `bare` changed: the shells' shadow copies are drawn again for the Sims that wear them now (`bareShadows`). */
+  /** Someone's `bare` changed: the shells' shadow copies are drawn again for the Sims that wear them now (`faceDetail`). */
   private shadowsBare = false;
-
-  /**
-   * The shells' shadow copies drawn for the Sims whose clothes now draw them (the drawn shells are left out
-   * per frame, `faceDetail`; the shadow copies keep their rows, so only when someone's `bare` changes).
-   */
-  private bareShadows(): void {
-    this.shadowsBare = false;
-    for (const pm of this.shadowMeshes.values()) {
-      if (!pm.shell || !pm.enabled) continue;
-      const ids = [...pm.all.filter((_, j) => j % 4 === 0)].filter((id) => !(pm.shell & this.bare[id]));
-      if (ids.length === pm.count && ids.every((id, j) => pm.settings[j * 4] === id)) continue;
-      // (Nobody: not drawn, its rows kept.)
-      if (ids.length) {
-        const settings = new Float32Array(ids.length * 4);
-        ids.forEach((id, j) => (settings[j * 4] = settings[j * 4 + 1] = id));
-        pm.settings = settings;
-      }
-      pm.count = ids.length;
-      this.view.partRows(pm.mesh, pm.settings, pm.count, ids.length ? 'new' : 'count');
-    }
-  }
+  /** Per Sim row: whether it was drawn when the parts' rows were last written (`faceDetail`: who is drawn changed). */
+  private readonly listed = new Uint8Array(MAX_CHARACTERS);
+  /** The parts' rows were all set again (`setInstances`): `faceDetail` leaves out those not drawn, from every one. */
+  private listsStale = true;
 
   /**
    * Blanket over a Sim asleep in a bed: fitted to the slot (half of a double bed, or a single bed)
@@ -4158,17 +4270,23 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     pm.settings = settings;
     pm.all = settings.slice();
     pm.count = n;
+    this.listsStale = true;
     // Parts drawn by distance rewrite their rows each frame.
     this.view.setPartRows(pm.mesh, settings, !(pm.detail === 0 && pm.range === Range.Always));
   }
 
   /**
-   * How big each Sim's face is on screen (`facePx`: px per 5 cm), and the small face parts (teeth,
-   * tongue, lashes, brows) drawn only on the faces big enough to show them.
+   * How big each Sim's face is on screen (`facePx`: px per 5 cm), and the rows each part draws: only
+   * those drawn now (not those hidden, away or out of view: every part, shadow-only copies too, or
+   * they're skinned all the same, to nothing), the small face parts (teeth, tongue, lashes, brows)
+   * only on the faces big enough to show them, the low-detail body or the full one by distance, and
+   * not the shells clothes leave out. Parts drawn whatever the distance are written again only when
+   * who is drawn changes.
    */
   private faceDetail(count: number): void {
     const c = this.cam;
     const px = this.facePx;
+    const shown = this.visible;
     // (No camera, or one without perspective: full detail.)
     if (!this.hasCam || Number.isNaN(c[4])) {
       px.fill(1e6);
@@ -4176,7 +4294,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const k = (0.05 * c[3]) / (2 * Math.tan(c[4] / 2));
       for (let i = 0; i < count; i++) {
         const rig = this.sims[i];
-        if (!rig || !this.visible[i]) {
+        if (!rig || !shown[i]) {
           px[i] = 0;
           continue;
         }
@@ -4189,35 +4307,51 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         px[i] = (k * rig.scale * rig.head) / Math.max(d, 0.05);
       }
     }
-    // Low detail far from the camera (with a gap between switching down and up).
+    // Low detail far from the camera (with a gap between switching down and up); those not drawn keep theirs.
     const far = this.far;
     for (let i = 0; i < count; i++) {
+      if (!shown[i]) continue;
       if (far[i] && px[i] > LOD_NEAR_PX) far[i] = 0;
       else if (!far[i] && px[i] < LOD_FAR_PX && this.hasLod) far[i] = 1;
     }
-    for (const pm of this.meshes.values()) {
-      if ((!pm.detail && pm.range === Range.Always) || !pm.enabled) continue;
-      const all = pm.all;
-      const out = pm.settings;
-      const near = pm.range === Range.Near;
-      const ranged = pm.range !== Range.Always;
-      let n = 0;
-      let changed = false;
-      for (let j = 0; j < all.length; j += 4) {
-        const id = all[j];
-        if (px[id] < pm.detail) continue;
-        if (ranged && (far[id] === 1) === near) continue;
-        if (pm.shell & this.bare[id]) continue;
-        if (out[n * 4] !== id) {
-          out[n * 4] = out[n * 4 + 1] = id;
-          changed = true;
-        }
-        n++;
-      }
-      if (changed || pm.count !== n) {
-        pm.count = n;
-        this.view.partRows(pm.mesh, out, n, 'rows');
-      }
+    // Who is drawn changed (or every part's rows were set again): the parts drawn whatever the distance too.
+    let all = this.listsStale;
+    this.listsStale = false;
+    for (let i = 0; i < MAX_CHARACTERS; i++) {
+      if (shown[i] === this.listed[i]) continue;
+      this.listed[i] = shown[i];
+      all = true;
     }
+    for (const pm of this.meshes.values()) {
+      if (!pm.enabled || (!all && !pm.detail && pm.range === Range.Always)) continue;
+      const perFrame = !!pm.detail || pm.range !== Range.Always;
+      this.listRows(pm, perFrame ? 'rows' : 'new', (id) => shown[id] === 1 && px[id] >= pm.detail && (pm.range === Range.Always || (far[id] === 1) !== (pm.range === Range.Near)) && !(pm.shell & this.bare[id]));
+    }
+    // The shadow-only copies: who is drawn, wearing the shells (they keep their rows till either changes).
+    if (!all && !this.shadowsBare) return;
+    this.shadowsBare = false;
+    for (const pm of this.shadowMeshes.values()) {
+      if (pm.enabled) this.listRows(pm, 'new', (id) => shown[id] === 1 && !(pm.shell & this.bare[id]));
+    }
+  }
+
+  /** The rows of `pm`'s Sims (`all`) that `draws` keeps, written where they changed (`change`: as `setInstances` set it, per frame or not). */
+  private listRows(pm: PartMesh<M>, change: 'rows' | 'new', draws: (id: number) => boolean): void {
+    const all = pm.all;
+    const out = pm.settings;
+    let n = 0;
+    let changed = false;
+    for (let j = 0; j < all.length; j += 4) {
+      const id = all[j];
+      if (!draws(id)) continue;
+      if (out[n * 4] !== id) {
+        out[n * 4] = out[n * 4 + 1] = id;
+        changed = true;
+      }
+      n++;
+    }
+    if (!changed && pm.count === n) return;
+    pm.count = n;
+    this.view.partRows(pm.mesh, out, n, change);
   }
 }

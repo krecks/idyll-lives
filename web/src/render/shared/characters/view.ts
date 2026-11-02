@@ -33,8 +33,9 @@ export interface ResidentProp {
 
 /**
  * How a part's rows changed (`ResidentView.partRows`): only how many are drawn (`count`), the array last given
- * rewritten in place (`rows`: the parts drawn by distance and detail, per frame), or a new array in its place
- * that stays (`new`: the shells' shadow copies, when someone's clothes change).
+ * rewritten in place (`rows`: the parts drawn by distance and detail, per frame), or rows that stay till they
+ * change again (`new`: the parts drawn whatever the distance, and the shadow-only copies, when who is drawn
+ * changes or someone's clothes do).
  */
 export type RowChange = 'count' | 'rows' | 'new';
 

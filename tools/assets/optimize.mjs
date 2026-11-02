@@ -6,8 +6,10 @@
 //
 //   textures (jpg/png/webp) -> KTX2, Basis Universal ETC1S with mipmaps. The GPU keeps them
 //     block-compressed (BC7/BC1, ETC2 or ASTC, whatever it has), 4-8x less memory than RGBA.
-//   models (.glb)           -> meshopt geometry (EXT_meshopt_compression, lossless on the
-//     already quantised data), embedded textures to KTX2 (KHR_texture_basisu); references to
+//   models (.glb)           -> quantised geometry (KHR_mesh_quantization: positions to 14 bits of
+//     the mesh's box, normals to 10, UVs in 0..1 to 12, as 16-bit integers, not 32-bit floats; not
+//     on models with foliage, `quantizeGeometry`), then meshopt (EXT_meshopt_compression, lossless
+//     on the quantised data), embedded textures to KTX2 (KHR_texture_basisu); references to
 //     shared textures (the foliage atlas) point at their KTX2 copies. The baked shading (COLOR_0,
 //     a grey of 32 levels: gamekit/shade.py) goes from 16 bits or floats to 8, which keeps every level.
 //   character binaries      -> gzip (the browser inflates them; most hosts don't compress .bin).
@@ -30,7 +32,7 @@ const CACHE = path.join(WEB, '.assets/cache');
 export const OUT = path.join(WEB, '.assets/out');
 
 /** Bump a kind's when its encoding changes, so only its cached outputs are rebuilt. */
-const VERSION = { model: 2, texture: 1, gzip: 1 };
+const VERSION = { model: 3, texture: 1, gzip: 1 };
 
 /** Left as they are: not loaded by the game, or drawn in a way KTX2 can't (flipped on upload). */
 const SKIP = new Set([
@@ -75,12 +77,13 @@ export async function optimizeAssets({ force = false, jobs = Math.max(1, os.avai
   const started = performance.now();
   const files = walk(SRC).map((abs) => path.relative(SRC, abs).split(path.sep).join('/'));
   const settings = (kind) => JSON.stringify({ VERSION: VERSION[kind], KTX2, SKIP: [...SKIP] });
+  const foliage = foliageModels(files);
   const tasks = [];
   for (const rel of files) {
     const p = plan(rel);
     if (!p) continue;
     const bytes = fs.readFileSync(path.join(SRC, rel));
-    const key = createHash('sha256').update(settings(p.kind)).update(p.kind).update(p.role ?? '').update(bytes).digest('hex').slice(0, 24);
+    const key = createHash('sha256').update(settings(p.kind)).update(p.kind).update(p.role ?? '').update(foliage.has(rel) ? 'foliage' : '').update(bytes).digest('hex').slice(0, 24);
     const cached = path.join(CACHE, key + path.extname(p.out));
     // Only the gzip pass below reads the bytes again (the workers read their own file): keep no others.
     tasks.push({ rel, ...p, size: bytes.length, cached, ...(p.kind === 'gzip' ? { bytes } : {}) });
@@ -94,7 +97,7 @@ export async function optimizeAssets({ force = false, jobs = Math.max(1, os.avai
   const heavy = todo.filter((t) => t.kind !== 'gzip').sort((a, b) => b.size - a.size);
   // The textures that get a KTX2 copy: given to each worker once, not with every model.
   const converted = tasks.filter((t) => t.kind === 'texture').map((t) => t.rel);
-  await runOnWorkers(heavy, jobs, { converted }, (t) => ({ kind: t.kind, role: t.role, src: path.join(SRC, t.rel), rel: t.rel }), (t, out) => {
+  await runOnWorkers(heavy, jobs, { converted }, (t) => ({ kind: t.kind, role: t.role, src: path.join(SRC, t.rel), rel: t.rel, foliage: foliage.has(t.rel) }), (t, out) => {
     fs.writeFileSync(t.cached, out);
     log(`[assets]   ${t.rel}: ${kb(t.size)} -> ${kb(out.length)}`);
   });
@@ -128,6 +131,28 @@ export async function optimizeAssets({ force = false, jobs = Math.max(1, os.avai
   for (const [group, s] of [...totals].sort()) log(`[assets] ${group.padEnd(22)} ${String(s.files).padStart(3)} files  ${kb(s.before).padStart(9)} -> ${kb(s.after).padStart(9)}`);
   log(`[assets] ${Object.keys(index).length} compressed copies in ${((performance.now() - started) / 1000).toFixed(1)} s`);
   return index;
+}
+
+/**
+ * The models drawn with foliage cards: an entry of a manifest (the base one, the packs') mapping one
+ * of its file's materials to the foliage finish (`material.finish.foliage`), its far version too.
+ * Their geometry keeps its floats (`quantizeGeometry`).
+ */
+function foliageModels(files) {
+  const models = new Set();
+  for (const rel of files.filter((f) => /(^|\/)manifest\.json$/.test(f))) {
+    let manifest;
+    try {
+      manifest = JSON.parse(fs.readFileSync(path.join(SRC, rel), 'utf8'));
+    } catch {
+      continue;
+    }
+    for (const entry of Object.values(manifest.entries ?? {})) {
+      if (entry?.type !== 'model' || !Object.values(entry.materials ?? {}).some((m) => m?.finish === 'material.finish.foliage')) continue;
+      for (const url of [entry.url, entry.far]) if (typeof url === 'string') models.add(path.posix.normalize(path.posix.join(path.posix.dirname(rel), url)));
+    }
+  }
+  return models;
 }
 
 function walk(dir) {
@@ -206,7 +231,7 @@ async function workerMain() {
     return 'data';
   };
 
-  async function model(src, rel) {
+  async function model(src, rel, foliage) {
     const doc = await io.read(src);
     doc.setLogger(new Logger(Logger.Verbosity.WARN));
     const root = doc.getRoot();
@@ -234,10 +259,9 @@ async function workerMain() {
       doc.createExtension(KHRTextureBasisu).setRequired(true);
       for (const ext of root.listExtensionsUsed()) if (ext.extensionName === 'EXT_texture_webp') ext.dispose();
     }
-    // The baked shading (COLOR_0, a grey of 32 levels: gamekit/shade.py) from 16 bits to 8, which keep every level.
-    await doc.transform(quantize({ pattern: /^COLOR_0$/, quantizeColor: 8 }));
-    // Vertex order that compresses (and caches) best, then meshopt over every buffer view. The
-    // data is encoded as it is (no further quantisation): the foliage cards keep float attributes.
+    await quantizeGeometry(doc, quantize, foliage);
+    // Vertex order that compresses (and caches) best, then meshopt over every buffer view (the data
+    // as `quantizeGeometry` left it: no further quantisation).
     await doc.transform(reorder({ encoder: MeshoptEncoder, target: 'size' }));
     doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE });
     return relinkImages(await io.writeBinary(doc), shared);
@@ -245,12 +269,46 @@ async function workerMain() {
 
   parentPort.on('message', async (msg) => {
     try {
-      const bytes = msg.kind === 'texture' ? await ktx2(fs.readFileSync(msg.src), msg.role) : await model(msg.src, msg.rel);
+      const bytes = msg.kind === 'texture' ? await ktx2(fs.readFileSync(msg.src), msg.role) : await model(msg.src, msg.rel, msg.foliage);
       parentPort.postMessage({ bytes }, [bytes.buffer]);
     } catch (err) {
       parentPort.postMessage({ error: String(err?.stack ?? err) });
     }
   });
+}
+
+/** A material named for the foliage finish (`name@foliage`): its model's geometry keeps its floats, as one a manifest maps to it (`foliageModels`). */
+const FOLIAGE = /@foliage(\b|$)|^foliage$/i;
+
+/**
+ * A model's vertex data quantised (`quantize`: glTF-Transform's, KHR_mesh_quantization): the baked
+ * shading (COLOR_0, a grey of 32 levels: gamekit/shade.py) from 16 bits to 8, which keep every
+ * level; and, but on a model with foliage cards (`foliage`, `FOLIAGE`: they keep their floats), positions to
+ * 14 bits of the mesh's box (a tenth of a millimetre on a 2 m sofa), normals to 10, UVs in 0..1 to
+ * 12, each a 16-bit integer, not a 32-bit float. The game reads them back as floats (`models.ts`
+ * `readAccessor`, normalised integers) and bakes each node's place into its vertices, so the
+ * quantisation's scale and offset, which glTF-Transform puts on the node holding a mesh, come off
+ * there. That node is a new one under each node with a mesh, named as it is: the named nodes keep
+ * their own places (the pivots `BuildOptions.parts` takes from them), the meshes their names.
+ */
+export async function quantizeGeometry(doc, quantize, foliage = false) {
+  await doc.transform(quantize({ pattern: /^COLOR_0$/, quantizeColor: 8 }));
+  const root = doc.getRoot();
+  if (foliage || root.listMaterials().some((m) => FOLIAGE.test(m.getName()))) return;
+  for (const node of root.listNodes()) {
+    const mesh = node.getMesh();
+    if (!mesh || node.getSkin()) continue;
+    node.addChild(doc.createNode(node.getName()).setMesh(mesh));
+    node.setMesh(null);
+  }
+  // (UVs past 0..1, a finish's tiling, stay floats: glTF-Transform says so for each; not worth a word.)
+  const logger = doc.getLogger();
+  doc.setLogger(Object.assign(Object.create(logger), { warn: (text) => /out of \[0,1\] range/.test(text) || logger.warn(text) }));
+  try {
+    await doc.transform(quantize({ pattern: /^(POSITION|NORMAL|TEXCOORD_\d+)$/, quantizePosition: 14, quantizeNormal: 10, quantizeTexcoord: 12 }));
+  } finally {
+    doc.setLogger(logger);
+  }
 }
 
 /**
