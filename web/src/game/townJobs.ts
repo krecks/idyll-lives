@@ -149,6 +149,7 @@ async function onPage(content: Content, job: TownJob): Promise<TownResult> {
  * aborted `signal` drops the job: one already running stops with its worker, and the jobs waiting
  * behind it go to a fresh one, so a player rolling world after world waits only for the last.
  */
+export function townJob<J extends TownJob>(content: Content, job: J, signal?: AbortSignal): Promise<Extract<TownResult, { kind: J['kind'] }>>;
 export function townJob(content: Content, job: TownJob, signal?: AbortSignal): Promise<TownResult> {
   if (signal?.aborted) return Promise.reject(new Superseded());
   return new Promise<TownResult>((resolve, reject) => {
