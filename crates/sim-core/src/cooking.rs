@@ -2826,13 +2826,15 @@ fn update(w: &mut World) {
         })
         .collect();
     let mut keep = Vec::with_capacity(w.items.list.len());
-    for mut it in std::mem::take(&mut w.items.list) {
+    let ats: Vec<ItemAt> = w.items.list.iter().map(|it| it.at).collect();
+    let holders = crate::items::holders(content, &w.objects, &ats);
+    for (mut it, holder) in std::mem::take(&mut w.items.list).into_iter().zip(holders) {
         let household = w.households.get(it.household as usize);
         let home = household.and_then(|h| h.plot);
         let (x, z) = it.at.tile();
         let placed = match it.at {
             ItemAt::Floor { .. } => w.lot.in_bounds(x, z),
-            _ => crate::items::holder(content, &w.objects, &it.at).is_some(),
+            _ => holder.is_some(),
         };
         let lives_here = w
             .sims

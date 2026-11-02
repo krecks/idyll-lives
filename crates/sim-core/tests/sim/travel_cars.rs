@@ -81,3 +81,53 @@ fn cars_keep_to_the_road_and_come_home_nose_in() {
         );
     }
 }
+
+/// A car pulling out of its driveway or parking in it changes walking only round it
+/// (`cars::restand`): walkers elsewhere keep their way, and the walkable regions are labelled
+/// again only there, not over the box round every car in town.
+#[test]
+fn a_car_coming_or_going_changes_walking_only_round_it() {
+    let mut w = world(21);
+    assert!(w.cars.len() >= 2);
+    let mut checked = 0;
+    for _ in 0..(24 * 60 * 20) {
+        let (seen, before) = (w.nav_version(), w.parked_tiles());
+        let spots: Vec<[f32; 2]> = w.cars.iter().map(|c| c.spot).collect();
+        w.tick_once();
+        let after = w.parked_tiles();
+        if w.nav_version() == seen || before == after {
+            continue;
+        }
+        // Between the two cars furthest apart (inside the box round them all), well away from
+        // every car: nothing changed there.
+        let spots: Vec<[f32; 2]> = spots
+            .into_iter()
+            .chain(w.cars.iter().map(|c| c.spot))
+            .collect();
+        let far = |a: [f32; 2], b: [f32; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
+        let (a, b) = spots
+            .iter()
+            .flat_map(|&a| spots.iter().map(move |&b| (a, b)))
+            .max_by(|p, q| far(p.0, p.1).total_cmp(&far(q.0, q.1)))
+            .unwrap();
+        let mid = [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0];
+        if spots.iter().any(|&s| far(s, mid) < 20.0) {
+            continue;
+        }
+        let (x, z) = (mid[0].floor() as i32, mid[1].floor() as i32);
+        assert!(
+            !w.nav_changed_since(seen, [x - 2, z - 2, x + 3, z + 3]),
+            "walking changed at {mid:?}, far from every car"
+        );
+        // Round the tiles that changed, it did.
+        let (x, z) = before
+            .iter()
+            .chain(&after)
+            .copied()
+            .find(|t| before.contains(t) != after.contains(t))
+            .unwrap();
+        assert!(w.nav_changed_since(seen, [x, z, x + 1, z + 1]));
+        checked += 1;
+    }
+    assert!(checked >= 2, "hardly any car came or went: {checked}");
+}

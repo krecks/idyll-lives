@@ -786,8 +786,37 @@ impl Graph {
         mode: Mode,
         country: f32,
     ) -> Option<RoadPath> {
+        let (pieces, len) = self.pieces(from, to, mode, country)?;
+        Some(self.assemble(&pieces, len, mode, country))
+    }
+
+    /// `path`'s length and cost only (as `path` gives them), without the points along it: for
+    /// an estimate (`Travel::eta`), asked for every public place in town as a resident weighs an
+    /// outing.
+    pub fn path_cost(
+        &self,
+        from: RoadPoint,
+        to: RoadPoint,
+        mode: Mode,
+        country: f32,
+    ) -> Option<(f32, f32)> {
+        let (pieces, len) = self.pieces(from, to, mode, country)?;
+        let mut cost = RoadPath::default().cost;
+        for &(r, s0, s1) in &pieces {
+            cost += Self::cost(self.roads[r as usize].kind, (s1 - s0).abs(), mode, country);
+        }
+        Some((len, cost))
+    }
+
+    /// The stretches of road `path` goes along, and their length.
+    fn pieces(
+        &self,
+        from: RoadPoint,
+        to: RoadPoint,
+        mode: Mode,
+        country: f32,
+    ) -> Option<(Vec<Piece>, f32)> {
         use std::cmp::Reverse;
-        use std::collections::BinaryHeap;
         let allowed = |e: &Edge| {
             let r = &self.roads[e.road as usize];
             match mode {
@@ -804,7 +833,7 @@ impl Graph {
         // The same stretch of road: straight along it.
         if from.road == to.road && from.edge == to.edge {
             let len = (to.s - from.s).abs();
-            return Some(self.assemble(&[(from.road, from.s, to.s)], len, mode, country));
+            return Some((vec![(from.road, from.s, to.s)], len));
         }
         let top = match mode {
             Mode::Foot => 1.0,
@@ -820,78 +849,97 @@ impl Graph {
                 Mode::Car => d / top,
             }
         };
-        let n = self.nodes.len();
-        let mut g = vec![f32::INFINITY; n];
-        let mut came: Vec<Option<u32>> = vec![None; n];
-        let mut heap = BinaryHeap::new();
-        let key = |v: f32| (v * 1000.0) as u64;
-        // Off the start's stretch at either end.
-        for (node, len) in [(fe.a, from.s - fe.s0), (fe.b, fe.s1 - from.s)] {
-            let c = Self::cost(kind(&fe), len.max(0.0), mode, country);
-            if c < g[node as usize] {
-                g[node as usize] = c;
-                heap.push(Reverse((key(c + h(node)), node)));
+        ROAD_SCRATCH.with_borrow_mut(|scratch| {
+            let n = self.nodes.len();
+            let stamp = scratch.start(n);
+            let RoadScratch {
+                g,
+                came,
+                stamps,
+                heap,
+                ..
+            } = scratch;
+            // (An entry counts only if stamped by this search: unset, no way there yet.)
+            let get = |g: &[f32], stamps: &[u32], v: usize| {
+                if stamps[v] == stamp {
+                    g[v]
+                } else {
+                    f32::INFINITY
+                }
+            };
+            let key = |v: f32| (v * 1000.0) as u64;
+            // Off the start's stretch at either end.
+            for (node, len) in [(fe.a, from.s - fe.s0), (fe.b, fe.s1 - from.s)] {
+                let c = Self::cost(kind(&fe), len.max(0.0), mode, country);
+                if c < get(g, stamps, node as usize) {
+                    g[node as usize] = c;
+                    came[node as usize] = None;
+                    stamps[node as usize] = stamp;
+                    heap.push(Reverse((key(c + h(node)), node)));
+                }
             }
-        }
-        let mut best_end: Option<(f32, u32)> = None;
-        while let Some(Reverse((f, u))) = heap.pop() {
-            if best_end.is_some_and(|(b, _)| (f as f32) / 1000.0 >= b) {
-                break;
-            }
-            let gu = g[u as usize];
-            // Onto the goal's stretch from here.
-            for (end, len) in [(te.a, to.s - te.s0), (te.b, te.s1 - to.s)] {
-                if end == u {
-                    let total = gu + Self::cost(kind(&te), len.max(0.0), mode, country);
-                    if best_end.is_none_or(|(b, _)| total < b) {
-                        best_end = Some((total, u));
+            let mut best_end: Option<(f32, u32)> = None;
+            while let Some(Reverse((f, u))) = heap.pop() {
+                if best_end.is_some_and(|(b, _)| (f as f32) / 1000.0 >= b) {
+                    break;
+                }
+                let gu = g[u as usize];
+                // Onto the goal's stretch from here.
+                for (end, len) in [(te.a, to.s - te.s0), (te.b, te.s1 - to.s)] {
+                    if end == u {
+                        let total = gu + Self::cost(kind(&te), len.max(0.0), mode, country);
+                        if best_end.is_none_or(|(b, _)| total < b) {
+                            best_end = Some((total, u));
+                        }
+                    }
+                }
+                for &e in &self.adj[u as usize] {
+                    if e == from.edge || e == to.edge {
+                        continue;
+                    }
+                    let edge = &self.edges[e as usize];
+                    if !allowed(edge) {
+                        continue;
+                    }
+                    let v = if edge.a == u { edge.b } else { edge.a };
+                    let c = gu + Self::cost(kind(edge), edge.len(), mode, country);
+                    if c < get(g, stamps, v as usize) {
+                        g[v as usize] = c;
+                        came[v as usize] = Some(e);
+                        stamps[v as usize] = stamp;
+                        heap.push(Reverse((key(c + h(v)), v)));
                     }
                 }
             }
-            for &e in &self.adj[u as usize] {
-                if e == from.edge || e == to.edge {
-                    continue;
-                }
+            heap.clear();
+            let (_, last) = best_end?;
+            // Back from the last node to the first, by edge.
+            let mut chain: Vec<u32> = Vec::new();
+            let mut at = last;
+            while let Some(e) = came[at as usize] {
+                chain.push(e);
                 let edge = &self.edges[e as usize];
-                if !allowed(edge) {
-                    continue;
-                }
-                let v = if edge.a == u { edge.b } else { edge.a };
-                let c = gu + Self::cost(kind(edge), edge.len(), mode, country);
-                if c < g[v as usize] {
-                    g[v as usize] = c;
-                    came[v as usize] = Some(e);
-                    heap.push(Reverse((key(c + h(v)), v)));
-                }
+                at = if edge.a == at { edge.b } else { edge.a };
             }
-        }
-        let (_, last) = best_end?;
-        // Back from the last node to the first, by edge.
-        let mut chain: Vec<u32> = Vec::new();
-        let mut at = last;
-        while let Some(e) = came[at as usize] {
-            chain.push(e);
-            let edge = &self.edges[e as usize];
-            at = if edge.a == at { edge.b } else { edge.a };
-        }
-        chain.reverse();
-        let first = at;
-        let mut pieces: Vec<(u32, f32, f32)> = Vec::new();
-        pieces.push((from.road, from.s, if first == fe.a { fe.s0 } else { fe.s1 }));
-        let mut node = first;
-        for &e in &chain {
-            let edge = &self.edges[e as usize];
-            let (s0, s1, next) = if edge.a == node {
-                (edge.s0, edge.s1, edge.b)
-            } else {
-                (edge.s1, edge.s0, edge.a)
-            };
-            pieces.push((edge.road, s0, s1));
-            node = next;
-        }
-        pieces.push((to.road, if last == te.a { te.s0 } else { te.s1 }, to.s));
-        let len = pieces.iter().map(|p| (p.2 - p.1).abs()).sum();
-        Some(self.assemble(&pieces, len, mode, country))
+            chain.reverse();
+            let first = at;
+            let mut pieces: Vec<Piece> = Vec::with_capacity(chain.len() + 2);
+            pieces.push((from.road, from.s, if first == fe.a { fe.s0 } else { fe.s1 }));
+            let mut node = first;
+            for &e in &chain {
+                let edge = &self.edges[e as usize];
+                let (s0, s1, next) = if edge.a == node {
+                    (edge.s0, edge.s1, edge.b)
+                } else {
+                    (edge.s1, edge.s0, edge.a)
+                };
+                pieces.push((edge.road, s0, s1));
+                node = next;
+            }
+            pieces.push((to.road, if last == te.a { te.s0 } else { te.s1 }, to.s));
+            let len = pieces.iter().map(|p| (p.2 - p.1).abs()).sum();
+            Some((pieces, len))
+        })
     }
 
     fn assemble(&self, pieces: &[(u32, f32, f32)], len: f32, mode: Mode, country: f32) -> RoadPath {
@@ -911,6 +959,42 @@ impl Graph {
         }
         out
     }
+}
+
+/// A stretch of a road: the road, and from and to how far along it (m).
+type Piece = (u32, f32, f32);
+
+/// Road searches' state kept between them (`Graph::pieces`): a big world's network has
+/// thousands of nodes, too many to allocate for every estimate. An entry counts only if stamped
+/// by the current search.
+#[derive(Default)]
+struct RoadScratch {
+    g: Vec<f32>,
+    came: Vec<Option<u32>>,
+    stamps: Vec<u32>,
+    search: u32,
+    heap: std::collections::BinaryHeap<std::cmp::Reverse<(u64, u32)>>,
+}
+
+impl RoadScratch {
+    /// Gets ready for a search over `nodes` nodes; returns its stamp.
+    fn start(&mut self, nodes: usize) -> u32 {
+        if self.g.len() != nodes || self.search == u32::MAX {
+            *self = Self {
+                g: vec![f32::INFINITY; nodes],
+                came: vec![None; nodes],
+                stamps: vec![0; nodes],
+                ..Self::default()
+            };
+        }
+        self.heap.clear();
+        self.search += 1;
+        self.search
+    }
+}
+
+thread_local! {
+    static ROAD_SCRATCH: std::cell::RefCell<RoadScratch> = std::cell::RefCell::default();
 }
 
 /// Everything the sim knows about getting about (`World::travel`).
@@ -934,7 +1018,15 @@ pub struct Travel {
     /// The tiles the town file's `terrain` masks (water, rock): blocked under everything, so a
     /// tile freed of what stood on it stays blocked (`World::set_travel`). Sorted tile indices.
     pub base_blocked: Vec<usize>,
+    /// By plot, for the public places: their door and where it gets on the roads on foot and by
+    /// car (`entry`), kept as each tick starts (`note_doors`): a resident weighing an outing asks
+    /// how long the way to every one is. Not saved.
+    doors: Vec<Option<Door>>,
 }
+
+/// A public place's door (its bits) and where it gets on the roads on foot and by car
+/// (`Travel::doors`).
+type Door = ([u32; 2], [Option<RoadPoint>; 2]);
 
 impl Travel {
     pub fn new(file: OpenWorld, meta: &serde_json::Value, exits: usize) -> Self {
@@ -959,6 +1051,44 @@ impl Travel {
             open,
             country_speed: COUNTRY_SPEED,
             base_blocked: Vec::new(),
+            doors: Vec::new(),
+        }
+    }
+
+    /// Where a trip from or to `p` gets on the roads for `mode` (the nearest road within
+    /// `ENTRY_REACH`), as `eta` finds it.
+    pub fn entry(&self, p: [f32; 2], mode: Mode) -> Option<RoadPoint> {
+        self.graph.near(p, ENTRY_REACH, 1, mode).first().copied()
+    }
+
+    /// Notes the public places' doors and where they get on the roads (`doors`), again only for
+    /// a door that moved.
+    pub(crate) fn note_doors(&mut self, plots: &[crate::world::Plot]) {
+        if !self.open {
+            return;
+        }
+        self.doors.resize(plots.len(), None);
+        for (i, p) in plots.iter().enumerate() {
+            let door = p.arrival_point();
+            let bits = door.map(f32::to_bits);
+            if !p.public {
+                self.doors[i] = None;
+            } else if self.doors[i].is_none_or(|(at, _)| at != bits) {
+                let entries = [self.entry(door, Mode::Foot), self.entry(door, Mode::Car)];
+                self.doors[i] = Some((bits, entries));
+            }
+        }
+    }
+
+    /// `entry` for the door `door` of public place `plot`, as noted (`note_doors`), or found.
+    pub fn door_entry(&self, plot: u32, door: [f32; 2], mode: Mode) -> Option<RoadPoint> {
+        match self.doors.get(plot as usize) {
+            Some(Some((at, entries))) if *at == door.map(f32::to_bits) => {
+                // (In the tests, the same as finding it.)
+                debug_assert_eq!(entries[mode as usize], self.entry(door, mode));
+                entries[mode as usize]
+            }
+            _ => self.entry(door, mode),
         }
     }
 
@@ -998,19 +1128,40 @@ impl Travel {
     /// or by car. No search of the tiles: the roads for long trips, the straight line (with a
     /// detour) for the rest.
     pub fn eta(&self, from: [f32; 2], to: [f32; 2], mode: Mode, walk: f32) -> f32 {
+        self.eta_via(
+            from,
+            to,
+            mode,
+            walk,
+            || self.entry(from, mode),
+            || self.entry(to, mode),
+        )
+    }
+
+    /// `eta`, with where the trip gets on and off the roads (`entry` of `from` and of `to`, asked
+    /// for only if it goes by road) found by the caller: the same for many trips from one place.
+    pub fn eta_via(
+        &self,
+        from: [f32; 2],
+        to: [f32; 2],
+        mode: Mode,
+        walk: f32,
+        on: impl FnOnce() -> Option<RoadPoint>,
+        off: impl FnOnce() -> Option<RoadPoint>,
+    ) -> f32 {
         let walk = walk.max(1e-3);
         match mode {
             Mode::Foot => {
                 if !self.by_road(from, to) {
                     return octile(from, to) * DETOUR / walk;
                 }
-                self.road_estimate(from, to, Mode::Foot)
+                self.road_estimate(on, off, Mode::Foot)
                     .map_or(octile(from, to) * DETOUR, |(m, _)| m)
                     / walk
             }
             Mode::Car => {
                 let straight = dist(from, to) / TOWN_SPEED / 60.0;
-                self.road_estimate(from, to, Mode::Car)
+                self.road_estimate(on, off, Mode::Car)
                     .map_or(straight, |(_, s)| s / 60.0)
             }
         }
@@ -1027,14 +1178,19 @@ impl Travel {
         }
     }
 
-    /// Along the roads from `from` to `to`: the metres on foot (tile legs with a detour), and the
+    /// Along the roads from where a trip gets on them (`on`) to where it gets off: the metres on foot (tile legs with a detour), and the
     /// seconds by car (`mode`).
-    fn road_estimate(&self, from: [f32; 2], to: [f32; 2], mode: Mode) -> Option<(f32, f32)> {
-        let a = *self.graph.near(from, ENTRY_REACH, 1, mode).first()?;
-        let b = *self.graph.near(to, ENTRY_REACH, 1, mode).first()?;
-        let path = self.graph.path(a, b, mode, self.country_speed)?;
+    fn road_estimate(
+        &self,
+        on: impl FnOnce() -> Option<RoadPoint>,
+        off: impl FnOnce() -> Option<RoadPoint>,
+        mode: Mode,
+    ) -> Option<(f32, f32)> {
+        let a = on()?;
+        let b = off()?;
+        let (len, cost) = self.graph.path_cost(a, b, mode, self.country_speed)?;
         let legs = (a.off + b.off) * DETOUR;
-        Some((path.len + legs, path.cost + legs / TOWN_SPEED.min(1.5)))
+        Some((len + legs, cost + legs / TOWN_SPEED.min(1.5)))
     }
 
     /// Where a trip on foot from `pos` to `target` gets on and off the roads, and the way along
@@ -1236,6 +1392,43 @@ mod tests {
             drive.len
         );
         assert!(g.near([1.0, 60.0], 3.0, 1, Mode::Car).is_empty());
+    }
+
+    /// `path_cost` is `path`'s length and cost, to the bit, from and to anywhere on the roads
+    /// (a search after another reuses the last one's state, `RoadScratch`).
+    #[test]
+    fn a_paths_cost_alone_is_the_paths() {
+        let g = Graph::build(&[
+            road(&line([0.0, 10.0], [100.0, 10.0]), 6.0, RoadKind::Street),
+            road(&line([100.0, 10.0], [100.0, 100.0]), 6.0, RoadKind::Country),
+            road(&line([0.0, 10.0], [0.0, 100.0]), 2.0, RoadKind::Trail),
+            road(&line([0.0, 100.0], [100.0, 100.0]), 6.0, RoadKind::Street),
+            road(&line([50.0, 10.0], [50.0, 100.0]), 4.0, RoadKind::Lane),
+        ]);
+        let points: Vec<[f32; 2]> = (0..12)
+            .flat_map(|i| (0..12).map(move |j| [i as f32 * 9.0 + 1.0, j as f32 * 9.0 + 1.0]))
+            .collect();
+        let mut compared = 0;
+        for mode in [Mode::Foot, Mode::Car] {
+            for &a in &points {
+                for &b in points.iter().step_by(7) {
+                    let (Some(&from), Some(&to)) = (
+                        g.near(a, 30.0, 1, mode).first(),
+                        g.near(b, 30.0, 1, mode).first(),
+                    ) else {
+                        continue;
+                    };
+                    let path = g.path(from, to, mode, COUNTRY_SPEED);
+                    let cost = g.path_cost(from, to, mode, COUNTRY_SPEED);
+                    assert_eq!(
+                        path.map(|p| (p.len.to_bits(), p.cost.to_bits())),
+                        cost.map(|(l, c)| (l.to_bits(), c.to_bits()))
+                    );
+                    compared += 1;
+                }
+            }
+        }
+        assert!(compared > 100);
     }
 
     #[test]
