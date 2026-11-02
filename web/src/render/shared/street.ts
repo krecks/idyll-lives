@@ -1097,7 +1097,8 @@ export class TownStreet {
     const mouths: [number, number][] = [];
     for (const { p } of this.meeting.filter((m) => m.road === r && m.side === side)) {
       const corners = [[p.x, p.z], [p.x + p.w, p.z], [p.x, p.z + p.d], [p.x + p.w, p.z + p.d]].map(([x, z]) => kerb.along(x, z));
-      const swing = world.cars?.length && Math.min(p.w, p.d) >= DRIVEWAY_MIN_WIDTH ? CAR_SWING : 0;
+      // (`world.cars` there or not, as `layoutKey` keys it: a car bought later finds the mouths clear.)
+      const swing = world.cars && Math.min(p.w, p.d) >= DRIVEWAY_MIN_WIDTH ? CAR_SWING : 0;
       mouths.push([Math.min(...corners) - swing, Math.max(...corners) + swing]);
     }
     const clear = (s: number, m: number) => s > 1 && s < kerb.length - 1 && kerb.open(s) && !mouths.some(([a, b]) => s > a - m && s < b + m);

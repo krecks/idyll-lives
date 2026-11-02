@@ -1088,7 +1088,7 @@ export interface TownLayout {
  * showed it. Each generated house is furnished for its household (`player`: a new one moving in
  * at `playerSlot`). A house someone lives in has the household's car on its driveway where the
  * street draws one (`houseCar`: about four in five, the same houses and the same cars), and the
- * player's has one whenever it has a driveway; the simulation drives them along the roads.
+ * player's has one whenever its driveway gets to the road; the simulation drives them along the roads.
  */
 export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDraft, playerSlot: number | null, player?: HouseholdDraft): TownLayout {
   const walls: Wall[] = [];

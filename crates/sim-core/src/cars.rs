@@ -589,7 +589,8 @@ impl Car {
                 if self.trip.is_none() {
                     self.no_way = roads.is_some();
                 }
-                Route::build(self, exits, travel, false)
+                // (`on_roads` just failed: not again, as `build` would.)
+                Route::off_roads(self, exits, travel, false)
             }
         };
         self.out_ticks = out.ticks();
@@ -663,6 +664,11 @@ impl Route {
         {
             return route;
         }
+        Self::off_roads(car, exits, travel, home)
+    }
+
+    /// `legacy`, to a road out of town (not a bus stop).
+    fn off_roads(car: &Car, exits: &[[f32; 2]], travel: Option<&Travel>, home: bool) -> Route {
         match travel {
             Some(t) if t.stops.iter().any(|&s| s) => {
                 let roads: Vec<[f32; 2]> = (0..exits.len())
@@ -1660,10 +1666,13 @@ fn drive_on(w: &mut World, c: usize) {
         // Someone walking along beside it (on the walkers' side of the road, `travel::walk_side`)
         // isn't in its way: a car on the road would follow them at a walk. Only someone in front
         // of it, or standing close by.
+        // (Walking the way it goes or against it: not across its path, as on the sidewalk
+        // behind a car backing out of a driveway.)
         let beside = || {
             let (sn, cs) = yaw.sin_cos();
             let (dx, dz) = (s.pos[0] - at[0], s.pos[1] - at[1]);
             (dx * cs - dz * sn).abs() >= car.wid / 2.0
+                && (s.yaw - yaw).cos().abs() > 0.7
                 && s.current()
                     .is_some_and(|a| matches!(a.phase, Phase::Routing { .. }))
         };
@@ -2502,6 +2511,7 @@ pub(crate) fn trip_car(
             && car.state == CarState::Parked
             && car.trip.is_none()
             && !car.blocked
+            && !car.no_way
             && car.owners.contains(&sim.id)
     })?;
     let c = c as u32;
