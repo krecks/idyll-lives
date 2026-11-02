@@ -20,6 +20,7 @@ all=(fmt clippy sim generated clips web tools sizes uses models types)
 quick=(fmt clippy sim clips web types)
 
 pinned=$(sed -nE 's/^ *bun-version: *([0-9.]+).*/\1/p' .github/workflows/ci.yml | head -1)
+[[ -n "$pinned" ]] || { echo "No bun-version in .github/workflows/ci.yml" >&2; exit 1; }
 bun_ci=(bun)
 # (CI runs the Rust steps before it sets Bun up.)
 if command -v bun >/dev/null && [[ "$(bun --version)" != "$pinned" ]]; then
