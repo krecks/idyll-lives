@@ -124,6 +124,9 @@ const STEEP = 0.25;
 /** An orchard beside a farmstead: this deep from the lot's side (m), a gap of this from it. */
 const ORCHARD = 26;
 const ORCHARD_GAP = 3;
+/** A home by a country road stands where it turns less than `BEND_MOST` (radians) over `BEND` m either side. */
+const BEND = 16;
+const BEND_MOST = 0.3;
 
 const range = (rand: Rand, lo: number, hi: number) => lo + (hi - lo) * rand();
 const between = (rand: Rand, [lo, hi]: [number, number]) => lo + Math.floor(rand() * (hi - lo + 1));
@@ -862,7 +865,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   const allGreens = plans.flatMap((p) => p.greens);
   const ground = new Ground(W, D, worldRoads, allGreens);
   ground.block(waterMask);
-  const lots = new LotPlacer(content, t, ground, worldRoads, recipe.gaps, rand);
+  const lots = new LotPlacer(content, t, ground, worldRoads, recipe.gaps, rand, true);
   const names: (string | undefined)[] = worldRoads.map((r) => r.name);
   const fronts = new Map<number, ReturnType<typeof frontageOf>>();
   const left: { u: Parameters<typeof lots.place>[0][number]; from: number }[] = [];
@@ -881,7 +884,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     const placed = others.some((a) => !lots.place([u], fronts.get(a)!, [], plans[a].centre, a, true).length);
     if (placed) continue;
     // Else along a country road, near its own area's end of it.
-    country ??= frontageOf(worldRoads, worldRoads.flatMap((r, i) => (r.kind === 'country' ? [i] : [])), plans[0].centre, rand);
+    country ??= frontageOf(worldRoads, worldRoads.flatMap((r, i) => (r.kind === 'country' ? [i] : [])), plans[0].centre, rand).filter((f) => straight(worldRoads[f.road].points, f.s, lengths(worldRoads[f.road].points)));
     const r = plans[from].rect;
     const off = (p: Pt) => Math.hypot(Math.max(r.x - p[0], 0, p[0] - r.x - r.w), Math.max(r.z - p[1], 0, p[1] - r.z - r.d));
     const near = country.filter((f) => off(f.p) < SPILL).sort((x, y) => dist(x.p, plans[from].centre) - dist(y.p, plans[from].centre));
@@ -955,7 +958,12 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       const r = rectOf(slot);
       pads[slot.index] = Math.round(land.at(r.x + r.w / 2, r.z + r.d / 2) * 10) / 10;
       const trail = trailTo(slot, plan, worldRoads, slots, waterMask, land, t, W, D);
-      if (!trail) continue;
+      // (No way to it: no place there, then. It is the last lot put down.)
+      if (!trail) {
+        slots.pop();
+        delete pads[slot.index];
+        continue;
+      }
       trail.name = uniqueName(`${slot.name} Trail`, `${slot.name} Path`);
       trail.area = a;
       worldRoads.push(trail);
@@ -1049,6 +1057,13 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   };
 }
 
+/** A country road runs nearly straight round arc length `s` (within `BEND` m either way): a car turns in off it without swinging off the road. */
+function straight(pts: readonly Pt[], s: number, ls: number[]): boolean {
+  const L = ls[ls.length - 1];
+  const [a, b] = [pointAt(pts, Math.max(0, s - BEND), ls).t, pointAt(pts, Math.min(L, s + BEND), ls).t];
+  return a[0] * b[0] + a[1] * b[1] > Math.cos(BEND_MOST);
+}
+
 /**
  * Homes along the country roads, on purpose: 2 to 4 cottages where each road leaves an area and
  * where it meets another out in the country, then a farmstead (a farm lot: its fields, its barn
@@ -1058,7 +1073,9 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
 function alongCountryRoads(content: Content, t: Templates, lots: LotPlacer, plans: readonly Plan[], roads: readonly RoadPlan[], land: Land, rand: Rand): PlotSlot[] {
   const country = roads.flatMap((r, i) => (r.kind === 'country' ? [i] : []));
   const byRoad = new Map<number, Frontage[]>();
+  const lens = new Map(country.map((r) => [r, lengths(roads[r].points)]));
   for (const f of frontageOf(roads, country, plans[0].centre, rand)) {
+    if (!straight(roads[f.road].points, f.s, lens.get(f.road)!)) continue;
     const list = byRoad.get(f.road);
     if (list) list.push(f);
     else byRoad.set(f.road, [f]);
