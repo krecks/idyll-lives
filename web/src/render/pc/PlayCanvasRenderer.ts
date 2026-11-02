@@ -1947,7 +1947,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.placing.frame(this.frameDt); // (the effects, the thing in hand.)
     this.updateSims(frame);
     this.cars.update(frame);
-    if (this.cars.moved) this.sunShadows.moved(false); // (a car's shadow goes with it.)
+    // (A car's shadow goes with it: `moved` true, or the rectangle round the cars that moved, which draws the map
+    // again only if it reaches the shadow square: `SunShadows.movedIn`, `rect`.)
+    this.sunShadows.movedIn(this.cars.moved);
     this.birdLife.update(frame, minute, this.frameDt, this.characters, this.simCount); // (after the residents, who scare them.)
     if (this.roofs.length && this.roofVisible() !== this.roofShown) {
       this.roofShown = !this.roofShown;
@@ -1979,7 +1981,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     this.lot.pullChairs(this.characters.pulled, this.placing.held); // (not the one in hand.)
     this.lot.takeRestProps(this.characters.restTaken);
-    if (this.characters.posed && this.quality.characterShadows) this.sunShadows.moved(false);
+    // (`posed`: true, or the rectangle round those posed, as the cars' `moved`.)
+    if (this.quality.characterShadows) this.sunShadows.movedIn(this.characters.posed);
     const blobs = this.simShadow;
     blobs.setCount(count);
     for (let i = 0; i < count; i++) blobs.setMatrix(i, shadows, i * 16);
