@@ -9,7 +9,7 @@
 # closed. Only the node's rotation, location or scale move. `swing`, `slide`, `grow` and `squash` go from
 # rest to open (the game plays them back); `spin` and `rock` come home to rest within the clip, so they
 # also serve as loops (`motions.loops`, `idle`), and `scroll` moves one repeat on, home unseen. `G.run` exports the clips when a model has any; the
-# exporter samples every frame, and the game samples the clip 30 times a second.
+# exporter samples every frame (30 a second, scene.FPS) from frame 1 as 0 s, and the game samples the clip 30 times a second.
 import math
 
 import bpy
@@ -23,8 +23,9 @@ def fps():
 
 
 def last_frame(seconds):
-    """The frame of a clip's last key, for a clip that ends `seconds` in (the exporter's clock)."""
-    return max(2, round(seconds * fps()))
+    """The frame of a clip's last key, for a clip that ends `seconds` in: frame 1 is 0 s (the export slides each
+    clip to start at 0), so this is also the frame `seconds` into any clip."""
+    return max(2, 1 + math.floor(seconds * fps() + 0.5))   # halves up: a clip is never a frame short
 
 
 def attach(obj, parent):
@@ -162,7 +163,7 @@ def path(obj, clip, keys, linear=False):
     carried over the rail and hung on the table's end; the robot vacuum's round (a loop: it ends at rest, its
     heading a whole turn on, either way; `linear` keeps an even speed between the keys, else each eases)."""
     assert keys[0][0] == 0 and not any(keys[0][1]) and not any(keys[0][2]), f'path {clip!r}: the first key is rest, at 0 s'
-    frames = [1 + round(s * fps()) for s, _, _ in keys]
+    frames = [last_frame(s) if s else 1 for s, _, _ in keys]
     assert all(b > a for a, b in zip(frames, frames[1:])), f'path {clip!r}: keys a frame or more apart, in order'
     obj.rotation_mode = 'XYZ'
     moved = False

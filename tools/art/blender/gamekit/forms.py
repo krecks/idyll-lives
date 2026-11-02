@@ -14,9 +14,7 @@ import bpy
 from mathutils import Matrix, Vector
 from mathutils import noise as vnoise
 
-from .shapes import _recalc_normals
-
-SHARP = 40  # degrees: an edge turning more than this stays sharp on a smooth form
+from .shapes import SHARP, _recalc_normals, bevel_edges, round_angle, shade
 
 
 # ---- profiles and outlines (2D) ------------------------------------------------------------------------
@@ -129,14 +127,15 @@ def _frames(pts, closed, up):
 
 
 def sweep(name, points, radius=0.02, profile=None, material=None, verts=12, scale=1.0, resolution=1, closed=False,
-          caps=True, up=(0, 0, 1), smooth=True, angle=SHARP):
+          caps=True, up=(0, 0, 1), smooth=True, angle=None):
     """
     A profile swept along a path through `points` (Blender, metres): a tube of `radius` (`verts` round), or any
     closed `profile` [(u, v), ...] about the path, u along the frame's normal (as near `up` as it goes), v across.
     `resolution` > 1 curves the path through the points (Catmull-Rom), that many steps between each pair.
     `scale` thickens it along the way: a number, a list (one per point, linear between) or a function of how far
     along (0..1), so a branch or a cabriole leg tapers. `closed` joins the path's ends (a ring, piping round a
-    cushion); otherwise the ends are capped flat (`caps`).
+    cushion); otherwise the ends are capped flat (`caps`). Smooth, edges turning more than `angle` degrees stay
+    sharp: by default `SHARP` for a `profile`, and for a round tube enough that its sides stay round (`round_angle`).
     """
     pts, where = _catmull(points, resolution, closed)
     if callable(scale):
@@ -165,6 +164,8 @@ def sweep(name, points, radius=0.02, profile=None, material=None, verts=12, scal
             faces.append((a + k, a + k2, b + k2, b + k))
     if caps and not closed:
         faces += [tuple(range(m - 1, -1, -1)), tuple(range((rings - 1) * m, rings * m))]
+    if angle is None:
+        angle = SHARP if profile else round_angle(verts)
     return _object(name, vs, faces, material, smooth, angle)
 
 
@@ -245,14 +246,9 @@ def extrude(name, outline, depth, at=(0, 0, 0), material=None, holes=(), plane='
     bm.free()
     obj = _link(name, mesh, material)
     _recalc_normals(obj)
-    _shade(obj, smooth, angle)
+    shade(obj, smooth, angle)
     if bevel:
-        mod = obj.modifiers.new('bevel', 'BEVEL')
-        mod.width = bevel
-        mod.segments = bevel_segments
-        mod.limit_method = 'ANGLE'
-        mod.angle_limit = math.radians(30)
-        mod.harden_normals = False
+        bevel_edges(obj, bevel, bevel_segments, angle=30)
     obj.location = at
     obj.rotation_euler = tuple(math.radians(a) for a in rot)
     return obj
@@ -421,7 +417,7 @@ def _object(name, vs, faces, material, smooth, angle, merge=False):
         bm.to_mesh(mesh)
         bm.free()
     _recalc_normals(obj)
-    _shade(obj, smooth, angle)
+    shade(obj, smooth, angle)
     return obj
 
 
@@ -432,10 +428,3 @@ def _link(name, mesh, material):
         obj.data.materials.append(material)
     return obj
 
-
-def _shade(obj, smooth, angle):
-    if smooth:
-        obj.data.shade_smooth()
-        obj.data.set_sharp_from_angle(angle=math.radians(angle))
-    else:
-        obj.data.shade_flat()

@@ -16,10 +16,10 @@ from .parts import (aside, check_size, fit, game_size, hinged, join, join_all, m
 from .place import GameFrame
 from .preview import preview, preview_clips, preview_perches
 from .scene import ASSETS, PREVIEWS, TAU, cosd, meshes, reset, sind
-from .shapes import boulder, cone, cube, cylinder, revolve, rod, sphere, torus
+from .shapes import SHARP, bevel_edges, boulder, cone, cube, cylinder, revolve, rod, round_angle, shade, sphere, torus
 
 __all__ = [
-    'ASSETS', 'FINISHES', 'PREVIEWS', 'TAU', 'Family', 'GameFrame', 'Model', 'Palette', 'aside', 'attach', 'boulder', 'check_size', 'clips',
+    'ASSETS', 'FINISHES', 'PREVIEWS', 'SHARP', 'TAU', 'bevel_edges', 'round_angle', 'shade', 'Family', 'GameFrame', 'Model', 'Palette', 'aside', 'attach', 'boulder', 'check_size', 'clips',
     'circle', 'cone', 'cosd', 'cut', 'extrude', 'cube', 'cylinder', 'export_glb', 'far_of', 'fit', 'game_size', 'grow', 'grow_in_turn', 'hinged', 'is_low', 'jitter', 'join',
     'join_all', 'kit', 'loft', 'low', 'mat', 'materials_used', 'measure', 'meshes', 'mirrored', 'new_parts', 'path', 'perch', 'preview', 'preview_clips', 'preview_perches', 'reset', 'revolve', 'ring', 'rock', 'rounded_rect',
     'rod', 'scroll', 'set_origin', 'settle', 'sind', 'slide', 'smooth_outline', 'soft_box', 'sphere', 'spin', 'squash', 'stages', 'stats', 'sweep', 'swing', 'torus', 'turn', 'turns',

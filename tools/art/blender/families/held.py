@@ -1820,7 +1820,7 @@ def pastryBag():
 
 def I(id, build, size, key, centre=(0.0, 0.0), code=False, tolerance=0.02):
     # (`tolerance`: a thing a centimetre across measures to the millimetre, not the 2 %.)
-    return G.Model(id, build, size=size, key=key, centre=centre, code=code,
+    return G.Model(id, build, size=size, key=key, centre=centre, code=code, ground=False,
                    tolerance=3 if os.environ.get('HELD_MEASURE') else tolerance)
 
 

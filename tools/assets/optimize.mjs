@@ -8,7 +8,8 @@
 //     block-compressed (BC7/BC1, ETC2 or ASTC, whatever it has), 4-8x less memory than RGBA.
 //   models (.glb)           -> meshopt geometry (EXT_meshopt_compression, lossless on the
 //     already quantised data), embedded textures to KTX2 (KHR_texture_basisu); references to
-//     shared textures (the foliage atlas) point at their KTX2 copies.
+//     shared textures (the foliage atlas) point at their KTX2 copies. The baked shading (COLOR_0,
+//     a grey of 32 levels: gamekit/shade.py) goes from 16 bits or floats to 8, which keeps every level.
 //   character binaries      -> gzip (the browser inflates them; most hosts don't compress .bin).
 //
 // Outputs are cached by content hash in web/.assets/cache, so only changed files are encoded.
@@ -29,7 +30,7 @@ const CACHE = path.join(WEB, '.assets/cache');
 export const OUT = path.join(WEB, '.assets/out');
 
 /** Bump when the encoding changes, so cached outputs are rebuilt. */
-const VERSION = 1;
+const VERSION = 2;
 
 /** Left as they are: not loaded by the game, or drawn in a way KTX2 can't (flipped on upload). */
 const SKIP = new Set([
@@ -177,7 +178,7 @@ async function workerMain() {
   const sharp = (await load('sharp')).default;
   // (ESM only, and its Node build isn't reachable through require.)
   const { encodeToKTX2 } = await import(pathToFileURL(path.join(WEB, 'node_modules/ktx2-encoder/dist/node/index.js')).href);
-  const { Logger, NodeIO } = await load('@gltf-transform/core');
+  const { Accessor, Logger, NodeIO } = await load('@gltf-transform/core');
   const { ALL_EXTENSIONS, EXTMeshoptCompression, KHRTextureBasisu } = await load('@gltf-transform/extensions');
   const { reorder } = await load('@gltf-transform/functions');
   const { MeshoptEncoder } = await load('meshoptimizer');
@@ -200,6 +201,34 @@ async function workerMain() {
     if (slots.some((s) => /normal/i.test(s))) return 'normal';
     return 'data';
   };
+
+  /**
+   * The baked shading (COLOR_0) as normalised bytes, RGBA: Blender writes it as 16-bit (or float) RGBA, a
+   * fifth of a model's bytes, for a grey of 32 levels (gamekit/shade.py `LEVELS`) that 8 bits hold to within
+   * 1/510. The game reads either (models.ts `readAccessor`).
+   */
+  function bytesShading(doc) {
+    const done = new Map();
+    for (const mesh of doc.getRoot().listMeshes()) {
+      for (const prim of mesh.listPrimitives()) {
+        const color = prim.getAttribute('COLOR_0');
+        if (!color || color.getComponentType() === Accessor.ComponentType.UNSIGNED_BYTE) continue;
+        if (!done.has(color)) {
+          const n = color.getCount();
+          const k = color.getElementSize();
+          const out = new Uint8Array(n * 4);
+          const el = [];
+          for (let i = 0; i < n; i++) {
+            color.getElement(i, el);
+            for (let c = 0; c < 4; c++) out[i * 4 + c] = Math.round(Math.min(1, Math.max(0, c < k ? el[c] : 1)) * 255);
+          }
+          done.set(color, doc.createAccessor().setType(Accessor.Type.VEC4).setArray(out).setNormalized(true).setBuffer(color.getBuffer()));
+        }
+        prim.setAttribute('COLOR_0', done.get(color));
+      }
+    }
+    for (const old of done.keys()) if (!old.listParents().some((p) => p.propertyType !== 'Root')) old.dispose();
+  }
 
   async function model(src, rel) {
     const doc = await io.read(src);
@@ -229,6 +258,7 @@ async function workerMain() {
       doc.createExtension(KHRTextureBasisu).setRequired(true);
       for (const ext of root.listExtensionsUsed()) if (ext.extensionName === 'EXT_texture_webp') ext.dispose();
     }
+    bytesShading(doc);
     // Vertex order that compresses (and caches) best, then meshopt over every buffer view. The
     // data is encoded as it is (no further quantisation): the foliage cards keep float attributes.
     await doc.transform(reorder({ encoder: MeshoptEncoder, target: 'size' }));

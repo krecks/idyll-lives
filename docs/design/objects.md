@@ -179,10 +179,13 @@ room has.
   material left behind each time the model is rebuilt. `cargo check-glb` warns of each one.
 - **Baked shading.** The export bakes how much sky each vertex sees into a grey vertex colour (COLOR_0,
   `gamekit/shade.py`, 32 greys), and the game multiplies it into the part's colour (`restyledMesh`), the
-  player's colour too: creases, seams, the gaps between cushions and drawer reveals darken, with no
-  texture, UV or draw call (about 10 % more download). A part a clip takes away from its rest (a door, a
-  drawer, something grown or hidden) is shaded by itself only, so it doesn't carry the shadow of what it
-  left; the rest are shaded together at rest. `cargo check-glb` fails a COLOR_0 that isn't grey.
+  player's colour too: creases, seams, the gaps between cushions and drawer reveals
+  darken, with no texture, UV or draw call (about 10 % more download; the build stores it in 8 bits). A
+  model on the ground (`Model(ground=)`, by default one on the floor that isn't a bird; a held thing isn't)
+  is shaded by the floor too, within 15 cm of it: the foot of its sides darkens where it meets the floor. A
+  part a clip takes away from its rest (a door, a drawer, something grown or hidden) is shaded by itself
+  only, so it doesn't carry the shadow of what it left; the rest are shaded together at rest. `cargo
+  check-glb` fails a COLOR_0 that isn't grey.
 - **Finishes by name.** A material named `<name>@<finish>` (`stone@matte`, `leaf@foliage`) is drawn
   with that finish without a `materials` entry (one in the entry still wins). Handy for files not made
   with gamekit, whose palettes write the map themselves.
@@ -397,11 +400,11 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 | Modifiers | applied | Bevels and the like are baked in |
 | Selection | the model's mesh objects only | No cameras, lights or helpers in the file |
 | UVs | off unless textured | Nothing reads them; they split vertices and cost bytes |
-| Normals | on | Smooth and hard edges as modelled |
+| Normals | on | Smooth and hard edges as modelled: edges over 40° sharp (round things' sides and lathes' gentle turns smooth), bevels with hardened normals (`gamekit/shapes.py`) |
 | Vertex colours | the baked shading only (`ao` as COLOR_0) | The game multiplies it in; nothing else may colour a vertex |
 | Materials | exported, one-sided | Their names and colours drive the finishes |
 | Compression | none (no Draco) | The build adds meshopt; the game ships no Draco decoder |
-| Clips | moving parts only (`clips=True`): node rotation, translation or scale, first key at rest | Thin instances move whole nodes, not bones (below) |
+| Clips | moving parts only (`clips=True`): node rotation, translation or scale, first key at rest and at 0 s (`export_anim_slide_to_zero`), keyed 30 a second | Thin instances move whole nodes, not bones (below); the game samples clips 30 times a second, and held a clip starting later at rest until then (a pause each round of a loop) |
 | Skins, morphs | none | Placed things are thin instances without bones |
 
 ## Validation

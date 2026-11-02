@@ -51,6 +51,8 @@ class Model:
                  stays on its top: the fridge, 0.722 deep, takes (0, -0.069). Written into centres.json (the
                  middle too), for the gate only (`cargo check-glb`: centred there, and against the wall)
       floor      False for a thing on a wall: built at its real height, not stood on the floor
+      ground     whether the floor it stands on shades the foot of it (gamekit/shade.py); default: on the floor
+                 and not a bird. False for what isn't on the ground where it's seen (a held thing)
       sink       how far the model may reach below the floor (default 0), for the few the game sinks
                  (the woods' rock, the selection marker the game centres on a resident)
       code       True for a model the game draws by code, not for a content object or item (a held tool.*,
@@ -74,7 +76,8 @@ class Model:
     """
 
     def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, parts=None,
-                 centre=(0.0, 0.0), floor=True, far=None, sink=0.0, code=False, bird=None, habitat=None, draws=None):
+                 centre=(0.0, 0.0), floor=True, far=None, sink=0.0, code=False, bird=None, habitat=None, draws=None,
+                 ground=None):
         self.id, self.build, self.size, self.key = id, build, size, key
         self.tolerance, self.motions, self.paint = tolerance, motions, paint
         self.parts = parts
@@ -84,6 +87,7 @@ class Model:
         self.bird = bird
         self.habitat = habitat
         self.draws = draws
+        self.ground = (floor and not bird) if ground is None else ground
 
 
 class Family:
@@ -170,7 +174,8 @@ class Family:
                     preview(stem + '.far.png')
                 continue
             clips = motion.clips(objs)
-            path = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.glb'), objs, clips=bool(clips))
+            path = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.glb'), objs, clips=bool(clips),
+                              ground=model.ground)
             self._check_motions(model, clips)
             entry = {'url': f'../../models/{self.name}/{model.id}.glb',
                      'materials': self.palette.finishes(materials_used(objs))}
@@ -193,7 +198,8 @@ class Family:
             if model.draws:
                 entry['draws'] = model.draws
             if model.far:
-                far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), self.make_far(model, objs))
+                far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), self.make_far(model, objs),
+                                 ground=model.ground)
                 entry['far'] = f'../../models/{self.name}/{model.id}.far.glb'
                 print(f'[gamekit] built its far version -> {os.path.relpath(far, ASSETS)}')
             entries[self.key(model)] = entry

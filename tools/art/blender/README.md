@@ -401,6 +401,15 @@ never one that's already running) and drive Playwright headless with full Chrome
 - **Shading by corners.** The baked shading is per vertex, so a face is as dark as its corners: a big flat
   face whose corners sit in a crease (a recessed panel, glass in a rim) goes dark all over. Corners buried
   inside another part are left unshaded; give a face that meets a crease an edge band (`kit.shaker` does).
+  (Shading each corner along its own face's normal was tried: no better in the game, and it streaked the long
+  triangles of an extruded frame.)
+- **Smooth, sharp and bevelled.** Smooth parts keep edges over `G.SHARP` (40°) sharp, so a cylinder's cap stays
+  flat (it used to shade into the side); round things with few sides stay round (`G.round_angle`: a 6-sided
+  leg, an 8-sided tube); a lathe (`G.revolve`) keeps only turns over 70° sharp (a jar's coarse shoulder stays
+  round); spheres, rings and boulders are smooth all over. A `bevel` is smooth with hardened normals: the faces
+  it joins stay flat, the edge rounds. `G.shade(obj, smooth, angle)` and `G.bevel_edges(obj, width)` do the same
+  to a mesh made by hand. (Raising `SHARP` to 50° rounded a 45° chamfer's steps; the bevel's `MITER_ARC` turned
+  the normals of a frame's inner corners round: both showed a shaker frame's corners as seams.)
 - **`up` is Blender's.** `F.sweep` maps the points to game axes but passes `up` (which way a profile's first
   side faces) as it is, in Blender axes (x left, y back, z up): `up=(0, 1, 0)` on a path along game x flipped a
   plinth's profile down through the floor.
@@ -422,7 +431,7 @@ never one that's already running) and drive Playwright headless with full Chrome
 | `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `turn`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
 | `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home), `turns` (parts out and back in turn), `scroll` (one repeat on, a belt), `path` (through keys), `stages` (a crop's growth); `clips` |
 | `export.py` | `export_glb` (the fixed export settings, the shading baked first), `write_pack`, `stats`, `materials_used` |
-| `shade.py` | `bake_ao`: the creases' shading baked into a grey vertex colour (COLOR_0), which the game multiplies in |
+| `shade.py` | `bake_ao`: the creases' shading baked into a grey vertex colour (COLOR_0), which the game multiplies in; the floor shades the foot of a model on the ground (`Model(ground=)`) |
 | `preview.py` | `preview` (front three-quarter, Workbench; or `view=` side, front, top), `lit` (EEVEE, as the game lights it: `--lit`), `preview_clips`, `preview_perches` |
 | `family.py` | `Model`, `Family` and its `run`: the command line every family script ends with |
 | `far.py` | `far_of` (a far version from the model's own build at low detail), `low`, `is_low` |

@@ -1564,7 +1564,7 @@ def _draw_on(part, clip, seconds):
     first frames. Squeezed along x only, at rest it showed as a hairline of colours down the board."""
     G.grow(part, clip, seconds=seconds, axis='X')
     for axis in (1, 2):
-        _clip(part, clip, 'scale', axis, [(1, 0.001), (3, 1.0), (last_frame(seconds), 1.0)])
+        _clip(part, clip, 'scale', axis, [(1, 0.001), (last_frame(0.1), 1.0), (last_frame(seconds), 1.0)])
 
 
 def _rect(x0, y0, x1, y1):
