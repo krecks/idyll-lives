@@ -549,9 +549,20 @@ export interface PlotInfo {
 /** Living: the residents earn the money for building. Creative: building is free. */
 export type GameKind = 'living' | 'creative';
 
-/** The parts of `WorldStructure` that are the lot itself: sent only when `lotVersion` changes. */
-export type LotPart = 'rooms' | 'walls' | 'openings' | 'diagonals' | 'fences' | 'floors' | 'meshes';
-export type LeanWorld = Omit<WorldStructure, LotPart>;
+/**
+ * A `world` message's structure (sim-core `view::StructureSync`): what changed since the last
+ * message, the first time everything. The parts it has replace the last ones, those `unset` names
+ * are gone (the last garage sold), and `objectChanges` are things that changed, by index, while
+ * the list of things stays the same (a door opened, a crop grown). The lot's walls, openings,
+ * diagonals, fences and floors come only when the lot changed; its rooms and meshes come beside it
+ * (typed arrays, transferred).
+ */
+export type WorldUpdate = Partial<Omit<WorldStructure, 'rooms' | 'meshes' | 'staffSims'>> & {
+  version: number;
+  lotVersion: number;
+  objectChanges?: [number, ObjectPlacement][];
+  unset?: (keyof WorldStructure)[];
+};
 
 export interface WorldStructure {
   version: number;
@@ -580,7 +591,8 @@ export interface WorldStructure {
   households: HouseholdInfo[];
   plots: PlotInfo[];
   exits: [number, number][];
-  rooms: number[];
+  /** The room of each tile, row by row (`width × depth`; 0 outdoors): a `Uint16Array` from the simulation. */
+  rooms: Uint16Array | number[];
   /** Every edge with a wall on it (plain, or with a door or window), in grid order. */
   walls: WallEdge[];
   /** Doors and windows. */
@@ -926,7 +938,8 @@ export type GameSource = { lot: string; seed: number } | { save: string };
 export type SaveProblem = 'tooNew' | 'tooOld' | 'corrupt' | 'failed';
 
 export type ToWorker =
-  | { type: 'init'; content: string; source: GameSource }
+  /** `speed`: the clock's speed from the first step (0: the game starts paused). */
+  | { type: 'init'; content: string; source: GameSource; speed?: number }
   /** Only checks that a save opens (an imported file); answered with `checked`. */
   | { type: 'check'; content: string; save: string }
   | { type: 'command'; command: Command }
@@ -940,8 +953,8 @@ export type ToWorker =
   | { type: 'inspect'; sim: number | null }
   /** The next UI update sends everything. */
   | { type: 'resync' }
-  /** Which part of the town to build geometry for (tile rectangle); null = everything. */
-  | { type: 'view'; region: [number, number, number, number] | null }
+  /** Which part of the town to build geometry for (tile rectangle); null = everything. `seq` comes back with the worlds built for it. */
+  | { type: 'view'; region: [number, number, number, number] | null; seq: number }
   /** The camera's stream rectangle: the sim's full-detail area (docs/design/open-world.md `setWatch`). */
   | { type: 'watch'; region: [number, number, number, number] | null }
   /** `?debug`'s `__crash`: the next step panics, an error nobody catches, or the worker hangs. */
@@ -965,8 +978,11 @@ export type FromWorker =
   /** A start is under way and making progress (before `ready`; repeated while the simulation downloads). */
   | { type: 'starting' }
   | { type: 'ready'; layout: SnapshotLayout; shared: SharedArrayBuffer | null; catalog: Catalog }
-  /** `full`: with the lot; otherwise a `LeanWorld` (the lot is as last sent). */
-  | { type: 'world'; world: WorldStructure | LeanWorld; full: boolean }
+  /**
+   * What changed of the world structure (`WorldUpdate`), with the lot's rooms when the lot changed
+   * and its meshes when the lot or the view did. `view`: the `seq` of the view it was built for.
+   */
+  | { type: 'world'; view: number; world: WorldUpdate; rooms?: Uint16Array; meshes?: WorldStructure['meshes'] }
   /** Food and dishes, whenever they change (`ItemPlacement`). */
   | { type: 'items'; items: ItemPlacement[] }
   /** The lamps switched off (object ids), whenever a lamp is switched or the objects change. */

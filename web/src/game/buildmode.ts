@@ -167,7 +167,7 @@ export class BuildBuyInput {
   /** Looks of the walls that have one (keys as `edges`). */
   private looks = new Map<string, Look>();
   /** Room of each tile, and of each half of a split tile (`x:z` → rooms of halves 0 and 1). */
-  private rooms: number[] = [];
+  private rooms: WorldStructure['rooms'] = [];
   private halves = new Map<string, [number, number]>();
   private width = 0;
   /** Paint tool: faces collected by the drag in progress. */

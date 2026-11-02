@@ -1118,22 +1118,25 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (A garage built or taken down: the street draws it.)
     if (!sameGarages(built.garages, world.garages)) return 'garages';
     if (built.objects.length !== world.objects.length) return 'object count';
+    // (A thing that didn't change is the same object: `bridge.ts` `mergeWorld`.)
     for (let i = 0; i < world.objects.length; i++) {
-      if (!sameObject(built.objects[i], world.objects[i])) return `object ${world.objects[i].id} ${world.objects[i].def}`;
+      const [a, b] = [built.objects[i], world.objects[i]];
+      if (a !== b && !sameObject(a, b)) return `object ${b.id} ${b.def}`;
     }
-    if (!sims) return null;
+    if (!sims || built.sims === world.sims) return null;
     if (built.sims.length !== world.sims.length) return 'sim count';
     for (let i = 0; i < world.sims.length; i++) {
       const [a, b] = [built.sims[i], world.sims[i]];
       if (a.id !== b.id || a.gender !== b.gender || a.stage !== b.stage || a.name !== b.name) return `sim ${b.id}`;
-      if (JSON.stringify(a.appearance) !== JSON.stringify(b.appearance)) return `sim look ${b.id}`;
+      // (The session keeps a look that didn't change the same object: compared whole only when it isn't.)
+      if (a.appearance !== b.appearance && JSON.stringify(a.appearance) !== JSON.stringify(b.appearance)) return `sim look ${b.id}`;
     }
     return null;
   }
 
   /** Applies a `patchable` world in place (what's drawn of an object, its open state and growth). */
   private patchWorld(world: WorldStructure): void {
-    this.lot.patch(world); // (objects' clips and picking boxes.)
+    this.lot.patch(world, this.builtWorld); // (objects' clips and picking boxes.)
     this.lastWorld = world;
     this.builtWorld = world;
     if (this.debug) console.info('[render] world patched (no rebuild)');
@@ -1183,7 +1186,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.worldBuilding = true;
     this.sliceStart = performance.now();
     try {
-      this.lot.patch(world);
+      this.lot.patch(world, this.builtWorld);
       await this.buildSims(world);
       this.builtWorld = world;
       if (this.debug) console.info('[render] world patched, residents built again');

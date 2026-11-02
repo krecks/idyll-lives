@@ -2127,14 +2127,56 @@ pub fn items_json(world: &World) -> String {
 /// The world structure; without `lot`, leaves out the lot itself (rooms, walls, openings,
 /// diagonals, fences, floors) for a caller that has it at this `lotVersion` already.
 pub fn structure_json_with(world: &World, lot: bool) -> String {
-    let content = &world.content;
     let lifts = surface_lifts(world);
     let objects = world
         .objects
         .iter()
         .map(|o| object_view(world, &lifts, o))
         .collect();
-    let sims = world
+    let (walls, openings, fences) = if lot {
+        let (w, o, f) = wall_edges(&world.lot, world.lot.walls());
+        (Some(w), Some(o), Some(f))
+    } else {
+        (None, None, None)
+    };
+    let diagonals = lot.then(|| diagonals(&world.lot, world.lot.diagonal_walls()));
+    serde_json::to_string(&StructureView {
+        version: world.structure_version(),
+        lot_version: world.lot_version(),
+        mode: world.mode,
+        width: world.lot.width,
+        depth: world.lot.depth,
+        storeys: world.storeys,
+        storey_depth: world.storey_depth(),
+        basement: basement_block(world),
+        objects,
+        sims: sim_infos(world),
+        former: &world.former,
+        households: household_views(world),
+        plots: plot_views(world),
+        exits: &world.exits,
+        rooms: lot.then(|| world.lot.rooms_row_major()),
+        walls,
+        openings,
+        fences,
+        diagonals,
+        floors: lot.then(|| floor_views(world)),
+        meta: &world.meta,
+        staff: staff_views(world),
+        cars: car_views(world),
+        garages: &world.garages,
+    })
+    .expect("structure serializes")
+}
+
+/// `StructureView::basement`.
+fn basement_block(world: &World) -> Option<i32> {
+    (world.stair_map().basement > 0).then_some(world.stair_map().basement)
+}
+
+fn sim_infos(world: &World) -> Vec<SimInfo<'_>> {
+    let content = &world.content;
+    world
         .sims
         .iter()
         .map(|s| SimInfo {
@@ -2155,8 +2197,11 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                 .map(|st| st.id.as_str()),
             outfit: s.outfit,
         })
-        .collect();
-    let households = world
+        .collect()
+}
+
+fn household_views(world: &World) -> Vec<HouseholdView<'_>> {
+    world
         .households
         .iter()
         .map(|h| HouseholdView {
@@ -2165,8 +2210,11 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
             plot: h.plot,
             player: h.player,
         })
-        .collect();
-    let plots = world
+        .collect()
+}
+
+fn plot_views(world: &World) -> Vec<PlotView<'_>> {
+    world
         .plots
         .iter()
         .map(|p| PlotView {
@@ -2188,73 +2236,242 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                     })
                     .count() as u8,
         })
-        .collect();
-    let (walls, openings, fences) = if lot {
-        let (w, o, f) = wall_edges(&world.lot, world.lot.walls());
-        (Some(w), Some(o), Some(f))
-    } else {
-        (None, None, None)
-    };
-    let diagonals = lot.then(|| diagonals(&world.lot, world.lot.diagonal_walls()));
-    serde_json::to_string(&StructureView {
-        version: world.structure_version(),
-        lot_version: world.lot_version(),
-        mode: world.mode,
-        width: world.lot.width,
-        depth: world.lot.depth,
-        storeys: world.storeys,
-        storey_depth: world.storey_depth(),
-        basement: (world.stair_map().basement > 0).then_some(world.stair_map().basement),
-        objects,
-        sims,
-        former: &world.former,
-        households,
-        plots,
-        exits: &world.exits,
-        rooms: lot.then(|| world.lot.rooms_row_major()),
-        walls,
-        openings,
-        fences,
-        diagonals,
-        floors: lot.then(|| {
-            world
-                .lot
-                .floors()
-                .map(|(x, z, c)| [x, z, u16::from(c)])
-                .collect()
-        }),
-        meta: &world.meta,
-        staff: crate::staff::plan(world)
-            .servers
-            .iter()
-            .take(crate::staff::MAX_STAFF)
-            .map(|s| StaffView {
-                seed: s.seed,
-                posts: s
-                    .posts
-                    .iter()
-                    .map(|&o| world.objects[o as usize].stable)
-                    .collect(),
-            })
-            .collect(),
-        cars: (!world.cars.is_empty() || !world.drives.is_empty()).then(|| {
-            world
-                .cars
+        .collect()
+}
+
+fn floor_views(world: &World) -> Vec<[u16; 3]> {
+    world
+        .lot
+        .floors()
+        .map(|(x, z, c)| [x, z, u16::from(c)])
+        .collect()
+}
+
+fn staff_views(world: &World) -> Vec<StaffView> {
+    crate::staff::plan(world)
+        .servers
+        .iter()
+        .take(crate::staff::MAX_STAFF)
+        .map(|s| StaffView {
+            seed: s.seed,
+            posts: s
+                .posts
                 .iter()
-                .take(crate::cars::MAX_CARS)
-                .map(|c| CarView {
-                    plot: c.plot,
-                    x: c.spot[0],
-                    z: c.spot[1],
-                    yaw: c.yaw,
-                    body: c.body,
-                    paint: c.paint,
-                })
-                .collect()
-        }),
-        garages: &world.garages,
+                .map(|&o| world.objects[o as usize].stable)
+                .collect(),
+        })
+        .collect()
+}
+
+/// `StructureView::cars`.
+fn car_views(world: &World) -> Option<Vec<CarView>> {
+    (!world.cars.is_empty() || !world.drives.is_empty()).then(|| {
+        world
+            .cars
+            .iter()
+            .take(crate::cars::MAX_CARS)
+            .map(|c| CarView {
+                plot: c.plot,
+                x: c.spot[0],
+                z: c.spot[1],
+                yaw: c.yaw,
+                body: c.body,
+                paint: c.paint,
+            })
+            .collect()
     })
-    .expect("structure serializes")
+}
+
+/// The world structure as updates for a view that keeps what it was sent (the sim worker's
+/// `world` messages): the first update, and the one after `resync`, has everything; later ones
+/// only what changed since the last (`structure_json`'s parts by name, `unset` naming those now
+/// left out, and `objectChanges` the things that changed, by index, while the list of things
+/// stays the same). `meta`, which the simulation carries unchanged, comes only with everything.
+/// The rooms never come (`Lot::rooms_row_major` goes as a typed array); the other lot parts only
+/// when asked for (`lot`: the lot changed, see `lotVersion`).
+///
+/// A big world has some 16 000 things and a quarter of a megabyte of presentation data (`meta`),
+/// and its structure changes with every door opened or crop grown: sent whole, that was 2 MB to
+/// parse each time on the main thread.
+pub struct StructureSync {
+    /// Fingerprints of the parts as last sent, by name (left out: not sent, or unset since).
+    parts: HashMap<&'static str, u64>,
+    /// Each thing as last sent, in order: its stable id and fingerprint.
+    objects: Vec<(u32, u64)>,
+    /// The plots' part as last made, and a fingerprint of what it was made from: their houses'
+    /// bounds scan every plot's tiles, and only the lot (or the plots themselves) changes them.
+    plots: Option<(u64, String)>,
+    /// Nothing sent yet (or `resync`): the next update has everything.
+    fresh: bool,
+}
+
+impl Default for StructureSync {
+    fn default() -> Self {
+        StructureSync::new()
+    }
+}
+
+impl StructureSync {
+    pub fn new() -> Self {
+        StructureSync {
+            parts: HashMap::new(),
+            objects: Vec::new(),
+            plots: None,
+            fresh: true,
+        }
+    }
+
+    /// The next update has everything (the view starts over).
+    pub fn resync(&mut self) {
+        *self = StructureSync::new();
+    }
+
+    /// The next update (JSON): what changed since the last; with `lot`, the lot's walls, openings,
+    /// diagonals, fences and floors too.
+    pub fn update_json(&mut self, world: &World, lot: bool) -> String {
+        use std::fmt::Write;
+        fn json<T: Serialize + ?Sized>(v: &T) -> String {
+            serde_json::to_string(v).expect("structure part serializes")
+        }
+        fn print(s: &str) -> u64 {
+            let mut h = DefaultHasher::new();
+            h.write(s.as_bytes());
+            h.finish()
+        }
+        let fresh = std::mem::take(&mut self.fresh);
+        let mut out = String::with_capacity(1024);
+        let _ = write!(
+            out,
+            "{{\"version\":{},\"lotVersion\":{}",
+            world.structure_version(),
+            world.lot_version()
+        );
+        let skip_empty = |v: String, empty: bool| (!empty).then_some(v);
+        let parts: [(&'static str, Option<String>); 15] = [
+            ("mode", Some(json(&world.mode))),
+            ("width", Some(json(&world.lot.width))),
+            ("depth", Some(json(&world.lot.depth))),
+            ("storeys", Some(json(&world.storeys))),
+            ("storeyDepth", Some(json(&world.storey_depth()))),
+            ("basement", basement_block(world).map(|b| json(&b))),
+            ("sims", Some(json(&sim_infos(world)))),
+            (
+                "former",
+                skip_empty(json(&world.former), world.former.is_empty()),
+            ),
+            ("households", Some(json(&household_views(world)))),
+            ("plots", Some(self.plots_json(world))),
+            ("exits", Some(json(&world.exits))),
+            // (Presentation data the simulation carries unchanged: sent the first time only.)
+            ("meta", fresh.then(|| json(&world.meta))),
+            ("staff", {
+                let staff = staff_views(world);
+                skip_empty(json(&staff), staff.is_empty())
+            }),
+            ("cars", car_views(world).map(|c| json(&c))),
+            (
+                "garages",
+                skip_empty(json(&world.garages), world.garages.is_empty()),
+            ),
+        ];
+        let mut unset = Vec::new();
+        for (key, part) in parts {
+            match part {
+                None if key == "meta" => {}
+                Some(v) => {
+                    let p = print(&v);
+                    if self.parts.insert(key, p) != Some(p) || fresh {
+                        let _ = write!(out, ",\"{key}\":{v}");
+                    }
+                }
+                None => {
+                    if self.parts.remove(key).is_some() {
+                        unset.push(key);
+                    }
+                }
+            }
+        }
+        // The things: those that changed, by index, while the list is the same things in the same
+        // order (a door opened, a crop grown); else the whole list (one bought, sold or moved in).
+        let lifts = surface_lifts(world);
+        let things: Vec<String> = world
+            .objects
+            .iter()
+            .map(|o| json(&object_view(world, &lifts, o)))
+            .collect();
+        let same = !fresh
+            && self.objects.len() == things.len()
+            && self
+                .objects
+                .iter()
+                .zip(&world.objects)
+                .all(|(s, o)| s.0 == o.stable);
+        if same {
+            let mut first = true;
+            for (i, (sent, v)) in self.objects.iter_mut().zip(&things).enumerate() {
+                let p = print(v);
+                if sent.1 == p {
+                    continue;
+                }
+                sent.1 = p;
+                out.push_str(if first { ",\"objectChanges\":[" } else { "," });
+                first = false;
+                let _ = write!(out, "[{i},{v}]");
+            }
+            if !first {
+                out.push(']');
+            }
+        } else {
+            out.push_str(",\"objects\":[");
+            out.push_str(&things.join(","));
+            out.push(']');
+            self.objects = world
+                .objects
+                .iter()
+                .zip(&things)
+                .map(|(o, v)| (o.stable, print(v)))
+                .collect();
+        }
+        if lot {
+            let (walls, openings, fences) = wall_edges(&world.lot, world.lot.walls());
+            let diagonals = diagonals(&world.lot, world.lot.diagonal_walls());
+            let _ = write!(
+                out,
+                ",\"walls\":{},\"openings\":{},\"fences\":{},\"diagonals\":{},\"floors\":{}",
+                json(&walls),
+                json(&openings),
+                json(&fences),
+                json(&diagonals),
+                json(&floor_views(world))
+            );
+        }
+        if !unset.is_empty() {
+            let _ = write!(out, ",\"unset\":{}", json(&unset));
+        }
+        out.push('}');
+        out
+    }
+
+    /// The plots (JSON), made again only when the lot or a plot changed.
+    fn plots_json(&mut self, world: &World) -> String {
+        use std::hash::Hash;
+        let mut h = DefaultHasher::new();
+        (world.lot_version(), world.storeys, world.storey_depth()).hash(&mut h);
+        for p in &world.plots {
+            (p.id, &p.name, p.x, p.z, p.w, p.d, p.public).hash(&mut h);
+            p.entry.map(|e| e.map(f32::to_bits)).hash(&mut h);
+            p.roof.map(|r| [r.style, r.color]).hash(&mut h);
+        }
+        let key = h.finish();
+        match &self.plots {
+            Some((k, v)) if *k == key => v.clone(),
+            _ => {
+                let v = serde_json::to_string(&plot_views(world)).expect("plots serialize");
+                self.plots = Some((key, v.clone()));
+                v
+            }
+        }
+    }
 }
 
 #[derive(Serialize)]

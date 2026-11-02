@@ -3,11 +3,30 @@
  * into interpolatable frames for the renderer. Allocation-free per frame.
  */
 
-import type { Catalog, Command, FromWorker, GameSource, ItemPlacement, SaveProblem, SimThreadStats, SocialEvent, SocialOption, ToWorker, UiUpdate, WorldStructure, LotPart } from './protocol';
+import type { Catalog, Command, FromWorker, GameSource, ItemPlacement, SaveProblem, SimThreadStats, SocialEvent, SocialOption, ToWorker, UiUpdate, WorldStructure } from './protocol';
 import { SharedSnapshotReader, type SnapshotLayout } from './snapshot';
 
-/** What a lean world leaves out (`LotPart`): the lot itself, kept from the last full one. */
-const LOT_PARTS: readonly LotPart[] = ['rooms', 'walls', 'openings', 'diagonals', 'fences', 'floors', 'meshes'];
+type WorldMessage = Extract<FromWorker, { type: 'world' }>;
+
+/**
+ * The world after a `world` message (`WorldUpdate`): `current` with what changed. Whatever didn't
+ * change is the same object as before (the lot's arrays, `meta`, the residents, each unchanged
+ * thing), so consumers can tell by reference what did. `shown` (the world listeners last got) is
+ * never changed in place; `current`, if it isn't that, is changed in place (nobody has seen it).
+ */
+export function mergeWorld(current: WorldStructure | null, shown: WorldStructure | null, msg: Pick<WorldMessage, 'world' | 'rooms' | 'meshes'>): WorldStructure {
+  const { objectChanges, unset, ...parts } = msg.world;
+  const world = (!current ? parts : current === shown ? { ...current, ...parts } : Object.assign(current, parts)) as WorldStructure;
+  if (objectChanges?.length) {
+    // (Copied once: the shown world keeps its list.)
+    if (world.objects === shown?.objects) world.objects = world.objects.slice();
+    for (const [i, o] of objectChanges) world.objects[i] = o;
+  }
+  for (const key of unset ?? []) delete world[key];
+  if (msg.rooms) world.rooms = msg.rooms;
+  if (msg.meshes) world.meshes = msg.meshes;
+  return world;
+}
 
 /** The simulation refused a save (`problem` says why; the message is the simulation's own). */
 export class SaveRefused extends Error {
@@ -46,6 +65,12 @@ const REQUEST_LIMIT_MS = 15_000;
  * the worker reports each phase, and the download as it arrives, so only a stuck one runs out.
  */
 const START_STALL_MS = 30_000;
+/**
+ * The world, food and lamps reach their listeners once a frame (`sync`): messages that queued up
+ * behind a long frame are applied together. Without frames (a hidden tab, the game prepared behind
+ * the menu) they still come, this much later.
+ */
+const DELIVER_LATE_MS = 100;
 /** The worker sends something every 100 ms (UI updates); this long without a word, it has hung. */
 const SILENCE_LIMIT_MS = 8000;
 const WATCHDOG_MS = 1000;
@@ -79,7 +104,17 @@ export class SimBridge {
   private pendingStep = 0;
   private readonly frameState: FrameState;
 
+  /** The world as the worker's messages built it up, and as its listeners last got it (`mergeWorld`). */
   private world: WorldStructure | null = null;
+  private shownWorld: WorldStructure | null = null;
+  /** The view (`setView`'s `seq`) `world` was built for, and the latest view asked for: a world for an older one waits for the newer. */
+  private worldView = 0;
+  private viewSeq = 0;
+  /** What the listeners haven't had yet, and the timer that hands it over without frames. */
+  private worldDue = false;
+  private itemsDue = false;
+  private lampsDue = false;
+  private deliverTimer: ReturnType<typeof setTimeout> | null = null;
   /** A UI update arrived (late subscribers then ask for everything again). */
   private uiSeen = false;
   /** The worker's latest report on how it keeps up (null until the first, after a second). */
@@ -132,7 +167,8 @@ export class SimBridge {
     this.watchdog = setInterval(this.watch, WATCHDOG_MS);
   }
 
-  static start(content: string, source: GameSource): Promise<SimBridge> {
+  /** `speed`: the clock's speed from the first step (0: it starts paused). */
+  static start(content: string, source: GameSource, speed?: number): Promise<SimBridge> {
     const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
     return new Promise((resolve, reject) => {
       // A start that failed doesn't leave its worker (and the simulation's memory) behind.
@@ -156,7 +192,7 @@ export class SimBridge {
         } else if (msg.type === 'error') failed(msg.problem ? new SaveRefused(msg.problem, msg.message) : new Error(msg.message));
       };
       arm();
-      worker.postMessage({ type: 'init', content, source } satisfies ToWorker);
+      worker.postMessage({ type: 'init', content, source, speed } satisfies ToWorker);
     });
   }
 
@@ -189,7 +225,8 @@ export class SimBridge {
 
   /** Limits wall/floor geometry to a tile rectangle (the lot being viewed); null = all. */
   setView(region: [number, number, number, number] | null): void {
-    this.worker.postMessage({ type: 'view', region } satisfies ToWorker);
+    // (Worlds still on their way, built for the last view, wait for this one's.)
+    this.worker.postMessage({ type: 'view', region, seq: ++this.viewSeq } satisfies ToWorker);
   }
 
   /** The tile rectangle the camera streams in: the sim's full-detail area (until sent: the view's; null = the view's again). */
@@ -272,6 +309,7 @@ export class SimBridge {
   private end(message: string): void {
     this.gone = message;
     clearInterval(this.watchdog);
+    if (this.deliverTimer !== null) clearTimeout(this.deliverTimer);
     this.worker.terminate();
     for (const id of [...this.requests.keys()]) this.reject(id, new Error(message));
   }
@@ -279,7 +317,7 @@ export class SimBridge {
   /** Latest world structure is replayed to late subscribers. */
   onWorld(fn: Listener<WorldStructure>): void {
     this.worldListeners.push(fn);
-    if (this.world) fn(this.world);
+    if (this.shownWorld) fn(this.shownWorld);
   }
 
   /** Food and dishes whenever they change; the latest are replayed to late subscribers. */
@@ -334,8 +372,9 @@ export class SimBridge {
     return this.hasData;
   }
 
-  /** Pulls the newest snapshot. Call once per rendered frame, before `frame()`. */
+  /** Pulls the newest snapshot (and hands over a changed world). Call once per rendered frame, before `frame()`. */
   sync(now: number): void {
+    this.deliver();
     const fresh = this.reader ? this.reader.read(this.scratch) : this.pending;
     if (!fresh) return;
     this.pending = false;
@@ -401,6 +440,31 @@ export class SimBridge {
     if (this.gone === null) this.end('The game has ended.');
   }
 
+  private deliverSoon(): void {
+    this.deliverTimer ??= setTimeout(this.deliver, DELIVER_LATE_MS);
+  }
+
+  /** Hands the latest lamps, food and world to their listeners (the lamps first: the world is built with them). */
+  private readonly deliver = (): void => {
+    if (this.deliverTimer !== null) clearTimeout(this.deliverTimer);
+    this.deliverTimer = null;
+    if (this.gone !== null) return;
+    if (this.lampsDue && this.lampsOff) {
+      this.lampsDue = false;
+      notify(this.lampListeners, this.lampsOff);
+    }
+    if (this.itemsDue && this.items) {
+      this.itemsDue = false;
+      notify(this.itemListeners, this.items);
+    }
+    // (A world built for a view before the latest waits: the latest view's comes next.)
+    if (this.worldDue && this.world && this.worldView === this.viewSeq) {
+      this.worldDue = false;
+      this.shownWorld = this.world;
+      notify(this.worldListeners, this.world);
+    }
+  };
+
   private handle(msg: FromWorker): void {
     switch (msg.type) {
       case 'snapshot':
@@ -408,27 +472,22 @@ export class SimBridge {
         this.pendingStep = msg.step;
         this.pending = true;
         break;
-      case 'world': {
-        // A lean world leaves out the lot: keep the one we have (same arrays, so consumers
-        // can tell by reference that walls, floors and meshes didn't change). Nothing else of the
-        // last world is kept: a list left out of the new one is empty now (the last garage sold).
-        const prev = this.world;
-        const lot = prev ? Object.fromEntries(LOT_PARTS.filter((k) => k in prev).map((k) => [k, prev[k]])) : {};
-        const world: WorldStructure = msg.full || !prev ? (msg.world as WorldStructure) : ({ ...lot, ...msg.world } as WorldStructure);
-        this.world = world;
-        for (const fn of this.worldListeners) fn(world);
+      case 'world':
+        this.world = mergeWorld(this.world, this.shownWorld, msg);
+        this.worldView = msg.view;
+        this.worldDue = true;
+        this.deliverSoon();
         break;
-      }
       case 'items':
         this.items = msg.items;
-        for (const fn of this.itemListeners) fn(msg.items);
+        this.itemsDue = true;
+        this.deliverSoon();
         break;
-      case 'lamps': {
-        const off = new Set(msg.off);
-        this.lampsOff = off;
-        for (const fn of this.lampListeners) fn(off);
+      case 'lamps':
+        this.lampsOff = new Set(msg.off);
+        this.lampsDue = true;
+        this.deliverSoon();
         break;
-      }
       case 'ui':
         this.uiSeen = true;
         for (const fn of this.uiListeners) fn(msg.ui);
@@ -458,6 +517,17 @@ export class SimBridge {
       case 'starting':
       case 'ready':
         break;
+    }
+  }
+}
+
+/** Calls each listener; one that throws is reported (as an uncaught error) and doesn't stop the rest or the frame. */
+function notify<T>(listeners: readonly Listener<T>[], value: T): void {
+  for (const fn of listeners) {
+    try {
+      fn(value);
+    } catch (err) {
+      reportError(err);
     }
   }
 }

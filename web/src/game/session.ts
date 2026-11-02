@@ -8,7 +8,7 @@ import { AssetRegistry } from '../assets/registry';
 import { prefetch, prefetchNow, planStream, reprioritize, whenStreamSettled } from '../assets/stream';
 import { Content } from '../content/content';
 import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
-import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
+import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SimInfo, SocialEvent, WorldStructure } from '../core/protocol';
 import { groundDepth, lowestStorey } from '../core/protocol';
 import { townMap } from '../ui/townMap.svelte';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
@@ -202,7 +202,8 @@ export async function startSession(
   }
 
   progress('Starting the simulation', 0.15);
-  const bridge = await perfTimeAsync('session: SimBridge.start', () => SimBridge.start(content.json, source)).catch(async (err: unknown) => {
+  // (Paused from the first step: the clock is held until the player enters the game.)
+  const bridge = await perfTimeAsync('session: SimBridge.start', () => SimBridge.start(content.json, source, 0)).catch(async (err: unknown) => {
     // A save the game can't open is set aside (kept if it's from a newer version, else removed).
     if (err instanceof SaveRefused && saved) throw new UnloadableSave(saved.id, err.problem, await refuseSave(saved, err.problem));
     throw err;
@@ -1031,30 +1032,60 @@ export async function startSession(
   bridge.onLamps((off) => {
     if (!disposed) renderer.setLampsOff(off);
   });
-  bridge.onWorld((w) => {
-    if (disposed) return;
-    // Newcomers and babies the simulation made up carry an appearance seed: give them their
-    // look (babies from their parents', so parents first). Residents with none at all (a game
-    // state the simulation's tests wrote) get one from their id and name.
+  /**
+   * Each resident's look as last made, by id: what it was made from (`key`), the look from their
+   * seed (`base`, what their babies' come from) and at their life stage (`look`). The same look
+   * stays the same object, so the renderer sees by reference that nobody looks different.
+   */
+  const looks = new Map<number, { key: string; base: Appearance; look: Appearance }>();
+  /**
+   * Newcomers and babies the simulation made up carry an appearance seed: give them their look
+   * (babies from their parents', so parents first). Residents with none at all (a game state the
+   * simulation's tests wrote) get one from their id and name. Then their life stage: body and head
+   * size, and age greys the hair (as the menus show them). A resident whose look is made from
+   * what it was last time gets the same look (`looks`).
+   */
+  const giveLooks = (w: WorldStructure) => {
     type Seeded = { seed?: number; parents?: number[]; voice?: Appearance['voice'] } | null;
     const nameSeed = (id: number, name: string) => [...name].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 0x01000193) >>> 0, 0x811c9dc5 ^ id);
+    const raw = new Map(w.sims.map((s) => [s.id, `${s.gender}|${s.stage ?? ''}|${s.name}|${JSON.stringify(s.appearance ?? null)}`]));
+    const bases = new Map<number, Appearance>();
+    const todo = new Map<SimInfo, string>();
+    for (const s of w.sims) {
+      const key = [raw.get(s.id), ...((s.appearance as Seeded)?.parents ?? []).map((p) => raw.get(p))].join('\n');
+      const made = looks.get(s.id);
+      if (made?.key !== key) todo.set(s, key);
+      else {
+        bases.set(s.id, made.base);
+        s.appearance = made.look;
+      }
+    }
+    if (!todo.size) return;
     for (const pass of [false, true]) {
-      for (const s of w.sims) {
+      for (const s of todo.keys()) {
         const { seed, parents, voice } = (s.appearance as Seeded) ?? { seed: nameSeed(s.id, s.name) };
         if (typeof seed !== 'number' || Boolean(parents?.length) !== pass) continue;
-        const looks = (parents ?? []).map((p) => w.sims[p]?.appearance).filter((a) => a && (a as Seeded)?.seed === undefined);
-        s.appearance = lookFromSeed(assets, s.gender, seed, looks);
+        const from = (parents ?? []).map((p) => bases.get(p) ?? w.sims[p]?.appearance).filter((a) => a && (a as Seeded)?.seed === undefined);
+        s.appearance = lookFromSeed(assets, s.gender, seed, from);
         // Only the look comes from the seed: a voice stored with it is kept.
         if (voice) s.appearance.voice = voice;
       }
     }
-    for (const s of w.sims) {
-      // Life stage: body and head size, and age greys the hair (as the menus show them).
+    for (const [s, key] of todo) {
       const stage = content.lifeStages.find((st) => st.id === s.stage);
+      const base = s.appearance;
       if (s.appearance) s.appearance = lookAtStage(s.appearance, stage, palette(assets, 'palette.hair'));
+      looks.set(s.id, { key, base, look: s.appearance });
     }
+  };
+  bridge.onWorld((w) => {
+    if (disposed) return;
+    // (The worker sends the residents only when something about them changed: else they are the
+    // last world's, looks given.)
+    const simsChanged = w.sims !== world?.sims;
+    if (simsChanged) giveLooks(w);
     // The town's vendors and shopkeepers, drawn after the residents (`game/staff.ts`).
-    w.staffSims = staffResidents(content, assets, w);
+    w.staffSims = !simsChanged && w.staff === world?.staff && world?.staffSims ? world.staffSims : staffResidents(content, assets, w);
     // Build mode: show what the simulation just accepted (furniture popping in, dust, money).
     const feedback = game.mode === 'build' && world && worldView === viewPlot ? editFeedback(world, w) : null;
     if (feedback?.sound) play(feedback.sound);
@@ -1084,17 +1115,21 @@ export async function startSession(
     if (game.placing?.objectId != null) buildBuy.rehover();
     if (game.buySelection !== null && !w.objects.some((o) => o.id === game.buySelection)) game.buySelection = null;
     buildBuy.objectsChanged();
-    game.roster = w.sims.filter((s) => !s.gone);
-    game.everyone = w.sims;
+    if (simsChanged) {
+      game.roster = w.sims.filter((s) => !s.gone);
+      game.everyone = w.sims;
+    }
     game.former = w.former ?? [];
     game.households = w.households;
     game.plots = w.plots;
     // Portraits for the HUD, the household first (drawn once, cached by look); the game is
     // ready once the household's are.
-    const mineFirst = [...game.roster].sort((a, b) => Number(!!w.households[b.household]?.player) - Number(!!w.households[a.household]?.player));
-    const looks = mineFirst.map((s) => ({ gender: s.gender, appearance: s.appearance, id: s.id }));
-    portraits ??= Promise.all(looks.filter((_, i) => w.households[mineFirst[i].household]?.player).map((look) => services.previews.portrait(look)));
-    services.previews.prefetch(looks);
+    if (simsChanged || !portraits) {
+      const mineFirst = [...game.roster].sort((a, b) => Number(!!w.households[b.household]?.player) - Number(!!w.households[a.household]?.player));
+      const shown = mineFirst.map((s) => ({ gender: s.gender, appearance: s.appearance, id: s.id }));
+      portraits ??= Promise.all(shown.filter((_, i) => w.households[mineFirst[i].household]?.player).map((look) => services.previews.portrait(look)));
+      services.previews.prefetch(shown);
+    }
     if (!focused) {
       focused = true;
       const first = playerSims()[0];
