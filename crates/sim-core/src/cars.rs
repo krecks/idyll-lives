@@ -1667,13 +1667,10 @@ fn drive_on(w: &mut World, c: usize) {
         // Someone walking along beside it (on the walkers' side of the road, `travel::walk_side`)
         // isn't in its way: a car on the road would follow them at a walk. Only someone in front
         // of it, or standing close by.
-        // (Walking the way it goes or against it: not across its path, as on the sidewalk
-        // behind a car backing out of a driveway.)
         let beside = || {
             let (sn, cs) = yaw.sin_cos();
             let (dx, dz) = (s.pos[0] - at[0], s.pos[1] - at[1]);
             (dx * cs - dz * sn).abs() >= car.wid / 2.0
-                && (s.yaw - yaw).cos().abs() > 0.7
                 && s.current()
                     .is_some_and(|a| matches!(a.phase, Phase::Routing { .. }))
         };
