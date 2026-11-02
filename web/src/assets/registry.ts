@@ -10,7 +10,7 @@
 
 import { withBuild, withoutBuild } from './build';
 import { bundled } from './bundle';
-import type { AssetEntry, AssetType, EntryOf, IconEntry, Manifest } from './types';
+import type { AssetEntry, AssetType, EntryOf, IconEntry, Manifest, MaterialEntry } from './types';
 
 const URL_FIELDS = ['url', 'far', 'texture'] as const;
 
@@ -99,6 +99,16 @@ async function readJson<T>(url: URL, check: (res: Response) => void): Promise<T>
   const res = await fetch(withBuild(url.href));
   check(res);
   return (await res.json()) as T;
+}
+
+/**
+ * A material's texture files: its albedo (`texture`) and the normal and ARM maps beside it, made
+ * absolute (the manifest gives those relative to the albedo); null without a texture.
+ */
+export function materialTextures(entry: Pick<MaterialEntry, 'texture' | 'normal' | 'arm'>): { texture: string; normal?: string; arm?: string } | null {
+  const { texture, normal, arm } = entry;
+  if (!texture) return null;
+  return { texture, normal: normal && new URL(normal, texture).href, arm: arm && new URL(arm, texture).href };
 }
 
 /** The file to fetch for an asset URL: its compressed copy when the build made one. */

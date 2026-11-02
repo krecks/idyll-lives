@@ -27,6 +27,7 @@ import type { Renderer } from '../render/types';
 import { settings } from '../settings/settings.svelte';
 import { deviceTest, llmWrites, LlmWriter, loadTalk, WRITE_MS } from '../talk';
 import { game, toast } from '../ui/state.svelte';
+import { BusyShare } from './busyShare';
 import { fill, loadLines, Lines, speechPieces, type Line } from './lines';
 import { playClip, updateVoiceVolume, type Playing } from './player';
 import { SAMPLE_RATE } from './protocol';
@@ -155,10 +156,10 @@ export class VoiceDirector {
   private steppingDown = false;
   private lateRun = 0;
   private lastFrame = 0;
-  /** Frames drawn while speech was being made, and those over `SLOW_FRAME_MS`; the same while not. */
-  private readonly frames = { busy: 0, busySlow: 0, idle: 0, idleSlow: 0 };
-  /** The same for the simulation's reports (a second each): while speech was being made and not, and those behind. */
-  private readonly simSeconds = { busy: 0, busyBehind: 0, idle: 0, idleBehind: 0 };
+  /** Frames drawn while speech was being made and while not, and those over `SLOW_FRAME_MS`. */
+  private readonly frames = new BusyShare(FRAME_WINDOW, SLOW_SHARE);
+  /** The same for the simulation's reports (a second each), and those behind. */
+  private readonly simSeconds = new BusyShare(SIM_WINDOW, SIM_SHARE);
   private lastSim: SimThreadStats | null = null;
   private lastTick = 0;
   private counter = 0;
@@ -321,26 +322,8 @@ export class VoiceDirector {
     // Gaps from a hidden tab or a paused game say nothing about voices, nor do the game's own
     // slow frames while it holds speech off (and just after).
     if (dt <= 0 || dt > 1000 || document.hidden || this.paused || heldSince(now - HELD_GRACE_MS)) return;
-    const f = this.frames;
-    const slow = dt > SLOW_FRAME_MS ? 1 : 0;
-    if ((this.inFlight > 0 && voiceStatus.state === 'ready') || this.writing.size > 0) {
-      f.busy++;
-      f.busySlow += slow;
-    } else {
-      f.idle++;
-      f.idleSlow += slow;
-    }
-    if (f.busy < FRAME_WINDOW) return;
-    const busyShare = f.busySlow / f.busy;
-    const idleShare = f.idle ? f.idleSlow / f.idle : 0;
-    // Only when speech makes it worse: a game that is slow anyway isn't the voices' fault.
-    if (busyShare > SLOW_SHARE && busyShare > idleShare * 2) this.pause('frames');
-    this.resetFrames();
-  }
-
-  private resetFrames(): void {
-    Object.assign(this.frames, { busy: 0, busySlow: 0, idle: 0, idleSlow: 0 });
-    Object.assign(this.simSeconds, { busy: 0, busyBehind: 0, idle: 0, idleBehind: 0 });
+    const making = (this.inFlight > 0 && voiceStatus.state === 'ready') || this.writing.size > 0;
+    if (this.frames.add(making, dt > SLOW_FRAME_MS)) this.pause('frames');
   }
 
   /**
@@ -353,21 +336,8 @@ export class VoiceDirector {
     if (!s || s === this.lastSim) return;
     this.lastSim = s;
     if (document.hidden || this.paused || heldSince(performance.now() - 1000 - HELD_GRACE_MS) || s.targetPerSecond <= 0) return;
-    const behind = s.stepsPerSecond < s.targetPerSecond * SIM_BEHIND ? 1 : 0;
     const making = voiceThreadStats().busy + llmStats().busy > MAKING_SHARE;
-    const c = this.simSeconds;
-    if (making) {
-      c.busy++;
-      c.busyBehind += behind;
-    } else {
-      c.idle++;
-      c.idleBehind += behind;
-    }
-    if (c.busy < SIM_WINDOW) return;
-    const busyShare = c.busyBehind / c.busy;
-    const idleShare = c.idle ? c.idleBehind / c.idle : 0;
-    if (busyShare > SIM_SHARE && busyShare > idleShare * 2) this.pause('sim');
-    Object.assign(c, { busy: 0, busyBehind: 0, idle: 0, idleBehind: 0 });
+    if (this.simSeconds.add(making, s.stepsPerSecond < s.targetPerSecond * SIM_BEHIND)) this.pause('sim');
   }
 
   /**
@@ -391,7 +361,8 @@ export class VoiceDirector {
           }
           // Give the processor a clean window to prove itself.
           this.lateRun = 0;
-          this.resetFrames();
+          this.frames.reset();
+          this.simSeconds.reset();
           toast(
             "Resident voices are switching to this computer's processor: the graphics card was too slow.",
             6000,

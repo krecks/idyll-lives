@@ -26,7 +26,7 @@ import { Instances } from './instancing';
 import type { HouseBuilder, HouseMesh } from './house';
 import { MaterialLibrary, GAME_FRONT_FACE } from './materials';
 import { drawMesh, meshFrom, type DrawOptions } from './meshes';
-import { buildModel, withGlows, type ModelMesh, type ModelTemplate } from './models';
+import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from './models';
 import { splitsByGroup, windStill } from './nature';
 import { TemplateCache } from './templateCache';
 import type { AssetRegistry } from '../../assets/registry';
@@ -479,7 +479,7 @@ export class Street {
     this.destroyed = true;
     for (const p of this.placed.values()) this.drop(p);
     this.placed.clear();
-    for (const [, t] of this.templates) void t.then((template) => this.disposeTemplate(template)).catch(() => {});
+    for (const [, t] of this.templates) void t.then((template) => disposeTemplate(template)).catch(() => {});
     this.templates.clear();
     this.root.destroy();
     this.glowMat.destroy();
@@ -758,10 +758,6 @@ export class Street {
       g.draw.destroy();
       g.material.destroy();
     }
-  }
-
-  private disposeTemplate(t: ModelTemplate): void {
-    for (const m of withGlows(t)) m.mesh.destroy();
   }
 
   /** Disposes the templates set aside (or those under `keys`), with the street's draws of them. */

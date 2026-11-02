@@ -18,12 +18,13 @@
 
 import * as pc from '../pc/engine';
 import { withoutBuild } from '../../assets/build';
-import { contentHash, type AssetRegistry } from '../../assets/registry';
+import { contentHash, materialTextures, type AssetRegistry } from '../../assets/registry';
 import { openCache } from '../../ml/assets';
 import { colorsKey, type PartColors } from '../../core/protocol';
 import { buildModel } from '../pc/models';
 import { shadingFromSettings } from '../pc/shaders/softLook';
 import { toEngine } from '../pc/space';
+import { idleMoment } from '../shared/idle';
 import { painted } from '../shared/modelEntry';
 import type { ItemPreviews, ItemStage } from '../types';
 import { boxCorners, contactShadow, PICTURE_STAND_IN, placeModel, shadersCompiling, studioScene, texturesReady, type StudioScene } from './itemScene';
@@ -247,7 +248,7 @@ class ItemThumbnails implements ItemPreviews {
         // (the rest wait in the queue for `holdAhead(false)`, and the app is released meanwhile).
         if (!this.queue.some((j) => j.priority === 'now')) {
           if (this.held) break;
-          await idle();
+          await idleMoment(400);
           // (Held while it waited, and nothing wanted on screen since.)
           if (this.held && !this.queue.some((j) => j.priority === 'now')) break;
         }
@@ -312,7 +313,8 @@ class ItemThumbnails implements ItemPreviews {
       const entry = this.assets.get(key, 'material');
       if (!entry) continue;
       parts.push(key, withoutBuild(JSON.stringify(entry)));
-      for (const url of [entry.texture, entry.texture && entry.normal && new URL(entry.normal, entry.texture).href, entry.texture && entry.arm && new URL(entry.arm, entry.texture).href]) {
+      const textures = materialTextures(entry);
+      for (const url of textures ? [textures.texture, textures.normal, textures.arm] : []) {
         if (!url) continue;
         const h = contentHash(url);
         if (h === null) known = false;
@@ -367,14 +369,6 @@ class ItemThumbnails implements ItemPreviews {
       studio.dispose();
     }, RELEASE_AFTER);
   }
-}
-
-/** Resolves when the browser has a quiet moment (or after a short while regardless). */
-function idle(): Promise<void> {
-  return new Promise((resolve) => {
-    if ('requestIdleCallback' in window) requestIdleCallback(() => resolve(), { timeout: 400 });
-    else setTimeout(resolve, 30);
-  });
 }
 
 /** FNV-1a, as hex. */

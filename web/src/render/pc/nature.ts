@@ -145,10 +145,17 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return { draws: [...draws, ...plants.draws, ...grass.draws.map((d) => d.entity)], casters: plants.casters, only: plants.only };
   }
 
-  /** The terrain's heights and colours: made in the worker while it runs (the same numbers), else here. */
-  protected override async shadeTerrain(positions: Float32Array | number[], colors: Float32Array, pace?: () => Promise<void>): Promise<void> {
-    if (positions instanceof Float32Array && (await this.offThread?.shade(positions, colors))) return;
-    return super.shadeTerrain(positions, colors, pace);
+  /**
+   * The terrain's heights and colours for the grid `grid` lays out (x and z; y is set): made in the
+   * worker while it runs (the same numbers; the grid goes over to it and comes back), else here.
+   */
+  private async shaded(grid: () => Float32Array, pace?: () => Promise<void>): Promise<{ positions: Float32Array; colors: Float32Array }> {
+    const made = await this.offThread?.shade(grid());
+    if (made) return made;
+    const positions = grid();
+    const colors = new Float32Array((positions.length / 3) * 4);
+    await this.shadeTerrain(positions, colors, pace);
+    return { positions, colors };
   }
 
   /**
@@ -255,25 +262,32 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     const S = TILE_LODS[0];
     const c = TILE / S;
     const n = S + 3; // (a ring of one past the tile for the normals)
-    for (let j = 0; j < count; j++) {
-      for (let i = 0; i < count; i++) {
-        const tx = x0 + i * TILE;
-        const tz = z0 + j * TILE;
-        // Grid point (col, row) of the finest level, col and row from -1 to S + 1; row 0 at the tile's far (max z) edge.
-        const positions = new Float32Array(n * n * 3);
-        for (let row = -1, v = 0; row <= S + 1; row++) for (let col = -1; col <= S + 1; col++, v++) [positions[v * 3], positions[v * 3 + 2]] = [tx + col * c, tz + (S - row) * c];
-        const colors = new Float32Array(n * n * 4);
-        await this.shadeTerrain(positions, colors, pace);
-        const at = (col: number, row: number) => (row + 1) * n + col + 1;
-        const meshes = TILE_LODS.map((segs) => tileMesh(app, positions, colors, at, segs, S / segs, c, x0, z0, size));
-        const mi = new pc.MeshInstance(meshes[1], material);
-        const entity = new pc.Entity(`terrain${i},${j}`, app);
-        entity.addComponent('render', { meshInstances: [mi], castShadows: false, receiveShadows: true });
-        entity.enabled = false;
-        parent.addChild(entity);
-        out.push(entity);
-        this.tiles.push({ mi, meshes, x: tx + TILE / 2, z: tz + TILE / 2, lod: 1 });
-      }
+    // Tile k (i across, j down) and its finest level's grid point (col, row), col and row from -1 to
+    // S + 1; row 0 at the tile's far (max z) edge.
+    const corner = (k: number) => [k % count, Math.floor(k / count), x0 + (k % count) * TILE, z0 + Math.floor(k / count) * TILE];
+    const grid = (k: number) => () => {
+      const [, , tx, tz] = corner(k);
+      const positions = new Float32Array(n * n * 3);
+      for (let row = -1, v = 0; row <= S + 1; row++) for (let col = -1; col <= S + 1; col++, v++) [positions[v * 3], positions[v * 3 + 2]] = [tx + col * c, tz + (S - row) * c];
+      return positions;
+    };
+    const at = (col: number, row: number) => (row + 1) * n + col + 1;
+    // The worker shades a few tiles ahead while one's meshes are made here (its round trips overlap);
+    // on the page, one at a time.
+    const ahead = this.offThread ? SHADE_AHEAD : 0;
+    const shading: Promise<{ positions: Float32Array; colors: Float32Array }>[] = [];
+    for (let k = 0; k < count * count; k++) {
+      while (shading.length <= ahead && k + shading.length < count * count) shading.push(this.shaded(grid(k + shading.length), pace));
+      const { positions, colors } = await shading.shift()!;
+      const [i, j, tx, tz] = corner(k);
+      const meshes = TILE_LODS.map((segs) => tileMesh(app, positions, colors, at, segs, S / segs, c, x0, z0, size));
+      const mi = new pc.MeshInstance(meshes[1], material);
+      const entity = new pc.Entity(`terrain${i},${j}`, app);
+      entity.addComponent('render', { meshInstances: [mi], castShadows: false, receiveShadows: true });
+      entity.enabled = false;
+      parent.addChild(entity);
+      out.push(entity);
+      this.tiles.push({ mi, meshes, x: tx + TILE / 2, z: tz + TILE / 2, lod: 1 });
     }
     return out;
   }
@@ -316,17 +330,24 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private async terrain(app: pc.AppBase, parent: pc.Entity, pace?: () => Promise<void>): Promise<pc.Entity> {
     const { size, segments } = this.terrainGrid();
     const n = segments + 1;
-    const positions = new Float32Array(n * n * 3);
-    const uvs = new Float32Array(n * n * 2);
     // (Rows from the far edge, moved to the town's middle.)
+    const uvs = new Float32Array(n * n * 2);
     for (let row = 0, v = 0; row <= segments; row++) {
       for (let col = 0; col <= segments; col++, v++) {
-        positions[v * 3] = (col * size) / segments - size / 2 + this.w / 2;
-        positions[v * 3 + 2] = ((segments - row) * size) / segments - size / 2 + this.d / 2;
         uvs[v * 2] = col / segments;
         uvs[v * 2 + 1] = 1 - row / segments;
       }
     }
+    const grid = () => {
+      const positions = new Float32Array(n * n * 3);
+      for (let row = 0, v = 0; row <= segments; row++) {
+        for (let col = 0; col <= segments; col++, v++) {
+          positions[v * 3] = (col * size) / segments - size / 2 + this.w / 2;
+          positions[v * 3 + 2] = ((segments - row) * size) / segments - size / 2 + this.d / 2;
+        }
+      }
+      return positions;
+    };
     const indices = new Uint32Array(segments * segments * 6);
     for (let row = 0, k = 0; row < segments; row++) {
       for (let col = 0; col < segments; col++) {
@@ -338,9 +359,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
         indices[k++] = col + row * n;
       }
     }
-    const colors = new Float32Array(n * n * 4);
     // sRGB vertex colours (converted on the GPU) multiply the grass detail texture.
-    await this.shadeTerrain(positions, colors, pace);
+    const { positions, colors } = await this.shaded(grid, pace);
     const normals = new Float32Array(positions.length);
     computeNormals(positions, indices, normals);
     const mesh = new pc.Mesh(app.graphicsDevice);
@@ -417,6 +437,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
 /** A big world's ground tiles (m), and their levels' quads across (the distances they change at are the preset's, `OpenWorldQuality.tiles`). */
 const TILE = 128;
 const TILE_LODS = [64, 32, 16];
+/** Ground tiles the render data worker is asked to shade ahead of the one whose meshes are being made. */
+const SHADE_AHEAD = 4;
 
 /**
  * One level of a ground tile from the finest level's shaded points (`at(col, row)` into `positions`

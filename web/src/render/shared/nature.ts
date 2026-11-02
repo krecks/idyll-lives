@@ -13,7 +13,7 @@ import { DEFAULT_LANDSCAPE, groundDepth, type LandscapeParams, type WorldStructu
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
-import { fbm, hash, smoothstep, valueNoise } from '../../game/noise';
+import { fbm, hash, mulberry32, smoothstep, valueNoise } from '../../game/noise';
 import { shareAt, ZoneField } from './zones';
 
 /**
@@ -78,19 +78,8 @@ export interface PlantPlacement {
 
 // ---- Deterministic noise ------------------------------------------------------------
 
-export function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-// (The lattice hash, value noise, fractal noise and smooth step: the world generator's own, `game/noise.ts`, so the land it lays out and the land drawn agree.)
-export { fbm, hash, smoothstep, valueNoise };
+// (The seeded generator, lattice hash, value noise, fractal noise and smooth step: the world generator's own, `game/noise.ts`, so the land it lays out and the land drawn agree.)
+export { fbm, hash, mulberry32, smoothstep, valueNoise };
 
 /** Ridged noise, 0..1: sharp crests where plain noise crosses its middle (mountain ridges). */
 function ridged(x: number, z: number, seed: number, octaves = 5): number {

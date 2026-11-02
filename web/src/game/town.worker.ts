@@ -22,11 +22,11 @@ const ready = Content.load(`${import.meta.env.BASE_URL}content/base.json`).then(
 // Jobs wait for the content, then run in the order they came. Content that can't load breaks
 // the worker (the page then makes its towns itself).
 scope.onmessage = (e) => {
-  const { id, job } = e.data;
+  const { id, message: job } = e.data;
   ready.then(
     ({ content, templates }) => {
       try {
-        scope.postMessage({ id, result: runTownJob(content, templates, job) });
+        scope.postMessage({ id, answer: runTownJob(content, templates, job) });
       } catch (err) {
         scope.postMessage({ id, error: err instanceof Error ? err.message : String(err) });
       }

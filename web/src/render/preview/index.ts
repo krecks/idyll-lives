@@ -12,6 +12,7 @@
 
 import type { AssetRegistry } from '../../assets/registry';
 import { loadCharacterSet } from '../shared/characters/data';
+import { idleMoment } from '../shared/idle';
 import type { SimLook, SimPreviews, SimStage, Wardrobe } from '../types';
 import { cached, lookKey, Portraits } from './portraits';
 import { StageController } from './stage';
@@ -100,11 +101,15 @@ class Previews implements SimPreviews {
     this.drawingAhead = true;
     try {
       while (this.ahead.size && !this.unavailable) {
-        await idle();
+        await idleMoment(IDLE_TIMEOUT);
         if (this.portraits.busy) continue;
-        const next = [...this.ahead].slice(0, PER_IDLE);
-        for (const [key] of next) this.ahead.delete(key);
-        await Promise.all(next.map(([, look]) => this.portrait(look)));
+        const next: SimLook[] = [];
+        for (const [key, look] of this.ahead) {
+          if (next.length === PER_IDLE) break;
+          next.push(look);
+          this.ahead.delete(key);
+        }
+        await Promise.all(next.map((look) => this.portrait(look)));
       }
     } finally {
       this.drawingAhead = false;
@@ -178,14 +183,6 @@ class Previews implements SimPreviews {
       studio.dispose();
     }, RELEASE_AFTER);
   }
-}
-
-/** The next idle moment (or a short wait where there are none). */
-function idle(): Promise<void> {
-  return new Promise((resolve) => {
-    if (typeof requestIdleCallback === 'function') requestIdleCallback(() => resolve(), { timeout: IDLE_TIMEOUT });
-    else setTimeout(resolve, 100);
-  });
 }
 
 function loadSet(assets: AssetRegistry) {

@@ -7,7 +7,7 @@
  */
 
 import type { AssetRegistry } from '../assets/registry';
-import { optimizedUrl } from '../assets/registry';
+import { materialTextures, optimizedUrl } from '../assets/registry';
 import { withBuild, withoutBuild } from '../assets/build';
 import type { Content } from '../content/content';
 import type { WorldStructure } from '../core/protocol';
@@ -114,11 +114,11 @@ export function gameAssetPlan(
   };
 
   // Surfaces (walls, floors, furniture finishes) and the residents. Normal and ARM maps sit
-  // next to the albedo and are only made absolute here, as `materials.ts` does.
+  // next to the albedo (`materialTextures`), as `materials.ts` loads them.
   for (const key of assets.keys('material')) {
-    const entry = assets.get(key, 'material');
-    if (!entry?.texture) continue;
-    for (const url of [entry.texture, entry.normal && new URL(entry.normal, entry.texture).href, entry.arm && new URL(entry.arm, entry.texture).href]) {
+    const textures = materialTextures(assets.get(key, 'material') ?? {});
+    if (!textures) continue;
+    for (const url of [textures.texture, textures.normal, textures.arm]) {
       if (!url) continue;
       const file = optimizedUrl(withBuild(url));
       all.add(file);

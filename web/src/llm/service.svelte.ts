@@ -8,7 +8,7 @@
  * residents' lines with it).
  */
 
-import { inferenceSlot, whenModelsMayStart } from '../ml/schedule.svelte';
+import { inferenceSlot, settle, whenModelsMayStart } from '../ml/schedule.svelte';
 import type { ChatMessage } from './chat';
 import type { GenParams, GenResult } from './generate';
 import { MODEL } from './models';
@@ -83,13 +83,13 @@ function onMessage(msg: FromLlmWorker): void {
     const now = performance.now();
     counters.recent.push({ at: now, ms: r.prefillMs + r.decodeMs });
     while (counters.recent.length && counters.recent[0].at < now - BUSY_WINDOW_MS) counters.recent.shift();
-    settle(msg.id)?.resolve(r);
+    settle(pending, msg.id)?.resolve(r);
   } else if (msg.type === 'skipped') {
     counters.skipped++;
-    settle(msg.id)?.resolve(null);
+    settle(pending, msg.id)?.resolve(null);
   } else if (msg.type === 'error') {
     if (msg.id !== undefined) {
-      settle(msg.id)?.reject(new Error(msg.message));
+      settle(pending, msg.id)?.reject(new Error(msg.message));
       return;
     }
     llmStatus.error = msg.message;
@@ -98,14 +98,6 @@ function onMessage(msg: FromLlmWorker): void {
     stop();
     llmStatus.state = 'error';
   }
-}
-
-/** A reply's entry, taken off the list, its turn on the card given back. */
-function settle(id: number) {
-  const p = pending.get(id);
-  pending.delete(id);
-  p?.free();
-  return p;
 }
 
 /**
@@ -156,14 +148,8 @@ export async function generateText(
   // Its turn on the graphics card (never beside a line being spoken), unless the deadline passes
   // or it is aborted first.
   const deadline = options.deadline ?? Number.MAX_SAFE_INTEGER;
-  const waiting = new AbortController();
-  const timer = deadline < Number.MAX_SAFE_INTEGER ? setTimeout(() => waiting.abort(), Math.max(0, deadline - Date.now())) : undefined;
-  const abort = () => waiting.abort();
-  options.signal?.addEventListener('abort', abort, { once: true });
-  if (options.signal?.aborted) waiting.abort();
-  const free = await inferenceSlot('gpu', waiting.signal);
-  clearTimeout(timer);
-  options.signal?.removeEventListener('abort', abort);
+  const waits = [options.signal, deadline < Number.MAX_SAFE_INTEGER ? AbortSignal.timeout(Math.max(0, deadline - Date.now())) : undefined];
+  const free = await inferenceSlot('gpu', AbortSignal.any(waits.filter((s) => s !== undefined)));
   if (!free || options.signal?.aborted) {
     free?.();
     counters.skipped++;

@@ -2,8 +2,8 @@
  * When the voices and the language model may work (both are ONNX Runtime in workers of their own,
  * each with its own WebGPU device), so they don't fight the game or each other:
  *
- * - their models start loading only once the page has booted (`startModelsAfter`), or once the
- *   loading stream says so (`startModels`), and not while the game holds them off;
+ * - their models start loading only once the page has booted (`startModelsAfter`), and not while
+ *   the game holds them off;
  * - the game holds them off while it works hard (`holdInference`: a game loading, a focus switch
  *   rebuilding the scene): no model starts and no new line is made until it lets go;
  * - one job at a time on the graphics card across both (`inferenceSlot`): a line being spoken and
@@ -12,6 +12,7 @@
  */
 
 import { untrack } from 'svelte';
+import { idleMoment } from '../render/shared/idle';
 
 export type InferenceDevice = 'gpu' | 'cpu';
 
@@ -19,10 +20,11 @@ export type InferenceDevice = 'gpu' | 'cpu';
 const HOLD_MAX_MS = 120_000;
 
 let nextHold = 1;
-const holds = new Map<number, { reason: string; timer: ReturnType<typeof setTimeout> }>();
+/** Holds not yet let go of, each with the timer that ends it if it's forgotten. */
+const holds = new Map<number, ReturnType<typeof setTimeout>>();
 /** When the last hold ended (performance clock): lines made across a hold aren't the engine's fault. */
 let releasedAt = -Infinity;
-/** The page has booted (or the loading stream said so): models may start, holds permitting. */
+/** The page has booted: models may start, holds permitting. */
 let started = false;
 
 interface Waiter {
@@ -55,20 +57,23 @@ function pump(): void {
 }
 
 /**
- * Holds inference and model starts off until the returned function is called (or `maxMs` passed).
- * `reason` is for the debug overlay.
+ * Holds inference and model starts off until the returned function is called (or `HOLD_MAX_MS`
+ * passed: `reason` says in the console what forgot to let go).
  */
-export function holdInference(reason: string, maxMs = HOLD_MAX_MS): () => void {
+export function holdInference(reason: string): () => void {
   const id = nextHold++;
   const release = () => {
-    const h = holds.get(id);
-    if (!h) return;
-    clearTimeout(h.timer);
+    if (!holds.has(id)) return;
+    clearTimeout(holds.get(id));
     holds.delete(id);
     releasedAt = performance.now();
     pump();
   };
-  holds.set(id, { reason, timer: setTimeout(release, maxMs) });
+  const forgotten = () => {
+    console.warn(`[ml] inference was held off (${reason}) and never let go: letting go`);
+    release();
+  };
+  holds.set(id, setTimeout(forgotten, HOLD_MAX_MS));
   return release;
 }
 
@@ -86,11 +91,6 @@ export function inferenceHeld(): boolean {
 /** Whether inference was held off at any time since `since` (performance clock). */
 export function heldSince(since: number): boolean {
   return holds.size > 0 || releasedAt >= since;
-}
-
-/** Why inference is held off (for the debug overlay); empty when it isn't. */
-export function holdReasons(): string[] {
-  return [...holds.values()].map((h) => h.reason);
 }
 
 /**
@@ -126,6 +126,14 @@ export function inferenceSlot(device: InferenceDevice, signal?: AbortSignal): Pr
   });
 }
 
+/** A job's entry taken off `pending` (`id`'s), its turn on the device (`inferenceSlot`) given back. */
+export function settle<P extends { free: () => void }>(pending: Map<number, P>, id: number): P | undefined {
+  const p = pending.get(id);
+  pending.delete(id);
+  p?.free();
+  return p;
+}
+
 /** Resolves once models may start loading: the page has booted and nothing holds them off. */
 export function whenModelsMayStart(): Promise<void> {
   return new Promise((resolve) => {
@@ -134,7 +142,7 @@ export function whenModelsMayStart(): Promise<void> {
   });
 }
 
-/** Models may start (as soon as nothing holds them off). The loading stream's hook; idempotent. */
+/** Models may start (as soon as nothing holds them off): `startModelsAfter`'s, once the page has booted; idempotent. */
 export function startModels(): void {
   if (started) return;
   started = true;
@@ -151,8 +159,7 @@ export function startModelsAfter(booting: () => boolean): void {
       if (booting()) return;
       untrack(() => {
         queueMicrotask(stop);
-        if ('requestIdleCallback' in window) requestIdleCallback(startModels, { timeout: 3000 });
-        else setTimeout(startModels, 200);
+        void idleMoment(3000).then(startModels);
       });
     });
   });

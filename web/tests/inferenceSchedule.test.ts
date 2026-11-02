@@ -3,7 +3,7 @@
 // game holds them off (and a forgotten hold ends by itself); models start only once allowed and
 // nothing holds them; a job whose signal aborts while it waits gives up its place. And the
 // processor's threads (`ml/ort.ts`): two at most, one on four cores.
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, jest, spyOn, test } from 'bun:test';
 import { cpuThreads } from '../src/ml/ort';
 import { heldSince, holdInference, inferenceHeld, inferenceSlot, startModels, whenModelsMayStart } from '../src/ml/schedule.svelte';
 
@@ -42,11 +42,19 @@ describe('inference schedule', () => {
     (await job)();
   });
 
-  test('a forgotten hold ends by itself', async () => {
-    holdInference('forgotten', 5);
-    expect(inferenceHeld()).toBe(true);
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(inferenceHeld()).toBe(false);
+  test('a forgotten hold ends by itself', () => {
+    jest.useFakeTimers();
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      holdInference('forgotten');
+      expect(inferenceHeld()).toBe(true);
+      jest.advanceTimersByTime(120_000);
+      expect(inferenceHeld()).toBe(false);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+      jest.useRealTimers();
+    }
   });
 
   test('a job aborted while it waits gives up its place', async () => {

@@ -33,7 +33,7 @@ import { INSTANCE_COLOR_SEMANTIC, installGameChunks, patchEngineChunks, WALL_CUT
 import { DIAG_VIEW_DEFINE } from './shaders/diagView';
 import { softLookWanted } from './shaders/softLook';
 import { withBuild } from '../../assets/build';
-import { optimizedUrl, type AssetRegistry } from '../../assets/registry';
+import { materialTextures, optimizedUrl, type AssetRegistry } from '../../assets/registry';
 import type { MaterialEntry } from '../../assets/types';
 import type { RGB } from '../shared/environment';
 import { WALL_HEIGHT } from '../shared/walls';
@@ -684,19 +684,19 @@ export class MaterialLibrary {
     const scale = entry.uvScale ?? 1;
     const tiling = new pc.Vec2(scale, scale);
     const offset = new pc.Vec2(0, 1 - scale);
-    const base = entry.texture;
-    if (base) {
-      this.useTexture(mat, 'diffuseMap', base, true);
+    const textures = materialTextures(entry);
+    if (textures) {
+      this.useTexture(mat, 'diffuseMap', textures.texture, true);
       mat.diffuseMapTiling = tiling;
       mat.diffuseMapOffset = offset;
-      if (entry.normal) {
-        this.useTexture(mat, 'normalMap', new URL(entry.normal, base).href, false);
+      if (textures.normal) {
+        this.useTexture(mat, 'normalMap', textures.normal, false);
         mat.normalMapTiling = tiling;
         mat.normalMapOffset = offset;
         mat.bumpiness = entry.normalStrength ?? 1;
       }
-      if (entry.arm) {
-        const arm = new URL(entry.arm, base).href;
+      const arm = textures.arm;
+      if (arm) {
         this.useTexture(mat, 'aoMap', arm, false);
         mat.aoMapChannel = 'r';
         this.useTexture(mat, 'glossMap', arm, false);
