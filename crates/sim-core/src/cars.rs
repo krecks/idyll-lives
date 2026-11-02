@@ -132,6 +132,10 @@ const ROUTE_TOLERANCE: f32 = 0.08;
 /// A driveway meeting its road further from square than this (the cosine of its angle to the
 /// road's side) comes alongside it rather than onto it: its car stays parked (`Car::no_way`).
 const OBLIQUE: f32 = 0.5;
+/// A street's or lane's sidewalks (m, each side: `roads.ts` `SIDEWALK`), inside its width; and how
+/// far onto the sidewalk a turn out of (or into) a driveway may begin (`Bay::past_kerb`).
+const SIDEWALK: f32 = 1.35;
+const KERB_SLACK: f32 = 0.4;
 /// A trip by car (`Trip`) parks at the town's public parking spot nearest the place, if one is
 /// this close to it (m).
 const TRIP_PARK_REACH: f32 = 120.0;
@@ -687,7 +691,6 @@ impl Route {
         let g = &travel.graph;
         let m = car.mouth(travel)?;
         let mp = g.point(m);
-        let t = g.roads[m.road as usize].tangent(m.s);
         // Where to: the parking spot of its trip, or the quickest way out by car.
         let (path, park) = match car.trip {
             Some(trip) => {
@@ -713,7 +716,14 @@ impl Route {
             return None;
         }
         // The driveway, and which way along the road it goes from it.
-        let drive = Bay::new(car.spot, car.yaw, car.axis, mp, t)?;
+        let drive = Bay::new(
+            car.spot,
+            car.yaw,
+            car.axis,
+            mp,
+            &g.roads[m.road as usize],
+            m.s,
+        )?;
         let ahead = drive.local(path.pts[(path.pts.len() - 1).min(3)].0);
         let d = if ahead[0] >= 0.0 { 1.0 } else { -1.0 };
         // The lane: right of the middle line, on past the exit (to the parking spot's side of
@@ -760,7 +770,9 @@ impl Route {
         // out of as a driveway is, and which way along the road it goes there (from the lane's
         // nearer end); a spot on the road itself is pulled into and out of straight.
         let bay = park.and_then(|(at, yaw)| {
-            let (rp, rt, axis) = parking_bay(travel, at)?;
+            let (rp, on, axis) = parking_bay(travel, at)?;
+            let road = &g.roads[on.road as usize];
+            let rt = road.tangent(on.s);
             let (a, b) = if home {
                 (lane[0], lane[1])
             } else {
@@ -768,7 +780,7 @@ impl Route {
             };
             let go = (b[0] - a[0]) * rt[0] + (b[1] - a[1]) * rt[1];
             Some((
-                Bay::new(at, yaw, Some(axis), rp, rt)?,
+                Bay::new(at, yaw, Some(axis), rp, road, on.s)?,
                 if go >= 0.0 { 1.0 } else { -1.0 },
             ))
         });
@@ -912,8 +924,8 @@ impl Route {
 
 /// Where a car parks off the road, its driveway or a parking bay, in the frame of the road where
 /// it meets it (`mp` on its middle line, its tangent `t` and normal `n`): where it parks (`x0`,
-/// `z0` in that frame) facing `yaw`, and the way it runs to the road (`u`: along its axis,
-/// else square to the road).
+/// `z0` in that frame) facing `yaw`, the way it runs to the road (`u`: along its axis, else
+/// square to the road), and the kerb on its side of the road (`kerb`, its `z` in that frame).
 struct Bay {
     spot: [f32; 2],
     yaw: f32,
@@ -923,17 +935,21 @@ struct Bay {
     x0: f32,
     z0: f32,
     u: [f32; 2],
+    kerb: f32,
 }
 
 impl Bay {
-    /// None: it comes alongside the road rather than onto it (`OBLIQUE`).
+    /// On `road` (its kerbs: `kerb_off`). None: it comes alongside the road rather than onto it
+    /// (`OBLIQUE`).
     fn new(
         spot: [f32; 2],
         yaw: f32,
         axis: Option<[f32; 2]>,
         mp: [f32; 2],
-        t: [f32; 2],
+        road: &crate::travel::Road,
+        s_at: f32,
     ) -> Option<Bay> {
+        let t = road.tangent(s_at);
         let n = [-t[1], t[0]];
         let (dx, dz) = (spot[0] - mp[0], spot[1] - mp[1]);
         let (x0, z0) = (dx * t[0] + dz * t[1], dx * n[0] + dz * n[1]);
@@ -957,7 +973,15 @@ impl Bay {
             x0,
             z0,
             u,
+            kerb: -s * kerb_off(road),
         })
+    }
+
+    /// How far along its line from where it crosses its side's kerb it crosses the lane `lane` m
+    /// off the middle line, and a little (`KERB_SLACK`): the most a turn onto (or off) that lane
+    /// takes up of it, so it turns on the road, not across the sidewalk.
+    fn past_kerb(&self, lane: f32) -> f32 {
+        ((lane - self.kerb) / self.u[1]).max(0.0) + KERB_SLACK
     }
 
     fn local(&self, p: [f32; 2]) -> [f32; 2] {
@@ -995,6 +1019,7 @@ impl Bay {
     fn leave(&self, legs: &mut Legs, d: f32) -> (f32, f32) {
         let lane_out = d * LANE;
         let (at, room) = self.cross(lane_out);
+        let room = room.min(self.past_kerb(lane_out));
         let facing = [self.yaw.sin(), self.yaw.cos()];
         let way = [
             self.u[0] * self.t[0] + self.u[1] * self.n[0],
@@ -1013,6 +1038,7 @@ impl Bay {
     fn entry(&self, d: f32) -> (Turn, f32) {
         let lane_in = -d * LANE;
         let (at, room) = self.cross(lane_in);
+        let room = room.min(self.past_kerb(lane_in));
         (
             Turn::round([at, lane_in], [-d, 0.0], [-self.u[0], -self.u[1]], room),
             at,
@@ -1032,14 +1058,23 @@ impl Bay {
 /// to the road, off its verge): the point of the road it's nearest, the road's tangent there and
 /// the way from the spot to it. None: no road near, or the spot is on the road itself (pulled into
 /// along it).
-fn parking_bay(travel: &Travel, at: [f32; 2]) -> Option<([f32; 2], [f32; 2], [f32; 2])> {
+fn parking_bay(travel: &Travel, at: [f32; 2]) -> Option<([f32; 2], RoadPoint, [f32; 2])> {
     let g = &travel.graph;
     let p = *g.near(at, ROAD_REACH, 1, Mode::Car).first()?;
     let road = &g.roads[p.road as usize];
     let rp = g.point(p);
     let (dx, dz) = (rp[0] - at[0], rp[1] - at[1]);
     let l = dx.hypot(dz);
-    (l > road.width / 2.0 + 0.5).then(|| (rp, road.tangent(p.s), [dx / l, dz / l]))
+    (l > road.width / 2.0 + 0.5).then_some((rp, p, [dx / l, dz / l]))
+}
+
+/// How far from its middle line a road's kerbs are (m): its width takes in the sidewalks of a
+/// street or lane (`roads.ts` `SIDEWALK`); a country road has none.
+fn kerb_off(road: &crate::travel::Road) -> f32 {
+    match road.kind {
+        crate::travel::RoadKind::Country | crate::travel::RoadKind::Trail => road.width / 2.0,
+        _ => (road.width / 2.0 - SIDEWALK).max(LANE + 0.5),
+    }
 }
 
 /// A turn at a driveway's mouth, in the frame of the road there (`Route::on_roads`): from going
