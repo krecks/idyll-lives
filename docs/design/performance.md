@@ -668,3 +668,66 @@ Today's scenes, base (the commit before the open-world work) → now, back to ba
 120 fps in every cell; the village's roam 119.6 fps, 287 draws. Pictures against the base's: the
 village at most 0.061 % of a picture's pixels (the flower beds' shrubs, as before; 51 of 54
 pictures, 3 timed out loading in the headless browser), the forest 0.018 %.
+
+### Roaming real Big games, not the bench (2026-11-02)
+
+The bench's Big world has no catalog, no world messages and no town going to work. A real one was
+played instead (`Create World → Lakeside → Big → Choose a household → Play`, headless Chromium on the
+M3 Pro, 1440 × 900, no vsync), the camera flown hamlet to hamlet for 90 s, a new world each run,
+the frames timed with the renderer's frame probe and the long animation frames (LoAF) with their
+scripts. What held frames up, and what was done:
+
+- **The catalog's pictures drawn ahead of time** (`render/preview/items.ts`): for about 15 s after
+  a new game, a model built, its pipelines made on a device of its own (compiled in the same GPU
+  process) and a read-back a picture; a 200 ms frame among them (a picture's encoding), and 14
+  frames over 33 ms on Low at 3× CPU slow-down. They now wait while the game is in Live
+  (`holdAhead`) and are drawn in Build and Create, where the game is paused.
+- **Low's merged object shadows uploaded whole** for every chair pulled up to the table, every
+  frame while someone sits down: 3.2 MB a frame on a big world's home lot, 425 uploads in one roam.
+  The copies are now split over meshes of 32 768 vertices, each uploaded alone (8–9 shadow draws
+  for a big lot, 5 for the forest scene's instead of 4; pictures as before).
+- **A resident coming or going rebuilt the whole lot** (a world message whose sim count changed:
+  the town's staff at noon, a visitor): the lot's objects, street, cars and birds, frames of 44 and
+  74 ms. The residents are now built again alone (`buildSimsOnly`: 7 ms against 22–48 ms of builds).
+- **Every world message compared 6 000 objects as JSON** (4–5 ms of each, several a second while
+  quiet hours are skipped): field by field now, 1.5–2 ms.
+- **The storey in view followed a resident upstairs** while the camera was hundreds of metres away,
+  each change a build of the lot's objects and residents (20–60 ms, a 42–48 ms frame): only within
+  40 m of the lot now.
+
+Left: frames of 60–125 ms, two or three together, about 86 s into the roam (09:35–09:45 on the
+first day, a few seconds after the town's residents got their jobs at 09:30) in roughly every other
+run, on Low and Medium, WebGPU and WebGL2 alike. Nothing is built then and the main thread is idle:
+the LoAF holds no script, and a GPU-process trace shows the renderer submitting a frame and then
+nothing for 75 ms until the GPU hands the frame back; our passes' GPU time (timestamps) stays at
+2–3 ms. It comes about 125–135 s after the browser started, not at a time of the game's: with
+60 s spent on the main menu first, 5 roams of 5 had no frame over 33 ms (none at 86 s, none at the
+26 s that would have been), against about every other one without. Something of a fresh browser
+profile's GPU process then (not found which; the game can't avoid it), not of the game. A model file streamed in mid-roam is parsed on the main thread
+(`XMLHttpRequest` callback, 31–45 ms) and makes a 40–60 ms frame now and then; the storey still
+follows residents at home (a 42 ms frame).
+
+Each roam, 90 s (before: the open-world branch's tip; after: this work):
+
+| run | fps | p95 / max ms | over 33 | draws (max) | CPU mean / p95 ms | GPU ms |
+|---|---|---|---|---|---|---|
+| Medium, before (4 worlds) | 66–72 | 19.9–21.9 / 31–112 | 0, 0, 0, 4 | 264–317 (705) | 1.95–2.45 / 3.3–3.9 | 2.0–2.4 |
+| Medium, after (3 worlds) | 55–72 | 21.6–24.6 / 32–61 | 1, 0, 5 | 291–301 (653) | 2.0–2.75 / 3.5–6.1 | 2.3–4.0 |
+| Low, before (5 runs) | 70–76 | 19.7–21.5 / 31–126 | 3, 0, 7, 0, 1 | 223–242 (386) | 1.7–2.1 / 3.2–3.4 | – |
+| Low, after (3 worlds) | 67–76 | 14.1–22.4 / 33–94 | 2, 1, 0 | 211–226 (551) | 1.67–1.80 / 2.9–3.9 | – |
+| Low, CPU ×3, before | 58.0 | 26.6 / 111 | 31 | 226 | 5.9 / 10.5 | – |
+| Low, CPU ×3, after | 68.6 | 22.7 / 67 | 9 | 244 | 4.9 / 8.3 | – |
+| WebGL2 Medium, before | 74.3 | 20.4 / 39 | 1 | 265 | 1.75 / 3.1 | 3.1 |
+| Medium, after, 60 s on the menu first (5 worlds) | 70–77 | 14.2–22.4 / 31–32 | 0, 0, 0, 0, 0 | 275–298 (623) | 2.0–2.1 / 3.4–3.5 | 2.3–2.5 |
+| WebGL2 Medium, after (2) | 74–75 | 19.9–20.4 / 32–124 | 3, 0 | 271–286 | 1.7–1.8 / 2.9–3.2 | 3.1–3.2 |
+
+(Low's GPU time from the timestamps spans the passes and what lies between them on Low: not a cost.
+The third Medium run after came while Spotlight took a core: 55 fps.) Low started every time, from
+the setting as a player sets it, with no device lost.
+
+Today's scenes, base → after (WebGPU, orbit by day and night, 2 runs): the same draws in every
+cell but Low's shadow draws in the forest (4 → 5); CPU within 0.05 ms; GPU 0.1–0.8 ms more in the village
+(run second; nothing in it changed for Medium or High) and within 0.1 ms in the forest, inside the
+±1 ms the M3 varies by between runs. Pictures against the base's: the village at most 0.059 % of a picture's pixels, the
+forest 0.000 %. The bench's Big lakeside and forest roams: the same draws, fps and slow frames
+(one 35–42 ms frame on Low at the same moment in both).

@@ -7,7 +7,7 @@
  *
  * Requests are queued and drawn one model at a time: what's on screen first, in order (cards ask
  * when they scroll into view and withdraw when they leave), then pictures drawn ahead of time in
- * idle moments. Encoding a picture overlaps building the next model. Pictures are kept for the
+ * idle moments, but not while held (`holdAhead`: in Live). Encoding a picture overlaps building the next model. Pictures are kept for the
  * page and, in Cache Storage, between visits (keyed by app version and the model's manifest
  * entry). Turntables (a model seen from `frames` angles around it) feed the detail pane's
  * preview. The app is released a few seconds after the queue empties.
@@ -90,6 +90,8 @@ class ItemThumbnails implements ItemPreviews {
   private readonly queue: Job[] = [];
   private running = false;
   private releaseTimer = 0;
+  /** Pictures drawn ahead of time wait (`holdAhead`). */
+  private held = false;
   private store: Promise<Cache | null> | null = null;
   /**
    * Pictures of a box (the model's file failed), by job key: not kept, but the latest is handed out
@@ -122,6 +124,12 @@ class ItemThumbnails implements ItemPreviews {
 
   prefetch(models: readonly { model: string; footprint: [number, number] }[]): void {
     for (const m of models) void this.thumbnail(m.model, m.footprint, 'idle');
+  }
+
+  holdAhead(hold: boolean): void {
+    if (hold === this.held) return;
+    this.held = hold;
+    if (!hold && this.queue.length) void this.pump();
   }
 
   cachedTurntable(model: string, frames: number, colors?: PartColors): string[] | null {
@@ -226,14 +234,21 @@ class ItemThumbnails implements ItemPreviews {
   }
 
   private async pump(): Promise<void> {
-    if (this.running) return;
+    // (Held with nothing wanted on screen: not even the app made.)
+    if (this.running || (this.held && !this.queue.some((j) => j.priority === 'now'))) return;
     this.running = true;
     clearTimeout(this.releaseTimer);
     try {
       const studio = await this.open();
       while (this.queue.length) {
-        // Drawing ahead of time yields to the game: one model per idle moment.
-        if (!this.queue.some((j) => j.priority === 'now')) await idle();
+        // Drawing ahead of time yields to the game: one model per idle moment; while held (Live), none
+        // (the rest wait in the queue for `holdAhead(false)`, and the app is released meanwhile).
+        if (!this.queue.some((j) => j.priority === 'now')) {
+          if (this.held) break;
+          await idle();
+          // (Held while it waited, and nothing wanted on screen since.)
+          if (this.held && !this.queue.some((j) => j.priority === 'now')) break;
+        }
         const job = this.next();
         if (!job) continue;
         let encoded: Promise<string[] | null> = Promise.resolve(null);
