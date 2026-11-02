@@ -128,6 +128,17 @@ impl StairMap {
         }
     }
 
+    /// `ground_z` for a point: where it is over the ground. Upstairs and the basement are rows
+    /// away in the stacked grid, not that far to walk: how long a trip takes (`travel::Travel`)
+    /// is asked from here.
+    pub fn ground_pos(&self, p: [f32; 2]) -> [f32; 2] {
+        if self.depth > 0 {
+            [p[0], p[1].rem_euclid(self.depth as f32)]
+        } else {
+            p
+        }
+    }
+
     /// Sets the flights and indexes their steps and ends by tile, so `step` and `link` cost a
     /// lookup, not a scan of every flight (they're asked for every step a search tries).
     pub fn set_stairs(&mut self, stairs: Vec<Stair>) {

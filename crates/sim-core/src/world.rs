@@ -6934,12 +6934,14 @@ fn pick_autonomous(
         let reach = content.autonomy.reach;
         let free = until_leave.unwrap_or(f32::INFINITY);
         let drives = crate::cars::could_drive(ctx, sim);
-        // (Where they'd get on the roads from here, on foot and by car, found once for all the
-        // places, and each place's door's as noted, `Travel::door_entry`.)
+        // (From over the ground, upstairs too. Where they'd get on the roads from here, on foot
+        // and by car, found once for all the places, and each place's door's as noted,
+        // `Travel::door_entry`.)
+        let pos = ctx.nav.stairs.ground_pos(sim.pos);
         let mut on: [Option<Option<crate::travel::RoadPoint>>; 2] = [None, None];
         for p in ctx.plots.iter().filter(|p| p.public) {
             let door = p.arrival_point();
-            if (door[0] - sim.pos[0]).hypot(door[1] - sim.pos[1]) <= reach {
+            if (door[0] - pos[0]).hypot(door[1] - pos[1]) <= reach {
                 continue;
             }
             // By car where they can drive there (`cars::trip_car`): a drive's seconds are the
@@ -6952,11 +6954,11 @@ fn pick_autonomous(
             };
             let from = &mut on[mode as usize];
             let eta = ctx.travel.eta_via(
-                sim.pos,
+                pos,
                 door,
                 mode,
                 walk_per_minute,
-                || *from.get_or_insert_with(|| ctx.travel.entry(sim.pos, mode)),
+                || *from.get_or_insert_with(|| ctx.travel.entry(pos, mode)),
                 || ctx.travel.door_entry(p.id, door, mode),
             );
             let eta = if car {
@@ -7865,16 +7867,8 @@ pub(crate) fn trip(
     target: [f32; 2],
     grounds: Option<&Grounds>,
 ) -> Option<Vec<[f32; 2]>> {
-    // (How far, along the ground: upstairs or in the basement is rows away in the stacked grid,
-    // not far off, so a walk upstairs at home is no trip by road.)
-    let depth = nav.stairs.depth as f32;
-    let ground = |p: [f32; 2]| {
-        if depth > 0.0 {
-            [p[0], p[1].rem_euclid(depth)]
-        } else {
-            p
-        }
-    };
+    // (How far, over the ground: a walk upstairs at home is no trip by road.)
+    let ground = |p| nav.stairs.ground_pos(p);
     if travel.by_road(ground(pos), ground(target))
         && let Some(waypoints) = road_route(nav, reach, travel, pos, start, goal, target, grounds)
     {
@@ -9568,11 +9562,12 @@ pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
     {
         return Some(exit);
     }
-    quickest_exit(ctx.travel, ctx.exits, sim.pos, true).map(|i| ctx.exits[i])
+    let pos = ctx.nav.stairs.ground_pos(sim.pos);
+    quickest_exit(ctx.travel, ctx.exits, pos, true).map(|i| ctx.exits[i])
 }
 
-/// The exit (an index into `exits`) quickest to get to from `pos`, on foot (bus stops too) or
-/// by car (roads out only).
+/// The exit (an index into `exits`) quickest to get to from `pos` (over the ground,
+/// `StairMap::ground_pos`), on foot (bus stops too) or by car (roads out only).
 pub(crate) fn quickest_exit(
     travel: &crate::travel::Travel,
     exits: &[[f32; 2]],

@@ -229,7 +229,9 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
         && let Some(&exit) = w.exits.get(c.exit)
     {
         let walk = crate::world::WALK_SPEED * sim.walk_speed(&w.content) / MINUTES_PER_TICK;
-        let from = on_ground(w, sim.pos);
+        // (From over the ground: a commute timed from bed upstairs had them setting off for
+        // work in the middle of the night.)
+        let from = w.stairs.ground_pos(sim.pos);
         let minutes = w.travel.eta(from, exit, crate::travel::Mode::Foot, walk) * WALK_MARGIN
             + OUT_OF_THE_HOUSE;
         let total = ticks(minutes + w.content.career_rules.commute_minutes);
@@ -242,18 +244,6 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
         }
     }
     planned
-}
-
-/// Where `p` is over the ground: upstairs and the basement are rows away in the stacked grid
-/// (`path::StairMap::depth`), not that far to walk (a commute timed from bed upstairs had them
-/// setting off for work in the middle of the night).
-fn on_ground(w: &World, p: [f32; 2]) -> [f32; 2] {
-    let depth = w.stairs.depth as f32;
-    if depth > 0.0 {
-        [p[0], p[1].rem_euclid(depth)]
-    } else {
-        p
-    }
 }
 
 /// Minutes added to the walk from the front door for getting out of the house to it, and a
@@ -305,7 +295,9 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
         Some(p) if !at_home => w.plots[p as usize].arrival_point(),
         _ => sim.pos,
     };
-    let Some(exit) = crate::world::quickest_exit(&w.travel, &w.exits, from, true) else {
+    // (How far, from over the ground: see `firm_leave`.)
+    let ground = w.stairs.ground_pos(from);
+    let Some(exit) = crate::world::quickest_exit(&w.travel, &w.exits, ground, true) else {
         w.sims[i].commute = None;
         return;
     };
@@ -328,14 +320,14 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
         Some(&grounds),
     )
     .map(|wp| {
-        let wp: Vec<[f32; 2]> = wp.iter().map(|&p| on_ground(w, p)).collect();
-        crate::travel::length(on_ground(w, from), &wp)
+        let wp: Vec<[f32; 2]> = wp.iter().map(|&p| w.stairs.ground_pos(p)).collect();
+        crate::travel::length(ground, &wp)
     });
     let minutes = match metres {
         Some(m) => m / walk.max(1e-3),
         None => w
             .travel
-            .eta(on_ground(w, from), target, crate::travel::Mode::Foot, walk),
+            .eta(ground, target, crate::travel::Mode::Foot, walk),
     } * WALK_MARGIN
         + OUT_OF_THE_HOUSE;
     let total = minutes + w.content.career_rules.commute_minutes;

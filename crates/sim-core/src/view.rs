@@ -1477,16 +1477,15 @@ fn trip_view(world: &World, s: &Sim) -> Option<TripView> {
     }
     let door = world.plots.get(to as usize)?.arrival_point();
     let walk = crate::world::WALK_SPEED * s.walk_speed(&world.content) / MINUTES_PER_TICK;
+    // (From over the ground, upstairs too.)
+    let from = world.stairs.ground_pos(s.pos);
     let minutes = if s.bound_for_car.is_some() {
-        world
-            .travel
-            .eta(s.pos, door, crate::travel::Mode::Car, walk)
-            * 60.0
+        world.travel.eta(from, door, crate::travel::Mode::Car, walk) * 60.0
             + crate::world::CAR_TRIP_MINUTES
     } else {
         world
             .travel
-            .eta(s.pos, door, crate::travel::Mode::Foot, walk)
+            .eta(from, door, crate::travel::Mode::Foot, walk)
     };
     let at = world.tick + (minutes.max(0.0) * crate::TICKS_PER_MINUTE as f32) as u64;
     Some(TripView { to, at: step(at) })
