@@ -23,6 +23,12 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
   dark trousers, as a counter hand would. It is a garment of its own (`top.apron`), so it is never picked for a
   resident: a shell over the front from the waistband to just above the knee, turned back on every edge, and it
   lies on the lap when they sit.
+- **Smoother moving parts, cleaner edges:** every model was rebuilt. Anything that loops (a rocking chair, a fan, a
+  treadmill's belt, a merry-go-round) no longer stops at rest for a moment each time round: its clip started 1/24 s
+  late, and the game held it until then. Clips are now keyed 30 times a second, as the game plays them. Round tops
+  and caps (a table's top, a lamp's base, a can's lid) stay flat to their rim instead of shading into their side,
+  rounded edges read as rounded instead of as a flat facet, thin round legs and tubes look round, and furniture
+  darkens a little where it meets the floor. The models are about 18 % smaller for the same triangles.
 ### Also
 - **Saves:** format 34 (where every car is, who owns it, every house's driveway and the garages). Older saves open with no cars in the simulation: their neighbours' cars stay parked, as before.
 
