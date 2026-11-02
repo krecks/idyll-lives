@@ -22,6 +22,7 @@
 
 import * as pc from './engine';
 import { Grass, grassGround, type GrassPusher } from './grass';
+import { disposeTiles, type GroundTile } from './groundTiles';
 import { Instances } from './instancing';
 import { GAME_FRONT_FACE, MaterialLibrary, textureWithFallback } from './materials';
 import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from './models';
@@ -401,23 +402,6 @@ export type OpenWorldDistances = Pick<OpenWorldQuality, 'woodsFar' | 'woodsCell'
  * drawn (the haze has them), its lawn flowers' past 170 m (a flower is a few pixels by then).
  */
 const OPEN_WORLD: OpenWorldDistances = QUALITY.medium.openWorld;
-
-/** A ground tile as `terrainTiles` builds it. */
-interface GroundTile {
-  mi: pc.MeshInstance;
-  meshes: pc.Mesh[];
-  x: number;
-  z: number;
-  lod: number;
-}
-
-/**
- * Destroys the ground tiles' levels no draw holds (all but the one each draws now, which goes with its
- * entity): left to themselves, about 40 MB of a big world's vertex buffers with every new game or load.
- */
-export function disposeTiles(tiles: readonly GroundTile[]): void {
-  for (const t of tiles) for (const m of t.meshes) if (m !== t.mi.mesh) m.destroy();
-}
 
 /**
  * One level of a ground tile from the finest level's shaded points (`at(col, row)` into `positions`

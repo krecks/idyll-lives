@@ -1,16 +1,9 @@
-// A big world's ground tiles (`render/pc/nature.ts`): each has three levels of detail and draws one;
+// A big world's ground tiles (`render/pc/groundTiles.ts`, built by `nature.ts`): each has three levels of detail and draws one;
 // taking the landscape down destroys the two not drawn too (the one drawn goes with its entity), or about
 // 40 MB of vertex buffers stay behind with every new game or load. On the engine's null device: no GPU.
-import { afterAll, describe, expect, mock, spyOn, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import * as pc from '../src/render/pc/engine';
-
-// (The renderer's modules read the page as they load: a stand-in for it, the real globals back after;
-// the settings are Svelte state, which only the app has.)
-const real = { location: globalThis.location, window: (globalThis as { window?: unknown }).window, raf: globalThis.requestAnimationFrame };
-Object.assign(globalThis, { window: globalThis, requestAnimationFrame: () => 0, location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-afterAll(() => Object.assign(globalThis, { location: real.location, window: real.window, requestAnimationFrame: real.raf }));
-mock.module('../src/settings/settings.svelte', () => ({ settings: {} }));
-const { disposeTiles } = await import('../src/render/pc/nature');
+import { disposeTiles } from '../src/render/pc/groundTiles';
 
 function device() {
   const canvas = { width: 1, height: 1, style: {}, addEventListener() {}, removeEventListener() {}, getBoundingClientRect: () => ({ width: 1, height: 1 }) } as unknown as HTMLCanvasElement;
