@@ -208,9 +208,9 @@ export async function startSession(
   }
 }
 
-/** `startSession`, holding inference with `loading` until the game is ready. */
+/** `startSession`, holding inference until the game is ready (`releaseInference` lets go, and is swapped for the stream's hold). */
 async function openSession(
-  loading: () => void,
+  releaseInference: () => void,
   renderer: Renderer,
   canvas: HTMLCanvasElement,
   overlay: HTMLElement,
@@ -227,7 +227,6 @@ async function openSession(
     report(label, value);
   };
   const started = perfStart('session: start→ready');
-  let releaseInference = loading;
   progress(request.kind === 'load' ? 'Reading your save' : 'Laying out the neighbourhood', 0.05);
   const { content, assets } = await perfTimeAsync('session: loadGameData', loadGameData);
 

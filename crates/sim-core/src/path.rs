@@ -1082,16 +1082,6 @@ impl NavChanges {
     }
 }
 
-/// The box round two tile rectangles.
-fn join(a: [i32; 4], b: [i32; 4]) -> [i32; 4] {
-    [
-        a[0].min(b[0]),
-        a[1].min(b[1]),
-        a[2].max(b[2]),
-        a[3].max(b[3]),
-    ]
-}
-
 impl NavLog {
     /// Notes the change that made navigation version `version`, over tiles `rect`, in tick
     /// `group`: with the tick's other changes if it follows on from them.
@@ -1144,15 +1134,21 @@ impl NavLog {
         (found >= u64::from(since)).then(|| {
             self.entries
                 .iter()
-                .filter(move |e| after(e) > 0)
-                .flat_map(move |e| {
-                    let rects = e.rects[..e.len].iter();
-                    rects
-                        .filter(move |r| now.wrapping_sub(r.1) < since)
-                        .map(|r| r.0)
-                })
+                .flat_map(move |e| e.rects[..e.len].iter())
+                .filter(move |r| now.wrapping_sub(r.1) < since)
+                .map(|r| r.0)
         })
     }
+}
+
+/// The box round two tile rectangles `[x0, z0, x1, z1)`.
+pub fn join(a: [i32; 4], b: [i32; 4]) -> [i32; 4] {
+    [
+        a[0].min(b[0]),
+        a[1].min(b[1]),
+        a[2].max(b[2]),
+        a[3].max(b[3]),
+    ]
 }
 
 /// Whether two tile rectangles `[x0, z0, x1, z1)` share a tile.

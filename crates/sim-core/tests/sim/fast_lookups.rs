@@ -7,9 +7,7 @@
 use crate::common;
 
 use common::hamlets::{two_hamlets, with_cars};
-use sim_core::{MINUTES_PER_TICK, World};
-
-const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
+use sim_core::World;
 
 #[test]
 fn quick_lookups_agree_with_asking_afresh() {
@@ -18,7 +16,7 @@ fn quick_lookups_agree_with_asking_afresh() {
     let mut w = World::from_json(&content, &with_cars(&h), 5).expect("the hamlets load");
     let (mut held, mut doors) = (0, 0);
     for _ in 0..24 {
-        for _ in 0..TICKS_PER_HOUR {
+        for _ in 0..common::TICKS_PER_HOUR {
             w.tick_once();
         }
         let (h, d) = common::check_lookups(&w);

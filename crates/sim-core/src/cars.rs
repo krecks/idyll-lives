@@ -2305,25 +2305,21 @@ fn patches(tiles: &[(i32, i32)]) -> Vec<[i32; 4]> {
             && a[1] - PATCH_GAP < b[3]
             && b[1] - PATCH_GAP < a[3]
     };
-    let join = |a: [i32; 4], b: [i32; 4]| {
-        [
-            a[0].min(b[0]),
-            a[1].min(b[1]),
-            a[2].max(b[2]),
-            a[3].max(b[3]),
-        ]
-    };
     let mut out: Vec<[i32; 4]> = Vec::new();
     for &(x, z) in tiles {
         let mut r = [x, z, x + 1, z + 1];
         // (Joining two patches can bring a third near: gather until none is.)
         while let Some(k) = out.iter().position(|&o| near(o, r)) {
-            r = join(r, out.swap_remove(k));
+            r = crate::path::join(r, out.swap_remove(k));
         }
         out.push(r);
     }
     if out.len() > MOST_PATCHES {
-        let all = out.iter().copied().reduce(join).unwrap_or_default();
+        let all = out
+            .iter()
+            .copied()
+            .reduce(crate::path::join)
+            .unwrap_or_default();
         return vec![all];
     }
     out

@@ -1065,7 +1065,7 @@ impl Lot {
                 LotChange::Diag(x, z, _) | LotChange::Floor(x, z, _) => edge(EdgeRef::Diag(x, z)),
                 LotChange::Look(e, _) => edge(e),
             };
-            self.changes.rect = Some(self.changes.rect.map_or(at, |r| union(r, at)));
+            self.changes.rect = Some(self.changes.rect.map_or(at, |r| crate::path::join(r, at)));
         }
         if let Some(log) = &mut self.log {
             log.push(change);
@@ -1557,16 +1557,6 @@ fn grow(r: &mut [i32; 4], x: i32, z: i32) {
     r[1] = r[1].min(z);
     r[2] = r[2].max(x + 1);
     r[3] = r[3].max(z + 1);
-}
-
-/// The tiles round both `a` and `b`.
-fn union(a: [i32; 4], b: [i32; 4]) -> [i32; 4] {
-    [
-        a[0].min(b[0]),
-        a[1].min(b[1]),
-        a[2].max(b[2]),
-        a[3].max(b[3]),
-    ]
 }
 
 #[cfg(test)]
