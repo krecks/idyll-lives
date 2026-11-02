@@ -1,6 +1,7 @@
 //! Generated worlds (web/src/game/world.ts and town.ts: towns of three sizes, farms, seaside,
 //! mountain, lakeside and forest worlds) checked by the simulation: each loads with no more
-//! residents than a town holds, every lot can be reached from the ends of every street and back,
+//! residents than a town holds, its roads make one network (as the sim joins them), every lot can
+//! be reached from the ends of every street and back,
 //! everything outdoors that residents use (a farm's crops, a park's benches) can be reached, as
 //! can the houses' basements from their front doors and everything residents use in the houses
 //! (on lots facing either way), and the town keeps going for half a day.
@@ -13,6 +14,7 @@ mod common;
 use sim_core::lot::{Edge, OUTDOORS};
 use sim_core::path::NavGrid;
 use sim_core::surface;
+use sim_core::travel::Graph;
 use sim_core::world::MAX_SIMS;
 use sim_core::{MINUTES_PER_TICK, World};
 
@@ -44,6 +46,14 @@ fn generated_worlds_are_livable() {
         }
         if w.exits.is_empty() {
             failures.push(format!("{label}: no way out of town"));
+        }
+        // The town's roads one network as the sim joins them (built here for a cosy town too,
+        // which plays without one).
+        let networks = Graph::from_town(&w.travel.file, &world["town"]["meta"]).networks();
+        if networks != 1 {
+            failures.push(format!(
+                "{label}: the roads make {networks} networks, not one"
+            ));
         }
         let mut cellars = 0;
         {
