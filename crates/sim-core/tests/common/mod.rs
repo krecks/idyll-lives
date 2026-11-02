@@ -800,7 +800,7 @@ fn state(w: &World, s: &Sim) -> State {
             }
         }
         Phase::Conversing { .. } => State::Busy(d),
-        Phase::Routing { .. } => State::Routing(d),
+        Phase::Routing { .. } | Phase::Driving => State::Routing(d),
         Phase::Calling { .. }
         | Phase::Waiting { .. }
         | Phase::Queued { .. }
@@ -843,7 +843,7 @@ fn describe(w: &World, st: State) -> String {
         Doing(k, a, b) => {
             let kinds = [
                 "Use", "MoveTo", "Social", "Join", "Work", "Visit", "GoHome", "Answer", "Clean",
-                "Repair", "Spot", "Cook", "Eat", "Dishes", "Phone",
+                "Repair", "Spot", "Cook", "Eat", "Dishes", "Phone", "Carry",
             ];
             format!("{} {a} {b}", kinds[k as usize])
         }
@@ -1773,3 +1773,4 @@ pub fn run_to(w: &mut World, day: u32, hour: f32) {
 pub fn apart(p: [f32; 2], q: [f32; 2]) -> f32 {
     (p[0] - q[0]).hypot(p[1] - q[1])
 }
+pub mod hamlets;

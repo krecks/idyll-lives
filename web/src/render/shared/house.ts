@@ -210,7 +210,7 @@ const CARPET = ['#B8AE9C', '#9FAAB8', '#B49C8C', '#A8B29A', '#C4B4A8'];
 /** Curtain colours seen through neighbours' windows. */
 const CURTAINS = ['#F2EDE0', '#E8D9B8', '#C9D6E2', '#E2C4BE', '#F4F1EA', '#E6E0C8'];
 /** Wall height of a garage (lower than the house). */
-const GARAGE_HEIGHT = 2.5;
+export const GARAGE_HEIGHT = 2.5;
 
 type RoomKind = 'living' | 'bedroom' | 'bath' | 'kitchen';
 
@@ -411,8 +411,8 @@ export interface SilhouetteSpec {
   front: [number, number];
   /** Centre of the front door along the front wall (x, or z on a wall along z), where the garden path meets the house, if known. */
   door: number | null;
-  /** Garage beside the house (wall centre lines), its door facing the street. */
-  garage: { x0: number; z0: number; x1: number; z1: number } | null;
+  /** Garage beside the house (wall centre lines), its door facing the street, or `door` (its outward normal: one the player built). */
+  garage: { x0: number; z0: number; x1: number; z1: number; door?: [number, number] } | null;
   /** The roof the player chose (`PlotInfo.roof`); absent: the house's own look. */
   roof?: [number, number];
   /** Storeys the house has (absent: one). */
@@ -627,10 +627,12 @@ export class HousePlanner {
     /** Whether a wall stands on an edge and is drawn here (a preview's own, not one standing round it). */
     const drawn = (axis: 'h' | 'v', x: number, z: number): boolean => !!(own ?? edges).get(axis, x, z) && !!edges.get(axis, x, z);
     // Looks: face coverings and form from the wall list, the style from the opening.
+    // (Only round the view: the lookups never leave it, and a big world's walls are thousands.)
+    const nearView = (e: { x: number; z: number }) => !view || (e.x >= view.x - 2 && e.z >= view.z - 2 && e.x <= view.x + view.w + 2 && e.z <= view.z + view.d + 2);
     const looks = new Map<string, Look>();
-    for (const e of [...standingWalls, ...world.walls]) if (e.faces || e.form) looks.set(`${e.axis}:${e.x}:${e.z}`, { faces: e.faces, form: e.form });
+    for (const e of [...standingWalls, ...world.walls]) if ((e.faces || e.form) && nearView(e)) looks.set(`${e.axis}:${e.x}:${e.z}`, { faces: e.faces, form: e.form });
     for (const o of [...standingOpenings, ...world.openings]) {
-      if (o.style || o.sill !== undefined || o.head !== undefined) looks.set(`${o.axis}:${o.x}:${o.z}`, { ...looks.get(`${o.axis}:${o.x}:${o.z}`), style: o.style, sill: o.sill, head: o.head });
+      if ((o.style || o.sill !== undefined || o.head !== undefined) && nearView(o)) looks.set(`${o.axis}:${o.x}:${o.z}`, { ...looks.get(`${o.axis}:${o.x}:${o.z}`), style: o.style, sill: o.sill, head: o.head });
     }
     const lookOf = (axis: 'h' | 'v', x: number, z: number): Look => looks.get(`${axis}:${x}:${z}`) ?? {};
     /** A door's top on an edge (m): the player's, else the usual. */
@@ -742,8 +744,10 @@ export class HousePlanner {
       t.sz += cz * n;
       roomTiles.set(r, t);
     };
-    for (let z = 0; z < D; z++) {
-      for (let x = 0; x < W; x++) {
+    // (Only the view's tiles: a big world's grid is a million a storey.)
+    const [z0, z1, x0, x1] = view ? [Math.max(0, view.z), Math.min(D, view.z + view.d), Math.max(0, view.x), Math.min(W, view.x + view.w)] : [0, D, 0, W];
+    for (let z = z0; z < z1; z++) {
+      for (let x = x0; x < x1; x++) {
         const r = room(x, z);
         if (r === 0 || !inView(x, z)) continue;
         const d = diagonal(x, z);
@@ -1618,6 +1622,43 @@ export class HousePlanner {
   }
 
   /**
+   * A house far off (the street's far LOD, past the chunks streamed in): its box of walls in its
+   * colour and its roof as `silhouettes` tops it (`roofTop`: a ridge along the longer side, or
+   * flat), into `geo` in the plain finish (rough, not metal). A few dozen triangles a house.
+   */
+  farHouse(geo: Geo, plot: { x: number; z: number; house: [number, number, number, number]; roof?: [number, number]; storeys?: number }): void {
+    const s = this.schemeWith(houseScheme(plot.x, plot.z), plot.roof);
+    const [x0, z0, x1, z1] = plot.house;
+    const [a0, b0, a1, b1] = [x0 - T, z0 - T, x1 + T, z1 + T];
+    const h = WALL_HEIGHT * (plot.storeys ?? 1);
+    const finish = 0.4;
+    geo.color(s.wall, finish).box(a0, 0, b0, a1, h, b1, 'ny py');
+    geo.color(s.roof, finish);
+    if (s.shape === 'flat') {
+      geo.box(a0 - 0.1, h, b0 - 0.1, a1 + 0.1, h + 0.2, b1 + 0.1, 'ny');
+      return;
+    }
+    const top = this.roofTop(plot);
+    const e = 0.3;
+    const alongX = a1 - a0 >= b1 - b0;
+    if (alongX) {
+      const mz = (b0 + b1) / 2;
+      geo.poly([[a0 - e, h, b0 - e], [a1 + e, h, b0 - e], [a1 + e, top, mz], [a0 - e, top, mz]], facing([a0, h, b0], [a1, h, b0], [a1, top, mz], [0, 1, -1]));
+      geo.poly([[a0 - e, h, b1 + e], [a0 - e, top, mz], [a1 + e, top, mz], [a1 + e, h, b1 + e]], facing([a0, h, b1], [a0, top, mz], [a1, top, mz], [0, 1, 1]));
+      geo.color(s.wall, finish);
+      geo.poly([[a0, h, b0], [a0, top, mz], [a0, h, b1]], [-1, 0, 0]);
+      geo.poly([[a1, h, b0], [a1, h, b1], [a1, top, mz]], [1, 0, 0]);
+    } else {
+      const mx = (a0 + a1) / 2;
+      geo.poly([[a0 - e, h, b0 - e], [mx, top, b0 - e], [mx, top, b1 + e], [a0 - e, h, b1 + e]], facing([a0, h, b0], [mx, top, b0], [mx, top, b1], [-1, 1, 0]));
+      geo.poly([[a1 + e, h, b0 - e], [a1 + e, h, b1 + e], [mx, top, b1 + e], [mx, top, b0 - e]], facing([a1, h, b0], [a1, h, b1], [mx, top, b1], [1, 1, 0]));
+      geo.color(s.wall, finish);
+      geo.poly([[a0, h, b0], [a1, h, b0], [mx, top, b0]], [0, 0, -1]);
+      geo.poly([[a0, h, b1], [mx, top, b1], [a1, h, b1]], [0, 0, 1]);
+    }
+  }
+
+  /**
    * Neighbouring houses as dressed boxes: the house's own doors and windows where they lie on
    * the box outline (framed, with muntins, curtains and shutters), corner boards, a porch with a
    * gabled canopy over the front door, a chimney on some roofs, and a garage at the end of the
@@ -1656,7 +1697,7 @@ export class HousePlanner {
       roof.color(s.roof);
       addRoofShaped(g, s, roof, trim, walls, GARAGE_HEIGHT, 0.3);
       // Sectional door on the street side (whichever wall that is), with a coach lamp beside it.
-      const [fx, fz] = b.front;
+      const [fx, fz] = g.door ?? b.front;
       const axis = fz ? 'h' : 'v';
       const plane = fz ? (fz > 0 ? g.z1 + T : g.z0 - T) : fx > 0 ? g.x1 + T : g.x0 - T;
       const n: V3 = [fx, 0, fz];

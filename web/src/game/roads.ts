@@ -78,6 +78,42 @@ export function pointAt(pts: readonly Pt[], s: number, ls = lengths(pts)): { p: 
   return { p: [lerp(a[0], b[0], f), lerp(a[1], b[1], f)], t: tangent(pts, f < 0.5 ? i : i + 1), i };
 }
 
+/** Whether a polyline turns no more than `most` radians from `half` m before arc length `s` to `half` m after it (its directions there). */
+export function straightAround(pts: readonly Pt[], s: number, half: number, most: number, ls = lengths(pts)): boolean {
+  const [a, b] = [pointAt(pts, s - half, ls).t, pointAt(pts, s + half, ls).t];
+  return a[0] * b[0] + a[1] * b[1] >= Math.cos(most);
+}
+
+/**
+ * The sharpest a polyline turns over two spans of `span` m: at each arc length `s` (a metre
+ * apart), the angle (radians) between its chords from `s - span` to `s` and from `s` to
+ * `s + span`. The worst, and where (`s`); 0 for a line shorter than two spans.
+ */
+export function sharpestTurn(pts: readonly Pt[], span = 20): { angle: number; s: number } {
+  const ls = lengths(pts);
+  const L = ls[ls.length - 1];
+  let i = 0;
+  // (Walking along: each `s` asked for is further than the last.)
+  const at = (s: number, from: number): [Pt, number] => {
+    let k = from;
+    while (k < ls.length - 2 && ls[k + 1] < s) k++;
+    const f = Math.max(0, Math.min(1, (s - ls[k]) / (ls[k + 1] - ls[k] || 1)));
+    const [a, b] = [pts[k], pts[k + 1] ?? pts[k]];
+    return [[lerp(a[0], b[0], f), lerp(a[1], b[1], f)], k];
+  };
+  let [j, k] = [0, 0];
+  let best = { angle: 0, s: 0 };
+  for (let s = span; s <= L - span; s++) {
+    const [p0, i0] = at(s - span, i);
+    const [p1, i1] = at(s, j);
+    const [p2, i2] = at(s + span, k);
+    [i, j, k] = [i0, i1, i2];
+    const turn = Math.abs(Math.atan2((p1[0] - p0[0]) * (p2[1] - p1[1]) - (p1[1] - p0[1]) * (p2[0] - p1[0]), (p1[0] - p0[0]) * (p2[0] - p1[0]) + (p1[1] - p0[1]) * (p2[1] - p1[1])));
+    if (turn > best.angle) best = { angle: turn, s };
+  }
+  return best;
+}
+
 /** The nearest point of a polyline: its distance, arc length and which side (+1: the left). */
 export function nearest(pts: readonly Pt[], x: number, z: number, ls = lengths(pts)): { dist: number; s: number; side: 1 | -1 } {
   let best = { dist: Infinity, s: 0, side: 1 as 1 | -1 };
@@ -200,6 +236,320 @@ export function lane(ctrl: readonly Pt[], ends: [RoadEnd, RoadEnd], width = LANE
   return { points: curve(ctrl), width, ends };
 }
 
+// ---- joining the roads up ------------------------------------------------------------------
+
+/** A lane left with a dead end (a court) reaches at most this far past the last road it meets (m). */
+export const COURT = 45;
+/** Roads running alongside each other keep this far apart (m, from the other's edge to the middle). */
+const APART = 18;
+/** Cross streets keep further from the roads they run alongside (room for a lot between, m). */
+const STREETS_APART = 30;
+/** Where a road meets another, no third comes within this of it (m). */
+const ROOM = 14;
+/** The tightest bend a new stretch of road takes (m, to its middle), and the least angle it meets a road at. */
+const TIGHTEST = 9;
+const MEET = (35 * Math.PI) / 180;
+/** How far a dead end looks for a road to go on to (m). */
+const REACH = 120;
+
+/** Where new stretches of road may run: inside `box`, `margin` m from its edge (default 14), off the `greens`. */
+export interface Fit {
+  box: Box;
+  margin?: number;
+  greens?: readonly Pt[][];
+}
+
+const unit = (x: number, z: number): Pt => {
+  const l = Math.hypot(x, z) || 1;
+  return [x / l, z / l];
+};
+/** `v` turned `a` radians. */
+const turned = ([x, z]: Pt, a: number): Pt => [x * Math.cos(a) - z * Math.sin(a), x * Math.sin(a) + z * Math.cos(a)];
+const dot = (a: Pt, b: Pt) => a[0] * b[0] + a[1] * b[1];
+/** The signed angle from `a` to `b` (radians). */
+const angleTo = (a: Pt, b: Pt) => Math.atan2(a[0] * b[1] - a[1] * b[0], dot(a, b));
+
+/** The way a road leaves at its last point (a unit direction, from 3 m back). */
+function endDir(pts: readonly Pt[]): Pt {
+  const ls = lengths(pts);
+  const back = pointAt(pts, ls[ls.length - 1] - 3, ls).p;
+  const e = pts[pts.length - 1];
+  return unit(e[0] - back[0], e[1] - back[1]);
+}
+
+/**
+ * A smooth stretch of road from `a`, leaving it along `da`, to `b`, arriving along `db` (unit
+ * directions): a cubic Bézier, as a `curve` (a point every metre or so).
+ */
+export function connector(a: Pt, da: Pt, b: Pt, db: Pt): Pt[] {
+  const k = Math.hypot(b[0] - a[0], b[1] - a[1]) * 0.38;
+  const p1: Pt = [a[0] + da[0] * k, a[1] + da[1] * k];
+  const p2: Pt = [b[0] - db[0] * k, b[1] - db[1] * k];
+  const ctrl: Pt[] = [];
+  for (let i = 0; i <= 6; i++) {
+    const t = i / 6;
+    const [u0, u1, u2, u3] = [(1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t * t, t ** 3];
+    ctrl.push([u0 * a[0] + u1 * p1[0] + u2 * p2[0] + u3 * b[0], u0 * a[1] + u1 * p1[1] + u2 * p2[1] + u3 * b[1]]);
+  }
+  return curve(ctrl);
+}
+
+/** How far a polyline turns left and right (radians, over 3 m steps), and whether it bends tighter than `TIGHTEST` anywhere. */
+export function bends(pts: readonly Pt[]): { left: number; right: number; tight: boolean } {
+  const ls = lengths(pts);
+  const L = ls[ls.length - 1];
+  let [left, right, tight] = [0, 0, false];
+  let prev: Pt | null = null;
+  for (let s = 0; s + 3 <= L + 1e-6; s += 3) {
+    const a = pointAt(pts, s, ls).p;
+    const b = pointAt(pts, Math.min(L, s + 3), ls).p;
+    const t = unit(b[0] - a[0], b[1] - a[1]);
+    if (prev) {
+      const d = angleTo(prev, t);
+      if (d > 0) left += d;
+      else right -= d;
+      if (Math.abs(d) > 3 / TIGHTEST) tight = true;
+    }
+    prev = t;
+  }
+  return { left, right, tight };
+}
+
+/**
+ * Whether a new stretch of road (`pts`, `width` wide) fits among `roads`: inside the box and off
+ * the greens, touching no road but road `from` at its start and road `to` at its end (-1: none),
+ * and nowhere running alongside another nearer than `apart` (m, from its edge).
+ */
+export function clearOf(pts: readonly Pt[], width: number, roads: readonly RoadPlan[], index: RoadIndex, fit: Fit, from: number, to: number, apart = APART): boolean {
+  const m = fit.margin ?? 14;
+  if (pts.some(([x, z]) => x < m || z < m || x > fit.box.w - m || z > fit.box.d - m)) return false;
+  const ls = lengths(pts);
+  const L = ls[ls.length - 1];
+  const greens = fit.greens ?? [];
+  const widest = Math.max(width, ...roads.map((r) => r.width));
+  for (let i = 0; i < pts.length; i++) {
+    const [x, z] = pts[i];
+    const [s, u] = [ls[i], L - ls[i]];
+    if (s > 4 && u > 4 && greens.some((g) => inside(g, x, z))) return false;
+    const t = tangent(pts, i);
+    for (const [r, near] of index.around(x, z, widest / 2 + apart)) {
+      const clear = roads[r].width / 2 + width / 2 + 1;
+      // (Where it leaves its road and where it meets the other, it comes in at 35° or more.)
+      const free = clear * 1.8 + 1;
+      if (near.dist < clear && !((r === from && s < free) || (r === to && u < free))) return false;
+      // Alongside: beside the other (not beyond its end), running the same way.
+      if (s > 20 && u > 20 && near.dist < roads[r].width / 2 + apart && Math.abs(dot(t, near.t)) > Math.cos(MEET)) {
+        const q = pointAt(roads[r].points, near.s).p;
+        if (Math.abs(dot([x - q[0], z - q[1]], near.t)) < near.dist * 0.5) return false;
+      }
+    }
+  }
+  return true;
+}
+
+/** Whether no road but `except` comes within `ROOM` m of `p` (room for a junction there). */
+export function roomAt(index: RoadIndex, p: Pt, except: readonly number[]): boolean {
+  for (const r of index.around(p[0], p[1], ROOM).keys()) if (!except.includes(r)) return false;
+  return true;
+}
+
+/** A way for road `from`'s dead end (its last point) to go on: the new points, the road it meets (`to`, at its dead end if `dead`), its cost. */
+interface Join {
+  from: number;
+  to: number;
+  dead: boolean;
+  pts: Pt[];
+  cost: number;
+}
+
+/** The best way on from road `i`'s dead end (its last point) to another road, or to another's dead end; null if none fits. */
+function joinFor(roads: readonly RoadPlan[], index: RoadIndex, i: number, fit: Fit): Join | null {
+  const r = roads[i];
+  const E = r.points[r.points.length - 1];
+  const d = endDir(r.points);
+  const cands: { T: Pt; a: Pt; to: number; dead: boolean; est: number }[] = [];
+  const add = (T: Pt, a: Pt, to: number, dead: boolean) => {
+    const v = unit(T[0] - E[0], T[1] - E[1]);
+    const L = Math.hypot(T[0] - E[0], T[1] - E[1]);
+    if (L < 8 || L > REACH || dot(v, d) < -0.3) return;
+    // One bend: the way there between the way out and the way in.
+    const [turn, first] = [angleTo(d, a), angleTo(d, v)];
+    const between = Math.sign(first) === Math.sign(turn) || Math.abs(first) < 0.15 || Math.abs(angleTo(v, a)) < 0.15;
+    cands.push({ T, a, to, dead, est: L + 12 * Math.abs(turn) + (between ? 0 : 40) - (dead ? 20 : 0) });
+  };
+  roads.forEach((o, q) => {
+    if (q === i || o.island || o.kind === 'trail') return;
+    if (o.ends[1] === 'dead') {
+      const dq = endDir(o.points);
+      add(o.points[o.points.length - 1], [-dq[0], -dq[1]], q, true);
+    }
+    const ls = lengths(o.points);
+    const Lq = ls[ls.length - 1];
+    const closed = o.ends[0] === 'loop';
+    for (let s = closed ? 0 : 10; s <= (closed ? Lq - 2 : Lq - 10); s += 4) {
+      const { p: T, t } = pointAt(o.points, s, ls);
+      const n = leftOf(t);
+      const sgn = dot([E[0] - T[0], E[1] - T[1]], n) >= 0 ? 1 : -1;
+      // Into the road from this side: square to it, or up to 32° off.
+      const a0: Pt = [-n[0] * sgn, -n[1] * sgn];
+      for (const tw of [0, 0.55, -0.55]) add(T, turned(a0, tw), q, false);
+    }
+  });
+  cands.sort((x, y) => x.est - y.est);
+  let best: Join | null = null;
+  let valid = 0;
+  for (const c of cands.slice(0, 120)) {
+    if (best && c.est > best.cost + 40) break;
+    const pts = connector(E, d, c.T, c.a);
+    const b = bends(pts);
+    if (b.tight || Math.min(b.left, b.right) > 0.3) continue;
+    if (!c.dead) {
+      // Square enough to the road it meets, with room there.
+      const tq = pointAt(roads[c.to].points, index.along(c.to, c.T[0], c.T[1])).t;
+      if (Math.abs(Math.sin(angleTo(endDir(pts), tq))) < Math.sin(MEET)) continue;
+      if (!roomAt(index, c.T, [c.to, i])) continue;
+    }
+    if (!clearOf(pts, r.width, roads, index, fit, i, c.to)) continue;
+    const cost = lengths(pts)[pts.length - 1] + 10 * (b.left + b.right) - (c.dead ? 20 : 0);
+    if (!best || cost < best.cost) best = { from: i, to: c.to, dead: c.dead, pts, cost };
+    if (++valid >= 4) break;
+  }
+  return best;
+}
+
+/** `roads` with join `j` made: the lane goes on to the road it meets, or the two lanes are one. */
+function joined(roads: readonly RoadPlan[], j: Join): RoadPlan[] {
+  const r = roads[j.from];
+  const on = j.pts.slice(1);
+  if (!j.dead) return roads.map((x, k) => (k === j.from ? { ...r, points: [...r.points, ...on], ends: [r.ends[0], 'join'] } : x));
+  const o = roads[j.to];
+  const one: RoadPlan = { ...r, width: Math.max(r.width, o.width), points: [...r.points, ...on.slice(0, -1), ...[...o.points].reverse()], ends: [r.ends[0], o.ends[0]] };
+  return roads.flatMap((x, k) => (k === j.to ? [] : k === j.from ? [one] : [x]));
+}
+
+/** Arc length along road `i` of the last place another road's end meets it (0: none past its start). */
+function lastJoin(roads: readonly RoadPlan[], index: RoadIndex, i: number): number {
+  let last = 0;
+  roads.forEach((o, k) => {
+    if (k === i) return;
+    for (const p of [o.points[0], o.points[o.points.length - 1]]) {
+      if (index.distance(i, p[0], p[1], Math.max(o.width, roads[i].width) / 2 + 1) < Infinity) last = Math.max(last, index.along(i, p[0], p[1]));
+    }
+  });
+  return last;
+}
+
+/** Road `r` up to arc length `s`. */
+function cutAt(r: RoadPlan, s: number): Pt[] {
+  const ls = lengths(r.points);
+  const keep = r.points.filter((_, k) => ls[k] < s - 0.5);
+  return [...keep, pointAt(r.points, s, ls).p];
+}
+
+/**
+ * The town's lanes joined up: every dead end goes on to the nearest road it fits to (or another
+ * dead end, the two lanes made one), by a smooth stretch of road with one bend at most, crossing
+ * nothing, meeting the other road at 35° or more and keeping clear of the roads alongside it
+ * (`Fit`: inside the box, off the greens). Those it can't stay courts, the shortest `courts` of
+ * them (cut to `COURT` m past the last road they meet); the others are taken back to that road.
+ */
+export function connect(laid: readonly RoadPlan[], fit: Fit, courts = 2): RoadPlan[] {
+  // Each lane's dead end at its end.
+  let roads = laid.map((r): RoadPlan => (r.ends[0] === 'dead' && r.ends[1] !== 'dead' ? { ...r, points: [...r.points].reverse(), ends: [r.ends[1], r.ends[0]] } : r));
+  const lane = (r: RoadPlan) => r.ends[1] === 'dead' && r.kind !== 'trail';
+  for (let guard = 0; guard < 40; guard++) {
+    const index = new RoadIndex(roads);
+    let best: Join | null = null;
+    for (const [i, r] of roads.entries()) {
+      if (!lane(r)) continue;
+      const j = joinFor(roads, index, i, fit);
+      if (j && (!best || j.cost < best.cost)) best = j;
+    }
+    if (!best) break;
+    roads = joined(roads, best);
+  }
+  // The rest: the shortest stay courts, the others go back to the last road they meet.
+  for (let guard = 0; guard < 40; guard++) {
+    const index = new RoadIndex(roads);
+    const dead = roads
+      .flatMap((r, i) => {
+        if (!lane(r)) return [];
+        const from = lastJoin(roads, index, i);
+        return [{ i, from, len: lengths(r.points)[r.points.length - 1] - from }];
+      })
+      .sort((a, b) => a.len - b.len);
+    const long = dead.slice(0, courts).find((c) => c.len > COURT + 0.5);
+    if (long) {
+      const r = roads[long.i];
+      roads = roads.map((x, k) => (k === long.i ? { ...r, points: cutAt(r, long.from + COURT) } : x));
+      continue;
+    }
+    const extra = dead[courts];
+    if (!extra) break;
+    if (extra.from < 0.5) {
+      roads = roads.filter((_, k) => k !== extra.i);
+      continue;
+    }
+    roads = turnCorner(roads, extra.i, extra.from);
+  }
+  return roads;
+}
+
+/**
+ * Road `i` cut back to `s`, where another road's end meets it, and the two made one road round
+ * the corner (rounded off), so neither ends at the other.
+ */
+function turnCorner(roads: readonly RoadPlan[], i: number, s: number): RoadPlan[] {
+  const r = roads[i];
+  const corner = pointAt(r.points, s).p;
+  const k = roads.findIndex((o, n) => n !== i && [o.points[0], o.points[o.points.length - 1]].some((p) => Math.hypot(p[0] - corner[0], p[1] - corner[1]) < Math.max(o.width, r.width) / 2 + 1.5));
+  if (k < 0) return roads.map((x, n) => (n === i ? { ...x, points: cutAt(x, s), ends: [x.ends[0], 'join'] } : x));
+  const o = roads[k];
+  const first = o.points[0];
+  // The other road leading away from the corner.
+  const away = Math.hypot(first[0] - corner[0], first[1] - corner[1]) < Math.hypot(o.points[o.points.length - 1][0] - corner[0], o.points[o.points.length - 1][1] - corner[1]);
+  const on = away ? o.points : [...o.points].reverse();
+  const onEnds: [RoadEnd, RoadEnd] = away ? o.ends : [o.ends[1], o.ends[0]];
+  const before = cutAt(r, Math.max(1, s - 8));
+  const lsOn = lengths(on);
+  const after = on.filter((_, n) => lsOn[n] > 8);
+  const a = before[before.length - 1];
+  const b = after[0] ?? on[on.length - 1];
+  const da = endDir(before);
+  const db = unit((after[1] ?? b)[0] - b[0], (after[1] ?? b)[1] - b[1]);
+  const round = connector(a, da, b, db);
+  const one: RoadPlan = { ...r, width: Math.max(r.width, o.width), points: [...before, ...round.slice(1, -1), ...after], ends: [r.ends[0], onEnds[1]] };
+  return roads.flatMap((x, n) => (n === k ? [] : n === i ? [one] : [x]));
+}
+
+/**
+ * A cross street from road `from` at `p` (leaving along `dir`) to the first road ahead of it,
+ * 30 to `reach` m away, if one fits as `connect`'s lanes do; null if not.
+ */
+export function crossStreet(roads: readonly RoadPlan[], index: RoadIndex, from: number, p: Pt, dir: Pt, fit: Fit, reach = 110, width = LANE_WIDTH): RoadPlan | null {
+  let hit: { k: number; road: number; s: number } | null = null;
+  for (let k = 8; k <= reach && !hit; k += 2) {
+    const q: Pt = [p[0] + dir[0] * k, p[1] + dir[1] * k];
+    const near = index.nearest(q[0], q[1], 8);
+    if (near && near.dist < roads[near.road].width / 2) hit = { k, road: near.road, s: near.s };
+  }
+  if (!hit || hit.k < 40 || hit.road === from) return null;
+  const to = roads[hit.road];
+  if (to.island || to.kind === 'trail') return null;
+  const { p: T, t: tq } = pointAt(to.points, hit.s);
+  const n = leftOf(tq);
+  const sgn = dot([p[0] - T[0], p[1] - T[1]], n) >= 0 ? 1 : -1;
+  const a = unit(dir[0] - n[0] * sgn, dir[1] - n[1] * sgn);
+  const pts = connector(p, dir, T, a);
+  const b = bends(pts);
+  if (b.tight || Math.min(b.left, b.right) > 0.3) return null;
+  const tp = pointAt(roads[from].points, index.along(from, p[0], p[1])).t;
+  if (Math.abs(Math.sin(angleTo(dir, tp))) < Math.sin(MEET) || Math.abs(Math.sin(angleTo(endDir(pts), tq))) < Math.sin(MEET)) return null;
+  if (!roomAt(index, p, [from]) || !roomAt(index, T, [hit.road])) return null;
+  if (!clearOf(pts, width, roads, index, fit, from, hit.road, STREETS_APART)) return null;
+  return { points: pts, width, ends: ['join', 'join'] };
+}
+
 // ---- the land the roads take ---------------------------------------------------------------
 
 /**
@@ -317,6 +667,21 @@ export class RoadIndex {
       const road = this.segs[id].road;
       return road !== skip && this.measure(id, x, z)[0] < this.roads[road].width / 2 + margin;
     });
+  }
+
+  /** Each road whose middle passes within `within` m of (x, z): how far, the arc length there and the way it runs there (a unit direction). */
+  around(x: number, z: number, within: number): Map<number, { dist: number; s: number; t: Pt }> {
+    const out = new Map<number, { dist: number; s: number; t: Pt }>();
+    this.near(x, z, within, (id) => {
+      const [dist, s] = this.measure(id, x, z);
+      const { road, k } = this.segs[id];
+      const had = out.get(road);
+      if (dist > within || (had && had.dist <= dist)) return;
+      const [[ax, az], [bx, bz]] = [this.roads[road].points[k], this.roads[road].points[k + 1]];
+      const l = Math.hypot(bx - ax, bz - az) || 1;
+      out.set(road, { dist, s, t: [(bx - ax) / l, (bz - az) / l] });
+    });
+    return out;
   }
 
   /** The road nearest (x, z) within `within` m, how far its middle is, the arc length there and which side (+1: its left). */

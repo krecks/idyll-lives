@@ -114,7 +114,7 @@ impl Links {
         // Which top covers each tile (floor objects never share tiles).
         let mut tops: Vec<u32> = Vec::new();
         if objects.iter().any(|o| content.objects[o.def].seat_at != 0) {
-            tops = vec![u32::MAX; lot.width * lot.depth];
+            tops = vec![u32::MAX; lot.tile_slots()];
             for o in objects
                 .iter()
                 .filter(|o| content.objects[o.def].surface.is_some())

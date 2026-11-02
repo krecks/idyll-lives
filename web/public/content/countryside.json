@@ -1,0 +1,134 @@
+{
+  "$comment": "Countryside spots for big worlds (docs/design/open-world.md): placed by the world generator on countryside plots, reached by trail. They reuse shipped models until their own are made. The fishing spot's use plays `look` until the renderer has a `fish` action (render/shared/characters/actions.ts ACTIONS) and the content declares it in `animations`; then its anim becomes `fish`. The trailhead's walk is `trail`: the resident walks out along the trail it stands at and back while it lasts (sim-core world::trail_step), shown walking.",
+  "objects": [
+    {
+      "id": "countryside.fishingSpot",
+      "name": "Fishing spot",
+      "model": "model.garden.pond",
+      "category": "community",
+      "group": "countryside",
+      "freeRotation": true,
+      "outdoors": true,
+      "footprint": [2, 2],
+      "price": 0,
+      "description": "A quiet bend of water with a flat stone to stand on: rods are left out for anyone patient enough.",
+      "interactions": [
+        {
+          "id": "fish",
+          "label": "Go fishing",
+          "anim": "look",
+          "minutes": 60,
+          "effects": { "fun": 0.35, "comfort": 0.2 },
+          "tags": ["nature", "outdoors"],
+          "skills": { "perception": 0.1 }
+        },
+        {
+          "id": "feedFish",
+          "label": "Feed the fish",
+          "anim": "garden",
+          "minutes": 5,
+          "effects": { "fun": 0.08 },
+          "tags": ["nature", "outdoors"],
+          "cost": 2
+        }
+      ]
+    },
+    {
+      "id": "countryside.lookout",
+      "name": "Lookout bench",
+      "model": "model.parkBench",
+      "category": "community",
+      "group": "countryside",
+      "footprint": [3, 1],
+      "slots": 3,
+      "price": 0,
+      "outdoors": true,
+      "decor": 0.3,
+      "seat": { "height": 0.45, "forward": 0.0 },
+      "description": "A bench on the rise, where the whole valley opens out below.",
+      "interactions": [
+        {
+          "id": "view",
+          "label": "Take in the view",
+          "anim": "sit",
+          "pose": "sit",
+          "minutes": 30,
+          "effects": { "comfort": 0.3, "fun": 0.15 },
+          "tags": ["lounge", "nature", "outdoors"]
+        }
+      ]
+    },
+    {
+      "id": "countryside.picnicSpot",
+      "name": "Picnic spot",
+      "model": "model.picnicTable",
+      "category": "community",
+      "group": "countryside",
+      "outdoors": true,
+      "footprint": [3, 2],
+      "price": 0,
+      "slots": 2,
+      "places": [{ "at": [-0.3, 0.7], "facing": 180 }, { "at": [-0.3, -0.7] }],
+      "surface": { "height": 0.73, "kind": "table", "size": [2.4, 0.7] },
+      "description": "A table in the meadow with a view of the hills: bring a basket.",
+      "interactions": [
+        {
+          "id": "picnic",
+          "label": "Have a picnic",
+          "anim": "eat",
+          "pose": "sit",
+          "minutes": 40,
+          "effects": { "hunger": 0.4, "fun": 0.2, "social": 0.05 },
+          "tags": ["food", "lounge", "nature", "outdoors"]
+        }
+      ]
+    },
+    {
+      "id": "countryside.berryBush",
+      "name": "Wild berries",
+      "model": "model.bush",
+      "category": "community",
+      "group": "countryside",
+      "freeRotation": true,
+      "outdoors": true,
+      "footprint": [1, 1],
+      "price": 0,
+      "description": "Brambles heavy with blackberries in late summer, free for the picking.",
+      "interactions": [
+        {
+          "id": "pick",
+          "label": "Pick berries",
+          "anim": "harvest",
+          "minutes": 20,
+          "effects": { "hunger": 0.15, "fun": 0.12 },
+          "tags": ["food", "nature", "outdoors"]
+        }
+      ]
+    },
+    {
+      "id": "countryside.trailhead",
+      "name": "Trailhead signpost",
+      "model": "model.noticeBoard",
+      "category": "community",
+      "group": "countryside",
+      "freeRotation": true,
+      "outdoors": true,
+      "footprint": [1, 1],
+      "price": 0,
+      "decor": 0.1,
+      "description": "Where the trail starts: a map of the walk, and how long it takes.",
+      "interactions": [
+        {
+          "id": "walk",
+          "label": "Walk the trail",
+          "anim": "idle",
+          "minutes": 60,
+          "trail": true,
+          "effects": { "fun": 0.3, "comfort": 0.15, "energy": -0.1 },
+          "tags": ["fitness", "nature", "outdoors"],
+          "skills": { "endurance": 0.2 }
+        }
+      ]
+    }
+  ]
+}

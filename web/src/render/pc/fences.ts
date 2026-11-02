@@ -23,9 +23,12 @@ export interface Fences {
   normals: Float32Array;
 }
 
-/** Builds the mesh of all fences and gates under `parent` (null when there are none). */
-export function buildFences(app: pc.AppBase, parent: pc.Entity, fences: readonly FenceEdge[], styles: readonly FenceStyleDef[]): Fences | null {
-  const plan = planFences(fences, styles);
+/**
+ * Builds the mesh of all fences and gates under `parent` (null when there are none). Hedges are the
+ * garden's (`fenceHedges`), but for `hedgeBoxes` (Build mode's previews: plain boxes).
+ */
+export function buildFences(app: pc.AppBase, parent: pc.Entity, fences: readonly FenceEdge[], styles: readonly FenceStyleDef[], { hedgeBoxes = false } = {}): Fences | null {
+  const plan = planFences(fences, styles, { hedgeBoxes });
   if (!plan) return null;
   const data = plan.geo.meshData({ colors: true });
   const mesh = meshFrom(app.graphicsDevice, data, plan.gates.length > 0);

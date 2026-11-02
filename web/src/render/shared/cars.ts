@@ -263,8 +263,8 @@ export interface ParkedCar {
  * house has none (about one in five). From the plot's place, so the town, the menus and the game
  * agree.
  */
-export function parkCar(plot: Rect, spot: DriveEnd): ParkedCar | null {
-  if (hash(plot.x, plot.z, 20) >= 0.8) return null;
+export function parkCar(plot: Rect, spot: DriveEnd, always = false): ParkedCar | null {
+  if (!always && hash(plot.x, plot.z, 20) >= 0.8) return null;
   const { front, street } = spot;
   const body = Math.floor(hash(plot.x, plot.z, 21) * CARS.length) % CARS.length;
   const { len, wid } = CARS[body];
@@ -281,11 +281,30 @@ export function parkCar(plot: Rect, spot: DriveEnd): ParkedCar | null {
   };
 }
 
+/**
+ * The car of the house on `plot` with the driveway `drive` (both on the town; the plot's street
+ * on its side `facing`, as `TownMeta.facing`: 0 north, 1 west, 2 south, 3 east), on the town:
+ * `parkCar` with the plot laid out as the street lays it out (`street.ts` `layout`: turned a
+ * quarter when its street is east or west of it), so the town's cars (`game/town.ts`, the sim's
+ * `cars`) stand where the street drew them, look as it drew them and go on the same houses (about
+ * four in five). `always`: a car even on a house the street would leave without one.
+ */
+export function houseCar(plot: Rect, facing: number, drive: Rect, always = false): ParkedCar | null {
+  const turned = facing % 2 === 1;
+  // (As `street.ts` `localRect`, `townPoint` and `townYaw`.)
+  const laid = (r: Rect): Rect => (turned ? { x: r.z, z: -(r.x + r.w), w: r.d, d: r.w } : r);
+  const front: 1 | -1 = facing === 2 || facing === 1 ? 1 : -1;
+  const d = laid(drive);
+  const car = parkCar(laid(plot), { x: d.x + d.w / 2, z: front > 0 ? d.z : d.z + d.d, front, street: 0 }, always);
+  if (!car || !turned) return car;
+  return { ...car, x: -car.z, z: car.x, yaw: car.yaw - Math.PI / 2 };
+}
+
 // ---- garages ---------------------------------------------------------------------------
 
 /** A garage's depth, and its least width between its wall lines: 3 m inside, a single garage's (its door 2.4 m). */
-const GARAGE_DEPTH = 5.4;
-const GARAGE_WIDTH = 3.14;
+export const GARAGE_DEPTH = 5.4;
+export const GARAGE_WIDTH = 3.14;
 /** Half a wall's thickness (as in `house.ts`). */
 const WALL_HALF = 0.07;
 /** How far a garage keeps from the things on the lot (m): a tile, to use them from and walk round them by. */
@@ -307,6 +326,14 @@ export interface Garage {
  */
 export function garageFor(plot: Rect, h: { x0: number; z0: number; x1: number; z1: number }, d: Rect, front: 1 | -1, blocked: readonly Rect[]): Garage | null {
   if (hash(plot.x, plot.z, 50) > 0.7) return null;
+  return garageAt(plot, h, d, front, blocked);
+}
+
+/**
+ * The garage `garageFor` gives a house that has one, on any house (the player builds it: Build
+ * mode's Garage tool, at the end of their driveway): null when it doesn't fit there.
+ */
+export function garageAt(plot: Rect, h: { x0: number; z0: number; x1: number; z1: number }, d: Rect, front: 1 | -1, blocked: readonly Rect[]): Garage | null {
   // As wide as the drive and a little more, at least a single garage's `GARAGE_WIDTH`, moved
   // (off the drive's middle if it must) to stand clear of the house and the plot's edge.
   const toRight = d.x >= h.x1;

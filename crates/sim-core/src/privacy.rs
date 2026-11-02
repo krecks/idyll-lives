@@ -85,58 +85,96 @@ fn private_room(
     content: &Content,
     plots: &[crate::world::Plot],
     r: &crate::rooms::RoomInfo,
-    outside: &[u16],
+    outside: &[bool],
 ) -> bool {
     !r.garden
         && r.id != OUTDOORS
         && !r.mixed
         && r.kind.is_some_and(|k| content.room_kinds[k].private)
-        && !outside.contains(&r.id)
+        && !outside.get(r.id as usize).copied().unwrap_or(false)
         && r.plot
             .is_none_or(|p| plots.get(p as usize).is_none_or(|p| !p.public))
 }
 
-/// The rooms of `rooms` kept shut while anyone is in them (`private_room`), sorted, and the claimed
-/// (`roomKinds[].claimed`: bedrooms, `Shut::claimants`) ones among them, sorted.
+/// Whether room `id` has a door to the outside, as `doors_out` finds it, over the edges round
+/// its tiles only (`Lot::room_rect`).
+pub(crate) fn door_out(lot: &Lot, id: u16) -> bool {
+    let Some([x0, z0, x1, z1]) = lot.room_rect(id) else {
+        return false;
+    };
+    let room = |x: i32, z: i32| lot.room_at(x, z);
+    let out = |a: u16, b: u16| (a == id && b == OUTDOORS) || (b == id && a == OUTDOORS);
+    lot.walls_in([x0, z0, x1 + 1, z1 + 1])
+        .into_iter()
+        .any(|(at, e)| match at {
+            crate::lot::EdgeRef::H(x, z) if e == crate::lot::Edge::Door => {
+                let (x, z) = (i32::from(x), i32::from(z));
+                out(room(x, z - 1), room(x, z))
+            }
+            crate::lot::EdgeRef::V(x, z) if e == crate::lot::Edge::Door => {
+                let (x, z) = (i32::from(x), i32::from(z));
+                out(room(x - 1, z), room(x, z))
+            }
+            _ => false,
+        })
+}
+
+/// Per room id (up to the highest of `rooms`): whether it has a door to the outside (such a
+/// room isn't private: `private_room`). Found with the rooms (`World::rooms_out`).
+pub(crate) fn doors_out(
+    content: &Content,
+    rooms: &[crate::rooms::RoomInfo],
+    lot: &Lot,
+) -> Vec<bool> {
+    if !content.room_kinds.iter().any(|k| k.private) {
+        return Vec::new();
+    }
+    let most = rooms.iter().map(|r| r.id as usize).max().unwrap_or(0);
+    let mut outside = vec![false; most + 1];
+    let room = |x: i32, z: i32| lot.room_at(x, z);
+    let mut door = |a: u16, b: u16| {
+        for (r, across) in [(a, b), (b, a)] {
+            if r != OUTDOORS
+                && across == OUTDOORS
+                && let Some(o) = outside.get_mut(r as usize)
+            {
+                *o = true;
+            }
+        }
+    };
+    for (at, e) in lot.walls() {
+        match at {
+            crate::lot::EdgeRef::H(x, z) if e == crate::lot::Edge::Door => {
+                let (x, z) = (i32::from(x), i32::from(z));
+                door(room(x, z - 1), room(x, z));
+            }
+            crate::lot::EdgeRef::V(x, z) if e == crate::lot::Edge::Door => {
+                let (x, z) = (i32::from(x), i32::from(z));
+                door(room(x - 1, z), room(x, z));
+            }
+            _ => {}
+        }
+    }
+    outside
+}
+
+/// The rooms of `rooms` kept shut while anyone is in them (`private_room`; `outside`: per room
+/// id, a door to the outside, `doors_out`), sorted, and the claimed (`roomKinds[].claimed`:
+/// bedrooms, `Shut::claimants`) ones among them, sorted.
 pub(crate) fn private_rooms(
     content: &Content,
     plots: &[crate::world::Plot],
     rooms: &[crate::rooms::RoomInfo],
-    lot: &Lot,
+    outside: &[bool],
 ) -> (Vec<u16>, Vec<u16>) {
     if !content.room_kinds.iter().any(|k| k.private) {
         return (Vec::new(), Vec::new());
-    }
-    // Rooms with a door to the outside.
-    let mut outside = Vec::new();
-    let room = |x: i32, z: i32| lot.room_at(x, z);
-    let (w, d) = (lot.width as i32, lot.depth as i32);
-    let mut door = |a: u16, b: u16| {
-        for (r, across) in [(a, b), (b, a)] {
-            if r != OUTDOORS && across == OUTDOORS && !outside.contains(&r) {
-                outside.push(r);
-            }
-        }
-    };
-    for z in 0..=d {
-        for x in 0..w {
-            if lot.h_edge(x as usize, z as usize) == crate::lot::Edge::Door {
-                door(room(x, z - 1), room(x, z));
-            }
-        }
-    }
-    for z in 0..d {
-        for x in 0..=w {
-            if lot.v_edge(x as usize, z as usize) == crate::lot::Edge::Door {
-                door(room(x - 1, z), room(x, z));
-            }
-        }
     }
     let mut ids = Vec::new();
     let mut claimed = Vec::new();
     for r in rooms
         .iter()
-        .filter(|r| private_room(content, plots, r, &outside))
+        .filter(|r| private_room(content, plots, r, outside))
     {
         ids.push(r.id);
         if r.kind.is_some_and(|k| content.room_kinds[k].claimed) {
@@ -253,17 +291,23 @@ pub(crate) fn claimed_places(
     objects: &[ObjectInstance],
 ) -> Vec<(u16, Vec<u32>)> {
     let mut out: Vec<(u16, Vec<u32>)> = claimed.iter().map(|&r| (r, Vec::new())).collect();
+    if claimed.is_empty() {
+        return out;
+    }
+    // (What kinds of thing offer a place, once: most don't, and needn't be found a room.)
+    let places: Vec<bool> = content
+        .objects
+        .iter()
+        .map(|def| def.interactions.iter().any(|i| offers_place(content, i)))
+        .collect();
     for (i, o) in objects.iter().enumerate() {
+        if !places.get(o.def).copied().unwrap_or(false) {
+            continue;
+        }
         // Broken ones are listed too: `room_claimants` skips them while they're broken, and a
         // repair shouldn't need the rooms rebuilt.
         let room = room_of_object(content, lot, o);
-        let Ok(k) = claimed.binary_search(&room) else {
-            continue;
-        };
-        let Some(def) = content.objects.get(o.def) else {
-            continue;
-        };
-        if def.interactions.iter().any(|i| offers_place(content, i)) {
+        if let Ok(k) = claimed.binary_search(&room) {
             out[k].1.push(i as u32);
         }
     }
@@ -388,7 +432,9 @@ fn room_hash(w: &World, room: u16, presence: u64) -> u64 {
         mix(&mut h, o.open as u64);
         mix(&mut h, o.ripe() as u64);
         mix(&mut h, o.run.map_or(0, |m| if m > 0.0 { 1 } else { 2 }));
-        mix(&mut h, o.closed_users);
+        for &w in o.closed_users.words() {
+            mix(&mut h, w);
+        }
         let mut n = 0;
         for u in o.users() {
             mix(&mut h, u as u64);

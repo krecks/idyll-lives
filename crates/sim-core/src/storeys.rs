@@ -78,9 +78,7 @@ impl World {
             blocks += 1;
         }
         self.lot.grow_depth(depth * blocks);
-        let tiles = self.lot.width * self.lot.depth;
-        self.blocked.resize(tiles, false);
-        self.dirt.resize(tiles, 0.0);
+        self.sync_tile_arrays();
         self.storeys = want;
         self.stairs.depth = depth as i32;
         self.refresh_stairs();
@@ -96,7 +94,7 @@ impl World {
             .iter()
             .filter_map(|o| stair_of(&self.content, o, &self.stairs))
             .collect();
-        self.stairs.stairs = stairs;
+        self.stairs.set_stairs(stairs);
     }
 
     /// The tiles an object takes from walking: its footprint, or for stairs the stairwell above

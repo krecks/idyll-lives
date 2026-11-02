@@ -73,8 +73,6 @@ export class CountryRoads {
   readonly roads: Point[][] = [];
   /** Side roads joining the ends of a town's streets (flat, on the apron round the town). */
   readonly links: Rect[] = [];
-  /** Each road's bounding box (grown by its verge), for quick misses in `near`. */
-  private readonly boxes: [number, number, number, number][] = [];
   /** `near`'s last question and answer. */
   private readonly asked = [NaN, NaN];
   private answer: NearRoad | null = null;
@@ -97,10 +95,6 @@ export class CountryRoads {
     exits.forEach((e, k) => {
       const road = this.lay(e.x + (several ? e.dx * TOWN_WIDTH : 0), e.z, e.dx, e.dz, k);
       this.roads.push(road);
-      const xs = road.map((p) => p[0]);
-      const zs = road.map((p) => p[1]);
-      const m = TOWN_WIDTH / 2 + ROAD_VERGE;
-      this.boxes.push([Math.min(...xs) - m, Math.min(...zs) - m, Math.max(...xs) + m, Math.max(...zs) + m]);
     });
   }
 
@@ -161,20 +155,53 @@ export class CountryRoads {
     return (this.answer = this.nearest(x, z));
   }
 
-  private nearest(x: number, z: number): NearRoad | null {
-    let best: NearRoad | null = null;
+  /**
+   * The road segments by 8 m cell (`GRID`): each in every cell its box, grown by its width and verge,
+   * touches, in the roads' order, so the nearest is found as the full scan would find it (ties too).
+   */
+  private grid: Map<number, number[]> | null = null;
+
+  private cells(): Map<number, number[]> {
+    if (this.grid) return this.grid;
+    const grid = new Map<number, number[]>();
     this.roads.forEach((road, r) => {
-      const [x0, z0, x1, z1] = this.boxes[r];
-      if (x < x0 || x > x1 || z < z0 || z > z1) return;
       for (let i = 0; i + 1 < road.length; i++) {
-        const [ax, az, ah, aw] = road[i];
-        const [bx, bz, bh, bw] = road[i + 1];
-        const [dx, dz] = [bx - ax, bz - az];
-        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
-        const dist = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
-        if (dist < (best?.dist ?? aw / 2 + ROAD_VERGE)) best = { dist, h: ah + (bh - ah) * t, width: aw + (bw - aw) * t };
+        const [ax, az, , aw] = road[i];
+        const [bx, bz, , bw] = road[i + 1];
+        const m = Math.max(aw, bw) / 2 + ROAD_VERGE;
+        for (let cx = Math.floor((Math.min(ax, bx) - m) / GRID); cx <= Math.floor((Math.max(ax, bx) + m) / GRID); cx++) {
+          for (let cz = Math.floor((Math.min(az, bz) - m) / GRID); cz <= Math.floor((Math.max(az, bz) + m) / GRID); cz++) {
+            const k = cellKey(cx, cz);
+            let list = grid.get(k);
+            if (!list) grid.set(k, (list = []));
+            list.push(r * SEGMENTS + i);
+          }
+        }
       }
     });
+    return (this.grid = grid);
+  }
+
+  private nearest(x: number, z: number): NearRoad | null {
+    const list = this.cells().get(cellKey(Math.floor(x / GRID), Math.floor(z / GRID)));
+    if (!list) return null;
+    let best: NearRoad | null = null;
+    for (const s of list) {
+      const road = this.roads[Math.floor(s / SEGMENTS)];
+      const i = s % SEGMENTS;
+      const [ax, az, ah, aw] = road[i];
+      const [bx, bz, bh, bw] = road[i + 1];
+      const [dx, dz] = [bx - ax, bz - az];
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
+      const dist = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
+      if (dist < (best?.dist ?? aw / 2 + ROAD_VERGE)) best = { dist, h: ah + (bh - ah) * t, width: aw + (bw - aw) * t };
+    }
     return best;
   }
 }
+
+/** Side of `near`'s grid cells (m). */
+const GRID = 8;
+/** Segment ids: road index × this + segment index (a road has fewer points). */
+const SEGMENTS = 1 << 16;
+const cellKey = (cx: number, cz: number) => (cx + 32768) * 65536 + (cz + 32768);

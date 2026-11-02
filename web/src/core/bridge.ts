@@ -3,8 +3,11 @@
  * into interpolatable frames for the renderer. Allocation-free per frame.
  */
 
-import type { Catalog, Command, FromWorker, GameSource, ItemPlacement, SaveProblem, SimThreadStats, SocialEvent, SocialOption, ToWorker, UiUpdate, WorldStructure } from './protocol';
+import type { Catalog, Command, FromWorker, GameSource, ItemPlacement, SaveProblem, SimThreadStats, SocialEvent, SocialOption, ToWorker, UiUpdate, WorldStructure, LotPart } from './protocol';
 import { SharedSnapshotReader, type SnapshotLayout } from './snapshot';
+
+/** What a lean world leaves out (`LotPart`): the lot itself, kept from the last full one. */
+const LOT_PARTS: readonly LotPart[] = ['rooms', 'walls', 'openings', 'diagonals', 'fences', 'floors', 'meshes'];
 
 /** The simulation refused a save (`problem` says why; the message is the simulation's own). */
 export class SaveRefused extends Error {
@@ -187,6 +190,11 @@ export class SimBridge {
   /** Limits wall/floor geometry to a tile rectangle (the lot being viewed); null = all. */
   setView(region: [number, number, number, number] | null): void {
     this.worker.postMessage({ type: 'view', region } satisfies ToWorker);
+  }
+
+  /** The tile rectangle the camera streams in: the sim's full-detail area (until sent: the view's; null = the view's again). */
+  setWatch(region: [number, number, number, number] | null): void {
+    this.worker.postMessage({ type: 'watch', region } satisfies ToWorker);
   }
 
   /** Serialized game state, taken between two sim steps. */
@@ -402,8 +410,11 @@ export class SimBridge {
         break;
       case 'world': {
         // A lean world leaves out the lot: keep the one we have (same arrays, so consumers
-        // can tell by reference that walls, floors and meshes didn't change).
-        const world: WorldStructure = msg.full || !this.world ? (msg.world as WorldStructure) : { ...this.world, ...msg.world };
+        // can tell by reference that walls, floors and meshes didn't change). Nothing else of the
+        // last world is kept: a list left out of the new one is empty now (the last garage sold).
+        const prev = this.world;
+        const lot = prev ? Object.fromEntries(LOT_PARTS.filter((k) => k in prev).map((k) => [k, prev[k]])) : {};
+        const world: WorldStructure = msg.full || !prev ? (msg.world as WorldStructure) : ({ ...lot, ...msg.world } as WorldStructure);
         this.world = world;
         for (const fn of this.worldListeners) fn(world);
         break;

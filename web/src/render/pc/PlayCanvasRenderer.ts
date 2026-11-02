@@ -29,6 +29,8 @@ import { GameCamera } from './camera';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { createApp, createDevice, destroyApp } from './device';
 import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
+import { fenceHedges } from '../shared/fences';
+import { shownFences } from '../shared/shownFences';
 import { gardenPool, GardenPools } from './gardenPools';
 import { HoverTile, ResizeHandles } from './handles';
 import { HeldFrames } from './heldFrames';
@@ -65,7 +67,7 @@ import { benchDiag } from '../../debug/benchFlags';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
-import { DOOR_SWING, doorLead, ease, goingThrough, shutDefs } from '../shared/doors';
+import { DOOR_SWING, doorLead, ease, goingThrough, MOVER, shutDefs } from '../shared/doors';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
 import { GAME_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
@@ -73,17 +75,18 @@ import { GrassPush } from '../shared/grass';
 import { houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
 import { compose, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
 import { OrbitControls } from '../shared/orbit';
+import { Flight, panBounds, Roam, warmLots, type FocusPlot } from '../shared/focus';
+import { CHUNK, chunkCoords } from '../shared/chunks';
 import { ModelRefresh } from '../shared/modelRefresh';
 import { OverviewCamera } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
 import { standInOf } from '../shared/modelEntry';
 import { renderScale, watchPixelRatio } from '../shared/resolution';
-import { roadMeshes, townRoads } from '../shared/roads';
 import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
-import { lowestStorey, storeyOfRow, storeyRow, storeyShown, type FenceEdge, type ItemPlacement, type ObjectPlacement, type StoreyLayout, type WorldStructure } from '../../core/protocol';
+import { groundDepth, lowestStorey, storeyOfRow, storeyRow, storeyShown, type FenceEdge, type GarageInfo, type ItemPlacement, type ObjectPlacement, type StoreyLayout, type WorldStructure } from '../../core/protocol';
 import type { VisemeTrack } from '../../voice/visemes';
 import type {
   BuildEffect,
@@ -96,6 +99,7 @@ import type {
   LotHighlight,
   ObjectBackgroundClips,
   ObjectClipInfo,
+  GaragePreview,
   PaintPreviewFace,
   PickResult,
   PlacementGhost,
@@ -125,11 +129,15 @@ declare global {
 
 /** The game camera's zoom and tilt limits. */
 const RADIUS_LIMITS = [6, 95] as const;
+/** A big world's warm-up builds and draws this many lots besides the one in view (`warmGame`). */
+const WARM_LOTS = 6;
 const BETA_LIMITS = [0.3, 1.35] as const;
 /** Its lens: vertical field of view (a slightly long lens flattens the perspective: the dollhouse look), near and far (m). */
 // (The near plane a fiftieth of the camera's distance, never under 0.3 m: from the town overview's 200–300 m at 0.3 m
 // the roads, 1.2 cm over the ground, fought it in green patches. Close up nothing changes: 0.3 m to 15 m out.)
 const LENS = { fov: 0.7, near: 0.3, far: 1600, nearShare: 1 / 50 };
+/** The far plane in a big world (m). */
+const BIG_FAR = 2600;
 /** Light is recomputed when the game's clock moved this many minutes (fast: the preset's `lightingStep`), at most every `LIGHT_MIN_MS`. */
 const LIGHT_STEP = 0.5;
 const LIGHT_MIN_MS = 100;
@@ -143,14 +151,16 @@ const MAX_FRAME_MS = 100;
 const HOLD_FRAMES = 2;
 /** Metres the sun's shadow square reaches past the viewed lot. */
 const SHADOW_MARGIN = 10;
-/** How far the road (and garden paths) is drawn beyond the viewed lot: the whole street. */
-const STREET_MARGIN = 500;
 /** The basement's pit (and the ground dug away over it) reaches this far past the plot (m), clear of walls on its edge. */
 const PIT_MARGIN = 0.3;
+/** Cells (m) the residents on the move are sorted into for the gates (`swingDoors`). */
+const GATE_CELL = 8;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
 const ROOF_MIN_DISTANCE = 15;
 /** Main-thread time (ms) a world build runs before the frames it runs behind get one (`pace`). */
 const BUILD_SLICE_MS = 8;
+/** The same while the camera roams (a big world, or once it has settled on a lot of its own). */
+const ROAM_SLICE_MS = 4;
 /**
  * Daylight doesn't reach under the ground or into a room without windows: no sun, only this much
  * of the sky fill and the environment (as seen, intensity times exposure: the same by day and by
@@ -174,6 +184,10 @@ const NOON_SKY_LUMA = skyLuma(lightingAt(13 * 60, LOOK, createLighting()));
 
 /** Residents this far (m) outside the viewed lot are still drawn (walking up to it). */
 const SIM_VIEW_MARGIN = 2;
+/** Residents further than this (m) from the camera's target, off the viewed lot, have no contact shadow. */
+const FAR_SHADOW = 40;
+/** `?residents=lot`: residents drawn only on the viewed lot, as before life on every lot. */
+const RESIDENTS_LOT_ONLY = typeof location !== 'undefined' && new URLSearchParams(location.search).get('residents') === 'lot';
 
 /** The camera's layers besides the world's that it keeps while the menus' town is shown (`showLayers`). */
 const TOWN_CAMERA_LAYERS: readonly number[] = [pc.LAYERID_DEPTH, pc.LAYERID_IMMEDIATE, pc.LAYERID_UI];
@@ -186,13 +200,57 @@ const IDENTITY = Float32Array.of(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)
 /** No neighbours' houses (to look through). */
 const NO_HOUSES: readonly (readonly [number, number, number, number])[] = [];
 
-/**
- * Everything an object is drawn from, but its open state and growth (drawn without a build: see
- * `patchable`). (Wear, quality and what it's worth don't change the model.)
- */
-function objectKey(o: ObjectPlacement): string {
-  return JSON.stringify([o.id, o.def, o.x, o.z, o.rot, o.turn, o.offset, o.size, o.tall, o.lift, o.w, o.d, o.colors]);
+/** Whether two worlds' garages are the same (field by field, as `sameObject`). */
+function sameGarages(a: readonly GarageInfo[] | undefined, b: readonly GarageInfo[] | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((g, i) => {
+    const h = b[i];
+    return g.plot === h.plot && g.x0 === h.x0 && g.z0 === h.z0 && g.x1 === h.x1 && g.z1 === h.z1 && g.rot === h.rot;
+  });
 }
+
+/**
+ * Whether two placements draw the same: everything an object is drawn from, but its open state and
+ * growth (drawn without a build: see `patchable`). (Wear, quality and what it's worth don't change the model.)
+ */
+function sameObject(a: ObjectPlacement, b: ObjectPlacement): boolean {
+  // (Field by field: a big world's lot sends 6 000 objects with every opened door, and their keys as JSON
+  // took 4-5 ms of each such message.)
+  const pair = (u: readonly number[] | undefined, v: readonly number[] | undefined) => u === v || (!!u && !!v && u[0] === v[0] && u[1] === v[1]);
+  return (
+    a.id === b.id &&
+    a.def === b.def &&
+    a.x === b.x &&
+    a.z === b.z &&
+    a.rot === b.rot &&
+    a.turn === b.turn &&
+    pair(a.offset, b.offset) &&
+    pair(a.size, b.size) &&
+    a.tall === b.tall &&
+    a.lift === b.lift &&
+    a.w === b.w &&
+    a.d === b.d &&
+    (a.colors === b.colors || (!!a.colors && !!b.colors && JSON.stringify(a.colors) === JSON.stringify(b.colors)))
+  );
+}
+
+/** `?stream=1`: the street streams its chunks round the camera in any town (else only in a big world's). */
+const STREAM_FLAG = typeof location !== 'undefined' && new URLSearchParams(location.search).get('stream') === '1';
+
+/** The plot (by index) under a ground point, else the nearest within `reach` m. */
+function plotNear(world: WorldStructure, x: number, z: number, reach: number): FocusPlot | null {
+  let best: FocusPlot | null = null;
+  let bestD = reach;
+  world.plots.forEach((p, i) => {
+    const d = Math.hypot(Math.max(p.x - x, 0, x - (p.x + p.w)), Math.max(p.z - z, 0, z - (p.z + p.d)));
+    if (d < bestD || (d === 0 && !best)) [best, bestD] = [{ id: i, x: p.x, z: p.z, w: p.w, d: p.d }, d];
+  });
+  return best;
+}
+
+/** A world build stopped because the roaming camera settled on another lot before it was done (`pace`). */
+class BuildSuperseded extends Error {}
 
 /** The same part of the town in view (the messages make a new rect each time). */
 function sameView(a: ViewRect | null, b: ViewRect | null): boolean {
@@ -303,7 +361,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private lastWorld: WorldStructure | null = null;
   private builtWorld: WorldStructure | null = null;
   private builtStorey = 0;
-  private nextWorld: { world: WorldStructure; view: ViewRect | null } | null = null;
+  /** The world to build next, and whether only its residents are (`sims`: the rest is as built, patched). */
+  private nextWorld: { world: WorldStructure; view: ViewRect | null; sims?: boolean } | null = null;
   /** The builds running (one after another), and whether the next is a build whatever it is (a file came: `refreshStreet`). */
   private worldBuilds: Promise<void> | null = null;
   private worldBuilding = false;
@@ -361,6 +420,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private stairwells: ViewRect[] = [];
   /** The house's garden trees and shrubs (`placeDecor`): a draw per model mesh, hidden while its basement is in view. */
   private decorTemplates!: TemplateCache<ModelTemplate>;
+  /** The viewed lot's hedges (its fences in the hedge style), planted with its garden's shrubs ([x, z, scale, yaw]). */
+  private lotHedges: [number, number, number, number][] = [];
   private readonly decor = new Map<string, { template: ModelTemplate; draws: Instances[] }>();
   /** The viewed lot's door leaves that swing, each with how far open it stands (1 open, as drawn; -1 not placed yet). */
   private doors: { leaf: HouseDoor; open: number }[] = [];
@@ -396,6 +457,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** Object kinds that make a room one that can be kept shut (`shutDefs`). */
   private shutDefs: ReadonlySet<string> = new Set();
   private readonly movers: number[] = [];
+  /** The cells (`GATE_CELL`) someone on the move is in this frame. */
+  private readonly moverCells = new Set<number>();
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
   private readonly neighboursUp: boolean[] = [];
   /** Indices of the snapshot layout's sleeping action tags, and the life stages of babies. */
@@ -422,11 +485,58 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private lastFrame: FrameState | null = null;
   private readonly markerHead = { x: 0, y: 0, z: 0 };
   private followIndex: number | null = null;
+  /** The roaming camera's stream of chunks and its focus lot (`shared/focus.ts`), a flight across the world (`flyTo`). */
+  private readonly roam = new Roam();
+  private readonly flight = new Flight();
+  private readonly flightPose = { x: 0, z: 0, radius: 0 };
+  private focusLotListener: ((plot: number) => boolean) | null = null;
+  /** The lot (index) the roaming camera settled on last and the game took (it is not framed: `buildSims`). */
+  private roamedTo: number | null = null;
+  /** When the roaming camera's last focus lot was taken, and how long each took to be built in full (ms; the bench reads them). */
+  private focusAsked: { plot: number; at: number } | null = null;
+  private readonly focusSwitches: number[] = [];
+  private watchListener: ((rect: [number, number, number, number]) => void) | null = null;
+  /** The street building the chunks streamed in, between world builds; another stream change waits for it. */
+  private streaming: Promise<void> | null = null;
+  private streamDue = false;
+  private streamSlice = 0;
+  /** Whether the stream limits what the street draws (a big world, or `?stream=1`); else the whole town is drawn, as it always was. */
+  private streamOn = false;
   /** Whether the camera has caught up with the resident it follows (`keepUp`: then it stays near them). */
   private followCaught = false;
   private readonly followHead = { x: 0, y: 0, z: 0 };
   private framedView = '';
-  private readonly simInView = (x: number, z: number) => !this.diag.has('nosims') && this.inView(x, z, SIM_VIEW_MARGIN);
+  /**
+   * Whether a resident at ground point (x, z) is drawn: on the viewed lot (and just round it) as
+   * ever; elsewhere outdoors within the preset's `residentRadius` of the camera's target and in the
+   * view (life on every lot), not indoors on a lot not in view (its house is a silhouette there).
+   * `?residents=lot`: only the viewed lot's, as before.
+   */
+  private readonly simInView = (x: number, z: number): boolean => {
+    if (this.diag.has('nosims')) return false;
+    if (this.inView(x, z, SIM_VIEW_MARGIN)) return true;
+    const vp = this.simViewProj;
+    const world = this.lastWorld;
+    if (RESIDENTS_LOT_ONLY || !vp || !world) return false;
+    const t = this.orbit.target;
+    const r = this.quality.residentRadius;
+    const dx = x - t.x;
+    const dz = z - t.z;
+    if (dx * dx + dz * dz > r * r) return false;
+    const ix = Math.floor(x);
+    const iz = Math.floor(z);
+    if (ix >= 0 && iz >= 0 && ix < world.width && iz < groundDepth(world) && world.rooms[iz * world.width + ix]) return false;
+    // In the view (a point a metre up, with some slack round the edges for the body).
+    const y = 1;
+    const wz = -z;
+    const cw = vp[3] * x + vp[7] * y + vp[11] * wz + vp[15];
+    if (!(cw > 0)) return false;
+    const cx = vp[0] * x + vp[4] * y + vp[8] * wz + vp[12];
+    const cy = vp[1] * x + vp[5] * y + vp[9] * wz + vp[13];
+    return Math.abs(cx) <= cw * 1.15 && Math.abs(cy) <= cw * 1.3;
+  };
+  /** The camera's view-projection for this frame's `simInView` (null: none yet). */
+  private simViewProj: Float32Array | null = null;
 
   private readonly cssSize = { width: 1, height: 1 };
   private sizeWatch: ResizeObserver | null = null;
@@ -563,6 +673,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       },
       lod: this.quality.streetLod,
       shadows: this.quality.streetShadows,
+      ground: true,
+      fenceStyles: c.fenceStyles,
     });
     this.cars = new Cars(this.app, this.root, this.quality.streetShadows);
     this.characters.setCarSeat((x, z) => this.cars.seatAt(x, z));
@@ -602,6 +714,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     o.wheelDeltaPercentage = 0.012;
     o.panningSensibility = 90;
     o.mapPanning = true;
+    o.panRadius = 24;
     o.inertia = 0.82;
     o.panningInertia = 0.82;
     this.detachOrbit = o.attach(canvas);
@@ -675,7 +788,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.onFrame?.(this.pacer.frameTime || performance.now());
       updated = performance.now();
       if (this.townMode) this.townFrame(dt);
-      else this.orbit.step(dt, Math.max(0.05, (dt * 60) / 1000));
+      else {
+        this.orbit.step(dt, Math.max(0.05, (dt * 60) / 1000));
+        this.roamFrame(dt);
+      }
       this.sunShadows.frame();
       this.applyCamera();
       this.pushGrass(dt);
@@ -766,10 +882,122 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   focus(x: number, z: number): void {
     // Keep the viewing angle; move the camera with its target.
     const o = this.orbit;
+    this.flight.stop();
     o.target.x = x;
     o.target.y = 0;
     o.target.z = z;
     o.radius = Math.min(o.radius, 32);
+  }
+
+  flyTo(x: number, z: number): void {
+    const o = this.orbit;
+    o.stopInertia();
+    this.flight.start(o.target.x, o.target.z, o.radius, x, z, Math.min(Math.max(o.radius, 24), 40));
+  }
+
+  onFocusLot(listener: ((plot: number) => boolean) | null): void {
+    this.focusLotListener = listener;
+  }
+
+  onWatch(listener: ((rect: [number, number, number, number]) => void) | null): void {
+    this.watchListener = listener;
+  }
+
+  /**
+   * Each frame, after the camera's input: a flight under way, then the chunks round the camera
+   * (streamed into the street) and the lot it has settled on (`onFocusLot`).
+   */
+  private roamFrame(dt: number): void {
+    const o = this.orbit;
+    if (this.flight.step(dt / 1000, this.flightPose)) {
+      o.target.x = this.flightPose.x;
+      o.target.z = this.flightPose.z;
+      o.radius = this.flightPose.radius;
+      o.checkLimits();
+    }
+    const world = this.builtWorld;
+    if (!world || !this.street.layout) return;
+    this.followShadows();
+    this.street.frame(o.target.x, o.target.z);
+    this.lot.landscape?.frameTiles(o.target.x, o.target.z);
+    this.roam.pinned = this.followIndex !== null || this.gameRig.active || this.flight.active;
+    const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
+    const fovH = 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect);
+    const changed = this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha: o.alpha, fovH }, performance.now(), (x, z, reach) => plotNear(world, x, z, reach), (plot) => {
+      const taken = !!this.focusLotListener?.(plot.id);
+      if (taken) {
+        this.roamedTo = plot.id;
+        this.focusAsked = { plot: plot.id, at: performance.now() };
+      }
+      return taken;
+    });
+    if (!changed) return;
+    if (this.streamOn && this.street.setChunks(this.roam.chunks)) this.streamStreet();
+    this.reportWatch();
+  }
+
+  /**
+   * The sun's shadow square: round the viewed lot while the camera looks at it (`buildWorld`); once
+   * it roams off it, round the camera's target, snapped to 8 m (it moves in steps, drawn again
+   * each), half a side of `clamp(0.9 · radius + 15, 30, 70)` m.
+   */
+  private followShadows(): void {
+    const v = this.view;
+    const t = this.orbit.target;
+    if (!v) return;
+    const onLot = (t.x >= v.x - 4 && t.z >= v.z - 4 && t.x <= v.x + v.w + 4 && t.z <= v.z + v.d + 4);
+    const square = onLot ? `lot` : `${Math.round(t.x / 8) * 8},${Math.round(t.z / 8) * 8},${Math.round(Math.min(70, Math.max(30, 0.9 * this.orbit.radius + 15)) / 8)}`;
+    if (square === this.shadowSquare) return;
+    this.shadowSquare = square;
+    if (onLot) this.sunShadows.setSquare(v.x + v.w / 2, v.z + v.d / 2, Math.hypot(v.w, v.d) / 2 + SHADOW_MARGIN);
+    else this.sunShadows.setSquare(Math.round(t.x / 8) * 8, Math.round(t.z / 8) * 8, Math.min(70, Math.max(30, 0.9 * this.orbit.radius + 15)));
+  }
+  private shadowSquare = 'lot';
+
+  /** The sim's full-detail area: the chunks streamed in, as a tile rectangle on the ground (`onWatch`). */
+  private reportWatch(): void {
+    const world = this.builtWorld;
+    if (!world || !this.watchListener || !this.roam.chunks.size) return;
+    let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const id of this.roam.chunks) {
+      const [cx, cz] = chunkCoords(id);
+      x0 = Math.min(x0, cx * CHUNK);
+      z0 = Math.min(z0, cz * CHUNK);
+      x1 = Math.max(x1, (cx + 1) * CHUNK);
+      z1 = Math.max(z1, (cz + 1) * CHUNK);
+    }
+    const d = groundDepth(world);
+    this.watchListener([Math.max(0, x0), Math.max(0, z0), Math.min(world.width, x1), Math.min(d, z1)]);
+  }
+
+  /** The street builds the chunks streamed in (between world builds; a world build builds them itself). */
+  private streamStreet(): void {
+    if (this.worldBuilding || this.streaming) {
+      this.streamDue = true;
+      return;
+    }
+    const world = this.builtWorld;
+    if (!world) return;
+    this.streaming = (async () => {
+      do {
+        this.streamDue = false;
+        this.streamSlice = performance.now();
+        await this.street.build(world, this.view, () => this.streamPace());
+        if (this.disposed) return;
+        this.sunShadows.moved();
+      } while (this.streamDue && !this.worldBuilding);
+    })()
+      .catch((err: unknown) => console.error('[render] streaming the street failed', err))
+      .finally(() => {
+        this.streaming = null;
+      });
+  }
+
+  /** A stream's build gives the frame back every 4 ms of main-thread time (the camera is moving: a frame it takes shows). */
+  private async streamPace(): Promise<void> {
+    if (performance.now() - this.streamSlice < 4) return;
+    await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    this.streamSlice = performance.now();
   }
 
   setGameShot(shot: GameShot | null, cut = false): void {
@@ -833,14 +1061,33 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   // --- the world -----------------------------------------------------------------------
 
   setWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
+    // A big world is never built whole in full detail (no view: every house's storeys and every
+    // thing, hundreds of MB of buffers; Low's merged object shadows alone 260 MB, which lost the
+    // WebGPU device): with no lot given, the focus stays the lot built, else the one nearest the camera.
+    if (!view && world.meta?.world?.size === 'big') view = this.view ?? this.nearestLot(world);
     if (this.rebuildNext) this.rebuildNext = false;
     else if (this.patchable(world, view)) {
       this.patchWorld(world);
       return Promise.resolve();
+    } else if (!this.worldBuilds && !this.unpatchable(world, view, false)) {
+      // Only the residents differ (one came or went, grew up, looks different): they are built again,
+      // the rest patched. A big world built the whole lot, street, cars and birds again for it (a
+      // town's staff coming on, a visitor): frames of 70-110 ms.
+      this.lastWorld = world;
+      this.nextWorld = { world, view, sims: true };
+      return (this.worldBuilds = this.buildWorlds());
     }
     this.lastWorld = world;
     this.nextWorld = { world, view };
     return (this.worldBuilds ??= this.buildWorlds());
+  }
+
+  /** The lot nearest the camera's target (before the camera is placed: the main town's middle), as a view; null without lots. */
+  private nearestLot(world: WorldStructure): ViewRect | null {
+    const main = world.meta?.areas?.[0];
+    const [x, z] = this.cameraPlaced ? [this.orbit.target.x, this.orbit.target.z] : main ? [main.x + main.w / 2, main.z + main.d / 2] : [world.width / 2, groundDepth(world) / 2];
+    const p = plotNear(world, x, z, Infinity);
+    return p && { x: p.x, z: p.z, w: p.w, d: p.d };
   }
 
   /**
@@ -856,8 +1103,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return false;
   }
 
-  /** What keeps `world` from being patched into what's on screen (null: nothing, it can be). */
-  private unpatchable(world: WorldStructure, view: ViewRect | null): string | null {
+  /** What keeps `world` from being patched into what's on screen (null: nothing, it can be); `sims` false: its residents left out. */
+  private unpatchable(world: WorldStructure, view: ViewRect | null, sims = true): string | null {
     const built = this.builtWorld;
     if (!built) return 'never built';
     if (this.worldBuilding) return 'building';
@@ -868,11 +1115,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (built.storeyDepth !== world.storeyDepth || built.basement !== world.basement) return 'storeys';
     // The lot itself (walls, rooms, floors, fences) is what costs a build; a lean message never has it.
     if (built.lotVersion !== world.lotVersion) return 'lot';
+    // (A garage built or taken down: the street draws it.)
+    if (!sameGarages(built.garages, world.garages)) return 'garages';
     if (built.objects.length !== world.objects.length) return 'object count';
-    if (built.sims.length !== world.sims.length) return 'sim count';
     for (let i = 0; i < world.objects.length; i++) {
-      if (objectKey(built.objects[i]) !== objectKey(world.objects[i])) return `object ${world.objects[i].id} ${world.objects[i].def}`;
+      if (!sameObject(built.objects[i], world.objects[i])) return `object ${world.objects[i].id} ${world.objects[i].def}`;
     }
+    if (!sims) return null;
+    if (built.sims.length !== world.sims.length) return 'sim count';
     for (let i = 0; i < world.sims.length; i++) {
       const [a, b] = [built.sims[i], world.sims[i]];
       if (a.id !== b.id || a.gender !== b.gender || a.stage !== b.stage || a.name !== b.name) return `sim ${b.id}`;
@@ -895,10 +1145,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       for (let next = this.nextWorld; next; next = this.nextWorld) {
         this.nextWorld = null;
         try {
-          await this.buildOne(next.world, next.view);
+          await (next.sims ? this.buildSimsOnly(next.world) : this.buildOne(next.world, next.view));
           error = null;
         } catch (err) {
-          error = err;
+          // (Stopped for a newer lot: what it left half built is built again, the lot layer first.)
+          if (err instanceof BuildSuperseded) {
+            this.lotKey = '';
+            error = null;
+          } else error = err;
         }
       }
     } finally {
@@ -919,6 +1173,23 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.builtStorey = this.storey;
     } finally {
       this.worldBuilding = false;
+      // (A stream change while it built: the street catches up.)
+      if (this.streamDue) this.streamStreet();
+    }
+  }
+
+  /** A world whose residents only differ from the one built (`setWorld`): the objects patched, the residents built again. */
+  private async buildSimsOnly(world: WorldStructure): Promise<void> {
+    this.worldBuilding = true;
+    this.sliceStart = performance.now();
+    try {
+      this.lot.patch(world);
+      await this.buildSims(world);
+      this.builtWorld = world;
+      if (this.debug) console.info('[render] world patched, residents built again');
+    } finally {
+      this.worldBuilding = false;
+      if (this.streamDue) this.streamStreet();
     }
   }
 
@@ -929,11 +1200,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const m = world.meta;
       this.lotParts = { refs, key: JSON.stringify([m?.seed, m?.streets, m?.roads, m?.paths, world.walls, world.openings, world.diagonals, world.floors, world.fences]) };
     }
+    // (An older town's fences, planned from what stands round them, are part of the lot's too.)
+    const planned = shownFences(world, this.deps.content.fenceStyles);
     return JSON.stringify([
       view,
       world.width,
       world.depth,
       this.lotParts.key,
+      planned === (world.fences ?? planned) ? 0 : planned.length,
       world.plots.map((p) => [p.house, p.roof]),
       world.households.find((h) => h.player)?.plot,
       houseObjectKey(world, view, (def) => !!this.deps.content.object(def)?.stairs, this.shutDefs),
@@ -948,26 +1222,49 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const [cx, cz] = [view ? view.x + view.w / 2 : width / 2, view ? view.z + view.d / 2 : depth / 2];
     // The sun's shadows cover a fixed square round the lot (`sunShadows.ts`).
     this.sunShadows.setSquare(cx, cz, Math.hypot(view?.w ?? width, view?.d ?? depth) / 2 + SHADOW_MARGIN);
+    this.shadowSquare = 'lot';
     if (!this.cameraPlaced) {
       this.aimAt(cx, cz);
       this.cameraPlaced = true;
     }
+    // The camera roams the land (a big world's, or the town and 60 m round it); the street streams
+    // its chunks round it in a big world, else draws the whole town as ever. The lot in view is the focus.
+    this.orbit.panBounds = panBounds(world);
+    this.orbit.checkLimits();
+    this.streamOn = world.meta?.world?.size === 'big' || STREAM_FLAG;
+    // A big world's land reaches further: its far plane too (its far LOD's houses to 650 m, the hills beyond).
+    const far = world.meta?.world?.size === 'big' ? BIG_FAR : LENS.far;
+    if (this.camera.camera.farClip !== far) this.camera.setLens({ ...LENS, far });
+    const pb = this.orbit.panBounds;
+    this.roam.setBounds({ x0: pb.x0 - 300, z0: pb.z0 - 300, x1: pb.x1 + 300, z1: pb.z1 + 300 });
+    const viewIndex = view ? world.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
+    this.roam.setFocus(viewIndex >= 0 ? viewIndex : null);
+    if (this.streamOn) {
+      const o = this.orbit;
+      const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
+      this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha: o.alpha, fovH: 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect) }, performance.now(), () => null, () => false);
+      this.street.setChunks(this.roam.chunks);
+    } else this.street.setChunks(null);
     // (lotContents.ts: the landscape, with its country roads.)
     await this.lot.buildNature(world, (roads, parent) => drawRoads(this.app, roads, parent));
 
     const lotKey = this.lotKeyOf(world, view);
     const lotBuilt = lotKey !== this.lotKey;
+    const v = view;
+    const onLot = (f: FenceEdge) => !!v && f.x >= v.x && f.z >= v.z && f.x + (f.axis === 'h' ? 1 : 0) <= v.x + v.w && f.z + (f.axis === 'v' ? 1 : 0) <= v.z + v.d;
+    const shown = shownFences(world, this.deps.content.fenceStyles);
+    const lotFences = lotBuilt ? shown.filter(onLot) : [];
     if (lotBuilt) {
       this.clearLot();
       this.lotKey = lotKey;
+      this.lotHedges = fenceHedges(lotFences, this.deps.content.fenceStyles).map(([x, z, s, , yaw]): [number, number, number, number] => [x, z, s, yaw]);
       this.buildStreets(world);
       await this.pace();
       await this.buildLot(world);
       await this.pace();
-      // The viewed lot's fences stand on the ground (hidden with it while the basement is in view); other lots' stay.
-      const v = view;
-      const onLot = (f: FenceEdge) => !!v && f.x >= v.x && f.z >= v.z && f.x + (f.axis === 'h' ? 1 : 0) <= v.x + v.w && f.z + (f.axis === 'v' ? 1 : 0) <= v.z + v.d;
-      for (const [list, storey] of [[(world.fences ?? []).filter(onLot), 0], [(world.fences ?? []).filter((f) => !onLot(f)), undefined]] as const) {
+      // The viewed lot's fences stand on the ground (hidden with it while the basement is in view, its
+      // hedges with the garden's shrubs: `lotHedges`); other lots' are the street's, but for their gates, which swing.
+      for (const [list, storey] of [[lotFences, 0], [shown.filter((f) => !onLot(f) && f.kind === 'gate'), undefined]] as const) {
         const fences = buildFences(this.app, this.root, list, this.deps.content.fenceStyles);
         if (!fences) continue;
         this.lotEntities.push({ entity: fences.entity, storey });
@@ -986,6 +1283,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.applyStoreys();
     void this.birdLife.settle(world, view, this.fixedHour !== null ? this.fixedHour * 60 : this.lastMinute, { landscape: this.lot.landscape, street: this.street.plants, roofs: this.roofs, houseTop: (plot) => this.house.roofTop(plot) }); // (where the birds live.)
     this.lastLightMinute = -1;
+    // A focus lot the roaming camera settled on, now drawn in full.
+    const asked = this.focusAsked;
+    const p = asked && world.plots[asked.plot];
+    if (asked && p && view && p.x === view.x && p.z === view.z) {
+      this.focusSwitches.push(performance.now() - asked.at);
+      if (this.focusSwitches.length > 100) this.focusSwitches.shift();
+      this.focusAsked = null;
+    }
     if (this.debug) console.info(`[render] setWorld ${(performance.now() - started).toFixed(1)} ms${lotBuilt ? '' : ' (lot kept)'}`);
   }
 
@@ -1003,7 +1308,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const key = v ? `${v.x},${v.z},${v.w},${v.d}` : '';
     const framing = !!v && key !== this.framedView;
     if (framing) this.framedView = key;
-    if (framing && this.followIndex === null) {
+    // (Not a lot the roaming camera settled on: the camera stays as the player has it.)
+    const roamed = !!v && this.roamedTo !== null && world.plots[this.roamedTo]?.x === v.x && world.plots[this.roamedTo]?.z === v.z;
+    if (framing && this.followIndex === null && !roamed) {
       const entry = world.plots.find((p) => p.x === v.x && p.z === v.z)?.entry;
       const dx = entry ? entry[0] - (v.x + v.w / 2) : 0;
       const dz = entry ? entry[1] - (v.z + v.d / 2) : 0;
@@ -1033,48 +1340,37 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /** A world build (or the overview's) gives the frames it runs behind one every `BUILD_SLICE_MS` of main-thread time. */
   private async pace(): Promise<void> {
-    if ((!this.worldBuilding && this.townBuilds === 0) || performance.now() - this.sliceStart < BUILD_SLICE_MS) return;
+    // (Shorter slices once the camera roams: the frames go on moving behind the build, and one it takes shows.)
+    const slice = this.townBuilds === 0 && (this.streamOn || this.roamedTo !== null) ? ROAM_SLICE_MS : BUILD_SLICE_MS;
+    if ((!this.worldBuilding && this.townBuilds === 0) || performance.now() - this.sliceStart < slice) return;
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     this.sliceStart = performance.now();
+    // A roaming camera has settled on another lot meanwhile: this lot's build stops here, the next one's starts.
+    const next = this.nextWorld;
+    if (this.worldBuilding && this.townBuilds === 0 && slice === ROAM_SLICE_MS && next && !sameView(next.view, this.view)) throw new BuildSuperseded();
   }
 
   /**
-   * Roads, garden paths and farm fields from the town metadata, each a flat mesh. Those on the
-   * viewed lot (its garden paths and driveway, a farm's fields) are a mesh of their own, on its
-   * ground: hidden with it while the basement is in view.
+   * The viewed lot's garden paths, driveway and a farm's fields, each a flat mesh on its ground:
+   * hidden with it while the basement is in view. (The road and the rest of the town's are the
+   * street's, chunk by chunk: `pc/street.ts`.)
    */
   private buildStreets(world: WorldStructure): void {
-    // Only the stretch of road near the viewed lot.
-    const road = meshFrom(this.device, roadMeshes(townRoads(world), this.view, STREET_MARGIN, {}, 'surface').surface.meshData());
-    if (road) this.lotEntities.push({ entity: drawMesh(this.root, 'streets', road, this.lotMaterial('material.road')) });
     const layers: [string, { x: number; z: number; w: number; d: number }[] | undefined, string, number][] = [
       ['paths', world.meta?.paths, 'material.path', 0.014],
       ...fieldLayers(world.meta?.world?.fields, ''),
     ];
     const v = this.view;
-    const onLot = (r: { x: number; z: number; w: number; d: number }) => !!v && r.x >= v.x && r.z >= v.z && r.x + r.w <= v.x + v.w && r.z + r.d <= v.z + v.d;
+    if (!v) return;
+    const onLot = (r: { x: number; z: number; w: number; d: number }) => r.x >= v.x && r.z >= v.z && r.x + r.w <= v.x + v.w && r.z + r.d <= v.z + v.d;
     for (const [name, all, material, y] of layers) {
-      // Only the stretch of road in front of the viewed lot.
-      const rects = all?.map((r) => this.clipToView(r, STREET_MARGIN)).filter((r) => r !== null);
-      if (!rects?.length) continue;
-      for (const [list, storey] of [[rects.filter(onLot), 0], [rects.filter((r) => !onLot(r)), undefined]] as const) {
-        if (!list.length) continue;
-        const geo = new Geo();
-        for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-        const mesh = meshFrom(this.device, geo.meshData());
-        if (mesh) this.lotEntities.push({ entity: drawMesh(this.root, name, mesh, this.lotMaterial(material)), storey });
-      }
+      const list = all?.filter(onLot) ?? [];
+      if (!list.length) continue;
+      const geo = new Geo();
+      for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+      const mesh = meshFrom(this.device, geo.meshData());
+      if (mesh) this.lotEntities.push({ entity: drawMesh(this.root, name, mesh, this.lotMaterial(material)), storey: 0 });
     }
-  }
-
-  private clipToView(r: { x: number; z: number; w: number; d: number }, margin: number) {
-    const v = this.view;
-    if (!v) return r;
-    const x0 = Math.max(r.x, v.x - margin);
-    const z0 = Math.max(r.z, v.z - margin);
-    const x1 = Math.min(r.x + r.w, v.x + v.w + margin);
-    const z1 = Math.min(r.z + r.d, v.z + v.d + margin);
-    return x1 > x0 && z1 > z0 ? { x: x0, z: z0, w: x1 - x0, d: z1 - z0 } : null;
   }
 
   /** Whether a world point is inside the viewed lot (expanded by `margin`). */
@@ -1168,8 +1464,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.wallsLow = add('wallsLow', world.meshes.wallsLow, wall);
       return;
     }
-    // Garden dressing split into species (hedges or mixed shrub borders, varied lot trees).
+    // Garden dressing split into species (hedges or mixed shrub borders, varied lot trees), and the lot's hedges round its garden (its fences').
     const decor = [...natureDecor('model.bush', ground.shrubs), ...natureDecor('model.tree', ground.trees, world, this.view)];
+    if (this.lotHedges.length) {
+      const hedges = decor.find(([k]) => k === 'model.hedge');
+      if (hedges) hedges[1] = [...hedges[1], ...this.lotHedges];
+      else decor.push(['model.hedge', this.lotHedges]);
+    }
     this.birdLife.setDecor(decor); // (the birds live in it.)
     for (const [key, items] of decor) {
       await this.pace();
@@ -1577,7 +1878,19 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const lead = doorLead(rate);
     const step = Math.min(1, (this.frameDt / 1000 / DOOR_SWING) * Math.min(Math.max(rate, 1), 10));
     let moved = false;
+    // (A town has a gate in most gardens: one standing shut with nobody within a cell of it isn't asked.)
+    const near = this.moverCells;
+    near.clear();
+    const cell = (cx: number, cz: number) => (cx + 1024) * 4096 + cz + 1024;
+    for (let i = 0; i < movers.length; i += MOVER) near.add(cell(Math.floor(movers[i] / GATE_CELL), Math.floor(movers[i + 1] / GATE_CELL)));
+    const anyone = (x: number, z: number) => {
+      if (!near.size) return false;
+      const [cx, cz] = [Math.floor(x / GATE_CELL), Math.floor(z / GATE_CELL)];
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (near.has(cell(cx + dx, cz + dz))) return true;
+      return false;
+    };
     for (const gate of this.gates) {
+      if (gate.open === 0 && lead < GATE_CELL && !anyone(gate.leaf.centre[0], gate.leaf.centre[1])) continue;
       const way = goingThrough(movers, gate.leaf.axis, gate.leaf.centre, gate.open === 1, lead, hand);
       // It opens away from the one coming through, and shuts the way it opened.
       if (way && gate.open === 0) gate.towards = way;
@@ -1653,7 +1966,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (With the vendors and shopkeepers drawn after them.)
     const count = Math.min(this.simCount + (layout.header.staffCount === undefined ? 0 : curr[layout.header.staffCount]), MAX_CHARACTERS);
     const shadows = this.simShadowMatrices;
+    this.simViewProj = this.camera.viewProjection();
     this.characters.update(frame, this.simInView, shadows, this.storey, this.doorHand);
+    // Contact shadows only near the camera (the sun's shadow square is no bigger): none past `FAR_SHADOW` m off the viewed lot.
+    const t = this.orbit.target;
+    for (let i = 0; i < count; i++) {
+      const o = i * 16;
+      if (shadows[o + 15] === 0) continue;
+      const sx = shadows[o + 12];
+      const sz = shadows[o + 14];
+      if (Math.hypot(sx - t.x, sz - t.z) > FAR_SHADOW && !this.inView(sx, sz, SIM_VIEW_MARGIN)) shadows.fill(0, o, o + 16);
+    }
     this.lot.pullChairs(this.characters.pulled, this.placing.held); // (not the one in hand.)
     this.lot.takeRestProps(this.characters.restTaken);
     if (this.characters.posed && this.quality.characterShadows) this.sunShadows.moved(false);
@@ -1700,6 +2023,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const t0 = performance.now();
     await this.framesRendered(1);
     this.shaderWatch.note(`warm-up frame done in ${Math.round(performance.now() - t0)} ms`);
+    // A big world: the camera roams to lots of every kind, each drawn in full once it settles. A few
+    // that between them have most of what its houses are made of are built and drawn here too, so
+    // those lots make few pipelines in play (each first one costs its frame tens of ms); then the lot
+    // in view again. (Load time for smooth roaming: about a second more.)
+    const world = this.lastWorld;
+    const home = this.view;
+    if (world?.meta?.world?.size === 'big' && home && !this.disposed) {
+      for (const lot of warmLots(world, home, WARM_LOTS)) {
+        await this.setWorld(world, lot);
+        this.warmNext = true;
+        await this.framesRendered(1);
+      }
+      await this.setWorld(this.lastWorld ?? world, home);
+      this.shaderWatch.note(`warm-up lots done in ${Math.round(performance.now() - t0)} ms`);
+    }
     this.shaderWatch.phase = this.townMode ? 'town' : 'game';
   }
 
@@ -1727,7 +2065,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sunShadows.moved(true);
     const hidden = this.drawHidden();
     const red = this.drawRedCopies();
-    const mirrors = this.mirrors.warm();
+    const mirrors = this.mirrors.warm(this.streamOn);
     return () => {
       mirrors();
       red();
@@ -2268,6 +2606,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       quality: { ...this.quality, mirrors: this.mirrors.capacity, clusteredLamps: true, postSamples: this.post?.samples ?? 1, fxaa: this.post?.options.fxaa ?? false },
       diag: [...this.diag],
       passes,
+      // The town drawn (the bench's roam loops over it) and the street's chunks.
+      world: this.builtWorld ? { width: this.builtWorld.width, depth: groundDepth(this.builtWorld), size: this.builtWorld.meta?.world?.size ?? 'cosy', areas: this.builtWorld.meta?.areas?.map((a) => [a.x + a.w / 2, a.z + a.d / 2]) } : undefined,
+      street: this.street.stats(),
+      focusSwitches: [...this.focusSwitches],
+      // What is being built now (the bench notes it at each slow frame): a world (a focus lot), the street streaming, both or nothing.
+      building: [this.worldBuilding ? 'world' : '', this.streaming ? 'stream' : ''].filter(Boolean).join('+'),
       scene: {
         ...scene,
         textures: d.textures.size,
@@ -2369,6 +2713,18 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lot.pushGrass(push.end(dt / 1000));
   }
 
+  simSpot(index: number, out: { x: number; z: number }): boolean {
+    const f = this.lastFrame;
+    if (!f || index >= this.simCount) return false;
+    const o = f.layout.headerLen + index * f.layout.simStride;
+    if (f.curr[o + f.layout.sim.away] !== 0) return false;
+    const z = f.curr[o + f.layout.sim.z];
+    out.x = f.curr[o + f.layout.sim.x];
+    // (Upstairs rows back to the ground's.)
+    out.z = z - this.rowOf(this.storeyOf(Math.floor(z)));
+    return true;
+  }
+
   simHead(index: number, out: { x: number; y: number; z: number }): boolean {
     return index < this.simCount && !!this.characters?.head(index, out);
   }
@@ -2431,6 +2787,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   setFloorPreview(tiles: readonly { x: number; z: number }[], floor: number | null): void {
     this.previews.setFloorPreview(tiles, floor);
+  }
+
+  setGaragePreview(garage: GaragePreview | null): void {
+    this.previews.setGaragePreview(garage);
   }
 
   setRoomOverlay(tiles: readonly RoomOverlayTile[]): void {

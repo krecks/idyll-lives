@@ -165,6 +165,21 @@ export interface LiveRenderOptions {
 
 /** Translucent preview of an object being placed in buy mode. */
 /** Buy-mode feedback played in the world (see `render/shared/buildFx.ts`). */
+/**
+ * Build mode's Garage tool preview: a garage's walls' centre lines (ground rows) and the way its door
+ * faces (`rot`, as a thing's: 0 towards +z, 1 +x, 2 -z, 3 -x); `valid` tints it; `sell`: the garage
+ * standing there, to be taken down.
+ */
+export interface GaragePreview {
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+  rot: number;
+  valid: boolean;
+  sell?: boolean;
+}
+
 export interface BuildEffect {
   kind: 'place' | 'upgrade' | 'sell' | 'build' | 'remove';
   /** Tile rectangle it covers. */
@@ -390,6 +405,8 @@ export interface Renderer {
   pickPlane(height: number): { x: number; z: number } | null;
   /** Projects a world point to canvas CSS pixels into `out`; false if behind the camera. */
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean;
+  /** Where Sim `index` is on the ground (town tiles, from the last update, drawn or not); false if away or unknown. */
+  simSpot(index: number, out: { x: number; z: number }): boolean;
   /** Interpolated world position above Sim `index`'s head from the last update; false if unknown. */
   simHead(index: number, out: { x: number; y: number; z: number }): boolean;
   /** The garden birds drawn about the viewed lot (render/shared/birds.ts), for the world's sound: kept and refilled, read it at once. */
@@ -398,6 +415,16 @@ export interface Renderer {
   birdSings(id: number, seconds: number): void;
   /** Centres the camera on a world point. */
   focus(x: number, z: number): void;
+  /** Flies the camera to a world point, smoothly (the town map's "look here"; `shared/focus.ts` `Flight`). */
+  flyTo(x: number, z: number): void;
+  /**
+   * The lot the roaming camera has settled on (a plot index), to be shown in full: the listener says
+   * whether it takes it (it shows it with `setWorld` of its view, the camera left where it is), or
+   * keeps its own (build mode). Not called while the camera follows someone or the director films.
+   */
+  onFocusLot(listener: ((plot: number) => boolean) | null): void;
+  /** The ground rectangle (tiles x0, z0, x1, z1) the camera streams in, for the sim's full-detail area (the worker's `setWatch`); called when it changes. */
+  onWatch(listener: ((rect: [number, number, number, number]) => void) | null): void;
   setHoverTile(tile: { x: number; z: number } | null): void;
   setSelectedSim(id: number | null): void;
   setWallMode(mode: WallMode): void;
@@ -432,6 +459,8 @@ export interface Renderer {
   setPaintPreview(faces: readonly PaintPreviewFace[], cover: number | null): void;
   /** Build mode's Floor tool: the tiles it would cover, laid with floor covering `floor` (0: the automatic look; null: none). */
   setFloorPreview(tiles: readonly { x: number; z: number }[], floor: number | null): void;
+  /** Build mode's Garage tool: the garage it would build or (`sell`) take down (null: none). Cheap; call on every pointer move. */
+  setGaragePreview(garage: GaragePreview | null): void;
   /** Build mode's room-score overlay: a film over each tile in its colour (`rgb` 0..1); empty hides it. */
   setRoomOverlay(tiles: readonly RoomOverlayTile[]): void;
   /** Build/buy mode: subtle tile grid over a tile rectangle (null hides it). */
@@ -584,6 +613,13 @@ export interface ItemPreviews {
   thumbnail(model: string, footprint: [number, number], priority?: 'now' | 'idle', signal?: AbortSignal): Promise<string | null>;
   /** Draws pictures ahead of time, in idle moments (opening the catalog is then instant). */
   prefetch(models: readonly { model: string; footprint: [number, number] }[]): void;
+  /**
+   * Holds the pictures drawn ahead of time (`idle`) while `hold` is set: in Live, where the camera
+   * moves and every frame counts (a picture is a model built, its shaders made and a read-back on a
+   * device of its own, beside the game's: big worlds' frames held up 50–200 ms by them). Those on
+   * screen (`now`) are drawn all the same.
+   */
+  holdAhead(hold: boolean): void;
   /** The cached picture, if it has been drawn. */
   cachedThumbnail(model: string): string | null;
   /** The cached turntable, if it has been drawn. */

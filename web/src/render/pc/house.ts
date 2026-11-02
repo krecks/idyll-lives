@@ -19,7 +19,7 @@ import { shadowOnlyLayer } from './sunShadows';
 import type { Opening, StoreyLayout, WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import type { RGB } from '../shared/environment';
-import type { Geo } from '../shared/geometry';
+import type { Geo, MeshData } from '../shared/geometry';
 import { HOUSE_MATERIALS, HousePlanner, type DoorLeaf, type HouseLooks, type HousePart, type HousePlan, type LaidPreview, type SilhouettePlan, type SilhouetteSpec, type StoreyBuild } from '../shared/house';
 
 /** A part as drawn: its entity (and the part). */
@@ -157,7 +157,12 @@ export class HouseBuilder {
 
   /** A part's entity under `parent` (null when it's empty). */
   private draw(part: HousePart, parent: pc.Entity): HouseMesh | null {
-    const mesh = meshFrom(this.device, part.geo.meshData({ colors: true, cut: part.cut }));
+    return this.drawData(part, part.geo.meshData({ colors: true, cut: part.cut }), parent);
+  }
+
+  /** A part drawn from vertex arrays of its own (the street merges its chunks' parts: `pc/street.ts`), under `parent`; null when empty. */
+  drawData(part: HousePart, data: MeshData, parent: pc.Entity): HouseMesh | null {
+    const mesh = meshFrom(this.device, data);
     if (!mesh) return null;
     const entity = drawMesh(parent, part.name, mesh, this.materialOf(part), {
       castShadows: part.cast,

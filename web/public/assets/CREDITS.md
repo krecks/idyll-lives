@@ -490,7 +490,7 @@ override pack
 |---|---|---|
 | `textures/sky/clouds.png` | Cloud band of the sky | `cargo tex clouds` (procedural noise, `crates/tools/src/tex.rs`) |
 | `textures/<set>/albedo.jpg`, `normal.jpg`, `arm.jpg`; `street/sidewalk/*.jpg` | All 20 surface sets (`bark` … `wood_oak`, `sidewalk`) | `cargo tex synth` (procedural height fields, `crates/tools/src/tex/synth.rs`) |
-| `icons/rotate.svg`, `wall.svg`, `door.svg`, `eraser.svg`, `eyedropper.svg`, `environment.svg`, `fence.svg`, `gate.svg`, `roof.svg`, `upgrade.svg`, `focused.svg`, `inspired.svg`, `energized.svg`, `relaxed.svg` | UI and emotion icons | Hand-written SVG in the style of the existing set |
+| `icons/rotate.svg`, `wall.svg`, `door.svg`, `eraser.svg`, `eyedropper.svg`, `environment.svg`, `fence.svg`, `gate.svg`, `garage.svg`, `roof.svg`, `upgrade.svg`, `focused.svg`, `inspired.svg`, `energized.svg`, `relaxed.svg` | UI and emotion icons | Hand-written SVG in the style of the existing set |
 
 ## Characters (`characters/`)
 

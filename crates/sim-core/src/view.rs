@@ -1500,7 +1500,7 @@ struct StructureView<'a> {
     plots: Vec<PlotView<'a>>,
     exits: &'a [[f32; 2]],
     #[serde(skip_serializing_if = "Option::is_none")]
-    rooms: Option<&'a [u16]>,
+    rooms: Option<Vec<u16>>,
     /// Every edge with a wall on it (plain walls, and walls with a door or window).
     #[serde(skip_serializing_if = "Option::is_none")]
     walls: Option<Vec<EdgeView>>,
@@ -1597,30 +1597,26 @@ impl LookView {
     }
 }
 
-fn diagonals(lot: &crate::lot::Lot) -> Vec<DiagonalView> {
-    let mut out = Vec::new();
-    for (i, d) in lot.diagonals().iter().enumerate() {
-        let Some(d) = d else { continue };
-        out.push(DiagonalView {
-            x: i % lot.width,
-            z: i / lot.width,
-            axis: match d.dir {
-                crate::lot::DiagDir::Dp => "dp",
-                crate::lot::DiagDir::Dn => "dn",
-            },
-            kind: match d.edge {
-                Edge::Door => "door",
-                Edge::Window => "window",
-                _ => "wall",
-            },
-            rooms: lot.half_rooms()[i],
-            look: LookView::of(
-                lot,
-                crate::lot::EdgeRef::Diag((i % lot.width) as u16, (i / lot.width) as u16),
-            ),
-        });
-    }
-    out
+fn diagonals(
+    lot: &crate::lot::Lot,
+    list: impl Iterator<Item = (usize, usize, crate::lot::Diagonal)>,
+) -> Vec<DiagonalView> {
+    list.map(|(x, z, d)| DiagonalView {
+        x,
+        z,
+        axis: match d.dir {
+            crate::lot::DiagDir::Dp => "dp",
+            crate::lot::DiagDir::Dn => "dn",
+        },
+        kind: match d.edge {
+            Edge::Door => "door",
+            Edge::Window => "window",
+            _ => "wall",
+        },
+        rooms: lot.half_rooms()[lot.tile_index(x as i32, z as i32)],
+        look: LookView::of(lot, crate::lot::EdgeRef::Diag(x as u16, z as u16)),
+    })
+    .collect()
 }
 
 /// A wall edge: `h` runs from `(x, z)` to `(x + 1, z)`, `v` from `(x, z)` to `(x, z + 1)`.
@@ -1662,8 +1658,12 @@ struct FenceView {
     style: u8,
 }
 
-/// Wall edges, openings (doors, windows) and fences of the whole lot, in grid order.
-fn wall_edges(lot: &crate::lot::Lot) -> (Vec<EdgeView>, Vec<OpeningView>, Vec<FenceView>) {
+/// Wall edges, openings (doors, windows) and fences among `list` (`Lot::walls` for the whole
+/// lot, in grid order).
+fn wall_edges(
+    lot: &crate::lot::Lot,
+    list: impl Iterator<Item = (crate::lot::EdgeRef, Edge)>,
+) -> (Vec<EdgeView>, Vec<OpeningView>, Vec<FenceView>) {
     let mut walls = Vec::new();
     let mut openings = Vec::new();
     let mut fences = Vec::new();
@@ -1711,14 +1711,11 @@ fn wall_edges(lot: &crate::lot::Lot) -> (Vec<EdgeView>, Vec<OpeningView>, Vec<Fe
             head: look.head,
         });
     };
-    for z in 0..=lot.depth {
-        for x in 0..lot.width {
-            add("h", x, z, lot.h_edge(x, z));
-        }
-    }
-    for z in 0..lot.depth {
-        for x in 0..=lot.width {
-            add("v", x, z, lot.v_edge(x, z));
+    for (at, e) in list {
+        match at {
+            crate::lot::EdgeRef::H(x, z) => add("h", x.into(), z.into(), e),
+            crate::lot::EdgeRef::V(x, z) => add("v", x.into(), z.into(), e),
+            crate::lot::EdgeRef::Diag(..) => {}
         }
     }
     (walls, openings, fences)
@@ -1873,7 +1870,7 @@ fn surface_lifts(world: &World) -> Vec<Option<f32>> {
     // The top over each tile (furniture never shares tiles), checked against where each thing's
     // middle is; a thing over the edge of its tile's top looks through them all.
     let lot = &world.lot;
-    let mut tops = vec![u32::MAX; lot.width * lot.depth];
+    let mut tops = vec![u32::MAX; lot.tile_slots()];
     for o in world
         .objects
         .iter()
@@ -1906,6 +1903,161 @@ fn surface_lifts(world: &World) -> Vec<Option<f32>> {
             Some(top.surface.height).filter(|&h| h > 0.0)
         })
         .collect()
+}
+
+/// An object as views send it.
+fn object_view<'a>(
+    world: &'a World,
+    lifts: &[Option<f32>],
+    o: &'a crate::world::ObjectInstance,
+) -> ObjectView<'a> {
+    let content = &world.content;
+    let (w, d) = o.size(content);
+    ObjectView {
+        id: o.stable,
+        def: &content.objects[o.def].id,
+        x: o.x,
+        z: o.z,
+        rot: o.rot,
+        turn: o.turn,
+        offset: o.offset,
+        size: (o.extent != crate::world::kind_size(content.objects[o.def].footprint))
+            .then_some(o.extent),
+        tall: o.tall,
+        lift: lifts.get(o.id as usize).copied().flatten(),
+        wear: o.wear,
+        open: o.open,
+        growth: world.content.objects[o.def]
+            .grows
+            .is_some()
+            .then(|| o.growth_stage() as u8),
+        running: o.running(),
+        w,
+        d,
+        quality: o.quality,
+        colors: crate::world::colors_hex(&o.colors),
+        sell_value: content.objects[o.def].price.map(|_| {
+            let broken = if o.broken() { 0.5 } else { 1.0 };
+            (o.value as f32 * content.object_rules.resale * broken).round() as i64
+        }),
+        repair_cost: (o.wear > 0.0).then(|| crate::home::repair_cost(content, o)),
+    }
+}
+
+/// What changed in which storage chunk (`lot::CHUNK` square; stacked rows, as `structure_rect`
+/// takes them): a fingerprint per chunk of its walls, doors, windows, fences, diagonals, floor
+/// coverings and the objects standing there (as views send them), row by row over
+/// `Lot::chunk_grid`. Compared from one structure version to the next, it tells a view which
+/// chunks to fetch again.
+pub fn chunk_fingerprints(world: &World) -> (usize, usize, Vec<u64>) {
+    use std::hash::{Hash, Hasher};
+    let lot = &world.lot;
+    let (cols, rows) = lot.chunk_grid();
+    let mut hashers: Vec<Option<std::collections::hash_map::DefaultHasher>> =
+        (0..cols * rows).map(|_| None).collect();
+    let chunk =
+        |x: i32, z: i32| lot.chunk_at(x.clamp(0, lot.width as i32), z.clamp(0, lot.depth as i32));
+    macro_rules! at {
+        ($x:expr, $z:expr) => {
+            hashers[chunk($x, $z)].get_or_insert_with(Default::default)
+        };
+    }
+    for (e, edge) in lot.walls() {
+        let (x, z) = match e {
+            crate::lot::EdgeRef::H(x, z)
+            | crate::lot::EdgeRef::V(x, z)
+            | crate::lot::EdgeRef::Diag(x, z) => (x as i32, z as i32),
+        };
+        let h = at!(x, z);
+        e.hash(h);
+        (edge as u8).hash(h);
+        let l = lot.look(e);
+        (l.sides, l.form, l.style, l.sill, l.head).hash(h);
+        if let crate::lot::EdgeRef::Diag(..) = e {
+            lot.half_rooms()[lot.tile_index(x, z)].hash(h);
+        }
+    }
+    for (x, z, c) in lot.floors() {
+        let h = at!(x as i32, z as i32);
+        (x, z, c).hash(h);
+    }
+    let lifts = surface_lifts(world);
+    for o in &world.objects {
+        let v = object_view(world, &lifts, o);
+        let h = at!(o.x, o.z);
+        serde_json::to_string(&v).unwrap_or_default().hash(h);
+    }
+    let out = hashers
+        .into_iter()
+        .map(|h| h.map_or(0, |h| h.finish()))
+        .collect();
+    (cols, rows, out)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RectView<'a> {
+    /// The tiles `[x0, z0, x1, z1)` (stacked rows) this covers.
+    rect: [i32; 4],
+    version: u32,
+    lot_version: u32,
+    walls: Vec<EdgeView>,
+    openings: Vec<OpeningView>,
+    fences: Vec<FenceView>,
+    diagonals: Vec<DiagonalView>,
+    floors: Vec<[u16; 3]>,
+    /// The objects whose tile (`x`, `z`) is inside.
+    objects: Vec<ObjectView<'a>>,
+}
+
+/// The walls, doors, windows, fences, diagonals, floor coverings and objects inside tiles
+/// `[x0, z0, x1, z1)` (stacked rows: storey `k` at rows `k * storeyDepth ..`), as
+/// `structure_json` gives them for the whole lot (JSON). An edge counts where the tile holding it
+/// is (its `+z` / `+x` side's tile), an object where its tile is.
+pub fn structure_rect_json(world: &World, rect: [i32; 4]) -> String {
+    let lot = &world.lot;
+    let [x0, z0, x1, z1] = rect;
+    let inside = |x: i32, z: i32| x >= x0 && z >= z0 && x < x1 && z < z1;
+    let list = lot.walls_in(rect);
+    let (walls, openings, fences) = wall_edges(
+        lot,
+        list.iter()
+            .copied()
+            .filter(|(e, _)| !matches!(e, crate::lot::EdgeRef::Diag(..))),
+    );
+    let diagonals = diagonals(
+        lot,
+        list.iter().filter_map(|&(e, _)| match e {
+            crate::lot::EdgeRef::Diag(x, z) => lot
+                .diag(x.into(), z.into())
+                .map(|d| (usize::from(x), usize::from(z), d)),
+            _ => None,
+        }),
+    );
+    let floors = lot
+        .floors()
+        .filter(|&(x, z, _)| inside(x.into(), z.into()))
+        .map(|(x, z, c)| [x, z, u16::from(c)])
+        .collect();
+    let lifts = surface_lifts(world);
+    let objects = world
+        .objects
+        .iter()
+        .filter(|o| inside(o.x, o.z))
+        .map(|o| object_view(world, &lifts, o))
+        .collect();
+    serde_json::to_string(&RectView {
+        rect,
+        version: world.structure_version(),
+        lot_version: world.lot_version(),
+        walls,
+        openings,
+        fences,
+        diagonals,
+        floors,
+        objects,
+    })
+    .unwrap_or_else(|_| "{}".into())
 }
 
 pub fn structure_json(world: &World) -> String {
@@ -1980,38 +2132,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
     let objects = world
         .objects
         .iter()
-        .map(|o| {
-            let (w, d) = o.size(content);
-            ObjectView {
-                id: o.stable,
-                def: &content.objects[o.def].id,
-                x: o.x,
-                z: o.z,
-                rot: o.rot,
-                turn: o.turn,
-                offset: o.offset,
-                size: (o.extent != crate::world::kind_size(content.objects[o.def].footprint))
-                    .then_some(o.extent),
-                tall: o.tall,
-                lift: lifts.get(o.id as usize).copied().flatten(),
-                wear: o.wear,
-                open: o.open,
-                growth: world.content.objects[o.def]
-                    .grows
-                    .is_some()
-                    .then(|| o.growth_stage() as u8),
-                running: o.running(),
-                w,
-                d,
-                quality: o.quality,
-                colors: crate::world::colors_hex(&o.colors),
-                sell_value: content.objects[o.def].price.map(|_| {
-                    let broken = if o.broken() { 0.5 } else { 1.0 };
-                    (o.value as f32 * content.object_rules.resale * broken).round() as i64
-                }),
-                repair_cost: (o.wear > 0.0).then(|| crate::home::repair_cost(content, o)),
-            }
-        })
+        .map(|o| object_view(world, &lifts, o))
         .collect();
     let sims = world
         .sims
@@ -2069,12 +2190,12 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
         })
         .collect();
     let (walls, openings, fences) = if lot {
-        let (w, o, f) = wall_edges(&world.lot);
+        let (w, o, f) = wall_edges(&world.lot, world.lot.walls());
         (Some(w), Some(o), Some(f))
     } else {
         (None, None, None)
     };
-    let diagonals = lot.then(|| diagonals(&world.lot));
+    let diagonals = lot.then(|| diagonals(&world.lot, world.lot.diagonal_walls()));
     serde_json::to_string(&StructureView {
         version: world.structure_version(),
         lot_version: world.lot_version(),
@@ -2090,7 +2211,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
         households,
         plots,
         exits: &world.exits,
-        rooms: lot.then(|| world.lot.rooms()),
+        rooms: lot.then(|| world.lot.rooms_row_major()),
         walls,
         openings,
         fences,
@@ -2238,6 +2359,8 @@ struct BuildView {
     /// A metre of fence and a gate, without fence styles (styles carry their own prices).
     fence: i64,
     gate: i64,
+    /// A garage on the home lot.
+    garage: i64,
 }
 
 /// Every career with all its levels, expanded from the content (sent to the UI once).
@@ -2316,6 +2439,7 @@ pub fn catalog_json(content: &Content) -> String {
             diagonal_wall: content.build.diagonal_wall(),
             fence: content.build.fence,
             gate: content.build.gate,
+            garage: content.build.garage,
         },
     })
     .expect("catalog serializes")

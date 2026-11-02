@@ -6,20 +6,30 @@
  * swings open for someone going through it (`Fences.gates`, `swingGate`) by moving its vertices
  * in the one mesh: no draw of its own.
  *
+ * A hedge (`kind` 'hedge', the hedges a town plants round its gardens) is the street's hedge model,
+ * one instance per edge (`FencePlan.hedges`), drawn with the garden's plants; a gate in it is a
+ * wooden one between two posts.
+ *
  * Engine-neutral: `planFences` writes the geometry and the gates' leaves, `swungGate` where a
- * leaf's vertices go as it swings; `pc/fences.ts` draws them.
+ * leaf's vertices go as it swings; `pc/fences.ts` draws them. The street writes other lots' fences
+ * into its own meshes with `writeFences`.
  */
 
 import type { FenceStyleDef } from '../../content/content';
 import type { FenceEdge } from '../../core/protocol';
 import { Geo } from './geometry';
-import { Painter } from './street';
+import { hash } from './cars';
+import { Painter, type Inst } from './street';
 
 type Kind = FenceStyleDef['kind'];
 
 const FALLBACK: FenceStyleDef = { id: 'picket', label: 'Picket', kind: 'picket', color: '#F2F0EA', height: 1 };
 /** Colour of iron gate leaves in stone walls. */
 const IRON = '#2B2D30';
+/** A gate in a hedge: weathered wood. */
+const HEDGE_GATE: FenceStyleDef = { id: 'hedgeGate', label: 'Gate', kind: 'rails', color: '#7C6146', height: 1.05 };
+/** The hedge model's length along its run at scale 1 (as the street plants it, `edgeRun`). */
+const HEDGE_LENGTH = 1.05;
 
 /** How far out from its post a gate leaf's hinge stands, along the fence (the leaf starts at 0.09). */
 const GATE_HINGE = 0.08;
@@ -38,20 +48,43 @@ export interface GateLeaf {
   restNormals: Float32Array;
 }
 
-/** The fences' geometry (plain finish, by vertex colour) and their gates' leaves in it. */
+/** The fences' geometry (plain finish, by vertex colour), their gates' leaves in it, and the hedges' instances. */
 export interface FencePlan {
   geo: Geo;
   gates: GateLeaf[];
+  /** The hedge model's instances (`street.ts` `Inst`: x, z, length scale, height scale, yaw), one per hedge edge. */
+  hedges: Inst[];
 }
 
-/** Writes all fences and gates (null when there are none). */
-export function planFences(fences: readonly FenceEdge[], styles: readonly FenceStyleDef[]): FencePlan | null {
+/**
+ * Writes all fences and gates (null when there are none). `hedgeBoxes`: hedges as plain green boxes
+ * too (Build mode's previews, which have no hedge model to hand).
+ */
+export function planFences(fences: readonly FenceEdge[], styles: readonly FenceStyleDef[], { hedgeBoxes = false } = {}): FencePlan | null {
   if (!fences.length) return null;
   const p = new Painter(new Geo());
+  const gates: GateLeaf[] = [];
+  const hedges: Inst[] = [];
+  writeFences(p, fences, styles, { gates, hedges, hedgeBoxes });
+  return { geo: p.geo, gates, hedges };
+}
+
+/**
+ * Writes fences and gates into `p` (posts where they meet or end, once per grid corner); `gates`
+ * collects the leaves (null: they are drawn shut and not kept), `hedges` the hedge model's
+ * instances (see `FencePlan.hedges`). Written in parts (the street's chunks): `postsFrom` the fences
+ * round them too (a post's style is the tallest there), `postHere` the corners this part draws.
+ */
+export function writeFences(
+  p: Painter,
+  fences: readonly FenceEdge[],
+  styles: readonly FenceStyleDef[],
+  out: { gates: GateLeaf[] | null; hedges: Inst[]; hedgeBoxes?: boolean; postsFrom?: readonly FenceEdge[]; postHere?: (x: number, z: number) => boolean },
+): void {
   const styleOf = (f: FenceEdge) => styles[f.style ?? 0] ?? styles[0] ?? FALLBACK;
   // Posts where fences meet or end: once per grid corner, in the tallest style there.
   const posts = new Map<string, { x: number; z: number; style: FenceStyleDef; gate: boolean }>();
-  for (const f of fences) {
+  for (const f of out.postsFrom ?? fences) {
     const style = styleOf(f);
     const ends: [number, number][] = f.axis === 'h' ? [[f.x, f.z], [f.x + 1, f.z]] : [[f.x, f.z], [f.x, f.z + 1]];
     for (const [x, z] of ends) {
@@ -61,19 +94,24 @@ export function planFences(fences: readonly FenceEdge[], styles: readonly FenceS
       else if (f.kind === 'gate') had.gate = true;
     }
   }
-  const gates: GateLeaf[] = [];
   for (const f of fences) {
     const style = styleOf(f);
     // Local frame: +x along the edge (0..1), +z across it.
     p.at(f.x, f.z, f.axis === 'h' ? 0 : -Math.PI / 2);
     if (f.kind !== 'gate') {
-      panel(p, style);
+      if (style.kind !== 'hedge') panel(p, style);
+      else {
+        const [x, z] = f.axis === 'h' ? [f.x + 0.5, f.z] : [f.x, f.z + 0.5];
+        out.hedges.push(hedgeAt(x, z, f.axis));
+        if (out.hedgeBoxes) p.paint(style.color, 0.9, 0).box(0, 0, -0.38, 1, height(style), 0.38, 'ny');
+      }
       continue;
     }
     const first = p.geo.pos.length / 3;
-    gate(p, style);
+    gate(p, style.kind === 'hedge' ? HEDGE_GATE : style);
+    if (!out.gates) continue;
     const [hx, , hz] = p.p(GATE_HINGE, 0, 0);
-    gates.push({
+    out.gates.push({
       axis: f.axis,
       centre: f.axis === 'h' ? [f.x + 0.5, f.z] : [f.x, f.z + 0.5],
       hinge: [hx, hz],
@@ -84,11 +122,26 @@ export function planFences(fences: readonly FenceEdge[], styles: readonly FenceS
     });
   }
   for (const post of posts.values()) {
-    if (post.style.kind === 'stone' && !post.gate) continue;
+    if (out.postHere && !out.postHere(post.x, post.z)) continue;
+    if ((post.style.kind === 'stone' || post.style.kind === 'hedge') && !post.gate) continue;
     p.at(post.x, post.z, 0);
-    postAt(p, post.style, post.gate);
+    postAt(p, post.style.kind === 'hedge' ? HEDGE_GATE : post.style, post.gate);
   }
-  return { geo: p.geo, gates };
+}
+
+/** The hedge model's instances for the hedge-style fences among `fences` (not their gates). */
+export function fenceHedges(fences: readonly FenceEdge[], styles: readonly FenceStyleDef[]): Inst[] {
+  return fences.filter((f) => f.kind === 'fence' && (styles[f.style ?? 0] ?? styles[0])?.kind === 'hedge').map((f) => (f.axis === 'h' ? hedgeAt(f.x + 0.5, f.z, 'h') : hedgeAt(f.x, f.z + 0.5, 'v')));
+}
+
+/**
+ * One edge's stretch of clipped hedge, centred on (x, z) along its edge: a touch longer than the
+ * edge (so stretches overlap and corners close), scaled evenly (the viewed lot plants it with its
+ * garden's shrubs, the street with its own), turned either way by where it is.
+ */
+export function hedgeAt(x: number, z: number, axis: 'h' | 'v'): Inst {
+  const s = (1 / HEDGE_LENGTH) * (1.04 + hash(x, z, 60) * 0.05);
+  return [x, z, s, s, (axis === 'h' ? 0 : Math.PI / 2) + (hash(x, z, 62) < 0.5 ? 0 : Math.PI)];
 }
 
 const scratch = { pos: new Float32Array(0), nor: new Float32Array(0) };
@@ -123,7 +176,7 @@ export function swungGate(gate: GateLeaf, open: number, towards: number): { pos:
 }
 
 const height = (s: FenceStyleDef) => s.height ?? 1;
-const rough: Record<Kind, number> = { picket: 0.6, rails: 0.8, slats: 0.55, iron: 0.45, stone: 0.95 };
+const rough: Record<Kind, number> = { picket: 0.6, rails: 0.8, slats: 0.55, iron: 0.45, stone: 0.95, hedge: 0.9 };
 
 /** A grid-corner post (stouter beside a gate). */
 function postAt(p: Painter, s: FenceStyleDef, gate: boolean): void {

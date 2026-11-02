@@ -1130,7 +1130,8 @@ fn a_baby_loaded_from_a_save_lies_back_in_the_crib() {
     }
 }
 
-/// A town as full as it gets (`MAX_SIMS`): partners don't keep trying for a baby that can't come.
+/// A town as full as it grows (`TOWN_SIMS`, a town without a size): partners don't keep trying
+/// for a baby that can't come.
 #[test]
 fn partners_in_a_full_town_dont_keep_trying_for_a_baby() {
     let content = r#"{
@@ -1181,11 +1182,11 @@ fn partners_in_a_full_town_dont_keep_trying_for_a_baby() {
         tries
     };
     assert!(
-        tries(sim_core::world::MAX_SIMS - 1) > 0,
+        tries(sim_core::world::TOWN_SIMS - 1) > 0,
         "with room in town they do"
     );
     assert_eq!(
-        tries(sim_core::world::MAX_SIMS),
+        tries(sim_core::world::TOWN_SIMS),
         0,
         "in a full town they don't"
     );

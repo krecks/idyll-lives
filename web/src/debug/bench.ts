@@ -49,6 +49,43 @@ const PATHS = {
  * lamp beside the glass, not in front of it.
  */
 const MIRROR_PATH = { distance: 4.4, radius: 6, beta: 0.8, turn: -0.4, swing: 0.2, period: 20 };
+/**
+ * `cam=roam`: the camera's target along a loop over the town at `ROAM.speed` m/s (an ellipse
+ * through the home lot, inset from the edge), looking the way it goes from `radius` m up and
+ * behind: the street streams in ahead. It stops for `hold` s every `every` s, so the lot it stops
+ * over becomes the focus (built in full) while it waits, and it moves on.
+ */
+const ROAM = { speed: 12, radius: 30, beta: 0.95, inset: 30, every: 8, hold: 2 };
+
+function roamPose(t: number, b: { x0: number; z0: number; x1: number; z1: number; from: [number, number, number]; areas?: [number, number][] }): { alpha: number; beta: number; radius: number; target: [number, number, number] } {
+  const moving = Math.floor(t / ROAM.every) * (ROAM.every - ROAM.hold) + Math.min(t % ROAM.every, ROAM.every - ROAM.hold);
+  // A big world's: from hamlet to hamlet (its areas' middles, round and back to the first).
+  if (b.areas) {
+    const pts = [...b.areas, b.areas[0]];
+    const lens = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]));
+    let s = (ROAM.speed * moving) % lens.reduce((a, l) => a + l, 0);
+    let i = 0;
+    while (s > lens[i]) s -= lens[i++];
+    const [a, c] = [pts[i], pts[i + 1]];
+    const k = s / (lens[i] || 1);
+    const [hx, hz] = [(c[0] - a[0]) / (lens[i] || 1), (c[1] - a[1]) / (lens[i] || 1)];
+    return { alpha: Math.atan2(-hz, -hx), beta: ROAM.beta, radius: ROAM.radius, target: [a[0] + (c[0] - a[0]) * k, 0, a[1] + (c[1] - a[1]) * k] };
+  }
+  const cx = (b.x0 + b.x1) / 2;
+  const cz = (b.z0 + b.z1) / 2;
+  const a = Math.max(20, (b.x1 - b.x0) / 2 - ROAM.inset);
+  const c = Math.max(20, (b.z1 - b.z0) / 2 - ROAM.inset);
+  // Starting where the home lot is round the loop; at about `speed` m/s along it (the ellipse's mean radius).
+  const start = Math.atan2((b.from[2] - cz) / c, (b.from[0] - cx) / a);
+  const th = start + (ROAM.speed * moving) / ((a + c) / 2);
+  const x = cx + a * Math.cos(th);
+  const z = cz + c * Math.sin(th);
+  // Heading along the loop; the eye behind it (the arc camera's eye is at target + (cos α, sin α) · …).
+  const hx = -a * Math.sin(th);
+  const hz = c * Math.cos(th);
+  return { alpha: Math.atan2(-hz, -hx), beta: ROAM.beta, radius: ROAM.radius, target: [x, 0, z] };
+}
+
 /** Where every path starts (the game's own opening angle). */
 const START_ALPHA = -Math.PI * 0.62;
 /** Longest wait for the game to start (loading, shaders). */
@@ -92,6 +129,10 @@ export interface BenchResult {
   /** Reflections drawn a second (all mirrors). */
   reflectionsPerSecond: number;
   longTasks: { count: number; maxMs: number; totalMs: number };
+  /** Frames that took longer than two at 60 Hz (33 ms between them). */
+  over33?: number;
+  /** Those frames: when (s into the measurement), how long (ms), and what the renderer was building then. */
+  slow?: { at: number; ms: number; building: string }[];
   render: Record<string, unknown>;
   /**
    * Scene counts at the start (meshes, materials, shadow casters and their triangles, plant instances,
@@ -157,7 +198,8 @@ export async function runBench(): Promise<void> {
 }
 
 async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
-  const saveId = await loadState(await sceneText(b.scene), `bench ${b.scene}`);
+  // (The big world is the village's, tiled for the renderer: `tile`.)
+  const saveId = await loadState(await sceneText(b.scene === 'bigworld' ? 'village' : b.scene), `bench ${b.scene}`);
   app.start({ kind: 'load', saveId });
   // Live once the game screen shows its interface (the session is revealed by then).
   const until = performance.now() + START_LIMIT_MS;
@@ -177,6 +219,9 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
   const plot = home == null ? null : game.plots[home];
   const centre: [number, number, number] = plot ? [plot.x + plot.w / 2, 0, plot.z + plot.d / 2] : [0, 0, 0];
   const path = PATHS[b.cam === 'wide' ? 'wide' : 'orbit'];
+  // The roam's loop: over the town (tiled, the big world's), from the home lot's side.
+  const town = renderer.benchInfo().world as { width: number; depth: number; areas?: [number, number][] } | undefined;
+  const bounds = { x0: 0, z0: 0, x1: town?.width ?? 100, z1: town?.depth ?? 100, from: centre, areas: town?.areas && town.areas.length > 1 ? town.areas : undefined };
   const frozen = b.diag.has('freeze');
   const mirror = b.cam === 'mirror' || b.cam === 'mirror-still' ? mirrorView(renderer.benchInfo().scene as { mirrorSpots?: Spot[] }, plot) : null;
   if (mirror) controls.setWallMode('up');
@@ -202,6 +247,8 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
         const s = Math.sin(m.beta);
         const g = mirror.glass;
         renderer.setCameraPose({ alpha, beta: m.beta, radius: m.radius, target: [g[0] + k * Math.cos(alpha) * s, g[1] + k * Math.cos(m.beta), g[2] + k * Math.sin(alpha) * s] });
+      } else if (b.cam === 'roam') {
+        renderer.setCameraPose(roamPose(t, bounds));
       } else {
         const o = b.orbit;
         renderer.setCameraPose({ alpha: START_ALPHA + (2 * Math.PI * t) / path.period, beta: o.beta ?? path.beta, radius: o.radius ?? path.radius, target: [centre[0] + o.tx, centre[1], centre[2] + o.tz] });
@@ -241,11 +288,14 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
       : null;
     observer?.observe({ type: 'longtask' });
     let last = 0;
+    const slow: { at: number; ms: number; building: string }[] = [];
     let rafCount = 0;
     let stop = false;
     const raf = (time: number) => {
       if (stop) return;
       if (last) intervals.push(time - last);
+      // (When the slow ones came, s into the measurement, and what the frame's build was then: `slow`.)
+      if (last && time - last > 33.4) slow.push({ at: Math.round(time - started) / 1000, ms: Math.round(time - last), building: renderer.benchInfo().building as string });
       last = time;
       rafCount++;
       requestAnimationFrame(raf);
@@ -284,7 +334,9 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
       lightingPerSecond: ((end.scene as { lightingUpdates: number }).lightingUpdates - lighting0) / secs,
       reflectionsPerSecond: ((end.scene as { mirrorDraws: number }).mirrorDraws - reflections0) / secs,
       longTasks: { count: long.length, maxMs: Math.max(0, ...long), totalMs: long.reduce((a, x) => a + x, 0) },
-      render: { ...info, end: end.scene },
+      over33: intervals.filter((ms) => ms > 33.4).length,
+      slow,
+      render: { ...info, end: end.scene, endStreet: end.street, focusSwitches: end.focusSwitches },
       fingerprint,
     };
   } finally {

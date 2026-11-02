@@ -41,6 +41,20 @@
       return { text: game.creative ? 'Free' : money(def.price ?? 0), sub: game.placeValid ? def.name : misfit, keys, bad: !game.placeValid };
     }
     const tool = game.buildTool;
+    if (tool === 'garage' && game.buildTab === 'build') {
+      const h = game.garageHover;
+      if (!h) return null;
+      const build = game.catalog?.build.garage ?? 0;
+      if (h.kind === 'sell') {
+        const back = game.creative ? 0 : Math.round(build * (game.catalog?.objectRules.resale ?? 0));
+        return { text: 'Take down the garage', sub: back ? `Sells for ${money(back)}` : undefined, keys: 'Click · Del', bad: false };
+      }
+      const price = game.creative ? 0 : build;
+      const what = h.drive ? 'Garage at the end of the driveway' : 'Garage';
+      const keys = h.drive ? undefined : 'R turns its door';
+      if (!h.valid) return { text: what, sub: h.reason ?? "Doesn't fit here", keys, bad: true };
+      return { text: price ? money(price) : 'Free', sub: what, keys, bad: false };
+    }
     if (game.buildEdges === 0) return null;
     const cost = game.buildCost;
     const short = !game.affords(cost);

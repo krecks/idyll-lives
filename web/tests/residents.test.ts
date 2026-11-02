@@ -17,6 +17,9 @@ import { fixture, numbers as recorded, type Numbers } from './fixtures/babylon';
 
 const WEB = new URL('../', import.meta.url).pathname;
 
+/** Rows of the pose texture when the recording was made (`MAX_CHARACTERS` then). */
+const RECORDED_ROWS = 96;
+
 function hash(a: ArrayLike<number> | null | undefined, from = 0, to = a?.length ?? 0): string {
   if (!a) return '-';
   const f = new Float32Array(1);
@@ -123,7 +126,7 @@ describe('residents', async () => {
       poses = data;
       width = w;
     },
-    uploadPoses: () => void log.push(`poses ${hash(poses)}`),
+    uploadPoses: () => void log.push(`poses ${hash(poses, 0, RECORDED_ROWS * width * 4)}`),
     uploadPoseRows: (from, count) => void log.push(`rows ${from} ${count} ${hash(poses, from * width * 4, (from + count) * width * 4)}`),
     createPart(body, part, shadow) {
       const p = { name: `${shadow ? 'shadow' : 'part'}:${body.name}:${part}`, enabled: true, rows: new Float32Array(0), count: 0 };
@@ -371,8 +374,10 @@ describe('residents', async () => {
         characters.update(frame, () => true, shadows);
         const drawn = parts.filter((p) => p.enabled && p.count).map((p) => `${p.name} ${hash(p.rows, 0, p.count * 4)}`);
         const covered = quilts.filter((q) => q.count).map((q) => `${q.name} ${q.count} ${hash(q.matrices, 0, q.count * 16)} ${hash(q.ext, 0, q.count * 2)} ${hash(q.tint, 0, q.count * 3)}`);
-        const held = props.filter((p) => p.count).map((p) => `${p.key} ${hash(p.matrices)}`);
-        second.push(hash(poses), hash(characters.heads), hash(shadows), hash(characters.visible), hash(ring), ...drawn, ...covered, ...held, ...log.splice(0), JSON.stringify([...characters.pulled]));
+        const held = props.filter((p) => p.count).map((p) => `${p.key} ${hash(p.matrices, 0, RECORDED_ROWS * 16)}`);
+        // (The rows the recording had when the pose texture held 96 residents: the same numbers in them, whatever room there is now.)
+        const rows = (a: ArrayLike<number>) => hash(a, 0, (a.length / MAX_CHARACTERS) * RECORDED_ROWS);
+        second.push(rows(poses), rows(characters.heads), rows(shadows), rows(characters.visible), hash(ring), ...drawn, ...covered, ...held, ...log.splice(0), JSON.stringify([...characters.pulled]));
         if (f % 30 === 29) {
           record.push(`${(f + 1) / 30} s: ${hash(new TextEncoder().encode(second.join('\n')))}`);
           second = [];

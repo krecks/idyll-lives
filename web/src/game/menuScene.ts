@@ -218,14 +218,17 @@ class MenuScene {
   }
 
   private baseShot(shot: Shot, world: WorldStructure, duration: number): TownShot {
-    const town = { x: 0, z: 0, w: world.width, d: groundDepth(world) };
+    // A big world's main town (its first area); else the whole town.
+    const main = world.meta?.areas?.[0];
+    const town = main ? { x: main.x, z: main.z, w: main.w, d: main.d } : { x: 0, z: 0, w: world.width, d: groundDepth(world) };
+    const inTown = main ? world.plots.filter((p) => p.x + p.w / 2 >= main.x && p.x + p.w / 2 <= main.x + main.w && p.z + p.d / 2 >= main.z && p.z + p.d / 2 <= main.z + main.d) : world.plots;
     // The built-up part (plots and street), without the empty margin.
-    const plots = world.plots.length
+    const plots = inTown.length
       ? {
-          x: Math.min(...world.plots.map((p) => p.x)),
-          z: Math.min(...world.plots.map((p) => p.z)),
-          w: Math.max(...world.plots.map((p) => p.x + p.w)) - Math.min(...world.plots.map((p) => p.x)),
-          d: Math.max(...world.plots.map((p) => p.z + p.d)) - Math.min(...world.plots.map((p) => p.z)),
+          x: Math.min(...inTown.map((p) => p.x)),
+          z: Math.min(...inTown.map((p) => p.z)),
+          w: Math.max(...inTown.map((p) => p.x + p.w)) - Math.min(...inTown.map((p) => p.x)),
+          d: Math.max(...inTown.map((p) => p.z + p.d)) - Math.min(...inTown.map((p) => p.z)),
         }
       : town;
     const W = window.innerWidth;
@@ -279,8 +282,12 @@ class MenuScene {
       if (o.width && o.height) blocks.push({ l: o.left - 6, t: o.top - 6, r: o.right + 6, b: o.bottom + 6 });
     }
     const placed: Label[] = [];
+    // A lot whose anchor is off the stage (a big world's far places, beside or behind the view) has no
+    // tag: clamped to the edge, they stacked up there in a column. One just past the edge still shows,
+    // pulled in.
+    const off = (x: number, y: number) => x < area.left - OFF_STAGE || x > area.right + OFF_STAGE || y < area.top - OFF_STAGE || y > area.bottom + OFF_STAGE;
     for (const [plot, label] of this.labels) {
-      const visible = label.y > -100 && r.project(label.x, label.y, label.z, this.out);
+      const visible = label.y > -100 && r.project(label.x, label.y, label.z, this.out) && !off(this.out.x, this.out.y);
       if (visible !== label.shown) {
         label.shown = visible;
         this.showLabel(label);
@@ -360,6 +367,8 @@ class MenuScene {
 
 /** Height of a tag's stem below its body (see TownStage). */
 const STEM = 10;
+/** How far (CSS px) past the stage's edge a lot's anchor may be and still have its tag (pulled in to the edge). */
+const OFF_STAGE = 24;
 
 interface Box {
   l: number;

@@ -32,7 +32,11 @@ const UNDO_DEPTH: usize = 30;
 #[derive(Debug, Clone)]
 pub(crate) struct HomeSnapshot {
     household: usize,
-    lot: crate::lot::Lot,
+    /// Where the lot's log stood when it was taken (`Lot::log_begin`), and once the edit is
+    /// done (`remember`), what it changed on the lot, as it was before: walls, looks and floors
+    /// (the rooms follow from them). A big world's lot is too big to copy for every edit.
+    lot_mark: crate::lot::LogMark,
+    lot: Option<Vec<crate::lot::LotChange>>,
     objects: Vec<ObjectInstance>,
     object_plot: Vec<Option<u32>>,
     blocked: Vec<bool>,
@@ -41,6 +45,12 @@ pub(crate) struct HomeSnapshot {
     plots: Vec<crate::world::Plot>,
     /// Food and dishes (they move and go with the furniture they're on).
     items: crate::items::Items,
+    /// The garages, the cars (one parks in front of a garage built at the end of its driveway) and
+    /// the tiles they take up.
+    garages: Vec<crate::cars::Garage>,
+    cars: Vec<crate::cars::Car>,
+    car_tiles: Vec<usize>,
+    cars_parked: Option<Vec<u64>>,
     /// The story's latest event id when it was taken, and the events the edit after it told
     /// (an upgrade): undo takes them out of the story, redo tells them again.
     events_before: u64,
@@ -111,13 +121,21 @@ fn shift_objects(t: &mut TaskKind, id: u32) {
     }
 }
 
+impl HomeSnapshot {
+    /// Where the lot's log stood when it was taken.
+    pub(crate) fn lot_mark(&self) -> crate::lot::LogMark {
+        self.lot_mark
+    }
+}
+
 impl World {
     /// The state a build or buy edit by `household` may change (None if it has no home).
-    pub(crate) fn home_snapshot(&self, household: u32) -> Option<HomeSnapshot> {
+    pub(crate) fn home_snapshot(&mut self, household: u32) -> Option<HomeSnapshot> {
         let (household, _) = self.home_of(household).ok()?;
         Some(HomeSnapshot {
             household,
-            lot: self.lot.clone(),
+            lot_mark: self.lot.log_begin(),
+            lot: None,
             objects: self.objects.clone(),
             object_plot: self.object_plot.clone(),
             blocked: self.blocked.clone(),
@@ -125,6 +143,10 @@ impl World {
             households: self.households.clone(),
             plots: self.plots.clone(),
             items: self.items.clone(),
+            garages: self.garages.clone(),
+            cars: self.cars.clone(),
+            car_tiles: self.car_tiles.clone(),
+            cars_parked: self.cars_parked.clone(),
             events_before: self.events.last_id(),
             story: Vec::new(),
         })
@@ -134,14 +156,17 @@ impl World {
     /// drawing a wall where one stands, leaves no step).
     pub(crate) fn remember(&mut self, mut before: HomeSnapshot) {
         let h = before.household;
-        let lot_changed = before.lot != self.lot;
+        let changes = self.lot.log_end(before.lot_mark);
+        let lot_changed = !changes.is_empty();
+        before.lot = Some(changes);
         if lot_changed {
             self.lot_version = self.lot_version.wrapping_add(1);
         }
         let changed = before.households[h].funds != self.households[h].funds
             || before.objects != self.objects
             || lot_changed
-            || before.plots != self.plots;
+            || before.plots != self.plots
+            || before.garages != self.garages;
         if !changed {
             return;
         }
@@ -184,8 +209,9 @@ impl World {
         // What the edit told goes from the story (and comes back with a redo).
         now.story = self.events.take(&s.story);
         self.keep_orders(&mut s);
-        self.redo.push(now);
         self.restore(s);
+        now.lot = Some(self.lot.log_end(now.lot_mark));
+        self.redo.push(now);
         Ok(())
     }
 
@@ -201,8 +227,9 @@ impl World {
         let mut s = self.redo.pop().expect("checked above");
         now.story = self.events.put_back(std::mem::take(&mut s.story));
         self.keep_orders(&mut s);
-        self.undo.push(now);
         self.restore(s);
+        now.lot = Some(self.lot.log_end(now.lot_mark));
+        self.undo.push(now);
         Ok(())
     }
 
@@ -229,13 +256,27 @@ impl World {
     }
 
     pub(crate) fn restore(&mut self, s: HomeSnapshot) {
-        if s.lot != self.lot {
+        let changed = match &s.lot {
+            // A finished edit taken back (undo, redo): what it changed goes back.
+            Some(changes) => {
+                self.lot.put_back(changes);
+                !changes.is_empty()
+            }
+            // An edit under way given up: what it changed since it began goes back.
+            None => self.lot.log_rollback(s.lot_mark),
+        };
+        if changed {
             self.lot_version = self.lot_version.wrapping_add(1);
         }
-        self.lot = s.lot;
+        self.lot.compute_rooms();
         self.objects = s.objects;
         self.object_plot = s.object_plot;
         self.blocked = s.blocked;
+        self.garages = s.garages;
+        self.cars = s.cars;
+        self.car_tiles = s.car_tiles;
+        self.cars_parked = s.cars_parked;
+        self.sync_tile_arrays();
         self.sims = s.sims;
         self.households = s.households;
         self.plots = s.plots;
@@ -246,6 +287,7 @@ impl World {
         self.refresh_stairs();
         self.nav_changed();
         self.rooms_layout_changed();
+        self.rooms_things_changed_everywhere();
     }
 
     /// The roof over the household's home: a style and a colour (free; only for looks).
@@ -443,7 +485,7 @@ impl World {
                 && x < p.x + p.w + REACH_MARGIN
                 && z < p.z + p.d + REACH_MARGIN
         };
-        let mut seen = vec![false; lot.width * lot.depth];
+        let mut seen = vec![false; lot.tile_slots()];
         let entry = p.arrival_point();
         let start = (entry[0].floor() as i32, entry[1].floor() as i32);
         if !nav.tile_free(start.0, start.1) {
@@ -471,7 +513,7 @@ impl World {
     }
 
     /// Front tiles and empty tiles of `plot` that can be reached, as `(tile index)` list.
-    fn reach_signature(&self, plot: u32) -> (Vec<bool>, Vec<bool>) {
+    pub(crate) fn reach_signature(&self, plot: u32) -> (Vec<bool>, Vec<bool>) {
         let seen = self.reachable(plot);
         let fronts = self
             .objects
@@ -492,7 +534,12 @@ impl World {
 
     /// Whether every object and Sim that could be reached `before` still can. Empty floor may
     /// be closed off (draw a room's walls first, then add its door).
-    fn keeps_reach(&self, plot: u32, before: &(Vec<bool>, Vec<bool>), skip: Option<u32>) -> bool {
+    pub(crate) fn keeps_reach(
+        &self,
+        plot: u32,
+        before: &(Vec<bool>, Vec<bool>),
+        skip: Option<u32>,
+    ) -> bool {
         let after = self.reach_signature(plot);
         let p = &self.plots[plot as usize];
         let objects_ok = before
@@ -508,7 +555,8 @@ impl World {
             let gz = self.ground_z(z);
             let on_plot = x >= p.x && gz >= p.z && x < p.x + p.w && gz < p.z + p.d;
             let i = self.lot.tile_index(x, z);
-            s.away_until.is_some() || !on_plot || !before.1[i] || after.1[i]
+            let seen = |s: &[bool]| s.get(i).copied().unwrap_or(false);
+            s.away_until.is_some() || !on_plot || !seen(&before.1) || seen(&after.1)
         });
         objects_ok && sims_ok
     }
@@ -583,6 +631,12 @@ impl World {
         }
         if self.content.objects[def].outdoors && !self.all_outdoors(&obj) {
             return Err(Error::new("that has to go outside"));
+        }
+        let crown = self.content.objects[def].crown;
+        if crown > 0.0 && self.crown_meets_wall(&obj, crown) {
+            return Err(Error::new(
+                "its crown would grow into the house: plant it further from the walls",
+            ));
         }
         // Residents walk under pictures and lamps and over rugs (not into a plant hanging low, nor
         // under a lamp at head height).
@@ -772,6 +826,57 @@ impl World {
         )?;
         self.objects[id as usize].carry_state(old);
         Ok(id)
+    }
+
+    /// Whether a house wall (with a door or window or not, on any storey above ground) stands
+    /// closer than `crown` metres to the middle of `obj` (a tree: its crown would grow into it).
+    pub(crate) fn crown_meets_wall(&self, obj: &ObjectInstance, crown: f32) -> bool {
+        let (mut sx, mut sz, mut n) = (0.0f32, 0.0f32, 0u32);
+        for (x, z) in obj.tiles(&self.content) {
+            sx += x as f32 + 0.5;
+            sz += z as f32 + 0.5;
+            n += 1;
+        }
+        if n == 0 {
+            return false;
+        }
+        let (cx, cz) = (sx / n as f32, sz / n as f32);
+        // On the storey's own rows: the same place on every storey above.
+        let lz = cz - self.storey_row(self.storey_of(cz as i32)) as f32;
+        let (width, depth) = (self.lot.width as i32, self.storey_depth());
+        // How far (cx, lz) is from the unit edge from (x0, z0) along x (`along_x`) or z.
+        let dist = |x0: f32, z0: f32, along_x: bool| {
+            let (dx, dz) = if along_x {
+                ((cx - cx.clamp(x0, x0 + 1.0)), lz - z0)
+            } else {
+                (cx - x0, lz - lz.clamp(z0, z0 + 1.0))
+            };
+            (dx * dx + dz * dz).sqrt()
+        };
+        let (x0, x1) = (
+            ((cx - crown).floor() as i32).max(0),
+            ((cx + crown).ceil() as i32).min(width),
+        );
+        let (z0, z1) = (
+            ((lz - crown).floor() as i32).max(0),
+            ((lz + crown).ceil() as i32).min(depth),
+        );
+        (0..self.storeys as i32).any(|k| {
+            let row = self.storey_row(k);
+            (z0..=z1).any(|z| {
+                (x0..=x1).any(|x| {
+                    let (ux, uz) = (x as usize, (row + z) as usize);
+                    (x < width
+                        && z <= depth
+                        && self.lot.h_edge(ux, uz).is_wall()
+                        && dist(x as f32, z as f32, true) < crown)
+                        || (x <= width
+                            && z < depth
+                            && self.lot.v_edge(ux, uz).is_wall()
+                            && dist(x as f32, z as f32, false) < crown)
+                })
+            })
+        })
     }
 
     /// Whether every tile of `obj` is outdoors (a tile split by a diagonal wall counts as indoors
@@ -1144,7 +1249,8 @@ impl World {
         self.pay(h, cost);
         self.objects[object as usize].wear = 0.0;
         self.structure_version = self.structure_version.wrapping_add(1);
-        self.rooms_need_rescore();
+        let o = &self.objects[object as usize];
+        self.rooms_things_changed((o.x, o.z));
         Ok(())
     }
 
@@ -1174,7 +1280,8 @@ impl World {
         obj.value += cost;
         let quality = obj.quality;
         self.structure_version = self.structure_version.wrapping_add(1);
-        self.rooms_need_rescore();
+        let o = &self.objects[object as usize];
+        self.rooms_things_changed((o.x, o.z));
         // Told about the household's first resident (nobody may live there yet).
         if let Some(member) = self
             .sims
@@ -1277,6 +1384,13 @@ impl World {
                         .any(|o| o.body_crosses(&self.content, e.x, e.z, dir)))
             {
                 return Err(Error::new("a wall can't go through furniture"));
+            }
+            if e.kind != EdgeKind::Open && self.garage_across(e.axis, e.x, e.z) {
+                return Err(Error::new(if target.is_fence() {
+                    "a fence can't go through the garage"
+                } else {
+                    "a wall can't go through the garage"
+                }));
             }
             if e.kind != EdgeKind::Open
                 && diagonal.is_none()
@@ -1410,7 +1524,8 @@ impl World {
         }
         self.can_pay(h, cost, || "not enough money to build that".into())?;
         let before = self.reach_signature(plot);
-        let saved = self.lot.clone();
+        // (What it changes is put back if it turns out it can't stand.)
+        let mark = self.lot.log_begin();
         for e in edits {
             let target = edge_kind(e.kind);
             match e.axis {
@@ -1432,8 +1547,11 @@ impl World {
         }
         // Rooms first: upstairs, where there's floor depends on them.
         self.lot.compute_rooms();
+        self.sync_tile_arrays();
         if !self.keeps_reach(plot, &before, None) {
-            self.lot = saved;
+            self.lot.log_rollback(mark);
+            self.lot.compute_rooms();
+            self.sync_tile_arrays();
             return Err(Error::new(
                 "that would shut a resident or an object in — add a door or a gate",
             ));
@@ -1442,11 +1560,30 @@ impl World {
             .storeys_stand(plot)
             .and_then(|()| self.walls_still_hold(plot))
         {
-            self.lot = saved;
+            self.lot.log_rollback(mark);
+            self.lot.compute_rooms();
+            self.sync_tile_arrays();
             return Err(e);
         }
+        self.lot.log_forget(mark);
         self.pay(h, cost);
-        self.nav_changed();
+        // The tiles either side of every edge built on (a diagonal's own tile), and upstairs the
+        // plot (its rooms say where there's floor).
+        let rect = edits
+            .iter()
+            .fold([i32::MAX, i32::MAX, i32::MIN, i32::MIN], |r, e| {
+                [
+                    r[0].min(e.x - 1),
+                    r[1].min(e.z - 1),
+                    r[2].max(e.x + 2),
+                    r[3].max(e.z + 2),
+                ]
+            });
+        if edits.is_empty() {
+            self.nav_changed();
+        } else {
+            self.walls_changed_on(plot, rect);
+        }
         self.rooms_layout_changed();
         Ok(())
     }
@@ -1724,23 +1861,28 @@ impl World {
         // Its tiles are free again, but for what else takes them: the table under a lamp at head
         // height, the lamp over a sofa.
         let freed = self.blocking_tiles(&obj);
+        let rect = self.object_rect(&obj);
         for &(x, z) in &freed {
             let i = self.lot.tile_index(x, z);
-            self.blocked[i] = false;
+            if i != crate::lot::VOID {
+                self.blocked[i] = self.travel.ground_blocked(i);
+            }
         }
         for o in 0..self.objects.len() {
             for (x, z) in self.blocking_tiles(&self.objects[o]) {
                 if freed.contains(&(x, z)) {
-                    let i = self.lot.tile_index(x, z);
+                    let i = self.tile_slot_mut(x, z);
                     self.blocked[i] = true;
                 }
             }
         }
         if self.content.objects[obj.def].stairs {
             self.refresh_stairs();
+            self.nav_changed();
+        } else {
+            self.objects_changed_in(rect);
         }
-        self.nav_changed();
-        self.rooms_layout_changed();
+        self.rooms_things_changed((obj.x, obj.z));
         obj
     }
 }

@@ -468,7 +468,8 @@ pub(crate) fn update(w: &mut World) {
             | Phase::Knocking { .. }
             | Phase::Queued { .. }
             | Phase::Boarding { .. }
-            | Phase::Alighting { .. } => continue,
+            | Phase::Alighting { .. }
+            | Phase::Driving => continue,
         };
         let s = &content.socials[social];
         let gap = dist(sims[i].pos, sims[t].pos);
@@ -657,7 +658,8 @@ pub(crate) fn update(w: &mut World) {
             | Phase::Knocking { .. }
             | Phase::Queued { .. }
             | Phase::Boarding { .. }
-            | Phase::Alighting { .. } => continue,
+            | Phase::Alighting { .. }
+            | Phase::Driving => continue,
         };
         if l == j || sims.get(l).is_none_or(|s| !s.here()) || sims[j].pressed(content) {
             end_activity(&mut sims[j], content, objects);

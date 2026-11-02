@@ -181,24 +181,44 @@ export function townGrass(field: GrassField, world: WorldStructure): void {
   const mask = lawnMask(world);
   const bare = bareTiles(world, mask);
   const walls = wallSegments(world, tw, td);
-  for (let j = 0; j < D; j++) {
-    for (let i = 0; i < W; i++) {
-      const fx = (i + 0.5) / n;
-      const fz = (j + 0.5) / n;
-      const tx = Math.floor(fx);
-      const tz = Math.floor(fz);
+  // Only the tiles whose lawn could have changed since the last time (furniture, rooms, walls: a lot
+  // shown or edited), the whole town the first time: a big world's mask is millions of texels.
+  const wallKeys = new Map<number, string>();
+  for (const [t, segs] of walls) wallKeys.set(t, segs.map((g) => g.join(',')).join(';'));
+  const before = field.town === town && lawnState.get(field);
+  const tiles = new Uint8Array(tw * td);
+  let changed = 0;
+  for (let t = 0; t < tw * td; t++) {
+    if (before && before.bare[t] === bare[t] && before.walls.get(t) === wallKeys.get(t) && (bare[t] < 2 || before.split.get(t) === mask.splitAxis.get(t))) continue;
+    tiles[t] = 1;
+    changed++;
+  }
+  lawnState.set(field, { bare, walls: wallKeys, split: new Map(mask.splitAxis) });
+  if (!changed) return;
+  for (let tz = 0; tz < td; tz++) {
+    for (let tx = 0; tx < tw; tx++) {
       const t = tz * tw + tx;
-      let grows = bare[t] === 0;
-      if (bare[t] > 1) {
-        // A split tile: grass on its outdoor half only.
-        grows = splitHalf(mask.splitAxis.get(t) ?? 'dp', fx - tx, fz - tz) !== bare[t] - 2;
+      if (!tiles[t]) continue;
+      for (let j = tz * n; j < (tz + 1) * n; j++) {
+        for (let i = tx * n; i < (tx + 1) * n; i++) {
+          const fx = (i + 0.5) / n;
+          const fz = (j + 0.5) / n;
+          let grows = bare[t] === 0;
+          if (bare[t] > 1) {
+            // A split tile: grass on its outdoor half only.
+            grows = splitHalf(mask.splitAxis.get(t) ?? 'dp', fx - tx, fz - tz) !== bare[t] - 2;
+          }
+          if (grows && nearWall(walls.get(t), fx, fz)) grows = false;
+          town[j * W + i] = grows ? 255 : 0;
+        }
       }
-      if (grows && nearWall(walls.get(t), fx, fz)) grows = false;
-      town[j * W + i] = grows ? 255 : 0;
     }
   }
   markPatches(field);
 }
+
+/** What each field's town mask was last made from (`townGrass`), by tile: its bare tiles, walls and split tiles' diagonals. */
+const lawnState = new WeakMap<GrassField, { bare: Uint8Array; walls: Map<number, string>; split: Map<number, string> }>();
 
 /** Wall edges and diagonals as segments, by the town tiles they pass through or touch. */
 function wallSegments(world: WorldStructure, tw: number, td: number): Map<number, [number, number, number, number][]> {

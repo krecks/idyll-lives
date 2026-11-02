@@ -56,8 +56,10 @@ jobs:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
         run: |
           bun tools/housegen/sample.ts /tmp/houses.json
-          bun tools/worlds/sample.ts /tmp/worlds.json
+          # Cosy and Normal worlds three per kind, Big ones (up to 1024 m) one per kind in a file of their own.
+          bun tools/worlds/sample.ts /tmp/worlds.json 3 --sizes cosy,normal,big --big-per-kind 1 --big-out /tmp/worlds-big.json
           HOUSES=/tmp/houses.json WORLDS=/tmp/worlds.json cargo test -p sim-core --release --locked --test generated_houses --test generated_worlds -- --ignored
+          WORLDS=/tmp/worlds-big.json cargo test -p sim-core --release --locked --test generated_worlds -- --ignored
 
       # The residents' clips on both bodies at every life stage; the known failures are in
       # tools/characters/clip-baseline.json, so only a new one fails.

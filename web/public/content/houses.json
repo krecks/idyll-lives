@@ -1309,6 +1309,144 @@
     {"def": "garden.hydrangea", "x": 24, "z": 9, "rot": 0},
     {"def": "picnicTable", "x": 11, "z": 16, "rot": 0}
    ]
+  },
+  {
+   "id": "picnicMeadow",
+   "name": "Picnic Meadow",
+   "description": "Picnic tables in the long grass and wildflowers, room to lie in the sun.",
+   "kind": "outdoor",
+   "site": "meadow",
+   "lot": {"width": 16, "depth": 14},
+   "$todo": "TODO(countryside.json, sim-travel branch): a picnicBlanket by the tables once its id exists.",
+   "entry": [8, 1.5],
+   "paths": [{"x": 7, "z": 0, "w": 2, "d": 3}],
+   "objects": [
+    {"def": "picnicTable", "x": 4, "z": 5, "rot": 0},
+    {"def": "picnicTable", "x": 9, "z": 8, "rot": 0},
+    {"def": "parkBench", "x": 6, "z": 11, "rot": 2},
+    {"def": "litterBin", "x": 2, "z": 2, "rot": 0},
+    {"def": "garden.meadow", "x": 2, "z": 10, "rot": 0},
+    {"def": "garden.meadow", "x": 13, "z": 4, "rot": 0},
+    {"def": "garden.meadow", "x": 13, "z": 11, "rot": 0},
+    {"def": "garden.meadow", "x": 1, "z": 6, "rot": 0},
+    {"def": "garden.daisies", "x": 11, "z": 2, "rot": 0},
+    {"def": "garden.daisies", "x": 3, "z": 12, "rot": 0},
+    {"def": "garden.poppies", "x": 14, "z": 8, "rot": 0},
+    {"def": "garden.birch", "x": 14, "z": 12, "rot": 0}
+   ]
+  },
+  {
+   "id": "fishingJetty",
+   "name": "Fishing Jetty",
+   "description": "Benches on the bank where the water runs deep: a quiet place to sit and watch the line.",
+   "kind": "outdoor",
+   "site": "water",
+   "lot": {"width": 14, "depth": 12},
+   "$todo": "TODO(countryside.json, sim-travel branch): the fishing spot and the jetty at the back edge (z 11, the water's side) once their ids exist.",
+   "entry": [7, 1.5],
+   "paths": [{"x": 6, "z": 0, "w": 2, "d": 10}],
+   "objects": [
+    {"def": "parkBench", "x": 2, "z": 9, "rot": 0},
+    {"def": "parkBench", "x": 9, "z": 9, "rot": 0},
+    {"def": "litterBin", "x": 1, "z": 2, "rot": 0},
+    {"def": "garden.boulder", "x": 12, "z": 10, "rot": 0},
+    {"def": "garden.boulder", "x": 0, "z": 11, "rot": 0},
+    {"def": "garden.grass", "x": 4, "z": 11, "rot": 0},
+    {"def": "garden.grass", "x": 12, "z": 6, "rot": 0},
+    {"def": "garden.fern", "x": 13, "z": 2, "rot": 0}
+   ]
+  },
+  {
+   "id": "lookout",
+   "name": "Lookout",
+   "description": "A telescope and a bench at the top of the hill, the whole valley below.",
+   "kind": "outdoor",
+   "site": "hill",
+   "lot": {"width": 12, "depth": 12},
+   "$todo": "TODO(countryside.json, sim-travel branch): the lookoutBench instead of the park bench once its id exists.",
+   "entry": [6, 1.5],
+   "paths": [{"x": 5, "z": 0, "w": 2, "d": 6}, {"x": 2, "z": 6, "w": 9, "d": 4}],
+   "objects": [
+    {"def": "telescope", "x": 6, "z": 8, "rot": 0},
+    {"def": "parkBench", "x": 2, "z": 8, "rot": 0},
+    {"def": "litterBin", "x": 1, "z": 1, "rot": 0},
+    {"def": "garden.boulder", "x": 1, "z": 11, "rot": 0},
+    {"def": "garden.boulder", "x": 10, "z": 11, "rot": 0},
+    {"def": "garden.lavender", "x": 0, "z": 4, "rot": 0},
+    {"def": "garden.lavender", "x": 11, "z": 4, "rot": 0}
+   ]
+  },
+  {
+   "id": "campfire",
+   "name": "Campfire Clearing",
+   "description": "A fire pit in a ring of benches, deep in the trees.",
+   "kind": "outdoor",
+   "site": "woods",
+   "lot": {"width": 14, "depth": 14},
+   "$todo": "TODO(countryside.json, sim-travel branch): a trailhead signpost by the entry once its id exists.",
+   "entry": [7, 1.5],
+   "paths": [{"x": 6, "z": 0, "w": 2, "d": 3}],
+   "objects": [
+    {"def": "firePit", "x": 7, "z": 7, "rot": 0},
+    {"def": "bench", "x": 6, "z": 4, "rot": 0},
+    {"def": "bench", "x": 6, "z": 10, "rot": 2},
+    {"def": "bench", "x": 3, "z": 6, "rot": 1},
+    {"def": "bench", "x": 10, "z": 6, "rot": 3},
+    {"def": "garden.fern", "x": 1, "z": 12, "rot": 0},
+    {"def": "garden.fern", "x": 12, "z": 1, "rot": 0},
+    {"def": "garden.fern", "x": 12, "z": 12, "rot": 0},
+    {"def": "garden.boulder", "x": 1, "z": 1, "rot": 0}
+   ]
+  },
+  {
+   "id": "orchard",
+   "name": "Orchard",
+   "description": "Rows of apple trees and a bench at the end of them; anyone may pick.",
+   "kind": "outdoor",
+   "site": "meadow",
+   "lot": {"width": 18, "depth": 16},
+   "$todo": "TODO(countryside.json, sim-travel branch): berry bushes along the edge once the berryBush id exists.",
+   "entry": [9, 1.5],
+   "paths": [{"x": 8, "z": 0, "w": 2, "d": 3}],
+   "objects": [
+    {"def": "garden.apple", "x": 3, "z": 4, "rot": 0},
+    {"def": "garden.apple", "x": 7, "z": 4, "rot": 0},
+    {"def": "garden.apple", "x": 11, "z": 4, "rot": 0},
+    {"def": "garden.apple", "x": 15, "z": 4, "rot": 0},
+    {"def": "garden.apple", "x": 3, "z": 8, "rot": 0},
+    {"def": "garden.apple", "x": 7, "z": 8, "rot": 0},
+    {"def": "garden.apple", "x": 11, "z": 8, "rot": 0},
+    {"def": "garden.apple", "x": 15, "z": 8, "rot": 0},
+    {"def": "garden.apple", "x": 3, "z": 12, "rot": 0},
+    {"def": "garden.apple", "x": 7, "z": 12, "rot": 0},
+    {"def": "garden.apple", "x": 11, "z": 12, "rot": 0},
+    {"def": "garden.cherry", "x": 15, "z": 12, "rot": 0},
+    {"def": "parkBench", "x": 1, "z": 14, "rot": 0},
+    {"def": "garden.wheelbarrow", "x": 16, "z": 1, "rot": 0},
+    {"def": "litterBin", "x": 1, "z": 1, "rot": 0}
+   ]
+  },
+  {
+   "id": "hammockGrove",
+   "name": "Hammock Grove",
+   "description": "Hammocks slung between the birches: the best nap in the county.",
+   "kind": "outdoor",
+   "site": "woods",
+   "lot": {"width": 14, "depth": 14},
+   "$todo": "TODO(countryside.json, sim-travel branch): a trailhead signpost by the entry once its id exists.",
+   "entry": [7, 1.5],
+   "paths": [{"x": 6, "z": 0, "w": 2, "d": 3}],
+   "objects": [
+    {"def": "hammock", "x": 3, "z": 4, "rot": 0},
+    {"def": "hammock", "x": 9, "z": 6, "rot": 0},
+    {"def": "garden.birch", "x": 2, "z": 2, "rot": 0},
+    {"def": "garden.birch", "x": 5, "z": 9, "rot": 0},
+    {"def": "garden.birch", "x": 11, "z": 3, "rot": 0},
+    {"def": "garden.birch", "x": 12, "z": 11, "rot": 0},
+    {"def": "garden.birch", "x": 1, "z": 12, "rot": 0},
+    {"def": "bench", "x": 6, "z": 11, "rot": 0},
+    {"def": "garden.fern", "x": 8, "z": 1, "rot": 0}
+   ]
   }
  ]
 }

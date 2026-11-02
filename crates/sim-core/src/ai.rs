@@ -26,6 +26,9 @@ pub struct AutonomyRules {
     /// Needs a chat fills (any social's gains): running low on these is no reason to stop
     /// talking.
     pub social_fills: u32,
+    /// Open-world towns: how far (m) residents look for public things to use where they are
+    /// (`index::ObjectIndex::usable_near`); farther places are for outings.
+    pub reach: f32,
 }
 
 impl Default for AutonomyRules {
@@ -38,6 +41,7 @@ impl Default for AutonomyRules {
             quick_minutes: 30.0,
             retry_minutes: 30.0,
             social_fills: 0,
+            reach: 160.0,
         }
     }
 }
@@ -51,6 +55,7 @@ pub(crate) struct AutonomyRaw {
     look_ahead: Option<f32>,
     quick_minutes: Option<f32>,
     retry_minutes: Option<f32>,
+    reach: Option<f32>,
 }
 
 impl AutonomyRaw {
@@ -65,8 +70,15 @@ impl AutonomyRaw {
             quick_minutes: self.quick_minutes.unwrap_or(d.quick_minutes).max(0.0),
             retry_minutes: self.retry_minutes.unwrap_or(d.retry_minutes).max(0.0),
             social_fills,
+            reach: self.reach.unwrap_or(d.reach).max(0.0),
         }
     }
+}
+
+/// How much less a place draws them the longer it takes to get there (`minutes`): at walking
+/// pace (1.5 m a minute) the same as `score_felt`'s distance falloff.
+pub fn falloff(minutes: f32) -> f32 {
+    1.0 / (1.0 + 0.12 * minutes.max(0.0))
 }
 
 /// How strongly a need at `value` (0 = empty, 1 = full) pulls a Sim. Low needs dominate.

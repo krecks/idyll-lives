@@ -41,6 +41,8 @@ let lastLot = -1;
 let lastRegion = '';
 /** Tile rectangle whose walls and floors are sent to the renderer (null = whole town). */
 let region: [number, number, number, number] | null = null;
+/** Tile rectangle the camera streams in: the sim's full-detail area (null: the view's). */
+let watched: [number, number, number, number] | null = null;
 /** What the simulation said as it panicked (its panic hook calls `__wasmPanic` just before the trap). */
 let panicked: string | null = null;
 /** The simulation failed for good (`stop`): nothing calls into it again. */
@@ -76,6 +78,9 @@ scope.onmessage = (e) => {
         watch(game);
         postWorld();
       }
+    } else if (msg.type === 'watch') {
+      watched = msg.region;
+      if (game) watch(game);
     } else if (msg.type === 'inspect' && game) {
       // Their details at once, so the panel opens with them.
       game.inspect(msg.sim ?? undefined);
@@ -286,9 +291,24 @@ function postWorld(): void {
   scope.postMessage({ type: 'world', world, full: true }, transfer);
 }
 
-/** The viewed lot is simulated in full detail; lots nobody watches in less (`sim_core::lod`). */
+/**
+ * What the camera streams in (`watched`; until the renderer says: the viewed lot) is simulated in
+ * full detail, lots nobody watches in less (`sim_core::lod`). A sim with `set_watch` (open-world
+ * sim-grid) keeps the view (the focus lot's structure) and the watch apart; an older one has only
+ * `set_view`, which is its full-detail area.
+ */
 function watch(g: Game): void {
-  if (region) g.set_view(region[0], region[1], region[2], region[3]);
+  const split = g as Game & { set_watch?(x0: number, z0: number, x1: number, z1: number): void; clear_watch?(): void };
+  if (typeof split.set_watch === 'function') {
+    if (region) g.set_view(region[0], region[1], region[2], region[3]);
+    else g.clear_view();
+    if (watched) split.set_watch(watched[0], watched[1], watched[2], watched[3]);
+    else if (region) split.set_watch(region[0], region[1], region[2], region[3]);
+    else split.clear_watch?.();
+    return;
+  }
+  const area = watched ?? region;
+  if (area) g.set_view(area[0], area[1], area[2], area[3]);
   else g.clear_view();
 }
 
