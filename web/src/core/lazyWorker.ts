@@ -3,6 +3,7 @@
  * while, its answers matched to its asks by id (`townJobs.ts`, `renderData.ts`). Where no worker can
  * start, or once one broke (its `onerror`, or an answer saying it is `broken`), every ask goes to the
  * fallback its caller gave (the page does the work itself): those waiting then, and all later ones.
+ * What was sent with `post` lives in that worker only: a fresh one never gets it again.
  */
 
 /** What the worker is sent: `message`, and the id its answer is to carry (0: no answer wanted, `post`). */
@@ -50,6 +51,8 @@ export class LazyWorker<In, Out> {
   private readonly pending = new Map<number, Pending<In, unknown>>();
   /** `hold`s not yet let go of. */
   private holds = 0;
+  /** Something was `post`ed to the worker running: state a fresh one wouldn't have. */
+  private posted = false;
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly options: LazyWorkerOptions) {}
@@ -63,7 +66,9 @@ export class LazyWorker<In, Out> {
    * `message`'s answer from the worker (started if need be), or `fallback`'s where no worker can
    * give it (none can run, or it broke first); rejected with the error the worker met. An aborted
    * `signal` rejects it with `Superseded`: for a worker that takes its asks in turn (the town
-   * worker), one it is on stops it, and those waiting behind go to a fresh one.
+   * worker), one it is on stops it, and those waiting behind go to a fresh one, or to their
+   * fallbacks where they couldn't go as they went (they handed something over with `transfer`, or
+   * the worker had been sent something with `post`).
    */
   ask<F = Out>(message: In, fallback: () => Promise<F>, { signal, transfer = [] }: { signal?: AbortSignal; transfer?: Transferable[] } = {}): Promise<Out | F> {
     if (signal?.aborted) return Promise.reject(new Superseded());
@@ -81,8 +86,13 @@ export class LazyWorker<In, Out> {
           // Stopping the worker is the only way to stop the ask it is on (a fresh one starts over).
           // One still waiting is answered and thrown away.
           if (!running || !this.worker) return;
+          const posted = this.posted;
           this.stop();
-          for (const [other, q] of [...this.pending]) this.send(other, q);
+          // What they handed over went with the old worker, and a fresh one lacks what was posted to it.
+          for (const [other, q] of [...this.pending]) {
+            if (posted || q.transfer.length) this.fallBack(other, q);
+            else this.send(other, q);
+          }
         },
         { once: true },
       );
@@ -94,8 +104,10 @@ export class LazyWorker<In, Out> {
   post(message: In, transfer: Transferable[] = []): number {
     const w = this.start();
     if (!w) return 0;
-    clearTimeout(this.idleTimer);
+    this.posted = true;
     w.postMessage({ id: 0, message } satisfies WorkerAsk<In>, transfer);
+    // A post wants no answer, so nothing else would set it going once idle.
+    this.idleSoon();
     return this.starts;
   }
 
@@ -115,13 +127,23 @@ export class LazyWorker<In, Out> {
   /** Hands `p` to the worker, or to its fallback when there can be none. */
   private send(id: number, p: Pending<In, unknown>): void {
     const w = this.start();
-    if (!w) {
-      this.pending.delete(id);
-      p.fallback().then(p.resolve, p.reject);
-      return;
-    }
+    if (!w) return this.fallBack(id, p);
     clearTimeout(this.idleTimer);
-    w.postMessage({ id, message: p.message } satisfies WorkerAsk<In>, p.transfer);
+    try {
+      w.postMessage({ id, message: p.message } satisfies WorkerAsk<In>, p.transfer);
+    } catch (err) {
+      // (It can't be sent: a buffer gone already, say.) Settled here, or it would wait for ever.
+      this.pending.delete(id);
+      p.reject(err);
+      this.idleSoon();
+    }
+  }
+
+  /** Hands `p` to its fallback (the page). */
+  private fallBack(id: number, p: Pending<In, unknown>): void {
+    this.pending.delete(id);
+    // (One that throws rather than rejects still settles it.)
+    new Promise((resolve) => resolve(p.fallback())).then(p.resolve, p.reject);
   }
 
   private start(): Worker | null {
@@ -135,6 +157,7 @@ export class LazyWorker<In, Out> {
     }
     this.worker = w;
     this.starts++;
+    this.posted = false;
     w.onmessage = (e: MessageEvent<WorkerAnswer<Out>>) => {
       const a = e.data;
       if ('error' in a && a.broken) return this.break(a.error);
