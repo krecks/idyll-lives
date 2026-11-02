@@ -45,6 +45,12 @@ pub(crate) struct HomeSnapshot {
     plots: Vec<crate::world::Plot>,
     /// Food and dishes (they move and go with the furniture they're on).
     items: crate::items::Items,
+    /// The garages, the cars (one parks in front of a garage built at the end of its driveway) and
+    /// the tiles they take up.
+    garages: Vec<crate::cars::Garage>,
+    cars: Vec<crate::cars::Car>,
+    car_tiles: Vec<usize>,
+    cars_parked: Option<Vec<u64>>,
     /// The story's latest event id when it was taken, and the events the edit after it told
     /// (an upgrade): undo takes them out of the story, redo tells them again.
     events_before: u64,
@@ -137,6 +143,10 @@ impl World {
             households: self.households.clone(),
             plots: self.plots.clone(),
             items: self.items.clone(),
+            garages: self.garages.clone(),
+            cars: self.cars.clone(),
+            car_tiles: self.car_tiles.clone(),
+            cars_parked: self.cars_parked.clone(),
             events_before: self.events.last_id(),
             story: Vec::new(),
         })
@@ -155,7 +165,8 @@ impl World {
         let changed = before.households[h].funds != self.households[h].funds
             || before.objects != self.objects
             || lot_changed
-            || before.plots != self.plots;
+            || before.plots != self.plots
+            || before.garages != self.garages;
         if !changed {
             return;
         }
@@ -261,6 +272,10 @@ impl World {
         self.objects = s.objects;
         self.object_plot = s.object_plot;
         self.blocked = s.blocked;
+        self.garages = s.garages;
+        self.cars = s.cars;
+        self.car_tiles = s.car_tiles;
+        self.cars_parked = s.cars_parked;
         self.sync_tile_arrays();
         self.sims = s.sims;
         self.households = s.households;
@@ -498,7 +513,7 @@ impl World {
     }
 
     /// Front tiles and empty tiles of `plot` that can be reached, as `(tile index)` list.
-    fn reach_signature(&self, plot: u32) -> (Vec<bool>, Vec<bool>) {
+    pub(crate) fn reach_signature(&self, plot: u32) -> (Vec<bool>, Vec<bool>) {
         let seen = self.reachable(plot);
         let fronts = self
             .objects
@@ -519,7 +534,12 @@ impl World {
 
     /// Whether every object and Sim that could be reached `before` still can. Empty floor may
     /// be closed off (draw a room's walls first, then add its door).
-    fn keeps_reach(&self, plot: u32, before: &(Vec<bool>, Vec<bool>), skip: Option<u32>) -> bool {
+    pub(crate) fn keeps_reach(
+        &self,
+        plot: u32,
+        before: &(Vec<bool>, Vec<bool>),
+        skip: Option<u32>,
+    ) -> bool {
         let after = self.reach_signature(plot);
         let p = &self.plots[plot as usize];
         let objects_ok = before
@@ -1307,6 +1327,13 @@ impl World {
                         .any(|o| o.body_crosses(&self.content, e.x, e.z, dir)))
             {
                 return Err(Error::new("a wall can't go through furniture"));
+            }
+            if e.kind != EdgeKind::Open && self.garage_across(e.axis, e.x, e.z) {
+                return Err(Error::new(if target.is_fence() {
+                    "a fence can't go through the garage"
+                } else {
+                    "a wall can't go through the garage"
+                }));
             }
             if e.kind != EdgeKind::Open
                 && diagonal.is_none()

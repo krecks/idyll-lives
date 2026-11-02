@@ -65,6 +65,13 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
 - `parking: { x, z, rot, area }[]` — public parking spots for car trips between areas.
 - `drives[].road?: number`, `drives[].s?: number` — the road a driveway meets and the distance
   along its polyline (m).
+- `garages[].rot?: 0 | 1 | 2 | 3` — a garage the player built (Build mode's Garage tool,
+  `Command::BuildGarage`): the way its door faces, as a thing's facing (0 towards +z, 1 +x,
+  2 -z, 3 -x). Absent: towards the street, as the town places garages. The same field is in the
+  save's `garages` and the structure's `WorldStructure.garages` (`GarageInfo`); a save also keeps
+  `cars[].driveSpot?: [x, z, yaw]`, where a car parked before it parked in front of such a garage at
+  the end of its driveway. Both are left out when absent, so towns and saves without a garage of
+  the player's stay byte for byte as they were.
 - `meta.zones: { kind: 'woods' | 'meadow' | 'water' | 'hill' | 'fields', poly: [x, z][] }[]`
 - `meta.pads: Record<plotIndex, y>` — the height an off-town outdoor plot is levelled to (m).
 - `meta.world.size` mirrors `size` for the renderer.

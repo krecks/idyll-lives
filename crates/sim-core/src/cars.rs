@@ -223,6 +223,11 @@ pub struct Car {
     /// On a trip: who rides with its driver (besides them), there and home again with it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub riders: Vec<u32>,
+    /// Parked in front of a garage the player built at the end of its driveway (`park_by_garage`):
+    /// where it parked before (x, z, yaw), where it goes back to once the garage is gone. Absent:
+    /// it parks where it always has.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drive_spot: Option<[f32; 3]>,
     /// Ticks it has waited for people in its way (not saved).
     #[serde(skip)]
     waited: u32,
@@ -277,8 +282,8 @@ impl Drive {
 }
 
 /// A garage at the inner end of a house's driveway (`LotFile::garages`, as the town placed it:
-/// wall centre lines). It stands where it is; nobody walks through it and nothing is put there
-/// (`reblock`).
+/// wall centre lines), or one the player built on their lot (`World::build_garage`). It stands
+/// where it is; nobody walks through it and nothing is put there (`reblock`).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Garage {
     pub plot: u32,
@@ -286,12 +291,33 @@ pub struct Garage {
     pub z0: f32,
     pub x1: f32,
     pub z1: f32,
+    /// Which way its door faces, as a thing's facing (0 towards +z, 1 +x, 2 -z, 3 -x): one the
+    /// player built (Build mode's Garage tool). Absent: towards the street, as a town places them
+    /// (and so files and saves without it stay as they were).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rot: Option<u8>,
 }
+
+/// Half a garage's wall (m), outside its centre lines (the renderer's `WALL_HALF`).
+pub const GARAGE_WALL_HALF: f32 = 0.07;
 
 impl Garage {
     /// The tiles it stands on.
-    fn tiles(&self) -> Vec<(i32, i32)> {
+    pub(crate) fn tiles(&self) -> Vec<(i32, i32)> {
         covered_tiles(self.x0, self.z0, self.x1, self.z1)
+    }
+
+    /// The middle of its door outside (on the outer face of its wall) and the way it faces out
+    /// (a unit vector), for a garage with a facing (`rot`).
+    pub fn door(&self) -> Option<([f32; 2], [f32; 2])> {
+        let (cx, cz) = ((self.x0 + self.x1) / 2.0, (self.z0 + self.z1) / 2.0);
+        let t = GARAGE_WALL_HALF;
+        Some(match self.rot? % 4 {
+            0 => ([cx, self.z1 + t], [0.0, 1.0]),
+            1 => ([self.x1 + t, cz], [1.0, 0.0]),
+            2 => ([cx, self.z0 - t], [0.0, -1.0]),
+            _ => ([self.x0 - t, cz], [-1.0, 0.0]),
+        })
     }
 }
 
@@ -345,6 +371,7 @@ impl Car {
             progress: 0.0,
             trip: None,
             riders: Vec::new(),
+            drive_spot: None,
             waited: 0,
             shown: None,
         }
@@ -388,6 +415,7 @@ impl Car {
             progress: self.progress,
             trip: self.trip,
             riders: Vec::new(),
+            drive_spot: self.drive_spot,
             waited: self.waited,
             shown: self.shown,
         }
@@ -1233,6 +1261,13 @@ pub(crate) fn update(w: &mut World) {
                 if w.cars[c].progress >= ticks {
                     w.cars[c].state = CarState::Away;
                     w.cars[c].since = tick;
+                    // (A garage built or taken down while it was leaving: it comes home to it.)
+                    let plot = w.cars[c].plot;
+                    if w.cars[c].drive_spot.is_some()
+                        || w.garages.iter().any(|g| g.plot == plot && g.rot.is_some())
+                    {
+                        park_by_garage(w, c);
+                    }
                 }
             }
             CarState::Away => {
@@ -1673,59 +1708,178 @@ fn relocate(w: &mut World, c: usize) {
     car.meets = drive.meets();
     car.spot = [drive.x, drive.z + drive.front * (PARK_GAP + car.len / 2.0)];
     car.yaw = car.nose_in_on(Some(travel));
+    car.drive_spot = None;
     car.settle(exits, Some(travel));
     // (Parked as it was, somewhere else: its tiles are worked out again.)
     w.cars_parked = None;
     refresh(w);
+    // (In front of the garage there, if the player built one at the end of that driveway.)
+    park_by_garage(w, c);
 }
 
 /// Which cars' parking spots have been built over: a wall or a fence across one, a thing on the
 /// tiles it takes up.
 fn refresh(w: &mut World) {
+    let things = things_on(w, &w.cars.iter().map(|c| c.plot).collect::<Vec<_>>());
     let lot = &w.lot;
+    for car in &mut w.cars {
+        car.blocked = built_over(lot, &things, &car.tiles());
+    }
+}
+
+/// The tiles the things on `plots` take from walking.
+fn things_on(w: &World, plots: &[u32]) -> std::collections::HashSet<(i32, i32)> {
     let mut things: std::collections::HashSet<(i32, i32)> = Default::default();
-    let plots: Vec<u32> = w.cars.iter().map(|c| c.plot).collect();
     for (o, plot) in w.objects.iter().zip(&w.object_plot) {
         if plot.is_some_and(|p| plots.contains(&p)) {
             things.extend(w.blocking_tiles(o));
         }
     }
-    for car in &mut w.cars {
-        let tiles = car.tiles();
-        let walled = |x: i32, z: i32| {
-            // An edge inside the car's tiles (not round their outline).
-            let inside = |x: i32, z: i32| tiles.contains(&(x, z));
-            (inside(x, z)
-                && inside(x, z - 1)
-                && lot.h_edge(x as usize, z as usize) != crate::lot::Edge::Open)
-                || (inside(x, z)
-                    && inside(x - 1, z)
-                    && lot.v_edge(x as usize, z as usize) != crate::lot::Edge::Open)
-        };
-        car.blocked = tiles.iter().any(|&(x, z)| {
-            !lot.in_bounds(x, z)
-                || things.contains(&(x, z))
-                || lot.diag_blocks(x, z)
-                || walled(x, z)
-        });
-    }
+    things
 }
 
-/// The tiles parked cars and garages take up: nobody walks through a car or a garage, and nothing is put where one stands
-/// (`World::blocked`; things never stand on them, see `refresh`). Walkers find their way again
-/// when that changes (the walkable regions, not the views: `nav_version` only).
-pub(crate) fn reblock(w: &mut World) {
-    // (Nothing to do while the same cars stand parked: a bit each.)
-    let mut parked = vec![0u64; w.cars.len().div_ceil(64)];
-    for c in (0..w.cars.len()).filter(|&c| present(w, c)) {
-        parked[c / 64] |= 1 << (c % 64);
+/// Whether a car standing on `tiles` would be built over: off the lot, a thing there (`things`),
+/// a diagonal wall, or a wall or a fence between two of them.
+fn built_over(
+    lot: &crate::lot::Lot,
+    things: &std::collections::HashSet<(i32, i32)>,
+    tiles: &[(i32, i32)],
+) -> bool {
+    let walled = |x: i32, z: i32| {
+        // An edge inside the car's tiles (not round their outline).
+        let inside = |x: i32, z: i32| tiles.contains(&(x, z));
+        (inside(x, z)
+            && inside(x, z - 1)
+            && lot.h_edge(x as usize, z as usize) != crate::lot::Edge::Open)
+            || (inside(x, z)
+                && inside(x - 1, z)
+                && lot.v_edge(x as usize, z as usize) != crate::lot::Edge::Open)
+    };
+    tiles.iter().any(|&(x, z)| {
+        !lot.in_bounds(x, z) || things.contains(&(x, z)) || lot.diag_blocks(x, z) || walled(x, z)
+    })
+}
+
+// ---- Garages the player builds ----------------------------------------------------------
+
+/// How far across its driveway's line a garage's door may be from the car's middle (m) for the
+/// car to drive straight in, and how much further on from where it parks (m).
+const GARAGE_LINE: f32 = 0.8;
+const GARAGE_REACH: f32 = 10.0;
+
+/// Where `car`, parked at `base` (its spot and yaw) on its driveway, parks with a garage the
+/// player built on its plot (`Garage::rot`) whose door faces its driveway: one in line with the
+/// car, a little further from the road it meets (`GARAGE_REACH`), its door towards that road. It
+/// parks in front of the door, nose in. None: no such garage. A town's own garages (no `rot`)
+/// change nothing: their cars park where the town put them.
+fn garage_spot(w: &World, car: &Car, base: ([f32; 2], f32)) -> Option<([f32; 2], f32)> {
+    let (fs, fc) = car
+        .posed(base.0, base.1)
+        .nose_in_on(Some(&w.travel))
+        .sin_cos();
+    let reach = PARK_GAP + car.len / 2.0;
+    w.garages
+        .iter()
+        .filter(|g| g.plot == car.plot)
+        .find_map(|g| {
+            let (m, n) = g.door()?;
+            // Its door faces the road: against the way the car faces parked nose in.
+            if n[0] * fs + n[1] * fc > -0.9 {
+                return None;
+            }
+            let (dx, dz) = (base.0[0] - m[0], base.0[1] - m[1]);
+            let out = dx * n[0] + dz * n[1];
+            let across = dx * n[1] - dz * n[0];
+            (across.abs() <= GARAGE_LINE && out > car.len / 2.0 && out <= reach + GARAGE_REACH)
+                .then(|| {
+                    (
+                        [m[0] + n[0] * reach, m[1] + n[1] * reach],
+                        (-n[0]).atan2(-n[1]),
+                    )
+                })
+        })
+}
+
+/// The tiles `car` would take up parked at `spot` facing `yaw`.
+pub(crate) fn car_tiles_at(car: &Car, spot: [f32; 2], yaw: f32) -> Vec<(i32, i32)> {
+    car.posed(spot, yaw).tiles()
+}
+
+/// The tiles a car takes up parked on driveway `d` (one as long as the longest car, as
+/// `relocate` parks it), whether or not one is there now.
+pub(crate) fn drive_tiles(d: &Drive) -> Vec<(i32, i32)> {
+    const LEN: f32 = 4.8;
+    const WID: f32 = 1.9;
+    if d.front == 0.0 {
+        return covered_tiles(
+            d.x - WID / 2.0,
+            d.z - WID / 2.0,
+            d.x + WID / 2.0,
+            d.z + WID / 2.0,
+        );
     }
-    if w.cars_parked.as_ref() == Some(&parked) {
-        return;
+    let z = d.z + d.front * (PARK_GAP + LEN / 2.0);
+    covered_tiles(
+        d.x - WID / 2.0,
+        z - LEN / 2.0,
+        d.x + WID / 2.0,
+        z + LEN / 2.0,
+    )
+}
+
+/// Car `c` parks in front of a garage the player built at the end of its driveway
+/// (`garage_spot`), or back where it parked before once that's gone (`Car::drive_spot`): while it
+/// stands parked with nobody setting off in it, or while it's away at work (it comes home to its
+/// new spot). Not where something stands in front of the garage. True when it moved.
+pub(crate) fn park_by_garage(w: &mut World, c: usize) -> bool {
+    let car = &w.cars[c];
+    let idle = match car.state {
+        CarState::Parked => {
+            car.driver.is_none()
+                && car.aboard.is_empty()
+                && !w.sims.iter().any(|s| s.bound_for_car == Some(c as u32))
+        }
+        CarState::Away => car.trip.is_none(),
+        _ => false,
+    };
+    if !idle {
+        return false;
     }
-    w.cars_parked = Some(parked.clone());
+    let base = car
+        .drive_spot
+        .map_or((car.spot, car.yaw), |[x, z, yaw]| ([x, z], yaw));
+    let want = garage_spot(w, car, base).filter(|&(spot, yaw)| {
+        let things = things_on(w, &[car.plot]);
+        !built_over(&w.lot, &things, &car.posed(spot, yaw).tiles())
+    });
+    let (spot, yaw, before) = match want {
+        Some((spot, yaw)) => (spot, yaw, Some([base.0[0], base.0[1], base.1])),
+        None => (base.0, base.1, None),
+    };
+    if car.spot == spot && car.yaw == yaw && car.drive_spot == before {
+        return false;
+    }
+    let World {
+        cars,
+        exits,
+        travel,
+        ..
+    } = &mut *w;
+    let car = &mut cars[c];
+    car.spot = spot;
+    car.yaw = yaw;
+    car.drive_spot = before;
+    car.route = None;
+    car.settle(exits, Some(travel));
+    // (Parked somewhere else: its tiles are worked out again.)
+    w.cars_parked = None;
+    refresh(w);
+    true
+}
+
+/// The tiles the garages and the cars parked (`parked`: a bit each) take up, sorted.
+fn standing_tiles(w: &World, parked: &[u64]) -> Vec<usize> {
     let mut tiles: Vec<usize> = Vec::new();
-    // (Garages too, as they stand.)
     for g in &w.garages {
         for (x, z) in g.tiles() {
             if w.lot.in_bounds(x, z) {
@@ -1744,6 +1898,91 @@ pub(crate) fn reblock(w: &mut World) {
     }
     tiles.sort_unstable();
     tiles.dedup();
+    tiles
+}
+
+/// Which cars stand parked, a bit each.
+fn parked_bits(w: &World) -> Vec<u64> {
+    let mut parked = vec![0u64; w.cars.len().div_ceil(64)];
+    for c in (0..w.cars.len()).filter(|&c| present(w, c)) {
+        parked[c / 64] |= 1 << (c % 64);
+    }
+    parked
+}
+
+/// A garage was built or taken down on `plot` (or put back by an undo): its car parks by it
+/// (`park_by_garage`), and walking changes only on the tiles taken up or freed (not over every
+/// garage and car in town, as `reblock` does: a big world's walkers elsewhere keep their way).
+pub(crate) fn garages_changed(w: &mut World, plot: u32) {
+    for c in 0..w.cars.len() {
+        if w.cars[c].plot == plot {
+            park_by_garage(w, c);
+        }
+    }
+    let parked = parked_bits(w);
+    let tiles = standing_tiles(w, &parked);
+    w.cars_parked = Some(parked);
+    // The tiles in one list and not the other (both are sorted).
+    let (old, new) = (&w.car_tiles, &tiles);
+    let (mut i, mut j) = (0, 0);
+    let (mut freed, mut taken) = (Vec::new(), Vec::new());
+    while i < old.len() || j < new.len() {
+        match (old.get(i).copied(), new.get(j).copied()) {
+            (Some(a), Some(b)) if a == b => {
+                i += 1;
+                j += 1;
+            }
+            (Some(a), Some(b)) if a < b => {
+                freed.push(a);
+                i += 1;
+            }
+            (Some(a), None) => {
+                freed.push(a);
+                i += 1;
+            }
+            (_, Some(b)) => {
+                taken.push(b);
+                j += 1;
+            }
+            (None, None) => break,
+        }
+    }
+    w.car_tiles = tiles;
+    if freed.is_empty() && taken.is_empty() {
+        return;
+    }
+    let mut rect = [i32::MAX, i32::MAX, i32::MIN, i32::MIN];
+    for &i in freed.iter().chain(&taken) {
+        let (x, z) = w.lot.tile_xz(i);
+        rect = [
+            rect[0].min(x),
+            rect[1].min(z),
+            rect[2].max(x + 1),
+            rect[3].max(z + 1),
+        ];
+    }
+    for &i in &freed {
+        w.blocked[i] = w.travel.ground_blocked(i);
+    }
+    for &i in &taken {
+        w.blocked[i] = true;
+    }
+    w.nav_changed_in(rect);
+    w.cars_nav = w.nav_version;
+}
+
+/// The tiles parked cars and garages take up: nobody walks through a car or a garage, and nothing is put where one stands
+/// (`World::blocked`; things never stand on them, see `refresh`). Walkers find their way again
+/// when that changes (the walkable regions, not the views: `nav_version` only).
+pub(crate) fn reblock(w: &mut World) {
+    // (Nothing to do while the same cars stand parked: a bit each.)
+    let parked = parked_bits(w);
+    if w.cars_parked.as_ref() == Some(&parked) {
+        return;
+    }
+    // (Garages too, as they stand.)
+    let tiles = standing_tiles(w, &parked);
+    w.cars_parked = Some(parked);
     if tiles == w.car_tiles {
         return;
     }

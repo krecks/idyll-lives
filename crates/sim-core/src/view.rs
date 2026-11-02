@@ -2359,6 +2359,8 @@ struct BuildView {
     /// A metre of fence and a gate, without fence styles (styles carry their own prices).
     fence: i64,
     gate: i64,
+    /// A garage on the home lot.
+    garage: i64,
 }
 
 /// Every career with all its levels, expanded from the content (sent to the UI once).
@@ -2437,6 +2439,7 @@ pub fn catalog_json(content: &Content) -> String {
             diagonal_wall: content.build.diagonal_wall(),
             fence: content.build.fence,
             gate: content.build.gate,
+            garage: content.build.garage,
         },
     })
     .expect("catalog serializes")

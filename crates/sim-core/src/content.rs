@@ -1587,6 +1587,8 @@ pub struct BuildRules {
     /// A metre of fence, and a gate, when there are no fence styles.
     pub fence: i64,
     pub gate: i64,
+    /// A garage on the home lot (Build mode's Garage tool; sold back for `objectRules.resale` of it).
+    pub garage: i64,
     /// Fence styles (`fenceStyles`): picket, ranch rails, slats... A fence's (or gate's) style is
     /// an index into this list; its `price` is per metre, a gate costs `gate` on top of it.
     pub fences: Vec<BuildStyle>,
@@ -2312,6 +2314,8 @@ struct BuildRaw {
     /// Fence per metre and gate, without fence styles.
     fence: Option<i64>,
     gate: Option<i64>,
+    /// A garage on the home lot.
+    garage: Option<i64>,
     storeys: Option<u8>,
     #[serde(default)]
     basement: bool,
@@ -4632,6 +4636,7 @@ impl Content {
             remove: raw.build.remove.unwrap_or(10),
             fence: raw.build.fence.unwrap_or(25),
             gate: raw.build.gate.unwrap_or(100),
+            garage: raw.build.garage.unwrap_or(2500),
             fences: build_styles(&raw.fence_styles, "fence style")?,
             roofs: build_styles(&raw.roof_styles, "roof style")?,
             roof_colors: build_styles(&raw.roof_colors, "roof colour")?,

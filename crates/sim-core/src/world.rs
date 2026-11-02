@@ -5387,6 +5387,15 @@ impl World {
                 dx,
                 dz,
             } => self.move_room(household, x, z, dx, dz)?,
+            Command::BuildGarage {
+                household,
+                x0,
+                z0,
+                x1,
+                z1,
+                rot,
+            } => self.build_garage(household, [x0, z0, x1, z1], rot)?,
+            Command::SellGarage { household } => self.sell_garage(household)?,
             Command::MoveIn {
                 household,
                 name,

@@ -662,6 +662,9 @@ is an index into this list, saved by `id`.
 `kind` is how it's drawn: `picket`, `rails`, `slats`, `iron` or `stone`; `price` is per metre
 (default `build.fence`), and a gate costs a metre plus `build.gate`.
 
+A garage on the home lot (Build mode's Garage tool) costs `build.garage` (default 2500) and is
+sold back for `objectRules.resale` of it.
+
 ## Roofs
 
 `roofStyles` and `roofColors` are what Build mode's Roof tool offers (saved by `id`):
