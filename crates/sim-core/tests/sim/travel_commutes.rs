@@ -192,3 +192,28 @@ fn walks_from_upstairs_are_timed_on_the_ground() {
         "{upstairs:.1} minutes from upstairs, {downstairs:.1} from downstairs"
     );
 }
+
+/// A new day starts from the day before's walk (`life::refresh_commute`): nobody's way to work is
+/// worked out again at midnight, only shortly before they set off (`firm_leave`).
+#[test]
+fn a_new_day_starts_from_the_day_befores_walk() {
+    let mut w = world(11);
+    let day = clock::day(w.tick);
+    while clock::day(w.tick + 1) == day {
+        w.tick_once();
+    }
+    let before: Vec<_> = w.sims.iter().map(|s| s.commute()).collect();
+    assert!(before.iter().any(|c| c.is_some()), "nobody commutes");
+    w.tick_once();
+    assert_eq!(clock::day(w.tick), day + 1);
+    for (s, before) in w.sims.iter().zip(before) {
+        let (Some(was), Some(now)) = (before, s.commute()) else {
+            continue;
+        };
+        assert_eq!((now.day, now.firm), (day + 1, false), "{}", s.name);
+        // (The same way out, and no shorter: only longer if the walk from where they are now
+        // looks longer, `firm_leave`.)
+        assert_eq!(now.exit, was.exit, "{}", s.name);
+        assert!(now.ticks >= was.ticks, "{}", s.name);
+    }
+}

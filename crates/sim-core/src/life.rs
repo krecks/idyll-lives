@@ -190,7 +190,8 @@ fn ticks(minutes: f32) -> u64 {
 /// past it, `careerRules.commuteMinutes`, the part off the map.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Commute {
-    /// The day and home it was worked out for.
+    /// The day it's for (carried over from the day before, `refresh_commute`) and the home it
+    /// was worked out for.
     pub day: u32,
     pub home: Option<u32>,
     /// The exit (`World::exits` index) they walk to.
@@ -269,10 +270,18 @@ pub fn leave_for(sim: &crate::world::Sim, leave: u64, start: u64) -> u64 {
     }
 }
 
-/// Once a day (and when they move house), how long `i`'s way to work takes (`Commute`); in towns
-/// laid out before the open world, nothing: `commuteMinutes` is the whole way, as it always was.
+/// How long `i`'s way to work takes (`Commute`), worked out when they first need it and when they
+/// move house; in towns laid out before the open world, nothing: `commuteMinutes` is the whole
+/// way, as it always was. A new day starts from the day before's (firmed up from where they were
+/// as they set off, mostly): it is worked out again only shortly before they leave
+/// (`firm_leave`), not for everyone in town at midnight, a walk across a big world each.
 pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
-    if !w.travel.open || w.exits.is_empty() {
+    // (Nowhere to go: no job, and not of an age for school.)
+    let sim = &w.sims[i];
+    let commutes = sim.job.is_some()
+        || w.content.life.school.is_some()
+            && w.content.life.stage_at(sim.age).is_some_and(|s| s.school);
+    if !w.travel.open || w.exits.is_empty() || !commutes {
         w.sims[i].commute = None;
         return;
     }
@@ -280,10 +289,13 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
         .households
         .get(w.sims[i].household as usize)
         .and_then(|h| h.plot);
-    if w.sims[i]
-        .commute
-        .is_some_and(|c| c.day == day && c.home == home)
+    if let Some(c) = w.sims[i].commute.as_mut()
+        && c.home == home
     {
+        if c.day != day {
+            c.day = day;
+            c.firm = false;
+        }
         return;
     }
     let sim = &w.sims[i];
@@ -375,8 +387,8 @@ pub(crate) fn update(w: &mut World) {
                 });
             }
         } else {
-            // (The day's commutes: those with yesterday's to go by can wait a tick when the
-            // searches are over budget, one a tick at least.)
+            // (Commutes worked out for the first time or after a move: those with one to go by
+            // can wait a tick when the searches are over budget, one a tick at least.)
             if w.sims[i].commute.is_none() || !w.over_search_budget() || !refreshed {
                 let before = w.sims[i].commute;
                 refresh_commute(w, i, day);

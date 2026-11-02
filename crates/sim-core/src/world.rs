@@ -1040,8 +1040,9 @@ pub struct Sim {
     /// resident nobody watches takes a turn only every so often, and a change between two of
     /// them still catches up with them. Not saved (after a load, a walker routes again once).
     pub(crate) nav_seen: u32,
-    /// Open-world towns: how long the way to work or school takes them today, worked out once
-    /// a day (`life::refresh_commute`); None: as `careerRules.commuteMinutes` says. Not saved.
+    /// Open-world towns: how long the way to work or school takes them today, firmed up shortly
+    /// before they set off (`life::refresh_commute`); None: as `careerRules.commuteMinutes`
+    /// says. Not saved.
     pub(crate) commute: Option<crate::life::Commute>,
     /// The trailhead (object id) whose trail they last walked (`trail_step`); they're walking it
     /// while they use it (`on_trail`). Not saved.
