@@ -109,6 +109,11 @@ export const WALL_CUT_SEMANTIC = pc.SEMANTIC_ATTR7;
  * location 10, free beside the instancing matrix (`instance_line1..4` at ATTR11, 12, 14, 15).
  */
 export const INSTANCE_COLOR_SEMANTIC = pc.SEMANTIC_ATTR10;
+/**
+ * Per-instance atlas tile (u, v, width, height; 4 floats) of a quad read through `GAME_ATLAS_TILE`
+ * (`uv0VS`): the objects' contact shadows (`lotContents.ts`).
+ */
+export const ATLAS_TILE_SEMANTIC = pc.SEMANTIC_ATTR8;
 
 const COMMON: ShaderFeature = {
   name: 'common',
@@ -294,7 +299,10 @@ const INSTANCE_NORMAL: Record<Language, string> = {
 	#endif`,
 };
 
-/** `uv0VS` for planar UVs (`GAME_PLANAR_UV`: the local XZ in metres); the engine's otherwise. */
+/**
+ * `uv0VS` for planar UVs (`GAME_PLANAR_UV`: the local XZ in metres) and atlas tiles (`GAME_ATLAS_TILE`:
+ * the mesh's uv into its copy's tile, `game_atlasTile` at `ATLAS_TILE_SEMANTIC`); the engine's otherwise.
+ */
 const UV0_GLSL = `
 #ifdef NINESLICED
 	vec2 getUv0() {
@@ -310,6 +318,11 @@ const UV0_GLSL = `
 #elif defined(GAME_PLANAR_UV)
 	vec2 getUv0() {
 		return vertex_position.xz;
+	}
+#elif defined(GAME_ATLAS_TILE)
+	attribute vec4 game_atlasTile;
+	vec2 getUv0() {
+		return game_atlasTile.xy + vertex_texCoord0 * game_atlasTile.zw;
 	}
 #else
 	vec2 getUv0() {
@@ -333,6 +346,11 @@ const UV0_WGSL = `
 #elif defined(GAME_PLANAR_UV)
 	fn getUv0() -> vec2f {
 		return vertex_position.xz;
+	}
+#elif defined(GAME_ATLAS_TILE)
+	attribute game_atlasTile: vec4f;
+	fn getUv0() -> vec2f {
+		return game_atlasTile.xy + vertex_texCoord0 * game_atlasTile.zw;
 	}
 #else
 	fn getUv0() -> vec2f {

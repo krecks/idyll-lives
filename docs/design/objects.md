@@ -72,8 +72,8 @@ gate below, so the review does.
   ceiling things hang from 2.8 m ([content-packs.md](../content-packs.md#objects), `layer`).
 - **Footprint:** the content's `footprint` is in whole 1 m tiles (`[1, 1]` by default). The model
   stays inside it with a few centimetres to spare, unless it is meant to meet its neighbour (a
-  counter run). The contact shadow (1.15 × the footprint) and buy mode's checks follow the
-  footprint; picking follows the drawn outline.
+  counter run). Buy mode's checks follow the footprint; picking and the contact shadow follow
+  what's drawn (the shadow is the model's own shape on the floor, `render/shared/contactShadow.ts`).
 - **Real size, uniform scale.** Build to the object's real size; `G.settle` stands it on the floor,
   centred, by moving it, and the family's `G.Model(size=…, tolerance=…)` asserts its size (2 % by
   default). `gamekit.fit` scales each axis on its own to hit an exact box: it stretched the garden

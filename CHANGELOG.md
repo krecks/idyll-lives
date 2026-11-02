@@ -39,6 +39,10 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
   was made, not projected along the model's axes: wood grain runs along each leg, rail and board and up a turned
   base, bark runs up the trunk and round it, and a tree's clumps of leaves are leaves all over instead of smeared
   into streaks where they turn. Polished marble, worktops and fruit no longer shine like mirrors.
+- **Shadows shaped like the furniture:** the soft shadow on the floor under each thing is its own shape, turned
+  with it, instead of the same round blob for everything: darkest where it stands on the floor (a cabinet's base,
+  a chair's feet, a table's legs), lighter under a seat or a table top the higher it is, and spilling a little
+  past its edge. All of them are still one draw.
 ### Also
 - **Saves:** format 34 (where every car is, who owns it, every house's driveway and the garages). Older saves open with no cars in the simulation: their neighbours' cars stay parked, as before.
 

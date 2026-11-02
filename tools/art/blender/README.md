@@ -409,7 +409,8 @@ never one that's already running) and drive Playwright headless with full Chrome
   middle as its `centre` (`families/lighting.py` `ceilingFan`). The gate warns of a part a loop or ambient
   clip spins (G.spin) whose circle reaches over 1 cm past the footprint, indoors.
 - **Clicking.** An object is clicked by its drawn outline at rest, never past its tiles. An object held open
-  is clicked by its whole tiles. The contact shadow follows the footprint.
+  is clicked by its whole tiles. The contact shadow is the model's own shape at rest, seen from above: darkest
+  where it touches the floor, lighter the higher a part is over it (`web/src/render/shared/contactShadow.ts`).
 - **Doubled covers.** A per-sleeper blanket (`BLANKET_BEDS`) and a modelled duvet show double.
 - **Room kind.** A `sleep` interaction turns a living room into a bedroom.
 - **Mirrors past the nearest.** Only the nearest mirror on screen reflects (two on High). Mirror glass
