@@ -126,6 +126,14 @@ export function inferenceSlot(device: InferenceDevice, signal?: AbortSignal): Pr
   });
 }
 
+/** A job's entry taken off `pending` (`id`'s), its turn on the device (`inferenceSlot`) given back. */
+export function settle<P extends { free: () => void }>(pending: Map<number, P>, id: number): P | undefined {
+  const p = pending.get(id);
+  pending.delete(id);
+  p?.free();
+  return p;
+}
+
 /** Resolves once models may start loading: the page has booted and nothing holds them off. */
 export function whenModelsMayStart(): Promise<void> {
   return new Promise((resolve) => {

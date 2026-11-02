@@ -7,7 +7,7 @@
 
 import { untrack } from 'svelte';
 import { hasWebGpu } from '../ml/ort';
-import { inferenceSlot, whenModelsMayStart } from '../ml/schedule.svelte';
+import { inferenceSlot, settle, whenModelsMayStart } from '../ml/schedule.svelte';
 import { settings } from '../settings/settings.svelte';
 import { SAMPLE_RATE, type FromVoiceWorker, type ToVoiceWorker, type VoiceDevice } from './protocol';
 import type { LineTiming } from './supertonic';
@@ -136,16 +136,10 @@ function onMessage(msg: FromVoiceWorker): void {
     counters.audioSeconds += msg.samples.length / SAMPLE_RATE;
     counters.recent.push({ at: now, ms: msg.ms });
     while (counters.recent.length && counters.recent[0].at < now - BUSY_WINDOW_MS) counters.recent.shift();
-    const p = pending.get(msg.id);
-    pending.delete(msg.id);
-    p?.free();
-    p?.resolve({ samples: msg.samples, visemes: parseVisemes(msg.visemes) });
+    settle(pending, msg.id)?.resolve({ samples: msg.samples, visemes: parseVisemes(msg.visemes) });
   } else if (msg.type === 'error') {
     if (msg.id !== undefined) {
-      const p = pending.get(msg.id);
-      pending.delete(msg.id);
-      p?.free();
-      p?.reject(new Error(msg.message));
+      settle(pending, msg.id)?.reject(new Error(msg.message));
       return;
     }
     const failedDevice = voiceStatus.device;
