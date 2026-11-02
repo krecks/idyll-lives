@@ -67,7 +67,7 @@ import { benchDiag } from '../../debug/benchFlags';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
-import { DOOR_SWING, doorLead, ease, goingThrough, shutDefs } from '../shared/doors';
+import { DOOR_SWING, doorLead, ease, goingThrough, MOVER, shutDefs } from '../shared/doors';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
 import { GAME_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
@@ -152,6 +152,8 @@ const HOLD_FRAMES = 2;
 const SHADOW_MARGIN = 10;
 /** The basement's pit (and the ground dug away over it) reaches this far past the plot (m), clear of walls on its edge. */
 const PIT_MARGIN = 0.3;
+/** Cells (m) the residents on the move are sorted into for the gates (`swingDoors`). */
+const GATE_CELL = 8;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
 const ROOF_MIN_DISTANCE = 15;
 /** Main-thread time (ms) a world build runs before the frames it runs behind get one (`pace`). */
@@ -444,6 +446,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** Object kinds that make a room one that can be kept shut (`shutDefs`). */
   private shutDefs: ReadonlySet<string> = new Set();
   private readonly movers: number[] = [];
+  /** The cells (`GATE_CELL`) someone on the move is in this frame. */
+  private readonly moverCells = new Set<number>();
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
   private readonly neighboursUp: boolean[] = [];
   /** Indices of the snapshot layout's sleeping action tags, and the life stages of babies. */
@@ -1861,7 +1865,19 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const lead = doorLead(rate);
     const step = Math.min(1, (this.frameDt / 1000 / DOOR_SWING) * Math.min(Math.max(rate, 1), 10));
     let moved = false;
+    // (A town has a gate in most gardens: one standing shut with nobody within a cell of it isn't asked.)
+    const near = this.moverCells;
+    near.clear();
+    const cell = (cx: number, cz: number) => (cx + 1024) * 4096 + cz + 1024;
+    for (let i = 0; i < movers.length; i += MOVER) near.add(cell(Math.floor(movers[i] / GATE_CELL), Math.floor(movers[i + 1] / GATE_CELL)));
+    const anyone = (x: number, z: number) => {
+      if (!near.size) return false;
+      const [cx, cz] = [Math.floor(x / GATE_CELL), Math.floor(z / GATE_CELL)];
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (near.has(cell(cx + dx, cz + dz))) return true;
+      return false;
+    };
     for (const gate of this.gates) {
+      if (gate.open === 0 && lead < GATE_CELL && !anyone(gate.leaf.centre[0], gate.leaf.centre[1])) continue;
       const way = goingThrough(movers, gate.leaf.axis, gate.leaf.centre, gate.open === 1, lead, hand);
       // It opens away from the one coming through, and shuts the way it opened.
       if (way && gate.open === 0) gate.towards = way;
