@@ -114,6 +114,36 @@ describe('garden fences', async () => {
     expect(flat.filter((f) => f.kind === 'gate').length).toBe(4);
   });
 
+  test('no land shut in between gardens, in a big world whose lots leave gaps between them', () => {
+    // (A big small town: its lots kept off junctions and bends left 90 tiles between four gardens.)
+    const town = generateWorld(content, t, 'small', 314192, undefined, 'big');
+    const layout = layoutTown(content, t, town, null);
+    const W = town.width;
+    const D = town.depth;
+    const fence = new Set(layout.fences.filter((f) => f.kind === 'fence').map(key));
+    const onPlot = new Uint8Array(W * D);
+    for (const p of layout.plots) {
+      for (let z = Math.max(0, Math.floor(p.z)); z < Math.min(D, Math.ceil(p.z + p.d)); z++) for (let x = Math.max(0, Math.floor(p.x)); x < Math.min(W, Math.ceil(p.x + p.w)); x++) onPlot[z * W + x] = 1;
+    }
+    // Land on no plot reached from the world's corner with the fences standing (as the sim walks).
+    const seen = new Uint8Array(W * D);
+    const stack = [0];
+    seen[0] = 1;
+    while (stack.length) {
+      const i = stack.pop()!;
+      const [x, z] = [i % W, Math.floor(i / W)];
+      for (const [nx, nz, edge] of [[x + 1, z, `v:${x + 1}:${z}`], [x - 1, z, `v:${x}:${z}`], [x, z + 1, `h:${x}:${z + 1}`], [x, z - 1, `h:${x}:${z}`]] as const) {
+        const j = nz * W + nx;
+        if (nx < 0 || nz < 0 || nx >= W || nz >= D || seen[j] || fence.has(edge)) continue;
+        seen[j] = 1;
+        stack.push(j);
+      }
+    }
+    const shut: string[] = [];
+    for (let i = 0; i < W * D; i++) if (!seen[i] && !onPlot[i]) shut.push(`${i % W},${Math.floor(i / W)}`);
+    expect(shut.slice(0, 5), `${shut.length} tiles on no plot shut in`).toEqual([]);
+  }, 120_000);
+
   test('written into the town file as runs', () => {
     const layout = layoutTown(content, t, towns[0].town, null);
     const runs = fenceRuns(layout.fences);

@@ -308,8 +308,8 @@ export function townFences(input: FenceInput): TownFence[] {
   return [...out.values()];
 }
 
-/** A pocket of land no bigger than this (tiles), on no plot, shut in by fences, goes to a garden beside it. */
-const POCKET = 64;
+/** A pocket of land no bigger than this (tiles), on no plot, shut in by fences, goes to a garden beside it (a big world's lots, kept off its junctions and bends, leave bigger gaps between them: 90 tiles, say). */
+const POCKET = 400;
 
 /**
  * Small pockets of land on no plot that the fences of gardens round them shut in (a narrow gap
@@ -338,12 +338,12 @@ function joinPockets(out: Map<string, TownFence>, plots: readonly FencePlot[]): 
     if (i + W < W * D) each(i + W, !!h[i + W], 'h', i + W);
   };
   const label = new Int32Array(W * D).fill(-1);
-  const regions: { first: number; size: number; plot: boolean }[] = [];
+  const regions: { first: number; size: number; plot: boolean; edge: boolean }[] = [];
   const stack: number[] = [];
   for (let s = 0; s < W * D; s++) {
     if (label[s] >= 0) continue;
     const id = regions.length;
-    const region = { first: s, size: 0, plot: false };
+    const region = { first: s, size: 0, plot: false, edge: false };
     regions.push(region);
     label[s] = id;
     stack.push(s);
@@ -351,6 +351,8 @@ function joinPockets(out: Map<string, TownFence>, plots: readonly FencePlot[]): 
       const i = stack.pop()!;
       region.size++;
       region.plot ||= !!onPlot[i];
+      // (At the edge of the fences' bounds: open land beyond, not shut in.)
+      region.edge ||= i % W === 0 || i % W === W - 1 || i < W || i >= W * (D - 1);
       look(i, (j, fenced) => {
         if (fenced || label[j] >= 0) return;
         label[j] = id;
@@ -359,7 +361,7 @@ function joinPockets(out: Map<string, TownFence>, plots: readonly FencePlot[]): 
     }
   }
   regions.forEach((r, id) => {
-    if (r.plot || r.size > POCKET) return;
+    if (r.plot || r.edge || r.size > POCKET) return;
     // Its tiles again, and the garden beside it: the first plot's region across one of its fences; the fences between them go.
     const tiles: number[] = [];
     const seen = new Set([r.first]);
