@@ -1615,7 +1615,7 @@ fn flipped_faces(g: &Glb) -> R<Vec<(String, usize)>> {
                 let v = pos.get(i)?;
                 Some([v[0].f(), v[1].f(), v[2].f()])
             };
-            for t in idx.chunks_exact(3) {
+            for t in idx.as_chunks::<3>().0 {
                 let (Some(a), Some(b), Some(c)) = (p(t[0]), p(t[1]), p(t[2])) else {
                     continue;
                 };
