@@ -11,11 +11,12 @@ import type { HouseholdDraft } from './household';
 import { assembleTown, generatedHouses, generateWorld, loadTemplates, primeHouses, type AssembleOptions, type HouseTemplate, type NeighbourhoodDraft, type Templates } from './town';
 import { previewWorld } from './townPreview';
 import type { WorldKind } from './world';
+import { mulberry32 } from './noise';
 
 export type TownJob =
   /** A new world (`generateWorld`), with the menu's preview of it (`previewWorld`). */
   | { kind: 'world'; world: WorldKind; seed: number; name?: string; size: WorldSize }
-  /** The simulation's town file (`assembleTown`); `random`: the seed for its unseeded dice (neighbours' bonds). */
+  /** The simulation's town file (`assembleTown`); `random`: the seed for its dice (neighbours' bonds). */
   | { kind: 'assemble'; town: NeighbourhoodDraft; player: HouseholdDraft; slot: number; options: AssembleOptions; random: number };
 
 export type TownResult =
@@ -26,21 +27,9 @@ export type ToTownWorker = { id: number; job: TownJob };
 /** `broken`: the worker couldn't load the content (every job fails there). */
 export type FromTownWorker = { id: number; result: TownResult } | { id: number; error: string; broken?: boolean };
 
-/** A small seeded generator (mulberry32) standing in for `Math.random` while a file is assembled. */
-function seeded(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 /**
- * Runs a job. `assembleTown` rolls some dice with `Math.random` (who are friends, rivals): they
- * come from the job's own seed, so the worker and the page give the same file for the same job.
+ * Runs a job. `assembleTown` rolls some dice (who are friends, rivals): they come from the job's
+ * own seed, so the worker and the page give the same file for the same job.
  */
 export function runTownJob(content: Content, t: Templates, job: TownJob): TownResult {
   if (job.kind === 'world') {
@@ -48,13 +37,7 @@ export function runTownJob(content: Content, t: Templates, job: TownJob): TownRe
     const preview = previewWorld(content, t, draft, null);
     return { kind: 'world', draft, preview, houses: generatedHouses(t, draft.slots.map((s) => s.template)) };
   }
-  const real = Math.random;
-  Math.random = seeded(job.random);
-  try {
-    return { kind: 'assemble', lot: assembleTown(content, t, job.town, job.player, job.slot, job.options) };
-  } finally {
-    Math.random = real;
-  }
+  return { kind: 'assemble', lot: assembleTown(content, t, job.town, job.player, job.slot, job.options, mulberry32(job.random)) };
 }
 
 /** Raised for a job a newer one replaced (or whose signal aborted it). */
