@@ -1674,12 +1674,20 @@ fn drive_on(w: &mut World, c: usize) {
                 && s.current()
                     .is_some_and(|a| matches!(a.phase, Phase::Routing { .. }))
         };
+        // Behind it as it goes (at its back bumper driving on, its front one backing up): it
+        // draws away from them, as they may follow it close (on their way the same way).
+        let behind_it = || {
+            let (sn, cs) = yaw.sin_cos();
+            let along = (s.pos[0] - at[0]) * sn + (s.pos[1] - at[1]) * cs;
+            if reverse { along > 0.0 } else { along < 0.0 }
+        };
         if !s.here()
             || s.away_until.is_some()
             || !car.covers(at, yaw, s.pos, ahead, behind)
             || busy()
             || at_a_wheel()
             || beside()
+            || behind_it()
         {
             continue;
         }
