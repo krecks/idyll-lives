@@ -1930,9 +1930,12 @@ fn house_bounds(world: &World, x0: i32, z0: i32, x1: i32, z1: i32) -> Option<[i3
     b
 }
 
+/// Per object, the height of the top it stands on (`surface_lifts`).
+type Lifts = Vec<Option<f32>>;
+
 /// Per object, the height of the top it stands on (things on the `surface` layer; None for the
 /// rest, or on a top at floor level).
-fn surface_lifts(world: &World) -> Vec<Option<f32>> {
+fn surface_lifts(world: &World) -> Lifts {
     let content = &world.content;
     let on_top = |o: &crate::world::ObjectInstance| {
         content.objects[o.def].layer == crate::content::Layer::Surface
@@ -2198,7 +2201,8 @@ pub fn items_json(world: &World) -> String {
 }
 
 /// The world structure; without `lot`, leaves out the lot itself (rooms, walls, openings,
-/// diagonals, fences, floors) for a caller that has it at this `lotVersion` already.
+/// diagonals, fences, floors), as `StructureSync` does unless asked for it (the tests compare
+/// the two).
 pub fn structure_json_with(world: &World, lot: bool) -> String {
     let lifts = surface_lifts(world);
     let objects = world
@@ -2321,7 +2325,7 @@ fn floor_views(world: &World) -> Vec<[u16; 3]> {
 }
 
 fn staff_views(world: &World) -> Vec<StaffView> {
-    crate::staff::plan(world)
+    crate::staff::current(world)
         .servers
         .iter()
         .take(crate::staff::MAX_STAFF)
@@ -2356,195 +2360,212 @@ fn car_views(world: &World) -> Option<Vec<CarView>> {
 }
 
 /// The world structure as updates for a view that keeps what it was sent (the sim worker's
-/// `world` messages): the first update, and the one after `resync`, has everything; later ones
-/// only what changed since the last (`structure_json`'s parts by name, `unset` naming those now
-/// left out, and `objectChanges` the things that changed, by index, while the list of things
-/// stays the same). `meta`, which the simulation carries unchanged, comes only with everything.
-/// The rooms never come (`Lot::rooms_row_major` goes as a typed array); the other lot parts only
-/// when asked for (`lot`: the lot changed, see `lotVersion`).
+/// `world` messages): the first update has everything; later ones only what changed since the
+/// last (`structure_json`'s parts by name, `unset` naming those now left out, and
+/// `objectChanges` the things that changed, by index, while the list of things stays the same).
+/// `meta`, which the simulation carries unchanged, comes only with everything. The rooms never
+/// come (`Lot::rooms_row_major` goes as a typed array); the other lot parts only when asked for
+/// (`lot`: the lot changed, see `lotVersion`).
 ///
 /// A big world has some 16 000 things and a quarter of a megabyte of presentation data (`meta`),
 /// and its structure changes with every door opened or crop grown: sent whole, that was 2 MB to
-/// parse each time on the main thread.
+/// parse each time on the main thread. Each thing is still written out to see whether it
+/// changed (the world doesn't say which did).
+#[derive(Default)]
 pub struct StructureSync {
     /// Fingerprints of the parts as last sent, by name (left out: not sent, or unset since).
     parts: HashMap<&'static str, u64>,
     /// Each thing as last sent, in order: its stable id and fingerprint.
     objects: Vec<(u32, u64)>,
-    /// The plots' part as last made, and a fingerprint of what it was made from: their houses'
-    /// bounds scan every plot's tiles, and only the lot (or the plots themselves) changes them.
-    plots: Option<(u64, String)>,
-    /// Nothing sent yet (or `resync`): the next update has everything.
-    fresh: bool,
-}
-
-impl Default for StructureSync {
-    fn default() -> Self {
-        StructureSync::new()
-    }
+    /// The plots' part as last made, with a fingerprint of what it was made from and of it:
+    /// their houses' bounds scan every plot's tiles, and only the lot (or the plots themselves)
+    /// changes them.
+    plots: Option<(u64, u64, String)>,
+    /// The things' lifts onto surfaces (`surface_lifts`, a lot-sized scan) as last found, for
+    /// the objects' and the lot's versions.
+    lifts: Option<((u32, u32), Lifts)>,
 }
 
 impl StructureSync {
-    pub fn new() -> Self {
-        StructureSync {
-            parts: HashMap::new(),
-            objects: Vec::new(),
-            plots: None,
-            fresh: true,
-        }
-    }
-
-    /// The next update has everything (the view starts over).
-    pub fn resync(&mut self) {
-        *self = StructureSync::new();
-    }
-
     /// The next update (JSON): what changed since the last; with `lot`, the lot's walls, openings,
     /// diagonals, fences and floors too.
     pub fn update_json(&mut self, world: &World, lot: bool) -> String {
-        use std::fmt::Write;
-        fn json<T: Serialize + ?Sized>(v: &T) -> String {
-            serde_json::to_string(v).expect("structure part serializes")
-        }
-        fn print(s: &str) -> u64 {
-            let mut h = DefaultHasher::new();
-            h.write(s.as_bytes());
-            h.finish()
-        }
-        let fresh = std::mem::take(&mut self.fresh);
-        let mut out = String::with_capacity(1024);
+        use std::io::Write;
+        // (Nothing sent yet: `mode` and the like always go.)
+        let fresh = self.parts.is_empty();
+        let mut parts = Parts {
+            sent: &mut self.parts,
+            out: Vec::with_capacity(1024),
+            buf: Vec::new(),
+            unset: Vec::new(),
+        };
         let _ = write!(
-            out,
+            parts.out,
             "{{\"version\":{},\"lotVersion\":{}",
             world.structure_version(),
             world.lot_version()
         );
-        let skip_empty = |v: String, empty: bool| (!empty).then_some(v);
-        let parts: [(&'static str, Option<String>); 15] = [
-            ("mode", Some(json(&world.mode))),
-            ("width", Some(json(&world.lot.width))),
-            ("depth", Some(json(&world.lot.depth))),
-            ("storeys", Some(json(&world.storeys))),
-            ("storeyDepth", Some(json(&world.storey_depth()))),
-            ("basement", basement_block(world).map(|b| json(&b))),
-            ("sims", Some(json(&sim_infos(world)))),
-            (
-                "former",
-                skip_empty(json(&world.former), world.former.is_empty()),
-            ),
-            ("households", Some(json(&household_views(world)))),
-            ("plots", Some(self.plots_json(world))),
-            ("exits", Some(json(&world.exits))),
-            // (Presentation data the simulation carries unchanged: sent the first time only.)
-            ("meta", fresh.then(|| json(&world.meta))),
-            ("staff", {
-                let staff = staff_views(world);
-                skip_empty(json(&staff), staff.is_empty())
-            }),
-            ("cars", car_views(world).map(|c| json(&c))),
-            (
-                "garages",
-                skip_empty(json(&world.garages), world.garages.is_empty()),
-            ),
-        ];
-        let mut unset = Vec::new();
-        for (key, part) in parts {
-            match part {
-                None if key == "meta" => {}
-                Some(v) => {
-                    let p = print(&v);
-                    if self.parts.insert(key, p) != Some(p) || fresh {
-                        let _ = write!(out, ",\"{key}\":{v}");
-                    }
-                }
-                None => {
-                    if self.parts.remove(key).is_some() {
-                        unset.push(key);
-                    }
-                }
-            }
+        parts.part("mode", Some(&world.mode));
+        parts.part("width", Some(&world.lot.width));
+        parts.part("depth", Some(&world.lot.depth));
+        parts.part("storeys", Some(&world.storeys));
+        parts.part("storeyDepth", Some(&world.storey_depth()));
+        parts.part("basement", basement_block(world).as_ref());
+        parts.part("sims", Some(&sim_infos(world)));
+        parts.part("former", Some(&world.former).filter(|f| !f.is_empty()));
+        parts.part("households", Some(&household_views(world)));
+        let (print, plots) = plots_json(&mut self.plots, world);
+        parts.put("plots", Some(print), plots.as_bytes());
+        parts.part("exits", Some(&world.exits));
+        // (Presentation data the simulation carries unchanged: sent the first time only.)
+        if fresh {
+            parts.part("meta", Some(&world.meta));
         }
+        let staff = staff_views(world);
+        parts.part("staff", Some(&staff).filter(|s| !s.is_empty()));
+        parts.part("cars", car_views(world).as_ref());
+        parts.part("garages", Some(&world.garages).filter(|g| !g.is_empty()));
+
         // The things: those that changed, by index, while the list is the same things in the same
         // order (a door opened, a crop grown); else the whole list (one bought, sold or moved in).
-        let lifts = surface_lifts(world);
-        let things: Vec<String> = world
-            .objects
-            .iter()
-            .map(|o| json(&object_view(world, &lifts, o)))
-            .collect();
+        let key = (world.objects_version, world.lot_version());
+        let lifts = match self.lifts.take() {
+            Some((k, lifts)) if k == key => lifts,
+            _ => surface_lifts(world),
+        };
+        let Parts {
+            mut out,
+            mut buf,
+            unset,
+            ..
+        } = parts;
         let same = !fresh
-            && self.objects.len() == things.len()
+            && self.objects.len() == world.objects.len()
             && self
                 .objects
                 .iter()
                 .zip(&world.objects)
                 .all(|(s, o)| s.0 == o.stable);
-        if same {
-            let mut first = true;
-            for (i, (sent, v)) in self.objects.iter_mut().zip(&things).enumerate() {
-                let p = print(v);
-                if sent.1 == p {
-                    continue;
+        if !same {
+            self.objects.clear();
+            out.extend_from_slice(b",\"objects\":[");
+        }
+        let mut changed = 0;
+        for (i, o) in world.objects.iter().enumerate() {
+            buf.clear();
+            serde_json::to_writer(&mut buf, &object_view(world, &lifts, o))
+                .expect("object serializes");
+            let p = fingerprint(&buf);
+            if !same {
+                if i > 0 {
+                    out.push(b',');
                 }
-                sent.1 = p;
-                out.push_str(if first { ",\"objectChanges\":[" } else { "," });
-                first = false;
-                let _ = write!(out, "[{i},{v}]");
+                out.extend_from_slice(&buf);
+                self.objects.push((o.stable, p));
+                continue;
             }
-            if !first {
-                out.push(']');
+            let sent = &mut self.objects[i].1;
+            if *sent == p {
+                continue;
             }
-        } else {
-            out.push_str(",\"objects\":[");
-            out.push_str(&things.join(","));
-            out.push(']');
-            self.objects = world
-                .objects
-                .iter()
-                .zip(&things)
-                .map(|(o, v)| (o.stable, print(v)))
-                .collect();
+            *sent = p;
+            out.extend_from_slice(if changed == 0 {
+                b",\"objectChanges\":["
+            } else {
+                b","
+            });
+            changed += 1;
+            let _ = write!(out, "[{i},");
+            out.extend_from_slice(&buf);
+            out.push(b']');
+        }
+        if !same || changed > 0 {
+            out.push(b']');
+        }
+        self.lifts = Some((key, lifts));
+        fn field<T: Serialize + ?Sized>(out: &mut Vec<u8>, key: &str, v: &T) {
+            let _ = write!(out, ",\"{key}\":");
+            serde_json::to_writer(out, v).expect("structure part serializes");
         }
         if lot {
             let (walls, openings, fences) = wall_edges(&world.lot, world.lot.walls());
+            field(&mut out, "walls", &walls);
+            field(&mut out, "openings", &openings);
+            field(&mut out, "fences", &fences);
             let diagonals = diagonals(&world.lot, world.lot.diagonal_walls());
-            let _ = write!(
-                out,
-                ",\"walls\":{},\"openings\":{},\"fences\":{},\"diagonals\":{},\"floors\":{}",
-                json(&walls),
-                json(&openings),
-                json(&fences),
-                json(&diagonals),
-                json(&floor_views(world))
-            );
+            field(&mut out, "diagonals", &diagonals);
+            field(&mut out, "floors", &floor_views(world));
         }
         if !unset.is_empty() {
-            let _ = write!(out, ",\"unset\":{}", json(&unset));
+            field(&mut out, "unset", &unset);
         }
-        out.push('}');
-        out
+        out.push(b'}');
+        String::from_utf8(out).expect("JSON is UTF-8")
+    }
+}
+
+/// `StructureSync::update_json`'s parts as it writes them: each only if it changed since it was
+/// last sent (`sent`).
+struct Parts<'a> {
+    sent: &'a mut HashMap<&'static str, u64>,
+    out: Vec<u8>,
+    /// A part as it is now, to see whether it changed.
+    buf: Vec<u8>,
+    /// The parts left out now that were sent before.
+    unset: Vec<&'static str>,
+}
+
+impl Parts<'_> {
+    /// Part `key` (`None`: left out).
+    fn part<T: Serialize + ?Sized>(&mut self, key: &'static str, v: Option<&T>) {
+        let mut buf = std::mem::take(&mut self.buf);
+        buf.clear();
+        let print = v.map(|v| {
+            serde_json::to_writer(&mut buf, v).expect("structure part serializes");
+            fingerprint(&buf)
+        });
+        self.put(key, print, &buf);
+        self.buf = buf;
     }
 
-    /// The plots (JSON), made again only when the lot or a plot changed.
-    fn plots_json(&mut self, world: &World) -> String {
-        use std::hash::Hash;
-        let mut h = DefaultHasher::new();
-        (world.lot_version(), world.storeys, world.storey_depth()).hash(&mut h);
-        for p in &world.plots {
-            (p.id, &p.name, p.x, p.z, p.w, p.d, p.public).hash(&mut h);
-            p.entry.map(|e| e.map(f32::to_bits)).hash(&mut h);
-            p.roof.map(|r| [r.style, r.color]).hash(&mut h);
-        }
-        let key = h.finish();
-        match &self.plots {
-            Some((k, v)) if *k == key => v.clone(),
-            _ => {
-                let v = serde_json::to_string(&plot_views(world)).expect("plots serialize");
-                self.plots = Some((key, v.clone()));
-                v
+    /// Part `key` as JSON with its fingerprint (`None`: left out).
+    fn put(&mut self, key: &'static str, print: Option<u64>, json: &[u8]) {
+        match print {
+            Some(p) => {
+                if self.sent.insert(key, p) != Some(p) {
+                    self.out.extend_from_slice(b",\"");
+                    self.out.extend_from_slice(key.as_bytes());
+                    self.out.extend_from_slice(b"\":");
+                    self.out.extend_from_slice(json);
+                }
+            }
+            None => {
+                if self.sent.remove(key).is_some() {
+                    self.unset.push(key);
+                }
             }
         }
     }
+}
+
+/// The plots' part (JSON) and its fingerprint, made again only when the lot or a plot changed
+/// (`StructureSync::plots`).
+fn plots_json<'a>(cached: &'a mut Option<(u64, u64, String)>, world: &World) -> (u64, &'a str) {
+    use std::hash::Hash;
+    let mut h = DefaultHasher::new();
+    (world.lot_version(), world.storeys, world.storey_depth()).hash(&mut h);
+    for p in &world.plots {
+        (p.id, &p.name, p.x, p.z, p.w, p.d, p.public).hash(&mut h);
+        p.entry.map(|e| e.map(f32::to_bits)).hash(&mut h);
+        p.roof.map(|r| [r.style, r.color]).hash(&mut h);
+    }
+    let key = h.finish();
+    if cached.as_ref().is_none_or(|c| c.0 != key) {
+        let json = serde_json::to_string(&plot_views(world)).expect("plots serialize");
+        *cached = Some((key, fingerprint(json.as_bytes()), json));
+    }
+    let (_, print, json) = cached.as_ref().expect("made just now");
+    (*print, json)
 }
 
 #[derive(Serialize)]

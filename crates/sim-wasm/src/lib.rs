@@ -229,11 +229,6 @@ impl Game {
         view::catalog_json(&self.world.content)
     }
 
-    /// The world structure; with `lot` false, without the lot parts (see `lotVersion`).
-    pub fn structure(&self, lot: bool) -> String {
-        view::structure_json_with(&self.world, lot)
-    }
-
     /// The next structure update (JSON): what changed since the last one (the first time:
     /// everything); with `lot`, the lot's walls, openings, diagonals, fences and floors too
     /// (never the rooms: `rooms`). See `sim_core::view::StructureSync`.
@@ -373,7 +368,7 @@ impl Game {
             world,
             snapshot: vec![0.0; snapshot::CAPACITY].into_boxed_slice(),
             ui: view::UiSync::new(),
-            structure: view::StructureSync::new(),
+            structure: view::StructureSync::default(),
             view: None,
             watch: None,
             chunks: Vec::new(),
