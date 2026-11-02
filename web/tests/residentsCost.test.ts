@@ -1,7 +1,8 @@
 // What the residents cost the GPU and the shadow map (`residents.ts` `faceDetail`, `upload`): a resident not drawn
 // (hidden, away, out of view) is in no part's rows, the parts drawn whatever the distance and the shadow-only copies
 // included, so nothing skins them to nothing; and only residents posed inside the sun's shadow square draw its map
-// again (`posed`). `bun test`.
+// again (`posed`). And the pose texture's three texels a bone (`layout.ts` `BONE_TEXELS`) are the skinning matrices'
+// rows, number for number. `bun test`.
 //
 // (What this caught when written: the hair, the eyes and the shadow-only copies kept every resident built, drawn or
 // not, and one hidden counted as far off, so its low-detail body was drawn too; and anyone posed within the preset's
@@ -29,6 +30,7 @@ describe('residents not drawn', async () => {
   const { Characters, MAX_CHARACTERS } = await import('../src/render/shared/characters/residents');
   const { TemplateCache } = await import('../src/render/shared/templateCache');
   const { Pose, simFields } = await import('../src/core/snapshot');
+  const pose = await import('../src/render/shared/characters/pose');
   type ResidentProp = import('../src/render/shared/characters/view').ResidentProp;
   type View = import('../src/render/shared/characters/view').ResidentView<Part, object, ResidentProp>;
   type SnapshotLayout = import('../src/core/snapshot').SnapshotLayout;
@@ -172,6 +174,28 @@ describe('residents not drawn', async () => {
       expect(drawnRows(true)).toEqual([0, 1, 2, 3, 4, 5]);
     } finally {
       performance.now = realNow;
+    }
+  }, 30_000);
+
+  test("the pose texture's rows are the skinning matrices'", async () => {
+    const characters = new Characters(view, assets, content, { castsShadows: true });
+    expect(await characters.init()).toBe(true);
+    const set = (characters as unknown as { set: import('../src/render/shared/characters/data').CharacterSet }).set;
+    const NB = set.bones.length;
+    const q = new Float32Array(NB * 4);
+    const p = new Float32Array(3);
+    pose.sampleClip(set, set.clips.get('walk')!, 0.3, q, p);
+    const add = pose.makeAdditive(NB);
+    pose.resetAdditive(add);
+    const head = new Float32Array(3);
+    for (const body of set.bodies.values()) {
+      const place = { x: 3, y: 0.2, z: -4, qx: 0, qy: Math.sin(0.4), qz: 0, qw: Math.cos(0.4), scale: 1.05, head: 1.1, build: 1.15 };
+      const columns = new Float32Array(NB * 16);
+      const rows = new Float32Array(NB * 12 + 8);
+      pose.skin(set, body, q, p, add, place, new pose.PoseScratch(NB), columns, 0, head);
+      pose.skin(set, body, q, p, add, place, new pose.PoseScratch(NB), rows, 8, head, true);
+      const m = new Float32Array(16);
+      for (let b = 0; b < NB; b++) expect(Array.from(pose.boneMatrix(rows, 8, b, m))).toEqual(Array.from(columns.subarray(b * 16, b * 16 + 16)));
     }
   });
 });

@@ -2,7 +2,8 @@
  * A resident's row in the pose texture: what the CPU writes (`characters.ts`) and the character
  * shader reads (`characters/material.ts`), one row per resident.
  *
- * Row layout (RGBA32F texels): bones * 4 matrix texels, then `APPEARANCE_TEXELS` texels:
+ * Row layout (RGBA32F texels): `BONE_TEXELS` a bone (its skinning matrix's first three rows; the fourth is
+ * 0 0 0 1), then `APPEARANCE_TEXELS` texels:
  *   0: skin colour rgb (linear), top: sleeve cut
  *   1: top colour rgb, top: hem height
  *   2: bottom colour rgb, top: crew neckline cut
@@ -18,6 +19,14 @@
  * Disabled cuts are -10 (or +10 for "below" cuts) so their predicate always / never holds.
  * Then `MORPH_TEXELS` texels of (channel, weight, channel, weight); weight 0 = unused.
  */
+
+/**
+ * Texels a bone: its skinning matrix's rows 0, 1 and 2 (an affine matrix: the fourth is 0 0 0 1), so the
+ * shader reads three a bone, not four (`pose.ts` `skin`, `shaders/character.ts` `gameSimSkin`).
+ */
+export const BONE_TEXELS = 3;
+/** Floats a bone in a row (`BONE_TEXELS` RGBA texels). */
+export const BONE_FLOATS = BONE_TEXELS * 4;
 
 /** Appearance texels per resident, after its bone matrices. */
 export const APPEARANCE_TEXELS = 8;

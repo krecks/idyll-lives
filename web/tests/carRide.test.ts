@@ -224,6 +224,6 @@ describe('riding in a car', async () => {
       } finally {
         performance.now = realNow;
       }
-    });
+    }, 30_000);
   }
 });

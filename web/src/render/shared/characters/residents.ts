@@ -76,7 +76,7 @@ import { type LegSide, SEAT_FIT, feetDown, legTurn, perch, seatSize } from './se
 import { BATH_WEAR, BEDS, BENCH_HIP, BENCH_KNEE, BLANKET_BEDS, BLANKET_MEET, BUNKS, type Bed, CLIP_HEIGHT, CURLED_BEDS, DEFAULT_BED, DEFAULT_SEAT, FEET_UP, FOOTSTOOLS, LEGS_OUT_DROP, LIE_CENTRE, LIE_ENTRY, type LegFit, NO_FEET_UP, ON_FLOOR, PEDAL, type PlacedObject, QUILT_COLOUR, QUILT_PART, REST_BACK, RISING, SEATS, SIDE_BEDS, SIDE_IN, SIT_CLIPS, SIT_FLEX, SIT_FROM, SLING, type Seat, type SeatFit, TUCK, floorSit, seatOf, slingTop } from './seats';
 import { AIM, Anim, EMBRACE, KISS_FIT, REFUSED, gesturesOf } from './socials';
 import { BLANKET_WIDTH, quiltGeometry, quiltTint } from './blanket';
-import { APPEARANCE_TEXELS, MORPH_TEXELS } from './layout';
+import { APPEARANCE_TEXELS, BONE_FLOATS, BONE_TEXELS, MORPH_TEXELS } from './layout';
 import type { TemplateCache } from '../templateCache';
 import { WALL_HEIGHT } from '../walls';
 import type { ResidentProp, ResidentView } from './view';
@@ -362,7 +362,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     }
     const set = this.set;
     const NB = set.bones.length;
-    this.width = NB * 4 + APPEARANCE_TEXELS + MORPH_TEXELS;
+    this.width = NB * BONE_TEXELS + APPEARANCE_TEXELS + MORPH_TEXELS;
     this.data = new Float32Array(this.width * MAX_CHARACTERS * 4);
     this.uploaded = new Float32Array(this.data.length);
     this.view.init(set, this.data, this.width, MAX_CHARACTERS);
@@ -823,7 +823,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       };
       this.sims[id] = rig;
       const look = { body: '#5F86C9', skin: '#C08A64', hair: '#2B2320', hairStyle: 'short' as const, height: 1, top: 'top.tee', bottom: 'bottom.trousers', shoes: 'shoes.sneakers' };
-      writeOutfit(outfitFor(id, body.name, look, body), this.data, this.row(id) + set.bones.length * 16);
+      writeOutfit(outfitFor(id, body.name, look, body), this.data, this.row(id) + set.bones.length * BONE_FLOATS);
     }
     // The ghosts' meshes (and the low-detail ones' shadow copies), even where nobody in the world wears them.
     for (const body of bodies) {
@@ -871,7 +871,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       pl.scale = rig.scale;
       pl.head = rig.head;
       pl.build = rig.build;
-      skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp);
+      skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp, true);
       this.visible[i] = 1;
     });
   }
@@ -1531,7 +1531,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const show = !!rig && !away && inView(tx, tz) && storeyShown(Math.floor(th + 0.01), storey);
       if (!rig || !show) {
         if (this.visible[i]) {
-          this.data.fill(0, this.row(i), this.row(i) + NB * 16);
+          this.data.fill(0, this.row(i), this.row(i) + NB * BONE_FLOATS);
           shadows.fill(0, i * 16, i * 16 + 16);
         }
         if (rig) rig.cover = 0;
@@ -1827,7 +1827,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const pad = this.onPadOf[i];
       if (pad) onPad(this.place, this.cradleQ, rig, pad);
       if (inArms > 0) cradled(this.place, this.cradleQ, this.cradle, rig, this.sims[this.heldBy[i]]!, this.heldBy[i], inArms);
-      skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp);
+      skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp, true);
       this.writeSit(rig, i);
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) writeCradle(set.bone, this.scratch.worldT, this.cradle, i, rig);
       this.writeBlanket(rig, i, pose, dt, appeared);
@@ -1868,7 +1868,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     for (let i = count + this.ghosts.length; i < MAX_CHARACTERS; i++) {
       if (!this.visible[i]) continue;
       this.visible[i] = 0;
-      this.data.fill(0, this.row(i), this.row(i) + NB * 16);
+      this.data.fill(0, this.row(i), this.row(i) + NB * BONE_FLOATS);
       shadows.fill(0, i * 16, i * 16 + 16);
     }
     for (const b of this.blankets.values()) {
@@ -3721,7 +3721,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
     // Morphs: the expression (lids following the eyes), then speech. Faces too small on screen to
     // show them skip their morphs (in the vertex shader too).
-    const morphRow = this.row(i) + set.bones.length * 16 + APPEARANCE_TEXELS * 4;
+    const morphRow = this.row(i) + set.bones.length * BONE_FLOATS + APPEARANCE_TEXELS * 4;
     if (this.facePx[i] < MORPH_PX && !dir && !dbg) {
       mixer.off(this.data, morphRow);
       return;
@@ -3902,7 +3902,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** Puts `worn` (one of its `outfits`) on Sim `i`: its appearance texels, and the shells it doesn't draw (`bare`). */
   private wear(rig: SimRig, i: number, worn: OutfitParams): void {
     rig.worn = worn;
-    writeOutfit(worn, this.data, this.row(i) + this.set!.bones.length * 16);
+    writeOutfit(worn, this.data, this.row(i) + this.set!.bones.length * BONE_FLOATS);
     if (this.bare[i] !== worn.bare) this.shadowsBare = true;
     this.bare[i] = worn.bare;
     rig.skirt = worn.parts.includes('bottom.skirt') && !(worn.bare & SHELL_BITS.bottom);
@@ -3917,17 +3917,18 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const set = this.set!;
     const d = this.data;
     const row = this.row(i);
-    const p = row + set.bone.pelvis * 16;
+    const p = row + set.bone.pelvis * BONE_FLOATS;
     let flex = 0;
     for (const thigh of [set.bone.thigh_l, set.bone.thigh_r]) {
-      // The thigh's rest down (0, -1, 0) as posed, in the pelvis' rest frame (columns: the matrices are column-major).
-      const o = row + thigh * 16;
-      const y = -(d[p + 4] * d[o + 4] + d[p + 5] * d[o + 5] + d[p + 6] * d[o + 6]);
-      const z = -(d[p + 8] * d[o + 4] + d[p + 9] * d[o + 5] + d[p + 10] * d[o + 6]);
+      // The thigh's rest down (0, -1, 0) as posed, in the pelvis' rest frame (columns 1 and 2: the rows are a texel
+      // each, `BONE_TEXELS`, so column c is at c, c + 4 and c + 8).
+      const o = row + thigh * BONE_FLOATS;
+      const y = -(d[p + 1] * d[o + 1] + d[p + 5] * d[o + 5] + d[p + 9] * d[o + 9]);
+      const z = -(d[p + 2] * d[o + 1] + d[p + 6] * d[o + 5] + d[p + 10] * d[o + 9]);
       flex += Math.max(0, Math.atan2(z, -y));
     }
     // (From `SIT_FROM`: a stride's swing of the legs leaves the skirt as it hangs.)
-    d[row + set.bones.length * 16 + 18] = clamp((flex / 2 - SIT_FROM) / (SIT_FLEX - SIT_FROM), 0, 1) * rig.size;
+    d[row + set.bones.length * BONE_FLOATS + 18] = clamp((flex / 2 - SIT_FROM) / (SIT_FLEX - SIT_FROM), 0, 1) * rig.size;
   }
 
   /** Someone's `bare` changed: the shells' shadow copies are drawn again for the Sims that wear them now (`faceDetail`). */
