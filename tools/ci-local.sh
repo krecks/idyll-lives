@@ -43,8 +43,9 @@ step() {
     generated)
       local out
       out=$(mktemp -d)
-      # (Gone even when a test fails, which ends the script.)
-      trap 'rm -rf "$out"' EXIT
+      # (Gone even when a test fails, which ends the script; the path taken now, as `out` is this
+      # step's own.)
+      trap "rm -rf '$out'" EXIT
       "${bun_ci[@]}" tools/housegen/sample.ts "$out/houses.json"
       # Cosy and Normal worlds three per kind, Big ones (up to 1024 m) one per kind in a file of their own.
       "${bun_ci[@]}" tools/worlds/sample.ts "$out/worlds.json" 3 --sizes cosy,normal,big --big-per-kind 1 --big-out "$out/worlds-big.json"
