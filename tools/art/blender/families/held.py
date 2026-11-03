@@ -53,6 +53,7 @@ M = G.Palette(
     carrot=('#E8772E', 'satin'),
     tomato=('#D93A2B', 'gloss', {'roughness': 0.3}),
     potato=('#E8D9A0', 'matte'),
+    heap=('#C9B06E', 'matte'),       # the prep bowl's heap under the diced vegetables
     pea=('#6BA33A', 'satin'),
     stew=('#B0562C', 'satin'),
     bread=('#E9CD98', 'matte'),
@@ -94,7 +95,7 @@ M = G.Palette(
     burnt=('#3F3022', 'matte'),
     residue=('#6B4A30', 'matte'),
     crumb=('#D9B98A', 'matte'),
-    melt=('#E9C9B4', 'matte'),       # melted ice cream in the bowl
+    melt=('#D2A48E', 'satin'),       # melted ice cream in the bowl, the three flavours run together
     smear_filling=('#6E2A2E', 'matte'),
     # the quick foods (review M-held-01): ice cream, toast, a smoothie, noodles, takeout
     vanilla=('#F6EBC8', 'satin'),
@@ -209,6 +210,14 @@ M = G.Palette(
     petal_yellow=('#F2C14E', 'satin'),
     flower_eye=('#E8A62A', 'matte'),
     stem_green=('#4E8A3A', 'satin'),   # a cut stem, a shade lighter than `leaf`
+    # something fresh from the garden: a salad
+    lettuce_pale=('#A6CC5E', 'satin'),
+    tomato_flesh=('#E8664E', 'satin'),
+    cucumber=('#3E6B2C', 'satin'),
+    cucumber_flesh=('#D4E6A4', 'satin'),
+    radish=('#C8324A', 'gloss'),
+    radish_white=('#F4EEF0', 'satin'),
+    berry_seed=('#E8D07A', 'satin'),   # a strawberry's seeds
 )
 
 # Built in the game's axes (x, height, depth; front +depth), as the old parts are.
@@ -468,12 +477,13 @@ def done(name):
 WELL = 0.009  # the height of the plate's well, where the food sits
 
 
-def plate():
+def plate(name='plate', at=(0, 0, 0), covered=False):
     """A dinner plate 29 cm across: a flat foot, a rim rising to 1.7 cm with a rolled edge, a well at 0.9 cm in a
-    paler glaze."""
-    lathe('plate', [(0, 0), (0.094, 0), (0.1438, 0.0156), (0.1408, 0.0172), (0.124, 0.0162), (0.088, WELL),
-                    (0, WELL)],
-          [M.china, M.china, M.china, M.china, M.china, M.china_well], segments=22)
+    paler glaze; its foot at the game point `at`. `covered`: under another plate (the stack), its well flat at the
+    rim's height, out of sight."""
+    inside = [(0, 0.0162)] if covered else [(0.088, WELL), (0, WELL)]
+    lathe(name, [(0, 0), (0.094, 0), (0.1438, 0.0156), (0.1408, 0.0172), (0.124, 0.0162)] + inside,
+          [M.china] * 5 if covered else [M.china] * 5 + [M.china_well], at=at, segments=20 if covered else 22)
 
 
 def _spoon(at, yaw, tilt, name='spoon', reach=0.11):
@@ -550,24 +560,29 @@ def ingredients():
 
 
 def prepBowl():
-    """A wide glazed bowl of chopped vegetables, its rim rolled: diced potato heaped with carrot, green beans and
-    peas over it."""
+    """A wide glazed bowl of chopped vegetables, its rim rolled: a heap rising over the rim, diced potato, carrot and
+    red pepper thick over it, green beans and peas."""
+    def heap(r):
+        """The heap's height at `r` from the middle: up from the bowl's inside wall to 3.5 cm over the rim."""
+        return 0.08 + 0.044 * max(0.0, 1 - (r / 0.15) ** 2)
     lathe('bowl', [(0, 0), (0.095, 0), (0.12, 0.012), (0.1605, 0.087), (0.162, 0.0915), (0.157, 0.093),
-                   (0.152, 0.0905), (0.146, 0.078), (0.09, 0.083), (0, 0.085)],
-          [M.bowl] * 7 + [M.potato, M.potato], segments=20)
-    for i, (x, z, m, yaw) in enumerate(((0.03, 0.02, M.carrot, 10), (-0.05, -0.02, M.carrot, 40),
-                                        (0.06, -0.06, M.carrot, 70), (-0.02, 0.07, M.carrot, 25),
-                                        (-0.08, -0.06, M.potato, 30), (0.01, 0.0, M.potato, 5),
-                                        (0.09, 0.03, M.potato, 50), (-0.06, 0.05, M.potato, 65),
-                                        (0.04, -0.09, M.carrot, 20), (-0.1, 0.0, M.carrot, 80))):
-        y = 0.093 - 0.00004 * (abs(x) + abs(z)) * 100
-        box(f'dice{i}', 0.02, 0.017, 0.02, (x, y, z), m, yaw=yaw, tilt=(12 * (i % 3 - 1), 9 * (i % 2)))
-    for i, (x, z, yaw) in enumerate(((-0.04, 0.025, 15), (0.02, -0.045, 75), (0.075, 0.07, 120))):
+                   (0.152, 0.0905), (0.146, 0.08), (0.11, heap(0.11)), (0.06, heap(0.06)), (0, heap(0))],
+          [M.bowl] * 7 + [M.heap] * 3, segments=18)
+    # (Plain diced boxes, not bevelled: two dozen of them in the 750 triangles.)
+    kinds = (M.carrot, M.potato, M.pepper_red, M.potato, M.carrot, M.potato)
+    for i in range(24):
+        r = 0.135 * math.sqrt((i + 0.5) / 24)
+        a = i * 2.39996
+        x, z = r * math.cos(a), r * math.sin(a)
+        box(f'dice{i}', 0.02, 0.017, 0.02, (x, heap(r) + 0.005, z), kinds[i % 6], yaw=37 * i + 5,
+            tilt=(-z / 0.15 * 16 + 6 * (i % 3 - 1), x / 0.15 * 16))
+    for i, (x, z, yaw) in enumerate(((-0.05, 0.03, 15), (0.045, -0.035, 120))):
         a = math.radians(yaw)
-        F.sweep(f'bean{i}', [(x - 0.016 * math.cos(a), 0.094, z + 0.016 * math.sin(a)),
-                             (x + 0.016 * math.cos(a), 0.094, z - 0.016 * math.sin(a))], 0.0045, M.pea, verts=5)
-    for i, (x, z) in enumerate(((0.0, 0.04), (-0.03, -0.05), (0.05, 0.0), (0.07, -0.03), (-0.07, 0.03), (0.03, 0.07))):
-        ball(f'pea{i}', 0.0055, (x, 0.0945, z), M.pea, seg=6, rings=3)
+        ca, sa = math.cos(a), math.sin(a)
+        p = [(x - 0.018 * ca, z + 0.018 * sa), (x + 0.018 * ca, z - 0.018 * sa)]
+        F.sweep(f'bean{i}', [(u, heap(math.hypot(u, w)) + 0.005, w) for u, w in p], 0.0045, M.pea, verts=5)
+    for i, (x, z) in enumerate(((0.015, 0.045), (-0.07, -0.03), (0.08, 0.04))):
+        ball(f'pea{i}', 0.006, (x, heap(math.hypot(x, z)) + 0.005, z), M.pea, seg=6, rings=3)
     return done('prepBowl')
 
 
@@ -698,8 +713,9 @@ def grillPlatter():
     """The platter from the grill: two sausages, bent and marked by the bars, a marked burger, a cob of corn with
     a pat of butter melting on it, and a sprig of parsley."""
     _platter()
-    for i, (z, yaw, m, b) in enumerate(((-0.04, 12, M.sausage, -0.008), (0.035, -8, M.sausage_b, 0.008))):
-        roll(f'sausage{i}', 0.025, 0.16, (m, M.char), (-0.08, 0.01 + 0.025, z), yaw=yaw, segments=10,
+    # (Sausages 2.8 cm thick, as a butcher's are: they were 5.)
+    for i, (z, yaw, m, b) in enumerate(((-0.04, 12, M.sausage, -0.008), (0.03, -8, M.sausage_b, 0.008))):
+        roll(f'sausage{i}', 0.014, 0.15, (m, M.char), (-0.08, 0.01 + 0.014, z), yaw=yaw, segments=10,
              marks=((-0.55, -0.4), (-0.05, 0.1), (0.45, 0.6)), bend=b)
     _patty('patty', (0.075, 0.01, 0.035))
     _corn('corn', 0.022, 0.13, (0.075, 0.01 + 0.022, -0.075), yaw=-12)
@@ -759,55 +775,55 @@ def _tray():
 
 
 def bakingTray():
-    """A tray of six bread rolls, golden on top, paler round their feet, each slashed across its top."""
+    """A tray of what `treatPlate` serves, fresh from the oven: six chocolate-chip cookies and three iced cupcakes
+    in their pleated cases, each with a cherry."""
     _tray()
-    for i, (x, z) in enumerate(((-0.11, -0.07), (0, -0.07), (0.11, -0.07), (-0.11, 0.07), (0, 0.07), (0.11, 0.07))):
-        top = M.bun if i % 2 else M.bun_dark
-        r = lathe(f'roll{i}', [(0, 0), (0.038, 0), (0.0395, 0.008), (0.036, 0.02), (0.026, 0.033), (0.012, 0.039),
-                               (0, 0.04)],
-                  [M.bun_base, M.bun_base, M.bun_base, top, top, top], at=(x, 0.006, z), segments=14, scale=(1, 0.92))
-        G.jitter(r, 0.001, size=0.02, seed=i * 1.7)
-        a = math.radians(25 + 40 * (i % 3))
-        ca, sa = math.cos(a), math.sin(a)
-        F.sweep(f'slash{i}', [(x - 0.016 * ca, 0.006 + 0.0372, z + 0.016 * sa), (x, 0.006 + 0.0403, z),
-                              (x + 0.016 * ca, 0.006 + 0.0372, z - 0.016 * sa)], None, M.bun_base,
-                profile=[(-0.0006, -0.0025), (0.0006, -0.0025), (0.0006, 0.0025), (-0.0006, 0.0025)],
-                scale=[0.4, 1, 0.4], resolution=2)
+    for i, (x, z) in enumerate(((-0.12, -0.085), (0.0, -0.085), (0.12, -0.085), (-0.12, 0.0), (0.0, 0.0), (0.12, 0.0),
+                                (-0.12, 0.085), (0.0, 0.085), (0.12, 0.085))):
+        if i in (0, 4, 8):
+            _cupcake(f'cupcake{i}', (x, 0.006, z))
+        else:
+            _cookie(f'cookie{i}', (x, 0.006, z), seed=i * 1.3, chips=2, yaw=40 * i)
     return done('bakingTray')
 
 
 def trayDirty():
-    """The tray after baking: a greasy stain with burnt patches, crumbs and a burnt crumb or two."""
+    """The tray after the cookies and cupcakes: a greasy stain with burnt patches, cookie crumbs, smudges of melted
+    chocolate, a dab of icing and a burnt crumb or two."""
     _tray()
     blob('grease', (0.0, 0.006, 0.0), 0.11, 0.075, 0.0012, M.grease, seed=0.3, yaw=5, n=10)
     for i, (x, z, d) in enumerate(((-0.07, -0.025, 0.02), (0.06, 0.03, 0.016), (0.02, -0.045, 0.013),
                                    (-0.11, 0.07, 0.012))):
         blob(f'burnt{i}', (x, 0.0072, z), d, d * 0.7, 0.0012, M.burnt, seed=i * 1.3, yaw=30 * i, n=6)
     for i, (x, z) in enumerate(((-0.1, 0.06), (0.11, -0.05), (0.04, 0.08), (-0.03, -0.09), (0.13, 0.09), (-0.14, -0.08))):
-        chunk(f'crumb{i}', 0.008, (x, 0.0095, z), M.crumb, yaw=25 * i)
+        chunk(f'crumb{i}', 0.008, (x, 0.0095, z), M.cookie, yaw=25 * i)
+    for i, (x, z, d) in enumerate(((0.1, 0.0, 0.012), (-0.02, 0.075, 0.009))):
+        blob(f'chocolate{i}', (x, 0.0072, z), d, d * 0.6, 0.0012, M.chocolate, seed=i + 0.7, yaw=50 * i, n=6)
+    blob('icing', (-0.12, 0.0072, -0.02), 0.008, 0.006, 0.0014, M.icing, seed=2.2, n=6)
     lump('bit', 0.007, (0.08, 0.0065, -0.06), M.burnt, scale=(1.3, 0.6, 1), seed=5.0)
     return done('trayDirty')
 
 
 def _pie_dish(inside_mats, inside):
-    """The glazed pie dish, 33.6 cm across, its outside fluted: `inside` the profile from its rim's inner edge."""
-    lathe('dish', [(0, 0), (0.135, 0), (0.166, 0.057), (0.168, 0.061), (0.158, 0.063)] + inside,
+    """The glazed pie dish, 26 cm across and 4.7 cm deep (a family pie's 23-28 cm), its outside fluted: `inside` the
+    profile from its rim's inner edge."""
+    lathe('dish', [(0, 0), (0.1045, 0), (0.1285, 0.043), (0.13, 0.046), (0.1225, 0.047)] + inside,
           [M.dish, M.dish, M.dish, M.dish] + inside_mats, segments=24, wave=(12, {1: 0.012, 2: 0.01}))
 
 
 def pieDish():
     """A cherry pie in a fluted glazed dish: a crimped rim of pastry and a lattice woven over the red filling."""
-    _pie_dish([M.pastry, M.filling], [(0.148, 0.072), (0, 0.075)])
-    c = crust('rim', [(0.147 * math.cos(TAU * i / 28), 0.147 * math.sin(TAU * i / 28)) for i in range(28)], 0.0725,
-              0.0105, M.pastry_baked, flat=0.95, crimp=14, bulge=0.12, verts=5, closed=True)
-    G.jitter(c, 0.0006, size=0.02, seed=0.8)
-    prof = [(-0.002, -0.011), (0.002, -0.011), (0.002, 0.011), (-0.002, 0.011)]
-    for i, o in enumerate((-0.07, 0, 0.07)):
-        h = math.sqrt(0.146 ** 2 - o ** 2)
-        lo, hi = 0.0775, 0.0805
+    _pie_dish([M.pastry, M.filling], [(0.1145, 0.054), (0, 0.0563)])
+    c = crust('rim', [(0.1138 * math.cos(TAU * i / 26), 0.1138 * math.sin(TAU * i / 26)) for i in range(26)], 0.0545,
+              0.0088, M.pastry_baked, flat=0.95, crimp=13, bulge=0.12, verts=5, closed=True)
+    G.jitter(c, 0.0005, size=0.02, seed=0.8)
+    prof = [(-0.0018, -0.009), (0.0018, -0.009), (0.0018, 0.009), (-0.0018, 0.009)]
+    for i, o in enumerate((-0.054, 0, 0.054)):
+        h = math.sqrt(0.113 ** 2 - o ** 2)
+        lo, hi = 0.0583, 0.061
         for axis in ('x', 'z'):
             ys = [(lo if (j + i + (axis == 'z')) % 2 else hi) for j in range(3)]
-            pts = [(-h, 0.0765), (-0.07, ys[0]), (0, ys[1]), (0.07, ys[2]), (h, 0.0765)]
+            pts = [(-h, 0.0575), (-0.054, ys[0]), (0, ys[1]), (0.054, ys[2]), (h, 0.0575)]
             pts = [(u, y, o) if axis == 'x' else (o, y, u) for u, y in pts]
             F.sweep(f'strip_{axis}{i}', pts, None, M.pastry, profile=prof, up=(0, 0, 1))
     return done('pieDish')
@@ -849,40 +865,60 @@ def pizzaSlice():
     """A plate with a slice of pizza: the base, tomato showing at its cut sides, cheese browned in a spot,
     pepperoni and basil, and its puffed crust along the back."""
     plate()
-    apex, R, A = (0.0, 0.075), 0.15, 21
+    _pizza_slice(WELL)
+    return done('pizzaSlice')
+
+
+def _pizza_slice(y, dz=0.0):
+    """A slice of pizza 15 cm from its tip (to the front) to its crust, its base at height `y`, moved `dz` along the
+    depth."""
+    apex, R, A = (0.0, 0.075 + dz), 0.15, 21
     wedge = [apex] + arc(R, A, apex, 3)
-    prism('base', wedge, WELL, WELL + 0.006, M.dough, M.dough)
-    prism('topping', _shrunk(wedge, 0.04), WELL + 0.006, WELL + 0.011, M.mozzarella, M.sauce)
-    c = crust('crust', arc(R - 0.009, A + 0.5, apex, 8), WELL + 0.012, 0.012, M.dough_baked, flat=0.83, taper=0.8)
+    prism('base', wedge, y, y + 0.006, M.dough, M.dough)
+    prism('topping', _shrunk(wedge, 0.04), y + 0.006, y + 0.011, M.mozzarella, M.sauce)
+    c = crust('crust', arc(R - 0.009, A + 0.5, apex, 8), y + 0.012, 0.012, M.dough_baked, flat=0.83, taper=0.8)
     G.jitter(c, 0.0008, size=0.015, seed=2.4, up=0.3)
     for i, (x, z) in enumerate(((0.0, 0.0), (-0.025, -0.045), (0.028, -0.04))):
-        coin(f'pepperoni{i}', 0.03, 0.0025, (x, WELL + 0.0108, z), M.pepperoni, segments=10)
-    leaf('basil', (0.005, WELL + 0.0122, 0.035), 0.022, 0.013, 30, M.leaf, tilt=4)
-    blob('brown', (-0.012, WELL + 0.0112, 0.02), 0.007, 0.005, 0.0005, M.cheese_brown, seed=1.0, n=6)
-    return done('pizzaSlice')
+        coin(f'pepperoni{i}', 0.03, 0.0025, (x, y + 0.0108, z + dz), M.pepperoni, segments=10)
+    leaf('basil', (0.005, y + 0.0122, 0.035 + dz), 0.022, 0.013, 30, M.leaf, tilt=4)
+    blob('brown', (-0.012, y + 0.0112, 0.02 + dz), 0.007, 0.005, 0.0005, M.cheese_brown, seed=1.0, n=6)
+
+
+def _cookie(name, at, tilt=(0, 0), seed=0.5, chips=1, yaw=0.0):
+    """A chocolate-chip cookie 7.6 cm across, its base at the game point `at`, tilted (Blender x, y degrees), a chip or
+    two showing on its top."""
+    x, y, z = at
+    ck = lathe(name, [(0, 0), (0.036, 0), (0.038, 0.006), (0.033, 0.012), (0, 0.013)], M.cookie, at=at, segments=10,
+               rot=(tilt[0], tilt[1], 0))
+    G.jitter(ck, 0.0009, size=0.01, seed=seed, up=0.5)
+    a = math.radians(yaw)
+    for k, (u, w) in enumerate(((-0.015, -0.008), (0.012, 0.012))[:chips]):
+        dx, dz = u * math.cos(a) - w * math.sin(a), u * math.sin(a) + w * math.cos(a)
+        lift = dz * math.tan(math.radians(tilt[0])) - dx * math.tan(math.radians(tilt[1]))
+        chunk(f'{name}_chip{k}', 0.008, (x + dx, y + 0.0125 + lift, z + dz), M.chocolate, yaw=20 * k + yaw,
+              tilt=(15, 10))
+
+
+def _cupcake(name, at):
+    """A cupcake in a pleated pink case, its icing piped in a swirl to a peak, a cherry with its stalk on top; its base
+    at the game point `at`."""
+    cx, y, cz = at
+    lathe(name, [(0, 0), (0.022, 0), (0.0285, 0.025), (0.0262, 0.0262), (0, 0.0262)],
+          [M.cupcake_case, M.cupcake_case, M.cupcake_case, M.icing], at=at, segments=16, wave=(8, {2: 0.07, 3: 0.07}))
+    swirl(f'{name}_icing', (cx, y + 0.024, cz), 0.019, 0.025, M.icing, tube=0.0095, turns=2.0, steps=10, star=6)
+    ball(f'{name}_cherry', 0.0075, (cx, y + 0.0555, cz), M.tomato, seg=6, rings=5)
+    G.kit.tube(F, f'{name}_stalk', [(cx, y + 0.0605, cz), (cx + 0.005, y + 0.0632, cz - 0.002),
+                                    (cx + 0.011, y + 0.0625, cz - 0.004)], 0.0008, M.leaf, verts=4, round=1)
 
 
 def treatPlate():
     """A plate of treats: chocolate-chip cookies, one leaning on the others, and a cupcake in a pleated case,
-    its icing piped in a swirl to a peak, a cherry on top."""
+    its icing piped in a swirl to a peak, a cherry on top (all in the well, clear of the rim)."""
     plate()
-    cookies = (((-0.042, WELL, 0.01), (0, 0)), ((0.04, WELL, 0.025), (0, 0)), ((0.0, WELL + 0.012, -0.012), (9, -6)))
-    for i, ((x, y, z), tilt) in enumerate(cookies):
-        ck = lathe(f'cookie{i}', [(0, 0), (0.036, 0), (0.038, 0.006), (0.033, 0.012), (0, 0.013)], M.cookie,
-                   at=(x, y, z), segments=10, rot=(tilt[0], tilt[1], 0))
-        G.jitter(ck, 0.0009, size=0.01, seed=i + 0.5, up=0.5)
-        for k, (dx, dz) in enumerate(((-0.015, -0.008), (0.012, 0.012))[:2 if i == 2 else 1]):
-            lift = (dz * math.tan(math.radians(tilt[0])) - dx * math.tan(math.radians(tilt[1]))) if i == 2 else 0
-            chunk(f'chip{i}{k}', 0.008, (x + dx, y + 0.0125 + lift, z + dz), M.chocolate, yaw=20 * k + 10 * i,
-                  tilt=(15, 10))
-    cx, cz = 0.058, -0.066
-    lathe('cupcake', [(0, 0), (0.022, 0), (0.0285, 0.025), (0.0262, 0.0262), (0, 0.0262)],
-          [M.cupcake_case, M.cupcake_case, M.cupcake_case, M.icing], at=(cx, WELL, cz), segments=16,
-          wave=(8, {2: 0.07, 3: 0.07}))
-    swirl('icing', (cx, WELL + 0.024, cz), 0.019, 0.025, M.icing, tube=0.0095, turns=2.0, steps=10, star=6)
-    ball('cherry', 0.0075, (cx, WELL + 0.0555, cz), M.tomato, seg=6, rings=5)
-    G.kit.tube(F, 'cherry_stalk', [(cx, WELL + 0.0605, cz), (cx + 0.005, WELL + 0.0632, cz - 0.002),
-                                   (cx + 0.011, WELL + 0.0625, cz - 0.004)], 0.0008, M.leaf, verts=4, round=1)
+    for i, (at, tilt) in enumerate((((-0.05, WELL, 0.022), (0, 0)), ((0.036, WELL, 0.036), (0, 0)),
+                                    ((-0.01, WELL + 0.012, -0.004), (9, -6)))):
+        _cookie(f'cookie{i}', at, tilt, seed=i + 0.5, chips=2 if i == 2 else 1, yaw=10 * i)
+    _cupcake('cupcake', (0.042, WELL, -0.05))
     return done('treatPlate')
 
 
@@ -890,7 +926,7 @@ def pieSlice():
     """A plate with a slice of cherry pie: pastry under and over the red filling, its crimped edge along the
     back, filling run out at its tip, and a piped rosette of cream with a mint leaf."""
     plate()
-    apex, R, A = (-0.015, 0.06), 0.125, 24
+    apex, R, A = (-0.015, 0.055), 0.11, 24  # (a sixth of the 26 cm pie: 11 cm from its tip to its crust)
     wedge = [apex] + arc(R, A, apex, 3)
     prism('pastry_base', wedge, WELL, WELL + 0.008, M.pastry, M.pastry_baked)
     prism('filling', _shrunk(wedge, 0.03), WELL + 0.008, WELL + 0.036, M.filling, M.filling)
@@ -901,7 +937,7 @@ def pieSlice():
     G.jitter(c, 0.0005, size=0.015, seed=3.0)
     for i, (x, z) in enumerate(((-0.015, -0.01), (-0.015, -0.04))):
         box(f'slit{i}', 0.022, 0.002, 0.004, (x, WELL + 0.0435, z), M.filling)
-    blob('ooze', (-0.015, WELL, 0.068), 0.014, 0.01, 0.0014, M.filling, seed=0.6, n=7)
+    blob('ooze', (-0.015, WELL, 0.063), 0.014, 0.01, 0.0014, M.filling, seed=0.6, n=7)
     swirl('cream', (0.07, WELL, 0.035), 0.014, 0.03, M.cream, tube=0.008, turns=1.8, steps=11)
     leaf('mint', (0.066, WELL + 0.03, 0.033), 0.016, 0.009, 50, M.leaf, tilt=20)
     return done('pieSlice')
@@ -940,22 +976,26 @@ def sandwich():
     nx, nz = 0.052, 0.058
     n = math.hypot(nx, nz)
     for half, pts, cut, sign in _halves((0.058, 0.052)):
-        off = (sign * nx / n * 0.008, sign * nz / n * 0.008)
-        y = WELL
-        for layer, h, m, grow in (('bread_lo', 0.019, M.bread, 0), ('lettuce', 0.006, M.lettuce, 0.08),
-                                  ('cheese', 0.004, M.cheese, 0.05), ('tomato', 0.007, M.tomato, -0.04),
-                                  ('bread_hi', 0.019, M.bread, 0)):
-            if m is M.bread:
-                sides = [M.bread if k == cut else M.crust for k in range(len(pts))]
-                prism(f'{layer}_{half}', pts, y, y + h, M.bread, M.crust, sides=sides, at=off)
-            elif m is M.lettuce:
-                lt = F.extrude(f'lettuce_{half}', [(x + off[0], z + off[1]) for x, z in _frill(pts, 0.07, 0.004)], 0.004,
-                               (0, y + 0.003, 0), M.lettuce, plane='top')
-                G.jitter(lt, 0.0016, size=0.01, seed=3.0 if sign > 0 else 7.0, up=1.0)
-            else:
-                prism(f'{layer}_{half}', _shrunk(pts, -grow), y, y + h, m, m, at=off)
-            y += h
+        _sandwich_half(half, pts, cut, (sign * nx / n * 0.008, sign * nz / n * 0.008), WELL, 3.0 if sign > 0 else 7.0)
     return done('sandwich')
+
+
+def _sandwich_half(half, pts, cut, off, y, seed):
+    """Half a sandwich over the outline `pts` (its side `cut` the cut, the crumb showing; crusts round the rest), moved
+    `off`, from height `y`: bread, lettuce frilled out past it, cheese, tomato, bread."""
+    for layer, h, m, grow in (('bread_lo', 0.019, M.bread, 0), ('lettuce', 0.006, M.lettuce, 0.08),
+                              ('cheese', 0.004, M.cheese, 0.05), ('tomato', 0.007, M.tomato, -0.04),
+                              ('bread_hi', 0.019, M.bread, 0)):
+        if m is M.bread:
+            sides = [M.bread if k == cut else M.crust for k in range(len(pts))]
+            prism(f'{layer}_{half}', pts, y, y + h, M.bread, M.crust, sides=sides, at=off)
+        elif m is M.lettuce:
+            lt = F.extrude(f'lettuce_{half}', [(x + off[0], z + off[1]) for x, z in _frill(pts, 0.07, 0.004)], 0.004,
+                           (0, y + 0.003, 0), M.lettuce, plane='top')
+            G.jitter(lt, 0.0016, size=0.01, seed=seed, up=1.0)
+        else:
+            prism(f'{layer}_{half}', _shrunk(pts, -grow), y, y + h, m, m, at=off)
+        y += h
 
 
 def _fork(name, at, yaw, pitch=0.0):
@@ -979,36 +1019,105 @@ def _knife(name, at, yaw, pitch=0.0):
 
 def cakeSlice():
     """A plate with a slice of the café's layer cake: two sponge layers with jam and cream between, white icing over
-    the top and its round back, a strawberry on it."""
+    the top and round its back (the cut sides show the layers), a strawberry standing on it, its green calyx spread on
+    the icing and its seeds showing."""
     plate()
     apex, R, A = (-0.012, 0.055), 0.115, 20
     wedge = [apex] + arc(R, A, apex, 3)
     y = WELL
-    for name, h, top, side in (('sponge0', 0.03, M.sponge, M.sponge_crumb), ('jam', 0.004, M.cake_jam, M.cake_jam),
-                               ('cream', 0.006, M.cake_icing, M.cake_icing), ('sponge1', 0.03, M.sponge, M.sponge_crumb)):
-        prism(name, wedge, y, y + h, top, side)
+    for name, h, top, cut in (('sponge0', 0.03, M.sponge, M.sponge_crumb), ('jam', 0.004, M.cake_jam, M.cake_jam),
+                              ('cream', 0.006, M.cake_icing, M.cake_icing), ('sponge1', 0.03, M.sponge, M.sponge_crumb)):
+        # (Its cut sides the layer's own; its round back iced.)
+        prism(name, wedge, y, y + h, top, cut, sides=[cut] + [M.cake_icing] * (len(wedge) - 2) + [cut])
         y += h
     prism('icing', wedge, y, y + 0.005, M.cake_icing, M.cake_icing, sides=[M.sponge_crumb] + [M.cake_icing] * (len(wedge) - 2)
           + [M.sponge_crumb])
     back = arc(R, A, apex, 3)
-    lathe('berry', [(0, 0), (0.011, 0.002), (0.013, 0.012), (0.009, 0.022), (0, 0.026)], M.cake_berry,
-          at=(back[1][0] * 0.45 + apex[0] * 0.55, y + 0.005, back[1][1] * 0.45 + apex[1] * 0.55), segments=8)
+    bx, bz = back[1][0] * 0.45 + apex[0] * 0.55, back[1][1] * 0.45 + apex[1] * 0.55
+    top = y + 0.005
+    # The strawberry: a cone with round shoulders, its tip up, on a star of a calyx.
+    lathe('berry', [(0, 0), (0.0115, 0.002), (0.0135, 0.009), (0.011, 0.018), (0.0055, 0.026), (0, 0.03)], M.cake_berry,
+          at=(bx, top, bz), segments=8)
+    F.extrude('calyx', _star(0.016, 0.38, n=5), 0.0012, (bx, top + 0.0012, bz), M.leaf, plane='top', rot=(0, 0, 15))
+    for k, (a, h) in enumerate(((20, 0.012), (140, 0.014), (260, 0.011), (80, 0.021), (200, 0.02), (320, 0.019))):
+        r = 0.0128 if h < 0.015 else 0.0098
+        box(f'seed{k}', 0.0016, 0.0024, 0.0016, (bx + r * math.cos(math.radians(a)), top + h,
+                                                  bz + r * math.sin(math.radians(a))), M.berry_seed, yaw=a)
     return done('cakeSlice')
+
+
+def freshPlate():
+    """Something fresh from the garden: a salad on the dinner plate, eaten with a fork: a heap of torn leaves in three
+    greens, wedges of tomato, cucumber and radish sliced over it."""
+    plate()
+
+    def greens(name, at, r, yaw, tilt, material, seed):
+        pts = [(r * (1.0 if k % 2 == 0 else 0.8) * math.cos(TAU * k / 10), r * 0.72 * (1.0 if k % 2 == 0 else 0.8)
+                * math.sin(TAU * k / 10)) for k in range(10)]
+        g = F.extrude(name, pts, 0.0018, (at[0], at[1] + 0.0009, at[2]), material, plane='top', rot=(tilt, 0, yaw))
+        G.jitter(g, 0.0032, size=0.014, seed=seed, up=1.0)
+    for i, (x, y, z, r, yaw, tilt, m) in enumerate((
+            (-0.035, 0.006, 0.022, 0.05, 20, 16, M.lettuce), (0.035, 0.006, -0.018, 0.048, 110, -18, M.lettuce_pale),
+            (0.005, 0.006, 0.048, 0.045, 160, 20, M.leaf), (-0.02, 0.016, -0.032, 0.044, 70, -22, M.lettuce),
+            (0.01, 0.026, 0.006, 0.04, 140, 14, M.lettuce_pale), (-0.03, 0.03, 0.002, 0.034, 40, -16, M.leaf))):
+        greens(f'greens{i}', (x, WELL + y, z), r * 1.15, yaw, tilt, m, seed=1.1 * i + 0.4)
+    # Tomato wedges lying on their skins, the cut flesh up.
+    for i, (x, z, yaw, y) in enumerate(((0.055, 0.03, 30, 0.004), (0.04, 0.055, 100, 0.006), (-0.06, 0.045, -20, 0.006))):
+        a = math.radians(yaw)
+        ca, sa = math.cos(a), math.sin(a)
+        half = [(0.024 * math.cos(math.pi * k / 4), 0.011 * math.sin(math.pi * k / 4)) for k in range(5)]
+        pts = [(x + u * ca - w * sa, z + u * sa + w * ca) for u, w in half]
+        prism(f'tomato{i}', pts, WELL + y, WELL + y + 0.013, M.tomato_flesh, M.tomato,
+              sides=[M.tomato] * 4 + [M.tomato_flesh])
+    for i, (x, y, z, t) in enumerate(((-0.008, 0.036, -0.004, 8), (0.025, 0.031, 0.02, -10), (-0.045, 0.022, -0.045, 12),
+                                      (0.062, 0.012, -0.04, -8))):
+        coin(f'cucumber{i}', 0.03, 0.004, (x, WELL + y, z), (M.cucumber, M.cucumber_flesh), segments=8, cup=0.0,
+             tilt=(t, -t * 0.7))
+    for i, (x, y, z, t) in enumerate(((0.012, 0.037, -0.028, -10), (-0.03, 0.03, 0.035, 12), (0.045, 0.016, -0.065, 6))):
+        coin(f'radish{i}', 0.022, 0.0035, (x, WELL + y, z), (M.radish, M.radish_white), segments=8, cup=0.0,
+             tilt=(t, t * 0.5))
+    return done('freshPlate')
 
 
 def plateDirty():
     """A plate after the meal: a smear of gravy, a streak of sauce, crumbs, a pea left over, and the knife and
     fork laid side by side."""
     plate()
-    blob('smear', (0.02, WELL, 0.02), 0.065, 0.045, 0.0016, M.smear, seed=1.4, yaw=-15)
-    blob('sauce', (-0.04, WELL + 0.0004, 0.045), 0.035, 0.011, 0.0016, M.smear_sauce, seed=0.2, yaw=25, n=7)
-    for i, (x, z) in enumerate(((-0.05, -0.02), (0.06, 0.05), (0.0, 0.07), (-0.07, 0.02))):
-        chunk(f'crumb{i}', 0.008, (x, WELL + 0.004, z), M.crumb, yaw=40 * i)
-    ball('pea', 0.0042, (0.045, WELL + 0.0036, -0.03), M.pea, seg=6, rings=4)
+    _leftovers(0.0, 0.0, 0.0)
     # side by side at twenty past four, the knife's handle resting on the rim
     _fork('fork', (-0.0642, WELL + 0.0003, -0.0301), 35)
     _knife('knife', (-0.067, WELL + 0.0003, -0.061), 35, pitch=1.5)
     return done('plateDirty')
+
+
+def _leftovers(x, y, z, crumbs=4):
+    """What a meal leaves on a plate whose foot is at the game point (`x`, `y`, `z`): a smear of gravy, a streak of
+    sauce, crumbs and a pea."""
+    blob('smear', (x + 0.02, y + WELL, z + 0.02), 0.065, 0.045, 0.0016, M.smear, seed=1.4, yaw=-15)
+    blob('sauce', (x - 0.04, y + WELL + 0.0004, z + 0.045), 0.035, 0.011, 0.0016, M.smear_sauce, seed=0.2, yaw=25, n=7)
+    for i, (u, w) in enumerate(((-0.05, -0.02), (0.06, 0.05), (0.0, 0.07), (-0.07, 0.02))[:crumbs]):
+        chunk(f'crumb{i}', 0.008, (x + u, y + WELL + 0.004, z + w), M.crumb, yaw=40 * i)
+    ball('pea', 0.0042, (x + 0.045, y + WELL + 0.0036, z - 0.03), M.pea, seg=6, rings=4)
+
+
+STACK = 0.0095  # how far each plate of a stack stands on the one under it: its foot in the well below
+
+
+def plateStackDirty():
+    """Three dirty plates stacked to be carried to the sink in both hands (the sim shows it when two or more dirty
+    plates are carried at once): each the dinner plate, a little askew on the one below, its foot in that one's well;
+    the top one's leftovers and fork, a drip of gravy down the middle one's rim and a scrap of lettuce hanging over
+    its edge."""
+    stack = ((0.0, 0.0), (0.007, -0.004), (-0.004, 0.006))
+    for k, (x, z) in enumerate(stack):
+        plate(f'plate{k}', (x, STACK * k, z), covered=k < 2)
+    x, z = stack[2]
+    _leftovers(x, 2 * STACK, z, crumbs=2)
+    _fork('fork', (x - 0.0642, 2 * STACK + WELL + 0.0003, z - 0.0301), 35)
+    # (Where the middle plate shows past the top one's rim: its +x edge and its back.)
+    blob('drip', (0.007 + 0.139, STACK + 0.0165, -0.004 + 0.01), 0.004, 0.01, 0.0012, M.smear, seed=0.9, n=6)
+    leaf('lettuce', (0.004, STACK + 0.0168, -0.004 - 0.138), 0.03, 0.018, 70, M.lettuce, tilt=-18)
+    return done('plateStackDirty')
 
 
 # --- the quick foods, each its own (review M-held-01: they borrowed the plates and the prep bowl) -----------------
@@ -1021,7 +1130,7 @@ def _dessert_bowl():
 
 def iceCream():
     """A dessert bowl of ice cream from the freezer: three scoops (vanilla, strawberry, chocolate), each with the
-    ragged lip a scoop leaves, chocolate sauce trickled over them, a fan wafer and a spoon."""
+    ragged lip a scoop leaves, chocolate sauce trickled over the vanilla and the strawberry, and a fan wafer. (No spoon: the one in the hand eats it, actions.ts `EATEN_WITH`.)"""
     _dessert_bowl()
     for i, (x, z, m, s) in enumerate(((-0.018, 0.012, M.vanilla, 1.0), (0.02, 0.008, M.strawberry, 0.95),
                                       (0.0, -0.022, M.choc_ice, 0.9))):
@@ -1029,22 +1138,68 @@ def iceCream():
                                  (0.02 * s, 0.039 * s), (0, 0.044 * s)], m,
                    at=(x, 0.026, z), segments=10, wave=(5, {2: 0.12}), rot=(0, 0, 25 * i))
         G.jitter(sc, 0.0012, size=0.01, seed=1.3 + i)
-    G.kit.tube(F, 'sauce', [(-0.035, 0.05, 0.02), (-0.02, 0.0695, 0.012), (-0.005, 0.062, 0.0), (0.008, 0.063, -0.018),
-                            (0.02, 0.066, 0.004), (0.035, 0.054, 0.012)], 0.0022, M.chocolate, verts=4, round=1)
+        if m is not M.choc_ice:
+            _sauce(f'sauce{i}', (x, 0.026, z), s, seed=i)
     box('wafer', 0.036, 0.004, 0.026, (-0.004, 0.077, -0.004), M.wafer, yaw=30, tilt=(55, 10), bevel=0.0008)
-    _spoon((0.025, 0.07, 0.03), 35, 16)
     return done('iceCream')
 
 
+def _sauce(name, at, s, seed=0):
+    """Chocolate sauce trickled over a scoop `s` its size whose base is at the game point `at`: a line zigzagging over
+    its top and running down its side in a drip, lying on it (over its jitter)."""
+    def surface(u, w):
+        """The scoop's height (its profile, `iceCream`) at (`u`, `w`) from its middle, and 2.5 mm over it."""
+        r = math.hypot(u, w) / s
+        h = 0.044 - 0.005 * r / 0.02 if r < 0.02 else 0.039 - 0.017 * (r - 0.02) / 0.01
+        return at[1] + h * s + 0.0025
+    c, d = math.cos(seed * 1.9), math.sin(seed * 1.9)
+    path = [(-0.022, -0.006), (-0.012, 0.012), (-0.004, -0.014), (0.006, 0.013), (0.014, -0.01), (0.022, 0.006),
+            (0.027, 0.008), (0.031, 0.009)]
+    pts = []
+    for u, w in path:
+        u, w = (u * c - w * d) * s, (u * d + w * c) * s
+        pts.append((at[0] + u, surface(u, w), at[2] + w))
+    G.kit.tube(F, name, pts, 0.0024, M.chocolate, verts=4, round=1)
+
+
 def bowlDirty():
-    """The dessert bowl eaten from: a film of melted ice cream in the bottom, a streak of chocolate, a drip down the
-    side and the spoon left in it."""
+    """The dessert bowl eaten from: a film of melted ice cream lying on its sloping inside, a streak of chocolate, a
+    drip of strawberry run down from the rim, and the spoon left in it."""
     _dessert_bowl()
-    blob('melt', (0.004, 0.012, 0.0), 0.034, 0.028, 0.0016, M.melt, seed=0.5, yaw=15)
-    blob('melt_choc', (-0.012, 0.0132, -0.01), 0.014, 0.008, 0.0012, M.choc_ice, seed=1.5, yaw=-30, n=6)
-    blob('drip', (0.02, 0.0134, 0.012), 0.009, 0.006, 0.001, M.strawberry, seed=2.5, n=6)
-    _spoon((0.012, 0.022, 0.012), 30, 33)
+    _film('melt', (0.004, -0.002), 0.036, 0.03, M.melt, seed=0.5, yaw=15)
+    _film('melt_choc', (-0.016, -0.014), 0.016, 0.009, M.choc_ice, seed=1.5, yaw=-30, lift=0.0016)
+    _film('drip', (0.034, 0.02), 0.016, 0.006, M.strawberry, seed=2.5, yaw=-30, lift=0.0016)
+    _spoon((0.012, 0.024, 0.012), 30, 33)
     return done('bowlDirty')
+
+
+def _film(name, at, rx, rz, material, seed=0.0, yaw=0.0, lift=0.0012, n=10):
+    """A film of something melted on the dessert bowl's inside (`_dessert_bowl`), about `rx` by `rz` round the game
+    (x, depth) `at`, lying `lift` over the glaze: its floor's middle at 1.2 cm, the sides rising 0.6 m a metre out."""
+    a0 = math.radians(yaw)
+    ring = []
+    for i in range(n):
+        a = TAU * i / n
+        k = 1 + 0.16 * math.sin(3 * a + seed) + 0.09 * math.sin(5 * a + 2.3 * seed)
+        u, w = rx * k * math.cos(a), rz * k * math.sin(a)
+        ring.append((at[0] + u * math.cos(a0) - w * math.sin(a0), at[1] + u * math.sin(a0) + w * math.cos(a0)))
+    bm = bmesh.new()
+
+    def vert(x, z):
+        return bm.verts.new(F.at(x, 0.012 + 0.6038 * math.hypot(x, z) + lift, z))
+    mid = vert(*at)
+    half = [vert((at[0] + x) / 2, (at[1] + z) / 2) for x, z in ring]
+    rim = [vert(x, z) for x, z in ring]
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((mid, half[i], half[j]))
+        bm.faces.new((half[i], rim[i], rim[j], half[j]))
+    bm.normal_update()
+    for f in bm.faces:
+        if f.normal.z < 0:
+            f.normal_flip()
+        f.smooth = True
+    return _object(name, bm, [material], (0, 0, 0), (0, 0, 0))
 
 
 def toast():
@@ -1054,17 +1209,22 @@ def toast():
     nx, nz = 0.05, 0.055
     n = math.hypot(nx, nz)
     for half, pts, cut, sign in _halves((0.055, 0.05)):
-        off = (sign * nx / n * 0.01, sign * nz / n * 0.01)
-        sides = [M.bread if k == cut else M.toast_crust for k in range(len(pts))]
-        prism(f'slice_{half}', pts, WELL, WELL + 0.013, M.toast, M.toast_crust, sides=sides, at=off)
-        cx = sum(p[0] for p in pts) / len(pts) + off[0]
-        cz = sum(p[1] for p in pts) / len(pts) + off[1]
-        blob(f'scorch_{half}', (cx - 0.015 * sign, WELL + 0.013, cz + 0.012 * sign), 0.01, 0.006, 0.0004,
-             M.toast_crust, seed=sign, n=6)
-        blob(f'pool_{half}', (cx, WELL + 0.013, cz), 0.015, 0.012, 0.0006, M.butter, seed=sign * 2, n=7)
-        box(f'butter_{half}', 0.018, 0.005, 0.016, (cx, WELL + 0.0154, cz), M.butter, yaw=20 if sign > 0 else -10,
-            bevel=0.0018)
+        _toast_half(half, pts, cut, (sign * nx / n * 0.01, sign * nz / n * 0.01), WELL, sign)
     return done('toast')
+
+
+def _toast_half(half, pts, cut, off, y, sign):
+    """Half a slice of toast over the outline `pts` (its side `cut` the cut), moved `off`, from height `y`: toasted on
+    top, dark crusts, a scorch, a pat of butter melting into a pool."""
+    sides = [M.bread if k == cut else M.toast_crust for k in range(len(pts))]
+    prism(f'slice_{half}', pts, y, y + 0.013, M.toast, M.toast_crust, sides=sides, at=off)
+    cx = sum(p[0] for p in pts) / len(pts) + off[0]
+    cz = sum(p[1] for p in pts) / len(pts) + off[1]
+    blob(f'scorch_{half}', (cx - 0.015 * sign, y + 0.013, cz + 0.012 * sign), 0.01, 0.006, 0.0004,
+         M.toast_crust, seed=sign, n=6)
+    blob(f'pool_{half}', (cx, y + 0.013, cz), 0.015, 0.012, 0.0006, M.butter, seed=sign * 2, n=7)
+    box(f'butter_{half}', 0.018, 0.005, 0.016, (cx, y + 0.0154, cz), M.butter, yaw=20 if sign > 0 else -10,
+        bevel=0.0018)
 
 
 def smoothie():
@@ -1090,7 +1250,7 @@ def smoothie():
 
 def noodles():
     """A takeaway noodle pail of white card with a red band: its four flaps standing open, a wire handle, noodles
-    and spring onion heaped in its top and a pair of chopsticks standing in it."""
+    and spring onion heaped in its top. (No chopsticks: the pair in the hand eats them, actions.ts `EATEN_WITH`.)"""
     def ring(y, hw):
         return [(x, y, z) for x, z in rrect(hw, hw, n=16, square=9)]
 
@@ -1118,9 +1278,6 @@ def noodles():
     pts = [(-0.0488 * math.cos(math.radians(a)), 0.088 + 0.07 * math.sin(math.radians(a)), 0.0)
            for a in range(0, 181, 15)]
     G.kit.tube(F, 'wire', pts, 0.0011, M.wire, verts=4, round=1)
-    for i, dx in enumerate((-0.006, 0.006)):
-        F.sweep(f'chopstick{i}', [(0.01 + dx, 0.06, -0.005), (0.033 + dx * 2, 0.268, -0.03)], None, M.chopstick,
-                profile=[(-0.0035, -0.0035), (0.0035, -0.0035), (0.0035, 0.0035), (-0.0035, 0.0035)], scale=[0.5, 1.0])
     return done('noodles')
 
 
@@ -1143,8 +1300,20 @@ def takeout():
     for h, hw, hd in ((0, 0.095, 0.07), (0.005, 0.089, 0.064), (0.0035, 0.085, 0.06), (0, 0.091, 0.066)):
         lid.append(_hinged([(x, h, 0.07 + z) for x, z in rrect(hw, hd, n=12, square=8)]))
     loft('lid', lid, M.kraft_fold, angle=30)
-    # the burger
-    bx, bz, y = -0.04, 0.005, 0.0045
+    y = 0.0045
+    _burger(-0.04, y, 0.005)
+    # the fries, heaped beside it
+    for i in range(8):
+        a = 37 * i
+        box(f'fry{i}', 0.056 - 0.004 * (i % 3), 0.008, 0.008,
+            (0.045 + 0.01 * math.cos(math.radians(a * 3)), y + 0.016 + 0.009 * (i % 3),
+             0.01 + 0.03 * math.sin(math.radians(a * 2))), M.fries, yaw=a, tilt=(0, 18 + 9 * (i % 3)))
+    return done('takeout')
+
+
+def _burger(bx, y, bz):
+    """A burger 8.8 cm across, its base at the game point (`bx`, `y`, `bz`): a sesame bun, a patty, cheese, lettuce
+    and tomato."""
     lathe('bun_base', [(0, 0), (0.04, 0), (0.0425, 0.008), (0.04, 0.016), (0, 0.016)], M.bun_base, at=(bx, y, bz),
           segments=10)
     _patty('patty', (bx, y + 0.016, bz), d=0.09, h=0.015, marks=False)
@@ -1160,13 +1329,6 @@ def takeout():
         h = 0.036 - 0.01 * (dx * dx + dz * dz) / 0.0004
         box(f'sesame{i}', 0.004, 0.0015, 0.0025, (bx + dx, y + 0.04 + h, bz + dz), M.sesame, yaw=37 * i,
             tilt=(-dz * 900, dx * 900))
-    # the fries, heaped beside it
-    for i in range(8):
-        a = 37 * i
-        box(f'fry{i}', 0.056 - 0.004 * (i % 3), 0.008, 0.008,
-            (0.045 + 0.01 * math.cos(math.radians(a * 3)), y + 0.016 + 0.009 * (i % 3),
-             0.01 + 0.03 * math.sin(math.radians(a * 2))), M.fries, yaw=a, tilt=(0, 18 + 9 * (i % 3)))
-    return done('takeout')
 
 
 # --- the dishes emptied, each the dish that went in (review M-held-02) ----------------------------------------------
@@ -1212,11 +1374,11 @@ def pizzaBoardDirty():
 def pieDishDirty():
     """The pie dish emptied: a red smear of filling over the bottom, pastry crumbs against its sides and the pie
     server left in it."""
-    _pie_dish([M.dish, M.residue], [(0.128, 0.01), (0, 0.01)])
-    blob('filling', (0.01, 0.01, 0.0), 0.08, 0.06, 0.0016, M.smear_filling, seed=0.4, yaw=20, n=10)
+    _pie_dish([M.dish, M.residue], [(0.099, 0.01), (0, 0.01)])
+    blob('filling', (0.01, 0.01, 0.0), 0.064, 0.048, 0.0016, M.smear_filling, seed=0.4, yaw=20, n=10)
     for i, a in enumerate((20, 95, 170, 230, 300, 340)):
         c, s = math.cos(math.radians(a)), math.sin(math.radians(a))
-        chunk(f'pastry{i}', 0.012 + 0.002 * (i % 2), (0.112 * c, 0.016, 0.112 * s), M.pastry_baked, yaw=a, tilt=(15, 10))
+        chunk(f'pastry{i}', 0.011 + 0.002 * (i % 2), (0.088 * c, 0.016, 0.088 * s), M.pastry_baked, yaw=a, tilt=(15, 10))
     blade = [(0.0, 0.0), (0.06, -0.028), (0.066, -0.026), (0.07, -0.012), (0.07, 0.012), (0.066, 0.026), (0.06, 0.028)]
     F.extrude('server', [(u - 0.08, v) for u, v in blade], 0.0016, (0.0, 0.0118, -0.02), M.steel, plane='top',
               rot=(0, 0, -20))
@@ -1228,7 +1390,7 @@ def pieDishDirty():
 # --- tools: on the station while a resident cooks ---------------------------------------------------------------
 def board():
     """The chopping board: rounded corners, a juice groove round its face and a slot to hang it by; a carrot half
-    chopped into coins, chopped parsley and the chef's knife."""
+    chopped into coins and chopped parsley. (The knife is in the cook's hand: `knife`, actions.ts `PROPS.knife`.)"""
     hole = [(0.152 + u, v) for u, v in G.rounded_rect(0.016, 0.07, 0.008, corner=2)]
     F.extrude('board', G.rounded_rect(0.34, 0.24, 0.02, corner=2), 0.025, (0, 0.0125, 0), M.board, plane='top',
               holes=[hole], bevel=0.004, bevel_segments=1)
@@ -1244,18 +1406,6 @@ def board():
     for i, (x, z, yaw) in enumerate(((0.02, 0.07, 10), (0.04, 0.05, 40), (0.03, 0.09, 70), (0.055, 0.075, 20),
                                      (0.065, 0.055, 120))):
         leaf(f'parsley{i}', (x, 0.0252, z), 0.014, 0.009, yaw, M.pea, tilt=10 * (i % 2), n=3)
-    with G.new_parts() as knife:
-        o = [(-0.0575, 0.01), (-0.035, -0.004), (0.0, -0.012), (0.045, -0.015), (0.06, -0.015), (0.06, 0.015),
-             (-0.045, 0.015)]
-        G.extrude('blade', o, 0.002, at=(0.0, 0.0, 0.0), material=M.steel, plane='XY')
-        G.cube('bolster', (0.01, 0.02, 0.012), at=(0.064, 0.005, 0.005), material=M.steel)
-        G.cube('handle', (0.07, 0.016, 0.018), at=(0.103, 0.006, 0.007), material=M.grip, bevel=0.005,
-               bevel_segments=1)
-        for k, u in enumerate((0.085, 0.12)):
-            G.cylinder(f'rivet{k}', 0.0022, 0.0186, at=(u, 0.006, 0.007), material=M.steel, verts=6)
-    k = G.join(knife, 'knife', origin=(0, 0, 0))
-    k.location = F.at(0.05, 0.027, -0.07)
-    k.rotation_euler = (0, 0, math.radians(15))
     return done('board')
 
 
@@ -1300,8 +1450,8 @@ def pan():
 def grillFood():
     """On the grill: two sausages, bent and marked by the bars, and a burger with its rounded, rough edge and
     the bars' marks across it."""
-    for i, (z, m, b) in enumerate(((-0.0526, M.sausage, -0.007), (0.033, M.sausage_b, -0.007))):
-        roll(f'sausage{i}', 0.0225, 0.16, (m, M.char), (-0.08, 0.0225, z), segments=12, bend=b,
+    for i, (z, m, b) in enumerate(((-0.045, M.sausage, -0.007), (0.027, M.sausage_b, -0.007))):
+        roll(f'sausage{i}', 0.014, 0.15, (m, M.char), (-0.08, 0.014, z), segments=12, bend=b,
              marks=((-0.55, -0.4), (-0.05, 0.1), (0.45, 0.6)))
     _patty('patty', (0.08, 0, 0.0), h=0.03)
     return done('grillFood')
@@ -1309,25 +1459,28 @@ def grillFood():
 
 def mixingBowl():
     """On the counter while batter is mixed or pastry made (`mix`): a deep glazed bowl, its rim rolled, of batter
-    stirred into a swirl, a wooden spoon standing in it, leaning on the far rim (+depth: away from the cook, as
-    the pan's handle)."""
+    stirred into a swirl, a wooden spoon left in it, its bowl in the batter and its handle over the far rim (+depth:
+    away from the cook, who whisks: actions.ts `PROPS.whisk`)."""
     lathe('bowl', [(0, 0), (0.07, 0), (0.085, 0.01), (0.128, 0.104), (0.13, 0.109), (0.1265, 0.113), (0.1215, 0.1115),
-                   (0.117, 0.1), (0.06, 0.0745), (0, 0.075)],
-          [M.mixing] * 7 + [M.batter, M.batter], segments=20)
+                   (0.117, 0.1), (0.111, 0.086), (0.06, 0.0848), (0, 0.085)],
+          [M.mixing] * 8 + [M.batter, M.batter], segments=20)
+    # The swirl the whisk leaves, coiling in on the batter (its top 0.85 cm up), riding on it.
     pts = []
     for i in range(17):
         f = i / 16
         a = TAU * 1.6 * f
         rr = 0.09 * (1 - f) + 0.01
-        pts.append((0.008 + rr * math.cos(a), 0.0752 + 0.002 * f, -0.006 + rr * math.sin(a)))
+        pts.append((0.008 + rr * math.cos(a), 0.0862 + 0.0015 * f, -0.006 + rr * math.sin(a)))
     F.sweep('ridge', pts, None, M.batter, profile=[(-0.002, -0.004), (0.0008, -0.0025), (0.0008, 0.0025),
                                                    (-0.002, 0.004)], scale=lambda f: 1 - 0.5 * f)
-    # the spoon: a handle tapering down to the bowl, buried in the batter
-    s0, s1 = Vector((0.0, 0.07, 0.02)), Vector((0.03, 0.27, 0.13))
-    d = (s1 - s0).normalized()
+    # The spoon: its bowl half sunk in the batter at the back, the handle resting on the rim (its top 11.3 cm up)
+    # and reaching 10 cm past it.
+    s0, rim = Vector((-0.01, 0.087, 0.03)), Vector((0.018, 0.12, 0.126))
+    d = (rim - s0).normalized()
+    s1 = rim + d * 0.1
     F.sweep('spoon_handle', [tuple(s0 + d * 0.012), tuple(s0 + (s1 - s0) * 0.5), tuple(s1 - d * 0.004), tuple(s1)],
             0.007, M.spoon, verts=8, scale=[0.6, 0.85, 1.0, 0.75])
-    G.sphere('spoon_bowl', 1.0, at=F.at(*(s0 - d * 0.004)), material=M.spoon, scale=(0.028, 0.02, 0.008),
+    G.sphere('spoon_bowl', 1.0, at=F.at(*(s0 - d * 0.012)), material=M.spoon, scale=(0.028, 0.02, 0.007),
              rot=aim(tuple(d)), segments=8, rings=5)
     return done('mixingBowl')
 
@@ -1336,6 +1489,143 @@ def mixingBowl():
 # Each is built as it lies or stands on a table, in the game's axes, its origin where characters.ts holds it from
 # (actions.ts `HAND_PROPS`): the middle of its base for the cups and the bag, the butt of a cue, the middle of a
 # grip for the rest. What is held along its length (cutlery, a dart, a cue, a bat) points to the front (+depth).
+# --- bites (2026-11-03): what is eaten by hand at the table, in the right hand on its way to the mouth ----------------
+# Drawn by the bite's grip (actions.ts `BITES`, `grip: 'bite'`), as the fork is: lying face up, its front (+depth), the
+# end bitten, to the mouth, held at the origin by its back end (the crust, the bun's end), the way it is held.
+def _moved(parts, name, dx=0.0, dz=0.0, yaw=0.0):
+    """`parts` (made where their item has them) joined, turned `yaw` degrees about the up axis and moved (`dx`, `dz`)."""
+    obj = G.join(parts, name, origin=(0, 0, 0))
+    obj.rotation_euler = (0, 0, math.radians(yaw))
+    obj.location = F.at(dx, 0.0, dz)
+    return obj
+
+
+def biteSandwich():
+    """Half the sandwich (`sandwich`), its point to the front: crusts along its back and left, the cut along its
+    front right."""
+    hw, hd = 0.058, 0.052
+    half, pts, cut, _ = _halves((hw, hd))[0]
+    with G.new_parts() as p:
+        _sandwich_half(half, pts, cut, (0.0, 0.0), 0.0, 3.0)
+    _moved(p, 'half', hw / 3, hd / 3 + 0.03)
+    return done('biteSandwich')
+
+
+def biteToast():
+    """Half a slice of the toast (`toast`), buttered, its point to the front."""
+    hw, hd = 0.055, 0.05
+    half, pts, cut, _ = _halves((hw, hd))[0]
+    with G.new_parts() as p:
+        _toast_half(half, pts, cut, (0.0, 0.0), 0.0, -1)
+    _moved(p, 'half', hw / 3, hd / 3 + 0.03)
+    return done('biteToast')
+
+
+def bitePizza():
+    """The slice of pizza (`pizzaSlice`), held by its crust, its tip to the front."""
+    _pizza_slice(0.0, dz=0.045)
+    return done('bitePizza')
+
+
+def biteCookie():
+    """A chocolate-chip cookie (`treatPlate`), held at its back edge."""
+    _cookie('cookie', (0.0, 0.0, 0.03), seed=0.5, chips=2)
+    return done('biteCookie')
+
+
+def biteBurger():
+    """The takeaway's burger (`takeout`), held at its back."""
+    _burger(0.0, 0.0, 0.035)
+    return done('biteBurger')
+
+
+def biteHotDog():
+    """The hot dog (`hotDog`) out of its boat: the bun's two halves, the sausage longer than it, mustard and ketchup;
+    along the depth, held at its back end."""
+    with G.new_parts() as p:
+        _hot_dog(0.0)
+    _moved(p, 'hot_dog', 0.0, 0.065, yaw=90)
+    return done('biteHotDog')
+
+
+def biteCracker():
+    """A cracker from the cheese board (`tastingBoard`) with a slice of cheese on it."""
+    box('cracker', 0.042, 0.005, 0.042, (0.0, 0.0025, 0.02), M.cracker, yaw=8, bevel=0.0012)
+    prism('cheese', [(-0.014, 0.004), (0.016, 0.01), (-0.01, 0.036)], 0.005, 0.012, M.cheese_cut, M.cheese_cut,
+          sides=[M.cheese_cut, M.cheese, M.cheese_cut])
+    return done('biteCracker')
+
+
+def biteCroissant():
+    """The bakery's croissant (`pastryBag`), lying, its horns curling back to the hand."""
+    for i, t in enumerate((-1.0, -0.5, 0.0, 0.5, 1.0)):
+        r = 0.02 * (1 - 0.35 * abs(t))
+        lump(f'lobe{i}', r, (0.04 * t, 0.0, 0.05 - 0.028 * t * t), M.pastry_baked, scale=(0.85, 0.75, 1.15),
+             seed=4.0 + i, noise=0.12)
+    return done('biteCroissant')
+
+
+def biteCrisps():
+    """A few crisps from the packet (`crisps`), one on another."""
+    for i, (x, y, z, a) in enumerate(((0.0, 0.0, 0.02, 10), (0.008, 0.004, 0.03, 70), (-0.006, 0.008, 0.026, 140))):
+        coin(f'crisp{i}', 0.034, 0.0015, (x, y, z), M.crisp, segments=8, cup=1.6, tilt=(a / 8, a / 10))
+    return done('biteCrisps')
+
+
+# --- cooking in hand (2026-11-03): the cook's tool while a step is done at a station (actions.ts `ACTIONS[tag].prop`) --
+def knife():
+    """A chef's knife, 27 cm, lying flat, the blade to the front (+depth) and its edge to the left (-x), held at the
+    middle of its handle: a black riveted handle, a steel bolster, a blade curving up to its point."""
+    box('handle', 0.022, 0.017, 0.1, (0.0, 0.0085, 0.0), M.grip, bevel=0.005)
+    for k, z in enumerate((-0.025, 0.02)):
+        disc(f'rivet{k}', 0.005, 0.0004, (0.0, 0.017, z), M.steel, verts=6)
+    box('bolster', 0.024, 0.016, 0.012, (0.0, 0.0085, 0.056), M.steel, bevel=0.002)
+    blade = [(0.0, 0.0105), (0.12, 0.0075), (0.165, 0.004), (0.17, 0.0025), (0.15, -0.012), (0.1, -0.026),
+             (0.035, -0.032), (0.0, -0.032)]
+    _along('blade', blade, 0.002, 0.0075, 0.062, M.steel)
+    return done('knife')
+
+
+def woodenSpoon():
+    """A wooden spoon, 30 cm, lying on its back, its bowl to the front (+depth), held at the origin 10 cm from the
+    handle's end."""
+    F.sweep('handle', [(0.0, 0.006, -0.1), (0.0, 0.006, 0.05), (0.0, 0.0065, 0.165)], 0.0065, M.spoon, verts=8,
+            scale=[1.0, 0.85, 0.6])
+    G.sphere('bowl', 1.0, at=F.at(0.0, 0.007, 0.185), material=M.spoon, scale=(0.02, 0.028, 0.007), segments=10,
+             rings=6)
+    return done('woodenSpoon')
+
+
+def spatula():
+    """A slotted turner for the grill, 31 cm: a black grip, a steel shank bent down to a blade 8 by 10 cm with three
+    slots, lying on its blade, the blade to the front (+depth), held at the middle of the grip."""
+    F.sweep('grip', [(0.0, 0.022, -0.07), (0.0, 0.022, 0.04)], None, M.grip,
+            profile=G.rounded_rect(0.022, 0.014, 0.006, corner=1), up=(0, 0, 1), scale=[0.9, 1.0])
+    F.sweep('shank', [(0.0, 0.022, 0.04), (0.0, 0.02, 0.08), (0.0, 0.004, 0.11)], None, M.steel,
+            profile=G.rounded_rect(0.014, 0.003, 0.001, corner=1), up=(0, 0, 1), resolution=2)
+    slots = [[(x + u, 0.15 + w) for u, w in G.rounded_rect(0.008, 0.05, 0.004, corner=2)] for x in (-0.018, 0.0, 0.018)]
+    F.extrude('blade', [(x, z + 0.155) for x, z in G.rounded_rect(0.08, 0.1, 0.01, corner=2)], 0.0018,
+              (0.0, 0.0009, 0.0), M.steel, plane='top', holes=slots)
+    return done('spatula')
+
+
+def whisk():
+    """A balloon whisk, 28 cm, lying, its wires to the front (+depth), held at the middle of its handle: a steel
+    handle and four loops of wire bowing out 6 cm across."""
+    lathe('handle', [(0, -0.07), (0.009, -0.068), (0.011, -0.05), (0.011, 0.03), (0.008, 0.05), (0, 0.052)], M.steel,
+          at=(0, 0.03, 0), segments=8, rot=(90, 0, 0))
+    for k in range(4):
+        a = math.pi * k / 4
+        pts = [(0.0, 0.03, 0.05)]
+        for i in range(1, 12):
+            ph = 0.35 + (TAU - 0.7) * i / 12
+            r = 0.03 * math.sin(ph)
+            pts.append((r * math.cos(a), 0.03 + r * math.sin(a), 0.155 - 0.105 * math.cos(ph)))
+        pts.append((0.0, 0.03, 0.05))
+        F.sweep(f'wire{k}', pts, 0.0011, M.steel, verts=4)
+    return done('whisk')
+
+
 def mug():
     """A glazed mug 8 cm across and 9.5 cm high, a blue band round it, its handle to the right (+x, the side of the
     hand that holds it), coffee in it with a little crema."""
@@ -1738,9 +2028,16 @@ def basketball():
 def iceCreamCup():
     """A paper cup of ice cream from the cart, 9 cm across at its top: pink-striped card, two scoops (strawberry on
     vanilla), each with a scoop's ragged lip, a flat wooden spoon stuck in."""
-    lathe('cup', [(0, 0), (0.031, 0), (0.0315, 0.003), (0.045, 0.058), (0.0465, 0.06), (0.0435, 0.06), (0, 0.05)],
-          [M.cup_paper, M.cup_paper, M.cup_stripe, M.cup_paper, M.cup_paper, M.vanilla], segments=18,
-          wave=(9, {3: 0.02}))
+    cup = lathe('cup', [(0, 0), (0.031, 0), (0.0315, 0.003), (0.045, 0.058), (0.0465, 0.06), (0.0435, 0.06), (0, 0.05)],
+                [M.cup_paper, M.cup_paper, M.cup_stripe, M.cup_paper, M.cup_paper, M.vanilla], segments=18,
+                wave=(9, {3: 0.02}))
+    # Its wall in nine pink stripes, white between (each a segment of the eighteen).
+    paper = list(cup.data.materials).index(M.cup_paper)
+    for f in cup.data.polygons:
+        c = f.center
+        if f.material_index != paper and f.normal.z < 0.9 and 0.004 < c.z < 0.057:
+            if int((math.atan2(c.y, c.x) % TAU) / TAU * 18) % 2:
+                f.material_index = paper
     for i, (x, y, z, m, s) in enumerate(((-0.006, 0.05, 0.004, M.vanilla, 1.0), (0.008, 0.074, -0.004, M.strawberry,
                                                                                    0.85))):
         sc = lathe(f'scoop{i}', [(0, 0), (0.03 * s, 0), (0.034 * s, 0.006 * s), (0.032 * s, 0.022 * s),
@@ -1757,21 +2054,28 @@ def hotDog():
     the bun, mustard piped along it in a zigzag and a line of ketchup."""
     def ring(y, hw, hd):
         return [(x, y, z) for x, z in rrect(hw, hd, n=12, square=6)]
-    loft('boat', [ring(0.0, 0.092, 0.032), ring(0.022, 0.1, 0.04), ring(0.022, 0.097, 0.037), ring(0.004, 0.089,
-                                                                                                    0.029)],
+    # (The boat 9 cm across its top, the bun 7 cm in it: the bun was 9.8, over the boat's sides.)
+    loft('boat', [ring(0.0, 0.092, 0.036), ring(0.022, 0.1, 0.045), ring(0.022, 0.097, 0.042), ring(0.004, 0.089,
+                                                                                                    0.033)],
          M.cup_paper, angle=30)
+    _hot_dog(0.0)
+    return done('hotDog')
+
+
+def _hot_dog(y):
+    """The hot dog itself along game x, `y` up from where it sits in its boat: the bun's two lathed halves side by
+    side, the bent sausage longer than it, a zigzag of mustard and a line of ketchup."""
     for s in (-1, 1):
         half = lathe(f'bun{s}', [(0, -0.075), (0.012, -0.072), (0.018, -0.055), (0.019, 0.0), (0.018, 0.055),
                                  (0.012, 0.072), (0, 0.075)], [M.bun] * 6, at=(0, 0.0, 0), segments=10,
-                     rot=(0, 90, 0), scale=(0.9, 1.25))
-        half.location = F.at(0.0, 0.022, s * 0.015)
-        half.rotation_euler = (math.radians(s * 14), math.radians(90), 0)
-    roll('sausage', 0.0115, 0.19, M.sausage, (0.0, 0.034, 0.0), segments=10, bend=-0.004)
-    pts = [(-0.075 + 0.015 * k, 0.047, 0.006 * (1 if k % 2 else -1)) for k in range(11)]
+                     rot=(0, 90, 0), scale=(0.9, 1.0))
+        # (Side by side along it: turned 14 degrees apart as they were, their ends stood out over the boat's sides.)
+        half.location = F.at(0.0, y + 0.022, s * 0.0125)
+    roll('sausage', 0.0115, 0.19, M.sausage, (0.0, y + 0.034, 0.0), segments=10, bend=-0.004)
+    pts = [(-0.075 + 0.015 * k, y + 0.047, 0.006 * (1 if k % 2 else -1)) for k in range(11)]
     F.sweep('mustard', pts, 0.0028, M.mustard, verts=5, resolution=2)
-    F.sweep('ketchup', [(-0.07, 0.0455, 0.0045), (0.0, 0.046, 0.0055), (0.07, 0.0455, 0.0045)], 0.0022, M.ketchup,
-            verts=5, resolution=2)
-    return done('hotDog')
+    F.sweep('ketchup', [(-0.07, y + 0.0455, 0.0045), (0.0, y + 0.046, 0.0055), (0.07, y + 0.0455, 0.0045)], 0.0022,
+            M.ketchup, verts=5, resolution=2)
 
 
 def crisps():
@@ -1828,37 +2132,41 @@ FAMILY = G.Family(
     'held', M,
     [
         I('ingredients', ingredients, (0.2, 0.336, 0.14), 'item.ingredients'),
-        I('prepBowl', prepBowl, (0.324, 0.104, 0.319), 'item.prepBowl'),
+        I('prepBowl', prepBowl, (0.324, 0.138, 0.319), 'item.prepBowl'),
         I('mealPot', mealPot, (0.39, 0.154, 0.266), 'item.mealPot'),
         I('potDirty', potDirty, (0.39, 0.15, 0.266), 'item.potDirty'),
         I('tastingBoard', tastingBoard, (0.4, 0.075, 0.24), 'item.tastingBoard'),
-        I('grillPlatter', grillPlatter, (0.4, 0.06, 0.28), 'item.grillPlatter'),
+        I('grillPlatter', grillPlatter, (0.4, 0.057, 0.28), 'item.grillPlatter'),
         I('platterDirty', platterDirty, (0.4, 0.034, 0.28), 'item.platterDirty'),
         I('pizza', pizza, (0.4, 0.052, 0.4), 'item.pizza'),
-        I('bakingTray', bakingTray, (0.38, 0.046, 0.28), 'item.bakingTray'),
+        I('bakingTray', bakingTray, (0.38, 0.07, 0.28), 'item.bakingTray'),
         I('trayDirty', trayDirty, (0.38, 0.025, 0.28), 'item.trayDirty'),
-        I('pieDish', pieDish, (0.336, 0.084, 0.336), 'item.pieDish'),
+        I('pieDish', pieDish, (0.26, 0.064, 0.26), 'item.pieDish'),
         I('mealPlate', mealPlate, (0.288, 0.061, 0.288), 'item.mealPlate'),
         I('pizzaSlice', pizzaSlice, (0.288, 0.031, 0.288), 'item.pizzaSlice'),
-        I('treatPlate', treatPlate, (0.288, 0.072, 0.288), 'item.treatPlate'),
+        I('treatPlate', treatPlate, (0.288, 0.073, 0.288), 'item.treatPlate'),
         I('pieSlice', pieSlice, (0.288, 0.059, 0.288), 'item.pieSlice'),
-        I('cakeSlice', cakeSlice, (0.288, 0.11, 0.285), 'item.cakeSlice'),
+        I('cakeSlice', cakeSlice, (0.288, 0.114, 0.285), 'item.cakeSlice'),
         I('sandwich', sandwich, (0.288, 0.064, 0.288), 'item.sandwich'),
         I('plateDirty', plateDirty, (0.288, 0.017, 0.288), 'item.plateDirty'),
-        I('iceCream', iceCream, (0.176, 0.101, 0.124), 'item.iceCream', centre=(0.0258, 0.0)),
-        I('bowlDirty', bowlDirty, (0.157, 0.083, 0.124), 'item.bowlDirty', centre=(0.0164, 0.0)),
+        I('freshPlate', freshPlate, (0.288, 0.051, 0.288), 'item.freshPlate'),
+        # (Its content entry, `plateStackDirty`, comes with the sim's stacking: `code` until then.)
+        I('plateStackDirty', plateStackDirty, (0.299, 0.036, 0.304), 'item.plateStackDirty', centre=(0.0015, -0.0039),
+          code=True),
+        I('iceCream', iceCream, (0.123, 0.091, 0.123), 'item.iceCream'),
+        I('bowlDirty', bowlDirty, (0.156, 0.085, 0.123), 'item.bowlDirty', centre=(0.0164, 0.0)),
         I('toast', toast, (0.288, 0.027, 0.288), 'item.toast'),
         I('smoothie', smoothie, (0.08, 0.196, 0.08), 'item.smoothie'),
-        I('noodles', noodles, (0.1, 0.271, 0.1), 'item.noodles'),
+        I('noodles', noodles, (0.1, 0.159, 0.1), 'item.noodles'),
         I('takeout', takeout, (0.192, 0.177, 0.19), 'item.takeout', centre=(0.001, -0.025)),
         I('boardDirty', boardDirty, (0.4, 0.04, 0.24), 'item.boardDirty'),
         I('pizzaBoardDirty', pizzaBoardDirty, (0.4, 0.038, 0.4), 'item.pizzaBoardDirty'),
-        I('pieDishDirty', pieDishDirty, (0.336, 0.063, 0.336), 'item.pieDishDirty'),
+        I('pieDishDirty', pieDishDirty, (0.26, 0.047, 0.26), 'item.pieDishDirty'),
         I('board', board, (0.34, 0.055, 0.24), 'tool.board'),
         # the handle reaches 2 cm further back than the old part's crossbar: the pan stays on its middle
         I('pan', pan, (0.28, 0.061, 0.395), 'tool.pan', centre=(0.0, 0.0575)),
-        I('grillFood', grillFood, (0.29, 0.045, 0.135), 'tool.grillFood', centre=(-0.015, -0.005)),
-        I('mixingBowl', mixingBowl, (0.26, 0.273, 0.266), 'tool.mixingBowl', centre=(0.0, 0.0029), code=True),
+        I('grillFood', grillFood, (0.285, 0.031, 0.106), 'tool.grillFood', centre=(-0.0125, -0.0041)),
+        I('mixingBowl', mixingBowl, (0.26, 0.157, 0.349), 'tool.mixingBowl', centre=(0.0, 0.0447), code=True),
         # props in hand (G-70: actions.ts `HAND_PROPS`)
         I('mug', mug, (0.11, 0.095, 0.081), 'tool.mug', centre=(0.0142, 0.0), code=True),
         I('glass', glass, (0.071, 0.111, 0.07), 'tool.glass', code=True),
@@ -1886,9 +2194,24 @@ FAMILY = G.Family(
         I('pencil', pencil, (0.008, 0.007, 0.17), 'tool.pencil', centre=(0.0, -0.05), code=True, tolerance=0.1),
         I('marker', marker, (0.019, 0.018, 0.155), 'tool.marker', centre=(0.0, -0.0425), code=True, tolerance=0.1),
         I('basketball', basketball, (0.252, 0.251, 0.252), 'tool.basketball', code=True),
+        # bites eaten by hand at the table (actions.ts `BITES`)
+        I('biteSandwich', biteSandwich, (0.126, 0.055, 0.113), 'tool.biteSandwich', centre=(0.019, 0.0468), code=True, tolerance=0.05),
+        I('biteToast', biteToast, (0.11, 0.018, 0.1), 'tool.biteToast', centre=(0.0183, 0.0467), code=True, tolerance=0.05),
+        I('bitePizza', bitePizza, (0.109, 0.022, 0.151), 'tool.bitePizza', centre=(0.0, 0.0443), code=True, tolerance=0.05),
+        I('biteCookie', biteCookie, (0.076, 0.017, 0.073), 'tool.biteCookie', centre=(0.0, 0.03), code=True, tolerance=0.05),
+        I('biteBurger', biteBurger, (0.102, 0.077, 0.104), 'tool.biteBurger', centre=(-0.0013, 0.0353), code=True, tolerance=0.05),
+        I('biteHotDog', biteHotDog, (0.061, 0.045, 0.19), 'tool.biteHotDog', centre=(0.0, 0.065), code=True, tolerance=0.05),
+        I('biteCracker', biteCracker, (0.047, 0.012, 0.047), 'tool.biteCracker', centre=(0.0, 0.02), code=True, tolerance=0.05),
+        I('biteCroissant', biteCroissant, (0.1, 0.03, 0.06), 'tool.biteCroissant', centre=(0.0, 0.0394), code=True, tolerance=0.05),
+        I('biteCrisps', biteCrisps, (0.048, 0.018, 0.044), 'tool.biteCrisps', centre=(0.0011, 0.0249), code=True, tolerance=0.05),
+        # cooking in hand (actions.ts `ACTIONS.chop`, `stir`, `flip`, `mix`)
+        I('knife', knife, (0.044, 0.017, 0.282), 'tool.knife', centre=(-0.01, 0.091), code=True, tolerance=0.05),
+        I('woodenSpoon', woodenSpoon, (0.038, 0.015, 0.313), 'tool.woodenSpoon', centre=(0.0, 0.0565), code=True, tolerance=0.05),
+        I('spatula', spatula, (0.08, 0.035, 0.275), 'tool.spatula', centre=(0.0, 0.0675), code=True, tolerance=0.05),
+        I('whisk', whisk, (0.061, 0.061, 0.331), 'tool.whisk', centre=(0.0, 0.0955), code=True, tolerance=0.05),
         # the food from town (review M-held-03)
         I('iceCreamCup', iceCreamCup, (0.093, 0.128, 0.092), 'item.iceCreamCup'),
-        I('hotDog', hotDog, (0.2, 0.05, 0.098), 'item.hotDog'),
+        I('hotDog', hotDog, (0.2, 0.05, 0.09), 'item.hotDog'),
         I('crisps', crisps, (0.132, 0.049, 0.223), 'item.crisps', centre=(0.0, 0.0093)),
         I('apple', apple, (0.074, 0.081, 0.073), 'item.apple'),
         I('pastryBag', pastryBag, (0.128, 0.198, 0.072), 'item.pastryBag'),
