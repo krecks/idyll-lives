@@ -73,6 +73,127 @@ const FLIPPED_AREA: f64 = 1e-4;
 /// part that goes round may sweep past it (measured from its vertices, so tighter: a fan's blades whose axis
 /// stood 3.3 cm off the middle swept 1.97 cm past).
 const OVERHANG: f64 = 0.02;
+
+/// The checks with one right answer (tools/art/README.md, "The gate"): each an error unless the model's pack entry
+/// `accept`s it by this name with its reason (`"accept": {"footprint": "why"}`), as the curtains' rail runs past the
+/// window. The rest are warnings: the budgets' aims, and what only an eye can judge (a loop that ends turned or
+/// moved, a part turning fast, a long use clip, a texture of its own) and the functional heights.
+pub const STRICT: &[(&str, &str)] = &[
+    (
+        "radius",
+        "a thing on a top reaches over 10 % past its content `radius`",
+    ),
+    (
+        "footprint",
+        "it reaches past its footprint (or the tiles of its `overhang`)",
+    ),
+    ("sweep", "a part that goes round sweeps past its footprint"),
+    ("wall", "it reaches into the wall"),
+    (
+        "thin",
+        "on the floor, it or a moving part is lower than the floor drawn over it",
+    ),
+    ("float", "a floor thing floats above its origin"),
+    ("centre", "it is off its Model's `centre`"),
+    ("flipped", "faces have normals turned against their winding"),
+    (
+        "flat",
+        "a part flattened at rest shows its flat shape (\"Grown from nothing\")",
+    ),
+    ("unplayed", "a clip plays for no use"),
+    ("cubic", "a clip has cubic-spline keys"),
+    ("cameras", "the file has cameras"),
+    ("lights", "the file has lights"),
+    ("mirror", "mirror glass is see-through or isn't flat"),
+    (
+        "materials",
+        "materials unmapped, double-sided, see-through (BLEND), glowing by day or with unused UVs",
+    ),
+    ("far", "its far version isn't the full model's size"),
+];
+
+/// Marks a finding of the strict check `kind` (`STRICT`), carried among the warnings until `strictly` sorts it.
+const TAG: char = '\u{1f}';
+
+fn strict(kind: &str, text: String) -> String {
+    debug_assert!(STRICT.iter().any(|(k, _)| *k == kind), "{kind}");
+    format!("{TAG}{kind}{TAG}{text}")
+}
+
+/// (kind, text) of a strict finding (`strict`), or None.
+fn untag(s: &str) -> Option<(&str, &str)> {
+    s.strip_prefix(TAG)?.split_once(TAG)
+}
+
+/// The findings of one model with its strict ones sorted out (`STRICT`): an error each, or, where its entry's
+/// `accept` names the check, an accepted note with the reason. An `accept` that names no strict check, gives no
+/// reason, or that the model no longer needs is an error: a stale one would hide the next.
+/// Returns (errors, warnings, accepted).
+fn strictly(
+    entry: &J,
+    errors: Vec<String>,
+    warnings: Vec<String>,
+) -> (Vec<String>, Vec<String>, Vec<String>) {
+    let none = J::Obj(Vec::new());
+    let accept = entry.get("accept").unwrap_or(&none);
+    let mut out = (Vec::new(), Vec::new(), Vec::new());
+    let mut reasons: BTreeMap<String, Option<String>> = BTreeMap::new();
+    // (What is wrong with `accept` itself comes after what the model is found to be.)
+    let mut problems = Vec::new();
+    match accept.entries() {
+        Some(list) => {
+            for (k, reason) in list {
+                let reason = reason.str().map(str::trim).filter(|r| !r.is_empty());
+                if !STRICT.iter().any(|(s, _)| s == k) {
+                    let names = STRICT
+                        .iter()
+                        .map(|(s, _)| *s)
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    problems.push(format!(
+                        "`accept` names {}, no check of the gate's (one of {names})",
+                        repr_str(k)
+                    ));
+                } else if reason.is_none() {
+                    problems.push(format!(
+                        "`accept.{k}` needs its reason: why the model is right as it is"
+                    ));
+                }
+                reasons.insert(k.clone(), reason.map(String::from));
+            }
+        }
+        None => problems.push("`accept` is {check: reason}".into()),
+    }
+    let mut used = HashSet::new();
+    for (is_error, text) in errors
+        .into_iter()
+        .map(|e| (true, e))
+        .chain(warnings.into_iter().map(|w| (false, w)))
+    {
+        match untag(&text) {
+            Some((kind, plain)) => match reasons.get(kind) {
+                Some(Some(reason)) => {
+                    used.insert(kind.to_string());
+                    out.2.push(format!("{plain} ({kind}: {reason})"));
+                }
+                Some(None) => {
+                    used.insert(kind.to_string());
+                    out.0.push(plain.to_string());
+                }
+                None => out.0.push(plain.to_string()),
+            },
+            None if is_error => out.0.push(text),
+            None => out.1.push(text),
+        }
+    }
+    out.0.extend(problems);
+    for (k, reason) in &reasons {
+        if reason.is_some() && STRICT.iter().any(|(s, _)| s == k) && !used.contains(k) {
+            out.0.push(format!("`accept.{k}` is unused: the model passes that check (take it out of its Model or entry)"));
+        }
+    }
+    out
+}
 const SWEEP: f64 = 0.01;
 /// How far (m) a model's middle at rest may be off its `centre` (centres.json).
 const OFF_CENTRE: f64 = 0.02;
@@ -1409,9 +1530,9 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
             ));
         }
         if cubic {
-            warnings.push(format!(
+            warnings.push(strict("cubic", format!(
                 "clip {name} has cubic-spline keys: the game plays them as straight lines between the keys (export it sampled, as gamekit does)"
-            ));
+            )));
         }
         for c in key(a, "channels")?.list().unwrap_or(&[]) {
             let target = key(c, "target")?;
@@ -1480,9 +1601,12 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
     }
     let played_keys: HashSet<String> = plays.iter().map(|(c, _)| c.key()).collect();
     for name in names.iter().filter(|n| !played_keys.contains(*n)) {
-        warnings.push(format!(
-            "clip {} plays for no use (name it in the entry's `motions`)",
-            repr_str(name)
+        warnings.push(strict(
+            "unplayed",
+            format!(
+                "clip {} plays for no use (name it in the entry's `motions`)",
+                repr_str(name)
+            ),
         ));
     }
     // A use's clip plays as the use starts: one much longer than about 1 s reads as slow. Loops, ambient,
@@ -2141,11 +2265,14 @@ fn content_warnings(
             .ok_or("bad operand type for unary -")?;
         let face = ((-depth) / Num::I(2)).f() + WALL;
         if slo[2].f() < face - 0.01 {
-            warnings.push(format!(
-                "reaches {} cm into the wall (its back at depth {}, the wall's face at {})",
-                fixed((face - slo[2].f()) * 100.0, 1),
-                fixed(slo[2].f(), 3),
-                fixed(face, 2)
+            warnings.push(strict(
+                "wall",
+                format!(
+                    "reaches {} cm into the wall (its back at depth {}, the wall's face at {})",
+                    fixed((face - slo[2].f()) * 100.0, 1),
+                    fixed(slo[2].f(), 3),
+                    fixed(face, 2)
+                ),
             ));
         }
         // (Whether it should stand against the wall, its back on the face, nothing in the content says: a
@@ -2186,7 +2313,7 @@ fn content_warnings(
         .reduce(|m, v| if v > m { v } else { m })
         .unwrap();
         if over > OVERHANG {
-            warnings.push(format!(
+            warnings.push(strict("footprint", format!(
                 "reaches {} cm past its {} x {} footprint (x {} to {}, depth {} to {}): it overlaps what stands next to it",
                 fixed(over * 100.0, 1),
                 py::num_str(w),
@@ -2195,7 +2322,7 @@ fn content_warnings(
                 fixed(shi[0].f(), 2),
                 fixed(slo[2].f(), 2),
                 fixed(shi[2].f(), 2)
-            ));
+            )));
         }
         // A part that goes round (a fan's blades) sweeps a whole circle about its pivot, not just its rest pose.
         let none = J::Obj(Vec::new());
@@ -2216,7 +2343,7 @@ fn content_warnings(
                 .reduce(|m, v| if v > m { v } else { m })
                 .unwrap();
             if over > SWEEP {
-                warnings.push(format!(
+                warnings.push(strict("sweep", format!(
                     "turning ({}), {} sweeps {} cm past its {} x {} footprint (x {} to {}, depth {} to {}; {} m from its axis): it overlaps what stands next to it (keep its axis on the middle, or make it smaller)",
                     repr_str(&s.clip),
                     s.name,
@@ -2228,7 +2355,7 @@ fn content_warnings(
                     fixed(zlo, 3),
                     fixed(zhi, 3),
                     fixed(radius, 3)
-                ));
+                )));
             }
         }
     }
@@ -2239,11 +2366,11 @@ fn content_warnings(
     {
         let out = reach(g, pose)? * scale.f();
         if out > 1.1 * f.radius {
-            warnings.push(format!(
+            warnings.push(strict("radius", format!(
                 "reaches {} m from its origin, past the {} m disc its content `radius` keeps on a top: it overlaps what stands next to it (give it a larger radius)",
                 fixed(out, 3),
                 fixed(f.radius, 2)
-            ));
+            )));
         }
     }
     // Thin on the floor: a house's floor hides what lies under `FLOOR_TOP` (a mat, a belt), the whole
@@ -2266,7 +2393,7 @@ fn content_warnings(
                 None => "it".to_string(),
                 Some(p) => format!("moving part {}", node_name(nodes, p)),
             };
-            warnings.push(format!("{what} reaches only {} cm up: a house's floor is drawn 1 cm up and hides it (make it reach 1.2 cm)", fixed(top * 100.0, 1)));
+            warnings.push(strict("thin", format!("{what} reaches only {} cm up: a house's floor is drawn 1 cm up and hides it (make it reach 1.2 cm)", fixed(top * 100.0, 1))));
         }
     }
     Ok(warnings)
@@ -3044,7 +3171,7 @@ fn check(
     facts: Option<&Vec<Facts>>,
     centre: Option<&J>,
     furniture: Option<&Furniture>,
-) -> R<(Vec<String>, Vec<String>, String)> {
+) -> R<Checked> {
     let (mut errors, mut warnings, info) =
         check_file(entry_key, fin, entry, path, facts, centre, furniture)?;
     let mut summary = format!(
@@ -3101,19 +3228,42 @@ fn check(
                 .zip(&info.dims)
                 .any(|(a, b)| (a.f() - b.f()).abs() > f64::max(0.05 * b.f(), 0.02))
             {
-                far_warnings.push(format!(
-                    "{} m, the full model {} m",
-                    dims_text(&fi.dims),
-                    dims_text(&info.dims)
+                far_warnings.push(strict(
+                    "far",
+                    format!(
+                        "{} m, the full model {} m",
+                        dims_text(&fi.dims),
+                        dims_text(&info.dims)
+                    ),
                 ));
             }
             summary += &format!("  (far: {} tris)", fi.tris);
         }
-        errors.extend(far_errors.into_iter().map(|e| format!("far: {e}")));
+        // (A strict finding of the far version stays one: `strict`'s mark comes first.)
+        let far = |w: String| match untag(&w) {
+            Some((kind, text)) => strict(kind, format!("far: {text}")),
+            None => format!("far: {w}"),
+        };
+        errors.extend(far_errors.into_iter().map(far));
         // (What it says of the far version, it says of the full model too.)
-        warnings.extend(far_warnings.into_iter().map(|w| format!("far: {w}")));
+        warnings.extend(far_warnings.into_iter().map(far));
     }
-    Ok((errors, warnings, summary))
+    let (errors, warnings, accepted) = strictly(entry, errors, warnings);
+    Ok(Checked {
+        errors,
+        warnings,
+        accepted,
+        summary,
+    })
+}
+
+/// What `check` found of one model: its errors, its warnings, the strict findings its entry `accept`s (each with
+/// its reason), and its numbers.
+struct Checked {
+    errors: Vec<String>,
+    warnings: Vec<String>,
+    accepted: Vec<String>,
+    summary: String,
 }
 
 /// (errors, warnings, numbers) for one model entry and a file of it; `facts`: those of each content object
@@ -3164,13 +3314,13 @@ fn check_file(
         );
     }
     if gltf.get("cameras").is_some_and(J::truthy) {
-        warnings.push("has cameras; the game drops them".into());
+        warnings.push(strict("cameras", "has cameras; the game drops them".into()));
     }
     for (mesh, faces) in flipped_faces(&g)? {
-        warnings.push(format!(
+        warnings.push(strict("flipped", format!(
             "mesh {}: {faces} faces over 1 cm² have normals turned against their winding, lit as if from behind (a face built inside out, or a bevel's arc miter)",
             repr_str(&mesh)
-        ));
+        )));
     }
     let (clip_errors, clip_warnings) = check_clips(&g, entry)?;
     errors.extend(clip_errors);
@@ -3203,9 +3353,10 @@ fn check_file(
         .unwrap_or(&[])
         .contains(&J::Str("KHR_lights_punctual".into()))
     {
-        warnings.push(
+        warnings.push(strict(
+            "lights",
             "has lights; the game drops them (a lamp's light is the content's `light`)".into(),
-        );
+        ));
     }
 
     let accessors = gltf.get("accessors").unwrap_or(&empty);
@@ -3230,11 +3381,11 @@ fn check_file(
                 repr_str(name)
             ));
         } else if truthy && fin.see_through(ov.opt("finish")) {
-            warnings.push(format!(
+            warnings.push(strict("mirror", format!(
                 "mirror glass {} is see-through ({}): where nothing reflects (Medium, Low) it shows what is behind it; map it to gloss",
                 repr_str(name),
                 str_of(key(ov, "finish")?)
-            ));
+            )));
         }
         if let Some(glow) = ov.opt("glow") {
             let ok = glow.str().is_some_and(|s| {
@@ -3403,12 +3554,12 @@ fn check_file(
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         if extent[0].f() > 0.1 * extent[1].f() {
-            warnings.push(format!(
+            warnings.push(strict("mirror", format!(
                 "mirror glass {} isn't flat ({} cm thick, {} cm across): the reflection lies on its box's thinnest side",
                 repr_str(name),
                 fixed((extent[0] * Num::I(100)).f(), 1),
                 fixed((extent[1] * Num::I(100)).f(), 0)
-            ));
+            )));
         }
     }
     for (flag, text) in [
@@ -3428,9 +3579,12 @@ fn check_file(
         ("uvs", "carrying UVs nothing reads (export without them)"),
     ] {
         if let Some(names) = flags.get(flag).filter(|n| !n.is_empty()) {
-            warnings.push(format!(
-                "materials {text}: {}",
-                names.iter().cloned().collect::<Vec<_>>().join(", ")
+            warnings.push(strict(
+                "materials",
+                format!(
+                    "materials {text}: {}",
+                    names.iter().cloned().collect::<Vec<_>>().join(", ")
+                ),
             ));
         }
     }
@@ -3463,6 +3617,13 @@ fn check_file(
     )?;
     let ((slo, shi), sparts) = bounds(gltf, &pose, &HashSet::new())?;
     let (slo, shi) = (slo.map(|v| v * scale), shi.map(|v| v * scale));
+    // (Hung at its real height, a thing on a wall or the ceiling floats as it should: every content object
+    // drawing it is one. A model no content object draws, a held tool or a far version, is checked as on the floor.)
+    let on_wall_or_ceiling = facts.is_some_and(|f| {
+        !f.is_empty()
+            && f.iter()
+                .all(|f| matches!(f.layer.str(), Some("wall") | Some("ceiling")))
+    });
     if !fit && !entry.get("offset").is_some_and(J::truthy) {
         // On the floor (y = 0). A model the game sinks may reach below it by its `sink` (the woods' rock, the marker).
         let sink = entry
@@ -3475,10 +3636,13 @@ fn check_file(
                 "reaches {} cm below the floor (origin on the floor, y = 0)",
                 fixed((-lo[1] * Num::I(100)).f(), 1)
             ));
-        } else if lo[1].f() > 0.005 {
-            warnings.push(format!(
-                "floats {} cm above its origin (fine only on a wall or ceiling)",
-                fixed((lo[1] * Num::I(100)).f(), 1)
+        } else if lo[1].f() > 0.005 && !on_wall_or_ceiling {
+            warnings.push(strict(
+                "float",
+                format!(
+                    "floats {} cm above its origin (fine only on a wall or ceiling)",
+                    fixed((lo[1] * Num::I(100)).f(), 1)
+                ),
             ));
         }
         // Centred where its `Model` says (centres.json, which the build writes: the middle, or its `centre`, a
@@ -3502,13 +3666,13 @@ fn check_file(
                 .ok_or("unsupported operand type(s) for -")?
                 .f();
             if f64::max((at.0 - c0).abs(), (at.1 - c1).abs()) > OFF_CENTRE {
-                warnings.push(format!(
+                warnings.push(strict("centre", format!(
                     "centred on (x {}, depth {}), its Model's `centre` is ({}, {}) (centres.json): rebuild it, or `cargo art --centres` if the Model changed",
                     fixed(at.0, 3),
                     fixed(at.1, 3),
                     fixed(c0, 3),
                     fixed(c1, 3)
-                ));
+                )));
             }
         }
         // Against what each content object that draws it says of it (two objects may share a model).
@@ -3568,10 +3732,10 @@ fn check_file(
         )
     };
     for (name, share) in flattened_in_view(&g, &opaque)? {
-        warnings.push(format!(
+        warnings.push(strict("flat", format!(
             "{name} lies flattened at rest with {} of it outside anything opaque, so its flat shape shows: put its origin inside something opaque (README trap \"Grown from nothing\")",
             percent(share)
-        ));
+        )));
     }
 
     // A bird the renderer flies (`bird`): its parts and size against the file; where birds sit on the model
@@ -3793,7 +3957,12 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
             .get("far")
             .filter(|f| f.truthy())
             .map(|f| normpath(&join(&dirname(manifest), &f.key())));
-        let (errors, warnings, summary) = check(
+        let Checked {
+            errors,
+            warnings,
+            accepted,
+            summary,
+        } = check(
             k,
             &fin,
             entry,
@@ -3803,12 +3972,11 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
             centres.get(k),
             Some(&furniture),
         )
-        .unwrap_or_else(|err| {
-            (
-                vec![format!("cannot read {path}: {err}")],
-                Vec::new(),
-                String::new(),
-            )
+        .unwrap_or_else(|err| Checked {
+            errors: vec![format!("cannot read {path}: {err}")],
+            warnings: Vec::new(),
+            accepted: Vec::new(),
+            summary: String::new(),
         });
         failed += !errors.is_empty() as usize;
         checked.push(k.clone());
@@ -3821,6 +3989,9 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
         }
         for w in warnings {
             text += &format!("       warning: {w}\n");
+        }
+        for a in accepted {
+            text += &format!("       accepted: {a}\n");
         }
     }
     text += &format!("{} models, {failed} failed", checked.len());
@@ -4810,6 +4981,67 @@ mod tests {
         );
     }
 
+    /// A strict check's finding is an error unless the entry `accept`s it by name with a reason; an accept that names
+    /// no check, gives no reason or isn't needed any more is an error itself; the rest stay warnings.
+    #[test]
+    fn strict_findings_fail_unless_accepted_with_a_reason() {
+        let over = strict("footprint", "reaches 15 cm past its 1 x 1 footprint".into());
+        let aim = "4 draw calls, aim for 3 at most".to_string();
+        let run = |accept: &str, warnings: Vec<String>| {
+            strictly(
+                &j(&format!(r#"{{"url": "x.glb"{accept}}}"#)),
+                vec!["a hard error".into()],
+                warnings,
+            )
+        };
+        // Not accepted: an error, the aim a warning.
+        let (e, w, a) = run("", vec![over.clone(), aim.clone()]);
+        assert_eq!(
+            e,
+            ["a hard error", "reaches 15 cm past its 1 x 1 footprint"]
+        );
+        assert_eq!((w, a.len()), (vec![aim.clone()], 0));
+        // Accepted, with its reason.
+        let (e, w, a) = run(
+            r#", "accept": {"footprint": "the rail runs past the window"}"#,
+            vec![over.clone(), aim],
+        );
+        assert_eq!(e, ["a hard error"]);
+        assert_eq!(w.len(), 1);
+        assert_eq!(
+            a,
+            ["reaches 15 cm past its 1 x 1 footprint (footprint: the rail runs past the window)"]
+        );
+        // A far version's finding is the model's: still strict.
+        let far = match untag(&over) {
+            Some((kind, text)) => strict(kind, format!("far: {text}")),
+            None => unreachable!(),
+        };
+        let (e, ..) = run("", vec![far]);
+        assert_eq!(e[1], "far: reaches 15 cm past its 1 x 1 footprint");
+        // Unused, unknown, without a reason.
+        let (e, ..) = run(r#", "accept": {"radius": "wide"}"#, Vec::new());
+        assert!(e[1].starts_with("`accept.radius` is unused"), "{e:?}");
+        let (e, ..) = run(r#", "accept": {"looks": "fine"}"#, Vec::new());
+        assert!(
+            e[1].starts_with("`accept` names 'looks', no check of the gate's"),
+            "{e:?}"
+        );
+        let (e, ..) = run(r#", "accept": {"footprint": " "}"#, vec![over]);
+        assert_eq!(
+            e[1..],
+            [
+                "reaches 15 cm past its 1 x 1 footprint",
+                "`accept.footprint` needs its reason: why the model is right as it is"
+            ]
+        );
+        let (e, ..) = run(r#", "accept": ["footprint"]"#, Vec::new());
+        assert_eq!(e[1], "`accept` is {check: reason}");
+        // Every strict check has its name once.
+        let names: HashSet<&str> = STRICT.iter().map(|(k, _)| *k).collect();
+        assert_eq!(names.len(), STRICT.len());
+    }
+
     /// A held tool (a coin 2 mm thick) is never on a floor, so the floor drawn over thin things isn't held against
     /// it; the same file as a floor model is.
     #[test]
@@ -4821,11 +5053,10 @@ mod tests {
         let path = join(&repo_root(), "web/public/assets/models/held/coin.glb");
         let entry = j(r#"{"type": "model", "url": "coin.glb"}"#);
         let thin = |key: &str| {
-            let (errors, warnings, _) =
-                check(key, &fin, &entry, &path, None, None, None, None).unwrap();
-            errors
+            let c = check(key, &fin, &entry, &path, None, None, None, None).unwrap();
+            c.errors
                 .iter()
-                .chain(&warnings)
+                .chain(&c.warnings)
                 .any(|w| w.contains("reaches only"))
         };
         assert!(!thin("tool.coin"));
