@@ -54,7 +54,7 @@ import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
 import { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, biteOf, eatClip, SET_DOWN_SPOTS } from './actions';
+import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, biteOf, eatClip, SET_DOWN_SPOTS, spotOn, type StationSpot } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { FLOOR_SITS } from './clips/seated';
 import { HANDED } from './clips/serve';
@@ -101,6 +101,20 @@ const UPPER_FADE_RATE = 4;
 const STATION_REACH = 0.5;
 /** The most (m) a cook steps in to a station's tool (the body clear of a cooker's front: `stationReach`). */
 const STATION_STEP_MAX = 0.45;
+/**
+ * The most (m) a cook steps along a station to its tool (`stationReach`): along a station only they can use (one slot),
+ * to its far end; where two can cook side by side, within their own half.
+ */
+const STATION_ALONG_MAX = 1.2;
+const STATION_ALONG_SHARED = 0.7;
+/** How far (m) in from the ends of a station's top a tool placed in front of the cook stays (`toolSpot`). */
+const TOOL_END_MARGIN = 0.2;
+
+/** How far (m) to `station`'s right of its middle Sim `rig` stands (in its own frame): the half of it they cook at. */
+function stationSide(rig: SimRig, station: PlacedObject): number {
+  const f = station.yaw;
+  return (rig.x - station.cx) * Math.cos(f) - (rig.z - station.cz) * Math.sin(f);
+}
 
 /**
  * Residents far off (in low detail: `faceDetail`'s `far`) are posed in full every this many frames, not every frame
@@ -1189,8 +1203,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const m = this.writeProp(this.heldProp, i, item && station ? (item.model ?? `item.${item.id}`) : null);
     if (!m || !station) return;
     const f = station.yaw;
-    const at = SET_DOWN_SPOTS[station.def]?.[tag];
-    const spot = STATION_SPOTS[station.def]?.[tag];
+    const side = stationSide(rig, station);
+    const at = spotOn(SET_DOWN_SPOTS, station.def, tag, side);
+    const spot = this.toolSpot(rig, station, tag);
     const top = at?.[2] ?? this.content?.object(station.def)?.surface?.height ?? spot?.[2] ?? this.content?.cooking.defaultSurfaceHeight ?? 0.9;
     // (In the station's own frame: its place, else right of its middle, or beside the tool's spot on the side away from
     // the middle: towards it, it stood on what the spot keeps clear of, a grill station's hood.)
@@ -1411,26 +1426,35 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   /**
    * The tool on the station Sim row `i` cooks at (a chopping board, a pan, food on the grill; by
-   * action tag): at its spot (`STATION_SPOTS`; none where it's done inside), else on its top, a little towards the cook.
+   * action tag): at its place (`toolSpot`; none where it's done inside).
    */
   private writeTool(rig: SimRig, i: number, tag: string, station: PlacedObject | null | undefined): void {
-    const spot = station ? STATION_SPOTS[station.def]?.[tag] : undefined;
-    const key = station && spot !== null ? (STATION_PROPS[tag] ?? null) : null;
-    const m = this.writeProp(this.toolProp, i, key);
-    if (!m || !station) return;
-    if (spot) {
-      const f = station.yaw;
-      const [x, z, y] = spot;
-      placeProp(m, i, station.cx + x * Math.cos(f) + z * Math.sin(f), rig.floorY + y, station.cz - x * Math.sin(f) + z * Math.cos(f), rig.yaw, 1);
-      return;
-    }
+    const spot = station && STATION_PROPS[tag] ? this.toolSpot(rig, station, tag) : null;
+    const m = this.writeProp(this.toolProp, i, spot ? STATION_PROPS[tag] : null);
+    if (!m || !station || !spot) return;
+    const f = station.yaw;
+    const [x, z, y] = spot;
+    placeProp(m, i, station.cx + x * Math.cos(f) + z * Math.sin(f), rig.floorY + y, station.cz - x * Math.sin(f) + z * Math.cos(f), rig.yaw, 1);
+  }
+
+  /**
+   * Where on `station` (its own frame) the tool of Sim `rig`'s step `tag` goes: its place (`STATION_SPOTS`, the one on
+   * the cook's half where it has one for each), else on its top straight in front of the cook (a board on a long island
+   * or a two-tile counter before whichever end they stand at, not at its middle), kept `TOOL_END_MARGIN` in from its
+   * ends, a little in from the middle towards them. Null: done inside it, not drawn.
+   */
+  private toolSpot(rig: SimRig, station: PlacedObject, tag: string): StationSpot | null {
+    const side = stationSide(rig, station);
+    const spot = spotOn(STATION_SPOTS, station.def, tag, side);
+    if (spot !== undefined) return spot;
     const def = this.content?.object(station.def);
     const top = def?.surface?.height ?? this.content?.cooking.defaultSurfaceHeight ?? 0.9;
-    const dx = rig.x - station.cx;
-    const dz = rig.z - station.cz;
-    const d = Math.hypot(dx, dz) || 1;
-    const toward = Math.min(0.15, d * 0.3);
-    placeProp(m, i, station.cx + (dx / d) * toward, rig.floorY + top + 0.005, station.cz + (dz / d) * toward, rig.yaw, 1);
+    const width = def?.surface?.size?.[0] ?? def?.footprint?.[0] ?? 1;
+    const mid = def?.surface?.at?.[0] ?? 0;
+    const half = Math.max(0, width / 2 - TOOL_END_MARGIN);
+    const f = station.yaw;
+    const ahead = (rig.x - station.cx) * Math.sin(f) + (rig.z - station.cz) * Math.cos(f);
+    return [Math.min(mid + half, Math.max(mid - half, side)), Math.sign(ahead) * Math.min(0.15, Math.abs(ahead) * 0.3), top + 0.005];
   }
 
   /**
@@ -1441,27 +1465,18 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
    * `STATION_STEP_MAX` in or across.
    */
   private stationReach(rig: SimRig, station: PlacedObject, tag: string): [number, number] {
-    const spot = STATION_SPOTS[station.def]?.[tag];
-    if (spot === null) return [0, 0];
+    const spot = this.toolSpot(rig, station, tag);
+    if (!spot) return [0, 0];
     const fx = Math.sin(rig.yaw);
     const fz = Math.cos(rig.yaw);
-    let sx = station.cx;
-    let sz = station.cz;
-    if (spot) {
-      const f = station.yaw;
-      sx += spot[0] * Math.cos(f) + spot[1] * Math.sin(f);
-      sz += -spot[0] * Math.sin(f) + spot[1] * Math.cos(f);
-    } else {
-      // (`writeTool`'s place without a spot: in from the middle towards the cook.)
-      const d = Math.hypot(rig.x - station.cx, rig.z - station.cz) || 1;
-      const toward = Math.min(0.15, d * 0.3);
-      sx += ((rig.x - station.cx) / d) * toward;
-      sz += ((rig.z - station.cz) / d) * toward;
-    }
+    const f = station.yaw;
+    const sx = station.cx + spot[0] * Math.cos(f) + spot[1] * Math.sin(f);
+    const sz = station.cz - spot[0] * Math.sin(f) + spot[1] * Math.cos(f);
     const ahead = (sx - rig.x) * fx + (sz - rig.z) * fz;
     const across = (sx - rig.x) * fz - (sz - rig.z) * fx;
-    const m = STATION_STEP_MAX;
-    return [Math.min(m, Math.max(0, ahead - STATION_REACH * rig.scale)), Math.min(m, Math.max(-m, across))];
+    // (Along a station only they cook at, to its far end; one two cook at side by side, within their half.)
+    const along = (this.content?.object(station.def)?.slots ?? 1) > 1 ? STATION_ALONG_SHARED : STATION_ALONG_MAX;
+    return [Math.min(STATION_STEP_MAX, Math.max(0, ahead - STATION_REACH * rig.scale)), Math.min(along, Math.max(-along, across))];
   }
 
   /** Head-top position of Sim `i` (false if not drawn). */

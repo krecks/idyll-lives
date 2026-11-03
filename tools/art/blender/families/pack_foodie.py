@@ -810,10 +810,10 @@ def chefsIsland():
         # the sitters' side: their knee space under the top, a brass foot rail on brackets
         G.kit.tube(F, 'foot_rail', G.kit.fillet([(-0.67, 0.25, 0.2), (-0.67, 0.25, 0.06), (0.67, 0.25, 0.06), (0.67, 0.25, 0.2)],
                                                 0.04), 0.012, M.brass, verts=8, round=1)
-        # on the top: the hob with a stock pot on its right ring, a board of vegetables, two tasting plates. The left
-        # ring is the cook's (`burner_on` glows under their pan, `STATION_SPOTS`: the copper pan modelled there showed
-        # through it), the top's left end is left free for their board or bowl, and between the hob and the board
-        # what they set down (`SET_DOWN_SPOTS`)
+        # on the top: the hob with a stock pot on its right ring, two tasting plates. The left ring is the cook's
+        # (`burner_on` glows under their pan, `STATION_SPOTS`: the copper pan modelled there showed through it), and
+        # both ends are left free, one for each of two cooks side by side: their board or bowl at the end, what they set
+        # down between it and the hob (`SET_DOWN_SPOTS`; a board of vegetables modelled on the right end was in the way)
         F.extrude('hob', G.rounded_rect(0.58, 0.3, 0.02, corner=2), 0.008, (0, TOP + 0.004, 0.27), M.hob, plane='top',
                   bevel=0.002, bevel_segments=1)
         for dx in (-RING, RING):
@@ -830,16 +830,6 @@ def chefsIsland():
             G.kit.tube(F, _name('pot_handle'), G.kit.fillet([(RING + s * 0.118, TOP + 0.16, 0.25), (RING + s * 0.15, TOP + 0.16, 0.255),
                                                              (RING + s * 0.15, TOP + 0.16, 0.285), (RING + s * 0.118, TOP + 0.16, 0.29)],
                                                             0.008), 0.005, M.chrome, verts=5, round=1)
-        bx = 0.7                                                    # the board, at the top's right end
-        F.extrude('chop_board', G.rounded_rect(0.34, 0.22, 0.02, corner=2), 0.02, (bx, TOP + 0.01, 0.3), M.oak, plane='top',
-                  bevel=0.004, bevel_segments=1)
-        F.sphere('tomato', 0.035, (bx - 0.06, TOP + 0.052, 0.3), M.tomato, scale=(1, 1, 0.9), segments=10, rings=6)
-        F.cone('tomato_calyx', 0.014, 0.0, 0.008, (bx - 0.06, TOP + 0.087, 0.3), M.basil, verts=5)
-        F.sweep('carrot', [(bx - 0.02, TOP + 0.04, 0.24), (bx + 0.08, TOP + 0.038, 0.3)], 0.018, M.carrot, verts=8, scale=[1.0, 0.15])
-        for k in range(3):
-            _leaf(F, _name('carrot_top'), bx - 0.02, TOP + 0.04, 0.24, 0.05, 210 + 25 * k, 20, M.basil)
-        F.box('knife', 0.16, 0.003, 0.025, (bx - 0.02, TOP + 0.022, 0.37), M.chrome)
-        F.box('knife_grip', 0.08, 0.016, 0.02, (bx + 0.1, TOP + 0.028, 0.37), M.black, bevel=0.005, bevel_segments=1)
         for x in (-0.45, 0.45):
             G.revolve(_name('plate'), [(0, 0), (0.07, 0), (0.11, 0.012), (0.105, 0.016), (0.068, 0.006), (0, 0.006)],
                       at=F.at(x, TOP, 0.11), material=M.plate, segments=16)

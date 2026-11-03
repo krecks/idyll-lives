@@ -794,7 +794,18 @@ export const ACTIONS: Record<string, ActionAnim> = {
  */
 export const STATION_PROPS: Record<string, string> = { chop: 'tool.board', stir: 'item.mealPot', flip: 'tool.grillFood', mix: 'tool.mixingBowl' };
 /** A place on a station, in its own frame: m to its right and forward of its middle, and the height it stands at. */
-type StationSpot = readonly [x: number, z: number, y: number];
+export type StationSpot = readonly [x: number, z: number, y: number];
+/** A station's place for a step: one, or one for each half of a station two cook at side by side (left, right). */
+type StationSpots = StationSpot | readonly [left: StationSpot, right: StationSpot];
+/**
+ * The place in `table` on `def` for a step `tag`, for a cook standing `side` m to the station's right of its middle
+ * (`StationSpots`: the half they're on); undefined: none listed, null: done inside it.
+ */
+export function spotOn(table: Record<string, Partial<Record<string, StationSpots | null>>>, def: string, tag: string, side: number): StationSpot | null | undefined {
+  const s = table[def]?.[tag];
+  if (s == null) return s;
+  return typeof s[0] === 'number' ? (s as StationSpot) : (s as readonly [StationSpot, StationSpot])[side < 0 ? 0 : 1];
+}
 /**
  * Where on a station its prop goes, by object def and action tag (else the top's middle, a little towards the
  * cook; the cook steps in to it, `stationReach`): the pot on the front burner the cooker's clip lights (its flame or
@@ -802,15 +813,25 @@ type StationSpot = readonly [x: number, z: number, y: number];
  * the board, the bowl and the food on the grill clear of what the model has on its top. `null`: done inside it, not
  * drawn.
  */
-export const STATION_SPOTS: Record<string, Partial<Record<string, StationSpot | null>>> = {
+export const STATION_SPOTS: Record<string, Partial<Record<string, StationSpots | null>>> = {
   stoveGas: { stir: [-0.26, 0.014, 0.891] },
   // (The front ring on the side of the knob that turns, glowing red while it's on.)
   stoveElectric: { stir: [-0.16, -0.02, 0.893] },
   rangeCooker: { stir: [0, 0.03, 0.911] },
   cooktopCounter: { stir: [0.16, 0.01, 0.954] },
   chefStove: { stir: [0, 0, 0.963] },
-  // (The left ring, which glows; the board and the bowl at the free left end of the top.)
-  'foodie.chefsIsland': { stir: [-0.145, 0.27, 0.908], chop: [-0.7, 0.32, 0.9], mix: [-0.7, 0.3, 0.9] },
+  // (The left ring, which glows; the board and the bowl at the free end of the top on the cook's half, two cooking.)
+  'foodie.chefsIsland': {
+    stir: [-0.145, 0.27, 0.908],
+    chop: [
+      [-0.7, 0.32, 0.9],
+      [0.7, 0.32, 0.9],
+    ],
+    mix: [
+      [-0.7, 0.3, 0.9],
+      [0.7, 0.3, 0.9],
+    ],
+  },
   // (On the floured end of the worktop by the range.)
   'kind.neighbourlyOven': { chop: [0.105, 0, 0.905], mix: [0.13, -0.01, 0.905] },
   breakfastCounter: { chop: [0.28, 0.05, 0.95], mix: [0.28, 0.05, 0.95] },
@@ -830,13 +851,24 @@ export const SET_DOWN: Record<string, 'top' | 'in'> = { chop: 'top', mix: 'top',
  * `SET_DOWN_SIDE`): on a cool, free part of its top, clear of the lit burner, the grate and what the model has on it
  * (an unlit burner's grate or a cold ring on a hob; the grill station's free counter, the kettle grill's side tray).
  */
-export const SET_DOWN_SPOTS: Record<string, Partial<Record<string, StationSpot>>> = {
+export const SET_DOWN_SPOTS: Record<string, Partial<Record<string, StationSpots>>> = {
   stoveGas: { stir: [0.26, -0.22, 0.891] },
   stoveElectric: { stir: [0.15, -0.165, 0.89] },
   rangeCooker: { stir: [0.55, 0.03, 0.911] },
   cooktopCounter: { stir: [-0.16, -0.19, 0.954] },
   chefStove: { stir: [0.5, 0.03, 0.963] },
-  'foodie.chefsIsland': { stir: [-0.7, 0.29, 0.9], chop: [0.41, 0.3, 0.9], mix: [0.41, 0.3, 0.9] },
+  // (Between the hob and the board on the cook's half.)
+  'foodie.chefsIsland': {
+    stir: [-0.7, 0.29, 0.9],
+    chop: [
+      [-0.41, 0.32, 0.9],
+      [0.41, 0.32, 0.9],
+    ],
+    mix: [
+      [-0.41, 0.32, 0.9],
+      [0.41, 0.32, 0.9],
+    ],
+  },
   'kind.neighbourlyOven': { chop: [0.13, -0.31, 0.905], mix: [0.13, -0.31, 0.905] },
   breakfastCounter: { chop: [-0.03, 0.06, 0.95], mix: [-0.03, 0.06, 0.95] },
   grill: { flip: [0.333, 0.333, 0.7], chop: [0.333, 0.333, 0.7] },
