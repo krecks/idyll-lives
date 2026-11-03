@@ -42,7 +42,7 @@ M = G.Palette(
     cup=('#F2F1EE', 'gloss'),        # a cup
     coffee=('#9A6B3F', 'gloss'),     # the stream of coffee
     fruit=('#E0A33E', 'gloss'),      # a piece of fruit in the bowl
-    bread=('#D29A55', 'satin'),      # bread rolls on the oven tray, toast's crust
+    bread=('#D29A55', 'satin'),      # toast's crust
     crumb=('#EED9A8', 'satin'),      # toast's face
     banana=('#E6C65A', 'satin'),     # a banana in the fruit bowl
     towel=('#CFDCE6', 'satin'),      # the range cooker's tea towel (plain: no draw call of its own)
@@ -332,7 +332,7 @@ def stoveGas():
 # --- oven tower: 1x1, two built-in ovens in a tall cabinet ---------------------------------------------
 def wallOven():
     """A tall cabinet under a moulded cornice holding two ovens and a control panel between them, a shaker door below
-    and one above; the upper oven's door drops and its tray of bread rolls slides out."""
+    and one above; the upper oven's door drops and its tray slides out."""
     F = G.GameFrame(shift=0.102)
     with G.new_parts() as still:
         F.box('plinth', 0.66, 0.06, 0.54, (0, 0.03, -0.16), M.dark, bevel=0.005)
@@ -354,13 +354,11 @@ def wallOven():
         _shaker(F, 'door_top', 0.60, 0.16, (0, 1.96, 0.16), M.cab, rail=0.04)
         _pull(F, 'pull_top', (0.24, 1.9), (0.24, 2.0), 0.17, out=0.03, w=0.012, t=0.012, r=0.005)
     G.join(still, 'body', origin=(0, 0, 0))
-    # the upper oven door (hinged at its bottom) and its tray of rolls
+    # the upper oven door (hinged at its bottom) and its tray, empty: it slides out for whatever goes in (a roast, a
+    # pie, a meal's dish, none of which the game draws in an oven); its rolls showed for every one (2026-11-03)
     door = _oven_door(F, 'oven_door', 0, 0.60, 1.62, 0.16, hinge_y=1.37, out=0.0735)
     with G.new_parts() as parts:
         _tray(F, 'tray', 0, 1.585, -0.015, 0.46, 0.31)
-        for i in range(6):
-            F.soft(f'roll{i}', 0.075, 0.045, 0.06, (-0.13 + 0.13 * (i % 3), 1.613, -0.09 + 0.15 * (i // 3)), M.bread,
-                   round=0.02, round_segments=2, puff=0.006, flat=1)
     tray = G.join(parts, 'tray', origin=F.at(0, 1.60, -0.17))
     G.settle()
     G.swing(door, 'oven_open', 85, seconds=SECONDS, axis='X')

@@ -44,7 +44,7 @@ hob and the oven windows are opaque glossy black (`hob`, a plain finish) rather 
 | `cup` | gloss | the cup under the spout |
 | `coffee` | gloss | the coffee stream |
 | `fruit` | gloss | the breakfast counter's oranges and smoothie, the microwave's soup |
-| `bread`, `crumb` | satin | the oven tower's rolls; toast (crust and face) |
+| `bread`, `crumb` | satin | toast (crust and face) |
 | `banana` | satin | the banana in the fruit bowl |
 | `towel` | satin | the tea towel over the range cooker's rail (plain, no draw call of its own) |
 
@@ -59,7 +59,7 @@ then the clips keyed (`settle()` must come before `swing()`/`slide()`).
 |---|---|---|---|---|---|
 | `model.stoveElectric` | 0.600 × 0.980 × 0.660 m | 2,944 | 4 | oven door, knob, hot ring | `oven_open` 1.4 s (bake); `burner_on` 0.5 s: the knob turns and the front ring on its side (−x) glows red (cook) |
 | `model.stoveGas` | 0.920 × 1.111 × 0.694 m | 3,708 | 4 | oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet): the outer knob on the −x side turns, the front burner there lights |
-| `model.wallOven` | 0.700 × 2.110 × 0.708 m | 4,738 | 3 | upper door, tray | `oven_open` 1.4 s: door drops and tray slides 10 cm (roast, bake) |
+| `model.wallOven` | 0.700 × 2.110 × 0.708 m | 2,938 | 3 | upper door, tray | `oven_open` 1.4 s: door drops and the empty tray slides 10 cm (roast, bake) |
 | `model.rangeCooker` | 1.580 × 1.141 × 0.761 m | 4,880 | 4 | left oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet): the knob nearest the middle (x −0.12) turns, the front middle burner lights |
 | `model.cooktopCounter` | 1.000 × 0.956 × 0.660 m | 2,820 | 3 | knob, hot ring | `burner_on` (cook): the outer knob on the +x side turns, the back ring on that side (z −0.22) glows red |
 | `model.microwave` | 1.000 × 1.250 × 0.666 m | 3,764 | 4 | door, turntable | `door_open` 1.0 s, `hold` 1.2 s (reheat); `turntable` loops (reheat) |
@@ -156,7 +156,11 @@ The models, to match:
   side of the ring that glows (+0.42; it was the far −x one).
 - **rangeCooker**: the knob that turns is the one nearest the middle (−0.12) for the middle burner; it was the far
   −x one (−0.6), which is a still knob now.
-- **dishwasher**, **dishwasherCompact**: emptying it (`unload`) drops the door too (it played nothing).
+- **dishwasher**, **dishwasherCompact**: emptying it (`unload`) drops the door too (it played nothing); loading it or
+  emptying it, the cook bends down to the open rack (`ACTIONS` `wash`, `clean`: they held a dirty pot at the worktop's
+  height over the door).
+- **wallOven**: its tray slides out empty; the six rolls on it showed for a roast dinner and every recipe's bake (the
+  game draws no dish in an oven).
 
 ## Rebuild
 

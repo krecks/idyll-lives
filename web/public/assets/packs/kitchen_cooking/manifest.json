@@ -124,9 +124,6 @@
       "type": "model",
       "url": "../../models/kitchen_cooking/wallOven.glb",
       "materials": {
-        "bread": {
-          "finish": "material.finish.satin"
-        },
         "cab": {
           "finish": "material.finish.satin"
         },
