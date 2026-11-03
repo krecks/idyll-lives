@@ -1452,8 +1452,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     await this.street.build(world, this.view, () => this.pace());
     this.cars.build(world);
     this.loadStep('Furnishing the house', 0.45);
-    await this.lot.buildObjects(world); // (the objects, their clips, contact shadows, items.)
-    await this.parkedRides.build(world, (x, z) => this.inView(x, z, 0)); // (other lots' bikes and e-scooters.)
+    // The objects, their clips, contact shadows and items; other lots' bikes and e-scooters alongside.
+    await Promise.all([this.lot.buildObjects(world), this.parkedRides.build(world, (x, z) => this.inView(x, z, 0))]);
     this.mirrors.set(this.lot.mirrors);
     this.placing.objectsBuilt(); // (the thing in hand hidden in them.)
     this.loadStep('Bringing everyone home', 0.55);
