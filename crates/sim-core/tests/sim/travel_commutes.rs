@@ -6,6 +6,7 @@ use crate::common;
 
 use common::hamlets::two_hamlets;
 use sim_core::social::EventKind;
+use sim_core::travel::Mode;
 use sim_core::world::TaskKind;
 use sim_core::{MINUTES_PER_TICK, World, clock, life};
 
@@ -131,28 +132,42 @@ fn the_walk_is_timed_to_the_quickest_way_out() {
         .filter(|&i| w.sims[i].commute().is_some())
         .collect();
     assert!(!walkers.is_empty(), "nobody's commute was worked out");
+    let off_map = w.content.career_rules.commute_minutes;
+    let mut timed = 0;
     for &i in &walkers {
         let c = w.sims[i].commute().unwrap();
-        let off_map = w.content.career_rules.commute_minutes;
+        let name = &w.sims[i].name;
+        // (By bus: timed by the bus they take, `travel_bus.rs`.)
+        if c.bus.is_some() {
+            assert!(w.travel.is_stop(c.exit), "{name}: by bus from a way out");
+            continue;
+        }
         assert_eq!(
             c.ticks,
             ((c.walk + off_map) / MINUTES_PER_TICK) as u64,
-            "{}",
-            w.sims[i].name
+            "{name}"
         );
-        assert!(c.walk < 60.0, "{}: {:.0} min", w.sims[i].name, c.walk);
+        // To the quickest of the ways out they may walk out by about when they'd leave: the roads
+        // out, and a hamlet's bus stop when no bus calls there (`bus::Transit::walks_out`).
+        let Some(start) = start_today(&w, i) else {
+            continue;
+        };
+        let leaving = start.saturating_sub((off_map / MINUTES_PER_TICK) as u64);
+        let from = w.stair_map().ground_pos(w.sims[i].pos);
+        let eta = |k: usize| w.travel.eta(from, w.exits[k], Mode::Foot, 1.5);
+        let best = (0..w.exits.len())
+            .filter(|&k| w.transit.walks_out(k, leaving))
+            .map(eta)
+            .fold(f32::INFINITY, f32::min);
+        assert!(
+            eta(c.exit) <= best + 1e-3,
+            "{name}: to exit {} ({:.0} min), the quickest {best:.0}",
+            c.exit,
+            eta(c.exit)
+        );
+        timed += 1;
     }
-    // Each hamlet has a bus stop in the middle of its street: most walk to one of those, not to
-    // the end of the road.
-    let to_stops = walkers
-        .iter()
-        .filter(|&&i| w.travel.is_stop(w.sims[i].commute().unwrap().exit))
-        .count();
-    assert!(
-        to_stops * 2 > walkers.len(),
-        "{to_stops} of {} to a stop",
-        walkers.len()
-    );
+    assert!(timed > 0, "no walk checked");
 }
 
 /// A walk worked out from upstairs (in bed at night, say) is timed along the ground, not across

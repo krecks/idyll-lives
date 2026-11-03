@@ -219,21 +219,54 @@ fn generated_worlds_are_livable() {
             }
         }
         common::check(&w);
-        // Half a day of everyone's free will.
+        // A town with bus stops has a bus calling at them (`bus.rs`).
+        let stops = (0..w.exits.len()).filter(|&k| w.travel.is_stop(k)).count();
+        if stops > 0 && w.transit.lines.is_empty() {
+            failures.push(format!("{label}: {stops} bus stops and no bus"));
+        }
+        // Half a day of everyone's free will: the bus comes, and nobody waits at a stop for long.
+        let mut waited = vec![0u64; w.sims.len()];
+        let mut bound: Vec<bool> = (0..w.sims.len()).map(|i| w.bound_for_bus(i).is_some()).collect();
+        let (mut most_buses, mut rode) = (0, 0);
         for hour in 0..12 {
             for _ in 0..TICKS_PER_HOUR {
                 w.tick_once();
+                most_buses = most_buses.max(w.transit.buses.len());
+                for (i, t) in waited.iter_mut().enumerate() {
+                    let at_stop = w.sims[i].current().is_some_and(|a| {
+                        matches!(a.phase, sim_core::world::Phase::AtStop { .. })
+                    });
+                    if at_stop {
+                        *t += 1;
+                        if *t == TICKS_PER_HOUR {
+                            failures.push(format!(
+                                "{label}: {} waited an hour at a bus stop",
+                                w.sims[i].name
+                            ));
+                        }
+                    } else {
+                        *t = 0;
+                    }
+                    // (On the bus: bound for it last tick, away now.)
+                    rode += usize::from(bound[i] && w.sims[i].away_until.is_some());
+                    bound[i] = w.bound_for_bus(i).is_some();
+                }
             }
             if hour % 3 == 2 {
                 common::check(&w);
             }
         }
+        if !w.transit.lines.is_empty() && most_buses == 0 {
+            failures.push(format!("{label}: no bus came all day"));
+        }
         eprintln!(
-            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements",
+            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements, {stops} bus stops, {} lines ({} min out and back at most), {rode} rode the bus",
             w.lot.width,
             w.lot.depth,
             w.sims.len(),
-            w.objects.len()
+            w.objects.len(),
+            w.transit.lines.len(),
+            w.transit.lines.iter().map(|l| l.end / sim_core::TICKS_PER_MINUTE).max().unwrap_or(0)
         );
         failures
     })

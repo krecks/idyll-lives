@@ -101,6 +101,7 @@ mod surfaces;
 mod tops_and_conditions;
 mod town_fields;
 mod travel_bikes;
+mod travel_bus;
 mod travel_cars;
 mod travel_commutes;
 mod travel_countryside;
