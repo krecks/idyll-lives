@@ -64,6 +64,7 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `item.pastryBag` | a white paper bag 12 cm wide, its top folded open, a croissant of five lobes standing out of it | 1 | 176 |
 | `item.cutFlowers` | a bunch of cut flowers 37 cm tall standing out of the hand, the stems gathered at the grip and curving up to six heads (three daisies with an amber eye, two tulip buds, a small daisy) and four leaves, the same heads as the vase of flowers (`tabletop.py`) | 1 | 624 |
 | `item.daisyChain` | a daisy chain 16 cm across, coiled flat in the hand: a ring of plaited green stems with eleven white daisies round it (an amber eye on each), heads up, and the two stem ends tucked back under where the chain was closed | 1 | 1034 |
+| `item.parcel` | a parcel from the shop 42 x 30 x 34 cm (2026-11-03, sim-core `setup.rs`): a corrugated card box, its edges rounded a little, brown tape over the top seam and a hand's width down the front and back, a white address label with three red lines; at the front door, in both hands, and on the floor while what's in it is put together | 1 | 140 |
 | `tool.book` | an open cloth-bound book, 30 x 22 cm: the boards, two page blocks rising from the spine and curving down to the fore-edges, a sheet over each with seven grey bands of type | 1 | 496 |
 | `tool.phone` | a smartphone 7.2 x 14.8 cm, a rounded dark body, the glass and a lit screen, a camera bump | 1 | 288 |
 | `tool.mug` | a glazed mug 8 cm across with a blue band, its handle to the right, coffee and crema | 1 | 480 |
