@@ -2,7 +2,11 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
-## Unreleased
+## 0.6.0 — 2026-11-03
+
+**Play it in your browser:** https://krecks.github.io/idyll-lives/
+
+Cars on the driveways and the roads, bigger open worlds with hamlets and country roads, real garden fences and a garage of your own, every model rebuilt and every texture made in code, and a quicker, smoother game.
 
 - **Bigger, open worlds:** Create World has a size: *Cosy* (the town as before), *Normal* (a town about 1.6 times as big, up to 256 m) and *Big* (a world of 896 to 1024 m: a main town, hamlets and countryside joined by country roads). The camera roams the whole world, and the town map pans and zooms to a hamlet. Residents travel it: on foot along the roads and trails, by bus from the stops, and in the household's car to work, to the next hamlet and back (whoever of the household goes along rides with them), parking at a public spot there. Out in the country are picnic meadows, lookouts, orchards and fishing jetties. The simulation keeps a Big world's 120 or so residents going at full speed, its ground stored and searched in chunks, and the renderer streams the world in by distance, so a Big world plays as smoothly as a town. Saved games keep their size; a town saved before is Cosy.
 - **Country roads without hairpins:** in a new Big world the country roads no longer double back on themselves where they meet a hamlet or a town. A road leaves a place the way a real one does: the end of a street running straight on into it, or a T-junction square off a street on the side facing where it is going (a second road off a busy street end branches off the first), and where two places are close it runs straight from one to a street of the other. Out in the country it bends in wide curves, never turning more than 70° over any 40 m, keeps from looping round, and still meets other country roads square on. A Big world's houses no longer stand right at a street corner or on a tight bend, where a car pulling out of the driveway would cut across the verge; a bigger gap of land left between their back gardens goes to one of them, not shut in behind the fences. Saved games keep their worlds.
@@ -50,8 +54,14 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
   with it, instead of the same round blob for everything: darkest where it stands on the floor (a cabinet's base,
   a chair's feet, a table's legs), lighter under a seat or a table top the higher it is, and spilling a little
   past its edge. All of them are still one draw.
+- **Quicker to load, smoother to play:** a game loads behind one loading screen whose bar only goes forward: the models, textures and pictures play needs are fetched eight at a time (none can hold the screen for ever), read off the page, and kept in the browser's cache for the next visit, and the catalog's pictures and the residents' portraits are drawn ahead in idle moments. New worlds and town files are made off the page, so choosing another world on the new-world screen no longer stalls the menus, and the grass and the land's shading are built off it too. In play, cars coming and going no longer make the whole town find its way again, the town's commutes aren't all worked out again at midnight, and the world's changes reach the renderer as small updates, applied once a frame. Far-off residents and the street are drawn more cheaply (the street's far things in their far versions, nothing drawn that is hidden, the sun's shadows only redrawn where something moves), the open world's distances follow the graphics preset, and Low draws a leaner picture. The voices and the language model wait while a game loads and its town streams in, then speak.
+- **Riding in the car:** whoever rides in a car sits in their seat and moves with it as it drives, instead of trailing behind it; the wheels turn and steer.
+- **On the way:** a resident's panel says where they are off to and about when they'll be there ("On the way to the Smiths · there about 14:20"); the town map says where the others are going.
+- **Keys and menus:** Esc closes what is on top first (a dialog, a panel), then opens the pause menu; the game's keys rest while a dialog is open; the middle mouse button turns the camera; the town map's clicks and labels land where they should on the bigger maps. A saved game goes on at the speed it was saved at once it is loaded.
+
 ### Also
-- **Saves:** format 34 (where every car is, who owns it, every house's driveway and the garages). Older saves open with no cars in the simulation: their neighbours' cars stay parked, as before.
+- **Saves:** format 35: where every car is, who owns it, every house's driveway and the garages (34), and the open world's size, roads and hamlets (35). Older saves open as Cosy towns with no cars in the simulation: their neighbours' cars stay parked, as before. 0.5.x can't open 0.6.0's saves: it keeps them and lists only the ones it can open.
+- **Known:** loading a Big world holds the game for up to a second once, while every resident's way to work is worked out.
 
 ## 0.5.1 — 2026-10-29
 
