@@ -290,6 +290,18 @@ When it goes well, those listening get its `targetFeeling`, and everyone there g
 `socialRules.joinFriendship` friendship with everyone else (default 2; the two talking get
 their social's outcome with each other instead).
 
+**A host's offer:** with `visits.offer` (`{"social", "afterMinutes", "againMinutes",
+"handAnim"}`; base game: *Offer a bite to eat*), a free host asks a guest who has nothing in
+hand and isn't eating if they'd like something, `afterMinutes` (default 15) after the guest
+came in and again every `againMinutes` (default 120), only with something at home to bring: an
+`eat` use a guest could have themselves, free of charge (the fridge's snack, the toaster's
+toast), the one that would do the guest the most good. The social must have `"effect":
+"serve"` on success (an error otherwise) and isn't in the social menu. A social's acceptance
+may weigh how short the target is of needs (`"acceptance": {"needs": {"hunger": 1.2}}`: per
+unit of 1 − the need), so a hungry guest says yes. Taken up, the host takes it out, carries it
+to the guest and hands it over (`handAnim`), and the guest sits down with it; the plate is
+the host's to wash up, and the story tells it (`served`). Code: `crates/sim-core/src/hosting.rs`.
+
 **Adding a tag:** reuse an existing tag whenever it fits. Add one only if a trait, emotion,
 schedule or buff must tell your objects apart. A tag exists once any interaction uses it;
 to refer to a tag before anything uses it (e.g. in a `traitPatches` preference), declare it

@@ -50,6 +50,7 @@ mod harvests;
 mod held_foods;
 mod high_chair;
 mod hood;
+mod hosting;
 mod items_and_buffs;
 mod lamps;
 mod laundry;

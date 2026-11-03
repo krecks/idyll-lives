@@ -489,8 +489,11 @@ pub fn check(w: &World) {
                     station == Some(o.id)
                 }
                 TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat == Some(o.id),
-                // (Beside the crib, lifting the baby out of it.)
-                TaskKind::Carry { from, stage: 0, .. } => from == o.id,
+                // (Beside the crib, lifting the baby out of it; at the fridge, taking something
+                // out for a guest.)
+                TaskKind::Carry { from, stage: 0, .. } | TaskKind::Serve { from, stage: 0, .. } => {
+                    from == o.id
+                }
                 _ => false,
             }) || (s.use_seat == Some(o.id)
                 && doing.is_some_and(|a| matches!(a.task.kind, TaskKind::Use { .. })));
@@ -512,8 +515,8 @@ pub fn check(w: &World) {
             );
         }
     }
-    // Only cooks, people eating and washing up, and harvesters on their way to the fridge carry things
-    // (the rest put them down).
+    // Only cooks, people eating and washing up, harvesters on their way to the fridge and hosts
+    // bringing a guest something carry things (the rest put them down).
     for s in &w.sims {
         if s.held.is_some() {
             let chain = |k: &TaskKind| {
@@ -523,6 +526,7 @@ pub fn check(w: &World) {
                         | TaskKind::Eat { .. }
                         | TaskKind::Dishes { .. }
                         | TaskKind::Carry { baby: None, .. }
+                        | TaskKind::Serve { .. }
                 )
             };
             assert!(
@@ -640,6 +644,20 @@ fn task_refs(w: &World, i: usize, kind: &TaskKind, doing: &str) {
             baby.is_none_or(|b| (b as usize) < n && b as usize != i)
                 && object(Some(from))
                 && object(Some(to))
+        }
+        // (What it's taken from matters only until it's in hand.)
+        TaskKind::Serve {
+            guest,
+            from,
+            interaction,
+            stage,
+        } => {
+            (guest as usize) < n
+                && guest as usize != i
+                && (stage > 0
+                    || w.objects
+                        .get(from as usize)
+                        .is_some_and(|o| interaction < c.objects[o.def].interactions.len()))
         }
     };
     assert!(
@@ -787,6 +805,7 @@ fn doing(kind: &TaskKind) -> Doing {
         TaskKind::Dishes { stage, .. } => Doing(13, stage as u32, 0),
         TaskKind::Phone { action, .. } => Doing(14, action as u32, 0),
         TaskKind::Carry { to, stage, .. } => Doing(15, to, stage as u32),
+        TaskKind::Serve { guest, stage, .. } => Doing(16, guest, stage as u32),
     }
 }
 
@@ -876,7 +895,7 @@ fn describe(w: &World, st: State) -> String {
         Doing(k, a, b) => {
             let kinds = [
                 "Use", "MoveTo", "Social", "Join", "Work", "Visit", "GoHome", "Answer", "Clean",
-                "Repair", "Spot", "Cook", "Eat", "Dishes", "Phone", "Carry",
+                "Repair", "Spot", "Cook", "Eat", "Dishes", "Phone", "Carry", "Serve",
             ];
             format!("{} {a} {b}", kinds[k as usize])
         }

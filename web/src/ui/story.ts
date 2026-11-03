@@ -53,6 +53,7 @@ const ICONS: Record<string, string> = {
   notClosed: 'icon.ui.home',
   playedAlone: 'icon.need.fun',
   noPartner: 'icon.need.social',
+  served: 'icon.social.offer',
 };
 
 const LOVE = new Set(['crush', 'firstKiss', 'startedDating', 'movedInWith', 'expecting', 'born', 'adopted']);
@@ -62,6 +63,15 @@ export function storyIcon(e: SocialEvent): string {
   if (e.kind === 'skillUp') return services.content.skills[e.skill ?? -1]?.icon ?? 'icon.ui.skills';
   if (e.kind === 'goalReached') return services.content.goals[e.goal ?? -1]?.icon || 'icon.ui.calendar';
   return ICONS[e.kind] ?? 'icon.need.social';
+}
+
+/** An item named in a sentence (sim-core `view::some_of`): "a snack", "an ice cream", "some toast". */
+function someOf(item: number | null | undefined): string {
+  const label = services.content.items[item ?? -1]?.label;
+  if (!label) return 'something';
+  const thing = label.toLowerCase();
+  if (thing.endsWith('s') || thing === 'toast' || thing === 'takeout') return `some ${thing}`;
+  return `${/^[aeiou]/.test(thing) ? 'an' : 'a'} ${thing}`;
 }
 
 /** A goal's text: its label with the skill, target and career category filled in. */
@@ -121,6 +131,7 @@ export function storyText(e: SocialEvent): string {
     .replace('{goal}', goalText(e.goal, e.n, e.skill, e.career, e.object))
     .replace('{accident}', services.content.accidents[e.n ?? -1]?.story ?? 'had a bad moment')
     .replace('{stage}', services.content.lifeStages[e.n ?? -1]?.story ?? 'is a year older')
+    .replace('{item}', () => someOf(e.n))
     .replace(/.*\{object\}.*/, (text) => fillObject(text, e.object ?? e.n))
     .replace('{grade}', (() => {
       const l = gradeLetter(e.n ?? 0);

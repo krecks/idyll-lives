@@ -1333,6 +1333,35 @@ fn task_view(
             };
             (label, world.stable_of(to), baby, minutes)
         }
+        // "Bring a snack" (the UI adds who): what they take out for a guest, or have in hand.
+        TaskKind::Serve {
+            guest,
+            from,
+            interaction,
+            stage,
+        } => {
+            let item = held.map(|h| h.def).or_else(|| {
+                let o = world.objects.get(from as usize)?;
+                let r = content.objects[o.def].interactions.get(interaction)?.eats?;
+                let item = content.recipes[r].item;
+                Some(content.items[item].serving.unwrap_or(item))
+            });
+            let what = item.map_or_else(
+                || "something".to_owned(),
+                |d| some_of(&content.items[d].label),
+            );
+            let minutes = if stage == 0 {
+                world
+                    .objects
+                    .get(from as usize)
+                    .and_then(|o| content.objects[o.def].interactions.get(interaction))
+                    .map_or(1.0, |i| i.minutes.max(0.5))
+            } else {
+                crate::hosting::HAND_MINUTES
+            };
+            let object = (stage == 0).then(|| world.stable_of(from)).flatten();
+            (format!("Bring {what}"), object, Some(guest), minutes)
+        }
     };
     let progress = match phase {
         Some(Phase::Using { elapsed }) | Some(Phase::Conversing { elapsed, .. }) => {
@@ -2770,4 +2799,16 @@ pub fn catalog_json(content: &Content) -> String {
 
 fn is_level(tall: &i16) -> bool {
     *tall == 0
+}
+
+/// A thing named in a sentence: "a snack", "an ice cream", "some toast", "some noodles".
+pub fn some_of(label: &str) -> String {
+    let thing = label.to_lowercase();
+    if thing.ends_with('s') || ["toast", "takeout"].contains(&thing.as_str()) {
+        format!("some {thing}")
+    } else if thing.starts_with(['a', 'e', 'i', 'o', 'u']) {
+        format!("an {thing}")
+    } else {
+        format!("a {thing}")
+    }
 }

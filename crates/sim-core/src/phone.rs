@@ -157,7 +157,7 @@ pub(crate) struct PhoneActionRaw {
     #[serde(default)]
     requires: Requirements,
     #[serde(default)]
-    acceptance: Acceptance,
+    acceptance: social::AcceptanceRaw,
     #[serde(default)]
     needs: HashMap<String, f32>,
     #[serde(default)]
@@ -243,7 +243,7 @@ pub(crate) fn parse(
             prefer: a.prefer,
             tags: social::tag_mask(&a.tags, ix, &ctx)?,
             requires: a.requires,
-            acceptance: a.acceptance,
+            acceptance: social::parse_acceptance(&a.acceptance, ix, &ctx)?,
             gains: social::need_array(&a.needs, ix, &ctx)?,
             contact_gains: social::need_array(&a.contact_needs, ix, &ctx)?,
             success,

@@ -81,6 +81,10 @@
 //! running along x keeps the way it runs (`drives[].frontX`, ±1; absent: along z, `front`), so
 //! files without one save as they did; a cosy town's driveways with the road each meets
 //! (`drives[].road`) are what has its cars drive its roads (`cars::settle_all`).
+//! Still 35: the story may tell of a host bringing a guest something (`served`, the item in `n`,
+//! by id in `refs.item`); older builds drop it, as any kind they don't know. A host's offer, or
+//! something on its way to a guest (`world::TaskKind::Serve`), isn't saved: what's in hand is put
+//! down after a load.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -1381,6 +1385,7 @@ impl World {
                     until: after(left.unwrap_or(content.visits.directed_hours * 60.0)),
                     idle: 0,
                     farewell: 0,
+                    offer_at: 0,
                 })
             });
             for t in &s.tasks {
@@ -1691,13 +1696,15 @@ impl World {
             },
             // (Eating and washing up start again from what's there after loading; a few minutes
             // on the phone are simply over, and so is listening in on a conversation.)
-            // (Nor is a carry: a baby is back in the crib after a load, a harvest put down.)
+            // (Nor is a carry: a baby is back in the crib after a load, a harvest put down; nor
+            // a host bringing a guest something, which is put down.)
             TaskKind::Answer { .. }
             | TaskKind::Eat { .. }
             | TaskKind::Dishes { .. }
             | TaskKind::Phone { .. }
             | TaskKind::Join { .. }
-            | TaskKind::Carry { .. } => return None,
+            | TaskKind::Carry { .. }
+            | TaskKind::Serve { .. } => return None,
         })
     }
 }
@@ -2288,6 +2295,7 @@ fn event_refs(
             "stage",
             n.and_then(|n| content.life.stages.get(n)).map(|d| &d.id),
         ),
+        Served => put("item", n.and_then(|n| content.items.get(n)).map(|d| &d.id)),
         _ => {}
     }
     put(
@@ -2342,6 +2350,7 @@ fn resolve_refs(
         find(refs, "object", content.objects.iter().map(|d| &d.id))?,
         find(refs, "accident", content.accidents.iter().map(|d| &d.id))?,
         find(refs, "stage", content.life.stages.iter().map(|d| &d.id))?,
+        find(refs, "item", content.items.iter().map(|d| &d.id))?,
     ];
     if let Some(i) = n.into_iter().flatten().next() {
         e.n = Some(i64::from(i));

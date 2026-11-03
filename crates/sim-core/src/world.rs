@@ -882,6 +882,15 @@ pub enum TaskKind {
         to: u32,
         stage: u8,
     },
+    /// A host bringing `guest` something to eat or drink (`hosting.rs`): over to `from` to take
+    /// it out (its `interaction`, an `eat` one; stage 0), then with it in hand to the guest and
+    /// handing it over (stage 1 on; each stage past 1 is one more go at getting to them).
+    Serve {
+        guest: u32,
+        from: u32,
+        interaction: usize,
+        stage: u8,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1146,6 +1155,16 @@ pub struct Sim {
     pub held: Option<crate::items::Held>,
     /// Told dinner's ready: keener to eat until this tick.
     pub(crate) invited_until: u64,
+    /// Their offer of something to eat or drink was taken up this tick by this resident: they go
+    /// and fetch it (`hosting::update`). Not saved.
+    pub(crate) serve_for: Option<u32>,
+    /// Handed what they hold to this resident this tick (`hosting::update` passes it over). Not
+    /// saved.
+    pub(crate) hand_to: Option<u32>,
+    /// Said yes to a host's offer: something to eat is on its way to them until this tick (or
+    /// till it's handed over), so they don't get food of their own meanwhile (`hosting.rs`). Not
+    /// saved.
+    pub(crate) expecting: u64,
     /// A dish they served this tick (an item; the household is told after the step).
     pub(crate) served: Option<u32>,
     /// A phone action that ended this tick (applied after the step, see `phone::update`).
@@ -1397,7 +1416,8 @@ impl Sim {
                 TaskKind::Work
                 | TaskKind::Visit { .. }
                 | TaskKind::GoHome
-                | TaskKind::Answer { .. },
+                | TaskKind::Answer { .. }
+                | TaskKind::Serve { .. },
                 _,
             ) => false,
             (
@@ -1702,6 +1722,10 @@ pub(crate) struct SimBrief {
     pub bound_for_car: Option<u32>,
     /// On their way to this car for a trip, or in it (`cars::Trip`: a `Visit` or `GoHome`).
     pub trip_car: Option<u32>,
+    /// The plot they're a guest on (`Sim::visiting`).
+    pub guest_at: Option<u32>,
+    /// The seat they eat at, or are on their way to with something to eat (`cooking::company`).
+    pub eats_at: Option<u32>,
 }
 
 pub struct World {
@@ -2894,6 +2918,9 @@ impl World {
             gone: None,
             held: None,
             invited_until: 0,
+            serve_for: None,
+            hand_to: None,
+            expecting: 0,
             served: None,
             hung_up: None,
             retired,
@@ -2982,6 +3009,7 @@ impl World {
             | TaskKind::Answer { guest: target } => target == id,
             TaskKind::Phone { contact, .. } => contact == Some(id),
             TaskKind::Carry { baby, .. } => baby == Some(id),
+            TaskKind::Serve { guest, .. } => guest == id,
             _ => false,
         };
         let World {
@@ -4242,6 +4270,11 @@ impl World {
                         matches!(a.task.kind, TaskKind::Visit { .. } | TaskKind::GoHome)
                     })
                 }),
+                guest_at: s.visiting.map(|v| v.plot),
+                eats_at: match s.current().map(|a| a.task.kind) {
+                    Some(TaskKind::Eat { seat, stage: 1, .. }) => seat,
+                    _ => None,
+                },
             });
         }
         // Who's in a conversation, and whose (for joining in).
@@ -4367,6 +4400,7 @@ impl World {
         self.wake_for_crying_babies();
         conversation::update(self);
         crate::privacy::after_step(self);
+        crate::hosting::update(self);
         crate::phone::update(self);
         crate::life::update(self);
         crate::lifecycle::update(self);
@@ -6218,7 +6252,7 @@ pub(crate) fn access_in(
 /// The first thing `inter` requires that no working object on `object`'s plot provides, if any
 /// (content `requires` / `provides`): a table's coffee needs a coffee machine. With `index`
 /// (current during a tick) only that plot's objects are looked at.
-fn missing_requirement<'a>(
+pub(crate) fn missing_requirement<'a>(
     content: &'a Content,
     object_plot: &[Option<u32>],
     index: Option<&ObjectIndex>,
@@ -7088,6 +7122,18 @@ fn pick_autonomous(
         });
     }
 
+    // Waiting for something to eat a host is bringing them (`hosting.rs`): nothing of their own.
+    if sim.expecting > ctx.tick {
+        candidates.retain(|&(_, choice)| match choice {
+            Choice::Eat(_) => false,
+            Choice::Object(o, i) => content.objects[objects[o as usize].def]
+                .interactions
+                .get(i)
+                .is_none_or(|it| it.eats.is_none() && it.recipe.is_none()),
+            _ => true,
+        });
+    }
+
     // From the seat: only a word with someone sitting near (nothing that takes them closer than
     // talking does: a hug, a kiss, a fight), or listening in on a talk going on beside them.
     if let Some(range) = from_seat {
@@ -7265,6 +7311,7 @@ fn start_task(
         }
         TaskKind::Phone { .. } => return crate::phone::start(sim, task, ctx, objects),
         TaskKind::Carry { .. } => return crate::carry::start(sim, task, ctx, objects),
+        TaskKind::Serve { .. } => return crate::hosting::start(sim, task, ctx, objects),
         TaskKind::Use {
             object,
             interaction,
@@ -8414,8 +8461,9 @@ fn progress(
                     crate::phone::using(sim, content, task, elapsed, minutes)
                 }
                 TaskKind::Carry { .. } => crate::carry::using(sim, elapsed),
+                TaskKind::Serve { .. } => crate::hosting::using(sim, ctx, objects, elapsed),
                 _ => unreachable!(
-                    "only Use, Repair, Spot, Clean, Cook, Eat, Dishes, Phone and Carry tasks have a Using phase"
+                    "only Use, Repair, Spot, Clean, Cook, Eat, Dishes, Phone, Carry and Serve tasks have a Using phase"
                 ),
             }
         }
@@ -8430,6 +8478,16 @@ fn progress(
             .is_some_and(|a| matches!(a.task.kind, TaskKind::Carry { .. }))
         {
             crate::carry::step_done(sim, ctx, objects, items);
+            if sim.current.is_some() {
+                return;
+            }
+        // Something for a guest taken out, or handed over: on to them, or done.
+        } else if sim
+            .current
+            .as_ref()
+            .is_some_and(|a| matches!(a.task.kind, TaskKind::Serve { .. }))
+        {
+            crate::hosting::step_done(sim, ctx, objects);
             if sim.current.is_some() {
                 return;
             }
@@ -8900,6 +8958,7 @@ fn arrive(
         }
         TaskKind::Phone { .. } => crate::phone::arrive(sim, ctx, objects),
         TaskKind::Carry { .. } => crate::carry::arrive(sim, ctx, objects),
+        TaskKind::Serve { .. } => crate::hosting::arrive(sim, ctx, objects),
         TaskKind::Use {
             object,
             interaction,
@@ -9751,7 +9810,9 @@ fn held_object(kind: TaskKind) -> Option<u32> {
     match kind {
         TaskKind::Use { object, .. } | TaskKind::Repair { object } => Some(object),
         // (Beside the crib, lifting the baby out.)
-        TaskKind::Carry { from, stage: 0, .. } => Some(from),
+        TaskKind::Carry { from, stage: 0, .. } | TaskKind::Serve { from, stage: 0, .. } => {
+            Some(from)
+        }
         TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station,
         TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat,
         _ => None,

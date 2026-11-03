@@ -18,6 +18,7 @@ pub mod cooking;
 pub mod error;
 pub mod garages;
 pub mod home;
+pub mod hosting;
 mod index;
 pub mod items;
 pub mod life;

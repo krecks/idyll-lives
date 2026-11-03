@@ -365,6 +365,49 @@ pub(crate) fn doing(world: &World, s: &Sim) -> Doing {
             .map_or(-1.0, |o| o.def as f32);
         return d;
     }
+    // Something for a guest (`hosting.rs`): taken out at the fridge (the `eat` use's own
+    // animation; not its interaction, whose lines are for having it oneself), then handed over.
+    if let Some(Activity {
+        task:
+            Task {
+                kind:
+                    TaskKind::Serve {
+                        from,
+                        interaction,
+                        stage,
+                        ..
+                    },
+                ..
+            },
+        phase,
+        ..
+    }) = s.current()
+    {
+        let using = matches!(phase, Phase::Using { .. });
+        if *stage > 0 {
+            let anim = world
+                .content
+                .visits
+                .offer
+                .as_ref()
+                .and_then(|o| o.hand_anim)
+                .filter(|_| using);
+            return Doing::plain(world, None, anim);
+        }
+        let Some(o) = world.objects.get(*from as usize) else {
+            return Doing::NOTHING;
+        };
+        let anim = world.content.objects[o.def]
+            .interactions
+            .get(*interaction)
+            .and_then(|i| i.anim)
+            .or(world.content.cooking.put_away_anim)
+            .filter(|_| using);
+        return Doing {
+            def: o.def as f32,
+            ..Doing::plain(world, Some(*from), anim)
+        };
+    }
     // Clearing away: at the bin, the sink or the counter, scraping, washing or putting away (the
     // station's kind too: washing at a dishwasher sounds unlike a sink's running tap).
     if let Some(Activity {

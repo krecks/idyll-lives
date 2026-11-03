@@ -1791,9 +1791,56 @@ fn dining<'a>(sim: &Sim, ctx: &Ctx<'a>) -> (&'a [u32], Option<u32>) {
     )
 }
 
+/// Who keeps someone eating company, and where: those eating (or on their way to a seat to eat:
+/// where they'll sit) first, then those sitting down free for a word (each in id order). At
+/// home, their guests there; at a host's, the hosts there. None elsewhere.
+fn company(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Vec<(u8, [f32; 2])> {
+    let me = sim.id as usize;
+    let Some(here) = ctx.briefs.get(me).and_then(|b| b.plot) else {
+        return Vec::new();
+    };
+    let guest = sim.visiting.is_some_and(|v| v.plot == here);
+    if !guest && ctx.households[sim.household as usize].plot != Some(here) {
+        return Vec::new();
+    }
+    let mut company: Vec<(u8, [f32; 2])> = ctx
+        .briefs
+        .iter()
+        .enumerate()
+        .filter(|&(j, b)| {
+            j != me
+                && b.here
+                && !b.away
+                && !b.baby
+                && b.plot == Some(here)
+                && if guest {
+                    b.guest_at.is_none() && ctx.households[b.household as usize].plot == Some(here)
+                } else {
+                    b.guest_at == Some(here)
+                }
+        })
+        .filter_map(|(j, b)| {
+            let seat = b.eats_at.and_then(|o| objects.get(o as usize));
+            match seat {
+                Some(o) => {
+                    let slot = o.slot_of(j as u32).unwrap_or(0);
+                    Some((0, o.slot_position(ctx.content, slot)))
+                }
+                None => (b.seated && b.available).then_some((1, b.pos)),
+            }
+        })
+        .collect();
+    company.sort_by_key(|c| c.0);
+    company
+}
+
 /// The best free place to sit and eat: a chair at a table (`surface::dining_seat`), else a
-/// table with seats of its own, else any seat.
-fn eat_seat(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
+/// table with seats of its own, else any seat. With company (a guest at home, the hosts at a
+/// host's) sitting down, first a seat within talking range of them, in sight (beside one
+/// eating before one only sitting), so the two talk over the meal (`conversation::from_seat`);
+/// else the best nearest to them.
+/// (`skip`: seats there's no way to.)
+fn eat_seat(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], skip: &[u32]) -> Option<u32> {
     let content = ctx.content;
     let rules = &content.cooking;
     let candidates: Vec<u32> = dining(sim, ctx)
@@ -1802,18 +1849,50 @@ fn eat_seat(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
         .copied()
         .filter(|&o| {
             let obj = &objects[o as usize];
-            !obj.broken() && obj.can_use(sim.id, content.objects[obj.def].slots)
+            !skip.contains(&o)
+                && !obj.broken()
+                && obj.can_use(sim.id, content.objects[obj.def].slots)
         })
         .collect();
     let stage = content.life.stage(sim.age);
-    if let Some(d) = surface::dining_seat(
-        content,
-        objects,
-        &ctx.index.links,
-        &candidates,
-        sim.pos,
-        stage,
-    ) {
+    let company = company(sim, ctx, objects);
+    for rank in 0..2 {
+        let near: Vec<[f32; 2]> = company
+            .iter()
+            .filter(|c| c.0 == rank)
+            .map(|c| c.1)
+            .collect();
+        let Some(&first) = near.first() else {
+            continue;
+        };
+        // (A place on it free, within talking range of one of them.)
+        let beside: Vec<u32> = candidates
+            .iter()
+            .copied()
+            .filter(|&o| {
+                let obj = &objects[o as usize];
+                let slots = usize::from(content.objects[obj.def].slots);
+                (0..slots)
+                    .filter(|&k| obj.users[k].is_none())
+                    .map(|k| obj.slot_position(content, k))
+                    .any(|p| {
+                        near.iter().any(|&c| {
+                            (p[0] - c[0]).hypot(p[1] - c[1]) <= crate::conversation::SEAT_RANGE
+                                && crate::conversation::in_sight(&ctx.nav, p, c)
+                        })
+                    })
+            })
+            .collect();
+        if let Some(d) =
+            surface::dining_seat(content, objects, &ctx.index.links, &beside, first, stage)
+        {
+            return Some(d.object);
+        }
+    }
+    let from = company.first().map_or(sim.pos, |c| c.1);
+    if let Some(d) =
+        surface::dining_seat(content, objects, &ctx.index.links, &candidates, from, stage)
+    {
         return Some(d.object);
     }
     let sits = |o: u32, tags: TagMask| {
@@ -1824,7 +1903,7 @@ fn eat_seat(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
         let (fx, fz) = approach(ctx, &objects[o as usize]);
         ctx.nav
             .stairs
-            .distance([fx as f32 + 0.5, fz as f32 + 0.5], sim.pos)
+            .distance([fx as f32 + 0.5, fz as f32 + 0.5], from)
     };
     let nearest = |pick: &dyn Fn(u32) -> bool| {
         candidates
@@ -1903,7 +1982,11 @@ fn eat_next(
     if sim.held.is_none_or(|h| h.recipe.is_none()) {
         return;
     }
-    if let Some(seat) = eat_seat(sim, ctx, objects) {
+    // (A seat there's no way to, a bedroom kept shut say: the next best, a few at most.)
+    let mut skip = Vec::new();
+    while skip.len() < 3
+        && let Some(seat) = eat_seat(sim, ctx, objects, &skip)
+    {
         let at = Task {
             kind: TaskKind::Eat {
                 item,
@@ -1916,6 +1999,7 @@ fn eat_next(
         if go_to(sim, at, ctx, objects, seat, tags) {
             return;
         }
+        skip.push(seat);
     }
     // Nowhere to sit: standing up.
     sim.pose = Pose::Stand;
@@ -2120,6 +2204,8 @@ pub(crate) fn queued(
     match task.kind {
         TaskKind::Cook { .. } => cook_next(sim, task, ctx, objects, items, Some(waited), None),
         TaskKind::Dishes { .. } => dishes_next(sim, task, ctx, objects, items, Some(waited)),
+        // Handed something to eat (`hosting.rs`): they sit down with it.
+        TaskKind::Eat { .. } => eat_next(sim, task, ctx, objects, items),
         _ => sim.current = None,
     }
 }
@@ -2760,13 +2846,19 @@ fn invite(w: &mut World) {
 }
 
 /// Whether `s` goes on with what they carry (`settle` leaves it with them): here, and cooking,
-/// eating or washing up, or about to (a recipe loaded from a save), or carrying a harvest.
+/// eating or washing up, or about to (a recipe loaded from a save), or carrying a harvest, or
+/// something for a guest.
 fn going_on(s: &crate::world::Sim) -> bool {
     s.here()
         && match &s.current {
-            // (A harvest on its way to the fridge too, `carry.rs`.)
+            // (A harvest on its way to the fridge too, `carry.rs`; a bite for a guest,
+            // `hosting.rs`.)
             Some(a) => {
-                chain(&a.task.kind) || matches!(a.task.kind, TaskKind::Carry { baby: None, .. })
+                chain(&a.task.kind)
+                    || matches!(
+                        a.task.kind,
+                        TaskKind::Carry { baby: None, .. } | TaskKind::Serve { .. }
+                    )
             }
             None => s
                 .queue

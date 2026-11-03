@@ -86,6 +86,9 @@ pub enum Effect {
     Kiss,
     /// Partners trying for a baby (the life cycle decides whether one is on the way).
     Conceive,
+    /// The actor brings the target something to eat or drink from home (a host's offer taken
+    /// up by a guest: `hosting.rs`).
+    Serve,
 }
 
 /// Conditions on the actor's view of the target (and their shared status).
@@ -124,8 +127,7 @@ impl Requirements {
 }
 
 /// Success chance terms. Relationship values are the target's view of the actor.
-#[derive(Debug, Clone, Copy, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[derive(Debug, Clone, Copy)]
 pub struct Acceptance {
     pub base: f32,
     /// Per friendship point.
@@ -138,6 +140,9 @@ pub struct Acceptance {
     pub mood: f32,
     /// Subtracted when the target is partnered with someone else.
     pub taken_penalty: f32,
+    /// Per unit the target is short of each need (1 - the need; content `needs`, need → weight):
+    /// a hungry guest says yes to a bite to eat.
+    pub needs: [f32; MAX_NEEDS],
 }
 
 impl Default for Acceptance {
@@ -149,8 +154,53 @@ impl Default for Acceptance {
             chemistry: 0.0,
             mood: 0.0,
             taken_penalty: 0.0,
+            needs: [0.0; MAX_NEEDS],
         }
     }
+}
+
+/// `Acceptance` as content writes it (needs by id).
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub(crate) struct AcceptanceRaw {
+    base: f32,
+    friendship: f32,
+    romance: f32,
+    chemistry: f32,
+    mood: f32,
+    taken_penalty: f32,
+    needs: HashMap<String, f32>,
+}
+
+impl Default for AcceptanceRaw {
+    fn default() -> Self {
+        let a = Acceptance::default();
+        Self {
+            base: a.base,
+            friendship: a.friendship,
+            romance: a.romance,
+            chemistry: a.chemistry,
+            mood: a.mood,
+            taken_penalty: a.taken_penalty,
+            needs: HashMap::new(),
+        }
+    }
+}
+
+pub(crate) fn parse_acceptance(
+    raw: &AcceptanceRaw,
+    ix: &Indices,
+    ctx: &str,
+) -> Result<Acceptance, Error> {
+    Ok(Acceptance {
+        base: raw.base,
+        friendship: raw.friendship,
+        romance: raw.romance,
+        chemistry: raw.chemistry,
+        mood: raw.mood,
+        taken_penalty: raw.taken_penalty,
+        needs: need_array(&raw.needs, ix, ctx)?,
+    })
 }
 
 #[derive(Debug, Clone)]
@@ -284,7 +334,7 @@ pub(crate) struct SocialRaw {
     #[serde(default)]
     requires: Requirements,
     #[serde(default)]
-    acceptance: Acceptance,
+    acceptance: AcceptanceRaw,
     #[serde(default)]
     prefer: Prefer,
     #[serde(default)]
@@ -484,7 +534,7 @@ pub(crate) fn parse_social(
         stages: crate::content::stage_mask(stage_ids, &raw.stages, ctx)?.unwrap_or(StageMask::MAX),
         target_stages: crate::content::stage_mask(stage_ids, &raw.target_stages, ctx)?
             .unwrap_or(StageMask::MAX),
-        acceptance: raw.acceptance,
+        acceptance: parse_acceptance(&raw.acceptance, ix, ctx)?,
         prefer: raw.prefer,
         actor_gain: need_array(&raw.needs, ix, ctx)?,
         target_gain: need_array(&raw.target_needs, ix, ctx)?,
@@ -887,6 +937,9 @@ pub enum EventKind {
     PlayedAlone,
     /// `a` was told to play a game for two at the `object` and had nobody free to play with.
     NoPartner,
+    /// `a` brought their guest `b` something to eat or drink (`n`: the item, an index into
+    /// `Content::items`; `hosting.rs`).
+    Served,
 }
 
 impl EventKind {
@@ -901,7 +954,7 @@ impl EventKind {
             | Fight | Jealous | QuitJob | RentDebt | Broke | Accident | TurnedAway | WantsToBuy
             | Bought | DeniedAgain | StayedHome | NoBed | NotClosed | PlayedAlone | NoPartner => 1,
             Met | MissedWork | SkillUp | PaidRent | Upgraded | Visited | GoalSuggested
-            | Repaired | NobodyHome | Invited | Declined | Babysitter => 0,
+            | Repaired | NobodyHome | Invited | Declined | Babysitter | Served => 0,
         }
     }
 }
@@ -1052,7 +1105,7 @@ impl EventLog {
         });
     }
 
-    /// An event about two Sims, with a number (an amount of money).
+    /// An event about two Sims, with a number (an amount of money, an item).
     pub fn push_amount(&mut self, tick: u64, kind: EventKind, a: usize, b: usize, n: i64) {
         self.add(SocialEvent {
             id: 0,
