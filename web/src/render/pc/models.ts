@@ -542,21 +542,38 @@ interface Container {
 function loadContainer(app: pc.AppBase, url: string): Promise<Container> {
   setupDecoders();
   const decoded = new Map<object, Uint8Array>();
+  // Every view is decoded, but PlayCanvas's `load` waits only for those it uses itself (with
+  // `skipMeshes`, not the geometry read here): when it comes, the rest may still be on their way,
+  // later in some browsers than others (Firefox). Read once all of them are in.
+  let views = Infinity;
+  let allIn: () => void = () => {};
+  const decodedAll = new Promise<void>((resolve) => (allIn = resolve));
   const options = {
     ...containerOptions,
-    bufferView: { ...containerOptions.bufferView, postprocess: (view: object, data: Uint8Array) => decoded.set(view, data) },
+    bufferView: {
+      ...containerOptions.bufferView,
+      postprocess: (view: object, data: Uint8Array) => {
+        decoded.set(view, data);
+        if (decoded.size >= views) allIn();
+      },
+    },
     // (Its meshes would be uploaded only to be let go of: the geometry is read from the views here.
     // Without them a skinned node has no mesh to skin: skins aren't read here either.)
     skipMeshes: true,
     global: {
-      preprocess: (gltf: { nodes?: { skin?: number }[] }) => {
+      preprocess: (gltf: { nodes?: { skin?: number }[]; bufferViews?: unknown[] }) => {
         for (const node of gltf.nodes ?? []) delete node.skin;
+        views = gltf.bufferViews?.length ?? 0;
+        if (decoded.size >= views) allIn();
       },
     },
   };
   return new Promise((resolve, reject) => {
     const asset = new pc.Asset(url, 'container', { url }, undefined, options as never);
-    asset.once('load', () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const viewsIn = () => Promise.race([decodedAll, new Promise((resolve) => (timer = setTimeout(resolve, VIEWS_WAIT_MS)))]).finally(() => clearTimeout(timer));
+    asset.once('load', () => void viewsIn().then(read).catch(reject));
+    const read = () => {
       const resource = asset.resource as pc.ContainerResource & { data: { gltf: Gltf; materials: pc.StandardMaterial[]; textures?: pc.Asset[] } };
       const gltf = resource.data.gltf;
       const container = { gltf, views: (gltf.bufferViews ?? []).map((v) => decoded.get(v)), materials: resource.data.materials.map((m) => m ?? null), textures: [...(resource.data.textures ?? [])] };
@@ -568,7 +585,7 @@ function loadContainer(app: pc.AppBase, url: string): Promise<Container> {
       for (const sub of [...resource.materials, ...resource.animations]) app.assets.remove(sub);
       app.assets.remove(asset);
       resolve(container);
-    });
+    };
     asset.once('error', (err: unknown) => {
       app.assets.remove(asset);
       reject(new Error(`${url}: ${String(err)}`));
@@ -577,6 +594,9 @@ function loadContainer(app: pc.AppBase, url: string): Promise<Container> {
     app.assets.load(asset);
   });
 }
+
+/** The longest a file waits after it loads for the last of its views to be decoded (ms). */
+const VIEWS_WAIT_MS = 5000;
 
 /**
  * The build's compressed copy of the file if there is one; the file itself if that fails to load.
