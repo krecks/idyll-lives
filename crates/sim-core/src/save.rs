@@ -1507,7 +1507,8 @@ impl World {
             }
         }
 
-        if save.version < 2 || save.relationships.is_empty() {
+        // (Since v35 a save whose pairs are all as new lists none, but keeps their chemistry.)
+        if save.version < 2 || (save.relationships.is_empty() && save.chemistry.is_empty()) {
             // Older saves have no relationships: start the household as housemates.
             world.init_relationships(&[])?;
         } else {
@@ -1753,7 +1754,8 @@ fn expand(s: &str) -> Result<std::borrow::Cow<'_, str>, Error> {
             n => n.parse().map_err(|_| corrupt())?,
         };
         // (No lot is bigger than this: a corrupt count can't ask for more.)
-        if out.len() + count > (crate::lot::MAX_SIDE + 1) * (crate::lot::MAX_ROWS + 1) {
+        if out.len().saturating_add(count) > (crate::lot::MAX_SIDE + 1) * (crate::lot::MAX_ROWS + 1)
+        {
             return Err(corrupt());
         }
         out.extend(std::iter::repeat_n(c, count));
@@ -2469,6 +2471,12 @@ mod tests {
         "sims":[{"name":"Ada","gender":"female","attractedTo":["male"],"appearance":{"body":"#fff"},"traits":["lazy"],"x":3.5,"z":3.5},
                 {"name":"Bo","gender":"male","household":1,"x":4.5,"z":6.5}],
         "relationships":[{"a":0,"b":1,"preset":"friends"}]}"##;
+
+    #[test]
+    fn a_run_too_long_for_any_lot_is_corrupt() {
+        assert!(super::expand(&format!("~01,0{}", usize::MAX)).is_err());
+        assert_eq!(&*super::expand("~03,1,02").unwrap(), "000100");
+    }
 
     #[test]
     fn round_trip_preserves_state() {

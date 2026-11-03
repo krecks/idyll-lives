@@ -36,6 +36,9 @@ pub(crate) struct ObjectIndex {
     /// `usable` then holds only each plot's own.
     cells: Vec<Vec<u32>>,
     cols: usize,
+    /// Open-world towns: the ground's depth (m). The storeys above and the basement are stacked
+    /// past it, each as deep: a place there is in the cell of the ground under it (`fold`).
+    ground: f32,
     open: bool,
 }
 
@@ -49,6 +52,7 @@ impl ObjectIndex {
             version,
             cells: Vec::new(),
             cols: 0,
+            ground: 0.0,
             open: false,
         };
         for (id, plot) in object_plot.iter().enumerate() {
@@ -90,6 +94,7 @@ impl ObjectIndex {
             version,
             cells: Vec::new(),
             cols: (size[0].max(1.0) / CELL).ceil() as usize,
+            ground: size[1].max(1.0),
             open: true,
         };
         let rows = (size[1].max(1.0) / CELL).ceil() as usize;
@@ -115,9 +120,18 @@ impl ObjectIndex {
         index
     }
 
+    /// `z` (stacked rows) on the ground: upstairs and in the basement, the ground under it.
+    fn fold(&self, z: f32) -> f32 {
+        if self.ground > 0.0 && z >= self.ground {
+            z.rem_euclid(self.ground)
+        } else {
+            z
+        }
+    }
+
     fn cell_of(&self, p: [f32; 2], rows: usize) -> usize {
         let cx = ((p[0].max(0.0) / CELL) as usize).min(self.cols.saturating_sub(1));
-        let cz = ((p[1].max(0.0) / CELL) as usize).min(rows.saturating_sub(1));
+        let cz = ((self.fold(p[1]).max(0.0) / CELL) as usize).min(rows.saturating_sub(1));
         cz * self.cols + cx
     }
 
@@ -138,7 +152,7 @@ impl ObjectIndex {
             lo.min(hi)..=hi
         };
         let mut near: Vec<u32> = Vec::new();
-        for cz in span(pos[1], rows) {
+        for cz in span(self.fold(pos[1]), rows) {
             for cx in span(pos[0], self.cols) {
                 near.extend_from_slice(&self.cells[cz * self.cols + cx]);
             }
@@ -190,6 +204,18 @@ mod tests {
         assert_eq!(&*ix.usable_near(Some(0), [5.0, 5.0], 100.0), [0, 1]);
         assert_eq!(&*ix.usable_near(Some(0), [250.0, 250.0], 100.0), [0, 2]);
         assert_eq!(&*ix.usable_near(None, [5.0, 5.0], 400.0), [1, 2]);
+    }
+
+    #[test]
+    fn open_towns_find_public_things_upstairs_over_the_ground_under_them() {
+        let plots = [plot(0, true)];
+        // A public thing on the ground near x 300, one upstairs (a block of 320 rows on) above it.
+        let object_plot = [Some(0), Some(0)];
+        let centres = [[300.0, 10.0], [300.0, 330.0]];
+        let ix = ObjectIndex::open(&object_plot, &plots, &centres, [320.0, 320.0], 1);
+        assert_eq!(&*ix.usable_near(None, [300.0, 330.0], 10.0), [0, 1]);
+        assert_eq!(&*ix.usable_near(None, [300.0, 10.0], 10.0), [0, 1]);
+        assert!(ix.usable_near(None, [10.0, 330.0], 10.0).is_empty());
     }
 
     #[test]
