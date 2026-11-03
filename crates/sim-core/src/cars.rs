@@ -1789,6 +1789,7 @@ fn route_ticks(w: &mut World, c: usize, home: bool) -> f32 {
 fn drive_on(w: &mut World, c: usize) {
     let home = w.cars[c].state == CarState::Arriving;
     let t = w.cars[c].progress;
+    let others = vehicles(&w.cars, &w.transit, Some(c), None);
     let World {
         cars,
         exits,
@@ -1825,6 +1826,7 @@ fn drive_on(w: &mut World, c: usize) {
         &nav,
         (content, objects),
         me,
+        &others,
         |_| false,
         &mut car.waited,
         &mut car.progress,
@@ -1926,11 +1928,13 @@ impl Body {
 /// through anyone. Someone at something or at a wheel, or `aside` (as the one driving has it),
 /// isn't in its way; nor is anyone whose body (`Body`, on foot or on a bike) clears its sides by
 /// `BESIDE`, walking by it or along beside it.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn go_on(
     sims: &mut [Sim],
     nav: &crate::path::NavGrid,
     bodies: (&crate::content::Content, &[crate::world::ObjectInstance]),
     d: Driving,
+    others: &[Driving],
     aside: impl Fn(&Sim) -> bool,
     waited: &mut u32,
     progress: &mut f32,
@@ -1954,13 +1958,15 @@ pub(crate) fn go_on(
             continue;
         }
         waiting = true;
+        // (Not into the way of another: `clear`.)
+        let clear = |p: [f32; 2]| clear(others, body, p);
         // (Stepping aside that long hasn't got them out of its way.)
         let round = (*waited >= PASS_TICKS)
-            .then(|| clear_of(&d, nav, body, s.pos))
+            .then(|| clear_of(&d, nav, body, s.pos, clear))
             .flatten();
         if let Some(p) = round.or_else(|| {
             (*waited > MAKE_WAY_TICKS)
-                .then(|| make_way(d.at, d.yaw, nav, s.pos, 0.06))
+                .then(|| make_way(d.at, d.yaw, nav, s.pos, 0.06, clear))
                 .flatten()
         }) {
             s.pos = p;
@@ -1974,14 +1980,59 @@ pub(crate) fn go_on(
     }
 }
 
+/// Every car and bus driving by, or a bus stood at a stop, as `walks_into` keeps clear of them (its
+/// body and the ground just in front of it), but car `car` and bus `bus`.
+pub(crate) fn vehicles(
+    cars: &[Car],
+    transit: &crate::bus::Transit,
+    car: Option<usize>,
+    bus: Option<usize>,
+) -> Vec<Driving> {
+    let at = |(at, yaw): ([f32; 2], f32), len: f32, wid: f32| Driving {
+        at,
+        yaw,
+        len,
+        wid,
+        ahead: AHEAD,
+        behind: 0.0,
+    };
+    let cars = cars.iter().enumerate().filter_map(|(c, k)| match k.shown {
+        Some((p, yaw, true, _)) if Some(c) != car => Some(at((p, yaw), k.len, k.wid)),
+        _ => None,
+    });
+    let buses = transit.buses.iter().enumerate().filter_map(|(b, k)| {
+        let (p, yaw, ..) = k.shown.filter(|_| Some(b) != bus)?;
+        Some(at((p, yaw), crate::bus::BUS_LEN, crate::bus::BUS_WID))
+    });
+    cars.chain(buses).collect()
+}
+
+/// Whether `body` at `p` is out of the way of all of `them` (`vehicles`): somewhere to step aside
+/// to, or to go round to, for someone in the way of another.
+pub(crate) fn clear(them: &[Driving], body: Body, p: [f32; 2]) -> bool {
+    them.iter().all(|d| {
+        !covers(
+            d.at,
+            d.yaw.sin_cos(),
+            d.len,
+            d.wid,
+            body,
+            p,
+            d.ahead,
+            d.behind,
+        )
+    })
+}
+
 /// Someone at `pos` in the way of something driving (`d`) with nowhere to step aside: the middle
 /// of the nearest tile they can walk to, `CLEAR_STEPS` at most, where their `body` is out of its
-/// way. None: nowhere that near (it waits on).
+/// way, and (`clear`) of any other's. None: nowhere that near (it waits on).
 fn clear_of(
     d: &Driving,
     nav: &crate::path::NavGrid,
     body: Body,
     pos: [f32; 2],
+    clear: impl Fn([f32; 2]) -> bool,
 ) -> Option<[f32; 2]> {
     let turn = d.yaw.sin_cos();
     let start = (pos[0].floor() as i32, pos[1].floor() as i32);
@@ -2002,7 +2053,7 @@ fn clear_of(
         let clear = next
             .iter()
             .map(|&(x, z)| [x as f32 + 0.5, z as f32 + 0.5])
-            .filter(|&p| !covers(d.at, turn, d.len, d.wid, body, p, d.ahead, d.behind))
+            .filter(|&p| !covers(d.at, turn, d.len, d.wid, body, p, d.ahead, d.behind) && clear(p))
             .min_by(|a, b| far(a).total_cmp(&far(b)));
         if clear.is_some() {
             return clear;
@@ -2100,14 +2151,15 @@ pub(crate) fn in_the_way(cars: &[Car], body: Body, from: [f32; 2], to: [f32; 2])
 }
 
 /// Someone has waited a while for a car (at `at`, facing `yaw`) to pass, standing in its way: a
-/// step aside (across the way it drives, away from it), where there's ground to stand on. None:
-/// nowhere to go.
+/// step aside (across the way it drives, away from it), where there's ground to stand on and it
+/// isn't into another's way (`clear`). None: nowhere to go.
 pub(crate) fn make_way(
     at: [f32; 2],
     yaw: f32,
     nav: &crate::path::NavGrid,
     pos: [f32; 2],
     step: f32,
+    clear: impl Fn([f32; 2]) -> bool,
 ) -> Option<[f32; 2]> {
     let (s, c) = yaw.sin_cos();
     let left = [c, -s];
@@ -2121,7 +2173,10 @@ pub(crate) fn make_way(
             let (x, z) = (p[0].floor() as i32, p[1].floor() as i32);
             // (A step to the next tile at most.)
             let near = (x - fx).abs() <= 1 && (z - fz).abs() <= 1;
-            nav.tile_free(x, z) && near && ((x, z) == (fx, fz) || nav.can_step(fx, fz, x, z))
+            nav.tile_free(x, z)
+                && near
+                && ((x, z) == (fx, fz) || nav.can_step(fx, fz, x, z))
+                && clear(*p)
         })
 }
 

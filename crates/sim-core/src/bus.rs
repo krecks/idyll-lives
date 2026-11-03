@@ -1139,7 +1139,7 @@ fn step_bus(w: &mut World, b: usize) -> bool {
             for (k, s) in off.into_iter().enumerate() {
                 let door = w.transit.lines[l as usize].door(j, 1);
                 // (One after another, a step apart, and a step out from the door: clear of the
-                // bus, to walk along beside it, `cars::walks_into`.)
+                // bus as it pulls away, `cars::go_on`.)
                 let back = w.transit.lines[l as usize].bays[j].1;
                 let along = [back.sin(), back.cos()];
                 let out = [-along[1], along[0]];
@@ -1207,9 +1207,10 @@ fn step_bus(w: &mut World, b: usize) -> bool {
 }
 
 /// A tick further along its way, unless someone is in its way (`cars::go_on`, as a car): it waits
-/// for them, and someone standing there a while steps aside. Not for long (`cars::PASS_TICKS`).
-/// Someone waiting for a bus, or stepping up to one, is out of its way.
+/// for them, and someone standing there a while steps aside (or, with nowhere to step, goes
+/// round). Someone waiting for a bus, or stepping up to one, is out of its way.
 fn drive_on(w: &mut World, b: usize) {
+    let others = cars::vehicles(&w.cars, &w.transit, None, Some(b));
     let World {
         transit,
         sims,
@@ -1250,29 +1251,26 @@ fn drive_on(w: &mut World, b: usize) {
         &nav,
         bodies,
         me,
+        &others,
         aside,
         &mut bus.waited,
         &mut bus.progress,
     );
 }
 
-/// The bus that a step from `from` to `to` with `body` would walk into (stepping out of its way
-/// is fine): where it is and which way it faces. Held up by someone in its way it's still in the
-/// way, as a car is, and stood at a stop too, but for those getting on there (`bound`: the stop
-/// they're bound for) on their way to its door.
+/// The bus driving by that a step from `from` to `to` with `body` would walk into (stepping out
+/// of its way is fine): where it is and which way it faces. Held up by someone in its way, it's
+/// still driving by, as a car is. (Stood at a stop it isn't: a stop where the bus turns round
+/// can stand on the way along the road, and a bus stood there after another would shut in
+/// whoever is on their way past.)
 pub(crate) fn in_the_way(
     t: &Transit,
     body: cars::Body,
-    bound: Option<u16>,
     from: [f32; 2],
     to: [f32; 2],
 ) -> Option<([f32; 2], f32)> {
     t.buses.iter().find_map(|b| {
-        let (at, yaw, ..) = b.shown?;
-        let stop = t.lines[b.line as usize].stops.get(b.next).copied();
-        if b.until.is_some() && bound.is_some() && bound == stop {
-            return None;
-        }
+        let (at, yaw, ..) = b.shown.filter(|_| b.until.is_none())?;
         cars::walks_into(at, yaw, BUS_LEN, BUS_WID, body, from, to).then_some((at, yaw))
     })
 }

@@ -8322,18 +8322,23 @@ fn progress(
                 // (Or the bus.)
                 let passing = crate::cars::in_the_way(ctx.cars, body, sim.pos, to)
                     .and_then(|c| ctx.cars[c].shown.map(|(at, yaw, ..)| (at, yaw)))
-                    .or_else(|| {
-                        crate::bus::in_the_way(ctx.transit, body, sim.bound_for_bus, sim.pos, to)
-                    });
+                    .or_else(|| crate::bus::in_the_way(ctx.transit, body, sim.pos, to));
                 if let Some((at, yaw)) = passing {
                     sim.car_wait = sim.car_wait.saturating_add(ticks);
+                    // (Not into the way of another car or bus.)
+                    let others = || {
+                        let all = crate::cars::vehicles(ctx.cars, ctx.transit, None, None);
+                        all.into_iter().filter(|d| d.at != at).collect::<Vec<_>>()
+                    };
                     if sim.car_wait > crate::cars::MAKE_WAY_TICKS
+                        && let others = others()
                         && let Some(p) = crate::cars::make_way(
                             at,
                             yaw,
                             &ctx.nav,
                             sim.pos,
                             (0.06 * ticks as f32).min(0.3),
+                            |p| crate::cars::clear(&others, body, p),
                         )
                     {
                         sim.pos = p;
