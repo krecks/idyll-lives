@@ -175,6 +175,9 @@ export const STEP_IN: Record<string, StepIn> = {
   busStop: { by: [[0, [], { to: 0.05 }]], lanes: [-0.95] },
   // At the feeder's post, at its back left, clear of the bird bath: its house filled from a scoop (clips/reach.ts).
   'kind.songbirdFeeder:garden': { by: bySize(FEEDER), lanes: [-0.2] },
+  // Up to the pedal bin (its lid lifting), the dish held over it and tapped to scrape the food off (clips/work.ts),
+  // not from a tile back with the arms spread.
+  'trashCan:clean': { by: [[0, ['scrape'], { to: 0.3 }]] },
   // At the microwave on the counter's right, the hands at its door.
   microwave: { by: [[0, [], { to: 0.55 }]], lanes: [-0.2] },
   // At the mic stand, singing into it.

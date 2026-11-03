@@ -91,6 +91,19 @@ function setDownPose(p: number): PoseSpec {
   );
 }
 
+/** Scraping a dish into a pedal bin (stepped up to it, `STEP_IN` `trashCan:clean`): bent over the open bin, the dish
+ * held over it in both hands and tipped, tapped down twice a round to knock the food off. */
+function scrapePose(p: number): PoseSpec {
+  const tap = bump(p, 0.2, 0.32, 0.06) + bump(p, 0.62, 0.74, 0.06);
+  const body = stand({ breath: p, lean: 26 + 5 * tap, fwd: 0.05, sink: 0.03, head: [18, 0, 0] });
+  const y = 0.84 - 0.05 * tap;
+  return hands(
+    body,
+    L([-0.11, y, 0.46], { pole: [-0.5, -1, -0.3], pronate: -5, hand: wrist('l', 25 + 20 * tap, 0) }),
+    R([0.11, y - 0.02, 0.46], { pole: [0.5, -1, -0.3], pronate: -5, hand: wrist('r', 25 + 20 * tap, 0) }),
+  );
+}
+
 /** Carrying something in the right hand (an upper-body layer, phase 2): forearm forward, the left arm swings at the walk's pace. */
 function carryOnePose(p: number): PoseSpec {
   const swing = -Math.cos(TAU * (p - 0.05));
@@ -163,5 +176,6 @@ export function workClips(): ClipDef[] {
     cycle('carry', { seconds: 1.1, loop: true }, carryPose),
     cycle('carryOne', { seconds: 1.1, loop: true }, carryOnePose),
     cycle('setDown', { seconds: 2.4, loop: true }, setDownPose),
+    cycle('scrape', { seconds: 1.8, loop: true }, scrapePose),
   ];
 }
