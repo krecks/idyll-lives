@@ -61,6 +61,8 @@ pub const BUS_WID: f32 = 2.3;
 pub const DOOR_ALONG: [f32; 2] = [3.25, -0.55];
 /// From the door to where someone stands to get on or off (m, out from its side).
 const DOOR_OUT: f32 = 0.35;
+/// How much further out from the door those getting off stand (m).
+const STEP_OFF: f32 = 0.2;
 /// At a stop, its front door is this far on past the stop's middle (m): by the shelter's end.
 const FRONT_DOOR_AT: f32 = 1.4;
 /// How long it stands at a stop on time; late, at least this long; and at most this long while
@@ -1136,12 +1138,14 @@ fn step_bus(w: &mut World, b: usize) -> bool {
             }
             for (k, s) in off.into_iter().enumerate() {
                 let door = w.transit.lines[l as usize].door(j, 1);
-                // (One after another, a step apart.)
+                // (One after another, a step apart, and a step out from the door: clear of the
+                // bus, to walk along beside it, `cars::walks_into`.)
                 let back = w.transit.lines[l as usize].bays[j].1;
                 let along = [back.sin(), back.cos()];
+                let out = [-along[1], along[0]];
                 let at = [
-                    door[0] - along[0] * 0.5 * k as f32,
-                    door[1] - along[1] * 0.5 * k as f32,
+                    door[0] - along[0] * 0.5 * k as f32 + out[0] * STEP_OFF,
+                    door[1] - along[1] * 0.5 * k as f32 + out[1] * STEP_OFF,
                 ];
                 get_off(w, s as usize, Some(at));
             }
@@ -1252,17 +1256,23 @@ fn drive_on(w: &mut World, b: usize) {
     );
 }
 
-/// The bus driving by that a step from `from` to `to` with `body` would walk into (stepping out
-/// of its way is fine): where it is and which way it faces. Held up by someone in its way, it's
-/// still driving by, as a car is (not stood at a stop).
+/// The bus that a step from `from` to `to` with `body` would walk into (stepping out of its way
+/// is fine): where it is and which way it faces. Held up by someone in its way it's still in the
+/// way, as a car is, and stood at a stop too, but for those getting on there (`bound`: the stop
+/// they're bound for) on their way to its door.
 pub(crate) fn in_the_way(
     t: &Transit,
     body: cars::Body,
+    bound: Option<u16>,
     from: [f32; 2],
     to: [f32; 2],
 ) -> Option<([f32; 2], f32)> {
     t.buses.iter().find_map(|b| {
-        let (at, yaw, ..) = b.shown.filter(|_| b.until.is_none())?;
+        let (at, yaw, ..) = b.shown?;
+        let stop = t.lines[b.line as usize].stops.get(b.next).copied();
+        if b.until.is_some() && bound.is_some() && bound == stop {
+            return None;
+        }
         cars::walks_into(at, yaw, BUS_LEN, BUS_WID, body, from, to).then_some((at, yaw))
     })
 }
