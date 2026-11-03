@@ -80,7 +80,9 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   a cosy or normal town's stop or two, which new towns of those sizes get on their main road near
   the middle, `town.ts` `busStops`): residents wait there for it when it beats the walk out, and
   come home on it. When no bus calls (the night), the stop is a way out for people on foot, as all
-  stops were before the bus. The renderer draws its shelter and sign where the sim says
+  stops were before the bus; in a big world it always is (nobody's way to work is slower for the
+  bus): someone walking out by it takes the bus calling there if one comes in time for work, else
+  leaves town there as before. The renderer draws its shelter and sign where the sim says
   (`WorldStructure.stops`) and each bus from its snapshot rows (`busBase`, `bus`).
 - `terrain: { water?: Rle, blocked?: Rle }` — run-length masks over the ground grid in row-major
   order: `[runLength, value, runLength, value, ...]` with value 0/1, starting at tile (0, 0).

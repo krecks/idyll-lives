@@ -26,10 +26,16 @@
 //! in the shelter or stood by it. When the bus pulls in they walk to its front door and get on
 //! (`Transition::Bus`): off to work, out of sight. They leave home in time for the bus that gets
 //! them there (`plan`, `life::Commute`). Done at work, someone who left from a stop comes home
-//! on the first bus into town after that (`off_work`), out of sight until it pulls in at their
-//! stop, and gets off by its middle door and walks home. Too late for the last bus, they walk home
-//! from the stop. A stop no bus calls at (at night, or that no bus can reach) is a way out on
-//! foot, as stops always were in big worlds (`Transit::walks_out`).
+//! on the next bus to call there within a headway (`off_work`), out of sight until it pulls in at
+//! their stop, and gets off by its middle door and walks home. With none due (after the last), they
+//! walk home from the stop. A stop no bus calls at (at night, or that no bus can reach) is a way
+//! out on foot, as stops always were in big worlds (`Transit::walks_out`).
+//!
+//! **Big worlds.** Their stops were ways out on foot before the bus, and nobody's way to work is
+//! slower for it: a big world's stop stays a way out on foot, timed as ever (`walk_stops`; no bus
+//! plan). Someone who walks out by a stop takes the bus calling there when one comes within a
+//! headway of their getting there and before work starts (`at_stop`), else leaves town at the stop
+//! as they always did.
 //!
 //! People on foot wait for a bus driving by and step aside for it (`in_the_way`), as for a car,
 //! and it waits for anyone in its way (`drive_on`).
@@ -245,6 +251,9 @@ pub struct Transit {
     taken: Vec<Vec<(u8, u32)>>,
     /// By exit, its stop (`stops` index).
     by_exit: Vec<Option<u16>>,
+    /// A big world's stops stay ways out on foot as they always were, the bus or not
+    /// (`walks_out`): a resident's way to work is never slower for it (`at_stop`).
+    pub walk_stops: bool,
 }
 
 impl Transit {
@@ -304,7 +313,9 @@ impl Transit {
     /// calls at then (the night, or one no bus reaches).
     pub fn walks_out(&self, i: usize, tick: u64) -> bool {
         match self.by_exit.get(i).copied().flatten() {
-            Some(s) => self.stops[s as usize].line.is_none() || !self.running(tick),
+            Some(s) => {
+                self.walk_stops || self.stops[s as usize].line.is_none() || !self.running(tick)
+            }
             None => true,
         }
     }
@@ -413,6 +424,7 @@ impl Transit {
 pub(crate) fn settle(w: &mut World) {
     let mut t = Transit::new(w.content.bus);
     t.by_exit = vec![None; w.exits.len()];
+    t.walk_stops = w.travel.size == crate::travel::WorldSize::Big;
     if !w.travel.graph.is_empty() {
         for i in 0..w.exits.len() {
             if !w.travel.is_stop(i) || !w.exits[i].iter().all(|v| v.is_finite()) {
@@ -1069,8 +1081,9 @@ fn step_bus(w: &mut World, b: usize) -> bool {
     if let Some(until) = bus.until {
         let (l, j, stood) = (bus.line, bus.next, bus.stood);
         let stop = line.stops[j];
-        // Its doors open: those coming home get off, those waiting come to get on.
-        if tick == stood + DOOR_TICKS {
+        // Its doors open: those coming home get off (one done at work while it stands there too),
+        // those waiting come to get on.
+        if tick >= stood + DOOR_TICKS && tick + DOOR_TICKS < until {
             let run = bus.run;
             let off: Vec<u32> = w
                 .transit
@@ -1276,6 +1289,43 @@ pub(crate) fn way(ctx: &Ctx, sim: &Sim, walk_out: Option<u64>) -> Option<(u16, u
     Some((stop, spot, at))
 }
 
+/// A big world's resident off to work or school by way of a bus stop (`exit`, the way out they
+/// walk to, timed as ever: `walks_out`): the stop and their place there when a bus calls there
+/// once they're there, within a headway and in time for work; else they leave town at the stop
+/// as they always did.
+pub(crate) fn at_stop(ctx: &Ctx, sim: &Sim, exit: [f32; 2]) -> Option<(u16, u8, [f32; 2])> {
+    let t = ctx.transit;
+    if !t.walk_stops || sim.bus_given_up {
+        return None;
+    }
+    let stop = t.stops.iter().position(|s| {
+        s.line.is_some() && ctx.exits.get(s.exit).is_some_and(|e| dist(*e, exit) < 0.01)
+    })? as u16;
+    let st = &t.stops[stop as usize];
+    let (l, j) = st.line?;
+    let pos = ctx.nav.stairs.ground_pos(sim.pos);
+    let walk = sim.walk_per_minute(ctx.content);
+    let minutes = ctx.travel.eta(pos, st.at, Mode::Foot, walk) * crate::life::WALK_MARGIN;
+    let there = ctx.tick + (minutes * TICKS_PER_MINUTE as f32) as u64;
+    let run = t.catches(stop, there)?;
+    // (On before work starts.)
+    let start = match &sim.job {
+        Some(job) => crate::life::shift_today(ctx.content, job, &sim.skills, ctx.tick),
+        None => crate::life::school_today(ctx.content, sim, ctx.tick),
+    }
+    .map(|(_, start, _)| start);
+    let board = (run + t.lines[l as usize].arrive[j as usize]).max(there);
+    if start.is_some_and(|start| board > start) {
+        return None;
+    }
+    let nav = &ctx.nav;
+    let spot = t.free_spot(stop, sim.id, |p| {
+        nav.tile_free(p[0].floor() as i32, p[1].floor() as i32)
+    })?;
+    let (at, ..) = st.spot(spot as usize)?;
+    Some((stop, spot, at))
+}
+
 /// `sim` is there (at their place at the stop, or at the bus's door): on they get, or they wait
 /// (sat on the bench, or stood facing the road), or the bus is in: to its door.
 pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx) {
@@ -1376,10 +1426,10 @@ pub(crate) fn off_work(w: &mut World, i: usize) -> bool {
         return false;
     };
     let tick = w.tick;
-    let run = t.next_run(tick);
-    if run > tick + t.every {
+    // (The next to call there, within a headway: one in town already, or to come.)
+    let Some(run) = t.catches(stop as u16, tick) else {
         return false;
-    }
+    };
     let h = Homeward {
         sim: i as u32,
         stop: stop as u16,
@@ -1416,7 +1466,8 @@ pub(crate) fn plan(
     walk_out: f32,
 ) -> Option<(u16, u64, f32)> {
     let t = &w.transit;
-    if t.lines.is_empty() {
+    // (A big world's stops are timed as the walk-out they always were.)
+    if t.lines.is_empty() || t.walk_stops {
         return None;
     }
     // Out of town with time for the rest of the way (as a car: `cars::off_map_ticks`).

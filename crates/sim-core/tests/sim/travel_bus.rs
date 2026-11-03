@@ -272,15 +272,16 @@ fn a_rider_waits_less_than_a_headway_gets_on_and_is_at_work_on_time() {
 
 #[test]
 fn they_come_home_by_bus_and_walk_from_the_stop() {
-    let c = content(10.0);
+    // (Work over at 14:15, the bus last at the stop at 14:08: they wait off the map for the next.)
+    let c = content(10.25);
     let mut w = world(&c, &town(1, 0, 90, true));
     day_hour(&mut w, 2, 5.0);
     morning(&mut w, clock::tick_at(2, 12.0 * 60.0).unwrap())
         .on
         .expect("never got on");
     let funds = w.households[0].funds;
-    // Done at 14: off the map until the bus home pulls in at their stop.
-    day_hour(&mut w, 2, 14.01);
+    // Done: off the map until the bus home pulls in at their stop.
+    day_hour(&mut w, 2, 14.26);
     assert_eq!(sim_core::bus::status(&w, &w.sims[0]), Some("home"));
     let mut off = None;
     let end = clock::tick_at(2, 16.0 * 60.0).unwrap();
@@ -291,7 +292,7 @@ fn they_come_home_by_bus_and_walk_from_the_stop() {
         }
     }
     let off = off.expect("never came home");
-    assert!(off - clock::tick_at(2, 14.0 * 60.0).unwrap() < 45 * TICKS_PER_MINUTE);
+    assert!(off - clock::tick_at(2, 14.25 * 60.0).unwrap() < 20 * TICKS_PER_MINUTE);
     // Off the bus standing at the stop, by its middle door, and paid once.
     let bus = w
         .transit
@@ -370,13 +371,14 @@ fn a_game_saved_at_the_stop_loads_with_them_waiting_for_the_next_bus() {
 
 #[test]
 fn a_game_saved_on_the_bus_home_loads_with_them_walking_home_from_the_stop() {
-    let c = content(10.0);
+    // (Work over at 14:15, the bus last at the stop at 14:08: they wait off the map for the next.)
+    let c = content(10.25);
     let mut w = world(&c, &town(1, 0, 90, true));
     day_hour(&mut w, 2, 5.0);
     morning(&mut w, clock::tick_at(2, 12.0 * 60.0).unwrap())
         .on
         .expect("never got on");
-    day_hour(&mut w, 2, 14.05);
+    day_hour(&mut w, 2, 14.26);
     assert_eq!(sim_core::bus::status(&w, &w.sims[0]), Some("home"));
     let funds = w.households[0].funds;
     let mut w = World::from_save_json(&c, &w.save_json()).unwrap();
@@ -413,4 +415,31 @@ fn a_save_without_stops_has_no_bus() {
         w.tick_once();
     }
     assert!(w.sims[0].away_until.is_some(), "never got to work");
+}
+
+#[test]
+fn a_big_worlds_stops_stay_ways_out_on_foot_while_the_bus_runs() {
+    let content = common::content();
+    let h = common::hamlets::two_hamlets(&content, 12);
+    let mut w = World::from_json(&content, &h.town, 12).unwrap();
+    assert!(w.transit.runs() && w.transit.walk_stops);
+    let stop = w.transit.stops[0].exit;
+    assert!(
+        w.transit
+            .walks_out(stop, clock::tick_at(2, 9.0 * 60.0).unwrap())
+    );
+    // Timed as the walk-out it always was: nobody's way to work is planned by a bus.
+    let end = clock::tick_at(2, 12.0 * 60.0).unwrap();
+    let mut rode = 0;
+    while w.tick < end {
+        w.tick_once();
+        for i in 0..w.sims.len() {
+            assert!(w.sims[i].commute().is_none_or(|c| c.bus.is_none()));
+            rode += usize::from(sim_core::bus::status(&w, &w.sims[i]) == Some("work"));
+        }
+    }
+    assert!(
+        rode > 0,
+        "nobody took the bus calling at the stop they walked out by"
+    );
 }

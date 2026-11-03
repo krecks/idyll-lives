@@ -7559,8 +7559,12 @@ fn start_task(
                     (None, Some(b)) => Some(b),
                     (None, None) => crate::ride::bike_for(ctx, sim, objects, exit),
                 };
-                // By bus (`bus.rs`), when that's quicker than the walk out: to the stop.
+                // By bus (`bus.rs`), when that's quicker than the walk out: to the stop. (In a big
+                // world, by the one calling at the stop they walk out by, if it's in time.)
                 let bus = || {
+                    if ctx.transit.walk_stops {
+                        return crate::bus::at_stop(ctx, sim, exit);
+                    }
                     let walk = sim.walk_per_minute(content);
                     let from = ctx.nav.stairs.ground_pos(sim.pos);
                     let minutes = ctx.travel.eta(from, exit, crate::travel::Mode::Foot, walk)

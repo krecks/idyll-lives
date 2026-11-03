@@ -33,6 +33,8 @@ fn start_today(w: &World, i: usize) -> Option<u64> {
 struct Day {
     left: Option<u64>,
     there: Option<u64>,
+    /// Waited at the stop they walked out by for the bus calling there (`bus::at_stop`).
+    bus: bool,
 }
 
 #[test]
@@ -61,6 +63,7 @@ fn residents_leave_by_their_walk_and_are_never_late() {
             if working && day.left.is_none() {
                 day.left = Some(w.tick);
             }
+            day.bus |= w.bound_for_bus(i).is_some();
             if let Some(left) = day.left
                 && s.away_until.is_some()
                 && day.there.is_none()
@@ -96,8 +99,15 @@ fn residents_leave_by_their_walk_and_are_never_late() {
                     c.walk,
                     c
                 );
-                // ...and at the way out of town in time for the rest.
-                let late = w.tick as i64 - (start - off_map) as i64;
+                // ...and at the way out of town in time for the rest (by the bus calling at the
+                // stop they walked out by: on it before work starts, the rest of the way on it).
+                let due = if day.bus { start } else { start - off_map };
+                assert!(
+                    !s.job.as_ref().is_some_and(|j| j.late),
+                    "{} late for work",
+                    s.name
+                );
+                let late = w.tick as i64 - due as i64;
                 worst_late = worst_late.max(late);
                 assert!(
                     late <= 0,
