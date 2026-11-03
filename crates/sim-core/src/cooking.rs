@@ -1804,7 +1804,7 @@ fn dining<'a>(sim: &Sim, ctx: &Ctx<'a>) -> (&'a [u32], Option<u32>) {
 
 /// The best free place to sit and eat: a chair at a table (`surface::dining_seat`), else a
 /// table with seats of its own, else any seat.
-fn eat_seat(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
+fn eat_seat(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], items: &Items) -> Option<u32> {
     let content = ctx.content;
     let rules = &content.cooking;
     let candidates: Vec<u32> = dining(sim, ctx)
@@ -1824,6 +1824,7 @@ fn eat_seat(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
         &candidates,
         sim.pos,
         stage,
+        &items.occupancy(content),
     ) {
         return Some(d.object);
     }
@@ -1914,7 +1915,7 @@ fn eat_next(
     if sim.held.is_none_or(|h| h.recipe.is_none()) {
         return;
     }
-    if let Some(seat) = eat_seat(sim, ctx, objects) {
+    if let Some(seat) = eat_seat(sim, ctx, objects, items) {
         let at = Task {
             kind: TaskKind::Eat {
                 item,
