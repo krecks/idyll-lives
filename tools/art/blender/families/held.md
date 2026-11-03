@@ -1,6 +1,6 @@
 # Held (`families/held.py`)
 
-The 79 things residents carry, cook with and hold while they use a thing. One pack, `packs/held/manifest.json`, models
+The 82 things residents carry, cook with and hold while they use a thing. One pack, `packs/held/manifest.json`, models
 in `models/held/`. Built 2026-10-16. They aren't buyable: no content entry, no Validate group, no paint.
 
 - **Items** (`item.*`, content `items[].model`): drawn on the palms while carried (characters.ts `writeCarried`:
@@ -20,7 +20,9 @@ in `models/held/`. Built 2026-10-16. They aren't buyable: no content entry, no V
   and the apple itself (`item.apple`, already the size of one). Each lies face up, the end bitten to the front, held at
   its back end, 4 cm along the bite's line from the palm. The plate stays on the table, or, carried (seated without a
   table, or standing with no free seat), on the left palm while the right hand takes the fork or the bite to the mouth
-  (residents.ts: standing, `eat` is played as `eatFork`); what is itself the food (the hot dog, the apple, the pastry,
+  (residents.ts: standing, `eat` is played as `eatFork`, and between bites the plate is held in front, `holdPlate`, not
+  at the hip); a drink served as a plate (the smoothie: `SIPPED`) is drunk from its glass, `item.smoothie` itself in
+  the hand (`drink`, held between sips: `holdCup`); what is itself the food (the hot dog, the apple, the pastry,
   the crisps) carried in the hand goes to the mouth as it is, nothing more in the hand.
 - **Props in hand** (`tool.*`, 2026-10-26, review G-70; actions.ts `PROPS`, residents.ts `writeHand`): what a resident
   holds while they use a thing, chosen by the use's animation tag and the object (`ACTIONS[tag].prop`) and placed by
@@ -57,6 +59,8 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `item.cakeSlice` | a slice of the café's layer cake on a plate: two sponges, jam and cream between, white icing over the top and round its back, the layers at the cut sides, a strawberry standing on a green calyx, its seeds showing | 1 | 472 |
 | `item.sandwich` | a sandwich cut corner to corner, loaf corners rounded: crumb on top and at the cut, crusts round, lettuce frilled out, cheese, tomato | 1 | 500 |
 | `item.plateDirty` | a plate with a smear of gravy, a streak of sauce, crumbs, a pea, the knife and fork laid side by side (outlines) | 1 | 548 |
+| `item.bbqPlate` | a plate from the barbecue (`grillPlatter`'s `serving`): a sausage marked by the bars, a marked burger, a piece of corn with butter, parsley; eaten with a fork | 1 | 780 |
+| `item.tastingPlate` | a plate from the tasting menu (`tastingBoard`'s `serving`): a wedge and a cube of cheese, folds of salami, two crackers, grapes, a dab of fig jam; eaten with a fork | 1 | 704 |
 | `item.freshPlate` | something fresh from the garden: a salad on the plate, torn leaves in three greens heaped, tomato wedges on their skins, cucumber and radish slices; eaten with a fork | 1 | 708 |
 | `item.plateStackDirty` | three dirty plates stacked, each a little askew, its foot in the well below (the lower two their wells flat, unseen): the top one's leftovers and fork, a drip of gravy down the middle one's rim, a scrap of lettuce over its edge. The sim shows it when two or more dirty plates are carried at once (both hands; content radius 0.156). Over the 750: three plates | 1 | 876 |
 | `tool.board` | the chopping board: rounded, a juice groove, a hanging slot; a tapering carrot, carrot coins, parsley (the knife is in the hand: `tool.knife`) | 2 | 600 |
@@ -72,7 +76,7 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `item.boardDirty` | the tasting board cleared: a cheese rind, a bare branching stalk, half a cracker, crumbs, smears of grease and jam | 2 | 640 |
 | `item.pizzaBoardDirty` | the pizza's round board after it: bent crust ends, a grease smear, sauce, crumbs, the pizza wheel | 2 | 712 |
 | `item.pieDishDirty` | the fluted pie dish emptied: a smear of filling, pastry crumbs, the pie server | 1 | 456 |
-| `item.iceCreamCup` | a paper cup 9 cm across in nine pink stripes, two ragged-lipped scoops (vanilla, strawberry), a flat wooden spoon | 1 | 360 |
+| `item.iceCreamCup` | a paper cup 9 cm across in nine pink stripes, two ragged-lipped scoops (vanilla, strawberry) (no spoon: the hand's, `tool.paddle`) | 1 | 340 |
 | `item.hotDog` | a hot dog on a paper boat 9 cm across: a bun 6.3 cm across in two lathed halves side by side, inside the boat, a bent sausage longer than it, a mustard zigzag and a line of ketchup | 1 | 624 |
 | `item.crisps` | a packet of crisps lying on its back, puffed, blue with a yellow band, crimped seals, its top torn open on the silvered inside, five crisps spilt | 1 | 616 |
 | `item.apple` | an apple 7.5 cm across, lobed a little, red with a yellow blush at the stalk and the eye, a stalk and a leaf | 1 | 250 |
@@ -105,6 +109,7 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `tool.pencil` | a yellow pencil, 17 cm, six-sided, sharpened: the bare wood cone and the lead | 1 | 60 |
 | `tool.marker` | a whiteboard marker, 15.5 cm with its cap on its back end: a white body, a blue cap and felt tip | 1 | 148 |
 | `tool.receiver` | the phone box's receiver, 21 cm: a black bar, the earpiece's and the mouthpiece's cups (drawn on the box's hook by code, `REST_PROPS`, and in the caller's hand) | 1 | 268 |
+| `tool.paddle` | the ice cream cart's flat wooden spoon, 9.5 cm (`EATEN_WITH.iceCreamCone`) | 1 | 28 |
 | `tool.knife` | a chef's knife 28 cm: a black riveted handle, a steel bolster, a blade curving up to its point, edge to the left | 1 | 156 |
 | `tool.woodenSpoon` | a wooden spoon 31 cm, held 10 cm from its end | 1 | 144 |
 | `tool.spatula` | a slotted turner 27 cm: a black grip, a steel shank bent down to a blade 8 x 10 cm with three slots | 1 | 280 |
@@ -139,14 +144,17 @@ sideways; the pan and the grill food, which stand off their middle, take their m
   (`item.pastryBag`, 0.07); the grocery's `shopSandwich` keeps the sandwich, which fits. Carried on the right palm and
   eaten from it on a bench or a café chair (the eat clip takes it to the mouth), or set down on a table.
 - **Thin in the gate:** the fork, the spoon, the chopsticks, the coin, the phone, the postcard, the pen, the pencil, the
-  chalk and the paintbrush are under the 1.2 cm the gate wants of a thing on a floor (a house's floor is drawn 1 cm up):
+  chalk, the paintbrush and the ice cream cart's paddle are under the 1.2 cm the gate wants of a thing on a floor (a house's floor is drawn 1 cm up):
   they are only ever in a hand, so its warning stands.
 - **Fixes** (2026-11-03): the dirty bowl's melt lies on its sloping inside (it was flat under it); the ice cream's sauce
   over the scoops (it was inside them); the noodles and the ice cream lost their own chopsticks and spoon (the hand's are
   the ones that move); the baking tray shows what it serves; the hot dog's bun fits its boat; the ice cream cup is
   striped; sausages 2.8 cm thick (were 4.5-5); the pie 26 cm (was 33.6), its slice and dish with it; the prep bowl
   heaped; the treat plate's cupcake off the rim; content `radius` matched to the models (the plate 0.144, the prep
-  bowl 0.162, the pie dish 0.13, the takeaway box 0.146, the crisps 0.12).
+  bowl 0.162, the pie dish 0.13, the takeaway box 0.146, the crisps 0.12; the pots 0.195 by their handles, the trays
+  0.23 and the tasting boards 0.227 by their corners, the dirty bowl 0.099 by its spoon).
+- **Servings** (2026-11-03): the barbecue and the tasting menu served a plate of stew (`mealPlate`); each now serves
+  its own plate, `bbqPlate` and `tastingPlate` (content `items`, empty to `plateDirty`, eaten with a fork).
 - **Finishes.** Dishes glazed `gloss`, pans and trays `metal` (the pan's handle `satin`), food `satin` or `matte`.
   The wooden boards (chopping, tasting, pizza) take `wood` as the old parts did: their second draw call.
 - **The plate** (`plate()`) is shared: a foot, a rim up to 1.7 cm and a paler well at 0.9 cm (`WELL`), where the food

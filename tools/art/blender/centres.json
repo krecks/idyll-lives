@@ -1,6 +1,7 @@
 {
   "item.apple": [0.0, 0.0],
   "item.bakingTray": [0.0, 0.0],
+  "item.bbqPlate": [0.0, 0.0],
   "item.boardDirty": [0.0, 0.0],
   "item.bowlDirty": [0.0164, 0.0],
   "item.cakeSlice": [0.0, 0.0],
@@ -32,6 +33,7 @@
   "item.smoothie": [0.0, 0.0],
   "item.takeout": [0.001, -0.025],
   "item.tastingBoard": [0.0, 0.0],
+  "item.tastingPlate": [0.0, 0.0],
   "item.toast": [0.0, 0.0],
   "item.trayDirty": [0.0, 0.0],
   "item.treatPlate": [0.0, 0.0],
@@ -627,6 +629,7 @@
   "tool.marker": [0.0, -0.0425],
   "tool.mixingBowl": [0.0, 0.0447],
   "tool.mug": [0.0142, 0.0],
+  "tool.paddle": [0.0, 0.0175],
   "tool.paintbrush": [0.0, -0.043],
   "tool.pan": [0.0, 0.0575],
   "tool.pen": [0.0, -0.0349],

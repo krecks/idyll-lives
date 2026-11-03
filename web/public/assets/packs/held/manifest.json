@@ -1019,9 +1019,6 @@
         "cup_stripe": {
           "finish": "material.finish.matte"
         },
-        "paddle": {
-          "finish": "material.finish.matte"
-        },
         "strawberry": {
           "finish": "material.finish.satin"
         },
@@ -1591,6 +1588,78 @@
       "materials": {
         "steel": {
           "finish": "material.finish.metal"
+        }
+      }
+    },
+    "item.bbqPlate": {
+      "type": "model",
+      "url": "../../models/held/bbqPlate.glb",
+      "materials": {
+        "butter": {
+          "finish": "material.finish.satin"
+        },
+        "char": {
+          "finish": "material.finish.matte"
+        },
+        "china": {
+          "finish": "material.finish.gloss"
+        },
+        "china_well": {
+          "finish": "material.finish.gloss"
+        },
+        "corn": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "patty": {
+          "finish": "material.finish.satin"
+        },
+        "sausage": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "item.tastingPlate": {
+      "type": "model",
+      "url": "../../models/held/tastingPlate.glb",
+      "materials": {
+        "cheese": {
+          "finish": "material.finish.satin"
+        },
+        "cheese_cut": {
+          "finish": "material.finish.satin"
+        },
+        "china": {
+          "finish": "material.finish.gloss"
+        },
+        "china_well": {
+          "finish": "material.finish.gloss"
+        },
+        "cracker": {
+          "finish": "material.finish.matte"
+        },
+        "grape": {
+          "finish": "material.finish.gloss"
+        },
+        "jam": {
+          "finish": "material.finish.gloss"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "salami": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "tool.paddle": {
+      "type": "model",
+      "url": "../../models/held/paddle.glb",
+      "materials": {
+        "paddle": {
+          "finish": "material.finish.matte"
         }
       }
     }

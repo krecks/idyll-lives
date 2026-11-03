@@ -4158,23 +4158,23 @@
       "hold": "both",
       "serving": "mealPlate",
       "emptyAs": "potDirty",
-      "radius": 0.16
+      "radius": 0.195
     },
     {
       "id": "tastingBoard",
       "label": "Tasting menu",
       "model": "item.tastingBoard",
       "hold": "both",
-      "serving": "mealPlate",
+      "serving": "tastingPlate",
       "emptyAs": "boardDirty",
-      "radius": 0.2
+      "radius": 0.227
     },
     {
       "id": "grillPlatter",
       "label": "Barbecue",
       "model": "item.grillPlatter",
       "hold": "both",
-      "serving": "mealPlate",
+      "serving": "bbqPlate",
       "emptyAs": "platterDirty",
       "radius": 0.2
     },
@@ -4194,7 +4194,7 @@
       "hold": "both",
       "serving": "treatPlate",
       "emptyAs": "trayDirty",
-      "radius": 0.2
+      "radius": 0.23
     },
     {
       "id": "pieDish",
@@ -4298,7 +4298,7 @@
       "model": "item.tastingBoard",
       "hold": "both",
       "emptyAs": "boardDirty",
-      "radius": 0.2
+      "radius": 0.227
     },
     {
       "id": "smoothie",
@@ -4416,7 +4416,7 @@
       "model": "item.potDirty",
       "hold": "both",
       "dirty": true,
-      "radius": 0.16
+      "radius": 0.195
     },
     {
       "id": "platterDirty",
@@ -4432,7 +4432,7 @@
       "model": "item.trayDirty",
       "hold": "both",
       "dirty": true,
-      "radius": 0.2
+      "radius": 0.23
     },
     {
       "id": "bowlDirty",
@@ -4440,7 +4440,7 @@
       "model": "item.bowlDirty",
       "hold": "hand",
       "dirty": true,
-      "radius": 0.08
+      "radius": 0.099
     },
     {
       "id": "boardDirty",
@@ -4448,7 +4448,7 @@
       "model": "item.boardDirty",
       "hold": "both",
       "dirty": true,
-      "radius": 0.2
+      "radius": 0.227
     },
     {
       "id": "pizzaBoardDirty",
@@ -4472,6 +4472,22 @@
       "model": "tool.mixingBowl",
       "hold": "both",
       "radius": 0.15
+    },
+    {
+      "id": "bbqPlate",
+      "label": "Barbecue plate",
+      "model": "item.bbqPlate",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.144
+    },
+    {
+      "id": "tastingPlate",
+      "label": "Tasting plate",
+      "model": "item.tastingPlate",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.144
     }
   ],
   "recipes": [

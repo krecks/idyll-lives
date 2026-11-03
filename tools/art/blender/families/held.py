@@ -690,11 +690,11 @@ def _patty(name, at, d=0.1, h=0.028, marks=True):
         box(f'{name}_mark{i}', 0.0065, 0.0016, d * 0.8 - abs(dx) * 1.2, (x + dx, y + h + 0.0002, z), M.char, yaw=20)
 
 
-def _corn(name, r, length, at, yaw, kernels=True, gnawed=False):
-    """A cob of corn lying along game x turned `yaw` degrees: rows of kernels (ridged along and round it), its
+def _corn(name, r, length, at, yaw, kernels=True, gnawed=False, rows=11, segments=14):
+    """A cob of corn lying along game x turned `yaw` degrees: `rows` rings of kernels (ridged along and round it), its
     rounded ends; `gnawed`: eaten to the cob in the middle, kernels left at its ends."""
     half = length / 2
-    stops = [-1, -0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1]
+    stops = [-1 + 2 * k / (rows - 1) for k in range(rows)]
     prof = [(0, -half - r * 0.2), (r * 0.7, -half)]
     for i, t in enumerate(stops):
         bump = (1.0 if i % 2 == 0 else 0.88)
@@ -706,7 +706,7 @@ def _corn(name, r, length, at, yaw, kernels=True, gnawed=False):
     if gnawed:
         mats = [M.corn if abs(stops[min(max(i - 1, 0), len(stops) - 1)]) > 0.55 else M.cob for i in range(len(prof) - 1)]
     wave = (7, {k: 0.1 for k in range(2, len(prof) - 2)}) if kernels else None
-    return lathe(name, prof, mats, at=at, segments=14, rot=(0, 90, -yaw), wave=wave)
+    return lathe(name, prof, mats, at=at, segments=segments, rot=(0, 90, -yaw), wave=wave)
 
 
 def grillPlatter():
@@ -1077,6 +1077,38 @@ def freshPlate():
         coin(f'radish{i}', 0.022, 0.0035, (x, WELL + y, z), (M.radish, M.radish_white), segments=8, cup=0.0,
              tilt=(t, t * 0.5))
     return done('freshPlate')
+
+
+def bbqPlate():
+    """A plate from the barbecue (`grillPlatter` serves it), eaten with a fork: a sausage marked by the bars, a marked
+    burger, a piece of corn with butter melting on it, and a sprig of parsley."""
+    plate()
+    roll('sausage', 0.014, 0.13, (M.sausage, M.char), (-0.035, WELL + 0.014, 0.045), yaw=-15, segments=8,
+         marks=((-0.55, -0.4), (-0.05, 0.1), (0.45, 0.6)), bend=0.006)
+    _patty('patty', (0.035, WELL, -0.02), d=0.085, h=0.024)
+    _corn('corn', 0.02, 0.075, (-0.05, WELL + 0.02, -0.045), yaw=25, rows=7, segments=10)
+    box('butter', 0.014, 0.005, 0.012, (-0.052, WELL + 0.0405, -0.045), M.butter, yaw=40, bevel=0.0018)
+    leaf('parsley', (0.075, WELL + 0.0005, 0.045), 0.022, 0.014, 40, M.leaf, tilt=6)
+    return done('bbqPlate')
+
+
+def tastingPlate():
+    """A plate from the tasting menu (`tastingBoard` serves it), small portions eaten with a fork: a wedge of cheese and
+    a cube, a fold of salami, two crackers, a few grapes, a dab of fig jam."""
+    plate()
+    prism('cheese', [(-0.075, -0.04), (-0.02, -0.022), (-0.07, 0.022)], WELL, WELL + 0.03, M.cheese_cut, M.cheese_cut,
+          sides=[M.cheese_cut, M.cheese, M.cheese_cut])
+    dice('cube', 0.016, (-0.01, WELL + 0.0068, 0.0), M.cheese_cut, yaw=30)
+    for i in range(3):
+        coin(f'salami{i}', 0.04, 0.0035, (0.02 + 0.012 * i, WELL + 0.0035 * (i % 2), -0.05 + 0.008 * i), M.salami,
+             segments=10, cup=0.25, tilt=(10, -12))
+    for i, (x, z, yaw) in enumerate(((0.055, 0.03, 15), (0.07, 0.045, 40))):
+        box(f'cracker{i}', 0.036, 0.005, 0.036, (x, WELL + 0.0025 + 0.005 * i, z), M.cracker, yaw=yaw, bevel=0.0012)
+    for i, (x, z, y) in enumerate(((-0.03, 0.05, 0.0), (-0.012, 0.058, 0.0), (-0.022, 0.07, 0.0), (-0.02, 0.058, 0.012))):
+        ball(f'grape{i}', 0.0125, (x, WELL + 0.0115 + y, z), M.grape, scale=(1, 1, 0.92), seg=6, rings=4)
+    blob('jam', (0.03, WELL, 0.0), 0.016, 0.012, 0.004, M.jam, seed=1.2, n=7)
+    leaf('basil', (0.0, WELL + 0.0005, 0.035), 0.02, 0.012, 60, M.leaf, tilt=4)
+    return done('tastingPlate')
 
 
 def plateDirty():
@@ -1711,6 +1743,14 @@ def spoon():
     return done('spoon')
 
 
+def paddle():
+    """The ice cream cart's flat wooden spoon, 9.5 cm, lying flat, its rounded blade to the front (+depth), held at the
+    origin 3 cm from its back end."""
+    _along('paddle', [(-0.03, -0.004), (0.035, -0.0055), (0.055, -0.0075), (0.065, -0.006), (0.065, 0.006),
+                      (0.055, 0.0075), (0.035, 0.0055), (-0.03, 0.004)], 0.0018, 0.0, 0.0, M.paddle)
+    return done('paddle')
+
+
 def chopsticks():
     """A pair of tapering wooden chopsticks, 23 cm long, side by side, their tips to the front (+depth), held from
     the origin."""
@@ -2027,7 +2067,8 @@ def basketball():
 # --- the food from town (review M-held-03): each in what it is sold in ------------------------------------------------
 def iceCreamCup():
     """A paper cup of ice cream from the cart, 9 cm across at its top: pink-striped card, two scoops (strawberry on
-    vanilla), each with a scoop's ragged lip, a flat wooden spoon stuck in."""
+    vanilla), each with a scoop's ragged lip. (Its flat wooden spoon is the one in the hand: `paddle`, actions.ts
+    `EATEN_WITH`.)"""
     cup = lathe('cup', [(0, 0), (0.031, 0), (0.0315, 0.003), (0.045, 0.058), (0.0465, 0.06), (0.0435, 0.06), (0, 0.05)],
                 [M.cup_paper, M.cup_paper, M.cup_stripe, M.cup_paper, M.cup_paper, M.vanilla], segments=18,
                 wave=(9, {3: 0.02}))
@@ -2044,8 +2085,6 @@ def iceCreamCup():
                                  (0.02 * s, 0.038 * s), (0, 0.043 * s)], m,
                    at=(x, y, z), segments=10, wave=(5, {2: 0.12}), rot=(0, 0, 30 * i))
         G.jitter(sc, 0.0012, size=0.01, seed=2.3 + i)
-    F.extrude('paddle', [(-0.004, 0.0), (0.004, 0.0), (0.0055, 0.06), (0.004, 0.075), (-0.004, 0.075),
-                         (-0.0055, 0.06)], 0.0018, (0.024, 0.062, 0.014), M.paddle, plane='front', rot=(-12, 30, -28))
     return done('iceCreamCup')
 
 
@@ -2149,6 +2188,8 @@ FAMILY = G.Family(
         I('cakeSlice', cakeSlice, (0.288, 0.114, 0.285), 'item.cakeSlice'),
         I('sandwich', sandwich, (0.288, 0.064, 0.288), 'item.sandwich'),
         I('plateDirty', plateDirty, (0.288, 0.017, 0.288), 'item.plateDirty'),
+        I('bbqPlate', bbqPlate, (0.288, 0.052, 0.288), 'item.bbqPlate'),
+        I('tastingPlate', tastingPlate, (0.288, 0.045, 0.288), 'item.tastingPlate'),
         I('freshPlate', freshPlate, (0.288, 0.051, 0.288), 'item.freshPlate'),
         # (Two or more dirty plates carried at once: content `plateDirty` `stackAs`.)
         I('plateStackDirty', plateStackDirty, (0.299, 0.036, 0.304), 'item.plateStackDirty', centre=(0.0015, -0.0039)),
@@ -2173,6 +2214,7 @@ FAMILY = G.Family(
         I('can', can, (0.066, 0.12, 0.065), 'tool.can', code=True),
         I('fork', fork, (0.026, 0.003, 0.2), 'tool.fork', centre=(0.0, 0.023), code=True, tolerance=0.1),
         I('spoon', spoon, (0.032, 0.011, 0.167), 'tool.spoon', centre=(0.0, 0.0235), code=True),
+        I('paddle', paddle, (0.015, 0.0018, 0.095), 'tool.paddle', centre=(0.0, 0.0175), code=True, tolerance=0.1),
         I('chopsticks', chopsticks, (0.026, 0.007, 0.23), 'tool.chopsticks', centre=(0.0, 0.055), code=True),
         I('phone', phone, (0.072, 0.0099, 0.148), 'tool.phone', code=True),
         I('book', book, (0.304, 0.032, 0.224), 'tool.book', code=True),
@@ -2209,7 +2251,7 @@ FAMILY = G.Family(
         I('spatula', spatula, (0.08, 0.035, 0.275), 'tool.spatula', centre=(0.0, 0.0675), code=True, tolerance=0.05),
         I('whisk', whisk, (0.061, 0.061, 0.331), 'tool.whisk', centre=(0.0, 0.0955), code=True, tolerance=0.05),
         # the food from town (review M-held-03)
-        I('iceCreamCup', iceCreamCup, (0.093, 0.128, 0.092), 'item.iceCreamCup'),
+        I('iceCreamCup', iceCreamCup, (0.093, 0.111, 0.092), 'item.iceCreamCup'),
         I('hotDog', hotDog, (0.2, 0.05, 0.09), 'item.hotDog'),
         I('crisps', crisps, (0.132, 0.049, 0.223), 'item.crisps', centre=(0.0, 0.0093)),
         I('apple', apple, (0.074, 0.081, 0.073), 'item.apple'),
