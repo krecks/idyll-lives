@@ -454,6 +454,10 @@ export const PROPS = {
   fork: { key: 'tool.fork', grip: 'bite', at: [0, 0.004, 0], clips: ['eatFork'] },
   spoon: { key: 'tool.spoon', grip: 'bite', at: [0, 0.004, 0], clips: ['eatFork'] },
   chopsticks: { key: 'tool.chopsticks', grip: 'bite', at: [0, 0.004, -0.02], clips: ['eatFork'] },
+  // (The ice cream cart's flat wooden spoon; the cup has none of its own.)
+  paddle: { key: 'tool.paddle', grip: 'bite', at: [0, 0.004, 0], clips: ['eatFork'] },
+  // A drink served at the table as a plate is (`SIPPED`): the glass itself to the lips, as a cup is.
+  smoothie: { key: 'item.smoothie', grip: 'level', at: [-0.04, -0.06, 0.01], sip: true },
   coin: { key: 'tool.coin', grip: 'hand', at: [-0.01, -0.02, 0.0], turn: [0, 0, 90], clips: ['toss'], during: [[0, TOSS_LET_GO]] },
   jarCoin: { key: 'tool.coin', grip: 'hand', at: [-0.01, -0.02, 0.0], turn: [0, 0, 90], clips: ['interact'], during: [[0, 0.45]] },
   seed: { key: 'tool.seedBag', grip: 'level', hand: 'l', at: [0, 0.01, 0], feeds: true },
@@ -527,7 +531,10 @@ const EATEN_WITH: Record<string, HandProp> = {
   pieSlice: PROPS.fork,
   cakeSlice: PROPS.fork,
   freshPlate: PROPS.fork,
+  bbqPlate: PROPS.fork,
+  tastingPlate: PROPS.fork,
   iceCream: PROPS.spoon,
+  iceCreamCone: PROPS.paddle,
   noodles: PROPS.chopsticks,
 };
 /**
@@ -548,15 +555,28 @@ const BITES: Record<string, HandProp> = {
   pastry: PROPS.biteCroissant,
   crisps: PROPS.biteCrisps,
 };
-/** What is itself the food, not a plate of it (`BITES`): carried, it goes to the mouth as it is, with nothing in the other hand. */
-const WHOLE = new Set(['hotDog', 'fruit', 'pastry', 'crisps']);
+/**
+ * Drinks served at the table as a plate is (content `items`, eaten): the glass in the right hand, sipped from (`drink`,
+ * held between sips: `holdCup`). The one on the table stays, as the plate does under a bite.
+ */
+const SIPPED: Record<string, HandProp> = { smoothie: PROPS.smoothie };
+/** What is itself the food, not a plate of it (`BITES`, `SIPPED`): carried, it goes to the mouth as it is, with nothing in the other hand. */
+const WHOLE = new Set(['hotDog', 'fruit', 'pastry', 'crisps', 'smoothie']);
 /**
  * What is in the right hand for a bite of `plate` (content `items` id), `carried` in the hand or on the table: its
  * cutlery (`EATEN_WITH`), else a bite of it (`BITES`; not of a thing `WHOLE` carried); then the bite is `eatFork`, the
  * hand a fork's length off the mouth, and a plate carried is on the left palm.
  */
 export function biteOf(plate: string, carried: boolean): HandProp | null {
-  return EATEN_WITH[plate] ?? (carried && WHOLE.has(plate) ? null : (BITES[plate] ?? null));
+  return EATEN_WITH[plate] ?? (carried && WHOLE.has(plate) ? null : (BITES[plate] ?? SIPPED[plate] ?? null));
+}
+/**
+ * The clip a bite of `plate` plays in place of `eat` (`carried` as for `biteOf`): `drink` for a drink in the hand
+ * (`SIPPED`), `eatFork` for the fork or a bite, else `eat` (the hand, or what it holds, to the mouth).
+ */
+export function eatClip(plate: string, carried: boolean): 'eat' | 'eatFork' | 'drink' {
+  const p = biteOf(plate, carried);
+  return !p ? 'eat' : p.sip ? 'drink' : 'eatFork';
 }
 /** The cup for a drink at `def` (`ACTIONS.drink`; none at the drinking fountain; the shaker where a cocktail is mixed). */
 export function drinkProp(def: string): HandProp | null {
@@ -580,7 +600,8 @@ export const FLOOR_TOYS = new Set(['toyBox', 'toyChest']);
 export const WALL_CUPBOARDS = new Set(Object.keys(CUPBOARD_OF));
 export const ACTIONS: Record<string, ActionAnim> = {
   // (With a fork, a spoon or chopsticks, for what wants them, or a bite of what is eaten by hand (`biteOf`), seated at the
-  // table or standing with the plate on the left palm: the bite is `eatFork`.)
+  // table or standing with the plate on the left palm: the bite is `eatFork` (`eatClip`), the plate held in front between
+  // bites standing (`holdPlate`); a drink served as a plate sipped from its glass.)
   eat: { stand: ['eat', 'idle'], upper: 'eat', hands: HANDS.hold, prop: (_, plate, _seated, carried) => biteOf(plate, carried) },
   // Sips from a cup, spaced out (`drinkProp`); a cocktail shaken (`SHAKERS`).
   drink: {

@@ -54,7 +54,7 @@ import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
 import { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, biteOf } from './actions';
+import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, biteOf, eatClip } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { FLOOR_SITS } from './clips/seated';
 import { HANDED } from './clips/serve';
@@ -2092,9 +2092,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         const up = known ? (typeof act?.upper === 'function' ? act.upper(rig.useDef) : act?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
         // Eating / drinking now and then (between sips the cup held: `between`); holding a book or phone throughout.
         if (up === 'eat' || up === 'drink') {
-          // (With cutlery or a bite in the hand, the bite stops a fork's length off the mouth: `eatFork`.)
-          const bite = up === 'eat' && biteOf(rig.plate, carry !== '') ? 'eatFork' : up;
-          upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? bite : known ? (act?.between ?? '') : '';
+          // (With cutlery or a bite in the hand, the bite stops a fork's length off the mouth: `eatFork`; a drink served
+          // as a plate is sipped from, the glass held between sips: `eatClip`.)
+          const bite = up === 'eat' ? eatClip(rig.plate, carry !== '') : up;
+          upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? bite : known ? (bite === 'drink' ? 'holdCup' : (act?.between ?? '')) : '';
         }
         else if (up) upper = up;
       }
@@ -2209,8 +2210,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         }
         key = seq[rig.seq % seq.length];
         // (Eating standing with cutlery or a bite in the hand, the plate on the left palm: the hand a fork's length off the
-        // mouth, as seated, not the plate to the face.)
-        if (key === 'eat' && tag === 'eat' && biteOf(rig.plate, carry !== '')) key = 'eatFork';
+        // mouth, as seated, not the plate to the face; between bites the plate held in front, not at the hip.)
+        if (tag === 'eat' && biteOf(rig.plate, carry !== '')) {
+          const bite = eatClip(rig.plate, carry !== '');
+          if (key === 'eat') key = bite;
+          else if (key === 'idle') key = bite === 'drink' ? 'holdCup' : 'holdPlate';
+        }
         repeat = true;
         // Up to the crib's rail to pick the baby up, back from it holding them (`cuddles`).
         // (Stepped in to a thing, `stepIn` places them: a reach as well would add to it, and walk them into the thing.)
