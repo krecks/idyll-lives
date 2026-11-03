@@ -254,6 +254,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private readonly carriedProps = [this.heldProp, this.toolProp, this.leftProp, this.rightProp, ...this.mountProps];
   /** Per Sim row: the prop in their hand for what they do (`ACTIONS[tag].prop`: a book, a cup, a phone). */
   private readonly handProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
+  /** How many of the slots above hold each prop, kept by `writeProp` (none: not there): `showProp` looks it up. */
+  private readonly propUses = new Map<string, number>();
   /** Scratch for `writeHand`: the hands as just posed. */
   private readonly hands: Hands = { palms: new Float32Array(6), quats: new Float32Array(8), head: new Float32Array(3), yaw: 0, floorY: 0, scale: 1, size: 1 };
   /** Scratch for `writeHeld`: a frame's axes and origin (x, y, z each). */
@@ -975,9 +977,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** Per frame: a prop nobody holds or works with isn't drawn (no draw call for its empty instances). */
   private readonly showProp = (p: P | null, key: string): void => {
     if (!p) return;
-    const used = this.heldProp.includes(key) || this.toolProp.includes(key) || this.leftProp.includes(key) || this.rightProp.includes(key) || this.handProp.includes(key) || this.mountProps.some((slot) => slot.includes(key));
     // (The `stress` ghosts' rigs are in `sims` already, in the rows after the residents'.)
-    this.view.showProp(p, used ? Math.min(this.sims.length, MAX_CHARACTERS) : 0);
+    this.view.showProp(p, this.propUses.has(key) ? Math.min(this.sims.length, MAX_CHARACTERS) : 0);
   };
 
   /**
@@ -1234,6 +1235,14 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private writeProp(slot: (string | null)[], i: number, key: string | null): Float32Array | null {
     const old = slot[i];
     if (old && old !== key) this.props.built(old)?.matrices.fill(0, i * 16, i * 16 + 16);
+    if (old !== key) {
+      if (old !== null) {
+        const n = (this.propUses.get(old) ?? 0) - 1;
+        if (n > 0) this.propUses.set(old, n);
+        else this.propUses.delete(old);
+      }
+      if (key !== null) this.propUses.set(key, (this.propUses.get(key) ?? 0) + 1);
+    }
     slot[i] = key;
     return key ? (this.prop(key)?.matrices ?? null) : null;
   }
@@ -2036,7 +2045,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.view.quiltRows(b.quilt, b.drawn, true);
     }
     // What's ridden changed: the renderer hides those where they stand.
-    if (this.riddenNow.size !== this.ridden.size || [...this.riddenNow].some((id) => !this.ridden.has(id))) {
+    let same = this.riddenNow.size === this.ridden.size;
+    if (same) {
+      for (const id of this.riddenNow) {
+        if (this.ridden.has(id)) continue;
+        same = false;
+        break;
+      }
+    }
+    if (!same) {
       this.ridden.clear();
       for (const id of this.riddenNow) this.ridden.add(id);
       this.riddenChanged = true;
