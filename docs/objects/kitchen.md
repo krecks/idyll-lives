@@ -104,7 +104,9 @@ for when there's nothing else to do, and a cook on the way to the fridge still h
 - Since 2026-11-03: the pan stands at its grate's or glass's height (it floated 1–2 cm), and what the cook carried in
   is put down on a cold burner or ring clear of it (`SET_DOWN_SPOTS`), not beside it at 0.9 m; the gas range's frying
   pan is gone (three pans with the cook's); the knob that turns is by the burner or ring that lights (the hob counter,
-  the range cooker); emptying a dishwasher opens its door (`tools/art/blender/families/kitchen_cooking.md`).
+  the range cooker); emptying a dishwasher opens its door, and loading or emptying it the resident bends down to its
+  rack (`DISHWASHERS`), not at the worktop; the oven tower's tray comes out empty, not with rolls for every dish
+  (`tools/art/blender/families/kitchen_cooking.md`).
 
 ## K3. Small appliances and dishwashers (4)
 

@@ -227,6 +227,8 @@ export interface PlacedObject {
   def: string;
   /** Facing (0..3, as the simulation's `rot`). */
   rot: number;
+  /** Its turn (rad): `rot`'s quarter turns and a freely turned thing's own (`turn`), as it's drawn. */
+  yaw: number;
   /** Where Sims sit on it (see `seatOf`; resized taller or shorter, the seat moves with it). */
   seat: Seat;
   /** What Sims stand up on to use it (content `stand`; resized, it moves too), or null. */

@@ -54,7 +54,7 @@ import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
 import { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, withCutlery } from './actions';
+import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SET_DOWN_SPOTS, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, withCutlery } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { FLOOR_SITS } from './clips/seated';
 import { HANDED } from './clips/serve';
@@ -771,7 +771,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const stool = FOOTSTOOLS[o.def];
       const made = def?.footprint ?? [1, 1];
       const footstool = stool ? { hw: (stool[0] / 2) * (o.size ? o.size[0] / (made[0] * 100) : 1), hd: (stool[1] / 2) * (o.size ? o.size[1] / (made[1] * 100) : 1), yaw: ((o.rot * 90 + (o.turn ?? 0)) * Math.PI) / 180 } : null;
-      return { def: o.def, rot: o.rot, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, builtIn: !!def?.surface && seatsItself(def), quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, footstool, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
+      return { def: o.def, rot: o.rot, yaw: (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, builtIn: !!def?.surface && seatsItself(def), quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, footstool, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
     this.footstools = this.objects.filter((o) => o.footstool);
     world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
@@ -1175,19 +1175,22 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   }
 
   /**
-   * What Sim row `i` carried in, put down on the station it works at (`SET_DOWN`; none: in the oven): on its top, to
-   * the side of the step's tool (`writeTool`) away from the station's middle, else of the middle.
+   * What Sim row `i` carried in, put down on the station it works at (`SET_DOWN`; none: in the oven): at its place
+   * there (`SET_DOWN_SPOTS`), else on its top to the side of the step's tool (`writeTool`) away from the station's
+   * middle, else of the middle.
    */
   private writeSetDown(rig: SimRig, i: number, item: ItemDef | undefined, tag: string, station: PlacedObject | null | undefined): void {
     const m = this.writeProp(this.heldProp, i, item && station ? (item.model ?? `item.${item.id}`) : null);
     if (!m || !station) return;
-    const f = (station.rot * Math.PI) / 2;
+    const f = station.yaw;
+    const at = SET_DOWN_SPOTS[station.def]?.[tag];
     const spot = STATION_SPOTS[station.def]?.[tag];
-    const top = this.content?.object(station.def)?.surface?.height ?? spot?.[2] ?? this.content?.cooking.defaultSurfaceHeight ?? 0.9;
-    // (In the station's own frame: right of its middle, or of the tool's spot, by the side it isn't on.)
-    const x = spot ? spot[0] - Math.sign(spot[0] || 1) * SET_DOWN_SIDE : SET_DOWN_SIDE;
-    const z = spot ? spot[1] : 0;
-    placeProp(m, i, station.cx + x * Math.cos(f) + z * Math.sin(f), rig.floorY + top, station.cz - x * Math.sin(f) + z * Math.cos(f), (station.rot * Math.PI) / 2, 1);
+    const top = at?.[2] ?? this.content?.object(station.def)?.surface?.height ?? spot?.[2] ?? this.content?.cooking.defaultSurfaceHeight ?? 0.9;
+    // (In the station's own frame: its place, else right of its middle, or beside the tool's spot on the side away from
+    // the middle: towards it, it stood on what the spot keeps clear of, a grill station's hood.)
+    const x = at ? at[0] : spot ? spot[0] + Math.sign(spot[0] || 1) * SET_DOWN_SIDE : SET_DOWN_SIDE;
+    const z = at ? at[1] : spot ? spot[1] : 0;
+    placeProp(m, i, station.cx + x * Math.cos(f) + z * Math.sin(f), rig.floorY + top, station.cz - x * Math.sin(f) + z * Math.cos(f), f, 1);
   }
 
   /**
@@ -1402,15 +1405,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   /**
    * The tool on the station Sim row `i` cooks at (a chopping board, a pan, food on the grill; by
-   * action tag): at its spot (`STATION_SPOTS`), else on its top, a little towards the cook.
+   * action tag): at its spot (`STATION_SPOTS`; none where it's done inside), else on its top, a little towards the cook.
    */
   private writeTool(rig: SimRig, i: number, tag: string, station: PlacedObject | null | undefined): void {
-    const key = station ? (STATION_PROPS[tag] ?? null) : null;
+    const spot = station ? STATION_SPOTS[station.def]?.[tag] : undefined;
+    const key = station && spot !== null ? (STATION_PROPS[tag] ?? null) : null;
     const m = this.writeProp(this.toolProp, i, key);
     if (!m || !station) return;
-    const spot = STATION_SPOTS[station.def]?.[tag];
     if (spot) {
-      const f = (station.rot * Math.PI) / 2;
+      const f = station.yaw;
       const [x, z, y] = spot;
       placeProp(m, i, station.cx + x * Math.cos(f) + z * Math.sin(f), rig.floorY + y, station.cz - x * Math.sin(f) + z * Math.cos(f), rig.yaw, 1);
       return;

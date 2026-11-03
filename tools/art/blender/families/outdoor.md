@@ -186,7 +186,9 @@ The game draws the cook's food on the grate and what they carried out beside it 
   The lid hides the bare grate at rest. A round enamel side tray (r 0.165, top at 0.70) is hooked onto the bowl's front
   right on two struts, inside the tile (its middle at (0.333, 0.333)): the bowl the cook brings out stands there, not on
   the grate over the coals. The food goes on the grate at (0, 0.06), 0.769. The model is now 0.82 × 1.04 × 0.80,
-  centred on (0.089, 0.096), built in place as before; the content's `surface` (the grate) is unchanged.
+  centred on (0.089, 0.096), built in place as before. Its content `surface` (the grate, at 0.77) is gone: the
+  lid closes over it, so a dish served there (a pizza, the barbecue platter, with no table near) was hidden, and
+  the next cook grilled on top of it; the tray is too small for a platter, so it isn't a top either.
 - **grillStation**: the burgers, sausages and corn on the grate are gone (the hood hides it at rest, and while it's
   up the cook's food is drawn there, at (0, −0.12), 0.914); the bottle and the pepper mill moved from the right counter
   to the back of the left one, beside the board of patties. The right counter is free: the content's `surface` is
