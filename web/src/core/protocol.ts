@@ -759,6 +759,12 @@ export interface JobView {
   grade: string | null;
   gradeLabel: string | null;
   performance: number;
+  /** What a shift adds to the bar at this pace (the mood they last left for work in). */
+  shiftPerformance: number;
+  /** Shifts at this pace still to fill the bar; null at the top, or when shifts don't fill it. */
+  shiftsToFullBar: number | null;
+  /** The mood they last left for work in (0..1). */
+  shiftMood: number;
   /** Per shift on this Sim's schedule. */
   pay: number;
   payPerHour: number;
