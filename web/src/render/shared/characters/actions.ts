@@ -697,7 +697,8 @@ export const ACTIONS: Record<string, ActionAnim> = {
   chop: { stand: ['chop', 'interact', 'chop'], hands: HANDS.grip },
   stir: { stand: ['stir', 'interact', 'stir'], hands: HANDS.hold },
   flip: { stand: ['flip', 'interact', 'flip'], hands: HANDS.grip },
-  serve: { stand: ['pickUp', 'idle'], hands: HANDS.hold },
+  // The dish set down on the table: bent over it, held at the top's height until it's let go (not a squat to the floor).
+  serve: { stand: ['setDown'], hands: HANDS.hold },
   // Batter stirred in a mixing bowl, pastry made (the bowl is drawn on the counter).
   mix: { stand: ['stir', 'interact', 'stir'], hands: HANDS.hold },
   // A dish put in the oven or the microwave, then watched, bending to look in now and then: down to

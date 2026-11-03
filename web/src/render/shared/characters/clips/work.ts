@@ -1,7 +1,7 @@
 /**
  * Standing work: reaching to use something, picking up from the floor, hands busy at a counter
  * (`spell`), pushing a mop or vacuum, leaning on a rail (telescope), and (phase 2) chopping,
- * stirring, flipping and carrying.
+ * stirring, flipping, carrying and putting a dish down on a table (`setDown`).
  *
  * Counters are 0.9 m high with their front edge ~0.5 m ahead of where a resident stands (the
  * centre of the tile in front): the weight goes forward over planted feet and the back leans in so
@@ -78,6 +78,19 @@ function carryPose(p: number): PoseSpec {
   return hands(body, L([-0.16, 1.05 + bob, 0.27], { pole: [-0.5, -1, -0.3], pronate: -10, hand: wrist('l', 20, 0) }), R([0.16, 1.05 + bob, 0.27], { pole: [0.5, -1, -0.3], pronate: -10, hand: wrist('r', 20, 0) }));
 }
 
+/** Putting a dish down on a table (serving): bent over it, knees giving a little, the dish held in both hands
+ * just over a 0.75 m top in front, until it's let go (the sim puts it down at the end). */
+const TABLE_Y = 0.8;
+function setDownPose(p: number): PoseSpec {
+  const bob = 0.006 * Math.sin(p * TAU);
+  const body = stand({ breath: p, lean: 32, fwd: 0.06, sink: 0.05 + 0.004 * Math.sin(p * TAU), head: [14, 0, 0] });
+  return hands(
+    body,
+    L([-0.16, TABLE_Y + bob, 0.42], { pole: [-0.5, -1, -0.3], pronate: -10, hand: wrist('l', 20, 0) }),
+    R([0.16, TABLE_Y + bob, 0.42], { pole: [0.5, -1, -0.3], pronate: -10, hand: wrist('r', 20, 0) }),
+  );
+}
+
 /** Carrying something in the right hand (an upper-body layer, phase 2): forearm forward, the left arm swings at the walk's pace. */
 function carryOnePose(p: number): PoseSpec {
   const swing = -Math.cos(TAU * (p - 0.05));
@@ -149,5 +162,6 @@ export function workClips(): ClipDef[] {
     cycle('flip', { seconds: 2, loop: true }, flipPose),
     cycle('carry', { seconds: 1.1, loop: true }, carryPose),
     cycle('carryOne', { seconds: 1.1, loop: true }, carryOnePose),
+    cycle('setDown', { seconds: 2.4, loop: true }, setDownPose),
   ];
 }
