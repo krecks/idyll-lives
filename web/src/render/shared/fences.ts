@@ -121,7 +121,12 @@ export function writeFences(
       restNormals: new Float32Array(p.geo.nor.slice(first * 3)),
     });
   }
+  // Only where a fence drawn here ends (the others' posts, the lot in view's, are theirs to draw:
+  // hidden with them over the basement).
+  const ends = new Set<string>();
+  for (const f of fences) for (const [x, z] of f.axis === 'h' ? [[f.x, f.z], [f.x + 1, f.z]] : [[f.x, f.z], [f.x, f.z + 1]]) ends.add(`${x}:${z}`);
   for (const post of posts.values()) {
+    if (!ends.has(`${post.x}:${post.z}`)) continue;
     if (out.postHere && !out.postHere(post.x, post.z)) continue;
     if ((post.style.kind === 'stone' || post.style.kind === 'hedge') && !post.gate) continue;
     p.at(post.x, post.z, 0);
