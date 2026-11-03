@@ -9874,11 +9874,7 @@ pub(crate) fn trip_minutes(eta: f32, car: bool) -> f32 {
 pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
     let walks = |i: usize| ctx.transit.walks_out(i, ctx.tick);
     if !ctx.travel.open {
-        let d = |p: &[f32; 2]| (p[0] - sim.pos[0]).hypot(p[1] - sim.pos[1]);
-        return (0..ctx.exits.len())
-            .filter(|&i| walks(i))
-            .map(|i| ctx.exits[i])
-            .min_by(|a, b| d(a).total_cmp(&d(b)));
+        return nearest_exit(ctx.exits, sim.pos, walks).map(|i| ctx.exits[i]);
     }
     // From home, the way their commute was timed by (on foot).
     let home = ctx
@@ -9941,10 +9937,17 @@ pub(crate) fn quickest_exit(
     best.map(|(_, i)| i)
 }
 
-/// The town's way out (`World::exits`) nearest `pos`, if it has any.
-pub(crate) fn nearest_exit(exits: &[[f32; 2]], pos: [f32; 2]) -> Option<[f32; 2]> {
-    let d = |p: &[f32; 2]| (p[0] - pos[0]).hypot(p[1] - pos[1]);
-    exits.iter().copied().min_by(|a, b| d(a).total_cmp(&d(b)))
+/// The town's way out (an index into `World::exits`) nearest `pos` in a straight line, of those
+/// `walks` lets them leave by (`quickest_exit`), if it has any.
+pub(crate) fn nearest_exit(
+    exits: &[[f32; 2]],
+    pos: [f32; 2],
+    walks: impl Fn(usize) -> bool,
+) -> Option<usize> {
+    let d = |i: usize| (exits[i][0] - pos[0]).hypot(exits[i][1] - pos[1]);
+    (0..exits.len())
+        .filter(|&i| walks(i) && exits[i].iter().all(|v| v.is_finite()))
+        .min_by(|&a, &b| d(a).total_cmp(&d(b)))
 }
 
 /// The object a task holds a place at (using it, repairing it, cooking at it, the seat they eat

@@ -368,16 +368,12 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
         walk_commute(w, i, from, ground, walk, walks)
     } else {
         // A cosy town: the nearest way out, all of the way `commuteMinutes`, as ever.
-        let d = |p: [f32; 2]| (p[0] - from[0]).hypot(p[1] - from[1]);
-        (0..w.exits.len())
-            .filter(|&k| walks(k) && w.exits[k].iter().all(|v| v.is_finite()))
-            .min_by(|&a, &b| d(w.exits[a]).total_cmp(&d(w.exits[b])))
-            .map(|exit| {
-                let eta = w
-                    .travel
-                    .eta(ground, w.exits[exit], crate::travel::Mode::Foot, walk);
-                (exit, eta * WALK_MARGIN + OUT_OF_THE_HOUSE, off_map)
-            })
+        crate::world::nearest_exit(&w.exits, from, walks).map(|exit| {
+            let eta = w
+                .travel
+                .eta(ground, w.exits[exit], crate::travel::Mode::Foot, walk);
+            (exit, eta * WALK_MARGIN + OUT_OF_THE_HOUSE, off_map)
+        })
     };
     let Some((exit, minutes, total)) = commute else {
         w.sims[i].commute = None;

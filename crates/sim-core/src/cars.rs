@@ -1557,8 +1557,8 @@ pub(crate) fn off_work(w: &mut World, i: usize) -> bool {
 
 /// `i` stands at the town's exit nearest them (out of sight).
 fn to_exit(w: &mut World, i: usize) {
-    if let Some(at) = nearest_exit(&w.exits, w.sims[i].pos) {
-        w.sims[i].pos = at;
+    if let Some(k) = nearest_exit(&w.exits, w.sims[i].pos, |_| true) {
+        w.sims[i].pos = w.exits[k];
     }
 }
 
