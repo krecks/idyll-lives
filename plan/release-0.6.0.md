@@ -34,6 +34,23 @@ The release review of the whole branch (`/code-review` on #50) found and fixed: 
 
 `tools/ci-local.sh` (every CI step, on CI's Bun 1.4.3, and the web's types and lint), the voice's tests, the production build, and the game played.
 
+| Gate | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings` | pass |
+| `cargo test -p sim-core --locked` | pass (141 + 664) |
+| generated houses and worlds (`--ignored`, Cosy/Normal three per kind, Big one per kind) | pass |
+| `bun run check:clips` | 313 clips, 0 new, 0 known |
+| `bun run check:chunks` | 195 anchors and names found in PlayCanvas 2.23.3 |
+| `bun run test` (each file isolated) | pass (281) |
+| `cargo test -p ll-tools --release --locked` | pass (112) |
+| `cargo review sizes`, `cargo review uses --check`, `cargo check-glb` | pass (629 models, 0 failed) |
+| `bun run check`, `bun run lint` | 0 errors, 0 warnings; clean |
+| `cargo test -p voice --release --locked`, `bun run check:voice` | pass (32); pitch, speed and depth work |
+| `cargo run -p sim-core --example tickbench` | 1.4 µs/tick with socials |
+| `cargo release-version` | 0.6.0 everywhere |
+| `vite build --base=/idyll-lives/` | pass, 675 MB (under 900) |
+| The game | a saved game at speed 3 resumes at 3, residents act, pause and resume, birds, no console errors; the production build's benchmark (village, Medium) on WebGPU and WebGL2: 0.6.0, cross-origin isolated, 60 fps, no page errors |
+
 ## 4. Release steps
 
 1. Pull request `release/0.6.0` → `main` (#50); CI passes on it; merge (a merge commit).
