@@ -2,18 +2,14 @@
 //! the one who asked carries it in and puts it together where it goes (`setup.rs`), someone else
 //! does if they can't, and it's set up for them in the end whatever happens.
 
-use crate::common::{self, Watch, garden_home, until};
+use crate::common::{self, Watch, apply, garden_home, until};
 
 use serde_json::json;
 use sim_core::content::Layer;
 use sim_core::planner::{self, PurchaseRequest};
 use sim_core::social::EventKind;
 use sim_core::world::{Phase, TaskKind};
-use sim_core::{Command, World, clock};
-
-fn apply(w: &mut World, cmd: serde_json::Value) -> Result<(), sim_core::Error> {
-    w.apply(Command::from_json(&cmd.to_string()).unwrap())
-}
+use sim_core::{World, clock};
 
 /// A small thing for indoors (one tile, on the floor) household 0 doesn't have.
 fn something_new(w: &World) -> usize {

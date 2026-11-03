@@ -7,9 +7,7 @@
 use crate::common;
 
 use sim_core::world::{Phase, TaskKind};
-use sim_core::{MINUTES_PER_TICK, World, clock, snapshot};
-
-const TICKS_PER_MINUTE: u64 = (1.0 / MINUTES_PER_TICK) as u64;
+use sim_core::{TICKS_PER_MINUTE, World, clock, snapshot};
 
 /// A clerk's job starting at `start` o'clock for four hours, every day; buses every 20 minutes
 /// from 6 to 23 o'clock.
@@ -79,13 +77,6 @@ fn world(content: &str, town: &str) -> World {
     let mut w = World::from_json(content, town, 5).unwrap();
     w.autonomy = false;
     w
-}
-
-fn day_hour(w: &mut World, day: u32, hour: f32) {
-    let t = clock::tick_at(day, hour * 60.0).unwrap();
-    while w.tick < t {
-        w.tick_once();
-    }
 }
 
 fn waiting(w: &World, i: usize) -> bool {
@@ -171,7 +162,7 @@ fn at_night_they_leave_town_by_the_stop_on_foot() {
     // Work at 5 o'clock: no bus yet, and the stop is the nearest way out.
     let c = content(5.0);
     let mut w = world(&c, &town(1, 0, 90, true));
-    day_hour(&mut w, 1, 23.5);
+    common::run_to(&mut w, 1, 23.5);
     let end = clock::tick_at(2, 6.0 * 60.0).unwrap();
     while w.tick < end && w.sims[0].away_until.is_none() {
         w.tick_once();
@@ -189,7 +180,7 @@ fn at_night_they_leave_town_by_the_stop_on_foot() {
 fn the_bus_keeps_its_timetable() {
     let c = content(10.0);
     let mut w = world(&c, &town(0, 0, 90, true));
-    day_hour(&mut w, 1, 23.9);
+    common::run_to(&mut w, 1, 23.9);
     let line = w.transit.lines[0].clone();
     let every = 20 * TICKS_PER_MINUTE;
     // When each bus came in, and when its doors opened at the stop.
@@ -238,7 +229,7 @@ fn a_rider_waits_less_than_a_headway_gets_on_and_is_at_work_on_time() {
     let c = content(10.0);
     let mut w = world(&c, &town(1, 0, 90, true));
     // A day in, so their leaving is timed by the bus (the game starts at 8).
-    day_hour(&mut w, 2, 5.0);
+    common::run_to(&mut w, 2, 5.0);
     let m = morning(&mut w, clock::tick_at(2, 12.0 * 60.0).unwrap());
     let c0 = m.commute.expect("a commute");
     assert!(c0.bus.is_some(), "not planned by bus: {c0:?}");
@@ -275,13 +266,13 @@ fn they_come_home_by_bus_and_walk_from_the_stop() {
     // (Work over at 14:15, the bus last at the stop at 14:08: they wait off the map for the next.)
     let c = content(10.25);
     let mut w = world(&c, &town(1, 0, 90, true));
-    day_hour(&mut w, 2, 5.0);
+    common::run_to(&mut w, 2, 5.0);
     morning(&mut w, clock::tick_at(2, 12.0 * 60.0).unwrap())
         .on
         .expect("never got on");
     let funds = w.households[0].funds;
     // Done: off the map until the bus home pulls in at their stop.
-    day_hour(&mut w, 2, 14.26);
+    common::run_to(&mut w, 2, 14.26);
     assert_eq!(sim_core::bus::status(&w, &w.sims[0]), Some("home"));
     let mut off = None;
     let end = clock::tick_at(2, 16.0 * 60.0).unwrap();
@@ -320,7 +311,7 @@ fn nobody_takes_the_bus_when_walking_is_quicker() {
     // The house by the way out at the west end.
     let c = content(10.0);
     let mut w = world(&c, &town(1, 0, 4, true));
-    day_hour(&mut w, 2, 5.0);
+    common::run_to(&mut w, 2, 5.0);
     assert!(w.sims[0].commute().is_some_and(|c| c.bus.is_none()));
     let end = clock::tick_at(2, 12.0 * 60.0).unwrap();
     while w.tick < end && w.sims[0].away_until.is_none() {
@@ -335,7 +326,7 @@ fn nobody_takes_the_bus_when_walking_is_quicker() {
 fn someone_with_a_bike_at_home_rides_it_instead() {
     let c = content(10.0);
     let mut w = world(&c, &town(1, 1, 90, true));
-    day_hour(&mut w, 2, 5.0);
+    common::run_to(&mut w, 2, 5.0);
     let mut rode = false;
     let end = clock::tick_at(2, 12.0 * 60.0).unwrap();
     while w.tick < end && w.sims[0].away_until.is_none() {
@@ -351,7 +342,7 @@ fn someone_with_a_bike_at_home_rides_it_instead() {
 fn a_game_saved_at_the_stop_loads_with_them_waiting_for_the_next_bus() {
     let c = content(10.0);
     let mut w = world(&c, &town(1, 0, 90, true));
-    day_hour(&mut w, 2, 5.0);
+    common::run_to(&mut w, 2, 5.0);
     let end = clock::tick_at(2, 12.0 * 60.0).unwrap();
     while !waiting(&w, 0) {
         w.tick_once();
@@ -374,11 +365,11 @@ fn a_game_saved_on_the_bus_home_loads_with_them_walking_home_from_the_stop() {
     // (Work over at 14:15, the bus last at the stop at 14:08: they wait off the map for the next.)
     let c = content(10.25);
     let mut w = world(&c, &town(1, 0, 90, true));
-    day_hour(&mut w, 2, 5.0);
+    common::run_to(&mut w, 2, 5.0);
     morning(&mut w, clock::tick_at(2, 12.0 * 60.0).unwrap())
         .on
         .expect("never got on");
-    day_hour(&mut w, 2, 14.26);
+    common::run_to(&mut w, 2, 14.26);
     assert_eq!(sim_core::bus::status(&w, &w.sims[0]), Some("home"));
     let funds = w.households[0].funds;
     let mut w = World::from_save_json(&c, &w.save_json()).unwrap();
@@ -400,7 +391,7 @@ fn a_save_without_stops_has_no_bus() {
     let mut w = World::from_save_json(&c, &w.save_json()).unwrap();
     w.autonomy = false;
     assert!(w.transit.stops.is_empty() && w.transit.lines.is_empty());
-    day_hour(&mut w, 2, 9.0);
+    common::run_to(&mut w, 2, 9.0);
     assert!(w.transit.buses.is_empty(), "a bus in a town without stops");
     let mut out = vec![0.0; snapshot::CAPACITY];
     snapshot::write(&w, &mut out);

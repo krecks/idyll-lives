@@ -5,7 +5,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { mapScale, screenToMap } from '../src/ui/mapView';
-import { placeAt, rideText, tripText } from '../src/ui/place';
+import { placeAt, rideText, tripText, wayText } from '../src/ui/place';
 
 describe('town map view', () => {
   const view = { x: -6, z: -6, w: 412, d: 212 };
@@ -81,5 +81,18 @@ describe('place names', () => {
     expect(rideText('scooter', 'work')).toBe('Riding the e-scooter to work');
     expect(tripText({ to: 1, at: 17 * 60 + 40 }, 1, plots, households, time, { kind: 'bike', to: 'home' })).toBe('Cycling home · back about 17:40');
     expect(tripText({ to: 1 }, 1, plots, households, time, { kind: 'scooter', to: 'home' })).toBe('Riding the e-scooter home');
+  });
+
+  test('a resident on their way: the bus first, then the trip, then the ride', () => {
+    const time = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+    const way = (s: Parameters<typeof wayText>[0]) => wayText(s, 1, plots, households, time);
+    const bike = { kind: 'bike', to: 'work' } as const;
+    expect(way({ bus: 'wait', job: null, trip: { to: 1 }, ride: bike })).toBe('Waiting for the bus');
+    expect(way({ bus: 'work', job: {} })).toBe('On the bus to work');
+    expect(way({ bus: 'work', job: null })).toBe('On the bus to school');
+    expect(way({ bus: 'home', job: {}, trip: { to: 1, at: 17 * 60 + 40 } })).toBe('On the bus home · back about 17:40');
+    expect(way({ job: {}, trip: { to: 0 }, ride: bike })).toBe('On the way to the Smiths');
+    expect(way({ job: {}, ride: bike })).toBe('Cycling to work');
+    expect(way({ job: {} })).toBe('');
   });
 });

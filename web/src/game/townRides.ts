@@ -12,6 +12,7 @@
 import type { Content } from '../content/content';
 import { hash } from '../render/shared/cars';
 import type { HouseholdDraft } from './household';
+import { frontTile, sizeOf } from './surfaces';
 import type { Door, Placement, Rect, Wall } from './town';
 
 /** What a household rides (content ids). */
@@ -59,25 +60,6 @@ export interface RideLot {
 
 /** Tiles kept clear round a door, out from it (its doorstep and the tile past it). */
 const DOORSTEP = 2;
-
-/** `[w, d]` of a footprint `[fw, fd]` turned `rot`. */
-function turned([fw, fd]: readonly [number, number], rot: number): [number, number] {
-  return rot % 2 ? [fd, fw] : [fw, fd];
-}
-
-/** The tile its users stand on (sim-core `ObjectInstance::front_tile`). */
-export function frontTile(x: number, z: number, w: number, d: number, rot: number): [number, number] {
-  switch (rot % 4) {
-    case 0:
-      return [x + Math.floor((w - 1) / 2), z + d];
-    case 1:
-      return [x + w, z + Math.floor((d - 1) / 2)];
-    case 2:
-      return [x + Math.floor((w - 1) / 2), z - 1];
-    default:
-      return [x - 1, z + Math.floor((d - 1) / 2)];
-  }
-}
 
 /** The tiles right behind a thing, along its back (away from its front tile). */
 function backTiles(x: number, z: number, w: number, d: number, rot: number): [number, number][] {
@@ -132,10 +114,9 @@ export function placeRides(content: Content, lot: RideLot, defs: readonly string
   // Not to stand on: the paths, the driveway and a tile round it, doorsteps, where things are used from.
   const keep = new Uint8Array(W * D);
   const keepAt = (x: number, z: number) => inLot(x, z) && (keep[key(x, z)] = 1);
-  const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
   for (const o of lot.objects) {
     const def = content.object(o.def);
-    const [w, d] = turned(footprint(o.def), o.rot);
+    const [w, d] = sizeOf(def, o.rot);
     const ground = !def?.layer || def.layer === 'floor';
     for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) (ground ? block : keepAt)(Math.floor(o.x) + dx, Math.floor(o.z) + dz);
     if (def?.interactions.length) keepAt(...frontTile(Math.floor(o.x), Math.floor(o.z), w, d, o.rot));
@@ -177,10 +158,10 @@ export function placeRides(content: Content, lot: RideLot, defs: readonly string
   const taken: [number, number][] = [];
   let n = 0;
   for (const def of defs) {
-    const fp = footprint(def);
+    const shape = content.object(def);
     const spots: { x: number; z: number; rot: number; score: number }[] = [];
     for (let rot = 0; rot < 4; rot++) {
-      const [w, d] = turned(fp, rot);
+      const [w, d] = sizeOf(shape, rot);
       for (let z = 1; z + d <= D - 1; z++) {
         for (let x = 1; x + w <= W - 1; x++) {
           const fronts = frontRow(x, z, w, d, rot);
@@ -202,7 +183,7 @@ export function placeRides(content: Content, lot: RideLot, defs: readonly string
     }
     spots.sort((a, b) => a.score - b.score);
     for (const s of spots.slice(0, 12)) {
-      const [w, d] = turned(fp, s.rot);
+      const [w, d] = sizeOf(shape, s.rot);
       for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) blocked[key(s.x + dx, s.z + dz)] = 1;
       const after = reach();
       const ok = frontRow(s.x, s.z, w, d, s.rot).every(([fx, fz]) => after[key(fx, fz)]) && before.every((v, k) => !v || after[k] || blocked[k]);

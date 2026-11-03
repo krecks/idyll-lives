@@ -98,3 +98,22 @@ export type SimRide = { kind: 'bike' | 'scooter'; to: 'work' | 'school' | 'home'
 export function rideText(kind: SimRide['kind'], to: SimRide['to']): string {
   return `${kind === 'bike' ? 'Cycling' : 'Riding the e-scooter'} ${to === 'home' ? 'home' : `to ${to}`}`;
 }
+
+/**
+ * A resident on their way (`SimView`'s `bus`, `trip` and `ride`), in words: the bus first (`busText`),
+ * then the trip (`tripText`), then the ride (`rideText`); '' when they aren't on their way. `home`,
+ * `plots`, `households` and `time` as `tripText`'s.
+ */
+export function wayText(
+  s: { bus?: 'wait' | 'work' | 'home' | null; job: unknown; trip?: { to: number; at?: number }; ride?: SimRide },
+  home: number | null,
+  plots: readonly PlacePlot[],
+  households: readonly { name: string; plot: number | null }[],
+  time: (minute: number) => string,
+): string {
+  const bus = busText(s);
+  if (bus) return bus;
+  if (s.trip) return tripText(s.trip, home, plots, households, time, s.ride, s.bus === 'home');
+  if (s.ride) return rideText(s.ride.kind, s.ride.to);
+  return '';
+}

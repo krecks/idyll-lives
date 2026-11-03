@@ -16,20 +16,19 @@
  */
 
 import * as pc from './engine';
-import { Instances } from './instancing';
-import { MaterialLibrary } from './materials';
-import { drawMesh, meshFrom } from './meshes';
+import type { Instances } from './instancing';
+import { drawMesh } from './meshes';
+import { LIFT, rollWheels, Vehicles } from './vehicles';
 import type { FrameState } from '../../core/bridge';
 import type { Seat } from '../shared/characters/seats';
 import type { WorldStructure } from '../../core/protocol';
-import { CARS, CAR_PAINT, carDoor, carriedAlong, DOORS, inCar, paintCar, paintDoor, paintWheel, wheelAt, type CarBody, type CarPose } from '../shared/cars';
-import { chunkAt } from '../shared/chunks';
-import { lerpAngle, wrapAngle } from '../shared/characters/rig';
+import { CARS, CAR_PAINT, carDoor, carriedAlong, DOORS, inCar, paintCar, paintDoor, wheelAt, type CarBody, type CarPose } from '../shared/cars';
+import { lerpAngle } from '../shared/characters/rig';
 import { DOOR_SWING, ease } from '../shared/doors';
 import { Geo } from '../shared/geometry';
 import { GAME_RATE } from '../shared/gameSpeed';
-import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
-import { blob, Painter } from '../shared/street';
+import { compose, quatYawPitchRoll } from '../shared/math';
+import { Painter } from '../shared/street';
 
 /** How wide a door opens (degrees). It swings as a house's door does (`DOOR_SWING`, in game time: about 9 sim ticks, which getting in and out leave it, sim-core `cars::DOOR_OPENS`). */
 const DOOR_OPEN = 62;
@@ -37,21 +36,14 @@ const DOOR_OPEN = 62;
 /** A car's seat (sim-core `Car::seat_at`): lower than a chair's, so a grown-up's head stays under the roof. */
 const CAR_SEAT: Seat = { h: 0.3, fwd: 0 };
 
-/** Cars further than this from the camera's target aren't drawn (m): past the fog, a dot at most. */
-const FAR = 650;
 /** How far the front wheels steer at most (rad), and how quickly they follow the way the car turns (per second). */
-const STEER_MAX = 0.5;
-const STEER_RATE = 8;
+const STEER = { max: 0.5, rate: 8 };
 /** How far the body tilts at most as it speeds up or slows down (rad, nose up speeding up), per m/s² of it, and how quickly it settles (per second). */
 const PITCH_MAX = 0.03;
 const PITCH_PER_ACCEL = 0.006;
 const PITCH_RATE = 5;
 /** How quickly the speed the tilt goes by follows the car's (per second): the frames between snapshots go in steps. */
 const SPEED_RATE = 4;
-/** Further than this in a frame (m), a car was put there (a load, back into town), not driven: its wheels don't turn for it. */
-const JUMP = 10;
-/** Height of the body and wheels over the ground (as the street's `paintCar`). */
-const LIFT = 0.015;
 /** Each body's four wheels (`wheelAt`), worked out once. */
 const WHEELS = CARS.map((body) => [0, 1, 2, 3].map((w) => wheelAt(body, w)));
 
@@ -103,47 +95,23 @@ interface Parked {
   dirty: boolean;
 }
 
-export class Cars {
-  private readonly lib: MaterialLibrary;
-  private readonly root: pc.Entity;
+export class Cars extends Vehicles {
   private key = '';
   private cars: Drawn[] = [];
   private lastNow = 0;
-  /** Body meshes by body and paint, the wheel and the contact shadow: shared by the cars of a build that look alike (they go with them). */
-  private readonly meshes = new Map<string, pc.Mesh>();
-  /** The parked cars by look; every car's wheels; every car's contact shadow. */
+  /** The parked cars by look (their body meshes, by body and paint, shared by the cars of a build that look alike). */
   private readonly parked = new Map<string, Parked>();
-  private wheels: Instances | null = null;
-  private shadowDraw: Instances | null = null;
   /** The wheels and contact shadows are written again: every car's (one came or went), or only those of the cars drawn that moved (`stirred`). */
   private around = true;
   private readonly stirred: Drawn[] = [];
   /** The cars in town driving in either snapshot (`pose`): all a resident who wasn't riding can be riding in (`ride`). */
   private readonly driving: Drawn[] = [];
-  /** Whether a car moved in the last frame where it casts a shadow into the sun's map (the map is to be drawn again). */
-  moved = false;
-  /** Cars standing in here (x0, z0, x1, z1) aren't drawn (`hideOn`). */
-  private hidden: readonly [number, number, number, number] | null = null;
-  /** The chunks streamed in (null: all of them) and the camera's target: cars outside them, or further than `FAR` from it, aren't drawn (`setView`). */
-  private chunks: ReadonlySet<number> | null = null;
-  private eye: { x: number; z: number } | null = null;
-  /** Whether a car at (x, z) could cast into the sun's map (`SunShadows.reaches`; null: anywhere): only one moving there draws it again. */
-  private inMap: ((x: number, z: number) => boolean) | null = null;
   /** The frame the cars were last placed for (`pose`: the residents riding in them ask first). */
   private posedAt = NaN;
   private posedCurr: Float32Array | null = null;
-  /** Scratch: a matrix (game space), and a turn. */
-  private readonly m = new Float32Array(16);
-  private readonly q: Quat = [0, 0, 0, 1];
 
-  constructor(
-    private readonly app: pc.AppBase,
-    parent: pc.Entity,
-    private readonly shadows: boolean,
-  ) {
-    this.lib = MaterialLibrary.for(app);
-    this.root = new pc.Entity('cars');
-    parent.addChild(this.root);
+  constructor(app: pc.AppBase, parent: pc.Entity, shadows: boolean) {
+    super(app, parent, shadows, 'cars');
   }
 
   /** The world's cars (built again only when they change: another town, another save). */
@@ -179,19 +147,7 @@ export class Cars {
         speed: 0,
       });
     }
-    const wheel = this.mesh('wheel', () => {
-      const p = new Painter(new Geo());
-      paintWheel(p);
-      return p.geo;
-    });
-    if (wheel) this.wheels = this.instanced('carWheels', wheel, this.lib.plainFinish(), this.shadows, list.length * 4);
-    // (A blob of radius 1, stretched to each car's size.)
-    const shadow = this.mesh('shadow', () => {
-      const g = new Geo().color('#000000');
-      blob(g, 0, 0, 1, 1, 0, 0.55, 0.03);
-      return g;
-    });
-    if (shadow) this.shadowDraw = this.instanced('carShadows', shadow, this.lib.contactShadow(false), false, list.length);
+    this.ensureAround('car', list.length, 0.55);
     this.around = true;
   }
 
@@ -244,28 +200,15 @@ export class Cars {
     this.flush();
   }
 
-  /**
-   * Cars standing in `rect` (x0, z0, x1, z1) aren't drawn, or none are hidden (null): the viewed lot
-   * while its basement is in view, as its ground is. A car driving off it shows as it leaves.
-   */
-  hideOn(rect: readonly [number, number, number, number] | null): void {
-    this.hidden = rect;
+  /** As `Vehicles.hideOn`: a car driving off the lot shows as it leaves. */
+  override hideOn(rect: readonly [number, number, number, number] | null): void {
+    super.hideOn(rect);
     this.restateAll();
   }
 
-  /**
-   * The chunks streamed in (null: the whole town is drawn) and the camera's target (x, z): cars
-   * outside the chunks, or further than `FAR` from the target, aren't drawn.
-   */
-  setView(chunks: ReadonlySet<number> | null, x: number, z: number): void {
-    this.chunks = chunks;
-    this.eye = { x, z };
+  override setView(chunks: ReadonlySet<number> | null, x: number, z: number): void {
+    super.setView(chunks, x, z);
     this.restateAll();
-  }
-
-  /** Whether a spot can cast into the sun's map (`SunShadows.reaches`; null: anywhere): a car moving elsewhere doesn't draw it again. */
-  setShadowTest(inMap: ((x: number, z: number) => boolean) | null): void {
-    this.inMap = inMap;
   }
 
   /** The seat of a car at (x, z) where it's drawn (someone sat in it, parked or driving), else null: for `Residents.setCarSeat`. */
@@ -297,19 +240,9 @@ export class Cars {
     this.driving.length = 0;
     for (const p of this.parked.values()) p.draw.destroy();
     this.parked.clear();
-    this.wheels?.destroy();
-    this.shadowDraw?.destroy();
-    this.wheels = this.shadowDraw = null;
-    // (The instanced draws hold their meshes without taking them; the entities' are let go as they went.)
-    for (const m of this.meshes.values()) if (m.refCount === 0) m.destroy();
-    this.meshes.clear();
+    this.clearDraws();
     this.key = '';
     this.posedAt = NaN;
-  }
-
-  destroy(): void {
-    this.clear();
-    this.root.destroy();
   }
 
   /** Where each car is drawn this frame (between the last two snapshots), once a frame: the residents riding in them ask before `update`. */
@@ -346,29 +279,16 @@ export class Cars {
 
   /** A car moved since last frame (`real` seconds): its wheels turn by the way it went, the front ones steer by how it turned, the body tilts by how its speed changed. */
   private roll(car: Drawn, real: number): void {
-    const { at, last, shape } = car;
-    const [dx, dz] = [at.x - last.x, at.z - last.z];
-    if (Math.hypot(dx, dz) > JUMP) {
-      car.speed = 0;
-      return;
-    }
-    const along = dx * Math.sin(at.yaw) + dz * Math.cos(at.yaw);
-    car.spin = (car.spin + along / shape.wheelR) % (Math.PI * 2);
-    if (real <= 0) return;
-    // Turning by `turn` over `along` metres: a circle the front wheels steer round (a bicycle's, the wheelbase long).
-    const turn = wrapAngle(at.yaw - last.yaw);
-    if (Math.abs(along) > 1e-3) {
-      const goal = Math.max(-STEER_MAX, Math.min(STEER_MAX, Math.atan((turn * shape.wheelBase) / along)));
-      car.steer += (goal - car.steer) * (1 - Math.exp(-real * STEER_RATE));
-    }
-    this.tilt(car, along / real, real);
+    const along = rollWheels(car, car.at, car.last, car.shape.wheelR, car.shape.wheelBase, STEER, real);
+    if (along === null) car.speed = 0;
+    else if (real > 0) this.tilt(car, along / real, real);
   }
 
   /** A car standing still this frame: its tilt settles, its wheels straighten once parked. Whether either changed. */
   private settle(car: Drawn, real: number): boolean {
     let changed = false;
     if (car.at.shown === 1 && car.steer !== 0) {
-      car.steer = Math.abs(car.steer) < 0.01 ? 0 : car.steer * Math.exp(-real * STEER_RATE);
+      car.steer = Math.abs(car.steer) < 0.01 ? 0 : car.steer * Math.exp(-real * STEER.rate);
       changed = true;
     }
     if (car.speed !== 0 || car.pitch !== 0) changed = this.tilt(car, 0, real) || changed;
@@ -387,21 +307,6 @@ export class Cars {
     car.pitch += (goal - car.pitch) * (1 - Math.exp(-real * PITCH_RATE));
     if (Math.abs(car.pitch) < 1e-4 && goal === 0) car.pitch = 0;
     return car.pitch !== pitch;
-  }
-
-  /** Whether a car at (x, z) can cast into the sun's map (`setShadowTest`). */
-  private inShadows(x: number, z: number): boolean {
-    return !this.inMap || this.inMap(x, z);
-  }
-
-  /** Whether a car is drawn: in town, near, and not standing where cars are hidden (`hideOn`). */
-  private visible(at: Drawn['at']): boolean {
-    if (!at.shown) return false;
-    const r = this.hidden;
-    if (r && at.x > r[0] && at.x < r[2] && at.z > r[1] && at.z < r[3]) return false;
-    if (this.chunks && !this.chunks.has(chunkAt(at.x, at.z))) return false;
-    const e = this.eye;
-    return !e || Math.hypot(at.x - e.x, at.z - e.z) <= FAR;
   }
 
   /** How a car is drawn now (by its own entity, in its look's parked draw, or not at all), its own entity placed. */
@@ -461,37 +366,12 @@ export class Cars {
       for (const car of this.stirred) this.writeCar(car);
     } else return;
     this.stirred.length = 0;
-    if (wheels) {
-      wheels.update();
-      wheels.enabled = wheels.count > 0;
-    }
-    if (shadows) {
-      shadows.update();
-      shadows.enabled = shadows.count > 0;
-    }
+    this.sendAround();
   }
 
   /** A drawn car's four wheels and its contact shadow, at its `slot`. */
   private writeCar(car: Drawn): void {
-    const { at, shape, slot } = car;
-    const { m, q } = this;
-    const [s, c] = [Math.sin(at.yaw), Math.cos(at.yaw)];
-    const wheels = this.wheels;
-    if (wheels) {
-      const r = shape.wheelR;
-      const four = WHEELS[car.body];
-      for (let w = 0; w < 4; w++) {
-        const { side, x, z, front } = four[w];
-        // The left ones turned round (their hubs face out), turning the other way for it.
-        const yaw = at.yaw + (front ? car.steer : 0) + (side < 0 ? Math.PI : 0);
-        const spin = side < 0 ? -car.spin : car.spin;
-        // Turned about y (`yaw`), then about x (`spin`), scaled by its radius across y and z.
-        compose(1, r, r, quatYawPitchRoll(yaw, spin, 0, q), at.x + x * c + z * s, r + LIFT, at.z - x * s + z * c, m);
-        wheels.setMatrix(slot * 4 + w, m);
-      }
-    }
-    // (A blob of radius 1, stretched to the car's size.)
-    this.shadowDraw?.setMatrix(slot, compose(shape.wid * 0.62, 1, shape.len * 0.56, quatYawPitchRoll(at.yaw, 0, 0, q), at.x, 0, at.z, m));
+    this.writeAt(car.slot, car.at, car.shape, WHEELS[car.body], car);
   }
 
   /** A parked car's body in game space (turned about y). */
@@ -577,21 +457,4 @@ export class Cars {
     return p;
   }
 
-  /** An instanced draw of `mesh` under the cars, out of the house's lamps. */
-  private instanced(name: string, mesh: pc.Mesh, material: pc.Material, castShadows: boolean, capacity: number): Instances {
-    const draw = new Instances(this.app.graphicsDevice, this.root, mesh, material, { name, castShadows, capacity: Math.max(1, capacity) });
-    this.lib.excludeFromLights([], [draw.meshInstance]);
-    draw.enabled = false;
-    return draw;
-  }
-
-  private mesh(key: string, make: () => Geo): pc.Mesh | null {
-    let m = this.meshes.get(key);
-    if (!m) {
-      const made = meshFrom(this.app.graphicsDevice, make().meshData({ colors: true }));
-      if (!made) return null;
-      this.meshes.set(key, (m = made));
-    }
-    return m;
-  }
 }

@@ -3,23 +3,19 @@
 
 use crate::common;
 
-use common::run_to;
+use common::{apply, run_to};
 
 use serde_json::json;
 use sim_core::content::Layer;
 use sim_core::planner::{self, GoalKind};
 use sim_core::social::EventKind;
-use sim_core::{Command, World, clock};
+use sim_core::{World, clock};
 
 /// A town with one newcomer (resident 0) in the player's house; free will on.
 fn town(seed: u64) -> World {
     let content = common::content();
     let file = common::town(&content, seed, 1);
     World::from_json(&content, &file, seed as u32).unwrap()
-}
-
-fn apply(w: &mut World, cmd: serde_json::Value) -> Result<(), sim_core::Error> {
-    w.apply(Command::from_json(&cmd.to_string()).unwrap())
 }
 
 /// Keeps resident `i` home and free (no job, no job hunting).

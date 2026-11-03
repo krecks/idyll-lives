@@ -1446,7 +1446,8 @@ export function assembleTown(
   if (open.meta) Object.assign(meta, open.meta);
   // Residents leave town (for work) where its roads lead out of it, or by bus from its stops.
   const stops = open.exits ? [] : busStops(town, plots, paths, objects);
-  const exits = open.exits ?? (stops.length ? [...roadExits(town.roads, town.width, town.depth).map(([x, z]): TownExit => ({ x, z, kind: 'road' })), ...stops.map(([x, z]): TownExit => ({ x, z, kind: 'stop' }))] : roadExits(town.roads, town.width, town.depth));
+  const roadsOut = open.exits ? [] : roadExits(town.roads, town.width, town.depth);
+  const exits = open.exits ?? (stops.length ? [...roadsOut.map(([x, z]): TownExit => ({ x, z, kind: 'road' })), ...stops.map(([x, z]): TownExit => ({ x, z, kind: 'stop' }))] : roadsOut);
   const plotKinds = town.slots.map((s): PlotKind => (s.kind === 'house' ? (s.lot === 'farm' ? 'farm' : 'home') : s.kind === 'shop' ? 'shop' : s.kind === 'outdoor' ? 'countryside' : 'public'));
   const filed = plots.map((p, i) => ({ ...p, area: town.slots[i].area ?? 0, kind: plotKinds[i] }));
   return JSON.stringify({

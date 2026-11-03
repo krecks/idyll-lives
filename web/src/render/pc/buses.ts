@@ -12,35 +12,28 @@
  */
 
 import * as pc from './engine';
-import { Instances } from './instancing';
-import { MaterialLibrary } from './materials';
-import { drawMesh, meshFrom } from './meshes';
+import { drawMesh } from './meshes';
+import { LIFT, rollWheels, Vehicles } from './vehicles';
 import type { FrameState } from '../../core/bridge';
 import { BUS, BUS_DOORS, busLeaf, busWheelAt, paintBus } from '../shared/bus';
-import { paintWheel } from '../shared/cars';
-import { chunkAt } from '../shared/chunks';
-import { lerpAngle, wrapAngle } from '../shared/characters/rig';
+import { lerpAngle } from '../shared/characters/rig';
 import { ease } from '../shared/doors';
 import { Geo } from '../shared/geometry';
 import { GAME_RATE } from '../shared/gameSpeed';
-import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
-import { blob, Painter } from '../shared/street';
+import { Painter } from '../shared/street';
 
-/** Buses further than this from the camera's target aren't drawn (m). */
-const FAR = 650;
 /** How long a door takes to open or shut (s of game time at 1×: the sim's doors open about 12 ticks after it stops, `bus::DOOR_TICKS`). */
 const DOOR_SECONDS = 0.55;
 /** How far a door's leaves slide apart (a share of a leaf's width), and out from the side (m). */
 const SLIDE = 0.92;
 const OUT = 0.05;
-/** How far the front wheels steer at most (rad) and how quickly (per second); further than this in a frame (m), it was put there. */
-const STEER_MAX = 0.45;
-const STEER_RATE = 6;
-const JUMP = 10;
-/** Height of the body over the ground. */
-const LIFT = 0.015;
-/** The bus's four wheels (`busWheelAt`). */
+/** How far the front wheels steer at most (rad) and how quickly (per second). */
+const STEER = { max: 0.45, rate: 6 };
+/** The distance between its axles (m). */
+const WHEEL_BASE = BUS.axles[0] - BUS.axles[1];
+/** The bus's four wheels (`busWheelAt`), a little wider than a car's. */
 const WHEELS = [0, 1, 2, 3].map(busWheelAt);
+const WHEEL_WIDE = 1.25;
 /** Most buses (sim-core `bus::MAX_BUSES`). */
 const MOST = 128;
 
@@ -63,33 +56,16 @@ interface Drawn {
   drawn: boolean;
 }
 
-export class Buses {
-  private readonly lib: MaterialLibrary;
-  private readonly root: pc.Entity;
+export class Buses extends Vehicles {
   private readonly buses = new Map<number, Drawn>();
   /** Buses gone out of town, kept for the next of their line (their meshes stay held). */
   private readonly spare: Drawn[] = [];
-  private readonly meshes = new Map<string, pc.Mesh>();
-  private wheels: Instances | null = null;
-  private shadowDraw: Instances | null = null;
   private lastNow = 0;
-  /** Whether a bus moved in the last frame where it casts into the sun's map. */
-  moved = false;
-  private hidden: readonly [number, number, number, number] | null = null;
-  private chunks: ReadonlySet<number> | null = null;
-  private eye: { x: number; z: number } | null = null;
-  private inMap: ((x: number, z: number) => boolean) | null = null;
-  private readonly m = new Float32Array(16);
-  private readonly q: Quat = [0, 0, 0, 1];
+  /** Where each bus was in the snapshot before (its row), by which bus it is: filled again each frame. */
+  private readonly before = new Map<number, number>();
 
-  constructor(
-    private readonly app: pc.AppBase,
-    parent: pc.Entity,
-    private readonly shadows: boolean,
-  ) {
-    this.lib = MaterialLibrary.for(app);
-    this.root = new pc.Entity('buses');
-    parent.addChild(this.root);
+  constructor(app: pc.AppBase, parent: pc.Entity, shadows: boolean) {
+    super(app, parent, shadows, 'buses');
   }
 
   /** Each bus where the snapshot has it (between the last two), its doors and wheels. */
@@ -107,7 +83,8 @@ export class Buses {
     const count = Math.min(MOST, curr[countAt] | 0);
     if (count === 0 && this.buses.size === 0) return;
     // Where each was in the snapshot before, by which bus it is (its row may have moved up).
-    const before = new Map<number, number>();
+    const before = this.before;
+    before.clear();
     for (let k = 0; k < Math.min(MOST, prev[countAt] | 0); k++) before.set(prev[base + k * stride + f.id], base + k * stride);
     for (const b of this.buses.values()) b.seen = false;
     let changed = false;
@@ -116,16 +93,21 @@ export class Buses {
       const shown = curr[o + f.shown];
       if (!shown) continue;
       const id = curr[o + f.id];
-      const bus = this.buses.get(id) ?? this.make(id, curr[o + f.line] | 0, curr[o + f.x], curr[o + f.z], curr[o + f.yaw]);
+      const x = curr[o + f.x];
+      const z = curr[o + f.z];
+      const yaw = curr[o + f.yaw];
+      const bus = this.buses.get(id) ?? this.make(id, curr[o + f.line] | 0, x, z, yaw);
       bus.seen = true;
       const p = before.get(id);
       // Driving in both, on past the newest snapshot while the next is late; standing, not past it.
       const was = p === undefined ? 0 : prev[p + f.shown];
       const t = !was ? 1 : shown === 2 && was === 2 ? Math.max(0, alpha) : Math.min(1, Math.max(0, alpha));
-      const [px, pz, pyaw] = p === undefined ? [curr[o + f.x], curr[o + f.z], curr[o + f.yaw]] : [prev[p + f.x], prev[p + f.z], prev[p + f.yaw]];
-      bus.at.x = px + (curr[o + f.x] - px) * t;
-      bus.at.z = pz + (curr[o + f.z] - pz) * t;
-      bus.at.yaw = lerpAngle(pyaw, curr[o + f.yaw], t);
+      const px = p === undefined ? x : prev[p + f.x];
+      const pz = p === undefined ? z : prev[p + f.z];
+      const pyaw = p === undefined ? yaw : prev[p + f.yaw];
+      bus.at.x = px + (x - px) * t;
+      bus.at.z = pz + (z - pz) * t;
+      bus.at.yaw = lerpAngle(pyaw, yaw, t);
       bus.at.shown = shown;
       // Its doors open while the sim has them open, sliding in game time.
       const target = (curr[o + f.doors] | 0) !== 0 ? 1 : 0;
@@ -147,36 +129,12 @@ export class Buses {
     if (changed) this.writeAround();
   }
 
-  /** Buses standing in `rect` (x0, z0, x1, z1) aren't drawn (the viewed lot while its basement is in view), or none are hidden (null). */
-  hideOn(rect: readonly [number, number, number, number] | null): void {
-    this.hidden = rect;
-  }
-
-  /** The chunks streamed in (null: the whole town is drawn) and the camera's target: buses outside them, or further than `FAR`, aren't drawn. */
-  setView(chunks: ReadonlySet<number> | null, x: number, z: number): void {
-    this.chunks = chunks;
-    this.eye = { x, z };
-  }
-
-  /** Whether a spot can cast into the sun's map (`SunShadows.reaches`; null: anywhere). */
-  setShadowTest(inMap: ((x: number, z: number) => boolean) | null): void {
-    this.inMap = inMap;
-  }
-
   clear(): void {
-    for (const b of [...this.buses.values(), ...this.spare]) b.entity.destroy();
+    for (const b of this.buses.values()) b.entity.destroy();
+    for (const b of this.spare) b.entity.destroy();
     this.buses.clear();
     this.spare.length = 0;
-    this.wheels?.destroy();
-    this.shadowDraw?.destroy();
-    this.wheels = this.shadowDraw = null;
-    for (const m of this.meshes.values()) if (m.refCount === 0) m.destroy();
-    this.meshes.clear();
-  }
-
-  destroy(): void {
-    this.clear();
-    this.root.destroy();
+    this.clearDraws();
   }
 
   /** A bus's entity (the first time it's in the snapshot): one of its line's put by, else a new one, its body whole and apart, its doors' leaves. */
@@ -222,7 +180,7 @@ export class Buses {
       }
     });
     for (const r of entity.findComponents('render') as pc.RenderComponent[]) this.lib.excludeFromLights([], r.meshInstances);
-    this.ensureDraws();
+    this.ensureAround('bus', MOST, 0.6);
     const bus: Drawn = { id, line, entity, whole, apart, leaves, at: { x, z, yaw, shown: 0 }, last: { x, z, yaw }, open: 0, spin: 0, steer: 0, seen: true, drawn: false };
     this.buses.set(id, bus);
     return bus;
@@ -232,29 +190,25 @@ export class Buses {
   private place(bus: Drawn, real: number): boolean {
     const { at, last } = bus;
     const drawn = this.visible(at);
+    const came = drawn && !bus.drawn;
     let changed = drawn !== bus.drawn;
     bus.drawn = drawn;
     if (bus.entity.enabled !== drawn) bus.entity.enabled = drawn;
-    const [dx, dz] = [at.x - last.x, at.z - last.z];
-    const moved = dx !== 0 || dz !== 0 || at.yaw !== last.yaw;
+    const moved = at.x !== last.x || at.z !== last.z || at.yaw !== last.yaw;
     if (moved) {
       changed = true;
-      if (Math.hypot(dx, dz) <= JUMP) {
-        const along = dx * Math.sin(at.yaw) + dz * Math.cos(at.yaw);
-        bus.spin = (bus.spin + along / BUS.wheelR) % (Math.PI * 2);
-        const turn = wrapAngle(at.yaw - last.yaw);
-        if (Math.abs(along) > 1e-3 && real > 0) {
-          const wheelBase = BUS.axles[0] - BUS.axles[1];
-          const goal = Math.max(-STEER_MAX, Math.min(STEER_MAX, Math.atan((turn * wheelBase) / along)));
-          bus.steer += (goal - bus.steer) * (1 - Math.exp(-real * STEER_RATE));
-        }
-      }
-      [last.x, last.z, last.yaw] = [at.x, at.z, at.yaw];
-      if (this.shadows && (!this.inMap || this.inMap(at.x, at.z))) this.moved = true;
+      rollWheels(bus, at, last, BUS.wheelR, WHEEL_BASE, STEER, real);
+      last.x = at.x;
+      last.z = at.z;
+      last.yaw = at.yaw;
+      if (this.shadows && this.inShadows(at.x, at.z)) this.moved = true;
     }
     if (!drawn) return changed;
-    bus.entity.setLocalPosition(at.x, 0, at.z);
-    bus.entity.setLocalEulerAngles(0, (at.yaw * 180) / Math.PI, 0);
+    // (Only when it moved, or it shows again: it may have moved while it wasn't drawn.)
+    if (moved || came) {
+      bus.entity.setLocalPosition(at.x, 0, at.z);
+      bus.entity.setLocalEulerAngles(0, (at.yaw * 180) / Math.PI, 0);
+    }
     const shut = bus.open <= 0;
     if (bus.whole.enabled !== shut) {
       bus.whole.enabled = shut;
@@ -263,7 +217,8 @@ export class Buses {
     }
     if (!shut) {
       const k = ease(bus.open);
-      BUS_DOORS.forEach((d, i) => {
+      for (let i = 0; i < BUS_DOORS.length; i++) {
+        const d = BUS_DOORS[i];
         const half = d.w / 4;
         for (let s = 0; s < 2; s++) {
           // The front leaf slides forward, the back one back, out from the side as they go.
@@ -271,87 +226,20 @@ export class Buses {
           const z = d.z + way * half * (1 + SLIDE * 2 * k);
           bus.leaves[i * 2 + s].setLocalPosition(-BUS.wid / 2 - OUT * Math.min(1, k * 4), 0, z);
         }
-      });
+      }
     }
     return changed;
   }
 
-  /** Whether a bus is drawn: near, streamed in, not hidden. */
-  private visible(at: Drawn['at']): boolean {
-    if (!at.shown) return false;
-    const r = this.hidden;
-    if (r && at.x > r[0] && at.x < r[2] && at.z > r[1] && at.z < r[3]) return false;
-    if (this.chunks && !this.chunks.has(chunkAt(at.x, at.z))) return false;
-    const e = this.eye;
-    return !e || Math.hypot(at.x - e.x, at.z - e.z) <= FAR;
-  }
-
-  /** The wheels' and contact shadows' draws, made the first time a bus comes. */
-  private ensureDraws(): void {
-    if (!this.wheels) {
-      const wheel = this.mesh('wheel', () => {
-        const p = new Painter(new Geo());
-        paintWheel(p);
-        return p.geo;
-      });
-      if (wheel) this.wheels = this.instanced('busWheels', wheel, this.lib.plainFinish(), this.shadows, MOST * 4);
-    }
-    if (!this.shadowDraw) {
-      const shadow = this.mesh('shadow', () => {
-        const g = new Geo().color('#000000');
-        blob(g, 0, 0, 1, 1, 0, 0.6, 0.03);
-        return g;
-      });
-      if (shadow) this.shadowDraw = this.instanced('busShadows', shadow, this.lib.contactShadow(false), false, MOST);
-    }
-  }
-
   /** Every drawn bus's wheels and contact shadow, written again. */
   private writeAround(): void {
-    const { m, q } = this;
-    const drawn = [...this.buses.values()].filter((b) => b.drawn);
-    const wheels = this.wheels;
-    const shadows = this.shadowDraw;
-    wheels?.setCount(drawn.length * 4);
-    shadows?.setCount(drawn.length);
-    drawn.forEach((bus, slot) => {
-      const { at } = bus;
-      const [s, c] = [Math.sin(at.yaw), Math.cos(at.yaw)];
-      const r = BUS.wheelR;
-      for (let w = 0; w < 4 && wheels; w++) {
-        const { side, x, z, front } = WHEELS[w];
-        // (The left ones, +x, as the cars': hubs facing out.)
-        const yaw = at.yaw + (front ? bus.steer : 0) + (side < 0 ? Math.PI : 0);
-        const spin = side < 0 ? -bus.spin : bus.spin;
-        compose(1.25, r, r, quatYawPitchRoll(yaw, spin, 0, q), at.x + x * c + z * s, r + LIFT, at.z - x * s + z * c, m);
-        wheels.setMatrix(slot * 4 + w, m);
-      }
-      shadows?.setMatrix(slot, compose(BUS.wid * 0.62, 1, BUS.len * 0.56, quatYawPitchRoll(at.yaw, 0, 0, q), at.x, 0, at.z, m));
-    });
-    if (wheels) {
-      wheels.update();
-      wheels.enabled = wheels.count > 0;
-    }
-    if (shadows) {
-      shadows.update();
-      shadows.enabled = shadows.count > 0;
-    }
-  }
-
-  private instanced(name: string, mesh: pc.Mesh, material: pc.Material, castShadows: boolean, capacity: number): Instances {
-    const draw = new Instances(this.app.graphicsDevice, this.root, mesh, material, { name, castShadows, capacity: Math.max(1, capacity) });
-    this.lib.excludeFromLights([], [draw.meshInstance]);
-    draw.enabled = false;
-    return draw;
-  }
-
-  private mesh(key: string, make: () => Geo): pc.Mesh | null {
-    let m = this.meshes.get(key);
-    if (!m) {
-      const made = meshFrom(this.app.graphicsDevice, make().meshData({ colors: true }));
-      if (!made) return null;
-      this.meshes.set(key, (m = made));
-    }
-    return m;
+    let n = 0;
+    for (const bus of this.buses.values()) if (bus.drawn) n++;
+    this.wheels?.setCount(n * 4);
+    this.shadowDraw?.setCount(n);
+    let slot = 0;
+    // (The left ones, +x, as the cars': hubs facing out.)
+    for (const bus of this.buses.values()) if (bus.drawn) this.writeAt(slot++, bus.at, BUS, WHEELS, bus, WHEEL_WIDE);
+    this.sendAround();
   }
 }

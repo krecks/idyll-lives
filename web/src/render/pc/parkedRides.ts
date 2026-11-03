@@ -35,7 +35,6 @@ interface Parked {
 
 /** A model in the player's colours for it: its near and far templates' draws, built once. */
 interface Look {
-  key: string;
   near: Instances[];
   far: Instances[];
   templates: ModelTemplate[];
@@ -81,15 +80,16 @@ export class ParkedRides {
       this.dropLook(look);
       this.looks.delete(key);
     }
-    for (const [key, o] of wanted) {
-      if (this.looks.has(key)) continue;
-      const look = await this.makeLook(key, o);
-      if (generation !== this.generation) {
-        this.dropLook(look);
-        return;
-      }
-      this.looks.set(key, look);
-    }
+    // The looks not built yet, all at once.
+    await Promise.all(
+      [...wanted].map(async ([key, o]) => {
+        if (this.looks.has(key)) return;
+        const look = await this.makeLook(key, o);
+        if (generation !== this.generation) this.dropLook(look);
+        else this.looks.set(key, look);
+      }),
+    );
+    if (generation !== this.generation) return;
     this.parked = list.flatMap((o) => {
       const look = this.looks.get(keyOf(o));
       if (!look) return [];
@@ -175,7 +175,7 @@ export class ParkedRides {
         draw.enabled = false;
         return draw;
       });
-    return { key, near: draws(near), far: draws(far), templates: [near, far] };
+    return { near: draws(near), far: draws(far), templates: [near, far] };
   }
 
   private dropLook(look: Look): void {
