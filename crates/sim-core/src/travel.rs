@@ -1230,12 +1230,12 @@ pub struct WalkPlan {
 /// How far to the right of a road's middle line people walk: on the pavement of a street (its
 /// width takes in the sidewalks), on the verge of a country road, down the middle of a trail.
 /// Half a metre in from its edge, 2.5 m out at most: on a 6 m lane, a bike's handlebars clear a
-/// car or bus going by (`cars::BESIDE`). Beside a country road there's open ground: 2.5 m out
-/// at least, off the edge of a narrower one.
-fn side_offset(width: f32, kind: RoadKind) -> f32 {
+/// car or bus going by (`cars::BESIDE`). Beside a country road there's open ground: half a
+/// metre out on the verge, clear of a bus pulled in at a stop by its edge (`bus::bay_out`).
+pub(crate) fn side_offset(width: f32, kind: RoadKind) -> f32 {
     match kind {
         RoadKind::Trail => 0.0,
-        RoadKind::Country => (width / 2.0 - 0.5).max(2.5),
+        RoadKind::Country => width / 2.0 + 0.5,
         _ => (width / 2.0 - 0.5).clamp(0.0, 2.5),
     }
 }

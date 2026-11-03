@@ -93,7 +93,7 @@ pub(crate) const AHEAD: f32 = 2.2;
 pub(crate) const BESIDE: f32 = 0.1;
 /// How close someone steps to a car or bus driving by (m, `walks_into`): further off than it
 /// keeps from them, so one it held up doesn't hold it up in turn as it moves on past them.
-const KEEP: f32 = 2.0 * BESIDE;
+pub(crate) const KEEP: f32 = 2.0 * BESIDE;
 /// How far someone on foot reaches out from where they stand (m: their shoulders and elbows).
 pub(crate) const BODY: f32 = 0.25;
 /// Someone waiting for a car to pass for this long steps aside out of its way (`make_way`).

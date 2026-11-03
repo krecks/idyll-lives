@@ -1547,3 +1547,25 @@ impl World {
         self.sims.get(i)?.bound_for_bus
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Walkers and riders beside a country road pass a bus pulled in at a stop by its edge with
+    /// room to spare (they walked into its side, and at a stop where buses turn round a rider
+    /// was held there among them all evening).
+    #[test]
+    fn the_way_beside_a_country_road_clears_a_bus_at_a_stop() {
+        for width in [5.0, 6.0, 8.0] {
+            let bus = bay_out(kerb_of(width, RoadKind::Country)) + BUS_WID / 2.0;
+            // (A city bike's handlebars, content `vehicle.reach`.)
+            let rider = crate::travel::side_offset(width, RoadKind::Country) - 0.3;
+            assert!(
+                rider - bus >= cars::KEEP,
+                "on a {width} m road the bike is {:.2} m from the bus",
+                rider - bus
+            );
+        }
+    }
+}
