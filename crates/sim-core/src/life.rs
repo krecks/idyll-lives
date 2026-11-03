@@ -289,6 +289,22 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
         // (From over the ground: a commute timed from bed upstairs had them setting off for
         // work in the middle of the night.)
         let from = w.stairs.ground_pos(sim.pos);
+        // To the way out they'd walk to from there (`world::exit_on_foot`): from home or the
+        // street, the one it was timed by; from somewhere else, the quickest from there. (Timed
+        // to the way out nearest home from a neighbour's by the other one, they set off early,
+        // or past the time to.)
+        let away = w
+            .briefs
+            .get(i)
+            .and_then(|b| b.plot)
+            .is_some_and(|p| Some(p) != c.home);
+        let walks = |k: usize| w.transit.walks_out(k, w.tick);
+        let exit = if away || !walks(c.exit) {
+            crate::world::quickest_exit(&w.travel, &w.exits, from, walks)
+                .map_or(exit, |k| w.exits[k])
+        } else {
+            exit
+        };
         let minutes = w.travel.eta(from, exit, crate::travel::Mode::Foot, walk) * WALK_MARGIN
             + OUT_OF_THE_HOUSE;
         let total = ticks(minutes + w.content.career_rules.commute_minutes);
