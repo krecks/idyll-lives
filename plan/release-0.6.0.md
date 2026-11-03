@@ -2,7 +2,7 @@
 
 - **Branch:** `release/0.6.0`, cut from `main` at `58f4b1a1` on 2026-10-30, merged into `main` by pull request (#50); tag `v0.6.0` on the merge
 - **Base:** v0.5.1 at `7aa616f9`
-- **Status:** release pull request #50 open
+- **Status:** **Released 2026-11-03**: https://github.com/krecks/idyll-lives/releases/tag/v0.6.0 (PR #50 merged as f4482e7f; CI 41559543728; dry run 41562436343 on main; the tag's deploy 41564007742; live checks passed).
 - **Release type:** features: cars, bigger open worlds, garden fences and garages, the rebuilt models and generated textures, and a performance and loading review; save format 35
 
 ## 1. What ships
@@ -52,6 +52,8 @@ The release review of the whole branch (`/code-review` on #50) found and fixed: 
 | The game | a saved game at speed 3 resumes at 3, residents act, pause and resume, birds, no console errors; the production build's benchmark (village, Medium) on WebGPU and WebGL2: 0.6.0, cross-origin isolated, 60 fps, no page errors |
 
 ## 4. Release steps
+
+All done 2026-11-03. Live: the bundle's build is f4482e7 (the release merge), it reports 0.6.0 and is cross-origin isolated; the village benchmark (Medium) runs at 60 fps on WebGPU and WebGL2 with no page errors.
 
 1. Pull request `release/0.6.0` → `main` (#50); CI passes on it; merge (a merge commit).
 2. Dry run: `gh workflow run pages.yml --ref main -f deploy=false`, watched to the end.
