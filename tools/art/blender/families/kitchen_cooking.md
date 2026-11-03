@@ -61,7 +61,7 @@ then the clips keyed (`settle()` must come before `swing()`/`slide()`).
 | `model.stoveGas` | 0.920 × 1.111 × 0.694 m | 3,708 | 4 | oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet): the outer knob on the −x side turns, the front burner there lights |
 | `model.wallOven` | 0.700 × 2.110 × 0.708 m | 2,938 | 3 | upper door, tray | `oven_open` 1.4 s: door drops and the empty tray slides 10 cm (roast, bake) |
 | `model.rangeCooker` | 1.580 × 1.141 × 0.761 m | 4,880 | 4 | left oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet): the knob nearest the middle (x −0.12) turns, the front middle burner lights |
-| `model.cooktopCounter` | 1.000 × 0.956 × 0.660 m | 2,820 | 3 | knob, hot ring | `burner_on` (cook): the outer knob on the +x side turns, the back ring on that side (z −0.22) glows red |
+| `model.cooktopCounter` | 1.000 × 0.956 × 0.660 m | 2,820 | 3 | knob, hot ring | `burner_on` (cook): the outer knob on the +x side turns, the front ring on that side (z 0.01) glows red |
 | `model.microwave` | 1.000 × 1.250 × 0.666 m | 3,764 | 4 | door, turntable | `door_open` 1.0 s, `hold` 1.2 s (reheat); `turntable` loops (reheat) |
 
 Seen from the front, the microwave's controls are on the right and its door hinges on its left edge (game +x is
@@ -137,23 +137,28 @@ corners without the Catmull-Rom overshoot `kit.tube` makes between a long span a
 ## Cooking at them (2026-11-03)
 
 What the cook brings and uses is drawn by the game on the station (`web/src/render/shared/characters/actions.ts`):
-the tool by the step's tag at `STATION_SPOTS` (the pan on the burner the clip lights), what they carried in at
+the tool by the step's tag at `STATION_SPOTS` (the stew pot on the burner the clip lights), what they carried in at
 `SET_DOWN_SPOTS` (the prepped bowl on a cold burner or ring, clear of the pan). Each number is the model's, in the
 footprint's frame (x to the right, depth to the front, height):
 
-| Model | The pan (`stir`) | Set down | Was |
+| Model | The pot (`stir`) | Set down | Was |
 |---|---|---|---|
 | `stoveGas` | front −x burner, (−0.26, 0.014), on its pan support at 0.891 | back +x burner, (0.26, −0.22) at 0.891, clear of the splash guard | 0.9 (1 cm over the support); set down at 0.9 between the burners, over the modelled frying pan |
 | `stoveElectric` | front −x ring, (−0.16, −0.02) at 0.893 | back +x ring, (0.15, −0.165) at 0.89, clear of the guard | 0.9 for both |
 | `rangeCooker` | front middle burner, (0, 0.03) at 0.911 | front +x burner, (0.55, 0.03) at 0.911 | 0.915 for both, on the hob 0.89 |
-| `cooktopCounter` | back +x ring, (0.16, −0.22) at 0.954 | front −x ring, (−0.16, −0.01) at 0.954 | set down on the back −x ring at the worktop's 0.95 |
+| `cooktopCounter` | front +x ring, (0.16, 0.01) at 0.954 | back −x ring, (−0.16, −0.19) at 0.954 | the pan on the back ring, out of reach; set down on the back −x ring at the worktop's 0.95 |
 
 The models, to match:
 - **stoveGas**: the frying pan on the front +x burner is gone (the cook's pan made a third piece of it, and what they
   set down stood on it); the stock pot stays at the back −x. 2.2 cm shallower without its handle: 0.694 deep, centre
   −0.089, its back where it was.
-- **cooktopCounter**: four knobs on the fascia (−0.42, −0.14, 0.14, 0.42); the one that turns is the outer one on the
-  side of the ring that glows (+0.42; it was the far −x one).
+- **cooktopCounter**: the ring that glows is the front +x one (it was the back one, out of the stirring hand's reach);
+  four knobs on the fascia (−0.42, −0.14, 0.14, 0.42), the one that turns the outer one on the side of the ring that
+  glows (+0.42; it was the far −x one).
+- The cook steps in to the station's tool for the step, and across to it (`stationReach` in `residents.ts`): the work
+  clips' hands are 0.5 m ahead of the feet and before the body, made for a counter's front edge straight ahead, and
+  stood in the middle of the tile in front they stirred the air 0.45 m short of a pot on a front burner and 0.26 m to
+  its side, or short of a board in a counter's middle; up to 0.45 m in (never back) and 0.45 m across.
 - **rangeCooker**: the knob that turns is the one nearest the middle (−0.12) for the middle burner; it was the far
   −x one (−0.6), which is a still knob now.
 - **dishwasher**, **dishwasherCompact**: emptying it (`unload`) drops the door too (it played nothing); loading it or

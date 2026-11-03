@@ -105,7 +105,8 @@ for when there's nothing else to do, and a cook on the way to the fridge still h
   is put down on a cold burner or ring clear of it (`SET_DOWN_SPOTS`), not beside it at 0.9 m; the gas range's frying
   pan is gone (three pans with the cook's); the knob that turns is by the burner or ring that lights (the hob counter,
   the range cooker); emptying a dishwasher opens its door, and loading or emptying it the resident bends down to its
-  rack (`DISHWASHERS`), not at the worktop; the oven tower's tray comes out empty, not with rolls for every dish
+  rack (`DISHWASHERS`), not at the worktop; at a station the cook steps in and across to the pot, board or bowl
+  (`stationReach`: the hands stopped in front of the cooker, beside the pot); the oven tower's tray comes out empty, not with rolls for every dish
   (`tools/art/blender/families/kitchen_cooking.md`).
 
 ## K3. Small appliances and dishwashers (4)

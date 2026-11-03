@@ -776,7 +776,8 @@ export const STATION_PROPS: Record<string, string> = { chop: 'tool.board', stir:
 type StationSpot = readonly [x: number, z: number, y: number];
 /**
  * Where on a station its prop goes, by object def and action tag (else the top's middle, a little towards the
- * cook): the pan on the burner the cooker's clip lights (its flame or hot ring), at its grate's or glass's height;
+ * cook; the cook steps in to it, `stationReach`): the pot on the front burner the cooker's clip lights (its flame or
+ * hot ring), at its grate's or glass's height;
  * the board, the bowl and the food on the grill clear of what the model has on its top. `null`: done inside it, not
  * drawn (meat grilled in the pizza oven's mouth).
  */
@@ -785,7 +786,7 @@ export const STATION_SPOTS: Record<string, Partial<Record<string, StationSpot | 
   // (The front ring on the side of the knob that turns, glowing red while it's on.)
   stoveElectric: { stir: [-0.16, -0.02, 0.893] },
   rangeCooker: { stir: [0, 0.03, 0.911] },
-  cooktopCounter: { stir: [0.16, -0.22, 0.954] },
+  cooktopCounter: { stir: [0.16, 0.01, 0.954] },
   chefStove: { stir: [0, 0, 0.963] },
   // (The left ring, which glows; the board and the bowl at the free left end of the top.)
   'foodie.chefsIsland': { stir: [-0.145, 0.27, 0.908], chop: [-0.7, 0.32, 0.9], mix: [-0.7, 0.3, 0.9] },
@@ -814,7 +815,7 @@ export const SET_DOWN_SPOTS: Record<string, Partial<Record<string, StationSpot>>
   stoveGas: { stir: [0.26, -0.22, 0.891] },
   stoveElectric: { stir: [0.15, -0.165, 0.89] },
   rangeCooker: { stir: [0.55, 0.03, 0.911] },
-  cooktopCounter: { stir: [-0.16, -0.01, 0.954] },
+  cooktopCounter: { stir: [-0.16, -0.19, 0.954] },
   chefStove: { stir: [0.5, 0.03, 0.963] },
   'foodie.chefsIsland': { stir: [-0.7, 0.29, 0.9], chop: [0.41, 0.3, 0.9], mix: [0.41, 0.3, 0.9] },
   'foodie.pizzaOven': { flip: [0.78, 0.07, 0.89] },

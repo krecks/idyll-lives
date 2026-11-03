@@ -445,10 +445,10 @@ def cooktopCounter():
             _pull(F, f'pull{i}', (-0.15, y + h / 2 - 0.05), (0.15, y + h / 2 - 0.05), 0.256, out=0.016, w=0.012,
                   r=None, verts=6)
     G.join(still, 'body', origin=(0, 0, 0))
-    # the knob turned is the outer one on the side of the ring that glows (the back ring at +x), as a hob's knobs
-    # run: it was the far one on the other side (2026-11-03)
+    # the ring that glows is the front one at +x, within the cook's reach (it was the back one), and the knob turned the
+    # outer one on its side, as a hob's knobs run: it was the far one on the other side (2026-11-03)
     knob = _knob_obj(F, 'knob0', 0.42, 0.84, 0.252)
-    flame = _hot_ring(F, 'hot_ring', 0.16, 0.9545, -0.24, 0.066)
+    flame = _hot_ring(F, 'hot_ring', 0.16, 0.9545, 0.03, 0.058)
     G.settle()
     G.swing(knob, 'burner_on', 90, seconds=0.5, axis='Y')
     _light(flame)
@@ -801,7 +801,7 @@ FAMILY = G.Family(
                                'bake': {'clip': 'oven_open', 'hold': HOLD}}},
              paint=[('enamel2', 'Body'), ('chrome', 'Knobs & rail'), ('grate', 'Hob')]),
      G.Model('cooktopCounter', cooktopCounter, size=(1.0, 0.955, 0.66), key='model.cooktopCounter', centre=(0, -0.10),
-             # cook (and any `stir` step) turns the outer knob on its side and the back ring at +x glows red
+             # cook (and any `stir` step) turns the outer knob on its side and the front ring at +x glows red
              motions={'uses': {'cook': 'burner_on', 'stir': 'burner_on'}},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('hob', 'Hob')]),
      G.Model('microwave', microwave, size=(1.0, 1.25, 0.66), key='model.microwave', centre=(0, -0.095),

@@ -97,6 +97,11 @@ export type CarRide = (frame: FrameState, x: number, z: number, yaw: number, abo
  * action runs fast: scaled by `animRate` like the lower fade). */
 const UPPER_FADE_RATE = 4;
 
+/** How far ahead of the feet (m, body scale) the work clips' hands are at a counter (`clips/work.ts` `COUNTER_Z`, leaning in). */
+const STATION_REACH = 0.5;
+/** The most (m) a cook steps in to a station's tool (the body clear of a cooker's front: `stationReach`). */
+const STATION_STEP_MAX = 0.45;
+
 /**
  * Residents far off (in low detail: `faceDetail`'s `far`) are posed in full every this many frames, not every frame
  * (staggered by row, so as many each frame): every second frame, every fourth with their faces at half the low-detail
@@ -613,6 +618,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         lookYaw: 0,
         lookPitch: 0,
         approach: 0,
+        aside: 0,
         feetUp: false,
         feet: new Float32Array(4),
         bearing: new Float32Array(BEARING_FLOATS),
@@ -1427,6 +1433,37 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     placeProp(m, i, station.cx + (dx / d) * toward, rig.floorY + top + 0.005, station.cz + (dz / d) * toward, rig.yaw, 1);
   }
 
+  /**
+   * How far (m) Sim `rig` steps in from where it stands, and across (to the right of its facing), to work at the tool
+   * on `station` (`writeTool`: its spot, else a little in from the top's middle): the work clips' hands are
+   * `STATION_REACH` ahead of the feet and before the body, made for a counter's front edge straight ahead, and a pot on
+   * a cooker's front burner to one side or a board on a counter's middle is further. Never back; no more than
+   * `STATION_STEP_MAX` in or across.
+   */
+  private stationReach(rig: SimRig, station: PlacedObject, tag: string): [number, number] {
+    const spot = STATION_SPOTS[station.def]?.[tag];
+    if (spot === null) return [0, 0];
+    const fx = Math.sin(rig.yaw);
+    const fz = Math.cos(rig.yaw);
+    let sx = station.cx;
+    let sz = station.cz;
+    if (spot) {
+      const f = station.yaw;
+      sx += spot[0] * Math.cos(f) + spot[1] * Math.sin(f);
+      sz += -spot[0] * Math.sin(f) + spot[1] * Math.cos(f);
+    } else {
+      // (`writeTool`'s place without a spot: in from the middle towards the cook.)
+      const d = Math.hypot(rig.x - station.cx, rig.z - station.cz) || 1;
+      const toward = Math.min(0.15, d * 0.3);
+      sx += ((rig.x - station.cx) / d) * toward;
+      sz += ((rig.z - station.cz) / d) * toward;
+    }
+    const ahead = (sx - rig.x) * fx + (sz - rig.z) * fz;
+    const across = (sx - rig.x) * fz - (sz - rig.z) * fx;
+    const m = STATION_STEP_MAX;
+    return [Math.min(m, Math.max(0, ahead - STATION_REACH * rig.scale)), Math.min(m, Math.max(-m, across))];
+  }
+
   /** Head-top position of Sim `i` (false if not drawn). */
   head(i: number, out: { x: number; y: number; z: number }): boolean {
     if (i < 0 || i >= MAX_CHARACTERS || !this.visible[i]) return false;
@@ -1849,9 +1886,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       pl.qy = sy * cp;
       pl.qz = -sy * sp;
       pl.qw = cyw * cp;
-      pl.x = at.x + Math.sin(at.yaw) * rootFwd;
+      pl.x = at.x + Math.sin(at.yaw) * rootFwd + Math.cos(at.yaw) * rig.aside;
       pl.y = rootY + rig.floorY;
-      pl.z = at.z + Math.cos(at.yaw) * rootFwd;
+      pl.z = at.z + Math.cos(at.yaw) * rootFwd - Math.sin(at.yaw) * rig.aside;
       this.stepPlace(rig, pl, step);
       if (rig.walkT >= 0) this.walkPlace(rig, pl, at.x + Math.sin(rig.walkYaw) * rootFwd, at.z + Math.cos(rig.walkYaw) * rootFwd, step);
       if (pose === Pose.Sit) {
@@ -1981,6 +2018,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // Step towards a partner (hugs, kisses, fights): eased towards `reach` at `reachRate`.
     let reach = 0;
     let reachRate = 4;
+    let aside = 0;
     // Using a thing from inside or up against it this frame (`stepIn`).
     let inside = false;
     // Placed in a frame of its own this frame (`Player.frame`: the bunk's ladder).
@@ -2228,6 +2266,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         } else if (obj && HUGGED[obj.def]) {
           // Up to the teddy, to hug it.
           reach = HUGGED[obj.def].reach;
+        } else if (obj && STATION_PROPS[tag]) {
+          // Working at a station's tool: up to it and across to it, so the hands are at the pot, the board, the grill.
+          [reach, aside] = this.stationReach(rig, obj, tag);
         }
         const on = obj?.stand;
         // (Holding its grips: `GRIPPED`.)
@@ -2272,6 +2313,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       reach = rig.approach;
     }
     rig.approach += (reach - rig.approach) * Math.min(1, step * reachRate);
+    rig.aside += (aside - rig.aside) * Math.min(1, step * reachRate);
     const dir = rig.dir;
     if (dir?.clip) {
       key = dir.clip;
@@ -2419,6 +2461,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       rig.upperFade = 1;
       rig.upperW = rig.upperTarget;
       rig.approach = reach;
+      rig.aside = aside;
       rig.hands = hands;
     }
   }
