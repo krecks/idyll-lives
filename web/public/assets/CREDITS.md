@@ -269,7 +269,8 @@ compost bin's lid lifts and the washing goes out on the line a line at a time.
 
 The grills and the fire pit (`models/outdoor/grill.glb`, `grillStation.glb`, `firePit.glb`, same pack and family)
 are built the same way (glTF, original, CC0). The grill's lid and the station's hood swing up while residents cook,
-and the fire pit's flames grow on its logs while they warm up by it.
+and the fire pit's flames grow on its logs while they warm up by it. The grates are bare for the cook's own food, and
+the grill has a side tray for what they bring out (2026-11-03).
 
 The home gym (`models/fitness/treadmill.glb`, `weightBench.glb`, `exerciseBike.glb`, `yogaMat.glb`,
 `dumbbells.glb`, override pack `packs/fitness/manifest.json`) is built in Blender by

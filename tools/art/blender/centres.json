@@ -295,7 +295,7 @@
   "model.gloomy.windowSeat": [0.0, -0.077],
   "model.grandfatherClock": [0.0, -0.23],
   "model.greenhouse": [0.0, 0.0],
-  "model.grill": [0.0, 0.013],
+  "model.grill": [0.089, 0.096],
   "model.grillStation": [0.0, -0.125],
   "model.groceryShelf": [0.0, -0.19],
   "model.guitarAcoustic": [0.0, -0.0217],

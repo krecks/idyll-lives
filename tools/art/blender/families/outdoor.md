@@ -37,7 +37,7 @@ What each has since the detail pass (2026-10-22):
 | porchSwing | legs cut level meeting under a beam with cut-back ends, gussets; shaped arms on turned posts, an arched top rail, a front rail; two chains from the corners to a ring, one up to a hook; a piped cushion |
 | swingSet | round timbers tapering, the beam's end caps; belt seats sagging between their chains, clips, hanger rings round the beam |
 | hotTubCedar | one wall with a V between each of its 32 staves, a moulded rim, flat bands with lugs, a step with a nosing and a riser, rippled water and the jets' foam; a cover with a rounded edge, straps, clips and handles |
-| grill | a rolled lip, dampers, bent side handles, a grate ring and bars, patties and bent sausages, leg sockets, a wire rack, an ash pan, wheels with hub caps; a lid with a vent tab, a thermometer and a shielded handle |
+| grill | a rolled lip, dampers, bent side handles, a grate ring and bars (bare since 2026-11-03), leg sockets, a wire rack, an ash pan, wheels with hub caps, a side tray on struts; a lid with a vent tab, a thermometer and a shielded handle |
 | grillStation | a moulded worktop, a tilted control panel with turned knobs and an igniter, framed stainless doors with bar pulls and hinges, a towel bar; the hood's dark end caps, bar handle and tilted gauge |
 | firePit | two courses of rough stones round a dark wall, ten rough wedge capstones (three pushed out a little so the bounds stay the old random stones'), logs with rough bark and pale sawn ends (`log_end`), flames as twisted lofted tongues |
 
@@ -160,8 +160,8 @@ Built 2026-10-16; they sat in Validate › Grills until signed off (back to Outd
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| grill | 0.64 × 1.04 × 0.64 | 4434 | 2 | Body, Lid |
-| grillStation | 1.66 × 1.20 × 0.66 | 4016 | 3 | Cart, Hood |
+| grill | 0.82 × 1.04 × 0.80 (with its tray) | 4338 | 2 | Body, Lid |
+| grillStation | 1.66 × 1.20 × 0.66 | 3528 | 3 | Cart, Hood |
 | firePit | 0.92 × 0.62 × 0.92 | 3006 | 3 | Bowl, Stones |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
@@ -176,3 +176,21 @@ fire pit (flames up, sitting on its rim), by day and at night; the colour studio
 cargo art outdoor            # every .glb, the pack, check-glb
 cargo art outdoor --preview  # previews/outdoor/bench.png, parasol@stir.png, …
 ```
+
+## Grilling at them (2026-11-03)
+
+The game draws the cook's food on the grate and what they carried out beside it (`STATION_SPOTS`, `SET_DOWN_SPOTS` in
+`web/src/render/shared/characters/actions.ts`); the models leave room for both.
+
+- **grill**: the burgers and sausages on its grate are gone: the cook's own (`tool.grillFood`) showed on top of them.
+  The lid hides the bare grate at rest. A round enamel side tray (r 0.165, top at 0.70) is hooked onto the bowl's front
+  right on two struts, inside the tile (its middle at (0.333, 0.333)): the bowl the cook brings out stands there, not on
+  the grate over the coals. The food goes on the grate at (0, 0.06), 0.769. The model is now 0.82 × 1.04 × 0.80,
+  centred on (0.089, 0.096), built in place as before; the content's `surface` (the grate) is unchanged.
+- **grillStation**: the burgers, sausages and corn on the grate are gone (the hood hides it at rest, and while it's
+  up the cook's food is drawn there, at (0, −0.12), 0.914); the bottle and the pepper mill moved from the right counter
+  to the back of the left one, beside the board of patties. The right counter is free: the content's `surface` is
+  now only it (0.36 × 0.66 at (0.65, −0.125); it was 0.7 × 0.55 at (0.55, 0), over the hood and past the cart), where
+  the cook chops (the board at (0.65, 0)) and sets down the ingredients (behind the board) or the prepped bowl.
+- Both play their clip for any recipe's grilling step (`flip`), not only their own `cook` (a meal started at the
+  fridge has no interaction there, only the step's tag), as the cookers do for `stir`.
