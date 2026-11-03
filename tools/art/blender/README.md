@@ -393,7 +393,8 @@ never one that's already running) and drive Playwright headless with full Chrome
   island have the same top; `fillsWall` only keeps the wall over it clear), so the gate can't tell one
   standing off it: check by eye.
 - **Thin on the floor.** A house's floor is drawn 1 cm up and hides anything lower: a mat or a belt must
-  reach 1.2 cm. The gate warns of a floor model, or a moving part, whose top is lower.
+  reach 1.2 cm. The gate warns of a floor model, or a moving part, whose top is lower (not a held tool,
+  `tool.*`, which is only ever drawn in a hand).
 - **Grown from nothing.** A part `G.grow`n from 0.001 along one axis keeps its other two, so at rest it
   lies flat where its origin is, and shows there: the dartboard's flights as crosses on its face, a flask's
   liquid as a disc through the glass. Put its origin inside something opaque (the board, the bench top),

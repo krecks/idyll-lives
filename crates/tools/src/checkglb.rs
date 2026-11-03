@@ -2116,6 +2116,7 @@ fn content_warnings(
     g: &Glb,
     pose: &Pose,
     entry: &J,
+    in_hand: bool,
 ) -> R<Vec<String>> {
     let mut warnings = Vec::new();
     let floor = J::Str("floor".into());
@@ -2246,8 +2247,8 @@ fn content_warnings(
         }
     }
     // Thin on the floor: a house's floor hides what lies under `FLOOR_TOP` (a mat, a belt), the whole
-    // model or a moving part (as it shows, grown).
-    if (is("floor") || is("rug")) && lo[1].f() <= 0.005 {
+    // model or a moving part (as it shows, grown). Not a tool, which is only ever drawn in a hand.
+    if (is("floor") || is("rug")) && lo[1].f() <= 0.005 && !in_hand {
         let mut flat: Vec<(Option<usize>, f64)> = Vec::new();
         if shi[1].f() < FLOOR_TOP {
             flat.push((None, shi[1].f()));
@@ -3024,10 +3025,18 @@ fn dims_text(dims: &[Num; 3]) -> String {
         .join(" x ")
 }
 
+/// Whether the model `key` is only ever drawn in a resident's hand (a held pack's `tool.*`: a fork, a coin, a phone),
+/// never on a floor or a top. (The pack's `item.*` are set down too: a plate on a table, a parcel on the doorstep.)
+fn in_hand(key: &str) -> bool {
+    key.starts_with("tool.")
+}
+
 /// (errors, warnings, summary) for one model entry and its file (and its far version's, at `far`);
 /// `facts`: those of each content object that draws it (`content_objects`); `centre`: where it's built
 /// centred (centres.json; None: not built here, not checked).
+#[allow(clippy::too_many_arguments)]
 fn check(
+    entry_key: &str,
     fin: &Finishes,
     entry: &J,
     path: &str,
@@ -3036,7 +3045,8 @@ fn check(
     centre: Option<&J>,
     furniture: Option<&Furniture>,
 ) -> R<(Vec<String>, Vec<String>, String)> {
-    let (mut errors, mut warnings, info) = check_file(fin, entry, path, facts, centre, furniture)?;
+    let (mut errors, mut warnings, info) =
+        check_file(entry_key, fin, entry, path, facts, centre, furniture)?;
     let mut summary = format!(
         "{:>6} KB {:>6} tris {} draws {:>2} materials  {} m",
         fixed(info.size as f64 / 1024.0, 1),
@@ -3063,7 +3073,7 @@ fn check(
                 .collect(),
         );
         let (mut far_errors, mut far_warnings, far_info) =
-            match check_file(fin, &far_entry, far, None, None, None) {
+            match check_file(entry_key, fin, &far_entry, far, None, None, None) {
                 Ok((e, w, i)) => (e, w, Some(i)),
                 Err(err) => (vec![format!("cannot read {far}: {err}")], Vec::new(), None),
             };
@@ -3109,6 +3119,7 @@ fn check(
 /// (errors, warnings, numbers) for one model entry and a file of it; `facts`: those of each content object
 /// that draws it (`content_objects`), each checked; `centre`: where it's built centred (centres.json), or None.
 fn check_file(
+    entry_key: &str,
     fin: &Finishes,
     entry: &J,
     path: &str,
@@ -3509,8 +3520,17 @@ fn check_file(
         let many = facts.is_some_and(|f| f.len() > 1);
         for fact in each {
             // Its functional heights against the model (`heights`: warnings only).
-            let mut found =
-                content_warnings(fact, &lo, &(slo, shi), &sparts, scale, &g, &pose, entry)?;
+            let mut found = content_warnings(
+                fact,
+                &lo,
+                &(slo, shi),
+                &sparts,
+                scale,
+                &g,
+                &pose,
+                entry,
+                in_hand(entry_key),
+            )?;
             if let (Some(f), Some(furniture)) = (fact, furniture) {
                 found.extend(
                     heights(&g, entry, &f.object, furniture, true)?
@@ -3774,6 +3794,7 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
             .filter(|f| f.truthy())
             .map(|f| normpath(&join(&dirname(manifest), &f.key())));
         let (errors, warnings, summary) = check(
+            k,
             &fin,
             entry,
             &path,
@@ -4787,6 +4808,29 @@ mod tests {
                 "wing.R reaches out the wrong way: a bird's wing.R is spread to its right, game +x (glTF -x)",
             ]
         );
+    }
+
+    /// A held tool (a coin 2 mm thick) is never on a floor, so the floor drawn over thin things isn't held against
+    /// it; the same file as a floor model is.
+    #[test]
+    fn a_held_tool_is_not_thin_on_the_floor() {
+        let fin = Finishes {
+            plain: HashMap::new(),
+            see_through: HashSet::new(),
+        };
+        let path = join(&repo_root(), "web/public/assets/models/held/coin.glb");
+        let entry = j(r#"{"type": "model", "url": "coin.glb"}"#);
+        let thin = |key: &str| {
+            let (errors, warnings, _) =
+                check(key, &fin, &entry, &path, None, None, None, None).unwrap();
+            errors
+                .iter()
+                .chain(&warnings)
+                .any(|w| w.contains("reaches only"))
+        };
+        assert!(!thin("tool.coin"));
+        assert!(thin("model.coin"));
+        assert!(in_hand("tool.phone") && !in_hand("item.parcel") && !in_hand("model.yogaMat"));
     }
 
     #[test]
