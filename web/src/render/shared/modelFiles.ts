@@ -49,7 +49,7 @@ export class ModelFiles<F> {
     private evict: ((file: F, url: string) => void) | null = null,
     private readonly idleLimit = IDLE_FILES,
   ) {
-    // (Not in a worker without one, nor a test's stand-in page.)
+    // (The page's, or a worker's; none where the global has no events, a test's stand-in page.)
     globalThis.addEventListener?.('online', this.online);
   }
 

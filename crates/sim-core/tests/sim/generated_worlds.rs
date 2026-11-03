@@ -10,15 +10,14 @@
 //! then `WORLDS=worlds.json cargo test --release -p sim-core --test sim generated_worlds:: -- --ignored --nocapture`.
 
 use crate::common;
+use common::TICKS_PER_HOUR;
 
+use sim_core::World;
 use sim_core::lot::{Edge, OUTDOORS};
 use sim_core::path::NavGrid;
 use sim_core::surface;
 use sim_core::travel::Graph;
 use sim_core::world::MAX_SIMS;
-use sim_core::{MINUTES_PER_TICK, World};
-
-const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
 
 /// `check` for each of `items`, a few at a time (one per core: each world plays on its own, and a
 /// path search's budget counts on its own thread), the results in the items' order.

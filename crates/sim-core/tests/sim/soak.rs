@@ -10,12 +10,11 @@
 //! looking around town), with the checks of the century runs (`century.rs`).
 
 use crate::common;
+use common::TICKS_PER_HOUR;
 
 use sim_core::command::ItemAction;
 use sim_core::social::EventKind;
 use sim_core::{Command, MINUTES_PER_TICK, World, clock, life};
-
-const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
 
 /// What happened over a whole run, by event kind (the world's log only keeps the latest).
 type Story = std::collections::BTreeMap<String, usize>;

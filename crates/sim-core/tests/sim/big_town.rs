@@ -6,6 +6,7 @@
 //! `cargo test --release -p sim-core --test sim big_town:: -- --ignored --nocapture`.
 
 use crate::common;
+use common::TICKS_PER_HOUR;
 
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
@@ -14,9 +15,7 @@ use std::time::Instant;
 use common::Layout;
 use sim_core::path::NavGrid;
 use sim_core::world::{MAX_SIMS, Phase, TaskKind};
-use sim_core::{MINUTES_PER_TICK, World, clock};
-
-const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
+use sim_core::{World, clock};
 const LAYOUT: Layout = Layout {
     columns: 9,
     streets: 2,

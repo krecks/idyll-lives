@@ -9,10 +9,9 @@
 //! `LOD=1`, the rest of the town besides the player's home runs at lower detail).
 
 use crate::common;
+use common::TICKS_PER_HOUR;
 
-use sim_core::{MINUTES_PER_TICK, World, clock};
-
-const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
+use sim_core::{World, clock};
 const DAYS: u32 = 60;
 
 /// What a typical room costs: a 4×4 room's walls ($40/m), a door, a window and a floor.
