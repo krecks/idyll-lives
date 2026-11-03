@@ -2362,7 +2362,6 @@ impl World {
         conversation::in_sight(&self.nav(), a, b)
     }
 
-    /// The plot a tile is on (on any storey).
     /// Whether resident `i` would set off now to visit `plot` (an invitation over the phone):
     /// the way isn't too long and they'd be there in visiting hours (`visit_fits`).
     pub(crate) fn visit_fits_now(&self, i: usize, plot: u32) -> bool {
@@ -2395,6 +2394,7 @@ impl World {
         )
     }
 
+    /// The plot a tile is on (on any storey).
     pub fn plot_at(&self, x: i32, z: i32) -> Option<u32> {
         let z = self.ground_z(z);
         let width = self.lot.width as i32;
@@ -7031,87 +7031,18 @@ fn pick_autonomous(
         }
     }
 
-    // Residents visit friends who are home.
+    // Residents visit friends who are home, or go out. (Not from a seat: only a word from it,
+    // below.)
     let household = &ctx.households[sim.household as usize];
     let visits = &content.visits;
-    let plans_soon = || {
-        crate::planner::plans_soon(
-            content,
-            sim,
-            routines,
-            ctx.day,
-            ctx.minute,
-            visits.hours * 60.0,
-        )
-    };
-    if sim.visiting.is_none()
-        && here.is_some()
-        && here == household.plot
-        && !minding
-        && (visits.earliest_hour..visits.latest_hour).contains(&ctx.hour)
-    {
-        let soon = plans_soon();
-        // Not a walk of hours, nor to arrive after visiting hours (`visit_minutes`, `visit_fits`).
-        let free = until_leave.unwrap_or(f32::INFINITY);
-        let drives = crate::cars::could_drive(ctx, sim);
-        let pos = ctx.nav.stairs.ground_pos(sim.pos);
-        let mut on: [Option<Option<crate::travel::RoadPoint>>; 2] = [None, None];
-        for other in ctx.households.iter().filter(|h| h.id != household.id) {
-            let Some(plot) = other.plot else { continue };
-            let friendship = ctx
-                .briefs
-                .iter()
-                .enumerate()
-                .filter(|(_, b)| b.household == other.id && b.plot == Some(plot) && !b.away)
-                .map(|(j, _)| ctx.rels.get(me, j).friendship)
-                .fold(f32::NEG_INFINITY, f32::max);
-            if friendship < visits.min_friendship {
-                continue;
-            }
-            // Someone to open the door: a grown-up at home, up and about, not on their way out.
-            if !ctx
-                .briefs
-                .iter()
-                .any(|b| crate::life::opens_door(b, other.id, plot))
-            {
-                continue;
-            }
-            let door = ctx.plots[plot as usize].arrival_point();
-            let distance = (door[0] - pos[0]).hypot(door[1] - pos[1]);
-            let eta = visit_minutes(
-                ctx.travel,
-                content,
-                pos,
-                walk_per_minute,
-                plot,
-                door,
-                drives,
-                &mut on,
-            );
-            if !visit_fits(content, eta, ctx.hour, free) {
-                continue;
-            }
-            // Travel is less of a deterrent than for a chat in the same room.
-            let score = ai::score_felt(needs, &felt, &visits.gains, distance * 0.25)
-                * (0.4 + friendship / 100.0)
-                * feel(visits.tags)
-                * crate::planner::visit_factor(content, sim, soon);
-            if score > MIN_AUTONOMY_SCORE {
-                candidates.push((score, Choice::Visit(plot)));
-            }
-        }
-    }
-
-    // An outing: in an open-world town, a public place out of reach, for the best it has, the
-    // less the longer the way (`OUTING_K`), with time for there and back and an hour there.
-    if ctx.travel.open
+    if from_seat.is_none()
         && sim.visiting.is_none()
         && here.is_some()
         && here == household.plot
         && !minding
         && (visits.earliest_hour..visits.latest_hour).contains(&ctx.hour)
     {
-        let reach = content.autonomy.reach;
+        // Not a walk of hours, nor to arrive after visiting hours (`visit_minutes`, `visit_fits`).
         let free = until_leave.unwrap_or(f32::INFINITY);
         let drives = crate::cars::could_drive(ctx, sim);
         // (From over the ground, upstairs too. Where they'd get on the roads from here, on foot
@@ -7119,50 +7050,104 @@ fn pick_autonomous(
         // `Travel::door_entry`.)
         let pos = ctx.nav.stairs.ground_pos(sim.pos);
         let mut on: [Option<Option<crate::travel::RoadPoint>>; 2] = [None, None];
-        for p in ctx.plots.iter().filter(|p| p.public) {
-            let door = p.arrival_point();
-            if (door[0] - pos[0]).hypot(door[1] - pos[1]) <= reach {
-                continue;
-            }
-            // By car where they can drive there (`cars::trip_car`).
-            let car = drives && crate::cars::parks_near(ctx.travel, door);
-            let mode = if car {
-                crate::travel::Mode::Car
-            } else {
-                crate::travel::Mode::Foot
-            };
-            let from = &mut on[mode as usize];
-            let eta = ctx.travel.eta_via(
-                pos,
-                door,
-                mode,
-                walk_per_minute,
-                || *from.get_or_insert_with(|| ctx.travel.entry(pos, mode)),
-                || ctx.travel.door_entry(p.id, door, mode),
-            );
-            let eta = trip_minutes(eta, car);
-            if free < 2.0 * eta + OUTING_STAY_MINUTES {
-                continue;
-            }
-            // The best the place has for each need, as one day out.
-            let mut best = [0.0f32; crate::content::MAX_NEEDS];
-            for i in ctx
-                .index
-                .on(p.id)
-                .iter()
-                .map(|&o| &objects[o as usize])
-                .filter(|o| !o.broken())
-                .flat_map(|o| &content.objects[o.def].interactions)
-                .filter(|i| unfit(content, sim.age, i).is_none())
-            {
-                for (b, &g) in best.iter_mut().zip(&i.total_gain) {
-                    *b = b.max(g);
+        let soon = crate::planner::plans_soon(
+            content,
+            sim,
+            routines,
+            ctx.day,
+            ctx.minute,
+            visits.hours * 60.0,
+        );
+        for other in ctx.households.iter().filter(|h| h.id != household.id) {
+            let Some(plot) = other.plot else { continue };
+            // The best friend of theirs at home, and someone to open the door: a grown-up at
+            // home, up and about, not on their way out (`life::opens_door`).
+            let mut friendship = f32::NEG_INFINITY;
+            let mut opener = false;
+            for (j, b) in ctx.briefs.iter().enumerate() {
+                if b.household == other.id && b.plot == Some(plot) && !b.away {
+                    friendship = friendship.max(ctx.rels.get(me, j).friendship);
+                    opener = opener || crate::life::opens_door(b, other.id, plot);
                 }
             }
-            let score = ai::score_felt(needs, &felt, &best, 0.0) * feel(visits.tags)
-                / (1.0 + OUTING_K * eta);
+            if friendship < visits.min_friendship || !opener {
+                continue;
+            }
+            let door = ctx.plots[plot as usize].arrival_point();
+            let distance = (door[0] - pos[0]).hypot(door[1] - pos[1]);
+            // Travel is less of a deterrent than for a chat in the same room.
+            let score = ai::score_felt(needs, &felt, &visits.gains, distance * 0.25)
+                * (0.4 + friendship / 100.0)
+                * feel(visits.tags)
+                * crate::planner::visit_factor(content, sim, soon);
+            // (The way there timed only for a visit worth making.)
             if score > MIN_AUTONOMY_SCORE {
-                candidates.push((score, Choice::Outing(p.id)));
+                let eta = visit_minutes(
+                    ctx.travel,
+                    content,
+                    pos,
+                    walk_per_minute,
+                    plot,
+                    door,
+                    drives,
+                    &mut on,
+                );
+                if visit_fits(content, eta, ctx.hour, free) {
+                    candidates.push((score, Choice::Visit(plot)));
+                }
+            }
+        }
+
+        // An outing: in an open-world town, a public place out of reach, for the best it has,
+        // the less the longer the way (`OUTING_K`), with time for there and back and an hour
+        // there.
+        if ctx.travel.open {
+            let reach = content.autonomy.reach;
+            for p in ctx.plots.iter().filter(|p| p.public) {
+                let door = p.arrival_point();
+                if (door[0] - pos[0]).hypot(door[1] - pos[1]) <= reach {
+                    continue;
+                }
+                // By car where they can drive there (`cars::trip_car`).
+                let car = drives && crate::cars::parks_near(ctx.travel, door);
+                let mode = if car {
+                    crate::travel::Mode::Car
+                } else {
+                    crate::travel::Mode::Foot
+                };
+                let from = &mut on[mode as usize];
+                let eta = ctx.travel.eta_via(
+                    pos,
+                    door,
+                    mode,
+                    walk_per_minute,
+                    || *from.get_or_insert_with(|| ctx.travel.entry(pos, mode)),
+                    || ctx.travel.door_entry(p.id, door, mode),
+                );
+                let eta = trip_minutes(eta, car);
+                if free < 2.0 * eta + OUTING_STAY_MINUTES {
+                    continue;
+                }
+                // The best the place has for each need, as one day out.
+                let mut best = [0.0f32; crate::content::MAX_NEEDS];
+                for i in ctx
+                    .index
+                    .on(p.id)
+                    .iter()
+                    .map(|&o| &objects[o as usize])
+                    .filter(|o| !o.broken())
+                    .flat_map(|o| &content.objects[o.def].interactions)
+                    .filter(|i| unfit(content, sim.age, i).is_none())
+                {
+                    for (b, &g) in best.iter_mut().zip(&i.total_gain) {
+                        *b = b.max(g);
+                    }
+                }
+                let score = ai::score_felt(needs, &felt, &best, 0.0) * feel(visits.tags)
+                    / (1.0 + OUTING_K * eta);
+                if score > MIN_AUTONOMY_SCORE {
+                    candidates.push((score, Choice::Outing(p.id)));
+                }
             }
         }
     }
