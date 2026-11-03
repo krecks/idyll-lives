@@ -74,8 +74,14 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
 - `areas: { name, kind: 'hamlet' | 'countryside', x, z, w, d }[]` — area 0 is the main town.
 - `plots[].area?: number`, `plots[].kind?: 'home' | 'farm' | 'public' | 'shop' | 'countryside'`.
   Countryside plots are public, unfenced, with an `entry` at their trail end.
-- `exits: ([x, z] | { x, z, kind: 'road' | 'stop' })[]` — a `stop` is a bus stop inside an area
-  that counts as an exit for people on foot.
+- `exits: ([x, z] | { x, z, kind: 'road' | 'stop' })[]` — a `stop` is a bus stop at the kerb of a
+  road. A bus calls there every `bus.every` minutes through the day (sim-core `bus.rs`: a line per
+  stop or two in a big world, coming in and going out where the roads leave the area; one through
+  a cosy or normal town's stop or two, which new towns of those sizes get on their main road near
+  the middle, `town.ts` `busStops`): residents wait there for it when it beats the walk out, and
+  come home on it. When no bus calls (the night), the stop is a way out for people on foot, as all
+  stops were before the bus. The renderer draws its shelter and sign where the sim says
+  (`WorldStructure.stops`) and each bus from its snapshot rows (`busBase`, `bus`).
 - `terrain: { water?: Rle, blocked?: Rle }` — run-length masks over the ground grid in row-major
   order: `[runLength, value, runLength, value, ...]` with value 0/1, starting at tile (0, 0).
   The sim treats set tiles as a base blocked layer; the renderer draws water from `meta.zones`.
