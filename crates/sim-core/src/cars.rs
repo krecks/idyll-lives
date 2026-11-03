@@ -91,6 +91,9 @@ const SWING: f32 = 1.2;
 /// there (`drive_on`); and how close to its sides and ends their bodies come (m, `Body`).
 pub(crate) const AHEAD: f32 = 2.2;
 pub(crate) const BESIDE: f32 = 0.1;
+/// How close someone steps to a car or bus driving by (m, `walks_into`): further off than it
+/// keeps from them, so one it held up doesn't hold it up in turn as it moves on past them.
+const KEEP: f32 = 2.0 * BESIDE;
 /// How far someone on foot reaches out from where they stand (m: their shoulders and elbows).
 pub(crate) const BODY: f32 = 0.25;
 /// Someone waiting for a car to pass for this long steps aside out of its way (`make_way`).
@@ -2042,8 +2045,9 @@ pub(crate) fn covers(
 }
 
 /// Whether a step from `from` to `to` with `body` (turned the way of the step) walks into
-/// something `len` by `wid` m driving by at `at` facing `yaw`, or within `BESIDE` of it
-/// (stepping out of its way is fine).
+/// something `len` by `wid` m driving by at `at` facing `yaw`, within `KEEP` of it, or into the
+/// ground just in front of it that it keeps clear (`AHEAD`): stepping out of its way is fine.
+/// (Stopped there, waiting for another to pass, they'd hold it up as it held them.)
 pub(crate) fn walks_into(
     at: [f32; 2],
     yaw: f32,
@@ -2058,9 +2062,9 @@ pub(crate) fn walks_into(
         yaw: (to[0] - from[0]).atan2(to[1] - from[1]),
         ..body
     };
-    let gap = |p: [f32; 2]| body.gap(at, turn, p, -len / 2.0, len / 2.0, wid / 2.0);
+    let gap = |p: [f32; 2]| body.gap(at, turn, p, -len / 2.0, len / 2.0 + AHEAD, wid / 2.0);
     let g = gap(to);
-    g < BESIDE && g <= gap(from)
+    g < KEEP && g <= gap(from)
 }
 
 /// Getting into `car` (`inward`, `Phase::Boarding`) or out of it (`Phase::Alighting`) by their
@@ -4015,6 +4019,18 @@ mod tests {
             in_the_way(&cars, bike, [12.4, 10.0], [12.0, 10.0]),
             Some(0),
             "but not on a bike"
+        );
+        // Nor into the ground just in front of it (it faces +z, its front at z = 12.2): stopped
+        // there, they'd hold it up. Out of there is fine.
+        assert_eq!(
+            in_the_way(&cars, on_foot, [10.0, 15.5], [10.0, 14.0]),
+            Some(0),
+            "in front of it"
+        );
+        assert_eq!(
+            in_the_way(&cars, on_foot, [10.0, 13.5], [10.0, 14.0]),
+            None,
+            "out from in front of it"
         );
     }
 
