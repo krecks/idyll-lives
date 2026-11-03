@@ -201,7 +201,9 @@ def neighbourlyOven():
         for k in range(1, 9):                              # the butcher block's strips
             F.box(_name('strip'), 0.003, 0.0015, cd + 0.022, (cx0 + k * cw / 9, 0.9052, WALL + (cd + 0.03) / 2), M.crust_dark)
         top = 0.905
-        # the bakes: a lattice pie, a wire rack of biscuits, a rolling pin in flour, a pink cake on its stand
+        # the bakes: a lattice pie, a wire rack of biscuits with the rolling pin in front, a pink cake on its stand; the
+        # worktop's right end, by the range, is left free (a patch of flour on it) for the cook's mixing bowl or board and
+        # what they set down behind it (`STATION_SPOTS`, `SET_DOWN_SPOTS`: the pin lay where the bowl goes)
         px, pz = cxm - 0.28, -0.06
         _turned(F, 'pie_dish', px, top, pz, [(0, 0), (0.12, 0), (0.16, 0.05), (0.165, 0.052), (0.15, 0.052), (0.11, 0.008),
                                              (0, 0.008)], M.terracotta, 20)
@@ -215,7 +217,7 @@ def neighbourlyOven():
                                               pz + (t - 0.5) * L)) for t in (0.0, 0.5, 1.0)]
                 F.sweep(_name('lattice'), pts, None, M.crust_dark, profile=[(-0.004, -0.01), (0.004, -0.01), (0.004, 0.01), (-0.004, 0.01)],
                         up=(0, 0, 1))
-        rx0, rz0 = cxm + 0.15, -0.1
+        rx0, rz0 = cxm + 0.1, -0.1
         for k in range(5):
             G.kit.tube(F, _name('rack_bar'), [(rx0 - 0.15, top + 0.016, rz0 - 0.1 + 0.05 * k), (rx0 + 0.15, top + 0.016, rz0 - 0.1 + 0.05 * k)],
                        0.0025, M.chrome, verts=4, round=1)
@@ -224,13 +226,13 @@ def neighbourlyOven():
                                                            (x, top + 0.016, rz0 + 0.11), (x, top, rz0 + 0.11)], 0.01), 0.003,
                        M.chrome, verts=4, round=1)
         for x, z in ((0.07, -0.15), (0.15, -0.06), (0.23, -0.14), (0.1, -0.03), (0.22, -0.04), (0.05, -0.09)):
-            _turned(F, _name('biscuit'), cxm + x, top + 0.019, z, [(0, 0), (0.03, 0.004), (0.026, 0.012), (0, 0.012)],
+            _turned(F, _name('biscuit'), rx0 - 0.15 + x, top + 0.019, z, [(0, 0), (0.03, 0.004), (0.026, 0.012), (0, 0.012)],
                     M.crust_dark, 10)
-        _turned(F, 'rolling_pin', cxm + 0.27, top + 0.025, 0.02, [(0, 0), (0.008, 0), (0.008, 0.05), (0.014, 0.056), (0.025, 0.065),
+        _turned(F, 'rolling_pin', rx0 - 0.15, top + 0.025, 0.065, [(0, 0), (0.008, 0), (0.008, 0.05), (0.014, 0.056), (0.025, 0.065),
                                                                   (0.025, 0.235), (0.014, 0.244), (0.008, 0.25), (0.008, 0.3),
                                                                   (0, 0.3)], M.honey, 14, rot=(0, -90, 0))
         F.extrude('flour_dust', G.smooth_outline([(-0.1, -0.06), (0.04, -0.075), (0.11, -0.02), (0.08, 0.06), (-0.03, 0.07),
-                                                  (-0.11, 0.02)], 2), 0.002, (cxm + 0.42, top + 0.001, -0.05), M.flour, plane='top')
+                                                  (-0.11, 0.02)], 2), 0.002, (0.135, top + 0.001, -0.03), M.flour, plane='top')
         _turned(F, 'cake_stand', cxm - 0.42, top, -0.3, [(0, 0), (0.06, 0), (0.05, 0.01), (0.02, 0.025), (0.016, 0.06), (0.02, 0.07),
                                                          (0.12, 0.074), (0.122, 0.082), (0.11, 0.085), (0, 0.085)], M.porcelain, 16)
         _turned(F, 'cake', cxm - 0.42, top + 0.085, -0.3, [(0, 0), (0.09, 0), (0.09, 0.08), (0.084, 0.092), (0.07, 0.095), (0, 0.095)],
@@ -259,9 +261,10 @@ def neighbourlyOven():
                                                                   (0.046, h - 0.022), (0.042, h - 0.02), (0.0, h - 0.02)], m, verts=12)
             _turned(F, _name('jar_lid'), cxm + dx, 1.515 + h - 0.0225, WALL + 0.1, [(0, 0), (0.05, 0), (0.051, 0.018), (0.046, 0.025),
                                                                                     (0, 0.025)], M.cork, 12)
-            F.box(_name('jar_label'), 0.05, 0.04, 0.004, (cxm + dx, 1.515 + h * 0.45, WALL + 0.155), M.towel_check)
+            # (plain, not the towel's check: the door with the towel takes the fabric draw)
+            F.box(_name('jar_label'), 0.05, 0.04, 0.004, (cxm + dx, 1.515 + h * 0.45, WALL + 0.155), M.porcelain)
         # the range: an enamel body, a hob with four burners under cast-iron grates, a backguard with a clock, a knob
-        # panel, a chrome rail with a gingham tea towel hung over it, a stock pot
+        # panel, a chrome rail, a stock pot (the gingham tea towel is the door's, over its handle)
         F.box('range', rw, rh - 0.04, rd - 0.03, (rx, (rh - 0.04) / 2, WALL + (rd - 0.03) / 2), M.enamel, bevel=0.02,
               bevel_segments=2)
         F.box('kick', rw - 0.06, 0.06, 0.02, (rx, 0.03, zf - 0.035), M.hob)
@@ -295,16 +298,6 @@ def neighbourlyOven():
         G.kit.tube(F, 'rail', G.kit.fillet([(rx - rw / 2 + 0.06, 0.7, zf - 0.016), (rx - rw / 2 + 0.06, 0.7, zf + 0.012),
                                             (rx + rw / 2 - 0.06, 0.7, zf + 0.012), (rx + rw / 2 - 0.06, 0.7, zf - 0.016)], 0.012),
                    0.009, M.chrome, verts=8, round=1)
-        tx = rx + 0.1
-        pts = [(tx, 0.45, zf + 0.026), (tx, 0.66, zf + 0.026), (tx, 0.704, zf + 0.025), (tx, 0.716, zf + 0.012),
-               (tx, 0.704, zf - 0.001), (tx, 0.6, zf - 0.002)]
-        towel = F.sweep('towel', pts, None, M.towel, profile=G.rounded_rect(0.16, 0.006, 0.003, corner=1), up=(1, 0, 0),
-                        resolution=2)
-        G.jitter(towel, 0.002, size=0.06, seed=1.0, up=0.3)
-        for k in range(4):
-            F.box(_name('towel_check'), 0.16, 0.022, 0.003, (tx, 0.49 + k * 0.05, zf + 0.0305), M.towel_check)
-        for k in range(3):
-            F.box(_name('towel_check_v'), 0.026, 0.21, 0.0028, (tx - 0.053 + 0.053 * k, 0.555, zf + 0.0302), M.towel_check)
         sx, sz = rx + 0.15, WALL + rd / 2 - 0.12
         _turned(F, 'stock_pot', sx, rh + 0.026, sz, [(0, 0), (0.105, 0), (0.11, 0.008), (0.11, 0.13), (0.114, 0.138), (0.104, 0.14),
                                                      (0.1, 0.135), (0, 0.135)], M.sage_pot, 18)
@@ -323,6 +316,18 @@ def neighbourlyOven():
                        [(-0.012, 0.0), (-0.012, 0.004), (0.0, 0.008), (0.012, 0.008), (0.012, 0.0)], M.enamel, at=zf - 0.01)
         F.box('oven_window', rw - 0.22, 0.2, 0.006, (rx, 0.36, zf - 0.009), M.oven_glass)
         G.kit.pull(F, 'door_handle', rx, 0.58, zf - 0.01, rw - 0.16, M.chrome, r=0.009, out=0.032, verts=8)
+        # the gingham tea towel folded over the handle, so it drops with the door (hung on the rail above, the door
+        # swung up through it as it opened)
+        tx, bz = rx + 0.1, zf + 0.022                      # its middle; the handle bar's depth
+        pts = [(tx, 0.40, bz + 0.012), (tx, 0.56, bz + 0.013), (tx, 0.588, bz + 0.011), (tx, 0.595, bz),
+               (tx, 0.588, bz - 0.011), (tx, 0.56, bz - 0.013), (tx, 0.50, bz - 0.014)]
+        towel = F.sweep('towel', pts, None, M.towel, profile=G.rounded_rect(0.16, 0.006, 0.003, corner=1), up=(1, 0, 0),
+                        resolution=2)
+        G.jitter(towel, 0.002, size=0.06, seed=1.0, up=0.3)
+        for k in range(4):
+            F.box(_name('towel_check'), 0.16, 0.02, 0.003, (tx, 0.43 + k * 0.04, bz + 0.0165), M.towel_check)
+        for k in range(3):
+            F.box(_name('towel_check_v'), 0.026, 0.15, 0.0028, (tx - 0.053 + 0.053 * k, 0.48, bz + 0.0163), M.towel_check)
     door = G.hinged(G.join(door, 'oven_door'), F.at(rx, 0.13, zf - 0.02))
     objs = G.settle(centre=False)
     G.swing(door, 'oven_open', 85, seconds=0.8, axis='X')
@@ -710,10 +715,10 @@ def hearthSettee():
 
 FAMILY = G.Family(
     'pack_kind', M,
-    [G.Model('neighbourlyOven', neighbourlyOven, size=(1.832, 1.718, 0.634), key='model.kind.neighbourlyOven',
+    [G.Model('neighbourlyOven', neighbourlyOven, size=(1.832, 1.717, 0.640), key='model.kind.neighbourlyOven',
              # the door drops while the dish goes in, then shuts for the bake (`hold`). Keyed by the bake step's
              # tag, not the uses: the recipes' mixing is done at its worktop too, where the oven stays shut.
-             centre=(-0.004, -0.113), motions={'uses': {'bake': 'oven_open'}, 'hold': 3.0},
+             centre=(-0.004, -0.110), motions={'uses': {'bake': 'oven_open'}, 'hold': 3.0},
              paint=[('enamel', 'Body'), ('towel', 'Fabric'), ('cabinet', 'Cupboards')]),
      G.Model('givingJar', givingJar, size=(0.641, 1.32, 0.655), key='model.kind.givingJar', centre=(0.101, 0.057),
              motions={'uses': {'donate': 'coin'}},

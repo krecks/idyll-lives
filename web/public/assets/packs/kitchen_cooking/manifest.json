@@ -124,9 +124,6 @@
       "type": "model",
       "url": "../../models/kitchen_cooking/wallOven.glb",
       "materials": {
-        "bread": {
-          "finish": "material.finish.satin"
-        },
         "cab": {
           "finish": "material.finish.satin"
         },
@@ -526,7 +523,8 @@
       "motions": {
         "uses": {
           "dishes": "door_open",
-          "wash": "door_open"
+          "wash": "door_open",
+          "unload": "door_open"
         }
       },
       "paint": [
@@ -576,7 +574,8 @@
       "motions": {
         "uses": {
           "dishes": "door_open",
-          "wash": "door_open"
+          "wash": "door_open",
+          "unload": "door_open"
         }
       },
       "paint": [

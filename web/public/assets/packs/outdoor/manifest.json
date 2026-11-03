@@ -506,9 +506,6 @@
       "type": "model",
       "url": "../../models/outdoor/grill.glb",
       "materials": {
-        "burger": {
-          "finish": "material.finish.satin"
-        },
         "coal_hot": {
           "finish": "material.finish.gloss",
           "glow": "#FF7A2E"
@@ -531,16 +528,14 @@
         "kettle_lid": {
           "finish": "material.finish.gloss"
         },
-        "sausage": {
-          "finish": "material.finish.satin"
-        },
         "wheel": {
           "finish": "material.finish.satin"
         }
       },
       "motions": {
         "uses": {
-          "cook": "lid_open"
+          "cook": "lid_open",
+          "flip": "lid_open"
         }
       },
       "paint": [
@@ -570,9 +565,6 @@
         "cart": {
           "finish": "material.finish.metal"
         },
-        "corn": {
-          "finish": "material.finish.satin"
-        },
         "firebox": {
           "finish": "material.finish.matte"
         },
@@ -588,9 +580,6 @@
         "hood": {
           "finish": "material.finish.metal"
         },
-        "sausage": {
-          "finish": "material.finish.satin"
-        },
         "tray": {
           "finish": "material.finish.gloss"
         },
@@ -601,7 +590,8 @@
       "motions": {
         "uses": {
           "cook": "hood_up",
-          "feast": "hood_up"
+          "feast": "hood_up",
+          "flip": "hood_up"
         }
       },
       "paint": [

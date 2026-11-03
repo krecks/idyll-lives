@@ -804,7 +804,7 @@ down with it (a chair at a table, then a table with seats of its own, then any s
 `cooking.seatTags`, else standing), eats, and leaves a dirty plate on the table (whoever takes the last serving from the fridge
 puts the empty pot down next to it, to be washed up). Someone
 clears away later (a chore, like tidying up): they pick up the dish and the dirty things next to
-it, up to `carryDishes` at a time, scrape any food off into a `bin` station (the pedal bin; with
+it, up to `carryDishes` of one kind at a time, scrape any food off into a `bin` station (the pedal bin; with
 none, at the sink), wash up at a sink or dishwasher and put the clean things away in the nearest cupboard or
 counter (`putAwayAt`; a wall cabinet over a counter first; with none, from the sink). Food goes off after `spoilHours` (`storedSpoilHours` in a fridge), and
 dirty or spoilt things slowly make their room dirty. The player can order any of it: clicking a
@@ -842,7 +842,7 @@ optional; a long recipe tempts them less, a hungry family more, and food already
 at all (`leftoverPreference`: they eat that first). Many homes have only a fridge and a sink:
 keep the prep and cooking steps of everyday recipes optional, and fetching the ingredients
 the shortest step (3 minutes in the shipped ones). A station that's busy is waited
-for (`stationWaitMinutes`), then done without (optional steps) or given up (others). Quick food
+for (`stationWaitMinutes`), then done without (optional steps), or for three times that and then given up (others). Quick food
 (a snack, toast, reheating) isn't a recipe but an interaction with `eat`: fetched or made at the
 object, then eaten sitting down like a dish (it has a hidden recipe of its own, which the
 game makes, so a plate in someone's hands survives a reload). Drinks (a coffee, a soda) stay
@@ -851,7 +851,8 @@ plain interactions.
 **`items`**: `{ "id": "mealPot", "label": "Home-cooked meal", "model": "item.mealPot", "hold": "both", "serving": "mealPlate", "emptyAs": "potDirty", "radius": 0.16 }`.
 `label` names it ("Eat Home-cooked meal"); `model` is its asset key; `hold` is `hand` or
 `both`; taking a serving gives a `serving` (a plate) and an empty dish becomes `emptyAs`;
-`dirty` things are washed up; `radius` is the disc it takes on a surface. Ingredients and bowls
+`dirty` things are washed up, and two or more carried at once (an armful of one kind: plates with plates,
+a pot on its own) are shown as their `stackAs` item if they have one (dirty plates as a stack); `radius` is the disc it takes on a surface. Ingredients and bowls
 are only carried (they're used up). Items aren't objects: they belong to a household, keep
 their place on the surface they stand on (moving the table carries them, selling it throws
 them away) and are saved with the game.
@@ -869,6 +870,7 @@ dining table this near on their storey, one with a chair pulled up to it or seat
 one first for an outdoor recipe, and serves it there; with none, it's served within `serveRange`),
 `serveMinutes` 1, `serveAnim` (`serve`) and `serveLabel` ("Serve it": putting it down on the table), `eatLabel`, `eatTags` (`food`), `eatAnim` (`eat`),
 `dishesLabel`, `dishesTags` (`chores`, `cleaning`), `dishesAnim` (`wash`), `dishesInterest` 0.6,
+`pickUpMinutes` 0.75 (picking an armful up off the table, bent over it with `serveAnim`),
 `scrapeMinutes` 1 (per thing with food on it) and `scrapeAnim` (`clean`), `putAwayMinutes` 2 (per
 armful), `putAwayAnim` (`fetch`) and `putAwayAt` (stations: the nearest, on a tie the first listed; `prep`; the
 base game has `cupboard`, `prep`).

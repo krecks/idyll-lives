@@ -175,6 +175,9 @@ export const STEP_IN: Record<string, StepIn> = {
   busStop: { by: [[0, [], { to: 0.05 }]], lanes: [-0.95] },
   // At the feeder's post, at its back left, clear of the bird bath: its house filled from a scoop (clips/reach.ts).
   'kind.songbirdFeeder:garden': { by: bySize(FEEDER), lanes: [-0.2] },
+  // Up to the pedal bin (its lid lifting), the dish held over it and tapped to scrape the food off (clips/work.ts),
+  // not from a tile back with the arms spread.
+  'trashCan:clean': { by: [[0, ['scrape'], { to: 0.3 }]] },
   // At the microwave on the counter's right, the hands at its door.
   microwave: { by: [[0, [], { to: 0.55 }]], lanes: [-0.2] },
   // At the mic stand, singing into it.
@@ -339,6 +342,10 @@ export const CROUCH_ONLY: readonly string[] = ['crouch'];
 export const NEAR_DESKS = new Set(['gloomy.journalDesk', 'neat.organizerDesk', 'romantic.letterBureau', 'hotHeaded.grudgeJournal']);
 /** Ovens under a hob, near the floor: baking (`bake`) bends down to them. */
 export const LOW_OVENS = new Set(['stoveElectric', 'stoveGas', 'rangeCooker', 'chefStove', 'kind.neighbourlyOven']);
+/** Down to a dishwasher's rack and up again, a thing put in or taken out each time (`wash`, `clean`). */
+const DISHWASHER_RACK = ['pickUp', 'interact', 'pickUp', 'idle'];
+/** Dishwashers: loaded and emptied bent down to the lower rack their open door slides out, not at the worktop. */
+export const DISHWASHERS = new Set(['dishwasher', 'dishwasherCompact']);
 /** Seated objects whose activity uses the hands on a desk / keys. */
 export const SIT_HANDS = new Set(['computerDesk', 'piano']);
 /** Standing object use: clip sequence (looped). */
@@ -390,8 +397,11 @@ export interface ActionAnim {
   hands?: number | ((def: string) => number);
   /** Seated, the upper layer between the now-and-then `eat` or `drink` (the cup held: `holdCup`); none, the hands in the lap. */
   between?: string;
-  /** What is in the hand (`HandProp`), or a function of the object def, what they eat (content item id, '' for none) and whether they sit. */
-  prop?: HandProp | ((def: string, plate: string, seated: boolean) => HandProp | null);
+  /**
+   * What is in the hand (`HandProp`), or a function of the object def, what they eat (content item id, '' for none),
+   * whether they sit and whether they carry what they eat (not on the table before them).
+   */
+  prop?: HandProp | ((def: string, plate: string, seated: boolean, carried: boolean) => HandProp | null);
 }
 /**
  * A prop in the hand (G-70), drawn by `residents.ts` `writeHand` while the use goes on: a `tool.*` model
@@ -448,6 +458,10 @@ export const PROPS = {
   fork: { key: 'tool.fork', grip: 'bite', at: [0, 0.004, 0], clips: ['eatFork'] },
   spoon: { key: 'tool.spoon', grip: 'bite', at: [0, 0.004, 0], clips: ['eatFork'] },
   chopsticks: { key: 'tool.chopsticks', grip: 'bite', at: [0, 0.004, -0.02], clips: ['eatFork'] },
+  // (The ice cream cart's flat wooden spoon; the cup has none of its own.)
+  paddle: { key: 'tool.paddle', grip: 'bite', at: [0, 0.004, 0], clips: ['eatFork'] },
+  // A drink served at the table as a plate is (`SIPPED`): the glass itself to the lips, as a cup is.
+  smoothie: { key: 'item.smoothie', grip: 'level', at: [-0.04, -0.06, 0.01], sip: true },
   coin: { key: 'tool.coin', grip: 'hand', at: [-0.01, -0.02, 0.0], turn: [0, 0, 90], clips: ['toss'], during: [[0, TOSS_LET_GO]] },
   jarCoin: { key: 'tool.coin', grip: 'hand', at: [-0.01, -0.02, 0.0], turn: [0, 0, 90], clips: ['interact'], during: [[0, 0.45]] },
   seed: { key: 'tool.seedBag', grip: 'level', hand: 'l', at: [0, 0.01, 0], feeds: true },
@@ -466,6 +480,22 @@ export const PROPS = {
   marker: { key: 'tool.marker', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
   babyBottle: { key: 'tool.babyBottle', grip: 'aim', reach: 0.171 },
   basketball: { key: 'tool.basketball', grip: 'ball', clips: [...SHOT, ...STREET_SHOT].map(({ clip }) => clip) },
+  // Cooking (2026-11-03): the step's tool in the right hand at the station (the board, the pot, the grill, the bowl).
+  knife: { key: 'tool.knife', grip: 'hand', at: [0, 0, 0], turn: [134, -46, 9] },
+  woodenSpoon: { key: 'tool.woodenSpoon', grip: 'hand', at: [0, 0, 0], turn: [-175, 28, 118] },
+  spatula: { key: 'tool.spatula', grip: 'hand', at: [0, 0, 0], turn: [87, 45, 69] },
+  whisk: { key: 'tool.whisk', grip: 'hand', at: [0, 0, 0], turn: [178, 28, 118] },
+  // Bites of what is eaten by hand at the table (`BITES`), from the hand to the mouth as the fork is.
+  biteSandwich: { key: 'tool.biteSandwich', grip: 'bite', at: [0, 0.004, 0.04], clips: ['eatFork'] },
+  biteToast: { key: 'tool.biteToast', grip: 'bite', at: [0, 0.004, 0.04], clips: ['eatFork'] },
+  bitePizza: { key: 'tool.bitePizza', grip: 'bite', at: [0, 0.004, 0.04], clips: ['eatFork'] },
+  biteCookie: { key: 'tool.biteCookie', grip: 'bite', at: [0, 0.004, 0.04], clips: ['eatFork'] },
+  biteBurger: { key: 'tool.biteBurger', grip: 'bite', at: [0, 0.004, 0.04], clips: ['eatFork'] },
+  biteHotDog: { key: 'tool.biteHotDog', grip: 'bite', at: [0, 0.004, 0.04], clips: ['eatFork'] },
+  biteCracker: { key: 'tool.biteCracker', grip: 'bite', at: [0, 0.004, 0.04], clips: ['eatFork'] },
+  biteCroissant: { key: 'tool.biteCroissant', grip: 'bite', at: [0, 0.004, 0.04], clips: ['eatFork'] },
+  biteCrisps: { key: 'tool.biteCrisps', grip: 'bite', at: [0, 0.004, 0.04], clips: ['eatFork'] },
+  biteApple: { key: 'item.apple', grip: 'bite', at: [0, 0.004, 0.04], clips: ['eatFork'] },
 } as const satisfies Record<string, HandProp>;
 /**
  * Items a use holds (content `holds`, the snapshot's `held` and `plate`) that are drawn as the prop in the hand
@@ -505,12 +535,52 @@ const EATEN_WITH: Record<string, HandProp> = {
   pieSlice: PROPS.fork,
   cakeSlice: PROPS.fork,
   freshPlate: PROPS.fork,
+  bbqPlate: PROPS.fork,
+  tastingPlate: PROPS.fork,
   iceCream: PROPS.spoon,
+  iceCreamCone: PROPS.paddle,
   noodles: PROPS.chopsticks,
 };
-/** Whether `plate` (content `items` id) is eaten with cutlery (`EATEN_WITH`): then the bite is `eatFork`, the hand a fork's length off the mouth. */
-export function withCutlery(plate: string): boolean {
-  return plate in EATEN_WITH;
+/**
+ * What is eaten by hand at the table (content `items`), a bite of it in the right hand (`biteOf`): the rest of it stays
+ * on the plate, as what is eaten with a fork does.
+ */
+const BITES: Record<string, HandProp> = {
+  sandwich: PROPS.biteSandwich,
+  shopSandwich: PROPS.biteSandwich,
+  toast: PROPS.biteToast,
+  pizzaSlice: PROPS.bitePizza,
+  treatPlate: PROPS.biteCookie,
+  snack: PROPS.biteCookie,
+  takeout: PROPS.biteBurger,
+  cheeseBoard: PROPS.biteCracker,
+  hotDog: PROPS.biteHotDog,
+  fruit: PROPS.biteApple,
+  pastry: PROPS.biteCroissant,
+  crisps: PROPS.biteCrisps,
+};
+/**
+ * Drinks served at the table as a plate is (content `items`, eaten): the glass in the right hand, sipped from (`drink`,
+ * held between sips: `holdCup`). The one on the table stays, as the plate does under a bite.
+ */
+const SIPPED: Record<string, HandProp> = { smoothie: PROPS.smoothie };
+/** What is itself the food, not a plate of it (`BITES`, `SIPPED`): carried, it goes to the mouth as it is, with nothing in the other hand. */
+const WHOLE = new Set(['hotDog', 'fruit', 'pastry', 'crisps', 'smoothie']);
+/**
+ * What is in the right hand for a bite of `plate` (content `items` id), `carried` in the hand or on the table: its
+ * cutlery (`EATEN_WITH`), else a bite of it (`BITES`; not of a thing `WHOLE` carried); then the bite is `eatFork`, the
+ * hand a fork's length off the mouth, and a plate carried is on the left palm.
+ */
+export function biteOf(plate: string, carried: boolean): HandProp | null {
+  return EATEN_WITH[plate] ?? (carried && WHOLE.has(plate) ? null : (BITES[plate] ?? SIPPED[plate] ?? null));
+}
+/**
+ * The clip a bite of `plate` plays in place of `eat` (`carried` as for `biteOf`): `drink` for a drink in the hand
+ * (`SIPPED`), `eatFork` for the fork or a bite, else `eat` (the hand, or what it holds, to the mouth).
+ */
+export function eatClip(plate: string, carried: boolean): 'eat' | 'eatFork' | 'drink' {
+  const p = biteOf(plate, carried);
+  return !p ? 'eat' : p.sip ? 'drink' : 'eatFork';
 }
 /** The cup for a drink at `def` (`ACTIONS.drink`; none at the drinking fountain; the shaker where a cocktail is mixed). */
 export function drinkProp(def: string): HandProp | null {
@@ -533,8 +603,10 @@ export const FLOOR_TOYS = new Set(['toyBox', 'toyChest']);
 /** Wall cupboards (each with its putting away, `CUPBOARD_OF`): things put away up in them (no squat to the floor). */
 export const WALL_CUPBOARDS = new Set(Object.keys(CUPBOARD_OF));
 export const ACTIONS: Record<string, ActionAnim> = {
-  // (Seated at the table with a fork, a spoon or chopsticks, for what wants them: `EATEN_WITH`.)
-  eat: { stand: ['eat', 'idle'], upper: 'eat', hands: HANDS.hold, prop: (_, plate, seated) => (seated ? (EATEN_WITH[plate] ?? null) : null) },
+  // (With a fork, a spoon or chopsticks, for what wants them, or a bite of what is eaten by hand (`biteOf`), seated at the
+  // table or standing with the plate on the left palm: the bite is `eatFork` (`eatClip`), the plate held in front between
+  // bites standing (`holdPlate`); a drink served as a plate sipped from its glass.)
+  eat: { stand: ['eat', 'idle'], upper: 'eat', hands: HANDS.hold, prop: (_, plate, _seated, carried) => biteOf(plate, carried) },
   // Sips from a cup, spaced out (`drinkProp`); a cocktail shaken (`SHAKERS`).
   drink: {
     stand: (def) => (SHAKERS.has(def) ? ['shake'] : drinkProp(def) ? ['drink', 'holdCup', 'holdCup'] : ['drink', 'idle', 'idle']),
@@ -550,7 +622,12 @@ export const ACTIONS: Record<string, ActionAnim> = {
     hands: HANDS.hold,
   },
   // (Seated at the dressing table, getting ready: brushing the hair in the mirror, clips/self.ts.)
-  wash: { stand: ['spell', 'interact'], upper: (def) => (def === 'dressingTable' ? 'brushHair' : ''), hands: (def) => (def === 'dressingTable' ? HANDS.grip : HANDS.relaxed) },
+  // (Clearing away into a dishwasher: down to its rack with the dirty thing, `DISHWASHERS`.)
+  wash: {
+    stand: (def) => (DISHWASHERS.has(def) ? DISHWASHER_RACK : ['spell', 'interact']),
+    upper: (def) => (def === 'dressingTable' ? 'brushHair' : ''),
+    hands: (def) => (def === 'dressingTable' ? HANDS.grip : DISHWASHERS.has(def) ? HANDS.hold : HANDS.relaxed),
+  },
   // Washing the hair, turning round, soaping, rinsing (clips/uses.ts; a child turns only the chest).
   shower: { stand: (_, height) => (height < SHOWER_CHILD ? SHOWER_SMALL : SHOWER_ONLY), hands: HANDS.open },
   bath: { hands: HANDS.open },
@@ -618,7 +695,8 @@ export const ACTIONS: Record<string, ActionAnim> = {
   // At the mic stand (`STEP_IN`), the hands free.
   sing: { stand: ['talk'], hands: HANDS.relaxed },
   clean: {
-    stand: (def) => (def.includes('Mop') || def.includes('Vacuum') ? ['push'] : def.includes('laundry') ? ['spell', 'interact', 'pickUp'] : ['interact', 'spell']),
+    stand: (def) =>
+      def.includes('Mop') || def.includes('Vacuum') ? ['push'] : def.includes('laundry') ? ['spell', 'interact', 'pickUp'] : DISHWASHERS.has(def) ? DISHWASHER_RACK : ['interact', 'spell'],
     hands: HANDS.hold,
   },
   // Gardening, by task (older content and packs: `garden`).
@@ -694,12 +772,14 @@ export const ACTIONS: Record<string, ActionAnim> = {
   // Cooking, step by step (content `recipes`): ingredients from the fridge, chopping on the board,
   // stirring the pan, turning things on the grill, putting a dish down.
   fetch: { stand: (def) => (WALL_CUPBOARDS.has(def) ? ['interact', 'idle'] : ['interact', 'pickUp', 'idle']), hands: HANDS.hold },
-  chop: { stand: ['chop', 'interact', 'chop'], hands: HANDS.grip },
-  stir: { stand: ['stir', 'interact', 'stir'], hands: HANDS.hold },
-  flip: { stand: ['flip', 'interact', 'flip'], hands: HANDS.grip },
-  serve: { stand: ['pickUp', 'idle'], hands: HANDS.hold },
+  // (A knife on the board, a wooden spoon in the pot, a turner at the grill, a whisk in the bowl: `PROPS`.)
+  chop: { stand: ['chop', 'interact', 'chop'], hands: HANDS.grip, prop: PROPS.knife },
+  stir: { stand: ['stir', 'interact', 'stir'], hands: HANDS.grip, prop: PROPS.woodenSpoon },
+  flip: { stand: ['flip', 'interact', 'flip'], hands: HANDS.grip, prop: PROPS.spatula },
+  // The dish set down on the table: bent over it, held at the top's height until it's let go (not a squat to the floor).
+  serve: { stand: ['setDown'], hands: HANDS.hold },
   // Batter stirred in a mixing bowl, pastry made (the bowl is drawn on the counter).
-  mix: { stand: ['stir', 'interact', 'stir'], hands: HANDS.hold },
+  mix: { stand: ['stir', 'interact', 'stir'], hands: HANDS.grip, prop: PROPS.whisk },
   // A dish put in the oven or the microwave, then watched, bending to look in now and then: down to
   // a cooker's oven, at chest height to an oven tower's, a pizza oven's mouth or a microwave.
   bake: { stand: (def) => (LOW_OVENS.has(def) ? ['pickUp', 'idle', 'foldArms', 'idle'] : ['interact', 'idle', 'foldArms', 'idle']), hands: HANDS.relaxed },
@@ -708,21 +788,57 @@ export const ACTIONS: Record<string, ActionAnim> = {
   buy: { stand: ['buy', 'idle'], hands: HANDS.hold },
   sell: { stand: ['sell', 'idle'], hands: HANDS.hold },
 };
-/** The prop drawn on a station's top while a Sim works there (by action tag; `tool.*` models). Nothing for a bake: the dish is in the oven. */
-export const STATION_PROPS: Record<string, string> = { chop: 'tool.board', stir: 'tool.pan', flip: 'tool.grillFood', mix: 'tool.mixingBowl' };
+/**
+ * The prop drawn on a station's top while a Sim works there (by action tag; held.py models). Nothing for a bake: the
+ * dish is in the oven. Stirred in the stew pot they then carry away (`item.mealPot`), not a frying pan.
+ */
+export const STATION_PROPS: Record<string, string> = { chop: 'tool.board', stir: 'item.mealPot', flip: 'tool.grillFood', mix: 'tool.mixingBowl' };
+/** A place on a station, in its own frame: m to its right and forward of its middle, and the height it stands at. */
+export type StationSpot = readonly [x: number, z: number, y: number];
+/** A station's place for a step: one, or one for each half of a station two cook at side by side (left, right). */
+type StationSpots = StationSpot | readonly [left: StationSpot, right: StationSpot];
+/**
+ * The place in `table` on `def` for a step `tag`, for a cook standing `side` m to the station's right of its middle
+ * (`StationSpots`: the half they're on); undefined: none listed, null: done inside it.
+ */
+export function spotOn(table: Record<string, Partial<Record<string, StationSpots | null>>>, def: string, tag: string, side: number): StationSpot | null | undefined {
+  const s = table[def]?.[tag];
+  if (s == null) return s;
+  return typeof s[0] === 'number' ? (s as StationSpot) : (s as readonly [StationSpot, StationSpot])[side < 0 ? 0 : 1];
+}
 /**
  * Where on a station its prop goes, by object def and action tag (else the top's middle, a little towards the
- * cook): m to its right and forward of its middle (its own frame), and the height it stands at. The pan on the
- * burner the cooker's clip lights (its flame or hot ring); the grill station's chopping on its free counter, off
- * the grate.
+ * cook; the cook steps in to it, `stationReach`): the pot on the front burner the cooker's clip lights (its flame or
+ * hot ring), at its grate's or glass's height;
+ * the board, the bowl and the food on the grill clear of what the model has on its top. `null`: done inside it, not
+ * drawn.
  */
-export const STATION_SPOTS: Record<string, Partial<Record<string, readonly [x: number, z: number, y: number]>>> = {
-  stoveGas: { stir: [-0.26, 0.02, 0.9] },
-  // (No ring lights on it: the front one on the side of the knob that turns.)
-  stoveElectric: { stir: [-0.16, -0.02, 0.9] },
-  rangeCooker: { stir: [0, 0.03, 0.915] },
-  cooktopCounter: { stir: [0.16, -0.22, 0.955] },
-  grillStation: { chop: [0.6, -0.05, 0.905] },
+export const STATION_SPOTS: Record<string, Partial<Record<string, StationSpots | null>>> = {
+  stoveGas: { stir: [-0.26, 0.014, 0.891] },
+  // (The front ring on the side of the knob that turns, glowing red while it's on.)
+  stoveElectric: { stir: [-0.16, -0.02, 0.893] },
+  rangeCooker: { stir: [0, 0.03, 0.911] },
+  cooktopCounter: { stir: [0.16, 0.01, 0.954] },
+  chefStove: { stir: [0, 0, 0.963] },
+  // (The left ring, which glows; the board and the bowl at the free end of the top on the cook's half, two cooking.)
+  'foodie.chefsIsland': {
+    stir: [-0.145, 0.27, 0.908],
+    chop: [
+      [-0.7, 0.32, 0.9],
+      [0.7, 0.32, 0.9],
+    ],
+    mix: [
+      [-0.7, 0.3, 0.9],
+      [0.7, 0.3, 0.9],
+    ],
+  },
+  // (On the floured end of the worktop by the range.)
+  'kind.neighbourlyOven': { chop: [0.105, 0, 0.905], mix: [0.13, -0.01, 0.905] },
+  breakfastCounter: { chop: [0.28, 0.05, 0.95], mix: [0.28, 0.05, 0.95] },
+  // (On its grate: it has no top of its own, `surface`, so these give the height.)
+  grill: { flip: [0, 0.06, 0.769], chop: [0, 0.06, 0.769] },
+  // (Chopping on its free right counter, off the grate.)
+  grillStation: { chop: [0.65, 0, 0.9], flip: [0, -0.12, 0.914] },
 };
 /**
  * Station steps worked with the hands free (by action tag): what the cook carried in (the ingredients, the prepped
@@ -730,6 +846,34 @@ export const STATION_SPOTS: Record<string, Partial<Record<string, readonly [x: n
  * again to move on; for a bake it's in the oven, not drawn.
  */
 export const SET_DOWN: Record<string, 'top' | 'in'> = { chop: 'top', mix: 'top', stir: 'top', flip: 'top', bake: 'in' };
+/**
+ * Where on a station what the cook carried in is put down, by object def and action tag (else beside its tool,
+ * `SET_DOWN_SIDE`): on a cool, free part of its top, clear of the lit burner, the grate and what the model has on it
+ * (an unlit burner's grate or a cold ring on a hob; the grill station's free counter, the kettle grill's side tray).
+ */
+export const SET_DOWN_SPOTS: Record<string, Partial<Record<string, StationSpots>>> = {
+  stoveGas: { stir: [0.26, -0.22, 0.891] },
+  stoveElectric: { stir: [0.15, -0.165, 0.89] },
+  rangeCooker: { stir: [0.55, 0.03, 0.911] },
+  cooktopCounter: { stir: [-0.16, -0.19, 0.954] },
+  chefStove: { stir: [0.5, 0.03, 0.963] },
+  // (Between the hob and the board on the cook's half.)
+  'foodie.chefsIsland': {
+    stir: [-0.7, 0.29, 0.9],
+    chop: [
+      [-0.41, 0.32, 0.9],
+      [0.41, 0.32, 0.9],
+    ],
+    mix: [
+      [-0.41, 0.32, 0.9],
+      [0.41, 0.32, 0.9],
+    ],
+  },
+  'kind.neighbourlyOven': { chop: [0.13, -0.31, 0.905], mix: [0.13, -0.31, 0.905] },
+  breakfastCounter: { chop: [-0.03, 0.06, 0.95], mix: [-0.03, 0.06, 0.95] },
+  grill: { flip: [0.333, 0.333, 0.7], chop: [0.333, 0.333, 0.7] },
+  grillStation: { chop: [0.65, -0.3, 0.9], flip: [0.65, -0.12, 0.9] },
+};
 /** How far (m) to the side of the station's tool a thing put down beside it stands. */
 export const SET_DOWN_SIDE = 0.3;
 /** How far (m, body scale) below the palms' centres a carried thing's base rests. */

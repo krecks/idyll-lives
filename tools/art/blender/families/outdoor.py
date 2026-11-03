@@ -64,9 +64,7 @@ M = G.Palette(
     coal_hot=('#D9542B', 'gloss', {'glow': '#FF7A2E'}),     # the kettle's coals, aglow at night (not through its lid)
     flame=('#FF9A3C', 'gloss', {'glow': '#FFB050'}),        # the fire pit's flames, grown while warmed by
     flame_core=('#FFD27A', 'gloss', {'glow': '#FFE0A0'}),
-    burger=('#6B3A26', 'satin'),         # food on the grates
-    sausage=('#8E3F2E', 'satin'),
-    corn=('#E8C24A', 'satin'),
+    burger=('#6B3A26', 'satin'),         # the grill station's patties waiting on their tray
     cart=('#C3C7CB', 'metal'),           # the grill station's stainless cart (Cart)
     hood=('#C3C7CB', 'metal'),           # its hood (Hood)
     worktop=('#3A3D41', 'satin'),        # its dark counter
@@ -1175,13 +1173,8 @@ def _burger(name, x, y, z, r, material):
               at=F.at(x, y, z), material=material, segments=10)
 
 
-def _sausage(name, a, b, r, material):
-    """A sausage from game point a to b, rounded at both ends, a little bent."""
-    mid = tuple((p + q) / 2 + (0.006 if i == 2 else 0.0) for i, (p, q) in enumerate(zip(a, b)))
-    F.sweep(name, [a, mid, b], r, material, verts=6, resolution=3, scale=lambda t: max(0.35, min(1.0, 4 * t, 4 * (1 - t))))
-
-
 KETTLE_R, KETTLE_RIM = 0.3, 0.79     # the charcoal grill's bowl: its radius and its rim's height
+TRAY, TRAY_R, TRAY_TOP = (0.333, 0.333), 0.165, 0.7   # its side tray: middle (game x, depth), radius, top
 UP = KETTLE_RIM - 0.99               # its parts' heights, drawn for a rim at 0.99 m, moved down to it
 
 
@@ -1190,8 +1183,8 @@ def _h(y):
 
 
 # The charcoal grill: a kettle on three legs, wheels on the back two, an ash catcher under the bowl; inside, a bed of
-# red coals (aglow at night) and a grate with burgers and sausages, at a 57 cm kettle's working height. The lid is
-# hinged at the back of the rim and swings up (`lid_open`) for the whole of a cook.
+# red coals (aglow at night) under an empty grate, at a 57 cm kettle's working height; a round side tray hooked on at
+# the front right. The lid is hinged at the back of the rim and swings up (`lid_open`) for the whole of a cook.
 def grill():
     with G.new_parts() as still:
         y0, top = _h(0.64), KETTLE_RIM
@@ -1217,10 +1210,23 @@ def grill():
             x = k * 0.05
             half = math.sqrt(max((KETTLE_R - 0.025) ** 2 - x * x, 0))
             _rod(f'grate_bar{k}', (x, _h(0.965), -half), (x, _h(0.965), half), 0.004, M.grate, verts=5)
-        for k, (x, z) in enumerate(((-0.12, 0.06), (0.02, -0.12), (0.13, 0.08))):
-            _burger(f'burger{k}', x, _h(0.97), z, 0.05, M.burger)
-        for k, (x, z) in enumerate(((-0.06, -0.09), (0.06, -0.02))):
-            _sausage(f'sausage{k}', (x - 0.07, _h(0.985), z), (x + 0.07, _h(0.985), z + 0.02), 0.016, M.sausage)
+        # (no food on the grate at rest: the cook's own is drawn on it while they grill, `STATION_SPOTS`; the
+        # burgers and sausages modelled here showed twice over it)
+        # the side tray, hooked onto the bowl at its front right on two struts, where the cook sets down what they
+        # carried out (`SET_DOWN_SPOTS`): a round enamel tray with a rolled rim, clear of the lid's swing
+        tx, tz = TRAY
+        G.revolve('tray', [(0.0, TRAY_TOP - 0.012), (TRAY_R - 0.012, TRAY_TOP - 0.012), (TRAY_R, TRAY_TOP - 0.006),
+                           (TRAY_R, TRAY_TOP + 0.012), (TRAY_R - 0.006, TRAY_TOP + 0.014), (TRAY_R - 0.01, TRAY_TOP + 0.004),
+                           (TRAY_R - 0.016, TRAY_TOP), (0.0, TRAY_TOP)], at=F.at(tx, 0, tz), material=M.kettle, segments=20)
+        d = math.hypot(tx, tz)
+        ux, uz = tx / d, tz / d
+        for k, a in enumerate((-24, 24)):                      # two struts in a V from the bowl's wall up under the tray
+            c, s_ = G.cosd(a), G.sind(a)
+            wx, wz = (ux * c - uz * s_) * 0.29, (uz * c + ux * s_) * 0.29
+            _rod(f'tray_strut{k}', (wx, _h(0.83), wz), (tx - ux * 0.05 + (wx - ux * 0.29) * 0.6, TRAY_TOP - 0.014,
+                                                        tz - uz * 0.05 + (wz - uz * 0.29) * 0.6), 0.006, M.grate, verts=6)
+        F.box('tray_clip', 0.05, 0.03, 0.012, (ux * 0.302, _h(0.93), uz * 0.302), M.grate, rot=(0, 0, -45), bevel=0.003,
+              bevel_segments=1)
         # the legs into sockets under the bowl, a wire rack between them, the ash pan, the wheels on their axle
         feet = []
         for k, a in enumerate((90, 210, 330)):
@@ -1264,9 +1270,9 @@ def grill():
 
 
 # The gas grill station: a stainless cart on a plinth, two doors with bar handles and a control panel's knobs below a
-# dark counter (its top at 0.9, the content's `surface`, which stands things on the right); a chopping board with a
-# tray of food on the left, a bottle and a pepper mill at the back right. The grill in the middle (food on its
-# grate) has a barrel hood hinged at the back that swings up (`hood_up`) for cook and feast.
+# dark counter (its top at 0.9, the content's `surface`: the free right counter); a chopping board with a tray of
+# patties, a bottle and a pepper mill on the left. The grill in the middle has a barrel hood hinged at the back that
+# swings up (`hood_up`) for cook and feast, and for any recipe's grilling step there (`flip`).
 HOOD = (-0.39, 0.11, 0.905, 1.0)      # the hood's back and front depth, its bottom and where its barrel starts
 
 
@@ -1296,20 +1302,17 @@ def grillStation():
             _rod(f'grate_bar{k}', (k * 0.05, 0.909, -0.36), (k * 0.05, 0.909, 0.08), 0.005, M.grate, verts=5)
         for z in (-0.36, 0.08):
             _rod(f'grate_frame{z}', (-0.42, 0.909, z), (0.42, 0.909, z), 0.006, M.grate, verts=5)
-        for k, (x, z) in enumerate(((-0.25, -0.05), (-0.1, -0.2), (0.06, -0.06))):
-            _burger(f'burger{k}', x, 0.913, z, 0.05, M.burger)
-        for k, z in enumerate((-0.25, -0.18)):
-            _sausage(f'sausage{k}', (0.12, 0.927, z), (0.3, 0.927, z + 0.02), 0.017, M.sausage)
-        F.sweep('corn', [(0.2, 0.93, 0.0), (0.36, 0.93, -0.04)], 0.024, M.corn, verts=8, resolution=1,
-                scale=[1.0, 0.75])
-        # on the counter: a board, a tray of patties, a bottle and a pepper mill
+        # (no food on the grate: the hood hides it at rest, and while it's up the cook's own is drawn on it,
+        # `STATION_SPOTS`; the burgers, sausages and corn modelled here showed twice over it)
+        # on the left counter: a board with a tray of patties, a bottle and a pepper mill behind it; the right counter
+        # is left free (the content's `surface`), where the cook chops and sets down what they carried out
         F.box('board', 0.34, 0.02, 0.36, (-0.62, 0.91, -0.12), M.board, bevel=0.006, bevel_segments=1)
         F.box('tray', 0.24, 0.025, 0.16, (-0.62, 0.9325, -0.12), M.tray, bevel=0.008, bevel_segments=1)
         for k, x in enumerate((-0.68, -0.6)):
             _burger(f'patty{k}', x, 0.945, -0.12, 0.035, M.burger)
-        _bottle('bottle', 0.72, 0.9, -0.33, 0.035, 0.24, M.bottle, cap=M.handle_steel, verts=10)
+        _bottle('bottle', -0.74, 0.9, -0.385, 0.035, 0.24, M.bottle, cap=M.handle_steel, verts=10)
         G.revolve('pepper_mill', [(0.0, 0.0), (0.022, 0.0), (0.024, 0.02), (0.016, 0.06), (0.02, 0.1), (0.022, 0.12),
-                                  (0.012, 0.14), (0.004, 0.15), (0.0, 0.15)], at=F.at(0.62, 0.9, -0.36), material=M.board,
+                                  (0.012, 0.14), (0.004, 0.15), (0.0, 0.15)], at=F.at(-0.54, 0.9, -0.395), material=M.board,
                   segments=10)
     G.join(still, 'cart', origin=(0, 0, 0))
     with G.new_parts() as parts:
@@ -1456,10 +1459,13 @@ FAMILY = G.Family(
              motions={'uses': {'soak': 'cover_off'}, 'open': 'cover_off', 'loops': {'soak': 'bubbles'}},
              paint=[('cedar', 'Cedar'), ('tub_cover', 'Cover')]),
      # OU3: the grills and the fire pit
-     G.Model('grill', grill, size=(0.642, 1.042, 0.634), centre=(0, 0.013), key='model.grill', motions={'uses': {'cook': 'lid_open'}},
+     # the lid up for a cook, and for any recipe's grilling step at it (the `flip` tag: one started at the fridge)
+     G.Model('grill', grill, size=(0.818, 1.044, 0.804), centre=(0.089, 0.096), key='model.grill',
+             motions={'uses': {'cook': 'lid_open', 'flip': 'lid_open'}},
              paint=[('kettle', 'Body'), ('kettle_lid', 'Lid')]),
      G.Model('grillStation', grillStation, size=(1.66, 1.199, 0.66), centre=(0, -0.125), key='model.grillStation',
-             motions={'uses': {'cook': 'hood_up', 'feast': 'hood_up'}}, paint=[('cart', 'Cart'), ('hood', 'Hood')]),
+             motions={'uses': {'cook': 'hood_up', 'feast': 'hood_up', 'flip': 'hood_up'}},
+             paint=[('cart', 'Cart'), ('hood', 'Hood')]),
      G.Model('firePit', firePit, size=(0.927, 0.619, 0.91), centre=(-0.001, -0.009), key='model.firePit', motions={'uses': {'relax': 'flames'}},
              paint=[('pit', 'Bowl'), ('pit_stones', 'Stones')])],
     comment='Blender-built outdoor things (tools/art/blender/families/outdoor.py). Listed in the base '

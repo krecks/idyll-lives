@@ -408,9 +408,6 @@
       "type": "model",
       "url": "../../models/pack_foodie/chefsIsland.glb",
       "materials": {
-        "basil": {
-          "finish": "material.finish.satin"
-        },
         "black": {
           "finish": "material.finish.gloss"
         },
@@ -418,9 +415,6 @@
           "finish": "material.finish.metal"
         },
         "cabinet": {
-          "finish": "material.finish.satin"
-        },
-        "carrot": {
           "finish": "material.finish.satin"
         },
         "chalk": {
@@ -431,9 +425,6 @@
         },
         "chrome": {
           "finish": "material.finish.chrome"
-        },
-        "copper": {
-          "finish": "material.finish.metal"
         },
         "dark": {
           "finish": "material.finish.satin"
@@ -468,10 +459,6 @@
         },
         "seat": {
           "finish": "material.finish.satin"
-        },
-        "tomato": {
-          "finish": "material.finish.gloss",
-          "roughness": 0.3
         },
         "worktop": {
           "finish": "material.finish.gloss",

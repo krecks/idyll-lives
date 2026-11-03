@@ -212,7 +212,7 @@ sinks, the desk drawer slides out and the plunge cover rolls back.
 The kind pack models (`models/pack_kind/neighbourlyOven.glb`, `givingJar.glb`, `knittingRocker.glb`,
 `welcomeTeaTable.glb`, `songbirdFeeder.glb`, `hearthSettee.glb`, override pack `packs/pack_kind/manifest.json`) are
 built in Blender by `tools/art/blender/families/pack_kind.py` on `gamekit` and exported as `.glb` (glTF, original,
-CC0). Each moves while it is used: the oven door drops, a coin drops into the jar, the rocker rocks, the teapot pours,
+CC0). Each moves while it is used: the oven door drops with the tea towel over its handle, a coin drops into the jar, the rocker rocks, the teapot pours,
 the feeder's roof lifts and songbirds fly out, and the settee's cushions sink. The tea table was rebuilt lower and
 narrower, its poufs either side of it facing each other (2026-10-21).
 
@@ -272,7 +272,8 @@ are parts the game moves.
 
 The grills and the fire pit (`models/outdoor/grill.glb`, `grillStation.glb`, `firePit.glb`, same pack and family)
 are built the same way (glTF, original, CC0). The grill's lid and the station's hood swing up while residents cook,
-and the fire pit's flames grow on its logs while they warm up by it.
+and the fire pit's flames grow on its logs while they warm up by it. The grates are bare for the cook's own food, and
+the grill has a side tray for what they bring out (2026-11-03).
 
 The home gym (`models/fitness/treadmill.glb`, `weightBench.glb`, `exerciseBike.glb`, `yogaMat.glb`,
 `dumbbells.glb`, override pack `packs/fitness/manifest.json`) is built in Blender by
@@ -312,7 +313,8 @@ The kitchen cookers (`models/kitchen_cooking/stoveElectric.glb`, `stoveGas.glb`,
 `rangeCooker.glb`, `cooktopCounter.glb`, `microwave.glb`, override pack `packs/kitchen_cooking/manifest.json`)
 are built in Blender by `tools/art/blender/families/kitchen_cooking.py` on `gamekit` and exported as `.glb`
 (glTF, original, CC0). Each drops an oven door on its bottom hinge while a resident bakes and turns a knob
-while they cook, with a ring of blue flame growing on the gas ones; the oven tower's tray slides out, and the
+while they cook, with a ring of blue flame growing on the gas ones (the knob by the burner or ring that lights,
+and the gas range's hob left free for the cook's pan and bowl, 2026-11-03); the oven tower's tray slides out, and the
 microwave swings its door and turns its turntable.
 
 The kitchen small appliances and dishwashers (`models/kitchen_cooking/coffeeMachine.glb`,
@@ -320,7 +322,7 @@ The kitchen small appliances and dishwashers (`models/kitchen_cooking/coffeeMach
 `tools/art/blender/families/kitchen_cooking.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
 The coffee machine slides its cup under the spout and runs a coffee stream; the breakfast counter's toaster
 lever slides and its toast pops, and its blender lid lifts over a swirling smoothie; the dishwashers drop their door and slide a rack
-out. The dishwashers were rebuilt 60 and 45 cm wide beside a cupboard or a drawer stack (2026-10-21).
+out, loaded or emptied. The dishwashers were rebuilt 60 and 45 cm wide beside a cupboard or a drawer stack (2026-10-21).
 
 The kitchen base counters (`models/kitchen_counters/counter.glb`, `counterCorner.glb`, `counterEnd.glb`,
 `counterCornerOuter.glb`, `counterDrawers.glb`, `counterOpenShelf.glb`, `butcherBlock.glb`,
@@ -405,7 +407,9 @@ tableware `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasse
 `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks`; override pack
 `packs/tabletop/manifest.json`) are built in Blender by `tools/art/blender/families/tabletop.py` on `gamekit` and
 exported as `.glb` (glTF, original, CC0). The alarm clock's hands tell the game's time and the
-candles' flames rise at night; the rest are static.
+candles' flames rise at night; the kettle's lid, the bread bin's roll-top and the laptop's lid open while they're used,
+and the toaster's toast goes down, the blender's jug shakes, the stand mixer's beater turns and the espresso machine
+runs coffee into its cup (2026-11-03); the rest are static.
 
 The playground (`models/playground/slide.glb`, `climbingFrame.glb`, `seesaw.glb`, `springRider.glb`,
 `merryGoRound.glb`, `basketballHoop.glb`, `pingPongTable.glb`, `parkChessTable.glb`, each with a `.far.glb` for the
@@ -475,12 +479,14 @@ cassette door tips open, and the electric fire's flames grow while a resident wa
 
 The things residents carry and cook with (`models/held/*.glb`: the bag of shopping, the prep bowl, the stew pot and
 the dirty pot, the tasting board, the grill platter and the dirty platter, the pizza, the baking tray and the dirty
-tray, the pie and the dirty pie dish, the plates of stew, pizza, treats, pie, cake, a sandwich and toast, the dirty plate, the
-dirty tasting board and pizza board, the bowl of ice cream and the dirty bowl, the smoothie, the noodle pail and the
+tray, the pie and the dirty pie dish, the plates of stew, barbecue, a tasting menu, pizza, treats, pie, cake, salad, a sandwich and toast, the dirty plate
+and a stack of three, the dirty tasting board and pizza board, the bowl of ice cream and the dirty bowl, the smoothie, the noodle pail and the
 takeaway box, the food bought in town (a paper cup of ice cream, a hot dog on its paper boat, a packet of crisps, an
 apple, a pastry in a paper bag), the parcel a thing bought comes in, the chopping board, the
-pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks, and what residents hold
-while they use a thing (a book, a mug, a tumbler, a wine glass, a can, a fork, a spoon, chopsticks, a phone, a coin,
+pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks, the cook's knife, wooden
+spoon, turner and whisk, the bites of what is eaten by hand (half a sandwich, half a slice of toast, a slice of pizza, a
+cookie, a burger, a hot dog, a cracker with cheese, a croissant, a few crisps), and what residents hold
+while they use a thing (a book, a mug, a tumbler, a wine glass, a can, a fork, a spoon, chopsticks, the ice cream cart's wooden spoon, a phone, a coin,
 a bag of bird seed, a dart, a pool cue, a ping-pong bat, a cocktail shaker, a watering can, secateurs, a paintbrush,
 chalk, a baby's bottle, a postcard, a basketball, a pen, a pencil, a whiteboard marker and the phone box's receiver);
 override pack

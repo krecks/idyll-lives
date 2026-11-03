@@ -25,22 +25,34 @@ fn countryside(w: &World, object: u32) -> Option<&str> {
 
 #[test]
 fn residents_use_the_countryside_spots() {
-    let mut w = world(41);
-    let mut used = std::collections::BTreeSet::new();
-    let end = w.tick + 3 * 24 * 60 * TICKS_PER_MINUTE;
-    while w.tick < end {
-        w.tick_once();
-        for s in &w.sims {
-            if let Some(a) = s.current()
-                && let (TaskKind::Use { object, .. }, Phase::Using { .. }) = (a.task.kind, &a.phase)
-                && let Some(id) = countryside(&w, object)
-            {
-                used.insert(id.to_string());
+    // Over three days in each of four towns: the residents of every one go out to the countryside,
+    // and between them to at least three different spots. (One town alone is a coin toss: which
+    // spots its handful of residents fancy in three days turns on any change to their timing.)
+    let mut all = std::collections::BTreeSet::new();
+    for seed in 41..45 {
+        let mut w = world(seed);
+        let mut used = std::collections::BTreeSet::new();
+        let end = w.tick + 3 * 24 * 60 * TICKS_PER_MINUTE;
+        while w.tick < end {
+            w.tick_once();
+            for s in &w.sims {
+                if let Some(a) = s.current()
+                    && let (TaskKind::Use { object, .. }, Phase::Using { .. }) =
+                        (a.task.kind, &a.phase)
+                    && let Some(id) = countryside(&w, object)
+                {
+                    used.insert(id.to_string());
+                }
             }
         }
+        eprintln!("town {seed}: countryside spots used over three days: {used:?}");
+        assert!(
+            !used.is_empty(),
+            "nobody in town {seed} went out to the countryside"
+        );
+        all.extend(used);
     }
-    eprintln!("countryside spots used over three days: {used:?}");
-    assert!(used.len() >= 3, "only {used:?}");
+    assert!(all.len() >= 3, "only {all:?}");
 }
 
 #[test]

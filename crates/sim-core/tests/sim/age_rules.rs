@@ -415,16 +415,25 @@ fn a_child_has_a_snack_at_the_kids_table_and_a_grown_up_never_does() {
     let from = [3.5, 0.5];
     let (child, adult) = (1, 2);
     assert_eq!(
-        dining_seat(&w.content, &w.objects, &links, &all, from, child).map(|d| d.object),
+        dining_seat(&w.content, &w.objects, &links, &all, from, child, &[]).map(|d| d.object),
         Some(kids_chair)
     );
     assert_eq!(
-        dining_seat(&w.content, &w.objects, &links, &all, [10.5, 8.5], adult).map(|d| d.object),
+        dining_seat(
+            &w.content,
+            &w.objects,
+            &links,
+            &all,
+            [10.5, 8.5],
+            adult,
+            &[]
+        )
+        .map(|d| d.object),
         Some(chair)
     );
     let kids_only = [object(&w, "kidsTable", 0), kids_chair];
     assert!(
-        dining_seat(&w.content, &w.objects, &links, &kids_only, from, adult).is_none(),
+        dining_seat(&w.content, &w.objects, &links, &kids_only, from, adult, &[]).is_none(),
         "the kids' chair is no seat for a grown-up"
     );
 }

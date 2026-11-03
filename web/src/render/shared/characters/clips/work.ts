@@ -1,7 +1,7 @@
 /**
  * Standing work: reaching to use something, picking up from the floor, hands busy at a counter
  * (`spell`), pushing a mop or vacuum, leaning on a rail (telescope), and (phase 2) chopping,
- * stirring, flipping and carrying.
+ * stirring, turning food on the grill, carrying and putting a dish down on a table (`setDown`).
  *
  * Counters are 0.9 m high with their front edge ~0.5 m ahead of where a resident stands (the
  * centre of the tile in front): the weight goes forward over planted feet and the back leans in so
@@ -59,15 +59,21 @@ function stirPose(p: number): PoseSpec {
   return hands(body, L([-0.2, COUNTER_Y + 0.05, COUNTER_Z - 0.04], { pronate: 30, hand: wrist('l', 30, 0) }), R([0.04 + 0.07 * Math.cos(a), COUNTER_Y + 0.13, COUNTER_Z + 0.06 * Math.sin(a)], { pronate: 30, hand: wrist('r', 30, 0) }));
 }
 
-/** Flipping (phase 2): the right hand tosses the pan up with a wrist flick, catches, settles; the left waits by the stove. */
+/**
+ * Turning food on the grill (`flip`: only at a grill, its top 0.77-0.9 m) with a turner (actions.ts `PROPS.spatula`): the
+ * right hand slides the blade in under a sausage, lifts it, turns it over with a roll of the forearm and lays it down,
+ * then settles; the left rests by the grill. The hands work lower than at a counter (`COUNTER_Y` is a 0.9 m top's), so
+ * the turner's blade reaches the grate.
+ */
 function flipPose(p: number): PoseSpec {
-  const toss = bump(p, 0.35, 0.65, 0.12);
-  const flick = bump(p, 0.42, 0.56, 0.05);
-  const body = atCounter(p, 20, { head: [10 - 10 * toss, 0, 0], lean: 20 - 4 * toss, sink: 0.01 + 0.02 * bump(p, 0.25, 0.42, 0.08) });
+  const slide = bump(p, 0.12, 0.7, 0.14);
+  const lift = bump(p, 0.32, 0.62, 0.1);
+  const roll = bump(p, 0.4, 0.6, 0.08);
+  const body = atCounter(p, 26, { head: [16, -3, 0], sink: 0.02 + 0.01 * slide });
   return hands(
     body,
-    L([-0.2, COUNTER_Y + 0.03, COUNTER_Z - 0.05], { pronate: 75 }),
-    R([0.15, COUNTER_Y + 0.06 + 0.12 * toss, COUNTER_Z - 0.04 + 0.04 * toss], { pronate: 10, hand: wrist('r', 10 - 30 * flick, 0) }),
+    L([-0.2, COUNTER_Y - 0.05, COUNTER_Z - 0.06], { pronate: 75 }),
+    R([0.13 - 0.02 * slide, COUNTER_Y - 0.08 + 0.07 * lift, COUNTER_Z - 0.02 + 0.06 * slide], { pronate: 15 + 75 * roll, hand: wrist('r', 5 - 15 * lift, 0) }),
   );
 }
 
@@ -76,6 +82,32 @@ function carryPose(p: number): PoseSpec {
   const bob = 0.008 * Math.cos(p * TAU * 2);
   const body = stand({ breath: p, lean: -2, head: [6, 0, 0] });
   return hands(body, L([-0.16, 1.05 + bob, 0.27], { pole: [-0.5, -1, -0.3], pronate: -10, hand: wrist('l', 20, 0) }), R([0.16, 1.05 + bob, 0.27], { pole: [0.5, -1, -0.3], pronate: -10, hand: wrist('r', 20, 0) }));
+}
+
+/** Putting a dish down on a table (serving): bent over it, knees giving a little, the dish held in both hands
+ * just over a 0.75 m top in front, until it's let go (the sim puts it down at the end). */
+const TABLE_Y = 0.8;
+function setDownPose(p: number): PoseSpec {
+  const bob = 0.006 * Math.sin(p * TAU);
+  const body = stand({ breath: p, lean: 32, fwd: 0.06, sink: 0.05 + 0.004 * Math.sin(p * TAU), head: [14, 0, 0] });
+  return hands(
+    body,
+    L([-0.16, TABLE_Y + bob, 0.42], { pole: [-0.5, -1, -0.3], pronate: -10, hand: wrist('l', 20, 0) }),
+    R([0.16, TABLE_Y + bob, 0.42], { pole: [0.5, -1, -0.3], pronate: -10, hand: wrist('r', 20, 0) }),
+  );
+}
+
+/** Scraping a dish into a pedal bin (stepped up to it, `STEP_IN` `trashCan:clean`): bent over the open bin, the dish
+ * held over it in both hands and tipped, tapped down twice a round to knock the food off. */
+function scrapePose(p: number): PoseSpec {
+  const tap = bump(p, 0.2, 0.32, 0.06) + bump(p, 0.62, 0.74, 0.06);
+  const body = stand({ breath: p, lean: 26 + 5 * tap, fwd: 0.05, sink: 0.03, head: [18, 0, 0] });
+  const y = 0.84 - 0.05 * tap;
+  return hands(
+    body,
+    L([-0.11, y, 0.46], { pole: [-0.5, -1, -0.3], pronate: -5, hand: wrist('l', 25 + 20 * tap, 0) }),
+    R([0.11, y - 0.02, 0.46], { pole: [0.5, -1, -0.3], pronate: -5, hand: wrist('r', 25 + 20 * tap, 0) }),
+  );
 }
 
 /** Carrying something in the right hand (an upper-body layer, phase 2): forearm forward, the left arm swings at the walk's pace. */
@@ -149,5 +181,7 @@ export function workClips(): ClipDef[] {
     cycle('flip', { seconds: 2, loop: true }, flipPose),
     cycle('carry', { seconds: 1.1, loop: true }, carryPose),
     cycle('carryOne', { seconds: 1.1, loop: true }, carryOnePose),
+    cycle('setDown', { seconds: 2.4, loop: true }, setDownPose),
+    cycle('scrape', { seconds: 1.8, loop: true }, scrapePose),
   ];
 }

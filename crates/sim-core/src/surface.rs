@@ -1045,7 +1045,9 @@ pub fn spot_for_seat(
 /// The best free seat to eat at among `candidates` for someone in life stage `stage`, nearest
 /// within a rank, from `from`: a chair pulled up to a table, else a table with its seats built
 /// in, else anywhere comfortable to sit (not a toilet or a desk chair). Within a rank, a seat
-/// made for their age comes first: a child has a snack at the kids' table.
+/// made for their age comes first: a child has a snack at the kids' table, and then one whose
+/// place at the table is clear of `taken` (things standing on tops, `Items::occupancy`): a plate
+/// goes in front of them, not beside the dirty one left there.
 pub fn dining_seat(
     content: &Content,
     objects: &[ObjectInstance],
@@ -1053,6 +1055,7 @@ pub fn dining_seat(
     candidates: &[u32],
     from: [f32; 2],
     stage: usize,
+    taken: &[([f32; 2], f32)],
 ) -> Option<DiningSeat> {
     let tag = |name: &str| {
         content
@@ -1065,7 +1068,7 @@ pub fn dining_seat(
     let comfy = food | tag("lounge");
     // (Every stage but a baby's: a seat for fewer is made for them.)
     let anyone = content.life.not_baby;
-    let mut best: Option<(DiningRank, bool, f32, u32, Option<u32>)> = None;
+    let mut best: Option<(DiningRank, bool, bool, f32, u32, Option<u32>)> = None;
     for &id in candidates {
         let Some(o) = objects.get(id as usize) else {
             continue;
@@ -1087,13 +1090,23 @@ pub fn dining_seat(
             .interactions
             .iter()
             .any(|i| i.pose == Pose::Sit && i.for_stage(stage) && i.stages & anyone != anyone);
+        let slot = o.users[..def.slots as usize]
+            .iter()
+            .position(Option::is_none)
+            .unwrap_or(0);
+        let cluttered = table.is_some()
+            && plate_target(content, objects, links, id, slot).is_some_and(|(_, at)| {
+                taken
+                    .iter()
+                    .any(|(c, r)| (c[0] - at[0]).hypot(c[1] - at[1]) < r + DEFAULT_RADIUS * 0.5)
+            });
         let c = o.centre(content);
         let d = (c[0] - from[0]).hypot(c[1] - from[1]);
-        if best.is_none_or(|b| (rank, anyones, d) < (b.0, b.1, b.2)) {
-            best = Some((rank, anyones, d, id, table));
+        if best.is_none_or(|b| (rank, anyones, cluttered, d) < (b.0, b.1, b.2, b.3)) {
+            best = Some((rank, anyones, cluttered, d, id, table));
         }
     }
-    let (rank, _, _, object, table) = best?;
+    let (rank, _, _, _, object, table) = best?;
     let o = &objects[object as usize];
     let slot = o.users[..content.objects[o.def].slots as usize]
         .iter()

@@ -4166,7 +4166,7 @@
       "label": "Prepped bowl",
       "model": "item.prepBowl",
       "hold": "both",
-      "radius": 0.14
+      "radius": 0.162
     },
     {
       "id": "mealPot",
@@ -4175,23 +4175,23 @@
       "hold": "both",
       "serving": "mealPlate",
       "emptyAs": "potDirty",
-      "radius": 0.16
+      "radius": 0.195
     },
     {
       "id": "tastingBoard",
       "label": "Tasting menu",
       "model": "item.tastingBoard",
       "hold": "both",
-      "serving": "mealPlate",
+      "serving": "tastingPlate",
       "emptyAs": "boardDirty",
-      "radius": 0.2
+      "radius": 0.227
     },
     {
       "id": "grillPlatter",
       "label": "Barbecue",
       "model": "item.grillPlatter",
       "hold": "both",
-      "serving": "mealPlate",
+      "serving": "bbqPlate",
       "emptyAs": "platterDirty",
       "radius": 0.2
     },
@@ -4211,7 +4211,7 @@
       "hold": "both",
       "serving": "treatPlate",
       "emptyAs": "trayDirty",
-      "radius": 0.2
+      "radius": 0.23
     },
     {
       "id": "pieDish",
@@ -4220,7 +4220,7 @@
       "hold": "both",
       "serving": "pieSlice",
       "emptyAs": "pieDishDirty",
-      "radius": 0.16
+      "radius": 0.13
     },
     {
       "id": "mealPlate",
@@ -4228,7 +4228,7 @@
       "model": "item.mealPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "pizzaSlice",
@@ -4236,7 +4236,7 @@
       "model": "item.pizzaSlice",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "treatPlate",
@@ -4244,7 +4244,7 @@
       "model": "item.treatPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "pieSlice",
@@ -4252,7 +4252,7 @@
       "model": "item.pieSlice",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "babyBottle",
@@ -4267,7 +4267,7 @@
       "model": "item.cakeSlice",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "sandwich",
@@ -4275,7 +4275,7 @@
       "model": "item.sandwich",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "snack",
@@ -4283,7 +4283,7 @@
       "model": "item.treatPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "iceCream",
@@ -4299,7 +4299,7 @@
       "model": "item.toast",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "leftovers",
@@ -4307,7 +4307,7 @@
       "model": "item.mealPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "cheeseBoard",
@@ -4315,7 +4315,7 @@
       "model": "item.tastingBoard",
       "hold": "both",
       "emptyAs": "boardDirty",
-      "radius": 0.2
+      "radius": 0.227
     },
     {
       "id": "smoothie",
@@ -4336,7 +4336,7 @@
       "label": "Takeout",
       "model": "item.takeout",
       "hold": "hand",
-      "radius": 0.13
+      "radius": 0.146
     },
     {
       "id": "iceCreamCone",
@@ -4357,7 +4357,7 @@
       "label": "Crisps",
       "model": "item.crisps",
       "hold": "hand",
-      "radius": 0.11
+      "radius": 0.12
     },
     {
       "id": "fruit",
@@ -4378,7 +4378,7 @@
       "label": "Sandwich",
       "model": "item.sandwich",
       "hold": "hand",
-      "radius": 0.1
+      "radius": 0.144
     },
     {
       "id": "gardenProduce",
@@ -4405,10 +4405,10 @@
     {
       "id": "freshPlate",
       "label": "Something fresh from the garden",
-      "model": "item.treatPlate",
+      "model": "item.freshPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "plateDirty",
@@ -4416,7 +4416,16 @@
       "model": "item.plateDirty",
       "hold": "hand",
       "dirty": true,
-      "radius": 0.13
+      "stackAs": "plateStackDirty",
+      "radius": 0.144
+    },
+    {
+      "id": "plateStackDirty",
+      "label": "Dirty plates",
+      "model": "item.plateStackDirty",
+      "hold": "both",
+      "dirty": true,
+      "radius": 0.156
     },
     {
       "id": "potDirty",
@@ -4424,7 +4433,7 @@
       "model": "item.potDirty",
       "hold": "both",
       "dirty": true,
-      "radius": 0.16
+      "radius": 0.195
     },
     {
       "id": "platterDirty",
@@ -4440,7 +4449,7 @@
       "model": "item.trayDirty",
       "hold": "both",
       "dirty": true,
-      "radius": 0.2
+      "radius": 0.23
     },
     {
       "id": "bowlDirty",
@@ -4448,7 +4457,7 @@
       "model": "item.bowlDirty",
       "hold": "hand",
       "dirty": true,
-      "radius": 0.08
+      "radius": 0.099
     },
     {
       "id": "boardDirty",
@@ -4456,7 +4465,7 @@
       "model": "item.boardDirty",
       "hold": "both",
       "dirty": true,
-      "radius": 0.2
+      "radius": 0.227
     },
     {
       "id": "pizzaBoardDirty",
@@ -4472,7 +4481,30 @@
       "model": "item.pieDishDirty",
       "hold": "both",
       "dirty": true,
-      "radius": 0.16
+      "radius": 0.13
+    },
+    {
+      "id": "batterBowl",
+      "label": "Bowl of batter",
+      "model": "tool.mixingBowl",
+      "hold": "both",
+      "radius": 0.15
+    },
+    {
+      "id": "bbqPlate",
+      "label": "Barbecue plate",
+      "model": "item.bbqPlate",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.144
+    },
+    {
+      "id": "tastingPlate",
+      "label": "Tasting plate",
+      "model": "item.tastingPlate",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.144
     },
     {
       "id": "parcel",
@@ -4768,14 +4800,14 @@
           "holds": "ingredients"
         },
         {
-          "label": "Prep",
+          "label": "Make the dough",
           "at": [
             "prep"
           ],
           "minutes": 15,
-          "anim": "chop",
+          "anim": "mix",
           "optional": true,
-          "holds": "prepBowl"
+          "holds": "batterBowl"
         },
         {
           "label": "Bake",
@@ -4825,7 +4857,7 @@
           "minutes": 15,
           "anim": "mix",
           "optional": true,
-          "holds": "prepBowl"
+          "holds": "batterBowl"
         },
         {
           "label": "Bake",
@@ -4874,7 +4906,7 @@
           "minutes": 15,
           "anim": "mix",
           "optional": true,
-          "holds": "prepBowl"
+          "holds": "batterBowl"
         },
         {
           "label": "Bake",

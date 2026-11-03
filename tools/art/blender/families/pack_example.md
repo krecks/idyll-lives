@@ -65,3 +65,11 @@ parts, clips, paint and draws):
 cargo art pack_example            # the two .glb, the pack, check-glb
 cargo art pack_example --preview  # previews/pack_example/<id>.png, <id>@<clip>.png
 ```
+
+## Cooking at it (2026-11-03)
+
+The game had no place for the cook's pan on the stove, so it stood at 0.9 m in the grates at the front edge, off the
+lit burner. It goes on the lit front middle burner's grate now, (0, 0) at 0.963, and the bowl the cook brought on the
+cold front right one, (0.5, 0.03) (`STATION_SPOTS`, `SET_DOWN_SPOTS`). The frying pan with the omelette on the back
+right burner turned its handle out to the right along the back row: it reached across that front right burner. (No
+content `surface`: a stove's hob isn't a top things are put on, as the other cookers have none.)
