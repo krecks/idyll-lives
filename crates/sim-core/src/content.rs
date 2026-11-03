@@ -551,7 +551,7 @@ pub struct ObjectDef {
 }
 
 /// What kind of thing is ridden (content `vehicle.kind`): how the rider is drawn on it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum VehicleKind {
     /// Sitting and pedalling.

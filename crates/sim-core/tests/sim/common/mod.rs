@@ -478,7 +478,7 @@ pub fn check(w: &World) {
         }
     }
     // Every object slot holder is someone who is using or heading to that object (or talking
-    // from its seat, what they sat down to do held: `paused`).
+    // from its seat, what they sat down to do held: `paused`; or riding it, or off to it to ride).
     for o in &w.objects {
         for u in o.users() {
             let s = &w.sims[u as usize];
@@ -493,7 +493,8 @@ pub fn check(w: &World) {
                 TaskKind::Carry { from, stage: 0, .. } => from == o.id,
                 _ => false,
             }) || (s.use_seat == Some(o.id)
-                && doing.is_some_and(|a| matches!(a.task.kind, TaskKind::Use { .. })));
+                && doing.is_some_and(|a| matches!(a.task.kind, TaskKind::Use { .. })))
+                || s.bike() == Some(o.id);
             assert!(
                 ok,
                 "object {} is held by {} who isn't using it",

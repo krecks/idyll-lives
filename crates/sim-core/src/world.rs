@@ -1251,6 +1251,12 @@ impl Sim {
         self.paused.as_ref()
     }
 
+    /// The bike (or e-scooter) they're on, or on their way to for work or school (`ride.rs`): its
+    /// slot is theirs until they're back.
+    pub fn bike(&self) -> Option<u32> {
+        self.riding.or(self.bound_for_bike)
+    }
+
     /// In bed for the night (or a nap): using something tagged as sleep.
     pub fn asleep(&self, content: &Content) -> bool {
         self.current.as_ref().is_some_and(|a| {
