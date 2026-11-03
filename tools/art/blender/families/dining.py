@@ -1200,7 +1200,7 @@ def sideboard():
     G.settle()                       # where the game places it, against the wall (its Model's centre)
     # the second door (hinged on its right) swings open while clean things are put away; one door only, as
     # each costs draws of its own
-    G.swing(doors[1], 'door_open', -100, seconds=DOOR_SECONDS)
+    G.swing(doors[1], 'door_open', -100, seconds=DOOR_SECONDS, ease='back_out')
     return G.meshes()
 
 
@@ -1244,7 +1244,7 @@ def buffet():
              for i, (x0, x1, left) in enumerate(doors)]
     G.settle()                       # where the game places it, against the wall (its Model's centre)
     # the wide middle door (hinged on its left) swings open while clean things are put away
-    G.swing(parts[2], 'door_open', 100, seconds=DOOR_SECONDS)
+    G.swing(parts[2], 'door_open', 100, seconds=DOOR_SECONDS, ease='back_out')
     return G.meshes()
 
 
@@ -1317,7 +1317,7 @@ def chinaCabinet():
         glazed_doors.append(_door(f'glass_door{s}', x0, x1, 0.93, 2.0, zf, M.body_china, s < 0, glazed, frame=0.045))
     G.settle()                       # where the game places it, against the wall (its Model's centre)
     # the left glazed door (hinged on its left) swings open onto the plates while clean things are put away
-    G.swing(glazed_doors[0], 'door_open', 100, seconds=DOOR_SECONDS)
+    G.swing(glazed_doors[0], 'door_open', 100, seconds=DOOR_SECONDS, ease='back_out')
     return G.meshes()
 
 

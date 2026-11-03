@@ -435,7 +435,9 @@ English file has about 1,000 lines, and the trait packs about 500 more for their
   and when the planner shows a thought (`thought`, per thought kind: `skipped`, `noPlace`,
   `kept`, `goal`, `roomLoved`, `roomDisliked`, `broken`, `accident`, `crying`).
 - **Later sources plug into the same pipeline:** the optional in-browser language model for
-  thoughts (see `docs/design/smarter-thoughts.md`).
+  thoughts (see `docs/design/smarter-thoughts.md`; measured 2026-11-01: describing the utility
+  AI's choice needs no shortlist, so it can ride on this pipeline as it is, while the re-rank the
+  note asks about is a separate, more expensive question).
 
 A group of lines is a list, or `{"lines": [...], "tone": ...}`; an object's `tone` applies to its
 `lines`. Tones (`happy`, `sad`, `angry`, `flirty`, `question`) adjust speed and pitch. `{name}` is

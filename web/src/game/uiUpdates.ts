@@ -89,6 +89,7 @@ function patched(old: SimView | undefined, patch: SimPatch): SimView {
   if (fields.grade === null) delete sim.grade;
   if (fields.phone === null) delete sim.phone;
   if (fields.homebound === null) delete sim.homebound;
+  if (fields.trip === null) delete sim.trip;
   if (plan === null) delete sim.plan;
   else if (plan) sim.plan = { ...sim.plan, ...plan } as PlanView;
   if (patch.detail === false) {

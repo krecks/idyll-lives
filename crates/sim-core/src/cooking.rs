@@ -2759,14 +2759,11 @@ fn invite(w: &mut World) {
     }
 }
 
-/// Puts down what people carry who are no longer cooking, eating or washing up (cancelled,
-/// called away, off to work, gone). A recipe about to go on (loaded from a save) keeps it.
-pub(crate) fn settle(w: &mut World) {
-    w.refresh_index();
-    for i in 0..w.sims.len() {
-        let s = &w.sims[i];
-        let Some(held) = s.held else { continue };
-        let going_on = match &s.current {
+/// Whether `s` goes on with what they carry (`settle` leaves it with them): here, and cooking,
+/// eating or washing up, or about to (a recipe loaded from a save), or carrying a harvest.
+fn going_on(s: &crate::world::Sim) -> bool {
+    s.here()
+        && match &s.current {
             // (A harvest on its way to the fridge too, `carry.rs`.)
             Some(a) => {
                 chain(&a.task.kind) || matches!(a.task.kind, TaskKind::Carry { baby: None, .. })
@@ -2775,10 +2772,23 @@ pub(crate) fn settle(w: &mut World) {
                 .queue
                 .front()
                 .is_some_and(|t| matches!(t.kind, TaskKind::Cook { .. })),
-        };
-        if s.here() && going_on {
-            continue;
         }
+}
+
+/// Whether `settle` has anything to put down.
+pub(crate) fn must_settle(w: &World) -> bool {
+    w.sims.iter().any(|s| s.held.is_some() && !going_on(s))
+}
+
+/// Puts down what people carry who are no longer cooking, eating or washing up (cancelled,
+/// called away, off to work, gone). A recipe about to go on (loaded from a save) keeps it.
+pub(crate) fn settle(w: &mut World) {
+    w.refresh_index();
+    for i in 0..w.sims.len() {
+        let s = &w.sims[i];
+        let Some(held) = s.held.filter(|_| !going_on(s)) else {
+            continue;
+        };
         w.sims[i].held = None;
         if !w.sims[i].here() {
             continue;
@@ -2816,13 +2826,15 @@ fn update(w: &mut World) {
         })
         .collect();
     let mut keep = Vec::with_capacity(w.items.list.len());
-    for mut it in std::mem::take(&mut w.items.list) {
+    let ats: Vec<ItemAt> = w.items.list.iter().map(|it| it.at).collect();
+    let holders = crate::items::holders(content, &w.objects, &ats);
+    for (mut it, holder) in std::mem::take(&mut w.items.list).into_iter().zip(holders) {
         let household = w.households.get(it.household as usize);
         let home = household.and_then(|h| h.plot);
         let (x, z) = it.at.tile();
         let placed = match it.at {
             ItemAt::Floor { .. } => w.lot.in_bounds(x, z),
-            _ => crate::items::holder(content, &w.objects, &it.at).is_some(),
+            _ => holder.is_some(),
         };
         let lives_here = w
             .sims
@@ -2847,8 +2859,10 @@ fn update(w: &mut World) {
         if it.to_clear(content) && !matches!(it.at, ItemAt::Stored { .. }) && w.lot.in_bounds(x, z)
         {
             let t = w.lot.tile_index(x, z);
-            w.dirt[t] = (w.dirt[t] + rules.dirty_dirt_per_hour * minutes / 60.0).min(1.0);
-            w.room_tiles.touch(t);
+            if t != crate::lot::VOID {
+                w.dirt[t] = (w.dirt[t] + rules.dirty_dirt_per_hour * minutes / 60.0).min(1.0);
+                w.room_tiles.touch(t);
+            }
         }
         keep.push(it);
     }

@@ -1,7 +1,8 @@
 /**
  * Daylight kept out of a basement in view and out of the rooms without windows on the storey in
  * view: there the sun, the sky's fill and the environment are scaled down to `game_undergroundLit`
- * (x, y, z), so only the lamps light them, day and night.
+ * (x, y, z), so only the lamps light them, day and night. In the basement the sky's fill and the
+ * environment keep their brightness, not their colour (`gameGrey`): no moonlight's blue down there.
  *
  * `gameUnder` is worked out once a fragment (`litUserMainStartPS`); the sun reads it where its
  * colour is read (an engine patch after `lightColor = light{i}_color`, `chunks.ts`), the sky's
@@ -32,9 +33,10 @@ export const UNDERGROUND: ShaderFeature = {
 	uniform vec4 game_windowlessArea;
 	uniform highp sampler2D game_windowlessMask;
 	vec3 gameUnder = vec3(1.0);
+	bool gameGrey = false;
 	vec3 gameUnderground(vec3 p) {
 		vec3 under = vec3(1.0);
-		if (game_undergroundLit.w > 0.5 && p.x > game_undergroundRect.x && p.x < game_undergroundRect.z && p.z > game_undergroundRect.y && p.z < game_undergroundRect.w) { under = game_undergroundLit.xyz; }
+		if (game_undergroundLit.w > 0.5 && p.x > game_undergroundRect.x && p.x < game_undergroundRect.z && p.z > game_undergroundRect.y && p.z < game_undergroundRect.w) { under = game_undergroundLit.xyz; gameGrey = true; }
 		// (Only at the storey's heights: the rest of the scene doesn't read the mask.)
 		if (p.y > game_windowlessBand.x && p.y < game_windowlessBand.y) {
 			vec2 wlT = p.xz - game_windowlessArea.xy;
@@ -67,9 +69,10 @@ export const UNDERGROUND: ShaderFeature = {
 	uniform game_windowlessArea: vec4f;
 	var game_windowlessMask: texture_2d<f32>;
 	var<private> gameUnder: vec3f = vec3f(1.0);
+	var<private> gameGrey: bool = false;
 	fn gameUnderground(p: vec3f) -> vec3f {
 		var under = vec3f(1.0);
-		if (uniform.game_undergroundLit.w > 0.5 && p.x > uniform.game_undergroundRect.x && p.x < uniform.game_undergroundRect.z && p.z > uniform.game_undergroundRect.y && p.z < uniform.game_undergroundRect.w) { under = uniform.game_undergroundLit.xyz; }
+		if (uniform.game_undergroundLit.w > 0.5 && p.x > uniform.game_undergroundRect.x && p.x < uniform.game_undergroundRect.z && p.z > uniform.game_undergroundRect.y && p.z < uniform.game_undergroundRect.w) { under = uniform.game_undergroundLit.xyz; gameGrey = true; }
 		if (p.y > uniform.game_windowlessBand.x && p.y < uniform.game_windowlessBand.y) {
 			let wlT = p.xz - uniform.game_windowlessArea.xy;
 			if (wlT.x >= 0.0 && wlT.y >= 0.0 && wlT.x < uniform.game_windowlessArea.z && wlT.y < uniform.game_windowlessArea.w) {

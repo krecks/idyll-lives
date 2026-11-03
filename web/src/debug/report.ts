@@ -8,6 +8,7 @@
 import type { CameraPose } from '../render/types';
 import { writeSave, type SaveRecord } from '../persistence/saves';
 import { recentLog, type LogEntry } from './log';
+import { within } from '../core/async';
 
 export interface DebugReport {
   /** What the report is about, typed by the player (may be empty). */
@@ -42,12 +43,7 @@ export interface DebugPayload {
   screenshot: string | null;
 }
 
-/** `promise`, or `fallback` if it takes longer than `ms`. */
-export function within<T, F>(promise: Promise<T>, ms: number, fallback: F): Promise<T | F> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<F>((resolve) => (timer = setTimeout(() => resolve(fallback), ms)));
-  return Promise.race([promise, late]).finally(() => clearTimeout(timer));
-}
+export { within };
 
 /**
  * A report without a game to ask (the crash screen when no game runs, or game data that didn't

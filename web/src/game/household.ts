@@ -5,6 +5,8 @@ import type { Content, LifeStageDef } from '../content/content';
 import { GARMENTS, pickOutfit } from '../render/shared/characters/outfit';
 import { chosenPreset, presetByName, presetsFor, VOICE_RANGE, type VoiceChoice } from '../voice/voices';
 import type { Residents } from './housegen';
+import { jobFor } from './wealth';
+import { mulberry32 } from './noise';
 
 /** Hairstyles (character parts `hair.<style>`), and bald. */
 export const HAIR_STYLES = [
@@ -97,6 +99,8 @@ export interface SimDraft {
   perks: string[];
   /** Age in years. */
   age: number;
+  /** Their job (a career track and a grade, 0 the first): settled grown-ups have one (`wealth.ts` `jobFor`); none for a child or a newcomer who hasn't found work yet. */
+  job?: { career: string; level: number };
 }
 
 export interface Bond {
@@ -327,18 +331,6 @@ export function lookFromSeed(assets: AssetRegistry, gender: string, seed: number
   return look;
 }
 
-/** A seeded random number generator (mulberry32): 0..1. */
-function mulberry32(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 /** A random age: mostly adults, some young adults, a few elders (or within `stage`). */
 export function randomAge(content: Content, stage?: string): number {
   const stages = content.adultStages;
@@ -347,14 +339,26 @@ export function randomAge(content: Content, stage?: string): number {
   return lo + Math.floor(Math.random() * (hi - lo + 1));
 }
 
+/** How `randomHousehold` rolls a household: `older`, its first grown-up past the young-adult years (for a dear home). */
+export interface HouseholdRoll {
+  older?: boolean;
+}
+
+/**
+ * A random household of `size`: often a couple (with a child at home) or two siblings. Most
+ * grown-ups have a job (`wealth.ts` `jobFor`: the older, the higher up they may be).
+ */
 export function randomHousehold(
   content: Content,
   assets: AssetRegistry,
   size = 1 + Math.floor(Math.random() * 3),
   avoidNames: readonly string[] = [],
+  { older = false }: HouseholdRoll = {},
 ): HouseholdDraft {
   const members: SimDraft[] = [];
   for (let i = 0; i < size; i++) members.push(randomSim(content, assets, members.map((m) => m.name)));
+  const [settled, elder] = content.adultStages.slice(1);
+  if (older && members[0] && settled) members[0].age = randomAge(content, (Math.random() < 0.8 ? settled : (elder ?? settled)).id);
   const bonds: Bond[] = [];
   // Two adults who are attracted to each other are often a couple.
   const [a, b, c] = members;
@@ -377,6 +381,8 @@ export function randomHousehold(
     b.age = Math.max(adult, a.age + Math.floor(Math.random() * 13) - 6);
     bonds.push({ a: a.uid, b: b.uid, preset: 'siblings' });
   }
+  // Most grown-ups work (or have retired from work).
+  for (const m of members) if (content.isAdult(m.age) && Math.random() < 0.75) m.job = jobFor(content, m.age, Math.random);
   const names = content.names.last.filter((n) => !avoidNames.includes(n));
   return { name: pick(names.length ? names : content.names.last), members, bonds };
 }

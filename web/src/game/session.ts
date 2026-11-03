@@ -5,15 +5,19 @@
  */
 
 import { AssetRegistry } from '../assets/registry';
-import { prefetch, prefetchNow, planStream, whenStreamSettled } from '../assets/stream';
+import { prefetch, prefetchNow, planStream, reprioritize, whenStreamSettled } from '../assets/stream';
 import { Content } from '../content/content';
 import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
-import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SocialEvent, WorldStructure } from '../core/protocol';
-import { lowestStorey } from '../core/protocol';
+import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SimInfo, SocialEvent, WorldStructure } from '../core/protocol';
+import { groundDepth, lowestStorey } from '../core/protocol';
+import { townMap } from '../ui/townMap.svelte';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
+import { tileWorld } from '../debug/tileWorld';
+import { benchBigWorld } from '../debug/bigTown';
 import { recentLog } from '../debug/log';
-import { deliverReport, gpuInfo, takePendingPose, within, type DebugReport } from '../debug/report';
+import { deliverReport, gpuInfo, takePendingPose, type DebugReport } from '../debug/report';
+import { within } from '../core/async';
 import { plainState } from '../debug/snapshot.svelte';
 import { liveSims } from '../debug/sims';
 import { threadStats } from '../debug/threads';
@@ -22,14 +26,16 @@ import { createItemPreviews } from '../render/preview/items';
 import type { CameraPose, Renderer, WallMode } from '../render/types';
 import { settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
-import { services, type GameControls } from '../ui/services';
+import { prefetchCatalog, services, type GameControls } from '../ui/services';
 import { game, nextWallMode, toast } from '../ui/state.svelte';
 import { saveDebugReport } from '../ui/debugReport';
+import { lotInSentence } from '../ui/place';
 import { ideaToasts } from '../ui/planner/ideaToasts';
 import { aboutUs } from '../ui/story';
 import { BubbleLayer } from './bubbles';
 import { RoomOverlay } from './roomOverlay';
 import { VoiceDirector } from '../voice';
+import { holdInference, holdInferenceWhile } from '../ml/schedule.svelte';
 import { endSoundOf, soundOf, WorldSound } from '../audio/world';
 import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
@@ -39,10 +45,12 @@ import { colorValues } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
 import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { clockTime, openAt, staffed, staffResidents } from './staff';
-import { PointerInput } from './input';
-import { assembleTown, loadTemplates, useTownContent, type NeighbourhoodDraft } from './town';
-import { gameAssetPlan } from './streamPlan';
-import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
+import { PointerInput, routeKey } from './input';
+import { useTownContent, type NeighbourhoodDraft } from './town';
+import { townJob } from './townJobs';
+import { gameAssetPlan, parseAheadFiles, streamRanks } from './streamPlan';
+import { GameSpeed } from './speed';
+import { perfEnd, perfPhase, perfStart, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
 declare global {
@@ -57,6 +65,8 @@ const SIM_PICK_RADIUS = 32;
 const STATS_INTERVAL_MS = 500;
 /** After the player picks a storey, the view stays on it this long before following residents again. */
 const STOREY_STAY_MS = 8000;
+/** The storey in view follows residents only while the camera's target is within this many metres of the viewed lot. */
+const STOREY_NEAR = 40;
 const THUMBNAIL = { width: 320, height: 200 };
 /** Longest wait for a save's picture (it needs a drawn frame); the save then keeps the last one. */
 const THUMBNAIL_WAIT_MS = 1000;
@@ -100,6 +110,12 @@ const PORTRAIT_WAIT_MS = 8000;
 const FIRST_FRAME_WAIT_MS = 1500;
 /** After this long in the game, the catalog's pictures are drawn in idle moments (the catalog then opens with them). */
 const PREFETCH_PICTURES_MS = 4000;
+/** Longest wait for the simulation compiled at boot (`compileSim`) before a game's worker compiles its own. */
+const SIM_COMPILE_WAIT_MS = 15_000;
+/** Longest wait for the street to build the chunks round the camera before the warm-up's frame (a big world). */
+const STREAM_WAIT_MS = 4000;
+/** Longest wait for the textures asked for to load before the warm-up's frame (it then uploads them). */
+const TEXTURES_WAIT_MS = 5000;
 /** Story events the journal keeps: as many as the simulation does (`EVENT_LOG_CAPACITY`). */
 const JOURNAL_SIZE = 300;
 /** Keys that act again while held (R turns, PageUp/PageDown change storey, Ctrl+Z/Y undo and redo); the rest act once per press. */
@@ -124,12 +140,27 @@ export interface GameSession {
    * instant. Rejects if the simulation stops before that.
    */
   readonly ready: Promise<void>;
-  /** Compiles and draws the game's own look (the mirror's clip-plane shaders too), if not done yet. */
-  warm(): Promise<void>;
+  /** Compiles and draws the game's own look (the mirror's clip-plane shaders too), if not done yet; `progress` hears its steps (0..1). */
+  warm(progress?: ProgressReport): Promise<void>;
   /** Unpauses the game and attaches input. */
   reveal(): void;
   /** Ends the session; resolves once it has let go of the renderer, which is kept for the next one. */
   dispose(): Promise<void>;
+}
+
+/** The simulation's wasm, compiled once a page (from boot on) and handed to each game's worker; null if it couldn't be (the worker then fetches it). */
+let simModule: Promise<WebAssembly.Module | null> | null = null;
+export function compileSim(): Promise<WebAssembly.Module | null> {
+  simModule ??= (async () => {
+    const url = new URL('../core/wasm-pkg/sim_wasm_bg.wasm', import.meta.url);
+    try {
+      return await (typeof WebAssembly.compileStreaming === 'function' ? WebAssembly.compileStreaming(fetch(url)) : WebAssembly.compile(await (await fetch(url)).arrayBuffer()));
+    } catch (err) {
+      console.warn('[session] the simulation could not be compiled ahead; each game compiles its own', err);
+      return null;
+    }
+  })();
+  return simModule;
 }
 
 /** Shared, immutable data: loaded once per page. */
@@ -146,6 +177,8 @@ export function loadGameData(): Promise<{ content: Content; assets: AssetRegistr
     useTownContent(content);
     services.previews = createSimPreviews({ assets, emotions: content.emotions.map((e) => e.id), backend: () => liveSettings.renderer });
     services.items = createItemPreviews(assets, () => liveSettings.renderer);
+    // (The simulation compiles meanwhile, once: every game's worker takes it as it is.)
+    void compileSim();
     return { content, assets };
   });
   return shared;
@@ -162,6 +195,29 @@ export async function startSession(
   settings: Settings,
   progress: ProgressReport = () => {},
   warm = true,
+): Promise<GameSession> {
+  // No voices or language model start or speak while the game loads (and, once revealed, while its town streams in).
+  const loading = holdInference('loading a game');
+  try {
+    return await openSession(loading, renderer, canvas, overlay, request, settings, progress, warm);
+  } catch (err) {
+    // A start that failed (a save gone or refused, a town or a simulation that didn't start) lets
+    // go at once, not when the hold runs out two minutes later (the voices quiet until then).
+    loading();
+    throw err;
+  }
+}
+
+/** `startSession`, holding inference until the game is ready (`releaseInference` lets go, and is swapped for the stream's hold). */
+async function openSession(
+  releaseInference: () => void,
+  renderer: Renderer,
+  canvas: HTMLCanvasElement,
+  overlay: HTMLElement,
+  request: StartRequest,
+  settings: Settings,
+  progress: ProgressReport,
+  warm: boolean,
 ): Promise<GameSession> {
   const params = new URLSearchParams(location.search);
   // Every loading step names the work in the perf report (a long task or a dropped frame then says which).
@@ -181,11 +237,11 @@ export async function startSession(
   /** The game this is (its saves carry it): new at New game, the save's own when loading (a save from before games had one is a game of its own). */
   let gameId: string;
   if (request.kind === 'new') {
-    const templates = await perfTimeAsync('session: loadTemplates', loadTemplates);
-    const lot = perfTime('session: assembleTown', () =>
-      assembleTown(content, templates, request.town, request.household, request.slot, { existing: request.existing, mode: request.mode, lifespan: request.lifespan }),
+    // (In the town worker: a big world's file takes most of a second to put together.)
+    const made = await perfTimeAsync('session: assembleTown', () =>
+      townJob(content, { kind: 'assemble', town: request.town, player: request.household, slot: request.slot, options: { existing: request.existing, mode: request.mode, lifespan: request.lifespan }, random: (Math.random() * 2 ** 32) >>> 0 }),
     );
-    source = { lot, seed: Number(params.get('seed')) || (Math.random() * 2 ** 31) >>> 0 };
+    source = { lot: made.lot, seed: Number(params.get('seed')) || (Math.random() * 2 ** 31) >>> 0 };
     household = request.household.name.trim();
     gameId = crypto.randomUUID();
   } else {
@@ -197,7 +253,13 @@ export async function startSession(
   }
 
   progress('Starting the simulation', 0.15);
-  const bridge = await perfTimeAsync('session: SimBridge.start', () => SimBridge.start(content.json, source)).catch(async (err: unknown) => {
+  // What every game needs whatever its world (the surfaces, the garden, the street, the residents,
+  // the birds) downloads while the simulation starts; the house's own things come with its world.
+  void prefetchNow(gameAssetPlan(content, assets, { objects: [] }, null).home);
+  // (Not for long: a download that hangs is the worker's to notice, `SimBridge.start`.)
+  const simWasm = await within(compileSim(), SIM_COMPILE_WAIT_MS, null);
+  // (Paused from the first step: the clock is held until the player enters the game.)
+  const bridge = await perfTimeAsync('session: SimBridge.start', () => SimBridge.start(content.json, source, 0, simWasm)).catch(async (err: unknown) => {
     // A save the game can't open is set aside (kept if it's from a newer version, else removed).
     if (err instanceof SaveRefused && saved) throw new UnloadableSave(saved.id, err.problem, await refuseSave(saved, err.problem));
     throw err;
@@ -214,9 +276,6 @@ export async function startSession(
     return bridge.frame(performance.now());
   };
   progress('Building the world', 0.3);
-  // Hold the clock until the player actually enters the game.
-  bridge.send({ type: 'setSpeed', speed: 0 });
-  let resumeSpeed: number | null = null;
   let revealed = false;
   let warmed = false;
   /** The world has been built once: later ones are patches or rare rebuilds, and need no warm-up. */
@@ -233,18 +292,37 @@ export async function startSession(
     failReady = reject;
   });
   void ready.then(
-    () => perfEnd(started),
-    () => perfEnd(started),
+    () => (perfEnd(started), releaseInference()),
+    () => (perfEnd(started), releaseInference()),
   );
+  // The first world build's steps, and the warm-up's, on the loading screen (until the game is ready).
+  renderer.onLoadStep((label, done) => progress(label, 0.65 + 0.25 * done));
+  void ready.then(
+    () => renderer.onLoadStep(null),
+    () => renderer.onLoadStep(null),
+  );
+  /**
+   * Before the warm-up's frame: the street's chunks round the camera built (a big world) and the
+   * textures asked for loaded, each for a while at most, so that frame draws and uploads what play
+   * shows first (they used to land in its first seconds).
+   */
+  const beforeWarm = async (report: ProgressReport) => {
+    report('Building the street', 0);
+    await perfTimeAsync('session: street streamed', () => renderer.streamSettled(STREAM_WAIT_MS));
+    report('Loading textures', 0.5);
+    await perfTimeAsync('session: textures', () => within(renderer.texturesReady(), TEXTURES_WAIT_MS, undefined));
+  };
   /** `?debug`'s `__crash('render')`: every frame fails. */
   let failFrames = false;
 
   let world: WorldStructure | null = null;
   /** The lot the last world structure showed (edit feedback compares worlds of the same lot). */
   let worldView: number | null = null;
-  let lastSpeed = 1;
   let focused = false;
   let viewPlot: number | null = null;
+  // `?bench=bigworld`: a real Big world for the renderer, made in the page, and its focus lot.
+  const benchBig = BENCH?.big ? benchBigWorld(content, assets, BENCH.big) : null;
+  let benchView: { x: number; z: number; w: number; d: number } | null = null;
   let lastEvent = -1;
   /** Whether the first update's story (the history, empty in a new game) has been seen. */
   let storySeen = false;
@@ -270,6 +348,11 @@ export async function startSession(
     if (id === null || layout.sim.height === undefined || id >= snap[layout.header.simCount]) return;
     const o = layout.headerLen + id * layout.simStride;
     if (snap[o + layout.sim.away] > 0 || game.sims.find((s) => s.id === id)?.plot !== viewPlot) return;
+    // (Not while the camera is away from the lot, roaming a big world: a storey changed is a build of
+    // the lot's objects and residents, 20-60 ms of frames, for a cutaway nobody sees.)
+    const lot = viewPlot === null ? null : world?.plots[viewPlot];
+    const at = renderer.cameraPose().target;
+    if (lot && Math.max(lot.x - at[0], at[0] - lot.x - lot.w, lot.z - at[2], at[2] - lot.z - lot.d) > STOREY_NEAR) return;
     const storey = Math.floor(snap[o + layout.sim.height] + 0.01);
     if (storey !== game.storey) setStorey(storey);
   };
@@ -282,7 +365,7 @@ export async function startSession(
     buildBuy.modeChanged();
     refreshRoomOverlay();
   }
-  const voices = new VoiceDirector(content, renderer, { world: () => world, subtitles: bubbles });
+  const voices = new VoiceDirector(content, renderer, { world: () => world, subtitles: bubbles, sim: () => bridge.threadStats });
   const worldSound = new WorldSound(renderer, content);
   const buildBuy = new BuildBuyInput(renderer, content, (command) => bridge.send(command));
   buildBuy.showStorey = (storey) => {
@@ -364,15 +447,39 @@ export async function startSession(
     clearTimeout(hudTimer);
     hudTimer = setTimeout(() => (game.hudAwake = false), HUD_AWAKE_MS);
   };
-  let speedBeforeMenu: number | null = null;
-  /** Build and Create pause the game; the speed to restore back in Live. */
-  let speedBeforeBuy: number | null = null;
+  /**
+   * The player's speed, held at 0 while the game loads, in Build and Create, and while a menu is
+   * open (`setMenuPause`): given back when nothing holds it any more. Play starts at the speed the
+   * game was saved at.
+   */
+  const speed = new GameSpeed((running) => {
+    bridge.send({ type: 'setSpeed', speed: running });
+    game.speed = running;
+  }, bridge.savedSpeed);
+  /**
+   * The catalog's pictures are drawn ahead of time in Build and Create, not in Live's frames
+   * (`holdAhead`). A house nobody lives in opens on the catalog: they're drawn behind its loading screen.
+   */
+  const catalogAhead = () => services.items.holdAhead(revealed ? game.mode === 'live' : game.occupied);
   let autosaveTimer: ReturnType<typeof setInterval> | undefined;
   let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
   /** The viewed house's files (the second loading screen); made once, on the first built view. */
   let homeAssets: Promise<void> | null = null;
   /** Everything after the house: streamed once the game is revealed. */
   let restUrls: string[] = [];
+  /** The tile rectangle the camera streams in last (`onWatch`; null: none yet). */
+  let watched: { x: number; z: number; w: number; d: number } | null = null;
+  /**
+   * In play, the model files of the things round the camera (then the rest of the town's, nearest
+   * first) are read in idle moments once downloaded: a lot the camera settles on next is built from
+   * them without reading each file in the frame that needs it.
+   */
+  const readAhead = (ranks?: ReadonlyMap<string, number>) => {
+    if (!revealed || disposed || !world) return;
+    renderer.parseAhead(parseAheadFiles(content, assets, world, ranks ?? fileRanks(world)));
+  };
+  /** How soon each of the town's model files is wanted, by the lot in view and where the camera looks (`streamRanks`). */
+  const fileRanks = (w: WorldStructure) => streamRanks(content, assets, w, viewPlot === null ? null : (w.plots[viewPlot] ?? null), watched);
   let autosaveMinutes = -1;
   /** The performance overlay setting last applied (F3 opens and closes the overlay in between). */
   let showFps: boolean | null = null;
@@ -384,16 +491,15 @@ export async function startSession(
   let autonomy: boolean | null = params.has('state') ? settings.autonomy : null;
 
   const controls: GameControls = {
-    setSpeed(speed) {
+    setSpeed(to) {
       // Time stands still in Build and Create.
       if (game.mode !== 'live') return;
-      speed = Math.max(0, Math.min(MAX_SPEED, speed));
-      if (speed > 0) lastSpeed = speed;
       slowedFrom = null;
-      bridge.send({ type: 'setSpeed', speed });
+      // (Under a menu: the speed it gives back.)
+      speed.choose(Math.max(0, Math.min(MAX_SPEED, to)));
     },
     togglePause() {
-      controls.setSpeed(game.speed === 0 ? lastSpeed : 0);
+      controls.setSpeed(game.speed === 0 ? speed.last : 0);
     },
     selectSim(id) {
       if (!playerSims().includes(id)) return;
@@ -417,16 +523,17 @@ export async function startSession(
         takeBack();
         const plot = game.sims.find((s) => s.id === id)?.plot;
         if (plot != null && plot !== viewPlot) showPlot(plot);
-      } else {
-        const home = buildBuy.home();
-        if (home && viewPlot !== home.id) showPlot(home.id);
       }
+      // Letting go leaves the camera where it is: the lot under it becomes the focus as the
+      // camera roams (`onFocusLot`), rather than a jump home before a "look here" flies off.
     },
     frameHouse() {
       takeBack();
       if (game.follow !== null) controls.follow(null);
       const plot = world && homePlot() !== null ? world.plots[homePlot()!] : null;
       if (!plot) return;
+      // (Drawn at once, not when the camera settles there.)
+      if (viewPlot !== plot.id) showPlot(plot.id, false);
       const [x0, z0, x1, z1] = plot.house ?? [plot.x, plot.z, plot.x + plot.w, plot.z + plot.d];
       renderer.setGameShot({ target: { x: (x0 + x1) / 2, z: (z0 + z1) / 2 }, beta: 0.72, radius: Math.min(60, Math.max(x1 - x0, z1 - z0) * 1.25 + 8), duration: liveSettings.reducedMotion ? 0 : 1.6 });
       // The shot lands, then the camera is the player's again.
@@ -513,12 +620,24 @@ export async function startSession(
       bridge.send({ type: 'quitCareer', sim: game.selected });
     },
     visit(plot) {
+      const who = game.sims.find((s) => s.id === game.selected);
       bridge.send({ type: 'visit', sim: game.selected, plot });
       game.townOpen = false;
+      // The view goes along with them (Esc lets go).
+      if (game.mode === 'live' && who) {
+        controls.follow(who.id);
+        const p = game.plots[plot];
+        toast(`${who.name} is on the way to ${p ? lotInSentence(p, game.households) : 'visit'}.`);
+      }
     },
     goHome() {
       bridge.send({ type: 'goHome', sim: game.selected });
       game.townOpen = false;
+    },
+    lookAt(x, z) {
+      // A flight across the world; the lot it settles on becomes the focus (`onFocusLot`).
+      if (game.follow !== null) controls.follow(null);
+      renderer.flyTo(x, z);
     },
     socialize(target, social) {
       if (game.mode !== 'live') return;
@@ -557,7 +676,11 @@ export async function startSession(
       game.socialMenu = null;
     },
     openPauseMenu() {
+      // Nothing stays open under it, for its Escape to close behind it.
       game.menu = null;
+      game.socialMenu = null;
+      game.townOpen = false;
+      game.journalOpen = false;
       game.pauseMenu = true;
     },
     setMode(mode) {
@@ -565,36 +688,29 @@ export async function startSession(
       if (game.mode === mode || (mode === 'create' && game.occupied)) return;
       takeBack();
       game.customising = null;
+      // (Build and Create happen at home: see below.)
       if (mode !== 'live' && game.follow !== null) controls.follow(null);
       const fromLive = game.mode === 'live';
       buildBuy.cancel();
       game.eyedropper = false;
       game.pickHint = null;
       game.mode = mode;
+      catalogAhead();
       refreshRoomOverlay();
       play(mode === 'live' ? 'close' : fromLive ? 'open' : 'tab');
       game.menu = null;
       game.socialMenu = null;
       // Build and Create pause the game (and close Live's panels); back in Live the speed returns.
+      speed.hold('build', mode !== 'live');
       if (mode !== 'live') {
-        if (fromLive) {
-          speedBeforeBuy = game.speed;
-          bridge.send({ type: 'setSpeed', speed: 0 });
-        }
         game.townOpen = false;
         game.jobBoardOpen = false;
         game.plannerOpen = false;
-      } else if (speedBeforeBuy !== null) {
-        if (speedBeforeBuy > 0) lastSpeed = speedBeforeBuy;
-        bridge.send({ type: 'setSpeed', speed: speedBeforeBuy });
-        speedBeforeBuy = null;
       }
       // Building happens at home, with the walls down so the floor plan is visible.
       const home = buildBuy.home();
-      if (mode === 'build' && home) {
-        if (viewPlot !== home.id) showPlot(home.id);
-        controls.setWallMode('down');
-      }
+      if (mode !== 'live' && home && viewPlot !== home.id) showPlot(home.id);
+      if (mode === 'build' && home) controls.setWallMode('down');
       buildBuy.modeChanged();
     },
     setBuildTab(tab) {
@@ -630,6 +746,11 @@ export async function startSession(
       game.placing = { def: obj.def, rot: obj.rot, turn: obj.turn ?? 0, objectId, size: ownSize(content, obj), tall: obj.tall ?? 0 };
     },
     rotatePlacing(fine = false) {
+      if (buildBuy.garageTool()) {
+        buildBuy.rotateGarage();
+        play('rotate');
+        return;
+      }
       if (!game.furnishing && !buildBuy.stairsTool()) return;
       // Facing and turn as one angle: a quarter turn, or 15° for things that turn freely.
       const turned = (def: string, rot: number, turn: number) => {
@@ -713,6 +834,12 @@ export async function startSession(
         buildBuy.clearPreviews();
       }
       play('tab');
+    },
+    buildGarageAtDrive() {
+      buildBuy.buildDrivewayGarage();
+    },
+    sellGarage() {
+      buildBuy.sellGarage();
     },
     setRoof(style, color) {
       bridge.send({ type: 'setRoof', household: game.home, style, color });
@@ -819,6 +946,10 @@ export async function startSession(
     },
   };
   services.controls = controls;
+  // A catalog card or a covering pointed at: its model read, or its surface made, before it's placed.
+  services.prepare = (key, kind) => {
+    if (!disposed) renderer.prepareAsset(key, kind);
+  };
   // `?debug`: drive the game from the console / test harness (and look at any lot: `__showPlot(i)`, `__world().plots`;
   // `__send(command)` sends any simulation command, `__items()` the food and dishes about). `__world().objects` carry
   // a lamp's (or a fire's) `off`, which the world itself doesn't (the snapshot has it: `bridge.lampOff`).
@@ -894,8 +1025,6 @@ export async function startSession(
     // the objects of everything that didn't.
     const changed = mirror.apply(ui);
     if (!changed) return;
-    // The first update carries the speed the game was saved at.
-    resumeSpeed ??= ui.speed > 0 ? ui.speed : 1;
     game.day = ui.day;
     game.minute = ui.minute;
     game.speed = ui.speed;
@@ -941,7 +1070,7 @@ export async function startSession(
   const store = async (name: string, id: string, autosave: boolean): Promise<string> => {
     const picture = document.hidden
       ? Promise.resolve(null)
-      : Promise.race([perfTimeAsync('save: picture', () => renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height)), new Promise<null>((resolve) => setTimeout(resolve, THUMBNAIL_WAIT_MS, null))]);
+      : within(perfTimeAsync('save: picture', () => renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height)), THUMBNAIL_WAIT_MS, null);
     const [data, taken] = await Promise.all([perfTimeAsync('save: data', () => bridge.requestSave()), picture]);
     thumbnail = taken ?? thumbnail;
     const record: SaveRecord = {
@@ -1000,30 +1129,60 @@ export async function startSession(
   bridge.onLamps((off) => {
     if (!disposed) renderer.setLampsOff(off);
   });
-  bridge.onWorld((w) => {
-    if (disposed) return;
-    // Newcomers and babies the simulation made up carry an appearance seed: give them their
-    // look (babies from their parents', so parents first). Residents with none at all (a game
-    // state the simulation's tests wrote) get one from their id and name.
+  /**
+   * Each resident's look as last made, by id: what it was made from (`key`), the look from their
+   * seed (`base`, what their babies' come from) and at their life stage (`look`). The same look
+   * stays the same object, so the renderer sees by reference that nobody looks different.
+   */
+  const looks = new Map<number, { key: string; base: Appearance; look: Appearance }>();
+  /**
+   * Newcomers and babies the simulation made up carry an appearance seed: give them their look
+   * (babies from their parents', so parents first). Residents with none at all (a game state the
+   * simulation's tests wrote) get one from their id and name. Then their life stage: body and head
+   * size, and age greys the hair (as the menus show them). A resident whose look is made from
+   * what it was last time gets the same look (`looks`).
+   */
+  const giveLooks = (w: WorldStructure) => {
     type Seeded = { seed?: number; parents?: number[]; voice?: Appearance['voice'] } | null;
     const nameSeed = (id: number, name: string) => [...name].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 0x01000193) >>> 0, 0x811c9dc5 ^ id);
+    const raw = new Map(w.sims.map((s) => [s.id, `${s.gender}|${s.stage ?? ''}|${s.name}|${JSON.stringify(s.appearance ?? null)}`]));
+    const bases = new Map<number, Appearance>();
+    const todo = new Map<SimInfo, string>();
+    for (const s of w.sims) {
+      const key = [raw.get(s.id), ...((s.appearance as Seeded)?.parents ?? []).map((p) => raw.get(p))].join('\n');
+      const made = looks.get(s.id);
+      if (made?.key !== key) todo.set(s, key);
+      else {
+        bases.set(s.id, made.base);
+        s.appearance = made.look;
+      }
+    }
+    if (!todo.size) return;
     for (const pass of [false, true]) {
-      for (const s of w.sims) {
+      for (const s of todo.keys()) {
         const { seed, parents, voice } = (s.appearance as Seeded) ?? { seed: nameSeed(s.id, s.name) };
         if (typeof seed !== 'number' || Boolean(parents?.length) !== pass) continue;
-        const looks = (parents ?? []).map((p) => w.sims[p]?.appearance).filter((a) => a && (a as Seeded)?.seed === undefined);
-        s.appearance = lookFromSeed(assets, s.gender, seed, looks);
+        const from = (parents ?? []).map((p) => bases.get(p) ?? w.sims[p]?.appearance).filter((a) => a && (a as Seeded)?.seed === undefined);
+        s.appearance = lookFromSeed(assets, s.gender, seed, from);
         // Only the look comes from the seed: a voice stored with it is kept.
         if (voice) s.appearance.voice = voice;
       }
     }
-    for (const s of w.sims) {
-      // Life stage: body and head size, and age greys the hair (as the menus show them).
+    for (const [s, key] of todo) {
       const stage = content.lifeStages.find((st) => st.id === s.stage);
+      const base = s.appearance;
       if (s.appearance) s.appearance = lookAtStage(s.appearance, stage, palette(assets, 'palette.hair'));
+      looks.set(s.id, { key, base, look: s.appearance });
     }
+  };
+  bridge.onWorld((w) => {
+    if (disposed) return;
+    // (The worker sends the residents only when something about them changed: else they are the
+    // last world's, looks given.)
+    const simsChanged = w.sims !== world?.sims;
+    if (simsChanged) giveLooks(w);
     // The town's vendors and shopkeepers, drawn after the residents (`game/staff.ts`).
-    w.staffSims = staffResidents(content, assets, w);
+    w.staffSims = !simsChanged && w.staff === world?.staff && world?.staffSims ? world.staffSims : staffResidents(content, assets, w);
     // Build mode: show what the simulation just accepted (furniture popping in, dust, money).
     const feedback = game.mode === 'build' && world && worldView === viewPlot ? editFeedback(world, w) : null;
     if (feedback?.sound) play(feedback.sound);
@@ -1033,6 +1192,8 @@ export async function startSession(
       if (added.length) director.noteBuilt(added.map((o) => o.id), performance.now());
     }
     world = w;
+    // The town map: the town's ground and its presentation data (roads, zones, areas), as it changes.
+    if (townMap.world?.meta !== w.meta || townMap.world?.width !== w.width) townMap.world = { width: w.width, depth: groundDepth(w), meta: w.meta };
     worldView = viewPlot;
     game.storeys = w.storeys ?? 1;
     game.lowestStorey = lowestStorey(w);
@@ -1051,17 +1212,21 @@ export async function startSession(
     if (game.placing?.objectId != null) buildBuy.rehover();
     if (game.buySelection !== null && !w.objects.some((o) => o.id === game.buySelection)) game.buySelection = null;
     buildBuy.objectsChanged();
-    game.roster = w.sims.filter((s) => !s.gone);
-    game.everyone = w.sims;
+    if (simsChanged) {
+      game.roster = w.sims.filter((s) => !s.gone);
+      game.everyone = w.sims;
+    }
     game.former = w.former ?? [];
     game.households = w.households;
     game.plots = w.plots;
     // Portraits for the HUD, the household first (drawn once, cached by look); the game is
     // ready once the household's are.
-    const mineFirst = [...game.roster].sort((a, b) => Number(!!w.households[b.household]?.player) - Number(!!w.households[a.household]?.player));
-    const looks = mineFirst.map((s) => ({ gender: s.gender, appearance: s.appearance, id: s.id }));
-    portraits ??= Promise.all(looks.filter((_, i) => w.households[mineFirst[i].household]?.player).map((look) => services.previews.portrait(look)));
-    services.previews.prefetch(looks);
+    if (simsChanged || !portraits) {
+      const mineFirst = [...game.roster].sort((a, b) => Number(!!w.households[b.household]?.player) - Number(!!w.households[a.household]?.player));
+      const shown = mineFirst.map((s) => ({ gender: s.gender, appearance: s.appearance, id: s.id }));
+      portraits ??= Promise.all(shown.filter((_, i) => w.households[mineFirst[i].household]?.player).map((look) => services.previews.portrait(look)));
+      services.previews.prefetch(shown);
+    }
     if (!focused) {
       focused = true;
       const first = playerSims()[0];
@@ -1086,7 +1251,7 @@ export async function startSession(
       // First the house (the loading screen waits for it), then the rest of the town (streamed
       // after Play). Planning once keeps a later world update from restarting the indicator.
       const plan = gameAssetPlan(content, assets, w, view);
-      planStream([...plan.home, ...plan.rest], 'Game data');
+      planStream([...plan.home, ...plan.rest], 'Loading the town nearby…');
       restUrls = plan.rest;
       homeAssets = prefetchNow(plan.home, (done, total) => {
         progress(`Fetching your home (${done}/${total})`, 0.3 + 0.35 * (done / Math.max(1, total)));
@@ -1095,21 +1260,24 @@ export async function startSession(
     const build = homeAssets.then(async () => {
       const buildSpan = perfStart('session: renderer setWorld');
       try {
-        return await renderer.setWorld(w, view);
+        // (`?bench=bigworld`: the town tiled for the renderer, a big world: `debug/tileWorld.ts`.)
+        if (benchBig) return await renderer.setWorld(await benchBig, benchView);
+        return await renderer.setWorld(BENCH && BENCH.tile > 1 ? tileWorld(w, BENCH.tile) : w, view);
       } finally {
         perfEnd(buildSpan);
       }
     });
     building = build.catch(() => {});
+    holdInferenceWhile('building the scene', building);
     if (feedback?.effects.length) void build.then(() => feedback.effects.forEach((fx) => renderer.buildEffect(fx)), () => {});
     build
       .then(async () => {
-        progress('Warming up', 0.75);
         // Compile the game's own look (its lighting and cutaway) while the menu still covers it.
         // (When the game is only prepared in the background, it waits until it is started: the
         // mirror's clip-plane shaders take a long frame, which must not land on a visible menu.)
         if (warm && !warmed) {
           warmed = true;
+          await beforeWarm((label, done) => progress(label, 0.8 + 0.01 * done));
           const frame = await perfTimeAsync('session: first frame', firstFrame);
           if (frame) await perfTimeAsync('session: warm game', () => renderer.warmGame(frame));
           else perfPhase('session: warm game (no frame)');
@@ -1122,7 +1290,13 @@ export async function startSession(
       })
       .then(() => {
         progress('Drawing portraits', 0.9);
-        return perfTimeAsync('session: portraits', () => Promise.race([portraits, new Promise((resolve) => setTimeout(resolve, PORTRAIT_WAIT_MS))]));
+        // A house nobody lives in opens on the catalog: its pictures (mostly drawn in the menus, and
+        // kept) are drawn now, behind the loading screen, rather than as it opens.
+        if (!game.occupied && !BENCH && !disposed) {
+          catalogAhead();
+          prefetchCatalog();
+        }
+        return perfTimeAsync('session: portraits', () => within(portraits ?? Promise.resolve(), PORTRAIT_WAIT_MS, undefined));
       })
       .then(() => {
         progress('Ready', 1);
@@ -1154,14 +1328,62 @@ export async function startSession(
    * Switches the view to a lot: the worker sends that lot's geometry, then the scene is rebuilt.
    * The camera moves to its middle, unless it is going along with someone the player follows.
    */
-  function showPlot(plot: number) {
+  function showPlot(plot: number, aim = true) {
     const p = world?.plots[plot];
     if (!p) return;
     viewPlot = plot;
     game.viewPlot = plot;
-    if (game.follow === null) renderer.focus(p.x + p.w / 2, p.z + p.d / 2);
+    if (aim && game.follow === null) renderer.focus(p.x + p.w / 2, p.z + p.d / 2);
     bridge.setView([p.x, p.z, p.x + p.w, p.z + p.d]);
   }
+  // The town map's live layer: residents where they are drawn (or simulated), and where the camera looks.
+  const mapHead = { x: 0, y: 0, z: 0 };
+  townMap.source = {
+    dots() {
+      if (!world) return [];
+      const mine = new Set(playerSims());
+      const out: { x: number; z: number; mine: boolean }[] = [];
+      for (const s of world.sims) {
+        if (s.gone || !renderer.simSpot(s.id, mapHead)) continue;
+        out.push({ x: mapHead.x, z: mapHead.z, mine: mine.has(s.id) });
+      }
+      return out;
+    },
+    camera() {
+      const t = renderer.cameraPose().target;
+      return [t[0], t[2]];
+    },
+  };
+  // The roaming camera settles on a lot: it is shown in full, the camera left where it is (in live
+  // mode, not following anyone; build mode keeps the lot it builds on).
+  renderer.onFocusLot((lot) => {
+    // (The bench's real big world: its own focus, drawn at once: `debug/bigTown.ts`.)
+    if (benchBig) {
+      void benchBig.then((big) => {
+        const p = big.plots[lot];
+        if (!p) return;
+        benchView = { x: p.x, z: p.z, w: p.w, d: p.d };
+        return renderer.setWorld(big, benchView);
+      });
+      return true;
+    }
+    // (The bench's tiled big world: a copy's lot is the town's own, `debug/tileWorld.ts`.)
+    const plot = BENCH && BENCH.tile > 1 && world ? lot % world.plots.length : lot;
+    if (game.mode !== 'live' || game.follow !== null || director.active || !world?.plots[plot]) return false;
+    if (plot !== viewPlot) showPlot(plot, false);
+    return true;
+  });
+  // What the camera streams in is the sim's full-detail area: in a big world (a town of today's sizes
+  // keeps its full detail on the viewed lot, as it always had).
+  // The files still to stream come by where the camera is: the focus lot's, those round the camera, the rest nearest first.
+  renderer.onWatch((rect) => {
+    if (world?.meta?.world?.size === 'big') bridge.setWatch(rect);
+    watched = { x: rect[0], z: rect[1], w: rect[2] - rect[0], d: rect[3] - rect[1] };
+    if (!world) return;
+    const ranks = fileRanks(world);
+    reprioritize((url) => ranks.get(url) ?? Infinity);
+    readAhead(ranks);
+  });
   controls.setWallMode(game.wallMode);
 
   const inLot = (x: number, z: number) => !!world && x >= 0 && z >= 0 && x < world.width && z < world.depth;
@@ -1354,19 +1576,30 @@ export async function startSession(
       if (e.key === ' ' || e.key === 'Tab' || e.key === 'F3' || e.key === 'F8') e.preventDefault();
       return;
     }
+    // Escape closes the pause menu first, whatever is behind it (it must not act on what the menu
+    // covers); a window over the menu (its settings) closes itself. Past here Escape has no pause menu to mind.
+    if (e.key === 'Escape' && game.pauseMenu) {
+      if (!app.overlay) game.pauseMenu = false;
+      return;
+    }
     // The colour studio: its keys are its own (Escape closes it, as Cancel).
     if (game.customising) {
-      if (e.key === 'Escape' && !game.pauseMenu) game.customising = null;
+      if (e.key === 'Escape') game.customising = null;
       return;
     }
     // Creation: its keys are its own (Escape goes back to Live).
     if (game.mode === 'create') {
-      if (e.key === 'Escape' && !game.pauseMenu) controls.setMode('live');
+      if (e.key === 'Escape') controls.setMode('live');
       return;
     }
-    if (e.key === 'Escape') {
+    const route = routeKey(e, {
+      paused: game.pauseMenu,
+      dialog: (game.plannerOpen && game.mode === 'live') || game.jobBoardOpen || app.overlay !== null,
+      onScene: !(t instanceof Element) || t === document.body || t === document.documentElement || t instanceof HTMLCanvasElement,
+    });
+    if (route === 'none') return;
+    if (route === 'escape') {
       if (game.townOpen) return void (game.townOpen = false);
-      if (game.jobBoardOpen) return void (game.jobBoardOpen = false);
       if (game.eyedropper) return controls.toggleEyedropper();
       // Step back: drop what's in hand, then leave Build mode.
       if (buildBuy.cancel()) return;
@@ -1375,17 +1608,11 @@ export async function startSession(
       if (game.journalOpen) return void (game.journalOpen = false);
       if (game.follow !== null) return controls.follow(null);
       if (game.inspected !== null && liveSettings.directControl !== 'always') return controls.inspect(null);
-      game.pauseMenu = !game.pauseMenu;
-      return;
+      return controls.openPauseMenu();
     }
-    if (game.pauseMenu) return;
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+    if (route === 'undo' || route === 'redo') {
       e.preventDefault();
-      return e.shiftKey ? controls.redo() : controls.undo();
-    }
-    if (e.ctrlKey && (e.key === 'y' || e.key === 'Y')) {
-      e.preventDefault();
-      return controls.redo();
+      return route === 'redo' ? controls.redo() : controls.undo();
     }
     switch (e.key) {
       case ' ':
@@ -1418,8 +1645,7 @@ export async function startSession(
         return;
       case 'c':
       case 'C':
-        // Construct: Build mode's walls, rooms and paint (again: back to Live). Not Ctrl/⌘+C: that copies.
-        if (e.ctrlKey || e.metaKey) return;
+        // Construct: Build mode's walls, rooms and paint (again: back to Live). (Not Ctrl/⌘+C: that copies, `routeKey`.)
         if (game.mode === 'build' && game.buildTab === 'build') return controls.setMode('live');
         return controls.setBuildTab('build');
       case 'o':
@@ -1460,6 +1686,7 @@ export async function startSession(
         return controls.toggleEyedropper();
       case 'Delete':
       case 'Backspace':
+        if (buildBuy.garageTool()) return controls.sellGarage();
         if (game.furnishing || buildBuy.stairsTool()) {
           const target = game.placing?.objectId ?? game.buySelection;
           if (target !== null) controls.sell(target);
@@ -1477,10 +1704,12 @@ export async function startSession(
       case 'L':
         return controls.setMode('live');
       case 'Tab': {
+        // On the page or the canvas: the next resident of the household (Shift: the one before).
         e.preventDefault();
         const ids = playerSims();
         if (!ids.length) return;
-        const next = ids[(ids.indexOf(game.inspected ?? game.selected) + 1) % ids.length];
+        const at = ids.indexOf(game.inspected ?? game.selected);
+        const next = at < 0 ? ids[0] : ids[(at + (e.shiftKey ? ids.length - 1 : 1)) % ids.length];
         controls.selectSim(next);
         controls.inspect(next);
         return;
@@ -1517,9 +1746,10 @@ export async function startSession(
       watchAt = 0;
       startWatching(now);
     }
-    // After a big moment, back to the speed the player had (unless they picked another).
+    // After a big moment, back to the speed the player had (unless they picked another; under a
+    // menu or in Build, once that lets go).
     if (slowedFrom !== null && now > slowUntil) {
-      if (game.speed === 1 && game.mode === 'live') bridge.send({ type: 'setSpeed', speed: slowedFrom });
+      speed.choose(slowedFrom);
       slowedFrom = null;
     }
   }, () => {
@@ -1537,12 +1767,20 @@ export async function startSession(
       return bridge.alive;
     },
     ready,
-    async warm() {
+    async warm(report = () => {}) {
       if (warmed) return;
       warmed = true;
+      await beforeWarm((label, done) => report(label, 0.1 * done));
       const frame = await perfTimeAsync('session: first frame', firstFrame);
-      if (frame) await perfTimeAsync('session: warm game', () => renderer.warmGame(frame));
-      else perfPhase('session: warm game (no frame)');
+      // (The renderer's warm-up steps run from 0.65 to 1 of its loading: `warmGame`.)
+      renderer.onLoadStep((label, done) => report(label, 0.1 + 0.8 * Math.max(0, (done - 0.65) / 0.35)));
+      try {
+        if (frame) await perfTimeAsync('session: warm game', () => renderer.warmGame(frame));
+        else perfPhase('session: warm game (no frame)');
+      } finally {
+        renderer.onLoadStep(null);
+      }
+      report('Warming up', 0.9);
       await perfTimeAsync('session: warm frames', () => renderer.framesRendered(WARM_FRAMES));
       // A save's picture is drawn into its own target: compile its shaders now, not at the first autosave.
       await perfTimeAsync('session: warm thumbnail', () => renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height));
@@ -1568,32 +1806,47 @@ export async function startSession(
       // The camera starts watching once it has flown in (unless watching on its own is off).
       if (liveSettings.directorDelay > 0) watchAt = lastInput + START_WATCH_MS;
       // (A benchmark runs at its own speed.)
-      bridge.send({ type: 'setSpeed', speed: BENCH?.speed ?? resumeSpeed ?? 1 });
+      if (BENCH) speed.choose(BENCH.speed);
       // Nobody lives here yet, or there's no house (an empty lot): the game starts with
       // building (time stands still until Live).
       const home = homePlot();
       if (!game.occupied || (home !== null && !game.plots[home]?.house)) {
-        game.speed = resumeSpeed ?? 1;
         // No house yet: the Build tab; a house nobody lives in: the catalog to furnish it.
         if (home !== null && !game.plots[home]?.house) controls.setBuildTool(game.buildTool);
         else controls.setBuildTab('furnish');
       }
+      // Time runs from here (at the speed chosen), unless something else holds it (a menu, the
+      // window left while loading with pausing on blur, Build).
+      speed.hold('loading', false);
       perfPhase(`session: reveal ${game.mode} ${game.buildTab} storey ${game.storey} walls ${game.wallMode}`);
       // The house is cached by now: stream the rest of the town while the player is in it. Its
       // models are built into the world once the stream is over (each settle used to rebuild it).
+      releaseInference();
+      releaseInference = holdInference('streaming the town');
       void (async () => {
-        await homeAssets;
-        if (disposed) return;
-        renderer.holdModelRefresh(true);
-        prefetch(restUrls);
-        // The catalog's pictures are built only once the stream is quiet, in idle moments.
-        await whenStreamSettled();
-        renderer.holdModelRefresh(false);
+        // (Let go of however this ends: a house whose files failed holds the voices no longer.)
+        try {
+          await homeAssets;
+          if (disposed) return;
+          renderer.holdModelRefresh(true);
+          try {
+            prefetch(restUrls);
+            readAhead();
+            // The catalog's pictures are built only once the stream is quiet, in idle moments.
+            await whenStreamSettled();
+          } finally {
+            renderer.holdModelRefresh(false);
+          }
+        } finally {
+          releaseInference();
+        }
         if (disposed || BENCH) return;
         prefetchTimer = setTimeout(() => {
           // (Not while benchmarking: drawing the pictures would show in the measurements.)
           if (disposed || BENCH) return;
-          services.items.prefetch(content.shop.map((def) => ({ model: def.model, footprint: def.footprint ?? [1, 1] })));
+          // (In Live they wait for Build.)
+          catalogAhead();
+          prefetchCatalog();
         }, PREFETCH_PICTURES_MS);
       })();
     },
@@ -1623,20 +1876,17 @@ export async function startSession(
       }
     },
     setMenuPause(paused) {
-      if (paused && speedBeforeMenu === null) {
-        speedBeforeMenu = game.speed;
-        bridge.send({ type: 'setSpeed', speed: 0 });
-      } else if (!paused && speedBeforeMenu !== null) {
-        bridge.send({ type: 'setSpeed', speed: speedBeforeMenu });
-        speedBeforeMenu = null;
-      }
+      speed.hold('menu', paused);
     },
     async dispose() {
       disposed = true;
+      releaseInference();
       ideas.clear();
       clearInterval(statsTimer);
       clearInterval(autosaveTimer);
       clearTimeout(prefetchTimer);
+      services.items.holdAhead(false);
+      services.prepare = undefined;
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pagehide', onLeave);
@@ -1659,6 +1909,10 @@ export async function startSession(
       await building;
       renderer.clear();
       bridge.dispose();
+      townMap.world = null;
+      townMap.source = {};
+      renderer.onFocusLot(null);
+      renderer.onWatch(null);
     },
   };
   session.applySettings(settings);

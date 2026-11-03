@@ -60,6 +60,10 @@ export type Command =
   | { type: 'buildBlueprint'; household: number; blueprint: unknown }
   /** Moves the room around tile (x, z) by (dx, dz) tiles, with what stands in it. */
   | { type: 'moveRoom'; household: number; x: number; z: number; dx: number; dz: number }
+  /** A garage on the home lot: its walls' centre lines, its door facing `rot` (as a thing's: 0 towards +z, 1 +x, 2 -z, 3 -x); content `build.garage`. */
+  | { type: 'buildGarage'; household: number; x0: number; z0: number; x1: number; z1: number; rot: number }
+  /** Takes down the home lot's garage (sold back for `objectRules.resale` of its price). */
+  | { type: 'sellGarage'; household: number }
   /** New residents move into the household's home (`bonds` index into `sims`); `name` renames the household. */
   | { type: 'moveIn'; household: number; name?: string; sims: SimSpawn[]; bonds: { a: number; b: number; preset: string }[] }
   /** The resident's own routine blocks (the whole list). */
@@ -373,21 +377,102 @@ export interface FormerResident {
 /** Event references with this bit name a former resident (sim-core `social::FORMER`). */
 export const FORMER = 2 ** 31;
 
+/** What is at the end of a road: the way out of town, a dead end (a turning circle), another road it joins, or itself (a ring). */
+export type RoadEnd = 'out' | 'dead' | 'join' | 'loop';
+
+/** A town's road (`game/roads.ts`): its middle, a point about every metre (town tiles); its width with the sidewalks. */
+export interface RoadPlan {
+  points: [number, number][];
+  width: number;
+  ends: [RoadEnd, RoadEnd];
+  name?: string;
+  /** The side its lots are on, if only one (+1: its left, looking along it; -1: its right): the other looks out over the water. */
+  lots?: 1 | -1;
+  /** What stands in the middle of a ring this small (a roundabout). */
+  island?: 'fountain';
+  /** What kind of way it is (default `street`; see docs/design/open-world.md). */
+  kind?: RoadKind;
+  /** The area (`OpenWorldTownFields.areas` index) it belongs to; absent for ways between areas. */
+  area?: number;
+}
+
+/** `street` (default) · `lane` · `country` (between areas) · `trail` (2 m, on foot only). */
+export type RoadKind = 'street' | 'lane' | 'country' | 'trail';
+
+/** How big a world is (docs/design/open-world.md); towns without one are `cosy`. */
+export type WorldSize = 'cosy' | 'normal' | 'big';
+
+/** Run-length mask over the ground grid, row-major from tile (0, 0): `[run, value(0|1), run, value, ...]`. */
+export type Rle = number[];
+
+/** A hamlet (area 0: the main town) or a stretch of countryside. */
+export interface TownArea {
+  name: string;
+  kind: 'hamlet' | 'countryside';
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+}
+
+/** Where people leave town: a road out (`[x, z]` is a road exit) or a bus stop people on foot use. */
+export type TownExit = [number, number] | { x: number; z: number; kind: 'road' | 'stop' };
+
+/** Land the renderer draws and the generator keeps building off. */
+export interface WorldZone {
+  /** What the land is (an orchard: fruit trees in rows beside a farmstead). */
+  kind: 'woods' | 'meadow' | 'water' | 'hill' | 'fields' | 'orchard';
+  poly: [number, number][];
+}
+
+/** The town file's open-world fields (all optional; absent: today's behaviour). */
+export interface OpenWorldTownFields {
+  size?: WorldSize;
+  /** The roads for the sim (the same objects as `meta.roads`). */
+  roads?: RoadPlan[];
+  areas?: TownArea[];
+  exits?: TownExit[];
+  terrain?: { water?: Rle; blocked?: Rle };
+  /** Public parking for car trips between areas. */
+  parking?: { x: number; z: number; rot: number; area: number }[];
+}
+
 export interface WorldMeta {
   kind?: string;
   name?: string;
+  /** Older towns' streets: straight, along x (newer ones have `roads`). */
   streets?: { x: number; z: number; w: number; d: number }[];
+  /** The town's roads (missing in older saves: their `streets`). */
+  roads?: RoadPlan[];
+  /** Village greens and the like: grass the roads go round (polygons, town tiles). */
+  greens?: [number, number][][];
   paths?: { x: number; z: number; w: number; d: number }[];
+  /** Where each plot's street is (by plot index; `game/town.ts` `Facing`): 0 north, 1 west, 2 south, 3 east. Missing in older saves. */
+  facing?: number[];
   seed?: number;
   /** What kind of world the town is in and how its land looks (missing: the classic valley). */
   world?: WorldLook;
-  /** The menus' town preview only: the plot drawn as the player's house, as the game shows it (no garage, car or garden dressing). */
+  /** The menus' town preview only: the plot drawn as the player's house, as the game shows it (its car on the driveway, no garage or garden dressing). */
   home?: number | null;
+  /**
+   * The town put its garden fences, hedges and farm field fences up as real fences (`fences`, see
+   * `game/gardenFences.ts`): the street draws none of its own. Missing in older towns and saves,
+   * whose street still dresses neighbours' gardens and fields with fences of its own.
+   */
+  gardenFences?: boolean;
+  /** Big worlds: woods, meadows, water, hills and fields across the world. */
+  zones?: WorldZone[];
+  /** Big worlds: the height (m) each outdoor plot off the flat town land is levelled to, by plot index. */
+  pads?: Record<number, number>;
+  /** The areas (hamlets) as the generator laid them out, for the map and the camera. */
+  areas?: TownArea[];
 }
 
 /** The world a town stands in (`game/world.ts`): its kind, its land, and farm fields in town. */
 export interface WorldLook {
   kind: string;
+  /** How big the world is (missing: `cosy`). */
+  size?: WorldSize;
   landscape: LandscapeParams;
   /** Tilled fields on farm lots (town tiles): drawn as soil, fenced in. */
   fields?: { x: number; z: number; w: number; d: number }[];
@@ -464,9 +549,20 @@ export interface PlotInfo {
 /** Living: the residents earn the money for building. Creative: building is free. */
 export type GameKind = 'living' | 'creative';
 
-/** The parts of `WorldStructure` that are the lot itself: sent only when `lotVersion` changes. */
-export type LotPart = 'rooms' | 'walls' | 'openings' | 'diagonals' | 'fences' | 'floors' | 'meshes';
-export type LeanWorld = Omit<WorldStructure, LotPart>;
+/**
+ * A `world` message's structure (sim-core `view::StructureSync`): what changed since the last
+ * message, the first time everything. The parts it has replace the last ones, those `unset` names
+ * are gone (the last garage sold), and `objectChanges` are things that changed, by index, while
+ * the list of things stays the same (a door opened, a crop grown). The lot's walls, openings,
+ * diagonals, fences and floors come only when the lot changed; its rooms and meshes come beside it
+ * (typed arrays, transferred).
+ */
+export type WorldUpdate = Partial<Omit<WorldStructure, 'rooms' | 'meshes' | 'staffSims'>> & {
+  version: number;
+  lotVersion: number;
+  objectChanges?: [number, ObjectPlacement][];
+  unset?: (keyof WorldStructure)[];
+};
 
 export interface WorldStructure {
   version: number;
@@ -495,7 +591,8 @@ export interface WorldStructure {
   households: HouseholdInfo[];
   plots: PlotInfo[];
   exits: [number, number][];
-  rooms: number[];
+  /** The room of each tile, row by row (`width × depth`; 0 outdoors): a `Uint16Array` from the simulation. */
+  rooms: Uint16Array | number[];
   /** Every edge with a wall on it (plain, or with a door or window), in grid order. */
   walls: WallEdge[];
   /** Doors and windows. */
@@ -516,6 +613,37 @@ export interface WorldStructure {
   staff?: StaffInfo[];
   /** The servers as residents for the renderer (rows `sims.length + k`), given their looks by the session (`game/staff.ts`). */
   staffSims?: SimInfo[];
+  /**
+   * Households' cars (sim-core `cars.rs`), in their snapshot rows' order (`SnapshotLayout.car`): where each
+   * parks. Absent: a game from before cars (the street draws some by the neighbours' driveways, parked).
+   */
+  cars?: CarInfo[];
+  /** Garages at the inner ends of driveways (sim-core `cars::Garage`: wall centre lines, by plot). Absent: a game from before them (the street places neighbours' own). */
+  garages?: GarageInfo[];
+}
+
+/**
+ * A garage (`WorldStructure.garages`): its walls' centre lines, and for one the player built (Build
+ * mode's Garage tool) the way its door faces (`rot`, as a thing's: 0 towards +z, 1 +x, 2 -z, 3 -x).
+ * No `rot`: its door faces the street, as the town placed it.
+ */
+export interface GarageInfo {
+  plot: number;
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+  rot?: number;
+}
+
+/** A household's car (`WorldStructure.cars`): where it parks (its middle, which way it faces: 0 towards +z) and its look (`shared/cars.ts`: its size is its body's). */
+export interface CarInfo {
+  plot: number;
+  x: number;
+  z: number;
+  yaw: number;
+  body: number;
+  paint: number;
 }
 
 /** One of the town's servers (`WorldStructure.staff`). */
@@ -561,6 +689,12 @@ export interface SimView {
   /** Minute of day they come back from work, if away. */
   awayUntil: number | null;
   visiting: number | null;
+  /**
+   * On their way somewhere (a visit, home, home from work by car): the plot, and about when they're
+   * there (minute of day, in 5-minute steps). `at` only with `detail` (it takes a search along the
+   * roads), or home from work by car. Absent when they aren't (and from older workers).
+   */
+  trip?: { to: number; at?: number };
   job: JobView | null;
   /** A pupil's school grade (0..100, in tenths). */
   grade?: number;
@@ -659,7 +793,7 @@ export interface Catalog {
     upgradeSkillPerLevel: number;
     resale: number;
   };
-  build: { wall: number; door: number; window: number; remove: number; diagonalWall?: number; fence?: number; gate?: number };
+  build: { wall: number; door: number; window: number; remove: number; diagonalWall?: number; fence?: number; gate?: number; garage?: number };
 }
 
 export interface CareerEntry {
@@ -810,7 +944,11 @@ export type GameSource = { lot: string; seed: number } | { save: string };
 export type SaveProblem = 'tooNew' | 'tooOld' | 'corrupt' | 'failed';
 
 export type ToWorker =
-  | { type: 'init'; content: string; source: GameSource }
+  /**
+   * `speed`: the clock's speed from the first step (0: the game starts paused). `module`: the
+   * simulation's wasm, compiled once a page (`game/session.ts` `compileSim`); else the worker fetches it.
+   */
+  | { type: 'init'; content: string; source: GameSource; speed?: number; module?: WebAssembly.Module }
   /** Only checks that a save opens (an imported file); answered with `checked`. */
   | { type: 'check'; content: string; save: string }
   | { type: 'command'; command: Command }
@@ -824,8 +962,10 @@ export type ToWorker =
   | { type: 'inspect'; sim: number | null }
   /** The next UI update sends everything. */
   | { type: 'resync' }
-  /** Which part of the town to build geometry for (tile rectangle); null = everything. */
-  | { type: 'view'; region: [number, number, number, number] | null }
+  /** Which part of the town to build geometry for (tile rectangle); null = everything. `seq` comes back with the worlds built for it. */
+  | { type: 'view'; region: [number, number, number, number] | null; seq: number }
+  /** The camera's stream rectangle: the sim's full-detail area (docs/design/open-world.md `setWatch`). */
+  | { type: 'watch'; region: [number, number, number, number] | null }
   /** `?debug`'s `__crash`: the next step panics, an error nobody catches, or the worker hangs. */
   | { type: 'debugCrash'; what: 'panic' | 'throw' | 'hang' };
 
@@ -846,9 +986,16 @@ export interface SimThreadStats {
 export type FromWorker =
   /** A start is under way and making progress (before `ready`; repeated while the simulation downloads). */
   | { type: 'starting' }
-  | { type: 'ready'; layout: SnapshotLayout; shared: SharedArrayBuffer | null; catalog: Catalog }
-  /** `full`: with the lot; otherwise a `LeanWorld` (the lot is as last sent). */
-  | { type: 'world'; world: WorldStructure | LeanWorld; full: boolean }
+  /**
+   * `speed`: the game's own speed as it opened (a save's: the one it was saved at), before the
+   * `init` speed held it: what play resumes at.
+   */
+  | { type: 'ready'; layout: SnapshotLayout; shared: SharedArrayBuffer | null; catalog: Catalog; speed: number }
+  /**
+   * What changed of the world structure (`WorldUpdate`), with the lot's rooms when the lot changed
+   * and its meshes when the lot or the view did. `view`: the `seq` of the view it was built for.
+   */
+  | { type: 'world'; view: number; world: WorldUpdate; rooms?: Uint16Array; meshes?: WorldStructure['meshes'] }
   /** Food and dishes, whenever they change (`ItemPlacement`). */
   | { type: 'items'; items: ItemPlacement[] }
   /** The lamps switched off (object ids), whenever a lamp is switched or the objects change. */
@@ -869,6 +1016,18 @@ export type FromWorker =
   | { type: 'error'; message: string; fatal: boolean; problem?: SaveProblem }
   /** A save `check`ed: `problem` null if it opens. */
   | { type: 'checked'; problem: SaveProblem | null; message: string };
+
+/**
+ * The newest thing (highest object id) a resident in `snapshot` uses or walks to, -1 if none. Ids
+ * are never reused (sim-core `next_object_id`), so one above the highest the main thread was sent
+ * is a thing it hasn't heard of yet (`sim.worker.ts` then sends the world at once).
+ */
+export function newestObjectUsed(snapshot: ArrayLike<number>, layout: SnapshotLayout): number {
+  let newest = -1;
+  const count = snapshot[layout.header.simCount] | 0;
+  for (let i = 0; i < count; i++) newest = Math.max(newest, snapshot[layout.headerLen + i * layout.simStride + layout.sim.object] | 0);
+  return newest;
+}
 
 /** Rows of the town itself (the ground storey; see `WorldStructure.storeyDepth`). */
 export function groundDepth(world: { depth: number; storeyDepth?: number }): number {

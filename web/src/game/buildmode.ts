@@ -22,11 +22,13 @@
 
 import type { Content, ObjectDef } from '../content/content';
 import { colorValues } from '../ui/buy/catalog';
-import { colorsKey, groundDepth, storeyOfRow, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type ObjectPlacement, type PartColors, type PlotInfo, type WorldStructure } from '../core/protocol';
+import { colorsKey, groundDepth, storeyOfRow, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type GarageInfo, type ObjectPlacement, type PartColors, type PlotInfo, type WorldStructure } from '../core/protocol';
 import type { BuildEffect, ObjectResize, Renderer, ResizeHandle } from '../render/types';
 import type { Sound } from '../ui/sfx';
 import { game, type BuildTool } from '../ui/state.svelte';
 import { approachTile, covers, facedTable, fitOnTop, frontTile, overhangEdges, overhangTiles, ownSize, spotAt, topOf, type Top } from './surfaces';
+import { edgeInGarage, freeGarage, garageFits, onGarage, type GaragePlan, type GarageSite } from './garage';
+import { drivewayGarage } from '../render/shared/street';
 
 type Point = { x: number; z: number };
 /** A wall face to paint; `half` for a half wall (the preview's height). */
@@ -165,7 +167,7 @@ export class BuildBuyInput {
   /** Looks of the walls that have one (keys as `edges`). */
   private looks = new Map<string, Look>();
   /** Room of each tile, and of each half of a split tile (`x:z` → rooms of halves 0 and 1). */
-  private rooms: number[] = [];
+  private rooms: WorldStructure['rooms'] = [];
   private halves = new Map<string, [number, number]>();
   private width = 0;
   /** Paint tool: faces collected by the drag in progress. */
@@ -250,6 +252,7 @@ export class BuildBuyInput {
   /** Keeps the current walls, doors and windows (from each new world structure). */
   setStructure(world: WorldStructure): void {
     this.layout = { depth: world.depth, storeyDepth: world.storeyDepth, storeys: world.storeys, basement: world.basement };
+    this.world = world;
     const refs = [world.walls, world.openings, world.diagonals, world.fences, world.floors, world.rooms];
     if (refs.every((r, i) => r === this.lotRefs[i])) return;
     this.lotRefs = refs;
@@ -337,6 +340,8 @@ export class BuildBuyInput {
     game.buildRoom = null;
     game.placeValid = true;
     game.placeHint = null;
+    this.preview.setGaragePreview(null);
+    game.garageHover = null;
   }
 
 
@@ -388,7 +393,8 @@ export class BuildBuyInput {
     this.lastHover = ground;
     if (!ground) return this.clearPreviews();
     if (this.pressed) this.lastGround = ground;
-    if (this.stairsTool() || game.furnishing) this.hoverBuy(ground);
+    if (this.garageTool()) this.hoverGarage(ground);
+    else if (this.stairsTool() || game.furnishing) this.hoverBuy(ground);
     else if (this.building()) this.hoverBuild(ground);
   }
 
@@ -466,6 +472,7 @@ export class BuildBuyInput {
   click(ground: Point | null, objectId: number | null): boolean {
     if (this.paintTool() || this.floorTool()) return true;
     if (this.stairsTool()) return this.clickStairs(ground, objectId);
+    if (this.garageTool()) return this.clickGarage(ground);
     if (this.building()) return ground ? this.clickBuild(ground) : true;
     if (game.furnishing) return this.clickBuy(ground, objectId);
     return false;
@@ -891,6 +898,153 @@ export class BuildBuyInput {
   objectsChanged(): void {
     this.handlesKey = '';
     this.syncHandles();
+    this.garageState();
+  }
+
+  // ---- Garage ----------------------------------------------------------------------
+
+  /** The world last given (`setStructure`): its garages and driveways, for the Garage tool. */
+  private world: WorldStructure | null = null;
+  /** The home's driveway and the garage that fits at its end, as last worked out, and from what. */
+  private drive: { key: unknown[]; at: ReturnType<typeof drivewayGarage> } | null = null;
+
+  /** Build mode's Garage tool: builds (and takes down) the home's garage. */
+  garageTool(): boolean {
+    return this.building() && game.buildTool === 'garage';
+  }
+
+  /** The player's home plot's id. */
+  private homePlot(): number | null {
+    return game.households.find((h) => h.player)?.plot ?? null;
+  }
+
+  /** The home's garage (a home has one at most), if it has one. */
+  private homeGarage(): GarageInfo | null {
+    const plot = this.homePlot();
+    return plot === null ? null : (this.world?.garages?.find((g) => g.plot === plot) ?? null);
+  }
+
+  /** The home's driveway, and the garage that fits at its end clear of the things on the lot (`drivewayGarage`), worked out again only when they change. */
+  private homeDrive(): ReturnType<typeof drivewayGarage> {
+    const plot = this.homePlot();
+    const p = plot === null ? undefined : game.plots[plot];
+    if (plot === null || !p || !this.world) return null;
+    const key = [this.world.plots, this.world.meta, game.objects, this.rooms, plot];
+    if (this.drive && this.drive.key.every((k, i) => k === key[i])) return this.drive.at;
+    // (The things outdoors: those in the house are behind its walls.)
+    const things = game.objects.filter((o) => o.x >= p.x && o.z >= p.z && o.x < p.x + p.w && o.z < p.z + p.d && !this.indoors(o.x, o.z)).map((o) => ({ x: o.x, z: o.z, w: o.w, d: o.d }));
+    const at = drivewayGarage(this.world, plot, things);
+    this.drive = { key, at };
+    return at;
+  }
+
+  /** What a garage costs in this game. */
+  private garagePrice(): number {
+    return game.creative ? 0 : (game.catalog?.build.garage ?? 0);
+  }
+
+  /** What a garage on the home lot has to keep clear of (null: not on the ground storey, or no home). */
+  private garageSite(): GarageSite | null {
+    const home = this.home();
+    if (!home || game.storey !== 0) return null;
+    const edge = (k: string) => (this.edges.get(k) ?? 'open') !== 'open';
+    return {
+      plot: home,
+      hasGarage: !!this.homeGarage(),
+      indoors: (x, z) => this.indoors(x, z),
+      walled: (axis, x, z) => (axis === 'd' ? this.diagonals.has(`${x}:${z}`) : edge(`${axis}:${x}:${z}`)),
+      thingAt: (x, z) => this.thingAt(x, z, null, () => true),
+      drive: this.homeDrive()?.drive ?? null,
+      affords: game.affords(this.garagePrice()),
+    };
+  }
+
+  /**
+   * Where a click with the Garage tool builds one: at the end of the driveway, where the town puts
+   * garages, while the pointer is on the driveway or near that spot (and one fits there); else
+   * under the pointer, facing `game.garageRot`, on whole tiles.
+   */
+  private garagePlan(ground: Point): { plan: GaragePlan; drive: boolean } {
+    const d = this.homeDrive();
+    if (d?.garage && !this.homeGarage()) {
+      const g = d.garage;
+      const near = (r: { x: number; z: number; w: number; d: number }, m: number) => ground.x >= r.x - m && ground.x <= r.x + r.w + m && ground.z >= r.z - m && ground.z <= r.z + r.d + m;
+      if (near(d.drive, 0.2) || near({ x: g.x0, z: g.z0, w: g.x1 - g.x0, d: g.z1 - g.z0 }, 1.5)) return { plan: { ...g, rot: d.rot }, drive: true };
+    }
+    return { plan: freeGarage(ground.x, ground.z, game.garageRot), drive: false };
+  }
+
+  private hoverGarage(ground: Point): void {
+    const own = this.homeGarage();
+    if (own && game.storey === 0 && onGarage(own, ground.x, ground.z)) {
+      this.preview.setGaragePreview({ x0: own.x0, z0: own.z0, x1: own.x1, z1: own.z1, rot: own.rot ?? 0, valid: false, sell: true });
+      game.garageHover = { kind: 'sell' };
+      return;
+    }
+    const site = this.garageSite();
+    if (!site) {
+      this.preview.setGaragePreview(null);
+      game.garageHover = null;
+      return;
+    }
+    const { plan, drive } = this.garagePlan(ground);
+    const fit = garageFits(plan, site);
+    this.preview.setGaragePreview({ ...plan, valid: fit === true });
+    game.garageHover = { kind: 'build', drive, valid: fit === true, reason: fit === true ? null : fit };
+  }
+
+  private clickGarage(ground: Point | null): boolean {
+    if (!ground) return true;
+    const own = this.homeGarage();
+    if (own && game.storey === 0 && onGarage(own, ground.x, ground.z)) {
+      this.sellGarage();
+      return true;
+    }
+    const site = this.garageSite();
+    if (!site) return true;
+    const { plan } = this.garagePlan(ground);
+    // Doesn't fit: say so here rather than ask the simulation to refuse it.
+    if (garageFits(plan, site) !== true) {
+      game.placeRefused++;
+      return true;
+    }
+    this.sendGarage(plan);
+    return true;
+  }
+
+  private sendGarage(g: GaragePlan): void {
+    this.send({ type: 'buildGarage', household: game.home, x0: g.x0, z0: g.z0, x1: g.x1, z1: g.z1, rot: g.rot });
+    this.preview.setGaragePreview(null);
+    game.garageHover = null;
+  }
+
+  /** The Garage tool's panel: builds one at the end of the driveway (where one fits). */
+  buildDrivewayGarage(): void {
+    const d = this.homeDrive();
+    if (d?.garage && !this.homeGarage()) this.sendGarage({ ...d.garage, rot: d.rot });
+  }
+
+  /** Takes down the home's garage (Delete with the Garage tool, a click on it, its panel). */
+  sellGarage(): void {
+    if (!this.homeGarage()) return;
+    this.send({ type: 'sellGarage', household: game.home });
+    this.preview.setGaragePreview(null);
+    game.garageHover = null;
+  }
+
+  /** R with the Garage tool: the next garage's door faces the next way round. */
+  rotateGarage(): void {
+    game.garageRot = (game.garageRot + 1) % 4;
+    if (this.lastHover) this.hoverGarage(this.lastHover);
+  }
+
+  /** What the Garage tool's panel offers: the home's garage to sell, one to build at the end of the driveway. */
+  private garageState(): void {
+    const own = !!this.homeGarage();
+    const drive = !own && !!this.homeDrive()?.garage;
+    if (game.homeGarage !== own) game.homeGarage = own;
+    if (game.drivewayGarage !== drive) game.drivewayGarage = drive;
+    if (this.garageTool() && this.lastHover) this.hoverGarage(this.lastHover);
   }
 
   /** Buy: pressing on an arrow of the picked object resizes it (things are moved with clicks, not dragged). */
@@ -1610,7 +1764,9 @@ export class BuildBuyInput {
     const inWall = fenced
       ? edges.every((e) => !walled(e))
       : !this.opening() || edges.every((e) => this.edgeState(e) !== 'open' && !(this.edgeState(e) === 'wall' && this.lookOf(e).form));
-    const valid = inWall && this.edgesOnHome(edges) && this.diagonalsFit(edges) && game.affords(game.buildCost);
+    // (Nor through a garage: the simulation keeps walls and fences out of them.)
+    const garaged = edges.some((e) => e.kind !== 'open' && (this.world?.garages ?? []).some((g) => edgeInGarage(g, e.axis, e.x, e.z)));
+    const valid = inWall && !garaged && this.edgesOnHome(edges) && this.diagonalsFit(edges) && game.affords(game.buildCost);
     this.preview.setEdgePreview(edges, valid);
     game.buildEdges = edges.length;
     game.buildValid = valid;
@@ -1910,6 +2066,21 @@ export function editFeedback(prev: WorldStructure, next: WorldStructure): { effe
   if ([...lookNow.faces].some(([k, v]) => lookWas.faces.has(k) && lookWas.faces.get(k) !== v)) sounds.add('paint');
   const floorKey = (w: WorldStructure) => (w.floors ?? []).map((f) => f.join(':')).join(',');
   if (prev.floors !== next.floors && floorKey(prev) !== floorKey(next)) sounds.add('paint');
+  // A garage built or taken down (Build mode's Garage tool, or its undo): dust round it.
+  const garageKey = (g: GarageInfo) => `${g.plot}:${g.x0}:${g.z0}:${g.x1}:${g.z1}:${g.rot ?? ''}`;
+  const garagesWere = new Set((prev.garages ?? []).map(garageKey));
+  const garagesNow = new Set((next.garages ?? []).map(garageKey));
+  const garageRect = (g: GarageInfo) => ({ x: g.x0, z: g.z0, w: g.x1 - g.x0, d: g.z1 - g.z0 });
+  for (const g of next.garages ?? []) {
+    if (garagesWere.has(garageKey(g))) continue;
+    effects.push({ kind: 'build', ...garageRect(g) });
+    sounds.add('build');
+  }
+  for (const g of prev.garages ?? []) {
+    if (garagesNow.has(garageKey(g))) continue;
+    effects.push({ kind: 'remove', ...garageRect(g) });
+    sounds.add('remove');
+  }
 
   const order: Sound[] = ['upgrade', 'place', 'sell', 'build', 'remove', 'paint', 'rotate'];
   return { effects, sound: order.find((s) => sounds.has(s)) ?? null };

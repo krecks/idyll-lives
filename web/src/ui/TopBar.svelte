@@ -1,7 +1,8 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import { clock, money, WEEKDAYS } from './format';
-  import { settings } from '../settings/settings.svelte';
+  import { settings, systemMotion } from '../settings/settings.svelte';
+  import { MoneyFloats, moneyChange } from './moneyFloats.svelte';
   import { services } from './services';
   import { game, nextWallMode } from './state.svelte';
 
@@ -29,6 +30,15 @@
     }
     return 'Household funds';
   });
+
+  /**
+   * Live: the money each change brings or takes (wages, rent, a takeout), floating off the funds
+   * for a moment (Build's purchases have their own, by the cursor: `buy/BuyFx.svelte`). With
+   * Reduce motion it shows where it is, without moving.
+   */
+  const floats = new MoneyFloats(1600, 3);
+  const still = $derived(settings.reducedMotion || systemMotion.reduced);
+  $effect(() => floats.note(game.funds, game.mode === 'live' && !game.creative));
 
   function storeyLabel(storey: number): string {
     if (storey < 0) return 'Basement';
@@ -58,7 +68,7 @@
     {#if game.mode === 'live'}
       <div class="segmented speeds">
         {#each speeds as s (s.value)}
-          <button class:active={game.speed === s.value} title={s.label} aria-label={s.label} onclick={() => services.controls.setSpeed(s.value)}>
+          <button class:active={game.speed === s.value} title={s.label} aria-label={s.label} aria-pressed={game.speed === s.value} onclick={() => services.controls.setSpeed(s.value)}>
             <Icon name={s.icon} size={15} />
           </button>
         {/each}
@@ -90,6 +100,9 @@
 
     <span class="funds tabular" class:debt={game.funds < 0} title={fundsTitle}>
       <Icon name="icon.ui.funds" size={16} />{money(game.funds)}
+      {#each floats.shown as f (f.id)}
+        <span class="float" class:gain={f.amount > 0} class:still aria-hidden="true">{moneyChange(f.amount)}</span>
+      {/each}
     </span>
 
     {#if game.storeys - game.lowestStorey > 1}
@@ -263,6 +276,7 @@
     background: var(--hairline);
   }
   .funds {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -273,6 +287,44 @@
   }
   .funds.debt {
     color: var(--bad);
+  }
+  /* A change of funds, floating down off them (under the bar, over the game). */
+  .float {
+    position: absolute;
+    top: 100%;
+    right: 8px;
+    margin-top: 6px;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--glass-strong);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-sm);
+    color: var(--bad);
+    font-size: 12px;
+    font-weight: 750;
+    pointer-events: none;
+    animation: drift 1.6s var(--ease) forwards;
+  }
+  .float.gain {
+    color: var(--good);
+  }
+  .float.still {
+    animation: none;
+  }
+  @keyframes drift {
+    0% {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    15%,
+    70% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(10px);
+    }
   }
   .storeys {
     display: flex;

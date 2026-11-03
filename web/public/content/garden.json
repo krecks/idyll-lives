@@ -128,6 +128,7 @@
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
+      "crown": 2.6,
       "description": "A dense, round crown of fresh green maple leaves. Gives deep shade on summer afternoons.",
       "interactions": [
         {
@@ -157,6 +158,7 @@
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
+      "crown": 1.7,
       "description": "White bark and an airy crown of small leaves that flicker in every breeze.",
       "interactions": [
         {
@@ -186,6 +188,7 @@
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
+      "crown": 2.6,
       "description": "A low, spreading crown covered in pink blossom.",
       "interactions": [
         {
@@ -234,6 +237,7 @@
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
+      "crown": 2.3,
       "description": "A compact fruit tree. In fruit, an apple picked for someone peckish, or the lot picked for the fridge; then it fruits again in a few days. Good gardeners get more out of it.",
       "interactions": [
         {
@@ -315,6 +319,7 @@
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
+      "crown": 1.9,
       "description": "A small, layered tree with deep red leaves: the star of any garden.",
       "interactions": [
         {
@@ -367,6 +372,7 @@
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
+      "crown": 2.1,
       "description": "Big, pale pink goblet flowers on an open crown.",
       "interactions": [
         {
@@ -411,6 +417,7 @@
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
+      "crown": 2.5,
       "description": "Long green curtains of willow sweep down to the lawn. A private spot to sit beneath.",
       "interactions": [
         {
@@ -440,6 +447,7 @@
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
+      "crown": 2.7,
       "description": "A dense, regular conifer with blue-green needles; evergreen.",
       "interactions": []
     },
@@ -934,6 +942,27 @@
             "outdoors"
           ],
           "feeling": "garden.sweetScent"
+        },
+        {
+          "id": "cut",
+          "label": "Cut some tulips",
+          "anim": "tend",
+          "minutes": 6,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.06,
+            "hygiene": -0.03
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "cutFlowers"
         }
       ]
     },
@@ -980,6 +1009,27 @@
             "outdoors"
           ],
           "feeling": "garden.sweetScent"
+        },
+        {
+          "id": "cut",
+          "label": "Cut some daffodils",
+          "anim": "tend",
+          "minutes": 6,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.06,
+            "hygiene": -0.03
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "cutFlowers"
         }
       ]
     },
@@ -1026,6 +1076,48 @@
             "outdoors"
           ],
           "feeling": "garden.sweetScent"
+        },
+        {
+          "id": "cut",
+          "label": "Cut some daisies",
+          "anim": "tend",
+          "minutes": 6,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.06,
+            "hygiene": -0.03
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "cutFlowers"
+        },
+        {
+          "id": "daisyChain",
+          "label": "Make a daisy chain",
+          "anim": "tend",
+          "minutes": 12,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.15,
+            "comfort": 0.05
+          },
+          "tags": [
+            "nature",
+            "garden",
+            "outdoors",
+            "cozy"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "daisyChain"
         }
       ]
     },
@@ -1253,6 +1345,27 @@
             "outdoors"
           ],
           "feeling": "garden.sweetScent"
+        },
+        {
+          "id": "cut",
+          "label": "Cut some lilies",
+          "anim": "tend",
+          "minutes": 6,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.06,
+            "hygiene": -0.03
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "cutFlowers"
         }
       ]
     },
@@ -1390,6 +1503,27 @@
             "outdoors"
           ],
           "feeling": "garden.sweetScent"
+        },
+        {
+          "id": "cut",
+          "label": "Cut some cosmos",
+          "anim": "tend",
+          "minutes": 6,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.06,
+            "hygiene": -0.03
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "cutFlowers"
         }
       ]
     },

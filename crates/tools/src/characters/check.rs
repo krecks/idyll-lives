@@ -103,6 +103,8 @@ fn runtime_names() -> Runtime {
             ids.extend(id_re.captures_iter(&list).map(|c| c[1].to_string()));
         }
         ids.extend(ts_list(&outfit, "const SHOE_PARTS"));
+        // Workwear (the staff's apron) is a garment of every body but is not offered in the creator.
+        ids.extend(ts_list(&outfit, "const WORKWEAR"));
         ids.into_iter().collect()
     };
     let garments = [

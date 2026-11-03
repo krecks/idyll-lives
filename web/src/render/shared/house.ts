@@ -35,6 +35,7 @@ import type { DoorStyleDef, FloorCoveringDef, LightAim, RoofColorDef, RoofStyleD
 import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
+import { roadIndex, townRoads } from './roads';
 import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from './slanted';
 import { WALL_HALF, WALL_HEIGHT } from './walls';
 
@@ -67,6 +68,8 @@ export interface HousePart {
 export { WALL_HALF, WALL_HEIGHT };
 export const WALL_STUB = 0.35;
 const T = WALL_HALF; // half wall thickness (sim-core WALL_THICKNESS / 2)
+/** How far a post's face against a wall sits inside it (m): its edges on the wall's faces showed as lines. */
+const INSIDE = 0.002;
 const DOOR_HEIGHT = 2.1;
 const PLINTH = 0.32;
 // Window opening (matches sim-core `WINDOW_SILL` / `WINDOW_HEAD`); the glazed part is narrower
@@ -122,6 +125,12 @@ const FLOOR_MATERIALS: Record<FloorCoveringDef['finish'], string> = {
 
 /** The finishes drawn with a pattern over their surface (wall and floor finishes alike). */
 const FINISH_PATTERNS: Partial<Record<WallCoveringDef['finish'] | FloorCoveringDef['finish'], SurfacePattern>> = { wallpaper: 'stripes', whitewash: 'whitewash' };
+
+/** The surface (and its pattern) a wall or floor covering of `finish` is drawn with; null for a finish there isn't. */
+export function coveringSurface(kind: 'wall' | 'floor', finish: string): { key: string; pattern?: SurfacePattern } | null {
+  const key = kind === 'wall' ? FINISH_MATERIALS[finish as WallCoveringDef['finish']] : FLOOR_MATERIALS[finish as FloorCoveringDef['finish']];
+  return key ? { key, pattern: FINISH_PATTERNS[finish as WallCoveringDef['finish']] } : null;
+}
 
 /** How far a covering preview lies off the surface it covers, so it draws over it (metres). */
 const PROUD = 0.004;
@@ -193,6 +202,8 @@ interface Run {
 const SIDING = ['#ECE6D8', '#C9D8C4', '#BCD0E0', '#EADBA8', '#D9C6B2', '#F4F2EC', '#A9BBA8', '#E6C9B8'];
 const BRICK = ['#FFFFFF', '#E8D8CC', '#D6C2B4'];
 const ACCENT = ['#3E5A4A', '#2F4058', '#7A3B34', '#4A4A4A', '#5B6E86', '#6E5A3E'];
+/** The front door (and shutters) of about one house in twelve: somebody wanted it seen. */
+const LOUD = ['#E8457A', '#F2B51D', '#3FA7D6', '#7BC950', '#9B5DE5', '#FF7A3D'];
 const ROOF = ['#5C626A', '#6B4A3A', '#8C4E3C', '#4F5A4C', '#3E4148', '#7A6A5A'];
 const TRIM = '#F7F5F0';
 const ROOM_WALLS: Record<RoomKind, string[]> = {
@@ -205,7 +216,7 @@ const CARPET = ['#B8AE9C', '#9FAAB8', '#B49C8C', '#A8B29A', '#C4B4A8'];
 /** Curtain colours seen through neighbours' windows. */
 const CURTAINS = ['#F2EDE0', '#E8D9B8', '#C9D6E2', '#E2C4BE', '#F4F1EA', '#E6E0C8'];
 /** Wall height of a garage (lower than the house). */
-const GARAGE_HEIGHT = 2.5;
+export const GARAGE_HEIGHT = 2.5;
 
 type RoomKind = 'living' | 'bedroom' | 'bath' | 'kitchen';
 
@@ -227,8 +238,10 @@ export interface RoomLight {
   /** Lamps: reach in metres and relative brightness (content `light`). */
   range?: number;
   power?: number;
-  /** A lamp with a switch (or a fire): its object id, to follow it on and off. */
+  /** A lamp with a switch (or a fire, or one that follows a use): its object id, to follow it on and off. */
   lamp?: number;
+  /** Lit as bright by day as at night: it follows a use, so it's on when it's needed, not only after dark. */
+  always?: boolean;
   /** Where its shade sends the light (content `light.aim`): a unit direction for a lamp that lights one side only (none: all round). */
   dir?: [number, number, number];
 }
@@ -282,8 +295,9 @@ export function placeLights(world: WorldStructure, inView: (x: number, z: number
     }
   };
   const lights = [
-    ...lamps.map((l): RoomLight => ({ x: l.x, z: l.z, ...aimed(l), room: l.room, area: areaOf(l.room), kind: 'lamp', power: l.light.intensity, ...(l.light.switch === false ? {} : { lamp: l.id }) })),
-    ...[...rooms.entries()].filter(([r]) => !lamps.some((l) => l.room === r)).map(([r, t]): RoomLight => ({ x: t.sx / t.n, y: 2.45, z: t.sz / t.n, room: r, area: t.n, kind: 'fill' })),
+    ...lamps.map((l): RoomLight => ({ x: l.x, z: l.z, ...aimed(l), room: l.room, area: areaOf(l.room), kind: 'lamp', power: l.light.intensity, ...(l.light.switch === false && l.light.while === undefined ? {} : { lamp: l.id }), ...(l.light.while === undefined ? {} : { always: true }) })),
+    // (A light that follows a use isn't the room's lamp: a room whose only light is a hood still gets its dim fill.)
+    ...[...rooms.entries()].filter(([r]) => !lamps.some((l) => l.room === r && l.light.while === undefined)).map(([r, t]): RoomLight => ({ x: t.sx / t.n, y: 2.45, z: t.sz / t.n, room: r, area: t.n, kind: 'fill' })),
   ];
   // How many lights of its room come before each.
   const nth = new Map<RoomLight, number>();
@@ -307,6 +321,8 @@ export interface LampLight {
   switch?: boolean;
   /** A fire: lit and put out as a lamp is switched (sim-core `lights.rs`), its flames burning while it's lit. */
   fire?: boolean;
+  /** Lit only while someone does one of these animations at an object on its tiles (sim-core `lights.rs`). */
+  while?: string | string[];
   /** Where its shade sends the light (`ObjectDef.light.aim`). */
   aim?: LightAim;
 }
@@ -393,14 +409,16 @@ export interface SilhouetteSpec {
   z1: number;
   /** Origin of the house's lot: its look (siding, roof, accent) is chosen from it, as for the game's house. */
   lot: { x: number; z: number };
-  /** The player's house, dressed as the game builds it (no porch, chimney or garage). */
+  /** The player's house, dressed as the game builds it (no porch or chimney; its garage). */
   home?: boolean;
-  /** Street side: 1 = the wall at z1 faces the street, -1 = the wall at z0. */
-  front: 1 | -1;
-  /** Centre x of the front door (where the garden path meets the house), if known. */
+  /** Only its garage: the game draws the house itself (the viewed lot's). */
+  garageOnly?: boolean;
+  /** The street side: the outward normal (x, z) of the wall that faces the street ([0, 1]: the wall at z1, [-1, 0]: the wall at x0...). */
+  front: [number, number];
+  /** Centre of the front door along the front wall (x, or z on a wall along z), where the garden path meets the house, if known. */
   door: number | null;
-  /** Garage beside the house (wall centre lines), its door facing the street. */
-  garage: { x0: number; z0: number; x1: number; z1: number } | null;
+  /** Garage beside the house (wall centre lines), its door facing the street, or `door` (its outward normal: one the player built). */
+  garage: { x0: number; z0: number; x1: number; z1: number; door?: [number, number] } | null;
   /** The roof the player chose (`PlotInfo.roof`); absent: the house's own look. */
   roof?: [number, number];
   /** Storeys the house has (absent: one). */
@@ -504,7 +522,7 @@ export function houseScheme(x: number, z: number): HouseScheme {
   return {
     brick,
     wall: brick ? pick(BRICK, x, z, 2) : pick(SIDING, x, z, 2),
-    accent: pick(ACCENT, x, z, 3),
+    accent: hash(x, z, 7) < 1 / 12 ? pick(LOUD, x, z, 8) : pick(ACCENT, x, z, 3),
     roof: pick(ROOF, x, z, 4),
     hip: hash(x, z, 5) < 0.45,
     shutters: hash(x, z, 6) < 0.6,
@@ -615,10 +633,12 @@ export class HousePlanner {
     /** Whether a wall stands on an edge and is drawn here (a preview's own, not one standing round it). */
     const drawn = (axis: 'h' | 'v', x: number, z: number): boolean => !!(own ?? edges).get(axis, x, z) && !!edges.get(axis, x, z);
     // Looks: face coverings and form from the wall list, the style from the opening.
+    // (Only round the view: the lookups never leave it, and a big world's walls are thousands.)
+    const nearView = (e: { x: number; z: number }) => !view || (e.x >= view.x - 2 && e.z >= view.z - 2 && e.x <= view.x + view.w + 2 && e.z <= view.z + view.d + 2);
     const looks = new Map<string, Look>();
-    for (const e of [...standingWalls, ...world.walls]) if (e.faces || e.form) looks.set(`${e.axis}:${e.x}:${e.z}`, { faces: e.faces, form: e.form });
+    for (const e of [...standingWalls, ...world.walls]) if ((e.faces || e.form) && nearView(e)) looks.set(`${e.axis}:${e.x}:${e.z}`, { faces: e.faces, form: e.form });
     for (const o of [...standingOpenings, ...world.openings]) {
-      if (o.style || o.sill !== undefined || o.head !== undefined) looks.set(`${o.axis}:${o.x}:${o.z}`, { ...looks.get(`${o.axis}:${o.x}:${o.z}`), style: o.style, sill: o.sill, head: o.head });
+      if ((o.style || o.sill !== undefined || o.head !== undefined) && nearView(o)) looks.set(`${o.axis}:${o.x}:${o.z}`, { ...looks.get(`${o.axis}:${o.x}:${o.z}`), style: o.style, sill: o.sill, head: o.head });
     }
     const lookOf = (axis: 'h' | 'v', x: number, z: number): Look => looks.get(`${axis}:${x}:${z}`) ?? {};
     /** A door's top on an edge (m): the player's, else the usual. */
@@ -730,8 +750,10 @@ export class HousePlanner {
       t.sz += cz * n;
       roomTiles.set(r, t);
     };
-    for (let z = 0; z < D; z++) {
-      for (let x = 0; x < W; x++) {
+    // (Only the view's tiles: a big world's grid is a million a storey.)
+    const [z0, z1, x0, x1] = view ? [Math.max(0, view.z), Math.min(D, view.z + view.d), Math.max(0, view.x), Math.min(W, view.x + view.w)] : [0, D, 0, W];
+    for (let z = z0; z < z1; z++) {
+      for (let x = x0; x < x1; x++) {
         const r = room(x, z);
         if (r === 0 || !inView(x, z)) continue;
         const d = diagonal(x, z);
@@ -827,8 +849,12 @@ export class HousePlanner {
         if (y0 < plinth) {
           const out = 0.03;
           stone.poly([P(a0, y0), P(a1, y0), P(a1, Math.min(plinth, y1)), P(a0, Math.min(plinth, y1))], n);
-          stone.poly([Q(a0, plinth, 0), Q(a1, plinth, 0), Q(a1, plinth, out), Q(a0, plinth, out)], [0, 1, 0]);
-          stone.poly([Q(a0, y0, out), Q(a1, y0, out), Q(a1, plinth, out), Q(a0, plinth, out)], n);
+          // Its ledge only where wall goes on above it: faced all the way up (a basement's), it
+          // would lie on the wall's top, and inside the walls a post joins.
+          if (plinth < y1) {
+            stone.poly([Q(a0, plinth, 0), Q(a1, plinth, 0), Q(a1, plinth, out), Q(a0, plinth, out)], [0, 1, 0]);
+            stone.poly([Q(a0, y0, out), Q(a1, y0, out), Q(a1, plinth, out), Q(a0, plinth, out)], n);
+          }
         }
         const yb = Math.max(y0, plinth);
         if (y1 > yb) (own ?? ext).poly([P(a0, yb), P(a1, yb), P(a1, y1), P(a0, y1)], n);
@@ -1071,7 +1097,10 @@ export class HousePlanner {
                   : [['h', x - 1, z, 0], ['h', x, z, 0], ['v', x, z, 0]];
           const from = faces.find(([axis, ex, ez]) => edges.get(axis, ex, ez));
           const cover = from ? faceAt(...from) : 0;
-          face(axis, plane, a0, a1, 0, top, n, ra === 0 || rb === 0 ? 0 : ra, cover, from && from.join(':'));
+          // Against a wall it sits a hair inside it (its edges off the wall's faces and top): only
+          // a cut wall shows it, and then a hair's crack round it doesn't.
+          const e0 = e ? INSIDE : 0;
+          face(axis, plane, a0 + e0, a1 - e0, 0, top - e0, n, ra === 0 || rb === 0 ? 0 : ra, cover, from && from.join(':'));
         };
         const q = (dx: number, dz: number) => roomP(x + dx * 0.25, z + dz * 0.25);
         side('px', hr, [1, 0, 0], q(1, -1), q(1, 1));
@@ -1494,8 +1523,9 @@ export class HousePlanner {
     const homeId = world.households?.find((h) => h.player)?.plot;
     const home = homeId == null ? null : world.plots?.[homeId];
     const onHome = (x: number, z: number) => !!home && x >= home.x && z >= home.z && x < home.x + home.w && z < home.z + home.d;
-    const paths = [...(world.meta?.paths ?? []), ...(world.meta?.streets ?? [])];
-    const paved = (x: number, z: number) => paths.some((r) => x >= r.x - 0.6 && x < r.x + r.w + 0.6 && z >= r.z - 0.6 && z < r.z + r.d + 0.6);
+    const paths = world.meta?.paths ?? [];
+    const roads = roadIndex(townRoads(world));
+    const paved = (x: number, z: number) => roads.onRoad(x, z, 0.6) || paths.some((r) => x >= r.x - 0.6 && x < r.x + r.w + 0.6 && z >= r.z - 0.6 && z < r.z + r.d + 0.6);
     // Garden spots: outdoors, off furniture and paths, and not on a tile split by a diagonal.
     const free = (x: number, z: number) =>
       inView(Math.floor(x), Math.floor(z)) && roomP(x, z) === 0 && !diagonal(Math.floor(x), Math.floor(z)) && !occupied.has(Math.floor(z) * W + Math.floor(x)) && !paved(x, z);
@@ -1598,6 +1628,43 @@ export class HousePlanner {
   }
 
   /**
+   * A house far off (the street's far LOD, past the chunks streamed in): its box of walls in its
+   * colour and its roof as `silhouettes` tops it (`roofTop`: a ridge along the longer side, or
+   * flat), into `geo` in the plain finish (rough, not metal). A few dozen triangles a house.
+   */
+  farHouse(geo: Geo, plot: { x: number; z: number; house: [number, number, number, number]; roof?: [number, number]; storeys?: number }): void {
+    const s = this.schemeWith(houseScheme(plot.x, plot.z), plot.roof);
+    const [x0, z0, x1, z1] = plot.house;
+    const [a0, b0, a1, b1] = [x0 - T, z0 - T, x1 + T, z1 + T];
+    const h = WALL_HEIGHT * (plot.storeys ?? 1);
+    const finish = 0.4;
+    geo.color(s.wall, finish).box(a0, 0, b0, a1, h, b1, 'ny py');
+    geo.color(s.roof, finish);
+    if (s.shape === 'flat') {
+      geo.box(a0 - 0.1, h, b0 - 0.1, a1 + 0.1, h + 0.2, b1 + 0.1, 'ny');
+      return;
+    }
+    const top = this.roofTop(plot);
+    const e = 0.3;
+    const alongX = a1 - a0 >= b1 - b0;
+    if (alongX) {
+      const mz = (b0 + b1) / 2;
+      geo.poly([[a0 - e, h, b0 - e], [a1 + e, h, b0 - e], [a1 + e, top, mz], [a0 - e, top, mz]], facing([a0, h, b0], [a1, h, b0], [a1, top, mz], [0, 1, -1]));
+      geo.poly([[a0 - e, h, b1 + e], [a0 - e, top, mz], [a1 + e, top, mz], [a1 + e, h, b1 + e]], facing([a0, h, b1], [a0, top, mz], [a1, top, mz], [0, 1, 1]));
+      geo.color(s.wall, finish);
+      geo.poly([[a0, h, b0], [a0, top, mz], [a0, h, b1]], [-1, 0, 0]);
+      geo.poly([[a1, h, b0], [a1, h, b1], [a1, top, mz]], [1, 0, 0]);
+    } else {
+      const mx = (a0 + a1) / 2;
+      geo.poly([[a0 - e, h, b0 - e], [mx, top, b0 - e], [mx, top, b1 + e], [a0 - e, h, b1 + e]], facing([a0, h, b0], [mx, top, b0], [mx, top, b1], [-1, 1, 0]));
+      geo.poly([[a1 + e, h, b0 - e], [a1 + e, h, b1 + e], [mx, top, b1 + e], [mx, top, b0 - e]], facing([a1, h, b0], [a1, h, b1], [mx, top, b1], [1, 1, 0]));
+      geo.color(s.wall, finish);
+      geo.poly([[a0, h, b0], [a1, h, b0], [mx, top, b0]], [0, 0, -1]);
+      geo.poly([[a0, h, b1], [mx, top, b1], [a1, h, b1]], [0, 0, 1]);
+    }
+  }
+
+  /**
    * Neighbouring houses as dressed boxes: the house's own doors and windows where they lie on
    * the box outline (framed, with muntins, curtains and shutters), corner boards, a porch with a
    * gabled canopy over the front door, a chimney on some roofs, and a garage at the end of the
@@ -1629,10 +1696,40 @@ export class HousePlanner {
       }
     };
 
+    /** A garage of house `b`'s look (wall centre lines `g`): its roof, a sectional door on the street side, a coach lamp beside it. */
+    const garage = (b: SilhouetteSpec, g: NonNullable<SilhouetteSpec['garage']>, s: HouseScheme & RoofShape, walls: Geo) => {
+      walls.color(s.wall);
+      shell(walls, g.x0, g.z0, g.x1, g.z1, GARAGE_HEIGHT);
+      roof.color(s.roof);
+      addRoofShaped(g, s, roof, trim, walls, GARAGE_HEIGHT, 0.3);
+      // Sectional door on the street side (whichever wall that is), with a coach lamp beside it.
+      const [fx, fz] = g.door ?? b.front;
+      const axis = fz ? 'h' : 'v';
+      const plane = fz ? (fz > 0 ? g.z1 + T : g.z0 - T) : fx > 0 ? g.x1 + T : g.x0 - T;
+      const n: V3 = [fx, 0, fz];
+      // Along the door's wall.
+      const [g0, g1] = fz ? [g.x0, g.x1] : [g.z0, g.z1];
+      // A single garage's door, 2.4–2.5 m (wider garages keep their walls either side).
+      const half = Math.min(g1 - g0 - 0.7, 2.5) / 2;
+      const [d0, d1] = [(g0 + g1) / 2 - half, (g0 + g1) / 2 + half];
+      trim.color(TRIM).box(...span(axis, plane, n, d0 - 0.1, d1 + 0.1, 0, 2.25, 0.03));
+      const door = hash(b.x0, b.z0, 9) < 0.5 ? '#F2F0EA' : s.accent;
+      trim.color(door).box(...span(axis, plane, n, d0, d1, 0, 2.12, 0.045));
+      trim.color(shade(door, 0.82));
+      for (const y of [0.53, 1.06, 1.59]) trim.box(...span(axis, plane, n, d0 + 0.04, d1 - 0.04, y - 0.015, y + 0.015, 0.05));
+      trim.color(TRIM);
+      const la = b.door !== null && b.door < (g0 + g1) / 2 ? d0 - 0.3 : d1 + 0.3;
+      lamps.push(fz ? [la, 1.9, plane + fz * 0.08, 0, fz] : [plane + fx * 0.08, 1.9, la, fx, 0]);
+    };
+
     const homes: { spec: SilhouetteSpec; panes: Geo }[] = [];
     for (const b of houses) {
       const s = this.schemeWith(houseScheme(b.lot.x, b.lot.z), b.roof);
       const walls = s.brick ? brick : siding;
+      if (b.garageOnly) {
+        if (b.garage) garage(b, b.garage, s, walls);
+        continue;
+      }
       const panes = b.lived ? new Geo() : glass;
       if (b.lived) homes.push({ spec: b, panes });
       const curtain = pick(CURTAINS, b.x0, b.z0, 7);
@@ -1699,34 +1796,14 @@ export class HousePlanner {
           board(a + 0.5 + 0.04, a + 1 - T - 0.1, 0.15, 0.95, 0.04);
           trim.color('#C8A64A').box(...span(o.axis, plane, n, a + 1 - T - 0.16, a + 1 - T - 0.1, 1.0, 1.06, 0.07));
           trim.color(TRIM);
-          const front = !b.home && b.door !== null && o.axis === 'h' && Math.abs(a + 0.5 - b.door) < 0.6 && n[2] === b.front;
+          const front = !b.home && b.door !== null && Math.abs(a + 0.5 - b.door) < 0.6 && n[0] === b.front[0] && n[2] === b.front[1];
           if (front) this.porch(o.axis, plane, n, a + 0.5, s, walls, roof, trim, lamps);
         }
       }
       roof.color(s.roof);
       addRoofShaped({ x0: b.x0, z0: b.z0, x1: b.x1, z1: b.z1 }, s, roof, trim, walls, tall);
       if (hash(b.x0, b.z0, 8) < 0.6 && s.shape !== 'flat' && !b.roof && !b.home) this.chimney(b, s, brick, stone, tall);
-      const g = b.home ? null : b.garage;
-      if (g) {
-        walls.color(s.wall);
-        shell(walls, g.x0, g.z0, g.x1, g.z1, GARAGE_HEIGHT);
-        roof.color(s.roof);
-        addRoofShaped(g, s, roof, trim, walls, GARAGE_HEIGHT, 0.3);
-        // Sectional door on the street side, with a coach lamp beside it.
-        const plane = b.front > 0 ? g.z1 + T : g.z0 - T;
-        const n: V3 = [0, 0, b.front];
-        // A single garage's door, 2.4–2.5 m (wider garages keep their walls either side).
-        const half = Math.min(g.x1 - g.x0 - 0.7, 2.5) / 2;
-        const [d0, d1] = [(g.x0 + g.x1) / 2 - half, (g.x0 + g.x1) / 2 + half];
-        trim.color(TRIM).box(...span('h', plane, n, d0 - 0.1, d1 + 0.1, 0, 2.25, 0.03));
-        const door = hash(b.x0, b.z0, 9) < 0.5 ? '#F2F0EA' : s.accent;
-        trim.color(door).box(...span('h', plane, n, d0, d1, 0, 2.12, 0.045));
-        trim.color(shade(door, 0.82));
-        for (const y of [0.53, 1.06, 1.59]) trim.box(...span('h', plane, n, d0 + 0.04, d1 - 0.04, y - 0.015, y + 0.015, 0.05));
-        trim.color(TRIM);
-        const lx = b.door !== null && b.door < (g.x0 + g.x1) / 2 ? d0 - 0.3 : d1 + 0.3;
-        lamps.push([lx, 1.9, plane + b.front * 0.08, 0, b.front]);
-      }
+      if (b.garage) garage(b, b.garage, s, walls);
     }
     const M = HOUSE_MATERIALS;
     const parts = ([
@@ -1752,29 +1829,37 @@ export class HousePlanner {
 
   /** Landing, posts and a small gabled canopy over a front door; a lamp beside the door. */
   private porch(axis: 'h' | 'v', plane: number, n: V3, mid: number, s: HouseScheme, walls: Geo, roof: Geo, trim: Geo, lamps: SilhouettePlan['lamps']): void {
-    if (axis !== 'h') return;
-    const out = n[2];
+    // Laid out along the wall (u) and out from it (v: z on a wall along x, x on one along z).
+    const out = axis === 'h' ? n[2] : n[0];
+    const box = (u0: number, y0: number, v0: number, u1: number, y1: number, v1: number, skip?: string) => {
+      const [va, vb] = [Math.min(v0, v1), Math.max(v0, v1)];
+      if (axis === 'h') trim.box(u0, y0, va, u1, y1, vb, skip);
+      else trim.box(va, y0, u0, vb, y1, u1, skip);
+    };
     const depth = 1.3;
     const half = 0.95;
     const z0 = plane;
     const z1 = plane + out * depth;
-    const [za, zb] = [Math.min(z0, z1), Math.max(z0, z1)];
     // Kept low: Sims walk up to the door at ground level.
     trim.color('#C9C4BA');
-    trim.box(mid - half, 0, za, mid + half, 0.05, zb, 'ny');
-    trim.box(mid - half + 0.15, 0, Math.min(z1, z1 + out * 0.3), mid + half - 0.15, 0.025, Math.max(z1, z1 + out * 0.3), 'ny');
+    box(mid - half, 0, z0, mid + half, 0.05, z1, 'ny');
+    box(mid - half + 0.15, 0, z1, mid + half - 0.15, 0.025, z1 + out * 0.3, 'ny');
     const top = 2.34;
     trim.color(TRIM);
     for (const x of [mid - half + 0.08, mid + half - 0.08]) {
       const zc = z1 - out * 0.08;
-      trim.box(x - 0.055, 0.05, zc - 0.055, x + 0.055, top, zc + 0.055);
-      trim.box(x - 0.08, 0.05, zc - 0.08, x + 0.08, 0.22, zc + 0.08);
+      box(x - 0.055, 0.05, zc - 0.055, x + 0.055, top, zc + 0.055);
+      box(x - 0.08, 0.05, zc - 0.08, x + 0.08, 0.22, zc + 0.08);
     }
     // The canopy runs into the wall so its ridge meets the house at right angles.
     roof.color(s.roof);
-    addRoof({ x0: mid - half + T, z0: Math.min(z1, z0 - out * 0.9) + T, x1: mid + half - T, z1: Math.max(z1, z0 - out * 0.9) - T }, false, roof, trim, walls, top, 0.12);
-    lamps.push([mid + 0.72, 1.75, plane + out * 0.08, 0, out]);
-    trim.color('#2E2E30').box(mid + 0.66, 1.62, Math.min(plane, plane + out * 0.05), mid + 0.78, 1.66, Math.max(plane, plane + out * 0.05));
+    const [ca, cb] = [Math.min(z1, z0 - out * 0.9) + T, Math.max(z1, z0 - out * 0.9) - T];
+    const canopy = axis === 'h' ? { x0: mid - half + T, z0: ca, x1: mid + half - T, z1: cb } : { x0: ca, z0: mid - half + T, x1: cb, z1: mid + half - T };
+    addRoof(canopy, false, roof, trim, walls, top, 0.12);
+    // The lamp on the side towards larger u (larger x on a wall along x, larger z on one along z).
+    lamps.push(axis === 'h' ? [mid + 0.72, 1.75, plane + out * 0.08, 0, out] : [plane + out * 0.08, 1.75, mid + 0.72, out, 0]);
+    trim.color('#2E2E30');
+    box(mid + 0.66, 1.62, plane, mid + 0.78, 1.66, plane + out * 0.05);
     trim.color(TRIM);
   }
 

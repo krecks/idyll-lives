@@ -3,7 +3,8 @@
  * screen up to a budget of about 1920×1080: a 1080p screen is drawn at 100 %, a Retina or 4K one at
  * about 2.07 million pixels, which the browser scales up (the picture stays sharp: the scene is
  * smoothed and the interface is drawn at the screen's own resolution). A number draws that share of
- * the screen's resolution along each side (0.5..1), whatever the screen.
+ * the screen's resolution along each side (0.5..1), whatever the screen. Low's `auto` has a smaller
+ * budget (`QualitySettings.pixelBudget`: three quarters of 1080p along each side).
  *
  * `renderScale` is pure (no DOM, no engine), so it can be checked on its own.
  */
@@ -16,11 +17,15 @@ export const PIXEL_BUDGET = 1920 * 1080;
 /** The lowest share the resolution setting offers. */
 export const MIN_SCALE = 0.5;
 
-/** The share of native resolution along each side to draw at, for a canvas of `width`×`height` device pixels. */
-export function renderScale(width: number, height: number, resolution: Resolution): number {
+/**
+ * The share of native resolution along each side to draw at, for a canvas of `width`×`height` device
+ * pixels. `budget`: the pixels `auto` draws at most (the preset's share of `PIXEL_BUDGET`,
+ * `QualitySettings.pixelBudget`: Low's 0.5625, 75 % along each side of a 1080p screen).
+ */
+export function renderScale(width: number, height: number, resolution: Resolution, budget = PIXEL_BUDGET): number {
   if (resolution !== 'auto') return Number.isFinite(resolution) ? Math.min(1, Math.max(MIN_SCALE, resolution)) : 1;
   const pixels = width * height;
-  return pixels > PIXEL_BUDGET ? Math.sqrt(PIXEL_BUDGET / pixels) : 1;
+  return pixels > budget ? Math.sqrt(budget / pixels) : 1;
 }
 
 /**

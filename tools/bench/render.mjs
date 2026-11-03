@@ -12,7 +12,8 @@
  *     --scene village          web/public/bench/<scene>.json(.gz)
  *     --presets low,medium,high
  *     --backends webgpu,webgl
- *     --scenarios orbit-day,orbit-night,dusk,build,wide   (also mirror-day, mirror-night, mirror-still:
+ *     --scenarios orbit-day,orbit-night,dusk,build,wide   (also roam: a loop over the town at 12 m/s, the
+ *                              street streaming and the focus lot changing as it goes; mirror-day, mirror-night, mirror-still:
  *                              the home lot's mirror in view from inside its room, the walls up, the
  *                              camera swinging before it or held)
  *     --throttle 1,3           CPU slow-down factors (CDP Emulation.setCPUThrottlingRate)
@@ -66,6 +67,8 @@ const SCENARIOS = {
   dusk: 'cam=dusk',
   build: 'cam=build&hour=13',
   wide: 'cam=wide&hour=13',
+  // The camera's target along a loop over the town at 12 m/s (`--scenarios roam`; `--scene bigworld`: the village tiled 5 × 5 as a big world).
+  roam: 'cam=roam&hour=13',
   // The home lot's mirror on screen all the time, the walls up (not in the default list: `--scenarios mirror-day,…`).
   'mirror-day': 'cam=mirror&hour=13',
   'mirror-night': 'cam=mirror&hour=21',

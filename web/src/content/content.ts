@@ -262,6 +262,8 @@ export interface ObjectDef {
   staff?: { at: [number, number]; hours: [number, number] };
   /** Can only be placed outdoors (trees, flower beds, ponds). */
   outdoors?: boolean;
+  /** How far a tree's crown reaches out from its middle (m): no house wall may stand closer (sim-core `home.rs`, `game/housegen.ts`). */
+  crown?: number;
   /** The household's own (a wardrobe, a dresser): visitors don't use it (sim-core `world::guest_may`). */
   private?: boolean;
   /** A flight of stairs to the storey above (sim-core `storeys.rs`). */
@@ -274,9 +276,11 @@ export interface ObjectDef {
    * `down` (a pendant's dome, a desk lamp), `up` (a sconce's open cup: a wash up the wall), `out`
    * (a wall light: away from its wall and down, none behind it) or `ceiling` (an uplighter: up
    * at the ceiling, which lights the room). `switch: false`: no switch, lit every night; `fire`:
-   * a fire, lit to sit by (sim-core `lights.rs`), its flames burning while it's lit.
+   * a fire, lit to sit by (sim-core `lights.rs`), its flames burning while it's lit. `while`: lit
+   * only while someone does one of these animations at an object on its tiles (a cooker hood's
+   * light over the hob: `['stir', 'bake']`; sim-core `lights.rs`), by day as at night.
    */
-  light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean; fire?: boolean; aim?: LightAim };
+  light?: { range?: number; intensity?: number; height?: number; at?: [number, number]; tiles?: number; switch?: boolean; fire?: boolean; aim?: LightAim; while?: string | string[] };
   /**
    * What's done at it sounds like this, by animation tag (world sound keys or `none`, as an
    * interaction's `sound`), for its uses without a `sound` and the cooking steps at it as a
@@ -469,7 +473,8 @@ export interface RoofColorDef {
 export interface FenceStyleDef {
   id: string;
   label: string;
-  kind: 'picket' | 'rails' | 'slats' | 'iron' | 'stone';
+  /** `hedge`: a clipped hedge, drawn from the hedge model (no posts; a gate in it a wooden one). */
+  kind: 'picket' | 'rails' | 'slats' | 'iron' | 'stone' | 'hedge';
   color: string;
   /** Height in metres. */
   height?: number;
@@ -508,12 +513,30 @@ export interface WindowStyleDef {
   price?: number;
 }
 
+/** A work shift: when it starts, how many hours, on which days of the week (0 Monday). */
+export interface Shift {
+  start: number;
+  hours: number;
+  days: number[];
+}
+
+/** A grade of every career (`careers.json` `grades`): a career's titles are its grades in order. */
+export interface CareerGrade {
+  id: string;
+  label: string;
+  payPerHour: number;
+  skillLevel: number;
+}
+
 export interface CareerCategory {
   id: string;
   label: string;
   icon: string;
   description: string;
-  tracks: { id: string; label: string; titles: string[] }[];
+  /** Pay against the grades' (sim-core `content.rs` `careers`); the tracks' shift, unless they have their own. */
+  payFactor?: number;
+  shift?: Shift;
+  tracks: { id: string; label: string; titles: string[]; payFactor?: number; shift?: Shift }[];
 }
 
 export interface Economy {
@@ -521,7 +544,11 @@ export interface Economy {
   /** Extra money to build with when a household starts on an empty lot (Living games). */
   emptyLotFunds?: number;
   currency: string;
-  rent?: { weekday: number; hour: number; base: number; perTile: number; billsBase?: number; billsRate?: number };
+  rent?: { weekday: number; hour: number; base: number; perTile: number; billsBase?: number; billsRate?: number; perResident?: number };
+  /** A home's price (`game/price.ts`). */
+  homePrice?: { perTile: number; perFloorTile: number; furniture: number; round: number; sizeRef?: number; sizePremium?: number };
+  /** What a household has saved (`game/wealth.ts`). */
+  savings?: { base: number; rate: number; yearsPerGrade: number; keep: number };
 }
 
 export interface TraitDef {
@@ -636,6 +663,7 @@ interface ContentFile {
   emotions: EmotionDef[];
   socials: SocialDef[];
   careerCategories?: CareerCategory[];
+  grades?: CareerGrade[];
   bondPresets: Record<string, unknown>;
   events: Record<string, string>;
   objects: ObjectDef[];
@@ -653,7 +681,7 @@ interface ContentFile {
   roomKinds?: RoomKindDef[];
   accidents?: AccidentDef[];
   roomRules?: { decorByCategory?: Record<string, number>; lampTiles?: number; windowTiles?: number };
-  life?: { daysPerYear?: number; startAge?: [number, number]; stages?: LifeStageDef[]; adoption?: { cost: number } };
+  life?: { daysPerYear?: number; startAge?: [number, number]; stages?: LifeStageDef[]; adoption?: { cost: number }; retireAt?: number };
   economy?: Partial<Economy>;
   objectRules?: { freeRotation?: string[] };
   /** Animation tags interactions can use as `anim` (the snapshot layout's `actions`). */
@@ -684,6 +712,10 @@ export class Content {
   readonly emotions: readonly EmotionDef[];
   readonly socials: readonly SocialDef[];
   readonly careerCategories: readonly CareerCategory[];
+  /** The grades every career's titles are, in order. */
+  readonly careerGrades: readonly CareerGrade[];
+  /** The age residents retire at (their job becomes a pension). */
+  readonly retireAt: number;
   readonly skills: readonly SkillDef[];
   readonly objectColors: readonly ObjectColorDef[];
   readonly buyCategories: readonly BuyCategory[];
@@ -750,6 +782,8 @@ export class Content {
     this.emotions = file.emotions ?? [];
     this.socials = file.socials ?? [];
     this.careerCategories = file.careerCategories ?? [];
+    this.careerGrades = file.grades ?? [];
+    this.retireAt = file.life?.retireAt ?? 65;
     this.skills = file.skills ?? [];
     this.objectColors = file.objectColors ?? [];
     this.buyCategories = file.buyCategories ?? [];

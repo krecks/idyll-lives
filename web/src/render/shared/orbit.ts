@@ -32,9 +32,13 @@ const ALL_KEYS = new Set([...KEY.up, ...KEY.down, ...KEY.left, ...KEY.right, ...
 
 type Interaction = 'rotate' | 'pan' | 'zoom';
 
-/** What a pointer drag does (the original's default input map): Ctrl+left pans, left turns, right pans; the middle button nothing. */
-function pointerInteraction(button: number, ctrl: boolean): Interaction | null {
+/**
+ * What a pointer drag does: Ctrl+left pans, left turns, right pans (the original's default input
+ * map), and the middle button turns too: it's how the camera turns while the left button draws walls.
+ */
+export function pointerInteraction(button: number, ctrl: boolean): Interaction | null {
   if (button === 0) return ctrl ? 'pan' : 'rotate';
+  if (button === 1) return 'rotate';
   return button === 2 ? 'pan' : null;
 }
 
@@ -159,6 +163,13 @@ export class OrbitControls {
   wheelPrecision = 3;
   /** Panning stays on the ground plane (the target never rises or sinks). */
   mapPanning = false;
+  /**
+   * Panning goes as much further per pixel as the camera is further out than this radius (m): the
+   * same drag moves the view as far across the screen at any zoom. Null: as far at any radius.
+   */
+  panRadius: number | null = null;
+  /** The ground rectangle the target stays in (`checkLimits`; null: anywhere). */
+  panBounds: { x0: number; z0: number; x1: number; z1: number } | null = null;
   /** The keys: radians a frame (at 60 fps), and their panning and zooming sensibilities. */
   keyAngularSpeed = 0.01;
   keyPanningSensibility = 50;
@@ -231,6 +242,8 @@ export class OrbitControls {
   attach(element: HTMLElement): () => void {
     const down = (e: PointerEvent) => {
       if (!this.enabled || !this.buttons.includes(e.button) || this.drag) return;
+      // (A middle press would otherwise start the browser's autoscroll.)
+      if (e.button === 1) e.preventDefault();
       try {
         element.setPointerCapture(e.pointerId);
       } catch {
@@ -354,6 +367,16 @@ export class OrbitControls {
       this.radius = radius[1];
       this.inertialRadiusOffset = 0;
     }
+    const b = this.panBounds;
+    if (b) {
+      const t = this.target;
+      const x = Math.min(b.x1, Math.max(b.x0, t.x));
+      const z = Math.min(b.z1, Math.max(b.z0, t.z));
+      // At the edge: what is left of a pan that way stops.
+      if (x !== t.x || z !== t.z) this.inertialPanningX = this.inertialPanningY = 0;
+      t.x = x;
+      t.z = z;
+    }
   }
 
   private rotateAndZoom(alpha: number, beta: number, radius: number): void {
@@ -365,6 +388,11 @@ export class OrbitControls {
 
   /** Moves the target by (x, y) in the camera's own axes (right, up); on the ground with `mapPanning`. */
   private pan(x: number, y: number): void {
+    if (this.panRadius) {
+      const k = Math.max(1, this.radius / this.panRadius);
+      x *= k;
+      y *= k;
+    }
     const sa = Math.sin(this.viewAlpha);
     const ca = Math.cos(this.viewAlpha);
     const sb = Math.sin(this.viewBeta);

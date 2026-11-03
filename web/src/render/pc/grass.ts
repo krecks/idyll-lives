@@ -69,8 +69,8 @@ export function grassGround(device: pc.GraphicsDevice, material: pc.StandardMate
   material.setParameter('game_grassTown', none.town);
   material.setParameter('game_grassArea', new Float32Array([0, 0, 1, 1]));
   material.setParameter('game_grassEye', new Float32Array(4));
-  // (No town: its mask isn't read.)
-  material.setParameter('game_grassTownSize', new Float32Array(4));
+  // (No town: its mask isn't read, nor the lawn's tone drawn.)
+  material.setParameter('game_grassTownSize', new Float32Array([0, 0, -2, -1]));
   material.update();
 }
 
@@ -142,10 +142,10 @@ export class Grass {
   private readonly eye = new Float32Array(4);
   /** The colour texture's corner and 1 / its size (m). */
   private readonly area: Float32Array;
-  /** The town's ground in metres (the mask's size). */
+  /** The town's ground in metres (the mask's size), and from how far round it to how far the lawn's tone fades out on the ground. */
   private readonly townSize = new Float32Array(4);
   /** The town's ground draw (`onGround`): it reads the mask too. */
-  private ground: pc.MeshInstance | null = null;
+  private grounds: pc.MeshInstance[] = [];
   /** A patch's bounds, with room for the eye to move by `SLACK` before they're chosen again. */
   private readonly sphere = new pc.BoundingSphere(new pc.Vec3(), GRASS.patch * 0.75 + 0.4 + SLACK);
   private readonly matrix = new Float32Array(16);
@@ -163,9 +163,12 @@ export class Grass {
     private readonly quality: GrassQuality,
   ) {
     const device = app.graphicsDevice;
-    this.colour = new pc.Texture(device, { name: 'grassColour', width: field.w, height: field.d, format: pc.PIXELFORMAT_RGBA8, mipmaps: false, minFilter: pc.FILTER_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [field.colour] });
+    // (With mips, trilinear: the ground reads it far off, `shaders/grass.ts`; the blades read its first level.)
+    this.colour = new pc.Texture(device, { name: 'grassColour', width: field.w, height: field.d, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [field.colour] });
     this.town = this.townTexture();
     this.area = new Float32Array([field.x0, field.z0, 1 / field.w, 1 / field.d]);
+    this.townSize[2] = field.margin;
+    this.townSize[3] = field.margin + GRASS.toneFade;
     this.eye[3] = quality.radius;
     const mat = (this.material = new pc.StandardMaterial());
     mat.name = 'grass';
@@ -209,18 +212,25 @@ export class Grass {
     const n = GRASS.townTexels;
     this.townSize[0] = f.townW / n;
     this.townSize[1] = f.townD / n;
-    for (const on of [this.material, this.ground]) {
+    for (const on of [this.material, ...this.grounds]) {
       on?.setParameter('game_grassTown', this.town);
       on?.setParameter('game_grassTownSize', this.townSize);
     }
   }
 
-  /** The town's ground (`meshInstance`, on a `grassGround` material) shows the gusts where this grass grows, and its shade near the eye (the town's mask too, `refresh`). */
-  onGround(meshInstance: pc.MeshInstance): void {
-    this.ground = meshInstance;
-    meshInstance.setParameter('game_grassEye', this.eye);
-    meshInstance.setParameter('game_grassColour', this.colour);
-    meshInstance.setParameter('game_grassArea', this.area);
+  /**
+   * The town's ground (`meshInstance`, on a `grassGround` material) shows the gusts where this grass
+   * grows, and its shade near the eye (the town's mask too, `refresh`); the lawn's tone and gusts
+   * go on past the field, fading out (`GRASS.toneFade`).
+   */
+  onGround(meshInstances: pc.MeshInstance | readonly pc.MeshInstance[]): void {
+    // (A big world's ground is tiles: each draw of it.)
+    this.grounds = Array.isArray(meshInstances) ? [...meshInstances] : [meshInstances as pc.MeshInstance];
+    for (const mi of this.grounds) {
+      mi.setParameter('game_grassEye', this.eye);
+      mi.setParameter('game_grassColour', this.colour);
+      mi.setParameter('game_grassArea', this.area);
+    }
     this.setTown();
   }
 

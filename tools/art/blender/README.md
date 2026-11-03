@@ -34,7 +34,7 @@ here runs inside Blender (`gamekit/manifest.py` is plain Python, no bpy).
 5. **Validate.** Install the Khronos validator in a scratch directory (`npm i gltf-validator`), outside
    the repo, and run `validateBytes` on the file: 0 errors, 0 warnings.
 6. **Wire it in** outside this folder when the object is new (below). Run
-   `cargo test -p sim-core --test shipped_content`, and `cargo test -p sim-core` if you touched the sim.
+   `cargo test -p sim-core --test sim shipped_content::`, and `cargo test -p sim-core` if you touched the sim.
 7. **Look in the game.** Start your own dev server and drive it headless (below). Check WebGPU and
    `&renderer=webgl`, at rest and with each clip playing.
 8. **Finish up.**
@@ -53,6 +53,7 @@ cargo art kitchen                  # build, export, register, check
 cargo art kitchen --only fridge    # one model
 cargo art garden_decor --preview   # previews/garden_decor/<id>.png (+ <id>@<clip>.png), no export
 cargo art living --preview --lit   # and <id>.lit.png: EEVEE, sun and sky, the finishes' textures (judge detail here)
+cargo art kitchen --preview --sheet  # and <id>.sheet.png: four sides, the baked shading, each clip at 0/25/50/75/100 %
 cargo art kitchen --no-pack        # export without writing the pack
 cargo art --all                    # every family (not _template)
 cargo art _template --preview      # the template only previews
@@ -124,6 +125,14 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      show their glass, and see-through `glass` would show what is behind it (a frame's backing, a door).
    - A lamp's shade or a screen that glows at night takes its glow's colour:
      `shade=('#F2E6CC', 'fabric', {'glow': '#FFD9A0'})`. Nothing glows by day.
+   - A plain finish may shine more or less than the finish does: `marble=('#EDEAE4', 'gloss', {'roughness':
+     0.28})` (polished stone, not the mirror gloss is), and `metallic` (0 or 1). It goes in the pack entry and
+     the game keeps it per vertex, so it costs no draw call. Worktops, marble and fruit have their own.
+   - Textured finishes (wood, fabric, bark, foliage) get UVs made for each part as it's joined (`gamekit/uv.py`):
+     a box along its own longest sides (wood's grain, up its picture, runs along a leg, a rail, a table's
+     length), round about its own z for cylinders, cones, lathes and level-ringed lofts, along its path for a
+     sweep (bark up a branch). A part built in place at an angle keeps its grain; one built level and turned
+     by `rot=` turns its grain with it.
 3. **Build** in a function, in metres, from `G.cube`/`sphere`/`cylinder`/`cone`/`torus`/`rod`/`revolve`/`boulder`
    (sizes are full extents; `bevel` rounds edges) and the forms (`gamekit/forms.py`), which make what boxes can't:
    - `G.sweep` (`F.sweep`): a round tube or any profile along a path, curved through the points (`resolution`),
@@ -152,9 +161,11 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      item (a held `tool.*`, a `model.street.*` prop, the woods' rock), takes `code=True` so its first
      build isn't refused; once its pack has it, it builds either way.
    - `far=0.25` also writes `<id>.far.glb`, its far version: the model at rest, joined and decimated
-     to a quarter of the triangles (all but what stands within 1 cm of the floor, so it keeps its
-     feet), drawn where it's only seen from afar (the town overview, the far woods). For what is placed
-     by the hundred or seen far off: trees, hedges, street props, the farm's buildings.
+     to a quarter of the triangles (`G.decimated`: vertices sitting on one another merged first, all but
+     what stands within 1 cm of the floor or 3 mm of its box, so it keeps its feet and its size, and each
+     face the decimation turned round turned back), drawn where it's only seen from afar (the town
+     overview, the far woods). For what is placed by the hundred or seen far off: trees, hedges, street
+     props, the farm's buildings.
      `far=build_function` builds one by hand instead. `--preview` renders `<id>.far.png`.
    - `far=G.far_of(build)` builds it by hand from the model's own build, run again at low detail: the
      build asks `G.low(full, reduced)` for each count, segment number or bevel, and `G.is_low()` for what
@@ -191,7 +202,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
   - `BEDS` (from `furniture.json`'s `beds`): mattress-top height, for anything residents lie on;
   - `BLANKET_BEDS`: whether sleepers get a blanket. Then don't model a full duvet: it shows doubled.
 - **Tests.**
-  - `cargo test -p sim-core --test shipped_content` checks every object's and item's model has its file
+  - `cargo test -p sim-core --test sim shipped_content::` checks every object's and item's model has its file
     (and its `far` file) once the manifests are stacked (a pack left out of `packs` fails it), every
     interaction has an animation, and the categories and groups exist.
   - Changed the sim? Run `cargo test -p sim-core`, then `bun run wasm` in `web/` before testing in the
@@ -214,22 +225,30 @@ The clips gamekit makes:
 
 | Clip | Does | For |
 |---|---|---|
-| `G.swing(part, clip, degrees, seconds, axis='Z')` | turns from rest by `degrees` | doors, lids, a bed folding down |
-| `G.slide(part, clip, (x, y, z), seconds)` | moves from rest | drawers, a cover sliding off |
+| `G.swing(part, clip, degrees, seconds, axis='Z', ease='smooth')` | turns from rest by `degrees`; `ease='back_out'` swings `overshoot` (4 %) past open and settles | doors (`back_out`), lids, a bed folding down |
+| `G.slide(part, clip, (x, y, z), seconds, ease='smooth')` | moves from rest | drawers, a cover sliding off |
 | `G.grow(part, clip, seconds, axis='Z')` | scales from how it was built (small, hidden) to full size | water, flames, washing on a line |
-| `G.squash(part, clip, scale, seconds, back=False)` | scales from rest to `scale` (a number or Blender (x, y, z)); `back`: and home again | a cushion sinking, a bag flattening, something hidden while held (0.001) |
+| `G.squash(part, clip, scale, seconds, back=False, split=0.5)` | scales from rest to `scale` (a number or Blender (x, y, z)); `back`: and home again, the turn `split` of the way through | a cushion sinking, a bag flattening, something hidden while held (0.001) |
 | `G.spin(part, clip, turns, seconds, axis='Z')` | whole turns at an even speed, ending at rest | wheels, platters, fans, the train |
 | `G.rock(part, clip, degrees, seconds, axis='X')` | out, back past rest and home, as a pendulum | rocking chairs, swings, the seesaw |
 | `G.scroll(part, clip, (x, y, z), seconds)` | moves by one repeat of a pattern at an even speed; the game jumps it home unseen | a treadmill's belt slats, a conveyor |
 | `G.turns(parts, clip, (x, y, z), seconds)` | the parts take turns moving out and back, ending at rest | a dance floor's tiles lifting in two sets |
 | `G.path(part, clip, [(seconds, (x, y, z), (rx, ry, rz)), …], linear=False)` | moves and turns from rest through keys (offsets in metres, turns in degrees, Blender axes; the first key is rest at 0 s); `linear`: an even speed, for a loop | the pool rack lifted off and hung up, the robot vacuum's round |
 | `G.stages(part, clip, picked, growing, planted, seconds, sink)` | a crop's scale at each growth stage, ripe at rest; `sink`: how far down into the soil at each | vegetables, fruit, a veggie bed |
+| `G.wobble(part, clip, degrees, seconds, axis='X', swings=3, delay=0)` | knocked out by `degrees`, swinging back and forth smaller each time, home at rest | what hangs or stands loose beside a part that moves: a towel on a door, a pan on its hook |
+| `G.keys(part, clip, prop, index, [(seconds, value[, ease]), …])` | keys one channel (`'location'`, `'rotation_euler'`, `'scale'`, Blender axis 0–2) at those times, the first at 0 s at rest; each key's ease to the next | a clip none of the others make: water rising after the tap, a koi surfacing |
 | `G.attach(part, parent)` | (no clip) puts a part inside another, to move with it and by its own clips | a lever on a door, a label on a record |
+
+`ease` is one of `G.EASES`: `'smooth'` (the default, slow out of each key and into the next), `'linear'`, `'out'`,
+`'in'`, `'in_out'`, `'expo_out'`, `'back_out'` (past the end and back) and `'bounce_out'`. A use's clip plays back
+to close, so its curve runs the other way round then: a door that overshoots opening opens a hair further, then
+swings shut and stops. Overshoot only where there's room past open (a door, not a lid against a wall or a bed
+onto the floor).
 
 The first four go from rest to open: the game holds them open and plays them back. `spin` and `rock`
 end where they start, so they also loop (`motions.loops`, `idle`), as does `turns`. `scroll` loops too: it ends one slat on,
 so hide the part's ends under covers (the treadmill's hood and rear cap). Keep a spin under about a turn a
-second: the game blends between samples 1/30 s apart. A part that looks the same turned (a fan's four
+second (two at most): the game blends between samples 1/60 s apart (`cargo check-glb` warns past 12° in that). A part that looks the same turned (a fan's four
 blades) can turn by less (a quarter) and loop.
 
 A part that is easier to build open (a bed that folds down) is built in its open pose and `hinged`. It's
@@ -299,7 +318,10 @@ How the parts work:
   a warning to check. A part a clip grows (darts, a pot thrown) is measured grown, not at rest; one flattened to
   nothing at rest warns if its flat shape shows (traps).
 - **Previews.** `--preview` renders each clip open on its own: `previews/<family>/<id>@<clip>.png` (a `spin` half
-  way round, a `rock` at its furthest).
+  way round, a `rock` at its furthest). `--sheet` adds `<id>.sheet.png`: its four sides (front and back
+  three-quarter, side, top) and its baked shading on the first row, then a row per clip at 0, 25, 50, 75 and 100 %
+  of the way through (a door through the cabinet half way, a lid closing past rest). Previews draw faces from the
+  front only, as the game does: one built inside out shows as a hole.
 - **In the game's renderer.** The clips bench, `/clips.html?keys=model.<id>` (below), plays every clip
   of the model as the game does.
 - **Examples.**
@@ -338,7 +360,7 @@ never one that's already running) and drive Playwright headless with full Chrome
 - **A house.** Open `/?state=bathroom-check&debug`: the house with resident 0 at home, doing nothing,
   needs at 0.8 (a use that fills a need lasts), plenty of money. `needy-check` has low needs and free
   will on, `office-night` is the same house at 21:30, `town-things` a town lot with every community
-  thing (`__showPlot(1)`). Make them with `DUMP_STATES=1 cargo test -p sim-core --test check_states`
+  thing (`__showPlot(1)`). Make them with `DUMP_STATES=1 cargo test -p sim-core --test sim check_states::`
   (`debug-states/`, gitignored; `tools/bench/README.md` says more).
   - Wait until `__sims()` answers and the strip shows "House 0" (not "Drawing portraits…").
   - Turn free will off: `__send({type: 'setAutonomy', enabled: false, household: 0})` (the game's own
@@ -387,7 +409,8 @@ never one that's already running) and drive Playwright headless with full Chrome
   middle as its `centre` (`families/lighting.py` `ceilingFan`). The gate warns of a part a loop or ambient
   clip spins (G.spin) whose circle reaches over 1 cm past the footprint, indoors.
 - **Clicking.** An object is clicked by its drawn outline at rest, never past its tiles. An object held open
-  is clicked by its whole tiles. The contact shadow follows the footprint.
+  is clicked by its whole tiles. The contact shadow is the model's own shape at rest, seen from above: darkest
+  where it touches the floor, lighter the higher a part is over it (`web/src/render/shared/contactShadow.ts`).
 - **Doubled covers.** A per-sleeper blanket (`BLANKET_BEDS`) and a modelled duvet show double.
 - **Room kind.** A `sleep` interaction turns a living room into a bedroom.
 - **Mirrors past the nearest.** Only the nearest mirror on screen reflects (two on High). Mirror glass
@@ -401,6 +424,15 @@ never one that's already running) and drive Playwright headless with full Chrome
 - **Shading by corners.** The baked shading is per vertex, so a face is as dark as its corners: a big flat
   face whose corners sit in a crease (a recessed panel, glass in a rim) goes dark all over. Corners buried
   inside another part are left unshaded; give a face that meets a crease an edge band (`kit.shaker` does).
+  (Shading each corner along its own face's normal was tried: no better in the game, and it streaked the long
+  triangles of an extruded frame.)
+- **Smooth, sharp and bevelled.** Smooth parts keep edges over `G.SHARP` (40°) sharp, so a cylinder's cap stays
+  flat (it used to shade into the side); round things with few sides stay round (`G.round_angle`: a 6-sided
+  leg, an 8-sided tube); a lathe (`G.revolve`) keeps only turns over 70° sharp (a jar's coarse shoulder stays
+  round); spheres, rings and boulders are smooth all over. A `bevel` is smooth with hardened normals: the faces
+  it joins stay flat, the edge rounds. `G.shade(obj, smooth, angle)` and `G.bevel_edges(obj, width)` do the same
+  to a mesh made by hand. (Raising `SHARP` to 50° rounded a 45° chamfer's steps; the bevel's `MITER_ARC` turned
+  the normals of a frame's inner corners round: both showed a shaker frame's corners as seams.)
 - **`up` is Blender's.** `F.sweep` maps the points to game axes but passes `up` (which way a profile's first
   side faces) as it is, in Blender axes (x left, y back, z up): `up=(0, 1, 0)` on a path along game x flipped a
   plinth's profile down through the floor.
@@ -422,7 +454,7 @@ never one that's already running) and drive Playwright headless with full Chrome
 | `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `turn`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
 | `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home), `turns` (parts out and back in turn), `scroll` (one repeat on, a belt), `path` (through keys), `stages` (a crop's growth); `clips` |
 | `export.py` | `export_glb` (the fixed export settings, the shading baked first), `write_pack`, `stats`, `materials_used` |
-| `shade.py` | `bake_ao`: the creases' shading baked into a grey vertex colour (COLOR_0), which the game multiplies in |
+| `shade.py` | `bake_ao`: the creases' shading baked into a grey vertex colour (COLOR_0), which the game multiplies in; the floor shades the foot of a model on the ground (`Model(ground=)`) |
 | `preview.py` | `preview` (front three-quarter, Workbench; or `view=` side, front, top), `lit` (EEVEE, as the game lights it: `--lit`), `preview_clips`, `preview_perches` |
 | `family.py` | `Model`, `Family` and its `run`: the command line every family script ends with |
 | `far.py` | `far_of` (a far version from the model's own build at low detail), `low`, `is_low` |

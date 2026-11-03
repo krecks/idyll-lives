@@ -10,7 +10,7 @@
 
 import { withBuild, withoutBuild } from './build';
 import { bundled } from './bundle';
-import type { AssetEntry, AssetType, EntryOf, IconEntry, Manifest } from './types';
+import type { AssetEntry, AssetType, EntryOf, IconEntry, Manifest, MaterialEntry } from './types';
 
 const URL_FIELDS = ['url', 'far', 'texture'] as const;
 
@@ -75,15 +75,18 @@ async function fetchManifests(url: URL): Promise<[URL, Manifest][]> {
 
 /** Absolute source URL -> absolute URL of its compressed copy (both without the build query). */
 const optimized = new Map<string, string>();
+/** Absolute source URL (without the build query) -> a hash of its contents (as the build encoded it). */
+const hashes = new Map<string, string>();
 
 /** Reads the build's index of compressed copies (there is none on the dev server). */
 async function loadOptimized(base: URL): Promise<void> {
   try {
-    const index = await readJson<{ files?: Record<string, string> }>(new URL('optimized.json', base), (res) => {
+    const index = await readJson<{ files?: Record<string, string>; hashes?: Record<string, string> }>(new URL('optimized.json', base), (res) => {
       // (The dev server answers a missing file with its index page.)
       if (!res.ok || !res.headers.get('content-type')?.includes('json')) throw new Error('no index');
     });
     for (const [file, copy] of Object.entries(index.files ?? {})) optimized.set(new URL(file, base).href, new URL(copy, base).href);
+    for (const [file, hash] of Object.entries(index.hashes ?? {})) hashes.set(new URL(file, base).href, hash);
   } catch {
     // No index: everything loads from its source file.
   }
@@ -98,10 +101,29 @@ async function readJson<T>(url: URL, check: (res: Response) => void): Promise<T>
   return (await res.json()) as T;
 }
 
+/**
+ * A material's texture files: its albedo (`texture`) and the normal and ARM maps beside it, made
+ * absolute (the manifest gives those relative to the albedo); null without a texture.
+ */
+export function materialTextures(entry: Pick<MaterialEntry, 'texture' | 'normal' | 'arm'>): { texture: string; normal?: string; arm?: string } | null {
+  const { texture, normal, arm } = entry;
+  if (!texture) return null;
+  return { texture, normal: normal && new URL(normal, texture).href, arm: arm && new URL(arm, texture).href };
+}
+
 /** The file to fetch for an asset URL: its compressed copy when the build made one. */
 export function optimizedUrl(url: string): string {
   const copy = optimized.get(withoutBuild(new URL(url, location.href).href));
   return copy ? withBuild(copy) : url;
+}
+
+/**
+ * A hash of the contents of the file at `url` (a source asset), as the build encoded it: the same
+ * from release to release while the file doesn't change. Null where there's none (the dev server, a
+ * modder's pack, a file the build doesn't encode).
+ */
+export function contentHash(url: string): string | null {
+  return hashes.get(withoutBuild(new URL(url, location.href).href)) ?? null;
 }
 
 /**

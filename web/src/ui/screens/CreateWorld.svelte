@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { menuScene } from '../../game/menuScene';
-  import { generateWorld, loadTemplates, type NeighbourhoodDraft, type Templates } from '../../game/town';
-  import { WORLD_KINDS, WORLDS, worldName, type WorldKind } from '../../game/world';
+  import { loadTemplates, neighbourCap, type NeighbourhoodDraft, type Templates } from '../../game/town';
+  import { keepHouses, Superseded, townJob } from '../../game/townJobs';
+  import { WORLD_KINDS, WORLDS, worldName, type WorldKind, type WorldSize } from '../../game/world';
   import { app } from '../app.svelte';
+  import { toast } from '../state.svelte';
   import { lifespanHint } from '../format';
   import Icon from '../Icon.svelte';
   import Segmented from '../kit/Segmented.svelte';
@@ -14,6 +16,13 @@
   let templates = $state.raw<Templates | null>(null);
   let world = $state.raw<NeighbourhoodDraft | null>(app.world);
   let kind = $state<WorldKind>(app.world?.world?.kind ?? 'medium');
+  /** How big a world (docs/design/open-world.md). */
+  let size = $state<WorldSize>(app.world?.world?.size ?? 'cosy');
+  const sizeOptions = [
+    { value: 'cosy' as const, label: 'Cosy' },
+    { value: 'normal' as const, label: 'Normal' },
+    { value: 'big' as const, label: 'Big' },
+  ];
   let name = $state(app.world?.name ?? '');
   /** The name was typed or rolled here (kept when the world is made again). */
   let named = $state(false);
@@ -23,6 +32,10 @@
   const homes = $derived(world ? world.slots.filter((s) => s.kind === 'house').length : 0);
   const farms = $derived(world ? world.slots.filter((s) => s.lot === 'farm').length : 0);
   const places = $derived(world ? world.slots.filter((s) => s.kind !== 'house').length : 0);
+  const roadCount = $derived(world ? world.roads.length : 0);
+  const hamlets = $derived(world?.open ? world.open.areas.length - 1 : 0);
+  /** The chosen size in a line: homes, land, how many residents it holds. */
+  const sizeHint = $derived(world ? `${homes} homes${hamlets ? ` in a town and ${hamlets} hamlets` : ''} · ${world.width} × ${world.depth} m · up to ${neighbourCap(size)} neighbours` : '');
 
   // Public places and farms have their names on them; plain houses are left untagged (the town reads better).
   const labels = $derived<LotLabel[]>(
@@ -31,18 +44,50 @@
       : [],
   );
 
+  /** The world being laid out (the town worker: a big one takes a few seconds); a newer one replaces it. */
+  let job: AbortController | null = null;
+  let making = $state(false);
+
   /** A new world of the chosen kind (a new seed: a different place every time). */
-  function make() {
+  async function make() {
     if (!templates) return;
-    world = generateWorld(content, templates, kind, undefined, named && name.trim() ? name.trim() : undefined);
-    name = world.name;
-    focus = null;
+    job?.abort();
+    const control = (job = new AbortController());
+    making = true;
+    const typed = named && name.trim() ? name.trim() : undefined;
+    try {
+      const made = await townJob(content, { kind: 'world', world: kind, seed: (Math.random() * 2 ** 31) >>> 0, name: typed, size }, control.signal);
+      if (job !== control) return;
+      // Its houses and preview come with it: the menu draws it without making them again.
+      keepHouses(made);
+      menuScene.prepare(made.draft, made.preview);
+      world = made.draft;
+      name = typed ?? world.name;
+      focus = null;
+    } catch (err) {
+      if (err instanceof Superseded) return;
+      console.error('[world] making the world failed:', err);
+      toast('That world could not be made. Try another.');
+    } finally {
+      if (job === control) {
+        job = null;
+        making = false;
+      }
+    }
+  }
+  $effect(() => () => job?.abort());
+
+  function resize(s: WorldSize) {
+    // (While a world is being made, the size asked for, not the one shown.)
+    if (s === (making ? size : (world?.world?.size ?? 'cosy')) && world) return;
+    size = s;
+    void make();
   }
 
   function choose(k: WorldKind) {
     if (k === kind && world) return;
     kind = k;
-    make();
+    void make();
   }
 
   function rollName() {
@@ -54,7 +99,7 @@
     if (!world) return;
     const chosen = { ...world, name: name.trim() || world.name };
     // The same world as before (back and forth): its neighbours stay.
-    const same = app.town && app.town.seed === chosen.seed && app.town.world?.kind === chosen.world?.kind;
+    const same = app.town && app.town.seed === chosen.seed && app.town.world?.kind === chosen.world?.kind && app.town.world?.size === chosen.world?.size;
     app.town = same && app.town ? { ...app.town, name: chosen.name } : null;
     app.world = chosen;
     app.screen = 'neighbourhood';
@@ -122,13 +167,16 @@
       {/if}
     </div>
     <div class="actions">
-      <button class="btn" disabled={!templates} onclick={make}><Icon name="icon.ui.dice" size={18} /> Another world</button>
-      <button class="btn primary" disabled={!world} onclick={next}>Choose a household →</button>
+      <button class="btn" disabled={!templates} onclick={() => void make()}><Icon name="icon.ui.dice" size={18} /> Another world</button>
+      <button class="btn primary" disabled={!world || making} onclick={next}>Choose a household →</button>
     </div>
   </header>
 
   <main>
     <section class="view">
+      {#if making}
+        <div class="making menu-glass" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span> Laying out the town…</div>
+      {/if}
       {#if world}
         <TownStage {labels} {hover} selected={focus} {focus} onhover={(p) => (hover = p)} onselect={(p) => (focus = p === focus ? null : p)} />
       {:else}
@@ -149,6 +197,11 @@
             <span class="hint">{app.mode === 'creative' ? 'Building is free. No rent or bills at home.' : 'Your residents earn the money to build with.'}</span>
           </div>
           <div class="control">
+            <span class="eyebrow">Size</span>
+            <Segmented label="Size" value={size} options={sizeOptions} onchange={resize} />
+            <span class="hint">{sizeHint}</span>
+          </div>
+          <div class="control">
             <span class="eyebrow">Lifespan</span>
             <Segmented
               label="Lifespan"
@@ -163,7 +216,7 @@
             <span class="hint">{lifespanHint(app.lifespan)}</span>
           </div>
           <div class="stats" aria-label="World summary">
-            <span><b>{world.streets.length}</b> {world.streets.length === 1 ? 'street' : 'streets'}</span>
+            <span><b>{roadCount}</b> {roadCount === 1 ? 'road' : 'roads'}</span>
             <span><b>{homes}</b> homes</span>
             {#if farms}<span><b>{farms}</b> {farms === 1 ? 'farm' : 'farms'}</span>{/if}
             <span><b>{places}</b> public {places === 1 ? 'place' : 'places'}</span>
@@ -298,6 +351,25 @@
     display: grid;
     grid-template-rows: 1fr auto;
     gap: 14px;
+  }
+  /* Over the town while the next one is laid out (it stays in view meanwhile). */
+  .making {
+    position: absolute;
+    top: 12px;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    width: max-content;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-strong);
+    pointer-events: none;
+    animation: rise 260ms var(--ease) both;
   }
   .controls {
     display: flex;

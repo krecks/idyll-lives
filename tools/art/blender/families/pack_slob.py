@@ -224,7 +224,7 @@ def microwaveCart():
                 M.chrome, profile=G.rounded_rect(0.02, 0.012, 0.005, corner=1), up=(1, 0, 0), resolution=2)
     door = G.hinged(G.join(door, 'door'), F.at(dx0, y + h / 2, zf + 0.004))
     objs = G.settle()      # on its Model centre: the back on the wall face
-    G.swing(door, 'door_open', -100, seconds=0.6)
+    G.swing(door, 'door_open', -100, seconds=0.6, ease='back_out')
     return objs
 
 

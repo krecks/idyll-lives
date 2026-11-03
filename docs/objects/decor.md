@@ -34,7 +34,8 @@ cutaway drops it, from either side.
 - Each hung on all four walls of the living room (the 2-wide abstract canvas on the bathroom's and bedroom's plain
   walls, where two plain tiles side by side are free of windows), walls up, by day and at night, on WebGPU and
   WebGL2, Medium and Low, every part coloured.
-- Since 2026-10-21 (review A-decor-01) the grandfather clock's pendulum swings (`fixes/motions/g1718/views/clock-t0.4.png`).
+- Since 2026-10-21 (review A-decor-01) the grandfather clock's pendulum swings (`fixes/motions/g1718/views/clock-t0.4.png`),
+  and since 2026-10-31 its trunk door opens while it's wound (`tools/art/blender/previews/decor/grandfatherClock@door_open.png`).
 - A resident admires the oil painting and the abstract canvas facing it (the "look" pose).
 - The wall clock's hands keep the game's time (ten past ten in the morning, ten to ten at night). Its case's well
   ends behind the face, so the face shows white by default and "Face" colours it.
@@ -52,7 +53,7 @@ cutaway drops it, from either side.
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `grandfatherClock` Grandfather clock | 1x1 · floor | wind:tinker | decor / ornaments | Case, Face | Clock (`motions.clock`) + ambient | `hour_hand`, `minute_hand`: the hands tell the game's time. `pendulum`: the pendulum swings ±4° behind the trunk door's window, a beat each 0.8 s, all the time near the camera (`idle`, not on Low; 2026-10-21). The case is a polished satin walnut, not the textured wood, so it stays within 4 draws; its trunk door is still (it's wound at the dial) (`families/decor.md`). |
+| `grandfatherClock` Grandfather clock | 1x1 · floor | wind:tinker | decor / ornaments | Case, Face | Clock (`motions.clock`) + ambient | `hour_hand`, `minute_hand`: the hands tell the game's time. `pendulum`: the pendulum swings ±4° behind the trunk door's window, a beat each 0.8 s, all the time near the camera (`idle`, not on Low; 2026-10-21). `door_open`: the trunk door swings open 100° on its left edge while the clock is wound, and shuts when the use ends (`wind`; 2026-10-31). The case is a polished satin walnut, not the textured wood, and its entry allows the fifth draw the door takes (`"draws": 5`: the one model that says so; `families/decor.md`). |
 | `vaseTall` Tall vase | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
 | `urnPorcelain` Porcelain urn | 1x1 · floor | — | decor / ornaments | Body | Static | Static. |
 | `vasePedestal` Vase on a pedestal | 1x1 · floor | — | decor / ornaments | Vase, Pedestal | Static | Static. |
@@ -93,6 +94,9 @@ cutaway drops it, from either side.
 - The curtains hang over windows on all four sides, open by day and drawn closed at night, on WebGPU and WebGL2 at
   Low; they stay drawn over sleepers. The two pleated panels widen from their outer ends until they meet (the
   fabric stretches to close, kept so).
+- Since 2026-10-30 (`curtainsWide` checked in play): on the stage's two-wide window it hangs on its 2.38 m rail,
+  drawn closed over both edges at 22:00 and stacked at each end by day at 10:00, the glass clear between them and
+  the hems just under the sill; WebGPU and WebGL2 (`bench-results/check-curtains/curtains-*-curtainsWide-no-uses.png`).
 - The rugs lie flat in all four facings. Each rug's "Rug" colours its field; borders and motifs keep their colours.
 - A 2-wide curtain over the house's 1-wide windows hangs with the window in one half of its rail (the placement,
   not the model). Generated houses no longer do (M-decor-03, 2026-10-21): their curtains are as wide as the window,

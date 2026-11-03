@@ -35,7 +35,7 @@ use crate::error::Error;
 use crate::world::{Activity, Ctx, ObjectInstance, Phase, Task, TaskKind, WALK_SPEED, World};
 
 /// Most servers in a town (snapshot rows after the residents'). Posts past them stay self-serve.
-pub const MAX_STAFF: usize = 32;
+pub const MAX_STAFF: usize = 48;
 /// Last orders (hours): someone who set off for a post while it was open and gets there this long
 /// after it closed is still served (the server waits for them), as no shop turns away the one
 /// coming through the door at closing time.
@@ -215,6 +215,10 @@ pub struct Server {
     pub posts: Vec<u32>,
     /// The post they're at or stepping over to (index into `posts`).
     pub at: usize,
+    /// Where they come in from and go home to: the door of their first post's lot
+    /// (`Plot::arrival_point`). They're drawn walking from there to the post when work starts, and
+    /// once they've walked back they're gone (`AWAY` in the snapshot).
+    pub home: [f32; 2],
     pub pos: [f32; 2],
     pub yaw: f32,
     /// Stepping over to another post.
@@ -232,7 +236,7 @@ pub struct Server {
 /// The town's servers (`World::staff`).
 #[derive(Debug, Clone, Default)]
 pub struct Staff {
-    /// The `World::nav_version` they were found for.
+    /// The `World::objects_version` they were found for.
     built: Option<u32>,
     pub servers: Vec<Server>,
     /// Server per object index (posts only).
@@ -290,7 +294,7 @@ pub fn place(content: &Content, o: &ObjectInstance) -> Option<([f32; 2], f32)> {
 
 /// Finds the town's posts and their servers again if the objects or the walls changed.
 pub(crate) fn refresh(w: &mut World) {
-    if w.staff.built == Some(w.nav_version) {
+    if w.staff.built == Some(w.objects_version) {
         return;
     }
     let mut staff = plan(w);
@@ -306,6 +310,16 @@ pub(crate) fn refresh(w: &mut World) {
         }
     }
     w.staff = staff;
+}
+
+/// The town's posts and their servers as the objects and walls are now: as `refresh` kept them,
+/// or found again (`plan`) if the objects changed since (views, before the next tick has them).
+pub(crate) fn current(w: &World) -> std::borrow::Cow<'_, Staff> {
+    if w.staff.built == Some(w.objects_version) {
+        std::borrow::Cow::Borrowed(&w.staff)
+    } else {
+        std::borrow::Cow::Owned(plan(w))
+    }
 }
 
 /// The town's posts and their servers as the objects and walls are now (nobody at work yet):
@@ -351,11 +365,16 @@ pub fn plan(w: &World) -> Staff {
             Some(k) => k,
             None if servers.len() < MAX_STAFF => {
                 let first = &w.objects[posts[lead].0 as usize];
-                let (pos, yaw) = place(content, first).unwrap_or(([0.0; 2], 0.0));
+                let (post, _) = place(content, first).unwrap_or(([0.0; 2], 0.0));
+                // In at the door of the lot, as a visitor comes in; before work they're there
+                // (gone), facing the way in.
+                let home = w.plots[posts[lead].1 as usize].arrival_point();
+                let yaw = (post[0] - home[0]).atan2(post[1] - home[1]);
                 servers.push(Server {
                     posts: vec![posts[lead].0],
                     at: 0,
-                    pos,
+                    home,
+                    pos: home,
                     yaw,
                     moving: false,
                     present: false,
@@ -373,7 +392,7 @@ pub fn plan(w: &World) -> Staff {
         of[o as usize] = Some(k as u16);
     }
     Staff {
-        built: Some(w.nav_version),
+        built: Some(w.objects_version),
         servers,
         of,
     }
@@ -519,23 +538,27 @@ pub(crate) fn update(w: &mut World) {
                 server.queue.push(c);
             }
         }
-        let present = open[k]
+        let wanted = open[k]
             || server.serving.is_some()
             || !server.queue.is_empty()
             || (coming[k] && staff_open(content, objects, &server.posts, late));
-        if !present {
-            // Gone home: back at the first post when they come in again.
+        if !wanted {
+            // Gone home: they walk out to the lot's door, and once there they're gone (and back at
+            // the door, at the first post, when they come in again).
             if server.present {
-                let first = &objects[server.posts[0] as usize];
-                if let Some((pos, yaw)) = place(content, first) {
-                    (server.pos, server.yaw) = (pos, yaw);
+                let home = server.home;
+                let yaw = server.yaw;
+                if walk(server, home, yaw) {
+                    server.present = false;
+                    (server.at, server.moving) = (0, false);
                 }
-                (server.at, server.moving) = (0, false);
             }
-            server.present = false;
             continue;
         }
-        server.present = true;
+        // In at the door, then over to their post.
+        if !server.present {
+            (server.pos, server.present) = (server.home, true);
+        }
         if server.serving.is_none() && !server.queue.is_empty() {
             server.serving = Some(server.queue.remove(0));
         }
@@ -556,16 +579,8 @@ pub(crate) fn update(w: &mut World) {
         let Some((to, yaw)) = place(content, &objects[server.posts[server.at] as usize]) else {
             continue;
         };
-        let (dx, dz) = (to[0] - server.pos[0], to[1] - server.pos[1]);
-        let dist = dx.hypot(dz);
-        if dist <= WALK_SPEED {
-            (server.pos, server.yaw, server.moving) = (to, yaw, false);
-        } else {
-            server.pos = [
-                server.pos[0] + dx / dist * WALK_SPEED,
-                server.pos[1] + dz / dist * WALK_SPEED,
-            ];
-            (server.yaw, server.moving) = (dx.atan2(dz), true);
+        if !walk(server, to, yaw) {
+            continue;
         }
         if let Some(c) = server.serving.filter(|_| !server.moving) {
             sims[c as usize].being_served = true;
@@ -576,6 +591,22 @@ pub(crate) fn update(w: &mut World) {
             server.yaw = crate::world::wrap_angle(yaw + off.clamp(-FACE_TURN, FACE_TURN));
         }
     }
+}
+
+/// A step of `server`'s walk to `to`, where they face `yaw`: whether they're there.
+fn walk(server: &mut Server, to: [f32; 2], yaw: f32) -> bool {
+    let (dx, dz) = (to[0] - server.pos[0], to[1] - server.pos[1]);
+    let dist = dx.hypot(dz);
+    if dist <= WALK_SPEED {
+        (server.pos, server.yaw, server.moving) = (to, yaw, false);
+        return true;
+    }
+    server.pos = [
+        server.pos[0] + dx / dist * WALK_SPEED,
+        server.pos[1] + dz / dist * WALK_SPEED,
+    ];
+    (server.yaw, server.moving) = (dx.atan2(dz), true);
+    false
 }
 
 /// What a customer at a post does this step (`world::progress`).

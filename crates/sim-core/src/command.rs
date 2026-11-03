@@ -285,6 +285,21 @@ pub enum Command {
         household: u32,
         blueprint: crate::blueprint::Blueprint,
     },
+    /// Build mode: a garage on the home lot, its walls' centre lines from `(x0, z0)` to
+    /// `(x1, z1)`, its door facing `rot` (as a thing's facing: 0 towards +z, 1 +x, 2 -z, 3 -x),
+    /// for content `build.garage` (see `World::build_garage`).
+    BuildGarage {
+        household: u32,
+        x0: f32,
+        z0: f32,
+        x1: f32,
+        z1: f32,
+        rot: u8,
+    },
+    /// Build mode: takes down the home lot's garage, for `objectRules.resale` of its price.
+    SellGarage {
+        household: u32,
+    },
     /// Build mode: moves the room around tile `(x, z)` of the home by `(dx, dz)` tiles, with its
     /// walls, doors, windows, floors and everything standing in it (see `World::move_room`).
     MoveRoom {
@@ -443,6 +458,8 @@ impl Command {
             | Command::SetRoof { household, .. }
             | Command::BuildBlueprint { household, .. }
             | Command::MoveRoom { household, .. }
+            | Command::BuildGarage { household, .. }
+            | Command::SellGarage { household }
             | Command::Repair { household, .. } => Some(household),
             _ => None,
         }

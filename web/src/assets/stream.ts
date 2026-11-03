@@ -14,12 +14,20 @@ import { withBuild, withoutBuild } from './build';
 
 /** Background downloads at once. */
 const BACKGROUND_PARALLEL = 2;
-/** Foreground downloads at once (a loading screen's plan). */
-const FOREGROUND_PARALLEL = 4;
+/** Foreground downloads at once (a loading screen's plan: mostly small files, which a few at a time left the line idle between). */
+const FOREGROUND_PARALLEL = 8;
+/** A download that receives nothing for this long (ms) is given up on, and tried once more. */
+const STALL_MS = 20_000;
+/** Tries per file in one load (`load`): the first, and one more after a stall or a network error. */
+const TRIES = 2;
 
 let foregroundLoads = 0;
 let backgroundLoads = 0;
-const waiting: (() => void)[] = [];
+/** Background loads waiting their turn: what starts each, the file it fetches (if known), and when it was asked for. */
+const waiting: { start: () => void; url: string | null; order: number }[] = [];
+let asked = 0;
+/** How soon a waiting file should come (lower first; `reprioritize`); null: in the order asked. */
+let rank: ((url: string) => number) | null = null;
 
 /** Runs a load someone is waiting for; background downloads hold back while it runs. */
 export async function foreground<T>(load: () => Promise<T>): Promise<T> {
@@ -35,17 +43,36 @@ export async function foreground<T>(load: () => Promise<T>): Promise<T> {
 function next(): void {
   while (foregroundLoads === 0 && backgroundLoads < BACKGROUND_PARALLEL && waiting.length) {
     backgroundLoads++;
-    waiting.shift()!();
+    let best = 0;
+    if (rank) {
+      let bestRank = Infinity;
+      for (let i = 0; i < waiting.length; i++) {
+        const w = waiting[i];
+        const r = w.url === null ? Infinity : rank(w.url);
+        if (r < bestRank || (r === bestRank && w.order < waiting[best].order)) [best, bestRank] = [i, r];
+      }
+    }
+    waiting.splice(best, 1)[0].start();
   }
+}
+
+/**
+ * Orders the files waiting to stream in the background by `by` (lower first; ties and files it
+ * doesn't know, Infinity, in the order asked): the game ranks them by where the camera is (the
+ * open world's priorities: the focus lot, then the models in the chunks streamed in, then the rest
+ * by distance). Null: in the order asked again.
+ */
+export function reprioritize(by: ((url: string) => number) | null): void {
+  rank = by;
 }
 
 /**
  * Runs a load nobody is waiting for (a file fetched ahead of time, one that failed tried again): it
  * waits until none of the loads someone is waiting for is running, a couple at a time.
  */
-export function background<T>(load: () => Promise<T>): Promise<T> {
+export function background<T>(load: () => Promise<T>, url: string | null = null): Promise<T> {
   return new Promise<void>((resolve) => {
-    waiting.push(resolve);
+    waiting.push({ start: resolve, url, order: asked++ });
     next();
   })
     .then(load)
@@ -64,14 +91,53 @@ const requested = new Set<string>();
 const finished = new Set<string>();
 const inflight = new Map<string, Promise<void>>();
 
-/** Downloads `url` once per page (shared by `prefetch` and `prefetchNow`). */
+/**
+ * Downloads `url` once, giving up when nothing arrives for `STALL_MS` (a connection that hangs would
+ * otherwise hold a loading screen for good). A slow download that keeps coming is never cut off.
+ */
+async function download(url: string, priority: 'high' | 'low'): Promise<void> {
+  const abort = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const alive = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => abort.abort(new Error(`${url}: nothing arrived for ${STALL_MS / 1000} s`)), STALL_MS);
+  };
+  alive();
+  try {
+    const res = await fetch(withBuild(url), { priority, signal: abort.signal });
+    if (!res.ok) throw new HttpError(`${url}: ${res.status}`);
+    const reader = res.body?.getReader();
+    if (!reader) {
+      await res.arrayBuffer();
+      return;
+    }
+    for (;;) {
+      const { done } = await reader.read();
+      if (done) return;
+      alive();
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The server answered, but not with the file: trying again won't help. */
+class HttpError extends Error {}
+
+/** Downloads `url` once per page (shared by `prefetch` and `prefetchNow`): tried again once if it stalls or the network fails. */
 function load(url: string, priority: 'high' | 'low'): Promise<void> {
   const existing = inflight.get(url);
   if (existing) return existing;
   const p = (async () => {
-    const res = await fetch(withBuild(url), { priority });
-    if (!res.ok) throw new Error(`${url}: ${res.status}`);
-    await res.arrayBuffer();
+    for (let tried = 1; ; tried++) {
+      try {
+        await download(url, priority);
+        break;
+      } catch (err) {
+        if (err instanceof HttpError || tried >= TRIES) throw err;
+        console.warn(`[assets] ${url} failed, trying again`, err);
+      }
+    }
     finished.add(url);
   })();
   inflight.set(url, p);
@@ -80,6 +146,11 @@ function load(url: string, priority: 'high' | 'low'): Promise<void> {
   };
   void p.then(forget, forget);
   return p;
+}
+
+/** Whether the file at `url` (a stream key: without the build's query) has been downloaded this page. */
+export function fetched(url: string): boolean {
+  return finished.has(key(url));
 }
 
 /* The plan: the files this session will fetch, and how many are done. */
@@ -147,7 +218,7 @@ export function planStream(urls: Iterable<string>, label: string): void {
  * planned its own (which takes these files in too).
  */
 export function streamGameData(urls: string[]): void {
-  if (planned.size === 0) planStream(urls, 'Game data');
+  if (planned.size === 0) planStream(urls, 'Getting the game ready…');
   prefetch(urls);
 }
 
@@ -173,7 +244,7 @@ export function prefetch(urls: Iterable<string>): void {
     const k = key(url);
     if (requested.has(k) || finished.has(k)) continue;
     requested.add(k);
-    void background(() => load(k, 'low'))
+    void background(() => load(k, 'low'), k)
       .then(() => settle(k, true))
       .catch(() => {
         requested.delete(k);

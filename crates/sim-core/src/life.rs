@@ -71,9 +71,23 @@ pub struct Visit {
 pub enum Transition {
     /// Reached the town exit: the shift starts.
     Work,
+    /// Got into a car to go to work in (`cars.rs`): off they go.
+    Board { car: u32 },
     /// Set off to visit a plot (guest status starts now, so an interrupted trip still ends at home).
     /// Visits the player asked for last longer.
     Visit { plot: u32, directed: bool },
+    /// At their car's door, beyond walking range of the place they're off to: they drive there
+    /// (`cars::start_trip`).
+    Drive { car: u32, plot: u32, directed: bool },
+    /// At their car parked out on a trip: they drive home (`cars::drive_home`).
+    DriveHome { car: u32 },
+    /// At the door of their household's car on a trip: they get in to ride along to `plot`, or
+    /// (None) home (`cars::ride`).
+    Ride {
+        car: u32,
+        plot: Option<u32>,
+        directed: bool,
+    },
     /// Reached home.
     Home,
     /// Reached the front door to answer `guest`'s knock.
@@ -171,10 +185,167 @@ fn ticks(minutes: f32) -> u64 {
     (minutes / MINUTES_PER_TICK) as u64
 }
 
+/// How long someone's way to work or school takes in an open-world town (`Sim::commute`): the
+/// walk to the way out of town quickest for them (`world::quickest_exit`, bus stops too) and,
+/// past it, `careerRules.commuteMinutes`, the part off the map.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Commute {
+    /// The day it's for (carried over from the day before, `refresh_commute`) and the home it
+    /// was worked out for.
+    pub day: u32,
+    pub home: Option<u32>,
+    /// The exit (`World::exits` index) they walk to.
+    pub exit: usize,
+    /// Minutes on foot to it (from where they were at home when it was worked out, with
+    /// `OUT_OF_THE_HOUSE`), and in all.
+    pub walk: f32,
+    pub ticks: u64,
+    /// Worked out again from where they were shortly before they set off (`FIRM_UP_MINUTES`).
+    pub firm: bool,
+}
+
+/// This long before they'd set off, the walk is worked out again from where they are.
+const FIRM_UP_MINUTES: f32 = 6.0;
+
+/// `leave_for`, worked out again from where they are once it's close (`FIRM_UP_MINUTES`).
+fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 {
+    let planned = leave_for(&w.sims[i], leave, start);
+    if w.sims[i].commute.is_some_and(|c| !c.firm)
+        && w.tick + ticks(FIRM_UP_MINUTES) >= planned
+        && !heading_out(&w.sims[i])
+    {
+        w.sims[i].commute = None;
+        refresh_commute(w, i, day);
+        if let Some(c) = w.sims[i].commute.as_mut() {
+            c.firm = true;
+        }
+        return leave_for(&w.sims[i], leave, start);
+    }
+    // Wherever they've got to since (out in the garden, at a neighbour's), at least as long as
+    // the walk from there looks.
+    let sim = &w.sims[i];
+    if let Some(c) = sim.commute
+        && !heading_out(sim)
+        && let Some(&exit) = w.exits.get(c.exit)
+    {
+        let walk = sim.walk_per_minute(&w.content);
+        // (From over the ground: a commute timed from bed upstairs had them setting off for
+        // work in the middle of the night.)
+        let from = w.stairs.ground_pos(sim.pos);
+        let minutes = w.travel.eta(from, exit, crate::travel::Mode::Foot, walk) * WALK_MARGIN
+            + OUT_OF_THE_HOUSE;
+        let total = ticks(minutes + w.content.career_rules.commute_minutes);
+        if total > c.ticks
+            && let Some(c) = w.sims[i].commute.as_mut()
+        {
+            c.walk = minutes;
+            c.ticks = total;
+            return leave_for(&w.sims[i], leave, start);
+        }
+    }
+    planned
+}
+
+/// Minutes added to the walk from the front door for getting out of the house to it, and a
+/// share more for the rest of the way (a car passing, someone in the way).
+pub const OUT_OF_THE_HOUSE: f32 = 5.0;
+pub const WALK_MARGIN: f32 = 1.05;
+
+/// When someone with work or school starting at `start` leaves (the content's `leave`, unless
+/// they live in an open-world town: then by their walk, `Sim::commute`).
+pub fn leave_for(sim: &crate::world::Sim, leave: u64, start: u64) -> u64 {
+    match sim.commute {
+        Some(c) => start.saturating_sub(c.ticks),
+        None => leave,
+    }
+}
+
+/// How long `i`'s way to work takes (`Commute`), worked out when they first need it and when they
+/// move house; in towns laid out before the open world, nothing: `commuteMinutes` is the whole
+/// way, as it always was. A new day starts from the day before's (firmed up from where they were
+/// as they set off, mostly): it is worked out again only shortly before they leave
+/// (`firm_leave`), not for everyone in town at midnight, a walk across a big world each.
+pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
+    // (Nowhere to go: no job, and not of an age for school.)
+    let sim = &w.sims[i];
+    let commutes = sim.job.is_some()
+        || w.content.life.school.is_some()
+            && w.content.life.stage_at(sim.age).is_some_and(|s| s.school);
+    if !w.travel.open || w.exits.is_empty() || !commutes {
+        w.sims[i].commute = None;
+        return;
+    }
+    let home = w
+        .households
+        .get(w.sims[i].household as usize)
+        .and_then(|h| h.plot);
+    if let Some(c) = w.sims[i].commute.as_mut()
+        && c.home == home
+    {
+        if c.day != day {
+            c.day = day;
+            c.firm = false;
+        }
+        return;
+    }
+    let sim = &w.sims[i];
+    // From where they are at home, else from the front door.
+    let at_home = home.is_some() && w.plot_at(sim.tile().0, sim.tile().1) == home;
+    let from = match home {
+        Some(p) if !at_home => w.plots[p as usize].arrival_point(),
+        _ => sim.pos,
+    };
+    // (How far, from over the ground: see `firm_leave`.)
+    let ground = w.stairs.ground_pos(from);
+    let Some(exit) = crate::world::quickest_exit(&w.travel, &w.exits, ground, true) else {
+        w.sims[i].commute = None;
+        return;
+    };
+    let target = w.exits[exit];
+    let walk = sim.walk_per_minute(&w.content);
+    // The way they'd walk it (in the house's grounds and the public ways), or the estimate.
+    let nav = w.nav();
+    let goal = (target[0].floor() as i32, target[1].floor() as i32);
+    let start = (from[0].floor() as i32, from[1].floor() as i32);
+    let grounds = crate::world::grounds(&w.tile_plot, &w.plots, &w.households, &nav, sim, goal);
+    let reach = (w.reach_version == w.nav_version).then_some(&w.reach);
+    let metres = crate::world::trip(
+        &nav,
+        reach,
+        &w.travel,
+        from,
+        start,
+        goal,
+        target,
+        Some(&grounds),
+    )
+    .map(|wp| {
+        let wp: Vec<[f32; 2]> = wp.iter().map(|&p| w.stairs.ground_pos(p)).collect();
+        crate::travel::length(ground, &wp)
+    });
+    let minutes = match metres {
+        Some(m) => m / walk.max(1e-3),
+        None => w
+            .travel
+            .eta(ground, target, crate::travel::Mode::Foot, walk),
+    } * WALK_MARGIN
+        + OUT_OF_THE_HOUSE;
+    let total = minutes + w.content.career_rules.commute_minutes;
+    w.sims[i].commute = Some(Commute {
+        day,
+        home,
+        exit,
+        walk: minutes,
+        ticks: ticks(total),
+        firm: false,
+    });
+}
+
 pub(crate) fn update(w: &mut World) {
     let tick = w.tick;
     let day = clock::day(tick);
     let hour = clock::hour(tick);
+    let mut refreshed = false;
     for i in 0..w.sims.len() {
         // (In lots nobody watches, on their turn; see `lod.rs`.)
         if !w.sims[i].here() || w.sims[i].steps == 0 {
@@ -198,8 +369,23 @@ pub(crate) fn update(w: &mut World) {
             apply_transition(w, i, transition);
         }
         if w.sims[i].away_until.is_some() {
-            at_work(w, i);
+            // (Done, and waiting for their car home or in it: `cars.rs` brings them back.) Done
+            // now: home in the car (`cars::off_work`), or on their own.
+            if !crate::cars::homeward(w, i) && at_work(w, i) && !crate::cars::off_work(w, i) {
+                w.sims[i].queue.push_back(Task {
+                    kind: TaskKind::GoHome,
+                    directed: false,
+                    routine: false,
+                });
+            }
         } else {
+            // (Commutes worked out for the first time or after a move: those with one to go by
+            // can wait a tick when the searches are over budget, one a tick at least.)
+            if w.sims[i].commute.is_none() || !w.over_search_budget() || !refreshed {
+                let before = w.sims[i].commute;
+                refresh_commute(w, i, day);
+                refreshed |= w.sims[i].commute != before;
+            }
             schedule_work(w, i, day);
             schedule_school(w, i, day);
             end_visit_if_due(w, i, hour);
@@ -328,6 +514,15 @@ pub fn school_today(
 
 /// Off to school when it's time (once a day; too late, and it's skipped for today).
 fn schedule_school(w: &mut World, i: usize, day: u32) {
+    if w.sims[i].school_day == day {
+        return;
+    }
+    let Some((leave, start, _)) = school_today(&w.content, &w.sims[i], w.tick) else {
+        return;
+    };
+    let leave = firm_leave(w, i, leave, start, day);
+    // By car, earlier: the drive takes a while (`cars::lead_ticks`).
+    let leave = leave.min(start.saturating_sub(crate::cars::lead_ticks(w, i, start)));
     let World {
         content,
         sims,
@@ -337,12 +532,6 @@ fn schedule_school(w: &mut World, i: usize, day: u32) {
     } = w;
     let tick = *tick;
     let sim = &mut sims[i];
-    if sim.school_day == day {
-        return;
-    }
-    let Some((leave, start, _)) = school_today(content, sim, tick) else {
-        return;
-    };
     if tick > start + ticks(content.career_rules.late_minutes) {
         // A day missed.
         sim.school_day = day;
@@ -377,6 +566,10 @@ fn schedule_work(w: &mut World, i: usize, day: u32) {
     let Some((leave, start, _)) = shift_today(&w.content, job, &sim.skills, tick) else {
         return;
     };
+    let leave = firm_leave(w, i, leave, start, day);
+    let sim = &w.sims[i];
+    // By car, earlier: the drive takes a while (`cars::lead_ticks`).
+    let leave = leave.min(start.saturating_sub(crate::cars::lead_ticks(w, i, start)));
     if tick > start + ticks(w.content.career_rules.late_minutes) {
         miss_shift(w, i, day);
         return;
@@ -695,6 +888,7 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             if sim.job.is_none() {
                 if let Some((_, start, end)) = school_today(content, sim, tick) {
                     sim.school_day = clock::day(tick);
+                    sim.shift_from = start;
                     sim.away_until = Some(end.max(start).max(tick + 1));
                     sim.queue.clear();
                 }
@@ -706,7 +900,9 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             };
             job.last_shift_day = clock::day(tick);
             job.shift_mood = mood;
-            // Early arrivals still work until the shift's end; late ones lose that time.
+            // Early arrivals still work until the shift's end; late ones lose that time. Before
+            // it starts they're on their way (`at_work`).
+            sim.shift_from = start;
             sim.away_until = Some(end.max(start).max(tick + 1));
             sim.queue.clear();
         }
@@ -744,6 +940,35 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
                 w.events.push(tick, EventKind::Visited, i, j, None);
             }
         }
+        Transition::Board { car } => {
+            // Gone without them (or not theirs to take now): on foot after all.
+            if !crate::cars::may_board(w, i, car) {
+                w.sims[i].queue.push_front(Task {
+                    kind: TaskKind::Work,
+                    directed: true,
+                    routine: false,
+                });
+                return;
+            }
+            apply_transition(w, i, Transition::Work);
+            if w.sims[i].away_until.is_some() {
+                crate::cars::board(w, i, car);
+            }
+        }
+        Transition::Drive {
+            car,
+            plot,
+            directed,
+        } => crate::cars::start_trip(w, i, car, plot, directed),
+        Transition::DriveHome { car } => {
+            w.sims[i].visiting = None;
+            crate::cars::drive_home(w, i, car);
+        }
+        Transition::Ride {
+            car,
+            plot,
+            directed,
+        } => crate::cars::ride(w, i, car, plot, directed),
         Transition::Home => w.sims[i].visiting = None,
         Transition::Answered { guest } => answer(w, i, guest as usize),
     }
@@ -988,8 +1213,9 @@ fn take_breaks(sim: &mut Sim, content: &Content, mut funds: Option<&mut i64>) {
     }
 }
 
-/// Off the map at work: needs change and skills grow, then come home with pay and maybe a promotion.
-fn at_work(w: &mut World, i: usize) {
+/// Off the map at work: needs change and skills grow, then (true) they're done, with pay and maybe
+/// a promotion: the caller sees them home.
+fn at_work(w: &mut World, i: usize) -> bool {
     let tick = w.tick;
     let World {
         content,
@@ -999,6 +1225,10 @@ fn at_work(w: &mut World, i: usize) {
         ..
     } = w;
     let sim = &mut sims[i];
+    // Still on their way: work (or school) hasn't started.
+    if tick < sim.shift_from {
+        return false;
+    }
     let minutes = sim.minutes();
     let Some(job) = sim.job.clone() else {
         take_breaks(sim, content, None);
@@ -1015,7 +1245,7 @@ fn at_work(w: &mut World, i: usize) {
             }
         }
         if sim.away_until.is_some_and(|until| tick < until) {
-            return;
+            return false;
         }
         // A day at school: the better they felt, the better it went.
         if let Some(school) = &content.life.school {
@@ -1024,12 +1254,7 @@ fn at_work(w: &mut World, i: usize) {
                 (sim.grade + school.attend + (mood - 0.5) * 2.0 * school.mood).clamp(0.0, 100.0);
         }
         sim.away_until = None;
-        sim.queue.push_back(Task {
-            kind: TaskKind::GoHome,
-            directed: false,
-            routine: false,
-        });
-        return;
+        return true;
     };
     let career = &content.careers[job.career];
     let level = &career.levels[job.level];
@@ -1052,14 +1277,16 @@ fn at_work(w: &mut World, i: usize) {
         );
     }
     if sim.away_until.is_some_and(|until| tick < until) {
-        return;
+        return false;
     }
     sim.away_until = None;
     households[sim.household as usize].funds += shift_pay(content, &job, &sim.skills);
     let rules = &content.career_rules;
     let fit = skill_fit(level, &sim.skills).clamp(-3.0, 3.0);
     // Still a job: it was there above, and nothing since takes it away.
-    let Some(job) = sim.job.as_mut() else { return };
+    let Some(job) = sim.job.as_mut() else {
+        return true;
+    };
     job.shifts += 1;
     job.missed = job.missed.saturating_sub(1);
     job.satisfaction = job.satisfaction * 0.8 + job.shift_mood * 0.2;
@@ -1086,11 +1313,7 @@ fn at_work(w: &mut World, i: usize) {
         }
         events.push_promotion(tick, i, job.career, job.level, bonus);
     }
-    sim.queue.push_back(Task {
-        kind: TaskKind::GoHome,
-        directed: false,
-        routine: false,
-    });
+    true
 }
 
 /// Story events for new skill levels (the player's household only: across a whole town they
@@ -1290,8 +1513,7 @@ pub(crate) fn farewell(w: &World, i: usize, plot: u32) -> Option<(usize, usize)>
         return None;
     }
     let household = w.households.iter().position(|h| h.plot == Some(plot))?;
-    let reach = crate::world::WALK_SPEED * guest.walk_speed(content) / MINUTES_PER_TICK
-        * rules.farewell_minutes;
+    let reach = guest.walk_per_minute(content) * rules.farewell_minutes;
     w.sims
         .iter()
         .enumerate()

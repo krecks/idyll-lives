@@ -109,7 +109,8 @@
           "finish": "material.finish.gloss"
         },
         "marble": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.28
         },
         "oil": {
           "finish": "material.finish.gloss"
@@ -118,7 +119,8 @@
           "finish": "material.finish.matte"
         },
         "tomato": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         },
         "wine": {
           "finish": "material.finish.gloss"
@@ -196,7 +198,8 @@
           "finish": "material.finish.satin"
         },
         "tomato": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         },
         "wicker": {
           "finish": "material.finish.satin"
@@ -260,7 +263,8 @@
           "finish": "material.finish.matte"
         },
         "tomato": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         },
         "walnut": {
           "finish": "material.finish.wood"
@@ -364,10 +368,12 @@
           "finish": "material.finish.matte"
         },
         "tomato": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "motions": {
@@ -439,7 +445,8 @@
           "finish": "material.finish.gloss"
         },
         "marble": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.28
         },
         "oak": {
           "finish": "material.finish.satin"
@@ -463,10 +470,12 @@
           "finish": "material.finish.satin"
         },
         "tomato": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         },
         "worktop": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       },
       "motions": {

@@ -26,14 +26,18 @@
  *   bent over show their pale sides), and far off the lawn's plain colour (`LAWN.blend`):
  *   `vGameGrass` (linear rgb, t).
  *
- * `GAME_GRASS_GROUND`, on the ground: the same gusts as a slight lightening of the lawn under them
- * (scaled by how much grass grows there, as the blades read it: the land's, and in town the lawn's mask), so the waves roll on past the blades. Colour only: the ground
- * doesn't move.
+ * `GAME_GRASS_GROUND`, on the ground: the shade under the blades near the eye, where they grow (the
+ * land's grassiness, and in town the lawn's mask, as the blades read it), and the lawn's tone, as
+ * dark as the blades and the shade between them average, with the same gusts as a slight lightening,
+ * so the waves roll on past the blades. The tone and the gusts are wherever the land is lawn (the
+ * terrain's vertex alpha), on past the grass's field round the town, fading out further off into the
+ * land's own colour, so there is no edge where the field ends. Colour only: the ground doesn't move.
  *
  * Uniforms (`pc/grass.ts`): `game_wind` (`nature.ts`: time, strength, direction x, z),
  * `game_grassEye` (the eye, game space, and in w how far the grass is drawn: the ground blends
  * into the lawn's colour towards it too), `game_grassDensity` (the preset's, `grassShare`), `game_grassArea` (the colour texture's corner and 1 / its
- * size in metres), `game_grassTownSize` (the town's ground in metres), `game_grassPush[16]`.
+ * size in metres), `game_grassTownSize` (the town's ground in metres, and from how far round it to
+ * how far the lawn's tone fades out), `game_grassPush[16]`.
  * Per copy: `game_grassSlope` (the ground's slope along x and z under its patch).
  */
 
@@ -57,8 +61,12 @@ const LAWN = { root: 0.55, tip: 1.35, saturation: 0.85, under: 0.55, far: 0.8, b
 function grassCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
   const { wgsl, v2, v3, v4, u, decl: d } = codeFor(lang);
   const [u2, u3, i2, uint] = wgsl ? ['vec2u', 'vec3u', 'vec2i', 'u32'] : ['uvec2', 'uvec3', 'ivec2', 'uint'];
-  // (Level 0 everywhere: the textures have no mips, and the ground reads them in a branch.)
+  // (Level 0 in the vertex shader, which has no derivatives, and where the ground reads in a branch (the
+  // town's mask and the gusts have no mips).)
   const tex = (name: string, uv: string) => (wgsl ? `textureSampleLevel(${name}, ${name}Sampler, ${uv}, 0.0)` : `textureLod(${name}, ${uv}, 0.0)`);
+  // The ground's read of the lawn's colour, outside any branch: filtered by its mips, so the field's
+  // texels don't shimmer on the ground far off (a texel a metre, a pixel several metres there).
+  const texMip = (name: string, uv: string) => (wgsl ? `textureSample(${name}, ${name}Sampler, ${uv})` : `texture(${name}, ${uv})`);
   const { patch, perPatch, near } = GRASS;
   const { span, span2, weight2, speed, calm, strong } = GRASS.gust;
   const [gc, gs] = GUST_ROTATION;
@@ -262,20 +270,33 @@ ${windDecl}
 #if defined(GAME_GRASS_GROUND) && !defined(SHADOW_PASS)
 	{
 		${d('ggQ', v3)} = gamePos(vPositionW);
-		${d('ggCov', 'float', true)} = ${tex('game_grassColour', `(ggQ.xz - ${u('game_grassArea')}.xy) * ${u('game_grassArea')}.zw`)}.a;
+		// Where the blades grow (the field's grassiness, fading out round its margin).
+		${d('ggCov', 'float', true)} = ${texMip('game_grassColour', `(ggQ.xz - ${u('game_grassArea')}.xy) * ${u('game_grassArea')}.zw`)}.a;
+		// The lawn's tone: wherever the land is lawn (the terrain's vertex alpha), fading out past the field's margin.
+		#ifdef VARYING_VVERTEXCOLOR
+			${d('ggLawn', 'float', true)} = vVertexColor.a;
+		#else
+			${d('ggLawn', 'float', true)} = ggCov;
+		#endif
+		${d('ggOut', v2)} = max(max(-ggQ.xz, ggQ.xz - ${u('game_grassTownSize')}.xy), ${v2}(0.0));
+		ggLawn = ggLawn * (1.0 - smoothstep(${u('game_grassTownSize')}.z, ${u('game_grassTownSize')}.w, length(ggOut)));
 		// In town, as much as the blades grow there (none by a wall, under furniture or on a patio: no shade of theirs).
-		if (ggCov > 0.0 && ${u('game_grassTownSize')}.x > 0.0) {
+		if (ggCov + ggLawn > 0.0 && ${u('game_grassTownSize')}.x > 0.0) {
 			${d('ggTu', v2)} = ggQ.xz / ${u('game_grassTownSize')}.xy;
-			if (${inTown('ggTu')}) { ggCov = min(ggCov, ${tex('game_grassTown', 'ggTu')}.r); }
+			if (${inTown('ggTu')}) {
+				${d('ggMask', 'float')} = ${tex('game_grassTown', 'ggTu')}.r;
+				ggCov = min(ggCov, ggMask);
+				ggLawn = min(ggLawn, ggMask);
+			}
 		}
 		// (Only where the land has lawn: roads, fields and the rest of the landscape skip the gusts.)
-		if (ggCov > 0.0) {
+		if (ggCov + ggLawn > 0.0) {
 			${d('ggP', v2)} = ggQ.xz - ${u('game_wind')}.zw * ${f(speed)} * ${u('game_wind')}.x;
 			${d('ggGust', 'float')} = ${gust('ggP')} * ${u('game_wind')}.y;
-			// Darker under the blades near the eye (the shade between them), blending out towards the
-			// grass's reach into the lawn's own colour, as dark as the blades and the shade between them average.
+			// The lawn's own colour, as dark as the blades and the shade between them average, and darker
+			// under the blades near the eye (the shade between them), blending out towards the grass's reach.
 			${d('ggNear', 'float')} = 1.0 - smoothstep(${u('game_grassEye')}.w * ${f(LAWN.blend[0])}, ${u('game_grassEye')}.w * ${f(LAWN.blend[1])}, length(ggQ - ${u('game_grassEye')}.xyz));
-			dAlbedo = dAlbedo * mix(1.0, mix(${f(LAWN.far)}, ${f(LAWN.under)}, ggNear), ggCov) * (1.0 + (ggGust - ${f(calm)}) * 0.13 * ggCov);
+			dAlbedo = dAlbedo * (1.0 - ggLawn * ${f(1 - LAWN.far)} - ggCov * ggNear * ${f(LAWN.far - LAWN.under)}) * (1.0 + (ggGust - ${f(calm)}) * 0.13 * ggLawn);
 		}
 	}
 #endif`;

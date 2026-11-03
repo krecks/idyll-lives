@@ -283,7 +283,11 @@ def dressingTable():
         F.soft('jewellery_lid', 0.164, 0.014, 0.104, (-0.28, TOP_Y + 0.042, 0.18), M.case, round=0.005,
                round_segments=1)
         F.box('jewellery_clasp', 0.02, 0.014, 0.004, (-0.28, TOP_Y + 0.032, 0.129), M.gilt, bevel=0.001)
-        # the pouf: a round cushion, piped round its top and foot, buttoned in the middle, on four brass feet
+    body = G.join(body, 'body', origin=(0, 0, 0))
+
+    # the pouf the resident sits on, out in front of the kneehole: drawn with the table, not part of its size
+    # (the kind is the table with its mirror; the pouf is where the seat is measured)
+    with G.new_parts() as carried:
         G.revolve('pouf', [(0, 0.045), (0.19, 0.045), (0.205, 0.06), (0.208, 0.36), (0.214, 0.39), (0.212, 0.415),
                            (0.2, 0.437), (0.17, 0.449), (0.08, 0.45), (0, 0.447)],
                   at=F.at(0, 0, -0.22), material=M.pouf, segments=28)
@@ -295,7 +299,7 @@ def dressingTable():
             a = math.radians(45 + 90 * k)
             F.cone(f'pouf_foot{k}', 0.01, 0.016, 0.045, (0.14 * math.cos(a), 0.0225, -0.22 + 0.14 * math.sin(a)),
                    M.table_frame, verts=10)
-    body = G.join(body, 'body', origin=(0, 0, 0))
+    pouf = G.aside(carried, 'pouf')
 
     # the right drawer: its front and the tray behind it, hidden in the case at rest
     with G.new_parts() as parts:
@@ -311,7 +315,7 @@ def dressingTable():
     # Built facing the wall (as the old part was), then turned round about the footprint's middle: the
     # mirror's back on the wall face, the pouf at the front, where the resident sits facing the mirror.
     half = Matrix.Rotation(math.pi, 4, 'Z')
-    for o in (body, drawer):
+    for o in (body, drawer, pouf):
         o.data.transform(half)
         o.data.update()
         o.location = half @ o.location + Vector((0, TURN_BACK, 0))
@@ -409,7 +413,8 @@ def mirrorFloor():
 FAMILY = G.Family(
     'bedroom_dressing', M,
     [G.Model('mirror', mirror, size=(0.80, 1.856, 0.56), key='model.mirror', paint=[('frame', 'Frame')]),
-     G.Model('dressingTable', dressingTable, size=(0.86, 1.533, 0.858), key='model.dressingTable',
+     # its own size: the pouf it carries stands out in front of the kneehole (0.86 m is the table's own depth)
+     G.Model('dressingTable', dressingTable, size=(0.86, 1.533, 0.418), key='model.dressingTable',
              centre=(0, -0.003),
              # getReady (the `wash` tag) slides the right drawer out to the seat, and back after a while
              motions={'uses': {'getReady': 'drawer_open'}, 'hold': DRAWER_HOLD},

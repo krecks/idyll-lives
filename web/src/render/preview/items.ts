@@ -7,9 +7,9 @@
  *
  * Requests are queued and drawn one model at a time: what's on screen first, in order (cards ask
  * when they scroll into view and withdraw when they leave), then pictures drawn ahead of time in
- * idle moments. Encoding a picture overlaps building the next model. Pictures are kept for the
- * page and, in Cache Storage, between visits (keyed by app version and the model's manifest
- * entry). Turntables (a model seen from `frames` angles around it) feed the detail pane's
+ * idle moments, but not while held (`holdAhead`: in Live). Encoding a picture overlaps building the next model. Pictures are kept for the
+ * page and, in Cache Storage, between visits (keyed by what they're drawn from: the model's manifest
+ * entry and its file's contents, the surfaces' entries and textures, `storeKey`). Turntables (a model seen from `frames` angles around it) feed the detail pane's
  * preview. The app is released a few seconds after the queue empties.
  *
  * The game's frames come first: pictures drawn ahead of time wait for an idle moment, one model
@@ -18,12 +18,13 @@
 
 import * as pc from '../pc/engine';
 import { withoutBuild } from '../../assets/build';
-import type { AssetRegistry } from '../../assets/registry';
+import { contentHash, materialTextures, type AssetRegistry } from '../../assets/registry';
 import { openCache } from '../../ml/assets';
 import { colorsKey, type PartColors } from '../../core/protocol';
 import { buildModel } from '../pc/models';
 import { shadingFromSettings } from '../pc/shaders/softLook';
 import { toEngine } from '../pc/space';
+import { idleMoment } from '../shared/idle';
 import { painted } from '../shared/modelEntry';
 import type { ItemPreviews, ItemStage } from '../types';
 import { boxCorners, contactShadow, PICTURE_STAND_IN, placeModel, shadersCompiling, studioScene, texturesReady, type StudioScene } from './itemScene';
@@ -66,12 +67,14 @@ interface Job {
 const thumbs = new Map<string, string>();
 const turntables = new Map<string, string[]>();
 /**
- * Pictures kept between visits (Cache Storage), in a cache per app version: older versions' caches
- * are deleted when it opens. Bump `v3` to drop old pictures after a look change. Pictures are kept
- * per shading (Settings, Performance, Shading), here and in memory.
+ * Pictures kept between visits (Cache Storage), across releases: each is keyed by the contents of
+ * what it's drawn from (`storeKey`), so a release redraws only what changed. Other caches of the
+ * prefix (older keys' schemes) are deleted when it opens. Bump `v4` to drop old pictures after a
+ * change to how they're drawn (the studio's light, the shaders). Pictures are kept per shading
+ * (Settings, Performance, Shading), here and in memory.
  */
 const STORE_PREFIX = 'littlelives-item-pictures-';
-const STORE = `${STORE_PREFIX}v3-${__APP_VERSION__}`;
+const STORE = `${STORE_PREFIX}v4`;
 
 /** A model's picture in the shading the setting asks for now (`thumbs`' key). */
 function thumbKey(model: string): string {
@@ -90,6 +93,8 @@ class ItemThumbnails implements ItemPreviews {
   private readonly queue: Job[] = [];
   private running = false;
   private releaseTimer = 0;
+  /** Pictures drawn ahead of time wait (`holdAhead`). */
+  private held = false;
   private store: Promise<Cache | null> | null = null;
   /**
    * Pictures of a box (the model's file failed), by job key: not kept, but the latest is handed out
@@ -122,6 +127,12 @@ class ItemThumbnails implements ItemPreviews {
 
   prefetch(models: readonly { model: string; footprint: [number, number] }[]): void {
     for (const m of models) void this.thumbnail(m.model, m.footprint, 'idle');
+  }
+
+  holdAhead(hold: boolean): void {
+    if (hold === this.held) return;
+    this.held = hold;
+    if (!hold && this.queue.length) void this.pump();
   }
 
   cachedTurntable(model: string, frames: number, colors?: PartColors): string[] | null {
@@ -226,14 +237,21 @@ class ItemThumbnails implements ItemPreviews {
   }
 
   private async pump(): Promise<void> {
-    if (this.running) return;
+    // (Held with nothing wanted on screen: not even the app made.)
+    if (this.running || (this.held && !this.queue.some((j) => j.priority === 'now'))) return;
     this.running = true;
     clearTimeout(this.releaseTimer);
     try {
       const studio = await this.open();
       while (this.queue.length) {
-        // Drawing ahead of time yields to the game: one model per idle moment.
-        if (!this.queue.some((j) => j.priority === 'now')) await idle();
+        // Drawing ahead of time yields to the game: one model per idle moment; while held (Live), none
+        // (the rest wait in the queue for `holdAhead(false)`, and the app is released meanwhile).
+        if (!this.queue.some((j) => j.priority === 'now')) {
+          if (this.held) break;
+          await idleMoment(400);
+          // (Held while it waited, and nothing wanted on screen since.)
+          if (this.held && !this.queue.some((j) => j.priority === 'now')) break;
+        }
         const job = this.next();
         if (!job) continue;
         let encoded: Promise<string[] | null> = Promise.resolve(null);
@@ -272,11 +290,41 @@ class ItemThumbnails implements ItemPreviews {
     return this.store;
   }
 
-  /** Cache key: changes with the app version, the shading and the model's manifest entry (its file, fit, finishes; not the build). */
+  /**
+   * Cache key: changes with the shading, the model's manifest entry (its file, fit, finishes; not the
+   * build), its file's contents and the surfaces' (`surfacesKey`). Where the build has no content hash
+   * for a file (the dev server, a modder's pack), with the app version instead, as before.
+   */
   private storeKey(model: string): string {
-    const entry = this.assets.has(model, 'model') ? withoutBuild(JSON.stringify(this.assets.get(model, 'model'))) : '';
-    return `${location.origin}/__item-pictures/${__APP_VERSION__}/${shadingFromSettings()}/${THUMB_PX}/${hash(model + entry)}.webp`;
+    const known = this.assets.has(model, 'model') ? this.assets.get(model, 'model') : undefined;
+    const entry = known ? withoutBuild(JSON.stringify(known)) : '';
+    const file = known?.url ? contentHash(known.url) : '';
+    const surfaces = this.surfacesKey();
+    const version = file !== null && surfaces !== null ? 'content' : __APP_VERSION__;
+    return `${location.origin}/__item-pictures/${version}/${shadingFromSettings()}/${THUMB_PX}/${hash(model + entry + file + (surfaces ?? ''))}.webp`;
   }
+
+  /** The surfaces a model may be drawn with (its finishes): their entries and their textures' contents; null if a texture has no content hash. */
+  private surfacesKey(): string | null {
+    if (this.surfaces !== undefined) return this.surfaces;
+    const parts: string[] = [];
+    let known = true;
+    for (const key of this.assets.keys('material')) {
+      const entry = this.assets.get(key, 'material');
+      if (!entry) continue;
+      parts.push(key, withoutBuild(JSON.stringify(entry)));
+      const textures = materialTextures(entry);
+      for (const url of textures ? [textures.texture, textures.normal, textures.arm] : []) {
+        if (!url) continue;
+        const h = contentHash(url);
+        if (h === null) known = false;
+        parts.push(h ?? '');
+      }
+    }
+    return (this.surfaces = known ? hash(parts.join('|')) : null);
+  }
+  /** `surfacesKey`, worked out once. */
+  private surfaces: string | null | undefined = undefined;
 
   private async stored(model: string): Promise<string | null> {
     try {
@@ -321,14 +369,6 @@ class ItemThumbnails implements ItemPreviews {
       studio.dispose();
     }, RELEASE_AFTER);
   }
-}
-
-/** Resolves when the browser has a quiet moment (or after a short while regardless). */
-function idle(): Promise<void> {
-  return new Promise((resolve) => {
-    if ('requestIdleCallback' in window) requestIdleCallback(() => resolve(), { timeout: 400 });
-    else setTimeout(resolve, 30);
-  });
 }
 
 /** FNV-1a, as hex. */

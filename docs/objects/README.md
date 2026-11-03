@@ -1,8 +1,9 @@
 # Objects
 
-Every object in the game, 541 of them, has a model built in Blender (`tools/art/blender`), exported as a `.glb`,
+Every object in the game, 543 of them, has a model built in Blender (`tools/art/blender`), exported as a `.glb`,
 with the moving parts it can show. Blender is the only source: the primitive parts the models replaced are gone, and
-the keys never changed, so saves and content need no migration. All 541 were built and checked in play by 2026-10-17,
+the keys never changed, so saves and content need no migration. All but the wide curtains, added 2026-10-21, and the empty
+vase, added 2026-10-30, were built and checked in play by 2026-10-17,
 as were the 36 models that aren't buyable: the 20 things residents carry and cook with (`families/held.py`), the 9 street props
 (`families/street.py`), and the lawn's grass tufts and wildflowers, the woods' rocks and the selection marker
 (`families/ground.py`). Every model key in the manifests has a `.glb`.
@@ -26,7 +27,7 @@ what is still open.
 | Fitness | [fitness.md](fitness.md) | 5 | F1 Home gym (5) |
 | Hobbies | [hobbies.md](hobbies.md) | 19 | H1 Music (6), H2 Games (6), H3 Crafts and science (7) |
 | Decor | [decor.md](decor.md) | 23 | D1 Wall art and clocks (6), D2 Ornaments (10), D3 Textiles (7) |
-| Tabletop | [tabletop.md](tabletop.md) | 39 | TT1 Kitchenware (11), TT2 Tableware (7), TT3 Books and small plants (7), TT4 Small ornaments (6), TT5 Bath, desk and toys (8) |
+| Tabletop | [tabletop.md](tabletop.md) | 40 | TT1 Kitchenware (11), TT2 Tableware (7), TT3 Books and small plants (8), TT4 Small ornaments (6), TT5 Bath, desk and toys (8) |
 | Lighting | [lighting.md](lighting.md) | 21 | LT1 Ceiling lights (7), LT2 Wall lights (3), LT3 Floor lamps (5), LT4 Table lamps (6) |
 | Outdoor | [outdoor.md](outdoor.md) | 43 | OU1 Patio seating and tables (11), OU2 Loungers, swings and the hot tub (5), OU3 Grills and fire (3), OU4 Play and yard (9), OU5 Pond, small garden things and lights (9), Garden decor (6) |
 | Garden plants and trees | [garden.md](garden.md) | 53 | G1 Houseplants (10), G2 Flowers (15), G3 Shrubs (11), G4 Edibles (5), G5 Trees (12) |
@@ -90,7 +91,7 @@ notes and scripts refer to them by these names.
 | E6 | Mirrors from files | a material's `"mirror": "front"` (gamekit: `glass=('#hex', 'glass', 'front')`) |
 | E7 | Level of detail | an entry's `far` file, `<id>.far.glb`; `G.Model(far=0.25)` writes it (trees, hedges, street props, the farm) |
 | E8 | Finishes by name, packs that extend, night glow | materials named `stone@matte`; a pack entry without `vary` keeps the one it overrides; a material's `"glow": "#hex"` (gamekit: `{'glow': '#hex'}`) follows the lamp level, never emissive at noon |
-| C1 | Content: things that stay open | interactions with `when` / `leaves` (`docs/content-packs.md`): the futon, the sofa bed, the washing line and the hot tub stay open (`crates/sim-core/tests/open_objects.rs`) |
+| C1 | Content: things that stay open | interactions with `when` / `leaves` (`docs/content-packs.md`): the futon, the sofa bed, the washing line and the hot tub stay open (`crates/sim-core/tests/sim/open_objects.rs`) |
 
 Added after, in the same spirit:
 - **Riders:** `motions.ride: clip`: residents sitting or lying on the object move with that clip's part (a rocking
@@ -122,7 +123,7 @@ Follow `tools/art/blender/README.md` ("Working as an agent: the loop") and `docs
 3. **Preview** (`cargo art <family> --preview`) and look at every model at rest and with every clip.
 4. **Export** (`cargo art <family> [--only <id>]`). The gate (`cargo check-glb`) must say `0 failed`;
    read every warning. The Khronos validator must report 0 errors and 0 warnings.
-5. **Test.** `cargo test -p sim-core --test shipped_content`, and the whole `sim-core` suite if content changed.
+5. **Test.** `cargo test -p sim-core --test sim shipped_content::`, and the whole `sim-core` suite if content changed.
 6. **Check it in play** (below).
 7. **Finish.** Add a line to `web/public/assets/CREDITS.md`. Commit only the `.glb` files you meant to change:
    re-exports aren't byte-for-byte the same, so `git checkout` the rest. Never commit `previews/`. Add the object's
@@ -144,8 +145,8 @@ Tools:
 - `tools/bench/check.mjs gallery | clips | play` runs the checks headless at 1 % volume on its own port. In the page,
   `__sims()` says where residents are and what they use; `__addFunds`, `__camera`, `__controls.follow` with zoom;
   `__renderer.motion.states`.
-- Debug states (`?state=<name>`): `DUMP_STATES=1 cargo test -p sim-core --test check_states` writes `bathroom-check`,
-  `needy-check`, `office-night` and `town-things` (all 36 community and farm things); `--test play_checks` writes
+- Debug states (`?state=<name>`): `DUMP_STATES=1 cargo test -p sim-core --test sim check_states::` writes `bathroom-check`,
+  `needy-check`, `office-night` and `town-things` (all 36 community and farm things); `--test sim play_checks::` writes
   `family-check` (`generated-<i>` with `--ignored`, `HOUSES=…`, `PICK=…`). Scripts must send `setAutonomy` off.
 - Residents' clips: `bun tools/characters/check_clips.ts`, or `bun run check:clips` for every body and stage (`tools/characters/README.md`);
   the poses per action are the table in `web/src/render/shared/characters/actions.ts` (`ACTIONS`).
@@ -169,7 +170,7 @@ cargo content out --group <group> [--to <category>/<group>] [--dry-run]
 Without `--to`, `out` sends each item to the **Home** column of the tables on these pages. To use it again, add the
 `validate` category back to `web/public/content/base.json` with an empty `groups` (and its icon), and remove it when
 the last group leaves. Items whose home category turns them freely (`objectRules.freeRotation`) carry
-`"freeRotation": true` while in Validate. Run `cargo test -p sim-core --test shipped_content` after.
+`"freeRotation": true` while in Validate. Run `cargo test -p sim-core --test sim shipped_content::` after.
 
 ## Lessons for the tooling
 

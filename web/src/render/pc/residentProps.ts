@@ -13,7 +13,7 @@
 
 import * as pc from './engine';
 import { Instances } from './instancing';
-import { buildModel, retellModelFileArrived, uploadData, type ModelMesh, type ModelTemplate } from './models';
+import { buildModel, disposeTemplate, releaseTemplateFile, retellModelFileArrived, uploadData, type ModelMesh, type ModelTemplate } from './models';
 import type { AssetRegistry } from '../../assets/registry';
 import type { PartColors } from '../../core/protocol';
 import { partColors } from '../shared/characters/parts';
@@ -32,6 +32,8 @@ export interface Prop {
   top: readonly [number, number, number];
   /** The files it was built without (it's a small block then). */
   failed?: string[];
+  /** The template it was made from, whose file (its materials) it draws with: let go of with it. */
+  template: { meshes: ModelMesh[] };
 }
 
 export class ResidentProps {
@@ -85,13 +87,13 @@ export class ResidentProps {
     if (!p) return null;
     const draws = p.meshes.map((m) => new Instances(this.app.graphicsDevice, this.parent, m.mesh, m.material, { name: `prop:${key}`, castShadows: false, receiveShadows: true, capacity: this.rows, cull: false }));
     for (const d of draws) d.enabled = false;
-    return { meshes: p.meshes, draws, matrices: new Float32Array(this.rows * 16), top: p.top, failed: p.failed };
+    return { meshes: p.meshes, draws, matrices: new Float32Array(this.rows * 16), top: p.top, failed: p.failed, template: p.template };
   }
 
-  private async whole(key: string): Promise<{ meshes: ModelMesh[]; top: readonly [number, number, number]; failed?: string[] }> {
+  private async whole(key: string): Promise<Omit<Prop, 'draws' | 'matrices'>> {
     const t = await buildModel(this.app, `prop:${key}`, this.assets.get(key, 'model'), [1, 1], { standIn: ITEM_STAND_IN });
     for (const g of t.glows ?? []) g.mesh.mesh.destroy();
-    return { meshes: t.meshes, top: [0, 0, 0], failed: t.failed };
+    return { meshes: t.meshes, top: [0, 0, 0], failed: t.failed, template: t };
   }
 
   /**
@@ -99,18 +101,18 @@ export class ResidentProps {
    * node's origin and axes at rest), painted in `colors` as the object is; and its top (the highest
    * point: a mop's handle); null if the model has no such part. Without the file, a small block.
    */
-  private async part(model: string, part: string, colors?: PartColors): Promise<{ meshes: ModelMesh[]; top: readonly [number, number, number]; failed?: string[] } | null> {
+  private async part(model: string, part: string, colors?: PartColors): Promise<Omit<Prop, 'draws' | 'matrices'> | null> {
     const t: ModelTemplate = await buildModel(this.app, `prop:${model}#${part}`, painted(this.assets.get(model, 'model'), colors), [1, 1], { standIn: ITEM_STAND_IN });
-    if (t.failed) return { meshes: t.meshes, top: [0, t.height, 0], failed: t.failed };
+    if (t.failed) return { meshes: t.meshes, top: [0, t.height, 0], failed: t.failed, template: t };
     for (const g of t.glows ?? []) g.mesh.mesh.destroy();
     const motion = t.motion;
     const j = motion?.names?.indexOf(part) ?? -1;
-    const keep = t.meshes.filter((_, k) => j >= 0 && motion!.parts[k] === j);
-    for (const m of t.meshes) if (!keep.includes(m)) m.mesh.destroy();
     if (j < 0 || !motion?.rests) {
-      for (const m of keep) m.mesh.destroy();
+      disposeTemplate({ meshes: t.meshes });
       return null;
     }
+    const keep = t.meshes.filter((_, k) => motion.parts[k] === j);
+    for (const m of t.meshes) if (!keep.includes(m)) m.mesh.destroy();
     const local = invert(motion.rests[j], new Float32Array(16));
     const top: [number, number, number] = [0, -Infinity, 0];
     const meshes = keep.map((m) => {
@@ -120,13 +122,14 @@ export class ResidentProps {
       m.mesh.destroy();
       return { ...m, mesh: uploadData(this.app.graphicsDevice, data) };
     });
-    return { meshes, top };
+    return { meshes, top, template: { meshes: t.meshes } };
   }
 }
 
 function destroyProp(p: Prop): void {
   for (const d of p.draws) d.destroy();
   for (const m of p.meshes) m.mesh.destroy();
+  releaseTemplateFile(p.template);
 }
 
 /** A mesh's vertices back from it (as `uploadData` made it). */

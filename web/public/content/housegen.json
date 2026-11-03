@@ -59,6 +59,13 @@
   "$margins": "Garden around the house: in front (towards the street, a range), at the back and at the sides (at least).",
   "margins": { "front": [3, 5], "back": 2, "side": 1 },
 
+  "$gardens": "A lot cut to fit its house, by garden size (a town's world says which its houses get): the garden behind the house as a share of the house's depth (`back`, a range; at least `backMin` and at most `backMax` m), beside it (`side`, m, a range) and at least `drive` m on the driveway's side (away from the front door). The front yard is `margins.front`.",
+  "gardens": {
+    "snug": { "back": [0.35, 0.6], "backMin": 5, "backMax": 8, "side": [1, 2], "drive": 4 },
+    "roomy": { "back": [0.6, 0.9], "backMin": 6, "backMax": 11, "side": [1, 3], "drive": 4 },
+    "big": { "back": [0.9, 1.3], "backMin": 9, "backMax": 16, "side": [2, 5], "drive": 5 }
+  },
+
   "$rooms": "weight: share of the floor a room wants; minSide: its narrowest width (`minSideOn`: per lot size instead; a large house's kitchen is wider, room for an island). A kitchen's `run` comes first: counter pieces side by side along one wall, one of each `with` slot (sink, stove, maybe a dishwasher) among plain `segments`, `length` tiles in all, along a wall with `clear` rows of room in front of it if one has them (an island and its stools). Furniture is placed against the walls in this order (the pieces that must come first, then `dining`, then the rest): `one` picks one of the ids, `chance` (default 1) whether it comes at all, `count` how many, `opposite` puts it across the room from another (a TV facing the sofa), `beside` on the same wall as another if there's room (`run`: the counter run; the fridge at its end). `dining`: a table standing free in the room with `seats` chairs (one kind, picked from `chairs`) round it, each facing it; with `wall`, against a wall with its chairs at its front (a desk). `surfaces`: small things put on tops of the kinds in `on` (counter, table, low, desk, shelf), the emptiest top first (`minSide`: only tops at least so wide, m). Then `wall`, `ceiling` and `rug` slots add things that take no floor space (content `layer`; only things nobody uses): pictures and curtains on walls (curtains over windows, as wide as the window: a pair a tile wide over a one-edge window, the wide ones over a two-edge window, another of the slot's curtains if the one picked fits none; `over`: on the wall behind one of those pieces if the room has one, like a mirror over the basin), lamps from the ceiling, a rug in the middle of the room. Rooms short of light get more ceiling lights (`lights` below).",
   "rooms": {
     "bedroom": {
@@ -347,11 +354,12 @@
   "$lights": "Every room gets lights enough for all of it at night (a lamp lights its `light.tiles`, else `roomRules.lampTiles` in base.json; lamps already in it count): more from the ceiling, as few as do it and spread evenly over the room, all of the kind among the room's own `ceiling` lights (else these: the upstairs hall, the basement's) that takes fewest, so a big room gets a chandelier rather than a ceiling full of small lights.",
   "lights": ["ceilingLight", "ceilingPendant"],
 
-  "$garden": "Things outside the house: first the washing line (`washingLine`) for a home with a washer and nothing to dry the washing in (a thing whose use leaves a washed load, content `makes`, and none that works on one, `workOn`: no dryer), on the lawn behind or beside the house with a clear tile all round, by the garden door if it fits; then tables with chairs round them (`sets`, as a room's `dining`), then a few things.",
+  "$garden": "Things outside the house: first the washing line (`washingLine`) for a home with a washer and nothing to dry the washing in (a thing whose use leaves a washed load, content `makes`, and none that works on one, `workOn`: no dryer), on the lawn behind or beside the house with a clear tile all round, by the garden door if it fits; then tables with chairs round them (`sets`, as a room's `dining`), then a few things: one for every `area` m² of garden behind and beside the house, within `count`.",
   "garden": {
     "sets": [{ "tables": ["patioTableRound", "patioTable4"], "chairs": ["patioChair"], "seats": [2, 4], "chance": 0.45 }],
-    "objects": ["plant", "flowerbed", "flowerbed", "bush", "bush", "tree", "pine", "bench", "grill", "gardenChair", "sunLounger", "lampPost", "firePit", "swingSet", "planterBox", "birdFeederPole", "birdhouse", "adirondackChair", "benchGarden3", "parasol", "raisedBed", "compostBin", "rainBarrel", "sundial", "firewoodStack"],
-    "count": [2, 6],
+    "objects": ["plant", "flowerbed", "flowerbed", "bush", "bush", "tree", "pine", "bench", "grill", "gardenChair", "sunLounger", "lampPost", "firePit", "swingSet", "planterBox", "birdFeederPole", "birdhouse", "adirondackChair", "benchGarden3", "parasol", "raisedBed", "compostBin", "rainBarrel", "sundial", "firewoodStack", "statueCat"],
+    "count": [1, 10],
+    "area": 35,
     "washingLine": "clothesline"
   },
 

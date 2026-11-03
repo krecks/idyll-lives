@@ -6,9 +6,9 @@
  * nothing here places a blade. What the GPU reads is made here:
  *
  * - `GrassField`: the land round the town in two textures. `colour` (RGBA, 1 texel a metre over the
- *   town and `GRASS.margin` round it): the ground's own colour under the grass (sRGB, the terrain's
- *   vertex colour, `LandscapeLayout.terrainColour`) and, in alpha, how grassy the land is out
- *   there (roads, water, sand, fields, rock: none). `town` (one byte a texel, `GRASS.townTexels`
+ *   town and its margin round it, `GRASS.margin`): the ground's own colour under the grass (sRGB,
+ *   the terrain's vertex colour, `LandscapeLayout.terrainColour`) and, in alpha, how grassy the
+ *   land is out there (roads, water, sand, fields, rock: none). `town` (one byte a texel, `GRASS.townTexels`
  *   a metre over the town's ground): the lawn as it grows now, none indoors, under furniture, on
  *   patios, streets, paths and fields, nor right by a wall (`townGrass`, again on `refreshLawn`).
  * - Which 2 m patches have any grass at all (`patches`), and each one's height and slope.
@@ -27,8 +27,19 @@ const PER_PATCH = 448;
 const LOD_COUNT = 7;
 
 export const GRASS = {
-  /** How far the grass grows round the town (m). */
+  /**
+   * How far the grass grows round the town (m) unless told (`grassField`). The game grows it over
+   * the whole landscape round the town (its `LandscapeLayout.ring`, 150 m or more, well past any
+   * preset's reach): the camera can be taken out over the meadows, and the grass grows on there
+   * (it's drawn only near the eye, wherever that is; a wider field costs only its build: about
+   * 110 ms over a town's loading, 195 ms a world's).
+   */
   margin: 40,
+  /**
+   * Past the margin, the lawn's tone on the ground (`GAME_GRASS_GROUND`: as dark as the blades and
+   * the shade between them average, and its gusts) fades into the land's own colour over this far (m).
+   */
+  toneFade: 90,
   /** The town mask's texels a metre. */
   townTexels: 4,
   /** Patches (m square): the grass is drawn a patch at a time. */
@@ -76,6 +87,8 @@ export interface GrassLand {
 export interface GrassField {
   x0: number;
   z0: number;
+  /** How far it reaches round the town (m; `GRASS.margin`). */
+  margin: number;
   /** The colour texture's texels (1 a metre) across and deep. */
   w: number;
   d: number;
@@ -93,9 +106,9 @@ export interface GrassField {
   ground: Float32Array;
 }
 
-/** The grass of a town as the land grows it (the town's mask comes with `townGrass`, again whenever the lot changes). */
-export async function grassField(world: WorldStructure, land: GrassLand, pace?: () => Promise<void>): Promise<GrassField> {
-  const m = GRASS.margin;
+/** The grass of a town as the land grows it, `margin` m round it (the town's mask comes with `townGrass`, again whenever the lot changes). */
+export async function grassField(world: WorldStructure, land: GrassLand, pace?: () => Promise<void>, margin: number = GRASS.margin): Promise<GrassField> {
+  const m = margin;
   const [tw, td] = [world.width, groundDepth(world)];
   const x0 = -m;
   const z0 = -m;
@@ -109,9 +122,10 @@ export async function grassField(world: WorldStructure, land: GrassLand, pace?: 
       // (Texel centres: the GPU filters between them.)
       const x = x0 + i + 0.5;
       const z = z0 + j + 0.5;
-      const lawn = land.terrainColour(x, z, land.heightAt(x, z), tmp);
-      // Fading out towards the margin's edge, where the blades stop.
+      // Fading out towards the margin's edge, where the blades stop (past it, in the corners, none: nothing reads it).
       const edge = 1 - smoothstep(m * 0.7, m * 0.95, land.distanceToTown(x, z));
+      if (edge <= 0) continue;
+      const lawn = land.terrainColour(x, z, land.heightAt(x, z), tmp);
       const o = (j * w + i) * 4;
       colour[o] = byte(tmp.r);
       colour[o + 1] = byte(tmp.g);
@@ -140,7 +154,7 @@ export async function grassField(world: WorldStructure, land: GrassLand, pace?: 
       ground[k + 2] = sz;
     }
   }
-  const field: GrassField = { x0, z0, w, d, colour, townW: 0, townD: 0, town: new Uint8Array(0), pw, pd, patches: new Uint8Array(pw * pd), ground };
+  const field: GrassField = { x0, z0, margin: m, w, d, colour, townW: 0, townD: 0, town: new Uint8Array(0), pw, pd, patches: new Uint8Array(pw * pd), ground };
   townGrass(field, world);
   return field;
 }
@@ -167,24 +181,44 @@ export function townGrass(field: GrassField, world: WorldStructure): void {
   const mask = lawnMask(world);
   const bare = bareTiles(world, mask);
   const walls = wallSegments(world, tw, td);
-  for (let j = 0; j < D; j++) {
-    for (let i = 0; i < W; i++) {
-      const fx = (i + 0.5) / n;
-      const fz = (j + 0.5) / n;
-      const tx = Math.floor(fx);
-      const tz = Math.floor(fz);
+  // Only the tiles whose lawn could have changed since the last time (furniture, rooms, walls: a lot
+  // shown or edited), the whole town the first time: a big world's mask is millions of texels.
+  const wallKeys = new Map<number, string>();
+  for (const [t, segs] of walls) wallKeys.set(t, segs.map((g) => g.join(',')).join(';'));
+  const before = field.town === town && lawnState.get(field);
+  const tiles = new Uint8Array(tw * td);
+  let changed = 0;
+  for (let t = 0; t < tw * td; t++) {
+    if (before && before.bare[t] === bare[t] && before.walls.get(t) === wallKeys.get(t) && (bare[t] < 2 || before.split.get(t) === mask.splitAxis.get(t))) continue;
+    tiles[t] = 1;
+    changed++;
+  }
+  lawnState.set(field, { bare, walls: wallKeys, split: new Map(mask.splitAxis) });
+  if (!changed) return;
+  for (let tz = 0; tz < td; tz++) {
+    for (let tx = 0; tx < tw; tx++) {
       const t = tz * tw + tx;
-      let grows = bare[t] === 0;
-      if (bare[t] > 1) {
-        // A split tile: grass on its outdoor half only.
-        grows = splitHalf(mask.splitAxis.get(t) ?? 'dp', fx - tx, fz - tz) !== bare[t] - 2;
+      if (!tiles[t]) continue;
+      for (let j = tz * n; j < (tz + 1) * n; j++) {
+        for (let i = tx * n; i < (tx + 1) * n; i++) {
+          const fx = (i + 0.5) / n;
+          const fz = (j + 0.5) / n;
+          let grows = bare[t] === 0;
+          if (bare[t] > 1) {
+            // A split tile: grass on its outdoor half only.
+            grows = splitHalf(mask.splitAxis.get(t) ?? 'dp', fx - tx, fz - tz) !== bare[t] - 2;
+          }
+          if (grows && nearWall(walls.get(t), fx, fz)) grows = false;
+          town[j * W + i] = grows ? 255 : 0;
+        }
       }
-      if (grows && nearWall(walls.get(t), fx, fz)) grows = false;
-      town[j * W + i] = grows ? 255 : 0;
     }
   }
   markPatches(field);
 }
+
+/** What each field's town mask was last made from (`townGrass`), by tile: its bare tiles, walls and split tiles' diagonals. */
+const lawnState = new WeakMap<GrassField, { bare: Uint8Array; walls: Map<number, string>; split: Map<number, string> }>();
 
 /** Wall edges and diagonals as segments, by the town tiles they pass through or touch. */
 function wallSegments(world: WorldStructure, tw: number, td: number): Map<number, [number, number, number, number][]> {

@@ -7,10 +7,11 @@
  */
 
 import type { AssetRegistry } from '../assets/registry';
-import { optimizedUrl } from '../assets/registry';
-import { withBuild } from '../assets/build';
+import { materialTextures, optimizedUrl } from '../assets/registry';
+import { withBuild, withoutBuild } from '../assets/build';
 import type { Content } from '../content/content';
 import type { WorldStructure } from '../core/protocol';
+import { BIRD_MODELS } from '../render/shared/birds';
 
 export interface Rect {
   x: number;
@@ -60,10 +61,15 @@ function inView(o: { x: number; z: number; w: number; d: number }, view: Rect | 
   return x >= view.x && z >= view.z && x <= view.x + view.w && z <= view.z + view.d;
 }
 
+/** A model's file as its entry names it (what a build loads); null if there's none. */
+function modelFile(assets: AssetRegistry, key: string): string | null {
+  return assets.has(key, 'model') ? (assets.get(key, 'model')?.url ?? null) : null;
+}
+
+/** A model's file as it's downloaded. */
 function modelUrl(assets: AssetRegistry, key: string): string | null {
-  if (!assets.has(key, 'model')) return null;
-  const entry = assets.get(key, 'model');
-  return entry?.url ? optimizedUrl(entry.url) : null;
+  const url = modelFile(assets, key);
+  return url ? optimizedUrl(url) : null;
 }
 
 /** Icons and character sets the menus and character creation show (boot's first loading screen). */
@@ -108,11 +114,11 @@ export function gameAssetPlan(
   };
 
   // Surfaces (walls, floors, furniture finishes) and the residents. Normal and ARM maps sit
-  // next to the albedo and are only made absolute here, as `materials.ts` does.
+  // next to the albedo (`materialTextures`), as `materials.ts` loads them.
   for (const key of assets.keys('material')) {
-    const entry = assets.get(key, 'material');
-    if (!entry?.texture) continue;
-    for (const url of [entry.texture, entry.normal && new URL(entry.normal, entry.texture).href, entry.arm && new URL(entry.arm, entry.texture).href]) {
+    const textures = materialTextures(assets.get(key, 'material') ?? {});
+    if (!textures) continue;
+    for (const url of [textures.texture, textures.normal, textures.arm]) {
       if (!url) continue;
       const file = optimizedUrl(withBuild(url));
       all.add(file);
@@ -121,6 +127,8 @@ export function gameAssetPlan(
   }
   for (const key of NATURE) addModel(key);
   for (const key of STREET) addModel(key);
+  // The garden birds (built with the first world, behind the loading screen).
+  for (const key of BIRD_MODELS) addModel(key);
   // The rig and every character set are `character` entries, not models (`model.sim` is one too).
   for (const key of assets.keys('character')) addHome(assets.get(key, 'character')?.url ?? null);
 
@@ -138,4 +146,63 @@ export function gameAssetPlan(
   for (const item of content.items) if (item.model) add(modelUrl(assets, item.model));
 
   return { home: [...home], rest: [...all].filter((url) => !home.has(url)) };
+}
+
+/**
+ * How soon each model file of the town's things should stream in, by where the camera is (the open
+ * world's priorities, `assets/stream.ts` `reprioritize`): 0 for the focus lot's (`view`), 1 and up
+ * for those in the chunks streamed in round the camera (`watch`), 2 and up for the rest, nearer
+ * first within each. Keyed as the stream keys its files (without the build's query).
+ */
+export function streamRanks(content: Content, assets: AssetRegistry, world: Pick<WorldStructure, 'objects'>, view: Rect | null, watch: Rect | null): Map<string, number> {
+  const ranks = new Map<string, number>();
+  const keys = new Map<string, string>();
+  const cx = watch ? watch.x + watch.w / 2 : view ? view.x + view.w / 2 : 0;
+  const cz = watch ? watch.z + watch.d / 2 : view ? view.z + view.d / 2 : 0;
+  const urls = new Map<string, string | null>();
+  for (const o of world.objects) {
+    let url = urls.get(o.def);
+    if (url === undefined) urls.set(o.def, (url = modelUrl(assets, content.object(o.def)?.model ?? `model.${o.def}`)));
+    if (!url) continue;
+    const d = Math.hypot(o.x - cx, o.z - cz) / 10_000;
+    const rank = view && inView(o, view) ? 0 : watch && inView(o, watch) ? 1 + d : 2 + d;
+    const k = keys.get(url) ?? keys.set(url, withoutBuild(url)).get(url)!;
+    if (rank < (ranks.get(k) ?? Infinity)) ranks.set(k, rank);
+  }
+  return ranks;
+}
+
+/** Model files read ahead of time at once at most (`parseAheadFiles`): kept until wanted (`shared/modelFiles.ts` keeps 96 idle ones). */
+const PARSE_AHEAD = 24;
+
+/**
+ * The model files of the town's things to read ahead of time, in idle moments (`Renderer.parseAhead`):
+ * those round the camera, then the rest, nearest first (`ranks`, from `streamRanks`: 1 and up; the
+ * focus lot's are built anyway), at most `limit`. Each as its entry names it (`url`, what a build
+ * loads) and as the stream keys its download (`file`).
+ */
+export function parseAheadFiles(
+  content: Content,
+  assets: AssetRegistry,
+  world: Pick<WorldStructure, 'objects'>,
+  ranks: ReadonlyMap<string, number>,
+  limit = PARSE_AHEAD,
+): { url: string; file: string }[] {
+  const out: { url: string; file: string; rank: number }[] = [];
+  const seen = new Set<string>();
+  for (const o of world.objects) {
+    const key = content.object(o.def)?.model ?? `model.${o.def}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const url = modelFile(assets, key);
+    if (!url) continue;
+    const file = withoutBuild(optimizedUrl(url));
+    const rank = ranks.get(file);
+    if (rank === undefined || rank < 1 || out.some((f) => f.url === url)) continue;
+    out.push({ url, file, rank });
+  }
+  return out
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, limit)
+    .map(({ url, file }) => ({ url, file }));
 }

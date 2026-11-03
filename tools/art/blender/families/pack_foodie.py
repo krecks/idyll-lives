@@ -20,7 +20,6 @@ import sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import gamekit as G  # noqa: E402
-from gamekit.motion import _clip, last_frame  # noqa: E402
 
 M = G.Palette(
     # the herb garden
@@ -40,7 +39,7 @@ M = G.Palette(
     cream_panel=('#E4D9C1', 'satin'),
     honey=('#A8754A', 'satin'),      # the pantry's shelves, plinth and crown (plain: the doors take the draws)
     back=('#E2D6BC', 'matte'),
-    marble=('#F3EFE8', 'gloss'),     # the pantry's ledge, the island's top
+    marble=('#F3EFE8', 'gloss', {'roughness': 0.28}),     # the pantry's ledge, the island's top
     brass=('#B8925A', 'metal'),
     jar_a=('#C98A3A', 'gloss'),
     jar_b=('#9DB86A', 'gloss'),
@@ -51,7 +50,7 @@ M = G.Palette(
     wine=('#6E2B33', 'gloss'),
     bottle=('#3E5A3A', 'gloss'),
     salami=('#8E3B2E', 'matte'),
-    tomato=('#C9483B', 'gloss'),
+    tomato=('#C9483B', 'gloss', {'roughness': 0.3}),
     board=('#B08E66', 'satin'),
     # the espresso bar
     teal=('#2F5D62', 'satin'),       # the cart's frame; its main part
@@ -80,7 +79,7 @@ M = G.Palette(
     brick_light=('#B8735A', 'matte'),
     brick_dark=('#6E4535', 'matte'),
     stone=('#C9C1B4', 'satin'),
-    worktop=('#E9E3D8', 'gloss'),
+    worktop=('#E9E3D8', 'gloss', {'roughness': 0.3}),
     iron=('#3E4146', 'metal'),
     log=('#8B6B4E', 'satin'),        # plain, not bark: the door, the peel and the fire take the draws
     mouth=('#2B2220', 'matte'),
@@ -378,8 +377,8 @@ def deliPantry():
     left = _pantry_door(F, -0.2025, -0.40, zf)
     right = _pantry_door(F, 0.2025, 0.40, zf)
     objs = G.settle(centre=False)
-    G.swing(left, 'doors_open', 100, seconds=0.8)
-    G.swing(right, 'doors_open', -100, seconds=0.8)
+    G.swing(left, 'doors_open', 100, seconds=0.8, ease='back_out')
+    G.swing(right, 'doors_open', -100, seconds=0.8, ease='back_out')
     return objs
 
 
@@ -594,7 +593,7 @@ def cookbookLectern():
     page.rotation_mode = 'YXZ'            # the tilt (X) after the turn about the spine (Y)
     page.rotation_euler = (math.radians(TILT), 0, 0)
     objs = G.settle(centre=False)
-    _clip(page, 'page', 'rotation_euler', 1, 0.0, math.radians(-172), 0.9)
+    G.keys(page, 'page', 'rotation_euler', 1, [(0, 0.0), (0.9, math.radians(-172))])
     return objs
 
 
@@ -744,18 +743,17 @@ def pizzaOven():
     # door_off: the door lifts off the mouth and is set down on the ground before the stand's left pillar; the
     # peel follows, round in front of the oven and in through the mouth (Blender axes: x = -game x, y = -game
     # depth, z = height).
-    f = last_frame
     for i, (lift, down) in enumerate(((0.0, 0.42), (-0.06, -0.06), (0.03, -(HEARTH - 0.005)))):
         rest = door.location[i]
-        _clip(door, 'door_off', 'location', i, [(1, rest), (f(0.2), rest + lift), (f(0.6), rest + down), (f(1.4), rest + down)])
+        G.keys(door, 'door_off', 'location', i, [(0, rest), (0.2, rest + lift), (0.6, rest + down), (1.4, rest + down)])
     lx, ly, lz = peel.location
     # game path: up off the counter, forward, along to the oven's middle, back into the mouth
     gx, gz = OX - px, 0.25 - pz
-    keys_x = [(1, lx), (f(0.35), lx), (f(0.6), lx), (f(1.0), lx - gx), (f(1.4), lx - gx)]
-    keys_y = [(1, ly), (f(0.35), ly), (f(0.6), ly - 0.62), (f(1.0), ly - 0.62), (f(1.4), ly - gz)]
-    keys_z = [(1, lz), (f(0.35), lz + 0.06), (f(0.6), lz + 0.06), (f(1.0), lz + 0.06), (f(1.4), lz + 0.03)]
-    for i, keys in enumerate((keys_x, keys_y, keys_z)):
-        _clip(peel, 'door_off', 'location', i, keys)
+    keys_x = [(0, lx), (0.35, lx), (0.6, lx), (1.0, lx - gx), (1.4, lx - gx)]
+    keys_y = [(0, ly), (0.35, ly), (0.6, ly - 0.62), (1.0, ly - 0.62), (1.4, ly - gz)]
+    keys_z = [(0, lz), (0.35, lz + 0.06), (0.6, lz + 0.06), (1.0, lz + 0.06), (1.4, lz + 0.03)]
+    for i, points in enumerate((keys_x, keys_y, keys_z)):
+        G.keys(peel, 'door_off', 'location', i, points)
     G.grow(fire, 'flames', seconds=0.8)
     return objs
 

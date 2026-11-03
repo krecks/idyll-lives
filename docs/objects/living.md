@@ -100,7 +100,7 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 | `sideTable` Side table | 1x1 · floor | — | living / tables | Wood, Knob | Static | Static. |
 | `coffeeTableRound` Round coffee table | 1x1 · floor | — | living / tables | Top, Base | Static | Static. |
 | `coffeeTableLong` Long coffee table | 2x1 · floor | — | living / tables | Top, Legs | Static | Static. |
-| `nestingTables` Nesting tables | 1x1 · floor | — | living / tables | Top, Small table, Legs | Static | Static. (+use) the small table slides out: it is a part of its own (`small_table`). |
+| `nestingTables` Nesting tables | 1x1 · floor | pullOut:fetch pushIn:fetch | living / tables | Top, Small table, Legs | Use | `small_out`: the oak table slides 42 cm out from under the white one, and back for "Push the small table back" (`motions.uses` `over: -1`). Both uses are the owner's (`autonomous: false`): 1 min, standing. |
 | `sideTableRound` Round side table | 1x1 · floor | — | living / tables | Top, Base | Static | Static. |
 | `consoleTable` Console table | 2x1 · floor | — | living / tables | Top, Legs, Baskets | Static | Static. Its text no longer says slim (0.56 m deep). |
 
@@ -110,6 +110,8 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
   tables' magazine use runs without a clip.
 - The six plain tables looked at by day and night, WebGPU and Low WebGL, coloured; the nesting tables' small table
   takes its own colour.
+- In play 2026-10-31: the nesting tables' oak table slides out for "Pull out the small table" and back under for
+  "Push the small table back" (`bench-results/check-parts/parts-nestingTables-{pullOut,pushIn}-01.png`).
 - Known, not changed: a kids' chair facing a coffee table (top 0.11 m over its seat) gets the desk hands, hovering
   over the top; nothing sets that pairing up.
 
@@ -161,7 +163,7 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 | `bookcaseCorner` Corner bookcase | 1x1 · floor | read:read | living / shelves | Frame, Back | Use | `book_out`. Quarter-round open end shelves to the wall. Read on a seat within 4 m (`seatNear`), else standing. |
 | `cubeShelf` Cube shelf | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static. Top 0.8 (content `surface`); 36 cm deep, back on the wall face. |
 | `ladderShelf` Ladder shelf | 1x1 · floor | — | living / shelves | Frame, Shelves | Static | Static; no back, its top on the wall face. |
-| `displayCabinet` Display cabinet | 1x1 · floor | — | living / shelves | Frame, Back | Static | Static; the brass-framed glass door is a part of its own (`door`, origin on its left hinge), still. (+use) the door swings. |
+| `displayCabinet` Display cabinet | 1x1 · floor | openDoor:fetch shutDoor:fetch | living / shelves | Frame, Back | Use | `door_open`: the brass-framed glass door swings 100° open on its left hinge and shuts again for "Shut the cabinet" (`over: -1`). The owner's uses (`autonomous: false`), 1 min, standing. |
 
 **In play** (signed off 2026-10-16):
 - Against the north, west and east walls and free at 180° (the corner bookcase in a north-west corner at facings 0
@@ -169,6 +171,8 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
   the end.
 - The industrial shelving, cube shelf, ladder shelf and display cabinet looked at and coloured, by day and night,
   WebGPU and Low WebGL.
+- In play 2026-10-31: the display cabinet's glass door swings open for "Open the cabinet" and shuts for "Shut the
+  cabinet" (`bench-results/check-parts/parts-displayCabinet-{openDoor,shutDoor}-01.png`).
 - Known, not changed: standing free, the ladder shelf leans on nothing (it is made to lean on a wall).
 
 ## L6. Stairs (1)

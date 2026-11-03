@@ -33,55 +33,58 @@ jobs:
           cargo clippy --version
       - uses: Swatinem/rust-cache@v2
 
+      # Each step's commands are in tools/ci-local.sh (run there with no step, they all go: before a
+      # push or a pull request).
       - name: Formatting
-        run: cargo fmt --all --check
+        run: tools/ci-local.sh fmt
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+        run: tools/ci-local.sh clippy
 
       - name: Simulation tests
-        run: cargo test -p sim-core --locked
+        run: tools/ci-local.sh sim
 
-      # Bun runs the clip check (no packages) and the renderer's checks (packages installed for them).
+      # Bun runs the sample makers, the clip check (no packages) and the renderer's checks.
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.3
 
-      # The generated_* tests are ignored because they need sample files; make them here so they
-      # run instead of passing without checking anything.
+      # The generated_* tests are ignored because they need sample files; made here so they run
+      # instead of passing without checking anything.
       - name: Generated houses and worlds
-        # Optimised for speed, but without the release build's fat LTO (minutes, for two test binaries).
-        env:
-          CARGO_PROFILE_RELEASE_LTO: 'false'
-          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
-        run: |
-          bun tools/housegen/sample.ts /tmp/houses.json
-          bun tools/worlds/sample.ts /tmp/worlds.json
-          HOUSES=/tmp/houses.json WORLDS=/tmp/worlds.json cargo test -p sim-core --release --locked --test generated_houses --test generated_worlds -- --ignored
+        run: tools/ci-local.sh generated
 
       # The residents' clips on both bodies at every life stage; the known failures are in
       # tools/characters/clip-baseline.json, so only a new one fails.
       - name: Clip check
-        working-directory: web
-        run: bun run check:clips
+        run: tools/ci-local.sh clips
 
       # The renderer: the PlayCanvas shader chunks' anchor lines and private names it patches or
       # reads, in the pinned release build (tools/render/check_chunks.ts), and its engine-neutral
-      # tests (web/tests, `bun test`). Neither needs the wasm builds.
-      - name: Install web packages
-        working-directory: web
-        run: bun install --frozen-lockfile
+      # tests (web/tests, `bun test`, each file in a fresh global). Neither needs the wasm builds.
       - name: Shader chunks and renderer tests
-        working-directory: web
-        run: |
-          bun run check:chunks
-          bun run test
+        run: tools/ci-local.sh web
 
       # The repo's tools (crates/tools): a fresh character build against the committed set and its
       # checks, the object gate over every shipped model (no Blender), and the content and texture
-      # tools. Release, as the character build is slow unoptimised (without fat LTO, as above).
+      # tools. Release without fat LTO, built once for these and the three checks after.
       - name: Tool tests
-        env:
-          CARGO_PROFILE_RELEASE_LTO: 'false'
-          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
-        run: cargo test -p ll-tools --release --locked
+        run: tools/ci-local.sh tools
+
+      # Every shipped model against the reference's kinds: a content object no kind covers (a new
+      # thing nobody sized) fails, where a measure outside its range is the review's to weigh.
+      - name: Object sizes
+        run: tools/ci-local.sh sizes
+
+      # Every use the renderer can play and every open that has its clip: a use whose animation
+      # `ACTIONS` has no entry for, a `motions` key no use answers to, an open without
+      # `motions.open` fails. An object with no use of its own, a duration out of the median and a
+      # sound only another kind makes stay the review's to weigh (the summary counts them).
+      - name: Object uses
+        run: tools/ci-local.sh uses
+
+      # Every shipped model at the gate (no Blender): a clip that does not run rest to rest, a part that
+      # moves without one, a budget over, a functional height (seat, top, mattress, lamp) the mesh and the
+      # content disagree on. A measure out of range is the review's to weigh; a broken model fails here.
+      - name: Models
+        run: tools/ci-local.sh models

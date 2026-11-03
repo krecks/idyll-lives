@@ -17,16 +17,20 @@ export const Cut = { Keep: 0, Clamp: 1, Hide: 2 } as const;
 /** Cut mask bits: the wall hides what is behind it when the camera looks along +x, -x, +z, -z. */
 export const LOOK = { PosX: 1, NegX: 2, PosZ: 4, NegZ: 8, All: 15 } as const;
 
-/** A mesh's vertex arrays as a renderer uploads them (`Geo.meshData`). */
+/**
+ * A mesh's vertex arrays as a renderer uploads them (`Geo.meshData`). The colours and the cutaway
+ * attribute are a byte a channel (40 bytes a vertex, not 64): the colours come from hex colours (a
+ * ridge cap's darkened by a fifth: within half a step of 255), the cutaway's are small whole numbers.
+ */
 export interface MeshData {
   positions: Float32Array;
   normals: Float32Array;
   uvs: Float32Array;
   indices: Uint16Array | Uint32Array;
-  /** sRGB vertex colours (RGBA), if asked for. */
-  colors?: Float32Array;
-  /** The cutaway attribute (`WALL_CUT_KIND`, 4 per vertex), if asked for. */
-  cut?: Float32Array;
+  /** sRGB vertex colours (RGBA, 0..255 for 0..1), if asked for. */
+  colors?: Uint8Array;
+  /** The cutaway attribute (`WALL_CUT_KIND`, 4 per vertex: masks 0..15, kind 0..2), if asked for. */
+  cut?: Uint8Array;
   /** Whether a vertex colour is translucent (the mesh then blends by vertex alpha). */
   vertexAlpha: boolean;
 }
@@ -103,6 +107,21 @@ export class Geo {
     return this;
   }
 
+  /** Adds `other`'s geometry as it is, its own colours and cutaway data (`append` paints it in this one's colour). */
+  merge(other: Geo): this {
+    const base = this.pos.length / 3;
+    const push = (to: number[], from: readonly number[]) => {
+      for (let i = 0; i < from.length; i++) to.push(from[i]);
+    };
+    push(this.pos, other.pos);
+    push(this.nor, other.nor);
+    push(this.uv, other.uv);
+    push(this.col, other.col);
+    push(this.cut, other.cut);
+    for (let i = 0; i < other.idx.length; i++) this.idx.push(base + other.idx[i]);
+    return this;
+  }
+
   /** Axis-aligned box; `skip` lists faces to omit ('px', 'nx', 'py', 'ny', 'pz', 'nz'). */
   box(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, skip = ''): this {
     if (!skip.includes('py')) this.poly([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [0, 1, 0]);
@@ -140,8 +159,8 @@ export class Geo {
       normals: new Float32Array(this.nor),
       uvs: new Float32Array(this.uv),
       indices: this.pos.length / 3 > 65535 ? new Uint32Array(this.idx) : new Uint16Array(this.idx),
-      colors: options.colors ? new Float32Array(this.col) : undefined,
-      cut: options.cut ? new Float32Array(this.cut) : undefined,
+      colors: options.colors ? Uint8Array.from(this.col, (v) => Math.min(255, Math.max(0, Math.round(v * 255)))) : undefined,
+      cut: options.cut ? new Uint8Array(this.cut) : undefined,
       vertexAlpha: !!options.colors && this.col.some((v, i) => i % 4 === 3 && v < 1),
     };
   }

@@ -7,12 +7,17 @@ use crate::Content;
 use crate::world::{Activity, MAX_SIMS, Phase, Sim, Task, TaskKind, World};
 use crate::{TICKS_PER_SECOND, clock};
 
-pub const HEADER_LEN: usize = 10;
+pub const HEADER_LEN: usize = 11;
 /// Floats per Sim (all 32 used).
 pub const SIM_STRIDE: usize = 32;
+/// The cars' rows (`header::CAR_COUNT`, `car`) start here: after room for every resident's and
+/// server's.
+pub const CAR_BASE: usize = HEADER_LEN + (MAX_SIMS + crate::staff::MAX_STAFF) * SIM_STRIDE;
+/// Floats per car.
+pub const CAR_STRIDE: usize = 5;
 /// The residents' rows, then the town's servers' (`header::STAFF_COUNT`, `staff.rs`), in the same
-/// layout.
-pub const CAPACITY: usize = HEADER_LEN + (MAX_SIMS + crate::staff::MAX_STAFF) * SIM_STRIDE;
+/// layout; then the cars'.
+pub const CAPACITY: usize = CAR_BASE + crate::cars::MAX_CARS * CAR_STRIDE;
 
 pub mod header {
     /// Tick counter modulo 2^24 (exact in f32); only used to detect change.
@@ -34,6 +39,22 @@ pub mod header {
     /// while they serve someone, with `HELD` what they hand over and `PROGRESS` how far the
     /// customer's use is; `OBJECT` is -1 (they stand behind it, not at it).
     pub const STAFF_COUNT: usize = 9;
+    /// Households' cars (`cars.rs`): as many rows as this from `CAR_BASE`, each laid out as `car`,
+    /// in the structure's `cars` order.
+    pub const CAR_COUNT: usize = 10;
+}
+
+/// A car's row.
+pub mod car {
+    /// 0: not to be seen (out of town, or its spot built over), 1 parked, 2 driving.
+    pub const SHOWN: usize = 0;
+    /// Its middle on the ground, and which way it faces (as a resident's yaw).
+    pub const X: usize = 1;
+    pub const Z: usize = 2;
+    pub const YAW: usize = 3;
+    /// Its open doors: bit `d` for door `d` (`cars::DOORS`: front left, front right, back left,
+    /// back right), while someone gets in or out.
+    pub const DOORS: usize = 4;
 }
 
 pub mod sim {
@@ -99,8 +120,8 @@ pub mod sim {
     pub const WAY_X: usize = 24;
     pub const WAY_Z: usize = 25;
     /// While walking, where their way is `AHEAD` metres on from where they are (or its end;
-    /// not past a step onto another storey); else where they stand. With `WAY_X`, the renderer
-    /// opens a door or a gate only for someone about to go through it.
+    /// not past a step onto another storey); else where they stand. From it the renderer opens
+    /// a door or a gate only for someone about to go through it (`doors.ts` `goingThrough`).
     pub const AHEAD_X: usize = 26;
     pub const AHEAD_Z: usize = 27;
     /// The baby they hold in the arms (`carry::carrying`: lifting them out of the crib, or on
@@ -134,15 +155,17 @@ const _: () = assert!(
         && sim::PLATE < SIM_STRIDE
         && sim::SHUTS < SIM_STRIDE
 );
-const _: () = assert!(header::ITEMS_VERSION < HEADER_LEN && header::STAFF_COUNT < HEADER_LEN);
+const _: () = assert!(
+    header::ITEMS_VERSION < HEADER_LEN && header::CAR_COUNT < HEADER_LEN && car::DOORS < CAR_STRIDE
+);
 
 /// What a Sim does for the snapshot; see `sim::OBJECT`, `sim::ACTION`, `sim::OBJECT_DEF` and
 /// `sim::INTERACTION`.
-struct Doing {
-    object: f32,
-    action: f32,
-    def: f32,
-    interaction: f32,
+pub(crate) struct Doing {
+    pub(crate) object: f32,
+    pub(crate) action: f32,
+    pub(crate) def: f32,
+    pub(crate) interaction: f32,
 }
 
 impl Doing {
@@ -186,7 +209,7 @@ fn eating(world: &World, s: &Sim) -> Option<usize> {
         .or(s.held.map(|h| h.def))
 }
 
-fn doing(world: &World, s: &Sim) -> Doing {
+pub(crate) fn doing(world: &World, s: &Sim) -> Doing {
     if s.away_until.is_some() {
         return Doing::NOTHING;
     }
@@ -678,6 +701,25 @@ pub fn write(world: &World, out: &mut [f32]) {
         }
     }
     write_staff(world, out);
+    write_cars(world, out);
+}
+
+/// The cars' rows (`header::CAR_COUNT`).
+fn write_cars(world: &World, out: &mut [f32]) {
+    let cars = &world.cars[..world.cars.len().min(crate::cars::MAX_CARS)];
+    out[header::CAR_COUNT] = cars.len() as f32;
+    for (k, c) in cars.iter().enumerate() {
+        let o = &mut out[CAR_BASE + k * CAR_STRIDE..CAR_BASE + (k + 1) * CAR_STRIDE];
+        let Some((p, yaw, moving, doors)) = c.shown else {
+            o[car::SHOWN] = 0.0;
+            continue;
+        };
+        o[car::SHOWN] = if moving { 2.0 } else { 1.0 };
+        o[car::X] = p[0];
+        o[car::Z] = p[1];
+        o[car::YAW] = yaw;
+        o[car::DOORS] = f32::from(doors);
+    }
 }
 
 /// The servers' rows, after the residents' (`header::STAFF_COUNT`).
@@ -756,7 +798,7 @@ fn serving(world: &World, s: &Sim) -> Option<usize> {
 /// The layout for the web side. `actions` (the content's animation tags) names the values
 /// of `sim.action`.
 pub fn layout_json(content: &Content) -> String {
-    serde_json::json!({
+    let mut layout = serde_json::json!({
         "capacity": CAPACITY,
         "headerLen": HEADER_LEN,
         "simStride": SIM_STRIDE,
@@ -786,6 +828,11 @@ pub fn layout_json(content: &Content) -> String {
         "actions": content.animations,
         "items": content.items.iter().map(|i| &i.id).collect::<Vec<_>>(),
         "recipes": content.recipes.iter().map(|r| &r.id).collect::<Vec<_>>(),
-    })
-    .to_string()
+    });
+    // (Apart: one `json!` this long would pass the macro's recursion limit.)
+    layout["header"]["carCount"] = header::CAR_COUNT.into();
+    layout["carBase"] = CAR_BASE.into();
+    layout["carStride"] = CAR_STRIDE.into();
+    layout["car"] = serde_json::json!({ "shown": car::SHOWN, "x": car::X, "z": car::Z, "yaw": car::YAW, "doors": car::DOORS });
+    layout.to_string()
 }

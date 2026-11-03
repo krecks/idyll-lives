@@ -571,7 +571,7 @@ def phoneBooth():
     # tile in front while it opens, steps inside and it shuts behind them (and it opens again to let them
     # out: the motions' `out`; `STEP_IN` in characters.ts times their steps to it). Opening in, it swept
     # through them inside.
-    G.swing(door, 'door_open', 90, seconds=0.8)
+    G.swing(door, 'door_open', 90, seconds=0.8, ease='back_out')
     return G.meshes()
 
 

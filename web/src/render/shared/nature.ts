@@ -9,9 +9,12 @@
  * Placements are matrices in game space (the layout of `math.ts`): 16 floats each.
  */
 
-import { DEFAULT_LANDSCAPE, groundDepth, type LandscapeParams, type WorldStructure } from '../../core/protocol';
+import { DEFAULT_LANDSCAPE, groundDepth, type LandscapeParams, type WorldStructure, type WorldZone } from '../../core/protocol';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
+import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
+import { fbm, hash, mulberry32, smoothstep, valueNoise } from '../../game/noise';
+import { shareAt, ZoneField } from './zones';
 
 /**
  * How far the landscape extends beyond the town (metres): towns of older code, and worlds (which
@@ -21,6 +24,17 @@ export const RING = 150;
 const WORLD_RING = 260;
 /** Flat apron around the town before the hills start. */
 export const APRON = 6;
+/** A big world's distance-from-built grid (m a cell; `distanceToTown`). */
+const BUILT_CELL = 2;
+/** A big world's woods are drawn in squares this wide (m), those far off left out (`pc/nature.ts` `frameTiles`); the preset's own (`OpenWorldQuality.woodsCell`) where it gives one. */
+export const BIG_WOODS_CELL = 256;
+/** A big world's lawn flowers are drawn in squares this wide (m), those far off left out (`pc/nature.ts` `frameTiles`). */
+export const BIG_FLOWERS_CELL = 128;
+/** A big world's orchards: fruit trees in rows this far apart (m), and this far apart along a row. */
+const ORCHARD_ROWS = 6;
+const ORCHARD_STEP = 5;
+/** A big world's hill zones rise this high (m) at most (between what is built: the land there stays flat). */
+const BIG_HILLS = 16;
 const TERRAIN_STEP = 2.5;
 /** At most this many terrain quads across (a wider landscape gets coarser ones). */
 const TERRAIN_SEGMENTS = 260;
@@ -64,39 +78,8 @@ export interface PlantPlacement {
 
 // ---- Deterministic noise ------------------------------------------------------------
 
-export function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-export function hash(x: number, z: number, seed: number): number {
-  let h = (Math.imul(x, 374761393) + Math.imul(z, 668265263) + Math.imul(seed, 2147483647)) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-
-/** Value noise, 0..1; with a `period`, its lattice wraps round every `period` cells (a tileable noise). */
-function valueNoise(x: number, z: number, seed: number, period = 0): number {
-  const xi = Math.floor(x);
-  const zi = Math.floor(z);
-  const xf = x - xi;
-  const zf = z - zi;
-  const u = xf * xf * (3 - 2 * xf);
-  const v = zf * zf * (3 - 2 * zf);
-  const [x0, z0] = period ? [((xi % period) + period) % period, ((zi % period) + period) % period] : [xi, zi];
-  const [x1, z1] = period ? [(x0 + 1) % period, (z0 + 1) % period] : [xi + 1, zi + 1];
-  const a = hash(x0, z0, seed);
-  const b = hash(x1, z0, seed);
-  const c = hash(x0, z1, seed);
-  const d = hash(x1, z1, seed);
-  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
-}
+// (The seeded generator, lattice hash, value noise, fractal noise and smooth step: the world generator's own, `game/noise.ts`, so the land it lays out and the land drawn agree.)
+export { fbm, hash, mulberry32, smoothstep, valueNoise };
 
 /** Ridged noise, 0..1: sharp crests where plain noise crosses its middle (mountain ridges). */
 function ridged(x: number, z: number, seed: number, octaves = 5): number {
@@ -114,24 +97,6 @@ function ridged(x: number, z: number, seed: number, octaves = 5): number {
   }
   return Math.min(1, sum / 0.9);
 }
-
-/** Fractal noise: `octaves` of `valueNoise`, each twice as fine and half as strong (0 .. 1 − 0.5^octaves); with a `period` (cells of the first), tileable. */
-export function fbm(x: number, z: number, seed: number, octaves = 4, period = 0): number {
-  let sum = 0;
-  let amp = 0.5;
-  let freq = 1;
-  for (let i = 0; i < octaves; i++) {
-    sum += amp * valueNoise(x * freq, z * freq, seed + i * 17, period * freq);
-    amp *= 0.5;
-    freq *= 2;
-  }
-  return sum;
-}
-
-export const smoothstep = (a: number, b: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-};
 
 // ---- Colours ------------------------------------------------------------------------
 
@@ -202,6 +167,8 @@ export interface LawnPlacement {
   key: string;
   matrices: Float32Array[];
   tiles: number[];
+  /** Which group an instance at (x, z) is drawn in (a big world's: squares the game leaves out past a distance); none: one draw. */
+  cell?: (x: number, z: number) => string;
 }
 
 /** Lawn flowers as drawn: each instance's original matrix and town tile (-1 outside the town), its matrix as drawn (`shown`) and whether it's hidden. */
@@ -232,22 +199,45 @@ export function splitHalf(axis: 'dp' | 'dn', fx: number, fz: number): 0 | 1 {
  * split tile: only that half), and 1 on its streets, paths and fields (`unlawned`) and its patios
  * (floor coverings outdoors). The grass's mask (`shared/grass.ts`) and the birds' lawn read it.
  */
-export function bareTiles(world: WorldStructure, mask: LawnMask = lawnMask(world)): Uint8Array {
+export function bareTiles(world: WorldStructure, mask?: LawnMask): Uint8Array {
+  // (Asked again for a world whose lawn is as it was, the birds' after a focus lot shown: the same answer.)
+  if (!mask) {
+    const inputs = lawnInputs(world);
+    if (lastBare && sameLawnInputs(lastBare.inputs, inputs)) return lastBare.bare;
+    const bare = bareTilesOf(world, lawnMask(world));
+    lastBare = { inputs, bare };
+    return bare;
+  }
+  return bareTilesOf(world, mask);
+}
+let lastBare: { inputs: LawnInputs; bare: Uint8Array } | null = null;
+
+function bareTilesOf(world: WorldStructure, mask: LawnMask): Uint8Array {
   const w = world.width;
   const d = groundDepth(world);
   const bare = mask.hidden.slice(0, w * d);
-  for (const r of unlawned(world)) {
-    for (let z = Math.max(0, Math.floor(r.z)); z < Math.min(d, Math.ceil(r.z + r.d)); z++) {
-      for (let x = Math.max(0, Math.floor(r.x)); x < Math.min(w, Math.ceil(r.x + r.w)); x++) bare[z * w + x] = 1;
-    }
-  }
+  const paved = unlawned(world);
+  for (let i = 0; i < bare.length; i++) if (paved[i]) bare[i] = 1;
   for (const [x, z] of world.floors ?? []) if (x >= 0 && z >= 0 && x < w && z < d) bare[z * w + x] = 1;
   return bare;
 }
 
-/** The town's ground where no lawn grows at all: its streets, paths and fields (the birds forage on the lawn). */
-export function unlawned(world: WorldStructure): readonly { x: number; z: number; w: number; d: number }[] {
-  return [...(world.meta?.streets ?? []), ...(world.meta?.paths ?? []), ...(world.meta?.world?.fields ?? [])];
+/**
+ * Per tile of the town's ground (1), where no lawn grows at all: its roads (or streets), paths and
+ * fields (the birds forage on the lawn). `any`: the tiles any of them reaches into; else only those
+ * whose middle they cover.
+ */
+export function unlawned(world: WorldStructure, any = true): Uint8Array {
+  const w = world.width;
+  const d = groundDepth(world);
+  const out = world.meta?.roads ? roadTiles(world.meta.roads, w, d).slice() : new Uint8Array(w * d);
+  const span = (a: number, len: number, n: number): [number, number] =>
+    any ? [Math.max(0, Math.floor(a)), Math.min(n, Math.ceil(a + len))] : [Math.max(0, Math.ceil(a - 0.5)), Math.min(n, Math.ceil(a + len - 0.5))];
+  for (const r of [...(world.meta?.streets ?? []), ...(world.meta?.paths ?? []), ...(world.meta?.world?.fields ?? [])]) {
+    const [[x0, x1], [z0, z1]] = [span(r.x, r.w, w), span(r.z, r.d, d)];
+    for (let z = z0; z < z1; z++) out.fill(1, z * w + x0, z * w + Math.max(x0, x1));
+  }
+  return out;
 }
 
 /** Where the lawn that grows is hidden now: the tiles indoors (or the half of a split tile that is) and under furniture. */
@@ -307,14 +297,13 @@ export function lawnLayer<D>(draws: D[], matrices: readonly ArrayLike<number>[],
   return { draws, base, shown: new Float32Array(base), tiles: Int32Array.from(indices, (k) => tiles[k]), hidden: new Uint8Array(indices.length) };
 }
 
-/** A model's instances grouped by `cell` (each group's indices into `matrices`, in their order); empty without one. */
-export function groupInstances(matrices: readonly ArrayLike<number>[], cell?: (x: number, z: number) => string): Map<string, number[]> {
-  const groups = new Map<string, number[]>();
-  if (!cell) return groups;
-  matrices.forEach((m, i) => {
-    const k = cell(m[12], m[14]);
-    const group = groups.get(k);
-    if (group) group.push(i);
+/** A model's copies grouped by `group` (each group's indices into `items`, in their order): the woods' and the street's draw groups. */
+export function groupInstances<T, K>(items: readonly T[], group: (item: T) => K): Map<K, number[]> {
+  const groups = new Map<K, number[]>();
+  items.forEach((it, i) => {
+    const k = group(it);
+    const list = groups.get(k);
+    if (list) list.push(i);
     else groups.set(k, [i]);
   });
   return groups;
@@ -334,8 +323,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   protected readonly land: LandscapeParams;
   /** How far the land reaches past the town (m). */
   protected readonly ring: number;
-  /** Where the road leaves town (z of the main street; the mountains part there). */
-  private readonly passZ: number | null;
+  /** Where the roads leave town (the mountains part there). */
+  private readonly passes: TownExit[];
   /** The roads out of town (the ground is levelled under them). */
   readonly roads: R;
   /** The woods' trees and bushes near the town (full models), where birds may live (`woodsNear`). */
@@ -347,7 +336,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * `lawnDensity`: the share of the lawn's flowers drawn (Low: half); `lawnLod` 1 draws
    * them in their far versions (Low, as the street's models: `QualitySettings.streetLod`); `woodsCell`:
    * the side (m) of the squares the game draws the woods in (0: the `FOREST_SECTORS`;
-   * `QualitySettings.woodsCell`).
+   * `QualitySettings.woodsCell`); `bigWoodsCell`: a big world's (`OpenWorldQuality.woodsCell`).
    */
   constructor(
     world: WorldStructure,
@@ -355,15 +344,17 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     protected readonly lawnDensity = 1,
     protected readonly lawnLod: 0 | 1 = 0,
     protected readonly woodsCell = 0,
+    protected readonly bigWoodsCell = BIG_WOODS_CELL,
   ) {
     this.seed = world.meta?.seed ?? 1;
     this.w = world.width;
     this.d = groundDepth(world);
     this.land = { ...DEFAULT_LANDSCAPE, ...world.meta?.world?.landscape };
     this.ring = world.meta?.world ? WORLD_RING : RING;
-    const streets = (world.meta?.streets ?? []).filter((s) => s.w >= s.d).sort((a, b) => a.z - b.z);
-    const main = streets[Math.floor((streets.length - 1) / 2)];
-    this.passZ = main ? main.z + main.d / 2 : null;
+    this.built = world.meta?.world?.size === 'big' ? LandscapeLayout.builtField(world, this.w, this.d) : null;
+    this.zones = this.built && world.meta?.zones?.length ? new ZoneField(world.meta.zones, this.w, this.d) : null;
+    this.orchards = this.zones ? (world.meta?.zones ?? []).filter((z) => z.kind === 'orchard') : [];
+    this.passes = townExits(world);
     this.roads = makeRoads(
       { seed: this.seed, w: this.w, d: this.d, ring: this.ring, ground: (x, z) => this.ground(x, z), waterEdge: (x, z) => this.waterEdge(x, z), distanceToTown: (x, z) => this.distanceToTown(x, z) },
       world,
@@ -383,15 +374,15 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     return !!this.land.mountains;
   }
 
-  /** Whether there is a sea or a lake. */
+  /** Whether there is a sea or a lake (a big world's: water zones). */
   get watered(): boolean {
-    return !!this.land.water;
+    return !!this.land.water || !!this.zones?.has('water');
   }
 
   /** Identity of a town's landscape (built once per town and kept while it is shown). */
   static key(world: WorldStructure): string {
     const look = world.meta?.world;
-    const streets = (world.meta?.streets ?? []).map((s) => `${s.z}`).join(',');
+    const streets = [...(world.meta?.streets ?? []).map((s) => `${s.z}`), ...(world.meta?.roads ?? []).map((r) => `${r.points[0]}:${r.points.length}`)].join(',');
     return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}:${streets}${look ? `:${look.kind}:${JSON.stringify(look.landscape)}` : ''}`;
   }
 
@@ -401,7 +392,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   waterEdge(x: number, z: number): number {
     const water = this.land.water;
-    if (!water) return -Infinity;
+    // (A big world's water is its zones'.)
+    if (!water) return this.zones ? this.zones.edge('water', x, z) - (fbm(x * 0.03, z * 0.03, this.seed + 61, 3) - 0.45) * 6 : -Infinity;
     if (water.kind === 'sea') {
       const past = water.side === 'zmin' ? -z : z - this.d;
       return past - water.shore - fbm(x * 0.02, 3.7, this.seed + 61, 3) * 8;
@@ -416,7 +408,75 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   distanceToTown(x: number, z: number): number {
     const dx = Math.max(0 - x, 0, x - this.w);
     const dz = Math.max(0 - z, 0, z - this.d);
-    return Math.hypot(dx, dz);
+    if (!this.built) return Math.hypot(dx, dz);
+    // A big world: from what is built (its lots, roads and trails), the land between rising as round a town.
+    const b = this.built;
+    const cx = Math.max(0, Math.min(b.gw - 1, Math.floor(Math.min(this.w, Math.max(0, x)) / BUILT_CELL)));
+    const cz = Math.max(0, Math.min(b.gd - 1, Math.floor(Math.min(this.d, Math.max(0, z)) / BUILT_CELL)));
+    return Math.hypot(dx, dz) + b.dist[cz * b.gw + cx];
+  }
+
+  /**
+   * A big world's distance (m) from anything built, on a `BUILT_CELL` m grid over it: its lots, and
+   * its roads and trails with a verge, so every hamlet gets the flat apron a town has and the land
+   * rises between them (two chamfer passes, ~2 % off the true distance). Null: not a big world.
+   */
+  protected readonly built: { gw: number; gd: number; dist: Float32Array } | null;
+
+  /** A big world's zones (`meta.zones`): its water, its hills, and where woods, meadows, fields and orchards are. Null elsewhere. */
+  protected readonly zones: ZoneField | null;
+  /** A big world's orchards (`meta.zones`), each a rectangle. */
+  private readonly orchards: readonly WorldZone[];
+
+  private static builtField(world: WorldStructure, w: number, d: number): { gw: number; gd: number; dist: Float32Array } {
+    const gw = Math.ceil(w / BUILT_CELL);
+    const gd = Math.ceil(d / BUILT_CELL);
+    const dist = new Float32Array(gw * gd).fill(1e9);
+    const mark = (x0: number, z0: number, x1: number, z1: number) => {
+      for (let cz = Math.max(0, Math.floor(z0 / BUILT_CELL)); cz <= Math.min(gd - 1, Math.floor(z1 / BUILT_CELL)); cz++) {
+        for (let cx = Math.max(0, Math.floor(x0 / BUILT_CELL)); cx <= Math.min(gw - 1, Math.floor(x1 / BUILT_CELL)); cx++) dist[cz * gw + cx] = 0;
+      }
+    };
+    for (const p of world.plots) mark(p.x, p.z, p.x + p.w, p.z + p.d);
+    for (const r of world.meta?.roads ?? []) {
+      const half = r.width / 2 + 2;
+      for (let i = 0; i + 1 < r.points.length; i++) {
+        const [[ax, az], [bx, bz]] = [r.points[i], r.points[i + 1]];
+        const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / BUILT_CELL));
+        for (let k = 0; k <= n; k++) {
+          const [x, z] = [ax + ((bx - ax) * k) / n, az + ((bz - az) * k) / n];
+          mark(x - half, z - half, x + half, z + half);
+        }
+      }
+    }
+    const c = BUILT_CELL;
+    const diag = c * Math.SQRT2;
+    const relax = (i: number, j: number, cost: number) => {
+      if (dist[j] + cost < dist[i]) dist[i] = dist[j] + cost;
+    };
+    for (let z = 0; z < gd; z++) {
+      for (let x = 0; x < gw; x++) {
+        const i = z * gw + x;
+        if (x > 0) relax(i, i - 1, c);
+        if (z > 0) {
+          relax(i, i - gw, c);
+          if (x > 0) relax(i, i - gw - 1, diag);
+          if (x < gw - 1) relax(i, i - gw + 1, diag);
+        }
+      }
+    }
+    for (let z = gd - 1; z >= 0; z--) {
+      for (let x = gw - 1; x >= 0; x--) {
+        const i = z * gw + x;
+        if (x < gw - 1) relax(i, i + 1, c);
+        if (z < gd - 1) {
+          relax(i, i + gw, c);
+          if (x < gw - 1) relax(i, i + gw + 1, diag);
+          if (x > 0) relax(i, i + gw - 1, diag);
+        }
+      }
+    }
+    return { gw, gd, dist };
   }
 
   /** Height of the land, levelled under the roads out of town. */
@@ -441,9 +501,14 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const ramp = smoothstep(APRON + 10, APRON + 130, dist);
     if (ramp <= 0) return 0;
     const open = this.openness(z);
-    // A pass where the road leaves town at each end.
-    const past = Math.max(-x, x - this.w);
-    const pass = this.passZ === null || past <= 0 ? 1 : 1 - smoothstep(0, 50, past) * (1 - smoothstep(14, 70, Math.abs(z - this.passZ))) * 0.8;
+    // A pass where each road leaves town: lower along its way out (`past` the town, `aside` from that way).
+    let pass = 1;
+    for (const e of this.passes) {
+      const past = (x - e.x) * e.dx + (z - e.z) * e.dz;
+      if (past <= 0) continue;
+      const aside = Math.abs((x - e.x) * e.dz - (z - e.z) * e.dx);
+      pass = Math.min(pass, 1 - smoothstep(0, 50, past) * (1 - smoothstep(14, 70, aside)) * 0.8);
+    }
     const crest = ridged(x * 0.0075, z * 0.0075, this.seed + 211);
     return top * ramp * open * pass * (0.25 + 0.75 * crest);
   }
@@ -452,17 +517,21 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   ground(x: number, z: number): number {
     const dist = this.distanceToTown(x, z);
     const L = this.land;
+    const water = this.watered;
     let h = 0;
     if (dist > APRON) {
       const rise = smoothstep(APRON, APRON + L.rise, dist);
       // Among mountains the near side of the valley (towards the menus' camera) stays low.
       const open = L.mountains ? this.openness(z) : 1;
       const hills = (fbm(x * 0.018, z * 0.018, this.seed) * L.hills - (L.hills * 4) / 14) * (0.15 + 0.85 * open);
-      const rim = Math.pow(Math.max(0, dist - L.rimFrom) / RING, 2) * L.rim * open;
+      // (A big world's rim rises round the world, past its edge; between its hamlets its hill zones do.)
+      const rimFrom = this.zones ? Math.hypot(Math.max(0 - x, 0, x - this.w), Math.max(0 - z, 0, z - this.d)) : dist - L.rimFrom;
+      const rim = Math.pow(Math.max(0, rimFrom) / RING, 2) * L.rim * open;
+      const zoned = this.zones ? this.zones.share('hill', x, z, 40) * BIG_HILLS * (0.55 + 0.9 * fbm(x * 0.008 + 5, z * 0.008, this.seed + 303, 3)) : 0;
       // By water the land stays above it (no puddles in the hollows).
-      h = Math.max(L.water ? 0 : -0.4, rise * hills + rim) + this.mountain(x, z, dist);
+      h = Math.max(water ? 0 : -0.4, rise * (hills + zoned) + rim) + this.mountain(x, z, dist);
     }
-    if (!L.water || dist === 0) return h;
+    if (!water || dist === 0) return h;
     // Down a sandy bank to the shore, then under the water.
     const e = this.waterEdge(x, z);
     if (e < -BEACH * 1.5) return h;
@@ -485,7 +554,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   /**
    * The terrain's heights and colours: each vertex of `positions` (x, y, z; in place) lifted to the
    * land, and its colour (RGBA, sRGB, converted on the GPU; it multiplies the grass detail texture)
-   * into `colors`.
+   * into `colors`, in alpha how much of it is lawn (the lawn's tone on the ground past the grass's
+   * field, `GAME_GRASS_GROUND`).
    */
   protected async shadeTerrain(positions: Float32Array | number[], colors: Float32Array, pace?: () => Promise<void>): Promise<void> {
     const tmp: Rgb = { r: 0, g: 0, b: 0 };
@@ -496,11 +566,11 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       const z = positions[i + 2];
       const h = this.heightAt(x, z);
       positions[i + 1] = h;
-      this.terrainColour(x, z, h, tmp);
+      const lawn = this.terrainColour(x, z, h, tmp);
       colors[c] = tmp.r;
       colors[c + 1] = tmp.g;
       colors[c + 2] = tmp.b;
-      colors[c + 3] = 1;
+      colors[c + 3] = lawn;
     }
   }
 
@@ -524,6 +594,11 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     lerp(P.lush, P.grass, smoothstep(0.3, 0.55, fine), out);
     lerp(out, P.meadow, smoothstep(0.5, 0.75, patch), out);
     lerp(out, P.hill, smoothstep(1, 10, h), out);
+    // A big world's meadows paler and flowery, its woods' floor the hills' deeper green.
+    if (this.zones) {
+      lerp(out, P.meadow, this.zones.share('meadow', x, z, 8) * 0.75, out);
+      lerp(out, P.hill, this.zones.share('woods', x, z, 10) * 0.6, out);
+    }
     // Worn, earthy patches: sparse, and more common on the flat ground near the town.
     const bare = smoothstep(0.66, 0.8, fbm(x * 0.09 + 13, z * 0.09 - 7, this.seed + 5, 3)) * (1 - smoothstep(2, 8, h));
     lerp(out, P.dirt, bare * 0.85, out);
@@ -574,11 +649,15 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * with distance and up the hills) and whether the point is by a hedgerow at its edge. Null elsewhere.
    */
   private fieldCell(x: number, z: number): { kind: number; v: number; weight: number; hedge: boolean } | null {
-    const f = this.land.fields;
+    // (A big world's fields are its field zones: the patchwork in them only, wherever they are.)
+    const zones = this.zones;
+    const f = zones ? (zones.has('fields') ? (this.land.fields ?? { size: 34, angle: hash(3, 5, this.seed) * Math.PI }) : null) : this.land.fields;
     if (!f) return null;
     const dist = this.distanceToTown(x, z);
     if (dist < APRON + 3) return null;
-    const weight = (1 - smoothstep(this.ring * 0.6, this.ring * 0.85, dist)) * smoothstep(APRON + 3, APRON + 6, dist);
+    // (How far inside the field zones: their share here, and a hedgerow along their edge.)
+    const inside = zones ? zones.edge('fields', x, z) : 0;
+    const weight = (zones ? shareAt(inside, 4) : 1 - smoothstep(this.ring * 0.6, this.ring * 0.85, dist)) * smoothstep(APRON + 3, APRON + 6, dist);
     if (weight <= 0) return null;
     const c = Math.cos(f.angle);
     const s = Math.sin(f.angle);
@@ -589,7 +668,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const kind = hash(cu, cv, this.seed + 77);
     if (kind > 0.82) return null;
     const edge = Math.min(u - cu, cu + 1 - u, v - cv, cv + 1 - v) * f.size * 0.7;
-    return { kind: kind / 0.82, v: (v - cv) * f.size * 0.7, weight, hedge: edge < 1.6 };
+    // (A hedgerow along the patchwork's lines, and along a big world's field zones' edges.)
+    return { kind: kind / 0.82, v: (v - cv) * f.size * 0.7, weight, hedge: edge < 1.6 || (!!zones && Math.abs(inside) < 1.2) };
   }
 
   /**
@@ -618,10 +698,18 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         if (dist < APRON + L.treeline) continue;
         const forest = fbm(x * 0.025, z * 0.025, this.seed + 7, 3);
         let density = smoothstep(0.42 - L.forest, 0.62 - L.forest, forest) * 0.85 + 0.06 + L.forest * 0.25 - (dist < 14 ? 0.05 : 0);
+        // A big world's woods are its woods zones (trees dotted about the open land, fewer on its
+        // meadows), and its orchards their own (rows of fruit trees, below).
+        if (this.zones) {
+          if (this.zones.edge('orchard', x, z) > -3) continue;
+          const wood = this.zones.share('woods', x, z, 8);
+          density = wood * (0.6 + 0.3 * smoothstep(0.3, 0.6, forest)) + (1 - wood) * (0.12 + 0.08 * smoothstep(0.42, 0.7, forest));
+          density *= 1 - 0.6 * this.zones.share('meadow', x, z, 6);
+        }
         // Fields are open, with hedgerows and the odd tree along their edges; nothing grows in the water or on the beach.
         const cell = this.fieldCell(x, z);
         if (cell) density = cell.hedge ? 0.55 : density * (1 - cell.weight);
-        if (L.water && this.waterEdge(x, z) > -BEACH * 0.8) continue;
+        if (this.watered && this.waterEdge(x, z) > -BEACH * 0.8) continue;
         // Bare tops on mountains.
         if (L.mountains && this.heightAt(x, z) > TREELINE + forest * 10) continue;
         // Nothing on the roads or right by them.
@@ -635,7 +723,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         const roll = rand();
         let kind: string;
         if (roll < 0.08) kind = 'model.rock';
-        else if (roll < 0.2) kind = 'model.bush';
+        // (A hedgerow mostly bushes.)
+        else if (roll < 0.2 || (cell?.hedge && roll < 0.55)) kind = 'model.bush';
         else if (roll < 0.26) kind = 'model.bush.small';
         else if ((forest > 0.56 && rand() < Math.min(1, (0.62 * L.conifers) / 0.5)) || (L.conifers > 0.5 && rand() < (L.conifers - 0.5) * 1.6)) kind = rand() < 0.4 ? 'model.spruce' : 'model.pine';
         else if (grove > 0.55 - Math.max(0, L.birches - 0.5) * 0.3 && rand() < Math.min(1, (0.7 * L.birches) / 0.5)) kind = 'model.tree.birch';
@@ -647,14 +736,42 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         const yaw = rand() * Math.PI * 2;
         const y = this.heightAt(x, z) - 0.05;
         const m = placed(scale, up, scale, yaw, x, y, z);
-        const close = dist < SHADOW_RANGE && kind !== 'model.rock';
+        // (A big world's: all far versions, none casting. Its roads and trails run everywhere, and every tree
+        // along them would be a full model in the sun's shadows.)
+        const close = !this.built && dist < SHADOW_RANGE && kind !== 'model.rock';
         if (close) this.nearWoods.push({ key: kind, x, y, z, sx: scale, sy: up, sz: scale, yaw });
         const bucket = close ? near : far;
-        bucket.set(kind, [...(bucket.get(kind) ?? []), m]);
+        let list = bucket.get(kind);
+        if (!list) bucket.set(kind, (list = []));
+        list.push(m);
+      }
+    }
+    // A big world's orchards: fruit trees in rows across each (its own draws, so the woods above are as they were).
+    for (const zone of this.zones ? this.orchards : []) {
+      const xs = zone.poly.map((p) => p[0]);
+      const zs = zone.poly.map((p) => p[1]);
+      const [x0o, x1o, z0o, z1o] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
+      // Rows along the orchard's longer side.
+      const along = x1o - x0o >= z1o - z0o;
+      const [len, across] = along ? [x1o - x0o, z1o - z0o] : [z1o - z0o, x1o - x0o];
+      const rows = Math.max(1, Math.floor((across - 2) / ORCHARD_ROWS));
+      const per = Math.max(1, Math.floor((len - 2) / ORCHARD_STEP));
+      for (let r = 0; r < rows; r++) {
+        for (let k = 0; k < per; k++) {
+          const u = (len - (per - 1) * ORCHARD_STEP) / 2 + k * ORCHARD_STEP + (rand() - 0.5) * 0.6;
+          const v = (across - (rows - 1) * ORCHARD_ROWS) / 2 + r * ORCHARD_ROWS + (rand() - 0.5) * 0.6;
+          const [x, z] = along ? [x0o + u, z0o + v] : [x0o + v, z0o + u];
+          const scale = 0.85 + rand() * 0.3;
+          const m = placed(scale, scale * (0.95 + rand() * 0.1), scale, rand() * Math.PI * 2, x, this.heightAt(x, z) - 0.05, z);
+          let list = far.get('model.tree.fruit');
+          if (!list) far.set('model.tree.fruit', (list = []));
+          list.push(m);
+        }
       }
     }
     const [cx, cz] = [this.w / 2, this.d / 2];
-    const cell = this.woodsCell;
+    // (A big world's woods in squares, whatever the preset: sectors from its middle would each reach a kilometre.)
+    const cell = this.built ? this.bigWoodsCell : this.woodsCell;
     const sector = cell > 0 ? (x: number, z: number) => `${Math.floor(x / cell)}:${Math.floor(z / cell)}` : (x: number, z: number) => `${Math.floor((Math.atan2(z - cz, x - cx) / (Math.PI * 2) + 1) * FOREST_SECTORS) % FOREST_SECTORS}`;
     return { near, far, sector };
   }
@@ -667,19 +784,20 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   protected async lawns(world: WorldStructure, pace?: () => Promise<void>): Promise<LawnPlacement[]> {
     const rand = mulberry32(this.seed ^ 0x1a3d);
-    const covered = unlawned(world);
-    const onPavement = (x: number, z: number) => covered.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.d);
+    // (Tiles whose middle is paved.)
+    const paved = unlawned(world, false);
     const flowers: Float32Array[] = [];
     const flowerTiles: number[] = [];
     for (let z = 0; z < groundDepth(world); z++) {
       if (z % 4 === 0) await pace?.();
       for (let x = 0; x < world.width; x++) {
         const i = z * world.width + x;
-        if (onPavement(x + 0.5, z + 0.5)) continue;
+        if (paved[i]) continue;
         // (Where the tufts were, before the grass: one or two a tile.)
         const n = rand() < 0.5 ? 2 : 1;
         for (let k = 0; k < n * TUFT_DRAWS; k++) rand();
-        if (rand() < 0.06) {
+        // (A big world's water is on its tiles: no flowers in it.)
+        if (rand() < 0.06 && !(this.zones && this.waterEdge(x + 0.5, z + 0.5) > -BEACH * 0.6)) {
           flowers.push(scatter(x, z, rand, 0.8 + rand() * 0.5));
           flowerTiles.push(i);
         }
@@ -706,8 +824,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     // A lighter lawn keeps every so many of them, the same ones each time (the placement above is unchanged).
     const d = this.lawnDensity;
     const thin = <T>(list: T[]) => (d >= 1 ? list : list.filter((_, k) => Math.floor((k + 1) * d) > Math.floor(k * d)));
-    // (Flowers are sparse: too few triangles for groups to pay.)
-    return [{ key: 'model.flowers', matrices: thin(flowers), tiles: thin(flowerTiles) }];
+    // (Flowers are sparse: too few triangles for groups to pay; but a big world's are a kilometre of them, in squares.)
+    const cell = this.built ? (x: number, z: number) => `${Math.floor(x / BIG_FLOWERS_CELL)}:${Math.floor(z / BIG_FLOWERS_CELL)}` : undefined;
+    return [{ key: 'model.flowers', matrices: thin(flowers), tiles: thin(flowerTiles), ...(cell ? { cell } : {}) }];
   }
 }
 
@@ -720,11 +839,11 @@ const TREE_CLEAR = { street: 3.0, path: 1.3, house: 2.2, object: 1.0 };
 
 /**
  * Moves a lot tree (by up to 2.5 m, staying on the viewed lot) until its trunk is clear of the
- * street (road, sidewalk, kerb furniture and streetlights all stand inside the street rects, see
+ * roads (road, sidewalk, kerb furniture and streetlights all stand within their width, see
  * street.ts), garden paths and driveways, the house and placed objects; null when no spot is.
  */
 function clearTreeSpot(x: number, z: number, world: WorldStructure, view: { x: number; z: number; w: number; d: number } | null): [number, number] | null {
-  const streets = world.meta?.streets ?? [];
+  const roads = roadIndex(townRoads(world));
   const paths = world.meta?.paths ?? [];
   const gap = (r: { x: number; z: number; w: number; d: number }, px: number, pz: number) =>
     Math.hypot(Math.max(r.x - px, 0, px - (r.x + r.w)), Math.max(r.z - pz, 0, pz - (r.z + r.d)));
@@ -739,7 +858,7 @@ function clearTreeSpot(x: number, z: number, world: WorldStructure, view: { x: n
   };
   const ok = (px: number, pz: number) =>
     (!view || (px > view.x + 0.8 && px < view.x + view.w - 0.8 && pz > view.z + 0.8 && pz < view.z + view.d - 0.8)) &&
-    streets.every((r) => gap(r, px, pz) >= TREE_CLEAR.street) &&
+    !roads.onRoad(px, pz, TREE_CLEAR.street) &&
     paths.every((r) => gap(r, px, pz) >= TREE_CLEAR.path) &&
     world.objects.every((o) => gap(o, px, pz) >= TREE_CLEAR.object) &&
     !indoorNear(px, pz, TREE_CLEAR.house);
@@ -768,7 +887,11 @@ export function decorPlants(decor: readonly [string, Decor][]): PlantPlacement[]
  */
 export function natureDecor(key: string, items: Decor, world?: WorldStructure, view?: { x: number; z: number; w: number; d: number } | null): [string, Decor][] {
   const out = new Map<string, Decor>();
-  const put = (k: string, item: [number, number, number, number]) => out.set(k, [...(out.get(k) ?? []), item]);
+  const put = (k: string, item: [number, number, number, number]) => {
+    const list = out.get(k);
+    if (list) list.push(item);
+    else out.set(k, [item]);
+  };
   if (key === 'model.tree') {
     for (const item of items) {
       const h = hash(Math.floor(item[0] * 7), Math.floor(item[1] * 7), 91);
@@ -862,4 +985,36 @@ export function windDirection(yaw: number, sx: number, sz: number, out: { x: num
   const across = (dx * s + dz * c) * (sz / sx) ** 2;
   out.x = along * c + across * s;
   out.z = -along * s + across * c;
+}
+
+/** What the lawn grows round (`lawnMask`, `bareTiles`, the grass's walls): rooms, things, walls, diagonals, floors, paths and fields. */
+export interface LawnInputs {
+  width: number;
+  rooms: ArrayLike<number>;
+  things: Int32Array;
+  defs: string;
+  edges: string;
+  meta: unknown;
+}
+
+export function lawnInputs(world: WorldStructure): LawnInputs {
+  const things = new Int32Array(world.objects.length * 5);
+  world.objects.forEach((o, i) => things.set([o.x, o.z, o.w, o.d, o.rot], i * 5));
+  return {
+    width: world.width,
+    rooms: world.rooms,
+    things,
+    defs: world.objects.map((o) => o.def).join(),
+    edges: JSON.stringify([world.walls.length, world.diagonals, world.floors, world.walls.map((e) => `${e.axis}${e.x},${e.z}`).join()]),
+    meta: [world.meta?.paths, world.meta?.streets, world.meta?.roads, world.meta?.world?.fields],
+  };
+}
+
+export function sameLawnInputs(a: LawnInputs, b: LawnInputs): boolean {
+  if (a.width !== b.width || a.rooms.length !== b.rooms.length || a.things.length !== b.things.length || a.defs !== b.defs || a.edges !== b.edges) return false;
+  const [am, bm] = [a.meta as unknown[], b.meta as unknown[]];
+  if (am.some((v, i) => v !== bm[i] && JSON.stringify(v) !== JSON.stringify(bm[i]))) return false;
+  for (let i = 0; i < a.things.length; i++) if (a.things[i] !== b.things[i]) return false;
+  if (a.rooms !== b.rooms) for (let i = 0; i < a.rooms.length; i++) if (a.rooms[i] !== b.rooms[i]) return false;
+  return true;
 }

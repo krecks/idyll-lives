@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
-  import { settings } from '../../settings/settings.svelte';
+  import { settings, systemMotion } from '../../settings/settings.svelte';
   import { money } from '../format';
+  import { MoneyFloats, moneyChange } from '../moneyFloats.svelte';
   import { services } from '../services';
   import { game } from '../state.svelte';
 
@@ -13,8 +13,6 @@
   let x = $state(0);
   let y = $state(0);
   let onCanvas = $state(false);
-  let floats = $state<{ id: number; amount: number; x: number; y: number }[]>([]);
-  let nextId = 0;
 
   function move(e: PointerEvent) {
     // The HUD is zoomed by the UI scale; positions inside it are in its own pixels.
@@ -41,6 +39,20 @@
       return { text: game.creative ? 'Free' : money(def.price ?? 0), sub: game.placeValid ? def.name : misfit, keys, bad: !game.placeValid };
     }
     const tool = game.buildTool;
+    if (tool === 'garage' && game.buildTab === 'build') {
+      const h = game.garageHover;
+      if (!h) return null;
+      const build = game.catalog?.build.garage ?? 0;
+      if (h.kind === 'sell') {
+        const back = game.creative ? 0 : Math.round(build * (game.catalog?.objectRules.resale ?? 0));
+        return { text: 'Take down the garage', sub: back ? `Sells for ${money(back)}` : undefined, keys: 'Click · Del', bad: false };
+      }
+      const price = game.creative ? 0 : build;
+      const what = h.drive ? 'Garage at the end of the driveway' : 'Garage';
+      const keys = h.drive ? undefined : 'R turns its door';
+      if (!h.valid) return { text: what, sub: h.reason ?? "Doesn't fit here", keys, bad: true };
+      return { text: price ? money(price) : 'Free', sub: what, keys, bad: false };
+    }
     if (game.buildEdges === 0) return null;
     const cost = game.buildCost;
     const short = !game.affords(cost);
@@ -90,22 +102,15 @@
   });
 
   // Money moved by an edit floats up from the pointer (time stands still in Build mode, so the
-  // funds only change through buying, selling and building).
-  let lastFunds: number | null = null;
-  $effect(() => {
-    const funds = game.funds;
-    const buying = game.mode === 'build';
-    const prev = lastFunds;
-    lastFunds = funds;
-    if (!buying || prev === null || funds === prev) return;
-    const id = ++nextId;
-    const k = settings.uiScale || 1;
-    untrack(() => {
-      const at = onCanvas ? { x, y } : { x: window.innerWidth / k / 2, y: window.innerHeight / k / 2 };
-      floats = [...floats, { id, amount: funds - prev, ...at }];
-    });
-    setTimeout(() => (floats = floats.filter((f) => f.id !== id)), 1400);
-  });
+  // funds only change through buying, selling and building). With Reduce motion it stays put.
+  const floats = new MoneyFloats<{ x: number; y: number }>(1400);
+  const still = $derived(settings.reducedMotion || systemMotion.reduced);
+  $effect(() =>
+    floats.note(game.funds, game.mode === 'build', () => {
+      const k = settings.uiScale || 1;
+      return onCanvas ? { x, y } : { x: window.innerWidth / k / 2, y: window.innerHeight / k / 2 };
+    }),
+  );
 </script>
 
 <svelte:window onpointermove={move} />
@@ -119,8 +124,8 @@
     </div>
   {/key}
 {/if}
-{#each floats as f (f.id)}
-  <div class="float tabular" class:gain={f.amount > 0} style="left:{f.x}px;top:{f.y}px">{f.amount > 0 ? '+' : '−'}{money(Math.abs(f.amount))}</div>
+{#each floats.shown as f (f.id)}
+  <div class="float tabular" class:gain={f.amount > 0} class:still style="left:{f.x}px;top:{f.y}px">{moneyChange(f.amount)}</div>
 {/each}
 
 <style>
@@ -199,6 +204,9 @@
   }
   .float.gain {
     color: var(--good);
+  }
+  .float.still {
+    animation: none;
   }
   @keyframes rise {
     0% {

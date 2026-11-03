@@ -76,28 +76,49 @@ export function kneelBody(t: number, lean: number, twist: number, head: Vec): Po
   return { ...body, ...leg('l'), ...leg('r') };
 }
 
-function kneelPose(p: number): PoseSpec {
-  // Three pulls per loop: left, right, both; each reaches, grips, pulls back and tosses to the side.
+/**
+ * Kneeling at the soil (`up` m above the ground, `ahead` m ahead of the feet; leaning `lean`°): three pulls per loop,
+ * left, right, both; each reaches, grips, pulls back and tosses to the side. On the ground (`kneel`) the hands go
+ * down to the earth; at a raised flower bed (`kneelBed`: knelt up against its box, `actions.ts` `STEP_IN`) over its
+ * rim to the soil a quarter of a metre up, the body more upright.
+ */
+const kneelPose = (up: number, ahead: number, lean: number) => (p: number): PoseSpec => {
   const n = (p * 3) % 1;
   const which = Math.floor(p * 3);
   const reach = bump(n, 0.0, 0.55, 0.2);
   const yank = bump(n, 0.4, 0.75, 0.12);
   const toss = bump(n, 0.62, 1.0, 0.15);
   const side = which === 0 ? -1 : which === 1 ? 1 : 0;
-  const body = kneelBody(p, 40 + 12 * reach - 10 * yank, 8 * side * reach + 14 * side * toss, [8 + 4 * reach, 10 * side * toss, 0]);
-  const soil = (sx: number): Vec => [0.12 * sx + 0.05 * side, 0.1 + 0.14 * yank, 0.44 + 0.06 * reach - 0.12 * yank];
-  const work = (s: 'l' | 'r') => (side === 0 || (s === 'l' ? side < 0 : side > 0) ? 1 : 0.25);
+  const body = kneelBody(p, lean + 12 * reach - 10 * yank, 8 * side * reach + 14 * side * toss, [8 + 4 * reach, 10 * side * toss, 0]);
+  const soil = (sx: number): Vec => [0.12 * sx + 0.05 * side, up + 0.14 * yank, ahead + 0.06 * reach - 0.12 * yank];
+  // (Each pull's hands go from their rest and back to it, so one pull runs into the next, and round the loop, smoothly.)
+  const work = (s: 'l' | 'r') => (side === 0 || (s === 'l' ? side < 0 : side > 0) ? 1 : 0.25) * bump(n, 0, 1, 0.12);
   const at = (s: 'l' | 'r'): Vec => {
     const sx = s === 'l' ? -1 : 1;
     const w = work(s);
-    const restP: Vec = [0.17 * sx, 0.3, 0.32];
+    const restP: Vec = [0.17 * sx, 0.2 + up, 0.32];
     const goal = soil(sx);
-    const tossP: Vec = [0.35 * sx, 0.3, 0.2];
+    const tossP: Vec = [0.35 * sx, 0.2 + up, 0.2];
     const a: Vec = [restP[0] + (goal[0] - restP[0]) * w, restP[1] + (goal[1] - restP[1]) * w, restP[2] + (goal[2] - restP[2]) * w];
     const tw = toss * w * (side === 0 || (sx < 0) === (side < 0) ? 1 : 0);
     return [a[0] + (tossP[0] - a[0]) * tw, a[1] + (tossP[1] - a[1]) * tw, a[2] + (tossP[2] - a[2]) * tw];
   };
   return hands(body, { at: at('l'), pronate: 60, hand: wrist('l', 10 + 20 * yank, 0) }, { at: at('r'), pronate: 60, hand: wrist('r', 10 + 20 * yank, 0) });
+};
+
+/**
+ * Smelling the flowers in a raised bed (`smellBed`): knelt up against its box (`actions.ts` `STEP_IN`), the left hand
+ * on its rim, leaning in over it with a bloom cupped in the right hand and drawn up to the face for slow, deep sniffs.
+ */
+function smellBedPose(p: number): PoseSpec {
+  const sniff = bump(p, 0.2, 0.62, 0.15);
+  const sway = Math.sin(p * TAU);
+  const body = kneelBody(p, 44 + 10 * sniff, 4 * sway, [40 + 14 * sniff, 5 * sway, 4 * sniff]);
+  return hands(
+    body,
+    { at: [-0.2, 0.27, 0.34], pronate: 80, hand: wrist('l', 10, 0) },
+    { at: [0.06, 0.44 + 0.06 * sniff, 0.5 - 0.06 * sniff], pronate: 20, hand: wrist('r', 25, 0) },
+  );
 }
 
 /** Crouching low to smell a flower: on the haunches, forearms on the knees, the head leaning in for slow deep sniffs. */
@@ -133,7 +154,10 @@ export function gardenClips(): ClipDef[] {
       [0.84, () => plantKey(0.84, 0.42, knee(-1), knee(1), 28, [6, 0, 0]), 'smooth'],
       [1, rest, 'smooth'],
     ]),
-    cycle('kneel', { seconds: 156 / 30, loop: true }, kneelPose),
+    cycle('kneel', { seconds: 156 / 30, loop: true }, kneelPose(0.1, 0.44, 40)),
+    // (The raised flower bed: its rim 0.245 m up a hand's breadth ahead of the knees, the soil just under it.)
+    cycle('kneelBed', { seconds: 156 / 30, loop: true }, kneelPose(0.27, 0.46, 28)),
     cycle('crouch', { seconds: 88 / 30, loop: true }, crouchPose),
+    cycle('smellBed', { seconds: 3.6, loop: true }, smellBedPose),
   ];
 }

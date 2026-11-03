@@ -676,6 +676,7 @@ struct SimSent {
     plot: u64,
     away_until: u64,
     visiting: u64,
+    trip: u64,
     job: u64,
     /// Reset when the details stop (the UI drops them).
     details: DetailsSent,
@@ -765,6 +766,16 @@ impl UiSync {
             })
             .collect();
 
+        // (Who is in a car on the way home, `trip_view`: found once, not for everyone away.)
+        let mut riders: Vec<u32> = world
+            .cars
+            .iter()
+            .filter(|c| c.state == crate::cars::CarState::Arriving)
+            .flat_map(|c| c.driver.iter().chain(&c.aboard).chain(&c.done))
+            .copied()
+            .collect();
+        riders.sort_unstable();
+
         let (mut sims, mut gone) = (List::default(), List::default());
         if self.sims.len() < world.sims.len() {
             self.sims.resize_with(world.sims.len(), || None);
@@ -780,7 +791,7 @@ impl UiSync {
             let mark = (sims.out.len(), sims.len);
             let mut o = Obj::open(sims.next());
             o.field("id", &s.id);
-            sim_patch(world, s, detailed[i], sent, &mut o);
+            sim_patch(world, s, detailed[i], &riders, sent, &mut o);
             if o.close() == 1 {
                 sims.out.truncate(mark.0);
                 sims.len = mark.1;
@@ -960,7 +971,14 @@ pub fn ui_state_json(world: &World) -> String {
 
 /// Writes the fields of resident `s` that changed (`SimView` in `protocol.ts`); with `detail`
 /// false only the summary (who, where, which job), the details being the UI's defaults.
-fn sim_patch(world: &World, s: &Sim, detail: bool, sent: &mut SimSent, o: &mut Obj) {
+fn sim_patch(
+    world: &World,
+    s: &Sim,
+    detail: bool,
+    riders: &[u32],
+    sent: &mut SimSent,
+    o: &mut Obj,
+) {
     let content = &world.content;
     if sent.detailed && !detail {
         sent.details = DetailsSent::default();
@@ -999,6 +1017,9 @@ fn sim_patch(world: &World, s: &Sim, detail: bool, sent: &mut SimSent, o: &mut O
         &mut sent.away_until,
     );
     o.changed("visiting", &s.visiting.map(|v| v.plot), &mut sent.visiting);
+    // (The time only with the details: it's a search along the roads, for a handful, not the town.)
+    let trip = trip_view(world, s, riders, detail);
+    o.changed_opt("trip", trip.as_ref(), &mut sent.trip);
     o.changed("job", &job_view(content, s), &mut sent.job);
     if !detail {
         return;
@@ -1433,6 +1454,70 @@ fn feelings<'a>(world: &'a World, s: &Sim) -> Vec<FeelingView<'a>> {
         .collect()
 }
 
+/// On their way somewhere (`SimView.trip`): to which plot, and about when they're there.
+#[derive(Serialize)]
+struct TripView {
+    to: u32,
+    /// Minute of day, in steps of `TRIP_STEP` (it's an estimate: and the UI isn't sent a new one
+    /// every few ticks as they go). None: not worked out (`trip_view`'s `timed`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    at: Option<u32>,
+}
+
+/// Minutes the arrival time of a trip is rounded to.
+const TRIP_STEP: f32 = 5.0;
+
+/// Where resident `s` is on their way to: a visit or home (until they're on that plot), or home
+/// from work in the household's car (back when the car is, `riders`: who is in one on the way
+/// home, sorted); with the time they're there, from `Travel::eta` (by car where they're bound
+/// for it). Read only: nothing here changes the game.
+///
+/// `timed` false: a visit or the way home without the time, which takes a search along the roads
+/// (the UI updates ten times a second: that's for the residents whose details are shown; the
+/// town map says where the others are off to). The car home from work has its time either way.
+fn trip_view(world: &World, s: &Sim, riders: &[u32], timed: bool) -> Option<TripView> {
+    let home = world.households.get(s.household as usize)?.plot;
+    let step = |tick: u64| {
+        let m = (clock::minute_of_day(tick) / TRIP_STEP).round() * TRIP_STEP;
+        (m as u32) % (24 * 60)
+    };
+    if let Some(until) = s.away_until {
+        let riding = riders.binary_search(&s.id).is_ok();
+        return riding.then_some(home).flatten().map(|to| TripView {
+            to,
+            at: Some(step(until)),
+        });
+    }
+    let to = match s.current()?.task.kind {
+        TaskKind::Visit { plot } => plot,
+        TaskKind::GoHome => home?,
+        _ => return None,
+    };
+    let (x, z) = s.tile();
+    if world.plot_at(x, z) == Some(to) {
+        return None;
+    }
+    let door = world.plots.get(to as usize)?.arrival_point();
+    if !timed {
+        return Some(TripView { to, at: None });
+    }
+    // (From over the ground, upstairs too.)
+    let from = world.stairs.ground_pos(s.pos);
+    let car = s.bound_for_car.is_some();
+    let mode = if car {
+        crate::travel::Mode::Car
+    } else {
+        crate::travel::Mode::Foot
+    };
+    let walk = s.walk_per_minute(&world.content);
+    let minutes = crate::world::trip_minutes(world.travel.eta(from, door, mode, walk), car);
+    let at = world.tick + (minutes.max(0.0) * crate::TICKS_PER_MINUTE as f32) as u64;
+    Some(TripView {
+        to,
+        at: Some(step(at)),
+    })
+}
+
 fn job_view<'a>(content: &'a Content, s: &Sim) -> Option<JobView<'a>> {
     let j = s.job.as_ref()?;
     let career = &content.careers[j.career];
@@ -1500,7 +1585,7 @@ struct StructureView<'a> {
     plots: Vec<PlotView<'a>>,
     exits: &'a [[f32; 2]],
     #[serde(skip_serializing_if = "Option::is_none")]
-    rooms: Option<&'a [u16]>,
+    rooms: Option<Vec<u16>>,
     /// Every edge with a wall on it (plain walls, and walls with a door or window).
     #[serde(skip_serializing_if = "Option::is_none")]
     walls: Option<Vec<EdgeView>>,
@@ -1520,6 +1605,25 @@ struct StructureView<'a> {
     /// The town's servers (`staff.rs`), in their snapshot rows' order (after the residents').
     #[serde(skip_serializing_if = "Vec::is_empty")]
     staff: Vec<StaffView>,
+    /// Households' cars (`cars.rs`), in their snapshot rows' order (`snapshot::car`). Left out
+    /// only for a game saved before cars, which has no driveways either (the renderer parks its
+    /// own by the neighbours' driveways); a town where nobody has one sends none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cars: Option<Vec<CarView>>,
+    /// Garages at the inner ends of driveways (`cars::Garage`); left out when there are none.
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    garages: &'a [crate::cars::Garage],
+}
+
+/// A household's car: where it's parked (its middle, its yaw) and its look.
+#[derive(Serialize)]
+struct CarView {
+    plot: u32,
+    x: f32,
+    z: f32,
+    yaw: f32,
+    body: u8,
+    paint: u8,
 }
 
 /// One of the town's servers: what they look like (`seed`, the renderer makes the look) and the
@@ -1578,30 +1682,26 @@ impl LookView {
     }
 }
 
-fn diagonals(lot: &crate::lot::Lot) -> Vec<DiagonalView> {
-    let mut out = Vec::new();
-    for (i, d) in lot.diagonals().iter().enumerate() {
-        let Some(d) = d else { continue };
-        out.push(DiagonalView {
-            x: i % lot.width,
-            z: i / lot.width,
-            axis: match d.dir {
-                crate::lot::DiagDir::Dp => "dp",
-                crate::lot::DiagDir::Dn => "dn",
-            },
-            kind: match d.edge {
-                Edge::Door => "door",
-                Edge::Window => "window",
-                _ => "wall",
-            },
-            rooms: lot.half_rooms()[i],
-            look: LookView::of(
-                lot,
-                crate::lot::EdgeRef::Diag((i % lot.width) as u16, (i / lot.width) as u16),
-            ),
-        });
-    }
-    out
+fn diagonals(
+    lot: &crate::lot::Lot,
+    list: impl Iterator<Item = (usize, usize, crate::lot::Diagonal)>,
+) -> Vec<DiagonalView> {
+    list.map(|(x, z, d)| DiagonalView {
+        x,
+        z,
+        axis: match d.dir {
+            crate::lot::DiagDir::Dp => "dp",
+            crate::lot::DiagDir::Dn => "dn",
+        },
+        kind: match d.edge {
+            Edge::Door => "door",
+            Edge::Window => "window",
+            _ => "wall",
+        },
+        rooms: lot.half_rooms()[lot.tile_index(x as i32, z as i32)],
+        look: LookView::of(lot, crate::lot::EdgeRef::Diag(x as u16, z as u16)),
+    })
+    .collect()
 }
 
 /// A wall edge: `h` runs from `(x, z)` to `(x + 1, z)`, `v` from `(x, z)` to `(x, z + 1)`.
@@ -1643,8 +1743,12 @@ struct FenceView {
     style: u8,
 }
 
-/// Wall edges, openings (doors, windows) and fences of the whole lot, in grid order.
-fn wall_edges(lot: &crate::lot::Lot) -> (Vec<EdgeView>, Vec<OpeningView>, Vec<FenceView>) {
+/// Wall edges, openings (doors, windows) and fences among `list` (`Lot::walls` for the whole
+/// lot, in grid order).
+fn wall_edges(
+    lot: &crate::lot::Lot,
+    list: impl Iterator<Item = (crate::lot::EdgeRef, Edge)>,
+) -> (Vec<EdgeView>, Vec<OpeningView>, Vec<FenceView>) {
     let mut walls = Vec::new();
     let mut openings = Vec::new();
     let mut fences = Vec::new();
@@ -1692,14 +1796,11 @@ fn wall_edges(lot: &crate::lot::Lot) -> (Vec<EdgeView>, Vec<OpeningView>, Vec<Fe
             head: look.head,
         });
     };
-    for z in 0..=lot.depth {
-        for x in 0..lot.width {
-            add("h", x, z, lot.h_edge(x, z));
-        }
-    }
-    for z in 0..lot.depth {
-        for x in 0..=lot.width {
-            add("v", x, z, lot.v_edge(x, z));
+    for (at, e) in list {
+        match at {
+            crate::lot::EdgeRef::H(x, z) => add("h", x.into(), z.into(), e),
+            crate::lot::EdgeRef::V(x, z) => add("v", x.into(), z.into(), e),
+            crate::lot::EdgeRef::Diag(..) => {}
         }
     }
     (walls, openings, fences)
@@ -1841,9 +1942,12 @@ fn house_bounds(world: &World, x0: i32, z0: i32, x1: i32, z1: i32) -> Option<[i3
     b
 }
 
+/// Per object, the height of the top it stands on (`surface_lifts`).
+type Lifts = Vec<Option<f32>>;
+
 /// Per object, the height of the top it stands on (things on the `surface` layer; None for the
 /// rest, or on a top at floor level).
-fn surface_lifts(world: &World) -> Vec<Option<f32>> {
+fn surface_lifts(world: &World) -> Lifts {
     let content = &world.content;
     let on_top = |o: &crate::world::ObjectInstance| {
         content.objects[o.def].layer == crate::content::Layer::Surface
@@ -1854,7 +1958,7 @@ fn surface_lifts(world: &World) -> Vec<Option<f32>> {
     // The top over each tile (furniture never shares tiles), checked against where each thing's
     // middle is; a thing over the edge of its tile's top looks through them all.
     let lot = &world.lot;
-    let mut tops = vec![u32::MAX; lot.width * lot.depth];
+    let mut tops = vec![u32::MAX; lot.tile_slots()];
     for o in world
         .objects
         .iter()
@@ -1887,6 +1991,161 @@ fn surface_lifts(world: &World) -> Vec<Option<f32>> {
             Some(top.surface.height).filter(|&h| h > 0.0)
         })
         .collect()
+}
+
+/// An object as views send it.
+fn object_view<'a>(
+    world: &'a World,
+    lifts: &[Option<f32>],
+    o: &'a crate::world::ObjectInstance,
+) -> ObjectView<'a> {
+    let content = &world.content;
+    let (w, d) = o.size(content);
+    ObjectView {
+        id: o.stable,
+        def: &content.objects[o.def].id,
+        x: o.x,
+        z: o.z,
+        rot: o.rot,
+        turn: o.turn,
+        offset: o.offset,
+        size: (o.extent != crate::world::kind_size(content.objects[o.def].footprint))
+            .then_some(o.extent),
+        tall: o.tall,
+        lift: lifts.get(o.id as usize).copied().flatten(),
+        wear: o.wear,
+        open: o.open,
+        growth: world.content.objects[o.def]
+            .grows
+            .is_some()
+            .then(|| o.growth_stage() as u8),
+        running: o.running(),
+        w,
+        d,
+        quality: o.quality,
+        colors: crate::world::colors_hex(&o.colors),
+        sell_value: content.objects[o.def].price.map(|_| {
+            let broken = if o.broken() { 0.5 } else { 1.0 };
+            (o.value as f32 * content.object_rules.resale * broken).round() as i64
+        }),
+        repair_cost: (o.wear > 0.0).then(|| crate::home::repair_cost(content, o)),
+    }
+}
+
+/// What changed in which storage chunk (`lot::CHUNK` square; stacked rows, as `structure_rect`
+/// takes them): a fingerprint per chunk of its walls, doors, windows, fences, diagonals, floor
+/// coverings and the objects standing there (as views send them), row by row over
+/// `Lot::chunk_grid`. Compared from one structure version to the next, it tells a view which
+/// chunks to fetch again.
+pub fn chunk_fingerprints(world: &World) -> (usize, usize, Vec<u64>) {
+    use std::hash::{Hash, Hasher};
+    let lot = &world.lot;
+    let (cols, rows) = lot.chunk_grid();
+    let mut hashers: Vec<Option<std::collections::hash_map::DefaultHasher>> =
+        (0..cols * rows).map(|_| None).collect();
+    let chunk =
+        |x: i32, z: i32| lot.chunk_at(x.clamp(0, lot.width as i32), z.clamp(0, lot.depth as i32));
+    macro_rules! at {
+        ($x:expr, $z:expr) => {
+            hashers[chunk($x, $z)].get_or_insert_with(Default::default)
+        };
+    }
+    for (e, edge) in lot.walls() {
+        let (x, z) = match e {
+            crate::lot::EdgeRef::H(x, z)
+            | crate::lot::EdgeRef::V(x, z)
+            | crate::lot::EdgeRef::Diag(x, z) => (x as i32, z as i32),
+        };
+        let h = at!(x, z);
+        e.hash(h);
+        (edge as u8).hash(h);
+        let l = lot.look(e);
+        (l.sides, l.form, l.style, l.sill, l.head).hash(h);
+        if let crate::lot::EdgeRef::Diag(..) = e {
+            lot.half_rooms()[lot.tile_index(x, z)].hash(h);
+        }
+    }
+    for (x, z, c) in lot.floors() {
+        let h = at!(x as i32, z as i32);
+        (x, z, c).hash(h);
+    }
+    let lifts = surface_lifts(world);
+    for o in &world.objects {
+        let v = object_view(world, &lifts, o);
+        let h = at!(o.x, o.z);
+        serde_json::to_string(&v).unwrap_or_default().hash(h);
+    }
+    let out = hashers
+        .into_iter()
+        .map(|h| h.map_or(0, |h| h.finish()))
+        .collect();
+    (cols, rows, out)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RectView<'a> {
+    /// The tiles `[x0, z0, x1, z1)` (stacked rows) this covers.
+    rect: [i32; 4],
+    version: u32,
+    lot_version: u32,
+    walls: Vec<EdgeView>,
+    openings: Vec<OpeningView>,
+    fences: Vec<FenceView>,
+    diagonals: Vec<DiagonalView>,
+    floors: Vec<[u16; 3]>,
+    /// The objects whose tile (`x`, `z`) is inside.
+    objects: Vec<ObjectView<'a>>,
+}
+
+/// The walls, doors, windows, fences, diagonals, floor coverings and objects inside tiles
+/// `[x0, z0, x1, z1)` (stacked rows: storey `k` at rows `k * storeyDepth ..`), as
+/// `structure_json` gives them for the whole lot (JSON). An edge counts where the tile holding it
+/// is (its `+z` / `+x` side's tile), an object where its tile is.
+pub fn structure_rect_json(world: &World, rect: [i32; 4]) -> String {
+    let lot = &world.lot;
+    let [x0, z0, x1, z1] = rect;
+    let inside = |x: i32, z: i32| x >= x0 && z >= z0 && x < x1 && z < z1;
+    let list = lot.walls_in(rect);
+    let (walls, openings, fences) = wall_edges(
+        lot,
+        list.iter()
+            .copied()
+            .filter(|(e, _)| !matches!(e, crate::lot::EdgeRef::Diag(..))),
+    );
+    let diagonals = diagonals(
+        lot,
+        list.iter().filter_map(|&(e, _)| match e {
+            crate::lot::EdgeRef::Diag(x, z) => lot
+                .diag(x.into(), z.into())
+                .map(|d| (usize::from(x), usize::from(z), d)),
+            _ => None,
+        }),
+    );
+    let floors = lot
+        .floors()
+        .filter(|&(x, z, _)| inside(x.into(), z.into()))
+        .map(|(x, z, c)| [x, z, u16::from(c)])
+        .collect();
+    let lifts = surface_lifts(world);
+    let objects = world
+        .objects
+        .iter()
+        .filter(|o| inside(o.x, o.z))
+        .map(|o| object_view(world, &lifts, o))
+        .collect();
+    serde_json::to_string(&RectView {
+        rect,
+        version: world.structure_version(),
+        lot_version: world.lot_version(),
+        walls,
+        openings,
+        fences,
+        diagonals,
+        floors,
+        objects,
+    })
+    .unwrap_or_else(|_| "{}".into())
 }
 
 pub fn structure_json(world: &World) -> String {
@@ -1954,47 +2213,59 @@ pub fn items_json(world: &World) -> String {
 }
 
 /// The world structure; without `lot`, leaves out the lot itself (rooms, walls, openings,
-/// diagonals, fences, floors) for a caller that has it at this `lotVersion` already.
+/// diagonals, fences, floors), as `StructureSync` does unless asked for it (the tests compare
+/// the two).
 pub fn structure_json_with(world: &World, lot: bool) -> String {
-    let content = &world.content;
     let lifts = surface_lifts(world);
     let objects = world
         .objects
         .iter()
-        .map(|o| {
-            let (w, d) = o.size(content);
-            ObjectView {
-                id: o.stable,
-                def: &content.objects[o.def].id,
-                x: o.x,
-                z: o.z,
-                rot: o.rot,
-                turn: o.turn,
-                offset: o.offset,
-                size: (o.extent != crate::world::kind_size(content.objects[o.def].footprint))
-                    .then_some(o.extent),
-                tall: o.tall,
-                lift: lifts.get(o.id as usize).copied().flatten(),
-                wear: o.wear,
-                open: o.open,
-                growth: world.content.objects[o.def]
-                    .grows
-                    .is_some()
-                    .then(|| o.growth_stage() as u8),
-                running: o.running(),
-                w,
-                d,
-                quality: o.quality,
-                colors: crate::world::colors_hex(&o.colors),
-                sell_value: content.objects[o.def].price.map(|_| {
-                    let broken = if o.broken() { 0.5 } else { 1.0 };
-                    (o.value as f32 * content.object_rules.resale * broken).round() as i64
-                }),
-                repair_cost: (o.wear > 0.0).then(|| crate::home::repair_cost(content, o)),
-            }
-        })
+        .map(|o| object_view(world, &lifts, o))
         .collect();
-    let sims = world
+    let (walls, openings, fences) = if lot {
+        let (w, o, f) = wall_edges(&world.lot, world.lot.walls());
+        (Some(w), Some(o), Some(f))
+    } else {
+        (None, None, None)
+    };
+    let diagonals = lot.then(|| diagonals(&world.lot, world.lot.diagonal_walls()));
+    serde_json::to_string(&StructureView {
+        version: world.structure_version(),
+        lot_version: world.lot_version(),
+        mode: world.mode,
+        width: world.lot.width,
+        depth: world.lot.depth,
+        storeys: world.storeys,
+        storey_depth: world.storey_depth(),
+        basement: basement_block(world),
+        objects,
+        sims: sim_infos(world),
+        former: &world.former,
+        households: household_views(world),
+        plots: plot_views(world),
+        exits: &world.exits,
+        rooms: lot.then(|| world.lot.rooms_row_major()),
+        walls,
+        openings,
+        fences,
+        diagonals,
+        floors: lot.then(|| floor_views(world)),
+        meta: &world.meta,
+        staff: staff_views(world),
+        cars: car_views(world),
+        garages: &world.garages,
+    })
+    .expect("structure serializes")
+}
+
+/// `StructureView::basement`.
+fn basement_block(world: &World) -> Option<i32> {
+    (world.stair_map().basement > 0).then_some(world.stair_map().basement)
+}
+
+fn sim_infos(world: &World) -> Vec<SimInfo<'_>> {
+    let content = &world.content;
+    world
         .sims
         .iter()
         .map(|s| SimInfo {
@@ -2015,8 +2286,11 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                 .map(|st| st.id.as_str()),
             outfit: s.outfit,
         })
-        .collect();
-    let households = world
+        .collect()
+}
+
+fn household_views(world: &World) -> Vec<HouseholdView<'_>> {
+    world
         .households
         .iter()
         .map(|h| HouseholdView {
@@ -2025,8 +2299,11 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
             plot: h.plot,
             player: h.player,
         })
-        .collect();
-    let plots = world
+        .collect()
+}
+
+fn plot_views(world: &World) -> Vec<PlotView<'_>> {
+    world
         .plots
         .iter()
         .map(|p| PlotView {
@@ -2048,57 +2325,259 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
                     })
                     .count() as u8,
         })
-        .collect();
-    let (walls, openings, fences) = if lot {
-        let (w, o, f) = wall_edges(&world.lot);
-        (Some(w), Some(o), Some(f))
-    } else {
-        (None, None, None)
-    };
-    let diagonals = lot.then(|| diagonals(&world.lot));
-    serde_json::to_string(&StructureView {
-        version: world.structure_version(),
-        lot_version: world.lot_version(),
-        mode: world.mode,
-        width: world.lot.width,
-        depth: world.lot.depth,
-        storeys: world.storeys,
-        storey_depth: world.storey_depth(),
-        basement: (world.stair_map().basement > 0).then_some(world.stair_map().basement),
-        objects,
-        sims,
-        former: &world.former,
-        households,
-        plots,
-        exits: &world.exits,
-        rooms: lot.then(|| world.lot.rooms()),
-        walls,
-        openings,
-        fences,
-        diagonals,
-        floors: lot.then(|| {
-            world
-                .lot
-                .floors()
-                .map(|(x, z, c)| [x, z, u16::from(c)])
-                .collect()
-        }),
-        meta: &world.meta,
-        staff: crate::staff::plan(world)
-            .servers
+        .collect()
+}
+
+fn floor_views(world: &World) -> Vec<[u16; 3]> {
+    world
+        .lot
+        .floors()
+        .map(|(x, z, c)| [x, z, u16::from(c)])
+        .collect()
+}
+
+fn staff_views(world: &World) -> Vec<StaffView> {
+    crate::staff::current(world)
+        .servers
+        .iter()
+        .take(crate::staff::MAX_STAFF)
+        .map(|s| StaffView {
+            seed: s.seed,
+            posts: s
+                .posts
+                .iter()
+                .map(|&o| world.objects[o as usize].stable)
+                .collect(),
+        })
+        .collect()
+}
+
+/// `StructureView::cars`.
+fn car_views(world: &World) -> Option<Vec<CarView>> {
+    (!world.cars.is_empty() || !world.drives.is_empty()).then(|| {
+        world
+            .cars
             .iter()
-            .take(crate::staff::MAX_STAFF)
-            .map(|s| StaffView {
-                seed: s.seed,
-                posts: s
-                    .posts
-                    .iter()
-                    .map(|&o| world.objects[o as usize].stable)
-                    .collect(),
+            .take(crate::cars::MAX_CARS)
+            .map(|c| CarView {
+                plot: c.plot,
+                x: c.spot[0],
+                z: c.spot[1],
+                yaw: c.yaw,
+                body: c.body,
+                paint: c.paint,
             })
-            .collect(),
+            .collect()
     })
-    .expect("structure serializes")
+}
+
+/// The world structure as updates for a view that keeps what it was sent (the sim worker's
+/// `world` messages): the first update has everything; later ones only what changed since the
+/// last (`structure_json`'s parts by name, `unset` naming those now left out, and
+/// `objectChanges` the things that changed, by index, while the list of things stays the same).
+/// `meta`, which the simulation carries unchanged, comes only with everything. The rooms never
+/// come (`Lot::rooms_row_major` goes as a typed array); the other lot parts only when asked for
+/// (`lot`: the lot changed, see `lotVersion`).
+///
+/// A big world has some 16 000 things and a quarter of a megabyte of presentation data (`meta`),
+/// and its structure changes with every door opened or crop grown: sent whole, that was 2 MB to
+/// parse each time on the main thread. Each thing is still written out to see whether it
+/// changed (the world doesn't say which did).
+#[derive(Default)]
+pub struct StructureSync {
+    /// Fingerprints of the parts as last sent, by name (left out: not sent, or unset since).
+    parts: HashMap<&'static str, u64>,
+    /// Each thing as last sent, in order: its stable id and fingerprint.
+    objects: Vec<(u32, u64)>,
+    /// The plots' part as last made, with a fingerprint of what it was made from and of it:
+    /// their houses' bounds scan every plot's tiles, and only the lot (or the plots themselves)
+    /// changes them.
+    plots: Option<(u64, u64, String)>,
+    /// The things' lifts onto surfaces (`surface_lifts`, a lot-sized scan) as last found, for
+    /// the objects' and the lot's versions.
+    lifts: Option<((u32, u32), Lifts)>,
+}
+
+impl StructureSync {
+    /// The next update (JSON): what changed since the last; with `lot`, the lot's walls, openings,
+    /// diagonals, fences and floors too.
+    pub fn update_json(&mut self, world: &World, lot: bool) -> String {
+        use std::io::Write;
+        // (Nothing sent yet: `mode` and the like always go.)
+        let fresh = self.parts.is_empty();
+        let mut parts = Parts {
+            sent: &mut self.parts,
+            out: Vec::with_capacity(1024),
+            buf: Vec::new(),
+            unset: Vec::new(),
+        };
+        let _ = write!(
+            parts.out,
+            "{{\"version\":{},\"lotVersion\":{}",
+            world.structure_version(),
+            world.lot_version()
+        );
+        parts.part("mode", Some(&world.mode));
+        parts.part("width", Some(&world.lot.width));
+        parts.part("depth", Some(&world.lot.depth));
+        parts.part("storeys", Some(&world.storeys));
+        parts.part("storeyDepth", Some(&world.storey_depth()));
+        parts.part("basement", basement_block(world).as_ref());
+        parts.part("sims", Some(&sim_infos(world)));
+        parts.part("former", Some(&world.former).filter(|f| !f.is_empty()));
+        parts.part("households", Some(&household_views(world)));
+        let (print, plots) = plots_json(&mut self.plots, world);
+        parts.put("plots", Some(print), plots.as_bytes());
+        parts.part("exits", Some(&world.exits));
+        // (Presentation data the simulation carries unchanged: sent the first time only.)
+        if fresh {
+            parts.part("meta", Some(&world.meta));
+        }
+        let staff = staff_views(world);
+        parts.part("staff", Some(&staff).filter(|s| !s.is_empty()));
+        parts.part("cars", car_views(world).as_ref());
+        parts.part("garages", Some(&world.garages).filter(|g| !g.is_empty()));
+
+        // The things: those that changed, by index, while the list is the same things in the same
+        // order (a door opened, a crop grown); else the whole list (one bought, sold or moved in).
+        let key = (world.objects_version, world.lot_version());
+        let lifts = match self.lifts.take() {
+            Some((k, lifts)) if k == key => lifts,
+            _ => surface_lifts(world),
+        };
+        let Parts {
+            mut out,
+            mut buf,
+            unset,
+            ..
+        } = parts;
+        let same = !fresh
+            && self.objects.len() == world.objects.len()
+            && self
+                .objects
+                .iter()
+                .zip(&world.objects)
+                .all(|(s, o)| s.0 == o.stable);
+        if !same {
+            self.objects.clear();
+            out.extend_from_slice(b",\"objects\":[");
+        }
+        let mut changed = 0;
+        for (i, o) in world.objects.iter().enumerate() {
+            buf.clear();
+            serde_json::to_writer(&mut buf, &object_view(world, &lifts, o))
+                .expect("object serializes");
+            let p = fingerprint(&buf);
+            if !same {
+                if i > 0 {
+                    out.push(b',');
+                }
+                out.extend_from_slice(&buf);
+                self.objects.push((o.stable, p));
+                continue;
+            }
+            let sent = &mut self.objects[i].1;
+            if *sent == p {
+                continue;
+            }
+            *sent = p;
+            out.extend_from_slice(if changed == 0 {
+                b",\"objectChanges\":["
+            } else {
+                b","
+            });
+            changed += 1;
+            let _ = write!(out, "[{i},");
+            out.extend_from_slice(&buf);
+            out.push(b']');
+        }
+        if !same || changed > 0 {
+            out.push(b']');
+        }
+        self.lifts = Some((key, lifts));
+        fn field<T: Serialize + ?Sized>(out: &mut Vec<u8>, key: &str, v: &T) {
+            let _ = write!(out, ",\"{key}\":");
+            serde_json::to_writer(out, v).expect("structure part serializes");
+        }
+        if lot {
+            let (walls, openings, fences) = wall_edges(&world.lot, world.lot.walls());
+            field(&mut out, "walls", &walls);
+            field(&mut out, "openings", &openings);
+            field(&mut out, "fences", &fences);
+            let diagonals = diagonals(&world.lot, world.lot.diagonal_walls());
+            field(&mut out, "diagonals", &diagonals);
+            field(&mut out, "floors", &floor_views(world));
+        }
+        if !unset.is_empty() {
+            field(&mut out, "unset", &unset);
+        }
+        out.push(b'}');
+        String::from_utf8(out).expect("JSON is UTF-8")
+    }
+}
+
+/// `StructureSync::update_json`'s parts as it writes them: each only if it changed since it was
+/// last sent (`sent`).
+struct Parts<'a> {
+    sent: &'a mut HashMap<&'static str, u64>,
+    out: Vec<u8>,
+    /// A part as it is now, to see whether it changed.
+    buf: Vec<u8>,
+    /// The parts left out now that were sent before.
+    unset: Vec<&'static str>,
+}
+
+impl Parts<'_> {
+    /// Part `key` (`None`: left out).
+    fn part<T: Serialize + ?Sized>(&mut self, key: &'static str, v: Option<&T>) {
+        let mut buf = std::mem::take(&mut self.buf);
+        buf.clear();
+        let print = v.map(|v| {
+            serde_json::to_writer(&mut buf, v).expect("structure part serializes");
+            fingerprint(&buf)
+        });
+        self.put(key, print, &buf);
+        self.buf = buf;
+    }
+
+    /// Part `key` as JSON with its fingerprint (`None`: left out).
+    fn put(&mut self, key: &'static str, print: Option<u64>, json: &[u8]) {
+        match print {
+            Some(p) => {
+                if self.sent.insert(key, p) != Some(p) {
+                    self.out.extend_from_slice(b",\"");
+                    self.out.extend_from_slice(key.as_bytes());
+                    self.out.extend_from_slice(b"\":");
+                    self.out.extend_from_slice(json);
+                }
+            }
+            None => {
+                if self.sent.remove(key).is_some() {
+                    self.unset.push(key);
+                }
+            }
+        }
+    }
+}
+
+/// The plots' part (JSON) and its fingerprint, made again only when the lot or a plot changed
+/// (`StructureSync::plots`).
+fn plots_json<'a>(cached: &'a mut Option<(u64, u64, String)>, world: &World) -> (u64, &'a str) {
+    use std::hash::Hash;
+    let mut h = DefaultHasher::new();
+    (world.lot_version(), world.storeys, world.storey_depth()).hash(&mut h);
+    for p in &world.plots {
+        (p.id, &p.name, p.x, p.z, p.w, p.d, p.public).hash(&mut h);
+        p.entry.map(|e| e.map(f32::to_bits)).hash(&mut h);
+        p.roof.map(|r| [r.style, r.color]).hash(&mut h);
+    }
+    let key = h.finish();
+    if cached.as_ref().is_none_or(|c| c.0 != key) {
+        let json = serde_json::to_string(&plot_views(world)).expect("plots serialize");
+        *cached = Some((key, fingerprint(json.as_bytes()), json));
+    }
+    let (_, print, json) = cached.as_ref().expect("made just now");
+    (*print, json)
 }
 
 #[derive(Serialize)]
@@ -2203,6 +2682,8 @@ struct BuildView {
     /// A metre of fence and a gate, without fence styles (styles carry their own prices).
     fence: i64,
     gate: i64,
+    /// A garage on the home lot.
+    garage: i64,
 }
 
 /// Every career with all its levels, expanded from the content (sent to the UI once).
@@ -2281,6 +2762,7 @@ pub fn catalog_json(content: &Content) -> String {
             diagonal_wall: content.build.diagonal_wall(),
             fence: content.build.fence,
             gate: content.build.gate,
+            garage: content.build.garage,
         },
     })
     .expect("catalog serializes")

@@ -221,7 +221,8 @@ export class Lamps {
    */
   place(lights: RoomLight[]): void {
     this.placed = lights;
-    this.lotLamps = lights.filter((l) => l.kind === 'lamp');
+    // (A light that follows a use isn't counted: a room with only a hood isn't a room whose lamps are off.)
+    this.lotLamps = lights.filter((l) => l.kind === 'lamp' && l.always !== true);
     this.findUnlitRooms();
     this.assign();
   }
@@ -367,8 +368,8 @@ export class Lamps {
       let range = 1;
       if (use) {
         // Down in the basement and in rooms without windows they're on by day too, as bright as at
-        // night (by day the exposure is lower).
-        const dark = basement || this.dimmed.has(use.room);
+        // night (by day the exposure is lower); so is a light that follows a use (a hood over a hob).
+        const dark = basement || this.dimmed.has(use.room) || use.always === true;
         const lit = (dark ? NIGHT_EXPOSURE / this.exposure : this.lampsLevel) * lamp.on;
         if (use.kind === 'lamp') {
           // A lamp the household bought: a warm pool around it.

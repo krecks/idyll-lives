@@ -2013,6 +2013,10 @@
     "startingFunds": 2500,
     "emptyLotFunds": 10000,
     "currency": "$",
+    "$homePrice": "A home's price (web/src/game/price.ts), paid once from the household's savings when it moves in: the land (`perTile` a tile of the lot), the house (`perFloorTile` a tile of floor, every storey and the basement, times (floor / `sizeRef`) to the `sizePremium`: a bigger house costs more a tile) and what's in it (`furniture` times the things' prices), rounded to `round`. An empty lot is the land alone.",
+    "homePrice": { "perTile": 40, "perFloorTile": 260, "sizeRef": 100, "sizePremium": 1, "furniture": 1, "round": 500 },
+    "$savings": "What a household has saved (web/src/game/wealth.ts): `base`, and a share (`rate`) of what each grown-up earned in the years they worked, climbing a grade every `yearsPerGrade` years from 18. Of what's left after buying a home, at most `keep` comes with the household as money to spend.",
+    "savings": { "base": 1500, "rate": 0.16, "yearsPerGrade": 3.5, "keep": 10000 },
     "rent": {
       "weekday": 6,
       "hour": 12,
@@ -2950,6 +2954,27 @@
             "outdoors"
           ],
           "feeling": "garden.sweetScent"
+        },
+        {
+          "id": "cut",
+          "label": "Cut some flowers",
+          "anim": "tend",
+          "minutes": 6,
+          "autonomous": false,
+          "effects": {
+            "fun": 0.06,
+            "hygiene": -0.03
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          },
+          "holds": "cutFlowers"
         }
       ],
       "price": 60,
@@ -2989,6 +3014,7 @@
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
+      "crown": 2.6,
       "description": "A broad, rounded shade tree. Its crown spreads about five metres across."
     },
     {
@@ -3005,6 +3031,7 @@
       "freeRotation": true,
       "group": "trees",
       "outdoors": true,
+      "crown": 3.0,
       "description": "A tall evergreen pine."
     },
     {
@@ -3745,6 +3772,7 @@
     "window": 120,
     "fence": 25,
     "gate": 80,
+    "garage": 2500,
     "remove": 0,
     "storeys": 3,
     "basement": true
@@ -3900,7 +3928,8 @@
     {"id": "rails", "label": "Ranch rails", "kind": "rails", "color": "#8A6440", "height": 1.1, "price": 20},
     {"id": "slats", "label": "Modern slats", "kind": "slats", "color": "#3E4247", "height": 1.4, "price": 45},
     {"id": "iron", "label": "Wrought iron", "kind": "iron", "color": "#25272A", "height": 1.2, "price": 55},
-    {"id": "stone", "label": "Low stone wall", "kind": "stone", "color": "#9C968C", "height": 0.7, "price": 60}
+    {"id": "stone", "label": "Low stone wall", "kind": "stone", "color": "#9C968C", "height": 0.7, "price": 60},
+    {"id": "hedge", "label": "Clipped hedge", "kind": "hedge", "color": "#41683A", "height": 1.1, "price": 35}
   ],
   "windowStyles": [
     {"id": "classic", "label": "Classic", "panes": "cross", "sill": 0.9, "head": 2.1, "inset": 0.12, "shutters": "house", "price": 120},
@@ -4044,7 +4073,8 @@
         {"id": "street", "label": "Street & square", "outside": true},
         {"id": "food", "label": "Carts & machines", "outside": true},
         {"id": "shops", "label": "Shop & café", "outside": false},
-        {"id": "farm", "label": "Farm", "outside": true}
+        {"id": "farm", "label": "Farm", "outside": true},
+        {"id": "countryside", "label": "Countryside", "outside": true}
       ]
     }
   ],
@@ -4340,6 +4370,20 @@
       "hold": "both",
       "serving": "freshPlate",
       "radius": 0.15
+    },
+    {
+      "id": "cutFlowers",
+      "label": "Cut flowers",
+      "model": "item.cutFlowers",
+      "hold": "hand",
+      "radius": 0.1
+    },
+    {
+      "id": "daisyChain",
+      "label": "Daisy chain",
+      "model": "item.daisyChain",
+      "hold": "hand",
+      "radius": 0.1
     },
     {
       "id": "freshPlate",
@@ -4858,6 +4902,7 @@
     "garden.json",
     "furniture.json",
     "community.json",
+    "countryside.json",
     "catalog2/kitchen.json",
     "catalog2/dining.json",
     "catalog2/living.json",

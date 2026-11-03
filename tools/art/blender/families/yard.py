@@ -784,7 +784,7 @@ def shedSmall():
         return G.settle([G.join_all('shedSmall')], centre=False)
     door = G.hinged(G.join(door, 'door'), F.at(DOOR_X - DOOR_W / 2, 0.8, FRONT_Z + 0.015))
     objs = G.settle(centre=False)
-    G.swing(door, 'door_open', 100, seconds=1.0)
+    G.swing(door, 'door_open', 100, seconds=1.0, ease='back_out')
     return objs
 
 
@@ -923,7 +923,7 @@ def greenhouse():
     door = G.hinged(G.join(door, 'door'), F.at(-GH_DOOR / 2 + 0.02, 1.0, hz - 0.025))
     vent = G.hinged(G.join(vent, 'vent'), F.at(-0.02, GH_RIDGE + 0.01, 0))
     objs = G.settle(centre=False)
-    G.swing(door, 'door_open', 70, seconds=0.9)
+    G.swing(door, 'door_open', 70, seconds=0.9, ease='back_out')
     G.swing(vent, 'door_open', -25, seconds=0.9, axis='Y')
     return objs
 

@@ -18,7 +18,7 @@ export interface MenuState {
 
 /** Live: play. Build: furnish, build and look after the home. Create: a family moving into an empty home (the new game's Creation, for a home left empty). */
 export type GameMode = 'live' | 'build' | 'create';
-export type BuildTool = 'wall' | 'room' | 'fence' | 'gate' | 'paint' | 'floor' | 'door' | 'window' | 'stairs' | 'roof' | 'remove' | 'move' | 'blueprint';
+export type BuildTool = 'wall' | 'room' | 'fence' | 'gate' | 'paint' | 'floor' | 'door' | 'window' | 'stairs' | 'garage' | 'roof' | 'remove' | 'move' | 'blueprint';
 /** Build mode's tabs: Furnish (the catalog: place, move, resize, upgrade, sell), Build (the house itself) and Home (how its rooms are doing). */
 export type BuildTab = 'furnish' | 'build' | 'home';
 
@@ -184,6 +184,16 @@ class GameState {
   placeHint = $state<string | null>(null);
   /** Counts clicks where the item in hand doesn't fit (it stays in hand; the pointer tag shakes). */
   placeRefused = $state(0);
+  /** Garage tool: the way the next garage's door faces (as a thing's facing; R turns it). */
+  garageRot = $state(0);
+  /**
+   * Garage tool: what a click does where the pointer is: build one (at the end of the driveway, or
+   * where it points; whether it fits, and why not), or take down the home's garage under it.
+   */
+  garageHover = $state.raw<{ kind: 'build'; drive: boolean; valid: boolean; reason: string | null } | { kind: 'sell' } | null>(null);
+  /** Garage tool: the home has a garage (to sell), and one fits at the end of its driveway (one click builds it). */
+  homeGarage = $state(false);
+  drivewayGarage = $state(false);
   jobBoardOpen = $state(false);
   /** Plot currently shown. */
   viewPlot = $state<number | null>(null);

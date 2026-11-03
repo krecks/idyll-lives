@@ -54,6 +54,7 @@ drink's surface), the plants' leaves and flowers plants.py's. Sixteen were over 
 | `booksUpright` | 0.32 × 0.21 × 0.13 m | 692 (624) | 1 | arched brass bookends with a round cut-out on their feet; eight books, boards proud of the pages, rounded spines, paper bands |
 | `vaseFlowers` | 0.18 × 0.41 × 0.17 m | 1,444 (1,428) | 1 | vase with belly and flared lip; daisies (ray petals, raised eyes), small daisies, three tulips, a cosmos, on curving stems, leaves on stems and at the neck |
 | `vaseSmall` | 0.08 × 0.28 × 0.08 m | 532 (492) | 1 | bud vase with slim neck and lip; one rose (two cupped rings round a furled bud), sepals, a leaf on the stem |
+| `vaseEmpty` | 0.13 × 0.24 × 0.13 m | 1,444 (1,428) | 2 | the vase of flowers' own body and bunch, split: the body alone at rest, the bunch a part of its own hidden at a thousandth inside it, grown up out of the mouth by `flowers_open` (0.9 s) and held up while the vase is open (`motions.open`); taken out, the same clip runs back along the use |
 | `potSucculent` | 0.16 × 0.14 × 0.16 m | 732 (524) | 1 | pot with a rim on grit; an echeveria: three tiers of fat upturned leaves round a heart |
 | `potCactus` | 0.18 × 0.32 × 0.13 m | 686 (896) | 1 | terracotta pot with a rolled rim on sand; a ribbed column with two ribbed arms bent up (fillet), a pink flower with its eye |
 | `potSmall` | 0.16 × 0.26 × 0.16 m | 728 (1,008) | 1 | glossy pot with a rim, soil; a peace lily: arching pointed leaves on stalks, two white spathes with spadices on tall stems |

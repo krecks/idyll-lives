@@ -610,12 +610,7 @@ fn seat_near(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<u32> {
     if rules.seat_range <= 0.0 {
         return None;
     }
-    let usable = match sim.visiting {
-        Some(visit) => ctx.index.on(visit.plot),
-        None => ctx
-            .index
-            .usable_from(ctx.households[sim.household as usize].plot),
-    };
+    let usable = crate::world::usable_here(sim, ctx);
     usable
         .iter()
         .map(|&o| &objects[o as usize])

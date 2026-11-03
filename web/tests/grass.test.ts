@@ -83,6 +83,12 @@ describe('where the grass grows', () => {
     world.rooms[5 * world.width + 7] = 0;
     townGrass(field, world);
     expect(grassAt(field, 7.5, 5.5)).toBe(1);
+    // (Made again only where it changed: the same mask as a field grown afresh.)
+    world.rooms[6 * world.width + 8] = 3;
+    townGrass(field, world);
+    const fresh = await grassField(world, land);
+    expect(Buffer.from(field.town).equals(Buffer.from(fresh.town))).toBe(true);
+    expect(Buffer.from(field.patches).equals(Buffer.from(fresh.patches))).toBe(true);
   });
 
   test('a patch with any grass is drawn; one all indoors is not', async () => {

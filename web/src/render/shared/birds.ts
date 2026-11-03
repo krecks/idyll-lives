@@ -193,6 +193,9 @@ const SPECIES: Species[] = [
   },
 ];
 
+/** The birds' model keys (`model.bird.<species>`): fetched with the house (`game/streamPlan.ts`). */
+export const BIRD_MODELS: readonly string[] = SPECIES.map((sp) => `model.bird.${sp.id}`);
+
 /**
  * How much faster the birds' clock runs at each game speed (`GAME_RATE`'s index): they keep to the
  * game (still while it's paused) but don't go frantic in a time-lapse.
@@ -454,7 +457,8 @@ export interface BirdView<L extends BirdLook> {
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const between = (r: () => number, [a, b]: readonly [number, number]) => a + r() * (b - a);
-const rnd = Math.random;
+/** `Math.random`, looked up at each call (a test fixing it after this module loaded still fixes the birds). */
+const rnd = () => Math.random();
 /** A number fixed by a place (to a tenth of a metre). */
 const placeHash = (x: number, z: number, salt: number) => hash(Math.round(x * 10), Math.round(z * 10), salt);
 /** Randoms from a seed in 0..1. */

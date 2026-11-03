@@ -35,10 +35,12 @@ Build a home and watch the people who live in it.
 | Input | Action |
 |---|---|
 | Left-click | A resident: their panel · an object: what to do with it · the floor: walk there |
-| Left-drag / right-drag / wheel | Rotate / pan / zoom |
+| Left- or middle-drag / right-drag / wheel | Rotate / pan / zoom (arrow keys and + / − too, once the view has the focus) |
 | Space, 0–5 | Pause, game speed |
 | L / B | Live / Build |
 | F · H · J · P · M | Follow · whole house · journal · planner · town map |
+| Tab, double-click a card | Look at the next resident, follow one |
+| E · Page Up/Down · Ctrl+Z/Y | Eyedropper · storeys · undo/redo (Build) |
 | W | Walls up → cutaway → down |
 | Esc | Step back, then the pause menu (save, load, settings) |
 
@@ -69,6 +71,7 @@ The first `bun run dev` or `bun run build` downloads the voice model (398 MB as 
 | `bun run lint` | Lint the web code |
 | `bun run test` | The renderer's engine-neutral tests (`web/tests`, `bun test`) |
 | `bun run check:chunks` | Check that the PlayCanvas internals the renderer patches or reads are still there (`tools/render/check_chunks.ts`; run it after a PlayCanvas upgrade) |
+| `bun run sounds` | Render every synthesised sound of the world to a WAV with its length, level and spectral centroid, and the content that sounds it (`tools/audio/listen.ts`; for listening to them, `G-53`) |
 | `bun run test:sim` | Run the Rust simulation tests |
 | `bun run test:voice` | Run the voice crate's tests (needs `bun run voice` for the dictionary) |
 | `bun run check:voice` | Check the voices in Bun against golden hashes (`tools/voice/check.mjs`) |
@@ -189,7 +192,7 @@ Everything gameplay-related is JSON in `web/public/content/`:
 - `base.json`: needs, genders, traits, perks, objects, **social interactions** (requirements, success chances, outcomes, animation), emotions, feelings, bond presets, social rules, **careers** (levels, pay, hours, workdays, work effects), **daily schedule** windows, visit rules, starting funds, story-feed texts.
 - `houses.json`: house layouts and the park, stamped onto town plots.
 
-Add an object to `content/base.json` or one of the files it `include`s (the catalogue is in `furniture.json`, `garden.json`, `community.json`, `catalog2/` and `packs/`: footprint, interactions, need effects, model key) and its model key to the manifest; homes are furnished from `houses.json` and `housegen.json`, or bought in the game. (`content/lots/starter.json` is only for the tests and the pack checker.) Content is checked when it loads: a value that would break the game is refused with the file and id in the message. `cargo test` validates the shipped content (`crates/sim-core/tests/shipped_content.rs`).
+Add an object to `content/base.json` or one of the files it `include`s (the catalogue is in `furniture.json`, `garden.json`, `community.json`, `catalog2/` and `packs/`: footprint, interactions, need effects, model key) and its model key to the manifest; homes are furnished from `houses.json` and `housegen.json`, or bought in the game. (`content/lots/starter.json` is only for the tests and the pack checker.) Content is checked when it loads: a value that would break the game is refused with the file and id in the message. `cargo test` validates the shipped content (`crates/sim-core/tests/sim/shipped_content.rs`).
 
 A production build serves the content from `bundle.json`, which wins over the loose files: to edit content inside a built site, rebuild it or delete `dist/bundle.json`.
 
@@ -197,9 +200,9 @@ Pack authors: see [docs/content-packs.md](docs/content-packs.md). The look of th
 
 ## Versions and releasing
 
-The current version is **0.5.1**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `cargo release-version` prints it and fails if they differ (CI checks this); `cargo release-version 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
+The current version is **0.6.0**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `cargo release-version` prints it and fails if they differ (CI checks this); `cargo release-version 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
 
-Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 33 since 0.5.0, also in 0.5.1 (32 in 0.3.1 to 0.4.2, 29 in 0.3.0, 23 in 0.2.0; 0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
+Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 35 since 0.6.0 (33 in 0.5.0 and 0.5.1, 32 in 0.3.1 to 0.4.2, 29 in 0.3.0, 23 in 0.2.0; 0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/sim/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
 
 **Releasing** (`.github/workflows/pages.yml`):
 1. `cargo release-version <x.y.z>` (it updates `Cargo.lock` too, so no `cargo build` is needed), and a `## <x.y.z> — <date>` section in CHANGELOG.md, with the date set by hand. Commit both on `main`, and `git push origin main`: the dry run builds what GitHub has.
@@ -211,7 +214,7 @@ Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save
    - The large files download in full, which only the live site can show: `llm/lfm2.5-350m/model_q4.onnx_dataz` returns 200 and is 254,923,309 bytes (gunzipped, its SHA-256 is the one in `crates/tools/src/llmfetch.rs`), and `voice/supertonic-3/vector_estimator.onnxz` is 119,556,677 bytes (packed by the Rust fetch tools; files CI still has cached from the earlier tools are 255,530,880 and 119,568,968 bytes, and are as good: what matters is the unzipped SHA-256).
 5. Publish the release notes: `gh release create v<x.y.z> --verify-tag --title "Idyll Lives <x.y.z>" --notes-file <the version's CHANGELOG section>`.
 
-**If a release goes wrong,** fix forward, or redeploy the last good build (`gh workflow run pages.yml --ref <tag> -f deploy=true`). 0.5.0 and 0.5.1 share save format 33, so 0.5.0 is a safe build to go back to; 0.4.2 can't open format 33, so it is one to go back to only with that in mind (0.3.1 to 0.4.2 share format 32); 0.3.0 can't open 0.3.1's saves (format 32), 0.2.0 can't open 0.3.0's (format 29), and v0.1.0 can't open 0.2.0's database (version 2): an older build keeps the newer saves and skips them, so it lists only the saves it can open. Nothing is lost; the saves come back with the newer build.
+**If a release goes wrong,** fix forward, or redeploy the last good build (`gh workflow run pages.yml --ref <tag> -f deploy=true`). 0.5.1 can't open 0.6.0's saves (format 35), so it is one to go back to only with that in mind; 0.5.0 and 0.5.1 share save format 33, so 0.5.0 is a safe build to go back to; 0.4.2 can't open format 33, so it is one to go back to only with that in mind (0.3.1 to 0.4.2 share format 32); 0.3.0 can't open 0.3.1's saves (format 32), 0.2.0 can't open 0.3.0's (format 29), and v0.1.0 can't open 0.2.0's database (version 2): an older build keeps the newer saves and skips them, so it lists only the saves it can open. Nothing is lost; the saves come back with the newer build.
 
 Each CI run keeps the site's WASM with function names as an artifact for 90 days (`wasm-with-names-<sha>`). It runs the same optimisations as the site with the name section kept, so its function numbers match the shipped WASM and a crash stack from the site can be read with it.
 

@@ -88,9 +88,11 @@ a single object does is on its category page ([README.md](README.md)); this page
 - **Mirrors reflect on every preset:** the nearest on screen on Low (1024×512, 10 a second) and Medium (4× MSAA, 30 a
   second), redrawn only when something it shows changes; two live on High. Medium with a mirror in view and
   something moving costs about 6 % fps and 1 ms CPU on the M3.
-- **Kept at 4 draws:** the washer and dryer, the phone box, the potting bench, the grandfather clock (hands and pendulum
-  moving, the door still), the base and pack showers (their sliding doors, Q-05), the jukebox, the bunk, the greenhouse, the stereo, and the eight pack models `chefStove`,
-  `whirlpoolTub`, `pizzaOven`, `recordCabinet`, `lavaLamp`, `soloSauna`, `glasshouse`, `veggieBed`.
+- **Kept at 4 draws:** the washer and dryer, the phone box, the potting bench, the base and pack showers (their sliding
+  doors, Q-05), the jukebox, the bunk, the greenhouse, the stereo, and the eight pack models `chefStove`,
+  `whirlpoolTub`, `pizzaOven`, `recordCabinet`, `lavaLamp`, `soloSauna`, `glasshouse`, `veggieBed`. A model may ask for
+  more: `"draws": N` in its pack entry (3–8, 4 unless it says), which the grandfather clock is the only one to use
+  (5: hands, pendulum and its trunk door, which opens as the clock is wound since 2026-10-31).
 - **Kept as they are:** pictures as flat shapes (a texture would double their draws); one sitter sinking every sofa
   cushion; pillows not following; the curtains stretching to close; standing mirrors upright; the retired `@modern`/`@cozy`/`@minimal` style variants.
 - **Colour parts:** the wardrobe has three (Body, Doors, Handles); the sewing table's legs, apron and drawer have
@@ -128,15 +130,24 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
   check's baseline (`tools/characters/clip-baseline.json`) is empty: it reports nothing to keep.
 
 ### Content and sim
-- **Servers** wear no apron and appear at their post at opening time rather than walking in.
+- **Servers' apron:** done 2026-10-31. `top.apron` is a garment of the character set (`contract.rs`, both bodies):
+  a white shirt painted on the body under an apron shell over the front of the trousers, from the waistband to just
+  above the knee (`crates/tools/src/characters/clothes.rs` `apron_layout`/`apron`), its own list in `outfit.ts`
+  (`WORKWEAR`, never picked for a resident). The staff wear it with dark trousers and dark shoes. They walk in too:
+  since 2026-10-30 a server comes in at the lot's door at opening and walks to their post, and back out at closing
+  (`staff.rs`). Stills: `bench-results/check-apron/`.
 - **The sounds want a listen by ear** (G-53): each was rendered and checked by its spectrum, timing and level, not
   heard (`bench-results/review/fixes/sounds/wav/`).
-- **Later, as polish:** the range hood's light while the hob below is in use (its hum is in; Q-19); flowers cut for
-  a vase (Q-18).
-- **Parts with no use, left decorative:** the executive desk's drawer (I-office-02, won't fix); the nesting tables'
-  small table and the display cabinet's door (decor, decision 4); the laundry basket's lid (not built). These are
-  modelled parts without a clip, so no clip is orphaned. The grandfather clock's trunk door is not a part of its own
-  (A-decor-01, won't fix): it would be a fifth draw, over what the gate passes, and the clock is wound at its dial.
+- **Cut flowers for a vase:** done 2026-10-30 (Q-18): the raised bed's "Cut some flowers" and the bought empty
+  vase that takes the bunch; the individual beds (tulips, daffodils, lilies, cosmos, daisies) cut for a vase too.
+  The daisies' "Make a daisy chain" (2026-10-31) was the last use the beds were missing.
+- **Parts with no use, left decorative:** the executive desk's drawer (I-office-02, won't fix) — the last one. The
+  nesting tables' small table slides out for "Pull out the small table" and the display cabinet's door swings for
+  "Open the cabinet" (2026-10-31; both were decor under decision 4, now built), so no modelled part is left without
+  a clip. The laundry basket has no lid and none is planned: it holds clean washing heaped above its
+  rim (bathroom review, 2026-10-21); the lidded one is the bedroom's `laundryHamper`, whose lid lifts for sorting.
+  The grandfather clock's trunk door is not a part of its own (A-decor-01, won't fix): it would be a fifth draw,
+  over what the gate passes, and the clock is wound at its dial.
 - **Uses end once every need they raise is full**, by design (I-systems-02); it makes clips easy to miss in checks.
 
 ### Tools
@@ -221,14 +232,16 @@ their finding ids. What is still open is here, with its id; §9 of the review sa
 - **Models:** the arc lamp reaching over the next tile, placed so by build mode and the house generator
   (M-lighting-06); the hot tub's cover folding back in two halves (A-outdoor-01, a fourth draw).
 - **Moving parts with a use:** the kettle's lid, the bread bin's roll-top and the laptop's lid open for their uses
-  (I-tabletop-01); the high chair's tray slides out as the baby is put in (I-kids-01).
+  (I-tabletop-01); the high chair's tray slides out as the baby is put in (I-kids-01); the nesting tables' small
+  table slides out and the display cabinet's door swings open (2026-10-31, I-living-01 and I-living-02).
 - **Sounds** (I-bathroom-04, G-53): the uses that were silent sound like their things, synthesised
   (`web/src/audio/things.ts`): the treadmill and bikes, the workbench and the bike stand, pool, foosball, ping-pong,
   darts, the arcade cabinets, the sewing machine, the chemistry set, the pottery wheel, the coffee machines, the
   blenders and the stand mixer, the microwaves (a hum, then a ping), toast (then the pop), an oven's fan, the pizza
   oven's fire (and the fireplace's and the fire pit's), the phone box, the vending machines, basketball, karaoke
   singing, a bowed cello, the punch bag and the smash bin; a fridge door and the pedal bin's lid, once as they're
-  used. The cooker hood hums while the hob under it is in use (I-kitchen-09, Q-19).
+  used. The cooker hood hums, and its light comes on, while the hob under it is in use (I-kitchen-09, Q-19;
+  2026-10-30).
 - **Rendering:** each lamp lights only its own room on Low too, and on each half of a tile split by a diagonal wall,
   on every preset (M-lighting-08); the town map leaves the world its clicks and camera drags, as the pie menu does;
   with a wall thing in hand the walls stand, so nothing hangs over a lowered wall (M-houses-01); `partBox` is the box

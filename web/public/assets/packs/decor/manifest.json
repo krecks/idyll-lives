@@ -264,7 +264,10 @@
           "minute": "minute_hand",
           "at": 610
         },
-        "idle": "pendulum"
+        "idle": "pendulum",
+        "uses": {
+          "wind": "door_open"
+        }
       },
       "paint": [
         {
@@ -275,7 +278,8 @@
           "material": "dial",
           "label": "Face"
         }
-      ]
+      ],
+      "draws": 5
     },
     "model.vaseTall": {
       "type": "model",

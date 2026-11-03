@@ -31,7 +31,8 @@
           "finish": "material.finish.satin"
         },
         "tomato": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       }
     },
@@ -376,7 +377,8 @@
           "finish": "material.finish.satin"
         },
         "tomato": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       }
     },
@@ -430,7 +432,8 @@
           "finish": "material.finish.satin"
         },
         "tomato": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       }
     },
@@ -718,7 +721,8 @@
           "finish": "material.finish.satin"
         },
         "tomato": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         }
       }
     },
@@ -1258,6 +1262,48 @@
       "url": "../../models/held/receiver.glb",
       "materials": {
         "handset": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "item.cutFlowers": {
+      "type": "model",
+      "url": "../../models/held/cutFlowers.glb",
+      "materials": {
+        "flower_eye": {
+          "finish": "material.finish.matte"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "petal_blush": {
+          "finish": "material.finish.satin"
+        },
+        "petal_rose": {
+          "finish": "material.finish.satin"
+        },
+        "petal_white": {
+          "finish": "material.finish.satin"
+        },
+        "petal_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "stem_green": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "item.daisyChain": {
+      "type": "model",
+      "url": "../../models/held/daisyChain.glb",
+      "materials": {
+        "flower_eye": {
+          "finish": "material.finish.matte"
+        },
+        "petal_white": {
+          "finish": "material.finish.satin"
+        },
+        "stem_green": {
           "finish": "material.finish.satin"
         }
       }

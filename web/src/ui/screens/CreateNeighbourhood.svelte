@@ -3,7 +3,7 @@
   import { lookAtAge, randomHousehold } from '../../game/household';
   import { reducedMotion } from '../../game/host';
   import { menuScene } from '../../game/menuScene';
-  import { loadTemplates, populate, vacantSlots, type NeighbourhoodDraft, type Templates } from '../../game/town';
+  import { loadTemplates, neighbourCap, populate, rehouse, vacantSlots, type NeighbourhoodDraft, type Templates } from '../../game/town';
   import { app } from '../app.svelte';
   import Icon from '../Icon.svelte';
   import SimPreview from '../kit/SimPreview.svelte';
@@ -19,6 +19,8 @@
   let list = $state<HTMLElement>();
 
   const houseCount = $derived(town ? town.slots.filter((s) => s.kind === 'house').length : 0);
+  /** Households at most: a house for each but one, and no more than the size's neighbours (`neighbourCap`). */
+  const mostHouseholds = $derived(Math.max(0, Math.min(houseCount - 1, neighbourCap(town?.world?.size))));
   const vacant = $derived(town ? vacantSlots(town).map((s) => s.index) : []);
   const population = $derived(town?.households.reduce((n, h) => n + h.household.members.length, 0) ?? 0);
 
@@ -53,7 +55,8 @@
     const households = [...town.households];
     // (A name no other household here has.)
     const taken = households.filter((_, j) => j !== i).map((h) => h.household.name);
-    households[i] = { ...households[i], household: randomHousehold(content, assets, households[i].household.members.length, taken) };
+    // (One that can buy the home they live in.)
+    households[i] = { ...households[i], household: templates ? rehouse(content, assets, templates, town, households[i].slot, households[i].household.members.length, taken) : randomHousehold(content, assets, households[i].household.members.length, taken) };
     town = { ...town, households };
   }
 
@@ -169,7 +172,7 @@
             <input
               type="range"
               min="0"
-              max={houseCount - 1}
+              max={mostHouseholds}
               value={town.households.length}
               onchange={(e) => setNeighbours(Number((e.currentTarget as HTMLInputElement).value))}
             />

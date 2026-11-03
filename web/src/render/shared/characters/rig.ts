@@ -18,8 +18,8 @@ import type { Placement } from './pose';
 import { type Bed, LIE_BACK, LIE_CENTRE, type PlacedObject } from './seats';
 import { EMBRACE } from './socials';
 
-/** Rows in the pose texture: the town's residents (sim-core `MAX_SIMS`, 64), then its vendors and shopkeepers (`staff::MAX_STAFF`, 32). */
-export const MAX_CHARACTERS = 96;
+/** Rows in the pose texture: the town's residents, then its vendors and shopkeepers, as many as the snapshot layout holds (`maxSims` + `maxStaff`: 160 + 48 in the open world's sim, 64 + 32 before it). */
+export const MAX_CHARACTERS = 208;
 /** How far the feet reach past the slot centre for a lying Sim, and their back's height above the feet line: babies (much smaller) lie centred in the crib, on the mattress. */
 export function lieCentre(rig: SimRig): number {
   // (A smaller body than its family's base body, a child's, lies with its head where a grown-up's would be, on the pillow.)
@@ -279,6 +279,8 @@ export interface SimRig {
   riseZ: number;
   /** How far along that step the rise had got (0..1): one cut short goes the rest of the way after it, not in a frame. */
   riseK: number;
+  /** Far off, the time (s) since last posed in full (`Characters.update`: posed every few frames, carried along between). */
+  lag: number;
   /** Rising off a built-in chair to a tile behind it: the corner beside the chair the step goes round (`cornerOf`; NaN: straight). */
   riseViaX: number;
   riseViaZ: number;
@@ -313,6 +315,12 @@ export interface SimRig {
   toweled: number;
   /** The shower they were last under (`toweled`), for its door as they step out (`startWalk`). */
   shower: PlacedObject | null;
+  /**
+   * A hand out to the handle of the door or gate they're going through this frame, 0..1 (the renderer's
+   * `doorHand`: the leaf's swing is timed to it). 0 for a door that stands open, and for anyone not
+   * walking.
+   */
+  doorHand: number;
   sitX: number;
   sitZ: number;
   /**

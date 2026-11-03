@@ -3,10 +3,12 @@
  * body, procedural additive rotations and skinning matrices.
  *
  * Quaternions are (x, y, z, w) in flat Float32Arrays; skinning matrices are written column-major
- * (the game's matrix array layout, `shared/math.ts`), one 4x4 per bone.
+ * (the game's matrix array layout, `shared/math.ts`), one 4x4 per bone, or into the pose texture
+ * as three rows a bone (`layout.ts` `BONE_TEXELS`).
  */
 
 import type { BodyData, CharacterSet, Clip } from './data';
+import { BONE_FLOATS } from './layout';
 
 const INV = 1 / 32767;
 
@@ -243,7 +245,9 @@ function girth(set: CharacterSet, body: BodyData): Float32Array {
 /**
  * Retargets the source-space local rotations `srcQ` / pelvis `srcPelvis` onto `body`, applies the
  * additive rotations and the placement, and writes one skinning matrix per bone into `out` at
- * `offset` (floats). Also returns the head joint's world position in `head` (x, y, z).
+ * `offset` (floats): a column-major 4x4 each, or (`rows`: a pose texture's row) its first three rows,
+ * `BONE_FLOATS` each (`boneMatrix` reads one back). Also returns the head joint's world position in
+ * `head` (x, y, z).
  */
 export function skin(
   set: CharacterSet,
@@ -256,6 +260,7 @@ export function skin(
   out: Float32Array,
   offset: number,
   head: Float32Array,
+  rows = false,
 ): void {
   const NB = set.bones.length;
   const parents = set.parents;
@@ -398,6 +403,20 @@ export function skin(
     const t1 = big ? hy + (wt[b * 3 + 1] - hy) * hs : wt[b * 3 + 1];
     const t2 = big ? hz + (wt[b * 3 + 2] - hz) * hs : wt[b * 3 + 2];
     const m = b * 16;
+    if (rows) {
+      // Its first three rows, a texel each (the fourth is the inverse bind's: 0 0 0 1).
+      const d = offset + b * BONE_FLOATS;
+      for (let c = 0; c < 4; c++) {
+        const i0 = ibm[m + c * 4];
+        const i1 = ibm[m + c * 4 + 1];
+        const i2 = ibm[m + c * 4 + 2];
+        const i3 = ibm[m + c * 4 + 3];
+        out[d + c] = r00 * i0 + r01 * i1 + r02 * i2 + t0 * i3;
+        out[d + 4 + c] = r10 * i0 + r11 * i1 + r12 * i2 + t1 * i3;
+        out[d + 8 + c] = r20 * i0 + r21 * i1 + r22 * i2 + t2 * i3;
+      }
+      continue;
+    }
     const d = offset + m;
     for (let c = 0; c < 4; c++) {
       const i0 = ibm[m + c * 4];
@@ -414,6 +433,15 @@ export function skin(
   head[0] = wt[h];
   head[1] = wt[h + 1];
   head[2] = wt[h + 2];
+}
+
+/** Bone `b`'s skinning matrix in a pose texture row from `row` (`skin`'s `rows`: three rows a bone), as a column-major 4x4 in `out`. */
+export function boneMatrix(data: ArrayLike<number>, row: number, b: number, out: Float32Array): Float32Array {
+  const d = row + b * BONE_FLOATS;
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) out[c * 4 + r] = data[d + r * 4 + c];
+  out[3] = out[7] = out[11] = 0;
+  out[15] = 1;
+  return out;
 }
 
 /** out[o..o+2] = rotate(q, v). */
