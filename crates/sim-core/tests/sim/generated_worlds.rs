@@ -260,11 +260,12 @@ fn generated_worlds_are_livable() {
             failures.push(format!("{label}: no bus came all day"));
         }
         eprintln!(
-            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements, {stops} bus stops, {} lines ({} min out and back at most), {rode} rode the bus",
+            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements, {stops} bus stops ({} with a shelter), {} lines ({} min out and back at most), {rode} rode the bus",
             w.lot.width,
             w.lot.depth,
             w.sims.len(),
             w.objects.len(),
+            w.transit.stops.iter().filter(|s| s.shelter).count(),
             w.transit.lines.len(),
             w.transit.lines.iter().map(|l| l.end / sim_core::TICKS_PER_MINUTE).max().unwrap_or(0)
         );

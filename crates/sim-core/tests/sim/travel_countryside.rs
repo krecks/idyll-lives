@@ -9,6 +9,9 @@ use sim_core::world::{Phase, TaskKind};
 use sim_core::{Command, MINUTES_PER_TICK, World};
 
 const TICKS_PER_MINUTE: u64 = (1.0 / MINUTES_PER_TICK) as u64;
+/// Days watched: four (the first hamlet's walk out of town takes some of their free time since
+/// its bus stop became the bus's, its bus slower than the walk out).
+const DAYS: u64 = 4;
 
 fn world(seed: u64) -> World {
     let content = common::content();
@@ -27,7 +30,7 @@ fn countryside(w: &World, object: u32) -> Option<&str> {
 fn residents_use_the_countryside_spots() {
     let mut w = world(41);
     let mut used = std::collections::BTreeSet::new();
-    let end = w.tick + 3 * 24 * 60 * TICKS_PER_MINUTE;
+    let end = w.tick + DAYS * 24 * 60 * TICKS_PER_MINUTE;
     while w.tick < end {
         w.tick_once();
         for s in &w.sims {
@@ -39,7 +42,7 @@ fn residents_use_the_countryside_spots() {
             }
         }
     }
-    eprintln!("countryside spots used over three days: {used:?}");
+    eprintln!("countryside spots used over {DAYS} days: {used:?}");
     assert!(used.len() >= 3, "only {used:?}");
 }
 

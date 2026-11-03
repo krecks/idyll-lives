@@ -374,7 +374,8 @@ impl Transit {
     }
 
     /// The run of the bus someone at `stop` at `there` gets on: one standing there with its doors
-    /// open, else the next to come.
+    /// open, else the next to come, if it comes within a headway (not the day's first, a long way
+    /// off yet, nor tomorrow's).
     fn catches(&self, stop: u16, there: u64) -> Option<u64> {
         let (l, j) = self.stops[stop as usize].line?;
         let line = &self.lines[l as usize];
@@ -390,13 +391,13 @@ impl Transit {
             })
             .map(|b| b.run)
             .min();
-        on_the_way.or_else(|| {
-            // (Its door shut a little before it goes.)
-            let after = (there + DOOR_TICKS + 1).saturating_sub(line.depart(j));
-            let run = self.next_run(after);
-            // (Not tomorrow's: a night's wait is no way to go.)
-            (run + line.arrive[j] <= there + self.every + DWELL_TICKS).then_some(run)
-        })
+        on_the_way
+            .or_else(|| {
+                // (Its door shut a little before it goes.)
+                let after = (there + DOOR_TICKS + 1).saturating_sub(line.depart(j));
+                Some(self.next_run(after))
+            })
+            .filter(|&run| run + line.arrive[j] <= there + self.every + DWELL_TICKS)
     }
 }
 
@@ -531,11 +532,11 @@ fn room_for_shelter(w: &World, stop: &Stop) -> bool {
             {
                 return false;
             }
-            // (Clear of the road, and of any other.)
+            // (Clear of the road, and of any other: its back edge may just touch the pavement.)
             let g = &w.travel.graph;
             if g.near(p, 4.0, 4, Mode::Foot)
                 .iter()
-                .any(|q| q.off < g.roads[q.road as usize].width / 2.0)
+                .any(|q| q.off < g.roads[q.road as usize].width / 2.0 - 0.25)
             {
                 return false;
             }
@@ -1170,7 +1171,12 @@ fn drive_on(w: &mut World, b: usize) {
             continue;
         }
         let phase = s.current().map(|a| &a.phase);
-        if matches!(phase, Some(Phase::Using { .. }) | Some(Phase::Driving)) {
+        // (At something, at a wheel; or waiting for a bus, stepping up to one: out of its way.)
+        if matches!(
+            phase,
+            Some(Phase::Using { .. }) | Some(Phase::Driving) | Some(Phase::AtStop { .. })
+        ) || s.bound_for_bus.is_some()
+        {
             continue;
         }
         // (Walking along beside it, on the pavement.)
@@ -1193,11 +1199,13 @@ fn drive_on(w: &mut World, b: usize) {
             }
         }
     }
-    if !waiting || bus.waited >= cars::PASS_TICKS {
+    if !waiting {
         bus.waited = 0;
         bus.progress += 1.0;
-    } else {
+    } else if bus.waited < cars::PASS_TICKS {
         bus.waited += 1;
+    } else {
+        bus.progress += 1.0;
     }
 }
 
@@ -1431,6 +1439,10 @@ pub(crate) fn plan(
         let Some(run) = out_by.checked_sub(line.end).and_then(|r| t.run_before(r)) else {
             continue;
         };
+        // (Not the night before's last: the first buses of the day are too late.)
+        if out_by - (run + line.end) > t.every {
+            continue;
+        }
         let board = run + line.arrive[j];
         let walk_ticks = (minutes * TICKS_PER_MINUTE as f32).ceil() as u64;
         let Some(leave) = board.checked_sub(walk_ticks + SLACK_TICKS) else {
