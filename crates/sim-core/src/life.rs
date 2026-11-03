@@ -348,7 +348,8 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
         return;
     };
     let target = w.exits[exit];
-    let walk = sim.walk_per_minute(&w.content);
+    // On foot, or on a bike of theirs at home (`ride.rs`).
+    let walk = sim.walk_per_minute(&w.content) * crate::ride::commute_speed(w, sim);
     // The way they'd walk it (in the house's grounds and the public ways), or the estimate.
     let nav = w.nav();
     let goal = (target[0].floor() as i32, target[1].floor() as i32);

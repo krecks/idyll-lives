@@ -545,6 +545,33 @@ pub struct ObjectDef {
     /// Someone serves here on a public lot (content `staff`): where they stand behind it and the
     /// hours it's open (`staff.rs`).
     pub staff: Option<crate::staff::Post>,
+    /// Something to ride (content `vehicle`: a bicycle, an e-scooter): parked on the lot, a
+    /// resident of the household it fits rides it out to work or school and back (`ride.rs`).
+    pub vehicle: Option<Vehicle>,
+}
+
+/// What kind of thing is ridden (content `vehicle.kind`): how the rider is drawn on it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum VehicleKind {
+    /// Sitting and pedalling.
+    Bike,
+    /// Standing on its deck.
+    Scooter,
+}
+
+/// A thing to ride (`ObjectDef::vehicle`).
+#[derive(Debug, Clone, Copy)]
+pub struct Vehicle {
+    pub kind: VehicleKind,
+    /// How many times as fast as walking.
+    pub speed: f32,
+    /// Life stages that ride it.
+    pub stages: StageMask,
+    /// Ways shorter than this many metres are walked.
+    pub min_ride: f32,
+    /// Keeps to roads (an e-scooter): no trails.
+    pub roads_only: bool,
 }
 
 impl ObjectDef {
@@ -2604,6 +2631,27 @@ struct ObjectRaw {
     /// Someone serves here on a public lot (see `ObjectDef::staff`).
     #[serde(default)]
     staff: Option<crate::staff::PostRaw>,
+    /// Something to ride (see `ObjectDef::vehicle`).
+    #[serde(default)]
+    vehicle: Option<VehicleRaw>,
+}
+
+/// An object's `vehicle`: `{"kind": "bike", "speed": 3, "stages": ["child", "teen", ...],
+/// "minRide": 60, "roadsOnly": false}`.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VehicleRaw {
+    kind: VehicleKind,
+    speed: f32,
+    stages: Option<Vec<String>>,
+    #[serde(default = "default_min_ride")]
+    min_ride: f32,
+    #[serde(default)]
+    roads_only: bool,
+}
+
+fn default_min_ride() -> f32 {
+    60.0
 }
 
 /// A slot's place: `{"at": [-0.3, 0.7], "facing": 180}` (m off the middle, to its right and front;
@@ -3819,6 +3867,25 @@ impl Content {
                     obj.id
                 )));
             }
+            let vehicle = match &obj.vehicle {
+                None => None,
+                Some(v) => {
+                    if !(1.0..=10.0).contains(&v.speed) || v.min_ride.is_nan() || v.min_ride < 0.0 {
+                        return Err(Error::new(format!(
+                            "object '{}': a vehicle's speed is 1 to 10 times walking, and its minRide 0 or more",
+                            obj.id
+                        )));
+                    }
+                    Some(Vehicle {
+                        kind: v.kind,
+                        speed: v.speed,
+                        stages: stages_of(&v.stages, &format!("object '{}' vehicle", obj.id))?
+                            .unwrap_or(every_stage),
+                        min_ride: v.min_ride,
+                        roads_only: v.roads_only,
+                    })
+                }
+            };
             let upper_stages = stages_of(
                 &obj.upper_stages,
                 &format!("object '{}' upperStages", obj.id),
@@ -3975,6 +4042,7 @@ impl Content {
                 footstool: obj.footstool,
                 overhang: obj.overhang.iter().map(|&[r, f]| (r, f)).collect(),
                 staff: obj.staff.as_ref().map(|r| crate::staff::post(r, obj.footprint, &obj.id)).transpose()?,
+                vehicle,
             });
         }
 

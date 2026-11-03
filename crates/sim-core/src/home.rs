@@ -1839,6 +1839,14 @@ impl World {
                     Some(if o > id { o - 1 } else { o })
                 }
             });
+            // A bike that goes (sold, moved) while they're off to it or on it: they walk.
+            for b in [&mut sim.riding, &mut sim.bound_for_bike] {
+                *b = match *b {
+                    Some(o) if o == id => None,
+                    Some(o) if o > id => Some(o - 1),
+                    other => other,
+                };
+            }
             // A seat taken to use something else (content `seatNear`): ids shift down too, and
             // if the seat itself goes they stand up but may carry on with what they were using.
             match sim.use_seat {
