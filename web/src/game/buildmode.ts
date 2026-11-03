@@ -214,8 +214,11 @@ export class BuildBuyInput {
   private grab: { id: number; dx: number; dz: number } | null = null;
   /** Buy: an owned object being resized by an arrow, until release. */
   private resizing: Resizing | null = null;
-  /** What the shown arrows were made from (redrawn only when it changes). */
-  private handlesKey = '';
+  /**
+   * What the shown arrows were made from (redrawn only when it changes): `''` none, `null` redraw
+   * next time. Kept apart, so arrows whose door went (or whose mode ended) aren't taken for none.
+   */
+  private handlesKey: string | null = '';
   /** The arrow under the pointer. */
   private hotHandle: string | null = null;
   /** Build: the door or window picked with its tool (all of a wide one), and its resize in progress. */
@@ -278,7 +281,7 @@ export class BuildBuyInput {
     if (sel) {
       const [x, z] = sel.axis === 'h' ? [sel.start, sel.line] : [sel.line, sel.start];
       this.openingSel = this.openingRun(sel.axis, x, z);
-      this.handlesKey = '';
+      this.handlesKey = null;
     }
     for (const f of world.fences ?? []) {
       this.edges.set(`${f.axis}:${f.x}:${f.z}`, f.kind);
@@ -379,7 +382,7 @@ export class BuildBuyInput {
     const hot = screen && picked ? (this.preview.handleAt(screen.x, screen.y) ?? null) : null;
     if (hot !== this.hotHandle) {
       this.hotHandle = hot;
-      this.handlesKey = '';
+      this.handlesKey = null;
       this.syncHandles();
     }
     if (this.picking()) {
@@ -783,7 +786,7 @@ export class BuildBuyInput {
     const c = objectCentre(obj);
     this.grab = ground && { id: obj.id, dx: c.x - ground.x, dz: c.z - ground.z };
     game.placing = { def: obj.def, rot: obj.rot, turn: obj.turn ?? 0, objectId: obj.id, size: ownSize(this.content, obj), tall: obj.tall ?? 0 };
-    this.handlesKey = '';
+    this.handlesKey = null;
     this.syncHandles();
     if (ground) this.hoverBuy(ground);
     return true;
@@ -882,7 +885,7 @@ export class BuildBuyInput {
     const box = sel && this.preview.objectBox(sel.id);
     if (!sel || !def || !box) {
       // Picked but not drawn yet (the renderer is still placing the new structure): try again next time.
-      if (sel) this.handlesKey = '';
+      if (sel) this.handlesKey = null;
       return this.preview.setResizeHandles(null);
     }
     const lift = sel.lift ?? 0;
@@ -896,7 +899,7 @@ export class BuildBuyInput {
 
   /** A new structure arrived: the picked object's arrows follow it. */
   objectsChanged(): void {
-    this.handlesKey = '';
+    this.handlesKey = null;
     this.syncHandles();
     this.garageState();
   }
@@ -1154,7 +1157,7 @@ export class BuildBuyInput {
       this.preview.setPlacementGhost(null);
       game.placeHint = null;
       game.placeValid = true;
-      this.handlesKey = '';
+      this.handlesKey = null;
       this.syncHandles();
       return true;
     }
@@ -1251,7 +1254,7 @@ export class BuildBuyInput {
     if (!run || run.kind !== game.buildTool || run.style !== style) return false;
     this.openingSel = run;
     this.clearPreviews();
-    this.handlesKey = '';
+    this.handlesKey = null;
     this.syncHandles();
     return true;
   }
@@ -1324,7 +1327,7 @@ export class BuildBuyInput {
       this.openingSel = n;
     }
     this.clearPreviews();
-    this.handlesKey = '';
+    this.handlesKey = null;
     this.syncHandles();
     return true;
   }
@@ -1931,7 +1934,7 @@ export class BuildBuyInput {
       this.openingDrag = null;
       this.preview.setLeftDragCamera(true);
       this.clearPreviews();
-      this.handlesKey = '';
+      this.handlesKey = null;
       this.syncHandles();
     }
     if (this.resizing) this.cancel();
@@ -1952,7 +1955,7 @@ export class BuildBuyInput {
       this.preview.setLeftDragCamera(true);
       this.clearPreviews();
       game.buySelection = held;
-      this.handlesKey = '';
+      this.handlesKey = null;
       this.syncHandles();
       return true;
     }
