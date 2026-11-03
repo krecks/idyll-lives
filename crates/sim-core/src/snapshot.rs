@@ -64,7 +64,7 @@ pub mod bus {
     /// Its line (1 and up: the number on its sign).
     pub const LINE: usize = 5;
     /// Which bus it is, the same while it's in town (its rows move up as those before it leave):
-    /// the minute it came in (modulo a million) and its line.
+    /// the minute it came in (modulo 100 000) and its line (exact in an f32).
     pub const ID: usize = 6;
 }
 
@@ -785,8 +785,8 @@ fn write_buses(world: &World, out: &mut [f32]) {
         o[bus::YAW] = yaw;
         o[bus::DOORS] = f32::from(doors);
         o[bus::LINE] = f32::from(b.line) + 1.0;
-        let minute = (b.run / crate::TICKS_PER_MINUTE) % 1_000_000;
-        o[bus::ID] = (minute * 16 + u64::from(b.line % 16)) as f32;
+        let minute = (b.run / crate::TICKS_PER_MINUTE) % 100_000;
+        o[bus::ID] = (minute * 128 + u64::from(b.line % 128)) as f32;
     }
 }
 
