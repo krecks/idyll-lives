@@ -33,10 +33,10 @@ drink's surface), the plants' leaves and flowers plants.py's. Sixteen were over 
 | Model | Size (w × h × d) | Triangles (before) | Draws | What it has |
 |---|---|---|---|---|
 | `kettle` | 0.23 × 0.24 × 0.17 m | 724 (696) | 2 | jug body swelling to the shoulder on a power base, beak spout, D handle in one piece, red switch, water window; the lid and knob turned, the lid flipping up (`lid_open`) |
-| `toaster` | 0.28 × 0.23 × 0.15 m | 710 (584) | 1 | rounded body on a plinth, two slots with toast (crust round the crumb), lever in its guide, browning dial and pointer, cancel button, chrome trim |
-| `blender` | 0.18 × 0.36 × 0.15 m | 736 (648) | 1 | tapering base with a dial and two buttons, collar, soft-square jug (smoothie its lower half), handle in one piece, lid and filler cap |
-| `standMixer` | 0.30 × 0.36 × 0.17 m | 708 (1,180) | 1 | rounded base, column, lofted tilt head swelling to its nose with a chrome band and hub, speed lever, steel bowl with batter, beater (a cut-out paddle) |
-| `espressoMachineSmall` | 0.23 × 0.31 × 0.39 m | 1,874 (844) | 1 | body rounded over the top, head with buttons and light, group, portafilter with two spouts, slotted grate over the drip tray, gauge (bezel, face, needle), steam knob and bent wand, water tank, cup-warmer rail on posts, a cup with crema and handle, a cup upturned on top |
+| `toaster` | 0.28 × 0.23 × 0.15 m | 710 (584) | 2 | rounded body on a plinth, two slots with toast (crust round the crumb), lever in its guide, browning dial and pointer, cancel button, chrome trim |
+| `blender` | 0.18 × 0.36 × 0.15 m | 736 (648) | 2 | tapering base with a dial and two buttons, collar, soft-square jug (smoothie its lower half), handle in one piece, lid and filler cap |
+| `standMixer` | 0.30 × 0.36 × 0.17 m | 808 (1,180) | 2 | rounded base, column, lofted tilt head swelling to its nose with a chrome band and hub, speed lever, steel bowl with batter, beater (a cut-out paddle) |
+| `espressoMachineSmall` | 0.23 × 0.31 × 0.39 m | 1,914 (844) | 2 | body rounded over the top, head with buttons and light, group, portafilter with two spouts, slotted grate over the drip tray, gauge (bezel, face, needle), steam knob and bent wand, water tank, cup-warmer rail on posts, a cup with crema and handle, a cup upturned on top |
 | `knifeBlock` | 0.12 × 0.30 × 0.23 m | 584 (352) | 1 | leaning block with eased edges on its foot, six knives (a steel bolster under each riveted handle, sized to its blade) |
 | `utensilCrock` | 0.13 × 0.32 × 0.12 m | 708 (668) | 1 | glazed crock with a rolled lip and a blue band; wooden spoon (one swept piece), slotted spatula, balloon whisk (two wire loops), ladle with its bowl |
 | `cuttingBoard` | 0.34 × 0.10 × 0.23 m | 724 (792) | 1 | board with a hand hole, a lofted bloomer with three scores, two tomatoes with calyxes, two slices with their cut faces, a cook's knife (blade, bolster, handle) |
@@ -116,3 +116,20 @@ candles show their flames unlit). Its height is the candles' at rest: 0.33 m.
 `tableClock` was 0.15 × 0.23 × 0.06 m, half again a real twin-bell clock's height (review M-tabletop-02). It is built
 at 0.72 (`S`): the case 10.7 cm across, 0.11 × 0.16 × 0.05 m in all, its ticks and hands as thick as
 before.
+
+## The appliances at work (2026-11-03)
+
+The toaster, the blender, the stand mixer and the espresso machine were one still mesh each, so their uses played
+nothing while the kettle's lid flipped up. Each now has one moving part (two draws, as the kettle):
+
+- `toaster`: the two slices and the lever are the `toast` part; `toast_down` (0.4 s) presses them 5.8 cm down, the
+  toast's tops just under the slots and the lever at the foot of its guide, for the whole of *Make toast*; it plays
+  back as the use ends, so the toast pops up done.
+- `blender`: the jug with its smoothie, lid, cap and handle is the `jug` part, seated on the collar; `whirr` twists it
+  2.5° each way and home in 0.2 s, a loop for as long as *Blend a smoothie* lasts (the jug is opaque, so the blades
+  can't show).
+- `standMixer`: the beater and its shaft, with a swirl of darker batter round it, are the `beater` part, its origin on
+  the shaft; `beat` turns it once round in 0.75 s, a loop while it bakes (*Practise baking*).
+- `espressoMachineSmall`: two thin streams of coffee (`coffee`) from the portafilter's spouts down into the cup, built
+  full length and flattened into the spouts' tips; `brew` runs them down in 0.6 s, held 2.5 s, then they stop and the
+  coffee is drunk (*Make a coffee*).

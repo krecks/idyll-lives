@@ -212,7 +212,7 @@ sinks, the desk drawer slides out and the plunge cover rolls back.
 The kind pack models (`models/pack_kind/neighbourlyOven.glb`, `givingJar.glb`, `knittingRocker.glb`,
 `welcomeTeaTable.glb`, `songbirdFeeder.glb`, `hearthSettee.glb`, override pack `packs/pack_kind/manifest.json`) are
 built in Blender by `tools/art/blender/families/pack_kind.py` on `gamekit` and exported as `.glb` (glTF, original,
-CC0). Each moves while it is used: the oven door drops, a coin drops into the jar, the rocker rocks, the teapot pours,
+CC0). Each moves while it is used: the oven door drops with the tea towel over its handle, a coin drops into the jar, the rocker rocks, the teapot pours,
 the feeder's roof lifts and songbirds fly out, and the settee's cushions sink. The tea table was rebuilt lower and
 narrower, its poufs either side of it facing each other (2026-10-21).
 
@@ -269,7 +269,8 @@ compost bin's lid lifts and the washing goes out on the line a line at a time.
 
 The grills and the fire pit (`models/outdoor/grill.glb`, `grillStation.glb`, `firePit.glb`, same pack and family)
 are built the same way (glTF, original, CC0). The grill's lid and the station's hood swing up while residents cook,
-and the fire pit's flames grow on its logs while they warm up by it.
+and the fire pit's flames grow on its logs while they warm up by it. The grates are bare for the cook's own food, and
+the grill has a side tray for what they bring out (2026-11-03).
 
 The home gym (`models/fitness/treadmill.glb`, `weightBench.glb`, `exerciseBike.glb`, `yogaMat.glb`,
 `dumbbells.glb`, override pack `packs/fitness/manifest.json`) is built in Blender by
@@ -309,7 +310,8 @@ The kitchen cookers (`models/kitchen_cooking/stoveElectric.glb`, `stoveGas.glb`,
 `rangeCooker.glb`, `cooktopCounter.glb`, `microwave.glb`, override pack `packs/kitchen_cooking/manifest.json`)
 are built in Blender by `tools/art/blender/families/kitchen_cooking.py` on `gamekit` and exported as `.glb`
 (glTF, original, CC0). Each drops an oven door on its bottom hinge while a resident bakes and turns a knob
-while they cook, with a ring of blue flame growing on the gas ones; the oven tower's tray slides out, and the
+while they cook, with a ring of blue flame growing on the gas ones (the knob by the burner or ring that lights,
+and the gas range's hob left free for the cook's pan and bowl, 2026-11-03); the oven tower's tray slides out, and the
 microwave swings its door and turns its turntable.
 
 The kitchen small appliances and dishwashers (`models/kitchen_cooking/coffeeMachine.glb`,
@@ -317,7 +319,7 @@ The kitchen small appliances and dishwashers (`models/kitchen_cooking/coffeeMach
 `tools/art/blender/families/kitchen_cooking.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
 The coffee machine slides its cup under the spout and runs a coffee stream; the breakfast counter's toaster
 lever slides and its toast pops, and its blender lid lifts over a swirling smoothie; the dishwashers drop their door and slide a rack
-out. The dishwashers were rebuilt 60 and 45 cm wide beside a cupboard or a drawer stack (2026-10-21).
+out, loaded or emptied. The dishwashers were rebuilt 60 and 45 cm wide beside a cupboard or a drawer stack (2026-10-21).
 
 The kitchen base counters (`models/kitchen_counters/counter.glb`, `counterCorner.glb`, `counterEnd.glb`,
 `counterCornerOuter.glb`, `counterDrawers.glb`, `counterOpenShelf.glb`, `butcherBlock.glb`,
@@ -402,7 +404,9 @@ tableware `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasse
 `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks`; override pack
 `packs/tabletop/manifest.json`) are built in Blender by `tools/art/blender/families/tabletop.py` on `gamekit` and
 exported as `.glb` (glTF, original, CC0). The alarm clock's hands tell the game's time and the
-candles' flames rise at night; the rest are static.
+candles' flames rise at night; the kettle's lid, the bread bin's roll-top and the laptop's lid open while they're used,
+and the toaster's toast goes down, the blender's jug shakes, the stand mixer's beater turns and the espresso machine
+runs coffee into its cup (2026-11-03); the rest are static.
 
 The playground (`models/playground/slide.glb`, `climbingFrame.glb`, `seesaw.glb`, `springRider.glb`,
 `merryGoRound.glb`, `basketballHoop.glb`, `pingPongTable.glb`, `parkChessTable.glb`, each with a `.far.glb` for the

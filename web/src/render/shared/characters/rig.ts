@@ -166,6 +166,8 @@ export interface SimRig {
   lookPitch: number;
   /** Extra forward step towards a partner (hugs, kisses); slid forward in a seat to put the feet up (`feet`). */
   approach: number;
+  /** A step to the side (m, to the right of its facing) as it works at a station's tool (`stationReach`). */
+  aside: number;
   /**
    * Feet up on a footstool this frame (`footstoolFor`, `feetUp`): whether, and where the ankles go (m: height,
    * forward of and to the right of the Sim's place) and how far forward the Sim slides in the seat for it.

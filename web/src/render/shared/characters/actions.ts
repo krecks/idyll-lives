@@ -342,6 +342,10 @@ export const CROUCH_ONLY: readonly string[] = ['crouch'];
 export const NEAR_DESKS = new Set(['gloomy.journalDesk', 'neat.organizerDesk', 'romantic.letterBureau', 'hotHeaded.grudgeJournal']);
 /** Ovens under a hob, near the floor: baking (`bake`) bends down to them. */
 export const LOW_OVENS = new Set(['stoveElectric', 'stoveGas', 'rangeCooker', 'chefStove', 'kind.neighbourlyOven']);
+/** Down to a dishwasher's rack and up again, a thing put in or taken out each time (`wash`, `clean`). */
+const DISHWASHER_RACK = ['pickUp', 'interact', 'pickUp', 'idle'];
+/** Dishwashers: loaded and emptied bent down to the lower rack their open door slides out, not at the worktop. */
+export const DISHWASHERS = new Set(['dishwasher', 'dishwasherCompact']);
 /** Seated objects whose activity uses the hands on a desk / keys. */
 export const SIT_HANDS = new Set(['computerDesk', 'piano']);
 /** Standing object use: clip sequence (looped). */
@@ -618,7 +622,12 @@ export const ACTIONS: Record<string, ActionAnim> = {
     hands: HANDS.hold,
   },
   // (Seated at the dressing table, getting ready: brushing the hair in the mirror, clips/self.ts.)
-  wash: { stand: ['spell', 'interact'], upper: (def) => (def === 'dressingTable' ? 'brushHair' : ''), hands: (def) => (def === 'dressingTable' ? HANDS.grip : HANDS.relaxed) },
+  // (Clearing away into a dishwasher: down to its rack with the dirty thing, `DISHWASHERS`.)
+  wash: {
+    stand: (def) => (DISHWASHERS.has(def) ? DISHWASHER_RACK : ['spell', 'interact']),
+    upper: (def) => (def === 'dressingTable' ? 'brushHair' : ''),
+    hands: (def) => (def === 'dressingTable' ? HANDS.grip : DISHWASHERS.has(def) ? HANDS.hold : HANDS.relaxed),
+  },
   // Washing the hair, turning round, soaping, rinsing (clips/uses.ts; a child turns only the chest).
   shower: { stand: (_, height) => (height < SHOWER_CHILD ? SHOWER_SMALL : SHOWER_ONLY), hands: HANDS.open },
   bath: { hands: HANDS.open },
@@ -686,7 +695,8 @@ export const ACTIONS: Record<string, ActionAnim> = {
   // At the mic stand (`STEP_IN`), the hands free.
   sing: { stand: ['talk'], hands: HANDS.relaxed },
   clean: {
-    stand: (def) => (def.includes('Mop') || def.includes('Vacuum') ? ['push'] : def.includes('laundry') ? ['spell', 'interact', 'pickUp'] : ['interact', 'spell']),
+    stand: (def) =>
+      def.includes('Mop') || def.includes('Vacuum') ? ['push'] : def.includes('laundry') ? ['spell', 'interact', 'pickUp'] : DISHWASHERS.has(def) ? DISHWASHER_RACK : ['interact', 'spell'],
     hands: HANDS.hold,
   },
   // Gardening, by task (older content and packs: `garden`).
@@ -783,19 +793,32 @@ export const ACTIONS: Record<string, ActionAnim> = {
  * dish is in the oven. Stirred in the stew pot they then carry away (`item.mealPot`), not a frying pan.
  */
 export const STATION_PROPS: Record<string, string> = { chop: 'tool.board', stir: 'item.mealPot', flip: 'tool.grillFood', mix: 'tool.mixingBowl' };
+/** A place on a station, in its own frame: m to its right and forward of its middle, and the height it stands at. */
+type StationSpot = readonly [x: number, z: number, y: number];
 /**
  * Where on a station its prop goes, by object def and action tag (else the top's middle, a little towards the
- * cook): m to its right and forward of its middle (its own frame), and the height it stands at. The pan on the
- * burner the cooker's clip lights (its flame or hot ring); the grill station's chopping on its free counter, off
- * the grate.
+ * cook; the cook steps in to it, `stationReach`): the pot on the front burner the cooker's clip lights (its flame or
+ * hot ring), at its grate's or glass's height;
+ * the board, the bowl and the food on the grill clear of what the model has on its top. `null`: done inside it, not
+ * drawn (meat grilled in the pizza oven's mouth).
  */
-export const STATION_SPOTS: Record<string, Partial<Record<string, readonly [x: number, z: number, y: number]>>> = {
-  stoveGas: { stir: [-0.26, 0.02, 0.9] },
-  // (No ring lights on it: the front one on the side of the knob that turns.)
-  stoveElectric: { stir: [-0.16, -0.02, 0.9] },
-  rangeCooker: { stir: [0, 0.03, 0.915] },
-  cooktopCounter: { stir: [0.16, -0.22, 0.955] },
-  grillStation: { chop: [0.6, -0.05, 0.905] },
+export const STATION_SPOTS: Record<string, Partial<Record<string, StationSpot | null>>> = {
+  stoveGas: { stir: [-0.26, 0.014, 0.891] },
+  // (The front ring on the side of the knob that turns, glowing red while it's on.)
+  stoveElectric: { stir: [-0.16, -0.02, 0.893] },
+  rangeCooker: { stir: [0, 0.03, 0.911] },
+  cooktopCounter: { stir: [0.16, 0.01, 0.954] },
+  chefStove: { stir: [0, 0, 0.963] },
+  // (The left ring, which glows; the board and the bowl at the free left end of the top.)
+  'foodie.chefsIsland': { stir: [-0.145, 0.27, 0.908], chop: [-0.7, 0.32, 0.9], mix: [-0.7, 0.3, 0.9] },
+  'foodie.pizzaOven': { flip: null },
+  // (On the floured end of the worktop by the range.)
+  'kind.neighbourlyOven': { chop: [0.105, 0, 0.905], mix: [0.13, -0.01, 0.905] },
+  breakfastCounter: { chop: [0.28, 0.05, 0.95], mix: [0.28, 0.05, 0.95] },
+  // (On its grate: it has no top of its own, `surface`, so these give the height.)
+  grill: { flip: [0, 0.06, 0.769], chop: [0, 0.06, 0.769] },
+  // (Chopping on its free right counter, off the grate.)
+  grillStation: { chop: [0.65, 0, 0.9], flip: [0, -0.12, 0.914] },
 };
 /**
  * Station steps worked with the hands free (by action tag): what the cook carried in (the ingredients, the prepped
@@ -803,6 +826,25 @@ export const STATION_SPOTS: Record<string, Partial<Record<string, readonly [x: n
  * again to move on; for a bake it's in the oven, not drawn.
  */
 export const SET_DOWN: Record<string, 'top' | 'in'> = { chop: 'top', mix: 'top', stir: 'top', flip: 'top', bake: 'in' };
+/**
+ * Where on a station what the cook carried in is put down, by object def and action tag (else beside its tool,
+ * `SET_DOWN_SIDE`): on a cool, free part of its top, clear of the lit burner, the grate and what the model has on it
+ * (an unlit burner's grate or a cold ring on a hob; the grill station's free counter, the kettle grill's side tray,
+ * the pizza oven's counter).
+ */
+export const SET_DOWN_SPOTS: Record<string, Partial<Record<string, StationSpot>>> = {
+  stoveGas: { stir: [0.26, -0.22, 0.891] },
+  stoveElectric: { stir: [0.15, -0.165, 0.89] },
+  rangeCooker: { stir: [0.55, 0.03, 0.911] },
+  cooktopCounter: { stir: [-0.16, -0.19, 0.954] },
+  chefStove: { stir: [0.5, 0.03, 0.963] },
+  'foodie.chefsIsland': { stir: [-0.7, 0.29, 0.9], chop: [0.41, 0.3, 0.9], mix: [0.41, 0.3, 0.9] },
+  'foodie.pizzaOven': { flip: [0.78, 0.07, 0.89] },
+  'kind.neighbourlyOven': { chop: [0.13, -0.31, 0.905], mix: [0.13, -0.31, 0.905] },
+  breakfastCounter: { chop: [-0.03, 0.06, 0.95], mix: [-0.03, 0.06, 0.95] },
+  grill: { flip: [0.333, 0.333, 0.7], chop: [0.333, 0.333, 0.7] },
+  grillStation: { chop: [0.65, -0.3, 0.9], flip: [0.65, -0.12, 0.9] },
+};
 /** How far (m) to the side of the station's tool a thing put down beside it stands. */
 export const SET_DOWN_SIDE = 0.3;
 /** How far (m, body scale) below the palms' centres a carried thing's base rests. */

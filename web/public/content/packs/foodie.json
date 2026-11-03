@@ -194,7 +194,7 @@
       "name": "Chef's island",
       "model": "model.foodie.chefsIsland",
       "stations": ["prep", "stove"],
-      "surface": { "height": 0.9, "kind": "counter" },
+      "surface": { "height": 0.9, "kind": "counter", "size": [1.86, 0.46], "at": [0, 0.225] },
       "footprint": [2, 1],
       "price": 3200,
       "category": "kitchen",

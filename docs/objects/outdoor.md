@@ -94,6 +94,10 @@ none.
 - Each shuts when the use ends. Nothing needed fixing.
 - Since the authenticity review (G-08): chopping at the grill station is on its free counter (`STATION_SPOTS`), not on
   the grate.
+- Since 2026-11-03: the food goes on the grates (the station's was on its front lip), which are bare of modelled food
+  (it showed twice), and what the cook brought out is put down off the hot grate: on the station's free right counter
+  (now its whole `surface`), on the grill's new side tray (`SET_DOWN_SPOTS`; `tools/art/blender/families/outdoor.md`).
+  The grill is no longer a top (`surface`): dishes served onto its grate were shut in under the lid.
 
 ## OU4. Play and yard (9)
 

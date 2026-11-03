@@ -34,7 +34,7 @@ M = G.Palette(
     display=('#5EC28B', 'gloss'),    # the microwave's display
     tray=('#8E9196', 'metal'),       # an oven tray and racks
     pot=('#6E7377', 'metal'),        # a stock pot
-    pan=('#4A4E52', 'satin'),        # a frying pan
+    pan=('#4A4E52', 'satin'),        # burner caps, a pot's knob
     steel=('#C9CBCC', 'metal'),      # a stainless appliance front
     toaster=('#C05B4D', 'gloss'),    # a toaster's body
     jug=('#DCE6EA', 'gloss'),        # a blender's jug (opaque, so it costs no extra draw call)
@@ -42,7 +42,7 @@ M = G.Palette(
     cup=('#F2F1EE', 'gloss'),        # a cup
     coffee=('#9A6B3F', 'gloss'),     # the stream of coffee
     fruit=('#E0A33E', 'gloss'),      # a piece of fruit in the bowl
-    bread=('#D29A55', 'satin'),      # bread rolls on the oven tray, toast's crust
+    bread=('#D29A55', 'satin'),      # toast's crust
     crumb=('#EED9A8', 'satin'),      # toast's face
     banana=('#E6C65A', 'satin'),     # a banana in the fruit bowl
     towel=('#CFDCE6', 'satin'),      # the range cooker's tea towel (plain: no draw call of its own)
@@ -257,17 +257,6 @@ def _stock_pot(F, name, x, y, z, r, h, material):
                 0.005, material, verts=6, resolution=2)
 
 
-def _frying_pan(F, name, x, y, z, r, handle_to):
-    """A frying pan on game height `y`: a flared shallow pan and a long handle reaching to game depth `handle_to`."""
-    bx, by, bz = F.at(x, y, z)
-    G.revolve(name, [(0.0, 0.0), (r * 0.8, 0.0), (r * 0.92, 0.008), (r, 0.045), (r * 0.96, 0.045), (r * 0.88, 0.012),
-                     (0.0, 0.012)], at=(bx, by, bz), material=M.pan, segments=14)
-    F.sweep(f'{name}_handle', [(x + r * 0.97, y + 0.03, z), (x + r + 0.04, y + 0.045, z + 0.02),
-                               (x + r + 0.04, y + 0.06, handle_to - 0.02), (x + r + 0.04, y + 0.062, handle_to)],
-            None, M.pan, profile=G.rounded_rect(0.022, 0.012, 0.005, corner=1), up=(0, 1, 0), resolution=2,
-            scale=[0.7, 0.9, 1.0, 1.0])
-
-
 def _oven_face(F, name, x, w, y, z, h=0.50, out=0.0345):
     """An oven's still front (one that never opens): as `_oven_door`, joined into the body."""
     window = [(u, v + 0.01) for u, v in G.rounded_rect(w - 0.14, 0.30, 0.02, corner=2)]
@@ -309,8 +298,8 @@ def stoveElectric():
 
 # --- gas range: 1x1, four burners with flames, a taller back guard and an oven -------------------------
 def stoveGas():
-    """A gas range: a dark hob with four burners under cast-iron pan supports (a stock pot and a frying pan on two), a
-    splash guard, a control fascia with five knobs, an oven with a window over a storage drawer."""
+    """A gas range: a dark hob with four burners under cast-iron pan supports (a stock pot on one), a splash guard, a
+    control fascia with five knobs, an oven with a window over a storage drawer."""
     F = G.GameFrame(shift=0.112)
     with G.new_parts() as still:
         F.box('plinth', 0.88, 0.06, 0.58, (0, 0.03, -0.17), M.dark, bevel=0.005)
@@ -324,9 +313,10 @@ def stoveGas():
         _drawer_front(F, 'drawer', 0.88, 0.10, (0, 0.11, 0.17), M.enamel, pull=0.4)
         for i, (x, z) in enumerate(((-0.26, -0.30), (0.26, -0.30), (-0.26, -0.02), (0.26, -0.02))):
             _burner(F, f'burner{i}', x, z, 0.87)
-        # a stock pot and a frying pan on the pan supports, the pan's handle reaching the model's front
+        # a stock pot on the back left pan support; the front left burner is the cook's (the flame lights under their
+        # pan) and the two on the right are left free, for what they set down (the frying pan that stood there made
+        # three pans of it while they cooked)
         _stock_pot(F, 'pot', -0.26, 0.891, -0.30, 0.13, 0.18, M.pot)
-        _frying_pan(F, 'pan', 0.26, 0.891, -0.02, 0.11, 0.246)
     G.join(still, 'body', origin=(0, 0, 0))
     door = _oven_door(F, 'oven_door', 0, 0.88, 0.42, 0.17, hinge_y=0.17)
     # the knob stands on the fascia, in front of where the old one was: it turns about the same front-to-back axis
@@ -342,7 +332,7 @@ def stoveGas():
 # --- oven tower: 1x1, two built-in ovens in a tall cabinet ---------------------------------------------
 def wallOven():
     """A tall cabinet under a moulded cornice holding two ovens and a control panel between them, a shaker door below
-    and one above; the upper oven's door drops and its tray of bread rolls slides out."""
+    and one above; the upper oven's door drops and its tray slides out."""
     F = G.GameFrame(shift=0.102)
     with G.new_parts() as still:
         F.box('plinth', 0.66, 0.06, 0.54, (0, 0.03, -0.16), M.dark, bevel=0.005)
@@ -364,13 +354,11 @@ def wallOven():
         _shaker(F, 'door_top', 0.60, 0.16, (0, 1.96, 0.16), M.cab, rail=0.04)
         _pull(F, 'pull_top', (0.24, 1.9), (0.24, 2.0), 0.17, out=0.03, w=0.012, t=0.012, r=0.005)
     G.join(still, 'body', origin=(0, 0, 0))
-    # the upper oven door (hinged at its bottom) and its tray of rolls
+    # the upper oven door (hinged at its bottom) and its tray, empty: it slides out for whatever goes in (a roast, a
+    # pie, a meal's dish, none of which the game draws in an oven); its rolls showed for every one (2026-11-03)
     door = _oven_door(F, 'oven_door', 0, 0.60, 1.62, 0.16, hinge_y=1.37, out=0.0735)
     with G.new_parts() as parts:
         _tray(F, 'tray', 0, 1.585, -0.015, 0.46, 0.31)
-        for i in range(6):
-            F.soft(f'roll{i}', 0.075, 0.045, 0.06, (-0.13 + 0.13 * (i % 3), 1.613, -0.09 + 0.15 * (i // 3)), M.bread,
-                   round=0.02, round_segments=2, puff=0.006, flat=1)
     tray = G.join(parts, 'tray', origin=F.at(0, 1.60, -0.17))
     G.settle()
     G.swing(door, 'oven_open', 85, seconds=SECONDS, axis='X')
@@ -401,7 +389,7 @@ def rangeCooker():
         F.box('back', 1.58, 0.24, 0.04, (0, 1.01, -0.46), M.enamel2, bevel=0.012, bevel_segments=2)
         F.box('back_trim', 1.5, 0.012, 0.012, (0, 1.115, -0.436), M.chrome, bevel=0.004, bevel_segments=1)
         _strip(F, 'strip', 1.5, 0.82, 0.19, display=-0.24)
-        for i, x in enumerate((-0.36, -0.12, 0.12, 0.36, 0.6), start=1):
+        for i, x in enumerate((-0.6, -0.36, 0.12, 0.36, 0.6), start=1):
             _knob(F, f'knob{i}', x, 0.82, 0.215)
         # the right oven stays shut; the left one drops (built below)
         _oven_face(F, 'oven_right', 0.40, 0.72, 0.42, 0.20)
@@ -419,7 +407,9 @@ def rangeCooker():
             F.box(f'towel_stripe{k}', 0.172, 0.012, 0.007, (0.24, y, 0.277), M.heat)
     G.join(still, 'body', origin=(0, 0, 0))
     door = _oven_door(F, 'oven_door', -0.40, 0.72, 0.42, 0.20, hinge_y=0.17)
-    knob = _knob_obj(F, 'knob0', -0.6, 0.82, 0.215)
+    # the knob turned is the one nearest the middle (the six run left to right, back and front, as the burners): it
+    # lights the front middle burner, not the far one at the end (2026-11-03)
+    knob = _knob_obj(F, 'knob0', -0.12, 0.82, 0.215)
     flame = _flame(F, 'flame', 0.0, 0.905, -0.02, 0.075)
     G.settle()
     G.swing(door, 'oven_open', 85, seconds=SECONDS, axis='X')
@@ -448,15 +438,17 @@ def cooktopCounter():
         # the fascia with its knobs, and two deep drawers under it
         F.extrude('fascia', G.rounded_rect(0.94, 0.08, 0.008, corner=2), 0.012, (0, 0.84, 0.245), M.cab, bevel=0.003,
                   bevel_segments=1)
-        for i, x in enumerate((0.14, -0.14), start=1):
+        for i, x in enumerate((0.14, -0.14, -0.42), start=1):
             _knob(F, f'knob{i}', x, 0.84, 0.252)
         for i, (y, h) in enumerate(((0.28, 0.32), (0.62, 0.30))):
             _shaker(F, f'drawer{i}', 0.94, h, (0, y, 0.25), M.cab, rail=0.05)
             _pull(F, f'pull{i}', (-0.15, y + h / 2 - 0.05), (0.15, y + h / 2 - 0.05), 0.256, out=0.016, w=0.012,
                   r=None, verts=6)
     G.join(still, 'body', origin=(0, 0, 0))
-    knob = _knob_obj(F, 'knob0', -0.42, 0.84, 0.252)
-    flame = _hot_ring(F, 'hot_ring', 0.16, 0.9545, -0.24, 0.066)
+    # the ring that glows is the front one at +x, within the cook's reach (it was the back one), and the knob turned the
+    # outer one on its side, as a hob's knobs run: it was the far one on the other side (2026-11-03)
+    knob = _knob_obj(F, 'knob0', 0.42, 0.84, 0.252)
+    flame = _hot_ring(F, 'hot_ring', 0.16, 0.9545, 0.03, 0.058)
     G.settle()
     G.swing(knob, 'burner_on', 90, seconds=0.5, axis='Y')
     _light(flame)
@@ -794,8 +786,8 @@ FAMILY = G.Family(
              # started at the fridge (snapshot.rs: no interaction at a station that isn't the recipe's origin).
              motions={'uses': {'cook': 'burner_on', 'stir': 'burner_on', 'bake': {'clip': 'oven_open', 'hold': HOLD}}},
              paint=[('enamel', 'Body'), ('chrome', 'Knobs'), ('hob', 'Hob')]),
-     G.Model('stoveGas', stoveGas, size=(0.92, 1.113, 0.716), key='model.stoveGas', centre=(0, -0.078),
-             # cook and gourmet (and any `stir` step) light the front burner; bake drops the oven door
+     G.Model('stoveGas', stoveGas, size=(0.92, 1.111, 0.694), key='model.stoveGas', centre=(0, -0.089),
+             # cook and gourmet (and any `stir` step) light the front left burner; bake drops the oven door
              motions={'uses': {'cook': 'burner_on', 'gourmet': 'burner_on', 'stir': 'burner_on',
                                'bake': {'clip': 'oven_open', 'hold': HOLD}}},
              paint=[('enamel', 'Body'), ('chrome', 'Knobs'), ('grate', 'Hob')]),
@@ -809,7 +801,7 @@ FAMILY = G.Family(
                                'bake': {'clip': 'oven_open', 'hold': HOLD}}},
              paint=[('enamel2', 'Body'), ('chrome', 'Knobs & rail'), ('grate', 'Hob')]),
      G.Model('cooktopCounter', cooktopCounter, size=(1.0, 0.955, 0.66), key='model.cooktopCounter', centre=(0, -0.10),
-             # cook (and any `stir` step) turns a knob and the front-right ring glows red
+             # cook (and any `stir` step) turns the outer knob on its side and the front ring at +x glows red
              motions={'uses': {'cook': 'burner_on', 'stir': 'burner_on'}},
              paint=[('cab', 'Cabinet'), ('worktop', 'Worktop'), ('hob', 'Hob')]),
      G.Model('microwave', microwave, size=(1.0, 1.25, 0.66), key='model.microwave', centre=(0, -0.095),
@@ -829,13 +821,13 @@ FAMILY = G.Family(
              motions={'uses': {'toast': 'toast_down', 'smoothie': 'blend'}, 'loops': {'smoothie': 'blades'}, 'hold': 2.0},
              paint=[('cab', 'Counter'), ('toaster', 'Toaster'), ('charcoal', 'Blender')]),
      G.Model('dishwasher', dishwasher, size=(1.0, 0.95, 0.685), key='model.dishwasher', centre=(0, -0.088),
-             # dishes (loading it) and clearing away at it (the `wash` tag) drop the door and slide the lower
-             # rack out, held open while it is loaded
-             motions={'uses': {'dishes': 'door_open', 'wash': 'door_open'}},
+             # dishes (loading it), clearing away at it (the `wash` tag) and emptying it (unload) drop the door
+             # and slide the lower rack out, held open while it is loaded or emptied
+             motions={'uses': {'dishes': 'door_open', 'wash': 'door_open', 'unload': 'door_open'}},
              paint=[('cab', 'Body'), ('chrome', 'Handle'), ('steel', 'Panel')]),
      G.Model('dishwasherCompact', dishwasherCompact, size=(1.0, 0.95, 0.66), key='model.dishwasherCompact', centre=(0, -0.10),
-             # dishes and clearing away, as the dishwasher
-             motions={'uses': {'dishes': 'door_open', 'wash': 'door_open'}},
+             # dishes, clearing away and emptying it, as the dishwasher
+             motions={'uses': {'dishes': 'door_open', 'wash': 'door_open', 'unload': 'door_open'}},
              paint=[('cab', 'Body'), ('chrome', 'Handle'), ('steel', 'Panel')])],
     comment='Blender-built kitchen cookers (tools/art/blender/families/kitchen_cooking.py). Listed in the '
             'base manifest\'s packs. Each cooker is a box on the floor with a hob on top and an oven '

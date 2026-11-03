@@ -58,6 +58,11 @@
           "finish": "material.finish.gloss"
         }
       },
+      "motions": {
+        "uses": {
+          "toast": "toast_down"
+        }
+      },
       "paint": [
         {
           "material": "toaster",
@@ -85,6 +90,11 @@
           "finish": "material.finish.gloss"
         }
       },
+      "motions": {
+        "loops": {
+          "smoothie": "whirr"
+        }
+      },
       "paint": [
         {
           "material": "blender_base",
@@ -100,6 +110,9 @@
       "type": "model",
       "url": "../../models/tabletop/standMixer.glb",
       "materials": {
+        "bread": {
+          "finish": "material.finish.matte"
+        },
         "chrome": {
           "finish": "material.finish.chrome"
         },
@@ -111,6 +124,11 @@
         },
         "steel": {
           "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "loops": {
+          "bake": "beat"
         }
       },
       "paint": [
@@ -150,6 +168,14 @@
         },
         "steel": {
           "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "espresso": {
+            "clip": "brew",
+            "hold": 2.5
+          }
         }
       },
       "paint": [
