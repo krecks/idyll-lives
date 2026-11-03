@@ -813,7 +813,7 @@ impl World {
                 }
                 // Done at work and coming home by bus (riders aren't saved): back at their stop
                 // (where they are), on their way home.
-                let bus_home = self.bus_home(s.id as usize);
+                let bus_home = crate::bus::homeward(self, s.id as usize);
                 let home_task = bus_home.then_some(Task {
                     kind: TaskKind::GoHome,
                     directed: false,

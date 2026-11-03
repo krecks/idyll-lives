@@ -531,18 +531,6 @@ impl Car {
             })
     }
 
-    /// Whether `pos` is on the car standing at `at` facing `yaw`, close beside it (`BESIDE`), or
-    /// within `ahead` in front of it or `behind` behind it.
-    fn covers(&self, at: [f32; 2], yaw: f32, pos: [f32; 2], ahead: f32, behind: f32) -> bool {
-        let (s, c) = yaw.sin_cos();
-        let (dx, dz) = (pos[0] - at[0], pos[1] - at[1]);
-        let along = dx * s + dz * c;
-        let across = dx * c - dz * s;
-        across.abs() < self.wid / 2.0 + BESIDE
-            && along < self.len / 2.0 + ahead
-            && along > -(self.len / 2.0 + behind)
-    }
-
     /// Where it is and which way it faces now, and whether it's moving; None while it's out
     /// of town.
     pub fn pose(&mut self, exits: &[[f32; 2]]) -> Option<([f32; 2], f32, bool)> {
@@ -650,6 +638,38 @@ impl Car {
     }
 }
 
+/// On `OVERSHOOT` past `b`, the way from `a` to `b`: where a drive out of town ends, off the map.
+pub(crate) fn extend_past(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
+    let len = crate::travel::dist(a, b).max(1e-3);
+    [
+        b[0] + (b[0] - a[0]) / len * OVERSHOOT,
+        b[1] + (b[1] - a[1]) / len * OVERSHOOT,
+    ]
+}
+
+/// The top speed on the roads at `p`, on a road of `kind` (m/s): `FAST` in the hamlets,
+/// `Travel::country_speed` on country roads, `JUNCTION_SPEED` near any of `junctions`.
+pub(crate) fn top_speed(
+    p: [f32; 2],
+    kind: crate::travel::RoadKind,
+    travel: &Travel,
+    junctions: &[[f32; 2]],
+) -> f32 {
+    let fast = if kind == crate::travel::RoadKind::Country {
+        travel.country_speed
+    } else {
+        FAST
+    };
+    if junctions
+        .iter()
+        .any(|&j| crate::travel::dist(j, p) < JUNCTION_REACH)
+    {
+        fast.min(JUNCTION_SPEED)
+    } else {
+        fast
+    }
+}
+
 /// A drive, sampled every `STEP` metres: where the car's middle is, which way it faces, and when
 /// it gets there (ticks from the start).
 #[derive(Debug, Clone, Default)]
@@ -737,13 +757,11 @@ impl Route {
         // The lane: right of the middle line, on past the exit (to the parking spot's side of
         // the road on a trip).
         let mut centre: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
-        let (a, b) = (centre[centre.len() - 2], centre[centre.len() - 1]);
-        let len = dist(a, b).max(1e-3);
         if park.is_none() {
-            centre.push([
-                b[0] + (b[0] - a[0]) / len * OVERSHOOT,
-                b[1] + (b[1] - a[1]) / len * OVERSHOOT,
-            ]);
+            centre.push(extend_past(
+                centre[centre.len() - 2],
+                centre[centre.len() - 1],
+            ));
         }
         if home {
             centre.reverse();
@@ -763,16 +781,7 @@ impl Route {
                 .iter()
                 .min_by(|x, y| dist(x.0, p).total_cmp(&dist(y.0, p)))
                 .map_or(RoadKind::Street, |x| x.2);
-            let fast = if kind == RoadKind::Country {
-                travel.country_speed
-            } else {
-                FAST
-            };
-            if junctions.iter().any(|&j| dist(j, p) < JUNCTION_REACH) {
-                fast.min(JUNCTION_SPEED)
-            } else {
-                fast
-            }
+            top_speed(p, kind, travel, &junctions)
         };
         // A trip's parking bay off the road (`parking_bay`), turned into nose first and backed
         // out of as a driveway is, and which way along the road it goes there (from the lane's
@@ -1745,10 +1754,9 @@ fn route_ticks(w: &mut World, c: usize, home: bool) -> f32 {
     cars[c].route(exits, Some(travel), home).ticks()
 }
 
-/// A tick further along its drive, unless someone is in its way: it waits for them. Someone
-/// standing there a while (a chat on the pavement) steps aside for it (`make_way`). Someone at
-/// something (a bench, a letterbox) is beside its way at most, nothing stands on a street or a
-/// driveway: it doesn't wait for them. Nor, past `PASS_TICKS`, for anyone.
+/// A tick further along its drive, unless someone is in its way: it waits for them (`go_on`).
+/// Someone at something (a bench, a letterbox) is beside its way at most, nothing stands on a
+/// street or a driveway: it doesn't wait for them.
 fn drive_on(w: &mut World, c: usize) {
     let home = w.cars[c].state == CarState::Arriving;
     let t = w.cars[c].progress;
@@ -1771,55 +1779,134 @@ fn drive_on(w: &mut World, c: usize) {
     } else {
         (AHEAD, -car.len / 2.0)
     };
+    let me = Driving {
+        at,
+        yaw,
+        len: car.len,
+        wid: car.wid,
+        ahead,
+        behind,
+    };
+    let nav = crate::path::NavGrid {
+        lot,
+        blocked,
+        stairs,
+    };
+    go_on(
+        sims,
+        &nav,
+        me,
+        |_| false,
+        &mut car.waited,
+        &mut car.progress,
+    );
+}
+
+/// Something driving (a car, a bus) where it is now, for who's in its way (`go_on`): its middle
+/// and yaw, its length and width, and how far in front of it and behind it someone is in its way
+/// (m, past its ends).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Driving {
+    pub at: [f32; 2],
+    pub yaw: f32,
+    pub len: f32,
+    pub wid: f32,
+    pub ahead: f32,
+    pub behind: f32,
+}
+
+/// Something driving (`d`) a tick further along its way (`progress`), unless someone is in its
+/// way: it waits for them (`waited`, ticks). Someone standing there a while (a chat on the
+/// pavement) steps aside for it (`make_way`). Someone at something or at a wheel, walking along
+/// beside it, or `aside` (as the one driving has it) isn't in its way. Nor, past `PASS_TICKS`,
+/// is anyone.
+pub(crate) fn go_on(
+    sims: &mut [Sim],
+    nav: &crate::path::NavGrid,
+    d: Driving,
+    aside: impl Fn(&Sim) -> bool,
+    waited: &mut u32,
+    progress: &mut f32,
+) {
+    let turn = d.yaw.sin_cos();
+    // (Nobody further off than its corners and the ground ahead of or behind them is in its way.)
+    let reach = d.len / 2.0 + d.ahead.max(d.behind) + d.wid / 2.0 + BESIDE + 1.0;
     let mut waiting = false;
     for s in sims.iter_mut() {
-        let busy = || {
-            s.current()
-                .is_some_and(|a| matches!(a.phase, Phase::Using { .. }))
-        };
-        let at_a_wheel = || {
-            s.current()
-                .is_some_and(|a| matches!(a.phase, Phase::Driving))
-        };
-        // Someone walking along beside it (on the walkers' side of the road, `travel::walk_side`)
-        // isn't in its way: a car on the road would follow them at a walk. Only someone in front
-        // of it, or standing close by.
-        let beside = || {
-            let (sn, cs) = yaw.sin_cos();
-            let (dx, dz) = (s.pos[0] - at[0], s.pos[1] - at[1]);
-            (dx * cs - dz * sn).abs() >= car.wid / 2.0
-                && s.current()
-                    .is_some_and(|a| matches!(a.phase, Phase::Routing { .. }))
-        };
-        if !s.here()
+        let (dx, dz) = (s.pos[0] - d.at[0], s.pos[1] - d.at[1]);
+        if dx * dx + dz * dz >= reach * reach
+            || !s.here()
             || s.away_until.is_some()
-            || !car.covers(at, yaw, s.pos, ahead, behind)
-            || busy()
-            || at_a_wheel()
-            || beside()
+            || !covers(d.at, turn, d.len, d.wid, s.pos, d.ahead, d.behind)
         {
             continue;
         }
+        let phase = s.current().map(|a| &a.phase);
+        if matches!(phase, Some(Phase::Using { .. }) | Some(Phase::Driving)) || aside(s) {
+            continue;
+        }
+        // Someone walking along beside it (on the walkers' side of the road, `travel::walk_side`)
+        // isn't in its way: it would follow them at a walk. Only someone in front of it, or
+        // standing close by.
+        let (_, across) = local(d.at, turn, s.pos);
+        if across.abs() >= d.wid / 2.0 && matches!(phase, Some(Phase::Routing { .. })) {
+            continue;
+        }
         waiting = true;
-        if car.waited > MAKE_WAY_TICKS {
-            let nav = crate::path::NavGrid {
-                lot,
-                blocked,
-                stairs,
-            };
-            if let Some(p) = make_way(at, yaw, &nav, s.pos, 0.06) {
-                s.pos = p;
-            }
+        if *waited > MAKE_WAY_TICKS
+            && let Some(p) = make_way(d.at, d.yaw, nav, s.pos, 0.06)
+        {
+            s.pos = p;
         }
     }
     if !waiting {
-        car.waited = 0;
-        car.progress += 1.0;
-    } else if car.waited < PASS_TICKS {
-        car.waited += 1;
+        *waited = 0;
+        *progress += 1.0;
+    } else if *waited < PASS_TICKS {
+        *waited += 1;
     } else {
-        car.progress += 1.0;
+        *progress += 1.0;
     }
+}
+
+/// `pos` from something at `at` turned `turn` (its yaw's sine and cosine): how far along it,
+/// ahead, and how far across it.
+fn local(at: [f32; 2], turn: (f32, f32), pos: [f32; 2]) -> (f32, f32) {
+    let (s, c) = turn;
+    let (dx, dz) = (pos[0] - at[0], pos[1] - at[1]);
+    (dx * s + dz * c, dx * c - dz * s)
+}
+
+/// Whether `pos` is on something `len` by `wid` m (a car, a bus) at `at`, turned `turn` (its
+/// yaw's sine and cosine), close beside it (`BESIDE`), or within `ahead` in front of it or
+/// `behind` behind it.
+pub(crate) fn covers(
+    at: [f32; 2],
+    turn: (f32, f32),
+    len: f32,
+    wid: f32,
+    pos: [f32; 2],
+    ahead: f32,
+    behind: f32,
+) -> bool {
+    let (along, across) = local(at, turn, pos);
+    across.abs() < wid / 2.0 + BESIDE && along < len / 2.0 + ahead && along > -(len / 2.0 + behind)
+}
+
+/// Whether a step from `from` to `to` walks into something `len` by `wid` m driving by at `at`
+/// facing `yaw` (stepping out of its way is fine).
+pub(crate) fn walks_into(
+    at: [f32; 2],
+    yaw: f32,
+    len: f32,
+    wid: f32,
+    from: [f32; 2],
+    to: [f32; 2],
+) -> bool {
+    let turn = yaw.sin_cos();
+    let on = |p: [f32; 2]| covers(at, turn, len, wid, p, 0.0, 0.0);
+    let d = |p: [f32; 2]| (p[0] - at[0]).hypot(p[1] - at[1]);
+    on(to) && !(on(from) && d(to) > d(from))
 }
 
 /// Getting into `car` (`inward`, `Phase::Boarding`) or out of it (`Phase::Alighting`) by their
@@ -1850,9 +1937,7 @@ pub(crate) fn in_the_way(cars: &[Car], from: [f32; 2], to: [f32; 2]) -> Option<u
         let Some((at, yaw, true, _)) = car.shown else {
             return false;
         };
-        let d = |p: [f32; 2]| (p[0] - at[0]).hypot(p[1] - at[1]);
-        car.covers(at, yaw, to, 0.0, 0.0)
-            && !(car.covers(at, yaw, from, 0.0, 0.0) && d(to) > d(from))
+        walks_into(at, yaw, car.len, car.wid, from, to)
     })
 }
 
