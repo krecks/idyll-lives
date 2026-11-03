@@ -309,7 +309,8 @@ The kitchen cookers (`models/kitchen_cooking/stoveElectric.glb`, `stoveGas.glb`,
 `rangeCooker.glb`, `cooktopCounter.glb`, `microwave.glb`, override pack `packs/kitchen_cooking/manifest.json`)
 are built in Blender by `tools/art/blender/families/kitchen_cooking.py` on `gamekit` and exported as `.glb`
 (glTF, original, CC0). Each drops an oven door on its bottom hinge while a resident bakes and turns a knob
-while they cook, with a ring of blue flame growing on the gas ones; the oven tower's tray slides out, and the
+while they cook, with a ring of blue flame growing on the gas ones (the knob by the burner or ring that lights,
+and the gas range's hob left free for the cook's pan and bowl, 2026-11-03); the oven tower's tray slides out, and the
 microwave swings its door and turns its turntable.
 
 The kitchen small appliances and dishwashers (`models/kitchen_cooking/coffeeMachine.glb`,
@@ -317,7 +318,7 @@ The kitchen small appliances and dishwashers (`models/kitchen_cooking/coffeeMach
 `tools/art/blender/families/kitchen_cooking.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
 The coffee machine slides its cup under the spout and runs a coffee stream; the breakfast counter's toaster
 lever slides and its toast pops, and its blender lid lifts over a swirling smoothie; the dishwashers drop their door and slide a rack
-out. The dishwashers were rebuilt 60 and 45 cm wide beside a cupboard or a drawer stack (2026-10-21).
+out, loaded or emptied. The dishwashers were rebuilt 60 and 45 cm wide beside a cupboard or a drawer stack (2026-10-21).
 
 The kitchen base counters (`models/kitchen_counters/counter.glb`, `counterCorner.glb`, `counterEnd.glb`,
 `counterCornerOuter.glb`, `counterDrawers.glb`, `counterOpenShelf.glb`, `butcherBlock.glb`,

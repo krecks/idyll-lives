@@ -509,7 +509,7 @@
   "model.stoolBarHigh": [0.0, 0.046],
   "model.stoolCounter": [0.0, 0.05],
   "model.stoveElectric": [0.0, -0.0995],
-  "model.stoveGas": [0.0, -0.078],
+  "model.stoveGas": [0.0, -0.089],
   "model.street.bench": [0.0, -0.037],
   "model.street.busSign": [0.0, 0.0163],
   "model.street.flowerTub": [0.0, 0.0],

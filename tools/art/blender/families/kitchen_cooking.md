@@ -36,7 +36,7 @@ hob and the oven windows are opaque glossy black (`hob`, a plain finish) rather 
 | `charcoal` | satin | the microwave's body |
 | `display` | gloss | the microwave's display |
 | `tray` | metal | the oven tower's tray, the ovens' racks and runners, a dishwasher's tub, baskets and inner door |
-| `pot`, `pan` | metal / satin | the stock pot and frying pan on the gas range |
+| `pot`, `pan` | metal / satin | the stock pots on the gas range and the range cooker; burner caps |
 | `steel` | metal | a stainless appliance front (a dishwasher's door) |
 | `toaster` | gloss | the breakfast counter's toaster body |
 | `jug` | gloss | the blender's jug (opaque, not `glass`, to save a draw call) |
@@ -57,17 +57,17 @@ then the clips keyed (`settle()` must come before `swing()`/`slide()`).
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
-| `model.stoveElectric` | 0.600 × 0.980 × 0.660 m | 2,944 | 4 | oven door, knob, hot ring | `oven_open` 1.4 s (bake); `burner_on` 0.5 s: the knob turns and the front ring on its side glows red (cook) |
-| `model.stoveGas` | 0.920 × 1.111 × 0.720 m | 3,984 | 4 | oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet) |
+| `model.stoveElectric` | 0.600 × 0.980 × 0.660 m | 2,944 | 4 | oven door, knob, hot ring | `oven_open` 1.4 s (bake); `burner_on` 0.5 s: the knob turns and the front ring on its side (−x) glows red (cook) |
+| `model.stoveGas` | 0.920 × 1.111 × 0.694 m | 3,708 | 4 | oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet): the outer knob on the −x side turns, the front burner there lights |
 | `model.wallOven` | 0.700 × 2.110 × 0.708 m | 4,738 | 3 | upper door, tray | `oven_open` 1.4 s: door drops and tray slides 10 cm (roast, bake) |
-| `model.rangeCooker` | 1.580 × 1.141 × 0.761 m | 4,880 | 4 | left oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet) |
-| `model.cooktopCounter` | 1.000 × 0.956 × 0.660 m | 2,708 | 3 | knob, hot ring | `burner_on` (cook): the knob turns, the front-right ring glows red |
+| `model.rangeCooker` | 1.580 × 1.141 × 0.761 m | 4,880 | 4 | left oven door, knob, flame | `oven_open` (bake); `burner_on` (cook, gourmet): the knob nearest the middle (x −0.12) turns, the front middle burner lights |
+| `model.cooktopCounter` | 1.000 × 0.956 × 0.660 m | 2,820 | 3 | knob, hot ring | `burner_on` (cook): the outer knob on the +x side turns, the back ring on that side (z −0.22) glows red |
 | `model.microwave` | 1.000 × 1.250 × 0.666 m | 3,764 | 4 | door, turntable | `door_open` 1.0 s, `hold` 1.2 s (reheat); `turntable` loops (reheat) |
 
 Seen from the front, the microwave's controls are on the right and its door hinges on its left edge (game +x is
 the viewer's left) and swings 100°; its glass turntable turns a full turn every 2 s
 while it heats. The gas range and the range cooker carry a pot and a pan on the hob; the flame lights on a
-free burner beside them. `stoveGas`, `rangeCooker`, `stoveElectric` (since its ring glows, 2026-10-21) and
+free burner beside them (the gas range's frying pan is gone since 2026-11-03, below). `stoveGas`, `rangeCooker`, `stoveElectric` (since its ring glows, 2026-10-21) and
 `microwave` take 4 draw calls (the most allowed); the rest take 3.
 
 **By the step's tag** (2026-10-21, review G-16): a cooker is a station of recipes started elsewhere (a meal from
@@ -91,9 +91,9 @@ Its blender lid lifts for `blend` (the jug blades need E1).
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
 | `model.coffeeMachine` | 1.000 × 1.400 × 0.666 m | 4,262 | 3 | cup, coffee stream | `brew` 0.6 s: cup slides under the spout, stream grows (espresso) |
-| `model.breakfastCounter` | 1.000 × 1.380 × 0.666 m | 4,944 | 4 | lever, toast, lid | `toast_down` (toast); `blend` 0.4 s: lid lifts (smoothie) |
-| `model.dishwasher` | 1.000 × 0.950 × 0.687 m | 3,124 | 3 | door (0.58 m), rack | `door_open` 0.9 s: door drops 85°, rack slides 30 cm, open for the whole use (dishes; clearing away at it, the `wash` tag) |
-| `model.dishwasherCompact` | 1.000 × 0.950 × 0.660 m | 3,604 | 3 | door (0.43 m), rack | `door_open` 0.9 s (dishes, `wash`), as the dishwasher |
+| `model.breakfastCounter` | 1.000 × 1.380 × 0.666 m | 4,944 | 4 | lever, toast, lid, smoothie | `toast_down` (toast); `blend` 0.8 s: lid lifts (smoothie); `blades` 1 s: the smoothie swirls, a loop while it blends (smoothie) |
+| `model.dishwasher` | 1.000 × 0.950 × 0.687 m | 3,124 | 3 | door (0.58 m), rack | `door_open` 1.4 s: door drops 85°, rack slides 30 cm, open for the whole use (dishes; clearing away at it, the `wash` tag; emptying it, unload) |
+| `model.dishwasherCompact` | 1.000 × 0.950 × 0.660 m | 3,604 | 3 | door (0.43 m), rack | `door_open` (dishes, `wash`, unload), as the dishwasher |
 
 The coffee machine and both dishwashers take 3 draw calls; the breakfast counter takes 4 (its three
 moving parts each cost one). `check-glb`: 31 models, 0 failed; its five warnings are those same draw counts
@@ -133,6 +133,30 @@ corners without the Catmull-Rom overshoot `kit.tube` makes between a long span a
   the lower basket of standing plates and a bowl, a fascia with a display and a button, the door's inner panel and
   detergent flap, shaker fronts beside it. The compact one's carcass stood 2 cm proud of its door and drawers, hiding
   them: it now stops at their backs (the door's hinge is where it was).
+
+## Cooking at them (2026-11-03)
+
+What the cook brings and uses is drawn by the game on the station (`web/src/render/shared/characters/actions.ts`):
+the tool by the step's tag at `STATION_SPOTS` (the pan on the burner the clip lights), what they carried in at
+`SET_DOWN_SPOTS` (the prepped bowl on a cold burner or ring, clear of the pan). Each number is the model's, in the
+footprint's frame (x to the right, depth to the front, height):
+
+| Model | The pan (`stir`) | Set down | Was |
+|---|---|---|---|
+| `stoveGas` | front −x burner, (−0.26, 0.014), on its pan support at 0.891 | back +x burner, (0.26, −0.22) at 0.891, clear of the splash guard | 0.9 (1 cm over the support); set down at 0.9 between the burners, over the modelled frying pan |
+| `stoveElectric` | front −x ring, (−0.16, −0.02) at 0.893 | back +x ring, (0.15, −0.165) at 0.89, clear of the guard | 0.9 for both |
+| `rangeCooker` | front middle burner, (0, 0.03) at 0.911 | front +x burner, (0.55, 0.03) at 0.911 | 0.915 for both, on the hob 0.89 |
+| `cooktopCounter` | back +x ring, (0.16, −0.22) at 0.954 | front −x ring, (−0.16, −0.01) at 0.954 | set down on the back −x ring at the worktop's 0.95 |
+
+The models, to match:
+- **stoveGas**: the frying pan on the front +x burner is gone (the cook's pan made a third piece of it, and what they
+  set down stood on it); the stock pot stays at the back −x. 2.2 cm shallower without its handle: 0.694 deep, centre
+  −0.089, its back where it was.
+- **cooktopCounter**: four knobs on the fascia (−0.42, −0.14, 0.14, 0.42); the one that turns is the outer one on the
+  side of the ring that glows (+0.42; it was the far −x one).
+- **rangeCooker**: the knob that turns is the one nearest the middle (−0.12) for the middle burner; it was the far
+  −x one (−0.6), which is a still knob now.
+- **dishwasher**, **dishwasherCompact**: emptying it (`unload`) drops the door too (it played nothing).
 
 ## Rebuild
 

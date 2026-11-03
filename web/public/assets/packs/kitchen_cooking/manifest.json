@@ -526,7 +526,8 @@
       "motions": {
         "uses": {
           "dishes": "door_open",
-          "wash": "door_open"
+          "wash": "door_open",
+          "unload": "door_open"
         }
       },
       "paint": [
@@ -576,7 +577,8 @@
       "motions": {
         "uses": {
           "dishes": "door_open",
-          "wash": "door_open"
+          "wash": "door_open",
+          "unload": "door_open"
         }
       },
       "paint": [
