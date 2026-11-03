@@ -800,7 +800,7 @@ type StationSpot = readonly [x: number, z: number, y: number];
  * cook; the cook steps in to it, `stationReach`): the pot on the front burner the cooker's clip lights (its flame or
  * hot ring), at its grate's or glass's height;
  * the board, the bowl and the food on the grill clear of what the model has on its top. `null`: done inside it, not
- * drawn (meat grilled in the pizza oven's mouth).
+ * drawn.
  */
 export const STATION_SPOTS: Record<string, Partial<Record<string, StationSpot | null>>> = {
   stoveGas: { stir: [-0.26, 0.014, 0.891] },
@@ -811,7 +811,6 @@ export const STATION_SPOTS: Record<string, Partial<Record<string, StationSpot | 
   chefStove: { stir: [0, 0, 0.963] },
   // (The left ring, which glows; the board and the bowl at the free left end of the top.)
   'foodie.chefsIsland': { stir: [-0.145, 0.27, 0.908], chop: [-0.7, 0.32, 0.9], mix: [-0.7, 0.3, 0.9] },
-  'foodie.pizzaOven': { flip: null },
   // (On the floured end of the worktop by the range.)
   'kind.neighbourlyOven': { chop: [0.105, 0, 0.905], mix: [0.13, -0.01, 0.905] },
   breakfastCounter: { chop: [0.28, 0.05, 0.95], mix: [0.28, 0.05, 0.95] },
@@ -829,8 +828,7 @@ export const SET_DOWN: Record<string, 'top' | 'in'> = { chop: 'top', mix: 'top',
 /**
  * Where on a station what the cook carried in is put down, by object def and action tag (else beside its tool,
  * `SET_DOWN_SIDE`): on a cool, free part of its top, clear of the lit burner, the grate and what the model has on it
- * (an unlit burner's grate or a cold ring on a hob; the grill station's free counter, the kettle grill's side tray,
- * the pizza oven's counter).
+ * (an unlit burner's grate or a cold ring on a hob; the grill station's free counter, the kettle grill's side tray).
  */
 export const SET_DOWN_SPOTS: Record<string, Partial<Record<string, StationSpot>>> = {
   stoveGas: { stir: [0.26, -0.22, 0.891] },
@@ -839,7 +837,6 @@ export const SET_DOWN_SPOTS: Record<string, Partial<Record<string, StationSpot>>
   cooktopCounter: { stir: [-0.16, -0.19, 0.954] },
   chefStove: { stir: [0.5, 0.03, 0.963] },
   'foodie.chefsIsland': { stir: [-0.7, 0.29, 0.9], chop: [0.41, 0.3, 0.9], mix: [0.41, 0.3, 0.9] },
-  'foodie.pizzaOven': { flip: [0.78, 0.07, 0.89] },
   'kind.neighbourlyOven': { chop: [0.13, -0.31, 0.905], mix: [0.13, -0.31, 0.905] },
   breakfastCounter: { chop: [-0.03, 0.06, 0.95], mix: [-0.03, 0.06, 0.95] },
   grill: { flip: [0.333, 0.333, 0.7], chop: [0.333, 0.333, 0.7] },

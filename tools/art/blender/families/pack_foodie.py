@@ -890,9 +890,7 @@ FAMILY = G.Family(
              paint=[('walnut', 'Body'), ('honey_wood', 'Stool & ledge'), ('cover', 'Cookbook')]),
      G.Model('pizzaOven', pizzaOven, size=(1.89, 1.9, 0.916), key='model.foodie.pizzaOven', centre=(0.005, 0.018),
              # a bake (the pizza, or any `bake` step of a recipe at it) takes the door off and lights the fire
-             # (a recipe's grilling step at it, `flip`, is done in its mouth: the fire grows, the pizza stays on its peel)
-             motions={'uses': {'bakePizza': ['door_off', 'flames'], 'bake': ['door_off', 'flames'], 'warmUp': 'flames',
-                               'flip': 'flames'}},
+             motions={'uses': {'bakePizza': ['door_off', 'flames'], 'bake': ['door_off', 'flames'], 'warmUp': 'flames'}},
              paint=[('plaster', 'Body'), ('worktop', 'Worktop'), ('brick', 'Brick')]),
      G.Model('chefsIsland', chefsIsland, size=(1.86, 1.128, 0.889), key='model.foodie.chefsIsland', centre=(0, 0.0154),
              # the drawer opens for the prep step's utensils (chop), the ring under the pan glows while it cooks (stir):

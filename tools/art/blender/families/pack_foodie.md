@@ -98,6 +98,5 @@ The game draws the cook's board, bowl or pan and what they carried in on the sta
   tasting plates in to x ±0.42. The cook's board or mixing bowl goes on the free left end (−0.7, 0.32), the prepped
   bowl there while they cook, the ingredients between the hob and the board (0.41, 0.3). Its content `surface` is the
   top itself, 1.86 × 0.46 at (0, 0.225) (it had no size, so the footprint's 2 × 1, over the stools).
-- `pizzaOven`: the bowl of sauce moved back (x 0.86, depth −0.19), leaving the counter's front right free; a recipe's
-  grilling step there (`flip`: it is a `grill` station) is done in the mouth (no food drawn, `STATION_SPOTS` `null`),
-  `flames` grows, and the prepped bowl stands on that free counter (0.78, 0.07), 0.89.
+- `pizzaOven`: the bowl of sauce moved back (x 0.86, depth −0.19), leaving the counter's front right free. It is an
+  `oven` station only (2026-11-03: it was a `grill` too, and a barbecue was grilled in its mouth when the grill was busy).

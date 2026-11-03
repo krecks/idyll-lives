@@ -386,8 +386,7 @@
             "door_off",
             "flames"
           ],
-          "warmUp": "flames",
-          "flip": "flames"
+          "warmUp": "flames"
         }
       },
       "paint": [
