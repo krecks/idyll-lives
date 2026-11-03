@@ -80,7 +80,11 @@
 //! when absent, so a game without a garage of the player's saves as it did. Still 35: a driveway
 //! running along x keeps the way it runs (`drives[].frontX`, ±1; absent: along z, `front`), so
 //! files without one save as they did; a cosy town's driveways with the road each meets
-//! (`drives[].road`) are what has its cars drive its roads (`cars::settle_all`).
+//! (`drives[].road`) are what has its cars drive its roads (`cars::settle_all`). Still 35: things
+//! a resident asked for, bought and waiting to be set up at home (`setups`: the household, who
+//! asked, the object by id, the tick it was bought and what was paid; `setup.rs`), left out when
+//! there are none, so an older file has none; setting one up isn't saved mid-way (the parcel is
+//! back at the front door after a load).
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -173,6 +177,21 @@ pub struct SaveFile {
     /// which exits are bus stops, plots' areas and kinds (absent: none).
     #[serde(default, skip_serializing_if = "crate::travel::OpenWorld::is_empty")]
     pub open_world: crate::travel::OpenWorld,
+    /// Things bought that wait to be set up at home (`setup.rs`; absent: none).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub setups: Vec<SetupSave>,
+}
+
+/// Something bought waiting to be set up (`setup::Setup`), its object by content id (unknown ones
+/// are dropped on load, the money given back).
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetupSave {
+    pub household: u32,
+    pub sim: u32,
+    pub object: String,
+    pub since: u64,
+    pub paid: i64,
 }
 
 /// Food or a dish somewhere, by content id (unknown ones are dropped on load).
@@ -1032,6 +1051,17 @@ impl World {
                 })
                 .collect(),
             next_item: self.items.next_id,
+            setups: self
+                .setups
+                .iter()
+                .map(|s| SetupSave {
+                    household: s.household,
+                    sim: s.sim,
+                    object: content.objects[s.object].id.clone(),
+                    since: s.since,
+                    paid: s.paid,
+                })
+                .collect(),
         }
     }
 
@@ -1618,6 +1648,19 @@ impl World {
             None => 0,
         };
         world.items.next_id = save.next_item.max(after_last);
+        for s in &save.setups {
+            let object = world.content.object_index(&s.object);
+            let Some(h) = world.households.get_mut(s.household as usize) else {
+                continue;
+            };
+            match object {
+                Some(object) if (s.sim as usize) < world.sims.len() => world.setups.push(
+                    crate::setup::Setup::new(s.household, s.sim, object, s.since, s.paid),
+                ),
+                // (Gone from the content: the money back.)
+                _ => h.funds += s.paid,
+            }
+        }
         world.make_storeys();
         world.refresh_rooms();
         crate::cars::load(&mut world, &save.cars, &save.drives, &save.garages);
@@ -1698,6 +1741,8 @@ impl World {
             | TaskKind::Phone { .. }
             | TaskKind::Join { .. }
             | TaskKind::Carry { .. } => return None,
+            // (Nor is setting something up: the parcel is back at the door, `setup.rs`.)
+            TaskKind::SetUp { .. } => return None,
         })
     }
 }

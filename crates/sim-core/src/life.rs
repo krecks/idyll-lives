@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::MINUTES_PER_TICK;
 use crate::clock;
-use crate::content::{CareerLevel, Content, MAX_NEEDS, MAX_SKILLS, Pose, WorkweekRule};
+use crate::content::{
+    CareerLevel, CareerRules, Content, MAX_NEEDS, MAX_SKILLS, Pose, WorkweekRule,
+};
 use crate::conversation;
 use crate::social::{self, EventKind};
 use crate::world::{
@@ -34,6 +36,10 @@ pub struct Job {
     pub shifts: u32,
     /// Recent missed shifts (one worked shift makes up for one missed); too many and they're let go.
     pub missed: u8,
+    /// Arrived late for the current shift (`careerRules.lateGraceMinutes`; not saved: a game
+    /// loaded mid-shift counts it as on time).
+    #[serde(skip)]
+    pub late: bool,
 }
 
 impl Job {
@@ -48,6 +54,7 @@ impl Job {
             satisfaction: 0.6,
             shifts: 0,
             missed: 0,
+            late: false,
         }
     }
 }
@@ -102,6 +109,45 @@ pub fn skill_fit(level: &CareerLevel, skills: &[f32; MAX_SKILLS]) -> f32 {
         .map(|&(s, need)| skills[s].floor() - need)
         .fold(None, |m: Option<f32>, f| Some(m.map_or(f, |m| m.min(f))))
         .unwrap_or(0.0)
+}
+
+/// How much one shift fills the performance bar (0..100): all a shift's worth is worked out here.
+/// At the entry grade, for a Sim in a middling mood (0.5) with just the skills the job asks for,
+/// it's `performancePerShift`. Leaving for work in a better mood adds up to `performancePerMood`
+/// (a worse one takes as much off); each skill level above the job's requirements adds
+/// `performancePerFit` (each one short takes it off; three count at most). Arriving more than
+/// `lateGraceMinutes` late, the shift counts `lateShare` as much. Each grade up it counts less
+/// (`grade_pace`), so later promotions take longer. A shift worked never takes any off (a missed
+/// one does).
+pub fn shift_performance(
+    rules: &CareerRules,
+    level: usize,
+    mood: f32,
+    fit: f32,
+    late: bool,
+) -> f32 {
+    let worth = rules.performance_per_shift
+        + (mood - 0.5) * 2.0 * rules.performance_per_mood
+        + fit.clamp(-3.0, 3.0) * rules.performance_per_fit;
+    let late = if late { rules.late_share } else { 1.0 };
+    worth.max(0.0) * late * grade_pace(rules, level)
+}
+
+/// What shifts (and missed ones) count for at a grade (0: the entry grade), as a share of the
+/// entry grade's: 1 / (1 + grade × `performanceSlowdown`).
+pub fn grade_pace(rules: &CareerRules, level: usize) -> f32 {
+    1.0 / (1.0 + level as f32 * rules.performance_slowdown)
+}
+
+/// Shifts still to work for a full bar, each worth what one is now (in the mood they last left
+/// for work in, on time); None at the top of the career, or when shifts don't fill it.
+pub fn shifts_to_full_bar(content: &Content, job: &Job, skills: &[f32; MAX_SKILLS]) -> Option<u32> {
+    let career = &content.careers[job.career];
+    career.levels.get(job.level + 1)?;
+    let fit = skill_fit(&career.levels[job.level], skills);
+    let worth = shift_performance(&content.career_rules, job.level, job.shift_mood, fit, false);
+    let left = (100.0 - job.performance).max(0.0);
+    (worth > 0.0).then(|| (left / worth).ceil() as u32)
 }
 
 /// The workweek rule for a fit (probation, standard, flexible...).
@@ -302,7 +348,8 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
         return;
     };
     let target = w.exits[exit];
-    let walk = sim.walk_per_minute(&w.content);
+    // On foot, or on a bike of theirs at home (`ride.rs`).
+    let walk = sim.walk_per_minute(&w.content) * crate::ride::commute_speed(w, sim);
     // The way they'd walk it (in the house's grounds and the public ways), or the estimate.
     let nav = w.nav();
     let goal = (target[0].floor() as i32, target[1].floor() as i32);
@@ -623,7 +670,9 @@ fn miss_shift(w: &mut World, i: usize, day: u32) {
     let sim = &mut sims[i];
     let Some(job) = sim.job.as_mut() else { return };
     job.last_shift_day = day;
-    job.performance = (job.performance - content.career_rules.missed_penalty).max(0.0);
+    let rules = &content.career_rules;
+    job.performance =
+        (job.performance - rules.missed_penalty * grade_pace(rules, job.level)).max(0.0);
     job.missed = job.missed.saturating_add(1);
     if let Some(m) = content.career_rules.missed_feeling {
         social::add_feeling(&mut sim.feelings, m, &content.feelings, tick);
@@ -681,7 +730,8 @@ fn takes_off(w: &World, task: &TaskKind, home: u32) -> bool {
         | TaskKind::Cook { .. }
         | TaskKind::Eat { .. }
         | TaskKind::Dishes { .. }
-        | TaskKind::Carry { .. } => false,
+        | TaskKind::Carry { .. }
+        | TaskKind::SetUp { .. } => false,
     }
 }
 
@@ -900,6 +950,7 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             };
             job.last_shift_day = clock::day(tick);
             job.shift_mood = mood;
+            job.late = tick > start + ticks(content.career_rules.late_grace_minutes);
             // Early arrivals still work until the shift's end; late ones lose that time. Before
             // it starts they're on their way (`at_work`).
             sim.shift_from = start;
@@ -1036,8 +1087,10 @@ fn doors(w: &mut World) {
         {
             *h = host;
         }
-        // Nobody comes (or whoever was coming never makes it): home again.
-        if (host.is_none() && waited >= wait) || waited >= wait * 3 {
+        // Nobody comes (or whoever was coming never makes it): home again. Someone up and about
+        // at home who is busy (in a conversation, say) comes once they're free: worth the wait.
+        let someone_up = host.is_some() || awake_at_home(w, plot, i);
+        if (!someone_up && waited >= wait) || waited >= wait * 3 {
             let sim = &mut w.sims[i];
             sim.current = None;
             if !sim.queue.iter().any(|t| matches!(t.kind, TaskKind::GoHome)) {
@@ -1057,6 +1110,24 @@ fn doors(w: &mut World) {
             }
         }
     }
+}
+
+/// Whether a grown-up of the household living at `plot` is on it, at home and awake (who
+/// would answer the door to `guest` once free).
+fn awake_at_home(w: &World, plot: u32, guest: usize) -> bool {
+    let Some(household) = w.households.iter().position(|h| h.plot == Some(plot)) else {
+        return false;
+    };
+    w.sims.iter().enumerate().any(|(j, s)| {
+        j != guest
+            && s.here()
+            && s.household as usize == household
+            && s.away_until.is_none()
+            && s.visiting.is_none()
+            && s.pose != Pose::Lie
+            && s.adult(&w.content)
+            && w.plot_at(s.tile().0, s.tile().1) == Some(plot)
+    })
 }
 
 /// How far (m) out from its front door a visitor stands to knock: an arm's length.
@@ -1163,6 +1234,12 @@ fn answer(w: &mut World, h: usize, guest: usize) {
         sensible_hour && w.relationships.get(h, guest).friendship >= rules.welcome_friendship;
     w.sims[guest].current = None;
     if welcome {
+        // The visit is from now: the way there doesn't count (a longer one the player asked
+        // for keeps its end).
+        let length = ticks(w.content.visits.hours * 60.0);
+        if let Some(v) = w.sims[guest].visiting.as_mut() {
+            v.until = v.until.max(tick + length);
+        }
         w.events.push(tick, EventKind::Visited, guest, h, None);
         if let Some(greet) = rules.greet {
             w.sims[h].queue.push_front(Task {
@@ -1282,7 +1359,7 @@ fn at_work(w: &mut World, i: usize) -> bool {
     sim.away_until = None;
     households[sim.household as usize].funds += shift_pay(content, &job, &sim.skills);
     let rules = &content.career_rules;
-    let fit = skill_fit(level, &sim.skills).clamp(-3.0, 3.0);
+    let fit = skill_fit(level, &sim.skills);
     // Still a job: it was there above, and nothing since takes it away.
     let Some(job) = sim.job.as_mut() else {
         return true;
@@ -1290,11 +1367,8 @@ fn at_work(w: &mut World, i: usize) -> bool {
     job.shifts += 1;
     job.missed = job.missed.saturating_sub(1);
     job.satisfaction = job.satisfaction * 0.8 + job.shift_mood * 0.2;
-    job.performance = (job.performance
-        + rules.performance_per_shift
-        + (job.shift_mood - 0.5) * 2.0 * rules.performance_per_mood
-        + fit * rules.performance_per_fit)
-        .clamp(0.0, 100.0);
+    let worth = shift_performance(rules, job.level, job.shift_mood, fit, job.late);
+    job.performance = (job.performance + worth).clamp(0.0, 100.0);
     // A promotion needs a full bar and the skills for the next level.
     if job.performance >= 100.0
         && let Some(next) = career.levels.get(job.level + 1)
@@ -1578,7 +1652,9 @@ fn give_up_farewell(w: &mut World, i: usize) {
 
 #[cfg(test)]
 mod tests {
+    use super::knocking;
     use crate::social::EventKind;
+    use crate::world::{Task, TaskKind};
     use crate::{Command, TICKS_PER_SECOND, World, clock};
 
     const CONTENT: &str = r#"{
@@ -1799,5 +1875,110 @@ mod tests {
             })
             .is_err()
         );
+    }
+
+    /// Visitors at a front door (`visits.door`): two houses side by side, friends.
+    const DOOR_CONTENT: &str = r#"{
+        "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01},{"id":"social","label":"Social","decayPerHour":0.01}],
+        "objects":[{"id":"chair","name":"Chair","interactions":[{"id":"sit","label":"Sit","minutes":30,"effects":{"social":0.01},"tags":["lounge"]}]}],
+        "animations":["knock","talk"],
+        "socials":[{"id":"chat","label":"Chat","minutes":10,"tags":["social"],"acceptance":{"base":1.0},"needs":{"social":0.3}}],
+        "bondPresets":{"friends":{"friendship":60}},
+        "visits":{"needs":{"social":0.5},"hours":2,"minFriendship":10,"earliestHour":9,"latestHour":21,
+          "door":{"waitMinutes":10,"welcomeFriendship":-20,"greet":"chat","knockAnim":"knock"}},
+        "economy":{"startingFunds":500}}"#;
+    const DOOR_TOWN: &str = r#"{"width":40,"depth":14,
+        "plots":[{"name":"West","x":0,"z":0,"w":20,"d":10,"entry":[10.5,9.5]},{"name":"East","x":20,"z":0,"w":20,"d":10,"entry":[30.5,9.5]}],
+        "households":[{"name":"Host","plot":0,"player":true},{"name":"Guest","plot":1}],
+        "objects":[{"def":"chair","x":3,"z":2,"rot":0},{"def":"chair","x":24,"z":2,"rot":0}],
+        "sims":[{"name":"Ada","household":0,"x":4.5,"z":4.5},{"name":"Bo","household":1,"x":25.5,"z":4.5}],
+        "relationships":[{"a":0,"b":1,"preset":"friends"}]}"#;
+
+    /// A host on her way somewhere with the next step of it to come (sitting down with the
+    /// coffee she went to pour, washing her hands after the toilet) answers the door first: the
+    /// step waits. (It used to go first, and the visitor gave up knocking.)
+    #[test]
+    fn someone_at_the_door_is_answered_before_the_next_step_of_a_routine() {
+        let mut w = World::from_json(DOOR_CONTENT, DOOR_TOWN, 7).unwrap();
+        w.autonomy = false;
+        until_hour(&mut w, 1, 11.0);
+        w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();
+        while knocking(&w.sims[1]).is_none() {
+            w.tick_once();
+            assert!(
+                w.tick < clock::tick_at(1, 12.0 * 60.0).unwrap(),
+                "never knocked"
+            );
+        }
+        let knocked = w.tick;
+        // Sent to the door, with sitting in the chair (30 minutes) to come next.
+        let ada = &mut w.sims[0];
+        ada.current = None;
+        ada.queue.push_front(Task {
+            kind: TaskKind::Answer { guest: 1 },
+            directed: false,
+            routine: false,
+        });
+        ada.follow_up = Some(Task {
+            kind: TaskKind::Use {
+                object: 0,
+                interaction: 0,
+            },
+            directed: false,
+            routine: false,
+        });
+        let in_by = knocked + ticks_of(10.0);
+        while !w.events.iter().any(|e| e.kind == EventKind::Visited) {
+            w.tick_once();
+            assert!(w.tick < in_by, "nobody came to the door");
+        }
+        assert!(
+            !w.events.iter().any(|e| e.kind == EventKind::NobodyHome),
+            "the visitor gave up"
+        );
+        // The visit's hours count from the door, not from leaving home.
+        let until = w.sims[1].visiting.unwrap().until;
+        assert!(
+            until >= w.tick + ticks_of(119.0),
+            "{} minutes left",
+            (until - w.tick) / 20
+        );
+    }
+
+    /// Friends are visited only where the walk isn't one of hours: the one next door, not the
+    /// one at the far end of a long street (`world::visit_fits`).
+    #[test]
+    fn friends_hours_away_are_not_visited_on_a_whim() {
+        for (east, visited) in [(20, true), (300, false)] {
+            let town = TOWN
+                .replace(r#""width":40"#, r#""width":340"#)
+                .replace(
+                    r#""x":20,"z":0,"w":20"#,
+                    &format!(r#""x":{east},"z":0,"w":20"#),
+                )
+                .replace(r#""x":24,"z":2"#, &format!(r#""x":{},"z":2"#, east + 4))
+                .replace(
+                    r#""x":25.5,"z":3.5"#,
+                    &format!(r#""x":{}.5,"z":3.5"#, east + 5),
+                )
+                .replace(
+                    r#""entry":[25.5,5.5]"#,
+                    &format!(r#""entry":[{}.5,5.5]"#, east + 5),
+                );
+            let mut w = World::from_json(CONTENT, &town, 3).unwrap();
+            w.sims[0].job = None;
+            w.sims[1].needs[1] = 0.1; // lonely guest
+            ticks(&mut w, TICKS_PER_SECOND as u64 * 240);
+            let went = w
+                .events
+                .iter()
+                .any(|e| e.kind == EventKind::Visited && e.a == 1)
+                || w.sims[1].visiting.is_some();
+            assert_eq!(went, visited, "friend {east} tiles away visited: {went}");
+        }
+    }
+
+    fn ticks_of(minutes: f32) -> u64 {
+        (minutes / crate::MINUTES_PER_TICK) as u64
     }
 }

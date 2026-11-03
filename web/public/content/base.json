@@ -1770,14 +1770,18 @@
     "joinFriendship": 2
   },
   "careerRules": {
+    "$comment": "A full performance bar (100) and the next grade's skills earn a promotion. A shift fills performancePerShift at the entry grade, in a middling mood with just the skills asked for; up to performancePerMood more in a good mood (less in a bad one), performancePerFit per skill level above the requirements; half as much more than lateGraceMinutes late; each grade up divides it by 1 + grade x performanceSlowdown (sim-core life::shift_performance). In a fine mood (0.6) the first promotion takes 5 workdays and the top grade's 10; happy (0.85), 4 and 7.",
     "commuteMinutes": 30,
     "lateMinutes": 60,
+    "lateGraceMinutes": 30,
+    "lateShare": 0.5,
     "missedPenalty": 20,
-    "performancePerShift": 2.5,
+    "performancePerShift": 18,
+    "performancePerMood": 20,
+    "performancePerFit": 2,
+    "performanceSlowdown": 0.15,
     "promotionFeeling": "promoted",
     "missedFeeling": "skippedWork",
-    "performancePerFit": 1,
-    "performancePerMood": 4,
     "probationLevels": 1,
     "market": {
       "hour": 9.5,
@@ -2080,7 +2084,10 @@
     "noBed": "{a} has no bed of their own: buy one for them",
     "notClosed": "{a} didn't close the {object}: someone else got in first",
     "playedAlone": "{a} had nobody free to play with at the {object}, so practised alone",
-    "noPartner": "{a} had nobody free to play with at the {object}"
+    "noPartner": "{a} had nobody free to play with at the {object}",
+    "setUp": "{a} set up the new {object}",
+    "setUpForThem": "{a}'s new {object} was set up for them",
+    "sentBack": "There was no room at home for {a}'s {object}: it went back to the shop, the money too"
   },
   "activities": [
     {
@@ -3761,6 +3768,7 @@
     "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community"],
     "wear": {"perUse": 0.004, "byCategory": {"bathroom": 0.006, "garden": 0, "outdoor": 0, "decor": 0}, "perQuality": 0.2},
     "repair": {"label": "Repair", "minutes": 45, "skill": "handiness", "skillGainPerHour": 0.3, "chance": 0.5, "chancePerLevel": 0.08, "interest": 1.5, "cost": 0.3, "tags": ["chores"]},
+    "setUp": {"label": "Set up", "minutes": 15, "fetchMinutes": 1.5, "helpAfterHours": 2, "waitHours": 24, "parcel": "parcel", "anim": "tinker", "fetchAnim": "serve", "tags": ["chores"]},
     "maxQuality": 3,
     "qualityBonus": 0.25,
     "upgradeCost": 0.3,
@@ -4059,6 +4067,7 @@
         {"id": "seating", "label": "Seating & dining", "outside": true},
         {"id": "cooking", "label": "Grills & fire", "outside": true},
         {"id": "play", "label": "Play", "outside": true},
+        {"id": "rides", "label": "Bikes & scooters", "outside": true},
         {"id": "lights", "label": "Lights", "outside": true},
         {"id": "decor", "label": "Garden decor", "outside": true},
         {"id": "yard", "label": "Sheds & garden work", "outside": true}
@@ -4488,6 +4497,13 @@
       "hold": "hand",
       "emptyAs": "plateDirty",
       "radius": 0.144
+    },
+    {
+      "id": "parcel",
+      "label": "Parcel",
+      "model": "item.parcel",
+      "hold": "both",
+      "radius": 0.25
     }
   ],
   "recipes": [

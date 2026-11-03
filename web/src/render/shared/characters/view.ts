@@ -29,6 +29,8 @@ export interface ResidentProp {
   readonly top: readonly [number, number, number];
   /** The files it was built without (a small block then, `ModelTemplate.failed`). */
   readonly failed?: string[];
+  /** A named node drawn as it stands in its model (`<model key>#node:<name>`): where it is at rest (model space), to turn it about. */
+  readonly pivot?: Float32Array;
 }
 
 /**
@@ -96,7 +98,8 @@ export interface ResidentView<M extends object, Q, P extends ResidentProp> {
    * Builds prop `key`: a model (`<model key>`, an item's or a tool's: the whole model, its top [0, 0, 0]), or a moving
    * part of an object's model on its own (`<model key>#<part>`, then `@<colorsKey>` for the colours the player gave
    * it), in the part's own frame (its node's origin and axes at rest), with its top; null if the model has no such
-   * part. Without the model's file, a small block (`failed`). Its `matrices` (`MAX_CHARACTERS` x 16, all zeros) are
+   * part. `<model key>#node:<name>[@<colorsKey>]`: a named node no clip moves (a bike's wheel), as it stands in the
+   * model, with its `pivot`. Without the model's file, a small block (`failed`). Its `matrices` (`MAX_CHARACTERS` x 16, all zeros) are
    * its instances' from then on, nothing drawn until `showProp`.
    */
   buildProp(key: string): Promise<P | null>;

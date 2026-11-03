@@ -31,6 +31,11 @@ const PAY_FACTOR: RangeInclusive<f32> = 0.25..=3.0;
 /// How short of the level a job is hired at on probation: more than a level is never close enough,
 /// and a negative shortfall would ask for skills above the job's own.
 const PROBATION: RangeInclusive<f32> = 0.0..=1.0;
+/// `careerRules.performanceSlowdown`: below 0 later grades would come quicker; past 2 the top
+/// grade's shifts count for almost nothing.
+const PERFORMANCE_SLOWDOWN: RangeInclusive<f32> = 0.0..=2.0;
+/// `careerRules.lateShare`: what a late shift counts for, from nothing to a full shift.
+const LATE_SHARE: RangeInclusive<f32> = 0.0..=1.0;
 /// Bitmask of indices into `Content::tags`.
 pub type TagMask = u64;
 /// Bitmask of indices into `LifeRules::stages` (content `stages` rules: who may use what).
@@ -540,6 +545,33 @@ pub struct ObjectDef {
     /// Someone serves here on a public lot (content `staff`): where they stand behind it and the
     /// hours it's open (`staff.rs`).
     pub staff: Option<crate::staff::Post>,
+    /// Something to ride (content `vehicle`: a bicycle, an e-scooter): parked on the lot, a
+    /// resident of the household it fits rides it out to work or school and back (`ride.rs`).
+    pub vehicle: Option<Vehicle>,
+}
+
+/// What kind of thing is ridden (content `vehicle.kind`): how the rider is drawn on it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum VehicleKind {
+    /// Sitting and pedalling.
+    Bike,
+    /// Standing on its deck.
+    Scooter,
+}
+
+/// A thing to ride (`ObjectDef::vehicle`).
+#[derive(Debug, Clone, Copy)]
+pub struct Vehicle {
+    pub kind: VehicleKind,
+    /// How many times as fast as walking.
+    pub speed: f32,
+    /// Life stages that ride it.
+    pub stages: StageMask,
+    /// Ways shorter than this many metres are walked.
+    pub min_ride: f32,
+    /// Keeps to roads (an e-scooter): no trails.
+    pub roads_only: bool,
 }
 
 impl ObjectDef {
@@ -1214,13 +1246,21 @@ pub struct CareerRules {
     pub commute_minutes: f32,
     /// How late a Sim may leave before the shift counts as missed.
     pub late_minutes: f32,
+    /// Performance lost for a missed shift (at the entry grade: less further up, as shifts count).
     pub missed_penalty: f32,
-    /// Performance gained per shift at neutral mood; mood shifts it up or down.
+    /// Performance a shift is worth at the entry grade, in a middling mood with just the skills
+    /// asked for (`life::shift_performance` puts it all together).
     pub performance_per_shift: f32,
     /// Extra performance per shift for each skill level above the requirements (or less below).
     pub performance_per_fit: f32,
     /// Extra performance per shift at full mood (and as much less at none).
     pub performance_per_mood: f32,
+    /// How much less a shift counts each grade up: worth / (1 + grade index × this). 0: the same
+    /// at every grade.
+    pub performance_slowdown: f32,
+    /// Arriving more than this many minutes after the start, a shift counts `late_share` as much.
+    pub late_grace_minutes: f32,
+    pub late_share: f32,
     /// How far below a job's requirements a Sim may still be hired (on probation).
     pub probation_levels: f32,
     /// Sorted by `fit`.
@@ -1521,6 +1561,7 @@ pub struct ObjectRules {
     /// Each quality level takes this share off wear per use.
     pub wear_per_quality: f32,
     pub repair: RepairRules,
+    pub set_up: SetUpRules,
     pub max_quality: u8,
     /// Need and skill gains grow by this fraction per quality level.
     pub quality_bonus: f32,
@@ -1548,6 +1589,27 @@ pub struct RepairRules {
     pub cost: f32,
     pub tags: TagMask,
     pub anim: Option<usize>,
+}
+
+/// Setting up something a resident asked for (`setup.rs`): it comes as a parcel to the front
+/// door, and they carry it in and put it together where it goes.
+#[derive(Debug, Clone)]
+pub struct SetUpRules {
+    /// "Set up" (the action reads "Set up the new <thing>").
+    pub label: String,
+    /// Game minutes putting it together at its spot, and picking the parcel up at the door.
+    pub minutes: f32,
+    pub fetch_minutes: f32,
+    /// Hours the one who asked has to it before someone else at home may do it.
+    pub help_hours: f32,
+    /// Hours before it's set up for them anyway (nobody got to it).
+    pub wait_hours: f32,
+    /// The parcel (an item, carried in the hands); none: they carry nothing.
+    pub parcel: Option<usize>,
+    pub tags: TagMask,
+    /// Putting it together, and picking the parcel up.
+    pub anim: Option<usize>,
+    pub fetch_anim: Option<usize>,
 }
 
 impl RepairRules {
@@ -2265,6 +2327,20 @@ struct RepairRaw {
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
+struct SetUpRaw {
+    label: Option<String>,
+    minutes: Option<f32>,
+    fetch_minutes: Option<f32>,
+    help_after_hours: Option<f32>,
+    wait_hours: Option<f32>,
+    parcel: Option<String>,
+    tags: Option<Vec<String>>,
+    anim: Option<String>,
+    fetch_anim: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
 struct RoomRulesRaw {
     weights: Option<[f32; 5]>,
     window_tiles: Option<f32>,
@@ -2301,6 +2377,7 @@ struct ObjectRulesRaw {
     free_rotation: Option<Vec<String>>,
     wear: WearRaw,
     repair: RepairRaw,
+    set_up: SetUpRaw,
     max_quality: Option<u8>,
     quality_bonus: Option<f32>,
     upgrade_cost: Option<f32>,
@@ -2365,6 +2442,9 @@ struct CareerRulesRaw {
     performance_per_shift: Option<f32>,
     performance_per_fit: Option<f32>,
     performance_per_mood: Option<f32>,
+    performance_slowdown: Option<f32>,
+    late_grace_minutes: Option<f32>,
+    late_share: Option<f32>,
     probation_levels: Option<f32>,
     workweek: Vec<WorkweekRaw>,
     #[serde(alias = "promotionMoodlet")] // key before the moodlet → feeling rename
@@ -2551,6 +2631,27 @@ struct ObjectRaw {
     /// Someone serves here on a public lot (see `ObjectDef::staff`).
     #[serde(default)]
     staff: Option<crate::staff::PostRaw>,
+    /// Something to ride (see `ObjectDef::vehicle`).
+    #[serde(default)]
+    vehicle: Option<VehicleRaw>,
+}
+
+/// An object's `vehicle`: `{"kind": "bike", "speed": 3, "stages": ["child", "teen", ...],
+/// "minRide": 60, "roadsOnly": false}`.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VehicleRaw {
+    kind: VehicleKind,
+    speed: f32,
+    stages: Option<Vec<String>>,
+    #[serde(default = "default_min_ride")]
+    min_ride: f32,
+    #[serde(default)]
+    roads_only: bool,
+}
+
+fn default_min_ride() -> f32 {
+    60.0
 }
 
 /// A slot's place: `{"at": [-0.3, 0.7], "facing": 180}` (m off the middle, to its right and front;
@@ -3766,6 +3867,25 @@ impl Content {
                     obj.id
                 )));
             }
+            let vehicle = match &obj.vehicle {
+                None => None,
+                Some(v) => {
+                    if !(1.0..=10.0).contains(&v.speed) || v.min_ride.is_nan() || v.min_ride < 0.0 {
+                        return Err(Error::new(format!(
+                            "object '{}': a vehicle's speed is 1 to 10 times walking, and its minRide 0 or more",
+                            obj.id
+                        )));
+                    }
+                    Some(Vehicle {
+                        kind: v.kind,
+                        speed: v.speed,
+                        stages: stages_of(&v.stages, &format!("object '{}' vehicle", obj.id))?
+                            .unwrap_or(every_stage),
+                        min_ride: v.min_ride,
+                        roads_only: v.roads_only,
+                    })
+                }
+            };
             let upper_stages = stages_of(
                 &obj.upper_stages,
                 &format!("object '{}' upperStages", obj.id),
@@ -3922,6 +4042,7 @@ impl Content {
                 footstool: obj.footstool,
                 overhang: obj.overhang.iter().map(|&[r, f]| (r, f)).collect(),
                 staff: obj.staff.as_ref().map(|r| crate::staff::post(r, obj.footprint, &obj.id)).transpose()?,
+                vehicle,
             });
         }
 
@@ -4271,6 +4392,20 @@ impl Content {
             performance_per_shift: cr.performance_per_shift.unwrap_or(12.0),
             performance_per_fit: cr.performance_per_fit.unwrap_or(0.0),
             performance_per_mood: cr.performance_per_mood.unwrap_or(15.0),
+            performance_slowdown: checked_range(
+                cr.performance_slowdown.unwrap_or(0.0),
+                "careerRules.performanceSlowdown",
+                PERFORMANCE_SLOWDOWN,
+            )?,
+            late_grace_minutes: time(
+                cr.late_grace_minutes.unwrap_or(0.0),
+                "careerRules.lateGraceMinutes",
+            )?,
+            late_share: checked_range(
+                cr.late_share.unwrap_or(1.0),
+                "careerRules.lateShare",
+                LATE_SHARE,
+            )?,
             probation_levels,
             workweek,
             promotion_feeling: feeling(&cr.promotion_feeling, "careerRules")?,
@@ -4617,6 +4752,38 @@ impl Content {
                     None => tag_index.get("chores").map_or(0, |&i| 1 << i),
                 },
                 anim: animations.iter().position(|a| a == "tinker"),
+            },
+            set_up: {
+                let su = &or.set_up;
+                let anim = |a: &Option<String>, default: &str| match a {
+                    None => Ok(anim_index(default)),
+                    Some(a) => anim_index(a).map(Some).ok_or_else(|| {
+                        Error::new(format!(
+                            "objectRules.setUp: unknown anim '{a}' (declare it in \"animations\")"
+                        ))
+                    }),
+                };
+                SetUpRules {
+                    label: su.label.clone().unwrap_or_else(|| "Set up".into()),
+                    minutes: su.minutes.unwrap_or(15.0).max(1.0),
+                    fetch_minutes: su.fetch_minutes.unwrap_or(1.5).max(0.5),
+                    help_hours: su.help_after_hours.unwrap_or(2.0).max(0.0),
+                    wait_hours: su.wait_hours.unwrap_or(24.0).max(1.0),
+                    parcel: match &su.parcel {
+                        None => None,
+                        Some(id) => {
+                            Some(items.iter().position(|i| &i.id == id).ok_or_else(|| {
+                                Error::new(format!("objectRules.setUp: unknown item '{id}'"))
+                            })?)
+                        }
+                    },
+                    tags: match &su.tags {
+                        Some(tags) => tag_mask(tags, "objectRules.setUp")?,
+                        None => tag_index.get("chores").map_or(0, |&i| 1 << i),
+                    },
+                    anim: anim(&su.anim, "tinker")?,
+                    fetch_anim: anim(&su.fetch_anim, "serve")?,
+                }
             },
             max_quality: or.max_quality.unwrap_or(3),
             quality_bonus: or.quality_bonus.unwrap_or(0.25),

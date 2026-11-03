@@ -34,6 +34,8 @@ export interface Prop {
   failed?: string[];
   /** The template it was made from, whose file (its materials) it draws with: let go of with it. */
   template: { meshes: ModelMesh[] };
+  /** A named node drawn as it stands in its model (`node`): where it is at rest (model space), to turn it about. */
+  pivot?: Float32Array;
 }
 
 export class ResidentProps {
@@ -83,17 +85,39 @@ export class ResidentProps {
    */
   async build(key: string): Promise<Prop | null> {
     const at = key.indexOf('#');
-    const p = at < 0 ? await this.whole(key) : await this.part(key.slice(0, at), ...partColors(key.slice(at + 1)));
+    const node = key.indexOf('#node:');
+    const p = node >= 0 ? await this.node(key.slice(0, node), ...partColors(key.slice(node + 6))) : at < 0 ? await this.whole(key) : await this.part(key.slice(0, at), ...partColors(key.slice(at + 1)));
     if (!p) return null;
     const draws = p.meshes.map((m) => new Instances(this.app.graphicsDevice, this.parent, m.mesh, m.material, { name: `prop:${key}`, castShadows: false, receiveShadows: true, capacity: this.rows, cull: false }));
     for (const d of draws) d.enabled = false;
-    return { meshes: p.meshes, draws, matrices: new Float32Array(this.rows * 16), top: p.top, failed: p.failed, template: p.template };
+    return { meshes: p.meshes, draws, matrices: new Float32Array(this.rows * 16), top: p.top, failed: p.failed, template: p.template, pivot: p.pivot };
   }
 
   private async whole(key: string): Promise<Omit<Prop, 'draws' | 'matrices'>> {
     const t = await buildModel(this.app, `prop:${key}`, this.assets.get(key, 'model'), [1, 1], { standIn: ITEM_STAND_IN });
     for (const g of t.glows ?? []) g.mesh.mesh.destroy();
     return { meshes: t.meshes, top: [0, 0, 0], failed: t.failed, template: t };
+  }
+
+  /**
+   * Named node `name` of model `model` (`<model key>#node:<name>`: a bike's frame, a wheel, its cranks, which no
+   * clip moves; `vehicles.ts` turns them), drawn as it stands in the model (model space, as built), with where
+   * it is at rest (`pivot`: its own frame, to turn it about); painted in `colors` as the object is. Null if the
+   * model has no such node. Without the file, a small block.
+   */
+  private async node(model: string, name: string, colors?: PartColors): Promise<Omit<Prop, 'draws' | 'matrices'> | null> {
+    const entry = painted(this.assets.get(model, 'model'), colors);
+    const t = await buildModel(this.app, `prop:${model}#${name}`, entry, [1, 1], { standIn: ITEM_STAND_IN, parts: [name] });
+    if (t.failed) return { meshes: t.meshes, top: [0, t.height, 0], failed: t.failed, template: t };
+    for (const g of t.glows ?? []) g.mesh.mesh.destroy();
+    const keep = t.meshes.filter((_, k) => t.motion?.parts[k] === 0);
+    const pivot = t.motion?.rests?.[0];
+    if (!keep.length || !pivot) {
+      disposeTemplate({ meshes: t.meshes });
+      return null;
+    }
+    for (const m of t.meshes) if (!keep.includes(m)) m.mesh.destroy();
+    return { meshes: keep, top: [0, t.height, 0], template: { meshes: t.meshes }, pivot };
   }
 
   /**

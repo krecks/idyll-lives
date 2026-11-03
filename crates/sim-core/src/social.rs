@@ -887,6 +887,12 @@ pub enum EventKind {
     PlayedAlone,
     /// `a` was told to play a game for two at the `object` and had nobody free to play with.
     NoPartner,
+    /// `a` set up the new `object` at home (a parcel carried in and put together; `setup.rs`).
+    SetUp,
+    /// The new `object` `a` wanted was set up for them, nobody at home having got to it.
+    SetUpForThem,
+    /// There was no room at home for the `object` `a` wanted: it went back, the money back.
+    SentBack,
 }
 
 impl EventKind {
@@ -899,7 +905,8 @@ impl EventKind {
             | MovedOut | MovedAway | Expecting | Born | Adopted | Graduated => 2,
             BecameFriends | BecameGoodFriends | BecameEnemies | Crush | ProposalRejected
             | Fight | Jealous | QuitJob | RentDebt | Broke | Accident | TurnedAway | WantsToBuy
-            | Bought | DeniedAgain | StayedHome | NoBed | NotClosed | PlayedAlone | NoPartner => 1,
+            | Bought | DeniedAgain | StayedHome | NoBed | NotClosed | PlayedAlone | NoPartner
+            | SetUp | SetUpForThem | SentBack => 1,
             Met | MissedWork | SkillUp | PaidRent | Upgraded | Visited | GoalSuggested
             | Repaired | NobodyHome | Invited | Declined | Babysitter => 0,
         }

@@ -393,6 +393,12 @@ struct JobView<'a> {
     grade: Option<&'a str>,
     grade_label: Option<&'a str>,
     performance: f32,
+    /// What a shift adds to the bar at this pace (the mood they last left for work in), and how
+    /// many more it takes to fill it (none at the top of the career, or when shifts don't).
+    shift_performance: f32,
+    shifts_to_full_bar: Option<u32>,
+    /// The mood they last left for work in (0..1).
+    shift_mood: f32,
     /// Pay per shift on this Sim's schedule.
     pay: i64,
     pay_per_hour: f32,
@@ -677,6 +683,7 @@ struct SimSent {
     away_until: u64,
     visiting: u64,
     trip: u64,
+    ride: u64,
     job: u64,
     /// Reset when the details stop (the UI drops them).
     details: DetailsSent,
@@ -1020,6 +1027,7 @@ fn sim_patch(
     // (The time only with the details: it's a search along the roads, for a handful, not the town.)
     let trip = trip_view(world, s, riders, detail);
     o.changed_opt("trip", trip.as_ref(), &mut sent.trip);
+    o.changed_opt("ride", ride_view(world, s).as_ref(), &mut sent.ride);
     o.changed("job", &job_view(content, s), &mut sent.job);
     if !detail {
         return;
@@ -1213,6 +1221,26 @@ fn task_view(
                 None,
                 None,
                 rest.map_or(1.0, |r| r.minutes),
+            )
+        }
+        // "Set up the new cookbook lectern".
+        TaskKind::SetUp { object, stage, .. } => {
+            let rules = &content.object_rules.set_up;
+            let name = content
+                .objects
+                .get(object as usize)
+                .map_or_else(String::new, |d| d.name.to_lowercase());
+            // (Picking the parcel up is the start of it: no progress yet.)
+            let minutes = if stage == 0 {
+                f32::INFINITY
+            } else {
+                rules.minutes
+            };
+            (
+                format!("{} the new {name}", rules.label),
+                None,
+                None,
+                minutes,
             )
         }
         TaskKind::Repair { object } => {
@@ -1509,13 +1537,42 @@ fn trip_view(world: &World, s: &Sim, riders: &[u32], timed: bool) -> Option<Trip
     } else {
         crate::travel::Mode::Foot
     };
-    let walk = s.walk_per_minute(&world.content);
+    // (On a bike: as fast as it goes, `ride.rs`.)
+    let walk =
+        s.walk_per_minute(&world.content) * crate::ride::speed(&world.content, s, &world.objects);
     let minutes = crate::world::trip_minutes(world.travel.eta(from, door, mode, walk), car);
     let at = world.tick + (minutes.max(0.0) * crate::TICKS_PER_MINUTE as f32) as u64;
     Some(TripView {
         to,
         at: Some(step(at)),
     })
+}
+
+/// On a bike or an e-scooter of theirs (`SimView.ride`, `ride.rs`): what it is, and whether they're
+/// off to work, to school or home on it.
+#[derive(Serialize)]
+struct RideView {
+    kind: crate::content::VehicleKind,
+    to: &'static str,
+}
+
+/// What resident `s` rides now, on their way (not while away at work with it).
+fn ride_view(world: &World, s: &Sim) -> Option<RideView> {
+    let bike = world.objects.get(s.riding? as usize)?;
+    let kind = world.content.objects[bike.def].vehicle?.kind;
+    if s.away_until.is_some() {
+        return None;
+    }
+    let home = s
+        .current()
+        .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
+    let school = world.content.life.school.is_some() && s.job.is_none();
+    let to = match (home, school) {
+        (true, _) => "home",
+        (false, true) => "school",
+        (false, false) => "work",
+    };
+    Some(RideView { kind, to })
 }
 
 fn job_view<'a>(content: &'a Content, s: &Sim) -> Option<JobView<'a>> {
@@ -1538,6 +1595,12 @@ fn job_view<'a>(content: &'a Content, s: &Sim) -> Option<JobView<'a>> {
         grade: grade.map(|g| g.id.as_str()),
         grade_label: grade.map(|g| g.label.as_str()),
         performance: j.performance,
+        shift_performance: round_to(
+            life::shift_performance(&content.career_rules, j.level, j.shift_mood, fit, false),
+            PERCENT,
+        ),
+        shifts_to_full_bar: life::shifts_to_full_bar(content, j, &s.skills),
+        shift_mood: round_to(j.shift_mood, PERCENT),
         pay: life::shift_pay(content, j, &s.skills),
         pay_per_hour: level.pay as f32 / level.hours,
         weekly_pay: level.pay * level.days.count_ones() as i64,
@@ -2171,9 +2234,23 @@ struct ItemView<'a> {
     household: u32,
 }
 
-/// Every item: food and dishes on surfaces, on the floor and in fridges (JSON array, by id).
+/// Every item: food and dishes on surfaces, on the floor and in fridges (JSON array, by id), and
+/// the parcels of things bought waiting to be set up (`setup::parcels`, on the floor).
 pub fn items_json(world: &World) -> String {
     let content = &world.content;
+    let parcels = crate::setup::parcels(world)
+        .into_iter()
+        .map(|(id, def, [x, z], household)| ItemView {
+            id,
+            def: &content.items[def].id,
+            x: round_to(x, 100.0),
+            z: round_to(z, 100.0),
+            y: 0.0,
+            yaw: 0.0,
+            servings: 0,
+            state: "fresh",
+            household,
+        });
     let items: Vec<ItemView> = world
         .items
         .list
@@ -2208,6 +2285,7 @@ pub fn items_json(world: &World) -> String {
                 household: it.household,
             }
         })
+        .chain(parcels)
         .collect();
     serde_json::to_string(&items).expect("items serialize")
 }

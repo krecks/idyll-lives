@@ -1252,13 +1252,38 @@ pub(crate) fn seat(
     cars: &[Car],
     briefs: &[SimBrief],
     households: &[Household],
+    rels: &crate::social::Relationships,
+    ground: [f32; 2],
     sim: &Sim,
 ) -> Option<(u32, usize)> {
     let me = briefs.get(sim.id as usize)?;
     let home = households.get(sim.household as usize)?.plot?;
-    if !sim.here() || me.baby || me.plot.is_some_and(|p| p != home) {
+    if !sim.here() || me.baby {
         return None;
     }
+    let own = || {
+        me.plot
+            .is_none_or(|p| p == home)
+            .then(|| own_seat(cars, briefs, sim, me, home))
+            .flatten()
+    };
+    // A lift from a neighbour leaving now (`lift_seat`): from home, or on their way to it.
+    own().or_else(|| {
+        me.plot
+            .is_some()
+            .then(|| lift_seat(cars, briefs, households, rels, ground, sim, me, home))
+            .flatten()
+    })
+}
+
+/// A seat in a car of `sim`'s own household (`seat`).
+fn own_seat(
+    cars: &[Car],
+    briefs: &[SimBrief],
+    sim: &Sim,
+    me: &SimBrief,
+    home: u32,
+) -> Option<(u32, usize)> {
     cars.iter().enumerate().find_map(|(c, car)| {
         // At home, or still close by on the street.
         let near = me.plot == Some(home)
@@ -1312,20 +1337,90 @@ pub(crate) fn seat(
     })
 }
 
+/// Neighbours give lifts: a car of another household standing within `LIFT_REACH` m of `sim`
+/// (`ground`: where they are, over the ground) whose driver is setting off now (on their way to
+/// it, or in it and waiting) and is a friend (`LIFT_FRIENDSHIP`), with a seat free.
+#[allow(clippy::too_many_arguments)]
+fn lift_seat(
+    cars: &[Car],
+    briefs: &[SimBrief],
+    households: &[Household],
+    rels: &crate::social::Relationships,
+    ground: [f32; 2],
+    sim: &Sim,
+    me: &SimBrief,
+    home: u32,
+) -> Option<(u32, usize)> {
+    cars.iter().enumerate().find_map(|(c, car)| {
+        let theirs = households.get(car.household as usize)?.plot;
+        if car.household == sim.household
+            || theirs != Some(car.plot)
+            || me.plot.is_some_and(|p| p != home && p != car.plot)
+            || car.blocked
+            || car.no_way
+            || car.trip.is_some()
+            || (ground[0] - car.spot[0]).hypot(ground[1] - car.spot[1]) > LIFT_REACH
+        {
+            return None;
+        }
+        let c = c as u32;
+        let drives =
+            |j: u32| car.owners.contains(&j) && briefs.get(j as usize).is_some_and(|b| b.adult);
+        let driver = match (car.state, car.driver) {
+            (CarState::Boarding, Some(d)) => Some(d),
+            (CarState::Parked, _) | (CarState::Boarding, None) => briefs
+                .iter()
+                .enumerate()
+                .find(|(j, b)| b.bound_for_car == Some(c) && drives(*j as u32))
+                .map(|(j, _)| j as u32),
+            _ => None,
+        }?;
+        if driver == sim.id
+            || rels.get(sim.id as usize, driver as usize).friendship < LIFT_FRIENDSHIP
+        {
+            return None;
+        }
+        let riders = car.aboard.iter().filter(|&&a| a != driver).count()
+            + briefs
+                .iter()
+                .enumerate()
+                .filter(|(j, b)| {
+                    *j as u32 != sim.id && b.bound_for_car == Some(c) && *j as u32 != driver
+                })
+                .count();
+        (riders + 1 < SEATS).then_some((c, riders + 1))
+    })
+}
+
+/// Neighbours give a lift (`lift_seat`) from a car this close (m) to someone at home...
+pub(crate) const LIFT_REACH: f32 = 25.0;
+/// ...to a friend this good.
+pub(crate) const LIFT_FRIENDSHIP: f32 = 30.0;
+
 /// Where `sim` heads for work (or school) when they go by car: the car, the door they get in by
 /// and where they stand for it. None: on foot.
 pub(crate) fn ride_for(
     ctx: &crate::world::Ctx,
     sim: &Sim,
 ) -> Option<(u32, usize, usize, [f32; 2])> {
-    let (c, seat) = seat(ctx.cars, ctx.briefs, ctx.households, sim)?;
+    let ground = ctx.nav.stairs.ground_pos(sim.pos);
+    let (c, seat) = seat(ctx.cars, ctx.briefs, ctx.households, ctx.rels, ground, sim)?;
     let (door, at) = ctx.cars[c as usize].door(&ctx.nav, seat)?;
     Some((c, seat, door, at))
 }
 
 /// Whether `i` can get into car `c` now (as `seat` found it on their way).
 pub(crate) fn may_board(w: &World, i: usize, c: u32) -> bool {
-    seat(&w.cars, &w.briefs, &w.households, &w.sims[i]).is_some_and(|(k, _)| k == c)
+    let ground = w.stairs.ground_pos(w.sims[i].pos);
+    seat(
+        &w.cars,
+        &w.briefs,
+        &w.households,
+        &w.relationships,
+        ground,
+        &w.sims[i],
+    )
+    .is_some_and(|(k, _)| k == c)
 }
 
 /// How much earlier than on foot `i` leaves for work or school starting at `start` when their
@@ -1335,25 +1430,42 @@ pub(crate) fn may_board(w: &World, i: usize, c: u32) -> bool {
 pub(crate) fn lead_ticks(w: &World, i: usize, start: u64) -> u64 {
     let s = &w.sims[i];
     let home = w.households.get(s.household as usize).and_then(|h| h.plot);
-    let Some(car) = w.cars.iter().find(|c| {
-        c.household == s.household && Some(c.plot) == home && c.at_home() && !c.blocked && !c.no_way
-    }) else {
-        return 0;
+    let usable = |c: &&Car| c.at_home() && !c.blocked && !c.no_way;
+    let drives = |car: &Car, j: usize| {
+        car.owners.contains(&(j as u32)) && w.briefs.get(j).is_some_and(|b| b.adult)
     };
-    let drives =
-        |j: usize| car.owners.contains(&(j as u32)) && w.briefs.get(j).is_some_and(|b| b.adult);
-    let lift = || {
+    // An owner who drives it and starts about when they do (`friend`: a friend enough for a
+    // lift, for a neighbour's car).
+    let lift = |car: &Car, friend: bool| {
         car.owners.iter().any(|&j| {
             let j = j as usize;
             j != i
-                && drives(j)
+                && drives(car, j)
                 && w.sims.get(j).is_some_and(|o| o.here())
+                && (!friend || w.relationships.get(i, j).friendship >= LIFT_FRIENDSHIP)
                 && starts_today(w, j).is_some_and(|st| st.abs_diff(start) <= BOARD_WAIT_TICKS)
         })
     };
-    if !drives(i) && !lift() {
+    let own = w
+        .cars
+        .iter()
+        .filter(usable)
+        .find(|c| c.household == s.household && Some(c.plot) == home)
+        .filter(|car| drives(car, i) || lift(car, false));
+    // Else a lift from a neighbour leaving with them (`lift_seat`).
+    let door = home.map(|p| w.plots[p as usize].arrival_point());
+    let car = own.or_else(|| {
+        let door = door?;
+        w.cars.iter().filter(usable).find(|c| {
+            c.household != s.household
+                && w.households.get(c.household as usize).and_then(|h| h.plot) == Some(c.plot)
+                && (door[0] - c.spot[0]).hypot(door[1] - c.spot[1]) <= LIFT_REACH
+                && lift(c, true)
+        })
+    });
+    let Some(car) = car else {
         return 0;
-    }
+    };
     WALK_TO_CAR_TICKS
         + u64::from(GET_IN_TICKS)
         + BOARD_MIN_TICKS
@@ -1902,20 +2014,25 @@ fn call_riders(w: &mut World, c: usize) -> bool {
     let mut expected = false;
     for i in 0..w.sims.len() {
         let s = &w.sims[i];
-        if !s.here()
-            || s.household != household
-            || s.away_until.is_some()
-            || w.cars[c].aboard.contains(&(i as u32))
-        {
+        if !s.here() || s.away_until.is_some() || w.cars[c].aboard.contains(&(i as u32)) {
             continue;
         }
         let heading_out = s
             .current()
             .is_some_and(|a| matches!(a.task.kind, TaskKind::Work));
+        // The household, still at home; or a neighbour setting off from theirs, for a lift
+        // (`lift_seat`, which `may_board` asks).
+        let from = if s.household == household {
+            Some(plot)
+        } else {
+            w.households.get(s.household as usize).and_then(|h| h.plot)
+        };
+        // (A neighbour on their way to it may be on either lot.)
         if !heading_out
+            || from.is_none()
             || w.briefs
                 .get(i)
-                .is_none_or(|b| b.plot.is_some_and(|p| p != plot))
+                .is_none_or(|b| b.plot.is_some_and(|p| Some(p) != from && p != plot))
         {
             continue;
         }
@@ -2478,21 +2595,27 @@ pub(crate) fn parks_near(travel: &Travel, door: [f32; 2]) -> bool {
 /// Whether `sim` could drive somewhere now (`trip_car` without the place): an open-world town
 /// with parking, a grown-up owner at home with the household's car parked there.
 pub(crate) fn could_drive(ctx: &crate::world::Ctx, sim: &Sim) -> bool {
-    let Some(home) = ctx
-        .households
-        .get(sim.household as usize)
-        .and_then(|h| h.plot)
-    else {
+    can_drive(ctx.travel, ctx.households, ctx.briefs, ctx.cars, sim)
+}
+
+/// `could_drive`, from the world's parts (outside a tick's `Ctx`).
+pub(crate) fn can_drive(
+    travel: &Travel,
+    households: &[crate::world::Household],
+    briefs: &[crate::world::SimBrief],
+    cars: &[Car],
+    sim: &Sim,
+) -> bool {
+    let Some(home) = households.get(sim.household as usize).and_then(|h| h.plot) else {
         return false;
     };
-    ctx.travel.open
-        && !ctx.travel.file.parking.is_empty()
+    travel.open
+        && !travel.file.parking.is_empty()
         && sim.visiting.is_none()
-        && ctx
-            .briefs
+        && briefs
             .get(sim.id as usize)
             .is_some_and(|b| b.adult && b.plot == Some(home))
-        && ctx.cars.iter().any(|car| {
+        && cars.iter().any(|car| {
             car.household == sim.household
                 && car.plot == home
                 && car.state == CarState::Parked
@@ -3269,6 +3392,50 @@ mod tests {
         while w.tick < target {
             w.tick_once();
         }
+    }
+
+    /// Ada's house with her car, and Cy's next door without one: both at the same office.
+    fn neighbours(bond: &str) -> World {
+        let content = CONTENT.replace(
+            r#""economy""#,
+            r#""bondPresets":{"friends":{"friendship":60},"strangers":{"friendship":0}},"economy""#,
+        );
+        let town = format!(
+            r#"{{"width":60,"depth":14,"exits":[[0.5,9.5],[59.5,9.5]],
+            "plots":[{{"name":"Home","x":20,"z":0,"w":20,"d":8,"entry":[25.5,7.5]}},
+                     {{"name":"Next","x":40,"z":0,"w":16,"d":8,"entry":[45.5,7.5]}}],
+            "households":[{{"name":"Ones","plot":0}},{{"name":"Twos","plot":1}}],
+            "sims":[{{"name":"Ada","household":0,"job":{{"career":"office"}},"x":25.5,"z":3.5}},
+                    {{"name":"Cy","household":1,"job":{{"career":"office"}},"x":45.5,"z":3.5}}],
+            "relationships":[{{"a":0,"b":1,"preset":"{bond}"}}],
+            "cars":[{{"plot":0,"x":34.0,"z":3.0,"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,"body":1,"paint":2}}]}}"#
+        );
+        World::from_json(&content, &town, 1).unwrap()
+    }
+
+    #[test]
+    fn a_friend_next_door_gets_a_lift_to_work_and_back() {
+        let mut w = neighbours("friends");
+        w.autonomy = false;
+        until(&mut w, 2, 10.0);
+        let mut aboard = w.cars[0].aboard.clone();
+        aboard.sort();
+        assert_eq!(aboard, vec![0, 1], "Cy went in Ada's car");
+        assert!(w.sims.iter().all(|s| s.away_until.is_some()));
+        until(&mut w, 2, 15.0);
+        assert_eq!(w.cars[0].state, CarState::Parked, "home again");
+        let (x, z) = w.sims[1].tile();
+        assert_eq!(w.plot_at(x, z), Some(1), "Cy walked home from next door");
+        assert!(w.sims[1].away_until.is_none());
+    }
+
+    #[test]
+    fn a_neighbour_who_is_no_friend_walks() {
+        let mut w = neighbours("strangers");
+        w.autonomy = false;
+        until(&mut w, 2, 10.0);
+        assert_eq!(w.cars[0].aboard, vec![0], "only Ada in her car");
+        assert!(w.sims[1].away_until.is_some(), "Cy got to work on foot");
     }
 
     #[test]

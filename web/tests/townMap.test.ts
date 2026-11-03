@@ -1,10 +1,11 @@
 /**
  * The town map's view (`ui/mapView.ts`): a point on screen to the ground under it when the map
- * fits a box of another shape (the "Bigger" map), and the place pill's words (`ui/place.ts`).
+ * fits a box of another shape (the "Bigger" map), and the place pill's words (`ui/place.ts`): where a
+ * resident is off to, on foot or riding.
  */
 import { describe, expect, test } from 'bun:test';
 import { mapScale, screenToMap } from '../src/ui/mapView';
-import { placeAt, tripText } from '../src/ui/place';
+import { placeAt, rideText, tripText } from '../src/ui/place';
 
 describe('town map view', () => {
   const view = { x: -6, z: -6, w: 412, d: 212 };
@@ -71,5 +72,14 @@ describe('place names', () => {
     // (The time only comes with a resident's details.)
     expect(tripText({ to: 1 }, 1, plots, households, time)).toBe('On the way home');
     expect(tripText({ to: 0 }, 1, plots, households, time)).toBe('On the way to the Smiths');
+  });
+
+  test('a resident riding: cycling or on the e-scooter, to work, to school or home', () => {
+    const time = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+    expect(rideText('bike', 'work')).toBe('Cycling to work');
+    expect(rideText('bike', 'school')).toBe('Cycling to school');
+    expect(rideText('scooter', 'work')).toBe('Riding the e-scooter to work');
+    expect(tripText({ to: 1, at: 17 * 60 + 40 }, 1, plots, households, time, { kind: 'bike', to: 'home' })).toBe('Cycling home · back about 17:40');
+    expect(tripText({ to: 1 }, 1, plots, households, time, { kind: 'scooter', to: 'home' })).toBe('Riding the e-scooter home');
   });
 });

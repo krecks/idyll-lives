@@ -695,6 +695,11 @@ export interface SimView {
    * roads), or home from work by car. Absent when they aren't (and from older workers).
    */
   trip?: { to: number; at?: number };
+  /**
+   * On a bike or an e-scooter of theirs (sim-core `ride.rs`), off to work, to school or home on it
+   * (not while away at work with it). Absent when they aren't (and from older workers).
+   */
+  ride?: { kind: 'bike' | 'scooter'; to: 'work' | 'school' | 'home' };
   job: JobView | null;
   /** A pupil's school grade (0..100, in tenths). */
   grade?: number;
@@ -759,6 +764,12 @@ export interface JobView {
   grade: string | null;
   gradeLabel: string | null;
   performance: number;
+  /** What a shift adds to the bar at this pace (the mood they last left for work in). */
+  shiftPerformance: number;
+  /** Shifts at this pace still to fill the bar; null at the top, or when shifts don't fill it. */
+  shiftsToFullBar: number | null;
+  /** The mood they last left for work in (0..1). */
+  shiftMood: number;
   /** Per shift on this Sim's schedule. */
   pay: number;
   payPerHour: number;

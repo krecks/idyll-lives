@@ -783,6 +783,15 @@ pub(crate) fn update(w: &mut World) {
         else {
             continue;
         };
+        // Whoever would set off for the other's home only goes if the way is one to make now
+        // (not a walk of hours, there in visiting hours: `World::visit_fits_now`).
+        let meet = w.content.phone.actions[h.action].meet;
+        let home_of = |s: usize| w.households[w.sims[s].household as usize].plot;
+        let can_meet = match meet {
+            Some(Meet::Here) => home_of(i).is_some_and(|p| w.visit_fits_now(c, p)),
+            Some(Meet::There) => h.directed || home_of(c).is_some_and(|p| w.visit_fits_now(i, p)),
+            None => true,
+        };
         let World {
             content,
             sims,
@@ -839,7 +848,7 @@ pub(crate) fn update(w: &mut World) {
         // crowd out everything else).
         let ours = households[sims[i].household as usize].player
             || households[sims[c].household as usize].player;
-        if h.answer == Answer::No {
+        if h.answer == Answer::No || !can_meet {
             if ours {
                 events.push(tick, EventKind::Declined, i, c, None);
             }

@@ -261,11 +261,14 @@ soak and hangs behind it while the water bubbles. The patio things, the hammock,
 grill were rebuilt to real sizes (2026-10-21).
 
 The play and yard things (`models/yard/sandbox.glb`, `bikeRack.glb`, `raisedBed.glb`, `shedSmall.glb`,
-`greenhouse.glb`, `compostBin.glb`, `rainBarrel.glb`, `clothesline.glb`, `firewoodStack.glb`, each with its
-`.far.glb`, override pack `packs/yard/manifest.json`) are built in Blender by `tools/art/blender/families/yard.py`
+`greenhouse.glb`, `compostBin.glb`, `rainBarrel.glb`, `clothesline.glb`, `firewoodStack.glb`, and the rides residents
+ride to work or school, `bicycle.glb` (a step-through city bike with a basket), `bicycleChild.glb` (a kids' bike on
+stabilisers) and `eScooter.glb` (an electric scooter), each with its `.far.glb`, override pack
+`packs/yard/manifest.json`) are built in Blender by `tools/art/blender/families/yard.py`
 on `gamekit` and exported as `.glb` (glTF, original, CC0). A sand castle grows in the sandpit, the bike lifts and
 turns its back wheel, the raised bed's crop grows and is picked, the shed's and the greenhouse's doors open, the
-compost bin's lid lifts and the washing goes out on the line a line at a time.
+compost bin's lid lifts and the washing goes out on the line a line at a time; the rides' wheels, cranks and stands
+are parts the game moves.
 
 The grills and the fire pit (`models/outdoor/grill.glb`, `grillStation.glb`, `firePit.glb`, same pack and family)
 are built the same way (glTF, original, CC0). The grill's lid and the station's hood swing up while residents cook,
@@ -479,7 +482,7 @@ the dirty pot, the tasting board, the grill platter and the dirty platter, the p
 tray, the pie and the dirty pie dish, the plates of stew, barbecue, a tasting menu, pizza, treats, pie, cake, salad, a sandwich and toast, the dirty plate
 and a stack of three, the dirty tasting board and pizza board, the bowl of ice cream and the dirty bowl, the smoothie, the noodle pail and the
 takeaway box, the food bought in town (a paper cup of ice cream, a hot dog on its paper boat, a packet of crisps, an
-apple, a pastry in a paper bag), the chopping board, the
+apple, a pastry in a paper bag), the parcel a thing bought comes in, the chopping board, the
 pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks, the cook's knife, wooden
 spoon, turner and whisk, the bites of what is eaten by hand (half a sandwich, half a slice of toast, a slice of pizza, a
 cookie, a burger, a hot dog, a cracker with cheese, a croissant, a few crisps), and what residents hold

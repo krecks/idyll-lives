@@ -47,6 +47,9 @@ M = G.Palette(
     kraft=('#C49A6C', 'matte'),
     kraft_fold=('#A9804F', 'matte'),
     kraft_inside=('#6E5236', 'matte'),
+    carton=('#B98B5A', 'matte'),     # the parcel's corrugated card
+    carton_seam=('#8E6840', 'matte'),
+    tape=('#DDBA85', 'satin'),       # brown packing tape, a little shiny
     # food
     lettuce=('#5FA33A', 'satin'),
     leaf=('#3F7F2A', 'satin'),
@@ -2161,6 +2164,25 @@ def pastryBag():
     return done('pastryBag')
 
 
+def parcel():
+    """A parcel from the shop, 42 cm wide, 30 cm high and 34 cm deep: a corrugated card box, the seam where its top
+    flaps meet running front to back, brown tape along it and down the front and the back, a white address label on
+    the top."""
+    w, h, d = 0.42, 0.30, 0.34
+    box('box', w, h, d, (0, h / 2, 0), M.carton, bevel=0.006)
+    # where the flaps meet, under the tape
+    box('seam', 0.004, 0.001, d - 0.01, (0, h + 0.0002, 0), M.carton_seam)
+    # the tape: over the top and a hand's width down the front and the back
+    box('tape', 0.05, 0.0016, d + 0.002, (0, h + 0.0008, 0), M.tape)
+    for z in (-1, 1):
+        box(f'tape{z}', 0.05, 0.1, 0.0016, (0, h - 0.05, z * (d / 2 + 0.0008)), M.tape)
+    # the label, on the top to one side of the tape
+    box('label', 0.1, 0.0012, 0.07, (0.11, h + 0.0006, 0.06), M.paper, yaw=4)
+    for i, (x, l) in enumerate(((0.016, 0.07), (0.0, 0.06), (-0.016, 0.045))):
+        box(f'line{i}', l, 0.0004, 0.004, (0.105, h + 0.0014, 0.06 + x), M.paper_red, yaw=4)
+    return done('parcel')
+
+
 def I(id, build, size, key, centre=(0.0, 0.0), code=False, tolerance=0.02):
     # (`tolerance`: a thing a centimetre across measures to the millimetre, not the 2 %.)
     return G.Model(id, build, size=size, key=key, centre=centre, code=code, ground=False,
@@ -2258,6 +2280,8 @@ FAMILY = G.Family(
         I('pastryBag', pastryBag, (0.128, 0.198, 0.072), 'item.pastryBag'),
         I('cutFlowers', cutFlowers, (0.134, 0.370, 0.070), 'item.cutFlowers', centre=(0.0, 0.0387)),
         I('daisyChain', daisyChain, (0.159, 0.014, 0.159), 'item.daisyChain'),
+        # a parcel to carry in and set up (sim-core setup.rs)
+        I('parcel', parcel, (0.42, 0.302, 0.343), 'item.parcel'),
     ],
     comment='Blender-built things residents carry and cook with (tools/art/blender/families/held.py): the '
             'models of content `items`, the props drawn on a station while cooking and those in the hands '
