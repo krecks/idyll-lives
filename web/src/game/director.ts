@@ -1,9 +1,10 @@
 /**
  * The watching director: while the player leaves the game alone, it picks what's worth seeing
- * at home (a conversation, a fight, a first kiss, someone trying out what was just built, a
- * guest arriving) and frames it; when nothing is going on it looks around the house. Any input
- * hands the camera back (see `session.ts`). Pure logic: it reads the snapshot and the world
- * structure and asks for shots, which the renderer flies.
+ * at home (a conversation, a fight, a first kiss, someone carrying in and setting up something
+ * new, someone trying out what was just built, a guest arriving) and frames it; when nothing is
+ * going on it looks around the house. Any input hands the camera back (see `session.ts`). Pure
+ * logic: it reads the snapshot and the world structure and asks for shots, which the renderer
+ * flies.
  */
 
 import type { Content } from '../content/content';
@@ -179,8 +180,14 @@ export class Director {
           out.push(this.peopleMoment(`talk:${i}:${partner}`, priority, [i, partner]));
         }
       }
-      // Trying out something new.
+      // Setting up something new (sim-core `setup.rs`): the parcel carried in from the door, then
+      // put together where it goes (no object yet: the new thing's type is `objectDef`).
       const object = snap[o + layout.sim.object];
+      const parcel = this.parcelHeld();
+      const carrying = parcel > 0 && layout.sim.held !== undefined && snap[o + layout.sim.held] === parcel;
+      const assembling = object < 0 && layout.sim.objectDef !== undefined && snap[o + layout.sim.objectDef] >= 0 && snap[o + layout.sim.action] >= 0;
+      if (carrying || assembling) out.push(this.peopleMoment(`setup:${i}`, 45, [i], 8.5));
+      // Trying out something new.
       if (object >= 0 && snap[o + layout.sim.action] >= 0 && this.fresh.has(object)) {
         out.push(this.peopleMoment(`use:${object}`, 50, [i], 8.5));
       }
@@ -197,6 +204,11 @@ export class Director {
       if (sims.length) out.push(this.peopleMoment(`event:${event.id}`, event.importance >= 2 ? 100 : 40, sims));
     }
     return out.sort((a, b) => b.priority - a.priority);
+  }
+
+  /** The parcel item as the snapshot's `held` names it (its index + 1), 0 if content has none. */
+  private parcelHeld(): number {
+    return (this.deps.layout.items?.indexOf('parcel') ?? -1) + 1;
   }
 
   /** A shot of residents: from the side of the line between them, close, walls cut away. */

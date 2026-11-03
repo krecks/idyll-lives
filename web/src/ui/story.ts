@@ -53,10 +53,13 @@ const ICONS: Record<string, string> = {
   notClosed: 'icon.ui.home',
   playedAlone: 'icon.need.fun',
   noPartner: 'icon.need.social',
+  setUp: 'icon.skill.handiness',
+  setUpForThem: 'icon.ui.home',
+  sentBack: 'icon.ui.funds',
 };
 
 const LOVE = new Set(['crush', 'firstKiss', 'startedDating', 'movedInWith', 'expecting', 'born', 'adopted']);
-const BAD = new Set(['died', 'becameEnemies', 'brokeUp', 'fight', 'jealous', 'proposalRejected', 'missedWork', 'rentDebt', 'fired', 'broke', 'accident', 'turnedAway', 'deniedAgain']);
+const BAD = new Set(['died', 'becameEnemies', 'brokeUp', 'fight', 'jealous', 'proposalRejected', 'missedWork', 'rentDebt', 'fired', 'broke', 'accident', 'turnedAway', 'deniedAgain', 'sentBack']);
 
 export function storyIcon(e: SocialEvent): string {
   if (e.kind === 'skillUp') return services.content.skills[e.skill ?? -1]?.icon ?? 'icon.ui.skills';

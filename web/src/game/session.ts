@@ -39,7 +39,7 @@ import { holdInference, holdInferenceWhile } from '../ml/schedule.svelte';
 import { endSoundOf, soundOf, WorldSound } from '../audio/world';
 import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
-import { addedObjects, BuildBuyInput, editFeedback, type Picked } from './buildmode';
+import { addedObjects, BuildBuyInput, editFeedback, liveAdded, placeEffect, type Picked } from './buildmode';
 import { ownSize } from './surfaces';
 import { colorValues } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
@@ -1191,6 +1191,14 @@ async function openSession(
       const added = addedObjects(world, w);
       if (added.length) director.noteBuilt(added.map((o) => o.id), performance.now());
     }
+    // In Live, something new set up at home (sim-core `setup.rs`; a crib for a new baby, the
+    // neighbours' new things) springs into place as Build mode's do, with its sound; its first use
+    // is worth a look too. (A whole house furnished at once isn't an edit.)
+    const appeared = game.mode === 'live' && world && worldView === viewPlot ? liveAdded(world, w) : [];
+    if (appeared.length) {
+      play('place');
+      director.noteBuilt(appeared.map((o) => o.id), performance.now());
+    }
     world = w;
     // The town map: the town's ground and its presentation data (roads, zones, areas), as it changes.
     if (townMap.world?.meta !== w.meta || townMap.world?.width !== w.width) townMap.world = { width: w.width, depth: groundDepth(w), meta: w.meta };
@@ -1270,6 +1278,7 @@ async function openSession(
     building = build.catch(() => {});
     holdInferenceWhile('building the scene', building);
     if (feedback?.effects.length) void build.then(() => feedback.effects.forEach((fx) => renderer.buildEffect(fx)), () => {});
+    if (appeared.length) void build.then(() => appeared.forEach((o) => renderer.buildEffect(placeEffect(o))), () => {});
     build
       .then(async () => {
         // Compile the game's own look (its lighting and cutaway) while the menu still covers it.
