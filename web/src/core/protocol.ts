@@ -695,6 +695,11 @@ export interface SimView {
    * roads), or home from work by car. Absent when they aren't (and from older workers).
    */
   trip?: { to: number; at?: number };
+  /**
+   * On a bike or an e-scooter of theirs (sim-core `ride.rs`), off to work, to school or home on it
+   * (not while away at work with it). Absent when they aren't (and from older workers).
+   */
+  ride?: { kind: 'bike' | 'scooter'; to: 'work' | 'school' | 'home' };
   job: JobView | null;
   /** A pupil's school grade (0..100, in tenths). */
   grade?: number;
