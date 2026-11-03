@@ -449,6 +449,10 @@ pub struct RoadPath {
     pub len: f32,
 }
 
+/// The way a trip along the roads sets off and the way it comes in: its first two points and its
+/// last two (as `Graph::path` has them). None for one of fewer than two points.
+pub type PathEnds = Option<([[f32; 2]; 2], [[f32; 2]; 2])>;
+
 impl Graph {
     /// The network of `roads` (see the module notes); empty without any.
     pub fn build(raw: &[RoadRaw]) -> Self {
@@ -793,17 +797,48 @@ impl Graph {
                 cost,
                 ..Default::default()
             };
-            for &(r, s0, s1) in pieces {
-                let road = &self.roads[r as usize];
-                for p in road.slice(s0, s1) {
-                    if out.pts.last().is_some_and(|q| dist(q.0, p) < 0.05) {
-                        continue;
-                    }
-                    out.pts.push((p, road.width, road.kind));
-                }
-            }
+            self.each_point(pieces, |p| out.pts.push(p));
             out
         })
+    }
+
+    /// `path`'s cost, and the way it sets off and the way it comes in (`PathEnds`), without the
+    /// points between: to weigh many ways and lay out only the one taken.
+    pub fn path_ends(
+        &self,
+        from: RoadPoint,
+        to: RoadPoint,
+        mode: Mode,
+        country: f32,
+    ) -> Option<(f32, PathEnds)> {
+        self.search(from, to, mode, country, |pieces| {
+            let (_, cost) = self.measure(pieces, mode, country);
+            let (mut n, mut first, mut last) = (0, [[0.0; 2]; 2], [[0.0; 2]; 2]);
+            self.each_point(pieces, |(p, ..)| {
+                if n < 2 {
+                    first[n] = p;
+                }
+                last = [last[1], p];
+                n += 1;
+            });
+            (cost, (n >= 2).then_some((first, last)))
+        })
+    }
+
+    /// The points along the stretches of road `pieces`, one after another, as `path` has them
+    /// (one within 0.05 m of the one before left out), each with its road's width and kind.
+    fn each_point(&self, pieces: &[Piece], mut f: impl FnMut(([f32; 2], f32, RoadKind))) {
+        let mut last: Option<[f32; 2]> = None;
+        for &(r, s0, s1) in pieces {
+            let road = &self.roads[r as usize];
+            for p in road.slice(s0, s1) {
+                if last.is_some_and(|q| dist(q, p) < 0.05) {
+                    continue;
+                }
+                last = Some(p);
+                f((p, road.width, road.kind));
+            }
+        }
     }
 
     /// `path`'s length and cost only (as `path` gives them), without the points along it: for

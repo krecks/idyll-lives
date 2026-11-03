@@ -47,7 +47,7 @@
 use crate::TICKS_PER_MINUTE;
 use crate::cars::{self, Legs, Route};
 use crate::content::Pose;
-use crate::travel::{Mode, RoadKind, RoadPath, RoadPoint, Travel, dist};
+use crate::travel::{Mode, PathEnds, RoadKind, RoadPath, RoadPoint, Travel, dist};
 use crate::world::{Ctx, Phase, Sim, World};
 
 /// Most buses in town at once (the snapshot's rows): a big world's lines are long, a few buses
@@ -694,17 +694,13 @@ fn ways_out(travel: &Travel, exits: &[[f32; 2]], bounds: Option<[f32; 4]>) -> Ve
     out
 }
 
-/// Whether a way along the roads leaves `from` (or comes into `to`) going `dir`.
-fn goes(path: &RoadPath, dir: [f32; 2], at_end: bool) -> bool {
-    let p = &path.pts;
-    if p.len() < 2 {
+/// Whether a way along the roads (its `ends`) leaves where it's from (or comes in where it's to:
+/// `at_end`) going `dir`.
+fn goes(ends: PathEnds, dir: [f32; 2], at_end: bool) -> bool {
+    let Some((first, last)) = ends else {
         return true;
-    }
-    let (a, b) = if at_end {
-        (p[p.len() - 2].0, p[p.len() - 1].0)
-    } else {
-        (p[0].0, p[1].0)
     };
+    let [a, b] = if at_end { last } else { first };
     (b[0] - a[0]) * dir[0] + (b[1] - a[1]) * dir[1] >= 0.0
 }
 
@@ -716,32 +712,36 @@ fn line_for(travel: &Travel, outs: &[RoadPoint], stops: &[Stop], group: &[u16]) 
     let country = travel.country_speed;
     let stop = |k: u16| &stops[k as usize];
     let wrong = |ok: bool| if ok { 0.0 } else { WRONG_WAY };
-    // Between each two stops, and in from and out to each way out.
-    let mut between: std::collections::HashMap<(u16, u16), Option<RoadPath>> = Default::default();
+    // Between each two stops, and in from and out to each way out: weighed by their cost and the
+    // way they set off and come in (`travel::Graph::path_ends`), laid out only for the legs taken.
+    let mut between: std::collections::HashMap<(u16, u16), Option<(f32, PathEnds)>> =
+        Default::default();
     for &a in group {
         for &b in group {
             if a != b {
                 between.insert(
                     (a, b),
-                    g.path(stop(a).road, stop(b).road, Mode::Car, country),
+                    g.path_ends(stop(a).road, stop(b).road, Mode::Car, country),
                 );
             }
         }
     }
-    let way_in = |k: u16| {
+    // The quickest way in to stop `k` (`into`) or out from it: its cost, and the way out.
+    let way = |k: u16, into: bool| {
         outs.iter()
-            .filter_map(|&o| g.path(o, stop(k).road, Mode::Car, country))
-            .map(|p| (p.cost + wrong(goes(&p, stop(k).dir, true)), p))
+            .filter_map(|&o| {
+                let (from, to) = if into {
+                    (o, stop(k).road)
+                } else {
+                    (stop(k).road, o)
+                };
+                let (cost, ends) = g.path_ends(from, to, Mode::Car, country)?;
+                Some((cost + wrong(goes(ends, stop(k).dir, into)), o))
+            })
             .min_by(|a, b| a.0.total_cmp(&b.0))
     };
-    let way_out = |k: u16| {
-        outs.iter()
-            .filter_map(|&o| g.path(stop(k).road, o, Mode::Car, country))
-            .map(|p| (p.cost + wrong(goes(&p, stop(k).dir, false)), p))
-            .min_by(|a, b| a.0.total_cmp(&b.0))
-    };
-    let ins: Vec<Option<(f32, RoadPath)>> = group.iter().map(|&k| way_in(k)).collect();
-    let outs_: Vec<Option<(f32, RoadPath)>> = group.iter().map(|&k| way_out(k)).collect();
+    let ins: Vec<Option<(f32, RoadPoint)>> = group.iter().map(|&k| way(k, true)).collect();
+    let outs_: Vec<Option<(f32, RoadPoint)>> = group.iter().map(|&k| way(k, false)).collect();
     let place = |k: u16| group.iter().position(|&x| x == k).expect("in the group");
     let orders: Vec<Vec<u16>> = if group.len() <= ORDERS_UP_TO {
         permutations(group)
@@ -771,17 +771,17 @@ fn line_for(travel: &Travel, outs: &[RoadPoint], stops: &[Stop], group: &[u16]) 
     let mut best: Option<(f32, Vec<u16>)> = None;
     for order in orders {
         let (first, last) = (order[0], *order.last().expect("a stop"));
-        let (Some(i), Some(o)) = (&ins[place(first)], &outs_[place(last)]) else {
+        let (Some(i), Some(o)) = (ins[place(first)], outs_[place(last)]) else {
             continue;
         };
         let mut cost = i.0 + o.0;
         let mut ok = true;
         for w in order.windows(2) {
-            match between.get(&(w[0], w[1])).and_then(|p| p.as_ref()) {
-                Some(p) => {
-                    cost += p.cost
-                        + wrong(goes(p, stop(w[0]).dir, false))
-                        + wrong(goes(p, stop(w[1]).dir, true));
+            match between.get(&(w[0], w[1])).copied().flatten() {
+                Some((c, ends)) => {
+                    cost += c
+                        + wrong(goes(ends, stop(w[0]).dir, false))
+                        + wrong(goes(ends, stop(w[1]).dir, true));
                 }
                 None => ok = false,
             }
@@ -791,11 +791,13 @@ fn line_for(travel: &Travel, outs: &[RoadPoint], stops: &[Stop], group: &[u16]) 
         }
     }
     let (_, order) = best?;
-    let mut legs: Vec<&RoadPath> = vec![&ins[place(order[0])].as_ref()?.1];
+    let (first, last) = (order[0], *order.last()?);
+    let leg = |from: RoadPoint, to: RoadPoint| g.path(from, to, Mode::Car, country);
+    let mut legs = vec![leg(ins[place(first)]?.1, stop(first).road)?];
     for w in order.windows(2) {
-        legs.push(between.get(&(w[0], w[1]))?.as_ref()?);
+        legs.push(leg(stop(w[0]).road, stop(w[1]).road)?);
     }
-    legs.push(&outs_[place(*order.last()?)].as_ref()?.1);
+    legs.push(leg(stop(last).road, outs_[place(last)]?.1)?);
     build_line(order, &legs, stops, travel, g.junctions().collect())
 }
 
@@ -821,7 +823,7 @@ fn permutations(items: &[u16]) -> Vec<Vec<u16>> {
 /// its lane, pulled in to the kerb at each stop and stopping there; its times to each stop.
 fn build_line(
     order: Vec<u16>,
-    legs: &[&RoadPath],
+    legs: &[RoadPath],
     stops: &[Stop],
     travel: &Travel,
     junctions: Vec<[f32; 2]>,
