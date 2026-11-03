@@ -3,7 +3,7 @@
   import { clock, needColor } from './format';
   import SimPreview from './kit/SimPreview.svelte';
   import TodayTimeline from './planner/TodayTimeline.svelte';
-  import { busText, rideText, tripText } from './place';
+  import { wayText } from './place';
   import { services } from './services';
   import { game } from './state.svelte';
   import { settings } from '../settings/settings.svelte';
@@ -17,9 +17,8 @@
   const needs = services.content.needs;
 
   function where(s: SimView): string {
-    if (busText(s)) return busText(s);
-    if (s.trip) return tripText(s.trip, home, game.plots, game.households, (m) => clock(m, settings.clock24h), s.ride, s.bus === 'home');
-    if (s.ride) return rideText(s.ride.kind, s.ride.to);
+    const way = wayText(s, home, game.plots, game.households, (m) => clock(m, settings.clock24h));
+    if (way) return way;
     if (s.awayUntil !== null) return `At work · back ${clock(s.awayUntil, settings.clock24h)}`;
     if (s.visiting !== null) return `Visiting ${game.plots[s.visiting]?.name ?? 'friends'}`;
     if (s.plot === home) return 'Home';

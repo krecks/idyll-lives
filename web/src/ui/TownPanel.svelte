@@ -7,7 +7,7 @@
   import { game } from './state.svelte';
   import { townMap } from './townMap.svelte';
   import { mapScale, screenToMap } from './mapView';
-  import { busText, lotTitle, rideText, tripText } from './place';
+  import { lotTitle, wayText } from './place';
   import { settings } from '../settings/settings.svelte';
 
   /**
@@ -163,9 +163,8 @@
   }
 
   function status(s: (typeof game.sims)[number]): string {
-    if (busText(s)) return busText(s);
-    if (s.trip) return tripText(s.trip, game.households[s.household]?.plot ?? null, game.plots, game.households, (m) => clock(m, settings.clock24h), s.ride, s.bus === 'home');
-    if (s.ride) return rideText(s.ride.kind, s.ride.to);
+    const way = wayText(s, game.households[s.household]?.plot ?? null, game.plots, game.households, (m) => clock(m, settings.clock24h));
+    if (way) return way;
     if (s.awayUntil !== null) return `At work until ${clock(s.awayUntil, settings.clock24h)}`;
     if (s.visiting !== null) return `Visiting ${game.plots[s.visiting]?.name ?? ''}`;
     if (s.plot === null) return 'Out and about';
