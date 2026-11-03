@@ -1208,8 +1208,8 @@ export class TownStreet {
         }
       }
     }
-    // The bus stops: the shelter facing the road (where it has one), and the stop's sign at the
-    // kerb past where the bus's front door stops.
+    // The bus stops: the shelter facing the road, its own sign on it; where there's no room for
+    // one, a sign on a pole at the kerb past where the bus's front door stops.
     for (const st of stops) {
       const s = kerb.along(st.x, st.z);
       if (st.shelter) {
@@ -1217,6 +1217,7 @@ export class TownStreet {
         const P = at(cx, cz);
         P.put(PROP.shelter, cx, cz, yaw);
         blob(P.shadows, cx, cz, 1.7, 0.6, yaw, 0.35, 0.02);
+        continue;
       }
       const [ax, az] = kerb.at(s, 0);
       const [bx, bz] = kerb.at(s + 1, 0);
