@@ -1023,38 +1023,57 @@ fn childcare(w: &mut World, b: usize) {
     }
 }
 
-fn apply_transition(w: &mut World, i: usize, transition: Transition) {
+/// `i` is off to work or school (out of town on foot, on the bus, in the car), with `rest` ticks
+/// of the way still to go (`still_to_go`): away until it's over. Late for work when that gets
+/// them there more than `careerRules.lateGraceMinutes` after it starts.
+fn start_shift(w: &mut World, i: usize, rest: u64) {
     let tick = w.tick;
-    match transition {
-        Transition::Work => {
-            let content = &w.content;
-            let mood = w.sims[i].mood(content);
-            let sim = &mut w.sims[i];
-            sim.bus_given_up = false;
-            let skills = sim.skills;
-            // A pupil: school until the afternoon.
-            if sim.job.is_none() {
-                if let Some((_, start, end)) = school_today(content, sim, tick) {
-                    sim.school_day = clock::day(tick);
-                    sim.shift_from = start;
-                    sim.away_until = Some(end.max(start).max(tick + 1));
-                    sim.queue.clear();
-                }
-                return;
-            }
-            let Some(job) = sim.job.as_mut() else { return };
-            let Some((_, start, end)) = shift_today(content, job, &skills, tick) else {
-                return;
-            };
-            job.last_shift_day = clock::day(tick);
-            job.shift_mood = mood;
-            job.late = tick > start + ticks(content.career_rules.late_grace_minutes);
-            // Early arrivals still work until the shift's end; late ones lose that time. Before
-            // it starts they're on their way (`at_work`).
+    let content = &w.content;
+    let mood = w.sims[i].mood(content);
+    let sim = &mut w.sims[i];
+    sim.bus_given_up = false;
+    let skills = sim.skills;
+    // A pupil: school until the afternoon.
+    if sim.job.is_none() {
+        if let Some((_, start, end)) = school_today(content, sim, tick) {
+            sim.school_day = clock::day(tick);
             sim.shift_from = start;
             sim.away_until = Some(end.max(start).max(tick + 1));
             sim.queue.clear();
         }
+        return;
+    }
+    let Some(job) = sim.job.as_mut() else { return };
+    let Some((_, start, end)) = shift_today(content, job, &skills, tick) else {
+        return;
+    };
+    job.last_shift_day = clock::day(tick);
+    job.shift_mood = mood;
+    let due = start.saturating_sub(rest);
+    job.late = tick > due + ticks(content.career_rules.late_grace_minutes);
+    // Early arrivals still work until the shift's end; late ones lose that time. Before
+    // it starts they're on their way (`at_work`).
+    sim.shift_from = start;
+    sim.away_until = Some(end.max(start).max(tick + 1));
+    sim.queue.clear();
+}
+
+/// What's left of the way to work once they're off (`start_shift`), as their way was timed: in
+/// an open-world town the part off the map (`cars::off_map_ticks`) and, before it, `out` (the
+/// drive or the bus ride out of town). A cosy town's way is all before work starts, as ever.
+fn still_to_go(w: &World, out: u64) -> u64 {
+    if w.travel.open {
+        out + crate::cars::off_map_ticks(w)
+    } else {
+        0
+    }
+}
+
+fn apply_transition(w: &mut World, i: usize, transition: Transition) {
+    let tick = w.tick;
+    match transition {
+        // At the way out of town (or, with no way out, where they are).
+        Transition::Work => start_shift(w, i, still_to_go(w, 0)),
         Transition::Visit { plot, directed } => {
             let visits = &w.content.visits;
             let hours = if directed {
@@ -1100,7 +1119,14 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
                 });
                 return;
             }
-            apply_transition(w, i, Transition::Work);
+            // Due on a bus out of town in time for the rest of the way (`bus::plan`); in a big
+            // world, on one before work starts (`bus::at_stop`).
+            let rest = if w.transit.walk_stops {
+                0
+            } else {
+                still_to_go(w, crate::bus::out_in(w, stop).unwrap_or(0))
+            };
+            start_shift(w, i, rest);
             if w.sims[i].away_until.is_some() {
                 crate::bus::board(w, i, stop);
             }
@@ -1115,7 +1141,12 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
                 });
                 return;
             }
-            apply_transition(w, i, Transition::Work);
+            // (The drive out of town and on to work still to go: `cars::lead_ticks`.)
+            let out = w
+                .cars
+                .get(car as usize)
+                .map_or(0, crate::cars::drive_out_ticks);
+            start_shift(w, i, still_to_go(w, out));
             if w.sims[i].away_until.is_some() {
                 crate::cars::board(w, i, car);
             }
