@@ -434,3 +434,58 @@ fn a_big_worlds_stops_stay_ways_out_on_foot_while_the_bus_runs() {
         "nobody took the bus calling at the stop they walked out by"
     );
 }
+
+#[test]
+fn someone_in_front_of_a_bus_waiting_for_them_doesnt_walk_through_it() {
+    // Work in the evening: W0 is free in the morning, when the buses run.
+    let c = content(20.0);
+    let mut w = world(&c, &town(1, 0, 150, true));
+    common::run_to(&mut w, 2, 6.0);
+    // A bus coming in from the west end...
+    let end = clock::tick_at(2, 8.0 * 60.0).unwrap();
+    let bus = loop {
+        w.tick_once();
+        assert!(w.tick < end, "no bus came");
+        if let Some(b) = w.transit.buses.iter().position(|b| {
+            b.shown
+                .is_some_and(|(at, _, moving, _)| moving && (30.0..50.0).contains(&at[0]))
+        }) {
+            break b;
+        }
+    };
+    let (at, ..) = w.transit.buses[bus].shown.unwrap();
+    // ...and W0 walking west along its lane towards it, past it.
+    w.sims[0].pos = [at[0] + 25.5, STREET + 0.5];
+    w.apply(sim_core::Command::MoveTo {
+        sim: 0,
+        x: at[0] - 20.5,
+        z: STREET + 0.5,
+    })
+    .unwrap();
+    let (mut closest, mut held) = (f32::INFINITY, false);
+    let run = w.transit.buses[bus].run;
+    let mut passed = false;
+    for _ in 0..3000 {
+        w.tick_once();
+        let Some(b) = w.transit.buses.iter().find(|b| b.run == run) else {
+            break;
+        };
+        let (at, yaw, moving, doors) = b.shown.unwrap();
+        // (Stood still away from the stop with its doors shut: held up for W0.)
+        held |= !moving && doors == 0 && (at[0] - STOP_X).abs() > 8.0;
+        let (s, k) = yaw.sin_cos();
+        let p = w.sims[0].pos;
+        let (dx, dz) = (p[0] - at[0], p[1] - at[1]);
+        let (along, across) = (dx * s + dz * k, dx * k - dz * s);
+        let (ex, ez) = (
+            along.abs() - sim_core::bus::BUS_LEN / 2.0,
+            across.abs() - sim_core::bus::BUS_WID / 2.0,
+        );
+        // (A quarter of a metre round them.)
+        closest = closest.min(ex.max(0.0).hypot(ez.max(0.0)) + ex.max(ez).min(0.0) - 0.25);
+        passed |= along < -sim_core::bus::BUS_LEN / 2.0;
+    }
+    assert!(held, "the bus never stopped for them");
+    assert!(passed, "they never got past it");
+    assert!(closest >= 0.0, "they walked {:.2} m into the bus", -closest);
+}

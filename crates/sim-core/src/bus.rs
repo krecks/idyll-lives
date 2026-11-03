@@ -1253,7 +1253,8 @@ fn drive_on(w: &mut World, b: usize) {
 }
 
 /// The bus driving by that a step from `from` to `to` with `body` would walk into (stepping out
-/// of its way is fine): where it is and which way it faces.
+/// of its way is fine): where it is and which way it faces. Held up by someone in its way, it's
+/// still driving by, as a car is (not stood at a stop).
 pub(crate) fn in_the_way(
     t: &Transit,
     body: cars::Body,
@@ -1261,9 +1262,7 @@ pub(crate) fn in_the_way(
     to: [f32; 2],
 ) -> Option<([f32; 2], f32)> {
     t.buses.iter().find_map(|b| {
-        let (at, yaw, true, _) = b.shown? else {
-            return None;
-        };
+        let (at, yaw, ..) = b.shown.filter(|_| b.until.is_none())?;
         cars::walks_into(at, yaw, BUS_LEN, BUS_WID, body, from, to).then_some((at, yaw))
     })
 }
