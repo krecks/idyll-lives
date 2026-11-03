@@ -2,7 +2,7 @@
 
 The outdoor things are built in four families. `families/outdoor.py` builds the eleven OU1 patio models, the five
 OU2 loungers and swings and the three OU3 grills (notes: `outdoor.md`); `families/yard.py` the nine OU4 play and yard
-things (notes: `yard.md`); `families/garden_things.py` the nine OU5 pond, small garden things and lights (notes:
+things and the three OU6 rides (notes: `yard.md`); `families/garden_things.py` the nine OU5 pond, small garden things and lights (notes:
 `garden_things.md`); `families/garden_decor.py` the six garden decor models (gnome, bird bath, fountain, lantern,
 wheelbarrow, boulders). Each model is built to the content's seat heights (`seat`) and table tops
 (`surface`), where the game has them. Every item is `outdoors`: it can only
@@ -152,6 +152,26 @@ none.
   house, sundial and stepping stones are still.
 - Known, not changed: one stepping stone has a small dark nick on its edge (a dent in the boulder shape, a few pixels
   from the game camera).
+
+## OU6. Rides (3)
+
+What residents ride to work or school (content `vehicle`, sim-core `ride.rs`; since 0.7.0). Furnish lists them under
+Outdoor › Bikes & scooters, and new towns stand them in most gardens (`web/src/game/townRides.ts`).
+
+- **Family:** `tools/art/blender/families/yard.py` (notes: `yard.md`, "The rides": the bike rack's bike made with
+  other numbers)
+
+| Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
+|---|---|---|---|---|---|---|
+| `bicycle` City bike | 2x1 · floor | tuneUp:tinker | outdoor / rides | Frame | Code | No clips: ridden, the renderer turns its wheels and cranks by code and hides its centre stand (`shared/characters/vehicles.ts` `MOUNTS`); parked, it stands on the stand. A step-through with mudguards, a bell, a wicker basket and a carrier. Ridden by teens and up at 3× walking pace. 1 draw, far version. |
+| `bicycleChild` Kids' bike | 1x1 · floor | tuneUp:tinker | outdoor / rides | Frame | Code | As the city bike, with stabilisers (no stand) and streamers on the grips. Ridden by children at 2.2× walking pace. 1 draw, far version. |
+| `eScooter` E-scooter | 1x1 · floor | — | outdoor / rides | Body | Code | Its wheels turn by code while ridden and its side stand is hidden; stood on its deck. Ridden by teens and up at 4× walking pace. 0.95 m long, to keep within its tile. 1 draw, far version. |
+
+**Checked:** in the sim tests (`crates/sim-core/tests/sim/travel_bikes.rs`: ridden to work and home again, a third
+of the walk's time out of town, a short way walked, one bike between two, a save mid-ride, a bike sold while ridden,
+a rider kept clear of a car on a narrow lane) and the web's (`web/tests/townRides.test.ts`: how many a new town
+gives, and where they stand). The riders' clips (`rideBike`, `rideBikeChild`, `rideScooter`) are in
+`docs/characters-format.md`; their sizes in `docs/review/reference.md` (`cityBike`, `kidsBike`, `eScooter`).
 
 ## Garden decor (6)
 
