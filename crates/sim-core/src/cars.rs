@@ -2478,21 +2478,27 @@ pub(crate) fn parks_near(travel: &Travel, door: [f32; 2]) -> bool {
 /// Whether `sim` could drive somewhere now (`trip_car` without the place): an open-world town
 /// with parking, a grown-up owner at home with the household's car parked there.
 pub(crate) fn could_drive(ctx: &crate::world::Ctx, sim: &Sim) -> bool {
-    let Some(home) = ctx
-        .households
-        .get(sim.household as usize)
-        .and_then(|h| h.plot)
-    else {
+    can_drive(ctx.travel, ctx.households, ctx.briefs, ctx.cars, sim)
+}
+
+/// `could_drive`, from the world's parts (outside a tick's `Ctx`).
+pub(crate) fn can_drive(
+    travel: &Travel,
+    households: &[crate::world::Household],
+    briefs: &[crate::world::SimBrief],
+    cars: &[Car],
+    sim: &Sim,
+) -> bool {
+    let Some(home) = households.get(sim.household as usize).and_then(|h| h.plot) else {
         return false;
     };
-    ctx.travel.open
-        && !ctx.travel.file.parking.is_empty()
+    travel.open
+        && !travel.file.parking.is_empty()
         && sim.visiting.is_none()
-        && ctx
-            .briefs
+        && briefs
             .get(sim.id as usize)
             .is_some_and(|b| b.adult && b.plot == Some(home))
-        && ctx.cars.iter().any(|car| {
+        && cars.iter().any(|car| {
             car.household == sim.household
                 && car.plot == home
                 && car.state == CarState::Parked

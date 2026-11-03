@@ -1689,6 +1689,8 @@ pub(crate) struct SimBrief {
     pub cleaning: Option<(i32, i32)>,
     /// Sitting down (on a sofa, at a table): someone sitting near can talk to them from their seat.
     pub seated: bool,
+    /// Lying down (asleep in bed, napping on the sofa): nobody to answer the door.
+    pub lying: bool,
     /// Eating sitting down: talked to only from close by in their seat (not a hug), the meal
     /// left a moment (`conversation::keeps_seat`).
     pub eating: bool,
@@ -2273,6 +2275,38 @@ impl World {
     }
 
     /// The plot a tile is on (on any storey).
+    /// Whether resident `i` would set off now to visit `plot` (an invitation over the phone):
+    /// the way isn't too long and they'd be there in visiting hours (`visit_fits`).
+    pub(crate) fn visit_fits_now(&self, i: usize, plot: u32) -> bool {
+        let (Some(sim), Some(p)) = (self.sims.get(i), self.plots.get(plot as usize)) else {
+            return false;
+        };
+        let pos = self.nav().stairs.ground_pos(sim.pos);
+        let drives = crate::cars::can_drive(
+            &self.travel,
+            &self.households,
+            &self.briefs,
+            &self.cars,
+            sim,
+        );
+        let eta = visit_minutes(
+            &self.travel,
+            &self.content,
+            pos,
+            sim.walk_per_minute(&self.content),
+            plot,
+            p.arrival_point(),
+            drives,
+            &mut [None, None],
+        );
+        visit_fits(
+            &self.content,
+            eta,
+            crate::clock::hour(self.tick),
+            f32::INFINITY,
+        )
+    }
+
     pub fn plot_at(&self, x: i32, z: i32) -> Option<u32> {
         let z = self.ground_z(z);
         let width = self.lot.width as i32;
@@ -4195,6 +4229,7 @@ impl World {
                     }
                 }),
                 seated: s.pose == Pose::Sit && !s.is_moving(),
+                lying: s.pose == Pose::Lie,
                 eating: s.eating_seated(),
                 game: s.game,
                 free: crate::partners::free_now(&self.content, s, tick),
@@ -5895,11 +5930,19 @@ fn step_sim(
     let mut ticks = sim.steps;
     if sim.current.is_none() {
         // A routine's next step (washing hands after the toilet) before anything else they'd
-        // do, unless the player asks for something.
-        let follow_up = sim
-            .follow_up
-            .take()
-            .filter(|_| !sim.queue.front().is_some_and(|t| t.directed));
+        // do, unless the player asks for something; someone at the door is answered first, and
+        // the step waits for after (`life::doors`).
+        let answering = sim
+            .queue
+            .front()
+            .is_some_and(|t| matches!(t.kind, TaskKind::Answer { .. }));
+        let follow_up = if answering {
+            None
+        } else {
+            sim.follow_up
+                .take()
+                .filter(|_| !sim.queue.front().is_some_and(|t| t.directed))
+        };
         if let Some(task) = follow_up {
             start_task(sim, task, ctx, objects, items);
         } else if let Some(task) = sim.queue.pop_front() {
@@ -6902,6 +6945,11 @@ fn pick_autonomous(
         && (visits.earliest_hour..visits.latest_hour).contains(&ctx.hour)
     {
         let soon = plans_soon();
+        // Not a walk of hours, nor to arrive after visiting hours (`visit_minutes`, `visit_fits`).
+        let free = until_leave.unwrap_or(f32::INFINITY);
+        let drives = crate::cars::could_drive(ctx, sim);
+        let pos = ctx.nav.stairs.ground_pos(sim.pos);
+        let mut on: [Option<Option<crate::travel::RoadPoint>>; 2] = [None, None];
         for other in ctx.households.iter().filter(|h| h.id != household.id) {
             let Some(plot) = other.plot else { continue };
             let friendship = ctx
@@ -6914,8 +6962,32 @@ fn pick_autonomous(
             if friendship < visits.min_friendship {
                 continue;
             }
+            // Someone to open the door: a grown-up at home, up and about, not on their way out.
+            if !ctx.briefs.iter().any(|b| {
+                b.household == other.id
+                    && b.plot == Some(plot)
+                    && !b.away
+                    && b.adult
+                    && !b.lying
+                    && !b.leaving
+            }) {
+                continue;
+            }
             let door = ctx.plots[plot as usize].arrival_point();
-            let distance = (door[0] - sim.pos[0]).hypot(door[1] - sim.pos[1]);
+            let distance = (door[0] - pos[0]).hypot(door[1] - pos[1]);
+            let eta = visit_minutes(
+                ctx.travel,
+                content,
+                pos,
+                walk_per_minute,
+                plot,
+                door,
+                drives,
+                &mut on,
+            );
+            if !visit_fits(content, eta, ctx.hour, free) {
+                continue;
+            }
             // Travel is less of a deterrent than for a chat in the same room.
             let score = ai::score_felt(needs, &felt, &visits.gains, distance * 0.25)
                 * (0.4 + friendship / 100.0)
@@ -9537,6 +9609,54 @@ fn open_ground_near(nav: &NavGrid, p: &Plot, at: [f32; 2]) -> Option<[f32; 2]> {
 /// back (minutes); the way puts them off this much a minute (less than a walk across the room
 /// does, `ai::falloff`: it's a day out).
 const OUTING_STAY_MINUTES: f32 = 60.0;
+/// Friends are visited (`Choice::Visit`, an invitation over the phone) no more than this many
+/// minutes away, and with time for at least `VISIT_STAY_MINUTES` there besides the way there
+/// and back.
+const VISIT_TRIP_MINUTES: f32 = 45.0;
+const VISIT_STAY_MINUTES: f32 = 45.0;
+
+/// About how many minutes the way from `pos` (over the ground) to `door` of `plot` takes for a
+/// visit, walking at `walk` m a minute, or by car past `autonomy.reach` for one who `drives`
+/// there (`cars::trip_car`). `on`: where they'd get on the roads, on foot and by car, found once
+/// for many visits from one place.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn visit_minutes(
+    travel: &crate::travel::Travel,
+    content: &Content,
+    pos: [f32; 2],
+    walk: f32,
+    plot: u32,
+    door: [f32; 2],
+    drives: bool,
+    on: &mut [Option<Option<crate::travel::RoadPoint>>; 2],
+) -> f32 {
+    let far = (door[0] - pos[0]).hypot(door[1] - pos[1]) > content.autonomy.reach;
+    let car = far && drives && crate::cars::parks_near(travel, door);
+    let mode = if car {
+        crate::travel::Mode::Car
+    } else {
+        crate::travel::Mode::Foot
+    };
+    let from = &mut on[mode as usize];
+    let eta = travel.eta_via(
+        pos,
+        door,
+        mode,
+        walk,
+        || *from.get_or_insert_with(|| travel.entry(pos, mode)),
+        || travel.door_entry(plot, door, mode),
+    );
+    trip_minutes(eta, car)
+}
+
+/// Whether a visit `eta` minutes away is one to make at `hour`, with `free` minutes before
+/// they must leave for something else: not a walk of hours, there before the end of visiting
+/// hours, and time to stay and get back.
+pub(crate) fn visit_fits(content: &Content, eta: f32, hour: f32, free: f32) -> bool {
+    eta <= VISIT_TRIP_MINUTES
+        && hour + eta / 60.0 < content.visits.latest_hour
+        && free >= 2.0 * eta + VISIT_STAY_MINUTES
+}
 /// An outing by car: minutes besides the drive, to the car and from it at either end.
 const CAR_TRIP_MINUTES: f32 = 10.0;
 const OUTING_K: f32 = 0.01;
