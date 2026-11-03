@@ -58,6 +58,7 @@ import { shadingFromSettings, softLookFromURL } from './shaders/softLook';
 import { drawRoads } from './roads';
 import { createWorldRoot, toEngine } from './space';
 import { Street } from './street';
+import { Buses } from './buses';
 import { Cars } from './cars';
 import { ParkedRides } from './parkedRides';
 import { SelectionMarker } from './selectionMarker';
@@ -436,6 +437,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private cars!: Cars;
   /** Other lots' bikes and e-scooters (the street leaves them out: they go off with their riders). */
   private parkedRides!: ParkedRides;
+  /** The town's buses (sim-core `bus.rs`). */
+  private buses!: Buses;
   /** What grows and stands on the lot: the landscape and sky, objects and their clips, items (`lotContents.ts`). */
   private lot!: LotContents;
   /** The viewed house's interior lights (`lamps.ts`). */
@@ -744,6 +747,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // Only cars and residents moving where they cast into the sun's map draw it again.
     const inMap = (x: number, z: number) => this.sunShadows.reaches(x, z);
     this.cars.setShadowTest(inMap);
+    this.buses = new Buses(this.app, this.root, this.quality.streetShadows);
+    this.buses.setShadowTest(inMap);
     this.characters.setShadowTest(inMap);
     this.characters.setCarRide((frame, x, z, yaw, aboard, out) => this.cars.ride(frame, x, z, yaw, aboard, out));
     this.decorTemplates = new TemplateCache(this.app);
@@ -1074,6 +1079,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.streamOn && this.street.setChunks(this.roam.chunks)) this.streamStreet();
     this.cars.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
     this.parkedRides.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
+    this.buses.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
     this.reportWatch();
   }
 
@@ -1411,6 +1417,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     } else this.street.setChunks(null);
     this.cars.setView(this.streamOn ? this.roam.chunks : null, this.orbit.target.x, this.orbit.target.z);
     this.parkedRides.setView(this.streamOn ? this.roam.chunks : null, this.orbit.target.x, this.orbit.target.z);
+    this.buses.setView(this.streamOn ? this.roam.chunks : null, this.orbit.target.x, this.orbit.target.z);
     // (lotContents.ts: the landscape, with its country roads.)
     this.loadStep('Laying out the land', 0.05);
     await this.lot.buildNature(world, (roads, parent) => drawRoads(this.app, roads, parent));
@@ -1858,6 +1865,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.street.clear();
     this.cars.clear();
     this.parkedRides.clear();
+    this.buses.clear();
     this.windowless = { rooms: new Set(), of: [] };
     this.dimming = null;
     this.applyDimming();
@@ -1953,6 +1961,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const pit = this.storey < 0 && v ? ([v.x - PIT_MARGIN, v.z - PIT_MARGIN, v.x + v.w + PIT_MARGIN, v.z + v.d + PIT_MARGIN] as const) : null;
     this.cars.hideOn(pit);
     this.parkedRides.hideOn(pit);
+    this.buses.hideOn(pit);
     this.applyDig();
     this.sunShadows.moved();
   }
@@ -2141,8 +2150,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.placing.frame(this.frameDt); // (the effects, the thing in hand.)
     this.updateSims(frame);
     this.cars.update(frame);
+    this.buses.update(frame);
     // (A car's shadow goes with it: `moved` only for a car that moved where it casts into the map, `setShadowTest`.)
-    if (this.cars.moved) this.sunShadows.moved(false);
+    if (this.cars.moved || this.buses.moved) this.sunShadows.moved(false);
     this.birdLife.update(frame, minute, this.frameDt, this.characters, this.simCount); // (after the residents, who scare them.)
     if (this.roofs.length && this.roofVisible() !== this.roofShown) {
       this.roofShown = !this.roofShown;
@@ -3073,6 +3083,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.overview?.destroy();
     this.street?.destroy();
     this.cars?.destroy();
+    this.buses?.destroy();
     this.gardenPools?.destroy();
     for (const p of this.decor.values()) for (const d of p.draws) d.destroy();
     this.decor.clear();

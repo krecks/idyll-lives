@@ -89,13 +89,13 @@ pub(crate) const GET_OUT_TICKS: u32 = DOOR_OPENS + STEP_IN;
 const SWING: f32 = 1.2;
 /// While a car drives, the ground ahead of it it keeps clear of people (m): it waits for anyone
 /// there (`drive_on`); and how close to its sides they keep (m).
-const AHEAD: f32 = 2.2;
-const BESIDE: f32 = 0.35;
+pub(crate) const AHEAD: f32 = 2.2;
+pub(crate) const BESIDE: f32 = 0.35;
 /// Someone waiting for a car to pass for this long steps aside out of its way (`make_way`).
 pub(crate) const MAKE_WAY_TICKS: u32 = 30;
 /// How long a car waits for someone who won't step aside (with nowhere to step) before it drives
 /// on.
-const PASS_TICKS: u32 = 3 * crate::TICKS_PER_MINUTE as u32;
+pub(crate) const PASS_TICKS: u32 = 3 * crate::TICKS_PER_MINUTE as u32;
 /// How long someone done at work waits there for the others in their car.
 const RIDE_WAIT_TICKS: u64 = 60 * crate::TICKS_PER_MINUTE;
 /// The drive between the end of town and work, each way.
@@ -103,13 +103,13 @@ const OFF_MAP_TICKS: u64 = 10 * crate::TICKS_PER_MINUTE;
 /// About how long the walk from the house to the car takes (for when to leave).
 const WALK_TO_CAR_TICKS: u64 = 3 * crate::TICKS_PER_MINUTE;
 /// The middle of a lane from the middle of the street (m): they drive on the right.
-const LANE: f32 = 0.8;
+pub(crate) const LANE: f32 = 0.8;
 /// Turning radius at the driveway's mouth (m).
 const TURN: f32 = 2.4;
 /// How far past the town's exit a car drives before it's gone (m).
-const OVERSHOOT: f32 = 12.0;
+pub(crate) const OVERSHOOT: f32 = 12.0;
 /// Top speeds (m per second at 1×): along the street, and in the driveway, turning or backing up.
-const FAST: f32 = 6.0;
+pub(crate) const FAST: f32 = 6.0;
 const SLOW: f32 = 1.8;
 /// Speeding up and slowing down (m/s²).
 const ACCEL: f32 = 2.2;
@@ -126,17 +126,17 @@ const PARK_GAP: f32 = 0.45;
 /// On the town's roads (`Route::on_roads`): how far from the road a driveway or exit may be (m),
 /// how slow cars take junctions (m/s) within how far of them (m), and the longest straight step
 /// between a route's points and how far a step may stray from the lane (m).
-const ROAD_REACH: f32 = 30.0;
-const JUNCTION_SPEED: f32 = 3.5;
-const JUNCTION_REACH: f32 = 8.0;
-const ROUTE_STEP: f32 = 4.0;
-const ROUTE_TOLERANCE: f32 = 0.08;
+pub(crate) const ROAD_REACH: f32 = 30.0;
+pub(crate) const JUNCTION_SPEED: f32 = 3.5;
+pub(crate) const JUNCTION_REACH: f32 = 8.0;
+pub(crate) const ROUTE_STEP: f32 = 4.0;
+pub(crate) const ROUTE_TOLERANCE: f32 = 0.08;
 /// A driveway meeting its road further from square than this (the cosine of its angle to the
 /// road's side) comes alongside it rather than onto it: its car stays parked (`Car::no_way`).
 const OBLIQUE: f32 = 0.5;
 /// A street's or lane's sidewalks (m, each side: `roads.ts` `SIDEWALK`), inside its width; and how
 /// far onto the sidewalk a turn out of (or into) a driveway may begin (`Bay::past_kerb`).
-const SIDEWALK: f32 = 1.35;
+pub(crate) const SIDEWALK: f32 = 1.35;
 const KERB_SLACK: f32 = 0.4;
 /// A trip by car (`Trip`) parks at the town's public parking spot nearest the place, if one is
 /// this close to it (m).
@@ -653,8 +653,8 @@ impl Car {
 /// A drive, sampled every `STEP` metres: where the car's middle is, which way it faces, and when
 /// it gets there (ticks from the start).
 #[derive(Debug, Clone, Default)]
-struct Route {
-    points: Vec<([f32; 2], f32, f32, bool)>,
+pub(crate) struct Route {
+    pub(crate) points: Vec<([f32; 2], f32, f32, bool)>,
 }
 
 impl Route {
@@ -906,12 +906,12 @@ impl Route {
         legs.timed(!home, home)
     }
 
-    fn ticks(&self) -> f32 {
+    pub(crate) fn ticks(&self) -> f32 {
         self.points.last().map_or(0.0, |p| p.2)
     }
 
     /// Where the car is `t` ticks in, which way it faces, and whether it's backing up.
-    fn at(&self, t: f32) -> ([f32; 2], f32, bool) {
+    pub(crate) fn at(&self, t: f32) -> ([f32; 2], f32, bool) {
         let pts = &self.points;
         let i = pts
             .partition_point(|p| p.2 <= t)
@@ -1146,16 +1146,20 @@ impl Turn {
 /// The pieces of a route as they're laid out: sampled points, whether the car backs along them,
 /// and the top speed there.
 #[derive(Default)]
-struct Legs {
+pub(crate) struct Legs {
     pts: Vec<([f32; 2], bool, f32)>,
 }
 
 impl Legs {
-    fn last(&self) -> Option<[f32; 2]> {
+    pub(crate) fn len(&self) -> usize {
+        self.pts.len()
+    }
+
+    pub(crate) fn last(&self) -> Option<[f32; 2]> {
         self.pts.last().map(|p| p.0)
     }
 
-    fn push(&mut self, p: [f32; 2], reverse: bool, top: f32) {
+    pub(crate) fn push(&mut self, p: [f32; 2], reverse: bool, top: f32) {
         if self
             .pts
             .last()
@@ -1166,7 +1170,7 @@ impl Legs {
         self.pts.push((p, reverse, top));
     }
 
-    fn line(&mut self, a: [f32; 2], b: [f32; 2], reverse: bool, top: f32) {
+    pub(crate) fn line(&mut self, a: [f32; 2], b: [f32; 2], reverse: bool, top: f32) {
         let n = ((a[0] - b[0]).hypot(a[1] - b[1]) / STEP).ceil().max(1.0) as usize;
         for i in 0..=n {
             let k = i as f32 / n as f32;
@@ -1192,7 +1196,7 @@ impl Legs {
     /// Times each point: the car speeds up and slows down (`ACCEL`), stands still where it
     /// changes between backing and driving on, and at the start (`stop_start`) and the end
     /// (`stop_end`). Yaw: the way it goes, turned round while it backs.
-    fn timed(self, stop_start: bool, stop_end: bool) -> Route {
+    pub(crate) fn timed(self, stop_start: bool, stop_end: bool) -> Route {
         let pts = self.pts;
         let n = pts.len();
         if n < 2 {
@@ -1475,7 +1479,7 @@ pub(crate) fn lead_ticks(w: &World, i: usize, start: u64) -> u64 {
 
 /// The drive between the end of town and work: in an open-world town `commuteMinutes` (the
 /// part of the way off the map), else `OFF_MAP_TICKS` as ever.
-fn off_map_ticks(w: &World) -> u64 {
+pub(crate) fn off_map_ticks(w: &World) -> u64 {
     if w.travel.open {
         (w.content.career_rules.commute_minutes / crate::MINUTES_PER_TICK) as u64
     } else {
@@ -1970,7 +1974,7 @@ fn arrive(w: &mut World, c: usize) {
 
 /// `i` sets off home on foot: out of the car (`by`: the car and their seat in it), sat in it as
 /// its door opens, then out beside it (`Phase::Alighting`); else from where they are.
-fn walk_home(w: &mut World, i: usize, by: Option<(usize, usize)>) {
+pub(crate) fn walk_home(w: &mut World, i: usize, by: Option<(usize, usize)>) {
     if let Some((c, seat)) = by {
         let door = w.cars[c].door(&w.nav(), seat).map(|(d, _)| d);
         if let Some(door) = door {
@@ -2541,9 +2545,13 @@ pub(crate) fn from_file(w: &mut World, raw: &[CarRaw], drives: &[Drive], garages
 /// take up, where they are.
 fn settle_all(w: &mut World) {
     // A cosy town made since cars drive winding roads (its driveways say where they meet them,
-    // `Drive::road`): the road network, for its cars only (nobody walks it: `Travel::by_road`).
-    // Older ones drive along x as ever.
-    if !w.travel.open && w.travel.graph.is_empty() && w.drives.iter().any(|d| d.road.is_some()) {
+    // `Drive::road`), or with bus stops: the road network, for its cars and its bus only (nobody
+    // walks it: `Travel::by_road`). Older ones drive along x as ever.
+    let stops = w.travel.stops.iter().any(|&s| s);
+    if !w.travel.open
+        && w.travel.graph.is_empty()
+        && (stops || w.drives.iter().any(|d| d.road.is_some()))
+    {
         w.travel.graph = crate::travel::Graph::from_town(&w.travel.file, &w.meta);
     }
     let World {

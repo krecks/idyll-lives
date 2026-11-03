@@ -5,7 +5,7 @@
  * world structure arrives, `source` once per game.
  */
 
-import type { WorldMeta } from '../core/protocol';
+import type { StopInfo, WorldMeta } from '../core/protocol';
 
 /** Live things on the map, asked for about twice a second while it is open. */
 export interface TownMapSource {
@@ -16,8 +16,8 @@ export interface TownMapSource {
 }
 
 class TownMapState {
-  /** The town's ground (tiles) and its presentation data; null outside a game (the map then works from the plots). */
-  world = $state.raw<{ width: number; depth: number; meta: WorldMeta | null } | null>(null);
+  /** The town's ground (tiles), its presentation data and its bus stops; null outside a game (the map then works from the plots). */
+  world = $state.raw<{ width: number; depth: number; meta: WorldMeta | null; stops?: readonly StopInfo[] } | null>(null);
   source: TownMapSource = {};
 }
 

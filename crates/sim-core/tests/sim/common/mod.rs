@@ -764,7 +764,7 @@ enum State {
     /// Using something (not a bed or a crib), or talking.
     Busy(Doing),
     Routing(Doing),
-    /// Waiting for someone to talk to, for a busy station, or at someone's door.
+    /// Waiting for someone to talk to, for a busy station, at someone's door, or for the bus.
     Waiting(Doing),
     Away,
     /// Being talked to by this resident.
@@ -874,7 +874,9 @@ fn state(w: &World, s: &Sim) -> State {
         | Phase::Queued { .. }
         | Phase::Knocking { .. }
         | Phase::Boarding { .. }
-        | Phase::Alighting { .. } => State::Waiting(d),
+        | Phase::Alighting { .. }
+        // (At the bus stop, for less than a headway: `bus.rs`.)
+        | Phase::AtStop { .. } => State::Waiting(d),
     }
 }
 

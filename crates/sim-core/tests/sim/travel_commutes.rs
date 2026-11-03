@@ -6,6 +6,7 @@ use crate::common;
 
 use common::hamlets::two_hamlets;
 use sim_core::social::EventKind;
+use sim_core::travel::Mode;
 use sim_core::world::TaskKind;
 use sim_core::{MINUTES_PER_TICK, World, clock, life};
 
@@ -32,6 +33,8 @@ fn start_today(w: &World, i: usize) -> Option<u64> {
 struct Day {
     left: Option<u64>,
     there: Option<u64>,
+    /// Waited at the stop they walked out by for the bus calling there (`bus::at_stop`).
+    bus: bool,
 }
 
 #[test]
@@ -60,6 +63,7 @@ fn residents_leave_by_their_walk_and_are_never_late() {
             if working && day.left.is_none() {
                 day.left = Some(w.tick);
             }
+            day.bus |= w.bound_for_bus(i).is_some();
             if let Some(left) = day.left
                 && s.away_until.is_some()
                 && day.there.is_none()
@@ -95,8 +99,15 @@ fn residents_leave_by_their_walk_and_are_never_late() {
                     c.walk,
                     c
                 );
-                // ...and at the way out of town in time for the rest.
-                let late = w.tick as i64 - (start - off_map) as i64;
+                // ...and at the way out of town in time for the rest (by the bus calling at the
+                // stop they walked out by: on it before work starts, the rest of the way on it).
+                let due = if day.bus { start } else { start - off_map };
+                assert!(
+                    !s.job.as_ref().is_some_and(|j| j.late),
+                    "{} late for work",
+                    s.name
+                );
+                let late = w.tick as i64 - due as i64;
                 worst_late = worst_late.max(late);
                 assert!(
                     late <= 0,
@@ -131,28 +142,42 @@ fn the_walk_is_timed_to_the_quickest_way_out() {
         .filter(|&i| w.sims[i].commute().is_some())
         .collect();
     assert!(!walkers.is_empty(), "nobody's commute was worked out");
+    let off_map = w.content.career_rules.commute_minutes;
+    let mut timed = 0;
     for &i in &walkers {
         let c = w.sims[i].commute().unwrap();
-        let off_map = w.content.career_rules.commute_minutes;
+        let name = &w.sims[i].name;
+        // (By bus: timed by the bus they take, `travel_bus.rs`.)
+        if c.bus.is_some() {
+            assert!(w.travel.is_stop(c.exit), "{name}: by bus from a way out");
+            continue;
+        }
         assert_eq!(
             c.ticks,
             ((c.walk + off_map) / MINUTES_PER_TICK) as u64,
-            "{}",
-            w.sims[i].name
+            "{name}"
         );
-        assert!(c.walk < 60.0, "{}: {:.0} min", w.sims[i].name, c.walk);
+        // To the quickest of the ways out they may walk out by about when they'd leave: the roads
+        // out, and a hamlet's bus stop when no bus calls there (`bus::Transit::walks_out`).
+        let Some(start) = start_today(&w, i) else {
+            continue;
+        };
+        let leaving = start.saturating_sub((off_map / MINUTES_PER_TICK) as u64);
+        let from = w.stair_map().ground_pos(w.sims[i].pos);
+        let eta = |k: usize| w.travel.eta(from, w.exits[k], Mode::Foot, 1.5);
+        let best = (0..w.exits.len())
+            .filter(|&k| w.transit.walks_out(k, leaving))
+            .map(eta)
+            .fold(f32::INFINITY, f32::min);
+        assert!(
+            eta(c.exit) <= best + 1e-3,
+            "{name}: to exit {} ({:.0} min), the quickest {best:.0}",
+            c.exit,
+            eta(c.exit)
+        );
+        timed += 1;
     }
-    // Each hamlet has a bus stop in the middle of its street: most walk to one of those, not to
-    // the end of the road.
-    let to_stops = walkers
-        .iter()
-        .filter(|&&i| w.travel.is_stop(w.sims[i].commute().unwrap().exit))
-        .count();
-    assert!(
-        to_stops * 2 > walkers.len(),
-        "{to_stops} of {} to a stop",
-        walkers.len()
-    );
+    assert!(timed > 0, "no walk checked");
 }
 
 /// A walk worked out from upstairs (in bed at night, say) is timed along the ground, not across

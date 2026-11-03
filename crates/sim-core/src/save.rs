@@ -84,7 +84,10 @@
 //! a resident asked for, bought and waiting to be set up at home (`setups`: the household, who
 //! asked, the object by id, the tick it was bought and what was paid; `setup.rs`), left out when
 //! there are none, so an older file has none; setting one up isn't saved mid-way (the parcel is
-//! back at the front door after a load).
+//! back at the front door after a load). Still 35: the town's bus (`bus.rs`) adds nothing: its
+//! lines come from the stops (`openWorld.stops`; a cosy town's too now) and the roads, its buses
+//! from the clock, on load; someone waiting at a stop sets off for it again, and someone on the
+//! bus home is saved back at their stop, on their way home from it.
 //! Still 35: a resident late for the shift they're at says so (`job.late`, left out when on
 //! time; an older file's are on time).
 //! Still 35: the story may tell of a host bringing a guest something (`served`, the item in `n`,
@@ -808,10 +811,19 @@ impl World {
                         |p| self.plots[p as usize].arrival_point(),
                     );
                 }
+                // Done at work and coming home by bus (riders aren't saved): back at their stop
+                // (where they are), on their way home.
+                let bus_home = self.bus_home(s.id as usize);
+                let home_task = bus_home.then_some(Task {
+                    kind: TaskKind::GoHome,
+                    directed: false,
+                    routine: false,
+                });
                 let tasks = s
                     .current()
                     .map(|a| &a.task)
                     .into_iter()
+                    .chain(home_task.as_ref())
                     .chain(s.queue())
                     .filter_map(|t| self.task_save(t))
                     .collect();
@@ -875,7 +887,7 @@ impl World {
                     }),
                     job_search_from: s.job_search_from,
                     nap_minutes: minutes_left(s.nap_until),
-                    away_minutes: s.away_until.map(minutes_left),
+                    away_minutes: s.away_until.filter(|_| !bus_home).map(minutes_left),
                     visiting: s.visiting.map(|v| (v.plot, Some(minutes_left(v.until)))),
                     tasks,
                     planner: planner_save(content, &s.planner),
@@ -1676,6 +1688,7 @@ impl World {
         world.make_storeys();
         world.refresh_rooms();
         crate::cars::load(&mut world, &save.cars, &save.drives, &save.garages);
+        crate::bus::settle(&mut world);
         // What someone was eating or washing up is put down (those don't go on after loading).
         crate::cooking::settle(&mut world);
         Ok(world)

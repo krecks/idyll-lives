@@ -7,7 +7,7 @@
   import { game } from './state.svelte';
   import { townMap } from './townMap.svelte';
   import { mapScale, screenToMap } from './mapView';
-  import { lotTitle, rideText, tripText } from './place';
+  import { busText, lotTitle, rideText, tripText } from './place';
   import { settings } from '../settings/settings.svelte';
 
   /**
@@ -72,6 +72,8 @@
   const roads = $derived((meta?.roads ?? []).map((r) => ({ kind: r.kind ?? 'street', width: r.width, points: line(r.points) })));
   const greens = $derived((meta?.greens ?? []).map(line));
   const areas = $derived(meta?.areas ?? []);
+  /** The bus stops a bus calls at (sim-core `bus.rs`). */
+  const stops = $derived((townMap.world?.stops ?? []).filter((s) => s.served));
   /** Outdoor places (a big world levels each to a height of its own: `pads`). */
   const spots = $derived(new Set(Object.keys(meta?.pads ?? {}).map(Number)));
 
@@ -161,7 +163,8 @@
   }
 
   function status(s: (typeof game.sims)[number]): string {
-    if (s.trip) return tripText(s.trip, game.households[s.household]?.plot ?? null, game.plots, game.households, (m) => clock(m, settings.clock24h), s.ride);
+    if (busText(s)) return busText(s);
+    if (s.trip) return tripText(s.trip, game.households[s.household]?.plot ?? null, game.plots, game.households, (m) => clock(m, settings.clock24h), s.ride, s.bus === 'home');
     if (s.ride) return rideText(s.ride.kind, s.ride.to);
     if (s.awayUntil !== null) return `At work until ${clock(s.awayUntil, settings.clock24h)}`;
     if (s.visiting !== null) return `Visiting ${game.plots[s.visiting]?.name ?? ''}`;
@@ -258,6 +261,13 @@
                 <text class="count" x={labelX(p.x + p.w / 2, `${homeCount(p.id)} here`, 9)} y={labelZ(p.z + p.d / 2 + px(17), 9)} font-size={px(9)} text-anchor="middle">{homeCount(p.id)} here</text>
               {/if}
             {/if}
+          </g>
+        {/each}
+        {#each stops as s, i (i)}
+          <g class="stop" transform="translate({s.x} {s.z})">
+            <title>Bus stop</title>
+            <rect x={-px(5)} y={-px(5)} width={px(10)} height={px(10)} rx={px(2.5)} stroke-width={px(1.2)} />
+            <text y={px(3.2)} font-size={px(8)} text-anchor="middle">B</text>
           </g>
         {/each}
         {#each dots as d, i (i)}
@@ -472,6 +482,15 @@
     fill: none;
     stroke: #8a6a3c;
     stroke-linecap: round;
+  }
+  .stop rect {
+    fill: #23707f;
+    stroke: #f4f1ec;
+  }
+  .stop text {
+    fill: #f4f1ec;
+    font-weight: 800;
+    pointer-events: none;
   }
   .dot {
     fill: #f4f1ec;

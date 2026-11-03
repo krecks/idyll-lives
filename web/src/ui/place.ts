@@ -38,6 +38,13 @@ export function lotTitle(p: PlacePlot, households: readonly { name: string; plot
   return hh ? `The ${hh.name}s` : empty;
 }
 
+/** A resident and the bus (`SimView.bus`), in words: "Waiting for the bus", "On the bus to work" (or school); '' otherwise (home on the bus: `tripText`). */
+export function busText(s: { bus?: 'wait' | 'work' | 'home' | null; job: unknown }): string {
+  if (s.bus === 'wait') return 'Waiting for the bus';
+  if (s.bus === 'work') return `On the bus to ${s.job ? 'work' : 'school'}`;
+  return '';
+}
+
 /** `lotTitle` within a sentence: "on the way to the Smiths". */
 export function lotInSentence(p: PlacePlot, households: readonly { name: string; plot: number | null }[]): string {
   const name = lotTitle(p, households);
@@ -66,7 +73,8 @@ export function placeAt(x: number, z: number, plots: readonly PlacePlot[], house
  * A resident on their way somewhere (`SimView.trip`), in words: "On the way home · back about
  * 17:40", "On the way to the Smiths · there about 14:20"; without the time when it isn't known
  * (the sim works it out only for residents whose details are shown). `home`: their household's
- * plot; `time` writes a minute of day as the player's clock does.
+ * plot; `time` writes a minute of day as the player's clock does. `bus`: home on the bus
+ * ("On the bus home · back about 17:40").
  */
 export function tripText(
   trip: { to: number; at?: number },
@@ -75,9 +83,10 @@ export function tripText(
   households: readonly { name: string; plot: number | null }[],
   time: (minute: number) => string,
   ride?: SimRide,
+  bus = false,
 ): string {
   const when = (word: string) => (trip.at === undefined ? '' : ` · ${word} about ${time(trip.at)}`);
-  if (trip.to === home) return `${ride ? rideText(ride.kind, 'home') : 'On the way home'}${when('back')}`;
+  if (trip.to === home) return `${ride ? rideText(ride.kind, 'home') : bus ? 'On the bus home' : 'On the way home'}${when('back')}`;
   const p = plots[trip.to];
   return `On the way to ${p ? lotInSentence(p, households) : 'somewhere'}${when('there')}`;
 }

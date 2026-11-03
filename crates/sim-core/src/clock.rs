@@ -21,7 +21,7 @@ pub const MAX_SPEED: u8 = 5;
 pub const AUTO_FAST_SPEED: u8 = 4;
 
 /// Ticks since the midnight before day 1.
-fn since_midnight(tick: u64) -> u64 {
+pub(crate) fn since_midnight(tick: u64) -> u64 {
     tick.saturating_add(START_TICKS)
 }
 

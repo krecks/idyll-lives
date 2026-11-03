@@ -8,6 +8,7 @@
 
 pub mod ai;
 pub mod blueprint;
+pub mod bus;
 pub mod carry;
 pub mod cars;
 pub mod clock;

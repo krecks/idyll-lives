@@ -486,6 +486,15 @@ function mergeSilhouettes(into: SilhouettePlan, s: SilhouettePlan): void {
   into.lamps.push(...s.lamps);
 }
 
+/**
+ * About a bus stop (along the kerb, m): kept clear of other furniture this far behind its middle
+ * (the bus's back, stopped) and ahead (past its front door, sim-core `bus::FRONT_DOOR_AT`), its
+ * sign this far ahead.
+ */
+const STOP_BEHIND = 7.5;
+const STOP_AHEAD = 4;
+const STOP_SIGN = 2.6;
+
 /** A part of `TownStreet.layoutKey`, strung once per object. */
 const keys = new WeakMap<object, string>();
 function keyOf(of: object, make: () => string): string {
@@ -634,6 +643,7 @@ export class TownStreet {
       // plans only the chunks round it again.)
       world.garages ? 'garages' : '-',
       mode === 'town' ? (world.cars ? keyOf(world.cars, () => JSON.stringify(world.cars)) : '-') : !!world.cars,
+      world.stops ? keyOf(world.stops, () => JSON.stringify(world.stops)) : '-',
       keyOf(world.plots, () => JSON.stringify(world.plots.map((p) => [p.id, p.x, p.z, p.w, p.d, p.public, p.entry]))),
     ].join('|');
   }
@@ -1099,6 +1109,20 @@ export class TownStreet {
       const swing = world.cars && Math.min(p.w, p.d) >= DRIVEWAY_MIN_WIDTH ? CAR_SWING : 0;
       mouths.push([Math.min(...corners) - swing, Math.max(...corners) + swing]);
     }
+    // The town's bus stops on this side (sim-core `bus.rs`): kept clear for the shelter, the sign and
+    // those waiting (from where the bus's back stops to past its front door).
+    const stops = (world.stops ?? []).filter((st) => {
+      const near = index.nearest(st.x, st.z, 8);
+      return near?.road === r && near.side === side;
+    });
+    for (const st of stops) {
+      const s = kerb.along(st.x, st.z);
+      const [ax, az] = kerb.at(s, 0);
+      const [bx, bz] = kerb.at(s + 1, 0);
+      // (+1: the bus goes the way `s` grows.)
+      const way = (bx - ax) * Math.sin(st.busYaw) + (bz - az) * Math.cos(st.busYaw) >= 0 ? 1 : -1;
+      mouths.push(way > 0 ? [s - STOP_BEHIND, s + STOP_AHEAD] : [s - STOP_AHEAD, s + STOP_BEHIND]);
+    }
     const clear = (s: number, m: number) => s > 1 && s < kerb.length - 1 && kerb.open(s) && !mouths.some(([a, b]) => s > a - m && s < b + m);
     const used: number[] = [];
     const near = (s: number, m: number) => used.some((u) => Math.abs(u - s) < m);
@@ -1184,8 +1208,26 @@ export class TownStreet {
         }
       }
     }
+    // The bus stops: the shelter facing the road, its own sign on it; where there's no room for
+    // one, a sign on a pole at the kerb past where the bus's front door stops.
+    for (const st of stops) {
+      const s = kerb.along(st.x, st.z);
+      if (st.shelter) {
+        const [cx, cz, yaw] = st.shelter;
+        const P = at(cx, cz);
+        P.put(PROP.shelter, cx, cz, yaw);
+        blob(P.shadows, cx, cz, 1.7, 0.6, yaw, 0.35, 0.02);
+        continue;
+      }
+      const [ax, az] = kerb.at(s, 0);
+      const [bx, bz] = kerb.at(s + 1, 0);
+      const way = (bx - ax) * Math.sin(st.busYaw) + (bz - az) * Math.cos(st.busYaw) >= 0 ? 1 : -1;
+      const ss = s + way * STOP_SIGN;
+      const [x, z] = on(ss);
+      at(x, z).put(PROP.busSign, x, z, kerb.yaw(ss));
+    }
     // At the ends of the row (past the last lots): a bus shelter facing the road, its stop sign
-    // at the kerb, and a street-name sign on the corner.
+    // at the kerb (in a town without stops of its own), and a street-name sign on the corner.
     if (row.length) {
       const first = side > 0;
       const corner = first ? row[0].s0 : row[row.length - 1].s1;
@@ -1193,7 +1235,7 @@ export class TownStreet {
       const cs = corner + outward * 4;
       const [cx, cz] = kerb.at(cs, -0.62);
       const shelter = { x: cx - 1.6, z: cz - 1.6, w: 3.2, d: 3.2 };
-      if (clear(cs, 1.6) && free(shelter, 0.2) && !index.onRoad(cx, cz, 1)) {
+      if (!world.stops?.length && clear(cs, 1.6) && free(shelter, 0.2) && !index.onRoad(cx, cz, 1)) {
         const P = at(cx, cz);
         P.put(PROP.shelter, cx, cz, kerb.yaw(cs));
         blob(P.shadows, cx, cz, 1.7, 0.6, kerb.yaw(cs), 0.35, 0.02);

@@ -1444,8 +1444,9 @@ export function assembleTown(
   const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths, facing, seed: town.seed ?? (rand() * 2 ** 31) >>> 0, world: worldLook(town, fields), gardenFences: true };
   const open = openWorldFields(town, drives, cars);
   if (open.meta) Object.assign(meta, open.meta);
-  // Residents leave town (for work) where its roads lead out of it (in a big world, also from its bus stops).
-  const exits = open.exits ?? roadExits(town.roads, town.width, town.depth);
+  // Residents leave town (for work) where its roads lead out of it, or by bus from its stops.
+  const stops = open.exits ? [] : busStops(town, plots, paths, objects);
+  const exits = open.exits ?? (stops.length ? [...roadExits(town.roads, town.width, town.depth).map(([x, z]): TownExit => ({ x, z, kind: 'road' })), ...stops.map(([x, z]): TownExit => ({ x, z, kind: 'stop' }))] : roadExits(town.roads, town.width, town.depth));
   const plotKinds = town.slots.map((s): PlotKind => (s.kind === 'house' ? (s.lot === 'farm' ? 'farm' : 'home') : s.kind === 'shop' ? 'shop' : s.kind === 'outdoor' ? 'countryside' : 'public'));
   const filed = plots.map((p, i) => ({ ...p, area: town.slots[i].area ?? 0, kind: plotKinds[i] }));
   return JSON.stringify({
@@ -1498,6 +1499,62 @@ function meetsRoad(list: readonly RoadPlan[], roads: ReturnType<typeof roadIndex
   // (Else the nearest road, passing over a trail nearer it.)
   const near = [...roads.around(street[0], street[1], 24)].filter(([r]) => list[r].kind !== 'trail').sort((x, y) => x[1].dist - y[1].dist)[0];
   return near ? { road: near[0], s: near[1].s } : null;
+}
+
+/** A bus stop's sign is this far in from its road's edge (m, on the pavement: as `macro.ts` `kerb`). */
+const STOP_IN = 0.6;
+/** Behind the pavement, a bus stop's shelter (sim-core `bus.rs`: its middle this far out, this long and deep) with room round it (m). */
+const SHELTER_OUT = 0.7;
+const SHELTER_LONG = 3.6;
+const SHELTER_DEEP: readonly number[] = [-0.6, 0, 0.75];
+/** A second stop as far as this from the first along the road (m), within the middle of it. */
+const STOPS_APART = 70;
+const STOPS_WITHIN = 0.7;
+
+/**
+ * A cosy or normal town's bus stops (sim-core `bus.rs`): on its main road (the longest way through
+ * town, else its longest road) near the town's middle, at the kerb, with room behind the pavement
+ * for a shelter, clear of the lots, their paths and driveways, the other roads and the things on
+ * the town; a second on the same side further along when the road is long enough, so the bus passes
+ * both the same way. None when there's no room on it.
+ */
+export function busStops(town: NeighbourhoodDraft, plots: readonly Rect[], paths: readonly Rect[], objects: readonly Placement[]): Pt[] {
+  const index = roadIndex(town.roads);
+  const mid: Pt = [town.width / 2, town.depth / 2];
+  const ways = town.roads.map((r, i) => ({ r, i, len: lengths(r.points).at(-1) ?? 0 })).filter((w) => w.r.kind !== 'trail' && w.r.kind !== 'country' && w.r.points.length > 1);
+  const through = ways.filter((w) => w.r.ends[0] === 'out' && w.r.ends[1] === 'out');
+  const near = (w: (typeof ways)[number]) => w.len - 2 * nearest(w.r.points, mid[0], mid[1]).dist;
+  const main = (through.length ? through : ways).sort((a, b) => near(b) - near(a))[0];
+  if (!main) return [];
+  const { r: road, len } = main;
+  const ls = lengths(road.points);
+  const inRect = (x: number, z: number, r: Rect, m: number) => x > r.x - m && x < r.x + r.w + m && z > r.z - m && z < r.z + r.d + m;
+  const clear = (x: number, z: number) =>
+    x > 1 && z > 1 && x < town.width - 1 && z < town.depth - 1 && !index.onRoad(x, z) && !plots.some((r) => inRect(x, z, r, 0.3)) && !paths.some((r) => inRect(x, z, r, 0.3)) && !objects.some((o) => Math.hypot(o.x + 0.5 - x, o.z + 0.5 - z) < 1.2);
+  const spots: { s: number; side: 1 | -1; at: Pt; from: number }[] = [];
+  for (let s = 10; s < len - 10; s += 2) {
+    const { p, t } = pointAt(road.points, s, ls);
+    for (const side of [1, -1] as const) {
+      const n: Pt = [-t[1] * side, t[0] * side];
+      const out = road.width / 2 + SHELTER_OUT;
+      const c: Pt = [p[0] + n[0] * out, p[1] + n[1] * out];
+      let room = true;
+      for (let a = -0.5; a <= 0.5 && room; a += 0.25) {
+        for (const b of SHELTER_DEEP) {
+          room &&= clear(c[0] + t[0] * SHELTER_LONG * a + n[0] * b, c[1] + t[1] * SHELTER_LONG * a + n[1] * b);
+        }
+      }
+      if (!room) continue;
+      const k = road.width / 2 - STOP_IN;
+      const at: Pt = [Math.round((p[0] + n[0] * k) * 100) / 100, Math.round((p[1] + n[1] * k) * 100) / 100];
+      spots.push({ s, side, at, from: Math.hypot(c[0] - mid[0], c[1] - mid[1]) });
+    }
+  }
+  const first = spots.sort((a, b) => a.from - b.from || a.s - b.s)[0];
+  if (!first) return [];
+  const edge = (len * (1 - STOPS_WITHIN)) / 2;
+  const second = spots.find((o) => o.side === first.side && Math.abs(o.s - first.s) >= STOPS_APART && o.s > edge && o.s < len - edge);
+  return second ? [first.at, second.at] : [first.at];
 }
 
 /** What a plot is, for the simulation (docs/design/open-world.md). */
