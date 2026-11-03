@@ -1310,8 +1310,8 @@ async function openSession(
     // The open journal keeps up (it's fetched again when it opens).
     if (game.journalOpen && game.journal.length) game.journal = game.journal.concat(fresh).slice(-JOURNAL_SIZE);
     director.noteEvents(fresh.filter(aboutUs), performance.now());
-    // The feed: what happens to the household, and the town's bigger news.
-    const news = fresh.filter((e) => (aboutUs(e) && e.importance >= 1) || e.importance >= 2 || (aboutUs(e) && e.kind === 'skillUp'));
+    // The feed: what happens to the household (the neighbours' news stays theirs).
+    const news = fresh.filter((e) => aboutUs(e) && (e.importance >= 1 || e.kind === 'skillUp'));
     if (news.length) game.feed = [...game.feed.filter((f) => now - f.at < FEED_MS), ...news.map((event) => ({ event, at: now }))].slice(-FEED_SIZE);
     // Big moments at home are worth seeing at normal speed.
     const big = fresh.find((e) => e.importance >= 2 && aboutUs(e));
