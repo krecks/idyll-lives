@@ -8,7 +8,7 @@ use crate::common;
 use sim_core::content::Pose;
 use sim_core::social::EventKind;
 use sim_core::world::{Phase, TaskKind};
-use sim_core::{Command, World, clock};
+use sim_core::{Command, TICKS_PER_MINUTE, World, clock};
 
 /// Hunger, fun, comfort and social; a fridge with a snack in it (not chosen on a whim: only
 /// when the test says), dining sets to sit at and a sofa; a chat, and the host's offer (a guest
@@ -77,10 +77,6 @@ fn need(w: &World, id: &str) -> usize {
     w.content.needs.iter().position(|n| n.id == id).unwrap()
 }
 
-fn social(w: &World, id: &str) -> usize {
-    w.content.socials.iter().position(|s| s.id == id).unwrap()
-}
-
 /// What `sim` is doing, if it's a serve: (guest, stage).
 fn serving(w: &World, sim: usize) -> Option<(u32, u8)> {
     match w.sims[sim].current()?.task.kind {
@@ -90,7 +86,7 @@ fn serving(w: &World, sim: usize) -> Option<(u32, u8)> {
 }
 
 fn offering(w: &World, sim: usize) -> bool {
-    let offer = social(w, "offer");
+    let offer = w.content.social_index("offer").unwrap();
     w.sims[sim]
         .current()
         .is_some_and(|a| matches!(a.task.kind, TaskKind::Social { social, .. } if social == offer))
@@ -110,8 +106,6 @@ fn tick(w: &mut World, watch: &mut common::Watch) {
     common::check(w);
     watch.sample(w);
 }
-
-const PER_MINUTE: u32 = (1.0 / sim_core::MINUTES_PER_TICK) as u32;
 
 #[test]
 fn a_host_who_eats_sits_beside_the_guest_and_they_talk_over_the_meal() {
@@ -137,7 +131,7 @@ fn a_host_who_eats_sits_beside_the_guest_and_they_talk_over_the_meal() {
                     && matches!(a.phase, Phase::Using { .. })
             })
     };
-    for _ in 0..30 * PER_MINUTE {
+    for _ in 0..30 * TICKS_PER_MINUTE {
         tick(&mut w, &mut watch);
         if seated(&w) {
             break;
@@ -151,7 +145,7 @@ fn a_host_who_eats_sits_beside_the_guest_and_they_talk_over_the_meal() {
     w.sims[0].needs[hunger] = 0.2;
     let mut seat = None;
     let mut talked = false;
-    for _ in 0..60 * PER_MINUTE {
+    for _ in 0..60 * TICKS_PER_MINUTE {
         tick(&mut w, &mut watch);
         seat = seat.or(eating_at(&w, 0));
         // A word while Ada has her meal (from their seats: neither gets up).
@@ -181,7 +175,7 @@ fn a_host_offers_the_guest_says_yes_and_has_what_is_brought() {
     let snack = w.content.item_index("snack").unwrap();
     let mut watch = common::Watch::new();
     let (mut offered, mut fetched, mut carried, mut ate_at) = (false, false, false, None);
-    for _ in 0..90 * PER_MINUTE {
+    for _ in 0..90 * TICKS_PER_MINUTE {
         tick(&mut w, &mut watch);
         offered |= offering(&w, 0);
         // At the fridge, taking it out; then on the way to Bo with it in hand.
@@ -222,7 +216,7 @@ fn a_host_offers_the_guest_says_yes_and_has_what_is_brought() {
     assert!(w.sims[0].held.is_none(), "Ada handed it over");
     // He eats it up, and the plate is Ada's household's to wash.
     let before = w.sims[1].needs[hunger];
-    for _ in 0..40 * PER_MINUTE {
+    for _ in 0..40 * TICKS_PER_MINUTE {
         tick(&mut w, &mut watch);
     }
     assert!(w.sims[1].needs[hunger] > before + 0.2, "Bo ate it");
@@ -236,7 +230,7 @@ fn a_host_offers_the_guest_says_yes_and_has_what_is_brought() {
         w.items.list
     );
     // Once is enough for a while.
-    let asked = (0..60 * PER_MINUTE).any(|_| {
+    let asked = (0..60 * TICKS_PER_MINUTE).any(|_| {
         tick(&mut w, &mut watch);
         offering(&w, 0)
     });
@@ -249,7 +243,7 @@ fn a_guest_who_is_not_hungry_says_no_and_nothing_is_brought() {
     let mut w = hosting(CONTENT);
     let mut watch = common::Watch::new();
     let mut offered = false;
-    for _ in 0..60 * PER_MINUTE {
+    for _ in 0..60 * TICKS_PER_MINUTE {
         tick(&mut w, &mut watch);
         offered |= offering(&w, 0);
         assert!(
@@ -290,7 +284,7 @@ fn without_a_fridge_nobody_offers_anything() {
         offer_at: 0,
     });
     let mut watch = common::Watch::new();
-    for _ in 0..60 * PER_MINUTE {
+    for _ in 0..60 * TICKS_PER_MINUTE {
         tick(&mut w, &mut watch);
         assert!(!offering(&w, 0), "Ada offered something she hasn't got");
         assert!(serving(&w, 0).is_none());
@@ -304,7 +298,7 @@ fn a_guest_who_leaves_while_it_is_on_its_way_leaves_nobody_stuck() {
     w.sims[1].needs[0] = 0.35;
     let mut watch = common::Watch::new();
     let on_its_way = |w: &World| serving(w, 0).is_some_and(|(_, stage)| stage > 0);
-    for _ in 0..90 * PER_MINUTE {
+    for _ in 0..90 * TICKS_PER_MINUTE {
         tick(&mut w, &mut watch);
         if on_its_way(&w) {
             break;
@@ -314,7 +308,7 @@ fn a_guest_who_leaves_while_it_is_on_its_way_leaves_nobody_stuck() {
     // Bo is off home.
     w.apply(Command::GoHome { sim: 1 }).unwrap();
     let mut dropped = false;
-    for _ in 0..60 * PER_MINUTE {
+    for _ in 0..60 * TICKS_PER_MINUTE {
         tick(&mut w, &mut watch);
         let ada = &w.sims[0];
         let serves = |k: &TaskKind| matches!(k, TaskKind::Serve { .. });
@@ -342,7 +336,7 @@ fn a_guest_who_leaves_while_it_is_on_its_way_leaves_nobody_stuck() {
         "the snack was put down at Ada's: {:?}",
         w.items.list
     );
-    for _ in 0..30 * PER_MINUTE {
+    for _ in 0..30 * TICKS_PER_MINUTE {
         tick(&mut w, &mut watch);
     }
     watch.assert_quiet();

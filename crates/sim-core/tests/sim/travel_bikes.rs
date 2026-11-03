@@ -2,6 +2,8 @@
 //! rides it out of town at its speed, it goes to work with them and comes home with them, back
 //! at its place; a way too short for it is walked; two can't share one bike.
 
+use crate::common;
+
 use sim_core::snapshot;
 use sim_core::{World, clock};
 
@@ -65,22 +67,11 @@ fn until_away(w: &mut World, i: usize, limit: u64, mut each: impl FnMut(&World))
     None
 }
 
-fn hours(h: f32) -> u64 {
-    (h * 60.0 / sim_core::MINUTES_PER_TICK) as u64
-}
-
 fn bike(w: &World) -> usize {
     w.objects
         .iter()
         .position(|o| w.content.objects[o.def].id == "bike")
         .unwrap()
-}
-
-fn day_hour(w: &mut World, day: u32, hour: f32) {
-    let t = clock::tick_at(day, hour * 60.0).unwrap();
-    while w.tick < t {
-        w.tick_once();
-    }
 }
 
 #[test]
@@ -106,7 +97,7 @@ fn someone_with_a_bike_rides_it_to_work_and_home_again() {
     assert_eq!(w.objects[b].users[0], Some(0));
     // Home again after the shift: off it, at its place, free.
     let mut home_at = None;
-    let end = w.tick + hours(10.0);
+    let end = w.tick + 10 * common::TICKS_PER_HOUR;
     while w.tick < end {
         w.tick_once();
         if w.sims[0].away_until.is_none() && w.sims[0].riding.is_none() {
@@ -127,7 +118,7 @@ fn someone_with_a_bike_rides_it_to_work_and_home_again() {
 fn a_bike_gets_them_out_of_town_in_a_third_of_the_walk() {
     let time_to_exit = |bikes: usize| {
         let mut w = town(1, bikes, 100);
-        day_hour(&mut w, 1, 8.0);
+        common::run_to(&mut w, 1, 8.0);
         let mut set_off = None;
         let away = until_away(&mut w, 0, clock::tick_at(2, 12.0 * 60.0).unwrap(), |w| {
             if set_off.is_none() && w.sims[0].current().is_some() {
@@ -191,7 +182,8 @@ fn a_game_saved_mid_ride_loads_with_the_bike_at_home_and_them_on_foot() {
     loaded.autonomy = false;
     assert!(loaded.sims[0].riding.is_none());
     assert!(loaded.objects[b].users.iter().all(Option::is_none));
-    until_away(&mut loaded, 0, hours(30.0), |_| {}).expect("never got to work after loading");
+    until_away(&mut loaded, 0, 30 * common::TICKS_PER_HOUR, |_| {})
+        .expect("never got to work after loading");
 }
 
 #[test]
@@ -212,5 +204,5 @@ fn a_bike_sold_while_they_ride_it_leaves_them_on_foot() {
     })
     .unwrap();
     assert!(w.sims[0].riding.is_none());
-    until_away(&mut w, 0, hours(30.0), |_| {}).expect("never got to work on foot");
+    until_away(&mut w, 0, 30 * common::TICKS_PER_HOUR, |_| {}).expect("never got to work on foot");
 }
