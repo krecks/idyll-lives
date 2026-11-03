@@ -805,7 +805,7 @@ optional; a long recipe tempts them less, a hungry family more, and food already
 at all (`leftoverPreference`: they eat that first). Many homes have only a fridge and a sink:
 keep the prep and cooking steps of everyday recipes optional, and fetching the ingredients
 the shortest step (3 minutes in the shipped ones). A station that's busy is waited
-for (`stationWaitMinutes`), then done without (optional steps) or given up (others). Quick food
+for (`stationWaitMinutes`), then done without (optional steps), or for three times that and then given up (others). Quick food
 (a snack, toast, reheating) isn't a recipe but an interaction with `eat`: fetched or made at the
 object, then eaten sitting down like a dish (it has a hidden recipe of its own, which the
 game makes, so a plate in someone's hands survives a reload). Drinks (a coffee, a soda) stay

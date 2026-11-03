@@ -1054,9 +1054,12 @@ fn cook_next(
     if step == 0 && servings == 0 && !r.possible(station_mask(sim, ctx, objects) | at_origin) {
         return cannot_cook(sim, ctx, tags);
     }
-    let give_up = waited.is_some_and(|w| {
-        w as f32 * crate::MINUTES_PER_TICK >= content.cooking.station_wait_minutes
-    });
+    // (A step the recipe can't do without, the ingredients from the fridge, is waited for longer:
+    // whoever has the station may still be on the way to it from the garden.)
+    let give_up = |optional: bool| {
+        let limit = content.cooking.station_wait_minutes * if optional { 1.0 } else { 3.0 };
+        waited.is_some_and(|w| w as f32 * crate::MINUTES_PER_TICK >= limit)
+    };
     let (mut step, mut skipped, mut carried) = (step, skipped, carried);
     while let Some(s) = r.steps.get(step as usize) {
         task.kind = TaskKind::Cook {
@@ -1086,7 +1089,7 @@ fn cook_next(
                     return;
                 }
             }
-            Found::Busy if !give_up => {
+            Found::Busy if !give_up(s.optional) => {
                 queue(sim, task, ctx, tags, waited);
                 return;
             }
