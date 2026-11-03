@@ -257,3 +257,77 @@ fn the_ui_says_where_a_trip_goes_and_about_when_they_are_there() {
     assert!(off <= 30, "estimated {at}, there at {now}");
     assert_eq!(trip_in_view(&w, i), None, "there: no longer on the way");
 }
+
+#[test]
+fn a_walk_past_a_car_parked_out_on_a_trip_goes_round_it() {
+    let (mut w, h, park) = world(5);
+    let (c, i) = w
+        .cars
+        .iter()
+        .enumerate()
+        .find_map(|(c, car)| {
+            let home = w.households[car.household as usize].plot? as usize;
+            h.plots[0].contains(&home).then_some(())?;
+            car.owners.first().map(|&o| (c, o as usize))
+        })
+        .expect("a car owner in the first hamlet");
+    w.apply(Command::Visit {
+        sim: i as u32,
+        plot: park,
+    })
+    .unwrap();
+    let end = w.tick + 20 * 60 * 20;
+    while w.cars[c].state != CarState::Out {
+        w.tick_once();
+        assert!(w.tick < end, "never parked out there");
+    }
+    let trip = w.cars[c].trip.unwrap();
+    let (len, wid) = (w.cars[c].len, w.cars[c].wid);
+    // Someone of the second hamlet walks along the road from one end of it to the other.
+    let j = h.plots[1]
+        .clone()
+        .find_map(|p| {
+            let hh = w
+                .households
+                .iter()
+                .position(|hh| hh.plot == Some(p as u32))?;
+            w.sims.iter().position(|s| s.household == hh as u32)
+        })
+        .expect("someone in the second hamlet");
+    let (fs, fc) = trip.yaw.sin_cos();
+    let along = |k: f32| [trip.at[0] + fs * k, trip.at[1] + fc * k];
+    w.sims[j].pos = along(-6.0);
+    let to = along(6.0);
+    w.apply(Command::MoveTo {
+        sim: j as u32,
+        x: to[0],
+        z: to[1],
+    })
+    .unwrap();
+    let mut closest = f32::INFINITY;
+    for _ in 0..2000 {
+        w.tick_once();
+        assert_eq!(w.cars[c].state, CarState::Out, "the car left");
+        let p = w.sims[j].pos;
+        let (dx, dz) = (p[0] - trip.at[0], p[1] - trip.at[1]);
+        let (a, b) = (
+            (dx * fs + dz * fc).abs() - len / 2.0,
+            (dx * fc - dz * fs).abs() - wid / 2.0,
+        );
+        closest = closest.min(a.max(0.0).hypot(b.max(0.0)) + a.max(b).min(0.0));
+        if sim_core::travel::dist(p, to) < 0.5 {
+            break;
+        }
+    }
+    assert!(
+        sim_core::travel::dist(w.sims[j].pos, to) < 0.5,
+        "never got past it: at {:?}",
+        w.sims[j].pos
+    );
+    // (Their middle: a tile's worth of the car at its edge is walkable, as at home.)
+    assert!(
+        closest >= 0.0,
+        "walked {:.2} m into the car parked there",
+        -closest
+    );
+}

@@ -42,10 +42,10 @@
 //! Anyone who misses it makes their own way, as do those in it waiting for a driver who can't come
 //! (at work, out of town) or hasn't come in `TRIP_WAIT_TICKS`.
 //!
-//! A parked car takes up the tiles under it: nobody walks through it and nothing can be put there
-//! (`World::blocked`, `reblock`). A car whose parking spot has been built over (a wall, a fence, a
-//! thing put there while it was out) stays where it is, unused (`Car::blocked`), and the renderer
-//! leaves it out.
+//! A parked car takes up the tiles under it, at home or out on a trip in its bay: nobody walks
+//! through it and nothing can be put there (`World::blocked`, `reblock`). A car whose parking
+//! spot has been built over (a wall, a fence, a thing put there while it was out) stays where it
+//! is, unused (`Car::blocked`), and the renderer leaves it out.
 //!
 //! The route is worked out from the car's spot, the street it faces and the town's exits, the
 //! same way each time, so it isn't saved; the snapshot gives the renderer the car's pose along
@@ -633,15 +633,27 @@ impl Car {
 
     /// The tiles it takes up parked.
     fn tiles(&self) -> Vec<(i32, i32)> {
-        let (s, c) = self.yaw.sin_cos();
-        // Axis-aligned enough: a car parks along its driveway.
+        self.tiles_at(self.spot, self.yaw)
+    }
+
+    /// The tiles it takes up parked at `at` facing `yaw`.
+    fn tiles_at(&self, at: [f32; 2], yaw: f32) -> Vec<(i32, i32)> {
+        let (s, c) = yaw.sin_cos();
+        // Axis-aligned enough: a car parks along its driveway, or square to the road in a bay.
         let (hw, hl) = if s.abs() > c.abs() {
             (self.len / 2.0, self.wid / 2.0)
         } else {
             (self.wid / 2.0, self.len / 2.0)
         };
-        let [x, z] = self.spot;
+        let [x, z] = at;
         covered_tiles(x - hw, z - hl, x + hw, z + hl)
+    }
+
+    /// Where it stands parked out on a trip (`CarState::Out`), and which way it faces.
+    fn out_at(&self) -> Option<([f32; 2], f32)> {
+        self.trip
+            .filter(|_| self.state == CarState::Out)
+            .map(|t| (t.at, t.yaw))
     }
 }
 
@@ -2428,7 +2440,7 @@ fn garage_spot(w: &World, car: &Car, base: ([f32; 2], f32)) -> Option<([f32; 2],
 
 /// The tiles `car` would take up parked at `spot` facing `yaw`.
 pub(crate) fn car_tiles_at(car: &Car, spot: [f32; 2], yaw: f32) -> Vec<(i32, i32)> {
-    car.posed(spot, yaw).tiles()
+    car.tiles_at(spot, yaw)
 }
 
 /// The tiles a car takes up parked on driveway `d` (one as long as the longest car, as
@@ -2514,12 +2526,19 @@ fn standing_tiles(w: &World, parked: &[u64]) -> Vec<usize> {
             }
         }
     }
-    for c in 0..w.cars.len() {
-        if parked[c / 64] & 1 << (c % 64) != 0 {
-            for (x, z) in w.cars[c].tiles() {
-                if w.lot.in_bounds(x, z) {
-                    tiles.push(w.lot.tile_index(x, z));
-                }
+    let out = w.cars.len().div_ceil(64);
+    for (c, car) in w.cars.iter().enumerate() {
+        let home = parked[c / 64] & 1 << (c % 64) != 0;
+        // (Out on a trip, it stands in its bay as at home.)
+        let away = parked[out + c / 64] & 1 << (c % 64) != 0;
+        let at = match car.out_at() {
+            Some((at, yaw)) if away => car.tiles_at(at, yaw),
+            _ if home => car.tiles(),
+            _ => continue,
+        };
+        for (x, z) in at {
+            if w.lot.in_bounds(x, z) {
+                tiles.push(w.lot.tile_index(x, z));
             }
         }
     }
@@ -2528,11 +2547,15 @@ fn standing_tiles(w: &World, parked: &[u64]) -> Vec<usize> {
     tiles
 }
 
-/// Which cars stand parked, a bit each.
+/// Which cars stand parked, a bit each: at home, then out on a trip.
 fn parked_bits(w: &World) -> Vec<u64> {
-    let mut parked = vec![0u64; w.cars.len().div_ceil(64)];
+    let out = w.cars.len().div_ceil(64);
+    let mut parked = vec![0u64; 2 * out];
     for c in (0..w.cars.len()).filter(|&c| present(w, c)) {
         parked[c / 64] |= 1 << (c % 64);
+    }
+    for c in (0..w.cars.len()).filter(|&c| w.cars[c].out_at().is_some()) {
+        parked[out + c / 64] |= 1 << (c % 64);
     }
     parked
 }
