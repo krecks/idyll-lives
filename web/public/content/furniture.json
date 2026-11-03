@@ -1753,7 +1753,7 @@
       "price": 150,
       "category": "living",
       "group": "media",
-      "description": "An old television in a wooden console on legs, rabbit ears on top. It still works (mostly).",
+      "description": "A slim flat-screen on a fluted oak media console, a games console in the cubby and a smart speaker on top. Everything streams.",
       "interactions": [
         {
           "id": "watch",

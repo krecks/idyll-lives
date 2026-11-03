@@ -112,26 +112,54 @@
       "type": "model",
       "url": "../../models/media/tvRetro.glb",
       "materials": {
-        "crt": {
-          "finish": "material.finish.gloss",
-          "glow": "#A8C8E0"
+        "black_metal": {
+          "finish": "material.finish.metal"
+        },
+        "display": {
+          "finish": "material.finish.gloss"
         },
         "grille": {
           "finish": "material.finish.matte"
         },
-        "retro_bezel": {
+        "led": {
           "finish": "material.finish.gloss"
+        },
+        "led_red": {
+          "finish": "material.finish.gloss"
+        },
+        "pebble": {
+          "finish": "material.finish.gloss"
+        },
+        "plant": {
+          "finish": "material.finish.satin"
+        },
+        "pot": {
+          "finish": "material.finish.gloss"
+        },
+        "rec_cream": {
+          "finish": "material.finish.satin"
+        },
+        "rec_mustard": {
+          "finish": "material.finish.satin"
+        },
+        "rec_rust": {
+          "finish": "material.finish.satin"
+        },
+        "rec_teal": {
+          "finish": "material.finish.satin"
+        },
+        "retro_bezel": {
+          "finish": "material.finish.satin"
         },
         "retro_wood": {
           "finish": "material.finish.wood"
         },
+        "screen": {
+          "finish": "material.finish.gloss",
+          "glow": "#8DB4E2"
+        },
         "steel": {
           "finish": "material.finish.metal"
-        }
-      },
-      "motions": {
-        "uses": {
-          "watch": "antenna"
         }
       },
       "paint": [
