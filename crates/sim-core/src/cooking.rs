@@ -1749,16 +1749,7 @@ pub(crate) fn eat_now(
     objects: &mut [ObjectInstance],
     items: &mut Items,
 ) {
-    let content = ctx.content;
-    let r = &content.recipes[recipe];
-    let plate = content.items[r.item].serving.unwrap_or(r.item);
-    sim.held = Some(Held {
-        def: plate,
-        servings: 1,
-        quality,
-        made_at: ctx.tick,
-        recipe: Some(recipe),
-    });
+    sim.held = Some(plate(ctx.content, recipe, quality, ctx.tick));
     let eat = Task {
         kind: TaskKind::Eat {
             item: None,
@@ -1769,6 +1760,31 @@ pub(crate) fn eat_now(
         ..task
     };
     eat_next(sim, eat, ctx, objects, items);
+}
+
+/// A plate of `recipe` (its serving) made at `tick`, `quality` as a cooked dish's: a snack taken
+/// out to eat at once (`eat_now`), or to hand a guest (`hosting.rs`).
+pub(crate) fn plate(content: &Content, recipe: usize, quality: f32, tick: u64) -> Held {
+    let r = &content.recipes[recipe];
+    Held {
+        def: content.items[r.item].serving.unwrap_or(r.item),
+        servings: 1,
+        quality,
+        made_at: tick,
+        recipe: Some(recipe),
+    }
+}
+
+/// How good what `inter` gives at `o` comes out (as a cooked dish's quality, a harvest's): the
+/// object's quality and the skill it takes, as `skills` have it.
+pub(crate) fn made_quality(
+    content: &Content,
+    o: &ObjectInstance,
+    inter: &Interaction,
+    skills: &[f32; crate::content::MAX_SKILLS],
+) -> f32 {
+    content.object_rules.quality_factor(o.quality)
+        * inter.skill_factor(&content.skill_rules, skills)
 }
 
 /// Where someone eats: on the plot they're on (at home, at a host's, in a park). Its objects,
