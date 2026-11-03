@@ -1345,11 +1345,7 @@ pub(crate) fn at_stop(ctx: &Ctx, sim: &Sim, exit: [f32; 2]) -> Option<(u16, u8, 
     let there = ctx.tick + (minutes * TICKS_PER_MINUTE as f32) as u64;
     let run = t.catches(stop, there)?;
     // (On before work starts.)
-    let start = match &sim.job {
-        Some(job) => crate::life::shift_today(ctx.content, job, &sim.skills, ctx.tick),
-        None => crate::life::school_today(ctx.content, sim, ctx.tick),
-    }
-    .map(|(_, start, _)| start);
+    let start = crate::life::start_on(ctx.content, sim, ctx.tick);
     let board = (run + t.lines[l as usize].arrive[j as usize]).max(there);
     if start.is_some_and(|start| board > start) {
         return None;

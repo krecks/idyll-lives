@@ -1489,12 +1489,7 @@ pub(crate) fn off_map_ticks(w: &World) -> u64 {
 
 /// When `j`'s work (or school) starts today, if they have it.
 fn starts_today(w: &World, j: usize) -> Option<u64> {
-    let s = &w.sims[j];
-    match &s.job {
-        Some(job) => crate::life::shift_today(&w.content, job, &s.skills, w.tick),
-        None => crate::life::school_today(&w.content, s, w.tick),
-    }
-    .map(|(_, start, _)| start)
+    crate::life::start_on(&w.content, &w.sims[j], w.tick)
 }
 
 /// `i` gets in (their shift is under way): the first owner in drives (someone in before them waits
