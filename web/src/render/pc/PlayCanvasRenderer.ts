@@ -59,6 +59,7 @@ import { drawRoads } from './roads';
 import { createWorldRoot, toEngine } from './space';
 import { Street } from './street';
 import { Cars } from './cars';
+import { ParkedRides } from './parkedRides';
 import { SelectionMarker } from './selectionMarker';
 import { SunShadows } from './sunShadows';
 import { TemplateCache } from './templateCache';
@@ -433,6 +434,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private street!: Street;
   /** Households' cars, parked and on the road (`cars.ts`). */
   private cars!: Cars;
+  /** Other lots' bikes and e-scooters (the street leaves them out: they go off with their riders). */
+  private parkedRides!: ParkedRides;
   /** What grows and stands on the lot: the landscape and sky, objects and their clips, items (`lotContents.ts`). */
   private lot!: LotContents;
   /** The viewed house's interior lights (`lamps.ts`). */
@@ -723,9 +726,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // Other lots show their things in the open, public places' and neighbours' gardens' (as the overview does).
     this.street = new Street(this.app, this.root, this.deps.assets, this.house, {
       lived: true,
+      // (Not the bikes and e-scooters: they go off with their riders, `parkedRides.ts`.)
       look: (def) => {
         const d = c.object(def);
-        return d && { model: d.model ?? `model.${def}`, footprint: d.footprint ?? [1, 1], standIn: standInOf(c, d) };
+        return d && !d.vehicle ? { model: d.model ?? `model.${def}`, footprint: d.footprint ?? [1, 1], standIn: standInOf(c, d) } : undefined;
       },
       lod: this.quality.streetLod,
       shadows: this.quality.streetShadows,
@@ -735,6 +739,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     });
     this.roam.streamScale = this.quality.openWorld.stream;
     this.cars = new Cars(this.app, this.root, this.quality.streetShadows);
+    this.parkedRides = new ParkedRides(this.app, this.root, this.deps.assets, c, this.quality.streetShadows);
     this.characters.setCarSeat((x, z) => this.cars.seatAt(x, z));
     // Only cars and residents moving where they cast into the sun's map draw it again.
     const inMap = (x: number, z: number) => this.sunShadows.reaches(x, z);
@@ -1068,6 +1073,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!changed) return;
     if (this.streamOn && this.street.setChunks(this.roam.chunks)) this.streamStreet();
     this.cars.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
+    this.parkedRides.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
     this.reportWatch();
   }
 
@@ -1404,6 +1410,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.street.setChunks(this.roam.chunks);
     } else this.street.setChunks(null);
     this.cars.setView(this.streamOn ? this.roam.chunks : null, this.orbit.target.x, this.orbit.target.z);
+    this.parkedRides.setView(this.streamOn ? this.roam.chunks : null, this.orbit.target.x, this.orbit.target.z);
     // (lotContents.ts: the landscape, with its country roads.)
     this.loadStep('Laying out the land', 0.05);
     await this.lot.buildNature(world, (roads, parent) => drawRoads(this.app, roads, parent));
@@ -1439,6 +1446,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.cars.build(world);
     this.loadStep('Furnishing the house', 0.45);
     await this.lot.buildObjects(world); // (the objects, their clips, contact shadows, items.)
+    await this.parkedRides.build(world, (x, z) => this.inView(x, z, 0)); // (other lots' bikes and e-scooters.)
     this.mirrors.set(this.lot.mirrors);
     this.placing.objectsBuilt(); // (the thing in hand hidden in them.)
     this.loadStep('Bringing everyone home', 0.55);
@@ -1849,6 +1857,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lotParts = null;
     this.street.clear();
     this.cars.clear();
+    this.parkedRides.clear();
     this.windowless = { rooms: new Set(), of: [] };
     this.dimming = null;
     this.applyDimming();
@@ -1941,7 +1950,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     for (const p of this.decor.values()) for (const d of p.draws) d.enabled = this.storey >= 0 && d.count > 0;
     const v = this.view;
     this.street.showLot(this.storey >= 0);
-    this.cars.hideOn(this.storey < 0 && v ? [v.x - PIT_MARGIN, v.z - PIT_MARGIN, v.x + v.w + PIT_MARGIN, v.z + v.d + PIT_MARGIN] : null);
+    const pit = this.storey < 0 && v ? ([v.x - PIT_MARGIN, v.z - PIT_MARGIN, v.x + v.w + PIT_MARGIN, v.z + v.d + PIT_MARGIN] as const) : null;
+    this.cars.hideOn(pit);
+    this.parkedRides.hideOn(pit);
     this.applyDig();
     this.sunShadows.moved();
   }
@@ -2162,6 +2173,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       if (Math.hypot(sx - t.x, sz - t.z) > FAR_SHADOW && !this.inView(sx, sz, SIM_VIEW_MARGIN)) shadows.fill(0, o, o + 16);
     }
     this.lot.pullChairs(this.characters.pulled, this.placing.held); // (not the one in hand.)
+    // (Bikes and e-scooters ridden off: not where they stand.)
+    if (this.characters.riddenChanged) {
+      this.characters.riddenChanged = false;
+      this.lot.hideRidden(this.characters.ridden);
+      this.parkedRides.hide(new Set(this.characters.ridden));
+    }
     this.lot.takeRestProps(this.characters.restTaken);
     // (Only residents posed where they cast into the map: `shadowPosed`, as the cars' `moved`.)
     if (this.quality.characterShadows && this.characters.shadowPosed) this.sunShadows.moved(false);

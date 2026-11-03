@@ -9,7 +9,7 @@ use crate::{TICKS_PER_SECOND, clock};
 
 pub const HEADER_LEN: usize = 11;
 /// Floats per Sim (all 32 used).
-pub const SIM_STRIDE: usize = 32;
+pub const SIM_STRIDE: usize = 33;
 /// The cars' rows (`header::CAR_COUNT`, `car`) start here: after room for every resident's and
 /// server's.
 pub const CAR_BASE: usize = HEADER_LEN + (MAX_SIMS + crate::staff::MAX_STAFF) * SIM_STRIDE;
@@ -139,6 +139,9 @@ pub mod sim {
     /// bedroom they try for a baby in; `privacy.rs`), else 0: the renderer keeps its doors shut
     /// to anyone but whoever goes through them (nobody else goes in).
     pub const SHUTS: usize = 31;
+    /// Stable id of the thing they ride (a bike, an e-scooter: `ride.rs`), drawn under them and
+    /// not at its place while they're on it (away at work too), or -1.
+    pub const RIDE: usize = 32;
 }
 
 /// How far ahead along their way `sim::AHEAD_X` looks, in metres.
@@ -155,6 +158,7 @@ const _: () = assert!(
         && sim::CARRY < SIM_STRIDE
         && sim::PLATE < SIM_STRIDE
         && sim::SHUTS < SIM_STRIDE
+        && sim::RIDE < SIM_STRIDE
 );
 const _: () = assert!(
     header::ITEMS_VERSION < HEADER_LEN && header::CAR_COUNT < HEADER_LEN && car::DOORS < CAR_STRIDE
@@ -683,6 +687,10 @@ pub fn write(world: &World, out: &mut [f32]) {
             .or_else(|| shown_held(world, s))
             .map_or(0.0, |d| d as f32 + 1.0);
         o[sim::SHUTS] = crate::privacy::keeps_shut(world, s.id) as u8 as f32;
+        o[sim::RIDE] = s
+            .riding
+            .and_then(|b| world.objects.get(b as usize))
+            .map_or(-1.0, |b| b.stable as f32);
     }
     // Conversations: write the shared state into every participant's row.
     for (i, s) in world.sims.iter().enumerate() {
@@ -771,6 +779,7 @@ fn write_staff(world: &World, out: &mut [f32]) {
         o[sim::PARTNER] = -1.0;
         o[sim::AWAY] = (!server.present) as u8 as f32;
         o[sim::OBJECT] = -1.0;
+        o[sim::RIDE] = -1.0;
         o[sim::OBJECT_DEF] = -1.0;
         o[sim::INTERACTION] = -1.0;
         o[sim::ACTION] = -1.0;
@@ -851,7 +860,7 @@ pub fn layout_json(content: &Content) -> String {
             "wayX": sim::WAY_X, "wayZ": sim::WAY_Z, "aheadX": sim::AHEAD_X, "aheadZ": sim::AHEAD_Z,
             "carry": sim::CARRY,
             "progress": sim::PROGRESS, "plate": sim::PLATE,
-            "shuts": sim::SHUTS,
+            "shuts": sim::SHUTS, "ride": sim::RIDE,
         },
         "actions": content.animations,
         "items": content.items.iter().map(|i| &i.id).collect::<Vec<_>>(),

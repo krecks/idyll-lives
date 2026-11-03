@@ -194,6 +194,12 @@ export class LotContents {
   private seatTurns = new Map<number, number>();
   private pulledIn = new Map<number, { by: number; saved: { target: PopTarget; matrix: Float32Array }[] }>();
   private readonly wallItemsHidden = new Map<number, Float32Array>();
+  /**
+   * Things ridden now (a bike, an e-scooter: the residents' `ridden`), not drawn where they stand: by stable id, each
+   * of its instances (its contact shadow's too) with the matrix to draw it again (`hideRidden`).
+   */
+  private readonly riddenHidden = new Map<number, { target: PopTarget; matrix: Float32Array }[]>();
+  private riddenIds: ReadonlySet<number> = new Set();
   /** Props drawn on objects at rest (`REST_PROPS`: the phone box's receiver on its hook), by prop key, and the ones in a hand now. */
   private readonly restProps = new Map<string, RestProps>();
   private restTaken: ReadonlySet<number> = new Set();
@@ -602,6 +608,7 @@ export class LotContents {
     this.templatesInUse.clear();
     this.placed = [];
     this.wallItemsHidden.clear();
+    this.riddenHidden.clear();
     const down = (o: ObjectPlacement) => storey >= 0 && v.storeyOf(o.z) === -1 && !!this.deps.content.object(o.def)?.stairs;
     const shown = world.objects.filter((o) => (storeyShown(v.storeyOf(o.z), storey) || down(o)) && v.inView(o.x + o.w / 2, o.z - v.rowOf(v.storeyOf(o.z)) + o.d / 2, 0));
     // One template per model and size (things the player resized get their own).
@@ -750,6 +757,8 @@ export class LotContents {
     this.pullUpChairs(world);
     this.retireTemplates();
     this.showItems();
+    // (What's ridden off, hidden in the new copies.)
+    this.hideRidden(this.riddenIds);
     this.hooks.shadowsMoved(true);
   }
 
@@ -995,6 +1004,7 @@ export class LotContents {
     this.tables = new Map();
     this.pulledIn.clear();
     this.wallItemsHidden.clear();
+    this.riddenHidden.clear();
     this.motion.clear();
     this.items.clear();
   }
@@ -1211,9 +1221,42 @@ export class LotContents {
     return all.length ? Float32Array.from(all) : null;
   }
 
-  /** Whether the thing on a wall `id` is hidden with its wall now (`cutWallItems`: not picked then). */
+  /** Whether the thing on a wall `id` is hidden with its wall now (`cutWallItems`), or ridden off (`hideRidden`): not picked then. */
   wallItemHidden(id: number): boolean {
-    return this.wallItemsHidden.has(id);
+    return this.wallItemsHidden.has(id) || this.riddenHidden.has(id);
+  }
+
+  /**
+   * The things ridden now (stable ids: a bike, an e-scooter its rider is on, away at work too, or getting on or
+   * off; the residents draw it under them) aren't drawn where they stand, nor their contact shadows; those no
+   * longer ridden are again. Kept across builds (`buildObjects` hides them in the new copies).
+   */
+  hideRidden(ids: ReadonlySet<number>): void {
+    this.riddenIds = new Set(ids);
+    let changed = false;
+    for (const [id, saved] of this.riddenHidden) {
+      if (ids.has(id)) continue;
+      for (const { target, matrix } of saved) this.write(target, matrix);
+      this.riddenHidden.delete(id);
+      changed = true;
+    }
+    for (const id of ids) {
+      if (this.riddenHidden.has(id)) continue;
+      const p = this.placed.find((o) => o.id === id);
+      if (!p) continue;
+      const saved = (p.shadow ? [p.pop, p.shadow] : [p.pop]).map((target) => ({ target, matrix: target.matrices.slice(target.index * 16, target.index * 16 + 16) }));
+      // Scaled to nothing where it stands (an all-zero matrix would put w = 0).
+      for (const { target, matrix } of saved) {
+        const gone = matrix.slice();
+        gone.fill(0, 0, 12);
+        this.write(target, gone);
+      }
+      this.riddenHidden.set(id, saved);
+      changed = true;
+    }
+    if (!changed) return;
+    this.hooks.shadowsMoved(true);
+    this.objectShadows?.flush();
   }
 
   dispose(): void {

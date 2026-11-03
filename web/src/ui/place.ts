@@ -68,9 +68,24 @@ export function placeAt(x: number, z: number, plots: readonly PlacePlot[], house
  * (the sim works it out only for residents whose details are shown). `home`: their household's
  * plot; `time` writes a minute of day as the player's clock does.
  */
-export function tripText(trip: { to: number; at?: number }, home: number | null, plots: readonly PlacePlot[], households: readonly { name: string; plot: number | null }[], time: (minute: number) => string): string {
+export function tripText(
+  trip: { to: number; at?: number },
+  home: number | null,
+  plots: readonly PlacePlot[],
+  households: readonly { name: string; plot: number | null }[],
+  time: (minute: number) => string,
+  ride?: SimRide,
+): string {
   const when = (word: string) => (trip.at === undefined ? '' : ` · ${word} about ${time(trip.at)}`);
-  if (trip.to === home) return `On the way home${when('back')}`;
+  if (trip.to === home) return `${ride ? rideText(ride.kind, 'home') : 'On the way home'}${when('back')}`;
   const p = plots[trip.to];
   return `On the way to ${p ? lotInSentence(p, households) : 'somewhere'}${when('there')}`;
+}
+
+/** What a resident rides on their way (`SimView.ride`). */
+export type SimRide = { kind: 'bike' | 'scooter'; to: 'work' | 'school' | 'home' };
+
+/** On a bike or an e-scooter, in words: "Cycling to work", "Riding the e-scooter home". */
+export function rideText(kind: SimRide['kind'], to: SimRide['to']): string {
+  return `${kind === 'bike' ? 'Cycling' : 'Riding the e-scooter'} ${to === 'home' ? 'home' : `to ${to}`}`;
 }

@@ -14,11 +14,12 @@
  */
 
 import { cycle, mix, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
-import { breathe, hangArms, TAU } from './idle';
+import { breathe, hangArms, stand, TAU } from './idle';
 import { liePose } from './lie';
 import { SEAT_MOVE, seatedBody } from './seated';
 import { addV, armIK, footIK, lerpV, smooth, sub, turned, wrist } from './ik';
-import { REF_HEIGHT, type Fit, type Size } from './street';
+import { REF_HEIGHT, sizes, type Fit, type Size } from './street';
+import { MOUNTS, type Mount } from '../vehicles';
 
 // --- tracks -------------------------------------------------------------------------------------
 
@@ -803,8 +804,61 @@ function swingPose(f: RideFit): (p: number) => PoseSpec {
   };
 }
 
+// --- bikes and e-scooters, ridden (vehicles.ts `MOUNTS`) ---------------------------------------------
+
+/**
+ * On a bike (the city bike for a grown-up's and a teen's size, the kids' bike for a child's): sat on its saddle
+ * (the rider's root over it, as on a seat), leant forward `lean` deg to the bars, the hands on its grips, the
+ * feet by its pedals with the cranks level; the runtime puts the feet on the pedals as they go round
+ * (characters.ts `pedalRide`). Places from the bike's measures (vehicles.ts), from the saddle's top.
+ */
+export const RIDE_BIKE = rideSizes('rideBike', 0, 1);
+export const RIDE_BIKE_CHILD = rideSizes('rideBikeChild', 2, 2);
+function bikePose(f: RideFit, m: Mount, lean: number): (p: number) => PoseSpec {
+  const [sx, sh] = m.seat;
+  const [gx, gh, gz] = m.grips;
+  const c = m.cranks!;
+  const grip = (k: number): Vec => onRide(f, [k * gz, gh - sh, gx - sx]);
+  return (p) =>
+    astride({
+      lean: lean + 1.5 * Math.sin(p * TAU),
+      nod: -lean * 0.6,
+      breath: p,
+      feet: onRide(f, [-c.out, c.h - sh + 0.07, c.x - sx - 0.06]),
+      knees: 0.1,
+      up: 0.6,
+      toes: 5,
+      hands: [grip(-1), grip(1)],
+      pronate: 85,
+    });
+}
+
+/**
+ * Stood on an e-scooter's deck (vehicles.ts `MOUNTS.eScooter`; the runtime raises the root to it), the left foot
+ * forward and the right behind it on the deck, leant in a little, the hands on the grips. A grown-up's and a
+ * teen's size.
+ */
+export const RIDE_SCOOTER: Size[] = sizes('rideScooter', [1, 0.83], (s) => ({ s, to: 0 }));
+function scooterPose(fit: Fit, m: Mount): (p: number) => PoseSpec {
+  const { s } = fit;
+  const [sx, sh] = m.seat;
+  const [gx, gh, gz] = m.grips;
+  const grip = (k: number): Vec => [(k * gz) / s, (gh - sh) / s, (gx - sx) / s];
+  return (p) => {
+    const body = stand({ shift: 0.2 * Math.sin(p * TAU), breath: p, lean: 6, head: [-3, 0, 0], feet: [0.05 / s, 0, 0.13 / s], footR: [-0.04 / s, 0, -0.15 / s] });
+    return {
+      ...body,
+      ...armIK('l', grip(-1), body, { palm: true, pole: [-0.5, -1, -0.4], pronate: 80, hand: wrist('l', 0, 0) }),
+      ...armIK('r', grip(1), body, { palm: true, pole: [0.5, -1, -0.4], pronate: 80, hand: wrist('r', 0, 0) }),
+    };
+  };
+}
+
 export function rideClips(): ClipDef[] {
   return [
+    ...RIDE_BIKE.map(({ clip, fit }) => cycle(clip, { seconds: 3, loop: true }, bikePose(fit, MOUNTS.bicycle, 20))),
+    ...RIDE_BIKE_CHILD.map(({ clip, fit }) => cycle(clip, { seconds: 3, loop: true }, bikePose(fit, MOUNTS.bicycleChild, 14))),
+    ...RIDE_SCOOTER.map(({ clip, fit }) => cycle(clip, { seconds: 3, loop: true }, scooterPose(fit, MOUNTS.eScooter))),
     ...SLIDE.map(({ clip, fit }) => cycle(clip, { seconds: SLIDE_S, loop: true }, slidePose(fit))),
     ...BUNK_UP.map(({ clip, fit }) => cycle(clip, { seconds: BUNK_UP_S, loop: false }, bunkUpPose(fit))),
     ...BUNK_DOWN.map(({ clip, fit }) => cycle(clip, { seconds: BUNK_DOWN_S, loop: false }, bunkDownPose(fit))),

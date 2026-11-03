@@ -6,10 +6,12 @@
  */
 
 import type { ObjectDef } from '../../../content/content';
+import { RIDE_BIKE, RIDE_BIKE_CHILD } from './clips/rides';
 import { FLOOR_SITS } from './clips/seated';
 import FURNITURE from './furniture.json';
 import type { Wear } from './outfit';
 import type { LegSide } from './seatFit';
+import type { Mount } from './vehicles';
 
 /**
  * Seat surface height (m) and forward offset of the hips from the object's centre, per object def;
@@ -216,8 +218,8 @@ export function floorSit(h: number): string {
 export const SIT_CLIPS: Record<string, { sit: string; down: string; up: string }> = Object.fromEntries(
   ['', ...FLOOR_SITS.map((f) => f.name)].map((n) => [n, { sit: `sit${n}`, down: `sitDown${n}`, up: `standUp${n}` }]),
 );
-/** Clips whose legs are placed by `legTo`: sitting (pedalling, legs out along a chaise) and lying (in a hammock). */
-export const LEG_CLIPS = ['sit', 'sitHands', 'lie'] as const;
+/** Clips whose legs are placed by `legTo`: sitting (pedalling, legs out along a chaise), lying (in a hammock) and riding a bike. */
+export const LEG_CLIPS: readonly string[] = ['sit', 'sitHands', 'lie', ...[...RIDE_BIKE, ...RIDE_BIKE_CHILD].map((r) => r.clip)];
 /** Pelvis offset of the seated clip for one body (scale 1). */
 export interface SeatFit {
   y: number;
@@ -249,6 +251,12 @@ export interface PlacedObject {
   quilt: { key: string; colour?: string } | null;
   /** A footstool (`FOOTSTOOLS`): its top's half width and depth (m, resized with it) and its facing (rad); null for anything else. */
   footstool: { hw: number; hd: number; yaw: number } | null;
+  /**
+   * Something to ride (`MOUNTS`, content `vehicle`): how it's drawn ridden, its nodes' prop keys (`mountNodes`'
+   * order, `<model key>#<node>`, then `@<colours>` for one the player coloured), how many times as fast as
+   * walking it goes, and which way its model's +x points where it stands (rad, as an object's yaw).
+   */
+  ride?: { mount: Mount; keys: string[]; speed: number; yaw: number };
   cx: number;
   cz: number;
   minX: number;

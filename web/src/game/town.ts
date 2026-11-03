@@ -23,7 +23,8 @@ import { connect, cropRoads, inside, leftOf, lengths, nearest, pointAt, roadExit
 import { householdFunds, savingsOf } from './wealth';
 import { extend, fill, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
 import { generateBigWorld, type OpenWorldDraft } from './macro';
-import { garageAt, garageFor, houseCar, type ParkedCar } from '../render/shared/cars';
+import { garageAt, garageFor, hash, houseCar, type ParkedCar } from '../render/shared/cars';
+import { placeRides, ridesFor } from './townRides';
 import { fenceRuns, townFences, type TownFence } from './gardenFences';
 
 export type Wall = [number, number, number, number];
@@ -1213,7 +1214,19 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     if (h.doors[0]) pathTo(s, h.doors[0]);
     // A driveway beside the house, crossing the verge to the road.
     const drive = driveway(h, pw, pd, footprint);
-    if (!drive) continue;
+    // The household's bikes and e-scooters by the house or the garage (`townRides.ts`), once both are known.
+    const who = living.get(s.index);
+    const rides = (car: boolean, garages: Rect[], room: Rect[] = []) => {
+      if (!who) return;
+      const defs = ridesFor(content, who, car, s);
+      const front = h.doors[0] ? [{ x: h.doors[0].x, z: 0, w: 1, d: h.doors[0].z }] : [];
+      const lot = { width: pw, depth: pd, walls: h.walls, doors: h.doors, objects: [...h.objects, ...(s.farm?.objects ?? [])], paths: front, drive, garages, keep: [...(s.farm?.fields ?? []), ...room] };
+      placeAll(s, placeRides(content, lot, defs, (k) => hash(s.x, s.z, 90 + k)));
+    };
+    if (!drive) {
+      rides(false, []);
+      continue;
+    }
     paths.push(turnOnto(t, s).rect(drive));
     driveOf.set(s.index, turnOnto(t, s).rect(drive));
     const reaches = verge(s, drive, DRIVE_REACH);
@@ -1235,14 +1248,18 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     });
     const garage = xs.length ? garageFor({ x: ox, z: oz, w: pw, d: pd }, box, shift(drive), -1, things) : null;
     const onTown = (g: { x0: number; z0: number; x1: number; z1: number }) => turnOnto(t, s).rect({ x: g.x0 - ox, z: g.z0 - oz, w: g.x1 - g.x0, d: g.z1 - g.z0 });
+    // (On the plot: its walls' box.)
+    const onPlot = (g: { x0: number; z0: number; x1: number; z1: number }): Rect => ({ x: g.x0 - ox - 0.07, z: g.z0 - oz - 0.07, w: g.x1 - g.x0 + 0.14, d: g.z1 - g.z0 + 0.14 });
     if (garage) {
       const r = onTown(garage);
       garages.push({ plot: s.index, x0: r.x, z0: r.z, x1: r.x + r.w, z1: r.z + r.d });
+      rides(!!car, [onPlot(garage)]);
     } else {
       // (As Build mode finds it, `drivewayGarage`: clear of the things outdoors, not those indoors.)
       const outdoors = things.filter((r) => r.x + r.w <= box.x0 || r.x >= box.x1 || r.z + r.d <= box.z0 || r.z >= box.z1);
       const room = xs.length ? garageAt({ x: ox, z: oz, w: pw, d: pd }, box, shift(drive), -1, outdoors) : null;
       if (room) roomFor.set(s.index, onTown(room));
+      rides(!!car, [], room ? [onPlot(room)] : []);
     }
   }
   dropCrowdedTrees(content, walls, objects, town.depth);

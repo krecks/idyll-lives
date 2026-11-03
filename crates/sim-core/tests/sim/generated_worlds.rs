@@ -4,7 +4,9 @@
 //! be reached from the ends of every street and back,
 //! everything outdoors that residents use (a farm's crops, a park's benches) can be reached, as
 //! can the houses' basements from their front doors and everything residents use in the houses
-//! (on lots facing either way), and the town keeps going for half a day.
+//! (on lots facing either way), and the town keeps going for half a day: in a cosy or a normal
+//! town with bikes at homes without a car someone rides one to work or school, and nobody is stuck
+//! on one in town.
 //!
 //! Make the worlds first: `bun tools/worlds/sample.ts worlds.json`,
 //! then `WORLDS=worlds.json cargo test --release -p sim-core --test sim generated_worlds:: -- --ignored --nocapture`.
@@ -59,14 +61,16 @@ fn generated_worlds_are_livable() {
         serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     let content = common::content();
     let items: Vec<(usize, &serde_json::Value)> = worlds.iter().enumerate().collect();
-    let failures: Vec<String> = each_world(&items, |&(i, world)| {
+    // Each world's problems, and (a cosy or a normal one with bikes at homes without a car) whether
+    // someone rode one.
+    let checked: Vec<(Vec<String>, Option<bool>)> = each_world(&items, |&(i, world)| {
         let mut failures = Vec::new();
         let label = format!("{} {} ({})", world["kind"], world["seed"], world["name"]);
         let mut w = match World::from_json(&content, &world["town"].to_string(), i as u32 + 1) {
             Ok(w) => w,
             Err(e) => {
                 failures.push(format!("{label}: {e}"));
-                return failures;
+                return (failures, None);
             }
         };
         if w.sims.len() > MAX_SIMS {
@@ -219,27 +223,84 @@ fn generated_worlds_are_livable() {
             }
         }
         common::check(&w);
-        // Half a day of everyone's free will.
+        // Half a day of everyone's free will. Those with a bike of their own ride it to work or
+        // school (`ride.rs`): someone does, in a cosy or a normal town, and nobody is on one in
+        // town for longer than a ride takes (stuck on it).
+        // (A household with a car at home drives: those without one ride.)
+        let carless = |plot: u32| {
+            w.households.iter().enumerate().any(|(h, hh)| {
+                hh.plot == Some(plot) && !w.cars.iter().any(|c| c.household == h as u32)
+            })
+        };
+        let bikes = w
+            .objects
+            .iter()
+            .filter(|o| w.content.objects[o.def].vehicle.is_some())
+            .count();
+        let carless_bikes = w
+            .objects
+            .iter()
+            .filter(|o| {
+                w.content.objects[o.def].vehicle.is_some()
+                    && w.plot_at(o.x, o.z).is_some_and(carless)
+            })
+            .count();
+        let mut rode = std::collections::BTreeSet::new();
+        let mut on_since = vec![None::<u64>; w.sims.len()];
+        let mut stuck = std::collections::BTreeSet::new();
         for hour in 0..12 {
-            for _ in 0..TICKS_PER_HOUR {
+            for t in 0..TICKS_PER_HOUR {
                 w.tick_once();
+                if t % 10 != 0 {
+                    continue;
+                }
+                for (k, sim) in w.sims.iter().enumerate() {
+                    let on = sim.riding.is_some() && sim.away_until.is_none();
+                    if sim.riding.is_some() {
+                        rode.insert(k);
+                    }
+                    let since = on_since.get_mut(k);
+                    let Some(since) = since else { continue };
+                    match (on, *since) {
+                        (true, None) => *since = Some(w.tick),
+                        (true, Some(t0)) if w.tick - t0 > RIDE_HOURS * TICKS_PER_HOUR => {
+                            stuck.insert(sim.name.clone());
+                        }
+                        (false, _) => *since = None,
+                        _ => {}
+                    }
+                }
             }
             if hour % 3 == 2 {
                 common::check(&w);
             }
         }
+        for name in &stuck {
+            failures.push(format!(
+                "{label}: {name} on a bike in town for over {RIDE_HOURS} hours"
+            ));
+        }
+        let small = matches!(world["size"].as_str(), Some("cosy" | "normal") | None);
+        let ridden = (small && carless_bikes > 0).then_some(!rode.is_empty());
         eprintln!(
-            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements",
+            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements, {bikes} bikes, {} rode",
             w.lot.width,
             w.lot.depth,
             w.sims.len(),
-            w.objects.len()
+            w.objects.len(),
+            rode.len()
         );
-        failures
-    })
-    .into_iter()
-    .flatten()
-    .collect();
+        (failures, ridden)
+    });
+    let mut failures: Vec<String> = checked.iter().flat_map(|(f, _)| f.clone()).collect();
+    // (Half a day may be the weekend, or a household's work may start after it: most of the towns.)
+    let towns = checked.iter().filter(|(_, r)| r.is_some()).count();
+    let ridden = checked.iter().filter(|(_, r)| *r == Some(true)).count();
+    if ridden * 2 < towns {
+        failures.push(format!(
+            "someone rode a bike to work or school in {ridden} of {towns} cosy and normal towns with bikes at homes without a car"
+        ));
+    }
     eprintln!(
         "{} worlds checked, {} problems",
         worlds.len(),
@@ -250,6 +311,10 @@ fn generated_worlds_are_livable() {
     }
     assert!(failures.is_empty());
 }
+
+/// Hours a resident may be on a bike or an e-scooter in town at a time at most (a ride out of town
+/// or home takes minutes).
+const RIDE_HOURS: u64 = 2;
 
 /// Cosy and normal worlds of the file whose cars are driven (each for a day), the first of each
 /// size; every big one is (for two days).

@@ -1077,6 +1077,11 @@ pub struct Sim {
     pub(crate) being_served: bool,
     /// Ticks they've waited at a post for its server (`staff::hold`). Not saved.
     pub(crate) serve_wait: u32,
+    /// The bike (or e-scooter) they're on their way to for work or school, and the one they're
+    /// on (`ride.rs`): an object at home, its slot theirs until they're back. Not saved (after a
+    /// load it's at its place and they walk).
+    pub(crate) bound_for_bike: Option<u32>,
+    pub riding: Option<u32>,
     /// The car they're on their way to for work or school (`cars::ride_for`), their seat in it (0:
     /// they drive) and the door they get in by (`cars::DOORS`). Not saved (after a load, they set
     /// off again).
@@ -1244,6 +1249,12 @@ impl Sim {
     /// Sitting, what they sat down to do while they talk from the seat (`paused`).
     pub fn paused(&self) -> Option<&Activity> {
         self.paused.as_ref()
+    }
+
+    /// The bike (or e-scooter) they're on, or on their way to for work or school (`ride.rs`): its
+    /// slot is theirs until they're back.
+    pub fn bike(&self) -> Option<u32> {
+        self.riding.or(self.bound_for_bike)
     }
 
     /// In bed for the night (or a nap): using something tagged as sleep.
@@ -2877,6 +2888,8 @@ impl World {
             partner_wait: 0,
             being_served: false,
             serve_wait: 0,
+            bound_for_bike: None,
+            riding: None,
             bound_for_car: None,
             car_seat: 0,
             car_door: 0,
@@ -5946,6 +5959,11 @@ fn step_sim(
         }
     }
 
+    // Off the bike once the way to work or school, or home from it, is over or cut short.
+    if (sim.riding.is_some() || sim.bound_for_bike.is_some()) && !crate::ride::commuting(sim) {
+        crate::ride::get_off(sim, objects);
+    }
+
     // Ticks what they're doing moves on by (fewer than `steps` if it starts partway through).
     let mut ticks = sim.steps;
     if sim.current.is_none() {
@@ -7498,7 +7516,13 @@ fn start_task(
         TaskKind::Work => {
             // By car (`cars.rs`): to its door.
             sim.bound_for_car = None;
-            if let Some((car, seat, door, at)) = crate::cars::ride_for(ctx, sim) {
+            let car = if sim.riding.is_none() {
+                crate::cars::ride_for(ctx, sim)
+            } else {
+                None
+            };
+            if let Some((car, seat, door, at)) = car {
+                crate::ride::get_off(sim, objects);
                 sim.bound_for_car = Some(car);
                 sim.car_seat = seat as u8;
                 sim.car_door = door as u8;
@@ -7506,10 +7530,23 @@ fn start_task(
             } else {
                 // Nearest way out of town; with no exits, work starts on the spot.
                 let Some(exit) = exit_on_foot(ctx, sim) else {
+                    crate::ride::get_off(sim, objects);
                     sim.transition = Some(crate::life::Transition::Work);
                     return;
                 };
-                (exit, (exit[0].floor() as i32, exit[1].floor() as i32), 0)
+                // On a bike of theirs (`ride.rs`): over to it first.
+                let bike = match (sim.riding, sim.bound_for_bike) {
+                    (Some(_), _) => None,
+                    (None, Some(b)) => Some(b),
+                    (None, None) => crate::ride::bike_for(ctx, sim, objects, exit),
+                };
+                if let Some(bike) = bike {
+                    crate::ride::claim(sim, objects, bike);
+                    let at = crate::ride::spot(content, &objects[bike as usize]);
+                    (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
+                } else {
+                    (exit, (exit[0].floor() as i32, exit[1].floor() as i32), 0)
+                }
             }
         }
         // (Their visit starts once there's a way there: see below.)
@@ -7582,12 +7619,18 @@ fn start_task(
             (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
         }
         TaskKind::GoHome => {
-            let home = ctx.households[sim.household as usize].plot;
-            let Some(door) = home.map(|p| ctx.plots[p as usize].arrival_point()) else {
-                sim.transition = Some(crate::life::Transition::Home);
-                return;
-            };
-            (door, (door[0].floor() as i32, door[1].floor() as i32), 0)
+            // On their bike: back to its place (`ride.rs`).
+            if let Some(bike) = sim.riding.and_then(|b| objects.get(b as usize)) {
+                let at = crate::ride::spot(content, bike);
+                (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
+            } else {
+                let home = ctx.households[sim.household as usize].plot;
+                let Some(door) = home.map(|p| ctx.plots[p as usize].arrival_point()) else {
+                    sim.transition = Some(crate::life::Transition::Home);
+                    return;
+                };
+                (door, (door[0].floor() as i32, door[1].floor() as i32), 0)
+            }
         }
         TaskKind::Answer { guest } => {
             let Some(other) = ctx.briefs.get(guest as usize) else {
@@ -8082,7 +8125,7 @@ fn progress(
 ) {
     let content = ctx.content;
     // (Before `current` is borrowed: how fast they walk, `walk_speed`.)
-    let walk = sim.walk_speed(content);
+    let walk = sim.walk_speed(content) * crate::ride::speed(content, sim, objects);
     let minutes = MINUTES_PER_TICK * ticks as f32;
     // On their way into a room someone keeps shut (a bathroom in use): they wait outside.
     if crate::privacy::wait_outside(sim, ctx, objects, ticks) {
@@ -8814,6 +8857,13 @@ fn arrive(
                     sim.queue.push_front(a.task);
                 }
             }
+            // At their bike: on they get, and off out of town on it.
+            None if sim.bound_for_bike.is_some() => {
+                crate::ride::get_on(sim);
+                if let Some(a) = sim.current.take() {
+                    sim.queue.push_front(a.task);
+                }
+            }
             None => {
                 sim.current = None;
                 sim.transition = Some(crate::life::Transition::Work);
@@ -8915,6 +8965,8 @@ fn arrive(
             }
         }
         TaskKind::GoHome => {
+            // Back at the bike's place: off it.
+            crate::ride::get_off(sim, objects);
             sim.current = None;
             sim.transition = Some(crate::life::Transition::Home);
             // Home again: the toilet first, out of habit.
