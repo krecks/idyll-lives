@@ -371,9 +371,13 @@ def yogaMat():
             F.cyl(f'strap{s}', ROLL_R + 0.0008, 0.025, (s * 0.2, ROLL_R, roll_z), M.dark, rot=(0, 90, 0), verts=24)
     roll = G.hinged(G.join(parts, 'roll'), F.at(0, 0, roll_z))
     # The flat mat, its origin under the roll's axis, built full and squeezed to nothing for rest: inside the roll,
-    # out of sight (its back edge showed as a strip). Its corners rounded, alignment lines along it.
+    # out of sight (its back edge showed as a strip). Its corners rounded, alignment lines along it. Its underside is
+    # 4 mm up (under the house's floor, drawn 1 cm up) and it is 1 cm narrower than the roll, so squeezed it lies
+    # inside the roll, clear of the roll's flat bottom and bevelled ends (on the floor it showed under them).
+    lift = 0.004
     with G.new_parts() as parts:
-        F.extrude('mat', _rr(MAT_W, MAT_L, 0.02, 2), MAT_T, (0, MAT_T / 2, BACK + MAT_L / 2), M.mat, plane='top')
+        F.extrude('mat', _rr(MAT_W - 0.01, MAT_L, 0.02, 2), MAT_T - lift, (0, (MAT_T + lift) / 2, BACK + MAT_L / 2), M.mat,
+                  plane='top')
         for x in (-0.2, 0.2):
             F.box(f'mat_line{x}', 0.006, 0.001, MAT_L - 0.2, (x, MAT_T + 0.0004, BACK + MAT_L / 2), M.mat_edge)
         F.box('mat_line_mid', MAT_W - 0.2, 0.001, 0.006, (0, MAT_T + 0.0004, BACK + MAT_L / 2), M.mat_edge)
