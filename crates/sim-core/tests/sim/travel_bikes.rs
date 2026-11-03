@@ -1,11 +1,14 @@
 //! Riding a bike to work and back (`ride.rs`, content `vehicle`): someone with a bike at home
 //! rides it out of town at its speed, it goes to work with them and comes home with them, back
-//! at its place; a way too short for it is walked; two can't share one bike.
+//! at its place; a way too short for it is walked; two can't share one bike. In an open-world
+//! town the way to work is timed as it's ridden or walked (`life::Commute`): someone too near the
+//! way out for their bike, or whose housemate has the one bike, leaves at their walking time.
 
 use crate::common;
 
 use sim_core::snapshot;
-use sim_core::{World, clock};
+use sim_core::world::TaskKind;
+use sim_core::{MINUTES_PER_TICK, World, clock, life};
 
 const CONTENT: &str = r#"{
     "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],
@@ -205,6 +208,137 @@ fn a_bike_sold_while_they_ride_it_leaves_them_on_foot() {
     .unwrap();
     assert!(w.sims[0].riding.is_none());
     until_away(&mut w, 0, 30 * common::TICKS_PER_HOUR, |_| {}).expect("never got to work on foot");
+}
+
+/// One morning off to work or school for each of `w`'s residents (from day 2, the first full
+/// one): when they set off, when they were out of town, whether they rode, and when they were
+/// due at the way out (`commuteMinutes` before the start: the rest of the way is off the map).
+#[derive(Debug, Default, Clone, Copy)]
+struct Morning {
+    left: Option<u64>,
+    out: Option<u64>,
+    rode: bool,
+    due: u64,
+}
+
+fn mornings(w: &mut World) -> Vec<Morning> {
+    common::run_to(w, 2, 0.0);
+    let off_map = (w.content.career_rules.commute_minutes / MINUTES_PER_TICK) as u64;
+    let mut days = vec![Morning::default(); w.sims.len()];
+    let end = clock::tick_at(2, 14.0 * 60.0).unwrap();
+    while w.tick < end && days.iter().any(|d| d.out.is_none()) {
+        w.tick_once();
+        for (i, d) in days.iter_mut().enumerate() {
+            let s = &w.sims[i];
+            if d.left.is_none()
+                && s.current()
+                    .is_some_and(|a| matches!(a.task.kind, TaskKind::Work))
+            {
+                d.left = Some(w.tick);
+            }
+            d.rode |= s.riding.is_some();
+            if d.out.is_none() && s.away_until.is_some() {
+                d.out = Some(w.tick);
+                let start = match &s.job {
+                    Some(job) => life::shift_today(&w.content, job, &s.skills, w.tick),
+                    None => life::school_today(&w.content, s, w.tick),
+                };
+                d.due = start.expect("work or school today").1 - off_map;
+            }
+        }
+    }
+    assert!(days.iter().all(|d| d.out.is_some()), "{days:?}");
+    days
+}
+
+/// Whether `a` and `b` set off within a minute of each other.
+fn same_time(a: Morning, b: Morning) -> bool {
+    let minute = (1.0 / MINUTES_PER_TICK) as u64;
+    a.left.unwrap().abs_diff(b.left.unwrap()) <= minute
+}
+
+/// An open-world town on `content`: a garden walled along its west and south sides, open to the
+/// street at its east end, and the way out of town west along the street, a long way round from
+/// the garden (some 80 m on foot from its front door at the west end, under 40 m in a straight
+/// line). Who lives there (`sims`) and what's in the garden (`objects`), as JSON.
+fn walled_town(content: &str, sims: &str, objects: &str) -> World {
+    let json = format!(
+        r#"{{"width":64,"depth":14,"size":"normal","exits":[[0.5,10.5]],
+        "walls":[[31,0,31,9],[31,9,56,9]],
+        "plots":[{{"name":"Home","x":30,"z":0,"w":30,"d":9,"entry":[34.5,5.5]}}],
+        "households":[{{"name":"Home","plot":0,"player":true}}],
+        "objects":[{objects}],
+        "sims":[{sims}]}}"#
+    );
+    let mut w = World::from_json(content, &json, 5).unwrap();
+    w.autonomy = false;
+    w
+}
+
+/// A child off to school in `walled_town` on the shipped content, nearer the way out in a straight
+/// line than their kids' bike's `minRide` (60 m); with the bike at home or not.
+fn child_by_the_way_out(bike: bool) -> World {
+    let kid = r#"{"name":"Kid","household":0,"age":8,"traits":["cheerful"],"x":34.5,"z":3.5}"#;
+    let bike = if bike {
+        r#"{"def":"bicycleChild","x":33,"z":5,"rot":0}"#
+    } else {
+        ""
+    };
+    walled_town(&common::content(), kid, bike)
+}
+
+/// Two off to work in `walled_town`, with `bikes` bikes (`CONTENT`'s, a `minRide` of 30 m) at home.
+fn two_by_the_way_out(bikes: usize) -> World {
+    let sims = r#"{"name":"W0","household":0,"job":{"career":"office"},"x":34.5,"z":3.5},
+        {"name":"W1","household":0,"job":{"career":"office"},"x":35.5,"z":3.5}"#;
+    let bike = if bikes > 0 {
+        r#"{"def":"bike","x":40,"z":5,"rot":0}"#
+    } else {
+        ""
+    };
+    walled_town(CONTENT, sims, bike)
+}
+
+#[test]
+fn a_child_too_near_the_way_out_for_their_bike_leaves_at_their_walking_time() {
+    // (Timed by the bike, they'd set off too late for the walk it turns out to be.)
+    let walked = mornings(&mut child_by_the_way_out(false))[0];
+    let with_bike = mornings(&mut child_by_the_way_out(true))[0];
+    assert!(!with_bike.rode, "rode a few steps");
+    assert!(
+        same_time(walked, with_bike),
+        "left at {:.2} with the bike at home, {:.2} without",
+        clock::hour(with_bike.left.unwrap()),
+        clock::hour(walked.left.unwrap())
+    );
+    assert!(
+        with_bike.out.unwrap() <= with_bike.due,
+        "out of town at {:.2}, due at {:.2}",
+        clock::hour(with_bike.out.unwrap()),
+        clock::hour(with_bike.due)
+    );
+}
+
+#[test]
+fn of_two_with_one_bike_the_one_without_it_leaves_at_their_walking_time() {
+    // (The first of the household has it: the other's way is timed on foot, as it's walked.)
+    let walking = mornings(&mut two_by_the_way_out(0));
+    let one_bike = mornings(&mut two_by_the_way_out(1));
+    assert!(one_bike[0].rode && !one_bike[1].rode, "{one_bike:?}");
+    assert!(
+        same_time(walking[1], one_bike[1]),
+        "left at {:.2} with a housemate on the bike, {:.2} with no bike",
+        clock::hour(one_bike[1].left.unwrap()),
+        clock::hour(walking[1].left.unwrap())
+    );
+    for (k, m) in one_bike.iter().enumerate() {
+        assert!(
+            m.out.unwrap() <= m.due,
+            "W{k} out of town at {:.2}, due at {:.2}",
+            clock::hour(m.out.unwrap()),
+            clock::hour(m.due)
+        );
+    }
 }
 
 // ---- Keeping clear of cars ---------------------------------------------------------------

@@ -2,20 +2,25 @@
 //!
 //! A thing to ride is furniture standing on the household's lot (`ObjectDef::vehicle`). Someone
 //! off to work or school with no seat in the household's car takes the fastest one at home that
-//! fits them (`Vehicle::stages`), if the way out of town is longer than its `minRide`: they walk
-//! over to it (`Sim::bound_for_bike`, its slot theirs from then on), get on, and ride their way
-//! out at its `speed` (`Sim::riding`; the renderer draws it under them and not at its place).
-//! It goes to work with them. Home again, they ride back to its place and get off, and it stands
-//! there as before. A ride cut short (called away, sent somewhere else) ends where they are: the
-//! bike is back at its place.
+//! fits them (`Vehicle::stages`), if the ride from it to the way out of town is longer than its
+//! `minRide`: they walk over to it (`Sim::bound_for_bike`, its slot theirs from then on), get on,
+//! and ride their way out at its `speed` (`Sim::riding`; the renderer draws it under them and not
+//! at its place). It goes to work with them. Home again, they ride back to its place and get off,
+//! and it stands there as before. A ride cut short (called away, sent somewhere else) ends where
+//! they are: the bike is back at its place.
+//!
+//! Where their way to work is timed (`life::Commute`), the bike is picked as it's worked out
+//! (`commute_bike`) and they set off on that one (`bike_for`): a way timed on foot is walked, and
+//! a bike one housemate's way is timed by isn't another's.
 //!
 //! Neither is saved: after a load the bike is at its place, free, and they walk.
 
 use crate::content::{Content, stage_in};
 use crate::world::{Ctx, ObjectInstance, Sim, TaskKind};
 
-/// A free thing to ride at home for `sim`'s way to `to` (the way out of town): the fastest that
-/// fits them, if the way is longer than its `minRide`. None when they're not at home.
+/// A free thing to ride at home for `sim`'s way to `to` (the way out of town): the one their way
+/// to work was timed by (`life::Commute::bike`), else the fastest that fits them (`fits`), not
+/// one a housemate's way is timed by. None when they're not at home.
 pub(crate) fn bike_for(
     ctx: &Ctx,
     sim: &Sim,
@@ -27,21 +32,43 @@ pub(crate) fn bike_for(
     if sim.visiting.is_some() || ctx.briefs.get(sim.id as usize)?.plot != Some(home) {
         return None;
     }
-    let pos = ctx.nav.stairs.ground_pos(sim.pos);
-    let way = (to[0] - pos[0]).hypot(to[1] - pos[1]);
     let stage = content.life.stage(sim.age);
+    let planned = sim
+        .commute
+        .filter(|c| c.home == Some(home))
+        .and_then(|c| c.bike);
+    let housemates = |o: u32| {
+        ctx.briefs
+            .iter()
+            .enumerate()
+            .any(|(j, b)| j != sim.id as usize && b.household == sim.household && b.bike == Some(o))
+    };
+    let free = |o: u32| {
+        let obj = objects.get(o as usize)?;
+        let mine = obj.users.iter().all(|u| u.is_none_or(|u| u == sim.id));
+        (mine && !housemates(o))
+            .then(|| fits(content, obj, stage, to))
+            .flatten()
+    };
+    if let Some(o) = planned.filter(|&o| ctx.index.on(home).contains(&o) && free(o).is_some()) {
+        return Some(o);
+    }
     ctx.index
         .on(home)
         .iter()
-        .filter_map(|&o| {
-            let obj = objects.get(o as usize)?;
-            let v = content.objects[obj.def].vehicle?;
-            let free = obj.users.iter().all(|u| u.is_none_or(|u| u == sim.id));
-            (free && !obj.broken() && stage_in(v.stages, stage) && way >= v.min_ride)
-                .then_some((v.speed, o))
-        })
+        .filter_map(|&o| Some((free(o)?, o)))
         .max_by(|a, b| a.0.total_cmp(&b.0))
         .map(|(_, o)| o)
+}
+
+/// `obj`'s speed if it's a thing to ride for someone at `stage`, not broken, and the ride from it
+/// to `to` (the way out of town) is at least its `minRide`. (From the bike, not from where they
+/// are: the same answer as their way to work is worked out and as they set off.)
+fn fits(content: &Content, obj: &ObjectInstance, stage: usize, to: [f32; 2]) -> Option<f32> {
+    let v = content.objects[obj.def].vehicle?;
+    let at = spot(content, obj);
+    let ride = (to[0] - at[0]).hypot(to[1] - at[1]);
+    (!obj.broken() && stage_in(v.stages, stage) && ride >= v.min_ride).then_some(v.speed)
 }
 
 /// How many times as fast as walking `sim` goes now: their bike's `speed` while they ride it.
@@ -95,25 +122,23 @@ pub(crate) fn commuting(sim: &Sim) -> bool {
         || sim.queue.front().is_some_and(|t| commute(&t.kind))
 }
 
-/// How many times as fast as walking `sim`'s way out of town goes, for the time they leave
-/// (`life::refresh_commute`): the fastest thing to ride at home that fits them, else 1. (A
-/// housemate may have taken it: then they're a little late.)
-pub(crate) fn commute_speed(w: &crate::world::World, sim: &Sim) -> f32 {
-    let Some(home) = w
-        .households
-        .get(sim.household as usize)
-        .and_then(|h| h.plot)
-    else {
-        return 1.0;
-    };
+/// The bike `i`'s way to work or school is timed by (`life::refresh_commute`), for the way out
+/// at `to`, and how many times as fast as walking it goes: the fastest at home that fits them
+/// (`fits`) and no housemate's way is timed by already (first come, first served: in household
+/// order, as their ways are first worked out). None: they walk.
+pub(crate) fn commute_bike(w: &crate::world::World, i: usize, to: [f32; 2]) -> Option<(u32, f32)> {
+    let sim = &w.sims[i];
+    let home = w.households.get(sim.household as usize)?.plot?;
     let stage = w.content.life.stage(sim.age);
+    let housemates = |o: u32| {
+        w.sims.iter().enumerate().any(|(j, s)| {
+            j != i && s.household == sim.household && s.commute.is_some_and(|c| c.bike == Some(o))
+        })
+    };
     w.object_index
         .on(home)
         .iter()
-        .filter_map(|&o| {
-            let obj = w.objects.get(o as usize)?;
-            let v = w.content.objects[obj.def].vehicle?;
-            (!obj.broken() && stage_in(v.stages, stage)).then_some(v.speed)
-        })
-        .fold(1.0, f32::max)
+        .filter(|&&o| !housemates(o))
+        .filter_map(|&o| Some((o, fits(&w.content, w.objects.get(o as usize)?, stage, to)?)))
+        .max_by(|a, b| a.1.total_cmp(&b.1))
 }

@@ -1504,11 +1504,12 @@ pub(crate) fn lead_ticks(w: &World, i: usize, start: u64) -> u64 {
     let Some(car) = car else {
         return 0;
     };
-    WALK_TO_CAR_TICKS
-        + u64::from(GET_IN_TICKS)
-        + BOARD_MIN_TICKS
-        + car.out_ticks.ceil() as u64
-        + off_map_ticks(w)
+    WALK_TO_CAR_TICKS + u64::from(GET_IN_TICKS) + drive_out_ticks(car) + off_map_ticks(w)
+}
+
+/// Once in `car` for work or school: the wait for it to go and the drive out of town.
+pub(crate) fn drive_out_ticks(car: &Car) -> u64 {
+    BOARD_MIN_TICKS + car.out_ticks.ceil() as u64
 }
 
 /// The drive between the end of town and work: in an open-world town `commuteMinutes` (the

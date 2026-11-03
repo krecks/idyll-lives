@@ -1777,6 +1777,9 @@ pub(crate) struct SimBrief {
     pub bound_for_car: Option<u32>,
     /// On their way to this car for a trip, or in it (`cars::Trip`: a `Visit` or `GoHome`).
     pub trip_car: Option<u32>,
+    /// The bike their way to work or school is timed by (`life::Commute::bike`): not a
+    /// housemate's to take (`ride::bike_for`).
+    pub bike: Option<u32>,
     /// The plot they're a guest on (`Sim::visiting`).
     pub guest_at: Option<u32>,
     /// The seat they eat at, or are on their way to with something to eat (`cooking::company`).
@@ -4340,6 +4343,7 @@ impl World {
                         matches!(a.task.kind, TaskKind::Visit { .. } | TaskKind::GoHome)
                     })
                 }),
+                bike: s.commute.and_then(|c| c.bike),
                 guest_at: s.visiting.map(|v| v.plot),
                 eats_at: match s.current().map(|a| a.task.kind) {
                     Some(TaskKind::Eat { seat, stage: 1, .. }) => seat,
