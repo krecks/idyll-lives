@@ -206,3 +206,153 @@ fn a_bike_sold_while_they_ride_it_leaves_them_on_foot() {
     assert!(w.sims[0].riding.is_none());
     until_away(&mut w, 0, 30 * common::TICKS_PER_HOUR, |_| {}).expect("never got to work on foot");
 }
+
+// ---- Keeping clear of cars ---------------------------------------------------------------
+
+/// A city bike as the shipped one reaches (content `vehicle.reach`): its front wheel, its back
+/// wheel and its handlebars.
+const REACH: [f32; 3] = [1.2, 0.6, 0.3];
+
+/// `CONTENT` with the bike as long and wide as a city bike.
+fn lane_content() -> String {
+    CONTENT.replace(
+        r#""minRide":30}"#,
+        &format!(r#""minRide":30,"reach":{REACH:?}}}"#),
+    )
+}
+
+/// The middle of the lane (z): 6 m wide, along x, the way out at its east end.
+const LANE: f32 = 30.0;
+
+/// A small open-world town on a 6 m lane: a rider's house (`R`, a job and a bike in the garden) at
+/// `rider_x`, and south of the lane at `car_x` a house whose car (driven by `D`) is parked nose
+/// out on its driveway.
+fn lane_town(rider_x: i32, car_x: i32) -> World {
+    let road: Vec<String> = (0..=499).map(|x| format!("[{x}.5,{LANE}]")).collect();
+    let road = format!(
+        r#"{{"points":[{}],"width":6,"kind":"lane","ends":["dead","out"]}}"#,
+        road.join(",")
+    );
+    let (cx, inner) = (car_x as f32 + 1.5, 39.5);
+    let json = format!(
+        r#"{{"width":500,"depth":60,"size":"normal",
+        "exits":[{{"x":499.5,"z":{LANE},"kind":"road"}}],
+        "roads":[{road}],"meta":{{"roads":[{road}]}},
+        "plots":[{{"name":"Riders","x":{rider_x},"z":34,"w":20,"d":16,"entry":[{re}.5,34.5]}},
+                 {{"name":"Drivers","x":{car_x},"z":34,"w":20,"d":16,"entry":[{ce}.5,34.5]}}],
+        "households":[{{"name":"Riders","plot":0,"player":true}},{{"name":"Drivers","plot":1}}],
+        "objects":[{{"def":"bike","x":{bx},"z":40,"rot":0}}],
+        "sims":[{{"name":"R","household":0,"job":{{"career":"office"}},"x":{rs}.5,"z":44.5}},
+                {{"name":"D","household":1,"x":{cs}.5,"z":44.5}}],
+        "drives":[{{"plot":1,"x":{cx},"z":{inner},"front":-1,"street":{LANE}}}],
+        "cars":[{{"plot":1,"x":{cx},"z":{spot},"yaw":{yaw},"street":{LANE},"len":4.4,"wid":1.8,"body":1,"paint":2}}]}}"#,
+        re = rider_x + 10,
+        ce = car_x + 10,
+        bx = rider_x + 12,
+        rs = rider_x + 5,
+        cs = car_x + 10,
+        spot = inner - 0.45 - 2.2,
+        yaw = std::f32::consts::PI,
+    );
+    let mut w = World::from_json(&lane_content(), &json, 5).unwrap();
+    w.autonomy = false;
+    w
+}
+
+/// D drives off now (at work as far as anyone can tell).
+fn drive_off(w: &mut World) {
+    let car = &mut w.cars[0];
+    car.state = sim_core::cars::CarState::Leaving;
+    car.since = w.tick;
+    car.progress = 0.0;
+    car.driver = Some(1);
+    car.aboard = vec![1];
+    w.sims[1].away_until = Some(w.tick + 100_000);
+}
+
+/// How far R's bike (its wheels and handlebars, facing the way R does) is from the car's body,
+/// where it is now: below 0, how far into it. None: the car isn't on the move, or R isn't riding.
+fn bike_from_car(w: &World) -> Option<f32> {
+    let (at, yaw, true, _) = w.cars[0].shown? else {
+        return None;
+    };
+    let s = &w.sims[0];
+    s.riding?;
+    let (len, wid) = (w.cars[0].len / 2.0, w.cars[0].wid / 2.0);
+    let [ahead, behind, side] = REACH;
+    let (fs, fc) = s.yaw.sin_cos();
+    let (cs, cc) = yaw.sin_cos();
+    // (Points along the bike's middle, each as far out as its handlebars.)
+    let gap = (0..=20)
+        .map(|k| {
+            let t = -(behind - side) + (ahead + behind - 2.0 * side) * k as f32 / 20.0;
+            let (dx, dz) = (s.pos[0] + fs * t - at[0], s.pos[1] + fc * t - at[1]);
+            let (along, across) = (dx * cs + dz * cc, dx * cc - dz * cs);
+            let (ex, ez) = (along.abs() - len, across.abs() - wid);
+            ex.max(0.0).hypot(ez.max(0.0)) + ex.max(ez).min(0.0) - side
+        })
+        .fold(f32::INFINITY, f32::min);
+    Some(gap)
+}
+
+#[test]
+fn a_rider_on_a_narrow_lane_keeps_clear_of_a_car_passing_them() {
+    // R rides east along the lane to the way out; D's car, west of them, overtakes.
+    let mut w = lane_town(140, 110);
+    let end = clock::tick_at(2, 12.0 * 60.0).unwrap();
+    while !(w.sims[0].riding.is_some() && w.sims[0].pos[1] < 34.0) {
+        w.tick_once();
+        assert!(w.tick < end, "never rode out onto the lane");
+    }
+    drive_off(&mut w);
+    let (mut closest, mut passed) = (f32::INFINITY, false);
+    while w.sims[0].away_until.is_none() && w.tick < end {
+        w.tick_once();
+        if let Some(gap) = bike_from_car(&w) {
+            closest = closest.min(gap);
+            passed |= w.cars[0].shown.unwrap().0[0] > w.sims[0].pos[0] + 5.0;
+        }
+    }
+    assert!(passed, "the car never overtook them");
+    // Their handlebars clear its side by a hand's width at least.
+    assert!(
+        closest >= 0.1,
+        "the bike came within {closest:.2} m of the car (into it below 0)"
+    );
+}
+
+#[test]
+fn a_rider_heading_at_a_cars_side_stops_with_the_front_wheel_outside_it() {
+    // R rides east along the lane past D's driveway, east of them, as the car pulls out of it
+    // across the pavement in front of them.
+    let mut w = lane_town(140, 200);
+    let end = clock::tick_at(2, 12.0 * 60.0).unwrap();
+    let car_x = w.cars[0].spot[0];
+    while !(w.sims[0].riding.is_some()
+        && w.sims[0].pos[1] < 34.0
+        && w.sims[0].pos[0] > car_x - 13.0)
+    {
+        w.tick_once();
+        assert!(w.tick < end, "never rode along the lane");
+    }
+    drive_off(&mut w);
+    let (mut closest, mut stopped) = (f32::INFINITY, false);
+    while w.sims[0].away_until.is_none() && w.tick < end {
+        let was = w.sims[0].pos;
+        w.tick_once();
+        if let Some(gap) = bike_from_car(&w) {
+            closest = closest.min(gap);
+            // (Held up by it, up against its side.)
+            stopped |= gap < 0.6 && w.sims[0].pos == was;
+        }
+    }
+    assert!(
+        stopped,
+        "never waited at the car's side (closest {closest:.2} m)"
+    );
+    assert!(
+        closest >= 0.0,
+        "the front wheel went {:.2} m into the car",
+        -closest
+    );
+}

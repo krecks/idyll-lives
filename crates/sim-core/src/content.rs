@@ -572,6 +572,10 @@ pub struct Vehicle {
     pub min_ride: f32,
     /// Keeps to roads (an e-scooter): no trails.
     pub roads_only: bool,
+    /// Ridden, how far it reaches in front of its rider and behind them, and out to each side
+    /// (m: its front wheel, its back wheel, its handlebars), for keeping clear of cars and buses
+    /// (`cars::Body`). Unsaid: as far as someone on foot.
+    pub reach: [f32; 3],
 }
 
 impl ObjectDef {
@@ -2696,7 +2700,7 @@ struct ObjectRaw {
 }
 
 /// An object's `vehicle`: `{"kind": "bike", "speed": 3, "stages": ["child", "teen", ...],
-/// "minRide": 60, "roadsOnly": false}`.
+/// "minRide": 60, "roadsOnly": false, "reach": [1.2, 0.6, 0.3]}`.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct VehicleRaw {
@@ -2707,6 +2711,7 @@ struct VehicleRaw {
     min_ride: f32,
     #[serde(default)]
     roads_only: bool,
+    reach: Option<[f32; 3]>,
 }
 
 fn default_min_ride() -> f32 {
@@ -3935,6 +3940,13 @@ impl Content {
                             obj.id
                         )));
                     }
+                    let reach = v.reach.unwrap_or([crate::cars::BODY; 3]);
+                    if !reach.iter().all(|r| (0.0..=3.0).contains(r)) {
+                        return Err(Error::new(format!(
+                            "object '{}': a vehicle's reach is 0 to 3 m each way",
+                            obj.id
+                        )));
+                    }
                     Some(Vehicle {
                         kind: v.kind,
                         speed: v.speed,
@@ -3942,6 +3954,7 @@ impl Content {
                             .unwrap_or(every_stage),
                         min_ride: v.min_ride,
                         roads_only: v.roads_only,
+                        reach,
                     })
                 }
             };

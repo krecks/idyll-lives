@@ -1212,18 +1212,21 @@ fn drive_on(w: &mut World, b: usize) {
         lot,
         blocked,
         stairs,
+        content,
+        objects,
         ..
     } = w;
     let bus = &mut transit.buses[b];
     let line = &transit.lines[bus.line as usize];
-    let (at, yaw, _) = line.route.at(bus.progress);
+    // (Where it would be a tick on, as a car: `cars::drive_on`.)
+    let (at, yaw, _) = line.route.at(bus.progress + 1.0);
     let me = cars::Driving {
         at,
         yaw,
         len: BUS_LEN,
         wid: BUS_WID,
         ahead: cars::AHEAD,
-        behind: -BUS_LEN / 2.0,
+        behind: 0.0,
     };
     let nav = crate::path::NavGrid {
         lot,
@@ -1237,17 +1240,31 @@ fn drive_on(w: &mut World, b: usize) {
         (next.is_some() && s.bound_for_bus == next)
             || matches!(s.current().map(|a| &a.phase), Some(Phase::AtStop { .. }))
     };
-    cars::go_on(sims, &nav, me, aside, &mut bus.waited, &mut bus.progress);
+    let bodies = (&*content, &objects[..]);
+    cars::go_on(
+        sims,
+        &nav,
+        bodies,
+        me,
+        aside,
+        &mut bus.waited,
+        &mut bus.progress,
+    );
 }
 
-/// The bus driving by that a step from `from` to `to` would walk into (stepping out of its way
-/// is fine): where it is and which way it faces.
-pub(crate) fn in_the_way(t: &Transit, from: [f32; 2], to: [f32; 2]) -> Option<([f32; 2], f32)> {
+/// The bus driving by that a step from `from` to `to` with `body` would walk into (stepping out
+/// of its way is fine): where it is and which way it faces.
+pub(crate) fn in_the_way(
+    t: &Transit,
+    body: cars::Body,
+    from: [f32; 2],
+    to: [f32; 2],
+) -> Option<([f32; 2], f32)> {
     t.buses.iter().find_map(|b| {
         let (at, yaw, true, _) = b.shown? else {
             return None;
         };
-        cars::walks_into(at, yaw, BUS_LEN, BUS_WID, from, to).then_some((at, yaw))
+        cars::walks_into(at, yaw, BUS_LEN, BUS_WID, body, from, to).then_some((at, yaw))
     })
 }
 

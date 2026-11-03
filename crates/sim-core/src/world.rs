@@ -8221,6 +8221,8 @@ fn progress(
     let content = ctx.content;
     // (Before `current` is borrowed: how fast they walk, `walk_speed`.)
     let walk = sim.walk_speed(content) * crate::ride::speed(content, sim, objects);
+    // (And how far they reach, on foot or on a bike, for the cars and buses they keep clear of.)
+    let body = crate::cars::Body::of(sim, content, objects, 0.0);
     let minutes = MINUTES_PER_TICK * ticks as f32;
     // On their way into a room someone keeps shut (a bathroom in use): they wait outside.
     if crate::privacy::wait_outside(sim, ctx, objects, ticks) {
@@ -8314,9 +8316,9 @@ fn progress(
                     sim.pos[1] + dz / dist.max(1e-4) * step,
                 ];
                 // (Or the bus.)
-                let passing = crate::cars::in_the_way(ctx.cars, sim.pos, to)
+                let passing = crate::cars::in_the_way(ctx.cars, body, sim.pos, to)
                     .and_then(|c| ctx.cars[c].shown.map(|(at, yaw, ..)| (at, yaw)))
-                    .or_else(|| crate::bus::in_the_way(ctx.transit, sim.pos, to));
+                    .or_else(|| crate::bus::in_the_way(ctx.transit, body, sim.pos, to));
                 if let Some((at, yaw)) = passing {
                     sim.car_wait = sim.car_wait.saturating_add(ticks);
                     if sim.car_wait > crate::cars::MAKE_WAY_TICKS

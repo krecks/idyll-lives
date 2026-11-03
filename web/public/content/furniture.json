@@ -5376,7 +5376,12 @@
           "adult",
           "elder"
         ],
-        "minRide": 60
+        "minRide": 60,
+        "reach": [
+          1.2,
+          0.6,
+          0.3
+        ]
       },
       "description": "A step-through city bike with mudguards, a bell and a basket. Whoever it fits rides it to work or school, three times as fast as walking.",
       "interactions": [
@@ -5418,7 +5423,12 @@
         "stages": [
           "child"
         ],
-        "minRide": 60
+        "minRide": 60,
+        "reach": [
+          0.65,
+          0.3,
+          0.25
+        ]
       },
       "description": "A small bike with stabilisers, a bell and streamers on the grips. A child rides it to school and back.",
       "interactions": [
@@ -5464,7 +5474,12 @@
           "elder"
         ],
         "minRide": 60,
-        "roadsOnly": true
+        "roadsOnly": true,
+        "reach": [
+          0.5,
+          0.45,
+          0.3
+        ]
       },
       "description": "An electric scooter. Stood on, it hums along the roads to work or school four times as fast as walking.",
       "interactions": []
