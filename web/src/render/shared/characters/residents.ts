@@ -2310,11 +2310,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (key !== 'standUp') rig.fromBed = false;
     if (key !== up) rig.rising = false;
     if (pose !== Pose.Sit) rootFwd += this.tuckOut(rig, key, step);
-    // Carrying something while walking or standing about (not while using a station with it).
-    if (carry && pose === Pose.Stand && !upper && !dir?.clip && key !== up && (moving || !rig.useSeq) && social !== Anim.Hug && social !== Anim.Fight) {
-      upper = carry;
+    // Carrying something while walking or standing about (not while using a station with it), and while turning
+    // to what they'll use it at: still held, not dropped to the hips for the turn; turning to the table to serve it,
+    // already bending to put it down (the serve itself is short, a turn's worth).
+    const turning = !moving && isTurn(key);
+    if (carry && pose === Pose.Stand && !upper && !dir?.clip && key !== up && (moving || !rig.useSeq || turning) && social !== Anim.Hug && social !== Anim.Fight) {
+      upper = turning && tag === 'serve' ? 'setDown' : carry;
       hands = HANDS.hold;
       if (key === 'foldArms') key = 'idle';
+    } else if (turning && tag === 'serve' && !carry && pose === Pose.Stand && !upper && !dir?.clip) {
+      // (Picking an armful up off the table, `serve` with nothing in hand yet: bending to it through the turn too.)
+      upper = 'setDown';
     }
     const fx = Math.sin(rig.yaw);
     const fz = Math.cos(rig.yaw);
