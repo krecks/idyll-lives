@@ -11,7 +11,8 @@
 //! A host offers once in a while (`againMinutes`), only with something at home to bring, and
 //! never to a guest who is busy, leaving, eating or holding something already. The guest
 //! leaving, or the host called away, it's dropped: what the host holds is put down
-//! (`cooking::settle`). Nothing of it is saved: a load finds it over.
+//! (`cooking::settle`), and the guest may get something of their own again (`nothing_coming`).
+//! Nothing of it is saved: a load finds it over.
 
 use crate::content::{Content, Pose};
 use crate::social::EventKind;
@@ -166,13 +167,47 @@ fn free_to_offer(w: &World, s: &Sim, plot: u32) -> bool {
 }
 
 /// After everyone's step and the conversations: what was handed over changes hands, offers
-/// taken up send the host off for it, serves for guests who are leaving are dropped, and free
-/// hosts offer their guests something.
+/// taken up send the host off for it, serves for guests who are leaving are dropped, guests
+/// nothing is coming for any more stop waiting for it, and free hosts offer their guests
+/// something.
 pub(crate) fn update(w: &mut World) {
     hand_over(w);
     fetch(w);
     drop_stale(w);
+    nothing_coming(w);
     offer(w);
+}
+
+/// The guest a serve is for.
+fn serving(t: &Task) -> Option<u32> {
+    match t.kind {
+        TaskKind::Serve { guest, .. } => Some(guest),
+        _ => None,
+    }
+}
+
+/// A guest waiting for something to eat (`Sim::expecting`) that no host is bringing them any
+/// more (the serve dropped, ended short, the host called away, sent somewhere else or gone): they
+/// may get something of their own again.
+fn nothing_coming(w: &mut World) {
+    let tick = w.tick;
+    for g in 0..w.sims.len() {
+        if w.sims[g].expecting <= tick {
+            continue;
+        }
+        let me = Some(g as u32);
+        let coming = w.sims.iter().any(|s| {
+            s.current
+                .iter()
+                .chain(&s.paused)
+                .map(|a| &a.task)
+                .chain(&s.queue)
+                .any(|t| serving(t) == me)
+        });
+        if !coming {
+            w.sims[g].expecting = 0;
+        }
+    }
 }
 
 /// What a host handed over (`Sim::hand_to`) is the guest's now: they drop what they picked to do
@@ -278,10 +313,7 @@ fn fetch(w: &mut World) {
 fn drop_stale(w: &mut World) {
     for h in 0..w.sims.len() {
         let s = &w.sims[h];
-        let serving = |t: &Task| match t.kind {
-            TaskKind::Serve { guest, .. } => Some(guest as usize),
-            _ => None,
-        };
+        let serving = |t: &Task| serving(t).map(|g| g as usize);
         let current = s.current.as_ref().and_then(|a| serving(&a.task));
         if current.is_none() && !s.queue.iter().any(|t| serving(t).is_some()) {
             continue;

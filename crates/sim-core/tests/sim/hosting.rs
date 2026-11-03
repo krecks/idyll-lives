@@ -341,3 +341,50 @@ fn a_guest_who_leaves_while_it_is_on_its_way_leaves_nobody_stuck() {
     }
     watch.assert_quiet();
 }
+
+#[test]
+fn a_guest_whose_host_is_called_away_mid_serve_gets_their_own_snack() {
+    let mut w = hosting(CONTENT);
+    let hunger = need(&w, "hunger");
+    w.sims[1].needs[hunger] = 0.35;
+    let mut watch = common::Watch::new();
+    for _ in 0..90 * TICKS_PER_MINUTE {
+        tick(&mut w, &mut watch);
+        if serving(&w, 0).is_some() {
+            break;
+        }
+    }
+    assert!(serving(&w, 0).is_some(), "Ada never went for it");
+    // Ada is sent across the garden: nothing is coming for Bo now. Still hungry, he gets a snack
+    // of his own from the fridge (one a guest may have on a whim from now on).
+    w.apply(Command::MoveTo {
+        sim: 0,
+        x: 18.5,
+        z: 1.5,
+    })
+    .unwrap();
+    let fridge = w.objects[FRIDGE as usize].def;
+    w.content.objects[fridge].interactions[0].autonomous = true;
+    let own = |w: &World| {
+        w.sims[1].current().is_some_and(|a| match a.task.kind {
+            TaskKind::Eat { .. } => true,
+            TaskKind::Use { object, .. } => object == FRIDGE,
+            _ => false,
+        })
+    };
+    let mut got = false;
+    for _ in 0..10 * TICKS_PER_MINUTE {
+        tick(&mut w, &mut watch);
+        assert!(serving(&w, 0).is_none(), "Ada carried on serving");
+        if own(&w) {
+            got = true;
+            break;
+        }
+    }
+    assert!(
+        got,
+        "Bo waited for what isn't coming: {:?}",
+        w.sims[1].current().map(|a| a.task.kind)
+    );
+    assert!(!w.events.iter().any(|e| e.kind == EventKind::Served));
+}
