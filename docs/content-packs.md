@@ -534,6 +534,15 @@ woken. They do the crib's care interactions for each of those needs under `tendB
 calls nobody again for `cooldownMinutes` (default 90). The base game wakes for hunger, bladder
 and hygiene.
 **Jobs:** `careerRules.market` turns on residents finding, quitting and losing jobs on their own.
+A promotion takes a full performance bar (100) and the next grade's skills. A shift worked fills
+the bar by `performancePerShift` (default 12) at the entry grade, for a resident who left for work
+in a middling mood (0.5) with just the skills the job asks for; up to `performancePerMood` (default
+15) more in the best mood and as much less in the worst, and `performancePerFit` (default 0) for
+each skill level above the requirements (less for each short, three at most). Arriving more than
+`lateGraceMinutes` (default 0) after the start, the shift counts `lateShare` (0 to 1, default 1:
+in full). Each grade up, a shift counts less: divided by 1 + grade × `performanceSlowdown` (0 to
+2, default 0: the same at every grade), as does `missedPenalty` (default 20), taken off for a shift
+missed. The base game fills it in 4 or 5 workdays at grade A, 7 to 10 at the top.
 **Story texts** (`events`): `promoted` (`{job}`: the new title, `{money}`: the bonus of half a
 week at the new grade); `promotedEarlier` for promotions in saves from before the bonus, which
 name neither.
@@ -1073,6 +1082,8 @@ keys share these objects. The rules:
 | A grade's `payPerHour` | 0 to 10000 | pay becomes shift pay and promotion bonuses; a huge one overflowed the sum |
 | `payFactor` (a career category's, a track's) | 0.25 to 3 | past that a track's pay no longer resembles its field |
 | `careerRules.probationLevels` | 0 to 1 | a shortfall of more than a level is never close enough to hire on probation |
+| `careerRules.performanceSlowdown` | 0 to 2 | below 0 later grades would come quicker; past 2 the top grade's shifts count for almost nothing |
+| `careerRules.lateShare` | 0 to 1 | what a late shift counts for, from nothing to a full shift |
 
 At run time the game also keeps needs between 0 and 1, and friendship and romance within ±100,
 whatever the content says; a score that isn't a number is never chosen. The hours of the

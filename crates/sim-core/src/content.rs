@@ -31,6 +31,11 @@ const PAY_FACTOR: RangeInclusive<f32> = 0.25..=3.0;
 /// How short of the level a job is hired at on probation: more than a level is never close enough,
 /// and a negative shortfall would ask for skills above the job's own.
 const PROBATION: RangeInclusive<f32> = 0.0..=1.0;
+/// `careerRules.performanceSlowdown`: below 0 later grades would come quicker; past 2 the top
+/// grade's shifts count for almost nothing.
+const PERFORMANCE_SLOWDOWN: RangeInclusive<f32> = 0.0..=2.0;
+/// `careerRules.lateShare`: what a late shift counts for, from nothing to a full shift.
+const LATE_SHARE: RangeInclusive<f32> = 0.0..=1.0;
 /// Bitmask of indices into `Content::tags`.
 pub type TagMask = u64;
 /// Bitmask of indices into `LifeRules::stages` (content `stages` rules: who may use what).
@@ -1214,13 +1219,21 @@ pub struct CareerRules {
     pub commute_minutes: f32,
     /// How late a Sim may leave before the shift counts as missed.
     pub late_minutes: f32,
+    /// Performance lost for a missed shift (at the entry grade: less further up, as shifts count).
     pub missed_penalty: f32,
-    /// Performance gained per shift at neutral mood; mood shifts it up or down.
+    /// Performance a shift is worth at the entry grade, in a middling mood with just the skills
+    /// asked for (`life::shift_performance` puts it all together).
     pub performance_per_shift: f32,
     /// Extra performance per shift for each skill level above the requirements (or less below).
     pub performance_per_fit: f32,
     /// Extra performance per shift at full mood (and as much less at none).
     pub performance_per_mood: f32,
+    /// How much less a shift counts each grade up: worth / (1 + grade index × this). 0: the same
+    /// at every grade.
+    pub performance_slowdown: f32,
+    /// Arriving more than this many minutes after the start, a shift counts `late_share` as much.
+    pub late_grace_minutes: f32,
+    pub late_share: f32,
     /// How far below a job's requirements a Sim may still be hired (on probation).
     pub probation_levels: f32,
     /// Sorted by `fit`.
@@ -2365,6 +2378,9 @@ struct CareerRulesRaw {
     performance_per_shift: Option<f32>,
     performance_per_fit: Option<f32>,
     performance_per_mood: Option<f32>,
+    performance_slowdown: Option<f32>,
+    late_grace_minutes: Option<f32>,
+    late_share: Option<f32>,
     probation_levels: Option<f32>,
     workweek: Vec<WorkweekRaw>,
     #[serde(alias = "promotionMoodlet")] // key before the moodlet → feeling rename
@@ -4271,6 +4287,20 @@ impl Content {
             performance_per_shift: cr.performance_per_shift.unwrap_or(12.0),
             performance_per_fit: cr.performance_per_fit.unwrap_or(0.0),
             performance_per_mood: cr.performance_per_mood.unwrap_or(15.0),
+            performance_slowdown: checked_range(
+                cr.performance_slowdown.unwrap_or(0.0),
+                "careerRules.performanceSlowdown",
+                PERFORMANCE_SLOWDOWN,
+            )?,
+            late_grace_minutes: time(
+                cr.late_grace_minutes.unwrap_or(0.0),
+                "careerRules.lateGraceMinutes",
+            )?,
+            late_share: checked_range(
+                cr.late_share.unwrap_or(1.0),
+                "careerRules.lateShare",
+                LATE_SHARE,
+            )?,
             probation_levels,
             workweek,
             promotion_feeling: feeling(&cr.promotion_feeling, "careerRules")?,

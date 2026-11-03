@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::MINUTES_PER_TICK;
 use crate::clock;
-use crate::content::{CareerLevel, Content, MAX_NEEDS, MAX_SKILLS, Pose, WorkweekRule};
+use crate::content::{
+    CareerLevel, CareerRules, Content, MAX_NEEDS, MAX_SKILLS, Pose, WorkweekRule,
+};
 use crate::conversation;
 use crate::social::{self, EventKind};
 use crate::world::{
@@ -34,6 +36,10 @@ pub struct Job {
     pub shifts: u32,
     /// Recent missed shifts (one worked shift makes up for one missed); too many and they're let go.
     pub missed: u8,
+    /// Arrived late for the current shift (`careerRules.lateGraceMinutes`; not saved: a game
+    /// loaded mid-shift counts it as on time).
+    #[serde(skip)]
+    pub late: bool,
 }
 
 impl Job {
@@ -48,6 +54,7 @@ impl Job {
             satisfaction: 0.6,
             shifts: 0,
             missed: 0,
+            late: false,
         }
     }
 }
@@ -102,6 +109,44 @@ pub fn skill_fit(level: &CareerLevel, skills: &[f32; MAX_SKILLS]) -> f32 {
         .map(|&(s, need)| skills[s].floor() - need)
         .fold(None, |m: Option<f32>, f| Some(m.map_or(f, |m| m.min(f))))
         .unwrap_or(0.0)
+}
+
+/// How much one shift fills the performance bar (0..100): all a shift's worth is worked out here.
+/// At the entry grade, for a Sim in a middling mood (0.5) with just the skills the job asks for,
+/// it's `performancePerShift`. Leaving for work in a better mood adds up to `performancePerMood`
+/// (a worse one takes as much off); each skill level above the job's requirements adds
+/// `performancePerFit` (each one short takes it off; three count at most). Arriving more than
+/// `lateGraceMinutes` late, the shift counts `lateShare` as much. Each grade up it counts less
+/// (`grade_pace`), so later promotions take longer.
+pub fn shift_performance(
+    rules: &CareerRules,
+    level: usize,
+    mood: f32,
+    fit: f32,
+    late: bool,
+) -> f32 {
+    let worth = rules.performance_per_shift
+        + (mood - 0.5) * 2.0 * rules.performance_per_mood
+        + fit.clamp(-3.0, 3.0) * rules.performance_per_fit;
+    let late = if late { rules.late_share } else { 1.0 };
+    worth * late * grade_pace(rules, level)
+}
+
+/// What shifts (and missed ones) count for at a grade (0: the entry grade), as a share of the
+/// entry grade's: 1 / (1 + grade × `performanceSlowdown`).
+pub fn grade_pace(rules: &CareerRules, level: usize) -> f32 {
+    1.0 / (1.0 + level as f32 * rules.performance_slowdown)
+}
+
+/// Shifts still to work for a full bar, each worth what one is now (in the mood they last left
+/// for work in, on time); None at the top of the career, or when shifts don't fill it.
+pub fn shifts_to_full_bar(content: &Content, job: &Job, skills: &[f32; MAX_SKILLS]) -> Option<u32> {
+    let career = &content.careers[job.career];
+    career.levels.get(job.level + 1)?;
+    let fit = skill_fit(&career.levels[job.level], skills);
+    let worth = shift_performance(&content.career_rules, job.level, job.shift_mood, fit, false);
+    let left = (100.0 - job.performance).max(0.0);
+    (worth > 0.0).then(|| (left / worth).ceil() as u32)
 }
 
 /// The workweek rule for a fit (probation, standard, flexible...).
@@ -623,7 +668,9 @@ fn miss_shift(w: &mut World, i: usize, day: u32) {
     let sim = &mut sims[i];
     let Some(job) = sim.job.as_mut() else { return };
     job.last_shift_day = day;
-    job.performance = (job.performance - content.career_rules.missed_penalty).max(0.0);
+    let rules = &content.career_rules;
+    job.performance =
+        (job.performance - rules.missed_penalty * grade_pace(rules, job.level)).max(0.0);
     job.missed = job.missed.saturating_add(1);
     if let Some(m) = content.career_rules.missed_feeling {
         social::add_feeling(&mut sim.feelings, m, &content.feelings, tick);
@@ -900,6 +947,7 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             };
             job.last_shift_day = clock::day(tick);
             job.shift_mood = mood;
+            job.late = tick > start + ticks(content.career_rules.late_grace_minutes);
             // Early arrivals still work until the shift's end; late ones lose that time. Before
             // it starts they're on their way (`at_work`).
             sim.shift_from = start;
@@ -1282,7 +1330,7 @@ fn at_work(w: &mut World, i: usize) -> bool {
     sim.away_until = None;
     households[sim.household as usize].funds += shift_pay(content, &job, &sim.skills);
     let rules = &content.career_rules;
-    let fit = skill_fit(level, &sim.skills).clamp(-3.0, 3.0);
+    let fit = skill_fit(level, &sim.skills);
     // Still a job: it was there above, and nothing since takes it away.
     let Some(job) = sim.job.as_mut() else {
         return true;
@@ -1290,11 +1338,8 @@ fn at_work(w: &mut World, i: usize) -> bool {
     job.shifts += 1;
     job.missed = job.missed.saturating_sub(1);
     job.satisfaction = job.satisfaction * 0.8 + job.shift_mood * 0.2;
-    job.performance = (job.performance
-        + rules.performance_per_shift
-        + (job.shift_mood - 0.5) * 2.0 * rules.performance_per_mood
-        + fit * rules.performance_per_fit)
-        .clamp(0.0, 100.0);
+    let worth = shift_performance(rules, job.level, job.shift_mood, fit, job.late);
+    job.performance = (job.performance + worth).clamp(0.0, 100.0);
     // A promotion needs a full bar and the skills for the next level.
     if job.performance >= 100.0
         && let Some(next) = career.levels.get(job.level + 1)
