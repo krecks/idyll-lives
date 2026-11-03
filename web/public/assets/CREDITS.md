@@ -404,7 +404,9 @@ tableware `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasse
 `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks`; override pack
 `packs/tabletop/manifest.json`) are built in Blender by `tools/art/blender/families/tabletop.py` on `gamekit` and
 exported as `.glb` (glTF, original, CC0). The alarm clock's hands tell the game's time and the
-candles' flames rise at night; the rest are static.
+candles' flames rise at night; the kettle's lid, the bread bin's roll-top and the laptop's lid open while they're used,
+and the toaster's toast goes down, the blender's jug shakes, the stand mixer's beater turns and the espresso machine
+runs coffee into its cup (2026-11-03); the rest are static.
 
 The playground (`models/playground/slide.glb`, `climbingFrame.glb`, `seesaw.glb`, `springRider.glb`,
 `merryGoRound.glb`, `basketballHoop.glb`, `pingPongTable.glb`, `parkChessTable.glb`, each with a `.far.glb` for the

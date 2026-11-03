@@ -309,27 +309,52 @@ def _slice(name, at, material, inner, w=0.13, h=0.075):
 
 def toaster():
     """A two-slice toaster: a rounded body on a dark plinth, two slots with a slice of toast up in each (a crust round
-    its crumb), the lever in its guide, a browning dial and a cancel button."""
+    its crumb), the lever in its guide, a browning dial and a cancel button. The toast and the lever are a part of
+    their own: `toast_down` presses them down into the slots while the toast is made, and they pop up as it ends."""
+    with G.new_parts() as body:
+        _toaster_body()
+    G.join(body, 'toaster', origin=(0, 0, 0))
+    with G.new_parts() as carriage:
+        for s in (-1, 1):
+            _slice(f'toast{s}', (0, s * 0.035, 0.192), M.bread, M.crumb)
+        box('lever', (0.022, 0.03, 0.014), (-0.14, 0, 0.125), M.dark, bevel=0.004)
+    toast = G.join(carriage, 'toast', origin=(0, 0, 0.125))
+    G.settle()
+    G.slide(toast, 'toast_down', (0, 0, -0.058), seconds=0.4)   # the toast's tops just under the slots, the lever down
+    return G.meshes()
+
+
+def _toaster_body():
     turned('plinth', [(0.122, 0.068, 0.0), (0.125, 0.071, 0.004), (0.125, 0.071, 0.013)], M.dark, verts=16, square=6)
     turned('body', [(0.125, 0.07, 0.012), (0.13, 0.075, 0.022), (0.13, 0.075, 0.15), (0.125, 0.07, 0.166),
                     (0.114, 0.06, 0.172)], M.toaster, verts=20, square=5)
     for s in (-1, 1):
         slab(f'slot{s}', G.rounded_rect(0.17, 0.024, 0.01, corner=2), 0.006, (0, s * 0.035, 0.171), M.dark, plane='XY')
-        _slice(f'toast{s}', (0, s * 0.035, 0.192), M.bread, M.crumb)
     box('guide', (0.004, 0.012, 0.1), (-0.13, 0, 0.1), M.dark)
-    box('lever', (0.022, 0.03, 0.014), (-0.14, 0, 0.125), M.dark, bevel=0.004)
     turned('knob', [(0.016, 0.0), (0.016, 0.006), (0.012, 0.011), (0.0, 0.012)], M.chrome, at=(-0.129, 0.03, 0.055),
            rot=(0, -90, 0), verts=12)
     box('pointer', (0.004, 0.003, 0.012), (-0.1415, 0.03, 0.062), M.dark)
     box('cancel', (0.006, 0.016, 0.01), (-0.132, -0.03, 0.055), M.chrome, bevel=0.002)
     for s in (-1, 1):
         box(f'trim{s}', (0.2, 0.002, 0.008), (0, s * 0.0755, 0.05), M.chrome)
-    return done('toaster')
 
 
 def blender():
     """A jug blender: a tapering base with a dial and two buttons, the collar, a soft-square jug (the smoothie its
-    lower half, the jug drawn opaque), its handle in one piece, the lid and its filler cap."""
+    lower half, the jug drawn opaque), its handle in one piece, the lid and its filler cap. The jug (with its lid and
+    handle) is a part of its own, seated on the collar: `whirr` shakes it to and fro on the base while it blends."""
+    with G.new_parts() as body:
+        _blender_base()
+    G.join(body, 'blender', origin=(0, 0, 0))
+    with G.new_parts() as jar:
+        _blender_jar()
+    jug = G.join(jar, 'jug', origin=(0, 0, 0.12))
+    G.settle()
+    G.rock(jug, 'whirr', 2.5, seconds=0.2, axis='Z')            # a quick twist each way, as the motor bites
+    return G.meshes()
+
+
+def _blender_base():
     turned('base', [(0.068, 0.068, 0.0), (0.07, 0.07, 0.006), (0.066, 0.066, 0.085), (0.06, 0.06, 0.1)], M.blender_base,
            verts=16, square=4)
     turned('dial', [(0.016, 0.0), (0.016, 0.005), (0.012, 0.008), (0.0, 0.009)], M.chrome, at=(0, -0.063, 0.05),
@@ -337,6 +362,9 @@ def blender():
     for x in (-0.038, 0.038):
         box(f'button{x}', (0.016, 0.008, 0.01), (x, -0.065, 0.05), M.chrome, bevel=0.002)
     turned('collar', [(0.056, 0.098), (0.06, 0.104), (0.06, 0.118), (0.056, 0.122)], M.dark, verts=16)
+
+
+def _blender_jar():
     turned('smoothie', [(0.05, 0.05, 0.12), (0.058, 0.058, 0.22)], M.smoothie, verts=12, square=3)
     turned('jug', [(0.058, 0.058, 0.22), (0.068, 0.068, 0.318)], M.jug, verts=12, square=3)
     turned('lid', [(0.068, 0.068, 0.316), (0.072, 0.072, 0.322), (0.072, 0.072, 0.334), (0.064, 0.064, 0.34)], M.dark,
@@ -344,13 +372,36 @@ def blender():
     turned('cap', [(0.022, 0.338), (0.022, 0.35), (0.018, 0.355), (0.0, 0.356)], M.dark, verts=10)
     bar('handle', G.kit.fillet([(-0.05, 0, 0.302), (-0.098, 0, 0.302), (-0.098, 0, 0.18), (-0.05, 0, 0.18)], 0.022,
                                steps=2), oval(0.018, 0.026, 6), M.dark, up=(0, 1, 0))
-    return done('blender')
 
 
 def standMixer():
     """A tilt-head stand mixer: a rounded base, the column rising into the head (lofted, swelling over the bowl to
     its nose, a chrome band and hub there), the speed lever, the steel bowl with batter in it and the beater's
-    shaft."""
+    shaft. The beater on its shaft is a part of its own: `beat` turns it round in the bowl while the mixer runs."""
+    with G.new_parts() as body:
+        _mixer_body()
+    G.join(body, 'standMixer', origin=(0, 0, 0))
+    with G.new_parts() as parts:
+        G.rod('shaft', (-0.07, 0, 0.232), (-0.07, 0, 0.125), 0.006, material=M.steel, verts=6)
+        slab('beater', [(-0.03, 0.03), (0.03, 0.03), (0.022, -0.01), (0.0, -0.03), (-0.022, -0.01)], 0.005,
+             (-0.07, 0, 0.11), M.steel, holes=[[(-0.016, 0.022), (0.016, 0.022), (0.01, -0.004), (0.0, -0.016),
+                                                  (-0.01, -0.004)]])
+        # a swirl of the batter round the shaft, turned with it, so the turning shows in the bowl
+        pts = []
+        for i in range(13):
+            f = i / 12
+            a = math.tau * 1.25 * f
+            r = 0.012 + 0.05 * f
+            pts.append((-0.07 + r * math.cos(a), r * math.sin(a), 0.1305 - 0.004 * f * f))
+        G.sweep('swirl', pts, None, material=M.bread, profile=[(-0.002, -0.003), (0.0008, -0.002), (0.0008, 0.002),
+                                                              (-0.002, 0.003)], scale=lambda f: 1 - 0.5 * f)
+    beater = G.join(parts, 'beater', origin=(-0.07, 0, 0.232))   # about its shaft
+    G.settle()
+    G.spin(beater, 'beat', turns=1, seconds=0.75, axis='Z')
+    return G.meshes()
+
+
+def _mixer_body():
     turned('base', [(0.15, 0.085, 0.0), (0.15, 0.085, 0.028), (0.142, 0.078, 0.04)], M.mixer, verts=16, square=5)
     turned('column', [(0.05, 0.056, 0.035), (0.042, 0.05, 0.14), (0.047, 0.056, 0.25)], M.mixer, at=(0.1, 0, 0),
            verts=12, square=3)
@@ -366,18 +417,28 @@ def standMixer():
     turned('bowl', [(0.042, 0.04), (0.06, 0.052), (0.074, 0.075), (0.08, 0.12), (0.082, 0.148), (0.078, 0.152),
                     (0.075, 0.122)], M.steel, at=(-0.07, 0, 0), verts=14)
     turned('batter', [(0.0752, 0.12), (0.05, 0.128), (0.0, 0.132)], M.crumb, at=(-0.07, 0, 0), verts=10)
-    G.rod('shaft', (-0.07, 0, 0.232), (-0.07, 0, 0.125), 0.006, material=M.steel, verts=6)
-    slab('beater', [(-0.03, 0.03), (0.03, 0.03), (0.022, -0.01), (0.0, -0.03), (-0.022, -0.01)], 0.005,
-         (-0.07, 0, 0.11), M.steel, holes=[[(-0.016, 0.022), (0.016, 0.022), (0.01, -0.004), (0.0, -0.016),
-                                              (-0.01, -0.004)]])
-    return done('standMixer')
 
 
 def espressoMachineSmall():
     """A small espresso machine: a brushed-steel body rounded over its top, the head over the cup with its buttons
     and light, the group and portafilter (a black handle on a steel basket, two spouts), a slotted grate over the drip
     tray, a pressure gauge in a chrome bezel, the steam knob and a bent wand, the water tank at the back, a rail round
-    the cup warmer and a cup upturned on it."""
+    the cup warmer and a cup upturned on it. Two thin streams of coffee from the spouts into the cup are a part of their
+    own, built full length and flattened into the spouts' tips: `brew` runs them down into the cup."""
+    with G.new_parts() as body:
+        _espresso_body()
+    G.join(body, 'espressoMachineSmall', origin=(0, 0, 0))
+    with G.new_parts() as parts:
+        for x in (-0.009, 0.009):
+            G.cylinder(f'stream{x}', 0.0022, 0.071, at=(x, -0.105, 0.1015), material=M.coffee, verts=6)
+    stream = G.join(parts, 'coffee', origin=(0, -0.105, 0.137))   # the spouts' tips
+    stream.scale[2] = 0.001                                         # hidden in the spouts at rest
+    G.settle()
+    G.grow(stream, 'brew', seconds=0.6)
+    return G.meshes()
+
+
+def _espresso_body():
     turned('body', [(0.11, 0.096, 0.0), (0.11, 0.096, 0.255), (0.104, 0.09, 0.267), (0.094, 0.08, 0.27)], M.espresso,
            at=(0, 0.026, 0), verts=20, square=8)
     slab('head', G.rounded_rect(0.085, 0.07, 0.022, corner=2), 0.2, (0, -0.0925, 0.235), M.espresso, plane='YZ',
@@ -425,7 +486,6 @@ def espressoMachineSmall():
         G.rod(f'post{i}', (x, y, 0.268), (x, y, 0.288), 0.003, material=M.chrome, verts=6)
     turned('top_cup', [(0.024, 0.27), (0.027, 0.272), (0.021, 0.304), (0.012, 0.31), (0.0, 0.31)], M.porcelain,
            at=(0.04, 0.06, 0), verts=12)
-    return done('espressoMachineSmall')
 
 
 def knifeBlock():
@@ -1446,10 +1506,15 @@ FAMILY = G.Family(
     [  # TT1 kitchenware
         T('kettle', kettle, (0.228, 0.238, 0.172), [('kettle', BODY), ('dark', 'Base, handle & lid')],
           motions={'uses': {'tea': {'clip': 'lid_open', 'hold': 1.6}}}),
-        T('toaster', toaster, (0.28, 0.23, 0.15), [('toaster', BODY)]),
-        T('blender', blender, (0.18, 0.356, 0.146), [('blender_base', BODY), ('smoothie', 'Smoothie')]),
-        T('standMixer', standMixer, (0.3, 0.356, 0.17), [('mixer', BODY)]),
-        T('espressoMachineSmall', espressoMachineSmall, (0.231, 0.31, 0.391), [('espresso', BODY)]),
+        # the toast down while it's made, popping up as the use ends
+        T('toaster', toaster, (0.28, 0.23, 0.15), [('toaster', BODY)], motions={'uses': {'toast': 'toast_down'}}),
+        # the jug shaking on its base, the beater turning round, for as long as each runs
+        T('blender', blender, (0.18, 0.356, 0.146), [('blender_base', BODY), ('smoothie', 'Smoothie')],
+          motions={'loops': {'smoothie': 'whirr'}}),
+        T('standMixer', standMixer, (0.3, 0.356, 0.17), [('mixer', BODY)], motions={'loops': {'bake': 'beat'}}),
+        # the coffee running into the cup, then stopped while it's drunk
+        T('espressoMachineSmall', espressoMachineSmall, (0.231, 0.31, 0.391), [('espresso', BODY)],
+          motions={'uses': {'espresso': {'clip': 'brew', 'hold': 2.5}}}),
         T('knifeBlock', knifeBlock, (0.12, 0.297, 0.232), [('knife_block', BODY), ('dark', 'Handles')]),
         T('utensilCrock', utensilCrock, (0.132, 0.316, 0.124), [('crock', BODY)]),
         T('cuttingBoard', cuttingBoard, (0.34, 0.106, 0.23), [('board', BODY)]),
