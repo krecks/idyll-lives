@@ -738,13 +738,14 @@ def sunriseLamp():
 # --- the confetti party booth (2x2): a horseshoe booth for two under a bulb-lit frame, a table with a tablet ----
 def _channels(F, name, x0, x1, n, y0, top, z0, z1, lean, mat):
     """A channelled back: `n` stuffed channels side by side from x0 to x1, each rising from the seat at `y0`
-    (depth `z0`) to `top`, leaning back to `z1` and rolling over at the top."""
+    (depth `z0`) to `top`, leaning back to `z1` and rolling over at the top. The roll starts 9 cm down and thins as
+    it goes: turned in the last 3.5 cm, tighter than the channel is thick, its back folded inside out."""
     cw = (x1 - x0) / n
     for i in range(n):
         x = x0 + cw * (i + 0.5)
-        F.sweep(_name(name), [(x, y0, z0), (x, (y0 + top) / 2, (z0 + z1) / 2 - 0.01), (x, top - 0.05, z1), (x, top - 0.015, z1 - lean)],
+        F.sweep(_name(name), [(x, y0, z0), (x, (y0 + top) / 2, (z0 + z1) / 2 - 0.01), (x, top - 0.09, z1 + 0.01), (x, top - 0.02, z1 - lean)],
                 None, mat, profile=G.rounded_rect(cw * 1.02, 0.17, 0.06, corner=1), up=(1, 0, 0), resolution=2,
-                scale=[1.0, 1.04, 1.0, 0.85])
+                scale=[1.0, 1.04, 0.95, 0.75])
 
 
 def partyBooth():

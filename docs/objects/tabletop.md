@@ -4,8 +4,9 @@ Small things that stand on tops (`surface` layer, 1×1). All 40 are built by `to
 (notes: `families/tabletop.md`). The origin is at the base,
 centred, and the renderer lifts each to its host's top. Each is no wider than the `radius` the content gives it
 (the disc it takes on a top; the gate warns of one reaching over 10 % past it), so a thing still fits where the game puts it;
-the four widest (`plateSet`, `teapotSet`, `espressoMachineSmall`, `monitor`, radius 0.23–0.3 m) don't fit on a
-counter's top with its edge margin and go on tables and desks.
+the four widest (`plateSet`, `teapotSet`, `espressoMachineSmall`, `monitor`, radius 0.22–0.27 m) fit on the counters
+(0.62–0.66 m deep), islands, tables and the deeper desks with their edge margin, not on the breakfast counter, the
+chef's island or the 0.38–0.44 m deep desks.
 
 Twenty-one of them have uses (G-63): the appliances and screens, food and drink, books, small plants and toys,
 and the empty vase that takes a bunch cut in the garden. A thing
@@ -129,7 +130,7 @@ sits on the top, turns with its facing and lights right at night.
 | `perfumeTray` Perfume tray | 1x1 · surface | — | tabletop / bath | Body | Static | Static. |
 | `deskOrganiser` Desk organiser | 1x1 · surface | — | tabletop / desk | Body | Static | Static. |
 | `laptopClosed` Laptop | 1x1 · surface | browse:type code:type write:type homework:type | tabletop / desk | Body | Use | `lid_open`: the lid opens 105° (its screen lit while it is used) for the whole use. |
-| `monitor` Monitor and keyboard | 1x1 · surface | browse:type code:type homework:type | tabletop / desk | Body | Static | Static. Takes a 0.23 m disc (half its 0.46 m depth with the keyboard): it fits on counters, islands and the simple, executive, corner and standing desks, not on the 0.38–0.44 m deep computer, writing, laptop and kids' desks. |
+| `monitor` Monitor and keyboard | 1x1 · surface | browse:type code:type homework:type | tabletop / desk | Body | Static | Static. Takes a 0.27 m disc (its screen's corners reach 0.29 m, inside the gate's 10 %): it fits on counters, islands and the simple, executive, corner and standing desks, not on the 0.38–0.44 m deep computer, writing, laptop and kids' desks. |
 | `stuffedToy` Teddy | 1x1 · surface | play:play | tabletop / toys | Body | Static | Static. |
 | `toyBlocks` Toy blocks | 1x1 · surface | blocks:tend | tabletop / toys | Block 1, Block 2, Block 3 | Static | Static. |
 

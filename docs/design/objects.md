@@ -418,18 +418,22 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   model's size, a model below the floor, extensions the game can't read, skins, morph targets, a clip
   that animates anything but a node's transform or doesn't start at rest or at 0 s (the game holds it at
   rest until its first key: a pause each round of a loop), a `motions` clip the file doesn't have,
-  textures over 1024 px, a mapping to a finish that doesn't exist. Warnings: a clip no use plays, a clip
-  with cubic-spline keys (played as straight lines), a part turning over 12° in 1/60 s (the game's samples
-  blended that far apart shrink it), faces over 1 cm² whose normals are turned against their winding
-  (lit as if from behind), over 3 draws or the triangle target, unmapped, double-sided, see-through or emissive
-  materials, UVs on a material neither textured nor on a textured finish (one UV throughout is fine), a floating origin, a Blender-built model off its `Model`'s `centre` (the
+  textures over 1024 px, a mapping to a finish that doesn't exist. Strict checks, errors too unless the
+  pack entry `accept`s them with a reason (`"accept": {"footprint": "why"}`, `checkglb::STRICT`,
+  tools/art/README.md "The gate"): a clip no use plays, a clip
+  with cubic-spline keys (played as straight lines), faces over 1 cm² whose normals are turned against their winding
+  (lit as if from behind), unmapped, double-sided, see-through or emissive
+  materials, UVs on a material neither textured nor on a textured finish (one UV throughout is fine), a floor thing floating above its origin, a Blender-built model off its `Model`'s `centre` (the
   middle, or the `centre` it gives; `tools/art/blender/centres.json`, which the build writes for the gate
   only) by over 2 cm at rest (not its far version), one that reaches over 1 cm into the wall, one
   indoors (on the floor, a wall or the ceiling, without `vary`) that reaches over 2 cm past its
   footprint at rest (and the tiles it reaches over, content `overhang`: the arc lamp's shade), or whose part that goes round (a loop or ambient spin: a fan's blades) sweeps
   over 1 cm past it, a thing on a top that reaches more than 10 % past its content `radius` from its
   origin (its farthest vertex, as it shows), and a floor model or moving part lower than the floor
-  drawn over it; each against every content object that draws the model. Functional heights (warnings
+  drawn over it (not a held `tool.*`); each against every content object that draws the model. Warnings:
+  a part turning over 12° in 1/60 s (the game's samples blended that far apart shrink it), a use's clip over
+  3 s, a loop that ends turned or moved (right if it looks the same), over 3 draws or the triangle target, a
+  texture of its own. Functional heights (warnings
   too): the model's top straight down at the seat (furniture.json `seats`, else content `seat`, else
   `defaultSeat` for one sat on; `fwd` forward, at each slot), the top (content `surface` at its `at`) and
   the mattress (furniture.json `bunks`, `beds`, else `defaultBed` for one lain on; held open by
