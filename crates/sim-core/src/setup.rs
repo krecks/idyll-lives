@@ -61,7 +61,19 @@ pub struct Setup {
     /// Where its parcel lies to be seen (`view::items_json`), none while in someone's hands.
     /// Not saved.
     pub(crate) parcel: Option<[f32; 2]>,
+    /// The resident last sent off for it (or found at it), to see each tick whether they're at it
+    /// still (`at_it`): nobody else is, as nobody is sent while someone is. Not saved.
+    by: Option<u32>,
+    /// Where it waits at the door (`door`), and for which plot and `World::nav_version` and
+    /// `World::lot_version`: found again only when they change. Not saved.
+    door: Option<(DoorKey, Door)>,
 }
+
+/// A home's plot, and the versions of walking and of the lot, as its door was found at.
+type DoorKey = (u32, u32, u32);
+
+/// Where a parcel lies at the door, and where the one picking it up stands (`door`).
+type Door = ([f32; 2], [f32; 2]);
 
 impl Setup {
     /// Where it goes, once someone set off for it (as for `World::buy_at`).
@@ -79,6 +91,8 @@ impl Setup {
             retry: 0,
             spot: None,
             parcel: None,
+            by: None,
+            door: None,
         }
     }
 }
@@ -88,23 +102,51 @@ fn for_object(kind: &TaskKind, object: usize) -> bool {
     matches!(*kind, TaskKind::SetUp { object: o, .. } if o as usize == object)
 }
 
-/// The resident at it now (on their way, carrying the parcel, putting it together) or about to be.
+/// Whether resident `x` is at `s` now (on their way, carrying the parcel, putting it together) or
+/// about to be.
+fn at_it(x: &Sim, s: &Setup) -> bool {
+    x.here()
+        && x.household == s.household
+        && (x
+            .current
+            .as_ref()
+            .is_some_and(|a| for_object(&a.task.kind, s.object))
+            || x.queue.iter().any(|t| for_object(&t.kind, s.object)))
+}
+
+/// The resident at `s` now, if anyone is (`at_it`).
 fn doing(w: &World, s: &Setup) -> Option<usize> {
-    w.sims.iter().position(|x| {
-        x.here()
-            && x.household == s.household
-            && (x
-                .current
-                .as_ref()
-                .is_some_and(|a| for_object(&a.task.kind, s.object))
-                || x.queue.iter().any(|t| for_object(&t.kind, s.object)))
-    })
+    w.sims.iter().position(|x| at_it(x, s))
+}
+
+/// Notes that resident `j` is at what household `h` bought of `object` (each one, should they
+/// have bought two: `for_object` doesn't tell them apart).
+fn mark_by(w: &mut World, h: u32, object: usize, j: usize) {
+    for s in w.setups.iter_mut() {
+        if s.household == h && s.object == object {
+            s.by = Some(j as u32);
+        }
+    }
+}
+
+/// Where `setups[k]`'s parcel waits at the front door of `plot` (`door`), found again only when
+/// walking or the lot changes there.
+fn door_of(w: &mut World, k: usize, plot: u32) -> Door {
+    let key = (plot, w.nav_version, w.lot_version);
+    if let Some((seen, at)) = w.setups[k].door
+        && seen == key
+    {
+        return at;
+    }
+    let at = door(w, plot);
+    w.setups[k].door = Some((key, at));
+    at
 }
 
 /// Where the parcel waits at the front door of `plot`: the point it lies at, and where the one
 /// picking it up stands (facing it). The visitors' knocking spot (`life::knock_spot`), else where
 /// people arrive at the plot.
-fn door(w: &World, plot: u32) -> ([f32; 2], [f32; 2]) {
+fn door(w: &World, plot: u32) -> Door {
     let p = &w.plots[plot as usize];
     match crate::life::knock_spot(&w.nav(), p) {
         Some(((x, z), _, yaw)) => {
@@ -280,7 +322,8 @@ pub(crate) fn update(w: &mut World) {
             sent_back(w, k);
             continue;
         };
-        if doing(w, &s).is_some() {
+        if let Some(j) = doing(w, &s) {
+            mark_by(w, s.household, s.object, j);
             k += 1;
             continue;
         }
@@ -302,14 +345,18 @@ pub(crate) fn update(w: &mut World) {
 }
 
 /// Where each parcel is seen (`Setup::parcel`): at the door, in someone's hands (nowhere), or put
-/// down by where it goes while they put it together. The view's items change with it.
+/// down by where it goes while they put it together. The view's items change with it. Every
+/// tick: only the one sent off for it is looked at (`Setup::by`), and its door is kept
+/// (`door_of`).
 pub(crate) fn refresh_parcels(w: &mut World) {
     for k in 0..w.setups.len() {
         let s = &w.setups[k];
         let Some(plot) = w.households.get(s.household as usize).and_then(|h| h.plot) else {
             continue;
         };
-        let by = doing(w, s).map(|j| &w.sims[j]);
+        let by =
+            s.by.and_then(|j| w.sims.get(j as usize))
+                .filter(|x| at_it(x, s));
         let parcel = match by.and_then(|x| x.current.as_ref().map(|a| (x, a))) {
             // (On the floor in front of them, towards where it goes: within reach.)
             Some((
@@ -330,7 +377,7 @@ pub(crate) fn refresh_parcels(w: &mut World) {
                 Some([x.pos[0] + dx * k, x.pos[1] + dz * k])
             }
             Some((x, _)) if x.held.is_some() => None,
-            _ => Some(door(w, plot).0),
+            _ => Some(door_of(w, k, plot).0),
         };
         if w.setups[k].parcel != parcel {
             w.setups[k].parcel = parcel;
@@ -348,7 +395,8 @@ fn send(w: &mut World, k: usize, j: usize, plot: u32) {
         sent_back(w, k);
         return;
     };
-    let (parcel, by_door) = door(w, plot);
+    let (parcel, by_door) = door_of(w, k, plot);
+    mark_by(w, household, object, j);
     let s = &mut w.setups[k];
     s.spot = Some(spot);
     s.retry = w.tick + RETRY_MINUTES * crate::TICKS_PER_MINUTE;
@@ -382,15 +430,12 @@ fn send(w: &mut World, k: usize, j: usize, plot: u32) {
 /// anywhere: it goes back.
 fn place(w: &mut World, k: usize, by: Option<usize>) {
     let s = w.setups[k].clone();
-    let h = s.household as usize;
-    // (Paid for already: `buy_at` pays again.)
-    w.households[h].funds += s.paid;
     let at = s
         .spot
         .or_else(|| spot(w, s.household, s.object).map(|(at, ..)| at));
-    let placed = crate::planner::place_wanted(w, s.household, s.object, at);
+    // (Paid for already.)
+    let placed = crate::planner::place_wanted(w, s.household, s.object, at, false);
     if placed.is_err() {
-        w.households[h].funds -= s.paid;
         sent_back(w, k);
         return;
     }

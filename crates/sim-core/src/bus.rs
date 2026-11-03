@@ -47,7 +47,7 @@
 use crate::TICKS_PER_MINUTE;
 use crate::cars::{self, Legs, Route};
 use crate::content::Pose;
-use crate::travel::{Mode, RoadKind, RoadPath, RoadPoint, Travel, dist};
+use crate::travel::{Mode, PathEnds, RoadKind, RoadPath, RoadPoint, Travel, dist};
 use crate::world::{Ctx, Phase, Sim, World};
 
 /// Most buses in town at once (the snapshot's rows): a big world's lines are long, a few buses
@@ -230,6 +230,15 @@ pub struct Bus {
     pub shown: Option<([f32; 2], f32, bool, u8)>,
 }
 
+impl Bus {
+    /// Whether it stands at a stop with its doors open at `tick` (open a little after it stops,
+    /// shut a little before it goes: `DOOR_TICKS`).
+    fn doors_open(&self, tick: u64) -> bool {
+        self.until
+            .is_some_and(|until| tick >= self.stood + DOOR_TICKS && tick + DOOR_TICKS < until)
+    }
+}
+
 /// Someone done at work coming home by bus: to their stop, on the first bus into town at or
 /// after `run`.
 #[derive(Debug, Clone, Copy)]
@@ -347,12 +356,9 @@ impl Transit {
     /// The bus standing at `stop` with its doors open at `tick`, if one is.
     fn boarding(&self, stop: u16, tick: u64) -> Option<usize> {
         let (l, j) = self.stops.get(stop as usize)?.line?;
-        self.buses.iter().position(|b| {
-            b.line == l
-                && b.next == j as usize
-                && b.until
-                    .is_some_and(|until| tick >= b.stood + DOOR_TICKS && tick + DOOR_TICKS < until)
-        })
+        self.buses
+            .iter()
+            .position(|b| b.line == l && b.next == j as usize && b.doors_open(tick))
     }
 
     /// Where someone waits at `stop`: its first waiting place nobody has taken that they can
@@ -366,22 +372,44 @@ impl Transit {
         })
     }
 
-    /// Taking the bus from `pos` now, walking at `walk` m a minute: the stop, and the ticks till
-    /// it's out of town with them (the walk with `life::WALK_MARGIN`, the wait for the bus they'd
-    /// catch, the ride). The quickest of the nearest few stops a line calls at.
-    fn best(&self, travel: &Travel, pos: [f32; 2], walk: f32, now: u64) -> Option<(u16, u64)> {
+    /// Someone at `stop` (`me`) and their place there: the first nobody has taken that they can
+    /// stand on (`free_spot`, on ground `nav` has free), and where it is.
+    fn place_at(
+        &self,
+        nav: &crate::path::NavGrid,
+        stop: u16,
+        me: u32,
+    ) -> Option<(u16, u8, [f32; 2])> {
+        let spot = self.free_spot(stop, me, |p| {
+            nav.tile_free(p[0].floor() as i32, p[1].floor() as i32)
+        })?;
+        let (at, ..) = self.stops[stop as usize].spot(spot as usize)?;
+        Some((stop, spot, at))
+    }
+
+    /// The stops someone at `from` weighs taking the bus from: the nearest few a line calls at,
+    /// within `STOP_REACH`, nearest first.
+    fn nearest_stops(&self, from: [f32; 2]) -> Vec<u16> {
         let mut near: Vec<(f32, u16)> = self
             .stops
             .iter()
             .enumerate()
             .filter(|(_, s)| s.line.is_some())
-            .map(|(k, s)| (dist(pos, s.at), k as u16))
+            .map(|(k, s)| (dist(from, s.at), k as u16))
             .filter(|&(d, _)| d <= STOP_REACH)
             .collect();
         near.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
         near.truncate(STOP_CANDIDATES);
-        near.into_iter()
-            .filter_map(|(_, k)| {
+        near.into_iter().map(|(_, k)| k).collect()
+    }
+
+    /// Taking the bus from `pos` now, walking at `walk` m a minute: the stop, and the ticks till
+    /// it's out of town with them (the walk with `life::WALK_MARGIN`, the wait for the bus they'd
+    /// catch, the ride). The quickest of the nearest few stops a line calls at.
+    fn best(&self, travel: &Travel, pos: [f32; 2], walk: f32, now: u64) -> Option<(u16, u64)> {
+        self.nearest_stops(pos)
+            .into_iter()
+            .filter_map(|k| {
                 let st = &self.stops[k as usize];
                 let minutes = travel.eta(pos, st.at, Mode::Foot, walk) * crate::life::WALK_MARGIN;
                 let there = now + (minutes * TICKS_PER_MINUTE as f32) as u64;
@@ -500,20 +528,14 @@ fn make_stop(travel: &Travel, exit: usize, at: [f32; 2]) -> Option<Stop> {
     // Right of the road's way (-z, x): the stop on that side, or the other.
     let side = (at[0] - mid[0]) * -tan[1] + (at[1] - mid[1]) * tan[0];
     let dir = if side >= 0.0 { tan } else { [-tan[0], -tan[1]] };
-    let edge = road.width / 2.0;
-    let pavement = if road.kind == RoadKind::Country {
-        0.6
-    } else {
-        cars::SIDEWALK
-    };
     Some(Stop {
         exit,
         at,
         mid,
         dir,
         road: p,
-        kerb: (edge - pavement).max(0.5),
-        edge,
+        kerb: kerb_of(road.width, road.kind),
+        edge: road.width / 2.0,
         line: None,
         shelter: false,
     })
@@ -650,7 +672,8 @@ fn ways_out(travel: &Travel, exits: &[[f32; 2]], bounds: Option<[f32; 4]>) -> Ve
     let inside =
         |p: [f32; 2]| p[0] >= b[0] - m && p[0] < b[2] + m && p[1] >= b[1] - m && p[1] < b[3] + m;
     let mut out: Vec<RoadPoint> = roads_out
-        .into_iter()
+        .iter()
+        .copied()
         .filter(|p| inside(g.point(*p)))
         .collect();
     for road in g.roads.iter().filter(|r| r.kind != RoadKind::Trail) {
@@ -666,29 +689,18 @@ fn ways_out(travel: &Travel, exits: &[[f32; 2]], bounds: Option<[f32; 4]>) -> Ve
         }
     }
     if out.is_empty() {
-        return (0..exits.len())
-            .filter(|&i| !travel.is_stop(i) && exits[i].iter().all(|v| v.is_finite()))
-            .filter_map(|i| {
-                g.near(exits[i], cars::ROAD_REACH, 1, Mode::Car)
-                    .first()
-                    .copied()
-            })
-            .collect();
+        return roads_out;
     }
     out
 }
 
-/// Whether a way along the roads leaves `from` (or comes into `to`) going `dir`.
-fn goes(path: &RoadPath, dir: [f32; 2], at_end: bool) -> bool {
-    let p = &path.pts;
-    if p.len() < 2 {
+/// Whether a way along the roads (its `ends`) leaves where it's from (or comes in where it's to:
+/// `at_end`) going `dir`.
+fn goes(ends: PathEnds, dir: [f32; 2], at_end: bool) -> bool {
+    let Some((first, last)) = ends else {
         return true;
-    }
-    let (a, b) = if at_end {
-        (p[p.len() - 2].0, p[p.len() - 1].0)
-    } else {
-        (p[0].0, p[1].0)
     };
+    let [a, b] = if at_end { last } else { first };
     (b[0] - a[0]) * dir[0] + (b[1] - a[1]) * dir[1] >= 0.0
 }
 
@@ -700,32 +712,36 @@ fn line_for(travel: &Travel, outs: &[RoadPoint], stops: &[Stop], group: &[u16]) 
     let country = travel.country_speed;
     let stop = |k: u16| &stops[k as usize];
     let wrong = |ok: bool| if ok { 0.0 } else { WRONG_WAY };
-    // Between each two stops, and in from and out to each way out.
-    let mut between: std::collections::HashMap<(u16, u16), Option<RoadPath>> = Default::default();
+    // Between each two stops, and in from and out to each way out: weighed by their cost and the
+    // way they set off and come in (`travel::Graph::path_ends`), laid out only for the legs taken.
+    let mut between: std::collections::HashMap<(u16, u16), Option<(f32, PathEnds)>> =
+        Default::default();
     for &a in group {
         for &b in group {
             if a != b {
                 between.insert(
                     (a, b),
-                    g.path(stop(a).road, stop(b).road, Mode::Car, country),
+                    g.path_ends(stop(a).road, stop(b).road, Mode::Car, country),
                 );
             }
         }
     }
-    let way_in = |k: u16| {
+    // The quickest way in to stop `k` (`into`) or out from it: its cost, and the way out.
+    let way = |k: u16, into: bool| {
         outs.iter()
-            .filter_map(|&o| g.path(o, stop(k).road, Mode::Car, country))
-            .map(|p| (p.cost + wrong(goes(&p, stop(k).dir, true)), p))
+            .filter_map(|&o| {
+                let (from, to) = if into {
+                    (o, stop(k).road)
+                } else {
+                    (stop(k).road, o)
+                };
+                let (cost, ends) = g.path_ends(from, to, Mode::Car, country)?;
+                Some((cost + wrong(goes(ends, stop(k).dir, into)), o))
+            })
             .min_by(|a, b| a.0.total_cmp(&b.0))
     };
-    let way_out = |k: u16| {
-        outs.iter()
-            .filter_map(|&o| g.path(stop(k).road, o, Mode::Car, country))
-            .map(|p| (p.cost + wrong(goes(&p, stop(k).dir, false)), p))
-            .min_by(|a, b| a.0.total_cmp(&b.0))
-    };
-    let ins: Vec<Option<(f32, RoadPath)>> = group.iter().map(|&k| way_in(k)).collect();
-    let outs_: Vec<Option<(f32, RoadPath)>> = group.iter().map(|&k| way_out(k)).collect();
+    let ins: Vec<Option<(f32, RoadPoint)>> = group.iter().map(|&k| way(k, true)).collect();
+    let outs_: Vec<Option<(f32, RoadPoint)>> = group.iter().map(|&k| way(k, false)).collect();
     let place = |k: u16| group.iter().position(|&x| x == k).expect("in the group");
     let orders: Vec<Vec<u16>> = if group.len() <= ORDERS_UP_TO {
         permutations(group)
@@ -755,17 +771,17 @@ fn line_for(travel: &Travel, outs: &[RoadPoint], stops: &[Stop], group: &[u16]) 
     let mut best: Option<(f32, Vec<u16>)> = None;
     for order in orders {
         let (first, last) = (order[0], *order.last().expect("a stop"));
-        let (Some(i), Some(o)) = (&ins[place(first)], &outs_[place(last)]) else {
+        let (Some(i), Some(o)) = (ins[place(first)], outs_[place(last)]) else {
             continue;
         };
         let mut cost = i.0 + o.0;
         let mut ok = true;
         for w in order.windows(2) {
-            match between.get(&(w[0], w[1])).and_then(|p| p.as_ref()) {
-                Some(p) => {
-                    cost += p.cost
-                        + wrong(goes(p, stop(w[0]).dir, false))
-                        + wrong(goes(p, stop(w[1]).dir, true));
+            match between.get(&(w[0], w[1])).copied().flatten() {
+                Some((c, ends)) => {
+                    cost += c
+                        + wrong(goes(ends, stop(w[0]).dir, false))
+                        + wrong(goes(ends, stop(w[1]).dir, true));
                 }
                 None => ok = false,
             }
@@ -775,11 +791,13 @@ fn line_for(travel: &Travel, outs: &[RoadPoint], stops: &[Stop], group: &[u16]) 
         }
     }
     let (_, order) = best?;
-    let mut legs: Vec<&RoadPath> = vec![&ins[place(order[0])].as_ref()?.1];
+    let (first, last) = (order[0], *order.last()?);
+    let leg = |from: RoadPoint, to: RoadPoint| g.path(from, to, Mode::Car, country);
+    let mut legs = vec![leg(ins[place(first)]?.1, stop(first).road)?];
     for w in order.windows(2) {
-        legs.push(between.get(&(w[0], w[1]))?.as_ref()?);
+        legs.push(leg(stop(w[0]).road, stop(w[1]).road)?);
     }
-    legs.push(&outs_[place(*order.last()?)].as_ref()?.1);
+    legs.push(leg(stop(last).road, outs_[place(last)]?.1)?);
     build_line(order, &legs, stops, travel, g.junctions().collect())
 }
 
@@ -805,7 +823,7 @@ fn permutations(items: &[u16]) -> Vec<Vec<u16>> {
 /// its lane, pulled in to the kerb at each stop and stopping there; its times to each stop.
 fn build_line(
     order: Vec<u16>,
-    legs: &[&RoadPath],
+    legs: &[RoadPath],
     stops: &[Stop],
     travel: &Travel,
     junctions: Vec<[f32; 2]>,
@@ -828,21 +846,14 @@ fn build_line(
         return None;
     }
     // On past either end, off the map.
-    let ext = |a: [f32; 2], b: [f32; 2]| {
-        let l = dist(a, b).max(1e-3);
-        [
-            b[0] + (b[0] - a[0]) / l * cars::OVERSHOOT,
-            b[1] + (b[1] - a[1]) / l * cars::OVERSHOOT,
-        ]
-    };
     let (w0, k0) = (centre[0].1, centre[0].2);
-    let before = ext(centre[1].0, centre[0].0);
+    let before = cars::extend_past(centre[1].0, centre[0].0);
     centre.insert(0, (before, w0, k0));
     for m in &mut marks {
         *m += 1;
     }
     let n = centre.len();
-    let after = ext(centre[n - 2].0, centre[n - 1].0);
+    let after = cars::extend_past(centre[n - 2].0, centre[n - 1].0);
     centre.push((after, centre[n - 1].1, centre[n - 1].2));
     // How far along each point is; the way the bus passes each stop; where it stands there (its
     // front door by the shelter's end, `FRONT_DOOR_AT`).
@@ -896,16 +907,7 @@ fn build_line(
     cuts.push(n - 1);
     let top = |i: usize| {
         let (p, _, kind) = centre[i];
-        let fast = if kind == RoadKind::Country {
-            travel.country_speed
-        } else {
-            cars::FAST
-        };
-        if junctions.iter().any(|&j| dist(j, p) < cars::JUNCTION_REACH) {
-            fast.min(cars::JUNCTION_SPEED)
-        } else {
-            fast
-        }
+        cars::top_speed(p, kind, travel, &junctions)
     };
     let mut legs_out = Legs::default();
     let mut at_index = Vec::new();
@@ -1115,35 +1117,34 @@ fn step_bus(w: &mut World, b: usize) -> bool {
     let line = &w.transit.lines[bus.line as usize];
     let n = line.stops.len();
     if let Some(until) = bus.until {
-        let (l, j, stood) = (bus.line, bus.next, bus.stood);
+        let (l, j, stood, run) = (bus.line, bus.next, bus.stood, bus.run);
         let stop = line.stops[j];
+        let mut coming = false;
         // Its doors open: those coming home get off (one done at work while it stands there too),
         // those waiting come to get on.
-        if tick >= stood + DOOR_TICKS && tick + DOOR_TICKS < until {
-            let run = bus.run;
-            let off: Vec<u32> = w
-                .transit
-                .homeward
-                .iter()
-                .filter(|h| h.stop == stop && h.run <= run)
-                .map(|h| h.sim)
-                .collect();
-            w.transit.homeward.retain(|h| !off.contains(&h.sim));
-            for (k, s) in off.into_iter().enumerate() {
-                let door = w.transit.lines[l as usize].door(j, 1);
-                // (One after another, a step apart.)
-                let back = w.transit.lines[l as usize].bays[j].1;
-                let along = [back.sin(), back.cos()];
-                let at = [
-                    door[0] - along[0] * 0.5 * k as f32,
-                    door[1] - along[1] * 0.5 * k as f32,
-                ];
-                get_off(w, s as usize, Some(at));
+        if bus.doors_open(tick) {
+            let home = |h: &Homeward| h.stop == stop && h.run <= run;
+            if w.transit.homeward.iter().any(home) {
+                let off: Vec<u32> = w
+                    .transit
+                    .homeward
+                    .iter()
+                    .filter(|h| home(h))
+                    .map(|h| h.sim)
+                    .collect();
+                w.transit.homeward.retain(|h| !off.contains(&h.sim));
+                for (k, s) in off.into_iter().enumerate() {
+                    let door = w.transit.lines[l as usize].door(j, 1);
+                    // (One after another, a step apart.)
+                    let back = w.transit.lines[l as usize].bays[j].1;
+                    let along = [back.sin(), back.cos()];
+                    let at = [
+                        door[0] - along[0] * 0.5 * k as f32,
+                        door[1] - along[1] * 0.5 * k as f32,
+                    ];
+                    get_off(w, s as usize, Some(at));
+                }
             }
-        }
-        let open = tick >= stood + DOOR_TICKS;
-        let mut coming = false;
-        if open && tick + DOOR_TICKS < until {
             let door = w.transit.lines[l as usize].door(j, 0);
             for s in &mut w.sims {
                 if s.bound_for_bus != Some(stop) || s.away_until.is_some() || !s.here() {
@@ -1201,8 +1202,9 @@ fn step_bus(w: &mut World, b: usize) -> bool {
     true
 }
 
-/// A tick further along its way, unless someone is in its way (as `cars::drive_on`): it waits for
-/// them, and someone standing there a while steps aside. Not for long (`cars::PASS_TICKS`).
+/// A tick further along its way, unless someone is in its way (`cars::go_on`, as a car): it waits
+/// for them, and someone standing there a while steps aside. Not for long (`cars::PASS_TICKS`).
+/// Someone waiting for a bus, or stepping up to one, is out of its way.
 fn drive_on(w: &mut World, b: usize) {
     let World {
         transit,
@@ -1215,63 +1217,24 @@ fn drive_on(w: &mut World, b: usize) {
     let bus = &mut transit.buses[b];
     let line = &transit.lines[bus.line as usize];
     let (at, yaw, _) = line.route.at(bus.progress);
-    let mut waiting = false;
-    for s in sims.iter_mut() {
-        if !s.here()
-            || s.away_until.is_some()
-            || !covers(at, yaw, s.pos, cars::AHEAD, -BUS_LEN / 2.0)
-        {
-            continue;
-        }
-        let phase = s.current().map(|a| &a.phase);
-        // (At something, at a wheel; or waiting for a bus, stepping up to one: out of its way.)
-        if matches!(
-            phase,
-            Some(Phase::Using { .. }) | Some(Phase::Driving) | Some(Phase::AtStop { .. })
-        ) || s.bound_for_bus.is_some()
-        {
-            continue;
-        }
-        // (Walking along beside it, on the pavement.)
-        let (sn, cs) = yaw.sin_cos();
-        let (dx, dz) = (s.pos[0] - at[0], s.pos[1] - at[1]);
-        if (dx * cs - dz * sn).abs() >= BUS_WID / 2.0
-            && matches!(phase, Some(Phase::Routing { .. }))
-        {
-            continue;
-        }
-        waiting = true;
-        if bus.waited > cars::MAKE_WAY_TICKS {
-            let nav = crate::path::NavGrid {
-                lot,
-                blocked,
-                stairs,
-            };
-            if let Some(p) = cars::make_way(at, yaw, &nav, s.pos, 0.06) {
-                s.pos = p;
-            }
-        }
-    }
-    if !waiting {
-        bus.waited = 0;
-        bus.progress += 1.0;
-    } else if bus.waited < cars::PASS_TICKS {
-        bus.waited += 1;
-    } else {
-        bus.progress += 1.0;
-    }
-}
-
-/// Whether `pos` is on a bus at `at` facing `yaw`, or `ahead` m in front of it (`behind` behind),
-/// or close to its sides.
-fn covers(at: [f32; 2], yaw: f32, pos: [f32; 2], ahead: f32, behind: f32) -> bool {
-    let (s, c) = yaw.sin_cos();
-    let (dx, dz) = (pos[0] - at[0], pos[1] - at[1]);
-    let along = dx * s + dz * c;
-    let across = dx * c - dz * s;
-    across.abs() < BUS_WID / 2.0 + cars::BESIDE
-        && along < BUS_LEN / 2.0 + ahead
-        && along > -(BUS_LEN / 2.0 + behind)
+    let me = cars::Driving {
+        at,
+        yaw,
+        len: BUS_LEN,
+        wid: BUS_WID,
+        ahead: cars::AHEAD,
+        behind: -BUS_LEN / 2.0,
+    };
+    let nav = crate::path::NavGrid {
+        lot,
+        blocked,
+        stairs,
+    };
+    let aside = |s: &Sim| {
+        s.bound_for_bus.is_some()
+            || matches!(s.current().map(|a| &a.phase), Some(Phase::AtStop { .. }))
+    };
+    cars::go_on(sims, &nav, me, aside, &mut bus.waited, &mut bus.progress);
 }
 
 /// The bus driving by that a step from `from` to `to` would walk into (stepping out of its way
@@ -1281,9 +1244,7 @@ pub(crate) fn in_the_way(t: &Transit, from: [f32; 2], to: [f32; 2]) -> Option<([
         let (at, yaw, true, _) = b.shown? else {
             return None;
         };
-        let d = |p: [f32; 2]| dist(p, at);
-        (covers(at, yaw, to, 0.0, 0.0) && !(covers(at, yaw, from, 0.0, 0.0) && d(to) > d(from)))
-            .then_some((at, yaw))
+        cars::walks_into(at, yaw, BUS_LEN, BUS_WID, from, to).then_some((at, yaw))
     })
 }
 
@@ -1294,10 +1255,7 @@ fn poses(w: &mut World) {
     for bus in &mut t.buses {
         let line = &t.lines[bus.line as usize];
         let (at, yaw, _) = line.route.at(bus.progress);
-        let doors = match bus.until {
-            Some(until) if tick >= bus.stood + DOOR_TICKS && tick + DOOR_TICKS < until => 0b11,
-            _ => 0,
-        };
+        let doors = if bus.doors_open(tick) { 0b11 } else { 0 };
         bus.shown = Some((at, yaw, bus.until.is_none() && bus.waited == 0, doors));
     }
 }
@@ -1317,12 +1275,7 @@ pub(crate) fn way(ctx: &Ctx, sim: &Sim, walk_out: Option<u64>) -> Option<(u16, u
     if walk_out.is_some_and(|w| w <= by_bus) {
         return None;
     }
-    let nav = &ctx.nav;
-    let spot = t.free_spot(stop, sim.id, |p| {
-        nav.tile_free(p[0].floor() as i32, p[1].floor() as i32)
-    })?;
-    let (at, ..) = t.stops[stop as usize].spot(spot as usize)?;
-    Some((stop, spot, at))
+    t.place_at(&ctx.nav, stop, sim.id)
 }
 
 /// A big world's resident off to work or school by way of a bus stop (`exit`, the way out they
@@ -1345,21 +1298,12 @@ pub(crate) fn at_stop(ctx: &Ctx, sim: &Sim, exit: [f32; 2]) -> Option<(u16, u8, 
     let there = ctx.tick + (minutes * TICKS_PER_MINUTE as f32) as u64;
     let run = t.catches(stop, there)?;
     // (On before work starts.)
-    let start = match &sim.job {
-        Some(job) => crate::life::shift_today(ctx.content, job, &sim.skills, ctx.tick),
-        None => crate::life::school_today(ctx.content, sim, ctx.tick),
-    }
-    .map(|(_, start, _)| start);
+    let start = crate::life::start_on(ctx.content, sim, ctx.tick);
     let board = (run + t.lines[l as usize].arrive[j as usize]).max(there);
     if start.is_some_and(|start| board > start) {
         return None;
     }
-    let nav = &ctx.nav;
-    let spot = t.free_spot(stop, sim.id, |p| {
-        nav.tile_free(p[0].floor() as i32, p[1].floor() as i32)
-    })?;
-    let (at, ..) = st.spot(spot as usize)?;
-    Some((stop, spot, at))
+    t.place_at(&ctx.nav, stop, sim.id)
 }
 
 /// `sim` is there (at their place at the stop, or at the bus's door): on they get, or they wait
@@ -1442,7 +1386,8 @@ pub(crate) fn board(w: &mut World, i: usize, stop: u16) {
     sim.pose = Pose::Stand;
 }
 
-/// Whether `i` is coming home by bus (done at work, they're away until it pulls in).
+/// Whether `i` is coming home by bus (done at work, they're away until it pulls in; `save.rs`:
+/// saved back at their stop, on their way home).
 pub(crate) fn homeward(w: &World, i: usize) -> bool {
     w.transit.homeward.iter().any(|h| h.sim == i as u32)
 }
@@ -1508,19 +1453,9 @@ pub(crate) fn plan(
     }
     // Out of town with time for the rest of the way (as a car: `cars::off_map_ticks`).
     let out_by = start.checked_sub(cars::off_map_ticks(w))?;
-    let mut near: Vec<(f32, usize)> = t
-        .stops
-        .iter()
-        .enumerate()
-        .filter(|(_, s)| s.line.is_some())
-        .map(|(k, s)| (dist(from, s.at), k))
-        .filter(|&(d, _)| d <= STOP_REACH)
-        .collect();
-    near.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
-    near.truncate(STOP_CANDIDATES);
     let mut best: Option<(u16, u64, f32)> = None;
-    for (_, k) in near {
-        let st = &t.stops[k];
+    for k in t.nearest_stops(from) {
+        let st = &t.stops[k as usize];
         let (l, j) = st.line?;
         let line = &t.lines[l as usize];
         let j = j as usize;
@@ -1546,7 +1481,7 @@ pub(crate) fn plan(
         }
         let lead = start - leave;
         if best.is_none_or(|b| lead < b.1) {
-            best = Some((k as u16, lead, minutes));
+            best = Some((k, lead, minutes));
         }
     }
     best
@@ -1575,11 +1510,5 @@ impl World {
     #[doc(hidden)]
     pub fn bound_for_bus(&self, i: usize) -> Option<u16> {
         self.sims.get(i)?.bound_for_bus
-    }
-
-    /// Whether resident `i` is done at work and coming home by bus (`save.rs`: saved back at
-    /// their stop, on their way home).
-    pub(crate) fn bus_home(&self, i: usize) -> bool {
-        homeward(self, i)
     }
 }

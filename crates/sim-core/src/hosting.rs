@@ -14,7 +14,6 @@
 //! (`cooking::settle`). Nothing of it is saved: a load finds it over.
 
 use crate::content::{Content, Pose};
-use crate::items::Held;
 use crate::social::EventKind;
 use crate::world::{
     Activity, Ctx, ObjectInstance, Phase, Sim, Task, TaskKind, World, end_activity, walk_route,
@@ -33,6 +32,8 @@ const TRIES: u8 = 20;
 const LAST_MINUTES: f32 = 20.0;
 /// How long a guest who said yes waits for it before they'd get something themselves.
 const EXPECT_MINUTES: f32 = 30.0;
+/// No host free to ask, or nothing at home to bring: asked again after this long (minutes).
+const RETRY_MINUTES: f32 = 1.0;
 
 /// Whether `s` is on their way home, or saying goodbye to go (`visits.farewell`).
 fn leaving(content: &Content, s: &Sim) -> bool {
@@ -322,6 +323,9 @@ fn offer(w: &mut World) {
         let Some(visit) = w.sims[g].visiting else {
             continue;
         };
+        if tick < visit.offer_at {
+            continue;
+        }
         let plot = visit.plot;
         let guest = &w.sims[g];
         // In (not on the way, nor at the door), at a home.
@@ -342,8 +346,7 @@ fn offer(w: &mut World) {
         }
         let eating = |t: &Task| matches!(t.kind, TaskKind::Eat { .. });
         let content = &w.content;
-        if tick < visit.offer_at
-            || visit.until < tick + ticks(LAST_MINUTES)
+        if visit.until < tick + ticks(LAST_MINUTES)
             || !free_will(w, guest)
             || guest.held.is_some()
             || !guest.available_for_social(content)
@@ -353,7 +356,13 @@ fn offer(w: &mut World) {
             continue;
         }
         let social = &content.socials[rules.social];
+        let retry = |w: &mut World| {
+            if let Some(v) = w.sims[g].visiting.as_mut() {
+                v.offer_at = tick + ticks(RETRY_MINUTES).max(1);
+            }
+        };
         let Some(household) = w.households.iter().position(|h| h.plot == Some(plot)) else {
+            retry(w);
             continue;
         };
         // The nearest of the household free to ask, with something to bring.
@@ -380,6 +389,7 @@ fn offer(w: &mut World) {
             })
             .filter(|&h| fare(w, h, g, plot).is_some());
         let Some(h) = host else {
+            retry(w);
             continue;
         };
         if let Some(v) = w.sims[g].visiting.as_mut() {
@@ -535,22 +545,17 @@ fn after(sim: &mut Sim, task: Task, ctx: &Ctx, objects: &mut [ObjectInstance]) {
     };
     sim.current = None;
     if stage < TRIES {
-        let next = match task.kind {
-            TaskKind::Serve {
-                guest,
-                from,
-                interaction,
-                ..
-            } => TaskKind::Serve {
-                guest,
-                from,
-                interaction,
-                stage: stage + 1,
-            },
-            kind => kind,
-        };
-        start(sim, Task { kind: next, ..task }, ctx, objects);
+        start(sim, next_stage(task), ctx, objects);
     }
+}
+
+/// A serve at its next stage.
+fn next_stage(task: Task) -> Task {
+    let mut next = task;
+    if let TaskKind::Serve { stage, .. } = &mut next.kind {
+        *stage += 1;
+    }
+    next
 }
 
 /// A moment taking it out (the `eat` use's minutes), or handing it over: whether it's done.
@@ -606,23 +611,9 @@ pub(crate) fn step_done(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance]
         let Some(recipe) = inter.eats else {
             return;
         };
-        let r = &content.recipes[recipe];
-        let quality = content.object_rules.quality_factor(o.quality)
-            * inter.skill_factor(&content.skill_rules, &sim.skills);
-        sim.held = Some(Held {
-            def: content.items[r.item].serving.unwrap_or(r.item),
-            servings: 1,
-            quality,
-            made_at: ctx.tick,
-            recipe: Some(recipe),
-        });
-        let next = TaskKind::Serve {
-            guest,
-            from,
-            interaction,
-            stage: 1,
-        };
-        return start(sim, Task { kind: next, ..task }, ctx, objects);
+        let quality = crate::cooking::made_quality(content, o, inter, &sim.skills);
+        sim.held = Some(crate::cooking::plate(content, recipe, quality, ctx.tick));
+        return start(sim, next_stage(task), ctx, objects);
     }
     if !guest_here(sim, ctx, guest) {
         return;

@@ -1375,9 +1375,10 @@ fn task_view(
         } => {
             let item = held.map(|h| h.def).or_else(|| {
                 let o = world.objects.get(from as usize)?;
-                let r = content.objects[o.def].interactions.get(interaction)?.eats?;
-                let item = content.recipes[r].item;
-                Some(content.items[item].serving.unwrap_or(item))
+                crate::staff::handed(
+                    content,
+                    content.objects[o.def].interactions.get(interaction)?,
+                )
             });
             let what = item.map_or_else(
                 || "something".to_owned(),

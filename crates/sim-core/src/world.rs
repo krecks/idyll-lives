@@ -8648,8 +8648,7 @@ fn progress(
                 {
                     // Food fetched: they sit down with it (at a table if there is one) and eat.
                     if let Some(recipe) = inter.eats {
-                        let quality = content.object_rules.quality_factor(o.quality)
-                            * inter.skill_factor(&content.skill_rules, &sim.skills);
+                        let quality = crate::cooking::made_quality(content, o, inter, &sim.skills);
                         crate::cooking::eat_now(
                             sim,
                             Task {
@@ -8667,8 +8666,7 @@ fn progress(
                         }
                     } else if let Some(y) = inter.yields.filter(|_| !given_up) {
                         // A harvest: its produce carried in to the fridge (`carry.rs`).
-                        let quality = content.object_rules.quality_factor(o.quality)
-                            * inter.skill_factor(&content.skill_rules, &sim.skills);
+                        let quality = crate::cooking::made_quality(content, o, inter, &sim.skills);
                         crate::carry::harvested(sim, task, y, quality, ctx, objects, items);
                         if sim.current.is_some() {
                             return;

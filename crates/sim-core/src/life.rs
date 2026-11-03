@@ -450,17 +450,19 @@ fn walk_commute(
 
 /// When `i`'s work or school next starts: today's, else tomorrow's (if either).
 fn next_start(w: &World, i: usize) -> Option<u64> {
-    let s = &w.sims[i];
-    let at = |tick: u64| {
-        match &s.job {
-            Some(job) => shift_today(&w.content, job, &s.skills, tick),
-            None => school_today(&w.content, s, tick),
-        }
-        .map(|(_, start, _)| start)
-    };
+    let at = |tick: u64| start_on(&w.content, &w.sims[i], tick);
     at(w.tick)
         .filter(|&start| start >= w.tick)
         .or_else(|| at(w.tick + clock::TICKS_PER_DAY))
+}
+
+/// When `sim`'s work (or school) starts on the day of `tick`, if they have it that day.
+pub(crate) fn start_on(content: &Content, sim: &Sim, tick: u64) -> Option<u64> {
+    match &sim.job {
+        Some(job) => shift_today(content, job, &sim.skills, tick),
+        None => school_today(content, sim, tick),
+    }
+    .map(|(_, start, _)| start)
 }
 
 pub(crate) fn update(w: &mut World) {
