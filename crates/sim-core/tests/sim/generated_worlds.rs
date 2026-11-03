@@ -224,6 +224,16 @@ fn generated_worlds_are_livable() {
         if stops > 0 && w.transit.lines.is_empty() {
             failures.push(format!("{label}: {stops} bus stops and no bus"));
         }
+        // At each stop the bus stands with the stop on its right, by the kerb (its doors' side).
+        for st in &w.transit.stops {
+            let Some((l, j)) = st.line else { continue };
+            let (p, yaw) = w.transit.lines[l as usize].bay(j as usize);
+            let right = [-yaw.cos(), yaw.sin()];
+            let out = (st.at[0] - p[0]) * right[0] + (st.at[1] - p[1]) * right[1];
+            if out < 0.5 {
+                failures.push(format!("{label}: the bus stands the wrong side of the stop at {:?} (out {out:.2}, bus at {p:?} yaw {yaw:.2}, stop way {:?} mid {:?})", st.at, st.dir, st.mid));
+            }
+        }
         // Half a day of everyone's free will: the bus comes, and nobody waits at a stop for long.
         let mut waited = vec![0u64; w.sims.len()];
         let mut bound: Vec<bool> = (0..w.sims.len()).map(|i| w.bound_for_bus(i).is_some()).collect();

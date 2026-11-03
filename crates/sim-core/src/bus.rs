@@ -5,7 +5,8 @@
 //! bus pulls in to the kerb there with the stop on its right and opens its doors on that side. A
 //! line comes in from a way out of town by road, calls at its stops and leaves by a way out by
 //! road (`line_for`: the quickest, passing each stop on the town file's side of the road where
-//! that's no long way round, `WRONG_WAY`; else the stop is served from the other side, `settle`).
+//! that's no long way round, `WRONG_WAY`; else the stop is served from the other side, by the
+//! kerb the bus stands at, `settle`).
 //! A cosy or normal town has one line through all its stops. A big world's roads are long for a
 //! bus driving them at a car's pace while the clock runs a minute a second, so each stop (or two
 //! near each other) has a line of its own, coming in and going out where the roads leave its area
@@ -175,9 +176,8 @@ impl Stop {
 /// A bus line: through its stops from a way out of town by road to another (`line_for`).
 #[derive(Debug, Clone)]
 pub struct Line {
-    /// Its stops (`Transit::stops` indices) in order, and the way it passes each (a unit vector).
+    /// Its stops (`Transit::stops` indices) in order.
     pub stops: Vec<u16>,
-    dirs: Vec<[f32; 2]>,
     route: Route,
     /// The route's ticks at each stop, and where the bus stands there (its middle) and its yaw.
     at: Vec<f32>,
@@ -188,6 +188,11 @@ pub struct Line {
 }
 
 impl Line {
+    /// Where the bus stands at stop `j` (its place on the line): its middle and yaw.
+    pub fn bay(&self, j: usize) -> ([f32; 2], f32) {
+        self.bays[j]
+    }
+
     /// Ticks after coming into town that it leaves stop `j` (its place on the line), on time.
     fn depart(&self, j: usize) -> u64 {
         self.arrive[j] + DWELL_TICKS
@@ -445,14 +450,19 @@ pub(crate) fn settle(w: &mut World) {
         for (j, &s) in line.stops.iter().enumerate() {
             let stop = &mut t.stops[s as usize];
             stop.line = Some((l, j as u16));
-            // Passed the other way: the stop is the other side of the road, the bus's kerb side.
-            let d = line.dirs[j];
-            if d[0] * stop.dir[0] + d[1] * stop.dir[1] < 0.0 {
-                stop.dir = d;
-                stop.at = [
-                    2.0 * stop.mid[0] - stop.at[0],
-                    2.0 * stop.mid[1] - stop.at[1],
-                ];
+            // Where the bus stands at it, the stop by its kerb side: passed the other way, on the
+            // other side of the road; by a junction, on the road the bus is on.
+            let (p, yaw) = line.bays[j];
+            let (fwd, right) = ([yaw.sin(), yaw.cos()], [-yaw.cos(), yaw.sin()]);
+            let out = (stop.at[0] - p[0]) * right[0] + (stop.at[1] - p[1]) * right[1];
+            let along = (stop.at[0] - p[0]) * fwd[0] + (stop.at[1] - p[1]) * fwd[1];
+            if out < BUS_WID / 2.0 || fwd[0] * stop.dir[0] + fwd[1] * stop.dir[1] < 0.9 {
+                let bay = bay_out(stop.kerb);
+                let base = [p[0] + fwd[0] * along, p[1] + fwd[1] * along];
+                stop.dir = fwd;
+                stop.mid = [base[0] - right[0] * bay, base[1] - right[1] * bay];
+                let k = (stop.edge - 0.6).max(bay + BUS_WID / 2.0 + 0.3);
+                stop.at = [stop.mid[0] + right[0] * k, stop.mid[1] + right[1] * k];
             }
         }
         t.lines.push(line);
@@ -840,22 +850,22 @@ fn build_line(
     for i in 1..centre.len() {
         cum[i] = cum[i - 1] + dist(centre[i - 1].0, centre[i].0);
     }
-    let dirs: Vec<[f32; 2]> = marks
-        .iter()
-        .map(|&m| {
-            let (a, b) = (centre[m - 1].0, centre[(m + 1).min(centre.len() - 1)].0);
-            let d = dist(a, b).max(1e-6);
-            [(b[0] - a[0]) / d, (b[1] - a[1]) / d]
-        })
-        .collect();
+    let dirs: Vec<[f32; 2]> = marks.iter().map(|&m| way_at(&centre, m)).collect();
     let back = DOOR_ALONG[0] - FRONT_DOOR_AT;
     for k in 0..marks.len() {
         let m = marks[k];
         let floor = if k == 0 { 1 } else { marks[k - 1] + 1 };
         let want = cum[m] - back;
-        marks[k] = (floor..=m)
+        let to = (floor..=m)
             .min_by(|&a, &b| (cum[a] - want).abs().total_cmp(&(cum[b] - want).abs()))
             .unwrap_or(m);
+        // (Only along a straight run: by a corner it stands at the stop itself.)
+        let d = dirs[k];
+        let straight = (to..=m).all(|i| {
+            let w = way_at(&centre, i);
+            w[0] * d[0] + w[1] * d[1] > 0.97
+        });
+        marks[k] = if straight { to } else { m };
     }
     let offs: Vec<f32> = (0..centre.len())
         .map(|i| {
@@ -876,9 +886,7 @@ fn build_line(
     let n = centre.len();
     let lane: Vec<[f32; 2]> = (0..n)
         .map(|i| {
-            let (a, b) = (centre[i.saturating_sub(1)].0, centre[(i + 1).min(n - 1)].0);
-            let d = dist(a, b).max(1e-6);
-            let (dx, dz) = ((b[0] - a[0]) / d, (b[1] - a[1]) / d);
+            let [dx, dz] = way_at(&centre, i);
             [centre[i].0[0] - dz * offs[i], centre[i].0[1] + dx * offs[i]]
         })
         .collect();
@@ -916,9 +924,17 @@ fn build_line(
             }
         }
     }
-    let route = legs_out.timed(false, false);
+    let mut route = legs_out.timed(false, false);
     if at_index.len() != order.len() {
         return None;
+    }
+    // (Stood at a stop facing the way it came in: a line turning back there turns as it leaves.)
+    for &i in &at_index {
+        if i > 0 {
+            let (a, b) = (route.points[i - 1].0, route.points[i].0);
+            route.points[i].1 = (b[0] - a[0]).atan2(b[1] - a[1]);
+            route.points[i].3 = false;
+        }
     }
     let at: Vec<f32> = at_index.iter().map(|&i| route.points[i].2).collect();
     let bays: Vec<([f32; 2], f32)> = at
@@ -936,13 +952,33 @@ fn build_line(
     let end = route.ticks().ceil() as u64 + order.len() as u64 * DWELL_TICKS;
     Some(Line {
         stops: order,
-        dirs,
         route,
         at,
         bays,
         arrive,
         end,
     })
+}
+
+/// The way a line of middle-line points runs at point `i` (a unit vector): from the one before to
+/// the one after, or the way it came in where it turns back on itself there (a line turning back
+/// at a stop, at the end of a dead end).
+fn way_at(pts: &[([f32; 2], f32, RoadKind)], i: usize) -> [f32; 2] {
+    let n = pts.len();
+    let unit = |a: [f32; 2], b: [f32; 2]| {
+        let d = dist(a, b).max(1e-6);
+        [(b[0] - a[0]) / d, (b[1] - a[1]) / d]
+    };
+    let (p, c, q) = (
+        pts[i.saturating_sub(1)].0,
+        pts[i].0,
+        pts[(i + 1).min(n - 1)].0,
+    );
+    let (inn, out) = (unit(p, c), unit(c, q));
+    if i > 0 && i + 1 < n && inn[0] * out[0] + inn[1] * out[1] < 0.0 {
+        return inn;
+    }
+    unit(p, q)
 }
 
 /// Bus of line `l` in town since `run`, where it is at `now` on time; None once it's gone.
