@@ -1230,8 +1230,11 @@ fn drive_on(w: &mut World, b: usize) {
         blocked,
         stairs,
     };
+    // (Those bound for the stop it calls at next: anyone else on their way to a stop is in its
+    // way as anyone is.)
+    let next = line.stops.get(bus.next).copied();
     let aside = |s: &Sim| {
-        s.bound_for_bus.is_some()
+        (next.is_some() && s.bound_for_bus == next)
             || matches!(s.current().map(|a| &a.phase), Some(Phase::AtStop { .. }))
     };
     cars::go_on(sims, &nav, me, aside, &mut bus.waited, &mut bus.progress);
