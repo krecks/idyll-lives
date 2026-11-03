@@ -26,7 +26,8 @@ describe('town rides', async () => {
   const { objectInfos } = await import('../src/game/housegen');
   const { AssetRegistry } = await import('../src/assets/registry');
   const { DRIVEWAY_MIN_WIDTH, generateWorld, layoutTown, populate, useTownContent } = await import('../src/game/town');
-  const { RIDES, frontTile } = await import('../src/game/townRides');
+  const { RIDES } = await import('../src/game/townRides');
+  const { frontTile } = await import('../src/game/surfaces');
   type Templates = import('../src/game/town').Templates;
 
   const content = await Content.load('http://localhost/content/base.json');
