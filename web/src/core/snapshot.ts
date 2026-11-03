@@ -31,12 +31,19 @@ export interface SnapshotLayout {
     staffCount?: number;
     /** Households' cars (sim-core `cars.rs`): rows from `carBase`, each laid out as `car` (missing in older layouts: none). */
     carCount?: number;
+    /** The town's buses in town now (sim-core `bus.rs`): rows from `busBase`, each laid out as `bus` (missing in older layouts: none). */
+    busCount?: number;
   };
   /** Where the cars' rows start, and floats per car (missing in older layouts). */
   carBase?: number;
   carStride?: number;
   /** A car's row: `shown` 0 out of sight, 1 parked, 2 driving; where its middle is and which way it faces; its open doors (bit `d` for door `d`, `shared/cars.ts` `DOORS`). */
   car?: { shown: number; x: number; z: number; yaw: number; doors?: number };
+  /** Where the buses' rows start, and floats per bus (missing in older layouts). */
+  busBase?: number;
+  busStride?: number;
+  /** A bus's row: `shown` 1 standing, 2 driving; where its middle is and which way it faces; its open doors (bit 0 the front one, bit 1 the middle one); its line (1 and up: the number on its sign); which bus it is (the same while it's in town: its row moves up as those before it leave). */
+  bus?: { shown: number; x: number; z: number; yaw: number; doors: number; line: number; id: number };
   sim: {
     id: number;
     x: number;

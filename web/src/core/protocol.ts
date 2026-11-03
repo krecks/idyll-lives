@@ -620,6 +620,21 @@ export interface WorldStructure {
   cars?: CarInfo[];
   /** Garages at the inner ends of driveways (sim-core `cars::Garage`: wall centre lines, by plot). Absent: a game from before them (the street places neighbours' own). */
   garages?: GarageInfo[];
+  /** The town's bus stops (sim-core `bus::Stop`). Absent: none (the street draws a shelter or two of its own at the ends of its rows of houses). */
+  stops?: StopInfo[];
+}
+
+/**
+ * A bus stop (`WorldStructure.stops`): where its sign stands (at the kerb), the way the bus goes
+ * past it (a resident's yaw: 0 towards +z), its shelter if it has one (its middle and the way it
+ * faces, towards the road), and whether a bus calls there.
+ */
+export interface StopInfo {
+  x: number;
+  z: number;
+  busYaw: number;
+  shelter?: [number, number, number];
+  served: boolean;
 }
 
 /**
@@ -695,6 +710,8 @@ export interface SimView {
    * roads), or home from work by car. Absent when they aren't (and from older workers).
    */
   trip?: { to: number; at?: number };
+  /** The bus (sim-core `bus::status`): waiting for it at a stop, on it to work, or on it home (then `trip` says when they're back). Absent: none of those. */
+  bus?: 'wait' | 'work' | 'home';
   job: JobView | null;
   /** A pupil's school grade (0..100, in tenths). */
   grade?: number;
