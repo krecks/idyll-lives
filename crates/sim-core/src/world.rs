@@ -905,6 +905,23 @@ pub enum TaskKind {
     },
 }
 
+impl TaskKind {
+    /// Whether whoever does it keeps what's in their hands (the rest put it down): cooking,
+    /// eating, washing up (`cooking::chain`), a harvest carried to the fridge (`carry.rs`), a
+    /// parcel carried in to be set up (`setup.rs`) and a bite brought to a guest (`hosting.rs`).
+    pub fn carries_held(&self) -> bool {
+        matches!(
+            self,
+            TaskKind::Cook { .. }
+                | TaskKind::Eat { .. }
+                | TaskKind::Dishes { .. }
+                | TaskKind::Carry { baby: None, .. }
+                | TaskKind::SetUp { .. }
+                | TaskKind::Serve { .. }
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Task {
     pub kind: TaskKind,
@@ -2345,7 +2362,6 @@ impl World {
         conversation::in_sight(&self.nav(), a, b)
     }
 
-    /// The plot a tile is on (on any storey).
     /// Whether resident `i` would set off now to visit `plot` (an invitation over the phone):
     /// the way isn't too long and they'd be there in visiting hours (`visit_fits`).
     pub(crate) fn visit_fits_now(&self, i: usize, plot: u32) -> bool {
@@ -2378,6 +2394,7 @@ impl World {
         )
     }
 
+    /// The plot a tile is on (on any storey).
     pub fn plot_at(&self, x: i32, z: i32) -> Option<u32> {
         let z = self.ground_z(z);
         let width = self.lot.width as i32;
@@ -6026,19 +6043,12 @@ fn step_sim(
     let mut ticks = sim.steps;
     if sim.current.is_none() {
         // A routine's next step (washing hands after the toilet) before anything else they'd
-        // do, unless the player asks for something; someone at the door is answered first, and
-        // the step waits for after (`life::doors`).
-        let answering = sim
-            .queue
-            .front()
-            .is_some_and(|t| matches!(t.kind, TaskKind::Answer { .. }));
-        let follow_up = if answering {
-            None
-        } else {
-            sim.follow_up
-                .take()
-                .filter(|_| !sim.queue.front().is_some_and(|t| t.directed))
-        };
+        // do, unless the player asks for something. (Someone sent to the door has it queued
+        // after answering it: `life::doors`.)
+        let follow_up = sim
+            .follow_up
+            .take()
+            .filter(|_| !sim.queue.front().is_some_and(|t| t.directed));
         if let Some(task) = follow_up {
             start_task(sim, task, ctx, objects, items);
         } else if let Some(task) = sim.queue.pop_front() {
@@ -7021,90 +7031,18 @@ fn pick_autonomous(
         }
     }
 
-    // Residents visit friends who are home.
+    // Residents visit friends who are home, or go out. (Not from a seat: only a word from it,
+    // below.)
     let household = &ctx.households[sim.household as usize];
     let visits = &content.visits;
-    let plans_soon = || {
-        crate::planner::plans_soon(
-            content,
-            sim,
-            routines,
-            ctx.day,
-            ctx.minute,
-            visits.hours * 60.0,
-        )
-    };
-    if sim.visiting.is_none()
-        && here.is_some()
-        && here == household.plot
-        && !minding
-        && (visits.earliest_hour..visits.latest_hour).contains(&ctx.hour)
-    {
-        let soon = plans_soon();
-        // Not a walk of hours, nor to arrive after visiting hours (`visit_minutes`, `visit_fits`).
-        let free = until_leave.unwrap_or(f32::INFINITY);
-        let drives = crate::cars::could_drive(ctx, sim);
-        let pos = ctx.nav.stairs.ground_pos(sim.pos);
-        let mut on: [Option<Option<crate::travel::RoadPoint>>; 2] = [None, None];
-        for other in ctx.households.iter().filter(|h| h.id != household.id) {
-            let Some(plot) = other.plot else { continue };
-            let friendship = ctx
-                .briefs
-                .iter()
-                .enumerate()
-                .filter(|(_, b)| b.household == other.id && b.plot == Some(plot) && !b.away)
-                .map(|(j, _)| ctx.rels.get(me, j).friendship)
-                .fold(f32::NEG_INFINITY, f32::max);
-            if friendship < visits.min_friendship {
-                continue;
-            }
-            // Someone to open the door: a grown-up at home, up and about, not on their way out.
-            if !ctx.briefs.iter().any(|b| {
-                b.household == other.id
-                    && b.plot == Some(plot)
-                    && !b.away
-                    && b.adult
-                    && !b.lying
-                    && !b.leaving
-            }) {
-                continue;
-            }
-            let door = ctx.plots[plot as usize].arrival_point();
-            let distance = (door[0] - pos[0]).hypot(door[1] - pos[1]);
-            let eta = visit_minutes(
-                ctx.travel,
-                content,
-                pos,
-                walk_per_minute,
-                plot,
-                door,
-                drives,
-                &mut on,
-            );
-            if !visit_fits(content, eta, ctx.hour, free) {
-                continue;
-            }
-            // Travel is less of a deterrent than for a chat in the same room.
-            let score = ai::score_felt(needs, &felt, &visits.gains, distance * 0.25)
-                * (0.4 + friendship / 100.0)
-                * feel(visits.tags)
-                * crate::planner::visit_factor(content, sim, soon);
-            if score > MIN_AUTONOMY_SCORE {
-                candidates.push((score, Choice::Visit(plot)));
-            }
-        }
-    }
-
-    // An outing: in an open-world town, a public place out of reach, for the best it has, the
-    // less the longer the way (`OUTING_K`), with time for there and back and an hour there.
-    if ctx.travel.open
+    if from_seat.is_none()
         && sim.visiting.is_none()
         && here.is_some()
         && here == household.plot
         && !minding
         && (visits.earliest_hour..visits.latest_hour).contains(&ctx.hour)
     {
-        let reach = content.autonomy.reach;
+        // Not a walk of hours, nor to arrive after visiting hours (`visit_minutes`, `visit_fits`).
         let free = until_leave.unwrap_or(f32::INFINITY);
         let drives = crate::cars::could_drive(ctx, sim);
         // (From over the ground, upstairs too. Where they'd get on the roads from here, on foot
@@ -7112,50 +7050,104 @@ fn pick_autonomous(
         // `Travel::door_entry`.)
         let pos = ctx.nav.stairs.ground_pos(sim.pos);
         let mut on: [Option<Option<crate::travel::RoadPoint>>; 2] = [None, None];
-        for p in ctx.plots.iter().filter(|p| p.public) {
-            let door = p.arrival_point();
-            if (door[0] - pos[0]).hypot(door[1] - pos[1]) <= reach {
-                continue;
-            }
-            // By car where they can drive there (`cars::trip_car`).
-            let car = drives && crate::cars::parks_near(ctx.travel, door);
-            let mode = if car {
-                crate::travel::Mode::Car
-            } else {
-                crate::travel::Mode::Foot
-            };
-            let from = &mut on[mode as usize];
-            let eta = ctx.travel.eta_via(
-                pos,
-                door,
-                mode,
-                walk_per_minute,
-                || *from.get_or_insert_with(|| ctx.travel.entry(pos, mode)),
-                || ctx.travel.door_entry(p.id, door, mode),
-            );
-            let eta = trip_minutes(eta, car);
-            if free < 2.0 * eta + OUTING_STAY_MINUTES {
-                continue;
-            }
-            // The best the place has for each need, as one day out.
-            let mut best = [0.0f32; crate::content::MAX_NEEDS];
-            for i in ctx
-                .index
-                .on(p.id)
-                .iter()
-                .map(|&o| &objects[o as usize])
-                .filter(|o| !o.broken())
-                .flat_map(|o| &content.objects[o.def].interactions)
-                .filter(|i| unfit(content, sim.age, i).is_none())
-            {
-                for (b, &g) in best.iter_mut().zip(&i.total_gain) {
-                    *b = b.max(g);
+        let soon = crate::planner::plans_soon(
+            content,
+            sim,
+            routines,
+            ctx.day,
+            ctx.minute,
+            visits.hours * 60.0,
+        );
+        for other in ctx.households.iter().filter(|h| h.id != household.id) {
+            let Some(plot) = other.plot else { continue };
+            // The best friend of theirs at home, and someone to open the door: a grown-up at
+            // home, up and about, not on their way out (`life::opens_door`).
+            let mut friendship = f32::NEG_INFINITY;
+            let mut opener = false;
+            for (j, b) in ctx.briefs.iter().enumerate() {
+                if b.household == other.id && b.plot == Some(plot) && !b.away {
+                    friendship = friendship.max(ctx.rels.get(me, j).friendship);
+                    opener = opener || crate::life::opens_door(b, other.id, plot);
                 }
             }
-            let score = ai::score_felt(needs, &felt, &best, 0.0) * feel(visits.tags)
-                / (1.0 + OUTING_K * eta);
+            if friendship < visits.min_friendship || !opener {
+                continue;
+            }
+            let door = ctx.plots[plot as usize].arrival_point();
+            let distance = (door[0] - pos[0]).hypot(door[1] - pos[1]);
+            // Travel is less of a deterrent than for a chat in the same room.
+            let score = ai::score_felt(needs, &felt, &visits.gains, distance * 0.25)
+                * (0.4 + friendship / 100.0)
+                * feel(visits.tags)
+                * crate::planner::visit_factor(content, sim, soon);
+            // (The way there timed only for a visit worth making.)
             if score > MIN_AUTONOMY_SCORE {
-                candidates.push((score, Choice::Outing(p.id)));
+                let eta = visit_minutes(
+                    ctx.travel,
+                    content,
+                    pos,
+                    walk_per_minute,
+                    plot,
+                    door,
+                    drives,
+                    &mut on,
+                );
+                if visit_fits(content, eta, ctx.hour, free) {
+                    candidates.push((score, Choice::Visit(plot)));
+                }
+            }
+        }
+
+        // An outing: in an open-world town, a public place out of reach, for the best it has,
+        // the less the longer the way (`OUTING_K`), with time for there and back and an hour
+        // there.
+        if ctx.travel.open {
+            let reach = content.autonomy.reach;
+            for p in ctx.plots.iter().filter(|p| p.public) {
+                let door = p.arrival_point();
+                if (door[0] - pos[0]).hypot(door[1] - pos[1]) <= reach {
+                    continue;
+                }
+                // By car where they can drive there (`cars::trip_car`).
+                let car = drives && crate::cars::parks_near(ctx.travel, door);
+                let mode = if car {
+                    crate::travel::Mode::Car
+                } else {
+                    crate::travel::Mode::Foot
+                };
+                let from = &mut on[mode as usize];
+                let eta = ctx.travel.eta_via(
+                    pos,
+                    door,
+                    mode,
+                    walk_per_minute,
+                    || *from.get_or_insert_with(|| ctx.travel.entry(pos, mode)),
+                    || ctx.travel.door_entry(p.id, door, mode),
+                );
+                let eta = trip_minutes(eta, car);
+                if free < 2.0 * eta + OUTING_STAY_MINUTES {
+                    continue;
+                }
+                // The best the place has for each need, as one day out.
+                let mut best = [0.0f32; crate::content::MAX_NEEDS];
+                for i in ctx
+                    .index
+                    .on(p.id)
+                    .iter()
+                    .map(|&o| &objects[o as usize])
+                    .filter(|o| !o.broken())
+                    .flat_map(|o| &content.objects[o.def].interactions)
+                    .filter(|i| unfit(content, sim.age, i).is_none())
+                {
+                    for (b, &g) in best.iter_mut().zip(&i.total_gain) {
+                        *b = b.max(g);
+                    }
+                }
+                let score = ai::score_felt(needs, &felt, &best, 0.0) * feel(visits.tags)
+                    / (1.0 + OUTING_K * eta);
+                if score > MIN_AUTONOMY_SCORE {
+                    candidates.push((score, Choice::Outing(p.id)));
+                }
             }
         }
     }
@@ -7292,6 +7284,11 @@ pub(crate) fn prefer_factor(
             }
         }
     }
+}
+
+/// A walk's goal at `at`: the point, its tile, and no tags (`start_task`).
+fn goal_at(at: [f32; 2]) -> ([f32; 2], (i32, i32), TagMask) {
+    (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
 }
 
 fn start_task(
@@ -7585,32 +7582,27 @@ fn start_task(
             )
         }
         TaskKind::Work => {
-            // By car (`cars.rs`): to its door.
             sim.bound_for_car = None;
             sim.bound_for_bus = None;
-            let car = if sim.riding.is_none() {
-                crate::cars::ride_for(ctx, sim)
-            } else {
+            // By car (`cars.rs`): to its door. (Not when already on their bike.)
+            let riding = sim.riding.is_some();
+            let car = if riding {
                 None
+            } else {
+                crate::cars::ride_for(ctx, sim)
             };
             if let Some((car, seat, door, at)) = car {
                 crate::ride::get_off(sim, objects);
                 sim.bound_for_car = Some(car);
                 sim.car_seat = seat as u8;
                 sim.car_door = door as u8;
-                (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
+                goal_at(at)
             } else {
                 // Nearest way out of town; with no exits, work starts on the spot.
                 let Some(exit) = exit_on_foot(ctx, sim) else {
                     crate::ride::get_off(sim, objects);
                     sim.transition = Some(crate::life::Transition::Work);
                     return;
-                };
-                // On a bike of theirs (`ride.rs`): over to it first.
-                let bike = match (sim.riding, sim.bound_for_bike) {
-                    (Some(_), _) => None,
-                    (None, Some(b)) => Some(b),
-                    (None, None) => crate::ride::bike_for(ctx, sim, objects, exit),
                 };
                 // By bus (`bus.rs`), when that's quicker than the walk out: to the stop. (In a big
                 // world, by the one calling at the stop they walk out by, if it's in time.)
@@ -7624,19 +7616,24 @@ fn start_task(
                         * crate::life::WALK_MARGIN;
                     crate::bus::way(ctx, sim, Some((minutes * TICKS_PER_MINUTE as f32) as u64))
                 };
-                if let Some(bike) = bike {
+                if riding {
+                    // On their bike: on it to the way out.
+                    goal_at(exit)
+                } else if let Some(bike) = sim
+                    .bound_for_bike
+                    .or_else(|| crate::ride::bike_for(ctx, sim, objects, exit))
+                {
+                    // On a bike of theirs (`ride.rs`): over to it first.
                     crate::ride::claim(sim, objects, bike);
-                    let at = crate::ride::spot(content, &objects[bike as usize]);
-                    (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
-                } else if let Some((stop, spot, at)) = (sim.riding.is_none() && ctx.transit.runs())
-                    .then(bus)
-                    .flatten()
+                    goal_at(crate::ride::spot(content, &objects[bike as usize]))
+                } else if ctx.transit.runs()
+                    && let Some((stop, spot, at)) = bus()
                 {
                     sim.bound_for_bus = Some(stop);
                     sim.bus_spot = spot;
-                    (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
+                    goal_at(at)
                 } else {
-                    (exit, (exit[0].floor() as i32, exit[1].floor() as i32), 0)
+                    goal_at(exit)
                 }
             }
         }
@@ -7697,7 +7694,7 @@ fn start_task(
             sim.bound_for_car = Some(car);
             sim.car_seat = 0;
             sim.car_door = door as u8;
-            (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
+            goal_at(at)
         }
         // The car they came in on a trip, parked out there: back to it, to ride home
         // (`cars::ride_home_for`).
@@ -7707,20 +7704,19 @@ fn start_task(
             sim.bound_for_car = Some(car);
             sim.car_seat = seat as u8;
             sim.car_door = door as u8;
-            (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
+            goal_at(at)
         }
         TaskKind::GoHome => {
             // On their bike: back to its place (`ride.rs`).
             if let Some(bike) = sim.riding.and_then(|b| objects.get(b as usize)) {
-                let at = crate::ride::spot(content, bike);
-                (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
+                goal_at(crate::ride::spot(content, bike))
             } else {
                 let home = ctx.households[sim.household as usize].plot;
                 let Some(door) = home.map(|p| ctx.plots[p as usize].arrival_point()) else {
                     sim.transition = Some(crate::life::Transition::Home);
                     return;
                 };
-                (door, (door[0].floor() as i32, door[1].floor() as i32), 0)
+                goal_at(door)
             }
         }
         TaskKind::Answer { guest } => {
@@ -8592,140 +8588,127 @@ fn progress(
         Phase::Calling { .. } | Phase::Waiting { .. } | Phase::Conversing { .. } => false,
     };
     if finished {
-        // A carry's moment of lifting, putting in or away: on to what comes next.
-        if sim
-            .current
-            .as_ref()
-            .is_some_and(|a| matches!(a.task.kind, TaskKind::Carry { .. }))
-        {
-            crate::carry::step_done(sim, ctx, objects, items);
-            if sim.current.is_some() {
-                return;
+        match sim.current.as_ref().map(|a| a.task.kind) {
+            // A carry's moment of lifting, putting in or away: on to what comes next.
+            Some(TaskKind::Carry { .. }) => {
+                crate::carry::step_done(sim, ctx, objects, items);
+                if sim.current.is_some() {
+                    return;
+                }
             }
-        // The parcel picked up, or the new thing put together (`setup.rs`).
-        } else if sim
-            .current
-            .as_ref()
-            .is_some_and(|a| matches!(a.task.kind, TaskKind::SetUp { .. }))
-        {
-            crate::setup::step_done(sim, ctx, objects);
-        // Something for a guest taken out, or handed over: on to them, or done.
-        } else if sim
-            .current
-            .as_ref()
-            .is_some_and(|a| matches!(a.task.kind, TaskKind::Serve { .. }))
-        {
-            crate::hosting::step_done(sim, ctx, objects);
-            if sim.current.is_some() {
-                return;
+            // The parcel picked up, or the new thing put together (`setup.rs`).
+            Some(TaskKind::SetUp { .. }) => crate::setup::step_done(sim, ctx, objects),
+            // Something for a guest taken out, or handed over: on to them, or done.
+            Some(TaskKind::Serve { .. }) => {
+                crate::hosting::step_done(sim, ctx, objects);
+                if sim.current.is_some() {
+                    return;
+                }
             }
-        // A recipe's step, eating, washing up: on to what comes next.
-        } else if sim
-            .current
-            .as_ref()
-            .is_some_and(|a| crate::cooking::chain(&a.task.kind))
-        {
-            let ate = sim
-                .current
-                .as_ref()
-                .is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { stage: 1, .. }));
-            crate::cooking::step_done(sim, ctx, objects, items);
-            if sim.current.is_some() {
-                return;
-            }
-            // After a meal: the toilet, out of habit.
-            if ate && sim.follow_up.is_none() {
-                sim.follow_up = habit(
-                    sim,
-                    ctx,
-                    objects,
-                    HabitTime::Meal,
-                    ctx.briefs[sim.id as usize].plot,
-                );
-            }
-        } else {
-            let used = sim.current.as_ref().map(|a| a.task);
-            if let Some(Task {
-                kind:
-                    TaskKind::Use {
-                        object,
-                        interaction,
-                    },
-                ..
-            }) = used
-                && !given_up
-            {
-                leaves_at_end(sim, content, &mut objects[object as usize], interaction);
-            }
-            end_activity(sim, content, objects);
-            if let Some(task) = used
-                && let TaskKind::Use {
-                    object,
-                    interaction,
-                } = task.kind
-                && let Some(o) = objects.get(object as usize)
-                && let Some(inter) = content.objects[o.def].interactions.get(interaction)
-            {
-                // Food fetched: they sit down with it (at a table if there is one) and eat.
-                if let Some(recipe) = inter.eats {
-                    let quality = content.object_rules.quality_factor(o.quality)
-                        * inter.skill_factor(&content.skill_rules, &sim.skills);
-                    crate::cooking::eat_now(
+            // A recipe's step, eating, washing up: on to what comes next.
+            Some(kind) if crate::cooking::chain(&kind) => {
+                let ate = matches!(kind, TaskKind::Eat { stage: 1, .. });
+                crate::cooking::step_done(sim, ctx, objects, items);
+                if sim.current.is_some() {
+                    return;
+                }
+                // After a meal: the toilet, out of habit.
+                if ate && sim.follow_up.is_none() {
+                    sim.follow_up = habit(
                         sim,
-                        Task {
-                            routine: false,
-                            ..task
-                        },
-                        recipe,
-                        quality,
                         ctx,
                         objects,
-                        items,
+                        HabitTime::Meal,
+                        ctx.briefs[sim.id as usize].plot,
                     );
-                    if sim.current.is_some() {
-                        return;
-                    }
-                } else if let Some(y) = inter.yields.filter(|_| !given_up) {
-                    // A harvest: its produce carried in to the fridge (`carry.rs`).
-                    let quality = content.object_rules.quality_factor(o.quality)
-                        * inter.skill_factor(&content.skill_rules, &sim.skills);
-                    crate::carry::harvested(sim, task, y, quality, ctx, objects, items);
-                    if sim.current.is_some() {
-                        return;
-                    }
-                } else if let Some(made) = inter.makes.filter(|_| !given_up && inter.after == 0) {
-                    // The washing taken out: on with it to the dryer or the line, or to fold it.
-                    sim.follow_up = crate::machines::carry_on(sim, ctx, objects, object, made);
-                } else if inter.carried {
-                    // Fed in the high chair: back to the crib in the arms.
-                    sim.follow_up = crate::carry::carry_back(sim, task, ctx, objects, object);
-                } else if inter.after != 0 {
-                    // (Not after a use given up the moment it began: no hands to wash after a toilet
-                    // visit that didn't happen.)
-                    if !given_up {
-                        sim.follow_up = follow_up(sim, ctx, objects, object, inter.after);
-                    }
-                } else if inter.close_after
-                    || inter.tags & (content.day_rhythm.sleep_tags | content.day_rhythm.nap_tags)
-                        != 0
+                }
+            }
+            _ => {
+                let used = sim.current.as_ref().map(|a| a.task);
+                if let Some(Task {
+                    kind:
+                        TaskKind::Use {
+                            object,
+                            interaction,
+                        },
+                    ..
+                }) = used
+                    && !given_up
                 {
-                    // Up from a night's sleep: the toilet first, out of habit.
-                    if inter.tags & content.day_rhythm.sleep_tags != 0 {
-                        sim.follow_up = habit(
+                    leaves_at_end(sim, content, &mut objects[object as usize], interaction);
+                }
+                end_activity(sim, content, objects);
+                if let Some(task) = used
+                    && let TaskKind::Use {
+                        object,
+                        interaction,
+                    } = task.kind
+                    && let Some(o) = objects.get(object as usize)
+                    && let Some(inter) = content.objects[o.def].interactions.get(interaction)
+                {
+                    // Food fetched: they sit down with it (at a table if there is one) and eat.
+                    if let Some(recipe) = inter.eats {
+                        let quality = content.object_rules.quality_factor(o.quality)
+                            * inter.skill_factor(&content.skill_rules, &sim.skills);
+                        crate::cooking::eat_now(
                             sim,
+                            Task {
+                                routine: false,
+                                ..task
+                            },
+                            recipe,
+                            quality,
                             ctx,
                             objects,
-                            HabitTime::Wake,
-                            ctx.object_plot[object as usize],
+                            items,
                         );
-                    }
-                    // Then what sleeping or napping opened is closed again (a wall bed folded
-                    // up, a sofa bed's bed put away; a hot tub's cover put on after a soak,
-                    // `close_after`), unless someone is still in it: whoever gets up last does it.
-                    if let Some(close) = closing(sim, content, o, object) {
-                        match sim.follow_up {
-                            None => sim.follow_up = Some(close),
-                            Some(_) => sim.queue.push_front(close),
+                        if sim.current.is_some() {
+                            return;
+                        }
+                    } else if let Some(y) = inter.yields.filter(|_| !given_up) {
+                        // A harvest: its produce carried in to the fridge (`carry.rs`).
+                        let quality = content.object_rules.quality_factor(o.quality)
+                            * inter.skill_factor(&content.skill_rules, &sim.skills);
+                        crate::carry::harvested(sim, task, y, quality, ctx, objects, items);
+                        if sim.current.is_some() {
+                            return;
+                        }
+                    } else if let Some(made) = inter.makes.filter(|_| !given_up && inter.after == 0)
+                    {
+                        // The washing taken out: on with it to the dryer or the line, or to fold it.
+                        sim.follow_up = crate::machines::carry_on(sim, ctx, objects, object, made);
+                    } else if inter.carried {
+                        // Fed in the high chair: back to the crib in the arms.
+                        sim.follow_up = crate::carry::carry_back(sim, task, ctx, objects, object);
+                    } else if inter.after != 0 {
+                        // (Not after a use given up the moment it began: no hands to wash after a toilet
+                        // visit that didn't happen.)
+                        if !given_up {
+                            sim.follow_up = follow_up(sim, ctx, objects, object, inter.after);
+                        }
+                    } else if inter.close_after
+                        || inter.tags
+                            & (content.day_rhythm.sleep_tags | content.day_rhythm.nap_tags)
+                            != 0
+                    {
+                        // Up from a night's sleep: the toilet first, out of habit.
+                        if inter.tags & content.day_rhythm.sleep_tags != 0 {
+                            sim.follow_up = habit(
+                                sim,
+                                ctx,
+                                objects,
+                                HabitTime::Wake,
+                                ctx.object_plot[object as usize],
+                            );
+                        }
+                        // Then what sleeping or napping opened is closed again (a wall bed folded
+                        // up, a sofa bed's bed put away; a hot tub's cover put on after a soak,
+                        // `close_after`), unless someone is still in it: whoever gets up last does it.
+                        if let Some(close) = closing(sim, content, o, object) {
+                            match sim.follow_up {
+                                None => sim.follow_up = Some(close),
+                                Some(_) => sim.queue.push_front(close),
+                            }
                         }
                     }
                 }
@@ -9876,11 +9859,7 @@ pub(crate) fn trip_minutes(eta: f32, car: bool) -> f32 {
 pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
     let walks = |i: usize| ctx.transit.walks_out(i, ctx.tick);
     if !ctx.travel.open {
-        let d = |p: &[f32; 2]| (p[0] - sim.pos[0]).hypot(p[1] - sim.pos[1]);
-        return (0..ctx.exits.len())
-            .filter(|&i| walks(i))
-            .map(|i| ctx.exits[i])
-            .min_by(|a, b| d(a).total_cmp(&d(b)));
+        return nearest_exit(ctx.exits, sim.pos, walks).map(|i| ctx.exits[i]);
     }
     // From home, the way their commute was timed by (on foot).
     let home = ctx
@@ -9943,10 +9922,17 @@ pub(crate) fn quickest_exit(
     best.map(|(_, i)| i)
 }
 
-/// The town's way out (`World::exits`) nearest `pos`, if it has any.
-pub(crate) fn nearest_exit(exits: &[[f32; 2]], pos: [f32; 2]) -> Option<[f32; 2]> {
-    let d = |p: &[f32; 2]| (p[0] - pos[0]).hypot(p[1] - pos[1]);
-    exits.iter().copied().min_by(|a, b| d(a).total_cmp(&d(b)))
+/// The town's way out (an index into `World::exits`) nearest `pos` in a straight line, of those
+/// `walks` lets them leave by (`quickest_exit`), if it has any.
+pub(crate) fn nearest_exit(
+    exits: &[[f32; 2]],
+    pos: [f32; 2],
+    walks: impl Fn(usize) -> bool,
+) -> Option<usize> {
+    let d = |i: usize| (exits[i][0] - pos[0]).hypot(exits[i][1] - pos[1]);
+    (0..exits.len())
+        .filter(|&i| walks(i) && exits[i].iter().all(|v| v.is_finite()))
+        .min_by(|&a, &b| d(a).total_cmp(&d(b)))
 }
 
 /// The object a task holds a place at (using it, repairing it, cooking at it, the seat they eat
