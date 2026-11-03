@@ -168,8 +168,12 @@ fn clear_away_takes_gone_off_food_and_plates_off_a_table_with_chairs_all_round()
         "on the way to the table: {:?}",
         w.sims[0].current().map(|a| a.task.kind)
     );
-    // No bin: scraped and washed at the sink, put away in the counter's cupboard.
-    assert_eq!(clearing(&mut w, 0, 120.0), [(2, SINK), (3, COUNTER)]);
+    // No bin: scraped and washed at the sink, put away in the counter's cupboard; one kind to an
+    // armful, so the pot first, then the plates.
+    assert_eq!(
+        clearing(&mut w, 0, 120.0),
+        [(2, SINK), (3, COUNTER), (2, SINK), (3, COUNTER)]
+    );
     assert!(
         w.items.get(pot).is_none() && plates.iter().all(|&p| w.items.get(p).is_none()),
         "the pot and plates went with them"
@@ -198,12 +202,17 @@ fn full_food_leftovers_and_empty_plates_are_all_cleared_and_scraped_into_a_bin()
         action: ItemAction::Clear,
     })
     .unwrap();
-    let mut scraped = 0.0;
+    let (mut scraped, mut scraps_by_trip) = (0.0, Vec::new());
     let mut steps = Vec::new();
     for _ in 0..(120.0 / sim_core::MINUTES_PER_TICK) as u32 {
         w.tick_once();
         common::check(&w);
-        let Some(a) = w.sims[0].current() else { break };
+        let Some(a) = w.sims[0].current() else {
+            if w.sims[0].queue().next().is_none() {
+                break;
+            }
+            continue;
+        };
         if let (
             TaskKind::Dishes {
                 stage,
@@ -214,19 +223,35 @@ fn full_food_leftovers_and_empty_plates_are_all_cleared_and_scraped_into_a_bin()
             Phase::Using { elapsed },
         ) = (a.task.kind, &a.phase)
         {
-            if stage == 1 {
-                assert_eq!(scraps, 2, "the pot and the plate with food on it");
-                scraped = *elapsed;
-            }
             if steps.last() != Some(&(stage, o)) {
                 steps.push((stage, o));
+                if stage == 1 {
+                    scraps_by_trip.push(scraps);
+                }
+            }
+            if stage == 1 {
+                scraped += sim_core::MINUTES_PER_TICK;
+                let _ = elapsed;
             }
         }
     }
+    // One kind to an armful: the pot (its food scraped off), then the plates (the one with food on it).
+    assert_eq!(
+        scraps_by_trip,
+        [1, 1],
+        "the pot, then the plate with food on it"
+    );
     assert_eq!(
         steps,
-        [(1, BIN), (2, SINK), (3, COUNTER)],
-        "the bin, the sink, the cupboard"
+        [
+            (1, BIN),
+            (2, SINK),
+            (3, COUNTER),
+            (1, BIN),
+            (2, SINK),
+            (3, COUNTER)
+        ],
+        "the bin, the sink, the cupboard, twice"
     );
     assert!(
         scraped >= 2.0 * w.content.cooking.scrape_minutes - 0.1,
@@ -445,4 +470,41 @@ fn a_child_leaves_the_clean_things_on_the_counter_under_a_wall_cabinet_out_of_re
         );
         assert_eq!(w.sims[0].held, None, "age {age}: put away");
     }
+}
+
+#[test]
+fn an_armful_of_plates_is_a_stack_picked_up_bent_over_the_table() {
+    let mut w = world();
+    let table = table(&w);
+    let plates = [
+        put_on(&mut w, table, "plateDirty", 0, 0),
+        put_on(&mut w, table, "plateDirty", 0, 0),
+        put_on(&mut w, table, "plateDirty", 0, 0),
+    ];
+    w.apply(Command::UseItem {
+        sim: 0,
+        item: plates[0],
+        action: ItemAction::Clear,
+    })
+    .unwrap();
+    // At the table a while (picking them up: `pickUpMinutes`), nothing in hand yet...
+    let mut picking = 0;
+    for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        let s = &w.sims[0];
+        match s.current().map(|a| (a.task.kind, &a.phase)) {
+            Some((TaskKind::Dishes { stage: 0, .. }, Phase::Using { .. })) => {
+                assert_eq!(s.held, None, "not picked up yet");
+                picking += 1;
+            }
+            _ if s.held.is_some() => break,
+            _ => {}
+        }
+    }
+    assert!(picking > 0, "bent over the table a while first");
+    // ...then all three in hand, as a stack.
+    let held = w.sims[0].held.expect("carrying them");
+    assert_eq!(w.content.items[held.def].id, "plateStackDirty");
+    assert_eq!(held.servings, 3, "three to wash");
+    assert!(plates.iter().all(|&p| w.items.get(p).is_none()));
 }

@@ -4399,6 +4399,15 @@
       "model": "item.plateDirty",
       "hold": "hand",
       "dirty": true,
+      "stackAs": "plateStackDirty",
+      "radius": 0.13
+    },
+    {
+      "id": "plateStackDirty",
+      "label": "Dirty plates",
+      "model": "item.plateStackDirty",
+      "hold": "both",
+      "dirty": true,
       "radius": 0.13
     },
     {
@@ -4456,6 +4465,13 @@
       "hold": "both",
       "dirty": true,
       "radius": 0.16
+    },
+    {
+      "id": "batterBowl",
+      "label": "Bowl of batter",
+      "model": "tool.mixingBowl",
+      "hold": "both",
+      "radius": 0.15
     }
   ],
   "recipes": [
@@ -4744,14 +4760,14 @@
           "holds": "ingredients"
         },
         {
-          "label": "Prep",
+          "label": "Make the dough",
           "at": [
             "prep"
           ],
           "minutes": 15,
-          "anim": "chop",
+          "anim": "mix",
           "optional": true,
-          "holds": "prepBowl"
+          "holds": "batterBowl"
         },
         {
           "label": "Bake",
@@ -4801,7 +4817,7 @@
           "minutes": 15,
           "anim": "mix",
           "optional": true,
-          "holds": "prepBowl"
+          "holds": "batterBowl"
         },
         {
           "label": "Bake",
@@ -4850,7 +4866,7 @@
           "minutes": 15,
           "anim": "mix",
           "optional": true,
-          "holds": "prepBowl"
+          "holds": "batterBowl"
         },
         {
           "label": "Bake",

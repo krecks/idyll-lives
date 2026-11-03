@@ -102,6 +102,8 @@ pub struct CookingRules {
     /// putting an armful of clean things away; their animations.
     pub scrape_minutes: f32,
     pub put_away_minutes: f32,
+    /// Picking the armful up off the table (bent over it, `serve_anim`, as a dish is put down).
+    pub pick_up_minutes: f32,
     pub scrape_anim: Option<usize>,
     pub put_away_anim: Option<usize>,
     /// Stations food is scraped into (`"bin"`), and clean things are put away at (`putAwayAt`:
@@ -131,6 +133,9 @@ pub struct ItemDef {
     pub empty_as: Option<usize>,
     /// Needs washing up.
     pub dirty: bool,
+    /// Two or more of these carried at once are shown as this (a stack of dirty plates); none:
+    /// as one of them.
+    pub stack_as: Option<usize>,
     /// Radius (m) of the disc it takes on a surface.
     pub radius: f32,
 }
@@ -245,6 +250,7 @@ pub(crate) struct CookingRaw {
     dishes_interest: Option<f32>,
     scrape_minutes: Option<f32>,
     put_away_minutes: Option<f32>,
+    pick_up_minutes: Option<f32>,
     scrape_anim: Option<String>,
     put_away_anim: Option<String>,
     put_away_at: Option<Vec<String>>,
@@ -261,6 +267,8 @@ pub(crate) struct ItemRaw {
     empty_as: Option<String>,
     #[serde(default)]
     dirty: bool,
+    #[serde(default)]
+    stack_as: Option<String>,
     #[serde(default)]
     radius: Option<f32>,
 }
@@ -454,6 +462,8 @@ pub(crate) fn parse(
         dishes: station_bit("dishes"),
         scrape_minutes: raw.scrape_minutes.unwrap_or(1.0).max(0.0),
         put_away_minutes: raw.put_away_minutes.unwrap_or(2.0).max(0.0),
+        pick_up_minutes: finite(raw.pick_up_minutes.unwrap_or(0.75), "cooking.pickUpMinutes")?
+            .max(0.0),
         scrape_anim: anim(&raw.scrape_anim, "clean", "cooking.scrapeAnim")?,
         put_away_anim: anim(&raw.put_away_anim, "fetch", "cooking.putAwayAnim")?,
         bin: station_bit("bin"),
@@ -485,6 +495,7 @@ pub(crate) fn parse(
             serving: it.serving.as_deref().map(|s| item(s, &ctx)).transpose()?,
             empty_as: it.empty_as.as_deref().map(|s| item(s, &ctx)).transpose()?,
             dirty: it.dirty,
+            stack_as: it.stack_as.as_deref().map(|s| item(s, &ctx)).transpose()?,
             radius: it
                 .radius
                 .unwrap_or(crate::content::DEFAULT_RADIUS)
@@ -2100,6 +2111,7 @@ pub(crate) fn clearing_minutes(
 ) -> f32 {
     let scraping = rules.scrape_minutes * f32::from(scraps);
     match stage {
+        0 => rules.pick_up_minutes,
         1 => scraping,
         3 => rules.put_away_minutes,
         _ => rules.dishes_minutes * f32::from(held.map_or(0, |h| h.servings.max(1))) + scraping,
@@ -2352,58 +2364,15 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
             act.phase = Phase::Using { elapsed: 0.0 };
         }
         TaskKind::Dishes { item, stage: 0, .. } => {
-            // Everything to clear from the same place, up to an armful.
-            let Some(target) = items
-                .get(item)
-                .filter(|it| it.household == sim.household)
-                .cloned()
-            else {
-                sim.current = None;
-                return;
-            };
-            let from = crate::items::holder(content, objects, &target.at);
-            let same = |it: &ItemInstance| match from {
-                Some(h) => crate::items::holder(content, objects, &it.at) == Some(h),
-                None => it.at.tile() == target.at.tile(),
-            };
-            let mut picked: Vec<u32> = vec![item];
-            for it in &items.list {
-                if picked.len() >= usize::from(content.cooking.carry_dishes) {
-                    break;
-                }
-                if it.id != item
-                    && it.household == sim.household
-                    && it.to_clear(content)
-                    && same(it)
-                {
-                    picked.push(it.id);
-                }
+            // At the table: bent over it, picking the armful up (`pick_up` once it's done).
+            if let Some(it) = items.get(item) {
+                let (x, z) = it.at.tile();
+                sim.yaw = (x as f32 + 0.5 - sim.pos[0]).atan2(z as f32 + 0.5 - sim.pos[1]);
             }
-            // Food on them (eaten or not, gone off or not) is scraped off first; what's left is
-            // carried dirty.
-            let (mut scraps, mut dirty, mut carried) = (0u8, 0u8, None);
-            for &id in &picked {
-                let Some(it) = items.remove(id) else { continue };
-                scraps += u8::from(it.servings > 0 || it.spoiled);
-                if let Some(def) = washed(content, it.def) {
-                    dirty += 1;
-                    carried.get_or_insert(def);
-                }
+            sim.pose = Pose::Stand;
+            if let Some(act) = sim.current.as_mut() {
+                act.phase = Phase::Using { elapsed: 0.0 };
             }
-            sim.held = carried.map(|def| Held {
-                servings: dirty,
-                ..Held::of(def)
-            });
-            let next = Task {
-                kind: TaskKind::Dishes {
-                    item,
-                    station: None,
-                    stage: 1,
-                    scraps,
-                },
-                ..task
-            };
-            dishes_next(sim, next, ctx, objects, items, None);
         }
         TaskKind::Dishes {
             station: Some(o), ..
@@ -2508,6 +2477,114 @@ pub(crate) fn using(
     }
 }
 
+/// Clearing away, at the table: everything to clear from the same place, up to an armful of one
+/// kind, picked up (the food on it to be scraped off), and on to the bin or the sink.
+fn pick_up(
+    sim: &mut Sim,
+    task: Task,
+    ctx: &Ctx,
+    objects: &mut [ObjectInstance],
+    items: &mut Items,
+) {
+    let content = ctx.content;
+    let TaskKind::Dishes { item, .. } = task.kind else {
+        return;
+    };
+    // Everything to clear from the same place, up to an armful.
+    let Some(target) = items
+        .get(item)
+        .filter(|it| it.household == sim.household)
+        .cloned()
+    else {
+        sim.current = None;
+        return;
+    };
+    let from = crate::items::holder(content, objects, &target.at);
+    let same = |it: &ItemInstance| match from {
+        Some(h) => crate::items::holder(content, objects, &it.at) == Some(h),
+        None => it.at.tile() == target.at.tile(),
+    };
+    // (One kind of thing in an armful: plates stack, a pot and a plate don't, so the pot
+    // waits for its own trip rather than vanishing under the plate.)
+    let kind = washed(content, target.def);
+    let mut picked: Vec<u32> = vec![item];
+    for it in &items.list {
+        if picked.len() >= usize::from(content.cooking.carry_dishes) {
+            break;
+        }
+        if it.id != item
+            && it.household == sim.household
+            && it.to_clear(content)
+            && same(it)
+            && washed(content, it.def).is_none_or(|w| kind.is_none_or(|k| k == w))
+        {
+            picked.push(it.id);
+        }
+    }
+    // Told to clear it: what's left there for being another kind (not for a full armful)
+    // is the next trip, straight after this one, so the table is cleared, a trip per kind.
+    // (Of their own accord, what's left is a chore for later, like any other.)
+    if task.directed
+        && let Some(rest) = items
+            .list
+            .iter()
+            .find(|it| {
+                !picked.contains(&it.id)
+                    && it.household == sim.household
+                    && it.to_clear(content)
+                    && same(it)
+                    && washed(content, it.def).is_some_and(|w| kind.is_some_and(|k| k != w))
+            })
+            .map(|it| it.id)
+        && !sim
+            .queue
+            .iter()
+            .any(|t| matches!(t.kind, TaskKind::Dishes { item, .. } if item == rest))
+    {
+        sim.queue.push_front(Task {
+            kind: TaskKind::Dishes {
+                item: rest,
+                station: None,
+                stage: 0,
+                scraps: 0,
+            },
+            ..task
+        });
+    }
+    // Food on them (eaten or not, gone off or not) is scraped off first; what's left is
+    // carried dirty.
+    let (mut scraps, mut dirty, mut carried) = (0u8, 0u8, None);
+    for &id in &picked {
+        let Some(it) = items.remove(id) else { continue };
+        scraps += u8::from(it.servings > 0 || it.spoiled);
+        if let Some(def) = washed(content, it.def) {
+            dirty += 1;
+            carried.get_or_insert(def);
+        }
+    }
+    // (Two or more: as a stack, where there's one.)
+    let carried = carried.map(|def: usize| {
+        content.items[def]
+            .stack_as
+            .filter(|_| dirty > 1)
+            .unwrap_or(def)
+    });
+    sim.held = carried.map(|def| Held {
+        servings: dirty,
+        ..Held::of(def)
+    });
+    let next = Task {
+        kind: TaskKind::Dishes {
+            item,
+            station: None,
+            stage: 1,
+            scraps,
+        },
+        ..task
+    };
+    dishes_next(sim, next, ctx, objects, items, None);
+}
+
 /// Wears a station a little for a finished step (as a finished use does).
 fn wear(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance], o: u32) {
     let Some(obj) = objects.get_mut(o as usize) else {
@@ -2535,6 +2612,10 @@ pub(crate) fn step_done(
         return;
     };
     match task.kind {
+        TaskKind::Dishes { stage: 0, .. } => {
+            sim.current = None;
+            pick_up(sim, task, ctx, objects, items);
+        }
         TaskKind::Cook { station, .. } if serving(content, &task) => {
             sim.current = None;
             put_dish_down(sim, task, ctx, objects, items, station);
