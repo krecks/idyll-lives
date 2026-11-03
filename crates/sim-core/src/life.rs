@@ -1174,11 +1174,6 @@ fn doors(w: &mut World) {
             if s.current.is_some() {
                 end_activity(s, content, objects);
             }
-            // (The next step of a routine they had coming, washing their hands after the toilet
-            // say, waits for after the door.)
-            if let Some(next) = s.follow_up.take() {
-                s.queue.push_front(next);
-            }
             s.queue.push_front(Task {
                 kind: TaskKind::Answer { guest: i as u32 },
                 directed: false,

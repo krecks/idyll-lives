@@ -1789,14 +1789,20 @@ pub(crate) fn eat_now(
 /// A plate of `recipe` (its serving) made at `tick`, `quality` as a cooked dish's: a snack taken
 /// out to eat at once (`eat_now`), or to hand a guest (`hosting.rs`).
 pub(crate) fn plate(content: &Content, recipe: usize, quality: f32, tick: u64) -> Held {
-    let r = &content.recipes[recipe];
     Held {
-        def: content.items[r.item].serving.unwrap_or(r.item),
+        def: serving_of(content, recipe),
         servings: 1,
         quality,
         made_at: tick,
         recipe: Some(recipe),
     }
+}
+
+/// The item a serving of `recipe` is (its item's `serving`, else the item itself): what `plate`
+/// holds, and what a customer is handed (`staff::handed`).
+pub(crate) fn serving_of(content: &Content, recipe: usize) -> usize {
+    let item = content.recipes[recipe].item;
+    content.items[item].serving.unwrap_or(item)
 }
 
 /// How good what `inter` gives at `o` comes out (as a cooked dish's quality, a harvest's): the

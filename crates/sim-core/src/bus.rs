@@ -1123,27 +1123,27 @@ fn step_bus(w: &mut World, b: usize) -> bool {
         // Its doors open: those coming home get off (one done at work while it stands there too),
         // those waiting come to get on.
         if bus.doors_open(tick) {
-            let home = |h: &Homeward| h.stop == stop && h.run <= run;
-            if w.transit.homeward.iter().any(home) {
-                let off: Vec<u32> = w
-                    .transit
-                    .homeward
-                    .iter()
-                    .filter(|h| home(h))
-                    .map(|h| h.sim)
-                    .collect();
+            // (No allocation when nobody gets off here: an empty Vec holds nothing.)
+            let off: Vec<u32> = w
+                .transit
+                .homeward
+                .iter()
+                .filter(|h| h.stop == stop && h.run <= run)
+                .map(|h| h.sim)
+                .collect();
+            if !off.is_empty() {
                 w.transit.homeward.retain(|h| !off.contains(&h.sim));
-                for (k, s) in off.into_iter().enumerate() {
-                    let door = w.transit.lines[l as usize].door(j, 1);
-                    // (One after another, a step apart.)
-                    let back = w.transit.lines[l as usize].bays[j].1;
-                    let along = [back.sin(), back.cos()];
-                    let at = [
-                        door[0] - along[0] * 0.5 * k as f32,
-                        door[1] - along[1] * 0.5 * k as f32,
-                    ];
-                    get_off(w, s as usize, Some(at));
-                }
+            }
+            for (k, s) in off.into_iter().enumerate() {
+                let door = w.transit.lines[l as usize].door(j, 1);
+                // (One after another, a step apart.)
+                let back = w.transit.lines[l as usize].bays[j].1;
+                let along = [back.sin(), back.cos()];
+                let at = [
+                    door[0] - along[0] * 0.5 * k as f32,
+                    door[1] - along[1] * 0.5 * k as f32,
+                ];
+                get_off(w, s as usize, Some(at));
             }
             let door = w.transit.lines[l as usize].door(j, 0);
             for s in &mut w.sims {

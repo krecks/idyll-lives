@@ -690,6 +690,5 @@ pub(crate) fn opens(content: &Content, objects: &[ObjectInstance], object: u32) 
 /// The item a customer is handed while served at a post (the food they then eat), as the snapshot
 /// shows it in their hands and the server's: the serving `eat` gives (`cooking::eat_now`).
 pub(crate) fn handed(content: &Content, inter: &Interaction) -> Option<usize> {
-    let r = &content.recipes[inter.eats?];
-    Some(content.items[r.item].serving.unwrap_or(r.item))
+    Some(crate::cooking::serving_of(content, inter.eats?))
 }

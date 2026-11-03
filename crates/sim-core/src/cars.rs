@@ -1370,12 +1370,16 @@ fn lift_seat(
     home: u32,
 ) -> Option<(u32, usize)> {
     cars.iter().enumerate().find_map(|(c, car)| {
-        if me.plot.is_some_and(|p| p != home && p != car.plot) || car.trip.is_some() {
+        // (The car's own tests first: who drives it is a look through everyone.)
+        if me.plot.is_some_and(|p| p != home && p != car.plot)
+            || car.trip.is_some()
+            || !lift_car(car, households, door, sim.household)
+        {
             return None;
         }
         let c = c as u32;
         let driver = setting_off_driver(car, c, briefs, Some(sim.id))?;
-        if !lift_ok(car, households, rels, door, sim.id, sim.household, driver) {
+        if !lift_friend(rels, sim.id, driver) {
             return None;
         }
         let rider = riders(car, c, briefs, driver, Some(sim.id)) + 1;
@@ -1395,13 +1399,22 @@ fn lift_ok(
     household: u32,
     driver: u32,
 ) -> bool {
+    lift_car(car, households, door, household) && lift_friend(rels, i, driver)
+}
+
+/// `lift_ok`'s test of the car: another household's than `household`, standing on its own
+/// driveway (usable), within `LIFT_REACH` m of `door`.
+fn lift_car(car: &Car, households: &[Household], door: [f32; 2], household: u32) -> bool {
     car.household != household
         && households.get(car.household as usize).and_then(|h| h.plot) == Some(car.plot)
         && !car.blocked
         && !car.no_way
         && (door[0] - car.spot[0]).hypot(door[1] - car.spot[1]) <= LIFT_REACH
-        && driver != i
-        && rels.get(i as usize, driver as usize).friendship >= LIFT_FRIENDSHIP
+}
+
+/// `lift_ok`'s test of the driver: someone else, and a friend of `i`'s (`LIFT_FRIENDSHIP`).
+fn lift_friend(rels: &crate::social::Relationships, i: u32, driver: u32) -> bool {
+    driver != i && rels.get(i as usize, driver as usize).friendship >= LIFT_FRIENDSHIP
 }
 
 /// Neighbours give a lift (`lift_ok`) from a car this close (m) to the door of someone's home...
