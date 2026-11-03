@@ -243,6 +243,10 @@ def _render(path, view, bounds=None, size=640):
     cam = bpy.data.cameras.new('preview')
     cam.type = 'ORTHO'
     cam.ortho_scale = span * (1.55 if 'three_quarter' in view else 1.15)
+    # (The camera stands about 1.6 spans off the middle: clip by the span, not Blender's 0.1 m near plane, which cut
+    # a 2 cm coin or a 7 cm apple out of the picture; far enough for the lit floor, 4 spans out each way.)
+    cam.clip_start = span * 0.05
+    cam.clip_end = span * 12
     obj = bpy.data.objects.new('preview', cam)
     bpy.context.collection.objects.link(obj)
     obj.location = loc
