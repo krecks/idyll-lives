@@ -618,6 +618,7 @@ enum Key {
     Phone(usize),
     Carry(u32, u8),
     SetUp(u32, u8),
+    Serve(u32, u8),
 }
 
 fn key(w: &World, i: usize) -> Key {
@@ -653,6 +654,7 @@ fn key(w: &World, i: usize) -> Key {
         TaskKind::Phone { action, .. } => Key::Phone(action),
         TaskKind::Carry { to, stage, .. } => Key::Carry(to, stage),
         TaskKind::SetUp { object, stage, .. } => Key::SetUp(object, stage),
+        TaskKind::Serve { guest, stage, .. } => Key::Serve(guest, stage),
     }
 }
 

@@ -1708,7 +1708,12 @@
     {"id": "goodbye", "label": "Say goodbye", "category": "friendly", "icon": "icon.social.goodbye", "minutes": 3, "animation": "wave",
      "tags": ["social", "friendly"], "autonomous": false, "acceptance": {"base": 1.0},
      "needs": {"social": 0.05}, "targetNeeds": {"social": 0.05},
-     "success": {"friendship": 1, "targetFriendship": 1}}
+     "success": {"friendship": 1, "targetFriendship": 1}},
+    {"id": "offer", "label": "Offer a bite to eat", "category": "friendly", "icon": "icon.social.offer", "minutes": 3, "animation": "talk",
+     "tags": ["social", "friendly"], "autonomous": false, "stages": ["teen", "youngAdult", "adult", "elder"],
+     "acceptance": {"base": -0.25, "friendship": 0.003, "needs": {"hunger": 1.6, "fun": 0.25}},
+     "needs": {"social": 0.05}, "targetNeeds": {"social": 0.05},
+     "success": {"friendship": 1, "targetFriendship": 2, "effect": "serve"}}
   ],
   "bondPresets": {
     "roommates": {
@@ -1929,7 +1934,8 @@
     "boredMinutes": 30,
     "farewell": ["goodbyeHug", "goodbye"],
     "farewellMinutes": 8,
-    "door": {"waitMinutes": 10, "welcomeFriendship": -20, "greet": "chat", "turnedAwayFeeling": "turnedAway", "knockAnim": "knock"}
+    "door": {"waitMinutes": 10, "welcomeFriendship": -20, "greet": "chat", "turnedAwayFeeling": "turnedAway", "knockAnim": "knock"},
+    "offer": {"social": "offer", "afterMinutes": 15, "againMinutes": 120, "handAnim": "serve"}
   },
   "phone": {
     "fromStage": "teen",
@@ -2087,7 +2093,8 @@
     "noPartner": "{a} had nobody free to play with at the {object}",
     "setUp": "{a} set up the new {object}",
     "setUpForThem": "{a}'s new {object} was set up for them",
-    "sentBack": "There was no room at home for {a}'s {object}: it went back to the shop, the money too"
+    "sentBack": "There was no room at home for {a}'s {object}: it went back to the shop, the money too",
+    "served": "{a} brought {b} {item}"
   },
   "activities": [
     {

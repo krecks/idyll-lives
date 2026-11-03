@@ -1511,6 +1511,21 @@ pub struct VisitRules {
     /// How long a leaving guest spends getting to a host to say goodbye (`farewellMinutes`):
     /// hosts further away than that aren't asked, and a goodbye not started by then is skipped.
     pub farewell_minutes: f32,
+    /// A host offers a guest something to eat or drink (`offer`; `hosting.rs`). None: they don't.
+    pub offer: Option<OfferRules>,
+}
+
+/// A host offering a guest something to eat or drink (`visits.offer`, `hosting.rs`).
+#[derive(Debug, Clone)]
+pub struct OfferRules {
+    /// What the host asks with (a social whose success has `"effect": "serve"`).
+    pub social: usize,
+    /// How long after the guest comes in the host first offers, and how long after an offer
+    /// (taken up or not) they offer again.
+    pub after_minutes: f32,
+    pub again_minutes: f32,
+    /// What the host is shown doing while handing it over (`handAnim`).
+    pub hand_anim: Option<usize>,
 }
 
 /// A visitor at the door: someone at home answers and lets them in or turns them away.
@@ -2498,6 +2513,16 @@ struct VisitRaw {
     bored_minutes: Option<f32>,
     farewell: Vec<String>,
     farewell_minutes: Option<f32>,
+    offer: Option<OfferRaw>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct OfferRaw {
+    social: String,
+    after_minutes: Option<f32>,
+    again_minutes: Option<f32>,
+    hand_anim: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -4853,6 +4878,37 @@ impl Content {
                 })
                 .collect::<Result<_, _>>()?,
             farewell_minutes: v.farewell_minutes.unwrap_or(10.0).max(1.0),
+            offer: match &v.offer {
+                None => None,
+                Some(o) => {
+                    let social =
+                        socials
+                            .iter()
+                            .position(|s| s.id == o.social)
+                            .ok_or_else(|| {
+                                Error::new(format!("visits.offer: unknown social '{}'", o.social))
+                            })?;
+                    if socials[social].success.effect != crate::social::Effect::Serve {
+                        return Err(Error::new(format!(
+                            "visits.offer: social '{}' must have \"effect\": \"serve\" on success",
+                            o.social
+                        )));
+                    }
+                    Some(OfferRules {
+                        social,
+                        after_minutes: o.after_minutes.unwrap_or(15.0).max(0.0),
+                        again_minutes: o.again_minutes.unwrap_or(120.0).max(1.0),
+                        hand_anim: match &o.hand_anim {
+                            None => None,
+                            Some(a) => Some(anim_index(a).ok_or_else(|| {
+                                Error::new(format!(
+                                    "visits.offer: unknown anim '{a}' (declare it in \"animations\")"
+                                ))
+                            })?),
+                        },
+                    })
+                }
+            },
             door: match &v.door {
                 None => None,
                 Some(d) => Some(DoorRules {

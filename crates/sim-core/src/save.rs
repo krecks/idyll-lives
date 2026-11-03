@@ -85,6 +85,12 @@
 //! asked, the object by id, the tick it was bought and what was paid; `setup.rs`), left out when
 //! there are none, so an older file has none; setting one up isn't saved mid-way (the parcel is
 //! back at the front door after a load).
+//! Still 35: a resident late for the shift they're at says so (`job.late`, left out when on
+//! time; an older file's are on time).
+//! Still 35: the story may tell of a host bringing a guest something (`served`, the item in `n`,
+//! by id in `refs.item`); older builds drop it, as any kind they don't know. A host's offer, or
+//! something on its way to a guest (`world::TaskKind::Serve`), isn't saved: what's in hand is put
+//! down after a load.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -613,6 +619,9 @@ pub struct JobSave {
     /// Mood when leaving for the current shift (absent before v8).
     #[serde(default)]
     pub shift_mood: Option<f32>,
+    /// Late for the current shift (`Job::late`; absent: on time).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub late: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -862,6 +871,7 @@ impl World {
                         shifts: j.shifts,
                         missed: j.missed,
                         shift_mood: some_finite(j.shift_mood),
+                        late: j.late,
                     }),
                     job_search_from: s.job_search_from,
                     nap_minutes: minutes_left(s.nap_until),
@@ -1375,6 +1385,7 @@ impl World {
                 job.shifts = j.shifts;
                 job.missed = j.missed;
                 job.shift_mood = j.shift_mood.unwrap_or(job.shift_mood);
+                job.late = j.late;
                 Some(job)
             });
             sim.job_search_from = s.job_search_from;
@@ -1411,6 +1422,7 @@ impl World {
                     until: after(left.unwrap_or(content.visits.directed_hours * 60.0)),
                     idle: 0,
                     farewell: 0,
+                    offer_at: 0,
                 })
             });
             for t in &s.tasks {
@@ -1734,13 +1746,15 @@ impl World {
             },
             // (Eating and washing up start again from what's there after loading; a few minutes
             // on the phone are simply over, and so is listening in on a conversation.)
-            // (Nor is a carry: a baby is back in the crib after a load, a harvest put down.)
+            // (Nor is a carry: a baby is back in the crib after a load, a harvest put down; nor
+            // a host bringing a guest something, which is put down.)
             TaskKind::Answer { .. }
             | TaskKind::Eat { .. }
             | TaskKind::Dishes { .. }
             | TaskKind::Phone { .. }
             | TaskKind::Join { .. }
-            | TaskKind::Carry { .. } => return None,
+            | TaskKind::Carry { .. }
+            | TaskKind::Serve { .. } => return None,
             // (Nor is setting something up: the parcel is back at the door, `setup.rs`.)
             TaskKind::SetUp { .. } => return None,
         })
@@ -2333,6 +2347,7 @@ fn event_refs(
             "stage",
             n.and_then(|n| content.life.stages.get(n)).map(|d| &d.id),
         ),
+        Served => put("item", n.and_then(|n| content.items.get(n)).map(|d| &d.id)),
         _ => {}
     }
     put(
@@ -2387,6 +2402,7 @@ fn resolve_refs(
         find(refs, "object", content.objects.iter().map(|d| &d.id))?,
         find(refs, "accident", content.accidents.iter().map(|d| &d.id))?,
         find(refs, "stage", content.life.stages.iter().map(|d| &d.id))?,
+        find(refs, "item", content.items.iter().map(|d| &d.id))?,
     ];
     if let Some(i) = n.into_iter().flatten().next() {
         e.n = Some(i64::from(i));

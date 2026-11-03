@@ -1512,7 +1512,12 @@ fn ask_to_buy(w: &mut World, i: usize, day: u32) {
         return;
     }
     let price = content.objects[object].price.unwrap_or(0);
-    let reserve = crate::life::weekly_costs(w, h).map_or(0, |(rent, bills)| rent + bills);
+    // (The bills go up with what the home is worth: counted with it in there.)
+    let reserve = crate::life::weekly_costs(w, h).map_or(0, |(rent, bills)| rent + bills)
+        + content
+            .rent
+            .as_ref()
+            .map_or(0, |r| r.bills(price, 0) - r.bills(0, 0));
     if w.households[h].funds - w.build_price(price) < reserve {
         return;
     }

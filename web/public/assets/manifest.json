@@ -442,6 +442,10 @@
       "type": "icon",
       "url": "icons/wave.svg"
     },
+    "icon.social.offer": {
+      "type": "icon",
+      "url": "icons/hunger.svg"
+    },
     "icon.bubble.good": {
       "type": "icon",
       "url": "icons/laugh.svg"

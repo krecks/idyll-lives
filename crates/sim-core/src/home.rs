@@ -86,6 +86,8 @@ fn uses_object(t: &TaskKind, id: u32) -> bool {
         TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station == Some(id),
         TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat == Some(id),
         TaskKind::Carry { from, to, .. } => from == id || to == id,
+        // (Once it's in hand, whatever it was taken from may go.)
+        TaskKind::Serve { from, stage: 0, .. } => from == id,
         _ => false,
     }
 }
@@ -117,6 +119,7 @@ fn shift_objects(t: &mut TaskKind, id: u32) {
             shift(from);
             shift(to);
         }
+        TaskKind::Serve { from, .. } => shift(from),
         _ => {}
     }
 }

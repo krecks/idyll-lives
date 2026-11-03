@@ -36,9 +36,8 @@ pub struct Job {
     pub shifts: u32,
     /// Recent missed shifts (one worked shift makes up for one missed); too many and they're let go.
     pub missed: u8,
-    /// Arrived late for the current shift (`careerRules.lateGraceMinutes`; not saved: a game
-    /// loaded mid-shift counts it as on time).
-    #[serde(skip)]
+    /// Arrived late for the current shift (`careerRules.lateGraceMinutes`; saved as `JobSave::late`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub late: bool,
 }
 
@@ -71,6 +70,10 @@ pub struct Visit {
     /// Ticks spent getting to a host to say goodbye (`visits.farewellMinutes`; not saved).
     #[serde(skip)]
     pub farewell: u32,
+    /// No host offers them something to eat or drink before this tick (`visits.offer`,
+    /// `hosting.rs`); 0: not let in yet. Not saved: after a load it's a while again.
+    #[serde(skip)]
+    pub offer_at: u64,
 }
 
 /// A change in where a Sim is (or what it finished), raised by tasks and handled by `life::update`.
@@ -731,7 +734,8 @@ fn takes_off(w: &World, task: &TaskKind, home: u32) -> bool {
         | TaskKind::Eat { .. }
         | TaskKind::Dishes { .. }
         | TaskKind::Carry { .. }
-        | TaskKind::SetUp { .. } => false,
+        | TaskKind::SetUp { .. }
+        | TaskKind::Serve { .. } => false,
     }
 }
 
@@ -970,6 +974,7 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
                 until,
                 idle: 0,
                 farewell: 0,
+                offer_at: 0,
             });
             // With door rules the story is told when they're let in (`answer`).
             if w.content.visits.door.is_some() && !w.plots[plot as usize].public {
