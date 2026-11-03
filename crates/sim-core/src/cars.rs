@@ -926,7 +926,7 @@ impl Route {
             a.0[0] + (b.0[0] - a.0[0]) * k,
             a.0[1] + (b.0[1] - a.0[1]) * k,
         ];
-        (p, a.1 + wrap_angle(b.1 - a.1) * k, a.3)
+        (p, wrap_angle(a.1 + wrap_angle(b.1 - a.1) * k), a.3)
     }
 }
 
@@ -1237,7 +1237,7 @@ impl Legs {
             let reverse = if i + 1 < n { pts[i + 1].1 } else { pts[i].1 };
             let mut yaw = (b[0] - a[0]).atan2(b[1] - a[1]);
             if reverse {
-                yaw += std::f32::consts::PI;
+                yaw = wrap_angle(yaw + std::f32::consts::PI);
             }
             points.push((pts[i].0, yaw, t, reverse));
         }
@@ -3690,5 +3690,26 @@ mod tests {
             "nose in: {}",
             end.1
         );
+    }
+
+    #[test]
+    fn a_car_faces_within_a_half_turn_either_way_backing_out_too() {
+        // (Its riders sit facing as it does: a yaw past a full turn was a resident facing 6.3.)
+        let exits = [[0.5, 20.0], [99.5, 20.0]];
+        for yaw in [std::f32::consts::PI, -std::f32::consts::FRAC_PI_2, 0.0, 3.0] {
+            let c = car([30.0, 10.0], yaw, 20.0);
+            for home in [false, true] {
+                let r = Route::new(&c, &exits, home);
+                let mut t = 0.0;
+                while t <= r.ticks() {
+                    let (_, a, _) = r.at(t);
+                    assert!(
+                        (-std::f32::consts::PI..=std::f32::consts::PI).contains(&a),
+                        "parked at {yaw}, home {home}: {a} at {t}"
+                    );
+                    t += 0.25;
+                }
+            }
+        }
     }
 }
