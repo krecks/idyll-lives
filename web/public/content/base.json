@@ -2084,7 +2084,10 @@
     "noBed": "{a} has no bed of their own: buy one for them",
     "notClosed": "{a} didn't close the {object}: someone else got in first",
     "playedAlone": "{a} had nobody free to play with at the {object}, so practised alone",
-    "noPartner": "{a} had nobody free to play with at the {object}"
+    "noPartner": "{a} had nobody free to play with at the {object}",
+    "setUp": "{a} set up the new {object}",
+    "setUpForThem": "{a}'s new {object} was set up for them",
+    "sentBack": "There was no room at home for {a}'s {object}: it went back to the shop, the money too"
   },
   "activities": [
     {
@@ -3765,6 +3768,7 @@
     "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community"],
     "wear": {"perUse": 0.004, "byCategory": {"bathroom": 0.006, "garden": 0, "outdoor": 0, "decor": 0}, "perQuality": 0.2},
     "repair": {"label": "Repair", "minutes": 45, "skill": "handiness", "skillGainPerHour": 0.3, "chance": 0.5, "chancePerLevel": 0.08, "interest": 1.5, "cost": 0.3, "tags": ["chores"]},
+    "setUp": {"label": "Set up", "minutes": 15, "fetchMinutes": 1.5, "helpAfterHours": 2, "waitHours": 24, "parcel": "parcel", "anim": "tinker", "fetchAnim": "serve", "tags": ["chores"]},
     "maxQuality": 3,
     "qualityBonus": 0.25,
     "upgradeCost": 0.3,
@@ -4460,6 +4464,13 @@
       "hold": "both",
       "dirty": true,
       "radius": 0.16
+    },
+    {
+      "id": "parcel",
+      "label": "Parcel",
+      "model": "item.parcel",
+      "hold": "both",
+      "radius": 0.25
     }
   ],
   "recipes": [

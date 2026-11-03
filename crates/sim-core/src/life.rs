@@ -729,7 +729,8 @@ fn takes_off(w: &World, task: &TaskKind, home: u32) -> bool {
         | TaskKind::Cook { .. }
         | TaskKind::Eat { .. }
         | TaskKind::Dishes { .. }
-        | TaskKind::Carry { .. } => false,
+        | TaskKind::Carry { .. }
+        | TaskKind::SetUp { .. } => false,
     }
 }
 

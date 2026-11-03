@@ -494,7 +494,9 @@ them harder. For `own`, residents pick what suits them (their traits' liked tags
 after, somewhere for a planned activity, or a better one of something they have), save up, and
 once they can afford it with a week's rent and bills left over they ask the player
 (`askAgainDays` after a no; `wishFeeling` on getting it; `deniedFeelings` from the second no for
-the same thing on). Households nobody plays buy it themselves.
+the same thing on). A yes pays for it, and it comes as a parcel to the front door that the one who
+asked carries in and sets up where it goes (`objectRules.setUp`, below); the goal is reached once it
+stands at home. Households nobody plays buy it themselves, and it's there at once.
 `weight` plus per-trait `traits` weights decide how often residents suggest them; `feeling`
 (optional) is granted on reaching it.
 
@@ -736,6 +738,14 @@ per hour) and `away` (its target at work); `preference` (how much the AI prefers
 **Wear and repairs** (`objectRules.wear`: `perUse`, `byCategory`, `perQuality`;
 `objectRules.repair`: `label`, `minutes`, `skill`, `skillGainPerHour`, `chance`,
 `chancePerLevel`, `interest`, `cost` as a share of the price for the paid quick fix, `tags`).
+
+**Setting up what a resident asked for** (`objectRules.setUp`: `label`, the action's first word,
+"Set up the new …"; `fetchMinutes` picking the parcel up at the front door, with `fetchAnim`;
+`minutes` putting it together where it goes, with `anim`; `parcel`, the item carried in both
+hands, none for nothing; `helpAfterHours`, after which any grown-up at home may do it instead of
+the one who asked; `waitHours`, after which it's set up for them anyway; `tags`). Defaults: 15
+minutes of `tinker`, 1.5 of `serve`, 2 and 24 hours. Only what the player says yes to (the
+catalog in Build mode places things at once).
 
 **Laundry** (`laundry`: `{"perDay": 0.4, "most": 4}`): each resident in town makes `perDay` loads
 of dirty washing a day for their household, up to `most` loads waiting (dirty, washed waiting to

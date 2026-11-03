@@ -512,8 +512,8 @@ pub fn check(w: &World) {
             );
         }
     }
-    // Only cooks, people eating and washing up, and harvesters on their way to the fridge carry things
-    // (the rest put them down).
+    // Only cooks, people eating and washing up, harvesters on their way to the fridge and someone
+    // carrying in a parcel to set up carry things (the rest put them down).
     for s in &w.sims {
         if s.held.is_some() {
             let chain = |k: &TaskKind| {
@@ -523,6 +523,7 @@ pub fn check(w: &World) {
                         | TaskKind::Eat { .. }
                         | TaskKind::Dishes { .. }
                         | TaskKind::Carry { baby: None, .. }
+                        | TaskKind::SetUp { .. }
                 )
             };
             assert!(
@@ -540,6 +541,11 @@ pub fn check(w: &World) {
                 s.queue().map(|t| t.kind).collect::<Vec<_>>()
             );
         }
+    }
+    // Things waiting to be set up belong to a household and were asked for by a resident.
+    for st in &w.setups {
+        assert!((st.household as usize) < w.households.len());
+        assert!((st.sim as usize) < n && st.object < w.content.objects.len());
     }
     // Items are in id order, belong to a household, and stand somewhere on the lot.
     for pair in w.items.list.windows(2) {
@@ -640,6 +646,13 @@ fn task_refs(w: &World, i: usize, kind: &TaskKind, doing: &str) {
             baby.is_none_or(|b| (b as usize) < n && b as usize != i)
                 && object(Some(from))
                 && object(Some(to))
+        }
+        TaskKind::SetUp {
+            object, stand, at, ..
+        } => {
+            (object as usize) < c.objects.len()
+                && w.lot.in_bounds(stand.0, stand.1)
+                && at.iter().all(|v| v.is_finite())
         }
     };
     assert!(
@@ -787,6 +800,7 @@ fn doing(kind: &TaskKind) -> Doing {
         TaskKind::Dishes { stage, .. } => Doing(13, stage as u32, 0),
         TaskKind::Phone { action, .. } => Doing(14, action as u32, 0),
         TaskKind::Carry { to, stage, .. } => Doing(15, to, stage as u32),
+        TaskKind::SetUp { object, stage, .. } => Doing(16, object, stage as u32),
     }
 }
 

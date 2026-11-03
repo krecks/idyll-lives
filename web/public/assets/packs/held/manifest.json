@@ -1307,6 +1307,27 @@
           "finish": "material.finish.satin"
         }
       }
+    },
+    "item.parcel": {
+      "type": "model",
+      "url": "../../models/held/parcel.glb",
+      "materials": {
+        "carton": {
+          "finish": "material.finish.matte"
+        },
+        "carton_seam": {
+          "finish": "material.finish.matte"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "paper_red": {
+          "finish": "material.finish.matte"
+        },
+        "tape": {
+          "finish": "material.finish.satin"
+        }
+      }
     }
   }
 }

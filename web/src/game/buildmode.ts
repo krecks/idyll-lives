@@ -1985,6 +1985,20 @@ export function addedObjects(prev: WorldStructure, next: WorldStructure): Object
   return next.objects.filter((o) => !before.has(o.id));
 }
 
+/** In Live mode, things that appeared on the lot in view (set up at home, `setup.rs`): a few at most (more is a house furnished, not an edit). */
+export function liveAdded(prev: WorldStructure, next: WorldStructure): ObjectPlacement[] {
+  const added = addedObjects(prev, next);
+  return added.length <= MAX_LIVE_OBJECTS ? added : [];
+}
+
+/** More new things than this at once in Live mode is a house furnished, not something set up. */
+const MAX_LIVE_OBJECTS = 3;
+
+/** The effect of an object popping into place where it stands (off the middle of its footprint for things that stand anywhere on their tile). */
+export function placeEffect(o: ObjectPlacement): BuildEffect {
+  return { kind: 'place', x: o.x + (o.offset?.[0] ?? 0) / 100, z: o.z + (o.offset?.[1] ?? 0) / 100, w: o.w, d: o.d, objectId: o.id };
+}
+
 /**
  * What changed between two world structures of the same lot, as effects to play and the sound
  * that goes with them: furniture bought, moved, restyled, upgraded or sold; walls, doors and
@@ -2002,7 +2016,7 @@ export function editFeedback(prev: WorldStructure, next: WorldStructure): { effe
   const removed = prev.objects.filter((o) => !after.has(o.id));
   if (added.length + removed.length <= MAX_EDIT_OBJECTS) {
     for (const o of added) {
-      effects.push({ kind: 'place', ...rect(o), objectId: o.id });
+      effects.push(placeEffect(o));
       sounds.add('place');
     }
     for (const o of removed) {

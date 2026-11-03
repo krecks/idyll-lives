@@ -882,6 +882,18 @@ pub enum TaskKind {
         to: u32,
         stage: u8,
     },
+    /// Setting up something new that was bought (`setup.rs`; `object` its type): over to its
+    /// parcel at the front door (`parcel`, standing at `door`) and picking it up (stage 0), then
+    /// carrying it to `stand`, beside where it goes (`at`, its middle), and putting it together
+    /// there (stage 1).
+    SetUp {
+        object: u32,
+        stage: u8,
+        door: [f32; 2],
+        parcel: [f32; 2],
+        stand: (i32, i32),
+        at: [f32; 2],
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1134,6 +1146,9 @@ pub struct Sim {
     /// An object they broke or repaired, or an accident they had, this tick (applied after
     /// the step).
     pub(crate) news: Option<News>,
+    /// Finished putting together something new this tick (an object type; `setup.rs` places it
+    /// after the step). Not saved.
+    pub(crate) set_up: Option<u32>,
     /// When each accident can happen again (`Content::accidents`).
     pub(crate) accident_at: [u64; crate::content::MAX_ACCIDENTS],
     /// Since when each accident's need has been empty (0: it isn't).
@@ -1714,6 +1729,8 @@ pub struct World {
     pub(crate) next_object_id: u32,
     /// Food, plates and pots (see `items.rs`).
     pub items: crate::items::Items,
+    /// Things bought that wait to be set up at home (see `setup.rs`).
+    pub setups: Vec<crate::setup::Setup>,
     /// Plot index per object (`None` when outside every plot).
     pub(crate) object_plot: Vec<Option<u32>>,
     /// Objects by plot, for decisions (see `index.rs`); kept up to date by `refresh_index`.
@@ -2118,6 +2135,7 @@ impl World {
             objects: Vec::new(),
             next_object_id: 0,
             items: Default::default(),
+            setups: Vec::new(),
             object_plot: Vec::new(),
             object_index: ObjectIndex::default(),
             sims: Vec::new(),
@@ -2888,6 +2906,7 @@ impl World {
             to_bed: None,
             kept_out: 0,
             news: None,
+            set_up: None,
             accident_at: [0; crate::content::MAX_ACCIDENTS],
             empty_since: [0; crate::content::MAX_ACCIDENTS],
             age,
@@ -4364,6 +4383,7 @@ impl World {
         self.broadcast();
         self.apply_messes();
         crate::carry::after_step(self);
+        crate::setup::update(self);
         self.wake_for_crying_babies();
         conversation::update(self);
         crate::privacy::after_step(self);
@@ -7265,6 +7285,7 @@ fn start_task(
         }
         TaskKind::Phone { .. } => return crate::phone::start(sim, task, ctx, objects),
         TaskKind::Carry { .. } => return crate::carry::start(sim, task, ctx, objects),
+        TaskKind::SetUp { .. } => return crate::setup::start(sim, task, ctx),
         TaskKind::Use {
             object,
             interaction,
@@ -8414,8 +8435,9 @@ fn progress(
                     crate::phone::using(sim, content, task, elapsed, minutes)
                 }
                 TaskKind::Carry { .. } => crate::carry::using(sim, elapsed),
+                TaskKind::SetUp { .. } => crate::setup::using(sim, content, elapsed),
                 _ => unreachable!(
-                    "only Use, Repair, Spot, Clean, Cook, Eat, Dishes, Phone and Carry tasks have a Using phase"
+                    "only Use, Repair, Spot, Clean, Cook, Eat, Dishes, Phone, Carry and SetUp tasks have a Using phase"
                 ),
             }
         }
@@ -8430,6 +8452,16 @@ fn progress(
             .is_some_and(|a| matches!(a.task.kind, TaskKind::Carry { .. }))
         {
             crate::carry::step_done(sim, ctx, objects, items);
+            if sim.current.is_some() {
+                return;
+            }
+        // The parcel picked up, or the new thing put together (`setup.rs`).
+        } else if sim
+            .current
+            .as_ref()
+            .is_some_and(|a| matches!(a.task.kind, TaskKind::SetUp { .. }))
+        {
+            crate::setup::step_done(sim, ctx, objects);
             if sim.current.is_some() {
                 return;
             }
@@ -8900,6 +8932,7 @@ fn arrive(
         }
         TaskKind::Phone { .. } => crate::phone::arrive(sim, ctx, objects),
         TaskKind::Carry { .. } => crate::carry::arrive(sim, ctx, objects),
+        TaskKind::SetUp { .. } => crate::setup::arrive(sim),
         TaskKind::Use {
             object,
             interaction,

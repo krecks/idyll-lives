@@ -36,6 +36,7 @@ pub mod privacy;
 pub mod rng;
 pub mod rooms;
 pub mod save;
+pub mod setup;
 pub mod snapshot;
 pub mod social;
 pub mod staff;

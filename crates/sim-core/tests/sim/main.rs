@@ -86,6 +86,7 @@ mod rooms;
 mod rooms_incremental;
 mod routines;
 mod search_budget;
+mod setting_up;
 mod shipped_content;
 mod sleep;
 mod slots;
