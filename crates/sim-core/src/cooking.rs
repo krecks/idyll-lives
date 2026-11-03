@@ -1368,7 +1368,11 @@ impl Place<'_> {
         mut prefer: Option<SurfaceSpot>,
         tick: u64,
     ) -> Option<u32> {
-        let def = &self.content.items[held.def];
+        // (A stack, `stack_as`, goes down as the things it's a stack of.)
+        let base = (self.content.items.iter())
+            .position(|d| d.stack_as == Some(held.def))
+            .unwrap_or(held.def);
+        let def = &self.content.items[base];
         let food = held.recipe.is_some() && held.servings > 0;
         if !food && !def.dirty {
             return None;
@@ -1405,7 +1409,7 @@ impl Place<'_> {
                 });
             let id = items.add(ItemInstance {
                 id: 0,
-                def: held.def,
+                def: base,
                 at,
                 servings: if food { held.servings } else { 0 },
                 quality: held.quality,
@@ -1929,8 +1933,21 @@ fn eat_next(
             return;
         }
     }
-    // Nowhere to sit: standing up.
+    // Nowhere to sit: standing up, first stepping off the spot something is used from (the grill
+    // they cooked at), so the next one to use it doesn't stand inside them.
     sim.pose = Pose::Stand;
+    let standing = Task {
+        kind: TaskKind::Eat {
+            item,
+            seat: None,
+            plate: None,
+            stage: 1,
+        },
+        ..task
+    };
+    if aside(sim, ctx).is_some_and(|t| walk_to(sim, standing, ctx, t, tags)) {
+        return;
+    }
     sim.current = Some(Activity {
         task: Task {
             kind: TaskKind::Eat {
@@ -2364,6 +2381,17 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
             };
             act.phase = Phase::Using { elapsed: 0.0 };
         }
+        // Stepped aside to eat standing (`eat_next`).
+        TaskKind::Eat {
+            seat: None,
+            stage: 1,
+            ..
+        } => {
+            sim.pose = Pose::Stand;
+            if let Some(act) = sim.current.as_mut() {
+                act.phase = Phase::Using { elapsed: 0.0 };
+            }
+        }
         TaskKind::Dishes { item, stage: 0, .. } => {
             // At the table: bent over it, picking the armful up (`pick_up` once it's done).
             if let Some(it) = items.get(item) {
@@ -2711,9 +2739,37 @@ pub(crate) fn step_done(
                     lot: ctx.nav.lot,
                     candidates,
                 };
-                at.put_down(
+                let put = at.put_down(
                     items, dirty, household, sim.pos, range, false, spot, ctx.tick,
                 );
+                // With nowhere to put it but the ground (eaten standing in the garden), it's taken
+                // in to be washed up straight away, not left on the grass at their feet.
+                if let Some(id) = put
+                    .filter(|&id| {
+                        matches!(items.get(id).map(|it| it.at), Some(ItemAt::Floor { .. }))
+                    })
+                    .filter(|_| household == sim.household)
+                    .filter(|_| {
+                        station_mask(sim, ctx, objects)
+                            & (content.cooking.dishes | content.cooking.bin)
+                            != 0
+                    })
+                    && !sim
+                        .queue
+                        .iter()
+                        .any(|t| matches!(t.kind, TaskKind::Dishes { item, .. } if item == id))
+                {
+                    sim.queue.push_front(Task {
+                        kind: TaskKind::Dishes {
+                            item: id,
+                            station: None,
+                            stage: 0,
+                            scraps: 0,
+                        },
+                        directed: false,
+                        routine: false,
+                    });
+                }
             }
         }
         TaskKind::Dishes {

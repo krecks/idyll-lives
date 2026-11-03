@@ -508,3 +508,38 @@ fn an_armful_of_plates_is_a_stack_picked_up_bent_over_the_table() {
     assert_eq!(held.servings, 3, "three to wash");
     assert!(plates.iter().all(|&p| w.items.get(p).is_none()));
 }
+
+#[test]
+fn a_stack_of_plates_put_down_part_way_is_so_many_plates() {
+    let mut w = world();
+    let table = table(&w);
+    for _ in 0..3 {
+        put_on(&mut w, table, "plateDirty", 0, 0);
+    }
+    let first = w.items.list[0].id;
+    w.apply(Command::UseItem {
+        sim: 0,
+        item: first,
+        action: ItemAction::Clear,
+    })
+    .unwrap();
+    for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        if w.sims[0].held.is_some() {
+            break;
+        }
+    }
+    assert!(w.sims[0].held.is_some(), "carrying the stack");
+    // Called away with it in hand: put down where they are, as the plates it's a stack of.
+    w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
+    for _ in 0..20 {
+        w.tick_once();
+    }
+    assert_eq!(w.sims[0].held, None, "put down");
+    let plate = w.content.item_index("plateDirty").unwrap();
+    assert_eq!(w.items.list.len(), 3, "three: {:?}", w.items.list);
+    assert!(
+        w.items.list.iter().all(|it| it.def == plate),
+        "plates, not stacks"
+    );
+}

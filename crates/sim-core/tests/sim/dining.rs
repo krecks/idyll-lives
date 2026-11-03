@@ -414,6 +414,12 @@ fn a_snack_is_eaten_sitting_at_the_table_if_there_is_one_else_standing() {
         } else {
             assert_eq!(seat, None, "nowhere to sit");
             assert_eq!(w.sims[0].pose, Pose::Stand);
+            let p = w.sims[0].pos;
+            assert_ne!(
+                (p[0].floor() as i32, p[1].floor() as i32),
+                (2, 3),
+                "stepped off the fridge's spot to eat, out of the next one's way"
+            );
             assert!(w.sims[0].held.is_some(), "the plate in hand");
             // The snack (a recipe made for the fridge's `eat`) is still food after a reload
             // (put down, as eating starts again from what's there).
@@ -482,4 +488,42 @@ fn a_diner_takes_the_chair_whose_place_is_clear_over_one_with_a_dirty_plate_in_f
         spot.z as f32 + 0.5 + f32::from(spot.offset[1]) / 100.0,
     ];
     assert_eq!(pick(&[(place, 0.13)]), far, "not beside the dirty plate");
+}
+
+#[test]
+fn a_plate_eaten_from_standing_with_nowhere_to_put_it_is_taken_away_not_left_on_the_floor() {
+    let (mut w, fridge, _) = kitchen(false);
+    buy(&mut w, "trashCan", 6, 2, 0).unwrap();
+    let hunger = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "hunger")
+        .unwrap();
+    w.sims[0].needs[hunger] = 0.3;
+    let snack = interaction(&w, fridge, "snack");
+    w.apply(Command::Use {
+        sim: 0,
+        object: fridge,
+        interaction: snack,
+    })
+    .unwrap();
+    let mut on_floor = false;
+    for _ in 0..12000 {
+        w.tick_once();
+        on_floor |= w
+            .items
+            .list
+            .iter()
+            .any(|it| matches!(it.at, sim_core::items::ItemAt::Floor { .. }));
+        if on_floor && w.sims[0].current().is_none() && w.sims[0].queue().next().is_none() {
+            break;
+        }
+    }
+    assert!(on_floor, "put down on the floor (no top anywhere)");
+    assert!(
+        w.items.list.is_empty(),
+        "picked up again and taken to the bin: {:?}",
+        w.items.list
+    );
 }
