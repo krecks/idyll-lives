@@ -1016,6 +1016,19 @@ impl World {
         colors: crate::world::Colors,
         layout: Layout,
     ) -> Result<u32, Error> {
+        self.buy_charging(household, def_id, at, colors, layout, true)
+    }
+
+    /// `buy_at`, paid for now (`charge`) or already (a parcel set up: `setup.rs`).
+    pub(crate) fn buy_charging(
+        &mut self,
+        household: u32,
+        def_id: &str,
+        at: Option<[i32; 3]>,
+        colors: crate::world::Colors,
+        layout: Layout,
+        charge: bool,
+    ) -> Result<u32, Error> {
         let (h, plot) = self.home_of(household)?;
         let def = self
             .content
@@ -1025,7 +1038,9 @@ impl World {
         let price = d
             .price
             .ok_or_else(|| Error::new(format!("{} isn't for sale", d.name)))?;
-        self.can_pay(h, price, || format!("not enough money for the {}", d.name))?;
+        if charge {
+            self.can_pay(h, price, || format!("not enough money for the {}", d.name))?;
+        }
         let on_top = d.layer == Layer::Surface;
         let id = match at {
             Some([x, z, rot]) => {
@@ -1052,7 +1067,9 @@ impl World {
             self.objects[id as usize].off = true;
             self.lights_version = self.lights_version.wrapping_add(1);
         }
-        self.pay(h, price);
+        if charge {
+            self.pay(h, price);
+        }
         Ok(id)
     }
 

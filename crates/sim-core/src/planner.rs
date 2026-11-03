@@ -1565,7 +1565,7 @@ fn ask_to_buy(w: &mut World, i: usize, day: u32) {
 /// the room they know stays as it was). Only where they can't be swapped there does the old one
 /// go and the new one find a free spot somewhere else.
 pub(crate) fn buy_wanted(w: &mut World, i: usize, object: usize) -> Result<u32, Error> {
-    let bought = place_wanted(w, w.sims[i].household, object, None)?;
+    let bought = place_wanted(w, w.sims[i].household, object, None, true)?;
     w.events
         .push_object(w.tick, EventKind::Bought, i, object, None);
     w.sims[i].planner.recheck = true;
@@ -1574,19 +1574,20 @@ pub(crate) fn buy_wanted(w: &mut World, i: usize, object: usize) -> Result<u32, 
 
 /// Buys `object` for household `h`'s home as `buy_wanted` does: over the cheaper one it
 /// replaces, else at `at` (as for `World::buy_at`) if it fits there, else at a free spot.
-/// Returns the new object's id.
+/// Paid for now (`charge`), or already (a parcel set up). Returns the new object's id.
 pub(crate) fn place_wanted(
     w: &mut World,
     h: u32,
     object: usize,
     at: Option<crate::setup::Spot>,
+    charge: bool,
 ) -> Result<u32, Error> {
     let id = w.content.objects[object].id.clone();
     let old = replaces(w, h as usize, object);
     // Their own thing goes first, and where it stood: not a new bed into some free corner.
-    match old.and_then(|o| swap_in(w, h, o, &id)) {
+    match old.and_then(|o| swap_in(w, h, o, &id, charge)) {
         Some(new) => Ok(new),
-        None => at_a_free_spot(w, h, object, &id, at),
+        None => at_a_free_spot(w, h, object, &id, at, charge),
     }
 }
 
@@ -1594,7 +1595,7 @@ pub(crate) fn place_wanted(
 /// thing stands in the old one's place. If it won't go there, it's put anywhere now free; if even
 /// that doesn't fit, `old` goes back as it was. Only for something nothing stands on and nobody
 /// uses.
-fn swap_in(w: &mut World, h: u32, old: u32, id: &str) -> Option<u32> {
+fn swap_in(w: &mut World, h: u32, old: u32, id: &str, charge: bool) -> Option<u32> {
     let o = w.objects.get(old as usize)?.clone();
     if o.users.iter().any(Option::is_some)
         || !crate::surface::riders(&w.content, &w.objects, old).is_empty()
@@ -1605,15 +1606,10 @@ fn swap_in(w: &mut World, h: u32, old: u32, id: &str) -> Option<u32> {
     let before = w.households[hh].funds;
     w.sell(h, old).ok()?;
     let refund = w.households[hh].funds - before;
-    let placed = w
-        .buy_at(
-            h,
-            id,
-            Some([o.x, o.z, o.rot as i32]),
-            Default::default(),
-            Default::default(),
-        )
-        .or_else(|_| w.buy_at(h, id, None, Default::default(), Default::default()));
+    let buy = |w: &mut World, at| {
+        w.buy_charging(h, id, at, Default::default(), Default::default(), charge)
+    };
+    let placed = buy(w, Some([o.x, o.z, o.rot as i32])).or_else(|_| buy(w, None));
     if let Ok(new) = placed {
         return Some(new);
     }
@@ -1634,13 +1630,16 @@ fn at_a_free_spot(
     object: usize,
     id: &str,
     at: Option<crate::setup::Spot>,
+    charge: bool,
 ) -> Result<u32, Error> {
     let old = replaces(w, h as usize, object);
+    let buy =
+        |w: &mut World, at, layout| w.buy_charging(h, id, at, Default::default(), layout, charge);
     let new = match at {
-        Some((spot, layout)) => w
-            .buy_at(h, id, Some(spot), Default::default(), layout)
-            .or_else(|_| w.buy_at(h, id, None, Default::default(), Default::default())),
-        None => w.buy_at(h, id, None, Default::default(), Default::default()),
+        Some((spot, layout)) => {
+            buy(w, Some(spot), layout).or_else(|_| buy(w, None, Default::default()))
+        }
+        None => buy(w, None, Default::default()),
     }?;
     // The old one goes too (ids after it shift down).
     match old {
