@@ -6026,19 +6026,12 @@ fn step_sim(
     let mut ticks = sim.steps;
     if sim.current.is_none() {
         // A routine's next step (washing hands after the toilet) before anything else they'd
-        // do, unless the player asks for something; someone at the door is answered first, and
-        // the step waits for after (`life::doors`).
-        let answering = sim
-            .queue
-            .front()
-            .is_some_and(|t| matches!(t.kind, TaskKind::Answer { .. }));
-        let follow_up = if answering {
-            None
-        } else {
-            sim.follow_up
-                .take()
-                .filter(|_| !sim.queue.front().is_some_and(|t| t.directed))
-        };
+        // do, unless the player asks for something. (Someone sent to the door has it queued
+        // after answering it: `life::doors`.)
+        let follow_up = sim
+            .follow_up
+            .take()
+            .filter(|_| !sim.queue.front().is_some_and(|t| t.directed));
         if let Some(task) = follow_up {
             start_task(sim, task, ctx, objects, items);
         } else if let Some(task) = sim.queue.pop_front() {
@@ -7059,14 +7052,11 @@ fn pick_autonomous(
                 continue;
             }
             // Someone to open the door: a grown-up at home, up and about, not on their way out.
-            if !ctx.briefs.iter().any(|b| {
-                b.household == other.id
-                    && b.plot == Some(plot)
-                    && !b.away
-                    && b.adult
-                    && !b.lying
-                    && !b.leaving
-            }) {
+            if !ctx
+                .briefs
+                .iter()
+                .any(|b| crate::life::opens_door(b, other.id, plot))
+            {
                 continue;
             }
             let door = ctx.plots[plot as usize].arrival_point();

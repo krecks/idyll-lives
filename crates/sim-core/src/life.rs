@@ -1176,6 +1176,11 @@ fn doors(w: &mut World) {
             if s.current.is_some() {
                 end_activity(s, content, objects);
             }
+            // (The next step of a routine they had coming, washing their hands after the toilet
+            // say, waits for after the door.)
+            if let Some(next) = s.follow_up.take() {
+                s.queue.push_front(next);
+            }
             s.queue.push_front(Task {
                 kind: TaskKind::Answer { guest: i as u32 },
                 directed: false,
@@ -1218,19 +1223,34 @@ fn doors(w: &mut World) {
 /// Whether a grown-up of the household living at `plot` is on it, at home and awake (who
 /// would answer the door to `guest` once free).
 fn awake_at_home(w: &World, plot: u32, guest: usize) -> bool {
-    let Some(household) = w.households.iter().position(|h| h.plot == Some(plot)) else {
-        return false;
-    };
-    w.sims.iter().enumerate().any(|(j, s)| {
-        j != guest
+    door_people(w, plot, guest).next().is_some()
+}
+
+/// The grown-ups of the household living at `plot` (but `guest`) who are on it, at home and
+/// awake: who answer the door (`door_host`, once free).
+fn door_people(
+    w: &World,
+    plot: u32,
+    guest: usize,
+) -> impl Iterator<Item = (usize, &crate::world::Sim)> {
+    let household = w.households.iter().position(|h| h.plot == Some(plot));
+    w.sims.iter().enumerate().filter(move |&(j, s)| {
+        household.is_some_and(|h| s.household as usize == h)
+            && j != guest
             && s.here()
-            && s.household as usize == household
             && s.away_until.is_none()
             && s.visiting.is_none()
             && s.pose != Pose::Lie
             && s.adult(&w.content)
             && w.plot_at(s.tile().0, s.tile().1) == Some(plot)
     })
+}
+
+/// `door_people` by the tick's briefs, for a visitor deciding to set off (`world::pick_autonomous`):
+/// whether `b` of `household` is on its home `plot`, a grown-up, up and about, and not on their
+/// way out.
+pub(crate) fn opens_door(b: &crate::world::SimBrief, household: u32, plot: u32) -> bool {
+    b.household == household && b.plot == Some(plot) && !b.away && b.adult && !b.lying && !b.leaving
 }
 
 /// How far (m) out from its front door a visitor stands to knock: an arm's length.
@@ -1285,7 +1305,6 @@ pub(crate) type Knock = ((i32, i32), [f32; 2], f32);
 /// Who answers the door of `plot`: the grown-up of the household living there who is nearest to
 /// the door, at home, awake, and not busy with something the player asked for or a conversation.
 fn door_host(w: &World, plot: u32, guest: usize) -> Option<usize> {
-    let household = w.households.iter().position(|h| h.plot == Some(plot))?;
     let door = w.plots[plot as usize].arrival_point();
     let free = |s: &crate::world::Sim| {
         s.current.as_ref().is_none_or(|a| {
@@ -1300,21 +1319,8 @@ fn door_host(w: &World, plot: u32, guest: usize) -> Option<usize> {
                 )
         }) && !s.queue.front().is_some_and(|t| t.directed)
     };
-    w.sims
-        .iter()
-        .enumerate()
-        .filter(|&(j, s)| {
-            j != guest
-                && s.here()
-                && s.household as usize == household
-                && s.away_until.is_none()
-                && s.visiting.is_none()
-                && s.pose != Pose::Lie
-                && s.engaged_with.is_none()
-                && s.adult(&w.content)
-                && w.plot_at(s.tile().0, s.tile().1) == Some(plot)
-                && free(s)
-        })
+    door_people(w, plot, guest)
+        .filter(|&(_, s)| s.engaged_with.is_none() && free(s))
         .map(|(j, s)| (j, (s.pos[0] - door[0]).hypot(s.pos[1] - door[1])))
         .min_by(|a, b| a.1.total_cmp(&b.1))
         .map(|(j, _)| j)
@@ -1755,9 +1761,9 @@ fn give_up_farewell(w: &mut World, i: usize) {
 
 #[cfg(test)]
 mod tests {
-    use super::knocking;
+    use super::{doors, knocking};
     use crate::social::EventKind;
-    use crate::world::{Task, TaskKind};
+    use crate::world::{Activity, Phase, Task, TaskKind};
     use crate::{Command, TICKS_PER_SECOND, World, clock};
 
     const CONTENT: &str = r#"{
@@ -2014,14 +2020,12 @@ mod tests {
             );
         }
         let knocked = w.tick;
-        // Sent to the door, with sitting in the chair (30 minutes) to come next.
+        // Sent to the door (after everyone's step: `doors`) just as she's done with something,
+        // with sitting in the chair (30 minutes) to come next.
         let ada = &mut w.sims[0];
         ada.current = None;
-        ada.queue.push_front(Task {
-            kind: TaskKind::Answer { guest: 1 },
-            directed: false,
-            routine: false,
-        });
+        ada.queue
+            .retain(|t| !matches!(t.kind, TaskKind::Answer { .. }));
         ada.follow_up = Some(Task {
             kind: TaskKind::Use {
                 object: 0,
@@ -2030,6 +2034,18 @@ mod tests {
             directed: false,
             routine: false,
         });
+        if let Some(Activity {
+            phase: Phase::Knocking { host, .. },
+            ..
+        }) = w.sims[1].current.as_mut()
+        {
+            *host = None;
+        }
+        doors(&mut w);
+        assert!(matches!(
+            w.sims[0].queue.front().map(|t| t.kind),
+            Some(TaskKind::Answer { guest: 1 })
+        ));
         let in_by = knocked + ticks_of(10.0);
         while !w.events.iter().any(|e| e.kind == EventKind::Visited) {
             w.tick_once();
