@@ -974,7 +974,7 @@
       "stations": [
         "dishes"
       ],
-      "description": "A slimline dishwasher with a stainless door, under a worktop: the washing up goes in and waits, and it washes by itself once it's full or the washing up is done.",
+      "description": "A slimline dishwasher with a stainless door, under a worktop: the washing up goes in and waits, and it washes by itself once it's full, or a third full with the washing up done.",
       "sounds": {
         "clean": "crockery",
         "wash": "crockery"

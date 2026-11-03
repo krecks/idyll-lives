@@ -4149,7 +4149,7 @@
       "label": "Prepped bowl",
       "model": "item.prepBowl",
       "hold": "both",
-      "radius": 0.14
+      "radius": 0.162
     },
     {
       "id": "mealPot",
@@ -4203,7 +4203,7 @@
       "hold": "both",
       "serving": "pieSlice",
       "emptyAs": "pieDishDirty",
-      "radius": 0.16
+      "radius": 0.13
     },
     {
       "id": "mealPlate",
@@ -4211,7 +4211,7 @@
       "model": "item.mealPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "pizzaSlice",
@@ -4219,7 +4219,7 @@
       "model": "item.pizzaSlice",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "treatPlate",
@@ -4227,7 +4227,7 @@
       "model": "item.treatPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "pieSlice",
@@ -4235,7 +4235,7 @@
       "model": "item.pieSlice",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "babyBottle",
@@ -4250,7 +4250,7 @@
       "model": "item.cakeSlice",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "sandwich",
@@ -4258,7 +4258,7 @@
       "model": "item.sandwich",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "snack",
@@ -4266,7 +4266,7 @@
       "model": "item.treatPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "iceCream",
@@ -4282,7 +4282,7 @@
       "model": "item.toast",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "leftovers",
@@ -4290,7 +4290,7 @@
       "model": "item.mealPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "cheeseBoard",
@@ -4319,7 +4319,7 @@
       "label": "Takeout",
       "model": "item.takeout",
       "hold": "hand",
-      "radius": 0.13
+      "radius": 0.146
     },
     {
       "id": "iceCreamCone",
@@ -4340,7 +4340,7 @@
       "label": "Crisps",
       "model": "item.crisps",
       "hold": "hand",
-      "radius": 0.11
+      "radius": 0.12
     },
     {
       "id": "fruit",
@@ -4361,7 +4361,7 @@
       "label": "Sandwich",
       "model": "item.sandwich",
       "hold": "hand",
-      "radius": 0.1
+      "radius": 0.144
     },
     {
       "id": "gardenProduce",
@@ -4388,10 +4388,10 @@
     {
       "id": "freshPlate",
       "label": "Something fresh from the garden",
-      "model": "item.treatPlate",
+      "model": "item.freshPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "plateDirty",
@@ -4399,7 +4399,16 @@
       "model": "item.plateDirty",
       "hold": "hand",
       "dirty": true,
-      "radius": 0.13
+      "stackAs": "plateStackDirty",
+      "radius": 0.144
+    },
+    {
+      "id": "plateStackDirty",
+      "label": "Dirty plates",
+      "model": "item.plateStackDirty",
+      "hold": "both",
+      "dirty": true,
+      "radius": 0.156
     },
     {
       "id": "potDirty",
@@ -4455,7 +4464,14 @@
       "model": "item.pieDishDirty",
       "hold": "both",
       "dirty": true,
-      "radius": 0.16
+      "radius": 0.13
+    },
+    {
+      "id": "batterBowl",
+      "label": "Bowl of batter",
+      "model": "tool.mixingBowl",
+      "hold": "both",
+      "radius": 0.15
     }
   ],
   "recipes": [
@@ -4744,14 +4760,14 @@
           "holds": "ingredients"
         },
         {
-          "label": "Prep",
+          "label": "Make the dough",
           "at": [
             "prep"
           ],
           "minutes": 15,
-          "anim": "chop",
+          "anim": "mix",
           "optional": true,
-          "holds": "prepBowl"
+          "holds": "batterBowl"
         },
         {
           "label": "Bake",
@@ -4801,7 +4817,7 @@
           "minutes": 15,
           "anim": "mix",
           "optional": true,
-          "holds": "prepBowl"
+          "holds": "batterBowl"
         },
         {
           "label": "Bake",
@@ -4850,7 +4866,7 @@
           "minutes": 15,
           "anim": "mix",
           "optional": true,
-          "holds": "prepBowl"
+          "holds": "batterBowl"
         },
         {
           "label": "Bake",

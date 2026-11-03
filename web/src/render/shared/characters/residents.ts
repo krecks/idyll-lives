@@ -54,7 +54,7 @@ import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
 import { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SET_DOWN_SPOTS, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, withCutlery } from './actions';
+import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SET_DOWN_SPOTS, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, biteOf } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { FLOOR_SITS } from './clips/seated';
 import { HANDED } from './clips/serve';
@@ -1052,12 +1052,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   /**
    * The prop in a Sim's hand for what they do (`ACTIONS[tag].prop`: a book, a cup, a phone, a cue; `plate`: what they
-   * eat); none while walking, talking (`busy`), lying, sitting down or getting up.
+   * eat, `carried` in the hand); none while walking, talking (`busy`), lying, sitting down or getting up.
    */
-  private handPropOf(rig: SimRig, pose: number, busy: boolean, tag: string, plate: string): HandProp | null {
+  private handPropOf(rig: SimRig, pose: number, busy: boolean, tag: string, plate: string, carried: boolean): HandProp | null {
     const act = ACTIONS[tag]?.prop;
     const still = !busy && rig.tagKnown && rig.walkT < 0 && pose !== Pose.Lie && !RISING.has(rig.cur.key);
-    return still && act ? (typeof act === 'function' ? act(rig.useDef, plate, pose === Pose.Sit) : act) : null;
+    return still && act ? (typeof act === 'function' ? act(rig.useDef, plate, pose === Pose.Sit, carried) : act) : null;
   }
 
   /** Prop `p` (`handPropOf`) in Sim row `i`'s hand, placed by the hands as just posed; not outside the clips it is held in. */
@@ -1883,8 +1883,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.writeSit(rig, i);
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) writeCradle(set.bone, this.scratch.worldT, this.cradle, i, rig);
       this.writeBlanket(rig, i, pose, dt, appeared);
-      // (A plate held while eating it with a fork: on the left palm, the fork in the right hand.)
-      const inHand = this.handPropOf(rig, pose, moving || !!social, tag, plate);
+      // (A plate held while eating it with a fork, or a bite of it by hand: on the left palm, the fork or the bite in the right hand.)
+      const inHand = this.handPropOf(rig, pose, moving || !!social, tag, plate, carry !== '');
       if (setDown) this.writeSetDown(rig, i, setDown === 'top' ? item : undefined, tag, useObj);
       else this.writeCarried(rig, i, handedYet(rig, tag) ? item : undefined, inHand?.grip === 'bite' && inHand.hand !== 'l' ? -1 : 1);
       this.writeHeld(rig, i, pose, moving);
@@ -2095,8 +2095,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         const up = known ? (typeof act?.upper === 'function' ? act.upper(rig.useDef) : act?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
         // Eating / drinking now and then (between sips the cup held: `between`); holding a book or phone throughout.
         if (up === 'eat' || up === 'drink') {
-          // (With cutlery, the bite stops a fork's length off the mouth: `eatFork`.)
-          const bite = up === 'eat' && withCutlery(rig.plate) ? 'eatFork' : up;
+          // (With cutlery or a bite in the hand, the bite stops a fork's length off the mouth: `eatFork`.)
+          const bite = up === 'eat' && biteOf(rig.plate, carry !== '') ? 'eatFork' : up;
           upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? bite : known ? (act?.between ?? '') : '';
         }
         else if (up) upper = up;
@@ -2211,6 +2211,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
           rig.stepTime = 0;
         }
         key = seq[rig.seq % seq.length];
+        // (Eating standing with cutlery or a bite in the hand, the plate on the left palm: the hand a fork's length off the
+        // mouth, as seated, not the plate to the face.)
+        if (key === 'eat' && tag === 'eat' && biteOf(rig.plate, carry !== '')) key = 'eatFork';
         repeat = true;
         // Up to the crib's rail to pick the baby up, back from it holding them (`cuddles`).
         // (Stepped in to a thing, `stepIn` places them: a reach as well would add to it, and walk them into the thing.)
@@ -2313,11 +2316,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (key !== 'standUp') rig.fromBed = false;
     if (key !== up) rig.rising = false;
     if (pose !== Pose.Sit) rootFwd += this.tuckOut(rig, key, step);
-    // Carrying something while walking or standing about (not while using a station with it).
-    if (carry && pose === Pose.Stand && !upper && !dir?.clip && key !== up && (moving || !rig.useSeq) && social !== Anim.Hug && social !== Anim.Fight) {
-      upper = carry;
+    // Carrying something while walking or standing about (not while using a station with it), and while turning
+    // to what they'll use it at: still held, not dropped to the hips for the turn; turning to the table to serve it,
+    // already bending to put it down (the serve itself is short, a turn's worth).
+    const turning = !moving && isTurn(key);
+    if (carry && pose === Pose.Stand && !upper && !dir?.clip && key !== up && (moving || !rig.useSeq || turning) && social !== Anim.Hug && social !== Anim.Fight) {
+      upper = turning && tag === 'serve' ? 'setDown' : carry;
       hands = HANDS.hold;
       if (key === 'foldArms') key = 'idle';
+    } else if (turning && tag === 'serve' && !carry && pose === Pose.Stand && !upper && !dir?.clip) {
+      // (Picking an armful up off the table, `serve` with nothing in hand yet: bending to it through the turn too.)
+      upper = 'setDown';
     }
     const fx = Math.sin(rig.yaw);
     const fz = Math.cos(rig.yaw);

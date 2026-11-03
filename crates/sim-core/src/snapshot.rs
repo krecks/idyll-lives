@@ -379,6 +379,8 @@ pub(crate) fn doing(world: &World, s: &Sim) -> Doing {
     {
         let rules = &world.content.cooking;
         let anim = match stage {
+            // (Picking the armful up off the table: bent over it, as a dish is put down.)
+            0 => rules.serve_anim,
             1 => rules.scrape_anim,
             3 => rules.put_away_anim,
             _ => rules.dishes_anim,

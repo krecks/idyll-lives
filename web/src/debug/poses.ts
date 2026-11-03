@@ -172,6 +172,7 @@ const STATIONS: Station[] = [
   { label: 'chop', def: 'counter', tag: 'chop' },
   { label: 'stir', def: 'stoveGas', tag: 'stir', female: true },
   { label: 'flip', def: 'grill', tag: 'flip' },
+  { label: 'mix', def: 'counter', tag: 'mix', female: true },
   { label: 'carry plate', held: 'mealPlate', walk: true, female: true },
   { label: 'carry pot', held: 'mealPot', walk: true },
   { label: 'hold ingredients', held: 'ingredients' },
@@ -184,6 +185,11 @@ const STATIONS: Station[] = [
   // Props in hand (G-70): a fork, a cup at the table, a can, wine, a shaker, a coin, seed for the birds
   { label: 'eat with a fork', def: 'diningChair', tag: 'eat', pose: P.Sit, plate: 'mealPlate' },
   { label: 'ice cream with a spoon', def: 'diningChair', tag: 'eat', pose: P.Sit, plate: 'iceCream', stage: 'child' },
+  // Eaten by hand (`BITES`): a bite of it in the hand.
+  { label: 'sandwich by hand', def: 'diningChair', tag: 'eat', pose: P.Sit, plate: 'sandwich' },
+  { label: 'pizza by hand', def: 'diningChair', tag: 'eat', pose: P.Sit, plate: 'pizzaSlice', female: true },
+  { label: 'a cookie', def: 'diningChair', tag: 'eat', pose: P.Sit, plate: 'treatPlate', stage: 'child' },
+  { label: 'a hot dog', def: 'diningChair', tag: 'eat', pose: P.Sit, plate: 'hotDog' },
   { label: 'coffee seated', def: 'diningChair', tag: 'drink', pose: P.Sit, female: true },
   { label: 'coffee standing', def: 'coffeeMachine', tag: 'drink' },
   { label: 'cold drink', def: 'fridge', tag: 'drink', female: true },
