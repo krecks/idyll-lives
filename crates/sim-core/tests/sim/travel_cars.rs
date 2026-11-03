@@ -131,3 +131,67 @@ fn a_car_coming_or_going_changes_walking_only_round_it() {
     }
     assert!(checked >= 2, "hardly any car came or went: {checked}");
 }
+
+/// A house on a street along x (its middle at z = 9.5), the ways out at both ends, the car on the
+/// driveway facing the street, and a box either side of the driveway's mouth: Ada drives, Bo has
+/// no job.
+fn driveway() -> World {
+    let content = r#"{
+        "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],
+        "objects":[{"id":"box","name":"Box","footprint":[1,1],"interactions":[]}],
+        "careers":[{"id":"office","label":"Office","levels":[
+            {"title":"Intern","pay":100,"start":9,"hours":4,"days":[0,1,2,3,4,5,6]}]}],
+        "economy":{"startingFunds":500}}"#;
+    let town = r#"{"width":60,"depth":14,"exits":[[0.5,9.5],[59.5,9.5]],
+        "plots":[{"name":"Home","x":20,"z":0,"w":20,"d":8,"entry":[25.5,7.5]}],
+        "households":[{"name":"Ones","plot":0}],
+        "objects":[{"def":"box","x":33,"z":6,"rot":0},{"def":"box","x":35,"z":6,"rot":0}],
+        "sims":[{"name":"Ada","household":0,"job":{"career":"office"},"x":25.5,"z":3.5},
+                {"name":"Bo","household":0,"x":26.5,"z":3.5}],
+        "cars":[{"plot":0,"x":34.0,"z":3.0,"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,"body":1,"paint":2}]}"#;
+    let mut w = World::from_json(content, town, 1).unwrap();
+    w.autonomy = false;
+    w
+}
+
+/// How far someone on foot at `pos` (a quarter of a metre round) is from car `c`'s body where
+/// it's drawn: below 0, how far into it. None: not drawn.
+fn from_car(w: &World, c: usize, pos: [f32; 2]) -> Option<f32> {
+    let (at, yaw, ..) = w.cars[c].shown?;
+    let (s, k) = yaw.sin_cos();
+    let (dx, dz) = (pos[0] - at[0], pos[1] - at[1]);
+    let (along, across) = (dx * s + dz * k, dx * k - dz * s);
+    let (ex, ez) = (
+        along.abs() - w.cars[c].len / 2.0,
+        across.abs() - w.cars[c].wid / 2.0,
+    );
+    Some(ex.max(0.0).hypot(ez.max(0.0)) + ex.max(ez).min(0.0) - 0.25)
+}
+
+#[test]
+fn a_car_never_drives_through_someone_with_nowhere_to_step_aside() {
+    let mut w = driveway();
+    // Ada drives off (at work as far as anyone can tell)...
+    let car = &mut w.cars[0];
+    car.state = CarState::Leaving;
+    car.progress = 0.0;
+    car.driver = Some(0);
+    car.aboard = vec![0];
+    w.sims[0].away_until = Some(w.tick + 100_000);
+    // ...and Bo stands in front of it between the boxes, with no room to step aside.
+    w.sims[1].pos = [34.0, 6.5];
+    let mut closest = f32::INFINITY;
+    for _ in 0..2000 {
+        w.tick_once();
+        if let Some(gap) = from_car(&w, 0, w.sims[1].pos) {
+            closest = closest.min(gap);
+        }
+    }
+    assert_eq!(w.cars[0].state, CarState::Away, "the car never got away");
+    assert!(
+        closest >= 0.0,
+        "it drove {:.2} m into Bo, now at {:?}",
+        -closest,
+        w.sims[1].pos
+    );
+}

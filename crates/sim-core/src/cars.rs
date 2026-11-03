@@ -95,9 +95,10 @@ pub(crate) const BESIDE: f32 = 0.1;
 pub(crate) const BODY: f32 = 0.25;
 /// Someone waiting for a car to pass for this long steps aside out of its way (`make_way`).
 pub(crate) const MAKE_WAY_TICKS: u32 = 30;
-/// How long a car waits for someone who won't step aside (with nowhere to step) before it drives
-/// on.
+/// How long a car waits for someone who can't step aside (with nowhere to step) before they go
+/// round to where it has room to pass them (`clear_of`), up to `CLEAR_STEPS` tiles off.
 pub(crate) const PASS_TICKS: u32 = 3 * crate::TICKS_PER_MINUTE as u32;
+const CLEAR_STEPS: usize = 6;
 /// How long someone done at work waits there for the others in their car.
 const RIDE_WAIT_TICKS: u64 = 60 * crate::TICKS_PER_MINUTE;
 /// The drive between the end of town and work, each way.
@@ -1916,10 +1917,11 @@ impl Body {
 
 /// Something driving (`d`, where it would be a tick on) a tick further along its way, unless
 /// someone is in its way: it waits for them (`waited`, ticks). Someone standing there a while (a
-/// chat on the pavement) steps aside for it (`make_way`). Someone at something or at a wheel, or
-/// `aside` (as the one driving has it), isn't in its way; nor is anyone whose body (`Body`, on
-/// foot or on a bike) clears its sides by `BESIDE`, walking by it or along beside it. Nor, past
-/// `PASS_TICKS`, is anyone.
+/// chat on the pavement) steps aside for it (`make_way`); someone with nowhere to step goes
+/// round to where they're out of its way, past `PASS_TICKS` (`clear_of`). It never drives
+/// through anyone. Someone at something or at a wheel, or `aside` (as the one driving has it),
+/// isn't in its way; nor is anyone whose body (`Body`, on foot or on a bike) clears its sides by
+/// `BESIDE`, walking by it or along beside it.
 pub(crate) fn go_on(
     sims: &mut [Sim],
     nav: &crate::path::NavGrid,
@@ -1948,20 +1950,62 @@ pub(crate) fn go_on(
             continue;
         }
         waiting = true;
-        if *waited > MAKE_WAY_TICKS
-            && let Some(p) = make_way(d.at, d.yaw, nav, s.pos, 0.06)
-        {
+        // (Stepping aside that long hasn't got them out of its way.)
+        let round = (*waited >= PASS_TICKS)
+            .then(|| clear_of(&d, nav, body, s.pos))
+            .flatten();
+        if let Some(p) = round.or_else(|| {
+            (*waited > MAKE_WAY_TICKS)
+                .then(|| make_way(d.at, d.yaw, nav, s.pos, 0.06))
+                .flatten()
+        }) {
             s.pos = p;
         }
     }
-    if !waiting {
+    if waiting {
+        *waited = waited.saturating_add(1);
+    } else {
         *waited = 0;
         *progress += 1.0;
-    } else if *waited < PASS_TICKS {
-        *waited += 1;
-    } else {
-        *progress += 1.0;
     }
+}
+
+/// Someone at `pos` in the way of something driving (`d`) with nowhere to step aside: the middle
+/// of the nearest tile they can walk to, `CLEAR_STEPS` at most, where their `body` is out of its
+/// way. None: nowhere that near (it waits on).
+fn clear_of(
+    d: &Driving,
+    nav: &crate::path::NavGrid,
+    body: Body,
+    pos: [f32; 2],
+) -> Option<[f32; 2]> {
+    let turn = d.yaw.sin_cos();
+    let start = (pos[0].floor() as i32, pos[1].floor() as i32);
+    let mut seen = vec![start];
+    let mut ring = vec![start];
+    for _ in 0..CLEAR_STEPS {
+        let mut next = Vec::new();
+        for &(x, z) in &ring {
+            for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                let t = (x + dx, z + dz);
+                if !seen.contains(&t) && nav.can_step(x, z, t.0, t.1) {
+                    seen.push(t);
+                    next.push(t);
+                }
+            }
+        }
+        let far = |p: &[f32; 2]| (p[0] - pos[0]).hypot(p[1] - pos[1]);
+        let clear = next
+            .iter()
+            .map(|&(x, z)| [x as f32 + 0.5, z as f32 + 0.5])
+            .filter(|&p| !covers(d.at, turn, d.len, d.wid, body, p, d.ahead, d.behind))
+            .min_by(|a, b| far(a).total_cmp(&far(b)));
+        if clear.is_some() {
+            return clear;
+        }
+        ring = next;
+    }
+    None
 }
 
 /// `pos` from something at `at` turned `turn` (its yaw's sine and cosine): how far along it,
