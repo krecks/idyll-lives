@@ -1867,6 +1867,14 @@ impl World {
                     other => other,
                 };
             }
+            // Their way to work timed by it: worked out again; by another: ids shift down too.
+            if let Some(c) = sim.commute.as_mut() {
+                match c.bike {
+                    Some(o) if o == id => sim.commute = None,
+                    Some(o) if o > id => c.bike = Some(o - 1),
+                    _ => {}
+                }
+            }
             // A seat taken to use something else (content `seatNear`): ids shift down too, and
             // if the seat itself goes they stand up but may carry on with what they were using.
             match sim.use_seat {

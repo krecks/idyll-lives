@@ -1490,6 +1490,14 @@ pub(crate) fn plan(
     best
 }
 
+/// The ticks until the bus at `stop` (its doors open) is out of town, as its timetable has it.
+pub(crate) fn out_in(w: &World, stop: u16) -> Option<u64> {
+    let t = &w.transit;
+    let bus = &t.buses[t.boarding(stop, w.tick)?];
+    let out = bus.run + t.lines.get(bus.line as usize)?.end;
+    Some(out.saturating_sub(w.tick))
+}
+
 /// What `s` is doing about the bus, for the UI: waiting for it at a stop (there, not on their
 /// way to it), on it to work, or coming home on it.
 pub fn status(w: &World, s: &Sim) -> Option<&'static str> {

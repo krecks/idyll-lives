@@ -242,3 +242,43 @@ fn a_new_day_starts_from_the_day_befores_walk() {
         assert!(now.ticks >= was.ticks, "{}", s.name);
     }
 }
+
+/// Whoever gets to the way out of town only as work starts is late for it: the rest of the way
+/// (`commuteMinutes`, off the map) is still to go, longer than `lateGraceMinutes`.
+#[test]
+fn at_the_way_out_as_work_starts_is_late() {
+    let content = r#"{
+        "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],
+        "objects":[],
+        "careers":[{"id":"office","label":"Office","levels":[
+            {"title":"Clerk","pay":100,"start":10,"hours":4,"days":[0,1,2,3,4,5,6]}]}],
+        "careerRules":{"commuteMinutes":60,"lateGraceMinutes":15,"performancePerShift":10},
+        "economy":{"startingFunds":500}}"#;
+    // An open-world town, Ada off to work in it.
+    let town = r#"{"width":40,"depth":14,"size":"normal","exits":[[0.5,10.5]],
+        "plots":[{"name":"Home","x":10,"z":0,"w":20,"d":9,"entry":[20.5,8.5]}],
+        "households":[{"name":"Home","plot":0,"player":true}],
+        "sims":[{"name":"Ada","household":0,"job":{"career":"office"},"x":1.5,"z":10.5}]}"#;
+    let mut w = World::from_json(content, town, 5).unwrap();
+    w.autonomy = false;
+    // No work for her today until a minute before it starts, and then she's a step from the way
+    // out: off at once, out of town as it starts.
+    let shift_day = |w: &mut World, day: u32| w.sims[0].job.as_mut().unwrap().last_shift_day = day;
+    common::run_to(&mut w, 2, 5.0);
+    shift_day(&mut w, 2);
+    common::run_to(&mut w, 2, 9.0 + 59.0 / 60.0);
+    assert!(w.sims[0].away_until.is_none(), "already off to work");
+    w.sims[0].pos = [1.5, 10.5];
+    shift_day(&mut w, 1);
+    let end = clock::tick_at(2, 10.5 * 60.0).unwrap();
+    while w.sims[0].away_until.is_none() && w.tick < end {
+        w.tick_once();
+    }
+    assert!(w.sims[0].away_until.is_some(), "never set off");
+    assert!(
+        clock::hour(w.tick) < 10.1,
+        "out of town at {:.2}",
+        clock::hour(w.tick)
+    );
+    assert!(w.sims[0].job.as_ref().unwrap().late, "not late for work");
+}
