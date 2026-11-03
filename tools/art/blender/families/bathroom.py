@@ -918,8 +918,9 @@ def showerStall():
         _curtain(F, 'curtain_side', (0.42, -0.39), (0.42, 0.39), 0.22, rail - 0.03, 6)
         _curtain_rings(F, 'ring_side', (0.42, -0.39), (0.42, 0.39), rail, 12, M.frame)
         # a riser on the back wall up to a tilted head, a lever mixer, a wire caddy with bottles
-        _tube(F, 'riser', [(-0.2, 1.08, -0.39), (-0.2, 1.93, -0.39), (-0.2, 1.955, -0.37), (-0.2, 1.96, -0.33)], 0.013,
-              M.fittings, verts=10, round=2)
+        # (bent round 3.5 cm, wider than the tube: bent tighter, its inside folded through itself)
+        _tube(F, 'riser', _bends([(-0.2, 1.08, -0.39), (-0.2, 1.96, -0.39), (-0.2, 1.96, -0.33)], 0.035, 5), 0.013,
+              M.fittings, verts=10, round=1)
         F.cyl('head', 0.07, 0.03, (-0.2, 1.96, -0.31), M.fittings, rot=(-25, 0, 0), verts=20, bevel=0.008, bevel_segments=2)
         _wall_rose(F, 'mixer', -0.2, 1.05, -0.404, 0.05, M.fittings, h=0.018, verts=20)
         _tube(F, 'lever', [(-0.2, 1.05, -0.38), (-0.2, 1.06, -0.35), (-0.16, 1.07, -0.345), (-0.12, 1.075, -0.345)], 0.008,
