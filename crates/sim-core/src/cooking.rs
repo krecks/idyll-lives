@@ -1375,8 +1375,14 @@ impl Place<'_> {
         let base = (self.content.items.iter())
             .position(|d| d.stack_as == Some(held.def))
             .unwrap_or(held.def);
-        let def = &self.content.items[base];
         let food = held.recipe.is_some() && held.servings > 0;
+        // (Something being cleared away with food still on it, put down part way: as the dirty
+        // thing it's on its way to being, the food scraped.)
+        let base = match self.content.items[base].empty_as {
+            Some(e) if !food && !self.content.items[base].dirty && self.content.items[e].dirty => e,
+            _ => base,
+        };
+        let def = &self.content.items[base];
         if !food && !def.dirty {
             return None;
         }
@@ -2585,22 +2591,30 @@ fn pick_up(
     }
     // Food on them (eaten or not, gone off or not) is scraped off first; what's left is
     // carried dirty.
-    let (mut scraps, mut dirty, mut carried) = (0u8, 0u8, None);
+    let (mut scraps, mut dirty, mut carried, mut with_food) = (0u8, 0u8, None, None);
     for &id in &picked {
         let Some(it) = items.remove(id) else { continue };
-        scraps += u8::from(it.servings > 0 || it.spoiled);
+        let food = it.servings > 0 || it.spoiled;
+        scraps += u8::from(food);
         if let Some(def) = washed(content, it.def) {
             dirty += 1;
             carried.get_or_insert(def);
+            if food {
+                with_food.get_or_insert(it.def);
+            }
         }
     }
-    // (Two or more: as a stack, where there's one.)
-    let carried = carried.map(|def: usize| {
-        content.items[def]
-            .stack_as
-            .filter(|_| dirty > 1)
-            .unwrap_or(def)
-    });
+    // One thing with food still on it is carried as it is (the half-eaten plate, the pot of
+    // leftovers) until it's scraped (`step_done`); two or more as a stack, where there's one.
+    let carried = match with_food {
+        Some(def) if dirty == 1 => Some(def),
+        _ => carried.map(|def: usize| {
+            content.items[def]
+                .stack_as
+                .filter(|_| dirty > 1)
+                .unwrap_or(def)
+        }),
+    };
     sim.held = carried.map(|def| Held {
         servings: dirty,
         ..Held::of(def)
@@ -2787,9 +2801,15 @@ pub(crate) fn step_done(
             if let Some(o) = station {
                 objects[o as usize].release(sim.id);
             }
-            // Scraped: on to the sink (with none, the dirty things went in the bin as well).
-            // Washed: the clean things are put away (out of hand now: called away, they're away
-            // already).
+            // Scraped: on to the sink (with none, the dirty things went in the bin as well), what
+            // they carry now as it is once scraped (the dirty plate). Washed: the clean things are
+            // put away (out of hand now: called away, they're away already).
+            if stage == 1
+                && let Some(h) = sim.held.as_mut()
+                && let Some(w) = washed(content, h.def)
+            {
+                h.def = w;
+            }
             if stage == 1 && station_mask(sim, ctx, objects) & content.cooking.dishes == 0 {
                 sim.held = None;
             }

@@ -543,3 +543,76 @@ fn a_stack_of_plates_put_down_part_way_is_so_many_plates() {
         "plates, not stacks"
     );
 }
+
+#[test]
+fn a_half_eaten_plate_is_carried_with_its_food_until_scraped_into_the_bin() {
+    let kitchen = format!(r#"{KITCHEN},{{"def":"trashCan","x":7,"z":1,"rot":0}}"#);
+    let mut w = world_with(&common::content(), &kitchen);
+    let table = table(&w);
+    let plate = put_on(&mut w, table, "mealPlate", 1, 0);
+    w.apply(Command::UseItem {
+        sim: 0,
+        item: plate,
+        action: ItemAction::Clear,
+    })
+    .unwrap();
+    let id = |w: &World| w.sims[0].held.map(|h| w.content.items[h.def].id.clone());
+    let (mut before, mut after) = (Vec::new(), Vec::new());
+    for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        let Some(a) = w.sims[0].current() else { break };
+        if let TaskKind::Dishes { stage, .. } = a.task.kind
+            && let Some(held) = id(&w)
+        {
+            if stage <= 1 {
+                before.push(held);
+            } else {
+                after.push(held);
+            }
+        }
+    }
+    assert!(
+        !before.is_empty() && !after.is_empty(),
+        "carried to the bin, then on"
+    );
+    assert!(
+        before.iter().all(|h| h == "mealPlate"),
+        "with its food on the way to the bin: {before:?}"
+    );
+    assert!(
+        after.iter().all(|h| h == "plateDirty"),
+        "scraped, a dirty plate: {after:?}"
+    );
+}
+
+#[test]
+fn a_half_eaten_plate_put_down_part_way_is_a_dirty_plate() {
+    let kitchen = format!(r#"{KITCHEN},{{"def":"trashCan","x":7,"z":1,"rot":0}}"#);
+    let mut w = world_with(&common::content(), &kitchen);
+    let table = table(&w);
+    let plate = put_on(&mut w, table, "mealPlate", 1, 0);
+    w.apply(Command::UseItem {
+        sim: 0,
+        item: plate,
+        action: ItemAction::Clear,
+    })
+    .unwrap();
+    for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        w.tick_once();
+        if w.sims[0].held.is_some() {
+            break;
+        }
+    }
+    assert!(w.sims[0].held.is_some(), "picked up");
+    w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
+    for _ in 0..20 {
+        w.tick_once();
+    }
+    let dirty = w.content.item_index("plateDirty").unwrap();
+    assert_eq!(w.sims[0].held, None);
+    assert!(
+        w.items.list.len() == 1 && w.items.list[0].def == dirty,
+        "put down as a dirty plate, not lost: {:?}",
+        w.items.list
+    );
+}
