@@ -17,6 +17,7 @@ mod big_town;
 mod bigger_homes;
 mod builders_start;
 mod calling_out;
+mod career_pace;
 mod century;
 mod check_states;
 mod chess_table_saves;

@@ -393,6 +393,12 @@ struct JobView<'a> {
     grade: Option<&'a str>,
     grade_label: Option<&'a str>,
     performance: f32,
+    /// What a shift adds to the bar at this pace (the mood they last left for work in), and how
+    /// many more it takes to fill it (none at the top of the career, or when shifts don't).
+    shift_performance: f32,
+    shifts_to_full_bar: Option<u32>,
+    /// The mood they last left for work in (0..1).
+    shift_mood: f32,
     /// Pay per shift on this Sim's schedule.
     pay: i64,
     pay_per_hour: f32,
@@ -1538,6 +1544,12 @@ fn job_view<'a>(content: &'a Content, s: &Sim) -> Option<JobView<'a>> {
         grade: grade.map(|g| g.id.as_str()),
         grade_label: grade.map(|g| g.label.as_str()),
         performance: j.performance,
+        shift_performance: round_to(
+            life::shift_performance(&content.career_rules, j.level, j.shift_mood, fit, false),
+            PERCENT,
+        ),
+        shifts_to_full_bar: life::shifts_to_full_bar(content, j, &s.skills),
+        shift_mood: round_to(j.shift_mood, PERCENT),
         pay: life::shift_pay(content, j, &s.skills),
         pay_per_hour: level.pay as f32 / level.hours,
         weekly_pay: level.pay * level.days.count_ones() as i64,

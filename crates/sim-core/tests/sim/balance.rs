@@ -20,11 +20,14 @@ const ROOM: i64 = 16 * 40 + 150 + 120 + 16 * 6;
 /// Weekly savings (pay minus rent, bills and spending) of a household with work, median over
 /// the run: enough to build something every week or two, not a house a week.
 const MEDIAN_WEEKLY_SAVINGS: std::ops::RangeInclusive<i64> = 100..=2 * ROOM;
-/// Nobody gets rich in two months.
-const MOST_FUNDS_AFTER_RUN: i64 = 30_000;
-/// Grades (A–J) a resident climbs in the run, at most; and on average for the employed.
-const MOST_GRADES_GAINED: usize = 4;
-const AVERAGE_GRADES_GAINED: f64 = 2.0;
+/// Nobody gets rich in two months (a household of two earners a few grades up comes closest).
+const MOST_FUNDS_AFTER_RUN: i64 = 50_000;
+/// Grades (A–J) a resident climbs in the run, at most; and on average for the employed. A
+/// promotion takes about a working week (four workdays at the entry grade, nine at the top:
+/// `careerRules`), so a whole career, A to J, takes some twelve weeks (40 years at two days a
+/// year): nobody climbs all nine grades in the run, and most climb about half of them.
+const MOST_GRADES_GAINED: usize = 8;
+const AVERAGE_GRADES_GAINED: f64 = 6.0;
 
 struct Run {
     /// Per household: funds at each weekly rent day, after paying.
@@ -139,8 +142,12 @@ fn living_mode_money_and_careers_take_time() {
     eprintln!(
         "richest household after {DAYS} days: {richest} (target at most {MOST_FUNDS_AFTER_RUN})"
     );
+    let mut spread = vec![0; most + 1];
+    for &g in &gained {
+        spread[g] += 1;
+    }
     eprintln!(
-        "grades gained: average {average:.1} (target at most {AVERAGE_GRADES_GAINED}), most {most} (target at most {MOST_GRADES_GAINED})"
+        "grades gained: average {average:.1} (target at most {AVERAGE_GRADES_GAINED}), most {most} (target at most {MOST_GRADES_GAINED}); residents by grades gained {spread:?}"
     );
     let mut failures = Vec::new();
     if !MEDIAN_WEEKLY_SAVINGS.contains(&median) {

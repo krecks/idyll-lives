@@ -1770,14 +1770,18 @@
     "joinFriendship": 2
   },
   "careerRules": {
+    "$comment": "A full performance bar (100) and the next grade's skills earn a promotion. A shift fills performancePerShift at the entry grade, in a middling mood with just the skills asked for; up to performancePerMood more in a good mood (less in a bad one), performancePerFit per skill level above the requirements; half as much more than lateGraceMinutes late; each grade up divides it by 1 + grade x performanceSlowdown (sim-core life::shift_performance). In a fine mood (0.6) the first promotion takes 5 workdays and the top grade's 10; happy (0.85), 4 and 7.",
     "commuteMinutes": 30,
     "lateMinutes": 60,
+    "lateGraceMinutes": 30,
+    "lateShare": 0.5,
     "missedPenalty": 20,
-    "performancePerShift": 2.5,
+    "performancePerShift": 18,
+    "performancePerMood": 20,
+    "performancePerFit": 2,
+    "performanceSlowdown": 0.15,
     "promotionFeeling": "promoted",
     "missedFeeling": "skippedWork",
-    "performancePerFit": 1,
-    "performancePerMood": 4,
     "probationLevels": 1,
     "market": {
       "hour": 9.5,
