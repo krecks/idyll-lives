@@ -521,20 +521,9 @@ pub fn check(w: &World) {
     // put them down).
     for s in &w.sims {
         if s.held.is_some() {
-            let chain = |k: &TaskKind| {
-                matches!(
-                    k,
-                    TaskKind::Cook { .. }
-                        | TaskKind::Eat { .. }
-                        | TaskKind::Dishes { .. }
-                        | TaskKind::Carry { baby: None, .. }
-                        | TaskKind::SetUp { .. }
-                        | TaskKind::Serve { .. }
-                )
-            };
             assert!(
                 match s.current() {
-                    Some(a) => chain(&a.task.kind),
+                    Some(a) => a.task.kind.carries_held(),
                     None => s
                         .queue()
                         .next()

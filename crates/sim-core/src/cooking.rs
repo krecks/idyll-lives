@@ -2845,23 +2845,13 @@ fn invite(w: &mut World) {
     }
 }
 
-/// Whether `s` goes on with what they carry (`settle` leaves it with them): here, and cooking,
-/// eating or washing up, or about to (a recipe loaded from a save), or carrying a harvest, or
-/// something for a guest.
+/// Whether `s` goes on with what they carry (`settle` leaves it with them): here, and at
+/// something that keeps it (`TaskKind::carries_held`: cooking, carrying a harvest, ...), or about
+/// to cook (a recipe loaded from a save).
 fn going_on(s: &crate::world::Sim) -> bool {
     s.here()
         && match &s.current {
-            // (A harvest on its way to the fridge too, `carry.rs`; a bite for a guest,
-            // `hosting.rs`; a parcel being carried in to be set up, `setup.rs`.)
-            Some(a) => {
-                chain(&a.task.kind)
-                    || matches!(
-                        a.task.kind,
-                        TaskKind::Carry { baby: None, .. }
-                            | TaskKind::SetUp { .. }
-                            | TaskKind::Serve { .. }
-                    )
-            }
+            Some(a) => a.task.kind.carries_held(),
             None => s
                 .queue
                 .front()

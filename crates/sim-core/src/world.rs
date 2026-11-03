@@ -905,6 +905,23 @@ pub enum TaskKind {
     },
 }
 
+impl TaskKind {
+    /// Whether whoever does it keeps what's in their hands (the rest put it down): cooking,
+    /// eating, washing up (`cooking::chain`), a harvest carried to the fridge (`carry.rs`), a
+    /// parcel carried in to be set up (`setup.rs`) and a bite brought to a guest (`hosting.rs`).
+    pub fn carries_held(&self) -> bool {
+        matches!(
+            self,
+            TaskKind::Cook { .. }
+                | TaskKind::Eat { .. }
+                | TaskKind::Dishes { .. }
+                | TaskKind::Carry { baby: None, .. }
+                | TaskKind::SetUp { .. }
+                | TaskKind::Serve { .. }
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Task {
     pub kind: TaskKind,
@@ -8582,140 +8599,127 @@ fn progress(
         Phase::Calling { .. } | Phase::Waiting { .. } | Phase::Conversing { .. } => false,
     };
     if finished {
-        // A carry's moment of lifting, putting in or away: on to what comes next.
-        if sim
-            .current
-            .as_ref()
-            .is_some_and(|a| matches!(a.task.kind, TaskKind::Carry { .. }))
-        {
-            crate::carry::step_done(sim, ctx, objects, items);
-            if sim.current.is_some() {
-                return;
+        match sim.current.as_ref().map(|a| a.task.kind) {
+            // A carry's moment of lifting, putting in or away: on to what comes next.
+            Some(TaskKind::Carry { .. }) => {
+                crate::carry::step_done(sim, ctx, objects, items);
+                if sim.current.is_some() {
+                    return;
+                }
             }
-        // The parcel picked up, or the new thing put together (`setup.rs`).
-        } else if sim
-            .current
-            .as_ref()
-            .is_some_and(|a| matches!(a.task.kind, TaskKind::SetUp { .. }))
-        {
-            crate::setup::step_done(sim, ctx, objects);
-        // Something for a guest taken out, or handed over: on to them, or done.
-        } else if sim
-            .current
-            .as_ref()
-            .is_some_and(|a| matches!(a.task.kind, TaskKind::Serve { .. }))
-        {
-            crate::hosting::step_done(sim, ctx, objects);
-            if sim.current.is_some() {
-                return;
+            // The parcel picked up, or the new thing put together (`setup.rs`).
+            Some(TaskKind::SetUp { .. }) => crate::setup::step_done(sim, ctx, objects),
+            // Something for a guest taken out, or handed over: on to them, or done.
+            Some(TaskKind::Serve { .. }) => {
+                crate::hosting::step_done(sim, ctx, objects);
+                if sim.current.is_some() {
+                    return;
+                }
             }
-        // A recipe's step, eating, washing up: on to what comes next.
-        } else if sim
-            .current
-            .as_ref()
-            .is_some_and(|a| crate::cooking::chain(&a.task.kind))
-        {
-            let ate = sim
-                .current
-                .as_ref()
-                .is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { stage: 1, .. }));
-            crate::cooking::step_done(sim, ctx, objects, items);
-            if sim.current.is_some() {
-                return;
-            }
-            // After a meal: the toilet, out of habit.
-            if ate && sim.follow_up.is_none() {
-                sim.follow_up = habit(
-                    sim,
-                    ctx,
-                    objects,
-                    HabitTime::Meal,
-                    ctx.briefs[sim.id as usize].plot,
-                );
-            }
-        } else {
-            let used = sim.current.as_ref().map(|a| a.task);
-            if let Some(Task {
-                kind:
-                    TaskKind::Use {
-                        object,
-                        interaction,
-                    },
-                ..
-            }) = used
-                && !given_up
-            {
-                leaves_at_end(sim, content, &mut objects[object as usize], interaction);
-            }
-            end_activity(sim, content, objects);
-            if let Some(task) = used
-                && let TaskKind::Use {
-                    object,
-                    interaction,
-                } = task.kind
-                && let Some(o) = objects.get(object as usize)
-                && let Some(inter) = content.objects[o.def].interactions.get(interaction)
-            {
-                // Food fetched: they sit down with it (at a table if there is one) and eat.
-                if let Some(recipe) = inter.eats {
-                    let quality = content.object_rules.quality_factor(o.quality)
-                        * inter.skill_factor(&content.skill_rules, &sim.skills);
-                    crate::cooking::eat_now(
+            // A recipe's step, eating, washing up: on to what comes next.
+            Some(kind) if crate::cooking::chain(&kind) => {
+                let ate = matches!(kind, TaskKind::Eat { stage: 1, .. });
+                crate::cooking::step_done(sim, ctx, objects, items);
+                if sim.current.is_some() {
+                    return;
+                }
+                // After a meal: the toilet, out of habit.
+                if ate && sim.follow_up.is_none() {
+                    sim.follow_up = habit(
                         sim,
-                        Task {
-                            routine: false,
-                            ..task
-                        },
-                        recipe,
-                        quality,
                         ctx,
                         objects,
-                        items,
+                        HabitTime::Meal,
+                        ctx.briefs[sim.id as usize].plot,
                     );
-                    if sim.current.is_some() {
-                        return;
-                    }
-                } else if let Some(y) = inter.yields.filter(|_| !given_up) {
-                    // A harvest: its produce carried in to the fridge (`carry.rs`).
-                    let quality = content.object_rules.quality_factor(o.quality)
-                        * inter.skill_factor(&content.skill_rules, &sim.skills);
-                    crate::carry::harvested(sim, task, y, quality, ctx, objects, items);
-                    if sim.current.is_some() {
-                        return;
-                    }
-                } else if let Some(made) = inter.makes.filter(|_| !given_up && inter.after == 0) {
-                    // The washing taken out: on with it to the dryer or the line, or to fold it.
-                    sim.follow_up = crate::machines::carry_on(sim, ctx, objects, object, made);
-                } else if inter.carried {
-                    // Fed in the high chair: back to the crib in the arms.
-                    sim.follow_up = crate::carry::carry_back(sim, task, ctx, objects, object);
-                } else if inter.after != 0 {
-                    // (Not after a use given up the moment it began: no hands to wash after a toilet
-                    // visit that didn't happen.)
-                    if !given_up {
-                        sim.follow_up = follow_up(sim, ctx, objects, object, inter.after);
-                    }
-                } else if inter.close_after
-                    || inter.tags & (content.day_rhythm.sleep_tags | content.day_rhythm.nap_tags)
-                        != 0
+                }
+            }
+            _ => {
+                let used = sim.current.as_ref().map(|a| a.task);
+                if let Some(Task {
+                    kind:
+                        TaskKind::Use {
+                            object,
+                            interaction,
+                        },
+                    ..
+                }) = used
+                    && !given_up
                 {
-                    // Up from a night's sleep: the toilet first, out of habit.
-                    if inter.tags & content.day_rhythm.sleep_tags != 0 {
-                        sim.follow_up = habit(
+                    leaves_at_end(sim, content, &mut objects[object as usize], interaction);
+                }
+                end_activity(sim, content, objects);
+                if let Some(task) = used
+                    && let TaskKind::Use {
+                        object,
+                        interaction,
+                    } = task.kind
+                    && let Some(o) = objects.get(object as usize)
+                    && let Some(inter) = content.objects[o.def].interactions.get(interaction)
+                {
+                    // Food fetched: they sit down with it (at a table if there is one) and eat.
+                    if let Some(recipe) = inter.eats {
+                        let quality = content.object_rules.quality_factor(o.quality)
+                            * inter.skill_factor(&content.skill_rules, &sim.skills);
+                        crate::cooking::eat_now(
                             sim,
+                            Task {
+                                routine: false,
+                                ..task
+                            },
+                            recipe,
+                            quality,
                             ctx,
                             objects,
-                            HabitTime::Wake,
-                            ctx.object_plot[object as usize],
+                            items,
                         );
-                    }
-                    // Then what sleeping or napping opened is closed again (a wall bed folded
-                    // up, a sofa bed's bed put away; a hot tub's cover put on after a soak,
-                    // `close_after`), unless someone is still in it: whoever gets up last does it.
-                    if let Some(close) = closing(sim, content, o, object) {
-                        match sim.follow_up {
-                            None => sim.follow_up = Some(close),
-                            Some(_) => sim.queue.push_front(close),
+                        if sim.current.is_some() {
+                            return;
+                        }
+                    } else if let Some(y) = inter.yields.filter(|_| !given_up) {
+                        // A harvest: its produce carried in to the fridge (`carry.rs`).
+                        let quality = content.object_rules.quality_factor(o.quality)
+                            * inter.skill_factor(&content.skill_rules, &sim.skills);
+                        crate::carry::harvested(sim, task, y, quality, ctx, objects, items);
+                        if sim.current.is_some() {
+                            return;
+                        }
+                    } else if let Some(made) = inter.makes.filter(|_| !given_up && inter.after == 0)
+                    {
+                        // The washing taken out: on with it to the dryer or the line, or to fold it.
+                        sim.follow_up = crate::machines::carry_on(sim, ctx, objects, object, made);
+                    } else if inter.carried {
+                        // Fed in the high chair: back to the crib in the arms.
+                        sim.follow_up = crate::carry::carry_back(sim, task, ctx, objects, object);
+                    } else if inter.after != 0 {
+                        // (Not after a use given up the moment it began: no hands to wash after a toilet
+                        // visit that didn't happen.)
+                        if !given_up {
+                            sim.follow_up = follow_up(sim, ctx, objects, object, inter.after);
+                        }
+                    } else if inter.close_after
+                        || inter.tags
+                            & (content.day_rhythm.sleep_tags | content.day_rhythm.nap_tags)
+                            != 0
+                    {
+                        // Up from a night's sleep: the toilet first, out of habit.
+                        if inter.tags & content.day_rhythm.sleep_tags != 0 {
+                            sim.follow_up = habit(
+                                sim,
+                                ctx,
+                                objects,
+                                HabitTime::Wake,
+                                ctx.object_plot[object as usize],
+                            );
+                        }
+                        // Then what sleeping or napping opened is closed again (a wall bed folded
+                        // up, a sofa bed's bed put away; a hot tub's cover put on after a soak,
+                        // `close_after`), unless someone is still in it: whoever gets up last does it.
+                        if let Some(close) = closing(sim, content, o, object) {
+                            match sim.follow_up {
+                                None => sim.follow_up = Some(close),
+                                Some(_) => sim.queue.push_front(close),
+                            }
                         }
                     }
                 }
