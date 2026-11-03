@@ -1256,6 +1256,11 @@ fn drive_on(w: &mut World, b: usize) {
         &mut bus.waited,
         &mut bus.progress,
     );
+    // Held up that long (where its line turns round, among the others), it edges on: a bus
+    // still drives on past `cars::PASS_TICKS`, as it always did, where a car never does.
+    if bus.waited >= cars::PASS_TICKS {
+        bus.progress += 1.0;
+    }
 }
 
 /// The bus driving by that a step from `from` to `to` with `body` would walk into (stepping out
