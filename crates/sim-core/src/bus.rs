@@ -2,17 +2,21 @@
 //! minutes by the clock.
 //!
 //! **Stops and lines.** A bus stop (`travel::ExitKind::Stop`) stands at the kerb of a road. The
-//! bus goes past it the way that has it on its right, pulls in to the kerb there and opens its
-//! doors on that side. A line comes in from a way out of town by road, calls at its stops and
-//! leaves by a way out by road (`line_for`: the quickest that passes each stop the right way
-//! round): one through the town in a cosy or normal one, one through each area's stops in a big
-//! world. It drives the roads as a car does (`cars::Legs`), pulled in to the kerb at each stop.
-//! A stop gets a shelter with a bench for three where there's room for one behind the pavement,
-//! off every plot (`Stop::shelter`).
+//! bus pulls in to the kerb there with the stop on its right and opens its doors on that side. A
+//! line comes in from a way out of town by road, calls at its stops and leaves by a way out by
+//! road (`line_for`: the quickest, passing each stop on the town file's side of the road where
+//! that's no long way round, `WRONG_WAY`; else the stop is served from the other side, `settle`).
+//! A cosy or normal town has one line through all its stops. A big world's roads are long for a
+//! bus driving them at a car's pace while the clock runs a minute a second, so each stop (or two
+//! near each other) has a line of its own, coming in and going out where the roads leave its area
+//! (`groups`, `ways_out`). It drives the roads as a car does (`cars::Legs`), pulled in to the kerb
+//! at each stop. A stop gets a shelter with a bench for three where there's room for one behind
+//! the pavement, off every plot (`Stop::shelter`).
 //!
 //! **The timetable.** A bus comes into town every `every` minutes from `first` to `last`
 //! o'clock, every day the same (`Transit::next_run`): it takes as long as its route says to each
-//! stop, stands there `DWELL_TICKS` with its doors open and drives on. One held up on the way
+//! stop, stands there `DWELL_TICKS` (about eight seconds at normal speed: its doors open, those
+//! waiting step up and in, those home step off) and drives on. One held up on the way
 //! stands less at the stops after, to make the time up. Nothing of the buses is saved: they are
 //! where the clock says on load (`settle`).
 //!
