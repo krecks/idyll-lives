@@ -117,7 +117,8 @@ pub fn skill_fit(level: &CareerLevel, skills: &[f32; MAX_SKILLS]) -> f32 {
 /// (a worse one takes as much off); each skill level above the job's requirements adds
 /// `performancePerFit` (each one short takes it off; three count at most). Arriving more than
 /// `lateGraceMinutes` late, the shift counts `lateShare` as much. Each grade up it counts less
-/// (`grade_pace`), so later promotions take longer.
+/// (`grade_pace`), so later promotions take longer. A shift worked never takes any off (a missed
+/// one does).
 pub fn shift_performance(
     rules: &CareerRules,
     level: usize,
@@ -129,7 +130,7 @@ pub fn shift_performance(
         + (mood - 0.5) * 2.0 * rules.performance_per_mood
         + fit.clamp(-3.0, 3.0) * rules.performance_per_fit;
     let late = if late { rules.late_share } else { 1.0 };
-    worth * late * grade_pace(rules, level)
+    worth.max(0.0) * late * grade_pace(rules, level)
 }
 
 /// What shifts (and missed ones) count for at a grade (0: the entry grade), as a share of the

@@ -538,11 +538,12 @@ A promotion takes a full performance bar (100) and the next grade's skills. A sh
 the bar by `performancePerShift` (default 12) at the entry grade, for a resident who left for work
 in a middling mood (0.5) with just the skills the job asks for; up to `performancePerMood` (default
 15) more in the best mood and as much less in the worst, and `performancePerFit` (default 0) for
-each skill level above the requirements (less for each short, three at most). Arriving more than
-`lateGraceMinutes` (default 0) after the start, the shift counts `lateShare` (0 to 1, default 1:
-in full). Each grade up, a shift counts less: divided by 1 + grade × `performanceSlowdown` (0 to
-2, default 0: the same at every grade), as does `missedPenalty` (default 20), taken off for a shift
-missed. The base game fills it in 4 or 5 workdays at grade A, 7 to 10 at the top.
+each skill level above the requirements (less for each short, three at most); a shift worked
+never takes any off. Arriving more than `lateGraceMinutes` (default 0) after the start, the shift
+counts `lateShare` (0 to 1, default 1: in full). Each grade up, a shift counts less: divided by
+1 + grade × `performanceSlowdown` (0 to 2, default 0: the same at every grade), as does
+`missedPenalty` (default 20), taken off for a shift missed. The base game fills it in 4 or 5
+workdays at grade A, 7 to 10 at the top.
 **Story texts** (`events`): `promoted` (`{job}`: the new title, `{money}`: the bonus of half a
 week at the new grade); `promotedEarlier` for promotions in saves from before the bonus, which
 name neither.
