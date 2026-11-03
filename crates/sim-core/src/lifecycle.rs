@@ -935,11 +935,24 @@ fn add_child(w: &mut World, h: usize, age: f32, parents: &[usize], born: bool) -
     let name = pick(&mut w.rng, &free)
         .map(|n| (*n).clone())
         .unwrap_or_else(|| "Baby".into());
-    let at = parents.first().map(|&p| w.sims[p].pos).or_else(|| {
-        w.households[h]
-            .plot
-            .map(|p| w.plots[p as usize].arrival_point())
-    })?;
+    // Beside the first parent (who may be on the bed, the sofa: somewhere nobody stands up from
+    // but the one using it), else at the door.
+    let beside = |pos: [f32; 2]| {
+        let nav = w.nav();
+        if nav.tile_free(pos[0].floor() as i32, pos[1].floor() as i32) {
+            return Some(pos);
+        }
+        crate::conversation::approach_tile(&nav, pos, pos)
+            .map(|(x, z)| [x as f32 + 0.5, z as f32 + 0.5])
+    };
+    let at = parents
+        .first()
+        .and_then(|&p| beside(w.sims[p].pos))
+        .or_else(|| {
+            w.households[h]
+                .plot
+                .map(|p| w.plots[p as usize].arrival_point())
+        })?;
     let (traits, perks) = random_character(w);
     let seed = w.rng.next_u32();
     let spawn = serde_json::json!({

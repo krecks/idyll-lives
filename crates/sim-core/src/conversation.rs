@@ -25,7 +25,7 @@
 
 use crate::content::{Content, MAX_NEEDS, Pose, stage_in};
 use crate::lot::{DiagDir, Edge, Lot, OUTDOORS, Side};
-use crate::path::{Grounds, NavGrid, STOREY_WALK};
+use crate::path::{Grounds, NavGrid, STOREY_WALK, StairMap};
 use crate::rng::Rng;
 use crate::social::{self, Effect, EventKind, EventLog, Relationships, SocialDef};
 use crate::world::{
@@ -1082,7 +1082,7 @@ fn meet<'a>(
         sims[t].heeding = None;
         return end_activity(&mut sims[i], content, objects);
     };
-    let (mut mine, middle) = halfway(sims[i].pos, &all);
+    let (mut mine, middle) = halfway(nav.stairs, sims[i].pos, &all);
     match way(sims, t, middle) {
         Some(waypoints) => {
             // What `t` was still at (back on the sofa after listening in, say) ends as they set
@@ -1116,20 +1116,32 @@ fn meet<'a>(
     );
 }
 
-/// The waypoints from `from` along `path` to its middle, and the middle.
-fn halfway(from: [f32; 2], path: &[[f32; 2]]) -> (Vec<[f32; 2]>, [f32; 2]) {
+/// The waypoints from `from` along `path` to its middle, and the middle. Legs are measured as
+/// they're walked (`StairMap::distance`: a flight of stairs is a few metres, not the rows between
+/// the storeys' blocks), and a middle on the stairs is the nearer end of them, never a point
+/// between two storeys' rows (somewhere else in town).
+fn halfway(stairs: &StairMap, from: [f32; 2], path: &[[f32; 2]]) -> (Vec<[f32; 2]>, [f32; 2]) {
     let legs = || {
         std::iter::once(from)
             .chain(path.iter().copied())
             .zip(path.iter().copied())
     };
-    let mut left = legs().map(|(a, b)| dist(a, b)).sum::<f32>() / 2.0;
+    let storey = |p: [f32; 2]| stairs.storey(p[1].floor() as i32);
+    let mut left = legs().map(|(a, b)| stairs.distance(a, b)).sum::<f32>() / 2.0;
     let mut out = Vec::new();
     for (a, b) in legs() {
-        let d = dist(a, b);
+        let d = stairs.distance(a, b);
         if d >= left {
             let k = if d > 0.0 { left / d } else { 0.0 };
-            let middle = [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+            if storey(a) != storey(b) && k < 0.5 {
+                // (`a` is where the waypoints so far end, or where they start from.)
+                return (out, a);
+            }
+            let middle = if storey(a) != storey(b) {
+                b
+            } else {
+                [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]
+            };
             out.push(middle);
             return (out, middle);
         }
@@ -1422,6 +1434,30 @@ fn facing(from: [f32; 2], to: [f32; 2]) -> f32 {
 #[cfg(test)]
 mod tests {
     use crate::social::EventKind;
+
+    #[test]
+    fn meeting_halfway_over_the_stairs_is_by_the_stairs_not_across_town() {
+        // Storeys 222 rows apart: one upstairs at (33.5, 284.5) calls one just down the stairs
+        // at (37.7, 66.5), the flight's top at (36.9, 286.5). Measured in rows, the middle was
+        // half of the 220 between the blocks: (37, 180.6) on the ground, a street away.
+        let mut stairs = crate::path::StairMap::default();
+        stairs.depth = 222;
+        let from = [33.5, 284.5];
+        let path = [[36.9, 286.5], [37.7, 66.5], [37.7, 60.5]];
+        let (mine, middle) = super::halfway(&stairs, from, &path);
+        assert!(
+            stairs.distance(middle, [37.7, 66.5]) < 6.0,
+            "by the stairs: {middle:?}"
+        );
+        assert_eq!(mine.last(), Some(&middle));
+        // On one storey, as before: halfway along the legs.
+        let flat = crate::path::StairMap::default();
+        let (_, m) = super::halfway(&flat, [0.0, 0.0], &[[4.0, 0.0], [4.0, 6.0]]);
+        assert!(
+            (m[0] - 4.0).abs() < 1e-4 && (m[1] - 1.0).abs() < 1e-4,
+            "{m:?}"
+        );
+    }
     use crate::world::{Phase, TICKS_PER_DAY, Task, TaskKind};
     use crate::{Command, TICKS_PER_SECOND, World};
 

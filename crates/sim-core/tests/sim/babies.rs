@@ -277,6 +277,36 @@ fn partners_have_a_baby() {
 }
 
 #[test]
+fn an_adopted_child_stands_beside_a_parent_on_the_bed_not_on_it() {
+    // (The crib stands for any bed or sofa: a grown-up lies on it, where nobody else can stand.
+    // A child put down there was shut in for good.)
+    let lot = COUPLE.replace(
+        r#""objects":[]"#,
+        r#""objects":[{"def":"crib","x":4,"z":8,"rot":0}]"#,
+    );
+    let mut w = World::from_json(FAMILY, &lot, 1).unwrap();
+    let ada = w.sims[0].tile();
+    assert!(
+        w.blocked()[w.lot.tile_index(ada.0, ada.1)],
+        "Ada is on the crib"
+    );
+    w.apply(Command::Adopt {
+        household: 0,
+        child: true,
+    })
+    .unwrap();
+    let kid = w.sims[2].tile();
+    assert!(
+        !w.blocked()[w.lot.tile_index(kid.0, kid.1)],
+        "the child stands on the floor: {kid:?}"
+    );
+    assert!(
+        (kid.0 - ada.0).abs() <= 1 && (kid.1 - ada.1).abs() <= 1,
+        "beside Ada: {kid:?} by {ada:?}"
+    );
+}
+
+#[test]
 fn adopting_a_child() {
     use sim_core::social::Kin;
     let mut w = World::from_json(FAMILY, COUPLE, 1).unwrap();
