@@ -7,7 +7,10 @@
 # the greenhouse (`model.greenhouse`), whose door and roof vent open (`door_open`); the compost bin
 # (`model.compostBin`) and its lid (`lid_open`); the rain barrel (`model.rainBarrel`); the washing line
 # (`model.clothesline`), whose washing is pegged out line by line (`washing`) and stays out until taken in
-# (`open`); the log store (`model.firewoodStack`).
+# (`open`); the log store (`model.firewoodStack`). The rides, with no clips (the renderer turns their parts by code,
+# each a top-level node on its pivot: `frame`, `wheel_front`, `wheel_rear`, `cranks`, `stand`): the step-through city
+# bike with its basket, carrier and centre stand (`model.bicycle`), the kids' bike on stabilisers (`model.bicycleChild`)
+# and the e-scooter on its side stand (`model.eScooter`), the two bikes the rack's bike with their own numbers (`Bike`).
 #
 # Each is built in place where the game places it (`F`, game axes), and each has a far version for the town
 # overview (`far=`).
@@ -41,6 +44,21 @@ M = G.Palette(
     tyre=('#2A2C30', 'satin'),
     rim=('#C9CBCC', 'chrome'),           # rims, hubs, bars, the chain ring
     saddle=('#3A3530', 'satin'),
+    # the city bike, the kids' bike and the e-scooter (with the rack's tyre, rim and saddle): all plain, one draw
+    city=('#2F5D50', 'gloss'),           # the city bike's frame, carrier and chain guard
+    basket_dark=('#A8885C', 'satin'),    # the basket's woven band (the basket: `basket`, the washing line's wicker)
+    lamp=('#F4F1E6', 'gloss'),           # a lamp's glass
+    reflector=('#C8302A', 'gloss'),      # a red back light
+    kid=('#E5484D', 'gloss'),            # the kids' bike's frame
+    kid_trim=('#F2F0EA', 'gloss'),       # its mudguards and chain case
+    streamer_pink=('#F28DC0', 'satin'),
+    streamer_yellow=('#F7D154', 'satin'),
+    streamer_blue=('#5BC0EB', 'satin'),
+    scooter=('#3A3D42', 'satin'),        # the e-scooter's deck, stem and bars
+    scooter_metal=('#8E9499', 'metal'),  # its rims and the hub motor
+    scooter_trim=('#D9483B', 'satin'),   # the latch, the deck's side strips, the grips' ends
+    grip_tape=('#232428', 'matte'),      # the deck's grip tape, the grips
+    screen=('#1C2A33', 'gloss'),         # the display
     # the raised bed
     bed=('#9A7452', 'satin'),            # its boards; the main part
     bed_post=('#7A5A40', 'satin'),
@@ -337,78 +355,150 @@ RACK_Z = -0.3
 LIFT = 8.5                    # degrees the bike tips up about the front tyre to rest its back axle on the stand
 
 
-def _wheel(x, z):
-    """A wheel at axle (x, WHEEL_R, z): a treaded tyre, a rim, a hub with its flanges and laced spokes, in the game's
+class Bike:
+    """A bike's numbers, game metres along its side (x, the front wheel to +x; height), `z` its middle across; `k`
+    scales the small things (tyres, hubs, tube and rod sizes) from the rack's bike, whose numbers are the defaults."""
+
+    def __init__(self, **kw):
+        self.r, self.k, self.tyre = WHEEL_R, 1.0, None      # wheel radius over the tyre; `tyre` its tube (0.02 k)
+        self.rear, self.front, self.z = REAR, FRONT, BZ     # the axles
+        self.spokes, self.segments = 16, (32, 10)           # spokes a wheel; the tyre's points round (full, far)
+        self.rim_segments, self.tyre_minor = 32, 6
+        self.bb, self.sc, self.ht, self.hb = (-0.1, 0.27), (-0.24, 0.66), (0.3, 0.68), (0.34, 0.56)
+        self.crown = None                                   # the fork's crown (default `hb`)
+        self.head = ((0.345, 0.55), (0.295, 0.7))           # the head tube's ends
+        self.fork_mid = (0.4, 0.42)
+        self.tubes = (0.018, 0.016, 0.02)                   # seat tube, top tube, down tube
+        self.step = None                                    # a step-through: (top tube path, down tube path), curved
+        self.stay_dz = 0.035
+        self.guards = ((20, 120), (60, 160))                # the mudguards' arcs, front and back (degrees, 0 to +x)
+        self.post = (-0.27, 0.78)                           # the seat post's top
+        self.saddle = (-0.38, 0.785)                        # the saddle's back end and its underside
+        self.saddle_rows = ((0.0, 0.03, 0.02), (0.03, 0.08, 0.035), (0.08, 0.075, 0.035), (0.14, 0.035, 0.03),
+                            (0.2, 0.015, 0.022), (0.23, 0.008, 0.012))   # along it, half its width, its thickness
+        self.stem = ((0.3, 0.68), (0.27, 0.8))
+        self.bars = [(0.21, 0.81, -0.2), (0.27, 0.8, -0.13), (0.27, 0.8, 0.13), (0.21, 0.81, 0.2)]   # (x, h, dz)
+        self.bend = 0.05
+        self.grips = [((0.222, 0.808, -0.185), (0.206, 0.81, -0.211)), ((0.222, 0.808, 0.185), (0.206, 0.81, 0.211))]
+        self.grip_r = 0.016
+        self.bell = (0.27, 0.82, 0.12)
+        self.ring, self.ring_dz, self.cog, self.chain_drop = 0.075, 0.05, 0.035, 0.47   # chain ring, cog radii
+        self.drive = 1                                      # the chain's side: +z (the rack's, to the front), -z (the rider's right)
+        self.crank = (0.1, -0.13)                           # the drive side's pedal from the bottom bracket
+        self.crank_dz, self.pedal_dz = 0.06, 0.04
+        self.pedal, self.pedal_segments = (0.08, 0.02, 0.06), 2
+        self.kickstand = True                               # the rack's bike: a kickstand folded up
+        self.colour = 'bike'                                # the frame's palette colour (a name: the scene's material is new each build)
+        self.guard_colour = None                            # the mudguards' (default the frame's)
+        self.guard_k = None                                 # the mudguards' section's scale (default `k`)
+        self.__dict__.update(kw)
+
+    @property
+    def body(self):
+        """The frame's material, in this build's scene."""
+        return getattr(M, self.colour)
+
+
+RACK_BIKE = Bike()
+
+
+def _wheel(x, z, S=RACK_BIKE):
+    """A wheel at axle (x, S.r, z): a treaded tyre, a rim, a hub with its flanges and laced spokes, in the game's
     x-height plane."""
-    y = WHEEL_R
-    G.torus(_name('tyre'), WHEEL_R - 0.02, 0.02, at=F.at(x, y, z), material=M.tyre, rot=(90, 0, 0),
-            major_segments=low(32, 10), minor_segments=low(6, 3))
+    R, k = S.r, S.k
+    t = S.tyre or 0.02 * k
+    y = R
+    G.torus(_name('tyre'), R - t, t, at=F.at(x, y, z), material=M.tyre, rot=(90, 0, 0),
+            major_segments=low(*S.segments), minor_segments=low(S.tyre_minor, 3))
     if not G.is_low():
-        G.torus(_name('rim'), WHEEL_R - 0.043, 0.009, at=F.at(x, y, z), material=M.rim, rot=(90, 0, 0),
-                major_segments=32, minor_segments=4)
-        G.revolve(_name('hub'), [(0.0, -0.05), (0.008, -0.05), (0.008, -0.035), (0.024, -0.033), (0.024, -0.026),
-                                 (0.013, -0.022), (0.013, 0.022), (0.024, 0.026), (0.024, 0.033), (0.008, 0.035),
-                                 (0.008, 0.05), (0.0, 0.05)], at=F.at(x, y, z), material=M.rim, segments=8, rot=(90, 0, 0))
-        for k in range(16):                                # laced: each spoke leaves its flange tangentially
-            a = 22.5 * k
-            side = 0.03 if k % 2 else -0.03
-            lead = 12 if k % 2 else -12
-            _rod(_name('spoke'), (x + 0.022 * G.cosd(a + lead), y + 0.022 * G.sind(a + lead), z + side),
-                 (x + (WHEEL_R - 0.05) * G.cosd(a), y + (WHEEL_R - 0.05) * G.sind(a), z), 0.0022, M.rim, verts=3)
+        rim = R - 2 * t - 0.003 * k
+        G.torus(_name('rim'), rim, 0.009 * k, at=F.at(x, y, z), material=M.rim, rot=(90, 0, 0),
+                major_segments=S.rim_segments, minor_segments=4)
+        G.revolve(_name('hub'), [(u * k, v * k) for u, v in (
+            (0.0, -0.05), (0.008, -0.05), (0.008, -0.035), (0.024, -0.033), (0.024, -0.026), (0.013, -0.022),
+            (0.013, 0.022), (0.024, 0.026), (0.024, 0.033), (0.008, 0.035), (0.008, 0.05), (0.0, 0.05))],
+            at=F.at(x, y, z), material=M.rim, segments=8, rot=(90, 0, 0))
+        n = S.spokes
+        for i in range(n):                                 # laced: each spoke leaves its flange tangentially
+            a = 360 / n * i
+            side = 0.03 * k if i % 2 else -0.03 * k
+            lead = 12 if i % 2 else -12
+            _rod(_name('spoke'), (x + 0.022 * k * G.cosd(a + lead), y + 0.022 * k * G.sind(a + lead), z + side),
+                 (x + (rim - 0.007 * k) * G.cosd(a), y + (rim - 0.007 * k) * G.sind(a), z), 0.0022 * k, M.rim, verts=3)
     else:
-        F.cyl(_name('hub'), 0.022, 0.1, (x, y, z), M.rim, rot=(90, 0, 0), verts=5)
+        F.cyl(_name('hub'), 0.022 * k, 0.1 * k, (x, y, z), M.rim, rot=(90, 0, 0), verts=5)
 
 
-def _bike():
-    """The bike, parked along x: its frame, front wheel, bars, saddle, cranks (the back wheel is the caller's)."""
-    ra, fa = (REAR, WHEEL_R), (FRONT, WHEEL_R)
-    bb, sc, ht, hb = (-0.1, 0.27), (-0.24, 0.66), (0.3, 0.68), (0.34, 0.56)
+def _bike(S=RACK_BIKE):
+    """The bike `S`, standing along x: its frame, front wheel, bars, saddle, cranks (the back wheel is the caller's).
+    Returns its parts made, as lists: (frame, front wheel, cranks)."""
+    k, BZ = S.k, S.z
+    R = S.r
+    ra, fa = (S.rear, R), (S.front, R)
+    bb, sc, ht, hb = S.bb, S.sc, S.ht, S.hb
+    crown = S.crown or hb
+    rdz = S.ring_dz * S.drive
+    body = S.body
 
     def at(p, dz=0.0):
         return (p[0], p[1], BZ + dz)
-    # the main triangle, the tubes tapering a little; a head tube; the stays in pairs
-    for k, (a, b, r) in enumerate(((bb, sc, 0.018), (sc, ht, 0.016), (bb, hb, 0.02))):
-        F.sweep(_name('tube'), [at(a), at(b)], r, M.bike, verts=low(10, 5), scale=[1.0, 0.85])
-    F.sweep('head_tube', [at((0.345, 0.55)), at((0.295, 0.7))], 0.022, M.bike, verts=low(10, 5))
-    for dz in (-0.035, 0.035):
-        F.sweep(_name('chainstay'), [at(ra, dz), at(bb, dz * 0.4)], 0.011, M.bike, verts=low(6, 4), scale=[0.8, 1.0])
-        F.sweep(_name('seatstay'), [at(ra, dz), at(((ra[0] + sc[0]) / 2, (ra[1] + sc[1]) / 2 + 0.01), dz * 0.6), at(sc, dz * 0.25)],
-                0.009, M.bike, verts=low(6, 4), resolution=low(2, 1))
-        # the fork's blades, raked forward to the axle
-        F.sweep(_name('fork'), [at(hb, dz * 0.5), at((0.4, 0.42), dz * 0.9), at(fa, dz)], 0.011, M.bike, verts=low(6, 4),
-                resolution=low(3, 1), scale=[1.1, 1.0, 0.8])
-    _wheel(FRONT, BZ)
-    # mudguards: a C-section arc over each wheel, on stays
-    for x, a0, a1 in ((FRONT, 20, 120), (REAR, 60, 160)):
-        pts = _arc_points((x, WHEEL_R, BZ), WHEEL_R + 0.03, a0, a1, low(10, 4))
-        F.sweep(_name('guard'), pts, None, M.bike, profile=[(-0.025, 0.0), (-0.02, 0.008), (0.0, 0.01), (0.02, 0.008), (0.025, 0.0),
-                                                           (0.0, 0.004)], up=(0, 1, 0))
-    # seat post and a saddle; stem and swept-back bars with grips; a bell
-    _rod('seat_post', at(sc), at((-0.27, 0.78)), 0.012, M.rim, verts=8)
-    sad = [(0.0, 0.03, 0.02), (0.03, 0.08, 0.035), (0.08, 0.075, 0.035), (0.14, 0.035, 0.03), (0.2, 0.015, 0.022),
-           (0.23, 0.008, 0.012)]
-    G.loft('saddle', [[F.at(-0.38 + u, 0.785 + th * (0.5 + 0.5 * G.sind(a)), BZ + hw * G.cosd(a))
-                       for a in range(0, 360, low(45, 90))] for u, hw, th in sad], material=M.saddle)
-    _rod('stem', at(ht), at((0.27, 0.8)), 0.013, M.rim, verts=8)
-    _bent('bars', [(0.21, 0.81, BZ - 0.2), (0.27, 0.8, BZ - 0.13), (0.27, 0.8, BZ + 0.13), (0.21, 0.81, BZ + 0.2)], 0.011, M.rim,
-          bend=0.05, verts=low(8, 5))
-    for s in (-1, 1):
-        _rod(_name('grip'), (0.222, 0.808, BZ + s * 0.185), (0.206, 0.81, BZ + s * 0.211), 0.016, M.saddle, verts=low(8, 5))
-    F.cyl('bell', 0.02, 0.015, (0.27, 0.82, BZ + 0.12), M.rim, verts=8)
-    # chain ring, cranks and pedals on the drive side (the front), the chain to the back cog
-    G.torus('chainring', 0.075, 0.006, at=F.at(bb[0], bb[1], BZ + 0.05), material=M.rim, rot=(90, 0, 0),
-            major_segments=low(24, 8), minor_segments=4)
-    F.cyl('cog', 0.035, 0.008, (REAR, WHEEL_R, BZ + 0.05), M.rim, rot=(90, 0, 0), verts=low(10, 5))
-    for s in (-1, 1):
-        a = (0.1 * s, -0.13 * s)
-        dz = 0.06 * s
-        _rod(_name('crank'), at(bb, dz), (bb[0] + a[0], bb[1] + a[1], BZ + dz), 0.009, M.rim, verts=6)
-        F.box(_name('pedal'), 0.08, 0.02, 0.06, (bb[0] + a[0], bb[1] + a[1], BZ + dz + 0.04 * s), M.tyre, bevel=0.005)
-    for dy in (0.075, -0.075)[:low(2, 0)]:
-        _rod(_name('chain'), (bb[0], bb[1] + dy, BZ + 0.05), (REAR, WHEEL_R + dy * 0.47, BZ + 0.05), 0.004, M.tyre,
-             verts=4)
-    # a kickstand, folded up along the chainstay
-    _rod('kickstand', (-0.14, 0.25, BZ - 0.05), (-0.42, 0.24, BZ - 0.06), 0.008, M.rim, verts=6)
+    with G.new_parts() as frame:
+        # the main triangle, the tubes tapering a little; a head tube; the stays in pairs. A step-through's top and
+        # down tubes curve down from the head tube, the top one into the seat tube low down.
+        F.sweep(_name('tube'), [at(bb), at(sc)], S.tubes[0], body, verts=low(10, 5), scale=[1.0, 0.85])
+        if S.step:
+            for path, r in zip(S.step, S.tubes[1:]):
+                F.sweep(_name('tube'), [at(p) for p in path], r, body, verts=low(10, 5), scale=[1.0, 0.85],
+                        resolution=low(4, 2))
+        else:
+            for a, b, r in ((sc, ht, S.tubes[1]), (bb, hb, S.tubes[2])):
+                F.sweep(_name('tube'), [at(a), at(b)], r, body, verts=low(10, 5), scale=[1.0, 0.85])
+        F.sweep('head_tube', [at(S.head[0]), at(S.head[1])], 0.022 * k, body, verts=low(10, 5))
+        for dz in (-S.stay_dz, S.stay_dz):
+            F.sweep(_name('chainstay'), [at(ra, dz), at(bb, dz * 0.4)], 0.011 * k, body, verts=low(6, 4), scale=[0.8, 1.0])
+            F.sweep(_name('seatstay'), [at(ra, dz), at(((ra[0] + sc[0]) / 2, (ra[1] + sc[1]) / 2 + 0.01 * k), dz * 0.6),
+                                        at(sc, dz * 0.25)], 0.009 * k, body, verts=low(6, 4), resolution=low(2, 1))
+            # the fork's blades, raked forward to the axle
+            F.sweep(_name('fork'), [at(crown, dz * 0.5), at(S.fork_mid, dz * 0.9), at(fa, dz)], 0.011 * k, body,
+                    verts=low(6, 4), resolution=low(3, 1), scale=[1.1, 1.0, 0.8])
+    with G.new_parts() as front_wheel:
+        _wheel(S.front, BZ, S)
+    with G.new_parts() as more:
+        # mudguards: a C-section arc over each wheel, on stays
+        gk = S.guard_k or k
+        for x, (a0, a1) in zip((S.front, S.rear), S.guards):
+            pts = _arc_points((x, R, BZ), R + 0.03 * k, a0, a1, low(10, 4))
+            F.sweep(_name('guard'), pts, None, getattr(M, S.guard_colour) if S.guard_colour else body,
+                    profile=[(u * gk, v * gk) for u, v in ((-0.025, 0.0), (-0.02, 0.008), (0.0, 0.01), (0.02, 0.008),
+                                                         (0.025, 0.0), (0.0, 0.004))], up=(0, 1, 0))
+        # seat post and a saddle; stem and swept-back bars with grips; a bell
+        _rod('seat_post', at(sc), at(S.post), 0.012 * k, M.rim, verts=8)
+        x0, y0 = S.saddle
+        G.loft('saddle', [[F.at(x0 + u, y0 + th * (0.5 + 0.5 * G.sind(a)), BZ + hw * G.cosd(a))
+                           for a in range(0, 360, low(45, 90))] for u, hw, th in S.saddle_rows], material=M.saddle)
+        _rod('stem', at(S.stem[0]), at(S.stem[1]), 0.013 * k, M.rim, verts=8)
+        _bent('bars', [(x, h, BZ + dz) for x, h, dz in S.bars], 0.011 * k, M.rim, bend=S.bend, verts=low(8, 5))
+        for a, b in S.grips:
+            _rod(_name('grip'), (a[0], a[1], BZ + a[2]), (b[0], b[1], BZ + b[2]), S.grip_r, M.saddle, verts=low(8, 5))
+        F.cyl('bell', 0.02 * k, 0.015 * k, (S.bell[0], S.bell[1], BZ + S.bell[2]), M.rim, verts=8)
+        F.cyl('cog', S.cog, 0.008 * k, (S.rear, R, BZ + rdz), M.rim, rot=(90, 0, 0), verts=low(10, 5))
+    with G.new_parts() as cranks:
+        # chain ring, cranks and pedals on the drive side (the front), the chain to the back cog
+        G.torus('chainring', S.ring, 0.006 * k, at=F.at(bb[0], bb[1], BZ + rdz), material=M.rim, rot=(90, 0, 0),
+                major_segments=low(24, 8), minor_segments=4)
+        for s in (-1, 1):
+            a = (S.crank[0] * s, S.crank[1] * s)
+            dz = S.crank_dz * s
+            _rod(_name('crank'), at(bb, dz), (bb[0] + a[0], bb[1] + a[1], BZ + dz), 0.009 * k, M.rim, verts=6)
+            F.box(_name('pedal'), *S.pedal, (bb[0] + a[0], bb[1] + a[1], BZ + dz + S.pedal_dz * s), M.tyre, bevel=0.005 * k,
+                  bevel_segments=S.pedal_segments)
+    with G.new_parts() as chain:
+        for dy in (S.ring, -S.ring)[:low(2, 0)]:
+            _rod(_name('chain'), (bb[0], bb[1] + dy, BZ + rdz), (S.rear, R + dy * S.chain_drop, BZ + rdz),
+                 0.004 * k, M.tyre, verts=4)
+        if S.kickstand:                                    # a kickstand, folded up along the chainstay
+            _rod('kickstand', (-0.14, 0.25, BZ - 0.05), (-0.42, 0.24, BZ - 0.06), 0.008, M.rim, verts=6)
+    return frame + more + chain, front_wheel, cranks
 
 
 def _rear_axle_lifted():
@@ -451,6 +541,347 @@ def bikeRack():
     G.swing(bike, 'wheel_up', -LIFT, seconds=0.8, axis='Y')
     G.spin(wheel, 'wheel_turn', turns=1, seconds=1.2, axis='Y')
     return objs
+
+
+# --- the rides: a city bike (2x1), a kids' bike (1x1), an e-scooter (1x1) ----------------------------------------
+# Each stands along x, its front wheel to +x, its middle line at depth 0, on the floor. No clips: the renderer moves
+# its parts by code, each a top-level node with its origin on its pivot (yard.md): `frame`, `wheel_front` and
+# `wheel_rear` (turned about their axles, game z), `cranks` (turned about the bottom bracket), `stand` (hidden while
+# it's ridden).
+CITY = Bike(
+    r=0.335, k=1.08, rear=-0.55, front=0.55, spokes=24, segments=(36, 12),
+    bb=(-0.07, 0.29), sc=(-0.205, 0.62), hb=(0.364, 0.715), ht=(0.333, 0.8), crown=(0.378, 0.677),
+    head=((0.381, 0.668), (0.311, 0.86)), fork_mid=(0.466, 0.46), tubes=(0.019, 0.017, 0.021),
+    # a step-through: the top tube curves down from the head tube into the seat tube low down, over the down tube
+    step=([(0.333, 0.8), (0.21, 0.6), (0.03, 0.47), (-0.132, 0.44)],
+          [(0.364, 0.715), (0.25, 0.5), (0.08, 0.34), (-0.07, 0.29)]),
+    stay_dz=0.04, guards=((15, 125), (35, 172)),
+    post=(-0.283, 0.81), saddle=(-0.36, 0.812),
+    saddle_rows=((0.0, 0.04, 0.022), (0.033, 0.104, 0.0385), (0.088, 0.098, 0.0385), (0.154, 0.046, 0.033),
+                 (0.22, 0.02, 0.024), (0.253, 0.011, 0.013)),
+    stem=((0.311, 0.86), (0.302, 0.985)),
+    # swept back to the rider: out and a little forward from the stem, then back to the grips
+    bars=[(0.165, 0.972, -0.31), (0.235, 0.978, -0.235), (0.315, 0.985, -0.15), (0.302, 0.985, -0.04),
+          (0.302, 0.985, 0.04), (0.315, 0.985, 0.15), (0.235, 0.978, 0.235), (0.165, 0.972, 0.31)],
+    bend=0.06,
+    grips=[((0.236, 0.978, -0.234), (0.164, 0.972, -0.31)), ((0.236, 0.978, 0.234), (0.164, 0.972, 0.31))],
+    grip_r=0.018, bell=(0.31, 1.0, 0.11),
+    ring=0.08, ring_dz=0.05, cog=0.038, chain_drop=0.475, crank=(0.17, 0.0), crank_dz=0.08, pedal_dz=0.05,
+    pedal=(0.09, 0.022, 0.07), drive=-1, kickstand=False, colour='city')
+CITY_STAND = (-0.13, 0.27)     # the centre stand's pivot, behind the bottom bracket
+
+KID = Bike(
+    r=0.18, k=0.62, tyre=0.022, rear=-0.28, front=0.28, spokes=12, segments=(24, 12), rim_segments=20, tyre_minor=5,
+    bb=(-0.05, 0.19), sc=(-0.126, 0.4), hb=(0.15, 0.42), ht=(0.128, 0.475), crown=(0.158, 0.401),
+    head=((0.161, 0.392), (0.119, 0.498)), fork_mid=(0.22, 0.262), tubes=(0.016, 0.015, 0.017),
+    stay_dz=0.032, guards=((25, 125), (40, 165)),
+    post=(-0.157, 0.485), saddle=(-0.215, 0.49),
+    saddle_rows=((0.0, 0.028, 0.016), (0.022, 0.062, 0.028), (0.06, 0.058, 0.03), (0.105, 0.028, 0.024),
+                 (0.15, 0.012, 0.017), (0.172, 0.006, 0.009)),
+    stem=((0.119, 0.498), (0.14, 0.54)),
+    # high-rise: up from the stem in a V to the grips, a brace across
+    bars=[(0.16, 0.66, -0.265), (0.16, 0.66, -0.13), (0.142, 0.545, -0.07), (0.14, 0.54, 0.0), (0.142, 0.545, 0.07),
+          (0.16, 0.66, 0.13), (0.16, 0.66, 0.265)],
+    bend=0.03,
+    grips=[((0.16, 0.66, -0.14), (0.16, 0.66, -0.26)), ((0.16, 0.66, 0.14), (0.16, 0.66, 0.26))],
+    grip_r=0.016, bell=(0.153, 0.627, 0.06),
+    ring=0.05, ring_dz=0.035, cog=0.026, chain_drop=0.52, crank=(0.105, 0.0), crank_dz=0.062, pedal_dz=0.036,
+    pedal=(0.06, 0.018, 0.05), pedal_segments=1, drive=-1, kickstand=False, colour='kid', guard_colour='kid_trim', guard_k=0.95)
+
+
+def _bb_shell(S, width):
+    """The bottom bracket's shell, across the frame where its tubes meet."""
+    F.cyl(_name('bb_shell'), 0.024 * S.k, width, (S.bb[0], S.bb[1], S.z), S.body, rot=(90, 0, 0), verts=low(10, 5))
+
+
+def _spindle(S):
+    """The cranks' axle through the bottom bracket (in the cranks, which turn about it)."""
+    F.cyl(_name('spindle'), 0.009 * S.k, 2 * S.crank_dz, (S.bb[0], S.bb[1], S.z), M.rim, rot=(90, 0, 0), verts=low(8, 4))
+
+
+def _chain_top(S, x):
+    """The chain's top run's height at game x."""
+    y0, y1 = S.bb[1] + S.ring, S.r + S.ring * S.chain_drop
+    return y0 + (x - S.bb[0]) * (y1 - y0) / (S.rear - S.bb[0])
+
+
+def _city_extras(S):
+    """The city bike's own things: a chain guard, a wicker basket on the bars with a lamp, a carrier with a red
+    light, the centre stand's plate."""
+    z, bx, by = S.z, S.bb[0], S.bb[1]
+    _bb_shell(S, 0.075)
+    # the chain guard over the top of the chain ring and the top run, between the ring and the crank
+    ro, ri = S.ring + 0.028, S.ring - 0.012
+    xe = S.rear + 0.075
+    out = [(bx + ro * G.cosd(a), by + ro * G.sind(a)) for a in range(-30, 91, low(15, 30))]
+    out += [(xe, _chain_top(S, xe) + 0.028), (xe, _chain_top(S, xe) - 0.012)]
+    out += [(bx + ri * G.cosd(a), by + ri * G.sind(a)) for a in range(90, -31, -low(15, 30))]
+    d = S.drive
+    F.extrude('chain_guard', out, 0.004, (0, 0, z + 0.064 * d), S.body)
+    _rod('guard_stay', (xe + 0.01, _chain_top(S, xe) - 0.005, z + 0.064 * d), (xe + 0.02, _chain_top(S, xe) - 0.03, z + 0.03 * d),
+         0.004, M.rim, verts=4)
+    # the basket, wicker, on the bars' clamp, on two stays down to the fork ends; a lamp on its front
+    cx, cy0, cy1, hx, hz = 0.515, 0.735, 0.955, 0.135, 0.17
+    px, pz, _ = F.at(cx, 0, z)
+    n = low(24, 8)
+    G.loft('basket', [G.ring(hx * 0.92, hz * 0.92, cy0, n, square=4, at=(px, pz)),
+                      G.ring(hx, hz, cy1, n, square=4, at=(px, pz)),
+                      G.ring(hx - 0.012, hz - 0.012, cy1, n, square=4, at=(px, pz)),
+                      G.ring(hx * 0.92 - 0.012, hz * 0.92 - 0.012, cy0 + 0.015, n, square=4, at=(px, pz))],
+           material=M.basket)
+    F.sweep('basket_rim', [(cx + u, cy1, z + v) for u, v in G.rounded_rect(2 * hx + 0.004, 2 * hz + 0.004, 0.05, corner=low(3, 1))],
+            0.009, M.basket, verts=low(6, 4), closed=True)
+    if not G.is_low():                                     # woven bands round it, the weave's ribs between them
+        for f in (0.3, 0.62):
+            sc_ = 0.92 + 0.08 * f + 0.004
+            F.sweep(_name('basket_band'), [(cx + u, cy0 + (cy1 - cy0) * f, z + v)
+                                           for u, v in G.rounded_rect(2 * hx * sc_, 2 * hz * sc_, 0.045, corner=3)],
+                    0.006, M.basket_dark, verts=4, closed=True)
+        for i in range(n):
+            a = 360 * (i + 0.5) / n
+            c, s_ = G.cosd(a), G.sind(a)
+            e = 2.0 / 4                                    # the rings' squareness (G.ring square=4)
+            u, v = math.copysign(abs(c) ** e, c), math.copysign(abs(s_) ** e, s_)
+            _rod(_name('basket_rib'), (cx + hx * 0.925 * u, cy0 + 0.01, z + hz * 0.925 * v),
+                 (cx + hx * 1.003 * u, cy1 - 0.012, z + hz * 1.003 * v), 0.0035, M.basket_dark, verts=3)
+    for s in (-1, 1):
+        _rod(_name('basket_stay'), (cx + 0.08, cy0 + 0.005, z + s * 0.07), (S.front, S.r, z + s * 0.062), 0.005, M.rim, verts=low(6, 4))
+    F.box('basket_bracket', 0.075, 0.03, 0.06, (0.35, 0.94, z), M.rim, bevel=low(0.004, 0), bevel_segments=1)
+    F.cyl('lamp', 0.026, 0.045, (cx + hx + 0.022, 0.86, z), M.rim, rot=(0, 90, 0), verts=low(12, 6))
+    F.cyl('lamp_glass', 0.022, 0.006, (cx + hx + 0.046, 0.86, z), M.lamp, rot=(0, 90, 0), verts=low(12, 6))
+    # the carrier over the back wheel, on stays to the axle and the seat stays; a red light at its back
+    ch, x0, x1 = 0.735, -0.3, -0.8
+    for s in (-1, 1):
+        dz = s * 0.065
+        _bent(_name('carrier_rail'), [(x0, ch - 0.02, z + dz * 0.5), (x0 - 0.04, ch, z + dz), (x1, ch, z + dz)], 0.0065, S.body,
+              bend=0.03, verts=low(6, 4))
+        _rod(_name('carrier_strut'), (x0, ch - 0.02, z + dz * 0.5), (-0.245, 0.585, z + s * 0.016), 0.005, S.body,
+             verts=low(6, 4))
+        for xa in (x1 + 0.02, -0.64):
+            _rod(_name('carrier_stay'), (xa, ch, z + dz), (S.rear - 0.01, S.r + 0.01, z + s * 0.046), 0.0055, S.body, verts=low(6, 4))
+    for xa in (-0.42, -0.56, x1):
+        _rod(_name('carrier_bar'), (xa, ch, z - 0.065), (xa, ch, z + 0.065), 0.005, S.body, verts=low(6, 4))
+    F.box('rear_light', 0.025, 0.035, 0.07, (x1 - 0.014, ch - 0.025, z), M.reflector, bevel=low(0.006, 0), bevel_segments=1)
+    # the centre stand's plate under the chainstays
+    F.box('stand_plate', 0.05, 0.016, 0.06, (CITY_STAND[0], CITY_STAND[1] + 0.017, z), S.body, bevel=low(0.003, 0),
+          bevel_segments=1)
+
+
+def _city_stand(S):
+    """A double-leg centre stand, down: a yoke on its pivot, two legs splayed to rubber feet either side."""
+    px, py = CITY_STAND
+    z = S.z
+    F.cyl('stand_yoke', 0.014, 0.07, (px, py, z), M.rim, rot=(90, 0, 0), verts=low(10, 5))
+    for s in (-1, 1):
+        F.sweep(_name('stand_leg'), [(px, py, z + s * 0.03), (px + 0.02, 0.16, z + s * 0.1), (px + 0.05, 0.016, z + s * 0.155)],
+                0.011, M.rim, verts=low(8, 4), resolution=low(3, 1), scale=[1.0, 0.9, 0.8])
+        F.box(_name('stand_foot'), 0.055, 0.016, 0.04, (px + 0.052, 0.008, z + s * 0.158), M.tyre, bevel=low(0.004, 0),
+              bevel_segments=1)
+
+
+def _kid_extras(S):
+    """The kids' bike's own things: a chain case, a brace across the bars, streamers from the grips' ends, the
+    stabilisers (their brackets, their little wheels on the floor either side of the back wheel)."""
+    z, bx, by = S.z, S.bb[0], S.bb[1]
+    _bb_shell(S, 0.06)
+    # the chain case: round the ring and the cog, between the ring and the crank
+    ro, rc = S.ring + 0.018, S.cog + 0.018
+    case = [(bx + ro * G.cosd(a), by + ro * G.sind(a)) for a in range(-80, 81, low(20, 40))]
+    case += [(S.rear + rc * G.cosd(a), S.r + rc * G.sind(a)) for a in range(100, 261, low(20, 40))]
+    F.extrude('chain_case', case, 0.004, (0, 0, z + (S.ring_dz + 0.012) * S.drive), M.kid_trim)
+    _rod('bar_brace', (0.153, 0.615, z - 0.105), (0.153, 0.615, z + 0.105), 0.007, M.rim, verts=low(6, 4))
+    # streamers: four ribbons hanging from each grip's end, a cap over it
+    colours = (M.streamer_pink, M.streamer_yellow, M.streamer_blue)
+    for s in (-1, 1):
+        gx, gh, gz = 0.16, 0.66, z + s * 0.268
+        F.cyl(_name('grip_cap'), 0.019, 0.012, (gx, gh, gz), M.streamer_pink, rot=(90, 0, 0), verts=low(10, 5))
+        for j in range(3):
+            a = 120 * j + 30 * s
+            ox, oz = 0.008 * G.cosd(a), 0.008 * G.sind(a)
+            pts = [(gx + ox, gh - 0.01, gz + s * 0.004 + oz), (gx + ox - 0.012, gh - 0.06, gz + s * 0.006 + oz * 1.4),
+                   (gx + ox - 0.03, gh - 0.11, gz + s * 0.008 + oz * 1.8), (gx + ox - 0.05, gh - 0.15, gz + s * 0.01 + oz * 2)]
+            F.sweep(_name('streamer'), pts, None, colours[j],
+                    profile=[(-0.004, -0.0006), (0.004, -0.0006), (0.004, 0.0006), (-0.004, 0.0006)], up=(1, 0, 0))
+    # the stabilisers: a bracket from the back axle out and down to each little wheel, standing on the floor
+    sr, sx = 0.06, S.rear - 0.03
+    for s in (-1, 1):
+        sz = z + s * 0.175
+        F.sweep(_name('stabiliser'), [(S.rear, S.r, z + s * 0.045), (S.rear - 0.012, 0.12, z + s * 0.13), (sx, sr, sz - s * 0.018)],
+                0.0075, M.rim, verts=low(6, 4))
+        G.torus(_name('stabiliser_tyre'), sr - 0.014, 0.014, at=F.at(sx, sr, sz), material=M.tyre, rot=(90, 0, 0),
+                major_segments=low(16, 8), minor_segments=low(5, 4))
+        F.cyl(_name('stabiliser_hub'), sr - 0.022, 0.02, (sx, sr, sz), M.trim, rot=(90, 0, 0), verts=low(12, 6))
+        F.cyl(_name('stabiliser_axle'), 0.007, 0.04, (sx, sr, sz), M.rim, rot=(90, 0, 0), verts=low(6, 4))
+
+
+def _ride(name, S, extras, stand=None, pivot=None):
+    """A bike `S` in its nodes (the note above): `extras` and `stand` (its pivot at game (x, height) `pivot`) build what
+    this one has of its own."""
+    with G.new_parts() as rear:
+        _wheel(S.rear, S.z, S)
+    frame, front, cranks = _bike(S)
+    with G.new_parts() as more:
+        extras(S)
+    with G.new_parts() as cranks_more:
+        _spindle(S)
+    with G.new_parts() as kick:
+        if stand:
+            stand(S)
+    if G.is_low():                                         # from afar: parked, all one still part
+        return G.settle([G.join_all(name)], centre=False)
+    G.join(frame + more, 'frame', origin=(0, 0, 0))
+    G.join(front, 'wheel_front', origin=F.at(S.front, S.r, S.z))
+    G.join(rear, 'wheel_rear', origin=F.at(S.rear, S.r, S.z))
+    G.join(cranks + cranks_more, 'cranks', origin=F.at(S.bb[0], S.bb[1], S.z))
+    if kick:
+        G.join(kick, 'stand', origin=F.at(*pivot, S.z))
+    return G.settle(centre=False)
+
+
+def bicycle():
+    return _ride('bicycle', CITY, _city_extras, _city_stand, CITY_STAND)
+
+
+def bicycleChild():
+    return _ride('bicycleChild', KID, _kid_extras)
+
+
+# The e-scooter: a low deck between two small solid wheels, a raked stem from the front up to T-bars.
+SC_R = 0.105                  # its wheels' radius
+SC_REAR, SC_FRONT = -0.36, 0.37
+SC_DECK = (-0.25, 0.25, 0.125)   # the deck's ends (x) and its top (with the grip tape)
+SC_TOP = (0.284, 1.015)       # the stem's top, under the bars
+SC_STAND = (0.1, 0.072, 0.07)    # the side stand's pivot, under the deck's left edge (+z: the rider's left)
+
+
+def _sc_axis(h):
+    """The point of the steering axis (front axle up to the stem's top) at height `h`: (x, h)."""
+    t = (h - SC_R) / (SC_TOP[1] - SC_R)
+    return SC_FRONT + (SC_TOP[0] - SC_FRONT) * t, h
+
+
+def _sc_wheel(x, motor):
+    """A scooter wheel at axle (x, SC_R, 0): a solid tyre, a rim with five spokes round a hub, or the hub motor's drum
+    filling it (`motor`); the back one's brake disc on its left (+z)."""
+    y = SC_R
+    G.torus(_name('tyre'), SC_R - 0.025, 0.025, at=F.at(x, y, 0), material=M.tyre, rot=(90, 0, 0),
+            major_segments=low(32, 12), minor_segments=low(8, 4))
+    rim = SC_R - 0.048
+    if motor:                                              # the motor: a drum as wide as the tyre, a lip either side
+        G.revolve(_name('motor'), [(0.0, -0.034), (0.03, -0.034), (0.046, -0.03), (0.054, -0.024), (rim + 0.004, -0.02),
+                                   (rim + 0.004, 0.02), (0.054, 0.024), (0.046, 0.03), (0.03, 0.034), (0.0, 0.034)],
+                  at=F.at(x, y, 0), material=M.scooter_metal, segments=low(20, 8), rot=(90, 0, 0))
+        if not G.is_low():
+            for s in (-1, 1):
+                F.cyl(_name('motor_cap'), 0.022, 0.006, (x, y, s * 0.036), M.scooter_trim, rot=(90, 0, 0), verts=10)
+    else:
+        G.revolve(_name('rim'), [(rim - 0.012, -0.02), (rim + 0.004, -0.02), (rim + 0.004, 0.02), (rim - 0.012, 0.02)],
+                  at=F.at(x, y, 0), material=M.scooter_metal, segments=low(24, 8), rot=(90, 0, 0))
+        F.cyl(_name('hub'), 0.02, 0.05, (x, y, 0), M.scooter_metal, rot=(90, 0, 0), verts=low(12, 6))
+        if not G.is_low():
+            for i in range(5):
+                a = 72 * i + 18
+                m = 0.5 * (0.02 + rim - 0.012)
+                F.box(_name('rim_spoke'), rim - 0.012 - 0.015, 0.012, 0.016, (x + m * G.cosd(a), y + m * G.sind(a), 0),
+                      M.scooter_metal, rot=(0, a, 0))
+        F.cyl(_name('brake_disc'), 0.05, 0.003, (x, y, 0.03), M.rim, rot=(90, 0, 0), verts=low(16, 8))
+    F.cyl(_name('axle'), 0.009, 0.1, (x, y, 0), M.rim, rot=(90, 0, 0), verts=low(8, 4))
+
+
+def _sc_frame():
+    """The scooter's still body: deck and grip tape, the back fork, the fenders, the neck and the head tube, the fork,
+    the stem with its latch, the bars and grips, a brake lever and a throttle, a bell, the display, the lamps."""
+    x0, x1, top = SC_DECK
+    L = x1 - x0
+    # the deck: a rounded slab, its edges rounded, grip tape on top, a trim strip along each side
+    F.extrude('deck', G.rounded_rect(L, 0.165, 0.05, corner=low(4, 1)), 0.058, ((x0 + x1) / 2, top - 0.004 - 0.029, 0),
+              M.scooter, plane='top', bevel=low(0.012, 0), bevel_segments=low(2, 1))
+    F.extrude('grip_tape', G.rounded_rect(L - 0.04, 0.135, 0.035, corner=low(4, 1)), 0.004, ((x0 + x1) / 2, top - 0.002, 0),
+              M.grip_tape, plane='top')
+    if not G.is_low():
+        for s in (-1, 1):
+            F.box(_name('deck_trim'), L - 0.08, 0.008, 0.004, ((x0 + x1) / 2, top - 0.03, s * 0.0835), M.scooter_trim)
+    # the back fork: a plate either side from the deck's tail to the axle; the fender over the wheel, a light at its end
+    for s in (-1, 1):
+        _board(_name('rear_fork'), (x0 + 0.03, top - 0.03, s * 0.042), (SC_REAR, SC_R, s * 0.042), 0.04, 0.008, M.scooter,
+               face=(0, 0, 1), bevel=low(0.003, 0))
+    prof = [(-0.032, 0.0), (-0.028, 0.008), (0.0, 0.011), (0.028, 0.008), (0.032, 0.0), (0.0, 0.004)]
+    for x, (a0, a1) in ((SC_REAR, (28, 152)), (SC_FRONT, (45, 140))):
+        F.sweep(_name('fender'), _arc_points((x, SC_R, 0), SC_R + 0.016, a0, a1, low(10, 4)), None, M.scooter, profile=prof,
+                up=(0, 1, 0))
+    ex, ey = SC_REAR + (SC_R + 0.016) * G.cosd(152), SC_R + (SC_R + 0.016) * G.sind(152)
+    F.box('tail_light', 0.012, 0.022, 0.04, (ex - 0.004, ey + 0.004, 0), M.reflector, bevel=low(0.003, 0),
+          bevel_segments=1)
+    # the neck from the deck's front up to the head tube; the head tube, the fork blades to the axle
+    hx0, hy0 = _sc_axis(0.2)
+    hx1, hy1 = _sc_axis(0.32)
+    F.sweep('neck', [(x1 - 0.06, top - 0.03, 0), (x1 + 0.03, top - 0.015, 0), (hx0 - 0.01, hy0 + 0.01, 0)], 0.024, M.scooter,
+            verts=low(10, 6), resolution=low(3, 1), scale=[1.0, 0.95, 0.85])
+    F.sweep('head_tube', [(hx0, hy0, 0), (hx1, hy1, 0)], 0.026, M.scooter, verts=low(12, 6))
+    cx, cy = _sc_axis(0.19)
+    for s in (-1, 1):
+        F.sweep(_name('fork'), [(cx, cy, s * 0.02), (SC_FRONT, SC_R, s * 0.042)], 0.009, M.scooter, verts=low(6, 4),
+                scale=[1.2, 0.9])
+    F.box('fork_crown', 0.04, 0.025, 0.1, (cx, cy, 0), M.scooter, bevel=low(0.006, 0), bevel_segments=1)
+    # the stem: the folding latch over the head tube, then the stem up to the bars
+    lx, ly = _sc_axis(0.36)
+    F.sweep('stem', [(hx1, hy1, 0), _sc_axis(0.6) + (0,), (SC_TOP[0], SC_TOP[1], 0)], 0.019, M.scooter, verts=low(12, 6),
+            scale=[1.0, 0.95, 0.88])
+    F.box('latch', 0.05, 0.07, 0.05, (lx + 0.012, ly, 0), M.scooter_trim, rot=(0, 5, 0), bevel=low(0.01, 0), bevel_segments=low(2, 1))
+    F.cyl('latch_hinge', 0.014, 0.07, (lx + 0.02, ly - 0.03, 0), M.rim, rot=(90, 0, 0), verts=low(8, 4))
+    # the T-bars and grips; a brake lever on the left (+z), a thumb throttle on the right, a bell
+    bx, by = SC_TOP[0], SC_TOP[1] + 0.015
+    F.sweep('bars', [(bx, by, -0.29), (bx, by, 0.29)], 0.012, M.scooter, verts=low(10, 5))
+    F.box('bar_clamp', 0.04, 0.04, 0.06, (bx, by - 0.005, 0), M.scooter, bevel=low(0.008, 0), bevel_segments=1)
+    for s in (-1, 1):
+        F.sweep(_name('grip'), [(bx, by, s * 0.17), (bx, by, s * 0.29)], 0.017, M.grip_tape, verts=low(10, 5),
+                scale=[1.0, 1.08])
+        F.cyl(_name('grip_end'), 0.018, 0.008, (bx, by, s * 0.294), M.scooter_trim, rot=(90, 0, 0), verts=low(10, 5))
+    F.sweep('brake_lever', [(bx + 0.01, by, 0.15), (bx + 0.035, by + 0.002, 0.2), (bx + 0.04, by, 0.26)], 0.005, M.rim,
+            verts=low(6, 4), resolution=low(2, 1))
+    F.box('brake_mount', 0.03, 0.03, 0.025, (bx + 0.006, by, 0.155), M.scooter, bevel=low(0.004, 0), bevel_segments=1)
+    F.box('throttle', 0.035, 0.012, 0.025, (bx - 0.018, by + 0.004, -0.155), M.scooter,
+          bevel=low(0.004, 0), bevel_segments=1)
+    F.cyl('bell', 0.015, 0.012, (bx, by + 0.016, 0.11), M.rim, verts=low(8, 5))
+    # the display on the bars' clamp, tilted up to the rider; the headlight on the stem's front
+    F.soft('display', 0.06, 0.022, 0.075, (bx - 0.012, by + 0.024, 0), M.scooter, round=0.008, flat=1, round_segments=low(2, 1))
+    F.box('screen', 0.04, 0.003, 0.05, (bx - 0.014, by + 0.0355, 0), M.screen)
+    hx, hy = _sc_axis(0.9)
+    F.cyl('headlight', 0.022, 0.03, (hx + 0.03, hy, 0), M.scooter, rot=(0, 90, 0), verts=low(12, 6))
+    F.cyl('headlight_glass', 0.018, 0.004, (hx + 0.046, hy, 0), M.lamp, rot=(0, 90, 0), verts=low(12, 6))
+    F.box('headlight_mount', 0.03, 0.02, 0.025, (hx + 0.012, hy, 0), M.scooter)
+    if not G.is_low():                                     # the motor's cable down the fork, the brake's down the stem
+        F.sweep('motor_cable', [(SC_FRONT - 0.01, SC_R + 0.02, 0.05), (cx + 0.02, cy, 0.04), (hx1 + 0.03, hy1, 0.02),
+                                (hx1 + 0.02, hy1 + 0.1, 0.0)], 0.004, M.tyre, verts=4, resolution=2)
+        F.sweep('brake_cable', [(bx + 0.01, by - 0.01, 0.15), (bx + 0.05, by - 0.12, 0.04), _sc_axis(0.7) + (0.0,)], 0.003,
+                M.tyre, verts=4, resolution=2)
+
+
+def _sc_stand():
+    """The side stand, down: a short leg from its pivot under the deck's left edge out and back to a foot."""
+    px, py, pz = SC_STAND
+    F.box('stand_mount', 0.04, 0.02, 0.02, (px, py + 0.006, pz - 0.008), M.scooter, bevel=low(0.004, 0), bevel_segments=1)
+    F.sweep('stand_leg', [(px, py, pz), (px - 0.07, 0.03, pz + 0.07), (px - 0.1, 0.012, pz + 0.105)], 0.008, M.scooter,
+            verts=low(8, 4), resolution=low(2, 1), scale=[1.0, 0.9, 0.85])
+    F.box('stand_foot', 0.035, 0.012, 0.03, (px - 0.104, 0.006, pz + 0.11), M.tyre, bevel=low(0.003, 0), bevel_segments=1)
+
+
+def eScooter():
+    with G.new_parts() as frame:
+        _sc_frame()
+    with G.new_parts() as front:
+        _sc_wheel(SC_FRONT, motor=True)
+    with G.new_parts() as rear:
+        _sc_wheel(SC_REAR, motor=False)
+    with G.new_parts() as kick:
+        _sc_stand()
+    if G.is_low():
+        return G.settle([G.join_all('eScooter')], centre=False)
+    G.join(frame, 'frame', origin=(0, 0, 0))
+    G.join(front, 'wheel_front', origin=F.at(SC_FRONT, SC_R, 0))
+    G.join(rear, 'wheel_rear', origin=F.at(SC_REAR, SC_R, 0))
+    G.join(kick, 'stand', origin=F.at(*SC_STAND))
+    return G.settle(centre=False)
 
 
 # --- the raised vegetable bed (2x1): boards round the soil, lettuces, carrots and tomato plants --------------
@@ -1217,6 +1648,12 @@ FAMILY = G.Family(
      G.Model('bikeRack', bikeRack, size=(1.8, 0.832, 0.58), centre=(0, -0.07), key='model.bikeRack', far=G.far_of(bikeRack),
              motions={'uses': {'tuneUp': 'wheel_up'}, 'loops': {'tuneUp': 'wheel_turn'}},
              paint=[('rack', 'Rack'), ('bike', 'Bike')]),
+     G.Model('bicycle', bicycle, size=(1.839, 1.008, 0.645), centre=(-0.0046, 0), key='model.bicycle', far=G.far_of(bicycle),
+             paint=[('city', 'Frame')]),
+     G.Model('bicycleChild', bicycleChild, size=(0.949, 0.679, 0.573), centre=(-0.0062, 0), key='model.bicycleChild',
+             far=G.far_of(bicycleChild), paint=[('kid', 'Frame')]),
+     G.Model('eScooter', eScooter, size=(0.952, 1.067, 0.596), centre=(-0.0009, 0), key='model.eScooter', far=G.far_of(eScooter),
+             paint=[('scooter', 'Body')]),
      G.Model('raisedBed', raisedBed, size=(1.861, 0.536, 0.88), key='model.raisedBed', far=G.far_of(raisedBed),
              motions={'growth': 'grow', 'uses': {'harvest': {'clip': 'harvest', 'over': 1},
                                                  'tend': {'clip': 'rustle', 'delay': 0.6, 'every': 2.4}}},

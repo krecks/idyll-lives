@@ -4067,6 +4067,7 @@
         {"id": "seating", "label": "Seating & dining", "outside": true},
         {"id": "cooking", "label": "Grills & fire", "outside": true},
         {"id": "play", "label": "Play", "outside": true},
+        {"id": "rides", "label": "Bikes & scooters", "outside": true},
         {"id": "lights", "label": "Lights", "outside": true},
         {"id": "decor", "label": "Garden decor", "outside": true},
         {"id": "yard", "label": "Sheds & garden work", "outside": true}
