@@ -1521,6 +1521,7 @@ pub struct ObjectRules {
     /// Each quality level takes this share off wear per use.
     pub wear_per_quality: f32,
     pub repair: RepairRules,
+    pub set_up: SetUpRules,
     pub max_quality: u8,
     /// Need and skill gains grow by this fraction per quality level.
     pub quality_bonus: f32,
@@ -1548,6 +1549,27 @@ pub struct RepairRules {
     pub cost: f32,
     pub tags: TagMask,
     pub anim: Option<usize>,
+}
+
+/// Setting up something a resident asked for (`setup.rs`): it comes as a parcel to the front
+/// door, and they carry it in and put it together where it goes.
+#[derive(Debug, Clone)]
+pub struct SetUpRules {
+    /// "Set up" (the action reads "Set up the new <thing>").
+    pub label: String,
+    /// Game minutes putting it together at its spot, and picking the parcel up at the door.
+    pub minutes: f32,
+    pub fetch_minutes: f32,
+    /// Hours the one who asked has to it before someone else at home may do it.
+    pub help_hours: f32,
+    /// Hours before it's set up for them anyway (nobody got to it).
+    pub wait_hours: f32,
+    /// The parcel (an item, carried in the hands); none: they carry nothing.
+    pub parcel: Option<usize>,
+    pub tags: TagMask,
+    /// Putting it together, and picking the parcel up.
+    pub anim: Option<usize>,
+    pub fetch_anim: Option<usize>,
 }
 
 impl RepairRules {
@@ -2265,6 +2287,20 @@ struct RepairRaw {
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
+struct SetUpRaw {
+    label: Option<String>,
+    minutes: Option<f32>,
+    fetch_minutes: Option<f32>,
+    help_after_hours: Option<f32>,
+    wait_hours: Option<f32>,
+    parcel: Option<String>,
+    tags: Option<Vec<String>>,
+    anim: Option<String>,
+    fetch_anim: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
 struct RoomRulesRaw {
     weights: Option<[f32; 5]>,
     window_tiles: Option<f32>,
@@ -2301,6 +2337,7 @@ struct ObjectRulesRaw {
     free_rotation: Option<Vec<String>>,
     wear: WearRaw,
     repair: RepairRaw,
+    set_up: SetUpRaw,
     max_quality: Option<u8>,
     quality_bonus: Option<f32>,
     upgrade_cost: Option<f32>,
@@ -4617,6 +4654,38 @@ impl Content {
                     None => tag_index.get("chores").map_or(0, |&i| 1 << i),
                 },
                 anim: animations.iter().position(|a| a == "tinker"),
+            },
+            set_up: {
+                let su = &or.set_up;
+                let anim = |a: &Option<String>, default: &str| match a {
+                    None => Ok(anim_index(default)),
+                    Some(a) => anim_index(a).map(Some).ok_or_else(|| {
+                        Error::new(format!(
+                            "objectRules.setUp: unknown anim '{a}' (declare it in \"animations\")"
+                        ))
+                    }),
+                };
+                SetUpRules {
+                    label: su.label.clone().unwrap_or_else(|| "Set up".into()),
+                    minutes: su.minutes.unwrap_or(15.0).max(1.0),
+                    fetch_minutes: su.fetch_minutes.unwrap_or(1.5).max(0.5),
+                    help_hours: su.help_after_hours.unwrap_or(2.0).max(0.0),
+                    wait_hours: su.wait_hours.unwrap_or(24.0).max(1.0),
+                    parcel: match &su.parcel {
+                        None => None,
+                        Some(id) => {
+                            Some(items.iter().position(|i| &i.id == id).ok_or_else(|| {
+                                Error::new(format!("objectRules.setUp: unknown item '{id}'"))
+                            })?)
+                        }
+                    },
+                    tags: match &su.tags {
+                        Some(tags) => tag_mask(tags, "objectRules.setUp")?,
+                        None => tag_index.get("chores").map_or(0, |&i| 1 << i),
+                    },
+                    anim: anim(&su.anim, "tinker")?,
+                    fetch_anim: anim(&su.fetch_anim, "serve")?,
+                }
             },
             max_quality: or.max_quality.unwrap_or(3),
             quality_bonus: or.quality_bonus.unwrap_or(0.25),

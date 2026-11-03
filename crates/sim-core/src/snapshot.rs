@@ -104,7 +104,8 @@ pub mod sim {
     pub const HEIGHT: usize = 18;
     /// Object definition (index into `Content::objects`) of the object in `OBJECT` while the
     /// Sim is using it or walking to use it, else -1 (repairs too). Voices pick lines per item
-    /// from it; the instance id alone would need the world structure.
+    /// from it; the instance id alone would need the world structure. While setting up something
+    /// new (`setup.rs`), the type of the thing being set up, `OBJECT` being -1.
     pub const OBJECT_DEF: usize = 19;
     /// The interaction (index into that definition's `interactions`) with `OBJECT_DEF`, or -1.
     pub const INTERACTION: usize = 20;
@@ -230,6 +231,33 @@ pub(crate) fn doing(world: &World, s: &Sim) -> Doing {
             .anim
             .filter(|_| matches!(phase, Phase::Using { .. }));
         return Doing::plain(world, Some(*object), anim);
+    }
+    // Setting up something new (`setup.rs`): no object yet, the new thing's type (`OBJECT_DEF`), and
+    // picking the parcel up at the door or putting it together while at it.
+    if let Some(Activity {
+        task:
+            Task {
+                kind: TaskKind::SetUp { object, stage, .. },
+                ..
+            },
+        phase,
+        ..
+    }) = s.current()
+    {
+        let rules = &world.content.object_rules.set_up;
+        let anim = if *stage == 0 {
+            rules.fetch_anim
+        } else {
+            rules.anim
+        };
+        return Doing {
+            def: *object as f32,
+            ..Doing::plain(
+                world,
+                None,
+                anim.filter(|_| matches!(phase, Phase::Using { .. })),
+            )
+        };
     }
     // An accident's while on the spot (asleep on the floor, takeout).
     if let Some(Activity {

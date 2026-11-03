@@ -1215,6 +1215,26 @@ fn task_view(
                 rest.map_or(1.0, |r| r.minutes),
             )
         }
+        // "Set up the new cookbook lectern".
+        TaskKind::SetUp { object, stage, .. } => {
+            let rules = &content.object_rules.set_up;
+            let name = content
+                .objects
+                .get(object as usize)
+                .map_or_else(String::new, |d| d.name.to_lowercase());
+            // (Picking the parcel up is the start of it: no progress yet.)
+            let minutes = if stage == 0 {
+                f32::INFINITY
+            } else {
+                rules.minutes
+            };
+            (
+                format!("{} the new {name}", rules.label),
+                None,
+                None,
+                minutes,
+            )
+        }
         TaskKind::Repair { object } => {
             let rules = &content.object_rules.repair;
             let name = &content.objects[world.objects[object as usize].def].name;
@@ -2171,9 +2191,23 @@ struct ItemView<'a> {
     household: u32,
 }
 
-/// Every item: food and dishes on surfaces, on the floor and in fridges (JSON array, by id).
+/// Every item: food and dishes on surfaces, on the floor and in fridges (JSON array, by id), and
+/// the parcels of things bought waiting to be set up (`setup::parcels`, on the floor).
 pub fn items_json(world: &World) -> String {
     let content = &world.content;
+    let parcels = crate::setup::parcels(world)
+        .into_iter()
+        .map(|(id, def, [x, z], household)| ItemView {
+            id,
+            def: &content.items[def].id,
+            x: round_to(x, 100.0),
+            z: round_to(z, 100.0),
+            y: 0.0,
+            yaw: 0.0,
+            servings: 0,
+            state: "fresh",
+            household,
+        });
     let items: Vec<ItemView> = world
         .items
         .list
@@ -2208,6 +2242,7 @@ pub fn items_json(world: &World) -> String {
                 household: it.household,
             }
         })
+        .chain(parcels)
         .collect();
     serde_json::to_string(&items).expect("items serialize")
 }

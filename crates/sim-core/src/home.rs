@@ -929,7 +929,7 @@ impl World {
     /// Good free spots for `def` on the plot, best first: indoors (outdoors for garden things),
     /// back to a wall, away from doors. Things on a surface go on the first top with room for
     /// them, in the middle if it's free.
-    fn find_spot(&self, plot: u32, def: usize) -> Vec<(i32, i32, u8, [i8; 2])> {
+    pub(crate) fn find_spot(&self, plot: u32, def: usize) -> Vec<(i32, i32, u8, [i8; 2])> {
         if self.content.objects[def].layer == Layer::Surface {
             let radius = self.content.objects[def].radius;
             return self

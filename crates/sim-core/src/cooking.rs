@@ -2765,8 +2765,13 @@ fn going_on(s: &crate::world::Sim) -> bool {
     s.here()
         && match &s.current {
             // (A harvest on its way to the fridge too, `carry.rs`.)
+            // (And a parcel being carried in to be set up, `setup.rs`.)
             Some(a) => {
-                chain(&a.task.kind) || matches!(a.task.kind, TaskKind::Carry { baby: None, .. })
+                chain(&a.task.kind)
+                    || matches!(
+                        a.task.kind,
+                        TaskKind::Carry { baby: None, .. } | TaskKind::SetUp { .. }
+                    )
             }
             None => s
                 .queue
