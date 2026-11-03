@@ -234,7 +234,8 @@ states the tests write: `wants-asking` (its resident is asking to buy something 
 
 | Hook | Does |
 |---|---|
-| `__sims()` | Every resident as the newest snapshot shows them: `x`, `z`, `storey`, `yaw`, `pose` (`stand`, `sit`, `lie`), `moving`, the `object` they use or walk to (`__world().objects` id), its `def` and `interaction` ids, `using` (at it, not walking), `action` (the animation), `held`, `recipe`, `partner`, `needs` by id (the player's household and the inspected), `doing` and `queue` (as the resident's panel). Wait on it rather than timing screenshots: `page.waitForFunction(() => __sims()[0].using && __sims()[0].pose === 'sit')`. |
+| `__sims()` | Every resident as the newest snapshot shows them: `x`, `z`, `storey`, `yaw`, `pose` (`stand`, `sit`, `lie`), `moving`, the `object` they use or walk to (`__world().objects` id), its `def` and `interaction` ids, `using` (at it, not walking), `action` (the animation), `held`, `recipe`, `partner`, `ride` (the bike or e-scooter they ride, by object id), `needs` by id (the player's household and the inspected), `doing` and `queue` (as the resident's panel). Wait on it rather than timing screenshots: `page.waitForFunction(() => __sims()[0].using && __sims()[0].pose === 'sit')`. |
+| `__buses()` | The town's buses as the newest snapshot shows them (sim-core `bus.rs`): `x`, `z`, `yaw`, `shown` (0 out of sight, 1 standing, 2 driving), `doors` (bit 0 the front door open, bit 1 the middle one) and `line` (from 1). |
 | `__world()` | The lot as drawn: objects (a lamp's or a fire's with `off`), walls, plots, `meta` (the streets). |
 | `__send(command)` | Any simulation command (`web/src/core/protocol.ts`): `buy`, `use`, `setAutonomy`, `setSpeed`, `cancel`, `adopt`… |
 | `__addFunds(amount)` | Money for the player's household (negative takes it away); for long sessions, where buys start failing ("not bought"). |

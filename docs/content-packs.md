@@ -291,6 +291,16 @@ When it goes well, those listening get its `targetFeeling`, and everyone there g
 `socialRules.joinFriendship` friendship with everyone else (default 2; the two talking get
 their social's outcome with each other instead).
 
+**Visitors at the door** (`visits.door`: `waitMinutes`, `welcomeFriendship`, `greet`,
+`turnedAwayFeeling`, `knockAnim`): a visitor knocks and a grown-up of the household who is home and
+awake answers, before the next step of a routine; one busy (in a conversation, say) comes once
+free, and while someone awake is home the visitor waits three times `waitMinutes` for them, else
+`waitMinutes`, then goes home. Residents set off on a visit of their own choosing only to a home
+with someone to let them in, and, on their own or invited over the phone, only when the way takes
+45 minutes at most and gets them there before `visits.latestHour` (on their own, with time for
+the way back and three quarters of an hour there before they leave for work or school); the visit's `hours`
+count from when they're let in.
+
 **A host's offer:** with `visits.offer` (`{"social", "afterMinutes", "againMinutes",
 "handAnim"}`; base game: *Offer a bite to eat*), a free host asks a guest who has nothing in
 hand and isn't eating if they'd like something, `afterMinutes` (default 15) after the guest
@@ -548,10 +558,12 @@ woken. They do the crib's care interactions for each of those needs under `tendB
 (default 0.6), and those woken go back to bed, with the `feeling` (optional); the same baby
 calls nobody again for `cooldownMinutes` (default 90). The base game wakes for hunger, bladder
 and hygiene.
+<!-- bus-spacing -->
 **The bus:** in a town with bus stops, a bus comes into town every `bus.every` minutes (5 to 240,
 default 20), the first at `bus.first` o'clock (default 6) and the last at `bus.last` (default 23),
 calls at its stops and leaves again. Off to work or school with no car and no bike, residents take
-it when it gets them out of town sooner than the walk, and leave home in time for it.
+it when it gets them out of town sooner than the walk, and leave home in time for it (code:
+`crates/sim-core/src/bus.rs`; the stops are the town's, `docs/design/open-world.md`).
 **Jobs:** `careerRules.market` turns on residents finding, quitting and losing jobs on their own.
 A promotion takes a full performance bar (100) and the next grade's skills. A shift worked fills
 the bar by `performancePerShift` (default 12) at the entry grade, for a resident who left for work
@@ -762,7 +774,9 @@ per hour) and `away` (its target at work); `preference` (how much the AI prefers
 hands, none for nothing; `helpAfterHours`, after which any grown-up at home may do it instead of
 the one who asked; `waitHours`, after which it's set up for them anyway; `tags`). Defaults: 15
 minutes of `tinker`, 1.5 of `serve`, 2 and 24 hours. Only what the player says yes to (the
-catalog in Build mode places things at once).
+catalog in Build mode places things at once). **Story texts** (`events`): `setUp` (`{a}` set up
+the new `{object}`), `setUpForThem` (after `waitHours`) and `sentBack` (no room for it at home: it
+goes back to the shop, the money too). Code: `crates/sim-core/src/setup.rs`.
 
 **Laundry** (`laundry`: `{"perDay": 0.4, "most": 4}`): each resident in town makes `perDay` loads
 of dirty washing a day for their household, up to `most` loads waiting (dirty, washed waiting to

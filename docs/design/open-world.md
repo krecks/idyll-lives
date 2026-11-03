@@ -74,6 +74,7 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
 - `areas: { name, kind: 'hamlet' | 'countryside', x, z, w, d }[]` — area 0 is the main town.
 - `plots[].area?: number`, `plots[].kind?: 'home' | 'farm' | 'public' | 'shop' | 'countryside'`.
   Countryside plots are public, unfenced, with an `entry` at their trail end.
+<!-- bus-spacing -->
 - `exits: ([x, z] | { x, z, kind: 'road' | 'stop' })[]` — a `stop` is a bus stop at the kerb of a
   road. A bus calls there every `bus.every` minutes through the day (sim-core `bus.rs`: a line per
   stop or two in a big world, coming in and going out where the roads leave the area; one through
@@ -134,7 +135,10 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
 
 ## Game feel
 
-Walking is 1.5 m per game minute (`WALK_SPEED`), so 1 km takes ~11 game hours on foot.
+Walking is 1.5 m per game minute (`WALK_SPEED`), so 1 km takes ~11 game hours on foot. A bike
+or an e-scooter is ridden at its content `vehicle.speed` times that (the city bike 3, the kids'
+bike 2.2, the e-scooter 4; `ride.rs`) along the same way as the walk, and the way to work is
+timed by the ride (`ride::commute_bike`).
 
 - Areas are 170 m or more apart (best ~230 m from the nearest, every quarter of the world with
   one or with homes out in the country); trips between them are by car. The household setting off with
@@ -147,6 +151,12 @@ Walking is 1.5 m per game minute (`WALK_SPEED`), so 1 km takes ~11 game hours on
 - Every house is within ~120 m of a stop or exit.
 - Countryside spots are within ~150 m of their hamlet, reached by trail.
 - `careerRules.commuteMinutes` means only the off-map part; the on-map part comes from the ETA.
+- The way to work or school is chosen once (`world.rs`, `TaskKind::Work`): already riding, else a
+  seat in the household's car, a neighbour's lift (`cars::lift_seat`: a friend of 30 or more whose
+  car stands within 25 m of the door, setting off with a seat free), the household's bike or
+  e-scooter, the bus (<!-- bus-spacing --> when the walk to the stop, the wait for it by the
+  timetable and the ride out beat the walk out, `bus.rs` `way`), or on foot. Late for work is
+  judged by when that way gets them there.
 
 ## Life on every lot
 

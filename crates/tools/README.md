@@ -33,9 +33,9 @@ release builds, as the character build is slow otherwise.
 How to make a release is in the [README](../../README.md#versions-and-releasing): the version and the
 CHANGELOG section (its date set by hand), `git push origin main`, the dry run (watched by its run id),
 the tag, the live checks of the large files, and `gh release create … --verify-tag`. The workflow is
-`.github/workflows/pages.yml`. If a release goes wrong, fix forward or redeploy the last good 0.3.x:
-0.3.0 can't open 0.3.1's saves (format 32), 0.2.0 can't open 0.3.0's (format 29), and v0.1.0 can't
-open 0.2.0's saves database.
+`.github/workflows/pages.yml`. If a release goes wrong, fix forward or redeploy the last good build;
+which builds open which saves is in the README's "If a release goes wrong" (0.6.0 and 0.7.0 share
+save format 35, 0.5.x can't open it).
 
 What each release tool does, in more words than the table above:
 
