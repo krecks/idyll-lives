@@ -212,7 +212,7 @@ sinks, the desk drawer slides out and the plunge cover rolls back.
 The kind pack models (`models/pack_kind/neighbourlyOven.glb`, `givingJar.glb`, `knittingRocker.glb`,
 `welcomeTeaTable.glb`, `songbirdFeeder.glb`, `hearthSettee.glb`, override pack `packs/pack_kind/manifest.json`) are
 built in Blender by `tools/art/blender/families/pack_kind.py` on `gamekit` and exported as `.glb` (glTF, original,
-CC0). Each moves while it is used: the oven door drops, a coin drops into the jar, the rocker rocks, the teapot pours,
+CC0). Each moves while it is used: the oven door drops with the tea towel over its handle, a coin drops into the jar, the rocker rocks, the teapot pours,
 the feeder's roof lifts and songbirds fly out, and the settee's cushions sink. The tea table was rebuilt lower and
 narrower, its poufs either side of it facing each other (2026-10-21).
 

@@ -386,7 +386,8 @@
             "door_off",
             "flames"
           ],
-          "warmUp": "flames"
+          "warmUp": "flames",
+          "flip": "flames"
         }
       },
       "paint": [
@@ -431,9 +432,6 @@
         },
         "chrome": {
           "finish": "material.finish.chrome"
-        },
-        "copper": {
-          "finish": "material.finish.metal"
         },
         "dark": {
           "finish": "material.finish.satin"

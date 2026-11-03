@@ -221,7 +221,9 @@ def _cookware(F):
                 resolution=2)
     G.revolve('frying_pan', [(0, 0), (0.13, 0), (0.15, 0.04), (0.142, 0.04), (0.124, 0.008), (0, 0.008)],
               at=F.at(0.5, y, -0.27), material=M.pan, segments=22)
-    F.sweep('pan_handle', [(0.6, y + 0.032, -0.18), (0.68, y + 0.05, -0.11), (0.76, y + 0.06, -0.04)], None, M.pan,
+    # (its handle out to the right, along the back row: reaching to the front, it ran through what the cook sets down
+    # on the front right burner, `SET_DOWN_SPOTS`)
+    F.sweep('pan_handle', [(0.645, y + 0.032, -0.27), (0.72, y + 0.05, -0.27), (0.79, y + 0.06, -0.27)], None, M.pan,
             profile=G.rounded_rect(0.022, 0.012, 0.005, corner=1), up=(0, 1, 0), scale=[0.9, 1.0, 1.15])
     F.soft('omelette', 0.17, 0.016, 0.15, (0.5, y + 0.016, -0.27), M.egg, round=0.008, puff=0.006, flat=2,
            round_segments=1)

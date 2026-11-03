@@ -17,7 +17,7 @@ old part's was 0.83), so what is put on it sits on it; its two counter stools' s
 | `cookbookLectern` | the right-hand page, origin on the spine and tilted onto the desk (`rotation_mode` YXZ): `page` turns it 172° about the spine (0.9 s), until the read ends | `studyRecipes`, `foodMagazines` |
 | `pizzaOven` | the iron grille door and the peel with a pizza: `door_off` (1.4 s) lifts the door off the mouth and sets it on the ground before the left pillar, then carries the peel from the counter round in front of the oven and in through the mouth | `bakePizza` |
 | `pizzaOven` | flat flames in the mouth behind the grille, built full height and flattened onto the sill: `flames` grows them (0.8 s) | `warmUp`, `bakePizza` (and any `bake` step) |
-| `chefsIsland` | the middle drawer on the cook's side: `drawer_open` pulls it out 12 cm (0.6 s), `hold` 2.5 s; the ring under the copper pan, scaled to nothing at rest: `burner_on` grows it, glowing red, while it cooks (0.5 s). Keyed by the recipe's step tags (A-systems-03), so each step at it plays its own | the `chop` (prep) and `stir` (cook) steps of `tastingMenu` |
+| `chefsIsland` | the middle drawer on the cook's side: `drawer_open` pulls it out 12 cm (0.6 s), `hold` 2.5 s; the hob's left ring (the cook's, under their pan), scaled to nothing at rest: `burner_on` grows it, glowing red, while it cooks (0.5 s). Keyed by the recipe's step tags (A-systems-03), so each step at it plays its own | the `chop` (prep) and `stir` (cook) steps of `tastingMenu` |
 
 The espresso's clip keys two parts; the pizza oven's `door_off` keys two parts with their own timing (`_clip`
 with keyframes: the peel waits for the door, then goes up, forward, along and in, so it never passes through the
@@ -69,7 +69,7 @@ comes off a burning oven (the plan names `flames` for `warmUp` only).
 | `model.foodie.espressoBar` | 0.76 × 1.51 × 0.51 m | 6,324 (was 5,364) | 3 | Body, Worktop, Machine |
 | `model.foodie.cookbookLectern` | 0.84 × 1.15 × 0.59 m | 2,644 (was 2,276) | 3 | Body, Stool & ledge, Cookbook |
 | `model.foodie.pizzaOven` | 1.89 × 1.90 × 0.92 m | 7,616 (was 5,056) | 4 | Body, Worktop, Brick |
-| `model.foodie.chefsIsland` | 1.86 × 1.13 × 0.89 m | 7,176 (was 6,380) | 3 | Body, Worktop, Stools |
+| `model.foodie.chefsIsland` | 1.86 × 1.13 × 0.89 m | 6,884 (7,176 before 2026-11-03) | 3 | Body, Worktop, Stools |
 
 The herb garden has no worktop; its second part is the pots. The rosemary stands 7 cm over the old part's.
 
@@ -86,3 +86,18 @@ the espresso bar used (the resident hides the stream from the camera; seen on th
 cargo art pack_foodie            # the six .glb, the pack, check-glb
 cargo art pack_foodie --preview  # previews/pack_foodie/<id>.png, <id>@<clip>.png
 ```
+
+## Cooking at them (2026-11-03)
+
+The game draws the cook's board, bowl or pan and what they carried in on the station (`STATION_SPOTS`,
+`SET_DOWN_SPOTS` in `web/src/render/shared/characters/actions.ts`); the models leave room for them.
+
+- `chefsIsland`: the copper pan on the hob is gone (the cook's pan was drawn through it and the stock pot); the hob is
+  0.58 × 0.30 with its rings at x ±0.145 (printed grey: red, the bare ring looked lit), the stock pot on the right one,
+  the cook's pan on the left (0.908), which glows. The board of vegetables moved to the top's right end (x 0.7), the
+  tasting plates in to x ±0.42. The cook's board or mixing bowl goes on the free left end (−0.7, 0.32), the prepped
+  bowl there while they cook, the ingredients between the hob and the board (0.41, 0.3). Its content `surface` is the
+  top itself, 1.86 × 0.46 at (0, 0.225) (it had no size, so the footprint's 2 × 1, over the stools).
+- `pizzaOven`: the bowl of sauce moved back (x 0.86, depth −0.19), leaving the counter's front right free; a recipe's
+  grilling step there (`flip`: it is a `grill` station) is done in the mouth (no food drawn, `STATION_SPOTS` `null`),
+  `flames` grows, and the prepped bowl stands on that free counter (0.78, 0.07), 0.89.

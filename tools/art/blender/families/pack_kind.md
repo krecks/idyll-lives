@@ -33,8 +33,8 @@ Where the plan's table says "Loop (E1) … Until then static" (the rocker), the 
 
 **Draw calls: 3 each.** The still body takes its plain finishes and at most one textured or glass finish, the moving
 parts the rest. So that it stays at 3:
-- the counter's top and shelf are plain satin (`butcher`), the range's tea towel takes the `fabric` draw; the door
-  is all plain;
+- the counter's top and shelf are plain satin (`butcher`), the jars' labels plain gloss; the door takes the `fabric`
+  draw with the tea towel over its handle (2026-11-03; it was the body's, on the rail);
 - the giving jar's pedestal is plain satin, its jar takes the `glass` draw, the coin the third; the ribbon is satin;
 - the rocker's chair is `rocker` (wood) and `cushion`/`throw` (fabric) on its moving part, so the yarn basket beside
   it is all plain;
@@ -46,7 +46,7 @@ parts the rest. So that it stays at 3:
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.kind.neighbourlyOven` | 1.83 × 1.72 × 0.63 m | 7,914 | 3 | Body (the range's enamel), Fabric (the towel), Cupboards |
+| `model.kind.neighbourlyOven` | 1.83 × 1.72 × 0.64 m | 7,938 | 3 | Body (the range's enamel), Fabric (the towel), Cupboards |
 | `model.kind.givingJar` | 0.64 × 1.32 × 0.66 m | 4,912 | 3 | Body (the pedestal), Fabric (the ribbon) |
 | `model.kind.knittingRocker` | 0.74 × 1.05 × 0.86 m | 4,820 | 3 | Body (the chair), Fabric (the cushion) |
 | `model.kind.welcomeTeaTable` | 1.94 × 0.50 × 0.87 m | 7,380 | 3 | Body (the table), Fabric, Second pouf, Rug |
@@ -101,3 +101,14 @@ feeder 5,004 → 6,724, settee 3,188 → 7,360; draws unchanged).
 cargo art pack_kind            # the six .glb, the pack, check-glb
 cargo art pack_kind --preview  # previews/pack_kind/<id>.png, <id>@<clip>.png
 ```
+
+## Baking at the counter (2026-11-03)
+
+- The tea towel hung over the range's rail, in front of the oven door, and the door swung up through it as it opened.
+  It is folded over the door's bar handle now, a part of the door, and drops with it; the rail stays, bare. The
+  towel's front is 8 mm further out (0.640 deep, centre −0.110, the back on the wall as before).
+- The cook's mixing bowl was drawn on the rolling pin at the front of the worktop, and the ingredients on the hob's
+  corner (at 0.9, under the hob's 0.92). The worktop's right end, by the range, is free now: the rack of biscuits moved
+  5 cm left with the rolling pin in front of it, the patch of flour under where the bowl goes. The bowl (or the board)
+  stands there, (0.13, −0.01) at the top's 0.905, and what the cook carried in behind it, (0.13, −0.31)
+  (`STATION_SPOTS`, `SET_DOWN_SPOTS`).
