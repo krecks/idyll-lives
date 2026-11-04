@@ -329,19 +329,30 @@ fn generated_worlds_are_livable() {
             ));
         }
         failures.extend(bus_failures.into_iter().map(|f| format!("{label}: {f}")));
-        if w.transit.withdrawn > BUSES_WITHDRAWN {
+        let small = matches!(world["size"].as_str(), Some("cosy" | "normal") | None);
+        let (withdrawn, skipped) = if small {
+            (0, 0)
+        } else {
+            (BUSES_WITHDRAWN, RUNS_SKIPPED)
+        };
+        if w.transit.withdrawn > withdrawn {
             failures.push(format!(
-                "{label}: {} buses taken out of service (held up for good), more than {BUSES_WITHDRAWN}",
+                "{label}: {} buses taken out of service (held up for good), more than {withdrawn}",
                 w.transit.withdrawn
             ));
         }
-        let small = matches!(world["size"].as_str(), Some("cosy" | "normal") | None);
+        if w.transit.skipped > skipped {
+            failures.push(format!(
+                "{label}: {} runs not run (their line's last bus still in town), more than {skipped}",
+                w.transit.skipped
+            ));
+        }
         let ridden = (small && carless_bikes > 0).then_some(!rode.is_empty());
         if !w.transit.lines.is_empty() && most_buses == 0 {
             failures.push(format!("{label}: no bus came all day"));
         }
         eprintln!(
-            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements, {bikes} bikes, {} rode, {stops} bus stops ({} with a shelter), {} lines ({} min out and back at most), {bus_riders} rode the bus, {} buses taken out of service",
+            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements, {bikes} bikes, {} rode, {stops} bus stops ({} with a shelter), {} lines ({} min out and back at most), {bus_riders} rode the bus, {} buses taken out of service, {} runs not run",
             w.lot.width,
             w.lot.depth,
             w.sims.len(),
@@ -355,7 +366,8 @@ fn generated_worlds_are_livable() {
                 .map(|l| l.end / sim_core::TICKS_PER_MINUTE)
                 .max()
                 .unwrap_or(0),
-            w.transit.withdrawn
+            w.transit.withdrawn,
+            w.transit.skipped
         );
         (failures, ridden)
     });
@@ -383,9 +395,12 @@ fn generated_worlds_are_livable() {
 /// other), and how long a bus may stand still away from its stops (held up behind another at a
 /// stop as long as it stands there, `bus::DWELL_MOST`, and more).
 const BUS_OVERLAP_TICKS: u64 = 2 * sim_core::TICKS_PER_MINUTE;
-/// The most buses a world may take out of service in half a day (`bus::OUT_OF_SERVICE`: held up
-/// for good, where the others can't give way).
+/// The most buses a big world may take out of service in half a day (`bus::OUT_OF_SERVICE`: held
+/// up for good, where the others can't give way; in the 0.7.0 samples 0 to 6, and never in a cosy
+/// or normal town), and the most runs it may not run (`Transit::skipped`: its line's last bus still
+/// in town; 1 to 10).
 const BUSES_WITHDRAWN: u32 = 8;
+const RUNS_SKIPPED: u32 = 15;
 const BUS_STILL_TICKS: u64 = 45 * sim_core::TICKS_PER_MINUTE;
 
 /// Two buses overlapping (by their lines and runs), since when.

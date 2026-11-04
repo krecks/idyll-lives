@@ -264,6 +264,11 @@ pub struct Car {
     /// saved).
     #[serde(skip)]
     pub shown: Option<([f32; 2], f32, bool, u8)>,
+    /// Driving, where it would be a tick on and which way it would face (`drive_on`): those on foot
+    /// keep clear of it there too (`in_the_way`), as it waits for anyone it would come nearer to
+    /// (`go_on`); turning tight, it swings round further than it is now. Not saved.
+    #[serde(skip)]
+    next: Option<([f32; 2], f32)>,
 }
 
 fn is_zero_f32(v: &f32) -> bool {
@@ -425,6 +430,7 @@ impl Car {
             drive_spot: None,
             waited: 0,
             shown: None,
+            next: None,
         }
     }
 
@@ -476,6 +482,7 @@ impl Car {
             drive_spot: self.drive_spot,
             waited: self.waited,
             shown: self.shown,
+            next: None,
         }
     }
 
@@ -1815,7 +1822,8 @@ fn drive_on(w: &mut World, c: usize) {
     // Where it would be a tick on, its body and the ground in front of it (behind it while it
     // backs up): not round its tail, as people may follow it close (on their way the same way),
     // but all along its sides, as its tail swings out on a turn.
-    let (at, yaw, reverse) = car.route(exits, Some(travel), home).at(t + 1.0);
+    let route = car.route(exits, Some(travel), home);
+    let ((at, yaw, reverse), (was, was_yaw, _)) = (route.at(t + 1.0), route.at(t));
     let (ahead, behind) = if reverse { (0.0, AHEAD) } else { (AHEAD, 0.0) };
     let me = Driving {
         at,
@@ -1825,7 +1833,14 @@ fn drive_on(w: &mut World, c: usize) {
         ahead,
         behind,
         first: car_first(c),
+        held: false,
     };
+    let now = Driving {
+        at: was,
+        yaw: was_yaw,
+        ..me
+    };
+    car.next = Some((at, yaw));
     let nav = crate::path::NavGrid {
         lot,
         blocked,
@@ -1836,6 +1851,7 @@ fn drive_on(w: &mut World, c: usize) {
         &nav,
         (content, objects),
         me,
+        now,
         &others,
         |_| false,
         false,
@@ -1857,6 +1873,9 @@ pub(crate) struct Driving {
     pub ahead: f32,
     pub behind: f32,
     pub first: u64,
+    /// A car held up past `PASS_TICKS` by someone on foot in its way (`Car::waited`), whom
+    /// stepping aside hasn't got out of it: a bus doesn't wait for it (`free`).
+    pub held: bool,
 }
 
 impl Driving {
@@ -1878,6 +1897,19 @@ impl Driving {
         }
     }
 
+    /// How far `body` at `pos` is from it and the ground in front of it (behind it, backing up):
+    /// below 0, how far into them (`Body::gap`).
+    fn gap(&self, body: Body, pos: [f32; 2]) -> f32 {
+        body.gap(
+            self.at,
+            self.yaw.sin_cos(),
+            pos,
+            -(self.len / 2.0 + self.behind),
+            self.len / 2.0 + self.ahead,
+            self.wid / 2.0,
+        )
+    }
+
     /// Its body.
     fn body(&self) -> Rect {
         Rect {
@@ -1888,10 +1920,14 @@ impl Driving {
     }
 
     /// Whether `d` waits for it at all: not while it backs up, out of a driveway or into one, nor
-    /// for a car already tangled with it (waiting would only hold both: they part as they go on).
+    /// for a car already tangled with it (waiting would only hold both: they part as they go on);
+    /// a bus not for a car held up by someone on foot (`held`: they may be kept there by the bus
+    /// itself, beside them, with nowhere to step aside to; it goes by).
     pub(crate) fn free(&self, d: &Driving) -> bool {
         let car = |v: &Driving| v.first >= 1 << 63;
-        self.ahead > 0.0 && !((car(self) || car(d)) && self.body().overlap(&d.body()) > 0.0)
+        self.ahead > 0.0
+            && !((car(self) || car(d)) && self.body().overlap(&d.body()) > 0.0)
+            && !(self.held && !car(d))
     }
 
     /// The way it's going (a unit vector: backwards, backing up).
@@ -2073,14 +2109,18 @@ impl Body {
 /// round to where they're out of its way, past `PASS_TICKS` (`clear_of`). It never drives
 /// through anyone. Someone at something or at a wheel, or `aside` (as the one driving has it),
 /// isn't in its way; nor is anyone whose body (`Body`, on foot or on a bike) clears its sides by
-/// `BESIDE`, walking by it or along beside it. Nor does it drive into another car or bus in front
-/// of it (`up_against`, `across` as there): it waits behind it (true), not counted in `waited`.
+/// `BESIDE`, walking by it or along beside it; nor anyone the tick on brings it no nearer (`now`:
+/// where it is, as `d`; nearer measured from its whole body, its corners and ends as it turns, and
+/// the ground ahead of it), as someone beside it waits for it (`walks_into`): they'd hold each
+/// other up. Nor does it drive into another car or bus in front of it (`up_against`, `across` as
+/// there): it waits behind it (true), not counted in `waited`.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn go_on(
     sims: &mut [Sim],
     nav: &crate::path::NavGrid,
     bodies: (&crate::content::Content, &[crate::world::ObjectInstance]),
     d: Driving,
+    now: Driving,
     others: &[Driving],
     aside: impl Fn(&Sim) -> bool,
     across: bool,
@@ -2098,7 +2138,12 @@ pub(crate) fn go_on(
             continue;
         }
         let body = Body::of(s, bodies.0, bodies.1, s.yaw);
-        if !covers(d.at, turn, d.len, d.wid, body, s.pos, d.ahead, d.behind) {
+        // (Beside it, no nearer a tick on, clear of its body and the ground ahead: they wait for
+        // it. Never into anyone.)
+        let next = d.gap(body, s.pos);
+        if !covers(d.at, turn, d.len, d.wid, body, s.pos, d.ahead, d.behind)
+            || next >= 0.0 && next >= now.gap(body, s.pos)
+        {
             continue;
         }
         let phase = s.current().map(|a| &a.phase);
@@ -2148,10 +2193,12 @@ pub(crate) fn vehicles(
         ahead: AHEAD,
         behind: 0.0,
         first,
+        held: false,
     };
     let cars = cars.iter().enumerate().filter_map(|(c, k)| match k.shown {
         Some((p, yaw, true, _)) if Some(c) != car => {
             let mut d = at((p, yaw), k.len, k.wid, car_first(c));
+            d.held = k.waited >= PASS_TICKS;
             if k.backing() {
                 (d.ahead, d.behind) = (0.0, AHEAD);
             }
@@ -2184,6 +2231,7 @@ pub(crate) fn parked(cars: &[Car]) -> impl Iterator<Item = Driving> + '_ {
             ahead: AHEAD,
             behind: 0.0,
             first: car_first(c),
+            held: false,
         }),
         _ => None,
     })
@@ -2334,6 +2382,9 @@ pub(crate) fn in_the_way(cars: &[Car], body: Body, from: [f32; 2], to: [f32; 2])
             return false;
         };
         walks_into(at, yaw, car.len, car.wid, body, from, to)
+            || car
+                .next
+                .is_some_and(|(at, yaw)| walks_into(at, yaw, car.len, car.wid, body, from, to))
     })
 }
 
@@ -2409,6 +2460,9 @@ pub(crate) fn poses(w: &mut World) {
             car.pose_on(exits, Some(travel))
                 .map(|(p, yaw, moving)| (p, yaw, moving, if moving { 0 } else { open }))
         };
+        if !car.shown.is_some_and(|s| s.2) {
+            car.next = None;
+        }
     }
 }
 
@@ -3086,20 +3140,26 @@ fn settle_all(w: &mut World) {
 /// The public parking spot (`parking`) nearest `door` within `TRIP_PARK_REACH`: where it is and
 /// which way a car faces parked there.
 fn parking_for(travel: &Travel, door: [f32; 2]) -> Option<([f32; 2], f32)> {
-    travel
-        .file
-        .parking
-        .iter()
-        .map(|p| ([p.x, p.z], p.rot))
-        .filter(|(at, _)| at.iter().all(|v| v.is_finite()))
-        .map(|(at, rot)| (crate::travel::dist(at, door), at, rot))
+    (0..travel.file.parking.len())
+        .filter(|&k| !travel.bus_way.get(k).copied().unwrap_or(false))
+        .filter_map(|k| parked_at(travel, k))
+        .map(|(at, yaw, _)| (crate::travel::dist(at, door), at, yaw))
         .filter(|&(d, ..)| d <= TRIP_PARK_REACH)
         .min_by(|a, b| a.0.total_cmp(&b.0))
-        // (A bay off the road: parked nose in, facing away from it, `parking_bay`.)
-        .map(|(_, at, rot)| match parking_bay(travel, at) {
-            Some((_, _, [x, z])) => (at, (0.0 - x).atan2(0.0 - z)),
-            None => (at, rot),
-        })
+        .map(|(_, at, yaw)| (at, yaw))
+}
+
+/// Where a car parked at public parking spot `k` (`OpenWorld::parking`) stands, which way it
+/// faces and whether it's a bay off the road (nose in, facing away from it: `parking_bay`; else
+/// as the spot, on the road).
+pub(crate) fn parked_at(travel: &Travel, k: usize) -> Option<([f32; 2], f32, bool)> {
+    let p = travel.file.parking.get(k)?;
+    let at = [p.x, p.z];
+    at.iter().all(|v| v.is_finite()).then_some(())?;
+    Some(match parking_bay(travel, at) {
+        Some((_, _, [x, z])) => (at, (0.0 - x).atan2(0.0 - z), true),
+        None => (at, p.rot, false),
+    })
 }
 
 /// Whether there's public parking near `door` for a trip by car (`TRIP_PARK_REACH`).

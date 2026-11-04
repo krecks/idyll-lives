@@ -799,3 +799,214 @@ fn a_bus_meeting_another_on_a_narrow_street_waits_at_the_way_in_till_it_is_out()
     assert!(waited, "no bus came while the other was held up");
     assert_eq!(w.transit.withdrawn, 0, "a bus was taken out of service");
 }
+
+/// The shipped content with a bus every `every` minutes on the timetable.
+fn shipped_every(every: u64) -> String {
+    let mut v: serde_json::Value = serde_json::from_str(&common::content()).unwrap();
+    v["bus"]["every"] = serde_json::json!(every);
+    v.to_string()
+}
+
+/// How many of line `l`'s buses are in town.
+fn in_town(w: &World, l: u16) -> usize {
+    w.transit
+        .buses
+        .iter()
+        .filter(|b| b.line == l && b.shown.is_some())
+        .count()
+}
+
+#[test]
+fn a_big_worlds_line_has_one_bus_on_the_road_at_a_time() {
+    // (A bus every 20 minutes on the timetable: shorter than either line's round trip.)
+    let content = shipped_every(EVERY);
+    let h = common::hamlets::two_hamlets(&content, 12);
+    let mut w = World::from_json(&content, &h.town, 12).unwrap();
+    assert!(w.transit.walk_stops && !w.transit.lines.is_empty());
+    for l in &w.transit.lines {
+        // (Its round trip, in town after its offset, in whole 10 minutes.)
+        let trip = l.end - l.offset;
+        assert!(
+            l.every >= trip && l.every % (10 * TICKS_PER_MINUTE) == 0,
+            "every {} min, out and back in {} min",
+            l.every / TICKS_PER_MINUTE,
+            trip / TICKS_PER_MINUTE
+        );
+    }
+    common::run_to(&mut w, 2, 6.0);
+    let end = clock::tick_at(2, 14.0 * 60.0).unwrap();
+    let mut called = std::collections::BTreeSet::new();
+    while w.tick < end {
+        w.tick_once();
+        for l in 0..w.transit.lines.len() as u16 {
+            let n = in_town(&w, l);
+            assert!(n <= 1, "line {l} has {n} buses in town");
+        }
+        for b in &w.transit.buses {
+            if b.shown.is_some_and(|s| s.3 != 0) {
+                called.insert((b.line, b.run));
+            }
+        }
+    }
+    assert!(
+        called.len() >= 8,
+        "{} buses called in eight hours",
+        called.len()
+    );
+    assert_eq!(w.transit.skipped, 0, "a run wasn't run");
+}
+
+#[test]
+fn a_big_worlds_run_after_a_bus_held_up_long_is_skipped_not_sent_after_it() {
+    let content = shipped_every(EVERY);
+    let h = common::hamlets::two_hamlets(&content, 12);
+    let mut town: serde_json::Value = serde_json::from_str(&h.town).unwrap();
+    let probe = World::from_json(&content, &h.town, 12).unwrap();
+    // A car parked on line 0's stop: its bus stands behind it, in view (never taken out of
+    // service there).
+    let (bay, yaw) = probe.transit.lines[0].bay(0);
+    town["cars"] = serde_json::json!([{"plot": 0, "x": bay[0], "z": bay[1], "yaw": yaw,
+        "street": bay[1], "len": 4.4, "wid": 1.8, "body": 1, "paint": 2}]);
+    let mut w = World::from_json(&content, &town.to_string(), 12).unwrap();
+    let (cw, cd) = (w.lot.width as i32, w.lot.depth as i32);
+    w.set_view(Some([0, 0, cw, cd]));
+    let spot = w.cars[0].spot;
+    common::run_to(&mut w, 2, 6.0);
+    let end = clock::tick_at(2, 10.0 * 60.0).unwrap();
+    while w.tick < end {
+        w.tick_once();
+        assert!(in_town(&w, 0) <= 1, "two of line 0's buses in town");
+    }
+    assert!(
+        w.transit.skipped > 0,
+        "the runs after the held-up bus were sent after it"
+    );
+    assert_eq!(
+        w.transit.withdrawn, 0,
+        "a bus in view was taken out of service"
+    );
+    // The car moved off: line 0's buses call at the stop again, on time.
+    w.cars[0].spot = [spot[0] + 200.0, spot[1]];
+    let skipped = w.transit.skipped;
+    let end = clock::tick_at(2, 14.0 * 60.0).unwrap();
+    let mut called = 0;
+    while w.tick < end {
+        w.tick_once();
+        called += w
+            .transit
+            .buses
+            .iter()
+            .filter(|b| b.line == 0 && b.shown.is_some_and(|s| s.3 != 0))
+            .count()
+            .min(1);
+    }
+    assert!(
+        called > 0,
+        "no bus called at the stop once the way was clear"
+    );
+    assert!(
+        w.transit.skipped <= skipped + 1,
+        "runs skipped after the way was clear"
+    );
+}
+
+#[test]
+fn no_car_parks_in_a_bay_a_bus_would_drive_through() {
+    let content = common::content();
+    let h = common::hamlets::two_hamlets(&content, 12);
+    let probe = World::from_json(&content, &h.town, 12).unwrap();
+    // Two bays off the first hamlet's street: one right by line 0's stop, square to the street
+    // (a car parked nose in there stands out into the bus's way as it pulls in); one well back.
+    let (bay, yaw) = probe.transit.lines[0].bay(0);
+    let along = bay[0] + yaw.sin() * 3.0;
+    let (z, ..) = h.streets[0];
+    let out = if (bay[1] as f64) < z { -1.0 } else { 1.0 };
+    let edge = (bay[1] - z as f32).abs() + 1.6;
+    let near = [along, z as f32 + out as f32 * (edge + 2.0)];
+    let far = [along, z as f32 + out as f32 * (edge + 14.0)];
+    let mut town: serde_json::Value = serde_json::from_str(&h.town).unwrap();
+    town["parking"] = serde_json::json!([
+        {"x": near[0], "z": near[1], "rot": 0.0, "area": 0},
+        {"x": far[0], "z": far[1], "rot": 0.0, "area": 0}]);
+    let w = World::from_json(&content, &town.to_string(), 12).unwrap();
+    assert_eq!(w.travel.bus_way, [true, false]);
+}
+
+/// A big world with a ring of 6 m street round a square (corners `RING_A`, `RING_B`), too narrow
+/// for two buses all the way round, and a hamlet at the middle of each side with its stop: each
+/// line comes in by the ring round one corner and goes out round the next, along the ends of its
+/// neighbours' sides the other way.
+const RING_A: f64 = 100.0;
+const RING_B: f64 = 240.0;
+
+fn ring_town() -> String {
+    let (a, b, m) = (RING_A, RING_B, (RING_A + RING_B) / 2.0);
+    let side = |p: [f64; 2], q: [f64; 2]| common::hamlets::line(p, q);
+    let mut pts = side([a, a], [b, a]);
+    pts.extend(side([b, a], [b, b]).into_iter().skip(1));
+    pts.extend(side([b, b], [a, b]).into_iter().skip(1));
+    pts.extend(side([a, b], [a, a]).into_iter().skip(1));
+    let roads = serde_json::json!([{"points": pts, "width": 6, "kind": "street", "area": 0,
+        "ends": ["join", "join"]}]);
+    let mids = [[m, a - 2.5], [b + 2.5, m], [m, b + 2.5], [a - 2.5, m]];
+    let exits: Vec<_> = mids
+        .iter()
+        .map(|p| serde_json::json!({"x": p[0], "z": p[1], "kind": "stop"}))
+        .collect();
+    let areas: Vec<_> = [[m, a], [b, m], [m, b], [a, m]]
+        .iter()
+        .enumerate()
+        .map(|(k, c)| {
+            serde_json::json!({"name": format!("Side {k}"), "kind": "hamlet",
+                "x": c[0] - 20.0, "z": c[1] - 20.0, "w": 40, "d": 40})
+        })
+        .collect();
+    serde_json::json!({
+        "width": 340, "depth": 340, "size": "big",
+        "walls": [], "doors": [], "windows": [], "objects": [], "sims": [], "relationships": [],
+        "plots": [{"name": "Home", "x": 150, "z": 150, "w": 20, "d": 16, "entry": [160.5, 150.5],
+            "area": 0}],
+        "households": [{"name": "Riders", "plot": 0, "player": true}],
+        "roads": roads, "meta": {"roads": roads}, "exits": exits, "areas": areas,
+    })
+    .to_string()
+}
+
+#[test]
+fn buses_round_a_ring_too_narrow_for_two_take_turns_and_never_hold_each_other_up_for_good() {
+    let content = common::content();
+    let mut w = World::from_json(&content, &ring_town(), 3).unwrap();
+    assert_eq!(w.transit.lines.len(), 4);
+    common::run_to(&mut w, 2, 6.0);
+    let end = clock::tick_at(2, 16.0 * 60.0).unwrap();
+    let mut called = std::collections::BTreeSet::new();
+    // (Each bus in sight: where it was last seen and since when.)
+    let mut seen: std::collections::HashMap<(u16, u64), ([f32; 2], u64)> = Default::default();
+    while w.tick < end {
+        w.tick_once();
+        let (o, a, b) = worst_overlap(&w);
+        assert!(o <= 0.0, "the {a} and {b} buses overlap by {o:.2} m");
+        for b in &w.transit.buses {
+            let Some((at, _, _, doors)) = b.shown else {
+                continue;
+            };
+            if doors != 0 {
+                called.insert((b.line, b.run));
+            }
+            let since = seen.entry((b.line, b.run)).or_insert((at, w.tick));
+            if since.0 != at || doors != 0 {
+                *since = (at, w.tick);
+            }
+            assert!(
+                w.tick - since.1 < 30 * TICKS_PER_MINUTE,
+                "line {}'s bus stood still half an hour at {at:?}",
+                b.line
+            );
+        }
+    }
+    for l in 0..4u16 {
+        let n = called.iter().filter(|(line, _)| *line == l).count();
+        assert!(n >= 3, "line {l}'s bus called {n} times in ten hours");
+    }
+    assert_eq!(w.transit.withdrawn, 0, "a bus was taken out of service");
+}

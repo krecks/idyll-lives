@@ -1,6 +1,6 @@
 //! The town's bus (content `bus`): through the town's bus stops and out, every `bus.every`
 //! minutes by the clock (an hour; longer where a line would meet its own next bus where they
-//! can't pass).
+//! can't pass, and in a big world every few hours, one bus of a line on the road at a time).
 //!
 //! **Stops and lines.** A bus stop (`travel::ExitKind::Stop`) stands at the kerb of a road. The
 //! bus pulls in to the kerb there with the stop on its right and opens its doors on that side. A
@@ -19,10 +19,15 @@
 //! o'clock, every day the same (`Transit::next_run`), or less often where the line passes a
 //! stretch two buses can't pass on both ways (in and out by the same narrow road, as in a forest
 //! town: every 80 to 100 minutes there), so one is off it before the next comes on
-//! (`Line::every`, `headway`). Each line comes in a share of the headway after the one before, as
-//! near it as keeps its buses from meeting another line's head-on where they can't pass
-//! (`Line::offset`, `offsets`: two coming in the same way aren't sent on top of each other; its
-//! times to its stops and out count from the run). It takes as long as its route says to each
+//! (`Line::every`, `headway`). In a big world a line's headway is its round trip, out and back,
+//! in whole ten minutes, an hour at least (`round_trip`): there's one bus of a line on the road at
+//! a time, every few hours, as a country bus. One due in while its line's last is still in town
+//! waits out of sight at the way in till that one is gone (`after_its_last`); still waiting
+//! `WAIT_MOST` after it was due, it isn't run (`Transit::skipped`), and the next is on time.
+//! Each line comes in a share of the headway after the one before (in a big world, a share of
+//! the timetable's), as near it as keeps its buses from meeting another line's head-on where they
+//! can't pass (`Line::offset`, `offsets`: two coming in the same way aren't sent on top of each
+//! other; its times to its stops and out count from the run). It takes as long as its route says to each
 //! stop, stands there `DWELL_TICKS` (about eight seconds at normal speed: its doors open, those
 //! waiting step up and in, those home step off) and drives on. One held up on the way
 //! stands less at the stops after, to make the time up. Nothing of the buses is saved: they are
@@ -43,10 +48,13 @@
 //! slower for it: a big world's stop stays a way out on foot, timed as ever (`walk_stops`; no bus
 //! plan). Someone who walks out by a stop takes the bus calling there when one comes within
 //! `WAIT_MOST` of their getting there and before work starts (`at_stop`), else leaves town at the
-//! stop as they always did.
+//! stop as they always did; with buses every few hours, most walk. A big world's roads are laid
+//! 7 m wide (`macro.ts`), wide enough for two buses to pass, one pulled over; a world saved before
+//! keeps its 6 m lanes, where buses take turns (below).
 //!
 //! People on foot wait for a bus driving by and step aside for it (`in_the_way`), as for a car,
-//! and it waits for anyone in its way (`drive_on`).
+//! and it waits for anyone in its way its next tick would bring it nearer to (`drive_on`,
+//! `cars::go_on`; someone beside it waits for it).
 //!
 //! **Among the traffic.** A bus never drives, backs or pulls over into another bus, a car or
 //! anyone (`clear_at` checks every move; `go_on` waits for those on foot):
@@ -55,7 +63,8 @@
 //!   junction or coming the other way where they can't pass (`ahead_of`);
 //! - coming towards another it keeps to its lane, clear of the other's where the road has room
 //!   (`lane_out`); on a street a little narrower (7 m) it pulls over towards the pavement, only
-//!   while passing and only as far as that needs (`pull_over`, two buses half each), no nearer the
+//!   while passing and only as far as that needs and a margin more (`pull_over`, `PULL_MARGIN`:
+//!   on a bend their bodies come nearer than their lanes; two buses half each), no nearer the
 //!   edge than the kerbside furniture keeps back to there (`kerbside`, the renderer's
 //!   `busStreets`). A 6 m street is too narrow for two buses either way: they take turns on it,
 //!   as trains on a single track (below), and the timetable keeps them from meeting there where
@@ -63,8 +72,13 @@
 //! - where buses still hold each other up for good (a loop of them, each waiting for the next),
 //!   the latest run that can backs up out of the way, those right behind it with it, and holds
 //!   back till the other is by (`make_way`); held up a while it no longer keeps room ahead nor
-//!   holds back (`IMPATIENT`), and held up past `OUT_OF_SERVICE` (none can give way), it's taken
-//!   out of service out of sight of the part of town in view: gone, as out of town (`withdraw`).
+//!   holds back (`IMPATIENT`), and held up past `OUT_OF_SERVICE` (none can give way: standing,
+//!   or edging back and forth and no further on), it's taken out of service out of sight of the
+//!   part of town in view: gone, as out of town (`withdraw`);
+//! - it doesn't wait for a car that is itself held up by someone on foot (`cars::Driving::held`:
+//!   they may be held where they are by the bus beside them, with nowhere to step aside to); and
+//!   no car parks in a public bay a bus's body swings through on its line's route, its tail
+//!   sweeping out round a tight corner (`bus_way`, `travel::Travel::bus_way`).
 //!
 //! **Taking turns where two can't pass** (`sections`, `signal`). Road too narrow for two buses is
 //! cut into blocks (a road's 8 m stretches; a junction's own), the same for every line; each
@@ -349,6 +363,11 @@ pub struct Bus {
     /// Ticks it has stood still on its way (not at a stop): held up past `IMPATIENT`, it no longer
     /// holds back nor keeps room ahead (`ahead_of`), only clear of the others.
     still: u32,
+    /// The furthest along its route it has come since it last stood at a stop, and the ticks since
+    /// then (not at a stop, not waiting at a refuge): edging back and forth, as two dodging each
+    /// other may for good, it's no further on (`OUT_OF_SERVICE`).
+    best: f32,
+    stuck: u32,
     /// The section of its line's route it holds (`Line::sections` index: it may drive through
     /// it), and the blocks of it it still holds and till when (`Section::frees`).
     holds: Option<usize>,
@@ -404,6 +423,9 @@ pub struct Transit {
     pub walk_stops: bool,
     /// Buses taken out of service since the game was loaded (`OUT_OF_SERVICE`).
     pub withdrawn: u32,
+    /// Runs not run since the game was loaded: in a big world, its line's last bus still in town
+    /// `WAIT_MOST` after it was due in (`after_its_last`).
+    pub skipped: u32,
     /// The streets a line drives where the kerbside furniture keeps back for buses to pass pulled
     /// over: the town file's road (`roads` index) and how far in from its edges the furniture may
     /// reach (`kerbside`). The world's structure carries them to the renderer (`busStreets`).
@@ -664,10 +686,15 @@ pub(crate) fn settle(w: &mut World) {
     // Each line's headway and when it comes into town after its run (`single_track`, `offsets`).
     let tracks: Vec<Vec<Track>> = t.lines.iter().map(single_track).collect();
     for (line, track) in t.lines.iter_mut().zip(&tracks) {
-        line.every = headway(t.every, track);
+        line.every = if t.walk_stops {
+            round_trip(t.every, line.end)
+        } else {
+            headway(t.every, track)
+        };
     }
-    offsets(&mut t.lines, &tracks);
+    offsets(&mut t.lines, &tracks, t.walk_stops.then_some(t.every));
     t.bus_streets = bus_streets(&w.travel, &t.lines);
+    w.travel.bus_way = bus_way(&w.travel, &t.lines);
     t.owners = vec![Vec::new(); sections(&w.travel, &mut t.lines)];
     for line in &mut t.lines {
         for a in &mut line.arrive {
@@ -697,6 +724,45 @@ pub(crate) fn settle(w: &mut World) {
     w.transit = t;
     poses(w);
 }
+
+/// Per public parking spot (`travel::Travel::bus_way`): whether a car parked in it, a bay off the
+/// road, would stand where a bus swings by on its line's route (its body, `PARKED_CLEAR` to spare,
+/// on a car's as long as the longest, `PARKED_HALF`): its tail sweeps out round a tight corner by
+/// a bay. (A spot on the road itself is where a car parks along the kerb, as it always did.)
+fn bus_way(travel: &Travel, lines: &[Line]) -> Vec<bool> {
+    (0..travel.file.parking.len())
+        .map(|k| {
+            let Some((at, yaw, true)) = cars::parked_at(travel, k) else {
+                return false;
+            };
+            let car = cars::Rect {
+                at,
+                yaw,
+                half: [PARKED_HALF[0] + PARKED_CLEAR, PARKED_HALF[1] + PARKED_CLEAR],
+            };
+            lines.iter().any(|line| {
+                let mut t = 0.0;
+                while t < line.route.ticks() {
+                    let (p, yaw) = line.place(t, 0.0);
+                    let bus = cars::Rect {
+                        at: p,
+                        yaw,
+                        half: [BUS_LEN / 2.0, BUS_WID / 2.0],
+                    };
+                    if dist(p, at) < BUS_LEN && bus.overlap(&car) > 0.0 {
+                        return true;
+                    }
+                    t += 1.0;
+                }
+                false
+            })
+        })
+        .collect()
+}
+/// The half length and width of the longest car (m: `cars::drive_tiles`), and how far a bus
+/// keeps clear of one parked (m), for `bus_way`.
+const PARKED_HALF: [f32; 2] = [2.4, 1.0];
+const PARKED_CLEAR: f32 = 0.2;
 
 /// How far apart the blocks of a road too narrow for two buses are (m, `sections`), and how near a
 /// junction one is the junction's own (m: every line through it shares it).
@@ -994,10 +1060,18 @@ fn headway(every: u64, track: &[Track]) -> u64 {
     every.max((span + HEADWAY_SLACK).div_ceil(HEADWAY_STEP) * HEADWAY_STEP)
 }
 
+/// A big world's line's headway (ticks): its round trip in town (`end`, out and back), in whole
+/// `HEADWAY_STEP`s, the timetable's (`every`) at least: one bus of it on the road at a time (one
+/// late waits out of town for the last to be gone: `waits_to_come_in`).
+fn round_trip(every: u64, end: u64) -> u64 {
+    every.max(end.div_ceil(HEADWAY_STEP) * HEADWAY_STEP)
+}
+
 /// When each line comes into town after its run (`Line::offset`): the lines of a headway spread
-/// over it, each as near its share as keeps its buses from meeting another line's head-on where
+/// over it (in a big world, every line over the timetable's headway, `spread`, whatever its
+/// own), each as near its share as keeps its buses from meeting another line's head-on where
 /// they can't pass (`tracks`), whole minutes on (the fewest such meetings, if none does).
-fn offsets(lines: &mut [Line], tracks: &[Vec<Track>]) {
+fn offsets(lines: &mut [Line], tracks: &[Vec<Track>], spread: Option<u64>) {
     // Every two places of two lines' where their buses would meet head-on, by the time between them.
     let meets = |a: usize, b: usize| -> Vec<i64> {
         let mut out = Vec::new();
@@ -1015,8 +1089,12 @@ fn offsets(lines: &mut [Line], tracks: &[Vec<Track>]) {
     for l in 0..n {
         let every = lines[l].every;
         let same: Vec<usize> = (0..n).filter(|&k| lines[k].every == every).collect();
-        let share =
-            same.iter().position(|&k| k == l).unwrap_or(0) as u64 * every / same.len() as u64;
+        let share = match spread {
+            Some(span) => l as u64 * span.min(every) / n as u64,
+            None => {
+                same.iter().position(|&k| k == l).unwrap_or(0) as u64 * every / same.len() as u64
+            }
+        };
         let others: Vec<(usize, Vec<i64>)> = done
             .iter()
             .filter(|&&k| lines[k].every == every)
@@ -1081,6 +1159,11 @@ fn lane_out(kerb: f32) -> f32 {
 
 /// How far apart two buses pass each other in their lanes, at least, where the road has room (m).
 const PASSING: f32 = 0.1;
+/// How much further apart than `PASSING` two coming towards each other pull over to pass, where
+/// the road has room (m, `pull_over`): its measure is across a way between theirs, the check that
+/// holds them up (`too_near`) their bodies as they are, which on a bend come nearer; pulled over
+/// only as far as one says, the other could hold both up.
+const PULL_MARGIN: f32 = 0.3;
 /// How near the road's edge a bus pulled over to pass another comes (m from it, `pull_over`):
 /// a country road's verge; on a street or lane, short of the kerbside furniture on its pavement
 /// (the renderer's street lamps, hydrants, bins and signs, `KERBSIDE` in from the edge; the
@@ -1601,6 +1684,7 @@ fn driving(t: &Transit, b: usize, back: bool) -> cars::Driving {
         ahead,
         behind,
         first: bus.first(),
+        held: false,
     }
 }
 
@@ -1616,6 +1700,7 @@ fn standing(t: &Transit, b: usize) -> cars::Driving {
         ahead: cars::AHEAD,
         behind: 0.0,
         first: bus.first(),
+        held: false,
     }
 }
 
@@ -1924,6 +2009,8 @@ fn on_time(line: &Line, l: u16, run: u64, now: u64) -> Option<Bus> {
         backs: false,
         yields: None,
         still: 0,
+        best: 0.0,
+        stuck: 0,
         holds: None,
         blocks: Vec::new(),
         shown: None,
@@ -2049,8 +2136,16 @@ fn due_at(t: &Transit, h: Homeward) -> u64 {
 /// Bus `b` a tick on: along its way, at a stop, or out of town (false: gone).
 fn step_bus(w: &mut World, b: usize) -> bool {
     let tick = w.tick;
+    // Its line's last bus still in town long after it was due in (a big world's): it isn't run,
+    // and the next is on time (those waiting for it go another way, `bus_due`).
     let bus = &w.transit.buses[b];
     let line = &w.transit.lines[bus.line as usize];
+    if after_its_last(&w.transit, b) && tick > bus.run + line.offset + WAIT_MOST {
+        let (l, run) = (bus.line, bus.run);
+        next_brings_home(&mut w.transit, l, run);
+        w.transit.skipped += 1;
+        return false;
+    }
     let n = line.stops.len();
     if let Some(until) = bus.until {
         let (l, j, stood, run) = (bus.line, bus.next, bus.stood, bus.run);
@@ -2129,7 +2224,7 @@ fn step_bus(w: &mut World, b: usize) -> bool {
     // Held up that long, among others holding each other up where none can give way, it's taken
     // out of service: gone, as out of town (its riders are on their way; those it would have
     // brought home come on the next, or walk).
-    if w.transit.buses[b].still > OUT_OF_SERVICE && !in_view(w, w.transit.now(b).0) {
+    if w.transit.buses[b].stuck > OUT_OF_SERVICE && !in_view(w, w.transit.now(b).0) {
         withdraw(w, b);
         return false;
     }
@@ -2231,11 +2326,18 @@ fn drive_on(w: &mut World, b: usize) {
     };
     let bodies = (&*content, &objects[..]);
     let mut step = 0.0;
+    let (was, was_yaw) = line.place(bus.progress, bus.shift);
+    let now = cars::Driving {
+        at: was,
+        yaw: was_yaw,
+        ..me
+    };
     let queued = cars::go_on(
         sims,
         &nav,
         bodies,
         me,
+        now,
         &others,
         aside,
         keeps_across(bus),
@@ -2287,6 +2389,12 @@ fn in_view(w: &World, at: [f32; 2]) -> bool {
 fn withdraw(w: &mut World, b: usize) {
     let t = &mut w.transit;
     let (line, run) = (t.buses[b].line, t.buses[b].run);
+    next_brings_home(t, line, run);
+    t.withdrawn += 1;
+}
+
+/// Those line `line`'s run `run` was to bring home come on the next instead (`homeward`).
+fn next_brings_home(t: &mut Transit, line: u16, run: u64) {
     for h in &mut t.homeward {
         if t.stops[h.stop as usize]
             .line
@@ -2296,29 +2404,40 @@ fn withdraw(w: &mut World, b: usize) {
             h.run = run + 1;
         }
     }
-    t.withdrawn += 1;
 }
 
-/// Bus `b` a tick on its way: how long it has stood still (`Bus::still`).
+/// Bus `b` a tick on its way: how long it has stood still (`Bus::still`), and how long it has
+/// come no further on (`Bus::stuck`).
 fn count_still(t: &mut Transit, b: usize, was: f32) {
     // (Waiting at a refuge for the section ahead isn't held up: the one in it goes on, or is
     // taken out of service itself.)
-    let waits = section_ahead(t, b).is_some();
+    let waits = section_ahead(t, b).is_some() || after_its_last(t, b);
     let bus = &mut t.buses[b];
-    bus.still = if bus.progress == was && bus.until.is_none() && !waits {
+    let held = bus.until.is_none() && !waits;
+    bus.still = if bus.progress == was && held {
         bus.still.saturating_add(1)
     } else {
         0
     };
+    if bus.progress > bus.best || !held {
+        bus.best = bus.best.max(bus.progress);
+        bus.stuck = 0;
+    } else {
+        bus.stuck = bus.stuck.saturating_add(1);
+    }
 }
 
 /// Whether bus `b`, out of town at its way in (not yet come in, or backed up out again), waits
 /// there: another out of town, an earlier run, would come in where it would (out of sight, no
-/// other keeps clear of them: they come in one at a time).
+/// other keeps clear of them: they come in one at a time; not one waiting there for its line's
+/// last bus to be gone); in a big world, its line's last bus is still in town (`after_its_last`).
 fn waits_to_come_in(t: &Transit, b: usize) -> bool {
     let bus = &t.buses[b];
     if bus.progress > 0.0 {
         return false;
+    }
+    if after_its_last(t, b) {
+        return true;
     }
     let body = |(at, yaw): ([f32; 2], f32)| cars::Rect {
         at,
@@ -2330,8 +2449,21 @@ fn waits_to_come_in(t: &Transit, b: usize) -> bool {
         o != b
             && other.progress <= 0.0
             && other.first() < bus.first()
+            && !after_its_last(t, o)
             && body(t.now(o)).overlap(&mine) > 0.0
     })
+}
+
+/// Whether bus `b`, in a big world out of town at its way in, waits for its line's last bus (an
+/// earlier run) to be out of town: one of a line on the road at a time (`round_trip`). It isn't
+/// held up (`count_still`): that one goes on, or is taken out of service.
+fn after_its_last(t: &Transit, b: usize) -> bool {
+    let bus = &t.buses[b];
+    t.walk_stops
+        && bus.progress <= 0.0
+        && t.buses
+            .iter()
+            .any(|o| o.line == bus.line && o.run < bus.run && o.progress > 0.0)
 }
 
 /// Whether bus `b` may move to `t` ticks along its route pulled over `shift` m: its body there
@@ -2411,7 +2543,7 @@ fn pull_over(w: &World, b: usize) -> f32 {
         if m.along < -ends || m.along > ends + PULL_AHEAD || m.apart < 0.0 {
             return (0.0, 1.0, 1.0);
         }
-        ((PASSING - m.gap).max(0.0), m.mine, m.theirs)
+        ((PASSING + PULL_MARGIN - m.gap).max(0.0), m.mine, m.theirs)
     };
     let mut want: f32 = 0.0;
     for car in w.cars.iter().filter(|c| !c.backing()) {
