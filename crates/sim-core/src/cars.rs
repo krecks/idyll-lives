@@ -63,7 +63,8 @@
 //! till they part (`Driving::free`). Coming into town it waits out of sight at the way in till the
 //! way in is clear of the one before it, the ground in front of it too, the one there longest first
 //! (`room_to_come_in`): those coming home at the same time come in one after another, not on top
-//! of each other.
+//! of each other. A trip's car parks only in a spot no other car is parked at or on its way to
+//! (`parking_for`).
 
 use serde::{Deserialize, Serialize};
 
@@ -3271,13 +3272,35 @@ fn settle_all(w: &mut World) {
 // ---- Trips by car (`Trip`) ---------------------------------------------------------------
 
 /// The public parking spot (`parking`) nearest `door` within `TRIP_PARK_REACH`: where it is and
-/// which way a car faces parked there.
-fn parking_for(travel: &Travel, door: [f32; 2]) -> Option<([f32; 2], f32)> {
+/// which way a car faces parked there. Of `cars`, but car `me`, none parks where another is on a
+/// trip to (on its way there, parked there, or still pulling out of it home: they'd stand one on
+/// top of the other): with all near taken, none.
+fn parking_for(
+    travel: &Travel,
+    door: [f32; 2],
+    cars: &[Car],
+    me: Option<usize>,
+) -> Option<([f32; 2], f32)> {
+    let taken = |at: [f32; 2]| {
+        cars.iter().enumerate().any(|(c, car)| {
+            let there = || match car.state {
+                CarState::Arriving => car
+                    .shown
+                    .is_some_and(|s| crate::travel::dist(s.0, at) < car.len),
+                _ => true,
+            };
+            Some(c) != me
+                && car
+                    .trip
+                    .is_some_and(|t| crate::travel::dist(t.at, at) < 0.5)
+                && there()
+        })
+    };
     (0..travel.file.parking.len())
         .filter(|&k| !travel.bus_way.get(k).copied().unwrap_or(false))
         .filter_map(|k| parked_at(travel, k))
         .map(|(at, yaw, _)| (crate::travel::dist(at, door), at, yaw))
-        .filter(|&(d, ..)| d <= TRIP_PARK_REACH)
+        .filter(|&(d, at, _)| d <= TRIP_PARK_REACH && !taken(at))
         .min_by(|a, b| a.0.total_cmp(&b.0))
         .map(|(_, at, yaw)| (at, yaw))
 }
@@ -3295,9 +3318,9 @@ pub(crate) fn parked_at(travel: &Travel, k: usize) -> Option<([f32; 2], f32, boo
     })
 }
 
-/// Whether there's public parking near `door` for a trip by car (`TRIP_PARK_REACH`).
+/// Whether there's public parking near `door` for a trip by car (`TRIP_PARK_REACH`), taken or not.
 pub(crate) fn parks_near(travel: &Travel, door: [f32; 2]) -> bool {
-    parking_for(travel, door).is_some()
+    parking_for(travel, door, &[], None).is_some()
 }
 
 /// `can_drive`, in a tick (from its `Ctx`).
@@ -3368,7 +3391,7 @@ pub(crate) fn trip_car(
     if crate::travel::dist(sim.pos, door) <= ctx.content.autonomy.reach {
         return None;
     }
-    let (at, _) = parking_for(travel, door)?;
+    let (at, _) = parking_for(travel, door, ctx.cars, None)?;
     let (c, car) = ctx.cars.iter().enumerate().find(|(_, car)| {
         car.household == sim.household
             && car.plot == home
@@ -3436,7 +3459,7 @@ pub(crate) fn start_trip(w: &mut World, i: usize, c: u32, plot: u32, directed: b
         routine: false,
     };
     let door = w.plots.get(plot as usize).map(|p| p.arrival_point());
-    let park = door.and_then(|d| parking_for(&w.travel, d));
+    let park = door.and_then(|d| parking_for(&w.travel, d, &w.cars, Some(c as usize)));
     let (Some((at, yaw)), true) = (park, may_set_off(&w.cars, c, i as u32)) else {
         w.sims[i].bound_for_car = None;
         w.sims[i].queue.push_front(visit);
@@ -3792,7 +3815,7 @@ fn sets_off_with(w: &World, j: usize, c: usize) -> Option<(u32, bool)> {
     }
     let door = w.plots.get(plot as usize)?.arrival_point();
     let far = crate::travel::dist(s.pos, door) > w.content.autonomy.reach;
-    let parks = parking_for(&w.travel, door).is_some_and(|(at, _)| at == trip.at);
+    let parks = parking_for(&w.travel, door, &w.cars, Some(c)).is_some_and(|(at, _)| at == trip.at);
     (near && far && parks).then_some((plot, task.directed))
 }
 
@@ -3912,12 +3935,15 @@ pub(crate) fn trip_ride(
     if me.baby || crate::travel::dist(sim.pos, door) <= ctx.content.autonomy.reach {
         return None;
     }
-    let (at, _) = parking_for(travel, door)?;
-    let (c, car) = ctx.cars.iter().enumerate().find(|(_, car)| {
+    let (c, car) = ctx.cars.iter().enumerate().find(|&(c, car)| {
         car.household == sim.household
             && car.plot == home
             && car.state == CarState::Boarding
-            && car.trip.is_some_and(|t| t.driver != sim.id && t.at == at)
+            && car.trip.is_some_and(|t| {
+                t.driver != sim.id
+                    && parking_for(travel, door, ctx.cars, Some(c))
+                        .is_some_and(|(at, _)| at == t.at)
+            })
             && !car.blocked
             && !car.aboard.contains(&sim.id)
     })?;
