@@ -6,7 +6,8 @@
 //! can the houses' basements from their front doors and everything residents use in the houses
 //! (on lots facing either way), and the town keeps going for half a day: in a cosy or a normal
 //! town with bikes at homes without a car someone rides one to work or school, and nobody is stuck
-//! on one in town.
+//! on one in town; and the buses never drive through each other nor are held up for good (taken
+//! out of service a few times at most).
 //!
 //! Make the worlds first: `bun tools/worlds/sample.ts worlds.json`,
 //! then `WORLDS=worlds.json cargo test --release -p sim-core --test sim generated_worlds:: -- --ignored --nocapture`.
@@ -269,10 +270,17 @@ fn generated_worlds_are_livable() {
             .map(|i| w.bound_for_bus(i).is_some())
             .collect();
         let (mut most_buses, mut bus_riders) = (0, 0);
+        // No two buses' bodies overlap (but for a moment), and no bus stands still away from its
+        // stops for long (held up for good).
+        let mut overlapping: std::collections::HashMap<((u16, u64), (u16, u64)), u64> =
+            Default::default();
+        let mut still: std::collections::HashMap<(u16, u64), u64> = Default::default();
+        let mut bus_failures = std::collections::BTreeSet::new();
         for hour in 0..12 {
             for t in 0..TICKS_PER_HOUR {
                 w.tick_once();
                 most_buses = most_buses.max(w.transit.buses.len());
+                check_buses(&w, &mut overlapping, &mut still, &mut bus_failures);
                 for (i, t) in waited.iter_mut().enumerate() {
                     let at_stop = w.sims[i]
                         .current()
@@ -321,13 +329,20 @@ fn generated_worlds_are_livable() {
                 "{label}: {name} on a bike in town for over {RIDE_HOURS} hours"
             ));
         }
+        failures.extend(bus_failures.into_iter().map(|f| format!("{label}: {f}")));
+        if w.transit.withdrawn > BUSES_WITHDRAWN {
+            failures.push(format!(
+                "{label}: {} buses taken out of service (held up for good), more than {BUSES_WITHDRAWN}",
+                w.transit.withdrawn
+            ));
+        }
         let small = matches!(world["size"].as_str(), Some("cosy" | "normal") | None);
         let ridden = (small && carless_bikes > 0).then_some(!rode.is_empty());
         if !w.transit.lines.is_empty() && most_buses == 0 {
             failures.push(format!("{label}: no bus came all day"));
         }
         eprintln!(
-            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements, {bikes} bikes, {} rode, {stops} bus stops ({} with a shelter), {} lines ({} min out and back at most), {bus_riders} rode the bus",
+            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements, {bikes} bikes, {} rode, {stops} bus stops ({} with a shelter), {} lines ({} min out and back at most), {bus_riders} rode the bus, {} buses taken out of service",
             w.lot.width,
             w.lot.depth,
             w.sims.len(),
@@ -340,7 +355,8 @@ fn generated_worlds_are_livable() {
                 .iter()
                 .map(|l| l.end / sim_core::TICKS_PER_MINUTE)
                 .max()
-                .unwrap_or(0)
+                .unwrap_or(0),
+            w.transit.withdrawn
         );
         (failures, ridden)
     });
@@ -362,6 +378,77 @@ fn generated_worlds_are_livable() {
         eprintln!("  {f}");
     }
     assert!(failures.is_empty());
+}
+
+/// How long two buses' bodies may overlap at most (ticks: a moment, as one pulls over past the
+/// other), and how long a bus may stand still away from its stops (held up behind another at a
+/// stop as long as it stands there, `bus::DWELL_MOST`, and more).
+const BUS_OVERLAP_TICKS: u64 = 2 * sim_core::TICKS_PER_MINUTE;
+/// The most buses a world may take out of service in half a day (`bus::OUT_OF_SERVICE`: held up
+/// for good, where the others can't give way).
+const BUSES_WITHDRAWN: u32 = 8;
+const BUS_STILL_TICKS: u64 = 45 * sim_core::TICKS_PER_MINUTE;
+
+/// A tick of `w`'s buses: those overlapping (by pairs of their lines and runs) and standing still
+/// away from their stops, since when; any for too long, in `failures`.
+fn check_buses(
+    w: &World,
+    overlapping: &mut std::collections::HashMap<((u16, u64), (u16, u64)), u64>,
+    still: &mut std::collections::HashMap<(u16, u64), u64>,
+    failures: &mut std::collections::BTreeSet<String>,
+) {
+    let minutes = |run: u64| run / sim_core::TICKS_PER_MINUTE;
+    let shown: Vec<_> = w
+        .transit
+        .buses
+        .iter()
+        .filter_map(|b| b.shown.map(|s| ((b.line, b.run), s)))
+        .collect();
+    let mut now = std::collections::HashSet::new();
+    for (i, &(a, (pa, ya, ..))) in shown.iter().enumerate() {
+        for &(b, (pb, yb, ..)) in &shown[i + 1..] {
+            if (pa[0] - pb[0]).hypot(pa[1] - pb[1]) > sim_core::bus::BUS_LEN + 1.0 {
+                continue;
+            }
+            let by = sim_core::bus::overlap((pa, ya), (pb, yb));
+            if by <= 0.0 {
+                continue;
+            }
+            now.insert((a, b));
+            let since = *overlapping.entry((a, b)).or_insert(w.tick);
+            if w.tick - since > BUS_OVERLAP_TICKS {
+                failures.insert(format!(
+                    "the buses of lines {} and {} (runs {} and {}) overlap at {pa:?} and {pb:?} by {by:.2} m",
+                    a.0,
+                    b.0,
+                    minutes(a.1),
+                    minutes(b.1)
+                ));
+            }
+        }
+    }
+    overlapping.retain(|k, _| now.contains(k));
+    for &(k, (at, _, moving, doors)) in &shown {
+        let line = &w.transit.lines[k.0 as usize];
+        let at_stop = (0..line.stops.len()).any(|j| {
+            let (p, _) = line.bay(j);
+            (p[0] - at[0]).hypot(p[1] - at[1]) < 0.5
+        });
+        if moving || doors != 0 || at_stop {
+            still.remove(&k);
+            continue;
+        }
+        let since = *still.entry(k).or_insert(w.tick);
+        if w.tick - since > BUS_STILL_TICKS {
+            failures.insert(format!(
+                "the bus of line {} (run {}) stood still at {at:?} for {} minutes",
+                k.0,
+                minutes(k.1),
+                BUS_STILL_TICKS / sim_core::TICKS_PER_MINUTE
+            ));
+        }
+    }
+    still.retain(|k, _| shown.iter().any(|(s, _)| s == k));
 }
 
 /// Hours a resident may be on a bike or an e-scooter in town at a time at most (a ride out of town

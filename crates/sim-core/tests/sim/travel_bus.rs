@@ -2,16 +2,27 @@
 //! keeps its timetable, someone whose quicker way is the bus walks to the stop, waits there for
 //! it, gets on and is at work on time, and comes home on it and walks from the stop; walking stays
 //! walking where that's quicker, and a bike at home is ridden; a save mid-wait or on the bus home
-//! loads sensibly, and a save without stops has no bus.
+//! loads sensibly, and a save without stops has no bus. A bus never drives into another: one
+//! coming to a stop where another stands waits behind it, and two lines coming in the same way
+//! are sent apart.
 
 use crate::common;
 
 use sim_core::world::{Phase, TaskKind};
 use sim_core::{TICKS_PER_MINUTE, World, clock, snapshot};
 
-/// A clerk's job starting at `start` o'clock for four hours, every day; buses every 20 minutes
+/// The tests' bus: every this many minutes (their own timetable, not the game's: the times below
+/// are worked out for it).
+const EVERY: u64 = 20;
+
+/// A clerk's job starting at `start` o'clock for four hours, every day; buses every `EVERY` minutes
 /// from 6 to 23 o'clock.
 fn content(start: f32) -> String {
+    content_every(start, EVERY)
+}
+
+/// `content` with a bus every `every` minutes.
+fn content_every(start: f32, every: u64) -> String {
     format!(
         r#"{{
     "needs":[{{"id":"hunger","label":"Hunger","decayPerHour":0.01}}],
@@ -21,7 +32,7 @@ fn content(start: f32) -> String {
     "careers":[{{"id":"office","label":"Office","levels":[
         {{"title":"Clerk","pay":100,"start":{start},"hours":4,"days":[0,1,2,3,4,5,6]}}]}}],
     "careerRules":{{"commuteMinutes":30,"lateGraceMinutes":0,"performancePerShift":10}},
-    "bus":{{"every":20,"first":6,"last":23}},
+    "bus":{{"every":{every},"first":6,"last":23}},
     "economy":{{"startingFunds":500}}}}"#
     )
 }
@@ -182,7 +193,7 @@ fn the_bus_keeps_its_timetable() {
     let mut w = world(&c, &town(0, 0, 90, true));
     common::run_to(&mut w, 1, 23.9);
     let line = w.transit.lines[0].clone();
-    let every = 20 * TICKS_PER_MINUTE;
+    let every = EVERY * TICKS_PER_MINUTE;
     // When each bus came in, and when its doors opened at the stop.
     let mut came: Vec<u64> = Vec::new();
     let mut opened: Vec<(u64, u64)> = Vec::new();
@@ -200,7 +211,7 @@ fn the_bus_keeps_its_timetable() {
             }
         }
     }
-    // Every 20 minutes from 6 to 23 o'clock, nothing at night.
+    // Every `EVERY` minutes from 6 to 23 o'clock, nothing at night.
     let first = clock::tick_at(2, 6.0 * 60.0).unwrap();
     let last = clock::tick_at(2, 23.0 * 60.0).unwrap();
     let expected: Vec<u64> = (0..)
@@ -208,7 +219,7 @@ fn the_bus_keeps_its_timetable() {
         .take_while(|&t| t <= last)
         .collect();
     assert_eq!(came, expected, "the buses that came in");
-    assert_eq!(came.len(), 52);
+    assert_eq!(came.len() as u64, 17 * 60 / EVERY + 1);
     // At the stop when the timetable says, its doors open a moment after.
     assert_eq!(opened.len(), came.len());
     for (run, at) in opened {
@@ -244,7 +255,7 @@ fn a_rider_waits_less_than_a_headway_gets_on_and_is_at_work_on_time() {
         clock::hour(set_off)
     );
     assert!(
-        on - at_stop < 20 * TICKS_PER_MINUTE,
+        on - at_stop < EVERY * TICKS_PER_MINUTE,
         "waited {} min",
         (on - at_stop) / TICKS_PER_MINUTE
     );
@@ -283,7 +294,7 @@ fn they_come_home_by_bus_and_walk_from_the_stop() {
         }
     }
     let off = off.expect("never came home");
-    assert!(off - clock::tick_at(2, 14.25 * 60.0).unwrap() < 20 * TICKS_PER_MINUTE);
+    assert!(off - clock::tick_at(2, 14.25 * 60.0).unwrap() < EVERY * TICKS_PER_MINUTE);
     // Off the bus standing at the stop, by its middle door, and paid once.
     let bus = w
         .transit
@@ -488,4 +499,160 @@ fn someone_in_front_of_a_bus_waiting_for_them_doesnt_walk_through_it() {
     assert!(held, "the bus never stopped for them");
     assert!(passed, "they never got past it");
     assert!(closest >= 0.0, "they walked {:.2} m into the bus", -closest);
+}
+
+/// How far two buses' bodies overlap (m; 0 or less: apart), each at its middle facing its yaw: the
+/// least along any of their sides' ways.
+fn overlap(a: ([f32; 2], f32), b: ([f32; 2], f32)) -> f32 {
+    let half = [sim_core::bus::BUS_LEN / 2.0, sim_core::bus::BUS_WID / 2.0];
+    let axes = |yaw: f32| {
+        let (s, c) = yaw.sin_cos();
+        [[s, c], [c, -s]]
+    };
+    let (aa, ba) = (axes(a.1), axes(b.1));
+    let d = [b.0[0] - a.0[0], b.0[1] - a.0[1]];
+    let reach = |ax: &[[f32; 2]; 2], u: [f32; 2]| {
+        half[0] * (ax[0][0] * u[0] + ax[0][1] * u[1]).abs()
+            + half[1] * (ax[1][0] * u[0] + ax[1][1] * u[1]).abs()
+    };
+    aa.iter()
+        .chain(ba.iter())
+        .map(|&u| reach(&aa, u) + reach(&ba, u) - (d[0] * u[0] + d[1] * u[1]).abs())
+        .fold(f32::INFINITY, f32::min)
+}
+
+/// The most two shown buses' bodies overlap (m) in `w` now, and which runs (minutes).
+fn worst_overlap(w: &World) -> (f32, u64, u64) {
+    let shown: Vec<_> = w
+        .transit
+        .buses
+        .iter()
+        .filter_map(|b| b.shown.map(|(at, yaw, ..)| (b.run, at, yaw)))
+        .collect();
+    let mut worst = (0.0, 0, 0);
+    for (i, a) in shown.iter().enumerate() {
+        for b in &shown[i + 1..] {
+            let o = overlap((a.1, a.2), (b.1, b.2));
+            if o > worst.0 {
+                worst = (o, a.0 / TICKS_PER_MINUTE, b.0 / TICKS_PER_MINUTE);
+            }
+        }
+    }
+    worst
+}
+
+#[test]
+fn a_bus_arriving_where_one_stands_waits_behind_it() {
+    // A bus every 5 minutes: each comes to the stop while the one before still stands there.
+    let c = content_every(20.0, 5);
+    let mut w = world(&c, &town(0, 0, 150, true));
+    common::run_to(&mut w, 2, 6.0);
+    let line = w.transit.lines[0].clone();
+    let (bay, _) = line.bay(0);
+    let mut called = std::collections::BTreeSet::new();
+    let mut queued = false;
+    let end = clock::tick_at(2, 8.0 * 60.0).unwrap();
+    while w.tick < end {
+        w.tick_once();
+        let (o, a, b) = worst_overlap(&w);
+        assert!(o <= 0.0, "the {a} and {b} buses overlap by {o:.2} m");
+        for bus in &w.transit.buses {
+            let Some((at, _, moving, doors)) = bus.shown else {
+                continue;
+            };
+            if doors != 0 {
+                called.insert(bus.run);
+            }
+            // (One stood behind the stop while another was at it.)
+            let behind = at[0] < bay[0] - 4.0 && at[0] > bay[0] - 20.0;
+            queued |= behind && !moving && doors == 0;
+        }
+    }
+    assert!(queued, "no bus ever waited behind another at the stop");
+    // They keep calling, one after another (stood less, late: `DWELL_LEAST`).
+    assert!(
+        called.len() >= 10,
+        "{} buses called in two hours",
+        called.len()
+    );
+}
+
+#[test]
+fn two_lines_coming_in_the_same_way_are_sent_apart() {
+    let content = common::content();
+    // Two hamlets side by side, a line each, both in from the road out at the west end.
+    let h = common::hamlets::hamlets(
+        &content,
+        7,
+        3,
+        &[
+            common::hamlets::Place { x: 0, z: 0 },
+            common::hamlets::Place { x: 70, z: 0 },
+        ],
+        (512, 64),
+    );
+    let mut w = World::from_json(&content, &h.town, 7).unwrap();
+    assert_eq!(w.transit.lines.len(), 2);
+    // Where each line's first bus comes into sight, and when.
+    let mut first: Vec<Option<(u64, [f32; 2])>> = vec![None; 2];
+    let end = clock::tick_at(1, 14.0 * 60.0).unwrap();
+    while w.tick < end {
+        w.tick_once();
+        let (o, a, b) = worst_overlap(&w);
+        assert!(o <= 0.0, "the {a} and {b} buses overlap by {o:.2} m");
+        for bus in &w.transit.buses {
+            if let Some((at, ..)) = bus.shown
+                && first[bus.line as usize].is_none()
+                && bus.run >= clock::tick_at(1, 9.0 * 60.0).unwrap()
+            {
+                first[bus.line as usize] = Some((w.tick, at));
+            }
+        }
+    }
+    let (Some((t0, p0)), Some((t1, p1))) = (first[0], first[1]) else {
+        panic!("a line's bus never came: {first:?}");
+    };
+    // (The same way in: they came into sight at the same place.)
+    assert!(
+        (p0[0] - p1[0]).hypot(p0[1] - p1[1]) < 1.0,
+        "the lines come in at {p0:?} and {p1:?}"
+    );
+    assert_ne!(t0, t1, "both lines' buses sent at the same tick");
+}
+
+#[test]
+fn a_bus_boxed_in_for_good_is_taken_out_of_service_and_the_town_recovers() {
+    // A car parked across the street west of the stop: every bus coming in from the west end
+    // stands behind it.
+    let c = content(20.0);
+    let mut town: serde_json::Value = serde_json::from_str(&town(0, 0, 150, true)).unwrap();
+    town["cars"] = serde_json::json!([{"plot": 0, "x": 60.0, "z": STREET, "yaw": std::f32::consts::FRAC_PI_2,
+        "street": STREET, "len": 4.4, "wid": 1.8, "body": 1, "paint": 2}]);
+    let mut w = world(&c, &town.to_string());
+    let line = w.transit.lines[0].clone();
+    let (bay, _) = line.bay(0);
+    let called = |w: &World| {
+        w.transit.buses.iter().any(|b| {
+            b.shown
+                .is_some_and(|(at, _, _, doors)| doors != 0 && (at[0] - bay[0]).abs() < 1.0)
+        })
+    };
+    common::run_to(&mut w, 2, 6.0);
+    let end = clock::tick_at(2, 9.0 * 60.0).unwrap();
+    while w.tick < end {
+        w.tick_once();
+        let (o, a, b) = worst_overlap(&w);
+        assert!(o <= 0.0, "the {a} and {b} buses overlap by {o:.2} m");
+        assert!(!called(&w), "a bus got past the car to the stop");
+    }
+    assert!(w.transit.withdrawn > 0, "no bus was taken out of service");
+    // The car moved off: the buses call at the stop again.
+    w.cars[0].spot = [150.0, 50.0];
+    let end = clock::tick_at(2, 11.0 * 60.0).unwrap();
+    let mut again = false;
+    while w.tick < end && !again {
+        w.tick_once();
+        again = called(&w);
+    }
+    assert!(again, "no bus called at the stop once the way was clear");
 }
