@@ -6,8 +6,8 @@
 //! can the houses' basements from their front doors and everything residents use in the houses
 //! (on lots facing either way), and the town keeps going for half a day: in a cosy or a normal
 //! town with bikes at homes without a car someone rides one to work or school, and nobody is stuck
-//! on one in town; and the buses never drive through each other nor are held up for good (taken
-//! out of service a few times at most).
+//! on one in town; no two cars stand or drive on top of each other; and the buses never drive
+//! through each other nor are held up for good (taken out of service a few times at most).
 //!
 //! Make the worlds first: `bun tools/worlds/sample.ts worlds.json`,
 //! then `WORLDS=worlds.json cargo test --release -p sim-core --test sim generated_worlds:: -- --ignored --nocapture`.
@@ -275,11 +275,13 @@ fn generated_worlds_are_livable() {
         let mut overlapping: Overlapping = Default::default();
         let mut still: std::collections::HashMap<(u16, u64), u64> = Default::default();
         let mut bus_failures = std::collections::BTreeSet::new();
+        let mut stacked: Stacked = Default::default();
         for hour in 0..12 {
             for t in 0..TICKS_PER_HOUR {
                 w.tick_once();
                 most_buses = most_buses.max(w.transit.buses.len());
                 check_buses(&w, &mut overlapping, &mut still, &mut bus_failures);
+                check_cars(&w, &mut stacked, &mut bus_failures);
                 for (i, t) in waited.iter_mut().enumerate() {
                     let at_stop = w.sims[i]
                         .current()
@@ -575,6 +577,43 @@ fn turning_circles(town: &serde_json::Value) -> Vec<([f32; 2], f32)> {
         }
     }
     out
+}
+
+/// Two cars' middles this near (m), facing the same way (within about 25°), are on top of each
+/// other, and may be for this long at most (ticks: one turning out through another, or slowly by
+/// one standing, goes on past it; two coming into town at the same tick drove all the way home
+/// together, one on top of the other, and two parked out at the same spot stood so).
+const STACKED: f32 = 0.5;
+const STACKED_TICKS: u64 = 10 * sim_core::TICKS_PER_SECOND as u64;
+
+/// Two cars on top of each other (by their indices), since when.
+type Stacked = std::collections::HashMap<(usize, usize), u64>;
+
+/// A tick of `w`'s cars: any two of them on top of each other where they're drawn (`STACKED`) for
+/// longer than `STACKED_TICKS`, in `failures`.
+fn check_cars(w: &World, stacked: &mut Stacked, failures: &mut std::collections::BTreeSet<String>) {
+    let shown: Vec<_> = w
+        .cars
+        .iter()
+        .enumerate()
+        .filter_map(|(k, c)| c.shown.map(|(at, yaw, ..)| (k, at, yaw, c.state)))
+        .collect();
+    let mut now = std::collections::HashSet::new();
+    for (i, &(a, pa, ya, sa)) in shown.iter().enumerate() {
+        for &(b, pb, yb, sb) in &shown[i + 1..] {
+            if (pa[0] - pb[0]).hypot(pa[1] - pb[1]) >= STACKED || (ya - yb).cos() < 0.9 {
+                continue;
+            }
+            now.insert((a, b));
+            let since = *stacked.entry((a, b)).or_insert(w.tick);
+            if w.tick - since > STACKED_TICKS {
+                failures.insert(format!(
+                    "cars {a} ({sa:?}) and {b} ({sb:?}) on top of each other at {pa:?} and {pb:?}"
+                ));
+            }
+        }
+    }
+    stacked.retain(|k, _| now.contains(k));
 }
 
 /// The households' cars of generated worlds (`town.ts` writes them where the street drew them,
