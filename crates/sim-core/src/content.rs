@@ -1843,8 +1843,10 @@ struct CarsRaw {
 /// town at `first` o'clock and the last at `last`.
 #[derive(Debug, Clone, Copy)]
 pub struct BusRules {
-    /// Minutes between buses (`every`, default 20).
+    /// Minutes between buses (`every`, default 60), and in a big world (`everyBig`, default
+    /// `every`).
     pub every: f32,
+    pub every_big: f32,
     /// The hours the first and the last bus of the day come into town (`first`, `last`; default
     /// 6 and 23).
     pub first: f32,
@@ -1854,7 +1856,8 @@ pub struct BusRules {
 impl Default for BusRules {
     fn default() -> Self {
         Self {
-            every: 20.0,
+            every: 60.0,
+            every_big: 60.0,
             first: 6.0,
             last: 23.0,
         }
@@ -1863,8 +1866,10 @@ impl Default for BusRules {
 
 #[derive(Deserialize, Default)]
 #[serde(default)]
+#[serde(rename_all = "camelCase")]
 struct BusRaw {
     every: Option<f32>,
+    every_big: Option<f32>,
     first: Option<f32>,
     last: Option<f32>,
 }
@@ -5132,19 +5137,23 @@ impl Content {
             },
             bus: {
                 let d = BusRules::default();
+                let every = raw.bus.every.unwrap_or(d.every);
                 let rules = BusRules {
-                    every: raw.bus.every.unwrap_or(d.every),
+                    every,
+                    every_big: raw.bus.every_big.unwrap_or(every),
                     first: raw.bus.first.unwrap_or(d.first),
                     last: raw.bus.last.unwrap_or(d.last),
                 };
                 let ok = |v: f32| v.is_finite() && (0.0..24.0).contains(&v);
-                if !(rules.every.is_finite() && (5.0..=240.0).contains(&rules.every))
+                let minutes = |v: f32| v.is_finite() && (5.0..=240.0).contains(&v);
+                if !minutes(rules.every)
+                    || !minutes(rules.every_big)
                     || !ok(rules.first)
                     || !ok(rules.last)
                     || rules.last < rules.first
                 {
                     return Err(Error::new(
-                        "bus: every is 5 to 240 minutes, and first and last are hours of the day, first no later than last",
+                        "bus: every and everyBig are 5 to 240 minutes, and first and last are hours of the day, first no later than last",
                     ));
                 }
                 rules
