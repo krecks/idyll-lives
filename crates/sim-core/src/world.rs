@@ -8246,10 +8246,13 @@ fn progress(
         // At the wheel: the car takes them (`cars::update`).
         Phase::Driving => return,
         // At the bus stop: the bus calls them to its door (`bus::update`); no bus for far too
-        // long, they go another way.
+        // long, or none due (gone, the next a headway off: `bus::bus_due`), they go another way.
         Phase::AtStop { ticks: waited } => {
             *waited += ticks;
-            if *waited > crate::bus::GIVE_UP_TICKS {
+            let due = sim
+                .bound_for_bus
+                .is_some_and(|stop| crate::bus::bus_due(ctx.transit, stop, ctx.tick));
+            if *waited > crate::bus::GIVE_UP_TICKS || !due {
                 crate::bus::give_up(sim);
             }
             return;

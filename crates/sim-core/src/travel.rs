@@ -1029,6 +1029,9 @@ pub struct Travel {
     /// The tiles the town file's `terrain` masks (water, rock): blocked under everything, so a
     /// tile freed of what stood on it stays blocked (`World::set_travel`). Sorted tile indices.
     pub base_blocked: Vec<usize>,
+    /// Per public parking spot (`OpenWorld::parking`): a bus swings through it on its line's
+    /// route (`bus::settle`), so no car parks there (`cars::parking_for`). Not saved.
+    pub bus_way: Vec<bool>,
     /// By plot, for the public places: their door and where it gets on the roads on foot and by
     /// car (`entry`), kept as each tick starts (`note_doors`): a resident weighing an outing asks
     /// how long the way to every one is. Not saved.
@@ -1062,6 +1065,7 @@ impl Travel {
             open,
             country_speed: COUNTRY_SPEED,
             base_blocked: Vec::new(),
+            bus_way: Vec::new(),
             doors: Vec::new(),
         }
     }

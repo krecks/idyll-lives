@@ -70,6 +70,9 @@ export interface Rect {
 
 /** Paths at least this wide are driveways (garden paths are 1 m; see `game/town.ts`). */
 const DRIVEWAY_MIN_WIDTH = 1.8;
+/** How far kerbside furniture reaches from where it stands, towards the road (m: a bench's depth, a lamp's base): on a bus street it stands this far back from what the buses keep clear (`BusStreetInfo.keep`). */
+export const KERBSIDE_REACH = 0.3;
+
 /** How far either side of a driveway's mouth a car coming or going swings across the sidewalk (m): no kerbside furniture there. */
 const CAR_SWING = 1.2;
 /** Half wall thickness (as in house.ts). */
@@ -644,6 +647,7 @@ export class TownStreet {
       world.garages ? 'garages' : '-',
       mode === 'town' ? (world.cars ? keyOf(world.cars, () => JSON.stringify(world.cars)) : '-') : !!world.cars,
       world.stops ? keyOf(world.stops, () => JSON.stringify(world.stops)) : '-',
+      world.busStreets ? keyOf(world.busStreets, () => JSON.stringify(world.busStreets)) : '-',
       keyOf(world.plots, () => JSON.stringify(world.plots.map((p) => [p.id, p.x, p.z, p.w, p.d, p.public, p.entry]))),
     ].join('|');
   }
@@ -1126,7 +1130,10 @@ export class TownStreet {
     const clear = (s: number, m: number) => s > 1 && s < kerb.length - 1 && kerb.open(s) && !mouths.some(([a, b]) => s > a - m && s < b + m);
     const used: number[] = [];
     const near = (s: number, m: number) => used.some((u) => Math.abs(u - s) < m);
-    const kerbD = SIDEWALK - KERB - 0.3;
+    // (On a bus street, back from the kerb: buses pull over onto the pavement to pass each other
+    // there, no nearer the road's edge than `keep`, `WorldStructure.busStreets`.)
+    const keep = world.busStreets?.find((b) => b.road === r)?.keep;
+    const kerbD = keep === undefined ? SIDEWALK - KERB - 0.3 : Math.min(SIDEWALK - KERB - 0.3, keep - KERBSIDE_REACH);
     const on = (s: number, d = kerbD) => kerb.at(s, d);
 
     // Streetlights, one per plot width, staggered between the two sides.

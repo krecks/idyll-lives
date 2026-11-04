@@ -2,7 +2,7 @@
 
 - **Branch:** `release/0.7.0`, cut from `main` at `70280ee9` on 2026-11-03 (0.6.0 released, and #52's three sim fixes); to be merged into `main` by pull request; tag `v0.7.0` on the merge
 - **Base:** v0.6.0 at `f4482e7f`
-- **Status:** **in release**: everything below is merged into `release/0.7.0` (at `f5c9a1d9` when these notes were drafted). The bus-spacing work (buses queueing behind other vehicles, staggered line times, meeting places on narrow roads) is in progress on `bus-spacing`; the places that describe the bus's driving, spacing or timetable carry `<!-- bus-spacing -->` to update after it merges. 0.6.1 (PR #53) was folded into 0.7.0 and closed.
+- **Status:** **in release**: everything below is merged into `release/0.7.0` (at `f5c9a1d9` when these notes were drafted). The bus-spacing work (`fix/bus-spacing`: buses keep their distance, the bus every hour) is merged; the places that describe the bus's driving, spacing and timetable say how it is now. 0.6.1 (PR #53) was folded into 0.7.0 and closed.
 - **Release type:** features: getting about town (bikes and e-scooters, a bus in every town, lifts), hosting, purchases set up at home, career pacing, visits; save format still 35
 
 ## 1. What ships
@@ -54,7 +54,7 @@ Still to run before the release PR, as for 0.6.0: the voice's tests (`cargo test
 
 ## 4. Release steps
 
-1. Merge `bus-spacing` (and update the `<!-- bus-spacing -->` places), then `cargo release-version 0.7.0` and the CHANGELOG's date; commit on the release branch.
+1. Merge `bus-spacing`, then `cargo release-version 0.7.0` and the CHANGELOG's date; commit on the release branch.
 2. Pull request `release/0.7.0` → `main`; CI passes on it; merge (a merge commit).
 3. Dry run: `gh workflow run pages.yml --ref main -f deploy=false`, watched to the end.
 4. Tag and push (after asking the owner): `git tag -a v0.7.0 -m "Idyll Lives 0.7.0: getting about town"`, `git push origin v0.7.0`; watch the tag's run.
@@ -63,14 +63,16 @@ Still to run before the release PR, as for 0.6.0: the voice's tests (`cargo test
 
 ## 5. Open points (for the owner)
 
-- <!-- bus-spacing --> **The big-world bus home** takes about 16 min instead of 9.
+- **The big-world bus home** takes about 16 min instead of 9.
 - **Money after faster promotions:** the balance test's richest-household cap went from $30k to $50k (measured $37–43k) and median weekly savings from $624 to about $1.6–2k; the knobs (grade pay in `careers.json`, the living costs) are unchanged so far.
 - **The 30-minute late grace** (`careerRules.lateGraceMinutes`): set while about half of the arrivals at work were late; lower it once the bikes and the bus make commutes punctual.
 - **Only 4 idea toasts show at once** (`ui/planner/ideaToasts.ts` `MAX_OPEN`): a purchase request can be pushed off screen (it is still answerable in the Goals panel). A purchase is set up even with free will off, since accepting it was the player's choice (`setup::who`).
 - **Nothing to drink to serve:** a host's offer brings only food (an `eat` use a guest could have themselves).
 - **Firefox:** the model-load fix (`6ada1144`) is not verified in Firefox.
-- <!-- bus-spacing --> **A bus still edges on through someone after 3 min** (`cars::PASS_TICKS`, `f5c9a1d9`: where buses turn round at a stop they otherwise held each other and the riders among them up for hours). A car never does.
-- <!-- bus-spacing --> **A bus standing at a stop can be walked through** (`98987553`: counted as in the way, it shut riders in among the buses turning round there).
+- **A bus still edges on through someone after 3 min** (`cars::PASS_TICKS`, `f5c9a1d9`: where buses turn round at a stop they otherwise held each other and the riders among them up for hours). A car never does; neither ever drives into a bus or a car.
+- **A bus held up for good is taken out of service** out of sight after 40 min (`bus::OUT_OF_SERVICE`, `withdraw`): never in a Cosy or Normal sample town, a few times a day in a Big world's busy middle, where the lines share 6 m lanes two buses can't pass on.
+- **Some towns' buses come every 80 to 100 min** (`bus::headway`: a line in and out by the same 6 m road, as in a forest town, so its buses never meet there); the others hourly.
+- **A bus standing at a stop can be walked through** (`98987553`: counted as in the way, it shut riders in among the buses turning round there).
 - **Parked-car tiles are coarse.**
 - `vehicle.roadsOnly` is read but not kept to: an e-scooter goes wherever the walk goes (`docs/content-packs.md`, `vehicle`).
 - The ignored long soaks `a_big_town_with_a_busy_player_*` already fail on `main` (a stuck resident, nobody born); not caused by 0.7.0.

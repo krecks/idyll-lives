@@ -1843,7 +1843,7 @@ struct CarsRaw {
 /// town at `first` o'clock and the last at `last`.
 #[derive(Debug, Clone, Copy)]
 pub struct BusRules {
-    /// Minutes between buses (`every`, default 20).
+    /// Minutes between buses (`every`, default 60).
     pub every: f32,
     /// The hours the first and the last bus of the day come into town (`first`, `last`; default
     /// 6 and 23).
@@ -1854,7 +1854,7 @@ pub struct BusRules {
 impl Default for BusRules {
     fn default() -> Self {
         Self {
-            every: 20.0,
+            every: 60.0,
             first: 6.0,
             last: 23.0,
         }

@@ -490,3 +490,46 @@ fn a_rider_heading_at_a_cars_side_stops_with_the_front_wheel_outside_it() {
         -closest
     );
 }
+
+/// Holly Clearing, a generated Normal forest town (`bun tools/worlds/sample.ts`, seed 209464, as
+/// the 0.7.0 samples had it): at 8:36 a car turns in tight from the lane to the narrow road to
+/// the dead end, its tail swinging round, as four riders come out of it and the bus is on its way
+/// in. The car waited for those beside it its turn would come nearer to, they for it (they keep
+/// clear of where it would be a tick on too), and nobody went anywhere for hours.
+#[test]
+fn a_car_turning_tight_among_riders_beside_it_turns_and_they_ride_on() {
+    let content = common::content();
+    let town = include_str!("../towns/holly_clearing.json");
+    let mut w = World::from_json(&content, town, 47).unwrap();
+    let end = w.tick + 3 * 60 * 20;
+    let mut riding = vec![0u64; w.sims.len()];
+    let mut still: Vec<(Option<[f32; 2]>, u64)> = vec![(None, 0); w.cars.len()];
+    while w.tick < end {
+        w.tick_once();
+        riding.resize(w.sims.len(), 0);
+        for (i, s) in w.sims.iter().enumerate() {
+            riding[i] = if s.riding.is_some() && s.away_until.is_none() {
+                riding[i] + 1
+            } else {
+                0
+            };
+            assert!(
+                riding[i] < 60 * 20,
+                "{} on a bike in town for an hour, at {:?}",
+                s.name,
+                s.pos
+            );
+        }
+        for (c, car) in w.cars.iter().enumerate() {
+            let at = car.shown.filter(|s| s.2).map(|s| s.0);
+            still[c] = match (at, still[c]) {
+                (Some(p), (Some(q), n)) if p == q => (Some(p), n + 1),
+                (p, _) => (p, 0),
+            };
+            assert!(
+                still[c].1 < 30 * 20,
+                "car {c} stood still half an hour on its way, at {at:?}"
+            );
+        }
+    }
+}
