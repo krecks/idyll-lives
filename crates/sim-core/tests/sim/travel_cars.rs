@@ -258,6 +258,17 @@ fn street(width: f32, houses: &[(f32, bool)]) -> World {
     w
 }
 
+/// Car `c` sets off now, its driver in (at work as far as anyone can tell).
+fn set_off(w: &mut World, c: usize) {
+    let car = &mut w.cars[c];
+    car.state = CarState::Leaving;
+    car.since = w.tick;
+    car.progress = 0.0;
+    car.driver = Some(c as u32);
+    car.aboard = vec![c as u32];
+    w.sims[c].away_until = Some(w.tick + 100_000);
+}
+
 /// Car `c`, away with its driver done at work, comes home now.
 fn come_home(w: &mut World, c: usize) {
     let car = &mut w.cars[c];
@@ -359,4 +370,40 @@ fn two_cars_coming_in_by_the_same_way_at_the_same_tick_come_in_one_after_the_oth
         "they came in {} ticks apart",
         a.abs_diff(b)
     );
+}
+
+#[test]
+fn two_cars_meeting_on_a_7_m_street_pass_each_other_in_their_lanes() {
+    // One drives off west from its house; the other comes in from the west to its home.
+    let mut w = street(7.0, &[(90.0, true), (60.0, false)]);
+    set_off(&mut w, 0);
+    come_home(&mut w, 1);
+    let mut met = false;
+    let mut stood = vec![0u64; 2];
+    let mut was = [None::<[f32; 2]>; 2];
+    for _ in 0..4000 {
+        w.tick_once();
+        let (o, a, b) = cars_overlap(&w);
+        assert!(o <= 0.0, "cars {a} and {b} overlap by {o:.2} m");
+        let at: Vec<_> = (0..2)
+            .map(|c| w.cars[c].shown.filter(|s| s.2).map(|s| s.0))
+            .collect();
+        if let (Some(p), Some(q)) = (at[0], at[1]) {
+            met |= (p[0] - q[0]).abs() < 3.0;
+        }
+        for c in 0..2 {
+            if at[c].is_some() && at[c] == was[c] {
+                stood[c] += 1;
+            }
+            was[c] = at[c];
+        }
+        if w.cars[0].state == CarState::Away && w.cars[1].state == CarState::Parked {
+            break;
+        }
+    }
+    assert_eq!(w.cars[0].state, CarState::Away, "the one leaving got away");
+    assert_eq!(w.cars[1].state, CarState::Parked, "the other got home");
+    assert!(met, "they passed each other on the street");
+    // (Where they meet, neither stops for the other: the street has room for both.)
+    assert!(stood.iter().all(|&s| s < 20), "they stood {stood:?} ticks");
 }

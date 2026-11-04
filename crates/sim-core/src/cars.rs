@@ -56,12 +56,14 @@
 //! alongside its road rather than onto it (`OBLIQUE`), or has no way out by road, stays parked
 //! (`Car::no_way`). Older towns drive straight along x (`Route::legacy`).
 //!
-//! **Among the traffic.** A car drives in its lane, `LANE` right of the road's middle. It keeps
-//! behind one in front of it going its way (`up_against`); of two tangled, the later keeps behind
-//! the earlier till they part (`Driving::free`). Coming into town it waits out of sight at the way
-//! in till the way in is clear of the one before it, the ground in front of it too, the one there
-//! longest first (`room_to_come_in`): those coming home at the same time come in one after
-//! another, not on top of each other.
+//! **Among the traffic.** A car drives in its lane, `LANE` right of the road's middle where the
+//! road has room for two to pass clear of each other (a 7 m street, a country road), `TIGHT_LANE`
+//! on one too narrow for that (a 6 m lane) and in older towns (`lane_on`). It keeps behind one in
+//! front of it going its way (`up_against`); of two tangled, the later keeps behind the earlier
+//! till they part (`Driving::free`). Coming into town it waits out of sight at the way in till the
+//! way in is clear of the one before it, the ground in front of it too, the one there longest first
+//! (`room_to_come_in`): those coming home at the same time come in one after another, not on top
+//! of each other.
 
 use serde::{Deserialize, Serialize};
 
@@ -115,8 +117,16 @@ const RIDE_WAIT_TICKS: u64 = 60 * crate::TICKS_PER_MINUTE;
 const OFF_MAP_TICKS: u64 = 10 * crate::TICKS_PER_MINUTE;
 /// About how long the walk from the house to the car takes (for when to leave).
 const WALK_TO_CAR_TICKS: u64 = 3 * crate::TICKS_PER_MINUTE;
-/// The middle of a lane from the middle of the street (m): they drive on the right.
-pub(crate) const LANE: f32 = 0.8;
+/// The middle of a car's lane from the middle of the road (m): they drive on the right, clear of
+/// one coming the other way by 0.1 m (the widest car is 1.88 m across) where the road has room
+/// for two (`lane_on`: a 7 m street, 4.3 m between its kerbs; a country road). On one too narrow
+/// for that (a 6 m lane), and in older towns' streets (`Route::legacy`), `TIGHT_LANE`.
+pub(crate) const LANE: f32 = 1.05;
+pub(crate) const TIGHT_LANE: f32 = 0.8;
+/// Half the widest car's width (m: the renderer's bodies), and how far in from the kerb a car
+/// keeps at least.
+const CAR_HALF: f32 = 0.94;
+const KERB_KEEP: f32 = 0.05;
 /// Turning radius at the driveway's mouth (m).
 const TURN: f32 = 2.4;
 /// How far past the town's exit a car drives before it's gone (m).
@@ -765,7 +775,7 @@ impl Route {
     /// Out of the driveway onto the road it meets and along the roads to the way out of town
     /// quickest by car, past it (`OVERSHOOT`), or (`home`) back in from there, nose first. The
     /// driveway's part as `legacy` lays it out, in the frame of the road at the driveway's
-    /// mouth; the lanes `LANE` right of the roads' middle lines; `FAST` in the hamlets,
+    /// mouth; the lanes right of the roads' middle lines (`lane_on`); `FAST` in the hamlets,
     /// `Travel::country_speed` on country roads, slower at junctions. Sampled more where it
     /// bends (`ROUTE_TOLERANCE`). None: no road near, or no way out by road.
     fn on_roads(car: &Car, exits: &[[f32; 2]], travel: &Travel, home: bool) -> Option<Route> {
@@ -811,17 +821,20 @@ impl Route {
         // The lane: right of the middle line, on past the exit (to the parking spot's side of
         // the road on a trip).
         let mut centre: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
+        let mut offs: Vec<f32> = path.pts.iter().map(|p| lane_on(p.1, p.2)).collect();
         if park.is_none() {
             centre.push(extend_past(
                 centre[centre.len() - 2],
                 centre[centre.len() - 1],
             ));
+            offs.push(offs[offs.len() - 1]);
         }
         if home {
             centre.reverse();
+            offs.reverse();
         }
         let lane = crate::travel::thin_with(
-            &crate::travel::offset_right(&centre, LANE),
+            &offset_right_by(&centre, &offs),
             ROUTE_STEP,
             ROUTE_TOLERANCE,
         );
@@ -880,15 +893,28 @@ impl Route {
         }
         .map(|(bay, d)| (bay, d, bay.entry(d)));
         let mut on = false;
-        for &p in &lane {
+        // (Which way the lane goes at its point `i`, and whether that's along the road at a bay's
+        // mouth going `d`: past a junction there it turns off, and its points on aren't the turn's.)
+        let way = |i: usize| {
+            let (a, b) = (lane[i.saturating_sub(1)], lane[(i + 1).min(lane.len() - 1)]);
+            let l = dist(a, b).max(1e-6);
+            [(b[0] - a[0]) / l, (b[1] - a[1]) / l]
+        };
+        let along = |b: &Bay, i: usize, d: f32| {
+            let w = way(i);
+            (w[0] * b.t[0] + w[1] * b.t[1]) * d > 0.7
+        };
+        for (i, &p) in lane.iter().enumerate() {
             if !on
                 && let Some((b, d, at, taken)) = start
                 && b.near(p, at, taken, d)
+                && along(b, i, d)
             {
                 continue;
             }
             if let Some((b, d, (turn, at))) = &into
                 && b.near(p, *at, turn.taken, *d)
+                && along(b, i, -*d)
             {
                 break;
             }
@@ -935,8 +961,8 @@ impl Route {
         let d = if exit[0] >= x0 { 1.0 } else { -1.0 };
         let end_x = exit[0] + d * OVERSHOOT;
         // Drive on the right: heading +x, that's the +z side.
-        let lane_out = car.street + d * LANE;
-        let lane_in = car.street - d * LANE;
+        let lane_out = car.street + d * TIGHT_LANE;
+        let lane_in = car.street - d * TIGHT_LANE;
         let mut legs = Legs::default();
         if home {
             let r = TURN.min((lane_in - z0).abs()).max(0.5);
@@ -1088,7 +1114,7 @@ impl Bay {
     /// away it backs out turning away from the way it goes (as `Route::legacy` does). Where the
     /// turn is along the road, and how much of the lane it takes up.
     fn leave(&self, legs: &mut Legs, d: f32) -> (f32, f32) {
-        let lane_out = d * LANE;
+        let lane_out = d * TIGHT_LANE;
         let (at, room) = self.cross(lane_out);
         let room = room.min(self.past_kerb(lane_out));
         let facing = [self.yaw.sin(), self.yaw.cos()];
@@ -1107,7 +1133,7 @@ impl Bay {
 
     /// The turn into it from the lane, coming along it against `d`, and where it is along the road.
     fn entry(&self, d: f32) -> (Turn, f32) {
-        let lane_in = -d * LANE;
+        let lane_in = -d * TIGHT_LANE;
         let (at, room) = self.cross(lane_in);
         let room = room.min(self.past_kerb(lane_in));
         (
@@ -1142,10 +1168,42 @@ fn parking_bay(travel: &Travel, at: [f32; 2]) -> Option<([f32; 2], RoadPoint, [f
 /// How far from its middle line a road's kerbs are (m): its width takes in the sidewalks of a
 /// street or lane (`roads.ts` `SIDEWALK`); a country road has none.
 fn kerb_off(road: &crate::travel::Road) -> f32 {
-    match road.kind {
-        crate::travel::RoadKind::Country | crate::travel::RoadKind::Trail => road.width / 2.0,
-        _ => (road.width / 2.0 - SIDEWALK).max(LANE + 0.5),
+    kerb_of(road.width, road.kind)
+}
+
+/// `kerb_off` for a road `width` m wide of `kind`.
+fn kerb_of(width: f32, kind: crate::travel::RoadKind) -> f32 {
+    match kind {
+        crate::travel::RoadKind::Country | crate::travel::RoadKind::Trail => width / 2.0,
+        _ => (width / 2.0 - SIDEWALK).max(TIGHT_LANE + 0.5),
     }
+}
+
+/// Where a car drives on a road `width` m wide of `kind` (m right of its middle line): `LANE` where
+/// that leaves it `KERB_KEEP` from the kerb, else `TIGHT_LANE` (a 6 m lane, 3.3 m between its
+/// kerbs: too narrow for two cars to pass either way, and not up on the kerb, as the kerbside
+/// furniture stands about 0.15 m in from it). It turns out of a driveway onto the road, and off it
+/// into one, `TIGHT_LANE` out as ever (`Bay`: a turn there at a bend in the road cuts the bend's
+/// edge the more the further out it ends), easing out to its lane on along the road.
+pub(crate) fn lane_on(width: f32, kind: crate::travel::RoadKind) -> f32 {
+    if kerb_of(width, kind) - CAR_HALF - KERB_KEEP >= LANE {
+        LANE
+    } else {
+        TIGHT_LANE
+    }
+}
+
+/// `pts` moved `offs[i]` m to the right (looking the way they run), each its own.
+fn offset_right_by(pts: &[[f32; 2]], offs: &[f32]) -> Vec<[f32; 2]> {
+    let n = pts.len();
+    (0..n)
+        .map(|i| {
+            let (a, b) = (pts[i.saturating_sub(1)], pts[(i + 1).min(n - 1)]);
+            let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
+            let d = dx.hypot(dz).max(1e-6);
+            [pts[i][0] - dz / d * offs[i], pts[i][1] + dx / d * offs[i]]
+        })
+        .collect()
 }
 
 /// A turn at a driveway's mouth, in the frame of the road there (`Route::on_roads`): from going
@@ -4499,7 +4557,7 @@ mod tests {
         let r = Route::new(&c, &exits, false);
         let last = r.points.last().unwrap().0;
         assert!(last[0] > 99.5, "drives to the east end: {last:?}");
-        assert!((last[1] - (20.0 + LANE)).abs() < 1e-3, "in its lane");
+        assert!((last[1] - (20.0 + TIGHT_LANE)).abs() < 1e-3, "in its lane");
         // Starts from the spot facing the street, ends heading east.
         assert!((r.points[0].0[0] - 70.0).abs() < 1e-3);
         assert!(r.points[0].1.abs() < 0.2);
