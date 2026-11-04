@@ -57,13 +57,27 @@
 //!   (`lane_out`); on a street a little narrower (7 m) it pulls over towards the pavement, only
 //!   while passing and only as far as that needs (`pull_over`, two buses half each), no nearer the
 //!   edge than the kerbside furniture keeps back to there (`kerbside`, the renderer's
-//!   `busStreets`). A 6 m street is too narrow for two buses either way: the timetable keeps them
-//!   from meeting there (`headway`, `offsets`);
+//!   `busStreets`). A 6 m street is too narrow for two buses either way: they take turns on it,
+//!   as trains on a single track (below), and the timetable keeps them from meeting there where
+//!   it can (`headway`, `offsets`);
 //! - where buses still hold each other up for good (a loop of them, each waiting for the next),
 //!   the latest run that can backs up out of the way, those right behind it with it, and holds
 //!   back till the other is by (`make_way`); held up a while it no longer keeps room ahead nor
 //!   holds back (`IMPATIENT`), and held up past `OUT_OF_SERVICE` (none can give way), it's taken
 //!   out of service out of sight of the part of town in view: gone, as out of town (`withdraw`).
+//!
+//! **Taking turns where two can't pass** (`sections`, `signal`). Road too narrow for two buses is
+//! cut into blocks (a road's 8 m stretches; a junction's own), the same for every line; each
+//! line's route into refuges (where the whole bus stands on road wide enough for two, or off the
+//! map at its ends) and the sections between them. A bus leaves a refuge only once it holds every
+//! block of the section ahead, granted all at once or not at all, in the order the buses asked
+//! (ties by the earlier run), and lets each go as its tail clears it. Buses going the same way may
+//! hold a block together, following each other through (one passing it both ways, in and back
+//! out, holds it alone). Why no buses can hold each other up for good there: a bus waits for a
+//! section only at a refuge, holding none of it; one in a section holds all of it, so nothing
+//! coming the other way or across is in it, and it waits for nothing but one ahead of it going its
+//! way; a refuge is wide enough for one coming out of the next section to pass it. So every bus in
+//! a section gets out of it, its blocks come free, and the first to ask for them gets them.
 //!
 //! A bus comes into town (into sight) only once there's room for it at the way in.
 //!
@@ -228,6 +242,24 @@ pub struct Line {
     /// `pull_over`), and how far right of the road's middle that brings it.
     room: Vec<f32>,
     reach: Vec<f32>,
+    /// Its stretches too narrow for two buses (`Section`), in order along its route.
+    sections: Vec<Section>,
+}
+
+/// A stretch of a line's route between two refuges (where a bus stands clear of any other coming
+/// the other way or across: a road wide enough for two, or the route's ends, off the map), through
+/// road too narrow for two buses (`single_track`). A bus waits at `from` (in the refuge before)
+/// till it holds every block of it (`cells`) at once; and lets each go as its tail clears it
+/// (`frees`: by then along its route). `to`: where the refuge after begins.
+#[derive(Debug, Clone)]
+struct Section {
+    from: f32,
+    to: f32,
+    /// Its blocks, and the way it goes through each (a unit vector: others going that way may
+    /// hold it too, following each other through, `signal`; none, passing it both ways: it holds
+    /// it alone).
+    cells: Vec<(u32, [f32; 2])>,
+    frees: Vec<(u32, f32)>,
 }
 
 impl Line {
@@ -317,6 +349,10 @@ pub struct Bus {
     /// Ticks it has stood still on its way (not at a stop): held up past `IMPATIENT`, it no longer
     /// holds back nor keeps room ahead (`ahead_of`), only clear of the others.
     still: u32,
+    /// The section of its line's route it holds (`Line::sections` index: it may drive through
+    /// it), and the blocks of it it still holds and till when (`Section::frees`).
+    holds: Option<usize>,
+    blocks: Vec<(u32, f32)>,
     /// Where it is, which way it faces, whether it's moving, and its open doors (bit 0 the
     /// front's, bit 1 the middle's): for the snapshot.
     pub shown: Option<([f32; 2], f32, bool, u8)>,
@@ -372,6 +408,11 @@ pub struct Transit {
     /// over: the town file's road (`roads` index) and how far in from its edges the furniture may
     /// reach (`kerbside`). The world's structure carries them to the renderer (`busStreets`).
     pub bus_streets: Vec<(u32, f32)>,
+    /// The blocks (`Section::cells`): which bus holds each (its `first`), and the buses waiting at
+    /// a refuge for a section, in the order they asked (the tick they asked, their `first`, the
+    /// section: `signal`).
+    owners: Vec<Vec<(u64, [f32; 2])>>,
+    asks: Vec<(u64, u64, usize)>,
 }
 
 impl Transit {
@@ -580,15 +621,9 @@ impl Transit {
 /// loaded game). Called once the cars are settled (`cars::settle_all` gives a cosy town with
 /// stops its road network).
 pub(crate) fn settle(w: &mut World) {
-    let big = w.travel.size == crate::travel::WorldSize::Big;
-    let mut rules = w.content.bus;
-    if big {
-        // (A big world's timetable: its stops are ways out on foot anyway.)
-        rules.every = rules.every_big;
-    }
-    let mut t = Transit::new(rules);
+    let mut t = Transit::new(w.content.bus);
     t.by_exit = vec![None; w.exits.len()];
-    t.walk_stops = big;
+    t.walk_stops = w.travel.size == crate::travel::WorldSize::Big;
     if !w.travel.graph.is_empty() {
         for i in 0..w.exits.len() {
             if !w.travel.is_stop(i) || !w.exits[i].iter().all(|v| v.is_finite()) {
@@ -633,6 +668,7 @@ pub(crate) fn settle(w: &mut World) {
     }
     offsets(&mut t.lines, &tracks);
     t.bus_streets = bus_streets(&w.travel, &t.lines);
+    t.owners = vec![Vec::new(); sections(&w.travel, &mut t.lines)];
     for line in &mut t.lines {
         for a in &mut line.arrive {
             *a += line.offset;
@@ -660,6 +696,225 @@ pub(crate) fn settle(w: &mut World) {
     t.sent = now + 1;
     w.transit = t;
     poses(w);
+}
+
+/// How far apart the blocks of a road too narrow for two buses are (m, `sections`), and how near a
+/// junction one is the junction's own (m: every line through it shares it).
+const BLOCK_LEN: f32 = 8.0;
+const BLOCK_JUNCTION: f32 = 7.0;
+/// How far clear of road too narrow for two a bus's ends stand in a refuge (m, `sections`).
+const REFUGE_MARGIN: f32 = 1.0;
+
+/// Each line's sections (`Line::sections`) and how many blocks there are in all: the road too
+/// narrow for two buses (`single_track`) cut into blocks shared by every line that drives it (a
+/// road's, `BLOCK_LEN` long, by where along it; a junction's own), and each line's route into
+/// refuges (where its whole body, `REFUGE_MARGIN` to spare, is on road wide enough for two, and its
+/// route's ends, off the map) and the sections between them.
+fn sections(travel: &Travel, lines: &mut [Line]) -> usize {
+    use std::collections::HashMap;
+    let g = &travel.graph;
+    let junctions: Vec<[f32; 2]> = g.junctions().collect();
+    // (A block: a junction, or a road's stretch.)
+    let mut ids: HashMap<(i64, i64), u32> = HashMap::new();
+    let mut block = |p: [f32; 2]| -> Option<u32> {
+        let key = if let Some(j) = junctions.iter().position(|&q| dist(p, q) < BLOCK_JUNCTION) {
+            (-1, j as i64)
+        } else {
+            let q = *g.near(p, 4.0, 1, Mode::Car).first()?;
+            (i64::from(q.road), (q.s / BLOCK_LEN).floor() as i64)
+        };
+        let n = ids.len() as u32;
+        Some(*ids.entry(key).or_insert(n))
+    };
+    let half = BUS_LEN / 2.0 + REFUGE_MARGIN;
+    for line in lines.iter_mut() {
+        // The route's places: when, how far along, and the block where it's too narrow for two,
+        // and the way it goes there.
+        let mut places: Vec<(f32, f32, Option<u32>, [f32; 2])> = Vec::new();
+        let (mut t, mut along, mut last) = (0.0, 0.0, line.place(0.0, 0.0).0);
+        let end = line.route.ticks();
+        while t <= end {
+            let (p, yaw) = line.place(t, 0.0);
+            along += dist(last, p);
+            last = p;
+            let narrow = line.reach_at(t) < BUS_WID / 2.0 + PASSING / 2.0;
+            let way = [yaw.sin(), yaw.cos()];
+            places.push((t, along, if narrow { block(p) } else { None }, way));
+            if t == end {
+                break;
+            }
+            t = (t + TRACK_STEP).min(end);
+        }
+        let n = places.len();
+        // Clear: the whole body there on road wide enough for two (or at the route's ends).
+        let clear: Vec<bool> = (0..n)
+            .map(|k| {
+                k == 0
+                    || k + 1 == n
+                    || places
+                        .iter()
+                        .filter(|q| (q.1 - places[k].1).abs() <= half)
+                        .all(|q| q.2.is_none())
+            })
+            .collect();
+        let mut out = Vec::new();
+        let mut k = 0;
+        while k + 1 < n {
+            // From the last clear place of a refuge to the first of the next.
+            if !(clear[k] && !clear[k + 1]) {
+                k += 1;
+                continue;
+            }
+            let from = k;
+            let mut to = k + 1;
+            while !clear[to] {
+                to += 1;
+            }
+            // (From the refuge at the route's start, a bus waits at the very start: out of town,
+            // out of sight and out of everyone's way, the way out by there too.)
+            let start = (0..=from).rev().take_while(|&j| clear[j]).last() == Some(0);
+            let (a, b) = (places[from].1 - half, places[to].1 + half);
+            let mut frees: Vec<(u32, f32)> = Vec::new();
+            let mut ways: Vec<(u32, [f32; 2], f32)> = Vec::new();
+            for q in places.iter().filter(|q| q.1 >= a && q.1 <= b) {
+                let Some(c) = q.2 else { continue };
+                match ways.iter_mut().find(|w| w.0 == c) {
+                    Some(w) => {
+                        w.1 = [w.1[0] + q.3[0], w.1[1] + q.3[1]];
+                        w.2 += 1.0;
+                    }
+                    None => ways.push((c, q.3, 1.0)),
+                }
+                // (Its tail past it: `half` further on.)
+                let gone = places
+                    .iter()
+                    .find(|r| r.1 >= q.1 + half)
+                    .map_or(end, |r| r.0);
+                match frees.iter_mut().find(|f| f.0 == c) {
+                    Some(f) => f.1 = f.1.max(gone),
+                    None => frees.push((c, gone)),
+                }
+            }
+            // (Passed both ways, in and back out, or turning: its alone, `[0, 0]`.)
+            let mut cells: Vec<(u32, [f32; 2])> = ways
+                .into_iter()
+                .map(|(c, [x, z], k)| {
+                    let n = x.hypot(z);
+                    if n < 0.7 * k {
+                        (c, [0.0, 0.0])
+                    } else {
+                        (c, [x / n, z / n])
+                    }
+                })
+                .collect();
+            cells.sort_unstable_by_key(|c| c.0);
+            if !cells.is_empty() {
+                out.push(Section {
+                    from: if start { 0.0 } else { places[from].0 },
+                    to: places[to].0,
+                    cells,
+                    frees,
+                });
+            }
+            k = to;
+        }
+        line.sections = out;
+    }
+    ids.len()
+}
+
+/// The section of bus `b`'s route it's at the start of, or in, without holding it: it waits for it
+/// at its start (`signal`). In one it holds, or past the last, none.
+fn section_ahead(t: &Transit, b: usize) -> Option<usize> {
+    let bus = &t.buses[b];
+    let line = &t.lines[bus.line as usize];
+    let k = line.sections.partition_point(|s| s.to <= bus.progress);
+    let s = line.sections.get(k)?;
+    (bus.holds != Some(k) && bus.progress + 1.0 > s.from).then_some(k)
+}
+
+/// The blocks a tick (before the buses go on): each bus lets go those its tail has cleared; one
+/// at a refuge for a section it doesn't hold asks for it (once); and the asks are granted in the
+/// order they came (ties by `Bus::first`), each only when every block of its section is free and
+/// none an earlier ask still waits for (it takes them all at once, or none: no one is passed over).
+/// A bus waits only at a refuge, holding no block of the section ahead, and goes on only holding
+/// all of it: no buses can wait for each other's blocks in a ring.
+fn signal(w: &mut World) {
+    let tick = w.tick;
+    let t = &mut w.transit;
+    for bus in &mut t.buses {
+        let (owners, progress, first) = (&mut t.owners, bus.progress, bus.first());
+        bus.blocks.retain(|&(c, gone)| {
+            let keep = progress < gone;
+            if !keep {
+                owners[c as usize].retain(|o| o.0 != first);
+            }
+            keep
+        });
+        let line = &t.lines[bus.line as usize];
+        if bus.holds.is_some_and(|k| {
+            line.sections.get(k).is_none_or(|s| progress >= s.to) && bus.blocks.is_empty()
+        }) {
+            bus.holds = None;
+        }
+    }
+    // (Asks for the sections ahead; gone, a bus's asks go too.)
+    let firsts: Vec<u64> = t.buses.iter().map(|b| b.first()).collect();
+    t.asks.retain(|a| firsts.contains(&a.1));
+    for b in 0..t.buses.len() {
+        if let Some(k) = section_ahead(t, b) {
+            let first = t.buses[b].first();
+            if !t.asks.iter().any(|a| a.1 == first && a.2 == k) {
+                t.asks.retain(|a| a.1 != first);
+                t.asks.push((tick, first, k));
+            }
+        }
+    }
+    t.asks.sort_unstable();
+    let mut wanted: Vec<u32> = Vec::new();
+    let mut granted: Vec<u64> = Vec::new();
+    for &(_, first, k) in &t.asks {
+        let Some(b) = t.buses.iter().position(|x| x.first() == first) else {
+            continue;
+        };
+        let section = &t.lines[t.buses[b].line as usize].sections[k];
+        // (Free: nobody in it but those going its way, nor an earlier ask waiting for it.)
+        let free = section.cells.iter().all(|&(c, way)| {
+            !wanted.contains(&c)
+                && t.owners[c as usize].iter().all(|&(o, theirs)| {
+                    o == first || way[0] * theirs[0] + way[1] * theirs[1] > SAME_WAY
+                })
+        });
+        if free {
+            for &(c, way) in &section.cells {
+                let owners = &mut t.owners[c as usize];
+                if !owners.iter().any(|o| o.0 == first) {
+                    owners.push((first, way));
+                }
+            }
+            let bus = &mut t.buses[b];
+            bus.holds = Some(k);
+            for &(c, gone) in &section.frees {
+                match bus.blocks.iter_mut().find(|x| x.0 == c) {
+                    Some(x) => x.1 = x.1.max(gone),
+                    None => bus.blocks.push((c, gone)),
+                }
+            }
+            granted.push(first);
+        } else {
+            wanted.extend(section.cells.iter().map(|c| c.0));
+        }
+    }
+    t.asks.retain(|a| !granted.contains(&a.1));
+}
+
+/// Bus `b` gone (out of town, or out of service): the blocks it held are free.
+fn let_go(t: &mut Transit, b: usize) {
+    let first = t.buses[b].first();
+    for (c, _) in std::mem::take(&mut t.buses[b].blocks) {
+        t.owners[c as usize].retain(|o| o.0 != first);
+    }
+    t.asks.retain(|a| a.1 != first);
 }
 
 /// The streets `lines` drive where the kerbside furniture keeps back (`Transit::bus_streets`).
@@ -1289,6 +1544,7 @@ fn build_line(
         end,
         room,
         reach,
+        sections: Vec::new(),
     })
 }
 
@@ -1504,20 +1760,20 @@ fn make_way(w: &mut World) {
     // Who holds up whom: those driving for others in their way a tick on, or holding back for
     // one.
     let mut holds: Vec<Vec<usize>> = vec![Vec::new(); n];
-    for b in 0..n {
+    for (b, held) in holds.iter_mut().enumerate() {
         let bus = &t.buses[b];
         if bus.until.is_some() || bus.shown.is_none() && bus.progress > 0.0 {
             continue;
         }
         let others = obstacles(w, b);
         let me = driving(t, b, false);
-        holds[b] = held_by(t, b, &me, &others, false).collect();
+        *held = held_by(t, b, &me, &others, false).collect();
         if let Some(h) = bus
             .yields
             .filter(|_| bus.still <= IMPATIENT)
             .and_then(|f| t.buses.iter().position(|x| x.first() == f))
         {
-            holds[b].push(h);
+            held.push(h);
         }
     }
     let reach = |from: usize| {
@@ -1668,6 +1924,8 @@ fn on_time(line: &Line, l: u16, run: u64, now: u64) -> Option<Bus> {
         backs: false,
         yields: None,
         still: 0,
+        holds: None,
+        blocks: Vec::new(),
         shown: None,
     };
     for j in 0..line.stops.len() {
@@ -1724,12 +1982,14 @@ pub(crate) fn update(w: &mut World) {
             s.bound_for_bus = None;
         }
     }
+    signal(w);
     make_way(w);
     let mut b = 0;
     while b < w.transit.buses.len() {
         if step_bus(w, b) {
             b += 1;
         } else {
+            let_go(&mut w.transit, b);
             w.transit.buses.remove(b);
         }
     }
@@ -1901,6 +2161,11 @@ fn step_bus(w: &mut World, b: usize) -> bool {
 fn drive_on(w: &mut World, b: usize) {
     shift_to(w, b, pull_over(w, b));
     let t = &mut w.transit;
+    // (At a refuge, the section ahead not its yet: it waits there, `signal`.)
+    if section_ahead(t, b).is_some() {
+        t.buses[b].queued = true;
+        return;
+    }
     let bus = &t.buses[b];
     let (backs, yields) = (bus.backs, bus.yields.filter(|_| bus.still <= IMPATIENT));
     if !backs && let Some(h) = yields {
@@ -2036,8 +2301,11 @@ fn withdraw(w: &mut World, b: usize) {
 
 /// Bus `b` a tick on its way: how long it has stood still (`Bus::still`).
 fn count_still(t: &mut Transit, b: usize, was: f32) {
+    // (Waiting at a refuge for the section ahead isn't held up: the one in it goes on, or is
+    // taken out of service itself.)
+    let waits = section_ahead(t, b).is_some();
     let bus = &mut t.buses[b];
-    bus.still = if bus.progress == was && bus.until.is_none() {
+    bus.still = if bus.progress == was && bus.until.is_none() && !waits {
         bus.still.saturating_add(1)
     } else {
         0

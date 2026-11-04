@@ -272,8 +272,7 @@ fn generated_worlds_are_livable() {
         let (mut most_buses, mut bus_riders) = (0, 0);
         // No two buses' bodies overlap (but for a moment), and no bus stands still away from its
         // stops for long (held up for good).
-        let mut overlapping: std::collections::HashMap<((u16, u64), (u16, u64)), u64> =
-            Default::default();
+        let mut overlapping: Overlapping = Default::default();
         let mut still: std::collections::HashMap<(u16, u64), u64> = Default::default();
         let mut bus_failures = std::collections::BTreeSet::new();
         for hour in 0..12 {
@@ -389,11 +388,14 @@ const BUS_OVERLAP_TICKS: u64 = 2 * sim_core::TICKS_PER_MINUTE;
 const BUSES_WITHDRAWN: u32 = 8;
 const BUS_STILL_TICKS: u64 = 45 * sim_core::TICKS_PER_MINUTE;
 
+/// Two buses overlapping (by their lines and runs), since when.
+type Overlapping = std::collections::HashMap<((u16, u64), (u16, u64)), u64>;
+
 /// A tick of `w`'s buses: those overlapping (by pairs of their lines and runs) and standing still
 /// away from their stops, since when; any for too long, in `failures`.
 fn check_buses(
     w: &World,
-    overlapping: &mut std::collections::HashMap<((u16, u64), (u16, u64)), u64>,
+    overlapping: &mut Overlapping,
     still: &mut std::collections::HashMap<(u16, u64), u64>,
     failures: &mut std::collections::BTreeSet<String>,
 ) {

@@ -688,3 +688,114 @@ fn someone_who_misses_the_bus_makes_their_own_way_rather_than_wait_for_the_next(
     );
     assert!(w.sims[0].away_until.is_some(), "never got to work");
 }
+
+/// A cosy town 200 m long with a 6 m street open at the west end and dead at x = 160 (as a forest
+/// town's way in), its bus stop near the dead end: the bus comes in and goes out the same way.
+fn dead_end() -> String {
+    let road: Vec<String> = (0..=160).map(|x| format!("[{x}.5,{STREET}]")).collect();
+    format!(
+        r#"{{"width":200,"depth":60,
+        "exits":[{{"x":0.5,"z":{STREET},"kind":"road"}},{{"x":140,"z":{},"kind":"stop"}}],
+        "roads":[{{"points":[{}],"width":6,"kind":"street","ends":["out","dead"]}}],
+        "plots":[{{"name":"Home","x":90,"z":38,"w":20,"d":16,"entry":[100.5,38.5]}}],
+        "households":[{{"name":"Riders","plot":0,"player":true}}],"objects":[],"sims":[]}}"#,
+        STREET + 2.4,
+        road.join(",")
+    )
+}
+
+#[test]
+fn a_line_in_and_out_by_one_narrow_street_has_one_bus_on_it_at_a_time() {
+    let c = content(20.0);
+    let mut w = world(&c, &dead_end());
+    assert_eq!(w.transit.lines.len(), 1);
+    let line = w.transit.lines[0].clone();
+    // (Every 20 minutes on the timetable: the line's buses come less often, one off the street
+    // before the next comes on.)
+    assert!(
+        line.every > EVERY * TICKS_PER_MINUTE,
+        "every {} min",
+        line.every / TICKS_PER_MINUTE
+    );
+    let (bay, _) = line.bay(0);
+    let mut called = std::collections::BTreeSet::new();
+    common::run_to(&mut w, 2, 6.0);
+    let end = clock::tick_at(2, 12.0 * 60.0).unwrap();
+    while w.tick < end {
+        w.tick_once();
+        let (o, a, b) = worst_overlap(&w);
+        assert!(o <= 0.0, "the {a} and {b} buses overlap by {o:.2} m");
+        let on: Vec<_> = w
+            .transit
+            .buses
+            .iter()
+            .filter_map(|b| b.shown.map(|s| (b.run, s)))
+            .filter(|(_, (at, ..))| (2.0..198.0).contains(&at[0]))
+            .collect();
+        assert!(on.len() <= 1, "{} buses on the street at once", on.len());
+        for (run, (at, _, _, doors)) in on {
+            if doors != 0 && (at[0] - bay[0]).abs() < 1.0 {
+                called.insert(run);
+            }
+        }
+    }
+    assert!(
+        called.len() >= 3,
+        "{} buses called in six hours",
+        called.len()
+    );
+}
+
+#[test]
+fn a_bus_meeting_another_on_a_narrow_street_waits_at_the_way_in_till_it_is_out() {
+    let c = content(20.0);
+    // A car across the street near the way in for a while: the bus on its way out stands behind
+    // it, and the next comes in the meantime.
+    let mut town: serde_json::Value = serde_json::from_str(&dead_end()).unwrap();
+    town["cars"] = serde_json::json!([{"plot": 0, "x": 12.0, "z": STREET, "yaw": std::f32::consts::FRAC_PI_2,
+        "street": STREET, "len": 4.4, "wid": 1.8, "body": 1, "paint": 2}]);
+    let mut w = world(&c, &town.to_string());
+    let car = w.cars[0].spot;
+    w.cars[0].spot = [150.0, 50.0];
+    common::run_to(&mut w, 2, 6.0);
+    let end = clock::tick_at(2, 12.0 * 60.0).unwrap();
+    let out = |w: &World| {
+        w.transit.buses.iter().any(|b| {
+            b.shown
+                .is_some_and(|(at, yaw, ..)| (20.0..50.0).contains(&at[0]) && yaw.sin() < -0.5)
+        })
+    };
+    while !out(&w) {
+        w.tick_once();
+        assert!(w.tick < end, "no bus came back from the stop");
+    }
+    w.cars[0].spot = car;
+    // (Held till the next has waited a while at the way in: out of sight, off the street.)
+    let (since, mut came, mut waited) = (w.tick, None::<u64>, false);
+    while w.tick < end {
+        w.tick_once();
+        if w.transit.buses.len() >= 2 {
+            came.get_or_insert(w.tick);
+        }
+        let release = came.is_some_and(|t| w.tick > t + 3 * TICKS_PER_MINUTE)
+            || w.tick > since + 35 * TICKS_PER_MINUTE;
+        if release && w.cars[0].spot == car {
+            waited = came.is_some();
+            w.cars[0].spot = [150.0, 50.0];
+        }
+        let (o, a, b) = worst_overlap(&w);
+        assert!(o <= 0.0, "the {a} and {b} buses overlap by {o:.2} m");
+        let on = w
+            .transit
+            .buses
+            .iter()
+            .filter(|b| {
+                b.shown
+                    .is_some_and(|(at, ..)| (2.0..198.0).contains(&at[0]))
+            })
+            .count();
+        assert!(on <= 1, "{on} buses on the street at once");
+    }
+    assert!(waited, "no bus came while the other was held up");
+    assert_eq!(w.transit.withdrawn, 0, "a bus was taken out of service");
+}

@@ -560,8 +560,7 @@ calls nobody again for `cooldownMinutes` (default 90). The base game wakes for h
 and hygiene.
 **The bus:** in a town with bus stops, a bus comes into town every `bus.every` minutes (5 to 240,
 default 60; a line that goes in and out by the same road too narrow for two buses comes less often,
-in whole 10 minutes, so its buses never meet there; a Big world's every `bus.everyBig`, the same
-range, default `bus.every`), the first at `bus.first` o'clock (default 6) and the last at `bus.last` (default 23),
+in whole 10 minutes, so its buses never meet there), the first at `bus.first` o'clock (default 6) and the last at `bus.last` (default 23),
 calls at its stops and leaves again. Off to work or school with no car and no bike, residents take
 it when it gets them out of town sooner than the walk, and leave home in time for it (code:
 `crates/sim-core/src/bus.rs`; the stops are the town's, `docs/design/open-world.md`).
