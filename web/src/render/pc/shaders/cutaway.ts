@@ -6,8 +6,12 @@
  *   `WALL_CUT_SEMANTIC` stream, `Geo`'s `cut`) = [mask A, kind, mask B, 0]: the vertex is cut when
  *   the camera looks along a direction set in both masks (`game_wallCutLook`, the `LOOK` bits of
  *   `shared/geometry.ts`), or all walls are down (`game_wallCutParams.x`); kind 1 clamps it to the
- *   stub height (`.y`, in the mesh's own space: a storey's), kind 2 hides it below the ground
- *   (window frames, lintels). Fragments within `game_wallHoleSpan.x` of the segment `game_wallHole`
+ *   stub height (`.y`, in the mesh's own space: a storey's), kind 2 hides it (window frames and
+ *   panes, the wall above and beside an opening, door leaves): every vertex of it goes to one
+ *   point, so its triangles have no area and nothing is drawn. (Lowering it below the floor hid it
+ *   under the ground only on the ground storey: an upper storey's came down into the rooms below,
+ *   2.8 m - 2 m = 0.8 m above their floor, in view whenever the storey above is. A part's
+ *   triangles all have one cut, `house.ts`'s parts are made so, so none is pulled out of shape.) Fragments within `game_wallHoleSpan.x` of the segment `game_wallHole`
  *   (x0, z0, x1, z1), between heights `.y` and `.z`, are dropped (Build mode's preview stands in
  *   for that stretch). Every mesh drawn with such a material must have the attribute (WebGPU
  *   fails a draw without it).
@@ -35,7 +39,7 @@ export const CUTAWAY: ShaderFeature = {
 		float cutA = step(0.5, dot(floor(fract(game_wallCut.x / vec4(2.0, 4.0, 8.0, 16.0)) * 2.0), game_wallCutLook));
 		float cutB = step(0.5, dot(floor(fract(game_wallCut.z / vec4(2.0, 4.0, 8.0, 16.0)) * 2.0), game_wallCutLook));
 		if (max(game_wallCutParams.x, cutA * cutB) > 0.5) {
-			if (game_wallCut.y > 1.5) { localPos.y = -2.0; }
+			if (game_wallCut.y > 1.5) { localPos = vec3(0.0, -2.0, 0.0); }
 			else if (game_wallCut.y > 0.5) { localPos.y = min(localPos.y, game_wallCutParams.y); }
 		}
 	}
@@ -80,7 +84,7 @@ export const CUTAWAY: ShaderFeature = {
 		let cutA = step(0.5, dot(floor(fract(game_wallCut.x / vec4f(2.0, 4.0, 8.0, 16.0)) * 2.0), uniform.game_wallCutLook));
 		let cutB = step(0.5, dot(floor(fract(game_wallCut.z / vec4f(2.0, 4.0, 8.0, 16.0)) * 2.0), uniform.game_wallCutLook));
 		if (max(uniform.game_wallCutParams.x, cutA * cutB) > 0.5) {
-			if (game_wallCut.y > 1.5) { localPos.y = -2.0; }
+			if (game_wallCut.y > 1.5) { localPos = vec3f(0.0, -2.0, 0.0); }
 			else if (game_wallCut.y > 0.5) { localPos.y = min(localPos.y, uniform.game_wallCutParams.y); }
 		}
 	}

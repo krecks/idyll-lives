@@ -15,6 +15,7 @@ Getting about town: bikes and e-scooters, a bus in every town and lifts from the
 - **Fixes:**
   - a picked door's resize arrows go with the door (undone or replaced), instead of staying up into Live mode;
   - no fence posts left standing round the basement when it's in view;
+  - with an upper floor in view, the windows, door leaves and the wall over and beside them that go with its walls cut away no longer come down into the rooms below as flat white frames about knee high, along the walls of the storey below (as it was since storeys came in);
   - models whose file the browser decoded in parts (seen in Firefox: swing sets, sandboxes and sectionals) are no longer drawn as boxes;
   - riders in a car backing out no longer sit facing past a full turn; residents meeting halfway over the stairs meet by the stairs, not across town; an adopted child stands beside a parent on the bed or sofa, not shut in on it;
   - walkers and riders keep their whole body (a bike's wheels and handlebars too) clear of cars and buses, beside a country road out on the verge, and wait clear of the ground in front of one; a car never drives through someone in its way, and one parked out on a trip takes up its bay;
