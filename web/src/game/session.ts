@@ -980,8 +980,19 @@ async function openSession(
         return { x: snap[o + l.bus!.x], z: snap[o + l.bus!.z], yaw: snap[o + l.bus!.yaw], shown: snap[o + l.bus!.shown], doors: snap[o + l.bus!.doors], line: snap[o + l.bus!.line] };
       });
     };
+    // `__cars()`: the households' cars as the newest snapshot shows them (sim-core `cars.rs`): which
+    // car (its row), where, which way, parked (1) or driving (2).
+    const cars = () => {
+      const [snap, l] = [bridge.latest(), bridge.layout];
+      if (!l.car || l.carBase === undefined || l.carStride === undefined || l.header.carCount === undefined) return [];
+      return Array.from({ length: snap[l.header.carCount] | 0 }, (_, k) => {
+        const o = l.carBase! + k * l.carStride!;
+        return { car: k, x: snap[o + l.car!.x], z: snap[o + l.car!.z], yaw: snap[o + l.car!.yaw], shown: snap[o + l.car!.shown] };
+      });
+    };
     Object.assign(window, {
       __buses: buses,
+      __cars: cars,
       __sims: () => liveSims(bridge.latest(), bridge.layout, content, game.sims),
       __content: content,
       __addFunds: (amount: number, household = game.home) => bridge.send({ type: 'addFunds', household, amount }),
