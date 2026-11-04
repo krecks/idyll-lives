@@ -1714,6 +1714,28 @@ struct StructureView<'a> {
     /// The town's bus stops (`bus::Stop`); left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     stops: Vec<StopView>,
+    /// The streets a bus drives where the kerbside furniture keeps back for buses to pass pulled
+    /// over (`bus::Transit::bus_streets`); left out when there are none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    bus_streets: Vec<BusStreetView>,
+}
+
+/// A street a bus drives (`StructureView::bus_streets`): the town file's road (`meta.roads`
+/// index) and how far in from its edges its kerbside furniture may reach (m, `bus::kerbside`).
+#[derive(Serialize)]
+struct BusStreetView {
+    road: u32,
+    keep: f32,
+}
+
+/// `StructureView::bus_streets`.
+fn bus_street_views(world: &World) -> Vec<BusStreetView> {
+    world
+        .transit
+        .bus_streets
+        .iter()
+        .map(|&(road, keep)| BusStreetView { road, keep })
+        .collect()
 }
 
 /// A bus stop: where its pole stands (the town file's exit), the way the bus goes past it (a
@@ -2385,6 +2407,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
         cars: car_views(world),
         garages: &world.garages,
         stops: stop_views(world),
+        bus_streets: bus_street_views(world),
     })
     .expect("structure serializes")
 }
@@ -2589,6 +2612,8 @@ impl StructureSync {
         parts.part("garages", Some(&world.garages).filter(|g| !g.is_empty()));
         let stops = stop_views(world);
         parts.part("stops", Some(&stops).filter(|s| !s.is_empty()));
+        let streets = bus_street_views(world);
+        parts.part("busStreets", Some(&streets).filter(|s| !s.is_empty()));
 
         // The things: those that changed, by index, while the list is the same things in the same
         // order (a door opened, a crop grown); else the whole list (one bought, sold or moved in).
