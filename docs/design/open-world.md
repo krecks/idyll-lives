@@ -77,7 +77,9 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
 - `exits: ([x, z] | { x, z, kind: 'road' | 'stop' })[]` — a `stop` is a bus stop at the kerb of a
   road. A bus calls there every `bus.every` minutes through the day (an hour; a line that goes in and
   out by the same 6 m road, every 80 to 100 minutes; sim-core `bus.rs`: a line per
-  stop or two in a big world, coming in and going out where the roads leave the area; one through
+  stop or two in a big world, coming in and going out where the roads leave the area, every few
+  hours, its round trip, one bus of it on the road at a time, on roads laid 7 m wide, `macro.ts`
+  `BUS_ROAD_WIDTH`, wide enough for two buses to pass; one through
   a cosy or normal town's stop or two, which new towns of those sizes get on their main road near
   the middle, `town.ts` `busStops`): residents wait there for it when it beats the walk out, and
   come home on it. When no bus calls (the night), the stop is a way out for people on foot, as all
