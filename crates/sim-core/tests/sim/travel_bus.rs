@@ -656,3 +656,35 @@ fn a_bus_boxed_in_for_good_is_taken_out_of_service_and_the_town_recovers() {
     }
     assert!(again, "no bus called at the stop once the way was clear");
 }
+
+#[test]
+fn someone_who_misses_the_bus_makes_their_own_way_rather_than_wait_for_the_next() {
+    // A bus an hour: held up at home after setting off, they come to the stop with theirs gone and
+    // the next half an hour off.
+    let c = content_every(10.0, 60);
+    let mut w = world(&c, &town(1, 0, 90, true));
+    common::run_to(&mut w, 2, 5.0);
+    let end = clock::tick_at(2, 12.0 * 60.0).unwrap();
+    while w.bound_for_bus(0).is_none() {
+        w.tick_once();
+        assert!(w.tick < end, "never set off for the bus");
+    }
+    let home = w.sims[0].pos;
+    let held = w.tick + 30 * TICKS_PER_MINUTE;
+    while w.tick < held {
+        w.tick_once();
+        w.sims[0].pos = home;
+    }
+    let (mut at_stop, mut most) = (0, 0);
+    while w.tick < end && w.sims[0].away_until.is_none() {
+        w.tick_once();
+        at_stop = if waiting(&w, 0) { at_stop + 1 } else { 0 };
+        most = most.max(at_stop);
+    }
+    assert!(
+        most < 2 * TICKS_PER_MINUTE,
+        "waited {} min at the stop for the next bus",
+        most / TICKS_PER_MINUTE
+    );
+    assert!(w.sims[0].away_until.is_some(), "never got to work");
+}

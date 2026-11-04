@@ -2376,7 +2376,23 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx) {
     }
 }
 
-/// Waited at the stop far too long (`GIVE_UP_TICKS`: no bus came): they go another way.
+/// Whether a bus is due at `stop` for someone waiting there at `tick`: one of its line on its
+/// way there (late or not, come into town or not yet), or standing there with time to get on,
+/// or the next to come within `WAIT_MOST` (`Transit::catches`). With none, they make their own
+/// way (`give_up`) rather than wait for one a headway off.
+pub(crate) fn bus_due(t: &Transit, stop: u16, tick: u64) -> bool {
+    let Some((l, j)) = t.stops.get(stop as usize).and_then(|s| s.line) else {
+        return false;
+    };
+    let j = j as usize;
+    t.buses.iter().any(|b| {
+        b.line == l
+            && (b.next < j || b.next == j && b.until.is_none_or(|until| tick + DOOR_TICKS < until))
+    }) || t.catches(stop, tick).is_some()
+}
+
+/// Waited at the stop far too long (`GIVE_UP_TICKS`: no bus came), or with no bus due
+/// (`bus_due`): they go another way.
 pub(crate) fn give_up(sim: &mut Sim) {
     if let Some(a) = sim.current.take() {
         sim.bus_given_up = true;
