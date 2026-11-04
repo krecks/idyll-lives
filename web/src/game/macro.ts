@@ -109,8 +109,15 @@ const AREA_AIM = 230;
 /** No area nearer the world's edge than this (m), nor nearer another's box. */
 const EDGE = 50;
 const BOX_GAP = 24;
+/**
+ * Every road a bus may drive in a big world, the country roads and every area's streets and lanes,
+ * is this wide at least (m): two buses pass on it, one pulled over (the sim's `bus::single_track`).
+ * Which roads a bus line takes is worked out in the sim from the finished roads, so all of them are
+ * laid this wide before any lot is placed.
+ */
+const BUS_ROAD_WIDTH = 7;
 /** Country roads' width (m), trails'. */
-const COUNTRY_WIDTH = 6;
+const COUNTRY_WIDTH = BUS_ROAD_WIDTH;
 const TRAIL_WIDTH = 2;
 /** Houses as far as this from a stop get one of their own (m). */
 const STOP_REACH = 105;
@@ -740,7 +747,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     };
     laid.forEach((r, k) => {
       const points = r.points.map(onto);
-      const road: RoadPlan = { ...r, points, kind: k === 0 ? 'street' : 'lane', area: index, ...(r.lots && swap ? { lots: (-r.lots) as 1 | -1 } : {}) };
+      const road: RoadPlan = { ...r, points, width: Math.max(r.width, BUS_ROAD_WIDTH), kind: k === 0 ? 'street' : 'lane', area: index, ...(r.lots && swap ? { lots: (-r.lots) as 1 | -1 } : {}) };
       const at = roads.push(road) - 1;
       plan.roads.push(at);
       for (const e of [0, 1] as const) {
