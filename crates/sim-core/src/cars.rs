@@ -55,6 +55,13 @@
 //! driveway meets it and along the lanes (`Route::on_roads`); a car whose driveway comes
 //! alongside its road rather than onto it (`OBLIQUE`), or has no way out by road, stays parked
 //! (`Car::no_way`). Older towns drive straight along x (`Route::legacy`).
+//!
+//! **Among the traffic.** A car drives in its lane, `LANE` right of the road's middle. It keeps
+//! behind one in front of it going its way (`up_against`); of two tangled, the later keeps behind
+//! the earlier till they part (`Driving::free`). Coming into town it waits out of sight at the way
+//! in till the way in is clear of the one before it, the ground in front of it too, the one there
+//! longest first (`room_to_come_in`): those coming home at the same time come in one after
+//! another, not on top of each other.
 
 use serde::{Deserialize, Serialize};
 
@@ -565,6 +572,8 @@ impl Car {
             CarState::Parked | CarState::Boarding => Some((self.spot, self.yaw, false)),
             CarState::Away => None,
             CarState::Out => self.trip.map(|t| (t.at, t.yaw, false)),
+            // (Not yet come in: out of sight at the way in.)
+            CarState::Arriving if self.outside() => None,
             CarState::Leaving | CarState::Arriving => {
                 let t = self.progress;
                 let route = self.route(exits, travel, self.state == CarState::Arriving);
@@ -583,6 +592,12 @@ impl Car {
             && self.route.as_ref().is_some_and(|(_, r)| {
                 r.at(self.progress).2 || r.at((self.progress - 1.0).max(0.0)).2
             })
+    }
+
+    /// Coming into town from the way in (not from a trip's parking spot), it hasn't yet: out of
+    /// sight there, waiting for room to come in (`drive_on`).
+    fn outside(&self) -> bool {
+        self.state == CarState::Arriving && self.trip.is_none() && self.progress <= 0.0
     }
 
     /// Its route out of town or (`home`) back (worked out when first asked for).
@@ -1801,11 +1816,16 @@ fn route_ticks(w: &mut World, c: usize, home: bool) -> f32 {
 
 /// A tick further along its drive, unless someone is in its way: it waits for them (`go_on`).
 /// Someone at something (a bench, a letterbox) is beside its way at most, nothing stands on a
-/// street or a driveway: it doesn't wait for them.
+/// street or a driveway: it doesn't wait for them. Coming into town, it waits out of sight at the
+/// way in till the way in is clear of the one before it (`room_to_come_in`), the one there longest
+/// first: cars coming home at the same time come in one after another.
 fn drive_on(w: &mut World, c: usize) {
     let home = w.cars[c].state == CarState::Arriving;
     let t = w.cars[c].progress;
     let others = vehicles(&w.cars, &w.transit, Some(c), None);
+    if w.cars[c].outside() && !room_to_come_in(w, c, &others) {
+        return;
+    }
     let World {
         cars,
         exits,
@@ -1824,6 +1844,7 @@ fn drive_on(w: &mut World, c: usize) {
     // but all along its sides, as its tail swings out on a turn.
     let route = car.route(exits, Some(travel), home);
     let ((at, yaw, reverse), (was, was_yaw, _)) = (route.at(t + 1.0), route.at(t));
+    let ticks = route.ticks();
     let (ahead, behind) = if reverse { (0.0, AHEAD) } else { (AHEAD, 0.0) };
     let me = Driving {
         at,
@@ -1858,6 +1879,53 @@ fn drive_on(w: &mut World, c: usize) {
         &mut car.waited,
         &mut car.progress,
     );
+    // (Where it is now, for those after it this tick: one coming in behind it sees it there.)
+    let progress = car.progress;
+    if progress > t && progress < ticks {
+        let (p, yaw, _) = car.route(exits, Some(travel), home).at(progress);
+        car.shown = Some((p, yaw, true, 0));
+    }
+}
+
+/// Whether car `c`, out of sight at the way in (`Car::outside`), comes in now: none there longer
+/// waits to come in by the same way (the earlier car, of two there as long), and its body a tick
+/// on and the ground in front of it (`AHEAD`) are clear of every car and bus in town (`others`,
+/// `vehicles`: those that came in this tick where they are now) and every car parked.
+fn room_to_come_in(w: &mut World, c: usize, others: &[Driving]) -> bool {
+    let World {
+        cars,
+        exits,
+        travel,
+        ..
+    } = w;
+    let (at, yaw, _) = cars[c].route(exits, Some(travel), true).at(1.0);
+    let start = |car: &Car| car.route.as_ref().filter(|r| r.0).map(|r| r.1.at(0.0).0);
+    let mine = start(&cars[c]);
+    let before = cars.iter().enumerate().any(|(o, other)| {
+        o != c
+            && other.outside()
+            && (other.since, o) < (cars[c].since, c)
+            && start(other)
+                .zip(mine)
+                .is_some_and(|(a, b)| crate::travel::dist(a, b) < 4.0)
+    });
+    let me = Driving {
+        at,
+        yaw,
+        len: cars[c].len,
+        wid: cars[c].wid,
+        ahead: AHEAD,
+        behind: 0.0,
+        first: car_first(c),
+        held: false,
+    };
+    let (body, front) = (me.body(), me.front());
+    !before
+        && others
+            .iter()
+            .copied()
+            .chain(parked(cars))
+            .all(|o| o.body().overlap(&body) <= 0.0 && o.body().overlap(&front) <= 0.0)
 }
 
 /// Something driving (a car, a bus) where it is now, for who's in its way (`go_on`): its middle
@@ -1920,14 +1988,21 @@ impl Driving {
     }
 
     /// Whether `d` waits for it at all: not while it backs up, out of a driveway or into one, nor
-    /// for a car already tangled with it (waiting would only hold both: they part as they go on);
-    /// a bus not for a car held up by someone on foot (`held`: they may be kept there by the bus
-    /// itself, beside them, with nowhere to step aside to; it goes by).
+    /// a bus for a car already tangled with it, or a car for a bus (waiting would only hold both:
+    /// they part as they go on); of two cars tangled, the earlier (`first`) doesn't wait for the
+    /// later, but the later for it, so the earlier pulls ahead and they part (going on together,
+    /// neither waiting, they'd stay on top of each other). A bus doesn't wait for a car held up by
+    /// someone on foot (`held`: they may be kept there by the bus itself, beside them, with nowhere
+    /// to step aside to; it goes by).
     pub(crate) fn free(&self, d: &Driving) -> bool {
         let car = |v: &Driving| v.first >= 1 << 63;
-        self.ahead > 0.0
-            && !((car(self) || car(d)) && self.body().overlap(&d.body()) > 0.0)
-            && !(self.held && !car(d))
+        let tangled = self.body().overlap(&d.body()) > 0.0;
+        let ignored = if car(self) && car(d) {
+            tangled && d.first < self.first
+        } else {
+            (car(self) || car(d)) && tangled
+        };
+        self.ahead > 0.0 && !ignored && !(self.held && !car(d))
     }
 
     /// The way it's going (a unit vector: backwards, backing up).

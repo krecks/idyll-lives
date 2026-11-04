@@ -195,3 +195,168 @@ fn a_car_never_drives_through_someone_with_nowhere_to_step_aside() {
         w.sims[1].pos
     );
 }
+
+// ---- Cars keeping their distance -----------------------------------------------------------
+
+/// The widest and longest of the renderer's cars (m).
+const CAR: (f32, f32) = (4.6, 1.88);
+
+/// A cosy town 200 m long with a street `width` m wide along x (its middle at z = 30, a way out at
+/// either end) and a house at each of `houses` (its driveway's x, and whether it's north of the
+/// street), with its driveway onto the street and a car on it, and its driver at home.
+fn street(width: f32, houses: &[(f32, bool)]) -> World {
+    let content = r#"{
+        "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],
+        "objects":[],
+        "economy":{"startingFunds":500}}"#;
+    let road: Vec<String> = (0..=199).map(|x| format!("[{x}.5,30]")).collect();
+    let (mut plots, mut households, mut sims, mut drives, mut cars) =
+        (vec![], vec![], vec![], vec![], vec![]);
+    for (k, &(x, north)) in houses.iter().enumerate() {
+        let (z0, inner, front, yaw) = if north {
+            (8.0, 20.5, 1.0, 0.0)
+        } else {
+            (34.0, 39.5, -1.0, std::f32::consts::PI)
+        };
+        let spot = inner + front * (0.45 + CAR.0 / 2.0);
+        let door = if north { z0 + 17.5 } else { z0 + 0.5 };
+        plots.push(format!(
+            r#"{{"name":"H{k}","x":{},"z":{z0},"w":16,"d":18,"entry":[{},{door}]}}"#,
+            x - 12.0,
+            x - 6.5
+        ));
+        households.push(format!(r#"{{"name":"F{k}","plot":{k}}}"#));
+        sims.push(format!(
+            r#"{{"name":"D{k}","household":{k},"x":{},"z":{}}}"#,
+            x - 6.5,
+            z0 + 9.5
+        ));
+        drives.push(format!(
+            r#"{{"plot":{k},"x":{x},"z":{inner},"front":{front},"street":30,"road":0,"s":{}}}"#,
+            x - 0.5
+        ));
+        cars.push(format!(
+            r#"{{"plot":{k},"x":{x},"z":{spot},"yaw":{yaw},"street":30,"len":{},"wid":{},"body":2,"paint":{k}}}"#,
+            CAR.0, CAR.1
+        ));
+    }
+    let town = format!(
+        r#"{{"width":200,"depth":60,
+        "exits":[{{"x":0.5,"z":30,"kind":"road"}},{{"x":199.5,"z":30,"kind":"road"}}],
+        "roads":[{{"points":[{}],"width":{width},"kind":"street","ends":["out","out"]}}],
+        "plots":[{}],"households":[{}],"objects":[],"sims":[{}],"drives":[{}],"cars":[{}]}}"#,
+        road.join(","),
+        plots.join(","),
+        households.join(","),
+        sims.join(","),
+        drives.join(","),
+        cars.join(",")
+    );
+    let mut w = World::from_json(content, &town, 1).unwrap();
+    w.autonomy = false;
+    assert!(w.cars.iter().all(|c| !c.no_way), "every car has a way out");
+    w
+}
+
+/// Car `c`, away with its driver done at work, comes home now.
+fn come_home(w: &mut World, c: usize) {
+    let car = &mut w.cars[c];
+    car.state = CarState::Away;
+    car.since = w.tick;
+    car.driver = Some(c as u32);
+    car.aboard = vec![c as u32];
+    car.done = vec![c as u32];
+    car.ready_at = w.tick;
+    w.sims[c].away_until = Some(w.tick + 100_000);
+}
+
+/// How far two of `w`'s cars' bodies overlap at most where they're drawn, one of them on the move
+/// (m; 0 or less: apart), and which.
+fn cars_overlap(w: &World) -> (f32, usize, usize) {
+    let corners = |p: [f32; 2], yaw: f32, len: f32, wid: f32| {
+        let (s, c) = yaw.sin_cos();
+        let (f, r) = (
+            [s * len / 2.0, c * len / 2.0],
+            [c * wid / 2.0, -s * wid / 2.0],
+        );
+        [
+            [p[0] + f[0] + r[0], p[1] + f[1] + r[1]],
+            [p[0] + f[0] - r[0], p[1] + f[1] - r[1]],
+            [p[0] - f[0] - r[0], p[1] - f[1] - r[1]],
+            [p[0] - f[0] + r[0], p[1] - f[1] + r[1]],
+        ]
+    };
+    // (Separating axes: the least overlap along any side's normal.)
+    let depth = |a: &[[f32; 2]; 4], b: &[[f32; 2]; 4]| {
+        let mut best = f32::INFINITY;
+        for poly in [a, b] {
+            for k in 0..2 {
+                let (p, q) = (poly[k], poly[k + 1]);
+                let l = (q[1] - p[1]).hypot(p[0] - q[0]);
+                let n = [(q[1] - p[1]) / l, (p[0] - q[0]) / l];
+                let span = |r: &[[f32; 2]; 4]| {
+                    r.iter()
+                        .map(|v| v[0] * n[0] + v[1] * n[1])
+                        .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), x| {
+                            (lo.min(x), hi.max(x))
+                        })
+                };
+                let ((a0, a1), (b0, b1)) = (span(a), span(b));
+                best = best.min(a1.min(b1) - a0.max(b0));
+            }
+        }
+        best
+    };
+    let shown: Vec<_> = w
+        .cars
+        .iter()
+        .enumerate()
+        .filter_map(|(k, c)| c.shown.map(|s| (k, s.2, corners(s.0, s.1, c.len, c.wid))))
+        .collect();
+    let mut worst = (f32::NEG_INFINITY, 0, 0);
+    for (i, a) in shown.iter().enumerate() {
+        for b in &shown[i + 1..] {
+            if a.1 || b.1 {
+                let d = depth(&a.2, &b.2);
+                if d > worst.0 {
+                    worst = (d, a.0, b.0);
+                }
+            }
+        }
+    }
+    worst
+}
+
+#[test]
+fn two_cars_coming_in_by_the_same_way_at_the_same_tick_come_in_one_after_the_other() {
+    // (Both homes nearer the west end: both come in by it, the first to come in (of two there as
+    // long, the first car) on past the other's home.)
+    let mut w = street(7.0, &[(90.0, true), (60.0, true)]);
+    come_home(&mut w, 0);
+    come_home(&mut w, 1);
+    let mut first_seen = [None::<u64>; 2];
+    for _ in 0..4000 {
+        w.tick_once();
+        let (o, a, b) = cars_overlap(&w);
+        assert!(o <= 0.0, "cars {a} and {b} overlap by {o:.2} m");
+        for (seen, car) in first_seen.iter_mut().zip(&w.cars) {
+            if car.shown.is_some_and(|s| s.2) && seen.is_none() {
+                *seen = Some(w.tick);
+            }
+        }
+        if w.cars.iter().all(|c| c.state == CarState::Parked) {
+            break;
+        }
+    }
+    assert!(
+        w.cars.iter().all(|c| c.state == CarState::Parked),
+        "both home"
+    );
+    let (a, b) = (first_seen[0].unwrap(), first_seen[1].unwrap());
+    // (The second waits out of sight till the first is a car's length and the gap in front on.)
+    assert!(
+        a.abs_diff(b) >= 10,
+        "they came in {} ticks apart",
+        a.abs_diff(b)
+    );
+}
