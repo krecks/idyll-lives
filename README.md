@@ -28,7 +28,7 @@ A home-building game with a living town, in the browser: you build and furnish a
 Build a home and watch the people who live in it.
 
 - **Start:** create a world (a town, a farm, a seaside village, a mountain hamlet, …), choose the neighbours, then play one of the households who already live there or make your own in **Creation**, and move in.
-- **Live (L):** everyone in town works, makes friends, falls in love and grows older on their own, your household included, and gets about on foot, by bike or e-scooter, in the household's car, on a neighbour's lift or by the town's bus. Click a resident to see their needs and plans and to step in; leave the game alone and the camera follows what happens at home.
+- **Live (L):** everyone in town works, makes friends, falls in love and grows older on their own, your household included, and gets about on foot, by bike or e-scooter, in the household's car or on a neighbour's lift. Click a resident to see their needs and plans and to step in; leave the game alone and the camera follows what happens at home.
 - **Build (B):** time stands still while you furnish (V), build walls, rooms, doors, windows and stairs (C) and see how each room is doing (O).
 - **A life:** 1000 jobs, 13 skills, a weekly planner (P), rent and bills, a garden to grow, and residents who can speak lines of their own (a voice model and a small language model, both run in the browser).
 
@@ -100,7 +100,7 @@ From the repo root: `cargo fmt --all` (CI checks the code is formatted) and `car
 | `?bench=village` | The rendering benchmark (also `forest`), with `&quality=`, `&hour=`, `&cam=orbit\|wide\|build\|dusk\|mirror\|mirror-still`, `&res=`, `&cap=`, `&diag=` and more ([docs/design/graphics.md](docs/design/graphics.md)) |
 | `?hour=13` | Holds the lighting at that hour |
 | `?diag=…` | A comma list. `noshadows`, `noaa`, `nonature`, `nolamps`, `nomirrors`, `noglass`, `nonight` leave a feature out to measure what it costs; `freeze` stops time for screenshots; `albedo` and `normals` draw every lit surface as its base colour or world normal; `nosims` leaves the residents out; `linear` draws the light without tone mapping, exposure or grading; `shaders` logs every shader and pipeline compiled, with its material and phase |
-| `?debug` | Console helpers: `__controls`, `__world()`, `__sims()` (residents live: where, pose, what they use, needs), `__buses()` (the town's buses: where, standing or driving, doors, line), `__send(command)`, `__addFunds(n)`, `__camera(pose)`, `__showPlot(i)`, `__characters`, `__renderer` (its debug hooks), and `__crash('panic'\|'throw'\|'hang'\|'render')` to see how the game copes with a failure |
+| `?debug` | Console helpers: `__controls`, `__world()`, `__sims()` (residents live: where, pose, what they use, needs), `__send(command)`, `__addFunds(n)`, `__camera(pose)`, `__showPlot(i)`, `__characters`, `__renderer` (its debug hooks), and `__crash('panic'\|'throw'\|'hang'\|'render')` to see how the game copes with a failure |
 | `?profile` | Logs where start-up and frames spend their time, with a summary once start-up settles (`debug/perf.ts`) |
 | `?seed=42` | The random seed of a new game |
 | `?pack=packs/my-art/manifest.json` | Loads an extra asset pack (can be repeated) |

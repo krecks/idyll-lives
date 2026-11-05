@@ -74,19 +74,11 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
 - `areas: { name, kind: 'hamlet' | 'countryside', x, z, w, d }[]` — area 0 is the main town.
 - `plots[].area?: number`, `plots[].kind?: 'home' | 'farm' | 'public' | 'shop' | 'countryside'`.
   Countryside plots are public, unfenced, with an `entry` at their trail end.
-- `exits: ([x, z] | { x, z, kind: 'road' | 'stop' })[]` — a `stop` is a bus stop at the kerb of a
-  road. A bus calls there every `bus.every` minutes through the day (an hour; a line that goes in and
-  out by the same 6 m road, every 80 to 100 minutes; sim-core `bus.rs`: a line per
-  stop or two in a big world, coming in and going out where the roads leave the area, every few
-  hours, its round trip, one bus of it on the road at a time, on roads laid 7 m wide, `macro.ts`
-  `BUS_ROAD_WIDTH`, wide enough for two buses to pass; one through
-  a cosy or normal town's stop or two, which new towns of those sizes get on their main road near
-  the middle, `town.ts` `busStops`): residents wait there for it when it beats the walk out, and
-  come home on it. When no bus calls (the night), the stop is a way out for people on foot, as all
-  stops were before the bus; in a big world it always is (nobody's way to work is slower for the
-  bus): someone walking out by it takes the bus calling there if one comes in time for work, else
-  leaves town there as before. The renderer draws its shelter and sign where the sim says
-  (`WorldStructure.stops`) and each bus from its snapshot rows (`busBase`, `bus`).
+- `exits: ([x, z] | { x, z, kind: 'road' })[]` — the roads out of town. (Town files and saves
+  written while 0.7.0's bus was in development may list bus stops too, `kind: 'stop'`: the bus is
+  gone, and they're no ways out; the sim leaves them out as the town loads. A shared work taxi
+  takes its place.) A big world's roads are laid 7 m wide (`macro.ts` `ROAD_WIDTH`), wide enough
+  for two cars to pass in their lanes.
 - `terrain: { water?: Rle, blocked?: Rle }` — run-length masks over the ground grid in row-major
   order: `[runLength, value, runLength, value, ...]` with value 0/1, starting at tile (0, 0).
   The sim treats set tiles as a base blocked layer; the renderer draws water from `meta.zones`.
@@ -111,11 +103,10 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   (room for the doors) and start behind where a garage could go at its end (Build mode's Garage
   tool); kerbside furniture keeps 1.2 m off a driveway's mouth where the world has cars, and on
   a 6 m lane (3.3 m between the kerbs, too narrow for two cars in their lanes) stands 0.5 m back
-  from the kerb (`busStreets`, `cars::LANE_KERBSIDE`), for two cars meeting there to pull over onto
-  the pavement and pass. Cars and buses take turns where their ways cross or meet (junctions'
-  boxes, driveway and bay mouths, stretches where a car and a bus can't pass, where a bus sweeps
-  round a sharp turn): one queue of claims for both, granted in the order asked
-  (`sim-core/src/traffic.rs`).
+  from the kerb (`pullOverStreets`, `cars::LANE_KERBSIDE`), for two cars meeting there to pull over
+  onto the pavement and pass. Cars take turns where their ways cross or meet (junctions' boxes,
+  where two roads cross or touch between their ends too, driveway and bay mouths, a 6 m lane's
+  tight bend): one queue of claims, granted in the order asked (`sim-core/src/traffic.rs`).
 - `garages[].rot?: 0 | 1 | 2 | 3` — a garage the player built (Build mode's Garage tool,
   `Command::BuildGarage`): the way its door faces, as a thing's facing (0 towards +z, 1 +x,
   2 -z, 3 -x). Absent: towards the street, as the town places garages. The same field is in the
@@ -156,14 +147,12 @@ timed by the ride (`ride::commute_bike`).
   Renderer contract unchanged: the car is a snapshot car row as ever, and everyone in it (the
   driver, and now the passengers) is a resident sitting in their seat (`pos`, pose sit, not
   away), so no new snapshot field.
-- Every house is within ~120 m of a stop or exit.
 - Countryside spots are within ~150 m of their hamlet, reached by trail.
 - `careerRules.commuteMinutes` means only the off-map part; the on-map part comes from the ETA.
 - The way to work or school is chosen once (`world.rs`, `TaskKind::Work`): already riding, else a
   seat in the household's car, a neighbour's lift (`cars::lift_seat`: a friend of 30 or more whose
   car stands within 25 m of the door, setting off with a seat free), the household's bike or
-  e-scooter, the bus (when the walk to the stop, the wait for it by the
-  timetable and the ride out beat the walk out, `bus.rs` `way`), or on foot. Late for work is
+  e-scooter, or on foot. Late for work is
   judged by when that way gets them there.
 
 ## Life on every lot

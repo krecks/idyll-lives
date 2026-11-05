@@ -558,12 +558,6 @@ woken. They do the crib's care interactions for each of those needs under `tendB
 (default 0.6), and those woken go back to bed, with the `feeling` (optional); the same baby
 calls nobody again for `cooldownMinutes` (default 90). The base game wakes for hunger, bladder
 and hygiene.
-**The bus:** in a town with bus stops, a bus comes into town every `bus.every` minutes (5 to 240,
-default 60; a line that goes in and out by the same road too narrow for two buses comes less often,
-in whole 10 minutes, so its buses never meet there), the first at `bus.first` o'clock (default 6) and the last at `bus.last` (default 23),
-calls at its stops and leaves again. Off to work or school with no car and no bike, residents take
-it when it gets them out of town sooner than the walk, and leave home in time for it (code:
-`crates/sim-core/src/bus.rs`; the stops are the town's, `docs/design/open-world.md`).
 **Jobs:** `careerRules.market` turns on residents finding, quitting and losing jobs on their own.
 A promotion takes a full performance bar (100) and the next grade's skills. A shift worked fills
 the bar by `performancePerShift` (default 12) at the entry grade, for a resident who left for work
