@@ -11,6 +11,7 @@ pub mod envconv;
 pub mod fp16;
 pub mod licenses;
 pub mod llmfetch;
+pub mod llmslim;
 pub mod pcg64;
 pub mod review;
 pub mod tex;

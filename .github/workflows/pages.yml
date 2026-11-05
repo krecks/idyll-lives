@@ -120,7 +120,7 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: web/public/llm
-          key: llm-${{ hashFiles('crates/tools/src/llmfetch.rs', 'crates/tools/src/download.rs') }}
+          key: llm-${{ hashFiles('crates/tools/src/llmfetch.rs', 'crates/tools/src/llmslim.rs', 'crates/tools/src/download.rs') }}
           restore-keys: llm-
 
       - name: Install

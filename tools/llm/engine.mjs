@@ -26,6 +26,8 @@ export const SPEC = {
   data: 'model_q4.onnx_dataz',
   chat: { bos: '<|startoftext|>' },
   stop: ['<|im_end|>', '<|endoftext|>'],
+  /** Positions it reads (`crates/tools/src/llmslim.rs`, POSITIONS). */
+  positions: 4096,
 };
 
 const json = (name) => JSON.parse(readFileSync(new URL(name, SPEC.dir), 'utf8'));
@@ -42,5 +44,5 @@ export async function engine(threads = 1) {
     externalData: [{ path: SPEC.data.replace(/z$/, ''), data: gunzipSync(readFileSync(new URL(SPEC.data, SPEC.dir))) }],
   });
   const stopIds = new Set(SPEC.stop.map((t) => tokenizer.token_to_id(t)).filter((id) => id !== undefined));
-  return { ort, session, tokenizer, stopIds, prefixes: new PrefixCache(4) };
+  return { ort, session, tokenizer, stopIds, prefixes: new PrefixCache(4), positions: SPEC.positions };
 }

@@ -6,7 +6,8 @@
 //!
 //! Works on the protobuf wire format directly: only the graph's initializers and nodes are
 //! touched, every other field is copied byte for byte. Deterministic, so the output can be pinned
-//! by its SHA-256. Used by `cargo fetch-voice`. (Was tools/voice/fp16.mjs.)
+//! by its SHA-256. Used by `cargo fetch-voice`, and its protobuf reading by `llmslim.rs`. (Was
+//! tools/voice/fp16.mjs.)
 
 /// Weights smaller than this stay float32 (biases, norms: little to gain).
 const MIN_VALUES: usize = 1024;
@@ -17,15 +18,15 @@ const FLOAT16: u64 = 10;
 const ATTR_INT: u64 = 2;
 
 /// A protobuf field, its payload still a slice of the message it came from.
-struct Field<'a> {
-    number: u64,
-    wire: u8,
+pub(crate) struct Field<'a> {
+    pub(crate) number: u64,
+    pub(crate) wire: u8,
     /// The value of a varint field.
-    varint: u64,
+    pub(crate) varint: u64,
     /// A length-delimited or fixed-width field's payload.
-    payload: &'a [u8],
+    pub(crate) payload: &'a [u8],
     /// The whole field: key, length, payload.
-    bytes: &'a [u8],
+    pub(crate) bytes: &'a [u8],
 }
 
 fn varint(buf: &[u8], at: &mut usize) -> Result<u64, String> {
@@ -56,7 +57,7 @@ fn encode_varint(value: u64) -> Vec<u8> {
 }
 
 /// A message's fields in order.
-fn fields(buf: &[u8]) -> Result<Vec<Field<'_>>, String> {
+pub(crate) fn fields(buf: &[u8]) -> Result<Vec<Field<'_>>, String> {
     let mut out = Vec::new();
     let mut at = 0;
     while at < buf.len() {
@@ -100,20 +101,20 @@ fn fields(buf: &[u8]) -> Result<Vec<Field<'_>>, String> {
     Ok(out)
 }
 
-fn bytes_field(field: u64, payload: &[u8]) -> Vec<u8> {
+pub(crate) fn bytes_field(field: u64, payload: &[u8]) -> Vec<u8> {
     let mut out = encode_varint(field * 8 + 2);
     out.extend_from_slice(&encode_varint(payload.len() as u64));
     out.extend_from_slice(payload);
     out
 }
 
-fn varint_field(field: u64, value: u64) -> Vec<u8> {
+pub(crate) fn varint_field(field: u64, value: u64) -> Vec<u8> {
     let mut out = encode_varint(field * 8);
     out.extend_from_slice(&encode_varint(value));
     out
 }
 
-fn string_field(field: u64, s: &str) -> Vec<u8> {
+pub(crate) fn string_field(field: u64, s: &str) -> Vec<u8> {
     bytes_field(field, s.as_bytes())
 }
 

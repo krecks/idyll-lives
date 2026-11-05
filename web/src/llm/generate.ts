@@ -152,6 +152,8 @@ export interface LlmEngine {
   /** Token ids that end a reply. */
   stopIds: ReadonlySet<number>;
   prefixes: PrefixCache;
+  /** Positions the model can read, the prompt and its reply together (`ModelSpec.positions`). */
+  positions: number;
 }
 
 /** A finished sentence: its closing punctuation (and a closing quote or bracket), then a space or the end. */
@@ -291,6 +293,10 @@ export async function generate(
   const parts = prompt.parts.length ? prompt.parts : [''];
   const partIds = parts.map((p) => tokenizer.encode(p, { add_special_tokens: false }).ids);
   const promptTokens = partIds.reduce((n, x) => n + x.length, 0);
+  // Past the model's positions it reads nothing sensible (its rotary tables end there): a prompt
+  // that doesn't fit is refused, and the reply stops where they end.
+  if (promptTokens >= engine.positions) throw new Error(`prompt of ${promptTokens} tokens: the model reads ${engine.positions}`);
+  const maxTokens = Math.min(params.maxTokens, engine.positions - promptTokens);
   let state: State = emptyState(engine);
   let past = 0;
   let cachedTokens = 0;
@@ -376,7 +382,7 @@ export async function generate(
       stop = 'text';
       break;
     }
-    if (ids.length >= params.maxTokens) break;
+    if (ids.length >= maxTokens) break;
     if (aborted()) {
       stop = 'aborted';
       break;
