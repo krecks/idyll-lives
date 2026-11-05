@@ -10,9 +10,9 @@
 //! tools/voice/fp16.mjs.)
 
 /// Weights smaller than this stay float32 (biases, norms: little to gain).
-const MIN_VALUES: usize = 1024;
+pub(crate) const MIN_VALUES: usize = 1024;
 
-const FLOAT: u64 = 1;
+pub(crate) const FLOAT: u64 = 1;
 const FLOAT16: u64 = 10;
 /// `AttributeProto.type` INT.
 const ATTR_INT: u64 = 2;
@@ -154,7 +154,7 @@ fn half(bits: u32) -> u16 {
 
 /// A float32 tensor's values as float16 bytes, or `None` if one doesn't fit (it would become
 /// infinite).
-fn to_half(values: &[f32]) -> Option<Vec<u8>> {
+pub(crate) fn to_half(values: &[f32]) -> Option<Vec<u8>> {
     let mut out = Vec::with_capacity(values.len() * 2);
     for v in values {
         let bits = v.to_bits();
@@ -168,13 +168,13 @@ fn to_half(values: &[f32]) -> Option<Vec<u8>> {
 }
 
 /// A `TensorProto`: its name, data type and, for float32, its values.
-struct Tensor {
-    name: String,
-    ty: i64,
-    values: Option<Vec<f32>>,
+pub(crate) struct Tensor {
+    pub(crate) name: String,
+    pub(crate) ty: i64,
+    pub(crate) values: Option<Vec<f32>>,
 }
 
-fn read_tensor(buf: &[u8]) -> Result<Tensor, String> {
+pub(crate) fn read_tensor(buf: &[u8]) -> Result<Tensor, String> {
     let mut name = String::new();
     let mut ty: i64 = 0;
     let mut raw: Option<&[u8]> = None;
@@ -224,7 +224,7 @@ fn read_tensor(buf: &[u8]) -> Result<Tensor, String> {
 }
 
 /// The tensor with float16 data under `name`: its dims copied as they are.
-fn half_tensor(buf: &[u8], name: &str, data: &[u8]) -> Result<Vec<u8>, String> {
+pub(crate) fn half_tensor(buf: &[u8], name: &str, data: &[u8]) -> Result<Vec<u8>, String> {
     let mut out = Vec::new();
     for f in fields(buf)? {
         if f.number == 1 {
@@ -238,7 +238,7 @@ fn half_tensor(buf: &[u8], name: &str, data: &[u8]) -> Result<Vec<u8>, String> {
 }
 
 /// `Cast(from) -> to` as float32.
-fn cast_node(from: &str, to: &str) -> Vec<u8> {
+pub(crate) fn cast_node(from: &str, to: &str) -> Vec<u8> {
     let mut attribute = string_field(1, "to");
     attribute.extend_from_slice(&varint_field(3, FLOAT));
     attribute.extend_from_slice(&varint_field(20, ATTR_INT));

@@ -32,7 +32,8 @@ const CHILD = { style: 'F1', pitch: 1.3, depth: 1.08, speed: 1.04 };
  * Supertonic's output for `LINES` as `ARLO`, then line 2 as `CHILD` (SHA-256, first 12 hex
  * digits). Update them only on purpose (a new model, noise, steps, shaping or phonemizer rule).
  */
-const GOLDEN = ['8cff13df1304', '222e114d9825', '1f0834091af4', 'd5f80af5ed12'];
+// (0.7.0: the graphs' weights in 8-bit integers.)
+const GOLDEN = ['5bdf9fa16ab3', '94bc662b5d4d', 'a05fc7e613c3', 'bb84b2227c20'];
 
 const hash = (a) => createHash('sha256').update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)).digest('hex').slice(0, 12);
 const same = (a, b) => a.length === b.length && Buffer.from(a.buffer, a.byteOffset, a.byteLength).equals(Buffer.from(b.buffer, b.byteOffset, b.byteLength));
@@ -108,10 +109,15 @@ for (const id of STYLE_IDS) {
 console.log(`voice: median pitch: ${pitches.join(', ')}`);
 
 const base = got[1];
-const low = await say(first, line, { ...ARLO, pitch: 0.85 });
+// Pitch x0.85 on each line: the median of their pitch ratios (one line's median pitch can land
+// off, for either model: over 10 voices and 4 lines, 1 in 40 measured above 0.93).
+const lows = [];
+for (const l of LINES) lows.push(await say(first, l, { ...ARLO, pitch: 0.85 }));
+const low = lows[1];
 const fast = await say(first, line, { ...ARLO, speed: 1.25 });
-const [p0, p1] = [medianPitch(base), medianPitch(low)];
-if (same(low, base) || !(p1 < p0 * 0.93)) fail(`pitch 0.85 should lower the pitch (${p0.toFixed(0)} Hz to ${p1.toFixed(0)} Hz)`);
+const ratios = lows.map((x, i) => medianPitch(x) / medianPitch(got[i])).sort((a, b) => a - b);
+const ratio = ratios[ratios.length >> 1];
+if (same(low, base) || !(ratio < 0.93)) fail(`pitch 0.85 should lower the pitch (median ratio ${ratio.toFixed(2)}: ${ratios.map((r) => r.toFixed(2)).join(', ')})`);
 if (Math.abs(low.length - base.length) > 0.05 * base.length) fail('pitch should not change the timing');
 if (!(fast.length < base.length * 0.85)) fail('a faster voice should be shorter');
 const ada = await say(first, line, { ...plain, style: 'F1' });
@@ -124,4 +130,4 @@ if ((await say(first, '', ARLO)).length !== 0) fail('empty text should give no s
 const peak = base.reduce((m, x) => Math.max(m, Math.abs(x)), 0);
 const onset = base.findIndex((v) => Math.abs(v) > 0.05 * peak);
 if (onset > 0.1 * SAMPLE_RATE) fail(`speech starts after ${(onset / SAMPLE_RATE).toFixed(2)} s: silence not trimmed`);
-console.log(`voice: Supertonic: line pitch (${p0.toFixed(0)} to ${p1.toFixed(0)} Hz at x0.85), speed and depth work; speech starts at ${(onset / SAMPLE_RATE).toFixed(2)} s`);
+console.log(`voice: Supertonic: line pitch x${ratio.toFixed(2)} at x0.85 (median of ${ratios.map((r) => r.toFixed(2)).join(', ')}), speed and depth work; speech starts at ${(onset / SAMPLE_RATE).toFixed(2)} s`);

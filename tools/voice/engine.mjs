@@ -21,7 +21,7 @@ export const { PRESETS } = voices;
 export const SAMPLE_RATE = 24000;
 /** The model's folder and files, as the worker names them. */
 export const MODEL_DIR = 'supertonic-3/';
-/** The graphs as the site ships them: 16-bit weights, gzipped (`fetch.mjs`). */
+/** The graphs as the site ships them: 8-bit weights (the duration predictor's 16-bit), gzipped (`cargo fetch-voice`). */
 export const MODELS = { duration: 'duration_predictor.onnxz', text: 'text_encoder.onnxz', vector: 'vector_estimator.onnxz', vocoder: 'vocoder.onnxz' };
 
 const dir = new URL('public/voice/', web);

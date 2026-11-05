@@ -109,13 +109,13 @@ jobs:
           restore-keys: wasm-opt-
 
       # The voice model and dictionary (about 400 MB from Hugging Face and GitHub, stored as
-      # float16) and the language model (about 260 MB), kept between runs so a release doesn't
+      # 87 MB) and the language model (about 200 MB), kept between runs so a release doesn't
       # depend on those sites. The fetch tools (cargo fetch-voice, cargo fetch-llm) check every
       # file's SHA-256 and fetch again what doesn't match, so an old cache can't slip through.
       - uses: actions/cache@v6
         with:
           path: web/public/voice
-          key: voice-${{ hashFiles('crates/tools/src/voicefetch.rs', 'crates/tools/src/fp16.rs', 'crates/tools/src/download.rs') }}
+          key: voice-${{ hashFiles('crates/tools/src/voicefetch.rs', 'crates/tools/src/fp16.rs', 'crates/tools/src/int8.rs', 'crates/tools/src/download.rs') }}
           restore-keys: voice-
       - uses: actions/cache@v6
         with:

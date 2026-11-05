@@ -16,6 +16,17 @@ export async function openCache(prefix: string, name: string): Promise<Cache | n
   }
 }
 
+/**
+ * ONNX Runtime's WASM binary (28.7 MB), cached once for both workers that run it (the voice's and
+ * the language model's), not in each one's own cache: one copy for a player who uses both. Its
+ * URL is hashed by the build, so a new runtime comes under a new name (`pruneRuntime` drops the
+ * old one).
+ */
+export function openRuntimeCache(): Promise<Cache | null> {
+  return openCache(RUNTIME_PREFIX, `${RUNTIME_PREFIX}v1`);
+}
+const RUNTIME_PREFIX = 'littlelives-ort-';
+
 /** Drops cached files this version no longer uses (an older build's wasm, models no longer used). */
 export async function prune(cache: Cache | null, keep: string[]): Promise<void> {
   if (!cache) return;

@@ -67,7 +67,7 @@ Numbers to know:
   model 248 MB; the largest file the language model's weights, 255,530,880 bytes). CI fails over
   900 MB, below Pages' limit of 1 GB.
 - The live checks after a release: `llm/lfm2.5-350m/model_q4.onnx_dataz` is 195,523,654 bytes and
-  `voice/supertonic-3/vector_estimator.onnxz` 119,556,677 bytes. (Both are gzipped by Rust's
+  `voice/supertonic-3/vector_estimator.onnxz` 55,258,368 bytes. (Both are gzipped by Rust's
   `flate2`, whose output is a little smaller than Node's zlib was, and the same on every platform.)
 
 CI keeps a WASM with function names as an artifact (`wasm-with-names-<commit>`) for 90 days: the

@@ -16,13 +16,22 @@ missing or too slow. Measurements and research behind the choices are at the end
 ## Built so far
 
 - **Model (`web/src/voice/supertonic.ts`):** Supertonic 3 (Supertone, BigScience OpenRAIL-M),
-  four ONNX graphs with their weights stored as 16-bit floats (`crates/tools/src/fp16.rs`, cast back
-  to 32-bit when the model loads, so the GPU does the same arithmetic) and gzipped (`.onnxz`,
-  unpacked in the worker): 185 MB instead of 398 as published. Measured against the published
-  weights, on the GPU, a line differs less than it does between two random seeds (spectral
-  match 0.61–0.77, against 0.55–0.59), with the same timing and the same pitch per voice. 4-bit
+  four ONNX graphs with their big weights stored smaller and turned back into 32-bit floats when
+  the model loads (ONNX Runtime folds it once), so the GPU does float32 arithmetic as before:
+  since 0.7.0 the text encoder, vector estimator and vocoder as 8-bit integers with a scale per
+  channel (`crates/tools/src/int8.rs`), the duration predictor as 16-bit floats
+  (`crates/tools/src/fp16.rs`; in int8 some lines came out a frame longer or shorter); gzipped
+  (`.onnxz`, unpacked in the worker): 87 MB instead of 398 as published (185 MB with 16-bit
+  weights everywhere, 0.2.0 to 0.6.x). The 16-bit weights, against the published ones on the GPU:
+  a line differs less than it does between two random seeds (spectral match 0.61–0.77, against
+  0.55–0.59), with the same timing and the same pitch per voice. The 8-bit ones against the
+  16-bit (2026-11-05, on the CPU, 30 lines by 10 residents; log-spectrogram correlation): 0.87–0.96,
+  against 0.39–0.79 between two noise seeds of the 16-bit model; pitch shaping alike (×0.85 gives
+  a median ×0.853 against ×0.852 over 40 lines and voices); the same speed on the GPU (the device
+  test's speech 203–210 ms against 206) and the CPU; and to the owner's ear the same. 4-bit
   doesn't fit: 91 % of the weights are convolutions, which ONNX Runtime has no 4-bit form of on
-  WebGPU (and the int8 build ran its int8 operators on the CPU: 25 times slower). The graphs:
+  WebGPU; and int8 *operators* (the upstream int8 build) run on the CPU, 25 times slower: the
+  8-bit weights here never reach an operator. The graphs:
   duration predictor (how long a line lasts), text encoder, vector estimator (flow matching: 8
   passes turn noise into the line's latents) and vocoder (44.1 kHz). A whole line in a few large passes, which suits the GPU. The loop is
   ported from Supertone's reference code (`web/helper.js`). It runs in the voice worker on
@@ -61,8 +70,10 @@ missing or too slow. Measurements and research behind the choices are at the end
   WebGPU is much slower for both models here (speech 0.7 s against 0.18 s), so the test turns the
   language model off there and the settings say why; voices still run. Not the computer: the
   same Mac is fast in the other browsers.
-- **Download:** 218.7 MB once (the model 185.2, the runtime's WebGPU build 28.7, voices and text
-  files 3.2, dictionary 1.3, our WASM 0.16), kept in the browser's cache (packed).
+- **Download:** 120.6 MB once (the model 87.1, the runtime's WebGPU build 28.7, voices and text
+  files 3.2, dictionary 1.3, our WASM 0.16), kept in the browser's cache (packed). The runtime is
+  cached once for the voices and the language model (`openRuntimeCache`, `ml/assets.ts`; until
+  0.7.0 each worker kept its own copy).
 - **Lines of 1–5 sentences (the language model's):** each line is asked for a length picked by
   its seed (1: 20 %, 2: 25 %, 3: 25 %, 4: 15 %, 5: 15 %; `lineSentences` in `talk/writer.ts`),
   and the generation keeps to it (`GenParams.sentences` in `llm/generate.ts`): until the last
@@ -121,7 +132,7 @@ API key, nothing leaves the player's computer.
   picked with a hash of the resident id and event, not the sim's random number generator, so
   saves and replays are unaffected and `sim-core` needs no changes.
 - **Every resident sounds different**, and always the same, across sessions and saves.
-- **Download on request.** The model (173 MB with the runtime and voices) is fetched when the
+- **Download on request.** The model (121 MB with the runtime and voices) is fetched when the
   player turns voices on, or when they hear a voice in the creator, and kept.
 - **Consent.** A player's recording is their own voice or someone's who agreed (Kyutai's terms
   for Pocket TTS forbid cloning a voice without its owner's consent; the creator says so).
@@ -343,7 +354,7 @@ nothing is added to `RESTART_KEYS`.
 | Resident voices | Toggle | Default off. |
 | Language | (hidden while English is the only one) | Comes back as a row when a second language ships. |
 | Runs on | Auto / Graphics card / Processor | Auto uses the graphics card and steps down to the processor when it is missing or too slow. The choice applies live. |
-| Voice model | Status | Supertonic 3, its state, where it runs, and the download (about 217 MB). |
+| Voice model | Status | Supertonic 3, its state, where it runs, and the download (about 121 MB). |
 | Try it | **Hear a sample** and **Speed test** | The speed test measures the model with the scene drawing: "On the graphics card: 0.4 s per line, 7.6× real time, smooth" (M3 Pro, Chrome; "smooth" needs 1.5 s or less). A result over 3 s per line says voices may pause. |
 | Voice volume | Slider | Separate from sound effects. |
 

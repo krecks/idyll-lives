@@ -8,7 +8,7 @@
  */
 
 import { Tokenizer } from '@huggingface/tokenizers';
-import { fetchOnce, forget, openCache, prune } from '../ml/assets';
+import { fetchOnce, forget, openCache, openRuntimeCache, prune } from '../ml/assets';
 import { configureOrt, importOrt, ORT_WASM, sessionOptions } from '../ml/ort';
 import { formatChat, type ChatMessage } from './chat';
 import { generate, PrefixCache, type GenParams, type LlmEngine } from './generate';
@@ -78,18 +78,19 @@ async function load(base: string, model: ModelSpec): Promise<void> {
   const { graph, data } = model;
   // `built`: imported through Vite. In dev their URLs aren't hashed, so a rebuilt runtime would
   // otherwise come back stale from the cache; those are fetched fresh there.
-  const files: { url: string; size: number; sha256?: string; built?: boolean }[] = [
-    { url: ORT_WASM.url, size: ORT_WASM.bytes, built: true },
+  const files: { url: string; size: number; sha256?: string; built?: boolean; runtime?: boolean }[] = [
+    { url: ORT_WASM.url, size: ORT_WASM.bytes, built: true, runtime: true },
     ...[model.tokenizer, model.tokenizerConfig, graph, ...(data ? [data] : [])].map(([name, size, sha256]) => ({ url: dir + name, size, sha256 })),
   ];
   const total = files.reduce((n, f) => n + f.size, 0);
   const done = files.map(() => 0);
   const report = () => scope.postMessage({ type: 'progress', loaded: done.reduce((a, b) => a + b, 0), total });
-  const cache = await openCache(CACHE_PREFIX, CACHE);
+  // The runtime in the cache both workers share (`openRuntimeCache`), the rest in this one's.
+  const [cache, runtime] = await Promise.all([openCache(CACHE_PREFIX, CACHE), openRuntimeCache()]);
   const bytes = await Promise.all(
     files.map((f, i) =>
       fetchOnce(
-        f.built && import.meta.env.DEV ? null : cache,
+        f.built && import.meta.env.DEV ? null : f.runtime ? runtime : cache,
         f.url,
         (n) => {
           done[i] = Math.min(n, f.size);
@@ -99,7 +100,8 @@ async function load(base: string, model: ModelSpec): Promise<void> {
       ),
     ),
   );
-  void prune(cache, files.map((f) => f.url));
+  void prune(cache, files.filter((f) => !f.runtime).map((f) => f.url));
+  void prune(runtime, [ORT_WASM.url]);
   const [ortWasm, tokenizerJson, tokenizerConfig, graphBytes, dataBytes] = bytes;
   const ort = await importOrt();
   configureOrt(ort, ortWasm);
