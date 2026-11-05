@@ -149,10 +149,14 @@ pub const LANE_KERBSIDE: f32 = 0.5;
 /// How far in from a street's edge its kerbside furniture reaches elsewhere (m: `street.ts` stands
 /// it `SIDEWALK - KERB - 0.3` in, its widest about 0.3 across).
 pub(crate) const KERBSIDE: f32 = SIDEWALK - 0.14 - 0.3 + 0.3;
-/// How far apart two cars pass each other at least (m: `too_near`), and how much further apart
-/// two coming towards each other pull over to pass where the lane is too narrow for both in their
-/// lanes (m, `pull_want`): its measure is across a way between theirs, `too_near` their bodies as
-/// they are, which on a bend come nearer.
+/// The least gap between two cars' bodies (m): two coming towards each other pass no nearer
+/// (`too_near`; the claims, `traffic::PASS_GAP`), and the last-resort check never lets one come
+/// nearer another, whoever waits for whom (`guard`). Two in their lanes on a 7 m street are 0.22 m
+/// apart at least (the widest cars).
+pub(crate) const GAP: f32 = 0.15;
+/// How far apart two coming towards each other pull over to pass where the lane is too narrow for
+/// both in their lanes (m, `pull_want`: the two together): its measure is across a way between
+/// theirs, `too_near` their bodies as they are, which on a bend come nearer.
 pub(crate) const PASSING: f32 = 0.1;
 pub(crate) const PULL_MARGIN: f32 = 0.3;
 /// How far a car pulls over (or back) a tick (m), and for one coming the other way how far ahead
@@ -2305,7 +2309,9 @@ fn drive_on(w: &mut World, c: usize) {
     if jammed && jam.1 > 0 && !w.cars[c].outside() {
         return;
     }
-    w.cars[c].waits_for = None;
+    // (Whom it waited for last tick: pulled over for that one, it doesn't pull back in into its
+    // way, `pull_over`.)
+    let waited = w.cars[c].waits_for.take();
     w.cars[c].on_foot.clear();
     let others = vehicles(&w.cars, Some(c));
     if w.cars[c].outside() && !room_to_come_in(w, c, &others) {
@@ -2313,7 +2319,7 @@ fn drive_on(w: &mut World, c: usize) {
     }
     let tick = w.tick;
     if !w.cars[c].outside() {
-        pull_over(w, c, &others, moving);
+        pull_over(w, c, &others, moving, waited);
     }
     {
         let World {
@@ -2411,17 +2417,24 @@ fn drive_on(w: &mut World, c: usize) {
     }
     // Not on past one coming the other way too near to pass (pulling over meanwhile); but for
     // one waiting for it (for its claim, or its body in the way of its own): it goes on by, as
-    // near as it can (never into it, `guard`). Nor in a junction's box holding its claim there:
-    // there the claims say who goes (one coming the other way let in with it can pass it in their
-    // lanes, nobody pulls over there; one not let in waits for it), and waiting for one coming
-    // would let that one's claim through this one's (`Traffic::begin`'s rule 1).
+    // near as it can, never nearer than `GAP` (`closes_in`, as the guard). Nor in a junction's box
+    // holding its claim there: there the claims say who goes (one coming the other way let in with
+    // it can pass it in their lanes, nobody pulls over there; one not let in waits for it), and
+    // waiting for one coming would let that one's claim through this one's (`Traffic::begin`'s
+    // rule 1).
     let boxed = holding_here && in_box(&travel.graph.boxes, at, car.len);
     if !reverse
         && !boxed
         && let Some(o) = others.iter().find(|o| {
-            o.free(&me)
-                && !traffic.waits_for(o.first).contains(&key)
-                && too_near((at, yaw, car.len, car.wid), (o.at, o.yaw, o.len, o.wid))
+            if !o.free(&me) {
+                return false;
+            }
+            if traffic.waits_for(o.first).contains(&key) {
+                let (h, way) = (me.heading(), o.heading());
+                return h[0] * way[0] + h[1] * way[1] < -ONCOMING
+                    && closes_in(&body_now, &body_next, &o.body());
+            }
+            too_near((at, yaw, car.len, car.wid), (o.at, o.yaw, o.len, o.wid))
                 && !too_near(
                     (was, was_yaw, car.len, car.wid),
                     (o.at, o.yaw, o.len, o.wid),
@@ -2492,7 +2505,7 @@ pub(crate) fn stand_taxi(w: &mut World, c: usize) {
         car.yaw = yaw;
     }
     let others = vehicles(&w.cars, Some(c));
-    pull_over(w, c, &others, false);
+    pull_over(w, c, &others, false, None);
 }
 
 /// How long a car and one in its way wait for each other before it backs up (ticks,
@@ -2583,36 +2596,45 @@ fn route_pass(car: &Car, t: f32) -> f32 {
 }
 
 /// The last-resort check on a car's move from body `now` to `next`: the first of `them` (the cars
-/// on the road and parked) it would be deeper into than it is now. None: it may move.
+/// on the road and parked) it would come nearer than `GAP` to, and nearer than it is now (one it's
+/// already that near, from before, it may draw away from or keep beside, never nearer). None: it
+/// may move.
 fn guard<'a>(now: &Rect, next: &Rect, them: impl Iterator<Item = &'a Driving>) -> Option<u64> {
-    let deeper = |r: &Rect| {
-        let after = next.overlap(r);
-        after > 1e-3 && after > now.overlap(r).max(0.0) + 1e-3
-    };
     let near = |at: [f32; 2], len: f32| {
-        crate::travel::dist(at, next.at) < (len + next.half[0] * 2.0) + AHEAD
+        crate::travel::dist(at, next.at) < (len + next.half[0] * 2.0) + AHEAD + GAP
     };
     them.into_iter()
-        .find(|o| near(o.at, o.len) && deeper(&o.body()))
+        .find(|o| near(o.at, o.len) && closes_in(now, next, &o.body()))
         .map(|o| o.first)
+}
+
+/// Whether a car's move from body `now` to `next` brings it nearer `o` than `GAP`, and nearer than
+/// it is (`guard`).
+fn closes_in(now: &Rect, next: &Rect, o: &Rect) -> bool {
+    let after = next.gap(o);
+    after < GAP - 1e-3 && after < now.gap(o) - 1e-3
 }
 
 /// Car `c` a tick nearer pulled over as far as it would be (`pull_want`), `PULL_RATE` a tick:
 /// back towards its lane only clear of those coming the other way (`too_near`), and never
 /// into another (`guard`). Where its room runs out it's back in its lane.
-fn pull_over(w: &mut World, c: usize, others: &[Driving], moving: bool) {
-    // (Pulled over for one that waits for it, it pulls over only as far as it can on its way.)
+fn pull_over(w: &mut World, c: usize, others: &[Driving], moving: bool, waited: Option<u64>) {
+    // (Pulled over for one that waits for it, it pulls over only as far as it can on its way: not
+    // for one it waits for in turn (`waited`, or its turn after it), held up by it there, which it
+    // would pull back in into the way of.)
     let me = car_first(c);
+    let after = |k: u64| waited == Some(k) || w.traffic.waits_for(me).contains(&k);
     let waits_me = |k: u64| {
-        w.traffic.waits_for(k).contains(&me)
+        (w.traffic.waits_for(k).contains(&me)
             || w.cars
                 .get((k & !(1 << 63)) as usize)
-                .is_some_and(|o| o.waits_for == Some(me))
+                .is_some_and(|o| o.waits_for == Some(me)))
+            && !after(k)
     };
-    let waited = w.cars[c].pulled_for.is_some_and(waits_me);
-    let (mut want, mut whom) = pull_want(w, c, moving || waited);
-    if !(moving || waited) && whom.is_some_and(waits_me) {
-        (want, whom) = pull_want(w, c, true);
+    let held = w.cars[c].pulled_for.is_some_and(waits_me);
+    let (mut want, mut whom) = pull_want(w, c, moving || held, &after);
+    if !(moving || held) && whom.is_some_and(waits_me) {
+        (want, whom) = pull_want(w, c, true, &after);
     }
     w.cars[c].pulled_for = whom;
     let standing: Vec<Driving> = parked(&w.cars).collect();
@@ -2668,14 +2690,21 @@ fn pull_over(w: &mut World, c: usize, others: &[Driving], moving: bool) {
         }
         return;
     }
-    w.cars[c].shift = shift;
+    // (Where it is now, for those after it this tick, as `drive_on` has it once on its way.)
+    let at = body(shift).at;
+    let car = &mut w.cars[c];
+    car.shift = shift;
+    if let Some(s) = car.shown.as_mut() {
+        s.0 = at;
+    }
 }
 
 /// How far right of its lane car `c` would be pulled over (m) to pass those coming the other way in
 /// front of it (`PULL_AHEAD`) where the lane is too narrow for both in their lanes: half the
 /// way past another car (it pulls over the other half, as far as it can: `Route::room`); as far as
-/// its room ahead allows (back in its lane before the room runs out).
-fn pull_want(w: &World, c: usize, moving: bool) -> (f32, Option<u64>) {
+/// its room ahead allows (back in its lane before the room runs out). Standing, as far as it can
+/// for one it waits for (`after`).
+fn pull_want(w: &World, c: usize, moving: bool, after: &dyn Fn(u64) -> bool) -> (f32, Option<u64>) {
     let car = &w.cars[c];
     let Some((_, route)) = car.route.as_ref() else {
         return (0.0, None);
@@ -2709,7 +2738,11 @@ fn pull_want(w: &World, c: usize, moving: bool) -> (f32, Option<u64>) {
     };
     let (mut want, mut whom): (f32, Option<u64>) = (0.0, None);
     for (o, other) in w.cars.iter().enumerate() {
-        if o == c || other.shown.is_none_or(|s| !s.2) || other.backing() {
+        // (Standing, waiting for that one (`after`: its turn after it too), it pulls over as far as
+        // it can, that one backing out of its driveway too: that one goes by, as it comes on round
+        // a bend or out of a driveway.)
+        let after = !moving && after(car_first(o));
+        if o == c || other.shown.is_none_or(|s| !s.2) || other.backing() && !after {
             continue;
         }
         let Some((_, theirs)) = other.route.as_ref() else {
@@ -2717,7 +2750,11 @@ fn pull_want(w: &World, c: usize, moving: bool) -> (f32, Option<u64>) {
         };
         let (p, facing, _) = theirs.at(other.progress);
         if let Some((all, mine, their)) = short(p, facing, other.len, other.wid) {
-            let share = (all / 2.0).max(all - theirs.room_at(other.progress) * their);
+            let share = if after {
+                f32::INFINITY
+            } else {
+                (all / 2.0).max(all - theirs.room_at(other.progress) * their)
+            };
             if share / mine > want {
                 (want, whom) = (share / mine, Some(car_first(o)));
             }
@@ -2805,7 +2842,7 @@ pub(crate) fn movers(
 
 /// Whether car `c`, out of sight at the way in (`Car::outside`), comes in now: none there longer
 /// waits to come in by the same way (the earlier car, of two there as long), and its body a tick
-/// on and the ground in front of it (`AHEAD`) are clear of every car in town (`others`,
+/// on (by `GAP`) and the ground in front of it (`AHEAD`) are clear of every car in town (`others`,
 /// `vehicles`: those that came in this tick where they are now) and every car parked.
 fn room_to_come_in(w: &mut World, c: usize, others: &[Driving]) -> bool {
     let World {
@@ -2840,7 +2877,7 @@ fn room_to_come_in(w: &mut World, c: usize, others: &[Driving]) -> bool {
             .iter()
             .copied()
             .chain(parked(cars))
-            .all(|o| o.body().overlap(&body) <= 0.0 && o.body().overlap(&front) <= 0.0)
+            .all(|o| o.body().gap(&body) >= GAP && o.body().overlap(&front) <= 0.0)
 }
 
 /// A car driving where it is now, for who's in its way (`go_on`): its middle and yaw, its length
@@ -2946,6 +2983,45 @@ impl Rect {
             .map(|&u| reach(self, &a, u) + reach(o, &b, u) - (d[0] * u[0] + d[1] * u[1]).abs())
             .fold(f32::INFINITY, f32::min)
     }
+
+    /// The gap between the two (m: the least distance from a corner of either to a side of the
+    /// other; below 0, how far they overlap, `overlap`).
+    pub(crate) fn gap(&self, o: &Rect) -> f32 {
+        let over = self.overlap(o);
+        if over > 0.0 {
+            return -over;
+        }
+        let corners = |r: &Rect| {
+            let (s, c) = r.yaw.sin_cos();
+            let (f, side) = (
+                [s * r.half[0], c * r.half[0]],
+                [c * r.half[1], -s * r.half[1]],
+            );
+            [(1.0, 1.0), (1.0, -1.0), (-1.0, -1.0), (-1.0, 1.0)].map(|(a, b)| {
+                [
+                    r.at[0] + a * f[0] + b * side[0],
+                    r.at[1] + a * f[1] + b * side[1],
+                ]
+            })
+        };
+        let to_side = |p: [f32; 2], a: [f32; 2], b: [f32; 2]| {
+            let ab = [b[0] - a[0], b[1] - a[1]];
+            let t = ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1])
+                / (ab[0] * ab[0] + ab[1] * ab[1]).max(1e-9);
+            let t = t.clamp(0.0, 1.0);
+            (p[0] - a[0] - ab[0] * t).hypot(p[1] - a[1] - ab[1] * t)
+        };
+        let (a, b) = (corners(self), corners(o));
+        let mut best = f32::INFINITY;
+        for (ps, qs) in [(&a, &b), (&b, &a)] {
+            for &p in ps {
+                for k in 0..4 {
+                    best = best.min(to_side(p, qs[k], qs[(k + 1) % 4]));
+                }
+            }
+        }
+        best
+    }
 }
 
 /// Whether a car driving (`d`, where it would be a tick on) comes up against another of `them`
@@ -3031,22 +3107,17 @@ pub(crate) fn passing(
     })
 }
 
-/// Whether `a` (where it would be a tick on) would come too near `b` coming the other way: its
-/// body, half `PASSING` wider either side, on the other's. (Pulled over as far as `passing` says,
+/// Whether `a` (where it would be a tick on) would come too near `b` coming the other way: nearer
+/// its body than `GAP`, as the guard has it (`Rect::gap`). (Pulled over as far as `passing` says,
 /// they're further apart than that: it measures across a way between theirs.)
 pub(crate) fn too_near(a: ([f32; 2], f32, f32, f32), b: ([f32; 2], f32, f32, f32)) -> bool {
     let (ahead, theirs) = ([a.1.sin(), a.1.cos()], [b.1.sin(), b.1.cos()]);
-    let mine = Rect {
-        at: a.0,
-        yaw: a.1,
-        half: [a.2 / 2.0, a.3 / 2.0 + PASSING / 2.0],
+    let body = |(at, yaw, len, wid): ([f32; 2], f32, f32, f32)| Rect {
+        at,
+        yaw,
+        half: [len / 2.0, wid / 2.0],
     };
-    let other = Rect {
-        at: b.0,
-        yaw: b.1,
-        half: [b.2 / 2.0, b.3 / 2.0],
-    };
-    ahead[0] * theirs[0] + ahead[1] * theirs[1] < -ONCOMING && mine.overlap(&other) > 0.0
+    ahead[0] * theirs[0] + ahead[1] * theirs[1] < -ONCOMING && body(a).gap(&body(b)) < GAP
 }
 
 /// Someone's body as cars keep clear of it, and it of them: how far it reaches in front
@@ -5704,5 +5775,49 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn pulling_back_in_beside_one_waiting_for_it_a_car_keeps_the_gap() {
+        // Pulled over 0.5 m to its right beside one coming the other way that waits for it, it
+        // pulls back in a step at a time (`pull_over`: nothing but the guard keeps it from that
+        // one). In its lane its body would touch the other's: it stops short by the gap the cars
+        // keep, waiting for that one.
+        let (len, wid) = (4.6, 1.88);
+        let them = [Driving {
+            at: [wid, 0.0],
+            yaw: std::f32::consts::PI,
+            len,
+            wid,
+            ahead: AHEAD,
+            behind: 0.0,
+            first: car_first(1),
+        }];
+        let body = |shift: f32| Rect {
+            at: shifted([0.0, 0.0], 0.0, shift),
+            yaw: 0.0,
+            half: [len / 2.0, wid / 2.0],
+        };
+        let mut shift: f32 = 0.5;
+        let mut held = None;
+        while shift > 0.0 && held.is_none() {
+            let to = (shift - PULL_RATE).max(0.0);
+            held = guard(&body(shift), &body(to), them.iter());
+            if held.is_none() {
+                shift = to;
+            }
+        }
+        // (Side by side, as far apart as it's pulled over.)
+        assert!(
+            shift >= 0.149,
+            "pulled back in to {shift:.3} m from it (`GAP`)"
+        );
+        assert_eq!(held, Some(car_first(1)), "never held for it");
+        // (And on along its lane so near it: no nearer, as near as it is.)
+        let on = |r: Rect| Rect {
+            at: [r.at[0], r.at[1] + 0.3],
+            ..r
+        };
+        assert_eq!(guard(&body(shift), &on(body(shift)), them.iter()), None);
     }
 }

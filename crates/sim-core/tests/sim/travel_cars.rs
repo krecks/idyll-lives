@@ -563,6 +563,147 @@ fn two_cars_meeting_on_a_6_m_lane_pass_each_other_pulled_over() {
     assert!(pulled > 0.2, "they pulled over {pulled:.2} m to pass");
 }
 
+/// The least gap between two of `w`'s cars' bodies where they're drawn, one of them on the move (m:
+/// the least distance from a corner of either to a side of the other; below 0, how far they
+/// overlap), and which.
+fn cars_gap(w: &World) -> (f32, usize, usize) {
+    let corners = |p: [f32; 2], yaw: f32, len: f32, wid: f32| {
+        let (s, c) = yaw.sin_cos();
+        let (f, r) = (
+            [s * len / 2.0, c * len / 2.0],
+            [c * wid / 2.0, -s * wid / 2.0],
+        );
+        [(1.0, 1.0), (1.0, -1.0), (-1.0, -1.0), (-1.0, 1.0)]
+            .map(|(a, b)| [p[0] + a * f[0] + b * r[0], p[1] + a * f[1] + b * r[1]])
+    };
+    let to_side = |p: [f32; 2], a: [f32; 2], b: [f32; 2]| {
+        let ab = [b[0] - a[0], b[1] - a[1]];
+        let t = ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / (ab[0] * ab[0] + ab[1] * ab[1]);
+        let t = t.clamp(0.0, 1.0);
+        (p[0] - a[0] - ab[0] * t).hypot(p[1] - a[1] - ab[1] * t)
+    };
+    let (worst, a, b) = cars_overlap(w);
+    if worst > 0.0 {
+        return (-worst, a, b);
+    }
+    let shown: Vec<_> = w
+        .cars
+        .iter()
+        .enumerate()
+        .filter_map(|(k, c)| c.shown.map(|s| (k, s.2, corners(s.0, s.1, c.len, c.wid))))
+        .collect();
+    let mut least = (f32::INFINITY, 0, 0);
+    for (i, a) in shown.iter().enumerate() {
+        for b in &shown[i + 1..] {
+            if !(a.1 || b.1) {
+                continue;
+            }
+            for (p, q) in [(&a.2, &b.2), (&b.2, &a.2)] {
+                for &v in p {
+                    for k in 0..4 {
+                        let g = to_side(v, q[k], q[(k + 1) % 4]);
+                        if g < least.0 {
+                            least = (g, a.0, b.0);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    least
+}
+
+/// How near the cars come at least (m between their bodies: `cars::GAP`, less its tolerance).
+const CAR_GAP: f32 = 0.149;
+
+/// Car 0 comes home along the street from its west end, car 1 sets off from its house further
+/// east `after` ticks on, west for the way out: both on their way within `ticks`, never nearer
+/// each other than `CAR_GAP`.
+fn turn_in_by_one_pulling_out(width: f32, houses: &[(f32, bool)], after: u32, ticks: u32) {
+    let mut w = street(width, houses);
+    come_home(&mut w, 0);
+    for t in 0..ticks {
+        if t == after {
+            set_off(&mut w, 1);
+        }
+        w.tick_once();
+        let (g, a, b) = cars_gap(&w);
+        assert!(
+            g >= CAR_GAP,
+            "cars {a} and {b} came {g:.3} m from each other at tick {t}: {:?}",
+            w.cars
+                .iter()
+                .map(|c| (c.state, c.shown.map(|s| s.0), c.shift, c.waits_for))
+                .collect::<Vec<_>>()
+        );
+        if t > after && w.cars[0].state == CarState::Parked && w.cars[1].state == CarState::Away {
+            return;
+        }
+    }
+    panic!(
+        "not both on their way: {:?}",
+        w.cars
+            .iter()
+            .map(|c| (c.state, c.progress))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn a_car_turning_in_home_across_one_pulling_out_next_door_keeps_its_distance() {
+    // (On a 7 m street: the one coming home turns in across the other's lane as it comes by, the
+    // one pulling out pulled over as far as it can: it waits for that one to pass, never nearer
+    // than the cars keep. They came within a hair of each other.)
+    turn_in_by_one_pulling_out(7.0, &[(60.0, true), (100.0, true)], 0, 4000);
+}
+
+#[test]
+fn on_a_6_m_lane_a_car_passing_one_pulled_over_keeps_its_distance_or_waits() {
+    // (Coming home to its house, about to turn in, it can't pull over itself; the one pulled
+    // out next door and pulled over for it isn't over far enough for the gap the cars keep: it
+    // waits for that one to pass.)
+    turn_in_by_one_pulling_out(6.0, &[(60.0, true), (70.0, true)], 100, 4000);
+}
+
+#[test]
+fn a_taxi_waiting_on_a_bend_for_a_car_turning_out_lets_it_by_clear() {
+    // (Oak Clearing, a normal town of the 0.7.0 samples: about 18:34 a car turns out of its
+    // driveway onto a 6 m lane's bend and on along it, as the work taxi coming the other way waits
+    // its turn after it there, pulled over. The car came within 0.1 m of it; kept clear of it, it
+    // waited for the taxi, which pulled back in for it, into its way, and the two waited for each
+    // other for good. Standing, waiting for it, the taxi pulls over as far as it can.)
+    let content = common::content();
+    let town = include_str!("../towns/oak_clearing.json");
+    let mut w = World::from_json(&content, town, 46).unwrap();
+    let end = sim_core::clock::tick_at(1, 19.5 * 60.0).unwrap();
+    assert!(
+        w.tick < end,
+        "the town begins at {:.2}h",
+        sim_core::clock::hour(w.tick)
+    );
+    while w.tick < end {
+        w.tick_once();
+        let (g, a, b) = cars_gap(&w);
+        assert!(
+            g >= CAR_GAP,
+            "cars {a} and {b} came {g:.3} m from each other at {:.2}h",
+            sim_core::clock::hour(w.tick)
+        );
+    }
+    // (It set off about 18:34: out of town by now, as every household's car on its way set off
+    // since.)
+    for (c, car) in w.cars.iter().enumerate().filter(|(_, c)| !c.taxi) {
+        let on = matches!(car.state, CarState::Leaving | CarState::Arriving);
+        assert!(
+            !on || w.tick - car.since < 45 * sim_core::TICKS_PER_MINUTE,
+            "car {c} {:?} since {:.2}h at {:?}",
+            car.state,
+            sim_core::clock::hour(car.since),
+            car.shown
+        );
+    }
+}
+
 #[test]
 fn a_car_gets_past_someone_walking_ahead_of_it_along_its_lane() {
     // (As on Barleystead's road out of town: one walking out along the lane in front of a car,
