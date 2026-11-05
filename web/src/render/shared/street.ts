@@ -6,8 +6,8 @@
  * the fences and hedges round gardens and fields, and flower beds along their house
  * fronts, with pots by the door and little lights along the garden path; the things standing in
  * their gardens. The town's public places seen from another lot: shops as silhouettes with an awning,
- * and the park, playground and market things standing in the open. At the ends of the street a bus
- * stop and street signs; benches, planters and bins along the kerb in front of the public places.
+ * and the park, playground and market things standing in the open. At the ends of the street a taxi
+ * rank and street signs; benches, planters and bins along the kerb in front of the public places.
  *
  * Rules:
  * - Visual only, and kept off where Sims walk: front lawns (Sims cut across them on their way
@@ -90,7 +90,7 @@ const PROP = {
   planter: 'model.street.planter',
   flowerTub: 'model.street.flowerTub',
   sign: 'model.street.sign',
-  busSign: 'model.street.busSign',
+  taxiSign: 'model.street.taxiSign',
   shelter: 'model.busStop',
   fountain: 'model.fountainTown',
   pot: 'model.street.pot',
@@ -1202,8 +1202,8 @@ export class TownStreet {
         }
       }
     }
-    // At the ends of the row (past the last lots): a bus shelter facing the road, its stop sign
-    // at the kerb, and a street-name sign on the corner.
+    // At the ends of the row (past the last lots): a taxi rank's shelter facing the road (`model.busStop`, as
+    // the bus stop it was), its TAXI sign at the kerb, and a street-name sign on the corner.
     if (row.length) {
       const first = side > 0;
       const corner = first ? row[0].s0 : row[row.length - 1].s1;
@@ -1211,7 +1211,8 @@ export class TownStreet {
       const cs = corner + outward * 4;
       const [cx, cz] = kerb.at(cs, -0.62);
       const shelter = { x: cx - 1.6, z: cz - 1.6, w: 3.2, d: 3.2 };
-      if (clear(cs, 1.6) && free(shelter, 0.2) && !index.onRoad(cx, cz, 1)) {
+      // (Just behind its own road's pavement: clear of the other roads, a metre at least.)
+      if (clear(cs, 1.6) && free(shelter, 0.2) && !index.onRoad(cx, cz, 1, r)) {
         const P = at(cx, cz);
         P.put(PROP.shelter, cx, cz, kerb.yaw(cs));
         blob(P.shadows, cx, cz, 1.7, 0.6, kerb.yaw(cs), 0.35, 0.02);
@@ -1219,7 +1220,7 @@ export class TownStreet {
         if (clear(ss, 0.3) && !near(ss, 0.6)) {
           used.push(ss);
           const [x, z] = on(ss);
-          at(x, z).put(PROP.busSign, x, z, kerb.yaw(ss));
+          at(x, z).put(PROP.taxiSign, x, z, kerb.yaw(ss));
         }
       }
       // Street-name signs at both ends, on one side of the road.

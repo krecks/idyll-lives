@@ -844,7 +844,7 @@
           "skills": { "endurance": 1, "perception": 0.6 },
           "payFactor": 0.54,
           "shift": { "start": 5, "hours": 10, "days": [0, 1, 2, 3, 4] },
-          "titles": ["Delivery Rider", "Courier", "Van Driver", "Bus Driver", "Truck Driver", "Long-Haul Trucker", "Fleet Supervisor", "Transport Manager", "Logistics Director", "Trucking Company Owner"]
+          "titles": ["Delivery Rider", "Courier", "Van Driver", "Taxi Driver", "Truck Driver", "Long-Haul Trucker", "Fleet Supervisor", "Transport Manager", "Logistics Director", "Trucking Company Owner"]
         },
         {
           "id": "transport.airTraffic",

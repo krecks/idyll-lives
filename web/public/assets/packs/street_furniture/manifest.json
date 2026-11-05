@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built street furniture (tools/art/blender/families/street_furniture.py): the street lamp, the park bench, the drinking fountain, the litter bin, the bus shelter, the post box, the notice board, the phone box, the town fountain and the founder's statue; and the traffic light (not buyable: render/pc/signals.ts draws one at each signal head the sim has). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each has a far version for the town overview. The lamp's lantern and the phone box's signs glow at night; the drinking fountain's water arcs for `drink` (`water_on`), the post box's flap swings in for `post` (`flap`), the phone box's door opens for `call` (`door_open`) and the town fountain's water runs near the camera (`water_run`, ambient).",
+  "$comment": "Blender-built street furniture (tools/art/blender/families/street_furniture.py): the street lamp, the park bench, the drinking fountain, the litter bin, the taxi rank's shelter, the post box, the notice board, the phone box, the town fountain and the founder's statue; and the traffic light (not buyable: render/pc/signals.ts draws one at each signal head the sim has). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each has a far version for the town overview. The lamp's lantern, the phone box's signs and the taxi rank's sign glow at night; the drinking fountain's water arcs for `drink` (`water_on`), the post box's flap swings in for `post` (`flap`), the phone box's door opens for `call` (`door_open`) and the town fountain's water runs near the camera (`water_run`, ambient).",
   "version": 1,
   "entries": {
     "model.streetLamp": {
@@ -115,11 +115,21 @@
         "glass": {
           "finish": "material.finish.glass"
         },
+        "ink": {
+          "finish": "material.finish.matte"
+        },
         "map": {
           "finish": "material.finish.matte"
         },
         "paper": {
           "finish": "material.finish.matte"
+        },
+        "sign_light": {
+          "finish": "material.finish.satin",
+          "glow": "#FFE7A0"
+        },
+        "taxi": {
+          "finish": "material.finish.gloss"
         },
         "wood": {
           "finish": "material.finish.wood"

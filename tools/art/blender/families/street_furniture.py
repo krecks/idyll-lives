@@ -1,5 +1,5 @@
 # The street furniture (CM2): the street lamp (`model.streetLamp`), the long park bench (`model.parkBench`), the
-# drinking fountain (`model.drinkingFountain`), the litter bin (`model.litterBin`), the bus shelter
+# drinking fountain (`model.drinkingFountain`), the litter bin (`model.litterBin`), the taxi rank's shelter
 # (`model.busStop`), the post box (`model.postBox`), the notice board (`model.noticeBoard`), the phone box
 # (`model.phoneBooth`), the town fountain (`model.fountainTown`) and the founder's statue (`model.townStatue`); and the
 # traffic light (`model.trafficLight`), which isn't bought: the renderer stands one at each signal head of the sim's
@@ -39,7 +39,12 @@ SHARED = dict(
     brass=('#B08D4A', 'metal'),       # crests and plaques
     wood=('#9A6B45', 'wood'),         # slats
     glass=('#C9DDE3', 'glass'),       # the shelter's and the phone box's glazing (see-through)
-    blue=('#2E6FA8', 'gloss'),        # the bus stop's sign
+    blue=('#2E6FA8', 'gloss'),        # the town map's routes
+    # the taxi rank (the shelter): the taxi's yellow, its chequers and lettering, and the sign's light box, lit at
+    # night (E8) as the taxi's roof sign looks lit
+    taxi=('#F2B81C', 'gloss'),
+    ink=('#16181A', 'matte'),
+    sign_light=('#FFF4C8', 'satin', {'glow': '#FFE7A0'}),
     map=('#DCE6D2', 'matte'),         # the shelter's map
     # notices pinned on the board: plain, so they cost no draw call
     note_white=('#F4F1E6', 'satin'),
@@ -353,7 +358,9 @@ def litterBin():
     return G.meshes()
 
 
-# --- the bus shelter: a glazed frame with a bench for three -------------------------------------------------
+# --- the taxi rank's shelter (was the bus shelter): a glazed frame with a bench for three --------------------------
+# Its id stays `busStop`, so the towns and saves that have one keep it; it reads as a taxi rank: the taxi's yellow
+# and chequers along the fascia, a lit TAXI sign on the roof, the fares on the back glass.
 SHELTER_SEAT = 0.46   # the content's `seat.height`
 SHELTER_BENCH = -0.31  # the bench's middle, its two slats either side (the content's `seat.forward` -0.3: the front one)
 # The posts' depths: 1.2 m deep under the roof on its one tile, a shelter's depth (it was 0.98 m, the bench filling it).
@@ -384,7 +391,8 @@ def busStop():
         for z in (back, front):
             F.box(f'beam{z}', 2.9, 0.09, 0.06, (0, 2.315, z), frame, bevel=0.01)
         F.box('fascia', 2.98, 0.11, 0.025, (0, 2.36, front + 0.037), frame, bevel=0.008)
-        F.box('fascia_stripe', 2.7, 0.03, 0.004, (0, 2.36, front + 0.0505), M.blue)
+        F.box('fascia_stripe', 2.7, 0.08, 0.004, (0, 2.36, front + 0.0505), M.taxi)
+        G.kit.chequer(F, 'fascia_check', -1.33, 1.33, 2.395, front + 0.0525, 0.035, 1, M.ink)
         F.sweep('gutter', [(-1.49, 2.34, back - 0.035), (1.49, 2.34, back - 0.035)], None, frame,
                 profile=G.rounded_rect(0.04, 0.035, 0.008, corner=1))
         # the glazing: the back in two panes and the right-hand end, in rails and a mullion, a white band across each
@@ -405,29 +413,28 @@ def busStop():
                                                  (x, 0.3, back + 0.03)], 0.03, steps=2), None, frame,
                     profile=G.rounded_rect(0.04, 0.03, 0.008, corner=1), up=(1, 0, 0))
             F.box(f'bracket_leg{x}', 0.04, 0.42, 0.04, (x, 0.21, SHELTER_BENCH - 0.12), frame, bevel=0.006)
-        # the timetable on the back glass, a map beside it
-        F.box('timetable_frame', 0.56, 0.78, 0.03, (-0.95, 1.45, back + 0.02), frame, bevel=0.008)
-        F.box('timetable', 0.5, 0.68, 0.01, (-0.95, 1.43, back + 0.038), M.paper)
-        F.box('timetable_head', 0.5, 0.08, 0.012, (-0.95, 1.73, back + 0.04), M.blue)
-        for k in range(8):
-            F.box(f'times{k}', 0.26, 0.012, 0.004, (-1.02, 1.64 - 0.06 * k, back + 0.044), M.dark)
-            F.box(f'clock{k}', 0.08, 0.012, 0.004, (-0.78, 1.64 - 0.06 * k, back + 0.044), M.dark)
+        # the fares on the back glass (the rank's name in a yellow head, the fares in lines), a map beside it
+        F.box('fares_frame', 0.56, 0.78, 0.03, (-0.95, 1.45, back + 0.02), frame, bevel=0.008)
+        F.box('fares', 0.5, 0.68, 0.01, (-0.95, 1.43, back + 0.038), M.paper)
+        F.box('fares_head', 0.5, 0.09, 0.012, (-0.95, 1.725, back + 0.04), M.taxi)
+        G.kit.taxi_word(F, 'fares_word', (-0.95, 1.725), 0.05, back + 0.046, 1, M.ink)
+        for k in range(7):
+            F.box(f'fare{k}', 0.26, 0.012, 0.004, (-1.02, 1.62 - 0.06 * k, back + 0.044), M.dark)
+            F.box(f'price{k}', 0.08, 0.012, 0.004, (-0.78, 1.62 - 0.06 * k, back + 0.044), M.dark)
         F.box('map_frame', 0.5, 0.6, 0.03, (-0.35, 1.4, back + 0.02), frame, bevel=0.008)
         F.box('map', 0.44, 0.54, 0.01, (-0.35, 1.4, back + 0.038), M.map)
         for k, (x, y, w, h) in enumerate(((-0.4, 1.45, 0.3, 0.012), (-0.3, 1.35, 0.012, 0.36), (-0.36, 1.3, 0.25, 0.012))):
             F.box(f'route{k}', w, h, 0.004, (x, y, back + 0.045), M.blue if k != 1 else M.dark)
-        # the stop's flag on the roof, at the front right: a blue plate with the white face and a bus
-        F.box('flag_pole', 0.05, 0.22, 0.05, (1.18, 2.52, front - 0.02), frame, bevel=0.006)
-        F.box('flag', 0.6, 0.34, 0.04, (1.18, 2.72, front - 0.02), M.blue, bevel=0.015)
-        F.box('flag_face', 0.44, 0.2, 0.046, (1.18, 2.72, front - 0.02), M.paper, bevel=0.01)
-        for s in (-1, 1):
-            zf = front - 0.02 + s * 0.024
-            F.box(f'flag_bus{s}', 0.24, 0.08, 0.004, (1.18, 2.735, zf), M.blue, bevel=0.002, bevel_segments=1)
-            for k in range(4):
-                F.box(f'flag_window{s}{k}', 0.035, 0.03, 0.005, (1.11 + 0.045 * k, 2.75, zf), M.paper)
-            for x in (1.1, 1.26):
-                G.cylinder(f'flag_wheel{s}{x}', 0.018, 0.006, at=F.at(x, 2.69, zf), material=M.dark, rot=(90, 0, 0),
-                           verts=8)
+        # the rank's sign on the roof, at the front right: a yellow case, a light box lettered TAXI front and back
+        # (lit at night), the taxi's chequers under it
+        sx, sy, sz = 1.18, 2.72, front - 0.02
+        F.box('sign_pole', 0.05, 0.22, 0.05, (sx, 2.52, sz), frame, bevel=0.006)
+        F.box('sign_case', 0.6, 0.32, 0.1, (sx, sy, sz), M.taxi, bevel=0.015)
+        F.box('sign_light', 0.52, 0.16, 0.106, (sx, sy + 0.06, sz), M.sign_light, bevel=0.004, bevel_segments=1)
+        for face in (1, -1):
+            G.kit.taxi_word(F, f'sign_word{face}', (sx, sy + 0.06), 0.1, sz + face * 0.053, face, M.ink)
+            G.kit.chequer(F, f'sign_check{face}', sx - 0.263, sx + 0.263, sy - 0.035, sz + face * 0.05, 0.035, face,
+                          M.ink)
     G.join_all('busStop')
     G.settle(centre=False)
     return G.meshes()
@@ -870,12 +877,12 @@ FAMILY = G.Family(
              paint=[('body', 'Statue')])],
     pack='street_furniture',
     comment='Blender-built street furniture (tools/art/blender/families/street_furniture.py): the street '
-            'lamp, the park bench, the drinking fountain, the litter bin, the bus shelter, the post box, '
+            'lamp, the park bench, the drinking fountain, the litter bin, the taxi rank\'s shelter, the post box, '
             'the notice board, the phone box, the town fountain and the founder\'s statue; and the traffic light '
             '(not buyable: render/pc/signals.ts draws one at each signal head the sim has). Listed in the '
             'base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw '
-            'call per finish group. Each has a far version for the town overview. The lamp\'s lantern and '
-            'the phone box\'s signs glow at night; the drinking fountain\'s water arcs for `drink` '
+            'call per finish group. Each has a far version for the town overview. The lamp\'s lantern, '
+            'the phone box\'s signs and the taxi rank\'s sign glow at night; the drinking fountain\'s water arcs for `drink` '
             '(`water_on`), the post box\'s flap swings in for `post` (`flap`), the phone box\'s door opens '
             'for `call` (`door_open`) and the town fountain\'s water runs near the camera (`water_run`, '
             'ambient).',

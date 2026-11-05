@@ -1,6 +1,6 @@
 /**
  * The street planned chunk by chunk (`TownStreet`, `shared/chunks.ts`): a long street of houses
- * either side of a road, crossing several 64 m chunks. Moving the focus from lot to lot plans only
+ * either side of a road, crossing several 64 m chunks, a taxi rank at each end of its rows. Moving the focus from lot to lot plans only
  * the chunks round the two lots again; a thing moved in a garden only its lot's chunk; and what a
  * street that has planned many focus lots gives is what a fresh one gives (its cache never keeps a
  * part it should have planned again).
@@ -149,5 +149,21 @@ describe('the street in chunks', async () => {
       const fresh = new TownStreet(new HousePlanner(), w, options, 'game');
       for (const id of street.chunkIds()) expect(drawn(street.chunk(id, f))).toBe(drawn(fresh.chunk(id, f)));
     }
+  });
+
+  test('a taxi rank stands at each end of the row: its shelter behind the pavement past the last lots, its sign at the kerb', () => {
+    const street = new TownStreet(new HousePlanner(), town(), options, 'game');
+    const of = (key: string) => street.chunkIds().flatMap((id) => street.chunk(id, NO_FOCUS).batches.get(key) ?? []);
+    const shelters = of('model.busStop');
+    const signs = of('model.street.taxiSign');
+    expect(shelters.length).toBe(2);
+    expect(signs.length).toBe(2);
+    const w = LOTS * LOT_W;
+    for (const [x, z] of shelters) {
+      // Past the row's ends (the lots run from 0 to w), off the road (z 20..26 with its pavements).
+      expect(x < 0 || x > w).toBe(true);
+      expect(z < 20 || z > 26).toBe(true);
+    }
+    for (const [x] of signs) expect(x < 0 || x > w).toBe(true);
   });
 });

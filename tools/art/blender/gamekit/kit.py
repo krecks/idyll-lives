@@ -233,3 +233,56 @@ def bench_end(frame, name, x, seat, front, back, top, material, arm=None, t=0.02
 
 
 __all__ = ['bench_end', 'cabriole', 'fillet', 'forms', 'knob', 'moulding', 'pull', 'scroll', 'shaker', 'songbird', 'tube']
+
+
+def taxi_word(frame, name, centre, h, z, facing, material, depth=0.004):
+    """TAXI in block letters `h` high, its middle at game (x, height) `centre`, standing `depth` proud of a face at
+    depth `z` that looks `facing` (+1: to the front, +z; -1: to the back), so it reads from that side: seen from the
+    front, the game's +x is on the left (README, "Coordinates"), so the word runs from +x there, from -x behind. The
+    taxi rank's signs and fares board (families/street.py, street_furniture.py), as the taxi's own roof sign
+    (render/shared/cars.ts `paintTaxi`)."""
+    cx, cy = centre
+    s, w, gap = 0.2 * h, 0.66 * h, 0.22 * h
+    total = 4 * w + 3 * gap
+    zz = z + facing * depth / 2
+    lean = math.degrees(math.atan2(w / 2 - s / 2, h))      # an A's legs from upright
+    cross = math.degrees(math.atan2(w - s, h))             # an X's strokes from upright
+    out = []
+    for i, ch in enumerate('TAXI'):
+        # (Seen from the side it faces, letter by letter left to right.)
+        x = cx + facing * (total / 2 - i * (w + gap) - w / 2)
+        n = f'{name}_{ch}{i}'
+        if ch == 'T':
+            out.append(frame.box(f'{n}_bar', w, s, depth, (x, cy + h / 2 - s / 2, zz), material))
+            out.append(frame.box(f'{n}_stem', s, h - s, depth, (x, cy - s / 2, zz), material))
+        elif ch == 'A':
+            for k in (-1, 1):
+                leg = math.hypot(w / 2 - s / 2, h)
+                out.append(frame.box(f'{n}_leg{k}', s, leg, depth, (x + k * (w / 4 - s / 4), cy, zz), material,
+                                     rot=(0, k * lean, 0)))
+            out.append(frame.box(f'{n}_bar', w * 0.42, s * 0.8, depth, (x, cy - h * 0.12, zz), material))
+        elif ch == 'X':
+            for k in (-1, 1):
+                out.append(frame.box(f'{n}_stroke{k}', s, math.hypot(w - s, h) * 0.97, depth, (x, cy, zz), material,
+                                     rot=(0, k * cross, 0)))
+        else:
+            out.append(frame.box(f'{n}_stem', s, h, depth, (x, cy, zz), material))
+    return out
+
+
+def chequer(frame, name, x0, x1, y, z, size, facing, material, rows=2, depth=0.003):
+    """A chequered band's dark squares (`size` a side, `rows` of them, the band's top at height `y`) from x0 to x1
+    along a face at depth `z` looking `facing` (+1 front, -1 back), `depth` proud of it: the light squares are the
+    face behind. The taxi's livery, on the taxi rank's signs and shelter."""
+    zz = z + facing * depth / 2
+    out = []
+    for r in range(rows):
+        k = 0
+        x = x0
+        while x + size <= x1 + 1e-6:
+            if (k + r) % 2 == 0:
+                out.append(frame.box(f'{name}{r}_{k}', size, size, depth, (x + size / 2, y - size / 2 - r * size, zz),
+                                     material))
+            x += size
+            k += 1
+    return out

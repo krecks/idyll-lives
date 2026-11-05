@@ -2378,7 +2378,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
       // Used from inside or up against it (`STEP_IN`): the clip for their height.
-      // (With every lane taken by others, from where sim-core stood them: three at the bus stop's timetable.)
+      // (With every lane taken by others, from where sim-core stood them: three at the taxi rank's fares.)
       const entry = known && obj ? stepInFor(obj.def, tag) : undefined;
       const into = entry && obj && (rig.inside === entry || !Number.isNaN(this.freeLane(rig, entry, obj))) ? entry : undefined;
       const fitted = into && obj ? this.stepSeq(rig, into, obj) : undefined;

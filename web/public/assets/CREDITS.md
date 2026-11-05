@@ -441,20 +441,20 @@ lifts while a resident buys from them; a snack slides down to the snack machine'
 machine's; the machines' signs and the drinks machine's front glow at night; the market stall is static.
 
 The street furniture (`models/street_furniture/streetLamp.glb`, `parkBench.glb`, `drinkingFountain.glb`,
-`litterBin.glb`, `busStop.glb`, `postBox.glb`, `noticeBoard.glb`, `phoneBooth.glb`, `fountainTown.glb`,
+`litterBin.glb`, `busStop.glb` (the taxi rank's shelter: the bus shelter until 2026-11-05), `postBox.glb`, `noticeBoard.glb`, `phoneBooth.glb`, `fountainTown.glb`,
 `townStatue.glb`, `trafficLight.glb` (2026-11-05: drawn at the sim's lit junctions, its lit lens the renderer's),
 each with a `.far.glb` for the town overview, override pack `packs/street_furniture/manifest.json`)
 is built in Blender by `tools/art/blender/families/street_furniture.py` on `gamekit` and exported as `.glb` (glTF,
-original, CC0). The street lamp's lantern and the phone box's signs glow at night; the drinking fountain's arc of
+original, CC0). The street lamp's lantern, the phone box's signs and the taxi rank's sign glow at night; the drinking fountain's arc of
 water grows while a resident drinks, the post box's slot flap swings in for a card, the phone box's door opens and
 shuts behind the caller, and the town fountain's water runs near the camera (`water_run`, ambient); the bench, the
-litter bin, the bus shelter, the notice board and the founder's statue are static.
+litter bin, the taxi rank's shelter, the notice board and the founder's statue are static.
 
-The street's dressing props (`models/street/bench.glb`, `planter.glb`, `flowerTub.glb`, `sign.glb`, `busSign.glb`,
+The street's dressing props (`models/street/bench.glb`, `planter.glb`, `flowerTub.glb`, `sign.glb`, `taxiSign.glb` (the bus-stop sign, `busSign.glb`, until 2026-11-05),
 `pot.glb`, `pathLight.glb`, `flowers.glb`, each with a `.far.glb` for the town overview, override pack
 `packs/street/manifest.json`) are built in Blender by `tools/art/blender/families/street.py` on `gamekit` and exported
 as `.glb` (glTF, original, CC0): the kerbside bench, the planter with its little tree, the flower tub, the street-name
-and bus-stop signs, the door pot, the garden path light (its lens glows at night) and the flower
+and taxi rank signs (the taxi sign's light box glows at night), the door pot, the garden path light (its lens glows at night) and the flower
 clump. All are static; their leaves and flowers sway in the wind.
 
 The garden things and lights (`models/garden_things/pond.glb`, `planterBox.glb`, `birdhouse.glb`,

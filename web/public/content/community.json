@@ -135,7 +135,7 @@
     },
     {
       "id": "busStop",
-      "name": "Bus shelter",
+      "name": "Taxi rank shelter",
       "model": "model.busStop",
       "footprint": [
         3,
@@ -150,7 +150,7 @@
         "height": 0.46,
         "forward": -0.3
       },
-      "description": "A glass shelter with a bench for three and the timetable on the wall.",
+      "description": "A glass shelter at the taxi rank, with a bench for three and the fares on the wall.",
       "interactions": [
         {
           "id": "wait",
@@ -168,7 +168,7 @@
         },
         {
           "id": "timetable",
-          "label": "Read the timetable",
+          "label": "Read the fares",
           "anim": "read",
           "minutes": 5,
           "effects": {

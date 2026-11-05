@@ -9128,8 +9128,8 @@
         "neufert"
       ]
     },
-    "busShelter": {
-      "label": "Bus shelter with bench",
+    "taxiShelter": {
+      "label": "Taxi rank shelter with bench",
       "w": [
         2.5,
         4
@@ -9147,8 +9147,8 @@
         0.5
       ],
       "uses": [
-        "wait for the bus",
-        "read the timetable"
+        "wait for a taxi",
+        "read the fares"
       ],
       "minutes": {
         "wait": [
@@ -9848,8 +9848,8 @@
         "neufert"
       ]
     },
-    "busStopSign": {
-      "label": "Bus stop flag on a pole",
+    "taxiRankSign": {
+      "label": "Taxi rank sign on a pole",
       "w": [
         0.3,
         0.6
@@ -9863,7 +9863,7 @@
         0.2
       ],
       "uses": [
-        "check the bus stop"
+        "find the taxi rank"
       ],
       "sources": [
         "neufert"
@@ -11998,7 +11998,7 @@
     "street.streetlight": "streetLamp",
     "drinkingFountain": "drinkingFountain",
     "litterBin": "litterBin",
-    "busStop": "busShelter",
+    "busStop": "taxiShelter",
     "postBox": "postBox",
     "noticeBoard": "noticeBoard",
     "phoneBooth": "phoneBox",
@@ -12024,7 +12024,7 @@
     "street.hydrant": "hydrant",
     "street.bin": "wheelieBin",
     "model.street.sign": "streetSign",
-    "model.street.busSign": "busStopSign",
+    "model.street.taxiSign": "taxiRankSign",
     "model.street.pathLight": "pathLight",
     "farm.barn": "barn",
     "farm.silo": "silo",
@@ -12132,7 +12132,7 @@
     "scarecrow",
     "trough",
     "streetSign",
-    "busStopSign",
+    "taxiRankSign",
     "grassTuft",
     "wildflower",
     "treePlanter",
