@@ -2298,8 +2298,9 @@ fn drive_on(w: &mut World, c: usize) {
     let jam = *jam;
     // (The other can back up no further, and waits for it as it does: it backs up now.)
     let theirs = w.cars[c].waits_for.is_some_and(|k| stuck_back(w, k));
-    if jammed && (jam.0 > JAM_TICKS || theirs) && jam.1 < JAM_BACK && !w.cars[c].outside() {
-        if back_off(w, c) {
+    // (Backed up as far as it goes, `JAM_BACK`, it can back up no further: the other does.)
+    if jammed && (jam.0 > JAM_TICKS || theirs) && !w.cars[c].outside() {
+        if jam.1 < JAM_BACK && back_off(w, c) {
             return;
         }
         w.cars[c].jam.2 = true;
@@ -2519,8 +2520,22 @@ const JAM_BACK: u32 = 60;
 fn waits_back(w: &World, k: u64, me: u64) -> bool {
     let o = (k & !(1 << 63)) as usize;
     let (mine, theirs) = (w.traffic.holding(me), w.traffic.holding(k));
-    // (Of the two, the one that can still back up: the other can't, or no further.)
     let mine_to_go = if mine == theirs { me > k } else { theirs };
+    // (One backing up out of the other's way already goes on: not the other in turn as their
+    // claims change, the one going on by letting go of its claim behind it, say; nor one, then the
+    // other, a tick each.)
+    let backing = |x: u64| {
+        w.cars
+            .get((x & !(1 << 63)) as usize)
+            .is_some_and(|c| c.jam.1 > 0)
+            && !stuck_back(w, x)
+    };
+    let mine_to_go = match (backing(me), backing(k)) {
+        (true, false) => true,
+        (false, true) => false,
+        _ => mine_to_go,
+    };
+    // (Of the two, the one that can still back up: the other can't, or no further.)
     let mine_to_go = if mine_to_go {
         !stuck_back(w, me)
     } else {
@@ -2721,27 +2736,42 @@ fn pull_want(w: &World, c: usize, moving: bool, after: &dyn Fn(u64) -> bool) -> 
         route.room_here(t)
     };
     let (at, yaw, back) = route.at(t);
-    // (Not in a junction's box: there they take turns, `traffic.rs`, and turning there it faces
-    // any way, those following it in too. For one coming the other way in it, as anywhere: the
-    // claims let that one in counting on this one's pulling over.)
-    let boxes = &w.travel.graph.boxes;
-    if room <= 0.0 || back || in_box(boxes, at, car.len) {
+    // (In a junction's box only for one coming the other way beside it now, their bodies nearer
+    // than `GAP` and `PASSING`: there they take turns, `traffic.rs`, and turning there it faces
+    // any way, those following it in too; but two let in together pass each other in their lanes,
+    // and round a bend there their ends swing across towards each other further than the claims'
+    // samples have it: neither could go on, `guard`. For one coming the other way into it, as
+    // anywhere: the claims let that one in counting on this one's pulling over.)
+    let boxed = in_box(&w.travel.graph.boxes, at, car.len);
+    if room <= 0.0 || back {
         return (0.0, None);
     }
+    let body = |p: [f32; 2], yaw: f32, len: f32, wid: f32| Rect {
+        at: p,
+        yaw,
+        half: [len / 2.0, wid / 2.0],
+    };
+    let mine = body(at, yaw, car.len, car.wid);
     let short = |p: [f32; 2], facing: f32, len: f32, wid: f32| {
         let m = passing((at, yaw, car.len, car.wid), (p, facing, len, wid))?;
         let ends = (car.len + len) / 2.0;
-        if m.along < -ends || m.along > ends + PULL_AHEAD || m.apart < 0.0 {
+        let ahead = if boxed { 0.0 } else { PULL_AHEAD };
+        if m.along < -ends || m.along > ends + ahead || m.apart < 0.0 {
             return None;
         }
-        Some(((PASSING + PULL_MARGIN - m.gap).max(0.0), m.mine, m.theirs))
+        // (Beside it, as near as their bodies are: on a bend nearer than across their ways.)
+        let gap = m.gap.min(mine.gap(&body(p, facing, len, wid)));
+        if boxed && gap >= GAP + PASSING {
+            return None;
+        }
+        Some(((PASSING + PULL_MARGIN - gap).max(0.0), m.mine, m.theirs))
     };
     let (mut want, mut whom): (f32, Option<u64>) = (0.0, None);
     for (o, other) in w.cars.iter().enumerate() {
         // (Standing, waiting for that one (`after`: its turn after it too), it pulls over as far as
         // it can, that one backing out of its driveway too: that one goes by, as it comes on round
         // a bend or out of a driveway.)
-        let after = !moving && after(car_first(o));
+        let after = !moving && !boxed && after(car_first(o));
         if o == c || other.shown.is_none_or(|s| !s.2) || other.backing() && !after {
             continue;
         }
