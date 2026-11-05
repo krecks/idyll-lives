@@ -766,7 +766,7 @@ fn a_taxi_due_in_through_a_jammed_junction_goes_round_it_or_waits_at_the_edge_of
     // A side street joins the street at x 300, between the way out and A's house, its junction
     // jammed (cars held up in it: `taxi::jammed`). With a way round it (a loop south of the street
     // from x 360 to x 240), the taxi takes that, never into it; with none, it waits at the edge of
-    // town a while rather than drive into it, and comes after.
+    // town a while rather than drive into it, and comes once it's cleared (15 minutes on).
     let road = |pts: Vec<[f32; 2]>, ends: &str| {
         let pts: Vec<String> = pts.iter().map(|p| format!("[{},{}]", p[0], p[1])).collect();
         format!(
@@ -804,6 +804,14 @@ fn a_taxi_due_in_through_a_jammed_junction_goes_round_it_or_waits_at_the_edge_of
         while w.tick < end && came(&w) < 2 {
             w.tick_once();
             no_overlaps(&w);
+            // (Cleared a quarter of an hour after the taxi was due in.)
+            if !round
+                && let Some(run) = w.taxis.runs.iter().find(|r| !r.home)
+                && run.enter > 0
+                && w.tick >= run.enter + 15 * 20
+            {
+                w.taxis.jams.clear();
+            }
             if let Some(run) = w.taxis.runs.iter().find(|r| !r.home)
                 && run.car.is_some()
                 && entered.is_none()
@@ -825,7 +833,7 @@ fn a_taxi_due_in_through_a_jammed_junction_goes_round_it_or_waits_at_the_edge_of
             );
         } else {
             assert!(
-                at >= enter + 25 * 20,
+                at >= enter + 15 * 20,
                 "({round}) came in at once: {} min",
                 (at - enter) / 20
             );

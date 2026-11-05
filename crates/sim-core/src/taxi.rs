@@ -20,7 +20,7 @@
 //! junctions and of another taxi standing then), and the taxi's way in at that way out, to each
 //! stand and out again as a car drives (`plan_way`, `lay_route`): on along its lane from a stand,
 //! turning round only in a dead end's turning circle or nose first into a side street at a
-//! junction, else round the block; round a junction jammed now (`jammed`). Timed back from when
+//! junction, else round the block; round where cars are held up now (`jammed`). Timed back from when
 //! it's to be out of town (the first one's work start less the part of the way off the map), each
 //! stop `DWELL` long; too late for that (a game begun after they'd have set off, a rider missed
 //! before), as soon as it can come, if that's still sooner than on foot (a late run). Each rider
@@ -104,10 +104,10 @@ pub struct Taxis {
     /// run, sooner out of town than on foot), but not after a second. Not saved.
     #[serde(skip)]
     missed: Vec<(u32, u64)>,
-    /// Each car on its way: where along it it stood still last, and since when (a tick), for the
-    /// jammed junctions (`jammed`). Not saved.
+    /// Each car on its way: where it stood still last (none: not on its way), and since when (a tick), for the
+    /// places held up (`jammed`). Not saved.
     #[serde(skip)]
-    still: Vec<(f32, u64)>,
+    still: Vec<(Option<[f32; 2]>, u64)>,
     /// For tests: junctions' boxes held to be jammed whatever (`jammed`). Not saved.
     #[doc(hidden)]
     #[serde(skip)]
@@ -695,7 +695,7 @@ fn kerbs_for(w: &World, halts: &[u32], skip: Option<u32>, due: u64) -> Option<Ve
 }
 
 /// A taxi's way in at `exit`, to stand at each of `kerbs` and out at `exit` again: its route and
-/// the ticks along it where it stands at each (`lay_route`), clear of jammed junctions where it can
+/// the ticks along it where it stands at each (`lay_route`), clear of places held up where it can
 /// be (`jammed`). None: no way.
 fn way_for(w: &World, exit: [f32; 2], kerbs: &[Kerb]) -> Option<(crate::cars::Route, Vec<f32>)> {
     let net = Net::new(&w.travel, &w.meta, &jammed(w));
@@ -738,8 +738,9 @@ fn run_on(w: &mut World, k: usize) -> bool {
             return false;
         }
         // In it comes, along its route as it is now (a car parked or gone since it was planned),
-        // round any junction jammed now; with no way round one, it waits at the edge of town for
-        // it to clear (a while at most).
+        // round any place cars are held up now; with no way round one, a run to work none of
+        // whose riders is out for it yet waits at the edge of town for it to clear, a while at
+        // most, else it doesn't come.
         let Some((route, at, kerbs)) = route_of(w, k) else {
             return false;
         };
@@ -751,8 +752,26 @@ fn run_on(w: &mut World, k: usize) -> bool {
                 .min(run.due_out.saturating_sub(run.enter) * SLACK_SHARE / (100 + SLACK_SHARE) / 2)
         };
         let jams = jammed(w);
-        if !jams.is_empty() && tick < run.enter + most && through(w, &route, &jams) {
-            return true;
+        // (Not while any of its riders are already out for it: in it comes, round what it can.)
+        let out = run.stops.iter().any(|st| {
+            st.state != StopState::Done
+                && w.sims.get(st.sim as usize).is_some_and(|x| {
+                    x.current()
+                        .is_some_and(|a| matches!(a.task.kind, TaskKind::Work))
+                })
+        });
+        if !jams.is_empty() && !out && !run.home && through(&route, &jams) {
+            if tick < run.enter + most {
+                return true;
+            }
+            // Still held up when it's waited all it can: it doesn't come, and its riders make
+            // their own way (not planned again into the same hold-up).
+            for st in &run.stops {
+                if let Some(start) = start_for(w, st.sim as usize) {
+                    w.taxis.missed.push((st.sim, start));
+                }
+            }
+            return false;
         }
         let Some(c) = slot(w) else {
             return false;
@@ -1341,8 +1360,8 @@ const TURN_COST: f32 = 6.0;
 /// What turning round in a side street costs, the way it's weighed (s: slowly in and backing out).
 const SIDE_COST: f32 = 12.0;
 const FAR_SIDE: f32 = 8.0;
-/// A junction's box with cars held up in it (`jammed`) as a run's way is weighed (s): driven
-/// through only with no other way near as quick.
+/// A stretch through a place cars are held up now (`jammed`) as a run's way is weighed (s): driven
+/// only with no other way near as quick.
 const JAM_COST: f32 = 600.0;
 
 /// Where a taxi stands for a halt (`kerb_at`): its middle `s` m along road `road` (the network's),
@@ -1495,7 +1514,7 @@ fn u_turn_reach(width: f32, kind: crate::travel::RoadKind) -> f32 {
 
 /// The taxis' road network as they drive it (`way_between`): the stretches of road at each node
 /// a car may take, those of the nodes a car can turn round at (a dead end's turning circle with
-/// its stretch long enough to swerve into it), and those of the nodes in a jammed junction's box
+/// its stretch long enough to swerve into it), and the stretches through a place held up now
 /// (`jammed`).
 struct Net {
     adj: Vec<Vec<u32>>,
@@ -1504,7 +1523,11 @@ struct Net {
 }
 
 impl Net {
-    fn new(travel: &crate::travel::Travel, meta: &serde_json::Value, jammed: &[usize]) -> Net {
+    fn new(
+        travel: &crate::travel::Travel,
+        meta: &serde_json::Value,
+        jammed: &[([f32; 2], f32)],
+    ) -> Net {
         let g = &travel.graph;
         let mut adj = vec![Vec::new(); g.nodes.len()];
         for (k, e) in g.edges.iter().enumerate() {
@@ -1529,16 +1552,24 @@ impl Net {
                     && edge.len() > u_turn_reach(road.width, road.kind) + 1.0
             })
             .collect();
-        let mut jam = vec![false; g.nodes.len()];
-        for &b in jammed {
-            if let Some(&(m, r)) = g.boxes.get(b) {
-                for (n, p) in g.nodes.iter().enumerate() {
-                    if crate::travel::dist(*p, m) <= r {
-                        jam[n] = true;
-                    }
+        // (A stretch through one, about: sampled every few metres.)
+        let jam = g
+            .edges
+            .iter()
+            .map(|e| {
+                if jammed.is_empty() {
+                    return false;
                 }
-            }
-        }
+                let road = &g.roads[e.road as usize];
+                let n = (e.len() / 4.0).ceil().max(1.0) as usize;
+                (0..=n).any(|k| {
+                    let p = road.at(e.s0 + e.len() * k as f32 / n as f32);
+                    jammed
+                        .iter()
+                        .any(|&(m, r)| crate::travel::dist(p, m) <= r + JAM_NEAR)
+                })
+            })
+            .collect();
         Net { adj, turn, jam }
     }
 }
@@ -1625,8 +1656,8 @@ fn way_between(
         }
         let u = node_of(st) as usize;
         let came_by = (st / 2) as u32;
-        let pass = if net.jam[u] { JAM_COST } else { 0.0 };
         for &e in &net.adj[u] {
+            let pass = if net.jam[e as usize] { JAM_COST } else { 0.0 };
             let back = e == came_by;
             if back && !net.turn[u] && side_turn(g, net, u as u32, came_by).is_none() {
                 continue;
@@ -2238,61 +2269,95 @@ fn u_turn(
 /// into town through one waits at the edge of town for it to clear at most (ticks, `run_on`: a
 /// run to work, half its spare time at most).
 const JAM_STILL: u64 = 5 * TICKS_PER_MINUTE;
+/// How long one car on its way stands still before the place counts as held up on its own (ticks).
+const LONE_STILL: u64 = 30 * TICKS_PER_MINUTE;
 const JAM_NEAR: f32 = 8.0;
 const JAM_WAIT: u64 = 30 * TICKS_PER_MINUTE;
+/// A car on its way that stays within this of where it was (m) stands still, as `jammed` has it.
+const STILL_REACH: f32 = 3.0;
 
 /// Since when each car on its way has stood still (`Taxis::still`).
 fn note_still(w: &mut World) {
     let tick = w.tick;
     let still = &mut w.taxis.still;
-    still.resize(w.cars.len(), (f32::NAN, tick));
+    still.resize(w.cars.len(), (None, tick));
     for (c, car) in w.cars.iter().enumerate() {
-        let going = matches!(
-            car.state,
-            crate::cars::CarState::Leaving | crate::cars::CarState::Arriving
-        ) && car.shown.is_some_and(|s| s.2);
-        if !going || still[c].0 != car.progress {
-            still[c] = (if going { car.progress } else { f32::NAN }, tick);
+        let at = car.shown.filter(|s| s.2).map(|s| s.0).filter(|_| {
+            matches!(
+                car.state,
+                crate::cars::CarState::Leaving | crate::cars::CarState::Arriving
+            )
+        });
+        // (Inching on or backing up a little, as one held up does, is standing still.)
+        let moved = match (at, still[c].0) {
+            (Some(p), Some(q)) => crate::travel::dist(p, q) > STILL_REACH,
+            _ => true,
+        };
+        if moved {
+            still[c] = (at, tick);
         }
     }
 }
 
-/// The junctions' boxes (`Graph::boxes` indices) held up now: two cars or more by one standing
-/// still on their way for `JAM_STILL` or longer (a ring of them waiting for each other, or a
-/// queue into one).
-fn jammed(w: &World) -> Vec<usize> {
-    let mut out = w.taxis.jams.clone();
+/// Where cars are held up now (middles and how far round them): a junction's box with two cars or
+/// more by it standing still on their way for `JAM_STILL` or longer (a ring of them waiting for
+/// each other, or a queue into one); anywhere else two such cars stand near each other (held up
+/// face to face on a stretch); and any one car standing still on its way `LONE_STILL` or longer.
+fn jammed(w: &World) -> Vec<([f32; 2], f32)> {
+    let g = &w.travel.graph;
+    let mut out: Vec<([f32; 2], f32)> = w
+        .taxis
+        .jams
+        .iter()
+        .filter_map(|&b| g.boxes.get(b).copied())
+        .collect();
     let held: Vec<[f32; 2]> = w
         .cars
         .iter()
         .zip(&w.taxis.still)
-        .filter(|(_, s)| !s.0.is_nan() && w.tick >= s.1 + JAM_STILL)
+        .filter(|(_, s)| s.0.is_some() && w.tick >= s.1 + JAM_STILL)
         .filter_map(|(c, _)| c.shown.map(|s| s.0))
         .collect();
+    // (One held up a long while on its own: there.)
+    out.extend(
+        w.cars
+            .iter()
+            .zip(&w.taxis.still)
+            .filter(|(_, s)| s.0.is_some() && w.tick >= s.1 + LONE_STILL)
+            .filter_map(|(c, _)| c.shown.map(|s| (s.0, JAM_NEAR))),
+    );
     if held.len() >= 2 {
-        out.extend(
-            w.travel
-                .graph
-                .boxes
+        let boxed = |p: [f32; 2]| {
+            g.boxes
                 .iter()
-                .enumerate()
-                .filter(|(_, (m, r))| {
-                    held.iter()
-                        .filter(|p| crate::travel::dist(**p, *m) < r + JAM_NEAR)
-                        .count()
-                        >= 2
-                })
-                .map(|(b, _)| b),
-        );
+                .any(|&(m, r)| crate::travel::dist(p, m) < r + JAM_NEAR)
+        };
+        out.extend(g.boxes.iter().copied().filter(|&(m, r)| {
+            held.iter()
+                .filter(|p| crate::travel::dist(**p, m) < r + JAM_NEAR)
+                .count()
+                >= 2
+        }));
+        for (i, &a) in held.iter().enumerate() {
+            for &b in &held[i + 1..] {
+                let d = crate::travel::dist(a, b);
+                if d < 2.0 * JAM_NEAR && !boxed(a) && !boxed(b) {
+                    let m = [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0];
+                    out.push((m, d / 2.0 + JAM_NEAR));
+                }
+            }
+        }
     }
     out
 }
 
-/// Whether `route` goes through one of the junctions' `boxes` given (`jammed`).
-fn through(w: &World, route: &crate::cars::Route, boxes: &[usize]) -> bool {
-    let g = &w.travel.graph;
-    boxes
-        .iter()
-        .filter_map(|&b| g.boxes.get(b))
-        .any(|&(m, r)| route.points.iter().any(|p| crate::travel::dist(p.0, m) < r))
+/// Whether `route` goes through one of the places held up given (`jammed`), or by it (`JAM_NEAR`:
+/// the junction it holds up, the queue into it).
+fn through(route: &crate::cars::Route, jams: &[([f32; 2], f32)]) -> bool {
+    jams.iter().any(|&(m, r)| {
+        route
+            .points
+            .iter()
+            .any(|p| crate::travel::dist(p.0, m) < r + JAM_NEAR)
+    })
 }
