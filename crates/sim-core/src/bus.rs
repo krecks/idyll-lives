@@ -1983,6 +1983,12 @@ fn held_by<'a>(
 /// How far ahead along its way a bus keeps room (m, `ahead_of`), and its way looked at this many
 /// ticks apart, at most this many ticks on.
 const ROOM_AHEAD: f32 = 6.0;
+/// How far in front of its body a bus looks for someone on foot in its way (m, `drive_on`).
+const BUS_WALK_AHEAD: f32 = 0.3;
+/// Where a bus will be on its way (ticks on) that those it waits for step clear of (`drive_on`).
+const BUS_SWEEP_LOOK: [f32; 4] = [5.0, 10.0, 20.0, 30.0];
+/// A bus turning further than this over those (radians) sweeps out to one side (`drive_on`).
+const BUS_SWEEP_TURN: f32 = 0.5;
 /// Held up this long on its way (ticks), a bus no longer keeps room ahead (`Bus::still`), and one
 /// it gives way to standing still that long is given way to no longer (`make_way`): those keep it
 /// out of the others' way where they'd hold each other up, never for good.
@@ -2675,7 +2681,32 @@ fn drive_on(w: &mut World, b: usize) {
         yaw: was_yaw,
         ..me
     };
-    let queued = cars::go_on(
+    // (Waiting for someone on foot only in its body a tick on: turning round, its front sweeps
+    // across the pavement, and those beside its way step clear as it comes, out of where it'll be
+    // on its way turning, `go_on_by`.)
+    let turning = {
+        let (_, now) = line.place(bus.progress, bus.shift);
+        let far = (bus.progress + BUS_SWEEP_LOOK[BUS_SWEEP_LOOK.len() - 1]).min(line.route.ticks());
+        crate::world::wrap_angle(line.place(far, bus.shift).1 - now).abs() > BUS_SWEEP_TURN
+    };
+    let sweep: Vec<cars::Driving> = if backs || !turning {
+        Vec::new()
+    } else {
+        BUS_SWEEP_LOOK
+            .iter()
+            .filter(|&&k| bus.progress + k < line.route.ticks())
+            .map(|&k| {
+                let (at, yaw) = line.place(bus.progress + k, bus.shift);
+                cars::Driving {
+                    at,
+                    yaw,
+                    ahead: 0.0,
+                    ..me
+                }
+            })
+            .collect()
+    };
+    let queued = cars::go_on_by(
         sims,
         &nav,
         bodies,
@@ -2684,6 +2715,7 @@ fn drive_on(w: &mut World, b: usize) {
         &others,
         aside,
         keeps_across(bus),
+        (BUS_WALK_AHEAD, &sweep),
         &mut bus.waited,
         &mut step,
     );

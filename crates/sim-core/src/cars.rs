@@ -2926,7 +2926,53 @@ pub(crate) fn go_on(
     waited: &mut u32,
     progress: &mut f32,
 ) -> bool {
+    go_on_by(
+        sims,
+        nav,
+        bodies,
+        d,
+        now,
+        others,
+        aside,
+        across,
+        (d.ahead, &[]),
+        waited,
+        progress,
+    )
+}
+
+/// `go_on`, someone in the way only within `walk.0` m in front of its body (a bus: its body a tick
+/// on, not the ground it keeps clear ahead; turning round it sweeps far to one side of it), and
+/// those it waits for stepping aside or going round to clear of where it'll be on its way
+/// (`walk.1`: a bus's body further on as it turns round), not to step in front of it again.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn go_on_by(
+    sims: &mut [Sim],
+    nav: &crate::path::NavGrid,
+    bodies: (&crate::content::Content, &[crate::world::ObjectInstance]),
+    d: Driving,
+    now: Driving,
+    others: &[Driving],
+    aside: impl Fn(&Sim) -> bool,
+    across: bool,
+    walk: (f32, &[Driving]),
+    waited: &mut u32,
+    progress: &mut f32,
+) -> bool {
+    let (walk_ahead, sweep) = walk;
     let turn = d.yaw.sin_cos();
+    // (Those on foot looked at only `walk_ahead` in front of it.)
+    let (d, now, keep) = (
+        Driving {
+            ahead: walk_ahead,
+            ..d
+        },
+        Driving {
+            ahead: walk_ahead,
+            ..now
+        },
+        d,
+    );
     // (Nobody further off than its corners and the ground ahead of or behind them, and the
     // longest bike, is in its way.)
     let reach = d.len / 2.0 + d.ahead.max(d.behind) + d.wid / 2.0 + BESIDE + 2.0;
@@ -2950,8 +2996,8 @@ pub(crate) fn go_on(
             continue;
         }
         waiting = true;
-        // (Not into the way of another: `clear`.)
-        let clear = |p: [f32; 2]| clear(others, body, p);
+        // (Not into the way of another, nor where this one comes on to: `clear`.)
+        let clear = |p: [f32; 2]| clear(others, body, p) && clear(sweep, body, p);
         // (Stepping aside that long hasn't got them out of its way.)
         let round = (*waited >= PASS_TICKS)
             .then(|| clear_of(&d, nav, body, s.pos, clear))
@@ -2964,7 +3010,7 @@ pub(crate) fn go_on(
             s.pos = p;
         }
     }
-    let blocked = up_against(&d, others, across);
+    let blocked = up_against(&keep, others, across);
     if waiting {
         *waited = waited.saturating_add(1);
     } else {

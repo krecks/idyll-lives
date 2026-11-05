@@ -1007,6 +1007,76 @@ fn a_line_whose_stop_is_by_a_junction_turns_round_on_along_its_road_clear_of_it(
 }
 
 #[test]
+fn a_bus_turning_round_gets_round_soon_with_someone_standing_where_it_sweeps() {
+    // (Willowley's evening: a line's bus turning round at its stop by the hub waited a tick at a
+    // time for someone on foot beside its way, as its front swung round over them, and the cars
+    // through the hub waited behind it a minute and more.) Someone stands on the pavement where
+    // the bus sweeps turning round past its stop: it gets round soon all the same, never into them.
+    let roads = format!(
+        r#"[{{"points":[{}],"width":7,"kind":"street","ends":["out","dead"]}}]"#,
+        line_pts([0.5, 30.0], [150.0, 30.0])
+    );
+    let house = House {
+        plot: [62.0, 8.0, 16.0, 18.0],
+        inner: [70.0, 20.5],
+        front: 1.0,
+        along_x: false,
+        road: 0,
+        s: 69.5,
+    };
+    let mut w = town_of(
+        BUS_CONTENT,
+        "",
+        200,
+        60,
+        &roads,
+        r#"[{"x":0.5,"z":30,"kind":"road"},{"x":40,"z":32.4,"kind":"stop"}]"#,
+        &[house],
+    );
+    common::run_to(&mut w, 2, 7.0);
+    // (The bus at its stop, then on its way round: where it turns, as it leaves.)
+    let end = w.tick + 60 * 60 * 20;
+    while bus_at_stop(&w).is_none() {
+        w.tick_once();
+        assert!(w.tick < end, "no bus came to the stop");
+    }
+    while bus_at_stop(&w).is_some() {
+        w.tick_once();
+    }
+    let start = w.tick;
+    let (at, yaw) = w.transit.buses[0]
+        .shown
+        .map(|s| (s.0, s.1))
+        .expect("in town");
+    // (Where its front swings round over as it turns, half way round.)
+    let f = [yaw.sin(), yaw.cos()];
+    let swung = yaw + 0.9;
+    let spot = [at[0] + swung.sin() * 4.6, at[1] + swung.cos() * 4.6];
+    w.sims[0].pos = spot;
+    // (Turned round: facing back the way it came.)
+    let mut round = None;
+    while w.tick < start + 3 * 60 * 20 {
+        w.tick_once();
+        let Some((p, y)) = w
+            .transit
+            .buses
+            .first()
+            .and_then(|b| b.shown.map(|s| (s.0, s.1)))
+        else {
+            break;
+        };
+        let back = y.sin() * f[0] + y.cos() * f[1] < -0.9;
+        if back && round.is_none() {
+            round = Some(w.tick - start);
+        }
+        let d = (w.sims[0].pos[0] - p[0]).hypot(w.sims[0].pos[1] - p[1]);
+        assert!(d > 1.0, "the bus drove over them");
+    }
+    let took = round.expect("the bus never got round");
+    assert!(took < 30 * 20, "the bus took {} s to turn round", took / 20);
+}
+
+#[test]
 fn cars_from_every_arm_of_a_busy_crossroads_all_get_through_with_the_buses() {
     // A big world's crossroads, its ways out east and west, two bus stops on either of those arms
     // (a line through it each way): two cars leave from houses on the north and south arms, two
