@@ -254,6 +254,25 @@ fn generated_worlds_are_livable() {
         if stops > 0 && w.transit.lines.is_empty() {
             failures.push(format!("{label}: {stops} bus stops and no bus"));
         }
+        // Every line planned was built, and every stop has a line calling at it.
+        if w.transit.unbuilt > 0 {
+            failures.push(format!(
+                "{label}: {} lines planned and never built",
+                w.transit.unbuilt
+            ));
+        }
+        let unserved: Vec<[f32; 2]> = w
+            .transit
+            .stops
+            .iter()
+            .filter(|st| st.line.is_none())
+            .map(|st| st.at)
+            .collect();
+        if !unserved.is_empty() {
+            failures.push(format!(
+                "{label}: no bus calls at the stops at {unserved:?}"
+            ));
+        }
         // At each stop the bus stands with the stop on its right, by the kerb (its doors' side).
         for st in &w.transit.stops {
             let Some((l, j)) = st.line else { continue };

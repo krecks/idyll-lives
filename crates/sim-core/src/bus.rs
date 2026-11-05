@@ -457,6 +457,10 @@ pub struct Transit {
     /// Runs not run since the game was loaded: in a big world, its line's last bus still in town
     /// `WAIT_MOST` after it was due in (`after_its_last`).
     pub skipped: u32,
+    /// Lines planned through a group of stops that couldn't be built (`line_for`: no way there
+    /// and on out along the roads): their stops have no bus. None in a town the generator made
+    /// (the generated worlds' check).
+    pub unbuilt: u32,
     /// The streets where the kerbside furniture keeps back for buses and cars to pass pulled over:
     /// those a line drives, and every lane too narrow for two cars to pass in their lanes
     /// (`cars::kerbside`): the town file's road (`roads` index) and how far in from its edges the
@@ -706,6 +710,7 @@ pub(crate) fn settle(w: &mut World) {
     for (bounds, group) in groups(&w.travel, &t.stops) {
         let outs = ways_out(&w.travel, &w.exits, bounds);
         let Some(line) = line_for(&w.travel, &outs, &t.stops, &group) else {
+            t.unbuilt += 1;
             continue;
         };
         let l = t.lines.len() as u16;
