@@ -148,8 +148,10 @@ const STOP_REACH: f32 = 600.0;
 /// A big world's bus comes into its area and leaves it this far past the area's box (m): out of
 /// sight of the area, its way on (hours of country road at the bus's speed) off the map.
 const AREA_OUT: f32 = 70.0;
-/// A big world's stops this near each other (m) share a line.
+/// A big world's stops this near one of a line's (m) share it, `LINE_STOPS` at most: fewer lines,
+/// fewer buses meeting at the junctions where their ways cross.
 const PAIR_REACH: f32 = 140.0;
+const LINE_STOPS: usize = 3;
 /// Over this far (m) it pulls in to the kerb before a stop, and out after.
 const PULL: f32 = 12.0;
 /// A line's stops tried in every order up to this many (more: nearest first).
@@ -1420,9 +1422,9 @@ fn room_for_shelter(w: &World, stop: &Stop) -> bool {
 
 /// The town's lines' stops: one line through all of a cosy or normal town's; in a big world, whose
 /// roads are long (the bus drives them at a car's pace while the clock runs a minute a second),
-/// a line for each stop or each two near each other (`PAIR_REACH`) in an area (the one each is
-/// nearest), coming in and going out where the roads leave the area (`ways_out`): each with the
-/// bounds it goes in and out of (x0, z0, x1, z1; none: the town's ways out).
+/// a line for each stop or each few near each other (`PAIR_REACH`, `LINE_STOPS`) in an area (the
+/// one each is nearest), coming in and going out where the roads leave the area (`ways_out`): each
+/// with the bounds it goes in and out of (x0, z0, x1, z1; none: the town's ways out).
 fn groups(travel: &Travel, stops: &[Stop]) -> Vec<(Option<[f32; 4]>, Vec<u16>)> {
     if stops.is_empty() {
         return Vec::new();
@@ -1450,14 +1452,18 @@ fn groups(travel: &Travel, stops: &[Stop]) -> Vec<(Option<[f32; 4]>, Vec<u16>)> 
         }
         taken[k] = true;
         let mut group = vec![k as u16];
-        let mate = (k + 1..stops.len())
-            .filter(|&m| {
-                !taken[m] && of[m] == of[k] && dist(stops[m].at, stops[k].at) <= PAIR_REACH
-            })
-            .min_by(|&a, &b| {
-                dist(stops[a].at, stops[k].at).total_cmp(&dist(stops[b].at, stops[k].at))
-            });
-        if let Some(m) = mate {
+        // (The nearest of its area's to any of the line's so far, one at a time.)
+        while group.len() < LINE_STOPS {
+            let near = |m: usize| {
+                group
+                    .iter()
+                    .map(|&g| dist(stops[m].at, stops[g as usize].at))
+                    .fold(f32::INFINITY, f32::min)
+            };
+            let mate = (k + 1..stops.len())
+                .filter(|&m| !taken[m] && of[m] == of[k] && near(m) <= PAIR_REACH)
+                .min_by(|&a, &b| near(a).total_cmp(&near(b)));
+            let Some(m) = mate else { break };
             taken[m] = true;
             group.push(m as u16);
         }
