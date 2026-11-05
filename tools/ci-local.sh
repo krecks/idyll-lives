@@ -12,7 +12,7 @@
 #   SEED_BASE=3 tools/ci-local.sh generated
 #                                the generated-world checks over other sample worlds (default 0:
 #                                CI's). The same seed base makes the same worlds, so a failure
-#                                replays; the release gate runs `generated` over seed bases 0 to 4.
+#                                replays; the release gate runs `generated` over five seed bases.
 #
 # Steps: fmt clippy sim generated clips web tools sizes uses models, and types (the web's types and
 # lint over fresh wasm builds of the sim and the voice: not in CI's job, which builds no wasm, so run

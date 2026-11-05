@@ -28,7 +28,7 @@
  * The same arguments make the same files, byte for byte (`Math.random` seeded per world:
  * web/tests/sampleWorlds.test.ts), so a world a check fails on can be made again and run alone.
  * `--seed-base n` (or WORLDS_SEED_BASE; default 0, the worlds CI checks) draws other worlds: the
- * release gate runs the checks over several (`tools/ci-local.sh`, SEED_BASE).
+ * release gate runs the checks over five (`tools/ci-local.sh`, SEED_BASE).
  *
  * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--sizes cosy,normal,big] [--big-out file] [--big-per-kind n] [--kinds farm,forest] [--seed-base n]
  */
