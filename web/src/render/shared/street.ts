@@ -84,6 +84,11 @@ export const RANK_APART = 60;
 const RANK_OBJECT = 'busStop';
 const RANK_OUT = 4;
 const RANK_BACK = 0.62;
+/** Half the shelter's length along the kerb (m, `model.busStop` 2.98 m), and the clear gap every kerbside thing keeps from it and its sign. */
+export const RANK_HALF = 1.49;
+export const RANK_GAP = 1.2;
+/** How far along the kerb from a rank `rankKerb` reports what stands near it (m). */
+const RANK_SPAN = 10;
 /** Half wall thickness (as in house.ts). */
 const T = 0.07;
 
@@ -451,6 +456,12 @@ interface KerbOut {
   touched: Set<number>;
   /** Cells of the blocked grid it looked in. */
   cells: Rect[];
+  /**
+   * The taxi rank at its row's end, if it has one (`TownStreet.chooseRanks`): its shelter's middle and
+   * its sign's (null: none) along the kerb, and where every other kerbside thing near it stands (`RANK_SPAN`):
+   * for checks (`TownStreet.rankKerb`).
+   */
+  rank?: { shelter: number; sign: number | null; others: number[] };
 }
 
 /** Something on the street that blocks props: a thing's footprint or a garage, and the plot it's on (-1: none). */
@@ -638,6 +649,11 @@ export class TownStreet {
   /** The taxi ranks at the rows' ends, where they stand (x, z): for checks. */
   rankSpots(): [number, number][] {
     return [...this.ranks.values()];
+  }
+
+  /** The taxi rank of road `r`'s `side` and what stands round it along the kerb (`KerbOut.rank`): for checks. */
+  rankKerb(r: number, side: 1 | -1): KerbOut['rank'] {
+    return this.kerbOf(`${r}|${side}`, NO_FOCUS).rank;
   }
 
   /**
@@ -1209,6 +1225,35 @@ export class TownStreet {
     const kerbD = keep === undefined ? SIDEWALK - KERB - 0.3 : Math.min(SIDEWALK - KERB - 0.3, keep - KERBSIDE_REACH);
     const on = (s: number, d = kerbD) => kerb.at(s, d);
 
+    // The taxi rank at the row's end, on the road sides the town chose (`chooseRanks`), first: past the
+    // row's last lot a shelter facing the road behind the pavement (`model.busStop`, as the bus stop it
+    // was), its TAXI sign at the kerb past the shelter's far end (away from the row and the street-name
+    // sign on its corner); every kerbside thing after keeps `RANK_GAP` clear of both.
+    let rank: { shelter: number; sign: number | null } | null = null;
+    if (row.length && this.ranks.has(`${r}|${side}`)) {
+      const first = side > 0;
+      const outward = first ? -1 : 1;
+      const cs = (first ? row[0].s0 : row[row.length - 1].s1) + outward * RANK_OUT;
+      const [cx, cz] = kerb.at(cs, -RANK_BACK);
+      const shelter = { x: cx - 1.6, z: cz - 1.6, w: 3.2, d: 3.2 };
+      // (Just behind its own road's pavement: clear of the other roads, a metre at least.)
+      if (clear(cs, 1.6) && free(shelter, 0.2) && !index.onRoad(cx, cz, 1, r)) {
+        const P = at(cx, cz);
+        P.put(PROP.shelter, cx, cz, kerb.yaw(cs));
+        blob(P.shadows, cx, cz, 1.7, 0.6, kerb.yaw(cs), 0.35, 0.02);
+        rank = { shelter: cs, sign: null };
+        const ss = cs + outward * (RANK_HALF + RANK_GAP + 0.1);
+        if (clear(ss, 0.3) && !near(ss, RANK_GAP)) {
+          used.push(ss);
+          const [x, z] = on(ss);
+          at(x, z).put(PROP.taxiSign, x, z, kerb.yaw(ss));
+          rank.sign = ss;
+          mouths.push([ss - RANK_GAP, ss + RANK_GAP]);
+        }
+        mouths.push([cs - RANK_HALF - RANK_GAP, cs + RANK_HALF + RANK_GAP]);
+      }
+    }
+
     // Streetlights, one per plot width, staggered between the two sides.
     const lights = row.map((f) => f.s0 + (side > 0 ? 1.2 : (f.s1 - f.s0) / 2));
     if (row.length) lights.push(row[row.length - 1].s1 + (side > 0 ? 1.2 : -1.2));
@@ -1288,28 +1333,9 @@ export class TownStreet {
         }
       }
     }
-    // At the end of the row (past the last lots), on the road sides the town chose (`chooseRanks`): a
-    // taxi rank's shelter facing the road (`model.busStop`, as the bus stop it was) and its TAXI sign at
-    // the kerb. A street-name sign on the corner.
+    // A street-name sign on the corner at the row's ends (the taxi rank's clear of it, above).
     if (row.length) {
       const first = side > 0;
-      const corner = first ? row[0].s0 : row[row.length - 1].s1;
-      const outward = first ? -1 : 1;
-      const cs = corner + outward * RANK_OUT;
-      const [cx, cz] = kerb.at(cs, -RANK_BACK);
-      const shelter = { x: cx - 1.6, z: cz - 1.6, w: 3.2, d: 3.2 };
-      // (Just behind its own road's pavement: clear of the other roads, a metre at least.)
-      if (this.ranks.has(`${r}|${side}`) && clear(cs, 1.6) && free(shelter, 0.2) && !index.onRoad(cx, cz, 1, r)) {
-        const P = at(cx, cz);
-        P.put(PROP.shelter, cx, cz, kerb.yaw(cs));
-        blob(P.shadows, cx, cz, 1.7, 0.6, kerb.yaw(cs), 0.35, 0.02);
-        const ss = cs - outward * 2.1;
-        if (clear(ss, 0.3) && !near(ss, 0.6)) {
-          used.push(ss);
-          const [x, z] = on(ss);
-          at(x, z).put(PROP.taxiSign, x, z, kerb.yaw(ss));
-        }
-      }
       // Street-name signs at both ends, on one side of the road.
       const ends = first ? [row[0].s0 - 0.9, row[row.length - 1].s1 + 0.9] : [];
       for (const s of ends) {
@@ -1351,6 +1377,10 @@ export class TownStreet {
         if (run < 40 || hash(s, r * 7 + side, 81) > 0.6) continue;
         if (bench(s - 20, -1.3)) run = -40;
       }
+    }
+    if (rank) {
+      const { shelter, sign } = rank;
+      out.rank = { shelter, sign, others: used.filter((s) => s !== sign && Math.abs(s - shelter) < RANK_SPAN) };
     }
     for (const c of out.chunks.values()) c.sig = c.parts.signature();
     return out;

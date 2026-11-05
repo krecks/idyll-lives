@@ -228,4 +228,44 @@ describe('the street in chunks', async () => {
       apart(c.drawn);
     }
   });
+
+  test('round a taxi rank every kerbside thing keeps a clear gap from its shelter, its sign and each other; the corner keeps its street-name sign', async () => {
+    const { RANK_GAP, RANK_HALF } = await import('../src/render/shared/street');
+    for (const w of [town(), streets([23, 69, 115])]) {
+      const street = new TownStreet(new HousePlanner(), w, options, 'game');
+      const roads = (w.meta as { roads: unknown[] }).roads.length;
+      let seen = 0;
+      for (let r = 0; r < roads; r++) {
+        for (const side of [1, -1] as const) {
+          const rank = street.rankKerb(r, side);
+          if (!rank) continue;
+          seen++;
+          const { shelter, sign, others } = rank;
+          // (The shelter's ends along the kerb, and its sign: a gap of RANK_GAP clear of each.)
+          const gap = (s: number) => Math.abs(s - shelter) - RANK_HALF;
+          if (sign !== null) expect(gap(sign)).toBeGreaterThanOrEqual(RANK_GAP);
+          for (const o of others) {
+            expect(gap(o)).toBeGreaterThanOrEqual(RANK_GAP);
+            if (sign !== null) expect(Math.abs(o - sign)).toBeGreaterThanOrEqual(RANK_GAP);
+          }
+          // The kerbside things beside it, those within a couple of gaps of its ends, clear of each other too.
+          const close = others.filter((o) => gap(o) < 3 * RANK_GAP).sort((a, b) => a - b);
+          for (let i = 1; i < close.length; i++) expect(close[i] - close[i - 1]).toBeGreaterThanOrEqual(RANK_GAP);
+        }
+      }
+      expect(seen).toBe(street.rankSpots().length);
+      expect(seen).toBeGreaterThan(0);
+      // A rank at the corner of a row with its street-name sign (the road's first side, its first end):
+      // the name sign still there, its TAXI sign well clear of it, at the shelter's far end.
+      const get = (k: string) => street.chunkIds().flatMap((id) => street.chunk(id, NO_FOCUS).batches.get(k) ?? []);
+      const names = get('model.street.sign');
+      const signs = get('model.street.taxiSign');
+      for (const [x, z] of get('model.busStop')) {
+        if (x > 0) continue;
+        const name = names.find((n) => Math.hypot(n[0] - x, n[1] - z) < 6);
+        expect(name).toBeDefined();
+        for (const t of signs) expect(Math.hypot(t[0] - name![0], t[1] - name![1])).toBeGreaterThanOrEqual(RANK_HALF + 2 * RANK_GAP);
+      }
+    }
+  });
 });
