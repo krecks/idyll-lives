@@ -18,7 +18,8 @@
  * reaching more than 45 m past the last road it meets, and no country road the layout found no
  * way for. And for big worlds: every area reaching a way out, nothing on the
  * water, every outdoor place at a trail's end and near its area, no trail through a lot, no
- * country road turning further than 70° over 40 m (no hairpins: `COUNTRY_TURN`), areas apart,
+ * country road turning further than 70° over 40 m (no hairpins: `COUNTRY_TURN`), none running
+ * alongside another road a few metres off for more than `SIDE_BY_SIDE` m, areas apart,
  * hamlets of four lots or more, residents within the
  * cap, the world filled (a quarter of it or more built and farmed, at most a tenth of its 100 m
  * squares with nothing in them, every quarter of it with an area or homes out in the country),
@@ -37,6 +38,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { HouseGenConfig } from '../../web/src/game/housegen.ts';
 import type { Facing, Templates } from '../../web/src/game/town.ts';
+import type { RoadPlan } from '../../web/src/core/protocol.ts';
 
 // The loaders fetch from the page's address: here, files under web/public.
 const root = new URL('../../web/public/', import.meta.url);
@@ -56,7 +58,7 @@ const { WORLD_KINDS, WORLD_SIZES } = await import('../../web/src/game/world.ts')
 const { AREA_APART, COUNTRY_TURN, unrle } = await import('../../web/src/game/macro.ts');
 const { homePrice } = await import('../../web/src/game/price.ts');
 const { savingsOf } = await import('../../web/src/game/wealth.ts');
-const { COURT, lengths, nearest, pointAt, roadMask, sharpestTurn } = await import('../../web/src/game/roads.ts');
+const { COURT, lengths, nearest, pointAt, roadMask, sharpestTurn, sideBySide } = await import('../../web/src/game/roads.ts');
 const { mulberry32 } = await import('../../web/src/game/noise.ts');
 
 type Rect = { x: number; z: number; w: number; d: number };
@@ -282,6 +284,12 @@ function openProblems(town: TownFile): string[] {
 }
 
 /** What's wrong with a town's layout. */
+/**
+ * How long a country road may run alongside another road a few metres off (m): where it leaves a
+ * port beside a street's end, or joins a road at a slant (`layoutProblems`). Two that follow the
+ * same way for longer share it.
+ */
+const SIDE_BY_SIDE = 60;
 function layoutProblems(town: TownFile): string[] {
   const out: string[] = openProblems(town);
   // (Trails are on foot, between the lots: `openProblems` checks they keep off them.)
@@ -302,6 +310,10 @@ function layoutProblems(town: TownFile): string[] {
     // (A park may stand in the middle of a green.)
     if (roads.length && gap > 13 && !p.public) out.push(`plot ${i} ${gap.toFixed(1)} m from its road`);
   });
+  // No country road alongside another road a few metres off for long (`roads.ts` `sideBySide`: cars
+  // on the two meet nose to nose): one that follows another's way shares it (`macro.ts` `alongExisting`).
+  const all = (town.meta.roads ?? []) as RoadPlan[];
+  for (const { a, b, length, at } of sideBySide(all, SIDE_BY_SIDE, 'country')) out.push(`${all[a].name} runs alongside ${all[b].name} a few metres off for ${length} m by ${at.map(Math.round).join(', ')}`);
   for (const [x, z] of town.exits.map(exitAt)) if (Math.min(x, z, town.width - x, town.depth - z) > 1) out.push(`a way out of town at ${x}, ${z}, not on its edge`);
   if (!town.exits.length) out.push('no way out of town');
   return out;
