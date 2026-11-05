@@ -474,6 +474,172 @@ fn check_cars(w: &World, stacked: &mut Stacked, failures: &mut std::collections:
     stacked.retain(|k, _| now.contains(k));
 }
 
+/// A work taxi standing at the kerb for its riders (`taxi.rs`) stands parallel to its lane within
+/// this (rad: about 5°), its body clear of its lane's kerb by this at least (m: a little under, as
+/// pulled over for one coming the other way on a lane too narrow to pass, `Car::shift`, onto the
+/// pavement no further than that) and of the kerbside furniture always (`cars::kerbside`).
+const STAND_ANGLE: f32 = 0.09;
+/// A street's or a lane's pavements (m, each side: `roads.ts` `SIDEWALK`).
+const SIDEWALK: f32 = 1.35;
+const STAND_KERB: f32 = -0.05;
+/// Two cars on their way passing each other, both moving, one of them a work taxi, keep this far
+/// apart at least (m, between their bodies: in their lanes on a 7 m street, 0.25 m on the
+/// straight). (By one standing to let it by, the last-resort guard keeps it out of that one.)
+const PASS_GAP: f32 = 0.05;
+
+/// The work taxis as `check_taxis` last saw them: standing or not, by car, and the pairs of cars
+/// passing each other.
+#[derive(Default)]
+struct Taxis {
+    standing: std::collections::BTreeSet<usize>,
+    passing: std::collections::BTreeSet<(usize, usize)>,
+    /// Where each car was drawn a tick before.
+    was: Vec<Option<[f32; 2]>>,
+}
+
+/// A body's corners (`at` its middle, facing `yaw`).
+fn body(at: [f32; 2], yaw: f32, len: f32, wid: f32) -> [[f32; 2]; 4] {
+    let (s, c) = yaw.sin_cos();
+    let f = [s * len / 2.0, c * len / 2.0];
+    let r = [c * wid / 2.0, -s * wid / 2.0];
+    [
+        [at[0] + f[0] + r[0], at[1] + f[1] + r[1]],
+        [at[0] + f[0] - r[0], at[1] + f[1] - r[1]],
+        [at[0] - f[0] - r[0], at[1] - f[1] - r[1]],
+        [at[0] - f[0] + r[0], at[1] - f[1] + r[1]],
+    ]
+}
+
+/// The gap between two bodies (m; less than none, they overlap), by the separating axes.
+fn gap(a: &[[f32; 2]; 4], b: &[[f32; 2]; 4]) -> f32 {
+    let mut best = f32::NEG_INFINITY;
+    for poly in [a, b] {
+        for k in 0..2 {
+            let (p, q) = (poly[k], poly[k + 1]);
+            let n = [q[1] - p[1], p[0] - q[0]];
+            let l = n[0].hypot(n[1]);
+            let n = [n[0] / l, n[1] / l];
+            let span = |r: &[[f32; 2]; 4]| {
+                r.iter()
+                    .map(|v| v[0] * n[0] + v[1] * n[1])
+                    .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), x| {
+                        (lo.min(x), hi.max(x))
+                    })
+            };
+            let ((a0, a1), (b0, b1)) = (span(a), span(b));
+            best = best.max(a0.max(b0) - a1.min(b1));
+        }
+    }
+    best
+}
+
+/// A car on its way, as `check_taxis` sees it: its index, its body, its middle, which way it
+/// faces, its length and whether it's a taxi.
+type Going = (usize, [[f32; 2]; 4], [f32; 2], f32, f32, bool);
+
+/// A tick of `w`'s work taxis: one come to stand at the kerb not parallel to its lane, or with its
+/// body over the kerb or the kerbside furniture (`STAND_ANGLE`, `STAND_KERB`); and two cars
+/// passing each other, one a taxi, nearer than `PASS_GAP`; in `failures`.
+fn check_taxis(w: &World, seen: &mut Taxis, failures: &mut std::collections::BTreeSet<String>) {
+    use sim_core::travel::{Mode, RoadKind};
+    let g = &w.travel.graph;
+    for (c, car) in w.cars.iter().enumerate() {
+        if !car.taxi || !car.standing {
+            seen.standing.remove(&c);
+            continue;
+        }
+        let Some((at, yaw, ..)) = car.shown else {
+            continue;
+        };
+        if !seen.standing.insert(c) {
+            continue;
+        }
+        let Some(rp) = g.near(at, 30.0, 1, Mode::Car).first().copied() else {
+            continue;
+        };
+        let road = &g.roads[rp.road as usize];
+        let t = road.tangent(rp.s);
+        let off = sim_core::world::wrap_angle(yaw - t[0].atan2(t[1])).abs();
+        let off = off.min(std::f32::consts::PI - off);
+        let (kerb, furniture) = match road.kind {
+            RoadKind::Country | RoadKind::Trail => (road.width / 2.0, road.width / 2.0),
+            _ => (
+                (road.width / 2.0 - SIDEWALK).max(1.3),
+                road.width / 2.0 - sim_core::cars::kerbside(road.width, road.kind),
+            ),
+        };
+        // (Each corner from the middle of the road it's on.)
+        let out = body(at, yaw, car.len, car.wid)
+            .iter()
+            .filter_map(|&q| {
+                let p = g.near(q, 30.0, 1, Mode::Car).first().copied()?;
+                (p.road == rp.road).then_some(p.off)
+            })
+            .fold(0.0f32, f32::max);
+        let at_s = format!(
+            "{:.1},{:.1} day {} {:05.2}h",
+            at[0],
+            at[1],
+            sim_core::clock::day(w.tick),
+            sim_core::clock::hour(w.tick)
+        );
+        if off > STAND_ANGLE {
+            failures.insert(format!(
+                "a taxi stood at the kerb {:.0}° off its lane at {at_s}",
+                off.to_degrees()
+            ));
+        }
+        if out > kerb + car.shift - STAND_KERB || out > furniture {
+            failures.insert(format!(
+                "a taxi stood {:.2} m from the road's middle, its kerb {kerb:.2} m (pulled over {:.2} m), at {at_s}",
+                out, car.shift
+            ));
+        }
+    }
+    // Passing: two on their way side by side, both moving, facing about opposite ways, one a taxi.
+    seen.was.resize(w.cars.len(), None);
+    let going: Vec<Going> = w
+        .cars
+        .iter()
+        .enumerate()
+        .filter_map(|(k, c)| {
+            let (at, yaw, moving, _) = c.shown?;
+            let moved = seen.was[k].is_some_and(|p| p != at);
+            (moving && moved).then(|| (k, body(at, yaw, c.len, c.wid), at, yaw, c.len, c.taxi))
+        })
+        .collect();
+    for (k, c) in w.cars.iter().enumerate() {
+        seen.was[k] = c.shown.map(|s| s.0);
+    }
+    let mut now = std::collections::BTreeSet::new();
+    for (i, a) in going.iter().enumerate() {
+        for b in &going[i + 1..] {
+            if !(a.5 || b.5) || (a.2[0] - b.2[0]).hypot(a.2[1] - b.2[1]) > 6.0 {
+                continue;
+            }
+            let fwd = [a.3.sin(), a.3.cos()];
+            let along = (b.2[0] - a.2[0]) * fwd[0] + (b.2[1] - a.2[1]) * fwd[1];
+            if (a.3 - b.3).cos() > -0.85 || along.abs() > (a.4 + b.4) / 2.0 - 0.3 {
+                continue;
+            }
+            let d = gap(&a.1, &b.1);
+            now.insert((a.0, b.0));
+            if d < PASS_GAP && !seen.passing.contains(&(a.0, b.0)) {
+                failures.insert(format!(
+                    "cars {} and {} passed {d:.2} m apart at {:.1},{:.1} day {} {:05.2}h",
+                    a.0,
+                    b.0,
+                    a.2[0],
+                    a.2[1],
+                    sim_core::clock::day(w.tick),
+                    sim_core::clock::hour(w.tick)
+                ));
+            }
+        }
+    }
+    seen.passing = now;
+}
+
 /// How long a car on its way may stand still while nothing it waits for goes on, however far
 /// round (ticks: `traffic::waits_on`; held up for good, two or more waiting for each other), and
 /// how long it may stand still at all (waiting its turn for a busy junction). A car queued right behind another going its way isn't counted:
@@ -693,13 +859,17 @@ fn generated_worlds_cars_keep_to_the_roads() {
         let mut worst = (0.0f32, String::new());
         let started = std::time::Instant::now();
         // (Every car on its way, both days: none held up for good, `check_stuck`, the day-1 check's
-        // rule, on day 2 too.)
+        // rule, on day 2 too. The work taxis: standing at the kerb parallel to their lanes and
+        // clear of the kerb; passing others clear of them, `check_taxis`.)
         let mut standing: Standing = Default::default();
         let mut stood = std::collections::BTreeSet::new();
+        let mut taxis: Taxis = Default::default();
+        let mut taxi_faults = std::collections::BTreeSet::new();
         while w.tick < end {
             w.tick_once();
             watch.sample(&w);
             check_stuck(&w, &mut standing, &mut stood);
+            check_taxis(&w, &mut taxis, &mut taxi_faults);
             if w.tick % 4 != 0 {
                 continue;
             }
@@ -778,6 +948,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
                 }
             }
         }
+        failures.extend(taxi_faults.into_iter().map(|f| format!("{label}: {f}")));
         if worst.0 > OFF_PAVING {
             failures.push(format!(
                 "{label}: {} is {:.2} m off the paving",

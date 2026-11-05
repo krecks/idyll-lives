@@ -1977,8 +1977,7 @@ pub(crate) struct Ctx<'a> {
     pub travel: &'a crate::travel::Travel,
     /// Households' cars and the work taxis (`World::cars`).
     pub cars: &'a [crate::cars::Car],
-    /// The houses' driveways (`World::drives`), and the work taxis' runs (`World::taxis`).
-    pub drives: &'a [crate::cars::Drive],
+    /// The work taxis' runs (`World::taxis`).
     pub taxis: &'a crate::taxi::Taxis,
     pub autonomy: bool,
     /// Room score per tile (`World::room_score`).
@@ -4407,7 +4406,6 @@ impl World {
                 exits,
                 travel,
                 cars,
-                drives,
                 taxis,
                 room_score,
                 dirt,
@@ -4442,7 +4440,6 @@ impl World {
                 exits,
                 travel,
                 cars,
-                drives,
                 taxis,
                 autonomy: *autonomy,
                 hour,
@@ -7602,10 +7599,11 @@ fn start_task(
             sim.bound_for_car = None;
             // By car (`cars.rs`): to its door. (Not when already on their bike.)
             let riding = sim.riding.is_some();
+            // (Called to the work taxi standing at their halt: over to its door, `taxi::door_for`.)
             let car = if riding {
                 None
             } else {
-                crate::cars::ride_for(ctx, sim)
+                crate::taxi::door_for(ctx, sim).or_else(|| crate::cars::ride_for(ctx, sim))
             };
             if let Some((car, seat, door, at)) = car {
                 crate::ride::get_off(sim, objects);
@@ -8957,8 +8955,9 @@ fn arrive(
             act.phase = Phase::Using { elapsed: 0.0 };
         }
         TaskKind::Work => match sim.bound_for_car.and_then(|c| ctx.cars.get(c as usize)) {
-            // At the car's door: facing it, they open it and get in.
-            Some(car) if car.at_home() => {
+            // At the car's door (a work taxi's, standing for them): facing it, they open it and
+            // get in.
+            Some(car) if car.at_home() || car.taxi && car.standing => {
                 sim.yaw = (car.spot[0] - sim.pos[0]).atan2(car.spot[1] - sim.pos[1]);
                 sim.pose = Pose::Stand;
                 act.phase = Phase::Boarding { ticks: 0 };
