@@ -72,11 +72,15 @@
 //!   as trains on a single track (below), and the timetable keeps them from meeting there where
 //!   it can (`headway`, `offsets`);
 //! - where buses still hold each other up for good (a loop of them, each waiting for the next),
-//!   the latest run that can backs up out of the way, those right behind it with it, and holds
-//!   back till the other is by (`make_way`); held up a while it no longer keeps room ahead nor
-//!   holds back (`IMPATIENT`), and held up past `OUT_OF_SERVICE` (none can give way: standing,
-//!   or edging back and forth and no further on), it's taken out of service out of sight of the
-//!   part of town in view: gone, as out of town (`withdraw`);
+//!   one gives way to another once and for all (the one with the most room behind it, then the
+//!   latest run): it backs up out of that one's way and of anyone waiting for it, those right
+//!   behind it with it, and stands till that one has come on past it (`make_way`, `given_way`);
+//!   nobody decides again every tick, so two never take turns backing up for each other. Giving
+//!   way isn't being held up; but the other standing still `IMPATIENT` itself, it's let off. Held
+//!   up a while a bus no longer keeps room ahead (`IMPATIENT`), and held up past
+//!   `OUT_OF_SERVICE` (none can give way: standing, or edging back and forth and no further on),
+//!   it's taken out of service out of sight of the part of town in view: gone, as out of town
+//!   (`withdraw`);
 //! - it doesn't wait for a car that is itself held up by someone on foot (`cars::Driving::held`:
 //!   they may be held where they are by the bus beside them, with nowhere to step aside to); and
 //!   no car parks in a public bay a bus's body (or the ground in front of it) swings through on
@@ -364,17 +368,22 @@ pub struct Bus {
     /// Ticks it has waited for someone in its way.
     waited: u32,
     /// It waits behind another car or bus (`cars::up_against`), for one coming the other way
-    /// (`oncoming`), or holds back for one (`yields`).
+    /// (`oncoming`), or gives way to one (`yields`).
     queued: bool,
     /// How far right of its lane it's pulled over (m) to pass one coming the other way
     /// (`pull_over`).
     shift: f32,
     /// It backs up this tick, out of the way of another (`make_way`).
     backs: bool,
-    /// The bus it backed up for (its `first`): it holds back till that one is by (`make_way`).
+    /// The bus it gives way to (its `first`): it backs up out of its way and holds back till
+    /// that one is by (`make_way`).
     yields: Option<u64>,
+    /// Where the one it gives way to was along its route as it began to, where it was last tick,
+    /// and the ticks since it last moved: past `IMPATIENT` (held up itself), it gives way no
+    /// longer (`make_way`).
+    given: (f32, f32, u32),
     /// Ticks it has stood still on its way (not at a stop): held up past `IMPATIENT`, it no longer
-    /// holds back nor keeps room ahead (`ahead_of`), only clear of the others.
+    /// keeps room ahead (`ahead_of`), only clear of the others.
     still: u32,
     /// The furthest along its route it has come since it last stood at a stop, and the ticks since
     /// then (not at a stop, not waiting at a refuge): edging back and forth, as two dodging each
@@ -1949,9 +1958,9 @@ fn held_by<'a>(
 /// How far ahead along its way a bus keeps room (m, `ahead_of`), and its way looked at this many
 /// ticks apart, at most this many ticks on.
 const ROOM_AHEAD: f32 = 6.0;
-/// Held up this long on its way (ticks), a bus no longer holds back for another nor keeps room
-/// ahead (`Bus::still`): those keep it out of the others' way where they'd hold each other up,
-/// never for good.
+/// Held up this long on its way (ticks), a bus no longer keeps room ahead (`Bus::still`), and one
+/// it gives way to standing still that long is given way to no longer (`make_way`): those keep it
+/// out of the others' way where they'd hold each other up, never for good.
 const IMPATIENT: u32 = 10 * TICKS_PER_MINUTE as u32;
 /// Held up this long on its way (ticks), a bus is taken out of service (`step_bus`), out of sight:
 /// further than this (m) from the part of town in view.
@@ -2028,17 +2037,33 @@ fn ahead_of(t: &Transit, b: usize, others: &[cars::Driving]) -> Vec<usize> {
 
 /// Buses holding each other up for good, a loop of them each waiting for the next (two coming
 /// towards each other where they can't pass, even pulled over; each in the other's way across a
-/// junction or where one turns round): the last of them by the timetable that has room to back up
-/// backs up out of the way of the one it holds up (`Bus::backs`), and doesn't drive back into its
-/// way till it's by (`Bus::yields`; never two for each other); a bus right behind one backing up
-/// backs up too. So the first of every such loop gets on, and
-/// nobody drives into anyone. (Loops through cars are the claims' to keep from forming:
-/// `traffic.rs`.)
+/// junction or where one turns round): one of them gives way to another it holds up, once and for
+/// all (`Bus::yields`): the one with the most room behind it, then the last by the timetable. It
+/// backs up (`Bus::backs`) till it's out of that one's way and a little more (`GIVE_WAY_LOOK`),
+/// then stands, and doesn't go on till that one is by (`given_way`): nobody decides again every
+/// tick, so they never take turns backing up. Only if the one it gives way to stands still past
+/// `IMPATIENT` itself (held up by something else) is it let off. A bus right behind one backing up
+/// backs up too. So the first of every such loop gets on, and nobody drives into anyone. (Loops
+/// through cars are the claims' to keep from forming: `traffic.rs`, where one giving way waits for
+/// the one it gives way to, `movers`.)
 fn make_way(w: &mut World) {
     let t = &w.transit;
     let n = t.buses.len();
-    // Who holds up whom: those driving for others in their way a tick on, or holding back for
-    // one.
+    let index = |f: u64| t.buses.iter().position(|x| x.first() == f);
+    // Those given way to already: till they're by, or stand still themselves that long.
+    let mut given: Vec<(f32, f32, u32)> = vec![(0.0, 0.0, 0); n];
+    let mut yields: Vec<Option<u64>> = (0..n)
+        .map(|b| {
+            let bus = &t.buses[b];
+            let h = bus.yields?;
+            let o = index(h)?;
+            let at = t.buses[o].progress;
+            let (from, last, still) = bus.given;
+            given[b] = (from, at, if at == last { still + 1 } else { 0 });
+            (given[b].2 <= IMPATIENT && !given_way(t, b, o)).then_some(h)
+        })
+        .collect();
+    // Who holds up whom: those driving for others in their way a tick on, or giving way to one.
     let mut holds: Vec<Vec<usize>> = vec![Vec::new(); n];
     for (b, held) in holds.iter_mut().enumerate() {
         let bus = &t.buses[b];
@@ -2048,11 +2073,7 @@ fn make_way(w: &mut World) {
         let others = obstacles(w, b);
         let me = driving(t, b, false);
         *held = held_by(t, b, &me, &others, false).collect();
-        if let Some(h) = bus
-            .yields
-            .filter(|_| bus.still <= IMPATIENT)
-            .and_then(|f| t.buses.iter().position(|x| x.first() == f))
-        {
+        if let Some(h) = yields[b].and_then(index) {
             held.push(h);
         }
     }
@@ -2075,41 +2096,54 @@ fn make_way(w: &mut World) {
             }
         })
         .collect();
-    let mut backs = vec![false; n];
-    let mut yields: Vec<Option<u64>> = t.buses.iter().map(|b| b.yields).collect();
     for b in (0..n).filter(|&b| reaches[b][b]) {
         // (The loop's: those it holds up, one way or another, that hold it up.)
         let looped = |o: usize| reaches[b][o] && reaches[o][b];
-        // (One can back up where there's ground behind it, or another bus on its way that can
-        // back up too, and so on: not one of the loop, nor a car, nor one standing at a stop.)
-        let can_back = |o: usize| can_back(w, o, &looped, 8);
-        // (Not one another of the loop is holding back for, while another can: whoever won the
-        // way stays first till it's by, or they'd take turns backing up for ever.)
-        let yielded = |o: usize| (0..n).any(|x| looped(x) && yields[x] == Some(t.buses[o].first()));
-        let able: Vec<usize> = (0..n).filter(|&o| looped(o) && can_back(o)).collect();
-        let last = able
-            .iter()
-            .copied()
-            .filter(|&o| !yielded(o))
-            .max_by_key(|&o| t.buses[o].first())
-            .or_else(|| able.iter().copied().max_by_key(|&o| t.buses[o].first()));
-        if last != Some(b) {
+        // (One of the loop gives way to another of it already: it's being let by.)
+        if (0..n).any(|x| looped(x) && yields[x].and_then(index).is_some_and(looped)) {
             continue;
         }
-        backs[b] = true;
+        // (One can back up where there's ground behind it, or another bus on its way that can
+        // back up too, and so on: not one of the loop, nor a car, nor one standing at a stop.)
+        let able = (0..n).filter(|&o| looped(o) && can_back(w, o, &looped, 8));
+        let Some(giver) = able.max_by_key(|&o| (room_behind(w, o), t.buses[o].first())) else {
+            continue;
+        };
+        if giver != b {
+            continue;
+        }
         if let Some(h) = (0..n)
             .filter(|&o| looped(o) && holds[o].contains(&b))
             .min_by_key(|&o| t.buses[o].first())
         {
             yields[b] = Some(t.buses[h].first());
-            // (Not both holding back for each other.)
+            given[b] = (t.buses[h].progress, t.buses[h].progress, 0);
+            // (Not both giving way to each other.)
             if yields[h] == Some(t.buses[b].first()) {
                 yields[h] = None;
             }
         }
     }
-    // (Right behind one backing up: it backs up too, and holds back for the one that backs up
-    // for.)
+    // Those giving way back up while they're in the way of the one they give way to, or will be
+    // as it comes on a little, or of anyone waiting for them (whom that one may be waiting for in
+    // turn), as far as they can.
+    let mut backs = vec![false; n];
+    for b in 0..n {
+        let Some(o) = yields[b].and_then(index) else {
+            continue;
+        };
+        let me = [standing(t, b)];
+        let theirs = &t.buses[o];
+        let first = t.buses[b].first();
+        let in_way = !waits_for(t, o, &driving(t, o, false), &me, false).is_empty()
+            || GIVE_WAY_LOOK
+                .iter()
+                .any(|&k| !clear_at(t, &me, o, theirs.progress + k, theirs.shift))
+            || w.cars.iter().any(|c| c.waits_for == Some(first))
+            || (0..n).any(|x| x != b && holds[x].contains(&b));
+        backs[b] = in_way && can_back(w, b, &|x| x == o, 8);
+    }
+    // (Right behind one backing up: it backs up too, and gives way to the one that gives way to.)
     let mut todo: Vec<usize> = (0..n).filter(|&b| backs[b]).collect();
     while let Some(b) = todo.pop() {
         let others = obstacles(w, b);
@@ -2129,8 +2163,50 @@ fn make_way(w: &mut World) {
     for (b, bus) in w.transit.buses.iter_mut().enumerate() {
         bus.backs = backs[b];
         bus.yields = yields[b];
+        bus.given = given[b];
     }
 }
+
+/// How far on (ticks along its route) one giving way looks at the one it gives way to: it backs
+/// up till it's clear of where that one will be (`make_way`).
+const GIVE_WAY_LOOK: [f32; 2] = [10.0, 20.0];
+
+/// Whether bus `b` has given way to bus `o` (`Bus::yields`): that one is far off, or has come
+/// `PASSED` on since and neither is in the other's way now.
+fn given_way(t: &Transit, b: usize, o: usize) -> bool {
+    let (mine, theirs) = (standing(t, b), standing(t, o));
+    if dist(mine.at, theirs.at) > BUS_LEN + PULL_AHEAD {
+        return true;
+    }
+    let on = t.buses[o].progress - t.buses[b].given.0;
+    let held = |x: usize, y: usize| {
+        !waits_for(t, x, &driving(t, x, false), &[standing(t, y)], false).is_empty()
+    };
+    on >= PASSED && !held(b, o) && !held(o, b)
+}
+
+/// How far on one given way to has come (ticks along its route) before the one giving way may go
+/// on, the two out of each other's way (`given_way`).
+const PASSED: f32 = 40.0;
+
+/// How far bus `b` could back up (ticks, in steps of five, at most `ROOM_BEHIND`): with more room
+/// behind it, it gives way (`make_way`).
+fn room_behind(w: &World, b: usize) -> u32 {
+    let t = &w.transit;
+    let bus = &t.buses[b];
+    let all = obstacles(w, b);
+    let mut k = 0;
+    while k < ROOM_BEHIND
+        && bus.progress - (k + 5) as f32 > 0.0
+        && clear_at(t, &all, b, bus.progress - (k + 5) as f32, bus.shift)
+    {
+        k += 5;
+    }
+    k
+}
+
+/// The most room behind a bus `room_behind` looks for (ticks).
+const ROOM_BEHIND: u32 = 100;
 
 /// Whether bus `b` can back up a tick: it's in town, it would move into no other, and whatever is
 /// right behind it is a bus on its way (not one of `looped`, nor standing at a stop) that can
@@ -2158,32 +2234,6 @@ fn can_back(w: &World, b: usize, looped: &dyn Fn(usize) -> bool, depth: u32) -> 
         })
 }
 
-/// Whether bus `b` holds back for the bus it backed up for (`Bus::yields`, its `first`): a tick on
-/// it would be in that one's way again, out of it now (`held_by`, as that one goes on or backs up).
-/// None: that one is by (gone, or no longer coming towards it): it doesn't yield any more.
-fn holds_back(t: &Transit, b: usize, h: u64) -> Option<bool> {
-    let o = t.buses.iter().position(|x| x.first() == h)?;
-    let (mine, theirs) = (standing(t, b), standing(t, o));
-    let near = dist(mine.at, theirs.at) <= BUS_LEN + PULL_AHEAD;
-    let by = passing(
-        (mine.at, mine.yaw, BUS_LEN, BUS_WID),
-        (theirs.at, theirs.yaw, BUS_LEN, BUS_WID),
-    )
-    .is_none_or(|m| m.along < -BUS_LEN);
-    if !near || by {
-        return None;
-    }
-    // (In its way already, it may only get out of it by going on.)
-    let them = driving(t, o, t.buses[o].backs);
-    let in_way = |me: &cars::Driving| {
-        held_by(t, o, &them, std::slice::from_ref(me), t.buses[o].backs)
-            .next()
-            .is_some()
-    };
-    let now = standing(t, b);
-    Some(in_way(&driving(t, b, false)) && !in_way(&now))
-}
-
 /// Bus of line `l` on its run `run`, where it is at `now` on time; None before it comes into
 /// town (`Line::offset`) and once it's gone.
 fn on_time(line: &Line, l: u16, run: u64, now: u64) -> Option<Bus> {
@@ -2203,6 +2253,7 @@ fn on_time(line: &Line, l: u16, run: u64, now: u64) -> Option<Bus> {
         shift: 0.0,
         backs: false,
         yields: None,
+        given: (0.0, 0.0, 0),
         still: 0,
         best: 0.0,
         stuck: 0,
@@ -2453,8 +2504,8 @@ fn step_bus(w: &mut World, b: usize) -> bool {
 /// round). Someone waiting for a bus, or stepping up to one, is out of its way. It keeps behind a
 /// car or bus in front of it, going its way or across it (`cars::up_against`), and pulls over to
 /// pass one coming the other way (`pull_over`), waiting till it's clear of it (`oncoming`); where
-/// two hold each other up, the later backs up out of the other's way and holds back till it's by
-/// (`make_way`).
+/// two hold each other up, one gives way to the other, backing up out of its way and standing
+/// till it's by (`make_way`).
 fn drive_on(w: &mut World, b: usize) {
     shift_to(w, b, pull_over(w, b));
     let t = &mut w.transit;
@@ -2464,15 +2515,15 @@ fn drive_on(w: &mut World, b: usize) {
         return;
     }
     let bus = &t.buses[b];
-    let (backs, yields) = (bus.backs, bus.yields.filter(|_| bus.still <= IMPATIENT));
+    let (backs, yields) = (bus.backs, bus.yields);
+    // (Giving way, out of the other's way now: it stands till that one is by.)
     if !backs && let Some(h) = yields {
-        match holds_back(t, b, h) {
-            Some(true) => {
+        match t.buses.iter().position(|x| x.first() == h) {
+            Some(o) if !given_way(t, b, o) => {
                 t.buses[b].queued = true;
                 return;
             }
-            Some(false) => {}
-            None => t.buses[b].yields = None,
+            _ => t.buses[b].yields = None,
         }
     }
     if waits_to_come_in(t, b) {
@@ -2626,7 +2677,7 @@ fn drive_on(w: &mut World, b: usize) {
 }
 
 /// Whom bus `b`, come no further on this tick, waits for (`Driving::first`), as `drive_on` sees
-/// it: one holding blocks of the section ahead, one it holds back for, the claims it asks for, one
+/// it: one holding blocks of the section ahead, one it gives way to, the claims it asks for, one
 /// in its way, one whose claim it would drive into.
 fn held_up_by(w: &World, b: usize) -> Option<u64> {
     let t = &w.transit;
@@ -2642,7 +2693,7 @@ fn held_up_by(w: &World, b: usize) -> Option<u64> {
             .flat_map(|&(c, _)| t.owners[c as usize].iter().map(|o| o.0))
             .find(|&o| o != bus.first());
     }
-    if let Some(h) = bus.yields.filter(|_| bus.still <= IMPATIENT && !bus.backs) {
+    if let Some(h) = bus.yields {
         return Some(h);
     }
     if w.traffic.waiting(bus.first()) {
@@ -2710,7 +2761,8 @@ pub(crate) fn movers(
             moving,
             ahead,
             parked: false,
-            waits: bus.waits_for,
+            // (Giving way to one, it waits for that one, backing up or not: `make_way`.)
+            waits: bus.yields.or(bus.waits_for),
         });
     }
 }
@@ -2761,8 +2813,9 @@ fn next_brings_home(t: &mut Transit, line: u16, run: u64) {
 /// come no further on (`Bus::stuck`).
 fn count_still(t: &mut Transit, b: usize, was: f32, asking: bool) {
     // (Waiting at a refuge for the section ahead isn't held up: the one in it goes on, or is
-    // taken out of service itself.)
-    let waits = section_ahead(t, b).is_some() || after_its_last(t, b) || asking;
+    // taken out of service itself. Nor is giving way to one on its way: `make_way`.)
+    let gives_way = t.buses[b].yields.is_some() && t.buses[b].given.2 <= IMPATIENT;
+    let waits = section_ahead(t, b).is_some() || after_its_last(t, b) || asking || gives_way;
     let bus = &mut t.buses[b];
     let held = bus.until.is_none() && !waits;
     bus.still = if bus.progress == was && held {
