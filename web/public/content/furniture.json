@@ -1753,7 +1753,7 @@
       "price": 150,
       "category": "living",
       "group": "media",
-      "description": "An old television in a wooden console on legs, rabbit ears on top. It still works (mostly).",
+      "description": "A dark plastic portable television, a big tube under a thin mask and a stub aerial on top. It still works (mostly).",
       "interactions": [
         {
           "id": "watch",
