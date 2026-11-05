@@ -95,6 +95,13 @@ export type { Face } from './face';
  */
 export type CarRide = (frame: FrameState, x: number, z: number, yaw: number, aboard: boolean, out: { x: number; z: number; yaw: number }) => boolean;
 
+/** Where a bike or an e-scooter left out by a place stands (its middle) and which way it faces (rad, as a placement's turn). */
+export interface ParkedAt {
+  x: number;
+  z: number;
+  yaw: number;
+}
+
 /** How fast an upper-layer clip fades in over the one it replaces (per second; a quarter of a second, less when the
  * action runs fast: scaled by `animRate` like the lower fade). */
 const UPPER_FADE_RATE = 4;
@@ -334,6 +341,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   readonly ridden = new Set<number>();
   riddenChanged = false;
   private readonly riddenNow = new Set<number>();
+  /**
+   * The bikes and e-scooters left out by a place their riders are visiting (stable id: where it stands, which way it
+   * faces), once they're off them: for the renderer to draw there (`ParkedRides.setAway`). Changed only when they do
+   * (`parkedChanged`).
+   */
+  readonly parked = new Map<number, ParkedAt>();
+  parkedChanged = false;
+  private readonly parkedNow = new Map<number, ParkedAt>();
+  /** Per row, where the thing they ride was left out (the snapshot's `parkX`/`parkZ`/`parkYaw`), while getting off it there and on again: it slides between there and under them, not its place at home. */
+  private readonly parkAt: (ParkedAt | null)[] = new Array(MAX_CHARACTERS).fill(null);
   /** Scratch for `writeMount`: matrices. */
   private readonly mountM = [new Float32Array(16), new Float32Array(16), new Float32Array(16)];
   private lastNow = 0;
@@ -1215,13 +1232,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     this.wheelTurn[i] = (this.wheelTurn[i] + way) % 1e4;
     const back = m.wheels[m.wheels.length - 1].r;
     if (m.cranks) this.crankTurn[i] = (this.crankTurn[i] + Math.min(way / back / m.cranks.gear, MOST_CADENCE * Math.PI * 2 * dt)) % (Math.PI * 2);
-    // Its model's place: from where it stands to under the rider (its +x the way they face).
+    // Its model's place: from where it stands to under the rider (its +x the way they face); left out by a place
+    // they're visiting, from where it was left.
     const e = smooth(on);
     const fx = Math.sin(rig.yaw);
     const fz = Math.cos(rig.yaw);
-    const x = lerp(obj.cx, rig.x - fx * m.seat[0], e);
-    const z = lerp(obj.cz, rig.z - fz * m.seat[0], e);
-    const yaw = lerpAngle(ride.yaw, rig.yaw - Math.PI / 2, e);
+    const park = this.parkAt[i];
+    const x = lerp(park ? park.x : obj.cx, rig.x - fx * m.seat[0], e);
+    const z = lerp(park ? park.z : obj.cz, rig.z - fz * m.seat[0], e);
+    const yaw = lerpAngle(park ? park.yaw : ride.yaw, rig.yaw - Math.PI / 2, e);
     const [base, turn, out] = this.mountM;
     compose(1, 1, 1, 0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2), x, rig.floorY * e, z, base);
     const nodes = ride.keys.length;
@@ -1606,6 +1625,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   update(frame: FrameState, inView: (x: number, z: number) => boolean, shadows: Float32Array, storey = Infinity, doorHand?: Float32Array): void {
     this.restTaken.clear();
     this.riddenNow.clear();
+    this.parkedNow.clear();
     this.seedCount = 0;
     const set = this.set;
     if (!set) return;
@@ -1700,8 +1720,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const mounted = rideId >= 0 ? this.objectById.get(rideId) : undefined;
       const mount = mounted?.ride ? mounted : null;
       if (rideId >= 0) this.riddenNow.add(rideId);
-      // (Left out by a place they're visiting: not at its place either.)
-      else if (rideId <= -2) this.riddenNow.add(-2 - rideId);
+      // (Left out by a place they're visiting: not at its place either, but where it stands; got on there again, it
+      // slides from there.)
+      else if (rideId <= -2) {
+        const id = -2 - rideId;
+        this.riddenNow.add(id);
+        const at = k.parkX === undefined ? null : { x: curr[o + k.parkX], z: curr[o + k.parkZ!], yaw: curr[o + k.parkYaw!] };
+        if (at) {
+          this.parkAt[i] = at;
+          if (this.mountId[i] < 0) this.parkedNow.set(id, at);
+        }
+      }
       // A walk's first and last step: moving in one snapshot and standing in the other glides too,
       // or the start and the end of every walk jump at speeds 4-5 (a step is 2.25 m at speed 4).
       // (Riding, as far as they ride between them.)
@@ -1738,6 +1767,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         // (Back in view on it, riding: no getting on.)
         this.mountId[i] = mount ? rideId : -1;
         this.mountOn[i] = mount ? 1 : 0;
+        if (mount) this.parkAt[i] = null;
+        else if (rideId <= -2 && this.parkAt[i]) this.parkedNow.set(-2 - rideId, this.parkAt[i]!);
         continue;
       }
       // Far off (in low detail), posed in full only every `FAR_EVERY` frames (staggered by row): between, the pose
@@ -1791,6 +1822,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.mountOn[i] = appeared ? (mount ? 1 : 0) : mount ? Math.min(1, this.mountOn[i] + mountStep) : Math.max(0, this.mountOn[i] - mountStep);
       if (this.mountOn[i] <= 0) this.mountId[i] = -1;
       if (this.mountId[i] >= 0) this.riddenNow.add(this.mountId[i]);
+      // (On it again: from now on its place is home's.)
+      if (mount && this.mountOn[i] >= 1) this.parkAt[i] = null;
+      // (Off it where it was left: drawn there from now, by the renderer.)
+      if (rideId <= -2 && this.mountId[i] < 0 && this.parkAt[i]) this.parkedNow.set(-2 - rideId, this.parkAt[i]!);
       this.mounting = mount?.ride?.mount ?? null;
       if (appeared) {
         rig.x = tx;
@@ -2114,6 +2149,21 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.ridden.clear();
       for (const id of this.riddenNow) this.ridden.add(id);
       this.riddenChanged = true;
+    }
+    // Left out where: changed, the renderer draws them again.
+    let still = this.parkedNow.size === this.parked.size;
+    if (still) {
+      for (const [id, at] of this.parkedNow) {
+        const was = this.parked.get(id);
+        if (was && was.x === at.x && was.z === at.z && was.yaw === at.yaw) continue;
+        still = false;
+        break;
+      }
+    }
+    if (!still) {
+      this.parked.clear();
+      for (const [id, at] of this.parkedNow) this.parked.set(id, at);
+      this.parkedChanged = true;
     }
     this.mounting = null;
     this.props.forEachBuilt(this.showProp);

@@ -9,7 +9,7 @@ use crate::common;
 
 use common::hamlets::{Hamlets, two_hamlets, with_cars};
 use serde_json::{Value, json};
-use sim_core::{MINUTES_PER_TICK, World, clock};
+use sim_core::{MINUTES_PER_TICK, World, clock, snapshot};
 
 const TICKS_PER_MINUTE: u64 = (1.0 / MINUTES_PER_TICK) as u64;
 
@@ -139,6 +139,9 @@ fn someone_with_a_bike_rides_to_a_place_beyond_walking_reach_and_is_home_by_the_
         std::collections::BTreeSet::new(),
     );
     let mut parked = false;
+    let stable = w.objects[bike].stable as f32;
+    let mut left = Vec::new();
+    let mut buf = vec![0.0; snapshot::CAPACITY];
     while w.tick < end {
         w.tick_once();
         let now = on_outings(&w);
@@ -147,11 +150,25 @@ fn someone_with_a_bike_rides_to_a_place_beyond_walking_reach_and_is_home_by_the_
             if sim.riding == Some(bike as u32) {
                 rode.insert((s, plot));
             }
-            // (There, off it: it's not at home, nor under them.)
+            // (There, off it: it's not at home, nor under them; the snapshot says where it's left.)
             let (x, z) = sim.tile();
-            parked |= w.plot_at(x, z) == Some(plot)
+            let off = w.plot_at(x, z) == Some(plot)
                 && sim.riding.is_none()
                 && sim.bike() == Some(bike as u32);
+            parked |= off;
+            if off && w.tick.is_multiple_of(600) {
+                snapshot::write(&w, &mut buf);
+                let o = snapshot::HEADER_LEN + s as usize * snapshot::SIM_STRIDE;
+                if buf[o + snapshot::sim::RIDE] == -2.0 - stable {
+                    left.push((
+                        plot,
+                        [
+                            buf[o + snapshot::sim::PARK_X],
+                            buf[o + snapshot::sim::PARK_Z],
+                        ],
+                    ));
+                }
+            }
         }
         let hour = clock::hour(w.tick);
         if hour >= home_by || hour < 6.0 {
@@ -163,6 +180,40 @@ fn someone_with_a_bike_rides_to_a_place_beyond_walking_reach_and_is_home_by_the_
     eprintln!("rode out on the bike (resident, place): {rode:?}");
     assert!(!rode.is_empty(), "nobody rode anywhere out of reach");
     assert!(parked, "nobody left the bike by the place they went to");
+    // Left on the place's lot, on free ground off its paths, near its way in.
+    assert!(
+        !left.is_empty(),
+        "the snapshot never said where the bike was left"
+    );
+    let paths: Vec<Value> = serde_json::from_str::<Value>(&h.town).unwrap()["meta"]["paths"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    for &(plot, at) in &left {
+        let p = &w.plots[plot as usize];
+        let (x, z) = (at[0].floor() as i32, at[1].floor() as i32);
+        assert_eq!(
+            w.plot_at(x, z),
+            Some(plot),
+            "left at {at:?}, off the place's lot"
+        );
+        assert!(
+            sim_core::travel::dist(at, p.arrival_point()) <= 9.0,
+            "left at {at:?}, far from the way in at {:?}",
+            p.arrival_point()
+        );
+        let on_path = paths.iter().any(|r| {
+            let k = |key: &str| r[key].as_f64().unwrap_or(0.0) as f32;
+            at[0] > k("x") && at[0] < k("x") + k("w") && at[1] > k("z") && at[1] < k("z") + k("d")
+        });
+        assert!(!on_path, "left at {at:?}, on a path");
+        assert!(
+            !w.objects
+                .iter()
+                .any(|o| o.id as usize != bike && (o.x, o.z) == (x, z)),
+            "left at {at:?}, on something"
+        );
+    }
     assert!(
         out_late.is_empty(),
         "out on an outing after {home_by}:00 (day, resident, place): {out_late:?}"

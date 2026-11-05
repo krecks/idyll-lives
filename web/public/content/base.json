@@ -1932,6 +1932,8 @@
     "latestHour": 20,
     "outingMinutes": 90,
     "outingHomeBy": 23,
+    "leastMinutes": 40,
+    "againMinutes": 90,
     "company": 0.05,
     "boredMinutes": 30,
     "farewell": ["goodbyeHug", "goodbye"],

@@ -248,6 +248,11 @@ fn generated_worlds_are_livable() {
             .count();
         let mut rode = std::collections::BTreeSet::new();
         let mut on_since = vec![None::<(u64, u8)>; w.sims.len()];
+        // (Who's at a visit or an outing, since when, where: `visits.leastMinutes` there at least,
+        // unless a need is about to run out, it's late or they're off to work.)
+        let mut there: Vec<Option<(u64, u32)>> = vec![None; w.sims.len()];
+        let mut short = std::collections::BTreeSet::new();
+        let least = (w.content.visits.least_minutes * 20.0) as u64;
         let mut stuck = std::collections::BTreeSet::new();
         let mut failures_on_road = std::collections::BTreeSet::new();
         let mut stacked: Stacked = Default::default();
@@ -272,6 +277,48 @@ fn generated_worlds_are_livable() {
                         Some(TaskKind::Work) => 3,
                         _ => 0,
                     };
+                    if let Some(at) = there.get_mut(k) {
+                        // (Over once they're off home, or gone home.)
+                        let home = sim
+                            .current()
+                            .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
+                        let now = sim
+                            .visiting
+                            .filter(|v| v.arrived > 0 && !home)
+                            .map(|v| (v.arrived, v.plot));
+                        if let Some((t0, plot)) = *at
+                            && now.is_none_or(|n| n.0 != t0)
+                        {
+                            let content = &w.content;
+                            let critical =
+                                content.needs.iter().zip(&sim.needs).any(|(d, &n)| {
+                                    !d.room && n < content.autonomy.urgent_below + 0.02
+                                });
+                            let hour = sim_core::clock::hour(w.tick);
+                            let work = sim
+                                .current()
+                                .is_some_and(|a| matches!(a.task.kind, TaskKind::Work));
+                            // (Come in someone else's car: they go when its driver does.)
+                            let passenger = w.cars.iter().any(|c| {
+                                c.trip.is_some_and(|t| t.driver != sim.id)
+                                    && c.riders.contains(&sim.id)
+                            });
+                            if w.tick < t0 + least
+                                && !critical
+                                && !work
+                                && !passenger
+                                && (6.0..22.0).contains(&hour)
+                                && sim.here()
+                            {
+                                short.insert(format!(
+                                    "{} went home from plot {plot} {} min after getting there",
+                                    sim.name,
+                                    (w.tick - t0) / 20
+                                ));
+                            }
+                        }
+                        *at = now;
+                    }
                     let since = on_since.get_mut(k);
                     let Some(since) = since else { continue };
                     match (on, *since) {
@@ -293,6 +340,9 @@ fn generated_worlds_are_livable() {
             failures.push(format!(
                 "{label}: {name} on a bike in town for over {RIDE_HOURS} hours"
             ));
+        }
+        for s in &short {
+            failures.push(format!("{label}: {s}"));
         }
         failures.extend(
             failures_on_road

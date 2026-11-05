@@ -2,7 +2,8 @@
  * Bikes and e-scooters (content `vehicle`, sim-core `ride.rs`) standing on lots other than the one viewed, on
  * PlayCanvas. The viewed lot's are its own objects (`lotContents.ts`); the street draws the rest of what stands
  * in other gardens, but not these: they go off with their riders, and aren't drawn where they stand while
- * ridden (`hide`: the residents draw them under their riders, `shared/characters/vehicles.ts`).
+ * ridden (`hide`: the residents draw them under their riders, `shared/characters/vehicles.ts`). One left out by a
+ * place its rider is visiting (`setAway`, the residents' `parked`) is drawn there, the viewed lot's too.
  *
  * One instanced draw per mesh of each model in the player's colours for it, shared by every copy: the model
  * near the camera's target (`NEAR`), its far version further off; none past `FAR`, nor outside the chunks
@@ -18,6 +19,7 @@ import { colorsKey, objectCentre, type ObjectPlacement, type WorldStructure } fr
 import { chunkAt } from '../shared/chunks';
 import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
 import { painted, placementVariation } from '../shared/modelEntry';
+import { type Away, placements } from '../shared/parked';
 
 /** Within this far of the camera's target (m), the whole model; further, its far version. */
 const NEAR = 45;
@@ -31,7 +33,13 @@ interface Parked {
   /** Its placement (game space), worked out once. */
   matrix: ArrayLike<number>;
   look: Look;
+  /** Off the viewed lot: drawn where it stands at home (the viewed lot's own objects draw it there otherwise). */
+  home: boolean;
+  /** Its size and turn as placed (`placementVariation`), kept for drawing it where it's left out. */
+  size: number;
+  turn: number;
 }
+
 
 /** A model in the player's colours for it: its near and far templates' draws, built once. */
 interface Look {
@@ -45,6 +53,9 @@ export class ParkedRides {
   private parked: Parked[] = [];
   private readonly looks = new Map<string, Look>();
   private hidden: ReadonlySet<number> = new Set();
+  private away: ReadonlyMap<number, Away> = new Map();
+  /** Scratch for a placement left out (`write`). */
+  private readonly awayMatrices = new Map<number, Float32Array>();
   private chunks: ReadonlySet<number> | null = null;
   private eye: { x: number; z: number } | null = null;
   private pit: readonly [number, number, number, number] | null = null;
@@ -68,11 +79,14 @@ export class ParkedRides {
     return !!content.object(def)?.vehicle;
   }
 
-  /** The world's things to ride that stand off the viewed lot (`viewed`: whether a spot is on it), outdoors on the ground storey. */
+  /**
+   * The world's things to ride, outdoors on the ground storey: drawn where they stand when off the viewed lot
+   * (`viewed`: whether a spot is on it), and wherever they're left out by a place (`setAway`), the viewed lot's too.
+   */
   async build(world: WorldStructure, viewed: (x: number, z: number) => boolean): Promise<void> {
     const generation = ++this.generation;
     const ground = world.storeyDepth ?? world.depth;
-    const list = world.objects.filter((o) => ParkedRides.rides(this.content, o.def) && o.z + o.d <= ground && !viewed(o.x + o.w / 2, o.z + o.d / 2));
+    const list = world.objects.filter((o) => ParkedRides.rides(this.content, o.def) && o.z + o.d <= ground);
     const keyOf = (o: ObjectPlacement) => `${o.def}${colorsKey(o.colors)}`;
     const wanted = new Map(list.map((o) => [keyOf(o), o]));
     for (const [key, look] of this.looks) {
@@ -97,7 +111,8 @@ export class ParkedRides {
       const model = this.content.object(o.def)?.model ?? '';
       const { turn, size } = placementVariation(this.assets.get(model, 'model')?.vary ?? 0, o.x, o.z);
       const yaw = (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn;
-      return [{ id: o.id, x: c.x, z: c.z, matrix: compose(size, size, size, quatYawPitchRoll(yaw, 0, 0, this.q), c.x, 0, c.z, new Float32Array(16)), look }];
+      const home = !viewed(o.x + o.w / 2, o.z + o.d / 2);
+      return [{ id: o.id, x: c.x, z: c.z, matrix: compose(size, size, size, quatYawPitchRoll(yaw, 0, 0, this.q), c.x, 0, c.z, new Float32Array(16)), look, home, size, turn }];
     });
     this.write();
   }
@@ -105,6 +120,12 @@ export class ParkedRides {
   /** Those ridden now (stable ids): not drawn where they stand. */
   hide(ids: ReadonlySet<number>): void {
     this.hidden = ids;
+    this.write();
+  }
+
+  /** Those left out by a place their riders are visiting (stable id: where, which way): drawn there. */
+  setAway(away: ReadonlyMap<number, Away>): void {
+    this.away = new Map(away);
     this.write();
   }
 
@@ -135,18 +156,25 @@ export class ParkedRides {
 
   /** Every copy written again where it's drawn (near or far) or left out. */
   private write(): void {
-    const near = new Map<Look, Parked[]>();
-    const far = new Map<Look, Parked[]>();
-    for (const p of this.parked) {
-      if (this.hidden.has(p.id) || (this.chunks && !this.chunks.has(chunkAt(p.x, p.z)))) continue;
+    const near = new Map<Look, { matrix: ArrayLike<number> }[]>();
+    const far = new Map<Look, { matrix: ArrayLike<number> }[]>();
+    for (const { p, at } of placements(this.parked, this.away, this.hidden)) {
+      const [x, z] = at ? [at.x, at.z] : [p.x, p.z];
+      if (this.chunks && !this.chunks.has(chunkAt(x, z))) continue;
       const r = this.pit;
-      if (r && p.x > r[0] && p.x < r[2] && p.z > r[1] && p.z < r[3]) continue;
-      const d = this.eye ? Math.hypot(p.x - this.eye.x, p.z - this.eye.z) : 0;
+      if (!at && r && x > r[0] && x < r[2] && z > r[1] && z < r[3]) continue;
+      const d = this.eye ? Math.hypot(x - this.eye.x, z - this.eye.z) : 0;
       if (d > FAR) continue;
+      let matrix = p.matrix;
+      if (at) {
+        const m = this.awayMatrices.get(p.id) ?? new Float32Array(16);
+        this.awayMatrices.set(p.id, m);
+        matrix = compose(p.size, p.size, p.size, quatYawPitchRoll(at.yaw + p.turn, 0, 0, this.q), x, 0, z, m);
+      }
       const into = d <= NEAR ? near : far;
       const list = into.get(p.look);
-      if (list) list.push(p);
-      else into.set(p.look, [p]);
+      if (list) list.push({ matrix });
+      else into.set(p.look, [{ matrix }]);
     }
     for (const look of this.looks.values()) {
       for (const [draws, list] of [
