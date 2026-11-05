@@ -816,7 +816,7 @@ impl Graph {
         let road = self.roads.iter().position(|r| r.source == source)? as u32;
         let s = s.clamp(0.0, self.roads[road as usize].len());
         Some(RoadPoint {
-            edge: self.edge_at(road, s),
+            edge: self.edge_at(road, s)?,
             road,
             s,
             off: 0.0,
@@ -859,10 +859,13 @@ impl Graph {
     }
 
     /// The edge of road `road` that `s` is on.
-    fn edge_at(&self, road: u32, s: f32) -> u32 {
-        let list = &self.road_edges[road as usize];
+    /// The edge of `road` that `s` m along it is on. None: a road too short for an edge (under
+    /// half a metre end to end, as an old save or a hand-built town may have): not in the
+    /// network.
+    fn edge_at(&self, road: u32, s: f32) -> Option<u32> {
+        let list = self.road_edges.get(road as usize)?;
         let i = list.partition_point(|&e| self.edges[e as usize].s1 < s);
-        list[i.min(list.len() - 1)]
+        list.get(i.min(list.len().checked_sub(1)?)).copied()
     }
 
     /// The nearest points on up to `n` different roads within `reach` m of `p` that `mode` may
@@ -907,11 +910,10 @@ impl Graph {
                 }
             }
         }
+        // (Not a road too short for an edge: not in the network.)
+        best.retain_mut(|b| self.edge_at(b.road, b.s).map(|e| b.edge = e).is_some());
         best.sort_by(|a, b| a.off.total_cmp(&b.off).then(a.road.cmp(&b.road)));
         best.truncate(n);
-        for b in &mut best {
-            b.edge = self.edge_at(b.road, b.s);
-        }
         best
     }
 
@@ -1501,6 +1503,29 @@ mod tests {
     fn line(a: [f32; 2], b: [f32; 2]) -> Vec<[f32; 2]> {
         let n = dist(a, b).ceil() as usize;
         (0..=n).map(|i| lerp(a, b, i as f32 / n as f32)).collect()
+    }
+
+    #[test]
+    fn a_road_too_short_for_an_edge_is_left_out_not_a_panic() {
+        // (Half a metre or less end to end, as an old save or a hand-built town may have: on its
+        // own off the street, and as a stub from it.)
+        let g = Graph::build(&[
+            road(&line([0.0, 10.0], [100.0, 10.0]), 6.0, RoadKind::Street),
+            road(&[[50.0, 40.0], [50.3, 40.0]], 6.0, RoadKind::Lane),
+            road(&[[20.0, 10.0], [20.0, 10.4]], 6.0, RoadKind::Lane),
+        ]);
+        for (p, mode) in [
+            ([50.1, 40.0], Mode::Car),
+            ([50.1, 40.0], Mode::Foot),
+            ([20.0, 10.2], Mode::Car),
+        ] {
+            for q in g.near(p, 40.0, 3, mode) {
+                assert_eq!(g.roads[q.road as usize].source, 0, "{q:?}");
+            }
+        }
+        assert!(g.at_source(1, 0.1).is_none());
+        assert!(g.at_source(2, 0.2).is_none());
+        assert!(g.at_source(0, 50.0).is_some());
     }
 
     #[test]
