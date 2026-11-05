@@ -3,9 +3,11 @@
 //!
 //! - Supertone's Supertonic 3 (BigScience OpenRAIL-M: its licence, with its use restrictions, is
 //!   fetched with it and goes along), its config, text indexer and ten voice styles as published,
-//!   and its four ONNX graphs with their weights stored as 16-bit floats (`fp16`: half the size,
-//!   the same arithmetic; a `NOTICE` says so) and gzipped (`.onnxz`, unpacked by the browser):
-//!   398 MB as published, 185 MB here. https://huggingface.co/Supertone/supertonic-3
+//!   and its four ONNX graphs with their big weights stored smaller, computing in float32 as
+//!   before (a `NOTICE` says so): the text encoder, vector estimator and vocoder as 8-bit integers
+//!   with a scale per channel (`int8.rs`), the duration predictor as 16-bit floats (`fp16.rs`; in
+//!   int8 some lines came out a frame longer or shorter); gzipped (`.onnxz`, unpacked by the
+//!   browser): 398 MB as published, 87 MB here. https://huggingface.co/Supertone/supertonic-3
 //! - Misaki's US English dictionaries (Apache-2.0, its licence goes along as `misaki-LICENSE.txt`),
 //!   for mouth shapes: https://github.com/hexgrad/misaki
 //!
@@ -15,6 +17,7 @@
 
 use crate::download::{self, agent, gzip9, sha256_hex};
 use crate::fp16::weights_to_fp16;
+use crate::int8::weights_to_int8;
 use std::path::{Path, PathBuf};
 
 const SUPERTONIC: &str = "https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323";
@@ -23,28 +26,38 @@ const SUPERTONIC: &str = "https://huggingface.co/Supertone/supertonic-3/resolve/
 /// versions.
 pub const MODEL_DIR: &str = "supertonic-3/";
 
-/// Supertonic 3's graphs: as published, and with their weights in 16-bit floats, saved gzipped as
-/// `<name>.onnxz`.
-const GRAPHS: [(&str, &str, &str); 4] = [
+/// How a graph's big weights are stored.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Store {
+    Fp16,
+    Int8,
+}
+
+/// Supertonic 3's graphs: as published, and as stored (saved gzipped as `<name>.onnxz`).
+const GRAPHS: [(&str, &str, &str, Store); 4] = [
     (
         "duration_predictor",
         "c3eb91414d5ff8a7a239b7fe9e34e7e2bf8a8140d8375ffb14718b1c639325db",
         "622de4d364dcb42259986c32d5ca4a0f521fddfaed09ffb155aa8cf3d7e4d864",
+        Store::Fp16,
     ),
     (
         "text_encoder",
         "c7befd5ea8c3119769e8a6c1486c4edc6a3bc8365c67621c881bbb774b9902ff",
-        "7533e6a775956007f8dc848d008751e7dbbcf8399cefb5ef180737541c3e0e0c",
+        "374d6738efba99252a5413613b2e07631939473e49262e8c3d1e62e7279327f9",
+        Store::Int8,
     ),
     (
         "vector_estimator",
         "883ac868ea0275ef0e991524dc64f16b3c0376efd7c320af6b53f5b780d7c61c",
-        "27a86f93335fd6edec7210c24dddb4f0de700688f9f0d18ab6418bd852742402",
+        "07bae522192843cfb973a3042d7bd7ebee041fbfa4f90c3fc46334ecf7a75212",
+        Store::Int8,
     ),
     (
         "vocoder",
         "085de76dd8e8d5836d6ca66826601f615939218f90e519f70ee8a36ed2a4c4ba",
-        "373aca3e481c5478af6e66773a58dcd1bdd6e3f874d676dc3b90ffb7e268452a",
+        "43ccb274d069d68e73592366519e886ce67b777550724c4f2407e5471349fe54",
+        Store::Int8,
     ),
 ];
 
@@ -144,10 +157,13 @@ const LEXICON: [(&str, &str); 2] = [
 const NOTICE: &str = "Supertonic 3 (Supertone Inc.), https://huggingface.co/Supertone/supertonic-3, revision 3cadd1ee.
 Licensed under the BigScience OpenRAIL-M licence (LICENSE.txt), including its use restrictions.
 
-Modified by Idyll Lives (cargo fetch-voice, crates/tools/src/fp16.rs): in duration_predictor,
-text_encoder, vector_estimator and vocoder, every float32 weight of 1,024 values or more is stored
-as float16 and cast back to float32 when the model loads; the files are gzipped (.onnxz). Nothing
-was retrained. tts.json, unicode_indexer.json and the voice styles (F1-F5, M1-M5) are unchanged.
+Modified by Idyll Lives (cargo fetch-voice, crates/tools/src/int8.rs and fp16.rs): in
+text_encoder, vector_estimator and vocoder, every float32 weight of 1,024 values or more with two
+or more axes is stored as 8-bit integers with a float32 scale per channel, and the other float32
+weights of 1,024 values or more as float16; in duration_predictor every float32 weight of 1,024
+values or more is stored as float16. All are turned back into float32 when the model loads, and
+the files are gzipped (.onnxz). Nothing was retrained. tts.json, unicode_indexer.json and the
+voice styles (F1-F5, M1-M5) are unchanged.
 ";
 
 /// The model's folder (`web/public/voice/supertonic-3/`).
@@ -196,18 +212,24 @@ fn run() -> Result<(), String> {
         let bytes = download::download(&agent, &format!("{SUPERTONIC}/{path}"), expected)?;
         download::write(&file, &bytes)?;
     }
-    for (name, sha, fp16) in GRAPHS {
+    for (name, sha, stored, store) in GRAPHS {
         let file = model.join(format!("{name}.onnxz"));
-        if download::file_sha256(&file, true).as_deref() == Some(fp16) {
+        if download::file_sha256(&file, true).as_deref() == Some(stored) {
             continue;
         }
-        println!("voice: downloading {name}.onnx, storing its weights as float16");
+        println!("voice: downloading {name}.onnx, storing its weights as {store:?}");
         let published = download::download(&agent, &format!("{SUPERTONIC}/onnx/{name}.onnx"), sha)?;
-        let (converted, weights, saved) = weights_to_fp16(&published)?;
+        let (converted, weights, saved) = match store {
+            Store::Fp16 => weights_to_fp16(&published)?,
+            Store::Int8 => {
+                let c = weights_to_int8(&published)?;
+                (c.model, c.int8 + c.fp16, c.saved)
+            }
+        };
         let actual = sha256_hex(&converted);
-        if actual != fp16 {
+        if actual != stored {
             return Err(format!(
-                "{name}: float16 weights SHA-256 {actual}, expected {fp16}"
+                "{name}: {store:?} weights SHA-256 {actual}, expected {stored}"
             ));
         }
         download::write(&file, &gzip9(&converted)?)?;
@@ -281,6 +303,21 @@ fn lexicon(agent: &ureq::Agent, out: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The duration predictor stays float16: in int8 some lines came out a frame longer or shorter.
+    #[test]
+    fn the_durations_keep_float16() {
+        let stores: Vec<(&str, Store)> = GRAPHS.iter().map(|g| (g.0, g.3)).collect();
+        assert_eq!(
+            stores,
+            [
+                ("duration_predictor", Store::Fp16),
+                ("text_encoder", Store::Int8),
+                ("vector_estimator", Store::Int8),
+                ("vocoder", Store::Int8)
+            ]
+        );
+    }
 
     #[test]
     fn the_licence_is_saved_as_text() {

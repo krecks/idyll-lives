@@ -9,6 +9,7 @@ pub mod decoders;
 pub mod download;
 pub mod envconv;
 pub mod fp16;
+pub mod int8;
 pub mod licenses;
 pub mod llmfetch;
 pub mod llmslim;

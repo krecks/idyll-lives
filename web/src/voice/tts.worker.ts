@@ -10,7 +10,7 @@
  * without downloading.
  */
 
-import { fetchOnce, forget, gunzipText, openCache, prune } from '../ml/assets';
+import { fetchOnce, forget, gunzipText, openCache, openRuntimeCache, prune } from '../ml/assets';
 import { configureOrt, hasWebGpu, importOrt, ORT_WASM, sessionOptions } from '../ml/ort';
 import init, { Voice } from './wasm-pkg/voice_wasm.js';
 import wasmUrl from './wasm-pkg/voice_wasm_bg.wasm?url';
@@ -28,22 +28,23 @@ const scope = self as WorkerScope;
 
 /** Bumped when the files change; older caches are deleted. (New files under new names don't need it.) */
 const CACHE_PREFIX = 'littlelives-voice-';
-const CACHE = `${CACHE_PREFIX}v5`;
+// v6: the graphs' weights in 8-bit integers (0.7.0), the same names.
+const CACHE = `${CACHE_PREFIX}v6`;
 /** Pocket TTS's encoded voices, no longer used: deleted. */
 const OLD_VOICES_PREFIX = 'littlelives-voices-';
 
 /**
  * Files under `voice/` (made by `cargo fetch-voice`), with sizes in bytes for the progress
- * bar. The graphs come with their weights in 16-bit floats, gzipped (`.onnxz`: unpacked by
- * `fetchOnce`).
+ * bar. The graphs come with their weights in 8-bit integers (the duration predictor's in 16-bit
+ * floats), gzipped (`.onnxz`: unpacked by `fetchOnce`).
  */
 type File = [name: string, bytes: number];
 const MODEL_DIR = 'supertonic-3/';
 const MODELS = {
   duration: ['duration_predictor.onnxz', 1_633_681],
-  text: ['text_encoder.onnxz', 16_783_293],
-  vector: ['vector_estimator.onnxz', 119_556_677],
-  vocoder: ['vocoder.onnxz', 47_191_753],
+  text: ['text_encoder.onnxz', 8_500_990],
+  vector: ['vector_estimator.onnxz', 55_258_368],
+  vocoder: ['vocoder.onnxz', 21_749_302],
 } satisfies Record<keyof Engine['sessions'], File>;
 /** A voice style file is about 291 KB. */
 const STYLE_BYTES = 291_500;
@@ -121,8 +122,8 @@ async function load(base: string, device: VoiceDevice): Promise<void> {
   const names = Object.keys(MODELS) as (keyof typeof MODELS)[];
   // `built`: imported through Vite. In dev their URLs aren't hashed, so a rebuilt wasm would
   // otherwise come back stale from the cache; those are fetched fresh there.
-  const files: { url: string; size: number; built?: boolean }[] = [
-    { url: ORT_WASM.url, size: ORT_WASM.bytes, built: true },
+  const files: { url: string; size: number; built?: boolean; runtime?: boolean }[] = [
+    { url: ORT_WASM.url, size: ORT_WASM.bytes, built: true, runtime: true },
     { url: wasmUrl, size: VOICE_WASM_BYTES, built: true },
     ...names.map((k) => ({ url: `${base}voice/${MODEL_DIR}${MODELS[k][0]}`, size: MODELS[k][1] })),
     ...SMALL.map(([name, size]) => ({ url: `${base}voice/${name}`, size })),
@@ -131,16 +132,18 @@ async function load(base: string, device: VoiceDevice): Promise<void> {
   const total = files.reduce((n, f) => n + f.size, 0);
   const done = files.map(() => 0);
   const report = () => scope.postMessage({ type: 'progress', loaded: done.reduce((a, b) => a + b, 0), total });
-  const cache = await openCache(CACHE_PREFIX, CACHE);
+  // The runtime in the cache both workers share (`openRuntimeCache`), the rest in this one's.
+  const [cache, runtime] = await Promise.all([openCache(CACHE_PREFIX, CACHE), openRuntimeCache()]);
   const bytes = await Promise.all(
     files.map((f, i) =>
-      fetchOnce(f.built && import.meta.env.DEV ? null : cache, f.url, (n) => {
+      fetchOnce(f.built && import.meta.env.DEV ? null : f.runtime ? runtime : cache, f.url, (n) => {
         done[i] = Math.min(n, f.size);
         report();
       }),
     ),
   );
-  void prune(cache, files.map((f) => f.url));
+  void prune(cache, files.filter((f) => !f.runtime).map((f) => f.url));
+  void prune(runtime, [ORT_WASM.url]);
   const [ortWasm, wasm, ...rest] = bytes;
   const models = rest.slice(0, names.length);
   const [config, indexer, lexicon, ...styles] = rest.slice(names.length);

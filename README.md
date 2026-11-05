@@ -58,7 +58,7 @@ bun install
 bun run dev      # builds both WASM modules, fetches the voice and language models, then starts Vite on http://localhost:5173
 ```
 
-The first `bun run dev` or `bun run build` downloads the voice model (398 MB as published, stored as 185 MB) and the language model (294 MB of weights as published, repacked to 228 MB without changing what it computes, stored gzipped as 196 MB) into `web/public/voice/` and `web/public/llm/` (not in git). Every file is pinned and checked by SHA-256, and files already there are kept.
+The first `bun run dev` or `bun run build` downloads the voice model (398 MB as published, its weights stored in 8 bits as 87 MB) and the language model (294 MB of weights as published, repacked to 228 MB without changing what it computes, stored gzipped as 196 MB) into `web/public/voice/` and `web/public/llm/` (not in git). Every file is pinned and checked by SHA-256, and files already there are kept.
 
 | Command (in `web/`) | What it does |
 |---|---|
@@ -211,7 +211,7 @@ Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save
 4. Check the live site:
    - The menu shows the new version, and Credits "Version <x.y.z> (build <the tagged commit>)". (To find the version in the bundle, search `index-*.js` for it without double quotes: it sits in backticks.)
    - F3 shows Shared memory: on, and a game runs.
-   - The large files download in full, which only the live site can show: `llm/lfm2.5-350m/model_q4.onnx_dataz` returns 200 and is 195,523,654 bytes (gunzipped, its SHA-256 is the one in `crates/tools/src/llmfetch.rs`), and `voice/supertonic-3/vector_estimator.onnxz` is 119,556,677 bytes (packed by the Rust fetch tools; the voice file CI still has cached from the earlier tools is 119,568,968 bytes, and is as good: what matters is the unzipped SHA-256).
+   - The large files download in full, which only the live site can show: `llm/lfm2.5-350m/model_q4.onnx_dataz` returns 200 and is 195,523,654 bytes (gunzipped, its SHA-256 is the one in `crates/tools/src/llmfetch.rs`), and `voice/supertonic-3/vector_estimator.onnxz` is 55,258,368 bytes (both packed by the Rust fetch tools; what matters is the unzipped SHA-256).
 5. Publish the release notes: `gh release create v<x.y.z> --verify-tag --title "Idyll Lives <x.y.z>" --notes-file <the version's CHANGELOG section>`.
 
 **If a release goes wrong,** fix forward, or redeploy the last good build (`gh workflow run pages.yml --ref <tag> -f deploy=true`). 0.6.0 and 0.7.0 share save format 35, so 0.6.0 is a safe build to go back to: it opens 0.7.0's saves without what it doesn't know (the bikes and e-scooters, a parcel waiting to be set up). 0.5.1 can't open 0.6.0's saves (format 35), so it is one to go back to only with that in mind; 0.5.0 and 0.5.1 share save format 33, so 0.5.0 is a safe build to go back to; 0.4.2 can't open format 33, so it is one to go back to only with that in mind (0.3.1 to 0.4.2 share format 32); 0.3.0 can't open 0.3.1's saves (format 32), 0.2.0 can't open 0.3.0's (format 29), and v0.1.0 can't open 0.2.0's database (version 2): an older build keeps the newer saves and skips them, so it lists only the saves it can open. Nothing is lost; the saves come back with the newer build.
