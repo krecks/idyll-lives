@@ -666,6 +666,17 @@ fn on_a_6_m_lane_a_car_passing_one_pulled_over_keeps_its_distance_or_waits() {
 }
 
 #[test]
+fn a_car_pulling_out_across_the_street_as_one_turns_in_gets_out() {
+    // (On a 7 m street, the one pulling out of its driveway opposite, or a little further on,
+    // still turning out as the one coming home turns in across its lane: the two come within the
+    // gap the cars keep of each other, the one coming home backs up to let it finish its turn
+    // (and stays back while it waits its turn), and both get on their way. They waited for each
+    // other for good, the one coming home backing up and coming back up to it by turns.)
+    turn_in_by_one_pulling_out(7.0, &[(60.0, true), (70.0, false)], 100, 4000);
+    turn_in_by_one_pulling_out(7.0, &[(60.0, true), (100.0, false)], 0, 4000);
+}
+
+#[test]
 fn a_taxi_waiting_on_a_bend_for_a_car_turning_out_lets_it_by_clear() {
     // (Oak Clearing, a normal town of the 0.7.0 samples: about 18:34 a car turns out of its
     // driveway onto a 6 m lane's bend and on along it, as the work taxi coming the other way waits
@@ -831,6 +842,56 @@ fn a_car_turning_out_of_a_side_road_waits_for_one_coming_along_the_road() {
                 .iter()
                 .map(|c| (c.state, c.progress))
                 .collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
+fn one_turning_out_of_a_side_road_and_one_coming_home_past_it_both_get_through_its_box() {
+    // (As at Pebble Bay: one coming home along the main road from the west to a house just east
+    // of the junction, as one turns out of the side road through its box: the claims let them in
+    // together where they'd pass no further apart than the gap the cars keep, and in the box,
+    // where nobody pulls over, they waited for each other for good. One of them waits.)
+    let side = |s: f32, west: bool| House {
+        plot: [if west { 102.0 } else { 122.0 }, 45.0 - s, 16.0, 14.0],
+        inner: [if west { 110.0 } else { 130.0 }, 52.0 - s],
+        front: if west { 1.0 } else { -1.0 },
+        along_x: true,
+        road: 1,
+        s,
+    };
+    let home = House {
+        plot: [133.0, 8.0, 16.0, 18.0],
+        inner: [141.0, 20.5],
+        front: 1.0,
+        along_x: false,
+        road: 0,
+        s: 140.5,
+    };
+    for out in [side(12.0, true), side(6.0, false), side(12.0, false)] {
+        let mut w = t_junction(&[home, out]);
+        come_home(&mut w, 0);
+        set_off(&mut w, 1);
+        let mut least = f32::INFINITY;
+        let done = run_clear(
+            &mut w,
+            4000,
+            |w| least = least.min(cars_gap(w).0),
+            |w| w.cars[0].state == CarState::Parked && w.cars[1].state == CarState::Away,
+        );
+        assert!(
+            done,
+            "({:?}) not both on their way: {:?}",
+            out.inner,
+            w.cars
+                .iter()
+                .map(|c| (c.state, c.progress))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            least >= CAR_GAP,
+            "({:?}) they came {least:.3} m apart",
+            out.inner
         );
     }
 }
