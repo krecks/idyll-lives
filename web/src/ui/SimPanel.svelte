@@ -145,7 +145,12 @@
           {#each sim.actions as action, i (i)}
             <li class:active={action.active} class:auto={!action.directed}>
               <span class="label">
-                {action.label}{#if action.target !== null}<span class="with"> · {info(action.target)?.name}</span>{/if}
+                {#if action.active && sim.taxi}
+                  <!-- (On their way by the work taxi: waiting for it or riding it, in place of "Go to work" or "At work".) -->
+                  {taxiText(sim.taxi, sim.job, (m) => clock(m, settings.clock24h))}
+                {:else}
+                  {action.label}{#if action.target !== null}<span class="with"> · {info(action.target)?.name}</span>{/if}
+                {/if}
               </span>
               {#if action.active}
                 <span class="progress"><span style="transform:scaleX({action.progress})"></span></span>
