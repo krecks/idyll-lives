@@ -33,6 +33,7 @@ Getting about town: bikes and e-scooters, lifts from the neighbours and a shared
 
 ### Also
 - **Saves:** unchanged (format 35): 0.6.0 and 0.7.0 open each other's saves. What 0.7.0 adds is kept in fields 0.6.0 doesn't read (a parcel waiting to be set up, a resident late for the shift they're at, a host's story), and riding and a host's offer aren't saved: after a load, the bikes are home. 0.6.0 opens a 0.7.0 save without what it doesn't know: the bikes and e-scooters, and a parcel still waiting at the door. A monitor on a turned corner desk it no longer fits is left out on load.
+- **Internals:** traffic lights at junctions: groundwork, not lit yet.
 - **For pack authors and modellers:** new content: an object's `vehicle`, the town's `taxi`, `visits.offer`, `objectRules.setUp` and `careerRules.performanceSlowdown`, `lateGraceMinutes` and `lateShare` ([docs/content-packs.md](docs/content-packs.md)). The model gate's checks with one right answer (a top's radius, the footprint, the wall, a floor thing floating, flipped faces and eleven more) are errors now, not warnings, unless the pack entry accepts one by name with a reason ([tools/art/README.md](tools/art/README.md), "The gate").
 - **Known:** the fix for models drawn as boxes is not yet checked in Firefox itself.
 

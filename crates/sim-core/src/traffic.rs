@@ -1235,20 +1235,17 @@ pub fn on_its_way(w: &World, key: u64) -> Option<f32> {
     .then_some(car.progress)
 }
 
-/// The junctions' traffic lights (`Travel::signals`: none in a game yet, `Travel::lights_on`; where
-/// it's on, every junction where `SIGNAL_ARMS` roads or more meet), and every car's claims worked
-/// out again with them (`Claim::gate`). Once the cars are made or loaded.
+/// The junctions' traffic lights (`Travel::signals`: none in a game, `Travel::lights_on`; where a
+/// test turns them on, every junction where `SIGNAL_ARMS` roads or more meet, while their heads fit
+/// the snapshot's rows), and every car's claims worked out again with them (`Claim::gate`). Once
+/// the cars are made or loaded. (The busiest junction of the sample worlds has about 10 cars an
+/// hour: not lit for 0.7.0.)
 pub(crate) fn settle(w: &mut World) {
     let g = &w.travel.graph;
-    // (The cars an hour through each junction at its busiest, about: every household car's way
-    // out of town, each once in the morning's hour, `peak_flow`.)
-    let flow = peak_flow(w);
     let mut signals: Vec<Signal> = Vec::new();
     let mut heads = 0;
-    for n in 0..g.nodes.len() {
-        if !(w.travel.lights_on || flow.get(n).is_some_and(|&f| f >= LIGHT_FLOW)) {
-            continue;
-        }
+    // (Not lit in a game: only where a test turns them on, `Travel::lights_on`.)
+    for n in (0..g.nodes.len()).filter(|_| w.travel.lights_on) {
         let Some(sig) = signal_at(g, n) else { continue };
         // (No junction lit without a head for each arm in the snapshot's rows.)
         if heads + sig.arms.len() > crate::snapshot::MAX_LIGHTS {
@@ -1261,35 +1258,6 @@ pub(crate) fn settle(w: &mut World) {
     for car in &mut w.cars {
         car.reclaim(&w.travel);
     }
-}
-
-/// A junction with at least this many cars an hour through it at its busiest (`peak_flow`) gets
-/// traffic lights (`settle`). In the sample worlds, a big world's busiest has 9, about one a
-/// fifth of the 50 s every arm's turn comes round in: none are lit.
-pub(crate) const LIGHT_FLOW: u32 = 40;
-
-/// Per node of the roads, about how many cars an hour come through it at its busiest: the
-/// households' cars whose way out of town passes it (each drives out once about the start of
-/// work, the morning's busiest hour), twice for a big world's cars and taxis coming in too.
-fn peak_flow(w: &World) -> Vec<u32> {
-    let g = &w.travel.graph;
-    let mut flow = vec![0u32; g.nodes.len()];
-    for car in w.cars.iter().filter(|c| !c.taxi) {
-        let Some(pts) = car.route_points() else {
-            continue;
-        };
-        for (n, &p) in g.nodes.iter().enumerate() {
-            if pts.iter().any(|&q| dist(p, q) < BOX_LEAST) {
-                flow[n] += 1;
-            }
-        }
-    }
-    if w.travel.size == crate::travel::WorldSize::Big {
-        for f in &mut flow {
-            *f *= 2;
-        }
-    }
-    flow
 }
 
 impl World {

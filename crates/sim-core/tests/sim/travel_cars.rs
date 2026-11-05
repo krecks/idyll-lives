@@ -901,7 +901,7 @@ fn junctions_past_the_snapshots_room_for_signal_heads_are_never_lit() {
     let mut w = town_of(CONTENT, more, 400, 400, &roads, exits, &[]);
     assert!(
         w.travel.signals.is_empty(),
-        "lit by traffic: nobody drives here"
+        "nothing lit in a game"
     );
     w.light_busy_junctions();
     let heads: usize = w.travel.signals.iter().map(|s| s.arms.len()).sum();
