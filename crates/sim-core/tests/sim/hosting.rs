@@ -69,6 +69,7 @@ fn hosting(content: &str) -> World {
         idle: 0,
         farewell: 0,
         offer_at: 0,
+        arrived: 0,
     });
     w
 }
@@ -282,6 +283,7 @@ fn without_a_fridge_nobody_offers_anything() {
         idle: 0,
         farewell: 0,
         offer_at: 0,
+        arrived: 0,
     });
     let mut watch = common::Watch::new();
     for _ in 0..60 * TICKS_PER_MINUTE {

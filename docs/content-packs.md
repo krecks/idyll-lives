@@ -307,7 +307,11 @@ there, and it ends in time to be home by that hour. A visit or an outing is time
 past `autonomy.reach`, a grown-up owner with the household's car at home drives when there's
 parking near; else, for a ride of its `minRide` or more, they take the fastest thing at home
 with a `vehicle` that fits them (a city bike, an e-scooter), ride it there at its `speed`, leave it
-by the place and ride it home; else they walk.
+by the place and ride it home; else they walk. Once there (let in, or at the place) a guest stays
+`visits.leastMinutes` at least (default 0) unless a need is below `autonomy.urgentBelow`, it's late
+or the hosts go, and they don't set off on a visit or an outing with a need that would be below
+0.15 by then with nothing there for it; back home from one, not on another of their own for
+`visits.againMinutes` (default 0).
 
 **A host's offer:** with `visits.offer` (`{"social", "afterMinutes", "againMinutes",
 "handAnim"}`; base game: *Offer a bite to eat*), a free host asks a guest who has nothing in

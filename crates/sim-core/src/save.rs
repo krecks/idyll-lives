@@ -1155,6 +1155,7 @@ impl World {
         world.lifespan = save.lifespan.unwrap_or(crate::lifecycle::Lifespan::Off);
         world.player_moves = save.player_moves.unwrap_or(true);
         world.meta = save.meta.clone();
+        world.note_paths();
         // (Bus stops, in a file written while the town had buses, are no ways out.)
         world.exits = save
             .exits
@@ -1456,6 +1457,7 @@ impl World {
                     idle: 0,
                     farewell: 0,
                     offer_at: 0,
+                    arrived: 0,
                 })
             });
             for t in &s.tasks {

@@ -145,6 +145,7 @@ pub(crate) fn claim(sim: &mut Sim, objects: &mut [ObjectInstance], bike: u32) {
 pub(crate) fn get_on(sim: &mut Sim) {
     sim.riding = sim.bound_for_bike.take();
     sim.bike_parked = None;
+    sim.bike_spot = None;
 }
 
 /// Where to get on or off `bike`: in front of it.
@@ -156,6 +157,7 @@ pub(crate) fn spot(content: &Content, bike: &ObjectInstance) -> [f32; 2] {
 /// Off the bike (home, or the ride cut short): it's at its place again, free.
 pub(crate) fn get_off(sim: &mut Sim, objects: &mut [ObjectInstance]) {
     sim.bike_parked = None;
+    sim.bike_spot = None;
     for o in [sim.riding.take(), sim.bound_for_bike.take()]
         .into_iter()
         .flatten()
@@ -206,4 +208,88 @@ pub(crate) fn commute_bike(w: &crate::world::World, i: usize, to: [f32; 2]) -> O
             ))
         })
         .max_by(|a, b| a.1.total_cmp(&b.1))
+}
+
+/// How far from a place's way in (m) a bike is left at most (`park_spot`).
+const PARK_REACH: f32 = 8.0;
+/// Nor nearer it than this (m): clear of the door.
+const PARK_CLEAR: f32 = 1.5;
+
+/// Where `sim` leaves the bike they ride to `plot` (a visit or an outing, `Sim::bike_spot`): its
+/// middle, which way it faces (rad, as a placement's quarter turns: its rider faces a quarter turn
+/// on from that) and where they get off and on beside it. On the place's lot, outdoors, as near its
+/// way in as there's room: on free bare ground (nothing on it, `NavGrid::tile_free`; no paving or
+/// floor laid, `Lot::floor`), off the town's paths and driveways (`World::paths`), clear of the way
+/// in itself and of anyone else's bike left there. None: no room, and they ride up to the way in and leave it there.
+pub(crate) fn park_spot(
+    ctx: &Ctx,
+    sim: &Sim,
+    objects: &[ObjectInstance],
+    plot: u32,
+) -> Option<([f32; 2], f32, [f32; 2])> {
+    let bike = objects.get(sim.riding? as usize)?;
+    let def = &ctx.content.objects[bike.def];
+    def.vehicle?;
+    let p = ctx.plots.get(plot as usize)?;
+    let door = p.arrival_point();
+    let nav = &ctx.nav;
+    // (Others' bikes left here: room round each.)
+    let taken: Vec<[f32; 4]> = ctx
+        .briefs
+        .iter()
+        .enumerate()
+        .filter(|&(j, _)| j != sim.id as usize)
+        .filter_map(|(_, b)| b.bike_spot)
+        .map(|c| [c[0] - 1.5, c[1] - 1.5, c[0] + 1.5, c[1] + 1.5])
+        .collect();
+    let overlaps =
+        |r: &[f32; 4], x: f32, z: f32| x + 1.0 > r[0] && x < r[2] && z + 1.0 > r[1] && z < r[3];
+    let inside = |x: i32, z: i32| x >= p.x && z >= p.z && x < p.x + p.w && z < p.z + p.d;
+    let open =
+        |x: i32, z: i32| nav.tile_free(x, z) && nav.lot.room_at(x, z) == crate::lot::OUTDOORS;
+    let ground = |x: i32, z: i32| {
+        let (fx, fz) = (x as f32, z as f32);
+        inside(x, z)
+            && open(x, z)
+            && x >= 0
+            && z >= 0
+            && nav.lot.floor(x as u16, z as u16) == 0
+            && !ctx.paths.iter().any(|r| overlaps(r, fx, fz))
+            && !taken.iter().any(|r| overlaps(r, fx, fz))
+            && crate::travel::dist([fx + 0.5, fz + 0.5], door) >= PARK_CLEAR
+    };
+    let [fw, fd] = [
+        i32::from(def.footprint[0].max(1)),
+        i32::from(def.footprint[1].max(1)),
+    ];
+    let (cx, cz) = (door[0].floor() as i32, door[1].floor() as i32);
+    let reach = PARK_REACH.ceil() as i32;
+    let mut best: Option<(f32, [f32; 2], f32, [f32; 2])> = None;
+    for z in cz - reach..=cz + reach {
+        for x in cx - reach..=cx + reach {
+            for rot in 0..2u8 {
+                let (w_, d_) = if rot == 0 { (fw, fd) } else { (fd, fw) };
+                if !(0..d_).all(|dz| (0..w_).all(|dx| ground(x + dx, z + dz))) {
+                    continue;
+                }
+                let centre = [x as f32 + w_ as f32 / 2.0, z as f32 + d_ as f32 / 2.0];
+                let d = crate::travel::dist(centre, door);
+                if d > PARK_REACH || best.is_some_and(|b| b.0 <= d) {
+                    continue;
+                }
+                // (Stood beside it, on one side or the other, outdoors, to get off and on.)
+                let side = if rot == 0 {
+                    [(x, z - 1), (x, z + d_)]
+                } else {
+                    [(x - 1, z), (x + w_, z)]
+                };
+                let Some(&(sx, sz)) = side.iter().find(|&&(sx, sz)| open(sx, sz)) else {
+                    continue;
+                };
+                let yaw = f32::from(rot) * std::f32::consts::FRAC_PI_2;
+                best = Some((d, centre, yaw, [sx as f32 + 0.5, sz as f32 + 0.5]));
+            }
+        }
+    }
+    best.map(|(_, centre, yaw, stand)| (centre, yaw, stand))
 }

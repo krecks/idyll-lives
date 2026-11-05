@@ -9,7 +9,7 @@ use crate::{TICKS_PER_SECOND, clock};
 
 pub const HEADER_LEN: usize = 12;
 /// Floats per Sim (all 32 used).
-pub const SIM_STRIDE: usize = 33;
+pub const SIM_STRIDE: usize = 36;
 /// The cars' rows (`header::CAR_COUNT`, `car`) start here: after room for every resident's and
 /// server's.
 pub const CAR_BASE: usize = HEADER_LEN + (MAX_SIMS + crate::staff::MAX_STAFF) * SIM_STRIDE;
@@ -181,6 +181,11 @@ pub mod sim {
     /// not at its place while they're on it (away at work too), or -1. Left out by a place they're
     /// visiting (`Sim::bike_parked`): -2 less its stable id, not drawn at its place either.
     pub const RIDE: usize = 32;
+    /// That bike left out (`RIDE` -2 less its stable id): where its middle stands and which way it
+    /// faces (rad, as a placement's turn: `ride::park_spot`); else 0.
+    pub const PARK_X: usize = 33;
+    pub const PARK_Z: usize = 34;
+    pub const PARK_YAW: usize = 35;
 }
 
 /// How far ahead along their way `sim::AHEAD_X` looks, in metres.
@@ -197,7 +202,7 @@ const _: () = assert!(
         && sim::CARRY < SIM_STRIDE
         && sim::PLATE < SIM_STRIDE
         && sim::SHUTS < SIM_STRIDE
-        && sim::RIDE < SIM_STRIDE
+        && sim::PARK_YAW < SIM_STRIDE
 );
 const _: () = assert!(
     header::ITEMS_VERSION < HEADER_LEN
@@ -775,11 +780,13 @@ pub fn write(world: &World, out: &mut [f32]) {
             .or_else(|| shown_held(world, s))
             .map_or(0.0, |d| d as f32 + 1.0);
         o[sim::SHUTS] = crate::privacy::keeps_shut(world, s.id) as u8 as f32;
-        let parked = s
-            .bike_parked
+        let spot = s.bike_parked.and(s.bike_spot);
+        let parked = spot
             .and(s.bound_for_bike)
             .and_then(|b| world.objects.get(b as usize))
             .map(|b| -2.0 - b.stable as f32);
+        let (at, yaw) = spot.filter(|_| parked.is_some()).unwrap_or(([0.0; 2], 0.0));
+        [o[sim::PARK_X], o[sim::PARK_Z], o[sim::PARK_YAW]] = [at[0], at[1], yaw];
         o[sim::RIDE] = s
             .riding
             .and_then(|b| world.objects.get(b as usize))
@@ -990,6 +997,9 @@ pub fn layout_json(content: &Content) -> String {
         "recipes": content.recipes.iter().map(|r| &r.id).collect::<Vec<_>>(),
     });
     // (Apart: one `json!` this long would pass the macro's recursion limit.)
+    layout["sim"]["parkX"] = sim::PARK_X.into();
+    layout["sim"]["parkZ"] = sim::PARK_Z.into();
+    layout["sim"]["parkYaw"] = sim::PARK_YAW.into();
     layout["header"]["carCount"] = header::CAR_COUNT.into();
     layout["carBase"] = CAR_BASE.into();
     layout["carStride"] = CAR_STRIDE.into();

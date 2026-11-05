@@ -1505,6 +1505,12 @@ pub struct VisitRules {
     /// (`outingHomeBy`); its stay ends in time for that.
     pub outing_minutes: f32,
     pub outing_home_by: f32,
+    /// Once there (let in, or at the place), a guest stays this long at least (`leastMinutes`),
+    /// unless a need is about to run out (`autonomy.urgentBelow`), it's late or the hosts go.
+    pub least_minutes: f32,
+    /// Back home from a visit or an outing, they don't set off on another of their own for this
+    /// long (`againMinutes`).
+    pub again_minutes: f32,
     /// Tag mask used for schedule/trait preferences of visiting.
     pub tags: TagMask,
     /// Visitors knock and wait to be let in (`visits.door`); without it they walk straight in.
@@ -2560,6 +2566,8 @@ struct VisitRaw {
     latest_hour: Option<f32>,
     outing_minutes: Option<f32>,
     outing_home_by: Option<f32>,
+    least_minutes: Option<f32>,
+    again_minutes: Option<f32>,
     door: Option<DoorRaw>,
     company: Option<f32>,
     bored_minutes: Option<f32>,
@@ -4928,6 +4936,8 @@ impl Content {
             latest_hour: v.latest_hour.unwrap_or(21.0),
             outing_minutes: v.outing_minutes.unwrap_or(90.0).max(0.0),
             outing_home_by: v.outing_home_by.unwrap_or(23.0).clamp(0.0, 24.0),
+            least_minutes: v.least_minutes.unwrap_or(0.0).max(0.0),
+            again_minutes: v.again_minutes.unwrap_or(0.0).max(0.0),
             tags: 1 << tag_index[VISIT_TAG],
             company: v.company.unwrap_or(0.0).max(0.0),
             bored_minutes: v.bored_minutes.map(|m| m.max(1.0)),

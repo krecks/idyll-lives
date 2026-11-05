@@ -2179,6 +2179,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.lot.hideRidden(this.characters.ridden);
       this.parkedRides.hide(new Set(this.characters.ridden));
     }
+    // (And those left out by a place their riders are visiting: drawn there.)
+    if (this.characters.parkedChanged) {
+      this.characters.parkedChanged = false;
+      this.parkedRides.setAway(this.characters.parked);
+    }
     this.lot.takeRestProps(this.characters.restTaken);
     // (Only residents posed where they cast into the map: `shadowPosed`, as the cars' `moved`.)
     if (this.quality.characterShadows && this.characters.shadowPosed) this.sunShadows.moved(false);

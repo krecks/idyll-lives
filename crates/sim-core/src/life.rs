@@ -74,6 +74,11 @@ pub struct Visit {
     /// `hosting.rs`); 0: not let in yet. Not saved: after a load it's a while again.
     #[serde(skip)]
     pub offer_at: u64,
+    /// When they got there (let in, or at the place: `world::arrive`); 0: not there yet. For
+    /// `visits.leastMinutes` they stay whatever, unless a need runs out (`end_visit_if_due`). Not
+    /// saved: after a load, as if there a while.
+    #[serde(skip)]
+    pub arrived: u64,
 }
 
 /// A change in where a Sim is (or what it finished), raised by tasks and handled by `life::update`.
@@ -326,6 +331,11 @@ const BIKE_MOST: f32 = 90.0;
 /// Minutes added to the walk from the front door for getting out of the house to it, and a
 /// share more for the rest of the way (a car passing, someone in the way).
 pub const OUT_OF_THE_HOUSE: f32 = 5.0;
+/// A guest with a need (but the room's) below this heads home (`end_visit_if_due`); one there for
+/// less than `visits.leastMinutes` only with one below `autonomy.urgentBelow`. A visit or an outing
+/// isn't set off on when a need would be down to it by then, with nothing there for it
+/// (`world::lasts`).
+pub(crate) const LOW_NEED: f32 = 0.15;
 pub const WALK_MARGIN: f32 = 1.05;
 
 /// When someone with work or school starting at `start` leaves (the content's `leave`, unless
@@ -479,6 +489,14 @@ pub(crate) fn update(w: &mut World) {
         // (In lots nobody watches, on their turn; see `lod.rs`.)
         if !w.sims[i].here() || w.sims[i].steps == 0 {
             continue;
+        }
+        // A bike left out with no room by the place (`ride::park_spot`): where they got off,
+        // facing as they did (a placement faces a quarter turn off its rider).
+        if w.sims[i].bike_parked.is_some() && w.sims[i].bike_spot.is_none() {
+            let sim = &mut w.sims[i];
+            sim.bike_spot = sim
+                .bike_parked
+                .map(|at| (at, sim.yaw - std::f32::consts::FRAC_PI_2));
         }
         // Interactions started this tick are paid from the Sim's own household (guests too).
         let spend = std::mem::take(&mut w.sims[i].pending_spend);
@@ -1107,6 +1125,7 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
                 idle: 0,
                 farewell: 0,
                 offer_at: 0,
+                arrived: 0,
             });
             // With door rules the story is told when they're let in (`answer`).
             if w.content.visits.door.is_some() && !w.plots[plot as usize].public {
@@ -1158,7 +1177,10 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             directed,
         } => crate::cars::start_trip(w, i, car, plot, directed),
         Transition::DriveHome { car } => {
-            w.sims[i].visiting = None;
+            // (Off home: not off on another visit for `visits.againMinutes`.)
+            if w.sims[i].visiting.take().is_some() {
+                w.sims[i].back_at = tick;
+            }
             crate::cars::drive_home(w, i, car);
         }
         Transition::Ride {
@@ -1166,7 +1188,12 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             plot,
             directed,
         } => crate::cars::ride(w, i, car, plot, directed),
-        Transition::Home => w.sims[i].visiting = None,
+        Transition::Home => {
+            // (Back from a visit or an outing: not off on another for `visits.againMinutes`.)
+            if w.sims[i].visiting.take().is_some() {
+                w.sims[i].back_at = tick;
+            }
+        }
         Transition::Taxi { plot, directed } => {
             // (No taxi after all: on foot, `taxi::Taxis::no_taxi`.)
             if !crate::taxi::book_leisure(w, i, plot, directed) {
@@ -1397,6 +1424,7 @@ fn answer(w: &mut World, h: usize, guest: usize) {
         let length = ticks(w.content.visits.hours * 60.0);
         if let Some(v) = w.sims[guest].visiting.as_mut() {
             v.until = v.until.max(tick + length);
+            v.arrived = tick;
         }
         w.events.push(tick, EventKind::Visited, guest, h, None);
         if let Some(greet) = rules.greet {
@@ -1693,17 +1721,35 @@ fn end_visit_if_due(w: &mut World, i: usize, hour: f32) {
             .visits
             .bored_minutes
             .is_some_and(|m| idle as f32 * MINUTES_PER_TICK >= m);
-    let tired = content
-        .needs
-        .iter()
-        .zip(&sim.needs)
-        .any(|(d, &n)| !d.room && n < 0.15);
+    let below = |least: f32| {
+        content
+            .needs
+            .iter()
+            .zip(&sim.needs)
+            .any(|(d, &n)| !d.room && n < least)
+    };
+    let tired = below(LOW_NEED);
     let late = !(6.0..22.0).contains(&hour) || hosts_out;
+    // (On the way there, and just there for `visits.leastMinutes`: they stay, unless a need is
+    // about to run out, it's late or the hosts have gone; not for a low one the place can't see
+    // to, nor for being bored.)
+    // (Or about to go on: off the bike by the place, say.)
+    let there = |k: &TaskKind| matches!(k, TaskKind::Visit { plot } if *plot == visit.plot);
+    let on_the_way = visit.arrived == 0
+        && (sim.current.as_ref().is_some_and(|a| there(&a.task.kind))
+            || sim.queue.front().is_some_and(|t| there(&t.kind)));
+    let staying = on_the_way
+        || visit.arrived > 0 && tick < visit.arrived + ticks(content.visits.least_minutes);
+    let due = if staying {
+        below(content.autonomy.urgent_below) || late
+    } else {
+        tick >= visit.until || tired || late || bored
+    };
     let busy = sim
         .current
         .as_ref()
         .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome | TaskKind::Work));
-    if (tick >= visit.until || tired || late || bored)
+    if due
         && !busy
         && sim.engaged_with.is_none()
         && !sim.queue.iter().any(|t| matches!(t.kind, TaskKind::GoHome))
