@@ -861,7 +861,18 @@ impl Traffic {
         if from <= STOP_SHORT / 2.0 || to > STOP_SHORT {
             return None;
         }
+        // (Standing where it stops, as it stands there: not in that one's way itself.)
         let stop = Sample { pass: 0.0, ..stop };
+        let short = Sample {
+            rect: raw_next,
+            pass: 0.0,
+            ..now
+        };
+        let into = |a: &Ask, r: &Sample| {
+            a.parts.iter().any(|(_, c)| {
+                in_bounds(c, &r.rect) && c.samples.iter().any(|o| conflict(r, o, true))
+            })
+        };
         self.asks
             .iter()
             .filter(|a| a.key != key && a.seen + 1 >= self.tick && self.tick > a.tick + OLD_ASK)
@@ -869,11 +880,7 @@ impl Traffic {
                 self.mover(a.key)
                     .is_none_or(|m| !behind((&now.rect, way), (&m.rect, m.way)))
             })
-            .find(|a| {
-                a.parts.iter().any(|(_, c)| {
-                    in_bounds(c, &stop.rect) && c.samples.iter().any(|o| conflict(&stop, o, true))
-                })
-            })
+            .find(|a| into(a, &stop) && !into(a, &short))
             .map(|a| a.key)
     }
 
