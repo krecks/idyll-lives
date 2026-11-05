@@ -1122,6 +1122,8 @@ fn crossroads_house(z: f32, west: bool) -> House {
 fn a_lit_junctions_signal_heads_are_in_the_snapshot_one_an_arm_on_its_kerb() {
     use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, header, light};
     let mut w = crossroads(&[]);
+    assert!(w.travel.signals.is_empty(), "no lights in a game yet");
+    w.light_busy_junctions();
     assert_eq!(
         w.travel.signals.len(),
         1,
@@ -1197,7 +1199,8 @@ fn a_lit_junctions_poles_stand_clear_of_the_bus_stops_by_it() {
         {"x":170,"z":197.6,"kind":"stop"},{"x":150,"z":202.4,"kind":"stop"}]"#;
     let more = r#","size":"big","walls":[],"doors":[],"windows":[],"relationships":[],
         "areas":[{"name":"Crossroads","kind":"hamlet","x":130,"z":130,"w":140,"d":140}]"#;
-    let w = town_of(BUS_CONTENT, more, 400, 400, &roads, exits, &[]);
+    let mut w = town_of(BUS_CONTENT, more, 400, 400, &roads, exits, &[]);
+    w.light_busy_junctions();
     assert_eq!(w.travel.signals.len(), 1, "the crossroads is lit");
     for arm in &w.travel.signals[0].arms {
         for st in &w.transit.stops {
@@ -1216,6 +1219,7 @@ fn a_lit_junctions_poles_stand_clear_of_the_bus_stops_by_it() {
 fn a_game_saved_with_the_lights_part_way_loads_with_them_where_they_were() {
     use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
     let mut w = crossroads(&[]);
+    w.light_busy_junctions();
     common::run_to(&mut w, 2, 7.0);
     let mut buf = vec![0.0f32; snapshot::CAPACITY];
     let states = |w: &World, buf: &mut Vec<f32>| {

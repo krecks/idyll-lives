@@ -764,6 +764,7 @@ pub(crate) fn settle(w: &mut World) {
     let stops_at: Vec<[f32; 2]> = t.stops.iter().map(|s| s.at).collect();
     let routes: Vec<Vec<[f32; 2]>> = t.lines.iter().map(Line::route_points).collect();
     w.travel.signals = (0..g.nodes.len())
+        .filter(|_| w.travel.lights_on)
         .filter(|&n| {
             let p = g.nodes[n];
             routes
@@ -3467,6 +3468,14 @@ pub fn status(w: &World, s: &Sim) -> Option<&'static str> {
 }
 
 impl World {
+    /// For tests: traffic lights at the busy junctions (`traffic::Signal`; not yet in a game:
+    /// `Travel::lights_on`), the town's buses and their claims worked out again with them.
+    #[doc(hidden)]
+    pub fn light_busy_junctions(&mut self) {
+        self.travel.lights_on = true;
+        settle(self);
+    }
+
     /// For tests: the stop resident `i` is waiting at or on their way to, if any.
     #[doc(hidden)]
     pub fn bound_for_bus(&self, i: usize) -> Option<u16> {

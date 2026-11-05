@@ -1042,6 +1042,9 @@ pub struct Travel {
     /// The junctions with traffic lights (`traffic::Signal`, `bus::settle`). Not saved: worked out
     /// again with the lines.
     pub signals: Vec<crate::traffic::Signal>,
+    /// Whether the busy junctions get traffic lights (`bus::settle`): not yet in a game (off),
+    /// only where a test turns them on (`World::light_busy_junctions`).
+    pub lights_on: bool,
     /// Where cars and buses take turns driving through, as through a junction's box: the
     /// junctions' boxes (`Graph::boxes`), and where a bus's body sweeps out of its lane round a
     /// sharp turn (`traffic::sweeps`), a middle and how far round it (m). Not saved.
@@ -1090,6 +1093,7 @@ impl Travel {
             country_speed: COUNTRY_SPEED,
             base_blocked: Vec::new(),
             bus_way: Vec::new(),
+            lights_on: false,
             signals: Vec::new(),
             narrow: Default::default(),
             zones: Vec::new(),

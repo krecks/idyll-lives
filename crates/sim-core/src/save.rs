@@ -1719,6 +1719,8 @@ impl World {
         world.make_storeys();
         world.refresh_rooms();
         crate::cars::load(&mut world, &save.cars, &save.drives, &save.garages);
+        // (Lights saved: the busy junctions have them.)
+        world.travel.lights_on = !save.lights.is_empty();
         crate::bus::settle(&mut world);
         // (The lights where they'd got to, for the same lit junctions.)
         if save.lights.len() == world.travel.signals.len() {
