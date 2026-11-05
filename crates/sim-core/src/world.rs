@@ -1880,6 +1880,9 @@ pub struct World {
     pub cars: Vec<crate::cars::Car>,
     /// The town's bus stops, lines and buses (`bus.rs`).
     pub transit: crate::bus::Transit,
+    /// The claims cars and buses hold and ask for where their ways cross or meet
+    /// (`traffic::Traffic`). Not saved.
+    pub traffic: crate::traffic::Traffic,
     pub drives: Vec<crate::cars::Drive>,
     /// Garages at the inner ends of driveways (`cars::Garage`).
     pub garages: Vec<crate::cars::Garage>,
@@ -2246,6 +2249,7 @@ impl World {
             travel: Default::default(),
             cars: Vec::new(),
             transit: Default::default(),
+            traffic: Default::default(),
             drives: Vec::new(),
             garages: Vec::new(),
             car_tiles: Vec::new(),
@@ -4481,6 +4485,7 @@ impl World {
         crate::phone::update(self);
         crate::life::update(self);
         crate::lifecycle::update(self);
+        crate::traffic::begin(self);
         crate::cars::update(self);
         crate::bus::update(self);
         crate::planner::update(self);

@@ -435,6 +435,9 @@ pub struct Graph {
     cells: Vec<Vec<(u32, u32)>>,
     cols: usize,
     rows: usize,
+    /// Its junctions' boxes (`traffic::boxes`): their middles and how far round them they reach
+    /// (m). Cars and buses take turns driving through them (`traffic.rs`).
+    pub boxes: Vec<([f32; 2], f32)>,
 }
 
 /// What a trip along the roads looks like: the points it passes (on the middle line), and how
@@ -584,6 +587,7 @@ impl Graph {
             }
         }
         g.index();
+        g.boxes = crate::traffic::boxes(&g);
         g
     }
 
@@ -1032,6 +1036,13 @@ pub struct Travel {
     /// Per public parking spot (`OpenWorld::parking`): a bus swings through it on its line's
     /// route (`bus::settle`), so no car parks there (`cars::parking_for`). Not saved.
     pub bus_way: Vec<bool>,
+    /// The buses' ways where a bus can't pass one coming the other way (`bus::settle`): a car's
+    /// route along one takes turns with the buses there (`traffic::Narrow`). Not saved.
+    pub narrow: crate::traffic::Narrow,
+    /// Where cars and buses take turns driving through, as through a junction's box: the
+    /// junctions' boxes (`Graph::boxes`), and where a bus's body sweeps out of its lane round a
+    /// sharp turn (`traffic::sweeps`), a middle and how far round it (m). Not saved.
+    pub zones: Vec<([f32; 2], f32)>,
     /// By plot, for the public places: their door and where it gets on the roads on foot and by
     /// car (`entry`), kept as each tick starts (`note_doors`): a resident weighing an outing asks
     /// how long the way to every one is. Not saved.
@@ -1043,6 +1054,16 @@ pub struct Travel {
 type Door = ([u32; 2], [Option<RoadPoint>; 2]);
 
 impl Travel {
+    /// Where cars and buses take turns (`zones`; before the buses' ways are known, the
+    /// junctions' boxes).
+    pub(crate) fn zones(&self) -> &[([f32; 2], f32)] {
+        if self.zones.is_empty() {
+            &self.graph.boxes
+        } else {
+            &self.zones
+        }
+    }
+
     pub fn new(file: OpenWorld, meta: &serde_json::Value, exits: usize) -> Self {
         let size = file.size();
         let open = size != WorldSize::Cosy;
@@ -1066,6 +1087,8 @@ impl Travel {
             country_speed: COUNTRY_SPEED,
             base_blocked: Vec::new(),
             bus_way: Vec::new(),
+            narrow: Default::default(),
+            zones: Vec::new(),
             doors: Vec::new(),
         }
     }

@@ -1714,14 +1714,15 @@ struct StructureView<'a> {
     /// The town's bus stops (`bus::Stop`); left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     stops: Vec<StopView>,
-    /// The streets a bus drives where the kerbside furniture keeps back for buses to pass pulled
-    /// over (`bus::Transit::bus_streets`); left out when there are none.
+    /// The streets where the kerbside furniture keeps back for buses and cars to pass pulled over
+    /// (`bus::Transit::bus_streets`); left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     bus_streets: Vec<BusStreetView>,
 }
 
-/// A street a bus drives (`StructureView::bus_streets`): the town file's road (`meta.roads`
-/// index) and how far in from its edges its kerbside furniture may reach (m, `bus::kerbside`).
+/// A street buses or cars pull over on (`StructureView::bus_streets`): the town file's road
+/// (`meta.roads` index) and how far in from its edges its kerbside furniture may reach (m,
+/// `bus::kerbside`).
 #[derive(Serialize)]
 struct BusStreetView {
     road: u32,
