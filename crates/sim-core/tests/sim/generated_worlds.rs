@@ -21,11 +21,14 @@ use sim_core::surface;
 use sim_core::travel::Graph;
 use sim_core::world::MAX_SIMS;
 
-/// `check` for each of `items`, a few at a time (one per core: each world plays on its own, and a
-/// path search's budget counts on its own thread), the results in the items' order.
+/// `check` for each of `items`, a few at a time (one per core, or `WORLD_THREADS` at most: each
+/// world plays on its own, and a path search's budget counts on its own thread), the results in
+/// the items' order.
 fn each_world<I: Sync, T: Send>(items: &[I], check: impl Fn(&I) -> T + Sync) -> Vec<T> {
-    let threads = std::thread::available_parallelism()
-        .map_or(1, |n| n.get())
+    let threads = std::env::var("WORLD_THREADS")
+        .ok()
+        .and_then(|n| n.parse().ok())
+        .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get()))
         .min(items.len())
         .max(1);
     let next = std::sync::atomic::AtomicUsize::new(0);
