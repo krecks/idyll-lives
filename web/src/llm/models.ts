@@ -1,8 +1,9 @@
 /**
  * The language model that writes residents' lines, with what the worker needs to run it: where
  * its files are, its chat format, stop tokens and sampling defaults. Liquid AI's LFM2.5 350M,
- * self-hosted (fetched by `cargo fetch-llm`), used as its upstream 4-bit build: small to
- * download, fast on the GPU (WebGPU). It runs only there (on the CPU 4-bit was too slow for
+ * self-hosted (fetched by `cargo fetch-llm`), its upstream 4-bit build repacked smaller without
+ * changing what it computes (`crates/tools/src/llmslim.rs`): small to download, fast on the GPU
+ * (WebGPU). It runs only there (on the CPU 4-bit was too slow for
  * lines); without WebGPU residents say hand-written lines. The generation loop (`generate.ts`)
  * reads the model's cache inputs from the model itself.
  */
@@ -32,6 +33,8 @@ export interface ModelSpec {
   /** The 4-bit graph, and its weights file if they're outside it. */
   graph: ModelFile;
   data?: ModelFile;
+  /** Positions it can read: a prompt and its reply together (its rotary tables' rows). */
+  positions: number;
   chat: ChatFormat;
   /** Tokens that end a reply. */
   stop: string[];
@@ -45,12 +48,14 @@ export const MODEL: ModelSpec = {
   id: 'lfm2.5-350m',
   label: 'LFM2.5 350M',
   about: 'Liquid AI. Fast, and good at keeping to the moment.',
-  version: 'lfm2.5-350m@7dd4999',
+  version: 'lfm2.5-350m@7dd4999-slim',
   url: 'llm/lfm2.5-350m/',
   tokenizer: ['tokenizer.json', 3_297_793, '29d43b4be8e8a896fefd7cd836ca6d6b4eedd249f823866ce0453b368e646f49'],
   tokenizerConfig: ['tokenizer_config.json', 3_825, 'e70cd070c2696bf1b0f1ad303c34502753670cca6f844637821cb1c37e6bea8d'],
-  graph: ['model_q4.onnx', 183_442, 'd1a705712e93aafaba1346b32245fa59e7857a46e2272003c0e8c524977e0de8'],
-  data: ['model_q4.onnx_dataz', 254_923_309, '71ec6ad38a4c463dcb3dba671d06a1d9861be3a23e51290d818b95c0b7d2a5db'],
+  graph: ['model_q4.onnx', 183_345, 'e17d03a87346295631d71358fd98abad930172bbf52819a26c34ca4d1dc4d04c'],
+  data: ['model_q4.onnx_dataz', 195_523_654, '3b7570c237498b56b6276ceae327a11dd7f3e96dee8a4eaa3dad27548ee6a9de'],
+  // `llmslim.rs`, POSITIONS.
+  positions: 4096,
   chat: { bos: '<|startoftext|>' },
   stop: ['<|im_end|>', '<|endoftext|>'],
   defaults: DEFAULTS,

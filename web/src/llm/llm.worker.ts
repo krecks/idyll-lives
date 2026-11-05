@@ -23,7 +23,8 @@ const scope = self as WorkerScope;
 
 /** Bumped when the files change in place; older caches are deleted. (New files under new names don't need it.) */
 const CACHE_PREFIX = 'littlelives-llm-';
-const CACHE = `${CACHE_PREFIX}v1`;
+// v2: LFM2.5 repacked (0.7.0), the same names.
+const CACHE = `${CACHE_PREFIX}v2`;
 
 let engine: LlmEngine | null = null;
 let spec: ModelSpec | null = null;
@@ -121,6 +122,7 @@ async function load(base: string, model: ModelSpec): Promise<void> {
     tokenizer,
     stopIds,
     prefixes: new PrefixCache(8),
+    positions: model.positions,
   };
   spec = model;
   scope.postMessage({ type: 'ready', ms: performance.now() - start });
