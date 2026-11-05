@@ -276,12 +276,14 @@ fn generated_worlds_are_livable() {
         let mut still: std::collections::HashMap<(u16, u64), u64> = Default::default();
         let mut bus_failures = std::collections::BTreeSet::new();
         let mut stacked: Stacked = Default::default();
+        let mut standing: Standing = Default::default();
         for hour in 0..12 {
             for t in 0..TICKS_PER_HOUR {
                 w.tick_once();
                 most_buses = most_buses.max(w.transit.buses.len());
                 check_buses(&w, &mut overlapping, &mut still, &mut bus_failures);
                 check_cars(&w, &mut stacked, &mut bus_failures);
+                check_stuck(&w, &mut standing, &mut bus_failures);
                 for (i, t) in waited.iter_mut().enumerate() {
                     let at_stop = w.sims[i]
                         .current()
@@ -614,6 +616,113 @@ fn check_cars(w: &World, stacked: &mut Stacked, failures: &mut std::collections:
         }
     }
     stacked.retain(|k, _| now.contains(k));
+}
+
+/// How long a car on its way may stand still while nothing it waits for goes on, however far
+/// round (ticks: `traffic::waits_on`; held up for good, two or more waiting for each other), and
+/// how long it may stand still at all (waiting its turn for a busy junction, or for a bus to clear
+/// a lane too narrow for both). A car queued right behind another going its way isn't counted:
+/// the one in front of the queue is.
+const CAR_STUCK_TICKS: u64 = 10 * sim_core::TICKS_PER_MINUTE;
+const CAR_WAIT_TICKS: u64 = 60 * sim_core::TICKS_PER_MINUTE;
+
+/// The cars standing still on their way: by car, how far along its way it was and since when (a
+/// tick), and the last tick anything it waited for went on; and every vehicle's place on its way
+/// (`traffic::on_its_way`) a tick before.
+#[derive(Default)]
+struct Standing {
+    cars: std::collections::BTreeMap<usize, (f32, u64, u64)>,
+    was: std::collections::BTreeMap<u64, f32>,
+}
+
+/// A tick of `w`'s cars on their way: any standing still for too long (`CAR_STUCK_TICKS`,
+/// `CAR_WAIT_TICKS`), in `failures`.
+fn check_stuck(
+    w: &World,
+    standing: &mut Standing,
+    failures: &mut std::collections::BTreeSet<String>,
+) {
+    use sim_core::cars::{CarState, car_key};
+    use sim_core::traffic::{on_its_way, waits_on};
+    // Who went on this tick (a bus standing at a stop is on its way).
+    let keys: Vec<u64> = (0..w.cars.len())
+        .map(car_key)
+        .chain(
+            w.transit
+                .buses
+                .iter()
+                .map(|b| (b.run << 16) | b.line as u64),
+        )
+        .collect();
+    let mut went = std::collections::BTreeSet::new();
+    let mut now = std::collections::BTreeMap::new();
+    for &k in &keys {
+        if let Some((p, at_stop)) = on_its_way(w, k) {
+            if at_stop || standing.was.get(&k) != Some(&p) {
+                went.insert(k);
+            }
+            now.insert(k, p);
+        }
+    }
+    standing.was = now;
+    // (Right behind one going its way.)
+    let queued = |c: usize| {
+        let me = w.cars[c].shown;
+        w.cars[c].waits_for.is_some_and(|x| {
+            x >= 1 << 63
+                && w.cars
+                    .get((x & !(1 << 63)) as usize)
+                    .and_then(|o| o.shown)
+                    .zip(me)
+                    .is_some_and(|(o, m)| {
+                        let way = [m.1.sin(), m.1.cos()];
+                        let d = [o.0[0] - m.0[0], o.0[1] - m.0[1]];
+                        (m.1 - o.1).cos() > 0.9
+                            && d[0] * way[0] + d[1] * way[1] > 0.5
+                            && (d[0] * way[1] - d[1] * way[0]).abs() < 1.2
+                    })
+        })
+    };
+    for (c, car) in w.cars.iter().enumerate() {
+        let driving = matches!(car.state, CarState::Leaving | CarState::Arriving)
+            && car.shown.is_some_and(|s| s.2);
+        let entry = standing
+            .cars
+            .entry(c)
+            .or_insert((car.progress, w.tick, w.tick));
+        if !driving || entry.0 != car.progress || queued(c) {
+            *entry = (car.progress, w.tick, w.tick);
+            continue;
+        }
+        // (Anything it waits for, however far round, going on.)
+        let mut seen = vec![car_key(c)];
+        let mut i = 0;
+        while i < seen.len() && seen.len() < 64 {
+            for k in waits_on(w, seen[i]) {
+                if went.contains(&k) {
+                    entry.2 = w.tick;
+                }
+                if !seen.contains(&k) {
+                    seen.push(k);
+                }
+            }
+            i += 1;
+        }
+        let (since, going) = (entry.1, entry.2.max(entry.1));
+        if w.tick - going > CAR_STUCK_TICKS || w.tick - since > CAR_WAIT_TICKS {
+            failures.insert(format!(
+                "car {c} ({:?}) stood still at {:?} for {} minutes{}",
+                car.state,
+                car.shown.map(|s| s.0),
+                (w.tick - since) / sim_core::TICKS_PER_MINUTE,
+                if w.tick - going > CAR_STUCK_TICKS {
+                    ", held up for good"
+                } else {
+                    ""
+                }
+            ));
+        }
+    }
 }
 
 /// The households' cars of generated worlds (`town.ts` writes them where the street drew them,

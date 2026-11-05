@@ -407,3 +407,658 @@ fn two_cars_meeting_on_a_7_m_street_pass_each_other_in_their_lanes() {
     // (Where they meet, neither stops for the other: the street has room for both.)
     assert!(stood.iter().all(|&s| s < 20), "they stood {stood:?} ticks");
 }
+
+// ---- Taking turns where ways cross (`traffic.rs`) --------------------------------------------
+
+/// A house in `roads_town`: its plot (x, z, w, d), and its driveway's inner end (x, z), the way it
+/// runs to its road (+1/-1 along z, or along x: `along_x`), the road it meets (`roads` index) and
+/// how far along it.
+#[derive(Clone, Copy)]
+struct House {
+    plot: [f32; 4],
+    inner: [f32; 2],
+    front: f32,
+    along_x: bool,
+    road: u32,
+    s: f32,
+}
+
+/// A cosy town 200 by 60 m with `roads` (JSON, `kind` street) and `exits` (JSON) and a car at each
+/// of `houses`, its driver at home.
+fn roads_town(roads: &str, exits: &str, houses: &[House]) -> World {
+    let content = r#"{
+        "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],
+        "objects":[],
+        "economy":{"startingFunds":500}}"#;
+    town_of(content, "", 200, 60, roads, exits, houses)
+}
+
+/// A town `width` by `depth` m with `content`, `more` (JSON fields, each with a comma before it),
+/// `roads` and `exits` (JSON) and a car at each of `houses`, its driver at home.
+fn town_of(
+    content: &str,
+    more: &str,
+    width: u32,
+    depth: u32,
+    roads: &str,
+    exits: &str,
+    houses: &[House],
+) -> World {
+    let (mut plots, mut households, mut sims, mut drives, mut cars) =
+        (vec![], vec![], vec![], vec![], vec![]);
+    for (k, h) in houses.iter().enumerate() {
+        let [x, z, pw, pd] = h.plot;
+        let (cx, cz) = (x + pw / 2.0, z + pd / 2.0);
+        plots.push(format!(
+            r#"{{"name":"H{k}","x":{x},"z":{z},"w":{pw},"d":{pd},"entry":[{},{}]}}"#,
+            cx.floor() + 0.5,
+            cz.floor() + 0.5
+        ));
+        households.push(format!(r#"{{"name":"F{k}","plot":{k}}}"#));
+        sims.push(format!(
+            r#"{{"name":"D{k}","household":{k},"x":{},"z":{}}}"#,
+            cx.floor() + 0.5,
+            cz.floor() + 0.5
+        ));
+        let k_park = 0.45 + CAR.0 / 2.0;
+        let (spot, yaw, front) = if h.along_x {
+            (
+                [h.inner[0] + h.front * k_park, h.inner[1]],
+                h.front * std::f32::consts::FRAC_PI_2,
+                format!(r#""front":0,"frontX":{}"#, h.front),
+            )
+        } else {
+            (
+                [h.inner[0], h.inner[1] + h.front * k_park],
+                if h.front > 0.0 {
+                    0.0
+                } else {
+                    std::f32::consts::PI
+                },
+                format!(r#""front":{}"#, h.front),
+            )
+        };
+        drives.push(format!(
+            r#"{{"plot":{k},"x":{},"z":{},{front},"street":30,"road":{},"s":{}}}"#,
+            h.inner[0], h.inner[1], h.road, h.s
+        ));
+        cars.push(format!(
+            r#"{{"plot":{k},"x":{},"z":{},"yaw":{yaw},"street":30,"len":{},"wid":{},"body":2,"paint":{k}}}"#,
+            spot[0], spot[1], CAR.0, CAR.1
+        ));
+    }
+    let town = format!(
+        r#"{{"width":{width},"depth":{depth},"exits":{exits},"roads":{roads}{more},
+        "plots":[{}],"households":[{}],"objects":[],"sims":[{}],"drives":[{}],"cars":[{}]}}"#,
+        plots.join(","),
+        households.join(","),
+        sims.join(","),
+        drives.join(","),
+        cars.join(",")
+    );
+    let mut w = World::from_json(content, &town, 1).unwrap();
+    w.autonomy = false;
+    assert!(w.cars.iter().all(|c| !c.no_way), "every car has a way out");
+    w
+}
+
+/// Points every metre from `a` to `b` (JSON).
+fn line_pts(a: [f32; 2], b: [f32; 2]) -> String {
+    let n = (a[0] - b[0]).hypot(a[1] - b[1]).round() as usize;
+    (0..=n)
+        .map(|k| {
+            let t = k as f32 / n as f32;
+            format!(
+                "[{},{}]",
+                a[0] + (b[0] - a[0]) * t,
+                a[1] + (b[1] - a[1]) * t
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// Ticks `w` on (at most `ticks`) till `done`, every tick checking no two cars overlap (one of
+/// them on the move); false if it never was.
+fn run_clear(
+    w: &mut World,
+    ticks: u32,
+    mut each: impl FnMut(&mut World),
+    done: impl Fn(&World) -> bool,
+) -> bool {
+    for _ in 0..ticks {
+        w.tick_once();
+        let (o, a, b) = cars_overlap(w);
+        assert!(o <= 0.05, "cars {a} and {b} overlap by {o:.2} m");
+        each(w);
+        if done(w) {
+            return true;
+        }
+    }
+    false
+}
+
+#[test]
+fn two_cars_meeting_on_a_6_m_lane_pass_each_other_pulled_over() {
+    // One drives off west from its house; the other comes in from the west to its home.
+    let mut w = street(6.0, &[(90.0, true), (60.0, false)]);
+    set_off(&mut w, 0);
+    come_home(&mut w, 1);
+    let mut pulled: f32 = 0.0;
+    let done = run_clear(
+        &mut w,
+        6000,
+        |w| pulled = pulled.max(w.cars[0].shift.min(w.cars[1].shift)),
+        |w| w.cars[0].state == CarState::Away && w.cars[1].state == CarState::Parked,
+    );
+    assert!(
+        done,
+        "both on their way: {:?}",
+        w.cars
+            .iter()
+            .map(|c| (c.state, c.progress))
+            .collect::<Vec<_>>()
+    );
+    // (Both onto their pavements, clear of the kerbside furniture: `cars::kerbside`.)
+    assert!(pulled > 0.2, "they pulled over {pulled:.2} m to pass");
+}
+
+#[test]
+fn a_car_pulling_out_of_its_driveway_waits_for_one_coming_along() {
+    // One comes in from the east end to its home; the other, on the same side further east,
+    // pulls out of its driveway as it comes by, to drive off east across its lane.
+    let mut w = street(7.0, &[(110.0, true), (150.0, true)]);
+    come_home(&mut w, 0);
+    let mut out = false;
+    let done = run_clear(
+        &mut w,
+        4000,
+        |w| {
+            if !out && w.cars[0].shown.is_some_and(|s| s.2 && s.0[0] < 170.0) {
+                set_off(w, 1);
+                out = true;
+            }
+        },
+        |w| w.cars[0].state == CarState::Parked && w.cars[1].state == CarState::Away,
+    );
+    assert!(
+        done,
+        "not both on their way: {:?}",
+        w.cars
+            .iter()
+            .map(|c| (c.state, c.progress))
+            .collect::<Vec<_>>()
+    );
+}
+
+/// A main road along x (z = 30) and a side road along z (x = 120) from a dead end at z = 52 to it;
+/// the ways out at either end of the main road.
+fn t_junction(houses: &[House]) -> World {
+    let roads = format!(
+        r#"[{{"points":[{}],"width":7,"kind":"street","ends":["out","out"]}},
+            {{"points":[{}],"width":6,"kind":"street","ends":["dead","join"]}}]"#,
+        line_pts([0.5, 30.0], [199.5, 30.0]),
+        line_pts([120.0, 52.0], [120.0, 30.0])
+    );
+    roads_town(
+        &roads,
+        r#"[{"x":0.5,"z":30,"kind":"road"},{"x":199.5,"z":30,"kind":"road"}]"#,
+        houses,
+    )
+}
+
+#[test]
+fn a_car_turning_out_of_a_side_road_waits_for_one_coming_along_the_road() {
+    // On the side road, west of it, a house whose car turns out onto the main road east (the
+    // nearer way out), across the way of one coming home along it from the east to a house just
+    // west of the junction.
+    let side = House {
+        plot: [102.0, 36.0, 16.0, 14.0],
+        inner: [110.0, 43.0],
+        front: 1.0,
+        along_x: true,
+        road: 1,
+        s: 9.0,
+    };
+    let main = House {
+        plot: [98.0, 8.0, 16.0, 18.0],
+        inner: [106.0, 20.5],
+        front: 1.0,
+        along_x: false,
+        road: 0,
+        s: 105.5,
+    };
+    for trigger in [175.0, 169.0, 165.0, 150.0] {
+        let mut w = t_junction(&[side, main]);
+        come_home(&mut w, 1);
+        let mut out = false;
+        let done = run_clear(
+            &mut w,
+            6000,
+            |w| {
+                if !out && w.cars[1].shown.is_some_and(|s| s.2 && s.0[0] < trigger) {
+                    set_off(w, 0);
+                    out = true;
+                }
+            },
+            |w| w.cars[0].state == CarState::Away && w.cars[1].state == CarState::Parked,
+        );
+        assert!(
+            done,
+            "({trigger}) not both on their way: {:?}",
+            w.cars
+                .iter()
+                .map(|c| (c.state, c.progress))
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
+fn cars_from_every_arm_of_a_crossroads_at_once_all_get_through() {
+    // A crossroads: the main road along x (dead ends either way), the cross road along z with the
+    // ways out at its ends. Two cars set off from houses on the main road's arms, two come home
+    // to houses on them from the cross road's: all four through the junction at once.
+    let roads = format!(
+        r#"[{{"points":[{}],"width":7,"kind":"street","ends":["dead","dead"]}},
+            {{"points":[{}],"width":7,"kind":"street","ends":["out","join"]}},
+            {{"points":[{}],"width":7,"kind":"street","ends":["join","out"]}}]"#,
+        line_pts([40.0, 30.0], [160.0, 30.0]),
+        line_pts([100.0, 0.5], [100.0, 30.0]),
+        line_pts([100.0, 30.0], [100.0, 59.5])
+    );
+    let house = |x: f32, north: bool| {
+        let (z, inner, front) = if north {
+            (8.0, 20.5, 1.0)
+        } else {
+            (34.0, 39.5, -1.0)
+        };
+        House {
+            plot: [x - 12.0, z, 16.0, 18.0],
+            inner: [x, inner],
+            front,
+            along_x: false,
+            road: 0,
+            s: x - 40.0,
+        }
+    };
+    let houses = [
+        house(70.0, true),
+        house(130.0, false),
+        house(80.0, false),
+        house(120.0, true),
+    ];
+    let mut w = roads_town(
+        &roads,
+        r#"[{"x":100,"z":0.5,"kind":"road"},{"x":100,"z":59.5,"kind":"road"}]"#,
+        &houses,
+    );
+    set_off(&mut w, 0);
+    set_off(&mut w, 1);
+    come_home(&mut w, 2);
+    come_home(&mut w, 3);
+    let mut ticks = 0;
+    let done = run_clear(
+        &mut w,
+        3 * 60 * 20,
+        |_| ticks += 1,
+        |w| {
+            matches!(w.cars[0].state, CarState::Away)
+                && matches!(w.cars[1].state, CarState::Away)
+                && w.cars[2].state == CarState::Parked
+                && w.cars[3].state == CarState::Parked
+        },
+    );
+    assert!(
+        done,
+        "not all through in three minutes: {:?}",
+        w.cars
+            .iter()
+            .map(|c| (c.state, c.progress))
+            .collect::<Vec<_>>()
+    );
+    // (Through the junction one after another: none of them over a minute of game time waiting.)
+    assert!(
+        ticks > 200,
+        "through in {ticks} ticks: did they drive at all?"
+    );
+}
+
+// ---- Cars and buses taking turns (`traffic.rs`) ------------------------------------------------
+
+/// A bus every 20 minutes from 6 to 23 o'clock.
+const BUS_CONTENT: &str = r#"{
+    "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],
+    "objects":[],
+    "bus":{"every":20,"first":6,"last":23},
+    "economy":{"startingFunds":500}}"#;
+
+/// How far two bodies overlap (m; 0 or less: apart), each where it is facing its yaw, its length
+/// and width: the least along any of their sides' ways.
+fn bodies_overlap(a: ([f32; 2], f32, f32, f32), b: ([f32; 2], f32, f32, f32)) -> f32 {
+    let axes = |yaw: f32| {
+        let (s, c) = yaw.sin_cos();
+        [[s, c], [c, -s]]
+    };
+    let (aa, ba) = (axes(a.1), axes(b.1));
+    let d = [b.0[0] - a.0[0], b.0[1] - a.0[1]];
+    let reach = |ax: &[[f32; 2]; 2], half: [f32; 2], u: [f32; 2]| {
+        half[0] * (ax[0][0] * u[0] + ax[0][1] * u[1]).abs()
+            + half[1] * (ax[1][0] * u[0] + ax[1][1] * u[1]).abs()
+    };
+    let (ha, hb) = ([a.2 / 2.0, a.3 / 2.0], [b.2 / 2.0, b.3 / 2.0]);
+    aa.iter()
+        .chain(ba.iter())
+        .map(|&u| reach(&aa, ha, u) + reach(&ba, hb, u) - (d[0] * u[0] + d[1] * u[1]).abs())
+        .fold(f32::INFINITY, f32::min)
+}
+
+/// How far a car on the move and a bus overlap at most where they're drawn (m; 0 or less: apart).
+fn car_bus_overlap(w: &World) -> f32 {
+    let (len, wid) = (sim_core::bus::BUS_LEN, sim_core::bus::BUS_WID);
+    w.cars
+        .iter()
+        .filter_map(|c| c.shown.filter(|s| s.2).map(|s| (s.0, s.1, c.len, c.wid)))
+        .flat_map(|c| {
+            w.transit
+                .buses
+                .iter()
+                .filter_map(|b| b.shown)
+                .map(move |b| bodies_overlap(c, (b.0, b.1, len, wid)))
+        })
+        .fold(f32::NEG_INFINITY, f32::max)
+}
+
+/// Ticks `w` on (at most `ticks`) till `done`, every tick checking no two cars overlap, nor a car
+/// and a bus; false if it never was.
+fn run_clear_of_buses(
+    w: &mut World,
+    ticks: u32,
+    mut each: impl FnMut(&mut World),
+    done: impl Fn(&World) -> bool,
+) -> bool {
+    run_clear(
+        w,
+        ticks,
+        |w| {
+            let o = car_bus_overlap(w);
+            assert!(o <= 0.05, "a car and a bus overlap by {o:.2} m");
+            each(w)
+        },
+        done,
+    )
+}
+
+/// The bus of `w` standing at a stop with its doors open, if any: where.
+fn bus_at_stop(w: &World) -> Option<[f32; 2]> {
+    w.transit
+        .buses
+        .iter()
+        .find_map(|b| b.shown.filter(|s| s.3 != 0).map(|s| s.0))
+}
+
+/// Where a bus of `w` in town is, if any.
+fn bus_at(w: &World) -> Option<[f32; 2]> {
+    w.transit.buses.iter().find_map(|b| b.shown.map(|s| s.0))
+}
+
+#[test]
+fn a_car_behind_and_one_coming_by_a_bus_at_its_stop_wait_and_never_touch_it() {
+    // A 6 m street with the bus stop near its west end (the bus going east, in from the west): one
+    // car comes home from the west behind the bus at its stop, another leaves west past it the
+    // other way, where neither can pass it.
+    let house = |x: f32| House {
+        plot: [x - 12.0, 8.0, 16.0, 18.0],
+        inner: [x, 20.5],
+        front: 1.0,
+        along_x: false,
+        road: 0,
+        s: x - 0.5,
+    };
+    let roads = format!(
+        r#"[{{"points":[{}],"width":6,"kind":"street","ends":["out","out"]}}]"#,
+        line_pts([0.5, 30.0], [199.5, 30.0])
+    );
+    let mut w = town_of(
+        BUS_CONTENT,
+        "",
+        200,
+        60,
+        &roads,
+        r#"[{"x":0.5,"z":30,"kind":"road"},{"x":199.5,"z":30,"kind":"road"},{"x":30,"z":32.4,"kind":"stop"}]"#,
+        &[house(60.0), house(70.0)],
+    );
+    assert_eq!(w.transit.lines.len(), 1);
+    common::run_to(&mut w, 2, 7.0);
+    let sent = std::cell::Cell::new(false);
+    let done = run_clear_of_buses(
+        &mut w,
+        40 * 60 * 20,
+        |w| {
+            if !sent.get() && bus_at_stop(w).is_some_and(|p| (p[0] - 30.0).abs() < 6.0) {
+                come_home(w, 0);
+                set_off(w, 1);
+                sent.set(true);
+            }
+        },
+        |w| sent.get() && w.cars[0].state == CarState::Parked && w.cars[1].state == CarState::Away,
+    );
+    assert!(
+        done,
+        "not both on their way: {:?}",
+        w.cars
+            .iter()
+            .map(|c| (c.state, c.progress))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(w.transit.withdrawn, 0, "the bus was taken out of service");
+}
+
+#[test]
+fn a_car_turning_out_of_a_side_road_takes_its_turn_with_a_bus_at_the_junction() {
+    // The side road's car turns out onto the main road as a bus comes along it to the junction (a
+    // stop east of it), at a few moments: never into it, nor the bus into the car, and both on.
+    let side = House {
+        plot: [102.0, 36.0, 16.0, 14.0],
+        inner: [110.0, 43.0],
+        front: 1.0,
+        along_x: true,
+        road: 1,
+        s: 9.0,
+    };
+    let roads = format!(
+        r#"[{{"points":[{}],"width":7,"kind":"street","ends":["out","out"]}},
+            {{"points":[{}],"width":6,"kind":"street","ends":["dead","join"]}}]"#,
+        line_pts([0.5, 30.0], [199.5, 30.0]),
+        line_pts([120.0, 52.0], [120.0, 30.0])
+    );
+    for trigger in [96.0, 104.0, 110.0, 116.0] {
+        let mut w = town_of(
+            BUS_CONTENT,
+            "",
+            200,
+            60,
+            &roads,
+            r#"[{"x":0.5,"z":30,"kind":"road"},{"x":199.5,"z":30,"kind":"road"},{"x":160,"z":32.4,"kind":"stop"}]"#,
+            &[side],
+        );
+        common::run_to(&mut w, 2, 7.0);
+        let sent = std::cell::Cell::new(false);
+        let mut bus_past = false;
+        let done = run_clear_of_buses(
+            &mut w,
+            40 * 60 * 20,
+            |w| {
+                if !sent.get()
+                    && bus_at(w).is_some_and(|p| (trigger..trigger + 6.0).contains(&p[0]))
+                {
+                    set_off(w, 0);
+                    sent.set(true);
+                }
+                bus_past |= sent.get() && bus_at(w).is_some_and(|p| p[0] > 150.0);
+            },
+            |w| sent.get() && w.cars[0].state == CarState::Away,
+        );
+        assert!(
+            done && bus_past,
+            "({trigger}) not both on: {:?}",
+            (w.cars[0].state, w.cars[0].progress)
+        );
+        assert_eq!(
+            w.transit.withdrawn, 0,
+            "({trigger}) the bus was taken out of service"
+        );
+    }
+}
+
+#[test]
+fn a_car_right_behind_a_bus_turning_round_keeps_out_of_its_sweep() {
+    // A line in from the west to its one stop and back out west: its bus turns round there, its
+    // body sweeping both lanes. A car coming home past the stop from the west comes up behind it as
+    // it stands there and turns, at a few moments: it keeps out of the bus's way round (`sweeps`).
+    let roads = format!(
+        r#"[{{"points":[{}],"width":7,"kind":"street","ends":["out","dead"]}}]"#,
+        line_pts([0.5, 30.0], [150.0, 30.0])
+    );
+    let house = House {
+        plot: [62.0, 8.0, 16.0, 18.0],
+        inner: [70.0, 20.5],
+        front: 1.0,
+        along_x: false,
+        road: 0,
+        s: 69.5,
+    };
+    for wait in [0, 40, 80, 120] {
+        let mut w = town_of(
+            BUS_CONTENT,
+            "",
+            200,
+            60,
+            &roads,
+            r#"[{"x":0.5,"z":30,"kind":"road"},{"x":40,"z":32.4,"kind":"stop"}]"#,
+            &[house],
+        );
+        assert!(
+            w.travel.zones.len() > w.travel.graph.boxes.len(),
+            "the bus's sweep turning round is a zone"
+        );
+        common::run_to(&mut w, 2, 7.0);
+        let (sent, since) = (std::cell::Cell::new(false), std::cell::Cell::new(None));
+        let done = run_clear_of_buses(
+            &mut w,
+            40 * 60 * 20,
+            |w| {
+                if since.get().is_none() && bus_at_stop(w).is_some() {
+                    since.set(Some(w.tick));
+                }
+                if !sent.get() && since.get().is_some_and(|t| w.tick >= t + wait) {
+                    come_home(w, 0);
+                    sent.set(true);
+                }
+            },
+            |w| sent.get() && w.cars[0].state == CarState::Parked,
+        );
+        assert!(
+            done,
+            "({wait}) the car never got home: {:?}",
+            (w.cars[0].state, w.cars[0].progress)
+        );
+        assert_eq!(
+            w.transit.withdrawn, 0,
+            "({wait}) the bus was taken out of service"
+        );
+    }
+}
+
+#[test]
+fn cars_from_every_arm_of_a_busy_crossroads_all_get_through_with_the_buses() {
+    // A big world's crossroads, its ways out east and west, two bus stops on either of those arms
+    // (a line through it each way): two cars leave from houses on the north and south arms, two
+    // come home to houses there, all across the junction as a bus comes to it, at a few moments.
+    let arm = |a: [f32; 2], b: [f32; 2], ends: &str| {
+        format!(
+            r#"{{"points":[{}],"width":7,"kind":"street","ends":{ends},"area":0}}"#,
+            line_pts(a, b)
+        )
+    };
+    let roads = format!(
+        "[{},{},{},{}]",
+        arm([0.5, 200.0], [200.0, 200.0], r#"["out","join"]"#),
+        arm([200.0, 200.0], [399.5, 200.0], r#"["join","out"]"#),
+        arm([200.0, 120.0], [200.0, 200.0], r#"["dead","join"]"#),
+        arm([200.0, 200.0], [200.0, 280.0], r#"["join","dead"]"#)
+    );
+    let exits = r#"[{"x":0.5,"z":200,"kind":"road"},{"x":399.5,"z":200,"kind":"road"},
+        {"x":230,"z":202.4,"kind":"stop"},{"x":250,"z":202.4,"kind":"stop"},
+        {"x":170,"z":197.6,"kind":"stop"},{"x":150,"z":197.6,"kind":"stop"}]"#;
+    let more = r#","size":"big","walls":[],"doors":[],"windows":[],"relationships":[],
+        "areas":[{"name":"Crossroads","kind":"hamlet","x":130,"z":130,"w":140,"d":140}]"#;
+    // (Houses west of the north arm and east of the south one, their driveways onto them.)
+    let house = |z: f32, west: bool| House {
+        plot: if west {
+            [180.0, z - 8.0, 14.0, 16.0]
+        } else {
+            [206.0, z - 8.0, 14.0, 16.0]
+        },
+        inner: if west { [193.0, z] } else { [207.0, z] },
+        front: if west { 1.0 } else { -1.0 },
+        along_x: true,
+        road: if z < 200.0 { 2 } else { 3 },
+        s: if z < 200.0 { z - 120.0 } else { z - 200.0 },
+    };
+    let houses = [
+        house(170.0, true),
+        house(230.0, false),
+        house(178.0, true),
+        house(222.0, false),
+    ];
+    for wait in [0, 30, 60] {
+        let mut w = town_of(BUS_CONTENT, more, 400, 400, &roads, exits, &houses);
+        assert!(
+            w.transit.lines.len() >= 2,
+            "{} lines",
+            w.transit.lines.len()
+        );
+        common::run_to(&mut w, 2, 7.0);
+        let (sent, since) = (std::cell::Cell::new(false), std::cell::Cell::new(None));
+        let done = run_clear_of_buses(
+            &mut w,
+            60 * 60 * 20,
+            |w| {
+                let near = w.transit.buses.iter().any(|b| {
+                    b.shown
+                        .is_some_and(|s| (s.0[0] - 200.0).hypot(s.0[1] - 200.0) < 30.0)
+                });
+                if since.get().is_none() && near {
+                    since.set(Some(w.tick));
+                }
+                if !sent.get() && since.get().is_some_and(|t| w.tick >= t + wait) {
+                    set_off(w, 0);
+                    set_off(w, 1);
+                    come_home(w, 2);
+                    come_home(w, 3);
+                    sent.set(true);
+                }
+            },
+            |w| {
+                sent.get()
+                    && w.cars[0].state == CarState::Away
+                    && w.cars[1].state == CarState::Away
+                    && w.cars[2].state == CarState::Parked
+                    && w.cars[3].state == CarState::Parked
+            },
+        );
+        assert!(
+            done,
+            "({wait}) not all through: {:?}",
+            w.cars
+                .iter()
+                .map(|c| (c.state, c.progress))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            w.transit.withdrawn, 0,
+            "({wait}) a bus was taken out of service"
+        );
+    }
+}
