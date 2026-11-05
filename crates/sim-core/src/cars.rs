@@ -338,6 +338,11 @@ pub struct Car {
     /// (`back_off`). Not saved.
     #[serde(skip)]
     jam: (u32, u32),
+    /// A work taxi (`taxi.rs`), not a household's: it comes in at a way out on a run, drives it
+    /// and goes again, and nothing of the households' (`update`) is its. Not saved with the cars
+    /// (the runs are, `taxi::Taxis`).
+    #[serde(skip)]
+    pub taxi: bool,
 }
 
 fn is_zero_f32(v: &f32) -> bool {
@@ -505,6 +510,7 @@ impl Car {
             moved: false,
             pulled_for: None,
             jam: (0, 0),
+            taxi: false,
         }
     }
 
@@ -562,6 +568,7 @@ impl Car {
             moved: false,
             pulled_for: None,
             jam: (0, 0),
+            taxi: false,
         }
     }
 

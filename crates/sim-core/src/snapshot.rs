@@ -14,7 +14,7 @@ pub const SIM_STRIDE: usize = 33;
 /// server's.
 pub const CAR_BASE: usize = HEADER_LEN + (MAX_SIMS + crate::staff::MAX_STAFF) * SIM_STRIDE;
 /// Floats per car.
-pub const CAR_STRIDE: usize = 5;
+pub const CAR_STRIDE: usize = 6;
 /// The traffic lights' rows (`header::LIGHT_COUNT`, `light`), after the cars': one per signal
 /// head, `MAX_LIGHTS` at most.
 pub const LIGHT_BASE: usize = CAR_BASE + crate::cars::MAX_CARS * CAR_STRIDE;
@@ -46,8 +46,10 @@ pub mod header {
     /// while they serve someone, with `HELD` what they hand over and `PROGRESS` how far the
     /// customer's use is; `OBJECT` is -1 (they stand behind it, not at it).
     pub const STAFF_COUNT: usize = 9;
-    /// Households' cars (`cars.rs`): as many rows as this from `CAR_BASE`, each laid out as `car`,
-    /// in the structure's `cars` order.
+    /// The cars (`cars.rs`): as many rows as this from `CAR_BASE`, each laid out as `car`. The
+    /// households' first, in the structure's `cars` order; then the work taxis' (`taxi.rs`, `KIND`
+    /// a taxi: none in the structure), a row each for good once one has come (an unused one not to
+    /// be seen).
     pub const CAR_COUNT: usize = 10;
     /// The traffic lights' signal heads (`traffic::Signal`, one per arm of each lit junction): as
     /// many rows as this from `LIGHT_BASE`, each laid out as `light`, the same from tick to tick
@@ -85,6 +87,12 @@ pub mod car {
     /// Its open doors: bit `d` for door `d` (`cars::DOORS`: front left, front right, back left,
     /// back right), while someone gets in or out.
     pub const DOORS: usize = 4;
+    /// What it is: `HOUSEHOLD` (its look in the structure's `cars`) or `TAXI` (a work taxi,
+    /// `taxi.rs`: its look the renderer's own).
+    pub const KIND: usize = 5;
+    /// `KIND`'s values.
+    pub const HOUSEHOLD: f32 = 0.0;
+    pub const TAXI: f32 = 1.0;
 }
 
 pub mod sim {
@@ -194,7 +202,7 @@ const _: () = assert!(
     header::ITEMS_VERSION < HEADER_LEN
         && header::CAR_COUNT < HEADER_LEN
         && header::LIGHT_COUNT < HEADER_LEN
-        && car::DOORS < CAR_STRIDE
+        && car::KIND < CAR_STRIDE
         && light::STATE < LIGHT_STRIDE
 );
 
@@ -852,6 +860,7 @@ fn write_cars(world: &World, out: &mut [f32]) {
     out[header::CAR_COUNT] = cars.len() as f32;
     for (k, c) in cars.iter().enumerate() {
         let o = &mut out[CAR_BASE + k * CAR_STRIDE..CAR_BASE + (k + 1) * CAR_STRIDE];
+        o[car::KIND] = if c.taxi { car::TAXI } else { car::HOUSEHOLD };
         let Some((p, yaw, moving, doors)) = c.shown else {
             o[car::SHOWN] = 0.0;
             continue;
@@ -976,7 +985,7 @@ pub fn layout_json(content: &Content) -> String {
     layout["header"]["carCount"] = header::CAR_COUNT.into();
     layout["carBase"] = CAR_BASE.into();
     layout["carStride"] = CAR_STRIDE.into();
-    layout["car"] = serde_json::json!({ "shown": car::SHOWN, "x": car::X, "z": car::Z, "yaw": car::YAW, "doors": car::DOORS });
+    layout["car"] = serde_json::json!({ "shown": car::SHOWN, "x": car::X, "z": car::Z, "yaw": car::YAW, "doors": car::DOORS, "kind": car::KIND, "kinds": { "household": car::HOUSEHOLD, "taxi": car::TAXI } });
     layout["header"]["lightCount"] = header::LIGHT_COUNT.into();
     layout["lightBase"] = LIGHT_BASE.into();
     layout["lightStride"] = LIGHT_STRIDE.into();
