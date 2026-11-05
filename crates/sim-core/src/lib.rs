@@ -44,6 +44,7 @@ pub mod social;
 pub mod staff;
 pub mod storeys;
 pub mod surface;
+pub mod taxi;
 pub mod traffic;
 pub mod travel;
 pub mod view;

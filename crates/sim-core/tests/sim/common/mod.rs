@@ -863,7 +863,9 @@ fn state(w: &World, s: &Sim) -> State {
         | Phase::Queued { .. }
         | Phase::Knocking { .. }
         | Phase::Boarding { .. }
-        | Phase::Alighting { .. } => State::Waiting(d),
+        | Phase::Alighting { .. }
+        // (At the kerb for the work taxi: `taxi.rs`.)
+        | Phase::AtKerb { .. } => State::Waiting(d),
     }
 }
 

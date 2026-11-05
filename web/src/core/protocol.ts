@@ -721,6 +721,8 @@ export interface SimView {
    * (not while away at work with it). Absent when they aren't (and from older workers).
    */
   ride?: { kind: 'bike' | 'scooter'; to: 'work' | 'school' | 'home' };
+  /** The work taxi (sim-core `taxi::status`): waiting for it at the kerb, in it to work or school (`at`: the minute of the day they're there), or home in it (or waiting at work for it). Absent: none of those. */
+  taxi?: { state: 'wait' | 'work' | 'home'; at?: number };
   job: JobView | null;
   /** A pupil's school grade (0..100, in tenths). */
   grade?: number;

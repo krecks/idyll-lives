@@ -4985,5 +4985,6 @@
     "packs/romantic.json",
     "packs/hotHeaded.json",
     "packs/kind.json"
-  ]
+  ],
+  "taxi": {"$comment": "The work taxi (sim-core taxi.rs): colleagues (one career, one way out) whose work starts within `window` minutes share one, `seats` a taxi, when the way out on foot takes longer than `minWalkMinutes` and the taxi is sooner; it waits `waitMinutes` at a rider's kerb.", "seats": 4, "minWalkMinutes": 10, "window": 15, "waitMinutes": 2}
 }

@@ -1810,6 +1810,8 @@ pub struct Content {
     pub laundry: Option<LaundryRules>,
     /// How cars drive (content `cars`; see `cars.rs`, `travel.rs`).
     pub cars: CarRules,
+    /// The work taxi (content `taxi`; see `taxi.rs`).
+    pub taxi: TaxiRules,
     /// The uses (object def, interaction) with `"trail": true`: done walking out along the trail
     /// the thing stands at and back (a trailhead's *Walk the trail*; `world::trail_step`).
     pub trail_walks: Vec<(usize, usize)>,
@@ -1835,6 +1837,42 @@ impl Default for CarRules {
 #[serde(rename_all = "camelCase", default)]
 struct CarsRaw {
     country_speed: Option<f32>,
+}
+
+/// The work taxi (content `taxi`, `taxi.rs`): who rides it and how it runs.
+#[derive(Debug, Clone, Copy)]
+pub struct TaxiRules {
+    /// Seats for riders (`seats`, 1 to 4, default 4): more riders than that take more taxis.
+    pub seats: usize,
+    /// A way out of town on foot taking longer than this is a long way, ridden when the taxi gets
+    /// them out sooner than the walk, its wait at the kerb included (game minutes,
+    /// `minWalkMinutes`, default 10).
+    pub min_walk: f32,
+    /// Colleagues whose work (or school) starts within this of each other share one (minutes,
+    /// `window`, default 15).
+    pub window: f32,
+    /// How long it waits at a rider's kerb for them (minutes, `waitMinutes`, default 2).
+    pub wait: f32,
+}
+
+impl Default for TaxiRules {
+    fn default() -> Self {
+        Self {
+            seats: 4,
+            min_walk: 10.0,
+            window: 15.0,
+            wait: 2.0,
+        }
+    }
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct TaxiRaw {
+    seats: Option<usize>,
+    min_walk_minutes: Option<f32>,
+    window: Option<f32>,
+    wait_minutes: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -1937,6 +1975,8 @@ struct ContentFile {
     laundry: Option<LaundryRaw>,
     #[serde(default)]
     cars: CarsRaw,
+    #[serde(default)]
+    taxi: TaxiRaw,
 }
 
 #[derive(Deserialize)]
@@ -5095,6 +5135,26 @@ impl Content {
                     }
                     None => crate::travel::COUNTRY_SPEED,
                 },
+            },
+            taxi: {
+                let d = TaxiRules::default();
+                let rules = TaxiRules {
+                    seats: raw.taxi.seats.unwrap_or(d.seats),
+                    min_walk: raw.taxi.min_walk_minutes.unwrap_or(d.min_walk),
+                    window: raw.taxi.window.unwrap_or(d.window),
+                    wait: raw.taxi.wait_minutes.unwrap_or(d.wait),
+                };
+                let ok = |v: f32, most: f32| v.is_finite() && (0.0..=most).contains(&v);
+                if !(1..=4).contains(&rules.seats)
+                    || !ok(rules.min_walk, 600.0)
+                    || !ok(rules.window, 120.0)
+                    || !ok(rules.wait, 30.0)
+                {
+                    return Err(Error::new(
+                        "taxi: seats is 1 to 4, minWalkMinutes 0 to 600, window 0 to 120 minutes and waitMinutes 0 to 30",
+                    ));
+                }
+                rules
             },
             object_index,
         })

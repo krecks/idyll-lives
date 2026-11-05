@@ -3,13 +3,15 @@
   import PhoneTab from './PhoneTab.svelte';
   import SkillsTab from './SkillsTab.svelte';
   import Icon from './Icon.svelte';
-  import { gradeLetter, moodLabel, needColor } from './format';
+  import { clock, gradeLetter, moodLabel, needColor } from './format';
   import SimPreview from './kit/SimPreview.svelte';
   import { chemistryLabel, friendLabel, kinLabel, romanceLabel } from './relationship';
   import { services } from './services';
   import TodayTimeline from './planner/TodayTimeline.svelte';
   import { goalText } from './story';
   import { game } from './state.svelte';
+  import { taxiText } from './place';
+  import { settings } from '../settings/settings.svelte';
 
   const allTabs = ['Now', 'People', 'Feelings', 'Career', 'Skills', 'Phone'] as const;
   let tab = $state<(typeof allTabs)[number]>('Now');
@@ -155,7 +157,15 @@
               {/if}
             </li>
           {:else}
-            <li class="idle">{sim.awayUntil !== null ? (grownUp ? 'At work' : 'At school') : 'Deciding what to do next'}</li>
+            <li class="idle">
+              {sim.taxi
+                ? taxiText(sim.taxi, sim.job, (m) => clock(m, settings.clock24h))
+                : sim.awayUntil !== null
+                  ? grownUp
+                    ? 'At work'
+                    : 'At school'
+                  : 'Deciding what to do next'}
+            </li>
           {/each}
         </ol>
         {#if baby}

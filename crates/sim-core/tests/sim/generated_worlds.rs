@@ -322,6 +322,9 @@ fn generated_worlds_are_livable() {
     assert!(failures.is_empty());
 }
 
+/// How late the work taxi's riders may be at work on average (game minutes).
+const TAXI_LATE: f32 = 0.7;
+
 /// Hours a resident may be on a bike or an e-scooter in town at a time at most (a ride out of town
 /// or home takes minutes).
 const RIDE_HOURS: u64 = 2;
@@ -593,7 +596,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
         Some((seed.parse().ok()?, plot.parse().ok()?))
     });
     // Per size: worlds driven, cars, cars with no way out, drives to work, trips to another hamlet.
-    let mut sizes: std::collections::BTreeMap<String, [usize; 5]> = Default::default();
+    let mut sizes: std::collections::BTreeMap<String, [usize; 7]> = Default::default();
     // (The first `CAR_WORLDS` of each size, every big one.)
     let mut picked: std::collections::BTreeMap<String, usize> = Default::default();
     let items: Vec<(usize, String, &serde_json::Value)> = worlds
@@ -611,7 +614,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
         let mut failures = Vec::new();
         let big = size == "big";
         // (Worlds driven, cars, with no way out, drives to work, trips: summed per size below.)
-        let mut tally = [1usize, 0, 0, 0, 0];
+        let mut tally = [1usize, 0, 0, 0, 0, 0, 0];
         let label = format!(
             "{size} {} {} ({})",
             world["kind"], world["seed"], world["name"]
@@ -727,8 +730,10 @@ fn generated_worlds_cars_keep_to_the_roads() {
                     ));
                 }
             }
+            // (The work taxis' slots come as they're needed: keep to the roads as any car.)
+            was.resize(w.cars.len(), CarState::Away);
             for (c, car) in w.cars.iter().enumerate() {
-                if was[c] != car.state {
+                if was[c] != car.state && !car.taxi {
                     if car.state == CarState::Leaving {
                         tally[if car.trip.is_some() { 4 } else { 3 }] += 1;
                     }
@@ -775,8 +780,10 @@ fn generated_worlds_cars_keep_to_the_roads() {
         // on its way (a drive across a big world takes game hours, and it gives way to everyone
         // in front of it for a few minutes each, a crowd at the way out of town too: one that
         // has stood for two hours of it, or someone getting in for longer than a trip waits, is
-        // stuck).
-        for car in &w.cars {
+        // stuck). (A work taxi, the households' no more than a bus was: at three in the morning on
+        // its way to an early shift or home from a late one, as on any run, kept to the roads
+        // and held up nowhere for good by the checks above.)
+        for car in w.cars.iter().filter(|c| !c.taxi) {
             let home = w.households[car.household as usize].plot;
             let since = w.tick.saturating_sub(car.since);
             let wrong = match car.state {
@@ -804,6 +811,14 @@ fn generated_worlds_cars_keep_to_the_roads() {
                 ));
             }
         }
+        // The work taxi's riders at work, and how late (ticks, early as on time).
+        tally[5] += w.taxis.arrivals.len();
+        tally[6] += w
+            .taxis
+            .arrivals
+            .iter()
+            .map(|a| a.1.max(0) as usize)
+            .sum::<usize>();
         // (A big world's residents away or walking for long are about as many with cars as
         // without: only those waiting for a car count there, above.)
         if !big {
@@ -828,10 +843,21 @@ fn generated_worlds_cars_keep_to_the_roads() {
         }
         failures.append(&mut found);
     }
-    for (size, [n, cars, stay, commutes, trips]) in &sizes {
+    for (size, [n, cars, stay, commutes, trips, taxi, late]) in &sizes {
+        let mean_late = *late as f32 / (*taxi).max(1) as f32 / sim_core::TICKS_PER_MINUTE as f32;
         eprintln!(
-            "{size}: {n} worlds, {cars} cars ({stay} with no way out or no door to open), {commutes} drives to work, {trips} trips"
+            "{size}: {n} worlds, {cars} cars ({stay} with no way out or no door to open), {commutes} drives to work, {trips} trips, {taxi} at work by taxi ({mean_late:.2} min late on average)"
         );
+        // Some of a big world's residents a long way out of town ride the work taxi, about on
+        // time (`taxi.rs`); a cosy or a normal town's may have none.
+        if size == "big" && *n > 0 && *taxi == 0 {
+            failures.push(format!("{size}: nobody went to work by taxi"));
+        }
+        if mean_late > TAXI_LATE {
+            failures.push(format!(
+                "{size}: taxi riders {mean_late:.2} min late on average, more than {TAXI_LATE}"
+            ));
+        }
         if *cars == 0 || *stay as f32 > *cars as f32 * NO_WAY {
             failures.push(format!(
                 "{size}: {stay} of {cars} cars have no way out by road"

@@ -108,6 +108,7 @@ mod travel_countryside;
 mod travel_outings;
 mod travel_passengers;
 mod travel_routes;
+mod travel_taxi;
 mod travel_trips;
 mod tree_crowns;
 mod turned_lots;

@@ -92,4 +92,13 @@ describe('place names', () => {
     expect(way({ ride: bike })).toBe('Cycling to work');
     expect(way({})).toBe('');
   });
+
+  test('a resident and the work taxi: waiting at the kerb, in it to work or school, home in it', () => {
+    const time = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+    const way = (s: Parameters<typeof wayText>[0]) => wayText(s, 1, plots, households, time);
+    expect(way({ taxi: { state: 'wait' }, job: {} })).toBe('Waiting for the taxi');
+    expect(way({ taxi: { state: 'work', at: 8 * 60 + 40 }, job: {} })).toBe('Taxi to work · there about 8:40');
+    expect(way({ taxi: { state: 'work' }, job: null })).toBe('Taxi to school');
+    expect(way({ taxi: { state: 'home', at: 18 * 60 }, job: {}, trip: { to: 1 } })).toBe('Taxi home');
+  });
 });

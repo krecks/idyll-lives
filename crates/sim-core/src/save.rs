@@ -196,6 +196,10 @@ pub struct SaveFile {
     /// none, or they start over).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub lights: Vec<LightSave>,
+    /// The work taxis' runs planned and under way, and who came to work by one (`taxi::Taxis`;
+    /// absent: none).
+    #[serde(default, skip_serializing_if = "crate::taxi::Taxis::is_empty")]
+    pub taxis: crate::taxi::Taxis,
 }
 
 /// A lit junction's lights (`traffic::Light`): whose turn it is (its arm), how far through it
@@ -1035,7 +1039,9 @@ impl World {
                 .collect(),
             next_event_id: self.events.last_id(),
             former: self.former.clone(),
-            cars: self.cars.clone(),
+            // (The households' cars: the work taxis' slots are the runs', `taxis`.)
+            cars: self.cars.iter().filter(|c| !c.taxi).cloned().collect(),
+            taxis: self.taxis.clone(),
             drives: self.drives.clone(),
             garages: self.garages.clone(),
             open_world: self.travel.file.clone(),
@@ -1722,6 +1728,9 @@ impl World {
                 })
                 .collect();
         }
+        // The work taxis' runs, their riders booked and the taxis under way where they were.
+        world.taxis = save.taxis.clone();
+        crate::taxi::settle(&mut world);
         // What someone was eating or washing up is put down (those don't go on after loading).
         crate::cooking::settle(&mut world);
         Ok(world)

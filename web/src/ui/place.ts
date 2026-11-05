@@ -90,18 +90,33 @@ export function rideText(kind: SimRide['kind'], to: SimRide['to']): string {
   return `${kind === 'bike' ? 'Cycling' : 'Riding the e-scooter'} ${to === 'home' ? 'home' : `to ${to}`}`;
 }
 
+/** The work taxi a resident waits for or rides (`SimView.taxi`, sim-core `taxi.rs`). */
+export type SimTaxi = { state: 'wait' | 'work' | 'home'; at?: number };
+
 /**
- * A resident on their way (`SimView`'s `trip` and `ride`), in words: the trip (`tripText`), else
- * the ride (`rideText`); '' when they aren't on their way. `home`, `plots`, `households` and
- * `time` as `tripText`'s.
+ * The work taxi, in words: "Waiting for the taxi", "Taxi to work · there about 08:40" (to school
+ * for a pupil, `job` absent), "Taxi home". `time` writes a minute of day as the player's clock does.
+ */
+export function taxiText(taxi: SimTaxi, job: unknown, time: (minute: number) => string): string {
+  if (taxi.state === 'wait') return 'Waiting for the taxi';
+  if (taxi.state === 'home') return 'Taxi home';
+  const when = taxi.at === undefined ? '' : ` · there about ${time(taxi.at)}`;
+  return `Taxi to ${job ? 'work' : 'school'}${when}`;
+}
+
+/**
+ * A resident on their way (`SimView`'s `taxi`, `trip` and `ride`), in words: the work taxi
+ * (`taxiText`), else the trip (`tripText`), else the ride (`rideText`); '' when they aren't on
+ * their way. `home`, `plots`, `households` and `time` as `tripText`'s.
  */
 export function wayText(
-  s: { trip?: { to: number; at?: number }; ride?: SimRide },
+  s: { trip?: { to: number; at?: number }; ride?: SimRide; taxi?: SimTaxi; job?: unknown },
   home: number | null,
   plots: readonly PlacePlot[],
   households: readonly { name: string; plot: number | null }[],
   time: (minute: number) => string,
 ): string {
+  if (s.taxi) return taxiText(s.taxi, s.job, time);
   if (s.trip) return tripText(s.trip, home, plots, households, time, s.ride);
   if (s.ride) return rideText(s.ride.kind, s.ride.to);
   return '';

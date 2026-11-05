@@ -558,6 +558,7 @@ woken. They do the crib's care interactions for each of those needs under `tendB
 (default 0.6), and those woken go back to bed, with the `feeling` (optional); the same baby
 calls nobody again for `cooldownMinutes` (default 90). The base game wakes for hunger, bladder
 and hygiene.
+**The work taxi:** in an open-world town, someone off to work or school whose way out of town on foot takes longer than `taxi.minWalkMinutes` (default 10), with no seat in a car and no bike for a ride out of 90 minutes at most, rides a taxi when it gets them out sooner than the walk: colleagues (one career, one way out) whose work starts within `taxi.window` minutes (default 15) share one, `taxi.seats` (1 to 4, default 4) a taxi; it waits `taxi.waitMinutes` (default 2) at a rider's kerb (code: `crates/sim-core/src/taxi.rs`).
 **Jobs:** `careerRules.market` turns on residents finding, quitting and losing jobs on their own.
 A promotion takes a full performance bar (100) and the next grade's skills. A shift worked fills
 the bar by `performancePerShift` (default 12) at the entry grade, for a resident who left for work

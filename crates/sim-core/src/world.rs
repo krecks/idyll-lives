@@ -978,6 +978,11 @@ pub enum Phase {
     /// At the wheel of their car on a trip to another hamlet or back (`cars::Trip`, a `Visit`
     /// or `GoHome` task): the car drives (`cars::update`), they sit in it.
     Driving,
+    /// At their kerb on their way to work or school, waiting for the work taxi they're booked on
+    /// (`Sim::taxi`, `taxi.rs`): it calls them to its door.
+    AtKerb {
+        ticks: u32,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -1112,6 +1117,9 @@ pub struct Sim {
     /// they drive) and the door they get in by (`cars::DOORS`). Not saved (after a load, they set
     /// off again).
     pub(crate) bound_for_car: Option<u32>,
+    /// The work taxi they're booked on (`taxi::Booking`): to work or school, or home from it. Not
+    /// saved (the runs are: `taxi::settle`).
+    pub(crate) taxi: Option<crate::taxi::Booking>,
     pub(crate) car_seat: u8,
     pub(crate) car_door: u8,
     /// Ticks they've waited for a car driving by to pass (`cars::in_the_way`). Not saved.
@@ -1870,6 +1878,8 @@ pub struct World {
     /// (`traffic::Traffic`). Not saved.
     pub traffic: crate::traffic::Traffic,
     pub drives: Vec<crate::cars::Drive>,
+    /// The work taxis' runs, planned and under way (`taxi.rs`).
+    pub taxis: crate::taxi::Taxis,
     /// Garages at the inner ends of driveways (`cars::Garage`).
     pub garages: Vec<crate::cars::Garage>,
     /// The tiles parked cars take up in `blocked` (`cars::reblock`), sorted.
@@ -1965,8 +1975,11 @@ pub(crate) struct Ctx<'a> {
     pub exits: &'a [[f32; 2]],
     /// The road network (`World::travel`).
     pub travel: &'a crate::travel::Travel,
-    /// Households' cars (`World::cars`).
+    /// Households' cars and the work taxis (`World::cars`).
     pub cars: &'a [crate::cars::Car],
+    /// The houses' driveways (`World::drives`), and the work taxis' runs (`World::taxis`).
+    pub drives: &'a [crate::cars::Drive],
+    pub taxis: &'a crate::taxi::Taxis,
     pub autonomy: bool,
     /// Room score per tile (`World::room_score`).
     pub room_score: &'a [f32],
@@ -2237,6 +2250,7 @@ impl World {
             cars: Vec::new(),
             traffic: Default::default(),
             drives: Vec::new(),
+            taxis: Default::default(),
             garages: Vec::new(),
             car_tiles: Vec::new(),
             cars_nav: 0,
@@ -2943,6 +2957,7 @@ impl World {
             bound_for_bike: None,
             riding: None,
             bound_for_car: None,
+            taxi: None,
             car_seat: 0,
             car_door: 0,
             car_wait: 0,
@@ -4392,6 +4407,8 @@ impl World {
                 exits,
                 travel,
                 cars,
+                drives,
+                taxis,
                 room_score,
                 dirt,
                 stairs,
@@ -4425,6 +4442,8 @@ impl World {
                 exits,
                 travel,
                 cars,
+                drives,
+                taxis,
                 autonomy: *autonomy,
                 hour,
                 day: crate::clock::day(tick),
@@ -4468,6 +4487,7 @@ impl World {
         crate::lifecycle::update(self);
         crate::traffic::begin(self);
         crate::cars::update(self);
+        crate::taxi::update(self);
         crate::planner::update(self);
         crate::cooking::after_step(self);
         crate::lights::update(self);
@@ -7600,13 +7620,21 @@ fn start_task(
                     sim.transition = Some(crate::life::Transition::Work);
                     return;
                 };
+                // (In an open-world town, a bike only where the way was timed by one: a ride of
+                // `life::BIKE_MOST` at most.)
+                let no_bike = sim.commute.is_some_and(|c| c.long_ride);
                 if riding {
                     // On their bike: on it to the way out.
                     goal_at(exit)
-                } else if let Some(bike) = sim
-                    .bound_for_bike
-                    .or_else(|| crate::ride::bike_for(ctx, sim, objects, exit))
-                {
+                } else if let Some(kerb) = crate::taxi::kerb_for(ctx, sim) {
+                    // By the work taxi they're booked on (`taxi.rs`): to the kerb, to wait for it.
+                    crate::ride::get_off(sim, objects);
+                    goal_at(kerb)
+                } else if let Some(bike) = sim.bound_for_bike.or_else(|| {
+                    (!no_bike)
+                        .then(|| crate::ride::bike_for(ctx, sim, objects, exit))
+                        .flatten()
+                }) {
                     // On a bike of theirs (`ride.rs`): over to it first.
                     crate::ride::claim(sim, objects, bike);
                     goal_at(crate::ride::spot(content, &objects[bike as usize]))
@@ -8211,6 +8239,19 @@ fn progress(
         }
         // At the wheel: the car takes them (`cars::update`).
         Phase::Driving => return,
+        // At their kerb: the taxi calls them to its door (`taxi::update`), or goes without them.
+        Phase::AtKerb { ticks: waited } => {
+            *waited += ticks;
+            if sim.taxi.is_none() {
+                sim.current = None;
+                sim.queue.push_front(Task {
+                    kind: TaskKind::Work,
+                    directed: true,
+                    routine: false,
+                });
+            }
+            return;
+        }
         // Getting into the car: in, and off to work (`life`, `cars::board`).
         Phase::Boarding { ticks: waited } => {
             *waited += ticks;
@@ -8895,6 +8936,8 @@ fn arrive(
             }
         }
     }
+    // (Booked on a work taxi still to come: at their kerb, they wait for it.)
+    let at_kerb = crate::taxi::kerb_for(ctx, sim).is_some();
     let Some(act) = sim.current.as_mut() else {
         return;
     };
@@ -8931,6 +8974,11 @@ fn arrive(
                 if let Some(a) = sim.current.take() {
                     sim.queue.push_front(a.task);
                 }
+            }
+            // At their kerb: they wait for the work taxi (`taxi.rs`).
+            None if at_kerb => {
+                sim.pose = Pose::Stand;
+                act.phase = Phase::AtKerb { ticks: 0 };
             }
             None => {
                 sim.current = None;

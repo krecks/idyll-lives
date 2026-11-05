@@ -684,6 +684,7 @@ struct SimSent {
     visiting: u64,
     trip: u64,
     ride: u64,
+    taxi: u64,
     job: u64,
     /// Reset when the details stop (the UI drops them).
     details: DetailsSent,
@@ -1028,6 +1029,8 @@ fn sim_patch(
     let trip = trip_view(world, s, riders, detail);
     o.changed_opt("trip", trip.as_ref(), &mut sent.trip);
     o.changed_opt("ride", ride_view(world, s).as_ref(), &mut sent.ride);
+    // The work taxi: waiting for it, in it to work (and when they're there), or home in it.
+    o.changed_opt("taxi", taxi_view(world, s).as_ref(), &mut sent.taxi);
     o.changed("job", &job_view(content, s), &mut sent.job);
     if !detail {
         return;
@@ -1584,6 +1587,24 @@ fn trip_view(world: &World, s: &Sim, riders: &[u32], timed: bool) -> Option<Trip
 struct RideView {
     kind: crate::content::VehicleKind,
     to: &'static str,
+}
+
+/// The work taxi (`SimView.taxi`, `taxi::status`): `state` `wait` (at their kerb), `work` (in it,
+/// `at` the minute of the day they're there) or `home` (on their way home in it, or waiting for it
+/// at work: `at` about when they're back).
+#[derive(Serialize)]
+struct TaxiView {
+    state: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    at: Option<f32>,
+}
+
+fn taxi_view(world: &World, s: &Sim) -> Option<TaxiView> {
+    let (state, at) = crate::taxi::status(world, s)?;
+    Some(TaxiView {
+        state,
+        at: at.map(|t| (clock::minute_of_day(t) / 5.0).round() * 5.0),
+    })
 }
 
 /// What resident `s` rides now, on their way (not while away at work with it).
@@ -2505,6 +2526,7 @@ fn car_views(world: &World) -> Option<Vec<CarView>> {
             .cars
             .iter()
             .take(crate::cars::MAX_CARS)
+            .filter(|c| !c.taxi)
             .map(|c| CarView {
                 plot: c.plot,
                 x: c.spot[0],
