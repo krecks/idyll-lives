@@ -663,7 +663,8 @@ fn schedule_school(w: &mut World, i: usize, day: u32) {
         lead if w.travel.open => start.saturating_sub(lead),
         lead => leave.min(start.saturating_sub(lead)),
     };
-    let leave = crate::taxi::leave_at(w, i).unwrap_or(leave);
+    let by_taxi = crate::taxi::leave_at(w, i);
+    let leave = by_taxi.unwrap_or(leave);
     let World {
         content,
         sims,
@@ -673,7 +674,8 @@ fn schedule_school(w: &mut World, i: usize, day: u32) {
     } = w;
     let tick = *tick;
     let sim = &mut sims[i];
-    if tick > start + ticks(content.career_rules.late_minutes) {
+    // (Booked on a work taxi still to come, late as it may be: not a day missed.)
+    if tick > start + ticks(content.career_rules.late_minutes) && by_taxi.is_none() {
         // A day missed.
         sim.school_day = day;
         if let Some(school) = &content.life.school {
@@ -718,8 +720,10 @@ fn schedule_work(w: &mut World, i: usize, day: u32) {
         lead if w.travel.open => start.saturating_sub(lead),
         lead => leave.min(start.saturating_sub(lead)),
     };
-    let leave = crate::taxi::leave_at(w, i).unwrap_or(leave);
-    if tick > start + ticks(w.content.career_rules.late_minutes) {
+    let by_taxi = crate::taxi::leave_at(w, i);
+    let leave = by_taxi.unwrap_or(leave);
+    // (Booked on a work taxi still to come, late as it may be: not a shift missed.)
+    if tick > start + ticks(w.content.career_rules.late_minutes) && by_taxi.is_none() {
         miss_shift(w, i, day);
         return;
     }

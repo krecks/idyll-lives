@@ -921,7 +921,7 @@ impl Route {
     /// Its claims (`Route::claims`), for a car `len` by `wid`: the junctions' boxes it drives
     /// through, its mouths, and where it couldn't pass one coming the other way pulled over (a 6 m
     /// lane's tight bend: `traffic::narrow`).
-    fn claim(&mut self, len: f32, wid: f32, travel: Option<&Travel>) {
+    pub(crate) fn claim(&mut self, len: f32, wid: f32, travel: Option<&Travel>) {
         let trace = crate::traffic::trace(|t| self.at(t), self.ticks());
         // (Pulling over to pass one coming the other way, out of the junctions' boxes only:
         // `pull_want`.)
@@ -1324,11 +1324,11 @@ impl Route {
 /// it meets it (`mp` on its middle line, its tangent `t` and normal `n`): where it parks (`x0`,
 /// `z0` in that frame) facing `yaw`, the way it runs to the road (`u`: along its axis, else
 /// square to the road), and the kerb on its side of the road (`kerb`, its `z` in that frame).
-struct Bay {
+pub(crate) struct Bay {
     spot: [f32; 2],
     yaw: f32,
     mp: [f32; 2],
-    t: [f32; 2],
+    pub(crate) t: [f32; 2],
     n: [f32; 2],
     x0: f32,
     z0: f32,
@@ -1339,7 +1339,7 @@ struct Bay {
 impl Bay {
     /// On `road` (its kerbs: `kerb_off`). None: it comes alongside the road rather than onto it
     /// (`OBLIQUE`).
-    fn new(
+    pub(crate) fn new(
         spot: [f32; 2],
         yaw: f32,
         axis: Option<[f32; 2]>,
@@ -1406,7 +1406,7 @@ impl Bay {
 
     /// Whether `p` is a point of the lane before (or after) a turn round `at` (along the road)
     /// that takes up `r` of it, going `d` (+1: along `t`).
-    fn near(&self, p: [f32; 2], at: f32, r: f32, d: f32) -> bool {
+    pub(crate) fn near(&self, p: [f32; 2], at: f32, r: f32, d: f32) -> bool {
         (self.local(p)[0] - at) * d < r + 0.5
             && crate::travel::dist(p, self.world([at, 0.0])) < 2.0 * r + 4.0
     }
@@ -1414,7 +1414,7 @@ impl Bay {
     /// Out of it onto the lane going `d` (+1: along `t`): facing the road it pulls out, facing
     /// away it backs out turning away from the way it goes (as `Route::legacy` does). Where the
     /// turn is along the road, and how much of the lane it takes up.
-    fn leave(&self, legs: &mut Legs, d: f32) -> (f32, f32) {
+    pub(crate) fn leave(&self, legs: &mut Legs, d: f32) -> (f32, f32) {
         let lane_out = d * TIGHT_LANE;
         let (at, room) = self.cross(lane_out);
         let room = room.min(self.past_kerb(lane_out));
@@ -1433,7 +1433,7 @@ impl Bay {
     }
 
     /// The turn into it from the lane, coming along it against `d`, and where it is along the road.
-    fn entry(&self, d: f32) -> (Turn, f32) {
+    pub(crate) fn entry(&self, d: f32) -> (Turn, f32) {
         let lane_in = -d * TIGHT_LANE;
         let (at, room) = self.cross(lane_in);
         let room = room.min(self.past_kerb(lane_in));
@@ -1444,7 +1444,7 @@ impl Bay {
     }
 
     /// Into it, nose first, by `turn` (`entry`).
-    fn enter(&self, legs: &mut Legs, turn: &Turn) {
+    pub(crate) fn enter(&self, legs: &mut Legs, turn: &Turn) {
         let from = legs.last().unwrap_or(self.world(turn.from));
         legs.line(from, self.world(turn.from), false, JUNCTION_SPEED);
         turn.drive(legs, &|q| self.world(q), false);
@@ -1545,7 +1545,7 @@ pub(crate) fn shifted(p: [f32; 2], yaw: f32, shift: f32) -> [f32; 2] {
 }
 
 /// `pts` moved `offs[i]` m to the right (looking the way they run), each its own.
-fn offset_right_by(pts: &[[f32; 2]], offs: &[f32]) -> Vec<[f32; 2]> {
+pub(crate) fn offset_right_by(pts: &[[f32; 2]], offs: &[f32]) -> Vec<[f32; 2]> {
     let n = pts.len();
     (0..n)
         .map(|i| {
@@ -1561,14 +1561,14 @@ fn offset_right_by(pts: &[[f32; 2]], offs: &[f32]) -> Vec<[f32; 2]> {
 /// `din` to going `dout` round the corner where their lines cross, an arc as tight as `TURN` at
 /// most that begins no further back from the corner than `room` (the driveway's length to it).
 /// A driveway square to the road turns a quarter, as `Route::legacy` does.
-struct Turn {
+pub(crate) struct Turn {
     /// Where it begins and ends, the arc's middle and radius (0: straight on).
     from: [f32; 2],
     to: [f32; 2],
     centre: [f32; 2],
     r: f32,
     /// How far from the corner it begins and ends (m).
-    taken: f32,
+    pub(crate) taken: f32,
 }
 
 impl Turn {
@@ -1619,13 +1619,13 @@ impl Turn {
 /// and the top speed there.
 #[derive(Default)]
 pub(crate) struct Legs {
-    pts: Vec<([f32; 2], bool, f32)>,
+    pub(crate) pts: Vec<([f32; 2], bool, f32)>,
     /// At each point, how far a car can pull over there (`Route::room`), and its lane
     /// (`Route::lane`).
     room: Vec<f32>,
     lane: Vec<f32>,
     /// Its mouths (`Route::mouths`), from point to point (None: to the end).
-    mouths: Vec<(usize, Option<usize>)>,
+    pub(crate) mouths: Vec<(usize, Option<usize>)>,
 }
 
 impl Legs {
@@ -1652,7 +1652,7 @@ impl Legs {
 
     /// `push` (driving on) of a lane's point `lane` m right of the road's middle, where a car can
     /// pull over `room` m (`Route::room`, `Route::lane`).
-    fn push_lane(&mut self, p: [f32; 2], top: f32, room: f32, lane: f32) {
+    pub(crate) fn push_lane(&mut self, p: [f32; 2], top: f32, room: f32, lane: f32) {
         let n = self.pts.len();
         self.push(p, false, top);
         if self.pts.len() > n {
@@ -2701,276 +2701,6 @@ fn pull_want(w: &World, c: usize, moving: bool) -> (f32, Option<u64>) {
         }
     }
     (want.min(room), whom)
-}
-
-/// A work taxi's stop (`taxi.rs`): by a house's driveway, `mouth` where it meets the road. The
-/// taxi stands at the kerb in its lane there; where it has to turn round to go on, it turns there
-/// as a car does, nose first into the driveway's mouth (its middle to `spot`, facing `yaw`, the
-/// driveway running to the street along `axis`) and backing out, after it has stood
-/// (`turn`: none, no room in the mouth for that).
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct TaxiStop {
-    pub spot: [f32; 2],
-    pub yaw: f32,
-    pub axis: [f32; 2],
-    pub mouth: RoadPoint,
-    pub turn: bool,
-}
-
-/// How far into a driveway from the road's edge a taxi turning in it goes at most, past half its
-/// length (m), and how far over the pavement its back may stay (m) where the household's car
-/// parked up the driveway leaves no more room (`taxi_stop`).
-const TAXI_IN: f32 = 0.3;
-const TAXI_OVER: f32 = 1.0;
-/// Room kept between a taxi turning in a driveway's mouth and the car parked up it (m).
-const TAXI_GAP: f32 = 0.4;
-
-/// Where a taxi `len` long stops at a house's driveway (`TaxiStop`), and whether it can turn in its
-/// mouth, clear of the household's car parked up it (`parked`: its length, if it's there). None:
-/// no driveway meeting a road for cars.
-pub(crate) fn taxi_stop(
-    travel: &Travel,
-    drive: &Drive,
-    len: f32,
-    parked: Option<f32>,
-) -> Option<TaxiStop> {
-    let g = &travel.graph;
-    let way = drive.way()?;
-    let (road, s) = drive.meets()?;
-    let mouth = g.at_source(road, s)?;
-    let r = &g.roads[mouth.road as usize];
-    if !r.drivable() {
-        return None;
-    }
-    let mp = g.point(mouth);
-    // (From the inner end along the driveway to the road's edge.)
-    let inner = [drive.x, drive.z];
-    let to_edge = (mp[0] - inner[0]) * way[0] + (mp[1] - inner[1]) * way[1] - r.width / 2.0;
-    let free = to_edge - parked.map_or(0.0, |l| PARK_GAP + l + TAXI_GAP);
-    let depth = (len / 2.0 + TAXI_IN).min(free - len / 2.0);
-    let k = to_edge - depth;
-    let spot = [inner[0] + way[0] * k, inner[1] + way[1] * k];
-    let yaw = (-way[0]).atan2(-way[1]);
-    let turn =
-        depth >= len / 2.0 - TAXI_OVER && Bay::new(spot, yaw, Some(way), mp, r, mouth.s).is_some();
-    Some(TaxiStop {
-        spot,
-        yaw,
-        axis: way,
-        mouth,
-        turn,
-    })
-}
-
-/// How far before and after where a taxi stands at a stop its claim there reaches (m,
-/// `taxi_route`): those behind it, or turning into or out of a driveway by it, wait for it.
-const TAXI_KERB_CLAIM: f32 = 4.0;
-
-/// A work taxi's route (`taxi.rs`), `len` by `wid`: in from `way_in` (a way out of town, from off
-/// the map as a car coming home is) along the roads to each of `stops`, standing at the kerb in its
-/// lane by each (a claim of the lane there, held as it stands), then out at `way_out` and on off the
-/// map. Where it goes on back the way it came, it turns at the stop, nose first into the
-/// driveway's mouth and backing out (its claim held from the kerb till it's back in the lane); its
-/// claims worked out (`Route::claim`). With the ticks along it where it stands at each stop. None:
-/// no way by the roads, or no room to turn where it has to.
-pub(crate) fn taxi_route(
-    travel: &Travel,
-    way_in: [f32; 2],
-    stops: &[TaxiStop],
-    way_out: [f32; 2],
-    len: f32,
-    wid: f32,
-) -> Option<(Route, Vec<f32>)> {
-    use crate::travel::{RoadKind, dist};
-    let g = &travel.graph;
-    let entry = *g.near(way_in, ROAD_REACH, 1, Mode::Car).first()?;
-    let exit = *g.near(way_out, ROAD_REACH, 1, Mode::Car).first()?;
-    let junctions: Vec<[f32; 2]> = g.junctions().collect();
-    // (Each leg's way, and where it turns round: going on back the way it came from a stop.)
-    let mut paths = Vec::with_capacity(stops.len() + 1);
-    let mut from = entry;
-    for k in 0..=stops.len() {
-        let to = if k == stops.len() {
-            exit
-        } else {
-            stops[k].mouth
-        };
-        let path = g.path(from, to, Mode::Car, travel.country_speed)?;
-        if path.pts.len() < 2 {
-            return None;
-        }
-        paths.push(path);
-        from = to;
-    }
-    let seg = |pts: &[([f32; 2], f32, RoadKind)], end: bool| {
-        let n = pts.len();
-        let (a, b) = if end {
-            (pts[n.saturating_sub(4)].0, pts[n - 1].0)
-        } else {
-            (pts[0].0, pts[3.min(n - 1)].0)
-        };
-        [b[0] - a[0], b[1] - a[1]]
-    };
-    let turns: Vec<bool> = (0..stops.len())
-        .map(|k| {
-            let (a, b) = (seg(&paths[k].pts, true), seg(&paths[k + 1].pts, false));
-            a[0] * b[0] + a[1] * b[1] < 0.0
-        })
-        .collect();
-    let mut bays: Vec<Option<Bay>> = Vec::with_capacity(stops.len());
-    for (k, st) in stops.iter().enumerate() {
-        if !turns[k] {
-            bays.push(None);
-            continue;
-        }
-        if !st.turn {
-            return None;
-        }
-        bays.push(Some(Bay::new(
-            st.spot,
-            st.yaw,
-            Some(st.axis),
-            g.point(st.mouth),
-            &g.roads[st.mouth.road as usize],
-            st.mouth.s,
-        )?));
-    }
-    let mut legs = Legs::default();
-    let mut at_stops = Vec::new();
-    // (Where it stood at the last stop, for its claim there, closed once the next leg is laid; and
-    // leaving a turn there: its bay, the way it goes, where its turn is and how much it takes.)
-    let mut stood: Option<usize> = None;
-    let mut start: Option<(usize, f32, f32, f32)> = None;
-    for (k, path) in paths.iter().enumerate() {
-        let last = k == stops.len();
-        let mut centre: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
-        let mut offs: Vec<f32> = path.pts.iter().map(|p| lane_on(p.1, p.2)).collect();
-        if k == 0 {
-            // (In from off the map.)
-            centre.insert(0, extend_past(centre[1], centre[0]));
-            offs.insert(0, offs[0]);
-        }
-        if last {
-            centre.push(extend_past(
-                centre[centre.len() - 2],
-                centre[centre.len() - 1],
-            ));
-            offs.push(offs[offs.len() - 1]);
-        }
-        let lane = crate::travel::thin_with(
-            &offset_right_by(&centre, &offs),
-            ROUTE_STEP,
-            ROUTE_TOLERANCE,
-        );
-        if lane.len() < 2 {
-            return None;
-        }
-        let road_at = |p: [f32; 2]| {
-            path.pts
-                .iter()
-                .min_by(|x, y| dist(x.0, p).total_cmp(&dist(y.0, p)))
-                .map_or((7.0, RoadKind::Street), |x| (x.1, x.2))
-        };
-        let top = |p: [f32; 2]| top_speed(p, road_at(p).1, travel, &junctions);
-        // (Turning at the last stop: into the driveway's mouth and backing out the way the lane
-        // goes on.)
-        if let Some((j, ..)) = start {
-            let bay = bays[j].as_ref().expect("a turn");
-            let ahead = bay.local(lane[(lane.len() - 1).min(3)]);
-            let d = if ahead[0] >= bay.local(lane[0])[0] {
-                1.0
-            } else {
-                -1.0
-            };
-            let (at, taken) = bay.leave(&mut legs, d);
-            start = Some((j, d, at, taken));
-        }
-        // (Turning at the next stop: it stands at the kerb short of its turn in.)
-        let into = bays
-            .get(k)
-            .filter(|_| !last)
-            .and_then(Option::as_ref)
-            .map(|bay| {
-                let road = &g.roads[stops[k].mouth.road as usize];
-                let rt = road.tangent(stops[k].mouth.s);
-                let (a, b) = (lane[lane.len() - 2], lane[lane.len() - 1]);
-                let go = (b[0] - a[0]) * rt[0] + (b[1] - a[1]) * rt[1];
-                let d = if go >= 0.0 { -1.0 } else { 1.0 };
-                (k, d, bay.entry(d))
-            });
-        let way = |i: usize| {
-            let (a, b) = (lane[i.saturating_sub(1)], lane[(i + 1).min(lane.len() - 1)]);
-            let l = dist(a, b).max(1e-6);
-            [(b[0] - a[0]) / l, (b[1] - a[1]) / l]
-        };
-        let along = |b: &Bay, i: usize, d: f32| {
-            let w = way(i);
-            (w[0] * b.t[0] + w[1] * b.t[1]) * d > 0.7
-        };
-        let mut on = false;
-        for (i, &p) in lane.iter().enumerate() {
-            if !on
-                && let Some((j, d, at, taken)) = start
-                && let Some(bay) = &bays[j]
-                && bay.near(p, at, taken, d)
-                && along(bay, i, d)
-            {
-                continue;
-            }
-            if let Some((j, d, (turn, at))) = &into
-                && let Some(bay) = &bays[*j]
-                && bay.near(p, *at, turn.taken, *d)
-                && along(bay, i, -*d)
-            {
-                break;
-            }
-            let first = !on;
-            if first && start.is_some() {
-                let from = legs.last().unwrap_or(p);
-                legs.line(from, p, false, JUNCTION_SPEED);
-            }
-            on = true;
-            let (width, kind) = road_at(p);
-            legs.push_lane(p, top(p), pull_room(width, kind, wid), lane_on(width, kind));
-            if first && let Some(s) = stood {
-                // (Its claim from where it stood, through its turn, back to the lane.)
-                legs.mouths.push((s, Some(legs.len() - 1)));
-            }
-        }
-        if !on && let Some(s) = stood {
-            legs.mouths.push((s, None));
-        }
-        // (Standing at the last stop with no turn: its stretch of the lane, from just before to
-        // just after.)
-        if start.is_none()
-            && let Some(s) = stood
-        {
-            let n = (TAXI_KERB_CLAIM / STEP).ceil() as usize;
-            legs.mouths.push((
-                s.saturating_sub(n),
-                Some((s + n).min(legs.len().saturating_sub(1))),
-            ));
-        }
-        start = None;
-        if last {
-            break;
-        }
-        // At the kerb: it slows to a stand at the lane's end there.
-        if let Some(p) = legs.pts.last_mut() {
-            p.2 = 0.0;
-        }
-        let s = legs.len() - 1;
-        at_stops.push(s);
-        stood = Some(s);
-        if let Some((j, _, (turn, _))) = into {
-            bays[j].as_ref().expect("a turn").enter(&mut legs, &turn);
-            start = Some((j, 0.0, 0.0, 0.0));
-        }
-    }
-    let mut route = legs.timed(false, false);
-    let ticks = at_stops.iter().map(|&i| route.points[i].2).collect();
-    route.claim(len, wid, Some(travel));
-    Some((route, ticks))
 }
 
 /// Whether a body `len` long with its middle at `p` is in one of the junctions' `boxes`, about.

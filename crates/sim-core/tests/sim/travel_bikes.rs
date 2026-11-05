@@ -520,6 +520,8 @@ fn a_car_turning_tight_among_riders_beside_it_turns_and_they_ride_on() {
                 s.pos
             );
         }
+        // (A work taxi's slot as one comes.)
+        still.resize(w.cars.len(), (None, 0));
         for (c, car) in w.cars.iter().enumerate() {
             let at = car.shown.filter(|s| s.2).map(|s| s.0);
             still[c] = match (at, still[c]) {
