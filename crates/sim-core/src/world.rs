@@ -7621,8 +7621,10 @@ fn start_task(
                     return;
                 };
                 // (In an open-world town, a bike only where the way was timed by one: a ride of
-                // `life::BIKE_MOST` at most.)
-                let no_bike = sim.commute.is_some_and(|c| c.long_ride);
+                // `life::BIKE_MOST` at most; not before it's been timed, nor where it was timed on
+                // foot or by car.)
+                let no_bike =
+                    ctx.travel.open && sim.commute.is_none_or(|c| c.long_ride || c.bike.is_none());
                 if riding {
                     // On their bike: on it to the way out.
                     goal_at(exit)

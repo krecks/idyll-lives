@@ -197,6 +197,26 @@ fn stop_for(w: &World, i: usize) -> Option<TaxiStop> {
         TAXI_LEN,
         home_car(&w.cars, &w.households, plot),
     )
+    .map(|st| paved(w, st))
+}
+
+/// `stop` turning in its driveway's mouth only where the driveway is paved there (the town's
+/// `meta.paths`: a household without a car may have none), else at the kerb.
+fn paved(w: &World, mut stop: TaxiStop) -> TaxiStop {
+    let on = |r: &serde_json::Value| {
+        let k = |key: &str| r[key].as_f64().unwrap_or(0.0) as f32;
+        let (x, z, pw, pd) = (k("x"), k("z"), k("w"), k("d"));
+        (x..=x + pw).contains(&stop.spot[0]) && (z..=z + pd).contains(&stop.spot[1])
+    };
+    // (No paths given, as in a town drawn by hand: its driveways as they are.)
+    if stop.turn
+        && w.meta["paths"]
+            .as_array()
+            .is_some_and(|paths| !paths.iter().any(on))
+    {
+        stop.turn = false;
+    }
+    stop
 }
 
 /// How long the car of the household at `plot` is, if it has one (the taxi keeps clear of where
@@ -563,7 +583,7 @@ fn route_of(w: &World, k: usize) -> Option<(crate::cars::Route, Vec<f32>)> {
         .map(|st| {
             let drive = w.drives.iter().find(|d| d.plot == st.plot)?;
             let parked = home_car(&w.cars, &w.households, st.plot);
-            crate::cars::taxi_stop(&w.travel, drive, TAXI_LEN, parked)
+            crate::cars::taxi_stop(&w.travel, drive, TAXI_LEN, parked).map(|st| paved(w, st))
         })
         .collect::<Option<_>>()?;
     crate::cars::taxi_route(&w.travel, exit, &stops, exit, TAXI_LEN, TAXI_WID)

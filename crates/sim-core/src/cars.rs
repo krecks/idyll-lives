@@ -2281,7 +2281,13 @@ fn drive_on(w: &mut World, c: usize) {
     } else {
         *jam
     };
+    let jam = *jam;
     if jammed && jam.0 > JAM_TICKS && jam.1 < JAM_BACK && !w.cars[c].outside() && back_off(w, c) {
+        return;
+    }
+    // (Backed up out of its way, it stays there while that one still waits for it: not on into
+    // its way again.)
+    if jammed && jam.1 > 0 && !w.cars[c].outside() {
         return;
     }
     w.cars[c].waits_for = None;
@@ -2372,9 +2378,15 @@ fn drive_on(w: &mut World, c: usize) {
         ..me
     };
     car.next = Some((at, yaw));
-    // Not into what's left of a claim another holds.
+    // Not into what's left of a claim another holds. (Pulling over to pass one in it only as far
+    // as it will on its way: not into a junction's box just ahead, `pull_want`.)
     let (body_now, body_next) = (now.body(), me.body());
-    let pass = (route_pass(car, t + 1.0) - shift).max(0.0);
+    let pass = ([1.0, 10.0, 20.0]
+        .into_iter()
+        .map(|k| route_pass(car, t + k))
+        .fold(f32::INFINITY, f32::min)
+        - shift)
+        .max(0.0);
     let holding_here = traffic.holding(key);
     let in_drive = !home && !holding_here && first_claim.is_some_and(|from| t < from);
     if let Some(k) = traffic.blocked(key, &body_now, &body_next, me.heading(), pass, in_drive) {
@@ -2472,10 +2484,13 @@ const JAM_TICKS: u32 = 5 * crate::TICKS_PER_MINUTE as u32;
 const JAM_BACK: u32 = 60;
 
 /// Whether car `k` (its `Driving::first`) waited for car `me` last tick, so that car `me`, waiting
-/// for it, should back up (`back_off`): of two cars, the later.
+/// for it, should back up (`back_off`): of two cars, the one not holding a claim (holding one,
+/// the other was let through where it waits: it's that one that's in the way); else the later.
 fn waits_back(w: &World, k: u64, me: u64) -> bool {
     let o = (k & !(1 << 63)) as usize;
-    me > k
+    let (mine, theirs) = (w.traffic.holding(me), w.traffic.holding(k));
+    let mine_to_go = if mine == theirs { me > k } else { theirs };
+    mine_to_go
         && (w.cars.get(o).is_some_and(|c| c.waits_for == Some(me))
             || w.traffic.waits_for(k).contains(&me))
 }
@@ -3004,7 +3019,14 @@ pub(crate) fn movers(
         } else {
             Vec::new()
         };
-        let pass = (route.pass_at(t) - shift).max(0.0);
+        // (As far as it will pull over on its way: not into a junction's box or a narrow span just
+        // ahead, as `drive_on` sees it.)
+        let pass = ([0.0, 10.0, 20.0]
+            .into_iter()
+            .map(|k| route.pass_at(t + k))
+            .fold(f32::INFINITY, f32::min)
+            - shift)
+            .max(0.0);
         movers.push(crate::traffic::Mover {
             key,
             rect: Rect { at: p, yaw, half },
@@ -3371,15 +3393,22 @@ pub(crate) fn go_on(
             continue;
         }
         let body = Body::of(s, bodies.0, bodies.1, s.yaw);
+        let phase = s.current().map(|a| &a.phase);
+        // (Standing at the kerb for the taxi, they won't step out in front of it: in its way only
+        // where its body goes, not the ground ahead.)
+        let (ahead, behind) = if matches!(phase, Some(Phase::AtKerb { .. })) {
+            (0.0, 0.0)
+        } else {
+            (d.ahead, d.behind)
+        };
         // (Beside it, no nearer a tick on, clear of its body and the ground ahead: they wait for
         // it. Never into anyone.)
         let next = d.gap(body, s.pos);
-        if !covers(d.at, turn, d.len, d.wid, body, s.pos, d.ahead, d.behind)
+        if !covers(d.at, turn, d.len, d.wid, body, s.pos, ahead, behind)
             || next >= 0.0 && next >= now.gap(body, s.pos)
         {
             continue;
         }
-        let phase = s.current().map(|a| &a.phase);
         if matches!(phase, Some(Phase::Using { .. }) | Some(Phase::Driving)) {
             continue;
         }
@@ -3402,7 +3431,9 @@ pub(crate) fn go_on(
     if waiting {
         *waited = waited.saturating_add(1);
     } else {
-        *waited = 0;
+        // (Held up most ticks, by one walking ahead of it on the road and on again: it still
+        // counts, so they step aside for it in the end, `make_way`.)
+        *waited = waited.saturating_sub(2);
         if !blocked {
             *progress += 1.0;
         }
