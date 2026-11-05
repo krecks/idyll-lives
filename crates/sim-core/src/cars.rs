@@ -309,6 +309,10 @@ pub struct Car {
     /// Ticks it has waited for people in its way (not saved).
     #[serde(skip)]
     waited: u32,
+    /// Those on foot or on a bike it waits for this tick (resident ids; for checks:
+    /// `traffic::waits_on`). Not saved.
+    #[serde(skip)]
+    pub(crate) on_foot: Vec<u32>,
     /// Where it is now, which way it faces, whether it's moving and which doors are open (bit
     /// `d` for door `d`); None while it's out of town or unused (`poses`; for the snapshot, not
     /// saved).
@@ -507,6 +511,7 @@ impl Car {
             riders: Vec::new(),
             drive_spot: None,
             waited: 0,
+            on_foot: Vec::new(),
             shown: None,
             next: None,
             shift: 0.0,
@@ -624,6 +629,7 @@ impl Car {
             riders: Vec::new(),
             drive_spot: self.drive_spot,
             waited: self.waited,
+            on_foot: Vec::new(),
             shown: self.shown,
             next: None,
             shift: 0.0,
@@ -2291,6 +2297,7 @@ fn drive_on(w: &mut World, c: usize) {
         return;
     }
     w.cars[c].waits_for = None;
+    w.cars[c].on_foot.clear();
     let others = vehicles(&w.cars, Some(c));
     if w.cars[c].outside() && !room_to_come_in(w, c, &others) {
         return;
@@ -2430,6 +2437,7 @@ fn drive_on(w: &mut World, c: usize) {
         &others,
         &mut car.waited,
         &mut progress,
+        &mut car.on_foot,
     );
     if held_up {
         car.waits_for = against(&me, &others).next().map(|k| others[k].first);
@@ -3381,8 +3389,10 @@ pub(crate) fn go_on(
     others: &[Driving],
     waited: &mut u32,
     progress: &mut f32,
+    whom: &mut Vec<u32>,
 ) -> bool {
     let turn = d.yaw.sin_cos();
+    whom.clear();
     // (Nobody further off than its corners and the ground ahead of or behind them, and the
     // longest bike, is in its way.)
     let reach = d.len / 2.0 + d.ahead.max(d.behind) + d.wid / 2.0 + BESIDE + 2.0;
@@ -3413,6 +3423,12 @@ pub(crate) fn go_on(
             continue;
         }
         waiting = true;
+        whom.push(s.id);
+        // (Walking on through its way, not waiting for it: they're on their way out of it, not
+        // to be stepped back where they came from.)
+        if matches!(phase, Some(Phase::Routing { .. })) && s.car_wait == 0 {
+            continue;
+        }
         // (Not into the way of another, nor where this one comes on to: `clear`.)
         let clear = |p: [f32; 2]| clear(others, body, p);
         // (Stepping aside that long hasn't got them out of its way.)

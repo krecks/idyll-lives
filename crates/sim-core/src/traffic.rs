@@ -1207,16 +1207,18 @@ pub(crate) fn behind(me: (&Rect, [f32; 2]), o: (&Rect, [f32; 2])) -> bool {
     along < -0.5 && across < BEHIND_ACROSS
 }
 
-/// Whom car `key` (`cars::Driving::first`) waits for this tick: one in its way, those holding
+/// Whom car `key` (`cars::Driving::first`) waits for this tick: one in its way (another vehicle,
+/// or those on foot or on a bike: their resident ids, below `1 << 63`), those holding
 /// claims it asks for and the earlier asks it waits for. For checks (the generated worlds': a car
 /// is stuck when nothing it waits for, however far round, goes on).
 pub fn waits_on(w: &World, key: u64) -> Vec<u64> {
-    let mut out: Vec<u64> = w
-        .cars
-        .get((key & !(1 << 63)) as usize)
-        .and_then(|c| c.waits_for)
-        .into_iter()
-        .collect();
+    let car = w.cars.get((key & !(1 << 63)) as usize);
+    let mut out: Vec<u64> = car.and_then(|c| c.waits_for).into_iter().collect();
+    // (Those on foot or on a bike in its way: their resident ids, no vehicle's key.)
+    out.extend(
+        car.into_iter()
+            .flat_map(|c| c.on_foot.iter().map(|&i| u64::from(i))),
+    );
     if let Some(a) = w.traffic.asks.iter().find(|a| a.key == key) {
         out.extend(a.by.iter().chain(&a.fifo));
     }
