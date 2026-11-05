@@ -387,10 +387,13 @@ pub struct Bus {
     /// The bus it gives way to (its `first`): it backs up out of its way and holds back till
     /// that one is by (`make_way`).
     yields: Option<u64>,
-    /// Where the one it gives way to was along its route as it began to, where it was last tick,
-    /// and the ticks since it last moved: past `IMPATIENT` (held up itself), it gives way no
-    /// longer (`make_way`).
+    /// Where the one it gives way to was along its route as it began to, where it last came on
+    /// `GIVEN_STEP` from, and the ticks since: past `IMPATIENT` (held up itself, or only edging),
+    /// it gives way no longer (`make_way`).
     given: (f32, f32, u32),
+    /// The bus it gave way to that came on no further all the same (`IMPATIENT`), while they
+    /// still hold each other up: it isn't the one to give way to that one again (`make_way`).
+    gave_up: Option<u64>,
     /// Ticks it has stood still on its way (not at a stop): held up past `IMPATIENT`, it no longer
     /// keeps room ahead (`ahead_of`), only clear of the others.
     still: u32,
@@ -2072,16 +2075,25 @@ fn make_way(w: &mut World) {
     let t = &w.transit;
     let n = t.buses.len();
     let index = |f: u64| t.buses.iter().position(|x| x.first() == f);
-    // Those given way to already: till they're by, or stand still themselves that long.
+    // Those given way to already: till they're by, or come on no further themselves that long
+    // (`GIVEN_STEP` at a time, not edging a tick now and then).
     let mut given: Vec<(f32, f32, u32)> = vec![(0.0, 0.0, 0); n];
+    let mut gave_up: Vec<Option<u64>> = t.buses.iter().map(|b| b.gave_up).collect();
     let mut yields: Vec<Option<u64>> = (0..n)
         .map(|b| {
             let bus = &t.buses[b];
             let h = bus.yields?;
             let o = index(h)?;
             let at = t.buses[o].progress;
-            let (from, last, still) = bus.given;
-            given[b] = (from, at, if at == last { still + 1 } else { 0 });
+            let (from, mark, still) = bus.given;
+            given[b] = if (at - mark).abs() >= GIVEN_STEP {
+                (from, at, 0)
+            } else {
+                (from, mark, still + 1)
+            };
+            if given[b].2 > IMPATIENT {
+                gave_up[b] = Some(h);
+            }
             (given[b].2 <= IMPATIENT && !given_way(t, b, o)).then_some(h)
         })
         .collect();
@@ -2118,6 +2130,12 @@ fn make_way(w: &mut World) {
             }
         })
         .collect();
+    // (Out of every loop, it may give way to anyone again.)
+    for (b, g) in gave_up.iter_mut().enumerate() {
+        if !reaches[b][b] {
+            *g = None;
+        }
+    }
     for b in (0..n).filter(|&b| reaches[b][b]) {
         // (The loop's: those it holds up, one way or another, that hold it up.)
         let looped = |o: usize| reaches[b][o] && reaches[o][b];
@@ -2127,7 +2145,12 @@ fn make_way(w: &mut World) {
         }
         // (One can back up where there's ground behind it, or another bus on its way that can
         // back up too, and so on: not one of the loop, nor a car, nor one standing at a stop.)
-        let able = (0..n).filter(|&o| looped(o) && can_back(w, o, &looped, 8));
+        // (Not one that gave way to another of the loop that came on no further all the same.)
+        let able = (0..n).filter(|&o| {
+            looped(o)
+                && can_back(w, o, &looped, 8)
+                && !gave_up[o].and_then(index).is_some_and(looped)
+        });
         let Some(giver) = able.max_by_key(|&o| (room_behind(w, o), t.buses[o].first())) else {
             continue;
         };
@@ -2186,6 +2209,7 @@ fn make_way(w: &mut World) {
         bus.backs = backs[b];
         bus.yields = yields[b];
         bus.given = given[b];
+        bus.gave_up = gave_up[b];
     }
 }
 
@@ -2210,6 +2234,10 @@ fn given_way(t: &Transit, b: usize, o: usize) -> bool {
 /// How far on one given way to has come (ticks along its route) before the one giving way may go
 /// on, the two out of each other's way (`given_way`).
 const PASSED: f32 = 40.0;
+
+/// How far on (ticks along its route) one given way to comes at a time, to be coming on at all
+/// (`make_way`: no further on in `IMPATIENT`, it's given way to no longer).
+const GIVEN_STEP: f32 = 10.0;
 
 /// How far bus `b` could back up (ticks, in steps of five, at most `ROOM_BEHIND`): with more room
 /// behind it, it gives way (`make_way`).
@@ -2276,6 +2304,7 @@ fn on_time(line: &Line, l: u16, run: u64, now: u64) -> Option<Bus> {
         backs: false,
         yields: None,
         given: (0.0, 0.0, 0),
+        gave_up: None,
         still: 0,
         best: 0.0,
         stuck: 0,
