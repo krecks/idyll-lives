@@ -5602,41 +5602,59 @@ mod tests {
     }
 
     #[test]
-    fn someone_crossing_in_front_of_a_waiting_car_gets_across() {
-        // (As at Crown Quarter: walking across the ground in front of a car that waits for them,
-        // they go on across, not stepped back where they came from, and it goes after.)
-        let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-        w.autonomy = false;
-        w.cars[0].state = CarState::Leaving;
-        w.cars[0].progress = 0.0;
-        w.cars[0].driver = Some(0);
-        w.cars[0].aboard = vec![0];
-        w.sims[0].away_until = Some(w.tick + 100_000);
-        w.sims[1].pos = [31.5, 6.5];
-        // (It has waited a while already, for others before them.)
-        w.tick_once();
-        w.cars[0].waited = 4 * MAKE_WAY_TICKS;
-        let _ = w.apply(crate::Command::MoveTo {
-            sim: 1,
-            x: 37.0,
-            z: 6.5,
-        });
-        let mut across = None;
-        for t in 0..1200 {
+    fn someone_whose_way_turns_right_in_front_of_a_waiting_car_gets_by() {
+        // (As at Crown Quarter: a walk by road turned in a junction's box right in front of the
+        // nose of a car waiting there, a while already, for others before them. At each step on
+        // into the ground in front of it, it stepped them back out of it to the middle of the
+        // tile beside, where it doesn't wait for them but they're still in its way, so on they
+        // step into it again: they never got round, and it never went on.) They walk on round the
+        // turn and out of its way, and it goes after. With the car a cm further out each time:
+        // just where it stands decides which tiles round it it doesn't wait for them at.
+        let mut held = Vec::new();
+        for k in 0..=30 {
+            let z = 3.4 + k as f32 * 0.01;
+            let town = TOWN.replace(r#""z":3.0,"yaw""#, &format!(r#""z":{z},"yaw""#));
+            let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+            w.autonomy = false;
+            w.cars[0].state = CarState::Leaving;
+            w.cars[0].progress = 0.0;
+            w.cars[0].driver = Some(0);
+            w.cars[0].aboard = vec![0];
+            w.sims[0].away_until = Some(w.tick + 100_000);
+            // Bo, just in front of it, on his way along the front of the house...
+            w.sims[1].pos = [34.5, 8.5];
+            let _ = w.apply(crate::Command::MoveTo {
+                sim: 1,
+                x: 40.5,
+                z: 8.5,
+            });
+            // (It has waited a while already, for others before them.)
+            w.cars[0].waited = PASS_TICKS + 5;
             w.tick_once();
-            if t < 400 {
-                w.cars[0].waited = w.cars[0].waited.max(4 * MAKE_WAY_TICKS);
+            // ...by the ground right in front of its nose, where his way turns.
+            let Some(Phase::Routing { waypoints, next }) =
+                w.sims[1].current.as_mut().map(|a| &mut a.phase)
+            else {
+                panic!("Bo isn't on his way");
+            };
+            *waypoints = vec![[34.0, 7.6], [40.5, 8.5]];
+            *next = 0;
+            let mut by = None;
+            for t in 0..400 {
+                w.tick_once();
+                if by.is_none() && w.sims[1].pos[0] > 40.0 {
+                    by = Some(t);
+                }
             }
-            if across.is_none() && w.sims[1].pos[0] > 36.0 {
-                across = Some(t);
+            if !by.is_some_and(|t| t < 200) || w.cars[0].progress < 20.0 {
+                held.push((z, by, w.sims[1].pos, w.cars[0].progress));
             }
         }
         assert!(
-            across.is_some_and(|t| t < 400),
-            "Bo never got across: {across:?} {:?}",
-            w.sims[1].pos
+            held.is_empty(),
+            "Bo never got round in front of the car, nor it on (its z, when he got by, where he \
+             is, its progress): {held:?}"
         );
-        assert!(w.cars[0].progress > 0.0, "and the car went after");
     }
 
     #[test]
