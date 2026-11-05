@@ -87,7 +87,11 @@
 //! back at the front door after a load). Still 35: the town's bus (`bus.rs`) adds nothing: its
 //! lines come from the stops (`openWorld.stops`; a cosy town's too now) and the roads, its buses
 //! from the clock, on load; someone waiting at a stop sets off for it again, and someone on the
-//! bus home is saved back at their stop, on their way home from it.
+//! bus home is saved back at their stop, on their way home from it. Still 35: the traffic lights
+//! at a big world's busy junctions (`traffic::Signal`, worked out with the lines on load) are
+//! saved where they'd got to (`lights`: each lit junction's arm, its stage, the tick it began),
+//! left out where there are none; absent (an older file, or another number of lit junctions),
+//! they start over at their first arm's green.
 //! Still 35: a resident late for the shift they're at says so (`job.late`, left out when on
 //! time; an older file's are on time).
 //! Still 35: the story may tell of a host bringing a guest something (`served`, the item in `n`,
@@ -189,6 +193,19 @@ pub struct SaveFile {
     /// Things bought that wait to be set up at home (`setup.rs`; absent: none).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub setups: Vec<SetupSave>,
+    /// The traffic lights where they'd got to (`traffic::Light`, a lit junction's each; absent:
+    /// none, or they start over).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lights: Vec<LightSave>,
+}
+
+/// A lit junction's lights (`traffic::Light`): whose turn it is (its arm), how far through it
+/// (0 green, 1 amber, 2 all red), and the tick that began.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct LightSave {
+    pub arm: u8,
+    pub stage: u8,
+    pub since: u64,
 }
 
 /// Something bought waiting to be set up (`setup::Setup`), its object by content id (unknown ones
@@ -1084,6 +1101,20 @@ impl World {
                     paid: s.paid,
                 })
                 .collect(),
+            lights: self
+                .traffic
+                .lights
+                .iter()
+                .map(|l| LightSave {
+                    arm: l.arm,
+                    stage: match l.stage {
+                        crate::traffic::Stage::Green => 0,
+                        crate::traffic::Stage::Amber => 1,
+                        crate::traffic::Stage::Clear => 2,
+                    },
+                    since: l.since,
+                })
+                .collect(),
         }
     }
 
@@ -1689,6 +1720,22 @@ impl World {
         world.refresh_rooms();
         crate::cars::load(&mut world, &save.cars, &save.drives, &save.garages);
         crate::bus::settle(&mut world);
+        // (The lights where they'd got to, for the same lit junctions.)
+        if save.lights.len() == world.travel.signals.len() {
+            world.traffic.lights = save
+                .lights
+                .iter()
+                .map(|l| crate::traffic::Light {
+                    arm: l.arm,
+                    stage: match l.stage {
+                        1 => crate::traffic::Stage::Amber,
+                        2 => crate::traffic::Stage::Clear,
+                        _ => crate::traffic::Stage::Green,
+                    },
+                    since: l.since,
+                })
+                .collect();
+        }
         // What someone was eating or washing up is put down (those don't go on after loading).
         crate::cooking::settle(&mut world);
         Ok(world)

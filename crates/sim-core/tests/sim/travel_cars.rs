@@ -1175,6 +1175,30 @@ fn a_lit_junctions_signal_heads_are_in_the_snapshot_one_an_arm_on_its_kerb() {
 }
 
 #[test]
+fn a_game_saved_with_the_lights_part_way_loads_with_them_where_they_were() {
+    use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
+    let mut w = crossroads(&[]);
+    common::run_to(&mut w, 2, 7.0);
+    let mut buf = vec![0.0f32; snapshot::CAPACITY];
+    let states = |w: &World, buf: &mut Vec<f32>| {
+        snapshot::write(w, buf);
+        (0..4)
+            .map(|k| buf[LIGHT_BASE + k * LIGHT_STRIDE + light::STATE])
+            .collect::<Vec<_>>()
+    };
+    // (Some arm but the first's turn, or amber: not where they start over.)
+    let first = states(&w, &mut buf);
+    let end = w.tick + 30 * 60 * 20;
+    while states(&w, &mut buf) == first && w.tick < end {
+        w.tick_once();
+    }
+    let was = states(&w, &mut buf);
+    assert_ne!(was, first, "the lights never changed");
+    let loaded = World::from_save_json(BUS_CONTENT, &w.save_json()).unwrap();
+    assert_eq!(states(&loaded, &mut buf), was);
+}
+
+#[test]
 fn cars_from_every_arm_of_a_busy_crossroads_all_get_through_with_the_buses() {
     // A big world's crossroads, its ways out east and west, two bus stops on either of those arms
     // (a line through it each way): two cars leave from houses on the north and south arms, two
