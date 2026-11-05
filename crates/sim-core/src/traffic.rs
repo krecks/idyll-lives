@@ -23,6 +23,12 @@
 //! 3. and nobody not holding a part is in it now, nor anyone at all on its far side ("don't block
 //!    the box"), nor anyone on the move into it in the next second or so (`LOOK`).
 //!
+//! But one following another through (that one holding its group, its body ahead on this one's
+//! way, going its way: `FOLLOW_NEAR`) doesn't wait for that one's parts or body, `cars::up_against`
+//! keeping it behind; and it goes in its leader's place in the order, before asks after that
+//! one's, a few to a platoon (`PLATOON`; not before an ask older than `OLD_ASK`). A queue through
+//! a box goes through it at a following gap, not each waiting for it to empty.
+//!
 //! Two bodies are in each other's way (`conflict`) when they overlap or come within `CLEAR`; going
 //! the same way (one following the other through, each keeping behind the one in front:
 //! `cars::up_against`) they aren't; coming towards each other they are where pulling over as far as
@@ -41,10 +47,12 @@
 //! waits for it, however far round (`reaches`): an earlier ask doesn't hold up a later one it waits
 //! for itself (rule 2), a body that waits for the asker doesn't (rule 3), one holding a part that
 //! waits for the asker's body doesn't (rule 1), nor in `Traffic::blocked`. So the grants never
-//! close a ring of waits the graph has in it: a ring forms only through waits it can't see (a
-//! pull-over, a turn sweeping wider than its samples), and those are broken where they form: a car
-//! and one in its way waiting for each other a while, the car backs up a little out of its way,
-//! never into anyone (`cars::back_off`). An ask older than `OLD_ASK` yields only to one it waits
+//! close a ring of waits the graph has in it; nor does a platoon (a follower waits for nothing of
+//! its leader's it didn't wait for itself, its leader for nothing of the follower's behind it, and
+//! those waiting for the follower wait for it as for its leader): a ring forms only through waits
+//! it can't see (a pull-over, a turn sweeping wider than its samples), and those are broken where
+//! they form: a car and one in its way waiting for each other a while, the car backs up a little
+//! out of its way, never into anyone (`cars::back_off`). An ask older than `OLD_ASK` yields only to one it waits
 //! for itself, not to a stream round about: nobody waits on and on while others come and go; and
 //! nobody comes up to wait in its way (`STOP_SHORT`, `Traffic::blocked`), to be let go first.
 //! Should two bodies come to overlap anyway, a last-resort check keeps every car from moving
@@ -624,6 +632,10 @@ struct Hold {
     claim: Claim,
     /// How far along its route its holder was as the tick began.
     at: f32,
+    /// Its place in the order the asks are granted in (`Ask::tick`: a platoon's, its first's), and
+    /// how far down a platoon it was let in (0: its first, `begin`).
+    asked: u64,
+    platoon: u8,
 }
 
 /// A vehicle's ask for the parts of a group of its route's claims (`Claim::group`), in order:
@@ -650,6 +662,13 @@ const KEEP_SHORT: f32 = 1.5;
 /// How far short of the start of its next claim one not holding a claim stops, where waiting
 /// there it would be in the way of a group asked for long ago (`OLD_ASK`, m: `Traffic::blocked`).
 const STOP_SHORT: f32 = 3.0;
+
+/// One whose body is this near (m) a sample of a group asked for, going its way, is on that way
+/// (`Traffic::begin`: followed through).
+const FOLLOW_NEAR: f32 = 1.0;
+/// One following another through a group goes in that one's place in the order, before asks
+/// after it, this many to a platoon at most (`Traffic::begin`).
+const PLATOON: usize = 4;
 
 /// An ask this old (ticks) yields only to those it waits for itself (`Traffic::begin`, rule 2).
 const OLD_ASK: u64 = 20 * crate::TICKS_PER_MINUTE;
@@ -741,6 +760,8 @@ impl Traffic {
                     tag,
                     claim: c.clone(),
                     at: t,
+                    asked: tick,
+                    platoon: 0,
                 });
                 continue;
             }
@@ -1020,12 +1041,14 @@ impl Traffic {
             // (Nothing to it: it's its own.)
             let Some(first) = next[0].samples.first() else {
                 let (tag, claim) = self.asks[i].parts.remove(0);
-                let key = self.asks[i].key;
+                let (key, asked) = (self.asks[i].key, self.asks[i].tick);
                 self.holds.push(Hold {
                     key,
                     tag,
                     at: claim.from,
                     claim,
+                    asked,
+                    platoon: 0,
                 });
                 continue;
             };
@@ -1053,7 +1076,42 @@ impl Traffic {
                     0..c.samples.len()
                 }
             };
-            // 1. What's left of the parts held.
+            // (Those holding a group whose bodies are ahead of it on its way, going its way: it
+            // follows them through, `cars::up_against` keeping it behind; the nearest, its leader
+            // in the platoon, with its place in the order and how far down the platoon it is.)
+            let ahead = |key: u64| -> Option<f32> {
+                let m = self.mover(key)?;
+                next.iter()
+                    .flat_map(|c| &c.samples)
+                    .filter(|s| {
+                        s.d > first.d + FOLLOW_NEAR
+                            && dist(s.rect.at, m.rect.at) < FOLLOW_NEAR
+                            && s.way[0] * m.way[0] + s.way[1] * m.way[1] > SAME_WAY
+                    })
+                    .map(|s| s.d)
+                    .reduce(f32::min)
+            };
+            let mut followed: Vec<u64> = Vec::new();
+            let mut lead: Option<(f32, u64, u8)> = None;
+            for h in &self.holds {
+                if h.key == a.key || followed.contains(&h.key) {
+                    continue;
+                }
+                if let Some(d) = ahead(h.key) {
+                    followed.push(h.key);
+                    let (asked, platoon) = self
+                        .holds
+                        .iter()
+                        .filter(|o| o.key == h.key)
+                        .fold((u64::MAX, 0u8), |x, o| {
+                            (x.0.min(o.asked), x.1.max(o.platoon))
+                        });
+                    if lead.is_none_or(|l| d < l.0) {
+                        lead = Some((d, asked, platoon));
+                    }
+                }
+            }
+            // 1. What's left of the parts held (but those it follows).
             let by_holds: Vec<u64> = self
                 .holds
                 .iter()
@@ -1081,6 +1139,7 @@ impl Traffic {
                             || reaches(&on_road, h.key, a.key));
                     h.key != a.key
                         && !waits
+                        && !followed.contains(&h.key)
                         && next
                             .iter()
                             .any(|c| overlaps((c, &c.samples[mine(c, h.key)]), (&h.claim, rest)))
@@ -1097,6 +1156,11 @@ impl Traffic {
                 // alone. No stream of others waiting their turn after it round about holds it up
                 // for good, and no ring of them either.)
                 let old = tick > e.tick + OLD_ASK;
+                // (Following one through, it goes in that one's place in the order: before an ask
+                // after it, a few down a platoon at most, `PLATOON`, and none asked long ago.)
+                if !old && lead.is_some_and(|l| l.1 < e.tick && usize::from(l.2) + 1 < PLATOON) {
+                    return false;
+                }
                 let first = if old {
                     reaches(&graph, e.key, a.key)
                 } else {
@@ -1129,7 +1193,7 @@ impl Traffic {
             // far side, past its zone, nobody.
             let mut bodies = Vec::new();
             for m in &self.movers {
-                if m.key == a.key || m.parked || behind_me(m.key) {
+                if m.key == a.key || m.parked || behind_me(m.key) || followed.contains(&m.key) {
                     continue;
                 }
                 let strict = !self.holding(m.key);
@@ -1162,14 +1226,20 @@ impl Traffic {
             let mut by = by_holds;
             by.extend(bodies);
             if free {
-                // (Held from now: the asks after it this tick see it held.)
+                // (Held from now: the asks after it this tick see it held; following one through,
+                // in its place in the order.)
                 let key = self.asks[i].key;
+                let (asked, platoon) = lead.map_or((self.asks[i].tick, 0), |l| {
+                    (l.1.min(self.asks[i].tick), l.2.saturating_add(1))
+                });
                 for (tag, claim) in std::mem::take(&mut self.asks[i].parts) {
                     self.holds.push(Hold {
                         key,
                         tag,
                         at: claim.from,
                         claim,
+                        asked,
+                        platoon,
                     });
                 }
                 by.clear();
