@@ -44,7 +44,8 @@
 //! close a ring of waits the graph has in it: a ring forms only through waits it can't see (a
 //! pull-over, a turn sweeping wider than its samples), and those are broken where they form: a car
 //! and one in its way waiting for each other a while, the car backs up a little out of its way,
-//! never into anyone (`cars::back_off`). An ask older than `OLD_ASK` yields only to one it waits
+//! never into anyone (`cars::back_off`), its ask keeping its place in the queue meanwhile
+//! (`Traffic::still_asking`). An ask older than `OLD_ASK` yields only to one it waits
 //! for itself, not to a stream round about: nobody waits on and on while others come and go.
 //! Should two bodies come to overlap anyway, a last-resort check keeps every car from moving
 //! deeper into another (`cars::guard`, counted in `Traffic::guarded`).
@@ -763,6 +764,20 @@ impl Traffic {
         true
     }
 
+    /// `key`, `t` ticks along its route tagged `route`, still short of the group it asked for
+    /// (backing up out of one's way, `cars::back_off`, or coming back up to it): its ask stands,
+    /// in its place in the queue (`OLD_ASK` too), as if asked again.
+    pub(crate) fn still_asking(&mut self, tick: u64, key: u64, route: u32, t: f32) {
+        for a in &mut self.asks {
+            if a.key == key
+                && a.route == route
+                && a.parts.first().is_some_and(|p| t <= p.1.from + 1e-3)
+            {
+                a.seen = tick;
+            }
+        }
+    }
+
     /// Whose claim `key` would drive into, its body `now` going on to `next` going `way` (pulling
     /// over `pass` m at most): what's left of a claim another holds that `next` is in the way of
     /// and `now` isn't (`counts`, even going its way: cutting in; not one right behind it,
@@ -1341,5 +1356,37 @@ mod tests {
         // (Overlapping further than both pulling over makes up for: in each other's way.)
         let near = [565.0, 650.5];
         assert!(conflict(&body(a, 0.06, 0.7), &body(near, -2.57, 0.7), true));
+    }
+
+    #[test]
+    fn an_ask_keeps_its_place_while_its_car_backs_up_and_comes_back() {
+        let part =
+            |from: f32, yaw: f32| Claim::new(from, from + 50.0, vec![body([0.0, 0.0], yaw, 0.0)]);
+        let (me, other) = (1 << 63 | 3, 1 << 63 | 4);
+        let mut traffic = Traffic::default();
+        // (Another in it, crossing its way: it holds it, driving on through.)
+        let across = std::f32::consts::FRAC_PI_2;
+        assert!(traffic.may_go(1, other, 0, &[part(100.0, across)], 101.0, 102.0));
+        // (It asks for it at its start, and waits.)
+        assert!(!traffic.may_go(10, me, 0, &[part(100.0, 0.0)], 99.5, 100.5));
+        traffic.begin(11, Vec::new(), &[(me, 0, 99.5), (other, 0, 101.0)], &[]);
+        assert_eq!(traffic.asks.len(), 1);
+        // (Backing up out of one's way and coming back up, a few ticks not at its start.)
+        for (tick, t) in [(12, 98.5), (13, 97.5), (14, 98.5), (15, 99.0)] {
+            traffic.still_asking(tick, me, 0, t);
+            traffic.begin(tick + 1, Vec::new(), &[(me, 0, t), (other, 0, 101.0)], &[]);
+        }
+        assert_eq!(
+            traffic
+                .asks
+                .iter()
+                .map(|a| (a.key, a.tick))
+                .collect::<Vec<_>>(),
+            vec![(me, 10)],
+            "its ask stands, asked at tick 10"
+        );
+        // (Not on its way to it, it's dropped.)
+        traffic.begin(30, Vec::new(), &[(me, 0, 99.0), (other, 0, 101.0)], &[]);
+        assert!(traffic.asks.is_empty());
     }
 }

@@ -2276,6 +2276,9 @@ fn drive_on(w: &mut World, c: usize) {
     // Held up for good, nose to nose with one waiting for it (`JAM_TICKS`), it backs up a little
     // out of its way (`back_off`).
     let key = car_first(c);
+    // (Short of the group it asked for, backing up out of one's way or coming back up to it: its
+    // ask stands, its place in the queue kept.)
+    w.traffic.still_asking(w.tick, key, u32::from(home), t);
     let jammed = w.cars[c].waits_for.is_some_and(|k| waits_back(w, k, key));
     // (Not on its way since, it's still held up: two pulling over for each other by turns wait
     // for each other every other tick.)
