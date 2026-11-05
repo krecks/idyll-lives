@@ -564,6 +564,46 @@ fn two_cars_meeting_on_a_6_m_lane_pass_each_other_pulled_over() {
 }
 
 #[test]
+fn a_car_gets_past_someone_walking_ahead_of_it_along_its_lane() {
+    // (As on Barleystead's road out of town: one walking out along the lane in front of a car,
+    // the way it goes, steps aside for it in the end, not followed at their pace all the way.)
+    let mut w = street(7.0, &[(90.0, true), (170.0, true)]);
+    set_off(&mut w, 0);
+    let mut walking = None;
+    let mut away = None;
+    for t in 0..4000u32 {
+        w.tick_once();
+        let Some((at, yaw, true, _)) = w.cars[0].shown else {
+            if w.cars[0].state == CarState::Away && walking.is_some() {
+                away = Some(t);
+                break;
+            }
+            continue;
+        };
+        // On the street, westbound: D1 in its lane 6 m in front, off west along it.
+        if walking.is_none() && (at[1] - 30.0).abs() < 2.5 && yaw.sin() < -0.99 {
+            w.sims[1].pos = [at[0] - 6.0, at[1]];
+            w.apply(sim_core::Command::MoveTo {
+                sim: 1,
+                x: 2.5,
+                z: at[1],
+            })
+            .unwrap();
+            walking = Some((t, at[0]));
+        }
+    }
+    let (from, x) = walking.expect("the car came out onto the street, westbound");
+    let gone = away.expect("the car never got away") - from;
+    // (Following them at their pace, it would be out of town about when they are: past them,
+    // it's long gone while they're still on the first half of the way.)
+    assert!(
+        w.sims[1].pos[0] > x / 2.0,
+        "the car followed D1 for {gone} ticks, out of town with them at {:?}",
+        w.sims[1].pos
+    );
+}
+
+#[test]
 fn a_car_pulling_out_of_its_driveway_waits_for_one_coming_along() {
     // One comes in from the east end to its home; the other, on the same side further east,
     // pulls out of its driveway as it comes by, to drive off east across its lane.

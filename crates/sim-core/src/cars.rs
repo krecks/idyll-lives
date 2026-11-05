@@ -118,6 +118,9 @@ pub(crate) const KEEP: f32 = 2.0 * BESIDE;
 pub(crate) const BODY: f32 = 0.25;
 /// Someone waiting for a car to pass for this long steps aside out of its way (`make_way`).
 pub(crate) const MAKE_WAY_TICKS: u32 = 30;
+/// Someone walking within about 30° of a car's way (the sine of the angle between) walks along
+/// it, not across it out of it (`go_on`).
+const ALONG: f32 = 0.5;
 /// How long a car waits for someone who can't step aside (with nowhere to step) before they go
 /// round to where it has room to pass them (`clear_of`), up to `CLEAR_STEPS` tiles off.
 pub(crate) const PASS_TICKS: u32 = 3 * crate::TICKS_PER_MINUTE as u32;
@@ -3437,9 +3440,13 @@ pub(crate) fn go_on(
         }
         waiting = true;
         whom.push(s.id);
-        // (Walking on through its way, not waiting for it: they're on their way out of it, not
-        // to be stepped back where they came from.)
-        if matches!(phase, Some(Phase::Routing { .. })) && s.car_wait == 0 {
+        // (Walking on across its way, not waiting for it: they're on their way out of it, not
+        // to be stepped back where they came from. Not one walking along its way, ahead of it or
+        // towards it: they'd hold it up all the way, so they step aside in the end as anyone.)
+        if matches!(phase, Some(Phase::Routing { .. }))
+            && s.car_wait == 0
+            && (s.yaw - d.yaw).sin().abs() >= ALONG
+        {
             continue;
         }
         // (Not into the way of another, nor where this one comes on to: `clear`.)
