@@ -1,14 +1,15 @@
 //! Choosing nearby things in an open-world town (`index::ObjectIndex::usable_near`,
 //! `Choice::Outing`): residents use the public things within reach of where they are, and go on
 //! outings to places farther off when the way there is short enough (`visits.outingMinutes`) the
-//! way they'd go (`world::leisure_way`: the household's car, a bike of theirs, else on foot) and
-//! they have the time, home by `visits.outingHomeBy`; an outing's stay counts from when they get
-//! there.
+//! way they'd go (`world::leisure_way`: the household's car, a bike of theirs, the taxi, else on
+//! foot) and they have the time, home by `visits.outingHomeBy`; an outing's stay counts from when
+//! they get there.
 
 use crate::common;
 
 use common::hamlets::{Hamlets, two_hamlets, with_cars};
 use serde_json::{Value, json};
+use sim_core::taxi::StopState;
 use sim_core::{MINUTES_PER_TICK, World, clock, snapshot};
 
 const TICKS_PER_MINUTE: u64 = (1.0 / MINUTES_PER_TICK) as u64;
@@ -47,22 +48,45 @@ fn with_cars_and_parking(h: &Hamlets) -> String {
 }
 
 #[test]
-fn with_no_car_nor_bike_an_outing_a_walk_of_hours_away_isnt_picked() {
+fn with_no_car_nor_bike_an_outing_a_walk_of_hours_away_goes_by_taxi() {
     // Two hamlets 160 m apart: the other's park is a walk of about two hours (more than
-    // `outingMinutes`), and nobody has a car to drive there in nor a bike to ride: they stay local.
+    // `outingMinutes`), and nobody has a car to drive there in nor a bike to ride: whoever goes
+    // goes by the taxi, there and back (`taxi::leisure_eta`), never on foot, and is home by the
+    // hour.
     let content = common::content();
     let h = two_hamlets(&content, 31);
     let mut w = World::from_json(&content, &h.town, 31).expect("the hamlets load");
-    let most = w.content.visits.outing_minutes;
+    let home_by = w.content.visits.outing_home_by;
     let end = w.tick + 3 * 24 * 60 * TICKS_PER_MINUTE;
     let mut outings = std::collections::BTreeSet::new();
+    let mut by_taxi = std::collections::BTreeSet::new();
+    let mut out_late = std::collections::BTreeSet::new();
     while w.tick < end {
         w.tick_once();
-        outings.extend(on_outings(&w));
+        let now = on_outings(&w);
+        outings.extend(now.iter().copied());
+        for r in w.taxis.runs.iter().filter(|r| !r.home) {
+            let Some(place) = r.place else { continue };
+            for st in r.stops.iter().filter(|st| st.state == StopState::Aboard) {
+                by_taxi.insert((st.sim, place));
+            }
+        }
+        let hour = clock::hour(w.tick);
+        if hour >= home_by || hour < 6.0 {
+            for (s, plot) in now {
+                out_late.insert((clock::day(w.tick), s, plot));
+            }
+        }
     }
+    eprintln!("outings (resident, place): {outings:?}");
+    let on_foot: Vec<_> = outings.difference(&by_taxi).collect();
     assert!(
-        outings.is_empty(),
-        "outings (resident, place) a walk of more than {most} minutes away: {outings:?}"
+        on_foot.is_empty(),
+        "outings (resident, place) a walk of hours away, not by taxi: {on_foot:?}"
+    );
+    assert!(
+        out_late.is_empty(),
+        "out on an outing after {home_by}:00 (day, resident, place): {out_late:?}"
     );
 }
 
