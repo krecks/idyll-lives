@@ -971,6 +971,42 @@ fn a_car_right_behind_a_bus_turning_round_keeps_out_of_its_sweep() {
 }
 
 #[test]
+fn a_line_whose_stop_is_by_a_junction_turns_round_on_along_its_road_clear_of_it() {
+    // In from the west to its one stop just past a side road's junction, and back out west: the
+    // line turns round on along the road clear of the junction (`bus::turn_away`), not at the stop,
+    // and is a line all the same (a town with stops has its buses).
+    let roads = format!(
+        r#"[{{"points":[{}],"width":7,"kind":"street","ends":["out","dead"]}},
+            {{"points":[{}],"width":6,"kind":"street","ends":["dead","join"]}}]"#,
+        line_pts([0.5, 30.0], [180.0, 30.0]),
+        line_pts([60.0, 52.0], [60.0, 30.0])
+    );
+    let w = town_of(
+        BUS_CONTENT,
+        "",
+        200,
+        60,
+        &roads,
+        r#"[{"x":0.5,"z":30,"kind":"road"},{"x":75,"z":32.4,"kind":"stop"}]"#,
+        &[],
+    );
+    assert_eq!(
+        w.transit.lines.len(),
+        1,
+        "no line to the stop by the junction"
+    );
+    // (How far east its route comes: where it turns round.)
+    let east = w.transit.lines[0]
+        .route_points()
+        .iter()
+        .fold(f32::MIN, |m, p| m.max(p[0]));
+    assert!(
+        east >= 60.0 + 44.0,
+        "it turns round at x = {east:.0}, by the junction at 60"
+    );
+}
+
+#[test]
 fn cars_from_every_arm_of_a_busy_crossroads_all_get_through_with_the_buses() {
     // A big world's crossroads, its ways out east and west, two bus stops on either of those arms
     // (a line through it each way): two cars leave from houses on the north and south arms, two

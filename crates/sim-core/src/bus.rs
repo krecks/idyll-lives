@@ -335,6 +335,13 @@ impl Line {
         self.bays[j]
     }
 
+    /// For tests: where its bus is along its route, a tick apart, from the way in to the way out.
+    #[doc(hidden)]
+    pub fn route_points(&self) -> Vec<[f32; 2]> {
+        let n = self.route.ticks().ceil() as u32;
+        (0..=n).map(|t| self.route.at(t as f32).0).collect()
+    }
+
     /// Ticks after coming into town that it leaves stop `j` (its place on the line), on time.
     fn depart(&self, j: usize) -> u64 {
         self.arrive[j] + DWELL_TICKS
@@ -1611,13 +1618,17 @@ fn line_for(travel: &Travel, outs: &[RoadPoint], stops: &[Stop], group: &[u16]) 
         legs.push(leg(stop(w[0]).road, stop(w[1]).road)?);
     }
     let out = outs_[place(last)]?.1;
-    match turn_away(travel, stop(last), out) {
-        Some(turn) => {
-            legs.push(leg(stop(last).road, turn)?);
-            legs.push(leg(turn, out)?);
-        }
-        None => legs.push(leg(stop(last).road, out)?),
-    }
+    // (The way out one leg, turning round on along the road where it can: `turn_away`.)
+    let away = turn_away(travel, stop(last), out).and_then(|turn| {
+        let (mut a, b) = (leg(stop(last).road, turn)?, leg(turn, out)?);
+        a.pts.extend(b.pts);
+        (a.cost, a.len) = (a.cost + b.cost, a.len + b.len);
+        Some(a)
+    });
+    legs.push(match away {
+        Some(a) => a,
+        None => leg(stop(last).road, out)?,
+    });
     build_line(order, &legs, stops, travel, g.junctions().collect())
 }
 
