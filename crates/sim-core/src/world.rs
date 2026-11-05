@@ -2398,7 +2398,8 @@ impl World {
             .map(|(_, speed, min)| (speed, min)),
         };
         let door = p.arrival_point();
-        let taxi = crate::taxi::leisure_eta(&self.travel, &self.taxis, sim, pos, plot);
+        let taxi =
+            crate::taxi::leisure_eta(&self.travel, &self.exits, &self.content, sim, pos, door);
         let (_, eta) = leisure_way(
             &self.travel,
             &self.content,
@@ -7139,7 +7140,7 @@ fn pick_autonomous(
                 * crate::planner::visit_factor(content, sim, soon);
             // (The way there timed only for a visit worth making.)
             if score > MIN_AUTONOMY_SCORE {
-                let taxi = crate::taxi::leisure_eta(ctx.travel, ctx.taxis, sim, pos, plot);
+                let taxi = crate::taxi::leisure_eta(ctx.travel, ctx.exits, content, sim, pos, door);
                 let (_, eta) = leisure_way(
                     ctx.travel,
                     content,
@@ -7169,7 +7170,7 @@ fn pick_autonomous(
                     continue;
                 }
                 // By the way they'd go (`leisure_way`).
-                let taxi = crate::taxi::leisure_eta(ctx.travel, ctx.taxis, sim, pos, p.id);
+                let taxi = crate::taxi::leisure_eta(ctx.travel, ctx.exits, content, sim, pos, door);
                 let (_, eta) = leisure_way(
                     ctx.travel,
                     content,
@@ -7658,7 +7659,8 @@ fn start_task(
             let car = if riding {
                 None
             } else {
-                crate::taxi::door_for(ctx, sim).or_else(|| crate::cars::ride_for(ctx, sim))
+                crate::taxi::door_for(ctx, sim, &TaskKind::Work)
+                    .or_else(|| crate::cars::ride_for(ctx, sim))
             };
             if let Some((car, seat, door, at)) = car {
                 crate::ride::get_off(sim, objects);
@@ -7681,7 +7683,7 @@ fn start_task(
                 if riding {
                     // On their bike: on it to the way out.
                     goal_at(exit)
-                } else if let Some(kerb) = crate::taxi::kerb_for(ctx, sim) {
+                } else if let Some(kerb) = crate::taxi::kerb_for(ctx, sim, &TaskKind::Work) {
                     // By the work taxi they're booked on (`taxi.rs`): to the kerb, to wait for it.
                     crate::ride::get_off(sim, objects);
                     goal_at(kerb)
@@ -7699,6 +7701,25 @@ fn start_task(
             }
         }
         // (Their visit starts once there's a way there: see below.)
+        // By the taxi they're booked on there (`taxi.rs`): to its door as it stands for them, else
+        // out to their kerb to wait for it.
+        TaskKind::Visit { .. } | TaskKind::GoHome
+            if sim.riding.is_none()
+                && let Some((car, seat, door, at)) =
+                    crate::taxi::door_for(ctx, sim, &task.kind) =>
+        {
+            sim.bound_for_car = Some(car);
+            sim.car_seat = seat as u8;
+            sim.car_door = door as u8;
+            goal_at(at)
+        }
+        TaskKind::Visit { .. } | TaskKind::GoHome
+            if sim.riding.is_none()
+                && let Some(kerb) = crate::taxi::kerb_for(ctx, sim, &task.kind) =>
+        {
+            sim.bound_for_car = None;
+            goal_at(kerb)
+        }
         // Beyond walking range, with the household's car at home: to its driver's door first,
         // to drive there (`cars::trip_car`).
         TaskKind::Visit { plot }
@@ -7745,6 +7766,18 @@ fn start_task(
                 (at[0].floor() as i32, at[1].floor() as i32),
                 content.visits.tags,
             )
+        }
+        // Else from home, the taxi where it beats walking (`leisure_way`, `taxi::leisure_eta`):
+        // booked on one, they wait at home till it's near (`taxi::book_leisure`).
+        TaskKind::Visit { plot }
+            if sim.riding.is_none() && sim.taxi.is_none() && taxi_from_home(sim, ctx, plot) =>
+        {
+            sim.current = None;
+            sim.transition = Some(crate::life::Transition::Taxi {
+                plot,
+                directed: task.directed,
+            });
+            return;
         }
         TaskKind::Visit { plot } => {
             // (On foot: not to a car, whatever they were heading for before.)
@@ -8319,13 +8352,11 @@ fn progress(
         // At their kerb: the taxi calls them to its door (`taxi::update`), or goes without them.
         Phase::AtKerb { ticks: waited } => {
             *waited += ticks;
+            // (Left by it: on their way after all, their own way.)
             if sim.taxi.is_none() {
+                let task = act.task;
                 sim.current = None;
-                sim.queue.push_front(Task {
-                    kind: TaskKind::Work,
-                    directed: true,
-                    routine: false,
-                });
+                sim.queue.push_front(task);
             }
             return;
         }
@@ -8349,18 +8380,24 @@ fn progress(
         Phase::Alighting { ticks: waited } => {
             *waited += ticks;
             let t = *waited;
+            let after = act.task;
             if let Some(car) = sim.bound_for_car.and_then(|c| ctx.cars.get(c as usize)) {
                 crate::cars::getting(sim, car, t, false);
             }
             if t >= crate::cars::GET_OUT_TICKS {
+                // (Out of a taxi at a place they're visiting: on in; else home.)
+                let task = match after.kind {
+                    TaskKind::Visit { .. } => after,
+                    _ => Task {
+                        kind: TaskKind::GoHome,
+                        directed: false,
+                        routine: false,
+                    },
+                };
                 sim.current = None;
                 sim.bound_for_car = None;
                 sim.pose = Pose::Stand;
-                sim.queue.push_front(Task {
-                    kind: TaskKind::GoHome,
-                    directed: false,
-                    routine: false,
-                });
+                sim.queue.push_front(task);
             }
             return;
         }
@@ -9014,7 +9051,9 @@ fn arrive(
         }
     }
     // (Booked on a work taxi still to come: at their kerb, they wait for it.)
-    let at_kerb = crate::taxi::kerb_for(ctx, sim).is_some();
+    let at_kerb = sim
+        .current()
+        .is_some_and(|a| crate::taxi::kerb_for(ctx, sim, &a.task.kind).is_some());
     let Some(act) = sim.current.as_mut() else {
         return;
     };
@@ -9063,6 +9102,23 @@ fn arrive(
                 sim.transition = Some(crate::life::Transition::Work);
             }
         },
+        // At the door of the taxi standing for them (`taxi.rs`): facing it, they open it and get
+        // in; at their kerb, they wait for it.
+        TaskKind::Visit { .. } | TaskKind::GoHome
+            if sim
+                .bound_for_car
+                .and_then(|c| ctx.cars.get(c as usize))
+                .is_some_and(|c| c.taxi && c.standing) =>
+        {
+            let car = &ctx.cars[sim.bound_for_car.expect("just looked") as usize];
+            sim.yaw = (car.spot[0] - sim.pos[0]).atan2(car.spot[1] - sim.pos[1]);
+            sim.pose = Pose::Stand;
+            act.phase = Phase::Boarding { ticks: 0 };
+        }
+        TaskKind::Visit { .. } | TaskKind::GoHome if at_kerb => {
+            sim.pose = Pose::Stand;
+            act.phase = Phase::AtKerb { ticks: 0 };
+        }
         // At their car's door, to drive there (`cars::start_trip`).
         TaskKind::Visit { plot }
             if sim
@@ -10077,7 +10133,11 @@ fn outing_fits_now(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], plot: u32) 
     let at_home = home.is_some() && ctx.briefs.get(sim.id as usize).and_then(|b| b.plot) == home;
     let pos = ctx.nav.stairs.ground_pos(sim.pos);
     let door = p.arrival_point();
+    // (Booked on a taxi there already: it's the taxi's to time, `taxi::book_leisure`.)
+    let visit = TaskKind::Visit { plot };
     if !ctx.travel.open
+        || crate::taxi::kerb_for(ctx, sim, &visit).is_some()
+        || crate::taxi::door_for(ctx, sim, &visit).is_some()
         || !p.public
         || !at_home
         || crate::travel::dist(pos, door) <= content.autonomy.reach
@@ -10111,10 +10171,45 @@ fn outing_fits_now(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], plot: u32) 
         plot,
         door,
         goer,
-        None,
+        taxi_from_home(sim, ctx, plot)
+            .then(|| crate::taxi::leisure_eta(ctx.travel, ctx.exits, content, sim, pos, door))
+            .flatten(),
         &mut [None, None],
     );
     outing_fits(content, eta, ctx.hour, free_before_work(sim, ctx))
+}
+
+/// Whether `sim`, at home, goes to `plot` (a visit or an outing) by the taxi (`leisure_way`: no
+/// car or bike of theirs to go in, nor the household's car at home, the taxi quicker than walking,
+/// `taxi::leisure_eta`), not just turned down for it (`taxi::Taxis::no_taxi`).
+fn taxi_from_home(sim: &Sim, ctx: &Ctx, plot: u32) -> bool {
+    let home = ctx
+        .households
+        .get(sim.household as usize)
+        .and_then(|h| h.plot);
+    let at_home = home.is_some() && ctx.briefs.get(sim.id as usize).and_then(|b| b.plot) == home;
+    let Some(p) = ctx.plots.get(plot as usize) else {
+        return false;
+    };
+    let pos = ctx.nav.stairs.ground_pos(sim.pos);
+    // (Not with the household's car at home: the household goes in it, or calls them to it.)
+    let car_home = ctx
+        .cars
+        .iter()
+        .any(|c| !c.taxi && c.household == sim.household && c.at_home());
+    at_home
+        && !car_home
+        && Some(plot) != home
+        && !ctx.taxis.no_taxi(sim.id, plot)
+        && crate::taxi::leisure_eta(
+            ctx.travel,
+            ctx.exits,
+            ctx.content,
+            sim,
+            pos,
+            p.arrival_point(),
+        )
+        .is_some()
 }
 
 /// The bike (or e-scooter) at home `sim` rides out on to `plot` (a visit or an outing in an
@@ -10133,8 +10228,8 @@ fn leisure_ride(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], plot: u32) -> 
 }
 
 /// The tick a guest on an outing to `plot` (a public place in an open-world town) heads home by
-/// to be home by `visits.outingHomeBy` today: the way back from `pos` on foot, or for one whose
-/// car is parked out for them the walk back to it and the drive. None: not such an outing.
+/// to be home by `visits.outingHomeBy` today: the way back from `pos` on foot (or by the taxi
+/// they came by), or for one whose car is parked out for them the walk back to it and the drive. None: not such an outing.
 fn outing_leave_by(
     sim: &Sim,
     ctx: &Ctx,
@@ -10172,7 +10267,9 @@ fn outing_leave_by(
         (None, Some((at, speed))) => {
             travel.eta(pos, at, foot, walk) + travel.eta(at, door, foot, walk * speed)
         }
-        (None, None) => travel.eta(pos, door, foot, walk),
+        // (Come by taxi: the taxi back, `taxi::back_minutes`.)
+        (None, None) => crate::taxi::back_minutes(ctx, sim, plot, pos, door)
+            .unwrap_or_else(|| travel.eta(pos, door, foot, walk)),
     };
     let back = (minutes * TICKS_PER_MINUTE as f32) as u64;
     let home_by = crate::clock::tick_at(ctx.day, content.visits.outing_home_by * 60.0)?;

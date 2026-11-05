@@ -934,3 +934,66 @@ fn a_riders_time_before_work_ends_when_the_taxi_comes_late_run_or_held_up() {
     }
     assert!(seen, "the run was never held at the edge of town");
 }
+
+#[test]
+fn a_visit_out_of_walking_reach_goes_by_taxi_there_and_back() {
+    // A (no car, no bike) is sent to visit B's house 540 m along the street (a walk of six hours,
+    // the taxi from the way out and the ride about half that): a taxi comes for A at the kerb,
+    // puts A down at B's, and when the visit's over one brings A home.
+    let mut w = town(
+        7,
+        &[
+            house(20, &[r#"{"name":"A","age":40,"traits":["cheerful"]}"#]),
+            house(560, &[r#"{"name":"B","age":40,"traits":["cheerful"]}"#]),
+        ],
+    );
+    run_to(&mut w, 1, 9.0);
+    let _ = w.apply(sim_core::Command::Visit { sim: 0, plot: 1 });
+    let end = sim_core::clock::tick_at(2, 12.0 * 60.0).unwrap();
+    let (mut out, mut there, mut back, mut home) = (false, None, false, false);
+    while w.tick < end && !home {
+        w.tick_once();
+        no_overlaps(&w);
+        for r in &w.taxis.runs {
+            let aboard = r
+                .stops
+                .iter()
+                .any(|s| s.sim == 0 && s.state == StopState::Aboard);
+            if r.place == Some(1) && aboard {
+                if r.home {
+                    back = true;
+                } else {
+                    out = true;
+                }
+            }
+        }
+        let a = &w.sims[0];
+        if out && there.is_none() && a.visiting.is_some_and(|v| v.plot == 1) {
+            let door = w.plots[1].arrival_point();
+            if (a.pos[0] - door[0]).hypot(a.pos[1] - door[1]) < 6.0 {
+                there = Some(w.tick);
+            }
+        }
+        home |= back && a.visiting.is_none() && a.pos[0] < 45.0 && w.taxi_booking(0).is_none();
+    }
+    assert!(out, "A never rode a taxi there");
+    assert!(there.is_some(), "A never got to B's door");
+    assert!(back, "A never rode a taxi home");
+    assert!(home, "A never got home");
+}
+
+#[test]
+fn a_cyclist_with_a_ride_out_of_over_an_hour_and_a_half_takes_the_taxi() {
+    // C's bike would take well over `BIKE_MOST` out of town from the street's far end: C rides
+    // the work taxi instead.
+    let mut far = house(20, &[&worker("C")]);
+    far.bike = true;
+    let mut w = town(7, &[far]);
+    let mut c = Vec::new();
+    let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
+    while w.tick < end && !c.iter().any(|x: &(u32, bool)| !x.1) {
+        w.tick_once();
+        rode(&w, 0, &mut c);
+    }
+    assert!(c.iter().any(|x| !x.1), "C never rode the taxi to work");
+}

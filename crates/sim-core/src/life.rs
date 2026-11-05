@@ -98,6 +98,8 @@ pub enum Transition {
         plot: Option<u32>,
         directed: bool,
     },
+    /// Off to `plot` (a visit or an outing) by the taxi: booked on one (`taxi::book_leisure`).
+    Taxi { plot: u32, directed: bool },
     /// Reached home.
     Home,
     /// Reached the front door to answer `guest`'s knock.
@@ -1165,6 +1167,17 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             directed,
         } => crate::cars::ride(w, i, car, plot, directed),
         Transition::Home => w.sims[i].visiting = None,
+        Transition::Taxi { plot, directed } => {
+            // (No taxi after all: on foot, `taxi::Taxis::no_taxi`.)
+            if !crate::taxi::book_leisure(w, i, plot, directed) {
+                w.taxis.turned_down(i as u32, plot);
+                w.sims[i].queue.push_front(Task {
+                    kind: TaskKind::Visit { plot },
+                    directed,
+                    routine: false,
+                });
+            }
+        }
         Transition::Answered { guest } => answer(w, i, guest as usize),
     }
 }

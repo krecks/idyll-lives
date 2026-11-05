@@ -178,8 +178,8 @@ fn someone_with_a_bike_rides_to_a_place_beyond_walking_reach_and_is_home_by_the_
 
 #[test]
 fn an_outings_stay_counts_from_when_they_get_there() {
-    // Sent to the other hamlet's park on foot (about two hours away): their stay lasts its hours
-    // from when they're there, the way there not counted.
+    // Sent to the other hamlet's park (about two hours away on foot, near an hour by the taxi
+    // they take): their stay lasts its hours from when they're there, the way there not counted.
     let content = common::content();
     let h = two_hamlets(&content, 31);
     let mut w = World::from_json(&content, &h.town, 31).expect("the hamlets load");
@@ -215,7 +215,7 @@ fn an_outings_stay_counts_from_when_they_get_there() {
     let (arrived, until) = there.expect("they got to the park");
     let walk = (arrived - set_off) / TICKS_PER_MINUTE;
     assert!(
-        walk > 60,
+        walk > 30,
         "the way there took {walk} minutes: too short to tell"
     );
     let stay = until.saturating_sub(arrived) as f32 / TICKS_PER_MINUTE as f32;

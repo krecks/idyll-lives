@@ -600,7 +600,7 @@ impl Car {
 
     /// The car as it stands parked at `spot` facing `yaw` (its doors and seats there): a copy
     /// without its routes or who is in it.
-    fn posed(&self, spot: [f32; 2], yaw: f32) -> Car {
+    pub(crate) fn posed(&self, spot: [f32; 2], yaw: f32) -> Car {
         Car {
             plot: self.plot,
             household: self.household,
