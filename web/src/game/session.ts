@@ -970,16 +970,6 @@ async function openSession(
       const target = pose.target ?? [now.target[0], pose.y ?? now.target[1], now.target[2]];
       renderer.setCameraPose({ ...now, ...pose, target });
     };
-    // `__buses()`: the town's buses as the newest snapshot shows them (sim-core `bus.rs`): where, which
-    // way, standing (1) or driving (2), their open doors and line.
-    const buses = () => {
-      const [snap, l] = [bridge.latest(), bridge.layout];
-      if (!l.bus || l.busBase === undefined || l.busStride === undefined || l.header.busCount === undefined) return [];
-      return Array.from({ length: snap[l.header.busCount] | 0 }, (_, k) => {
-        const o = l.busBase! + k * l.busStride!;
-        return { x: snap[o + l.bus!.x], z: snap[o + l.bus!.z], yaw: snap[o + l.bus!.yaw], shown: snap[o + l.bus!.shown], doors: snap[o + l.bus!.doors], line: snap[o + l.bus!.line] };
-      });
-    };
     // `__cars()`: the households' cars as the newest snapshot shows them (sim-core `cars.rs`): which
     // car (its row), where, which way, parked (1) or driving (2).
     const cars = () => {
@@ -1003,7 +993,6 @@ async function openSession(
       });
     };
     Object.assign(window, {
-      __buses: buses,
       __cars: cars,
       __lights: lights,
       __sims: () => liveSims(bridge.latest(), bridge.layout, content, game.sims),
@@ -1236,7 +1225,7 @@ async function openSession(
     }
     world = w;
     // The town map: the town's ground and its presentation data (roads, zones, areas), as it changes.
-    if (townMap.world?.meta !== w.meta || townMap.world?.width !== w.width || townMap.world?.stops !== w.stops) townMap.world = { width: w.width, depth: groundDepth(w), meta: w.meta, stops: w.stops };
+    if (townMap.world?.meta !== w.meta || townMap.world?.width !== w.width) townMap.world = { width: w.width, depth: groundDepth(w), meta: w.meta };
     worldView = viewPlot;
     game.storeys = w.storeys ?? 1;
     game.lowestStorey = lowestStorey(w);

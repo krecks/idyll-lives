@@ -101,7 +101,8 @@ pub struct RoadRaw {
     pub area: Option<u32>,
 }
 
-/// A way out of town (`TownExit`): a road out, or a bus stop that only people on foot use.
+/// A way out of town (`TownExit`): a road out (older town files may list bus stops too, `Stop`:
+/// no longer ways out, dropped as the town loads).
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(untagged)]
 pub enum ExitRaw {
@@ -237,8 +238,9 @@ pub struct OpenWorld {
     pub terrain: Option<Terrain>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parking: Vec<Parking>,
-    /// Saves only: which of `World::exits` are bus stops (indices).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Older saves only: which of their exits were bus stops (indices), dropped from
+    /// `World::exits` as they load (no longer ways out). Never written.
+    #[serde(default, skip_serializing)]
     pub stops: Vec<u32>,
     /// Saves only: each plot's area and kind (`plots[].area/kind`), by plot index.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -436,7 +438,7 @@ pub struct Graph {
     cols: usize,
     rows: usize,
     /// Its junctions' boxes (`traffic::boxes`): their middles and how far round them they reach
-    /// (m). Cars and buses take turns driving through them (`traffic.rs`).
+    /// (m). Cars take turns driving through them (`traffic.rs`).
     pub boxes: Vec<([f32; 2], f32)>,
 }
 
@@ -1018,8 +1020,6 @@ pub struct Travel {
     /// The town file's open-world fields, as they came (saved).
     pub file: OpenWorld,
     pub graph: Graph,
-    /// Per exit (`World::exits`): a bus stop, for people on foot only.
-    pub stops: Vec<bool>,
     /// How big the world is (`OpenWorld::size`).
     pub size: WorldSize,
     /// The town is laid out for the open world (its `size` is `normal` or `big`): it has a road
@@ -1033,22 +1033,12 @@ pub struct Travel {
     /// The tiles the town file's `terrain` masks (water, rock): blocked under everything, so a
     /// tile freed of what stood on it stays blocked (`World::set_travel`). Sorted tile indices.
     pub base_blocked: Vec<usize>,
-    /// Per public parking spot (`OpenWorld::parking`): a bus swings through it on its line's
-    /// route (`bus::settle`), so no car parks there (`cars::parking_for`). Not saved.
-    pub bus_way: Vec<bool>,
-    /// The buses' ways where a bus can't pass one coming the other way (`bus::settle`): a car's
-    /// route along one takes turns with the buses there (`traffic::Narrow`). Not saved.
-    pub narrow: crate::traffic::Narrow,
-    /// The junctions with traffic lights (`traffic::Signal`, `bus::settle`). Not saved: worked out
-    /// again with the lines.
+    /// The junctions with traffic lights (`traffic::Signal`, `traffic::settle`). Not saved: worked
+    /// out again on load.
     pub signals: Vec<crate::traffic::Signal>,
-    /// Whether the busy junctions get traffic lights (`bus::settle`): not yet in a game (off),
-    /// only where a test turns them on (`World::light_busy_junctions`).
+    /// Whether the junctions get traffic lights (`traffic::settle`): not yet in a game (off), only
+    /// where a test turns them on (`World::light_busy_junctions`).
     pub lights_on: bool,
-    /// Where cars and buses take turns driving through, as through a junction's box: the
-    /// junctions' boxes (`Graph::boxes`), and where a bus's body sweeps out of its lane round a
-    /// sharp turn (`traffic::sweeps`), a middle and how far round it (m). Not saved.
-    pub zones: Vec<([f32; 2], f32)>,
     /// By plot, for the public places: their door and where it gets on the roads on foot and by
     /// car (`entry`), kept as each tick starts (`note_doors`): a resident weighing an outing asks
     /// how long the way to every one is. Not saved.
@@ -1060,17 +1050,7 @@ pub struct Travel {
 type Door = ([u32; 2], [Option<RoadPoint>; 2]);
 
 impl Travel {
-    /// Where cars and buses take turns (`zones`; before the buses' ways are known, the
-    /// junctions' boxes).
-    pub(crate) fn zones(&self) -> &[([f32; 2], f32)] {
-        if self.zones.is_empty() {
-            &self.graph.boxes
-        } else {
-            &self.zones
-        }
-    }
-
-    pub fn new(file: OpenWorld, meta: &serde_json::Value, exits: usize) -> Self {
+    pub fn new(file: OpenWorld, meta: &serde_json::Value) -> Self {
         let size = file.size();
         let open = size != WorldSize::Cosy;
         let graph = if open {
@@ -1078,25 +1058,15 @@ impl Travel {
         } else {
             Graph::default()
         };
-        let mut stops = vec![false; exits];
-        for &i in &file.stops {
-            if let Some(s) = stops.get_mut(i as usize) {
-                *s = true;
-            }
-        }
         Self {
             file,
             graph,
-            stops,
             size,
             open,
             country_speed: COUNTRY_SPEED,
             base_blocked: Vec::new(),
-            bus_way: Vec::new(),
             lights_on: false,
             signals: Vec::new(),
-            narrow: Default::default(),
-            zones: Vec::new(),
             doors: Vec::new(),
         }
     }
@@ -1146,11 +1116,6 @@ impl Travel {
     /// Whether tile `i` (`Lot::tile_index`) is blocked by the land itself (`base_blocked`).
     pub fn ground_blocked(&self, i: usize) -> bool {
         self.base_blocked.binary_search(&i).is_ok()
-    }
-
-    /// Whether exit `i` is a bus stop.
-    pub fn is_stop(&self, i: usize) -> bool {
-        self.stops.get(i).copied().unwrap_or(false)
     }
 
     /// The area a point is in, if any.
@@ -1265,8 +1230,8 @@ pub struct WalkPlan {
 /// How far to the right of a road's middle line people walk: on the pavement of a street (its
 /// width takes in the sidewalks), on the verge of a country road, down the middle of a trail.
 /// Half a metre in from its edge, 2.5 m out at most: on a 6 m lane, a bike's handlebars clear a
-/// car or bus going by (`cars::BESIDE`). Beside a country road there's open ground: half a
-/// metre out on the verge, clear of a bus pulled in at a stop by its edge (`bus::bay_out`).
+/// car going by (`cars::BESIDE`). Beside a country road there's open ground: half a metre out on
+/// the verge.
 pub(crate) fn side_offset(width: f32, kind: RoadKind) -> f32 {
     match kind {
         RoadKind::Trail => 0.0,

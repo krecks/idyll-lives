@@ -19,7 +19,7 @@
  * way for. And for big worlds: every area reaching a way out, nothing on the
  * water, every outdoor place at a trail's end and near its area, no trail through a lot, no
  * country road turning further than 70° over 40 m (no hairpins: `COUNTRY_TURN`), areas apart,
- * hamlets of four lots or more, every house near a stop or a way out, residents within the
+ * hamlets of four lots or more, residents within the
  * cap, the world filled (a quarter of it or more built and farmed, at most a tenth of its 100 m
  * squares with nothing in them, every quarter of it with an area or homes out in the country),
  * every road named (no two alike), the file under 4 MB, and the time a big world takes (its
@@ -62,7 +62,7 @@ const { mulberry32 } = await import('../../web/src/game/noise.ts');
 type Rect = { x: number; z: number; w: number; d: number };
 type Pt = [number, number];
 type Road = { points: Pt[]; width: number; ends: [string, string]; name?: string; kind?: string; area?: number };
-type Exit = Pt | { x: number; z: number; kind: 'road' | 'stop' };
+type Exit = Pt | { x: number; z: number; kind: 'road' };
 type TownFile = {
   size?: 'cosy' | 'normal' | 'big';
   width: number;
@@ -77,7 +77,6 @@ type TownFile = {
   meta: { roads?: Road[]; facing?: number[]; zones?: { kind: string; poly: Pt[] }[] };
 };
 const exitAt = (e: Exit): Pt => (Array.isArray(e) ? e : [e.x, e.z]);
-const isRoadExit = (e: Exit) => Array.isArray(e) || e.kind === 'road';
 /** How far a point is from a rectangle (0 inside it). */
 const offRect = (r: Rect, x: number, z: number) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 /**
@@ -274,12 +273,6 @@ function openProblems(town: TownFile): string[] {
     });
     const homes = town.plots.filter((p) => p.kind === 'home' || p.kind === 'farm');
     if (homes.length < 70) out.push(`${homes.length} homes (a big world has 70 or more)`);
-    // Every house within ~120 m of a stop or a way out.
-    for (const [i, p] of town.plots.entries()) {
-      if (p.kind !== 'home' && p.kind !== 'farm') continue;
-      const far = Math.min(...town.exits.map((e) => Math.hypot(exitAt(e)[0] - (p.x + p.w / 2), exitAt(e)[1] - (p.z + p.d / 2))));
-      if (far > 125) out.push(`house ${i} is ${far.toFixed(0)} m from a stop`);
-    }
   }
   // Neighbours within the cap (the player's household aside).
   const player = town.households.findIndex((h) => h.player);
@@ -309,8 +302,8 @@ function layoutProblems(town: TownFile): string[] {
     // (A park may stand in the middle of a green.)
     if (roads.length && gap > 13 && !p.public) out.push(`plot ${i} ${gap.toFixed(1)} m from its road`);
   });
-  for (const [x, z] of town.exits.filter(isRoadExit).map(exitAt)) if (Math.min(x, z, town.width - x, town.depth - z) > 1) out.push(`a way out of town at ${x}, ${z}, not on its edge`);
-  if (!town.exits.some(isRoadExit)) out.push('no way out of town');
+  for (const [x, z] of town.exits.map(exitAt)) if (Math.min(x, z, town.width - x, town.depth - z) > 1) out.push(`a way out of town at ${x}, ${z}, not on its edge`);
+  if (!town.exits.length) out.push('no way out of town');
   return out;
 }
 const problems: string[] = [];

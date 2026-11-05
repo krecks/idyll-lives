@@ -264,7 +264,7 @@ export interface ObjectDef {
    * Something to ride (sim-core `ride.rs`): a bike, sat on and pedalled, or an e-scooter, stood on; `speed` times
    * as fast as walking, by those of `stages` (absent: everyone), for ways longer than `minRide` m; `roadsOnly`:
    * keeps to the roads; `reach`: ridden, how far it reaches in front of its rider, behind them and out to each side
-   * (m, for keeping clear of cars and buses). The renderer draws it under its rider (`shared/characters/vehicles.ts`).
+   * (m, for keeping clear of cars). The renderer draws it under its rider (`shared/characters/vehicles.ts`).
    */
   vehicle?: { kind: 'bike' | 'scooter'; speed: number; stages?: string[]; minRide?: number; roadsOnly?: boolean; reach?: [number, number, number] };
   /** Can only be placed outdoors (trees, flower beds, ponds). */

@@ -38,13 +38,6 @@ export function lotTitle(p: PlacePlot, households: readonly { name: string; plot
   return hh ? `The ${hh.name}s` : empty;
 }
 
-/** A resident and the bus (`SimView.bus`), in words: "Waiting for the bus", "On the bus to work" (or school); '' otherwise (home on the bus: `tripText`). */
-export function busText(s: { bus?: 'wait' | 'work' | 'home' | null; job: unknown }): string {
-  if (s.bus === 'wait') return 'Waiting for the bus';
-  if (s.bus === 'work') return `On the bus to ${s.job ? 'work' : 'school'}`;
-  return '';
-}
-
 /** `lotTitle` within a sentence: "on the way to the Smiths". */
 export function lotInSentence(p: PlacePlot, households: readonly { name: string; plot: number | null }[]): string {
   const name = lotTitle(p, households);
@@ -73,8 +66,7 @@ export function placeAt(x: number, z: number, plots: readonly PlacePlot[], house
  * A resident on their way somewhere (`SimView.trip`), in words: "On the way home · back about
  * 17:40", "On the way to the Smiths · there about 14:20"; without the time when it isn't known
  * (the sim works it out only for residents whose details are shown). `home`: their household's
- * plot; `time` writes a minute of day as the player's clock does. `bus`: home on the bus
- * ("On the bus home · back about 17:40").
+ * plot; `time` writes a minute of day as the player's clock does.
  */
 export function tripText(
   trip: { to: number; at?: number },
@@ -83,10 +75,9 @@ export function tripText(
   households: readonly { name: string; plot: number | null }[],
   time: (minute: number) => string,
   ride?: SimRide,
-  bus = false,
 ): string {
   const when = (word: string) => (trip.at === undefined ? '' : ` · ${word} about ${time(trip.at)}`);
-  if (trip.to === home) return `${ride ? rideText(ride.kind, 'home') : bus ? 'On the bus home' : 'On the way home'}${when('back')}`;
+  if (trip.to === home) return `${ride ? rideText(ride.kind, 'home') : 'On the way home'}${when('back')}`;
   const p = plots[trip.to];
   return `On the way to ${p ? lotInSentence(p, households) : 'somewhere'}${when('there')}`;
 }
@@ -100,20 +91,18 @@ export function rideText(kind: SimRide['kind'], to: SimRide['to']): string {
 }
 
 /**
- * A resident on their way (`SimView`'s `bus`, `trip` and `ride`), in words: the bus first (`busText`),
- * then the trip (`tripText`), then the ride (`rideText`); '' when they aren't on their way. `home`,
- * `plots`, `households` and `time` as `tripText`'s.
+ * A resident on their way (`SimView`'s `trip` and `ride`), in words: the trip (`tripText`), else
+ * the ride (`rideText`); '' when they aren't on their way. `home`, `plots`, `households` and
+ * `time` as `tripText`'s.
  */
 export function wayText(
-  s: { bus?: 'wait' | 'work' | 'home' | null; job: unknown; trip?: { to: number; at?: number }; ride?: SimRide },
+  s: { trip?: { to: number; at?: number }; ride?: SimRide },
   home: number | null,
   plots: readonly PlacePlot[],
   households: readonly { name: string; plot: number | null }[],
   time: (minute: number) => string,
 ): string {
-  const bus = busText(s);
-  if (bus) return bus;
-  if (s.trip) return tripText(s.trip, home, plots, households, time, s.ride, s.bus === 'home');
+  if (s.trip) return tripText(s.trip, home, plots, households, time, s.ride);
   if (s.ride) return rideText(s.ride.kind, s.ride.to);
   return '';
 }

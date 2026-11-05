@@ -58,7 +58,6 @@ fn the_network_joins_the_hamlets() {
     assert_eq!(g.roads.len(), 3);
     assert_eq!(g.nodes.len(), 4, "{:?}", g.nodes);
     assert!(w.travel.open);
-    assert_eq!(w.travel.stops.iter().filter(|&&s| s).count(), 2);
 }
 
 #[test]

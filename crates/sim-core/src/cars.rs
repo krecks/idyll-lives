@@ -66,17 +66,15 @@
 //! of each other. A trip's car parks only in a spot no other car is parked at or on its way to
 //! (`parking_for`).
 //!
-//! Where its way crosses or meets another's, it takes turns with the other cars and the buses
-//! (`traffic.rs`): into a junction's box, across a lane out of its driveway or a bay (or into one),
-//! along a stretch where it couldn't pass a bus (or, round a 6 m lane's tight bend, a car) coming
-//! the other way, and round where a bus's body sweeps out of its lane, only holding its claim to
-//! it (`traffic::Traffic::may_go`), and never into what's left of another's
+//! Where its way crosses or meets another's, it takes turns with the other cars (`traffic.rs`):
+//! into a junction's box, across a lane out of its driveway or a bay (or into one), and round a 6 m
+//! lane's tight bend where it couldn't pass one coming the other way, only holding its claim to it
+//! (`traffic::Traffic::may_go`), and never into what's left of another's
 //! (`traffic::Traffic::blocked`). On a 6 m lane two cars meeting pull over onto the pavement to
 //! pass (`pull_over`, the kerbside furniture `LANE_KERBSIDE` back from the edge for it), and a car
-//! waits while one coming the other way is too near to pass (`bus::too_near`), but for one waiting
-//! for it. Someone waiting at a bus stop, on the pavement by it, isn't in its way. Held up nose to
-//! nose with one that waits for it for `JAM_TICKS`, it backs up a little out of its way
-//! (`back_off`). And never deeper into another car or a bus than it is (`guard`).
+//! waits while one coming the other way is too near to pass (`too_near`), but for one waiting for
+//! it. Held up nose to nose with one that waits for it for `JAM_TICKS`, it backs up a little out of
+//! its way (`back_off`). And never deeper into another car than it is (`guard`).
 
 use serde::{Deserialize, Serialize};
 
@@ -113,7 +111,7 @@ const SWING: f32 = 1.2;
 /// there (`drive_on`); and how close to its sides and ends their bodies come (m, `Body`).
 pub(crate) const AHEAD: f32 = 2.2;
 pub(crate) const BESIDE: f32 = 0.1;
-/// How close someone steps to a car or bus driving by (m, `walks_into`): further off than it
+/// How close someone steps to a car driving by (m, `walks_into`): further off than it
 /// keeps from them, so one it held up doesn't hold it up in turn as it moves on past them.
 pub(crate) const KEEP: f32 = 2.0 * BESIDE;
 /// How far someone on foot reaches out from where they stand (m: their shoulders and elbows).
@@ -141,10 +139,23 @@ pub(crate) const TIGHT_LANE: f32 = 0.8;
 pub(crate) const CAR_HALF: f32 = 0.94;
 const KERB_KEEP: f32 = 0.05;
 /// How far in from a lane's edges its kerbside furniture may reach (m; the renderer's street
-/// dressing keeps to it, `Transit::pull_streets`) where the lane is too narrow for two cars to
-/// pass in their lanes (a 6 m lane): back from the kerb, for them to pull over onto the pavement
-/// to pass (`pull_room`).
+/// dressing keeps to it, `pull_over_streets`) where the lane is too narrow for two cars to pass
+/// in their lanes (a 6 m lane): back from the kerb, for them to pull over onto the pavement to
+/// pass (`pull_room`).
 pub const LANE_KERBSIDE: f32 = 0.5;
+/// How far in from a street's edge its kerbside furniture reaches elsewhere (m: `street.ts` stands
+/// it `SIDEWALK - KERB - 0.3` in, its widest about 0.3 across).
+pub(crate) const KERBSIDE: f32 = SIDEWALK - 0.14 - 0.3 + 0.3;
+/// How far apart two cars pass each other at least (m: `too_near`), and how much further apart
+/// two coming towards each other pull over to pass where the lane is too narrow for both in their
+/// lanes (m, `pull_want`): its measure is across a way between theirs, `too_near` their bodies as
+/// they are, which on a bend come nearer.
+pub(crate) const PASSING: f32 = 0.1;
+pub(crate) const PULL_MARGIN: f32 = 0.3;
+/// How far a car pulls over (or back) a tick (m), and for one coming the other way how far ahead
+/// of its front (m, from the other's front: `pull_want`).
+pub(crate) const PULL_RATE: f32 = 0.06;
+pub(crate) const PULL_AHEAD: f32 = 16.0;
 /// How near the furniture (or a country road's edge) a car pulled over comes (m), and how far
 /// right of its lane it pulls over at most (m).
 const PULL_EDGE: f32 = 0.1;
@@ -313,7 +324,7 @@ pub struct Car {
     #[serde(skip)]
     pub shift: f32,
     /// Who it waits for this tick (`Driving::first`: one in front of it, one coming the other way,
-    /// one whose claim it would drive into): a bus doesn't wait for a car waiting for it. Not saved.
+    /// one whose claim it would drive into). Not saved.
     #[serde(skip)]
     pub waits_for: Option<u64>,
     /// It moved on its way last tick (others asking for a claim look ahead along its way:
@@ -683,7 +694,7 @@ impl Car {
                     self.no_way = roads.is_some();
                 }
                 // (`on_roads` just failed: not again, as `build` would.)
-                Route::off_roads(self, exits, travel, false)
+                Route::off_roads(self, exits, false)
             }
         };
         let mut out = out;
@@ -701,7 +712,7 @@ impl Car {
             .or_else(|| g.near(self.spot, ROAD_REACH, 1, Mode::Car).first().copied())
     }
 
-    /// Its route's claims worked out again (the buses' ways in town settled: `Travel::narrow`).
+    /// Its route's claims worked out again (the junctions' lights settled: `traffic::settle`).
     pub(crate) fn reclaim(&mut self, travel: &Travel) {
         let (len, wid) = (self.len, self.wid);
         if let Some((_, route)) = self.route.as_mut() {
@@ -819,20 +830,20 @@ pub(crate) struct Route {
 
 impl Route {
     /// The route on the town's roads (`on_roads`) where it has a network the car's driveway
-    /// meets, else `legacy` (to a road out of town, not a bus stop).
+    /// meets, else `legacy` (to a road out of town).
     fn build(car: &Car, exits: &[[f32; 2]], travel: Option<&Travel>, home: bool) -> Route {
         let mut route = match travel.filter(|t| !t.graph.is_empty()) {
             Some(t) => Self::on_roads(car, exits, t, home),
             None => None,
         }
-        .unwrap_or_else(|| Self::off_roads(car, exits, travel, home));
+        .unwrap_or_else(|| Self::off_roads(car, exits, home));
         route.claim(car.len, car.wid, travel);
         route
     }
 
     /// Its claims (`Route::claims`), for a car `len` by `wid`: the junctions' boxes it drives
-    /// through, its mouths, and where it couldn't pass one coming the other way pulled over (along
-    /// a bus's narrow way where they can't pass, `travel`'s `Travel::narrow`; a tight bend).
+    /// through, its mouths, and where it couldn't pass one coming the other way pulled over (a 6 m
+    /// lane's tight bend: `traffic::narrow`).
     fn claim(&mut self, len: f32, wid: f32, travel: Option<&Travel>) {
         let trace = crate::traffic::trace(|t| self.at(t), self.ticks());
         let pass: Vec<f32> = trace.iter().map(|s| self.room_here(s.0)).collect();
@@ -891,11 +902,11 @@ impl Route {
                 }
             })
             .collect();
-        if let Some(t) = travel {
-            more.extend(t.narrow.spans(&trace, len, wid, &pass, &swing, &over));
+        if travel.is_some() {
+            more.extend(crate::traffic::narrow(&trace, &pass, &swing, &over));
         }
-        let boxes = travel.map_or(&[][..], |t| t.zones());
-        self.claims = crate::traffic::claims(&trace, &pass, len, wid, boxes, &more, 0.0, &[]);
+        let boxes = travel.map_or(&[][..], |t| &t.graph.boxes[..]);
+        self.claims = crate::traffic::claims(&trace, &pass, len, wid, boxes, &more);
         if let Some(t) = travel {
             crate::traffic::gate(&mut self.claims, &t.signals);
         }
@@ -941,18 +952,9 @@ impl Route {
         self.room[i - 1].min(self.room[i])
     }
 
-    /// `legacy`, to a road out of town (not a bus stop).
-    fn off_roads(car: &Car, exits: &[[f32; 2]], travel: Option<&Travel>, home: bool) -> Route {
-        match travel {
-            Some(t) if t.stops.iter().any(|&s| s) => {
-                let roads: Vec<[f32; 2]> = (0..exits.len())
-                    .filter(|&i| !t.is_stop(i))
-                    .map(|i| exits[i])
-                    .collect();
-                Self::legacy(car, &roads, home)
-            }
-            _ => Self::legacy(car, exits, home),
-        }
+    /// `legacy`, to a road out of town.
+    fn off_roads(car: &Car, exits: &[[f32; 2]], home: bool) -> Route {
+        Self::legacy(car, exits, home)
     }
 
     #[cfg(test)]
@@ -982,7 +984,6 @@ impl Route {
             }
             None => {
                 let (_, path) = (0..exits.len())
-                    .filter(|&i| !travel.is_stop(i))
                     .filter_map(|i| {
                         let e = *g.near(exits[i], ROAD_REACH, 1, Mode::Car).first()?;
                         let path = g.path(m, e, Mode::Car, travel.country_speed)?;
@@ -1403,14 +1404,34 @@ pub(crate) fn lane_on(width: f32, kind: crate::travel::RoadKind) -> f32 {
 
 /// How far in from the edges of a road `width` m wide of `kind` its kerbside furniture may reach
 /// (m): `LANE_KERBSIDE` on a lane too narrow for two cars to pass in their lanes (`lane_on`), where
-/// they pull over onto the pavement to pass; elsewhere as on a bus street (`bus::bus_kerbside`: on
-/// a 7 m street back from the kerb, for a bus and a car to pass pulled over on a bend).
+/// they pull over onto the pavement to pass; elsewhere where it always stood (`KERBSIDE`).
 pub fn kerbside(width: f32, kind: crate::travel::RoadKind) -> f32 {
     if lane_on(width, kind) == TIGHT_LANE {
         LANE_KERBSIDE
     } else {
-        crate::bus::bus_kerbside(width)
+        KERBSIDE
     }
+}
+
+/// The streets whose kerbside furniture keeps back from the kerb (`kerbside`): every lane too
+/// narrow for two cars to pass in their lanes, where they pull over onto the pavement to pass. The
+/// town file's road (`meta.roads` index) and how far in from its edges the furniture may reach (m),
+/// by road: for the renderer's street dressing (the world's structure, `pullOverStreets`).
+pub fn pull_over_streets(travel: &Travel) -> Vec<(u32, f32)> {
+    use crate::travel::RoadKind;
+    let mut out: Vec<(u32, f32)> = travel
+        .graph
+        .roads
+        .iter()
+        .filter(|r| !matches!(r.kind, RoadKind::Country | RoadKind::Trail))
+        .filter_map(|r| {
+            let keep = kerbside(r.width, r.kind);
+            (keep < KERBSIDE).then_some((r.source, keep))
+        })
+        .collect();
+    out.sort_by_key(|&(r, _)| r);
+    out.dedup_by_key(|&mut (r, _)| r);
+    out
 }
 
 /// How far right of its lane (`lane_on`) a car `wid` m wide can pull over on a road `width` m wide
@@ -1953,7 +1974,7 @@ pub(crate) fn off_work(w: &mut World, i: usize) -> bool {
 
 /// `i` stands at the town's exit nearest them (out of sight).
 fn to_exit(w: &mut World, i: usize) {
-    if let Some(k) = nearest_exit(&w.exits, w.sims[i].pos, |_| true) {
+    if let Some(k) = nearest_exit(&w.exits, w.sims[i].pos) {
         w.sims[i].pos = w.exits[k];
     }
 }
@@ -2151,7 +2172,7 @@ fn route_ticks(w: &mut World, c: usize, home: bool) -> f32 {
 /// across a lane out of (or into) a driveway or a bay only holding the claim to it
 /// (`traffic::Traffic::may_go`), nor into another's (`Traffic::blocked`). Pulled over where the
 /// lane is narrow, it passes one coming the other way (`pull_over`; it waits while they're too
-/// near, `bus::too_near`). And never deeper into another car or a bus than it is (`guard`).
+/// near, `too_near`). And never deeper into another car than it is (`guard`).
 fn drive_on(w: &mut World, c: usize) {
     let home = w.cars[c].state == CarState::Arriving;
     let t = w.cars[c].progress;
@@ -2170,7 +2191,7 @@ fn drive_on(w: &mut World, c: usize) {
         return;
     }
     w.cars[c].waits_for = None;
-    let others = vehicles(&w.cars, &w.transit, Some(c), None);
+    let others = vehicles(&w.cars, Some(c));
     if w.cars[c].outside() && !room_to_come_in(w, c, &others) {
         return;
     }
@@ -2215,7 +2236,6 @@ fn drive_on(w: &mut World, c: usize) {
         stairs,
         content,
         objects,
-        transit,
         traffic,
         ..
     } = w;
@@ -2237,7 +2257,6 @@ fn drive_on(w: &mut World, c: usize) {
         ahead,
         behind,
         first: key,
-        held: false,
     };
     let now = Driving {
         at: was,
@@ -2259,8 +2278,8 @@ fn drive_on(w: &mut World, c: usize) {
         && let Some(o) = others.iter().find(|o| {
             o.free(&me)
                 && !traffic.waits_for(o.first).contains(&key)
-                && crate::bus::too_near((at, yaw, car.len, car.wid), (o.at, o.yaw, o.len, o.wid))
-                && !crate::bus::too_near(
+                && too_near((at, yaw, car.len, car.wid), (o.at, o.yaw, o.len, o.wid))
+                && !too_near(
                     (was, was_yaw, car.len, car.wid),
                     (o.at, o.yaw, o.len, o.wid),
                 )
@@ -2275,8 +2294,6 @@ fn drive_on(w: &mut World, c: usize) {
         stairs,
     };
     let mut progress = t;
-    // (Someone waiting at a bus stop, on the pavement by it, isn't in its way: they wait for the
-    // bus, which may wait for this car.)
     let held_up = go_on(
         sims,
         &nav,
@@ -2284,22 +2301,15 @@ fn drive_on(w: &mut World, c: usize) {
         me,
         now,
         &others,
-        |s| matches!(s.current().map(|a| &a.phase), Some(Phase::AtStop { .. })),
-        false,
         &mut car.waited,
         &mut progress,
     );
     if held_up {
-        car.waits_for = against(&me, &others, false).next().map(|k| others[k].first);
+        car.waits_for = against(&me, &others).next().map(|k| others[k].first);
     }
     if progress > t {
-        // (The last resort: never deeper into another car or a bus than it is.)
-        match guard(
-            &body_now,
-            &body_next,
-            others.iter().chain(&standing),
-            transit,
-        ) {
+        // (The last resort: never deeper into another car than it is.)
+        match guard(&body_now, &body_next, others.iter().chain(&standing)) {
             Some(k) => {
                 traffic.guarded += 1;
                 car.waits_for = Some(k);
@@ -2324,17 +2334,9 @@ fn drive_on(w: &mut World, c: usize) {
 const JAM_TICKS: u32 = 5 * crate::TICKS_PER_MINUTE as u32;
 const JAM_BACK: u32 = 60;
 
-/// Whether `k` (a car's or a bus's `Driving::first`) waited for car `me` last tick, so that car
-/// `me`, waiting for it, should back up (`back_off`): a bus that does; a car that does, of two
-/// cars the later.
+/// Whether car `k` (its `Driving::first`) waited for car `me` last tick, so that car `me`, waiting
+/// for it, should back up (`back_off`): of two cars, the later.
 fn waits_back(w: &World, k: u64, me: u64) -> bool {
-    if k < 1 << 63 {
-        return w.traffic.waits_for(k).contains(&me)
-            || w.transit
-                .buses
-                .iter()
-                .any(|b| b.first() == k && b.waits_for == Some(me));
-    }
     let o = (k & !(1 << 63)) as usize;
     me > k
         && (w.cars.get(o).is_some_and(|c| c.waits_for == Some(me))
@@ -2346,7 +2348,7 @@ fn waits_back(w: &World, k: u64, me: u64) -> bool {
 /// (`traffic::Traffic::blocked`). Whether it moved.
 fn back_off(w: &mut World, c: usize) -> bool {
     let key = car_first(c);
-    let others = vehicles(&w.cars, &w.transit, Some(c), None);
+    let others = vehicles(&w.cars, Some(c));
     let standing: Vec<Driving> = parked(&w.cars).collect();
     let car = &w.cars[c];
     let Some((home, route)) = car.route.as_ref() else {
@@ -2367,7 +2369,7 @@ fn back_off(w: &mut World, c: usize) -> bool {
     };
     let (now, next) = (body(t), body(to));
     let way = [-next.yaw.sin(), -next.yaw.cos()];
-    if guard(&now, &next, others.iter().chain(&standing), &w.transit).is_some()
+    if guard(&now, &next, others.iter().chain(&standing)).is_some()
         || w.traffic.blocked(key, &now, &next, way, 0.0).is_some()
     {
         return false;
@@ -2394,14 +2396,8 @@ fn route_pass(car: &Car, t: f32) -> f32 {
 }
 
 /// The last-resort check on a car's move from body `now` to `next`: the first of `them` (the cars
-/// on the road and parked) or the buses in town it would be deeper into than it is now. None: it
-/// may move.
-fn guard<'a>(
-    now: &Rect,
-    next: &Rect,
-    them: impl Iterator<Item = &'a Driving>,
-    transit: &crate::bus::Transit,
-) -> Option<u64> {
+/// on the road and parked) it would be deeper into than it is now. None: it may move.
+fn guard<'a>(now: &Rect, next: &Rect, them: impl Iterator<Item = &'a Driving>) -> Option<u64> {
     let deeper = |r: &Rect| {
         let after = next.overlap(r);
         after > 1e-3 && after > now.overlap(r).max(0.0) + 1e-3
@@ -2409,32 +2405,13 @@ fn guard<'a>(
     let near = |at: [f32; 2], len: f32| {
         crate::travel::dist(at, next.at) < (len + next.half[0] * 2.0) + AHEAD
     };
-    for o in them {
-        if o.first < 1 << 63 || !near(o.at, o.len) {
-            continue;
-        }
-        if deeper(&o.body()) {
-            return Some(o.first);
-        }
-    }
-    for b in 0..transit.buses.len() {
-        if !transit.in_town(b) {
-            continue;
-        }
-        let (at, yaw) = transit.now(b);
-        if !near(at, crate::bus::BUS_LEN) {
-            continue;
-        }
-        let half = [crate::bus::BUS_LEN / 2.0, crate::bus::BUS_WID / 2.0];
-        if deeper(&Rect { at, yaw, half }) {
-            return Some(transit.buses[b].first());
-        }
-    }
-    None
+    them.into_iter()
+        .find(|o| near(o.at, o.len) && deeper(&o.body()))
+        .map(|o| o.first)
 }
 
-/// Car `c` a tick nearer pulled over as far as it would be (`pull_want`), `bus::PULL_RATE` a tick:
-/// back towards its lane only clear of those coming the other way (`bus::too_near`), and never
+/// Car `c` a tick nearer pulled over as far as it would be (`pull_want`), `PULL_RATE` a tick:
+/// back towards its lane only clear of those coming the other way (`too_near`), and never
 /// into another (`guard`). Where its room runs out it's back in its lane.
 fn pull_over(w: &mut World, c: usize, others: &[Driving], moving: bool) {
     // (Pulled over for one that waits for it, it pulls over only as far as it can on its way.)
@@ -2457,17 +2434,17 @@ fn pull_over(w: &mut World, c: usize, others: &[Driving], moving: bool) {
         yaw,
         half,
     };
-    let rate = crate::bus::PULL_RATE;
+    let rate = PULL_RATE;
     let mut shift = car.shift + (want - car.shift).clamp(-rate, rate);
     // (Back towards its lane only clear of those coming the other way.)
     let (at, len, wid) = (body(shift).at, car.len, car.wid);
     if shift < car.shift
         && let Some(o) = others
             .iter()
-            .find(|o| crate::bus::too_near((at, yaw, len, wid), (o.at, o.yaw, o.len, o.wid)))
+            .find(|o| too_near((at, yaw, len, wid), (o.at, o.yaw, o.len, o.wid)))
     {
         shift = car.shift;
-        // (It waits for that one to pass: one that waits for it goes by, `bus::drive_on`.)
+        // (It waits for that one to pass: one that waits for it goes by, `drive_on`.)
         w.cars[c].waits_for = Some(o.first);
     }
     let car = &w.cars[c];
@@ -2476,12 +2453,11 @@ fn pull_over(w: &mut World, c: usize, others: &[Driving], moving: bool) {
     if (shift - car.shift).abs() < 1e-5 {
         return;
     }
-    // (Out, or back in: never into another, a bus going by that waited for it too.)
+    // (Out, or back in: never into another, one going by that waited for it too.)
     if guard(
         &body(car.shift),
         &body(shift),
         others.iter().chain(&standing),
-        &w.transit,
     )
     .is_some()
     {
@@ -2491,11 +2467,10 @@ fn pull_over(w: &mut World, c: usize, others: &[Driving], moving: bool) {
 }
 
 /// How far right of its lane car `c` would be pulled over (m) to pass those coming the other way in
-/// front of it (`bus::PULL_AHEAD`) where the lane is too narrow for both in their lanes: half the
-/// way past another car (it pulls over the other half, as far as it can: `Route::room`), all the
-/// way past a bus; as far as its room ahead allows (back in its lane before the room runs out).
+/// front of it (`PULL_AHEAD`) where the lane is too narrow for both in their lanes: half the
+/// way past another car (it pulls over the other half, as far as it can: `Route::room`); as far as
+/// its room ahead allows (back in its lane before the room runs out).
 fn pull_want(w: &World, c: usize, moving: bool) -> (f32, Option<u64>) {
-    use crate::bus::{PASSING, PULL_AHEAD, PULL_MARGIN};
     let car = &w.cars[c];
     let Some((_, route)) = car.route.as_ref() else {
         return (0.0, None);
@@ -2516,7 +2491,7 @@ fn pull_want(w: &World, c: usize, moving: bool) -> (f32, Option<u64>) {
         return (0.0, None);
     }
     let short = |p: [f32; 2], facing: f32, len: f32, wid: f32| {
-        let m = crate::bus::passing((at, yaw, car.len, car.wid), (p, facing, len, wid))?;
+        let m = passing((at, yaw, car.len, car.wid), (p, facing, len, wid))?;
         let ends = (car.len + len) / 2.0;
         if m.along < -ends || m.along > ends + PULL_AHEAD || m.apart < 0.0 {
             return None;
@@ -2537,17 +2512,6 @@ fn pull_want(w: &World, c: usize, moving: bool) -> (f32, Option<u64>) {
             if share / mine > want {
                 (want, whom) = (share / mine, Some(car_first(o)));
             }
-        }
-    }
-    for b in 0..w.transit.buses.len() {
-        if !w.transit.in_town(b) {
-            continue;
-        }
-        let (p, facing) = w.transit.now(b);
-        if let Some((all, mine, _)) = short(p, facing, crate::bus::BUS_LEN, crate::bus::BUS_WID)
-            && all / mine > want
-        {
-            (want, whom) = (all / mine, Some(w.transit.buses[b].first()));
         }
     }
     (want.min(room), whom)
@@ -2616,7 +2580,7 @@ pub(crate) fn movers(
 
 /// Whether car `c`, out of sight at the way in (`Car::outside`), comes in now: none there longer
 /// waits to come in by the same way (the earlier car, of two there as long), and its body a tick
-/// on and the ground in front of it (`AHEAD`) are clear of every car and bus in town (`others`,
+/// on and the ground in front of it (`AHEAD`) are clear of every car in town (`others`,
 /// `vehicles`: those that came in this tick where they are now) and every car parked.
 fn room_to_come_in(w: &mut World, c: usize, others: &[Driving]) -> bool {
     let World {
@@ -2644,7 +2608,6 @@ fn room_to_come_in(w: &mut World, c: usize, others: &[Driving]) -> bool {
         ahead: AHEAD,
         behind: 0.0,
         first: car_first(c),
-        held: false,
     };
     let (body, front) = (me.body(), me.front());
     !before
@@ -2655,10 +2618,9 @@ fn room_to_come_in(w: &mut World, c: usize, others: &[Driving]) -> bool {
             .all(|o| o.body().overlap(&body) <= 0.0 && o.body().overlap(&front) <= 0.0)
 }
 
-/// Something driving (a car, a bus) where it is now, for who's in its way (`go_on`): its middle
-/// and yaw, its length and width, and how far in front of it and behind it someone is in its way
-/// (m, past its ends); and which it is (`first`: of two buses holding each other up, the later backs
-/// up, `bus::make_way`; a car's after every bus's).
+/// A car driving where it is now, for who's in its way (`go_on`): its middle and yaw, its length
+/// and width, and how far in front of it and behind it someone is in its way (m, past its ends);
+/// and which it is (`first`: `car_first`).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Driving {
     pub at: [f32; 2],
@@ -2668,9 +2630,6 @@ pub(crate) struct Driving {
     pub ahead: f32,
     pub behind: f32,
     pub first: u64,
-    /// A car held up past `PASS_TICKS` by someone on foot in its way (`Car::waited`), whom
-    /// stepping aside hasn't got out of it: a bus doesn't wait for it (`free`).
-    pub held: bool,
 }
 
 impl Driving {
@@ -2714,22 +2673,13 @@ impl Driving {
         }
     }
 
-    /// Whether `d` waits for it at all: not while it backs up, out of a driveway or into one, nor
-    /// a bus for a car already tangled with it, or a car for a bus (waiting would only hold both:
-    /// they part as they go on); of two cars tangled, the earlier (`first`) doesn't wait for the
-    /// later, but the later for it, so the earlier pulls ahead and they part (going on together,
-    /// neither waiting, they'd stay on top of each other). A bus doesn't wait for a car held up by
-    /// someone on foot (`held`: they may be kept there by the bus itself, beside them, with nowhere
-    /// to step aside to; it goes by).
+    /// Whether `d` waits for it at all: not while it backs up, out of a driveway or into one; of
+    /// two tangled, the earlier (`first`) doesn't wait for the later, but the later for it, so the
+    /// earlier pulls ahead and they part (going on together, neither waiting, they'd stay on top of
+    /// each other).
     pub(crate) fn free(&self, d: &Driving) -> bool {
-        let car = |v: &Driving| v.first >= 1 << 63;
         let tangled = self.body().overlap(&d.body()) > 0.0;
-        let ignored = if car(self) && car(d) {
-            tangled && d.first < self.first
-        } else {
-            (car(self) || car(d)) && tangled
-        };
-        self.ahead > 0.0 && !ignored && !(self.held && !car(d))
+        self.ahead > 0.0 && !(tangled && d.first < self.first)
     }
 
     /// The way it's going (a unit vector: backwards, backing up).
@@ -2773,33 +2723,27 @@ impl Rect {
     }
 }
 
-/// Whether something driving (`d`, where it would be a tick on) comes up against another of
-/// `them` (`vehicles`, as they are now): one whose body is in the ground in front of it
-/// (`Driving::front`), going its way, or (`across`: a bus) across it too. It keeps behind it, as
-/// behind one standing at a stop. (One coming the other way passes it in the other lane, a bus
-/// pulled over where the road is too narrow for both: `bus::pull_over`.) A car waits only behind
-/// one in front of it going its way, driving on (not backing up), so whoever waits for one waits for
-/// something that moves on; of two buses holding each other up, the later backs up
-/// (`bus::make_way`).
-pub(crate) fn up_against(d: &Driving, them: &[Driving], across: bool) -> bool {
-    against(d, them, across).next().is_some()
+/// Whether a car driving (`d`, where it would be a tick on) comes up against another of `them`
+/// (`vehicles`, as they are now): one whose body is in the ground in front of it
+/// (`Driving::front`), going its way. It keeps behind it. (One coming the other way passes it in
+/// the other lane, both pulled over where the lane is too narrow for both: `pull_over`.) It waits
+/// only behind one in front of it going its way, driving on (not backing up), so whoever waits
+/// for one waits for something that moves on.
+pub(crate) fn up_against(d: &Driving, them: &[Driving]) -> bool {
+    against(d, them).next().is_some()
 }
 
 /// Those of `them` (indices) `d` comes up against (`up_against`).
-pub(crate) fn against<'a>(
-    d: &'a Driving,
-    them: &'a [Driving],
-    across: bool,
-) -> impl Iterator<Item = usize> + 'a {
+pub(crate) fn against<'a>(d: &'a Driving, them: &'a [Driving]) -> impl Iterator<Item = usize> + 'a {
     // (Backing up, out of a driveway or into one, a car waits for nobody but those on foot.)
-    let backing = !across && d.ahead <= 0.0;
+    let backing = d.ahead <= 0.0;
     let (front, heading) = (d.front(), d.heading());
     them.iter()
         .enumerate()
         .filter(move |(_, o)| {
             let way = o.heading();
             let cos = heading[0] * way[0] + heading[1] * way[1];
-            if backing || cos < -ONCOMING || !across && cos < ONCOMING || !o.free(d) {
+            if backing || cos < ONCOMING || !o.free(d) {
                 return false;
             }
             let reach = d.len + d.ahead.max(d.behind) + o.len;
@@ -2813,24 +2757,74 @@ pub(crate) fn against<'a>(
         .map(|(k, _)| k)
 }
 
-/// Those of `them` (indices) in the ground behind something backing up (`d`, where it would be
-/// a tick on: `Driving::front`), going any way.
-pub(crate) fn behind<'a>(d: &'a Driving, them: &'a [Driving]) -> impl Iterator<Item = usize> + 'a {
-    let back = d.front();
-    them.iter()
-        .enumerate()
-        .filter(move |(_, o)| {
-            (o.at[0] - d.at[0]).hypot(o.at[1] - d.at[1]) <= d.len + d.behind + o.len
-                && back.overlap(&o.body()) > 0.0
-        })
-        .map(|(k, _)| k)
-}
-
 /// Another driving towards something (the cosine of the angle between their ways, less than
-/// minus this) is coming the other way (`up_against`).
+/// minus this) is coming the other way (`up_against`, `passing`, `too_near`).
 const ONCOMING: f32 = 0.7;
 
-/// Someone's body as cars and buses keep clear of it, and it of them: how far it reaches in front
+/// Two coming towards each other, measured along and across the way between theirs (the same
+/// for both: on a bend either may look to be off the other's right): how far the second is along
+/// it from the first; how far apart their middles are across it (the second on the first's left:
+/// more), and the gap there is between their bodies (m: less than none, they may overlap); and
+/// how far across it each moves pulling over a metre (`pull_want`).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Passing {
+    pub along: f32,
+    pub apart: f32,
+    pub gap: f32,
+    pub mine: f32,
+    pub theirs: f32,
+}
+
+/// `Passing` for `a` and `b` (each where, facing which way, how long and wide), if they're coming
+/// towards each other (else none).
+pub(crate) fn passing(
+    a: ([f32; 2], f32, f32, f32),
+    b: ([f32; 2], f32, f32, f32),
+) -> Option<Passing> {
+    let (ahead, theirs) = ([a.1.sin(), a.1.cos()], [b.1.sin(), b.1.cos()]);
+    if ahead[0] * theirs[0] + ahead[1] * theirs[1] >= -ONCOMING {
+        return None;
+    }
+    let u = [ahead[0] - theirs[0], ahead[1] - theirs[1]];
+    let n = u[0].hypot(u[1]).max(1e-6);
+    let (u, left) = ([u[0] / n, u[1] / n], [u[1] / n, -u[0] / n]);
+    let d = [b.0[0] - a.0[0], b.0[1] - a.0[1]];
+    let (along, apart) = (d[0] * u[0] + d[1] * u[1], d[0] * left[0] + d[1] * left[1]);
+    // (How far each reaches across that way, turned as it is; and moves, pulling over to its
+    // right.)
+    let reach = |way: [f32; 2], len: f32, wid: f32| {
+        let k = way[0] * left[0] + way[1] * left[1];
+        len / 2.0 * k.abs() + wid / 2.0 * (1.0 - k * k).max(0.0).sqrt()
+    };
+    let pulls = |way: [f32; 2]| (way[0] * u[0] + way[1] * u[1]).abs().max(0.3);
+    Some(Passing {
+        along,
+        apart,
+        gap: apart.abs() - reach(ahead, a.2, a.3) - reach(theirs, b.2, b.3),
+        mine: pulls(ahead),
+        theirs: pulls(theirs),
+    })
+}
+
+/// Whether `a` (where it would be a tick on) would come too near `b` coming the other way: its
+/// body, half `PASSING` wider either side, on the other's. (Pulled over as far as `passing` says,
+/// they're further apart than that: it measures across a way between theirs.)
+pub(crate) fn too_near(a: ([f32; 2], f32, f32, f32), b: ([f32; 2], f32, f32, f32)) -> bool {
+    let (ahead, theirs) = ([a.1.sin(), a.1.cos()], [b.1.sin(), b.1.cos()]);
+    let mine = Rect {
+        at: a.0,
+        yaw: a.1,
+        half: [a.2 / 2.0, a.3 / 2.0 + PASSING / 2.0],
+    };
+    let other = Rect {
+        at: b.0,
+        yaw: b.1,
+        half: [b.2 / 2.0, b.3 / 2.0],
+    };
+    ahead[0] * theirs[0] + ahead[1] * theirs[1] < -ONCOMING && mine.overlap(&other) > 0.0
+}
+
+/// Someone's body as cars keep clear of it, and it of them: how far it reaches in front
 /// of where they are and behind them, and out to each side (m), facing `yaw`. On foot, `BODY`
 /// all round; on a bike, its wheels in front and behind and its handlebars to the sides (content
 /// `vehicle.reach`).
@@ -2909,13 +2903,12 @@ impl Body {
 /// someone is in its way: it waits for them (`waited`, ticks). Someone standing there a while (a
 /// chat on the pavement) steps aside for it (`make_way`); someone with nowhere to step goes
 /// round to where they're out of its way, past `PASS_TICKS` (`clear_of`). It never drives
-/// through anyone. Someone at something or at a wheel, or `aside` (as the one driving has it),
-/// isn't in its way; nor is anyone whose body (`Body`, on foot or on a bike) clears its sides by
+/// through anyone. Someone at something or at a wheel isn't in its way; nor is anyone whose body (`Body`, on foot or on a bike) clears its sides by
 /// `BESIDE`, walking by it or along beside it; nor anyone the tick on brings it no nearer (`now`:
 /// where it is, as `d`; nearer measured from its whole body, its corners and ends as it turns, and
 /// the ground ahead of it), as someone beside it waits for it (`walks_into`): they'd hold each
-/// other up. Nor does it drive into another car or bus in front of it (`up_against`, `across` as
-/// there): it waits behind it (true), not counted in `waited`.
+/// other up. Nor does it drive into another car in front of it (`up_against`): it waits behind it
+/// (true), not counted in `waited`.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn go_on(
     sims: &mut [Sim],
@@ -2924,58 +2917,10 @@ pub(crate) fn go_on(
     d: Driving,
     now: Driving,
     others: &[Driving],
-    aside: impl Fn(&Sim) -> bool,
-    across: bool,
     waited: &mut u32,
     progress: &mut f32,
 ) -> bool {
-    go_on_by(
-        sims,
-        nav,
-        bodies,
-        d,
-        now,
-        others,
-        aside,
-        across,
-        (d.ahead, &[]),
-        waited,
-        progress,
-    )
-}
-
-/// `go_on`, someone in the way only within `walk.0` m in front of its body (a bus: its body a tick
-/// on, not the ground it keeps clear ahead; turning round it sweeps far to one side of it), and
-/// those it waits for stepping aside or going round to clear of where it'll be on its way
-/// (`walk.1`: a bus's body further on as it turns round), not to step in front of it again.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn go_on_by(
-    sims: &mut [Sim],
-    nav: &crate::path::NavGrid,
-    bodies: (&crate::content::Content, &[crate::world::ObjectInstance]),
-    d: Driving,
-    now: Driving,
-    others: &[Driving],
-    aside: impl Fn(&Sim) -> bool,
-    across: bool,
-    walk: (f32, &[Driving]),
-    waited: &mut u32,
-    progress: &mut f32,
-) -> bool {
-    let (walk_ahead, sweep) = walk;
     let turn = d.yaw.sin_cos();
-    // (Those on foot looked at only `walk_ahead` in front of it.)
-    let (d, now, keep) = (
-        Driving {
-            ahead: walk_ahead,
-            ..d
-        },
-        Driving {
-            ahead: walk_ahead,
-            ..now
-        },
-        d,
-    );
     // (Nobody further off than its corners and the ground ahead of or behind them, and the
     // longest bike, is in its way.)
     let reach = d.len / 2.0 + d.ahead.max(d.behind) + d.wid / 2.0 + BESIDE + 2.0;
@@ -2995,12 +2940,12 @@ pub(crate) fn go_on_by(
             continue;
         }
         let phase = s.current().map(|a| &a.phase);
-        if matches!(phase, Some(Phase::Using { .. }) | Some(Phase::Driving)) || aside(s) {
+        if matches!(phase, Some(Phase::Using { .. }) | Some(Phase::Driving)) {
             continue;
         }
         waiting = true;
         // (Not into the way of another, nor where this one comes on to: `clear`.)
-        let clear = |p: [f32; 2]| clear(others, body, p) && clear(sweep, body, p);
+        let clear = |p: [f32; 2]| clear(others, body, p);
         // (Stepping aside that long hasn't got them out of its way.)
         let round = (*waited >= PASS_TICKS)
             .then(|| clear_of(&d, nav, body, s.pos, clear))
@@ -3013,7 +2958,7 @@ pub(crate) fn go_on_by(
             s.pos = p;
         }
     }
-    let blocked = up_against(&keep, others, across);
+    let blocked = up_against(&d, others);
     if waiting {
         *waited = waited.saturating_add(1);
     } else {
@@ -3025,14 +2970,9 @@ pub(crate) fn go_on_by(
     blocked
 }
 
-/// Every car and bus driving by, or a bus stood at a stop, as `walks_into` keeps clear of them (its
-/// body and the ground just in front of it), but car `car` and bus `bus`.
-pub(crate) fn vehicles(
-    cars: &[Car],
-    transit: &crate::bus::Transit,
-    car: Option<usize>,
-    bus: Option<usize>,
-) -> Vec<Driving> {
+/// Every car driving by, as `walks_into` keeps clear of them (its body and the ground just in front
+/// of it), but car `car`.
+pub(crate) fn vehicles(cars: &[Car], car: Option<usize>) -> Vec<Driving> {
     let at = |(at, yaw): ([f32; 2], f32), len: f32, wid: f32, first: u64| Driving {
         at,
         yaw,
@@ -3041,12 +2981,10 @@ pub(crate) fn vehicles(
         ahead: AHEAD,
         behind: 0.0,
         first,
-        held: false,
     };
     let cars = cars.iter().enumerate().filter_map(|(c, k)| match k.shown {
         Some((p, yaw, true, _)) if Some(c) != car => {
             let mut d = at((p, yaw), k.len, k.wid, car_first(c));
-            d.held = k.waited >= PASS_TICKS;
             if k.backing() {
                 (d.ahead, d.behind) = (0.0, AHEAD);
             }
@@ -3054,17 +2992,7 @@ pub(crate) fn vehicles(
         }
         _ => None,
     });
-    // (Where each bus is now: those moved already this tick where they've moved to.)
-    let buses = transit.buses.iter().enumerate().filter_map(|(b, k)| {
-        (Some(b) != bus && transit.in_town(b)).then_some(())?;
-        Some(at(
-            transit.now(b),
-            crate::bus::BUS_LEN,
-            crate::bus::BUS_WID,
-            k.first(),
-        ))
-    });
-    cars.chain(buses).collect()
+    cars.collect()
 }
 
 /// Every car parked where it can be seen (at home, out on a trip): as `vehicles` has those on the
@@ -3079,7 +3007,6 @@ pub(crate) fn parked(cars: &[Car]) -> impl Iterator<Item = Driving> + '_ {
             ahead: AHEAD,
             behind: 0.0,
             first: car_first(c),
-            held: false,
         }),
         _ => None,
     })
@@ -3089,7 +3016,7 @@ pub fn car_key(c: usize) -> u64 {
     car_first(c)
 }
 
-/// Car `c`'s `Driving::first`: after every bus's.
+/// Car `c`'s `Driving::first` (its top bit set, as ever).
 pub(crate) fn car_first(c: usize) -> u64 {
     (1 << 63) | c as u64
 }
@@ -3158,7 +3085,7 @@ fn local(at: [f32; 2], turn: (f32, f32), pos: [f32; 2]) -> (f32, f32) {
     (dx * s + dz * c, dx * c - dz * s)
 }
 
-/// Whether `body` at `pos` comes within `BESIDE` of something `len` by `wid` m (a car, a bus)
+/// Whether `body` at `pos` comes within `BESIDE` of something `len` by `wid` m (a car)
 /// at `at`, turned `turn` (its yaw's sine and cosine), or of the ground `ahead` in front of it
 /// or `behind` behind it.
 #[allow(clippy::too_many_arguments)]
@@ -3958,13 +3885,9 @@ pub(crate) fn from_file(w: &mut World, raw: &[CarRaw], drives: &[Drive], garages
 /// take up, where they are.
 fn settle_all(w: &mut World) {
     // A cosy town made since cars drive winding roads (its driveways say where they meet them,
-    // `Drive::road`), or with bus stops: the road network, for its cars and its bus only (nobody
-    // walks it: `Travel::by_road`). Older ones drive along x as ever.
-    let stops = w.travel.stops.iter().any(|&s| s);
-    if !w.travel.open
-        && w.travel.graph.is_empty()
-        && (stops || w.drives.iter().any(|d| d.road.is_some()))
-    {
+    // `Drive::road`): the road network, for its cars only (nobody walks it: `Travel::by_road`).
+    // Older ones drive along x as ever.
+    if !w.travel.open && w.travel.graph.is_empty() && w.drives.iter().any(|d| d.road.is_some()) {
         w.travel.graph = crate::travel::Graph::from_town(&w.travel.file, &w.meta);
     }
     let World {
@@ -4015,7 +3938,6 @@ fn parking_for(
         })
     };
     (0..travel.file.parking.len())
-        .filter(|&k| !travel.bus_way.get(k).copied().unwrap_or(false))
         .filter_map(|k| parked_at(travel, k))
         .map(|(at, yaw, _)| (crate::travel::dist(at, door), at, yaw))
         .filter(|&(d, at, _)| d <= TRIP_PARK_REACH && !taken(at))

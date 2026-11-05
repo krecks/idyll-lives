@@ -13,8 +13,7 @@
  * the grid that turn as a road does (`steer`: wide bends, never back on themselves), smoothed
  * into curves with no hairpins (`COUNTRY_TURN`); trails are A* paths on a finer grid round the
  * lots. One `Ground` covers the whole world, and each area's lots go along its own roads,
- * nearest its middle first (`town.ts` `LotPlacer`). Every area has a bus stop or two, so every
- * house is within ~120 m of a way out of town for people on foot.
+ * nearest its middle first (`town.ts` `LotPlacer`).
  */
 
 import type { Content } from '../content/content';
@@ -29,7 +28,7 @@ import { clearing, countryLane, crescentTown, crossroads, highStreet, streetName
 type Rand = () => number;
 type Shape = (rand: Rand, box: Box, scale?: number) => RoadLayout;
 
-/** A big world's areas, land, stops and parking, as the town file carries them (`assembleTown`). */
+/** A big world's areas, land and parking, as the town file carries them (`assembleTown`). */
 export interface OpenWorldDraft {
   /** Area 0 is the main town. */
   areas: TownArea[];
@@ -38,8 +37,6 @@ export interface OpenWorldDraft {
   water: Rle;
   /** The height (m) each outdoor plot is levelled to, by plot index. */
   pads: Record<number, number>;
-  /** Bus stops: a way out of town for people on foot, in each area. */
-  stops: { x: number; z: number; area: number }[];
   parking: { x: number; z: number; rot: number; area: number }[];
 }
 
@@ -110,17 +107,14 @@ const AREA_AIM = 230;
 const EDGE = 50;
 const BOX_GAP = 24;
 /**
- * Every road a bus may drive in a big world, the country roads and every area's streets and lanes,
- * is this wide at least (m): two buses pass on it, one pulled over (the sim's `bus::single_track`).
- * Which roads a bus line takes is worked out in the sim from the finished roads, so all of them are
- * laid this wide before any lot is placed.
+ * Every road in a big world, the country roads and every area's streets and lanes, is this wide at
+ * least (m): two cars pass on it in their lanes (the sim's `cars::lane_on`), so all of them are laid
+ * this wide before any lot is placed.
  */
-const BUS_ROAD_WIDTH = 7;
+const ROAD_WIDTH = 7;
 /** Country roads' width (m), trails'. */
-const COUNTRY_WIDTH = BUS_ROAD_WIDTH;
+const COUNTRY_WIDTH = ROAD_WIDTH;
 const TRAIL_WIDTH = 2;
-/** Houses as far as this from a stop get one of their own (m). */
-const STOP_REACH = 105;
 /** Houses with no room in any area go along a country road, as far as this from their own area's box (m). */
 const SPILL = 140;
 /** Along a country road: a farmstead every so far (m), and none nearer an area's box than this. */
@@ -747,7 +741,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     };
     laid.forEach((r, k) => {
       const points = r.points.map(onto);
-      const road: RoadPlan = { ...r, points, width: Math.max(r.width, BUS_ROAD_WIDTH), kind: k === 0 ? 'street' : 'lane', area: index, ...(r.lots && swap ? { lots: (-r.lots) as 1 | -1 } : {}) };
+      const road: RoadPlan = { ...r, points, width: Math.max(r.width, ROAD_WIDTH), kind: k === 0 ? 'street' : 'lane', area: index, ...(r.lots && swap ? { lots: (-r.lots) as 1 | -1 } : {}) };
       const at = roads.push(road) - 1;
       plan.roads.push(at);
       for (const e of [0, 1] as const) {
@@ -1384,38 +1378,9 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   const slots = lots.slots;
   const rectOf = (s: PlotSlot) => plotRect(t, s);
 
-  // ---- stops and parking in each area -------------------------------------------------------
-  const stops: OpenWorldDraft['stops'] = [];
+  // ---- parking in each area ------------------------------------------------------------------
   const parking: OpenWorldDraft['parking'] = [];
-  const index = new RoadIndex(worldRoads);
-  /** The kerb of road `r` nearest (x, z): on its sidewalk. */
-  const kerb = (r: number, x: number, z: number): Pt => {
-    const road = worldRoads[r];
-    const n = nearest(road.points, x, z);
-    const ls = lengths(road.points);
-    let i = 0;
-    while (i < ls.length - 1 && ls[i] < n.s) i++;
-    const [p, q] = [road.points[Math.max(0, i - 1)], road.points[Math.min(road.points.length - 1, i + 1)]];
-    const l = dist(p, q) || 1;
-    const left: Pt = [(q[1] - p[1]) / l, -(q[0] - p[0]) / l];
-    const c = road.points[i];
-    const off = road.width / 2 - 0.6;
-    return [round2(c[0] + left[0] * off * n.side), round2(c[1] + left[1] * off * n.side)];
-  };
   for (const [a, plan] of plans.entries()) {
-    const mine = slots.filter((s) => (s.area ?? 0) === a);
-    const centreRoad = plan.roads.map((r) => ({ r, d: index.distance(r, plan.centre[0], plan.centre[1], 400) })).sort((x, y) => x.d - y.d)[0];
-    const here: Pt[] = [];
-    if (centreRoad) here.push(kerb(centreRoad.r, plan.centre[0], plan.centre[1]));
-    for (const s of mine) {
-      if (s.kind !== 'house') continue;
-      const f = lots.placed.get(s);
-      const r = rectOf(s);
-      const mid: Pt = [r.x + r.w / 2, r.z + r.d / 2];
-      if (here.some((p) => dist(p, mid) <= STOP_REACH) || !f) continue;
-      here.push(kerb(f.road, f.p[0], f.p[1]));
-    }
-    stops.push(...here.map(([x, z]) => ({ x, z, area: a })));
     // Parking: a few spaces by the verge nearest the middle.
     const frontage = frontageOf(worldRoads, plan.roads, plan.centre, rand);
     for (const f of frontage) {
@@ -1540,7 +1505,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     seed,
     world: { kind, size: 'big', tagline, landscape },
     diagnostics: { dropped: lots.dropped, ...(failed.length ? { roads: failed } : {}) },
-    open: { areas, zones, water: rle(waterMask), pads, stops, parking },
+    open: { areas, zones, water: rle(waterMask), pads, parking },
   };
 }
 

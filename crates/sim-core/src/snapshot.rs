@@ -7,7 +7,7 @@ use crate::Content;
 use crate::world::{Activity, MAX_SIMS, Phase, Sim, Task, TaskKind, World};
 use crate::{TICKS_PER_SECOND, clock};
 
-pub const HEADER_LEN: usize = 13;
+pub const HEADER_LEN: usize = 12;
 /// Floats per Sim (all 32 used).
 pub const SIM_STRIDE: usize = 33;
 /// The cars' rows (`header::CAR_COUNT`, `car`) start here: after room for every resident's and
@@ -15,19 +15,15 @@ pub const SIM_STRIDE: usize = 33;
 pub const CAR_BASE: usize = HEADER_LEN + (MAX_SIMS + crate::staff::MAX_STAFF) * SIM_STRIDE;
 /// Floats per car.
 pub const CAR_STRIDE: usize = 5;
-/// The buses' rows (`header::BUS_COUNT`, `bus`) start here, after the cars'.
-pub const BUS_BASE: usize = CAR_BASE + crate::cars::MAX_CARS * CAR_STRIDE;
-/// Floats per bus.
-pub const BUS_STRIDE: usize = 7;
-/// The traffic lights' rows (`header::LIGHT_COUNT`, `light`), after the buses': one per signal
+/// The traffic lights' rows (`header::LIGHT_COUNT`, `light`), after the cars': one per signal
 /// head, `MAX_LIGHTS` at most.
-pub const LIGHT_BASE: usize = BUS_BASE + crate::bus::MAX_BUSES * BUS_STRIDE;
+pub const LIGHT_BASE: usize = CAR_BASE + crate::cars::MAX_CARS * CAR_STRIDE;
 /// Floats per signal head.
 pub const LIGHT_STRIDE: usize = 5;
 /// Signal heads the snapshot has room for.
 pub const MAX_LIGHTS: usize = 256;
 /// The residents' rows, then the town's servers' (`header::STAFF_COUNT`, `staff.rs`), in the same
-/// layout; then the cars', the buses', and the traffic lights'.
+/// layout; then the cars', and the traffic lights'.
 pub const CAPACITY: usize = LIGHT_BASE + MAX_LIGHTS * LIGHT_STRIDE;
 
 pub mod header {
@@ -53,13 +49,10 @@ pub mod header {
     /// Households' cars (`cars.rs`): as many rows as this from `CAR_BASE`, each laid out as `car`,
     /// in the structure's `cars` order.
     pub const CAR_COUNT: usize = 10;
-    /// The town's buses in town now (`bus.rs`): as many rows as this from `BUS_BASE`, each laid out
-    /// as `bus`.
-    pub const BUS_COUNT: usize = 11;
     /// The traffic lights' signal heads (`traffic::Signal`, one per arm of each lit junction): as
     /// many rows as this from `LIGHT_BASE`, each laid out as `light`, the same from tick to tick
     /// (lit junction by lit junction, arm by arm round it).
-    pub const LIGHT_COUNT: usize = 12;
+    pub const LIGHT_COUNT: usize = 11;
 }
 
 /// A signal head's row (`traffic::SignalArm`: one per arm of a lit junction, facing those coming
@@ -79,23 +72,6 @@ pub mod light {
     pub const AMBER: f32 = 1.0;
     pub const GREEN: f32 = 2.0;
     pub const WALK: f32 = 3.0;
-}
-
-/// A bus's row.
-pub mod bus {
-    /// 1 standing (at a stop, or waiting for someone in its way), 2 driving.
-    pub const SHOWN: usize = 0;
-    /// Its middle on the ground, and which way it faces (as a resident's yaw).
-    pub const X: usize = 1;
-    pub const Z: usize = 2;
-    pub const YAW: usize = 3;
-    /// Its open doors: bit 0 the front one, bit 1 the middle one.
-    pub const DOORS: usize = 4;
-    /// Its line (1 and up: the number on its sign).
-    pub const LINE: usize = 5;
-    /// Which bus it is, the same while it's in town (its rows move up as those before it leave):
-    /// the minute it came in (modulo 100 000) and its line (exact in an f32).
-    pub const ID: usize = 6;
 }
 
 /// A car's row.
@@ -217,10 +193,8 @@ const _: () = assert!(
 const _: () = assert!(
     header::ITEMS_VERSION < HEADER_LEN
         && header::CAR_COUNT < HEADER_LEN
-        && header::BUS_COUNT < HEADER_LEN
         && header::LIGHT_COUNT < HEADER_LEN
         && car::DOORS < CAR_STRIDE
-        && bus::ID < BUS_STRIDE
         && light::STATE < LIGHT_STRIDE
 );
 
@@ -843,7 +817,6 @@ pub fn write(world: &World, out: &mut [f32]) {
     }
     write_staff(world, out);
     write_cars(world, out);
-    write_buses(world, out);
     write_lights(world, out);
 }
 
@@ -871,27 +844,6 @@ fn write_lights(world: &World, out: &mut [f32]) {
         n = k + 1;
     }
     out[header::LIGHT_COUNT] = n as f32;
-}
-
-/// The buses' rows (`header::BUS_COUNT`).
-fn write_buses(world: &World, out: &mut [f32]) {
-    let buses = &world.transit.buses[..world.transit.buses.len().min(crate::bus::MAX_BUSES)];
-    out[header::BUS_COUNT] = buses.len() as f32;
-    for (k, b) in buses.iter().enumerate() {
-        let o = &mut out[BUS_BASE + k * BUS_STRIDE..BUS_BASE + (k + 1) * BUS_STRIDE];
-        let Some((p, yaw, moving, doors)) = b.shown else {
-            o[bus::SHOWN] = 0.0;
-            continue;
-        };
-        o[bus::SHOWN] = if moving { 2.0 } else { 1.0 };
-        o[bus::X] = p[0];
-        o[bus::Z] = p[1];
-        o[bus::YAW] = yaw;
-        o[bus::DOORS] = f32::from(doors);
-        o[bus::LINE] = f32::from(b.line) + 1.0;
-        let minute = (b.run / crate::TICKS_PER_MINUTE) % 100_000;
-        o[bus::ID] = (minute * 128 + u64::from(b.line % 128)) as f32;
-    }
 }
 
 /// The cars' rows (`header::CAR_COUNT`).
@@ -1025,10 +977,6 @@ pub fn layout_json(content: &Content) -> String {
     layout["carBase"] = CAR_BASE.into();
     layout["carStride"] = CAR_STRIDE.into();
     layout["car"] = serde_json::json!({ "shown": car::SHOWN, "x": car::X, "z": car::Z, "yaw": car::YAW, "doors": car::DOORS });
-    layout["header"]["busCount"] = header::BUS_COUNT.into();
-    layout["busBase"] = BUS_BASE.into();
-    layout["busStride"] = BUS_STRIDE.into();
-    layout["bus"] = serde_json::json!({ "shown": bus::SHOWN, "x": bus::X, "z": bus::Z, "yaw": bus::YAW, "doors": bus::DOORS, "line": bus::LINE, "id": bus::ID });
     layout["header"]["lightCount"] = header::LIGHT_COUNT.into();
     layout["lightBase"] = LIGHT_BASE.into();
     layout["lightStride"] = LIGHT_STRIDE.into();

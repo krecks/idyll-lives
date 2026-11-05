@@ -6,8 +6,7 @@
 //! can the houses' basements from their front doors and everything residents use in the houses
 //! (on lots facing either way), and the town keeps going for half a day: in a cosy or a normal
 //! town with bikes at homes without a car someone rides one to work or school, and nobody is stuck
-//! on one in town; no two cars stand or drive on top of each other; and the buses never drive
-//! through each other nor are held up for good (taken out of service a few times at most).
+//! on one in town; no two cars stand or drive on top of each other, nor is one held up for good.
 //!
 //! Make the worlds first: `bun tools/worlds/sample.ts worlds.json`,
 //! then `WORLDS=worlds.json cargo test --release -p sim-core --test sim generated_worlds:: -- --ignored --nocapture`.
@@ -249,79 +248,14 @@ fn generated_worlds_are_livable() {
         let mut rode = std::collections::BTreeSet::new();
         let mut on_since = vec![None::<u64>; w.sims.len()];
         let mut stuck = std::collections::BTreeSet::new();
-        // A town with bus stops has a bus calling at them (`bus.rs`).
-        let stops = (0..w.exits.len()).filter(|&k| w.travel.is_stop(k)).count();
-        if stops > 0 && w.transit.lines.is_empty() {
-            failures.push(format!("{label}: {stops} bus stops and no bus"));
-        }
-        // Every line planned was built, and every stop has a line calling at it.
-        if w.transit.unbuilt > 0 {
-            failures.push(format!(
-                "{label}: {} lines planned and never built",
-                w.transit.unbuilt
-            ));
-        }
-        let unserved: Vec<[f32; 2]> = w
-            .transit
-            .stops
-            .iter()
-            .filter(|st| st.line.is_none())
-            .map(|st| st.at)
-            .collect();
-        if !unserved.is_empty() {
-            failures.push(format!(
-                "{label}: no bus calls at the stops at {unserved:?}"
-            ));
-        }
-        // At each stop the bus stands with the stop on its right, by the kerb (its doors' side).
-        for st in &w.transit.stops {
-            let Some((l, j)) = st.line else { continue };
-            let (p, yaw) = w.transit.lines[l as usize].bay(j as usize);
-            let right = [-yaw.cos(), yaw.sin()];
-            let out = (st.at[0] - p[0]) * right[0] + (st.at[1] - p[1]) * right[1];
-            if out < 0.5 {
-                failures.push(format!("{label}: the bus stands the wrong side of the stop at {:?} (out {out:.2}, bus at {p:?} yaw {yaw:.2}, stop way {:?} mid {:?})", st.at, st.dir, st.mid));
-            }
-        }
-        // Half a day of everyone's free will: the bus comes, and nobody waits at a stop for long.
-        let mut waited = vec![0u64; w.sims.len()];
-        let mut bound: Vec<bool> = (0..w.sims.len())
-            .map(|i| w.bound_for_bus(i).is_some())
-            .collect();
-        let (mut most_buses, mut bus_riders) = (0, 0);
-        // No two buses' bodies overlap (but for a moment), and no bus stands still away from its
-        // stops for long (held up for good).
-        let mut overlapping: Overlapping = Default::default();
-        let mut still: std::collections::HashMap<(u16, u64), u64> = Default::default();
-        let mut bus_failures = std::collections::BTreeSet::new();
+        let mut failures_on_road = std::collections::BTreeSet::new();
         let mut stacked: Stacked = Default::default();
         let mut standing: Standing = Default::default();
         for hour in 0..12 {
             for t in 0..TICKS_PER_HOUR {
                 w.tick_once();
-                most_buses = most_buses.max(w.transit.buses.len());
-                check_buses(&w, &mut overlapping, &mut still, &mut bus_failures);
-                check_cars(&w, &mut stacked, &mut bus_failures);
-                check_stuck(&w, &mut standing, &mut bus_failures);
-                for (i, t) in waited.iter_mut().enumerate() {
-                    let at_stop = w.sims[i]
-                        .current()
-                        .is_some_and(|a| matches!(a.phase, sim_core::world::Phase::AtStop { .. }));
-                    if at_stop {
-                        *t += 1;
-                        if *t == TICKS_PER_HOUR {
-                            failures.push(format!(
-                                "{label}: {} waited an hour at a bus stop",
-                                w.sims[i].name
-                            ));
-                        }
-                    } else {
-                        *t = 0;
-                    }
-                    // (On the bus: bound for it last tick, away now.)
-                    bus_riders += usize::from(bound[i] && w.sims[i].away_until.is_some());
-                    bound[i] = w.bound_for_bus(i).is_some();
-                }
+                check_cars(&w, &mut stacked, &mut failures_on_road);
+                check_stuck(&w, &mut standing, &mut failures_on_road);
                 if t % 10 != 0 {
                     continue;
                 }
@@ -351,46 +285,20 @@ fn generated_worlds_are_livable() {
                 "{label}: {name} on a bike in town for over {RIDE_HOURS} hours"
             ));
         }
-        failures.extend(bus_failures.into_iter().map(|f| format!("{label}: {f}")));
+        failures.extend(
+            failures_on_road
+                .into_iter()
+                .map(|f| format!("{label}: {f}")),
+        );
         let small = matches!(world["size"].as_str(), Some("cosy" | "normal") | None);
-        let (withdrawn, skipped) = if small {
-            (0, 0)
-        } else {
-            (BUSES_WITHDRAWN, RUNS_SKIPPED)
-        };
-        if w.transit.withdrawn > withdrawn {
-            failures.push(format!(
-                "{label}: {} buses taken out of service (held up for good), more than {withdrawn}",
-                w.transit.withdrawn
-            ));
-        }
-        if w.transit.skipped > skipped {
-            failures.push(format!(
-                "{label}: {} runs not run (their line's last bus still in town), more than {skipped}",
-                w.transit.skipped
-            ));
-        }
         let ridden = (small && carless_bikes > 0).then_some(!rode.is_empty());
-        if !w.transit.lines.is_empty() && most_buses == 0 {
-            failures.push(format!("{label}: no bus came all day"));
-        }
         eprintln!(
-            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements, {bikes} bikes, {} rode, {stops} bus stops ({} with a shelter), {} lines ({} min out and back at most), {bus_riders} rode the bus, {} buses taken out of service, {} runs not run",
+            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements, {bikes} bikes, {} rode",
             w.lot.width,
             w.lot.depth,
             w.sims.len(),
             w.objects.len(),
             rode.len(),
-            w.transit.stops.iter().filter(|s| s.shelter).count(),
-            w.transit.lines.len(),
-            w.transit
-                .lines
-                .iter()
-                .map(|l| l.end / sim_core::TICKS_PER_MINUTE)
-                .max()
-                .unwrap_or(0),
-            w.transit.withdrawn,
-            w.transit.skipped
         );
         (failures, ridden)
     });
@@ -412,83 +320,6 @@ fn generated_worlds_are_livable() {
         eprintln!("  {f}");
     }
     assert!(failures.is_empty());
-}
-
-/// How long two buses' bodies may overlap at most (ticks: a moment, as one pulls over past the
-/// other), and how long a bus may stand still away from its stops (held up behind another at a
-/// stop as long as it stands there, `bus::DWELL_MOST`, and more).
-const BUS_OVERLAP_TICKS: u64 = 2 * sim_core::TICKS_PER_MINUTE;
-/// The most buses a big world may take out of service in half a day (`bus::OUT_OF_SERVICE`: held
-/// up for good, where the others can't give way; in the 0.7.0 samples 0 to 6, and never in a cosy
-/// or normal town), and the most runs it may not run (`Transit::skipped`: its line's last bus still
-/// in town; 1 to 10).
-const BUSES_WITHDRAWN: u32 = 8;
-const RUNS_SKIPPED: u32 = 15;
-const BUS_STILL_TICKS: u64 = 45 * sim_core::TICKS_PER_MINUTE;
-
-/// Two buses overlapping (by their lines and runs), since when.
-type Overlapping = std::collections::HashMap<((u16, u64), (u16, u64)), u64>;
-
-/// A tick of `w`'s buses: those overlapping (by pairs of their lines and runs) and standing still
-/// away from their stops, since when; any for too long, in `failures`.
-fn check_buses(
-    w: &World,
-    overlapping: &mut Overlapping,
-    still: &mut std::collections::HashMap<(u16, u64), u64>,
-    failures: &mut std::collections::BTreeSet<String>,
-) {
-    let minutes = |run: u64| run / sim_core::TICKS_PER_MINUTE;
-    let shown: Vec<_> = w
-        .transit
-        .buses
-        .iter()
-        .filter_map(|b| b.shown.map(|s| ((b.line, b.run), s)))
-        .collect();
-    let mut now = std::collections::HashSet::new();
-    for (i, &(a, (pa, ya, ..))) in shown.iter().enumerate() {
-        for &(b, (pb, yb, ..)) in &shown[i + 1..] {
-            if (pa[0] - pb[0]).hypot(pa[1] - pb[1]) > sim_core::bus::BUS_LEN + 1.0 {
-                continue;
-            }
-            let by = sim_core::bus::overlap((pa, ya), (pb, yb));
-            if by <= 0.0 {
-                continue;
-            }
-            now.insert((a, b));
-            let since = *overlapping.entry((a, b)).or_insert(w.tick);
-            if w.tick - since > BUS_OVERLAP_TICKS {
-                failures.insert(format!(
-                    "the buses of lines {} and {} (runs {} and {}) overlap at {pa:?} and {pb:?} by {by:.2} m",
-                    a.0,
-                    b.0,
-                    minutes(a.1),
-                    minutes(b.1)
-                ));
-            }
-        }
-    }
-    overlapping.retain(|k, _| now.contains(k));
-    for &(k, (at, _, moving, doors)) in &shown {
-        let line = &w.transit.lines[k.0 as usize];
-        let at_stop = (0..line.stops.len()).any(|j| {
-            let (p, _) = line.bay(j);
-            (p[0] - at[0]).hypot(p[1] - at[1]) < 0.5
-        });
-        if moving || doors != 0 || at_stop {
-            still.remove(&k);
-            continue;
-        }
-        let since = *still.entry(k).or_insert(w.tick);
-        if w.tick - since > BUS_STILL_TICKS {
-            failures.insert(format!(
-                "the bus of line {} (run {}) stood still at {at:?} for {} minutes",
-                k.0,
-                minutes(k.1),
-                BUS_STILL_TICKS / sim_core::TICKS_PER_MINUTE
-            ));
-        }
-    }
-    still.retain(|k, _| shown.iter().any(|(s, _)| s == k));
 }
 
 /// Hours a resident may be on a bike or an e-scooter in town at a time at most (a ride out of town
@@ -639,14 +470,13 @@ fn check_cars(w: &World, stacked: &mut Stacked, failures: &mut std::collections:
 
 /// How long a car on its way may stand still while nothing it waits for goes on, however far
 /// round (ticks: `traffic::waits_on`; held up for good, two or more waiting for each other), and
-/// how long it may stand still at all (waiting its turn for a busy junction, or for a bus to clear
-/// a lane too narrow for both). A car queued right behind another going its way isn't counted:
+/// how long it may stand still at all (waiting its turn for a busy junction). A car queued right behind another going its way isn't counted:
 /// the one in front of the queue is.
 const CAR_STUCK_TICKS: u64 = 10 * sim_core::TICKS_PER_MINUTE;
 const CAR_WAIT_TICKS: u64 = 60 * sim_core::TICKS_PER_MINUTE;
 
 /// The cars standing still on their way: by car, how far along its way it was and since when (a
-/// tick), and the last tick anything it waited for went on; and every vehicle's place on its way
+/// tick), and the last tick anything it waited for went on; and every car's place on its way
 /// (`traffic::on_its_way`) a tick before.
 #[derive(Default)]
 struct Standing {
@@ -663,21 +493,12 @@ fn check_stuck(
 ) {
     use sim_core::cars::{CarState, car_key};
     use sim_core::traffic::{at_red, on_its_way, waits_on};
-    // Who went on this tick (a bus standing at a stop is on its way).
-    let keys: Vec<u64> = (0..w.cars.len())
-        .map(car_key)
-        .chain(
-            w.transit
-                .buses
-                .iter()
-                .map(|b| (b.run << 16) | b.line as u64),
-        )
-        .collect();
+    // Who went on this tick.
     let mut went = std::collections::BTreeSet::new();
     let mut now = std::collections::BTreeMap::new();
-    for &k in &keys {
-        if let Some((p, at_stop)) = on_its_way(w, k) {
-            if at_stop || standing.was.get(&k) != Some(&p) {
+    for k in (0..w.cars.len()).map(car_key) {
+        if let Some(p) = on_its_way(w, k) {
+            if standing.was.get(&k) != Some(&p) {
                 went.insert(k);
             }
             now.insert(k, p);

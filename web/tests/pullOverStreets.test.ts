@@ -1,21 +1,20 @@
 /**
- * Pull-over streets (`WorldStructure.busStreets`, sim-core `bus::kerbside`, `cars::kerbside`): on a
- * street a bus drives where two buses pass pulled over onto the pavement (7 m), and on every lane
- * too narrow for two cars to pass in their lanes (6 m: they pull over to pass, and a car and a bus
- * where it's straight), the kerbside furniture (streetlights, mailboxes, hydrants, bins, benches,
- * signs) keeps back from the road, no further in than the street's `keep` from its edges: the strip
- * they may pull into is clear of it. Elsewhere it stands where it always did, nearer the kerb.
+ * Pull-over streets (`WorldStructure.pullOverStreets`, sim-core `cars::kerbside`): on every lane too
+ * narrow for two cars to pass in their lanes (6 m: they pull over onto the pavement to pass), the
+ * kerbside furniture (streetlights, mailboxes, hydrants, bins, benches, signs) keeps back from the
+ * road, no further in than the lane's `keep` from its edges: the strip they may pull into is clear
+ * of it. Elsewhere it stands where it always did, nearer the kerb.
  */
 import { describe, expect, test } from 'bun:test';
 import type { PlotInfo, WorldStructure } from '../src/core/protocol';
 import type { StreetPlan } from '../src/render/shared/street';
 
-/** The street: along x, its middle at z = MID, a town's 7 m main road or a 6 m lane. */
+/** The street: along x, its middle at z = MID, a 6 m lane. */
 const MID = 23;
-/** How far in from its edges the furniture may reach, as the sim has it: a 7 m bus street (`bus::kerbside`), a 6 m lane (`cars::LANE_KERBSIDE`). */
-const KEEP: Record<number, number> = { 7: 1.05, 6: 0.5 };
+/** How far in from its edges the furniture may reach on a 6 m lane, as the sim has it (`cars::LANE_KERBSIDE`). */
+const KEEP: Record<number, number> = { 6: 0.5 };
 
-/** Two houses each side of a street `width` m wide; `pull`: the sim lists it (`busStreets`). */
+/** Two houses each side of a street `width` m wide; `pull`: the sim lists it (`pullOverStreets`). */
 function town(width: number, pull: boolean): WorldStructure {
   const [north, south] = [MID - width / 2, MID + width / 2];
   const lots = [
@@ -56,7 +55,7 @@ function town(width: number, pull: boolean): WorldStructure {
       facing: lots.map((l) => l.facing),
       seed: 1,
     },
-    ...(pull ? { busStreets: [{ road: 0, keep: KEEP[width] }] } : {}),
+    ...(pull ? { pullOverStreets: [{ road: 0, keep: KEEP[width] }] } : {}),
   } as unknown as WorldStructure;
 }
 
@@ -76,15 +75,12 @@ function reach(plan: StreetPlan, width: number): number {
   return most;
 }
 
-describe('kerbside furniture where buses and cars pull over', async () => {
+describe('kerbside furniture where cars pull over', async () => {
   // The renderer's modules read the page's address (and its frames' timing) as they load.
   Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' }, requestAnimationFrame: () => 0, window: {} });
   const { HousePlanner } = await import('../src/render/shared/house');
   const { planStreet } = await import('../src/render/shared/street');
-  for (const [width, what] of [
-    [7, 'a bus street: out of the strip the buses pull into'],
-    [6, 'a 6 m lane: out of the strip the cars pull into to pass'],
-  ] as const) {
+  for (const [width, what] of [[6, 'a 6 m lane: out of the strip the cars pull into to pass']] as const) {
     test(what, async () => {
       const keep = KEEP[width];
       const [plain, pulled] = [await planStreet(new HousePlanner(), town(width, false), null, options), await planStreet(new HousePlanner(), town(width, true), null, options)];

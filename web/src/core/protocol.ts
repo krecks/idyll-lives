@@ -415,8 +415,8 @@ export interface TownArea {
   d: number;
 }
 
-/** Where people leave town: a road out (`[x, z]` is a road exit) or a bus stop people on foot use. */
-export type TownExit = [number, number] | { x: number; z: number; kind: 'road' | 'stop' };
+/** Where people leave town: a road out (`[x, z]`, or typed `kind: 'road'`). */
+export type TownExit = [number, number] | { x: number; z: number; kind: 'road' };
 
 /** Land the renderer draws and the generator keeps building off. */
 export interface WorldZone {
@@ -620,15 +620,12 @@ export interface WorldStructure {
   cars?: CarInfo[];
   /** Garages at the inner ends of driveways (sim-core `cars::Garage`: wall centre lines, by plot). Absent: a game from before them (the street places neighbours' own). */
   garages?: GarageInfo[];
-  /** The town's bus stops (sim-core `bus::Stop`). Absent: none (the street draws a shelter or two of its own at the ends of its rows of houses). */
-  stops?: StopInfo[];
   /**
-   * The streets where the kerbside furniture keeps back, for buses and cars to pull over onto the
-   * pavement to pass: those a bus drives (two buses pass there pulled over), and every lane too
-   * narrow for two cars to pass in their lanes (sim-core `bus::Transit::bus_streets`, the one source
-   * for both). Absent: none (the furniture stands where it always did).
+   * The lanes where the kerbside furniture keeps back, for cars to pull over onto the pavement to
+   * pass: every lane too narrow for two cars to pass in their lanes (a 6 m lane: sim-core
+   * `cars::pull_over_streets`). Absent: none (the furniture stands where it always did).
    */
-  busStreets?: BusStreetInfo[];
+  pullOverStreets?: PullOverStreetInfo[];
   /**
    * Where the traffic lights' poles stand on the kerb (sim-core `traffic::SignalArm::pole`, in the snapshot's signal
    * head rows' order): the kerbside furniture keeps clear of them. Absent: none.
@@ -637,26 +634,13 @@ export interface WorldStructure {
 }
 
 /**
- * A street buses or cars pull over on (`WorldStructure.busStreets`): the town's road (`meta.roads`
+ * A lane cars pull over on (`WorldStructure.pullOverStreets`): the town's road (`meta.roads`
  * index) and how far in from its edges (m, either side) its kerbside furniture may reach (sim-core
- * `bus::kerbside`, `cars::kerbside`): a bus or a car passing another pulled over comes no nearer.
+ * `cars::kerbside`, `cars::LANE_KERBSIDE`): a car passing another pulled over comes no nearer.
  */
-export interface BusStreetInfo {
+export interface PullOverStreetInfo {
   road: number;
   keep: number;
-}
-
-/**
- * A bus stop (`WorldStructure.stops`): where its sign stands (at the kerb), the way the bus goes
- * past it (a resident's yaw: 0 towards +z), its shelter if it has one (its middle and the way it
- * faces, towards the road), and whether a bus calls there.
- */
-export interface StopInfo {
-  x: number;
-  z: number;
-  busYaw: number;
-  shelter?: [number, number, number];
-  served: boolean;
 }
 
 /**
@@ -737,8 +721,6 @@ export interface SimView {
    * (not while away at work with it). Absent when they aren't (and from older workers).
    */
   ride?: { kind: 'bike' | 'scooter'; to: 'work' | 'school' | 'home' };
-  /** The bus (sim-core `bus::status`): waiting for it at a stop, on it to work, or on it home (then `trip` says when they're back). Absent: none of those. */
-  bus?: 'wait' | 'work' | 'home';
   job: JobView | null;
   /** A pupil's school grade (0..100, in tenths). */
   grade?: number;

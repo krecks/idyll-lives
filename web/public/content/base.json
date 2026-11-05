@@ -3771,7 +3771,6 @@
   },
   "autonomy": {"urgent": ["hunger", "energy", "bladder", "hygiene"], "urgentBelow": 0.1, "comfortBoost": 2, "lookAhead": 0.25, "quickMinutes": 30, "retryMinutes": 30},
   "laundry": {"perDay": 0.4, "most": 4},
-  "bus": {"$comment": "The town's bus (sim-core bus.rs): one comes into town every `every` minutes, the first at `first` o'clock and the last at `last`, through its bus stops and out.", "every": 60, "first": 6, "last": 23},
   "objectRules": {
     "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community"],
     "wear": {"perUse": 0.004, "byCategory": {"bathroom": 0.006, "garden": 0, "outdoor": 0, "decor": 0}, "perQuality": 0.2},

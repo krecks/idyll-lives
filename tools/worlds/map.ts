@@ -3,7 +3,7 @@
  * how a kind of world is laid out: its roads (or an older town's streets) and greens, the lots
  * (public ones blue, farms' fields yellow, outdoor places orange; a tick on the side they face),
  * garden paths and driveways, the ground floor's walls, the things standing about and the ways
- * out of town (red; bus stops white with a red ring). A big world also shows its land (water,
+ * out of town (red). A big world also shows its land (water,
  * woods, hills, meadows, fields, orchards), its country roads and trails (dashed), and its areas' names.
  * An index.html shows them all on one page.
  *
@@ -21,7 +21,7 @@ type Town = {
   walls: [number, number, number, number][];
   objects: { x: number; z: number }[];
   plots: (Rect & { name: string; public: boolean; kind?: string })[];
-  exits?: (Pt | { x: number; z: number; kind: 'road' | 'stop' })[];
+  exits?: (Pt | { x: number; z: number; kind: 'road' })[];
   parking?: { x: number; z: number }[];
   meta?: {
     streets?: Rect[];
@@ -76,7 +76,7 @@ for (const { kind, size, seed, name, town } of worlds) {
     ...town.objects.filter((o) => ground(o.z)).map((o) => `<circle cx="${o.x + 0.5}" cy="${o.z + 0.5}" r="0.35" fill="#5a4a3a"/>`),
     ...town.walls.filter(([, z0, , z1]) => ground(z0) && ground(z1)).map(([x0, z0, x1, z1]) => `<line x1="${x0}" y1="${z0}" x2="${x1}" y2="${z1}" stroke="#7a2e1f" stroke-width="0.35"/>`),
     ...(town.parking ?? []).map((p) => `<rect x="${p.x - 1.5}" y="${p.z - 1.5}" width="3" height="3" fill="#3f6fb5"/>`),
-    ...exits.map((e) => (e.kind === 'stop' ? `<circle cx="${e.x}" cy="${e.z}" r="${Math.max(1.5, px(4))}" fill="#fff" stroke="#d33" stroke-width="${Math.max(0.5, px(2))}"/>` : `<circle cx="${e.x}" cy="${e.z}" r="${Math.max(1.5, px(5))}" fill="#d33"/>`)),
+    ...exits.map((e) => `<circle cx="${e.x}" cy="${e.z}" r="${Math.max(1.5, px(5))}" fill="#d33"/>`),
     // Outdoor places' and areas' names.
     ...(big ? town.plots.filter((p) => p.kind === 'countryside').map((p) => `<text x="${p.x + p.w / 2}" y="${p.z - px(4)}" font-size="${px(11)}" text-anchor="middle" font-family="sans-serif" fill="#5a3a12">${esc(p.name)}</text>`) : []),
     ...(town.meta?.areas ?? []).map((a) => `<text x="${a.x + a.w / 2}" y="${a.z + a.d / 2}" font-size="${px(18)}" font-weight="700" text-anchor="middle" font-family="sans-serif" fill="#1d2230" stroke="#fff" stroke-width="${px(3)}" paint-order="stroke">${esc(a.name)}</text>`),

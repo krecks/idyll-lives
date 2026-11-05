@@ -978,11 +978,6 @@ pub enum Phase {
     /// At the wheel of their car on a trip to another hamlet or back (`cars::Trip`, a `Visit`
     /// or `GoHome` task): the car drives (`cars::update`), they sit in it.
     Driving,
-    /// At the bus stop on their way to work or school (`Sim::bound_for_bus`), waiting for the
-    /// bus: sat on the bench in its shelter or stood by it (`bus.rs`).
-    AtStop {
-        ticks: u32,
-    },
 }
 
 #[derive(Debug, Clone)]
@@ -1121,13 +1116,6 @@ pub struct Sim {
     pub(crate) car_door: u8,
     /// Ticks they've waited for a car driving by to pass (`cars::in_the_way`). Not saved.
     pub(crate) car_wait: u32,
-    /// The bus stop (`bus::Transit::stops`) they're on their way to for work or school, or wait
-    /// at, and their place there (`bus::Stop::spot`); and that they waited there for a bus that
-    /// didn't come, so make their own way this time (`bus::wait`). Not saved (after a load they
-    /// set off again).
-    pub(crate) bound_for_bus: Option<u16>,
-    pub(crate) bus_spot: u8,
-    pub(crate) bus_given_up: bool,
     /// The work shift (or school day) they're away for starts at this tick: until then they're on
     /// their way (`life::at_work`). Not saved (after a load, it's under way).
     pub(crate) shift_from: u64,
@@ -1873,14 +1861,12 @@ pub struct World {
     work: Vec<u8>,
     /// Where Sims leave town for work.
     pub exits: Vec<[f32; 2]>,
-    /// The road network, bus stops and the town file's other open-world fields (`travel.rs`).
+    /// The road network and the town file's other open-world fields (`travel.rs`).
     pub travel: crate::travel::Travel,
     /// Households' cars (see `cars.rs`), and every house's driveway (where a car goes when its
     /// household moves).
     pub cars: Vec<crate::cars::Car>,
-    /// The town's bus stops, lines and buses (`bus.rs`).
-    pub transit: crate::bus::Transit,
-    /// The claims cars and buses hold and ask for where their ways cross or meet
+    /// The claims cars hold and ask for where their ways cross or meet
     /// (`traffic::Traffic`). Not saved.
     pub traffic: crate::traffic::Traffic,
     pub drives: Vec<crate::cars::Drive>,
@@ -1977,12 +1963,10 @@ pub(crate) struct Ctx<'a> {
     /// Objects by plot (`World::object_index`).
     pub index: &'a ObjectIndex,
     pub exits: &'a [[f32; 2]],
-    /// The road network and bus stops (`World::travel`).
+    /// The road network (`World::travel`).
     pub travel: &'a crate::travel::Travel,
     /// Households' cars (`World::cars`).
     pub cars: &'a [crate::cars::Car],
-    /// The bus stops and buses (`World::transit`).
-    pub transit: &'a crate::bus::Transit,
     pub autonomy: bool,
     /// Room score per tile (`World::room_score`).
     pub room_score: &'a [f32],
@@ -2069,7 +2053,13 @@ impl World {
         world.mode = lot_file.mode;
         world.lifespan = lot_file.lifespan;
         world.meta = lot_file.meta.clone();
-        world.exits = lot_file.exits.iter().map(|e| e.point()).collect();
+        // (A bus stop in an older town file is no way out: left out.)
+        world.exits = lot_file
+            .exits
+            .iter()
+            .filter(|e| e.kind() != crate::travel::ExitKind::Stop)
+            .map(|e| e.point())
+            .collect();
         world.plots = lot_file
             .plots
             .iter()
@@ -2131,9 +2121,6 @@ impl World {
         }
         // The road network and the town's other open-world fields (`travel.rs`).
         let mut open_world = lot_file.open_world.clone();
-        open_world.stops = (0..lot_file.exits.len() as u32)
-            .filter(|&i| lot_file.exits[i as usize].kind() == crate::travel::ExitKind::Stop)
-            .collect();
         if lot_file
             .plots
             .iter()
@@ -2189,7 +2176,7 @@ impl World {
             &lot_file.drives,
             &lot_file.garages,
         );
-        crate::bus::settle(&mut world);
+        crate::traffic::settle(&mut world);
         // Babies come with a crib (a crowded home is reported to the player as time starts).
         for h in 0..world.households.len() {
             crate::lifecycle::cribs_for_babies(&mut world, h);
@@ -2248,7 +2235,6 @@ impl World {
             exits: Vec::new(),
             travel: Default::default(),
             cars: Vec::new(),
-            transit: Default::default(),
             traffic: Default::default(),
             drives: Vec::new(),
             garages: Vec::new(),
@@ -2288,7 +2274,7 @@ impl World {
     /// The road network and the rest of the travel state from the town file's open-world
     /// fields (on load too: the graph isn't saved).
     pub(crate) fn set_travel(&mut self, file: crate::travel::OpenWorld) {
-        let mut travel = crate::travel::Travel::new(file, &self.meta, self.exits.len());
+        let mut travel = crate::travel::Travel::new(file, &self.meta);
         travel.country_speed = self.content.cars.country_speed;
         // Water and other ground nobody walks on: blocked underneath everything (`base_blocked`).
         if let Some(terrain) = &travel.file.terrain {
@@ -2960,9 +2946,6 @@ impl World {
             car_seat: 0,
             car_door: 0,
             car_wait: 0,
-            bound_for_bus: None,
-            bus_spot: 0,
-            bus_given_up: false,
             shift_from: 0,
             alone_until: 0,
             household: spawn.household,
@@ -4409,7 +4392,6 @@ impl World {
                 exits,
                 travel,
                 cars,
-                transit,
                 room_score,
                 dirt,
                 stairs,
@@ -4443,7 +4425,6 @@ impl World {
                 exits,
                 travel,
                 cars,
-                transit,
                 autonomy: *autonomy,
                 hour,
                 day: crate::clock::day(tick),
@@ -4487,7 +4468,6 @@ impl World {
         crate::lifecycle::update(self);
         crate::traffic::begin(self);
         crate::cars::update(self);
-        crate::bus::update(self);
         crate::planner::update(self);
         crate::cooking::after_step(self);
         crate::lights::update(self);
@@ -7600,7 +7580,6 @@ fn start_task(
         }
         TaskKind::Work => {
             sim.bound_for_car = None;
-            sim.bound_for_bus = None;
             // By car (`cars.rs`): to its door. (Not when already on their bike.)
             let riding = sim.riding.is_some();
             let car = if riding {
@@ -7621,18 +7600,6 @@ fn start_task(
                     sim.transition = Some(crate::life::Transition::Work);
                     return;
                 };
-                // By bus (`bus.rs`), when that's quicker than the walk out: to the stop. (In a big
-                // world, by the one calling at the stop they walk out by, if it's in time.)
-                let bus = || {
-                    if ctx.transit.walk_stops {
-                        return crate::bus::at_stop(ctx, sim, exit);
-                    }
-                    let walk = sim.walk_per_minute(content);
-                    let from = ctx.nav.stairs.ground_pos(sim.pos);
-                    let minutes = ctx.travel.eta(from, exit, crate::travel::Mode::Foot, walk)
-                        * crate::life::WALK_MARGIN;
-                    crate::bus::way(ctx, sim, Some((minutes * TICKS_PER_MINUTE as f32) as u64))
-                };
                 if riding {
                     // On their bike: on it to the way out.
                     goal_at(exit)
@@ -7643,12 +7610,6 @@ fn start_task(
                     // On a bike of theirs (`ride.rs`): over to it first.
                     crate::ride::claim(sim, objects, bike);
                     goal_at(crate::ride::spot(content, &objects[bike as usize]))
-                } else if ctx.transit.runs()
-                    && let Some((stop, spot, at)) = bus()
-                {
-                    sim.bound_for_bus = Some(stop);
-                    sim.bus_spot = spot;
-                    goal_at(at)
                 } else {
                     goal_at(exit)
                 }
@@ -8230,7 +8191,7 @@ fn progress(
     let content = ctx.content;
     // (Before `current` is borrowed: how fast they walk, `walk_speed`.)
     let walk = sim.walk_speed(content) * crate::ride::speed(content, sim, objects);
-    // (And how far they reach, on foot or on a bike, for the cars and buses they keep clear of.)
+    // (And how far they reach, on foot or on a bike, for the cars they keep clear of.)
     let body = crate::cars::Body::of(sim, content, objects, 0.0);
     let minutes = MINUTES_PER_TICK * ticks as f32;
     // On their way into a room someone keeps shut (a bathroom in use): they wait outside.
@@ -8250,18 +8211,6 @@ fn progress(
         }
         // At the wheel: the car takes them (`cars::update`).
         Phase::Driving => return,
-        // At the bus stop: the bus calls them to its door (`bus::update`); no bus for far too
-        // long, or none due (gone, the next a headway off: `bus::bus_due`), they go another way.
-        Phase::AtStop { ticks: waited } => {
-            *waited += ticks;
-            let due = sim
-                .bound_for_bus
-                .is_some_and(|stop| crate::bus::bus_due(ctx.transit, stop, ctx.tick));
-            if *waited > crate::bus::GIVE_UP_TICKS || !due {
-                crate::bus::give_up(sim);
-            }
-            return;
-        }
         // Getting into the car: in, and off to work (`life`, `cars::board`).
         Phase::Boarding { ticks: waited } => {
             *waited += ticks;
@@ -8327,15 +8276,13 @@ fn progress(
                     sim.pos[0] + dx / dist.max(1e-4) * step,
                     sim.pos[1] + dz / dist.max(1e-4) * step,
                 ];
-                // (Or the bus.)
                 let passing = crate::cars::in_the_way(ctx.cars, body, sim.pos, to)
-                    .and_then(|c| ctx.cars[c].shown.map(|(at, yaw, ..)| (at, yaw)))
-                    .or_else(|| crate::bus::in_the_way(ctx.transit, body, sim.pos, to));
+                    .and_then(|c| ctx.cars[c].shown.map(|(at, yaw, ..)| (at, yaw)));
                 if let Some((at, yaw)) = passing {
                     sim.car_wait = sim.car_wait.saturating_add(ticks);
-                    // (Not into the way of another car or bus.)
+                    // (Not into the way of another car.)
                     let others = || {
-                        let all = crate::cars::vehicles(ctx.cars, ctx.transit, None, None);
+                        let all = crate::cars::vehicles(ctx.cars, None);
                         all.into_iter().filter(|d| d.at != at).collect::<Vec<_>>()
                     };
                     if sim.car_wait > crate::cars::MAKE_WAY_TICKS
@@ -8985,8 +8932,6 @@ fn arrive(
                     sim.queue.push_front(a.task);
                 }
             }
-            // At the bus stop (or the bus's door): they wait, or get on (`bus.rs`).
-            None if sim.bound_for_bus.is_some() => crate::bus::arrive(sim, ctx),
             None => {
                 sim.current = None;
                 sim.transition = Some(crate::life::Transition::Work);
@@ -9881,12 +9826,10 @@ pub(crate) fn trip_minutes(eta: f32, car: bool) -> f32 {
 }
 
 /// The way out of town `sim` takes on foot: the nearest by straight line, or in an open-world
-/// town the quickest (`travel::Travel::eta`); bus stops too when no bus calls there
-/// (`bus::Transit::walks_out`).
+/// town the quickest (`travel::Travel::eta`).
 pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
-    let walks = |i: usize| ctx.transit.walks_out(i, ctx.tick);
     if !ctx.travel.open {
-        return nearest_exit(ctx.exits, sim.pos, walks).map(|i| ctx.exits[i]);
+        return nearest_exit(ctx.exits, sim.pos).map(|i| ctx.exits[i]);
     }
     // From home, the way their commute was timed by (on foot).
     let home = ctx
@@ -9895,8 +9838,6 @@ pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
         .and_then(|h| h.plot);
     if let Some(c) = sim.commute
         && c.home == home
-        && c.bus.is_none()
-        && walks(c.exit)
         && let Some(&exit) = ctx.exits.get(c.exit)
         && ctx
             .briefs
@@ -9906,23 +9847,20 @@ pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
         return Some(exit);
     }
     let pos = ctx.nav.stairs.ground_pos(sim.pos);
-    quickest_exit(ctx.travel, ctx.exits, pos, walks).map(|i| ctx.exits[i])
+    quickest_exit(ctx.travel, ctx.exits, pos).map(|i| ctx.exits[i])
 }
 
 /// The exit (an index into `exits`) quickest to get to on foot from `pos` (over the ground,
-/// `StairMap::ground_pos`), of those `walks` lets them leave by (roads out, and bus stops no bus
-/// calls at then: `bus::Transit::walks_out`).
+/// `StairMap::ground_pos`).
 pub(crate) fn quickest_exit(
     travel: &crate::travel::Travel,
     exits: &[[f32; 2]],
     pos: [f32; 2],
-    walks: impl Fn(usize) -> bool,
 ) -> Option<usize> {
     let mode = crate::travel::Mode::Foot;
     // Nearest first by the straight line, which no way along the roads beats: past the first
     // whose straight line takes longer than the quickest found, none can be quicker.
     let mut order: Vec<(f32, usize)> = (0..exits.len())
-        .filter(|&i| walks(i))
         .filter(|&i| exits[i].iter().all(|v| v.is_finite()))
         .map(|i| (travel.eta_at_least(pos, exits[i], mode, 1.5), i))
         .collect();
@@ -9949,16 +9887,12 @@ pub(crate) fn quickest_exit(
     best.map(|(_, i)| i)
 }
 
-/// The town's way out (an index into `World::exits`) nearest `pos` in a straight line, of those
-/// `walks` lets them leave by (`quickest_exit`), if it has any.
-pub(crate) fn nearest_exit(
-    exits: &[[f32; 2]],
-    pos: [f32; 2],
-    walks: impl Fn(usize) -> bool,
-) -> Option<usize> {
+/// The town's way out (an index into `World::exits`) nearest `pos` in a straight line, if it has
+/// any.
+pub(crate) fn nearest_exit(exits: &[[f32; 2]], pos: [f32; 2]) -> Option<usize> {
     let d = |i: usize| (exits[i][0] - pos[0]).hypot(exits[i][1] - pos[1]);
     (0..exits.len())
-        .filter(|&i| walks(i) && exits[i].iter().all(|v| v.is_finite()))
+        .filter(|&i| exits[i].iter().all(|v| v.is_finite()))
         .min_by(|&a, &b| d(a).total_cmp(&d(b)))
 }
 

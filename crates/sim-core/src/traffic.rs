@@ -1,66 +1,57 @@
-//! Taking turns where cars' and buses' ways cross or meet (`World::traffic`): reservations, not
-//! give-way rules, cars and buses alike in one queue.
+//! Taking turns where cars' ways cross or meet (`World::traffic`): reservations, not give-way
+//! rules, every car in one queue.
 //!
 //! **Zones and claims.** Where two ways may cross or meet so that both can't go on, there's a
-//! zone (`Travel::zones`): each junction's box (`boxes`: a 6 m circle round its middle, reaching
-//! on along an arm as far as needed to keep a body in its lane there `ARMS_APART` from one on
-//! another arm close to it), and where a bus's body sweeps out of its lane round a sharp turn or
-//! turning round (`sweeps`, circles round its body as it turns). Each route (a car's,
-//! `cars::Route`; a bus line's, `bus::Line`) is looked at once, as it's laid out, for the zones it
+//! zone: each junction's box (`boxes`: a 6 m circle round its middle, reaching on along an arm as
+//! far as needed to keep a body in its lane there `ARMS_APART` from one on another arm close to
+//! it). Each car's route (`cars::Route`) is looked at once, as it's laid out, for the zones it
 //! drives through, and for stretches that are claims of their own: a driveway's, a bay's or a spot
-//! on the road's mouth (a car turning out across the lane or in), and where it couldn't pass one
-//! coming the other way, both pulled over as far as they can (`Narrow`: a car's or a bus's way
-//! where their bodies, side by side or nose to nose round a bend, still come too near; a 6 m lane's
-//! tight bend for two cars). Each is a part (`Claim`): the stretch of the route from just before
-//! its body first touches it (`Claim::from`; a bus `bus::BUS_LEAD` before a zone, clear of where
-//! one coming out of it the other way goes on) to where it's out of it again (`Claim::to`),
-//! sampled every `SAMPLE` m (more often turning) with its room on the far side (its length and
-//! `ROOM_GAP`). Parts its body comes to before it's out of the last make a group
-//! (`Claim::group`): it can't stand clear between them, so it asks for them together. A bus's
-//! group is cut where it stands at a stop clear of every junction's box: it asks for the rest
-//! only as it leaves the stop.
+//! on the road's mouth (a car turning out across the lane or in), and round a 6 m lane's tight
+//! bend where it couldn't pass one coming the other way, both pulled over as far as they can
+//! (`narrow`). Each is a part (`Claim`): the stretch of the route from just before its body first
+//! touches it (`Claim::from`) to where it's out of it again (`Claim::to`), sampled every `SAMPLE` m
+//! (more often turning) with its room on the far side (its length and `ROOM_GAP`). Parts its body
+//! comes to before it's out of the last make a group (`Claim::group`): it can't stand clear between
+//! them, so it asks for them together.
 //!
-//! **Asking.** A car or bus about to drive into a group asks for it (`Traffic::may_go`) and waits
-//! where it is till it's granted, all of it at once. The asks are granted once a tick
-//! (`Traffic::begin`, before the cars and the buses go on), in the order they were asked (the
-//! tick, then `cars::Driving::first`), each when
+//! **Asking.** A car about to drive into a group asks for it (`Traffic::may_go`) and waits where it
+//! is till it's granted, all of it at once. The asks are granted once a tick (`Traffic::begin`,
+//! before the cars go on), in the order they were asked (the tick, then `cars::Driving::first`),
+//! each when
 //! 1. none of it is in the way (`conflict`) of what's left of a part another holds,
 //! 2. nor of an earlier ask still waiting,
-//! 3. and nobody not holding a part is in it now, nor anyone at all (a bus not waiting for a
-//!    claim itself included) on its far side ("don't block the box"), nor anyone on the move
-//!    into it in the next second or so (`LOOK`).
+//! 3. and nobody not holding a part is in it now, nor anyone at all on its far side ("don't block
+//!    the box"), nor anyone on the move into it in the next second or so (`LOOK`).
 //!
 //! Two bodies are in each other's way (`conflict`) when they overlap or come within `CLEAR`; going
 //! the same way (one following the other through, each keeping behind the one in front:
 //! `cars::up_against`) they aren't; coming towards each other they are where pulling over as far as
-//! both can there (`Sample::pass`) doesn't leave `PASS_GAP` between them. Two buses are never in
-//! each other's way here (their own rules keep them apart: the signal box, pulling over, backing
-//! up: `bus.rs`), but for one waiting on the far side of another's group. One right behind
-//! another in its lane (`behind`) can't get anywhere before that one does: neither its parts nor
-//! its ask hold that one up there.
+//! both can there (`Sample::pass`) doesn't leave `PASS_GAP` between them. One right behind another
+//! in its lane (`behind`) can't get anywhere before that one does: neither its parts nor its ask
+//! hold that one up there.
 //!
-//! **Holding.** Holding a group, a vehicle drives through it, letting go of each part as its
-//! body's out of it. Anyone else, holding a group or not, keeps `KEEP_SHORT` short of what's left
-//! of one another holds (`Traffic::blocked`; holding one itself, it may follow another through
-//! one going its way; already in another's way, it goes on out of it).
+//! **Holding.** Holding a group, a car drives through it, letting go of each part as its body's
+//! out of it. Anyone else, holding a group or not, keeps `KEEP_SHORT` short of what's left of one
+//! another holds (`Traffic::blocked`; holding one itself, it may follow another through one going
+//! its way; already in another's way, it goes on out of it).
 //!
-//! **Why nobody waits for good.** As a tick begins, who waits for whom is a graph: the vehicles'
-//! waits on the road last tick (`Mover::waits`, `cars::Car::waits_for`, the buses'
-//! `bus::held_up_by`), and the asks' waits for parts held, bodies and earlier asks. Every rule
-//! that makes one wait for another leaves out one that waits for it, however far round
-//! (`reaches`): an earlier ask doesn't hold up a later one it waits for itself (rule 2), a body
-//! that waits for the asker doesn't (rule 3), a car holding a part that waits for the asker's body
-//! doesn't (rule 1), nor in `Traffic::blocked`. So the grants never close a ring of waits the
-//! graph has in it: a ring forms only through waits it can't see (a pull-over, a turn sweeping
-//! wider than its samples), and those are broken where they form: a car and one in its way
-//! waiting for each other a while, the car backs up a little out of its way, never into anyone
-//! (`cars::back_off`). An ask older than `OLD_ASK` yields only to one it waits for itself, not to
-//! a stream round about: nobody waits on and on while others come and go. Should two bodies come
-//! to overlap anyway, a last-resort check keeps every car from moving deeper into another or a
-//! bus (`cars::guard`, counted in `Traffic::guarded`).
+//! **Why nobody waits for good.** As a tick begins, who waits for whom is a graph: the cars' waits
+//! on the road last tick (`Mover::waits`, `cars::Car::waits_for`), and the asks' waits for parts
+//! held, bodies and earlier asks. Every rule that makes one wait for another leaves out one that
+//! waits for it, however far round (`reaches`): an earlier ask doesn't hold up a later one it waits
+//! for itself (rule 2), a body that waits for the asker doesn't (rule 3), one holding a part that
+//! waits for the asker's body doesn't (rule 1), nor in `Traffic::blocked`. So the grants never
+//! close a ring of waits the graph has in it: a ring forms only through waits it can't see (a
+//! pull-over, a turn sweeping wider than its samples), and those are broken where they form: a car
+//! and one in its way waiting for each other a while, the car backs up a little out of its way,
+//! never into anyone (`cars::back_off`). An ask older than `OLD_ASK` yields only to one it waits
+//! for itself, not to a stream round about: nobody waits on and on while others come and go.
+//! Should two bodies come to overlap anyway, a last-resort check keeps every car from moving
+//! deeper into another (`cars::guard`, counted in `Traffic::guarded`).
 //!
-//! Nothing here is saved: the zones and the claims are worked out again with the routes, and a
-//! vehicle found in a part it doesn't hold (a game just loaded) takes it as it goes on.
+//! Nothing here is saved but the lights (`Light`): the zones and the claims are worked out again
+//! with the routes, and a car found in a part it doesn't hold (a game just loaded) takes it as it
+//! goes on.
 
 use crate::cars::Rect;
 use crate::travel::{Graph, dist};
@@ -72,8 +63,8 @@ pub(crate) const SAMPLE: f32 = 1.0;
 const TURN_SAMPLE: f32 = 0.08;
 /// The room a vehicle wants clear on the far side of a claim: its length, and this (m).
 pub(crate) const ROOM_GAP: f32 = 1.0;
-/// Two coming towards each other pass where pulling over takes them this far apart (m: `bus`'s
-/// `PASSING` and a little).
+/// Two coming towards each other pass where pulling over takes them this far apart (m: about
+/// `cars::PASSING`).
 pub(crate) const PASS_GAP: f32 = 0.08;
 /// Two going within about 25° of each other's way go the same way (the cosine).
 const SAME_WAY: f32 = 0.9;
@@ -83,7 +74,7 @@ const CLEAR: f32 = 0.25;
 /// to stop short in front of one just granted.
 pub(crate) const LOOK: [f32; 3] = [10.0, 20.0, 30.0];
 /// How far along its way a vehicle's ask is its own business with one right behind it (m,
-/// `behind`): that one can't get there first. Further on (a bus's way round and back) it may.
+/// `behind`): that one can't get there first. Further on (its way round and back) it may.
 const NEAR_AHEAD: f32 = 40.0;
 /// A junction's box: as far from its middle as two bodies in their lanes on any two of its arms
 /// are this far apart (m), between `BOX_LEAST` and `BOX_MOST`; its arms looked along this far (m).
@@ -211,13 +202,10 @@ pub(crate) fn swings(trace: &Trace, len: f32) -> Vec<f32> {
 }
 
 /// A route's claims (`Claim`), its parts in order: for a body `len` by `wid` along `trace` (how far
-/// it can pull over at each pose, `pass`), the zones it drives through (`zones`: junctions' boxes,
-/// where a bus sweeps round a sharp turn; waited for `lead` m short of them), and `more` (stretches
-/// of it that are parts of their own: a driveway's mouth, a bus's way where a car can't pass it, a
-/// car's where it couldn't pass one coming the other way). Parts its body comes to before it's out
-/// of the last make one group (`Claim::group`: it can't stand clear of them between); `cuts`
-/// (ticks along it) split a group where it stands clear of every junction's box (a bus at a stop).
-#[allow(clippy::too_many_arguments)]
+/// it can pull over at each pose, `pass`), the zones it drives through (`zones`: junctions' boxes),
+/// and `more` (stretches of it that are parts of their own: a driveway's mouth, where it couldn't
+/// pass one coming the other way). Parts its body comes to before it's out of the last make one
+/// group (`Claim::group`: it can't stand clear of them between).
 pub(crate) fn claims(
     trace: &Trace,
     pass: &[f32],
@@ -225,8 +213,6 @@ pub(crate) fn claims(
     wid: f32,
     zones: &[([f32; 2], f32)],
     more: &[(f32, f32)],
-    lead: f32,
-    cuts: &[f32],
 ) -> Vec<Claim> {
     let n = trace.len();
     if n == 0 {
@@ -276,11 +262,11 @@ pub(crate) fn claims(
             last => parts.push((a, b, last.map_or(0, |l| l.2 + 1), zone)),
         }
     }
-    // A group begun with a zone, waited for `lead` m short of it (clear of where one coming out of
-    // it the other way goes on): one with the group before, where that's no further on than that.
+    // A group begun with a zone, from its first pose there: one with the group before, where
+    // that's no further on.
     let back = |t: f32| {
         let k = trace.partition_point(|s| s.0 < t).min(n - 1);
-        trace[trace.partition_point(|s| s.4 < trace[k].4 - lead).min(k)].0
+        trace[trace.partition_point(|s| s.4 < trace[k].4).min(k)].0
     };
     let orig: Vec<u32> = parts.iter().map(|p| p.2).collect();
     let (mut id, mut end) = (0u32, f32::NEG_INFINITY);
@@ -303,33 +289,9 @@ pub(crate) fn claims(
             b
         };
     }
-    // Cut where it stands clear (renumbering the groups after).
-    let mut out: Vec<(f32, f32, u32, bool)> = Vec::new();
-    let (mut id, mut was) = (0, None);
-    for (a, b, g, zone) in parts {
-        if was.is_some_and(|w| w != g) {
-            id += 1;
-        }
-        was = Some(g);
-        let cut = cuts
-            .iter()
-            .copied()
-            .filter(|&c| c > a + 1e-3 && c < b - 1e-3)
-            .fold(None, |m: Option<f32>, c| Some(m.map_or(c, |m| m.min(c))));
-        match cut {
-            Some(c) => {
-                // (Asking for the rest only once it's on its way again: `CUT_ON` after.)
-                out.push((a, c, id, zone));
-                id += 1;
-                if c + CUT_ON < b {
-                    out.push((c + CUT_ON, b, id, zone));
-                }
-            }
-            None => out.push((a, b, id, zone)),
-        }
-    }
     let room = len + ROOM_GAP;
-    out.into_iter()
+    parts
+        .into_iter()
         .map(|(from, to, group, _)| {
             let far = along(to) + room;
             let samples = (0..n)
@@ -350,24 +312,6 @@ pub(crate) fn claims(
             let mut c = Claim::new(from, to, samples);
             c.group = group;
             c
-        })
-        .collect()
-}
-
-/// Whether a body `len` by `wid` is in a junction's box (`boxes`) at each of `trace`'s poses.
-pub(crate) fn in_boxes(trace: &Trace, len: f32, wid: f32, boxes: &[([f32; 2], f32)]) -> Vec<bool> {
-    let r0 = len.hypot(wid) / 2.0;
-    trace
-        .iter()
-        .map(|&(_, p, yaw, ..)| {
-            let body = Rect {
-                at: p,
-                yaw,
-                half: [len / 2.0, wid / 2.0],
-            };
-            boxes
-                .iter()
-                .any(|&(c, r)| dist(p, c) <= r + r0 && touches(&body, c, r))
         })
         .collect()
 }
@@ -455,8 +399,8 @@ pub fn boxes(g: &Graph) -> Vec<([f32; 2], f32)> {
     out
 }
 
-/// A junction with traffic lights (`Travel::signals`: where `SIGNAL_ARMS` roads or more meet and
-/// `SIGNAL_LINES` bus lines or more come through, `bus::settle`): its middle, and its arms. One arm
+/// A junction with traffic lights (`Travel::signals`: where `SIGNAL_ARMS` roads or more meet,
+/// `settle`): its middle, and its arms. One arm
 /// at a time has green (`Light`); a group through it is asked for only on its arm's green
 /// (`Claim::gate`), at the stop line where its claim begins, and holding it, one goes on through
 /// on amber and red; the claims keep anyone from driving into another in the box as ever.
@@ -495,12 +439,10 @@ pub struct Light {
     pub since: u64,
 }
 
-/// A junction where this many roads for cars meet, and this many bus lines come through, has
-/// traffic lights (`Signal`).
+/// A junction where this many roads for cars meet may have traffic lights (`Signal`).
 pub(crate) const SIGNAL_ARMS: usize = 3;
-pub(crate) const SIGNAL_LINES: usize = 2;
 /// How long an arm's green lasts at least, its amber, and all red after while the box
-/// clears: a bus across it out the far side (ticks).
+/// clears (ticks).
 const MIN_GREEN: u64 = 5 * crate::TICKS_PER_MINUTE;
 /// Every arm's turn comes round in this long at most (ticks): an arm's green lasts no longer than
 /// its share of it (`change_lights`).
@@ -515,9 +457,9 @@ const POLE_OUT: f32 = 1.0;
 const POLE_KERB: f32 = 0.4;
 
 /// The lights of the junction at node `n` of `g` (`Signal`): its arms for cars, each with its pole
-/// on the kerb to the right of the way in, just out past the box (`boxes`), moved on out along the
-/// arm clear of `clear` (bus stops: `POLE_CLEAR`). None: fewer than `SIGNAL_ARMS` arms.
-pub(crate) fn signal_at(g: &Graph, n: usize, clear: &[[f32; 2]]) -> Option<Signal> {
+/// on the kerb to the right of the way in, just out past the box (`boxes`). None: fewer than
+/// `SIGNAL_ARMS` arms.
+pub(crate) fn signal_at(g: &Graph, n: usize) -> Option<Signal> {
     let p = g.nodes[n];
     let mut arms: Vec<([f32; 2], f32)> = Vec::new();
     // (Each arm's way out, and how far from its middle its kerb is.)
@@ -572,24 +514,15 @@ pub(crate) fn signal_at(g: &Graph, n: usize, clear: &[[f32; 2]]) -> Option<Signa
                     p[1] + way[1] * d + right[1] * side,
                 ]
             };
-            let mut d = reach(way) + POLE_OUT;
-            while d < reach(way) + POLE_OUT + 12.0
-                && clear.iter().any(|&c| dist(c, at(d)) < POLE_CLEAR)
-            {
-                d += 1.0;
-            }
             SignalArm {
                 way,
-                pole: at(d),
+                pole: at(reach(way) + POLE_OUT),
                 yaw: way[0].atan2(way[1]),
             }
         })
         .collect();
     Some(Signal { at: p, arms })
 }
-
-/// How far from a bus stop a signal pole stands at least (m, `signal_at`).
-pub const POLE_CLEAR: f32 = 4.0;
 
 /// The lights `claims`' groups go through (`Claim::gate`): of `signals`, the first each group
 /// comes this near (`GATE_REACH`), and the arm it comes in by.
@@ -624,156 +557,22 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal]) {
     }
 }
 
-/// How far a bus's way turns over its own length (radians) for its body to sweep out of its lane
-/// round a sharp turn outside a junction's box (`sweeps`): a car right behind it would be in the
-/// way of its tail swinging round.
-const SWEEP_TURN: f32 = 0.8;
-/// How far apart the circles round a bus's body sweeping round are (m, `sweeps`).
-const SWEEP_STEP: f32 = 1.5;
-
-/// The zones where a bus's body sweeps out of its lane round a sharp turn outside any junction's
-/// box (`boxes`), along `trace` for a body `len` by `wid` (its line's way): round all its body's
-/// corners there (a middle, and how far round it), with `CLEAR` to spare. Cars and buses take
-/// turns through them as through a junction's box (`World::travel`'s `zones`).
-pub(crate) fn sweeps(
-    trace: &Trace,
-    len: f32,
-    wid: f32,
-    boxes: &[([f32; 2], f32)],
-) -> Vec<([f32; 2], f32)> {
-    let n = trace.len();
-    let boxed = in_boxes(trace, len, wid, boxes);
-    let sharp = |k: usize| {
-        let d = trace[k].4;
-        let a = trace[..k].partition_point(|s| s.4 < d - len / 2.0);
-        let b = (k + trace[k..].partition_point(|s| s.4 <= d + len / 2.0)).min(n - 1);
-        !boxed[k] && crate::world::wrap_angle(trace[b].2 - trace[a].2).abs() > SWEEP_TURN
-    };
-    // (Round its body as it goes, every `SWEEP_STEP` m along it, at each pose, in circles across
-    // its width.)
-    let mut out: Vec<([f32; 2], f32)> = Vec::new();
-    let r = wid / 2.0 + CLEAR;
-    for (from, to) in runs(trace, sharp) {
-        for s in trace.iter().filter(|s| s.0 >= from && s.0 <= to) {
-            let (sn, cs) = s.2.sin_cos();
-            let n = (len / SWEEP_STEP).ceil() as usize;
-            for k in 0..=n {
-                let d = -len / 2.0 + len * k as f32 / n as f32;
-                let c = [s.1[0] + sn * d, s.1[1] + cs * d];
-                if !out.iter().any(|&(q, _)| dist(q, c) < SWEEP_STEP / 2.0) {
-                    out.push((c, r));
-                }
-            }
-        }
-    }
-    out
+/// The stretches of a car's route along `trace` (pulling over `pass` m at each pose, its ends
+/// swinging out `swing` m, overlapping another car coming the other way in its lane `over` m) where
+/// it couldn't pass one coming the other way (a 6 m lane's tight bend), each begun `NARROW_BACK` m
+/// before: a claim of their own, so that two coming towards each other take turns there.
+pub(crate) fn narrow(trace: &Trace, pass: &[f32], swing: &[f32], over: &[f32]) -> Vec<(f32, f32)> {
+    let at = |v: &[f32], k: usize| v.get(k).copied().unwrap_or(0.0);
+    let spans = runs(trace, |k| {
+        let (p, s, o) = (at(pass, k), at(swing, k), at(over, k));
+        o > 0.0 && o + s + PASS_GAP > 2.0 * p
+    });
+    back_by(trace, spans, NARROW_BACK)
 }
 
-/// The buses' ways (`bus::settle`), for where a car coming the other way couldn't pass a bus, both
-/// pulled over: their places about every `SAMPLE` m, the way the bus goes there, how far it can
-/// pull over (none stood at a stop), how far its ends swing out on a bend (`swings`), and how far
-/// a car in its lane coming the other way overlaps it in its own (m), by the `NARROW_CELL` m square
-/// they're in. A car's route along one where they couldn't pass claims it (`Narrow::spans`), as the
-/// bus's does (`bus::Line::claims`): they take turns there.
-#[derive(Debug, Clone, Default)]
-pub struct Narrow {
-    cells: std::collections::BTreeMap<(i32, i32), Vec<NarrowPlace>>,
-}
-
-/// A place on a bus's way (`Narrow`): where, the way the bus goes, and how far it can pull over
-/// there (m).
-type NarrowPlace = ([f32; 2], [f32; 2], f32);
-
-/// The cells of `Narrow` (m).
-const NARROW_CELL: f32 = 8.0;
-/// How far before one a claim of it begins (m: half a car's length and half a bus's): two coming
-/// towards each other wait where they pass.
-pub(crate) const NARROW_BACK: f32 = 6.6;
-
-impl Narrow {
-    /// Adds the place `p` where a bus going `way` can pull over `pass` m.
-    pub(crate) fn add(&mut self, p: [f32; 2], way: [f32; 2], pass: f32) {
-        self.cells.entry(cell(p)).or_default().push((p, way, pass));
-    }
-
-    /// Whether a car's body `car` going `way`, pulling over `pass` m there, couldn't pass a bus
-    /// coming the other way there: their bodies as they'd be, side by side or nose to nose on a
-    /// bend, both pulled over as far as they can (`conflict`).
-    fn stuck(&self, car: &Rect, way: [f32; 2], pass: f32) -> bool {
-        let (cx, cz) = cell(car.at);
-        let mine = Sample {
-            t: 0.0,
-            d: 0.0,
-            rect: *car,
-            way,
-            pass,
-        };
-        (cx - 1..=cx + 1).any(|x| {
-            (cz - 1..=cz + 1).any(|z| {
-                self.cells
-                    .get(&(x, z))
-                    .into_iter()
-                    .flatten()
-                    .any(|&(q, theirs, room)| {
-                        // (Coming towards each other, if round a bend.)
-                        if way[0] * theirs[0] + way[1] * theirs[1] >= 0.0 {
-                            return false;
-                        }
-                        let bus = Sample {
-                            t: 0.0,
-                            d: 0.0,
-                            rect: Rect {
-                                at: q,
-                                yaw: theirs[0].atan2(theirs[1]),
-                                half: [crate::bus::BUS_LEN / 2.0, crate::bus::BUS_WID / 2.0],
-                            },
-                            way: theirs,
-                            pass: room,
-                        };
-                        conflict(&mine, &bus, false)
-                    })
-            })
-        })
-    }
-
-    /// The stretches of a car's route along `trace` (a body `len` by `wid`, pulling over `pass` m
-    /// at each pose, its ends swinging out `swing` m, overlapping another car coming the other way
-    /// in its lane `over` m) where it couldn't pass one coming the other way: a bus, here, or
-    /// another car (a 6 m lane's tight bend).
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn spans(
-        &self,
-        trace: &Trace,
-        len: f32,
-        wid: f32,
-        pass: &[f32],
-        swing: &[f32],
-        over: &[f32],
-    ) -> Vec<(f32, f32)> {
-        let at = |v: &[f32], k: usize| v.get(k).copied().unwrap_or(0.0);
-        let spans = runs(trace, |k| {
-            let (p, s, o) = (at(pass, k), at(swing, k), at(over, k));
-            let (_, q, yaw, back, _) = trace[k];
-            let w = if back { -1.0 } else { 1.0 };
-            let car = Rect {
-                at: q,
-                yaw,
-                half: [len / 2.0, wid / 2.0],
-            };
-            (o > 0.0 && o + s + PASS_GAP > 2.0 * p)
-                || self.stuck(&car, [yaw.sin() * w, yaw.cos() * w], p)
-        });
-        back_by(trace, spans, NARROW_BACK)
-    }
-}
-
-/// The cell of `Narrow` a place is in.
-fn cell(p: [f32; 2]) -> (i32, i32) {
-    (
-        (p[0] / NARROW_CELL).floor() as i32,
-        (p[1] / NARROW_CELL).floor() as i32,
-    )
-}
+/// How far before a narrow stretch a claim of it begins (m, `narrow`): two coming towards each
+/// other wait where they pass.
+const NARROW_BACK: f32 = 6.6;
 
 /// `spans` of `trace` (ticks along it), each begun `back` m earlier.
 pub(crate) fn back_by(trace: &Trace, spans: Vec<(f32, f32)>, back: f32) -> Vec<(f32, f32)> {
@@ -788,7 +587,7 @@ pub(crate) fn back_by(trace: &Trace, spans: Vec<(f32, f32)>, back: f32) -> Vec<(
         .collect()
 }
 
-/// A car or bus on the road this tick, as the others keep out of its way (`Traffic::begin`): its
+/// A car on the road this tick, as the others keep out of its way (`Traffic::begin`): its
 /// key (`cars::Driving::first`), its body, the way it goes and how far it can still pull over
 /// (`Sample::pass`); whether it moved last tick, and where it'll be along its way in the next ticks
 /// (`LOOK`); and whether it stands parked to all intents (a car still in its driveway, not yet let
@@ -807,8 +606,7 @@ pub(crate) struct Mover {
 }
 
 /// Where a vehicle is on its route, for its claims (`Traffic::begin`): its key, the tag of its
-/// route's claims (a car's: whether it's on its way home; a bus's 0) and how far along it is
-/// (ticks).
+/// route's claims (whether it's on its way home) and how far along it is (ticks).
 pub(crate) type Place = (u64, u32, f32);
 
 #[derive(Debug, Clone)]
@@ -818,9 +616,6 @@ struct Hold {
     claim: Claim,
     /// How far along its route its holder was as the tick began.
     at: f32,
-    /// The tick it last came on along its route (`HOLD_STILL`), and the tick it asked for it.
-    since: u64,
-    asked: u64,
 }
 
 /// A vehicle's ask for the parts of a group of its route's claims (`Claim::group`), in order:
@@ -841,15 +636,8 @@ struct Ask {
     fifo: Vec<u64>,
 }
 
-/// How far past where a group is cut (`claims`) the rest of it begins (ticks): standing there,
-/// it asks for it only once it's on its way again.
-const CUT_ON: f32 = 1.0;
-
 /// How far short of what's left of another's claim one waits (m, `Traffic::blocked`).
 const KEEP_SHORT: f32 = 1.5;
-/// A bus that hasn't come on in this long (ticks) lets go of the parts it isn't in yet
-/// (`Traffic::begin`).
-const HOLD_STILL: u64 = 10 * crate::TICKS_PER_MINUTE;
 
 /// An ask this old (ticks) yields only to those it waits for itself (`Traffic::begin`, rule 2).
 const OLD_ASK: u64 = 20 * crate::TICKS_PER_MINUTE;
@@ -861,14 +649,11 @@ pub struct Traffic {
     tick: u64,
     holds: Vec<Hold>,
     asks: Vec<Ask>,
-    /// Those that let go of parts not come on to (`HOLD_STILL`), and when they had asked: asking
-    /// again, they keep their place.
-    kept: Vec<(u64, u64)>,
     /// Each lit junction's lights (`Travel::signals`): the arm whose turn it is, how far through
     /// it (`Light`), and since when.
     pub(crate) lights: Vec<Light>,
     movers: Vec<Mover>,
-    /// Ticks a car was kept from moving deeper into another car or a bus by the last-resort check
+    /// Ticks a car was kept from moving deeper into another by the last-resort check
     /// (`cars::guard`), since the game was loaded.
     pub guarded: u64,
 }
@@ -876,11 +661,6 @@ pub struct Traffic {
 /// Claim `k` of a route tagged `route` (`Place`).
 fn tag(route: u32, k: usize) -> u32 {
     route << 16 | k as u32
-}
-
-/// Whether `key` is a bus's (`cars::Driving::first`: a car's has its top bit set).
-fn is_bus(key: u64) -> bool {
-    key < 1 << 63
 }
 
 impl Traffic {
@@ -894,8 +674,7 @@ impl Traffic {
         self.holds.iter().any(|h| h.key == key)
     }
 
-    /// Whether `key` waits for a claim to be granted, at the start of it (this tick or the last:
-    /// the cars go on before the buses).
+    /// Whether `key` waits for a claim to be granted, at the start of it (this tick or the last).
     pub fn waiting(&self, key: u64) -> bool {
         self.asks
             .iter()
@@ -947,21 +726,14 @@ impl Traffic {
                     tag,
                     claim: c.clone(),
                     at: t,
-                    since: tick,
-                    asked: tick,
                 });
                 continue;
             }
             match self.asks.iter_mut().find(|a| a.key == key) {
                 Some(a) if a.parts.first().is_some_and(|p| p.0 == tag) => a.seen = tick,
                 found => {
-                    // (Asking again for what it let go of, standing still: in its place.)
-                    let asked = match self.kept.iter().position(|k| k.0 == key) {
-                        Some(i) => self.kept.remove(i).1,
-                        None => tick,
-                    };
                     let ask = Ask {
-                        tick: asked,
+                        tick,
                         key,
                         route,
                         group: c.group,
@@ -1017,31 +789,25 @@ impl Traffic {
         let holding = self.holding(key);
         let next = if holding { *next } else { long(next) };
         let (now, next) = (sample(now), sample(&next));
-        let me = is_bus(key);
         for h in &self.holds {
             if h.key == key || !in_bounds(&h.claim, &next.rect) {
                 continue;
             }
-            // (Not one right behind it, nor a car that waits for it to go on: as for its grant.)
-            if self.mover(h.key).is_some_and(|m| {
-                behind((&now.rect, way), (&m.rect, m.way)) || !is_bus(h.key) && m.waits == Some(key)
-            }) {
+            // (Not one right behind it, nor one that waits for it to go on: as for its grant.)
+            if self
+                .mover(h.key)
+                .is_some_and(|m| behind((&now.rect, way), (&m.rect, m.way)) || m.waits == Some(key))
+            {
                 continue;
             }
             let rest = h.claim.rest(h.at);
             // (In its way already, ahead of it: it waits for this one, which goes on out.)
-            if rest
-                .iter()
-                .any(|o| counts(&now, me, o, is_bus(h.key), true))
-            {
+            if rest.iter().any(|o| conflict(&now, o, true)) {
                 continue;
             }
             // (Holding a claim itself, it was granted it with the other's: going its way, they
             // follow each other through, `cars::up_against`; only one not holding cuts in.)
-            if rest
-                .iter()
-                .any(|o| counts(&next, me, o, is_bus(h.key), !holding))
-            {
+            if rest.iter().any(|o| conflict(&next, o, !holding)) {
                 return Some(h.key);
             }
         }
@@ -1122,7 +888,7 @@ impl Traffic {
         }
     }
 
-    /// The tick's claims (before the cars and the buses go on): the vehicles on the road
+    /// The tick's claims (before the cars go on): the vehicles on the road
     /// (`movers`), and where those holding or asking are (`places`); a part its holder is out of,
     /// or no longer on (another route, gone), let go; asks neither asked again nor going on through
     /// their group dropped; then the asks' next parts granted in order (see the module notes).
@@ -1141,31 +907,13 @@ impl Traffic {
                 .find(|p| p.0 == key && p.1 == route)
                 .map(|p| p.2)
         };
-        // (A bus that hasn't come on `HOLD_STILL` and isn't in a part yet lets it go, and asks
-        // for it again as it comes on: one held up on its way doesn't keep a junction from
-        // everyone else.)
-        let mut kept = Vec::new();
         self.holds.retain_mut(|h| match place(h.key, h.tag >> 16) {
             Some(t) if t < h.claim.to => {
-                if t > h.at + 0.5 {
-                    h.since = tick;
-                }
                 h.at = t;
-                let stood = is_bus(h.key) && t < h.claim.from && tick > h.since + HOLD_STILL;
-                if stood {
-                    kept.push((h.key, h.asked));
-                }
-                !stood
+                true
             }
             _ => false,
         });
-        for (key, asked) in kept {
-            match self.kept.iter_mut().find(|k| k.0 == key) {
-                Some(k) => k.1 = k.1.min(asked),
-                None => self.kept.push((key, asked)),
-            }
-        }
-        self.kept.retain(|k| places.iter().any(|p| p.0 == k.0));
         let holds = &self.holds;
         self.asks.retain(|a| {
             let going = holds
@@ -1202,14 +950,11 @@ impl Traffic {
             let Some(first) = next[0].samples.first() else {
                 let (tag, claim) = self.asks[i].parts.remove(0);
                 let key = self.asks[i].key;
-                let asked = self.asks[i].tick;
                 self.holds.push(Hold {
                     key,
                     tag,
                     at: claim.from,
                     claim,
-                    since: tick,
-                    asked,
                 });
                 continue;
             };
@@ -1243,20 +988,16 @@ impl Traffic {
                 .iter()
                 .filter(|h| {
                     let rest = h.claim.rest(h.at);
-                    // (Not a car's that waits for this one's body where it stands, in its way, or
+                    // (Not one's that waits for this one's body where it stands, in its way, or
                     // for the body of one that does, and so on, as in a queue behind it: it's to go
                     // on first.)
-                    let waits = !is_bus(h.key)
-                        && (self.mover(h.key).is_some_and(|m| m.waits == Some(a.key))
-                            || reaches(&on_road, h.key, a.key));
+                    let waits = self.mover(h.key).is_some_and(|m| m.waits == Some(a.key))
+                        || reaches(&on_road, h.key, a.key);
                     h.key != a.key
                         && !waits
-                        && next.iter().any(|c| {
-                            overlaps(
-                                (c, &c.samples[mine(c, h.key)], is_bus(a.key)),
-                                (&h.claim, rest, is_bus(h.key)),
-                            )
-                        })
+                        && next
+                            .iter()
+                            .any(|c| overlaps((c, &c.samples[mine(c, h.key)]), (&h.claim, rest)))
                 })
                 .map(|h| h.key)
                 .collect();
@@ -1264,8 +1005,8 @@ impl Traffic {
             // body).
             let conflicting = |(j, bodies_of): &&(usize, Vec<u64>)| {
                 let e = &self.asks[*j];
-                // (Asked long ago, only one it waits for itself goes first, a bus's or a car's:
-                // no stream of others waiting for it round about holds it up for good.)
+                // (Asked long ago, only one it waits for itself goes first: no stream of others
+                // waiting for it round about holds it up for good.)
                 let old = tick > e.tick + OLD_ASK;
                 let first = if old {
                     graph.get(&e.key).is_some_and(|g| g.contains(&a.key))
@@ -1275,10 +1016,7 @@ impl Traffic {
                 !first
                     && next.iter().any(|c| {
                         e.parts.iter().any(|(_, o)| {
-                            overlaps(
-                                (c, &c.samples[mine(c, e.key)], is_bus(a.key)),
-                                (o, &o.samples, is_bus(e.key)),
-                            )
+                            overlaps((c, &c.samples[mine(c, e.key)]), (o, &o.samples))
                         })
                     })
             };
@@ -1307,10 +1045,6 @@ impl Traffic {
                     continue;
                 }
                 let strict = !self.holding(m.key);
-                let asking = self
-                    .asks
-                    .iter()
-                    .any(|x| x.key == m.key && x.seen + 1 >= tick);
                 let hit = |r: &Rect, strict: bool| {
                     let o = Sample {
                         t: 0.0,
@@ -1322,11 +1056,8 @@ impl Traffic {
                     next.iter().any(|c| {
                         in_bounds(c, r)
                             && c.samples.iter().any(|s| {
-                                // (Its far side clear of buses too, a bus's of one not itself
-                                // waiting for a claim: don't block the box.)
-                                let far = s.t > c.to;
-                                let ahead = far && !asking;
-                                counts(s, is_bus(a.key) && !ahead, &o, is_bus(m.key), strict || far)
+                                // (Its far side clear too: don't block the box.)
+                                conflict(s, &o, strict || s.t > c.to)
                             })
                     })
                 };
@@ -1344,8 +1075,6 @@ impl Traffic {
                     self.holds.push(Hold {
                         key,
                         tag,
-                        since: tick,
-                        asked: self.asks[i].tick,
                         at: claim.from,
                         claim,
                     });
@@ -1388,13 +1117,6 @@ fn reaches(graph: &std::collections::BTreeMap<u64, Vec<u64>>, from: u64, to: u64
     false
 }
 
-/// Whether sample `a` (a bus's, `abus`, or a car's) is in the way of `b` (`bbus`'s): `conflict`
-/// (`strict`: going the same way too); never a bus's of a bus's (their own rules: the signal box,
-/// pulling over, backing up).
-fn counts(a: &Sample, abus: bool, b: &Sample, bbus: bool, strict: bool) -> bool {
-    !(abus && bbus) && conflict(a, b, strict)
-}
-
 /// Whether body `r` is within reach of `claim`'s samples at all (its box).
 fn in_bounds(claim: &Claim, r: &Rect) -> bool {
     let b = claim.bounds;
@@ -1402,19 +1124,15 @@ fn in_bounds(claim: &Claim, r: &Rect) -> bool {
     !(r.at[0] + k < b[0] || r.at[0] - k > b[2] || r.at[1] + k < b[1] || r.at[1] - k > b[3])
 }
 
-/// Whether any of samples `a` (of claim `ca`, a bus's or not) is in the way of any of `b` (of
-/// `cb`: `counts`).
-fn overlaps(a: (&Claim, &[Sample], bool), b: (&Claim, &[Sample], bool)) -> bool {
-    let ((ca, a, pa), (cb, b, pb)) = (a, b);
-    if pa && pb {
-        return false;
-    }
+/// Whether any of samples `a` (of claim `ca`) is in the way of any of `b` (of `cb`: `conflict`).
+fn overlaps(a: (&Claim, &[Sample]), b: (&Claim, &[Sample])) -> bool {
+    let ((ca, a), (cb, b)) = (a, b);
     let (x, y) = (ca.bounds, cb.bounds);
     if x[2] < y[0] || y[2] < x[0] || x[3] < y[1] || y[3] < x[1] {
         return false;
     }
     a.iter()
-        .any(|s| in_bounds(cb, &s.rect) && b.iter().any(|o| counts(s, pa, o, pb, false)))
+        .any(|s| in_bounds(cb, &s.rect) && b.iter().any(|o| conflict(s, o, false)))
 }
 
 /// Whether two bodies (samples `a` and `b`) are in each other's way: overlapping, or within
@@ -1457,23 +1175,16 @@ pub(crate) fn behind(me: (&Rect, [f32; 2]), o: (&Rect, [f32; 2])) -> bool {
     along < -0.5 && across < BEHIND_ACROSS
 }
 
-/// Whom vehicle `key` (`cars::Driving::first`: a car's or a bus's) waits for this tick: one in
-/// its way, those holding claims it asks for and the earlier asks it waits for. For checks (the
-/// generated worlds': a vehicle is stuck when nothing it waits for, however far round, goes on).
+/// Whom car `key` (`cars::Driving::first`) waits for this tick: one in its way, those holding
+/// claims it asks for and the earlier asks it waits for. For checks (the generated worlds': a car
+/// is stuck when nothing it waits for, however far round, goes on).
 pub fn waits_on(w: &World, key: u64) -> Vec<u64> {
-    let mut out: Vec<u64> = if is_bus(key) {
-        w.transit
-            .way_of(key)
-            .and_then(|b| b.2)
-            .into_iter()
-            .collect()
-    } else {
-        w.cars
-            .get((key & !(1 << 63)) as usize)
-            .and_then(|c| c.waits_for)
-            .into_iter()
-            .collect()
-    };
+    let mut out: Vec<u64> = w
+        .cars
+        .get((key & !(1 << 63)) as usize)
+        .and_then(|c| c.waits_for)
+        .into_iter()
+        .collect();
     if let Some(a) = w.traffic.asks.iter().find(|a| a.key == key) {
         out.extend(a.by.iter().chain(&a.fifo));
     }
@@ -1492,26 +1203,46 @@ pub fn at_red(w: &World, key: u64) -> bool {
     })
 }
 
-/// How far along its way vehicle `key` is (ticks), and whether it's a bus standing at a stop (on
-/// its way all the same); none, not on its way. For checks, with `waits_on`.
-pub fn on_its_way(w: &World, key: u64) -> Option<(f32, bool)> {
-    if is_bus(key) {
-        return w.transit.way_of(key).map(|b| (b.0, b.1));
-    }
+/// How far along its way car `key` is (ticks); none, not on its way. For checks, with `waits_on`.
+pub fn on_its_way(w: &World, key: u64) -> Option<f32> {
     let car = w.cars.get((key & !(1 << 63)) as usize)?;
     matches!(
         car.state,
         crate::cars::CarState::Leaving | crate::cars::CarState::Arriving
     )
-    .then_some((car.progress, false))
+    .then_some(car.progress)
 }
 
-/// The tick's claims, before the cars and buses go on (`Traffic::begin`).
+/// The junctions' traffic lights (`Travel::signals`: none in a game yet, `Travel::lights_on`; where
+/// it's on, every junction where `SIGNAL_ARMS` roads or more meet), and every car's claims worked
+/// out again with them (`Claim::gate`). Once the cars are made or loaded.
+pub(crate) fn settle(w: &mut World) {
+    let g = &w.travel.graph;
+    w.travel.signals = if w.travel.lights_on {
+        (0..g.nodes.len()).filter_map(|n| signal_at(g, n)).collect()
+    } else {
+        Vec::new()
+    };
+    for car in &mut w.cars {
+        car.reclaim(&w.travel);
+    }
+}
+
+impl World {
+    /// For tests: traffic lights at the junctions (`traffic::Signal`; not yet in a game:
+    /// `Travel::lights_on`), the cars' claims worked out again with them.
+    #[doc(hidden)]
+    pub fn light_busy_junctions(&mut self) {
+        self.travel.lights_on = true;
+        settle(self);
+    }
+}
+
+/// The tick's claims, before the cars go on (`Traffic::begin`).
 pub(crate) fn begin(w: &mut World) {
     let mut movers = Vec::new();
     let mut places = Vec::new();
     crate::cars::movers(w, &mut movers, &mut places);
-    crate::bus::movers(w, &mut movers, &mut places);
     let tick = w.tick;
     w.traffic.begin(tick, movers, &places, &w.travel.signals);
 }
