@@ -1380,7 +1380,7 @@ fn kerb_off(road: &crate::travel::Road) -> f32 {
 }
 
 /// `kerb_off` for a road `width` m wide of `kind`.
-fn kerb_of(width: f32, kind: crate::travel::RoadKind) -> f32 {
+pub(crate) fn kerb_of(width: f32, kind: crate::travel::RoadKind) -> f32 {
     match kind {
         crate::travel::RoadKind::Country | crate::travel::RoadKind::Trail => width / 2.0,
         _ => (width / 2.0 - SIDEWALK).max(TIGHT_LANE + 0.5),

@@ -629,6 +629,11 @@ export interface WorldStructure {
    * for both). Absent: none (the furniture stands where it always did).
    */
   busStreets?: BusStreetInfo[];
+  /**
+   * Where the traffic lights' poles stand on the kerb (sim-core `traffic::SignalArm::pole`, in the snapshot's signal
+   * head rows' order): the kerbside furniture keeps clear of them. Absent: none.
+   */
+  lightPoles?: [number, number][];
 }
 
 /**

@@ -496,6 +496,8 @@ function mergeSilhouettes(into: SilhouettePlan, s: SilhouettePlan): void {
  */
 const STOP_BEHIND = 7.5;
 const STOP_AHEAD = 4;
+/** How far either side of a traffic light's pole along the kerb nothing else stands (m: `WorldStructure.lightPoles`). */
+export const POLE_CLEAR = 1.5;
 const STOP_SIGN = 2.6;
 
 /** A part of `TownStreet.layoutKey`, strung once per object. */
@@ -648,6 +650,7 @@ export class TownStreet {
       mode === 'town' ? (world.cars ? keyOf(world.cars, () => JSON.stringify(world.cars)) : '-') : !!world.cars,
       world.stops ? keyOf(world.stops, () => JSON.stringify(world.stops)) : '-',
       world.busStreets ? keyOf(world.busStreets, () => JSON.stringify(world.busStreets)) : '-',
+      world.lightPoles ? keyOf(world.lightPoles, () => JSON.stringify(world.lightPoles)) : '-',
       keyOf(world.plots, () => JSON.stringify(world.plots.map((p) => [p.id, p.x, p.z, p.w, p.d, p.public, p.entry]))),
     ].join('|');
   }
@@ -1126,6 +1129,13 @@ export class TownStreet {
       // (+1: the bus goes the way `s` grows.)
       const way = (bx - ax) * Math.sin(st.busYaw) + (bz - az) * Math.cos(st.busYaw) >= 0 ? 1 : -1;
       mouths.push(way > 0 ? [s - STOP_BEHIND, s + STOP_AHEAD] : [s - STOP_AHEAD, s + STOP_BEHIND]);
+    }
+    // The traffic lights' poles on this side (sim-core `traffic::Signal`): nothing else stands there.
+    for (const [x, z] of world.lightPoles ?? []) {
+      const near = index.nearest(x, z, 8);
+      if (near?.road !== r || near.side !== side) continue;
+      const s = kerb.along(x, z);
+      mouths.push([s - POLE_CLEAR, s + POLE_CLEAR]);
     }
     const clear = (s: number, m: number) => s > 1 && s < kerb.length - 1 && kerb.open(s) && !mouths.some(([a, b]) => s > a - m && s < b + m);
     const used: number[] = [];

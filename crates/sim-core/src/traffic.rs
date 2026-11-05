@@ -499,17 +499,20 @@ pub struct Light {
 /// traffic lights (`Signal`).
 pub(crate) const SIGNAL_ARMS: usize = 3;
 pub(crate) const SIGNAL_LINES: usize = 2;
-/// How long an arm's green lasts at least and at most, its amber, and all red after while the box
+/// How long an arm's green lasts at least, its amber, and all red after while the box
 /// clears: a bus across it out the far side (ticks).
 const MIN_GREEN: u64 = 5 * crate::TICKS_PER_MINUTE;
-const MAX_GREEN: u64 = 20 * crate::TICKS_PER_MINUTE;
+/// Every arm's turn comes round in this long at most (ticks): an arm's green lasts no longer than
+/// its share of it (`change_lights`).
+const CYCLE: u64 = 50 * crate::TICKS_PER_MINUTE;
 const AMBER: u64 = 2 * crate::TICKS_PER_MINUTE;
 const ALL_RED: u64 = 4 * crate::TICKS_PER_MINUTE;
 /// A route this near a lit junction's middle goes through its lights (m, `gate`).
 const GATE_REACH: f32 = BOX_MOST + 2.0;
-/// How far out past its arm's box a signal pole stands, and out past the kerb (m).
+/// How far out past its arm's box a signal pole stands, and in from the kerb on the pavement (or
+/// the road's edge) (m).
 const POLE_OUT: f32 = 1.0;
-const POLE_KERB: f32 = 0.5;
+const POLE_KERB: f32 = 0.4;
 
 /// The lights of the junction at node `n` of `g` (`Signal`): its arms for cars, each with its pole
 /// on the kerb to the right of the way in, just out past the box (`boxes`), moved on out along the
@@ -517,6 +520,7 @@ const POLE_KERB: f32 = 0.5;
 pub(crate) fn signal_at(g: &Graph, n: usize, clear: &[[f32; 2]]) -> Option<Signal> {
     let p = g.nodes[n];
     let mut arms: Vec<([f32; 2], f32)> = Vec::new();
+    // (Each arm's way out, and how far from its middle its kerb is.)
     for e in g.edges.iter() {
         let road = &g.roads[e.road as usize];
         if !road.drivable() {
@@ -529,7 +533,10 @@ pub(crate) fn signal_at(g: &Graph, n: usize, clear: &[[f32; 2]]) -> Option<Signa
             let q = road.at((s + k * ARM_LOOK.min(e.len())).clamp(e.s0, e.s1));
             let l = dist(p, q);
             if l > 0.1 {
-                arms.push(([(q[0] - p[0]) / l, (q[1] - p[1]) / l], road.width));
+                arms.push((
+                    [(q[0] - p[0]) / l, (q[1] - p[1]) / l],
+                    crate::cars::kerb_of(road.width, road.kind),
+                ));
             }
         }
     }
@@ -555,11 +562,11 @@ pub(crate) fn signal_at(g: &Graph, n: usize, clear: &[[f32; 2]]) -> Option<Signa
     };
     let arms = arms
         .iter()
-        .map(|&(way, width)| {
+        .map(|&(way, kerb)| {
             // (Coming in, its right is the way out's left.)
             let right = [way[1], -way[0]];
             let at = |d: f32| {
-                let side = width / 2.0 + POLE_KERB;
+                let side = kerb + POLE_KERB;
                 [
                     p[0] + way[0] * d + right[0] * side,
                     p[1] + way[1] * d + right[1] * side,
@@ -1063,8 +1070,8 @@ impl Traffic {
 
     /// The lights a tick on (`Light`): green on an arm `MIN_GREEN` at least, on while anyone comes
     /// to it (an ask through it, or one holding a claim through it still out of the box) and
-    /// `MAX_GREEN` at most, and only while someone waits at another; then amber (`AMBER`), all red
-    /// while the box clears (`CLEAR`), and the next arm round that anyone waits at. Nobody waiting
+    /// its share of `CYCLE` at most, and only while someone waits at another; then amber (`AMBER`),
+    /// all red while the box clears (`ALL_RED`), and the next arm round that anyone waits at. Nobody waiting
     /// anywhere, it stays green where it is.
     fn change_lights(&mut self, tick: u64, signals: &[Signal]) {
         self.lights.resize(signals.len(), Light::default());
@@ -1083,12 +1090,16 @@ impl Traffic {
             let n = sig.arms.len() as u8;
             let l = self.lights[i];
             let on = tick.saturating_sub(l.since);
+            // (Every arm round in `CYCLE` at most: nobody waits at a red light much longer.)
+            let most = (CYCLE / u64::from(n.max(2) - 1))
+                .saturating_sub(AMBER + ALL_RED)
+                .max(MIN_GREEN);
             let next = |arm: u8| (1..n).map(|k| (arm + k) % n).find(|&x| waits(x));
             self.lights[i] = match l.stage {
                 Stage::Green => {
                     let busy = waits(l.arm) || coming(l.arm);
                     match next(l.arm) {
-                        Some(_) if on >= MAX_GREEN || on >= MIN_GREEN && !busy => Light {
+                        Some(_) if on >= most || on >= MIN_GREEN && !busy => Light {
                             stage: Stage::Amber,
                             since: tick,
                             ..l
@@ -1469,6 +1480,16 @@ pub fn waits_on(w: &World, key: u64) -> Vec<u64> {
     out.sort_unstable();
     out.dedup();
     out
+}
+
+/// Whether vehicle `key` waits at a red light (its ask through lights not on its arm's green): it
+/// isn't held up for good, the light changes (for checks).
+pub fn at_red(w: &World, key: u64) -> bool {
+    w.traffic.asks.iter().any(|a| {
+        a.key == key
+            && a.seen + 1 >= w.traffic.tick
+            && !w.traffic.green(a.parts.first().and_then(|p| p.1.gate))
+    })
 }
 
 /// How far along its way vehicle `key` is (ticks), and whether it's a bus standing at a stop (on

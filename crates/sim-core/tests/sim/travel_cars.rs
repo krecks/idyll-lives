@@ -1155,10 +1155,11 @@ fn a_lit_junctions_signal_heads_are_in_the_snapshot_one_an_arm_on_its_kerb() {
         for k in 0..4 {
             let o = &buf[LIGHT_BASE + k * LIGHT_STRIDE..LIGHT_BASE + (k + 1) * LIGHT_STRIDE];
             assert_eq!(o[light::SHOWN], 1.0);
-            // (On a kerb by the junction: out of the roads' 7 m, near its box.)
+            // (On a pavement by the junction: past the kerb, 2.15 m from a 7 m street's middle,
+            // and on the street, near its box.)
             let (x, z) = (o[light::X], o[light::Z]);
             let off = (x - 200.0).abs().min((z - 200.0).abs());
-            assert!((3.5..5.0).contains(&off), "head {k} at {x}, {z}");
+            assert!((2.15..3.5).contains(&off), "head {k} at {x}, {z}");
             assert!((x - 200.0).hypot(z - 200.0) < 25.0, "head {k} at {x}, {z}");
             let state = o[light::STATE];
             assert!([light::RED, light::AMBER, light::GREEN].contains(&state));
@@ -1172,6 +1173,43 @@ fn a_lit_junctions_signal_heads_are_in_the_snapshot_one_an_arm_on_its_kerb() {
         assert!(lit <= 1, "two arms not red at once");
     }
     assert!(greens.len() >= 2, "the lights changed: {greens:?}");
+}
+
+#[test]
+fn a_lit_junctions_poles_stand_clear_of_the_bus_stops_by_it() {
+    // The crossroads with a stop right by its east arm, on the side its pole would stand: the pole
+    // stands further out along the arm instead.
+    let arm = |a: [f32; 2], b: [f32; 2], ends: &str| {
+        format!(
+            r#"{{"points":[{}],"width":7,"kind":"street","ends":{ends},"area":0}}"#,
+            line_pts(a, b)
+        )
+    };
+    let roads = format!(
+        "[{},{},{},{}]",
+        arm([0.5, 200.0], [200.0, 200.0], r#"["out","join"]"#),
+        arm([200.0, 200.0], [399.5, 200.0], r#"["join","out"]"#),
+        arm([200.0, 120.0], [200.0, 200.0], r#"["dead","join"]"#),
+        arm([200.0, 200.0], [200.0, 280.0], r#"["join","dead"]"#)
+    );
+    let exits = r#"[{"x":0.5,"z":200,"kind":"road"},{"x":399.5,"z":200,"kind":"road"},
+        {"x":211,"z":197.6,"kind":"stop"},{"x":250,"z":202.4,"kind":"stop"},
+        {"x":170,"z":197.6,"kind":"stop"},{"x":150,"z":202.4,"kind":"stop"}]"#;
+    let more = r#","size":"big","walls":[],"doors":[],"windows":[],"relationships":[],
+        "areas":[{"name":"Crossroads","kind":"hamlet","x":130,"z":130,"w":140,"d":140}]"#;
+    let w = town_of(BUS_CONTENT, more, 400, 400, &roads, exits, &[]);
+    assert_eq!(w.travel.signals.len(), 1, "the crossroads is lit");
+    for arm in &w.travel.signals[0].arms {
+        for st in &w.transit.stops {
+            let d = (arm.pole[0] - st.at[0]).hypot(arm.pole[1] - st.at[1]);
+            assert!(
+                d >= sim_core::traffic::POLE_CLEAR,
+                "a pole at {:?} {d:.1} m from the stop at {:?}",
+                arm.pole,
+                st.at
+            );
+        }
+    }
 }
 
 #[test]

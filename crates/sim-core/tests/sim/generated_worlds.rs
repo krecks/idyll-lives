@@ -662,7 +662,7 @@ fn check_stuck(
     failures: &mut std::collections::BTreeSet<String>,
 ) {
     use sim_core::cars::{CarState, car_key};
-    use sim_core::traffic::{on_its_way, waits_on};
+    use sim_core::traffic::{at_red, on_its_way, waits_on};
     // Who went on this tick (a bus standing at a stop is on its way).
     let keys: Vec<u64> = (0..w.cars.len())
         .map(car_key)
@@ -713,10 +713,14 @@ fn check_stuck(
             *entry = (car.progress, w.tick, w.tick);
             continue;
         }
-        // (Anything it waits for, however far round, going on.)
+        // (Anything it waits for, however far round, going on; or a red light, which changes:
+        // waiting there longer than `CAR_WAIT_TICKS` is all the same.)
         let mut seen = vec![car_key(c)];
         let mut i = 0;
         while i < seen.len() && seen.len() < 64 {
+            if at_red(w, seen[i]) {
+                entry.2 = w.tick;
+            }
             for k in waits_on(w, seen[i]) {
                 if went.contains(&k) {
                     entry.2 = w.tick;
