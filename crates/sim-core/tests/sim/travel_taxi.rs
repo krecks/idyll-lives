@@ -537,3 +537,61 @@ fn a_car_held_up_by_a_crowd_crossing_in_front_of_it_gets_its_gap() {
     }
     assert!(reached.is_some(), "it never came up to them");
 }
+
+#[test]
+fn a_car_waiting_for_three_crossing_right_in_front_of_it_gets_by() {
+    // (As at Crown Quarter: three on foot crossing the street a few metres in front of a car,
+    // over and over, each across and back.) Those walking through the ground in front of it go on
+    // across, not stepped back where they came from; those coming up to it wait for it: it gets
+    // by soon.
+    let mut crowd = house(300, &[]);
+    crowd.sims = (0..3)
+        .map(|k| format!(r#"{{"name":"W{k}","age":30,"traits":["cheerful"]}}"#))
+        .collect();
+    let mut home = house(200, &[r#"{"name":"Dad","age":40,"traits":["cheerful"]}"#]);
+    home.car = true;
+    let mut w = town(7, &[home, crowd]);
+    run_to(&mut w, 1, 9.0);
+    drive(&mut w, 0, 0, true);
+    let end = w.tick + 4 * 60 * 20;
+    let cross = 268.0;
+    let mut reached = None;
+    while w.cars[0].state != CarState::Parked && w.tick < end {
+        let x = w.cars[0].shown.map_or(f32::INFINITY, |s| s.0[0]);
+        if reached.is_none() && x < cross + 9.0 && w.cars[0].state == CarState::Arriving {
+            reached = Some(w.tick);
+        }
+        // (From when it's a few metres off: each of them across, then back, at the same place.)
+        if x < cross + 14.0 {
+            for i in 1..=3usize {
+                let s = &w.sims[i];
+                let walking = s
+                    .current()
+                    .is_some_and(|a| matches!(a.phase, sim_core::world::Phase::Routing { .. }));
+                if walking {
+                    continue;
+                }
+                let z = if s.pos[1] < STREET {
+                    STREET + 4.5
+                } else {
+                    STREET - 4.5
+                };
+                let _ = w.apply(sim_core::Command::MoveTo {
+                    sim: i as u32,
+                    x: cross + i as f32 * 0.4,
+                    z,
+                });
+            }
+        }
+        w.tick_once();
+        no_overlaps(&w);
+        if let Some(t) = reached {
+            assert!(
+                x < cross - 6.0 || w.tick < t + 20 * 20,
+                "the car still held up by them after 20 minutes: {:?}",
+                w.cars[0].shown
+            );
+        }
+    }
+    assert!(reached.is_some(), "it never came up to them");
+}

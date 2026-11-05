@@ -2722,6 +2722,9 @@ pub(crate) struct TaxiStop {
 /// parked up the driveway leaves no more room (`taxi_stop`).
 const TAXI_IN: f32 = 0.3;
 const TAXI_OVER: f32 = 1.0;
+/// How far from a public parking bay's middle a taxi turning in a driveway's mouth keeps its own
+/// middle, past half its length (m: a car's length and its turn's swing).
+const BAY_CLEAR: f32 = 6.0;
 /// Room kept between a taxi turning in a driveway's mouth and the car parked up it (m).
 const TAXI_GAP: f32 = 0.4;
 
@@ -2751,8 +2754,16 @@ pub(crate) fn taxi_stop(
     let k = to_edge - depth;
     let spot = [inner[0] + way[0] * k, inner[1] + way[1] * k];
     let yaw = (-way[0]).atan2(-way[1]);
-    let turn =
-        depth >= len / 2.0 - TAXI_OVER && Bay::new(spot, yaw, Some(way), mp, r, mouth.s).is_some();
+    // (Not where a car parked out in a public bay by the mouth may stand in the way of its turn:
+    // its body would be under the taxi's path, held up for good by it.)
+    let bay_by = travel
+        .file
+        .parking
+        .iter()
+        .any(|p| crate::travel::dist([p.x, p.z], spot) < len / 2.0 + BAY_CLEAR);
+    let turn = depth >= len / 2.0 - TAXI_OVER
+        && !bay_by
+        && Bay::new(spot, yaw, Some(way), mp, r, mouth.s).is_some();
     Some(TaxiStop {
         spot,
         yaw,
@@ -3027,11 +3038,13 @@ pub(crate) fn movers(
         } else {
             Vec::new()
         };
-        // (As far as it will pull over on its way: not into a junction's box or a narrow span just
-        // ahead, as `drive_on` sees it.)
-        let pass = ([0.0, 10.0, 20.0]
-            .into_iter()
-            .map(|k| route.pass_at(t + k))
+        // (On the move, as far as it will pull over on its way: not into a junction's box or a
+        // narrow span just ahead, as `drive_on` sees it. Standing, waiting at a box's edge, as far
+        // as it can where it stands: those coming out of the box pass it there.)
+        let ahead_too: &[f32] = if moved { &[0.0, 10.0, 20.0] } else { &[0.0] };
+        let pass = (ahead_too
+            .iter()
+            .map(|&k| route.pass_at(t + k))
             .fold(f32::INFINITY, f32::min)
             - shift)
             .max(0.0);
@@ -5586,6 +5599,44 @@ mod tests {
             "Bo stepped aside: {:?}",
             w.sims[1].pos
         );
+    }
+
+    #[test]
+    fn someone_crossing_in_front_of_a_waiting_car_gets_across() {
+        // (As at Crown Quarter: walking across the ground in front of a car that waits for them,
+        // they go on across, not stepped back where they came from, and it goes after.)
+        let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+        w.autonomy = false;
+        w.cars[0].state = CarState::Leaving;
+        w.cars[0].progress = 0.0;
+        w.cars[0].driver = Some(0);
+        w.cars[0].aboard = vec![0];
+        w.sims[0].away_until = Some(w.tick + 100_000);
+        w.sims[1].pos = [31.5, 6.5];
+        // (It has waited a while already, for others before them.)
+        w.tick_once();
+        w.cars[0].waited = 4 * MAKE_WAY_TICKS;
+        let _ = w.apply(crate::Command::MoveTo {
+            sim: 1,
+            x: 37.0,
+            z: 6.5,
+        });
+        let mut across = None;
+        for t in 0..1200 {
+            w.tick_once();
+            if t < 400 {
+                w.cars[0].waited = w.cars[0].waited.max(4 * MAKE_WAY_TICKS);
+            }
+            if across.is_none() && w.sims[1].pos[0] > 36.0 {
+                across = Some(t);
+            }
+        }
+        assert!(
+            across.is_some_and(|t| t < 400),
+            "Bo never got across: {across:?} {:?}",
+            w.sims[1].pos
+        );
+        assert!(w.cars[0].progress > 0.0, "and the car went after");
     }
 
     #[test]

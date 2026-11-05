@@ -689,9 +689,14 @@ fn generated_worlds_cars_keep_to_the_roads() {
         let mut held: Vec<Option<u64>> = vec![None; w.sims.len()];
         let mut worst = (0.0f32, String::new());
         let started = std::time::Instant::now();
+        // (Every car on its way, both days: none held up for good, `check_stuck`, the day-1 check's
+        // rule, on day 2 too.)
+        let mut standing: Standing = Default::default();
+        let mut stood = std::collections::BTreeSet::new();
         while w.tick < end {
             w.tick_once();
             watch.sample(&w);
+            check_stuck(&w, &mut standing, &mut stood);
             if w.tick % 4 != 0 {
                 continue;
             }
@@ -809,6 +814,14 @@ fn generated_worlds_cars_keep_to_the_roads() {
                     clock::day(car.since),
                     clock::hour(car.since)
                 ));
+            }
+        }
+        // (The first time each car stood still too long: once a car, not once a tick.)
+        let mut cars_stood = std::collections::BTreeSet::new();
+        for f in stood {
+            let car = f.split(" (").next().unwrap_or_default().to_string();
+            if cars_stood.insert(car) {
+                failures.push(format!("{label}: {f}"));
             }
         }
         // The work taxi's riders at work, and how late (ticks, early as on time).

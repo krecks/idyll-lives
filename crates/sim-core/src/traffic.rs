@@ -947,7 +947,14 @@ impl Traffic {
         }
         // (Who waits for whose body on the road, however far round: the asks' waits left out.)
         let on_road = graph.clone();
+        // (And who waits for whom for their claims and bodies: the earlier asks they wait their
+        // turn after left out.)
+        let mut by_graph = graph.clone();
         for a in &self.asks {
+            by_graph
+                .entry(a.key)
+                .or_default()
+                .extend(a.by.iter().copied());
             let e = graph.entry(a.key).or_default();
             e.extend(a.by.iter().chain(&a.fifo).copied());
         }
@@ -1033,11 +1040,13 @@ impl Traffic {
             // body).
             let conflicting = |(j, bodies_of): &&(usize, Vec<u64>)| {
                 let e = &self.asks[*j];
-                // (Asked long ago, only one it waits for itself goes first: no stream of others
-                // waiting for it round about holds it up for good.)
+                // (Asked long ago, only one it waits for itself goes first, however far round by
+                // claims and bodies: no stream of others waiting their turn after it round about
+                // holds it up for good, and no ring of them either.)
                 let old = tick > e.tick + OLD_ASK;
                 let first = if old {
                     graph.get(&e.key).is_some_and(|g| g.contains(&a.key))
+                        || reaches(&by_graph, e.key, a.key)
                 } else {
                     bodies_of.contains(&a.key) || reaches(&graph, e.key, a.key)
                 };
