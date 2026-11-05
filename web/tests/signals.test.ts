@@ -1,49 +1,21 @@
 /**
  * The traffic lights' signal-head rows as the renderer reads them (`render/shared/signals.ts`
  * `SignalRows`, drawn by `render/pc/signals.ts`): laid out as sim-core's snapshot writes them
- * (`snapshot.rs` `LIGHT_*`, `header::LIGHT_COUNT`, `light::*`, read from its source here), the rows
+ * (`snapshot.rs` `LIGHT_*`, `header::LIGHT_COUNT`, `light::*`, read from its source: `snapshotLayout.ts`), the rows
  * shown, where each pole stands and which way it faces, the lamp each shows, and what changed from
  * one read to the next.
  */
 
 import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { SnapshotLayout } from '../src/core/snapshot';
 import { AMBER, GREEN, lampOf, RED, SignalRows } from '../src/render/shared/signals';
+import { BASES, constant, layout, LAYOUT, SNAPSHOT_RS } from './snapshotLayout';
 
-const SNAPSHOT_RS = readFileSync(join(import.meta.dir, '../../crates/sim-core/src/snapshot.rs'), 'utf8');
-
-/** A `pub const NAME: ty = value;` of snapshot.rs (in `module`, when given), as a number. */
-function constant(name: string, module?: string): number {
-  const src = module ? SNAPSHOT_RS.slice(SNAPSHOT_RS.indexOf(`pub mod ${module} {`)) : SNAPSHOT_RS;
-  const m = new RegExp(`pub const ${name}: \\w+ = ([0-9.]+);`).exec(src);
-  if (!m) throw new Error(`no ${module ? `${module}::` : ''}${name} in snapshot.rs`);
-  return Number(m[1]);
-}
-
-/** The light rows' part of the layout, as sim-core's `layout_json` writes it (the rows from 100 here). */
-const STRIDE = constant('LIGHT_STRIDE');
-const BASE = 100;
-const MOST = constant('MAX_LIGHTS');
-const F = {
-  shown: constant('SHOWN', 'light'),
-  x: constant('X', 'light'),
-  z: constant('Z', 'light'),
-  yaw: constant('YAW', 'light'),
-  state: constant('STATE', 'light'),
-  states: { red: constant('RED', 'light'), amber: constant('AMBER', 'light'), green: constant('GREEN', 'light'), walk: constant('WALK', 'light') },
-};
-const COUNT = constant('LIGHT_COUNT', 'header');
-const layout = {
-  capacity: BASE + MOST * STRIDE,
-  headerLen: constant('HEADER_LEN'),
-  header: { tick: 0, day: 1, minute: 2, speed: 3, simCount: 4, structureVersion: 5, lightCount: COUNT },
-  lightBase: BASE,
-  lightStride: STRIDE,
-  maxLights: MOST,
-  light: F,
-} as unknown as SnapshotLayout;
+/** The light rows' part of the layout, as sim-core's `layout_json` writes it (worked out from snapshot.rs: `snapshotLayout.ts`). */
+const STRIDE = LAYOUT.lightStride;
+const BASE = LAYOUT.lightBase;
+const F = LAYOUT.light;
+const COUNT = LAYOUT.header.lightCount;
 
 /** A head's row: shown, its pole and facing, its state (the sim's value). */
 type Row = { shown?: number; x: number; z: number; yaw: number; state: number };
@@ -73,7 +45,10 @@ const JUNCTION: Row[] = [
 
 describe('signal-head rows', () => {
   test('are laid out as sim-core writes them', () => {
-    // (The fields fit the row, and the header's count is in the header.)
+    // (Right after the cars' rows, as snapshot.rs works it out; the fields fit the row; the header's count is in the header.)
+    expect(SNAPSHOT_RS).toContain(BASES.light);
+    expect(SNAPSHOT_RS).toContain(BASES.capacity);
+    expect(BASE).toBe(LAYOUT.carBase + LAYOUT.maxCars * LAYOUT.carStride);
     expect(Math.max(F.shown, F.x, F.z, F.yaw, F.state)).toBeLessThan(STRIDE);
     expect(COUNT).toBeLessThan(constant('HEADER_LEN'));
     expect(new Set(Object.values(S)).size).toBe(4);
