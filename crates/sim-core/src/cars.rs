@@ -3241,8 +3241,9 @@ pub(crate) fn against<'a>(d: &'a Driving, them: &'a [Driving]) -> impl Iterator<
 }
 
 /// Another driving towards something (the cosine of the angle between their ways, less than
-/// minus this) is coming the other way (`up_against`, `passing`, `too_near`).
-const ONCOMING: f32 = 0.7;
+/// minus this) is coming the other way (`up_against`, `passing`, `too_near`; and for the claims,
+/// `traffic::conflict`).
+pub(crate) const ONCOMING: f32 = 0.7;
 
 /// Two coming towards each other, measured along and across the way between theirs (the same
 /// for both: on a bend either may look to be off the other's right): how far the second is along

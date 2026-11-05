@@ -1179,7 +1179,9 @@ fn overlaps(a: (&Claim, &[Sample]), b: (&Claim, &[Sample])) -> bool {
 /// Whether two bodies (samples `a` and `b`) are in each other's way: overlapping, or within
 /// `CLEAR`; not going the same way (one following the other), unless `strict`; coming towards each
 /// other only where pulling over as far as both can there (`Sample::pass`) leaves less than
-/// `PASS_GAP` between them.
+/// `PASS_GAP` between them. Coming towards each other at more of an angle (as the cars see it,
+/// `cars::ONCOMING`: one on a bend, the other not yet), they pass too where pulling over, as much
+/// across as it does at that angle, leaves `CLEAR`.
 pub(crate) fn conflict(a: &Sample, b: &Sample, strict: bool) -> bool {
     // (Backing up, it follows nobody, nor passes anyone: going the way it faces, it's going on.)
     let back = |s: &Sample| s.way[0] * s.rect.yaw.sin() + s.way[1] * s.rect.yaw.cos() < 0.0;
@@ -1194,6 +1196,11 @@ pub(crate) fn conflict(a: &Sample, b: &Sample, strict: bool) -> bool {
     let over = a.rect.overlap(&b.rect);
     if cos < -SAME_WAY && !backing {
         over + PASS_GAP > a.pass + b.pass
+    } else if cos < -crate::cars::ONCOMING && !backing {
+        // (Each pulled over a metre, they're this much further apart across the way between
+        // theirs: `cars::passing`.)
+        let across = ((1.0 - cos) / 2.0).sqrt();
+        over + CLEAR > (a.pass + b.pass) * across
     } else {
         over > -CLEAR
     }
@@ -1298,4 +1305,41 @@ pub(crate) fn begin(w: &mut World) {
     crate::cars::movers(w, &mut movers, &mut places);
     let tick = w.tick;
     w.traffic.begin(tick, movers, &places, &w.travel.signals);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A car's body (4.6 by 1.88 m) at `at` facing `yaw`, going that way, able to pull over `pass`.
+    fn body(at: [f32; 2], yaw: f32, pass: f32) -> Sample {
+        Sample {
+            t: 0.0,
+            d: 0.0,
+            rect: Rect {
+                at,
+                yaw,
+                half: [2.3, 0.94],
+            },
+            way: [yaw.sin(), yaw.cos()],
+            pass,
+        }
+    }
+
+    #[test]
+    fn two_coming_towards_each_other_on_a_bend_pass_where_they_can_pull_over() {
+        // (Oakwood's: one out of a junction's box still going straight on, one in the bend past
+        // it coming the other way in its lane, 30° off its way and 0.2 m from its body.)
+        let (a, b) = ([563.45, 647.59], [566.52, 651.5]);
+        let cos = |yb: f32| 0.06f32.sin() * yb.sin() + 0.06f32.cos() * yb.cos();
+        assert!(cos(-2.57) > -SAME_WAY && cos(-2.57) < -crate::cars::ONCOMING);
+        let gap = -body(a, 0.06, 0.0).rect.overlap(&body(b, -2.57, 0.0).rect);
+        assert!(gap > 0.0 && gap < CLEAR, "{gap}");
+        assert!(!conflict(&body(a, 0.06, 0.7), &body(b, -2.57, 0.7), true));
+        // (Neither able to pull over, as in a box: in each other's way, as across it.)
+        assert!(conflict(&body(a, 0.06, 0.0), &body(b, -2.57, 0.0), true));
+        // (Overlapping further than both pulling over makes up for: in each other's way.)
+        let near = [565.0, 650.5];
+        assert!(conflict(&body(a, 0.06, 0.7), &body(near, -2.57, 0.7), true));
+    }
 }
