@@ -59,7 +59,9 @@ const DWELL: u64 = crate::cars::GET_IN_TICKS as u64 + 2 * TICKS_PER_MINUTE;
 /// How long before the taxi is due a rider is at their kerb (ticks), and how much spare time a run
 /// is timed with (ticks).
 const KERB_EARLY: u64 = 3 * TICKS_PER_MINUTE;
-const SLACK: u64 = 2 * TICKS_PER_MINUTE;
+const SLACK: u64 = 4 * TICKS_PER_MINUTE;
+/// And this share of the ride more (per cent: held up at junctions and by those in its way).
+const SLACK_SHARE: u64 = 20;
 /// How long the rider's walk from the house to the kerb takes, at least (ticks).
 const TO_KERB_LEAST: u64 = 2 * TICKS_PER_MINUTE;
 /// How far out from where a taxi stands its rider waits for it (m, past its door: clear of it as
@@ -356,11 +358,13 @@ fn time_run(
     let first = chunk.iter().map(|m| m.1).min().unwrap_or(0);
     let ride = route.ticks().ceil() as u64 + chunk.len() as u64 * DWELL;
     let due_out = first.saturating_sub(off_map);
+    // (Spare time for the way: `SLACK` and a share of it, those in its way on the roads.)
+    let spare = SLACK + ride * SLACK_SHARE / 100;
     // (Too late to come in time: none of them by taxi.)
-    if due_out < w.tick + ride + SLACK {
+    if due_out < w.tick + ride + spare {
         return Err(chunk.iter().map(|m| m.0).collect());
     }
-    let enter = due_out - ride - SLACK;
+    let enter = due_out - ride - spare;
     let mut slow = Vec::new();
     let mut out = Vec::new();
     for (k, &(i, start, ref st)) in chunk.iter().enumerate() {

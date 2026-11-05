@@ -990,9 +990,24 @@ impl Traffic {
                     let rest = h.claim.rest(h.at);
                     // (Not one's that waits for this one's body where it stands, in its way, or
                     // for the body of one that does, and so on, as in a queue behind it: it's to go
-                    // on first.)
-                    let waits = self.mover(h.key).is_some_and(|m| m.waits == Some(a.key))
-                        || reaches(&on_road, h.key, a.key);
+                    // on first; but for its way through crossing where that one stands.)
+                    let holder = self.mover(h.key);
+                    let through = holder.is_some_and(|m| {
+                        let body = Sample {
+                            t: 0.0,
+                            d: 0.0,
+                            rect: m.rect,
+                            way: m.way,
+                            pass: m.pass,
+                        };
+                        next.iter().any(|c| {
+                            in_bounds(c, &m.rect)
+                                && c.samples.iter().any(|s| conflict(s, &body, true))
+                        })
+                    });
+                    let waits = !through
+                        && (holder.is_some_and(|m| m.waits == Some(a.key))
+                            || reaches(&on_road, h.key, a.key));
                     h.key != a.key
                         && !waits
                         && next

@@ -2299,6 +2299,18 @@ fn drive_on(w: &mut World, c: usize) {
         } = &mut *w;
         let route = cars[c].route(exits, Some(travel), home);
         if !traffic.may_go(tick, key, u32::from(home), &route.claims, t, t + 1.0) {
+            // (Waiting for its claim: for one holding a claim in its way that waits for it in
+            // turn, as one in its way on the road, so that the later of them backs up out of the
+            // other's way, `back_off`.)
+            let by = traffic.waits_for(key).to_vec();
+            cars[c].waits_for = by
+                .iter()
+                .copied()
+                .find(|&k| {
+                    cars.get((k & !(1 << 63)) as usize)
+                        .is_some_and(|o| o.waits_for == Some(key))
+                })
+                .or(cars[c].waits_for);
             return;
         }
     }
