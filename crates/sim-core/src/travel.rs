@@ -10,8 +10,10 @@
 //!
 //! **The network.** The town's roads (the town file's top-level `roads`; else `meta.roads`, or
 //! the centre lines of `meta.streets`; none: no network) become a small graph: a node at each
-//! end of every road and wherever one road's end meets another (within `width / 2 + 1` m of its
-//! middle), and an edge for each stretch of road between two nodes, with its length and kind.
+//! end of every road, wherever one road's end meets another (within `width / 2 + 1` m of its
+//! middle) and wherever two roads for cars cross or touch away from their ends (their middle
+//! lines within `CROSS_NEAR`: a junction like any other, `crossings`), and an edge for each
+//! stretch of road between two nodes, with its length and kind.
 //! Trails are for people on foot only; country roads are where cars go fast.
 //!
 //! **Long walks.** A trip on foot shorter than `ROAD_TRIP_TILES` (or in a town with no network)
@@ -458,6 +460,120 @@ pub struct RoadPath {
 /// last two (as `Graph::path` has them). None for one of fewer than two points.
 pub type PathEnds = Option<([[f32; 2]; 2], [[f32; 2]; 2])>;
 
+/// Two roads' middle lines this near (m) away from their ends meet there (`crossings`): two cars
+/// in their lanes on them would touch.
+const CROSS_NEAR: f32 = 2.0;
+/// Of two roads coming that near along a stretch, one meeting place every this far (m), where
+/// they come nearest.
+const CROSS_APART: f32 = 12.0;
+
+/// Where two roads for cars (`Road::drivable`) cross, or their middle lines touch (`CROSS_NEAR`),
+/// away from either's ends (where `Graph::build` joins them already): the two roads, how far along
+/// each, and the place (between the two nearest points), in order. A town file's roads should
+/// meet at their ends; a country road laid across or along another meets it all the same.
+fn crossings(roads: &[Road]) -> Vec<(usize, usize, f32, f32, [f32; 2])> {
+    let bounds: Vec<[f32; 4]> = roads
+        .iter()
+        .map(|r| {
+            r.pts.iter().fold(
+                [
+                    f32::INFINITY,
+                    f32::INFINITY,
+                    f32::NEG_INFINITY,
+                    f32::NEG_INFINITY,
+                ],
+                |b, p| {
+                    [
+                        b[0].min(p[0]),
+                        b[1].min(p[1]),
+                        b[2].max(p[0]),
+                        b[3].max(p[1]),
+                    ]
+                },
+            )
+        })
+        .collect();
+    let mut out = Vec::new();
+    for r in 0..roads.len() {
+        for q in r + 1..roads.len() {
+            let (a, b) = (&roads[r], &roads[q]);
+            let (x, y) = (bounds[r], bounds[q]);
+            if !a.drivable()
+                || !b.drivable()
+                || x[2] + CROSS_NEAR < y[0]
+                || y[2] + CROSS_NEAR < x[0]
+                || x[3] + CROSS_NEAR < y[1]
+                || y[3] + CROSS_NEAR < x[1]
+            {
+                continue;
+            }
+            let snap = a.width.max(b.width) / 2.0 + 1.0;
+            let inside = |road: &Road, s: f32| s >= snap && s <= road.len() - snap;
+            // (The nearest places of each pair of segments within reach, nearest first per
+            // stretch along `a`.)
+            let mut near: Vec<(f32, f32, f32, [f32; 2])> = Vec::new();
+            for i in 0..a.pts.len() - 1 {
+                for j in 0..b.pts.len() - 1 {
+                    let (ta, tb, d) =
+                        segments_nearest(a.pts[i], a.pts[i + 1], b.pts[j], b.pts[j + 1]);
+                    if d > CROSS_NEAR {
+                        continue;
+                    }
+                    let sa = a.cum[i] + (a.cum[i + 1] - a.cum[i]) * ta;
+                    let sb = b.cum[j] + (b.cum[j + 1] - b.cum[j]) * tb;
+                    if !inside(a, sa) || !inside(b, sb) {
+                        continue;
+                    }
+                    let (pa, pb) = (a.at(sa), b.at(sb));
+                    near.push((d, sa, sb, [(pa[0] + pb[0]) / 2.0, (pa[1] + pb[1]) / 2.0]));
+                }
+            }
+            near.sort_by(|m, n| m.0.total_cmp(&n.0).then(m.1.total_cmp(&n.1)));
+            let mut kept: Vec<(f32, f32, f32, [f32; 2])> = Vec::new();
+            for m in near {
+                if kept.iter().all(|k| (k.1 - m.1).abs() >= CROSS_APART) {
+                    kept.push(m);
+                }
+            }
+            kept.sort_by(|m, n| m.1.total_cmp(&n.1));
+            out.extend(kept.into_iter().map(|(_, sa, sb, p)| (r, q, sa, sb, p)));
+        }
+    }
+    out
+}
+
+/// The nearest points of segments `a0`–`a1` and `b0`–`b1`: how far along each (0 to 1), and how
+/// far apart they are (m).
+fn segments_nearest(a0: [f32; 2], a1: [f32; 2], b0: [f32; 2], b1: [f32; 2]) -> (f32, f32, f32) {
+    let (u, v) = (
+        [a1[0] - a0[0], a1[1] - a0[1]],
+        [b1[0] - b0[0], b1[1] - b0[1]],
+    );
+    let w0 = [a0[0] - b0[0], a0[1] - b0[1]];
+    let dot = |p: [f32; 2], q: [f32; 2]| p[0] * q[0] + p[1] * q[1];
+    let (aa, bb, cc, dd, ee) = (dot(u, u), dot(u, v), dot(v, v), dot(u, w0), dot(v, w0));
+    let den = aa * cc - bb * bb;
+    let mut s = if den > 1e-9 {
+        ((bb * ee - cc * dd) / den).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let mut t = if cc > 1e-9 {
+        ((bb * s + ee) / cc).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    if aa > 1e-9 {
+        s = ((bb * t - dd) / aa).clamp(0.0, 1.0);
+    }
+    if cc > 1e-9 {
+        t = ((bb * s + ee) / cc).clamp(0.0, 1.0);
+    }
+    let p = [a0[0] + u[0] * s, a0[1] + u[1] * s];
+    let q = [b0[0] + v[0] * t, b0[1] + v[1] * t];
+    (s, t, dist(p, q))
+}
+
 impl Graph {
     /// The network of `roads` (see the module notes); empty without any.
     pub fn build(raw: &[RoadRaw]) -> Self {
@@ -541,6 +657,14 @@ impl Graph {
                     }
                 }
             }
+        }
+        // Where two roads for cars cross or touch away from their ends: a node on both.
+        for (r, q, sr, sq, p) in crossings(&g.roads) {
+            let n = parent.len();
+            parent.push(n);
+            pos.push(p);
+            splits[r].push((sr, n));
+            splits[q].push((sq, n));
         }
         // Splits along each road close together are one node.
         for list in &mut splits {
@@ -1380,6 +1504,28 @@ mod tests {
         ]);
         assert_eq!(apart.networks(), 2);
         assert_eq!(Graph::default().networks(), 0);
+    }
+
+    #[test]
+    fn roads_crossing_or_touching_away_from_their_ends_meet_there() {
+        // A street along x; a country road across it, and another bending down to touch it (its
+        // middle line 0.3 m from the street's) and away again; a trail across it.
+        let mut touch = line([60.0, -30.0], [75.0, 9.7]);
+        touch.extend(line([75.0, 9.7], [90.0, -30.0]).into_iter().skip(1));
+        let g = Graph::build(&[
+            road(&line([0.0, 10.0], [100.0, 10.0]), 7.0, RoadKind::Street),
+            road(&line([30.0, -30.0], [30.0, 50.0]), 7.0, RoadKind::Country),
+            road(&touch, 7.0, RoadKind::Country),
+            road(&line([50.0, -30.0], [50.0, 50.0]), 2.0, RoadKind::Trail),
+        ]);
+        let junctions: Vec<[f32; 2]> = g.junctions().collect();
+        assert_eq!(junctions.len(), 2, "{junctions:?}");
+        assert!(junctions.iter().any(|&p| dist(p, [30.0, 10.0]) < 0.5));
+        assert!(junctions.iter().any(|&p| dist(p, [75.0, 9.85]) < 0.5));
+        // A box at each, for the cars to take turns there; the trail crosses as ever.
+        assert!(g.boxes.iter().any(|&(c, _)| dist(c, [30.0, 10.0]) < 0.5));
+        assert!(g.boxes.iter().any(|&(c, _)| dist(c, [75.0, 9.85]) < 0.5));
+        assert_eq!(g.networks(), 2, "the trail apart");
     }
 
     #[test]

@@ -2453,14 +2453,16 @@ fn pull_over(w: &mut World, c: usize, others: &[Driving], moving: bool) {
     if (shift - car.shift).abs() < 1e-5 {
         return;
     }
-    // (Out, or back in: never into another, one going by that waited for it too.)
-    if guard(
+    // (Out, or back in: never into another, one going by that waited for it too. Kept from
+    // pulling back in by one, it waits for that one: who waits for whom sees it, `back_off`.)
+    if let Some(k) = guard(
         &body(car.shift),
         &body(shift),
         others.iter().chain(&standing),
-    )
-    .is_some()
-    {
+    ) {
+        if shift < car.shift {
+            w.cars[c].waits_for = Some(k);
+        }
         return;
     }
     w.cars[c].shift = shift;
@@ -2487,7 +2489,15 @@ fn pull_want(w: &World, c: usize, moving: bool) -> (f32, Option<u64>) {
         route.room_here(t)
     };
     let (at, yaw, back) = route.at(t);
-    if room <= 0.0 || back {
+    // (Not in a junction's box, nor for one in it: there they take turns, `traffic.rs`, and one
+    // turning there faces any way.)
+    let boxes = &w.travel.graph.boxes;
+    let in_box = |p: [f32; 2], len: f32| {
+        boxes
+            .iter()
+            .any(|&(m, r)| crate::travel::dist(m, p) < r + len / 2.0)
+    };
+    if room <= 0.0 || back || in_box(at, car.len) {
         return (0.0, None);
     }
     let short = |p: [f32; 2], facing: f32, len: f32, wid: f32| {
@@ -2507,6 +2517,9 @@ fn pull_want(w: &World, c: usize, moving: bool) -> (f32, Option<u64>) {
             continue;
         };
         let (p, facing, _) = theirs.at(other.progress);
+        if in_box(p, other.len) {
+            continue;
+        }
         if let Some((all, mine, their)) = short(p, facing, other.len, other.wid) {
             let share = (all / 2.0).max(all - theirs.room_at(other.progress) * their);
             if share / mine > want {
