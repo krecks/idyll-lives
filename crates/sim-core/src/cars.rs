@@ -2279,6 +2279,9 @@ fn drive_on(w: &mut World, c: usize) {
     // Held up for good, nose to nose with one waiting for it (`JAM_TICKS`), it backs up a little
     // out of its way (`back_off`).
     let key = car_first(c);
+    // (Short of the group it asked for, backing up out of one's way or coming back up to it: its
+    // ask stands, its place in the queue kept.)
+    w.traffic.still_asking(w.tick, key, u32::from(home), t);
     let jammed = w.cars[c].waits_for.is_some_and(|k| waits_back(w, k, key));
     // (Not on its way since, it's still held up: two pulling over for each other by turns wait
     // for each other every other tick.)
@@ -3244,8 +3247,9 @@ pub(crate) fn against<'a>(d: &'a Driving, them: &'a [Driving]) -> impl Iterator<
 }
 
 /// Another driving towards something (the cosine of the angle between their ways, less than
-/// minus this) is coming the other way (`up_against`, `passing`, `too_near`).
-const ONCOMING: f32 = 0.7;
+/// minus this) is coming the other way (`up_against`, `passing`, `too_near`; and for the claims,
+/// `traffic::conflict`).
+pub(crate) const ONCOMING: f32 = 0.7;
 
 /// Two coming towards each other, measured along and across the way between theirs (the same
 /// for both: on a bend either may look to be off the other's right): how far the second is along
