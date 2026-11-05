@@ -24,10 +24,11 @@
 //!    the box"), nor anyone on the move into it in the next second or so (`LOOK`).
 //!
 //! But one following another through (that one holding its group, its body ahead on this one's
-//! way, going its way: `FOLLOW_NEAR`) doesn't wait for that one's parts or body, `cars::up_against`
-//! keeping it behind; and it goes in its leader's place in the order, before asks after that
-//! one's, a few to a platoon (`PLATOON`; not before an ask older than `OLD_ASK`). A queue through
-//! a box goes through it at a following gap, not each waiting for it to empty.
+//! way going its way, `FOLLOW_NEAR`, and all this one's way on that one's; neither turning round
+//! in it) doesn't wait for that one's parts, nor its body on the move, `cars::up_against` keeping
+//! it behind; and it goes in its leader's place in the order, before asks after that one's, a few
+//! to a platoon (`PLATOON`; not before an ask older than `OLD_ASK`). A queue through a box goes
+//! through it at a following gap, not each waiting for it to empty.
 //!
 //! Two bodies are in each other's way (`conflict`) when they overlap or come within `CLEAR`; going
 //! the same way (one following the other through, each keeping behind the one in front:
@@ -1091,13 +1092,44 @@ impl Traffic {
                     .map(|s| s.d)
                     .reduce(f32::min)
             };
+            // (And all its way through on that one's: in nobody's way it isn't in.)
+            let on_its_way = |key: u64| {
+                next.iter().flat_map(|c| &c.samples).all(|s| {
+                    self.holds
+                        .iter()
+                        .filter(|h| h.key == key && in_bounds(&h.claim, &s.rect))
+                        .flat_map(|h| &h.claim.samples)
+                        .any(|o| {
+                            dist(s.rect.at, o.rect.at) < FOLLOW_NEAR
+                                && s.way[0] * o.way[0] + s.way[1] * o.way[1] > SAME_WAY
+                        })
+                })
+            };
+            // (Not turning round in it, backing up or coming back over its own way: one ahead of
+            // it might be coming back towards it.)
+            let way_back = |c: &Claim| {
+                c.samples.iter().any(|s| {
+                    s.way[0] * s.rect.yaw.sin() + s.way[1] * s.rect.yaw.cos() < 0.0
+                        || c.samples.first().is_some_and(|f| {
+                            f.way[0] * s.way[0] + f.way[1] * s.way[1] < -SAME_WAY.min(0.5)
+                        })
+                })
+            };
+            let turning_round = next.iter().any(|c| way_back(c));
             let mut followed: Vec<u64> = Vec::new();
             let mut lead: Option<(f32, u64, u8)> = None;
             for h in &self.holds {
-                if h.key == a.key || followed.contains(&h.key) {
+                if turning_round
+                    || h.key == a.key
+                    || followed.contains(&h.key)
+                    || self
+                        .holds
+                        .iter()
+                        .any(|o| o.key == h.key && way_back(&o.claim))
+                {
                     continue;
                 }
-                if let Some(d) = ahead(h.key) {
+                if let Some(d) = ahead(h.key).filter(|_| on_its_way(h.key)) {
                     followed.push(h.key);
                     let (asked, platoon) = self
                         .holds
@@ -1193,7 +1225,12 @@ impl Traffic {
             // far side, past its zone, nobody.
             let mut bodies = Vec::new();
             for m in &self.movers {
-                if m.key == a.key || m.parked || behind_me(m.key) || followed.contains(&m.key) {
+                // (Nor one it follows through on the move, on its way on out of it.)
+                if m.key == a.key
+                    || m.parked
+                    || behind_me(m.key)
+                    || followed.contains(&m.key) && m.moving && m.waits.is_none()
+                {
                     continue;
                 }
                 let strict = !self.holding(m.key);
