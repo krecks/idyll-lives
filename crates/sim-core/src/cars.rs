@@ -150,9 +150,9 @@ pub const LANE_KERBSIDE: f32 = 0.5;
 /// it `SIDEWALK - KERB - 0.3` in, its widest about 0.3 across).
 pub(crate) const KERBSIDE: f32 = SIDEWALK - 0.14 - 0.3 + 0.3;
 /// The least gap between two cars' bodies (m): two coming towards each other pass no nearer
-/// (`too_near`; the claims, `traffic::PASS_GAP`), and the last-resort check never lets one come
-/// nearer another, whoever waits for whom (`guard`). Two in their lanes on a 7 m street are 0.22 m
-/// apart at least (the widest cars).
+/// (`too_near`; the claims a little further apart, `traffic::PASS_GAP`), and the last-resort check
+/// never lets one come nearer another, whoever waits for whom (`guard`). Two in their lanes on a
+/// 7 m street are 0.22 m apart at least (the widest cars).
 pub(crate) const GAP: f32 = 0.15;
 /// How far apart two coming towards each other pull over to pass where the lane is too narrow for
 /// both in their lanes (m, `pull_want`: the two together): its measure is across a way between
@@ -350,6 +350,10 @@ pub struct Car {
     /// `waits_back`). Not saved.
     #[serde(skip)]
     jam: (u32, u32, bool),
+    /// Backed up out of the way of this one (`back_off`): it stays back while that one is near.
+    /// Not saved.
+    #[serde(skip)]
+    backed_for: Option<u64>,
     /// A work taxi (`taxi.rs`), not a household's: it comes in at a way out on a run, drives it
     /// and goes again, and nothing of the households' (`update`) is its. Not saved with the cars
     /// (the runs are, `taxi::Taxis`).
@@ -527,6 +531,7 @@ impl Car {
             moved: false,
             pulled_for: None,
             jam: (0, 0, false),
+            backed_for: None,
             taxi: false,
             standing: false,
         }
@@ -561,6 +566,7 @@ impl Car {
         self.shift = 0.0;
         self.waited = 0;
         self.jam = (0, 0, false);
+        self.backed_for = None;
         self.waits_for = None;
         self.pulled_for = None;
     }
@@ -645,6 +651,7 @@ impl Car {
             moved: false,
             pulled_for: None,
             jam: (0, 0, false),
+            backed_for: None,
             taxi: false,
             standing: false,
         }
@@ -2299,6 +2306,9 @@ fn drive_on(w: &mut World, c: usize) {
         *jam
     };
     let jam = *jam;
+    if jam.1 == 0 {
+        w.cars[c].backed_for = None;
+    }
     // (The other can back up no further, and waits for it as it does: it backs up now.)
     let theirs = w.cars[c].waits_for.is_some_and(|k| stuck_back(w, k));
     if jammed && (jam.0 > JAM_TICKS || theirs) && jam.1 < JAM_BACK && !w.cars[c].outside() {
@@ -2307,9 +2317,21 @@ fn drive_on(w: &mut World, c: usize) {
         }
         w.cars[c].jam.2 = true;
     }
-    // (Backed up out of its way, it stays there while that one still waits for it: not on into
-    // its way again.)
-    if jammed && jam.1 > 0 && !w.cars[c].outside() {
+    // (Backed up out of its way, it stays there while that one still waits for it, or while it
+    // still waits its turn after it, or that one is still by it (held up there by others now and
+    // then, on foot too): not on into its way again.)
+    let asking = !w.traffic.waits_for(key).is_empty();
+    let by = w.cars[c].backed_for.is_some_and(|k| {
+        let me = &w.cars[c];
+        w.cars
+            .get((k & !(1 << 63)) as usize)
+            .and_then(|o| Some((o, o.shown.filter(|s| s.2)?)))
+            .zip(me.shown)
+            .is_some_and(|((o, s), m)| {
+                crate::travel::dist(m.0, s.0) < (me.len + o.len) / 2.0 + 2.0 * AHEAD
+            })
+    });
+    if (jammed || asking || by) && jam.1 > 0 && !w.cars[c].outside() {
         return;
     }
     // (Whom it waited for last tick: pulled over for that one, it doesn't pull back in into its
@@ -2522,8 +2544,25 @@ const JAM_BACK: u32 = 60;
 fn waits_back(w: &World, k: u64, me: u64) -> bool {
     let o = (k & !(1 << 63)) as usize;
     let (mine, theirs) = (w.traffic.holding(me), w.traffic.holding(k));
+    // (Turning out of its driveway, it has its way: the other backs up to give it room to finish
+    // its turn.)
+    let (out, their_out) = (turning_out(w, me), turning_out(w, k));
+    // (Of two not holding one, the one waiting its turn for a claim the other is in the way of:
+    // that one can't go on out of its way till it's backed up out of that one's.)
+    let (asks, their_asks) = (
+        !w.traffic.waits_for(me).is_empty(),
+        !w.traffic.waits_for(k).is_empty(),
+    );
     // (Of the two, the one that can still back up: the other can't, or no further.)
-    let mine_to_go = if mine == theirs { me > k } else { theirs };
+    let mine_to_go = if out != their_out {
+        their_out
+    } else if mine != theirs {
+        theirs
+    } else if !mine && asks != their_asks {
+        asks
+    } else {
+        me > k
+    };
     let mine_to_go = if mine_to_go {
         !stuck_back(w, me)
     } else {
@@ -2532,6 +2571,20 @@ fn waits_back(w: &World, k: u64, me: u64) -> bool {
     mine_to_go
         && (w.cars.get(o).is_some_and(|c| c.waits_for == Some(me))
             || w.traffic.waits_for(k).contains(&me))
+}
+
+/// Whether car `k` (its `Driving::first`) is a household's car still turning out of its driveway
+/// onto the road: in its route's first mouth (`Route::mouths`).
+fn turning_out(w: &World, k: u64) -> bool {
+    w.cars.get((k & !(1 << 63)) as usize).is_some_and(|c| {
+        !c.taxi
+            && c.state == CarState::Leaving
+            && c.route.as_ref().is_some_and(|(_, r)| {
+                r.mouths
+                    .first()
+                    .is_some_and(|&(a, b)| a <= 0.0 && c.progress <= b)
+            })
+    })
 }
 
 /// Whether car `k` (its `Driving::first`) can back up no further out of the way of one it holds
@@ -2581,6 +2634,7 @@ fn back_off(w: &mut World, c: usize) -> bool {
     let car = &mut w.cars[c];
     car.progress = to;
     car.jam.1 += 1;
+    car.backed_for = partner;
     if home == (car.state == CarState::Arriving) {
         car.shown = Some((next.at, next.yaw, true, 0));
     }
@@ -2624,9 +2678,27 @@ fn closes_in(now: &Rect, next: &Rect, o: &Rect) -> bool {
 fn pull_over(w: &mut World, c: usize, others: &[Driving], moving: bool, waited: Option<u64>) {
     // (Pulled over for one that waits for it, it pulls over only as far as it can on its way: not
     // for one it waits for in turn (`waited`, or its turn after it), held up by it there, which it
-    // would pull back in into the way of.)
+    // would pull back in into the way of, unless that one has backed up clear of it to give it the
+    // way.)
     let me = car_first(c);
-    let after = |k: u64| waited == Some(k) || w.traffic.waits_for(me).contains(&k);
+    // (Not one backed up out of its way, clear of it now by more than it's pulled over and the
+    // gap the cars keep: that one gives it the way, and it pulls back in to go on.)
+    let body = |car: &Car| {
+        car.shown.map(|s| Rect {
+            at: s.0,
+            yaw: s.1,
+            half: [car.len / 2.0, car.wid / 2.0],
+        })
+    };
+    let backed = |k: u64| {
+        w.cars.get((k & !(1 << 63)) as usize).is_some_and(|o| {
+            o.jam.1 > 0
+                && body(o)
+                    .zip(body(&w.cars[c]))
+                    .is_some_and(|(a, b)| a.gap(&b) > w.cars[c].shift + GAP)
+        })
+    };
+    let after = |k: u64| (waited == Some(k) || w.traffic.waits_for(me).contains(&k)) && !backed(k);
     let waits_me = |k: u64| {
         (w.traffic.waits_for(k).contains(&me)
             || w.cars

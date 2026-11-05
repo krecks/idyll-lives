@@ -666,6 +666,17 @@ fn on_a_6_m_lane_a_car_passing_one_pulled_over_keeps_its_distance_or_waits() {
 }
 
 #[test]
+fn a_car_pulling_out_across_the_street_as_one_turns_in_gets_out() {
+    // (On a 7 m street, the one pulling out of its driveway opposite, or a little further on,
+    // still turning out as the one coming home turns in across its lane: the two come within the
+    // gap the cars keep of each other, the one coming home backs up to let it finish its turn
+    // (and stays back while it waits its turn), and both get on their way. They waited for each
+    // other for good, the one coming home backing up and coming back up to it by turns.)
+    turn_in_by_one_pulling_out(7.0, &[(60.0, true), (70.0, false)], 100, 4000);
+    turn_in_by_one_pulling_out(7.0, &[(60.0, true), (100.0, false)], 0, 4000);
+}
+
+#[test]
 fn a_taxi_waiting_on_a_bend_for_a_car_turning_out_lets_it_by_clear() {
     // (Oak Clearing, a normal town of the 0.7.0 samples: about 18:34 a car turns out of its
     // driveway onto a 6 m lane's bend and on along it, as the work taxi coming the other way waits
