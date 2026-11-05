@@ -1582,7 +1582,7 @@ fn trip_view(world: &World, s: &Sim, riders: &[u32], timed: bool) -> Option<Trip
 }
 
 /// On a bike or an e-scooter of theirs (`SimView.ride`, `ride.rs`): what it is, and whether they're
-/// off to work, to school or home on it.
+/// off to work, to school, out (a visit or an outing) or home on it.
 #[derive(Serialize)]
 struct RideView {
     kind: crate::content::VehicleKind,
@@ -1614,14 +1614,15 @@ fn ride_view(world: &World, s: &Sim) -> Option<RideView> {
     if s.away_until.is_some() {
         return None;
     }
-    let home = s
-        .current()
-        .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
+    let task = s.current().map(|a| a.task.kind);
+    let home = matches!(task, Some(TaskKind::GoHome));
+    let out = matches!(task, Some(TaskKind::Visit { .. }));
     let school = world.content.life.school.is_some() && s.job.is_none();
-    let to = match (home, school) {
-        (true, _) => "home",
-        (false, true) => "school",
-        (false, false) => "work",
+    let to = match (home, out, school) {
+        (true, ..) => "home",
+        (false, true, _) => "out",
+        (false, false, true) => "school",
+        (false, false, false) => "work",
     };
     Some(RideView { kind, to })
 }

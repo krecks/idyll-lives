@@ -717,10 +717,11 @@ export interface SimView {
    */
   trip?: { to: number; at?: number };
   /**
-   * On a bike or an e-scooter of theirs (sim-core `ride.rs`), off to work, to school or home on it
-   * (not while away at work with it). Absent when they aren't (and from older workers).
+   * On a bike or an e-scooter of theirs (sim-core `ride.rs`), off to work, to school, out (a visit
+   * or an outing: where to is the `trip`) or home on it (not while away at work with it). Absent
+   * when they aren't (and from older workers).
    */
-  ride?: { kind: 'bike' | 'scooter'; to: 'work' | 'school' | 'home' };
+  ride?: { kind: 'bike' | 'scooter'; to: 'work' | 'school' | 'out' | 'home' };
   /** The work taxi (sim-core `taxi::status`): waiting for it at the kerb, in it to work or school (`at`: the minute of the day they're there), or home in it (or waiting at work for it). Absent: none of those. */
   taxi?: { state: 'wait' | 'work' | 'home'; at?: number };
   job: JobView | null;

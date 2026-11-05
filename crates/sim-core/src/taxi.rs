@@ -1091,3 +1091,17 @@ impl Taxis {
         self.runs.is_empty() && self.rode.is_empty()
     }
 }
+
+/// About how many minutes a taxi would take `sim` from `from` to `plot` on a visit or an outing
+/// (`world::leisure_way`, after the household's car and a bike of theirs, before walking): Some,
+/// and they'd go by it. None for now: the work taxi is for work and school only (taxi.rs is to
+/// take leisure rides; `world::start_task`'s `Visit` arms then need one that books it).
+pub(crate) fn leisure_eta(
+    _travel: &crate::travel::Travel,
+    _taxis: &Taxis,
+    _sim: &crate::world::Sim,
+    _from: [f32; 2],
+    _plot: u32,
+) -> Option<f32> {
+    None
+}

@@ -1,6 +1,7 @@
 //! Choosing nearby things in an open-world town (`index::ObjectIndex::usable_near`,
 //! `Choice::Outing`): residents use the public things within reach of where they are, and go on
-//! outings to places farther off when the way there is short enough (`visits.outingMinutes`) and
+//! outings to places farther off when the way there is short enough (`visits.outingMinutes`) the
+//! way they'd go (`world::leisure_way`: the household's car, a bike of theirs, else on foot) and
 //! they have the time, home by `visits.outingHomeBy`; an outing's stay counts from when they get
 //! there.
 
@@ -46,9 +47,9 @@ fn with_cars_and_parking(h: &Hamlets) -> String {
 }
 
 #[test]
-fn an_outing_a_walk_of_hours_away_isnt_picked() {
+fn with_no_car_nor_bike_an_outing_a_walk_of_hours_away_isnt_picked() {
     // Two hamlets 160 m apart: the other's park is a walk of about two hours (more than
-    // `outingMinutes`), and nobody has a car to drive there in.
+    // `outingMinutes`), and nobody has a car to drive there in nor a bike to ride: they stay local.
     let content = common::content();
     let h = two_hamlets(&content, 31);
     let mut w = World::from_json(&content, &h.town, 31).expect("the hamlets load");
@@ -77,10 +78,17 @@ fn an_outing_by_car_in_reach_is_picked_and_theyre_home_by_the_hour() {
     let end = w.tick + 3 * 24 * 60 * TICKS_PER_MINUTE;
     let mut outings = std::collections::BTreeSet::new();
     let mut out_late = std::collections::BTreeSet::new();
+    let mut drove = std::collections::BTreeSet::new();
     while w.tick < end {
         w.tick_once();
         let now = on_outings(&w);
         outings.extend(now.iter().copied());
+        for &(s, _) in &now {
+            let a = w.sims[s as usize].current();
+            if a.is_some_and(|a| matches!(a.phase, sim_core::world::Phase::Driving)) {
+                drove.insert(s);
+            }
+        }
         // Past the hour (and before the morning), nobody is still out on one.
         let hour = clock::hour(w.tick);
         if hour >= home_by || hour < 6.0 {
@@ -89,11 +97,82 @@ fn an_outing_by_car_in_reach_is_picked_and_theyre_home_by_the_hour() {
             }
         }
     }
-    eprintln!("outings (resident, place): {outings:?}");
-    assert!(!outings.is_empty(), "nobody drove anywhere out of reach");
+    eprintln!("outings (resident, place): {outings:?}, at the wheel or in the car: {drove:?}");
+    assert!(!outings.is_empty(), "nobody went anywhere out of reach");
+    assert!(!drove.is_empty(), "nobody drove there");
     assert!(
         out_late.is_empty(),
         "out on an outing after {home_by}:00 (day, resident, place): {out_late:?}"
+    );
+}
+
+#[test]
+fn someone_with_a_bike_rides_to_a_place_beyond_walking_reach_and_is_home_by_the_hour() {
+    // The hamlets again, no cars, and a city bike in the garden of the player's home: the other
+    // hamlet's park is a ride of about forty minutes.
+    let content = common::content();
+    let h = two_hamlets(&content, 31);
+    let mut w = World::from_json(&content, &h.town, 31).expect("the hamlets load");
+    let home = w.households[0].plot.expect("the player's home");
+    let p = w.plots[home as usize].clone();
+    let placed = (p.z..p.z + p.d).rev().any(|z| {
+        (p.x..p.x + p.w).any(|x| {
+            w.apply(sim_core::Command::Buy {
+                household: 0,
+                object: "bicycle".into(),
+                at: Some([x, z, 0]),
+                colors: Default::default(),
+                turn: None,
+                offset: None,
+                size: None,
+                tall: None,
+            })
+            .is_ok()
+        })
+    });
+    assert!(placed, "no room for the bike at home");
+    let bike = w.objects.len() - 1;
+    let home_by = w.content.visits.outing_home_by;
+    let end = w.tick + 3 * 24 * 60 * TICKS_PER_MINUTE;
+    let (mut rode, mut out_late) = (
+        std::collections::BTreeSet::new(),
+        std::collections::BTreeSet::new(),
+    );
+    let mut parked = false;
+    while w.tick < end {
+        w.tick_once();
+        let now = on_outings(&w);
+        for &(s, plot) in &now {
+            let sim = &w.sims[s as usize];
+            if sim.riding == Some(bike as u32) {
+                rode.insert((s, plot));
+            }
+            // (There, off it: it's not at home, nor under them.)
+            let (x, z) = sim.tile();
+            parked |= w.plot_at(x, z) == Some(plot)
+                && sim.riding.is_none()
+                && sim.bike() == Some(bike as u32);
+        }
+        let hour = clock::hour(w.tick);
+        if hour >= home_by || hour < 6.0 {
+            for (s, plot) in now {
+                out_late.insert((clock::day(w.tick), s, plot));
+            }
+        }
+    }
+    eprintln!("rode out on the bike (resident, place): {rode:?}");
+    assert!(!rode.is_empty(), "nobody rode anywhere out of reach");
+    assert!(parked, "nobody left the bike by the place they went to");
+    assert!(
+        out_late.is_empty(),
+        "out on an outing after {home_by}:00 (day, resident, place): {out_late:?}"
+    );
+    // (Home again, it's back at its place, nobody's.)
+    assert!(
+        w.sims
+            .iter()
+            .all(|s| s.bike() != Some(bike as u32) || s.visiting.is_some()),
+        "the bike is still out with someone home"
     );
 }
 

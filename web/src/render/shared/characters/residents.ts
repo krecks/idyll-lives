@@ -1700,6 +1700,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const mounted = rideId >= 0 ? this.objectById.get(rideId) : undefined;
       const mount = mounted?.ride ? mounted : null;
       if (rideId >= 0) this.riddenNow.add(rideId);
+      // (Left out by a place they're visiting: not at its place either.)
+      else if (rideId <= -2) this.riddenNow.add(-2 - rideId);
       // A walk's first and last step: moving in one snapshot and standing in the other glides too,
       // or the start and the end of every walk jump at speeds 4-5 (a step is 2.25 m at speed 4).
       // (Riding, as far as they ride between them.)
