@@ -9679,7 +9679,10 @@ fn free_before_work(sim: &Sim, ctx: &Ctx) -> f32 {
         .taxi
         .and_then(|b| crate::taxi::booked_leave(ctx.taxis, ctx.cars, ctx.tick, b))
     {
-        return leave.saturating_sub(ctx.tick) as f32 * MINUTES_PER_TICK;
+        // (Sooner from further in than the run was timed with, `taxi::indoor_lead`.)
+        let lead =
+            crate::taxi::indoor_lead(ctx.content, ctx.nav.stairs, ctx.households, ctx.plots, sim);
+        return leave.saturating_sub(ctx.tick + lead) as f32 * MINUTES_PER_TICK;
     }
     let content = ctx.content;
     let Some((leave, start, _)) = sim

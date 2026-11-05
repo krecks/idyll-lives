@@ -757,6 +757,16 @@ impl Car {
         self.state == CarState::Arriving && self.trip.is_none() && self.progress <= 0.0
     }
 
+    /// Whether it waits out of sight to come into town by the way in at `at` (`outside`; the
+    /// taxis count those, `taxi::queued`).
+    pub(crate) fn waits_to_come_in_at(&self, at: [f32; 2]) -> bool {
+        self.outside()
+            && self
+                .route
+                .as_ref()
+                .is_some_and(|r| r.0 && crate::travel::dist(r.1.at(0.0).0, at) < 4.0)
+    }
+
     /// Its route out of town or (`home`) back (worked out when first asked for).
     fn route(&mut self, exits: &[[f32; 2]], travel: Option<&Travel>, home: bool) -> &Route {
         if self.route.as_ref().is_none_or(|(h, _)| *h != home) {
