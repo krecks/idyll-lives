@@ -1499,6 +1499,12 @@ pub struct VisitRules {
     pub min_friendship: f32,
     pub earliest_hour: f32,
     pub latest_hour: f32,
+    /// An outing (open-world towns: a public place out of `autonomy.reach`) goes only where the
+    /// way takes this many minutes at most (`outingMinutes`: by car for one who'd drive there,
+    /// else on foot), and only with time there and the way back before `outing_home_by` o'clock
+    /// (`outingHomeBy`); its stay ends in time for that.
+    pub outing_minutes: f32,
+    pub outing_home_by: f32,
     /// Tag mask used for schedule/trait preferences of visiting.
     pub tags: TagMask,
     /// Visitors knock and wait to be let in (`visits.door`); without it they walk straight in.
@@ -2552,6 +2558,8 @@ struct VisitRaw {
     min_friendship: Option<f32>,
     earliest_hour: Option<f32>,
     latest_hour: Option<f32>,
+    outing_minutes: Option<f32>,
+    outing_home_by: Option<f32>,
     door: Option<DoorRaw>,
     company: Option<f32>,
     bored_minutes: Option<f32>,
@@ -4918,6 +4926,8 @@ impl Content {
             min_friendship: v.min_friendship.unwrap_or(15.0),
             earliest_hour: v.earliest_hour.unwrap_or(9.0),
             latest_hour: v.latest_hour.unwrap_or(21.0),
+            outing_minutes: v.outing_minutes.unwrap_or(90.0).max(0.0),
+            outing_home_by: v.outing_home_by.unwrap_or(23.0).clamp(0.0, 24.0),
             tags: 1 << tag_index[VISIT_TAG],
             company: v.company.unwrap_or(0.0).max(0.0),
             bored_minutes: v.bored_minutes.map(|m| m.max(1.0)),

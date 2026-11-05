@@ -299,7 +299,12 @@ free, and while someone awake is home the visitor waits three times `waitMinutes
 with someone to let them in, and, on their own or invited over the phone, only when the way takes
 45 minutes at most and gets them there before `visits.latestHour` (on their own, with time for
 the way back and three quarters of an hour there before they leave for work or school); the visit's `hours`
-count from when they're let in.
+count from when they're let in. In an open-world town they go on outings too, to a public place
+out of `autonomy.reach`: only one the way to takes `visits.outingMinutes` at most (default 90; by
+car for a grown-up owner with the household's car at home and parking there, else on foot), with
+time for the way there, an hour there and the way back before they leave for work or school and
+before `visits.outingHomeBy` o'clock (default 23); the outing's `hours` count from when they get
+there, and it ends in time to be home by that hour.
 
 **A host's offer:** with `visits.offer` (`{"social", "afterMinutes", "againMinutes",
 "handAnim"}`; base game: *Offer a bite to eat*), a free host asks a guest who has nothing in

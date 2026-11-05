@@ -1092,6 +1092,8 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             } else {
                 visits.hours
             };
+            // (Till they're there: then it's from then, `world::arrive`, or from being let in,
+            // `answer`.)
             let until = tick + ticks(hours * 60.0);
             w.sims[i].visiting = Some(Visit {
                 plot,

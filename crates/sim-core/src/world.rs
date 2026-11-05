@@ -7116,8 +7116,9 @@ fn pick_autonomous(
         }
 
         // An outing: in an open-world town, a public place out of reach, for the best it has,
-        // the less the longer the way (`OUTING_K`), with time for there and back and an hour
-        // there.
+        // the less the longer the way (`OUTING_K`): only one the way to takes `outingMinutes` at
+        // most, with time for there and back and an hour there before work or school and before
+        // `outingHomeBy` (`outing_fits`).
         if ctx.travel.open {
             let reach = content.autonomy.reach;
             for p in ctx.plots.iter().filter(|p| p.public) {
@@ -7141,8 +7142,13 @@ fn pick_autonomous(
                     || *from.get_or_insert_with(|| ctx.travel.entry(pos, mode)),
                     || ctx.travel.door_entry(p.id, door, mode),
                 );
-                let eta = trip_minutes(eta, car);
-                if free < 2.0 * eta + OUTING_STAY_MINUTES {
+                let eta = trip_minutes(eta, car)
+                    + if car {
+                        park_walk(ctx.travel, door, walk_per_minute)
+                    } else {
+                        0.0
+                    };
+                if !outing_fits(content, eta, ctx.hour, free) {
                     continue;
                 }
                 // The best the place has for each need, as one day out.
@@ -7349,6 +7355,14 @@ fn start_task(
                     || !conditions_met(ctx, sim, o, i)
                     || closed_now(ctx, objects, object, i)
             })
+    {
+        return;
+    }
+    // An outing of their own choosing weighed by car that they'd walk after all (the car taken
+    // meanwhile, say), too far for that: not now (`outing_on_foot_fits`).
+    if let TaskKind::Visit { plot } = task.kind
+        && !task.directed
+        && !outing_on_foot_fits(sim, ctx, plot)
     {
         return;
     }
@@ -9041,6 +9055,27 @@ fn arrive(
                     host: None,
                 };
             } else {
+                // There: the visit is from now, the way there doesn't count (a longer one the
+                // player asked for keeps its end); an outing ends in time to be home by
+                // `visits.outingHomeBy` (`outing_leave_by`).
+                let directed = act.task.directed;
+                let leave_by = (!directed)
+                    .then(|| outing_leave_by(sim, ctx, plot, sim.pos))
+                    .flatten();
+                let rules = &content.visits;
+                let hours = if directed {
+                    rules.directed_hours
+                } else {
+                    rules.hours
+                };
+                let until = ctx.tick + (hours * 60.0 * TICKS_PER_MINUTE as f32) as u64;
+                if let Some(v) = sim.visiting.as_mut().filter(|v| v.plot == plot) {
+                    v.until = if directed {
+                        v.until.max(until)
+                    } else {
+                        leave_by.map_or(until, |t| until.min(t))
+                    };
+                }
                 sim.current = None;
             }
         }
@@ -9851,6 +9886,19 @@ pub(crate) fn visit_minutes(
         || travel.door_entry(plot, door, mode),
     );
     trip_minutes(eta, car)
+        + if car {
+            park_walk(travel, door, walk)
+        } else {
+            0.0
+        }
+}
+
+/// Minutes on foot from the public parking nearest `door` to it (`cars::parking_near`): a trip
+/// there by car walks it, as much as 120 m.
+fn park_walk(travel: &crate::travel::Travel, door: [f32; 2], walk: f32) -> f32 {
+    crate::cars::parking_near(travel, door).map_or(0.0, |at| {
+        travel.eta(at, door, crate::travel::Mode::Foot, walk)
+    })
 }
 
 /// Whether a visit `eta` minutes away is one to make at `hour`, with `free` minutes before
@@ -9861,6 +9909,86 @@ pub(crate) fn visit_fits(content: &Content, eta: f32, hour: f32, free: f32) -> b
         && hour + eta / 60.0 < content.visits.latest_hour
         && free >= 2.0 * eta + VISIT_STAY_MINUTES
 }
+
+/// Whether an outing `eta` minutes away (by car for one who'd drive there, else on foot) is one
+/// to set off on at `hour`, with `free` minutes before they must leave for work or school: as
+/// `visit_fits`, the way no longer than `visits.outingMinutes` (a walk of hours had them out
+/// past midnight, asleep by the road), and time for `OUTING_STAY_MINUTES` there and the way
+/// back, before they leave and home by `visits.outingHomeBy`.
+pub(crate) fn outing_fits(content: &Content, eta: f32, hour: f32, free: f32) -> bool {
+    let rules = &content.visits;
+    let away = 2.0 * eta + OUTING_STAY_MINUTES;
+    eta <= rules.outing_minutes && free >= away && hour + away / 60.0 <= rules.outing_home_by
+}
+
+/// Whether `sim`, setting off from home on an outing to `plot` (a public place out of
+/// `autonomy.reach`), may go: by car (`cars::trip_car`, `cars::trip_ride`), or on foot where that
+/// fits too (`outing_fits`). Anything else (not from home, not such a place): yes.
+fn outing_on_foot_fits(sim: &Sim, ctx: &Ctx, plot: u32) -> bool {
+    let content = ctx.content;
+    let Some(p) = ctx.plots.get(plot as usize) else {
+        return true;
+    };
+    let home = ctx
+        .households
+        .get(sim.household as usize)
+        .and_then(|h| h.plot);
+    let at_home = home.is_some() && ctx.briefs.get(sim.id as usize).and_then(|b| b.plot) == home;
+    let pos = ctx.nav.stairs.ground_pos(sim.pos);
+    let door = p.arrival_point();
+    if !ctx.travel.open
+        || !p.public
+        || !at_home
+        || crate::travel::dist(pos, door) <= content.autonomy.reach
+        || crate::cars::trip_car(ctx, sim, plot).is_some()
+        || crate::cars::trip_ride(ctx, sim, plot).is_some()
+    {
+        return true;
+    }
+    let eta = visit_minutes(
+        ctx.travel,
+        content,
+        pos,
+        sim.walk_per_minute(content),
+        plot,
+        door,
+        false,
+        &mut [None, None],
+    );
+    let free = leave_today(sim, ctx).map_or(f32::INFINITY, |t| {
+        t.saturating_sub(ctx.tick) as f32 * MINUTES_PER_TICK
+    });
+    outing_fits(content, eta, ctx.hour, free)
+}
+
+/// The tick a guest on an outing to `plot` (a public place in an open-world town) heads home by
+/// to be home by `visits.outingHomeBy` today: the way back from `pos` on foot, or for one whose
+/// car is parked out for them the walk back to it and the drive. None: not such an outing.
+fn outing_leave_by(sim: &Sim, ctx: &Ctx, plot: u32, pos: [f32; 2]) -> Option<u64> {
+    let content = ctx.content;
+    if !ctx.travel.open || !ctx.plots.get(plot as usize)?.public {
+        return None;
+    }
+    let home = ctx.households.get(sim.household as usize)?.plot?;
+    let door = ctx.plots.get(home as usize)?.arrival_point();
+    let walk = sim.walk_per_minute(content);
+    let travel = ctx.travel;
+    // (By car: the walk back to it where it's parked out, and the drive.)
+    let car = crate::cars::car_out_for(ctx, sim)
+        .map(|(.., at)| at)
+        .or_else(|| crate::cars::ride_home_for(ctx, sim).map(|(.., at)| at));
+    let minutes = match car {
+        Some(at) => {
+            travel.eta(pos, at, crate::travel::Mode::Foot, walk)
+                + trip_minutes(travel.eta(at, door, crate::travel::Mode::Car, walk), true)
+        }
+        None => travel.eta(pos, door, crate::travel::Mode::Foot, walk),
+    };
+    let back = (minutes * TICKS_PER_MINUTE as f32) as u64;
+    let home_by = crate::clock::tick_at(ctx.day, content.visits.outing_home_by * 60.0)?;
+    Some(home_by.saturating_sub(back))
+}
+
 /// An outing by car: minutes besides the drive, to the car and from it at either end.
 const CAR_TRIP_MINUTES: f32 = 10.0;
 const OUTING_K: f32 = 0.01;

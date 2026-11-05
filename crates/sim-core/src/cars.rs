@@ -4465,7 +4465,13 @@ pub(crate) fn parked_at(travel: &Travel, k: usize) -> Option<([f32; 2], f32, boo
 
 /// Whether there's public parking near `door` for a trip by car (`TRIP_PARK_REACH`), taken or not.
 pub(crate) fn parks_near(travel: &Travel, door: [f32; 2]) -> bool {
-    parking_for(travel, door, &[], None).is_some()
+    parking_near(travel, door).is_some()
+}
+
+/// The public parking spot nearest `door` for a trip by car (`TRIP_PARK_REACH`), taken or not:
+/// the walk from it to there is part of the trip.
+pub(crate) fn parking_near(travel: &Travel, door: [f32; 2]) -> Option<[f32; 2]> {
+    parking_for(travel, door, &[], None).map(|(at, _)| at)
 }
 
 /// `can_drive`, in a tick (from its `Ctx`).
