@@ -11,9 +11,10 @@
  * is); the areas go where it is flat and dry, far enough apart (a Poisson disc); country roads
  * leave an area by a street's end straight on or by a T square off a street, and are paths over
  * the grid that turn as a road does (`steer`: wide bends, never back on themselves), smoothed
- * into curves with no hairpins (`COUNTRY_TURN`); trails are A* paths on a finer grid round the
- * lots. One `Ground` covers the whole world, and each area's lots go along its own roads,
- * nearest its middle first (`town.ts` `LotPlacer`).
+ * into curves with no hairpins (`COUNTRY_TURN`); one whose path follows a road laid already shares
+ * it, joining it and leaving it in a T, rather than running beside it (`alongExisting`); trails
+ * are A* paths on a finer grid round the lots. One `Ground` covers the whole world, and each
+ * area's lots go along its own roads, nearest its middle first (`town.ts` `LotPlacer`).
  */
 
 import type { Content } from '../content/content';
@@ -152,6 +153,17 @@ const ASIDE = 30;
 const WAYS = 5;
 /** A country road's course, before it is smoothed into a curve, has a point at least this often (m): see `evenly`. */
 const CTRL_APART = 16;
+/**
+ * A country road's course that comes within `SHARED_REACH` cells of a road laid already (not a
+ * trail) for `SHARED_RUN` cells or more (in a row, give or take `SHARED_GAP`), heading its way give
+ * or take `SHARED_ANGLE`, follows it there: it is laid only up to it and on from it, joining it in
+ * a T (`alongExisting`), and that road carries it over the stretch, rather than the two running
+ * side by side a few metres apart (cars on them meet nose to nose, each pulling over to its right).
+ */
+const SHARED_REACH = 2;
+const SHARED_RUN = 3;
+const SHARED_GAP = 2;
+const SHARED_ANGLE = Math.PI / 4;
 /** A country road between two areas goes straight on from a way out of one to a street of the other this near (m), where that street bends less than `STRAIGHT_BEND` (radians) over 28 m. */
 const STRAIGHT_ON = 160;
 const STRAIGHT_BEND = 0.6;
@@ -899,6 +911,125 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     return road;
   };
   /**
+   * A country road's course from `a` along `cells` to `b` (null: on out of the world), in pieces
+   * where it runs along a road laid already (`SHARED_RUN`): the stretches it would run alongside
+   * that road are left to it, and each piece between joins it square in a T (merged into it,
+   * rather than side by side a few metres off); from a port right by one, straight onto it. Each
+   * piece's ends (`a`, `b`: the course's own, or such a T) and its cells, and whether it is the
+   * course's first or last stretch; one piece, the whole course, if it runs alongside none.
+   */
+  const alongExisting = (a: Way, cells: readonly number[], b: Way | null): { a: Way; cells: number[]; b: Way | null; first: boolean; last: boolean }[] => {
+    // The roads (not trails) passing within `SHARED_REACH` cells of each cell, but for the streets
+    // its own ends go on from (it leaves a port in line with its street).
+    const own = new Set([a.port?.road, b?.port?.road]);
+    const by = new Map<number, number[]>();
+    const R = SHARED_REACH;
+    roads.forEach((r, i) => {
+      if (r.kind === 'trail' || own.has(i)) return;
+      // (Each cell it passes over once; off the world, none.)
+      const under = new Set(r.points.map(([x, z]) => (x < 0 || z < 0 || x >= W || z >= D ? -1 : Math.floor(z / CELL) * gw + Math.floor(x / CELL))));
+      under.delete(-1);
+      for (const u of under) {
+        const [cx, cz] = [u % gw, Math.floor(u / gw)];
+        for (let dz = -R; dz <= R; dz++) {
+          for (let dx = -R; dx <= R; dx++) {
+            if (cx + dx < 0 || cz + dz < 0 || cx + dx >= gw || cz + dz >= gd) continue;
+            const at = (cz + dz) * gw + cx + dx;
+            const list = by.get(at);
+            if (!list) by.set(at, [i]);
+            else if (!list.includes(i)) list.push(i);
+          }
+        }
+      }
+    });
+    // Per cell, those it runs along there (within `SHARED_ANGLE` of their way: not crossing them).
+    const on = cells.map((c, i) => {
+      const [p, q] = [land.centre(cells[Math.max(0, i - 1)]), land.centre(cells[Math.min(cells.length - 1, i + 1)])];
+      const l = dist(p, q) || 1;
+      const c0 = land.centre(c);
+      return (by.get(c) ?? []).filter((road) => {
+        const { t } = pointAt(roads[road].points, nearest(roads[road].points, c0[0], c0[1]).s);
+        return Math.abs(((q[0] - p[0]) * t[0] + (q[1] - p[1]) * t[1]) / l) >= Math.cos(SHARED_ANGLE);
+      });
+    });
+    const runs: { from: number; to: number; roads: Set<number> }[] = [];
+    for (let i = 0; i < cells.length; i++) {
+      if (!on[i].length) continue;
+      let j = i;
+      for (let k = i + 1; k < cells.length && k <= j + SHARED_GAP + 1; k++) if (on[k].length) j = k;
+      if (j - i + 1 >= SHARED_RUN) runs.push({ from: i, to: j, roads: new Set(on.slice(i, j + 1).flat()) });
+      i = j;
+    }
+    if (!runs.length) return [{ a, cells: [...cells], b, first: true, last: true }];
+    // A T on the nearest of `list` to `cell` (or a point), facing it.
+    const tee = (list: Set<number>, cell: number | Pt): Way => {
+      const c = typeof cell === 'number' ? land.centre(cell) : cell;
+      const [road, at] = [...list].map((r) => [r, nearest(roads[r].points, c[0], c[1])] as const).sort((x, y) => x[1].dist - y[1].dist)[0];
+      const { p, t } = pointAt(roads[road].points, at.s);
+      const n = leftOf(t);
+      return { p, dir: [n[0] * at.side, n[1] * at.side] };
+    };
+    // (From a port alongside one only if the port is near it: straight onto it, a short way.)
+    const fromPort = !!a.port && a.p === a.port.p;
+    if (runs[0].from === 0 && fromPort && dist(a.p, tee(runs[0].roads, a.p).p) > SHARED_REACH * CELL) runs.shift();
+    if (!runs.length) return [{ a, cells: [...cells], b, first: true, last: true }];
+    const out: { a: Way; cells: number[]; b: Way | null; first: boolean; last: boolean }[] = [];
+    const add = (from: number, to: number, pa: Way, pb: Way | null, first: boolean, last: boolean) => {
+      if (to >= from) out.push({ a: pa, cells: cells.slice(from, to + 1), b: pb, first, last });
+    };
+    add(0, runs[0].from - 1, a, tee(runs[0].roads, cells[Math.max(0, runs[0].from - 1)]), true, false);
+    // (Alongside it from a port on: the port straight onto it, no cells.)
+    if (runs[0].from === 0 && fromPort) out.push({ a, cells: [], b: tee(runs[0].roads, a.p), first: true, last: false });
+    for (let k = 0; k + 1 < runs.length; k++) {
+      const [r, n] = [runs[k], runs[k + 1]];
+      // (Not off a road and back onto it: it goes on along it.)
+      if ([...r.roads].some((x) => n.roads.has(x))) continue;
+      add(r.to + 1, n.from - 1, tee(r.roads, cells[r.to + 1]), tee(n.roads, cells[n.from - 1]), false, false);
+    }
+    const end = runs[runs.length - 1];
+    add(end.to + 1, cells.length - 1, tee(end.roads, cells[Math.min(cells.length - 1, end.to + 1)]), b, false, true);
+    return out;
+  };
+  /** A piece of a country road (`alongExisting`): straight from its start onto the road beside it if it has no cells, out of the world over edge `side` if it is the last and goes out. */
+  const layPiece = (part: ReturnType<typeof alongExisting>[number], side = -1): RoadPlan =>
+    !part.cells.length
+      ? { points: curve(evenly([part.a.p, part.b!.p], CTRL_APART)), width: COUNTRY_WIDTH, ends: ['join', 'join'], kind: 'country', name: '' }
+      : part.last && side >= 0
+        ? toEdge(part.a, part.cells, side, '')
+        : countryRoad(part.a, part.cells, part.b, ['join', 'join'], '');
+  /**
+   * Whether the roads laid so far and `extra` (not trails), joined as the simulation joins them (an
+   * end within half the wider one's width and a metre of the other's middle), join `p` to `q`.
+   */
+  const joins = (extra: readonly RoadPlan[], p: Pt, q: Pt): boolean => {
+    const all = [...roads, ...extra].filter((r) => r.kind !== 'trail');
+    const index = new RoadIndex(all);
+    const parent = all.map((_, i) => i);
+    const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+    all.forEach((r, i) => {
+      for (const [x, z] of [r.points[0], r.points[r.points.length - 1]]) {
+        for (const [j, hit] of index.around(x, z, 12)) if (j !== i && hit.dist <= Math.max(r.width, all[j].width) / 2 + 1) parent[find(i)] = find(j);
+      }
+    });
+    const at = ([x, z]: Pt) => [...index.around(x, z, 1).keys()].map(find);
+    const from = at(p);
+    return at(q).some((r) => from.includes(r));
+  };
+  /**
+   * A country road (`whole`, laid from `a` along `cells` to `b`, or out of the world over edge
+   * `side`) as it goes down: in pieces where it runs along a road laid already (`alongExisting`),
+   * if they and the roads join its ends still; else whole. The roads, and whether they leave
+   * its first end and come to its last.
+   */
+  const layCourse = (whole: RoadPlan, a: Way, cells: readonly number[] | undefined, b: Way | null, side = -1): { laid: RoadPlan[]; first: boolean; last: boolean } => {
+    const parts = cells ? alongExisting(a, cells, b) : null;
+    if (!parts || (parts.length === 1 && parts[0].first && parts[0].last)) return { laid: [whole], first: true, last: true };
+    // (Not a stub where a port touches the road beside it already: the two join as they are.)
+    const laid = parts.map((part) => layPiece(part, side)).filter((r) => lengths(r.points)[r.points.length - 1] > COUNTRY_WIDTH / 2 + 1);
+    if (!joins(laid, whole.points[0], whole.points[whole.points.length - 1])) return { laid: [whole], first: true, last: true };
+    return { laid, first: !!parts[0]?.first, last: !!parts[parts.length - 1]?.last };
+  };
+  /**
    * Where a country road leaves port `q` towards `toward`: the port itself; one another country
    * road leaves already, off that road 30 m out from it, square to it (rather than both from the
    * port, running together a while).
@@ -1106,7 +1237,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     // if it turns too sharply (its ends, smoothed), again without the way it came in by, then without the one it left by.
     let outs = waysOut(a, plans[b].centre).slice(0, WAYS);
     let ins = waysOut(b, plans[a].centre).slice(0, WAYS);
-    type Made = { road: RoadPlan; pa: Way; pb: Way; bad: number };
+    type Made = { road: RoadPlan; pa: Way; pb: Way; bad: number; cells?: number[] };
     let made = null as Made | null;
     // Near enough, a way out of one straight on to a street of the other, meeting it in a T.
     const direct = [...outs.map((w) => ({ w, to: b })), ...ins.map((w) => ({ w, to: a }))]
@@ -1142,7 +1273,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       const pa = outs[found.from];
       const road = countryRoad(pa, found.cells, pb, ['join', 'join'], '');
       const bad = fault(road);
-      if (!made || bad < made.bad) made = { road, pa, pb, bad };
+      if (!made || bad < made.bad) made = { road, pa, pb, bad, cells: found.cells };
       // (No way it steers between any of them: none without them either.)
       if (!bad || !found.steered) break;
       if (tries % 2 === 0) ins = ins.filter((w) => w !== pb);
@@ -1154,8 +1285,13 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     }
     const far = b === 0 ? a : a === 0 ? b : dist(plans[a].centre, mainCentre) > dist(plans[b].centre, mainCentre) ? a : b;
     const near = far === a ? b : a;
-    roads.push({ ...settle(made.road), name: uniqueName(`${plans[far].name} Road`, `${plans[near].name} Lane`) });
-    for (const w of [made.pa, made.pb]) if (w.port) w.port.used = true;
+    const name = () => uniqueName(`${plans[far].name} Road`, `${plans[near].name} Lane`);
+    // (In pieces where it runs along a road laid already; a straight road onto a street, whole.)
+    const { laid, first, last } = layCourse(made.road, made.pa, made.cells, made.pb);
+    for (const road of laid) roads.push({ ...settle(road), name: name() });
+    // (Its ends' ports, where a piece of it leaves them.)
+    if (first && made.pa.port) made.pa.port.used = true;
+    if (last && made.pb.port) made.pb.port.used = true;
   }
   // Two or three ways out of the world: from the ports left over (else any), to the nearest edge.
   const outs = 2 + Math.floor(rand() * 2);
@@ -1197,9 +1333,11 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       noWay.set(q, (noWay.get(q) ?? new Set()).add(side));
       continue;
     }
-    const road = toEdge(from, found.cells, side, uniqueName(`${edgeName[side]} Road`, `${edgeName[side]} Lane`));
-    roads.push(settle(road));
-    if (from.port) q.used = true;
+    // (In pieces where it runs along a road laid already.)
+    const name = () => uniqueName(`${edgeName[side]} Road`, `${edgeName[side]} Lane`);
+    const { laid, first } = layCourse(toEdge(from, found.cells, side, ''), from, found.cells, null, side);
+    for (const road of laid) roads.push({ ...settle(road), name: name() });
+    if (from.port && first) q.used = true;
     usedEdges.add(side);
     made++;
   }
@@ -1238,7 +1376,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       };
       const from: Way = { p: q.p, dir: q.dir, port: q };
       // The nearest; if the road there turns too sharply or winds round, the nearest somewhere else.
-      let made: { road: RoadPlan; to?: Port; bad: number } | null = null;
+      let made: { road: RoadPlan; to?: Port; bad: number; cells: number[]; b: Way | null; side: number } | null = null;
       for (let tries = 0; tries < TRIES && (!made || made.bad > 0); tries++) {
         const cells = route(cost(true), cost(false), [from], goal, () => 0)?.cells;
         const end = cells?.[cells.length - 1];
@@ -1246,8 +1384,12 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
         const to = portAt.get(end);
         const other = country.get(end)?.road;
         let road: RoadPlan;
-        if (to) road = countryRoad(q, cells, to, ['join', 'join'], '');
-        else if (other !== undefined) {
+        // (Its course and where it ends: a port, a T, out of the world over edge `side`.)
+        let [course, b, side] = [cells, null as Way | null, -1];
+        if (to) {
+          b = { p: to.p, dir: to.dir, port: to };
+          road = countryRoad(q, cells, b, ['join', 'join'], '');
+        } else if (other !== undefined) {
           // Into the other road square to it, ending on its middle.
           // (Met from the side the way comes from: the last cell but one or two before it.)
           const c = cells.length >= 3 ? land.centre(cells[cells.length - 3]) : q.p;
@@ -1255,12 +1397,15 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
           const at = nearest(pts, c[0], c[1]);
           const T = pointAt(pts, at.s).p;
           const n = leftOf(pointAt(pts, at.s).t);
-          road = countryRoad(q, cells.slice(0, -1), { p: T, dir: [n[0] * at.side, n[1] * at.side] }, ['join', 'join'], '');
+          b = { p: T, dir: [n[0] * at.side, n[1] * at.side] };
+          course = cells.slice(0, -1);
+          road = countryRoad(q, course, b, ['join', 'join'], '');
         } else {
-          road = toEdge(q, cells, edgeOf(end), '');
+          side = edgeOf(end);
+          road = toEdge(q, cells, side, '');
         }
         const bad = fault(road);
-        if (!made || bad < made.bad) made = { road, to, bad };
+        if (!made || bad < made.bad) made = { road, to, bad, cells: course, b, side };
         // (Not there again.)
         const [ex, ez] = [end % gw, Math.floor(end / gw)];
         for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) if (ex + dx >= 0 && ez + dz >= 0 && ex + dx < gw && ez + dz < gd) banned.add((ez + dz) * gw + ex + dx);
@@ -1269,9 +1414,12 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
         failed.push(`no country road on from ${plan.name}`);
         continue;
       }
-      roads.push({ ...settle(made.road), name: uniqueName(`${plan.name} Road`, `${plan.name} Lane`) });
-      if (made.to) made.to.used = true;
-      q.used = true;
+      // (In pieces where it runs along a road laid already.)
+      const name = () => uniqueName(`${plan.name} Road`, `${plan.name} Lane`);
+      const { laid, first, last } = layCourse(made.road, from, made.cells, made.b, made.side);
+      for (const road of laid) roads.push({ ...settle(road), name: name() });
+      if (made.to && last) made.to.used = true;
+      if (first) q.used = true;
     }
   }
   // Ports still nobody's (no way on from them): their roads end there.
