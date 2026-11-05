@@ -1130,8 +1130,9 @@ export class TownStreet {
     const clear = (s: number, m: number) => s > 1 && s < kerb.length - 1 && kerb.open(s) && !mouths.some(([a, b]) => s > a - m && s < b + m);
     const used: number[] = [];
     const near = (s: number, m: number) => used.some((u) => Math.abs(u - s) < m);
-    // (On a bus street, back from the kerb: buses pull over onto the pavement to pass each other
-    // there, no nearer the road's edge than `keep`, `WorldStructure.busStreets`.)
+    // (On a bus street or a 6 m lane, back from the kerb: buses and cars pull over onto the
+    // pavement to pass each other there, no nearer the road's edge than `keep`,
+    // `WorldStructure.busStreets`.)
     const keep = world.busStreets?.find((b) => b.road === r)?.keep;
     const kerbD = keep === undefined ? SIDEWALK - KERB - 0.3 : Math.min(SIDEWALK - KERB - 0.3, keep - KERBSIDE_REACH);
     const on = (s: number, d = kerbD) => kerb.at(s, d);

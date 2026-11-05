@@ -623,17 +623,18 @@ export interface WorldStructure {
   /** The town's bus stops (sim-core `bus::Stop`). Absent: none (the street draws a shelter or two of its own at the ends of its rows of houses). */
   stops?: StopInfo[];
   /**
-   * The streets a bus drives where the kerbside furniture keeps back, for two buses to pass pulled
-   * over onto the pavement (sim-core `bus::Transit::bus_streets`, the one source for both). Absent:
-   * none (the furniture stands where it always did).
+   * The streets where the kerbside furniture keeps back, for buses and cars to pull over onto the
+   * pavement to pass: those a bus drives (two buses pass there pulled over), and every lane too
+   * narrow for two cars to pass in their lanes (sim-core `bus::Transit::bus_streets`, the one source
+   * for both). Absent: none (the furniture stands where it always did).
    */
   busStreets?: BusStreetInfo[];
 }
 
 /**
- * A street a bus drives (`WorldStructure.busStreets`): the town's road (`meta.roads` index) and how
- * far in from its edges (m, either side) its kerbside furniture may reach (sim-core `bus::kerbside`):
- * a bus passing another pulled over comes no nearer.
+ * A street buses or cars pull over on (`WorldStructure.busStreets`): the town's road (`meta.roads`
+ * index) and how far in from its edges (m, either side) its kerbside furniture may reach (sim-core
+ * `bus::kerbside`, `cars::kerbside`): a bus or a car passing another pulled over comes no nearer.
  */
 export interface BusStreetInfo {
   road: number;
