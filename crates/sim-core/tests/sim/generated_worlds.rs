@@ -19,7 +19,7 @@ use sim_core::lot::{Edge, OUTDOORS};
 use sim_core::path::NavGrid;
 use sim_core::surface;
 use sim_core::travel::Graph;
-use sim_core::world::MAX_SIMS;
+use sim_core::world::{MAX_SIMS, TaskKind};
 
 /// `check` for each of `items`, a few at a time (one per core: each world plays on its own, and a
 /// path search's budget counts on its own thread), the results in the items' order.
@@ -224,8 +224,9 @@ fn generated_worlds_are_livable() {
         }
         common::check(&w);
         // Half a day of everyone's free will. Those with a bike of their own ride it to work or
-        // school (`ride.rs`): someone does, in a cosy or a normal town, and nobody is on one in
-        // town for longer than a ride takes (stuck on it).
+        // school (`ride.rs`), and out on a visit or an outing: someone does, in a cosy or a normal
+        // town, and nobody is on one in town for longer than a ride takes (stuck on it), one way
+        // (a ride out to a café and straight back home is two).
         // (A household with a car at home drives: those without one ride.)
         let carless = |plot: u32| {
             w.households.iter().enumerate().any(|(h, hh)| {
@@ -246,7 +247,7 @@ fn generated_worlds_are_livable() {
             })
             .count();
         let mut rode = std::collections::BTreeSet::new();
-        let mut on_since = vec![None::<u64>; w.sims.len()];
+        let mut on_since = vec![None::<(u64, u8)>; w.sims.len()];
         let mut stuck = std::collections::BTreeSet::new();
         let mut failures_on_road = std::collections::BTreeSet::new();
         let mut stacked: Stacked = Default::default();
@@ -264,11 +265,19 @@ fn generated_worlds_are_livable() {
                     if sim.riding.is_some() {
                         rode.insert(k);
                     }
+                    // (Which way: out, home, to work.)
+                    let leg = match sim.current().map(|a| a.task.kind) {
+                        Some(TaskKind::Visit { .. }) => 1,
+                        Some(TaskKind::GoHome) => 2,
+                        Some(TaskKind::Work) => 3,
+                        _ => 0,
+                    };
                     let since = on_since.get_mut(k);
                     let Some(since) = since else { continue };
                     match (on, *since) {
-                        (true, None) => *since = Some(w.tick),
-                        (true, Some(t0)) if w.tick - t0 > RIDE_HOURS * TICKS_PER_HOUR => {
+                        (true, None) => *since = Some((w.tick, leg)),
+                        (true, Some((_, was))) if was != leg => *since = Some((w.tick, leg)),
+                        (true, Some((t0, _))) if w.tick - t0 > RIDE_HOURS * TICKS_PER_HOUR => {
                             stuck.insert(sim.name.clone());
                         }
                         (false, _) => *since = None,

@@ -559,20 +559,30 @@ fn book(w: &mut World, mut run: Run) {
 /// (`life`'s leaving): in time for the taxi as planned, or as late as it's running (held up on its
 /// way, or still at the edge of town when it was due in, `run_on`).
 pub(crate) fn leave_at(w: &World, i: usize) -> Option<u64> {
-    let b = w.sims[i].taxi?;
-    let run = w.taxis.runs.iter().find(|r| r.id == b.run && !r.home)?;
+    booked_leave(&w.taxis, &w.cars, w.tick, w.sims[i].taxi?)
+}
+
+/// `leave_at` for booking `b` at `tick`: the planned leave, later by as much as the taxi runs late
+/// (`world`'s free time before work follows it too).
+pub(crate) fn booked_leave(
+    taxis: &Taxis,
+    cars: &[crate::cars::Car],
+    tick: u64,
+    b: Booking,
+) -> Option<u64> {
+    let run = taxis.runs.iter().find(|r| r.id == b.run && !r.home)?;
     let st = run.stops.get(b.stop as usize)?;
     if st.state != StopState::Booked {
         return None;
     }
-    let late = match run.car.and_then(|c| w.cars.get(c as usize)) {
+    let late = match run.car.and_then(|c| cars.get(c as usize)) {
         Some(car) => {
             let at = run.at.get(st.halt as usize).copied().unwrap_or(0.0);
             let to_go = (at - car.progress).max(0.0).ceil() as u64;
             let halts = (st.halt as u64).saturating_sub(run.next as u64) * DWELL;
-            (w.tick + to_go + halts).saturating_sub(st.due)
+            (tick + to_go + halts).saturating_sub(st.due)
         }
-        None => w.tick.saturating_sub(run.enter),
+        None => tick.saturating_sub(run.enter),
     };
     Some(st.leave + late)
 }
@@ -1313,6 +1323,13 @@ impl World {
     #[doc(hidden)]
     pub fn taxi_booking(&self, i: usize) -> Option<Booking> {
         self.sims.get(i)?.taxi
+    }
+
+    /// For tests: when resident `i` leaves for the taxi they're booked on to work, as late as it
+    /// runs (`booked_leave`: their free time before work ends then).
+    #[doc(hidden)]
+    pub fn taxi_leave(&self, i: usize) -> Option<u64> {
+        leave_at(self, i)
     }
 }
 
@@ -2360,4 +2377,18 @@ fn through(route: &crate::cars::Route, jams: &[([f32; 2], f32)]) -> bool {
             .iter()
             .any(|p| crate::travel::dist(p.0, m) < r + JAM_NEAR)
     })
+}
+
+/// About how many minutes a taxi would take `sim` from `from` to `plot` on a visit or an outing
+/// (`world::leisure_way`, after the household's car and a bike of theirs, before walking): Some,
+/// and they'd go by it. None for now: the work taxi is for work and school only (taxi.rs is to
+/// take leisure rides; `world::start_task`'s `Visit` arms then need one that books it).
+pub(crate) fn leisure_eta(
+    _travel: &crate::travel::Travel,
+    _taxis: &Taxis,
+    _sim: &crate::world::Sim,
+    _from: [f32; 2],
+    _plot: u32,
+) -> Option<f32> {
+    None
 }

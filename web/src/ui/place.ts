@@ -79,15 +79,16 @@ export function tripText(
   const when = (word: string) => (trip.at === undefined ? '' : ` · ${word} about ${time(trip.at)}`);
   if (trip.to === home) return `${ride ? rideText(ride.kind, 'home') : 'On the way home'}${when('back')}`;
   const p = plots[trip.to];
-  return `On the way to ${p ? lotInSentence(p, households) : 'somewhere'}${when('there')}`;
+  const going = ride?.to === 'out' ? (ride.kind === 'bike' ? 'Cycling' : 'Riding the e-scooter') : 'On the way';
+  return `${going} to ${p ? lotInSentence(p, households) : 'somewhere'}${when('there')}`;
 }
 
 /** What a resident rides on their way (`SimView.ride`). */
-export type SimRide = { kind: 'bike' | 'scooter'; to: 'work' | 'school' | 'home' };
+export type SimRide = { kind: 'bike' | 'scooter'; to: 'work' | 'school' | 'out' | 'home' };
 
-/** On a bike or an e-scooter, in words: "Cycling to work", "Riding the e-scooter home". */
+/** On a bike or an e-scooter, in words: "Cycling to work", "Riding the e-scooter home", "Cycling out" (a visit or an outing, its place unknown here). */
 export function rideText(kind: SimRide['kind'], to: SimRide['to']): string {
-  return `${kind === 'bike' ? 'Cycling' : 'Riding the e-scooter'} ${to === 'home' ? 'home' : `to ${to}`}`;
+  return `${kind === 'bike' ? 'Cycling' : 'Riding the e-scooter'} ${to === 'home' || to === 'out' ? to : `to ${to}`}`;
 }
 
 /** The work taxi a resident waits for or rides (`SimView.taxi`, sim-core `taxi.rs`). */

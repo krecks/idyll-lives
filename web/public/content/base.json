@@ -1930,6 +1930,8 @@
     "minFriendship": 15,
     "earliestHour": 10,
     "latestHour": 20,
+    "outingMinutes": 90,
+    "outingHomeBy": 23,
     "company": 0.05,
     "boredMinutes": 30,
     "farewell": ["goodbyeHug", "goodbye"],

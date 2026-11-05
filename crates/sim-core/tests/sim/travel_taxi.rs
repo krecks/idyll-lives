@@ -868,3 +868,69 @@ fn neighbours_in_different_work_going_the_same_way_at_the_same_hour_share_a_taxi
         "never the same taxi: {mum:?} {pip:?}"
     );
 }
+
+#[test]
+fn a_riders_time_before_work_ends_when_the_taxi_comes_late_run_or_held_up() {
+    // A's taxi is held at the edge of town by a jam: A leaves for it (and their free time before
+    // work ends) as much later as it's held. And booked on a late run once work has begun (a game
+    // begun after they'd have set off), A has a leave time all the same: no free time without end
+    // before it (`world::free_before_work`).
+    let road = |pts: Vec<[f32; 2]>, ends: &str| {
+        let pts: Vec<String> = pts.iter().map(|p| format!("[{},{}]", p[0], p[1])).collect();
+        format!(
+            r#"{{"points":[{}],"width":7,"kind":"street","ends":{ends}}}"#,
+            pts.join(",")
+        )
+    };
+    let side = road(
+        (0..=40).map(|z| [300.5, STREET + z as f32]).collect(),
+        r#"["join","dead"]"#,
+    );
+    let mut w = town_with(7, &[house(20, &[&worker("A")])], |_| 0.0, &[side]);
+    // (Day 1: booked on a late run, work begun.)
+    let day1 = sim_core::clock::tick_at(1, 12.0 * 60.0).unwrap();
+    let mut late_run = false;
+    while w.tick < day1 && !late_run {
+        w.tick_once();
+        if let Some(b) = w.taxi_booking(0)
+            && let Some(run) = w.taxis.runs.iter().find(|r| r.id == b.run && !r.home)
+        {
+            let start = run.stops[b.stop as usize].due;
+            late_run = w.taxi_leave(0).is_some() && run.due_out > start.min(run.due_out);
+            assert!(w.taxi_leave(0).is_some(), "booked with no leave time");
+        }
+    }
+    // (Day 2: the run held at the edge of town past when it was due in.)
+    let jam = w
+        .travel
+        .graph
+        .boxes
+        .iter()
+        .position(|(m, _)| (m[0] - 300.5).abs() < 2.0)
+        .expect("the side street's junction");
+    let end = sim_core::clock::tick_at(2, 23.0 * 60.0).unwrap();
+    let day2 = sim_core::clock::tick_at(2, 0.0).unwrap();
+    while w.tick < day2 {
+        w.tick_once();
+    }
+    w.taxis.jams = vec![jam];
+    let mut seen = false;
+    while w.tick < end && !seen {
+        w.tick_once();
+        let Some(b) = w.taxi_booking(0) else { continue };
+        let Some(run) = w.taxis.runs.iter().find(|r| r.id == b.run && !r.home) else {
+            continue;
+        };
+        let st = run.stops[b.stop as usize];
+        if run.car.is_none() && w.tick > run.enter + 5 * 20 && st.state == StopState::Booked {
+            let leave = w.taxi_leave(0).expect("a leave time");
+            assert_eq!(
+                leave,
+                st.leave + (w.tick - run.enter),
+                "not as late as it's held"
+            );
+            seen = true;
+        }
+    }
+    assert!(seen, "the run was never held at the edge of town");
+}

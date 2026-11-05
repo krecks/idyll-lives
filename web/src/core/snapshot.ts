@@ -113,7 +113,7 @@ export interface SnapshotLayout {
      * whoever goes through them (missing in older layouts).
      */
     shuts?: number;
-    /** Stable id of the thing they ride (a bike, an e-scooter), drawn under them and not at its place, or -1. */
+    /** Stable id of the thing they ride (a bike, an e-scooter), drawn under them and not at its place, or -1; left out by a place they're visiting, -2 less its stable id (not drawn at its place either). */
     ride?: number;
   };
   /** Animation tags from content (`animations` in base.json), named by `sim.action`. */
