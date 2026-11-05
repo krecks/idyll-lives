@@ -628,13 +628,24 @@ pub(crate) fn leave_at(w: &World, i: usize) -> Option<u64> {
 }
 
 /// `leave_at` for booking `b` at `tick`: the planned leave, later by as much as the taxi runs late
-/// (`world`'s free time before work follows it too).
+/// (`world`'s free time before work follows it too). None: not on a run to work (or school).
 pub(crate) fn booked_leave(
     taxis: &Taxis,
     cars: &[crate::cars::Car],
     tick: u64,
     b: Booking,
 ) -> Option<u64> {
+    taxis
+        .runs
+        .iter()
+        .any(|r| r.id == b.run && r.place.is_none())
+        .then(|| leave_for(taxis, cars, tick, b))
+        .flatten()
+}
+
+/// `booked_leave` for any run that picks its riders up (to work or school, to a place or back
+/// from it, `leisure_leaving`).
+fn leave_for(taxis: &Taxis, cars: &[crate::cars::Car], tick: u64, b: Booking) -> Option<u64> {
     let run = taxis.runs.iter().find(|r| r.id == b.run && r.picks_up())?;
     let st = run.stops.get(b.stop as usize)?;
     if st.state != StopState::Booked {
@@ -2839,7 +2850,7 @@ fn leisure_leaving(w: &mut World) {
         let Some(place) = r.place else { continue };
         for st in r.stops.iter().filter(|st| st.state == StopState::Booked) {
             let i = st.sim as usize;
-            let leave = booked_leave(
+            let leave = leave_for(
                 &w.taxis,
                 &w.cars,
                 tick,
