@@ -456,13 +456,18 @@ const GATE_REACH: f32 = BOX_MOST + 2.0;
 const POLE_OUT: f32 = 1.0;
 const POLE_KERB: f32 = 0.4;
 
+/// An arm's road from its junction (`signal_at`): which, where along it and which way (+1, -1),
+/// and the stretch of it between its ends' nodes.
+type ArmRoad = (u32, f32, f32, f32, f32);
+
 /// The lights of the junction at node `n` of `g` (`Signal`): its arms for cars, each with its pole
 /// on the kerb to the right of the way in, just out past the box (`boxes`). None: fewer than
 /// `SIGNAL_ARMS` arms.
 pub(crate) fn signal_at(g: &Graph, n: usize) -> Option<Signal> {
     let p = g.nodes[n];
-    let mut arms: Vec<([f32; 2], f32)> = Vec::new();
-    // (Each arm's way out, and how far from its middle its kerb is.)
+    // (Each arm's way out, how far from its middle its kerb is, and its road from the node: which,
+    // where along it and which way.)
+    let mut arms: Vec<([f32; 2], f32, ArmRoad)> = Vec::new();
     for e in g.edges.iter() {
         let road = &g.roads[e.road as usize];
         if !road.drivable() {
@@ -478,6 +483,7 @@ pub(crate) fn signal_at(g: &Graph, n: usize) -> Option<Signal> {
                 arms.push((
                     [(q[0] - p[0]) / l, (q[1] - p[1]) / l],
                     crate::cars::kerb_of(road.width, road.kind),
+                    (e.road, s, k, e.s0, e.s1),
                 ));
             }
         }
@@ -504,20 +510,21 @@ pub(crate) fn signal_at(g: &Graph, n: usize) -> Option<Signal> {
     };
     let arms = arms
         .iter()
-        .map(|&(way, kerb)| {
-            // (Coming in, its right is the way out's left.)
-            let right = [way[1], -way[0]];
-            let at = |d: f32| {
-                let side = kerb + POLE_KERB;
-                [
-                    p[0] + way[0] * d + right[0] * side,
-                    p[1] + way[1] * d + right[1] * side,
-                ]
-            };
+        .map(|&(way, kerb, (road, s, k, s0, s1))| {
+            // (Along its own road, round its bend: where that's out past the box, and the way
+            // out there; coming in, its right is the way out's left. On the pavement, `POLE_KERB`
+            // in from the kerb; on a country road, as far out on the verge.)
+            let road = &g.roads[road as usize];
+            let at = (s + k * (reach(way) + POLE_OUT)).clamp(s0, s1);
+            let t = road.tangent(at);
+            let out = [t[0] * k, t[1] * k];
+            let right = [out[1], -out[0]];
+            let m = road.at(at);
+            let side = kerb + POLE_KERB;
             SignalArm {
                 way,
-                pole: at(reach(way) + POLE_OUT),
-                yaw: way[0].atan2(way[1]),
+                pole: [m[0] + right[0] * side, m[1] + right[1] * side],
+                yaw: out[0].atan2(out[1]),
             }
         })
         .collect();
@@ -1233,14 +1240,56 @@ pub fn on_its_way(w: &World, key: u64) -> Option<f32> {
 /// out again with them (`Claim::gate`). Once the cars are made or loaded.
 pub(crate) fn settle(w: &mut World) {
     let g = &w.travel.graph;
-    w.travel.signals = if w.travel.lights_on {
-        (0..g.nodes.len()).filter_map(|n| signal_at(g, n)).collect()
-    } else {
-        Vec::new()
-    };
+    // (The cars an hour through each junction at its busiest, about: every household car's way
+    // out of town, each once in the morning's hour, `peak_flow`.)
+    let flow = peak_flow(w);
+    let mut signals: Vec<Signal> = Vec::new();
+    let mut heads = 0;
+    for n in 0..g.nodes.len() {
+        if !(w.travel.lights_on || flow.get(n).is_some_and(|&f| f >= LIGHT_FLOW)) {
+            continue;
+        }
+        let Some(sig) = signal_at(g, n) else { continue };
+        // (No junction lit without a head for each arm in the snapshot's rows.)
+        if heads + sig.arms.len() > crate::snapshot::MAX_LIGHTS {
+            break;
+        }
+        heads += sig.arms.len();
+        signals.push(sig);
+    }
+    w.travel.signals = signals;
     for car in &mut w.cars {
         car.reclaim(&w.travel);
     }
+}
+
+/// A junction with at least this many cars an hour through it at its busiest (`peak_flow`) gets
+/// traffic lights (`settle`). In the sample worlds, a big world's busiest has 9, about one a
+/// fifth of the 50 s every arm's turn comes round in: none are lit.
+pub(crate) const LIGHT_FLOW: u32 = 40;
+
+/// Per node of the roads, about how many cars an hour come through it at its busiest: the
+/// households' cars whose way out of town passes it (each drives out once about the start of
+/// work, the morning's busiest hour), twice for a big world's cars and taxis coming in too.
+fn peak_flow(w: &World) -> Vec<u32> {
+    let g = &w.travel.graph;
+    let mut flow = vec![0u32; g.nodes.len()];
+    for car in w.cars.iter().filter(|c| !c.taxi) {
+        let Some(pts) = car.route_points() else {
+            continue;
+        };
+        for (n, &p) in g.nodes.iter().enumerate() {
+            if pts.iter().any(|&q| dist(p, q) < BOX_LEAST) {
+                flow[n] += 1;
+            }
+        }
+    }
+    if w.travel.size == crate::travel::WorldSize::Big {
+        for f in &mut flow {
+            *f *= 2;
+        }
+    }
+    flow
 }
 
 impl World {

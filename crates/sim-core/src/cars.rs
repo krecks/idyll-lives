@@ -552,6 +552,13 @@ impl Car {
         self.pulled_for = None;
     }
 
+    /// Where its route out goes (or its way now), sampled: for counting the traffic through the
+    /// junctions (`traffic::settle`). None: no route.
+    pub(crate) fn route_points(&self) -> Option<Vec<[f32; 2]>> {
+        let (_, r) = self.route.as_ref()?;
+        Some(r.points.iter().step_by(8).map(|p| p.0).collect())
+    }
+
     /// A taxi's route's length (ticks).
     /// A taxi's door for `seat` (`door`), else its own door's place whatever is there.
     pub(crate) fn taxi_door(&self, nav: &crate::path::NavGrid, seat: usize) -> (usize, [f32; 2]) {

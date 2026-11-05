@@ -874,3 +874,85 @@ fn a_game_saved_with_the_lights_part_way_loads_with_them_where_they_were() {
     let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     assert_eq!(states(&loaded, &mut buf), was);
 }
+
+#[test]
+fn junctions_past_the_snapshots_room_for_signal_heads_are_never_lit() {
+    // A grid of 9 streets each way, 81 crossroads of four arms: 324 heads were they all lit, past
+    // the snapshot's rows. Those lit fit, every one with a head an arm.
+    let lines: Vec<String> = (0..9)
+        .flat_map(|k| {
+            let c = 40.0 + 40.0 * k as f32;
+            let road = |a: [f32; 2], b: [f32; 2], ends: &str| {
+                format!(
+                    r#"{{"points":[{}],"width":7,"kind":"street","ends":{ends},"area":0}}"#,
+                    line_pts(a, b)
+                )
+            };
+            [
+                road([0.5, c], [399.5, c], r#"["out","out"]"#),
+                road([c, 0.5], [c, 399.5], r#"["out","out"]"#),
+            ]
+        })
+        .collect();
+    let roads = format!("[{}]", lines.join(","));
+    let exits = r#"[{"x":0.5,"z":40,"kind":"road"}]"#;
+    let more = r#","size":"big","walls":[],"doors":[],"windows":[],"relationships":[],
+        "areas":[{"name":"Grid","kind":"hamlet","x":0,"z":0,"w":400,"d":400}]"#;
+    let mut w = town_of(CONTENT, more, 400, 400, &roads, exits, &[]);
+    assert!(
+        w.travel.signals.is_empty(),
+        "lit by traffic: nobody drives here"
+    );
+    w.light_busy_junctions();
+    let heads: usize = w.travel.signals.iter().map(|s| s.arms.len()).sum();
+    assert!(!w.travel.signals.is_empty());
+    assert!(heads <= sim_core::snapshot::MAX_LIGHTS, "{heads} heads");
+    assert!(w.travel.signals.iter().all(|s| s.arms.len() == 4));
+    let mut buf = vec![0.0f32; sim_core::snapshot::CAPACITY];
+    sim_core::snapshot::write(&w, &mut buf);
+    assert_eq!(
+        buf[sim_core::snapshot::header::LIGHT_COUNT] as usize,
+        heads,
+        "a row a head"
+    );
+}
+
+#[test]
+fn a_car_pulling_up_at_a_light_resting_on_another_arms_green_gets_its_turn_soon() {
+    use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
+    // The crossroads lit, nobody about: whichever arm rests on green. A car comes home along the
+    // north arm's dead end: its arm's green within the 50 s every turn comes round in.
+    let mut w = crossroads(&[crossroads_house(170.0, true)]);
+    w.light_busy_junctions();
+    common::run_to(&mut w, 2, 7.0);
+    // (Resting: a while with nobody at it.)
+    for _ in 0..20 * 20 {
+        w.tick_once();
+    }
+    let mut buf = vec![0.0f32; snapshot::CAPACITY];
+    snapshot::write(&w, &mut buf);
+    let resting: Vec<f32> = (0..4)
+        .map(|k| buf[LIGHT_BASE + k * LIGHT_STRIDE + light::STATE])
+        .collect();
+    set_off(&mut w, 0);
+    let (start, mut through) = (w.tick, None);
+    while w.tick < start + 60 * 60 * 20 && through.is_none() {
+        w.tick_once();
+        // (Past the junction's middle on its way out east or west.)
+        if w.cars[0]
+            .shown
+            .is_some_and(|s| (s.0[0] - 200.0).abs() > 15.0)
+            && w.cars[0].progress > 0.0
+        {
+            through = Some(w.tick);
+        }
+    }
+    let through = through.expect("never through the junction");
+    // (Its drive out of its driveway and down the arm, and the wait for its turn: a minute or so
+    // in all, the turn itself 50 s at most.)
+    assert!(
+        through - start < 50 * 20 + 3 * 60 * 20,
+        "through after {} s, the lights resting at {resting:?}",
+        (through - start) / 20
+    );
+}

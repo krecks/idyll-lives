@@ -1731,19 +1731,20 @@ struct StructureView<'a> {
     /// (`cars::pull_over_streets`); left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pull_over_streets: Vec<PullOverStreetView>,
-    /// Where the traffic lights' poles stand (`traffic::SignalArm::pole`, in their snapshot rows'
-    /// order): the kerbside furniture keeps clear of them; left out when there are none.
+    /// Where the traffic lights' poles stand and which way their heads face (`traffic::SignalArm`:
+    /// x, z and yaw, in their snapshot rows' order): the kerbside furniture keeps clear of them;
+    /// left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    light_poles: Vec<[f32; 2]>,
+    light_poles: Vec<[f32; 3]>,
 }
 
 /// `StructureView::light_poles`.
-fn light_pole_views(world: &World) -> Vec<[f32; 2]> {
+fn light_pole_views(world: &World) -> Vec<[f32; 3]> {
     world
         .travel
         .signals
         .iter()
-        .flat_map(|s| s.arms.iter().map(|a| a.pole))
+        .flat_map(|s| s.arms.iter().map(|a| [a.pole[0], a.pole[1], a.yaw]))
         .take(crate::snapshot::MAX_LIGHTS)
         .collect()
 }

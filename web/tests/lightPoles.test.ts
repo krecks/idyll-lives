@@ -14,7 +14,7 @@ const WIDTH = 7;
 const KERB = 2.15;
 
 /** Two houses each side of the street; `poles`: the lights' poles on its kerbs. */
-function town(poles: [number, number][]): WorldStructure {
+function town(poles: [number, number, number][]): WorldStructure {
   const [north, south] = [MID - WIDTH / 2, MID + WIDTH / 2];
   const lots = [
     { x: 0, w: 20, z: 0, d: north, door: 8, facing: 2 },
@@ -82,7 +82,7 @@ describe('kerbside furniture by traffic light poles', async () => {
     // (A pole where a streetlight stood, on each side's kerb: it stands somewhere else.)
     const north = plain.filter(([, z]) => z < MID);
     const south = plain.filter(([, z]) => z > MID);
-    const poles: [number, number][] = [north, south].filter((s) => s.length).map((s) => [s[0][0], s[0][1] < MID ? MID - KERB - 0.4 : MID + KERB + 0.4]);
+    const poles: [number, number, number][] = [north, south].filter((s) => s.length).map((s) => [s[0][0], s[0][1] < MID ? MID - KERB - 0.4 : MID + KERB + 0.4, 0]);
     const lit = streetlights(await planStreet(new HousePlanner(), town(poles), null, options));
     expect(lit.length).toBeGreaterThan(0);
     for (const [px, pz] of poles) {
