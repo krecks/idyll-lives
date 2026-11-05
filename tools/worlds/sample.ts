@@ -27,8 +27,10 @@
  *
  * The same arguments make the same files, byte for byte (`Math.random` seeded per world:
  * web/tests/sampleWorlds.test.ts), so a world a check fails on can be made again and run alone.
+ * `--seed-base n` (or WORLDS_SEED_BASE; default 0, the worlds CI checks) draws other worlds: the
+ * release gate runs the checks over several (`tools/ci-local.sh`, SEED_BASE).
  *
- * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--sizes cosy,normal,big] [--big-out file] [--big-per-kind n] [--kinds farm,forest]
+ * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--sizes cosy,normal,big] [--big-out file] [--big-per-kind n] [--kinds farm,forest] [--seed-base n]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -326,6 +328,10 @@ const sizes = (flag('--sizes') ?? 'cosy').split(',') as (typeof WORLD_SIZES)[num
 for (const size of sizes) if (!WORLD_SIZES.includes(size)) throw new Error(`no size ${size}`);
 const bigOutFlag = flag('--big-out');
 const bigPerKind = Number(flag('--big-per-kind') ?? 1);
+/** Which worlds of each kind (0: CI's); each world's seed moves on `SEED_STEP` per one. */
+const seedBase = Number(flag('--seed-base') ?? process.env.WORLDS_SEED_BASE ?? 0);
+if (!Number.isInteger(seedBase) || seedBase < 0) throw new Error(`no seed base ${seedBase}`);
+const SEED_STEP = 7919;
 const kinds = (flag('--kinds')?.split(',') ?? [...WORLD_KINDS]) as (typeof WORLD_KINDS)[number][];
 for (const kind of kinds) if (!WORLD_KINDS.includes(kind)) throw new Error(`no kind ${kind}`);
 const out = process.argv[2] ?? 'worlds.json';
@@ -348,7 +354,7 @@ const courtsOf: Record<string, [number, number, number]> = {};
 for (const size of sizes) {
   for (const kind of WORLD_KINDS.filter((k) => kinds.includes(k))) {
     for (let i = 1; i <= (size === 'big' ? bigPerKind : perKind); i++) {
-      const seed = i * 104729 + kind.length;
+      const seed = i * 104729 + kind.length + seedBase * SEED_STEP;
       const tag = `${kind}${size === 'cosy' ? '' : ` ${size}`} ${seed}`;
       // (The households, the player's and the neighbours', drawn with `Math.random`: seeded here
       // by the world's seed and size, the same seeds make the same files, so a failure in a
