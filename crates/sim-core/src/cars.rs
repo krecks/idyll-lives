@@ -2473,14 +2473,14 @@ fn pull_over(w: &mut World, c: usize, others: &[Driving], moving: bool) {
     if (shift - car.shift).abs() < 1e-5 {
         return;
     }
-    if shift > car.shift
-        && guard(
-            &body(car.shift),
-            &body(shift),
-            others.iter().chain(&standing),
-            &w.transit,
-        )
-        .is_some()
+    // (Out, or back in: never into another, a bus going by that waited for it too.)
+    if guard(
+        &body(car.shift),
+        &body(shift),
+        others.iter().chain(&standing),
+        &w.transit,
+    )
+    .is_some()
     {
         return;
     }
