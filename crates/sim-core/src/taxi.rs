@@ -1661,11 +1661,11 @@ fn out_end(
 }
 
 /// Where the taxi stands for a house whose way to the road meets it at `mouth`, running there
-/// along `axis` (`home_way`): by it, nearest first along the road, where the road runs straight for the taxi's body and a little
-/// more (`STAND_ROOM`, `STAND_STRAIGHT`), clear of junctions' boxes, of a dead end's turning
-/// circle, of the way out of town, and of another taxi standing (`taken`: (road, s), with
-/// `STAND_GAP` between them). None: not a road for cars, or no such stretch within
-/// `STAND_REACH`.
+/// along `axis` (`home_way`): by it, nearest first along the road, where the road runs straight
+/// for the taxi's body and a little more (`STAND_ROOM`, `STAND_STRAIGHT`), clear of junctions'
+/// boxes, of a dead end's turning circle, of the way out of town, of public parking
+/// (`PARK_CLEAR`), and of another taxi standing (`taken`: (road, s), with `STAND_GAP` between
+/// them). None: not a road for cars, or no such stretch within `STAND_REACH`.
 pub(crate) fn kerb_at(
     travel: &crate::travel::Travel,
     meta: &serde_json::Value,
@@ -1708,10 +1708,17 @@ pub(crate) fn kerb_at(
                     .iter()
                     .all(|&(m, r)| crate::travel::dist(m, p) >= r + STAND_ROOM + TAXI_WID)
             });
+            // (Nor where a car parks out on a trip, nor pulls into or out of it.)
+            let parking = (0..=n).all(|i| {
+                let p = road.at(s - half + i as f32 * 2.0 * half / n as f32);
+                (0..travel.file.parking.len())
+                    .filter_map(|k| crate::cars::parked_at(travel, k))
+                    .all(|(at, ..)| crate::travel::dist(at, p) >= PARK_CLEAR)
+            });
             let free = taken
                 .iter()
                 .all(|&(r, ts)| r != mouth.road || (ts - s).abs() >= TAXI_LEN + STAND_GAP);
-            straight && clear && free
+            straight && clear && parking && free
         })
         .map(|s| Kerb {
             road: mouth.road,
@@ -1720,6 +1727,10 @@ pub(crate) fn kerb_at(
             axis,
         })
 }
+
+/// A taxi's stand keeps this far from a public parking spot (m, `kerb_at`): a car's length, and
+/// a little to swing in or out.
+const PARK_CLEAR: f32 = 4.0;
 
 /// The radii of a taxi's turn round in a dead end's turning circle on a road `width` m wide of
 /// `kind` (`u_turn`): the loop round its middle, the lane's offset, and how far before the end
@@ -2614,10 +2625,12 @@ const LEISURE_WINDOW: u64 = 30 * TICKS_PER_MINUTE;
 const BACK_SLACK: u64 = 8 * TICKS_PER_MINUTE;
 
 /// About how many minutes a taxi would take `sim` from `from` to `plot` on a visit or an outing
-/// (`world::leisure_way`, after the household's car and a bike of theirs, before walking): its
-/// coming in from the way out nearest their home, the ride from their kerb to the place's, the
-/// steps to and from the kerbs. Some, and they'd go by it: an open-world town, the place out of a
-/// short walk (`autonomy.reach`), and the taxi quicker than walking (`LEISURE_BEATS`).
+/// (`world::leisure_way`, after the household's car and a bike of theirs, before walking), a way
+/// there or back: the ride from their kerb to the place's, the steps to and from the kerbs, and
+/// half its coming in from the way out nearest them, waited for at home once for the two ways
+/// (an outing's time away, `world::outing_fits`, counts each way and the wait just once). Some,
+/// and they'd go by it: an open-world town, the place out of a short walk (`autonomy.reach`), and
+/// the taxi, its coming in too, quicker than walking (`LEISURE_BEATS`).
 pub(crate) fn leisure_eta(
     travel: &crate::travel::Travel,
     exits: &[[f32; 2]],
@@ -2639,8 +2652,10 @@ pub(crate) fn leisure_eta(
         .min_by(|a, b| crate::travel::dist(*a, from).total_cmp(&crate::travel::dist(*b, from)))?;
     let come = travel.eta(exit, from, Mode::Car, walk);
     let ride = travel.eta(from, door, Mode::Car, walk);
-    let by_taxi = (come + ride) * DRIVE_MINUTES + kerb_walks(travel, from, door, walk);
-    (by_taxi.is_finite() && by_taxi < on_foot * LEISURE_BEATS).then_some(by_taxi)
+    let by_taxi = ride * DRIVE_MINUTES + kerb_walks(travel, from, door, walk);
+    let wait = come * DRIVE_MINUTES;
+    (by_taxi.is_finite() && wait.is_finite() && by_taxi + wait < on_foot * LEISURE_BEATS)
+        .then_some(by_taxi + wait / 2.0)
 }
 
 /// Resident `i` sets off from home to `plot` (a visit or an outing) by the taxi (`world`'s way
