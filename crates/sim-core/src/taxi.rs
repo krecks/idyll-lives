@@ -902,6 +902,26 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
             StopState::Aboard | StopState::Done => {}
         }
     }
+    // (Not off into one going by alongside it, both pulled over as they pass on a narrow lane: it
+    // waits till they're past, a while at most.)
+    if !busy && tick <= since + PASS_BY_MOST {
+        let car = &w.cars[c];
+        let me = car.shown.map_or((car.spot, car.yaw), |s| (s.0, s.1));
+        let key = crate::cars::car_first(c);
+        busy = crate::cars::vehicles(&w.cars, Some(c)).iter().any(|o| {
+            // (Not one that waits for it, which won't pass.)
+            let waits = w
+                .cars
+                .get((o.first & !(1 << 63)) as usize)
+                .is_some_and(|x| x.waits_for == Some(key))
+                || w.traffic.waits_for(o.first).contains(&key);
+            !waits
+                && crate::cars::too_near(
+                    (me.0, me.1, car.len, car.wid + 2.0 * PASS_BY),
+                    (o.at, o.yaw, o.len, o.wid),
+                )
+        });
+    }
     if !busy {
         let run = &mut w.taxis.runs[k];
         run.next += 1;
@@ -909,6 +929,11 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
         w.cars[c].standing = false;
     }
 }
+
+/// How near one going by a taxi ready to go on may be, besides `cars::PASSING` (m, either side),
+/// for it to wait till they're past, and how long it waits so at most since it stood (ticks).
+const PASS_BY: f32 = 0.3;
+const PASS_BY_MOST: u64 = 2 * ARRIVE_SOON;
 
 /// Resident `i`, booked on a taxi, isn't riding it: unbooked, and on their way to work or school
 /// their own way (from the kerb, or wherever they've got to); planned once more for the same start
@@ -1307,8 +1332,9 @@ const STAND_OUT: f32 = 20.0;
 /// How far the claim of a taxi standing at the kerb reaches before and after its middle, past half
 /// its length (m): those behind it, or turning out of a driveway by it, wait for it.
 const KERB_CLAIM: f32 = 2.0;
-/// Its own lane's kerb a standing taxi keeps this far from (m).
-const KERB_KEEP: f32 = 0.05;
+/// Its own lane's kerb a standing taxi keeps this far from (m: its corners too, on a lane that
+/// turns a little over its length, `STAND_STRAIGHT`).
+const KERB_KEEP: f32 = 0.15;
 /// Over how much of the way before it the taxi eases to where it stands (m).
 const STAND_EASE: f32 = 8.0;
 /// Turning round in a dead end's turning circle (`u_turn`): how far its kerb reaches past the
@@ -1926,11 +1952,21 @@ fn lay_route(
                 along.push(along[n - 1]);
             }
             let full = crate::cars::offset_right_by(&centre, &offs);
-            let lane = crate::travel::thin_with(
+            let mut lane = crate::travel::thin_with(
                 &full,
                 crate::cars::ROUTE_STEP,
                 crate::cars::ROUTE_TOLERANCE,
             );
+            // (On from a stand: from a point just ahead on the straight, facing along it as it
+            // stands; not its own first, where it stands again but for the lane's offset worked
+            // out along this way rather than the last, a hair's breadth across.)
+            let from_stand = j == 0 && k > 0 && out.len() > 0;
+            if from_stand && full.len() > 2 {
+                if lane.get(1) != Some(&full[1]) {
+                    lane.insert(1, full[1]);
+                }
+                lane.remove(0);
+            }
             let nearest = |p: [f32; 2]| {
                 (0..full.len())
                     .min_by(|&a, &b| dist(full[a], p).total_cmp(&dist(full[b], p)))
@@ -1965,6 +2001,7 @@ fn lay_route(
                     continue;
                 }
                 if let Some((bay, d, turn, at)) = &into
+                    && !(from_stand && i == 0)
                     && bay.near(p, *at, turn.taken, *d)
                     && along_bay(bay, i, -*d)
                 {

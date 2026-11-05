@@ -479,8 +479,9 @@ const STAND_ANGLE: f32 = 0.09;
 /// A street's or a lane's pavements (m, each side: `roads.ts` `SIDEWALK`).
 const SIDEWALK: f32 = 1.35;
 const STAND_KERB: f32 = -0.05;
-/// Two cars on their way passing each other, one of them a work taxi, keep this far apart at
-/// least (m, between their bodies: in their lanes on a 7 m street, 0.25 m on the straight).
+/// Two cars on their way passing each other, both moving, one of them a work taxi, keep this far
+/// apart at least (m, between their bodies: in their lanes on a 7 m street, 0.25 m on the
+/// straight). (By one standing to let it by, the last-resort guard keeps it out of that one.)
 const PASS_GAP: f32 = 0.05;
 
 /// The work taxis as `check_taxis` last saw them: standing or not, by car, and the pairs of cars
@@ -489,6 +490,8 @@ const PASS_GAP: f32 = 0.05;
 struct Taxis {
     standing: std::collections::BTreeSet<usize>,
     passing: std::collections::BTreeSet<(usize, usize)>,
+    /// Where each car was drawn a tick before.
+    was: Vec<Option<[f32; 2]>>,
 }
 
 /// A body's corners (`at` its middle, facing `yaw`).
@@ -590,16 +593,21 @@ fn check_taxis(w: &World, seen: &mut Taxis, failures: &mut std::collections::BTr
             ));
         }
     }
-    // Passing: two on their way side by side, facing about opposite ways, one a taxi.
+    // Passing: two on their way side by side, both moving, facing about opposite ways, one a taxi.
+    seen.was.resize(w.cars.len(), None);
     let going: Vec<Going> = w
         .cars
         .iter()
         .enumerate()
         .filter_map(|(k, c)| {
             let (at, yaw, moving, _) = c.shown?;
-            moving.then(|| (k, body(at, yaw, c.len, c.wid), at, yaw, c.len, c.taxi))
+            let moved = seen.was[k].is_some_and(|p| p != at);
+            (moving && moved).then(|| (k, body(at, yaw, c.len, c.wid), at, yaw, c.len, c.taxi))
         })
         .collect();
+    for (k, c) in w.cars.iter().enumerate() {
+        seen.was[k] = c.shown.map(|s| s.0);
+    }
     let mut now = std::collections::BTreeSet::new();
     for (i, a) in going.iter().enumerate() {
         for b in &going[i + 1..] {
