@@ -645,6 +645,9 @@ struct Hold {
     claim: Claim,
     /// How far along its route its holder was as the tick began.
     at: f32,
+    /// The tick it last came on along its route (`HOLD_STILL`), and the tick it asked for it.
+    since: u64,
+    asked: u64,
 }
 
 /// A vehicle's ask for the parts of a group of its route's claims (`Claim::group`), in order:
@@ -671,6 +674,9 @@ const CUT_ON: f32 = 1.0;
 
 /// How far short of what's left of another's claim one waits (m, `Traffic::blocked`).
 const KEEP_SHORT: f32 = 1.5;
+/// A bus that hasn't come on in this long (ticks) lets go of the parts it isn't in yet
+/// (`Traffic::begin`).
+const HOLD_STILL: u64 = 10 * crate::TICKS_PER_MINUTE;
 
 /// An ask this old (ticks) yields only to those it waits for itself (`Traffic::begin`, rule 2).
 const OLD_ASK: u64 = 20 * crate::TICKS_PER_MINUTE;
@@ -682,6 +688,9 @@ pub struct Traffic {
     tick: u64,
     holds: Vec<Hold>,
     asks: Vec<Ask>,
+    /// Those that let go of parts not come on to (`HOLD_STILL`), and when they had asked: asking
+    /// again, they keep their place.
+    kept: Vec<(u64, u64)>,
     movers: Vec<Mover>,
     /// Ticks a car was kept from moving deeper into another car or a bus by the last-resort check
     /// (`cars::guard`), since the game was loaded.
@@ -762,14 +771,21 @@ impl Traffic {
                     tag,
                     claim: c.clone(),
                     at: t,
+                    since: tick,
+                    asked: tick,
                 });
                 continue;
             }
             match self.asks.iter_mut().find(|a| a.key == key) {
                 Some(a) if a.parts.first().is_some_and(|p| p.0 == tag) => a.seen = tick,
                 found => {
+                    // (Asking again for what it let go of, standing still: in its place.)
+                    let asked = match self.kept.iter().position(|k| k.0 == key) {
+                        Some(i) => self.kept.remove(i).1,
+                        None => tick,
+                    };
                     let ask = Ask {
-                        tick,
+                        tick: asked,
                         key,
                         route,
                         group: c.group,
@@ -869,13 +885,31 @@ impl Traffic {
                 .find(|p| p.0 == key && p.1 == route)
                 .map(|p| p.2)
         };
+        // (A bus that hasn't come on `HOLD_STILL` and isn't in a part yet lets it go, and asks
+        // for it again as it comes on: one held up on its way doesn't keep a junction from
+        // everyone else.)
+        let mut kept = Vec::new();
         self.holds.retain_mut(|h| match place(h.key, h.tag >> 16) {
             Some(t) if t < h.claim.to => {
+                if t > h.at + 0.5 {
+                    h.since = tick;
+                }
                 h.at = t;
-                true
+                let stood = is_bus(h.key) && t < h.claim.from && tick > h.since + HOLD_STILL;
+                if stood {
+                    kept.push((h.key, h.asked));
+                }
+                !stood
             }
             _ => false,
         });
+        for (key, asked) in kept {
+            match self.kept.iter_mut().find(|k| k.0 == key) {
+                Some(k) => k.1 = k.1.min(asked),
+                None => self.kept.push((key, asked)),
+            }
+        }
+        self.kept.retain(|k| places.iter().any(|p| p.0 == k.0));
         let holds = &self.holds;
         self.asks.retain(|a| {
             let going = holds
@@ -911,11 +945,14 @@ impl Traffic {
             let Some(first) = next[0].samples.first() else {
                 let (tag, claim) = self.asks[i].parts.remove(0);
                 let key = self.asks[i].key;
+                let asked = self.asks[i].tick;
                 self.holds.push(Hold {
                     key,
                     tag,
                     at: claim.from,
                     claim,
+                    since: tick,
+                    asked,
                 });
                 continue;
             };
@@ -1044,6 +1081,8 @@ impl Traffic {
                     self.holds.push(Hold {
                         key,
                         tag,
+                        since: tick,
+                        asked: self.asks[i].tick,
                         at: claim.from,
                         claim,
                     });
