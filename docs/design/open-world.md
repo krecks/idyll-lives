@@ -109,7 +109,13 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   the road at the kerb, not across the sidewalk; a big world's parking bays are turned into nose
   first and backed out of like driveways. Garden fences keep a metre off every driveway's sides
   (room for the doors) and start behind where a garage could go at its end (Build mode's Garage
-  tool); kerbside furniture keeps 1.2 m off a driveway's mouth where the world has cars.
+  tool); kerbside furniture keeps 1.2 m off a driveway's mouth where the world has cars, and on
+  a 6 m lane (3.3 m between the kerbs, too narrow for two cars in their lanes) stands 0.5 m back
+  from the kerb (`busStreets`, `cars::LANE_KERBSIDE`), for two cars meeting there to pull over onto
+  the pavement and pass. Cars and buses take turns where their ways cross or meet (junctions'
+  boxes, driveway and bay mouths, stretches where a car and a bus can't pass, where a bus sweeps
+  round a sharp turn): one queue of claims for both, granted in the order asked
+  (`sim-core/src/traffic.rs`).
 - `garages[].rot?: 0 | 1 | 2 | 3` — a garage the player built (Build mode's Garage tool,
   `Command::BuildGarage`): the way its door faces, as a thing's facing (0 towards +z, 1 +x,
   2 -z, 3 -x). Absent: towards the street, as the town places garages. The same field is in the
