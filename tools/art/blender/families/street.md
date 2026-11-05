@@ -5,7 +5,7 @@ the street-name sign, the taxi rank's sign, the door pot, the garden path light 
 One pack, `packs/street/manifest.json`, models in `models/street/`. Built 2026-10-16. They aren't buyable: no content entry, no Validate group.
 
 `render/pc/street.ts` draws them as thin instances (`PROP`, `FOLIAGE`): benches, planters and flower tubs along
-the kerb in front of the public places, the taxi rank's and street-name signs at the ends of the streets, pots by the
+the kerb in front of the public places, the taxi rank's sign at a row's end beside its shelter (one a street at most, 60 m apart), the street-name signs at the ends of the streets, pots by the
 neighbours' front doors and path lights along their garden paths, flower clumps in the beds along their house fronts.
 The town overview draws the same street again from afar, from the far versions (`BuildOptions.far`). Each model is
 built where the game places it (game axes, `F`), at its size within 2 %; the bench and the taxi rank's sign stand
