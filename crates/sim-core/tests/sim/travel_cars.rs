@@ -847,6 +847,56 @@ fn a_car_turning_out_of_a_side_road_waits_for_one_coming_along_the_road() {
 }
 
 #[test]
+fn one_turning_out_of_a_side_road_and_one_coming_home_past_it_both_get_through_its_box() {
+    // (As at Pebble Bay: one coming home along the main road from the west to a house just east
+    // of the junction, as one turns out of the side road through its box: the claims let them in
+    // together where they'd pass no further apart than the gap the cars keep, and in the box,
+    // where nobody pulls over, they waited for each other for good. One of them waits.)
+    let side = |s: f32, west: bool| House {
+        plot: [if west { 102.0 } else { 122.0 }, 45.0 - s, 16.0, 14.0],
+        inner: [if west { 110.0 } else { 130.0 }, 52.0 - s],
+        front: if west { 1.0 } else { -1.0 },
+        along_x: true,
+        road: 1,
+        s,
+    };
+    let home = House {
+        plot: [133.0, 8.0, 16.0, 18.0],
+        inner: [141.0, 20.5],
+        front: 1.0,
+        along_x: false,
+        road: 0,
+        s: 140.5,
+    };
+    for out in [side(12.0, true), side(6.0, false), side(12.0, false)] {
+        let mut w = t_junction(&[home, out]);
+        come_home(&mut w, 0);
+        set_off(&mut w, 1);
+        let mut least = f32::INFINITY;
+        let done = run_clear(
+            &mut w,
+            4000,
+            |w| least = least.min(cars_gap(w).0),
+            |w| w.cars[0].state == CarState::Parked && w.cars[1].state == CarState::Away,
+        );
+        assert!(
+            done,
+            "({:?}) not both on their way: {:?}",
+            out.inner,
+            w.cars
+                .iter()
+                .map(|c| (c.state, c.progress))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            least >= CAR_GAP,
+            "({:?}) they came {least:.3} m apart",
+            out.inner
+        );
+    }
+}
+
+#[test]
 fn cars_from_every_arm_of_a_crossroads_at_once_all_get_through() {
     // A crossroads: the main road along x (dead ends either way), the cross road along z with the
     // ways out at its ends. Two cars set off from houses on the main road's arms, two come home
