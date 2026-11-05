@@ -893,6 +893,8 @@ impl Traffic {
         for m in &self.movers {
             graph.entry(m.key).or_default().extend(m.waits);
         }
+        // (Who waits for whose body on the road, however far round: the asks' waits left out.)
+        let on_road = graph.clone();
         for a in &self.asks {
             let e = graph.entry(a.key).or_default();
             e.extend(a.by.iter().chain(&a.fifo).copied());
@@ -941,10 +943,12 @@ impl Traffic {
                 .iter()
                 .filter(|h| {
                     let rest = h.claim.rest(h.at);
-                    // (Not a car's that waits for this one's body where it stands, in its way: it's
-                    // to go on first.)
-                    let waits =
-                        !is_bus(h.key) && self.mover(h.key).is_some_and(|m| m.waits == Some(a.key));
+                    // (Not a car's that waits for this one's body where it stands, in its way, or
+                    // for the body of one that does, and so on, as in a queue behind it: it's to go
+                    // on first.)
+                    let waits = !is_bus(h.key)
+                        && (self.mover(h.key).is_some_and(|m| m.waits == Some(a.key))
+                            || reaches(&on_road, h.key, a.key));
                     h.key != a.key
                         && !waits
                         && next.iter().any(|c| {
