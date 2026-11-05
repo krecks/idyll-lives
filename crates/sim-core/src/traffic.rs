@@ -766,7 +766,8 @@ impl Traffic {
     /// Whose claim `key` would drive into, its body `now` going on to `next` going `way` (pulling
     /// over `pass` m at most): what's left of a claim another holds that `next` is in the way of
     /// and `now` isn't (`counts`, even going its way: cutting in; not one right behind it,
-    /// `behind`).
+    /// `behind`). Still in its driveway (`in_drive`: before its first claim, none held), `now` in
+    /// the way too: it'd only come out deeper into it.
     pub(crate) fn blocked(
         &self,
         key: u64,
@@ -774,6 +775,7 @@ impl Traffic {
         next: &Rect,
         way: [f32; 2],
         pass: f32,
+        in_drive: bool,
     ) -> Option<u64> {
         let sample = |rect: &Rect| Sample {
             t: 0.0,
@@ -808,8 +810,12 @@ impl Traffic {
                 continue;
             }
             let rest = h.claim.rest(h.at);
-            // (In its way already, ahead of it: it waits for this one, which goes on out.)
-            if rest.iter().any(|o| conflict(&now, o, true)) {
+            // (In its way already, ahead of it: it waits for this one, which goes on out, away
+            // from it; not on towards it.)
+            let away = self
+                .mover(h.key)
+                .is_none_or(|m| dist(next.rect.at, m.rect.at) >= dist(now.rect.at, m.rect.at));
+            if !in_drive && away && rest.iter().any(|o| conflict(&now, o, true)) {
                 continue;
             }
             // (Holding a claim itself, it was granted it with the other's: going its way, they
@@ -1062,8 +1068,7 @@ impl Traffic {
             // far side, past its zone, nobody.
             let mut bodies = Vec::new();
             for m in &self.movers {
-                // (Not one that waits for this one, however far round: it's to go on first.)
-                if m.key == a.key || m.parked || behind_me(m.key) || reaches(&graph, m.key, a.key) {
+                if m.key == a.key || m.parked || behind_me(m.key) {
                     continue;
                 }
                 let strict = !self.holding(m.key);
@@ -1083,6 +1088,11 @@ impl Traffic {
                             })
                     })
                 };
+                // (Not one that waits for this one, however far round: it's to go on first; but
+                // for one standing where its way goes through, as for a claim's holder (rule 1).)
+                if reaches(&graph, m.key, a.key) && !hit(&m.rect, true) {
+                    continue;
+                }
                 if hit(&m.rect, strict) || m.moving && m.ahead.iter().any(|r| hit(r, false)) {
                     bodies.push(m.key);
                 }

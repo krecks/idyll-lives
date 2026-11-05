@@ -2271,13 +2271,17 @@ fn drive_on(w: &mut World, c: usize) {
     // out of its way (`back_off`).
     let key = car_first(c);
     let jammed = w.cars[c].waits_for.is_some_and(|k| waits_back(w, k, key));
+    // (Not on its way since, it's still held up: two pulling over for each other by turns wait
+    // for each other every other tick.)
     let jam = &mut w.cars[c].jam;
     *jam = if jammed {
         (jam.0.saturating_add(1), jam.1)
-    } else {
+    } else if moving {
         (0, 0)
+    } else {
+        *jam
     };
-    if jam.0 > JAM_TICKS && jam.1 < JAM_BACK && !w.cars[c].outside() && back_off(w, c) {
+    if jammed && jam.0 > JAM_TICKS && jam.1 < JAM_BACK && !w.cars[c].outside() && back_off(w, c) {
         return;
     }
     w.cars[c].waits_for = None;
@@ -2299,9 +2303,9 @@ fn drive_on(w: &mut World, c: usize) {
         } = &mut *w;
         let route = cars[c].route(exits, Some(travel), home);
         if !traffic.may_go(tick, key, u32::from(home), &route.claims, t, t + 1.0) {
-            // (Waiting for its claim: for one holding a claim in its way that waits for it in
-            // turn, as one in its way on the road, so that the later of them backs up out of the
-            // other's way, `back_off`.)
+            // (Waiting for its claim: for one in its way that waits for it in turn, on the road
+            // or for a claim of its own, as one in its way on the road, so that the later of them
+            // backs up out of the other's way, `back_off`.)
             let by = traffic.waits_for(key).to_vec();
             cars[c].waits_for = by
                 .iter()
@@ -2309,6 +2313,7 @@ fn drive_on(w: &mut World, c: usize) {
                 .find(|&k| {
                     cars.get((k & !(1 << 63)) as usize)
                         .is_some_and(|o| o.waits_for == Some(key))
+                        || traffic.waits_for(k).contains(&key)
                 })
                 .or(cars[c].waits_for);
             return;
@@ -2350,6 +2355,7 @@ fn drive_on(w: &mut World, c: usize) {
     let ((at, yaw, reverse), (was, was_yaw, _)) = (route.at(t + 1.0), route.at(t));
     let (at, was) = (shifted(at, yaw, shift), shifted(was, was_yaw, shift));
     let ticks = route.ticks();
+    let first_claim = route.claims.first().map(|c| c.from);
     let (ahead, behind) = if reverse { (0.0, AHEAD) } else { (AHEAD, 0.0) };
     let me = Driving {
         at,
@@ -2370,7 +2376,8 @@ fn drive_on(w: &mut World, c: usize) {
     let (body_now, body_next) = (now.body(), me.body());
     let pass = (route_pass(car, t + 1.0) - shift).max(0.0);
     let holding_here = traffic.holding(key);
-    if let Some(k) = traffic.blocked(key, &body_now, &body_next, me.heading(), pass) {
+    let in_drive = !home && !holding_here && first_claim.is_some_and(|from| t < from);
+    if let Some(k) = traffic.blocked(key, &body_now, &body_next, me.heading(), pass, in_drive) {
         car.waits_for = Some(k);
         return;
     }
@@ -2503,7 +2510,7 @@ fn back_off(w: &mut World, c: usize) -> bool {
     let partner = car.waits_for;
     if guard(&now, &next, others.iter().chain(&standing)).is_some()
         || w.traffic
-            .blocked(key, &now, &next, way, 0.0)
+            .blocked(key, &now, &next, way, 0.0, false)
             .is_some_and(|k| Some(k) != partner)
     {
         return false;
@@ -2549,10 +2556,18 @@ fn guard<'a>(now: &Rect, next: &Rect, them: impl Iterator<Item = &'a Driving>) -
 /// into another (`guard`). Where its room runs out it's back in its lane.
 fn pull_over(w: &mut World, c: usize, others: &[Driving], moving: bool) {
     // (Pulled over for one that waits for it, it pulls over only as far as it can on its way.)
-    let waited = w.cars[c]
-        .pulled_for
-        .is_some_and(|k| w.traffic.waits_for(k).contains(&car_first(c)));
-    let (want, whom) = pull_want(w, c, moving || waited);
+    let me = car_first(c);
+    let waits_me = |k: u64| {
+        w.traffic.waits_for(k).contains(&me)
+            || w.cars
+                .get((k & !(1 << 63)) as usize)
+                .is_some_and(|o| o.waits_for == Some(me))
+    };
+    let waited = w.cars[c].pulled_for.is_some_and(waits_me);
+    let (mut want, mut whom) = pull_want(w, c, moving || waited);
+    if !(moving || waited) && whom.is_some_and(waits_me) {
+        (want, whom) = pull_want(w, c, true);
+    }
     w.cars[c].pulled_for = whom;
     let standing: Vec<Driving> = parked(&w.cars).collect();
     let car = &w.cars[c];
@@ -2570,12 +2585,20 @@ fn pull_over(w: &mut World, c: usize, others: &[Driving], moving: bool) {
     };
     let rate = PULL_RATE;
     let mut shift = car.shift + (want - car.shift).clamp(-rate, rate);
-    // (Back towards its lane only clear of those coming the other way.)
+    // (Back towards its lane only clear of those coming the other way; but for one waiting for
+    // it, which won't pass: it pulls back in to go on by, never into it, `guard`.)
     let (at, len, wid) = (body(shift).at, car.len, car.wid);
+    let key = car_first(c);
+    let waits_for_me = |o: &Driving| {
+        w.traffic.waits_for(o.first).contains(&key)
+            || w.cars
+                .get((o.first & !(1 << 63)) as usize)
+                .is_some_and(|x| x.waits_for == Some(key))
+    };
     if shift < car.shift
-        && let Some(o) = others
-            .iter()
-            .find(|o| too_near((at, yaw, len, wid), (o.at, o.yaw, o.len, o.wid)))
+        && let Some(o) = others.iter().find(|o| {
+            too_near((at, yaw, len, wid), (o.at, o.yaw, o.len, o.wid)) && !waits_for_me(o)
+        })
     {
         shift = car.shift;
         // (It waits for that one to pass: one that waits for it goes by, `drive_on`.)
@@ -2615,7 +2638,7 @@ fn pull_want(w: &World, c: usize, moving: bool) -> (f32, Option<u64>) {
     // (On the move, back in its lane before its room runs out; standing, as far as it has room
     // where it stands.)
     let room = if moving {
-        [0.0, 10.0, 20.0]
+        [0.0, 1.0, 10.0, 20.0]
             .into_iter()
             .map(|k| route.room_at(t + k))
             .fold(f32::INFINITY, f32::min)

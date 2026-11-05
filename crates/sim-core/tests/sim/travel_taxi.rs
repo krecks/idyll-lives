@@ -424,8 +424,10 @@ fn drive(w: &mut World, c: usize, d: u32, home: bool) {
 #[test]
 fn the_households_car_pulling_out_or_coming_home_as_the_taxi_stands_at_its_kerb_waits_its_turn() {
     // Pip's house has a car (Dad's) on its driveway: as the taxi stands at their kerb, it pulls
-    // out (and, another day, comes home). Never into each other; both on their way soon.
-    for home in [false, true] {
+    // out (and, another day, comes home). Never into each other; both on their way soon. And so
+    // as the taxi comes up to their kerb (`early`): pulling out as it's a few metres off, or
+    // coming home as it comes into town (the taxi turning where the car parks).
+    for (home, early) in [(false, false), (true, false), (false, true), (true, true)] {
         let pip = r#"{"name":"Pip","age":10,"traits":["cheerful"]}"#;
         let dad = r#"{"name":"Dad","age":40,"traits":["cheerful"]}"#;
         let mut h = house(60, &[pip, dad]);
@@ -443,7 +445,26 @@ fn the_households_car_pulling_out_or_coming_home_as_the_taxi_stands_at_its_kerb_
         while w.tick < end && done.is_none() {
             w.tick_once();
             no_overlaps(&w);
-            if !sent && w.cars.iter().any(|c| c.taxi && c.standing) {
+            let mouth = w
+                .drives
+                .iter()
+                .find(|d| d.plot == w.cars[0].plot)
+                .map(|d| [d.x, d.street])
+                .expect("Pip's driveway");
+            let coming = |c: &sim_core::cars::Car| {
+                c.taxi
+                    && !c.standing
+                    && c.state == CarState::Arriving
+                    && c.shown.is_some_and(|s| {
+                        home || (s.0[0] - mouth[0]).hypot(s.0[1] - mouth[1]) < 12.0
+                    })
+            };
+            let now = if early {
+                w.cars.iter().any(coming)
+            } else {
+                w.cars.iter().any(|c| c.taxi && c.standing)
+            };
+            if !sent && now {
                 drive(&mut w, 0, 1, home);
                 sent = true;
             }
@@ -456,8 +477,8 @@ fn the_households_car_pulling_out_or_coming_home_as_the_taxi_stands_at_its_kerb_
                 done = Some(w.tick);
             }
         }
-        assert!(sent, "({home}) the taxi never stood at the kerb");
-        assert!(done.is_some(), "({home}) not both on their way");
+        assert!(sent, "({home}, {early}) the taxi never stood at the kerb");
+        assert!(done.is_some(), "({home}, {early}) not both on their way");
     }
 }
 

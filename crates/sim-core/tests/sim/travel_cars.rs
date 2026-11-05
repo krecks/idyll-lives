@@ -899,10 +899,7 @@ fn junctions_past_the_snapshots_room_for_signal_heads_are_never_lit() {
     let more = r#","size":"big","walls":[],"doors":[],"windows":[],"relationships":[],
         "areas":[{"name":"Grid","kind":"hamlet","x":0,"z":0,"w":400,"d":400}]"#;
     let mut w = town_of(CONTENT, more, 400, 400, &roads, exits, &[]);
-    assert!(
-        w.travel.signals.is_empty(),
-        "nothing lit in a game"
-    );
+    assert!(w.travel.signals.is_empty(), "nothing lit in a game");
     w.light_busy_junctions();
     let heads: usize = w.travel.signals.iter().map(|s| s.arms.len()).sum();
     assert!(!w.travel.signals.is_empty());

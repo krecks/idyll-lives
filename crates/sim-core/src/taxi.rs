@@ -191,13 +191,30 @@ fn stop_for(w: &World, i: usize) -> Option<TaxiStop> {
     let s = &w.sims[i];
     let plot = w.households.get(s.household as usize)?.plot?;
     let drive = w.drives.iter().find(|d| d.plot == plot)?;
-    // (The household's car parked up the driveway: the taxi keeps clear of it.)
-    let parked = w
-        .cars
-        .iter()
-        .find(|c| !c.taxi && c.plot == plot && c.at_home())
-        .map(|c| c.len);
-    crate::cars::taxi_stop(&w.travel, drive, TAXI_LEN, parked)
+    crate::cars::taxi_stop(
+        &w.travel,
+        drive,
+        TAXI_LEN,
+        home_car(&w.cars, &w.households, plot),
+    )
+}
+
+/// How long the car of the household at `plot` is, if it has one (the taxi keeps clear of where
+/// it parks up the driveway, home or not: it may come home while the taxi turns there).
+fn home_car(
+    cars: &[crate::cars::Car],
+    households: &[crate::world::Household],
+    plot: u32,
+) -> Option<f32> {
+    cars.iter()
+        .filter(|c| {
+            !c.taxi
+                && households
+                    .get(c.household as usize)
+                    .is_some_and(|h| h.plot == Some(plot))
+        })
+        .map(|c| c.len)
+        .reduce(f32::max)
 }
 
 /// Whether `i` would ride a taxi to work or school starting at `start`, and if so the stop at
@@ -494,11 +511,7 @@ pub(crate) fn kerb_for(ctx: &crate::world::Ctx, sim: &crate::world::Sim) -> Opti
     }
     let plot = ctx.households.get(sim.household as usize)?.plot?;
     let drive = ctx.drives.iter().find(|d| d.plot == plot)?;
-    let parked = ctx
-        .cars
-        .iter()
-        .find(|c| !c.taxi && c.plot == plot && c.at_home())
-        .map(|c| c.len);
+    let parked = home_car(ctx.cars, ctx.households, plot);
     let stop = crate::cars::taxi_stop(ctx.travel, drive, TAXI_LEN, parked)?;
     Some(wait_spot(ctx.travel, &stop))
 }
@@ -549,11 +562,7 @@ fn route_of(w: &World, k: usize) -> Option<(crate::cars::Route, Vec<f32>)> {
         })
         .map(|st| {
             let drive = w.drives.iter().find(|d| d.plot == st.plot)?;
-            let parked = w
-                .cars
-                .iter()
-                .find(|c| !c.taxi && c.plot == st.plot && c.at_home())
-                .map(|c| c.len);
+            let parked = home_car(&w.cars, &w.households, st.plot);
             crate::cars::taxi_stop(&w.travel, drive, TAXI_LEN, parked)
         })
         .collect::<Option<_>>()?;
