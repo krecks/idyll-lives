@@ -833,3 +833,30 @@ fn a_taxi_due_in_through_a_jammed_junction_goes_round_it_or_waits_at_the_edge_of
         assert!(came(&w) > 0, "({round}) A never rode");
     }
 }
+
+#[test]
+fn neighbours_in_different_work_going_the_same_way_at_the_same_hour_share_a_taxi() {
+    // Two houses a long way from the way out, one a manager's, one a marketer's, both starting at
+    // the same hour: one taxi for both (shared by the way out, whatever the work).
+    let other = r#"{"name":"Pip","age":30,"traits":["cheerful"],"job":{"career":"business.marketing","level":0}}"#;
+    let mut w = town(7, &[house(20, &[&worker("Mum")]), house(60, &[other])]);
+    let (mut mum, mut pip) = (Vec::new(), Vec::new());
+    let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
+    let day2 = sim_core::clock::tick_at(2, 0.0).unwrap();
+    while w.tick < end
+        && (mum.iter().all(|x: &(u32, bool)| x.1)
+            || pip.iter().all(|x: &(u32, bool)| x.1)
+            || w.tick < day2)
+    {
+        w.tick_once();
+        no_overlaps(&w);
+        rode(&w, 0, &mut mum);
+        rode(&w, 1, &mut pip);
+    }
+    let there = |r: &[(u32, bool)]| r.iter().filter(|x| !x.1).map(|x| x.0).collect::<Vec<_>>();
+    assert!(!there(&mum).is_empty(), "Mum never rode: {mum:?}");
+    assert!(
+        there(&mum).iter().any(|r| there(&pip).contains(r)),
+        "never the same taxi: {mum:?} {pip:?}"
+    );
+}

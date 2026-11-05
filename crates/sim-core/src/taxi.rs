@@ -9,9 +9,10 @@
 //! or a bike to ride (`Commute::bike`); nobody in a cosy town (no `Commute`: its way out is all
 //! `commuteMinutes`). With or without a driveway (`home_way`: else by the front path).
 //!
-//! **Shared.** Those with the same career (or pupils, at school) who leave town by the same way out
-//! and whose work starts within `taxi.window` minutes of the first's share one (`group`), up to
-//! `taxi.seats` a taxi; more take more taxis.
+//! **Shared.** Those who leave town by the same way out, whatever their work (or school), and
+//! whose work starts within `taxi.window` minutes of the first's share one (`group`), up to
+//! `taxi.seats` a taxi, housemates side by side; more take more taxis. Those already too late to be
+//! there in time on foot (a game begun) share one late run that way, whenever their work starts.
 //!
 //! **The run there** (`Run`). Planned `PLAN_LEAD` before the first of them would have set off on
 //! foot: the riders in a short order from the way in, a stand at the kerb for each house
@@ -82,8 +83,6 @@ const WAIT_ASIDE: f32 = 2.0;
 const ARRIVE_SOON: u64 = 10 * TICKS_PER_MINUTE;
 const TO_DOOR_MOST: u64 = 2 * ARRIVE_SOON;
 const WAY_ROUND: f32 = 1.3;
-/// A pupil's group (`group`): their school.
-const SCHOOL: u32 = u32::MAX;
 
 /// The runs planned and under way (`World::taxis`), and who rode one to work today (for the run
 /// home).
@@ -205,13 +204,11 @@ impl Run {
     }
 }
 
-/// Resident `i`'s group for the taxi: their career (pupils: `SCHOOL`) and the way out they leave
-/// by.
+/// Resident `i`'s group for the taxi: the way out they leave by (whatever their work or school:
+/// the taxi's shared; 0, then the way out's index).
 fn group(w: &World, i: usize) -> Option<(u32, u32)> {
-    let s = &w.sims[i];
-    let c = s.commute?;
-    let career = s.job.as_ref().map_or(SCHOOL, |j| j.career as u32);
-    Some((career, c.exit as u32))
+    let c = w.sims[i].commute?;
+    Some((0, c.exit as u32))
 }
 
 /// Where the taxi would stand for resident `i` at home (`kerb_at`), no other taxi about.
@@ -276,15 +273,19 @@ fn start_for(w: &World, i: usize) -> Option<u64> {
         .or_else(|| crate::life::next_start(w, i))
 }
 
-/// The runs to work due to be planned: everyone who'd ride, by group, those starting within
-/// `taxi.window` of the first of a group, once one of them would set off on foot within
-/// `PLAN_LEAD` (and not yet on their way).
+/// One who'd ride (`plan`): their group, the start they're grouped by, their start, who, and when
+/// they'd set off on foot.
+type Want = ((u32, u32), u64, u64, usize, u64);
+
+/// The runs to work due to be planned: everyone who'd ride, by group (their way out), those
+/// starting within `taxi.window` of the first of a group (all too late on foot already, together),
+/// once one of them would set off on foot within `PLAN_LEAD` (and not yet on their way).
 fn plan(w: &mut World) {
     let tick = w.tick;
     let window = (w.content.taxi.window * TICKS_PER_MINUTE as f32) as u64;
     w.taxis.declined.retain(|d| d.1 + window > tick);
     w.taxis.missed.retain(|d| d.1 + window > tick);
-    let mut want: Vec<((u32, u32), u64, usize, u64)> = Vec::new();
+    let mut want: Vec<Want> = Vec::new();
     for i in 0..w.sims.len() {
         let Some(start) = start_for(w, i) else {
             continue;
@@ -300,37 +301,23 @@ fn plan(w: &mut World) {
         }
         let Some(g) = group(w, i) else { continue };
         let on_foot = start.saturating_sub(s.commute.map_or(0, |c| c.ticks));
+        // (Too late to be there in time on foot already: one late run for all of them going out
+        // that way, whenever their work starts.)
+        let key = if on_foot <= tick { 0 } else { start };
         if would_ride(w, i, start).is_some() {
-            want.push((g, start, i, on_foot));
+            want.push((g, key, start, i, on_foot));
         }
     }
-    // (Housemates going the same way out about the same time ride together, whatever their
-    // work: the first's group for all of them.)
-    want.sort_by_key(|&(g, start, i, _)| (w.sims[i].household, g.1, start, i));
-    let mut j = 0;
-    while j < want.len() {
-        let (g, first, i0, _) = want[j];
-        let mut n = j + 1;
-        while n < want.len()
-            && w.sims[want[n].2].household == w.sims[i0].household
-            && want[n].0.1 == g.1
-            && want[n].1 <= first + window
-        {
-            want[n].0 = g;
-            n += 1;
-        }
-        j = n;
-    }
-    want.sort_by_key(|&(g, start, i, _)| (g, start, i));
+    want.sort_by_key(|&(g, key, start, i, _)| (g, key, start, i));
     let mut k = 0;
     while k < want.len() {
-        let (g, first, _, _) = want[k];
+        let (g, first, ..) = want[k];
         let n = want[k..]
             .iter()
             .take_while(|m| m.0 == g && m.1 <= first + window)
             .count();
-        let members: Vec<(usize, u64)> = want[k..k + n].iter().map(|m| (m.2, m.1)).collect();
-        let soonest = want[k..k + n].iter().map(|m| m.3).min().unwrap_or(0);
+        let members: Vec<(usize, u64)> = want[k..k + n].iter().map(|m| (m.3, m.2)).collect();
+        let soonest = want[k..k + n].iter().map(|m| m.4).min().unwrap_or(0);
         k += n;
         // (Only once one of them would soon set off on foot.)
         if soonest > tick + PLAN_LEAD {
@@ -745,6 +732,10 @@ fn run_on(w: &mut World, k: usize) -> bool {
         // (Waiting at the edge of town: tried again a minute on.)
         if tick < run.enter || !(tick - run.enter).is_multiple_of(TICKS_PER_MINUTE) {
             return true;
+        }
+        // (Nobody left to ride it, all of them gone their own way: it doesn't come.)
+        if run.stops.iter().all(|s| s.state == StopState::Done) {
+            return false;
         }
         // In it comes, along its route as it is now (a car parked or gone since it was planned),
         // round any junction jammed now; with no way round one, it waits at the edge of town for
