@@ -25,6 +25,9 @@
  * every road named (no two alike), the file under 4 MB, and the time a big world takes (its
  * layout without generating houses, and assembling its file: a problem at twice the budget).
  *
+ * The same arguments make the same files, byte for byte (`Math.random` seeded per world:
+ * web/tests/sampleWorlds.test.ts), so a world a check fails on can be made again and run alone.
+ *
  * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--sizes cosy,normal,big] [--big-out file] [--big-per-kind n] [--kinds farm,forest]
  */
 
@@ -52,6 +55,7 @@ const { AREA_APART, COUNTRY_TURN, unrle } = await import('../../web/src/game/mac
 const { homePrice } = await import('../../web/src/game/price.ts');
 const { savingsOf } = await import('../../web/src/game/wealth.ts');
 const { COURT, lengths, nearest, pointAt, roadMask, sharpestTurn } = await import('../../web/src/game/roads.ts');
+const { mulberry32 } = await import('../../web/src/game/noise.ts');
 
 type Rect = { x: number; z: number; w: number; d: number };
 type Pt = [number, number];
@@ -346,6 +350,10 @@ for (const size of sizes) {
     for (let i = 1; i <= (size === 'big' ? bigPerKind : perKind); i++) {
       const seed = i * 104729 + kind.length;
       const tag = `${kind}${size === 'cosy' ? '' : ` ${size}`} ${seed}`;
+      // (The households, the player's and the neighbours', drawn with `Math.random`: seeded here
+      // by the world's seed and size, the same seeds make the same files, so a failure in a
+      // check of them can be run again.)
+      Math.random = mulberry32(seed * WORLD_SIZES.length + WORLD_SIZES.indexOf(size));
       generateStats.houseMs = 0;
       let t0 = performance.now();
       const world = generateWorld(content, templates, kind, seed, undefined, size);
