@@ -381,3 +381,138 @@ fn on_a_6_m_lane_a_taxi_at_a_blocked_driveway_stops_at_the_kerb_clear_of_the_car
     assert!(!by.0.is_empty() && !by.1.is_empty(), "not both to school");
     assert_eq!(by.0, by.1, "not the same taxi");
 }
+
+#[test]
+fn housemates_going_the_same_way_share_a_taxi_whatever_their_work() {
+    // Two of one house in different careers, starting at the same hour: one taxi, one halt.
+    let other = r#"{"name":"Pip","age":30,"traits":["cheerful"],"job":{"career":"business.marketing","level":0}}"#;
+    let mut w = town(7, &[house(20, &[&worker("Mum"), other])]);
+    let (mut mum, mut pip) = (Vec::new(), Vec::new());
+    let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
+    while w.tick < end && (mum.is_empty() || pip.is_empty()) {
+        w.tick_once();
+        no_overlaps(&w);
+        rode(&w, 0, &mut mum);
+        rode(&w, 1, &mut pip);
+    }
+    let there = |r: &[(u32, bool)]| r.iter().filter(|x| !x.1).map(|x| x.0).next();
+    assert!(
+        there(&mum).is_some() && there(&mum) == there(&pip),
+        "{mum:?} {pip:?}"
+    );
+}
+
+/// Car `c` sets off now with its driver (resident `d`), or comes home now.
+fn drive(w: &mut World, c: usize, d: u32, home: bool) {
+    let car = &mut w.cars[c];
+    car.state = if home {
+        CarState::Away
+    } else {
+        CarState::Leaving
+    };
+    car.since = w.tick;
+    car.progress = 0.0;
+    car.driver = Some(d);
+    car.aboard = vec![d];
+    if home {
+        car.done = vec![d];
+        car.ready_at = w.tick;
+    }
+    w.sims[d as usize].away_until = Some(w.tick + 100_000);
+}
+
+#[test]
+fn the_households_car_pulling_out_or_coming_home_as_the_taxi_stands_at_its_kerb_waits_its_turn() {
+    // Pip's house has a car (Dad's) on its driveway: as the taxi stands at their kerb, it pulls
+    // out (and, another day, comes home). Never into each other; both on their way soon.
+    for home in [false, true] {
+        let pip = r#"{"name":"Pip","age":10,"traits":["cheerful"]}"#;
+        let dad = r#"{"name":"Dad","age":40,"traits":["cheerful"]}"#;
+        let mut h = house(60, &[pip, dad]);
+        h.car = true;
+        let mut w = town(6, &[h]);
+        if home {
+            // (Away, coming home when the taxi stands there.)
+            w.cars[0].state = CarState::Away;
+            w.cars[0].aboard = vec![1];
+            w.sims[1].away_until = Some(w.tick + 100_000);
+        }
+        let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
+        let mut sent = false;
+        let mut done = None;
+        while w.tick < end && done.is_none() {
+            w.tick_once();
+            no_overlaps(&w);
+            if !sent && w.cars.iter().any(|c| c.taxi && c.standing) {
+                drive(&mut w, 0, 1, home);
+                sent = true;
+            }
+            let car_done = if home {
+                w.cars[0].state == CarState::Parked
+            } else {
+                w.cars[0].state == CarState::Away
+            };
+            if sent && car_done && !w.taxis.arrivals.is_empty() {
+                done = Some(w.tick);
+            }
+        }
+        assert!(sent, "({home}) the taxi never stood at the kerb");
+        assert!(done.is_some(), "({home}) not both on their way");
+    }
+}
+
+#[test]
+fn a_car_held_up_by_a_crowd_crossing_in_front_of_it_gets_its_gap() {
+    // (As at Willowley's busy corner: seven on foot crossing the street back and forth in front of
+    // a car coming home, on and on.) Those already in its way go on out of it; those not yet in
+    // it wait for it once it's waiting: it gets home soon, never into anyone.
+    let mut crowd = house(300, &[]);
+    crowd.sims = (0..7)
+        .map(|k| format!(r#"{{"name":"W{k}","age":30,"traits":["cheerful"]}}"#))
+        .collect();
+    let mut home = house(200, &[r#"{"name":"Dad","age":40,"traits":["cheerful"]}"#]);
+    home.car = true;
+    let mut w = town(7, &[home, crowd]);
+    run_to(&mut w, 1, 9.0);
+    // (Away, coming home now, along the street past the crowd.)
+    drive(&mut w, 0, 0, true);
+    let end = w.tick + 4 * 60 * 20;
+    let (mut k, mut reached) = (0, None);
+    while w.cars[0].state != CarState::Parked && w.tick < end {
+        // (From when it comes up to them: past them soon.)
+        let x = w.cars[0].shown.map_or(f32::INFINITY, |s| s.0[0]);
+        if reached.is_none()
+            && x < 295.0
+            && w.cars[0].state == CarState::Arriving
+            && w.cars[0].progress > 0.0
+        {
+            reached = Some(w.tick);
+        }
+        w.tick_once();
+        no_overlaps(&w);
+        // (Each of them off across the street again every so often, between x 240 and 280.)
+        if w.tick.is_multiple_of(40) {
+            k += 1;
+            let i = 1 + k % 7;
+            let x = 240.5 + (k * 13 % 40) as f32;
+            let z = if k % 2 == 0 {
+                STREET - 5.0
+            } else {
+                STREET + 5.0
+            };
+            let _ = w.apply(sim_core::Command::MoveTo {
+                sim: i as u32,
+                x,
+                z,
+            });
+        }
+        if let Some(t) = reached {
+            assert!(
+                x < 230.0 || w.tick < t + 20 * 20,
+                "the car still among them after 20 minutes: {:?}",
+                w.cars[0].shown
+            );
+        }
+    }
+    assert!(reached.is_some(), "it never came up to them");
+}

@@ -55,7 +55,7 @@ const PLAN_LEAD: u64 = 60 * TICKS_PER_MINUTE;
 const PLAN_HORIZON: u64 = 24 * 60 * TICKS_PER_MINUTE;
 /// How long a taxi stands at a stop, in all, as its run is timed (ticks: the door, getting in or
 /// out, the door again).
-const DWELL: u64 = crate::cars::GET_IN_TICKS as u64 + 2 * TICKS_PER_MINUTE;
+const DWELL: u64 = crate::cars::GET_IN_TICKS as u64 + TICKS_PER_MINUTE;
 /// How long before the taxi is due a rider is at their kerb (ticks), and how much spare time a run
 /// is timed with (ticks).
 const KERB_EARLY: u64 = 3 * TICKS_PER_MINUTE;
@@ -66,9 +66,11 @@ const SLACK_SHARE: u64 = 20;
 const TO_KERB_LEAST: u64 = 2 * TICKS_PER_MINUTE;
 /// How far out from where a taxi stands its rider waits for it (m, past its door: clear of it as
 /// it pulls in).
-const WAIT_OUT: f32 = 2.5;
 /// A rider on their way to work this near the taxi standing at their stop gets in (m).
 const NEAR_TAXI: f32 = 6.0;
+/// The taxi stands at a stop for a rider not yet at the kerb for this long at most (ticks: there
+/// within it at their pace, else they're left).
+const ARRIVE_SOON: u64 = 4 * TICKS_PER_MINUTE;
 /// A pupil's group (`group`): their school.
 const SCHOOL: u32 = u32::MAX;
 
@@ -141,6 +143,9 @@ pub struct Stop {
     #[serde(default)]
     pub leave: u64,
     pub state: StopState,
+    /// Where the taxi stands for them along its run (`Run::at`): housemates share one.
+    #[serde(default)]
+    pub halt: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -260,6 +265,23 @@ fn plan(w: &mut World) {
             want.push((g, start, i, on_foot));
         }
     }
+    // (Housemates going the same way out about the same time ride together, whatever their
+    // work: the first's group for all of them.)
+    want.sort_by_key(|&(g, start, i, _)| (w.sims[i].household, g.1, start, i));
+    let mut j = 0;
+    while j < want.len() {
+        let (g, first, i0, _) = want[j];
+        let mut n = j + 1;
+        while n < want.len()
+            && w.sims[want[n].2].household == w.sims[i0].household
+            && want[n].0.1 == g.1
+            && want[n].1 <= first + window
+        {
+            want[n].0 = g;
+            n += 1;
+        }
+        j = n;
+    }
     want.sort_by_key(|&(g, start, i, _)| (g, start, i));
     let mut k = 0;
     while k < want.len() {
@@ -351,12 +373,27 @@ fn time_run(
     exit: [f32; 2],
     chunk: &[(usize, u64, TaxiStop)],
 ) -> Result<Run, Vec<usize>> {
-    let stops: Vec<TaxiStop> = chunk.iter().map(|m| m.2).collect();
+    // (Housemates, next to each other in the order: one halt.)
+    let plot_of = |i: usize| {
+        w.households[w.sims[i].household as usize]
+            .plot
+            .unwrap_or(u32::MAX)
+    };
+    let mut halts: Vec<(u32, TaxiStop)> = Vec::new();
+    let mut halt_of = Vec::with_capacity(chunk.len());
+    for m in chunk {
+        let plot = plot_of(m.0);
+        if halts.last().is_none_or(|h| h.0 != plot) {
+            halts.push((plot, m.2));
+        }
+        halt_of.push(halts.len() - 1);
+    }
+    let stops: Vec<TaxiStop> = halts.iter().map(|h| h.1).collect();
     let (route, at) =
         crate::cars::taxi_route(&w.travel, exit, &stops, exit, TAXI_LEN, TAXI_WID).ok_or(vec![])?;
     let off_map = crate::cars::off_map_ticks(w);
     let first = chunk.iter().map(|m| m.1).min().unwrap_or(0);
-    let ride = route.ticks().ceil() as u64 + chunk.len() as u64 * DWELL;
+    let ride = route.ticks().ceil() as u64 + halts.len() as u64 * DWELL;
     let due_out = first.saturating_sub(off_map);
     // (Spare time for the way: `SLACK` and a share of it, those in its way on the roads.)
     let spare = SLACK + ride * SLACK_SHARE / 100;
@@ -368,7 +405,8 @@ fn time_run(
     let mut slow = Vec::new();
     let mut out = Vec::new();
     for (k, &(i, start, ref st)) in chunk.iter().enumerate() {
-        let due = enter + at[k].ceil() as u64 + k as u64 * DWELL;
+        let h = halt_of[k];
+        let due = enter + at[h].ceil() as u64 + h as u64 * DWELL;
         let sim = &w.sims[i];
         let walk = sim.walk_per_minute(&w.content);
         let door = w
@@ -399,6 +437,7 @@ fn time_run(
             due,
             leave,
             state: StopState::Booked,
+            halt: h as u8,
         });
     }
     if !slow.is_empty() {
@@ -448,7 +487,7 @@ pub(crate) fn kerb_for(ctx: &crate::world::Ctx, sim: &crate::world::Sim) -> Opti
     let b = sim.taxi?;
     let run = ctx.taxis.runs.iter().find(|r| r.id == b.run && !r.home)?;
     let st = run.stops.get(b.stop as usize)?;
-    if st.state != StopState::Booked || run.next > b.stop as u32 {
+    if st.state != StopState::Booked || run.next > st.halt as u32 {
         return None;
     }
     let plot = ctx.households.get(sim.household as usize)?.plot?;
@@ -462,24 +501,13 @@ pub(crate) fn kerb_for(ctx: &crate::world::Ctx, sim: &crate::world::Sim) -> Opti
     Some(wait_spot(ctx.travel, &stop))
 }
 
-/// Where a rider waits for the taxi at `stop`: beside where it'll stand in the driveway's mouth,
-/// on the pavement out past its side, clear of it as it pulls in; at a kerb stop, on the pavement
-/// by the driveway's mouth.
+/// Where a rider waits for the taxi at `stop`: on the pavement by their driveway's mouth.
 fn wait_spot(travel: &crate::travel::Travel, stop: &TaxiStop) -> [f32; 2] {
     let g = &travel.graph;
     let mp = g.point(stop.mouth);
     let road = &g.roads[stop.mouth.road as usize];
-    if stop.kerb {
-        let k = road.width / 2.0 - 0.5;
-        return [mp[0] - stop.axis[0] * k, mp[1] - stop.axis[1] * k];
-    }
-    let side = [stop.axis[1], -stop.axis[0]];
-    let k = TAXI_WID / 2.0 + WAIT_OUT;
-    let edge = road.width / 2.0 - 0.6;
-    [
-        mp[0] - stop.axis[0] * edge + side[0] * k,
-        mp[1] - stop.axis[1] * edge + side[1] * k,
-    ]
+    let k = road.width / 2.0 - 0.5;
+    [mp[0] - stop.axis[0] * k, mp[1] - stop.axis[1] * k]
 }
 
 /// A slot for a taxi in `World::cars`: one free (a taxi done with its run), else a new one (none
@@ -502,9 +530,16 @@ fn slot(w: &mut World) -> Option<u32> {
 fn route_of(w: &World, k: usize) -> Option<(crate::cars::Route, Vec<f32>)> {
     let run = &w.taxis.runs[k];
     let &exit = w.exits.get(run.group.1 as usize)?;
+    // (A halt each: housemates' one.)
+    let mut seen: Vec<u8> = Vec::new();
     let stops: Vec<TaxiStop> = run
         .stops
         .iter()
+        .filter(|st| {
+            let new = !seen.contains(&st.halt);
+            seen.push(st.halt);
+            new
+        })
         .map(|st| {
             let drive = w.drives.iter().find(|d| d.plot == st.plot)?;
             let parked = w
@@ -548,7 +583,7 @@ fn run_on(w: &mut World, k: usize) -> bool {
     let c = w.taxis.runs[k].car.expect("in town") as usize;
     let next = w.taxis.runs[k].next as usize;
     let ticks = w.cars[c].taxi_ticks();
-    if next < w.taxis.runs[k].stops.len() {
+    if next < w.taxis.runs[k].at.len() {
         let stop_at = w.taxis.runs[k]
             .at
             .get(next)
@@ -564,8 +599,9 @@ fn run_on(w: &mut World, k: usize) -> bool {
     w.cars[c].progress < ticks
 }
 
-/// Run `k`'s taxi (car `c`) stands at its stop `next`: a rider gets in, or out; one not there in
-/// time is left.
+/// Run `k`'s taxi (car `c`) stands at its stop `next` (a halt: housemates' one): those there get
+/// in, or out, each by a door of their own; one not at the kerb nor coming to it within
+/// `ARRIVE_SOON` is left.
 fn stand(w: &mut World, k: usize, c: usize, next: usize) {
     let tick = w.tick;
     crate::cars::stand_taxi(w, c);
@@ -573,63 +609,66 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
         w.taxis.runs[k].since = tick;
     }
     let since = w.taxis.runs[k].since;
-    let wait = (w.content.taxi.wait * TICKS_PER_MINUTE as f32) as u64;
-    let st = w.taxis.runs[k].stops[next];
-    let i = st.sim as usize;
-    let done = |w: &mut World| {
-        let run = &mut w.taxis.runs[k];
-        run.next += 1;
-        run.since = 0;
-        w.cars[c].standing = false;
-    };
-    if w.taxis.runs[k].home {
-        match st.state {
-            StopState::Aboard => {
-                // Home: out they get at their door and walk home.
-                let seat = 1 + next % 4;
-                w.taxis.runs[k].stops[next].state = StopState::Done;
-                if w.sims.get(i).is_some_and(|s| s.here()) {
-                    w.sims[i].away_until = None;
-                    w.sims[i].taxi = None;
-                    crate::cars::walk_home(w, i, Some((c, seat)));
+    let id = w.taxis.runs[k].id;
+    let home = w.taxis.runs[k].home;
+    let here: Vec<usize> = (0..w.taxis.runs[k].stops.len())
+        .filter(|&s| w.taxis.runs[k].stops[s].halt as usize == next)
+        .collect();
+    let mut busy = false;
+    for s in here {
+        let st = w.taxis.runs[k].stops[s];
+        let i = st.sim as usize;
+        let seat = 1 + s % 4;
+        if home {
+            match st.state {
+                StopState::Aboard => {
+                    // Home: out they get at their door and walk home.
+                    w.taxis.runs[k].stops[s].state = StopState::Done;
+                    if w.sims.get(i).is_some_and(|x| x.here()) {
+                        w.sims[i].away_until = None;
+                        w.sims[i].taxi = None;
+                        crate::cars::walk_home(w, i, Some((c, seat)));
+                    }
+                    busy = true;
                 }
-                w.taxis.runs[k].since = tick;
-            }
-            _ => {
-                // (Their door shut behind them: on.)
-                let out = w
-                    .sims
-                    .get(i)
-                    .and_then(|s| s.current())
-                    .is_some_and(|a| matches!(a.phase, Phase::Alighting { .. }));
-                if !out || tick > since + DWELL {
-                    done(w);
+                _ => {
+                    // (Their door shut behind them.)
+                    busy |= w
+                        .sims
+                        .get(i)
+                        .and_then(|x| x.current())
+                        .is_some_and(|a| matches!(a.phase, Phase::Alighting { .. }))
+                        && tick <= since + DWELL;
                 }
             }
+            continue;
         }
-        return;
-    }
-    match st.state {
-        StopState::Booked => {
-            // (At their kerb, or about it on their way to work: stepped out of the taxi's way.)
-            let taxi_at = w.cars[c].spot;
-            let waiting = w.sims.get(i).is_some_and(|s| {
-                s.taxi.is_some_and(|b| b.run == w.taxis.runs[k].id)
-                    && s.current().is_some_and(|a| {
-                        matches!(a.phase, Phase::AtKerb { .. })
-                            || matches!(a.task.kind, TaskKind::Work)
-                                && crate::travel::dist(s.pos, taxi_at) < NEAR_TAXI
-                    })
-            });
-            if waiting {
-                // Their turn: to the taxi's door, and in.
-                let seat = 1 + next % 4;
-                let (d, _) = w.cars[c].taxi_door(&w.nav(), seat);
-                {
+        match st.state {
+            StopState::Booked => {
+                let taxi_at = w.cars[c].spot;
+                let sim = &w.sims[i];
+                let on_way = sim.taxi.is_some_and(|b| b.run == id)
+                    && sim
+                        .current()
+                        .is_some_and(|a| matches!(a.task.kind, TaskKind::Work));
+                let d = crate::travel::dist(sim.pos, taxi_at);
+                // (At their kerb, or there about now; else coming to it soon, at their pace.)
+                let there = on_way
+                    && (sim
+                        .current()
+                        .is_some_and(|a| matches!(a.phase, Phase::AtKerb { .. }))
+                        || d < NEAR_TAXI);
+                let left = ARRIVE_SOON.saturating_sub(tick - since) as f32;
+                let soon = on_way
+                    && (d - NEAR_TAXI)
+                        <= left * sim.walk_per_minute(&w.content) * crate::MINUTES_PER_TICK;
+                if there {
+                    // Their turn: to the taxi's door, and in.
+                    let (door, _) = w.cars[c].taxi_door(&w.nav(), seat);
                     let sim = &mut w.sims[i];
                     sim.bound_for_car = Some(c as u32);
                     sim.car_seat = seat as u8;
-                    sim.car_door = d as u8;
+                    sim.car_door = door as u8;
                     sim.current = Some(crate::world::Activity {
                         task: Task {
                             kind: TaskKind::Work,
@@ -639,31 +678,38 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
                         phase: Phase::Boarding { ticks: 0 },
                         tags: Default::default(),
                     });
-                    w.taxis.runs[k].stops[next].state = StopState::Boarding;
-                    return;
+                    w.taxis.runs[k].stops[s].state = StopState::Boarding;
+                    busy = true;
+                } else if soon {
+                    busy = true;
+                } else {
+                    // Not there, nor coming: on without them, and they make their own way.
+                    w.taxis.runs[k].stops[s].state = StopState::Done;
+                    release(w, i);
                 }
             }
-            if tick > since + wait {
-                // Not there in time: on without them, and they make their own way.
-                w.taxis.runs[k].stops[next].state = StopState::Done;
-                release(w, i);
-                done(w);
+            StopState::Boarding => {
+                // (Called away meanwhile: on without them.)
+                let boarding = w.sims.get(i).is_some_and(|x| {
+                    x.current()
+                        .is_some_and(|a| matches!(a.phase, Phase::Boarding { .. }))
+                        && x.bound_for_car == Some(c as u32)
+                });
+                if boarding {
+                    busy = true;
+                } else {
+                    w.taxis.runs[k].stops[s].state = StopState::Done;
+                    release(w, i);
+                }
             }
+            StopState::Aboard | StopState::Done => {}
         }
-        StopState::Boarding => {
-            // (Called away meanwhile: on without them.)
-            let boarding = w.sims.get(i).is_some_and(|s| {
-                s.current()
-                    .is_some_and(|a| matches!(a.phase, Phase::Boarding { .. }))
-                    && s.bound_for_car == Some(c as u32)
-            });
-            if !boarding {
-                w.taxis.runs[k].stops[next].state = StopState::Done;
-                release(w, i);
-                done(w);
-            }
-        }
-        StopState::Aboard | StopState::Done => done(w),
+    }
+    if !busy {
+        let run = &mut w.taxis.runs[k];
+        run.next += 1;
+        run.since = 0;
+        w.cars[c].standing = false;
     }
 }
 
@@ -726,7 +772,8 @@ pub(crate) fn boarded(w: &mut World, i: usize, c: u32) {
     };
     let s = w.taxis.runs[k].stop_of(me).expect("just found");
     let rest_ride = (w.cars[c as usize].taxi_ticks() - w.cars[c as usize].progress).max(0.0);
-    let left = (w.taxis.runs[k].stops.len() - s - 1) as u64;
+    let halt = w.taxis.runs[k].stops[s].halt as usize;
+    let left = w.taxis.runs[k].at.len().saturating_sub(halt + 1) as u64;
     let rest = rest_ride.ceil() as u64 + left * DWELL + crate::cars::off_map_ticks(w);
     crate::life::start_taxi_shift(w, i, rest);
     let g = w.taxis.runs[k].group;
@@ -811,6 +858,7 @@ pub(crate) fn off_work(w: &mut World, i: usize) -> bool {
         due: 0,
         leave: 0,
         state: StopState::Aboard,
+        halt: 0,
     };
     let k = match w.taxis.runs.iter().position(|r| {
         r.home && r.group == g && r.enter == 0 && r.depart >= tick && r.stops.len() < seats
@@ -885,6 +933,14 @@ fn close_home_runs(w: &mut World) {
             at = place(w, &st);
             order.push(st);
         }
+        // (Housemates next to each other: one halt.)
+        let mut h = 0u8;
+        for j in 0..order.len() {
+            if j > 0 && order[j].plot != order[j - 1].plot {
+                h += 1;
+            }
+            order[j].halt = h;
+        }
         w.taxis.runs[k].stops = order;
         w.taxis.runs[k].enter = tick + off_map;
         let Some((route, at)) = route_of(w, k) else {
@@ -896,7 +952,8 @@ fn close_home_runs(w: &mut World) {
         let enter = tick + off_map;
         let stops = w.taxis.runs[k].stops.clone();
         for (s, st) in stops.iter().enumerate() {
-            let back = enter + at[s].ceil() as u64 + s as u64 * DWELL;
+            let h = st.halt as usize;
+            let back = enter + at.get(h).copied().unwrap_or(0.0).ceil() as u64 + h as u64 * DWELL;
             let i = st.sim as usize;
             if w.sims.get(i).is_some_and(|x| x.here()) {
                 w.sims[i].away_until = Some(back.max(tick + 1) + DWELL);
