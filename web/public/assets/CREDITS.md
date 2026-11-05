@@ -534,13 +534,14 @@ The model runs with **ONNX Runtime Web** 1.31.1 (`onnxruntime-web`, its WebGPU b
 
 ## The language model for residents' lines
 
-Optional (Settings › Voices › What residents say › Lines › Language model), its 4-bit ONNX build, unchanged; the weights file is shipped gzipped and unpacked by the player's browser. Fetched at build time into `../llm/` (pinned and checked by SHA-256, not stored in git). Like the voices, it runs only on WebGPU.
+Optional (Settings › Voices › What residents say › Lines › Language model), its 4-bit ONNX build, repacked smaller without changing what it computes (below); the weights file is shipped gzipped and unpacked by the player's browser. Fetched at build time into `../llm/` (pinned and checked by SHA-256, not stored in git). Like the voices, it runs only on WebGPU.
 
 | Model | Files | By | Source | Licence |
 |---|---|---|---|---|
-| LFM2.5-350M | `lfm2.5-350m/model_q4.onnx`, `model_q4.onnx_dataz` (`model_q4.onnx_data` gzipped, unpacked by the browser), `tokenizer.json`, `tokenizer_config.json` (revision `7dd49995`) | Liquid AI (model), onnx-community (export) | https://huggingface.co/onnx-community/LFM2.5-350M-ONNX | LFM Open License v1.0 (`lfm2.5-350m/LICENSE.txt`, from Liquid AI's https://huggingface.co/LiquidAI/LFM2.5-350M at revision `9e6c6ccf`: the export has no copy) |
+| LFM2.5-350M | `lfm2.5-350m/model_q4.onnx`, `model_q4.onnx_dataz` (`model_q4.onnx_data` gzipped, unpacked by the browser) (revision `7dd49995`), **modified**: repacked without changing what the model computes (`crates/tools/src/llmslim.rs`): the tied 4-bit embedding, stored twice in the export, stored once, and the rotary tables (`cos_cache`, `sin_cache`) cut to their first 4,096 of 128,000 positions; nothing retrained or requantised (`lfm2.5-350m/NOTICE`) | Liquid AI (model), onnx-community (export) | https://huggingface.co/onnx-community/LFM2.5-350M-ONNX | LFM Open License v1.0 (`lfm2.5-350m/LICENSE.txt`, from Liquid AI's https://huggingface.co/LiquidAI/LFM2.5-350M at revision `9e6c6ccf`: the export has no copy) |
+| LFM2.5-350M | `lfm2.5-350m/tokenizer.json`, `tokenizer_config.json` (revision `7dd49995`), **unchanged** | Liquid AI (model), onnx-community (export) | https://huggingface.co/onnx-community/LFM2.5-350M-ONNX | LFM Open License v1.0 (`lfm2.5-350m/LICENSE.txt`, from Liquid AI's https://huggingface.co/LiquidAI/LFM2.5-350M at revision `9e6c6ccf`: the export has no copy) |
 
-**The LFM Open License v1.0** allows reproducing, changing and distributing the model free of charge, on conditions that include giving every recipient a copy of the licence (shipped with the model as `lfm2.5-350m/LICENSE.txt`). Commercial use by an organisation whose annual revenue is 10 million US dollars or more isn't licensed (its section 5).
+**The LFM Open License v1.0** allows reproducing, changing and distributing the model free of charge, on conditions that include giving every recipient a copy of the licence (shipped with the model as `lfm2.5-350m/LICENSE.txt`) and marking changed files as changed (its section 4(b): `lfm2.5-350m/NOTICE`, written by `cargo fetch-llm`). Commercial use by an organisation whose annual revenue is 10 million US dollars or more isn't licensed (its section 5).
 
 The tokenizer runs with **Tokenizers.js** (`@huggingface/tokenizers`), © Hugging Face, Apache-2.0: https://github.com/huggingface/tokenizers.js. The model runs with ONNX Runtime Web's WebGPU build (`ort-wasm-simd-threaded.asyncify.wasm`).
 
