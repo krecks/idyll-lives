@@ -18,7 +18,7 @@ Player notes: the `## 0.7.0` section of [CHANGELOG.md](../CHANGELOG.md), also in
 | `feat/lifts` (`c0587654`) | Lifts in a friend's car next door (`cars::lift_seat`) |
 | `feat/hosting` (`0a80db02`) | A host's offer of a bite (`hosting.rs`, `visits.offer`), eating beside one's company; also the basement's fence posts (`7e9907f0`), Firefox's model loading (`6ada1144`) and households nobody plays buying with next week's bills left (`8682a8ef`) |
 | `feat/town-bus` (`a178eeab`) | A timetabled bus through every new town's stops and a big world's (`bus.rs`, content `bus`), the stops and shelters (`town.ts` `busStops`), the procedural bus (`render/pc/buses.ts`) |
-| #54 `feat/modern-console-tv` (`8fe2b8f3`) | The Console TV as a set of today |
+| #54 `feat/modern-console-tv` (`8fe2b8f3`) | The Console TV redrawn (later replaced by the portable tube set, 657aedf6) |
 | #55 `fix/food-cooking` (`b457700f`) | Food and cooking reviewed and fixed: serving, clearing, scraping, eating, the cook's tools, the cookers' and held food's models |
 | `simplify/sim-core`, `simplify/bus-hosting`, `simplify/web` (`d97f6d05`, `9da73623`, `6a44a4a8`) | `/simplify` passes over the branch |
 | `fix/riders-and-vehicles` (through `f5c9a1d9`, with `fix/commute-timing` and `fix/model-gate`) | The code review's fixes: bodies kept clear of cars and buses, a car never driving through anyone, the bike or walk decided once, lateness by the way's due time, a guest's promised bite; the gate's strict checks as errors (`checkglb::STRICT`, `accept`); the armoire, party booth, shower stall, seedling and yoga mat; the monitor's radius |
