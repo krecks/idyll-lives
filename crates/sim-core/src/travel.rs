@@ -1181,6 +1181,10 @@ pub struct Travel {
     /// Whether the junctions get traffic lights (`traffic::settle`): not yet in a game (off), only
     /// where a test turns them on (`World::light_busy_junctions`).
     pub lights_on: bool,
+    /// By public parking spot (`OpenWorld::parking`), whether a car parked there would stand where
+    /// a household's car turns into or out of its driveway (`cars::settle_all`): not parked at on a
+    /// trip. Not saved: worked out again on load.
+    pub(crate) by_a_mouth: Vec<bool>,
     /// By plot, for the public places: their door and where it gets on the roads on foot and by
     /// car (`entry`), kept as each tick starts (`note_doors`): a resident weighing an outing asks
     /// how long the way to every one is. Not saved.
@@ -1208,6 +1212,7 @@ impl Travel {
             country_speed: COUNTRY_SPEED,
             base_blocked: Vec::new(),
             lights_on: false,
+            by_a_mouth: Vec::new(),
             signals: Vec::new(),
             doors: Vec::new(),
         }

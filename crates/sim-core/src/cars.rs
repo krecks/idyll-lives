@@ -4422,6 +4422,23 @@ fn settle_all(w: &mut World) {
         drives,
         ..
     } = &mut *w;
+    // (The public parking spots a car parked at would stand in the way of one turning into or out
+    // of its driveway: none parks there on a trip, `parking_for`.)
+    let mouths: Vec<[f32; 2]> = drives
+        .iter()
+        .filter_map(Drive::meets)
+        .filter_map(|(road, s)| travel.graph.at_source(road, s))
+        .map(|p| travel.graph.point(p))
+        .collect();
+    travel.by_a_mouth = (0..travel.file.parking.len())
+        .map(|k| {
+            parked_at(travel, k).is_some_and(|(at, ..)| {
+                mouths
+                    .iter()
+                    .any(|&m| crate::travel::dist(m, at) < MOUTH_CLEAR)
+            })
+        })
+        .collect();
     for car in cars.iter_mut() {
         let drive = drives.iter().find(|d| d.plot == car.plot);
         car.meets = drive.and_then(Drive::meets);
@@ -4437,10 +4454,15 @@ fn settle_all(w: &mut World) {
 
 // ---- Trips by car (`Trip`) ---------------------------------------------------------------
 
+/// How near a driveway's mouth (where it meets its road) the middle of a car parked out on a trip
+/// may not be (m: a car's length and the swing of one turning in or out by it).
+const MOUTH_CLEAR: f32 = 7.0;
+
 /// The public parking spot (`parking`) nearest `door` within `TRIP_PARK_REACH`: where it is and
 /// which way a car faces parked there. Of `cars`, but car `me`, none parks where another is on a
 /// trip to (on its way there, parked there, or still pulling out of it home: they'd stand one on
-/// top of the other): with all near taken, none.
+/// top of the other), nor at one by a driveway's mouth (`Travel::by_a_mouth`): with all near
+/// taken, none.
 fn parking_for(
     travel: &Travel,
     door: [f32; 2],
@@ -4463,6 +4485,7 @@ fn parking_for(
         })
     };
     (0..travel.file.parking.len())
+        .filter(|&k| !travel.by_a_mouth.get(k).copied().unwrap_or(false))
         .filter_map(|k| parked_at(travel, k))
         .map(|(at, yaw, _)| (crate::travel::dist(at, door), at, yaw))
         .filter(|&(d, at, _)| d <= TRIP_PARK_REACH && !taken(at))
