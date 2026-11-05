@@ -846,7 +846,19 @@ impl Route {
     /// lane's tight bend: `traffic::narrow`).
     fn claim(&mut self, len: f32, wid: f32, travel: Option<&Travel>) {
         let trace = crate::traffic::trace(|t| self.at(t), self.ticks());
-        let pass: Vec<f32> = trace.iter().map(|s| self.room_here(s.0)).collect();
+        // (Pulling over to pass one coming the other way, out of the junctions' boxes only:
+        // `pull_want`.)
+        let boxes = travel.map_or(&[][..], |t| &t.graph.boxes[..]);
+        let pass: Vec<f32> = trace
+            .iter()
+            .map(|s| {
+                if in_box(boxes, s.1, len) {
+                    0.0
+                } else {
+                    self.room_here(s.0)
+                }
+            })
+            .collect();
         let swing = crate::traffic::swings(&trace, len);
         let over: Vec<f32> = trace
             .iter()
@@ -905,7 +917,6 @@ impl Route {
         if travel.is_some() {
             more.extend(crate::traffic::narrow(&trace, &pass, &swing, &over));
         }
-        let boxes = travel.map_or(&[][..], |t| &t.graph.boxes[..]);
         self.claims = crate::traffic::claims(&trace, &pass, len, wid, boxes, &more);
         if let Some(t) = travel {
             crate::traffic::gate(&mut self.claims, &t.signals);
@@ -1125,6 +1136,10 @@ impl Route {
                 let to = legs.len() - 1;
                 legs.mouths.push((0, Some(to)));
             }
+        }
+        // (Never on the lane, from the driveway straight into the bay by it: all of it a mouth.)
+        if !on && (start.is_some() || park.is_some() && home) {
+            legs.mouths.push((0, None));
         }
         // (Into a driveway, a bay or a spot on the road: its mouth, from the lane.)
         let lane_end = legs.len().saturating_sub(1);
@@ -2492,12 +2507,7 @@ fn pull_want(w: &World, c: usize, moving: bool) -> (f32, Option<u64>) {
     // (Not in a junction's box, nor for one in it: there they take turns, `traffic.rs`, and one
     // turning there faces any way.)
     let boxes = &w.travel.graph.boxes;
-    let in_box = |p: [f32; 2], len: f32| {
-        boxes
-            .iter()
-            .any(|&(m, r)| crate::travel::dist(m, p) < r + len / 2.0)
-    };
-    if room <= 0.0 || back || in_box(at, car.len) {
+    if room <= 0.0 || back || in_box(boxes, at, car.len) {
         return (0.0, None);
     }
     let short = |p: [f32; 2], facing: f32, len: f32, wid: f32| {
@@ -2517,7 +2527,7 @@ fn pull_want(w: &World, c: usize, moving: bool) -> (f32, Option<u64>) {
             continue;
         };
         let (p, facing, _) = theirs.at(other.progress);
-        if in_box(p, other.len) {
+        if in_box(boxes, p, other.len) {
             continue;
         }
         if let Some((all, mine, their)) = short(p, facing, other.len, other.wid) {
@@ -2528,6 +2538,13 @@ fn pull_want(w: &World, c: usize, moving: bool) -> (f32, Option<u64>) {
         }
     }
     (want.min(room), whom)
+}
+
+/// Whether a body `len` long with its middle at `p` is in one of the junctions' `boxes`, about.
+fn in_box(boxes: &[([f32; 2], f32)], p: [f32; 2], len: f32) -> bool {
+    boxes
+        .iter()
+        .any(|&(m, r)| crate::travel::dist(m, p) < r + len / 2.0)
 }
 
 /// The cars on the road this tick, for the claims (`traffic::begin`): those driving (`places`:

@@ -463,14 +463,19 @@ pub type PathEnds = Option<([[f32; 2]; 2], [[f32; 2]; 2])>;
 /// Two roads' middle lines this near (m) away from their ends meet there (`crossings`): two cars
 /// in their lanes on them would touch.
 const CROSS_NEAR: f32 = 2.0;
-/// Of two roads coming that near along a stretch, one meeting place every this far (m), where
-/// they come nearest.
-const CROSS_APART: f32 = 12.0;
+/// Two roads that near along no further than this (m) meet once, where they come nearest; along
+/// further (one laid on the other), where they come together and where they part (`crossings`).
+const CROSS_RUN: f32 = 20.0;
+/// A gap this long (m along the first road) between places where two roads are that near is
+/// two stretches.
+const CROSS_GAP: f32 = 4.0;
 
 /// Where two roads for cars (`Road::drivable`) cross, or their middle lines touch (`CROSS_NEAR`),
 /// away from either's ends (where `Graph::build` joins them already): the two roads, how far along
-/// each, and the place (between the two nearest points), in order. A town file's roads should
-/// meet at their ends; a country road laid across or along another meets it all the same.
+/// each, and the place (between the two nearest points), in order. A crossing, or a touch along a
+/// short stretch, is one place (`CROSS_RUN`); a road laid on another for longer meets it where
+/// they come together and where they part. A town file's roads should meet at their ends; a
+/// country road laid across or along another meets it all the same.
 fn crossings(roads: &[Road]) -> Vec<(usize, usize, f32, f32, [f32; 2])> {
     let bounds: Vec<[f32; 4]> = roads
         .iter()
@@ -509,8 +514,8 @@ fn crossings(roads: &[Road]) -> Vec<(usize, usize, f32, f32, [f32; 2])> {
             }
             let snap = a.width.max(b.width) / 2.0 + 1.0;
             let inside = |road: &Road, s: f32| s >= snap && s <= road.len() - snap;
-            // (The nearest places of each pair of segments within reach, nearest first per
-            // stretch along `a`.)
+            // (The nearest places of each pair of segments within reach, by the stretches along `a`
+            // they make.)
             let mut near: Vec<(f32, f32, f32, [f32; 2])> = Vec::new();
             for i in 0..a.pts.len() - 1 {
                 for j in 0..b.pts.len() - 1 {
@@ -528,15 +533,28 @@ fn crossings(roads: &[Road]) -> Vec<(usize, usize, f32, f32, [f32; 2])> {
                     near.push((d, sa, sb, [(pa[0] + pb[0]) / 2.0, (pa[1] + pb[1]) / 2.0]));
                 }
             }
-            near.sort_by(|m, n| m.0.total_cmp(&n.0).then(m.1.total_cmp(&n.1)));
-            let mut kept: Vec<(f32, f32, f32, [f32; 2])> = Vec::new();
-            for m in near {
-                if kept.iter().all(|k| (k.1 - m.1).abs() >= CROSS_APART) {
-                    kept.push(m);
+            near.sort_by(|m, n| m.1.total_cmp(&n.1).then(m.0.total_cmp(&n.0)));
+            let mut start = 0;
+            while start < near.len() {
+                let mut end = start + 1;
+                while end < near.len() && near[end].1 - near[end - 1].1 < CROSS_GAP {
+                    end += 1;
                 }
+                let run = &near[start..end];
+                let least = run.iter().map(|m| m.0).fold(f32::INFINITY, f32::min);
+                if run[run.len() - 1].1 - run[0].1 <= CROSS_RUN {
+                    let m = run.iter().find(|m| m.0 == least).expect("one is the least");
+                    out.push((r, q, m.1, m.2, m.3));
+                } else {
+                    // (Where they've come together, and the last place before they part.)
+                    let met = |m: &&(f32, f32, f32, [f32; 2])| m.0 <= least + 0.3;
+                    let first = run.iter().find(met).expect("one is the least");
+                    let last = run.iter().rev().find(met).expect("one is the least");
+                    out.push((r, q, first.1, first.2, first.3));
+                    out.push((r, q, last.1, last.2, last.3));
+                }
+                start = end;
             }
-            kept.sort_by(|m, n| m.1.total_cmp(&n.1));
-            out.extend(kept.into_iter().map(|(_, sa, sb, p)| (r, q, sa, sb, p)));
         }
     }
     out
