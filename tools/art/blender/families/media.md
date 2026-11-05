@@ -15,7 +15,7 @@ the old parts did and as housegen expects (`"opposite": "sofa"`).
 |---|---|---|
 | `tv` | none: a slim set on its stand on an oak media unit, a soundbar in front | — |
 | `tvWall` | none: a thin panel on a wall bracket, a soundbar on two brackets under it (wall layer, `floor=False`) | — |
-| `tvRetro` | the rabbit ears, origin at their foot: `antenna` turns them 20° and stretches them 1.6× up (0.9 s), telescoping | `watch` (until it ends) |
+| `tvRetro` | the telescopic aerial, origin at its foot on the case's top right: `antenna` lifts it 35° (0.9 s) | `watch` (until it ends) |
 | `tvStandLow` | the TV with the lift's lid on its top edge, down in the bench at rest: `tv_up` lifts it 60 cm (1.6 s) | `watch` (sinks back at the end) |
 | `homeCinema` | the projector screen, its origin in the case on the wall, flattened into it at rest: `screen_down` unrolls it (1.4 s) | `watch`, `film` |
 | `stereo` | the record on the turntable (platter, vinyl, label with a stripe): `record` turns it once in 1.8 s, 33 rpm (a loop; 2026-10-21, for the CD tray, which no longer moves); the two woofer cones: `pulse` swells them forward and back (0.5 s, `squash(back=True)`, `every` 0.45 s) | `listen`, `dance` |
@@ -78,7 +78,7 @@ Rebuilt with the forms and the kit, same sizes, centres, parts, clips, glow, pai
 |---|---|---|---|---|
 | `model.tv` | 0.91 × 1.07 × 0.44 m | 2,144 → 3,548 | 2 | Body (`tv_cabinet`), Trim (`tv_oak`) |
 | `model.tvWall` | 1.24 × 0.87 × 0.10 m | 492 → 884 | 1 | Body (`wall_frame`), Trim (`wall_bar`) |
-| `model.tvRetro` | 0.94 × 1.13 × 0.49 m | 1,892 → 3,452 | 3 | Body (`retro_wood`), Trim (`retro_bezel`) |
+| `model.tvRetro` | 0.89 × 0.79 × 0.43 m | 1,892 → 3,584 | 2 | Body (`retro_shell`), Trim (`retro_bezel`) |
 | `model.tvStandLow` | 1.82 × 0.80 × 0.46 m | 2,688 → 4,452 | 3 | Bench (`bench`), TV (`bench_tv`) |
 | `model.homeCinema` | 1.88 × 1.65 × 0.45 m | 2,408 → 6,248 | 3 | Body (`cinema_unit`), Trim (`cinema_oak`) |
 | `model.stereo` | 0.92 × 0.84 × 0.42 m | 3,480 → 3,800 | 4 | Body (`stereo_wood`), Trim (`stereo_dark`) |

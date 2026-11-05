@@ -119,11 +119,14 @@
         "grille": {
           "finish": "material.finish.matte"
         },
+        "led_red": {
+          "finish": "material.finish.gloss"
+        },
         "retro_bezel": {
           "finish": "material.finish.gloss"
         },
-        "retro_wood": {
-          "finish": "material.finish.wood"
+        "retro_shell": {
+          "finish": "material.finish.satin"
         },
         "steel": {
           "finish": "material.finish.metal"
@@ -136,7 +139,7 @@
       },
       "paint": [
         {
-          "material": "retro_wood",
+          "material": "retro_shell",
           "label": "Body"
         },
         {
