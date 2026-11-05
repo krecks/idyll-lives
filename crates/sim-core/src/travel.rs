@@ -385,7 +385,7 @@ impl Road {
         true
     }
 
-    fn drivable(&self) -> bool {
+    pub(crate) fn drivable(&self) -> bool {
         self.kind != RoadKind::Trail
     }
 }
@@ -1039,6 +1039,9 @@ pub struct Travel {
     /// The buses' ways where a bus can't pass one coming the other way (`bus::settle`): a car's
     /// route along one takes turns with the buses there (`traffic::Narrow`). Not saved.
     pub narrow: crate::traffic::Narrow,
+    /// The junctions with traffic lights (`traffic::Signal`, `bus::settle`). Not saved: worked out
+    /// again with the lines.
+    pub signals: Vec<crate::traffic::Signal>,
     /// Where cars and buses take turns driving through, as through a junction's box: the
     /// junctions' boxes (`Graph::boxes`), and where a bus's body sweeps out of its lane round a
     /// sharp turn (`traffic::sweeps`), a middle and how far round it (m). Not saved.
@@ -1087,6 +1090,7 @@ impl Travel {
             country_speed: COUNTRY_SPEED,
             base_blocked: Vec::new(),
             bus_way: Vec::new(),
+            signals: Vec::new(),
             narrow: Default::default(),
             zones: Vec::new(),
             doors: Vec::new(),

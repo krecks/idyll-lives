@@ -1076,11 +1076,10 @@ fn a_bus_turning_round_gets_round_soon_with_someone_standing_where_it_sweeps() {
     assert!(took < 30 * 20, "the bus took {} s to turn round", took / 20);
 }
 
-#[test]
-fn cars_from_every_arm_of_a_busy_crossroads_all_get_through_with_the_buses() {
-    // A big world's crossroads, its ways out east and west, two bus stops on either of those arms
-    // (a line through it each way): two cars leave from houses on the north and south arms, two
-    // come home to houses there, all across the junction as a bus comes to it, at a few moments.
+/// A big world's crossroads at (200, 200), its ways out east and west, two bus stops on either of
+/// those arms (a line through it each way: a lit junction), dead ends north and south, and
+/// `houses` along those (`crossroads_house`).
+fn crossroads(houses: &[House]) -> World {
     let arm = |a: [f32; 2], b: [f32; 2], ends: &str| {
         format!(
             r#"{{"points":[{}],"width":7,"kind":"street","ends":{ends},"area":0}}"#,
@@ -1099,8 +1098,13 @@ fn cars_from_every_arm_of_a_busy_crossroads_all_get_through_with_the_buses() {
         {"x":170,"z":197.6,"kind":"stop"},{"x":150,"z":197.6,"kind":"stop"}]"#;
     let more = r#","size":"big","walls":[],"doors":[],"windows":[],"relationships":[],
         "areas":[{"name":"Crossroads","kind":"hamlet","x":130,"z":130,"w":140,"d":140}]"#;
-    // (Houses west of the north arm and east of the south one, their driveways onto them.)
-    let house = |z: f32, west: bool| House {
+    town_of(BUS_CONTENT, more, 400, 400, &roads, exits, houses)
+}
+
+/// A house by the crossroads' north arm (`z` below 200, west of it) or south arm (east of it),
+/// its driveway onto it (`crossroads`).
+fn crossroads_house(z: f32, west: bool) -> House {
+    House {
         plot: if west {
             [180.0, z - 8.0, 14.0, 16.0]
         } else {
@@ -1111,15 +1115,79 @@ fn cars_from_every_arm_of_a_busy_crossroads_all_get_through_with_the_buses() {
         along_x: true,
         road: if z < 200.0 { 2 } else { 3 },
         s: if z < 200.0 { z - 120.0 } else { z - 200.0 },
-    };
+    }
+}
+
+#[test]
+fn a_lit_junctions_signal_heads_are_in_the_snapshot_one_an_arm_on_its_kerb() {
+    use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, header, light};
+    let mut w = crossroads(&[]);
+    assert_eq!(
+        w.travel.signals.len(),
+        1,
+        "the crossroads two lines go through is lit"
+    );
+    let layout: serde_json::Value =
+        serde_json::from_str(&snapshot::layout_json(&w.content)).unwrap();
+    assert_eq!(layout["header"]["lightCount"], header::LIGHT_COUNT);
+    assert_eq!(layout["lightBase"], LIGHT_BASE);
+    assert_eq!(layout["lightStride"], LIGHT_STRIDE);
+    assert_eq!(layout["maxLights"], snapshot::MAX_LIGHTS);
+    for (key, at) in [
+        ("shown", light::SHOWN),
+        ("x", light::X),
+        ("z", light::Z),
+        ("yaw", light::YAW),
+        ("state", light::STATE),
+    ] {
+        assert_eq!(layout["light"][key], at, "light.{key}");
+    }
+    assert_eq!(layout["light"]["states"]["green"], light::GREEN as f64);
+    let mut buf = vec![0.0f32; snapshot::CAPACITY];
+    common::run_to(&mut w, 2, 7.0);
+    let end = w.tick + 30 * 60 * 20;
+    let mut greens = std::collections::BTreeSet::new();
+    while w.tick < end {
+        w.tick_once();
+        snapshot::write(&w, &mut buf);
+        assert_eq!(buf[header::LIGHT_COUNT], 4.0, "a head an arm");
+        let mut lit = 0;
+        for k in 0..4 {
+            let o = &buf[LIGHT_BASE + k * LIGHT_STRIDE..LIGHT_BASE + (k + 1) * LIGHT_STRIDE];
+            assert_eq!(o[light::SHOWN], 1.0);
+            // (On a kerb by the junction: out of the roads' 7 m, near its box.)
+            let (x, z) = (o[light::X], o[light::Z]);
+            let off = (x - 200.0).abs().min((z - 200.0).abs());
+            assert!((3.5..5.0).contains(&off), "head {k} at {x}, {z}");
+            assert!((x - 200.0).hypot(z - 200.0) < 25.0, "head {k} at {x}, {z}");
+            let state = o[light::STATE];
+            assert!([light::RED, light::AMBER, light::GREEN].contains(&state));
+            if state != light::RED {
+                lit += 1;
+            }
+            if state == light::GREEN {
+                greens.insert(k);
+            }
+        }
+        assert!(lit <= 1, "two arms not red at once");
+    }
+    assert!(greens.len() >= 2, "the lights changed: {greens:?}");
+}
+
+#[test]
+fn cars_from_every_arm_of_a_busy_crossroads_all_get_through_with_the_buses() {
+    // A big world's crossroads, its ways out east and west, two bus stops on either of those arms
+    // (a line through it each way): two cars leave from houses on the north and south arms, two
+    // come home to houses there, all across the junction as a bus comes to it, at a few moments.
+    // (Houses west of the north arm and east of the south one, their driveways onto them.)
     let houses = [
-        house(170.0, true),
-        house(230.0, false),
-        house(178.0, true),
-        house(222.0, false),
+        crossroads_house(170.0, true),
+        crossroads_house(230.0, false),
+        crossroads_house(178.0, true),
+        crossroads_house(222.0, false),
     ];
     for wait in [0, 30, 60] {
-        let mut w = town_of(BUS_CONTENT, more, 400, 400, &roads, exits, &houses);
+        let mut w = crossroads(&houses);
         assert!(
             w.transit.lines.len() >= 2,
             "{} lines",

@@ -148,6 +148,8 @@ const STOP_REACH: f32 = 600.0;
 /// A big world's bus comes into its area and leaves it this far past the area's box (m): out of
 /// sight of the area, its way on (hours of country road at the bus's speed) off the map.
 const AREA_OUT: f32 = 70.0;
+/// A line goes through a junction it comes this near (m, its middle: `traffic::Signal`).
+const SIGNAL_NEAR: f32 = 6.0;
 /// A big world's stops this near one of a line's (m) share it, `LINE_STOPS` at most: fewer lines,
 /// fewer buses meeting at the junctions where their ways cross.
 const PAIR_REACH: f32 = 140.0;
@@ -756,6 +758,22 @@ pub(crate) fn settle(w: &mut World) {
     // sweeps out of its lane round a sharp turn (`Travel::zones`), and each line's claims
     // (`Line::claims`): the junctions' boxes and those zones it drives through, and where a car
     // coming the other way couldn't pass it.
+    // The junctions with traffic lights: those where `SIGNAL_LINES` lines or more come through
+    // (`traffic::Signal`), their poles clear of the stops.
+    let g = &w.travel.graph;
+    let stops_at: Vec<[f32; 2]> = t.stops.iter().map(|s| s.at).collect();
+    let routes: Vec<Vec<[f32; 2]>> = t.lines.iter().map(Line::route_points).collect();
+    w.travel.signals = (0..g.nodes.len())
+        .filter(|&n| {
+            let p = g.nodes[n];
+            routes
+                .iter()
+                .filter(|r| r.iter().any(|q| dist(*q, p) <= SIGNAL_NEAR))
+                .count()
+                >= crate::traffic::SIGNAL_LINES
+        })
+        .filter_map(|n| crate::traffic::signal_at(g, n, &stops_at))
+        .collect();
     let mut narrow = crate::traffic::Narrow::default();
     let mut zones = w.travel.graph.boxes.clone();
     let mut ways = Vec::new();
@@ -840,6 +858,7 @@ pub(crate) fn settle(w: &mut World) {
         line.claims = crate::traffic::claims(
             trace, pass, BUS_LEN, BUS_WID, &zones, spans, BUS_LEAD, &cuts,
         );
+        crate::traffic::gate(&mut line.claims, &w.travel.signals);
     }
     // (Cars along them take turns with the buses there: their claims again.)
     w.travel.narrow = narrow;

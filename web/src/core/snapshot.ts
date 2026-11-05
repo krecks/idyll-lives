@@ -33,6 +33,11 @@ export interface SnapshotLayout {
     carCount?: number;
     /** The town's buses in town now (sim-core `bus.rs`): rows from `busBase`, each laid out as `bus` (missing in older layouts: none). */
     busCount?: number;
+    /**
+     * The traffic lights' signal heads (sim-core `traffic::Signal`: one per arm of each lit junction, the same rows from
+     * tick to tick): rows from `lightBase`, each laid out as `light` (missing in older layouts: none).
+     */
+    lightCount?: number;
   };
   /** Where the cars' rows start, and floats per car (missing in older layouts). */
   carBase?: number;
@@ -44,6 +49,22 @@ export interface SnapshotLayout {
   busStride?: number;
   /** A bus's row: `shown` 1 standing, 2 driving; where its middle is and which way it faces; its open doors (bit 0 the front one, bit 1 the middle one); its line (1 and up: the number on its sign); which bus it is (the same while it's in town: its row moves up as those before it leave). */
   bus?: { shown: number; x: number; z: number; yaw: number; doors: number; line: number; id: number };
+  /** Where the signal heads' rows start, floats per head, and how many there's room for (missing in older layouts). */
+  lightBase?: number;
+  lightStride?: number;
+  maxLights?: number;
+  /**
+   * A signal head's row: `shown` 1 to be seen; where its pole stands on the kerb and which way its head faces (towards
+   * those coming in); `state` what it shows, one of `states` (red, amber, green, walk: red, those on foot crossing).
+   */
+  light?: {
+    shown: number;
+    x: number;
+    z: number;
+    yaw: number;
+    state: number;
+    states: { red: number; amber: number; green: number; walk: number };
+  };
   sim: {
     id: number;
     x: number;

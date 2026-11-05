@@ -990,9 +990,22 @@ async function openSession(
         return { car: k, x: snap[o + l.car!.x], z: snap[o + l.car!.z], yaw: snap[o + l.car!.yaw], shown: snap[o + l.car!.shown] };
       });
     };
+    // `__lights()`: the traffic lights' signal heads as the newest snapshot shows them (sim-core
+    // `traffic::Signal`, one per arm of each lit junction): where the pole stands, which way the head
+    // faces, and what it shows ('red', 'amber', 'green' or 'walk').
+    const lights = () => {
+      const [snap, l] = [bridge.latest(), bridge.layout];
+      if (!l.light || l.lightBase === undefined || l.lightStride === undefined || l.header.lightCount === undefined) return [];
+      const names = Object.fromEntries(Object.entries(l.light.states).map(([k, v]) => [v, k]));
+      return Array.from({ length: snap[l.header.lightCount] | 0 }, (_, k) => {
+        const o = l.lightBase! + k * l.lightStride!;
+        return { head: k, x: snap[o + l.light!.x], z: snap[o + l.light!.z], yaw: snap[o + l.light!.yaw], shown: snap[o + l.light!.shown], state: names[snap[o + l.light!.state]] ?? 'red' };
+      });
+    };
     Object.assign(window, {
       __buses: buses,
       __cars: cars,
+      __lights: lights,
       __sims: () => liveSims(bridge.latest(), bridge.layout, content, game.sims),
       __content: content,
       __addFunds: (amount: number, household = game.home) => bridge.send({ type: 'addFunds', household, amount }),

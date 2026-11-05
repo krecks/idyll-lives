@@ -896,6 +896,9 @@ impl Route {
         }
         let boxes = travel.map_or(&[][..], |t| t.zones());
         self.claims = crate::traffic::claims(&trace, &pass, len, wid, boxes, &more, 0.0, &[]);
+        if let Some(t) = travel {
+            crate::traffic::gate(&mut self.claims, &t.signals);
+        }
         self.pass = trace.iter().zip(&pass).map(|(s, &p)| (s.0, p)).collect();
     }
 

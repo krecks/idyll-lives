@@ -7,7 +7,7 @@ use crate::Content;
 use crate::world::{Activity, MAX_SIMS, Phase, Sim, Task, TaskKind, World};
 use crate::{TICKS_PER_SECOND, clock};
 
-pub const HEADER_LEN: usize = 12;
+pub const HEADER_LEN: usize = 13;
 /// Floats per Sim (all 32 used).
 pub const SIM_STRIDE: usize = 33;
 /// The cars' rows (`header::CAR_COUNT`, `car`) start here: after room for every resident's and
@@ -19,9 +19,16 @@ pub const CAR_STRIDE: usize = 5;
 pub const BUS_BASE: usize = CAR_BASE + crate::cars::MAX_CARS * CAR_STRIDE;
 /// Floats per bus.
 pub const BUS_STRIDE: usize = 7;
+/// The traffic lights' rows (`header::LIGHT_COUNT`, `light`), after the buses': one per signal
+/// head, `MAX_LIGHTS` at most.
+pub const LIGHT_BASE: usize = BUS_BASE + crate::bus::MAX_BUSES * BUS_STRIDE;
+/// Floats per signal head.
+pub const LIGHT_STRIDE: usize = 5;
+/// Signal heads the snapshot has room for.
+pub const MAX_LIGHTS: usize = 256;
 /// The residents' rows, then the town's servers' (`header::STAFF_COUNT`, `staff.rs`), in the same
-/// layout; then the cars', then the buses'.
-pub const CAPACITY: usize = BUS_BASE + crate::bus::MAX_BUSES * BUS_STRIDE;
+/// layout; then the cars', the buses', and the traffic lights'.
+pub const CAPACITY: usize = LIGHT_BASE + MAX_LIGHTS * LIGHT_STRIDE;
 
 pub mod header {
     /// Tick counter modulo 2^24 (exact in f32); only used to detect change.
@@ -49,6 +56,29 @@ pub mod header {
     /// The town's buses in town now (`bus.rs`): as many rows as this from `BUS_BASE`, each laid out
     /// as `bus`.
     pub const BUS_COUNT: usize = 11;
+    /// The traffic lights' signal heads (`traffic::Signal`, one per arm of each lit junction): as
+    /// many rows as this from `LIGHT_BASE`, each laid out as `light`, the same from tick to tick
+    /// (lit junction by lit junction, arm by arm round it).
+    pub const LIGHT_COUNT: usize = 12;
+}
+
+/// A signal head's row (`traffic::SignalArm`: one per arm of a lit junction, facing those coming
+/// in along it).
+pub mod light {
+    /// 1: to be seen (a pole on the kerb with its head).
+    pub const SHOWN: usize = 0;
+    /// Where its pole stands on the ground, and which way the head faces (as a resident's yaw:
+    /// towards those coming in).
+    pub const X: usize = 1;
+    pub const Z: usize = 2;
+    pub const YAW: usize = 3;
+    /// What it shows: 0 red, 1 amber, 2 green, 3 walk (red, those on foot crossing).
+    pub const STATE: usize = 4;
+    /// `STATE`'s values.
+    pub const RED: f32 = 0.0;
+    pub const AMBER: f32 = 1.0;
+    pub const GREEN: f32 = 2.0;
+    pub const WALK: f32 = 3.0;
 }
 
 /// A bus's row.
@@ -188,8 +218,10 @@ const _: () = assert!(
     header::ITEMS_VERSION < HEADER_LEN
         && header::CAR_COUNT < HEADER_LEN
         && header::BUS_COUNT < HEADER_LEN
+        && header::LIGHT_COUNT < HEADER_LEN
         && car::DOORS < CAR_STRIDE
         && bus::ID < BUS_STRIDE
+        && light::STATE < LIGHT_STRIDE
 );
 
 /// What a Sim does for the snapshot; see `sim::OBJECT`, `sim::ACTION`, `sim::OBJECT_DEF` and
@@ -812,6 +844,33 @@ pub fn write(world: &World, out: &mut [f32]) {
     write_staff(world, out);
     write_cars(world, out);
     write_buses(world, out);
+    write_lights(world, out);
+}
+
+/// The traffic lights' rows (`header::LIGHT_COUNT`): each lit junction's arms in turn.
+fn write_lights(world: &World, out: &mut [f32]) {
+    let heads = world
+        .travel
+        .signals
+        .iter()
+        .enumerate()
+        .flat_map(|(s, sig)| sig.arms.iter().enumerate().map(move |(a, arm)| (s, a, arm)))
+        .take(MAX_LIGHTS);
+    let mut n = 0;
+    for (k, (s, a, arm)) in heads.enumerate() {
+        let o = &mut out[LIGHT_BASE + k * LIGHT_STRIDE..LIGHT_BASE + (k + 1) * LIGHT_STRIDE];
+        o[light::SHOWN] = 1.0;
+        o[light::X] = arm.pole[0];
+        o[light::Z] = arm.pole[1];
+        o[light::YAW] = arm.yaw;
+        o[light::STATE] = match world.traffic.light(s, a) {
+            Some(crate::traffic::Stage::Green) => light::GREEN,
+            Some(crate::traffic::Stage::Amber) => light::AMBER,
+            _ => light::RED,
+        };
+        n = k + 1;
+    }
+    out[header::LIGHT_COUNT] = n as f32;
 }
 
 /// The buses' rows (`header::BUS_COUNT`).
@@ -970,5 +1029,13 @@ pub fn layout_json(content: &Content) -> String {
     layout["busBase"] = BUS_BASE.into();
     layout["busStride"] = BUS_STRIDE.into();
     layout["bus"] = serde_json::json!({ "shown": bus::SHOWN, "x": bus::X, "z": bus::Z, "yaw": bus::YAW, "doors": bus::DOORS, "line": bus::LINE, "id": bus::ID });
+    layout["header"]["lightCount"] = header::LIGHT_COUNT.into();
+    layout["lightBase"] = LIGHT_BASE.into();
+    layout["lightStride"] = LIGHT_STRIDE.into();
+    layout["maxLights"] = MAX_LIGHTS.into();
+    layout["light"] = serde_json::json!({
+        "shown": light::SHOWN, "x": light::X, "z": light::Z, "yaw": light::YAW, "state": light::STATE,
+        "states": { "red": light::RED, "amber": light::AMBER, "green": light::GREEN, "walk": light::WALK },
+    });
     layout.to_string()
 }

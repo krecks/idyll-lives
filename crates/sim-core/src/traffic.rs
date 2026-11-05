@@ -119,6 +119,9 @@ pub(crate) struct Claim {
     samples: Vec<Sample>,
     /// The box round all its samples' bodies (x0, z0, x1, z1).
     bounds: [f32; 4],
+    /// The traffic lights its group goes through, and the arm it comes in by (`Travel::signals`,
+    /// `gate`): it's asked for only on that arm's green.
+    pub gate: Option<(u16, u8)>,
 }
 
 impl Claim {
@@ -144,6 +147,7 @@ impl Claim {
             group: 0,
             samples,
             bounds: b,
+            gate: None,
         }
     }
 
@@ -451,6 +455,168 @@ pub fn boxes(g: &Graph) -> Vec<([f32; 2], f32)> {
     out
 }
 
+/// A junction with traffic lights (`Travel::signals`: where `SIGNAL_ARMS` roads or more meet and
+/// `SIGNAL_LINES` bus lines or more come through, `bus::settle`): its middle, and its arms. One arm
+/// at a time has green (`Light`); a group through it is asked for only on its arm's green
+/// (`Claim::gate`), at the stop line where its claim begins, and holding it, one goes on through
+/// on amber and red; the claims keep anyone from driving into another in the box as ever.
+#[derive(Debug, Clone)]
+pub struct Signal {
+    pub at: [f32; 2],
+    pub arms: Vec<SignalArm>,
+}
+
+/// An arm of a lit junction (`Signal`): the way out along it (a unit vector), and its signal head:
+/// the pole on the kerb to the right of the way in, a little out past the box, and which way it
+/// faces (as a resident's yaw: towards those coming in).
+#[derive(Debug, Clone, Copy)]
+pub struct SignalArm {
+    pub way: [f32; 2],
+    pub pole: [f32; 2],
+    pub yaw: f32,
+}
+
+/// What a lit junction's lights show (`Light`): an arm's green, its amber, then all red while the
+/// box clears.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Stage {
+    #[default]
+    Green,
+    Amber,
+    Clear,
+}
+
+/// A lit junction's lights now (`Traffic::lights`): whose turn it is (`SignalArm` index), how far
+/// through it, and since when (the tick).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Light {
+    pub arm: u8,
+    pub stage: Stage,
+    pub since: u64,
+}
+
+/// A junction where this many roads for cars meet, and this many bus lines come through, has
+/// traffic lights (`Signal`).
+pub(crate) const SIGNAL_ARMS: usize = 3;
+pub(crate) const SIGNAL_LINES: usize = 2;
+/// How long an arm's green lasts at least and at most, its amber, and all red after while the box
+/// clears: a bus across it out the far side (ticks).
+const MIN_GREEN: u64 = 5 * crate::TICKS_PER_MINUTE;
+const MAX_GREEN: u64 = 20 * crate::TICKS_PER_MINUTE;
+const AMBER: u64 = 2 * crate::TICKS_PER_MINUTE;
+const ALL_RED: u64 = 4 * crate::TICKS_PER_MINUTE;
+/// A route this near a lit junction's middle goes through its lights (m, `gate`).
+const GATE_REACH: f32 = BOX_MOST + 2.0;
+/// How far out past its arm's box a signal pole stands, and out past the kerb (m).
+const POLE_OUT: f32 = 1.0;
+const POLE_KERB: f32 = 0.5;
+
+/// The lights of the junction at node `n` of `g` (`Signal`): its arms for cars, each with its pole
+/// on the kerb to the right of the way in, just out past the box (`boxes`), moved on out along the
+/// arm clear of `clear` (bus stops: `POLE_CLEAR`). None: fewer than `SIGNAL_ARMS` arms.
+pub(crate) fn signal_at(g: &Graph, n: usize, clear: &[[f32; 2]]) -> Option<Signal> {
+    let p = g.nodes[n];
+    let mut arms: Vec<([f32; 2], f32)> = Vec::new();
+    for e in g.edges.iter() {
+        let road = &g.roads[e.road as usize];
+        if !road.drivable() {
+            continue;
+        }
+        for (end, s, k) in [(e.a, e.s0, 1.0f32), (e.b, e.s1, -1.0)] {
+            if end as usize != n {
+                continue;
+            }
+            let q = road.at((s + k * ARM_LOOK.min(e.len())).clamp(e.s0, e.s1));
+            let l = dist(p, q);
+            if l > 0.1 {
+                arms.push(([(q[0] - p[0]) / l, (q[1] - p[1]) / l], road.width));
+            }
+        }
+    }
+    if arms.len() < SIGNAL_ARMS {
+        return None;
+    }
+    // (Arms by the way they go round, for the lights' turns.)
+    arms.sort_by(|a, b| a.0[0].atan2(a.0[1]).total_cmp(&b.0[0].atan2(b.0[1])));
+    let reach = |a: [f32; 2]| {
+        arms.iter()
+            .filter(|b| b.0 != a)
+            .map(|b| {
+                let cos = a[0] * b.0[0] + a[1] * b.0[1];
+                let sin = (1.0 - cos * cos).max(0.0).sqrt();
+                if cos > 0.0 {
+                    ARMS_APART / sin.max(1e-3)
+                } else {
+                    0.0
+                }
+            })
+            .fold(BOX_LEAST, f32::max)
+            .min(BOX_MOST)
+    };
+    let arms = arms
+        .iter()
+        .map(|&(way, width)| {
+            // (Coming in, its right is the way out's left.)
+            let right = [way[1], -way[0]];
+            let at = |d: f32| {
+                let side = width / 2.0 + POLE_KERB;
+                [
+                    p[0] + way[0] * d + right[0] * side,
+                    p[1] + way[1] * d + right[1] * side,
+                ]
+            };
+            let mut d = reach(way) + POLE_OUT;
+            while d < reach(way) + POLE_OUT + 12.0
+                && clear.iter().any(|&c| dist(c, at(d)) < POLE_CLEAR)
+            {
+                d += 1.0;
+            }
+            SignalArm {
+                way,
+                pole: at(d),
+                yaw: way[0].atan2(way[1]),
+            }
+        })
+        .collect();
+    Some(Signal { at: p, arms })
+}
+
+/// How far from a bus stop a signal pole stands at least (m, `signal_at`).
+pub const POLE_CLEAR: f32 = 4.0;
+
+/// The lights `claims`' groups go through (`Claim::gate`): of `signals`, the first each group
+/// comes this near (`GATE_REACH`), and the arm it comes in by.
+pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal]) {
+    let mut k = 0;
+    while k < claims.len() {
+        let g = claims[k].group;
+        let end = k + claims[k..].iter().take_while(|c| c.group == g).count();
+        let gate = claims[k..end]
+            .iter()
+            .flat_map(|c| &c.samples)
+            .find_map(|s| {
+                signals.iter().enumerate().find_map(|(i, sig)| {
+                    let d = [s.rect.at[0] - sig.at[0], s.rect.at[1] - sig.at[1]];
+                    (d[0].hypot(d[1]) < GATE_REACH).then(|| {
+                        let arm = (0..sig.arms.len())
+                            .max_by(|&a, &b| {
+                                let dot = |x: usize| {
+                                    sig.arms[x].way[0] * d[0] + sig.arms[x].way[1] * d[1]
+                                };
+                                dot(a).total_cmp(&dot(b))
+                            })
+                            .unwrap_or(0);
+                        (i as u16, arm as u8)
+                    })
+                })
+            });
+        for c in &mut claims[k..end] {
+            c.gate = gate;
+        }
+        k = end;
+    }
+}
+
 /// How far a bus's way turns over its own length (radians) for its body to sweep out of its lane
 /// round a sharp turn outside a junction's box (`sweeps`): a car right behind it would be in the
 /// way of its tail swinging round.
@@ -691,6 +857,9 @@ pub struct Traffic {
     /// Those that let go of parts not come on to (`HOLD_STILL`), and when they had asked: asking
     /// again, they keep their place.
     kept: Vec<(u64, u64)>,
+    /// Each lit junction's lights (`Travel::signals`): the arm whose turn it is, how far through
+    /// it (`Light`), and since when.
+    pub(crate) lights: Vec<Light>,
     movers: Vec<Mover>,
     /// Ticks a car was kept from moving deeper into another car or a bus by the last-resort check
     /// (`cars::guard`), since the game was loaded.
@@ -872,11 +1041,87 @@ impl Traffic {
         None
     }
 
+    /// Whether a group through the lights `gate` (`Claim::gate`) may be asked for now: its arm's
+    /// green (none: no lights).
+    pub(crate) fn green(&self, gate: Option<(u16, u8)>) -> bool {
+        gate.is_none_or(|(s, arm)| {
+            self.lights
+                .get(s as usize)
+                .is_none_or(|l| l.stage == Stage::Green && l.arm == arm)
+        })
+    }
+
+    /// What arm `arm` of lit junction `s` shows (`Stage::Green` or `Amber` on its turn, else red).
+    pub(crate) fn light(&self, s: usize, arm: usize) -> Option<Stage> {
+        let l = self.lights.get(s)?;
+        Some(if usize::from(l.arm) == arm && l.stage != Stage::Clear {
+            l.stage
+        } else {
+            Stage::Clear
+        })
+    }
+
+    /// The lights a tick on (`Light`): green on an arm `MIN_GREEN` at least, on while anyone comes
+    /// to it (an ask through it, or one holding a claim through it still out of the box) and
+    /// `MAX_GREEN` at most, and only while someone waits at another; then amber (`AMBER`), all red
+    /// while the box clears (`CLEAR`), and the next arm round that anyone waits at. Nobody waiting
+    /// anywhere, it stays green where it is.
+    fn change_lights(&mut self, tick: u64, signals: &[Signal]) {
+        self.lights.resize(signals.len(), Light::default());
+        for (i, sig) in signals.iter().enumerate() {
+            let waits = |arm: u8| {
+                self.asks.iter().any(|a| {
+                    a.seen + 1 >= tick
+                        && a.parts.first().and_then(|p| p.1.gate) == Some((i as u16, arm))
+                })
+            };
+            let coming = |arm: u8| {
+                self.holds
+                    .iter()
+                    .any(|h| h.claim.gate == Some((i as u16, arm)) && h.at < h.claim.from + 1.0)
+            };
+            let n = sig.arms.len() as u8;
+            let l = self.lights[i];
+            let on = tick.saturating_sub(l.since);
+            let next = |arm: u8| (1..n).map(|k| (arm + k) % n).find(|&x| waits(x));
+            self.lights[i] = match l.stage {
+                Stage::Green => {
+                    let busy = waits(l.arm) || coming(l.arm);
+                    match next(l.arm) {
+                        Some(_) if on >= MAX_GREEN || on >= MIN_GREEN && !busy => Light {
+                            stage: Stage::Amber,
+                            since: tick,
+                            ..l
+                        },
+                        _ => l,
+                    }
+                }
+                Stage::Amber if on >= AMBER => Light {
+                    stage: Stage::Clear,
+                    since: tick,
+                    ..l
+                },
+                Stage::Clear if on >= ALL_RED => Light {
+                    arm: next(l.arm).unwrap_or(l.arm),
+                    stage: Stage::Green,
+                    since: tick,
+                },
+                _ => l,
+            };
+        }
+    }
+
     /// The tick's claims (before the cars and the buses go on): the vehicles on the road
     /// (`movers`), and where those holding or asking are (`places`); a part its holder is out of,
     /// or no longer on (another route, gone), let go; asks neither asked again nor going on through
     /// their group dropped; then the asks' next parts granted in order (see the module notes).
-    pub(crate) fn begin(&mut self, tick: u64, movers: Vec<Mover>, places: &[Place]) {
+    pub(crate) fn begin(
+        &mut self,
+        tick: u64,
+        movers: Vec<Mover>,
+        places: &[Place],
+        signals: &[Signal],
+    ) {
         self.tick = tick;
         self.movers = movers;
         let place = |key: u64, route: u32| {
@@ -920,6 +1165,7 @@ impl Traffic {
                     .is_some_and(|t| a.parts.first().is_some_and(|p| t <= p.1.from + 1e-3))
         });
         self.asks.sort_by_key(|a| (a.tick, a.key));
+        self.change_lights(tick, signals);
         // Who waited for whom as the tick began: those on the road, for one in their way; the
         // asks, for the claims, bodies and earlier asks in theirs. An earlier ask doesn't hold up
         // one it waits for itself, however far round (`reaches`): no two asks wait for each other.
@@ -956,6 +1202,12 @@ impl Traffic {
                 });
                 continue;
             };
+            // (At the lights, not its arm's green: it waits at the stop line, and holds nobody up.)
+            if !self.green(next[0].gate) {
+                waits.push((i, Vec::new()));
+                fifo.push((i, Vec::new()));
+                continue;
+            }
             let me = self
                 .mover(a.key)
                 .map_or((first.rect, first.way), |m| (m.rect, m.way));
@@ -1240,5 +1492,5 @@ pub(crate) fn begin(w: &mut World) {
     crate::cars::movers(w, &mut movers, &mut places);
     crate::bus::movers(w, &mut movers, &mut places);
     let tick = w.tick;
-    w.traffic.begin(tick, movers, &places);
+    w.traffic.begin(tick, movers, &places, &w.travel.signals);
 }
