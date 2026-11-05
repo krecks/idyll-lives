@@ -21,11 +21,14 @@ use sim_core::surface;
 use sim_core::travel::Graph;
 use sim_core::world::{MAX_SIMS, TaskKind};
 
-/// `check` for each of `items`, a few at a time (one per core: each world plays on its own, and a
-/// path search's budget counts on its own thread), the results in the items' order.
+/// `check` for each of `items`, a few at a time (one per core, or `WORLD_THREADS` at most: each
+/// world plays on its own, and a path search's budget counts on its own thread), the results in
+/// the items' order.
 fn each_world<I: Sync, T: Send>(items: &[I], check: impl Fn(&I) -> T + Sync) -> Vec<T> {
-    let threads = std::thread::available_parallelism()
-        .map_or(1, |n| n.get())
+    let threads = std::env::var("WORLD_THREADS")
+        .ok()
+        .and_then(|n| n.parse().ok())
+        .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get()))
         .min(items.len())
         .max(1);
     let next = std::sync::atomic::AtomicUsize::new(0);
@@ -703,13 +706,14 @@ fn check_taxis(w: &World, seen: &mut Taxis, failures: &mut std::collections::BTr
 const CAR_STUCK_TICKS: u64 = 10 * sim_core::TICKS_PER_MINUTE;
 const CAR_WAIT_TICKS: u64 = 60 * sim_core::TICKS_PER_MINUTE;
 
-/// The cars standing still on their way: by car, how far along its way it was and since when (a
-/// tick), and the last tick anything it waited for went on; and every car's place on its way
-/// (`traffic::on_its_way`) a tick before.
+/// The cars standing still on their way: by car, the furthest along its way it had come and since
+/// when (a tick), and the last tick anything it waited for went on; and by car, the furthest along
+/// its way it has come while driving (`traffic::on_its_way`). Going on is coming further than that:
+/// a car backing up a little and coming back up to where it was, again and again, isn't.
 #[derive(Default)]
 struct Standing {
     cars: std::collections::BTreeMap<usize, (f32, u64, u64)>,
-    was: std::collections::BTreeMap<u64, f32>,
+    furthest: std::collections::BTreeMap<u64, f32>,
 }
 
 /// A tick of `w`'s cars on their way: any standing still for too long (`CAR_STUCK_TICKS`,
@@ -721,18 +725,22 @@ fn check_stuck(
 ) {
     use sim_core::cars::{CarState, car_key};
     use sim_core::traffic::{at_red, on_its_way, waits_on};
-    // Who went on this tick.
+    // Who went on this tick: further along its way than it has been since it began to drive (a
+    // taxi standing at a stop, then on along its next way, begins again).
     let mut went = std::collections::BTreeSet::new();
     let mut now = std::collections::BTreeMap::new();
-    for k in (0..w.cars.len()).map(car_key) {
-        if let Some(p) = on_its_way(w, k) {
-            if standing.was.get(&k) != Some(&p) {
-                went.insert(k);
-            }
-            now.insert(k, p);
+    for (c, car) in w.cars.iter().enumerate() {
+        let k = car_key(c);
+        let Some(p) = on_its_way(w, k).filter(|_| car.shown.is_some_and(|s| s.2)) else {
+            continue;
+        };
+        let furthest = standing.furthest.get(&k).copied();
+        if furthest.is_none_or(|f| p > f) {
+            went.insert(k);
         }
+        now.insert(k, furthest.map_or(p, |f| f.max(p)));
     }
-    standing.was = now;
+    standing.furthest = now;
     // (Right behind one going its way.)
     let queued = |c: usize| {
         let me = w.cars[c].shown;
@@ -758,8 +766,14 @@ fn check_stuck(
             .cars
             .entry(c)
             .or_insert((car.progress, w.tick, w.tick));
-        if !driving || entry.0 != car.progress || queued(c) {
-            *entry = (car.progress, w.tick, w.tick);
+        if !driving || car.progress > entry.0 || queued(c) {
+            // (Not driving, it begins again: a car parked keeps its last way's progress.)
+            let from = if driving {
+                car.progress
+            } else {
+                f32::NEG_INFINITY
+            };
+            *entry = (from, w.tick, w.tick);
             continue;
         }
         // (Anything it waits for, however far round, going on; or a red light, which changes:
@@ -914,13 +928,17 @@ fn generated_worlds_cars_keep_to_the_roads() {
         let mut held: Vec<Option<u64>> = vec![None; w.sims.len()];
         let mut worst = (0.0f32, String::new());
         let started = std::time::Instant::now();
-        // (The work taxis: standing at the kerb parallel to their lanes and clear of the kerb;
-        // passing others clear of them, `check_taxis`.)
+        // (Every car on its way, both days: none held up for good, `check_stuck`, the day-1 check's
+        // rule, on day 2 too. The work taxis: standing at the kerb parallel to their lanes and
+        // clear of the kerb; passing others clear of them, `check_taxis`.)
+        let mut standing: Standing = Default::default();
+        let mut stood = std::collections::BTreeSet::new();
         let mut taxis: Taxis = Default::default();
         let mut taxi_faults = std::collections::BTreeSet::new();
         while w.tick < end {
             w.tick_once();
             watch.sample(&w);
+            check_stuck(&w, &mut standing, &mut stood);
             check_taxis(&w, &mut taxis, &mut taxi_faults);
             if w.tick % 4 != 0 {
                 continue;
@@ -1040,6 +1058,14 @@ fn generated_worlds_cars_keep_to_the_roads() {
                     clock::day(car.since),
                     clock::hour(car.since)
                 ));
+            }
+        }
+        // (The first time each car stood still too long: once a car, not once a tick.)
+        let mut cars_stood = std::collections::BTreeSet::new();
+        for f in stood {
+            let car = f.split(" (").next().unwrap_or_default().to_string();
+            if cars_stood.insert(car) {
+                failures.push(format!("{label}: {f}"));
             }
         }
         // The work taxi's riders at work, and how late (ticks, early as on time).

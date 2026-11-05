@@ -63,9 +63,9 @@ pub(crate) const SAMPLE: f32 = 1.0;
 const TURN_SAMPLE: f32 = 0.08;
 /// The room a vehicle wants clear on the far side of a claim: its length, and this (m).
 pub(crate) const ROOM_GAP: f32 = 1.0;
-/// Two coming towards each other pass where pulling over takes them this far apart (m: about
-/// `cars::PASSING`).
-pub(crate) const PASS_GAP: f32 = 0.08;
+/// Two coming towards each other pass where pulling over takes them this far apart (m: the gap
+/// the cars keep, `cars::GAP`).
+pub(crate) const PASS_GAP: f32 = crate::cars::GAP;
 /// Two going within about 25° of each other's way go the same way (the cosine).
 const SAME_WAY: f32 = 0.9;
 /// Bodies this near (m) are in each other's way (a body's corners between two samples too).
@@ -947,7 +947,14 @@ impl Traffic {
         }
         // (Who waits for whose body on the road, however far round: the asks' waits left out.)
         let on_road = graph.clone();
+        // (And who waits for whom for their claims and bodies: the earlier asks they wait their
+        // turn after left out.)
+        let mut by_graph = graph.clone();
         for a in &self.asks {
+            by_graph
+                .entry(a.key)
+                .or_default()
+                .extend(a.by.iter().copied());
             let e = graph.entry(a.key).or_default();
             e.extend(a.by.iter().chain(&a.fifo).copied());
         }
@@ -1033,11 +1040,13 @@ impl Traffic {
             // body).
             let conflicting = |(j, bodies_of): &&(usize, Vec<u64>)| {
                 let e = &self.asks[*j];
-                // (Asked long ago, only one it waits for itself goes first: no stream of others
-                // waiting for it round about holds it up for good.)
+                // (Asked long ago, only one it waits for itself goes first, however far round by
+                // claims and bodies: no stream of others waiting their turn after it round about
+                // holds it up for good, and no ring of them either.)
                 let old = tick > e.tick + OLD_ASK;
                 let first = if old {
                     graph.get(&e.key).is_some_and(|g| g.contains(&a.key))
+                        || reaches(&by_graph, e.key, a.key)
                 } else {
                     bodies_of.contains(&a.key) || reaches(&graph, e.key, a.key)
                 };
