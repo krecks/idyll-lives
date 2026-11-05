@@ -560,6 +560,7 @@
   "model.toyBox": [0.0, -0.0389],
   "model.toyChest": [0.0, -0.1735],
   "model.trackLights": [0.0, 0.0],
+  "model.trafficLight": [0.0, 0.15],
   "model.trainTable": [0.0, 0.0],
   "model.trashCan": [0.0, -0.247],
   "model.treadmill": [0.032, -0.005],

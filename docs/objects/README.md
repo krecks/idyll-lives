@@ -6,7 +6,8 @@ the keys never changed, so saves and content need no migration. All but the wide
 vase, added 2026-10-30, and the three rides, added 2026-11-03, were built and checked in play by 2026-10-17,
 as were the 36 models that aren't buyable: the 20 things residents carry and cook with (`families/held.py`), the 9 street props
 (`families/street.py`), and the lawn's grass tufts and wildflowers, the woods' rocks and the selection marker
-(`families/ground.py`). Every model key in the manifests has a `.glb`.
+(`families/ground.py`). A 37th, the traffic light (`families/street_furniture.py`, drawn at the sim's lit junctions),
+was added 2026-11-05. Every model key in the manifests has a `.glb`.
 
 How to build an object is in [docs/design/objects.md](../design/objects.md) (the standard: scale, budgets,
 materials, moving parts, the gate) and [tools/art/blender/README.md](../../tools/art/blender/README.md) (the toolkit

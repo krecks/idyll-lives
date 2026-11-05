@@ -1,15 +1,16 @@
 # The street furniture (CM2): the street lamp (`model.streetLamp`), the long park bench (`model.parkBench`), the
 # drinking fountain (`model.drinkingFountain`), the litter bin (`model.litterBin`), the bus shelter
 # (`model.busStop`), the post box (`model.postBox`), the notice board (`model.noticeBoard`), the phone box
-# (`model.phoneBooth`), the town fountain (`model.fountainTown`) and the founder's statue (`model.townStatue`). Notes:
-# street_furniture.md.
+# (`model.phoneBooth`), the town fountain (`model.fountainTown`) and the founder's statue (`model.townStatue`); and the
+# traffic light (`model.trafficLight`), which isn't bought: the renderer stands one at each signal head of the sim's
+# lit junctions (render/pc/signals.ts). Notes: street_furniture.md.
 #
 # Each is built in game axes (`F`) where the game places it, at the content's heights (the bench's and the
 # shelter's seats, the fountain's rim, the lamp's light), and each has a far version (a quarter): they stand on
 # the town's lots and are seen from afar. The lamp's lantern glows at night; the drinking fountain's arc of water
 # grows while someone drinks (`water_on`); the post box's flap swings in for a card (`flap`); the phone box's
 # door opens and shuts behind the caller (`door_open`); the town fountain's water runs all the time near the
-# camera (`water_run`, ambient). The rest are still.
+# camera (`water_run`, ambient). The traffic light's lit lens is the renderer's. The rest are still.
 #
 # Run:  cargo art street_furniture [--only postBox] [--preview]
 import math
@@ -51,6 +52,12 @@ SHARED = dict(
     # at night: the lamp's lantern and the phone box's sign glow (E8), nothing by day
     lantern=('#F6EBCF', 'satin', {'glow': '#FFD596'}),
     sign=('#F2F0EA', 'matte', {'glow': '#FFF1D2'}),
+    # the traffic light's backboard and hoods, and its three lenses: dark glass, each glowing its colour while it's
+    # the one the light shows (by day too: render/pc/signals.ts), plain, so the head stays one draw
+    board=('#171A19', 'matte'),
+    lens_red=('#4A1714', 'gloss', {'glow': '#FF4A2E'}),
+    lens_amber=('#4A3812', 'gloss', {'glow': '#FFB21E'}),
+    lens_green=('#103A2C', 'gloss', {'glow': '#1FE58A'}),
 )
 
 
@@ -149,6 +156,67 @@ def streetLamp():
                              (0, 4.24)], material=iron, segments=10)
     G.join_all('streetLamp')
     G.settle()
+    return G.meshes()
+
+
+# --- the traffic light: a cast-iron pole with a three-lamp head facing the traffic coming in ---------------------
+# Its pole's axis is the origin (the snapshot's pole, sim-core `traffic::SignalArm`), its head in front of the pole
+# facing +z (towards those coming in). The three lenses are each a material of their own (`lens_red`, `lens_amber`,
+# `lens_green`), dark glass with the colour they glow (`glow`): the renderer (render/pc/signals.ts) draws each
+# lens's glow apart, only the one the snapshot's light shows.
+SIGNAL_LENSES = (('red', 2.81), ('amber', 2.52), ('green', 2.23))   # each lens's middle (m up)
+SIGNAL_FRONT = 0.27      # the head's front face (m in front of the pole's axis)
+
+
+def trafficLight():
+    M = _palette(body=('#2B302E', 'metal'))
+    F = G.GameFrame()
+    iron = M.body
+    n = G.low(16, 8)
+    with G.new_parts():
+        # the base: a chamfered square plinth, a short fluted bell rising to a moulded collar (the lamp's, smaller)
+        G.loft('plinth', [G.ring(0.13, 0.13, 0.0, G.low(24, 8), square=10), G.ring(0.13, 0.13, 0.03, G.low(24, 8), square=10),
+                          G.ring(0.115, 0.115, 0.05, G.low(24, 8), square=10), G.ring(0.105, 0.105, 0.062, G.low(24, 8), square=4)],
+               material=iron)
+        bell = [(0.104, 0.06), (0.098, 0.1), (0.084, 0.18), (0.07, 0.28), (0.062, 0.36)]
+        if G.is_low():
+            G.loft('bell', [_square(0.07, 0.06), _square(0.05, 0.36)], material=iron, smooth=False)
+        else:
+            G.loft('bell', [_fluted(r, y, 10, 0.07) for r, y in bell], material=iron)
+        G.revolve('collar', [(0, 0.355), (0.07, 0.36), (0.075, 0.375), (0.064, 0.39), (0.056, 0.405), (0, 0.405)],
+                  material=iron, segments=n)
+        # the pole: fluted as the lamp's, behind the head, up to a turned cap over it
+        if G.is_low():
+            F.cyl('pole', 0.045, 2.62, (0, 1.71, 0), iron, verts=6)
+        else:
+            G.loft('pole', [_fluted(0.046, 0.4, 10, 0.1), _fluted(0.043, 3.02, 10, 0.1)], material=iron)
+        G.revolve('cap', [(0, 3.01), (0.056, 3.015), (0.06, 3.03), (0.045, 3.045), (0.02, 3.07), (0.008, 3.09), (0, 3.095)],
+                  material=iron, segments=n)
+        # the head's two clamps round the pole, each with a lug out to the head's back
+        for k, y in enumerate((2.2, 2.84)):
+            F.cyl(f'clamp{k}', 0.056, 0.05, (0, y, 0), iron, verts=n, bevel=G.low(0.006, 0.0), bevel_segments=1)
+            F.box(f'lug{k}', 0.07, 0.05, 0.04, (0, y, 0.06), iron)
+        # the head: a housing with rounded edges, a black backboard with a white rim behind it
+        F.box('housing', 0.3, 0.9, 0.19, (0, 2.52, SIGNAL_FRONT - 0.095), iron, bevel=G.low(0.025, 0.0), bevel_segments=2)
+        board = (0, 2.52, 0.085)
+        F.extrude('rim', G.rounded_rect(0.52, 1.1, 0.06, corner=G.low(4, 1)), 0.012, board, M.paper)
+        F.extrude('board', G.rounded_rect(0.47, 1.05, 0.04, corner=G.low(4, 1)), 0.016, board, M.board)
+        # three lenses, each in its bezel under a hood open below
+        for colour, y in SIGNAL_LENSES:
+            F.cyl(f'lens_{colour}', 0.1, 0.02, (0, y, SIGNAL_FRONT + 0.005), getattr(M, f'lens_{colour}'), verts=G.low(24, 10),
+                  rot=(90, 0, 0))
+            G.revolve(f'bezel_{colour}', [(0.1, -0.014), (0.118, -0.014), (0.12, 0.0), (0.118, 0.014), (0.1, 0.014)],
+                      at=F.at(0, y, SIGNAL_FRONT + 0.004), material=M.board, segments=G.low(24, 10), rot=(90, 0, 0))
+            if G.is_low():
+                F.box(f'hood_{colour}', 0.24, 0.012, 0.15, (0, y + 0.118, SIGNAL_FRONT + 0.085), M.board)
+            else:
+                arc = [math.radians(-28 + 236 * i / 14) for i in range(15)]
+                hood = [(0.124 * math.cos(a), 0.124 * math.sin(a)) for a in arc] + \
+                       [(0.113 * math.cos(a), 0.113 * math.sin(a)) for a in reversed(arc)]
+                F.extrude(f'hood_{colour}', hood, 0.15, (0, y, SIGNAL_FRONT + 0.085), M.board)
+    G.join_all('trafficLight')
+    # (Not centred: its pole's axis stays on the origin, where the snapshot stands it.)
+    G.settle(centre=False)
     return G.meshes()
 
 
@@ -779,6 +847,8 @@ FAMILY = G.Family(
     'street_furniture', PALETTES,
     [G.Model('streetLamp', streetLamp, size=(0.657, 4.24, 0.467), key='model.streetLamp', far=FAR,
              paint=[('body', 'Lamp post')]),
+     G.Model('trafficLight', trafficLight, size=(0.52, 3.095, 0.56), key='model.trafficLight', centre=(0, 0.15),
+             far=G.far_of(trafficLight), code=True),
      G.Model('parkBench', parkBench, size=(2.5, 0.907, 0.572), key='model.parkBench', centre=(0, -0.036), far=FAR,
              paint=[('body', 'Frame')]),
      G.Model('drinkingFountain', drinkingFountain, size=(0.56, 1.093, 0.56), key='model.drinkingFountain', far=_far(drinkingFountain),
@@ -801,7 +871,8 @@ FAMILY = G.Family(
     pack='street_furniture',
     comment='Blender-built street furniture (tools/art/blender/families/street_furniture.py): the street '
             'lamp, the park bench, the drinking fountain, the litter bin, the bus shelter, the post box, '
-            'the notice board, the phone box, the town fountain and the founder\'s statue. Listed in the '
+            'the notice board, the phone box, the town fountain and the founder\'s statue; and the traffic light '
+            '(not buyable: render/pc/signals.ts draws one at each signal head the sim has). Listed in the '
             'base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw '
             'call per finish group. Each has a far version for the town overview. The lamp\'s lantern and '
             'the phone box\'s signs glow at night; the drinking fountain\'s water arcs for `drink` '

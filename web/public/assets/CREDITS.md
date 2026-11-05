@@ -442,7 +442,8 @@ machine's; the machines' signs and the drinks machine's front glow at night; the
 
 The street furniture (`models/street_furniture/streetLamp.glb`, `parkBench.glb`, `drinkingFountain.glb`,
 `litterBin.glb`, `busStop.glb`, `postBox.glb`, `noticeBoard.glb`, `phoneBooth.glb`, `fountainTown.glb`,
-`townStatue.glb`, each with a `.far.glb` for the town overview, override pack `packs/street_furniture/manifest.json`)
+`townStatue.glb`, `trafficLight.glb` (2026-11-05: drawn at the sim's lit junctions, its lit lens the renderer's),
+each with a `.far.glb` for the town overview, override pack `packs/street_furniture/manifest.json`)
 is built in Blender by `tools/art/blender/families/street_furniture.py` on `gamekit` and exported as `.glb` (glTF,
 original, CC0). The street lamp's lantern and the phone box's signs glow at night; the drinking fountain's arc of
 water grows while a resident drinks, the post box's slot flap swings in for a card, the phone box's door opens and

@@ -117,12 +117,13 @@ Rebuilt in detail on 2026-10-22 with the forms and the kit, each at most half it
 | `model.phoneBooth` | 0.95 × 2.70 × 0.95 m | 3,900 (3,100) | 920 | 4 | Kiosk |
 | `model.fountainTown` | 2.96 × 2.47 × 2.96 m | 5,452 (5,784) | 1,232 | 3 | Stone |
 | `model.townStatue` | 1.80 × 3.39 × 1.80 m | 3,410 (2,476) | 820 | 1 | Statue |
+| `model.trafficLight` | 0.52 × 3.10 × 0.56 m | 2,684 (new) | 800 | 1 (+1 lit lens) | — |
 
 Draws are counted as `check-glb` does, each moving part apart: the bench (iron, wood), the shelter (frame, wood,
 glass), the drinking fountain and the post box (body, the moving part), the notice board (plain, wood), the town
 fountain (body, jet, splashes). The lamp and the phone box take one more at night for their glow.
 
-`check-glb`: 10 models, 0 failed. One warning, expected:
+`check-glb`: 10 models, 0 failed (11 with the traffic light, 2026-11-05: no warning). One warning, expected:
 
 - **Phone box: 4 draw calls** (the most allowed, as the washer): the kiosk, its glazing, the door and the door's
   glazing. The plan's folding door would be two moving leaves, each with its own glass: 6 draws, over the limit, so
@@ -130,6 +131,23 @@ fountain (body, jet, splashes). The lamp and the phone box take one more at nigh
   not be seen through.
 
 Khronos validator: 0 errors, 0 warnings on all twenty files (each model and its far version).
+
+## The traffic light (`model.trafficLight`)
+
+Built 2026-11-05. Not buyable and in no content (`code=True`): `render/pc/signals.ts` stands one at each signal head
+the sim has (the snapshot's `light` rows, sim-core `traffic.rs`: one per arm of each lit junction). Its origin is the
+pole's axis, where the snapshot stands it, so it isn't centred (`G.settle(centre=False)`, `centre=(0, 0.15)`: the
+head reaches forward); its head faces +z, towards the traffic coming in.
+
+- A square chamfered plinth and a short fluted bell to a moulded collar (the street lamp's, smaller), a fluted pole
+  up behind the head to a turned cap; two clamps with lugs out to the head.
+- The head: a housing with rounded edges, 0.3 × 0.9 m, its front 0.27 m in front of the pole; a black backboard with a
+  white rim behind it; three lenses (red 2.81 m up, amber 2.52, green 2.23), each in a bezel under a hood open below.
+- The lenses are each a material of their own, dark glass (`lens_red`, `lens_amber`, `lens_green`, gloss) with the
+  colour it glows (`glow`). All plain, so the model is one draw. The renderer builds the glows a mesh per material
+  (`BuildOptions.glowApart`) and draws each colour's as one instanced draw of the heads showing it: only the lamp
+  the snapshot shows is lit, by day as at night (brighter as the lamps come up). The rest stay dark glass.
+- Far version: its own build at low detail (`G.far_of`): fewer segments, no flutes, flat hoods.
 
 ## Rebuild
 
