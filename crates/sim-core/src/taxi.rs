@@ -66,6 +66,8 @@ const SLACK_SHARE: u64 = 20;
 const TO_KERB_LEAST: u64 = 2 * TICKS_PER_MINUTE;
 /// How far out from where a taxi stands its rider waits for it (m, past its door: clear of it as
 /// it pulls in).
+/// How far beside their driveway's middle a rider waits for the taxi (m, `wait_spot`).
+const WAIT_ASIDE: f32 = 3.0;
 /// A rider on their way to work this near the taxi standing at their stop gets in (m).
 const NEAR_TAXI: f32 = 6.0;
 /// The taxi stands at a stop for a rider not yet at the kerb for this long at most (ticks: there
@@ -501,13 +503,18 @@ pub(crate) fn kerb_for(ctx: &crate::world::Ctx, sim: &crate::world::Sim) -> Opti
     Some(wait_spot(ctx.travel, &stop))
 }
 
-/// Where a rider waits for the taxi at `stop`: on the pavement by their driveway's mouth.
+/// Where a rider waits for the taxi at `stop`: on the pavement beside their driveway's mouth.
 fn wait_spot(travel: &crate::travel::Travel, stop: &TaxiStop) -> [f32; 2] {
     let g = &travel.graph;
     let mp = g.point(stop.mouth);
     let road = &g.roads[stop.mouth.road as usize];
-    let k = road.width / 2.0 - 0.5;
-    [mp[0] - stop.axis[0] * k, mp[1] - stop.axis[1] * k]
+    // (At the back of the pavement, beside the driveway's mouth: clear of the taxi turning in.)
+    let k = road.width / 2.0 - 0.3;
+    let side = [stop.axis[1], -stop.axis[0]];
+    [
+        mp[0] - stop.axis[0] * k + side[0] * WAIT_ASIDE,
+        mp[1] - stop.axis[1] * k + side[1] * WAIT_ASIDE,
+    ]
 }
 
 /// A slot for a taxi in `World::cars`: one free (a taxi done with its run), else a new one (none
@@ -690,10 +697,15 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
             }
             StopState::Boarding => {
                 // (Called away meanwhile: on without them.)
+                // (In: their getting in done, it's under way this tick, `boarded`.)
                 let boarding = w.sims.get(i).is_some_and(|x| {
                     x.current()
                         .is_some_and(|a| matches!(a.phase, Phase::Boarding { .. }))
                         && x.bound_for_car == Some(c as u32)
+                        || matches!(
+                            x.transition,
+                            Some(crate::life::Transition::Board { car }) if car == c as u32
+                        )
                 });
                 if boarding {
                     busy = true;
