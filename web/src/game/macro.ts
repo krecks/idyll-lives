@@ -173,6 +173,14 @@ const WINDING = Math.PI;
 const WINDING_OVER = 150;
 /** A country road turns no sharper than this (radians) over any 40 m of it: as a steady bend, one of 16 m radius or more; no hairpins. */
 export const COUNTRY_TURN = (70 * Math.PI) / 180;
+/**
+ * What a country road is laid to keep short of `COUNTRY_TURN` (radians): its points are rounded to
+ * the centimetre in the file, and a bend near its end is measured over a span that ends where the
+ * road does, so a hair either way moves it.
+ */
+const TURN_SPARE = 0.05;
+/** The longer straight leads (m) a country road tries out of a way or into one it meets at a slant (`countryRoad`). */
+const LONG_LEADS = [24, 34, 44];
 /** An area's lots keep their middles this far along their road from where it meets another (m), and off where it turns more than `TIGHT_BEND` (radians) over as far (a bend of 20 m radius or less). */
 const CORNER = 18;
 const TIGHT_BEND = 0.9;
@@ -465,11 +473,13 @@ function unkink(pts: readonly Pt[], most: number, tries = 600): Pt[] | null {
   const L = ls[ls.length - 1];
   const n = Math.max(2, Math.ceil(L / 2));
   let line = Array.from({ length: n + 1 }, (_, k): Pt => pointAt(pts, (L * k) / n, ls).p);
+  // (Measured as it will be filed: to the centimetre.)
+  const filed = (pts: readonly Pt[]) => pts.map(([x, z]): Pt => [round2(x), round2(z)]);
   for (let k = 0; k < tries; k++) {
-    if (k % 20 === 0 && sharpestTurn(line, 20).angle <= most) return line;
+    if (k % 20 === 0 && sharpestTurn(filed(line), 20).angle <= most) return filed(line);
     line = line.map((p, i): Pt => (i === 0 || i === n ? p : [(p[0] * 2 + line[i - 1][0] + line[i + 1][0]) / 4, (p[1] * 2 + line[i - 1][1] + line[i + 1][1]) / 4]));
   }
-  return sharpestTurn(line, 20).angle <= most ? line : null;
+  return sharpestTurn(filed(line), 20).angle <= most ? filed(line) : null;
 }
 
 /** The most a polyline's heading (along it 10 m at a time) changes, one way, within `over` m of it (radians). */
@@ -899,8 +909,16 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       return curve(evenly(ctrl, CTRL_APART));
     };
     // (Shorter leads if the longer ones swing it out over the water.)
+    const wet = (pts: readonly Pt[]) => pts.some(([x, z]) => land.wet(x, z, 2));
     let points = make(14);
-    for (const k of [7, 3]) if (points.some(([x, z]) => land.wet(x, z, 2))) points = make(k);
+    for (const k of [7, 3]) if (wet(points)) points = make(k);
+    // (Longer leads where it comes into a way, or leaves one, at a slant and turns too sharply
+    // just before it: the bend in further out, where it has room to be a road's.)
+    for (const k of LONG_LEADS) {
+      if (sharpestTurn(points, 20).angle <= COUNTRY_TURN - TURN_SPARE) break;
+      const longer = make(k);
+      if (!wet(longer) && sharpestTurn(longer, 20).angle < sharpestTurn(points, 20).angle) points = longer;
+    }
     return { points, width: COUNTRY_WIDTH, ends, kind: 'country', name: roadName };
   };
   /** A country road from `a` along `cells` out of the world over edge `side` (`FACING`), 40 m on past its last cell. */
@@ -1018,15 +1036,18 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   /**
    * A country road (`whole`, laid from `a` along `cells` to `b`, or out of the world over edge
    * `side`) as it goes down: in pieces where it runs along a road laid already (`alongExisting`),
-   * if they and the roads join its ends still; else whole. The roads, and whether they leave
+   * if they and the roads join its ends still and none turns or winds worse than it would; else whole. The roads, and whether they leave
    * its first end and come to its last.
    */
   const layCourse = (whole: RoadPlan, a: Way, cells: readonly number[] | undefined, b: Way | null, side = -1): { laid: RoadPlan[]; first: boolean; last: boolean } => {
     const parts = cells ? alongExisting(a, cells, b) : null;
     if (!parts || (parts.length === 1 && parts[0].first && parts[0].last)) return { laid: [whole], first: true, last: true };
     // (Not a stub where a port touches the road beside it already: the two join as they are.)
-    const laid = parts.map((part) => layPiece(part, side)).filter((r) => lengths(r.points)[r.points.length - 1] > COUNTRY_WIDTH / 2 + 1);
-    if (!joins(laid, whole.points[0], whole.points[whole.points.length - 1])) return { laid: [whole], first: true, last: true };
+    const laid = parts.map((part) => settle(layPiece(part, side))).filter((r) => lengths(r.points)[r.points.length - 1] > COUNTRY_WIDTH / 2 + 1);
+    // (Nor pieces that wind or turn worse than the road would whole: a short one between two Ts
+    // close together can double back.)
+    const worst = Math.max(0, ...laid.map(fault));
+    if (worst > fault(settle(whole)) || !joins(laid, whole.points[0], whole.points[whole.points.length - 1])) return { laid: [whole], first: true, last: true };
     return { laid, first: !!parts[0]?.first, last: !!parts[parts.length - 1]?.last };
   };
   /**
@@ -1196,12 +1217,12 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
    * if it winds round further than `WINDING` within `WINDING_OVER` m (a loop), else 0.
    */
   const fault = (road: RoadPlan) =>
-    road.points.some(([x, z]) => land.wet(x, z, 1)) ? 3 : sharpestTurn(road.points, 20).angle > COUNTRY_TURN - 0.01 ? 2 : winding(road.points, WINDING_OVER) > WINDING ? 1 : 0;
+    road.points.some(([x, z]) => land.wet(x, z, 1)) ? 3 : sharpestTurn(road.points, 20).angle > COUNTRY_TURN - TURN_SPARE ? 2 : winding(road.points, WINDING_OVER) > WINDING ? 1 : 0;
   /** A country road that turns too sharply (`fault` 2) relaxed till it doesn't (`unkink`), if that keeps it off the water; else as it was. */
   const settle = (road: RoadPlan): RoadPlan => {
     if (fault(road) !== 2) return road;
-    const points = unkink(road.points, COUNTRY_TURN - 0.02);
-    return points && !points.some(([x, z]) => land.wet(x, z, 1)) ? { ...road, points: points.map(([x, z]): Pt => [round2(x), round2(z)]) } : road;
+    const points = unkink(road.points, COUNTRY_TURN - TURN_SPARE);
+    return points && !points.some(([x, z]) => land.wet(x, z, 1)) ? { ...road, points } : road;
   };
   /** Whether `p` lies ahead of way `w`, within `angle` (radians) of straight on. */
   const inFront = (w: Way, p: Pt, angle: number) => w.dir[0] * (p[0] - w.p[0]) + w.dir[1] * (p[1] - w.p[1]) >= dist(p, w.p) * Math.cos(angle);
