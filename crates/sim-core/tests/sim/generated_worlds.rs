@@ -481,13 +481,14 @@ fn check_cars(w: &World, stacked: &mut Stacked, failures: &mut std::collections:
 const CAR_STUCK_TICKS: u64 = 10 * sim_core::TICKS_PER_MINUTE;
 const CAR_WAIT_TICKS: u64 = 60 * sim_core::TICKS_PER_MINUTE;
 
-/// The cars standing still on their way: by car, how far along its way it was and since when (a
-/// tick), and the last tick anything it waited for went on; and every car's place on its way
-/// (`traffic::on_its_way`) a tick before.
+/// The cars standing still on their way: by car, the furthest along its way it had come and since
+/// when (a tick), and the last tick anything it waited for went on; and by car, the furthest along
+/// its way it has come while driving (`traffic::on_its_way`). Going on is coming further than that:
+/// a car backing up a little and coming back up to where it was, again and again, isn't.
 #[derive(Default)]
 struct Standing {
     cars: std::collections::BTreeMap<usize, (f32, u64, u64)>,
-    was: std::collections::BTreeMap<u64, f32>,
+    furthest: std::collections::BTreeMap<u64, f32>,
 }
 
 /// A tick of `w`'s cars on their way: any standing still for too long (`CAR_STUCK_TICKS`,
@@ -499,18 +500,22 @@ fn check_stuck(
 ) {
     use sim_core::cars::{CarState, car_key};
     use sim_core::traffic::{at_red, on_its_way, waits_on};
-    // Who went on this tick.
+    // Who went on this tick: further along its way than it has been since it began to drive (a
+    // taxi standing at a stop, then on along its next way, begins again).
     let mut went = std::collections::BTreeSet::new();
     let mut now = std::collections::BTreeMap::new();
-    for k in (0..w.cars.len()).map(car_key) {
-        if let Some(p) = on_its_way(w, k) {
-            if standing.was.get(&k) != Some(&p) {
-                went.insert(k);
-            }
-            now.insert(k, p);
+    for (c, car) in w.cars.iter().enumerate() {
+        let k = car_key(c);
+        let Some(p) = on_its_way(w, k).filter(|_| car.shown.is_some_and(|s| s.2)) else {
+            continue;
+        };
+        let furthest = standing.furthest.get(&k).copied();
+        if furthest.is_none_or(|f| p > f) {
+            went.insert(k);
         }
+        now.insert(k, furthest.map_or(p, |f| f.max(p)));
     }
-    standing.was = now;
+    standing.furthest = now;
     // (Right behind one going its way.)
     let queued = |c: usize| {
         let me = w.cars[c].shown;
@@ -536,8 +541,14 @@ fn check_stuck(
             .cars
             .entry(c)
             .or_insert((car.progress, w.tick, w.tick));
-        if !driving || entry.0 != car.progress || queued(c) {
-            *entry = (car.progress, w.tick, w.tick);
+        if !driving || car.progress > entry.0 || queued(c) {
+            // (Not driving, it begins again: a car parked keeps its last way's progress.)
+            let from = if driving {
+                car.progress
+            } else {
+                f32::NEG_INFINITY
+            };
+            *entry = (from, w.tick, w.tick);
             continue;
         }
         // (Anything it waits for, however far round, going on; or a red light, which changes:
