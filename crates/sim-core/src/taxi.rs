@@ -2062,6 +2062,18 @@ pub(crate) fn kerb_at(
     };
     let (lo, hi) = (keep(0) + half, len - keep(1) - half);
     let steps = (STAND_REACH / STAND_STEP) as i32;
+    // (Where a car parks at each public parking spot (`cars::parked_at`: the spot itself), of
+    // those it could be near: a stand's body is within `STAND_REACH` and its half length of the
+    // mouth along the road, so no nearer to it as the crow flies.)
+    let near = road.at(mouth.s);
+    let parked: Vec<[f32; 2]> = travel
+        .file
+        .parking
+        .iter()
+        .map(|p| [p.x, p.z])
+        .filter(|at| at.iter().all(|v| v.is_finite()))
+        .filter(|&at| crate::travel::dist(at, near) < STAND_REACH + half + PARK_CLEAR + 1.0)
+        .collect();
     // (Clear of driveways by a car's length and a margin where it can be within reach, else
     // clear of their mouths at least: a house in a row of them still has its taxi.)
     let find = |keep: f32| {
@@ -2092,9 +2104,9 @@ pub(crate) fn kerb_at(
                 // (Nor where a car parks out on a trip, nor pulls into or out of it.)
                 let parking = (0..=n).all(|i| {
                     let p = road.at(s - half + i as f32 * 2.0 * half / n as f32);
-                    (0..travel.file.parking.len())
-                        .filter_map(|k| crate::cars::parked_at(travel, k))
-                        .all(|(at, ..)| crate::travel::dist(at, p) >= PARK_CLEAR)
+                    parked
+                        .iter()
+                        .all(|&at| crate::travel::dist(at, p) >= PARK_CLEAR)
                 });
                 let free = taken
                     .iter()
