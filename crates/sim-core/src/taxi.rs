@@ -714,16 +714,23 @@ pub(crate) fn indoor_lead(
     plots: &[crate::world::Plot],
     sim: &crate::world::Sim,
 ) -> u64 {
-    let Some(door) = households
+    let Some(home) = households
         .get(sim.household as usize)
         .and_then(|h| h.plot)
         .and_then(|p| plots.get(p as usize))
-        .map(|p| p.arrival_point())
     else {
         return 0;
     };
+    // (Only in and about the house: from elsewhere, a visit's own end brings them home in time;
+    // timed as a walk from a visit across the map, a cyclist was home on their bike an hour
+    // early, still on it at the kerb two hours on, Swan Reach.)
+    let ground = stairs.ground_pos(sim.pos);
+    if !home.contains(ground[0].floor() as i32, ground[1].floor() as i32) {
+        return 0;
+    }
+    let door = home.arrival_point();
     let storeys = stairs.storey(sim.pos[1].floor() as i32).unsigned_abs() as f32;
-    let walk = crate::travel::dist(stairs.ground_pos(sim.pos), door) + storeys * STOREY_WALK;
+    let walk = crate::travel::dist(ground, door) + storeys * STOREY_WALK;
     let ticks = walk / (sim.walk_per_minute(content) * crate::MINUTES_PER_TICK).max(0.01);
     (ticks as u64).saturating_sub((crate::life::OUT_OF_THE_HOUSE / crate::MINUTES_PER_TICK) as u64)
 }

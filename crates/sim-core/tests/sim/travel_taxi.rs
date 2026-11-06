@@ -1416,3 +1416,27 @@ fn one_upstairs_booked_on_a_taxi_out_leaves_for_it_timed_from_over_the_ground() 
         "A was to leave {early} min before the taxi's due"
     );
 }
+
+#[test]
+fn one_booked_on_a_taxi_while_out_at_another_house_isnt_called_home_hours_early() {
+    // A, booked on a taxi to work, is at a house along the street: the lead for the walk out
+    // of the house (`indoor_lead`) is for in and about their own, not a walk across the map from
+    // elsewhere (timed so from a visit, a cyclist came home on their bike an hour early and was
+    // still on it at the kerb two hours on, Swan Reach). From there, as from their own door.
+    let mut w = town(7, &[house(20, &[&worker("A")]), house(500, &[])]);
+    let end = sim_core::clock::tick_at(3, 0.0).unwrap();
+    while w.tick < end && w.taxi_leave(0).is_none() {
+        w.tick_once();
+    }
+    let door = w.plots[0].arrival_point();
+    w.sims[0].pos = door;
+    let at_door = w.taxi_leave(0).expect("A booked on a taxi to work");
+    w.sims[0].pos = w.plots[1].arrival_point();
+    let away = w.taxi_leave(0).expect("still booked");
+    assert_eq!(
+        away,
+        at_door,
+        "out at another house, A leaves {} min sooner",
+        at_door.saturating_sub(away) / 20
+    );
+}
