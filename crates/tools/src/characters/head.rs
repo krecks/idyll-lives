@@ -163,9 +163,12 @@ pub fn youth(stage_hh: f64) -> f64 {
     clip((stage_hh - 1.0 / 6.5) / (1.0 / 3.4 - 1.0 / 6.5), 0.0, 1.0)
 }
 
-/// An eyeball's radius (m): the sockets are carved round it.
+/// An eyeball's radius (m): the sockets are carved round it. A young adult's is 34 mm across where a
+/// real one is 24, and small children's a little larger still: at 6 m, the game's closest camera, the
+/// iris is 5 px, and the larger sphere is what keeps the sclera from closing the iris into a dot. Past
+/// that it stops reading as an eye and starts reading as a bead.
 fn eye_radius(pr: &Proportions) -> f64 {
-    (0.075 + 0.02 * youth(pr.hh)) * pr.hh * pr.h
+    (0.062 + 0.018 * youth(pr.hh)) * pr.hh * pr.h
 }
 
 /// Approximate signed distance to an ellipsoid (exact on its surface).
@@ -522,7 +525,10 @@ pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
             let bpt = m + (q0 - m) * 0.6 + out * 0.012 * hh;
             let mut q = m + (q0 - m).component_mul(&v3(0.6, 1.0, 0.55));
             q += out * (0.04 + 0.015 * yg) * hh * (if front { 0.7 } else { 1.0 });
-            q[1] += (if top { 0.085 } else { -0.06 }) * hh * (1.0 - 0.3 * yg);
+            // The lobe hangs 3 % of the head's height below the middle and no further out than the
+            // rest: at 6 % and full out its underside faced the floor, and the sun, which comes from
+            // above, left a dark brown wedge under the ear that read as a smear on the jaw.
+            q[1] += (if top { 0.085 } else { -0.03 }) * hh * (1.0 - 0.3 * yg);
             q[2] -= 0.015 * hh;
             base.push(bpt);
             offs.push(q - bpt);
@@ -660,9 +666,14 @@ impl HeadFrame {
     }
 
     /// Scalp weight (0..1) of a point: 1 well above the hairline, 0 on the face and neck.
+    ///
+    /// The ramp is 4 cm of head height wide, so the shade fades out over the skin instead of stepping:
+    /// the side hairline sits at jaw height, where the neck's 8-vertex ring has one vertex above it and
+    /// one below, and a ramp two centimetres wide drew a hard brown band across the neck that read as
+    /// dirt (`shaders/character.ts` darkens the scalp to 0.7 of the hair's colour).
     pub fn scalp(&self, p: V3) -> f64 {
         clip(
-            (p.y - hairline_y(self, p)) / (0.06 * self.hh) + 0.5,
+            (p.y - hairline_y(self, p)) / (0.10 * self.hh) + 0.5,
             0.0,
             1.0,
         )
@@ -760,8 +771,8 @@ fn make_head_frame(family: &str, stage: &str) -> HeadFrame {
         face_z: 0.0,
         eyes,
         eye_r,
-        iris_r: eye_r * 0.5,
-        pupil_r: eye_r * 0.2,
+        iris_r: eye_r * 0.55,
+        pupil_r: eye_r * 0.22,
         mouth: V3::zeros(),
         mouth_w: 0.2 * hh,
         brows: [[V3::zeros(); 2]; 2],

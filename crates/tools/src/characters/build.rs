@@ -174,11 +174,23 @@ fn bake_ao(parts: &mut [(String, Mesh)], spread: (usize, &dyn Fn(V3) -> bool)) {
         } else {
             continue;
         };
-        let occ = if name == "body" {
-            ao::occlusion_spread(m, &around, ao::REACH, spread.0, spread.1)
+        let (reach, passes) = if name == "body" || name == "lod.body" {
+            (ao::REACH_BODY, 2)
+        } else if name.starts_with("hair.") {
+            (ao::REACH, 0)
         } else {
-            ao::occlusion(m, &around, ao::REACH)
+            (ao::REACH_SHELL, 2)
         };
+        let occ = if name == "body" {
+            ao::occlusion_spread(m, &around, reach, spread.0, spread.1)
+        } else {
+            ao::occlusion(m, &around, reach)
+        };
+        // The face's creases are narrower than the triangles, and `occlusion_spread` has them; the rest
+        // of the skin and the shells are relaxed over the mesh instead, so a ring's two or three dark
+        // vertices read as a crease rather than as a blotch (`ao::smooth`).
+        let face = |i: usize| name == "body" && i < spread.0 && (spread.1)(m.pos[i]);
+        let occ = ao::smooth(m, &occ, passes, &face);
         ao::bake(m, occ);
     }
 }

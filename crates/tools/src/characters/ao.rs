@@ -11,10 +11,18 @@ use super::meshops::ray_hit;
 use super::{Mesh, V3, v3};
 
 /// Rays per vertex.
-const SAMPLES: usize = 48;
-/// How far a crease is looked for (m): the furniture's rule, a fifth of the model's largest side (a
-/// young adult's height).
+const SAMPLES: usize = 96;
+/// How far a crease is looked for (m) on the hair, where the shade is the depth into the volume and
+/// so wants the whole of it: the furniture's rule, a fifth of the model's largest side (a young
+/// adult's height).
 pub const REACH: f64 = 0.34;
+/// The skin's reach (m): a crease of the body, not the shade of whatever stands across the chest. At
+/// a fifth of the body's height the chin and the arms reach the sternum, which a 12-column ring
+/// cannot resolve and so smears; a hand's width keeps the shade to the folds and the seams.
+pub const REACH_BODY: f64 = 0.12;
+/// The shells' reach (m): their own folds, and the body they are lifted off, which is close enough to
+/// graze them all over and darken the lot if the reach is long.
+pub const REACH_SHELL: f64 = 0.15;
 /// Rays start this far off the surface (m), so they don't hit their own face.
 const LIFT: f64 = 0.0015;
 /// Steps it is rounded to: neighbours share a value, which packs tightly.
@@ -243,7 +251,7 @@ pub fn occlusion_spread(
     (0..mesh.len())
         .map(|i| {
             if i < n && den[i] > 0.0 {
-                (num[i] / den[i] * LEVELS).round() / LEVELS
+                num[i] / den[i]
             } else {
                 vertex(&bvh, &dirs, mesh, i, reach)
             }
@@ -251,12 +259,48 @@ pub fn occlusion_spread(
         .collect()
 }
 
-/// Writes an occlusion (one per vertex) into `mesh`'s tone.w.
+/// Writes an occlusion (one per vertex) into `mesh`'s tone.w, rounded to `LEVELS` steps there (after
+/// `smooth`, so the relaxation does not undo the packing).
 pub fn bake(mesh: &mut Mesh, occ: Vec<f64>) {
     mesh.tone.resize(mesh.len(), [0.0; 4]);
     for (t, a) in mesh.tone.iter_mut().zip(occ) {
-        t[3] = a;
+        t[3] = (a * LEVELS).round() / LEVELS;
     }
+}
+
+/// `occ` relaxed over the mesh's edges, `passes` times, the vertices `keep` picks left as they are
+/// (the face's, whose creases are narrower than the triangles and which `occlusion_spread` has
+/// already spread): each vertex takes half its own shade and half the mean of its neighbours'.
+///
+/// The rays give the shade at a point and the cage gives 8 or 12 vertices round a limb, so a crease a
+/// finger wide lands on two or three of them and the rest of the ring carries it as a blotch. The
+/// relaxation moves it onto the vertices either side without losing it: a crease stays, its edge
+/// softens.
+pub fn smooth(mesh: &Mesh, occ: &[f64], passes: usize, keep: &dyn Fn(usize) -> bool) -> Vec<f64> {
+    let n = mesh.len();
+    let mut nbr: Vec<Vec<usize>> = vec![Vec::new(); n];
+    for t in mesh.idx.chunks(3) {
+        for k in 0..3 {
+            let (a, b) = (t[k], t[(k + 1) % 3]);
+            if a < n && b < n {
+                nbr[a].push(b);
+                nbr[b].push(a);
+            }
+        }
+    }
+    let mut cur = occ.to_vec();
+    for _ in 0..passes {
+        let mut next = cur.clone();
+        for i in 0..n {
+            if keep(i) || nbr[i].is_empty() {
+                continue;
+            }
+            let mean = nbr[i].iter().map(|&j| cur[j]).sum::<f64>() / nbr[i].len() as f64;
+            next[i] = 0.5 * cur[i] + 0.5 * mean;
+        }
+        cur = next;
+    }
+    cur
 }
 
 #[cfg(test)]

@@ -240,14 +240,19 @@ shape of the face (build.rs `lid_shading`); on `lod.body` the mean tone of the s
 stage uses the base stage's tone.
 
 w is how much of the sky a vertex does not see at rest, 0 (open) to 1 (enclosed), in 32 steps
-(`ao.rs`, after the furniture's `gamekit/shade.py`): 48 rays per vertex over the hemisphere about its
+(`ao.rs`, after the furniture's `gamekit/shade.py`): 96 rays per vertex over the hemisphere about its
 normal (cosine-weighted, a Fibonacci spiral twisted by the vertex's index), started 1.5 mm off the
-surface; a hit counts `1 - (d / 0.34 m)^2`. A vertex whose rays mostly meet a back face first is
+surface; a hit counts `1 - (d / reach)^2`, the reach being 0.12 m on the skin (a fold, a seam, the
+crease beside the nose), 0.15 m on the shells and 0.34 m on the hair (a fifth of the body's height,
+where the shade is the depth into the volume). A vertex whose rays mostly meet a back face first is
 buried in another part and stays 0. On the head (from 0.1 hh under the chin up) a skin vertex takes
 instead the mean over its triangles (four points each, weighted by its barycentric weight), so a
 crease's shade narrower than the triangles (the skin against the lips, beside the nose) is not
 caught at a few vertices and spread in spikes; and the skin is baked as it is without the eye
-sockets (the lids cover them). What occludes what:
+sockets (the lids cover them). The shade then eases over the mesh twice (once on `lod.body`, not at
+all on the hair): a vertex takes half its own and half its neighbours' mean, the face's vertices
+left alone, so a crease that lands on two of a ring's eight vertices reads as a crease and not as a
+blotch. What occludes what:
 
 - `body`: itself (its lids and lips included) and the teeth and tongue, not the eyes;
 - `lod.body`: the same, its own bake;
