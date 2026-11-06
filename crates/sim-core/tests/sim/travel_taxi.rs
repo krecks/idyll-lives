@@ -1232,3 +1232,108 @@ fn a_house_with_one_stand_clear_of_the_driveways_has_its_taxi_for_each_run_an_ho
         "one run for both: {kit_runs:?} {mum_runs:?}"
     );
 }
+
+#[test]
+fn a_taxi_held_still_where_nothing_gives_gives_its_way_up_and_its_riders_still_go_by_taxi() {
+    // A car stands across the street between the way in and the rider's house, its household's
+    // and never driven: every taxi coming in is held behind it. Held still LONE_STILL (30 min),
+    // a taxi gives its way up and goes, off the road, so nobody behind it waits on it. A rider it
+    // was to pick up is booked again; a rider it was taking home, a long walk from where it was
+    // held, isn't let out to walk it (walks of hours, all night) but waits at work for another
+    // run.
+    let mut car = house(300, &[]);
+    car.car = true;
+    let mut w = town(7, &[house(100, &[&worker("A")]), car]);
+    let c = w
+        .cars
+        .iter()
+        .position(|k| !k.taxi)
+        .expect("the household's car");
+    let home = (w.cars[c].spot, w.cars[c].yaw);
+    let across = |w: &mut World| {
+        w.cars[c].spot = [303.5, STREET];
+        w.cars[c].yaw = std::f32::consts::FRAC_PI_2;
+    };
+    // (A's runs, to work or home, a tick ago: id, home, its taxi, A aboard.)
+    let runs = |w: &World| -> Vec<(u32, bool, Option<u32>, bool)> {
+        w.taxis
+            .runs
+            .iter()
+            .filter(|r| r.place.is_none() && r.stops.iter().any(|s| s.sim == 0))
+            .map(|r| {
+                let aboard = r
+                    .stops
+                    .iter()
+                    .any(|s| s.sim == 0 && s.state == StopState::Aboard);
+                (r.id, r.home, r.car, aboard)
+            })
+            .collect()
+    };
+    across(&mut w);
+    // Booked to work, held behind it: given up, and A booked again.
+    let day3 = sim_core::clock::tick_at(3, 0.0).unwrap();
+    let mut first = None;
+    let mut again = false;
+    while w.tick < day3 && !again {
+        let before = runs(&w);
+        w.tick_once();
+        for &(id, _, car, _) in before.iter().filter(|b| !b.1 && b.2.is_some()) {
+            if w.taxis.runs.iter().any(|r| r.id == id) {
+                continue;
+            }
+            let k = &w.cars[car.unwrap() as usize];
+            assert!(
+                k.shown.is_none(),
+                "the taxi gave its way up but is still on the road"
+            );
+            first.get_or_insert(id);
+        }
+        again = first.is_some_and(|f| w.taxi_booking(0).is_some_and(|b| b.run != f));
+    }
+    assert!(
+        first.is_some(),
+        "no run to work gave its way up behind the car"
+    );
+    assert!(
+        again,
+        "A wasn't booked again after their run to work gave up"
+    );
+    // The street clear, A rides to work; across it again, A's run home is held behind it.
+    w.cars[c].spot = home.0;
+    w.cars[c].yaw = home.1;
+    let end = sim_core::clock::tick_at(6, 0.0).unwrap();
+    let mut rode_out = false;
+    while w.tick < end && !rode_out {
+        w.tick_once();
+        rode_out = w.taxis.runs.iter().any(|r| {
+            !r.home
+                && r.stops
+                    .iter()
+                    .any(|s| s.sim == 0 && s.state == StopState::Aboard)
+        });
+    }
+    assert!(rode_out, "A never rode to work with the street clear");
+    across(&mut w);
+    let mut held_home = None;
+    while w.tick < end && held_home.is_none() {
+        let before = runs(&w);
+        w.tick_once();
+        held_home = before
+            .iter()
+            .find(|b| b.1 && b.3 && b.2.is_some() && !w.taxis.runs.iter().any(|r| r.id == b.0))
+            .copied();
+    }
+    let (id, _, car, _) = held_home.expect("A's run home never gave its way up behind the car");
+    assert!(
+        w.cars[car.unwrap() as usize].shown.is_none(),
+        "the taxi gave its way up but is still on the road"
+    );
+    // (Not let out on foot a long way from home: away at work, on another run home.)
+    let a = &w.sims[0];
+    assert!(
+        a.away_until.is_some() && w.taxi_booking(0).is_some_and(|b| b.run != id),
+        "A was let out to walk home: {:?} at {:?}",
+        a.current().map(|x| x.task.kind),
+        a.pos
+    );
+}
