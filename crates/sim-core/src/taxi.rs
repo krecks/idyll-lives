@@ -84,7 +84,7 @@ const WAY_ROUND: f32 = 1.3;
 const DOOR_WALK: f32 = 6.0;
 /// A storey up or down on the way out of the house is about this much more walk (m: the
 /// flight and round the landing, `indoor_lead`).
-const STOREY_WALK: f32 = 8.0;
+const STOREY_WALK: f32 = 6.0;
 
 /// The runs planned and under way (`World::taxis`), and who rode one to work today (for the run
 /// home).
@@ -708,10 +708,8 @@ pub(crate) fn indoor_lead(
         return 0;
     };
     let storeys = stairs.storey(sim.pos[1].floor() as i32).unsigned_abs() as f32;
-    let walk =
-        (crate::travel::dist(stairs.ground_pos(sim.pos), door) + storeys * STOREY_WALK) * WAY_ROUND;
-    let ticks = walk / (sim.walk_per_minute(content) * crate::MINUTES_PER_TICK).max(0.01)
-        + TICKS_PER_MINUTE as f32;
+    let walk = crate::travel::dist(stairs.ground_pos(sim.pos), door) + storeys * STOREY_WALK;
+    let ticks = walk / (sim.walk_per_minute(content) * crate::MINUTES_PER_TICK).max(0.01);
     (ticks as u64).saturating_sub((crate::life::OUT_OF_THE_HOUSE / crate::MINUTES_PER_TICK) as u64)
 }
 
@@ -1330,14 +1328,6 @@ pub(crate) fn release(w: &mut World, i: usize) {
     let heading = sim
         .current()
         .is_some_and(|a| matches!(a.task.kind, TaskKind::Work));
-    if heading {
-        sim.current = None;
-        sim.queue.push_front(Task {
-            kind: TaskKind::Work,
-            directed: true,
-            routine: false,
-        });
-    }
     let mut leisure = None;
     let home = match w.taxis.runs.iter_mut().find(|r| r.id == b.run) {
         Some(run) => {
@@ -1387,12 +1377,34 @@ pub(crate) fn release(w: &mut World, i: usize) {
     }
     // (Planned again once for the same start, a late run of their own if it must be; then their
     // own way it is.)
+    let mut again = false;
     if !home && let Some(start) = start_for(w, i) {
         let me = (i as u32, start);
         if w.taxis.missed.contains(&me) {
             w.taxis.declined.push(me);
         } else {
             w.taxis.missed.push(me);
+            again = true;
+        }
+    }
+    // (On their way to it: on to work on their own; or, to be booked again, back to what they'd
+    // do till it's time to go out for the next (`leave_at`), not waiting at the kerb for it.)
+    if heading {
+        let World {
+            sims,
+            content,
+            objects,
+            ..
+        } = &mut *w;
+        let sim = &mut sims[i];
+        crate::world::end_activity(sim, content, objects);
+        sim.current = None;
+        if !again {
+            sim.queue.push_front(Task {
+                kind: TaskKind::Work,
+                directed: true,
+                routine: false,
+            });
         }
     }
 }
@@ -1956,11 +1968,16 @@ pub(crate) fn kerb_at(
                 let t = road.tangent(s - half + i as f32 * 2.0 * half / n as f32);
                 crate::world::wrap_angle(t[1].atan2(t[0]) - chord).abs() <= STAND_STRAIGHT
             });
+            // (Clear of junctions' boxes, and of another road lying along or over this one: two
+            // country roads a metre apart, its stand across the other's lane.)
             let clear = (0..=n).all(|i| {
                 let p = road.at(s - half + i as f32 * 2.0 * half / n as f32);
                 g.boxes
                     .iter()
                     .all(|&(m, r)| crate::travel::dist(m, p) >= r + STAND_ROOM + TAXI_WID)
+                    && g.near(p, road.width, 3, crate::travel::Mode::Car)
+                        .iter()
+                        .all(|q| q.road == mouth.road)
             });
             // (Nor where a car parks out on a trip, nor pulls into or out of it.)
             let parking = (0..=n).all(|i| {
@@ -2439,7 +2456,10 @@ fn lay_route(
             }
             let mut offs: Vec<f32> = along.iter().map(|&(w, kind)| lane_on(w, kind)).collect();
             let first_run = k == 0 && j == 0;
-            // (Eased to where it stands, clear of its kerb, and out again after.)
+            // (Eased to where it stands, clear of its kerb, and out again after; its body's
+            // length by the stand already there, so it stands straight along its lane: eased
+            // right up to it, it stood as much as 9 degrees across a country road's.)
+            let flat = TAXI_LEN / 2.0 + STAND_ROOM;
             let ease = |offs: &mut [f32], order: &mut dyn Iterator<Item = usize>| {
                 let mut gone = 0.0;
                 let mut was: Option<usize> = None;
@@ -2448,13 +2468,13 @@ fn lay_route(
                         gone += dist(centre[q], centre[i]);
                     }
                     was = Some(i);
-                    if gone > STAND_EASE {
+                    if gone > flat + STAND_EASE {
                         break;
                     }
                     let (w, kind) = along[i];
                     let lane = lane_on(w, kind);
                     let off = lane.min(kerb_of(w, kind) - TAXI_WID / 2.0 - KERB_KEEP);
-                    offs[i] = off + (lane - off) * (gone / STAND_EASE).clamp(0.0, 1.0);
+                    offs[i] = off + (lane - off) * ((gone - flat) / STAND_EASE).clamp(0.0, 1.0);
                 }
             };
             if j + 1 == n_runs && k < last_leg {
