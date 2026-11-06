@@ -3252,10 +3252,17 @@ pub(crate) fn go_on(
         whom.push(s.id);
         // (Walking on across its way, not waiting for it: they're on their way out of it, not
         // to be stepped back where they came from. Not one walking along its way, ahead of it or
-        // towards it: they'd hold it up all the way, so they step aside in the end as anyone.)
+        // towards it: they'd hold it up all the way, so they step aside in the end as anyone. Nor
+        // one beside it, behind its nose, walking on nearer its body, into its side or round its
+        // tail: they'd walk into it, wait for it, be stepped back out of its way by it and walk on
+        // into it again, for good. In front of its nose they walk on across it.)
+        let to_body = |p: [f32; 2]| body.gap(d.at, turn, p, -d.len / 2.0, d.len / 2.0, d.wid / 2.0);
+        let step = [s.pos[0] + s.yaw.sin() * 0.1, s.pos[1] + s.yaw.cos() * 0.1];
+        let beside = local(d.at, turn, s.pos).0 < d.len / 2.0;
         if matches!(phase, Some(Phase::Routing { .. }))
             && s.car_wait == 0
             && (s.yaw - d.yaw).sin().abs() >= ALONG
+            && (!beside || to_body(step) >= to_body(s.pos) - 1e-4)
         {
             continue;
         }
