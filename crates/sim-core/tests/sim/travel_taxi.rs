@@ -1187,3 +1187,48 @@ fn a_run_coming_in_a_longer_way_than_planned_tells_its_riders() {
     assert!(out2 >= out, "due out of town sooner than planned");
     assert!(came(&w) > 0, "A never rode");
 }
+
+#[test]
+fn a_house_with_one_stand_clear_of_the_driveways_has_its_taxi_for_each_run_an_hour_apart() {
+    // Driveways all along the street but one stretch past the riders' own, the only stand clear of
+    // them (`DRIVE_CLEAR`, `DRIVE_LEAST`); housemates whose work starts an hour apart, a run each,
+    // there and home. A run's stand is held for about when it's there, not all its time in town:
+    // held so, the second run found no stand and didn't come, and its rider walked (there, or
+    // home from the way out).
+    let kit = r#"{"name":"Kit","age":30,"traits":["cheerful"],"job":{"career":"business.entrepreneur","level":0}}"#;
+    let south = |x: i32| House {
+        south: true,
+        ..house(x, &[])
+    };
+    let mut w = town(
+        7,
+        &[
+            south(70),
+            house(80, &[]),
+            south(90),
+            house(100, &[kit, &worker("Mum")]),
+            house(120, &[]),
+            south(130),
+        ],
+    );
+    // (From the day after the game begins: on its first morning, both too late on foot, one late
+    // run takes them.)
+    run_to(&mut w, 2, 0.0);
+    let (mut kit_runs, mut mum_runs) = (Vec::new(), Vec::new());
+    let both = |r: &[(u32, bool)]| r.iter().any(|x| !x.1) && r.iter().any(|x| x.1);
+    let end = sim_core::clock::tick_at(5, 0.0).unwrap();
+    while w.tick < end && !(both(&kit_runs) && both(&mum_runs)) {
+        w.tick_once();
+        no_overlaps(&w);
+        rode(&w, 0, &mut kit_runs);
+        rode(&w, 1, &mut mum_runs);
+    }
+    for (who, r) in [("Kit", &kit_runs), ("Mum", &mum_runs)] {
+        assert!(r.iter().any(|x| !x.1), "{who} never rode to work: {r:?}");
+        assert!(r.iter().any(|x| x.1), "{who} never rode home: {r:?}");
+    }
+    assert!(
+        kit_runs.iter().all(|x| !mum_runs.contains(x)),
+        "one run for both: {kit_runs:?} {mum_runs:?}"
+    );
+}
