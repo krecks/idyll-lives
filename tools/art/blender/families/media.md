@@ -28,10 +28,10 @@ it is down: at night both glow while watched. The fireplace's ember strip glows 
 night, `switch: false`), and the flames glow while they burn. The stereo's and boombox's little displays don't (a draw at
 night each for a few pixels).
 
-**Draw calls: 3 each, the TV 2, the wall TV 1, the stereo 4.**
-- The TV, the portable TV, the bench, the home cinema and the fireplace: one textured `wood` group (the unit, the
-  cabinet, the oak top, the mantel) plus the plain group, plus the moving part. The portable TV's speaker grille is
-  wooden slats over plain cloth (a `fabric` grille would have been a fourth).
+**Draw calls: 3 each, the TV and the portable TV 2, the wall TV 1, the stereo 4.**
+- The TV, the bench, the home cinema and the fireplace: one textured `wood` group (the unit, the oak top, the mantel)
+  plus the plain group, plus the moving part. The portable TV has no wood: its plastic shell, mask and pads, the tube,
+  a steel badge, a red standby light and a black grille share one plain group, the aerial a second.
 - The stereo: wood and plain, the turning record and the pulsing cones: 4. The fourth is the E1 loop the plan asks for;
   `check-glb` warns "4 draw calls, aim for 3 at most".
 
@@ -46,8 +46,7 @@ default 0.45 m in the footprint's middle, in mid-air with their back to the fire
 on it, facing the flames; the old part had the cushion too. The model's depth is 0.92 m (the old part's surround
 0.40; `check-glb` warns).
 
-Other warnings left, by design: the portable TV's height (1.28 m with its ears out, 1.13 at rest), the wall TV floating
-above its origin (it hangs on the wall).
+Other warnings left, by design: the wall TV floating above its origin (it hangs on the wall).
 
 ## Detail (2026-10-22)
 
@@ -57,9 +56,11 @@ Rebuilt with the forms and the kit, same sizes, centres, parts, clips, glow, pai
   feet; the set a rounded panel with a vented back (`_flat_screen`), a swept neck, an oval foot; a soundbar swept round
   with a ribbed grille and a light; the pebbles (jittered) in their bowl on two books; a remote with its keys.
 - **Wall TV:** a bracket with two arms, the rounded panel, a standby light, a cable cover, a swept soundbar, ribbed.
-- **Portable TV:** a rounded cabinet; the bezel extruded round the opening, the tube lofted into a dome; turned knobs,
-  the channel dial's numbers, a badge; tapered legs in metal ferrules; the ears swept as telescoping sections on a
-  pivot.
+- **Portable TV:** one moulded plastic case with well-rounded corners on an inset base band, two pads at the front and a
+  rail at the back; a thin rounded mask proud of the case, the tube's glass lofted out of it into a dome; a badge and a
+  standby light on the chin; a turned knob over two buttons on a pad at its right; a vented back; a stub aerial swept
+  from a ball foot on the top right, its own part, lifted for watch. (2026-11-06: the cabinet, its tapered legs and the
+  rabbit ears are gone; the set is the plastic portable of the reference photo.)
 - **TV bench:** framed doors with bar pulls, a reveal, tapered legs; a plant of swept leaves in a rimmed pot, a game
   controller; the TV's logo and the lid's finger grip.
 - **Home cinema:** bent sled feet, slab fronts with routed grips, a swept soundbar with a ribbed grille, the projector's
