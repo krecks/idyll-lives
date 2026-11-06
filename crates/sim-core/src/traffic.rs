@@ -672,6 +672,10 @@ const FOLLOW_NEAR: f32 = 1.0;
 /// after it, this many to a platoon at most (`Traffic::begin`).
 const PLATOON: usize = 4;
 
+/// An ask not asked again stands while its vehicle is no further short of its group than this
+/// (ticks along its route: backed up out of one's way, `cars::JAM_BACK`, `Traffic::begin`).
+const KEPT_ASK: f32 = 65.0;
+
 /// An ask this old (ticks) yields only to those it waits for itself (`Traffic::begin`, rule 2).
 const OLD_ASK: u64 = 20 * crate::TICKS_PER_MINUTE;
 
@@ -1013,9 +1017,12 @@ impl Traffic {
             let going = holds
                 .iter()
                 .any(|h| h.key == a.key && h.tag >> 16 == a.route && h.claim.group == a.group);
-            (a.seen + 1 >= tick || going)
-                && place(a.key, a.route)
-                    .is_some_and(|t| a.parts.first().is_some_and(|p| t <= p.1.from + 1e-3))
+            // (Backed up a little out of one's way, not asking again meanwhile, `cars::back_off`:
+            // its ask stands, in its place in the queue, `KEPT_ASK`.)
+            let at = place(a.key, a.route);
+            let short = |t: f32| a.parts.first().is_some_and(|p| t >= p.1.from - KEPT_ASK);
+            (a.seen + 1 >= tick || going || at.is_some_and(short))
+                && at.is_some_and(|t| a.parts.first().is_some_and(|p| t <= p.1.from + 1e-3))
         });
         self.asks.sort_by_key(|a| (a.tick, a.key));
         self.change_lights(tick, signals);
