@@ -57,8 +57,12 @@ fn jacket_lift(gid: &str) -> f64 {
 }
 /// The jacket shells' sleeves end (sleeve parameter) on the upper arm; the rest is painted.
 const SHELL_SLEEVE: f64 = 0.42;
+/// The skirt's rings round and down. Seven rows left the flare between the hips and the hem three
+/// kinks deep, which read as facets on the closest camera (1 px is 4 mm there); twelve take the
+/// kinks below a pixel and cost 240 triangles, of a 1500 shell budget. Twenty-four sides round is
+/// already past what the hem's 0.24 m radius shows as corners.
 const SKIRT_SEGS: usize = 24;
-const SKIRT_ROWS: usize = 7;
+const SKIRT_ROWS: usize = 12;
 
 /// A garment's cut (the keys a kind has, in rig.json's order).
 #[derive(Clone, Debug, Default, Serialize)]
@@ -1082,6 +1086,9 @@ struct ShoeStyle {
     welt: f64,
     arch: f64,
     midsole: f64,
+    /// The toe's lift off the floor at the tip: the whole sole rises there, so the shoe's underside is a
+    /// curve rather than a slab lying flat on the ground.
+    spring: f64,
     laces: bool,
     /// Polished leather (glossier).
     polish: bool,
@@ -1097,15 +1104,16 @@ fn shoe_style(gid: &str) -> ShoeStyle {
             pad: 0.002,
             shaft: 0.0,
             point: 0.0,
-            collar: [0.028, 0.018, 0.04],
+            collar: [0.022, 0.012, 0.032],
             throat: 1.0,
-            sock: 0.035,
-            sole: 0.02,
-            heel_h: 0.022,
+            sock: 0.03,
+            sole: 0.016,
+            heel_h: 0.019,
             block: (0.15, 0.6),
-            welt: 0.004,
+            welt: 0.003,
             arch: 0.0,
-            midsole: 0.5,
+            midsole: 0.55,
+            spring: 0.008,
             laces: true,
             polish: false,
         },
@@ -1117,15 +1125,16 @@ fn shoe_style(gid: &str) -> ShoeStyle {
             pad: 0.003,
             shaft: 0.0,
             point: 0.0,
-            collar: [0.034, 0.024, 0.046],
+            collar: [0.03, 0.02, 0.042],
             throat: 1.0,
-            sock: 0.04,
-            sole: 0.022,
-            heel_h: 0.034,
+            sock: 0.038,
+            sole: 0.018,
+            heel_h: 0.028,
             block: (0.1, 0.7),
-            welt: 0.005,
+            welt: 0.004,
             arch: 0.0,
-            midsole: 0.8,
+            midsole: 0.7,
+            spring: 0.01,
             laces: true,
             polish: false,
         },
@@ -1140,12 +1149,13 @@ fn shoe_style(gid: &str) -> ShoeStyle {
             collar: [0.13, 0.125, 0.125],
             throat: 1.0,
             sock: 0.12,
-            sole: 0.02,
-            heel_h: 0.028,
+            sole: 0.018,
+            heel_h: 0.026,
             block: (0.26, 0.31),
-            welt: 0.005,
+            welt: 0.004,
             arch: 0.005,
             midsole: 0.0,
+            spring: 0.005,
             laces: true,
             polish: false,
         },
@@ -1161,12 +1171,13 @@ fn shoe_style(gid: &str) -> ShoeStyle {
             collar: [-0.02, -0.03, -0.022],
             throat: 0.45,
             sock: 0.032,
-            sole: 0.011,
-            heel_h: 0.024,
+            sole: 0.01,
+            heel_h: 0.022,
             block: (0.26, 0.31),
-            welt: 0.003,
+            welt: 0.0025,
             arch: 0.006,
             midsole: 0.0,
+            spring: 0.011,
             laces: false,
             polish: true,
         },
@@ -1712,35 +1723,57 @@ fn sole(
     let welt = st.welt * k;
     let top = |u: f64| st.top(u) * k;
     let split = |u: f64| top(u) * (1.0 - st.midsole);
-    // Rows down its edge: a light midsole and a dark outsole meet at a seam (a row twice, one colour
-    // above it, the other below); else dark all the way down.
+    // The toe spring: the sole's whole edge lifts towards the tip (its top and its underside alike, so
+    // its band keeps its thickness), which leaves the shoe's silhouette curved off the floor at the
+    // toe rather than a slab lying flat. The upper is cut where the flat sole's top was, so the sole
+    // covers a little more of it there.
+    let spring = |u: f64| st.spring * k * smoothstep(0.7, 1.0, u).powi(2);
+    // Rows down its edge: a welt line (dark, the step under the upper), a light midsole, then the dark
+    // outsole; the midsole and the outsole meet at a seam (a row twice, one colour above it, the other
+    // below); else dark all the way down.
     let (rows, mut flags) = if st.midsole > 0.0 {
+        let line = 0.004 * k;
         let rows = vec![
-            ring(welt, &top),
-            ring(welt + 0.001 * k, &split),
-            ring(welt + 0.001 * k, &split),
-            ring(welt - 0.0015 * k, &arch),
+            ring(welt, &|u| top(u) + spring(u)),
+            ring(welt, &|u| top(u) + spring(u) - line),
+            ring(welt, &|u| top(u) + spring(u) - line),
+            ring(welt + 0.001 * k, &|u| split(u) + spring(u)),
+            ring(welt + 0.001 * k, &|u| split(u) + spring(u)),
+            ring(welt - 0.0015 * k, &|u| arch(u) + spring(u)),
         ];
         (
             rows,
-            [FLAG_MIDSOLE, FLAG_MIDSOLE, FLAG_SOLE, FLAG_SOLE]
-                .iter()
-                .flat_map(|&f| vec![f; segs])
-                .collect::<Vec<_>>(),
+            [
+                FLAG_SOLE,
+                FLAG_SOLE,
+                FLAG_MIDSOLE,
+                FLAG_MIDSOLE,
+                FLAG_SOLE,
+                FLAG_SOLE,
+            ]
+            .iter()
+            .flat_map(|&f| vec![f; segs])
+            .collect::<Vec<_>>(),
         )
     } else {
         (
-            vec![ring(welt, &top), ring(welt - 0.0015 * k, &arch)],
+            vec![
+                ring(welt, &|u| top(u) + spring(u)),
+                ring(welt - 0.0015 * k, &|u| arch(u) + spring(u)),
+            ],
             vec![FLAG_SOLE; 2 * segs],
         )
     };
     let (mut pos, mut idx) = strip(&rows, true);
     if st.midsole > 0.0 {
+        // The two rows twice (the welt's and the midsole's seam, and the midsole's and the outsole's):
+        // no triangles between them, so each band keeps one flag from end to end.
+        idx.drain(segs * 18..segs * 24);
         idx.drain(segs * 6..segs * 12);
     }
     let (ct, cb, last) = (pos.len(), pos.len() + 1, (rows.len() - 1) * segs);
-    pos.push(v3(cx, top(0.5), cz));
-    pos.push(v3(cx, arch(0.5), cz));
+    pos.push(v3(cx, top(0.5) + spring(0.5), cz));
+    pos.push(v3(cx, arch(0.5) + spring(0.5), cz));
     for j in 0..segs {
         let j1 = (j + 1) % segs;
         idx.extend([ct, j1, j, cb, last + j, last + j1]);
