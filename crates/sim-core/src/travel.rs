@@ -1184,8 +1184,8 @@ pub struct Travel {
     /// where a test turns them on (`World::light_busy_junctions`).
     pub lights_on: bool,
     /// By public parking spot (`OpenWorld::parking`), whether a car parked there would stand where
-    /// a household's car turns into or out of its driveway (`cars::settle_all`): not parked at on a
-    /// trip. Not saved: worked out again on load.
+    /// a household's car turns into or out of its driveway, or on the driveway (`cars::settle_all`):
+    /// not parked at on a trip. Not saved: worked out again on load.
     pub(crate) by_a_mouth: Vec<bool>,
     /// By plot, for the public places: their door and where it gets on the roads on foot and by
     /// car (`entry`), kept as each tick starts (`note_doors`): a resident weighing an outing asks

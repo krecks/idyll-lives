@@ -2308,8 +2308,9 @@ fn drive_on(w: &mut World, c: usize) {
     }
     // (The other can back up no further, and waits for it as it does: it backs up now.)
     let theirs = w.cars[c].waits_for.is_some_and(|k| stuck_back(w, k));
-    if jammed && (jam.0 > JAM_TICKS || theirs) && jam.1 < JAM_BACK && !w.cars[c].outside() {
-        if back_off(w, c) {
+    // (Backed up as far as it goes, `JAM_BACK`, it can back up no further: the other does.)
+    if jammed && (jam.0 > JAM_TICKS || theirs) && !w.cars[c].outside() {
+        if jam.1 < JAM_BACK && back_off(w, c) {
             return;
         }
         w.cars[c].jam.2 = true;
@@ -2560,6 +2561,20 @@ fn waits_back(w: &World, k: u64, me: u64) -> bool {
     } else {
         me > k
     };
+    // (One backing up out of the other's way already goes on: not the other in turn as their
+    // claims change, the one going on by letting go of its claim behind it, say; nor one, then the
+    // other, a tick each.)
+    let backing = |x: u64| {
+        w.cars
+            .get((x & !(1 << 63)) as usize)
+            .is_some_and(|c| c.jam.1 > 0)
+            && !stuck_back(w, x)
+    };
+    let mine_to_go = match (backing(me), backing(k)) {
+        (true, false) => true,
+        (false, true) => false,
+        _ => mine_to_go,
+    };
     let mine_to_go = if mine_to_go {
         !stuck_back(w, me)
     } else {
@@ -2793,27 +2808,42 @@ fn pull_want(w: &World, c: usize, moving: bool, after: &dyn Fn(u64) -> bool) -> 
         route.room_here(t)
     };
     let (at, yaw, back) = route.at(t);
-    // (Not in a junction's box: there they take turns, `traffic.rs`, and turning there it faces
-    // any way, those following it in too. For one coming the other way in it, as anywhere: the
-    // claims let that one in counting on this one's pulling over.)
-    let boxes = &w.travel.graph.boxes;
-    if room <= 0.0 || back || in_box(boxes, at, car.len) {
+    // (In a junction's box only for one coming the other way beside it now, their bodies nearer
+    // than `GAP` and `PASSING`: there they take turns, `traffic.rs`, and turning there it faces
+    // any way, those following it in too; but two let in together pass each other in their lanes,
+    // and round a bend there their ends swing across towards each other further than the claims'
+    // samples have it: neither could go on, `guard`. For one coming the other way into it, as
+    // anywhere: the claims let that one in counting on this one's pulling over.)
+    let boxed = in_box(&w.travel.graph.boxes, at, car.len);
+    if room <= 0.0 || back {
         return (0.0, None);
     }
+    let body = |p: [f32; 2], yaw: f32, len: f32, wid: f32| Rect {
+        at: p,
+        yaw,
+        half: [len / 2.0, wid / 2.0],
+    };
+    let mine = body(at, yaw, car.len, car.wid);
     let short = |p: [f32; 2], facing: f32, len: f32, wid: f32| {
         let m = passing((at, yaw, car.len, car.wid), (p, facing, len, wid))?;
         let ends = (car.len + len) / 2.0;
-        if m.along < -ends || m.along > ends + PULL_AHEAD || m.apart < 0.0 {
+        let ahead = if boxed { 0.0 } else { PULL_AHEAD };
+        if m.along < -ends || m.along > ends + ahead || m.apart < 0.0 {
             return None;
         }
-        Some(((PASSING + PULL_MARGIN - m.gap).max(0.0), m.mine, m.theirs))
+        // (Beside it, as near as their bodies are: on a bend nearer than across their ways.)
+        let gap = m.gap.min(mine.gap(&body(p, facing, len, wid)));
+        if boxed && gap >= GAP + PASSING {
+            return None;
+        }
+        Some(((PASSING + PULL_MARGIN - gap).max(0.0), m.mine, m.theirs))
     };
     let (mut want, mut whom): (f32, Option<u64>) = (0.0, None);
     for (o, other) in w.cars.iter().enumerate() {
         // (Standing, waiting for that one (`after`: its turn after it too), it pulls over as far as
         // it can, that one backing out of its driveway too: that one goes by, as it comes on round
         // a bend or out of a driveway.)
-        let after = !moving && after(car_first(o));
+        let after = !moving && !boxed && after(car_first(o));
         if o == c || other.shown.is_none_or(|s| !s.2) || other.backing() && !after {
             continue;
         }
@@ -4318,19 +4348,23 @@ fn settle_all(w: &mut World) {
         ..
     } = &mut *w;
     // (The public parking spots a car parked at would stand in the way of one turning into or out
-    // of its driveway: none parks there on a trip, `parking_for`.)
-    let mouths: Vec<[f32; 2]> = drives
+    // of its driveway, or on the driveway itself (a bay off the road where a driveway runs: the
+    // car coming home couldn't get by it): none parks there on a trip, `parking_for`.)
+    let ways: Vec<([f32; 2], [f32; 2])> = drives
         .iter()
-        .filter_map(Drive::meets)
-        .filter_map(|(road, s)| travel.graph.at_source(road, s))
-        .map(|p| travel.graph.point(p))
+        .filter_map(|d| {
+            let (road, s) = d.meets()?;
+            let mouth = travel.graph.point(travel.graph.at_source(road, s)?);
+            Some(([d.x, d.z], mouth))
+        })
         .collect();
     travel.by_a_mouth = (0..travel.file.parking.len())
         .map(|k| {
             parked_at(travel, k).is_some_and(|(at, ..)| {
-                mouths
-                    .iter()
-                    .any(|&m| crate::travel::dist(m, at) < MOUTH_CLEAR)
+                ways.iter().any(|&(inner, mouth)| {
+                    crate::travel::dist(mouth, at) < MOUTH_CLEAR
+                        || to_segment(at, inner, mouth) < DRIVE_CLEAR
+                })
             })
         })
         .collect();
@@ -4352,6 +4386,19 @@ fn settle_all(w: &mut World) {
 /// How near a driveway's mouth (where it meets its road) the middle of a car parked out on a trip
 /// may not be (m: a car's length and the swing of one turning in or out by it).
 const MOUTH_CLEAR: f32 = 7.0;
+
+/// How near a driveway (the line from its inner end to its mouth) the middle of a car parked out
+/// on a trip may not be (m: half of each of two cars side by side, the gap between them and some).
+const DRIVE_CLEAR: f32 = 2.5;
+
+/// How far `p` is from the segment `a`..`b` (m).
+fn to_segment(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
+    let ab = [b[0] - a[0], b[1] - a[1]];
+    let t =
+        ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / (ab[0] * ab[0] + ab[1] * ab[1]).max(1e-6);
+    let t = t.clamp(0.0, 1.0);
+    crate::travel::dist(p, [a[0] + ab[0] * t, a[1] + ab[1] * t])
+}
 
 /// The public parking spot (`parking`) nearest `door` within `TRIP_PARK_REACH`: where it is and
 /// which way a car faces parked there. Of `cars`, but car `me`, none parks where another is on a
@@ -5675,6 +5722,30 @@ mod tests {
     }
 
     #[test]
+    fn no_trip_parks_on_a_driveway() {
+        // (Pebble Sands, a big world of the 0.7.0 samples: a bay off the road where a house's
+        // driveway runs, 12 m from its mouth; a car parked out there on a trip, the car of the
+        // house coming home couldn't get by it.) A spot on the driveway, one by its mouth, and one
+        // down the street clear of it.
+        let road: Vec<String> = (0..=199).map(|x| format!("[{x}.5,30]")).collect();
+        let town = format!(
+            r#"{{"width":200,"depth":60,
+            "exits":[{{"x":0.5,"z":30,"kind":"road"}},{{"x":199.5,"z":30,"kind":"road"}}],
+            "roads":[{{"points":[{}],"width":7,"kind":"street","ends":["out","out"]}}],
+            "plots":[{{"name":"H","x":78,"z":8,"w":16,"d":18,"entry":[83.5,25.5]}}],
+            "households":[{{"name":"F","plot":0}}],
+            "sims":[{{"name":"D","household":0,"x":83.5,"z":17.5}}],
+            "drives":[{{"plot":0,"x":90,"z":8.5,"front":1,"street":30,"road":0,"s":89.5}}],
+            "cars":[{{"plot":0,"x":90,"z":11.25,"yaw":0,"street":30,"len":4.6,"wid":1.88,"body":2,"paint":0}}],
+            "parking":[{{"x":91.0,"z":20.0,"rot":0,"area":0}},{{"x":93.0,"z":25.0,"rot":0,"area":0}},
+                       {{"x":140.0,"z":24.0,"rot":0,"area":0}}]}}"#,
+            road.join(",")
+        );
+        let w = World::from_json(CONTENT, &town, 1).unwrap();
+        assert_eq!(w.travel.by_a_mouth, [true, true, false]);
+    }
+
+    #[test]
     fn of_two_held_up_by_each_other_the_one_that_can_back_up_does() {
         // Two cars on their way, each waiting for the other, neither holding a claim: the later
         // backs up (`waits_back`); can it back up no further, the earlier does instead.
@@ -5697,6 +5768,28 @@ mod tests {
             !waits_back(&w, b, a) && !waits_back(&w, a, b),
             "neither can"
         );
+    }
+
+    #[test]
+    fn of_two_held_up_by_each_other_the_one_backing_up_goes_on() {
+        // (Willowbrook, a big world of the 0.7.0 samples: a car and a taxi meeting round a bend
+        // took turns backing up a tick each as their claims changed, for good.) The earlier backing
+        // up already goes on backing up, though the later would otherwise; backed up as far as it
+        // can, the later does.
+        let town = TOWN.replace(
+            r#""cars":[{"plot":0"#,
+            r#""cars":[{"plot":0,"x":30.0,"z":3.0,"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,"body":1,"paint":1},{"plot":0"#,
+        );
+        let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+        let (a, b) = (car_first(0), car_first(1));
+        w.cars[0].waits_for = Some(b);
+        w.cars[1].waits_for = Some(a);
+        w.cars[0].jam = (200, 3, false);
+        assert!(waits_back(&w, b, a), "the earlier goes on backing up");
+        assert!(!waits_back(&w, a, b), "the later doesn't");
+        w.cars[0].jam.2 = true;
+        assert!(waits_back(&w, a, b), "the earlier can't: the later does");
+        assert!(!waits_back(&w, b, a));
     }
 
     #[test]
