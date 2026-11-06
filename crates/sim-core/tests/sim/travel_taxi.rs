@@ -1791,3 +1791,56 @@ fn one_booked_on_a_taxi_while_out_at_another_house_isnt_called_home_hours_early(
         at_door.saturating_sub(away) / 20
     );
 }
+
+#[test]
+fn a_cyclist_out_on_a_visit_when_work_calls_doesnt_ride_out_on_the_bike_their_way_isnt_by() {
+    // C's way out is by the work taxi (by bike, well over `BIKE_MOST`). Sent on a visit along
+    // the street just before leaving for the taxi, C sets off on the bike; leaving time comes
+    // on the way: the ride cut short, off to the kerb for the taxi. (On, they rode hours out of
+    // town on it, Hollyshaw and Stationgate.)
+    let mut far = house(20, &[&worker("C")]);
+    far.bike = true;
+    let mut w = town(
+        7,
+        &[
+            far,
+            house(140, &[r#"{"name":"D","age":40,"traits":["cheerful"]}"#]),
+        ],
+    );
+    run_to(&mut w, 2, 0.0);
+    let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
+    let leave = loop {
+        w.tick_once();
+        assert!(w.tick < end, "C never booked on a taxi to work");
+        if let Some(l) = w.taxi_leave(0)
+            && l > w.tick + 10 * 20
+        {
+            break l;
+        }
+    };
+    while w.tick + 10 * 20 < leave {
+        w.tick_once();
+    }
+    let _ = w.apply(sim_core::Command::Visit { sim: 0, plot: 1 });
+    let mut rode_off = false;
+    let mut to_work = false;
+    let mut aboard = Vec::new();
+    while w.tick < end && aboard.iter().all(|x: &(u32, bool)| x.1) {
+        w.tick_once();
+        let c = &w.sims[0];
+        rode_off |= c.riding.is_some() && c.away_until.is_none();
+        let work = c
+            .current()
+            .is_some_and(|a| matches!(a.task.kind, sim_core::world::TaskKind::Work));
+        to_work |= work;
+        assert!(
+            !(work && c.riding.is_some()),
+            "C rode to work on a bike their way out isn't by, at {:?}",
+            c.pos
+        );
+        rode(&w, 0, &mut aboard);
+    }
+    assert!(rode_off, "C never set off on the bike");
+    assert!(to_work, "C never left for work");
+    assert!(aboard.iter().any(|x| !x.1), "C never rode the taxi to work");
+}

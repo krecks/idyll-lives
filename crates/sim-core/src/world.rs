@@ -7720,9 +7720,18 @@ fn start_task(
                 // (In an open-world town, a bike only where the way was timed by one: a ride of
                 // `life::BIKE_MOST` at most; not before it's been timed, nor where it was timed on
                 // foot or by car.)
-                let no_bike =
-                    ctx.travel.open && sim.commute.is_none_or(|c| c.long_ride || c.bike.is_none());
-                if riding {
+                let no_bike = no_bike_out(ctx, sim);
+                if riding && no_bike {
+                    // On a bike of theirs from a visit or an outing where the way out isn't by
+                    // one (a ride of over `life::BIKE_MOST`, or none timed): the ride cut short,
+                    // and on to work as its way is timed, to their kerb for the taxi or on foot
+                    // (on it to work, they rode hours out of town, Hollyshaw).
+                    crate::ride::get_off(sim, objects);
+                    match crate::taxi::kerb_for(ctx, sim, &TaskKind::Work) {
+                        Some(kerb) => goal_at(kerb),
+                        None => goal_at(exit),
+                    }
+                } else if riding {
                     // On their bike: on it to the way out.
                     goal_at(exit)
                 } else if let Some(kerb) = crate::taxi::kerb_for(ctx, sim, &TaskKind::Work) {
@@ -10399,6 +10408,13 @@ pub(crate) fn trip_minutes(eta: f32, car: bool) -> f32 {
     } else {
         eta
     }
+}
+
+/// Whether `sim`'s way out to work or school isn't by bike (in an open-world town, a bike only
+/// where the way was timed by one: a ride of `life::BIKE_MOST` at most; not before it's been
+/// timed, nor where it was timed on foot or by car).
+fn no_bike_out(ctx: &Ctx, sim: &Sim) -> bool {
+    ctx.travel.open && sim.commute.is_none_or(|c| c.long_ride || c.bike.is_none())
 }
 
 /// The way out of town `sim` takes on foot: the nearest by straight line, or in an open-world
