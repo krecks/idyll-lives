@@ -228,8 +228,11 @@ hairline and chin as before.
 ## Tone (4 per vertex)
 
 x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = shade drawn by hand (the
-line between the lips, the upper lids' crease, the teeth's sides, deep in the hair; the mouth plate is
-1), z = hair clump bands (0..1: light in a lock's middle, dark in the parting between two) and on the
+upper lids' crease, the teeth's sides, deep in the hair; the mouth plate is
+1), and on the lips its opposite sign: negative, how much of the lip's colour they take (up to 0.9,
+less at the mouth's corners and towards the line between them, which the occlusion bakes: the
+shader tints the skin red-rose by it and takes the gloss off, `character.ts` `LIP_MIX`), z = hair
+clump bands (0..1: light in a lock's middle, dark in the parting between two) and on the
 body the face's age folds (0..1: a soft line from beside
 each nose wing down past the mouth's corner, `HeadFrame::fold`, each vertex's the mean over its
 triangles weighted by its barycentric weight, as the triangles can show it; the shader darkens the
@@ -309,8 +312,9 @@ moves with the foot; its edges the collar crosses are split, and every point lie
 skin. The collar runs round the ankle, low at the sides (a boot's up the shin; a dress shoe's low,
 with a throat down the instep), its lining a band turned in to the skin. The sole stands a few mm out
 round the upper, from the floor (as the old soles: the clips and the seat fit stand on it) to its
-top; heels are thicker, and a heel's arch is lifted off the floor. Laces are bars across the
-instep (fields w and x); a sole is dark, or a light midsole over a dark outsole; dress shoes are
+top; heels are thicker, and a heel's arch and the toe lift off the floor. Laces are bars across the
+instep (fields w and x); a sole is dark, or a thin dark welt over a light midsole over a dark outsole;
+dress shoes are
 polished. The low-detail copy is the low-detail body's skin, unsplit and unlined, on the same
 soles (fewer sides).
 
