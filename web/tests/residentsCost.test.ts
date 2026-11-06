@@ -31,6 +31,7 @@ describe('residents not drawn', async () => {
   const { Content } = await import('../src/content/content');
   const { AssetRegistry } = await import('../src/assets/registry');
   const { Characters, MAX_CHARACTERS } = await import('../src/render/shared/characters/residents');
+  const { LOD_FAR_PX, LOD_NEAR_PX } = await import('../src/render/shared/characters/parts');
   const { TemplateCache } = await import('../src/render/shared/templateCache');
   const { Pose, simFields } = await import('../src/core/snapshot');
   const pose = await import('../src/render/shared/characters/pose');
@@ -180,6 +181,50 @@ describe('residents not drawn', async () => {
     }
   }, 30_000);
 
+  test('the default camera draws the full body, not the low-detail one', async () => {
+    // The game's lens: 1080 px tall, fov 0.7 rad (`PlayCanvasRenderer.ts` LENS), the default camera 24 m
+    // out (its `orbit` pose) and the closest game camera 6 m. The thresholds have to keep the full body
+    // in both, and leave `lod.body` to the far town.
+    const facePx = (dist: number) => (0.05 * 1080) / (2 * Math.tan(0.7 / 2)) / dist;
+    expect(facePx(24)).toBeGreaterThan(LOD_NEAR_PX);
+    expect(facePx(6)).toBeGreaterThan(LOD_NEAR_PX);
+    expect(facePx(60)).toBeLessThan(LOD_FAR_PX);
+  });
+  test('the body or its low-detail copy is drawn by the distance, and not both', async () => {
+    const realNow = performance.now;
+    let now = 0;
+    performance.now = () => now;
+    // (The parts of this Sim set only: `parts` holds the other tests' too, still with their counts.)
+    const first = parts.length;
+    try {
+      const characters = new Characters(view, assets, content, { castsShadows: true });
+      expect(await characters.init()).toBe(true);
+      await characters.build({ sims, objects: [] });
+      const prev = new Float32Array(layout.capacity);
+      const curr = new Float32Array(layout.capacity);
+      const frame: FrameState = { prev, curr, alpha: 0, steps: 1, layout, now: 0 };
+      const shadows = new Float32Array(MAX_CHARACTERS * 16);
+      write(prev, -1);
+      write(curr, -1);
+      // This view's camera: 720 px tall at 0.8 rad, so 42.6 px per 5 cm at 1 m.
+      const run = (dist: number, frames: number) => {
+        cam[2] = dist;
+        for (let f = 0; f < frames; f++) {
+          now += 1000 / 60;
+          frame.now = now;
+          characters.update(frame, () => true, shadows);
+        }
+        const drawn = (name: string) => parts.slice(first).some((p) => p.name.endsWith(`:${name}`) && !p.shadow && p.count > 0);
+        return { body: drawn('body'), lod: drawn('lod.body') };
+      };
+      // Close (about 4 px per 5 cm): the full body; then far off (1 px): its low-detail copy.
+      expect(run(10, 3)).toEqual({ body: true, lod: false });
+      expect(run(40, 3)).toEqual({ body: false, lod: true });
+      expect(run(10, 3)).toEqual({ body: true, lod: false });
+    } finally {
+      performance.now = realNow;
+    }
+  }, 30_000);
   test('only those posed in the shadow square draw the sun\'s map again', async () => {
     const realNow = performance.now;
     let now = 0;

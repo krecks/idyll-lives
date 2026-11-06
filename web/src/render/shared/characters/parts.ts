@@ -71,9 +71,15 @@ export function surfaceOf(part: string): CharacterSurface {
 /**
  * Sims switch to the low-detail body and clothes below this projected size (px per 5 cm of face)
  * and back above the second: the gap keeps a Sim at the threshold from flickering between them.
+ *
+ * The thresholds are set by where the game's camera looks from: 24 m out at the default lens (fov 0.7,
+ * 1080 px tall) a face is about 3.1 px per 5 cm, so a 6 px threshold kept the *whole* default view on
+ * `lod.body` (the cage at its limit, 1.3k triangles) while the hair on the same head drew at 2.8k. A
+ * 2 px threshold puts the full body at 37 m out, past the default camera and the close one (6 m), and
+ * leaves the low-detail body to the far town, the shadows and the distance where a face is 2 px tall.
  */
-export const LOD_FAR_PX = 6;
-export const LOD_NEAR_PX = 7;
+export const LOD_FAR_PX = 2;
+export const LOD_NEAR_PX = 3;
 /**
  * Small face parts are skipped on faces too small on screen to show them: the projected size (px)
  * of a 5 cm feature (a mouth, an eye with its brow) below which each isn't drawn.
