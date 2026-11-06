@@ -1031,8 +1031,8 @@ fn a_taxi_stands_clear_of_every_driveways_mouth_its_riders_own_too() {
 
 #[test]
 fn a_rider_called_to_the_taxi_who_doesnt_get_there_is_waited_for_the_walk_and_booked_again() {
-    // B, called to the taxi's door, is kept from it (held 8 m off): the taxi waits the wait at
-    // the kerb and the walk round to its door at most (`taxi.waitMinutes`, a few minutes, no
+    // B, called to the taxi's door, is kept from it (held 8 m off): the taxi waits for one on
+    // their way and the walk round to its door at most (`taxi::COMING_WAIT`, a few minutes, no
     // longer: a taxi stood 20 minutes in its lane for a rider, a car out of its driveway behind
     // it), goes on without them, and they're booked on another.
     let mut w = town(7, &[house(20, &[&worker("A")]), house(60, &[&worker("B")])]);
@@ -1072,9 +1072,9 @@ fn a_rider_called_to_the_taxi_who_doesnt_get_there_is_waited_for_the_walk_and_bo
         }
     }
     assert!(run.is_some(), "B was never called to the taxi");
-    let wait = (w.content.taxi.wait * 20.0) as u64;
+    // (Five minutes for one on their way, the walk round to its door, and in.)
     assert!(
-        longest <= wait + 6 * 20 + 3 * 20,
+        longest <= 5 * 20 + 6 * 20 + 3 * 20,
         "a taxi stood {} minutes",
         longest / 20
     );

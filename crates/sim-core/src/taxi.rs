@@ -82,6 +82,10 @@ const WAIT_ASIDE: f32 = 2.0;
 /// is waited for that walk at their pace after `taxi.waitMinutes` (`stand`), else left.
 const WAY_ROUND: f32 = 1.3;
 const DOOR_WALK: f32 = 6.0;
+/// How long a taxi waits for a rider already on their way out to it (ticks, `stand`): at its
+/// door within this at their pace, they're called to it, and waited for; else left (a rider
+/// left walks the long way, as the taxi was brought in to spare them).
+const COMING_WAIT: u64 = 5 * TICKS_PER_MINUTE;
 /// A storey up or down on the way out of the house is about this much more walk (m: the
 /// flight and round the landing, `indoor_lead`).
 const STOREY_WALK: f32 = 6.0;
@@ -1140,8 +1144,8 @@ fn run_on(w: &mut World, k: usize) -> bool {
 
 /// Run `k`'s taxi (car `c`) stands at its stop `next` (a halt: housemates' one): those there get
 /// in (called to its door, a seat each: `door_for`), or out, each by a door of their own; one not
-/// on their way to it, or not at its door within `taxi.waitMinutes` at their pace (and the walk round
-/// to it, `DOOR_WALK`), is left, and booked again (`release`).
+/// out yet within `taxi.waitMinutes`, or on their way but not at its door within `COMING_WAIT` at
+/// their pace (and the walk round to it, `DOOR_WALK`), is left, and booked again (`release`).
 fn stand(w: &mut World, k: usize, c: usize, next: usize) {
     let tick = w.tick;
     crate::cars::stand_taxi(w, c);
@@ -1213,9 +1217,10 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
                 let on_way = sim.taxi.is_some_and(|b| b.run == id)
                     && sim.current().is_some_and(|a| task_of(&a.task.kind));
                 // (At their kerb, or coming: at its door soon at their pace, the way round a
-                // little longer than straight there.)
+                // little longer than straight there; one already on their way out to it is waited
+                // for longer, `COMING_WAIT`, than one yet to set off, `taxi.waitMinutes`.)
                 let d = crate::travel::dist(sim.pos, taxi_at);
-                let left = wait.saturating_sub(tick - since) as f32;
+                let left = COMING_WAIT.saturating_sub(tick - since) as f32;
                 let at_kerb = sim
                     .current()
                     .is_some_and(|a| matches!(a.phase, Phase::AtKerb { .. }));
@@ -1235,6 +1240,9 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
                     }
                     w.taxis.runs[k].stops[s].state = StopState::Boarding;
                     busy = true;
+                } else if !on_way && sim.taxi.is_some_and(|b| b.run == id) && tick < since + wait {
+                    // (Not out yet: a moment for them to set off.)
+                    busy = true;
                 } else {
                     // Not there, nor coming: on without them, and they make their own way.
                     w.taxis.runs[k].stops[s].state = StopState::Done;
@@ -1252,7 +1260,7 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
                     let door_walk = (DOOR_WALK * WAY_ROUND
                         / (x.walk_per_minute(&w.content) * crate::MINUTES_PER_TICK).max(0.01))
                         as u64;
-                    let most = since + wait + door_walk;
+                    let most = since + COMING_WAIT + door_walk;
                     to_it
                         && matches!(doing, Some((_, Phase::Boarding { .. })))
                         && tick <= most + crate::cars::GET_IN_TICKS as u64
