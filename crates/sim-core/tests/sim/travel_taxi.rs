@@ -1337,3 +1337,43 @@ fn a_taxi_held_still_where_nothing_gives_gives_its_way_up_and_its_riders_still_g
         a.pos
     );
 }
+
+#[test]
+fn a_taxi_with_two_stands_close_along_one_street_stands_straight_at_both() {
+    // A generated normal town (Snowdale, v4 s7) whose run home puts down neighbours a car's length
+    // and a little apart along one street: it keeps to the kerb between the two and stands
+    // straight along its lane at each (easing out of one undid easing into the next: it stood
+    // 11 degrees across its lane there, 30 in Brightdale). Every taxi's stand till the evening,
+    // as `generated_worlds`' check has it (`STAND_ANGLE`).
+    let town = include_str!("../towns/snowdale_stands.json");
+    let mut w = World::from_json(&common::content(), town, 160171).expect("Snowdale loads");
+    let g = &w.travel.graph.clone();
+    let end = sim_core::clock::tick_at(sim_core::clock::day(w.tick), 19.0 * 60.0).unwrap();
+    let mut was: Vec<bool> = Vec::new();
+    let mut stood = 0;
+    while w.tick < end {
+        w.tick_once();
+        was.resize(w.cars.len(), false);
+        for (c, car) in w.cars.iter().enumerate() {
+            let now = car.taxi && car.standing;
+            if now
+                && !was[c]
+                && let Some((at, yaw, ..)) = car.shown
+                && let Some(rp) = g.near(at, 30.0, 1, sim_core::travel::Mode::Car).first()
+            {
+                stood += 1;
+                let t = g.roads[rp.road as usize].tangent(rp.s);
+                let off = sim_core::world::wrap_angle(yaw - t[0].atan2(t[1])).abs();
+                let off = off.min(std::f32::consts::PI - off);
+                assert!(
+                    off <= 0.09,
+                    "a taxi stood {:.0}° off its lane at {at:?}, {:.2}h",
+                    off.to_degrees(),
+                    sim_core::clock::hour(w.tick)
+                );
+            }
+            was[c] = now;
+        }
+    }
+    assert!(stood >= 5, "only {stood} stands");
+}

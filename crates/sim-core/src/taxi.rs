@@ -2669,7 +2669,11 @@ fn lay_route(
                     let (w, kind) = along[i];
                     let lane = lane_on(w, kind);
                     let off = lane.min(kerb_of(w, kind) - TAXI_WID / 2.0 - KERB_KEEP);
-                    offs[i] = off + (lane - off) * ((gone - flat) / STAND_EASE).clamp(0.0, 1.0);
+                    // (Two stands close along one road: whichever's nearer the kerb, so it keeps
+                    // to the kerb between them; else easing out of one undid easing into the
+                    // next, and it stood 30 degrees across its lane.)
+                    let eased = off + (lane - off) * ((gone - flat) / STAND_EASE).clamp(0.0, 1.0);
+                    offs[i] = offs[i].min(eased);
                 }
             };
             if j + 1 == n_runs && k < last_leg {
