@@ -1377,3 +1377,42 @@ fn a_taxi_with_two_stands_close_along_one_street_stands_straight_at_both() {
     }
     assert!(stood >= 5, "only {stood} stands");
 }
+
+#[test]
+fn one_upstairs_booked_on_a_taxi_out_leaves_for_it_timed_from_over_the_ground() {
+    // A, upstairs, is sent to visit B's house a long walk along the street: booked on a taxi,
+    // A's walk out to the kerb is timed from where A is over the ground (an upstairs storey lies
+    // further along the map: timed from there, A was out at the kerb two hours early, waiting,
+    // and the taxi came that much later, Swan Reach).
+    let mut w = town(
+        7,
+        &[
+            house(20, &[r#"{"name":"A","age":40,"traits":["cheerful"]}"#]),
+            house(560, &[r#"{"name":"B","age":40,"traits":["cheerful"]}"#]),
+        ],
+    );
+    run_to(&mut w, 1, 9.0);
+    let up = w.stair_map().storey_row(1) as f32;
+    assert!(up > 0.0, "no storey upstairs");
+    w.sims[0].pos[1] += up;
+    let _ = w.apply(sim_core::Command::Visit { sim: 0, plot: 1 });
+    let end = w.tick + 30 * 20;
+    let mut stop = None;
+    while w.tick < end && stop.is_none() {
+        w.tick_once();
+        stop = w
+            .taxis
+            .runs
+            .iter()
+            .filter(|r| r.place == Some(1) && !r.home)
+            .flat_map(|r| r.stops.iter().filter(|s| s.sim == 0))
+            .map(|s| (s.due, s.leave))
+            .next();
+    }
+    let (due, leave) = stop.expect("A wasn't booked on a taxi there");
+    let early = due.saturating_sub(leave) / 20;
+    assert!(
+        early <= 20,
+        "A was to leave {early} min before the taxi's due"
+    );
+}

@@ -3303,8 +3303,10 @@ fn time_leisure(w: &World, run: &mut Run) -> bool {
         .iter()
         .map(|st| {
             let sim = &w.sims[st.sim as usize];
+            // (From over the ground: upstairs, a walk timed across the map from the storey's
+            // place on it had them out at their kerb two hours early, Swan Reach.)
             let to_kerb = ((w.travel.eta(
-                sim.pos,
+                w.stairs.ground_pos(sim.pos),
                 wait_spot(&w.travel, &kerbs[halt(st)]),
                 crate::travel::Mode::Foot,
                 sim.walk_per_minute(&w.content),
