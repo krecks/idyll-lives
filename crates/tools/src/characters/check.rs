@@ -17,11 +17,16 @@ use super::rig::{BASE_STAGE, BONES, CLIP_BONES, RUNTIME_BONES, STAGES, target_he
 use super::{V3, repo_root, v3};
 
 /// lod.body: the cage at its limit (~0.9k) plus the eyelids (~0.2k).
+///
+/// hair: the styles are built at `hair::DETAIL` (1.5) times their layout's columns and rows, so the
+/// densest (`hair.bob`, `hair.long`) come to about 5.1k and the rest to 2.1k-4.9k. It was 3k, which
+/// left the cap and the curtains' locks at 40 columns and 8-16 rows: plates, with a polyline for a
+/// hem (see `hair.rs`).
 fn budget(name: &str) -> Option<usize> {
     match name {
         "body" => Some(6000),
         "lod.body" => Some(1400),
-        _ if name.starts_with("hair.") => Some(3000),
+        _ if name.starts_with("hair.") => Some(5200),
         _ if shell_re(true).is_match(name) => Some(1500),
         _ => None,
     }

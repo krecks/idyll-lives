@@ -596,6 +596,22 @@ fn comp(
 
 type Field<'a> = &'a dyn Fn(f64, f64) -> f64;
 
+/// How much denser than its layout the hair is built (`dense_*`): the same style, more columns and
+/// rows, so its locks round off instead of reading as plates and its hem is a curve rather than a
+/// polyline. The styles' numbers are the shapes; this is the resolution they are cut at.
+const DETAIL: f64 = 1.5;
+/// `n` columns at `DETAIL`, kept a multiple of 4 (a lock is 4 columns wide).
+fn dense_cols(n: usize) -> usize {
+    4 * ((n as f64 * DETAIL / 4.0).round() as usize).max(1)
+}
+/// `n` locks at `DETAIL`.
+fn dense_locks(n: usize) -> usize {
+    ((n as f64 * DETAIL).round() as usize).max(1)
+}
+/// `n` rows at `DETAIL`.
+fn dense_rows(n: usize) -> usize {
+    ((n as f64 * DETAIL).round() as usize).max(2)
+}
 /// How far into a lock column j of a sheet or cap is: 0 on the parting between two locks (columns
 /// 4k), 1 in a lock's middle (4k + 2).
 fn lock_at(j: f64) -> f64 {
@@ -656,8 +672,9 @@ fn round(a: f64) -> f64 {
 /// `edge` at the rim; in locks, with a parting. Round an ear (`Meet::Round`) the rim follows an arc
 /// over it (`Oval::rim`) on more columns, and the rows above bend round it too; over them
 /// (`Meet::Over`) the cap stands off the ear and closes under itself in a hem above it.
-fn cap(sc: &Scalp, c: Cap) -> Comp {
+fn cap(sc: &Scalp, mut c: Cap) -> Comp {
     let h = sc.h;
+    (c.cols, c.rows) = (dense_cols(c.cols), dense_rows(c.rows));
     let step = TAU / c.cols as f64;
     let turn = c.part.map_or(0.0, |(ap, _)| {
         ap - (((ap + PI) / (4.0 * step)).round() * 4.0 * step - PI)
@@ -999,8 +1016,9 @@ struct Curtain<'a> {
 /// hem, coming out from under the cap, over the ears and falling straight from the head's widest. `back(y)`
 /// (optional): the furthest forward its inner face may come at height y (so it clears the
 /// shoulders and back).
-fn curtain(sc: &Scalp, c: Curtain) -> Comp {
+fn curtain(sc: &Scalp, mut c: Curtain) -> Comp {
     let h = sc.h;
+    (c.locks, c.rows) = (dense_locks(c.locks), dense_rows(c.rows));
     let cols = 4 * c.locks + 1;
     let a = linspace(c.a0, c.a1, cols);
     // Whole locks at the edges, the partings between them.
@@ -1096,7 +1114,8 @@ struct Fringe<'a> {
 /// Hair falling over the forehead in locks, on the face as drawn (`face`: a Scalp that isn't held
 /// to the cranium): between azimuths a0..a1, from polar angle top(a) (under the cap) down to height
 /// bottom(a) (m) and the locks' tips below.
-fn fringe(face: &Scalp, c: Fringe) -> Comp {
+fn fringe(face: &Scalp, mut c: Fringe) -> Comp {
+    (c.locks, c.rows) = (dense_locks(c.locks), dense_rows(c.rows));
     let cols = 4 * c.locks + 1;
     let a = linspace(c.a0, c.a1, cols);
     let lk = locks(cols);

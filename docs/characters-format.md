@@ -130,8 +130,10 @@ Every body has:
 
 `hair.none` has no part: a bald resident's scalp keeps the skin colour (appearance texel 7 w = 0).
 
-Hair (`hair.rs`, up to 3,000 triangles a style, one draw) is closed shapes in locks, so it breaks
-its outline and shades in clumps:
+Hair (`hair.rs`, up to 5.2k triangles a style, one draw) is closed shapes in locks, so it breaks
+its outline and shades in clumps. Every style's layout is a shape, and it is cut at `DETAIL` (1.5)
+times the columns and rows the layout asks for: at 3k a cap was 40 columns and 8-16 rows, which read
+as plates with a polyline for a hem:
 
 - every style has a skull cap: rows from the crown to the hairline in locks 4 columns wide, which
   leave the crown in a whorl, the grooves between them deepening to the hairline (none over the
