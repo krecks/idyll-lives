@@ -247,6 +247,17 @@ def keys(obj, clip, prop, index, points):
     return _clip(obj, clip, prop, index, frames)
 
 
+FLAT = 0.001   # a part hidden at rest: a thousandth of its size, out of sight
+
+
+def flat(obj, axis='Z'):
+    """Hides `obj` at rest by flattening it along `axis` ('X', 'Y' or 'Z', Blender) to `FLAT`: a screen rolled
+    up in its case on the wall, a fire's flames at the foot of the log bed. `grow` runs it out to full size when
+    the object is used, and `squash` from here too."""
+    obj.scale['XYZ'.index(axis)] = FLAT
+    return obj
+
+
 def grow(obj, clip, seconds=0.4, axis='Z'):
     """A clip `clip` scaling `obj` about its own origin along `axis` ('X', 'Y' or 'Z', Blender) from
     where it is (built small and hidden) to full size (scale 1): a part that appears while a resident

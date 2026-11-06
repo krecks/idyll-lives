@@ -9,7 +9,7 @@
 # is down, while watched.
 #
 # What moves:
-#   tvRetro            the aerial lifts 25° off the case (`antenna`, for watch);
+#   tvRetro            the aerial lifts 35° off the case (`antenna`, for watch);
 #   tvStandLow         the TV rises 60 cm out of the bench's lift (`tv_up`, for watch, back down at the end);
 #   homeCinema         the projector screen unrolls from its case on the wall (`screen_down`, watch and film);
 #   stereo             the record turns on the turntable (`record`, a loop) and the woofers pulse (`pulse`, `every`);
@@ -20,6 +20,9 @@
 import math
 import os
 import sys
+from typing import Any
+
+import bpy
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -46,7 +49,7 @@ M = G.Palette(
     wall_bar=('#3A3D41', 'satin'),      # the soundbar; Trim
     # the portable TV: a dark plastic case
     retro_shell=('#43474E', 'satin'),   # Body
-    retro_bezel=('#141619', 'gloss'),   # the screen's surround, the controls, the feet; Trim
+    retro_bezel=('#141619', 'gloss'),   # the screen's surround, the controls, the pads; Trim
     crt=('#26313D', 'gloss', {'glow': '#A8C8E0'}),
     # the low TV bench
     bench=('#F1F0EC', 'satin'),         # Bench (and the lift's lid, on the TV)
@@ -110,42 +113,37 @@ M = G.Palette(
 
 F = G.GameFrame()
 WALL = -0.43
+Point = tuple[float, float, float]   # a game position: x, height, depth
 
 
-def _front_cyl(name, r, depth, x, y, z, mat, verts=20, **kw):
-    """A disc facing the front (its axis along the game's depth), its face at depth `z` + depth/2."""
-    return F.cyl(name, r, depth, (x, y, z), mat, rot=(90, 0, 0), verts=verts, **kw)
-
-
-def _rod(name, a, b, r, mat, verts=8):
-    """A rod between two game points."""
-    return G.rod(name, F.at(*a), F.at(*b), r, material=mat, verts=verts)
-
-
-def _axle(gx, gz):
+def _axle(gx: float, gz: float) -> Point:
     """The rot for a cylinder whose axis runs along the game direction (gx, 0, gz)."""
     return (0, 90, math.degrees(math.atan2(-gz, -gx)))
 
 
-def _rbox(name, w, h, d, at, mat, r=0.004, segs=1, **kw):
+def _rbox(name: str, w: float, h: float, d: float, at: Point, mat: bpy.types.Material, r: float = 0.004,
+          segs: int = 1, **kw: Any) -> bpy.types.Object:
     """A box with its edges chamfered (`segs` 1) or rounded (2 or more)."""
     return F.box(name, w, h, d, at, mat, bevel=r, bevel_segments=segs, **kw)
 
 
-def _capsule(name, x0, x1, y, z, h, d, mat, r=None):
+def _capsule(name: str, x0: float, x1: float, y: float, z: float, h: float, d: float, mat: bpy.types.Material,
+             r: float | None = None) -> bpy.types.Object:
     """A bar along x from x0 to x1, its section an h x d rounded rectangle (a soundbar, a rail, a case)."""
     return F.sweep(name, [(x0, y, z), (x1, y, z)], None, mat, profile=G.rounded_rect(h, d, r or min(h, d) * 0.45, corner=3),
                    up=(0, 0, 1), angle=50)
 
 
-def _grille(name, x, y, z, w, h, mat, rows=None, face=1):
+def _grille(name: str, x: float, y: float, z: float, w: float, h: float, mat: bpy.types.Material,
+            rows: int | None = None, face: int = 1) -> None:
     """A speaker's cloth face: a thin panel on the front at depth `z`, with fine horizontal ribs."""
     _rbox(name, w, h, 0.003, (x, y, z), mat, r=0.001)
     for k in range(rows or 0):
         F.box(f'{name}_rib{k}', w - 0.006, 0.0015, 0.001, (x, y - h / 2 + h * (k + 0.5) / rows, z + face * 0.002), M.grille_dark)
 
 
-def _driver(name, x, y, z, r, cone=None, ring=None, verts=20):
+def _driver(name: str, x: float, y: float, z: float, r: float, cone: bpy.types.Material | None = None,
+            ring: bpy.types.Material | None = None, verts: int = 20) -> None:
     """A loudspeaker driver facing the front from depth `z`: a rim, a cone sunk into it and a dust cap."""
     G.revolve(name, [(0, -0.002), (r, -0.002), (r, 0.003), (r * 0.9, 0.004), (r * 0.82, 0.0), (r * 0.3, -r * 0.35),
                      (r * 0.28, -r * 0.3), (r * 0.22, -r * 0.18), (0, -r * 0.14)],
@@ -155,7 +153,8 @@ def _driver(name, x, y, z, r, cone=None, ring=None, verts=20):
                                  for a in range(0, 360, 360 // verts)], 0.0035, ring, verts=5, closed=True)
 
 
-def _flat_screen(prefix, x, y, z, w, h, frame, depth=0.025, back=None, chin=0.0):
+def _flat_screen(prefix: str, x: float, y: float, z: float, w: float, h: float, frame: bpy.types.Material,
+                 depth: float = 0.025, back: tuple[float, float] | None = None, chin: float = 0.0) -> None:
     """A flat panel facing the front at depth `z` (its middle): a slim rounded bezel, the screen set a hair in, a deeper
     rounded hump behind (`back`: its w, h), a logo under the screen."""
     F.soft(f'{prefix}panel', w, h, depth, (x, y, z), frame, round=0.006, round_segments=2)
@@ -169,7 +168,7 @@ def _flat_screen(prefix, x, y, z, w, h, frame, depth=0.025, back=None, chin=0.0)
 
 
 # --- the television (1x1): a flat set on its stand on a low oak media unit (the old `tv_set`) -------------
-def tv():
+def tv() -> None:
     # the unit: a carcass on four turned feet, an oak top board, two doors with slim pulls, a reveal round them
     F.soft('unit', 0.9, 0.4, 0.42, (0, 0.24, -0.22), M.tv_cabinet, round=0.012, round_segments=2)
     F.soft('top', 0.91, 0.03, 0.43, (0, 0.455, -0.215), M.tv_oak, round=0.009, round_segments=2)
@@ -190,7 +189,7 @@ def tv():
     _capsule('soundbar', -0.25, 0.25, 0.495, -0.12, 0.05, 0.07, M.soundbar, r=0.01)
     _grille('soundbar_grille', 0, 0.495, -0.0855, 0.46, 0.03, M.grille, rows=4)
     F.box('soundbar_led', 0.012, 0.003, 0.002, (0.2, 0.476, -0.0855), M.led)
-    for k, (m, t, turn) in enumerate(((M.retro_bezel, 0.022, 4), (M.label, 0.018, -6))):
+    for k, (m, t, turn) in enumerate(((M.retro_bezel, 0.022, 4), (M.rec_rust, 0.018, -6))):
         _rbox(f'book{k}', 0.2, t, 0.15, (0.33, 0.47 + 0.022 * k + t / 2, -0.115), m, r=0.002, rot=(0, 0, turn))
     G.revolve('bowl', [(0, 0), (0.05, 0), (0.065, 0.02), (0.06, 0.035), (0.05, 0.02), (0, 0.012)],
               at=F.at(0.33, 0.51, -0.11), material=M.bowl, segments=20)
@@ -208,8 +207,11 @@ def tv():
 
 
 # --- the flat-screen TV (2x1, wall): a thin panel on a bracket, a soundbar under it (the old tv_wall) ------
-def tv_wall():
-    y = 1.28
+WALL_TV_Y = 1.28   # the panel's middle height: its foot 0.92 m up the wall, its top 1.64 m
+
+
+def tv_wall() -> None:
+    y = WALL_TV_Y
     # the wall bracket: a plate on the wall and two arms out to the set's back
     _rbox('bracket', 0.3, 0.2, 0.008, (0, y - 0.02, WALL + 0.004), M.black_metal, r=0.002)
     for s in (-1, 1):
@@ -232,24 +234,27 @@ def tv_wall():
 
 
 # --- the portable TV (1x1): a dark plastic monobloc case, its CRT behind a thin rounded mask, on two pads -----
-# The set of the reference photo: one moulded shell, no cabinet and no legs, a big 4:3 tube under a slim rounded
-# mask, the controls and a stub aerial on the top right, the back on the wall face.
+# The set of the reference photo: no cabinet and no legs, the controls and the stub aerial on the top right, the
+# back on the wall face.
 PT_W, PT_H, PT_D = 0.86, 0.66, 0.40   # the case
 PT_BACK = WALL                        # its back, on the wall face
 PT_FRONT = PT_BACK + PT_D             # its front
-PT_MID = 0.095 + PT_H / 2             # its middle height: it stands on a base band and two pads
-PT_TOP = 0.095 + PT_H                 # its top
+PT_MID_Z = (PT_BACK + PT_FRONT) / 2   # its middle depth
+PT_BASE_T = 0.05                      # the base band's thickness, its top at `PT_BASE_H`
+PT_BASE_H = 0.095                     # the base band's top, where the case's bottom sits
+PT_MID = PT_BASE_H + PT_H / 2         # its middle height: it stands on the base band and two pads
+PT_TOP = PT_BASE_H + PT_H             # its top
 PT_SC_Y = 0.44                        # the screen's middle height: a chin below it, a narrow brow above
 PT_SC_W, PT_SC_H, PT_BEZ = 0.68, 0.50, 0.02   # the glass, and the mask round it
 PT_AERIAL = (0.33, PT_TOP, PT_BACK + 0.13)    # the aerial's foot, on the case's top right
 
 
-def tv_retro():
-    zc = (PT_BACK + PT_FRONT) / 2
+def tv_retro() -> None:
     with G.new_parts() as still:
         # the shell: one soft case, its corners well rounded, on an inset base band
-        F.soft('case', PT_W, PT_H, PT_D, (0, PT_MID, zc), M.retro_shell, round=0.05, round_segments=3)
-        F.soft('base', PT_W - 0.06, 0.05, PT_D - 0.05, (0, 0.07, zc), M.retro_shell, round=0.014, round_segments=2)
+        F.soft('case', PT_W, PT_H, PT_D, (0, PT_MID, PT_MID_Z), M.retro_shell, round=0.05, round_segments=3)
+        F.soft('base', PT_W - 0.06, PT_BASE_T, PT_D - 0.05, (0, PT_BASE_H - PT_BASE_T / 2, PT_MID_Z), M.retro_shell,
+               round=0.014, round_segments=2)
         # two pads at the front, a rail at the back
         for s in (-1, 1):
             F.soft(f'pad{s}', 0.11, 0.045, 0.08, (s * 0.28, 0.0225, PT_FRONT - 0.09), M.retro_bezel, round=0.012,
@@ -260,10 +265,10 @@ def tv_retro():
         F.extrude('mask', G.rounded_rect(PT_SC_W + 2 * PT_BEZ, PT_SC_H + 2 * PT_BEZ, 0.055, corner=4), 0.028,
                   (0, PT_SC_Y, PT_FRONT + 0.012), M.retro_bezel, holes=[hole], bevel=0.006, bevel_segments=2)
         glass = PT_FRONT - 0.005
-        secs = []
-        for t, k in ((0.0, 1.015), (0.006, 1.015), (0.012, 1.0), (0.017, 0.94), (0.021, 0.80), (0.024, 0.45)):
-            secs.append([(-u * k, -(glass + t), PT_SC_Y + v * k) for u, v in hole])
-        G.loft('tube', secs, material=M.crt)
+        # the first two sections are the same size: a lip at the mask, so the glass's edge doesn't taper into it
+        tube = [[(-u * k, -(glass + t), PT_SC_Y + v * k) for u, v in hole]
+                for t, k in ((0.0, 1.015), (0.006, 1.015), (0.012, 1.0), (0.017, 0.94), (0.021, 0.80), (0.024, 0.45))]
+        G.loft('tube', tube, material=M.crt)
         # the chin: a badge and the standby light
         F.box('badge', 0.07, 0.012, 0.002, (0, 0.132, PT_FRONT + 0.0005), M.steel)
         F.box('led', 0.006, 0.002, 0.0015, (0.29, 0.132, PT_FRONT + 0.0005), M.led_red)
@@ -278,12 +283,11 @@ def tv_retro():
         F.soft('back', 0.70, 0.5, 0.02, (0, 0.42, PT_BACK + 0.012), M.retro_bezel, round=0.01, round_segments=2)
         for k in range(5):
             F.box(f'vent{k}', 0.5, 0.012, 0.004, (0, 0.3 + 0.055 * k, PT_BACK + 0.021), M.grille)
-        # the aerial's foot on the case's top right
         F.sphere('aerial_foot', 0.022, PT_AERIAL, M.retro_bezel, scale=(1, 0.6, 1), segments=14, rings=8)
     G.join(still, 'tvRetro', origin=(0, 0, 0))
     # the aerial: a telescopic stub lying back along the case's top, its own part, lifted when watched
     with G.new_parts() as aerial:
-        # a telescopic stub: a thick foot section, then the thin rod and its ball
+        # a thick foot section, then the thin rod: `scale` is two rings a point
         knee = (PT_AERIAL[0] + 0.014, PT_AERIAL[1] + 0.008, PT_AERIAL[2] - 0.05)
         tip = (PT_AERIAL[0] + 0.03, PT_AERIAL[1] + 0.022, PT_BACK + 0.025)
         F.sweep('aerial_rod', [PT_AERIAL, knee, tip], 0.006, M.steel, verts=8, scale=[1.7, 1.7, 0.9, 0.9, 0.7, 0.7])
@@ -295,10 +299,14 @@ def tv_retro():
 
 # --- the low TV bench (2x1): a white bench on oak legs, a TV lift in a hood at its back -----------------------
 HOOD_W, HOOD_Z0, HOOD_Z1, HOOD_TOP = 1.3, WALL, -0.31, 0.8
+BENCH_D = 0.43                 # the carcass's depth, its back on the wall face
+BENCH_Z = WALL + BENCH_D / 2   # the carcass's middle depth: its legs splay away from it
+SPLAY = 0.006                  # how far a leg's foot stands out from its top
 LIFT = 0.6
 
 
-def _plant(name, x, y, z, r, h, pot, leaf, n=9, length=0.12):
+def _plant(name: str, x: float, y: float, z: float, r: float, h: float, pot: bpy.types.Material,
+           leaf: bpy.types.Material, n: int = 9, length: float = 0.12) -> None:
     """A pot of leaves: a rimmed pot `r` round and `h` high on `y`, leaves arching out of it."""
     G.revolve(f'{name}_pot', [(0, 0), (r * 0.78, 0), (r * 0.95, h * 0.85), (r * 1.06, h * 0.87), (r * 1.06, h),
                               (r * 0.92, h), (r * 0.9, h * 0.9), (0, h * 0.9)], at=F.at(x, y, z), material=pot, segments=18)
@@ -314,13 +322,15 @@ def _plant(name, x, y, z, r, h, pot, leaf, n=9, length=0.12):
                 up=(0, 0, 1), resolution=2, scale=[0.4, 1.0, 0.8, 0.15])
 
 
-def tv_stand_low():
+def tv_stand_low() -> None:
     with G.new_parts() as still:
-        for x in (-0.84, 0.84):
-            for z in (-0.4, -0.04):
-                F.sweep(f'leg{x}{z}', [(x, 0.06, z), (x + math.copysign(0.006, x), 0.0, z + math.copysign(0.006, z + 0.22))],
+        for i, x in enumerate((-0.84, 0.84)):
+            for k, z in enumerate((-0.4, -0.04)):
+                # each leg's foot stands out from its top, further out sideways and in depth
+                F.sweep(f'leg{i}{k}', [(x, 0.06, z),
+                                       (x + math.copysign(SPLAY, x), 0.0, z + math.copysign(SPLAY, z - BENCH_Z))],
                         0.02, M.bench_oak, verts=10, scale=[1.0, 0.75])
-        F.soft('carcass', 1.8, 0.4, 0.43, (0, 0.26, -0.215), M.bench, round=0.01, round_segments=2)
+        F.soft('carcass', 1.8, 0.4, BENCH_D, (0, 0.26, BENCH_Z), M.bench, round=0.01, round_segments=2)
         F.box('reveal', 1.78, 0.35, 0.002, (0, 0.26, 0.0005), M.grille)
         # the top: in front of the hood and either side of it
         F.soft('top', 1.82, 0.03, 0.34, (0, 0.475, (HOOD_Z1 + 0.03) / 2), M.bench_oak, round=0.008, round_segments=2)
@@ -371,7 +381,7 @@ CASE_Y = 1.6
 SCREEN_W, SCREEN_H = 1.54, 0.92
 
 
-def home_cinema():
+def home_cinema() -> None:
     with G.new_parts() as still:
         for s in (-1, 1):
             F.sweep(f'sled{s}', G.kit.fillet([(s * 0.86, 0.04, -0.405), (s * 0.86, 0.02, -0.38), (s * 0.86, 0.02, -0.06),
@@ -423,7 +433,7 @@ def home_cinema():
                                              (0.03, top - SCREEN_H - 0.04, z), (0.03, top - SCREEN_H - 0.008, z)], 0.01),
                 0.003, M.black_metal, verts=5)
     screen = G.join(screen, 'screen', origin=F.at(0, CASE_Y - 0.01, z))
-    screen.scale[2] = 0.001
+    G.flat(screen)
     G.settle(centre=False)
     G.grow(screen, 'screen_down', seconds=1.4)
 
@@ -431,11 +441,17 @@ def home_cinema():
 # --- the stereo (1x1): an oak hi-fi cabinet with an amplifier, a CD player and records in its open front, a
 # turntable between two speakers on top ------------------------------------------------------------------------
 ST_Z = -0.22   # the cabinet's middle depth: its back on the wall face
-RECORDS = ('rec_rust', 'rec_black', 'rec_mustard', 'rec_teal', 'rec_cream', 'rec_black', 'rec_navy', 'rec_clay',
-           'rec_teal', 'rec_rust')
 
 
-def stereo():
+def _records() -> tuple[bpy.types.Material, ...]:
+    """The records' sleeves, in the order they stand: rust, black, mustard, teal, cream, black, navy, clay, teal,
+    rust. A palette's materials are remade for each model (`Palette`), so they are read as a model is built and not
+    once at import."""
+    return (M.rec_rust, M.rec_black, M.rec_mustard, M.rec_teal, M.rec_cream, M.rec_black, M.rec_navy, M.rec_clay,
+            M.rec_teal, M.rec_rust)
+
+
+def stereo() -> None:
     z = ST_Z
     d = 0.42
     with G.new_parts() as still:
@@ -447,11 +463,11 @@ def stereo():
         F.box('cab_mid', 0.02, 0.41, d - 0.02, (-0.01, 0.37, z - 0.01), M.stereo_wood)
         F.box('cab_back', 0.87, 0.41, 0.012, (0, 0.37, z - d / 2 + 0.006), M.stereo_inside)
         F.box('cab_shelf', 0.43, 0.018, d - 0.02, (-0.225, 0.37, z - 0.01), M.stereo_wood)
-        for x in (-0.4, 0.4):
-            for s in (-1, 1):
+        for i, x in enumerate((-0.4, 0.4)):
+            for k, s in enumerate((-1, 1)):
                 # tapered legs, splayed a little, in brass shoes
-                F.sweep(f'leg{x}{s}', [(x, 0.14, z + s * 0.16), (x * 1.04, 0.0, z + s * 0.17)], 0.02, M.stereo_wood, verts=8,
-                        scale=[1.0, 0.65])
+                F.sweep(f'leg{i}{k}', [(x, 0.14, z + s * 0.16), (x * 1.04, 0.0, z + s * 0.17)], 0.02, M.stereo_wood,
+                        verts=8, scale=[1.0, 0.65])
         # the amplifier on the shelf: a brushed front, a display, two knobs and a power button
         _rbox('amp', 0.4, 0.1, 0.3, (-0.225, 0.43, z), M.stereo_dark, r=0.006)
         F.box('amp_face', 0.39, 0.09, 0.002, (-0.225, 0.43, z + 0.1505), M.steel_dark)
@@ -465,9 +481,10 @@ def stereo():
         F.box('cd_slot', 0.16, 0.012, 0.002, (-0.26, 0.21, z + 0.1505), M.stereo_inside)
         F.box('cd_led', 0.02, 0.008, 0.002, (-0.1, 0.2, z + 0.151), M.led)
         # records on end in the right bay
-        for i, rec in enumerate(RECORDS):
-            F.box(f'record{i}', 0.012, 0.3, 0.31, (0.04 + i * 0.036, 0.315, z - 0.02), getattr(M, rec),
-                  rot=(0, 3 if i == len(RECORDS) - 1 else 0, 0))
+        records = _records()
+        for i, rec in enumerate(records):
+            F.box(f'record{i}', 0.012, 0.3, 0.31, (0.04 + i * 0.036, 0.315, z - 0.02), rec,
+                  rot=(0, 3 if i == len(records) - 1 else 0, 0))
         # the turntable on top: a plinth, the arm on its pivot with a counterweight and a headshell, the speed knob
         _rbox('plinth', 0.4, 0.07, 0.32, (0, 0.635, z), M.stereo_wood, r=0.01)
         G.revolve('arm_base', [(0, 0), (0.022, 0), (0.022, 0.012), (0.012, 0.016), (0.01, 0.03), (0, 0.03)],
@@ -520,7 +537,7 @@ BB_Y = 0.42   # the boombox's foot: the crate's top
 BB_Z = -0.08
 
 
-def boombox():
+def boombox() -> None:
     y0, z = BB_Y, BB_Z
     zf = z + 0.07    # the boombox's front
     with G.new_parts() as still:
@@ -535,9 +552,9 @@ def boombox():
             _rbox(f'crate_top{x}', 0.27, 0.018, 0.44, (x, 0.411, 0), M.crate, r=0.003)
         for y in (0.1, 0.3):
             _rbox(f'crate_back{y}', 0.6, 0.13, 0.018, (0, y, -0.211), M.crate, r=0.003)
+        records = _records()
         for i in range(11):
-            rec = RECORDS[i % len(RECORDS)]
-            F.box(f'record{i}', 0.01, 0.3, 0.3, (-0.24 + i * 0.033, 0.17, -0.04), getattr(M, rec),
+            F.box(f'record{i}', 0.01, 0.3, 0.3, (-0.24 + i * 0.033, 0.17, -0.04), records[i % len(records)],
                   rot=(0, -6 if i == 10 else 0, 0))
         for i, (x, zz, turn) in enumerate(((0.1, 0.1, 12), (0.13, 0.12, -20))):
             _rbox(f'tape_case{i}', 0.11, 0.017, 0.07, (x, 0.4285 + i * 0.017, zz), M.cassette if i else M.rec_cream,
@@ -598,14 +615,14 @@ HEARTH_Z = 0.29   # the floor cushion's middle
 TONGUE = [(0, 0), (0.3, 0.06), (0.48, 0.2), (0.46, 0.38), (0.34, 0.58), (0.18, 0.8), (0, 1.0)]
 
 
-def _log(name, a, b, r, seed):
+def _log(name: str, a: Point, b: Point, r: float, seed: float) -> bpy.types.Object:
     """A split log from game point `a` to `b`: a lumpy barked round, its sawn ends showing."""
     log = F.sweep(name, [a, tuple((p + q) / 2 for p, q in zip(a, b)), b], r, M.logs, verts=9, scale=[0.95, 1.05, 0.9])
     G.jitter(log, r * 0.12, size=0.04, seed=seed)
     return log
 
 
-def fireplace_electric():
+def fireplace_electric() -> None:
     zc = (FP_Z0 + FP_Z1) / 2
     d = FP_Z1 - FP_Z0
     with G.new_parts() as still:
@@ -682,7 +699,7 @@ def fireplace_electric():
             G.revolve(f'core{i}', TONGUE, at=F.at(x, LOG_Y - 0.01, LOG_Z + 0.012), material=M.flame_core, segments=12,
                       scale=(w * 0.55, 0.03, h * 0.6), rot=(0, lean, 0))
     flames = G.join(flames, 'flames', origin=F.at(0, LOG_Y, LOG_Z))
-    flames.scale[2] = 0.001
+    G.flat(flames)
     G.settle(centre=False)
     G.grow(flames, 'flames', seconds=0.8)
 
