@@ -707,13 +707,7 @@ fn schedule_school(w: &mut World, i: usize, day: u32) {
         return;
     }
     if !heading_out(sim) {
-        end_activity(sim, content, objects);
-        sim.engaged_with = None;
-        sim.queue.push_front(Task {
-            kind: TaskKind::Work,
-            directed: true,
-            routine: false,
-        });
+        set_off(sim, content, objects, tick);
     }
 }
 
@@ -765,9 +759,23 @@ fn schedule_work(w: &mut World, i: usize, day: u32) {
         objects,
         ..
     } = w;
-    let sim = &mut sims[i];
+    set_off(&mut sims[i], content, objects, tick);
+}
+
+/// Off to work or school now: whatever they're doing dropped, and a visit or an outing they're
+/// on over, as coming home ends one (`Transition::Home`); not ended, it went to work with them,
+/// and a cyclist rode on with a visit hours past its end (Snowdale, Hollyshaw, Stationgate).
+fn set_off(
+    sim: &mut Sim,
+    content: &Content,
+    objects: &mut [crate::world::ObjectInstance],
+    tick: u64,
+) {
     end_activity(sim, content, objects);
     sim.engaged_with = None;
+    if sim.visiting.take().is_some() {
+        sim.back_at = tick;
+    }
     sim.queue.push_front(Task {
         kind: TaskKind::Work,
         directed: true,

@@ -1844,3 +1844,78 @@ fn a_cyclist_out_on_a_visit_when_work_calls_doesnt_ride_out_on_the_bike_their_wa
     assert!(to_work, "C never left for work");
     assert!(aboard.iter().any(|x| !x.1), "C never rode the taxi to work");
 }
+
+#[test]
+fn a_visit_when_a_bike_commute_starts_is_over_and_the_ride_goes_out_of_town() {
+    // C rides to work (300 m to the way out, a ride well within `BIKE_MOST`). Out on a visit
+    // along the street as it's time to set off: the visit's over (as coming home ends one), and
+    // C rides out of town. (Not ended, it went to work with them: a cyclist rode on with a visit
+    // hours past its end, stuck on the bike in town, Snowdale, Hollyshaw, Stationgate.)
+    let make = || {
+        let mut c = house(300, &[&worker("C")]);
+        c.bike = true;
+        town(
+            7,
+            &[
+                c,
+                house(180, &[r#"{"name":"D","age":40,"traits":["cheerful"]}"#]),
+            ],
+        )
+    };
+    let working = |w: &World| {
+        w.sims[0]
+            .current()
+            .is_some_and(|a| matches!(a.task.kind, sim_core::world::TaskKind::Work))
+    };
+    // (When C sets off on day 2 left alone.)
+    let mut w = make();
+    run_to(&mut w, 2, 0.0);
+    let end = sim_core::clock::tick_at(3, 0.0).unwrap();
+    while w.tick < end && !working(&w) {
+        w.tick_once();
+    }
+    let off = w.tick;
+    assert!(off < end, "C never set off for work");
+    assert!(
+        w.sims[0].commute().is_some_and(|c| c.bike.is_some()),
+        "C's way out isn't by bike"
+    );
+    // Again, out on a visit then.
+    let mut w = make();
+    while w.tick + 15 * 20 < off {
+        w.tick_once();
+    }
+    w.apply(sim_core::Command::Visit { sim: 0, plot: 1 })
+        .unwrap();
+    let mut visited = false;
+    let mut set_off = None;
+    // (On a bike in town since, and the longest spell: `generated_worlds`' check's.)
+    let (mut riding, mut longest) = (None::<u64>, 0u64);
+    while w.tick < end && w.sims[0].away_until.is_none() {
+        w.tick_once();
+        let c = &w.sims[0];
+        visited |= c.visiting.is_some_and(|v| v.plot == 1);
+        if c.riding.is_some() {
+            let since = *riding.get_or_insert(w.tick);
+            longest = longest.max(w.tick - since);
+        } else {
+            riding = None;
+        }
+        if working(&w) {
+            set_off.get_or_insert(w.tick);
+            assert!(
+                c.visiting.is_none(),
+                "off to work with the visit still on: {:?}",
+                c.visiting
+            );
+        }
+    }
+    assert!(visited, "C never went on the visit");
+    assert!(set_off.is_some(), "C never set off for work");
+    assert!(w.sims[0].away_until.is_some(), "C never got out of town");
+    assert!(
+        longest < 2 * 60 * 20,
+        "C on the bike in town for {} min",
+        longest / 20
+    );
+}
