@@ -53,6 +53,11 @@ fn arm_k(s: &str) -> (usize, usize, usize) {
 }
 /// The thighs' first rings keep this far (x thigh radius) from the midline, either side of the crotch.
 const CROTCH_GAP: f64 = 0.1;
+/// How much wider than the palm's columns the knuckles' are (and the fingers, which sit between
+/// them): fingers the palm's width apart touch, and a hand a few pixels wide then reads as a mitten.
+/// A tenth more puts 5 mm between them, which is a pixel at the closest camera, and still leaves
+/// the knuckles about the palm's width (its widest ring) rather than a fan.
+const KNUCKLE_SPREAD: f64 = 1.06;
 
 pub fn region(name: &str) -> usize {
     REGIONS.iter().position(|&r| r == name).expect("region")
@@ -524,7 +529,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         let k1j = pj(nm("fingers_01"));
         let lpm = (k1j - jwr).norm();
         // (A small child's hand is a little wider, its fingers plumper and shorter.)
-        let (wp, tp) = ((0.80 + 0.12 * yg) * lpm, 0.30 * lpm);
+        let (wp, tp) = ((0.84 + 0.12 * yg) * lpm, 0.30 * lpm);
         let zs: Vec<f64> = [-0.5, -0.25, 0.0, 0.25, 0.5]
             .iter()
             .zip([0.9, 1.0, 1.0, 1.0, 0.92])
@@ -591,21 +596,25 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                     let edge = if k == 0 || k == 4 { 0.85 } else { 1.0 };
                     if v > 0.0 {
                         cc + d * (1.0 * lpm)
-                            + z * (zs[k] * 0.98)
+                            + z * (zs[k] * KNUCKLE_SPREAD)
                             + u * (top * edge - if k == 0 || k == 4 { 0.0 } else { 0.012 * lpm })
                     } else {
-                        cc + d * (1.08 * lpm) + z * (zs[k] * 0.98) - u * (pad * edge)
+                        cc + d * (1.08 * lpm) + z * (zs[k] * KNUCKLE_SPREAD) - u * (pad * edge)
                     }
                 })
                 .collect();
             // Order: palm side 3 .. 0, the pinky's side, back 0 .. 4, the index's side, palm side 4.
             out.insert(
                 4,
-                cc + d * (1.04 * lpm) + z * (zs[0] * 0.98 - 0.02 * lpm) - u * (0.01 * lpm),
+                cc + d * (1.04 * lpm)
+                    + z * (zs[0] * KNUCKLE_SPREAD - 0.02 * lpm)
+                    - u * (0.01 * lpm),
             );
             out.insert(
                 10,
-                cc + d * (1.04 * lpm) + z * (zs[4] * 0.98 + 0.02 * lpm) - u * (0.01 * lpm),
+                cc + d * (1.04 * lpm)
+                    + z * (zs[4] * KNUCKLE_SPREAD + 0.02 * lpm)
+                    - u * (0.01 * lpm),
             );
             out
         };
@@ -651,7 +660,9 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         let crotch: Vec<usize> = (1..4)
             .map(|k| {
                 c.add(
-                    jwr + d * (1.2 * lpm) + z * (zs[k] * 0.98) - u * (0.045 * lpm),
+                    jwr + d * (1.08 * lpm)
+                        + z * (zs[k] * KNUCKLE_SPREAD)
+                        - u * (0.10 * lpm),
                     wc.clone(),
                     "hand",
                     None,
@@ -684,12 +695,14 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
             ];
             // (Half width, half depth; distal length past the joint, in palm lengths. The palm side is fuller.)
             let (hw, hd) = (
-                [0.088, 0.098, 0.1, 0.098][fi] * chub,
+                [0.080, 0.089, 0.091, 0.089][fi] * chub,
                 [0.095, 0.105, 0.107, 0.105][fi] * chub,
             );
             let tip = [0.25, 0.29, 0.31, 0.29][fi] * (1.0 - 0.3 * yg);
-            let zf = (zs[fi] + zs[fi + 1]) / 2.0 * 0.98;
-            let spread = (fi as f64 - 1.5) * 0.05;
+            let zf = (zs[fi] + zs[fi + 1]) / 2.0 * KNUCKLE_SPREAD;
+            // (The fingers fan a little, so the gaps between them widen towards the tips, where the
+            // silhouette shows them; at rest a hand's fingers are not parallel.)
+            let spread = (fi as f64 - 1.5) * 0.07;
             // (A 6-ring round cc facing ax: half width, half depth on the back and on the palm side.)
             let hex = |cc: V3, ax: V3, up: V3, hw: f64, back: f64, palm: f64| -> Vec<V3> {
                 let sd = unit(up.cross(&ax)) * sign(up.cross(&ax).dot(&z));
@@ -712,7 +725,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                 pivot - d * (0.04 * lpm),
                 d,
                 u,
-                hw * 1.1,
+                hw * 0.98,
                 hd * 1.05,
                 hd * 1.5,
             );
@@ -724,7 +737,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                 pivot + ad * (tip * lpm) + z * (spread * tip * lpm),
                 ad,
                 au,
-                hw * 0.95,
+                hw * 0.90,
                 hd * 0.85,
                 hd * 1.15,
             );

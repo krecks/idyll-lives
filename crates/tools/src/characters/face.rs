@@ -101,6 +101,9 @@ fn style(family: &str) -> Style {
 
 /// How dark the upper lid's crease is (tone y).
 const LID_CREASE: f64 = 0.7;
+/// How much of the lip's colour the lips take (tone y, negative): the whole tube, less towards its edge
+/// against the face and towards the line between the lips (which the occlusion shades).
+const LIP_TINT: f64 = 0.9;
 
 /// The lids reach out over the eye's socket to the face (`Face::seams`): their outer row lies
 /// `LID_LIFT` mm in front of the face round the socket, `LID_MARGIN` eye radii past the hollow and at
@@ -1041,7 +1044,8 @@ fn smooth_n(name: &str, pos: &[V3], idx: &[usize]) -> Vec<V3> {
     }
 }
 
-/// Per piece tone: lips blushed (x), the mouth plate dark (y), the tongue red, teeth shaded at the sides.
+/// Per piece tone: lips tinted (y < 0: how much of the lip's colour) and blushed (x), the mouth plate
+/// dark (y = 1), the lids' crease dark (y > 0), the tongue red, teeth shaded at the sides.
 fn tone(name: &str, pos: &[V3], idx: &[usize], face: &Face) -> Vec<[f64; 4]> {
     let n = pos.len();
     let mut t = vec![[0.0; 4]; n];
@@ -1052,14 +1056,16 @@ fn tone(name: &str, pos: &[V3], idx: &[usize], face: &Face) -> Vec<[f64; 4]> {
             t[2 * k + j][1] = LID_CREASE * (PI * j as f64 / (k - 1) as f64).sin().sqrt();
         }
     } else if name == "lipU" || name == "lipL" {
-        // The sides facing the other lip in shade: a dark line between the lips, so the mouth's
-        // shape (a smile, a frown) reads even when it is a few pixels wide.
+        // The lips' colour (y < 0), fading at the mouth's corners into the skin and towards the line
+        // between them: there the lips' inner sides face each other in shade, which the occlusion (w)
+        // bakes, so the mouth's shape (a smile, a frown) reads even when it is a few pixels wide.
         let nn = smooth_normals(pos, idx);
         for i in 0..n {
             let s = clip((pos[i].x - face.h.mouth[0]).abs() / face.hw, 0.0, 1.0);
             t[i][0] = (if name == "lipU" { 0.75 } else { 0.85 }) * (1.0 - 0.35 * s.powf(3.0));
             let ny = nn[i].y * (if name == "lipU" { -1.0 } else { 1.0 });
-            t[i][1] = 0.75 * clip(ny, 0.0, 1.0).powf(1.5);
+            let inner = clip(ny, 0.0, 1.0).powf(1.5);
+            t[i][1] = -LIP_TINT * (1.0 - 0.45 * s.powf(3.0)) * (1.0 - 0.55 * inner);
         }
     } else if name == "plate" {
         for v in &mut t {

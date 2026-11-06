@@ -47,6 +47,13 @@ const HAIR_MICRO = '0.38';
 /** Polished shoes: glossier than the other shells. */
 const POLISH_MICRO = '0.55';
 /**
+ * The lips (body tone.y < 0): how much of the lip's colour over the skin's, and how matte they are
+ * (skin is glossier, and a lip's tube catches the key light along its whole length when it isn't).
+ */
+const LIP_MIX = '0.9';
+const LIP_SHADE = '0.3';
+const LIP_MICRO = '0.25';
+/**
  * Fabric along the painted cuts and a skirt's hem (`simHem`): a turned band per edge, its width and its
  * stitch line's distance from the edge (m on the fields).
  */
@@ -311,8 +318,9 @@ const PS_GLSL = {
 	varying vec4 vSimTone;
 	uniform highp sampler2D game_simPoses;
 	uniform vec4 game_simLayout;
-	// Painted clothes' share (the body's roughness), and the eye's catchlight (its emission).
+	// Painted clothes' share (the body's roughness), the lips' (theirs), and the eye's catchlight (its emission).
 	float gameSimCloth = 0.0;
+	float gameSimLip = 0.0;
 	float gameSimCatch = 0.0;
 	// Appearance texel k of the resident's row.
 	vec4 simTexel(int k) { return texelFetch(game_simPoses, ivec2(int(game_simLayout.x + 0.5) + k, int(vSimRow + 0.5)), 0); }
@@ -357,11 +365,18 @@ const PS_GLSL = {
 			vec2 simHemTop = ${HEM_TOP};
 			vec2 simHemBottom = ${HEM_BOTTOM};
 			vec2 simHemShoe = simHem(gShoe, ${BAND.welt}) * simPlain;
-			// Skin: the Sim's colour (relative to the reference), blushed by the tone (x), the line between the lips
-			// and the lids' crease darkened (y), and the age folds (z) as far as the Sim's age (texel 4 g).
+			// Skin: the Sim's colour (relative to the reference), blushed by the tone (x), the lids' crease and
+			// the line between the lips darkened (y > 0), the lips themselves tinted (y < 0: how much of the lip),
+			// and the age folds (z) as far as the Sim's age (texel 4 g).
 			vec4 simRef = simTexel(5);
 			vec3 skin = simA.rgb * clamp(albedo / max(simRef.rgb, vec3(0.01)), vec3(0.0), vec3(2.0));
-			skin = skin * mix(vec3(1.0), vec3(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0)) * (1.0 - ${FOLD} * clamp(simT.z * simT4.y, 0.0, 1.0));
+			skin = skin * mix(vec3(1.0), vec3(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0));
+			// The lips: a red-rose tint that reads on a pale face and on a dark one alike (the skin darkened and
+			// reddened, then mixed towards a rose), and a shade under them where they turn down.
+			gameSimLip = clamp(-simT.y, 0.0, 1.0);
+			vec3 simLipC = mix(skin * vec3(0.62, 0.34, 0.33), vec3(0.42, 0.14, 0.13), 0.45);
+			skin = mix(skin, simLipC, ${LIP_MIX} * gameSimLip) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0));
+			skin = skin * (1.0 - ${LIP_SHADE} * gameSimLip * clamp(-normalW.y, 0.0, 1.0)) * (1.0 - ${FOLD} * clamp(simT.z * simT4.y, 0.0, 1.0));
 			float scalp = clamp(-simF.z - 1.0, 0.0, 1.0) * simTexel(7).w;
 			skin = mix(skin, simTexel(3).rgb * 0.7, scalp);
 			vec3 cTop = simTexel(1).rgb;
@@ -448,8 +463,9 @@ const PS_GLSL = {
   gloss: `
 #ifdef GAME_RESIDENT
 	#ifdef GAME_SIM_BODY
-		// Painted clothes are rougher than skin.
+		// Painted clothes are rougher than skin, the lips a little too (they don't take a highlight).
 		dGlossiness = mix(dGlossiness, ${CLOTH_MICRO}, gameSimCloth);
+		dGlossiness = mix(dGlossiness, ${LIP_MICRO}, gameSimLip);
 	#endif
 	#ifdef GAME_SIM_HAIR
 		dGlossiness = min(dGlossiness, ${HAIR_MICRO});
@@ -474,6 +490,7 @@ const PS_WGSL = {
 	var game_simPoses: texture_2d<uff>;
 	uniform game_simLayout: vec4f;
 	var<private> gameSimCloth: f32 = 0.0;
+	var<private> gameSimLip: f32 = 0.0;
 	var<private> gameSimCatch: f32 = 0.0;
 	fn simTexel(k: i32) -> vec4f { return textureLoad(game_simPoses, vec2i(i32(uniform.game_simLayout.x + 0.5) + k, i32(vSimRow + 0.5)), 0); }
 	#if defined(GAME_SIM_BODY) || defined(GAME_SIM_CLOTH)
@@ -515,7 +532,11 @@ const PS_WGSL = {
 			let simHemShoe = simHem(gShoe, ${BAND.welt}) * simPlain;
 			let simRef = simTexel(5);
 			var skin = simA.rgb * clamp(albedo / max(simRef.rgb, vec3f(0.01)), vec3f(0.0), vec3f(2.0));
-			skin = skin * mix(vec3f(1.0), vec3f(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0)) * (1.0 - ${FOLD} * clamp(simT.z * simT4.y, 0.0, 1.0));
+			skin = skin * mix(vec3f(1.0), vec3f(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0));
+			gameSimLip = clamp(-simT.y, 0.0, 1.0);
+			let simLipC = mix(skin * vec3f(0.62, 0.34, 0.33), vec3f(0.42, 0.14, 0.13), 0.45);
+			skin = mix(skin, simLipC, ${LIP_MIX} * gameSimLip) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0));
+			skin = skin * (1.0 - ${LIP_SHADE} * gameSimLip * clamp(-normalW.y, 0.0, 1.0)) * (1.0 - ${FOLD} * clamp(simT.z * simT4.y, 0.0, 1.0));
 			let scalp = clamp(-simF.z - 1.0, 0.0, 1.0) * simTexel(7).w;
 			skin = mix(skin, simTexel(3).rgb * 0.7, scalp);
 			var cTop = simTexel(1).rgb;
@@ -590,6 +611,7 @@ const PS_WGSL = {
 #ifdef GAME_RESIDENT
 	#ifdef GAME_SIM_BODY
 		dGlossiness = mix(dGlossiness, ${CLOTH_MICRO}, gameSimCloth);
+		dGlossiness = mix(dGlossiness, ${LIP_MICRO}, gameSimLip);
 	#endif
 	#ifdef GAME_SIM_HAIR
 		dGlossiness = min(dGlossiness, ${HAIR_MICRO});
