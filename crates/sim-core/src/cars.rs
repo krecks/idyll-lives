@@ -5771,6 +5771,28 @@ mod tests {
     }
 
     #[test]
+    fn of_two_held_up_by_each_other_the_one_backing_up_goes_on() {
+        // (Willowbrook, a big world of the 0.7.0 samples: a car and a taxi meeting round a bend
+        // took turns backing up a tick each as their claims changed, for good.) The earlier backing
+        // up already goes on backing up, though the later would otherwise; backed up as far as it
+        // can, the later does.
+        let town = TOWN.replace(
+            r#""cars":[{"plot":0"#,
+            r#""cars":[{"plot":0,"x":30.0,"z":3.0,"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,"body":1,"paint":1},{"plot":0"#,
+        );
+        let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+        let (a, b) = (car_first(0), car_first(1));
+        w.cars[0].waits_for = Some(b);
+        w.cars[1].waits_for = Some(a);
+        w.cars[0].jam = (200, 3, false);
+        assert!(waits_back(&w, b, a), "the earlier goes on backing up");
+        assert!(!waits_back(&w, a, b), "the later doesn't");
+        w.cars[0].jam.2 = true;
+        assert!(waits_back(&w, a, b), "the earlier can't: the later does");
+        assert!(!waits_back(&w, b, a));
+    }
+
+    #[test]
     fn a_garage_takes_up_its_ground() {
         let town = TOWN.replace(
             r#""cars":["#,
