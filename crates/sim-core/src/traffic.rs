@@ -45,7 +45,8 @@
 //! pull-over, a turn sweeping wider than its samples), and those are broken where they form: a car
 //! and one in its way waiting for each other a while, the car backs up a little out of its way,
 //! never into anyone (`cars::back_off`). An ask older than `OLD_ASK` yields only to one it waits
-//! for itself, not to a stream round about: nobody waits on and on while others come and go.
+//! for itself, not to a stream round about: nobody waits on and on while others come and go; and
+//! nobody comes up to wait in its way (`STOP_SHORT`, `Traffic::blocked`), to be let go first.
 //! Should two bodies come to overlap anyway, a last-resort check keeps every car from moving
 //! deeper into another (`cars::guard`, counted in `Traffic::guarded`).
 //!
@@ -647,6 +648,14 @@ struct Ask {
 /// How far short of what's left of another's claim one waits (m, `Traffic::blocked`).
 const KEEP_SHORT: f32 = 1.5;
 
+/// How far short of the start of its next claim one not holding a claim stops, where waiting
+/// there it would be in the way of a group asked for long ago (`OLD_ASK`, m: `Traffic::blocked`).
+const STOP_SHORT: f32 = 3.0;
+
+/// An ask not asked again stands while its vehicle is no further short of its group than this
+/// (ticks along its route: backed up out of one's way, `cars::JAM_BACK`, `Traffic::begin`).
+const KEPT_ASK: f32 = 65.0;
+
 /// An ask this old (ticks) yields only to those it waits for itself (`Traffic::begin`, rule 2).
 const OLD_ASK: u64 = 20 * crate::TICKS_PER_MINUTE;
 
@@ -661,6 +670,9 @@ pub struct Traffic {
     /// it (`Light`), and since when.
     pub(crate) lights: Vec<Light>,
     movers: Vec<Mover>,
+    /// Where each vehicle on its way to the start of its next claim, not yet there, will wait for
+    /// it (its key, the claim's first sample: `may_go`, this tick).
+    starts: Vec<(u64, Sample)>,
     /// Ticks a car was kept from moving deeper into another by the last-resort check
     /// (`cars::guard`), since the game was loaded.
     pub guarded: u64,
@@ -759,7 +771,17 @@ impl Traffic {
                     }
                 }
             }
+            self.starts.retain(|s| s.0 != key);
             return false;
+        }
+        // (Where it'll wait for its next claim: `blocked`.)
+        self.starts.retain(|s| s.0 != key);
+        let next = claims
+            .iter()
+            .enumerate()
+            .find(|(k, c)| c.from >= to && !self.holds(key, tag(route, *k)));
+        if let Some(first) = next.and_then(|(_, c)| c.samples.first()) {
+            self.starts.push((key, *first));
         }
         true
     }
@@ -768,7 +790,8 @@ impl Traffic {
     /// over `pass` m at most): what's left of a claim another holds that `next` is in the way of
     /// and `now` isn't (`counts`, even going its way: cutting in; not one right behind it,
     /// `behind`). Still in its driveway (`in_drive`: before its first claim, none held), `now` in
-    /// the way too: it'd only come out deeper into it.
+    /// the way too: it'd only come out deeper into it. Not holding one, nor on up to wait in the
+    /// way of a group asked for long ago (`OLD_ASK`).
     pub(crate) fn blocked(
         &self,
         key: u64,
@@ -797,6 +820,7 @@ impl Traffic {
         };
         // (Holding a claim itself, granted it with the others in mind, as it is.)
         let holding = self.holding(key);
+        let raw_next = *next;
         let next = if holding { *next } else { long(next) };
         let (now, next) = (sample(now), sample(&next));
         for h in &self.holds {
@@ -825,7 +849,44 @@ impl Traffic {
                 return Some(h.key);
             }
         }
-        None
+        // Not holding a claim, nor on up to wait at the start of its next one (`Traffic::starts`)
+        // where it would be in the way of a group another has asked for long (`OLD_ASK`) and
+        // waits for at its start: it stops `STOP_SHORT` short of it. (Standing there, it would hold
+        // that one up, to be let go first as it asked after it: a stream of them kept the one
+        // waiting there for good.)
+        if holding {
+            return None;
+        }
+        let stop = self.starts.iter().find(|s| s.0 == key).map(|s| s.1)?;
+        // (Nearer than half that already, it came up to it before that one's ask was old: on.)
+        let (from, to) = (
+            dist(now.rect.at, stop.rect.at),
+            dist(raw_next.at, stop.rect.at),
+        );
+        if from <= STOP_SHORT / 2.0 || to > STOP_SHORT {
+            return None;
+        }
+        // (Standing where it stops, as it stands there: not in that one's way itself.)
+        let stop = Sample { pass: 0.0, ..stop };
+        let short = Sample {
+            rect: raw_next,
+            pass: 0.0,
+            ..now
+        };
+        let into = |a: &Ask, r: &Sample| {
+            a.parts.iter().any(|(_, c)| {
+                in_bounds(c, &r.rect) && c.samples.iter().any(|o| conflict(r, o, true))
+            })
+        };
+        self.asks
+            .iter()
+            .filter(|a| a.key != key && a.seen + 1 >= self.tick && self.tick > a.tick + OLD_ASK)
+            .filter(|a| {
+                self.mover(a.key)
+                    .is_none_or(|m| !behind((&now.rect, way), (&m.rect, m.way)))
+            })
+            .find(|a| into(a, &stop) && !into(a, &short))
+            .map(|a| a.key)
     }
 
     /// Whether a group through the lights `gate` (`Claim::gate`) may be asked for now: its arm's
@@ -915,6 +976,7 @@ impl Traffic {
     ) {
         self.tick = tick;
         self.movers = movers;
+        self.starts.clear();
         let place = |key: u64, route: u32| {
             places
                 .iter()
@@ -933,9 +995,12 @@ impl Traffic {
             let going = holds
                 .iter()
                 .any(|h| h.key == a.key && h.tag >> 16 == a.route && h.claim.group == a.group);
-            (a.seen + 1 >= tick || going)
-                && place(a.key, a.route)
-                    .is_some_and(|t| a.parts.first().is_some_and(|p| t <= p.1.from + 1e-3))
+            // (Backed up a little out of one's way, not asking again meanwhile, `cars::back_off`:
+            // its ask stands, in its place in the queue, `KEPT_ASK`.)
+            let at = place(a.key, a.route);
+            let short = |t: f32| a.parts.first().is_some_and(|p| t >= p.1.from - KEPT_ASK);
+            (a.seen + 1 >= tick || going || at.is_some_and(short))
+                && at.is_some_and(|t| a.parts.first().is_some_and(|p| t <= p.1.from + 1e-3))
         });
         self.asks.sort_by_key(|a| (a.tick, a.key));
         self.change_lights(tick, signals);
@@ -948,14 +1013,7 @@ impl Traffic {
         }
         // (Who waits for whose body on the road, however far round: the asks' waits left out.)
         let on_road = graph.clone();
-        // (And who waits for whom for their claims and bodies: the earlier asks they wait their
-        // turn after left out.)
-        let mut by_graph = graph.clone();
         for a in &self.asks {
-            by_graph
-                .entry(a.key)
-                .or_default()
-                .extend(a.by.iter().copied());
             let e = graph.entry(a.key).or_default();
             e.extend(a.by.iter().chain(&a.fifo).copied());
         }
@@ -1041,13 +1099,14 @@ impl Traffic {
             // body).
             let conflicting = |(j, bodies_of): &&(usize, Vec<u64>)| {
                 let e = &self.asks[*j];
-                // (Asked long ago, only one it waits for itself goes first, however far round by
-                // claims and bodies: no stream of others waiting their turn after it round about
-                // holds it up for good, and no ring of them either.)
+                // (Asked long ago, only one it waits for itself, however far round, goes first:
+                // by claims, bodies or the earlier asks it waits its turn after (one in the way of
+                // an ask before it is to go on first); not one it doesn't, on this tick's bodies
+                // alone. No stream of others waiting their turn after it round about holds it up
+                // for good, and no ring of them either.)
                 let old = tick > e.tick + OLD_ASK;
                 let first = if old {
-                    graph.get(&e.key).is_some_and(|g| g.contains(&a.key))
-                        || reaches(&by_graph, e.key, a.key)
+                    reaches(&graph, e.key, a.key)
                 } else {
                     bodies_of.contains(&a.key) || reaches(&graph, e.key, a.key)
                 };
@@ -1299,4 +1358,166 @@ pub(crate) fn begin(w: &mut World) {
     crate::cars::movers(w, &mut movers, &mut places);
     let tick = w.tick;
     w.traffic.begin(tick, movers, &places, &w.travel.signals);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A car's body (4.6 by 1.88 m) at `at` facing `yaw`.
+    fn rect(at: [f32; 2], yaw: f32) -> Rect {
+        Rect {
+            at,
+            yaw,
+            half: [2.3, 0.94],
+        }
+    }
+
+    /// A claim from 10 to 20 ticks along its route through `points` (each facing on to the next).
+    fn claim(points: &[[f32; 2]]) -> Claim {
+        let n = points.len();
+        let samples = (0..n)
+            .map(|k| {
+                let (a, b) = if k + 1 < n {
+                    (points[k], points[k + 1])
+                } else {
+                    (points[k - 1], points[k])
+                };
+                let yaw = (b[0] - a[0]).atan2(b[1] - a[1]);
+                Sample {
+                    t: 10.0 + 10.0 * k as f32 / (n - 1) as f32,
+                    d: k as f32,
+                    rect: rect(points[k], yaw),
+                    way: [yaw.sin(), yaw.cos()],
+                    pass: 0.0,
+                }
+            })
+            .collect();
+        Claim::new(10.0, 20.0, samples)
+    }
+
+    /// One standing at `at` facing `yaw`, waiting for nobody on the road.
+    fn standing(key: u64, at: [f32; 2], yaw: f32) -> Mover {
+        Mover {
+            key,
+            rect: rect(at, yaw),
+            way: [yaw.sin(), yaw.cos()],
+            pass: 0.0,
+            moving: false,
+            ahead: Vec::new(),
+            parked: false,
+            waits: None,
+        }
+    }
+
+    #[test]
+    fn an_old_ask_waiting_its_turn_after_one_held_up_by_a_later_one_lets_that_one_go() {
+        // (Mirrormere's: the first, its way across where the third stands; the second, asked a
+        // tick after it, its way across the first's; the third, asked long after, its way
+        // across the second's only. Each waited for the next for good: the third for the second,
+        // an old ask, the second its turn after the first, the first for the third's body.)
+        let (first, second, third) = (1 << 63 | 11, 1 << 63 | 18, 1 << 63 | 9);
+        let c_first = claim(&[
+            [-12.0, 0.0],
+            [-6.0, 0.0],
+            [0.0, 0.0],
+            [6.0, 0.0],
+            [12.0, 0.0],
+        ]);
+        let c_second = claim(&[
+            [6.0, -6.0],
+            [6.0, 0.0],
+            [6.0, 6.0],
+            [6.0, 12.0],
+            [6.0, 18.0],
+        ]);
+        let c_third = claim(&[
+            [0.0, 6.0],
+            [0.0, 9.0],
+            [2.0, 12.0],
+            [6.0, 14.0],
+            [12.0, 14.0],
+        ]);
+        let movers = || {
+            vec![
+                standing(first, [-15.0, 0.0], std::f32::consts::FRAC_PI_2),
+                standing(second, [6.0, -9.0], 0.0),
+                standing(third, [0.0, 2.0], 0.0),
+            ]
+        };
+        let places = [(first, 0, 9.5), (second, 0, 9.5), (third, 0, 9.5)];
+        let mut traffic = Traffic::default();
+        let late = 2 + OLD_ASK + 10;
+        for tick in 1..late + 20 {
+            traffic.may_go(tick, first, 0, std::slice::from_ref(&c_first), 9.5, 10.5);
+            if tick >= 2 {
+                traffic.may_go(tick, second, 0, std::slice::from_ref(&c_second), 9.5, 10.5);
+            }
+            if tick >= late && !traffic.holding(third) {
+                traffic.may_go(tick, third, 0, std::slice::from_ref(&c_third), 9.5, 10.5);
+            }
+            traffic.begin(tick + 1, movers(), &places, &[]);
+        }
+        assert!(
+            traffic.waits_for(first).contains(&third),
+            "the first waits for the third's body"
+        );
+        assert!(
+            traffic.holding(third),
+            "the third goes first: waits {:?}",
+            traffic.waits_for(third)
+        );
+    }
+
+    #[test]
+    fn one_coming_up_to_wait_in_the_way_of_an_old_ask_stops_short() {
+        // (Crown Quarter's: a taxi waiting to turn across a junction's mouth, where those coming
+        // up the other arm stand at its edge, each in its way and let go first as it asked: one
+        // after another kept it waiting an hour. Asked long ago, the next stops short.)
+        let (waiting, coming) = (1 << 63 | 40, 1 << 63 | 18);
+        let across = claim(&[
+            [-12.0, 0.0],
+            [-6.0, 0.0],
+            [0.0, 0.0],
+            [6.0, 0.0],
+            [12.0, 0.0],
+        ]);
+        let mine = claim(&[
+            [0.0, -2.0],
+            [0.0, 2.0],
+            [0.0, 6.0],
+            [0.0, 10.0],
+            [0.0, 14.0],
+        ]);
+        // (Held up meanwhile by one standing in its way further on.)
+        let right = std::f32::consts::FRAC_PI_2;
+        let movers = || {
+            vec![
+                standing(waiting, [-15.0, 0.0], right),
+                standing(1 << 63 | 7, [10.0, 0.0], right),
+            ]
+        };
+        let mut traffic = Traffic::default();
+        let mut stops = Vec::new();
+        for tick in 1..OLD_ASK + 20 {
+            traffic.may_go(tick, waiting, 0, std::slice::from_ref(&across), 9.5, 10.5);
+            traffic.begin(tick + 1, movers(), &[(waiting, 0, 9.5)], &[]);
+            // (Coming up, 3.4 m short of where it would wait, a tick on 2.9 m.)
+            assert!(traffic.may_go(tick + 1, coming, 0, std::slice::from_ref(&mine), 5.0, 6.0));
+            let (now, next) = (rect([0.0, -5.4], 0.0), rect([0.0, -4.9], 0.0));
+            stops.push(traffic.blocked(coming, &now, &next, [0.0, 1.0], 0.7, false));
+        }
+        assert_eq!(stops[0], None, "a young ask: on up to it");
+        assert_eq!(
+            stops.last().copied().flatten(),
+            Some(waiting),
+            "an old one: it stops short"
+        );
+        // (Nearer than half that already, it came up before the ask was old: on.)
+        let (now, next) = (rect([0.0, -3.4], 0.0), rect([0.0, -2.9], 0.0));
+        assert_eq!(
+            traffic.blocked(coming, &now, &next, [0.0, 1.0], 0.7, false),
+            None
+        );
+    }
 }

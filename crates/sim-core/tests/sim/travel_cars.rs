@@ -847,7 +847,6 @@ fn a_car_turning_out_of_a_side_road_waits_for_one_coming_along_the_road() {
 }
 
 #[test]
-#[ignore = "needs the oncoming-on-a-bend passing and the kept ask (5593cd43, d53540e2), reverted in c96a2147 and being redone on fix/cg-rings"]
 fn one_turning_out_of_a_side_road_and_one_coming_home_past_it_both_get_through_its_box() {
     // (As at Pebble Bay: one coming home along the main road from the west to a house just east
     // of the junction, as one turns out of the side road through its box: the claims let them in
