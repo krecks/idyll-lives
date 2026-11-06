@@ -4348,19 +4348,23 @@ fn settle_all(w: &mut World) {
         ..
     } = &mut *w;
     // (The public parking spots a car parked at would stand in the way of one turning into or out
-    // of its driveway: none parks there on a trip, `parking_for`.)
-    let mouths: Vec<[f32; 2]> = drives
+    // of its driveway, or on the driveway itself (a bay off the road where a driveway runs: the
+    // car coming home couldn't get by it): none parks there on a trip, `parking_for`.)
+    let ways: Vec<([f32; 2], [f32; 2])> = drives
         .iter()
-        .filter_map(Drive::meets)
-        .filter_map(|(road, s)| travel.graph.at_source(road, s))
-        .map(|p| travel.graph.point(p))
+        .filter_map(|d| {
+            let (road, s) = d.meets()?;
+            let mouth = travel.graph.point(travel.graph.at_source(road, s)?);
+            Some(([d.x, d.z], mouth))
+        })
         .collect();
     travel.by_a_mouth = (0..travel.file.parking.len())
         .map(|k| {
             parked_at(travel, k).is_some_and(|(at, ..)| {
-                mouths
-                    .iter()
-                    .any(|&m| crate::travel::dist(m, at) < MOUTH_CLEAR)
+                ways.iter().any(|&(inner, mouth)| {
+                    crate::travel::dist(mouth, at) < MOUTH_CLEAR
+                        || to_segment(at, inner, mouth) < DRIVE_CLEAR
+                })
             })
         })
         .collect();
@@ -4382,6 +4386,19 @@ fn settle_all(w: &mut World) {
 /// How near a driveway's mouth (where it meets its road) the middle of a car parked out on a trip
 /// may not be (m: a car's length and the swing of one turning in or out by it).
 const MOUTH_CLEAR: f32 = 7.0;
+
+/// How near a driveway (the line from its inner end to its mouth) the middle of a car parked out
+/// on a trip may not be (m: half of each of two cars side by side, the gap between them and some).
+const DRIVE_CLEAR: f32 = 2.5;
+
+/// How far `p` is from the segment `a`..`b` (m).
+fn to_segment(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
+    let ab = [b[0] - a[0], b[1] - a[1]];
+    let t =
+        ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / (ab[0] * ab[0] + ab[1] * ab[1]).max(1e-6);
+    let t = t.clamp(0.0, 1.0);
+    crate::travel::dist(p, [a[0] + ab[0] * t, a[1] + ab[1] * t])
+}
 
 /// The public parking spot (`parking`) nearest `door` within `TRIP_PARK_REACH`: where it is and
 /// which way a car faces parked there. Of `cars`, but car `me`, none parks where another is on a
@@ -5702,6 +5719,30 @@ mod tests {
             Some(1),
             "holding nobody up"
         );
+    }
+
+    #[test]
+    fn no_trip_parks_on_a_driveway() {
+        // (Pebble Sands, a big world of the 0.7.0 samples: a bay off the road where a house's
+        // driveway runs, 12 m from its mouth; a car parked out there on a trip, the car of the
+        // house coming home couldn't get by it.) A spot on the driveway, one by its mouth, and one
+        // down the street clear of it.
+        let road: Vec<String> = (0..=199).map(|x| format!("[{x}.5,30]")).collect();
+        let town = format!(
+            r#"{{"width":200,"depth":60,
+            "exits":[{{"x":0.5,"z":30,"kind":"road"}},{{"x":199.5,"z":30,"kind":"road"}}],
+            "roads":[{{"points":[{}],"width":7,"kind":"street","ends":["out","out"]}}],
+            "plots":[{{"name":"H","x":78,"z":8,"w":16,"d":18,"entry":[83.5,25.5]}}],
+            "households":[{{"name":"F","plot":0}}],
+            "sims":[{{"name":"D","household":0,"x":83.5,"z":17.5}}],
+            "drives":[{{"plot":0,"x":90,"z":8.5,"front":1,"street":30,"road":0,"s":89.5}}],
+            "cars":[{{"plot":0,"x":90,"z":11.25,"yaw":0,"street":30,"len":4.6,"wid":1.88,"body":2,"paint":0}}],
+            "parking":[{{"x":91.0,"z":20.0,"rot":0,"area":0}},{{"x":93.0,"z":25.0,"rot":0,"area":0}},
+                       {{"x":140.0,"z":24.0,"rot":0,"area":0}}]}}"#,
+            road.join(",")
+        );
+        let w = World::from_json(CONTENT, &town, 1).unwrap();
+        assert_eq!(w.travel.by_a_mouth, [true, true, false]);
     }
 
     #[test]
