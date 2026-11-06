@@ -74,8 +74,9 @@ const TURN_SAMPLE: f32 = 0.08;
 /// The room a vehicle wants clear on the far side of a claim: its length, and this (m).
 pub(crate) const ROOM_GAP: f32 = 1.0;
 /// Two coming towards each other pass where pulling over takes them this far apart (m: the gap
-/// the cars keep, `cars::GAP`).
-pub(crate) const PASS_GAP: f32 = crate::cars::GAP;
+/// the cars keep, `cars::GAP`, and a little: their ways are sampled a metre apart, and between two
+/// a body turning comes a little nearer).
+pub(crate) const PASS_GAP: f32 = crate::cars::GAP + 0.05;
 /// Two going within about 25° of each other's way go the same way (the cosine).
 const SAME_WAY: f32 = 0.9;
 /// Bodies this near (m) are in each other's way (a body's corners between two samples too).
