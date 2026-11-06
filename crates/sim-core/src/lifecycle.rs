@@ -312,10 +312,12 @@ fn has_room_for_partner(w: &World, h: usize) -> bool {
 }
 
 /// Whether a resident's household lets them move on their own (the player can say no). Being
-/// at work or out doesn't matter: they come back to the new home.
+/// at work doesn't matter: they come back to the new home. Out on a visit or an outing, not
+/// that day (moved, they were taken from the host's home ten minutes in).
 fn may_move(w: &World, i: usize) -> bool {
     let s = &w.sims[i];
     s.here()
+        && s.visiting.is_none()
         && s.adult(&w.content)
         && (w.player_moves || !w.households[s.household as usize].player)
 }
