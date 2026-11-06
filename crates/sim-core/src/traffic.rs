@@ -566,13 +566,15 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal]) {
 
 /// The stretches of a car's route along `trace` (pulling over `pass` m at each pose, its ends
 /// swinging out `swing` m, overlapping another car coming the other way in its lane `over` m) where
-/// it couldn't pass one coming the other way (a 6 m lane's tight bend), each begun `NARROW_BACK` m
-/// before: a claim of their own, so that two coming towards each other take turns there.
+/// it couldn't pass one coming the other way (a 6 m lane's tight bend; a 7 m street's sharp bend
+/// out of the junctions' boxes, there the two in their lanes too near each other however far
+/// they pull over), each begun `NARROW_BACK` m before: a claim of their own, so that two coming
+/// towards each other take turns there.
 pub(crate) fn narrow(trace: &Trace, pass: &[f32], swing: &[f32], over: &[f32]) -> Vec<(f32, f32)> {
     let at = |v: &[f32], k: usize| v.get(k).copied().unwrap_or(0.0);
     let spans = runs(trace, |k| {
         let (p, s, o) = (at(pass, k), at(swing, k), at(over, k));
-        o > 0.0 && o + s + PASS_GAP > 2.0 * p
+        (o > 0.0 || p > 0.0) && o + s + PASS_GAP > 2.0 * p
     });
     back_by(trace, spans, NARROW_BACK)
 }
