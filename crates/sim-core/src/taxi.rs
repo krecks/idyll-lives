@@ -1957,45 +1957,53 @@ pub(crate) fn kerb_at(
     };
     let (lo, hi) = (keep(0) + half, len - keep(1) - half);
     let steps = (STAND_REACH / STAND_STEP) as i32;
-    (0..=2 * steps)
-        .map(|k| mouth.s + ((k + 1) / 2) as f32 * STAND_STEP * if k % 2 == 1 { 1.0 } else { -1.0 })
-        .filter(|&s| s >= lo && s <= hi)
-        .find(|&s| {
-            let (a, b) = (road.at(s - half), road.at(s + half));
-            let chord = (b[1] - a[1]).atan2(b[0] - a[0]);
-            let n = (2.0 * half / STAND_STEP).ceil() as usize;
-            let straight = (0..=n).all(|i| {
-                let t = road.tangent(s - half + i as f32 * 2.0 * half / n as f32);
-                crate::world::wrap_angle(t[1].atan2(t[0]) - chord).abs() <= STAND_STRAIGHT
-            });
-            // (Clear of junctions' boxes, and of another road lying along or over this one: two
-            // country roads a metre apart, its stand across the other's lane.)
-            let clear = (0..=n).all(|i| {
-                let p = road.at(s - half + i as f32 * 2.0 * half / n as f32);
-                g.boxes
-                    .iter()
-                    .all(|&(m, r)| crate::travel::dist(m, p) >= r + STAND_ROOM + TAXI_WID)
-                    && g.near(p, road.width, 3, crate::travel::Mode::Car)
+    // (Clear of driveways by a car's length and a margin where it can be within reach, else
+    // clear of their mouths at least: a house in a row of them still has its taxi.)
+    let find = |keep: f32| {
+        (0..=2 * steps)
+            .map(|k| {
+                mouth.s + ((k + 1) / 2) as f32 * STAND_STEP * if k % 2 == 1 { 1.0 } else { -1.0 }
+            })
+            .filter(|&s| s >= lo && s <= hi)
+            .find(|&s| {
+                let (a, b) = (road.at(s - half), road.at(s + half));
+                let chord = (b[1] - a[1]).atan2(b[0] - a[0]);
+                let n = (2.0 * half / STAND_STEP).ceil() as usize;
+                let straight = (0..=n).all(|i| {
+                    let t = road.tangent(s - half + i as f32 * 2.0 * half / n as f32);
+                    crate::world::wrap_angle(t[1].atan2(t[0]) - chord).abs() <= STAND_STRAIGHT
+                });
+                // (Clear of junctions' boxes, and of another road lying along or over this one: two
+                // country roads a metre apart, its stand across the other's lane.)
+                let clear = (0..=n).all(|i| {
+                    let p = road.at(s - half + i as f32 * 2.0 * half / n as f32);
+                    g.boxes
                         .iter()
-                        .all(|q| q.road == mouth.road)
-            });
-            // (Nor where a car parks out on a trip, nor pulls into or out of it.)
-            let parking = (0..=n).all(|i| {
-                let p = road.at(s - half + i as f32 * 2.0 * half / n as f32);
-                (0..travel.file.parking.len())
-                    .filter_map(|k| crate::cars::parked_at(travel, k))
-                    .all(|(at, ..)| crate::travel::dist(at, p) >= PARK_CLEAR)
-            });
-            let free = taken
-                .iter()
-                .all(|&(r, ts)| r != mouth.road || (ts - s).abs() >= TAXI_LEN + STAND_GAP);
-            // (Nor across a driveway's mouth, theirs too: a car's length and a little either side
-            // of it, for one coming out or turning in.)
-            let drives = mouths
-                .iter()
-                .all(|&(r, m)| r != mouth.road || (m - s).abs() >= half + DRIVE_CLEAR);
-            straight && clear && parking && drives && free
-        })
+                        .all(|&(m, r)| crate::travel::dist(m, p) >= r + STAND_ROOM + TAXI_WID)
+                        && g.near(p, road.width, 3, crate::travel::Mode::Car)
+                            .iter()
+                            .all(|q| q.road == mouth.road)
+                });
+                // (Nor where a car parks out on a trip, nor pulls into or out of it.)
+                let parking = (0..=n).all(|i| {
+                    let p = road.at(s - half + i as f32 * 2.0 * half / n as f32);
+                    (0..travel.file.parking.len())
+                        .filter_map(|k| crate::cars::parked_at(travel, k))
+                        .all(|(at, ..)| crate::travel::dist(at, p) >= PARK_CLEAR)
+                });
+                let free = taken
+                    .iter()
+                    .all(|&(r, ts)| r != mouth.road || (ts - s).abs() >= TAXI_LEN + STAND_GAP);
+                // (Nor across a driveway's mouth, theirs too: a car's length and a little either side
+                // of it, for one coming out or turning in.)
+                let drives = mouths
+                    .iter()
+                    .all(|&(r, m)| r != mouth.road || (m - s).abs() >= half + keep);
+                straight && clear && parking && drives && free
+            })
+    };
+    find(DRIVE_CLEAR)
+        .or_else(|| find(DRIVE_LEAST))
         .map(|s| Kerb {
             road: mouth.road,
             s,
@@ -2007,6 +2015,9 @@ pub(crate) fn kerb_at(
 /// A taxi's body keeps this far either side of a driveway's mouth (m, `kerb_at`: a car's length
 /// and a margin; a taxi at its rider's own mouth held the household's car in the driveway).
 const DRIVE_CLEAR: f32 = 5.5;
+/// With no stand that clear within reach, at least this clear (m: half a driveway's mouth and a
+/// little, so nobody's way out is across its body).
+const DRIVE_LEAST: f32 = 2.0;
 /// A taxi's stand keeps this far from a public parking spot (m, `kerb_at`): a car's length, and
 /// a little to swing in or out.
 const PARK_CLEAR: f32 = 4.0;
