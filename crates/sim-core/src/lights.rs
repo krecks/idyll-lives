@@ -32,8 +32,9 @@ use crate::lot::OUTDOORS;
 pub const DARK_FROM: f32 = 19.0 * 60.0;
 /// Minutes of the day until which it is still dark in the morning.
 pub const DARK_UNTIL: f32 = 6.0 * 60.0 + 30.0;
-/// How often (ticks) residents' comings and goings are looked at: a quarter of a game minute.
-const EVERY: u64 = 5;
+/// How often (ticks) residents' comings and goings are looked at: a quarter of a second of real
+/// time (the lamps are seen to come on as someone comes in).
+const EVERY: u64 = crate::secs(0.25);
 
 /// What the residents' rule saw last time (not saved: on load it starts from what's there,
 /// switching nothing).

@@ -63,9 +63,9 @@ const PLAN_LEAD: u64 = 3 * 60 * TICKS_PER_MINUTE;
 /// to their kerb instead, `setting_off`).
 const SETTING_OFF: f32 = 25.0;
 const PLAN_HORIZON: u64 = 24 * 60 * TICKS_PER_MINUTE;
-/// How long a taxi stands at a stop, in all, as its run is timed (ticks: the door, getting in or
-/// out, the door again).
-const DWELL: u64 = crate::cars::GET_IN_TICKS as u64 + TICKS_PER_MINUTE;
+/// How long a taxi stands at a stop, in all, as its run is timed (ticks of real time: the door,
+/// getting in or out, the door again).
+const DWELL: u64 = crate::cars::GET_IN_TICKS as u64 + crate::secs(1.0);
 /// How long before the taxi is due a rider is at their kerb (ticks), and how much spare time a run
 /// is timed with (ticks).
 const KERB_EARLY: u64 = 4 * TICKS_PER_MINUTE;
@@ -1062,7 +1062,7 @@ fn route_via(
 }
 
 /// The way in at `at` (a point of `World::exits`): how many cars wait out of sight to come in by
-/// it (`Car::waits_to_come_in_at`), and stand still on their way near it (`QUEUE_NEAR`, a minute
+/// it (`Car::waits_to_come_in_at`), and stand still on their way near it (`QUEUE_NEAR`, a second
 /// or more): a queue into its first junction.
 fn queued(w: &World, at: [f32; 2]) -> usize {
     let outside = w.cars.iter().filter(|c| c.waits_to_come_in_at(at)).count();
@@ -1072,7 +1072,7 @@ fn queued(w: &World, at: [f32; 2]) -> usize {
         .zip(&w.taxis.still)
         .filter(|(_, s)| {
             s.0.is_some_and(|p| crate::travel::dist(p, at) < QUEUE_NEAR)
-                && w.tick >= s.1 + TICKS_PER_MINUTE
+                && w.tick >= s.1 + crate::secs(1.0)
         })
         .count();
     outside + held
@@ -1488,9 +1488,10 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
 }
 
 /// How near one going by a taxi ready to go on may be, besides `cars::PASSING` (m, either side),
-/// for it to wait till they're past, and how long it waits so at most since it stood (ticks).
+/// for it to wait till they're past, and how long it waits so at most since it stood (ticks of
+/// real time).
 const PASS_BY: f32 = 0.3;
-const PASS_BY_MOST: u64 = 3 * TICKS_PER_MINUTE;
+const PASS_BY_MOST: u64 = crate::secs(3.0);
 
 /// Resident `i`, booked on a taxi, isn't riding it: unbooked, and on their way to work or school
 /// their own way (from the kerb, or wherever they've got to); planned once more for the same start
@@ -3079,14 +3080,15 @@ fn u_turn(
 }
 
 /// How long two cars or more by a junction's box stand still on their way before it counts as
-/// jammed (ticks, `jammed`), how far round its box they're by it (m), and how long a taxi due
-/// into town through one waits at the edge of town for it to clear at most (ticks, `run_on`: a
-/// run to work, half its spare time at most).
-const JAM_STILL: u64 = 5 * TICKS_PER_MINUTE;
-/// How long one car on its way stands still before the place counts as held up on its own (ticks).
-const LONE_STILL: u64 = 30 * TICKS_PER_MINUTE;
+/// jammed (ticks of real time, `jammed`), how far round its box they're by it (m), and how long a
+/// taxi due into town through one waits at the edge of town for it to clear at most (ticks of
+/// real time, as the cars clear it, `run_on`: a run to work, half its spare time at most).
+const JAM_STILL: u64 = crate::secs(5.0);
+/// How long one car on its way stands still before the place counts as held up on its own (ticks
+/// of real time).
+const LONE_STILL: u64 = crate::secs(30.0);
 const JAM_NEAR: f32 = 8.0;
-const JAM_WAIT: u64 = 30 * TICKS_PER_MINUTE;
+const JAM_WAIT: u64 = crate::secs(30.0);
 /// A taxi stands clear of another's stand when it's there within this long of it, either way (ticks,
 /// `stand_window`): as each is timed, give or take its stand, a hold-up on its way and a wait at
 /// the edge of town (`JAM_WAIT`).
@@ -3193,9 +3195,9 @@ const LEISURE_BEATS: f32 = 0.9;
 const LEISURE_KERBS: f32 = 8.0;
 /// A walk to or from the kerb is about this much longer than as the crow flies (`kerb_walks`).
 const KERB_WINDING: f32 = 1.3;
-/// Game minutes in a minute of `Travel::eta` by car (a drive's seconds are the game's minutes,
-/// `world::trip_minutes`).
-const DRIVE_MINUTES: f32 = 60.0;
+/// Game minutes in a minute of `Travel::eta` by car (a real minute's drive: the cars drive in real
+/// time, `world::trip_minutes`).
+const DRIVE_MINUTES: f32 = 60.0 * crate::GAME_MINUTES_PER_SECOND;
 /// Those off to the same place within this long of each other share a taxi (ticks).
 const LEISURE_WINDOW: u64 = 30 * TICKS_PER_MINUTE;
 /// A taxi back from a place comes this long after its rider's visit ends (ticks: a goodbye and
@@ -3816,7 +3818,7 @@ mod leisure_leaving_tests {
         let tick = w.tick;
         w.sims[i].visiting = Some(crate::life::Visit {
             plot: 0,
-            until: tick + 600,
+            until: tick + crate::mins(30.0),
             idle: 0,
             farewell: 0,
             offer_at: 0,
@@ -3853,14 +3855,14 @@ mod leisure_leaving_tests {
             place: Some(0),
             directed: false,
             group: (0, 0),
-            enter: tick + 1000,
+            enter: tick + crate::mins(50.0),
             due_out: 0,
             planned_out: 0,
             depart: 0,
             stops: vec![Stop {
                 sim: i as u32,
                 plot: 1,
-                due: tick + 10,
+                due: tick + crate::mins(0.5),
                 leave: tick,
                 state: StopState::Booked,
                 halt: 0,
