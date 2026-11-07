@@ -48,6 +48,10 @@ const DETOUR: f32 = 1.25;
 /// (`cars.countrySpeed`).
 pub const TOWN_SPEED: f32 = 6.0;
 pub const COUNTRY_SPEED: f32 = 16.0;
+/// Game minutes in a minute of `Travel::eta` by car: a car's speeds are real time (m/s at 1×), so
+/// the eta's minutes are a drive's real seconds over 60, each second `GAME_MINUTES_PER_SECOND` of
+/// the game's minutes (`world::trip_minutes`).
+pub const DRIVE_MINUTES: f32 = 60.0 * crate::GAME_MINUTES_PER_SECOND;
 /// Spatial cells for finding the road near a point (m).
 const CELL: f32 = 16.0;
 
@@ -1370,9 +1374,10 @@ impl Travel {
         self.open && !self.graph.is_empty() && octile(a, b) >= ROAD_TRIP_TILES
     }
 
-    /// About how many minutes a trip from `from` to `to` takes: on foot at `walk` m a minute,
-    /// or by car. No search of the tiles: the roads for long trips, the straight line (with a
-    /// detour) for the rest.
+    /// About how many minutes a trip from `from` to `to` takes: on foot at `walk` m a minute
+    /// (game minutes, as `walk` is), or by car (minutes of driving at 1×, real time: times
+    /// `DRIVE_MINUTES` in game minutes). No search of the tiles: the roads for long trips, the
+    /// straight line (with a detour) for the rest.
     pub fn eta(&self, from: [f32; 2], to: [f32; 2], mode: Mode, walk: f32) -> f32 {
         self.eta_via(
             from,
@@ -1413,9 +1418,9 @@ impl Travel {
         }
     }
 
-    /// At least as many minutes as `eta` says the trip takes: the straight line at the fastest
-    /// way along it (no search at all). For finding the quickest of several without working
-    /// out every one (`world::quickest_exit`).
+    /// At least as many minutes as `eta` says the trip takes (in its units): the straight line at
+    /// the fastest way along it (no search at all). For finding the quickest of several without
+    /// working out every one (`world::quickest_exit`).
     pub fn eta_at_least(&self, from: [f32; 2], to: [f32; 2], mode: Mode, walk: f32) -> f32 {
         let d = dist(from, to);
         match mode {

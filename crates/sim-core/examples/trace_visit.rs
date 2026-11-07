@@ -11,8 +11,9 @@ fn main() {
     let plot: u32 = args[2].parse().unwrap();
     let mut w = World::from_json(CONTENT, &town, 7).unwrap();
     w.apply(Command::Visit { sim: 0, plot }).unwrap();
+    // A line a game minute, for an hour.
     for step in 0..60 {
-        for _ in 0..20 {
+        for _ in 0..sim_core::TICKS_PER_MINUTE {
             w.tick_once();
         }
         let s = &w.sims[0];

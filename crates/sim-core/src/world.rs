@@ -65,15 +65,22 @@ impl SimSet {
 pub const MAX_QUEUE: usize = 6;
 /// How many things a resident remembers they couldn't get to (`Sim::unreachable`).
 pub(crate) const UNREACHABLE: usize = 4;
-/// How long a resident remembers that someone was out of reach: people move, so not long.
-pub(crate) const PERSON_UNREACHABLE_TICKS: u64 = 10;
+/// How long a resident remembers that someone was out of reach: people move, so not long (half a
+/// real second: as long as the one they wanted takes to walk a little way).
+pub(crate) const PERSON_UNREACHABLE_TICKS: u64 = crate::secs(0.5);
 /// Walking speed in tiles per tick (1.5 m per real second at 1×).
 pub(crate) const WALK_SPEED: f32 = 1.5 / TICKS_PER_SECOND as f32;
-/// Idle time before a Sim picks something on its own.
-const AUTONOMY_DELAY_TICKS: u32 = TICKS_PER_SECOND;
+/// Idle time before a Sim picks something on its own: a beat seen standing there, a real second
+/// (counted in their steps, so a turn at lower detail covers it, `lod.rs`). Those listening in on a
+/// talk wait longer for its next social (`conversation::REGROUP_TICKS`).
+pub(crate) const AUTONOMY_DELAY_TICKS: u32 = crate::secs(1.0) as u32;
 /// Getting up from the upper bunk: the time to climb down its ladder (the renderer's `bunkDown`, 6.5 s), in
 /// which they do nothing else (`Sim::ladder_ticks`).
-pub(crate) const LADDER_DOWN_TICKS: u32 = 13 * TICKS_PER_SECOND / 2;
+pub(crate) const LADDER_DOWN_TICKS: u32 = crate::secs(6.5) as u32;
+/// Stepping aside out of a car's way (`cars::make_way`): 0.06 m a tick at 20 ticks a real second
+/// (1.2 m/s), at most `SIDESTEP_MOST` in one step.
+const SIDESTEP: f32 = 0.06 * (20.0 / TICKS_PER_SECOND as f32);
+const SIDESTEP_MOST: f32 = 0.3;
 const MIN_AUTONOMY_SCORE: f32 = 0.01;
 /// How much less a meal nobody at home would eat tempts free will (the cooking practice it
 /// gives aside): cooked only with nothing much else to do.
@@ -8510,6 +8517,8 @@ fn progress(
                 let (dx, dz) = (wp[0] - sim.pos[0], wp[1] - sim.pos[1]);
                 let dist = dx.hypot(dz);
                 // A car driving by: they wait for it (and after a while step aside, out of its way).
+                // (Looked for at least 5 cm on, however short this tick's step: a distance, not a
+                // pace, so slow walkers and more ticks a second see a car as soon.)
                 let step = budget.min(dist).max(0.05);
                 let to = [
                     sim.pos[0] + dx / dist.max(1e-4) * step,
@@ -8531,7 +8540,7 @@ fn progress(
                             yaw,
                             &ctx.nav,
                             sim.pos,
-                            (0.06 * ticks as f32).min(0.3),
+                            (SIDESTEP * ticks as f32).min(SIDESTEP_MOST),
                             |p| crate::cars::clear(&others, body, p),
                         )
                     {
@@ -10430,10 +10439,10 @@ const CAR_TRIP_MINUTES: f32 = 10.0;
 const OUTING_K: f32 = 0.01;
 
 /// The game minutes a trip takes that `Travel::eta` says takes `eta` (by car, `car`): a drive's
-/// seconds are the game's minutes, and a few more to and from the car.
+/// minutes at 1× are `travel::DRIVE_MINUTES` of the game's each, and a few more to and from the car.
 pub(crate) fn trip_minutes(eta: f32, car: bool) -> f32 {
     if car {
-        eta * 60.0 + CAR_TRIP_MINUTES
+        eta * crate::travel::DRIVE_MINUTES + CAR_TRIP_MINUTES
     } else {
         eta
     }
@@ -10677,7 +10686,7 @@ mod tests {
         World::from_json(CONTENT, LOT, 7).unwrap()
     }
 
-    fn run_ticks(w: &mut World, n: u32) {
+    fn run_ticks(w: &mut World, n: u64) {
         for _ in 0..n {
             w.tick_once();
         }
@@ -10728,7 +10737,7 @@ mod tests {
         let mut w = world();
         w.sims[0].needs[0] = 0.05;
         w.sims[0].needs[1] = 1.0;
-        run_ticks(&mut w, TICKS_PER_SECOND * 60);
+        run_ticks(&mut w, crate::mins(60.0));
         assert!(
             w.sims[0].needs[0] > 0.3,
             "hunger was {}",
@@ -10746,7 +10755,7 @@ mod tests {
             interaction: 0,
         })
         .unwrap();
-        run_ticks(&mut w, TICKS_PER_SECOND * 30);
+        run_ticks(&mut w, crate::mins(30.0));
         let s = &w.sims[0];
         assert_eq!(s.pose, Pose::Lie);
         assert_eq!(w.objects[1].users().next(), Some(0));
@@ -10791,7 +10800,7 @@ mod tests {
             interaction: 0,
         })
         .unwrap();
-        run_ticks(&mut w, TICKS_PER_SECOND * 30);
+        run_ticks(&mut w, crate::secs(30.0));
         assert_eq!(w.sims[0].use_seat, Some(1), "sat on the sofa");
         assert_eq!(w.sims[0].pose, Pose::Sit);
         assert_eq!(w.objects[0].users().next(), Some(0));
@@ -10871,8 +10880,8 @@ mod tests {
     #[test]
     fn deterministic_for_same_seed() {
         let (mut a, mut b) = (world(), world());
-        run_ticks(&mut a, 2000);
-        run_ticks(&mut b, 2000);
+        run_ticks(&mut a, crate::mins(100.0));
+        run_ticks(&mut b, crate::mins(100.0));
         assert_eq!(a.sims[0].pos, b.sims[0].pos);
         assert_eq!(a.sims[0].needs, b.sims[0].needs);
     }
@@ -10886,7 +10895,7 @@ mod tests {
             "sims":[{"name":"Neighbour","household":1,"x":14.5,"z":4.5}]}"#;
         let mut w = World::from_json(CONTENT, lot, 1).unwrap();
         w.sims[0].needs[0] = 0.0;
-        run_ticks(&mut w, TICKS_PER_SECOND * 60);
+        run_ticks(&mut w, crate::mins(60.0));
         assert!(!w.objects[0].in_use());
         assert!(w.sims[0].pos[0] > 10.0, "stayed home");
     }
@@ -10914,7 +10923,7 @@ mod tests {
                 .current()
                 .is_some_and(|a| matches!(a.phase, Phase::Using { .. }))
         };
-        for _ in 0..TICKS_PER_SECOND * 60 {
+        for _ in 0..crate::secs(60.0) {
             if using(&w) {
                 break;
             }
@@ -10940,7 +10949,7 @@ mod tests {
         assert_eq!(loaded.sims[0].tile(), front);
 
         // Done: out where they stepped in from.
-        for _ in 0..TICKS_PER_SECOND * 600 {
+        for _ in 0..crate::mins(600.0) {
             if !using(&w) {
                 break;
             }
