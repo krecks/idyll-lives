@@ -46,7 +46,7 @@ const STREET = [
   'model.street.planter',
   'model.street.flowerTub',
   'model.street.sign',
-  'model.street.busSign',
+  'model.street.taxiSign',
   'model.busStop',
   'model.street.pot',
   'model.street.pathLight',

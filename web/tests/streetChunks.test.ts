@@ -1,6 +1,6 @@
 /**
  * The street planned chunk by chunk (`TownStreet`, `shared/chunks.ts`): a long street of houses
- * either side of a road, crossing several 64 m chunks. Moving the focus from lot to lot plans only
+ * either side of a road, crossing several 64 m chunks, a taxi rank at each end of its rows. Moving the focus from lot to lot plans only
  * the chunks round the two lots again; a thing moved in a garden only its lot's chunk; and what a
  * street that has planned many focus lots gives is what a fresh one gives (its cache never keeps a
  * part it should have planned again).
@@ -43,6 +43,36 @@ function town(objects: ObjectPlacement[] = []): WorldStructure {
     sims: [],
     exits: [],
     meta: { kind: 'town', name: 'Test', streets: [], paths, facing, seed: 1, roads: [{ points: [[-10, 23], [w + 10, 23]], width: 6, ends: ['out', 'out'] }] },
+  } as unknown as WorldStructure;
+}
+
+/** Streets of houses along x at each of `roads` (z), lots either side (20 deep), as `town` has one. */
+function streets(roads: readonly number[]): WorldStructure {
+  const base = town();
+  const plots: PlotInfo[] = [];
+  const paths: { x: number; z: number; w: number; d: number }[] = [];
+  const facing: number[] = [];
+  for (const rz of roads) {
+    for (let i = 0; i < LOTS; i++) {
+      for (const north of [true, false]) {
+        const x = i * LOT_W;
+        const z = north ? rz - 23 : rz + 3;
+        const id = plots.length;
+        const house: [number, number, number, number] = north ? [x + 3, z + 5, x + 13, z + 14] : [x + 4, z + 5, x + 14, z + 14];
+        const door = x + 8;
+        plots.push({ id, name: `${id}`, x, z, w: LOT_W, d: 20, public: false, entry: [door + 0.5, north ? z + 18 : z + 2], house } as PlotInfo);
+        paths.push(north ? { x: door, z: z + 14, w: 1, d: 6 } : { x: door, z, w: 1, d: 5 });
+        facing.push(north ? 2 : 0);
+      }
+    }
+  }
+  const depth = Math.max(...roads) + 23;
+  return {
+    ...base,
+    depth,
+    plots,
+    rooms: new Array(base.width * depth).fill(0),
+    meta: { ...base.meta, paths, facing, roads: roads.map((z) => ({ points: [[-10, z], [base.width + 10, z]], width: 6, ends: ['out', 'out'] })) },
   } as unknown as WorldStructure;
 }
 
@@ -148,6 +178,94 @@ describe('the street in chunks', async () => {
       for (const id of street.chunkIds()) street.chunk(id, f);
       const fresh = new TownStreet(new HousePlanner(), w, options, 'game');
       for (const id of street.chunkIds()) expect(drawn(street.chunk(id, f))).toBe(drawn(fresh.chunk(id, f)));
+    }
+  });
+
+
+  /** The ranks' shelters a street draws (every chunk's), and its own account of them. */
+  const ranksOf = (street: InstanceType<typeof TownStreet>) => ({
+    drawn: street.chunkIds().flatMap((id) => street.chunk(id, NO_FOCUS).batches.get('model.busStop') ?? []).map((i) => [i[0], i[1]] as [number, number]),
+    signs: street.chunkIds().flatMap((id) => street.chunk(id, NO_FOCUS).batches.get('model.street.taxiSign') ?? []),
+    spots: street.rankSpots(),
+  });
+
+  test('a street gets one taxi rank at most, past the end of its row behind the pavement, its sign at the kerb', () => {
+    const { drawn, signs, spots } = ranksOf(new TownStreet(new HousePlanner(), town(), options, 'game'));
+    expect(drawn.length).toBe(1);
+    expect(signs.length).toBe(1);
+    expect(spots).toEqual(drawn);
+    const [x, z] = drawn[0];
+    // Past the row's ends (the lots run from 0 to its length), off the road (z 20..26 with its pavements).
+    expect(x < 0 || x > LOTS * LOT_W).toBe(true);
+    expect(z < 20 || z > 26).toBe(true);
+  });
+
+  test('no two taxi ranks within 60 m, the town’s own on a lot among them, chosen the same each time', async () => {
+    const { RANK_APART } = await import('../src/render/shared/street');
+    expect(RANK_APART).toBe(60);
+    // Three streets of houses 46 m apart: each could have a rank at either end, two ends 46 m from the next street's.
+    const w = streets([23, 69, 115]);
+    const a = ranksOf(new TownStreet(new HousePlanner(), w, options, 'game'));
+    expect(a.drawn.length).toBeGreaterThanOrEqual(2);
+    expect(a.drawn.length).toBeLessThanOrEqual(3);
+    const apart = (list: [number, number][]) => {
+      for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) expect(Math.hypot(list[i][0] - list[j][0], list[i][1] - list[j][1])).toBeGreaterThanOrEqual(60);
+    };
+    apart(a.drawn);
+    // One a street: each rank by its street (the nearest road).
+    const roadOf = ([, z]: [number, number]) => [23, 69, 115].reduce((b, r) => (Math.abs(r - z) < Math.abs(b - z) ? r : b));
+    expect(new Set(a.drawn.map(roadOf)).size).toBe(a.drawn.length);
+    // The same town again (and with another lot in view) chooses the same.
+    const b = new TownStreet(new HousePlanner(), w, options, 'game');
+    expect(b.rankSpots()).toEqual(a.spots);
+    const viewed = b.chunkIds().flatMap((id) => b.chunk(id, 7).batches.get('model.busStop') ?? []).map((i) => [i[0], i[1]]);
+    expect(viewed).toEqual(a.drawn);
+    // A rank on a lot (the Market Square's shelter) keeps the row ends' 60 m off.
+    for (const [x, z] of a.drawn) {
+      const own = { ...w, objects: [{ id: 99, def: 'busStop', x: x + 10, z: z > 50 ? z + 2 : z - 2, w: 3, d: 1, rot: 0 } as ObjectPlacement] } as WorldStructure;
+      const c = ranksOf(new TownStreet(new HousePlanner(), own, options, 'game'));
+      for (const [rx, rz] of c.drawn) expect(Math.hypot(rx - (x + 11.5), rz - (z > 50 ? z + 2.5 : z - 1.5))).toBeGreaterThanOrEqual(60);
+      apart(c.drawn);
+    }
+  });
+
+  test('round a taxi rank every kerbside thing keeps a clear gap from its shelter, its sign and each other; the corner keeps its street-name sign', async () => {
+    const { RANK_GAP, RANK_HALF } = await import('../src/render/shared/street');
+    for (const w of [town(), streets([23, 69, 115])]) {
+      const street = new TownStreet(new HousePlanner(), w, options, 'game');
+      const roads = (w.meta as { roads: unknown[] }).roads.length;
+      let seen = 0;
+      for (let r = 0; r < roads; r++) {
+        for (const side of [1, -1] as const) {
+          const rank = street.rankKerb(r, side);
+          if (!rank) continue;
+          seen++;
+          const { shelter, sign, others } = rank;
+          // (The shelter's ends along the kerb, and its sign: a gap of RANK_GAP clear of each.)
+          const gap = (s: number) => Math.abs(s - shelter) - RANK_HALF;
+          if (sign !== null) expect(gap(sign)).toBeGreaterThanOrEqual(RANK_GAP);
+          for (const o of others) {
+            expect(gap(o)).toBeGreaterThanOrEqual(RANK_GAP);
+            if (sign !== null) expect(Math.abs(o - sign)).toBeGreaterThanOrEqual(RANK_GAP);
+          }
+          // The kerbside things beside it, those within a couple of gaps of its ends, clear of each other too.
+          const close = others.filter((o) => gap(o) < 3 * RANK_GAP).sort((a, b) => a - b);
+          for (let i = 1; i < close.length; i++) expect(close[i] - close[i - 1]).toBeGreaterThanOrEqual(RANK_GAP);
+        }
+      }
+      expect(seen).toBe(street.rankSpots().length);
+      expect(seen).toBeGreaterThan(0);
+      // A rank at the corner of a row with its street-name sign (the road's first side, its first end):
+      // the name sign still there, its TAXI sign well clear of it, at the shelter's far end.
+      const get = (k: string) => street.chunkIds().flatMap((id) => street.chunk(id, NO_FOCUS).batches.get(k) ?? []);
+      const names = get('model.street.sign');
+      const signs = get('model.street.taxiSign');
+      for (const [x, z] of get('model.busStop')) {
+        if (x > 0) continue;
+        const name = names.find((n) => Math.hypot(n[0] - x, n[1] - z) < 6);
+        expect(name).toBeDefined();
+        for (const t of signs) expect(Math.hypot(t[0] - name![0], t[1] - name![1])).toBeGreaterThanOrEqual(RANK_HALF + 2 * RANK_GAP);
+      }
     }
   });
 });

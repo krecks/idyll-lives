@@ -24,6 +24,7 @@ import { threadStats } from '../debug/threads';
 import { createSimPreviews } from '../render/preview';
 import { createItemPreviews } from '../render/preview/items';
 import type { CameraPose, Renderer, WallMode } from '../render/types';
+import { carRowIsTaxi } from '../render/shared/cars';
 import { settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
 import { prefetchCatalog, services, type GameControls } from '../ui/services';
@@ -972,13 +973,13 @@ async function openSession(
     };
     // `__cars()`: the households' cars and the work taxis as the newest snapshot shows them (sim-core
     // `cars.rs`): which car (its row), where, which way, parked (1) or driving (2), and its `kind`
-    // (0 a household's, 1 a taxi).
+    // (0 a household's, 1 a taxi: `carRowIsTaxi`, by the layout's `kinds`).
     const cars = () => {
       const [snap, l] = [bridge.latest(), bridge.layout];
       if (!l.car || l.carBase === undefined || l.carStride === undefined || l.header.carCount === undefined) return [];
       return Array.from({ length: snap[l.header.carCount] | 0 }, (_, k) => {
         const o = l.carBase! + k * l.carStride!;
-        const kind = l.car!.kind === undefined ? 0 : snap[o + l.car!.kind];
+        const kind = carRowIsTaxi(snap, l, k) ? 1 : 0;
         return { car: k, x: snap[o + l.car!.x], z: snap[o + l.car!.z], yaw: snap[o + l.car!.yaw], shown: snap[o + l.car!.shown], kind };
       });
     };

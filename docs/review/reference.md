@@ -491,7 +491,7 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `streetLamp` | Street lamp (heritage lantern or column) | 0.25–1.5 × 3–8 × 0.25–1.5 |  | light the pavement at night |  |  | streetlight, neufert | `streetLamp` `street.streetlight` |
 | `drinkingFountain` | Drinking fountain | 0.3–0.7 × 0.75–1.1 × 0.3–0.7 |  | have a drink of water | drink 0–2 |  | ada604, neufert | `drinkingFountain` |
 | `litterBin` | Street litter bin | 0.4–0.7 × 0.8–1.2 × 0.4–0.7 |  | throw rubbish away |  |  | neufert | `litterBin` |
-| `busShelter` | Bus shelter with bench | 2.5–4 × 2.3–2.8 × 1.2–1.8 | seat 42–50 | wait for the bus; read the timetable | wait 2–20 |  | neufert, dimBench | `busStop` |
+| `taxiShelter` | Taxi rank shelter with bench | 2.5–4 × 2.3–2.8 × 1.2–1.8 | seat 42–50 | wait for a taxi; read the fares | wait 2–20 |  | neufert, dimBench | `busStop` |
 | `postBox` | Pillar post box | 0.45–0.6 × 1.5–1.7 × 0.45–0.6 |  | post a letter | post 0–2 |  | pillarBox | `postBox` |
 | `noticeBoard` | Notice board on posts | 0.8–1.5 × 1.6–2.2 × 0.1–0.4 |  | read the notices; pin one up | read 1–10 |  | neufert | `noticeBoard` |
 | `phoneBox` | Phone box (K6 kiosk) | 0.85–1 × 2.4–2.8 × 0.85–1 |  | make a call | call 2–20 | door 80–110° | k6 | `phoneBooth` |
@@ -514,7 +514,7 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `hydrant` | Fire hydrant (pillar) | 0.25–0.5 × 0.6–1 × 0.25–0.5 |  | (firefighters connect hoses) |  |  | hydrant, hydrantNj | `street.hydrant` |
 | `wheelieBin` | Wheelie bin (120-240 L) | 0.48–0.6 × 0.93–1.1 × 0.55–0.75 |  | put the rubbish out; wheel it to the kerb |  | lid 180–270° | bin240 | `street.bin` |
 | `streetSign` | Street-name sign on posts | 0.6–1.2 × 2–3 × 0.05–0.9 |  | read the street name *(decor)* |  |  | neufert | `model.street.sign` |
-| `busStopSign` | Bus stop flag on a pole | 0.3–0.6 × 2.3–3 × 0.05–0.2 |  | check the bus stop *(decor)* |  |  | neufert | `model.street.busSign` |
+| `taxiRankSign` | Taxi rank sign on a pole | 0.3–0.6 × 2.3–3 × 0.05–0.2 |  | find the taxi rank *(decor)* |  |  | neufert | `model.street.taxiSign` |
 | `pathLight` | Garden path light (bollard) | 0.1–0.25 × 0.3–1 × 0.1–0.25 |  | light the path at night |  |  | neufert | `model.street.pathLight` |
 
 ### Farm

@@ -2,11 +2,14 @@
  * Households' cars as the street draws them: their bodies (made of the street's plain-finish
  * primitives, `paintCar`), their paints, and where a house's car parks on its driveway
  * (`parkCar`), the same for the town as it is made (`game/town.ts`, the sim's `cars`), the menus'
- * town and the game, so a car stands where the town showed it.
+ * town and the game, so a car stands where the town showed it. The work taxi's look too
+ * (`paintTaxi`: no household's, so its own), and which of the snapshot's car rows is which
+ * (`carRowAt`, `carRowIsTaxi`).
  *
  * Engine-neutral: the street (`street.ts`) and the moving cars (`pc/cars.ts`) draw them.
  */
 
+import type { SnapshotLayout } from '../../core/snapshot';
 import { wrapAngle } from './characters/rig';
 import { facing, type V3 } from './geometry';
 import type { Painter, Rect } from './street';
@@ -185,6 +188,146 @@ export function paintCar(p: Painter, body: CarBody, paint: string, apart = false
   p.box(-0.26, yl + 0.2, zb - 0.02, 0.26, yl + 0.31, zb);
   p.paint(paint, 0.2, 0);
   for (const s of [-1, 1]) p.box(Math.min(s * hw, s * (hw + 0.12)), yb + 0.04, bf - 0.32, Math.max(s * hw, s * (hw + 0.12)), yb + 0.14, bf - 0.2);
+}
+
+// ---- the work taxi ----------------------------------------------------------------------
+
+/** The work taxi (sim-core `taxi.rs`, a car row whose `kind` is a taxi): a saloon (`CARS`) in the taxi's yellow. */
+export const TAXI_BODY = 0;
+export const TAXI_PAINT = '#F2B81C';
+/** Its chequered band along its sides: its squares' size (m), two rows of them, their top this far under the belt line. */
+const CHECK = 0.07;
+const CHECK_DROP = 0.07;
+/** Its roof sign: width, height, depth (m), and its colours. */
+const SIGN = { w: 0.62, h: 0.17, d: 0.15 };
+const SIGN_FACE = '#FFF4C8';
+const INK = '#16181A';
+
+/**
+ * The work taxi in `p`'s frame, as `paintCar` paints a household's (`apart`, `wheels` as there):
+ * a saloon in the taxi's yellow with a black-and-white chequered band along each side (on the
+ * doors where they're apart: `paintTaxiDoor`) and a lit-looking TAXI sign across its roof,
+ * lettered front and back, so it's a taxi at a glance from any side.
+ */
+export function paintTaxi(p: Painter, apart = false, wheels = true): void {
+  const body = CARS[TAXI_BODY];
+  paintCar(p, body, TAXI_PAINT, apart, wheels);
+  const hw = body.wid / 2;
+  const [, bf, rr, rf, yb, yr] = body.cabin;
+  const zb = Math.min(...body.low.map((q) => q[0]));
+  // The band from the rear quarter to the front wing, past the doors (their own when apart).
+  const [from, to] = [zb + 0.3, bf + 0.25];
+  for (const side of [-1, 1] as const) {
+    const x = side * (hw + 0.004);
+    const face = (z: number, y: number): V3 => [x, y, z];
+    if (!apart) {
+      checks(p, from, to, yb, face, [side, 0, 0]);
+      continue;
+    }
+    // (Apart, the doors' spans are theirs: the band behind and in front of them.)
+    const spans = [0, 1, 2, 3].filter((d) => carDoor(body, d).side === side).map((d) => doorSpan(body, d));
+    const lo = Math.min(...spans.map((sp) => sp[0]));
+    const hi = Math.max(...spans.map((sp) => sp[1]));
+    checks(p, from, lo, yb, face, [side, 0, 0]);
+    checks(p, hi, to, yb, face, [side, 0, 0]);
+  }
+  // The roof sign: a light box on a dark foot across the roof, TAXI on its front and back.
+  const zc = (rr + rf) / 2;
+  const { w, h, d } = SIGN;
+  p.paint(INK, 0.6, 0).box(-w / 2 + 0.04, yr, zc - d / 2 + 0.02, w / 2 - 0.04, yr + 0.03, zc + d / 2 - 0.02, 'ny');
+  p.paint(SIGN_FACE, 0.3, 0).box(-w / 2, yr + 0.03, zc - d / 2, w / 2, yr + 0.03 + h, zc + d / 2, 'ny');
+  for (const end of [-1, 1] as const) {
+    const z = zc + end * (d / 2 + 0.003);
+    // (Read from in front of the car, its +x is on the left, as the world is drawn mirrored in z;
+    // from behind, on the right: the word runs from -x at the front, +x at the back.)
+    lettering(p, (u, v): V3 => [-end * u, yr + 0.03 + v, z], [0, 0, end], h);
+  }
+}
+
+/** Door `d` of the taxi (`paintDoor` with its paint), its part of the chequered band on it. */
+export function paintTaxiDoor(p: Painter, d: number): void {
+  const body = CARS[TAXI_BODY];
+  paintDoor(p, body, TAXI_PAINT, d);
+  const { side, hinge } = carDoor(body, d);
+  const [rear, front] = doorSpan(body, d);
+  // (In the door's frame, as `paintDoor`'s: x out from the car's side, z back from the hinge.)
+  const x = side * (0.008 + 0.004);
+  checks(p, rear, front, body.cabin[4], (z, y): V3 => [x, y, z - hinge], [side, 0, 0]);
+}
+
+/** Where door `d`'s panel runs (z, rear to front) at the band's height. */
+function doorSpan(body: CarBody, d: number): [number, number] {
+  const { hinge, rearBelt, rearLow, sill } = carDoor(body, d);
+  const yb = body.cabin[4];
+  const t = Math.min(1, Math.max(0, (yb - CHECK_DROP - CHECK - sill) / (yb - sill)));
+  return [rearLow + (rearBelt - rearLow) * t, hinge];
+}
+
+/**
+ * The chequered band from `z0` to `z1` (car z), two rows of squares on a white strip under the
+ * belt line `yb`, its squares on the car's own grid (a door's line up with the body's), placed by
+ * `at(z, y)` facing `n`.
+ */
+function checks(p: Painter, z0: number, z1: number, yb: number, at: (z: number, y: number) => V3, n: V3): void {
+  if (z1 - z0 < 0.01) return;
+  const top = yb - CHECK_DROP;
+  const bottom = top - 2 * CHECK;
+  const lift = (q: V3, k: number): V3 => [q[0] + n[0] * k, q[1] + n[1] * k, q[2] + n[2] * k];
+  p.paint('#F4F2EC', 0.3, 0).poly([at(z0, bottom), at(z1, bottom), at(z1, top), at(z0, top)], n);
+  p.paint(INK, 0.4, 0);
+  for (let k = Math.floor(z0 / CHECK); k * CHECK < z1; k++) {
+    const a = Math.max(z0, k * CHECK);
+    const b = Math.min(z1, (k + 1) * CHECK);
+    if (b - a < 0.005) continue;
+    // (Black on alternate squares, each row the other way: `k` may be negative.)
+    const row = ((k % 2) + 2) % 2;
+    const y0 = row === 0 ? bottom : bottom + CHECK;
+    p.poly([lift(at(a, y0), 0.002), lift(at(b, y0), 0.002), lift(at(b, y0 + CHECK), 0.002), lift(at(a, y0 + CHECK), 0.002)], n);
+  }
+}
+
+/** TAXI in block letters on a sign `h` high, placed by `at(u, v)` (u across from its middle, v up from its foot) facing `n`. */
+function lettering(p: Painter, at: (u: number, v: number) => V3, n: V3, h: number): void {
+  const quad = (a: [number, number], b: [number, number], c: [number, number], d: [number, number]) => p.poly([at(...a), at(...b), at(...c), at(...d)], n);
+  const [lw, gap, s] = [0.085, 0.032, 0.021];
+  const [v0, v1] = [h * 0.2, h * 0.8];
+  const vm = (v0 + v1) / 2;
+  const total = 4 * lw + 3 * gap;
+  p.paint(INK, 0.4, 0);
+  ['T', 'A', 'X', 'I'].forEach((ch, i) => {
+    const u0 = -total / 2 + i * (lw + gap);
+    const [u1, uc] = [u0 + lw, u0 + lw / 2];
+    if (ch === 'T') {
+      quad([u0, v1 - s], [u1, v1 - s], [u1, v1], [u0, v1]);
+      quad([uc - s / 2, v0], [uc + s / 2, v0], [uc + s / 2, v1 - s], [uc - s / 2, v1 - s]);
+    } else if (ch === 'A') {
+      quad([u0, v0], [u0 + s, v0], [uc + s / 2, v1], [uc - s / 2, v1]);
+      quad([u1 - s, v0], [u1, v0], [uc + s / 2, v1], [uc - s / 2, v1]);
+      quad([u0 + lw * 0.27, vm - s * 0.7], [u1 - lw * 0.27, vm - s * 0.7], [u1 - lw * 0.32, vm + s * 0.3], [u0 + lw * 0.32, vm + s * 0.3]);
+    } else if (ch === 'X') {
+      quad([u0, v0], [u0 + s, v0], [u1, v1], [u1 - s, v1]);
+      quad([u1 - s, v0], [u1, v0], [u0 + s, v1], [u0, v1]);
+    } else quad([uc - s / 2, v0], [uc + s / 2, v0], [uc + s / 2, v1], [uc - s / 2, v1]);
+  });
+}
+
+// ---- the snapshot's car rows -------------------------------------------------------------
+
+/** Where car row `row` starts in a snapshot laid out as `layout` (-1: the layout has no cars). */
+export function carRowAt(layout: SnapshotLayout, row: number): number {
+  return layout.carBase === undefined || layout.carStride === undefined || !layout.car ? -1 : layout.carBase + row * layout.carStride;
+}
+
+/**
+ * Whether car row `row` of `snap` is a work taxi's (`car.kind`, sim-core `snapshot::car::KIND`):
+ * none is in a layout without kinds (every car a household's), nor past the rows there are.
+ */
+export function carRowIsTaxi(snap: ArrayLike<number>, layout: SnapshotLayout, row: number): boolean {
+  const f = layout.car;
+  const o = carRowAt(layout, row);
+  if (o < 0 || f?.kind === undefined || !f.kinds || layout.header.carCount === undefined) return false;
+  if (row < 0 || row >= (snap[layout.header.carCount] | 0)) return false;
+  return snap[o + f.kind] === f.kinds.taxi;
 }
 
 /**

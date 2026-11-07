@@ -1,5 +1,5 @@
 # The street's dressing props (`model.street.*`): the kerbside bench, the planter with its little tree, the flower
-# tub, the street-name sign, the bus-stop sign, the pot by a front door, the garden path light, and the foliage of
+# tub, the street-name sign, the taxi rank's sign, the pot by a front door, the garden path light, and the foliage of
 # the street (`flowers`). Notes: street.md.
 #
 # render/pc/street.ts draws them as thin instances along the kerbs and in the neighbours' front gardens, dozens
@@ -48,8 +48,11 @@ M = G.Palette(
     pole=('#5C6168', 'metal'),         # the signs' poles
     sign=('#2F5D3A', 'gloss'),         # the street-name sign's green blades and lettering
     plate=('#F2F2F0', 'gloss'),        # white panels
-    flag=('#2E6FA8', 'gloss'),         # the bus stop's blue
-    ink=('#3A3F45', 'matte'),        # the timetable's lines, the bus's wheels
+    ink=('#3A3F45', 'matte'),          # the fares' lines
+    # the taxi rank's sign: the taxi's yellow, its chequers and lettering, the light box lit at night (E8)
+    taxi=('#F2B81C', 'gloss'),
+    black=('#16181A', 'matte'),
+    sign_light=('#FFF4C8', 'satin', {'glow': '#FFE7A0'}),
     terracotta=('#B5653F', 'satin'),   # the door pot
     lamp=('#2B2C2E', 'metal'),         # the path light's post and cap
     # the path light's frosted lens: glows at night (E8), where the old part's glass bulb was
@@ -254,55 +257,40 @@ def sign():
     return G.meshes()
 
 
-# --- the bus-stop sign: the round blue flag with a bus on it, and the timetable -------------------------------
-def _bus(F, name, y, z, face):
-    """The bus pictogram on one face of the flag (+1 front, -1 back): a blue bus side, its windows and door cut out of
-    it so the white face shows through, two dark wheels."""
-    s = face
-    outline = [(-0.1, -0.035), (0.1, -0.035), (0.1, 0.025), (0.085, 0.045), (-0.095, 0.045), (-0.1, 0.035)]
-    holes = [[(u - 0.072 + k * 0.036, v + 0.016) for u, v in G.rounded_rect(0.028, 0.026, 0.004, corner=1)]
-             for k in range(4)]
-    holes.append([(0.068, -0.024), (0.088, -0.024), (0.088, 0.0), (0.068, 0.0)])          # the door's window
-    outline = [(u * s, v) for u, v in outline]
-    holes = [[(u * s, v) for u, v in h] for h in holes]
-    if s < 0:                                             # mirrored: keep the loops anticlockwise
-        outline = outline[::-1]
-        holes = [h[::-1] for h in holes]
-    F.extrude(name, outline, 0.004, (0, y, z), M.flag, holes=holes)
-    for x in (-0.06, 0.055):
-        G.cylinder(f'{name}_wheel{x}', 0.017, 0.006, at=F.at(x * s, y - 0.035, z), material=M.ink, rot=(90, 0, 0), verts=8)
-
-
-def busSign():
+# --- the taxi rank's sign: a lit TAXI box on a post, the taxi's chequers, and the fares --------------------------
+def taxiSign():
     F = G.GameFrame()
     full = not G.is_low()
-    # the post stops under the flag (into its rim), so the flag's faces stay whole
-    _post(F, 2.2, foot=0.0375)
-    _band(F, 'collar', 2.15, r=0.037, h=0.04)
-    # the flag: a disc with a rolled rim, a white face proud of it on both sides, the bus on each face
-    G.revolve('flag', [(0, -0.017), (0.21, -0.017), (0.226, -0.012), (0.23, 0.0), (0.226, 0.012), (0.21, 0.017), (0, 0.017)]
-              if full else [(0, -0.02), (0.23, -0.02), (0.23, 0.02), (0, 0.02)],
-              at=F.at(0, 2.4, 0), material=M.flag, segments=low(32, 12), rot=(90, 0, 0))
-    G.cylinder('flag_face', 0.17, 0.042, at=F.at(0, 2.4, 0), material=M.plate, rot=(90, 0, 0), verts=low(28, 12))
+    # the post up into the sign's case
+    _post(F, 2.3, foot=0.0375)
+    _band(F, 'collar', 2.18, r=0.037, h=0.04)
+    # the sign: a yellow case, a light box lettered TAXI on both faces (lit at night), the chequers under it
+    _box(F, 'case', 0.5, 0.3, 0.07, (0, 2.42, 0), M.taxi, bevel=0.012)
+    _box(F, 'light', 0.44, 0.15, 0.076, (0, 2.475, 0), M.sign_light, bevel=0.004)
     if full:
         for face in (1, -1):
-            _bus(F, f'bus{face}', 2.41, face * 0.023, face)
-    # the timetable in its case, clamped to the pole's front: a framed case under a little hood
+            G.kit.taxi_word(F, f'word{face}', (0, 2.475), 0.095, face * 0.038, face, M.black)
+            G.kit.chequer(F, f'check{face}', -0.21, 0.21, 2.385, face * 0.035, 0.03, face, M.black)
+    else:
+        for face in (1, -1):
+            _box(F, f'band{face}', 0.42, 0.06, 0.003, (0, 2.355, face * 0.0365), M.black)
+    # the fares in their case, clamped to the post's front: a framed case under a little hood, a yellow head
     _box(F, 'case_back', 0.29, 0.41, 0.02, (0, 1.5, 0.045), M.pole, bevel=0.004)
     frame = G.rounded_rect(0.3, 0.42, low(0.012, 0.0), corner=low(2, 1))
-    F.extrude('case', frame, 0.012, (0, 1.5, 0.061), M.pole, holes=[G.rounded_rect(0.264, 0.384, 0.004, corner=1)])
+    F.extrude('fares_case', frame, 0.012, (0, 1.5, 0.061), M.pole, holes=[G.rounded_rect(0.264, 0.384, 0.004, corner=1)])
     _box(F, 'hood', 0.32, 0.014, 0.044, (0, 1.718, 0.0482), M.pole, bevel=0.004)
-    _box(F, 'timetable', 0.27, 0.39, 0.004, (0, 1.5, 0.057), M.plate)
-    _box(F, 'header', 0.26, 0.06, 0.004, (0, 1.66, 0.06), M.flag)
+    _box(F, 'fares', 0.27, 0.39, 0.004, (0, 1.5, 0.057), M.plate)
+    _box(F, 'header', 0.26, 0.06, 0.004, (0, 1.66, 0.06), M.taxi)
     if full:
-        for k in range(10):
+        G.kit.taxi_word(F, 'header_word', (0, 1.66), 0.035, 0.062, 1, M.black)
+        for k in range(9):
             w = 0.16 - (k % 3) * 0.03 if k % 4 != 3 else 0.07
             _box(F, f'line{k}', w, 0.01, 0.003, (-0.11 + w / 2, 1.6 - k * 0.03, 0.06), M.ink)
-            _box(F, f'time{k}', 0.05, 0.01, 0.003, (0.085, 1.6 - k * 0.03, 0.06), M.ink)    # the times, at the right
+            _box(F, f'fare{k}', 0.05, 0.01, 0.003, (0.085, 1.6 - k * 0.03, 0.06), M.ink)    # the fares, at the right
     for y in (1.36, 1.64):
         _band(F, f'clamp{y}', y, r=0.037, h=0.03)
         _box(F, f'lug{y}', 0.05, 0.03, 0.03, (0, y, 0.03), M.pole)
-    G.join_all('busSign')
+    G.join_all('taxiSign')
     G.settle(centre=False)
     return G.meshes()
 
@@ -403,12 +391,12 @@ FAMILY = G.Family(
      G.Model('planter', planter, size=(0.8, 2.445, 0.72), far=far_of(planter)),
      G.Model('flowerTub', flowerTub, size=(0.7, 0.57, 0.7), far=far_of(flowerTub)),
      G.Model('sign', sign, size=(0.9, 2.665, 0.9), far=far_of(sign)),
-     G.Model('busSign', busSign, size=(0.46, 2.627, 0.108), centre=(0, 0.0163), far=far_of(busSign)),
+     G.Model('taxiSign', taxiSign, size=(0.5, 2.57, 0.112), centre=(0, 0.0141), code=True, far=far_of(taxiSign)),
      G.Model('pot', pot, size=(0.432, 0.88, 0.421), far=far_of(pot)),
      G.Model('pathLight', pathLight, size=(0.18, 0.56, 0.18), far=far_of(pathLight)),
      G.Model('flowers', flowers, size=(0.6, 0.343, 0.52), far=far_of(flowers))],
     comment='Blender-built street dressing (tools/art/blender/families/street.py): the kerbside bench, '
-            'the planter with its little tree, the flower tub, the street-name sign, the bus-stop sign, '
+            'the planter with its little tree, the flower tub, the street-name sign, the taxi rank\'s sign, '
             'the door pot, the garden path light and the flower clump that '
             'render/pc/street.ts draws as thin instances along the kerbs and front gardens. Listed '
             'in the base manifest\'s packs. Each has a far version for the town overview. Leaves and '

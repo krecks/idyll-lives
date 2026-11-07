@@ -3,7 +3,7 @@
 `street_furniture.py` builds the ten CM2 street furniture models (docs/objects/community.md) into
 `web/public/assets/models/street_furniture/` and their entries in `packs/street_furniture/manifest.json`: the street
 lamp (`model.streetLamp`), the long park bench (`model.parkBench`), the drinking fountain (`model.drinkingFountain`),
-the litter bin (`model.litterBin`), the bus shelter (`model.busStop`), the post box (`model.postBox`), the notice board
+the litter bin (`model.litterBin`), the taxi rank's shelter (`model.busStop`, the bus shelter it was), the post box (`model.postBox`), the notice board
 (`model.noticeBoard`), the phone box (`model.phoneBooth`), the town fountain (`model.fountainTown`) and the founder's
 statue (`model.townStatue`). The street dressing props (`model.street.*`) are not part of it. Built
 2026-10-14; they sat in Validate › Street until checked in play.
@@ -51,6 +51,8 @@ statue (metal). A `G.Palette` has one colour and finish per name, so each build 
 - The lamp's four frosted panes are `lantern` (satin) with `glow` `#FFD596`: they glow from dusk as the lamps come up
   (E8), out of doors so no room's lights put them out. The lamp's light itself is the content's `light`, unchanged.
 - The phone box's four TELEPHONE signs are `sign` (matte) with `glow` `#FFF1D2`.
+- The taxi rank's TAXI sign on the shelter's roof is a light box, `sign_light` (satin) with `glow` `#FFE7A0`, lit
+  from dusk as the taxi's roof sign looks lit; its letters stand in front of it, dark.
 
 ## Far versions (E7)
 
@@ -79,10 +81,14 @@ Rebuilt in detail on 2026-10-22 with the forms and the kit, each at most half it
 - **Litter bin**: a green bin, pressed slats between two rolled beads, a rounded foot, a rolled iron rim round a dark
   mouth with a black bag's edge over it, a label with a bin sign; on a square iron post with a pyramid cap, two curved
   straps round its back.
-- **Bus shelter**: four posts on bolted foot plates, a curved roof on beams, a fascia with a blue stripe, a gutter; glass
-  at the back (two panes on a mullion) and the right-hand end in rails, white safety bands; a two-slat bench on
-  cantilevered brackets with slim legs; the timetable and a route map on the back glass; the stop's blue flag on the
-  roof with the bus on both faces.
+- **Taxi rank shelter** (`busStop`; the bus shelter until 2026-11-05, when the bus went and a shared work taxi took
+  its place): four posts on bolted foot plates, a curved roof on beams, a fascia with the taxi's yellow stripe and
+  two rows of its chequers (`kit.chequer`), a gutter; glass at the back (two panes on a mullion) and the right-hand
+  end in rails, white safety bands; a two-slat bench on cantilevered brackets with slim legs; the fares (a yellow
+  head lettered TAXI, `kit.taxi_word`, over lines of fares) and a town map on the back glass; on the roof the rank's
+  sign: a yellow case, a light box lettered TAXI on both faces (lit at night), the chequers under it, in the language
+  of the taxi's roof sign (`render/shared/cars.ts` `paintTaxi`). Its shapes are the bus shelter's; its id stays
+  `busStop`, so towns and saves keep it.
 - **Post box**: a red pillar box turned in one piece (foot moulding, band, shaft, stepped cornice, domed cap) on a black
   plinth, the door's outline cast round the front with a keyhole, the slot's arched hood, sill and cheeks round a dark
   opening and its flap (with its word), the collection times in a framed plate, a brass crown over the slot.
@@ -111,18 +117,19 @@ Rebuilt in detail on 2026-10-22 with the forms and the kit, each at most half it
 | `model.parkBench` | 2.50 × 0.89 × 0.57 m | 3,892 (2,160) | 972 | 2 | Frame |
 | `model.drinkingFountain` | 0.56 × 1.09 × 0.56 m | 2,728 (1,524) | 570 | 2 | Pillar |
 | `model.litterBin` | 0.47 × 0.98 × 0.58 m | 1,600 (1,704) | 400 | 1 | Bin |
-| `model.busStop` | 2.98 × 2.89 × 1.21 m | 3,980 (2,616) | 968 | 3 | Frame |
+| `model.busStop` | 2.98 × 2.88 × 1.21 m | 5,156 (2,616) | 1,836 | 3 (+1 lit sign) | Frame |
 | `model.postBox` | 0.50 × 1.53 × 0.52 m | 2,810 (2,132) | 688 | 2 | Box |
 | `model.noticeBoard` | 1.02 × 2.07 × 0.35 m | 1,868 (1,320) | 436 | 2 | Frame |
 | `model.phoneBooth` | 0.95 × 2.70 × 0.95 m | 3,900 (3,100) | 920 | 4 | Kiosk |
 | `model.fountainTown` | 2.96 × 2.47 × 2.96 m | 5,452 (5,784) | 1,232 | 3 | Stone |
 | `model.townStatue` | 1.80 × 3.39 × 1.80 m | 3,410 (2,476) | 820 | 1 | Statue |
+| `model.trafficLight` | 0.52 × 3.10 × 0.56 m | 2,684 (new) | 800 | 1 (+1 lit lens) | — |
 
 Draws are counted as `check-glb` does, each moving part apart: the bench (iron, wood), the shelter (frame, wood,
 glass), the drinking fountain and the post box (body, the moving part), the notice board (plain, wood), the town
 fountain (body, jet, splashes). The lamp and the phone box take one more at night for their glow.
 
-`check-glb`: 10 models, 0 failed. One warning, expected:
+`check-glb`: 10 models, 0 failed (11 with the traffic light, 2026-11-05: no warning). One warning, expected:
 
 - **Phone box: 4 draw calls** (the most allowed, as the washer): the kiosk, its glazing, the door and the door's
   glazing. The plan's folding door would be two moving leaves, each with its own glass: 6 draws, over the limit, so
@@ -130,6 +137,23 @@ fountain (body, jet, splashes). The lamp and the phone box take one more at nigh
   not be seen through.
 
 Khronos validator: 0 errors, 0 warnings on all twenty files (each model and its far version).
+
+## The traffic light (`model.trafficLight`)
+
+Built 2026-11-05. Not buyable and in no content (`code=True`): `render/pc/signals.ts` stands one at each signal head
+the sim has (the snapshot's `light` rows, sim-core `traffic.rs`: one per arm of each lit junction). Its origin is the
+pole's axis, where the snapshot stands it, so it isn't centred (`G.settle(centre=False)`, `centre=(0, 0.15)`: the
+head reaches forward); its head faces +z, towards the traffic coming in.
+
+- A square chamfered plinth and a short fluted bell to a moulded collar (the street lamp's, smaller), a fluted pole
+  up behind the head to a turned cap; two clamps with lugs out to the head.
+- The head: a housing with rounded edges, 0.3 × 0.9 m, its front 0.27 m in front of the pole; a black backboard with a
+  white rim behind it; three lenses (red 2.81 m up, amber 2.52, green 2.23), each in a bezel under a hood open below.
+- The lenses are each a material of their own, dark glass (`lens_red`, `lens_amber`, `lens_green`, gloss) with the
+  colour it glows (`glow`). All plain, so the model is one draw. The renderer builds the glows a mesh per material
+  (`BuildOptions.glowApart`) and draws each colour's as one instanced draw of the heads showing it: only the lamp
+  the snapshot shows is lit, by day as at night (brighter as the lamps come up). The rest stay dark glass.
+- Far version: its own build at low detail (`G.far_of`): fewer segments, no flutes, flat hoods.
 
 ## Rebuild
 

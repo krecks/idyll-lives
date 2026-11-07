@@ -171,7 +171,7 @@ export const STEP_IN: Record<string, StepIn> = {
   'foodie.cookbookLectern:read': { by: bySize(LECTERN) },
   // Kneeling at the low train table's edge, the hands on its track and its little town, a lane each (clips/low.ts).
   'trainTable:play': { by: bySize(KNEEL_TABLE), lanes: KNEEL_LANES },
-  // Into the shelter at the timetable's end, on the back glass past the bench.
+  // Into the taxi rank's shelter at the fares' end, on the back glass past the bench.
   busStop: { by: [[0, [], { to: 0.05 }]], lanes: [-0.95] },
   // At the feeder's post, at its back left, clear of the bird bath: its house filled from a scoop (clips/reach.ts).
   'kind.songbirdFeeder:garden': { by: bySize(FEEDER), lanes: [-0.2] },
@@ -645,7 +645,7 @@ export const ACTIONS: Record<string, ActionAnim> = {
     // (A card posted at the post box; at a desk a pen, a pencil at the children's.)
     prop: (def) => (def === 'postBox' ? PROPS.postcard : KIDS_DESKS.has(def) ? PROPS.pencil : PROPS.pen),
   },
-  // (A notice board or a timetable is read looking at it, not at a book in the hands.)
+  // (A notice board or the taxi rank's fares are read looking at them, not at a book in the hands.)
   // (The book in the hands; at the cookbook lectern the book is the lectern's.)
   read: {
     stand: (def) => (def === 'noticeBoard' || def === 'busStop' ? ['idle'] : ['lantern']),

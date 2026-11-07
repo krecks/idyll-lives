@@ -40,7 +40,11 @@ export interface SnapshotLayout {
   /** Where the cars' rows start, and floats per car (missing in older layouts). */
   carBase?: number;
   carStride?: number;
-  /** A car's row: `shown` 0 out of sight, 1 parked, 2 driving; where its middle is and which way it faces; its open doors (bit `d` for door `d`, `shared/cars.ts` `DOORS`); its `kind` (`kinds`: a household's or a work taxi). */
+  /**
+   * A car's row: `shown` 0 out of sight, 1 parked, 2 driving; where its middle is and which way it faces; its open doors
+   * (bit `d` for door `d`, `shared/cars.ts` `DOORS`); what it is (`kind`, one of `kinds`: a household's car, its look in the
+   * structure's `cars`, or a work taxi, the renderer's own look; missing in older layouts: all households').
+   */
   car?: { shown: number; x: number; z: number; yaw: number; doors?: number; kind?: number; kinds?: { household: number; taxi: number } };
   /** Where the signal heads' rows start, floats per head, and how many there's room for (missing in older layouts). */
   lightBase?: number;

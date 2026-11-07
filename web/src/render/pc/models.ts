@@ -105,8 +105,10 @@ export interface ModelTemplate {
    * of those faces drawn added on top, per moving part (-1: the still body), off until the renderer
    * gives each instance its strength (the instance colour, `INSTANCE_COLOR`) and draws it. `screen`
    * marks the ones lit by use rather than by the room. Not in `meshes`: nothing else draws them.
+   * With `BuildOptions.glowApart`, a mesh per glowing material too, named by `material` (a traffic
+   * light's three lenses, lit one at a time).
    */
-  glows?: { mesh: ModelMesh; part: number; screen?: boolean }[];
+  glows?: { mesh: ModelMesh; part: number; screen?: boolean; material?: string }[];
   /**
    * The files it was built without, as they failed to load: its far version (it's the full model
    * then), or every one (it's drawn as nothing, or the box asked for). It's built again when one of
@@ -201,6 +203,8 @@ export interface BuildOptions {
   parts?: readonly string[];
   /** Work out its contact shadow's shape (`ModelTemplate.contact`): placed objects on the floor or a top. */
   contact?: boolean;
+  /** Its glows a mesh per glowing material (`ModelTemplate.glows`' `material`), not one per part: each drawn on its own (a traffic light's lenses). */
+  glowApart?: boolean;
 }
 
 export async function buildModel(app: pc.AppBase, name: string, entry: ModelEntry | undefined, footprint: [number, number], options: BuildOptions = {}): Promise<ModelTemplate> {
@@ -1061,7 +1065,7 @@ function buildGltf(app: pc.AppBase, name: string, entry: ModelEntry, file: Loade
 }
 
 /** `buildGltf`'s build; what it uploads goes into `made`. */
-function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], { resize, contact }: BuildOptions, made: pc.Mesh[]): ModelTemplate {
+function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], { resize, contact, glowApart }: BuildOptions, made: pc.Mesh[]): ModelTemplate {
   const extras = entry as ModelEntry & ModelExtras;
   const fit = extras.fit;
   const [ox, oy, oz] = entry.offset ?? [0, 0, 0];
@@ -1147,18 +1151,19 @@ function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: L
     ...(extras.parts ?? []).filter((p) => p.mirror).map(mirrorSurface),
   ];
   // What glows (a lamp's shade at night, a screen while it's used): its faces again, in the glow's
-  // colour, a mesh per part they're on.
+  // colour, a mesh per part they're on (and per material, `glowApart`).
   const glowing = Map.groupBy(
     pieces.filter(({ source }) => overrideFor(source)?.glow),
-    ({ part }) => part,
+    ({ part, source }) => (glowApart ? `${part}|${source.materialName}` : `${part}`),
   );
-  const glows = [...glowing].map(([part, list]) => ({
-    part,
+  const glows = [...glowing].map(([, list]) => ({
+    part: list[0].part,
     // A screen (a TV, a monitor: its `screen`, `crt` or `projection` material, or a manifest's
     // `screen`) is only lit while someone is using it; a lamp's shade or a fire glows with its room.
     screen: list.some(({ source }) => overrideFor(source)?.screen ?? /screen|crt|projection/i.test(source.materialName)),
+    ...(glowApart ? { material: list[0].source.materialName } : {}),
     mesh: {
-      name: `${name}|glow${part < 0 ? '' : `|${file.parts[part].name}`}`,
+      name: `${name}|glow${list[0].part < 0 ? '' : `|${file.parts[list[0].part].name}`}${glowApart ? `|${list[0].source.materialName}` : ''}`,
       mesh: upload(glowData(list.map(({ source, data }) => ({ data, color: overrideFor(source)!.glow! })))),
       material: glowMaterial(app),
     },

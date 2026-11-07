@@ -1,6 +1,6 @@
 /**
- * Households' cars in the game on PlayCanvas (sim-core `cars.rs`): parked on their driveways, and
- * driving off to work and back, placed every frame where the sim's snapshot says it is
+ * Households' cars and the work taxis in the game on PlayCanvas (sim-core `cars.rs`, `taxi.rs`):
+ * parked on their driveways, and driving off to work and back, placed every frame where the sim's snapshot says it is
  * (`SnapshotLayout.car`), between two snapshots (and on past the newest while it drives, as the
  * residents go: `FrameState.alpha`); hidden while it's out of town or its parking spot has been
  * built over, while it stands on the viewed lot with its basement in view (`hideOn`: the lot's
@@ -13,6 +13,11 @@
  * turn as it goes and the front ones steer: `paintWheel`), and their soft contact shadows another.
  * A door swings open while someone gets in or out by it, and shut after (`DOOR_SECONDS`, in game
  * time). Those riding in a car that drives sit in it where it is drawn (`ride`).
+ *
+ * The snapshot's car rows are the households' first, in the structure's `cars` order (their looks),
+ * then the work taxis' (`car.kind`): none in the structure, so each is drawn as the taxi
+ * (`shared/cars.ts` `paintTaxi`), made the first time its row comes (a row stays for good; an
+ * unused taxi's isn't shown).
  */
 
 import * as pc from './engine';
@@ -22,7 +27,7 @@ import { LIFT, rollWheels, Vehicles } from './vehicles';
 import type { FrameState } from '../../core/bridge';
 import type { Seat } from '../shared/characters/seats';
 import type { WorldStructure } from '../../core/protocol';
-import { CARS, CAR_PAINT, carDoor, carriedAlong, DOORS, inCar, paintCar, paintDoor, wheelAt, type CarBody, type CarPose } from '../shared/cars';
+import { CARS, CAR_PAINT, carDoor, carriedAlong, carRowIsTaxi, DOORS, inCar, paintCar, paintDoor, paintTaxi, paintTaxiDoor, TAXI_BODY, wheelAt, type CarBody, type CarPose } from '../shared/cars';
 import { lerpAngle } from '../shared/characters/rig';
 import { DOOR_SWING, ease } from '../shared/doors';
 import { Geo } from '../shared/geometry';
@@ -59,8 +64,12 @@ interface Own {
 }
 
 interface Drawn {
+  /** Its row in the snapshot's cars (a household's car: its place in the structure's `cars`). */
+  row: number;
+  /** A work taxi (its look the taxi's: `paintTaxi`), else a household's car (`body`, `paint`). */
+  taxi: boolean;
   shape: CarBody;
-  /** Its body and paint (`body paint`): the instanced draw it's in while parked. */
+  /** Its body and paint (`body paint`, or `taxi`): the instanced draw it's in while parked. */
   look: string;
   body: number;
   paint: number;
@@ -98,6 +107,8 @@ interface Parked {
 export class Cars extends Vehicles {
   private key = '';
   private cars: Drawn[] = [];
+  /** The snapshot's car rows looked at for a taxi so far (the households' and the taxis' come before). */
+  private scanned = 0;
   private lastNow = 0;
   /** The parked cars by look (their body meshes, by body and paint, shared by the cars of a build that look alike). */
   private readonly parked = new Map<string, Parked>();
@@ -121,32 +132,8 @@ export class Cars extends Vehicles {
     if (key === this.key) return;
     this.clear();
     this.key = key;
-    for (const info of list) {
-      const body = info.body % CARS.length;
-      const paint = info.paint % CAR_PAINT.length;
-      const shape = CARS[body];
-      const at = { x: info.x, z: info.z, yaw: info.yaw, shown: 0 };
-      this.cars.push({
-        shape,
-        look: `${body} ${paint}`,
-        body,
-        paint,
-        at,
-        last: { x: at.x, z: at.z, yaw: at.yaw, shown: 0 },
-        snap: { x: at.x, z: at.z, yaw: at.yaw, driving: false },
-        open: new Array<number>(DOORS).fill(0),
-        sides: Array.from({ length: DOORS }, (_, d) => carDoor(shape, d).side),
-        ajar: false,
-        own: null,
-        drawn: false,
-        owned: false,
-        slot: -1,
-        spin: 0,
-        steer: 0,
-        pitch: 0,
-        speed: 0,
-      });
-    }
+    list.forEach((info, row) => this.cars.push(drawnCar(row, false, info.body % CARS.length, info.paint % CAR_PAINT.length, info.x, info.z, info.yaw)));
+    this.scanned = list.length;
     this.ensureAround('car', list.length, 0.55);
     this.around = true;
   }
@@ -173,7 +160,7 @@ export class Cars extends Vehicles {
       last.shown = at.shown;
       let changed = false;
       if (at.shown) {
-        const o = layout.carBase + i * layout.carStride;
+        const o = layout.carBase + car.row * layout.carStride;
         changed = at.x !== last.x || at.z !== last.z || at.yaw !== last.yaw;
         // (Paused, nothing goes on settling.)
         if (changed) this.roll(car, real);
@@ -242,6 +229,7 @@ export class Cars extends Vehicles {
     this.parked.clear();
     this.clearDraws();
     this.key = '';
+    this.scanned = 0;
     this.posedAt = NaN;
   }
 
@@ -258,12 +246,22 @@ export class Cars extends Vehicles {
     if (base === undefined || stride === undefined || !f) return;
     const count = layout.header.carCount === undefined ? 0 : curr[layout.header.carCount];
     const before = layout.header.carCount === undefined ? 0 : prev[layout.header.carCount];
+    // A taxi's row come (after the households' and the taxis' before it): drawn as the taxi from now on.
+    for (; this.scanned < count; this.scanned++) {
+      const row = this.scanned;
+      if (!carRowIsTaxi(curr, layout, row)) continue;
+      const o = base + row * stride;
+      this.cars.push(drawnCar(row, true, TAXI_BODY, -1, curr[o + f.x], curr[o + f.z], curr[o + f.yaw]));
+      this.ensureAround('car', this.cars.length, 0.55);
+      this.around = true;
+    }
     for (let i = 0; i < this.cars.length; i++) {
-      const { at, snap } = this.cars[i];
-      const o = base + i * stride;
-      at.shown = i < count ? curr[o + f.shown] : 0;
+      const { at, snap, row, taxi } = this.cars[i];
+      const o = base + row * stride;
+      // (A row not what it was taken for, as a household's car whose structure is a step behind: not shown.)
+      at.shown = row < count && carRowIsTaxi(curr, layout, row) === taxi ? curr[o + f.shown] : 0;
       if (!at.shown) continue;
-      const was = i < before ? prev[o + f.shown] : 0;
+      const was = row < before ? prev[o + f.shown] : 0;
       // Driving in both, on past the newest snapshot while the next is late (as far as the residents
       // go: the bridge's `MAX_EXTRAPOLATION`), or it would stall and then jump; parking, not past its spot.
       const k = !was ? 1 : at.shown === 2 && was === 2 ? Math.max(0, alpha) : Math.min(1, Math.max(0, alpha));
@@ -399,8 +397,8 @@ export class Cars extends Vehicles {
 
   /** A car's own entity (the first time it drives or opens a door): its body in one piece, and apart with its doors. */
   private makeOwn(car: Drawn): Own {
-    const { shape, body, paint } = car;
-    const hex = CAR_PAINT[paint];
+    const { shape, paint } = car;
+    const hex = car.taxi ? '' : CAR_PAINT[paint];
     const entity = new pc.Entity('car');
     this.root.addChild(entity);
     const tilt = new pc.Entity('carTilt');
@@ -412,18 +410,20 @@ export class Cars extends Vehicles {
     apart.enabled = false;
     const one = this.wholeMesh(car);
     if (one) drawMesh(whole, 'carBody', one, this.lib.plainFinish(), { castShadows: this.shadows });
-    const bare = this.mesh(`body ${body} ${paint}`, () => {
+    const bare = this.mesh(`body ${car.look}`, () => {
       const p = new Painter(new Geo());
-      paintCar(p.at(0, 0, 0, LIFT), shape, hex, true, false);
+      if (car.taxi) paintTaxi(p.at(0, 0, 0, LIFT), true, false);
+      else paintCar(p.at(0, 0, 0, LIFT), shape, hex, true, false);
       return p.geo;
     });
     if (bare) drawMesh(apart, 'carBody', bare, this.lib.plainFinish(), { castShadows: this.shadows });
     const doors: pc.Entity[] = [];
     for (let d = 0; d < DOORS; d++) {
       const { side, hinge } = carDoor(shape, d);
-      const mesh = this.mesh(`door ${body} ${paint} ${d}`, () => {
+      const mesh = this.mesh(`door ${car.look} ${d}`, () => {
         const p = new Painter(new Geo());
-        paintDoor(p.at(0, 0, 0, LIFT), shape, hex, d);
+        if (car.taxi) paintTaxiDoor(p.at(0, 0, 0, LIFT), d);
+        else paintDoor(p.at(0, 0, 0, LIFT), shape, hex, d);
         return p.geo;
       });
       const door = new pc.Entity('carDoor');
@@ -439,9 +439,10 @@ export class Cars extends Vehicles {
 
   /** A car's body in one piece, its doors shut, without its wheels (shut, as most are most of the time, one draw instead of five). */
   private wholeMesh(car: Drawn): pc.Mesh | null {
-    return this.mesh(`whole ${car.body} ${car.paint}`, () => {
+    return this.mesh(`whole ${car.look}`, () => {
       const p = new Painter(new Geo());
-      paintCar(p.at(0, 0, 0, LIFT), car.shape, CAR_PAINT[car.paint], false, false);
+      if (car.taxi) paintTaxi(p.at(0, 0, 0, LIFT), false, false);
+      else paintCar(p.at(0, 0, 0, LIFT), car.shape, CAR_PAINT[car.paint], false, false);
       return p.geo;
     });
   }
@@ -457,4 +458,31 @@ export class Cars extends Vehicles {
     return p;
   }
 
+}
+
+/** A car to draw: row `row` of the snapshot's cars, a household's (`body`, `paint`) or a work taxi, where it first stands. */
+function drawnCar(row: number, taxi: boolean, body: number, paint: number, x: number, z: number, yaw: number): Drawn {
+  const shape = CARS[body];
+  return {
+    row,
+    taxi,
+    shape,
+    look: taxi ? 'taxi' : `${body} ${paint}`,
+    body,
+    paint,
+    at: { x, z, yaw, shown: 0 },
+    last: { x, z, yaw, shown: 0 },
+    snap: { x, z, yaw, driving: false },
+    open: new Array<number>(DOORS).fill(0),
+    sides: Array.from({ length: DOORS }, (_, d) => carDoor(shape, d).side),
+    ajar: false,
+    own: null,
+    drawn: false,
+    owned: false,
+    slot: -1,
+    spin: 0,
+    steer: 0,
+    pitch: 0,
+    speed: 0,
+  };
 }

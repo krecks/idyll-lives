@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built street dressing (tools/art/blender/families/street.py): the kerbside bench, the planter with its little tree, the flower tub, the street-name sign, the bus-stop sign, the door pot, the garden path light and the flower clump that render/pc/street.ts draws as thin instances along the kerbs and front gardens. Listed in the base manifest's packs. Each has a far version for the town overview. Leaves and flowers are on the foliage finish, so they sway in the wind; the path light's lens glows at night.",
+  "$comment": "Blender-built street dressing (tools/art/blender/families/street.py): the kerbside bench, the planter with its little tree, the flower tub, the street-name sign, the taxi rank's sign, the door pot, the garden path light and the flower clump that render/pc/street.ts draws as thin instances along the kerbs and front gardens. Listed in the base manifest's packs. Each has a far version for the town overview. Leaves and flowers are on the foliage finish, so they sway in the wind; the path light's lens glows at night.",
   "version": 1,
   "entries": {
     "model.street.bench": {
@@ -108,25 +108,6 @@
       },
       "far": "../../models/street/sign.far.glb"
     },
-    "model.street.busSign": {
-      "type": "model",
-      "url": "../../models/street/busSign.glb",
-      "materials": {
-        "flag": {
-          "finish": "material.finish.gloss"
-        },
-        "ink": {
-          "finish": "material.finish.matte"
-        },
-        "plate": {
-          "finish": "material.finish.gloss"
-        },
-        "pole": {
-          "finish": "material.finish.metal"
-        }
-      },
-      "far": "../../models/street/busSign.far.glb"
-    },
     "model.street.pot": {
       "type": "model",
       "url": "../../models/street/pot.glb",
@@ -202,6 +183,32 @@
         }
       },
       "far": "../../models/street/flowers.far.glb"
+    },
+    "model.street.taxiSign": {
+      "type": "model",
+      "url": "../../models/street/taxiSign.glb",
+      "materials": {
+        "black": {
+          "finish": "material.finish.matte"
+        },
+        "ink": {
+          "finish": "material.finish.matte"
+        },
+        "plate": {
+          "finish": "material.finish.gloss"
+        },
+        "pole": {
+          "finish": "material.finish.metal"
+        },
+        "sign_light": {
+          "finish": "material.finish.satin",
+          "glow": "#FFE7A0"
+        },
+        "taxi": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "far": "../../models/street/taxiSign.far.glb"
     }
   }
 }
