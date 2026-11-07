@@ -1458,6 +1458,7 @@ impl World {
                     farewell: 0,
                     offer_at: 0,
                     arrived: 0,
+                    leaving: false,
                 })
             });
             for t in &s.tasks {

@@ -70,6 +70,7 @@ fn hosting(content: &str) -> World {
         farewell: 0,
         offer_at: 0,
         arrived: 0,
+        leaving: false,
     });
     w
 }
@@ -284,6 +285,7 @@ fn without_a_fridge_nobody_offers_anything() {
         farewell: 0,
         offer_at: 0,
         arrived: 0,
+        leaving: false,
     });
     let mut watch = common::Watch::new();
     for _ in 0..60 * TICKS_PER_MINUTE {
@@ -389,4 +391,60 @@ fn a_guest_whose_host_is_called_away_mid_serve_gets_their_own_snack() {
         w.sims[1].current().map(|a| a.task.kind)
     );
     assert!(!w.events.iter().any(|e| e.kind == EventKind::Served));
+}
+
+#[test]
+fn a_guest_whose_need_about_to_run_out_is_seen_to_there_stays_their_least_stay() {
+    // Bo, just let in (`visits.leastMinutes`: 40), sits down at the far table; a need about to
+    // run out has his way home queued. Seen to there (sitting comfortably) within the 40
+    // minutes, he stays: it's withdrawn. (Left queued, he went once he'd finished sitting, 38
+    // minutes in, the need long since seen to, Ashdale.)
+    let content = CONTENT.replace(r#""hours":4,"#, r#""hours":4,"leastMinutes":40,"#);
+    let mut w = hosting(&content);
+    let comfort = need(&w, "comfort");
+    w.sims[1].visiting.as_mut().unwrap().arrived = w.tick;
+    let least = w.tick + 40 * TICKS_PER_MINUTE;
+    w.apply(Command::Use {
+        sim: 1,
+        object: FAR_TABLE,
+        interaction: 0,
+    })
+    .unwrap();
+    let going = |w: &World| {
+        w.sims[1]
+            .queue()
+            .any(|t| matches!(t.kind, TaskKind::GoHome))
+    };
+    let urgent = w.content.autonomy.urgent_below;
+    w.apply(Command::SetNeed {
+        sim: 1,
+        need: "comfort".into(),
+        value: urgent * 0.5,
+    })
+    .unwrap();
+    let mut queued = false;
+    for _ in 0..TICKS_PER_MINUTE * 5 {
+        w.tick_once();
+        queued |= going(&w);
+        if queued {
+            break;
+        }
+    }
+    assert!(
+        queued,
+        "a need about to run out didn't have Bo's way home queued"
+    );
+    w.sims[1].needs[comfort] = 0.6;
+    while w.tick < least - TICKS_PER_MINUTE {
+        w.tick_once();
+        assert!(
+            !going(&w),
+            "still to go, the need seen to, with {} min of his 40 left",
+            (least - w.tick) / 20
+        );
+        assert!(
+            w.sims[1].visiting.is_some(),
+            "Bo went home before his 40 minutes"
+        );
+    }
 }

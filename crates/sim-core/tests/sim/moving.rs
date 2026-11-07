@@ -277,6 +277,7 @@ fn a_partner_out_on_a_visit_isnt_moved_from_under_it() {
         farewell: 0,
         offer_at: 0,
         arrived: w.tick,
+        leaving: false,
     };
     w.sims[1].visiting = Some(visit);
     w.tick_once();

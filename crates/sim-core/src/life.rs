@@ -79,6 +79,10 @@ pub struct Visit {
     /// saved: after a load, as if there a while.
     #[serde(skip)]
     pub arrived: u64,
+    /// Their goodbye and way home are queued, within `visits.leastMinutes`, for a need about to
+    /// run out (`end_visit_if_due`): withdrawn once it no longer is (seen to there). Not saved.
+    #[serde(skip)]
+    pub leaving: bool,
 }
 
 /// A change in where a Sim is (or what it finished), raised by tasks and handled by `life::update`.
@@ -1134,6 +1138,7 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
                 farewell: 0,
                 offer_at: 0,
                 arrived: 0,
+                leaving: false,
             });
             // With door rules the story is told when they're let in (`answer`).
             if w.content.visits.door.is_some() && !w.plots[plot as usize].public {
@@ -1753,6 +1758,18 @@ fn end_visit_if_due(w: &mut World, i: usize, hour: f32) {
     } else {
         tick >= visit.until || tired || late || bored
     };
+    // (Queued to go within their stay for a need about to run out that's since been seen to
+    // there: they stay after all. Gone 38 minutes in, for a need the park's bench had seen to.)
+    if visit.leaving && !(staying && due) {
+        if staying {
+            sim.queue.retain(|t| {
+                !(matches!(t.kind, TaskKind::GoHome) && !t.directed) && !is_farewell(content, t)
+            });
+        }
+        if let Some(v) = sim.visiting.as_mut() {
+            v.leaving = false;
+        }
+    }
     let busy = sim
         .current
         .as_ref()
@@ -1762,6 +1779,9 @@ fn end_visit_if_due(w: &mut World, i: usize, hour: f32) {
         && sim.engaged_with.is_none()
         && !sim.queue.iter().any(|t| matches!(t.kind, TaskKind::GoHome))
     {
+        if staying && let Some(v) = sim.visiting.as_mut() {
+            v.leaving = true;
+        }
         if let Some((host, social)) = farewell(w, i, visit.plot) {
             w.sims[i].queue.push_back(Task {
                 kind: TaskKind::Social {
