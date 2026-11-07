@@ -18,9 +18,6 @@
         "grille_dark": {
           "finish": "material.finish.matte"
         },
-        "label": {
-          "finish": "material.finish.satin"
-        },
         "led": {
           "finish": "material.finish.gloss"
         },
@@ -29,6 +26,9 @@
         },
         "pebble": {
           "finish": "material.finish.gloss"
+        },
+        "rec_rust": {
+          "finish": "material.finish.satin"
         },
         "retro_bezel": {
           "finish": "material.finish.gloss"

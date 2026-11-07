@@ -9,8 +9,8 @@ from .family import Family, Model
 from .far import decimated, far_of, is_low, low
 from .forms import circle, cut, extrude, jitter, loft, mirrored, ring, rounded_rect, smooth_outline, soft_box, sweep
 from .materials import FINISHES, Palette, mat
-from .motion import (EASES, attach, clips, grow, grow_in_turn, keys, path, rock, scroll, slide, spin, squash, stages, swing,
-                     turns, wobble)
+from .motion import (EASES, FLAT, attach, clips, flat, grow, grow_in_turn, keys, path, rock, scroll, slide, spin,
+                     squash, stages, swing, turns, wobble)
 from . import kit, perch
 from .parts import (aside, check_size, fit, game_size, hinged, join, join_all, measure, new_parts, set_origin,
                     settle, turn)
@@ -20,8 +20,8 @@ from .scene import ASSETS, PREVIEWS, TAU, cosd, meshes, reset, sind
 from .shapes import SHARP, bevel_edges, boulder, cone, cube, cylinder, revolve, rod, round_angle, shade, sphere, torus
 
 __all__ = [
-    'ASSETS', 'EASES', 'FINISHES', 'PREVIEWS', 'SHARP', 'TAU', 'bevel_edges', 'round_angle', 'shade', 'Family', 'GameFrame', 'Model', 'Palette', 'aside', 'attach', 'boulder', 'check_size', 'clips',
-    'circle', 'cone', 'cosd', 'cut', 'extrude', 'cube', 'cylinder', 'decimated', 'export_glb', 'far_of', 'fit', 'game_size', 'grow', 'grow_in_turn', 'hinged', 'is_low', 'jitter', 'join',
+    'ASSETS', 'EASES', 'FINISHES', 'FLAT', 'PREVIEWS', 'SHARP', 'TAU', 'bevel_edges', 'round_angle', 'shade', 'Family', 'GameFrame', 'Model', 'Palette', 'aside', 'attach', 'boulder', 'check_size', 'clips',
+    'circle', 'cone', 'cosd', 'cut', 'extrude', 'cube', 'cylinder', 'decimated', 'export_glb', 'far_of', 'fit', 'flat', 'game_size', 'grow', 'grow_in_turn', 'hinged', 'is_low', 'jitter', 'join',
     'join_all', 'kit', 'loft', 'low', 'mat', 'materials_used', 'measure', 'meshes', 'mirrored', 'new_parts', 'path', 'perch', 'preview', 'preview_clips', 'preview_perches', 'reset', 'revolve', 'ring', 'rock', 'rounded_rect',
     'rod', 'scroll', 'set_origin', 'settle', 'sind', 'slide', 'smooth_outline', 'soft_box', 'sphere', 'spin', 'squash', 'stages', 'stats', 'sweep', 'swing', 'torus', 'turn', 'turns', 'keys', 'wobble',
     'write_pack',

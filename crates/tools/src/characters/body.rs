@@ -37,7 +37,7 @@ use super::head::{HeadFrame, head_cage, onto_head, sockets, youth};
 use super::kdtree::KdTree;
 use super::meshops::smooth_normals;
 use super::np::{clip, lstsq, mean, mean_rows, radians, sign, smoothstep, unique};
-use super::rig::{BASE_STAGE, NB, b, joints, proportions};
+use super::rig::{BASE_STAGE, NB, b, joints, maturity, proportions};
 use super::sparse::Csr;
 use super::subdiv::{
     Subdivision, check_closed, limit_matrix, orient, polygon_triangles, subdivision, triangles,
@@ -53,6 +53,11 @@ fn arm_k(s: &str) -> (usize, usize, usize) {
 }
 /// The thighs' first rings keep this far (x thigh radius) from the midline, either side of the crotch.
 const CROTCH_GAP: f64 = 0.1;
+/// How much wider than the palm's columns the knuckles' are (and the fingers, which sit between
+/// them): fingers the palm's width apart touch, and a hand a few pixels wide then reads as a mitten.
+/// 6 % more (they were 2 % less, 0.98) opens a gap between them and still leaves the knuckles about
+/// the palm's width (its widest ring) rather than a fan.
+const KNUCKLE_SPREAD: f64 = 1.06;
 
 pub fn region(name: &str) -> usize {
     REGIONS.iter().position(|&r| r == name).expect("region")
@@ -107,6 +112,8 @@ struct Shape {
     h: f64,
     female: bool,
     yg: f64,
+    /// How grown the body is (`maturity`): how far it shows the families' grown differences.
+    m: f64,
     r_th: f64,
     r_a: f64,
     r_n: f64,
@@ -119,13 +126,20 @@ fn shape(family: &str, stage: &str) -> Shape {
     let (h, g) = (pr.h, pr.girth);
     let female = family == "female";
     let yg = youth(pr.hh);
+    // Grown: a man's arms and neck thicker, a woman's slighter.
+    let m = maturity(stage);
+    let grown = |a: f64, b: f64| if female { a * m } else { b * m };
     Shape {
         h,
         female,
         yg,
-        r_th: (if female { 0.058 } else { 0.056 }) * h * g * (1.0 + 0.08 * yg),
-        r_a: (if female { 0.029 } else { 0.033 }) * h * g,
-        r_n: (if female { 0.031 } else { 0.035 }) * h * g.powf(0.5),
+        m,
+        r_th: (if female { 0.058 } else { 0.056 } + grown(0.002, -0.003))
+            * h
+            * g
+            * (1.0 + 0.08 * yg),
+        r_a: (if female { 0.029 } else { 0.033 } + grown(-0.0015, 0.002)) * h * g,
+        r_n: (if female { 0.031 } else { 0.035 } + grown(-0.0025, 0.0025)) * h * g.powf(0.5),
         waist: pr.waist,
         belly: pr.belly * h,
     }
@@ -186,8 +200,13 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
 
     // Torso rings T1 (hips) .. T7 (shoulders); (y, half width, front depth, back depth, z,
     // squareness). T7 is all neck loop and arm loops (below).
-    let hw = hip_x + r_th * 0.85;
     let f = |a: f64, m: f64| if female { a } else { m };
+    // Grown (`Shape::m`), on top of the families' own numbers: a woman's hips wider under a narrower
+    // chest and shoulders, her waist about 0.6 of her hips across (it was 0.52, 21 cm: a wasp's); a
+    // man's chest and shoulders broader over narrower hips, his waist nearly as wide as them (0.85; it
+    // was 0.73, an hourglass of his own, which is much of why men and women looked alike).
+    let g = |a: f64, m: f64| f(a, m) * s.m;
+    let hw = hip_x + r_th * 0.85 + g(0.011, -0.003) * h;
     let rows = [
         (
             y_hip + 0.012 * h,
@@ -199,7 +218,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         ),
         (
             y_hip + 0.55 * (y_s1 - y_hip),
-            f(0.106, 0.095) * h * (1.0 + 0.1 * yg),
+            (f(0.106, 0.095) + g(0.003, -0.004)) * h * (1.0 + 0.1 * yg),
             0.062 * h + bel * 0.7,
             f(0.075, 0.07) * h,
             0.0,
@@ -207,7 +226,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         ),
         (
             (y_s1 + y_s2) / 2.0,
-            f(0.068, 0.08) * h * s.waist * (1.0 + 0.25 * yg),
+            (f(0.068, 0.08) + g(0.005, 0.01)) * h * s.waist * (1.0 + 0.25 * yg),
             0.062 * h + bel,
             0.056 * h,
             0.003 * h,
@@ -215,7 +234,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         ),
         (
             y_s2 + 0.45 * (y_s3 - y_s2),
-            f(0.085, 0.098) * h * (1.0 + 0.12 * yg),
+            (f(0.085, 0.098) + g(-0.002, 0.006)) * h * (1.0 + 0.12 * yg),
             0.068 * h + bel * 0.6,
             0.060 * h,
             0.002 * h,
@@ -223,23 +242,23 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         ),
         (
             sh[1] - 1.95 * r_a,
-            f(0.092, 0.108) * h,
-            f(0.07, 0.074) * h + bel * 0.2,
+            (f(0.092, 0.108) + g(-0.004, 0.007)) * h,
+            (f(0.07, 0.074) + g(0.0, 0.004)) * h + bel * 0.2,
             0.064 * h,
             0.0,
             2.2,
         ),
         (
             sh[1] - 0.75 * r_a,
-            f(0.096, 0.112) * h,
-            0.07 * h,
+            (f(0.096, 0.112) + g(-0.005, 0.008)) * h,
+            (0.07 + g(0.0, 0.003)) * h,
             0.064 * h,
             -0.002 * h,
             2.2,
         ),
         (
             sh[1] + 0.25 * r_a,
-            f(0.09, 0.1) * h,
+            (f(0.09, 0.1) + g(-0.004, 0.006)) * h,
             0.05 * h,
             0.055 * h,
             -0.006 * h,
@@ -254,10 +273,11 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
     // Bust (female, gentle), shoulder blades, buttocks, belly.
     if female {
         for k in [1, 11] {
-            t[4][k][2] += 0.016 * h * (1.0 - yg);
+            t[4][k][2] += (0.016 * (1.0 - yg) + 0.012 * s.m) * h;
             t[4][k][1] -= 0.008 * h;
-            t[3][k][2] += 0.005 * h * (1.0 - yg);
+            t[3][k][2] += (0.005 * (1.0 - yg) + 0.004 * s.m) * h;
         }
+        t[4][0][2] += 0.006 * s.m * h;
     }
     for k in [5, 7] {
         t[5][k][2] -= 0.006 * h;
@@ -524,7 +544,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         let k1j = pj(nm("fingers_01"));
         let lpm = (k1j - jwr).norm();
         // (A small child's hand is a little wider, its fingers plumper and shorter.)
-        let (wp, tp) = ((0.80 + 0.12 * yg) * lpm, 0.30 * lpm);
+        let (wp, tp) = ((0.84 + 0.12 * yg) * lpm, 0.30 * lpm);
         let zs: Vec<f64> = [-0.5, -0.25, 0.0, 0.25, 0.5]
             .iter()
             .zip([0.9, 1.0, 1.0, 1.0, 0.92])
@@ -591,21 +611,23 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                     let edge = if k == 0 || k == 4 { 0.85 } else { 1.0 };
                     if v > 0.0 {
                         cc + d * (1.0 * lpm)
-                            + z * (zs[k] * 0.98)
+                            + z * (zs[k] * KNUCKLE_SPREAD)
                             + u * (top * edge - if k == 0 || k == 4 { 0.0 } else { 0.012 * lpm })
                     } else {
-                        cc + d * (1.08 * lpm) + z * (zs[k] * 0.98) - u * (pad * edge)
+                        cc + d * (1.08 * lpm) + z * (zs[k] * KNUCKLE_SPREAD) - u * (pad * edge)
                     }
                 })
                 .collect();
             // Order: palm side 3 .. 0, the pinky's side, back 0 .. 4, the index's side, palm side 4.
             out.insert(
                 4,
-                cc + d * (1.04 * lpm) + z * (zs[0] * 0.98 - 0.02 * lpm) - u * (0.01 * lpm),
+                cc + d * (1.04 * lpm) + z * (zs[0] * KNUCKLE_SPREAD - 0.02 * lpm)
+                    - u * (0.01 * lpm),
             );
             out.insert(
                 10,
-                cc + d * (1.04 * lpm) + z * (zs[4] * 0.98 + 0.02 * lpm) - u * (0.01 * lpm),
+                cc + d * (1.04 * lpm) + z * (zs[4] * KNUCKLE_SPREAD + 0.02 * lpm)
+                    - u * (0.01 * lpm),
             );
             out
         };
@@ -651,7 +673,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
         let crotch: Vec<usize> = (1..4)
             .map(|k| {
                 c.add(
-                    jwr + d * (1.2 * lpm) + z * (zs[k] * 0.98) - u * (0.045 * lpm),
+                    jwr + d * (1.08 * lpm) + z * (zs[k] * KNUCKLE_SPREAD) - u * (0.10 * lpm),
                     wc.clone(),
                     "hand",
                     None,
@@ -684,12 +706,14 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
             ];
             // (Half width, half depth; distal length past the joint, in palm lengths. The palm side is fuller.)
             let (hw, hd) = (
-                [0.088, 0.098, 0.1, 0.098][fi] * chub,
+                [0.080, 0.089, 0.091, 0.089][fi] * chub,
                 [0.095, 0.105, 0.107, 0.105][fi] * chub,
             );
             let tip = [0.25, 0.29, 0.31, 0.29][fi] * (1.0 - 0.3 * yg);
-            let zf = (zs[fi] + zs[fi + 1]) / 2.0 * 0.98;
-            let spread = (fi as f64 - 1.5) * 0.05;
+            let zf = (zs[fi] + zs[fi + 1]) / 2.0 * KNUCKLE_SPREAD;
+            // (The fingers fan a little, so the gaps between them widen towards the tips, where the
+            // silhouette shows them; at rest a hand's fingers are not parallel.)
+            let spread = (fi as f64 - 1.5) * 0.07;
             // (A 6-ring round cc facing ax: half width, half depth on the back and on the palm side.)
             let hex = |cc: V3, ax: V3, up: V3, hw: f64, back: f64, palm: f64| -> Vec<V3> {
                 let sd = unit(up.cross(&ax)) * sign(up.cross(&ax).dot(&z));
@@ -712,7 +736,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                 pivot - d * (0.04 * lpm),
                 d,
                 u,
-                hw * 1.1,
+                hw * 0.98,
                 hd * 1.05,
                 hd * 1.5,
             );
@@ -724,7 +748,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                 pivot + ad * (tip * lpm) + z * (spread * tip * lpm),
                 ad,
                 au,
-                hw * 0.95,
+                hw * 0.90,
                 hd * 0.85,
                 hd * 1.15,
             );

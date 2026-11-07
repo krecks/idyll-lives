@@ -287,6 +287,11 @@ export function characterMaterial(app: pc.AppBase, part: string, options: Charac
   mat.setDefine('GAME_RESIDENT', '');
   mat.setDefine(`GAME_SIM_${kind.toUpperCase()}`, '');
   if (morph) mat.setDefine('GAME_SIM_MORPH', '');
+  // The shadow-only copies are drawn in along their normals in the shadow pass (`character.ts` `CASTER_INSET`).
+  if (shadow) {
+    mat.setDefine('GAME_SIM_CASTER', '');
+    mat.setAttribute('game_simCasterN', pc.SEMANTIC_NORMAL);
+  }
   bind(r, mat);
   if (shadow) {
     installGameChunks(mat, device);

@@ -205,6 +205,20 @@ pub const ADULT: Proportions = Proportions {
     belly: 0.0,
 };
 
+/// A grown man's shoulder joints (fraction of H out from the middle).
+const MAN_SHOULDER: f64 = 0.136;
+
+/// How far a life stage shows the grown body's and face's differences between the families (the ones
+/// `body.rs` and `head.rs` add on top of the shared shapes): none on babies and children, most of them
+/// on a teen.
+pub fn maturity(stage: &str) -> f64 {
+    match stage {
+        "baby" | "child" => 0.0,
+        "teen" => 0.6,
+        _ => 1.0,
+    }
+}
+
 /// The stage's numbers: `ADULT` with the family / stage overrides (H in metres).
 pub fn proportions(family: &str, stage: &str) -> Proportions {
     let a = ADULT;
@@ -266,7 +280,13 @@ pub fn proportions(family: &str, stage: &str) -> Proportions {
             girth: 0.95,
             ..a
         },
-        ("youngAdult", false) => Proportions { h: 1.77, ..a },
+        // Grown men's shoulders a little broader than `ADULT`'s (0.13): a man and a woman of the same
+        // build read apart by the shoulders before anything else.
+        ("youngAdult", false) => Proportions {
+            h: 1.77,
+            shoulder: MAN_SHOULDER,
+            ..a
+        },
         ("youngAdult", true) => Proportions {
             h: 1.67,
             shoulder: 0.115,
@@ -275,6 +295,7 @@ pub fn proportions(family: &str, stage: &str) -> Proportions {
         },
         ("adult", false) => Proportions {
             h: 1.76,
+            shoulder: MAN_SHOULDER,
             waist: 1.08,
             belly: 0.006,
             ..a
@@ -291,7 +312,7 @@ pub fn proportions(family: &str, stage: &str) -> Proportions {
             h: 1.74,
             hh: 1.0 / 6.4,
             hip: 0.49,
-            shoulder: 0.13 * 0.95,
+            shoulder: MAN_SHOULDER * 0.95,
             waist: 1.12,
             belly: 0.01,
             neck_z: -0.002,

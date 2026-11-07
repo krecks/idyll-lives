@@ -70,7 +70,7 @@ import { cradled, cuddlePose, onPad, writeCradle } from './cuddles';
 import { lyingPose, measureLegs, measureSit, outfitFit, type PoseKit } from './measure';
 import { type Hands, palmAt, placeFrame, placeHand, placeProp } from './props';
 import { rimOf } from './clips/shot';
-import { DETAIL_PX, FACE_PARTS, LOD_FAR_PX, LOD_NEAR_PX, MORPH_PX, type PartMesh, Range, YOUNG_STAGES, shellBit, skinChunks } from './parts';
+import { DETAIL_PX, FACE_PARTS, LOD_FAR_PX, LOD_HEIGHT_PX, LOD_NEAR_PX, MORPH_PX, POSE_FAR_PX, POSE_NEAR_PX, type PartMesh, Range, YOUNG_STAGES, shellBit, skinChunks } from './parts';
 import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, sampleClip, skin } from './pose';
 import { BABBLE, compose, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clamp, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, hash, lerp, lerpAngle, lieBack, lieCentre, multiply, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
 import { type LegSide, SEAT_FIT, feetDown, legTurn, perch, seatSize } from './seatFit';
@@ -126,9 +126,8 @@ function stationSide(rig: SimRig, station: PlacedObject): number {
 }
 
 /**
- * Residents far off (in low detail: `faceDetail`'s `far`) are posed in full every this many frames, not every frame
- * (staggered by row, so as many each frame): every second frame, every fourth with their faces at half the low-detail
- * size. Between, the pose goes along with them as it is (`carryPose`). And never more than `FAR_LAG` s apart.
+ * Residents far off (`faceDetail`'s `poseFar`: `POSE_FAR_PX`) are posed in full every this many frames, not every frame
+ * (staggered by row, so as many each frame): every second frame, every fourth with their faces at half that size. Between, the pose goes along with them as it is (`carryPose`). And never more than `FAR_LAG` s apart.
  */
 const FAR_EVERY = [2, 4] as const;
 const FAR_LAG = 0.25;
@@ -315,6 +314,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private readonly facePx = new Float32Array(MAX_CHARACTERS).fill(1e6);
   /** Per Sim row: drawn with the low-detail body and clothes. */
   private readonly far = new Uint8Array(MAX_CHARACTERS);
+  /** Far enough off to be posed in full only every `FAR_EVERY` frames, the fingers left in fists (`POSE_FAR_PX`). */
+  private readonly poseFar = new Uint8Array(MAX_CHARACTERS);
   /** The set has low-detail bodies. */
   private hasLod = false;
   /** Shadow-only copies of the low-detail meshes (all Sims cast shadows from those; none without `castsShadows`). */
@@ -1771,10 +1772,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         else if (rideId <= -2 && this.parkAt[i]) this.parkedNow.set(-2 - rideId, this.parkAt[i]!);
         continue;
       }
-      // Far off (in low detail), posed in full only every `FAR_EVERY` frames (staggered by row): between, the pose
+      // Far off (`poseFar`), posed in full only every `FAR_EVERY` frames (staggered by row): between, the pose
       // goes along with them as it is (`carryPose`). Not those whose pose others' depend on, nor those moving in ways
       // a pose carried along wouldn't follow (stepping in, lying under a blanket, a prop of a thing in hand).
-      const every = this.everyFrame || !this.far[i] || this.directions[i] ? 1 : this.facePx[i] < LOD_FAR_PX / 2 ? FAR_EVERY[1] : FAR_EVERY[0];
+      const every = this.everyFrame || !this.poseFar[i] || this.directions[i] ? 1 : this.facePx[i] < POSE_FAR_PX / 2 ? FAR_EVERY[1] : FAR_EVERY[0];
       if (every > 1 && rig.visible && !stalled && (this.frameNo + i) % every !== 0 && rig.lag < FAR_LAG && curr[o + k.pose] !== Pose.Lie && rig.walkT < 0 && rig.cuddleBaby < 0 && this.heldBy[i] < 0 && !this.onPadOf[i] && !this.handProp[i]) {
         rig.lag += frameDt;
         const moved = curr[o + k.moving] > 0 || riding;
@@ -2021,7 +2022,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const worn = rig.outfits?.[wear];
       if (worn && worn !== rig.worn) this.wear(rig, i, worn);
       // Hand pose: the clips clench fists; open them according to the activity. (Not far off: the hands are a pixel or two.)
-      if (!this.far[i] || this.everyFrame || dir) blendInto(this.qA, this.pA, set.sourceRestQ, this.pA, rig.hands, this.fingerMask);
+      if (!this.poseFar[i] || this.everyFrame || dir) blendInto(this.qA, this.pA, set.sourceRestQ, this.pA, rig.hands, this.fingerMask);
 
       // Procedural layers.
       resetAdditive(this.add);
@@ -4602,12 +4603,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         px[i] = (k * rig.scale * rig.head) / Math.max(d, 0.05);
       }
     }
-    // Low detail far from the camera (with a gap between switching down and up); those not drawn keep theirs.
-    const far = this.far;
+    // Low detail far from the camera (with a gap between switching down and up; the mesh's measured at
+    // `LOD_HEIGHT_PX` tall, the pose's as drawn); those not drawn keep theirs.
+    const { far, poseFar } = this;
+    const atLod = this.hasCam && c[3] > 0 ? LOD_HEIGHT_PX / c[3] : 1;
     for (let i = 0; i < count; i++) {
       if (!shown[i]) continue;
-      if (far[i] && px[i] > LOD_NEAR_PX) far[i] = 0;
-      else if (!far[i] && px[i] < LOD_FAR_PX && this.hasLod) far[i] = 1;
+      const lodPx = px[i] * atLod;
+      if (far[i] && lodPx > LOD_NEAR_PX) far[i] = 0;
+      else if (!far[i] && lodPx < LOD_FAR_PX && this.hasLod) far[i] = 1;
+      if (poseFar[i] && px[i] > POSE_NEAR_PX) poseFar[i] = 0;
+      else if (!poseFar[i] && px[i] < POSE_FAR_PX) poseFar[i] = 1;
     }
     // Who is drawn changed (or every part's rows were set again): the parts drawn whatever the distance too.
     let all = this.listsStale;
