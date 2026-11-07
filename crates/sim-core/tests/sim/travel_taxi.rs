@@ -766,7 +766,7 @@ fn a_taxi_due_in_through_a_jammed_junction_goes_round_it_or_waits_at_the_edge_of
     // A side street joins the street at x 300, between the way out and A's house, its junction
     // jammed (cars held up in it: `taxi::jammed`). With a way round it (a loop south of the street
     // from x 360 to x 240), the taxi takes that, never into it; with none, it waits at the edge of
-    // town a while rather than drive into it, and comes after.
+    // town a while rather than drive into it, and comes once it's cleared (15 minutes on).
     let road = |pts: Vec<[f32; 2]>, ends: &str| {
         let pts: Vec<String> = pts.iter().map(|p| format!("[{},{}]", p[0], p[1])).collect();
         format!(
@@ -804,6 +804,14 @@ fn a_taxi_due_in_through_a_jammed_junction_goes_round_it_or_waits_at_the_edge_of
         while w.tick < end && came(&w) < 2 {
             w.tick_once();
             no_overlaps(&w);
+            // (Cleared a quarter of an hour after the taxi was due in.)
+            if !round
+                && let Some(run) = w.taxis.runs.iter().find(|r| !r.home)
+                && run.enter > 0
+                && w.tick >= run.enter + 15 * 20
+            {
+                w.taxis.jams.clear();
+            }
             if let Some(run) = w.taxis.runs.iter().find(|r| !r.home)
                 && run.car.is_some()
                 && entered.is_none()
@@ -825,7 +833,7 @@ fn a_taxi_due_in_through_a_jammed_junction_goes_round_it_or_waits_at_the_edge_of
             );
         } else {
             assert!(
-                at >= enter + 25 * 20,
+                at >= enter + 15 * 20,
                 "({round}) came in at once: {} min",
                 (at - enter) / 20
             );
@@ -858,5 +866,577 @@ fn neighbours_in_different_work_going_the_same_way_at_the_same_hour_share_a_taxi
     assert!(
         there(&mum).iter().any(|r| there(&pip).contains(r)),
         "never the same taxi: {mum:?} {pip:?}"
+    );
+}
+
+#[test]
+fn a_riders_time_before_work_ends_when_the_taxi_comes_late_run_or_held_up() {
+    // A's taxi is held at the edge of town by a jam: A leaves for it (and their free time before
+    // work ends) as much later as it's held. And booked on a late run once work has begun (a game
+    // begun after they'd have set off), A has a leave time all the same: no free time without end
+    // before it (`world::free_before_work`).
+    let road = |pts: Vec<[f32; 2]>, ends: &str| {
+        let pts: Vec<String> = pts.iter().map(|p| format!("[{},{}]", p[0], p[1])).collect();
+        format!(
+            r#"{{"points":[{}],"width":7,"kind":"street","ends":{ends}}}"#,
+            pts.join(",")
+        )
+    };
+    let side = road(
+        (0..=40).map(|z| [300.5, STREET + z as f32]).collect(),
+        r#"["join","dead"]"#,
+    );
+    let mut w = town_with(7, &[house(20, &[&worker("A")])], |_| 0.0, &[side]);
+    // (Day 1: booked on a late run, work begun.)
+    let day1 = sim_core::clock::tick_at(1, 12.0 * 60.0).unwrap();
+    let mut late_run = false;
+    while w.tick < day1 && !late_run {
+        w.tick_once();
+        if let Some(b) = w.taxi_booking(0)
+            && let Some(run) = w.taxis.runs.iter().find(|r| r.id == b.run && !r.home)
+        {
+            let start = run.stops[b.stop as usize].due;
+            late_run = w.taxi_leave(0).is_some() && run.due_out > start.min(run.due_out);
+            assert!(w.taxi_leave(0).is_some(), "booked with no leave time");
+        }
+    }
+    // (Day 2: the run held at the edge of town past when it was due in.)
+    let jam = w
+        .travel
+        .graph
+        .boxes
+        .iter()
+        .position(|(m, _)| (m[0] - 300.5).abs() < 2.0)
+        .expect("the side street's junction");
+    let end = sim_core::clock::tick_at(2, 23.0 * 60.0).unwrap();
+    let day2 = sim_core::clock::tick_at(2, 0.0).unwrap();
+    while w.tick < day2 {
+        w.tick_once();
+    }
+    w.taxis.jams = vec![jam];
+    let mut seen = false;
+    while w.tick < end && !seen {
+        w.tick_once();
+        let Some(b) = w.taxi_booking(0) else { continue };
+        let Some(run) = w.taxis.runs.iter().find(|r| r.id == b.run && !r.home) else {
+            continue;
+        };
+        let st = run.stops[b.stop as usize];
+        if run.car.is_none() && w.tick > run.enter + 5 * 20 && st.state == StopState::Booked {
+            let leave = w.taxi_leave(0).expect("a leave time");
+            assert_eq!(
+                leave,
+                st.leave + (w.tick - run.enter),
+                "not as late as it's held"
+            );
+            seen = true;
+        }
+    }
+    assert!(seen, "the run was never held at the edge of town");
+}
+
+#[test]
+fn a_visit_out_of_walking_reach_goes_by_taxi_there_and_back() {
+    // A (no car, no bike) is sent to visit B's house 540 m along the street (a walk of six hours,
+    // the taxi from the way out and the ride about half that): a taxi comes for A at the kerb,
+    // puts A down at B's, and when the visit's over one brings A home.
+    let mut w = town(
+        7,
+        &[
+            house(20, &[r#"{"name":"A","age":40,"traits":["cheerful"]}"#]),
+            house(560, &[r#"{"name":"B","age":40,"traits":["cheerful"]}"#]),
+        ],
+    );
+    run_to(&mut w, 1, 9.0);
+    let _ = w.apply(sim_core::Command::Visit { sim: 0, plot: 1 });
+    let end = sim_core::clock::tick_at(2, 12.0 * 60.0).unwrap();
+    let (mut out, mut there, mut back, mut home) = (false, None, false, false);
+    while w.tick < end && !home {
+        w.tick_once();
+        no_overlaps(&w);
+        for r in &w.taxis.runs {
+            let aboard = r
+                .stops
+                .iter()
+                .any(|s| s.sim == 0 && s.state == StopState::Aboard);
+            if r.place == Some(1) && aboard {
+                if r.home {
+                    back = true;
+                } else {
+                    out = true;
+                }
+            }
+        }
+        let a = &w.sims[0];
+        if out && there.is_none() && a.visiting.is_some_and(|v| v.plot == 1) {
+            let door = w.plots[1].arrival_point();
+            if (a.pos[0] - door[0]).hypot(a.pos[1] - door[1]) < 6.0 {
+                there = Some(w.tick);
+            }
+        }
+        home |= back && a.visiting.is_none() && a.pos[0] < 45.0 && w.taxi_booking(0).is_none();
+    }
+    assert!(out, "A never rode a taxi there");
+    assert!(there.is_some(), "A never got to B's door");
+    assert!(back, "A never rode a taxi home");
+    assert!(home, "A never got home");
+}
+
+#[test]
+fn a_cyclist_with_a_ride_out_of_over_an_hour_and_a_half_takes_the_taxi() {
+    // C's bike would take well over `BIKE_MOST` out of town from the street's far end: C rides
+    // the work taxi instead.
+    let mut far = house(20, &[&worker("C")]);
+    far.bike = true;
+    let mut w = town(7, &[far]);
+    let mut c = Vec::new();
+    let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
+    while w.tick < end && !c.iter().any(|x: &(u32, bool)| !x.1) {
+        w.tick_once();
+        rode(&w, 0, &mut c);
+    }
+    assert!(c.iter().any(|x| !x.1), "C never rode the taxi to work");
+}
+
+#[test]
+fn a_taxi_stands_clear_of_every_driveways_mouth_its_riders_own_too() {
+    // Three houses side by side, their driveways 20 m apart: the taxi for the middle one stands
+    // a car's length and more clear of each mouth (a taxi at its rider's own mouth held the
+    // household's car in its driveway), between two of them.
+    let mut w = town(
+        7,
+        &[house(20, &[]), house(40, &[&worker("A")]), house(60, &[])],
+    );
+    let mouths: Vec<f32> = w.drives.iter().filter_map(|d| d.s).collect();
+    assert_eq!(mouths.len(), 3);
+    let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
+    let mut stood = 0;
+    while w.tick < end && came(&w) < 2 {
+        w.tick_once();
+        for (c, at, _) in standing(&w) {
+            stood += 1;
+            let half = w.cars[c].len / 2.0;
+            for &m in &mouths {
+                assert!(
+                    (at[0] - m).abs() >= half + 5.0,
+                    "a taxi standing at x {:.1}, across the driveway at {m:.1}",
+                    at[0]
+                );
+            }
+        }
+    }
+    assert!(stood > 0, "no taxi stood");
+    assert!(came(&w) > 0, "A never rode");
+}
+
+#[test]
+fn a_rider_called_to_the_taxi_who_doesnt_get_there_is_waited_for_the_walk_and_booked_again() {
+    // B, called to the taxi's door, is kept from it (held 8 m off): the taxi waits for one on
+    // their way and the walk round to its door at most (`taxi::COMING_WAIT`, a few minutes, no
+    // longer: a taxi stood 20 minutes in its lane for a rider, a car out of its driveway behind
+    // it), goes on without them, and they're booked on another.
+    let mut w = town(7, &[house(20, &[&worker("A")]), house(60, &[&worker("B")])]);
+    let end = sim_core::clock::tick_at(2, 12.0 * 60.0).unwrap();
+    let mut run = None;
+    let mut since: Option<u64> = None;
+    let mut longest = 0;
+    let mut again = false;
+    while w.tick < end {
+        w.tick_once();
+        let b = w.taxi_booking(1);
+        let state = b.and_then(|b| {
+            w.taxis
+                .runs
+                .iter()
+                .find(|r| r.id == b.run)
+                .and_then(|r| r.stops.get(b.stop as usize))
+                .map(|s| s.state)
+        });
+        if state == Some(StopState::Boarding) {
+            run = run.or(b.map(|b| b.run));
+            if let Some((_, at, _)) = standing(&w).first() {
+                w.sims[1].pos = [at[0], at[1] + 8.0];
+            }
+        }
+        // (How long a taxi stands, each time.)
+        if standing(&w).is_empty() {
+            if let Some(s) = since.take() {
+                longest = longest.max(w.tick - s);
+            }
+        } else {
+            since.get_or_insert(w.tick);
+        }
+        if run.is_some() && b.is_some_and(|b| Some(b.run) != run) {
+            again = true;
+            break;
+        }
+    }
+    assert!(run.is_some(), "B was never called to the taxi");
+    // (Five minutes for one on their way, the walk round to its door, and in.)
+    assert!(
+        longest <= 5 * 20 + 6 * 20 + 3 * 20,
+        "a taxi stood {} minutes",
+        longest / 20
+    );
+    assert!(again, "B wasn't booked on another taxi");
+}
+
+#[test]
+fn a_taxi_doesnt_go_hours_round_a_hold_up_it_could_wait_out() {
+    // The side street's junction at x 300 is held up, and the only way round it is a loop of a
+    // kilometre and more south of the street: rather than that, the taxi takes the street (waiting
+    // at the edge of town till it clears, a while at most), never the loop.
+    let road = |pts: Vec<[f32; 2]>, ends: &str| {
+        let pts: Vec<String> = pts.iter().map(|p| format!("[{},{}]", p[0], p[1])).collect();
+        format!(
+            r#"{{"points":[{}],"width":7,"kind":"street","ends":{ends}}}"#,
+            pts.join(",")
+        )
+    };
+    let side = road(
+        (0..=40).map(|z| [300.5, STREET + z as f32]).collect(),
+        r#"["join","dead"]"#,
+    );
+    // (Out east to x 590, then far south and back: about 1.2 km.)
+    let mut lp: Vec<[f32; 2]> = (0..=20).map(|z| [360.5, STREET - z as f32]).collect();
+    lp.extend((1..=220).map(|x| [360.5 + x as f32, STREET - 20.0]));
+    lp.extend((1..=10).map(|z| [580.5, STREET - 20.0 - z as f32]));
+    lp.extend((1..=340).rev().map(|x| [240.5 + x as f32, STREET - 30.0]));
+    lp.extend((0..=30).rev().map(|z| [240.5, STREET - z as f32]));
+    let lp = road(lp, r#"["join","join"]"#);
+    let mut w = town_with(7, &[house(20, &[&worker("A")])], |_| 0.0, &[side, lp]);
+    let jam = w
+        .travel
+        .graph
+        .boxes
+        .iter()
+        .position(|(m, _)| (m[0] - 300.5).abs() < 2.0)
+        .expect("the side street's junction");
+    w.taxis.jams = vec![jam];
+    let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
+    while w.tick < end && came(&w) < 1 {
+        w.tick_once();
+        if let Some(run) = w.taxis.runs.iter().find(|r| !r.home)
+            && run.enter > 0
+            && w.tick >= run.enter + 15 * 20
+        {
+            w.taxis.jams.clear();
+        }
+        for c in w.cars.iter().filter(|c| c.taxi) {
+            if let Some((at, ..)) = c.shown {
+                assert!(at[1] > STREET - 15.0, "a taxi on the loop round at {at:?}");
+            }
+        }
+    }
+    assert!(came(&w) > 0, "A never rode");
+}
+
+#[test]
+fn a_run_coming_in_a_longer_way_than_planned_tells_its_riders() {
+    // Planned along the street; as it comes in the side street's junction is held up and it goes
+    // round by the loop south (a few minutes more): the rider's taxi is due at their kerb that
+    // much later, they leave home as much later, and it's due out of town no sooner than planned
+    // (later, were the way longer than its spare time).
+    let road = |pts: Vec<[f32; 2]>, ends: &str| {
+        let pts: Vec<String> = pts.iter().map(|p| format!("[{},{}]", p[0], p[1])).collect();
+        format!(
+            r#"{{"points":[{}],"width":7,"kind":"street","ends":{ends}}}"#,
+            pts.join(",")
+        )
+    };
+    let side = road(
+        (0..=40).map(|z| [300.5, STREET + z as f32]).collect(),
+        r#"["join","dead"]"#,
+    );
+    let mut lp: Vec<[f32; 2]> = (0..=20).map(|z| [360.5, STREET - z as f32]).collect();
+    lp.extend((1..120).map(|x| [360.5 - x as f32, STREET - 20.0]));
+    lp.extend((0..=20).rev().map(|z| [240.5, STREET - z as f32]));
+    let lp = road(lp, r#"["join","join"]"#);
+    let mut w = town_with(7, &[house(20, &[&worker("A")])], |_| 0.0, &[side, lp]);
+    let jam = w
+        .travel
+        .graph
+        .boxes
+        .iter()
+        .position(|(m, _)| (m[0] - 300.5).abs() < 2.0)
+        .expect("the side street's junction");
+    let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
+    // (Planned, not yet in: its times then.)
+    let mut planned = None;
+    let mut revised = None;
+    while w.tick < end && came(&w) < 1 {
+        w.tick_once();
+        let Some(r) = w.taxis.runs.iter().find(|r| !r.home) else {
+            continue;
+        };
+        let times = (r.stops[0].due, r.stops[0].leave, r.due_out);
+        if r.car.is_none() && planned.is_none() {
+            planned = Some(times);
+            w.taxis.jams = vec![jam];
+        } else if r.car.is_some() && revised.is_none() {
+            revised = Some(times);
+        }
+    }
+    let (due, leave, out) = planned.expect("never planned");
+    let (due2, leave2, out2) = revised.expect("never came");
+    assert!(
+        due2 > due,
+        "the taxi due at the kerb as planned: {due} {due2}"
+    );
+    assert_eq!(leave2 - leave, due2 - due, "the rider's leave not told");
+    assert!(out2 >= out, "due out of town sooner than planned");
+    assert!(came(&w) > 0, "A never rode");
+}
+
+#[test]
+fn a_house_with_one_stand_clear_of_the_driveways_has_its_taxi_for_each_run_an_hour_apart() {
+    // Driveways all along the street but one stretch past the riders' own, the only stand clear of
+    // them (`DRIVE_CLEAR`, `DRIVE_LEAST`); housemates whose work starts an hour apart, a run each,
+    // there and home. A run's stand is held for about when it's there, not all its time in town:
+    // held so, the second run found no stand and didn't come, and its rider walked (there, or
+    // home from the way out).
+    let kit = r#"{"name":"Kit","age":30,"traits":["cheerful"],"job":{"career":"business.entrepreneur","level":0}}"#;
+    let south = |x: i32| House {
+        south: true,
+        ..house(x, &[])
+    };
+    let mut w = town(
+        7,
+        &[
+            south(70),
+            house(80, &[]),
+            south(90),
+            house(100, &[kit, &worker("Mum")]),
+            house(120, &[]),
+            south(130),
+        ],
+    );
+    // (From the day after the game begins: on its first morning, both too late on foot, one late
+    // run takes them.)
+    run_to(&mut w, 2, 0.0);
+    let (mut kit_runs, mut mum_runs) = (Vec::new(), Vec::new());
+    let both = |r: &[(u32, bool)]| r.iter().any(|x| !x.1) && r.iter().any(|x| x.1);
+    let end = sim_core::clock::tick_at(5, 0.0).unwrap();
+    while w.tick < end && !(both(&kit_runs) && both(&mum_runs)) {
+        w.tick_once();
+        no_overlaps(&w);
+        rode(&w, 0, &mut kit_runs);
+        rode(&w, 1, &mut mum_runs);
+    }
+    for (who, r) in [("Kit", &kit_runs), ("Mum", &mum_runs)] {
+        assert!(r.iter().any(|x| !x.1), "{who} never rode to work: {r:?}");
+        assert!(r.iter().any(|x| x.1), "{who} never rode home: {r:?}");
+    }
+    assert!(
+        kit_runs.iter().all(|x| !mum_runs.contains(x)),
+        "one run for both: {kit_runs:?} {mum_runs:?}"
+    );
+}
+
+#[test]
+fn a_taxi_held_still_where_nothing_gives_gives_its_way_up_and_its_riders_still_go_by_taxi() {
+    // A car stands across the street between the way in and the rider's house, its household's
+    // and never driven: every taxi coming in is held behind it. Held still LONE_STILL (30 min),
+    // a taxi gives its way up and goes, off the road, so nobody behind it waits on it. A rider it
+    // was to pick up is booked again; a rider it was taking home, a long walk from where it was
+    // held, isn't let out to walk it (walks of hours, all night) but waits at work for another
+    // run.
+    let mut car = house(300, &[]);
+    car.car = true;
+    let mut w = town(7, &[house(100, &[&worker("A")]), car]);
+    let c = w
+        .cars
+        .iter()
+        .position(|k| !k.taxi)
+        .expect("the household's car");
+    let home = (w.cars[c].spot, w.cars[c].yaw);
+    let across = |w: &mut World| {
+        w.cars[c].spot = [303.5, STREET];
+        w.cars[c].yaw = std::f32::consts::FRAC_PI_2;
+    };
+    // (A's runs, to work or home, a tick ago: id, home, its taxi, A aboard.)
+    let runs = |w: &World| -> Vec<(u32, bool, Option<u32>, bool)> {
+        w.taxis
+            .runs
+            .iter()
+            .filter(|r| r.place.is_none() && r.stops.iter().any(|s| s.sim == 0))
+            .map(|r| {
+                let aboard = r
+                    .stops
+                    .iter()
+                    .any(|s| s.sim == 0 && s.state == StopState::Aboard);
+                (r.id, r.home, r.car, aboard)
+            })
+            .collect()
+    };
+    across(&mut w);
+    // Booked to work, held behind it: given up, and A booked again.
+    let day3 = sim_core::clock::tick_at(3, 0.0).unwrap();
+    let mut first = None;
+    let mut again = false;
+    while w.tick < day3 && !again {
+        let before = runs(&w);
+        w.tick_once();
+        for &(id, _, car, _) in before.iter().filter(|b| !b.1 && b.2.is_some()) {
+            if w.taxis.runs.iter().any(|r| r.id == id) {
+                continue;
+            }
+            let k = &w.cars[car.unwrap() as usize];
+            assert!(
+                k.shown.is_none(),
+                "the taxi gave its way up but is still on the road"
+            );
+            first.get_or_insert(id);
+        }
+        again = first.is_some_and(|f| w.taxi_booking(0).is_some_and(|b| b.run != f));
+    }
+    assert!(
+        first.is_some(),
+        "no run to work gave its way up behind the car"
+    );
+    assert!(
+        again,
+        "A wasn't booked again after their run to work gave up"
+    );
+    // The street clear, A rides to work; across it again, A's run home is held behind it.
+    w.cars[c].spot = home.0;
+    w.cars[c].yaw = home.1;
+    let end = sim_core::clock::tick_at(6, 0.0).unwrap();
+    let mut rode_out = false;
+    while w.tick < end && !rode_out {
+        w.tick_once();
+        rode_out = w.taxis.runs.iter().any(|r| {
+            !r.home
+                && r.stops
+                    .iter()
+                    .any(|s| s.sim == 0 && s.state == StopState::Aboard)
+        });
+    }
+    assert!(rode_out, "A never rode to work with the street clear");
+    across(&mut w);
+    let mut held_home = None;
+    while w.tick < end && held_home.is_none() {
+        let before = runs(&w);
+        w.tick_once();
+        held_home = before
+            .iter()
+            .find(|b| b.1 && b.3 && b.2.is_some() && !w.taxis.runs.iter().any(|r| r.id == b.0))
+            .copied();
+    }
+    let (id, _, car, _) = held_home.expect("A's run home never gave its way up behind the car");
+    assert!(
+        w.cars[car.unwrap() as usize].shown.is_none(),
+        "the taxi gave its way up but is still on the road"
+    );
+    // (Not let out on foot a long way from home: away at work, on another run home.)
+    let a = &w.sims[0];
+    assert!(
+        a.away_until.is_some() && w.taxi_booking(0).is_some_and(|b| b.run != id),
+        "A was let out to walk home: {:?} at {:?}",
+        a.current().map(|x| x.task.kind),
+        a.pos
+    );
+}
+
+#[test]
+fn a_taxi_with_two_stands_close_along_one_street_stands_straight_at_both() {
+    // A generated normal town (Snowdale, v4 s7) whose run home puts down neighbours a car's length
+    // and a little apart along one street: it keeps to the kerb between the two and stands
+    // straight along its lane at each (easing out of one undid easing into the next: it stood
+    // 11 degrees across its lane there, 30 in Brightdale). Every taxi's stand till the evening,
+    // as `generated_worlds`' check has it (`STAND_ANGLE`).
+    let town = include_str!("../towns/snowdale_stands.json");
+    let mut w = World::from_json(&common::content(), town, 160171).expect("Snowdale loads");
+    let g = &w.travel.graph.clone();
+    let end = sim_core::clock::tick_at(sim_core::clock::day(w.tick), 19.0 * 60.0).unwrap();
+    let mut was: Vec<bool> = Vec::new();
+    let mut stood = 0;
+    while w.tick < end {
+        w.tick_once();
+        was.resize(w.cars.len(), false);
+        for (c, car) in w.cars.iter().enumerate() {
+            let now = car.taxi && car.standing;
+            if now
+                && !was[c]
+                && let Some((at, yaw, ..)) = car.shown
+                && let Some(rp) = g.near(at, 30.0, 1, sim_core::travel::Mode::Car).first()
+            {
+                stood += 1;
+                let t = g.roads[rp.road as usize].tangent(rp.s);
+                let off = sim_core::world::wrap_angle(yaw - t[0].atan2(t[1])).abs();
+                let off = off.min(std::f32::consts::PI - off);
+                assert!(
+                    off <= 0.09,
+                    "a taxi stood {:.0}° off its lane at {at:?}, {:.2}h",
+                    off.to_degrees(),
+                    sim_core::clock::hour(w.tick)
+                );
+            }
+            was[c] = now;
+        }
+    }
+    assert!(stood >= 5, "only {stood} stands");
+}
+
+#[test]
+fn one_upstairs_booked_on_a_taxi_out_leaves_for_it_timed_from_over_the_ground() {
+    // A, upstairs, is sent to visit B's house a long walk along the street: booked on a taxi,
+    // A's walk out to the kerb is timed from where A is over the ground (an upstairs storey lies
+    // further along the map: timed from there, A was out at the kerb two hours early, waiting,
+    // and the taxi came that much later, Swan Reach).
+    let mut w = town(
+        7,
+        &[
+            house(20, &[r#"{"name":"A","age":40,"traits":["cheerful"]}"#]),
+            house(560, &[r#"{"name":"B","age":40,"traits":["cheerful"]}"#]),
+        ],
+    );
+    run_to(&mut w, 1, 9.0);
+    let up = w.stair_map().storey_row(1) as f32;
+    assert!(up > 0.0, "no storey upstairs");
+    w.sims[0].pos[1] += up;
+    let _ = w.apply(sim_core::Command::Visit { sim: 0, plot: 1 });
+    let end = w.tick + 30 * 20;
+    let mut stop = None;
+    while w.tick < end && stop.is_none() {
+        w.tick_once();
+        stop = w
+            .taxis
+            .runs
+            .iter()
+            .filter(|r| r.place == Some(1) && !r.home)
+            .flat_map(|r| r.stops.iter().filter(|s| s.sim == 0))
+            .map(|s| (s.due, s.leave))
+            .next();
+    }
+    let (due, leave) = stop.expect("A wasn't booked on a taxi there");
+    let early = due.saturating_sub(leave) / 20;
+    assert!(
+        early <= 20,
+        "A was to leave {early} min before the taxi's due"
+    );
+}
+
+#[test]
+fn one_booked_on_a_taxi_while_out_at_another_house_isnt_called_home_hours_early() {
+    // A, booked on a taxi to work, is at a house along the street: the lead for the walk out
+    // of the house (`indoor_lead`) is for in and about their own, not a walk across the map from
+    // elsewhere (timed so from a visit, a cyclist came home on their bike an hour early and was
+    // still on it at the kerb two hours on, Swan Reach). From there, as from their own door.
+    let mut w = town(7, &[house(20, &[&worker("A")]), house(500, &[])]);
+    let end = sim_core::clock::tick_at(3, 0.0).unwrap();
+    while w.tick < end && w.taxi_leave(0).is_none() {
+        w.tick_once();
+    }
+    let door = w.plots[0].arrival_point();
+    w.sims[0].pos = door;
+    let at_door = w.taxi_leave(0).expect("A booked on a taxi to work");
+    w.sims[0].pos = w.plots[1].arrival_point();
+    let away = w.taxi_leave(0).expect("still booked");
+    assert_eq!(
+        away,
+        at_door,
+        "out at another house, A leaves {} min sooner",
+        at_door.saturating_sub(away) / 20
     );
 }

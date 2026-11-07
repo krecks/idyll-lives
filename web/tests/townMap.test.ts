@@ -81,6 +81,8 @@ describe('place names', () => {
     expect(rideText('scooter', 'work')).toBe('Riding the e-scooter to work');
     expect(tripText({ to: 1, at: 17 * 60 + 40 }, 1, plots, households, time, { kind: 'bike', to: 'home' })).toBe('Cycling home · back about 17:40');
     expect(tripText({ to: 1 }, 1, plots, households, time, { kind: 'scooter', to: 'home' })).toBe('Riding the e-scooter home');
+    expect(rideText('bike', 'out')).toBe('Cycling out');
+    expect(tripText({ to: 0 }, 1, plots, households, time, { kind: 'bike', to: 'out' })).toBe('Cycling to the Smiths');
   });
 
   test('a resident on their way: the trip, then the ride', () => {

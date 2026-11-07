@@ -614,7 +614,7 @@ impl Car {
 
     /// The car as it stands parked at `spot` facing `yaw` (its doors and seats there): a copy
     /// without its routes or who is in it.
-    fn posed(&self, spot: [f32; 2], yaw: f32) -> Car {
+    pub(crate) fn posed(&self, spot: [f32; 2], yaw: f32) -> Car {
         Car {
             plot: self.plot,
             household: self.household,
@@ -762,6 +762,16 @@ impl Car {
     /// sight there, waiting for room to come in (`drive_on`).
     fn outside(&self) -> bool {
         self.state == CarState::Arriving && self.trip.is_none() && self.progress <= 0.0
+    }
+
+    /// Whether it waits out of sight to come into town by the way in at `at` (`outside`; the
+    /// taxis count those, `taxi::queued`).
+    pub(crate) fn waits_to_come_in_at(&self, at: [f32; 2]) -> bool {
+        self.outside()
+            && self
+                .route
+                .as_ref()
+                .is_some_and(|r| r.0 && crate::travel::dist(r.1.at(0.0).0, at) < 4.0)
     }
 
     /// Its route out of town or (`home`) back (worked out when first asked for).
@@ -4450,7 +4460,13 @@ pub(crate) fn parked_at(travel: &Travel, k: usize) -> Option<([f32; 2], f32, boo
 
 /// Whether there's public parking near `door` for a trip by car (`TRIP_PARK_REACH`), taken or not.
 pub(crate) fn parks_near(travel: &Travel, door: [f32; 2]) -> bool {
-    parking_for(travel, door, &[], None).is_some()
+    parking_near(travel, door).is_some()
+}
+
+/// The public parking spot nearest `door` for a trip by car (`TRIP_PARK_REACH`), taken or not:
+/// the walk from it to there is part of the trip.
+pub(crate) fn parking_near(travel: &Travel, door: [f32; 2]) -> Option<[f32; 2]> {
+    parking_for(travel, door, &[], None).map(|(at, _)| at)
 }
 
 /// `can_drive`, in a tick (from its `Ctx`).

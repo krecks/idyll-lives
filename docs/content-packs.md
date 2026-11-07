@@ -299,7 +299,19 @@ free, and while someone awake is home the visitor waits three times `waitMinutes
 with someone to let them in, and, on their own or invited over the phone, only when the way takes
 45 minutes at most and gets them there before `visits.latestHour` (on their own, with time for
 the way back and three quarters of an hour there before they leave for work or school); the visit's `hours`
-count from when they're let in.
+count from when they're let in. In an open-world town they go on outings too, to a public place
+out of `autonomy.reach`: only one the way to takes `visits.outingMinutes` at most (default 90), with
+time for the way there, an hour there and the way back before they leave for work or school and
+before `visits.outingHomeBy` o'clock (default 23); the outing's `hours` count from when they get
+there, and it ends in time to be home by that hour. A visit or an outing is timed the way they'd go:
+past `autonomy.reach`, a grown-up owner with the household's car at home drives when there's
+parking near; else, for a ride of its `minRide` or more, they take the fastest thing at home
+with a `vehicle` that fits them (a city bike, an e-scooter), ride it there at its `speed`, leave it
+by the place and ride it home; else they walk. Once there (let in, or at the place) a guest stays
+`visits.leastMinutes` at least (default 0) unless a need is below `autonomy.urgentBelow`, it's late
+or the hosts go, and they don't set off on a visit or an outing with a need that would be below
+0.15 by then with nothing there for it; back home from one, not on another of their own for
+`visits.againMinutes` (default 0).
 
 **A host's offer:** with `visits.offer` (`{"social", "afterMinutes", "againMinutes",
 "handAnim"}`; base game: *Offer a bite to eat*), a free host asks a guest who has nothing in

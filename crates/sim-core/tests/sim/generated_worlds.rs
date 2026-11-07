@@ -19,7 +19,7 @@ use sim_core::lot::{Edge, OUTDOORS};
 use sim_core::path::NavGrid;
 use sim_core::surface;
 use sim_core::travel::Graph;
-use sim_core::world::MAX_SIMS;
+use sim_core::world::{MAX_SIMS, TaskKind};
 
 /// `check` for each of `items`, a few at a time (one per core, or `WORLD_THREADS` at most: each
 /// world plays on its own, and a path search's budget counts on its own thread), the results in
@@ -227,8 +227,9 @@ fn generated_worlds_are_livable() {
         }
         common::check(&w);
         // Half a day of everyone's free will. Those with a bike of their own ride it to work or
-        // school (`ride.rs`): someone does, in a cosy or a normal town, and nobody is on one in
-        // town for longer than a ride takes (stuck on it).
+        // school (`ride.rs`), and out on a visit or an outing: someone does, in a cosy or a normal
+        // town, and nobody is on one in town for longer than a ride takes (stuck on it), one way
+        // (a ride out to a café and straight back home is two).
         // (A household with a car at home drives: those without one ride.)
         let carless = |plot: u32| {
             w.households.iter().enumerate().any(|(h, hh)| {
@@ -249,7 +250,12 @@ fn generated_worlds_are_livable() {
             })
             .count();
         let mut rode = std::collections::BTreeSet::new();
-        let mut on_since = vec![None::<u64>; w.sims.len()];
+        let mut on_since = vec![None::<(u64, u8)>; w.sims.len()];
+        // (Who's at a visit or an outing, since when, where: `visits.leastMinutes` there at least,
+        // unless a need is about to run out, it's late or they're off to work.)
+        let mut there: Vec<Option<(u64, u32)>> = vec![None; w.sims.len()];
+        let mut short = std::collections::BTreeSet::new();
+        let least = (w.content.visits.least_minutes * 20.0) as u64;
         let mut stuck = std::collections::BTreeSet::new();
         let mut failures_on_road = std::collections::BTreeSet::new();
         let mut stacked: Stacked = Default::default();
@@ -267,11 +273,61 @@ fn generated_worlds_are_livable() {
                     if sim.riding.is_some() {
                         rode.insert(k);
                     }
+                    // (Which way: out, home, to work.)
+                    let leg = match sim.current().map(|a| a.task.kind) {
+                        Some(TaskKind::Visit { .. }) => 1,
+                        Some(TaskKind::GoHome) => 2,
+                        Some(TaskKind::Work) => 3,
+                        _ => 0,
+                    };
+                    if let Some(at) = there.get_mut(k) {
+                        // (Over once they're off home, or gone home.)
+                        let home = sim
+                            .current()
+                            .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
+                        let now = sim
+                            .visiting
+                            .filter(|v| v.arrived > 0 && !home)
+                            .map(|v| (v.arrived, v.plot));
+                        if let Some((t0, plot)) = *at
+                            && now.is_none_or(|n| n.0 != t0)
+                        {
+                            let content = &w.content;
+                            let critical =
+                                content.needs.iter().zip(&sim.needs).any(|(d, &n)| {
+                                    !d.room && n < content.autonomy.urgent_below + 0.02
+                                });
+                            let hour = sim_core::clock::hour(w.tick);
+                            let work = sim
+                                .current()
+                                .is_some_and(|a| matches!(a.task.kind, TaskKind::Work));
+                            // (Come in someone else's car: they go when its driver does.)
+                            let passenger = w.cars.iter().any(|c| {
+                                c.trip.is_some_and(|t| t.driver != sim.id)
+                                    && c.riders.contains(&sim.id)
+                            });
+                            if w.tick < t0 + least
+                                && !critical
+                                && !work
+                                && !passenger
+                                && (6.0..22.0).contains(&hour)
+                                && sim.here()
+                            {
+                                short.insert(format!(
+                                    "{} went home from plot {plot} {} min after getting there",
+                                    sim.name,
+                                    (w.tick - t0) / 20
+                                ));
+                            }
+                        }
+                        *at = now;
+                    }
                     let since = on_since.get_mut(k);
                     let Some(since) = since else { continue };
                     match (on, *since) {
-                        (true, None) => *since = Some(w.tick),
-                        (true, Some(t0)) if w.tick - t0 > RIDE_HOURS * TICKS_PER_HOUR => {
+                        (true, None) => *since = Some((w.tick, leg)),
+                        (true, Some((_, was))) if was != leg => *since = Some((w.tick, leg)),
+                        (true, Some((t0, _))) if w.tick - t0 > RIDE_HOURS * TICKS_PER_HOUR => {
                             stuck.insert(sim.name.clone());
                         }
                         (false, _) => *since = None,
@@ -287,6 +343,9 @@ fn generated_worlds_are_livable() {
             failures.push(format!(
                 "{label}: {name} on a bike in town for over {RIDE_HOURS} hours"
             ));
+        }
+        for s in &short {
+            failures.push(format!("{label}: {s}"));
         }
         failures.extend(
             failures_on_road
