@@ -35,7 +35,7 @@ use crate::world::{
 
 /// How long an actor waits for a busy target before giving up (in all: following them about
 /// counts too, see `follow`).
-const WAIT_LIMIT_TICKS: u32 = (10.0 / MINUTES_PER_TICK) as u32;
+const WAIT_LIMIT_TICKS: u32 = (10.0 * crate::TICKS_PER_MINUTE as f32) as u32;
 /// Re-route when the target is this far from the route's end. Routes end on a tile
 /// *next to* the target (up to ~1.6 m from them), so this must exceed that.
 const REPATH_DISTANCE: f32 = 2.4;
@@ -77,7 +77,7 @@ pub(crate) const SEAT_RANGE: f32 = 2.5;
 pub(crate) const SEATED_DISTANCE: f32 = 0.9;
 /// How often someone sitting thinks of a word with those sitting near them, and the chance
 /// they do, each time, if anything they'd say comes to mind (`from_seat`).
-pub(crate) const SEAT_TALK_TICKS: u32 = (5.0 / MINUTES_PER_TICK) as u32;
+pub(crate) const SEAT_TALK_TICKS: u32 = (5.0 * crate::TICKS_PER_MINUTE as f32) as u32;
 pub(crate) const SEAT_TALK_CHANCE: f32 = 0.5;
 /// Someone joining in this close to their place in the group settles into it; further off,
 /// they walk there (`take_place`).

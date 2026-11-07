@@ -1396,7 +1396,7 @@ impl Sim {
 
     /// How many metres they walk in a minute (`walk_speed`), as `travel::Travel::eta` asks.
     pub(crate) fn walk_per_minute(&self, content: &Content) -> f32 {
-        WALK_SPEED * self.walk_speed(content) / MINUTES_PER_TICK
+        WALK_SPEED * self.walk_speed(content) * TICKS_PER_MINUTE as f32
     }
 
     /// Recomputes `mods` when the set of active feelings with effects has changed.
@@ -8681,7 +8681,7 @@ fn progress(
                         at,
                         elapsed,
                         total,
-                        WALK_SPEED * walk / MINUTES_PER_TICK,
+                        WALK_SPEED * walk * TICKS_PER_MINUTE as f32,
                     ) {
                         sim.pos = p;
                         sim.yaw = yaw;

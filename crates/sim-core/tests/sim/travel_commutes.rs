@@ -145,7 +145,7 @@ fn the_walk_is_timed_to_the_quickest_way_out() {
         let name = &w.sims[i].name;
         assert_eq!(
             c.ticks,
-            ((c.walk + off_map) / MINUTES_PER_TICK) as u64,
+            ((c.walk + off_map) * TICKS_PER_MINUTE as f32) as u64,
             "{name}"
         );
         // To the quickest of the ways out.

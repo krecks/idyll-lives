@@ -2621,7 +2621,7 @@ pub(crate) fn drive_out_ticks(car: &Car) -> u64 {
 /// part of the way off the map), else `OFF_MAP_TICKS` as ever.
 pub(crate) fn off_map_ticks(w: &World) -> u64 {
     if w.travel.open {
-        (w.content.career_rules.commute_minutes / crate::MINUTES_PER_TICK) as u64
+        (w.content.career_rules.commute_minutes * crate::TICKS_PER_MINUTE as f32) as u64
     } else {
         OFF_MAP_TICKS
     }

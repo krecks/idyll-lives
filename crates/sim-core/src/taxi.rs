@@ -558,7 +558,7 @@ fn time_run(
                 crate::travel::Mode::Foot,
                 walk,
             ) + crate::life::OUT_OF_THE_HOUSE)
-                / crate::MINUTES_PER_TICK) as u64;
+                * crate::TICKS_PER_MINUTE as f32) as u64;
             to_kerb.max(TO_KERB_LEAST) + KERB_EARLY
         })
         .collect();
@@ -737,7 +737,8 @@ pub(crate) fn indoor_lead(
     let storeys = stairs.storey(sim.pos[1].floor() as i32).unsigned_abs() as f32;
     let walk = crate::travel::dist(ground, door) + storeys * STOREY_WALK;
     let ticks = walk / (sim.walk_per_minute(content) * crate::MINUTES_PER_TICK).max(0.01);
-    (ticks as u64).saturating_sub((crate::life::OUT_OF_THE_HOUSE / crate::MINUTES_PER_TICK) as u64)
+    (ticks as u64)
+        .saturating_sub((crate::life::OUT_OF_THE_HOUSE * crate::TICKS_PER_MINUTE as f32) as u64)
 }
 
 /// `leave_at` for booking `b` at `tick`: the planned leave, later by as much as the taxi runs late
@@ -1347,7 +1348,7 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
         (Some(_), true) => matches!(t, TaskKind::GoHome),
     };
     // (How long it waits for one not yet at its door, `taxi.waitMinutes`.)
-    let wait = (w.content.taxi.wait / crate::MINUTES_PER_TICK) as u64;
+    let wait = (w.content.taxi.wait * crate::TICKS_PER_MINUTE as f32) as u64;
     let mut busy = false;
     for s in drops {
         let st = w.taxis.runs[k].stops[s];
@@ -3404,7 +3405,7 @@ fn time_leisure(w: &World, run: &mut Run) -> bool {
                 crate::travel::Mode::Foot,
                 sim.walk_per_minute(&w.content),
             ) + crate::life::OUT_OF_THE_HOUSE)
-                / crate::MINUTES_PER_TICK) as u64;
+                * crate::TICKS_PER_MINUTE as f32) as u64;
             to_kerb.max(TO_KERB_LEAST) + KERB_EARLY
         })
         .collect();

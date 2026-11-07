@@ -247,7 +247,7 @@ pub fn shift_today(
 }
 
 fn ticks(minutes: f32) -> u64 {
-    (minutes / MINUTES_PER_TICK) as u64
+    (minutes * crate::TICKS_PER_MINUTE as f32) as u64
 }
 
 /// How long someone's way to work or school takes (`Sim::commute`): in an open-world town the
@@ -1982,7 +1982,7 @@ mod tests {
             "guest never visited"
         );
         // The visit lasts two hours; afterwards they head home.
-        ticks(&mut w, (3.0 * 60.0 / crate::MINUTES_PER_TICK) as u64);
+        ticks(&mut w, (3.0 * 60.0 * crate::TICKS_PER_MINUTE as f32) as u64);
         let (x, z) = w.sims[1].tile();
         assert_eq!(w.plot_at(x, z), Some(1), "guest went home");
         assert!(w.sims[1].visiting.is_none());
@@ -2090,7 +2090,7 @@ mod tests {
         ticks(&mut w, secs(40.0));
         assert_eq!(w.sims[0].visiting.map(|v| v.plot), Some(1));
         // Twice as long as a normal (2 h) visit, then home.
-        ticks(&mut w, (5.0 * 60.0 / crate::MINUTES_PER_TICK) as u64);
+        ticks(&mut w, (5.0 * 60.0 * crate::TICKS_PER_MINUTE as f32) as u64);
         assert!(w.sims[0].visiting.is_none());
     }
 
@@ -2228,6 +2228,6 @@ mod tests {
     }
 
     fn ticks_of(minutes: f32) -> u64 {
-        (minutes / crate::MINUTES_PER_TICK) as u64
+        (minutes * crate::TICKS_PER_MINUTE as f32) as u64
     }
 }

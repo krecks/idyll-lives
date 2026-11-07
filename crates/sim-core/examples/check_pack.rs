@@ -161,7 +161,7 @@ fn check_object(merged: &str, content: &Content, id: &str) -> bool {
                 ok = false;
                 continue;
             }
-            let limit = ((inter.minutes + 120.0) / MINUTES_PER_TICK) as u32;
+            let limit = ((inter.minutes + 120.0) * sim_core::TICKS_PER_MINUTE as f32) as u32;
             let (mut used, mut done) = (0u32, false);
             for _ in 0..limit {
                 w.tick_once();
