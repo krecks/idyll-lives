@@ -85,4 +85,4 @@ pub const fn mins(minutes: f32) -> u64 {
 }
 
 // A quarter of a second is a whole number of ticks (the lights).
-const _: () = assert!(TICKS_PER_SECOND % 4 == 0);
+const _: () = assert!(TICKS_PER_SECOND.is_multiple_of(4));

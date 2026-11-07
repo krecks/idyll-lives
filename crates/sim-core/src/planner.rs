@@ -700,7 +700,9 @@ pub(crate) fn update(w: &mut World) {
         }
         // Goals: progress every game ten minutes (staggered) or straight after a promotion, a
         // new skill level or a purchase; reviews once a day.
-        if (tick + i as u64).is_multiple_of(200) || std::mem::take(&mut w.sims[i].planner.recheck) {
+        if (tick + i as u64).is_multiple_of(10 * crate::TICKS_PER_MINUTE)
+            || std::mem::take(&mut w.sims[i].planner.recheck)
+        {
             check_goals(w, i);
         }
         if review && w.sims[i].planner.reviewed != day {

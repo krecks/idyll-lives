@@ -1893,7 +1893,7 @@ mod tests {
     use super::{doors, knocking};
     use crate::social::EventKind;
     use crate::world::{Activity, Phase, Task, TaskKind};
-    use crate::{Command, TICKS_PER_SECOND, World, clock};
+    use crate::{Command, World, clock, mins, secs};
 
     const CONTENT: &str = r#"{
         "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.02},{"id":"social","label":"Social","decayPerHour":0.02}],
@@ -1974,7 +1974,7 @@ mod tests {
         let mut w = World::from_json(CONTENT, TOWN, 3).unwrap();
         w.sims[0].job = None;
         w.sims[1].needs[1] = 0.1; // lonely guest
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 120);
+        ticks(&mut w, mins(120.0));
         assert!(
             w.events
                 .iter()
@@ -1994,9 +1994,10 @@ mod tests {
         w.sims[0].job = None;
         w.sims[0].needs[0] = 0.2; // hungry: the home chair... and nothing to eat anywhere
         w.apply(Command::Visit { sim: 0, plot: 1 }).unwrap();
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 30);
+        ticks(&mut w, secs(30.0));
+        // (An hour there, looked at each minute.)
         for _ in 0..60 {
-            ticks(&mut w, TICKS_PER_SECOND as u64);
+            ticks(&mut w, mins(1.0));
             let (x, z) = w.sims[0].tile();
             assert_eq!(
                 w.plot_at(x, z),
@@ -2011,10 +2012,10 @@ mod tests {
         let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
         w.sims[0].job = None;
         w.apply(Command::Visit { sim: 0, plot: 1 }).unwrap();
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 40);
+        ticks(&mut w, secs(40.0));
         assert_eq!(w.sims[0].visiting.map(|v| v.plot), Some(1));
         w.apply(Command::GoHome { sim: 0 }).unwrap();
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 40);
+        ticks(&mut w, secs(40.0));
         assert!(w.sims[0].visiting.is_none());
     }
 
@@ -2086,7 +2087,7 @@ mod tests {
         let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
         w.sims[0].job = None;
         w.apply(Command::Visit { sim: 0, plot: 1 }).unwrap();
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 40);
+        ticks(&mut w, secs(40.0));
         assert_eq!(w.sims[0].visiting.map(|v| v.plot), Some(1));
         // Twice as long as a normal (2 h) visit, then home.
         ticks(&mut w, (5.0 * 60.0 / crate::MINUTES_PER_TICK) as u64);
@@ -2189,7 +2190,7 @@ mod tests {
         assert!(
             until >= w.tick + ticks_of(119.0),
             "{} minutes left",
-            (until - w.tick) / 20
+            (until - w.tick) / crate::TICKS_PER_MINUTE
         );
     }
 
@@ -2216,7 +2217,7 @@ mod tests {
             let mut w = World::from_json(CONTENT, &town, 3).unwrap();
             w.sims[0].job = None;
             w.sims[1].needs[1] = 0.1; // lonely guest
-            ticks(&mut w, TICKS_PER_SECOND as u64 * 240);
+            ticks(&mut w, mins(240.0));
             let went = w
                 .events
                 .iter()
