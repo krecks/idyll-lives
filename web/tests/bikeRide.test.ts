@@ -5,6 +5,7 @@
 // work too, until it's back in its place. `bun test`.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
+import { TICK_RATES, TICKS_PER_SECOND } from './snapshotLayout';
 
 const WEB = new URL('../', import.meta.url).pathname;
 
@@ -96,7 +97,7 @@ describe('riding a bike', async () => {
     headerLen: 6,
     simStride: FIELDS.length,
     maxSims: MAX_CHARACTERS,
-    ticksPerSecond: 20,
+    ...TICK_RATES,
     header: { tick: 0, day: 1, minute: 2, speed: 3, simCount: 4, structureVersion: 5 },
     sim: simFields(FIELDS),
     actions: [...content.animations],
@@ -105,7 +106,7 @@ describe('riding a bike', async () => {
   const k = layout.sim as Record<(typeof FIELDS)[number], number>;
 
   /** The script (s): stood by the bike, on it, riding off along +z at `SPEED` m/s, away at work, back on it, off again. */
-  const TICKS = 20;
+  const TICKS = TICKS_PER_SECOND;
   const SPEED = 4;
   const ON = 1;
   const AWAY = 4;

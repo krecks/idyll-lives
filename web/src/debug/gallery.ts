@@ -30,7 +30,7 @@ import { createStage } from './pcStage';
 import { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import type { SimInfo } from '../core/protocol';
-import { Pose, simFields, type SnapshotLayout } from '../core/snapshot';
+import { Pose, simFields, tickRates, type SnapshotLayout } from '../core/snapshot';
 import { lookAtStage, palette } from '../game/household';
 import { Characters, MAX_CHARACTERS } from '../render/pc/characters';
 import { Instances } from '../render/pc/instancing';
@@ -175,7 +175,7 @@ const layout: SnapshotLayout = {
   headerLen: HEADER_LEN,
   simStride: STRIDE,
   maxSims: MAX_CHARACTERS,
-  ticksPerSecond: 20,
+  ...tickRates,
   header: { tick: 0, day: 1, minute: 2, speed: 3, simCount: 4, structureVersion: 5 },
   sim: simFields(FIELDS),
   actions: [],

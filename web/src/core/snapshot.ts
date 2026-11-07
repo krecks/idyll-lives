@@ -10,7 +10,16 @@ export interface SnapshotLayout {
   maxSims: number;
   /** Most servers' rows after the residents' (missing in older layouts). */
   maxStaff?: number;
+  /**
+   * Ticks a real second at speed 1 (sim-core `TICKS_PER_SECOND`): what moves in real time (walking, cars, doors)
+   * moves this many ticks a second, and the sim runs a step every 1 / `ticksPerSecond` s.
+   */
   ticksPerSecond: number;
+  /**
+   * Ticks a game minute (sim-core `TICKS_PER_MINUTE`): the clock, needs and every duration a resident lives
+   * through. (`readLayout` fills it in, `ticksPerSecond`, for a sim that didn't send it.)
+   */
+  ticksPerMinute: number;
   header: {
     tick: number;
     day: number;
@@ -133,6 +142,32 @@ export interface SnapshotLayout {
 }
 
 export const Pose = { Stand: 0, Sit: 1, Lie: 2 } as const;
+
+/** The layout from sim-core's JSON (`Game::snapshot_layout`), `ticksPerMinute` filled in where it didn't send one (a game minute was a real second). */
+export function readLayout(json: string): SnapshotLayout {
+  const layout = JSON.parse(json) as Omit<SnapshotLayout, 'ticksPerMinute'> & { ticksPerMinute?: number };
+  return { ...layout, ticksPerMinute: layout.ticksPerMinute ?? layout.ticksPerSecond };
+}
+
+/** Game minutes a tick (sim-core `MINUTES_PER_TICK`). */
+export function minutesPerTick(layout: Pick<SnapshotLayout, 'ticksPerMinute'>): number {
+  return 1 / layout.ticksPerMinute;
+}
+
+/**
+ * Game minutes that pass in a real second at speed 1 (sim-core `GAME_MINUTES_PER_SECOND`); at another speed, this
+ * times its `PLAYBACK_RATE` (`render/shared/gameSpeed.ts`).
+ */
+export function gameMinutesPerSecond(layout: Pick<SnapshotLayout, 'ticksPerSecond' | 'ticksPerMinute'>): number {
+  return layout.ticksPerSecond / layout.ticksPerMinute;
+}
+
+/**
+ * The running sim's rates (`SimBridge` sets them from its layout as a game starts), for what reads a tick without a
+ * layout to hand: the journal's times, a pasted state's day. Before the first game: sim-core's as of writing
+ * (`tests/tickRates.test.ts` keeps them to its `lib.rs`).
+ */
+export const tickRates: Pick<SnapshotLayout, 'ticksPerSecond' | 'ticksPerMinute'> = { ticksPerSecond: 20, ticksPerMinute: 20 };
 
 /**
  * A layout's `sim` indices for the fields it writes: `simFields(['id', 'x'])` gives `{ id: 0, x: 1 }`. The names

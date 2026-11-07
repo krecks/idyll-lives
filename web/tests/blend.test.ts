@@ -18,6 +18,7 @@
 // moved the held pose to the lie's own root, 7 cm in a frame, and 1 cm more turned the way they get up to.)
 import { afterAll, describe, expect, test } from 'bun:test';
 import { readFileSync, existsSync } from 'node:fs';
+import { TICK_RATES, TICKS_PER_SECOND } from './snapshotLayout';
 
 const WEB = new URL('../', import.meta.url).pathname;
 
@@ -305,7 +306,7 @@ describe('residents crossfade continuity', async () => {
     headerLen: 6,
     simStride: FIELDS.length,
     maxSims: MAX_CHARACTERS,
-    ticksPerSecond: 20,
+    ...TICK_RATES,
     header: {
       tick: 0,
       day: 1,
@@ -450,9 +451,11 @@ describe('residents crossfade continuity', async () => {
       // one moved in a frame, for the failure's message.
       const hips = actors.map(() => [NaN, NaN, NaN]);
       let farthest = { cm: 0, sim: -1, at: 0 };
-      // When the chair's Sim is out of view (s), whether it has been since it was last drawn, and how far (cm) its
-      // pelvis was from where the snapshot put it on the frame it came back.
-      const HIDDEN = [2.37, 3] as const;
+      // When the chair's Sim is out of view (s): just after the walk at 2.4 s cut its rise short, which comes a sim step
+      // before that (snapshots come every `STEP` s, the newest a step ahead of what is drawn); whether it has been since
+      // it was last drawn, and how far (cm) its pelvis was from where the snapshot put it on the frame it came back.
+      const STEP = 1 / TICKS_PER_SECOND;
+      const HIDDEN = [2.4 - STEP + 0.02, 3] as const;
       let wasHidden = false;
       let reappeared = NaN;
       // The bed's riser (its rig: `Characters` keeps them to itself): the clip it played the frame before, and how far
@@ -480,12 +483,12 @@ describe('residents crossfade continuity', async () => {
       };
       for (let f = 0; f < FPS * SECONDS; f++) {
         const t = f / FPS;
-        while ((tick + 1) * 0.05 <= t) {
+        while ((tick + 1) * STEP <= t) {
           tick++;
           prev.set(curr);
-          writeSnapshot(curr, (tick + 1) * 0.05);
+          writeSnapshot(curr, (tick + 1) * STEP);
         }
-        frame.alpha = (t - tick * 0.05) / 0.05;
+        frame.alpha = (t - tick * STEP) / STEP;
         now = 1000 + t * 1000;
         frame.now = now;
         // The chair's Sim out of view just after a walk cut its rise short (`hidden`), and back in view later.

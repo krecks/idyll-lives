@@ -271,12 +271,18 @@ describe('residents', async () => {
   const actions = [...content.animations];
   const items = content.items.map((it) => it.id);
   const FIELDS = ['id', 'x', 'z', 'yaw', 'pose', 'moving', 'social', 'outcome', 'partner', 'anim', 'emotion', 'role', 'away', 'object', 'action', 'mood', 'held'] as const;
+  /**
+   * The recording's own clock, not the sim's (`snapshotLayout.ts` `TICK_RATES`): snapshots 20 times a second, a game
+   * minute a second. Its numbers are of a run at these; another rate is another run.
+   */
+  const RECORDED_RATES = { ticksPerSecond: 20, ticksPerMinute: 20 };
+  const STEP = 1 / RECORDED_RATES.ticksPerSecond;
   const layout: SnapshotLayout = {
     capacity: 6 + FIELDS.length * MAX_CHARACTERS,
     headerLen: 6,
     simStride: FIELDS.length,
     maxSims: MAX_CHARACTERS,
-    ticksPerSecond: 20,
+    ...RECORDED_RATES,
     header: { tick: 0, day: 1, minute: 2, speed: 3, simCount: 4, structureVersion: 5 },
     sim: simFields(FIELDS),
     actions,
@@ -354,17 +360,17 @@ describe('residents', async () => {
       const track = { times: Float32Array.from([0, 0.12, 0.3, 0.45, 0.7, 0.9]), visemes: Uint8Array.from([10, 11, 13, 1, 4]), energy: Float32Array.from([0.4, 0.8, 1, 0.6, 0.3]) };
       let tick = 0;
       writeSnapshot(prev, 0);
-      writeSnapshot(curr, 0.05);
+      writeSnapshot(curr, STEP);
       const record: string[] = [];
       let second: string[] = [];
       for (let f = 0; f < 30 * 24; f++) {
         t = f / 30;
-        while ((tick + 1) * 0.05 <= t) {
+        while ((tick + 1) * STEP <= t) {
           tick++;
           prev.set(curr);
-          writeSnapshot(curr, (tick + 1) * 0.05);
+          writeSnapshot(curr, (tick + 1) * STEP);
         }
-        frame.alpha = (t - tick * 0.05) / 0.05;
+        frame.alpha = (t - tick * STEP) / STEP;
         frame.now = now = 1000 + t * 1000;
         // In and out (the faces' detail and the low-detail bodies) and round.
         [cam.x, cam.y, cam.z] = [Math.sin(t * 0.3) * (2 + t), 1.6 + t * 0.4, Math.cos(t * 0.3) * (2 + t)];
