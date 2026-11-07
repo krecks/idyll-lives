@@ -20,6 +20,9 @@ Player notes: the `## 0.7.0` section of [CHANGELOG.md](../CHANGELOG.md), also in
 | `feat/town-bus` (`a178eeab`) | A timetabled bus through the towns' stops: **dropped** on `fix/car-guard` (`bus.rs`, content `bus`, the stops, `render/pc/buses.ts` all out; a town file's or a save's stops are no ways out, dropped as they load); a shared work taxi replaces it |
 | #54 `feat/modern-console-tv` (`8fe2b8f3`) | The Console TV redrawn (later replaced by the portable tube set, 657aedf6) |
 | #55 `fix/food-cooking` (`b457700f`) | Food and cooking reviewed and fixed: serving, clearing, scraping, eating, the cook's tools, the cookers' and held food's models |
+| `fix/offview-traffic` (`c4798d29`, with `fix/car-guard` `b8d44f9c`, `fix/worldgen-driveways`, `fix/worldgen-bends`, `fix/taxi-stops`, `fix/outing-reach`, `fix/edge-bikes`, `fix/visit-stay`, and the object-hold and stand-angle fixes) | The bus out and the shared work taxi in (`taxi.rs`: stands at the kerb, shared runs, late runs, leisure taxis); the cars' turns (`traffic.rs` claims); a big world's traffic kept apart only where it's seen (the renderer's watch plus 32 m), metered into view, and a jam in view undone (`cars::turn_round_by`, `drive_off`), a car passing a standing taxi; outings in reach by car, bike or taxi; the generated check's Big preview rule (in-view stuck cars and Big taxi lateness up to 6 min printed, not failing; the owner's call, 2026-11-07) |
+| `feat/lights-render` (`2d1a9b1a`) | The taxi drawn; taxi ranks where the bus shelters were (one a street at most, none within 60 m of another); traffic lights' model and drawing (none lit: groundwork) |
+| `docs/release-prep` (`1b61e31a`) | The version and these notes; the Console TV as the portable tube set (`657aedf6`, its revert of #54's flat screen); the language model's NOTICE; *Big (preview)* on Create World |
 | `simplify/sim-core`, `simplify/bus-hosting`, `simplify/web` (`d97f6d05`, `9da73623`, `6a44a4a8`) | `/simplify` passes over the branch |
 | `fix/riders-and-vehicles` (through `f5c9a1d9`, with `fix/commute-timing` and `fix/model-gate`) | The code review's fixes: bodies kept clear of cars, a car never driving through anyone, the bike or walk decided once, lateness by the way's due time, a guest's promised bite; the gate's strict checks as errors (`checkglb::STRICT`, `accept`); the armoire, party booth, shower stall, seedling and yoga mat; the monitor's radius |
 
@@ -54,7 +57,7 @@ Still to run before the release PR, as for 0.6.0: the voice's tests (`cargo test
 
 ## 4. Release steps
 
-1. Merge `fix/car-guard` (the bus out, the work taxi in, the cars' turns), then `cargo release-version 0.7.0` and the CHANGELOG's date; commit on the release branch.
+1. Merge `fix/offview-traffic` (the bus out, the work taxi in, the cars' turns, big towns' traffic), `feat/lights-render` and `docs/release-prep` (`cargo release-version 0.7.0`, the CHANGELOG's date) into the release branch.
 2. Pull request `release/0.7.0` → `main`; CI passes on it; merge (a merge commit).
 3. Dry run: `gh workflow run pages.yml --ref main -f deploy=false`, watched to the end.
 4. Tag and push (after asking the owner): `git tag -a v0.7.0 -m "Idyll Lives 0.7.0: getting about town"`, `git push origin v0.7.0`; watch the tag's run.
@@ -67,6 +70,7 @@ Still to run before the release PR, as for 0.6.0: the voice's tests (`cargo test
 - **The 30-minute late grace** (`careerRules.lateGraceMinutes`): set while about half of the arrivals at work were late; lower it once the bikes and the work taxi make commutes punctual.
 - **Only 4 idea toasts show at once** (`ui/planner/ideaToasts.ts` `MAX_OPEN`): a purchase request can be pushed off screen (it is still answerable in the Goals panel). A purchase is set up even with free will off, since accepting it was the player's choice (`setup::who`).
 - **Nothing to drink to serve:** a host's offer brings only food (an `eat` use a guest could have themselves).
+- **Big towns are a preview** (the owner's call, 2026-11-07): Big rush-hour traffic is bistable (local rule changes moved jams between towns), so a jam in view can still form and is undone by a car turning round; finished in 0.7.1 (leads: less peak demand, a turning car reserving the ground ahead of it).
 - **Firefox:** the model-load fix (`6ada1144`) is not verified in Firefox.
 - **Parked-car tiles are coarse.**
 - `vehicle.roadsOnly` is read but not kept to: an e-scooter goes wherever the walk goes (`docs/content-packs.md`, `vehicle`).
