@@ -127,7 +127,12 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
 
 - `setView(rect)` — the focus lot: its wall/floor meshes and full structure, as today.
 - `setWatch(rect)` — new: the camera's stream rectangle; `World::set_view` uses it for the
-  sim's full-detail area (LOD). Defaults to the view rect when never sent.
+  sim's full-detail area (LOD), the view rect when never sent. It is also what's drawn
+  (`World::set_watch`): cars further than 32 m out of it drive through each other, claiming
+  nothing (`cars::sight`, the owner's call for big towns); the snapshot leaves them out. A car
+  the camera comes to on top of another is put clear along its way before it's drawn, and one
+  held up out of the picture (8 m and more from the watch) with all it waits for is put on after
+  3 game minutes. Never sent (cosy and normal towns, drawn whole), every car is in sight.
 - `rooms` is sent as a transferable `Uint16Array` (same indexing as today's `number[]`).
 - Structure is versioned per sim chunk; `structure_rect(x0, z0, x1, z1)` returns the walls,
   doors and objects inside a rectangle, and `chunk_versions()` lists the versions to diff.
