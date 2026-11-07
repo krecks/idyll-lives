@@ -38,6 +38,93 @@ pub fn look_at(w: &mut World, plot: u32) {
     w.set_view(Some([p.x, p.z, p.x + p.w, p.z + p.d]));
 }
 
+/// The renderer's watch for a camera on (`x`, `z`), as a big town's game sends it
+/// (`render/shared/focus.ts` `Roam`, `PlayCanvasRenderer.reportWatch`): the bounds of the 64 m
+/// chunks streamed in round the camera's target at the default zoom (24 m out, its first turn,
+/// a 16:9 view, the default preset's stream), clipped to the town (tiles).
+pub fn stream_watch(w: &World, x: f32, z: f32) -> [i32; 4] {
+    const CHUNK: f32 = 64.0;
+    let r = (24.0f32 * 1.2 + 80.0).clamp(120.0, 260.0);
+    let alpha = -std::f32::consts::PI * 0.62;
+    let fov = 2.0 * (0.35f32.tan() * 16.0 / 9.0).atan();
+    let reach = r * 1.5 + 32.0;
+    let (mut x0, mut z0, mut x1, mut z1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+    let span = |a: f32| ((a - reach) / CHUNK).floor() as i32..=((a + reach) / CHUNK).floor() as i32;
+    for cx in span(x) {
+        for cz in span(z) {
+            let (ax, az) = (cx as f32 * CHUNK, cz as f32 * CHUNK);
+            let d = (ax - x)
+                .max(x - ax - CHUNK)
+                .max(0.0)
+                .hypot((az - z).max(z - az - CHUNK).max(0.0));
+            // (Within the radius, or 1.5 times it inside the view's angle.)
+            let near = d <= r
+                || d <= r * 1.5 && {
+                    let (mx, mz) = (ax + CHUNK / 2.0 - x, az + CHUNK / 2.0 - z);
+                    let dist = mx.hypot(mz).max(1.0);
+                    let along = -(mx * alpha.cos() + mz * alpha.sin());
+                    (along / dist).clamp(-1.0, 1.0).acos()
+                        <= fov / 2.0 + (CHUNK * 0.71).atan2(dist) + 0.15
+                };
+            if near {
+                (x0, z0, x1, z1) = (
+                    x0.min(ax),
+                    z0.min(az),
+                    x1.max(ax + CHUNK),
+                    z1.max(az + CHUNK),
+                );
+            }
+        }
+    }
+    let (wd, dd) = (w.lot.width as f32, w.storey_depth() as f32);
+    [
+        x0.max(0.0) as i32,
+        z0.max(0.0) as i32,
+        x1.min(wd) as i32,
+        z1.min(dd) as i32,
+    ]
+}
+
+/// Looks at the player's home as a big town's game does at the start, the camera on it: the
+/// renderer's watch round it (`stream_watch`) simulated in full detail (`World::set_view`) and
+/// what's drawn (`World::set_watch`: cars out of it drive through each other). The watch.
+pub fn watch_home(w: &mut World) -> [i32; 4] {
+    let home = w
+        .households
+        .iter()
+        .find(|h| h.player)
+        .or(w.households.first())
+        .and_then(|h| h.plot);
+    let p = &w.plots[home.unwrap_or(0) as usize];
+    let at = [p.x as f32 + p.w as f32 / 2.0, p.z as f32 + p.d as f32 / 2.0];
+    let r = stream_watch(w, at[0], at[1]);
+    w.set_view(Some(r));
+    w.set_watch(Some(r));
+    r
+}
+
+/// Which cars are drawn with the watch `watch` (None: the whole town is): shown, not left out of
+/// the snapshot (`cars::hidden`: out of sight, or on top of one that is) and their middles in the
+/// watch (the renderer draws only what's in the chunks streamed in).
+pub fn drawn(w: &World, watch: Option<[i32; 4]>) -> Vec<bool> {
+    let hidden = sim_core::cars::hidden(&w.cars);
+    w.cars
+        .iter()
+        .zip(hidden)
+        .map(|(car, hidden)| {
+            !hidden
+                && car.shown.is_some_and(|(p, ..)| {
+                    watch.is_none_or(|[x0, z0, x1, z1]| {
+                        p[0] >= x0 as f32
+                            && p[0] < x1 as f32
+                            && p[1] >= z0 as f32
+                            && p[1] < z1 as f32
+                    })
+                })
+        })
+        .collect()
+}
+
 /// With `LOD=1` in the environment, looks at the player's home (to compare runs with lower
 /// detail for the rest of the town against full detail).
 pub fn lod_from_env(w: &mut World) {
@@ -753,7 +840,7 @@ enum State {
     /// Using something (not a bed or a crib), or talking.
     Busy(Doing),
     Routing(Doing),
-    /// Waiting for someone to talk to, for a busy station, at someone's door, or for the bus.
+    /// Waiting for someone to talk to, for a busy station, or at someone's door.
     Waiting(Doing),
     Away,
     /// Being talked to by this resident.
@@ -864,8 +951,8 @@ fn state(w: &World, s: &Sim) -> State {
         | Phase::Knocking { .. }
         | Phase::Boarding { .. }
         | Phase::Alighting { .. }
-        // (At the bus stop, for less than a headway: `bus.rs`.)
-        | Phase::AtStop { .. } => State::Waiting(d),
+        // (At the kerb for the work taxi: `taxi.rs`.)
+        | Phase::AtKerb { .. } => State::Waiting(d),
     }
 }
 

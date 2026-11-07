@@ -1,5 +1,5 @@
 /**
- * What the cars and the buses share on PlayCanvas (`cars.ts`, `buses.ts`): which of them are drawn
+ * What the cars draw with on PlayCanvas (`cars.ts`): which of them are drawn
  * (near, streamed in, not hidden: `hideOn`, `setView`), whether one moving draws the sun's map
  * again (`setShadowTest`), how their wheels turn and steer as they go (`rollWheels`), and every one's
  * wheels in one instanced draw and their soft contact shadows in another.

@@ -1,5 +1,5 @@
 //! Commutes in an open-world town (`life::Commute`): residents leave for work or school the walk
-//! to the quickest way out of town (a bus stop, on foot) plus `commuteMinutes` (the part off the
+//! to the quickest way out of town on foot plus `commuteMinutes` (the part off the
 //! map) before it starts, and get there on time.
 
 use crate::common;
@@ -33,8 +33,6 @@ fn start_today(w: &World, i: usize) -> Option<u64> {
 struct Day {
     left: Option<u64>,
     there: Option<u64>,
-    /// Waited at the stop they walked out by for the bus calling there (`bus::at_stop`).
-    bus: bool,
 }
 
 #[test]
@@ -63,7 +61,6 @@ fn residents_leave_by_their_walk_and_are_never_late() {
             if working && day.left.is_none() {
                 day.left = Some(w.tick);
             }
-            day.bus |= w.bound_for_bus(i).is_some();
             if let Some(left) = day.left
                 && s.away_until.is_some()
                 && day.there.is_none()
@@ -99,9 +96,8 @@ fn residents_leave_by_their_walk_and_are_never_late() {
                     c.walk,
                     c
                 );
-                // ...and at the way out of town in time for the rest (by the bus calling at the
-                // stop they walked out by: on it before work starts, the rest of the way on it).
-                let due = if day.bus { start } else { start - off_map };
+                // ...and at the way out of town in time for the rest.
+                let due = start - off_map;
                 assert!(
                     !s.job.as_ref().is_some_and(|j| j.late),
                     "{} late for work",
@@ -147,28 +143,15 @@ fn the_walk_is_timed_to_the_quickest_way_out() {
     for &i in &walkers {
         let c = w.sims[i].commute().unwrap();
         let name = &w.sims[i].name;
-        // (By bus: timed by the bus they take, `travel_bus.rs`.)
-        if c.bus.is_some() {
-            assert!(w.travel.is_stop(c.exit), "{name}: by bus from a way out");
-            continue;
-        }
         assert_eq!(
             c.ticks,
             ((c.walk + off_map) / MINUTES_PER_TICK) as u64,
             "{name}"
         );
-        // To the quickest of the ways out they may walk out by about when they'd leave: the roads
-        // out, and a hamlet's bus stop when no bus calls there (`bus::Transit::walks_out`).
-        let Some(start) = start_today(&w, i) else {
-            continue;
-        };
-        let leaving = start.saturating_sub((off_map / MINUTES_PER_TICK) as u64);
+        // To the quickest of the ways out.
         let from = w.stair_map().ground_pos(w.sims[i].pos);
         let eta = |k: usize| w.travel.eta(from, w.exits[k], Mode::Foot, 1.5);
-        let best = (0..w.exits.len())
-            .filter(|&k| w.transit.walks_out(k, leaving))
-            .map(eta)
-            .fold(f32::INFINITY, f32::min);
+        let best = (0..w.exits.len()).map(eta).fold(f32::INFINITY, f32::min);
         assert!(
             eta(c.exit) <= best + 1e-3,
             "{name}: to exit {} ({:.0} min), the quickest {best:.0}",

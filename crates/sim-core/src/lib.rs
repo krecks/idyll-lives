@@ -8,7 +8,6 @@
 
 pub mod ai;
 pub mod blueprint;
-pub mod bus;
 pub mod carry;
 pub mod cars;
 pub mod clock;
@@ -45,6 +44,8 @@ pub mod social;
 pub mod staff;
 pub mod storeys;
 pub mod surface;
+pub mod taxi;
+pub mod traffic;
 pub mod travel;
 pub mod view;
 pub mod world;

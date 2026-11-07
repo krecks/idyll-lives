@@ -249,19 +249,23 @@ impl Game {
         self.view = None;
         self.watch = None;
         self.world.set_view(None);
+        self.world.set_watch(None);
     }
 
     /// The camera's stream rectangle (tiles): simulated in full detail, lots it touches too, from
-    /// now on instead of the focus lot (`set_view`).
+    /// now on instead of the focus lot (`set_view`). It's what the renderer draws: cars out of it
+    /// drive through each other (`World::set_watch`).
     pub fn set_watch(&mut self, x0: i32, z0: i32, x1: i32, z1: i32) {
         self.watch = Some([x0, z0, x1, z1]);
         self.world.set_view(self.watch);
+        self.world.set_watch(self.watch);
     }
 
-    /// Back to the focus lot as the area simulated in full detail.
+    /// Back to the focus lot as the area simulated in full detail (and every car in sight).
     pub fn clear_watch(&mut self) {
         self.watch = None;
         self.world.set_view(self.view);
+        self.world.set_watch(None);
     }
 
     /// The room id of every tile, row by row (`width × depth` of the structure; 0 outdoors), as a

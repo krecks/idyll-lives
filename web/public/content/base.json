@@ -1930,6 +1930,10 @@
     "minFriendship": 15,
     "earliestHour": 10,
     "latestHour": 20,
+    "outingMinutes": 90,
+    "outingHomeBy": 23,
+    "leastMinutes": 40,
+    "againMinutes": 90,
     "company": 0.05,
     "boredMinutes": 30,
     "farewell": ["goodbyeHug", "goodbye"],
@@ -3771,7 +3775,6 @@
   },
   "autonomy": {"urgent": ["hunger", "energy", "bladder", "hygiene"], "urgentBelow": 0.1, "comfortBoost": 2, "lookAhead": 0.25, "quickMinutes": 30, "retryMinutes": 30},
   "laundry": {"perDay": 0.4, "most": 4},
-  "bus": {"$comment": "The town's bus (sim-core bus.rs): one comes into town every `every` minutes, the first at `first` o'clock and the last at `last`, through its bus stops and out.", "every": 60, "first": 6, "last": 23},
   "objectRules": {
     "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community"],
     "wear": {"perUse": 0.004, "byCategory": {"bathroom": 0.006, "garden": 0, "outdoor": 0, "decor": 0}, "perQuality": 0.2},
@@ -4986,5 +4989,6 @@
     "packs/romantic.json",
     "packs/hotHeaded.json",
     "packs/kind.json"
-  ]
+  ],
+  "taxi": {"$comment": "The work taxi (sim-core taxi.rs): colleagues (one career, one way out) whose work starts within `window` minutes share one, `seats` a taxi, when the way out on foot takes longer than `minWalkMinutes` and the taxi is sooner; it waits `waitMinutes` at a rider's kerb.", "seats": 4, "minWalkMinutes": 10, "window": 15, "waitMinutes": 2}
 }

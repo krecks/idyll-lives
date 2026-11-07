@@ -970,29 +970,33 @@ async function openSession(
       const target = pose.target ?? [now.target[0], pose.y ?? now.target[1], now.target[2]];
       renderer.setCameraPose({ ...now, ...pose, target });
     };
-    // `__buses()`: the town's buses as the newest snapshot shows them (sim-core `bus.rs`): where, which
-    // way, standing (1) or driving (2), their open doors and line.
-    const buses = () => {
-      const [snap, l] = [bridge.latest(), bridge.layout];
-      if (!l.bus || l.busBase === undefined || l.busStride === undefined || l.header.busCount === undefined) return [];
-      return Array.from({ length: snap[l.header.busCount] | 0 }, (_, k) => {
-        const o = l.busBase! + k * l.busStride!;
-        return { x: snap[o + l.bus!.x], z: snap[o + l.bus!.z], yaw: snap[o + l.bus!.yaw], shown: snap[o + l.bus!.shown], doors: snap[o + l.bus!.doors], line: snap[o + l.bus!.line] };
-      });
-    };
-    // `__cars()`: the households' cars as the newest snapshot shows them (sim-core `cars.rs`): which
-    // car (its row), where, which way, parked (1) or driving (2).
+    // `__cars()`: the households' cars and the work taxis as the newest snapshot shows them (sim-core
+    // `cars.rs`): which car (its row), where, which way, parked (1) or driving (2), and its `kind`
+    // (0 a household's, 1 a taxi).
     const cars = () => {
       const [snap, l] = [bridge.latest(), bridge.layout];
       if (!l.car || l.carBase === undefined || l.carStride === undefined || l.header.carCount === undefined) return [];
       return Array.from({ length: snap[l.header.carCount] | 0 }, (_, k) => {
         const o = l.carBase! + k * l.carStride!;
-        return { car: k, x: snap[o + l.car!.x], z: snap[o + l.car!.z], yaw: snap[o + l.car!.yaw], shown: snap[o + l.car!.shown] };
+        const kind = l.car!.kind === undefined ? 0 : snap[o + l.car!.kind];
+        return { car: k, x: snap[o + l.car!.x], z: snap[o + l.car!.z], yaw: snap[o + l.car!.yaw], shown: snap[o + l.car!.shown], kind };
+      });
+    };
+    // `__lights()`: the traffic lights' signal heads as the newest snapshot shows them (sim-core
+    // `traffic::Signal`, one per arm of each lit junction): where the pole stands, which way the head
+    // faces, and what it shows ('red', 'amber', 'green' or 'walk').
+    const lights = () => {
+      const [snap, l] = [bridge.latest(), bridge.layout];
+      if (!l.light || l.lightBase === undefined || l.lightStride === undefined || l.header.lightCount === undefined) return [];
+      const names = Object.fromEntries(Object.entries(l.light.states).map(([k, v]) => [v, k]));
+      return Array.from({ length: snap[l.header.lightCount] | 0 }, (_, k) => {
+        const o = l.lightBase! + k * l.lightStride!;
+        return { head: k, x: snap[o + l.light!.x], z: snap[o + l.light!.z], yaw: snap[o + l.light!.yaw], shown: snap[o + l.light!.shown], state: names[snap[o + l.light!.state]] ?? 'red' };
       });
     };
     Object.assign(window, {
-      __buses: buses,
       __cars: cars,
+      __lights: lights,
       __sims: () => liveSims(bridge.latest(), bridge.layout, content, game.sims),
       __content: content,
       __addFunds: (amount: number, household = game.home) => bridge.send({ type: 'addFunds', household, amount }),
@@ -1223,7 +1227,7 @@ async function openSession(
     }
     world = w;
     // The town map: the town's ground and its presentation data (roads, zones, areas), as it changes.
-    if (townMap.world?.meta !== w.meta || townMap.world?.width !== w.width || townMap.world?.stops !== w.stops) townMap.world = { width: w.width, depth: groundDepth(w), meta: w.meta, stops: w.stops };
+    if (townMap.world?.meta !== w.meta || townMap.world?.width !== w.width) townMap.world = { width: w.width, depth: groundDepth(w), meta: w.meta };
     worldView = viewPlot;
     game.storeys = w.storeys ?? 1;
     game.lowestStorey = lowestStorey(w);

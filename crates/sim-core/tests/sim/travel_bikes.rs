@@ -493,9 +493,9 @@ fn a_rider_heading_at_a_cars_side_stops_with_the_front_wheel_outside_it() {
 
 /// Holly Clearing, a generated Normal forest town (`bun tools/worlds/sample.ts`, seed 209464, as
 /// the 0.7.0 samples had it): at 8:36 a car turns in tight from the lane to the narrow road to
-/// the dead end, its tail swinging round, as four riders come out of it and the bus is on its way
-/// in. The car waited for those beside it its turn would come nearer to, they for it (they keep
-/// clear of where it would be a tick on too), and nobody went anywhere for hours.
+/// the dead end, its tail swinging round, as four riders come out of it. The car waited for those
+/// beside it its turn would come nearer to, they for it (they keep clear of where it would be a
+/// tick on too), and nobody went anywhere for hours.
 #[test]
 fn a_car_turning_tight_among_riders_beside_it_turns_and_they_ride_on() {
     let content = common::content();
@@ -520,6 +520,8 @@ fn a_car_turning_tight_among_riders_beside_it_turns_and_they_ride_on() {
                 s.pos
             );
         }
+        // (A work taxi's slot as one comes.)
+        still.resize(w.cars.len(), (None, 0));
         for (c, car) in w.cars.iter().enumerate() {
             let at = car.shown.filter(|s| s.2).map(|s| s.0);
             still[c] = match (at, still[c]) {

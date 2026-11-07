@@ -189,7 +189,7 @@ export interface NeighbourhoodDraft {
   seed?: number;
   /** The world the town is in (missing in drafts from older code: the classic valley). */
   world?: WorldInfo;
-  /** A big world's hamlets, land, stops and parking (`macro.ts`); missing in a cosy or normal one. */
+  /** A big world's hamlets, land and parking (`macro.ts`); missing in a cosy or normal one. */
   open?: OpenWorldDraft;
   /**
    * What the layout couldn't do: lots that found no room along the roads (left out of the town),
@@ -823,7 +823,7 @@ export class LotPlacer {
       let found = false;
       for (const f of u.lot === 'farm' ? outskirts : frontage) {
         const at = lotAt(ground, roads[f.road], f, width, depth, this.snug);
-        if (!at) continue;
+        if (!at || !this.drivesOut(u, at)) continue;
         this.put(u, at, f);
         found = true;
         break;
@@ -833,6 +833,28 @@ export class LotPlacer {
       else this.dropped.push({ name: u.name, kind: u.kind, lot: u.lot });
     }
     return left;
+  }
+
+  /**
+   * Whether a house on lot `u` at `at` has a driveway whose line meets a road squarely
+   * (`driveMeets`): a car can turn out of it onto the road, not come alongside it (on a bend
+   * the road takes away from the lot's corner, or by a junction). Or no room for one.
+   */
+  private drivesOut(u: Unplaced, at: { x: number; z: number; facing: Facing }): boolean {
+    const { t, roads } = this;
+    const house = u.kind === 'house' ? houseTemplate(t, u.template) : undefined;
+    if (!house) return true;
+    const footprint = (def: string): [number, number] => this.content.object(def)?.footprint ?? [1, 1];
+    const { width, depth } = slotDims(t, u);
+    const sides = driveways(onLot(t, house, u, footprint), width, depth, footprint);
+    const turn = turner(at.x, at.z, width, depth, at.facing);
+    return (
+      !sides.length ||
+      sides.some((r) => {
+        const [a, b] = [turn.point([r.x + r.w / 2, 0]), turn.point([r.x + r.w / 2, -1])];
+        return driveMeets(roads, roadIndex(roads), a, [b[0] - a[0], b[1] - a[1]], DRIVE_REACH)?.square;
+      })
+    );
   }
 
   /** House numbers along each road (odd on its left, even on its right), and the roads' names (`names`, by road; those without one are left as they are). */
@@ -1044,6 +1066,14 @@ const DRIVEWAY_PAST_FRONT = 5.4;
  * of garden objects. Null when neither side has room.
  */
 export function driveway(h: HouseTemplate, pw: number, pd: number, footprint: (def: string) => [number, number]): Rect | null {
+  return driveways(h, pw, pd, footprint)[0] ?? null;
+}
+
+/**
+ * The driveways a house layout has room for (`driveway`), the one it takes first: one on each
+ * side with room, clear of garden objects and of `keep` (a farm's fields and farmyard).
+ */
+export function driveways(h: HouseTemplate, pw: number, pd: number, footprint: (def: string) => [number, number], keep: readonly Rect[] = []): Rect[] {
   const xs = h.walls.flatMap(([x0, , x1]) => [x0, x1]);
   const zs = h.walls.flatMap(([, z0, , z1]) => [z0, z1]);
   const [hx0, hx1, hz0] = [Math.min(...xs), Math.max(...xs), Math.min(...zs)];
@@ -1053,19 +1083,20 @@ export function driveway(h: HouseTemplate, pw: number, pd: number, footprint: (d
     { gap: pw - hx1, far: door < (hx0 + hx1) / 2, rect: (w: number, gap: number) => ({ x: hx1 + Math.min(0.6, gap - w - 0.3), z: 0, w, d }) },
     { gap: hx0, far: door >= (hx0 + hx1) / 2, rect: (w: number, gap: number) => ({ x: hx0 - Math.min(0.6, gap - w - 0.3) - w, z: 0, w, d }) },
   ].sort((a, b) => b.gap - a.gap || Number(b.far) - Number(a.far));
+  const over = (r: Rect, o: Rect) => o.x < r.x + r.w && o.x + o.w > r.x && o.z < r.z + r.d && o.z + o.d > r.z;
   const blocked = (r: Rect) =>
+    keep.some((o) => over(r, o)) ||
     h.objects.some((o) => {
       const [fw, fd] = footprint(o.def);
-      const [w, dd] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
-      return o.x < r.x + r.w && o.x + w > r.x && o.z < r.z + r.d && o.z + dd > r.z;
+      const [w, d] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
+      return over(r, { x: o.x, z: o.z, w, d });
     });
-  for (const side of sides) {
+  return sides.flatMap((side) => {
     const w = Math.min(3, side.gap - 0.6);
-    if (w < 2.3) continue;
+    if (w < 2.3) return [];
     const r = side.rect(w, side.gap);
-    if (!blocked(r)) return r;
-  }
-  return null;
+    return blocked(r) ? [] : [r];
+  });
 }
 
 export function vacantSlots(town: NeighbourhoodDraft): PlotSlot[] {
@@ -1085,8 +1116,8 @@ export interface TownLayout {
   fields: Rect[];
   /** Garages at the inner ends of driveways (`garageFor`: wall centre lines; `plot`: the slot's index). */
   garages: { plot: number; x0: number; z0: number; x1: number; z1: number }[];
-  /** Each house's driveway: the middle of its inner end and of its end at the street (town tiles). */
-  drives: { plot: number; inner: Pt; street: Pt; facing: Facing }[];
+  /** Each house's driveway: the middle of its inner end and of its end at the street (town tiles), and where its line meets a road (`driveMeets`). */
+  drives: { plot: number; inner: Pt; street: Pt; facing: Facing; meets: DriveMeet | null }[];
   /** The households' cars (`plot`: the slot's index), parked on their driveways where the street draws them (`houseCar`, town tiles). */
   cars: (ParkedCar & { plot: number })[];
   plots: { name: string; x: number; z: number; w: number; d: number; public: boolean; entry: [number, number]; storeys: number }[];
@@ -1136,15 +1167,16 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
    * A path's way on from the front of plot `s` to its road, across the verge (`r`: its stretch on the
    * plot, plot coordinates): as far as the sidewalk, longer where the plot stands back from a bend
    * (`reach` m at most: a driveway's goes further, for the car to get to the road, but not across
-   * another lot). Whether it got there.
+   * another lot). To the first road it comes to, or to `onto` (a driveway's: the road its car
+   * drives onto, across a trail on the way). Whether it got there.
    */
   const roads = roadIndex(town.roads);
-  const verge = (s: PlotSlot, r: Rect, reach = 12): boolean => {
+  const verge = (s: PlotSlot, r: Rect, reach = 12, onto?: number): boolean => {
     const turn = turnOnto(t, s);
     for (let k = 1; k <= reach; k++) {
       const [x, z] = turn.point([r.x + r.w / 2, -k + 0.5]);
       if (k > 12 && plots.some((p, i) => i !== s.index && x > p.x && x < p.x + p.w && z > p.z && z < p.z + p.d)) return false;
-      if (!roads.onRoad(x, z)) continue;
+      if (onto === undefined ? !roads.onRoad(x, z) : !(roads.distance(onto, x, z) < town.roads[onto].width / 2)) continue;
       paths.push(turn.rect({ x: r.x, z: -k, w: r.w, d: k }));
       return true;
     }
@@ -1212,8 +1244,23 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     }
     // A garden path from the front door to the street.
     if (h.doors[0]) pathTo(s, h.doors[0]);
-    // A driveway beside the house, crossing the verge to the road.
-    const drive = driveway(h, pw, pd, footprint);
+    // A driveway beside the house, crossing the verge to the road: on the side whose line meets
+    // its road squarely (`driveMeets`), where a car can turn out onto it, if either side's does.
+    const turn = turnOnto(t, s);
+    const lineOf = (r: Rect): [Pt, Pt] => {
+      const [a, b] = [turn.point([r.x + r.w / 2, 0]), turn.point([r.x + r.w / 2, -1])];
+      return [a, [b[0] - a[0], b[1] - a[1]]];
+    };
+    const farmland = [
+      ...(s.farm?.fields ?? []),
+      ...(s.farm?.objects ?? []).map((o): Rect => {
+        const [fw, fd] = footprint(o.def);
+        return o.rot % 2 === 0 ? { x: o.x, z: o.z, w: fw, d: fd } : { x: o.x, z: o.z, w: fd, d: fw };
+      }),
+    ];
+    const sides = driveways(h, pw, pd, footprint, farmland).map((r) => ({ r, meets: driveMeets(town.roads, roads, ...lineOf(r), DRIVE_REACH) }));
+    const side = sides.find((o) => o.meets?.square) ?? sides[0];
+    const drive = side?.r ?? null;
     // The household's bikes and e-scooters by the house or the garage (`townRides.ts`), once both are known.
     const who = living.get(s.index);
     const rides = (car: boolean, garages: Rect[], room: Rect[] = []) => {
@@ -1229,9 +1276,12 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     }
     paths.push(turnOnto(t, s).rect(drive));
     driveOf.set(s.index, turnOnto(t, s).rect(drive));
-    const reaches = verge(s, drive, DRIVE_REACH);
-    drives.push({ plot: s.index, inner: turnOnto(t, s).point([drive.x + drive.w / 2, drive.d]), street: turnOnto(t, s).point([drive.x + drive.w / 2, 0]), facing: s.facing });
-    // The household's car on it (the player's always), where it gets to the road.
+    // (Its way across the verge to the road it meets squarely; else to the first road it comes
+    // to, as a garden path's, and no car: it would have no way out.)
+    const square = side.meets?.square ? side.meets : null;
+    const reaches = square ? verge(s, drive, DRIVE_REACH, square.road) : (verge(s, drive, DRIVE_REACH), false);
+    drives.push({ plot: s.index, inner: turn.point([drive.x + drive.w / 2, drive.d]), street: turn.point([drive.x + drive.w / 2, 0]), facing: s.facing, meets: side.meets });
+    // The household's car on it (the player's always), where it gets onto the road.
     const car = reaches && (living.has(s.index) || s.index === playerSlot) ? houseCar(plotRect(t, s), s.facing, turnOnto(t, s).rect(drive), s.index === playerSlot) : null;
     if (car) cars.push({ plot: s.index, ...car });
     // A garage at its inner end, clear of what's in the garden (as the street draws it): laid out
@@ -1444,10 +1494,8 @@ export function assembleTown(
   const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths, facing, seed: town.seed ?? (rand() * 2 ** 31) >>> 0, world: worldLook(town, fields), gardenFences: true };
   const open = openWorldFields(town, drives, cars);
   if (open.meta) Object.assign(meta, open.meta);
-  // Residents leave town (for work) where its roads lead out of it, or by bus from its stops.
-  const stops = open.exits ? [] : busStops(town, plots, paths, objects);
-  const roadsOut = open.exits ? [] : roadExits(town.roads, town.width, town.depth);
-  const exits = open.exits ?? (stops.length ? [...roadsOut.map(([x, z]): TownExit => ({ x, z, kind: 'road' })), ...stops.map(([x, z]): TownExit => ({ x, z, kind: 'stop' }))] : roadsOut);
+  // Residents leave town (for work) where its roads lead out of it.
+  const exits = open.exits ?? roadExits(town.roads, town.width, town.depth);
   const plotKinds = town.slots.map((s): PlotKind => (s.kind === 'house' ? (s.lot === 'farm' ? 'farm' : 'home') : s.kind === 'shop' ? 'shop' : s.kind === 'outdoor' ? 'countryside' : 'public'));
   const filed = plots.map((p, i) => ({ ...p, area: town.slots[i].area ?? 0, kind: plotKinds[i] }));
   return JSON.stringify({
@@ -1478,84 +1526,71 @@ export function assembleTown(
 }
 
 /**
- * The road a driveway leads onto and how far along it (m): where its line, on from its end at the
- * plot's edge (`street`, running `way`), comes onto a road (its paving crosses the verge to it:
- * `layoutTown`'s `verge`), at the middle of that road; else the road nearest that end. Not a
- * trail. Null: none within 24 m.
+ * A driveway's line meets its road no further from square than this: the cosine of the angle
+ * between it and the road's side (sim-core `cars::OBLIQUE` is 0.5, and a little to spare).
+ * Further from square it comes alongside the road rather than onto it, and its car has no way
+ * to turn out onto it.
  */
-function meetsRoad(list: readonly RoadPlan[], roads: ReturnType<typeof roadIndex>, street: Pt, way: Pt): { road: number; s: number } | null {
+const DRIVE_SQUARE = 0.55;
+
+/** Where a driveway meets its road (`driveMeets`). */
+export interface DriveMeet {
+  road: number;
+  /** How far along the road (m), where the driveway's line gets nearest its middle. */
+  s: number;
+  /** Whether it meets the road squarely enough for a car to turn onto it (`DRIVE_SQUARE`). */
+  square: boolean;
+}
+
+/**
+ * Where a driveway's line, on from its end at the plot's edge (`street`, running `way`: a unit
+ * direction), first comes onto a road a car can drive (not a trail: it goes on across one), within
+ * `reach` m: that road, how far along it the line gets nearest its middle, and whether it meets
+ * it squarely there, as the simulation measures it (the way the road's segment runs there:
+ * sim-core `Bay::new`). Null: none.
+ */
+function driveMeets(list: readonly RoadPlan[], roads: ReturnType<typeof roadIndex>, street: Pt, way: Pt, reach: number): DriveMeet | null {
   const at = (k: number): Pt => [street[0] + way[0] * k, street[1] + way[1] * k];
-  for (let k = 0.5; k <= 24; k += 0.5) {
-    const near = roads.nearest(...at(k), 24);
-    if (!near || list[near.road].kind === 'trail' || near.dist > list[near.road].width / 2) continue;
+  const widest = Math.max(0, ...list.map((r) => r.width));
+  for (let k = 0.5; k <= reach; k += 0.5) {
+    let on: { road: number; dist: number } | null = null;
+    for (const [road, hit] of roads.around(...at(k), widest / 2)) {
+      if (list[road].kind === 'trail' || hit.dist > list[road].width / 2 || (on && on.dist <= hit.dist)) continue;
+      on = { road, dist: hit.dist };
+    }
+    if (!on) continue;
     // On it: on along the line while that takes it nearer the road's middle.
-    let [best, kb] = [near.dist, k];
-    for (let j = k + 0.25; j <= k + list[near.road].width; j += 0.25) {
-      const d = roads.distance(near.road, ...at(j), list[near.road].width);
+    const width = list[on.road].width;
+    let [best, kb] = [on.dist, k];
+    for (let j = k + 0.25; j <= k + width; j += 0.25) {
+      const d = roads.distance(on.road, ...at(j), width);
       if (d >= best) break;
       [best, kb] = [d, j];
     }
-    return { road: near.road, s: roads.along(near.road, ...at(kb)) };
+    const s = roads.along(on.road, ...at(kb));
+    const [tx, tz] = segmentWay(list[on.road].points, s);
+    return { road: on.road, s, square: Math.abs(tx * way[1] - tz * way[0]) >= DRIVE_SQUARE };
   }
-  // (Else the nearest road, passing over a trail nearer it.)
-  const near = [...roads.around(street[0], street[1], 24)].filter(([r]) => list[r].kind !== 'trail').sort((x, y) => x[1].dist - y[1].dist)[0];
-  return near ? { road: near[0], s: near[1].s } : null;
+  return null;
 }
 
-/** A bus stop's sign is this far in from its road's edge (m, on the pavement: as `macro.ts` `kerb`). */
-const STOP_IN = 0.6;
-/** Behind the pavement, a bus stop's shelter (sim-core `bus.rs`: its middle this far out, this long and deep) with room round it (m). */
-const SHELTER_OUT = 0.7;
-const SHELTER_LONG = 3.6;
-const SHELTER_DEEP: readonly number[] = [-0.6, 0, 0.75];
-/** A second stop as far as this from the first along the road (m), within the middle of it. */
-const STOPS_APART = 70;
-const STOPS_WITHIN = 0.7;
+/** The way a polyline's segment at arc length `s` runs (a unit direction; as sim-core `Road::tangent`). */
+function segmentWay(pts: readonly Pt[], s: number): Pt {
+  const ls = lengths(pts);
+  let i = 1;
+  while (i < pts.length - 1 && ls[i] <= s) i++;
+  const [a, b] = [pts[i - 1], pts[i]];
+  const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  return [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+}
 
 /**
- * A cosy or normal town's bus stops (sim-core `bus.rs`): on its main road (the longest way through
- * town, else its longest road) near the town's middle, at the kerb, with room behind the pavement
- * for a shelter, clear of the lots, their paths and driveways, the other roads and the things on
- * the town; a second on the same side further along when the road is long enough, so the bus passes
- * both the same way. None when there's no room on it.
+ * The road a driveway with no way onto one leads to and how far along it (m): the road nearest
+ * the end of it at the plot's edge (`street`), passing over a trail nearer it. Null: none within 24 m.
  */
-export function busStops(town: NeighbourhoodDraft, plots: readonly Rect[], paths: readonly Rect[], objects: readonly Placement[]): Pt[] {
-  const index = roadIndex(town.roads);
-  const mid: Pt = [town.width / 2, town.depth / 2];
-  const ways = town.roads.map((r, i) => ({ r, i, len: lengths(r.points).at(-1) ?? 0 })).filter((w) => w.r.kind !== 'trail' && w.r.kind !== 'country' && w.r.points.length > 1);
-  const through = ways.filter((w) => w.r.ends[0] === 'out' && w.r.ends[1] === 'out');
-  const near = (w: (typeof ways)[number]) => w.len - 2 * nearest(w.r.points, mid[0], mid[1]).dist;
-  const main = (through.length ? through : ways).sort((a, b) => near(b) - near(a))[0];
-  if (!main) return [];
-  const { r: road, len } = main;
-  const ls = lengths(road.points);
-  const inRect = (x: number, z: number, r: Rect, m: number) => x > r.x - m && x < r.x + r.w + m && z > r.z - m && z < r.z + r.d + m;
-  const clear = (x: number, z: number) =>
-    x > 1 && z > 1 && x < town.width - 1 && z < town.depth - 1 && !index.onRoad(x, z) && !plots.some((r) => inRect(x, z, r, 0.3)) && !paths.some((r) => inRect(x, z, r, 0.3)) && !objects.some((o) => Math.hypot(o.x + 0.5 - x, o.z + 0.5 - z) < 1.2);
-  const spots: { s: number; side: 1 | -1; at: Pt; from: number }[] = [];
-  for (let s = 10; s < len - 10; s += 2) {
-    const { p, t } = pointAt(road.points, s, ls);
-    for (const side of [1, -1] as const) {
-      const n: Pt = [-t[1] * side, t[0] * side];
-      const out = road.width / 2 + SHELTER_OUT;
-      const c: Pt = [p[0] + n[0] * out, p[1] + n[1] * out];
-      let room = true;
-      for (let a = -0.5; a <= 0.5 && room; a += 0.25) {
-        for (const b of SHELTER_DEEP) {
-          room &&= clear(c[0] + t[0] * SHELTER_LONG * a + n[0] * b, c[1] + t[1] * SHELTER_LONG * a + n[1] * b);
-        }
-      }
-      if (!room) continue;
-      const k = road.width / 2 - STOP_IN;
-      const at: Pt = [Math.round((p[0] + n[0] * k) * 100) / 100, Math.round((p[1] + n[1] * k) * 100) / 100];
-      spots.push({ s, side, at, from: Math.hypot(c[0] - mid[0], c[1] - mid[1]) });
-    }
-  }
-  const first = spots.sort((a, b) => a.from - b.from || a.s - b.s)[0];
-  if (!first) return [];
-  const edge = (len * (1 - STOPS_WITHIN)) / 2;
-  const second = spots.find((o) => o.side === first.side && Math.abs(o.s - first.s) >= STOPS_APART && o.s > edge && o.s < len - edge);
-  return second ? [first.at, second.at] : [first.at];
+function nearestRoad(list: readonly RoadPlan[], roads: ReturnType<typeof roadIndex>, street: Pt): { road: number; s: number } | null {
+  const near = [...roads.around(street[0], street[1], 24)].filter(([r]) => list[r].kind !== 'trail').sort((x, y) => x[1].dist - y[1].dist)[0];
+  return near ? { road: near[0], s: near[1].s } : null;
 }
 
 /** What a plot is, for the simulation (docs/design/open-world.md). */
@@ -1565,7 +1600,7 @@ type PlotKind = 'home' | 'farm' | 'public' | 'shop' | 'countryside';
  * The town file's open-world fields (docs/design/open-world.md): its areas (a cosy or normal town
  * is one), every house's driveway with where it meets its road and the households' cars on them
  * (sim-core `cars.rs`: they drive the roads, in a cosy town too), and in a big world its typed
- * exits (the roads out, the bus stops), the water, public parking, and the zones, pads and areas
+ * exits (the roads out), the water, public parking, and the zones, pads and areas
  * for the renderer.
  */
 function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'], cars: TownLayout['cars']) {
@@ -1575,9 +1610,9 @@ function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'],
   const r3 = (v: number) => Math.round(v * 1000) / 1000;
   // Where each driveway meets the road it leads to (not a trail), the way it runs to it (a
   // driveway of a house facing east or west runs along x: `frontX`), and the way out along it.
-  const filed = drives.map(({ plot, inner, street, facing }) => {
+  const filed = drives.map(({ plot, inner, street, facing, meets }) => {
     const across = facing === 1 ? -1 : facing === 3 ? 1 : 0;
-    const road = meetsRoad(town.roads, roads, street, [across, facing === 0 ? -1 : facing === 2 ? 1 : 0]);
+    const road = meets ? { road: meets.road, s: meets.s } : nearestRoad(town.roads, roads, street);
     const at = road ? pointAt(town.roads[road.road].points, road.s).p : street;
     return { plot, x: r2(inner[0]), z: r2(inner[1]), front: facing === 0 ? -1 : facing === 2 ? 1 : 0, ...(across ? { frontX: across } : {}), street: r2(at[1]), ...(road ? { road: road.road, s: r2(road.s) } : {}) };
   });
@@ -1585,7 +1620,7 @@ function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'],
   const open = town.open;
   if (!open) return { areas, file: { drives: filed, cars: parked } };
   const ways = town.roads.filter((r) => r.kind !== 'trail');
-  const exits: TownExit[] = [...roadExits(ways, town.width, town.depth).map(([x, z]): TownExit => ({ x, z, kind: 'road' })), ...open.stops.map(({ x, z }): TownExit => ({ x, z, kind: 'stop' }))];
+  const exits: TownExit[] = roadExits(ways, town.width, town.depth).map(([x, z]): TownExit => ({ x, z, kind: 'road' }));
   return {
     areas,
     exits,

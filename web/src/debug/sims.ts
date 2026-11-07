@@ -38,6 +38,8 @@ export interface LiveSim {
   /** Talking with (another resident's id). */
   /** The bike or e-scooter they ride (its stable id; `ride.rs`), else null. */
   ride: number | null;
+  /** The bike or e-scooter they left out by a place they're visiting: its stable id and where it stands, else null. */
+  parked: { id: number; x: number; z: number; yaw: number } | null;
   partner: number | null;
   /** Needs by content id, 0..1 (only for residents with details: the player's household, the inspected). */
   needs: Record<string, number> | null;
@@ -83,6 +85,7 @@ export function liveSims(snap: Float32Array, layout: SnapshotLayout, content: Co
       recipe: recipe > 0 ? (layout.recipes?.[recipe - 1] ?? null) : null,
       partner: partner >= 0 ? partner : null,
       ride: field(o, k.ride) >= 0 ? field(o, k.ride) : null,
+      parked: field(o, k.ride) <= -2 && k.parkX !== undefined ? { id: -2 - field(o, k.ride), x: field(o, k.parkX), z: field(o, k.parkZ!), yaw: field(o, k.parkYaw!) } : null,
       needs: view?.detail ? Object.fromEntries(content.needs.map((n, j) => [n.id, view.needs[j] ?? 0])) : null,
       doing: view?.actions[0]?.label ?? null,
       queue: view?.actions.slice(1).map((a) => a.label) ?? [],

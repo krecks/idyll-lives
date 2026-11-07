@@ -68,7 +68,8 @@
 //! `(0, 1), (0, 2), …, (1, 2), …`, as little-endian f32s) and relationships list only the pairs
 //! that aren't as new (no `chemistry` of their own), and the town file's open-world fields are
 //! kept as they came (`openWorld`, `travel::OpenWorld`: size, roads, areas, terrain masks,
-//! parking, which exits are bus stops, plots' areas and kinds; driveways keep their `road` and
+//! parking, plots' areas and kinds (and, written before the bus was dropped, which exits were bus
+//! stops); driveways keep their `road` and
 //! `s` in `drives`); a car on a trip between hamlets keeps it (`cars[].trip`, state `out` while
 //! it's parked there) and who rides with it (`cars[].riders`; absent: nobody, as in files written
 //! before passengers, so no new version). Absent: a `cosy` town, as before: no road network from
@@ -84,10 +85,12 @@
 //! a resident asked for, bought and waiting to be set up at home (`setups`: the household, who
 //! asked, the object by id, the tick it was bought and what was paid; `setup.rs`), left out when
 //! there are none, so an older file has none; setting one up isn't saved mid-way (the parcel is
-//! back at the front door after a load). Still 35: the town's bus (`bus.rs`) adds nothing: its
-//! lines come from the stops (`openWorld.stops`; a cosy town's too now) and the roads, its buses
-//! from the clock, on load; someone waiting at a stop sets off for it again, and someone on the
-//! bus home is saved back at their stop, on their way home from it.
+//! back at the front door after a load). Still 35: a file written while the town had buses (its
+//! bus stops among its exits, `openWorld.stops`) loads without them: the stops are no ways out,
+//! dropped from the exits as it loads, and nothing of the buses was ever saved. Still 35: the
+//! traffic lights (`traffic::Signal`, worked out again on load) are saved where they'd got to (`lights`: each lit junction's arm, its stage, the tick it began),
+//! left out where there are none; absent (an older file, or another number of lit junctions),
+//! they start over at their first arm's green.
 //! Still 35: a resident late for the shift they're at says so (`job.late`, left out when on
 //! time; an older file's are on time).
 //! Still 35: the story may tell of a host bringing a guest something (`served`, the item in `n`,
@@ -183,12 +186,29 @@ pub struct SaveFile {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub chemistry: String,
     /// The town file's open-world fields (`travel::OpenWorld`): roads, areas, terrain, parking,
-    /// which exits are bus stops, plots' areas and kinds (absent: none).
+    /// plots' areas and kinds (absent: none).
     #[serde(default, skip_serializing_if = "crate::travel::OpenWorld::is_empty")]
     pub open_world: crate::travel::OpenWorld,
     /// Things bought that wait to be set up at home (`setup.rs`; absent: none).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub setups: Vec<SetupSave>,
+    /// The traffic lights where they'd got to (`traffic::Light`, a lit junction's each; absent:
+    /// none, or they start over).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lights: Vec<LightSave>,
+    /// The work taxis' runs planned and under way, and who came to work by one (`taxi::Taxis`;
+    /// absent: none).
+    #[serde(default, skip_serializing_if = "crate::taxi::Taxis::is_empty")]
+    pub taxis: crate::taxi::Taxis,
+}
+
+/// A lit junction's lights (`traffic::Light`): whose turn it is (its arm), how far through it
+/// (0 green, 1 amber, 2 all red), and the tick that began.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct LightSave {
+    pub arm: u8,
+    pub stage: u8,
+    pub since: u64,
 }
 
 /// Something bought waiting to be set up (`setup::Setup`), its object by content id (unknown ones
@@ -811,19 +831,10 @@ impl World {
                         |p| self.plots[p as usize].arrival_point(),
                     );
                 }
-                // Done at work and coming home by bus (riders aren't saved): back at their stop
-                // (where they are), on their way home.
-                let bus_home = crate::bus::homeward(self, s.id as usize);
-                let home_task = bus_home.then_some(Task {
-                    kind: TaskKind::GoHome,
-                    directed: false,
-                    routine: false,
-                });
                 let tasks = s
                     .current()
                     .map(|a| &a.task)
                     .into_iter()
-                    .chain(home_task.as_ref())
                     .chain(s.queue())
                     .filter_map(|t| self.task_save(t))
                     .collect();
@@ -887,7 +898,7 @@ impl World {
                     }),
                     job_search_from: s.job_search_from,
                     nap_minutes: minutes_left(s.nap_until),
-                    away_minutes: s.away_until.filter(|_| !bus_home).map(minutes_left),
+                    away_minutes: s.away_until.map(minutes_left),
                     visiting: s.visiting.map(|v| (v.plot, Some(minutes_left(v.until)))),
                     tasks,
                     planner: planner_save(content, &s.planner),
@@ -1028,23 +1039,12 @@ impl World {
                 .collect(),
             next_event_id: self.events.last_id(),
             former: self.former.clone(),
-            cars: self.cars.clone(),
+            // (The households' cars: the work taxis' slots are the runs', `taxis`.)
+            cars: self.cars.iter().filter(|c| !c.taxi).cloned().collect(),
+            taxis: self.taxis.clone(),
             drives: self.drives.clone(),
             garages: self.garages.clone(),
-            open_world: {
-                let mut file = self.travel.file.clone();
-                // (Indices into the exits as saved: those that are numbers.)
-                file.stops = self
-                    .exits
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, e)| e.iter().all(|v| v.is_finite()))
-                    .enumerate()
-                    .filter(|&(_, (i, _))| self.travel.is_stop(i))
-                    .map(|(k, _)| k as u32)
-                    .collect();
-                file
-            },
+            open_world: self.travel.file.clone(),
             items: self
                 .items
                 .list
@@ -1082,6 +1082,20 @@ impl World {
                     object: content.objects[s.object].id.clone(),
                     since: s.since,
                     paid: s.paid,
+                })
+                .collect(),
+            lights: self
+                .traffic
+                .lights
+                .iter()
+                .map(|l| LightSave {
+                    arm: l.arm,
+                    stage: match l.stage {
+                        crate::traffic::Stage::Green => 0,
+                        crate::traffic::Stage::Amber => 1,
+                        crate::traffic::Stage::Clear => 2,
+                    },
+                    since: l.since,
                 })
                 .collect(),
         }
@@ -1141,7 +1155,15 @@ impl World {
         world.lifespan = save.lifespan.unwrap_or(crate::lifecycle::Lifespan::Off);
         world.player_moves = save.player_moves.unwrap_or(true);
         world.meta = save.meta.clone();
-        world.exits = save.exits.clone();
+        world.note_paths();
+        // (Bus stops, in a file written while the town had buses, are no ways out.)
+        world.exits = save
+            .exits
+            .iter()
+            .enumerate()
+            .filter(|&(i, _)| !save.open_world.stops.contains(&(i as u32)))
+            .map(|(_, e)| *e)
+            .collect();
         world.set_travel(save.open_world.clone());
         world.plots = save
             .plots
@@ -1435,6 +1457,8 @@ impl World {
                     idle: 0,
                     farewell: 0,
                     offer_at: 0,
+                    arrived: 0,
+                    leaving: false,
                 })
             });
             for t in &s.tasks {
@@ -1688,7 +1712,28 @@ impl World {
         world.make_storeys();
         world.refresh_rooms();
         crate::cars::load(&mut world, &save.cars, &save.drives, &save.garages);
-        crate::bus::settle(&mut world);
+        // (Lights saved: the junctions have them.)
+        world.travel.lights_on = !save.lights.is_empty();
+        crate::traffic::settle(&mut world);
+        // (The lights where they'd got to, for the same lit junctions.)
+        if save.lights.len() == world.travel.signals.len() {
+            world.traffic.lights = save
+                .lights
+                .iter()
+                .map(|l| crate::traffic::Light {
+                    arm: l.arm,
+                    stage: match l.stage {
+                        1 => crate::traffic::Stage::Amber,
+                        2 => crate::traffic::Stage::Clear,
+                        _ => crate::traffic::Stage::Green,
+                    },
+                    since: l.since,
+                })
+                .collect();
+        }
+        // The work taxis' runs, their riders booked and the taxis under way where they were.
+        world.taxis = save.taxis.clone();
+        crate::taxi::settle(&mut world);
         // What someone was eating or washing up is put down (those don't go on after loading).
         crate::cooking::settle(&mut world);
         Ok(world)

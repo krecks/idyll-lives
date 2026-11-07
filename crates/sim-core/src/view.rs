@@ -684,7 +684,7 @@ struct SimSent {
     visiting: u64,
     trip: u64,
     ride: u64,
-    bus: u64,
+    taxi: u64,
     job: u64,
     /// Reset when the details stop (the UI drops them).
     details: DetailsSent,
@@ -774,15 +774,13 @@ impl UiSync {
             })
             .collect();
 
-        // (Who is in a car or on the bus on the way home, `trip_view`: found once, not for
-        // everyone away.)
+        // (Who is in a car on the way home, `trip_view`: found once, not for everyone away.)
         let mut riders: Vec<u32> = world
             .cars
             .iter()
             .filter(|c| c.state == crate::cars::CarState::Arriving)
             .flat_map(|c| c.driver.iter().chain(&c.aboard).chain(&c.done))
             .copied()
-            .chain(world.transit.homeward_ids())
             .collect();
         riders.sort_unstable();
 
@@ -1031,8 +1029,8 @@ fn sim_patch(
     let trip = trip_view(world, s, riders, detail);
     o.changed_opt("trip", trip.as_ref(), &mut sent.trip);
     o.changed_opt("ride", ride_view(world, s).as_ref(), &mut sent.ride);
-    // Waiting for the bus, on it to work, or on it home (`bus::status`).
-    o.changed_opt("bus", crate::bus::status(world, s).as_ref(), &mut sent.bus);
+    // The work taxi: waiting for it, in it to work (and when they're there), or home in it.
+    o.changed_opt("taxi", taxi_view(world, s).as_ref(), &mut sent.taxi);
     o.changed("job", &job_view(content, s), &mut sent.job);
     if !detail {
         return;
@@ -1531,8 +1529,8 @@ struct TripView {
 const TRIP_STEP: f32 = 5.0;
 
 /// Where resident `s` is on their way to: a visit or home (until they're on that plot), or home
-/// from work in the household's car or on the bus (back when it is, `riders`: who is in one or on
-/// it on the way home, sorted); with the time they're there, from `Travel::eta` (by car where they're bound
+/// from work in the household's car (back when it is, `riders`: who is in one on the way home,
+/// sorted); with the time they're there, from `Travel::eta` (by car where they're bound
 /// for it). Read only: nothing here changes the game.
 ///
 /// `timed` false: a visit or the way home without the time, which takes a search along the roads
@@ -1584,11 +1582,29 @@ fn trip_view(world: &World, s: &Sim, riders: &[u32], timed: bool) -> Option<Trip
 }
 
 /// On a bike or an e-scooter of theirs (`SimView.ride`, `ride.rs`): what it is, and whether they're
-/// off to work, to school or home on it.
+/// off to work, to school, out (a visit or an outing) or home on it.
 #[derive(Serialize)]
 struct RideView {
     kind: crate::content::VehicleKind,
     to: &'static str,
+}
+
+/// The work taxi (`SimView.taxi`, `taxi::status`): `state` `wait` (at their kerb), `work` (in it,
+/// `at` the minute of the day they're there) or `home` (on their way home in it, or waiting for it
+/// at work: `at` about when they're back).
+#[derive(Serialize)]
+struct TaxiView {
+    state: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    at: Option<f32>,
+}
+
+fn taxi_view(world: &World, s: &Sim) -> Option<TaxiView> {
+    let (state, at) = crate::taxi::status(world, s)?;
+    Some(TaxiView {
+        state,
+        at: at.map(|t| (clock::minute_of_day(t) / 5.0).round() * 5.0),
+    })
 }
 
 /// What resident `s` rides now, on their way (not while away at work with it).
@@ -1598,14 +1614,15 @@ fn ride_view(world: &World, s: &Sim) -> Option<RideView> {
     if s.away_until.is_some() {
         return None;
     }
-    let home = s
-        .current()
-        .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
+    let task = s.current().map(|a| a.task.kind);
+    let home = matches!(task, Some(TaskKind::GoHome));
+    let out = matches!(task, Some(TaskKind::Visit { .. }));
     let school = world.content.life.school.is_some() && s.job.is_none();
-    let to = match (home, school) {
-        (true, _) => "home",
-        (false, true) => "school",
-        (false, false) => "work",
+    let to = match (home, out, school) {
+        (true, ..) => "home",
+        (false, true, _) => "out",
+        (false, false, true) => "school",
+        (false, false, false) => "work",
     };
     Some(RideView { kind, to })
 }
@@ -1711,45 +1728,43 @@ struct StructureView<'a> {
     /// Garages at the inner ends of driveways (`cars::Garage`); left out when there are none.
     #[serde(skip_serializing_if = "<[_]>::is_empty")]
     garages: &'a [crate::cars::Garage],
-    /// The town's bus stops (`bus::Stop`); left out when there are none.
+    /// The streets where the kerbside furniture keeps back for cars to pass pulled over
+    /// (`cars::pull_over_streets`); left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    stops: Vec<StopView>,
-    /// The streets a bus drives where the kerbside furniture keeps back for buses to pass pulled
-    /// over (`bus::Transit::bus_streets`); left out when there are none.
+    pull_over_streets: Vec<PullOverStreetView>,
+    /// Where the traffic lights' poles stand and which way their heads face (`traffic::SignalArm`:
+    /// x, z and yaw, in their snapshot rows' order): the kerbside furniture keeps clear of them;
+    /// left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    bus_streets: Vec<BusStreetView>,
+    light_poles: Vec<[f32; 3]>,
 }
 
-/// A street a bus drives (`StructureView::bus_streets`): the town file's road (`meta.roads`
-/// index) and how far in from its edges its kerbside furniture may reach (m, `bus::kerbside`).
+/// `StructureView::light_poles`.
+fn light_pole_views(world: &World) -> Vec<[f32; 3]> {
+    world
+        .travel
+        .signals
+        .iter()
+        .flat_map(|s| s.arms.iter().map(|a| [a.pole[0], a.pole[1], a.yaw]))
+        .take(crate::snapshot::MAX_LIGHTS)
+        .collect()
+}
+
+/// A street cars pull over on (`StructureView::pull_over_streets`): the town file's road
+/// (`meta.roads` index) and how far in from its edges its kerbside furniture may reach (m,
+/// `cars::kerbside`).
 #[derive(Serialize)]
-struct BusStreetView {
+struct PullOverStreetView {
     road: u32,
     keep: f32,
 }
 
-/// `StructureView::bus_streets`.
-fn bus_street_views(world: &World) -> Vec<BusStreetView> {
-    world
-        .transit
-        .bus_streets
-        .iter()
-        .map(|&(road, keep)| BusStreetView { road, keep })
+/// `StructureView::pull_over_streets`.
+fn pull_over_street_views(world: &World) -> Vec<PullOverStreetView> {
+    crate::cars::pull_over_streets(&world.travel)
+        .into_iter()
+        .map(|(road, keep)| PullOverStreetView { road, keep })
         .collect()
-}
-
-/// A bus stop: where its pole stands (the town file's exit), the way the bus goes past it (a
-/// resident's yaw), its shelter if it has one (its middle and the way it faces), and whether a bus
-/// calls there.
-#[derive(Serialize)]
-struct StopView {
-    x: f32,
-    z: f32,
-    #[serde(rename = "busYaw")]
-    bus_yaw: f32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    shelter: Option<[f32; 3]>,
-    served: bool,
 }
 
 /// A household's car: where it's parked (its middle, its yaw) and its look.
@@ -2406,8 +2421,8 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
         staff: staff_views(world),
         cars: car_views(world),
         garages: &world.garages,
-        stops: stop_views(world),
-        bus_streets: bus_street_views(world),
+        pull_over_streets: pull_over_street_views(world),
+        light_poles: light_pole_views(world),
     })
     .expect("structure serializes")
 }
@@ -2506,25 +2521,6 @@ fn staff_views(world: &World) -> Vec<StaffView> {
         .collect()
 }
 
-/// `StructureView::stops`.
-fn stop_views(world: &World) -> Vec<StopView> {
-    world
-        .transit
-        .stops
-        .iter()
-        .map(|s| StopView {
-            x: s.at[0],
-            z: s.at[1],
-            bus_yaw: s.dir[0].atan2(s.dir[1]),
-            shelter: s.shelter.then(|| {
-                let (c, yaw) = s.shelter_pose();
-                [c[0], c[1], yaw]
-            }),
-            served: s.line.is_some(),
-        })
-        .collect()
-}
-
 /// `StructureView::cars`.
 fn car_views(world: &World) -> Option<Vec<CarView>> {
     (!world.cars.is_empty() || !world.drives.is_empty()).then(|| {
@@ -2532,6 +2528,7 @@ fn car_views(world: &World) -> Option<Vec<CarView>> {
             .cars
             .iter()
             .take(crate::cars::MAX_CARS)
+            .filter(|c| !c.taxi)
             .map(|c| CarView {
                 plot: c.plot,
                 x: c.spot[0],
@@ -2610,10 +2607,10 @@ impl StructureSync {
         parts.part("staff", Some(&staff).filter(|s| !s.is_empty()));
         parts.part("cars", car_views(world).as_ref());
         parts.part("garages", Some(&world.garages).filter(|g| !g.is_empty()));
-        let stops = stop_views(world);
-        parts.part("stops", Some(&stops).filter(|s| !s.is_empty()));
-        let streets = bus_street_views(world);
-        parts.part("busStreets", Some(&streets).filter(|s| !s.is_empty()));
+        let streets = pull_over_street_views(world);
+        parts.part("pullOverStreets", Some(&streets).filter(|s| !s.is_empty()));
+        let poles = light_pole_views(world);
+        parts.part("lightPoles", Some(&poles).filter(|p| !p.is_empty()));
 
         // The things: those that changed, by index, while the list is the same things in the same
         // order (a door opened, a crop grown); else the whole list (one bought, sold or moved in).

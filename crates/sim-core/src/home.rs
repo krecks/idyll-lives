@@ -276,7 +276,14 @@ impl World {
         self.object_plot = s.object_plot;
         self.blocked = s.blocked;
         self.garages = s.garages;
-        self.cars = s.cars;
+        // (The work taxis as they are now: the runs drive them, `taxi.rs`.)
+        let taxis: Vec<crate::cars::Car> = self.cars.iter().filter(|c| c.taxi).cloned().collect();
+        self.cars = s
+            .cars
+            .into_iter()
+            .filter(|c| !c.taxi)
+            .chain(taxis)
+            .collect();
         self.car_tiles = s.car_tiles;
         self.cars_parked = s.cars_parked;
         self.sync_tile_arrays();

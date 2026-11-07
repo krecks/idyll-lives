@@ -573,7 +573,7 @@ pub struct Vehicle {
     /// Keeps to roads (an e-scooter): no trails.
     pub roads_only: bool,
     /// Ridden, how far it reaches in front of its rider and behind them, and out to each side
-    /// (m: its front wheel, its back wheel, its handlebars), for keeping clear of cars and buses
+    /// (m: its front wheel, its back wheel, its handlebars), for keeping clear of cars
     /// (`cars::Body`). Unsaid: as far as someone on foot.
     pub reach: [f32; 3],
 }
@@ -1499,6 +1499,18 @@ pub struct VisitRules {
     pub min_friendship: f32,
     pub earliest_hour: f32,
     pub latest_hour: f32,
+    /// An outing (open-world towns: a public place out of `autonomy.reach`) goes only where the
+    /// way takes this many minutes at most (`outingMinutes`: by car for one who'd drive there,
+    /// else on foot), and only with time there and the way back before `outing_home_by` o'clock
+    /// (`outingHomeBy`); its stay ends in time for that.
+    pub outing_minutes: f32,
+    pub outing_home_by: f32,
+    /// Once there (let in, or at the place), a guest stays this long at least (`leastMinutes`),
+    /// unless a need is about to run out (`autonomy.urgentBelow`), it's late or the hosts go.
+    pub least_minutes: f32,
+    /// Back home from a visit or an outing, they don't set off on another of their own for this
+    /// long (`againMinutes`).
+    pub again_minutes: f32,
     /// Tag mask used for schedule/trait preferences of visiting.
     pub tags: TagMask,
     /// Visitors knock and wait to be let in (`visits.door`); without it they walk straight in.
@@ -1810,8 +1822,8 @@ pub struct Content {
     pub laundry: Option<LaundryRules>,
     /// How cars drive (content `cars`; see `cars.rs`, `travel.rs`).
     pub cars: CarRules,
-    /// When the town's bus runs (content `bus`; see `bus.rs`).
-    pub bus: BusRules,
+    /// The work taxi (content `taxi`; see `taxi.rs`).
+    pub taxi: TaxiRules,
     /// The uses (object def, interaction) with `"trail": true`: done walking out along the trail
     /// the thing stands at and back (a trailhead's *Walk the trail*; `world::trail_step`).
     pub trail_walks: Vec<(usize, usize)>,
@@ -1839,34 +1851,40 @@ struct CarsRaw {
     country_speed: Option<f32>,
 }
 
-/// When the town's bus runs (content `bus`): a bus every `every` minutes, the first entering
-/// town at `first` o'clock and the last at `last`.
+/// The work taxi (content `taxi`, `taxi.rs`): who rides it and how it runs.
 #[derive(Debug, Clone, Copy)]
-pub struct BusRules {
-    /// Minutes between buses (`every`, default 60).
-    pub every: f32,
-    /// The hours the first and the last bus of the day come into town (`first`, `last`; default
-    /// 6 and 23).
-    pub first: f32,
-    pub last: f32,
+pub struct TaxiRules {
+    /// Seats for riders (`seats`, 1 to 4, default 4): more riders than that take more taxis.
+    pub seats: usize,
+    /// A way out of town on foot taking longer than this is a long way, ridden when the taxi gets
+    /// them out sooner than the walk, its wait at the kerb included (game minutes,
+    /// `minWalkMinutes`, default 10).
+    pub min_walk: f32,
+    /// Colleagues whose work (or school) starts within this of each other share one (minutes,
+    /// `window`, default 15).
+    pub window: f32,
+    /// How long it waits at a rider's kerb for them (minutes, `waitMinutes`, default 2).
+    pub wait: f32,
 }
 
-impl Default for BusRules {
+impl Default for TaxiRules {
     fn default() -> Self {
         Self {
-            every: 60.0,
-            first: 6.0,
-            last: 23.0,
+            seats: 4,
+            min_walk: 10.0,
+            window: 15.0,
+            wait: 2.0,
         }
     }
 }
 
 #[derive(Deserialize, Default)]
-#[serde(default)]
-struct BusRaw {
-    every: Option<f32>,
-    first: Option<f32>,
-    last: Option<f32>,
+#[serde(rename_all = "camelCase", default)]
+struct TaxiRaw {
+    seats: Option<usize>,
+    min_walk_minutes: Option<f32>,
+    window: Option<f32>,
+    wait_minutes: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -1970,7 +1988,7 @@ struct ContentFile {
     #[serde(default)]
     cars: CarsRaw,
     #[serde(default)]
-    bus: BusRaw,
+    taxi: TaxiRaw,
 }
 
 #[derive(Deserialize)]
@@ -2546,6 +2564,10 @@ struct VisitRaw {
     min_friendship: Option<f32>,
     earliest_hour: Option<f32>,
     latest_hour: Option<f32>,
+    outing_minutes: Option<f32>,
+    outing_home_by: Option<f32>,
+    least_minutes: Option<f32>,
+    again_minutes: Option<f32>,
     door: Option<DoorRaw>,
     company: Option<f32>,
     bored_minutes: Option<f32>,
@@ -4912,6 +4934,10 @@ impl Content {
             min_friendship: v.min_friendship.unwrap_or(15.0),
             earliest_hour: v.earliest_hour.unwrap_or(9.0),
             latest_hour: v.latest_hour.unwrap_or(21.0),
+            outing_minutes: v.outing_minutes.unwrap_or(90.0).max(0.0),
+            outing_home_by: v.outing_home_by.unwrap_or(23.0).clamp(0.0, 24.0),
+            least_minutes: v.least_minutes.unwrap_or(0.0).max(0.0),
+            again_minutes: v.again_minutes.unwrap_or(0.0).max(0.0),
             tags: 1 << tag_index[VISIT_TAG],
             company: v.company.unwrap_or(0.0).max(0.0),
             bored_minutes: v.bored_minutes.map(|m| m.max(1.0)),
@@ -5130,21 +5156,22 @@ impl Content {
                     None => crate::travel::COUNTRY_SPEED,
                 },
             },
-            bus: {
-                let d = BusRules::default();
-                let rules = BusRules {
-                    every: raw.bus.every.unwrap_or(d.every),
-                    first: raw.bus.first.unwrap_or(d.first),
-                    last: raw.bus.last.unwrap_or(d.last),
+            taxi: {
+                let d = TaxiRules::default();
+                let rules = TaxiRules {
+                    seats: raw.taxi.seats.unwrap_or(d.seats),
+                    min_walk: raw.taxi.min_walk_minutes.unwrap_or(d.min_walk),
+                    window: raw.taxi.window.unwrap_or(d.window),
+                    wait: raw.taxi.wait_minutes.unwrap_or(d.wait),
                 };
-                let ok = |v: f32| v.is_finite() && (0.0..24.0).contains(&v);
-                if !(rules.every.is_finite() && (5.0..=240.0).contains(&rules.every))
-                    || !ok(rules.first)
-                    || !ok(rules.last)
-                    || rules.last < rules.first
+                let ok = |v: f32, most: f32| v.is_finite() && (0.0..=most).contains(&v);
+                if !(1..=4).contains(&rules.seats)
+                    || !ok(rules.min_walk, 600.0)
+                    || !ok(rules.window, 120.0)
+                    || !ok(rules.wait, 30.0)
                 {
                     return Err(Error::new(
-                        "bus: every is 5 to 240 minutes, and first and last are hours of the day, first no later than last",
+                        "taxi: seats is 1 to 4, minWalkMinutes 0 to 600, window 0 to 120 minutes and waitMinutes 0 to 30",
                     ));
                 }
                 rules

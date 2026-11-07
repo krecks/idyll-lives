@@ -18,20 +18,27 @@
  * reaching more than 45 m past the last road it meets, and no country road the layout found no
  * way for. And for big worlds: every area reaching a way out, nothing on the
  * water, every outdoor place at a trail's end and near its area, no trail through a lot, no
- * country road turning further than 70° over 40 m (no hairpins: `COUNTRY_TURN`), areas apart,
- * hamlets of four lots or more, every house near a stop or a way out, residents within the
+ * country road turning further than 70° over 40 m (no hairpins: `COUNTRY_TURN`), none running
+ * alongside another road a few metres off for more than `SIDE_BY_SIDE` m, areas apart,
+ * hamlets of four lots or more, residents within the
  * cap, the world filled (a quarter of it or more built and farmed, at most a tenth of its 100 m
  * squares with nothing in them, every quarter of it with an area or homes out in the country),
  * every road named (no two alike), the file under 4 MB, and the time a big world takes (its
  * layout without generating houses, and assembling its file: a problem at twice the budget).
  *
- * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--sizes cosy,normal,big] [--big-out file] [--big-per-kind n] [--kinds farm,forest]
+ * The same arguments make the same files, byte for byte (`Math.random` seeded per world:
+ * web/tests/sampleWorlds.test.ts), so a world a check fails on can be made again and run alone.
+ * `--seed-base n` (or WORLDS_SEED_BASE; default 0, the worlds CI checks) draws other worlds: the
+ * release gate runs the checks over five (`tools/ci-local.sh`, SEED_BASE).
+ *
+ * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--sizes cosy,normal,big] [--big-out file] [--big-per-kind n] [--kinds farm,forest] [--seed-base n]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { HouseGenConfig } from '../../web/src/game/housegen.ts';
 import type { Facing, Templates } from '../../web/src/game/town.ts';
+import type { RoadPlan } from '../../web/src/core/protocol.ts';
 
 // The loaders fetch from the page's address: here, files under web/public.
 const root = new URL('../../web/public/', import.meta.url);
@@ -51,12 +58,13 @@ const { WORLD_KINDS, WORLD_SIZES } = await import('../../web/src/game/world.ts')
 const { AREA_APART, COUNTRY_TURN, unrle } = await import('../../web/src/game/macro.ts');
 const { homePrice } = await import('../../web/src/game/price.ts');
 const { savingsOf } = await import('../../web/src/game/wealth.ts');
-const { COURT, lengths, nearest, pointAt, roadMask, sharpestTurn } = await import('../../web/src/game/roads.ts');
+const { COURT, lengths, nearest, pointAt, roadMask, sharpestTurn, sideBySide } = await import('../../web/src/game/roads.ts');
+const { mulberry32 } = await import('../../web/src/game/noise.ts');
 
 type Rect = { x: number; z: number; w: number; d: number };
 type Pt = [number, number];
 type Road = { points: Pt[]; width: number; ends: [string, string]; name?: string; kind?: string; area?: number };
-type Exit = Pt | { x: number; z: number; kind: 'road' | 'stop' };
+type Exit = Pt | { x: number; z: number; kind: 'road' };
 type TownFile = {
   size?: 'cosy' | 'normal' | 'big';
   width: number;
@@ -71,7 +79,6 @@ type TownFile = {
   meta: { roads?: Road[]; facing?: number[]; zones?: { kind: string; poly: Pt[] }[] };
 };
 const exitAt = (e: Exit): Pt => (Array.isArray(e) ? e : [e.x, e.z]);
-const isRoadExit = (e: Exit) => Array.isArray(e) || e.kind === 'road';
 /** How far a point is from a rectangle (0 inside it). */
 const offRect = (r: Rect, x: number, z: number) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 /**
@@ -268,12 +275,6 @@ function openProblems(town: TownFile): string[] {
     });
     const homes = town.plots.filter((p) => p.kind === 'home' || p.kind === 'farm');
     if (homes.length < 70) out.push(`${homes.length} homes (a big world has 70 or more)`);
-    // Every house within ~120 m of a stop or a way out.
-    for (const [i, p] of town.plots.entries()) {
-      if (p.kind !== 'home' && p.kind !== 'farm') continue;
-      const far = Math.min(...town.exits.map((e) => Math.hypot(exitAt(e)[0] - (p.x + p.w / 2), exitAt(e)[1] - (p.z + p.d / 2))));
-      if (far > 125) out.push(`house ${i} is ${far.toFixed(0)} m from a stop`);
-    }
   }
   // Neighbours within the cap (the player's household aside).
   const player = town.households.findIndex((h) => h.player);
@@ -283,6 +284,12 @@ function openProblems(town: TownFile): string[] {
 }
 
 /** What's wrong with a town's layout. */
+/**
+ * How long a country road may run alongside another road a few metres off (m): where it leaves a
+ * port beside a street's end, or joins a road at a slant (`layoutProblems`). Two that follow the
+ * same way for longer share it.
+ */
+const SIDE_BY_SIDE = 60;
 function layoutProblems(town: TownFile): string[] {
   const out: string[] = openProblems(town);
   // (Trails are on foot, between the lots: `openProblems` checks they keep off them.)
@@ -303,8 +310,12 @@ function layoutProblems(town: TownFile): string[] {
     // (A park may stand in the middle of a green.)
     if (roads.length && gap > 13 && !p.public) out.push(`plot ${i} ${gap.toFixed(1)} m from its road`);
   });
-  for (const [x, z] of town.exits.filter(isRoadExit).map(exitAt)) if (Math.min(x, z, town.width - x, town.depth - z) > 1) out.push(`a way out of town at ${x}, ${z}, not on its edge`);
-  if (!town.exits.some(isRoadExit)) out.push('no way out of town');
+  // No country road alongside another road a few metres off for long (`roads.ts` `sideBySide`: cars
+  // on the two meet nose to nose): one that follows another's way shares it (`macro.ts` `alongExisting`).
+  const all = (town.meta.roads ?? []) as RoadPlan[];
+  for (const { a, b, length, at } of sideBySide(all, SIDE_BY_SIDE, 'country')) out.push(`${all[a].name} runs alongside ${all[b].name} a few metres off for ${length} m by ${at.map(Math.round).join(', ')}`);
+  for (const [x, z] of town.exits.map(exitAt)) if (Math.min(x, z, town.width - x, town.depth - z) > 1) out.push(`a way out of town at ${x}, ${z}, not on its edge`);
+  if (!town.exits.length) out.push('no way out of town');
   return out;
 }
 const problems: string[] = [];
@@ -322,6 +333,10 @@ const sizes = (flag('--sizes') ?? 'cosy').split(',') as (typeof WORLD_SIZES)[num
 for (const size of sizes) if (!WORLD_SIZES.includes(size)) throw new Error(`no size ${size}`);
 const bigOutFlag = flag('--big-out');
 const bigPerKind = Number(flag('--big-per-kind') ?? 1);
+/** Which worlds of each kind (0: CI's); each world's seed moves on `SEED_STEP` per one. */
+const seedBase = Number(flag('--seed-base') ?? process.env.WORLDS_SEED_BASE ?? 0);
+if (!Number.isInteger(seedBase) || seedBase < 0) throw new Error(`no seed base ${seedBase}`);
+const SEED_STEP = 7919;
 const kinds = (flag('--kinds')?.split(',') ?? [...WORLD_KINDS]) as (typeof WORLD_KINDS)[number][];
 for (const kind of kinds) if (!WORLD_KINDS.includes(kind)) throw new Error(`no kind ${kind}`);
 const out = process.argv[2] ?? 'worlds.json';
@@ -344,8 +359,12 @@ const courtsOf: Record<string, [number, number, number]> = {};
 for (const size of sizes) {
   for (const kind of WORLD_KINDS.filter((k) => kinds.includes(k))) {
     for (let i = 1; i <= (size === 'big' ? bigPerKind : perKind); i++) {
-      const seed = i * 104729 + kind.length;
+      const seed = i * 104729 + kind.length + seedBase * SEED_STEP;
       const tag = `${kind}${size === 'cosy' ? '' : ` ${size}`} ${seed}`;
+      // (The households, the player's and the neighbours', drawn with `Math.random`: seeded here
+      // by the world's seed and size, the same seeds make the same files, so a failure in a
+      // check of them can be run again.)
+      Math.random = mulberry32(seed * WORLD_SIZES.length + WORLD_SIZES.indexOf(size));
       generateStats.houseMs = 0;
       let t0 = performance.now();
       const world = generateWorld(content, templates, kind, seed, undefined, size);

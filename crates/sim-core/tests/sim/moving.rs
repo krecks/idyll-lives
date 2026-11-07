@@ -250,3 +250,41 @@ fn newcomers_are_grown_up() {
     }
     assert!(families > 0, "no couple moved in with a grown child");
 }
+
+#[test]
+fn a_partner_out_on_a_visit_isnt_moved_from_under_it() {
+    // Out at a neighbour's as the day's moves come round (11:00): Cy stays where he is, a guest,
+    // and moves in with Ada another day (taken from the host's home ten minutes in, Eagle Pass).
+    let mut w = World::from_json(
+        CONTENT,
+        &town("", r#",{"a":0,"b":1,"preset":"partners"}"#),
+        1,
+    )
+    .unwrap();
+    w.apply(Command::SetAutonomy {
+        enabled: false,
+        household: None,
+    })
+    .unwrap();
+    let hour = sim_core::clock::tick_at(1, 11.0 * 60.0).unwrap();
+    while w.tick + 1 < hour {
+        w.tick_once();
+    }
+    let visit = sim_core::life::Visit {
+        plot: 2,
+        until: w.tick + 60 * 20,
+        idle: 0,
+        farewell: 0,
+        offer_at: 0,
+        arrived: w.tick,
+        leaving: false,
+    };
+    w.sims[1].visiting = Some(visit);
+    w.tick_once();
+    w.tick_once();
+    assert_eq!(w.sims[1].household, 1, "moved from under his visit");
+    // (Home again, he moves in on a day to come.)
+    w.sims[1].visiting = None;
+    days(&mut w, 6);
+    assert_eq!(w.sims[1].household, 0, "Cy never moved in with Ada");
+}

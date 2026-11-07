@@ -9,6 +9,10 @@
 #   tools/ci-local.sh            every step, and `types` (about 20 minutes)
 #   tools/ci-local.sh --quick    fmt clippy sim clips web types
 #   tools/ci-local.sh web sim    those steps
+#   SEED_BASE=3 tools/ci-local.sh generated
+#                                the generated-world checks over other sample worlds (default 0:
+#                                CI's). The same seed base makes the same worlds, so a failure
+#                                replays; the release gate runs `generated` over five seed bases.
 #
 # Steps: fmt clippy sim generated clips web tools sizes uses models, and types (the web's types and
 # lint over fresh wasm builds of the sim and the voice: not in CI's job, which builds no wasm, so run
@@ -48,9 +52,14 @@ step() {
       trap "rm -rf '$out'" EXIT
       "${bun_ci[@]}" tools/housegen/sample.ts "$out/houses.json"
       # Cosy and Normal worlds three per kind, Big ones (up to 1024 m) one per kind in a file of their own.
-      "${bun_ci[@]}" tools/worlds/sample.ts "$out/worlds.json" 3 --sizes cosy,normal,big --big-per-kind 1 --big-out "$out/worlds-big.json"
-      HOUSES="$out/houses.json" WORLDS="$out/worlds.json" cargo test -p sim-core --locked --test sim -- --ignored generated_houses:: generated_worlds::
-      WORLDS="$out/worlds-big.json" cargo test -p sim-core --locked --test sim -- --ignored generated_worlds::
+      local base=${SEED_BASE:-0}
+      echo "Sample worlds of seed base $base."
+      "${bun_ci[@]}" tools/worlds/sample.ts "$out/worlds.json" 3 --sizes cosy,normal,big --big-per-kind 1 --big-out "$out/worlds-big.json" --seed-base "$base"
+      if ! HOUSES="$out/houses.json" WORLDS="$out/worlds.json" cargo test -p sim-core --locked --test sim -- --ignored generated_houses:: generated_worlds:: ||
+        ! WORLDS="$out/worlds-big.json" cargo test -p sim-core --locked --test sim -- --ignored generated_worlds::; then
+        echo "The generated-world checks failed on seed base $base (again: SEED_BASE=$base tools/ci-local.sh generated)." >&2
+        exit 1
+      fi
       rm -rf "$out"
       ;;
     # The residents' clips on both bodies at every life stage (known failures: tools/characters/clip-baseline.json).
