@@ -515,6 +515,290 @@ fn the_households_car_pulling_out_or_coming_home_as_the_taxi_stands_at_its_kerb_
     }
 }
 
+/// A 7 m street with a car of house `taxi_x` made a work taxi standing at the kerb in its lane
+/// (driven off east, stopped 30 m on along the street and held there, as a taxi waiting for its
+/// rider), and the cars of houses `more`, each with its driver: the world, the taxi's index, and
+/// each car's.
+fn street_with_standing_taxi(taxi_x: i32, more: &[i32]) -> (World, usize, Vec<usize>) {
+    let driver = |n: &str| format!(r#"{{"name":"{n}","age":40,"traits":["cheerful"]}}"#);
+    let mut houses = Vec::new();
+    for (k, &x) in std::iter::once(&taxi_x).chain(more).enumerate() {
+        let d = driver(&format!("D{k}"));
+        let mut h = house(x, &[&d]);
+        h.car = true;
+        houses.push(h);
+    }
+    let mut w = town(7, &houses);
+    let car_of = |w: &World, k: usize| {
+        w.cars
+            .iter()
+            .position(|c| c.plot == k as u32)
+            .expect("its car")
+    };
+    let t = car_of(&w, 0);
+    let others = (1..houses.len()).map(|k| car_of(&w, k)).collect();
+    drive(&mut w, t, 0, false);
+    let stop = taxi_x as f32 + 33.0;
+    for _ in 0..4000 {
+        w.tick_once();
+        if w.cars[t].shown.is_some_and(|s| s.0[0] >= stop) {
+            break;
+        }
+    }
+    let car = &mut w.cars[t];
+    let s = car.shown.expect("on the street");
+    assert!(s.0[0] >= stop, "the taxi-to-be never got along the street");
+    car.taxi = true;
+    car.standing = true;
+    car.shown = Some((s.0, s.1, false, 0));
+    (w, t, others)
+}
+
+/// The least gap between two cars' bodies (m; below 0 overlapping).
+fn gap_between(w: &World, a: usize, b: usize) -> f32 {
+    let body = |c: &sim_core::cars::Car| {
+        let s = c.shown.expect("shown");
+        corners(s.0, s.1, c.len, c.wid)
+    };
+    -depth(&body(&w.cars[a]), &body(&w.cars[b]))
+}
+
+#[test]
+fn a_car_behind_a_taxi_standing_at_the_kerb_on_a_7_m_street_passes_it() {
+    // A taxi stands at the kerb in its lane (waiting for its rider, as Canalside's did while one
+    // behind it waited a quarter of an hour): the car coming up behind it goes out round it into
+    // the other lane, the way clear, and back in past it (`cars::PassBy`), never touching it, nor
+    // turning round.
+    let (mut w, t, cars) = street_with_standing_taxi(100, &[20]);
+    let f = cars[0];
+    let taxi_x = w.cars[t].shown.unwrap().0[0];
+    drive(&mut w, f, 1, false);
+    let (mut out, mut past, mut least) = (false, None, f32::INFINITY);
+    let start = w.tick;
+    while w.tick < start + 3000 && past.is_none() {
+        w.tick_once();
+        no_overlaps(&w);
+        let car = &w.cars[f];
+        assert!(w.cars[t].standing, "the taxi left");
+        assert!(
+            car.detour.is_none(),
+            "it turned round instead, tick {}",
+            w.tick
+        );
+        out |= car.pass_by.is_some();
+        if car.shown.is_some() {
+            least = least.min(gap_between(&w, f, t));
+        }
+        if car.shown.is_some_and(|s| s.0[0] > taxi_x + 10.0) {
+            past = Some(w.tick);
+        }
+    }
+    assert!(out, "it never went out round the taxi");
+    assert!(past.is_some(), "it never got past the taxi");
+    assert!(least >= 0.15, "it came {least:.2} m from the taxi going by");
+}
+
+#[test]
+fn one_coming_the_other_way_waits_its_turn_short_of_a_taxi_standing_at_the_kerb() {
+    // As one goes out round a taxi standing at the kerb into the other lane, one coming the other
+    // way waits short of the stretch alongside it till it's back in its lane: they take turns
+    // there (`Route::spans`), in the order they came. Started at times one apart: never two
+    // cars touching, both through, nobody turning round; and the one coming the other way stood
+    // waiting outside that stretch as the other went by.
+    let mut waited = 0;
+    for k in 0..10u64 {
+        let (mut w, t, cars) = street_with_standing_taxi(300, &[220, 160]);
+        let (f, o) = (cars[0], cars[1]);
+        let taxi = w.cars[t].shown.unwrap().0;
+        let len = w.cars[t].len;
+        // (The other coming home from the way out, east, to its house west of the taxi.)
+        drive(&mut w, o, 2, true);
+        let start = w.tick;
+        let (mut sent, mut home, mut gone) = (false, false, false);
+        let mut still = (0.0f32, 0u32);
+        let mut stood_out = false;
+        while w.tick < start + 6000 && !(home && gone) {
+            w.tick_once();
+            no_overlaps(&w);
+            if !sent && w.tick >= start + 300 + 25 * k {
+                drive(&mut w, f, 1, false);
+                sent = true;
+            }
+            for c in [f, o] {
+                assert!(w.cars[c].detour.is_none(), "car {c} turned round, case {k}");
+            }
+            let (fc, oc) = (&w.cars[f], &w.cars[o]);
+            // (The other standing still east of the taxi as this one is out round it.)
+            let going_by = fc
+                .pass_by
+                .is_some_and(|p| fc.progress > p.from && fc.progress < p.to);
+            if oc.state == CarState::Arriving {
+                if (oc.progress - still.0).abs() < 1e-3 {
+                    still.1 += 1;
+                } else {
+                    still = (oc.progress, 0);
+                }
+                let east = oc
+                    .shown
+                    .is_some_and(|s| s.0[0] > taxi[0] + len / 2.0 + oc.len / 2.0);
+                if going_by && east && still.1 >= 10 {
+                    stood_out = true;
+                }
+            }
+            home |= oc.state == CarState::Parked && w.tick > start + 10;
+            gone |= sent && fc.state == CarState::Away;
+        }
+        assert!(home && gone, "case {k}: not both through ({home}, {gone})");
+        waited += usize::from(stood_out);
+    }
+    assert!(
+        waited > 0,
+        "the one coming the other way never waited its turn"
+    );
+}
+
+/// A's taxi comes in from the way out (east) along a 7 m street to A's kerb (south of the street,
+/// in its lane coming in): two neighbours west of A come home right behind it (up behind it as it
+/// stands: out round it), and two drive off east as it stands there (meeting them alongside it).
+/// Each tick (no two cars ever overlapping) `each` sees the world and the neighbours' cars, and may
+/// stop it (true); else till all are through. Whether anyone went out round the taxi
+/// (`Car::pass_by`) and was alongside it.
+fn cars_round_a_standing_taxi(mut each: impl FnMut(&World, &[usize]) -> bool) -> bool {
+    let driver = |n: &str| format!(r#"{{"name":"{n}","age":40,"traits":["cheerful"]}}"#);
+    let mut a = house(300, &[&worker("A")]);
+    a.south = true;
+    let mut houses = vec![a];
+    for (k, x) in [100, 160, 40, 250].into_iter().enumerate() {
+        let d = driver(&format!("D{k}"));
+        let mut h = house(x, &[&d]);
+        h.car = true;
+        houses.push(h);
+    }
+    let mut w = town(7, &houses);
+    let car_of = |w: &World, k: usize| {
+        w.cars
+            .iter()
+            .position(|c| !c.taxi && c.plot == k as u32)
+            .expect("its car")
+    };
+    let cars: Vec<usize> = (1..=4).map(|k| car_of(&w, k)).collect();
+    // (The first two away, to come home as the taxi comes.)
+    for (k, &c) in cars.iter().enumerate().take(2) {
+        w.cars[c].state = CarState::Away;
+        w.cars[c].aboard = vec![k as u32 + 1];
+        w.sims[k + 1].away_until = Some(w.tick + 100_000);
+    }
+    let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
+    let (mut home, mut off) = (false, None);
+    let mut passed = false;
+    let taxi_at = |w: &World| {
+        w.cars
+            .iter()
+            .find(|c| c.taxi && c.state == CarState::Arriving)
+            .and_then(|c| c.shown)
+    };
+    while w.tick < end && off.is_none_or(|t| w.tick < t + 4000) {
+        w.tick_once();
+        no_overlaps(&w);
+        passed |= cars.iter().any(|&c| {
+            w.cars[c]
+                .pass_by
+                .is_some_and(|p| w.cars[c].progress > p.out && w.cars[c].progress < p.back)
+        });
+        if each(&w, &cars) {
+            return passed;
+        }
+        let taxi = taxi_at(&w);
+        if !home && taxi.is_some_and(|s| s.0[0] < 585.0) {
+            for (k, &c) in cars.iter().enumerate().take(2) {
+                drive(&mut w, c, k as u32 + 1, true);
+            }
+            home = true;
+        }
+        if home && off.is_none() && w.cars.iter().any(|c| c.taxi && c.standing) {
+            for (k, &c) in cars.iter().enumerate().skip(2) {
+                drive(&mut w, c, k as u32 + 1, false);
+            }
+            off = Some(w.tick);
+        }
+    }
+    assert!(off.is_some(), "the taxi never came and stood");
+    for (k, &c) in cars.iter().enumerate() {
+        let want = if k < 2 {
+            CarState::Parked
+        } else {
+            CarState::Away
+        };
+        assert_eq!(w.cars[c].state, want, "car {k} isn't through");
+    }
+    passed
+}
+
+#[test]
+fn round_a_work_taxi_standing_at_the_kerb_cars_both_ways_never_touch() {
+    // Whoever goes out round the taxi, waits its turn or turns round, no two cars ever touch
+    // (bodies nearer than a centimetre, one of them on the move), one goes out round it, and
+    // everyone gets where they were going (`cars_round_a_standing_taxi`).
+    let passed = cars_round_a_standing_taxi(|w, _| {
+        let moving: Vec<usize> = (0..w.cars.len())
+            .filter(|&c| w.cars[c].shown.is_some_and(|s| s.2))
+            .collect();
+        for &a in &moving {
+            for b in 0..w.cars.len() {
+                if b != a && w.cars[b].shown.is_some() && (b > a || !moving.contains(&b)) {
+                    let g = gap_between(w, a, b);
+                    assert!(
+                        g >= 0.01,
+                        "cars {a} and {b} touch ({g:.3} m), tick {}",
+                        w.tick
+                    );
+                }
+            }
+        }
+        false
+    });
+    assert!(passed, "nobody went out round the taxi");
+}
+
+#[test]
+fn a_game_saved_with_a_car_part_way_round_a_standing_taxi_loads_with_it_where_it_was() {
+    // Saved as one is out round the taxi in the other lane (`cars_round_a_standing_taxi`), and
+    // loaded: it's where it was (`cars::PassBy`, saved with it), not back in its own lane on top of
+    // the taxi, and goes on by as before, touching nobody, never jumping.
+    let mut saved = None;
+    cars_round_a_standing_taxi(|w, cars| {
+        saved = cars
+            .iter()
+            .copied()
+            .find(|&c| {
+                w.cars[c]
+                    .pass_by
+                    .is_some_and(|p| w.cars[c].progress > (p.out + p.back) / 2.0)
+            })
+            .map(|c| (c, w.cars[c].shown.expect("on the street").0, w.save_json()));
+        saved.is_some()
+    });
+    let (c, at, json) = saved.expect("nobody went out round the taxi");
+    let mut l = World::from_save_json(&common::content(), &json).unwrap();
+    let mut was = None;
+    for _ in 0..300 {
+        l.tick_once();
+        no_overlaps(&l);
+        let Some(s) = l.cars[c].shown else { break };
+        let (from, limit) = match was {
+            None => (at, 0.5),
+            Some(p) => (p, 0.6),
+        };
+        let step = (s.0[0] - from[0]).hypot(s.0[1] - from[1]);
+        assert!(
+            step < limit,
+            "it moved {step:.2} m at once, to {:?} from {from:?}",
+            s.0
+        );
+        was = Some(s.0);
+    }
+}
+
 #[test]
 fn a_car_held_up_by_a_crowd_crossing_in_front_of_it_gets_its_gap() {
     // (As at Willowley's busy corner: seven on foot crossing the street back and forth in front of
@@ -1237,7 +1521,9 @@ fn a_house_with_one_stand_clear_of_the_driveways_has_its_taxi_for_each_run_an_ho
 fn a_taxi_held_still_where_nothing_gives_gives_its_way_up_and_its_riders_still_go_by_taxi() {
     // A car stands across the street between the way in and the rider's house, its household's
     // and never driven: every taxi coming in is held behind it. Held still LONE_STILL (30 min),
-    // a taxi gives its way up and goes, off the road, so nobody behind it waits on it. A rider it
+    // a taxi gives its way up; in sight, as everything is here, it stays on the road and drives
+    // off once it can turn round (`cars::drive_off`: the owner's rule, nothing vanishes in view;
+    // out of sight it would be gone at once). A rider it
     // was to pick up is booked again; a rider it was taking home, a long walk from where it was
     // held, isn't let out to walk it (walks of hours, all night) but waits at work for another
     // run.
@@ -1281,10 +1567,12 @@ fn a_taxi_held_still_where_nothing_gives_gives_its_way_up_and_its_riders_still_g
             if w.taxis.runs.iter().any(|r| r.id == id) {
                 continue;
             }
+            // (In sight, as everything is here, it never leaves the road on the spot: it drives
+            // off out of town once it can turn round, `cars::drive_off`; the owner's rule.)
             let k = &w.cars[car.unwrap() as usize];
             assert!(
-                k.shown.is_none(),
-                "the taxi gave its way up but is still on the road"
+                k.shown.is_some(),
+                "the taxi gave its way up in sight and left the road where it was"
             );
             first.get_or_insert(id);
         }
@@ -1325,8 +1613,8 @@ fn a_taxi_held_still_where_nothing_gives_gives_its_way_up_and_its_riders_still_g
     }
     let (id, _, car, _) = held_home.expect("A's run home never gave its way up behind the car");
     assert!(
-        w.cars[car.unwrap() as usize].shown.is_none(),
-        "the taxi gave its way up but is still on the road"
+        w.cars[car.unwrap() as usize].shown.is_some(),
+        "the taxi gave its way up in sight and left the road where it was"
     );
     // (Not let out on foot a long way from home: away at work, on another run home.)
     let a = &w.sims[0];
@@ -1335,6 +1623,69 @@ fn a_taxi_held_still_where_nothing_gives_gives_its_way_up_and_its_riders_still_g
         "A was let out to walk home: {:?} at {:?}",
         a.current().map(|x| x.task.kind),
         a.pos
+    );
+}
+
+#[test]
+fn a_taxi_turned_round_in_a_hold_up_loads_where_it_was_on_the_way_it_turned_round_to() {
+    // As above, a car across the street, and a side street joining it behind (at x 340, from
+    // the way in): a taxi held behind it in sight turns round (`cars::unjam`), backing up out of
+    // the junction it came through. Saved as it backs up and loaded, it's where it was, on the
+    // way it turned round to (`Run::detour`), not back on the way it had been held up on.
+    let pts: Vec<String> = (0..=40)
+        .map(|z| format!("[340.5,{}]", STREET + z as f32))
+        .collect();
+    let side = format!(
+        r#"{{"points":[{}],"width":7,"kind":"street","ends":["join","dead"]}}"#,
+        pts.join(",")
+    );
+    let mut car = house(300, &[]);
+    car.car = true;
+    let mut w = town_with(7, &[house(100, &[&worker("A")]), car], |_| 0.0, &[side]);
+    let c = w
+        .cars
+        .iter()
+        .position(|k| !k.taxi)
+        .expect("the household's car");
+    w.cars[c].spot = [303.5, STREET];
+    w.cars[c].yaw = std::f32::consts::FRAC_PI_2;
+    let day3 = sim_core::clock::tick_at(3, 0.0).unwrap();
+    // (On its run still: not one given up, driving off out of town.)
+    let turned = |w: &World| {
+        w.taxis.runs.iter().filter_map(|r| r.car).find_map(|t| {
+            let k = &w.cars[t as usize];
+            (k.detour.is_some() && k.progress > 20.0).then_some(t as usize)
+        })
+    };
+    while w.tick < day3 && turned(&w).is_none() {
+        w.tick_once();
+    }
+    let t = turned(&w).unwrap_or_else(|| {
+        panic!(
+            "no taxi turned round behind the car: unjams {}, none could {:?}",
+            w.traffic.unjams, w.traffic.unjam_impossible
+        )
+    });
+    let mut loaded = World::from_save_json(&common::content(), &w.save_json()).unwrap();
+    w.tick_once();
+    loaded.tick_once();
+    let at = w.cars[t].shown.expect("the taxi on the road").0;
+    let there = loaded
+        .cars
+        .iter()
+        .filter(|k| k.taxi && k.detour.is_some())
+        .filter_map(|k| k.shown)
+        .map(|s| (s.0[0] - at[0]).hypot(s.0[1] - at[1]))
+        .fold(f32::INFINITY, f32::min);
+    assert!(
+        there < 0.05,
+        "loaded {there:.2} m from where it was, turned round: {:?}",
+        loaded
+            .cars
+            .iter()
+            .filter(|k| k.taxi)
+            .map(|k| (k.shown.map(|s| s.0), k.detour.is_some()))
+            .collect::<Vec<_>>()
     );
 }
 

@@ -284,6 +284,11 @@ fn come_home(w: &mut World, c: usize) {
 /// How far two of `w`'s cars' bodies overlap at most where they're drawn, one of them on the move
 /// (m; 0 or less: apart), and which.
 fn cars_overlap(w: &World) -> (f32, usize, usize) {
+    overlap_where(w, |_| true)
+}
+
+/// As `cars_overlap`, of the pairs one of which is `counted`.
+fn overlap_where(w: &World, counted: impl Fn(usize) -> bool) -> (f32, usize, usize) {
     let corners = |p: [f32; 2], yaw: f32, len: f32, wid: f32| {
         let (s, c) = yaw.sin_cos();
         let (f, r) = (
@@ -327,7 +332,7 @@ fn cars_overlap(w: &World) -> (f32, usize, usize) {
     let mut worst = (f32::NEG_INFINITY, 0, 0);
     for (i, a) in shown.iter().enumerate() {
         for b in &shown[i + 1..] {
-            if a.1 || b.1 {
+            if (a.1 || b.1) && (counted(a.0) || counted(b.0)) {
                 let d = depth(&a.2, &b.2);
                 if d > worst.0 {
                     worst = (d, a.0, b.0);
@@ -1193,5 +1198,367 @@ fn a_car_pulling_up_at_a_light_resting_on_another_arms_green_gets_its_turn_soon(
         through - start < 50 * 20 + 3 * 60 * 20,
         "through after {} s, the lights resting at {resting:?}",
         (through - start) / 20
+    );
+}
+
+// ---- Out of sight (`cars::sight`) ---------------------------------------------------------------
+
+/// The crossroads (`crossroads`) with four houses up either dead-end arm, their cars always coming
+/// and going (`keep_driving`): they hold each other up there by turns.
+fn crowded_crossroads() -> World {
+    crossroads(&[
+        crossroads_house(150.0, true),
+        crossroads_house(160.0, true),
+        crossroads_house(170.0, true),
+        crossroads_house(180.0, true),
+        crossroads_house(220.0, false),
+        crossroads_house(230.0, false),
+        crossroads_house(240.0, false),
+        crossroads_house(250.0, false),
+    ])
+}
+
+/// The cars of `w` waiting for each other round (by their `cars::car_key`s): a ring in who waits
+/// for whom (`traffic::waits_on`), else none.
+fn ring(w: &World) -> Vec<u64> {
+    use sim_core::traffic::waits_on;
+    for c in 0..w.cars.len() {
+        let (start, mut path) = (sim_core::cars::car_key(c), Vec::new());
+        let mut at = start;
+        while let Some(&next) = waits_on(w, at).iter().find(|&&k| k >= 1 << 63) {
+            path.push(at);
+            if next == start {
+                return path;
+            }
+            if path.contains(&next) || path.len() > w.cars.len() {
+                break;
+            }
+            at = next;
+        }
+    }
+    Vec::new()
+}
+
+/// Every car's state as a test compares it: where along its way, where it's drawn, whether in
+/// sight, whom it waits for.
+fn cars_now(w: &World) -> Vec<String> {
+    w.cars
+        .iter()
+        .map(|c| {
+            format!(
+                "{:?} {:.4} {:?} {:?} {:?} {:.4}",
+                c.state, c.progress, c.shown, c.sight, c.waits_for, c.shift
+            )
+        })
+        .collect()
+}
+
+/// A watch far off the crossroads: nothing near it is in sight.
+const ELSEWHERE: [i32; 4] = [0, 0, 64, 64];
+
+#[test]
+fn cars_holding_each_other_up_out_of_sight_go_on_at_once() {
+    // The crowded crossroads looked at (a watch over all of it) till cars there wait for each
+    // other round a while; then the camera goes elsewhere.
+    let mut w = crowded_crossroads();
+    w.set_watch(Some([0, 0, 400, 400]));
+    let mut held = 0;
+    let mut cars = Vec::new();
+    for _ in 0..3 * 60 * 20 {
+        keep_driving(&mut w);
+        w.tick_once();
+        let r = ring(&w);
+        held = if r.is_empty() { 0 } else { held + 1 };
+        if held >= 10 {
+            cars = r;
+            break;
+        }
+    }
+    assert!(
+        !cars.is_empty(),
+        "no ring of cars waiting for each other formed"
+    );
+    let at = |w: &World, k: u64| w.cars[(k & !(1 << 63)) as usize].progress;
+    let from: Vec<f32> = cars.iter().map(|&k| at(&w, k)).collect();
+    w.set_watch(Some(ELSEWHERE));
+    // Out of sight they drive through each other: in a couple of game minutes each has gone on
+    // well along its way, and nobody waits for anyone.
+    for t in 0..2 * 20 {
+        keep_driving(&mut w);
+        w.tick_once();
+        for c in 0..w.cars.len() {
+            let car = &w.cars[c];
+            if matches!(car.state, CarState::Leaving | CarState::Arriving) {
+                assert_eq!(
+                    car.sight,
+                    sim_core::cars::Sight::Ghost,
+                    "car {c} out of sight"
+                );
+                assert!(
+                    sim_core::traffic::waits_on(&w, sim_core::cars::car_key(c)).is_empty(),
+                    "car {c} waits out of sight, tick {t}"
+                );
+            }
+        }
+    }
+    for (k, from) in cars.iter().zip(from) {
+        let car = &w.cars[(k & !(1 << 63)) as usize];
+        assert!(
+            car.progress >= from + 30.0
+                || !matches!(car.state, CarState::Leaving | CarState::Arriving),
+            "car {k:x} went from {from} to {} only",
+            car.progress
+        );
+    }
+}
+
+#[test]
+fn a_car_coming_into_sight_never_overlaps_one_there() {
+    // Two cars coming home by the same way at the same tick, the way in out of sight: there they
+    // drive in on top of each other (out of sight nobody waits for anyone).
+    let mut w = street(7.0, &[(80.0, true), (90.0, true)]);
+    let watch = [70, 0, 200, 60];
+    w.set_watch(Some(watch));
+    come_home(&mut w, 0);
+    come_home(&mut w, 1);
+    let mut together = false;
+    let mut waited = false;
+    for _ in 0..4000 {
+        w.tick_once();
+        let (a, b) = (w.cars[0].shown, w.cars[1].shown);
+        together |= a.zip(b).is_some_and(|(a, b)| a.0 == b.0 && a.2);
+        waited |= w
+            .cars
+            .iter()
+            .any(|c| matches!(c.sight, sim_core::cars::Sight::Wait(_)));
+        // Never on top of each other where either is drawn, nor both in sight.
+        let drawn = common::drawn(&w, Some(watch));
+        let (o, a, b) = overlap_where(&w, |c| drawn[c]);
+        assert!(
+            o <= 0.0,
+            "cars {a} and {b} overlap by {o:.2} m where they're drawn"
+        );
+        let (o, a, b) = overlap_where(&w, |c| w.cars[c].sight == sim_core::cars::Sight::Seen);
+        let both = w.cars[a].sight == sim_core::cars::Sight::Seen
+            && w.cars[b].sight == sim_core::cars::Sight::Seen;
+        assert!(
+            o <= 0.0 || !both,
+            "cars {a} and {b}, both in sight, overlap by {o:.2} m"
+        );
+        if w.cars.iter().all(|c| c.state == CarState::Parked) {
+            break;
+        }
+    }
+    assert!(together, "they came in on top of each other out of sight");
+    assert!(
+        waited,
+        "one waited outside the seen area for its way in to clear"
+    );
+    assert!(
+        w.cars.iter().all(|c| c.state == CarState::Parked),
+        "both home"
+    );
+}
+
+#[test]
+fn the_camera_coming_to_two_cars_on_top_of_each_other_shows_them_apart() {
+    // Two cars coming home by the same way at the same tick, out of sight: on top of each other.
+    let mut w = street(7.0, &[(60.0, true), (70.0, true)]);
+    w.set_watch(Some([190, 0, 200, 60]));
+    come_home(&mut w, 0);
+    come_home(&mut w, 1);
+    let together = |w: &World| {
+        w.cars[0]
+            .shown
+            .zip(w.cars[1].shown)
+            .is_some_and(|(a, b)| a.0 == b.0 && a.2)
+    };
+    for _ in 0..200 {
+        w.tick_once();
+        if together(&w) && w.cars[0].shown.is_some_and(|s| s.0[0] > 20.0) {
+            break;
+        }
+    }
+    assert!(
+        together(&w),
+        "they drove in on top of each other out of sight"
+    );
+    // The camera comes to them: the next picture has both, apart.
+    w.set_watch(Some([0, 0, 200, 60]));
+    w.tick_once();
+    let hidden = sim_core::cars::hidden(&w.cars);
+    assert!(!hidden[0] && !hidden[1], "both drawn: {hidden:?}");
+    assert!(
+        w.cars
+            .iter()
+            .all(|c| c.sight == sim_core::cars::Sight::Seen),
+        "both in sight"
+    );
+    let (o, a, b) = cars_overlap(&w);
+    assert!(o <= -0.15, "cars {a} and {b} {:.2} m apart at most", -o);
+    let done = run_clear(
+        &mut w,
+        4000,
+        |_| {},
+        |w| w.cars.iter().all(|c| c.state == CarState::Parked),
+    );
+    assert!(done, "both home");
+}
+
+#[test]
+fn in_sight_the_cars_go_as_without_a_watch() {
+    // The crowded crossroads with a watch over all of it, and with none: tick for tick the same.
+    let mut a = crowded_crossroads();
+    let mut b = crowded_crossroads();
+    b.set_watch(Some([0, 0, 400, 400]));
+    for t in 0..2 * 60 * 20 {
+        keep_driving(&mut a);
+        keep_driving(&mut b);
+        a.tick_once();
+        b.tick_once();
+        assert_eq!(cars_now(&a), cars_now(&b), "tick {t}");
+    }
+}
+
+#[test]
+fn with_the_same_watches_the_cars_go_the_same_way_and_none_in_sight_waits_for_one_out_of_it() {
+    // The camera moving round the crowded crossroads (and off it, and the watch cleared), the same
+    // way twice: tick for tick the same. Nobody waits for a car out of sight, and no two cars
+    // overlap where one of them is drawn.
+    let watches: [Option<[i32; 4]>; 6] = [
+        Some([0, 0, 400, 400]),
+        Some([150, 150, 250, 250]),
+        Some(ELSEWHERE),
+        None,
+        Some([192, 100, 256, 192]),
+        Some([136, 192, 200, 300]),
+    ];
+    let run = || {
+        let mut w = crowded_crossroads();
+        let mut states = Vec::new();
+        for t in 0..3 * 60 * 20 {
+            let watch = watches[(t / 150) % watches.len()];
+            w.set_watch(watch);
+            keep_driving(&mut w);
+            w.tick_once();
+            for c in 0..w.cars.len() {
+                for k in sim_core::traffic::waits_on(&w, sim_core::cars::car_key(c)) {
+                    let other = w
+                        .cars
+                        .get((k & !(1 << 63)) as usize)
+                        .filter(|_| k >= 1 << 63);
+                    assert!(
+                        other.is_none_or(|o| o.sight == sim_core::cars::Sight::Seen),
+                        "car {c} waits for car {k:x}, out of sight, tick {t}"
+                    );
+                }
+            }
+            let drawn = common::drawn(&w, watch);
+            let (o, a, b) = overlap_where(&w, |c| drawn[c]);
+            assert!(
+                o <= 0.05,
+                "cars {a} and {b} overlap by {o:.2} m where drawn, tick {t}"
+            );
+            states.push(cars_now(&w));
+        }
+        states
+    };
+    let (first, second) = (run(), run());
+    assert!(first == second, "the two runs went differently");
+}
+
+// ---- Held up in sight: turning round (`cars::unjam`) -------------------------------------------
+
+#[test]
+fn a_car_held_up_for_good_in_sight_backs_out_of_the_junction_and_goes_another_way() {
+    // A car off to work from up the crossroads' north arm; past the junction, a neighbour's car is left
+    // across the arm it took, never to be driven: held up behind it a few minutes, it backs up
+    // out of the junction it came through (into clear room, never into anyone) and goes out of
+    // town the other way.
+    let mut w = crossroads(&[
+        crossroads_house(150.0, true),
+        crossroads_house(250.0, false),
+        crossroads_house(260.0, false),
+    ]);
+    set_off(&mut w, 0);
+    let mut past = None;
+    for _ in 0..3000 {
+        w.tick_once();
+        if let Some((p, yaw, true, _)) = w.cars[0].shown
+            && (p[0] - 200.0).abs() > 12.0
+            && (p[1] - 200.0).abs() < 4.0
+        {
+            past = Some((p, yaw));
+            break;
+        }
+    }
+    let (p, yaw) = past.unwrap_or_else(|| {
+        panic!(
+            "it drove out past the junction: {:?} {:?} prog {} waits {:?} unjams {}",
+            w.cars[0].state,
+            w.cars[0].shown,
+            w.cars[0].progress,
+            sim_core::traffic::waits_on(&w, sim_core::cars::car_key(0)),
+            w.traffic.unjams
+        )
+    });
+    // (Across the arm 15 m on, never driven: another house's car, parked there.)
+    let way = [yaw.sin(), yaw.cos()];
+    w.cars[1].spot = [p[0] + way[0] * 15.0, 200.0];
+    w.cars[1].yaw = 0.0;
+    let went = run_clear(
+        &mut w,
+        20 * 60 * 20,
+        |_| {},
+        |w| w.cars[0].state == CarState::Away,
+    );
+    assert!(w.traffic.unjams >= 1, "it never turned round");
+    assert!(went, "it never got out of town: {:?}", w.cars[0].shown);
+    // (Out the other way: it backed out of the arm it was held up on.)
+    assert!(
+        w.cars[0].detour.is_none() || w.cars[0].state == CarState::Away,
+        "still turned round"
+    );
+}
+
+#[test]
+fn a_car_held_up_with_no_room_behind_it_to_turn_round_is_counted_and_never_backs_into_anyone() {
+    // As above, but another car right behind it, the way it came, standing (left there, never
+    // driven): it can't back up, and nobody turns round; the ring is counted, with why.
+    let mut w = crossroads(&[
+        crossroads_house(150.0, true),
+        crossroads_house(250.0, false),
+        crossroads_house(260.0, false),
+    ]);
+    set_off(&mut w, 0);
+    let mut past = None;
+    for _ in 0..3000 {
+        w.tick_once();
+        if let Some((p, yaw, true, _)) = w.cars[0].shown
+            && (p[0] - 200.0).abs() > 12.0
+            && (p[1] - 200.0).abs() < 4.0
+        {
+            past = Some((p, yaw));
+            break;
+        }
+    }
+    let (p, yaw) = past.expect("it drove out past the junction");
+    let way = [yaw.sin(), yaw.cos()];
+    w.cars[1].spot = [p[0] + way[0] * 15.0, 200.0];
+    w.cars[1].yaw = 0.0;
+    // (Right behind it, across its lane.)
+    w.cars[2].spot = [p[0] - way[0] * 4.0, 200.0];
+    w.cars[2].yaw = 0.0;
+    let went = run_clear(
+        &mut w,
+        20 * 60 * 20,
+        |_| {},
+        |w| w.cars[0].state == CarState::Away,
+    );
+    assert!(!went, "it got by");
+    assert_eq!(w.traffic.unjams, 0, "it turned round with no room");
+    assert!(
+        w.traffic.unjam_impossible.values().sum::<u64>() >= 1,
+        "the ring wasn't counted"
     );
 }
