@@ -344,6 +344,7 @@ fn a_visitor_is_refused_the_households_own_things() {
         offer_at: 0,
         arrived: 0,
         leaving: false,
+        home_by: false,
     });
     for _ in 0..ticks(12.0 * 60.0) {
         w.tick_once();

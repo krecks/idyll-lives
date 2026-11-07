@@ -391,6 +391,25 @@
             "creativity": 0.05
           },
           "skill": "cooking"
+        },
+        {
+          "id": "bakeCake",
+          "label": "Bake a cake",
+          "recipe": "cake",
+          "anim": "cook",
+          "effects": {
+            "fun": 0.1
+          },
+          "tags": [
+            "food",
+            "cooking",
+            "creative"
+          ],
+          "skills": {
+            "cooking": 0.15,
+            "creativity": 0.05
+          },
+          "skill": "cooking"
         }
       ]
     },
@@ -453,6 +472,25 @@
           "id": "bake",
           "label": "Bake treats",
           "recipe": "bakedTreats",
+          "anim": "cook",
+          "effects": {
+            "fun": 0.1
+          },
+          "tags": [
+            "food",
+            "cooking",
+            "creative"
+          ],
+          "skills": {
+            "cooking": 0.15,
+            "creativity": 0.05
+          },
+          "skill": "cooking"
+        },
+        {
+          "id": "bakeCake",
+          "label": "Bake a cake",
+          "recipe": "cake",
           "anim": "cook",
           "effects": {
             "fun": 0.1
@@ -2355,6 +2393,7 @@
       "surface": {
         "height": 0.89,
         "kind": "shelf",
+        "dressed": true,
         "size": [
           1.44,
           0.52
@@ -2510,6 +2549,7 @@
           "id": "use",
           "label": "Use toilet",
           "anim": "toilet",
+          "lasts": true,
           "endSound": "flush",
           "minutes": 5,
           "after": "handwash",
@@ -2542,6 +2582,7 @@
           "id": "use",
           "label": "Use toilet",
           "anim": "toilet",
+          "lasts": true,
           "endSound": "flush",
           "minutes": 5,
           "after": "handwash",
@@ -3235,6 +3276,7 @@
       "surface": {
         "height": 0.75,
         "kind": "desk",
+        "dressed": true,
         "size": [
           1.54,
           0.42
@@ -3299,6 +3341,7 @@
       "surface": {
         "height": 0.75,
         "kind": "desk",
+        "dressed": true,
         "size": [
           0.9,
           0.42
@@ -4564,9 +4607,9 @@
       "light": {
         "aim": "down",
         "range": 5.0,
-        "intensity": 1.0,
+        "intensity": 1.5,
         "height": 2.16,
-        "tiles": 16
+        "tiles": 8
       },
       "description": "A frosted dome on a short cord, hung high enough to walk under.",
       "interactions": []
@@ -4587,7 +4630,7 @@
       "decor": 0.1,
       "light": {
         "range": 5.0,
-        "intensity": 0.9,
+        "intensity": 1.15,
         "height": 2.3,
         "tiles": 20
       },
@@ -4636,9 +4679,9 @@
       "light": {
         "aim": "down",
         "range": 5.0,
-        "intensity": 1.0,
+        "intensity": 1.4,
         "height": 1.9,
-        "tiles": 14
+        "tiles": 7
       },
       "description": "An enamel factory shade on a chain.",
       "interactions": []
@@ -4659,7 +4702,7 @@
       "decor": 0.2,
       "light": {
         "range": 4.5,
-        "intensity": 0.8,
+        "intensity": 0.95,
         "height": 2.4,
         "tiles": 14
       },

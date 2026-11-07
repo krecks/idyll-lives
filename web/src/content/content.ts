@@ -338,9 +338,11 @@ export interface ObjectDef {
   /**
    * A top small things stand on: its height (m), kind, and the margin kept clear along its edges
    * (m, default 0.04); its width and depth (m, default the footprint's) and where its middle is off
-   * the footprint's middle (m, to the object's right and front; default [0, 0]).
+   * the footprint's middle (m, to the object's right and front; default [0, 0]). `dressed`: its
+   * model brings its own things on the top (a dresser's vase and picture, a desk's monitor), so a
+   * generated house puts nothing more there.
    */
-  surface?: { height: number; kind: SurfaceKind; inset?: number; size?: [number, number]; at?: [number, number] };
+  surface?: { height: number; kind: SurfaceKind; inset?: number; size?: [number, number]; at?: [number, number]; dressed?: boolean };
   /** Things on the `surface` layer: the radius (m) of the disc they take on their host's top (default 0.12). */
   radius?: number;
   /**

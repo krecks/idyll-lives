@@ -8,6 +8,8 @@ export interface MenuState {
   objectId: number;
   /** A menu for food or a dish (an item) instead of an object: index 0 eats, 1 clears away. */
   itemId?: number;
+  /** A menu for a spot on the floor or the ground instead of an object: index 0 walks `sim` there. */
+  ground?: { x: number; z: number; sim: number };
   title: string;
   /** Canvas-relative CSS pixels. */
   x: number;

@@ -2524,7 +2524,7 @@
     },
     {
       "id": "sink",
-      "name": "Sink",
+      "name": "Kitchen sink",
       "model": "model.sink",
       "stations": [
         "dishes"
@@ -2548,22 +2548,25 @@
           ]
         },
         {
-          "id": "brushTeeth",
-          "label": "Brush your teeth",
+          "id": "washUp",
+          "label": "Wash the dishes",
+          "workOn": "dishes",
           "anim": "wash",
-          "minutes": 3,
+          "minutes": 15,
           "effects": {
-            "hygiene": 0.03
+            "comfort": 0.06
           },
           "tags": [
-            "hygiene",
-            "handwash"
-          ]
+            "chores",
+            "cleaning"
+          ],
+          "autonomous": false
         }
       ],
       "price": 180,
-      "category": "bathroom",
-      "group": "sinks"
+      "category": "kitchen",
+      "group": "counters",
+      "description": "A kitchen sink in a white cabinet: wash up after cooking, or just your hands. Teeth are brushed at a bathroom basin."
     },
     {
       "id": "bed",
@@ -2625,6 +2628,7 @@
           "id": "use",
           "label": "Use toilet",
           "anim": "toilet",
+          "lasts": true,
           "endSound": "flush",
           "minutes": 5,
           "after": "handwash",
@@ -4226,6 +4230,15 @@
       "radius": 0.13
     },
     {
+      "id": "cake",
+      "label": "Layer cake",
+      "model": "model.cakeStand",
+      "hold": "both",
+      "serving": "cakeSlice",
+      "emptyAs": "cakeStandDirty",
+      "radius": 0.19
+    },
+    {
       "id": "mealPlate",
       "label": "Plate of food",
       "model": "item.mealPlate",
@@ -4485,6 +4498,14 @@
       "hold": "both",
       "dirty": true,
       "radius": 0.13
+    },
+    {
+      "id": "cakeStandDirty",
+      "label": "Dirty cake stand",
+      "model": "item.cakeStandDirty",
+      "hold": "both",
+      "dirty": true,
+      "radius": 0.14
     },
     {
       "id": "batterBowl",
@@ -4917,6 +4938,56 @@
             "oven"
           ],
           "minutes": 30,
+          "anim": "bake"
+        }
+      ]
+    },
+    {
+      "id": "cake",
+      "label": "Bake a cake",
+      "item": "cake",
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
+      "servings": [
+        4,
+        8
+      ],
+      "costPerServing": 3,
+      "effects": {
+        "hunger": 0.4,
+        "fun": 0.2
+      },
+      "eatMinutes": 15,
+      "steps": [
+        {
+          "label": "Get ingredients",
+          "at": [
+            "ingredients"
+          ],
+          "minutes": 3,
+          "anim": "fetch",
+          "holds": "ingredients"
+        },
+        {
+          "label": "Mix the batter",
+          "at": [
+            "prep"
+          ],
+          "minutes": 15,
+          "anim": "mix",
+          "optional": true,
+          "holds": "batterBowl"
+        },
+        {
+          "label": "Bake",
+          "at": [
+            "oven"
+          ],
+          "minutes": 40,
           "anim": "bake"
         }
       ]

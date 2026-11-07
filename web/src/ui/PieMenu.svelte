@@ -6,8 +6,8 @@
 
   const RADIUS = 96;
   const menu = $derived(game.menu);
-  /** Who does it: the household member last looked at. */
-  const actor = $derived(game.sims.find((s) => s.id === game.selected));
+  /** Who does it: the household member last looked at (or, on the floor, the one it walks). */
+  const actor = $derived(game.sims.find((s) => s.id === (menu?.ground?.sim ?? game.selected)));
   // Keep the ring on screen.
   const cx = $derived(menu ? Math.min(Math.max(menu.x, RADIUS + 80), innerWidth - RADIUS - 80) : 0);
   const cy = $derived(menu ? Math.min(Math.max(menu.y, RADIUS + 40), innerHeight - RADIUS - 40) : 0);
@@ -30,7 +30,14 @@
         style={position(i, menu.items.length)}
         disabled={item.disabled || poor}
         title={poor ? `Can't afford — costs ${money(item.cost ?? 0)}` : undefined}
-        onclick={() => (menu.itemId !== undefined ? services.controls.useItem(menu.itemId, item.index === 0 ? 'eat' : 'clear') : item.index < 0 ? services.controls.switchLamp(menu.objectId) : services.controls.useObject(menu.objectId, item.index))}
+        onclick={() =>
+          menu.ground
+            ? services.controls.walkTo(menu.ground.sim, menu.ground.x, menu.ground.z)
+            : menu.itemId !== undefined
+              ? services.controls.useItem(menu.itemId, item.index === 0 ? 'eat' : 'clear')
+              : item.index < 0
+                ? services.controls.switchLamp(menu.objectId)
+                : services.controls.useObject(menu.objectId, item.index)}
       >
         {item.label}{#if item.cost !== undefined}<span class="cost tabular" class:short={poor}> · {money(item.cost)}</span>{/if}
       </button>

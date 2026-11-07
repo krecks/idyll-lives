@@ -660,6 +660,11 @@ async function openSession(
       bridge.send({ type: 'useItem', sim: game.selected, item: itemId, action });
       game.menu = null;
     },
+    walkTo(sim, x, z) {
+      if (game.mode !== 'live') return;
+      bridge.send({ type: 'moveTo', sim, x, z });
+      game.menu = null;
+    },
     switchLamp(objectId) {
       if (game.mode !== 'live') return;
       bridge.send({ type: 'switchLamp', object: objectId, on: bridge.lampOff(objectId) });
@@ -1558,8 +1563,9 @@ async function openSession(
       const hit = renderer.pick(x, y);
       if (hit.itemId != null) return openItemMenu(hit.itemId, x, y);
       if (hit.objectId !== null) return openMenu(hit.objectId, x, y);
+      // The floor (or the ground): a menu with "Walk here", as an object's has its uses.
       if (actor !== null && hit.ground && inLot(hit.ground.x, hit.ground.z)) {
-        bridge.send({ type: 'moveTo', sim: actor, x: hit.ground.x, z: hit.ground.z });
+        game.menu = { objectId: -1, ground: { x: hit.ground.x, z: hit.ground.z, sim: actor }, title: 'Here', x, y, items: [{ label: 'Walk here', index: 0 }] };
       } else if (!direct) controls.inspect(null);
     },
     hover(x, y) {

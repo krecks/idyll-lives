@@ -63,7 +63,7 @@ sits on the top, turns with its facing and lights right at night.
 |---|---|---|---|---|---|---|
 | `fruitBowl` Fruit bowl | 1x1 · surface | fruit:fetch | tabletop / tableware | Body | Static | Static. |
 | `plateSet` Place setting | 1x1 · surface | — | tabletop / tableware | Body, Rim, Napkin | Static | Static. |
-| `cakeStand` Cake on a stand | 1x1 · surface | — | tabletop / tableware | Body, Icing | Static | Static. |
+| `cakeStand` Cake on a stand | 1x1 · surface | — | tabletop (not sold) | Body, Icing | Static | Static. Not sold since 0.7.0 (one standing stays): a cake is baked (recipe `cake`, item `cake`, drawn with this model). |
 | `teapotSet` Tea set | 1x1 · surface | tea:drink | tabletop / tableware | Body, Tray | Static | Static. |
 | `mugs` Mugs | 1x1 · surface | drink:drink | tabletop / tableware | Mug 1, Mug 2, Mug 3 | Static | Static. |
 | `wineGlasses` Wine and glasses | 1x1 · surface | wine:drink | tabletop / tableware | Body | Static | Static. |

@@ -212,9 +212,9 @@
       "light": {
         "aim": "down",
         "range": 5.0,
-        "intensity": 1.0,
+        "intensity": 1.6,
         "height": 2.5,
-        "tiles": 20
+        "tiles": 9
       },
       "description": "Three black spotlights on a white ceiling track.",
       "interactions": []

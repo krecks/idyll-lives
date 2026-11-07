@@ -175,11 +175,22 @@ fn the_toilet_before_leaving_for_work() {
     let job = w.sims[0].job.clone().unwrap();
     let (leave, ..) =
         life::shift_today(&w.content, &job, &w.sims[0].skills, w.tick).expect("a workday");
-    // An hour before they leave, up and about with a bladder not quite full.
+    // An hour before they leave, up and about with a bladder not quite full (breakfast over:
+    // the toilet after a meal, `dayRhythm.habits` `meal`, isn't the one this is about).
     let ready = (w.content.day_rhythm.ready_minutes / MINUTES_PER_TICK) as u64;
-    while w.tick < leave - ready - (15.0 / MINUTES_PER_TICK) as u64 {
+    let eating = |w: &World| {
+        matches!(
+            w.sims[0].current().map(|a| a.task.kind),
+            Some(TaskKind::Eat { .. })
+        )
+    };
+    while w.tick < leave - ready - (15.0 / MINUTES_PER_TICK) as u64 || eating(&w) {
         w.tick_once();
     }
+    assert!(
+        w.tick < leave - ready,
+        "breakfast went on into getting ready"
+    );
     full_but(&mut w, &[("bladder", 0.7), ("fun", 0.3)]);
     let b = need(&w, "bladder");
     let mut toilet_at = None;

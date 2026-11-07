@@ -5976,6 +5976,16 @@ fn step_sim(
     if sim.away_until.is_some() {
         return;
     }
+    // On an outing: home by the hour from where they are now, looked at once a minute (wandered
+    // off to the far end of the park, the way back to the bike is longer than from the way in).
+    if let Some(v) = sim.visiting.filter(|v| v.home_by && v.arrived > 0)
+        && (ctx.tick + u64::from(sim.id)).is_multiple_of(crate::TICKS_PER_MINUTE)
+        && let Some(t) = outing_leave_by(sim, ctx, objects, v.plot, sim.pos)
+        && t < v.until
+        && let Some(v) = sim.visiting.as_mut()
+    {
+        v.until = t;
+    }
 
     // The house changed under them since their last turn: a wall where they were going, or a
     // door opened.
@@ -6567,9 +6577,15 @@ fn pick_autonomous(
         false,
     );
     // How far away the nearest thing for each need is, and how long until they leave for work
-    // or school (minutes).
+    // or school, or head home from where they're visiting (an outing ends in time to be home by
+    // `visits.outingHomeBy`) (minutes).
     let reach = reach(sim, ctx, objects, usable, walk_per_minute);
-    let until_leave = leave_today(sim, ctx).map(|t| (t - ctx.tick) as f32 * MINUTES_PER_TICK);
+    let visit_end = sim.visiting.filter(|v| v.arrived > 0).map(|v| v.until);
+    let until_leave = leave_today(sim, ctx)
+        .into_iter()
+        .chain(visit_end)
+        .min()
+        .map(|t| t.saturating_sub(ctx.tick) as f32 * MINUTES_PER_TICK);
     // The last grown-up at home with a baby doesn't go out (`life::minding_baby`), unless for
     // an essential need about to run out that home has nothing for.
     let minding = crate::life::minding_baby(sim, ctx);
@@ -6800,7 +6816,8 @@ fn pick_autonomous(
             }
             // Not something long another need would run out before the end of, counting the way
             // there and from there to what fills it (only what would wake them counts for a
-            // night's sleep): that first. Nor what they couldn't finish before leaving for work.
+            // night's sleep): that first. Nor what they couldn't finish before leaving for work,
+            // or before an outing's time is up.
             let watch =
                 fillable & !fills & !urgent & if sleep { rhythm.wake_for } else { u32::MAX };
             if runs_out(
@@ -9004,8 +9021,14 @@ fn use_object(
             .as_ref()
             .is_some_and(|a| !a.task.directed && !a.task.routine);
         let left = total - elapsed;
+        // Time to head home from where they're visiting (an outing's end, `visits.outingHomeBy`):
+        // what they chose themselves there ends there and then (up off the park bench), so
+        // they're home by the hour.
+        let heading_home = sim.visiting.is_some_and(|v| v.arrived > 0)
+            && sim.queue.iter().any(|t| matches!(t.kind, TaskKind::GoHome));
         let drained = emptying
             || (urgent && planned)
+            || (chosen && heading_home)
             || (chosen && breaks_off(sim, content, pressing, fills, left, inter, low));
         let routine = sim.current.as_ref().is_some_and(|a| a.task.routine);
         // Practising a skill they still want to (as when choosing: at home or in a public place)
@@ -9016,12 +9039,16 @@ fn use_object(
             && access(ctx, sim, ctx.object_plot[obj.id as usize]) == Access::Full
             && training_interest(sim, content, inter) > MIN_AUTONOMY_SCORE;
         // A job that changes the thing as the hands go (hanging out the washing, a harvest) goes on to
-        // its end, and clothes are changed all the way, whatever it does for comfort; so does
+        // its end, clothes are changed all the way, whatever it does for comfort, and a use that
+        // `lasts` (the toilet) takes its time however soon the bladder is empty, once begun (one
+        // with nothing to fill at all is given up on its first tick) and while it isn't time to
+        // head home (an outing's end, `visits.outingHomeBy`); so does
         // loading a machine or emptying it, or anything that leaves a load to work on next.
         // So does a game for two: one stopping would end it for the other.
         let job = inter.gradual
             || inter.picks
             || inter.changes_outfit
+            || (inter.lasts && elapsed > minutes && !heading_home)
             || inter.partner
             || inter.loads
             || inter.unloads
@@ -9286,6 +9313,7 @@ fn arrive(
                     } else {
                         leave_by.map_or(until, |t| until.min(t))
                     };
+                    v.home_by = leave_by.is_some();
                     v.arrived = ctx.tick;
                 }
                 sim.current = None;

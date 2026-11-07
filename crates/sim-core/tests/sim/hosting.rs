@@ -71,6 +71,7 @@ fn hosting(content: &str) -> World {
         offer_at: 0,
         arrived: 0,
         leaving: false,
+        home_by: false,
     });
     w
 }
@@ -286,6 +287,7 @@ fn without_a_fridge_nobody_offers_anything() {
         offer_at: 0,
         arrived: 0,
         leaving: false,
+        home_by: false,
     });
     let mut watch = common::Watch::new();
     for _ in 0..60 * TICKS_PER_MINUTE {

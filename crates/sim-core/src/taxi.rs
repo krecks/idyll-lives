@@ -3822,6 +3822,7 @@ mod leisure_leaving_tests {
             offer_at: 0,
             arrived: tick,
             leaving: false,
+            home_by: false,
         });
         assert!(w.objects[chair as usize].reserve(i as u32, 1));
         let task = |kind| Task {

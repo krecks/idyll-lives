@@ -83,6 +83,11 @@ pub struct Visit {
     /// run out (`end_visit_if_due`): withdrawn once it no longer is (seen to there). Not saved.
     #[serde(skip)]
     pub leaving: bool,
+    /// An outing that ends in time to be home by `visits.outingHomeBy` (`world::outing_leave_by`):
+    /// its end comes forward as they wander further from the way home. Not saved: after a load it
+    /// keeps the end it has.
+    #[serde(skip)]
+    pub home_by: bool,
 }
 
 /// A change in where a Sim is (or what it finished), raised by tasks and handled by `life::update`.
@@ -1139,6 +1144,7 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
                 offer_at: 0,
                 arrived: 0,
                 leaving: false,
+                home_by: false,
             });
             // With door rules the story is told when they're let in (`answer`).
             if w.content.visits.door.is_some() && !w.plots[plot as usize].public {
