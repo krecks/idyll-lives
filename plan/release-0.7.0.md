@@ -53,7 +53,11 @@ Player notes: the `## 0.7.0` section of [CHANGELOG.md](../CHANGELOG.md), also in
 
 Run 2026-11-03/04 on CI's Bun 1.4.3: all green.
 
-Still to run before the release PR, as for 0.6.0: the voice's tests (`cargo test -p voice --release --locked`, `bun run check:voice`), tickbench, the production build and its size, the generated-world tests ten times or more on fresh worlds, and the game played: a new Cosy, Normal and Big game (riders on the road, a bike's spot empty while it's out, a work taxi calling and colleagues getting in, a lift, the household-only feed and Journal), a 0.6.0 save loading, no console errors, and the production benchmark on WebGPU and WebGL2.
+**Final run, 2026-11-07, on `integration/0.7.0-final` at `a8498ebc`** (all the merges, the side-by-side roads and the early visitor fixed):
+- `tools/ci-local.sh`, every step: all green (sim 160 + 765, web 333, 652 models, clips 0 new).
+- The voice tests and `check:voice` (matches the golden samples); tickbench 1.19 µs a tick; the production build 507 MB (676 MB before the smaller voice and language model).
+- `generated` over seed bases 16–25, under the Big preview rule: all green. Bases 16–18 failed first (two country roads laid side by side, a guest taken from a visit by her booked taxi) and were fixed, so 21–25 were the unseen gate; the worldgen fix's author checked only their layouts.
+- Played (headless Chromium, the dev server): new Cosy (WebGPU), Normal (WebGL2) and Big games (WebGPU, and a dense one on WebGL2) at 60 fps, with taxis standing at the kerb and riders getting in, the ranks, a bike ridden to an outing, *Big (preview)* and its line on Create World; a 0.6.0 save (format 35) continued and played; a 0.7.0 game saved and continued. No console errors.
 
 ## 4. Release steps
 
