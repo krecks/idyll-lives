@@ -3195,9 +3195,6 @@ const LEISURE_BEATS: f32 = 0.9;
 const LEISURE_KERBS: f32 = 8.0;
 /// A walk to or from the kerb is about this much longer than as the crow flies (`kerb_walks`).
 const KERB_WINDING: f32 = 1.3;
-/// Game minutes in a minute of `Travel::eta` by car (a real minute's drive: the cars drive in real
-/// time, `world::trip_minutes`).
-const DRIVE_MINUTES: f32 = 60.0 * crate::GAME_MINUTES_PER_SECOND;
 /// Those off to the same place within this long of each other share a taxi (ticks).
 const LEISURE_WINDOW: u64 = 30 * TICKS_PER_MINUTE;
 /// A taxi back from a place comes this long after its rider's visit ends (ticks: a goodbye and
@@ -3232,8 +3229,8 @@ pub(crate) fn leisure_eta(
         .min_by(|a, b| crate::travel::dist(*a, from).total_cmp(&crate::travel::dist(*b, from)))?;
     let come = travel.eta(exit, from, Mode::Car, walk);
     let ride = travel.eta(from, door, Mode::Car, walk);
-    let by_taxi = ride * DRIVE_MINUTES + kerb_walks(travel, from, door, walk);
-    let wait = come * DRIVE_MINUTES;
+    let by_taxi = ride * crate::travel::DRIVE_MINUTES + kerb_walks(travel, from, door, walk);
+    let wait = come * crate::travel::DRIVE_MINUTES;
     (by_taxi.is_finite() && wait.is_finite() && by_taxi + wait < on_foot * LEISURE_BEATS)
         .then_some(by_taxi + wait / 2.0)
 }
@@ -3620,7 +3617,7 @@ pub(crate) fn back_minutes(
                 door,
                 crate::travel::Mode::Car,
                 sim.walk_per_minute(ctx.content),
-            ) * DRIVE_MINUTES
+            ) * crate::travel::DRIVE_MINUTES
             + kerb_walks(ctx.travel, pos, door, sim.walk_per_minute(ctx.content))
     })
 }

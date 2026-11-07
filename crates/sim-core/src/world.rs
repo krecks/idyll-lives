@@ -77,9 +77,7 @@ pub(crate) const AUTONOMY_DELAY_TICKS: u32 = crate::secs(1.0) as u32;
 /// Getting up from the upper bunk: the time to climb down its ladder (the renderer's `bunkDown`, 6.5 s), in
 /// which they do nothing else (`Sim::ladder_ticks`).
 pub(crate) const LADDER_DOWN_TICKS: u32 = crate::secs(6.5) as u32;
-/// Stepping aside out of a car's way (`cars::make_way`): 0.06 m a tick at 20 ticks a real second
-/// (1.2 m/s), at most `SIDESTEP_MOST` in one step.
-const SIDESTEP: f32 = 0.06 * (20.0 / TICKS_PER_SECOND as f32);
+/// Stepping aside out of a car's way (`cars::make_way`): at most this far in one step (m).
 const SIDESTEP_MOST: f32 = 0.3;
 const MIN_AUTONOMY_SCORE: f32 = 0.01;
 /// How much less a meal nobody at home would eat tempts free will (the cooking practice it
@@ -8540,7 +8538,7 @@ fn progress(
                             yaw,
                             &ctx.nav,
                             sim.pos,
-                            (SIDESTEP * ticks as f32).min(SIDESTEP_MOST),
+                            (crate::cars::STEP_ASIDE * ticks as f32).min(SIDESTEP_MOST),
                             |p| crate::cars::clear(&others, body, p),
                         )
                     {
