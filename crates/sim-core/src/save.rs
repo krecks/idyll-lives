@@ -3057,18 +3057,25 @@ mod tests {
         let mut old: serde_json::Value = serde_json::from_str(&json).unwrap();
         old["version"] = 35.into();
         let loaded = World::from_save_json(CONTENT, &old.to_string()).unwrap();
-        assert_eq!(loaded.tick, w.tick);
-        assert_eq!(loaded.cars[0].since, w.cars[0].since);
+        // (As this build counts them: the same at 20 and 20.)
+        let r = super::Rescale::of(35);
+        assert_eq!(loaded.tick, r.tick(w.tick));
+        assert_eq!(loaded.cars[0].since, r.tick(w.cars[0].since));
         assert_eq!(
             loaded.cars[0].progress.to_bits(),
-            w.cars[0].progress.to_bits()
+            r.route(w.cars[0].progress).to_bits()
         );
         let ticks = |w: &World| w.events.iter().map(|e| e.tick).collect::<Vec<_>>();
-        assert_eq!(ticks(&loaded), ticks(&w));
         assert_eq!(
-            loaded.save_json(),
-            World::from_save_json(CONTENT, &json).unwrap().save_json()
+            ticks(&loaded),
+            ticks(&w).into_iter().map(|t| r.tick(t)).collect::<Vec<_>>()
         );
+        if r == super::Rescale::of(super::SAVE_VERSION) {
+            assert_eq!(
+                loaded.save_json(),
+                World::from_save_json(CONTENT, &json).unwrap().save_json()
+            );
+        }
     }
 
     /// From 20 ticks a game minute to 75 (and 20 a real second to 60): each tick of the clock is
