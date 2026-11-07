@@ -872,6 +872,34 @@ impl Graph {
 
     /// The nearest points on up to `n` different roads within `reach` m of `p` that `mode` may
     /// use, nearest first.
+    /// Whether network road `road` comes within `reach` of `p` somewhere else than about `s` along
+    /// it (more than `apart` further on or back): a road come back over itself, a hairpin's way
+    /// back beside its way out (`near` gives each road's nearest point only: there, `s` itself).
+    pub fn passes_again(&self, road: u32, s: f32, p: [f32; 2], reach: f32, apart: f32) -> bool {
+        if self.is_empty() {
+            return false;
+        }
+        let (x0, x1) = (
+            self.cell(p[0] - reach, self.cols),
+            self.cell(p[0] + reach, self.cols),
+        );
+        let (z0, z1) = (
+            self.cell(p[1] - reach, self.rows),
+            self.cell(p[1] + reach, self.rows),
+        );
+        (z0..=z1).any(|cz| {
+            (x0..=x1).any(|cx| {
+                self.cells[cz * self.cols + cx]
+                    .iter()
+                    .filter(|&&(r, _)| r == road)
+                    .any(|&(r, i)| {
+                        let (at, d) = self.roads[r as usize].project_segment(i as usize, p);
+                        d <= reach && (at - s).abs() > apart
+                    })
+            })
+        })
+    }
+
     pub fn near(&self, p: [f32; 2], reach: f32, n: usize, mode: Mode) -> Vec<RoadPoint> {
         if self.is_empty() {
             return Vec::new();

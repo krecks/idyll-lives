@@ -2187,15 +2187,18 @@ pub(crate) fn kerb_at(
                     crate::world::wrap_angle(t[1].atan2(t[0]) - chord).abs() <= STAND_STRAIGHT
                 });
                 // (Clear of junctions' boxes, and of another road lying along or over this one: two
-                // country roads a metre apart, its stand across the other's lane.)
+                // country roads a metre apart, its stand across the other's lane; or this road
+                // itself further along, come back over it: its stand across that stretch's lane.)
                 let clear = (0..=n).all(|i| {
-                    let p = road.at(s - half + i as f32 * 2.0 * half / n as f32);
+                    let at = s - half + i as f32 * 2.0 * half / n as f32;
+                    let p = road.at(at);
                     g.boxes
                         .iter()
                         .all(|&(m, r)| crate::travel::dist(m, p) >= r + STAND_ROOM + TAXI_WID)
                         && g.near(p, road.width, 3, crate::travel::Mode::Car)
                             .iter()
                             .all(|q| q.road == mouth.road)
+                        && !g.passes_again(mouth.road, at, p, road.width, road.width + half)
                 });
                 // (Nor where a car parks out on a trip, nor pulls into or out of it.)
                 let parking = (0..=n).all(|i| {
@@ -2223,6 +2226,67 @@ pub(crate) fn kerb_at(
             mouth,
             axis,
         })
+}
+
+#[cfg(test)]
+mod kerb_at_tests {
+    use super::*;
+
+    /// A town of one street that runs east from x 100 and doubles back (a hairpin at x 220): its
+    /// way back lies over its way out, a few metres off, as far as x 100.
+    fn hairpin() -> World {
+        let mut pts: Vec<String> = (0..=120).map(|k| format!("[{},30.0]", 100 + k)).collect();
+        pts.extend((1..=6).map(|k| format!("[220.0,{}]", 30 + k)));
+        pts.extend(
+            (1..=120).map(|k| format!("[{},{:.2}]", 220 - k, 36.0 - 3.0 * k as f32 / 120.0)),
+        );
+        let road = format!(
+            r#"{{"points":[{}],"width":7,"kind":"street","ends":["out","dead"]}}"#,
+            pts.join(",")
+        );
+        let town = format!(
+            r#"{{"width":300,"depth":80,"size":"normal","exits":[{{"x":100.0,"z":30.0,"kind":"road"}}],
+            "roads":[{road}],"meta":{{"roads":[{road}]}},"plots":[],"households":[],"sims":[]}}"#
+        );
+        World::from_json(
+            r#"{"needs":[{"id":"social","label":"Social","decayPerHour":0.02}],"objects":[]}"#,
+            &town,
+            1,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_taxi_doesnt_stand_where_its_street_comes_back_over_itself() {
+        // By the street's way out, its way back a few metres off: no stand there, its body
+        // across that stretch's lane (Oakwood, v4 s11: 8 degrees across, stood over a loop of
+        // its own road; one road, so "another road along or over it" let it be).
+        let w = hairpin();
+        let g = &w.travel.graph;
+        let mouth = *g
+            .near([160.0, 30.0], 2.0, 1, crate::travel::Mode::Car)
+            .first()
+            .expect("the street");
+        let road = &g.roads[mouth.road as usize];
+        let back: Vec<[f32; 2]> = (1..=120)
+            .map(|k| [220.0 - k as f32, 36.0 - 3.0 * k as f32 / 120.0])
+            .collect();
+        if let Some(k) = kerb_at(&w.travel, &w.meta, (mouth, [0.0, -1.0]), &[], &[]) {
+            let half = TAXI_LEN / 2.0;
+            for d in [-half, 0.0, half] {
+                let p = road.at(k.s + d);
+                let near = back
+                    .iter()
+                    .map(|&q| crate::travel::dist(p, q))
+                    .fold(f32::INFINITY, f32::min);
+                assert!(
+                    near >= road.width,
+                    "a stand at s {:.1}, {near:.1} m from the street's way back",
+                    k.s
+                );
+            }
+        }
+    }
 }
 
 /// A taxi's body keeps this far either side of a driveway's mouth (m, `kerb_at`: a car's length
