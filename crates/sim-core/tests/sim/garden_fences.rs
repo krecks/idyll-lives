@@ -44,7 +44,7 @@ fn walk(w: &mut World) -> Vec<[f32; 2]> {
     })
     .unwrap();
     let mut way = vec![w.sims[0].pos];
-    for _ in 0..2000 {
+    for _ in 0..common::secs(100.0) {
         w.tick_once();
         way.push(w.sims[0].pos);
         if !w.sims[0].is_moving() && (w.sims[0].pos[0] - 11.5).abs() < 0.3 {

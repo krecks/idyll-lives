@@ -52,7 +52,7 @@ use crate::common;
 use common::run_to;
 
 use serde_json::{Value, json};
-use sim_core::{Command, MINUTES_PER_TICK, World, clock};
+use sim_core::{Command, World, clock};
 
 const SEED: u64 = 21;
 /// Money for buying everything a check needs.
@@ -71,7 +71,7 @@ fn free_up(w: &mut World) {
         while w.sims[0].current().is_some() || w.sims[0].queue().next().is_some() {
             w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
         }
-        for _ in 0..(2.0 / MINUTES_PER_TICK) as u32 {
+        for _ in 0..common::mins(2.0) {
             w.tick_once();
         }
     }
@@ -401,7 +401,7 @@ fn stage(more: &[Value], hour: f32) -> World {
     // five days would age everyone two and a half years (two days a year).
     world.tick = clock::tick_at(6, hour * 60.0 - 5.0).unwrap();
     assert_eq!(clock::weekday(clock::day(world.tick)), 5);
-    for _ in 0..(5.0 / MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(5.0) {
         world.tick_once();
     }
     free_up(&mut world);
@@ -568,7 +568,7 @@ fn review_baby() {
         })
         .unwrap();
     let mut seated = false;
-    for _ in 0..(30.0 / MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(30.0) {
         world.tick_once();
         seated |= world
             .objects
@@ -664,7 +664,7 @@ fn crowded_garden() {
             interaction: sunbathe,
         })
         .unwrap();
-    let on = (0..(30.0 / MINUTES_PER_TICK) as u32).any(|_| {
+    let on = (0..common::mins(30.0)).any(|_| {
         world.tick_once();
         world.objects[at as usize].users.contains(&Some(0))
             && world.sims[0].pose == sim_core::content::Pose::Lie

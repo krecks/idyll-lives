@@ -10,9 +10,9 @@ use crate::common;
 use common::hamlets::{Hamlets, two_hamlets, with_cars};
 use serde_json::{Value, json};
 use sim_core::taxi::StopState;
-use sim_core::{MINUTES_PER_TICK, World, clock, snapshot};
+use sim_core::{World, clock, snapshot};
 
-const TICKS_PER_MINUTE: u64 = (1.0 / MINUTES_PER_TICK) as u64;
+const TICKS_PER_MINUTE: u64 = common::TICKS_PER_MINUTE;
 
 /// Who is on an outing (visiting a public place out of `autonomy.reach` of home) and where.
 fn on_outings(w: &World) -> Vec<(u32, u32)> {
@@ -180,7 +180,7 @@ fn someone_with_a_bike_rides_to_a_place_beyond_walking_reach_and_is_home_by_the_
                 && sim.riding.is_none()
                 && sim.bike() == Some(bike as u32);
             parked |= off;
-            if off && w.tick.is_multiple_of(600) {
+            if off && w.tick.is_multiple_of(common::mins(30.0)) {
                 snapshot::write(&w, &mut buf);
                 let o = snapshot::HEADER_LEN + s as usize * snapshot::SIM_STRIDE;
                 if buf[o + snapshot::sim::RIDE] == -2.0 - stable {

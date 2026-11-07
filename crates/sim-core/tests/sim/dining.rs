@@ -126,7 +126,7 @@ fn a_chair_needs_one_free_side() {
 }
 
 /// Runs until the resident's pose changes from `from` (at most `limit` ticks).
-fn until_pose_changes(w: &mut World, from: Pose, limit: u32) {
+fn until_pose_changes(w: &mut World, from: Pose, limit: u64) {
     for _ in 0..limit {
         w.tick_once();
         if w.sims[0].pose != from {
@@ -149,7 +149,7 @@ fn a_diner_comes_round_the_chair_sits_facing_the_table_and_gets_up_behind_it() {
         interaction: dine,
     })
     .unwrap();
-    until_pose_changes(&mut w, Pose::Stand, 2000);
+    until_pose_changes(&mut w, Pose::Stand, common::mins(100.0));
     let s = &w.sims[0];
     assert_eq!(s.pose, Pose::Sit);
     assert_eq!(s.pos, [4.5, 3.5], "on the chair");
@@ -159,7 +159,7 @@ fn a_diner_comes_round_the_chair_sits_facing_the_table_and_gets_up_behind_it() {
     let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     assert_eq!(loaded.sims[0].pos, [4.5, 2.5]);
 
-    until_pose_changes(&mut w, Pose::Sit, 5000);
+    until_pose_changes(&mut w, Pose::Sit, common::mins(250.0));
     assert_eq!(
         w.sims[0].pos,
         [4.5, 2.5],
@@ -187,7 +187,7 @@ fn dining_needs_a_table() {
     assert!(err.contains("table"), "{err}");
     // Left to themselves, a hungry resident never dines at a chair in the middle of nowhere.
     w.autonomy = true;
-    for _ in 0..3000 {
+    for _ in 0..common::mins(150.0) {
         w.sims[0].needs[0] = 0.1;
         w.tick_once();
         let dining = w.sims[0].current().is_some_and(|a| matches!(a.task.kind, TaskKind::Use { object, interaction } if object == chair && interaction == dine));
@@ -348,7 +348,7 @@ fn long_seats_spread_their_sitters_across_their_width() {
         })
         .unwrap();
     }
-    for _ in 0..2000 {
+    for _ in 0..common::mins(100.0) {
         w.tick_once();
         if w.sims.iter().all(|s| s.pose == Pose::Sit) {
             break;
@@ -393,7 +393,7 @@ fn a_snack_is_eaten_sitting_at_the_table_if_there_is_one_else_standing() {
         // Fetched at the fridge, then eaten: sitting at the table with the plate on it, or
         // standing with it in hand.
         let mut eating = None;
-        for _ in 0..4000 {
+        for _ in 0..common::mins(200.0) {
             w.tick_once();
             if let Some(a) = w.sims[0].current()
                 && let TaskKind::Eat { seat, plate, .. } = a.task.kind
@@ -435,7 +435,7 @@ fn a_snack_is_eaten_sitting_at_the_table_if_there_is_one_else_standing() {
                 "the snack is still there"
             );
         }
-        for _ in 0..4000 {
+        for _ in 0..common::mins(200.0) {
             w.tick_once();
             if w.sims[0].current().is_none() {
                 break;
@@ -509,7 +509,7 @@ fn a_plate_eaten_from_standing_with_nowhere_to_put_it_is_taken_away_not_left_on_
     })
     .unwrap();
     let mut on_floor = false;
-    for _ in 0..12000 {
+    for _ in 0..common::mins(600.0) {
         w.tick_once();
         on_floor |= w
             .items

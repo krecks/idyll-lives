@@ -95,8 +95,8 @@ fn snapshot_carries_object_and_action_while_using() {
     assert_eq!(row(&w, 0), (1.0, action(&w, "eat")));
     assert_eq!(row(&w, 1), (-1.0, -1.0), "the other Sim is idle");
 
-    // 40 game minutes (one per real second).
-    for _ in 0..40 * sim_core::TICKS_PER_SECOND {
+    // 40 game minutes.
+    for _ in 0..sim_core::mins(40.0) {
         w.tick_once();
     }
     assert!(w.sims[0].current().is_none(), "finished");
@@ -276,7 +276,7 @@ fn walkers_tell_where_their_way_goes() {
         z: 8.5,
     })
     .unwrap();
-    for _ in 0..10 {
+    for _ in 0..sim_core::secs(0.5) {
         w.tick_once();
     }
     let (pos, way, ahead) = at(&w);

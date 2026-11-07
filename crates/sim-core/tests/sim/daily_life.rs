@@ -144,7 +144,7 @@ fn training_objects_raise_skills_and_cost_needs() {
     })
     .unwrap();
     let hygiene = w.sims[0].needs[2];
-    for _ in 0..20 * 70 {
+    for _ in 0..common::mins(70.0) {
         w.tick_once();
     }
     assert!(
@@ -313,7 +313,7 @@ fn upgrades_are_instant_purchases_that_make_objects_better() {
         interaction: 0,
     })
     .unwrap();
-    for _ in 0..20 * 25 {
+    for _ in 0..common::mins(25.0) {
         w.tick_once();
     }
     assert!(

@@ -37,7 +37,7 @@ fn world() -> World {
 }
 
 fn hours(w: &mut World, h: f32) {
-    for _ in 0..(h * 60.0 * 20.0) as usize {
+    for _ in 0..sim_core::mins(h * 60.0) {
         w.tick_once();
     }
 }

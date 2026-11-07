@@ -105,7 +105,7 @@ fn a_visit_to_the_next_hamlet_goes_by_car_and_back() {
     };
     // There: it drives off, parks, and they walk to the park.
     let mut arrived = None;
-    for t in 0..20 * 60 * 20 {
+    for t in 0..common::hours(20.0) {
         w.tick_once();
         let before = seen.len();
         note(&w, &mut worst, &mut seen);
@@ -149,7 +149,7 @@ fn a_visit_to_the_next_hamlet_goes_by_car_and_back() {
     // Home: back to the car, and the drive home.
     w.apply(Command::GoHome { sim: i as u32 }).unwrap();
     let mut home_again = false;
-    for _ in 0..20 * 60 * 20 {
+    for _ in 0..common::hours(20.0) {
         w.tick_once();
         note(&w, &mut worst, &mut seen);
         let s = &w.sims[i];
@@ -191,7 +191,7 @@ fn a_cosy_town_never_drives_to_a_visit() {
         .find_map(|(c, car)| car.owners.first().map(|&o| (c, o)))
         .unwrap();
     w.apply(Command::Visit { sim: i, plot: park }).unwrap();
-    for _ in 0..20 * 60 * 5 {
+    for _ in 0..common::hours(5.0) {
         w.tick_once();
         assert!(w.cars[c].trip.is_none() && w.cars[c].state == CarState::Parked);
     }
@@ -234,7 +234,7 @@ fn the_ui_says_where_a_trip_goes_and_about_when_they_are_there() {
     })
     .unwrap();
     let mut first = None;
-    for _ in 0..20 * 60 * 20 {
+    for _ in 0..common::hours(20.0) {
         w.tick_once();
         if first.is_none() {
             first = trip_in_view(&w, i);
@@ -276,7 +276,7 @@ fn a_walk_past_a_car_parked_out_on_a_trip_goes_round_it() {
         plot: park,
     })
     .unwrap();
-    let end = w.tick + 20 * 60 * 20;
+    let end = w.tick + common::hours(20.0);
     while w.cars[c].state != CarState::Out {
         w.tick_once();
         assert!(w.tick < end, "never parked out there");
@@ -305,7 +305,7 @@ fn a_walk_past_a_car_parked_out_on_a_trip_goes_round_it() {
     })
     .unwrap();
     let mut closest = f32::INFINITY;
-    for _ in 0..2000 {
+    for _ in 0..common::secs(100.0) {
         w.tick_once();
         assert_eq!(w.cars[c].state, CarState::Out, "the car left");
         let p = w.sims[j].pos;

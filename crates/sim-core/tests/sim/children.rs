@@ -1,6 +1,8 @@
 //! Children and teens: no romance, no jobs, no moving on their own, and never a household of
 //! their own; babies don't choose anything.
 
+use crate::common;
+
 use sim_core::lot::SimSpawn;
 use sim_core::{Command, World};
 
@@ -95,7 +97,7 @@ fn children_and_teens_are_not_grown_ups() {
 fn babies_do_nothing_on_their_own() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     w.sims[3].needs[0] = 0.0;
-    for _ in 0..2 * 60 * 20 {
+    for _ in 0..common::hours(2.0) {
         w.tick_once();
     }
     assert!(w.sims[3].current().is_none(), "the baby didn't go and play");
@@ -186,7 +188,7 @@ fn teens_grow_up_into_young_adults() {
         .is_err(),
         "17: too young to work"
     );
-    for _ in 0..24 * 60 * 20 {
+    for _ in 0..common::TICKS_PER_DAY {
         w.tick_once();
     }
     assert!(w.sims[1].adult(&w.content), "18 now");
@@ -233,7 +235,7 @@ fn school_grades_homework_and_finishing_school() {
     .unwrap();
     assert_eq!(w.sims[1].grade, 60.0);
     // A day at school.
-    for _ in 0..24 * 60 * 20 {
+    for _ in 0..common::TICKS_PER_DAY {
         w.tick_once();
     }
     assert!(
@@ -242,7 +244,7 @@ fn school_grades_homework_and_finishing_school() {
         w.sims[1].grade
     );
     // After the second school day, homework helps.
-    for _ in 0..9 * 60 * 20 {
+    for _ in 0..common::hours(9.0) {
         w.tick_once();
     }
     assert!(
@@ -256,14 +258,14 @@ fn school_grades_homework_and_finishing_school() {
         interaction: 0,
     })
     .unwrap();
-    for _ in 0..60 * 20 {
+    for _ in 0..common::hours(1.0) {
         w.tick_once();
     }
     assert!(w.sims[1].grade > 73.0, "homework: {}", w.sims[1].grade);
     // Finishing school with a good grade.
     w.sims[1].age = 17.6;
     w.apply(Command::SetSpeed { speed: 1 }).unwrap();
-    for _ in 0..24 * 60 * 20 {
+    for _ in 0..common::TICKS_PER_DAY {
         w.tick_once();
     }
     let done = w
@@ -313,7 +315,7 @@ fn a_save_and_load_after_school_costs_no_missed_day() {
     assert_eq!(saved["version"], sim_core::save::SAVE_VERSION);
     let after_load = |save: &serde_json::Value| {
         let mut back = World::from_save_json(&content, &save.to_string()).unwrap();
-        for _ in 0..60 * 20 {
+        for _ in 0..common::hours(1.0) {
             back.tick_once();
         }
         back.sims[1].grade

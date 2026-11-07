@@ -76,7 +76,7 @@ fn updates_add_up_to_the_structure() {
     assert_eq!(view, lean(&w));
 
     // The town lives on: what changes comes.
-    for _ in 0..1000 {
+    for _ in 0..common::mins(50.0) {
         let before = w.structure_version();
         w.tick_once();
         if w.structure_version() == before {

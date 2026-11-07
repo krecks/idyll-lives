@@ -32,7 +32,7 @@ fn world() -> World {
 }
 
 fn days(w: &mut World, d: u32) {
-    for _ in 0..d * 24 * 60 * 20 {
+    for _ in 0..u64::from(d) * sim_core::clock::TICKS_PER_DAY {
         w.tick_once();
     }
 }

@@ -98,7 +98,7 @@ fn plates(w: &mut World, n: usize) -> Vec<u32> {
 
 /// Ticks up to `minutes` until `f` holds (checking the world each tick): whether it did.
 fn until(w: &mut World, minutes: f32, mut f: impl FnMut(&World) -> bool) -> bool {
-    for _ in 0..(minutes / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(minutes) {
         w.tick_once();
         common::check(w);
         if f(w) {

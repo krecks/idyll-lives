@@ -89,7 +89,7 @@ fn over_budget_they_wait_a_tick_and_the_player_goes_first() {
     let run = |budget: u64| {
         let mut w = World::from_json(&content, &town, 3).unwrap();
         w.search_budget = budget;
-        for _ in 0..1200 {
+        for _ in 0..common::mins(60.0) {
             w.tick_once();
         }
         w.sims.iter().map(|s| s.pos).collect::<Vec<_>>()
