@@ -932,14 +932,18 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
    * A country road's course from `a` along `cells` to `b` (null: on out of the world), in pieces
    * where it runs along a road laid already (`SHARED_RUN`): the stretches it would run alongside
    * that road are left to it, and each piece between joins it square in a T (merged into it,
-   * rather than side by side a few metres off); from a port right by one, straight onto it. Each
+   * rather than side by side a few metres off); from an end right by one it runs along (`shortcut`),
+   * straight onto it, or off it straight into the end; each T facing the side the piece goes. Each
    * piece's ends (`a`, `b`: the course's own, or such a T) and its cells, and whether it is the
    * course's first or last stretch; one piece, the whole course, if it runs alongside none.
    */
   const alongExisting = (a: Way, cells: readonly number[], b: Way | null): { a: Way; cells: number[]; b: Way | null; first: boolean; last: boolean }[] => {
     // The roads (not trails) passing within `SHARED_REACH` cells of each cell, but for the streets
-    // its own ends go on from (it leaves a port in line with its street).
-    const own = new Set([a.port?.road, b?.port?.road]);
+    // its own ends go on from where they are their ports (it leaves a port in line with its
+    // street). (An end off a country road from a port, `via`, is out beside that street: it may
+    // run along it.)
+    const atPort = (w: Way | null) => (w?.port && w.p === w.port.p ? w.port.road : undefined);
+    const own = new Set([atPort(a), atPort(b)]);
     const by = new Map<number, number[]>();
     const R = SHARED_REACH;
     roads.forEach((r, i) => {
@@ -979,33 +983,64 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       i = j;
     }
     if (!runs.length) return [{ a, cells: [...cells], b, first: true, last: true }];
-    // A T on the nearest of `list` to `cell` (or a point), facing it.
-    const tee = (list: Set<number>, cell: number | Pt): Way => {
+    const centre = (i: number) => land.centre(cells[i]);
+    // A T on the nearest of `list` to `cell` (or a point), facing `side` (a point; else it).
+    const tee = (list: Iterable<number>, cell: number | Pt, side?: Pt): Way => {
       const c = typeof cell === 'number' ? land.centre(cell) : cell;
       const [road, at] = [...list].map((r) => [r, nearest(roads[r].points, c[0], c[1])] as const).sort((x, y) => x[1].dist - y[1].dist)[0];
       const { p, t } = pointAt(roads[road].points, at.s);
       const n = leftOf(t);
-      return { p, dir: [n[0] * at.side, n[1] * at.side] };
+      const k = side ? (n[0] * (side[0] - p[0]) + n[1] * (side[1] - p[1]) >= 0 ? 1 : -1) : at.side;
+      return { p, dir: [n[0] * k, n[1] * k] };
+    };
+    // (The way a piece goes off a T, or comes into one: a few cells on from it, not the cell by it,
+    // which may lie over the road where the course crosses it at a slant.)
+    const ahead = (from: number, to: number) => centre(Math.min(to, from + SHARED_RUN));
+    const behind = (from: number, to: number) => centre(Math.max(from, to - SHARED_RUN));
+    /**
+     * Where the course's end `w` (`into`: its start; else its end) lies by a road it runs along in
+     * `run`, and that road from by `w` to where the course first runs along it from there is no
+     * further than the course's own way: a T on it by `w`, to go straight onto it (the course's
+     * cells before dropped: a stub, or a loop round back onto the road beside it). Else null.
+     */
+    const shortcut = (w: Way | null, run: (typeof runs)[number], into: boolean): Way | null => {
+      if (!w) return null;
+      const fits = [...run.roads].filter((r) => {
+        const ls = lengths(roads[r].points);
+        const m = nearest(roads[r].points, w.p[0], w.p[1], ls);
+        if (m.dist > SHARED_REACH * CELL) return false;
+        // (The cell it is along it from, and the course's way from `w` to there.)
+        let at = into ? run.from : run.to;
+        while (!on[at].includes(r)) at += into ? 1 : -1;
+        let way = dist(w.p, centre(into ? 0 : cells.length - 1));
+        for (let i = into ? 0 : at; i < (into ? at : cells.length - 1); i++) way += dist(centre(i), centre(i + 1));
+        const c = centre(at);
+        return Math.abs(m.s - nearest(roads[r].points, c[0], c[1], ls).s) <= way + CELL;
+      });
+      return fits.length ? tee(fits, w.p) : null;
     };
     // (From a port alongside one only if the port is near it: straight onto it, a short way.)
-    const fromPort = !!a.port && a.p === a.port.p;
-    if (runs[0].from === 0 && fromPort && dist(a.p, tee(runs[0].roads, a.p).p) > SHARED_REACH * CELL) runs.shift();
+    const fromPort = atPort(a) !== undefined;
+    if (runs[0].from === 0 && fromPort && !shortcut(a, runs[0], true)) runs.shift();
     if (!runs.length) return [{ a, cells: [...cells], b, first: true, last: true }];
+    const end = runs[runs.length - 1];
+    const [onto, off] = [shortcut(a, runs[0], true), shortcut(b, end, false)];
     const out: { a: Way; cells: number[]; b: Way | null; first: boolean; last: boolean }[] = [];
     const add = (from: number, to: number, pa: Way, pb: Way | null, first: boolean, last: boolean) => {
       if (to >= from) out.push({ a: pa, cells: cells.slice(from, to + 1), b: pb, first, last });
     };
-    add(0, runs[0].from - 1, a, tee(runs[0].roads, cells[Math.max(0, runs[0].from - 1)]), true, false);
-    // (Alongside it from a port on: the port straight onto it, no cells.)
-    if (runs[0].from === 0 && fromPort) out.push({ a, cells: [], b: tee(runs[0].roads, a.p), first: true, last: false });
+    // (By it from its start, or by it from a port on: straight onto it, no cells.)
+    if (onto) out.push({ a, cells: [], b: onto, first: true, last: false });
+    else add(0, runs[0].from - 1, a, tee(runs[0].roads, cells[Math.max(0, runs[0].from - 1)], behind(0, runs[0].from - 1)), true, false);
     for (let k = 0; k + 1 < runs.length; k++) {
       const [r, n] = [runs[k], runs[k + 1]];
       // (Not off a road and back onto it: it goes on along it.)
       if ([...r.roads].some((x) => n.roads.has(x))) continue;
-      add(r.to + 1, n.from - 1, tee(r.roads, cells[r.to + 1]), tee(n.roads, cells[n.from - 1]), false, false);
+      add(r.to + 1, n.from - 1, tee(r.roads, cells[r.to + 1], ahead(r.to + 1, n.from - 1)), tee(n.roads, cells[n.from - 1], behind(r.to + 1, n.from - 1)), false, false);
     }
-    const end = runs[runs.length - 1];
-    add(end.to + 1, cells.length - 1, tee(end.roads, cells[Math.min(cells.length - 1, end.to + 1)]), b, false, true);
+    // (By it to its end: off it straight to the end.)
+    if (off) out.push({ a: off, cells: [], b, first: false, last: true });
+    else add(end.to + 1, cells.length - 1, tee(end.roads, cells[Math.min(cells.length - 1, end.to + 1)], ahead(end.to + 1, cells.length - 1)), b, false, true);
     return out;
   };
   /** A piece of a country road (`alongExisting`): straight from its start onto the road beside it if it has no cells, out of the world over edge `side` if it is the last and goes out. */
