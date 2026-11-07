@@ -1,7 +1,9 @@
 //! Saves written by released builds load and play on with the shipped content: day 5 of a town
 //! saved by v0.1.0 (save version 17), and by the build that was live on the site after it (d7c506e,
 //! version 19); the benchmark's village played two days by v0.4.2 (version 32, the last before 33's
-//! migration). Add one for each release (`tests/saves/`).
+//! migration); a Normal open world saved by 0.7.0 at 20 ticks a second at rush hour on day 2, cars
+//! and a taxi on the road (version 35, the last before the 60-tick clock). Add one for each release
+//! (`tests/saves/`).
 
 use crate::common;
 
@@ -181,4 +183,40 @@ fn a_game_saved_while_the_town_had_buses_loads_without_them() {
         loaded.tick_once();
     }
     common::check(&loaded);
+}
+
+/// 0.7.0's Normal world at 07:40 on day 2, saved at 20 ticks a second and a 20-tick game minute,
+/// plays on from the same minute with its cars and the taxi still on their way.
+#[test]
+fn an_open_world_saved_by_0_7_0_plays_on() {
+    use sim_core::clock;
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves/v035_normal.json");
+    let json = std::fs::read_to_string(path).unwrap();
+    let old: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(old["version"], 35);
+    let content = common::content();
+    let mut w = World::from_save_json(&content, &json).unwrap();
+    assert_eq!(
+        (clock::day(w.tick), clock::minute_of_day(w.tick)),
+        (2, 460.0)
+    );
+    assert!(w.travel.open, "an open world");
+    assert!(
+        w.cars
+            .iter()
+            .any(|c| !matches!(c.state, sim_core::cars::CarState::Parked)),
+        "cars on the road"
+    );
+    assert!(!w.taxis.runs.is_empty(), "a taxi on its way");
+    common::check(&w);
+    w.lod = false;
+    let end = w.tick + TICKS_PER_DAY;
+    while w.tick < end {
+        w.tick_once();
+        if w.tick.is_multiple_of(sim_core::TICKS_PER_MINUTE * 30) {
+            common::check(&w);
+        }
+    }
+    common::reload(&w, &content);
 }
