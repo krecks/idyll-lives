@@ -8,7 +8,7 @@
 // legs, `runMaxRate`: 0 at speed 3 on every stage. Speeds 4 and 5 keep their slide: won't fix.)
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
-import { GAME_RATE } from '../src/render/shared/gameSpeed';
+import { PLAYBACK_RATE } from '../src/render/shared/gameSpeed';
 import { RUN_MAX_RATE } from '../src/render/shared/characters/actions';
 import { gaitFor, gaitSlide } from '../src/render/shared/characters/gait';
 import { locomotionClips } from '../src/render/shared/characters/clips/locomotion';
@@ -35,14 +35,14 @@ describe('gaits', () => {
     const table: string[] = [];
     let worst = 0;
     for (const { who, legs: l } of legs) {
-      const row = [1, 2, 3, 4, 5].map((s) => gaitSlide(WALK * GAME_RATE[s], l, speedOf));
+      const row = [1, 2, 3, 4, 5].map((s) => gaitSlide(WALK * PLAYBACK_RATE[s], l, speedOf));
       // (What the run's old cap, the same four strides a second on every leg, left.)
       const before = (v: number) => {
         const { gear, rate } = gaitFor(v, l, -1, speedOf);
         const capped = gear === 2 ? Math.min(rate, RUN_MAX_RATE) : rate;
         return Math.max(0, 1 - (capped * speedOf(['walk', 'jogAlong', 'runAlong'][gear])! * l) / v);
       };
-      const at3 = WALK * GAME_RATE[3];
+      const at3 = WALK * PLAYBACK_RATE[3];
       const fastest = gaitSlide(at3 * FASTEST, l, speedOf);
       const pc = (x: number) => `${(x * 100).toFixed(0)} %`;
       table.push(`${who.padEnd(17)} ${row.map((x) => pc(x).padStart(5)).join(' ')}   speed 3 before ${pc(before(at3))}; the fastest ${pc(fastest)}, before ${pc(before(at3 * FASTEST))}`);
@@ -54,7 +54,7 @@ describe('gaits', () => {
 
   test("a child's run takes more strides a second than a grown-up's, and no more than it needs at speed 3", () => {
     const child = Math.min(...legs.filter((x) => x.who.endsWith('child')).map((x) => x.legs));
-    const { gear, rate } = gaitFor(WALK * GAME_RATE[3], child, -1, speedOf);
+    const { gear, rate } = gaitFor(WALK * PLAYBACK_RATE[3], child, -1, speedOf);
     expect(gear).toBe(2);
     expect(rate).toBeGreaterThan(RUN_MAX_RATE);
     // (The cap scales as the square root of the legs: under 5.5 strides a second on the shortest.)

@@ -5,6 +5,7 @@
 // `ParkedRides` draws where. `bun test`.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
+import { TICK_RATES, TICKS_PER_SECOND } from './snapshotLayout';
 
 const WEB = new URL('../', import.meta.url).pathname;
 
@@ -97,7 +98,7 @@ describe('a bike left out by a place', async () => {
     headerLen: 6,
     simStride: FIELDS.length,
     maxSims: MAX_CHARACTERS,
-    ticksPerSecond: 20,
+    ...TICK_RATES,
     header: { tick: 0, day: 1, minute: 2, speed: 3, simCount: 4, structureVersion: 5 },
     sim: simFields(FIELDS),
     actions: [...content.animations],
@@ -109,7 +110,7 @@ describe('a bike left out by a place', async () => {
    * The script (s): riding from home (10, 10) along +z to the café, off it there at `OFF` and left at `PARK` (beside
    * them), inside till `ON`, on it again and riding back home, off it at its place at `HOME`.
    */
-  const TICKS = 20;
+  const TICKS = TICKS_PER_SECOND;
   const SPEED = 4;
   const OFF = 2;
   const ON = 5;

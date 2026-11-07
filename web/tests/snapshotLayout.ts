@@ -23,6 +23,16 @@ export function constant(name: string, module?: string, src = SNAPSHOT_RS): numb
   return Number(m[1].replace(/_/g, ''));
 }
 
+/**
+ * The sim's rates (sim-core `lib.rs`): ticks a real second at speed 1, and ticks a game minute. Tests that play
+ * snapshots out in time (a snapshot every 1 / `TICKS_PER_SECOND` s) and the layouts they write them in keep to these,
+ * so they go on holding whatever sim-core makes them.
+ */
+export const TICKS_PER_SECOND = constant('TICKS_PER_SECOND', undefined, source('lib.rs'));
+export const TICKS_PER_MINUTE = constant('TICKS_PER_MINUTE', undefined, source('lib.rs'));
+/** A layout's `ticksPerSecond` and `ticksPerMinute`, as the sim's. */
+export const TICK_RATES = { ticksPerSecond: TICKS_PER_SECOND, ticksPerMinute: TICKS_PER_MINUTE };
+
 /** The bases as snapshot.rs works them out (checked against its source by the tests). */
 export const BASES = {
   car: 'pub const CAR_BASE: usize = HEADER_LEN + (MAX_SIMS + crate::staff::MAX_STAFF) * SIM_STRIDE;',
@@ -47,7 +57,7 @@ export const LAYOUT = {
   headerLen: HEADER_LEN,
   simStride: SIM_STRIDE,
   maxSims: MAX_SIMS,
-  ticksPerSecond: 20,
+  ...TICK_RATES,
   header: {
     tick: constant('TICK', 'header'),
     day: constant('DAY', 'header'),

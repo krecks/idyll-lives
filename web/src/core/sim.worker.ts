@@ -9,7 +9,7 @@
 
 import init, { Game, LoadError } from './wasm-pkg/sim_wasm.js';
 import { newestObjectUsed, type FromWorker, type GameSource, type MeshArrays, type SaveProblem, type ToWorker, type WorldUpdate } from './protocol';
-import { createSharedSnapshot, SharedSnapshotWriter, type SnapshotLayout } from './snapshot';
+import { createSharedSnapshot, readLayout, SharedSnapshotWriter, type SnapshotLayout } from './snapshot';
 
 interface WorkerScope {
   onmessage: ((e: MessageEvent<ToWorker>) => void) | null;
@@ -31,12 +31,13 @@ const STATS_INTERVAL_MS = 1000;
 /** While the wasm downloads, how often the main thread hears that it's still coming. */
 const START_PROGRESS_MS = 500;
 /**
- * Steps run back to back, at most, to catch up after one ran late. A longer backlog (a stall: a
- * slow step, the debugger, a busy machine) is dropped rather than run as a burst, which the
- * renderer would show as a jump; if steps keep taking longer than their share, the game runs
- * slower than its speed (the debug overlay's steps per second say so).
+ * The most real time (ms) the steps catch up on, run back to back, after one ran late (a step's
+ * worth at 20 steps a second: two steps at once at most). A longer backlog (a stall: a slow step,
+ * the debugger, a busy machine) is dropped rather than run as a burst, which the renderer would
+ * show as a jump; if steps keep taking longer than their share, the game runs slower than its
+ * speed (the debug overlay's steps per second say so).
  */
-const MAX_CATCH_UP = 2;
+const MAX_BACKLOG_MS = 50;
 
 let game: Game | null = null;
 let memory: WebAssembly.Memory;
@@ -152,7 +153,7 @@ async function start(content: string, source: GameSource, speed: number | undefi
   const ui = JSON.parse(game.ui_update());
   // (Before the first step: a game that starts paused runs none.)
   if (speed !== undefined) game.command(JSON.stringify({ type: 'setSpeed', speed }));
-  layout = JSON.parse(game.snapshot_layout());
+  layout = readLayout(game.snapshot_layout());
 
   const shared = typeof SharedArrayBuffer !== 'undefined' && self.crossOriginIsolated ? createSharedSnapshot(layout) : null;
   writer = shared ? new SharedSnapshotWriter(shared, layout.capacity) : null;
@@ -263,8 +264,8 @@ function runLoop(stepMs: number): void {
       steps = busyMs = maxMs = 0;
     }
     next += stepMs;
-    // (Steps due by now run at once: at most MAX_CATCH_UP of them.)
-    next = Math.max(next, now - (MAX_CATCH_UP - 1) * stepMs);
+    // (Steps due by now run at once: those of at most MAX_BACKLOG_MS.)
+    next = Math.max(next, now - MAX_BACKLOG_MS);
     setTimeout(step, Math.max(0, next - now));
   };
   setTimeout(step, stepMs);

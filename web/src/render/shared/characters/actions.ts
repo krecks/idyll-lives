@@ -31,11 +31,11 @@ export const STALL = 0.5;
 /**
  * Walkers glide from snapshot to snapshot as far as they can walk between them (at speeds 4 and 5
  * a step covers metres; cutting corners of their path is the price): metres walked per tick
- * (`world::WALK_SPEED`), the fastest walkers' trait, perk and emotion factors (1.15 x 1.2 x 1.08,
- * angry or energised, in the base game: 1.49) and some slack (packs' quicker walkers too). Further
- * than that, or not walking in both, is a jump.
+ * (`world::WALK_SPEED`: `doors.ts` `PACE` over the layout's `ticksPerSecond`), the fastest
+ * walkers' trait, perk and emotion factors (1.15 x 1.2 x 1.08, angry or energised, in the base
+ * game: 1.49) and some slack (packs' quicker walkers too). Further than that, or not walking in
+ * both, is a jump.
  */
-export const WALK_PER_TICK = 0.075;
 export const WALK_FASTEST = 1.5;
 export const WALK_SLACK = 1.2;
 /**

@@ -7,8 +7,7 @@
 // as the hand reaches the handle.)
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
-import { GAME_RATE } from '../src/render/shared/gameSpeed';
-import { WALK_PER_TICK } from '../src/render/shared/characters/actions';
+import { PLAYBACK_RATE } from '../src/render/shared/gameSpeed';
 import { DOOR_SWING, MOVER, PACE, doorLead, goingThrough } from '../src/render/shared/doors';
 
 /**
@@ -28,15 +27,12 @@ describe('doors', () => {
   const door: [number, number] = [0, 0];
   const lead = doorLead(1);
 
-  test('the pace is how fast sim-core walks them (`world::WALK_SPEED`, m a second), and the residents step it', () => {
+  test('the pace is how fast sim-core walks them (`world::WALK_SPEED`, m a real second), and the residents step it', () => {
     const sim = (file: string) => readFileSync(new URL(`../../crates/sim-core/src/${file}`, import.meta.url), 'utf8');
-    const walk = /const WALK_SPEED: f32 = ([\d.]+) \/ TICKS_PER_SECOND/.exec(sim('world.rs'));
-    const ticks = /pub const TICKS_PER_SECOND: u32 = (\d+);/.exec(sim('lib.rs'));
+    // (A tick's worth of it, as residents.ts works out how far a walker gets between snapshots: PACE / ticksPerSecond.)
+    const walk = /const WALK_SPEED: f32 = ([\d.]+) \/ TICKS_PER_SECOND as f32;/.exec(sim('world.rs'));
     expect(walk).not.toBeNull();
-    expect(ticks).not.toBeNull();
     expect(PACE).toBe(Number(walk![1]));
-    // (characters/actions.ts: the residents' walk, a tick's worth.)
-    expect(WALK_PER_TICK).toBeCloseTo(PACE / Number(ticks![1]), 9);
   });
 
   test('a hand reaches the leaf: the lead is a hand at speed 1, and the swing fits in it', () => {
@@ -51,10 +47,10 @@ describe('doors', () => {
 
   test('at every game speed the swing finishes before the walker arrives', () => {
     for (const s of [1, 2, 3, 4, 5]) {
-      const rate = GAME_RATE[s];
+      const rate = PLAYBACK_RATE[s];
       const l = doorLead(rate);
       const arrive = l / (PACE * rate);
-      // In game time the leaf needs DOOR_SWING; the renderer scales its step by the rate, up to 10x.
+      // In the sim's real time the leaf needs DOOR_SWING; the renderer scales its step by the rate, up to 10x.
       const swing = DOOR_SWING / Math.min(Math.max(rate, 1), 10);
       expect(swing).toBeLessThanOrEqual(arrive + 1e-9);
       // And never opens further off than the swing needs, nor nearer than the hand.

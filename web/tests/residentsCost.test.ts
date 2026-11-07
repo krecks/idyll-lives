@@ -10,6 +10,7 @@
 // resident radius, 140 m, drew the sun's map again, though it covers 30–70 m.)
 import { afterAll, describe, expect, test } from 'bun:test';
 import { readFileSync, existsSync } from 'node:fs';
+import { TICK_RATES } from './snapshotLayout';
 
 const WEB = new URL('../', import.meta.url).pathname;
 /** A shadow test as `SunShadows.reaches` gives it: a square round (x, z), with a long shadow's 8 m round it. */
@@ -111,7 +112,7 @@ describe('residents not drawn', async () => {
     headerLen: 6,
     simStride: FIELDS.length,
     maxSims: MAX_CHARACTERS,
-    ticksPerSecond: 20,
+    ...TICK_RATES,
     header: { tick: 0, day: 1, minute: 2, speed: 3, simCount: 4, structureVersion: 5 },
     sim: simFields(FIELDS),
     actions: [...content.animations],

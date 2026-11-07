@@ -1,6 +1,7 @@
 /** How story events read: their sentence, icon and tone (the feed and the journal). */
 
 import { FORMER, type SocialEvent } from '../core/protocol';
+import { minutesPerTick, tickRates } from '../core/snapshot';
 import { gradeLetter, money } from './format';
 import { services } from './services';
 import { game } from './state.svelte';
@@ -150,12 +151,11 @@ export function aboutUs(e: SocialEvent): boolean {
   return [e.a, e.b, e.c].some((id) => id !== undefined && id < FORMER && game.households[game.everyone.find((s) => s.id === id)?.household ?? -1]?.player);
 }
 
-/** Game minutes per tick (`sim-core` `MINUTES_PER_TICK`); day 1 starts at 08:00. */
-const MINUTES_PER_TICK = 1 / 20;
+/** Day 1 starts at 08:00. */
 const START_MINUTE = 8 * 60;
 
 /** When an event happened: day (from 1) and minute of the day. */
 export function storyTime(e: SocialEvent): { day: number; minute: number } {
-  const total = START_MINUTE + e.tick * MINUTES_PER_TICK;
+  const total = START_MINUTE + e.tick * minutesPerTick(tickRates);
   return { day: Math.floor(total / 1440) + 1, minute: total % 1440 };
 }

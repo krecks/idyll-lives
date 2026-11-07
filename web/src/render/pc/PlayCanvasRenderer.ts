@@ -74,7 +74,7 @@ import { GameCameraRig, keepUp } from '../shared/cameraRig';
 import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS } from '../shared/lens';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER, shutDefs } from '../shared/doors';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
-import { GAME_RATE } from '../shared/gameSpeed';
+import { PLAYBACK_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
 import { GrassPush } from '../shared/grass';
 import { idleMoment } from '../shared/idle';
@@ -2064,7 +2064,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * swings back once they're through. It opens at the hand: the leaf starts when the walker's hand
    * could be on its handle (`doorLead`: a hand's reach, or as far ahead as the swing needs at this
    * game speed, so it's open by the time they are), and the resident's arm goes out with it
-   * (`doorHand`, `residents.ts`). `rate`: how fast the game runs (`GAME_RATE`).
+   * (`doorHand`, `residents.ts`). `rate`: how fast the game runs (`PLAYBACK_RATE`).
    */
   private swingDoors(rate: number): void {
     const hand = this.doorHand;
@@ -2136,7 +2136,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // Who is where: doors open for those going through, neighbours' windows glow while someone is up.
     this.findDarkRooms(frame);
     this.lamps.frame(this.frameDt / 1000, this.darkRooms, this.awakeRooms); // (lamps and glows fading, `lamps.ts`.)
-    this.swingDoors(GAME_RATE[curr[h.speed] | 0] ?? 1);
+    this.swingDoors(PLAYBACK_RATE[curr[h.speed] | 0] ?? 1);
     this.steerCamera(this.frameDt / 1000);
     this.keepCameraClear();
     if (this.lot.update(frame)) this.mirrors.changed(); // (the objects' clips, the screens; things moving, in the held reflections.)
