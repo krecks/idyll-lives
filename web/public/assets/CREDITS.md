@@ -480,7 +480,7 @@ cassette door tips open, and the electric fire's flames grow while a resident wa
 
 The things residents carry and cook with (`models/held/*.glb`: the bag of shopping, the prep bowl, the stew pot and
 the dirty pot, the tasting board, the grill platter and the dirty platter, the pizza, the baking tray and the dirty
-tray, the pie and the dirty pie dish, the plates of stew, barbecue, a tasting menu, pizza, treats, pie, cake, salad, a sandwich and toast, the dirty plate
+tray, the pie and the dirty pie dish, the cake stand left after a baked cake, the plates of stew, barbecue, a tasting menu, pizza, treats, pie, cake, salad, a sandwich and toast, the dirty plate
 and a stack of three, the dirty tasting board and pizza board, the bowl of ice cream and the dirty bowl, the smoothie, the noodle pail and the
 takeaway box, the food bought in town (a paper cup of ice cream, a hot dog on its paper boat, a packet of crisps, an
 apple, a pastry in a paper bag), the parcel a thing bought comes in, the chopping board, the
