@@ -450,6 +450,8 @@ pub struct Graph {
 pub struct RoadPath {
     /// (point, road width, kind) along the way, from the first road point to the last.
     pub pts: Vec<([f32; 2], f32, RoadKind)>,
+    /// The edges it goes along (`Graph::path_by` only).
+    pub edges: Vec<u32>,
     /// Cost (seconds for cars, metres for walkers).
     pub cost: f32,
     /// Its length (m).
@@ -952,6 +954,32 @@ impl Graph {
         })
     }
 
+    /// `path`, setting off only towards `way.toward` and avoiding `way.avoid` (`Way`): a car turned
+    /// round to go another way (`cars::Detour`).
+    pub fn path_by(
+        &self,
+        from: RoadPoint,
+        to: RoadPoint,
+        mode: Mode,
+        country: f32,
+        way: Way,
+    ) -> Option<RoadPath> {
+        self.search_by(from, to, mode, country, way, |pieces| {
+            let (len, cost) = self.measure(pieces, mode, country);
+            let mut out = RoadPath {
+                len,
+                cost,
+                ..Default::default()
+            };
+            self.each_point(pieces, |p| out.pts.push(p));
+            out.edges = pieces
+                .iter()
+                .filter_map(|&(r, s0, s1)| self.edge_at(r, (s0 + s1) / 2.0))
+                .collect();
+            out
+        })
+    }
+
     /// `path`'s cost, and the way it sets off and the way it comes in (`PathEnds`), without the
     /// points between: to weigh many ways and lay out only the one taken.
     pub fn path_ends(
@@ -1025,6 +1053,20 @@ impl Graph {
         country: f32,
         found: impl FnOnce(&[Piece]) -> R,
     ) -> Option<R> {
+        self.search_by(from, to, mode, country, Way::default(), found)
+    }
+
+    /// `search`, setting off from `from` only towards `way.toward` (a node at an end of its edge),
+    /// and each edge of `way.avoid` costing that much more.
+    fn search_by<R>(
+        &self,
+        from: RoadPoint,
+        to: RoadPoint,
+        mode: Mode,
+        country: f32,
+        way: Way,
+        found: impl FnOnce(&[Piece]) -> R,
+    ) -> Option<R> {
         use std::cmp::Reverse;
         let allowed = |e: &Edge| {
             let r = &self.roads[e.road as usize];
@@ -1039,10 +1081,16 @@ impl Graph {
             return None;
         }
         let kind = |e: &Edge| self.roads[e.road as usize].kind;
-        // The same stretch of road: straight along it.
-        if from.road == to.road && from.edge == to.edge {
+        // The same stretch of road: straight along it (the way it may set off).
+        let ahead = |s: f32| match way.toward {
+            Some(n) if n == fe.b => s >= from.s,
+            Some(n) if n == fe.a => s <= from.s,
+            _ => true,
+        };
+        if from.road == to.road && from.edge == to.edge && ahead(to.s) {
             return Some(found(&[(from.road, from.s, to.s)]));
         }
+        let extra = |e: u32| way.avoid.iter().find(|a| a.0 == e).map_or(0.0, |a| a.1);
         let top = match mode {
             Mode::Foot => 1.0,
             Mode::Car => country.max(TOWN_SPEED),
@@ -1078,7 +1126,10 @@ impl Graph {
             let key = |v: f32| (v * 1000.0) as u64;
             // Off the start's stretch at either end.
             for (node, len) in [(fe.a, from.s - fe.s0), (fe.b, fe.s1 - from.s)] {
-                let c = Self::cost(kind(&fe), len.max(0.0), mode, country);
+                if way.toward.is_some_and(|n| n != node) {
+                    continue;
+                }
+                let c = Self::cost(kind(&fe), len.max(0.0), mode, country) + extra(from.edge);
                 if c < get(g, stamps, node as usize) {
                     g[node as usize] = c;
                     came[node as usize] = None;
@@ -1095,7 +1146,9 @@ impl Graph {
                 // Onto the goal's stretch from here.
                 for (end, len) in [(te.a, to.s - te.s0), (te.b, te.s1 - to.s)] {
                     if end == u {
-                        let total = gu + Self::cost(kind(&te), len.max(0.0), mode, country);
+                        let total = gu
+                            + Self::cost(kind(&te), len.max(0.0), mode, country)
+                            + extra(to.edge);
                         if best_end.is_none_or(|(b, _)| total < b) {
                             best_end = Some((total, u));
                         }
@@ -1110,7 +1163,7 @@ impl Graph {
                         continue;
                     }
                     let v = if edge.a == u { edge.b } else { edge.a };
-                    let c = gu + Self::cost(kind(edge), edge.len(), mode, country);
+                    let c = gu + Self::cost(kind(edge), edge.len(), mode, country) + extra(e);
                     if c < get(g, stamps, v as usize) {
                         g[v as usize] = c;
                         came[v as usize] = Some(e);
@@ -1140,6 +1193,14 @@ impl Graph {
             Some(found(pieces))
         })
     }
+}
+
+/// How a way is searched for (`Graph::path_by`): setting off only towards this node (an end of the
+/// start's edge), and these edges costing this much more each.
+#[derive(Debug, Clone, Default)]
+pub struct Way {
+    pub toward: Option<u32>,
+    pub avoid: Vec<(u32, f32)>,
 }
 
 /// A stretch of a road: the road, and from and to how far along it (m).

@@ -39,6 +39,14 @@ impl World {
         self.view = region;
     }
 
+    /// What the renderer draws of the town, a tile rectangle `[x0, z0, x1, z1)` on the ground
+    /// storey (a big town's streamed chunks round the camera; None: all of it, as in cosy and
+    /// normal towns, drawn whole). Cars out of it and `cars::SEEN_MARGIN` round it drive through
+    /// each other (`cars::sight`). Not saved: the renderer sends it again.
+    pub fn set_watch(&mut self, region: Option<[i32; 4]>) {
+        self.watch = region;
+    }
+
     /// Whether resident `i` is updated every tick (as of this tick): always, unless lower
     /// detail is on, there's a view, and they're neither of the player's household, nor on a
     /// watched lot, nor near the view.

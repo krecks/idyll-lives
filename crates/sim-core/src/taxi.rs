@@ -182,6 +182,10 @@ pub struct Run {
     /// not standing).
     #[serde(default)]
     pub progress: f32,
+    /// Its taxi turned round on its way (`cars::unjam`): `progress` is along the way it turned
+    /// round to, which a load works out again (`cars::turned_round`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detour: Option<crate::cars::Detour>,
     #[serde(default)]
     pub since: u64,
     /// Its car slot (`World::cars` index) while it's in town. Not saved.
@@ -631,6 +635,7 @@ fn time_run(
         stops: out,
         next: 0,
         progress: 0.0,
+        detour: None,
         since: 0,
         car: None,
         at,
@@ -848,7 +853,9 @@ fn wait_spot(travel: &crate::travel::Travel, stop: &Kerb) -> [f32; 2] {
 /// past `cars::MAX_CARS`).
 fn slot(w: &mut World) -> Option<u32> {
     let busy: Vec<u32> = w.taxis.runs.iter().filter_map(|r| r.car).collect();
-    if let Some(c) = (0..w.cars.len()).find(|&c| w.cars[c].taxi && !busy.contains(&(c as u32))) {
+    if let Some(c) = (0..w.cars.len())
+        .find(|&c| w.cars[c].taxi && !w.cars[c].off_run && !busy.contains(&(c as u32)))
+    {
         return Some(c as u32);
     }
     if w.cars.len() >= crate::cars::MAX_CARS {
@@ -1223,10 +1230,19 @@ fn run_on(w: &mut World, k: usize) -> bool {
         .is_some_and(|s| s.0.is_some() && tick >= s.1 + LONE_STILL)
         && give_up(w, k, c)
     {
+        // (In sight it doesn't leave the road on the spot: it turns round and drives off out of
+        // town, `cars::drive_off`; out of sight it's gone.)
+        if w.cars[c].sight == crate::cars::Sight::Seen {
+            w.cars[c].off_run = true;
+            w.traffic.give_ups[0] += 1;
+        } else {
+            w.traffic.give_ups[1] += 1;
+        }
         return false;
     }
     crate::cars::drive_taxi(w, c);
     w.taxis.runs[k].progress = w.cars[c].progress;
+    w.taxis.runs[k].detour = w.cars[c].detour;
     w.cars[c].progress < ticks
 }
 
@@ -1640,7 +1656,8 @@ fn finish(w: &mut World, k: usize) {
     let tick = w.tick;
     let off_map = crate::cars::off_map_ticks(w);
     let run = w.taxis.runs[k].clone();
-    if let Some(c) = run.car {
+    // (Not one driving off, given up in sight: it parks once out of town, `cars::drive_off`.)
+    if let Some(c) = run.car.filter(|&c| !w.cars[c as usize].off_run) {
         w.cars[c as usize].park_taxi();
     }
     for st in &run.stops {
@@ -1760,6 +1777,7 @@ fn join_home_run(w: &mut World, i: usize, g: (u32, u32)) -> bool {
                 stops: Vec::new(),
                 next: 0,
                 progress: 0.0,
+                detour: None,
                 since: 0,
                 car: None,
                 at: Vec::new(),
@@ -1905,6 +1923,10 @@ pub(crate) fn settle(w: &mut World) {
                     w.taxis.runs[k].car = Some(c);
                     w.taxis.runs[k].at = at;
                     w.taxis.runs[k].kerbs = kerbs;
+                    // (Turned round on its way: on the way it turned round to.)
+                    if let Some(d) = run.detour {
+                        crate::cars::turned_round(w, c as usize, d);
+                    }
                 }
                 _ => {
                     finish(w, k);
@@ -3220,6 +3242,7 @@ fn seat_leisure(
                 stops: Vec::new(),
                 next: 0,
                 progress: 0.0,
+                detour: None,
                 since: 0,
                 car: None,
                 at: Vec::new(),
@@ -3578,5 +3601,41 @@ fn seat_riders(w: &mut World) {
                 sim.pose = crate::content::Pose::Sit;
             }
         }
+    }
+}
+
+/// Whether car `c` is a work taxi with a halt still ahead on its run (`cars::unjam`: one with none
+/// left may turn round and go out of town another way).
+pub(crate) fn halts_ahead(w: &World, c: usize) -> bool {
+    w.taxis
+        .runs
+        .iter()
+        .find(|r| r.car == Some(c as u32))
+        .is_some_and(|r| (r.next as usize) < r.at.len())
+}
+
+/// Whether car `c`, a work taxi, has a halt still to come between `from` and `to` ticks along its
+/// way (`cars::pass_stands`: it doesn't go out round a standing taxi there).
+pub(crate) fn halts_within(w: &World, c: usize, from: f32, to: f32) -> bool {
+    w.taxis
+        .runs
+        .iter()
+        .find(|r| r.car == Some(c as u32))
+        .is_some_and(|r| {
+            r.at[(r.next as usize).min(r.at.len())..]
+                .iter()
+                .any(|&h| (from..=to).contains(&h))
+        })
+}
+
+/// Car `c`, a work taxi, backed up out of the way on its run (`cars::unjam`): its halts still
+/// ahead are at `at(old)` along its way now.
+pub(crate) fn moved_halts(w: &mut World, c: usize, at: &dyn Fn(f32) -> f32) {
+    let progress = w.cars[c].progress;
+    if let Some(run) = w.taxis.runs.iter_mut().find(|r| r.car == Some(c as u32)) {
+        for h in run.next as usize..run.at.len() {
+            run.at[h] = at(run.at[h]);
+        }
+        run.progress = progress;
     }
 }

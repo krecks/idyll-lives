@@ -571,19 +571,21 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal]) {
 /// it couldn't pass one coming the other way (a 6 m lane's tight bend; a 7 m street's sharp bend
 /// out of the junctions' boxes, there the two in their lanes too near each other however far
 /// they pull over), each begun `NARROW_BACK` m before: a claim of their own, so that two coming
-/// towards each other take turns there.
+/// towards each other take turns there. (The other's body swings about as much as its own there,
+/// across the bend from it: two taxis met side by side on a 7 m lane's bend by a junction, too near
+/// to pass, Rowan Hollow.)
 pub(crate) fn narrow(trace: &Trace, pass: &[f32], swing: &[f32], over: &[f32]) -> Vec<(f32, f32)> {
     let at = |v: &[f32], k: usize| v.get(k).copied().unwrap_or(0.0);
     let spans = runs(trace, |k| {
         let (p, s, o) = (at(pass, k), at(swing, k), at(over, k));
-        (o > 0.0 || p > 0.0) && o + s + PASS_GAP > 2.0 * p
+        (o > 0.0 || p > 0.0) && o + 2.0 * s + PASS_GAP > 2.0 * p
     });
     back_by(trace, spans, NARROW_BACK)
 }
 
 /// How far before a narrow stretch a claim of it begins (m, `narrow`): two coming towards each
 /// other wait where they pass.
-const NARROW_BACK: f32 = 6.6;
+pub(crate) const NARROW_BACK: f32 = 6.6;
 
 /// `spans` of `trace` (ticks along it), each begun `back` m earlier.
 pub(crate) fn back_by(trace: &Trace, spans: Vec<(f32, f32)>, back: f32) -> Vec<(f32, f32)> {
@@ -645,6 +647,15 @@ struct Ask {
     by: Vec<u64>,
     /// The earlier asks it waited for as the tick began (their keys).
     fifo: Vec<u64>,
+    /// Of `by`, those only on the move into its way, not in it: they're to stop short, it doesn't
+    /// wait for them to go first (`begin`, rule 3).
+    coming: Vec<u64>,
+    /// Held up by nobody's claim nor an earlier ask, only by bodies: once those still to come
+    /// keep clear (`blocked`), it's granted.
+    bodies_only: bool,
+    /// Long asked (`OLD_ASK`), whom it waits for, however far round (as the tick began, those only
+    /// coming into its way left out): none of them keeps clear of it (`blocked`).
+    reach: Vec<u64>,
 }
 
 /// How far short of what's left of another's claim one waits (m, `Traffic::blocked`).
@@ -678,6 +689,28 @@ pub struct Traffic {
     /// Ticks a car was kept from moving deeper into another by the last-resort check
     /// (`cars::guard`), since the game was loaded.
     pub guarded: u64,
+    /// Cars held up out of the picture put on along their ways (`cars::unstick`), since the game
+    /// was loaded.
+    pub unstuck: u64,
+    /// Cars held up in sight turned round to go another way (`cars::unjam`), and rings of them
+    /// none of which could, by why, since the game was loaded.
+    pub unjams: u64,
+    pub unjam_impossible: std::collections::BTreeMap<&'static str, u64>,
+    /// Rings `cars::unjam` last tried (by their least key), and when.
+    pub(crate) unjam_tried: Vec<(u64, u64)>,
+    /// Work taxis held still on their way so long they gave their way up (`taxi.rs`): in sight
+    /// (driving off, `cars::drive_off`) and out of it (gone), since the game was loaded.
+    pub give_ups: [u64; 2],
+    /// Each car turning round (`cars::unjam`): the ground it still backs up over, its bodies
+    /// along it this tick.
+    pub(crate) turning: Vec<(u64, Vec<crate::cars::Rect>)>,
+    /// The work taxis standing at the kerb in sight (`cars::pass_stands`: their keys, where), and
+    /// a count that goes up each time they change.
+    pub(crate) stands: Vec<(u64, [f32; 2])>,
+    pub(crate) stand_gen: u64,
+    /// Each car on its way round a standing taxi (`cars::PassBy`), and the taxi's key: it keeps
+    /// clear of the taxi's claim as it goes by.
+    pub(crate) passing: Vec<(u64, u64)>,
 }
 
 /// Claim `k` of a route tagged `route` (`Place`).
@@ -710,6 +743,32 @@ impl Traffic {
             .iter()
             .find(|a| a.key == key && a.seen + 1 >= self.tick)
             .map_or(&[][..], |a| &a.by[..])
+    }
+
+    /// `key`, a taxi standing `t` ticks along its way at a stop (`cars::stand_taxi`): every claim
+    /// it holds but the one it stands in let go, and its asks too; it asks again as it sets off.
+    /// (Standing there for its riders, a claim on ahead held others up all the while.)
+    pub(crate) fn stand(&mut self, key: u64, t: f32) {
+        self.holds
+            .retain(|h| h.key != key || h.claim.from <= t + 1e-3 && t < h.claim.to);
+        self.asks.retain(|a| a.key != key);
+        self.starts.retain(|s| s.0 != key);
+        for a in &mut self.asks {
+            a.by.retain(|&k| k != key);
+            a.fifo.retain(|&k| k != key);
+        }
+    }
+
+    /// `key` gone out of sight (`cars::sight`): its claims, held or asked for, let go, and nobody
+    /// waits for it.
+    pub(crate) fn forget(&mut self, key: u64) {
+        self.holds.retain(|h| h.key != key);
+        self.asks.retain(|a| a.key != key);
+        self.starts.retain(|s| s.0 != key);
+        for a in &mut self.asks {
+            a.by.retain(|&k| k != key);
+            a.fifo.retain(|&k| k != key);
+        }
     }
 
     fn mover(&self, key: u64) -> Option<&Mover> {
@@ -766,6 +825,9 @@ impl Traffic {
                         seen: tick,
                         by: Vec::new(),
                         fifo: Vec::new(),
+                        coming: Vec::new(),
+                        bodies_only: false,
+                        reach: Vec::new(),
                     };
                     match found {
                         Some(a) => *a = ask,
@@ -826,7 +888,11 @@ impl Traffic {
         let next = if holding { *next } else { long(next) };
         let (now, next) = (sample(now), sample(&next));
         for h in &self.holds {
-            if h.key == key || !in_bounds(&h.claim, &next.rect) {
+            // (Going by a standing taxi, out round it: not its claim where it stands.)
+            if h.key == key
+                || !in_bounds(&h.claim, &next.rect)
+                || self.passing.contains(&(key, h.key))
+            {
                 continue;
             }
             // (Not one right behind it, nor one that waits for it to go on: as for its grant.)
@@ -859,6 +925,31 @@ impl Traffic {
         if holding {
             return None;
         }
+        let into = |a: &Ask, r: &Sample| {
+            a.parts.iter().any(|(_, c)| {
+                in_bounds(c, &r.rect) && c.samples.iter().any(|o| conflict(r, o, true))
+            })
+        };
+        let old = |a: &&Ask| {
+            a.key != key
+                && a.seen + 1 >= self.tick
+                && self.tick > a.tick + OLD_ASK
+                && self
+                    .mover(a.key)
+                    .is_none_or(|m| !behind((&now.rect, way), (&m.rect, m.way)))
+        };
+        // Not holding a claim, nor on into the way of a group another has asked for long
+        // (`OLD_ASK`), held up only by bodies in its way, while out of it ("keep clear"): stood
+        // there in turn, it'd hold that one up as those before it did; a stream of them kept one
+        // backing out of its driveway by a busy junction, and one waiting at a junction with a
+        // stream of taxis through it, waiting for good. (Not one that one waits for, however far
+        // round: they'd wait for each other.)
+        let clear = Sample { pass: 0.0, ..now };
+        if let Some(a) = self.asks.iter().filter(old).find(|a| {
+            a.bodies_only && !a.reach.contains(&key) && into(a, &next) && !into(a, &clear)
+        }) {
+            return Some(a.key);
+        }
         let stop = self.starts.iter().find(|s| s.0 == key).map(|s| s.1)?;
         // (Nearer than half that already, it came up to it before that one's ask was old: on.)
         let (from, to) = (
@@ -875,18 +966,9 @@ impl Traffic {
             pass: 0.0,
             ..now
         };
-        let into = |a: &Ask, r: &Sample| {
-            a.parts.iter().any(|(_, c)| {
-                in_bounds(c, &r.rect) && c.samples.iter().any(|o| conflict(r, o, true))
-            })
-        };
         self.asks
             .iter()
-            .filter(|a| a.key != key && a.seen + 1 >= self.tick && self.tick > a.tick + OLD_ASK)
-            .filter(|a| {
-                self.mover(a.key)
-                    .is_none_or(|m| !behind((&now.rect, way), (&m.rect, m.way)))
-            })
+            .filter(old)
             .find(|a| into(a, &stop) && !into(a, &short))
             .map(|a| a.key)
     }
@@ -1016,8 +1098,15 @@ impl Traffic {
         // (Who waits for whose body on the road, however far round: the asks' waits left out.)
         let on_road = graph.clone();
         for a in &self.asks {
+            // (Not those only coming into its way: they keep clear of it, `blocked`, and are no
+            // reason for it to let them go first.)
             let e = graph.entry(a.key).or_default();
-            e.extend(a.by.iter().chain(&a.fifo).copied());
+            e.extend(
+                a.by.iter()
+                    .filter(|k| !a.coming.contains(k))
+                    .chain(&a.fifo)
+                    .copied(),
+            );
         }
         // (Earlier asks with parts not granted, and whose bodies they wait for.)
         let mut pending: Vec<(usize, Vec<u64>)> = Vec::new();
@@ -1091,6 +1180,7 @@ impl Traffic {
                             || reaches(&on_road, h.key, a.key));
                     h.key != a.key
                         && !waits
+                        && !self.passing.contains(&(a.key, h.key))
                         && next
                             .iter()
                             .any(|c| overlaps((c, &c.samples[mine(c, h.key)]), (&h.claim, rest)))
@@ -1138,8 +1228,13 @@ impl Traffic {
             // block the box), nor on the move into it; those holding one, not in its way; on its
             // far side, past its zone, nobody.
             let mut bodies = Vec::new();
+            let mut coming = Vec::new();
             for m in &self.movers {
-                if m.key == a.key || m.parked || behind_me(m.key) {
+                if m.key == a.key
+                    || m.parked
+                    || behind_me(m.key)
+                    || self.passing.contains(&(a.key, m.key))
+                {
                     continue;
                 }
                 let strict = !self.holding(m.key);
@@ -1164,11 +1259,16 @@ impl Traffic {
                 if reaches(&graph, m.key, a.key) && !hit(&m.rect, true) {
                     continue;
                 }
-                if hit(&m.rect, strict) || m.moving && m.ahead.iter().any(|r| hit(r, false)) {
+                let inside = hit(&m.rect, strict);
+                if !inside && m.moving && m.ahead.iter().any(|r| hit(r, false)) {
+                    coming.push(m.key);
+                }
+                if inside || m.moving && m.ahead.iter().any(|r| hit(r, false)) {
                     bodies.push(m.key);
                 }
             }
             let free = by_holds.is_empty() && !earlier && bodies.is_empty();
+            let bodies_only = by_holds.is_empty() && !earlier;
             let mut by = by_holds;
             by.extend(bodies);
             if free {
@@ -1185,11 +1285,15 @@ impl Traffic {
                 by.clear();
             }
             if !self.asks[i].parts.is_empty() {
-                // (The bodies it waits for, and those the earlier asks it waits for wait for.)
-                let mut bodies_of = by.clone();
+                // (The bodies it waits for, and those the earlier asks it waits for wait for: not
+                // those only coming into its way.)
+                let mut bodies_of: Vec<u64> =
+                    by.iter().filter(|k| !coming.contains(k)).copied().collect();
                 bodies_of.extend(after);
                 pending.push((i, bodies_of));
             }
+            self.asks[i].coming = coming;
+            self.asks[i].bodies_only = bodies_only;
             waits.push((i, by));
         }
         for (i, e) in fifo {
@@ -1197,6 +1301,26 @@ impl Traffic {
         }
         for (i, by) in waits {
             self.asks[i].by = by;
+        }
+        // (Whom each long-asked waits for however far round: `blocked`.)
+        for i in 0..self.asks.len() {
+            let a = &self.asks[i];
+            let reach = if tick > a.tick + OLD_ASK {
+                let mut seen = vec![a.key];
+                let mut k = 0;
+                while k < seen.len() {
+                    for &x in graph.get(&seen[k]).into_iter().flatten() {
+                        if !seen.contains(&x) {
+                            seen.push(x);
+                        }
+                    }
+                    k += 1;
+                }
+                seen
+            } else {
+                Vec::new()
+            };
+            self.asks[i].reach = reach;
         }
         self.asks.retain(|a| !a.parts.is_empty());
     }
@@ -1355,6 +1479,10 @@ impl World {
 
 /// The tick's claims, before the cars go on (`Traffic::begin`).
 pub(crate) fn begin(w: &mut World) {
+    crate::cars::track_stall(w);
+    crate::cars::sight(w);
+    crate::cars::pass_stands(w);
+    crate::cars::unjam(w);
     let mut movers = Vec::new();
     let mut places = Vec::new();
     crate::cars::movers(w, &mut movers, &mut places);

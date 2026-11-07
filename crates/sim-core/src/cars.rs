@@ -75,6 +75,21 @@
 //! waits while one coming the other way is too near to pass (`too_near`), but for one waiting for
 //! it. Held up nose to nose with one that waits for it for `JAM_TICKS`, it backs up a little out of
 //! its way (`back_off`). And never deeper into another car than it is (`guard`).
+//!
+//! **Out of sight** (`sight`; the owner's call for big towns). All that is only where the player
+//! can see it: a car takes turns with the others, keeps clear of them and waits for anyone in its
+//! way only while it's in the seen area, what the renderer draws (`World::set_watch`: the
+//! camera's streamed chunks) and `SEEN_MARGIN` round it (`Sight::Seen`). Out of it a car drives on
+//! through the others, through junctions and past people, claiming nothing (`Sight::Ghost`):
+//! nobody draws it there, and a hold-up nobody can see is gone at once. Those in sight never wait
+//! for one driving out of it. One driving into the seen area comes under the rules some 20 m short
+//! of it (`COMING_IN`), and short of any claim of its reaching into it, once clear of those in it:
+//! till then it waits outside (`Sight::Wait`). One the seen area came to (the camera moved, nobody
+//! has seen it yet) on top of or touching one in it is put back along its way, or on, to the
+//! nearest place clear of them (`moved_clear`) and comes into sight there: no car is drawn on top
+//! of another, and none the player sees is hidden (`hidden`, `snapshot::car`, leaves out those out
+//! of sight and any touching one). Without a watch (cosy and normal towns, drawn whole; headless
+//! runs) every car is seen.
 
 use serde::{Deserialize, Serialize};
 
@@ -223,6 +238,117 @@ pub enum CarState {
     Out,
 }
 
+/// A car's way turned round (`unjam`, `Route::detour`): it was held up `from` ticks along the way
+/// it had (`home`: its way home), backs up along it to `back` and goes on from there another way,
+/// round edge `avoid` of the roads (`travel::Graph::edges`). Saved with the car, so its way after a
+/// load is the same.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Detour {
+    pub home: bool,
+    pub from: f32,
+    pub back: f32,
+    pub avoid: u32,
+    /// It only backs up out of the way, and goes on the way it had: a work taxi with its stops
+    /// still ahead on it (`taxi.rs`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub same: bool,
+    /// It turns round in a driveway's mouth it came by (`MouthTurn`), backing into it and out the
+    /// other way.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mouth: Option<MouthTurn>,
+}
+
+/// A driveway's mouth a car turns round in (`Detour::mouth`): the road it meets and how far along
+/// it (the network's: `travel::Graph::roads`), the way it runs to the road (`Drive::way`), and
+/// the way along the road (+1: the road's own) the car came going, backing into it.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MouthTurn {
+    pub road: u32,
+    pub s: f32,
+    pub way: [f32; 2],
+    pub go: f32,
+}
+
+/// A car's way round a work taxi standing at the kerb in its lane (`pass_stands`): its way's
+/// points from `from` to `to` (ticks along it) moved `off` m to their right (out into the other
+/// lane: less than 0), all of it between `out` and `back` (alongside the taxi and clear of it at
+/// either end), eased out before and back in after. A claim of its own, taken in turns with
+/// those coming the other way there (`Route::spans`). Made on its way as it was then (`home`, and
+/// `at`: where it is `from` along it), taxi `taxi`'s (its index in `World::cars`).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PassBy {
+    pub home: bool,
+    pub taxi: u32,
+    pub from: f32,
+    pub out: f32,
+    pub back: f32,
+    pub to: f32,
+    pub off: f32,
+    pub at: [f32; 2],
+}
+
+/// What going along the stretch a car turned round from costs it more, finding its new way
+/// (seconds: `Route::detour`): only if there's no other way does it go back that way.
+const DETOUR_AVOID: f32 = 1.0e5;
+
+/// Whether a car on its way is in sight (`sight`, see the module notes): under the rules (`Seen`),
+/// out of sight driving through the others (`Ghost`), or just outside the seen area waiting for its
+/// way into it to clear of one in sight (`Wait`: that one's `Driving::first`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Sight {
+    #[default]
+    Seen,
+    Ghost,
+    Wait(u64),
+}
+
+/// The seen area reaches this far (m) round the watch (`World::set_watch`): those coming in are
+/// under the rules this far short of where anyone could see them, a camera moving on finds them so
+/// there, and one out of sight driving through another is never near what's drawn.
+pub(crate) const SEEN_MARGIN: f32 = 32.0;
+
+/// One in sight goes out of it only this much further out (m): backed up a little out of
+/// another's way at the edge of the seen area, or pulled over there, it isn't in and out of sight
+/// by turns, letting go of its claims each time (`sight`).
+const SEEN_SLACK: f32 = 12.0;
+
+/// One out of sight comes under the rules once it's this near coming into sight along its way
+/// (ticks: some 20 m at speed), clear of those in sight (`sight`).
+const COMING_IN: [f32; 5] = [1.0, 20.0, 40.0, 60.0, 80.0];
+
+/// Coming into sight (`sight`), a car out of it waits outside while one in sight standing still
+/// (`METER_STILL`, or a taxi at its stop) is on its way in up to the first junction it takes
+/// turns at in sight (else `ahead` ticks along it; `most` at most; sampled every 10), this near
+/// it past `GAP` (`gap`, m): the queue
+/// there has no room for it. Out of sight nobody waits, so those coming would all come in at once
+/// and fill the seen area past what the rules would have let through (Fernglade).
+struct Meter {
+    ahead: f32,
+    most: f32,
+    gap: f32,
+}
+const METER: Meter = Meter {
+    ahead: 120.0,
+    most: 1500.0,
+    gap: 1.0,
+};
+/// How long one in sight on its way has stood still for its queue to count as full (ticks).
+const METER_STILL: u64 = crate::TICKS_PER_MINUTE;
+/// How long one waits outside for room at most (ticks, `METER`): then it comes in all the same.
+const METER_MOST: u64 = 5 * crate::TICKS_PER_MINUTE;
+
+/// Two cars this near (m) touch: one the camera comes to touching one in sight is put clear
+/// (`sight`), and one in sight touching one out of it isn't drawn (`hidden`). (Those under the
+/// rules keep `GAP` apart.)
+const TOUCH: f32 = 0.05;
+
+/// Till when a car turned round waits out of the way (`Car::let_by`), and those it waits for to
+/// go on: each car, how far along its way it was, in which state.
+type LetBy = (u64, Vec<(u32, f32, CarState)>);
+
 /// A drive to a place beyond walking range and back (`Car::trip`; open-world towns): out of the
 /// driveway along the roads to a public parking spot near it (the town file's `parking`), parked
 /// there (`CarState::Out`) while the driver walks to the place and is there, then back the same
@@ -363,6 +489,37 @@ pub struct Car {
     /// Not saved.
     #[serde(skip)]
     pub standing: bool,
+    /// On its way, whether it's in sight (`sight`; every car parked or out of town is). Not saved.
+    #[serde(skip)]
+    pub sight: Sight,
+    /// Since when it waits outside the seen area for room in the queue on its way in (`METER`;
+    /// a tick). Not saved.
+    #[serde(skip)]
+    metered: Option<u64>,
+    /// The furthest along its way it has been, in sight, and since when (`unstick`, `unjam`).
+    /// Not saved.
+    #[serde(skip)]
+    stall: (f32, u64),
+    /// Its way turned round, held up (`unjam`); none: the way it always takes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detour: Option<Detour>,
+    /// A work taxi that gave its way up in sight (`taxi.rs`): its run over, it turns round and
+    /// drives off out of town (`drive_off`) rather than leave the road where it is. Not saved.
+    #[serde(skip)]
+    pub(crate) off_run: bool,
+    /// Turned round with no other way than back where it was held up (`unjam`): it waits out of
+    /// the way, where it turned, till those it was held up with have gone on (car, how far along,
+    /// in which state), or till the tick given. Not saved.
+    #[serde(skip)]
+    let_by: Option<LetBy>,
+    /// The stretches of road it turned round from lately (`travel::Graph::edges`) and till when it
+    /// keeps off them, turning round again (`AVOID_FOR`). Not saved.
+    #[serde(skip)]
+    avoided: Vec<(u32, u64)>,
+    /// Its way out round a work taxi standing at the kerb in its lane, back in past it
+    /// (`pass_stands`), laid on its way; saved, so a game loaded part way round is the same.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pass_by: Option<PassBy>,
 }
 
 fn is_zero_f32(v: &f32) -> bool {
@@ -534,6 +691,14 @@ impl Car {
             backed_for: None,
             taxi: false,
             standing: false,
+            sight: Sight::Seen,
+            metered: None,
+            stall: (0.0, 0),
+            detour: None,
+            off_run: false,
+            let_by: None,
+            avoided: Vec::new(),
+            pass_by: None,
         }
     }
 
@@ -569,6 +734,9 @@ impl Car {
         self.backed_for = None;
         self.waits_for = None;
         self.pulled_for = None;
+        // (A new way: not one it turned round to, `unjam`.)
+        self.detour = None;
+        self.let_by = None;
     }
 
     /// A taxi's route's length (ticks).
@@ -586,6 +754,9 @@ impl Car {
 
     /// A taxi done with its run: out of town, free.
     pub(crate) fn park_taxi(&mut self) {
+        self.off_run = false;
+        self.let_by = None;
+        self.detour = None;
         self.state = CarState::Away;
         self.route = None;
         self.progress = 0.0;
@@ -594,6 +765,18 @@ impl Car {
         self.next = None;
         self.shift = 0.0;
         self.waits_for = None;
+    }
+
+    /// Out of sight (`Sight`): it waits for nobody on the road or on foot, nor stays backed up or
+    /// pulled over for anyone.
+    fn unhold(&mut self) {
+        self.moved = false;
+        self.waits_for = None;
+        self.on_foot.clear();
+        self.waited = 0;
+        self.jam = (0, 0, false);
+        self.backed_for = None;
+        self.pulled_for = None;
     }
 
     /// Standing on its driveway (parked, or waiting for the others to get in).
@@ -654,6 +837,14 @@ impl Car {
             backed_for: None,
             taxi: false,
             standing: false,
+            sight: Sight::Seen,
+            metered: None,
+            stall: (0.0, 0),
+            detour: None,
+            off_run: false,
+            let_by: None,
+            avoided: Vec::new(),
+            pass_by: None,
         }
     }
 
@@ -777,9 +968,44 @@ impl Car {
     /// Its route out of town or (`home`) back (worked out when first asked for).
     fn route(&mut self, exits: &[[f32; 2]], travel: Option<&Travel>, home: bool) -> &Route {
         if self.route.as_ref().is_none_or(|(h, _)| *h != home) {
-            self.route = Some((home, Route::build(self, exits, travel, home)));
+            // (Turned round on this way, `unjam`: that way, as it was then.)
+            let detour = self
+                .detour
+                .filter(|d| d.home == home)
+                .zip(travel.filter(|t| !t.graph.is_empty()))
+                .and_then(|(d, t)| {
+                    let had = Route::on_roads(self, exits, t, home)?;
+                    self.detoured(exits, t, home, &d, &had)
+                });
+            let route = detour.unwrap_or_else(|| Route::build(self, exits, travel, home));
+            self.route = Some((home, route));
         }
         &self.route.as_ref().expect("just made").1
+    }
+
+    /// Its way turned round `d` from the way it had (`Route::detour`), with its claims: none
+    /// backing up out of the way it came (it backs into room that's clear, `unjam`, never deeper
+    /// into another, `guard`).
+    fn detoured(
+        &self,
+        exits: &[[f32; 2]],
+        travel: &Travel,
+        home: bool,
+        d: &Detour,
+        had: &Route,
+    ) -> Option<Route> {
+        let mut r = Route::detour(self, exits, travel, home, d, had)?;
+        // (It sets off backing up facing as it faces now: no turn on the spot.)
+        if let Some(p) = r.points.first_mut() {
+            p.1 = had.at(d.from).1;
+        }
+        r.claim(self.len, self.wid, Some(travel));
+        let back = r.points.iter().find(|p| !p.3).map_or(0.0, |p| p.2);
+        r.claims.retain(|k| k.to > back);
+        for k in &mut r.claims {
+            k.from = k.from.max(back);
+        }
+        Some(r)
     }
 
     /// Works out again what follows from where it parks (after it came home, moved, or loaded).
@@ -817,8 +1043,17 @@ impl Car {
     /// Its route's claims worked out again (the junctions' lights settled: `traffic::settle`).
     pub(crate) fn reclaim(&mut self, travel: &Travel) {
         let (len, wid) = (self.len, self.wid);
+        let turned = self.detour.is_some();
         if let Some((_, route)) = self.route.as_mut() {
             route.claim(len, wid, Some(travel));
+            // (Turned round: none backing up out of the way it came, as `detoured` has them.)
+            if turned && route.points.first().is_some_and(|p| p.3) {
+                let back = route.points.iter().find(|p| !p.3).map_or(0.0, |p| p.2);
+                route.claims.retain(|k| k.to > back);
+                for k in &mut route.claims {
+                    k.from = k.from.max(back);
+                }
+            }
         }
     }
 
@@ -928,6 +1163,27 @@ pub(crate) struct Route {
     /// Where it must hold a claim to drive on (`traffic::Claim`): junctions' boxes and the mouths,
     /// worked out with the route (`Route::build`).
     pub(crate) claims: Vec<crate::traffic::Claim>,
+    /// Where it takes turns with one passing a work taxi standing at the kerb the other way
+    /// (ticks along it, from and to: `pass_stands`), claims of their own.
+    spans: Vec<(f32, f32)>,
+    /// Its way out round a work taxi standing at the kerb in its lane as laid on it (`PassBy`),
+    /// with what it took the place of, to put back (`Leg`).
+    leg: Option<Leg>,
+    /// The taxis standing it was last looked at against (`Traffic::stand_gen`; 0: never).
+    stand_gen: u64,
+}
+
+/// A car's way round a taxi standing at the kerb (`PassBy`) as laid on its route: the points
+/// from `at` on it took the place of, and their rooms and lanes (`Route::room`, `Route::lane`),
+/// and how many it laid there.
+#[derive(Debug, Clone)]
+struct Leg {
+    pass: PassBy,
+    at: usize,
+    laid: usize,
+    points: Vec<([f32; 2], f32, f32, bool)>,
+    room: Vec<f32>,
+    lane: Vec<f32>,
 }
 
 impl Route {
@@ -1019,6 +1275,16 @@ impl Route {
         if travel.is_some() {
             more.extend(crate::traffic::narrow(&trace, &pass, &swing, &over));
         }
+        // (By a taxi standing at the kerb: alongside where one passes it the other way, begun as
+        // far short as a narrow stretch's, so it waits there; and its own way round it.)
+        more.extend(crate::traffic::back_by(
+            &trace,
+            self.spans.clone(),
+            crate::traffic::NARROW_BACK,
+        ));
+        if let Some(l) = &self.leg {
+            more.push((l.pass.from, l.pass.to));
+        }
         self.claims = crate::traffic::claims(&trace, &pass, len, wid, boxes, &more);
         if let Some(t) = travel {
             crate::traffic::gate(&mut self.claims, &t.signals);
@@ -1030,6 +1296,85 @@ impl Route {
     pub(crate) fn pass_at(&self, t: f32) -> f32 {
         let k = self.pass.partition_point(|p| p.0 <= t);
         self.pass.get(k.saturating_sub(1)).map_or(0.0, |p| p.1)
+    }
+
+    /// Lays `pass` on it (`PassBy`): its points from `pass.from` to `pass.to` a tick apart, each
+    /// moved its share of `pass.off` to its right, facing on to the next, with no room to pull
+    /// over. False: no such stretch on it (backing up there, or past its end).
+    fn lay_leg(&mut self, pass: PassBy) -> bool {
+        let n = self.points.len();
+        if self.leg.is_some()
+            || n < 2
+            || self.room.len() != n
+            || self.lane.len() != n
+            || !(pass.from < pass.out && pass.out <= pass.back && pass.back < pass.to)
+            || pass.to + 1.0 >= self.ticks()
+        {
+            return false;
+        }
+        let share = |t: f32| {
+            let ease = |x: f32| {
+                let x = x.clamp(0.0, 1.0);
+                x * x * (3.0 - 2.0 * x)
+            };
+            if t < pass.out {
+                ease((t - pass.from) / (pass.out - pass.from))
+            } else if t <= pass.back {
+                1.0
+            } else {
+                1.0 - ease((t - pass.back) / (pass.to - pass.back))
+            }
+        };
+        let mut ts: Vec<f32> = (0..)
+            .map(|i| pass.from + i as f32)
+            .take_while(|&t| t < pass.to)
+            .collect();
+        ts.push(pass.to);
+        let mut laid = Vec::with_capacity(ts.len());
+        let (mut room, mut lane) = (Vec::new(), Vec::new());
+        for &t in &ts {
+            let (p, yaw, back) = self.at(t);
+            if back {
+                return false;
+            }
+            laid.push((shifted(p, yaw, pass.off * share(t)), yaw, t, false));
+            room.push(0.0);
+            lane.push(self.lane_at(t));
+        }
+        // (Facing on to the next, the last as the one before it.)
+        for k in 0..laid.len() {
+            let (a, b) = if k + 1 < laid.len() {
+                (laid[k].0, laid[k + 1].0)
+            } else {
+                (laid[k - 1].0, laid[k].0)
+            };
+            laid[k].1 = (b[0] - a[0]).atan2(b[1] - a[1]);
+        }
+        let i0 = self.points.partition_point(|p| p.2 < pass.from);
+        let i1 = self.points.partition_point(|p| p.2 <= pass.to);
+        let count = laid.len();
+        let points = self.points.splice(i0..i1, laid).collect();
+        let room = self.room.splice(i0..i1, room).collect();
+        let lane = self.lane.splice(i0..i1, lane).collect();
+        self.leg = Some(Leg {
+            pass,
+            at: i0,
+            laid: count,
+            points,
+            room,
+            lane,
+        });
+        true
+    }
+
+    /// Its way round a standing taxi taken off it again (`lay_leg`), as it was.
+    fn unlay_leg(&mut self) {
+        if let Some(l) = self.leg.take() {
+            let r = l.at..l.at + l.laid;
+            self.points.splice(r.clone(), l.points);
+            self.room.splice(r.clone(), l.room);
+            self.lane.splice(r, l.lane);
+        }
     }
 
     /// How far right of its lane a car standing `t` ticks along can pull over (m: the more of the
@@ -1261,6 +1606,236 @@ impl Route {
         }
         let trip = park.is_some();
         Some(legs.timed(!home || trip, home || trip))
+    }
+
+    /// Its way turned round (`Detour`): back along the way it had (`on_roads`) from where it was
+    /// held up to where it turns (`Detour::back`), then on along the lanes from there, setting off
+    /// the way it faces, round the stretch it was held up on (`Detour::avoid`), to where it was
+    /// going: into its driveway (home), its trip's parking spot, or out of town. None: no such
+    /// way (only by that stretch, say).
+    fn detour(
+        car: &Car,
+        exits: &[[f32; 2]],
+        travel: &Travel,
+        home: bool,
+        d: &Detour,
+        had: &Route,
+    ) -> Option<Route> {
+        use crate::travel::{RoadKind, Way, dist};
+        let g = &travel.graph;
+        // (Into a driveway's mouth it may back from where it stands: `mouth_behind`.)
+        let backs = d.back < d.from || d.mouth.is_some() && d.back <= d.from;
+        if !(backs && d.from <= had.ticks()) {
+            return None;
+        }
+        let mut legs = Legs::default();
+        // Back along the way it came, as it drove it (round the bends and turns it took).
+        let mut t = d.from;
+        loop {
+            // (Pulled over as far as the way it came lets it, as it was: `pull_over`.)
+            legs.push_back(had.at(t).0, had.room_here(t), had.lane_at(t));
+            if t <= d.back {
+                break;
+            }
+            t = (t - 1.0).max(d.back);
+        }
+        // (Backed up out of the way only: on the way it had from there, as it had it.)
+        if d.same {
+            let i0 = had.points.partition_point(|q| q.2 <= d.back);
+            for i in i0..had.points.len() {
+                let (q, _, t, rev) = had.points[i];
+                let top = had.points.get(i + 1).map_or(SLOW, |n| {
+                    let dt = (n.2 - t).max(1e-3) / TICKS_PER_SECOND as f32;
+                    (dist(q, n.0) / dt).max(0.3)
+                });
+                legs.pts.push((q, rev, top));
+                legs.room.push(had.room.get(i).copied().unwrap_or(0.0));
+                legs.lane.push(had.lane.get(i).copied().unwrap_or(LANE));
+            }
+            return Some(legs.timed(true, false));
+        }
+        // (Into a driveway's mouth backing up, round as it would pull out of it, and out of it the
+        // other way.)
+        let turned = match d.mouth {
+            Some(m) => {
+                let (bay, go) = (mouth_turn(&m, travel, car.len)?, m.go);
+                let mut into = Legs::default();
+                bay.leave(&mut into, go);
+                for &(q, ..) in into.pts.iter().rev() {
+                    legs.push(q, true, SLOW);
+                }
+                bay.leave(&mut legs, -go);
+                let n = legs.pts.len();
+                let (a, b) = (legs.pts[n.saturating_sub(2)].0, legs.pts[n - 1].0);
+                Some((b, (b[0] - a[0]).atan2(b[1] - a[1])))
+            }
+            None => None,
+        };
+        // On from there, the way it faces.
+        let (p, yaw) = turned.unwrap_or_else(|| {
+            let (p, yaw, _) = had.at(d.back);
+            (p, yaw)
+        });
+        let rp = *g.near(p, ROAD_REACH, 1, Mode::Car).first()?;
+        let e = g.edges[rp.edge as usize];
+        let tan = g.roads[rp.road as usize].tangent(rp.s);
+        let toward = if tan[0] * yaw.sin() + tan[1] * yaw.cos() >= 0.0 {
+            e.b
+        } else {
+            e.a
+        };
+        let mut avoid = vec![(d.avoid, DETOUR_AVOID)];
+        avoid.extend(
+            car.avoided
+                .iter()
+                .filter(|a| a.0 != d.avoid)
+                .map(|a| (a.0, DETOUR_AVOID)),
+        );
+        let way = Way {
+            toward: Some(toward),
+            avoid,
+        };
+        let speed = travel.country_speed;
+        // (A work taxi, its halts behind it: out of town where its run goes, `taxi.rs`.)
+        let taxi = car.taxi;
+        let ends = if taxi {
+            vec![had.points.last()?.0]
+        } else {
+            exits.to_vec()
+        };
+        let m = car.mouth(travel);
+        let (path, park) = if home && !taxi {
+            (g.path_by(rp, m?, Mode::Car, speed, way)?, None)
+        } else if let Some(trip) = car.trip.filter(|_| !taxi) {
+            let to = *g.near(trip.at, ROAD_REACH, 1, Mode::Car).first()?;
+            (
+                g.path_by(rp, to, Mode::Car, speed, way)?,
+                Some((trip.at, trip.yaw)),
+            )
+        } else {
+            // (Weighed with what going along the stretches it keeps off costs it more, as the
+            // search has it: by its cost alone it went back the way it turned round from, the way
+            // out that way as near as another.)
+            let weight = |p: &crate::travel::RoadPath| {
+                p.cost
+                    + p.edges
+                        .iter()
+                        .filter_map(|e| way.avoid.iter().find(|a| a.0 == *e))
+                        .map(|a| a.1)
+                        .sum::<f32>()
+            };
+            ends.iter()
+                .filter_map(|&x| {
+                    let e = *g.near(x, ROAD_REACH, 1, Mode::Car).first()?;
+                    g.path_by(rp, e, Mode::Car, speed, way.clone())
+                })
+                .min_by(|a, b| weight(a).total_cmp(&weight(b)))
+                .map(|p| (p, None))?
+        };
+        // (Round where it was held up if there's another way; else the same way, once those it
+        // backed up out of the way of have gone by.)
+        if path.pts.len() < 2 {
+            return None;
+        }
+        let mut centre: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
+        let mut offs: Vec<f32> = path.pts.iter().map(|p| lane_on(p.1, p.2)).collect();
+        let home = home && !taxi;
+        if !home && park.is_none() {
+            centre.push(extend_past(
+                centre[centre.len() - 2],
+                centre[centre.len() - 1],
+            ));
+            offs.push(offs[offs.len() - 1]);
+        }
+        let lane = crate::travel::thin_with(
+            &offset_right_by(&centre, &offs),
+            ROUTE_STEP,
+            ROUTE_TOLERANCE,
+        );
+        if lane.len() < 2 {
+            return None;
+        }
+        let junctions: Vec<[f32; 2]> = g.junctions().collect();
+        let road_at = |q: [f32; 2]| {
+            path.pts
+                .iter()
+                .min_by(|x, y| dist(x.0, q).total_cmp(&dist(y.0, q)))
+                .map_or((7.0, RoadKind::Street), |x| (x.1, x.2))
+        };
+        let top = |q: [f32; 2]| top_speed(q, road_at(q).1, travel, &junctions);
+        // Off the lane at the end: into its driveway, coming from the side the way comes in
+        // from; or into its trip's parking bay.
+        let into = if home {
+            let m = m?;
+            let drive = Bay::new(
+                car.spot,
+                car.yaw,
+                car.axis,
+                g.point(m),
+                &g.roads[m.road as usize],
+                m.s,
+            )?;
+            let n = path.pts.len();
+            let side = drive.local(path.pts[n - 1 - (n - 1).min(3)].0);
+            Some((drive, if side[0] >= 0.0 { 1.0 } else { -1.0 }))
+        } else {
+            park.and_then(|(at, yaw)| {
+                let (rp, on, axis) = parking_bay(travel, at)?;
+                let road = &g.roads[on.road as usize];
+                let rt = road.tangent(on.s);
+                let (a, b) = (lane[lane.len() - 2], lane[lane.len() - 1]);
+                let go = (b[0] - a[0]) * rt[0] + (b[1] - a[1]) * rt[1];
+                Some((
+                    Bay::new(at, yaw, Some(axis), rp, road, on.s)?,
+                    if go >= 0.0 { -1.0 } else { 1.0 },
+                ))
+            })
+        }
+        .map(|(bay, d)| {
+            let entry = bay.entry(d);
+            (bay, d, entry)
+        });
+        let way = |i: usize| {
+            let (a, b) = (lane[i.saturating_sub(1)], lane[(i + 1).min(lane.len() - 1)]);
+            let l = dist(a, b).max(1e-6);
+            [(b[0] - a[0]) / l, (b[1] - a[1]) / l]
+        };
+        let along = |b: &Bay, i: usize, d: f32| {
+            let w = way(i);
+            (w[0] * b.t[0] + w[1] * b.t[1]) * d > 0.7
+        };
+        let from = legs.last().unwrap_or(lane[0]);
+        legs.line(from, lane[0], false, JUNCTION_SPEED);
+        for (i, &q) in lane.iter().enumerate() {
+            if let Some((b, d, (turn, at))) = &into
+                && b.near(q, *at, turn.taken, *d)
+                && along(b, i, -*d)
+            {
+                break;
+            }
+            let (width, kind) = road_at(q);
+            legs.push_lane(
+                q,
+                top(q),
+                pull_room(width, kind, car.wid),
+                lane_on(width, kind),
+            );
+        }
+        let lane_end = legs.len().saturating_sub(1);
+        match &into {
+            Some((b, _, (turn, _))) => {
+                legs.mouths.push((lane_end, None));
+                b.enter(&mut legs, turn);
+            }
+            None => {
+                if let Some((at, _)) = park {
+                    legs.mouths.push((lane_end, None));
+                    let from = legs.last().unwrap_or(at);
+                    legs.line(from, at, false, SLOW);
+                }
+            }
+        }
+        Some(legs.timed(true, home || park.is_some()))
     }
 
     /// Out of the driveway to the nearest end of town along its street, or (`home`) back in
@@ -1686,6 +2261,17 @@ impl Legs {
         }
     }
 
+    /// `push` of a point it backs up to (at `SLOW`), on a lane where a car can pull over `room`
+    /// m, `lane` m right of the road's middle (`Route::room`, `Route::lane`).
+    pub(crate) fn push_back(&mut self, p: [f32; 2], room: f32, lane: f32) {
+        let n = self.pts.len();
+        self.push(p, true, SLOW);
+        if self.pts.len() > n {
+            *self.room.last_mut().expect("just pushed") = room;
+            *self.lane.last_mut().expect("just pushed") = lane;
+        }
+    }
+
     pub(crate) fn line(&mut self, a: [f32; 2], b: [f32; 2], reverse: bool, top: f32) {
         let n = ((a[0] - b[0]).hypot(a[1] - b[1]) / STEP).ceil().max(1.0) as usize;
         for i in 0..=n {
@@ -1775,6 +2361,9 @@ impl Legs {
             pass: Vec::new(),
             mouths,
             claims: Vec::new(),
+            spans: Vec::new(),
+            leg: None,
+            stand_gen: 0,
         }
     }
 }
@@ -2119,15 +2708,23 @@ pub(crate) fn update(w: &mut World) {
         }
     }
     for c in 0..w.cars.len() {
-        // (A work taxi is the taxis' own: `taxi.rs`.)
+        // (A work taxi is the taxis' own: `taxi.rs`; but one driving off, its run given up in
+        // sight.)
         if w.cars[c].taxi {
+            if w.cars[c].off_run {
+                drive_off(w, c);
+            }
             continue;
         }
         owners(w, c);
         relocate(w, c);
         let gone = |w: &World, s: u32| w.sims.get(s as usize).is_none_or(|s| !s.here());
-        // Nobody to drive it home (the driver died or moved away while out): it's back.
-        if !w.cars[c].at_home() && w.cars[c].driver.is_none_or(|d| gone(w, d)) {
+        // Nobody to drive it home (the driver died or moved away while out): it's back. (Not
+        // while it's in the picture, nor its spot at home: it would jump there, `in_picture`;
+        // meanwhile it goes on.)
+        let seen =
+            w.cars[c].shown.is_some_and(|s| in_picture(w, s.0)) || in_picture(w, w.cars[c].spot);
+        if !w.cars[c].at_home() && w.cars[c].driver.is_none_or(|d| gone(w, d)) && !seen {
             if w.cars[c].trip.take().is_some() {
                 // (Those riding with them get out and make their own way.)
                 let aboard = w.cars[c].aboard.clone();
@@ -2296,6 +2893,16 @@ fn route_ticks(w: &mut World, c: usize, home: bool) -> f32 {
 /// near, `too_near`). And never deeper into another car than it is (`guard`).
 fn drive_on(w: &mut World, c: usize) {
     let home = w.cars[c].state == CarState::Arriving;
+    match w.cars[c].sight {
+        Sight::Seen => {}
+        Sight::Ghost => return drive_through(w, c, home),
+        Sight::Wait(k) => {
+            let car = &mut w.cars[c];
+            car.unhold();
+            car.waits_for = Some(k);
+            return;
+        }
+    }
     let t = w.cars[c].progress;
     let moving = std::mem::take(&mut w.cars[c].moved);
     // Held up for good, nose to nose with one waiting for it (`JAM_TICKS`), it backs up a little
@@ -2319,7 +2926,41 @@ fn drive_on(w: &mut World, c: usize) {
     // (The other can back up no further, and waits for it as it does: it backs up now.)
     let theirs = w.cars[c].waits_for.is_some_and(|k| stuck_back(w, k));
     // (Backed up as far as it goes, `JAM_BACK`, it can back up no further: the other does.)
-    if jammed && (jam.0 > JAM_TICKS || theirs) && !w.cars[c].outside() {
+    // (Backing up a tick on, turned round: `unjam`.)
+    let turning = w.cars[c].detour.is_some()
+        && w.cars[c]
+            .route
+            .as_ref()
+            .is_some_and(|(_, r)| r.at(t + 1.0).2);
+    // (Backed up out of the way to let those it was held up with by, `unjam`: out of the way it
+    // waits till they've gone on.)
+    if !turning && let Some((until, by)) = w.cars[c].let_by.as_ref() {
+        // (Not for one that waits for it in turn, behind it say: that one can't go on first.)
+        let me = car_first(c);
+        let still = (w.tick < *until)
+            .then(|| {
+                by.iter().find(|&&(o, p, st)| {
+                    w.cars.get(o as usize).is_some_and(|x| {
+                        x.state == st
+                            && x.progress <= p + 1.0
+                            && x.sight == Sight::Seen
+                            && !crate::traffic::waits_on(w, car_first(o as usize)).contains(&me)
+                    })
+                })
+            })
+            .flatten()
+            .map(|&(o, ..)| o);
+        match still {
+            Some(o) => {
+                let car = &mut w.cars[c];
+                car.waits_for = Some(car_first(o as usize));
+                car.moved = false;
+                return;
+            }
+            None => w.cars[c].let_by = None,
+        }
+    }
+    if jammed && (jam.0 > JAM_TICKS || theirs) && !w.cars[c].outside() && !turning {
         if jam.1 < JAM_BACK && back_off(w, c) {
             return;
         }
@@ -2351,7 +2992,9 @@ fn drive_on(w: &mut World, c: usize) {
         return;
     }
     let tick = w.tick;
-    if !w.cars[c].outside() {
+    // (Turning round, it backs up as it stands, pulled over as far as it was: that's the room it
+    // found clear, `turn_round`.)
+    if !w.cars[c].outside() && !turning {
         pull_over(w, c, &others, moving, waited);
     }
     {
@@ -2380,8 +3023,9 @@ fn drive_on(w: &mut World, c: usize) {
             return;
         }
     }
-    // (Pulled over further than it has room on: back towards its lane first.)
-    if w.cars[c].shift > route_room(&w.cars[c], t + 1.0) + 1e-3 {
+    // (Pulled over further than it has room on: back towards its lane first. Not turning round:
+    // it backs up as it stands, into a driveway's mouth too, `turn_round`.)
+    if !turning && w.cars[c].shift > route_room(&w.cars[c], t + 1.0) + 1e-3 {
         // (Pulled over for one coming the other way, it waits for that one to pass; for one
         // waiting for it, it pulls back in first.)
         if w.cars[c].waits_for.is_none()
@@ -2417,7 +3061,14 @@ fn drive_on(w: &mut World, c: usize) {
     let (at, was) = (shifted(at, yaw, shift), shifted(was, was_yaw, shift));
     let ticks = route.ticks();
     let first_claim = route.claims.first().map(|c| c.from);
-    let (ahead, behind) = if reverse { (0.0, AHEAD) } else { (AHEAD, 0.0) };
+    // (Turning round, `unjam`, it backs slowly into room it found clear: only what's right behind
+    // it holds it up, `TURN_BEHIND`.)
+    let back = if reverse && car.detour.is_some() {
+        TURN_BEHIND
+    } else {
+        AHEAD
+    };
+    let (ahead, behind) = if reverse { (0.0, back) } else { (AHEAD, 0.0) };
     let me = Driving {
         at,
         yaw,
@@ -2443,8 +3094,15 @@ fn drive_on(w: &mut World, c: usize) {
         - shift)
         .max(0.0);
     let holding_here = traffic.holding(key);
-    let in_drive = !home && !holding_here && first_claim.is_some_and(|from| t < from);
-    if let Some(k) = traffic.blocked(key, &body_now, &body_next, me.heading(), pass, in_drive) {
+    let in_drive =
+        !home && !holding_here && car.detour.is_none() && first_claim.is_some_and(|from| t < from);
+    // (Backing up out of where it was held up, turned round, `unjam`: into clear room, never into
+    // another, as `guard` keeps it; not kept by the claims of those it backs away from.)
+    let turning = reverse && car.detour.is_some();
+    if let Some(k) = traffic
+        .blocked(key, &body_now, &body_next, me.heading(), pass, in_drive)
+        .filter(|_| !turning)
+    {
         car.waits_for = Some(k);
         return;
     }
@@ -2475,6 +3133,21 @@ fn drive_on(w: &mut World, c: usize) {
         })
     {
         car.waits_for = Some(o.first);
+        return;
+    }
+    // Nor into the ground one turning round still backs up over (`unjam`): it has the way.
+    if let Some(k) = traffic.turning.iter().find_map(|(k, path)| {
+        (*k != key
+            && path.iter().any(|r| {
+                crate::travel::dist(r.at, body_next.at) < r.half[0] + body_next.half[0] + 1.0 && {
+                    // (Kept `TURN_KEEP` off it, so the one backing up comes by clear.)
+                    let after = body_next.gap(r);
+                    after < GAP + TURN_KEEP && after < body_now.gap(r) - 1e-3
+                }
+            }))
+        .then_some(*k)
+    }) {
+        car.waits_for = Some(k);
         return;
     }
     let nav = crate::path::NavGrid {
@@ -2519,6 +3192,50 @@ fn drive_on(w: &mut World, c: usize) {
     }
 }
 
+/// Car `c` out of sight (`Sight::Ghost`) a tick on along its way (`home`: back): through anyone,
+/// claiming nothing; back into its lane as it goes.
+fn drive_through(w: &mut World, c: usize, home: bool) {
+    let World {
+        cars,
+        exits,
+        travel,
+        ..
+    } = w;
+    let car = &mut cars[c];
+    car.unhold();
+    let t = car.progress;
+    let shift = car.shift;
+    let route = car.route(exits, Some(travel), home);
+    let ticks = route.ticks();
+    let shift = (shift - PULL_RATE).min(route.room_at(t + 1.0)).max(0.0);
+    let (p, yaw, _) = route.at(t + 1.0);
+    let at = shifted(p, yaw, shift);
+    car.shift = shift;
+    car.next = Some((at, yaw));
+    car.progress = t + 1.0;
+    car.moved = true;
+    if car.progress < ticks {
+        car.shown = Some((at, yaw, true, 0));
+    }
+}
+
+/// A work taxi whose run is over, given up in sight (`Car::off_run`), a tick on: it turns round
+/// (`turn_round`, as one held up does, tried each `UNJAM_AGAIN`) and drives out of town, where
+/// it's parked off the map (`Car::park_taxi`).
+fn drive_off(w: &mut World, c: usize) {
+    let tick = w.tick;
+    if w.cars[c].detour.is_none()
+        && (tick.is_multiple_of(UNJAM_AGAIN) || w.cars[c].stall.1 + 1 >= tick)
+        && let Ok((_, d)) = turn_round(w, c)
+    {
+        turn_round_by(w, c, d);
+    }
+    drive_taxi(w, c);
+    if w.cars[c].progress >= w.cars[c].taxi_ticks() {
+        w.cars[c].park_taxi();
+    }
+}
+
 /// A work taxi a tick on along its run (`taxi.rs`): as any car drives on.
 pub(crate) fn drive_taxi(w: &mut World, c: usize) {
     w.cars[c].standing = false;
@@ -2528,6 +3245,9 @@ pub(crate) fn drive_taxi(w: &mut World, c: usize) {
 /// A work taxi standing at a stop (`taxi.rs`): pulled over for one coming the other way as far as
 /// it has room, as any car standing.
 pub(crate) fn stand_taxi(w: &mut World, c: usize) {
+    // (Standing, it holds no claim but the one it stands in: none on ahead.)
+    let t = w.cars[c].progress;
+    w.traffic.stand(car_first(c), t);
     let car = &mut w.cars[c];
     car.standing = true;
     car.waits_for = None;
@@ -2536,6 +3256,12 @@ pub(crate) fn stand_taxi(w: &mut World, c: usize) {
         let (p, yaw, _) = route.at(car.progress);
         car.spot = shifted(p, yaw, car.shift);
         car.yaw = yaw;
+    }
+    // (Out of sight, back in its lane: nobody to pull over for.)
+    if car.sight != Sight::Seen {
+        car.unhold();
+        car.shift = (car.shift - PULL_RATE).max(0.0);
+        return;
     }
     let others = vehicles(&w.cars, Some(c));
     pull_over(w, c, &others, false, None);
@@ -2642,6 +3368,13 @@ fn back_off(w: &mut World, c: usize) -> bool {
         }
     };
     let (now, next) = (body(t), body(to));
+    // (Not back into a junction's box it's out of: it holds no claim to it, and standing there it
+    // would hold up those taking their turn through it, one it's held up with among them: they'd
+    // wait for each other for good, Rowan Hollow.)
+    let boxes = &w.travel.graph.boxes;
+    if in_box(boxes, next.at, car.len) && !in_box(boxes, now.at, car.len) {
+        return false;
+    }
     let way = [-next.yaw.sin(), -next.yaw.cos()];
     // (Back out of the claim of the one it's held up with, too: away from it is out of its way.)
     let partner = car.waits_for;
@@ -2854,7 +3587,14 @@ fn pull_want(w: &World, c: usize, moving: bool, after: &dyn Fn(u64) -> bool) -> 
         // it can, that one backing out of its driveway too: that one goes by, as it comes on round
         // a bend or out of a driveway.)
         let after = !moving && !boxed && after(car_first(o));
-        if o == c || other.shown.is_none_or(|s| !s.2) || other.backing() && !after {
+        // (A taxi standing at the kerb for its riders too, once it waits for it: it pulls over as
+        // far as it can to get by, `stand_taxi`.)
+        let standing_taxi = other.taxi && other.standing && after;
+        if o == c
+            || other.shown.is_none_or(|s| !s.2) && !standing_taxi
+            || other.backing() && !after
+            || other.sight != Sight::Seen
+        {
             continue;
         }
         let Some((_, theirs)) = other.route.as_ref() else {
@@ -2882,6 +3622,1429 @@ fn in_box(boxes: &[([f32; 2], f32)], p: [f32; 2], len: f32) -> bool {
         .any(|&(m, r)| crate::travel::dist(m, p) < r + len / 2.0)
 }
 
+/// Which cars on their way are in sight this tick (`Car::sight`, before the claims: `traffic::begin`;
+/// see the module notes). With a watch (`World::set_watch`), one whose body is in the seen area
+/// (the watch and `SEEN_MARGIN` round it), now or soon (`COMING_IN`, or a claim of its reaching
+/// into it), is seen if it was (and till it's `SEEN_SLACK` out of it); one coming into it is seen
+/// once clear of every car seen (`GAP`; those in sight first, then the others in turn as they are
+/// now), else it waits outside for the one it isn't clear of (`Sight::Wait`), or, the seen area
+/// come to it where it touches one, is put where it's clear (`moved_clear`). The rest are out
+/// of sight (`Sight::Ghost`); their claims are let go. Without a watch the seen area is the whole
+/// town.
+pub(crate) fn sight(w: &mut World) {
+    // (No watch: every car in sight, as it always was; but one out of sight on top of another
+    // still till it's clear of them.)
+    if w.watch.is_none() && w.cars.iter().all(|c| c.sight == Sight::Seen) {
+        return;
+    }
+    let m = SEEN_MARGIN;
+    let area = w
+        .watch
+        .map(|[x0, z0, x1, z1]| (x0 as f32 - m, z0 as f32 - m, x1 as f32 + m, z1 as f32 + m));
+    let near = |p: [f32; 2], reach: f32| {
+        area.is_none_or(|(x0, z0, x1, z1)| {
+            let dx = (x0 - p[0]).max(p[0] - x1).max(0.0);
+            let dz = (z0 - p[1]).max(p[1] - z1).max(0.0);
+            dx.hypot(dz) <= reach
+        })
+    };
+    // (Those in sight first, which stay or go; then those out of it, coming in clear of them as
+    // they are now.)
+    let order: Vec<usize> = (0..w.cars.len())
+        .filter(|&c| w.cars[c].sight == Sight::Seen)
+        .chain((0..w.cars.len()).filter(|&c| w.cars[c].sight != Sight::Seen))
+        .collect();
+    for c in order {
+        if !matches!(w.cars[c].state, CarState::Leaving | CarState::Arriving) {
+            w.cars[c].sight = Sight::Seen;
+            continue;
+        }
+        let home = w.cars[c].state == CarState::Arriving;
+        let tick = w.tick;
+        let World {
+            cars,
+            exits,
+            travel,
+            ..
+        } = &mut *w;
+        let car = &mut cars[c];
+        let (t, shift, half) = (car.progress, car.shift, [car.len / 2.0, car.wid / 2.0]);
+        let (was, shown) = (car.sight, car.shown);
+        // (Its corners and the ground in front of it.)
+        let reach = half[0] + half[1] + AHEAD;
+        let route = car.route(exits, Some(travel), home);
+        let (p, yaw, _) = route.at(t + 1.0);
+        let next = Rect {
+            at: shifted(p, yaw, shift),
+            yaw,
+            half,
+        };
+        let now = shown.map(|s| Rect {
+            at: s.0,
+            yaw: s.1,
+            half,
+        });
+        // (In sight, it stays so till `SEEN_SLACK` further out.)
+        let reach = if was == Sight::Seen {
+            reach + SEEN_SLACK
+        } else {
+            reach
+        };
+        let in_now = now.is_some_and(|r| near(r.at, reach));
+        // (Coming into sight, it's under the rules a little way short of it, `COMING_IN`: up to a
+        // junction there taking turns, not cutting in part way across it. So too short of a claim
+        // of its, there or that near, that reaches into sight: it asks for it as anyone there,
+        // not driving through on into sight.)
+        let last = COMING_IN[COMING_IN.len() - 1];
+        let reaches = |k: &crate::traffic::Claim| {
+            let (a, b) = (k.from.max(t), k.to);
+            let n = ((b - a) / 10.0).ceil().max(1.0) as usize;
+            (0..=n).any(|i| near(route.at(a + (b - a) * i as f32 / n as f32).0, reach))
+        };
+        let coming = COMING_IN.iter().any(|&k| near(route.at(t + k).0, reach))
+            || route
+                .claims
+                .iter()
+                .filter(|k| k.to > t && k.from <= t + last)
+                .any(reaches);
+        let mut moved = None;
+        let sight = if was == Sight::Seen {
+            if in_now || coming {
+                Sight::Seen
+            } else {
+                Sight::Ghost
+            }
+        } else if !in_now && !coming {
+            Sight::Ghost
+        } else {
+            let on = |o: &Car| {
+                o.shown.map(|s| Rect {
+                    at: s.0,
+                    yaw: s.1,
+                    half: [o.len / 2.0, o.wid / 2.0],
+                })
+            };
+            let seen = || {
+                cars.iter()
+                    .enumerate()
+                    .filter(|&(o, other)| o != c && other.sight == Sight::Seen)
+                    .filter_map(|(o, other)| Some((car_first(o), on(other)?)))
+            };
+            // (On top of one in sight where it is, or touching it, the seen area come to it (the
+            // camera moved there, nobody has seen it yet): it's put back along its way, or on, to
+            // the nearest place clear of those in sight (`moved_clear`), and comes into sight
+            // there. Coming in, it waits outside till its way in is clear by `GAP`.)
+            let on_top = now.is_some_and(|r| seen().any(|(_, b)| b.gap(&r) < TOUCH));
+            let by = seen()
+                .find(|(_, b)| b.gap(&next) < GAP || now.is_some_and(|r| b.gap(&r) < GAP))
+                .map(|(k, _)| k);
+            match by {
+                Some(_) if in_now && on_top => {
+                    let clear = |r: &Rect| {
+                        seen().all(|(_, b)| {
+                            crate::travel::dist(b.at, r.at) > b.half[0] + r.half[0] + GAP + 0.5
+                                || b.gap(r) >= GAP
+                        })
+                    };
+                    match cars[c]
+                        .route
+                        .as_ref()
+                        .and_then(|(_, r)| moved_clear(r, t, half, &[-1.0, 1.0], &clear))
+                    {
+                        Some(to) => {
+                            moved = Some(to);
+                            Sight::Seen
+                        }
+                        None => Sight::Ghost,
+                    }
+                }
+                // (Without a watch the way into town is in sight, where it waits its turn,
+                // `room_to_come_in`.)
+                Some(k) if !in_now && area.is_some() => Sight::Wait(k),
+                // (Its way in held up just inside: out of sight nobody waits, so those coming
+                // would all come in at once. It waits outside till the queue there has room for
+                // it, as the rules would have let it come, `METER`.)
+                None if !in_now && area.is_some() => {
+                    let bodies: Vec<(u64, Rect)> = cars
+                        .iter()
+                        .enumerate()
+                        .filter(|&(o, k)| {
+                            o != c
+                                && k.sight == Sight::Seen
+                                && matches!(k.state, CarState::Leaving | CarState::Arriving)
+                                && (k.standing || tick >= k.stall.1 + METER_STILL)
+                        })
+                        .filter_map(|(o, k)| Some((car_first(o), on(k)?)))
+                        .collect();
+                    let route = &cars[c].route.as_ref().expect("its way").1;
+                    // (Its place on its way in, up to the first junction it takes turns at in
+                    // sight: the queue for it.)
+                    let upto = route
+                        .claims
+                        .iter()
+                        .map(|k| k.from)
+                        .find(|&f| f > t && near(route.at(f).0, 0.0))
+                        .unwrap_or(t + METER.ahead)
+                        .min(t + METER.most);
+                    let full = (0..)
+                        .map(|i| t + 1.0 + i as f32 * 10.0)
+                        .take_while(|&s| s < upto)
+                        .find_map(|s| {
+                            let (p, yaw, _) = route.at(s);
+                            let r = Rect {
+                                at: shifted(p, yaw, shift),
+                                yaw,
+                                half,
+                            };
+                            bodies
+                                .iter()
+                                .find(|(_, b)| b.gap(&r) < GAP + METER.gap)
+                                .map(|(k, _)| *k)
+                        });
+                    // (Not for good: waited `METER_MOST`, it comes in as it would have.)
+                    let since = *cars[c].metered.get_or_insert(tick);
+                    match full {
+                        Some(k) if tick < since + METER_MOST => Sight::Wait(k),
+                        _ => Sight::Seen,
+                    }
+                }
+                _ => Sight::Seen,
+            }
+        };
+        if let Some(to) = moved {
+            let car = &mut w.cars[c];
+            car.progress = to;
+            car.shift = 0.0;
+            car.unhold();
+            if let Some((_, r)) = car.route.as_ref() {
+                let (p, yaw, _) = r.at(to);
+                car.shown = Some((p, yaw, true, 0));
+                car.next = Some((r.at(to + 1.0).0, r.at(to + 1.0).1));
+            }
+        }
+        if !matches!(sight, Sight::Wait(_)) {
+            w.cars[c].metered = None;
+        }
+        if sight != Sight::Seen && was == Sight::Seen {
+            w.traffic.forget(car_first(c));
+        }
+        w.cars[c].sight = sight;
+    }
+    unstick(w);
+    // (One in sight waits for, stays backed up for or pulled over for nobody out of it.)
+    let out: Vec<bool> = w.cars.iter().map(|c| c.sight != Sight::Seen).collect();
+    let gone =
+        |k: &Option<u64>| k.is_some_and(|k| out.get((k & !(1 << 63)) as usize) == Some(&true));
+    for car in w.cars.iter_mut().filter(|c| c.sight == Sight::Seen) {
+        if gone(&car.waits_for) {
+            car.waits_for = None;
+        }
+        if gone(&car.backed_for) {
+            car.backed_for = None;
+        }
+        if gone(&car.pulled_for) {
+            car.pulled_for = None;
+        }
+    }
+}
+
+/// How far along `route` (ticks) a car `half` its length and width, `t` along it, is put to come
+/// into sight clear of those in sight (`clear`, now and a tick on), the camera come to it on top of
+/// one of them (`sight`): the nearest such place back along its way, else on along it, up to
+/// `MOVED_MOST` either way, out of its claims (part way through one, it would cut in). None: none.
+fn moved_clear(
+    route: &Route,
+    t: f32,
+    half: [f32; 2],
+    ways: &[f32],
+    clear: &dyn Fn(&Rect) -> bool,
+) -> Option<f32> {
+    let ticks = route.ticks();
+    let claiming = |s: f32| route.claims.iter().any(|k| k.from + 1e-3 < s && s < k.to);
+    let body = |s: f32| {
+        let (at, yaw, _) = route.at(s);
+        Rect { at, yaw, half }
+    };
+    (1..=MOVED_MOST)
+        .flat_map(|d| ways.iter().map(move |k| t + k * d as f32))
+        .filter(|&s| s >= 1.0 && s + 1.0 < ticks)
+        .find(|&s| !claiming(s) && clear(&body(s)) && clear(&body(s + 1.0)))
+}
+
+/// Cars held up in the seen area but out of the picture (further than `UNSEEN` from the watch, the
+/// renderer's: `World::set_watch`), with all they wait for, standing still `STUCK_UNSEEN`: each is
+/// put on along its way to the nearest place clear of those in sight (`moved_clear`), out of the
+/// picture too and out of its claims, letting go of those it held. Nobody sees it go: a hold-up
+/// nobody can see is gone, as one out of sight (`sight`), but no car drives through another where
+/// the camera could come any moment.
+fn unstick(w: &mut World) {
+    let Some([x0, z0, x1, z1]) = w.watch else {
+        return;
+    };
+    let tick = w.tick;
+    let unseen = |p: [f32; 2]| {
+        let dx = (x0 as f32 - p[0]).max(p[0] - x1 as f32).max(0.0);
+        let dz = (z0 as f32 - p[1]).max(p[1] - z1 as f32).max(0.0);
+        dx.hypot(dz) > UNSEEN
+    };
+    let on_way = |c: &Car| {
+        matches!(c.state, CarState::Leaving | CarState::Arriving) && c.sight == Sight::Seen
+    };
+    let stuck = |c: &Car| {
+        on_way(c) && tick >= c.stall.1 + STUCK_UNSEEN && c.shown.is_some_and(|s| s.2 && unseen(s.0))
+    };
+    let mut out = Vec::new();
+    for c in 0..w.cars.len() {
+        if !stuck(&w.cars[c]) {
+            continue;
+        }
+        // (All it waits for, however far round, as held up and as far out of the picture.)
+        let mut seen = vec![car_first(c)];
+        let mut todo = vec![car_first(c)];
+        let mut all = true;
+        while let Some(k) = todo.pop() {
+            for o in crate::traffic::waits_on(w, k) {
+                if o < 1 << 63 || seen.contains(&o) {
+                    continue;
+                }
+                let car = &w.cars[(o & !(1 << 63)) as usize];
+                if !stuck(car) {
+                    all = false;
+                }
+                seen.push(o);
+                todo.push(o);
+            }
+        }
+        if all {
+            out.push(c);
+        }
+    }
+    for c in out {
+        let body = |o: &Car| {
+            o.shown.map(|s| Rect {
+                at: s.0,
+                yaw: s.1,
+                half: [o.len / 2.0, o.wid / 2.0],
+            })
+        };
+        let others: Vec<Rect> = w
+            .cars
+            .iter()
+            .enumerate()
+            .filter(|&(o, k)| o != c && k.sight == Sight::Seen)
+            .filter_map(|(_, k)| body(k))
+            .collect();
+        let car = &w.cars[c];
+        let half = [car.len / 2.0, car.wid / 2.0];
+        let clear = |r: &Rect| {
+            unseen(r.at)
+                && others.iter().all(|b| {
+                    crate::travel::dist(b.at, r.at) > b.half[0] + r.half[0] + GAP + 0.5
+                        || b.gap(r) >= GAP
+                })
+        };
+        let Some(to) = car
+            .route
+            .as_ref()
+            .and_then(|(_, r)| moved_clear(r, car.progress, half, &[1.0], &clear))
+        else {
+            continue;
+        };
+        w.traffic.forget(car_first(c));
+        w.traffic.unstuck += 1;
+        let car = &mut w.cars[c];
+        car.progress = to;
+        car.shift = 0.0;
+        car.unhold();
+        car.stall = (to, tick);
+        if let Some((_, r)) = car.route.as_ref() {
+            let (p, yaw, _) = r.at(to);
+            car.shown = Some((p, yaw, true, 0));
+            let (q, qy, _) = r.at(to + 1.0);
+            car.next = Some((q, qy));
+        }
+    }
+}
+
+/// Where each car on its way is furthest along it in sight and since when (`Car::stall`), before
+/// the claims each tick (`unstick`, `unjam`): standing there since, it's held up.
+pub(crate) fn track_stall(w: &mut World) {
+    let tick = w.tick;
+    for car in w.cars.iter_mut() {
+        let going = matches!(car.state, CarState::Leaving | CarState::Arriving);
+        if !going {
+            car.detour = None;
+            car.let_by = None;
+        }
+        let on_way = going && car.sight == Sight::Seen;
+        if !on_way || car.progress > car.stall.0 + 1e-3 || car.progress < car.stall.0 - 200.0 {
+            car.stall = (car.progress, tick);
+        }
+    }
+}
+
+/// How far ahead along its way (ticks) a car in sight is looked along for a work taxi standing at
+/// the kerb in its lane, or alongside one the other way (`pass_stands`).
+const PASS_LOOK: f32 = 900.0;
+/// Passing a work taxi standing at the kerb in its lane (`PassBy`): how far clear of it its body
+/// keeps alongside (m), how far behind it and past it (m) it's out of its lane all the way, and
+/// how far it eases out before and back in after (m; out, `PASS_EASE_LEAST` at least, right
+/// behind it).
+const PASS_SIDE: f32 = 0.35;
+const PASS_ENDS: f32 = 0.5;
+const PASS_EASE: f32 = 8.0;
+const PASS_EASE_LEAST: f32 = 3.0;
+/// How long a car waits for its way round a work taxi standing in its lane, or behind one with
+/// no way round it, before it turns round as one held up by a car parked in its way (ticks,
+/// `unjam`).
+const PASS_WAIT: u64 = 3 * crate::TICKS_PER_MINUTE;
+
+/// How much of its way out round a standing taxi a car is at `t` ticks along (`PassBy`: 0 in its
+/// lane, 1 out alongside it), easing out and back in.
+fn pass_share(pass: &PassBy, t: f32) -> f32 {
+    let ease = |x: f32| {
+        let x = x.clamp(0.0, 1.0);
+        x * x * (3.0 - 2.0 * x)
+    };
+    if t < pass.out {
+        ease((t - pass.from) / (pass.out - pass.from))
+    } else if t <= pass.back {
+        1.0
+    } else {
+        1.0 - ease((t - pass.back) / (pass.to - pass.back))
+    }
+}
+
+/// Work taxis standing at the kerb in sight (`stand_taxi`), before the claims each tick: each
+/// such stretch of road is narrow for a while, taken in turns. A car in sight on its way up behind
+/// one in its lane goes out round it into the other lane and back in past it (`PassBy`, laid on
+/// its way: `Route::lay_leg`), a claim of its own; one coming the other way alongside it takes its
+/// turn for that stretch (`Route::spans`), begun short of it as a narrow stretch's is: they go
+/// through in the order they came, as on a 6 m lane's tight bend. Once the taxi pulls away, a car
+/// not yet out round it keeps to its lane, and none takes turns there. (No way round it, or none
+/// clear for `PASS_WAIT`: it turns round, `unjam`.) The cars are looked at again as the taxis
+/// standing change (`Traffic::stand_gen`), or their ways do.
+pub(crate) fn pass_stands(w: &mut World) {
+    let stands: Vec<(usize, Rect)> = w
+        .cars
+        .iter()
+        .enumerate()
+        .filter(|(_, k)| {
+            k.taxi
+                && k.standing
+                && k.sight == Sight::Seen
+                && matches!(k.state, CarState::Leaving | CarState::Arriving)
+        })
+        .filter_map(|(o, k)| {
+            // (Where it stands in its lane, as it stood still: not as it pulls over for one coming
+            // the other way.)
+            let (_, route) = k.route.as_ref()?;
+            let (p, yaw, _) = route.at(k.progress);
+            Some((
+                o,
+                Rect {
+                    at: p,
+                    yaw,
+                    half: [k.len / 2.0, k.wid / 2.0],
+                },
+            ))
+        })
+        .collect();
+    let now: Vec<(u64, [f32; 2])> = stands.iter().map(|(o, r)| (car_first(*o), r.at)).collect();
+    if w.traffic.stand_gen == 0 || now != w.traffic.stands {
+        w.traffic.stand_gen += 1;
+        w.traffic.stands = now;
+    }
+    let now_gen = w.traffic.stand_gen;
+    let mut passing = Vec::new();
+    for c in 0..w.cars.len() {
+        let car = &w.cars[c];
+        if !matches!(car.state, CarState::Leaving | CarState::Arriving)
+            || car.sight != Sight::Seen
+            || car.standing
+        {
+            continue;
+        }
+        let Some((home, route)) = car.route.as_ref() else {
+            continue;
+        };
+        let (home, t) = (*home, car.progress);
+        let mut lay = None;
+        let (mut unlay, mut drop) = (false, false);
+        // Its way round one laid already: kept while it's on it or the taxi stands; laid again on
+        // its way worked out again (a game loaded) where it was made on it.
+        if let Some(pass) = car.pass_by {
+            let fits = pass.home == home
+                && match route.leg.as_ref() {
+                    Some(l) => l.pass == pass,
+                    None => crate::travel::dist(route.at(pass.from).0, pass.at) < 0.3,
+                };
+            let gone = !stands.iter().any(|(o, _)| *o as u32 == pass.taxi);
+            if !fits || t > pass.to {
+                drop = true;
+            } else if gone && t < pass.from {
+                unlay = true;
+            } else {
+                if route.leg.is_none() {
+                    lay = Some(pass);
+                }
+                passing.push((car_first(c), car_first(pass.taxi as usize)));
+            }
+        }
+        let fresh = route.stand_gen != now_gen;
+        let spans = if fresh {
+            stands
+                .iter()
+                .filter(|(o, _)| *o != c)
+                .filter_map(|(_, r)| span_by(route, t, car.len, r))
+                .collect()
+        } else {
+            route.spans.clone()
+        };
+        if fresh && (car.pass_by.is_none() || drop) && !unlay {
+            lay = stands
+                .iter()
+                .filter(|(o, _)| *o != c)
+                .find_map(|&(o, r)| leg_past(w, c, home, o, &r));
+            if let Some(p) = lay {
+                passing.push((car_first(c), car_first(p.taxi as usize)));
+            }
+        }
+        let World {
+            cars,
+            travel,
+            traffic,
+            ..
+        } = &mut *w;
+        let car = &mut cars[c];
+        let Some((_, route)) = car.route.as_mut() else {
+            continue;
+        };
+        route.stand_gen = now_gen;
+        if drop {
+            car.pass_by = None;
+        }
+        let mut changed = spans != route.spans;
+        route.spans = spans;
+        if unlay {
+            route.unlay_leg();
+            car.pass_by = None;
+            changed = true;
+        }
+        if let Some(p) = lay {
+            route.unlay_leg();
+            if route.lay_leg(p) {
+                car.pass_by = Some(p);
+            } else {
+                car.pass_by = None;
+                passing.retain(|x| x.0 != car_first(c));
+            }
+            changed = true;
+        }
+        // (Its claims worked out again: what it held and asked for let go, taken again as it goes
+        // on, `traffic::Traffic::may_go`.)
+        if changed {
+            car.reclaim(travel);
+            traffic.forget(car_first(c));
+        }
+    }
+    w.traffic.passing = passing;
+}
+
+/// Car `c`'s way out round work taxi `o` standing at the kerb (its body `taxi`) in its lane on its
+/// way (`home`) ahead (`PassBy`): out into the other lane, clear of it by `PASS_SIDE`, from
+/// `PASS_ENDS` behind it to as far past it, easing out and back in over `PASS_EASE`. None: the taxi
+/// isn't in its lane ahead, or there's no such way: too near behind it to ease out, a junction's
+/// box, its driveway or a stop of its on it, off the paving, or not clear of another standing.
+fn leg_past(w: &World, c: usize, home: bool, o: usize, taxi: &Rect) -> Option<PassBy> {
+    let car = &w.cars[c];
+    let route = &car.route.as_ref()?.1;
+    let t = car.progress;
+    let half = [car.len / 2.0, car.wid / 2.0];
+    let end = route.ticks().min(t + PASS_LOOK);
+    if t + 2.0 >= end || crate::travel::dist(route.at(t).0, taxi.at) > PASS_LOOK {
+        return None;
+    }
+    // (Ticks along it from here a tick apart, and how far along that is, m.)
+    let mut ts = vec![t];
+    let mut ds = vec![0.0f32];
+    let mut s = t;
+    while s + 1.0 < end {
+        let a = route.at(s).0;
+        s += 1.0;
+        ts.push(s);
+        ds.push(ds[ds.len() - 1] + crate::travel::dist(a, route.at(s).0));
+    }
+    let body = |s: f32, off: f32| {
+        let (p, yaw, _) = route.at(s);
+        Rect {
+            at: shifted(p, yaw, off),
+            yaw,
+            half,
+        }
+    };
+    // (Where it would come up against it, going its way in its lane.)
+    let near = half[0] + taxi.half[0] + 1.0;
+    let hit = (0..ts.len()).find(|&k| {
+        let b = body(ts[k], 0.0);
+        crate::travel::dist(b.at, taxi.at) < near && b.gap(taxi) < PASS_SIDE
+    })?;
+    let (_, yaw, back) = route.at(ts[hit]);
+    let way = [taxi.yaw.sin(), taxi.yaw.cos()];
+    if back || yaw.sin() * way[0] + yaw.cos() * way[1] < 0.9 {
+        return None;
+    }
+    // (Its middle alongside the taxi's, and how far right of it the taxi's is.)
+    let kc = (hit..ts.len().min(hit + 80)).min_by(|&a, &b| {
+        crate::travel::dist(route.at(ts[a]).0, taxi.at)
+            .total_cmp(&crate::travel::dist(route.at(ts[b]).0, taxi.at))
+    })?;
+    let (pc, yc, _) = route.at(ts[kc]);
+    let lat = (taxi.at[0] - pc[0]) * -yc.cos() + (taxi.at[1] - pc[1]) * yc.sin();
+    if lat.abs() > 1.2 {
+        return None;
+    }
+    let off = lat - taxi.half[1] - half[1] - PASS_SIDE;
+    let dc = ds[kc];
+    let d_out = dc - taxi.half[0] - half[0] - PASS_ENDS;
+    let d_back = dc + taxi.half[0] + half[0] + PASS_ENDS;
+    let d_from = (d_out - PASS_EASE).max(0.3);
+    if d_out - d_from < PASS_EASE_LEAST {
+        return None;
+    }
+    let at_d = |d: f32| {
+        let k = ds.partition_point(|x| *x < d);
+        ts.get(k).copied()
+    };
+    let (from, out, back, to) = (
+        at_d(d_from)?,
+        at_d(d_out)?,
+        at_d(d_back)?,
+        at_d(d_back + PASS_EASE)?,
+    );
+    if !(t < from && from < out && out <= back && back < to) {
+        return None;
+    }
+    // (Not where it turns into or out of a driveway or a bay, nor a stop of its, a taxi.)
+    if route.mouths.iter().any(|&(a, b)| a < to && b > from) {
+        return None;
+    }
+    if car.taxi && crate::taxi::halts_within(w, c, from - 1.0, to + 1.0) {
+        return None;
+    }
+    let pass = PassBy {
+        home,
+        taxi: o as u32,
+        from,
+        out,
+        back,
+        to,
+        off,
+        at: route.at(from).0,
+    };
+    // (Every pose of it out of the junctions' boxes, on the paving, and clear of those standing.)
+    let g = &w.travel.graph;
+    let standing: Vec<Rect> = parked(&w.cars)
+        .filter(|d| d.first != car_first(c))
+        .map(|d| d.body())
+        .collect();
+    let mut s = from;
+    while s <= to {
+        let (p, yaw0, _) = route.at(s);
+        let (q, _, _) = route.at(s + 1.0);
+        let (a, b) = (
+            shifted(p, yaw0, off * pass_share(&pass, s)),
+            shifted(q, yaw0, off * pass_share(&pass, s + 1.0)),
+        );
+        let r = Rect {
+            at: a,
+            yaw: (b[0] - a[0]).atan2(b[1] - a[1]),
+            half,
+        };
+        if in_box(&g.boxes, r.at, car.len) {
+            return None;
+        }
+        let (sn, cs) = r.yaw.sin_cos();
+        let paved = [(1.0, 1.0), (1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0)]
+            .into_iter()
+            .all(|(i, j)| {
+                let k = [
+                    r.at[0] + sn * i * half[0] + cs * j * half[1],
+                    r.at[1] + cs * i * half[0] - sn * j * half[1],
+                ];
+                g.near(k, 8.0, 1, Mode::Car)
+                    .first()
+                    .is_some_and(|x| x.off <= kerb_off(&g.roads[x.road as usize]) + KERB_SLACK)
+            });
+        if !paved || standing.iter().any(|o| o.gap(&r) < PASS_SIDE - 0.1) {
+            return None;
+        }
+        s += 2.0;
+    }
+    Some(pass)
+}
+
+/// The stretch of `route` ahead of `t` (ticks along it) alongside taxi `taxi` standing at the kerb,
+/// going the other way, where one passing the taxi (`PassBy`) would be out in its lane, begun and
+/// ended a car of `len` short of that: its turn there with them (`pass_stands`). None: its way
+/// doesn't go by it so.
+fn span_by(route: &Route, t: f32, len: f32, taxi: &Rect) -> Option<(f32, f32)> {
+    let u = [taxi.yaw.sin(), taxi.yaw.cos()];
+    let n = [-taxi.yaw.cos(), taxi.yaw.sin()];
+    let reach = taxi.half[0] + len + PASS_ENDS + PASS_EASE + 1.0;
+    let end = route.ticks().min(t + PASS_LOOK);
+    let mut s = t + 1.0;
+    let (mut first, mut last) = (None, None);
+    while s < end {
+        let (q, yaw, back) = route.at(s);
+        let rel = [q[0] - taxi.at[0], q[1] - taxi.at[1]];
+        let along = rel[0] * u[0] + rel[1] * u[1];
+        let lat = rel[0] * n[0] + rel[1] * n[1];
+        let facing = yaw.sin() * u[0] + yaw.cos() * u[1];
+        if !back && along.abs() <= reach && (-4.5..-0.5).contains(&lat) && facing < -0.9 {
+            first.get_or_insert(s);
+            last = Some(s);
+        } else if last.is_some() {
+            break;
+        }
+        s += 2.0;
+    }
+    Some((first?, last?))
+}
+
+/// Cars in sight held up by each other (`traffic::waits_on`, round in a ring or on to one that
+/// waits for nothing), or by a car parked in the way, none of them on `UNJAM` (`UNJAM_TICKS`), none at a red light and nobody
+/// on foot among them (they step aside first, `go_on`): the one of them with the most clear room
+/// behind it does as a driver would (`Detour`). It backs up along the way it came, round the turn
+/// it took, till it's out of the last junction it came through, and goes on from there another
+/// way, round the stretch it was held up on (`Route::detour`). Of those with as much room: one
+/// with nobody riding with it first, then one on a trip before one on its way to or from work,
+/// then one with riders, a work taxi last, and only once its stops are behind it (they're along
+/// its way). None can (no junction behind it within the
+/// room it has, or no other way): counted with why (`Traffic::unjam_impossible`), tried again
+/// `UNJAM_AGAIN` later.
+pub(crate) fn unjam(w: &mut World) {
+    let tick = w.tick;
+    let held = |c: &Car| {
+        matches!(c.state, CarState::Leaving | CarState::Arriving)
+            && c.sight == Sight::Seen
+            && tick >= c.stall.1 + UNJAM_TICKS
+            && c.shown.is_some_and(|s| s.2)
+    };
+    let mut rings: Vec<Vec<usize>> = Vec::new();
+    let mut taken = vec![false; w.cars.len()];
+    // (Held up `PASS_WAIT` by a work taxi standing at the kerb in its way with no way out round it,
+    // or waiting for its way round it while none of those it waits for goes on either: as by a
+    // car parked there. Waiting its turn behind those coming the other way, it gets it.)
+    let standing = |k: u64| {
+        w.cars
+            .get((k & !(1 << 63)) as usize)
+            .is_some_and(|x| x.taxi && x.standing)
+    };
+    let still = |k: u64| {
+        w.cars
+            .get((k & !(1 << 63)) as usize)
+            .is_some_and(|x| x.standing || tick >= x.stall.1 + PASS_WAIT)
+    };
+    for (c, car) in w.cars.iter().enumerate() {
+        let by = crate::traffic::waits_on(w, car_first(c));
+        let waiting = matches!(car.state, CarState::Leaving | CarState::Arriving)
+            && car.sight == Sight::Seen
+            && !car.standing
+            && tick >= car.stall.1 + PASS_WAIT
+            && car.shown.is_some_and(|s| s.2)
+            && match car.pass_by {
+                Some(p) => car.progress <= p.from && by.iter().all(|&k| k >= 1 << 63 && still(k)),
+                None => by.iter().any(|&k| standing(k)),
+            };
+        let key = car_first(c);
+        if waiting
+            && w.traffic
+                .unjam_tried
+                .iter()
+                .all(|&(k, at)| k != key || tick >= at + UNJAM_AGAIN)
+        {
+            taken[c] = true;
+            rings.push(vec![c]);
+        }
+    }
+    for c in 0..w.cars.len() {
+        if taken[c] || !held(&w.cars[c]) {
+            continue;
+        }
+        let mut ring = vec![c];
+        let mut todo = vec![car_first(c)];
+        let mut ok = true;
+        // (Held up by a car parked in its way, standing for good as far as anyone knows.)
+        let mut parked = false;
+        while let Some(k) = todo.pop() {
+            if crate::traffic::at_red(w, k) {
+                ok = false;
+            }
+            for o in crate::traffic::waits_on(w, k) {
+                // (Someone on foot among them: they step aside first.)
+                if o < 1 << 63 {
+                    ok = false;
+                    continue;
+                }
+                let o = (o & !(1 << 63)) as usize;
+                if ring.contains(&o) {
+                    continue;
+                }
+                if w.cars
+                    .get(o)
+                    .is_some_and(|x| x.state == CarState::Parked && !x.taxi)
+                {
+                    parked = true;
+                    continue;
+                }
+                if w.cars.get(o).is_none_or(|x| !held(x)) {
+                    ok = false;
+                    continue;
+                }
+                ring.push(o);
+                todo.push(car_first(o));
+            }
+        }
+        for &o in &ring {
+            taken[o] = true;
+        }
+        let key = ring.iter().map(|&o| car_first(o)).min().unwrap_or(0);
+        if ok
+            && (ring.len() >= 2 || parked)
+            && w.traffic
+                .unjam_tried
+                .iter()
+                .all(|&(k, at)| k != key || tick >= at + UNJAM_AGAIN)
+        {
+            rings.push(ring);
+        }
+    }
+    for ring in rings {
+        let key = ring.iter().map(|&o| car_first(o)).min().unwrap_or(0);
+        // (A ring tried a little while ago and still there: counted once.)
+        let again = w.traffic.unjam_tried.iter().any(|&(k, _)| k == key);
+        w.traffic
+            .unjam_tried
+            .retain(|&(k, at)| k != key && tick < at + 4 * UNJAM_AGAIN);
+        w.traffic.unjam_tried.push((key, tick));
+        // Who of them can turn round, and how much room each has behind it: the most room
+        // first, then by who's in it (`unjam`).
+        let mut can: Vec<((f32, u8), usize, Detour)> = Vec::new();
+        let mut why = "";
+        for &c in &ring {
+            match turn_round(w, c) {
+                Ok((room, d)) => {
+                    let car = &w.cars[c];
+                    let riders = car.aboard.len() > 1 || !car.riders.is_empty();
+                    let rank = match (car.taxi, riders, car.trip.is_some()) {
+                        (true, ..) => 3,
+                        (_, false, true) => 0,
+                        (_, false, false) => 1,
+                        (_, true, _) => 2,
+                    };
+                    can.push((((room * 2.0).floor() / 2.0, rank), c, d));
+                }
+                Err(e) => {
+                    // (Why the household's cars couldn't, before that one of them was a taxi.)
+                    let rank = |e: &str| UNJAM_WHY.iter().position(|x| *x == e).unwrap_or(0);
+                    if why.is_empty() || rank(e) > rank(why) {
+                        why = e;
+                    }
+                }
+            }
+        }
+        can.sort_by(|a, b| {
+            b.0.0
+                .total_cmp(&a.0.0)
+                .then(a.0.1.cmp(&b.0.1))
+                .then(a.1.cmp(&b.1))
+        });
+        let mut fired = false;
+        for (_, c, d) in can {
+            if turn_round_by(w, c, d) {
+                fired = true;
+                // (No other way than back where it was held up: it lets the others by first.)
+                let blocked = w.cars[c]
+                    .route
+                    .as_ref()
+                    .and_then(|(_, r)| {
+                        let back = r.points.iter().position(|q| !q.3)?;
+                        let at = r.points.first()?.0;
+                        Some(
+                            r.points[back..]
+                                .iter()
+                                .any(|q| crate::travel::dist(q.0, at) < 3.0),
+                        )
+                    })
+                    .unwrap_or(false);
+                if blocked {
+                    let by = ring
+                        .iter()
+                        .filter(|&&o| o != c)
+                        .map(|&o| (o as u32, w.cars[o].progress, w.cars[o].state))
+                        .collect();
+                    w.cars[c].let_by = Some((tick + LET_BY_MOST, by));
+                }
+                break;
+            }
+            why = "no way";
+        }
+        if !fired && !again {
+            *w.traffic.unjam_impossible.entry(why).or_default() += 1;
+        }
+    }
+    // The ground each car turning round backs up over still (`Traffic::turning`): the others
+    // keep out of it till it has (`drive_on`).
+    let mut turning = Vec::new();
+    for (c, car) in w.cars.iter().enumerate() {
+        let (Some(_), Some((_, r))) = (car.detour, car.route.as_ref()) else {
+            continue;
+        };
+        let half = [car.len / 2.0, car.wid / 2.0];
+        let mut t = car.progress;
+        let mut path = Vec::new();
+        while r.at(t).2 && t < r.ticks() {
+            let (p, yaw, _) = r.at(t);
+            path.push(Rect {
+                at: shifted(p, yaw, car.shift),
+                yaw,
+                half,
+            });
+            t += 1.0;
+        }
+        if !path.is_empty() {
+            turning.push((car_first(c), path));
+        }
+    }
+    w.traffic.turning = turning;
+}
+
+/// Car `c` turned round `d` (`Detour`, `unjam`): its way that way from now on, its claims let go.
+/// False: there's no such way (as it was).
+fn turn_round_by(w: &mut World, c: usize, d: Detour) -> bool {
+    let tick = w.tick;
+    let home = d.home;
+    let World {
+        cars,
+        exits,
+        travel,
+        traffic,
+        ..
+    } = &mut *w;
+    let car = &mut cars[c];
+    car.avoided.retain(|a| a.1 > tick);
+    let old = car.route.take();
+    let twice = car.detour.is_some();
+    let passing = car.pass_by.take();
+    car.detour = Some(d);
+    let mut halts: Option<Box<dyn Fn(f32) -> f32>> = None;
+    // (Turned round from its way as it is: a work taxi's is its run's, `taxi.rs`; one turned round
+    // before, the way it turned round to. After a load that's worked out from the way it always
+    // takes, `Car::route`: a car turned round twice is where the second way has it then. So too
+    // one whose way isn't the way it always takes as it backs up along it, as one set off from
+    // where it parked before stands: from that, it jumped there, tens of metres.)
+    let plain = (!travel.graph.is_empty())
+        .then(|| Route::on_roads(car, exits, travel, home))
+        .flatten();
+    let off_plain = match (old.as_ref(), plain.as_ref()) {
+        (Some((_, had)), Some(p)) => [d.back, (d.back + d.from) / 2.0, d.from]
+            .iter()
+            .any(|&t| crate::travel::dist(had.at(t).0, p.at(t).0) > 0.05),
+        _ => false,
+    };
+    if car.taxi || twice || off_plain {
+        let new = old
+            .as_ref()
+            .and_then(|(_, had)| car.detoured(exits, travel, home, &d, had));
+        // (Its stops still ahead, on the way it had: where they are along it now.)
+        if let (true, Some(new), Some((_, had))) = (d.same, new.as_ref(), old.as_ref()) {
+            halts = Some(Box::new(moved_along(had, new, d.back)));
+        }
+        car.route = new.map(|r| (home, r));
+    } else {
+        // (As `Car::route` has it after a load; but no such way, it isn't turned round: not off
+        // on its way afresh from where it set off, which it jumped back to.)
+        car.route = plain
+            .as_ref()
+            .and_then(|p| car.detoured(exits, travel, home, &d, p))
+            .map(|r| (home, r));
+    }
+    // (Backing up as the new way has it, every pose of it clear of the others by the gap, as it
+    // found the room, and of the ground any other turning round still backs up over
+    // (`Traffic::turning`): two backing up into each other's way would wait for each other for
+    // good. Else not.)
+    let shift = car.shift;
+    let half = [car.len / 2.0, car.wid / 2.0];
+    let me = car_first(c);
+    let others: Vec<Rect> = cars
+        .iter()
+        .enumerate()
+        .filter(|&(o, k)| o != c && k.sight == Sight::Seen)
+        .filter_map(|(_, k)| {
+            k.shown.map(|s| Rect {
+                at: s.0,
+                yaw: s.1,
+                half: [k.len / 2.0, k.wid / 2.0],
+            })
+        })
+        .chain(
+            traffic
+                .turning
+                .iter()
+                .filter(|(k, _)| *k != me)
+                .flat_map(|(_, path)| path.iter().copied()),
+        )
+        .collect();
+    let car = &mut cars[c];
+    let clear = car.route.as_ref().is_some_and(|(_, r)| {
+        let body = |t: f32| {
+            let (p, yaw, _) = r.at(t);
+            Rect {
+                at: shifted(p, yaw, shift),
+                yaw,
+                half,
+            }
+        };
+        let now = body(0.0);
+        let mut t = 0.0;
+        let mut ok = true;
+        while ok && t < r.ticks() && r.at(t).2 {
+            let b = body(t);
+            ok = others.iter().all(|o| {
+                crate::travel::dist(o.at, b.at) > o.half[0] + b.half[0] + GAP + 0.5
+                    || o.gap(&b) >= GAP.min(o.gap(&now))
+            });
+            t += 1.0;
+        }
+        ok
+    });
+    if car
+        .route
+        .as_ref()
+        .is_none_or(|(h, r)| *h != home || r.ticks() <= 1.0)
+        || !clear
+    {
+        car.detour = None;
+        car.route = old;
+        car.pass_by = passing;
+        return false;
+    }
+    traffic.forget(car_first(c));
+    traffic.unjams += 1;
+    car.avoided.retain(|a| a.1 > tick && a.0 != d.avoid);
+    car.avoided.push((d.avoid, tick + AVOID_FOR));
+    car.progress = 0.01;
+    car.unhold();
+    car.stall = (car.progress, tick);
+    if let Some(f) = halts {
+        crate::taxi::moved_halts(w, c, &*f);
+    }
+    true
+}
+
+/// Turned round only backing up out of the way (`Detour::same`) from `had` to `new`, backing up
+/// to `back`: where a point so far along `had` (ticks) is along `new` (the stretch from `back` on
+/// is the same, after the stretch it backs up).
+fn moved_along(had: &Route, new: &Route, back: f32) -> impl Fn(f32) -> f32 + use<> {
+    let i0 = had.points.partition_point(|q| q.2 <= back);
+    let n_rev = new.points.len().saturating_sub(had.points.len() - i0);
+    let (hp, np): (Vec<f32>, Vec<f32>) = (
+        had.points.iter().map(|q| q.2).collect(),
+        new.points.iter().map(|q| q.2).collect(),
+    );
+    move |a: f32| {
+        let i = hp.partition_point(|&t| t <= a).saturating_sub(1).max(i0);
+        let j = (n_rev + i - i0).min(np.len().saturating_sub(1));
+        let (t0, t1) = (hp[i], hp.get(i + 1).copied().unwrap_or(hp[i]));
+        let (u0, u1) = (np[j], np.get(j + 1).copied().unwrap_or(np[j]));
+        let k = if t1 > t0 {
+            ((a - t0) / (t1 - t0)).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        u0 + (u1 - u0) * k
+    }
+}
+
+/// Work taxi `c`, its run loaded (`taxi::settle`) on the way it always takes, as far along it as
+/// it had come on the way it turned round to (`d`, `Run::detour`): on that way, its halts still
+/// ahead where they are along it. (Turned round twice, the second way from the way it always
+/// takes: as a household's car, `Car::route`.)
+pub(crate) fn turned_round(w: &mut World, c: usize, d: Detour) {
+    let World {
+        cars,
+        exits,
+        travel,
+        ..
+    } = &mut *w;
+    let car = &mut cars[c];
+    let Some((_, had)) = car.route.take() else {
+        return;
+    };
+    let progress = car.progress;
+    let Some(new) = car.detoured(exits, travel, d.home, &d, &had) else {
+        car.route = Some((true, had));
+        return;
+    };
+    let halts = d.same.then(|| moved_along(&had, &new, d.back));
+    car.detour = Some(d);
+    car.route = Some((d.home, new));
+    car.progress = progress;
+    if let Some(f) = halts {
+        crate::taxi::moved_halts(w, c, &f);
+    }
+}
+
+/// How far car `c` can back up along the way it came (m) clear of every other car (`GAP`), and
+/// where it would turn round (`Detour`): out of the last junction's box it came through, along the
+/// stretch before it, within that room. Err: why it can't.
+fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static str> {
+    let car = &w.cars[c];
+    // (A work taxi with its stops still ahead backs up out of the way only, and goes on its way.)
+    let same = car.taxi && crate::taxi::halts_ahead(w, c);
+    // (Turned round already, backing up still or letting the others by: not again.)
+    if car.let_by.is_some() {
+        return Err("turning round");
+    }
+    if car.detour.is_some()
+        && car
+            .route
+            .as_ref()
+            .is_some_and(|(_, r)| r.at(car.progress).2)
+    {
+        return Err("turning round");
+    }
+    let Some((home, route)) = car.route.as_ref() else {
+        return Err("no way");
+    };
+    let t = car.progress;
+    let half = [car.len / 2.0, car.wid / 2.0];
+    let body = |s: f32| {
+        let (p, yaw, _) = route.at(s);
+        Rect {
+            at: shifted(p, yaw, car.shift),
+            yaw,
+            half,
+        }
+    };
+    let others: Vec<Rect> = w
+        .cars
+        .iter()
+        .enumerate()
+        .filter(|&(o, k)| o != c && k.sight == Sight::Seen)
+        .filter_map(|(_, k)| {
+            k.shown.map(|s| Rect {
+                at: s.0,
+                yaw: s.1,
+                half: [k.len / 2.0, k.wid / 2.0],
+            })
+        })
+        .collect();
+    let clear = |r: &Rect| {
+        others.iter().all(|b| {
+            crate::travel::dist(b.at, r.at) > b.half[0] + r.half[0] + GAP + 0.5 || b.gap(r) >= GAP
+        })
+    };
+    // (Not back into the driveway it came out of, nor out of town.)
+    let first = route
+        .mouths
+        .first()
+        .filter(|m| m.0 <= 0.0 && !*home)
+        .map_or(1.0, |m| m.1.max(1.0));
+    let boxes = &w.travel.graph.boxes;
+    // (The stretch it was held up on: where it is, or on along its way.)
+    let mut ahead = t;
+    while ahead + 4.0 < route.ticks() && crate::travel::dist(route.at(ahead).0, body(t).at) <= 6.0 {
+        ahead += 4.0;
+    }
+    let on = *w
+        .travel
+        .graph
+        .near(route.at(ahead).0, ROAD_REACH, 1, Mode::Car)
+        .first()
+        .ok_or("no way")?;
+    let turn = |back: f32, room: f32| {
+        Ok((
+            room,
+            Detour {
+                home: *home,
+                from: t,
+                back,
+                avoid: on.edge,
+                same,
+                mouth: None,
+            },
+        ))
+    };
+    // Back along the way it came, while that's clear: out of the last junction's box it came
+    // through and on a little (`TURN_PAST`), where it turns into another way; or, short of one, the
+    // furthest place back where the road is wide enough for one to pass it pulled over
+    // (`PASS_ROOM`) and it's a length and more back, where it waits for the others to go by.
+    let (mut s, mut room, mut was) = (t, 0.0f32, body(t).at);
+    let mut boxed = in_box(boxes, was, car.len);
+    let mut seen_box = false;
+    let mut wide: Option<(f32, f32)> = None;
+    let mut why = "no junction behind";
+    loop {
+        let next = (s - 1.0).max(first);
+        if next >= s {
+            break;
+        }
+        let r = body(next);
+        if !clear(&r) {
+            why = if seen_box { "no room" } else { why };
+            break;
+        }
+        room += crate::travel::dist(was, r.at);
+        was = r.at;
+        s = next;
+        if room > TURN_ROOM {
+            break;
+        }
+        let inside = in_box(boxes, r.at, car.len);
+        if inside && !boxed {
+            seen_box = true;
+        }
+        boxed = inside;
+        if !inside && room > car.len + TURN_PAST && route.room_at(s) >= PASS_ROOM {
+            wide = Some((s, room));
+        }
+        // (Out of the box it came through, and on a little: there it turns.)
+        if seen_box && !inside {
+            let mut back = s;
+            let mut more = 0.0;
+            while more < TURN_PAST {
+                let n = (back - 1.0).max(first);
+                if n >= back || !clear(&body(n)) {
+                    break;
+                }
+                more += crate::travel::dist(body(back).at, body(n).at);
+                back = n;
+            }
+            return turn(back, room + more);
+        }
+    }
+    // Short of a junction, a driveway's mouth it came by within that clear room (not a taxi on
+    // its run's way: it backs up only).
+    if !same && let Some((back, m)) = mouth_behind(w, c, route, s, t, &clear) {
+        let room = crate::travel::dist(body(back).at, body(t).at);
+        return Ok((
+            room,
+            Detour {
+                home: *home,
+                from: t,
+                back,
+                avoid: on.edge,
+                same,
+                mouth: Some(m),
+            },
+        ));
+    }
+    match wide {
+        Some((back, room)) => turn(back, room),
+        None => Err(why),
+    }
+}
+
+/// The nearest driveway's mouth behind car `c` (`t` ticks along `route`, clear back to `lo`) it can
+/// turn round in (`MouthTurn`): one its way came by, empty (`clear`, every pose backing into it
+/// and pulling out of it the other way), and where along its way it backs up to before backing
+/// into it.
+fn mouth_behind(
+    w: &World,
+    c: usize,
+    route: &Route,
+    lo: f32,
+    t: f32,
+    clear: &dyn Fn(&Rect) -> bool,
+) -> Option<(f32, MouthTurn)> {
+    let car = &w.cars[c];
+    let g = &w.travel.graph;
+    let half = [car.len / 2.0, car.wid / 2.0];
+    let at = |s: f32| route.at(s);
+    let mut best: Option<(f32, f32, MouthTurn)> = None;
+    for d in &w.drives {
+        let Some(way) = d.way() else { continue };
+        let Some(p) = d.meets().and_then(|(r, s)| g.at_source(r, s)) else {
+            continue;
+        };
+        let road = &g.roads[p.road as usize];
+        let mp = road.at(p.s);
+        // (Where its way passes the mouth, behind it and within the clear room.)
+        let mut s = t;
+        let mut near = None;
+        while s >= lo {
+            if crate::travel::dist(at(s).0, mp) < road.width / 2.0 + 1.0 {
+                near = Some(s);
+                break;
+            }
+            s -= 1.0;
+        }
+        let Some(sm) = near else { continue };
+        if best.is_some_and(|b| b.0 >= sm) {
+            continue;
+        }
+        let (_, yaw, _) = at(sm);
+        let tan = road.tangent(p.s);
+        let go = if tan[0] * yaw.sin() + tan[1] * yaw.cos() >= 0.0 {
+            1.0
+        } else {
+            -1.0
+        };
+        let m = MouthTurn {
+            road: p.road,
+            s: p.s,
+            way,
+            go,
+        };
+        let Some(bay) = mouth_turn(&m, &w.travel, car.len) else {
+            continue;
+        };
+        let (mut into, mut out) = (Legs::default(), Legs::default());
+        bay.leave(&mut into, go);
+        bay.leave(&mut out, -go);
+        let Some(l) = into.last() else { continue };
+        // (Where its way passes where backing into the mouth begins: it backs up to there.)
+        let mut back = None;
+        let mut s = t;
+        while s >= lo {
+            if crate::travel::dist(at(s).0, l) < 1.0 {
+                back = Some(s);
+                break;
+            }
+            s -= 1.0;
+        }
+        let Some(back) = back else { continue };
+        // (Every pose of it, backing in and pulling out, clear of the others.)
+        let poses = |pts: &[([f32; 2], bool, f32)]| {
+            pts.windows(2).all(|k| {
+                let (a, b) = (k[0].0, k[1].0);
+                let r = Rect {
+                    at: b,
+                    yaw: (b[0] - a[0]).atan2(b[1] - a[1]),
+                    half,
+                };
+                crate::travel::dist(a, b) < 1e-3 || clear(&r)
+            })
+        };
+        if poses(&into.pts) && poses(&out.pts) {
+            best = Some((sm, back, m));
+        }
+    }
+    best.map(|(_, back, m)| (back, m))
+}
+
+/// Why none of a ring of cars could turn round (`unjam`), the most telling last: the one counted.
+const UNJAM_WHY: [&str; 4] = ["turning round", "no room", "no junction behind", "no way"];
+
+/// Longest a car turned round with no other way waits out of the way for those it was held up
+/// with to go on (ticks, `unjam`).
+const LET_BY_MOST: u64 = 15 * crate::TICKS_PER_MINUTE;
+
+/// How long a car keeps off a stretch it turned round from, turning round again (ticks, `unjam`).
+const AVOID_FOR: u64 = 30 * crate::TICKS_PER_MINUTE;
+
+/// How far the others keep off the ground a car turning round backs up over, past `GAP` (m,
+/// `drive_on`).
+const TURN_KEEP: f32 = 0.5;
+
+/// The ground right behind a car turning round that holds it up (m, `drive_on`).
+const TURN_BEHIND: f32 = 0.3;
+/// A road where a car can pull over this far (m, `Route::room_at`) is wide enough for one to pass
+/// it: a car held up with no junction behind it backs up to such a place (`turn_round`).
+const PASS_ROOM: f32 = 0.6;
+/// Furthest a car backs up to turn round (m, `turn_round`).
+const TURN_ROOM: f32 = 60.0;
+/// How far on past a junction's box a car backs up to turn round there (m).
+const TURN_PAST: f32 = 3.0;
+/// Held up this long (ticks), in sight, a car turns round (`unjam`): well before a check counts
+/// it held up for good (10 minutes).
+const UNJAM_TICKS: u64 = 4 * crate::TICKS_PER_MINUTE;
+/// Cars none of which could turn round are tried again this much later (ticks, `unjam`).
+const UNJAM_AGAIN: u64 = 2 * crate::TICKS_PER_MINUTE;
+
+/// Whether car `c` on a trip, its driver no longer at the wheel, is in the picture, or where it
+/// parks out or at home is (`in_picture`): it drives on there, not to be seen to jump there.
+fn trip_seen(w: &World, c: usize) -> bool {
+    let car = &w.cars[c];
+    car.shown.is_some_and(|s| in_picture(w, s.0))
+        || car.trip.is_some_and(|t| in_picture(w, t.at))
+        || in_picture(w, car.spot)
+}
+
+/// Whether `p` is in the picture or near it (within `UNSEEN` of the watch, `World::set_watch`).
+/// Without a watch nothing is, as before: a cosy or normal town keeps what it always did.
+fn in_picture(w: &World, p: [f32; 2]) -> bool {
+    w.watch.is_some_and(|[x0, z0, x1, z1]| {
+        let dx = (x0 as f32 - p[0]).max(p[0] - x1 as f32).max(0.0);
+        let dz = (z0 as f32 - p[1]).max(p[1] - z1 as f32).max(0.0);
+        dx.hypot(dz) <= UNSEEN
+    })
+}
+
+/// A car this far (m, its middle) from the watch is out of the picture (`unstick`): its body and
+/// the ground in front of it well clear of what's drawn.
+const UNSEEN: f32 = 8.0;
+
+/// Standing still this long (ticks), with all it waits for, out of the picture, a car is put on
+/// (`unstick`).
+const STUCK_UNSEEN: u64 = 3 * crate::TICKS_PER_MINUTE;
+
+/// The bay a car `len` long turns round in at driveway mouth `m` (`Detour::mouth`): just inside
+/// the driveway, off the road, facing out (as if parked there nose out). None: no road there, or
+/// the driveway too short for the car off the road.
+fn mouth_turn(m: &MouthTurn, travel: &Travel, len: f32) -> Option<Bay> {
+    let g = &travel.graph;
+    let road = g.roads.get(m.road as usize)?;
+    let mp = road.at(m.s);
+    let depth = kerb_off(road) + len / 2.0 + MOUTH_IN;
+    let spot = [mp[0] - m.way[0] * depth, mp[1] - m.way[1] * depth];
+    Bay::new(spot, m.way[0].atan2(m.way[1]), Some(m.way), mp, road, m.s)
+}
+
+/// How far into a driveway past the kerb a car turning round in its mouth backs (m, past its
+/// length).
+const MOUTH_IN: f32 = 0.5;
+
+/// Furthest (ticks along its way) a car the camera came to on top of another is put to come into
+/// sight clear of it (`moved_clear`).
+const MOVED_MOST: u32 = 300;
+
+/// Which of `cars` aren't drawn (`snapshot::car`): those out of sight (`Sight`: none is drawn
+/// driving through the others), and any on top of one of those or touching it (`TOUCH`: at the
+/// seen area's edge, out of the picture, so no two cars are ever drawn on top of each other).
+pub fn hidden(cars: &[Car]) -> Vec<bool> {
+    let mut out: Vec<bool> = cars.iter().map(|c| c.sight != Sight::Seen).collect();
+    if !out.contains(&true) {
+        return out;
+    }
+    let body = |c: &Car| {
+        c.shown.map(|s| Rect {
+            at: s.0,
+            yaw: s.1,
+            half: [c.len / 2.0, c.wid / 2.0],
+        })
+    };
+    let out_of_sight: Vec<Rect> = cars
+        .iter()
+        .filter(|c| c.sight != Sight::Seen)
+        .filter_map(body)
+        .collect();
+    for (k, car) in cars.iter().enumerate() {
+        if out[k] {
+            continue;
+        }
+        let Some(r) = body(car) else {
+            continue;
+        };
+        out[k] = out_of_sight.iter().any(|o| {
+            crate::travel::dist(o.at, r.at) < o.half[0] + r.half[0] + 0.5 && o.gap(&r) < TOUCH
+        });
+    }
+    out
+}
+
 /// The cars on the road this tick, for the claims (`traffic::begin`): those driving (`places`:
 /// where along their routes, by their routes' tags: home or not), and those in sight (`movers`:
 /// their bodies, the way they go, and if they moved last tick where they'll be along their way;
@@ -2899,7 +5062,9 @@ pub(crate) fn movers(
         ..
     } = w;
     for (c, car) in cars.iter_mut().enumerate() {
-        if !matches!(car.state, CarState::Leaving | CarState::Arriving) {
+        // (Out of sight, it claims nothing and nobody keeps out of its way: `sight`.)
+        if !matches!(car.state, CarState::Leaving | CarState::Arriving) || car.sight != Sight::Seen
+        {
             continue;
         }
         let key = car_first(c);
@@ -3411,8 +5576,12 @@ pub(crate) fn vehicles(cars: &[Car], car: Option<usize>) -> Vec<Driving> {
         behind: 0.0,
         first,
     };
+    // (For one in sight, those in sight: `sight`; one out of sight keeps out of nobody's way.)
+    if car.is_some_and(|c| cars[c].sight != Sight::Seen) {
+        return Vec::new();
+    }
     let cars = cars.iter().enumerate().filter_map(|(c, k)| match k.shown {
-        Some((p, yaw, true, _)) if Some(c) != car => {
+        Some((p, yaw, true, _)) if Some(c) != car && (car.is_none() || k.sight == Sight::Seen) => {
             let mut d = at((p, yaw), k.len, k.wid, car_first(c));
             if k.backing() {
                 (d.ahead, d.behind) = (0.0, AHEAD);
@@ -3428,7 +5597,8 @@ pub(crate) fn vehicles(cars: &[Car], car: Option<usize>) -> Vec<Driving> {
 /// road, but standing.
 pub(crate) fn parked(cars: &[Car]) -> impl Iterator<Item = Driving> + '_ {
     cars.iter().enumerate().filter_map(|(c, k)| match k.shown {
-        Some((at, yaw, false, _)) => Some(Driving {
+        // (A taxi standing out of sight, out of sight: `sight`.)
+        Some((at, yaw, false, _)) if k.sight == Sight::Seen => Some(Driving {
             at,
             yaw,
             len: k.len,
@@ -4299,6 +6469,11 @@ pub(crate) fn load(w: &mut World, saved: &[Car], drives: &[Drive], garages: &[Ga
         .cloned()
         .collect();
     for car in &mut w.cars {
+        // (On its way, it comes into sight as one coming in does, clear of the others: it may have
+        // been driving through one out of sight as the game was saved, `sight`.)
+        if matches!(car.state, CarState::Leaving | CarState::Arriving) {
+            car.sight = Sight::Ghost;
+        }
         car.owners.retain(|&o| o < sims);
         car.aboard.retain(|&o| o < sims);
         car.done.retain(|o| car.aboard.contains(o));
@@ -4798,11 +6973,12 @@ fn trip_update(w: &mut World, c: usize) {
         }
         CarState::Leaving => {
             let ticks = route_ticks(w, c, false);
-            if at_wheel {
+            if at_wheel || trip_seen(w, c) {
                 drive_on(w, c);
                 seat_party(w, c);
             } else {
-                // (Called away at the wheel, as they can't be: the car is there.)
+                // (Called away at the wheel, as they can't be: the car is there. Not in the
+                // picture, nor where it's going: it would be seen to jump there, `trip_seen`.)
                 w.cars[c].progress = ticks;
             }
             if w.cars[c].progress >= ticks {
@@ -4811,7 +6987,7 @@ fn trip_update(w: &mut World, c: usize) {
         }
         CarState::Arriving => {
             let ticks = route_ticks(w, c, true);
-            if at_wheel {
+            if at_wheel || trip_seen(w, c) {
                 drive_on(w, c);
                 seat_party(w, c);
             } else {
@@ -4888,7 +7064,13 @@ fn trip_update(w: &mut World, c: usize) {
                 .get(w.sims[d].household as usize)
                 .and_then(|h| h.plot);
             let there = home.is_some() && w.briefs.get(d).and_then(|b| b.plot) == home;
-            if there && w.sims[d].bound_for_car != Some(c as u32) {
+            // (Not while the camera is on where it's parked out or where it parks at home: it
+            // isn't seen to jump there, `in_picture`.)
+            let seen = {
+                let car = &w.cars[c];
+                car.trip.is_some_and(|t| in_picture(w, t.at)) || in_picture(w, car.spot)
+            };
+            if there && w.sims[d].bound_for_car != Some(c as u32) && !seen {
                 let car = &mut w.cars[c];
                 car.done = car.aboard.clone();
                 car.aboard.clear();

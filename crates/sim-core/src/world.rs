@@ -1954,6 +1954,9 @@ pub struct World {
     pub lod: bool,
     /// The part of the town being looked at (`set_view`); None: all of it.
     pub(crate) view: Option<[i32; 4]>,
+    /// What the renderer draws (`set_watch`, for the cars in sight: `cars::sight`); None: all of
+    /// it. Not saved.
+    pub(crate) watch: Option<[i32; 4]>,
     /// Per plot: watched this tick (see `lod::plan`).
     pub(crate) watched: Vec<bool>,
     /// Bumped when a lamp is switched on or off (see `lights.rs`); not a structure change.
@@ -2294,6 +2297,7 @@ impl World {
             stairs: crate::path::StairMap::default(),
             lod: true,
             view: None,
+            watch: None,
             watched: Vec::new(),
             lights_version: 0,
             light_watch: Default::default(),

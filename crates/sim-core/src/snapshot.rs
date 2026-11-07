@@ -78,7 +78,8 @@ pub mod light {
 
 /// A car's row.
 pub mod car {
-    /// 0: not to be seen (out of town, or its spot built over), 1 parked, 2 driving.
+    /// 0: not to be seen (out of town, its spot built over, or out of sight: `cars::hidden`),
+    /// 1 parked, 2 driving.
     pub const SHOWN: usize = 0;
     /// Its middle on the ground, and which way it faces (as a resident's yaw).
     pub const X: usize = 1;
@@ -722,6 +723,7 @@ pub fn write(world: &World, out: &mut [f32]) {
     out[header::ITEMS_VERSION] = (world.items.version % (1 << 24)) as f32;
     let staff = &world.staff.servers[..world.staff.servers.len().min(crate::staff::MAX_STAFF)];
     out[header::STAFF_COUNT] = staff.len() as f32;
+    let hidden = crate::cars::hidden(&world.cars);
     for (i, s) in world.sims.iter().enumerate() {
         let o = &mut out[HEADER_LEN + i * SIM_STRIDE..HEADER_LEN + (i + 1) * SIM_STRIDE];
         o[sim::ID] = s.id as f32;
@@ -736,7 +738,8 @@ pub fn write(world: &World, out: &mut [f32]) {
         o[sim::ANIM] = 0.0;
         o[sim::EMOTION] = s.emotion(&world.content).map_or(0.0, |e| e as f32 + 1.0);
         o[sim::ROLE] = 0.0;
-        o[sim::AWAY] = (s.away_until.is_some() || !s.here()) as u8 as f32;
+        o[sim::AWAY] =
+            (s.away_until.is_some() || !s.here() || in_hidden_car(world, &hidden, s)) as u8 as f32;
         let doing = doing(world, s);
         o[sim::OBJECT] = doing.object;
         o[sim::ACTION] = doing.action;
@@ -839,7 +842,7 @@ pub fn write(world: &World, out: &mut [f32]) {
         }
     }
     write_staff(world, out);
-    write_cars(world, out);
+    write_cars(world, &hidden, out);
     write_lights(world, out);
 }
 
@@ -869,14 +872,25 @@ fn write_lights(world: &World, out: &mut [f32]) {
     out[header::LIGHT_COUNT] = n as f32;
 }
 
+/// Whether `s` sits in a car on its way that isn't drawn (`hidden`, `cars::hidden`): nor are they.
+fn in_hidden_car(world: &World, hidden: &[bool], s: &crate::world::Sim) -> bool {
+    hidden.contains(&true)
+        && s.current()
+            .is_some_and(|a| matches!(a.phase, crate::world::Phase::Driving))
+        && crate::cars::driving(&world.cars, s.id)
+            .is_some_and(|c| hidden.get(c as usize) == Some(&true))
+}
+
 /// The cars' rows (`header::CAR_COUNT`).
-fn write_cars(world: &World, out: &mut [f32]) {
+fn write_cars(world: &World, hidden: &[bool], out: &mut [f32]) {
     let cars = &world.cars[..world.cars.len().min(crate::cars::MAX_CARS)];
     out[header::CAR_COUNT] = cars.len() as f32;
     for (k, c) in cars.iter().enumerate() {
         let o = &mut out[CAR_BASE + k * CAR_STRIDE..CAR_BASE + (k + 1) * CAR_STRIDE];
         o[car::KIND] = if c.taxi { car::TAXI } else { car::HOUSEHOLD };
-        let Some((p, yaw, moving, doors)) = c.shown else {
+        // (Out of sight, driving through the others, or on top of one that is: not drawn,
+        // `cars::hidden`.)
+        let Some((p, yaw, moving, doors)) = c.shown.filter(|_| !hidden[k]) else {
             o[car::SHOWN] = 0.0;
             continue;
         };

@@ -351,8 +351,9 @@ function watch(g: Game): void {
   if (typeof split.set_watch === 'function') {
     if (region) g.set_view(region[0], region[1], region[2], region[3]);
     else g.clear_view();
+    // (Only the camera's: it's also what's drawn, and cars out of it drive through each other. Till
+    // then the viewed lot is the full-detail area, `set_view`, and every car is in sight.)
     if (watched) split.set_watch(watched[0], watched[1], watched[2], watched[3]);
-    else if (region) split.set_watch(region[0], region[1], region[2], region[3]);
     else split.clear_watch?.();
     return;
   }
