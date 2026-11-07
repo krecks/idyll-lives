@@ -1087,7 +1087,7 @@ struct ShoeStyle {
     arch: f64,
     midsole: f64,
     /// The toe's lift off the floor at the tip: the whole sole rises there, so the shoe's underside is a
-    /// curve rather than a slab lying flat on the ground.
+    /// curve rather than a slab lying flat on the ground (`spring_at`).
     spring: f64,
     laces: bool,
     /// Polished leather (glossier).
@@ -1188,6 +1188,12 @@ impl ShoeStyle {
     /// The sole's top (m on a 1.7 m body) at `u` along the foot (0 heel .. 1 toe).
     fn top(&self, u: f64) -> f64 {
         self.sole + (self.heel_h - self.sole) * (1.0 - smoothstep(self.block.0, self.block.1, u))
+    }
+
+    /// The toe spring's lift (m on a 1.7 m body) at `u` along the foot: the whole sole's, its top and
+    /// its underside alike, and so the upper's cut inside it.
+    fn spring_at(&self, u: f64) -> f64 {
+        self.spring * smoothstep(0.7, 1.0, u).powi(2)
     }
 
     /// The collar's height over the ankle joint at a point `dx` to the side of it, `dz` ahead and `u`
@@ -1465,11 +1471,12 @@ fn upper_layout(family: &str, gid: &str, lod: bool) -> Arc<UpperLayout> {
             } else {
                 1.0
             };
-            // Under the collar, above the sole's inside (lifted as at the base), off the sole (the
-            // foot's flat underside).
+            // Under the collar, above the sole's inside (lifted as at the base, and with the toe spring,
+            // which can be taller than a thin sole: cut where the flat sole's top was, the upper would
+            // come out under a sprung toe), off the sole (the foot's flat underside).
             let y = q.y + n.y * lift * kb;
             let g = below
-                .min(y - (st.top(u) - UPPER_IN_SOLE) * kb)
+                .min(y - (st.top(u) + st.spring_at(u) - UPPER_IN_SOLE) * kb)
                 .min(n.y + 0.9);
             (lift, point, below, across, g)
         };
@@ -1725,9 +1732,9 @@ fn sole(
     let split = |u: f64| top(u) * (1.0 - st.midsole);
     // The toe spring: the sole's whole edge lifts towards the tip (its top and its underside alike, so
     // its band keeps its thickness), which leaves the shoe's silhouette curved off the floor at the
-    // toe rather than a slab lying flat. The upper is cut where the flat sole's top was, so the sole
-    // covers a little more of it there.
-    let spring = |u: f64| st.spring * k * smoothstep(0.7, 1.0, u).powi(2);
+    // toe rather than a slab lying flat. The upper's cut rises with it (`upper_layout`), so it stays
+    // inside the sole however thin the sole is.
+    let spring = |u: f64| st.spring_at(u) * k;
     // Rows down its edge: a welt line (dark, the step under the upper), a light midsole, then the dark
     // outsole; the midsole and the outsole meet at a seam (a row twice, one colour above it, the other
     // below); else dark all the way down.
@@ -1849,4 +1856,51 @@ pub fn build_clothes(family: &str, stage: &str, cuts: &Cuts) -> Vec<(String, Mes
         out.push((format!("lod.{gid}"), shoe(family, stage, gid, &full, true)));
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// At the toe, where the sole springs up off the floor, every shoe's upper (not its lining) stays
+    /// above the sole's underside (with the upper cut where the flat sole's top was, a spring taller
+    /// than the sole, the dress shoe's 11 mm on 10 mm, would leave room for it to come out under there).
+    #[test]
+    fn the_upper_stays_above_a_sprung_sole() {
+        for family in ["male", "female"] {
+            let k = proportions(family, BASE_STAGE).h / 1.7;
+            for gid in [
+                "shoes.sneakers",
+                "shoes.trainers",
+                "shoes.boots",
+                "shoes.dress",
+            ] {
+                let st = shoe_style(gid);
+                let full = upper(family, BASE_STAGE, gid, false);
+                for side in [-1.0, 1.0] {
+                    let pts: Vec<V3> = full
+                        .pos
+                        .iter()
+                        .zip(&full.fields)
+                        .filter(|(q, f)| sign(q.x) == side && f[0] >= 0.0)
+                        .map(|(q, _)| *q)
+                        .collect();
+                    // Along the foot as `sole` measures it (over the upper's length), past the arch.
+                    let (z0, z1) = pts
+                        .iter()
+                        .fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), q| {
+                            (a.min(q.z), b.max(q.z))
+                        });
+                    for q in pts {
+                        let u = clip((q.z - z0) / (z1 - z0), 0.0, 1.0);
+                        let under = st.spring_at(u) * k;
+                        assert!(
+                            u < 0.7 || q.y > under,
+                            "{family} {gid}: the upper at {q:?} is under its sole ({under:.4} m)"
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

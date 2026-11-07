@@ -71,6 +71,7 @@ import { within } from '../../core/async';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
+import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS } from '../shared/lens';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER, shutDefs } from '../shared/doors';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
 import { GAME_RATE } from '../shared/gameSpeed';
@@ -132,8 +133,6 @@ declare global {
   }
 }
 
-/** The game camera's zoom and tilt limits. */
-const RADIUS_LIMITS = [6, 95] as const;
 /** A big world's warm-up builds and draws this many lots besides the one in view (`warmGame`). */
 const WARM_LOTS = 6;
 /** Longest wait (ms) for the birds of a game's first build (their models built): they'd pop in in play otherwise. */
@@ -142,11 +141,6 @@ const BIRDS_WAIT_MS = 3000;
 const PARSE_IDLE_MS = 8;
 /** How long (ms) a catalog card must be pointed at before its model is read (`prepareAsset`). */
 const PREPARE_AFTER_MS = 150;
-const BETA_LIMITS = [0.3, 1.35] as const;
-/** Its lens: vertical field of view (a slightly long lens flattens the perspective: the dollhouse look), near and far (m). */
-// (The near plane a fiftieth of the camera's distance, never under 0.3 m: from the town overview's 200–300 m at 0.3 m
-// the roads, 1.2 cm over the ground, fought it in green patches. Close up nothing changes: 0.3 m to 15 m out.)
-const LENS = { fov: 0.7, near: 0.3, far: 1600, nearShare: 1 / 50 };
 /** Light is recomputed when the game's clock moved this many minutes (fast: the preset's `lightingStep`), at most every `LIGHT_MIN_MS`. */
 const LIGHT_STEP = 0.5;
 const LIGHT_MIN_MS = 100;
@@ -349,7 +343,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly fixedHour: number | null;
 
   /** The player's camera input and the game camera's pose (the director's rig drives it too). */
-  private readonly orbit = new OrbitControls({ alpha: -Math.PI * 0.62, beta: 0.86, radius: 24 }, { radius: RADIUS_LIMITS, beta: BETA_LIMITS });
+  private readonly orbit = new OrbitControls({ ...DEFAULT_ORBIT }, { radius: RADIUS_LIMITS, beta: BETA_LIMITS });
   private detachOrbit: (() => void) | null = null;
   private readonly gameRig: GameCameraRig;
   /** The overview camera's pose (`OverviewCamera` writes it; the camera takes it each town frame). */

@@ -70,6 +70,14 @@ const AO_GAIN = '1.5';
 const AO_AGE = '0.6';
 /** How dark the face's age folds (body tone.z) are on an elder (texel 4 g = 1); younger, less. */
 const FOLD = '0.3';
+/**
+ * How far (m) the shadow-only copies (`GAME_SIM_CASTER`: the low-detail body and shells every resident casts its sun
+ * shadow from) are drawn in along their normals, the hands left as they are (thinner than it). The low-detail surface
+ * stands up to about a centimetre outside the full one the camera sees (the neck, the chest, the face: the cage's
+ * limit against the drawn head and body), so the full body lay behind its own caster there and took its shadow in
+ * stripes (acne) wherever the map's texels were small: the creator, a close camera, the pages.
+ */
+const CASTER_INSET = '0.012';
 /** The eye's catchlight (linear, emissive). */
 const CATCHLIGHT = '0.85';
 /** The occlusion's darkening, at `gain` per unit of tone.w. */
@@ -176,6 +184,10 @@ const VS_GLSL = {
 		uniform highp sampler2D game_simMorphs;
 		vec4 gameSimMorphTexel(int i, int width) { return texelFetch(game_simMorphs, ivec2(i % width, i / width), 0); }
 	#endif
+	#if defined(GAME_SIM_CASTER) && defined(SHADOW_PASS)
+		// (The mesh's normals: the shadow pass declares none of its own.)
+		attribute vec3 game_simCasterN;
+	#endif
 #endif`,
   vsLocal: `
 #ifdef GAME_RESIDENT
@@ -208,6 +220,15 @@ const VS_GLSL = {
 		#ifdef GAME_SIM_CLOTH
 			// Seated: the shell's corrective (its tone) as far as the thighs are turned forward (texel 4 b).
 			localPos += game_simTone.xyz * texelFetch(game_simPoses, ivec2(simOff + 4, simRow), 0).z;
+		#endif
+		#if defined(GAME_SIM_CASTER) && defined(SHADOW_PASS)
+			// The shadow caster drawn in (\`CASTER_INSET\`), not the hands (the body's fields.x past the wrist).
+			#ifdef GAME_SIM_BODY
+				float simInset = ${CASTER_INSET} * (1.0 - smoothstep(0.85, 1.0, game_simField.x));
+			#else
+				float simInset = ${CASTER_INSET};
+			#endif
+			localPos -= game_simCasterN * simInset;
 		#endif
 	}
 #endif`,
@@ -267,6 +288,9 @@ const VS_WGSL = {
 		var game_simMorphs: texture_2d<f32>;
 		fn gameSimMorphTexel(i: i32, width: i32) -> vec4f { return textureLoad(game_simMorphs, vec2i(i % width, i / width), 0); }
 	#endif
+	#if defined(GAME_SIM_CASTER) && defined(SHADOW_PASS)
+		attribute game_simCasterN: vec3f;
+	#endif
 #endif`,
   vsLocal: `
 #ifdef GAME_RESIDENT
@@ -299,6 +323,14 @@ const VS_WGSL = {
 		#ifdef GAME_SIM_CLOTH
 			// Seated: the shell's corrective (its tone) as far as the thighs are turned forward (texel 4 b).
 			localPos = localPos + game_simTone.xyz * textureLoad(game_simPoses, vec2i(simOff + 4, simRow), 0).z;
+		#endif
+		#if defined(GAME_SIM_CASTER) && defined(SHADOW_PASS)
+			#ifdef GAME_SIM_BODY
+				let simInset = ${CASTER_INSET} * (1.0 - smoothstep(0.85, 1.0, game_simField.x));
+			#else
+				let simInset = ${CASTER_INSET};
+			#endif
+			localPos = localPos - game_simCasterN * simInset;
 		#endif
 	}
 #endif`,
@@ -367,16 +399,19 @@ const PS_GLSL = {
 			vec2 simHemShoe = simHem(gShoe, ${BAND.welt}) * simPlain;
 			// Skin: the Sim's colour (relative to the reference), blushed by the tone (x), the lids' crease and
 			// the line between the lips darkened (y > 0), the lips themselves tinted (y < 0: how much of the lip),
-			// and the age folds (z) as far as the Sim's age (texel 4 g).
+			// and the age folds (z) as far as the Sim's age (texel 4 g); on the lips z is how far they turn down
+			// at rest (baked, so the shade under them is the lip's shape whichever way the head faces).
 			vec4 simRef = simTexel(5);
 			vec3 skin = simA.rgb * clamp(albedo / max(simRef.rgb, vec3(0.01)), vec3(0.0), vec3(2.0));
 			skin = skin * mix(vec3(1.0), vec3(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0));
 			// The lips: a red-rose tint that reads on a pale face and on a dark one alike (the skin darkened and
 			// reddened, then mixed towards a rose), and a shade under them where they turn down.
 			gameSimLip = clamp(-simT.y, 0.0, 1.0);
+			float simLipDown = simT.y < 0.0 ? simT.z : 0.0;
+			float simFold = simT.y < 0.0 ? 0.0 : simT.z;
 			vec3 simLipC = mix(skin * vec3(0.62, 0.34, 0.33), vec3(0.42, 0.14, 0.13), 0.45);
 			skin = mix(skin, simLipC, ${LIP_MIX} * gameSimLip) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0));
-			skin = skin * (1.0 - ${LIP_SHADE} * gameSimLip * clamp(-normalW.y, 0.0, 1.0)) * (1.0 - ${FOLD} * clamp(simT.z * simT4.y, 0.0, 1.0));
+			skin = skin * (1.0 - ${LIP_SHADE} * gameSimLip * clamp(simLipDown, 0.0, 1.0)) * (1.0 - ${FOLD} * clamp(simFold * simT4.y, 0.0, 1.0));
 			float scalp = clamp(-simF.z - 1.0, 0.0, 1.0) * simTexel(7).w;
 			skin = mix(skin, simTexel(3).rgb * 0.7, scalp);
 			vec3 cTop = simTexel(1).rgb;
@@ -534,9 +569,11 @@ const PS_WGSL = {
 			var skin = simA.rgb * clamp(albedo / max(simRef.rgb, vec3f(0.01)), vec3f(0.0), vec3f(2.0));
 			skin = skin * mix(vec3f(1.0), vec3f(0.98, 0.62, 0.6), clamp(simT.x, 0.0, 1.0));
 			gameSimLip = clamp(-simT.y, 0.0, 1.0);
+			let simLipDown = select(0.0, simT.z, simT.y < 0.0);
+			let simFold = select(simT.z, 0.0, simT.y < 0.0);
 			let simLipC = mix(skin * vec3f(0.62, 0.34, 0.33), vec3f(0.42, 0.14, 0.13), 0.45);
 			skin = mix(skin, simLipC, ${LIP_MIX} * gameSimLip) * (1.0 - 0.45 * clamp(simT.y, 0.0, 1.0));
-			skin = skin * (1.0 - ${LIP_SHADE} * gameSimLip * clamp(-normalW.y, 0.0, 1.0)) * (1.0 - ${FOLD} * clamp(simT.z * simT4.y, 0.0, 1.0));
+			skin = skin * (1.0 - ${LIP_SHADE} * gameSimLip * clamp(simLipDown, 0.0, 1.0)) * (1.0 - ${FOLD} * clamp(simFold * simT4.y, 0.0, 1.0));
 			let scalp = clamp(-simF.z - 1.0, 0.0, 1.0) * simTexel(7).w;
 			skin = mix(skin, simTexel(3).rgb * 0.7, scalp);
 			var cTop = simTexel(1).rgb;

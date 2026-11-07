@@ -174,17 +174,17 @@ fn bake_ao(parts: &mut [(String, Mesh)], spread: (usize, &dyn Fn(V3) -> bool)) {
         } else {
             continue;
         };
-        let (reach, passes) = if name == "body" || name == "lod.body" {
-            (ao::REACH_BODY, 2)
+        let (reach, passes, samples) = if name == "body" || name == "lod.body" {
+            (ao::REACH_BODY, 2, ao::SAMPLES)
         } else if name.starts_with("hair.") {
-            (ao::REACH, 0)
+            (ao::REACH, 0, ao::SAMPLES_HAIR)
         } else {
-            (ao::REACH_SHELL, 2)
+            (ao::REACH_SHELL, 2, ao::SAMPLES)
         };
         let occ = if name == "body" {
-            ao::occlusion_spread(m, &around, reach, spread.0, spread.1)
+            ao::occlusion_spread(m, &around, reach, samples, spread.0, spread.1)
         } else {
-            ao::occlusion(m, &around, reach)
+            ao::occlusion(m, &around, reach, samples)
         };
         // The face's creases are narrower than the triangles, and `occlusion_spread` has them; the rest
         // of the skin and the shells are relaxed over the mesh instead, so a ring's two or three dark

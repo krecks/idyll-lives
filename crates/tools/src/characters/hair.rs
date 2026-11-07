@@ -596,31 +596,38 @@ fn comp(
 
 type Field<'a> = &'a dyn Fn(f64, f64) -> f64;
 
-/// How much denser than its layout the hair is built (`dense_*`): the same style, more columns and
-/// rows, so its locks round off instead of reading as plates and its hem is a curve rather than a
-/// polyline. The styles' numbers are the shapes; this is the resolution they are cut at.
+/// How much denser than its layout the hair is built (`dense_*`, `LOCK`): the same style, more
+/// columns and rows, so its locks round off instead of reading as plates and its hem is a curve
+/// rather than a polyline. The styles' numbers are the shapes (a cap's columns, 4 to a lock; a
+/// curtain's or a fringe's locks; a parting's width in the layout's columns); this is only the
+/// resolution they are cut at: the locks keep their count and width, each on more columns.
 const DETAIL: f64 = 1.5;
-/// `n` columns at `DETAIL`, kept a multiple of 4 (a lock is 4 columns wide).
+/// Columns a lock is wide in a style's layout.
+const LAYOUT_LOCK: usize = 4;
+/// Columns a lock is wide as built: `LAYOUT_LOCK` at `DETAIL` (even, so a lock has a middle column).
+const LOCK: usize = 6;
+const _: () = assert!(
+    LOCK as f64 == LAYOUT_LOCK as f64 * DETAIL,
+    "LOCK is LAYOUT_LOCK at DETAIL"
+);
+/// A cap's `n` layout columns (a multiple of `LAYOUT_LOCK`) at `DETAIL`: the same locks, `LOCK`
+/// columns each.
 fn dense_cols(n: usize) -> usize {
-    4 * ((n as f64 * DETAIL / 4.0).round() as usize).max(1)
-}
-/// `n` locks at `DETAIL`.
-fn dense_locks(n: usize) -> usize {
-    ((n as f64 * DETAIL).round() as usize).max(1)
+    (n / LAYOUT_LOCK).max(1) * LOCK
 }
 /// `n` rows at `DETAIL`.
 fn dense_rows(n: usize) -> usize {
     ((n as f64 * DETAIL).round() as usize).max(2)
 }
-/// How far into a lock column j of a sheet or cap is: 0 on the parting between two locks (columns
-/// 4k), 1 in a lock's middle (4k + 2).
-fn lock_at(j: f64) -> f64 {
-    (PI * j / 4.0).sin().abs().powf(0.6)
+/// How far into a lock column j of a sheet or cap is, its locks `w` columns wide: 0 on the parting
+/// between two locks (columns w k), 1 in a lock's middle (w k + w/2).
+fn lock_at(j: f64, w: usize) -> f64 {
+    (PI * j / w as f64).sin().abs().powf(0.6)
 }
 
 /// `lock_at` across `cols` columns starting half a lock in (whole locks at the edges).
-fn locks(cols: usize) -> Vec<f64> {
-    (0..cols).map(|j| lock_at((j + 2) as f64)).collect()
+fn locks(cols: usize, w: usize) -> Vec<f64> {
+    (0..cols).map(|j| lock_at((j + w / 2) as f64, w)).collect()
 }
 
 /// A fixed 0..1 for lock k of a component (seed), so lengths and tips vary from lock to lock.
@@ -634,7 +641,8 @@ struct Cap<'a> {
     /// Thickness (m) by azimuth and u (0 at the crown .. 1 at the hairline).
     thick: Field<'a>,
     rows: usize,
-    /// Columns round the head, a multiple of 4 (a lock is 4 columns wide).
+    /// Columns round the head in the layout, a multiple of `LAYOUT_LOCK` (a lock is that many wide;
+    /// built at `DETAIL`, `dense_cols`).
     cols: usize,
     /// The hairline's polar angle by azimuth (else the scalp's).
     limit: Option<&'a dyn Fn(f64) -> f64>,
@@ -674,11 +682,14 @@ fn round(a: f64) -> f64 {
 /// (`Meet::Over`) the cap stands off the ear and closes under itself in a hem above it.
 fn cap(sc: &Scalp, mut c: Cap) -> Comp {
     let h = sc.h;
+    // A layout column (the parting's width is in them), then the columns as built.
+    let layout_step = TAU / c.cols as f64;
     (c.cols, c.rows) = (dense_cols(c.cols), dense_rows(c.rows));
     let step = TAU / c.cols as f64;
-    let turn = c.part.map_or(0.0, |(ap, _)| {
-        ap - (((ap + PI) / (4.0 * step)).round() * 4.0 * step - PI)
-    });
+    let lock = LOCK as f64 * step;
+    let turn = c
+        .part
+        .map_or(0.0, |(ap, _)| ap - (((ap + PI) / lock).round() * lock - PI));
     let base: Vec<f64> = linspace_open(-PI, PI, c.cols)
         .iter()
         .map(|&a| a + turn)
@@ -733,7 +744,7 @@ fn cap(sc: &Scalp, mut c: Cap) -> Comp {
         }
     }
     let cols = ell.len();
-    let lk: Vec<f64> = ell.iter().map(|&l| lock_at(l)).collect();
+    let lk: Vec<f64> = ell.iter().map(|&l| lock_at(l, LOCK)).collect();
     // Tips past the hairline, none where it goes round an ear.
     let lim: Vec<f64> = (0..cols)
         .map(|k| {
@@ -780,7 +791,7 @@ fn cap(sc: &Scalp, mut c: Cap) -> Comp {
     let parting = |a: f64, u: f64| {
         c.part.map_or(0.0, |(ap, u0)| {
             let d = py_mod(a - ap + PI, TAU) - PI;
-            (-(d / (0.6 * step)).powi(2)).exp() * smoothstep(u0, u0 + 0.35, u)
+            (-(d / (0.6 * layout_step)).powi(2)).exp() * smoothstep(u0, u0 + 0.35, u)
         })
     };
     // Over the ears: at least as far out as they reach, and a little more over them.
@@ -823,7 +834,8 @@ fn cap(sc: &Scalp, mut c: Cap) -> Comp {
             z.push(match c.bands {
                 Some(bf) => bf(ak, u),
                 None => {
-                    0.5 + (0.6 * lk[k] * (0.7 + 0.3 * jitter((ell[k] / 4.0) as usize, 3.0)) - 0.3
+                    0.5 + (0.6 * lk[k] * (0.7 + 0.3 * jitter((ell[k] / LOCK as f64) as usize, 3.0))
+                        - 0.3
                         + 0.1 * (u * 9.0 + ell[k]).sin())
                         * smoothstep(0.1, 0.6, u)
                 }
@@ -957,12 +969,12 @@ fn slab(mid: &[Vec<V3>], nrm: &[Vec<V3>], half: &[Vec<f64>], curl: f64, bands: &
 /// Clump bands across a sheet's columns (whole locks at its edges): light in the locks' middles,
 /// varying from lock to lock.
 fn lock_bands(cols: usize, seed: f64) -> Vec<f64> {
-    locks(cols)
+    locks(cols, LOCK)
         .iter()
         .enumerate()
         .map(|(j, l)| {
             clip(
-                0.15 + 0.7 * l * (0.75 + 0.25 * jitter((j + 2) / 4, seed)),
+                0.15 + 0.7 * l * (0.75 + 0.25 * jitter((j + LOCK / 2) / LOCK, seed)),
                 0.0,
                 1.0,
             )
@@ -1018,17 +1030,17 @@ struct Curtain<'a> {
 /// shoulders and back).
 fn curtain(sc: &Scalp, mut c: Curtain) -> Comp {
     let h = sc.h;
-    (c.locks, c.rows) = (dense_locks(c.locks), dense_rows(c.rows));
-    let cols = 4 * c.locks + 1;
+    c.rows = dense_rows(c.rows);
+    let cols = LOCK * c.locks + 1;
     let a = linspace(c.a0, c.a1, cols);
     // Whole locks at the edges, the partings between them.
-    let lk = locks(cols);
+    let lk = locks(cols, LOCK);
     let seed = c.seed as f64;
     let tt: Vec<f64> = a.iter().map(|&a| (c.top)(a)).collect();
     let bt: Vec<f64> = (0..cols)
         .map(|j| {
             (c.bottom)(a[j])
-                - c.tip * (0.35 + 0.65 * jitter((j + 2) / 4, seed)) * lk[j].powf(c.sharp)
+                - c.tip * (0.35 + 0.65 * jitter((j + LOCK / 2) / LOCK, seed)) * lk[j].powf(c.sharp)
         })
         .collect();
     let hangs: Vec<_> = a.iter().map(|&a| hang(sc, a)).collect();
@@ -1068,7 +1080,8 @@ fn curtain(sc: &Scalp, mut c: Curtain) -> Comp {
         .collect();
     let nrm = grid_normals(&inner, &|q| v3(q.x - h.centre[0], 0.0, q.z - h.centre[2]));
     // The locks at the edges fuller (they frame the face).
-    let full = |j: usize| 1.0 + 0.5 * smoothstep(2.0, 0.0, j.min(cols - 1 - j) as f64);
+    let full =
+        |j: usize| 1.0 + 0.5 * smoothstep((LOCK / 2) as f64, 0.0, j.min(cols - 1 - j) as f64);
     let half: Vec<Vec<f64>> = us
         .iter()
         .map(|&u| {
@@ -1115,10 +1128,10 @@ struct Fringe<'a> {
 /// to the cranium): between azimuths a0..a1, from polar angle top(a) (under the cap) down to height
 /// bottom(a) (m) and the locks' tips below.
 fn fringe(face: &Scalp, mut c: Fringe) -> Comp {
-    (c.locks, c.rows) = (dense_locks(c.locks), dense_rows(c.rows));
-    let cols = 4 * c.locks + 1;
+    c.rows = dense_rows(c.rows);
+    let cols = LOCK * c.locks + 1;
     let a = linspace(c.a0, c.a1, cols);
-    let lk = locks(cols);
+    let lk = locks(cols, LOCK);
     let t0: Vec<f64> = a.iter().map(|&a| (c.top)(a)).collect();
     let t1: Vec<f64> = (0..cols)
         .map(|j| {
@@ -1126,7 +1139,9 @@ fn fringe(face: &Scalp, mut c: Fringe) -> Comp {
                 face,
                 a[j],
                 (c.bottom)(a[j])
-                    - c.tip * (0.5 + 0.5 * jitter((j + 2) / 4, c.seed)) * lk[j].powf(c.sharp),
+                    - c.tip
+                        * (0.5 + 0.5 * jitter((j + LOCK / 2) / LOCK, c.seed))
+                        * lk[j].powf(c.sharp),
                 t0[j] + 0.02,
             )
         })
@@ -2006,7 +2021,7 @@ fn beard(sc: &Scalp) -> Comp {
     let hh = h.hh;
     let (cols, rows) = (25, 12);
     let a = linspace(-radians(94.0), radians(94.0), cols);
-    let lk = locks(cols);
+    let lk = locks(cols, LAYOUT_LOCK);
     // Mouth direction (polar angle) and the hole round it.
     let qm = (h.mouth - h.centre).component_div(&h.radii);
     let phm = (qm[1] / qm.norm()).acos();

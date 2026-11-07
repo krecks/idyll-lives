@@ -56,6 +56,9 @@ struct Style {
     brow_z: f64,
     arch: f64,
     brow_tip: f64,
+    /// Where along the brow its arch peaks (the exponent of its run: 0.8 a third of the way out, 1.5
+    /// two thirds).
+    arch_at: f64,
     lash: f64,
     flick: f64,
     upper: f64,
@@ -66,14 +69,15 @@ struct Style {
 fn style(family: &str) -> Style {
     if family == "male" {
         Style {
-            lip_u: 3.1,
-            lip_l: 4.0,
+            lip_u: 2.8,
+            lip_l: 3.6,
             lip_z: 3.0,
-            proud: 1.6,
-            brow_h: 3.2,
-            brow_z: 1.4,
-            arch: 1.0,
-            brow_tip: 0.5,
+            proud: 1.5,
+            brow_h: 3.5,
+            brow_z: 1.5,
+            arch: 0.6,
+            brow_tip: 0.55,
+            arch_at: 0.8,
             lash: 1.2,
             flick: 0.3,
             upper: 63.0,
@@ -82,14 +86,15 @@ fn style(family: &str) -> Style {
         }
     } else {
         Style {
-            lip_u: 3.6,
-            lip_l: 4.6,
-            lip_z: 3.3,
-            proud: 1.8,
-            brow_h: 2.5,
-            brow_z: 1.1,
-            arch: 2.8,
-            brow_tip: 0.35,
+            lip_u: 3.9,
+            lip_l: 5.0,
+            lip_z: 3.5,
+            proud: 1.9,
+            brow_h: 2.3,
+            brow_z: 1.0,
+            arch: 3.0,
+            brow_tip: 0.3,
+            arch_at: 1.5,
             lash: 2.0,
             flick: 1.6,
             upper: 61.0,
@@ -742,7 +747,7 @@ impl Face {
         let (mut pts, mut ry, mut rz) = (Vec::new(), Vec::new(), Vec::new());
         for &t in &t {
             let dy = interp(t, &[0.0, 0.45, 1.0], &[inner, mid, outer]) * mm
-                + st.arch * mm * (PI * t.powf(0.8)).sin();
+                + st.arch * mm * (PI * t.powf(st.arch_at)).sin();
             let dx = (3.5 * p.brow_down[k] + 1.2 * p.sneer[k]) * mm * (1.0 - t).powf(1.5) * inward;
             let x = a[0] + (b[0] - a[0]) * t + dx;
             let y = a[1] + (b[1] - a[1]) * t + dy;
@@ -1058,7 +1063,9 @@ fn tone(name: &str, pos: &[V3], idx: &[usize], face: &Face) -> Vec<[f64; 4]> {
     } else if name == "lipU" || name == "lipL" {
         // The lips' colour (y < 0), fading at the mouth's corners into the skin and towards the line
         // between them: there the lips' inner sides face each other in shade, which the occlusion (w)
-        // bakes, so the mouth's shape (a smile, a frown) reads even when it is a few pixels wide.
+        // bakes, so the mouth's shape (a smile, a frown) reads even when it is a few pixels wide. And
+        // (z, lips only) how far the lip turns down at rest, which the shader shades: the lip's own
+        // shape, not which way the head faces (lying down, bent over).
         let nn = smooth_normals(pos, idx);
         for i in 0..n {
             let s = clip((pos[i].x - face.h.mouth[0]).abs() / face.hw, 0.0, 1.0);
@@ -1066,6 +1073,7 @@ fn tone(name: &str, pos: &[V3], idx: &[usize], face: &Face) -> Vec<[f64; 4]> {
             let ny = nn[i].y * (if name == "lipU" { -1.0 } else { 1.0 });
             let inner = clip(ny, 0.0, 1.0).powf(1.5);
             t[i][1] = -LIP_TINT * (1.0 - 0.45 * s.powf(3.0)) * (1.0 - 0.55 * inner);
+            t[i][2] = clip(-nn[i].y, 0.0, 1.0);
         }
     } else if name == "plate" {
         for v in &mut t {

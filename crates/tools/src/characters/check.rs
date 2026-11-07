@@ -18,7 +18,8 @@ use super::{V3, repo_root, v3};
 
 /// lod.body: the cage at its limit (~0.9k) plus the eyelids (~0.2k).
 ///
-/// hair: the styles are built at `hair::DETAIL` (1.5) times their layout's columns and rows, so the
+/// hair: the styles are built at `hair::DETAIL` (1.5) times their layout's rows, each lock on 6
+/// columns rather than 4 (`hair::LOCK`), so the
 /// densest (`hair.layered`) comes to 7.3k and the rest to 2.1k-5.6k. It was 3k, which left the cap
 /// and the curtains' locks at 40 columns and 8-16 rows: plates, with a polyline for a hem (see
 /// `hair.rs`). At 5.2k the curtains still read as ribbons of six or nine, the width of a thumb at

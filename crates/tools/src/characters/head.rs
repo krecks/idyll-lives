@@ -28,7 +28,7 @@ use std::sync::Arc;
 use super::cage::{Cage, Tags, Weights};
 use super::kdtree::KdTree;
 use super::np::{PI, clip, linspace_open, mean, median, radians, sign};
-use super::rig::{Proportions, b, joints, proportions};
+use super::rig::{Proportions, b, joints, maturity, proportions};
 use super::{Cache, V3, key, v3};
 
 /// Rows from the jaw up: elevation (degrees) of the ray from the head's middle (`MIDDLE`) at the
@@ -133,13 +133,42 @@ fn shapes(family: &str) -> Shapes {
     }
 }
 
-/// How far each feature's cage vertex moves (fractions of hh; the surface follows by about half).
-fn nose(family: &str) -> f64 {
-    if family == "male" { 0.085 } else { 0.07 }
+/// What a grown face adds to `shapes` (fractions of hh: the cheeks' and the chin's centre and radii),
+/// as far as the stage is grown (`maturity`): a man's jaw wider and squarer, his chin broad and
+/// heavy; a woman's jaw narrower and rounder, her cheekbones higher, her chin small and pointed.
+fn grown(family: &str) -> [(V3, V3); 2] {
+    if family == "male" {
+        [
+            (v3(0.0, -0.005, 0.0), v3(0.02, 0.005, 0.005)),
+            (v3(0.0, -0.01, 0.005), v3(0.03, 0.01, 0.01)),
+        ]
+    } else {
+        [
+            (v3(0.0, 0.012, 0.0), v3(-0.012, -0.008, -0.004)),
+            (v3(0.0, 0.006, -0.004), v3(-0.022, -0.008, -0.006)),
+        ]
+    }
 }
 
-fn brow(family: &str) -> f64 {
-    if family == "male" { 0.025 } else { 0.014 }
+/// How far each feature's cage vertex moves (fractions of hh; the surface follows by about half): the
+/// nose (a man's larger) and the brow ridge (a man's heavier; a woman's hardly there), as far as the
+/// stage is grown.
+fn nose(family: &str, stage: &str) -> f64 {
+    let m = maturity(stage);
+    if family == "male" {
+        0.085 + 0.012 * m
+    } else {
+        0.07 - 0.008 * m
+    }
+}
+
+fn brow(family: &str, stage: &str) -> f64 {
+    let m = maturity(stage);
+    if family == "male" {
+        0.025 + 0.01 * m
+    } else {
+        0.014 - 0.006 * m
+    }
 }
 
 /// The nose: (row, column's degrees, then the offset out to the side, up and forward), in `nose`
@@ -166,9 +195,15 @@ pub fn youth(stage_hh: f64) -> f64 {
 /// An eyeball's radius (m): the sockets are carved round it. A young adult's is 34 mm across where a
 /// real one is 24, and small children's a little larger still: at 6 m, the game's closest camera, the
 /// iris is 5 px, and the larger sphere is what keeps the sclera from closing the iris into a dot. Past
-/// that it stops reading as an eye and starts reading as a bead.
-fn eye_radius(pr: &Proportions) -> f64 {
-    (0.062 + 0.018 * youth(pr.hh)) * pr.hh * pr.h
+/// that it stops reading as an eye and starts reading as a bead. A grown woman's a little larger (a
+/// twentieth), which reads as hers at a distance more than any other feature of the face.
+fn eye_radius(family: &str, stage: &str, pr: &Proportions) -> f64 {
+    let f = if family == "female" {
+        1.0 + 0.05 * maturity(stage)
+    } else {
+        1.0
+    };
+    (0.062 + 0.018 * youth(pr.hh)) * pr.hh * pr.h * f
 }
 
 /// Approximate signed distance to an ellipsoid (exact on its surface).
@@ -195,6 +230,9 @@ pub fn head_shape(family: &str, stage: &str) -> impl Fn(V3) -> f64 {
     let (mut kc, mut kr) = s.cheeks;
     let (mut mc, mr) = s.muzzle;
     let (mut nc, mut nr) = s.chin;
+    let m = maturity(stage);
+    let [(dkc, dkr), (dnc, dnr)] = grown(family);
+    (kc, kr, nc, nr) = (kc + dkc * m, kr + dkr * m, nc + dnc * m, nr + dnr * m);
     // Small children: a bigger, rounder cranium, chubby cheeks low on a short face, a flatter muzzle
     // and a small chin.
     cr += v3(0.035, 0.0, 0.02) * yg;
@@ -237,7 +275,7 @@ fn cast(f: &impl Fn(V3) -> f64, o: V3, d: V3) -> V3 {
 pub fn sockets(family: &str, stage: &str, lod: bool) -> impl Fn(V3) -> V3 {
     let pr = proportions(family, stage);
     let j = joints(family, stage);
-    let r = eye_radius(&pr);
+    let r = eye_radius(family, stage, &pr);
     let eyes = [j[b("eye_l")], j[b("eye_r")]];
     let [over, side, r0, cv, ch, c4] = SOCKET;
     move |p: V3| {
@@ -402,7 +440,7 @@ fn features(family: &str, stage: &str) -> Vec<Vec<V3>> {
     let mut dd = vec![vec![V3::zeros(); COLS.len()]; ROWS.len()];
     let z = v3(0.0, 0.0, 1.0);
     let young = 1.0 - 0.55 * yg;
-    let n = nose(family) * young * hh * (if stage == "elder" { 1.1 } else { 1.0 });
+    let n = nose(family, stage) * young * hh * (if stage == "elder" { 1.1 } else { 1.0 });
     for (r, deg, [ox, oy, oz]) in NOSE {
         for sx in if deg == 0.0 {
             vec![1.0]
@@ -423,7 +461,7 @@ fn features(family: &str, stage: &str) -> Vec<Vec<V3>> {
     ] {
         dd[LIP][col_of(deg)] += z * k * n;
     }
-    let bw = brow(family) * (1.0 - 0.6 * yg) * hh;
+    let bw = brow(family, stage) * (1.0 - 0.6 * yg) * hh;
     for deg in [14.0, 28.0, 40.0, 50.0] {
         for sx in [1.0, -1.0] {
             dd[BROW][col_of(sx * deg)] += z * bw;
@@ -667,10 +705,10 @@ impl HeadFrame {
 
     /// Scalp weight (0..1) of a point: 1 well above the hairline, 0 on the face and neck.
     ///
-    /// The ramp is 4 cm of head height wide, so the shade fades out over the skin instead of stepping:
-    /// the side hairline sits at jaw height, where the neck's 8-vertex ring has one vertex above it and
-    /// one below, and a ramp two centimetres wide drew a hard brown band across the neck that read as
-    /// dirt (`shaders/character.ts` darkens the scalp to 0.7 of the hair's colour).
+    /// The ramp is a tenth of the head's height wide (2.6 cm on an adult), so the shade fades out over
+    /// the skin instead of stepping: the side hairline sits at jaw height, where the neck's 8-vertex
+    /// ring has one vertex above it and one below, and a ramp of 0.06 of it (1.6 cm) drew a hard brown
+    /// band across the neck that read as dirt (`shaders/character.ts` darkens the scalp to 0.7 of the hair's colour).
     pub fn scalp(&self, p: V3) -> f64 {
         clip(
             (p.y - hairline_y(self, p)) / (0.10 * self.hh) + 0.5,
@@ -738,7 +776,7 @@ fn make_head_frame(family: &str, stage: &str) -> HeadFrame {
     let (hgt, hh) = (pr.h, pr.hh * pr.h);
     let chin_y = hgt - hh;
     let eyes = [j[b("eye_l")], j[b("eye_r")]];
-    let eye_r = eye_radius(&pr);
+    let eye_r = eye_radius(family, stage, &pr);
     // The cranium's ellipsoid: round the head above the ears (ears and face excluded).
     let cran = &srf.cranium;
     let zmin = cran.iter().map(|p| p.z).fold(f64::INFINITY, f64::min);
@@ -798,10 +836,14 @@ fn make_head_frame(family: &str, stage: &str) -> HeadFrame {
     h.face_z = mean(&rim);
     let my = chin_y + 0.2 * hh;
     h.mouth = v3(0.0, my, h.surface_z(0.0, my));
-    let by = chin_y + 0.6 * hh;
+    // The brows over the eyes, by the eye (eye radii from its centre): from over the inner corner to a
+    // little past the outer one, on the brow bone rather than round the temple (they were 1.9 cm past
+    // the outer corner, a third of the head's width each).
+    let [lift, inner_k, outer_k, drop] = brow_layout(family);
     for (k, sx) in [-1.0, 1.0].into_iter().enumerate() {
-        let inner = v3(sx * 0.07 * hh, by, 0.0);
-        let outer = v3(sx * 0.3 * hh, by - 0.02 * hh, 0.0);
+        let (ex, by) = (eyes[k].x.abs(), eyes[k].y + lift * eye_r);
+        let inner = v3(sx * (ex - inner_k * eye_r), by, 0.0);
+        let outer = v3(sx * (ex + outer_k * eye_r), by - drop * eye_r, 0.0);
         for (e, mut pt) in [inner, outer].into_iter().enumerate() {
             pt[2] = h.surface_z(pt[0], pt[1]);
             h.brows[k][e] = pt;
@@ -823,6 +865,17 @@ fn make_head_frame(family: &str, stage: &str) -> HeadFrame {
         v3(0.0, -0.45, 1.0) / 0.45f64.hypot(1.0),
     );
     h
+}
+
+/// A brow's line, in eye radii from the eye's centre: how high over it, how far in towards the nose and
+/// out past it its ends are, and how much lower the outer end is. A man's sit lower over the eye and
+/// straighter; a woman's higher, ending sooner, their tails dropping.
+fn brow_layout(family: &str) -> [f64; 4] {
+    if family == "male" {
+        [2.35, 1.15, 1.35, 0.15]
+    } else {
+        [2.65, 1.05, 1.25, 0.35]
+    }
 }
 
 /// Where a ray from inside the head leaves its surface (bisection on the sdf).

@@ -294,7 +294,7 @@ def tv_retro() -> None:
         F.sphere('aerial_ball', 0.009, tip, M.steel, segments=10, rings=6)
     aerial = G.join(aerial, 'aerial', origin=F.at(*PT_AERIAL))
     G.settle(centre=False)
-    G.swing(aerial, 'antenna', 35, seconds=0.9)
+    G.swing(aerial, 'antenna', 35, seconds=0.9, axis='X')   # about X: its tip, at the back (+Y), rises
 
 
 # --- the low TV bench (2x1): a white bench on oak legs, a TV lift in a hood at its back -----------------------

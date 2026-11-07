@@ -69,17 +69,33 @@ export function surfaceOf(part: string): CharacterSurface {
               : 'hair';
 }
 /**
- * Sims switch to the low-detail body and clothes below this projected size (px per 5 cm of face)
- * and back above the second: the gap keeps a Sim at the threshold from flickering between them.
+ * Sims switch to the low-detail body and clothes below this projected size (px per 5 cm of face, at
+ * `LOD_HEIGHT_PX` tall: `faceDetail`) and back above the second: the gap keeps a Sim at the threshold
+ * from flickering between them.
  *
- * The thresholds are set by where the game's camera looks from: 24 m out at the default lens (fov 0.7,
- * 1080 px tall) a face is about 3.1 px per 5 cm, so a 6 px threshold kept the *whole* default view on
- * `lod.body` (the cage at its limit, 1.3k triangles) while the hair on the same head drew at 2.8k. A
- * 2 px threshold puts the full body at 37 m out, past the default camera and the close one (6 m), and
- * leaves the low-detail body to the far town, the shadows and the distance where a face is 2 px tall.
+ * The thresholds are set by where the game's camera looks from (`shared/lens.ts`): at its default 24 m
+ * a face is about 3.1 px per 5 cm, so a 6 px threshold kept the *whole* default view on `lod.body` (the
+ * cage at its limit, 1.3k triangles) while the hair on the same head drew at 2.8k. 2.4 px brings the
+ * full body back from 31 m in, and 1.8 px leaves it from 41 m out: the default view (and the close one,
+ * 6 m) clear of the gap, so everyone there draws the same detail whichever way they came to it, and
+ * the low-detail body to the far town and the shadows.
+ *
+ * Measured at a fixed height (not the drawing's: a window's size, the device's pixel ratio and the
+ * resolution setting all change that), so the same camera shows the same detail on every screen.
  */
-export const LOD_FAR_PX = 2;
-export const LOD_NEAR_PX = 3;
+export const LOD_FAR_PX = 1.8;
+export const LOD_NEAR_PX = 2.4;
+/** The drawing's height (px) `LOD_FAR_PX` and `LOD_NEAR_PX` are measured at. */
+export const LOD_HEIGHT_PX = 1080;
+/**
+ * Far enough off to be posed in full only every few frames (`residents.ts` `FAR_EVERY`), the fingers left
+ * in the clips' fists, below this projected size (px per 5 cm of face, as drawn) and back above the second.
+ * Apart from the mesh's (`LOD_FAR_PX`): at a few pixels a pose a frame or two old and a fist don't show on
+ * the full body any more than on the low-detail one, and posing every resident in the default view every
+ * frame would cost the slowest machines (an 8 GB M1) what nobody sees.
+ */
+export const POSE_FAR_PX = 6;
+export const POSE_NEAR_PX = 7;
 /**
  * Small face parts are skipped on faces too small on screen to show them: the projected size (px)
  * of a 5 cm feature (a mouth, an eye with its brow) below which each isn't drawn.

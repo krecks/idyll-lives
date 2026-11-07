@@ -31,7 +31,7 @@ describe('residents not drawn', async () => {
   const { Content } = await import('../src/content/content');
   const { AssetRegistry } = await import('../src/assets/registry');
   const { Characters, MAX_CHARACTERS } = await import('../src/render/shared/characters/residents');
-  const { LOD_FAR_PX, LOD_NEAR_PX } = await import('../src/render/shared/characters/parts');
+  const { DEFAULT_ORBIT, LENS, RADIUS_LIMITS } = await import('../src/render/shared/lens');
   const { TemplateCache } = await import('../src/render/shared/templateCache');
   const { Pose, simFields } = await import('../src/core/snapshot');
   const pose = await import('../src/render/shared/characters/pose');
@@ -53,6 +53,8 @@ describe('residents not drawn', async () => {
   const parts: Part[] = [];
   /** The camera (x, y, z), looking on: far off, residents are drawn in low detail. */
   const cam = [0, 1.6, 6];
+  /** Its drawing's height (px) and vertical field of view (rad). */
+  const lens = { height: 720, fov: 0.8 };
   const view: View = {
     init: () => {},
     uploadPoses: () => {},
@@ -85,7 +87,7 @@ describe('residents not drawn', async () => {
     onModelFile: () => () => {},
     fileColour: async () => undefined,
     camera(out) {
-      [out[0], out[1], out[2], out[3], out[4]] = [cam[0], cam[1], cam[2], 720, 0.8];
+      [out[0], out[1], out[2], out[3], out[4]] = [cam[0], cam[1], cam[2], lens.height, lens.fov];
       return true;
     },
     onDispose: () => {},
@@ -181,15 +183,62 @@ describe('residents not drawn', async () => {
     }
   }, 30_000);
 
-  test('the default camera draws the full body, not the low-detail one', async () => {
-    // The game's lens: 1080 px tall, fov 0.7 rad (`PlayCanvasRenderer.ts` LENS), the default camera 24 m
-    // out (its `orbit` pose) and the closest game camera 6 m. The thresholds have to keep the full body
-    // in both, and leave `lod.body` to the far town.
-    const facePx = (dist: number) => (0.05 * 1080) / (2 * Math.tan(0.7 / 2)) / dist;
-    expect(facePx(24)).toBeGreaterThan(LOD_NEAR_PX);
-    expect(facePx(6)).toBeGreaterThan(LOD_NEAR_PX);
-    expect(facePx(60)).toBeLessThan(LOD_FAR_PX);
-  });
+  test('the default camera draws the full body at any size of drawing, and poses them in turn', async () => {
+    // The game's lens and the pose a game opens in (`shared/lens.ts`), looking at the residents from its distance, at
+    // the drawing's heights a window, the device's pixel ratio and the resolution setting make (720 to 2160 px).
+    const realNow = performance.now;
+    let now = 0;
+    performance.now = () => now;
+    const first = parts.length;
+    try {
+      const characters = new Characters(view, assets, content, { castsShadows: true });
+      expect(await characters.init()).toBe(true);
+      await characters.build({ sims, objects: [] });
+      const prev = new Float32Array(layout.capacity);
+      const curr = new Float32Array(layout.capacity);
+      const frame: FrameState = { prev, curr, alpha: 0, steps: 1, layout, now: 0 };
+      const shadows = new Float32Array(MAX_CHARACTERS * 16);
+      write(prev, -1);
+      write(curr, -1);
+      const rigs = (characters as unknown as { sims: { lag: number }[] }).sims;
+      lens.fov = LENS.fov;
+      // The orbit's eye about the residents' middle (`shared/orbit.ts`: target + radius (cos α sin β, cos β, sin α sin β)).
+      const mid = ((N - 1) * 1.5) / 2;
+      const run = (radius: number, height: number, frames: number) => {
+        const { alpha, beta } = DEFAULT_ORBIT;
+        [cam[0], cam[1], cam[2]] = [mid + radius * Math.cos(alpha) * Math.sin(beta), radius * Math.cos(beta), radius * Math.sin(alpha) * Math.sin(beta)];
+        lens.height = height;
+        let lagging = 0;
+        for (let f = 0; f < frames; f++) {
+          now += 1000 / 60;
+          frame.now = now;
+          characters.update(frame, () => true, shadows);
+          for (let i = 0; i < N; i++) if (rigs[i].lag > 0) lagging++;
+        }
+        const drawn = (name: string) => parts.slice(first).some((p) => p.name.endsWith(`:${name}`) && !p.shadow && p.count > 0);
+        return { body: drawn('body'), lod: drawn('lod.body'), lagging: lagging / (frames * N) };
+      };
+      for (const height of [720, 1080, 1440, 2160]) {
+        const at = run(DEFAULT_ORBIT.radius, height, 6);
+        expect([height, at.body, at.lod]).toEqual([height, true, false]);
+        // Zoomed all the way out (the far town: the low-detail body), then back: the full body again, whichever way
+        // they came to the default view.
+        expect(run(RADIUS_LIMITS[1], height, 3)).toMatchObject({ body: false, lod: true });
+        expect(run(DEFAULT_ORBIT.radius, height, 3)).toMatchObject({ body: true, lod: false });
+        // And the closest camera.
+        expect(run(RADIUS_LIMITS[0], height, 3)).toMatchObject({ body: true, lod: false });
+      }
+      // In the default view, on the full body, still posed in full only every few frames (the pose's distance is not
+      // the mesh's); close up, every frame (once the pose carried along from out there has caught up).
+      expect(run(DEFAULT_ORBIT.radius, 1080, 60).lagging).toBeGreaterThan(0.3);
+      run(RADIUS_LIMITS[0], 1080, 5);
+      expect(run(RADIUS_LIMITS[0], 1080, 60).lagging).toBe(0);
+    } finally {
+      performance.now = realNow;
+      [lens.height, lens.fov] = [720, 0.8];
+      [cam[0], cam[1], cam[2]] = [0, 1.6, 6];
+    }
+  }, 30_000);
   test('the body or its low-detail copy is drawn by the distance, and not both', async () => {
     const realNow = performance.now;
     let now = 0;
