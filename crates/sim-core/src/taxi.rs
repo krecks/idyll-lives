@@ -3419,6 +3419,11 @@ fn leisure_leaving(w: &mut World) {
         let sim = &mut sims[i];
         if sim.current.is_some() {
             crate::world::end_activity(sim, content, objects);
+            // (Talking from a seat: that ended the talk and took them back to what they sat
+            // down to do; that ends too. Dropped, the seat stayed theirs.)
+            if sim.current.is_some() {
+                crate::world::end_activity(sim, content, objects);
+            }
         }
         sim.current = None;
         let kind = if home {
@@ -3637,5 +3642,110 @@ pub(crate) fn moved_halts(w: &mut World, c: usize, at: &dyn Fn(f32) -> f32) {
             run.at[h] = at(run.at[h]);
         }
         run.progress = progress;
+    }
+}
+
+#[cfg(test)]
+mod leisure_leaving_tests {
+    use super::*;
+    use crate::world::Activity;
+
+    const CONTENT: &str = r#"{
+        "needs":[{"id":"social","label":"Social","decayPerHour":0.02}],
+        "objects":[{"id":"chair","name":"Chair","interactions":[{"id":"sit","label":"Sit","minutes":30,"effects":{"social":0.01},"tags":["lounge"]}]}],
+        "socials":[{"id":"chat","label":"Chat","minutes":10,"tags":["social"],"acceptance":{"base":1.0},"needs":{"social":0.3}}],
+        "visits":{"needs":{"social":0.5},"hours":2,"minFriendship":10,"earliestHour":0,"latestHour":24},
+        "economy":{"startingFunds":500}}"#;
+
+    /// Two houses on one street, a chair in each.
+    const TOWN: &str = r#"{"width":40,"depth":14,"exits":[[0.5,7.5]],
+        "plots":[{"name":"West","x":0,"z":0,"w":20,"d":6,"entry":[5.5,5.5]},{"name":"East","x":20,"z":0,"w":20,"d":6,"entry":[25.5,5.5]}],
+        "households":[{"name":"Host","plot":0,"player":true},{"name":"Guest","plot":1}],
+        "objects":[{"def":"chair","x":3,"z":2,"rot":0},{"def":"chair","x":24,"z":2,"rot":0}],
+        "sims":[{"name":"Host","household":0,"x":5.5,"z":3.5},{"name":"Guest","household":1,"x":3.5,"z":3.5}]}"#;
+
+    #[test]
+    fn a_guest_off_to_the_taxi_home_mid_talk_from_a_seat_lets_go_of_the_seat() {
+        // The guest, at West's, sat on its chair talking from it (what they sat down to do
+        // paused), is due out to their kerb for the taxi home: off they go, the talk over and
+        // the chair free. (Ending the talk took them back to the chair, and that was dropped
+        // with the chair still theirs: "object 0 is held by Guest who isn't using it", Crown
+        // Quarter.)
+        let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+        let (i, chair) = (1usize, 0u32);
+        let tick = w.tick;
+        w.sims[i].visiting = Some(crate::life::Visit {
+            plot: 0,
+            until: tick + 600,
+            idle: 0,
+            farewell: 0,
+            offer_at: 0,
+            arrived: tick,
+            leaving: false,
+        });
+        assert!(w.objects[chair as usize].reserve(i as u32, 1));
+        let task = |kind| Task {
+            kind,
+            directed: false,
+            routine: false,
+        };
+        w.sims[i].paused = Some(Activity {
+            task: task(TaskKind::Use {
+                object: chair,
+                interaction: 0,
+            }),
+            phase: Phase::Using { elapsed: 0.0 },
+            tags: Default::default(),
+        });
+        w.sims[i].current = Some(Activity {
+            task: task(TaskKind::Social {
+                target: 0,
+                social: 0,
+            }),
+            phase: Phase::Waiting { ticks: 0 },
+            tags: Default::default(),
+        });
+        // Booked on the taxi home from West's, time to be out at the kerb for it.
+        w.taxis.runs.push(Run {
+            id: 7,
+            home: true,
+            place: Some(0),
+            directed: false,
+            group: (0, 0),
+            enter: tick + 1000,
+            due_out: 0,
+            planned_out: 0,
+            depart: 0,
+            stops: vec![Stop {
+                sim: i as u32,
+                plot: 1,
+                due: tick + 10,
+                leave: tick,
+                state: StopState::Booked,
+                halt: 0,
+            }],
+            next: 0,
+            progress: 0.0,
+            detour: None,
+            since: 0,
+            car: None,
+            at: Vec::new(),
+            kerbs: Vec::new(),
+        });
+        w.sims[i].taxi = Some(Booking { run: 7, stop: 0 });
+        leisure_leaving(&mut w);
+        let s = &w.sims[i];
+        assert!(
+            s.queue
+                .front()
+                .is_some_and(|t| matches!(t.kind, TaskKind::GoHome)),
+            "not off home"
+        );
+        assert!(s.current.is_none() && s.paused.is_none(), "still at it");
+        assert_eq!(
+            w.objects[chair as usize].users().count(),
+            0,
+            "the chair still held"
+        );
     }
 }
