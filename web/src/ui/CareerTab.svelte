@@ -16,6 +16,18 @@
   const nextReady = $derived(job?.next ? job.next.requires.every((r) => r.have >= r.level) : false);
   const retired = $derived(sim.pension !== undefined);
 
+  /** When the next promotion comes at this pace, or what holds it back. */
+  const nextPace = $derived.by(() => {
+    if (!job?.next) return '';
+    // (A full bar promotes at the end of a shift: one more at least.)
+    const left = job.shiftsToFullBar === null ? null : Math.max(1, job.shiftsToFullBar);
+    const days = left === null ? '' : `about ${left} more ${left === 1 ? 'workday' : 'workdays'}`;
+    const mood = job.shiftMood < 0.5 ? ' A better mood before work would speed it up.' : '';
+    if (!nextReady) return job.performance >= 100 ? 'Bar full — waiting on the skills shown.' : `Needs the skills shown, and ${days || 'a full bar'}.${mood}`;
+    if (left === null) return `The bar isn't filling at this pace.${mood}`;
+    return `Skills ready — ${days} at this pace.${mood}`;
+  });
+
   /** Whole skill levels as a string, so suggestions only recompute when a level changes. */
   const skillKey = $derived(sim.skills.map((s) => Math.floor(s)).join(','));
 
@@ -108,7 +120,7 @@
       <div class="next">
         <span>Next: <b>{job.next.title}</b>{job.next.grade ? ` (grade ${job.next.grade})` : ''}</span>
         {@render chips(job.next.requires)}
-        <span class="muted">{nextReady ? 'Skills ready — fill the bar to be promoted.' : 'Needs the skills shown and a full bar.'}</span>
+        <span class="muted">{nextPace}</span>
       </div>
     {:else}
       <span class="muted">Top of the field.</span>

@@ -1,7 +1,6 @@
 //! Synthetic open-world towns: hamlets built like `town_with`'s streets (`paste`), set apart in
 //! open country and joined by country roads, with the open-world fields of
-//! docs/design/open-world.md (`roads` with kinds, `areas`, typed `exits` with a bus stop in each
-//! hamlet, `size`). `hamlets` places a few where a travel test wants them; `grid` fills a world
+//! docs/design/open-world.md (`roads` with kinds, `areas`, typed `exits`, `size`). `hamlets` places a few where a travel test wants them; `grid` fills a world
 //! as big as a town file may be with them, for the big-world benchmark (`tests/big_world.rs`).
 
 use serde_json::{Value, json};
@@ -44,8 +43,8 @@ pub fn line(a: [f64; 2], b: [f64; 2]) -> Vec<[f64; 2]> {
 }
 
 /// Hamlets of `columns` plots a side at `places`, `width × depth` in all; the first and the last
-/// joined to each other (and on) by a country road with a bend, a road out at the far end of each
-/// end hamlet, and a bus stop in the middle of every street.
+/// joined to each other (and on) by a country road with a bend, and a road out at the far end of
+/// each end hamlet.
 pub fn hamlets(
     content: &str,
     seed: u64,
@@ -102,7 +101,6 @@ pub fn hamlets(
         roads.push(
             json!({"points": pts, "width": 6, "ends": ["out", "out"], "kind": "street", "area": k}),
         );
-        exits.push(json!({"x": (x0 + x1) / 2.0, "z": z + 2.5, "kind": "stop"}));
         areas.push(json!({"name": format!("Hamlet {k}"), "kind": "hamlet", "x": dx, "z": dz, "w": bw, "d": bd}));
     }
     // Country roads from each hamlet's east end to the next one's west end, with two bends.
@@ -328,7 +326,7 @@ pub fn paste(out: &mut Value, block: &Value, dx: i64, dz: i64) -> Pasted {
 /// street of `columns` `town_with` houses a side (the shipped house layouts, with the content's
 /// storeys and basement above and below them) and a park, with at least a hamlet's depth of open
 /// country between them. Residents move in up to `max_residents`; the player's household is in
-/// the first hamlet. With `open` it's a `big` town: every street a road with a bus stop, the
+/// the first hamlet. With `open` it's a `big` town: every street a road, the
 /// hamlets of a row joined by country roads that run on to a way out at both edges of the world,
 /// and the rows joined by a country road down the west edge. Without, a town with no open-world
 /// fields (cosy, as the benchmark's first baseline was), a way out at both edges of the world on
@@ -404,7 +402,6 @@ pub fn grid(
             }
             let pts = line([x0 + 0.5, z], [x1 - 0.5, z]);
             roads.push(json!({"points": pts, "width": 6, "kind": "street", "area": k}));
-            exits.push(json!({"x": (x0 + x1) / 2.0, "z": z + 2.5, "kind": "stop"}));
             areas.push(json!({"name": format!("Hamlet {k}"), "kind": "hamlet",
                 "x": ox, "z": oz, "w": hw, "d": hd}));
             // Along the row: from the world's west edge to its first hamlet, on to the next, and

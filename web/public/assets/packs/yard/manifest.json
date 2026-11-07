@@ -450,6 +450,123 @@
         }
       ],
       "far": "../../models/yard/firewoodStack.far.glb"
+    },
+    "model.bicycle": {
+      "type": "model",
+      "url": "../../models/yard/bicycle.glb",
+      "materials": {
+        "basket": {
+          "finish": "material.finish.satin"
+        },
+        "basket_dark": {
+          "finish": "material.finish.satin"
+        },
+        "city": {
+          "finish": "material.finish.gloss"
+        },
+        "lamp": {
+          "finish": "material.finish.gloss"
+        },
+        "reflector": {
+          "finish": "material.finish.gloss"
+        },
+        "rim": {
+          "finish": "material.finish.chrome"
+        },
+        "saddle": {
+          "finish": "material.finish.satin"
+        },
+        "tyre": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "city",
+          "label": "Frame"
+        }
+      ],
+      "far": "../../models/yard/bicycle.far.glb"
+    },
+    "model.bicycleChild": {
+      "type": "model",
+      "url": "../../models/yard/bicycleChild.glb",
+      "materials": {
+        "kid": {
+          "finish": "material.finish.gloss"
+        },
+        "kid_trim": {
+          "finish": "material.finish.gloss"
+        },
+        "rim": {
+          "finish": "material.finish.chrome"
+        },
+        "saddle": {
+          "finish": "material.finish.satin"
+        },
+        "streamer_blue": {
+          "finish": "material.finish.satin"
+        },
+        "streamer_pink": {
+          "finish": "material.finish.satin"
+        },
+        "streamer_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        },
+        "tyre": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "kid",
+          "label": "Frame"
+        }
+      ],
+      "far": "../../models/yard/bicycleChild.far.glb"
+    },
+    "model.eScooter": {
+      "type": "model",
+      "url": "../../models/yard/eScooter.glb",
+      "materials": {
+        "grip_tape": {
+          "finish": "material.finish.matte"
+        },
+        "lamp": {
+          "finish": "material.finish.gloss"
+        },
+        "reflector": {
+          "finish": "material.finish.gloss"
+        },
+        "rim": {
+          "finish": "material.finish.chrome"
+        },
+        "scooter": {
+          "finish": "material.finish.satin"
+        },
+        "scooter_metal": {
+          "finish": "material.finish.metal"
+        },
+        "scooter_trim": {
+          "finish": "material.finish.satin"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "tyre": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "scooter",
+          "label": "Body"
+        }
+      ],
+      "far": "../../models/yard/eScooter.far.glb"
     }
   }
 }

@@ -16,13 +16,22 @@ missing or too slow. Measurements and research behind the choices are at the end
 ## Built so far
 
 - **Model (`web/src/voice/supertonic.ts`):** Supertonic 3 (Supertone, BigScience OpenRAIL-M),
-  four ONNX graphs with their weights stored as 16-bit floats (`crates/tools/src/fp16.rs`, cast back
-  to 32-bit when the model loads, so the GPU does the same arithmetic) and gzipped (`.onnxz`,
-  unpacked in the worker): 185 MB instead of 398 as published. Measured against the published
-  weights, on the GPU, a line differs less than it does between two random seeds (spectral
-  match 0.61–0.77, against 0.55–0.59), with the same timing and the same pitch per voice. 4-bit
+  four ONNX graphs with their big weights stored smaller and turned back into 32-bit floats when
+  the model loads (ONNX Runtime folds it once), so the GPU does float32 arithmetic as before:
+  since 0.7.0 the text encoder, vector estimator and vocoder as 8-bit integers with a scale per
+  channel (`crates/tools/src/int8.rs`), the duration predictor as 16-bit floats
+  (`crates/tools/src/fp16.rs`; in int8 some lines came out a frame longer or shorter); gzipped
+  (`.onnxz`, unpacked in the worker): 87 MB instead of 398 as published (185 MB with 16-bit
+  weights everywhere, 0.2.0 to 0.6.x). The 16-bit weights, against the published ones on the GPU:
+  a line differs less than it does between two random seeds (spectral match 0.61–0.77, against
+  0.55–0.59), with the same timing and the same pitch per voice. The 8-bit ones against the
+  16-bit (2026-11-05, on the CPU, 30 lines by 10 residents; log-spectrogram correlation): 0.87–0.96,
+  against 0.39–0.79 between two noise seeds of the 16-bit model; pitch shaping alike (×0.85 gives
+  a median ×0.853 against ×0.852 over 40 lines and voices); the same speed on the GPU (the device
+  test's speech 203–210 ms against 206) and the CPU; and to the owner's ear the same. 4-bit
   doesn't fit: 91 % of the weights are convolutions, which ONNX Runtime has no 4-bit form of on
-  WebGPU (and the int8 build ran its int8 operators on the CPU: 25 times slower). The graphs:
+  WebGPU; and int8 *operators* (the upstream int8 build) run on the CPU, 25 times slower: the
+  8-bit weights here never reach an operator. The graphs:
   duration predictor (how long a line lasts), text encoder, vector estimator (flow matching: 8
   passes turn noise into the line's latents) and vocoder (44.1 kHz). A whole line in a few large passes, which suits the GPU. The loop is
   ported from Supertone's reference code (`web/helper.js`). It runs in the voice worker on
@@ -61,8 +70,10 @@ missing or too slow. Measurements and research behind the choices are at the end
   WebGPU is much slower for both models here (speech 0.7 s against 0.18 s), so the test turns the
   language model off there and the settings say why; voices still run. Not the computer: the
   same Mac is fast in the other browsers.
-- **Download:** 218.7 MB once (the model 185.2, the runtime's WebGPU build 28.7, voices and text
-  files 3.2, dictionary 1.3, our WASM 0.16), kept in the browser's cache (packed).
+- **Download:** 120.6 MB once (the model 87.1, the runtime's WebGPU build 28.7, voices and text
+  files 3.2, dictionary 1.3, our WASM 0.16), kept in the browser's cache (packed). The runtime is
+  cached once for the voices and the language model (`openRuntimeCache`, `ml/assets.ts`; until
+  0.7.0 each worker kept its own copy).
 - **Lines of 1–5 sentences (the language model's):** each line is asked for a length picked by
   its seed (1: 20 %, 2: 25 %, 3: 25 %, 4: 15 %, 5: 15 %; `lineSentences` in `talk/writer.ts`),
   and the generation keeps to it (`GenParams.sentences` in `llm/generate.ts`): until the last
@@ -71,6 +82,16 @@ missing or too slow. Measurements and research behind the choices are at the end
   stop alone, and the line ends with its last sentence. Asked alone, LFM2.5 350M wrote two
   sentences when asked for three to five. 20 of 20 sampled lines had the length asked for, 125–600
   ms each on the GPU.
+- **The language model's files (`cargo fetch-llm`, `crates/tools/src/llmslim.rs`):** the
+  onnx-community 4-bit export of LFM2.5 350M, repacked without changing what it computes (since
+  0.7.0): its tied 4-bit embedding was stored twice, for reading the tokens and for the output
+  layer (33.6 MB the same, which gzip can't fold away: its window is 32 KB), and its rotary tables
+  held 128,000 positions (32.8 MB) where a prompt and its reply take about 470 + 160. Now the two
+  point at the same bytes and the tables keep their first 4,096 rows, which `generate.ts` never
+  goes past (`ModelSpec.positions`: a prompt that doesn't fit is refused). Weights 293.6 → 228.4
+  MB, the download 254.9 → 195.5 MB. Checked (M3 Pro, 2026-11-05): `check:llm`'s golden text as
+  before, the benchmark's five lines word for word, and the same speed (three runs of each in
+  turn, medians about 165–175 tokens a second for both).
 - **Made ahead (`voice/index.ts`, `setOut`):** the snapshot shows what a resident is walking to
   use (`objectDef`, `interaction`) before the animation starts, so when they set out the dice
   decide whether they'll speak and, if so, the line is written and its speech made on the way;
@@ -111,7 +132,7 @@ API key, nothing leaves the player's computer.
   picked with a hash of the resident id and event, not the sim's random number generator, so
   saves and replays are unaffected and `sim-core` needs no changes.
 - **Every resident sounds different**, and always the same, across sessions and saves.
-- **Download on request.** The model (173 MB with the runtime and voices) is fetched when the
+- **Download on request.** The model (121 MB with the runtime and voices) is fetched when the
   player turns voices on, or when they hear a voice in the creator, and kept.
 - **Consent.** A player's recording is their own voice or someone's who agreed (Kyutai's terms
   for Pocket TTS forbid cloning a voice without its owner's consent; the creator says so).
@@ -333,7 +354,7 @@ nothing is added to `RESTART_KEYS`.
 | Resident voices | Toggle | Default off. |
 | Language | (hidden while English is the only one) | Comes back as a row when a second language ships. |
 | Runs on | Auto / Graphics card / Processor | Auto uses the graphics card and steps down to the processor when it is missing or too slow. The choice applies live. |
-| Voice model | Status | Supertonic 3, its state, where it runs, and the download (about 217 MB). |
+| Voice model | Status | Supertonic 3, its state, where it runs, and the download (about 121 MB). |
 | Try it | **Hear a sample** and **Speed test** | The speed test measures the model with the scene drawing: "On the graphics card: 0.4 s per line, 7.6× real time, smooth" (M3 Pro, Chrome; "smooth" needs 1.5 s or less). A result over 3 s per line says voices may pause. |
 | Voice volume | Slider | Separate from sound effects. |
 
@@ -507,6 +528,21 @@ Web code lives in `web/src/voice/`, behind one small interface used by the game 
 | Later | Thoughts from the Planner (0.8) and from an in-browser language model; lip sync; persistent clip cache (IndexedDB, Opus via WebCodecs); a distilled male voice; more languages. | |
 
 Every phase keeps `bun run check` clean and the frame-time budget checked, with voices on and off.
+
+## Research: other models (2026-11-05)
+
+Looked at as replacements; none taken. **Language model: MNN-Pocket-0.3B** (Alibaba's MNN team,
+Apache-2.0, Qwen3 layout with 28 layers, English and Chinese; its own card puts it at IFEval 73
+against LFM2.5's 72). No browser build is published: its 4-bit build is in MNN's own format, and
+the community ONNX export (`liodon-ai/MNN-Pocket-0.3B-ONNX`) leaves every operator separate, so
+on WebGPU (`tools/llm/bench.mjs`, M3 Pro) its fp16 build (769 MB) wrote 14 tokens a second and
+its dynamic int8 build (364 MB, int8 operators on the CPU) 6.3, against LFM2.5's 187. Built as
+4-bit for WebGPU (ONNX Runtime GenAI's builder) it was 176 MB and wrote 158 tokens a second, but
+asked for five sentences it ran into `!!!!.....` to the token limit, in fp16 and 4-bit alike.
+**Voices:** OmniVoice (k2-fsa) has non-commercial weights (CC-BY-NC) and is 3.3 GB;
+Audio8-TTS-Realistic-Air (Apache-2.0) is 2.6 GB, autoregressive and only for PyTorch on CUDA;
+PiVo-1.4M (Apache-2.0, 15 MB of ONNX) has two voices at 16 kHz, a vocoder run once per 10 ms and,
+by its author, a metallic sound. Supertonic 3 stays.
 
 ## Research: a voice the player can shape (2026-10-11/12)
 

@@ -1,11 +1,12 @@
 //! Commutes in an open-world town (`life::Commute`): residents leave for work or school the walk
-//! to the quickest way out of town (a bus stop, on foot) plus `commuteMinutes` (the part off the
+//! to the quickest way out of town on foot plus `commuteMinutes` (the part off the
 //! map) before it starts, and get there on time.
 
 use crate::common;
 
 use common::hamlets::two_hamlets;
 use sim_core::social::EventKind;
+use sim_core::travel::Mode;
 use sim_core::world::TaskKind;
 use sim_core::{MINUTES_PER_TICK, World, clock, life};
 
@@ -96,7 +97,13 @@ fn residents_leave_by_their_walk_and_are_never_late() {
                     c
                 );
                 // ...and at the way out of town in time for the rest.
-                let late = w.tick as i64 - (start - off_map) as i64;
+                let due = start - off_map;
+                assert!(
+                    !s.job.as_ref().is_some_and(|j| j.late),
+                    "{} late for work",
+                    s.name
+                );
+                let late = w.tick as i64 - due as i64;
                 worst_late = worst_late.max(late);
                 assert!(
                     late <= 0,
@@ -131,28 +138,29 @@ fn the_walk_is_timed_to_the_quickest_way_out() {
         .filter(|&i| w.sims[i].commute().is_some())
         .collect();
     assert!(!walkers.is_empty(), "nobody's commute was worked out");
+    let off_map = w.content.career_rules.commute_minutes;
+    let mut timed = 0;
     for &i in &walkers {
         let c = w.sims[i].commute().unwrap();
-        let off_map = w.content.career_rules.commute_minutes;
+        let name = &w.sims[i].name;
         assert_eq!(
             c.ticks,
             ((c.walk + off_map) / MINUTES_PER_TICK) as u64,
-            "{}",
-            w.sims[i].name
+            "{name}"
         );
-        assert!(c.walk < 60.0, "{}: {:.0} min", w.sims[i].name, c.walk);
+        // To the quickest of the ways out.
+        let from = w.stair_map().ground_pos(w.sims[i].pos);
+        let eta = |k: usize| w.travel.eta(from, w.exits[k], Mode::Foot, 1.5);
+        let best = (0..w.exits.len()).map(eta).fold(f32::INFINITY, f32::min);
+        assert!(
+            eta(c.exit) <= best + 1e-3,
+            "{name}: to exit {} ({:.0} min), the quickest {best:.0}",
+            c.exit,
+            eta(c.exit)
+        );
+        timed += 1;
     }
-    // Each hamlet has a bus stop in the middle of its street: most walk to one of those, not to
-    // the end of the road.
-    let to_stops = walkers
-        .iter()
-        .filter(|&&i| w.travel.is_stop(w.sims[i].commute().unwrap().exit))
-        .count();
-    assert!(
-        to_stops * 2 > walkers.len(),
-        "{to_stops} of {} to a stop",
-        walkers.len()
-    );
+    assert!(timed > 0, "no walk checked");
 }
 
 /// A walk worked out from upstairs (in bed at night, say) is timed along the ground, not across
@@ -216,4 +224,44 @@ fn a_new_day_starts_from_the_day_befores_walk() {
         assert_eq!(now.exit, was.exit, "{}", s.name);
         assert!(now.ticks >= was.ticks, "{}", s.name);
     }
+}
+
+/// Whoever gets to the way out of town only as work starts is late for it: the rest of the way
+/// (`commuteMinutes`, off the map) is still to go, longer than `lateGraceMinutes`.
+#[test]
+fn at_the_way_out_as_work_starts_is_late() {
+    let content = r#"{
+        "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],
+        "objects":[],
+        "careers":[{"id":"office","label":"Office","levels":[
+            {"title":"Clerk","pay":100,"start":10,"hours":4,"days":[0,1,2,3,4,5,6]}]}],
+        "careerRules":{"commuteMinutes":60,"lateGraceMinutes":15,"performancePerShift":10},
+        "economy":{"startingFunds":500}}"#;
+    // An open-world town, Ada off to work in it.
+    let town = r#"{"width":40,"depth":14,"size":"normal","exits":[[0.5,10.5]],
+        "plots":[{"name":"Home","x":10,"z":0,"w":20,"d":9,"entry":[20.5,8.5]}],
+        "households":[{"name":"Home","plot":0,"player":true}],
+        "sims":[{"name":"Ada","household":0,"job":{"career":"office"},"x":1.5,"z":10.5}]}"#;
+    let mut w = World::from_json(content, town, 5).unwrap();
+    w.autonomy = false;
+    // No work for her today until a minute before it starts, and then she's a step from the way
+    // out: off at once, out of town as it starts.
+    let shift_day = |w: &mut World, day: u32| w.sims[0].job.as_mut().unwrap().last_shift_day = day;
+    common::run_to(&mut w, 2, 5.0);
+    shift_day(&mut w, 2);
+    common::run_to(&mut w, 2, 9.0 + 59.0 / 60.0);
+    assert!(w.sims[0].away_until.is_none(), "already off to work");
+    w.sims[0].pos = [1.5, 10.5];
+    shift_day(&mut w, 1);
+    let end = clock::tick_at(2, 10.5 * 60.0).unwrap();
+    while w.sims[0].away_until.is_none() && w.tick < end {
+        w.tick_once();
+    }
+    assert!(w.sims[0].away_until.is_some(), "never set off");
+    assert!(
+        clock::hour(w.tick) < 10.1,
+        "out of town at {:.2}",
+        clock::hour(w.tick)
+    );
+    assert!(w.sims[0].job.as_ref().unwrap().late, "not late for work");
 }

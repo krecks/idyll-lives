@@ -6,26 +6,27 @@
 //!
 //! Works on the protobuf wire format directly: only the graph's initializers and nodes are
 //! touched, every other field is copied byte for byte. Deterministic, so the output can be pinned
-//! by its SHA-256. Used by `cargo fetch-voice`. (Was tools/voice/fp16.mjs.)
+//! by its SHA-256. Used by `cargo fetch-voice`, and its protobuf reading by `llmslim.rs`. (Was
+//! tools/voice/fp16.mjs.)
 
 /// Weights smaller than this stay float32 (biases, norms: little to gain).
-const MIN_VALUES: usize = 1024;
+pub(crate) const MIN_VALUES: usize = 1024;
 
-const FLOAT: u64 = 1;
+pub(crate) const FLOAT: u64 = 1;
 const FLOAT16: u64 = 10;
 /// `AttributeProto.type` INT.
 const ATTR_INT: u64 = 2;
 
 /// A protobuf field, its payload still a slice of the message it came from.
-struct Field<'a> {
-    number: u64,
-    wire: u8,
+pub(crate) struct Field<'a> {
+    pub(crate) number: u64,
+    pub(crate) wire: u8,
     /// The value of a varint field.
-    varint: u64,
+    pub(crate) varint: u64,
     /// A length-delimited or fixed-width field's payload.
-    payload: &'a [u8],
+    pub(crate) payload: &'a [u8],
     /// The whole field: key, length, payload.
-    bytes: &'a [u8],
+    pub(crate) bytes: &'a [u8],
 }
 
 fn varint(buf: &[u8], at: &mut usize) -> Result<u64, String> {
@@ -56,7 +57,7 @@ fn encode_varint(value: u64) -> Vec<u8> {
 }
 
 /// A message's fields in order.
-fn fields(buf: &[u8]) -> Result<Vec<Field<'_>>, String> {
+pub(crate) fn fields(buf: &[u8]) -> Result<Vec<Field<'_>>, String> {
     let mut out = Vec::new();
     let mut at = 0;
     while at < buf.len() {
@@ -100,20 +101,20 @@ fn fields(buf: &[u8]) -> Result<Vec<Field<'_>>, String> {
     Ok(out)
 }
 
-fn bytes_field(field: u64, payload: &[u8]) -> Vec<u8> {
+pub(crate) fn bytes_field(field: u64, payload: &[u8]) -> Vec<u8> {
     let mut out = encode_varint(field * 8 + 2);
     out.extend_from_slice(&encode_varint(payload.len() as u64));
     out.extend_from_slice(payload);
     out
 }
 
-fn varint_field(field: u64, value: u64) -> Vec<u8> {
+pub(crate) fn varint_field(field: u64, value: u64) -> Vec<u8> {
     let mut out = encode_varint(field * 8);
     out.extend_from_slice(&encode_varint(value));
     out
 }
 
-fn string_field(field: u64, s: &str) -> Vec<u8> {
+pub(crate) fn string_field(field: u64, s: &str) -> Vec<u8> {
     bytes_field(field, s.as_bytes())
 }
 
@@ -153,7 +154,7 @@ fn half(bits: u32) -> u16 {
 
 /// A float32 tensor's values as float16 bytes, or `None` if one doesn't fit (it would become
 /// infinite).
-fn to_half(values: &[f32]) -> Option<Vec<u8>> {
+pub(crate) fn to_half(values: &[f32]) -> Option<Vec<u8>> {
     let mut out = Vec::with_capacity(values.len() * 2);
     for v in values {
         let bits = v.to_bits();
@@ -167,13 +168,13 @@ fn to_half(values: &[f32]) -> Option<Vec<u8>> {
 }
 
 /// A `TensorProto`: its name, data type and, for float32, its values.
-struct Tensor {
-    name: String,
-    ty: i64,
-    values: Option<Vec<f32>>,
+pub(crate) struct Tensor {
+    pub(crate) name: String,
+    pub(crate) ty: i64,
+    pub(crate) values: Option<Vec<f32>>,
 }
 
-fn read_tensor(buf: &[u8]) -> Result<Tensor, String> {
+pub(crate) fn read_tensor(buf: &[u8]) -> Result<Tensor, String> {
     let mut name = String::new();
     let mut ty: i64 = 0;
     let mut raw: Option<&[u8]> = None;
@@ -223,7 +224,7 @@ fn read_tensor(buf: &[u8]) -> Result<Tensor, String> {
 }
 
 /// The tensor with float16 data under `name`: its dims copied as they are.
-fn half_tensor(buf: &[u8], name: &str, data: &[u8]) -> Result<Vec<u8>, String> {
+pub(crate) fn half_tensor(buf: &[u8], name: &str, data: &[u8]) -> Result<Vec<u8>, String> {
     let mut out = Vec::new();
     for f in fields(buf)? {
         if f.number == 1 {
@@ -237,7 +238,7 @@ fn half_tensor(buf: &[u8], name: &str, data: &[u8]) -> Result<Vec<u8>, String> {
 }
 
 /// `Cast(from) -> to` as float32.
-fn cast_node(from: &str, to: &str) -> Vec<u8> {
+pub(crate) fn cast_node(from: &str, to: &str) -> Vec<u8> {
     let mut attribute = string_field(1, "to");
     attribute.extend_from_slice(&varint_field(3, FLOAT));
     attribute.extend_from_slice(&varint_field(20, ATTR_INT));

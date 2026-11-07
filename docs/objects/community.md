@@ -5,6 +5,10 @@ families: `families/playground.py` (notes: `playground.md`), `families/street_fu
 `families/stalls.py` (`stalls.md`), `families/shops.py` (`shops.md`) and `families/farm.py` (`farm.md`). The street's
 dressing props (`model.street.*`, `families/street.py`) aren't buyable and aren't listed here.
 
+The five countryside things of a Big world (`content/countryside.json`: the fishing spot, the lookout bench, the
+picnic spot, the wild berries and the trailhead signpost) have no models of their own: they use the garden pond, the
+park bench, the picnic table, the bush and the notice board, listed on their pages.
+
 They stand on town lots (the park lots, `houses.json` `parks`; the farm things on farm lots, placed by id in
 `web/src/game/town.ts` `farmstead`). They are seen from far and by the hundred, so
 every model has a far version (E7): the model at rest, joined and decimated (`far=0.25`), or built by hand where that
@@ -79,7 +83,7 @@ rides.
 | `parkBench` Long park bench | 3x1 · floor | sit:sit feedBirds:feed | community / street | Frame | Static | Static. 2.5 m long. *Feed the pigeons*: a bag of seed held on the left palm over the lap, a pinch scattered ahead every three seconds (`scatter`, the seated upper layer; held.py `tool.seedBag`, G-70). The garden birds that feed on the ground (blackbirds, chaffinches, doves) within 25 m come down round the seed a few at a time, work towards it and peck, and stay while it's thrown; the one throwing it doesn't scare them (birds.ts, `Residents.seed`). |
 | `drinkingFountain` Drinking fountain | 1x1 · floor | drink:drink | community / street | Pillar | Use | `water_on`: the water arc grows for drink; the drinker steps up and bends over the spout (`fountainDrink<cm>` by height). |
 | `litterBin` Litter bin | 1x1 · floor | — | community / street | Bin | Static | Static. |
-| `busStop` Bus shelter | 3x1 · floor | wait:sit timetable:read | community / street | Frame | Static | Static. 1.2 m deep, the bench at the back. |
+| `busStop` Taxi rank shelter | 3x1 · floor | wait:sit timetable:read | community / street | Frame | Static | Static. 1.2 m deep, the bench at the back. The bus shelter until 2026-11-05: the bus went and a shared work taxi took its place, so it reads as a taxi rank (the taxi's yellow and chequers, a TAXI sign on the roof lit at night, the fares on the back glass; "Read the fares"). Its id and its uses' ids stay, so towns and saves keep it. The street also draws its model at the end of a row of houses, with the rank's sign (`render/shared/street.ts`, `model.street.taxiSign`): one a street at most, none within 60 m of another (the Market Square's among them), chosen once per town (`TownStreet.chooseRanks`), so none comes or goes as the camera moves; its TAXI sign at the kerb past the shelter's far end (away from the corner's street-name sign), and every kerbside thing (lamps, the name sign, hydrants, mailboxes) 1.2 m clear of the shelter and the sign; scenery, no taxi stops there. |
 | `postBox` Post box | 1x1 · floor | post:write | community / street | Box | Use | `flap`: the slot flap swings in for post (`hold` 1 s). |
 | `noticeBoard` Notice board | 1x1 · floor | read:read | community / street | Frame | Static | Static. |
 | `phoneBooth` Phone box | 1x1 · floor | call:phone | community / street | Kiosk | Use | `door_open`: the door opens out (`delay` 0.3 s), the caller steps inside and it shuts behind them (`hold` 2.4 s); it opens again to let them out (`out` 1.6 s). |
@@ -88,7 +92,7 @@ rides.
 
 **In play** (signed off 2026-10-16):
 - Checked outdoors (the notice board indoors) and on the `town-things` lot: sat on (bench, shelter), pigeons fed,
-  the timetable read, the post box's flap, the statue admired, a wish made at the town fountain and its rim sat on.
+  the timetable (now the fares) read, the post box's flap, the statue admired, a wish made at the town fountain and its rim sat on.
   The town fountain's water runs on WebGPU Medium and is off on Low, as designed. The street lamp lights at night
   (WebGPU and Low WebGL).
 - Drinking fountain: the drinker steps up and bends over the bowl, hands on the rim, mouth at the arc

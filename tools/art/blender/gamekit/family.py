@@ -73,12 +73,15 @@ class Model:
       draws      the most draw calls the model may take, the entry's `draws` (`cargo check-glb`): 4 for every model
                  unless one says otherwise, for a model whose moving parts can't fit in four (the grandfather clock's
                  trunk door, which swings open while it is wound)
+      accept     the gate's strict checks this model is right to fail, the entry's `accept`: {check: reason}, a
+                 check by its name in `cargo check-glb`'s list (`checkglb::STRICT`) and why the model is right as
+                 it is, e.g. {'footprint': 'its rail runs past the window'} (tools/art/README.md, "The gate")
     Perches the build finds (`gamekit/perch.py`: a tree's outer twigs) are written as the entry's `perches`.
     """
 
     def __init__(self, id, build, size, key=None, tolerance=0.02, motions=None, paint=None, parts=None,
                  centre=(0.0, 0.0), floor=True, far=None, sink=0.0, code=False, bird=None, habitat=None, draws=None,
-                 ground=None):
+                 ground=None, accept=None):
         self.id, self.build, self.size, self.key = id, build, size, key
         self.tolerance, self.motions, self.paint = tolerance, motions, paint
         self.parts = parts
@@ -88,6 +91,9 @@ class Model:
         self.bird = bird
         self.habitat = habitat
         self.draws = draws
+        assert not accept or all(isinstance(r, str) and r.strip() for r in accept.values()), \
+            f'{id}: each `accept` gives its reason'
+        self.accept = accept
         self.ground = (floor and not bird) if ground is None else ground
 
 
@@ -203,6 +209,8 @@ class Family:
                 entry['habitat'] = model.habitat
             if model.draws:
                 entry['draws'] = model.draws
+            if model.accept:
+                entry['accept'] = model.accept
             if model.far:
                 far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), self.make_far(model, objs),
                                  ground=model.ground)

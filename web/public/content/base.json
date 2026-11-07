@@ -693,7 +693,7 @@
           "Busy pavements, corner shops and neighbours on every side.",
           "Never more than a minute from a fresh loaf.",
           "Thin walls, close friends, loud Saturdays.",
-          "The bus is always just leaving.",
+          "The taxi is always just round the corner.",
           "Window boxes on every sill, gossip on every step."
         ]
       },
@@ -1708,7 +1708,12 @@
     {"id": "goodbye", "label": "Say goodbye", "category": "friendly", "icon": "icon.social.goodbye", "minutes": 3, "animation": "wave",
      "tags": ["social", "friendly"], "autonomous": false, "acceptance": {"base": 1.0},
      "needs": {"social": 0.05}, "targetNeeds": {"social": 0.05},
-     "success": {"friendship": 1, "targetFriendship": 1}}
+     "success": {"friendship": 1, "targetFriendship": 1}},
+    {"id": "offer", "label": "Offer a bite to eat", "category": "friendly", "icon": "icon.social.offer", "minutes": 3, "animation": "talk",
+     "tags": ["social", "friendly"], "autonomous": false, "stages": ["teen", "youngAdult", "adult", "elder"],
+     "acceptance": {"base": -0.25, "friendship": 0.003, "needs": {"hunger": 1.6, "fun": 0.25}},
+     "needs": {"social": 0.05}, "targetNeeds": {"social": 0.05},
+     "success": {"friendship": 1, "targetFriendship": 2, "effect": "serve"}}
   ],
   "bondPresets": {
     "roommates": {
@@ -1770,14 +1775,18 @@
     "joinFriendship": 2
   },
   "careerRules": {
+    "$comment": "A full performance bar (100) and the next grade's skills earn a promotion. A shift fills performancePerShift at the entry grade, in a middling mood with just the skills asked for; up to performancePerMood more in a good mood (less in a bad one), performancePerFit per skill level above the requirements; half as much more than lateGraceMinutes late; each grade up divides it by 1 + grade x performanceSlowdown (sim-core life::shift_performance). In a fine mood (0.6) the first promotion takes 5 workdays and the top grade's 10; happy (0.85), 4 and 7.",
     "commuteMinutes": 30,
     "lateMinutes": 60,
+    "lateGraceMinutes": 30,
+    "lateShare": 0.5,
     "missedPenalty": 20,
-    "performancePerShift": 2.5,
+    "performancePerShift": 18,
+    "performancePerMood": 20,
+    "performancePerFit": 2,
+    "performanceSlowdown": 0.15,
     "promotionFeeling": "promoted",
     "missedFeeling": "skippedWork",
-    "performancePerFit": 1,
-    "performancePerMood": 4,
     "probationLevels": 1,
     "market": {
       "hour": 9.5,
@@ -1921,11 +1930,16 @@
     "minFriendship": 15,
     "earliestHour": 10,
     "latestHour": 20,
+    "outingMinutes": 90,
+    "outingHomeBy": 23,
+    "leastMinutes": 40,
+    "againMinutes": 90,
     "company": 0.05,
     "boredMinutes": 30,
     "farewell": ["goodbyeHug", "goodbye"],
     "farewellMinutes": 8,
-    "door": {"waitMinutes": 10, "welcomeFriendship": -20, "greet": "chat", "turnedAwayFeeling": "turnedAway", "knockAnim": "knock"}
+    "door": {"waitMinutes": 10, "welcomeFriendship": -20, "greet": "chat", "turnedAwayFeeling": "turnedAway", "knockAnim": "knock"},
+    "offer": {"social": "offer", "afterMinutes": 15, "againMinutes": 120, "handAnim": "serve"}
   },
   "phone": {
     "fromStage": "teen",
@@ -2080,7 +2094,11 @@
     "noBed": "{a} has no bed of their own: buy one for them",
     "notClosed": "{a} didn't close the {object}: someone else got in first",
     "playedAlone": "{a} had nobody free to play with at the {object}, so practised alone",
-    "noPartner": "{a} had nobody free to play with at the {object}"
+    "noPartner": "{a} had nobody free to play with at the {object}",
+    "setUp": "{a} set up the new {object}",
+    "setUpForThem": "{a}'s new {object} was set up for them",
+    "sentBack": "There was no room at home for {a}'s {object}: it went back to the shop, the money too",
+    "served": "{a} brought {b} {item}"
   },
   "activities": [
     {
@@ -3761,6 +3779,7 @@
     "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community"],
     "wear": {"perUse": 0.004, "byCategory": {"bathroom": 0.006, "garden": 0, "outdoor": 0, "decor": 0}, "perQuality": 0.2},
     "repair": {"label": "Repair", "minutes": 45, "skill": "handiness", "skillGainPerHour": 0.3, "chance": 0.5, "chancePerLevel": 0.08, "interest": 1.5, "cost": 0.3, "tags": ["chores"]},
+    "setUp": {"label": "Set up", "minutes": 15, "fetchMinutes": 1.5, "helpAfterHours": 2, "waitHours": 24, "parcel": "parcel", "anim": "tinker", "fetchAnim": "serve", "tags": ["chores"]},
     "maxQuality": 3,
     "qualityBonus": 0.25,
     "upgradeCost": 0.3,
@@ -4059,6 +4078,7 @@
         {"id": "seating", "label": "Seating & dining", "outside": true},
         {"id": "cooking", "label": "Grills & fire", "outside": true},
         {"id": "play", "label": "Play", "outside": true},
+        {"id": "rides", "label": "Bikes & scooters", "outside": true},
         {"id": "lights", "label": "Lights", "outside": true},
         {"id": "decor", "label": "Garden decor", "outside": true},
         {"id": "yard", "label": "Sheds & garden work", "outside": true}
@@ -4149,7 +4169,7 @@
       "label": "Prepped bowl",
       "model": "item.prepBowl",
       "hold": "both",
-      "radius": 0.14
+      "radius": 0.162
     },
     {
       "id": "mealPot",
@@ -4158,23 +4178,23 @@
       "hold": "both",
       "serving": "mealPlate",
       "emptyAs": "potDirty",
-      "radius": 0.16
+      "radius": 0.195
     },
     {
       "id": "tastingBoard",
       "label": "Tasting menu",
       "model": "item.tastingBoard",
       "hold": "both",
-      "serving": "mealPlate",
+      "serving": "tastingPlate",
       "emptyAs": "boardDirty",
-      "radius": 0.2
+      "radius": 0.227
     },
     {
       "id": "grillPlatter",
       "label": "Barbecue",
       "model": "item.grillPlatter",
       "hold": "both",
-      "serving": "mealPlate",
+      "serving": "bbqPlate",
       "emptyAs": "platterDirty",
       "radius": 0.2
     },
@@ -4194,7 +4214,7 @@
       "hold": "both",
       "serving": "treatPlate",
       "emptyAs": "trayDirty",
-      "radius": 0.2
+      "radius": 0.23
     },
     {
       "id": "pieDish",
@@ -4203,7 +4223,7 @@
       "hold": "both",
       "serving": "pieSlice",
       "emptyAs": "pieDishDirty",
-      "radius": 0.16
+      "radius": 0.13
     },
     {
       "id": "mealPlate",
@@ -4211,7 +4231,7 @@
       "model": "item.mealPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "pizzaSlice",
@@ -4219,7 +4239,7 @@
       "model": "item.pizzaSlice",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "treatPlate",
@@ -4227,7 +4247,7 @@
       "model": "item.treatPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "pieSlice",
@@ -4235,7 +4255,7 @@
       "model": "item.pieSlice",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "babyBottle",
@@ -4250,7 +4270,7 @@
       "model": "item.cakeSlice",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "sandwich",
@@ -4258,7 +4278,7 @@
       "model": "item.sandwich",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "snack",
@@ -4266,7 +4286,7 @@
       "model": "item.treatPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "iceCream",
@@ -4282,7 +4302,7 @@
       "model": "item.toast",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "leftovers",
@@ -4290,7 +4310,7 @@
       "model": "item.mealPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "cheeseBoard",
@@ -4298,7 +4318,7 @@
       "model": "item.tastingBoard",
       "hold": "both",
       "emptyAs": "boardDirty",
-      "radius": 0.2
+      "radius": 0.227
     },
     {
       "id": "smoothie",
@@ -4319,7 +4339,7 @@
       "label": "Takeout",
       "model": "item.takeout",
       "hold": "hand",
-      "radius": 0.13
+      "radius": 0.146
     },
     {
       "id": "iceCreamCone",
@@ -4340,7 +4360,7 @@
       "label": "Crisps",
       "model": "item.crisps",
       "hold": "hand",
-      "radius": 0.11
+      "radius": 0.12
     },
     {
       "id": "fruit",
@@ -4361,7 +4381,7 @@
       "label": "Sandwich",
       "model": "item.sandwich",
       "hold": "hand",
-      "radius": 0.1
+      "radius": 0.144
     },
     {
       "id": "gardenProduce",
@@ -4388,10 +4408,10 @@
     {
       "id": "freshPlate",
       "label": "Something fresh from the garden",
-      "model": "item.treatPlate",
+      "model": "item.freshPlate",
       "hold": "hand",
       "emptyAs": "plateDirty",
-      "radius": 0.13
+      "radius": 0.144
     },
     {
       "id": "plateDirty",
@@ -4399,7 +4419,16 @@
       "model": "item.plateDirty",
       "hold": "hand",
       "dirty": true,
-      "radius": 0.13
+      "stackAs": "plateStackDirty",
+      "radius": 0.144
+    },
+    {
+      "id": "plateStackDirty",
+      "label": "Dirty plates",
+      "model": "item.plateStackDirty",
+      "hold": "both",
+      "dirty": true,
+      "radius": 0.156
     },
     {
       "id": "potDirty",
@@ -4407,7 +4436,7 @@
       "model": "item.potDirty",
       "hold": "both",
       "dirty": true,
-      "radius": 0.16
+      "radius": 0.195
     },
     {
       "id": "platterDirty",
@@ -4423,7 +4452,7 @@
       "model": "item.trayDirty",
       "hold": "both",
       "dirty": true,
-      "radius": 0.2
+      "radius": 0.23
     },
     {
       "id": "bowlDirty",
@@ -4431,7 +4460,7 @@
       "model": "item.bowlDirty",
       "hold": "hand",
       "dirty": true,
-      "radius": 0.08
+      "radius": 0.099
     },
     {
       "id": "boardDirty",
@@ -4439,7 +4468,7 @@
       "model": "item.boardDirty",
       "hold": "both",
       "dirty": true,
-      "radius": 0.2
+      "radius": 0.227
     },
     {
       "id": "pizzaBoardDirty",
@@ -4455,7 +4484,37 @@
       "model": "item.pieDishDirty",
       "hold": "both",
       "dirty": true,
-      "radius": 0.16
+      "radius": 0.13
+    },
+    {
+      "id": "batterBowl",
+      "label": "Bowl of batter",
+      "model": "tool.mixingBowl",
+      "hold": "both",
+      "radius": 0.15
+    },
+    {
+      "id": "bbqPlate",
+      "label": "Barbecue plate",
+      "model": "item.bbqPlate",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.144
+    },
+    {
+      "id": "tastingPlate",
+      "label": "Tasting plate",
+      "model": "item.tastingPlate",
+      "hold": "hand",
+      "emptyAs": "plateDirty",
+      "radius": 0.144
+    },
+    {
+      "id": "parcel",
+      "label": "Parcel",
+      "model": "item.parcel",
+      "hold": "both",
+      "radius": 0.25
     }
   ],
   "recipes": [
@@ -4744,14 +4803,14 @@
           "holds": "ingredients"
         },
         {
-          "label": "Prep",
+          "label": "Make the dough",
           "at": [
             "prep"
           ],
           "minutes": 15,
-          "anim": "chop",
+          "anim": "mix",
           "optional": true,
-          "holds": "prepBowl"
+          "holds": "batterBowl"
         },
         {
           "label": "Bake",
@@ -4801,7 +4860,7 @@
           "minutes": 15,
           "anim": "mix",
           "optional": true,
-          "holds": "prepBowl"
+          "holds": "batterBowl"
         },
         {
           "label": "Bake",
@@ -4850,7 +4909,7 @@
           "minutes": 15,
           "anim": "mix",
           "optional": true,
-          "holds": "prepBowl"
+          "holds": "batterBowl"
         },
         {
           "label": "Bake",
@@ -4930,5 +4989,6 @@
     "packs/romantic.json",
     "packs/hotHeaded.json",
     "packs/kind.json"
-  ]
+  ],
+  "taxi": {"$comment": "The work taxi (sim-core taxi.rs): colleagues (one career, one way out) whose work starts within `window` minutes share one, `seats` a taxi, when the way out on foot takes longer than `minWalkMinutes` and the taxi is sooner; it waits `waitMinutes` at a rider's kerb.", "seats": 4, "minWalkMinutes": 10, "window": 15, "waitMinutes": 2}
 }

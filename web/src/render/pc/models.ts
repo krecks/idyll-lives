@@ -105,8 +105,10 @@ export interface ModelTemplate {
    * of those faces drawn added on top, per moving part (-1: the still body), off until the renderer
    * gives each instance its strength (the instance colour, `INSTANCE_COLOR`) and draws it. `screen`
    * marks the ones lit by use rather than by the room. Not in `meshes`: nothing else draws them.
+   * With `BuildOptions.glowApart`, a mesh per glowing material too, named by `material` (a traffic
+   * light's three lenses, lit one at a time).
    */
-  glows?: { mesh: ModelMesh; part: number; screen?: boolean }[];
+  glows?: { mesh: ModelMesh; part: number; screen?: boolean; material?: string }[];
   /**
    * The files it was built without, as they failed to load: its far version (it's the full model
    * then), or every one (it's drawn as nothing, or the box asked for). It's built again when one of
@@ -201,6 +203,8 @@ export interface BuildOptions {
   parts?: readonly string[];
   /** Work out its contact shadow's shape (`ModelTemplate.contact`): placed objects on the floor or a top. */
   contact?: boolean;
+  /** Its glows a mesh per glowing material (`ModelTemplate.glows`' `material`), not one per part: each drawn on its own (a traffic light's lenses). */
+  glowApart?: boolean;
 }
 
 export async function buildModel(app: pc.AppBase, name: string, entry: ModelEntry | undefined, footprint: [number, number], options: BuildOptions = {}): Promise<ModelTemplate> {
@@ -542,21 +546,38 @@ interface Container {
 function loadContainer(app: pc.AppBase, url: string): Promise<Container> {
   setupDecoders();
   const decoded = new Map<object, Uint8Array>();
+  // Every view is decoded, but PlayCanvas's `load` waits only for those it uses itself (with
+  // `skipMeshes`, not the geometry read here): when it comes, the rest may still be on their way,
+  // later in some browsers than others (Firefox). Read once all of them are in.
+  let views = Infinity;
+  let allIn: () => void = () => {};
+  const decodedAll = new Promise<void>((resolve) => (allIn = resolve));
   const options = {
     ...containerOptions,
-    bufferView: { ...containerOptions.bufferView, postprocess: (view: object, data: Uint8Array) => decoded.set(view, data) },
+    bufferView: {
+      ...containerOptions.bufferView,
+      postprocess: (view: object, data: Uint8Array) => {
+        decoded.set(view, data);
+        if (decoded.size >= views) allIn();
+      },
+    },
     // (Its meshes would be uploaded only to be let go of: the geometry is read from the views here.
     // Without them a skinned node has no mesh to skin: skins aren't read here either.)
     skipMeshes: true,
     global: {
-      preprocess: (gltf: { nodes?: { skin?: number }[] }) => {
+      preprocess: (gltf: { nodes?: { skin?: number }[]; bufferViews?: unknown[] }) => {
         for (const node of gltf.nodes ?? []) delete node.skin;
+        views = gltf.bufferViews?.length ?? 0;
+        if (decoded.size >= views) allIn();
       },
     },
   };
   return new Promise((resolve, reject) => {
     const asset = new pc.Asset(url, 'container', { url }, undefined, options as never);
-    asset.once('load', () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const viewsIn = () => Promise.race([decodedAll, new Promise((resolve) => (timer = setTimeout(resolve, VIEWS_WAIT_MS)))]).finally(() => clearTimeout(timer));
+    asset.once('load', () => void viewsIn().then(read).catch(reject));
+    const read = () => {
       const resource = asset.resource as pc.ContainerResource & { data: { gltf: Gltf; materials: pc.StandardMaterial[]; textures?: pc.Asset[] } };
       const gltf = resource.data.gltf;
       const container = { gltf, views: (gltf.bufferViews ?? []).map((v) => decoded.get(v)), materials: resource.data.materials.map((m) => m ?? null), textures: [...(resource.data.textures ?? [])] };
@@ -568,7 +589,7 @@ function loadContainer(app: pc.AppBase, url: string): Promise<Container> {
       for (const sub of [...resource.materials, ...resource.animations]) app.assets.remove(sub);
       app.assets.remove(asset);
       resolve(container);
-    });
+    };
     asset.once('error', (err: unknown) => {
       app.assets.remove(asset);
       reject(new Error(`${url}: ${String(err)}`));
@@ -577,6 +598,9 @@ function loadContainer(app: pc.AppBase, url: string): Promise<Container> {
     app.assets.load(asset);
   });
 }
+
+/** The longest a file waits after it loads for the last of its views to be decoded (ms). */
+const VIEWS_WAIT_MS = 5000;
 
 /**
  * The build's compressed copy of the file if there is one; the file itself if that fails to load.
@@ -1041,7 +1065,7 @@ function buildGltf(app: pc.AppBase, name: string, entry: ModelEntry, file: Loade
 }
 
 /** `buildGltf`'s build; what it uploads goes into `made`. */
-function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], { resize, contact }: BuildOptions, made: pc.Mesh[]): ModelTemplate {
+function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], { resize, contact, glowApart }: BuildOptions, made: pc.Mesh[]): ModelTemplate {
   const extras = entry as ModelEntry & ModelExtras;
   const fit = extras.fit;
   const [ox, oy, oz] = entry.offset ?? [0, 0, 0];
@@ -1127,18 +1151,19 @@ function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: L
     ...(extras.parts ?? []).filter((p) => p.mirror).map(mirrorSurface),
   ];
   // What glows (a lamp's shade at night, a screen while it's used): its faces again, in the glow's
-  // colour, a mesh per part they're on.
+  // colour, a mesh per part they're on (and per material, `glowApart`).
   const glowing = Map.groupBy(
     pieces.filter(({ source }) => overrideFor(source)?.glow),
-    ({ part }) => part,
+    ({ part, source }) => (glowApart ? `${part}|${source.materialName}` : `${part}`),
   );
-  const glows = [...glowing].map(([part, list]) => ({
-    part,
+  const glows = [...glowing].map(([, list]) => ({
+    part: list[0].part,
     // A screen (a TV, a monitor: its `screen`, `crt` or `projection` material, or a manifest's
     // `screen`) is only lit while someone is using it; a lamp's shade or a fire glows with its room.
     screen: list.some(({ source }) => overrideFor(source)?.screen ?? /screen|crt|projection/i.test(source.materialName)),
+    ...(glowApart ? { material: list[0].source.materialName } : {}),
     mesh: {
-      name: `${name}|glow${part < 0 ? '' : `|${file.parts[part].name}`}`,
+      name: `${name}|glow${list[0].part < 0 ? '' : `|${file.parts[list[0].part].name}`}${glowApart ? `|${list[0].source.materialName}` : ''}`,
       mesh: upload(glowData(list.map(({ source, data }) => ({ data, color: overrideFor(source)!.glow! })))),
       material: glowMaterial(app),
     },

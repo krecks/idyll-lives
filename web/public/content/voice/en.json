@@ -456,6 +456,29 @@
         "Already? Fine, bye."
       ],
       "tone": "happy"
+    },
+    "offer": {
+      "start": [
+        "Can I get you something to eat?",
+        "Hungry? I've got snacks!",
+        "Would you like a little something?",
+        "Fancy a bite to eat, {name}?",
+        "Let me get you something."
+      ],
+      "good": [
+        "Ooh, yes please!",
+        "That would be lovely, thanks.",
+        "I'd love something, {name}.",
+        "Go on then, thank you!",
+        "You read my mind!"
+      ],
+      "bad": [
+        "I'm fine, thanks.",
+        "No thanks, I just ate.",
+        "Maybe later!",
+        "I'm good, but thank you."
+      ],
+      "tone": "happy"
     }
   },
   "object": {

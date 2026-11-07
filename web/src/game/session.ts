@@ -24,6 +24,7 @@ import { threadStats } from '../debug/threads';
 import { createSimPreviews } from '../render/preview';
 import { createItemPreviews } from '../render/preview/items';
 import type { CameraPose, Renderer, WallMode } from '../render/types';
+import { carRowIsTaxi } from '../render/shared/cars';
 import { settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
 import { prefetchCatalog, services, type GameControls } from '../ui/services';
@@ -39,7 +40,7 @@ import { holdInference, holdInferenceWhile } from '../ml/schedule.svelte';
 import { endSoundOf, soundOf, WorldSound } from '../audio/world';
 import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
-import { addedObjects, BuildBuyInput, editFeedback, type Picked } from './buildmode';
+import { addedObjects, BuildBuyInput, editFeedback, liveAdded, placeEffect, type Picked } from './buildmode';
 import { ownSize } from './surfaces';
 import { colorValues } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
@@ -970,7 +971,33 @@ async function openSession(
       const target = pose.target ?? [now.target[0], pose.y ?? now.target[1], now.target[2]];
       renderer.setCameraPose({ ...now, ...pose, target });
     };
+    // `__cars()`: the households' cars and the work taxis as the newest snapshot shows them (sim-core
+    // `cars.rs`): which car (its row), where, which way, parked (1) or driving (2), and its `kind`
+    // (0 a household's, 1 a taxi: `carRowIsTaxi`, by the layout's `kinds`).
+    const cars = () => {
+      const [snap, l] = [bridge.latest(), bridge.layout];
+      if (!l.car || l.carBase === undefined || l.carStride === undefined || l.header.carCount === undefined) return [];
+      return Array.from({ length: snap[l.header.carCount] | 0 }, (_, k) => {
+        const o = l.carBase! + k * l.carStride!;
+        const kind = carRowIsTaxi(snap, l, k) ? 1 : 0;
+        return { car: k, x: snap[o + l.car!.x], z: snap[o + l.car!.z], yaw: snap[o + l.car!.yaw], shown: snap[o + l.car!.shown], kind };
+      });
+    };
+    // `__lights()`: the traffic lights' signal heads as the newest snapshot shows them (sim-core
+    // `traffic::Signal`, one per arm of each lit junction): where the pole stands, which way the head
+    // faces, and what it shows ('red', 'amber', 'green' or 'walk').
+    const lights = () => {
+      const [snap, l] = [bridge.latest(), bridge.layout];
+      if (!l.light || l.lightBase === undefined || l.lightStride === undefined || l.header.lightCount === undefined) return [];
+      const names = Object.fromEntries(Object.entries(l.light.states).map(([k, v]) => [v, k]));
+      return Array.from({ length: snap[l.header.lightCount] | 0 }, (_, k) => {
+        const o = l.lightBase! + k * l.lightStride!;
+        return { head: k, x: snap[o + l.light!.x], z: snap[o + l.light!.z], yaw: snap[o + l.light!.yaw], shown: snap[o + l.light!.shown], state: names[snap[o + l.light!.state]] ?? 'red' };
+      });
+    };
     Object.assign(window, {
+      __cars: cars,
+      __lights: lights,
       __sims: () => liveSims(bridge.latest(), bridge.layout, content, game.sims),
       __content: content,
       __addFunds: (amount: number, household = game.home) => bridge.send({ type: 'addFunds', household, amount }),
@@ -1191,6 +1218,14 @@ async function openSession(
       const added = addedObjects(world, w);
       if (added.length) director.noteBuilt(added.map((o) => o.id), performance.now());
     }
+    // In Live, something new set up at home (sim-core `setup.rs`; a crib for a new baby, the
+    // neighbours' new things) springs into place as Build mode's do, with its sound; its first use
+    // is worth a look too. (A whole house furnished at once isn't an edit.)
+    const appeared = game.mode === 'live' && world && worldView === viewPlot ? liveAdded(world, w) : [];
+    if (appeared.length) {
+      play('place');
+      director.noteBuilt(appeared.map((o) => o.id), performance.now());
+    }
     world = w;
     // The town map: the town's ground and its presentation data (roads, zones, areas), as it changes.
     if (townMap.world?.meta !== w.meta || townMap.world?.width !== w.width) townMap.world = { width: w.width, depth: groundDepth(w), meta: w.meta };
@@ -1270,6 +1305,7 @@ async function openSession(
     building = build.catch(() => {});
     holdInferenceWhile('building the scene', building);
     if (feedback?.effects.length) void build.then(() => feedback.effects.forEach((fx) => renderer.buildEffect(fx)), () => {});
+    if (appeared.length) void build.then(() => appeared.forEach((o) => renderer.buildEffect(placeEffect(o))), () => {});
     build
       .then(async () => {
         // Compile the game's own look (its lighting and cutaway) while the menu still covers it.
@@ -1310,8 +1346,8 @@ async function openSession(
     // The open journal keeps up (it's fetched again when it opens).
     if (game.journalOpen && game.journal.length) game.journal = game.journal.concat(fresh).slice(-JOURNAL_SIZE);
     director.noteEvents(fresh.filter(aboutUs), performance.now());
-    // The feed: what happens to the household, and the town's bigger news.
-    const news = fresh.filter((e) => (aboutUs(e) && e.importance >= 1) || e.importance >= 2 || (aboutUs(e) && e.kind === 'skillUp'));
+    // The feed: what happens to the household (the neighbours' news stays theirs).
+    const news = fresh.filter((e) => aboutUs(e) && (e.importance >= 1 || e.kind === 'skillUp'));
     if (news.length) game.feed = [...game.feed.filter((f) => now - f.at < FEED_MS), ...news.map((event) => ({ event, at: now }))].slice(-FEED_SIZE);
     // Big moments at home are worth seeing at normal speed.
     const big = fresh.find((e) => e.importance >= 2 && aboutUs(e));

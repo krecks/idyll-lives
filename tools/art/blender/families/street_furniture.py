@@ -1,15 +1,16 @@
 # The street furniture (CM2): the street lamp (`model.streetLamp`), the long park bench (`model.parkBench`), the
-# drinking fountain (`model.drinkingFountain`), the litter bin (`model.litterBin`), the bus shelter
+# drinking fountain (`model.drinkingFountain`), the litter bin (`model.litterBin`), the taxi rank's shelter
 # (`model.busStop`), the post box (`model.postBox`), the notice board (`model.noticeBoard`), the phone box
-# (`model.phoneBooth`), the town fountain (`model.fountainTown`) and the founder's statue (`model.townStatue`). Notes:
-# street_furniture.md.
+# (`model.phoneBooth`), the town fountain (`model.fountainTown`) and the founder's statue (`model.townStatue`); and the
+# traffic light (`model.trafficLight`), which isn't bought: the renderer stands one at each signal head of the sim's
+# lit junctions (render/pc/signals.ts). Notes: street_furniture.md.
 #
 # Each is built in game axes (`F`) where the game places it, at the content's heights (the bench's and the
 # shelter's seats, the fountain's rim, the lamp's light), and each has a far version (a quarter): they stand on
 # the town's lots and are seen from afar. The lamp's lantern glows at night; the drinking fountain's arc of water
 # grows while someone drinks (`water_on`); the post box's flap swings in for a card (`flap`); the phone box's
 # door opens and shuts behind the caller (`door_open`); the town fountain's water runs all the time near the
-# camera (`water_run`, ambient). The rest are still.
+# camera (`water_run`, ambient). The traffic light's lit lens is the renderer's. The rest are still.
 #
 # Run:  cargo art street_furniture [--only postBox] [--preview]
 import math
@@ -38,7 +39,12 @@ SHARED = dict(
     brass=('#B08D4A', 'metal'),       # crests and plaques
     wood=('#9A6B45', 'wood'),         # slats
     glass=('#C9DDE3', 'glass'),       # the shelter's and the phone box's glazing (see-through)
-    blue=('#2E6FA8', 'gloss'),        # the bus stop's sign
+    blue=('#2E6FA8', 'gloss'),        # the town map's routes
+    # the taxi rank (the shelter): the taxi's yellow, its chequers and lettering, and the sign's light box, lit at
+    # night (E8) as the taxi's roof sign looks lit
+    taxi=('#F2B81C', 'gloss'),
+    ink=('#16181A', 'matte'),
+    sign_light=('#FFF4C8', 'satin', {'glow': '#FFE7A0'}),
     map=('#DCE6D2', 'matte'),         # the shelter's map
     # notices pinned on the board: plain, so they cost no draw call
     note_white=('#F4F1E6', 'satin'),
@@ -51,6 +57,12 @@ SHARED = dict(
     # at night: the lamp's lantern and the phone box's sign glow (E8), nothing by day
     lantern=('#F6EBCF', 'satin', {'glow': '#FFD596'}),
     sign=('#F2F0EA', 'matte', {'glow': '#FFF1D2'}),
+    # the traffic light's backboard and hoods, and its three lenses: dark glass, each glowing its colour while it's
+    # the one the light shows (by day too: render/pc/signals.ts), plain, so the head stays one draw
+    board=('#171A19', 'matte'),
+    lens_red=('#4A1714', 'gloss', {'glow': '#FF4A2E'}),
+    lens_amber=('#4A3812', 'gloss', {'glow': '#FFB21E'}),
+    lens_green=('#103A2C', 'gloss', {'glow': '#1FE58A'}),
 )
 
 
@@ -149,6 +161,67 @@ def streetLamp():
                              (0, 4.24)], material=iron, segments=10)
     G.join_all('streetLamp')
     G.settle()
+    return G.meshes()
+
+
+# --- the traffic light: a cast-iron pole with a three-lamp head facing the traffic coming in ---------------------
+# Its pole's axis is the origin (the snapshot's pole, sim-core `traffic::SignalArm`), its head in front of the pole
+# facing +z (towards those coming in). The three lenses are each a material of their own (`lens_red`, `lens_amber`,
+# `lens_green`), dark glass with the colour they glow (`glow`): the renderer (render/pc/signals.ts) draws each
+# lens's glow apart, only the one the snapshot's light shows.
+SIGNAL_LENSES = (('red', 2.81), ('amber', 2.52), ('green', 2.23))   # each lens's middle (m up)
+SIGNAL_FRONT = 0.27      # the head's front face (m in front of the pole's axis)
+
+
+def trafficLight():
+    M = _palette(body=('#2B302E', 'metal'))
+    F = G.GameFrame()
+    iron = M.body
+    n = G.low(16, 8)
+    with G.new_parts():
+        # the base: a chamfered square plinth, a short fluted bell rising to a moulded collar (the lamp's, smaller)
+        G.loft('plinth', [G.ring(0.13, 0.13, 0.0, G.low(24, 8), square=10), G.ring(0.13, 0.13, 0.03, G.low(24, 8), square=10),
+                          G.ring(0.115, 0.115, 0.05, G.low(24, 8), square=10), G.ring(0.105, 0.105, 0.062, G.low(24, 8), square=4)],
+               material=iron)
+        bell = [(0.104, 0.06), (0.098, 0.1), (0.084, 0.18), (0.07, 0.28), (0.062, 0.36)]
+        if G.is_low():
+            G.loft('bell', [_square(0.07, 0.06), _square(0.05, 0.36)], material=iron, smooth=False)
+        else:
+            G.loft('bell', [_fluted(r, y, 10, 0.07) for r, y in bell], material=iron)
+        G.revolve('collar', [(0, 0.355), (0.07, 0.36), (0.075, 0.375), (0.064, 0.39), (0.056, 0.405), (0, 0.405)],
+                  material=iron, segments=n)
+        # the pole: fluted as the lamp's, behind the head, up to a turned cap over it
+        if G.is_low():
+            F.cyl('pole', 0.045, 2.62, (0, 1.71, 0), iron, verts=6)
+        else:
+            G.loft('pole', [_fluted(0.046, 0.4, 10, 0.1), _fluted(0.043, 3.02, 10, 0.1)], material=iron)
+        G.revolve('cap', [(0, 3.01), (0.056, 3.015), (0.06, 3.03), (0.045, 3.045), (0.02, 3.07), (0.008, 3.09), (0, 3.095)],
+                  material=iron, segments=n)
+        # the head's two clamps round the pole, each with a lug out to the head's back
+        for k, y in enumerate((2.2, 2.84)):
+            F.cyl(f'clamp{k}', 0.056, 0.05, (0, y, 0), iron, verts=n, bevel=G.low(0.006, 0.0), bevel_segments=1)
+            F.box(f'lug{k}', 0.07, 0.05, 0.04, (0, y, 0.06), iron)
+        # the head: a housing with rounded edges, a black backboard with a white rim behind it
+        F.box('housing', 0.3, 0.9, 0.19, (0, 2.52, SIGNAL_FRONT - 0.095), iron, bevel=G.low(0.025, 0.0), bevel_segments=2)
+        board = (0, 2.52, 0.085)
+        F.extrude('rim', G.rounded_rect(0.52, 1.1, 0.06, corner=G.low(4, 1)), 0.012, board, M.paper)
+        F.extrude('board', G.rounded_rect(0.47, 1.05, 0.04, corner=G.low(4, 1)), 0.016, board, M.board)
+        # three lenses, each in its bezel under a hood open below
+        for colour, y in SIGNAL_LENSES:
+            F.cyl(f'lens_{colour}', 0.1, 0.02, (0, y, SIGNAL_FRONT + 0.005), getattr(M, f'lens_{colour}'), verts=G.low(24, 10),
+                  rot=(90, 0, 0))
+            G.revolve(f'bezel_{colour}', [(0.1, -0.014), (0.118, -0.014), (0.12, 0.0), (0.118, 0.014), (0.1, 0.014)],
+                      at=F.at(0, y, SIGNAL_FRONT + 0.004), material=M.board, segments=G.low(24, 10), rot=(90, 0, 0))
+            if G.is_low():
+                F.box(f'hood_{colour}', 0.24, 0.012, 0.15, (0, y + 0.118, SIGNAL_FRONT + 0.085), M.board)
+            else:
+                arc = [math.radians(-28 + 236 * i / 14) for i in range(15)]
+                hood = [(0.124 * math.cos(a), 0.124 * math.sin(a)) for a in arc] + \
+                       [(0.113 * math.cos(a), 0.113 * math.sin(a)) for a in reversed(arc)]
+                F.extrude(f'hood_{colour}', hood, 0.15, (0, y, SIGNAL_FRONT + 0.085), M.board)
+    G.join_all('trafficLight')
+    # (Not centred: its pole's axis stays on the origin, where the snapshot stands it.)
+    G.settle(centre=False)
     return G.meshes()
 
 
@@ -285,7 +358,9 @@ def litterBin():
     return G.meshes()
 
 
-# --- the bus shelter: a glazed frame with a bench for three -------------------------------------------------
+# --- the taxi rank's shelter (was the bus shelter): a glazed frame with a bench for three --------------------------
+# Its id stays `busStop`, so the towns and saves that have one keep it; it reads as a taxi rank: the taxi's yellow
+# and chequers along the fascia, a lit TAXI sign on the roof, the fares on the back glass.
 SHELTER_SEAT = 0.46   # the content's `seat.height`
 SHELTER_BENCH = -0.31  # the bench's middle, its two slats either side (the content's `seat.forward` -0.3: the front one)
 # The posts' depths: 1.2 m deep under the roof on its one tile, a shelter's depth (it was 0.98 m, the bench filling it).
@@ -316,7 +391,8 @@ def busStop():
         for z in (back, front):
             F.box(f'beam{z}', 2.9, 0.09, 0.06, (0, 2.315, z), frame, bevel=0.01)
         F.box('fascia', 2.98, 0.11, 0.025, (0, 2.36, front + 0.037), frame, bevel=0.008)
-        F.box('fascia_stripe', 2.7, 0.03, 0.004, (0, 2.36, front + 0.0505), M.blue)
+        F.box('fascia_stripe', 2.7, 0.08, 0.004, (0, 2.36, front + 0.0505), M.taxi)
+        G.kit.chequer(F, 'fascia_check', -1.33, 1.33, 2.395, front + 0.0525, 0.035, 1, M.ink)
         F.sweep('gutter', [(-1.49, 2.34, back - 0.035), (1.49, 2.34, back - 0.035)], None, frame,
                 profile=G.rounded_rect(0.04, 0.035, 0.008, corner=1))
         # the glazing: the back in two panes and the right-hand end, in rails and a mullion, a white band across each
@@ -337,29 +413,28 @@ def busStop():
                                                  (x, 0.3, back + 0.03)], 0.03, steps=2), None, frame,
                     profile=G.rounded_rect(0.04, 0.03, 0.008, corner=1), up=(1, 0, 0))
             F.box(f'bracket_leg{x}', 0.04, 0.42, 0.04, (x, 0.21, SHELTER_BENCH - 0.12), frame, bevel=0.006)
-        # the timetable on the back glass, a map beside it
-        F.box('timetable_frame', 0.56, 0.78, 0.03, (-0.95, 1.45, back + 0.02), frame, bevel=0.008)
-        F.box('timetable', 0.5, 0.68, 0.01, (-0.95, 1.43, back + 0.038), M.paper)
-        F.box('timetable_head', 0.5, 0.08, 0.012, (-0.95, 1.73, back + 0.04), M.blue)
-        for k in range(8):
-            F.box(f'times{k}', 0.26, 0.012, 0.004, (-1.02, 1.64 - 0.06 * k, back + 0.044), M.dark)
-            F.box(f'clock{k}', 0.08, 0.012, 0.004, (-0.78, 1.64 - 0.06 * k, back + 0.044), M.dark)
+        # the fares on the back glass (the rank's name in a yellow head, the fares in lines), a map beside it
+        F.box('fares_frame', 0.56, 0.78, 0.03, (-0.95, 1.45, back + 0.02), frame, bevel=0.008)
+        F.box('fares', 0.5, 0.68, 0.01, (-0.95, 1.43, back + 0.038), M.paper)
+        F.box('fares_head', 0.5, 0.09, 0.012, (-0.95, 1.725, back + 0.04), M.taxi)
+        G.kit.taxi_word(F, 'fares_word', (-0.95, 1.725), 0.05, back + 0.046, 1, M.ink)
+        for k in range(7):
+            F.box(f'fare{k}', 0.26, 0.012, 0.004, (-1.02, 1.62 - 0.06 * k, back + 0.044), M.dark)
+            F.box(f'price{k}', 0.08, 0.012, 0.004, (-0.78, 1.62 - 0.06 * k, back + 0.044), M.dark)
         F.box('map_frame', 0.5, 0.6, 0.03, (-0.35, 1.4, back + 0.02), frame, bevel=0.008)
         F.box('map', 0.44, 0.54, 0.01, (-0.35, 1.4, back + 0.038), M.map)
         for k, (x, y, w, h) in enumerate(((-0.4, 1.45, 0.3, 0.012), (-0.3, 1.35, 0.012, 0.36), (-0.36, 1.3, 0.25, 0.012))):
             F.box(f'route{k}', w, h, 0.004, (x, y, back + 0.045), M.blue if k != 1 else M.dark)
-        # the stop's flag on the roof, at the front right: a blue plate with the white face and a bus
-        F.box('flag_pole', 0.05, 0.22, 0.05, (1.18, 2.52, front - 0.02), frame, bevel=0.006)
-        F.box('flag', 0.6, 0.34, 0.04, (1.18, 2.72, front - 0.02), M.blue, bevel=0.015)
-        F.box('flag_face', 0.44, 0.2, 0.046, (1.18, 2.72, front - 0.02), M.paper, bevel=0.01)
-        for s in (-1, 1):
-            zf = front - 0.02 + s * 0.024
-            F.box(f'flag_bus{s}', 0.24, 0.08, 0.004, (1.18, 2.735, zf), M.blue, bevel=0.002, bevel_segments=1)
-            for k in range(4):
-                F.box(f'flag_window{s}{k}', 0.035, 0.03, 0.005, (1.11 + 0.045 * k, 2.75, zf), M.paper)
-            for x in (1.1, 1.26):
-                G.cylinder(f'flag_wheel{s}{x}', 0.018, 0.006, at=F.at(x, 2.69, zf), material=M.dark, rot=(90, 0, 0),
-                           verts=8)
+        # the rank's sign on the roof, at the front right: a yellow case, a light box lettered TAXI front and back
+        # (lit at night), the taxi's chequers under it
+        sx, sy, sz = 1.18, 2.72, front - 0.02
+        F.box('sign_pole', 0.05, 0.22, 0.05, (sx, 2.52, sz), frame, bevel=0.006)
+        F.box('sign_case', 0.6, 0.32, 0.1, (sx, sy, sz), M.taxi, bevel=0.015)
+        F.box('sign_light', 0.52, 0.16, 0.106, (sx, sy + 0.06, sz), M.sign_light, bevel=0.004, bevel_segments=1)
+        for face in (1, -1):
+            G.kit.taxi_word(F, f'sign_word{face}', (sx, sy + 0.06), 0.1, sz + face * 0.053, face, M.ink)
+            G.kit.chequer(F, f'sign_check{face}', sx - 0.263, sx + 0.263, sy - 0.035, sz + face * 0.05, 0.035, face,
+                          M.ink)
     G.join_all('busStop')
     G.settle(centre=False)
     return G.meshes()
@@ -779,6 +854,8 @@ FAMILY = G.Family(
     'street_furniture', PALETTES,
     [G.Model('streetLamp', streetLamp, size=(0.657, 4.24, 0.467), key='model.streetLamp', far=FAR,
              paint=[('body', 'Lamp post')]),
+     G.Model('trafficLight', trafficLight, size=(0.52, 3.095, 0.56), key='model.trafficLight', centre=(0, 0.15),
+             far=G.far_of(trafficLight), code=True),
      G.Model('parkBench', parkBench, size=(2.5, 0.907, 0.572), key='model.parkBench', centre=(0, -0.036), far=FAR,
              paint=[('body', 'Frame')]),
      G.Model('drinkingFountain', drinkingFountain, size=(0.56, 1.093, 0.56), key='model.drinkingFountain', far=_far(drinkingFountain),
@@ -800,11 +877,12 @@ FAMILY = G.Family(
              paint=[('body', 'Statue')])],
     pack='street_furniture',
     comment='Blender-built street furniture (tools/art/blender/families/street_furniture.py): the street '
-            'lamp, the park bench, the drinking fountain, the litter bin, the bus shelter, the post box, '
-            'the notice board, the phone box, the town fountain and the founder\'s statue. Listed in the '
+            'lamp, the park bench, the drinking fountain, the litter bin, the taxi rank\'s shelter, the post box, '
+            'the notice board, the phone box, the town fountain and the founder\'s statue; and the traffic light '
+            '(not buyable: render/pc/signals.ts draws one at each signal head the sim has). Listed in the '
             'base manifest\'s packs. The materials map onto the game\'s finishes so a model costs one draw '
-            'call per finish group. Each has a far version for the town overview. The lamp\'s lantern and '
-            'the phone box\'s signs glow at night; the drinking fountain\'s water arcs for `drink` '
+            'call per finish group. Each has a far version for the town overview. The lamp\'s lantern, '
+            'the phone box\'s signs and the taxi rank\'s sign glow at night; the drinking fountain\'s water arcs for `drink` '
             '(`water_on`), the post box\'s flap swings in for `post` (`flap`), the phone box\'s door opens '
             'for `call` (`door_open`) and the town fountain\'s water runs near the camera (`water_run`, '
             'ambient).',

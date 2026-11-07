@@ -1045,7 +1045,7 @@
   {
    "id": "market",
    "name": "Market Square",
-   "description": "Fruit and vegetable stalls round the founder's statue, a hot dog stand, benches and the bus stop.",
+   "description": "Fruit and vegetable stalls round the founder's statue, a hot dog stand, benches and the taxi rank.",
    "kind": "park",
    "paths": [
     {"x": 2, "z": 1, "w": 22, "d": 18}

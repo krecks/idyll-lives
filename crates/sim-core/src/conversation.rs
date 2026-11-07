@@ -151,21 +151,28 @@ pub(crate) fn accepts(
     if acc.taken_penalty > 0.0 && rels.partner_of(t).is_some_and(|p| p != a) {
         p -= acc.taken_penalty;
     }
+    for (n, k) in acc.needs.iter().enumerate().take(content.needs.len()) {
+        p += k * (1.0 - target.needs[n]);
+    }
     p.clamp(0.0, 1.0)
 }
 
 /// Social options `actor` has toward `target`: `(social index, success chance)`. (Goodbyes at
-/// the end of a visit, `visits.farewell`, aren't on offer: guests say them as they leave.)
+/// the end of a visit, `visits.farewell`, aren't on offer: guests say them as they leave; nor is
+/// a host's offer of something to eat or drink, `visits.offer`, which hosts make of their own
+/// accord.)
 pub fn options(w: &World, actor: usize, target: usize) -> Vec<(usize, f32)> {
     let (Some(a), Some(t)) = (w.sims.get(actor), w.sims.get(target)) else {
         return Vec::new();
     };
+    let offer = w.content.visits.offer.as_ref().map(|o| o.social);
     w.content
         .socials
         .iter()
         .enumerate()
-        .filter(|(i, s)| {
-            !w.content.visits.farewell.contains(i)
+        .filter(|&(i, s)| {
+            !w.content.visits.farewell.contains(&i)
+                && offer != Some(i)
                 && social_allowed(&w.content, &w.relationships, a, t, s)
         })
         .map(|(i, s)| (i, acceptance_chance(&w.content, &w.relationships, a, t, s)))
@@ -469,7 +476,8 @@ pub(crate) fn update(w: &mut World) {
             | Phase::Queued { .. }
             | Phase::Boarding { .. }
             | Phase::Alighting { .. }
-            | Phase::Driving => continue,
+            | Phase::Driving
+            | Phase::AtKerb { .. } => continue,
         };
         let s = &content.socials[social];
         let gap = dist(sims[i].pos, sims[t].pos);
@@ -659,7 +667,8 @@ pub(crate) fn update(w: &mut World) {
             | Phase::Queued { .. }
             | Phase::Boarding { .. }
             | Phase::Alighting { .. }
-            | Phase::Driving => continue,
+            | Phase::Driving
+            | Phase::AtKerb { .. } => continue,
         };
         if l == j || sims.get(l).is_none_or(|s| !s.here()) || sims[j].pressed(content) {
             end_activity(&mut sims[j], content, objects);
@@ -1286,6 +1295,12 @@ pub(crate) fn outcome(
         Effect::Conceive => {
             if success {
                 sims[a].to_bed = Some(t as u32);
+            }
+        }
+        // (Off to fetch it: `hosting::update`.)
+        Effect::Serve => {
+            if success {
+                sims[a].serve_for = Some(t as u32);
             }
         }
         Effect::Kiss => {

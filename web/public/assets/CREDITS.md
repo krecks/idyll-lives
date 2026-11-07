@@ -212,7 +212,7 @@ sinks, the desk drawer slides out and the plunge cover rolls back.
 The kind pack models (`models/pack_kind/neighbourlyOven.glb`, `givingJar.glb`, `knittingRocker.glb`,
 `welcomeTeaTable.glb`, `songbirdFeeder.glb`, `hearthSettee.glb`, override pack `packs/pack_kind/manifest.json`) are
 built in Blender by `tools/art/blender/families/pack_kind.py` on `gamekit` and exported as `.glb` (glTF, original,
-CC0). Each moves while it is used: the oven door drops, a coin drops into the jar, the rocker rocks, the teapot pours,
+CC0). Each moves while it is used: the oven door drops with the tea towel over its handle, a coin drops into the jar, the rocker rocks, the teapot pours,
 the feeder's roof lifts and songbirds fly out, and the settee's cushions sink. The tea table was rebuilt lower and
 narrower, its poufs either side of it facing each other (2026-10-21).
 
@@ -261,15 +261,19 @@ soak and hangs behind it while the water bubbles. The patio things, the hammock,
 grill were rebuilt to real sizes (2026-10-21).
 
 The play and yard things (`models/yard/sandbox.glb`, `bikeRack.glb`, `raisedBed.glb`, `shedSmall.glb`,
-`greenhouse.glb`, `compostBin.glb`, `rainBarrel.glb`, `clothesline.glb`, `firewoodStack.glb`, each with its
-`.far.glb`, override pack `packs/yard/manifest.json`) are built in Blender by `tools/art/blender/families/yard.py`
+`greenhouse.glb`, `compostBin.glb`, `rainBarrel.glb`, `clothesline.glb`, `firewoodStack.glb`, and the rides residents
+ride to work or school, `bicycle.glb` (a step-through city bike with a basket), `bicycleChild.glb` (a kids' bike on
+stabilisers) and `eScooter.glb` (an electric scooter), each with its `.far.glb`, override pack
+`packs/yard/manifest.json`) are built in Blender by `tools/art/blender/families/yard.py`
 on `gamekit` and exported as `.glb` (glTF, original, CC0). A sand castle grows in the sandpit, the bike lifts and
 turns its back wheel, the raised bed's crop grows and is picked, the shed's and the greenhouse's doors open, the
-compost bin's lid lifts and the washing goes out on the line a line at a time.
+compost bin's lid lifts and the washing goes out on the line a line at a time; the rides' wheels, cranks and stands
+are parts the game moves.
 
 The grills and the fire pit (`models/outdoor/grill.glb`, `grillStation.glb`, `firePit.glb`, same pack and family)
 are built the same way (glTF, original, CC0). The grill's lid and the station's hood swing up while residents cook,
-and the fire pit's flames grow on its logs while they warm up by it.
+and the fire pit's flames grow on its logs while they warm up by it. The grates are bare for the cook's own food, and
+the grill has a side tray for what they bring out (2026-11-03).
 
 The home gym (`models/fitness/treadmill.glb`, `weightBench.glb`, `exerciseBike.glb`, `yogaMat.glb`,
 `dumbbells.glb`, override pack `packs/fitness/manifest.json`) is built in Blender by
@@ -309,7 +313,8 @@ The kitchen cookers (`models/kitchen_cooking/stoveElectric.glb`, `stoveGas.glb`,
 `rangeCooker.glb`, `cooktopCounter.glb`, `microwave.glb`, override pack `packs/kitchen_cooking/manifest.json`)
 are built in Blender by `tools/art/blender/families/kitchen_cooking.py` on `gamekit` and exported as `.glb`
 (glTF, original, CC0). Each drops an oven door on its bottom hinge while a resident bakes and turns a knob
-while they cook, with a ring of blue flame growing on the gas ones; the oven tower's tray slides out, and the
+while they cook, with a ring of blue flame growing on the gas ones (the knob by the burner or ring that lights,
+and the gas range's hob left free for the cook's pan and bowl, 2026-11-03); the oven tower's tray slides out, and the
 microwave swings its door and turns its turntable.
 
 The kitchen small appliances and dishwashers (`models/kitchen_cooking/coffeeMachine.glb`,
@@ -317,7 +322,7 @@ The kitchen small appliances and dishwashers (`models/kitchen_cooking/coffeeMach
 `tools/art/blender/families/kitchen_cooking.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
 The coffee machine slides its cup under the spout and runs a coffee stream; the breakfast counter's toaster
 lever slides and its toast pops, and its blender lid lifts over a swirling smoothie; the dishwashers drop their door and slide a rack
-out. The dishwashers were rebuilt 60 and 45 cm wide beside a cupboard or a drawer stack (2026-10-21).
+out, loaded or emptied. The dishwashers were rebuilt 60 and 45 cm wide beside a cupboard or a drawer stack (2026-10-21).
 
 The kitchen base counters (`models/kitchen_counters/counter.glb`, `counterCorner.glb`, `counterEnd.glb`,
 `counterCornerOuter.glb`, `counterDrawers.glb`, `counterOpenShelf.glb`, `butcherBlock.glb`,
@@ -402,7 +407,9 @@ tableware `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasse
 `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks`; override pack
 `packs/tabletop/manifest.json`) are built in Blender by `tools/art/blender/families/tabletop.py` on `gamekit` and
 exported as `.glb` (glTF, original, CC0). The alarm clock's hands tell the game's time and the
-candles' flames rise at night; the rest are static.
+candles' flames rise at night; the kettle's lid, the bread bin's roll-top and the laptop's lid open while they're used,
+and the toaster's toast goes down, the blender's jug shakes, the stand mixer's beater turns and the espresso machine
+runs coffee into its cup (2026-11-03); the rest are static.
 
 The playground (`models/playground/slide.glb`, `climbingFrame.glb`, `seesaw.glb`, `springRider.glb`,
 `merryGoRound.glb`, `basketballHoop.glb`, `pingPongTable.glb`, `parkChessTable.glb`, each with a `.far.glb` for the
@@ -434,19 +441,20 @@ lifts while a resident buys from them; a snack slides down to the snack machine'
 machine's; the machines' signs and the drinks machine's front glow at night; the market stall is static.
 
 The street furniture (`models/street_furniture/streetLamp.glb`, `parkBench.glb`, `drinkingFountain.glb`,
-`litterBin.glb`, `busStop.glb`, `postBox.glb`, `noticeBoard.glb`, `phoneBooth.glb`, `fountainTown.glb`,
-`townStatue.glb`, each with a `.far.glb` for the town overview, override pack `packs/street_furniture/manifest.json`)
+`litterBin.glb`, `busStop.glb` (the taxi rank's shelter: the bus shelter until 2026-11-05), `postBox.glb`, `noticeBoard.glb`, `phoneBooth.glb`, `fountainTown.glb`,
+`townStatue.glb`, `trafficLight.glb` (2026-11-05: drawn at the sim's lit junctions, its lit lens the renderer's),
+each with a `.far.glb` for the town overview, override pack `packs/street_furniture/manifest.json`)
 is built in Blender by `tools/art/blender/families/street_furniture.py` on `gamekit` and exported as `.glb` (glTF,
-original, CC0). The street lamp's lantern and the phone box's signs glow at night; the drinking fountain's arc of
+original, CC0). The street lamp's lantern, the phone box's signs and the taxi rank's sign glow at night; the drinking fountain's arc of
 water grows while a resident drinks, the post box's slot flap swings in for a card, the phone box's door opens and
 shuts behind the caller, and the town fountain's water runs near the camera (`water_run`, ambient); the bench, the
-litter bin, the bus shelter, the notice board and the founder's statue are static.
+litter bin, the taxi rank's shelter, the notice board and the founder's statue are static.
 
-The street's dressing props (`models/street/bench.glb`, `planter.glb`, `flowerTub.glb`, `sign.glb`, `busSign.glb`,
+The street's dressing props (`models/street/bench.glb`, `planter.glb`, `flowerTub.glb`, `sign.glb`, `taxiSign.glb` (the bus-stop sign, `busSign.glb`, until 2026-11-05),
 `pot.glb`, `pathLight.glb`, `flowers.glb`, each with a `.far.glb` for the town overview, override pack
 `packs/street/manifest.json`) are built in Blender by `tools/art/blender/families/street.py` on `gamekit` and exported
 as `.glb` (glTF, original, CC0): the kerbside bench, the planter with its little tree, the flower tub, the street-name
-and bus-stop signs, the door pot, the garden path light (its lens glows at night) and the flower
+and taxi rank signs (the taxi sign's light box glows at night), the door pot, the garden path light (its lens glows at night) and the flower
 clump. All are static; their leaves and flowers sway in the wind.
 
 The garden things and lights (`models/garden_things/pond.glb`, `planterBox.glb`, `birdhouse.glb`,
@@ -466,18 +474,20 @@ it is built on the GPU (`web/src/render/pc/grass.ts`, original code).
 The living room's media (`models/media/tv.glb`, `tvWall.glb`, `tvRetro.glb`, `tvStandLow.glb`, `homeCinema.glb`,
 `stereo.glb`, `boombox.glb`, `fireplaceElectric.glb`, override pack `packs/media/manifest.json`) are built in Blender
 by `tools/art/blender/families/media.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The screens glow
-at night; the portable TV's rabbit ears turn and extend, the low bench's TV rises out of its lift and the home
+at night; the portable TV's aerial lifts off its case, the low bench's TV rises out of its lift and the home
 cinema's projector screen unrolls while watched; the stereo's CD tray slides out and its woofers pulse, the boombox's
 cassette door tips open, and the electric fire's flames grow while a resident warms up on its floor cushion.
 
 The things residents carry and cook with (`models/held/*.glb`: the bag of shopping, the prep bowl, the stew pot and
 the dirty pot, the tasting board, the grill platter and the dirty platter, the pizza, the baking tray and the dirty
-tray, the pie and the dirty pie dish, the plates of stew, pizza, treats, pie, cake, a sandwich and toast, the dirty plate, the
-dirty tasting board and pizza board, the bowl of ice cream and the dirty bowl, the smoothie, the noodle pail and the
+tray, the pie and the dirty pie dish, the plates of stew, barbecue, a tasting menu, pizza, treats, pie, cake, salad, a sandwich and toast, the dirty plate
+and a stack of three, the dirty tasting board and pizza board, the bowl of ice cream and the dirty bowl, the smoothie, the noodle pail and the
 takeaway box, the food bought in town (a paper cup of ice cream, a hot dog on its paper boat, a packet of crisps, an
-apple, a pastry in a paper bag), the chopping board, the
-pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks, and what residents hold
-while they use a thing (a book, a mug, a tumbler, a wine glass, a can, a fork, a spoon, chopsticks, a phone, a coin,
+apple, a pastry in a paper bag), the parcel a thing bought comes in, the chopping board, the
+pan, the mixing bowl and the food on the grill that stand on a station while a resident cooks, the cook's knife, wooden
+spoon, turner and whisk, the bites of what is eaten by hand (half a sandwich, half a slice of toast, a slice of pizza, a
+cookie, a burger, a hot dog, a cracker with cheese, a croissant, a few crisps), and what residents hold
+while they use a thing (a book, a mug, a tumbler, a wine glass, a can, a fork, a spoon, chopsticks, the ice cream cart's wooden spoon, a phone, a coin,
 a bag of bird seed, a dart, a pool cue, a ping-pong bat, a cocktail shaker, a watering can, secateurs, a paintbrush,
 chalk, a baby's bottle, a postcard, a basketball, a pen, a pencil, a whiteboard marker and the phone box's receiver);
 override pack
@@ -513,7 +523,7 @@ Unlike the art above, these come with their own licences: the model under the **
 
 | File | Source | Authors | URL | Licence |
 |---|---|---|---|---|
-| `supertonic-3/*.onnxz` | Supertonic 3 (revision `3cadd1ee`): duration predictor, text encoder, vector estimator and vocoder, **modified**: every float32 weight of 1,024 values or more stored as float16 and cast back to float32 when the model loads (`crates/tools/src/fp16.rs`), then gzipped; nothing retrained (`supertonic-3/NOTICE`) | Supertone Inc. | https://huggingface.co/Supertone/supertonic-3, https://github.com/supertone-inc/supertonic | BigScience OpenRAIL-M (`supertonic-3/LICENSE.txt`) |
+| `supertonic-3/*.onnxz` | Supertonic 3 (revision `3cadd1ee`): duration predictor, text encoder, vector estimator and vocoder, **modified**: in the text encoder, vector estimator and vocoder every float32 weight of 1,024 values or more with two or more axes stored as 8-bit integers with a float32 scale per channel (`crates/tools/src/int8.rs`), the other weights of 1,024 values or more and the duration predictor's as float16 (`crates/tools/src/fp16.rs`), all turned back into float32 when the model loads, then gzipped; nothing retrained (`supertonic-3/NOTICE`) | Supertone Inc. | https://huggingface.co/Supertone/supertonic-3, https://github.com/supertone-inc/supertonic | BigScience OpenRAIL-M (`supertonic-3/LICENSE.txt`) |
 | `supertonic-3/tts.json`, `unicode_indexer.json`, `F1.json`…`F5.json`, `M1.json`…`M5.json` | Supertonic 3 (revision `3cadd1ee`): config, text indexer and ten voice styles, **unchanged** | Supertone Inc. | https://huggingface.co/Supertone/supertonic-3 | BigScience OpenRAIL-M (`supertonic-3/LICENSE.txt`) |
 | `en-us.lexz` | Misaki US English dictionaries (`us_gold`, `us_silver`), merged and gzipped | hexgrad | https://github.com/hexgrad/misaki | Apache-2.0 (`misaki-LICENSE.txt`) |
 
@@ -525,13 +535,14 @@ The model runs with **ONNX Runtime Web** 1.31.1 (`onnxruntime-web`, its WebGPU b
 
 ## The language model for residents' lines
 
-Optional (Settings › Voices › What residents say › Lines › Language model), its 4-bit ONNX build, unchanged; the weights file is shipped gzipped and unpacked by the player's browser. Fetched at build time into `../llm/` (pinned and checked by SHA-256, not stored in git). Like the voices, it runs only on WebGPU.
+Optional (Settings › Voices › What residents say › Lines › Language model), its 4-bit ONNX build, repacked smaller without changing what it computes (below); the weights file is shipped gzipped and unpacked by the player's browser. Fetched at build time into `../llm/` (pinned and checked by SHA-256, not stored in git). Like the voices, it runs only on WebGPU.
 
 | Model | Files | By | Source | Licence |
 |---|---|---|---|---|
-| LFM2.5-350M | `lfm2.5-350m/model_q4.onnx`, `model_q4.onnx_dataz` (`model_q4.onnx_data` gzipped, unpacked by the browser), `tokenizer.json`, `tokenizer_config.json` (revision `7dd49995`) | Liquid AI (model), onnx-community (export) | https://huggingface.co/onnx-community/LFM2.5-350M-ONNX | LFM Open License v1.0 (`lfm2.5-350m/LICENSE.txt`, from Liquid AI's https://huggingface.co/LiquidAI/LFM2.5-350M at revision `9e6c6ccf`: the export has no copy) |
+| LFM2.5-350M | `lfm2.5-350m/model_q4.onnx`, `model_q4.onnx_dataz` (`model_q4.onnx_data` gzipped, unpacked by the browser) (revision `7dd49995`), **modified**: repacked without changing what the model computes (`crates/tools/src/llmslim.rs`): the tied 4-bit embedding, stored twice in the export, stored once, and the rotary tables (`cos_cache`, `sin_cache`) cut to their first 4,096 of 128,000 positions; nothing retrained or requantised (`lfm2.5-350m/NOTICE`) | Liquid AI (model), onnx-community (export) | https://huggingface.co/onnx-community/LFM2.5-350M-ONNX | LFM Open License v1.0 (`lfm2.5-350m/LICENSE.txt`, from Liquid AI's https://huggingface.co/LiquidAI/LFM2.5-350M at revision `9e6c6ccf`: the export has no copy) |
+| LFM2.5-350M | `lfm2.5-350m/tokenizer.json`, `tokenizer_config.json` (revision `7dd49995`), **unchanged** | Liquid AI (model), onnx-community (export) | https://huggingface.co/onnx-community/LFM2.5-350M-ONNX | LFM Open License v1.0 (`lfm2.5-350m/LICENSE.txt`, from Liquid AI's https://huggingface.co/LiquidAI/LFM2.5-350M at revision `9e6c6ccf`: the export has no copy) |
 
-**The LFM Open License v1.0** allows reproducing, changing and distributing the model free of charge, on conditions that include giving every recipient a copy of the licence (shipped with the model as `lfm2.5-350m/LICENSE.txt`). Commercial use by an organisation whose annual revenue is 10 million US dollars or more isn't licensed (its section 5).
+**The LFM Open License v1.0** allows reproducing, changing and distributing the model free of charge, on conditions that include giving every recipient a copy of the licence (shipped with the model as `lfm2.5-350m/LICENSE.txt`) and marking changed files as changed (its section 4(b): `lfm2.5-350m/NOTICE`, written by `cargo fetch-llm`). Commercial use by an organisation whose annual revenue is 10 million US dollars or more isn't licensed (its section 5).
 
 The tokenizer runs with **Tokenizers.js** (`@huggingface/tokenizers`), © Hugging Face, Apache-2.0: https://github.com/huggingface/tokenizers.js. The model runs with ONNX Runtime Web's WebGPU build (`ort-wasm-simd-threaded.asyncify.wasm`).
 

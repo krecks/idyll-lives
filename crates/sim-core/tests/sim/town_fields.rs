@@ -39,9 +39,8 @@ fn open_world_fields_are_read_kept_and_saved() {
     assert_eq!(f.roads[1].area, Some(0));
     assert_eq!(t.graph.roads.len(), 2);
     assert_eq!(f.areas[0].kind, AreaKind::Hamlet);
-    assert!(!t.is_stop(0));
-    assert!(t.is_stop(1));
-    assert_eq!(world.exits, vec![[0.5, 30.0], [20.0, 31.0]]);
+    // (A bus stop, in a town file from when the town had buses, is no way out: left out.)
+    assert_eq!(world.exits, vec![[0.5, 30.0]]);
     assert_eq!(f.parking.len(), 1);
     assert_eq!(f.plot_areas[0], Some(0));
     assert_eq!(f.plot_kinds[0], Some(PlotKind::Home));
@@ -56,7 +55,7 @@ fn open_world_fields_are_read_kept_and_saved() {
     let json = |w: &World| serde_json::to_value(&w.travel.file).unwrap();
     assert_eq!(json(&back), json(&world));
     assert_eq!(back.travel.size, WorldSize::Normal);
-    assert!(back.travel.is_stop(1));
+    assert_eq!(back.exits, world.exits);
     assert_eq!(back.travel.graph.roads.len(), 2);
 }
 
@@ -72,7 +71,6 @@ fn a_town_without_them_is_cosy_and_plays_as_before() {
     assert!(!t.open);
     assert!(t.graph.is_empty(), "no network for a cosy town");
     assert!(t.file.is_empty());
-    assert!((0..world.exits.len()).all(|i| !t.is_stop(i)));
     // Saved without them, and still cosy after a load.
     let json: serde_json::Value = serde_json::from_str(&world.save_json()).unwrap();
     assert!(json.get("openWorld").is_none());

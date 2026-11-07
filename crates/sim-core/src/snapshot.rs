@@ -7,17 +7,24 @@ use crate::Content;
 use crate::world::{Activity, MAX_SIMS, Phase, Sim, Task, TaskKind, World};
 use crate::{TICKS_PER_SECOND, clock};
 
-pub const HEADER_LEN: usize = 11;
+pub const HEADER_LEN: usize = 12;
 /// Floats per Sim (all 32 used).
-pub const SIM_STRIDE: usize = 32;
+pub const SIM_STRIDE: usize = 36;
 /// The cars' rows (`header::CAR_COUNT`, `car`) start here: after room for every resident's and
 /// server's.
 pub const CAR_BASE: usize = HEADER_LEN + (MAX_SIMS + crate::staff::MAX_STAFF) * SIM_STRIDE;
 /// Floats per car.
-pub const CAR_STRIDE: usize = 5;
+pub const CAR_STRIDE: usize = 6;
+/// The traffic lights' rows (`header::LIGHT_COUNT`, `light`), after the cars': one per signal
+/// head, `MAX_LIGHTS` at most.
+pub const LIGHT_BASE: usize = CAR_BASE + crate::cars::MAX_CARS * CAR_STRIDE;
+/// Floats per signal head.
+pub const LIGHT_STRIDE: usize = 5;
+/// Signal heads the snapshot has room for.
+pub const MAX_LIGHTS: usize = 256;
 /// The residents' rows, then the town's servers' (`header::STAFF_COUNT`, `staff.rs`), in the same
-/// layout; then the cars'.
-pub const CAPACITY: usize = CAR_BASE + crate::cars::MAX_CARS * CAR_STRIDE;
+/// layout; then the cars', and the traffic lights'.
+pub const CAPACITY: usize = LIGHT_BASE + MAX_LIGHTS * LIGHT_STRIDE;
 
 pub mod header {
     /// Tick counter modulo 2^24 (exact in f32); only used to detect change.
@@ -39,14 +46,40 @@ pub mod header {
     /// while they serve someone, with `HELD` what they hand over and `PROGRESS` how far the
     /// customer's use is; `OBJECT` is -1 (they stand behind it, not at it).
     pub const STAFF_COUNT: usize = 9;
-    /// Households' cars (`cars.rs`): as many rows as this from `CAR_BASE`, each laid out as `car`,
-    /// in the structure's `cars` order.
+    /// The cars (`cars.rs`): as many rows as this from `CAR_BASE`, each laid out as `car`. The
+    /// households' first, in the structure's `cars` order; then the work taxis' (`taxi.rs`, `KIND`
+    /// a taxi: none in the structure), a row each for good once one has come (an unused one not to
+    /// be seen).
     pub const CAR_COUNT: usize = 10;
+    /// The traffic lights' signal heads (`traffic::Signal`, one per arm of each lit junction): as
+    /// many rows as this from `LIGHT_BASE`, each laid out as `light`, the same from tick to tick
+    /// (lit junction by lit junction, arm by arm round it).
+    pub const LIGHT_COUNT: usize = 11;
+}
+
+/// A signal head's row (`traffic::SignalArm`: one per arm of a lit junction, facing those coming
+/// in along it).
+pub mod light {
+    /// 1: to be seen (a pole on the kerb with its head).
+    pub const SHOWN: usize = 0;
+    /// Where its pole stands on the ground, and which way the head faces (as a resident's yaw:
+    /// towards those coming in).
+    pub const X: usize = 1;
+    pub const Z: usize = 2;
+    pub const YAW: usize = 3;
+    /// What it shows: 0 red, 1 amber, 2 green, 3 walk (red, those on foot crossing).
+    pub const STATE: usize = 4;
+    /// `STATE`'s values.
+    pub const RED: f32 = 0.0;
+    pub const AMBER: f32 = 1.0;
+    pub const GREEN: f32 = 2.0;
+    pub const WALK: f32 = 3.0;
 }
 
 /// A car's row.
 pub mod car {
-    /// 0: not to be seen (out of town, or its spot built over), 1 parked, 2 driving.
+    /// 0: not to be seen (out of town, its spot built over, or out of sight: `cars::hidden`),
+    /// 1 parked, 2 driving.
     pub const SHOWN: usize = 0;
     /// Its middle on the ground, and which way it faces (as a resident's yaw).
     pub const X: usize = 1;
@@ -55,6 +88,12 @@ pub mod car {
     /// Its open doors: bit `d` for door `d` (`cars::DOORS`: front left, front right, back left,
     /// back right), while someone gets in or out.
     pub const DOORS: usize = 4;
+    /// What it is: `HOUSEHOLD` (its look in the structure's `cars`) or `TAXI` (a work taxi,
+    /// `taxi.rs`: its look the renderer's own).
+    pub const KIND: usize = 5;
+    /// `KIND`'s values.
+    pub const HOUSEHOLD: f32 = 0.0;
+    pub const TAXI: f32 = 1.0;
 }
 
 pub mod sim {
@@ -104,7 +143,8 @@ pub mod sim {
     pub const HEIGHT: usize = 18;
     /// Object definition (index into `Content::objects`) of the object in `OBJECT` while the
     /// Sim is using it or walking to use it, else -1 (repairs too). Voices pick lines per item
-    /// from it; the instance id alone would need the world structure.
+    /// from it; the instance id alone would need the world structure. While setting up something
+    /// new (`setup.rs`), the type of the thing being set up, `OBJECT` being -1.
     pub const OBJECT_DEF: usize = 19;
     /// The interaction (index into that definition's `interactions`) with `OBJECT_DEF`, or -1.
     pub const INTERACTION: usize = 20;
@@ -138,6 +178,15 @@ pub mod sim {
     /// bedroom they try for a baby in; `privacy.rs`), else 0: the renderer keeps its doors shut
     /// to anyone but whoever goes through them (nobody else goes in).
     pub const SHUTS: usize = 31;
+    /// Stable id of the thing they ride (a bike, an e-scooter: `ride.rs`), drawn under them and
+    /// not at its place while they're on it (away at work too), or -1. Left out by a place they're
+    /// visiting (`Sim::bike_parked`): -2 less its stable id, not drawn at its place either.
+    pub const RIDE: usize = 32;
+    /// That bike left out (`RIDE` -2 less its stable id): where its middle stands and which way it
+    /// faces (rad, as a placement's turn: `ride::park_spot`); else 0.
+    pub const PARK_X: usize = 33;
+    pub const PARK_Z: usize = 34;
+    pub const PARK_YAW: usize = 35;
 }
 
 /// How far ahead along their way `sim::AHEAD_X` looks, in metres.
@@ -154,9 +203,14 @@ const _: () = assert!(
         && sim::CARRY < SIM_STRIDE
         && sim::PLATE < SIM_STRIDE
         && sim::SHUTS < SIM_STRIDE
+        && sim::PARK_YAW < SIM_STRIDE
 );
 const _: () = assert!(
-    header::ITEMS_VERSION < HEADER_LEN && header::CAR_COUNT < HEADER_LEN && car::DOORS < CAR_STRIDE
+    header::ITEMS_VERSION < HEADER_LEN
+        && header::CAR_COUNT < HEADER_LEN
+        && header::LIGHT_COUNT < HEADER_LEN
+        && car::KIND < CAR_STRIDE
+        && light::STATE < LIGHT_STRIDE
 );
 
 /// What a Sim does for the snapshot; see `sim::OBJECT`, `sim::ACTION`, `sim::OBJECT_DEF` and
@@ -230,6 +284,33 @@ pub(crate) fn doing(world: &World, s: &Sim) -> Doing {
             .anim
             .filter(|_| matches!(phase, Phase::Using { .. }));
         return Doing::plain(world, Some(*object), anim);
+    }
+    // Setting up something new (`setup.rs`): no object yet, the new thing's type (`OBJECT_DEF`), and
+    // picking the parcel up at the door or putting it together while at it.
+    if let Some(Activity {
+        task:
+            Task {
+                kind: TaskKind::SetUp { object, stage, .. },
+                ..
+            },
+        phase,
+        ..
+    }) = s.current()
+    {
+        let rules = &world.content.object_rules.set_up;
+        let anim = if *stage == 0 {
+            rules.fetch_anim
+        } else {
+            rules.anim
+        };
+        return Doing {
+            def: *object as f32,
+            ..Doing::plain(
+                world,
+                None,
+                anim.filter(|_| matches!(phase, Phase::Using { .. })),
+            )
+        };
     }
     // An accident's while on the spot (asleep on the floor, takeout).
     if let Some(Activity {
@@ -365,6 +446,49 @@ pub(crate) fn doing(world: &World, s: &Sim) -> Doing {
             .map_or(-1.0, |o| o.def as f32);
         return d;
     }
+    // Something for a guest (`hosting.rs`): taken out at the fridge (the `eat` use's own
+    // animation; not its interaction, whose lines are for having it oneself), then handed over.
+    if let Some(Activity {
+        task:
+            Task {
+                kind:
+                    TaskKind::Serve {
+                        from,
+                        interaction,
+                        stage,
+                        ..
+                    },
+                ..
+            },
+        phase,
+        ..
+    }) = s.current()
+    {
+        let using = matches!(phase, Phase::Using { .. });
+        if *stage > 0 {
+            let anim = world
+                .content
+                .visits
+                .offer
+                .as_ref()
+                .and_then(|o| o.hand_anim)
+                .filter(|_| using);
+            return Doing::plain(world, None, anim);
+        }
+        let Some(o) = world.objects.get(*from as usize) else {
+            return Doing::NOTHING;
+        };
+        let anim = world.content.objects[o.def]
+            .interactions
+            .get(*interaction)
+            .and_then(|i| i.anim)
+            .or(world.content.cooking.put_away_anim)
+            .filter(|_| using);
+        return Doing {
+            def: o.def as f32,
+            ..Doing::plain(world, Some(*from), anim)
+        };
+    }
     // Clearing away: at the bin, the sink or the counter, scraping, washing or putting away (the
     // station's kind too: washing at a dishwasher sounds unlike a sink's running tap).
     if let Some(Activity {
@@ -379,6 +503,8 @@ pub(crate) fn doing(world: &World, s: &Sim) -> Doing {
     {
         let rules = &world.content.cooking;
         let anim = match stage {
+            // (Picking the armful up off the table: bent over it, as a dish is put down.)
+            0 => rules.serve_anim,
             1 => rules.scrape_anim,
             3 => rules.put_away_anim,
             _ => rules.dishes_anim,
@@ -597,6 +723,7 @@ pub fn write(world: &World, out: &mut [f32]) {
     out[header::ITEMS_VERSION] = (world.items.version % (1 << 24)) as f32;
     let staff = &world.staff.servers[..world.staff.servers.len().min(crate::staff::MAX_STAFF)];
     out[header::STAFF_COUNT] = staff.len() as f32;
+    let hidden = crate::cars::hidden(&world.cars);
     for (i, s) in world.sims.iter().enumerate() {
         let o = &mut out[HEADER_LEN + i * SIM_STRIDE..HEADER_LEN + (i + 1) * SIM_STRIDE];
         o[sim::ID] = s.id as f32;
@@ -611,7 +738,8 @@ pub fn write(world: &World, out: &mut [f32]) {
         o[sim::ANIM] = 0.0;
         o[sim::EMOTION] = s.emotion(&world.content).map_or(0.0, |e| e as f32 + 1.0);
         o[sim::ROLE] = 0.0;
-        o[sim::AWAY] = (s.away_until.is_some() || !s.here()) as u8 as f32;
+        o[sim::AWAY] =
+            (s.away_until.is_some() || !s.here() || in_hidden_car(world, &hidden, s)) as u8 as f32;
         let doing = doing(world, s);
         o[sim::OBJECT] = doing.object;
         o[sim::ACTION] = doing.action;
@@ -655,6 +783,19 @@ pub fn write(world: &World, out: &mut [f32]) {
             .or_else(|| shown_held(world, s))
             .map_or(0.0, |d| d as f32 + 1.0);
         o[sim::SHUTS] = crate::privacy::keeps_shut(world, s.id) as u8 as f32;
+        let spot = s.bike_parked.and(s.bike_spot);
+        let parked = spot
+            .and(s.bound_for_bike)
+            .and_then(|b| world.objects.get(b as usize))
+            .map(|b| -2.0 - b.stable as f32);
+        let (at, yaw) = spot.filter(|_| parked.is_some()).unwrap_or(([0.0; 2], 0.0));
+        [o[sim::PARK_X], o[sim::PARK_Z], o[sim::PARK_YAW]] = [at[0], at[1], yaw];
+        o[sim::RIDE] = s
+            .riding
+            .and_then(|b| world.objects.get(b as usize))
+            .map(|b| b.stable as f32)
+            .or(parked)
+            .unwrap_or(-1.0);
     }
     // Conversations: write the shared state into every participant's row.
     for (i, s) in world.sims.iter().enumerate() {
@@ -701,16 +842,55 @@ pub fn write(world: &World, out: &mut [f32]) {
         }
     }
     write_staff(world, out);
-    write_cars(world, out);
+    write_cars(world, &hidden, out);
+    write_lights(world, out);
+}
+
+/// The traffic lights' rows (`header::LIGHT_COUNT`): each lit junction's arms in turn.
+fn write_lights(world: &World, out: &mut [f32]) {
+    let heads = world
+        .travel
+        .signals
+        .iter()
+        .enumerate()
+        .flat_map(|(s, sig)| sig.arms.iter().enumerate().map(move |(a, arm)| (s, a, arm)))
+        .take(MAX_LIGHTS);
+    let mut n = 0;
+    for (k, (s, a, arm)) in heads.enumerate() {
+        let o = &mut out[LIGHT_BASE + k * LIGHT_STRIDE..LIGHT_BASE + (k + 1) * LIGHT_STRIDE];
+        o[light::SHOWN] = 1.0;
+        o[light::X] = arm.pole[0];
+        o[light::Z] = arm.pole[1];
+        o[light::YAW] = arm.yaw;
+        o[light::STATE] = match world.traffic.light(s, a) {
+            Some(crate::traffic::Stage::Green) => light::GREEN,
+            Some(crate::traffic::Stage::Amber) => light::AMBER,
+            _ => light::RED,
+        };
+        n = k + 1;
+    }
+    out[header::LIGHT_COUNT] = n as f32;
+}
+
+/// Whether `s` sits in a car on its way that isn't drawn (`hidden`, `cars::hidden`): nor are they.
+fn in_hidden_car(world: &World, hidden: &[bool], s: &crate::world::Sim) -> bool {
+    hidden.contains(&true)
+        && s.current()
+            .is_some_and(|a| matches!(a.phase, crate::world::Phase::Driving))
+        && crate::cars::driving(&world.cars, s.id)
+            .is_some_and(|c| hidden.get(c as usize) == Some(&true))
 }
 
 /// The cars' rows (`header::CAR_COUNT`).
-fn write_cars(world: &World, out: &mut [f32]) {
+fn write_cars(world: &World, hidden: &[bool], out: &mut [f32]) {
     let cars = &world.cars[..world.cars.len().min(crate::cars::MAX_CARS)];
     out[header::CAR_COUNT] = cars.len() as f32;
     for (k, c) in cars.iter().enumerate() {
         let o = &mut out[CAR_BASE + k * CAR_STRIDE..CAR_BASE + (k + 1) * CAR_STRIDE];
-        let Some((p, yaw, moving, doors)) = c.shown else {
+        o[car::KIND] = if c.taxi { car::TAXI } else { car::HOUSEHOLD };
+        // (Out of sight, driving through the others, or on top of one that is: not drawn,
+        // `cars::hidden`.)
+        let Some((p, yaw, moving, doors)) = c.shown.filter(|_| !hidden[k]) else {
             o[car::SHOWN] = 0.0;
             continue;
         };
@@ -743,6 +923,7 @@ fn write_staff(world: &World, out: &mut [f32]) {
         o[sim::PARTNER] = -1.0;
         o[sim::AWAY] = (!server.present) as u8 as f32;
         o[sim::OBJECT] = -1.0;
+        o[sim::RIDE] = -1.0;
         o[sim::OBJECT_DEF] = -1.0;
         o[sim::INTERACTION] = -1.0;
         o[sim::ACTION] = -1.0;
@@ -823,16 +1004,27 @@ pub fn layout_json(content: &Content) -> String {
             "wayX": sim::WAY_X, "wayZ": sim::WAY_Z, "aheadX": sim::AHEAD_X, "aheadZ": sim::AHEAD_Z,
             "carry": sim::CARRY,
             "progress": sim::PROGRESS, "plate": sim::PLATE,
-            "shuts": sim::SHUTS,
+            "shuts": sim::SHUTS, "ride": sim::RIDE,
         },
         "actions": content.animations,
         "items": content.items.iter().map(|i| &i.id).collect::<Vec<_>>(),
         "recipes": content.recipes.iter().map(|r| &r.id).collect::<Vec<_>>(),
     });
     // (Apart: one `json!` this long would pass the macro's recursion limit.)
+    layout["sim"]["parkX"] = sim::PARK_X.into();
+    layout["sim"]["parkZ"] = sim::PARK_Z.into();
+    layout["sim"]["parkYaw"] = sim::PARK_YAW.into();
     layout["header"]["carCount"] = header::CAR_COUNT.into();
     layout["carBase"] = CAR_BASE.into();
     layout["carStride"] = CAR_STRIDE.into();
-    layout["car"] = serde_json::json!({ "shown": car::SHOWN, "x": car::X, "z": car::Z, "yaw": car::YAW, "doors": car::DOORS });
+    layout["car"] = serde_json::json!({ "shown": car::SHOWN, "x": car::X, "z": car::Z, "yaw": car::YAW, "doors": car::DOORS, "kind": car::KIND, "kinds": { "household": car::HOUSEHOLD, "taxi": car::TAXI } });
+    layout["header"]["lightCount"] = header::LIGHT_COUNT.into();
+    layout["lightBase"] = LIGHT_BASE.into();
+    layout["lightStride"] = LIGHT_STRIDE.into();
+    layout["maxLights"] = MAX_LIGHTS.into();
+    layout["light"] = serde_json::json!({
+        "shown": light::SHOWN, "x": light::X, "z": light::Z, "yaw": light::YAW, "state": light::STATE,
+        "states": { "red": light::RED, "amber": light::AMBER, "green": light::GREEN, "walk": light::WALK },
+    });
     layout.to_string()
 }

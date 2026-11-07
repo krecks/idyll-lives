@@ -688,9 +688,11 @@ def wardrobeSingle():
 # --- the armoire: mahogany, a cornice, raised-panel doors with brass knobs, on bun feet -------------------
 def _crown(name, x, front, back, y, material, h=0.069, out=0.05):
     """A crown moulding round the front and sides at height `y` (its bottom), its path `x` either side and at
-    game depth `front`: a cove rising and swelling out `out` to a flat top."""
+    game depth `front`: a cove rising and swelling out `out` to a flat top. Its back edge reaches only 1 cm in from
+    the path, inside the path's 1.2 cm corners: reaching farther, it folded back on itself round each front corner
+    (faces turned inside out)."""
     prof = [(0.0, 0.0), (0.0, -0.006), (0.012, -0.012), (0.024, -0.02), (0.036, -0.032), (0.046, -0.044),
-            (0.054, -out), (h, -out), (h, 0.03), (0.0, 0.03)]
+            (0.054, -out), (h, -out), (h, 0.01), (0.0, 0.01)]
     path = G.kit.fillet([(-x, y, back), (-x, y, front), (x, y, front), (x, y, back)], 0.012, 2)
     F.sweep(name, path, None, material, profile=prof, up=(0, 0, 1), angle=30)
 

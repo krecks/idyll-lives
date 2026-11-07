@@ -441,6 +441,9 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `swingSet` | Garden swing set (two swings) | 2–3.5 × 1.9–2.5 × 1.2–2.2 | seat 35–60 | swing; push a child | swing 5–30 | swing 30–70° | en1176, neufert | `swingSet` |
 | `sandpit` | Sandpit | 1–2 × 0.15–0.4 × 1–2 |  | build sandcastles; dig | sandcastle 15–60 | cover 0–110° | neufert | `sandbox` |
 | `bikeRack` | Bike rack with a bicycle | 1.6–2 × 0.9–1.2 × 0.4–0.7 |  | park the bike; tune it up | tuneUp 15–60 |  | neufert | `bikeRack` |
+| `cityBike` | City bike (step-through, 28 in wheels, on its stand) | 1.75–1.95 × 1–1.15 × 0.55–0.7 |  | ride to work or school; tune it up | tuneUp 15–60 |  | neufert, bikeInsightsCity | `bicycle` |
+| `kidsBike` | Kids' bike with stabilisers (14 in wheels) | 0.95–1.05 × 0.56–0.75 × 0.35–0.6 |  | ride to school; tune it up | tuneUp 15–60 |  | argosKids14 | `bicycleChild` |
+| `eScooter` | Electric kick scooter, unfolded | 1.05–1.15 × 1.1–1.2 × 0.43–0.6 |  | ride to work or school |  |  | nbcScooter, ldlcScooter4 | `eScooter` |
 | `planter` | Planter or raised bed (flowers, herbs) | 0.4–1.2 × 0.3–0.9 × 0.3–1 |  | water and tend the plants | water 1–10, tend 10–30 |  | rhsPlants | `planterBox` `flowerbed` `garden.flowerBox` `garden.wheelbarrow` `model.street.flowerTub` `model.street.pot` `garden.geraniums` `garden.herbs` |
 | `raisedVegBed` | Raised vegetable bed | 1–2.4 × 0.3–0.9 × 0.6–1.2 |  | sow, weed and water; harvest vegetables | tend 15–45, harvest 10–30 |  | rhsPlants | `raisedBed` `natureLover.veggieBed` |
 | `shed` | Garden shed | 1.5–3 × 2–2.5 × 1.2–2.5 |  | store tools; potter about | potter 15–90 | door 90–110° | neufert | `shedSmall` |
@@ -488,7 +491,7 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `streetLamp` | Street lamp (heritage lantern or column) | 0.25–1.5 × 3–8 × 0.25–1.5 |  | light the pavement at night |  |  | streetlight, neufert | `streetLamp` `street.streetlight` |
 | `drinkingFountain` | Drinking fountain | 0.3–0.7 × 0.75–1.1 × 0.3–0.7 |  | have a drink of water | drink 0–2 |  | ada604, neufert | `drinkingFountain` |
 | `litterBin` | Street litter bin | 0.4–0.7 × 0.8–1.2 × 0.4–0.7 |  | throw rubbish away |  |  | neufert | `litterBin` |
-| `busShelter` | Bus shelter with bench | 2.5–4 × 2.3–2.8 × 1.2–1.8 | seat 42–50 | wait for the bus; read the timetable | wait 2–20 |  | neufert, dimBench | `busStop` |
+| `taxiShelter` | Taxi rank shelter with bench | 2.5–4 × 2.3–2.8 × 1.2–1.8 | seat 42–50 | wait for a taxi; read the fares | wait 2–20 |  | neufert, dimBench | `busStop` |
 | `postBox` | Pillar post box | 0.45–0.6 × 1.5–1.7 × 0.45–0.6 |  | post a letter | post 0–2 |  | pillarBox | `postBox` |
 | `noticeBoard` | Notice board on posts | 0.8–1.5 × 1.6–2.2 × 0.1–0.4 |  | read the notices; pin one up | read 1–10 |  | neufert | `noticeBoard` |
 | `phoneBox` | Phone box (K6 kiosk) | 0.85–1 × 2.4–2.8 × 0.85–1 |  | make a call | call 2–20 | door 80–110° | k6 | `phoneBooth` |
@@ -511,7 +514,7 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `hydrant` | Fire hydrant (pillar) | 0.25–0.5 × 0.6–1 × 0.25–0.5 |  | (firefighters connect hoses) |  |  | hydrant, hydrantNj | `street.hydrant` |
 | `wheelieBin` | Wheelie bin (120-240 L) | 0.48–0.6 × 0.93–1.1 × 0.55–0.75 |  | put the rubbish out; wheel it to the kerb |  | lid 180–270° | bin240 | `street.bin` |
 | `streetSign` | Street-name sign on posts | 0.6–1.2 × 2–3 × 0.05–0.9 |  | read the street name *(decor)* |  |  | neufert | `model.street.sign` |
-| `busStopSign` | Bus stop flag on a pole | 0.3–0.6 × 2.3–3 × 0.05–0.2 |  | check the bus stop *(decor)* |  |  | neufert | `model.street.busSign` |
+| `taxiRankSign` | Taxi rank sign on a pole | 0.3–0.6 × 2.3–3 × 0.05–0.2 |  | find the taxi rank *(decor)* |  |  | neufert | `model.street.taxiSign` |
 | `pathLight` | Garden path light (bollard) | 0.1–0.25 × 0.3–1 × 0.1–0.25 |  | light the path at night |  |  | neufert | `model.street.pathLight` |
 
 ### Farm
@@ -652,6 +655,10 @@ Every kind cites at least one of these keys. Several are retailer or guide pages
 | `dimLaundry` | [Dimensions.com, Whirlpool front-load washer and dryer 99 x 69 x 79-84 cm; stacked 198 cm](https://www.dimensions.com/element/laundry-machines-whirlpool-front-load-washer-dryer) |
 | `dimDishwasher` | [Dimensions.com, Bosch 24 in dishwasher (60 x 86 x 60 cm); 18 in models 45 cm wide](https://www.dimensions.com/element/bosch-500-series-pocket-handle-dishwasher-24) |
 | `dimExBike` | [Dimensions.com, Exercise bicycles](https://www.dimensions.com/element/exercise-bicycles) |
+| `bikeInsightsCity` | [Bike Insights, 2017 Liv Alight City M geometry: 1763 mm long with tyres, 620 mm bars, 700C wheels](https://bikeinsights.com/bike-geometries/693081232e0f8a001a14cc87-2017-liv-cycling-alight-city-m) |
+| `argosKids14` | [Argos, Pedal Pals 14 in kids' bike with stabilisers: assembled H 71 x W 49 x L 99 cm](https://www.argos.co.uk/product/8380368) |
+| `nbcScooter` | [Notebookcheck, Xiaomi Mi Electric Scooter 3 review: 108 x 43.5 x 114 cm unfolded, 8.5 in wheels](https://www.notebookcheck.net/Xiaomi-Mi-Electric-Scooter-3-in-review-Proven-e-scooter-with-two-points-of-criticism.690490.0.html) |
+| `ldlcScooter4` | [LDLC, Xiaomi Electric Scooter 4: 1143 x 480 x 1170 mm unfolded, 10 in wheels](https://ldlc.com/en/product/PB00552087.html) |
 | `dimPicnic` | [Dimensions.com, Rectangular picnic table: 183 x 149 x 77 cm, bench 43 cm](https://www.dimensions.com/element/rectangular-picnic-table) |
 | `dimBench` | [Dimensions.com, Plank bench: benches 46-51 cm high; 127 cm seats two](https://www.dimensions.com/element/plank-bench) |
 | `dimDrinkware` | [Dimensions.com, Drinkware (wine glasses 15.5-26.4 cm, IKEA 365+ mug 7 x 10.5 cm)](https://www.dimensions.com/collection/drinkware) |

@@ -130,6 +130,7 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `footstool` | A footstool (a pouf, an ottoman): the feet go up on it from a seat in front, and someone sitting down alone on a sofa takes the seat with one 0.3–1.2 m in front of it. Default `false`. |
 | `provides` | Things it provides while it works, for interactions elsewhere on the same lot that list them in `requires`: `["coffee"]` for a coffee machine. A broken object provides nothing. |
 | `staff` | Someone serves here on a public lot (a vendor, a shopkeeper, the baker, a barista): `{"at": [0, -0.85], "hours": [10, 20]}`. `at`: where they stand, metres off the footprint's middle to its right and front before turning, as `places` (behind it: a negative front; within 1.5 m of the footprint); `hours`: when it's open, `[from, to]` (0 to 24, past midnight when `from` is later). Its uses with `selfServe` are then sold: the customer comes to the front and waits for the server, who serves one at a time, first come first served (`service.waitMinutes` at most, then they give up); while they're served the use runs, drawn as ordering, being handed it and paying (`buy`, the server's `sell`), and outside the hours it's closed (last orders: someone who set off while it was open and gets there within half an hour of closing is still served; otherwise residents don't choose it, the order fails with "the ice cream cart is closed: it opens at 10:00", the pie menu greys it out and says when). Posts on one lot within `service.share` metres of each other, with a straight walk between, share a server who steps over (the café's counter and coffee machine). Nobody serves where there's no room for them (`at` on a wall, another thing or off the lot) nor on a household's own lot: there the uses are self-serve, as `selfServe` says. The staff aren't residents: they need no slot, have no needs and aren't saved (a town has at most 32). Code: `crates/sim-core/src/staff.rs`. Default: nobody. |
+| `vehicle` | Something to ride to work or school (a bike, an e-scooter): `{"kind": "bike", "speed": 3, "stages": ["teen", "youngAdult", "adult", "elder"], "minRide": 60, "roadsOnly": false, "reach": [1.2, 0.6, 0.3]}`. It stands on the household's lot; a resident off to work or school with no seat in the household's car takes the fastest free one at home their life stage rides (`stages`; absent: everyone), if their way out of town is longer than `minRide` metres (default 60): they walk to it, get on and ride out at `speed` times walking pace (1 to 10), and back home to its place. `kind`: how the rider is drawn on it, `bike` (sat, pedalling) or `scooter` (stood on its deck); the renderer draws the models it knows (`shared/characters/vehicles.ts`: `bicycle`, `bicycleChild`, `eScooter`). `roadsOnly` is read but not yet kept to. `reach`: ridden, how far it reaches in front of its rider, behind them and out to each side (m: its front wheel, its back wheel, its handlebars; 0 to 3 each), which cars and work taxis keep clear of and which keeps its rider out of them (default: as far as someone on foot, 0.25 all round). Riding isn't saved. Code: `crates/sim-core/src/ride.rs`. Default: not ridden. |
 | `stores` | Fridges: keeps leftovers. Food served where no surface is free goes in, and keeps longer there (`cooking.storedSpoilHours`). Default `false`. |
 | `grows` | A crop (or a fruit tree's fruit: the apple and lemon trees, `"fallow": 0`, picked bare and fruiting again over `days`): `{"days": 2, "fallow": 0.5}`. Bought, it is just planted and ripens over `days`; one in a lot's or a house's file comes ripe. An interaction with `"leaves": "picked"` (the harvest) picks it as the use starts, and one with `"when": "ripe"` is offered only while it's ripe (the order fails with "the … isn't ripe yet"; residents don't choose it). Picked, it lies fallow for `fallow` game days (default 0.5), is planted again by itself and ripens over `days` (sooner for uses with `tends`), showing as just planted for the first third, then growing. Saved. Its model's `motions.growth` clip shows the stage (docs/design/objects.md, "Moving parts"). |
 | `freeRotation` | `true` lets the player turn it to any angle in 15° steps, only for looks. (Anything but stairs stands anywhere on its tiles, in quarter tiles or to the centimetre with Shift, as long as no wall, straight or diagonal, runs through its body: see `offset` in a town's `objects`.) Default: 1×1 objects not on a wall whose category is listed in `objectRules.freeRotation` (base game: `decor`, `garden`, `outdoor`, `lighting`, `kids`, `community`). |
@@ -289,6 +290,40 @@ be joined by up to two others nearby, who listen and fill their needs by its `ta
 When it goes well, those listening get its `targetFeeling`, and everyone there gains
 `socialRules.joinFriendship` friendship with everyone else (default 2; the two talking get
 their social's outcome with each other instead).
+
+**Visitors at the door** (`visits.door`: `waitMinutes`, `welcomeFriendship`, `greet`,
+`turnedAwayFeeling`, `knockAnim`): a visitor knocks and a grown-up of the household who is home and
+awake answers, before the next step of a routine; one busy (in a conversation, say) comes once
+free, and while someone awake is home the visitor waits three times `waitMinutes` for them, else
+`waitMinutes`, then goes home. Residents set off on a visit of their own choosing only to a home
+with someone to let them in, and, on their own or invited over the phone, only when the way takes
+45 minutes at most and gets them there before `visits.latestHour` (on their own, with time for
+the way back and three quarters of an hour there before they leave for work or school); the visit's `hours`
+count from when they're let in. In an open-world town they go on outings too, to a public place
+out of `autonomy.reach`: only one the way to takes `visits.outingMinutes` at most (default 90), with
+time for the way there, an hour there and the way back before they leave for work or school and
+before `visits.outingHomeBy` o'clock (default 23); the outing's `hours` count from when they get
+there, and it ends in time to be home by that hour. A visit or an outing is timed the way they'd go:
+past `autonomy.reach`, a grown-up owner with the household's car at home drives when there's
+parking near; else, for a ride of its `minRide` or more, they take the fastest thing at home
+with a `vehicle` that fits them (a city bike, an e-scooter), ride it there at its `speed`, leave it
+by the place and ride it home; else they walk. Once there (let in, or at the place) a guest stays
+`visits.leastMinutes` at least (default 0) unless a need is below `autonomy.urgentBelow`, it's late
+or the hosts go, and they don't set off on a visit or an outing with a need that would be below
+0.15 by then with nothing there for it; back home from one, not on another of their own for
+`visits.againMinutes` (default 0).
+
+**A host's offer:** with `visits.offer` (`{"social", "afterMinutes", "againMinutes",
+"handAnim"}`; base game: *Offer a bite to eat*), a free host asks a guest who has nothing in
+hand and isn't eating if they'd like something, `afterMinutes` (default 15) after the guest
+came in and again every `againMinutes` (default 120), only with something at home to bring: an
+`eat` use a guest could have themselves, free of charge (the fridge's snack, the toaster's
+toast), the one that would do the guest the most good. The social must have `"effect":
+"serve"` on success (an error otherwise) and isn't in the social menu. A social's acceptance
+may weigh how short the target is of needs (`"acceptance": {"needs": {"hunger": 1.2}}`: per
+unit of 1 − the need), so a hungry guest says yes. Taken up, the host takes it out, carries it
+to the guest and hands it over (`handAnim`), and the guest sits down with it; the plate is
+the host's to wash up, and the story tells it (`served`). Code: `crates/sim-core/src/hosting.rs`.
 
 **Adding a tag:** reuse an existing tag whenever it fits. Add one only if a trait, emotion,
 schedule or buff must tell your objects apart. A tag exists once any interaction uses it;
@@ -494,7 +529,9 @@ them harder. For `own`, residents pick what suits them (their traits' liked tags
 after, somewhere for a planned activity, or a better one of something they have), save up, and
 once they can afford it with a week's rent and bills left over they ask the player
 (`askAgainDays` after a no; `wishFeeling` on getting it; `deniedFeelings` from the second no for
-the same thing on). Households nobody plays buy it themselves.
+the same thing on). A yes pays for it, and it comes as a parcel to the front door that the one who
+asked carries in and sets up where it goes (`objectRules.setUp`, below); the goal is reached once it
+stands at home. Households nobody plays buy it themselves, and it's there at once.
 `weight` plus per-trait `traits` weights decide how often residents suggest them; `feeling`
 (optional) is granted on reaching it.
 
@@ -533,7 +570,18 @@ woken. They do the crib's care interactions for each of those needs under `tendB
 (default 0.6), and those woken go back to bed, with the `feeling` (optional); the same baby
 calls nobody again for `cooldownMinutes` (default 90). The base game wakes for hunger, bladder
 and hygiene.
+**The work taxi:** in an open-world town, someone off to work or school whose way out of town on foot takes longer than `taxi.minWalkMinutes` (default 10), with no seat in a car and no bike for a ride out of 90 minutes at most, rides a taxi when it gets them out sooner than the walk: colleagues (one career, one way out) whose work starts within `taxi.window` minutes (default 15) share one, `taxi.seats` (1 to 4, default 4) a taxi; it waits `taxi.waitMinutes` (default 2) at a rider's kerb (code: `crates/sim-core/src/taxi.rs`).
 **Jobs:** `careerRules.market` turns on residents finding, quitting and losing jobs on their own.
+A promotion takes a full performance bar (100) and the next grade's skills. A shift worked fills
+the bar by `performancePerShift` (default 12) at the entry grade, for a resident who left for work
+in a middling mood (0.5) with just the skills the job asks for; up to `performancePerMood` (default
+15) more in the best mood and as much less in the worst, and `performancePerFit` (default 0) for
+each skill level above the requirements (less for each short, three at most); a shift worked
+never takes any off. Arriving more than `lateGraceMinutes` (default 0) after the start, the shift
+counts `lateShare` (0 to 1, default 1: in full). Each grade up, a shift counts less: divided by
+1 + grade × `performanceSlowdown` (0 to 2, default 0: the same at every grade), as does
+`missedPenalty` (default 20), taken off for a shift missed. The base game fills it in 4 or 5
+workdays at grade A, 7 to 10 at the top.
 **Story texts** (`events`): `promoted` (`{job}`: the new title, `{money}`: the bonus of half a
 week at the new grade); `promotedEarlier` for promotions in saves from before the bonus, which
 name neither.
@@ -727,6 +775,16 @@ per hour) and `away` (its target at work); `preference` (how much the AI prefers
 `objectRules.repair`: `label`, `minutes`, `skill`, `skillGainPerHour`, `chance`,
 `chancePerLevel`, `interest`, `cost` as a share of the price for the paid quick fix, `tags`).
 
+**Setting up what a resident asked for** (`objectRules.setUp`: `label`, the action's first word,
+"Set up the new …"; `fetchMinutes` picking the parcel up at the front door, with `fetchAnim`;
+`minutes` putting it together where it goes, with `anim`; `parcel`, the item carried in both
+hands, none for nothing; `helpAfterHours`, after which any grown-up at home may do it instead of
+the one who asked; `waitHours`, after which it's set up for them anyway; `tags`). Defaults: 15
+minutes of `tinker`, 1.5 of `serve`, 2 and 24 hours. Only what the player says yes to (the
+catalog in Build mode places things at once). **Story texts** (`events`): `setUp` (`{a}` set up
+the new `{object}`), `setUpForThem` (after `waitHours`) and `sentBack` (no room for it at home: it
+goes back to the shop, the money too). Code: `crates/sim-core/src/setup.rs`.
+
 **Laundry** (`laundry`: `{"perDay": 0.4, "most": 4}`): each resident in town makes `perDay` loads
 of dirty washing a day for their household, up to `most` loads waiting (dirty, washed waiting to
 dry, and dried waiting to be folded, each). An interaction with `"workOn"` takes a load of its kind
@@ -767,7 +825,7 @@ down with it (a chair at a table, then a table with seats of its own, then any s
 `cooking.seatTags`, else standing), eats, and leaves a dirty plate on the table (whoever takes the last serving from the fridge
 puts the empty pot down next to it, to be washed up). Someone
 clears away later (a chore, like tidying up): they pick up the dish and the dirty things next to
-it, up to `carryDishes` at a time, scrape any food off into a `bin` station (the pedal bin; with
+it, up to `carryDishes` of one kind at a time, scrape any food off into a `bin` station (the pedal bin; with
 none, at the sink), wash up at a sink or dishwasher and put the clean things away in the nearest cupboard or
 counter (`putAwayAt`; a wall cabinet over a counter first; with none, from the sink). Food goes off after `spoilHours` (`storedSpoilHours` in a fridge), and
 dirty or spoilt things slowly make their room dirty. The player can order any of it: clicking a
@@ -805,7 +863,7 @@ optional; a long recipe tempts them less, a hungry family more, and food already
 at all (`leftoverPreference`: they eat that first). Many homes have only a fridge and a sink:
 keep the prep and cooking steps of everyday recipes optional, and fetching the ingredients
 the shortest step (3 minutes in the shipped ones). A station that's busy is waited
-for (`stationWaitMinutes`), then done without (optional steps) or given up (others). Quick food
+for (`stationWaitMinutes`), then done without (optional steps), or for three times that and then given up (others). Quick food
 (a snack, toast, reheating) isn't a recipe but an interaction with `eat`: fetched or made at the
 object, then eaten sitting down like a dish (it has a hidden recipe of its own, which the
 game makes, so a plate in someone's hands survives a reload). Drinks (a coffee, a soda) stay
@@ -814,7 +872,8 @@ plain interactions.
 **`items`**: `{ "id": "mealPot", "label": "Home-cooked meal", "model": "item.mealPot", "hold": "both", "serving": "mealPlate", "emptyAs": "potDirty", "radius": 0.16 }`.
 `label` names it ("Eat Home-cooked meal"); `model` is its asset key; `hold` is `hand` or
 `both`; taking a serving gives a `serving` (a plate) and an empty dish becomes `emptyAs`;
-`dirty` things are washed up; `radius` is the disc it takes on a surface. Ingredients and bowls
+`dirty` things are washed up, and two or more carried at once (an armful of one kind: plates with plates,
+a pot on its own) are shown as their `stackAs` item if they have one (dirty plates as a stack); `radius` is the disc it takes on a surface. Ingredients and bowls
 are only carried (they're used up). Items aren't objects: they belong to a household, keep
 their place on the surface they stand on (moving the table carries them, selling it throws
 them away) and are saved with the game.
@@ -832,6 +891,7 @@ dining table this near on their storey, one with a chair pulled up to it or seat
 one first for an outdoor recipe, and serves it there; with none, it's served within `serveRange`),
 `serveMinutes` 1, `serveAnim` (`serve`) and `serveLabel` ("Serve it": putting it down on the table), `eatLabel`, `eatTags` (`food`), `eatAnim` (`eat`),
 `dishesLabel`, `dishesTags` (`chores`, `cleaning`), `dishesAnim` (`wash`), `dishesInterest` 0.6,
+`pickUpMinutes` 0.75 (picking an armful up off the table, bent over it with `serveAnim`),
 `scrapeMinutes` 1 (per thing with food on it) and `scrapeAnim` (`clean`), `putAwayMinutes` 2 (per
 armful), `putAwayAnim` (`fetch`) and `putAwayAt` (stations: the nearest, on a tie the first listed; `prep`; the
 base game has `cupboard`, `prep`).
@@ -1073,6 +1133,8 @@ keys share these objects. The rules:
 | A grade's `payPerHour` | 0 to 10000 | pay becomes shift pay and promotion bonuses; a huge one overflowed the sum |
 | `payFactor` (a career category's, a track's) | 0.25 to 3 | past that a track's pay no longer resembles its field |
 | `careerRules.probationLevels` | 0 to 1 | a shortfall of more than a level is never close enough to hire on probation |
+| `careerRules.performanceSlowdown` | 0 to 2 | below 0 later grades would come quicker; past 2 the top grade's shifts count for almost nothing |
+| `careerRules.lateShare` | 0 to 1 | what a late shift counts for, from nothing to a full shift |
 
 At run time the game also keeps needs between 0 and 1, and friendship and romance within ±100,
 whatever the content says; a score that isn't a number is never chosen. The hours of the

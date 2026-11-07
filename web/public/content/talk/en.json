@@ -127,7 +127,8 @@
     "apologize": { "start": "{me} apologises to {name}.", "reply": "{name} apologises to {me}" },
     "tryForBaby": { "start": "{me} tells {name} they would love a baby together.", "reply": "{name} says they would love a baby with {me}" },
     "goodbyeHug": { "start": "{me} hugs {name} goodbye before going home.", "reply": "{name} hugs {me} goodbye before going home" },
-    "goodbye": { "start": "{me} says goodbye to {name} before going home.", "reply": "{name} says goodbye to {me} before going home" }
+    "goodbye": { "start": "{me} says goodbye to {name} before going home.", "reply": "{name} says goodbye to {me} before going home" },
+    "offer": { "start": "{me} asks their guest {name} if they would like something to eat.", "reply": "{name} asks {me}, their guest, if they would like something to eat" }
   },
   "outcome": { "good": ", and {me} likes it.", "bad": ", and {me} doesn't like it." },
   "use": "{me} is about to {action}.",

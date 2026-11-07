@@ -46,8 +46,14 @@
         "carrot": {
           "finish": "material.finish.satin"
         },
+        "heap": {
+          "finish": "material.finish.matte"
+        },
         "pea": {
           "finish": "material.finish.satin"
+        },
+        "pepper_red": {
+          "finish": "material.finish.gloss"
         },
         "potato": {
           "finish": "material.finish.matte"
@@ -235,14 +241,24 @@
       "type": "model",
       "url": "../../models/held/bakingTray.glb",
       "materials": {
-        "bun": {
+        "chocolate": {
           "finish": "material.finish.satin"
         },
-        "bun_base": {
+        "cookie": {
           "finish": "material.finish.matte"
         },
-        "bun_dark": {
+        "cupcake_case": {
           "finish": "material.finish.satin"
+        },
+        "icing": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "tomato": {
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
         },
         "tray": {
           "finish": "material.finish.metal"
@@ -256,11 +272,17 @@
         "burnt": {
           "finish": "material.finish.matte"
         },
-        "crumb": {
+        "chocolate": {
+          "finish": "material.finish.satin"
+        },
+        "cookie": {
           "finish": "material.finish.matte"
         },
         "grease": {
           "finish": "material.finish.matte"
+        },
+        "icing": {
+          "finish": "material.finish.satin"
         },
         "tray": {
           "finish": "material.finish.metal"
@@ -480,14 +502,8 @@
         "carrot_core": {
           "finish": "material.finish.satin"
         },
-        "grip": {
-          "finish": "material.finish.satin"
-        },
         "pea": {
           "finish": "material.finish.satin"
-        },
-        "steel": {
-          "finish": "material.finish.metal"
         }
       }
     },
@@ -576,9 +592,6 @@
         "chocolate": {
           "finish": "material.finish.satin"
         },
-        "steel": {
-          "finish": "material.finish.metal"
-        },
         "strawberry": {
           "finish": "material.finish.satin"
         },
@@ -604,7 +617,7 @@
           "finish": "material.finish.satin"
         },
         "melt": {
-          "finish": "material.finish.matte"
+          "finish": "material.finish.satin"
         },
         "steel": {
           "finish": "material.finish.metal"
@@ -669,9 +682,6 @@
       "type": "model",
       "url": "../../models/held/noodles.glb",
       "materials": {
-        "chopstick": {
-          "finish": "material.finish.satin"
-        },
         "lettuce": {
           "finish": "material.finish.satin"
         },
@@ -1009,9 +1019,6 @@
         "cup_stripe": {
           "finish": "material.finish.matte"
         },
-        "paddle": {
-          "finish": "material.finish.matte"
-        },
         "strawberry": {
           "finish": "material.finish.satin"
         },
@@ -1093,6 +1100,9 @@
       "type": "model",
       "url": "../../models/held/cakeSlice.glb",
       "materials": {
+        "berry_seed": {
+          "finish": "material.finish.satin"
+        },
         "cake_berry": {
           "finish": "material.finish.gloss"
         },
@@ -1107,6 +1117,9 @@
         },
         "china_well": {
           "finish": "material.finish.gloss"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
         },
         "sponge": {
           "finish": "material.finish.matte"
@@ -1304,6 +1317,369 @@
           "finish": "material.finish.satin"
         },
         "stem_green": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "item.freshPlate": {
+      "type": "model",
+      "url": "../../models/held/freshPlate.glb",
+      "materials": {
+        "china": {
+          "finish": "material.finish.gloss"
+        },
+        "china_well": {
+          "finish": "material.finish.gloss"
+        },
+        "cucumber": {
+          "finish": "material.finish.satin"
+        },
+        "cucumber_flesh": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "lettuce": {
+          "finish": "material.finish.satin"
+        },
+        "lettuce_pale": {
+          "finish": "material.finish.satin"
+        },
+        "radish": {
+          "finish": "material.finish.gloss"
+        },
+        "radish_white": {
+          "finish": "material.finish.satin"
+        },
+        "tomato": {
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
+        },
+        "tomato_flesh": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "item.plateStackDirty": {
+      "type": "model",
+      "url": "../../models/held/plateStackDirty.glb",
+      "materials": {
+        "china": {
+          "finish": "material.finish.gloss"
+        },
+        "china_well": {
+          "finish": "material.finish.gloss"
+        },
+        "crumb": {
+          "finish": "material.finish.matte"
+        },
+        "lettuce": {
+          "finish": "material.finish.satin"
+        },
+        "pea": {
+          "finish": "material.finish.satin"
+        },
+        "smear": {
+          "finish": "material.finish.matte"
+        },
+        "smear_sauce": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      }
+    },
+    "tool.biteSandwich": {
+      "type": "model",
+      "url": "../../models/held/biteSandwich.glb",
+      "materials": {
+        "bread": {
+          "finish": "material.finish.matte"
+        },
+        "cheese": {
+          "finish": "material.finish.satin"
+        },
+        "crust": {
+          "finish": "material.finish.matte"
+        },
+        "lettuce": {
+          "finish": "material.finish.satin"
+        },
+        "tomato": {
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
+        }
+      }
+    },
+    "tool.biteToast": {
+      "type": "model",
+      "url": "../../models/held/biteToast.glb",
+      "materials": {
+        "bread": {
+          "finish": "material.finish.matte"
+        },
+        "butter": {
+          "finish": "material.finish.satin"
+        },
+        "toast": {
+          "finish": "material.finish.matte"
+        },
+        "toast_crust": {
+          "finish": "material.finish.matte"
+        }
+      }
+    },
+    "tool.bitePizza": {
+      "type": "model",
+      "url": "../../models/held/bitePizza.glb",
+      "materials": {
+        "cheese_brown": {
+          "finish": "material.finish.satin"
+        },
+        "dough": {
+          "finish": "material.finish.matte"
+        },
+        "dough_baked": {
+          "finish": "material.finish.matte"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "mozzarella": {
+          "finish": "material.finish.satin"
+        },
+        "pepperoni": {
+          "finish": "material.finish.satin"
+        },
+        "sauce": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "tool.biteCookie": {
+      "type": "model",
+      "url": "../../models/held/biteCookie.glb",
+      "materials": {
+        "chocolate": {
+          "finish": "material.finish.satin"
+        },
+        "cookie": {
+          "finish": "material.finish.matte"
+        }
+      }
+    },
+    "tool.biteBurger": {
+      "type": "model",
+      "url": "../../models/held/biteBurger.glb",
+      "materials": {
+        "bun": {
+          "finish": "material.finish.satin"
+        },
+        "bun_base": {
+          "finish": "material.finish.matte"
+        },
+        "cheese": {
+          "finish": "material.finish.satin"
+        },
+        "lettuce": {
+          "finish": "material.finish.satin"
+        },
+        "patty": {
+          "finish": "material.finish.satin"
+        },
+        "sesame": {
+          "finish": "material.finish.satin"
+        },
+        "tomato": {
+          "finish": "material.finish.gloss",
+          "roughness": 0.3
+        }
+      }
+    },
+    "tool.biteHotDog": {
+      "type": "model",
+      "url": "../../models/held/biteHotDog.glb",
+      "materials": {
+        "bun": {
+          "finish": "material.finish.satin"
+        },
+        "ketchup": {
+          "finish": "material.finish.satin"
+        },
+        "mustard": {
+          "finish": "material.finish.satin"
+        },
+        "sausage": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "tool.biteCracker": {
+      "type": "model",
+      "url": "../../models/held/biteCracker.glb",
+      "materials": {
+        "cheese": {
+          "finish": "material.finish.satin"
+        },
+        "cheese_cut": {
+          "finish": "material.finish.satin"
+        },
+        "cracker": {
+          "finish": "material.finish.matte"
+        }
+      }
+    },
+    "tool.biteCroissant": {
+      "type": "model",
+      "url": "../../models/held/biteCroissant.glb",
+      "materials": {
+        "pastry_baked": {
+          "finish": "material.finish.matte"
+        }
+      }
+    },
+    "tool.biteCrisps": {
+      "type": "model",
+      "url": "../../models/held/biteCrisps.glb",
+      "materials": {
+        "crisp": {
+          "finish": "material.finish.matte"
+        }
+      }
+    },
+    "tool.knife": {
+      "type": "model",
+      "url": "../../models/held/knife.glb",
+      "materials": {
+        "grip": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      }
+    },
+    "tool.woodenSpoon": {
+      "type": "model",
+      "url": "../../models/held/woodenSpoon.glb",
+      "materials": {
+        "spoon": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "tool.spatula": {
+      "type": "model",
+      "url": "../../models/held/spatula.glb",
+      "materials": {
+        "grip": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      }
+    },
+    "tool.whisk": {
+      "type": "model",
+      "url": "../../models/held/whisk.glb",
+      "materials": {
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      }
+    },
+    "item.bbqPlate": {
+      "type": "model",
+      "url": "../../models/held/bbqPlate.glb",
+      "materials": {
+        "butter": {
+          "finish": "material.finish.satin"
+        },
+        "char": {
+          "finish": "material.finish.matte"
+        },
+        "china": {
+          "finish": "material.finish.gloss"
+        },
+        "china_well": {
+          "finish": "material.finish.gloss"
+        },
+        "corn": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "patty": {
+          "finish": "material.finish.satin"
+        },
+        "sausage": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "item.tastingPlate": {
+      "type": "model",
+      "url": "../../models/held/tastingPlate.glb",
+      "materials": {
+        "cheese": {
+          "finish": "material.finish.satin"
+        },
+        "cheese_cut": {
+          "finish": "material.finish.satin"
+        },
+        "china": {
+          "finish": "material.finish.gloss"
+        },
+        "china_well": {
+          "finish": "material.finish.gloss"
+        },
+        "cracker": {
+          "finish": "material.finish.matte"
+        },
+        "grape": {
+          "finish": "material.finish.gloss"
+        },
+        "jam": {
+          "finish": "material.finish.gloss"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "salami": {
+          "finish": "material.finish.satin"
+        }
+      }
+    },
+    "tool.paddle": {
+      "type": "model",
+      "url": "../../models/held/paddle.glb",
+      "materials": {
+        "paddle": {
+          "finish": "material.finish.matte"
+        }
+      }
+    },
+    "item.parcel": {
+      "type": "model",
+      "url": "../../models/held/parcel.glb",
+      "materials": {
+        "carton": {
+          "finish": "material.finish.matte"
+        },
+        "carton_seam": {
+          "finish": "material.finish.matte"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "paper_red": {
+          "finish": "material.finish.matte"
+        },
+        "tape": {
           "finish": "material.finish.satin"
         }
       }

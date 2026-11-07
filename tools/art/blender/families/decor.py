@@ -1316,6 +1316,11 @@ def _curtains(w, top, bottom, gathered):
 # two. A rail runs past it, so the open curtains stack on the wall beside the glass, not over it: each pair's
 # `w` is the opening plus its two gathered panels (rails 1.22 and 2.38 m, 0.1-0.2 m past the footprint each side).
 # The window-height pairs hang from above the head (2.1 m) to just under the sill (0.9 m).
+# Past their footprint, along the wall, by design (`cargo check-glb`'s `footprint`):
+CURTAINS_ACCEPT = {'footprint': 'the rail runs past the window, its opening plus a gathered panel each side, so the '
+                                'open curtains stack on the wall beside the glass (decor.md, M-decor-02)'}
+
+
 def curtains():
     return _curtains(1.16, 2.45, 0.85, 0.2)
 
@@ -1526,11 +1531,11 @@ FAMILY = G.Family(
              motions={'uses': {'relax': 'flames'}}, paint=[('surround', 'Surround'), ('oak', 'Mantel')]),
      # D3. Textiles
      G.Model('curtains', curtains, size=(1.288, 1.674, 0.104), key='model.curtains', centre=(0, -0.378),
-             floor=False, motions={'night': 'close'}, paint=[('linen', 'Fabric'), ('rail', 'Rail')]),
+             floor=False, motions={'night': 'close'}, paint=[('linen', 'Fabric'), ('rail', 'Rail')], accept=CURTAINS_ACCEPT),
      G.Model('curtainsWide', curtainsWide, size=(2.448, 1.674, 0.104), key='model.curtainsWide', centre=(0, -0.378),
-             floor=False, motions={'night': 'close'}, paint=[('linen', 'Fabric'), ('rail', 'Rail')]),
+             floor=False, motions={'night': 'close'}, paint=[('linen', 'Fabric'), ('rail', 'Rail')], accept=CURTAINS_ACCEPT),
      G.Model('curtainsLong', curtainsLong, size=(2.448, 2.584, 0.104), key='model.curtainsLong', centre=(0, -0.378),
-             floor=False, motions={'night': 'close'}, paint=[('linen', 'Fabric'), ('rail', 'Rail')]),
+             floor=False, motions={'night': 'close'}, paint=[('linen', 'Fabric'), ('rail', 'Rail')], accept=CURTAINS_ACCEPT),
      G.Model('rugRound', rugRound, size=(1.9, 0.019, 1.9), key='model.rugRound', paint=[('rug', 'Rug')]),
      G.Model('rugLarge', rugLarge, size=(2.85, 0.019, 1.85), key='model.rugLarge', paint=[('rug', 'Rug')]),
      G.Model('rugRunner', rugRunner, size=(0.8, 0.019, 2.8), key='model.rugRunner', paint=[('rug', 'Rug')]),

@@ -25,22 +25,37 @@ fn countryside(w: &World, object: u32) -> Option<&str> {
 
 #[test]
 fn residents_use_the_countryside_spots() {
-    let mut w = world(41);
-    let mut used = std::collections::BTreeSet::new();
-    let end = w.tick + 3 * 24 * 60 * TICKS_PER_MINUTE;
-    while w.tick < end {
-        w.tick_once();
-        for s in &w.sims {
-            if let Some(a) = s.current()
-                && let (TaskKind::Use { object, .. }, Phase::Using { .. }) = (a.task.kind, &a.phase)
-                && let Some(id) = countryside(&w, object)
-            {
-                used.insert(id.to_string());
+    // Over three days in each of four towns: the residents of three of them at least go out to the
+    // countryside, and between them to at least three different spots. (One town alone is a coin
+    // toss: whether and which spots its handful of residents fancy in three days turns on any
+    // change to their timing, as their walks to work.)
+    let mut all = std::collections::BTreeSet::new();
+    let mut towns = 0;
+    for seed in 41..45 {
+        let mut w = world(seed);
+        let mut used = std::collections::BTreeSet::new();
+        let end = w.tick + 3 * 24 * 60 * TICKS_PER_MINUTE;
+        while w.tick < end {
+            w.tick_once();
+            for s in &w.sims {
+                if let Some(a) = s.current()
+                    && let (TaskKind::Use { object, .. }, Phase::Using { .. }) =
+                        (a.task.kind, &a.phase)
+                    && let Some(id) = countryside(&w, object)
+                {
+                    used.insert(id.to_string());
+                }
             }
         }
+        eprintln!("town {seed}: countryside spots used over three days: {used:?}");
+        towns += usize::from(!used.is_empty());
+        all.extend(used);
     }
-    eprintln!("countryside spots used over three days: {used:?}");
-    assert!(used.len() >= 3, "only {used:?}");
+    assert!(
+        towns >= 3,
+        "only {towns} of 4 towns went out to the countryside"
+    );
+    assert!(all.len() >= 3, "only {all:?}");
 }
 
 #[test]

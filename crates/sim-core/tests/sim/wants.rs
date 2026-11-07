@@ -3,23 +3,19 @@
 
 use crate::common;
 
-use common::run_to;
+use common::{apply, run_to};
 
 use serde_json::json;
 use sim_core::content::Layer;
 use sim_core::planner::{self, GoalKind};
 use sim_core::social::EventKind;
-use sim_core::{Command, World, clock};
+use sim_core::{World, clock};
 
 /// A town with one newcomer (resident 0) in the player's house; free will on.
 fn town(seed: u64) -> World {
     let content = common::content();
     let file = common::town(&content, seed, 1);
     World::from_json(&content, &file, seed as u32).unwrap()
-}
-
-fn apply(w: &mut World, cmd: serde_json::Value) -> Result<(), sim_core::Error> {
-    w.apply(Command::from_json(&cmd.to_string()).unwrap())
 }
 
 /// Keeps resident `i` home and free (no job, no job hunting).
@@ -63,6 +59,16 @@ fn wants(w: &mut World, object: usize) {
     w.households[h].funds = 50_000;
 }
 
+/// Ticks on until what was bought is set up at home (`setup.rs`: carried in from the door and put
+/// together, or set up for them within a day).
+fn set_up(w: &mut World) {
+    let minutes = ((w.content.object_rules.set_up.wait_hours + 1.0) * 60.0) as u64;
+    assert!(
+        common::until(w, minutes, |w| w.setups.is_empty()),
+        "what was bought is set up"
+    );
+}
+
 fn review(w: &mut World) {
     let day = clock::day(w.tick) + 1;
     run_to(w, day, w.content.planner.review_hour + 0.1);
@@ -90,6 +96,9 @@ fn they_ask_for_what_they_want_and_a_yes_buys_it() {
 
     let before = w.households[h].funds;
     apply(&mut w, json!({"type": "acceptPurchase", "sim": 0})).unwrap();
+    // (On its way: carried in and set up, `setup.rs`.)
+    assert!(!planner::has_at_home(&w, h, object));
+    set_up(&mut w);
     assert!(planner::has_at_home(&w, h, object));
     assert_eq!(
         w.households[h].funds,
@@ -247,6 +256,7 @@ fn a_better_one_replaces_the_old() {
     wants(&mut w, new);
     review(&mut w);
     apply(&mut w, json!({"type": "acceptPurchase", "sim": 0})).unwrap();
+    set_up(&mut w);
     assert_eq!(count(&w, new), 1);
     assert_eq!(count(&w, old), olds - 1, "the old one was sold");
 }
@@ -338,6 +348,7 @@ fn buy_both(w: &mut World, id: &str) {
         "Ada asks for the {id}"
     );
     apply(w, json!({"type": "acceptPurchase", "sim": 0})).unwrap();
+    set_up(w);
     for h in 0..2 {
         assert!(
             planner::has_at_home(w, h, w.content.object_index(id).unwrap()),
@@ -394,6 +405,7 @@ fn a_bigger_one_that_wont_fit_their_spot_goes_its_own_way() {
     .unwrap();
     review(&mut w);
     apply(&mut w, json!({"type": "acceptPurchase", "sim": 0})).unwrap();
+    set_up(&mut w);
     let home = at_home(&w, 0);
     assert!(home.contains(&"bedDouble"), "the new bed came in: {home:?}");
     assert!(!home.contains(&"bed"), "and the old one was sold: {home:?}");
@@ -706,6 +718,7 @@ fn outdoor_things_go_outside_and_pot_plants_inside() {
         wants(&mut w, def);
         review(&mut w);
         apply(&mut w, json!({"type": "acceptPurchase", "sim": 0})).unwrap();
+        set_up(&mut w);
         assert_eq!(where_is(&w, def) == outdoors, outside, "{id}");
     }
 }

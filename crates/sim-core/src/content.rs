@@ -31,6 +31,11 @@ const PAY_FACTOR: RangeInclusive<f32> = 0.25..=3.0;
 /// How short of the level a job is hired at on probation: more than a level is never close enough,
 /// and a negative shortfall would ask for skills above the job's own.
 const PROBATION: RangeInclusive<f32> = 0.0..=1.0;
+/// `careerRules.performanceSlowdown`: below 0 later grades would come quicker; past 2 the top
+/// grade's shifts count for almost nothing.
+const PERFORMANCE_SLOWDOWN: RangeInclusive<f32> = 0.0..=2.0;
+/// `careerRules.lateShare`: what a late shift counts for, from nothing to a full shift.
+const LATE_SHARE: RangeInclusive<f32> = 0.0..=1.0;
 /// Bitmask of indices into `Content::tags`.
 pub type TagMask = u64;
 /// Bitmask of indices into `LifeRules::stages` (content `stages` rules: who may use what).
@@ -540,6 +545,37 @@ pub struct ObjectDef {
     /// Someone serves here on a public lot (content `staff`): where they stand behind it and the
     /// hours it's open (`staff.rs`).
     pub staff: Option<crate::staff::Post>,
+    /// Something to ride (content `vehicle`: a bicycle, an e-scooter): parked on the lot, a
+    /// resident of the household it fits rides it out to work or school and back (`ride.rs`).
+    pub vehicle: Option<Vehicle>,
+}
+
+/// What kind of thing is ridden (content `vehicle.kind`): how the rider is drawn on it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum VehicleKind {
+    /// Sitting and pedalling.
+    Bike,
+    /// Standing on its deck.
+    Scooter,
+}
+
+/// A thing to ride (`ObjectDef::vehicle`).
+#[derive(Debug, Clone, Copy)]
+pub struct Vehicle {
+    pub kind: VehicleKind,
+    /// How many times as fast as walking.
+    pub speed: f32,
+    /// Life stages that ride it.
+    pub stages: StageMask,
+    /// Ways shorter than this many metres are walked.
+    pub min_ride: f32,
+    /// Keeps to roads (an e-scooter): no trails.
+    pub roads_only: bool,
+    /// Ridden, how far it reaches in front of its rider and behind them, and out to each side
+    /// (m: its front wheel, its back wheel, its handlebars), for keeping clear of cars
+    /// (`cars::Body`). Unsaid: as far as someone on foot.
+    pub reach: [f32; 3],
 }
 
 impl ObjectDef {
@@ -1214,13 +1250,21 @@ pub struct CareerRules {
     pub commute_minutes: f32,
     /// How late a Sim may leave before the shift counts as missed.
     pub late_minutes: f32,
+    /// Performance lost for a missed shift (at the entry grade: less further up, as shifts count).
     pub missed_penalty: f32,
-    /// Performance gained per shift at neutral mood; mood shifts it up or down.
+    /// Performance a shift is worth at the entry grade, in a middling mood with just the skills
+    /// asked for (`life::shift_performance` puts it all together).
     pub performance_per_shift: f32,
     /// Extra performance per shift for each skill level above the requirements (or less below).
     pub performance_per_fit: f32,
     /// Extra performance per shift at full mood (and as much less at none).
     pub performance_per_mood: f32,
+    /// How much less a shift counts each grade up: worth / (1 + grade index × this). 0: the same
+    /// at every grade.
+    pub performance_slowdown: f32,
+    /// Arriving more than this many minutes after the start, a shift counts `late_share` as much.
+    pub late_grace_minutes: f32,
+    pub late_share: f32,
     /// How far below a job's requirements a Sim may still be hired (on probation).
     pub probation_levels: f32,
     /// Sorted by `fit`.
@@ -1455,6 +1499,18 @@ pub struct VisitRules {
     pub min_friendship: f32,
     pub earliest_hour: f32,
     pub latest_hour: f32,
+    /// An outing (open-world towns: a public place out of `autonomy.reach`) goes only where the
+    /// way takes this many minutes at most (`outingMinutes`: by car for one who'd drive there,
+    /// else on foot), and only with time there and the way back before `outing_home_by` o'clock
+    /// (`outingHomeBy`); its stay ends in time for that.
+    pub outing_minutes: f32,
+    pub outing_home_by: f32,
+    /// Once there (let in, or at the place), a guest stays this long at least (`leastMinutes`),
+    /// unless a need is about to run out (`autonomy.urgentBelow`), it's late or the hosts go.
+    pub least_minutes: f32,
+    /// Back home from a visit or an outing, they don't set off on another of their own for this
+    /// long (`againMinutes`).
+    pub again_minutes: f32,
     /// Tag mask used for schedule/trait preferences of visiting.
     pub tags: TagMask,
     /// Visitors knock and wait to be let in (`visits.door`); without it they walk straight in.
@@ -1471,6 +1527,21 @@ pub struct VisitRules {
     /// How long a leaving guest spends getting to a host to say goodbye (`farewellMinutes`):
     /// hosts further away than that aren't asked, and a goodbye not started by then is skipped.
     pub farewell_minutes: f32,
+    /// A host offers a guest something to eat or drink (`offer`; `hosting.rs`). None: they don't.
+    pub offer: Option<OfferRules>,
+}
+
+/// A host offering a guest something to eat or drink (`visits.offer`, `hosting.rs`).
+#[derive(Debug, Clone)]
+pub struct OfferRules {
+    /// What the host asks with (a social whose success has `"effect": "serve"`).
+    pub social: usize,
+    /// How long after the guest comes in the host first offers, and how long after an offer
+    /// (taken up or not) they offer again.
+    pub after_minutes: f32,
+    pub again_minutes: f32,
+    /// What the host is shown doing while handing it over (`handAnim`).
+    pub hand_anim: Option<usize>,
 }
 
 /// A visitor at the door: someone at home answers and lets them in or turns them away.
@@ -1521,6 +1592,7 @@ pub struct ObjectRules {
     /// Each quality level takes this share off wear per use.
     pub wear_per_quality: f32,
     pub repair: RepairRules,
+    pub set_up: SetUpRules,
     pub max_quality: u8,
     /// Need and skill gains grow by this fraction per quality level.
     pub quality_bonus: f32,
@@ -1548,6 +1620,27 @@ pub struct RepairRules {
     pub cost: f32,
     pub tags: TagMask,
     pub anim: Option<usize>,
+}
+
+/// Setting up something a resident asked for (`setup.rs`): it comes as a parcel to the front
+/// door, and they carry it in and put it together where it goes.
+#[derive(Debug, Clone)]
+pub struct SetUpRules {
+    /// "Set up" (the action reads "Set up the new <thing>").
+    pub label: String,
+    /// Game minutes putting it together at its spot, and picking the parcel up at the door.
+    pub minutes: f32,
+    pub fetch_minutes: f32,
+    /// Hours the one who asked has to it before someone else at home may do it.
+    pub help_hours: f32,
+    /// Hours before it's set up for them anyway (nobody got to it).
+    pub wait_hours: f32,
+    /// The parcel (an item, carried in the hands); none: they carry nothing.
+    pub parcel: Option<usize>,
+    pub tags: TagMask,
+    /// Putting it together, and picking the parcel up.
+    pub anim: Option<usize>,
+    pub fetch_anim: Option<usize>,
 }
 
 impl RepairRules {
@@ -1729,6 +1822,8 @@ pub struct Content {
     pub laundry: Option<LaundryRules>,
     /// How cars drive (content `cars`; see `cars.rs`, `travel.rs`).
     pub cars: CarRules,
+    /// The work taxi (content `taxi`; see `taxi.rs`).
+    pub taxi: TaxiRules,
     /// The uses (object def, interaction) with `"trail": true`: done walking out along the trail
     /// the thing stands at and back (a trailhead's *Walk the trail*; `world::trail_step`).
     pub trail_walks: Vec<(usize, usize)>,
@@ -1754,6 +1849,42 @@ impl Default for CarRules {
 #[serde(rename_all = "camelCase", default)]
 struct CarsRaw {
     country_speed: Option<f32>,
+}
+
+/// The work taxi (content `taxi`, `taxi.rs`): who rides it and how it runs.
+#[derive(Debug, Clone, Copy)]
+pub struct TaxiRules {
+    /// Seats for riders (`seats`, 1 to 4, default 4): more riders than that take more taxis.
+    pub seats: usize,
+    /// A way out of town on foot taking longer than this is a long way, ridden when the taxi gets
+    /// them out sooner than the walk, its wait at the kerb included (game minutes,
+    /// `minWalkMinutes`, default 10).
+    pub min_walk: f32,
+    /// Colleagues whose work (or school) starts within this of each other share one (minutes,
+    /// `window`, default 15).
+    pub window: f32,
+    /// How long it waits at a rider's kerb for them (minutes, `waitMinutes`, default 2).
+    pub wait: f32,
+}
+
+impl Default for TaxiRules {
+    fn default() -> Self {
+        Self {
+            seats: 4,
+            min_walk: 10.0,
+            window: 15.0,
+            wait: 2.0,
+        }
+    }
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct TaxiRaw {
+    seats: Option<usize>,
+    min_walk_minutes: Option<f32>,
+    window: Option<f32>,
+    wait_minutes: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -1856,6 +1987,8 @@ struct ContentFile {
     laundry: Option<LaundryRaw>,
     #[serde(default)]
     cars: CarsRaw,
+    #[serde(default)]
+    taxi: TaxiRaw,
 }
 
 #[derive(Deserialize)]
@@ -2265,6 +2398,20 @@ struct RepairRaw {
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
+struct SetUpRaw {
+    label: Option<String>,
+    minutes: Option<f32>,
+    fetch_minutes: Option<f32>,
+    help_after_hours: Option<f32>,
+    wait_hours: Option<f32>,
+    parcel: Option<String>,
+    tags: Option<Vec<String>>,
+    anim: Option<String>,
+    fetch_anim: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
 struct RoomRulesRaw {
     weights: Option<[f32; 5]>,
     window_tiles: Option<f32>,
@@ -2301,6 +2448,7 @@ struct ObjectRulesRaw {
     free_rotation: Option<Vec<String>>,
     wear: WearRaw,
     repair: RepairRaw,
+    set_up: SetUpRaw,
     max_quality: Option<u8>,
     quality_bonus: Option<f32>,
     upgrade_cost: Option<f32>,
@@ -2365,6 +2513,9 @@ struct CareerRulesRaw {
     performance_per_shift: Option<f32>,
     performance_per_fit: Option<f32>,
     performance_per_mood: Option<f32>,
+    performance_slowdown: Option<f32>,
+    late_grace_minutes: Option<f32>,
+    late_share: Option<f32>,
     probation_levels: Option<f32>,
     workweek: Vec<WorkweekRaw>,
     #[serde(alias = "promotionMoodlet")] // key before the moodlet → feeling rename
@@ -2413,11 +2564,25 @@ struct VisitRaw {
     min_friendship: Option<f32>,
     earliest_hour: Option<f32>,
     latest_hour: Option<f32>,
+    outing_minutes: Option<f32>,
+    outing_home_by: Option<f32>,
+    least_minutes: Option<f32>,
+    again_minutes: Option<f32>,
     door: Option<DoorRaw>,
     company: Option<f32>,
     bored_minutes: Option<f32>,
     farewell: Vec<String>,
     farewell_minutes: Option<f32>,
+    offer: Option<OfferRaw>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct OfferRaw {
+    social: String,
+    after_minutes: Option<f32>,
+    again_minutes: Option<f32>,
+    hand_anim: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -2551,6 +2716,28 @@ struct ObjectRaw {
     /// Someone serves here on a public lot (see `ObjectDef::staff`).
     #[serde(default)]
     staff: Option<crate::staff::PostRaw>,
+    /// Something to ride (see `ObjectDef::vehicle`).
+    #[serde(default)]
+    vehicle: Option<VehicleRaw>,
+}
+
+/// An object's `vehicle`: `{"kind": "bike", "speed": 3, "stages": ["child", "teen", ...],
+/// "minRide": 60, "roadsOnly": false, "reach": [1.2, 0.6, 0.3]}`.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VehicleRaw {
+    kind: VehicleKind,
+    speed: f32,
+    stages: Option<Vec<String>>,
+    #[serde(default = "default_min_ride")]
+    min_ride: f32,
+    #[serde(default)]
+    roads_only: bool,
+    reach: Option<[f32; 3]>,
+}
+
+fn default_min_ride() -> f32 {
+    60.0
 }
 
 /// A slot's place: `{"at": [-0.3, 0.7], "facing": 180}` (m off the middle, to its right and front;
@@ -3766,6 +3953,33 @@ impl Content {
                     obj.id
                 )));
             }
+            let vehicle = match &obj.vehicle {
+                None => None,
+                Some(v) => {
+                    if !(1.0..=10.0).contains(&v.speed) || v.min_ride.is_nan() || v.min_ride < 0.0 {
+                        return Err(Error::new(format!(
+                            "object '{}': a vehicle's speed is 1 to 10 times walking, and its minRide 0 or more",
+                            obj.id
+                        )));
+                    }
+                    let reach = v.reach.unwrap_or([crate::cars::BODY; 3]);
+                    if !reach.iter().all(|r| (0.0..=3.0).contains(r)) {
+                        return Err(Error::new(format!(
+                            "object '{}': a vehicle's reach is 0 to 3 m each way",
+                            obj.id
+                        )));
+                    }
+                    Some(Vehicle {
+                        kind: v.kind,
+                        speed: v.speed,
+                        stages: stages_of(&v.stages, &format!("object '{}' vehicle", obj.id))?
+                            .unwrap_or(every_stage),
+                        min_ride: v.min_ride,
+                        roads_only: v.roads_only,
+                        reach,
+                    })
+                }
+            };
             let upper_stages = stages_of(
                 &obj.upper_stages,
                 &format!("object '{}' upperStages", obj.id),
@@ -3922,6 +4136,7 @@ impl Content {
                 footstool: obj.footstool,
                 overhang: obj.overhang.iter().map(|&[r, f]| (r, f)).collect(),
                 staff: obj.staff.as_ref().map(|r| crate::staff::post(r, obj.footprint, &obj.id)).transpose()?,
+                vehicle,
             });
         }
 
@@ -4271,6 +4486,20 @@ impl Content {
             performance_per_shift: cr.performance_per_shift.unwrap_or(12.0),
             performance_per_fit: cr.performance_per_fit.unwrap_or(0.0),
             performance_per_mood: cr.performance_per_mood.unwrap_or(15.0),
+            performance_slowdown: checked_range(
+                cr.performance_slowdown.unwrap_or(0.0),
+                "careerRules.performanceSlowdown",
+                PERFORMANCE_SLOWDOWN,
+            )?,
+            late_grace_minutes: time(
+                cr.late_grace_minutes.unwrap_or(0.0),
+                "careerRules.lateGraceMinutes",
+            )?,
+            late_share: checked_range(
+                cr.late_share.unwrap_or(1.0),
+                "careerRules.lateShare",
+                LATE_SHARE,
+            )?,
             probation_levels,
             workweek,
             promotion_feeling: feeling(&cr.promotion_feeling, "careerRules")?,
@@ -4618,6 +4847,38 @@ impl Content {
                 },
                 anim: animations.iter().position(|a| a == "tinker"),
             },
+            set_up: {
+                let su = &or.set_up;
+                let anim = |a: &Option<String>, default: &str| match a {
+                    None => Ok(anim_index(default)),
+                    Some(a) => anim_index(a).map(Some).ok_or_else(|| {
+                        Error::new(format!(
+                            "objectRules.setUp: unknown anim '{a}' (declare it in \"animations\")"
+                        ))
+                    }),
+                };
+                SetUpRules {
+                    label: su.label.clone().unwrap_or_else(|| "Set up".into()),
+                    minutes: su.minutes.unwrap_or(15.0).max(1.0),
+                    fetch_minutes: su.fetch_minutes.unwrap_or(1.5).max(0.5),
+                    help_hours: su.help_after_hours.unwrap_or(2.0).max(0.0),
+                    wait_hours: su.wait_hours.unwrap_or(24.0).max(1.0),
+                    parcel: match &su.parcel {
+                        None => None,
+                        Some(id) => {
+                            Some(items.iter().position(|i| &i.id == id).ok_or_else(|| {
+                                Error::new(format!("objectRules.setUp: unknown item '{id}'"))
+                            })?)
+                        }
+                    },
+                    tags: match &su.tags {
+                        Some(tags) => tag_mask(tags, "objectRules.setUp")?,
+                        None => tag_index.get("chores").map_or(0, |&i| 1 << i),
+                    },
+                    anim: anim(&su.anim, "tinker")?,
+                    fetch_anim: anim(&su.fetch_anim, "serve")?,
+                }
+            },
             max_quality: or.max_quality.unwrap_or(3),
             quality_bonus: or.quality_bonus.unwrap_or(0.25),
             upgrade_cost: or.upgrade_cost.unwrap_or(0.3),
@@ -4673,6 +4934,10 @@ impl Content {
             min_friendship: v.min_friendship.unwrap_or(15.0),
             earliest_hour: v.earliest_hour.unwrap_or(9.0),
             latest_hour: v.latest_hour.unwrap_or(21.0),
+            outing_minutes: v.outing_minutes.unwrap_or(90.0).max(0.0),
+            outing_home_by: v.outing_home_by.unwrap_or(23.0).clamp(0.0, 24.0),
+            least_minutes: v.least_minutes.unwrap_or(0.0).max(0.0),
+            again_minutes: v.again_minutes.unwrap_or(0.0).max(0.0),
             tags: 1 << tag_index[VISIT_TAG],
             company: v.company.unwrap_or(0.0).max(0.0),
             bored_minutes: v.bored_minutes.map(|m| m.max(1.0)),
@@ -4686,6 +4951,37 @@ impl Content {
                 })
                 .collect::<Result<_, _>>()?,
             farewell_minutes: v.farewell_minutes.unwrap_or(10.0).max(1.0),
+            offer: match &v.offer {
+                None => None,
+                Some(o) => {
+                    let social =
+                        socials
+                            .iter()
+                            .position(|s| s.id == o.social)
+                            .ok_or_else(|| {
+                                Error::new(format!("visits.offer: unknown social '{}'", o.social))
+                            })?;
+                    if socials[social].success.effect != crate::social::Effect::Serve {
+                        return Err(Error::new(format!(
+                            "visits.offer: social '{}' must have \"effect\": \"serve\" on success",
+                            o.social
+                        )));
+                    }
+                    Some(OfferRules {
+                        social,
+                        after_minutes: o.after_minutes.unwrap_or(15.0).max(0.0),
+                        again_minutes: o.again_minutes.unwrap_or(120.0).max(1.0),
+                        hand_anim: match &o.hand_anim {
+                            None => None,
+                            Some(a) => Some(anim_index(a).ok_or_else(|| {
+                                Error::new(format!(
+                                    "visits.offer: unknown anim '{a}' (declare it in \"animations\")"
+                                ))
+                            })?),
+                        },
+                    })
+                }
+            },
             door: match &v.door {
                 None => None,
                 Some(d) => Some(DoorRules {
@@ -4859,6 +5155,26 @@ impl Content {
                     }
                     None => crate::travel::COUNTRY_SPEED,
                 },
+            },
+            taxi: {
+                let d = TaxiRules::default();
+                let rules = TaxiRules {
+                    seats: raw.taxi.seats.unwrap_or(d.seats),
+                    min_walk: raw.taxi.min_walk_minutes.unwrap_or(d.min_walk),
+                    window: raw.taxi.window.unwrap_or(d.window),
+                    wait: raw.taxi.wait_minutes.unwrap_or(d.wait),
+                };
+                let ok = |v: f32, most: f32| v.is_finite() && (0.0..=most).contains(&v);
+                if !(1..=4).contains(&rules.seats)
+                    || !ok(rules.min_walk, 600.0)
+                    || !ok(rules.window, 120.0)
+                    || !ok(rules.wait, 30.0)
+                {
+                    return Err(Error::new(
+                        "taxi: seats is 1 to 4, minWalkMinutes 0 to 600, window 0 to 120 minutes and waitMinutes 0 to 30",
+                    ));
+                }
+                rules
             },
             object_index,
         })

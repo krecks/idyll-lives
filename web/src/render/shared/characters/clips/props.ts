@@ -1,7 +1,8 @@
 /**
  * Clips for what is done with a prop in the hand (G-70; the prop is drawn by `residents.ts` `writeHand`, actions.ts
  * `PROPS`): a cup held before the chest between sips (`holdCup`, standing and the seated upper layer; the sip is
- * `drink`, clips/seated.ts), a coin tossed into the fountain (`toss`), seed scattered from a bag on the lap for the birds
+ * `drink`, clips/seated.ts), a plate held in front between bites eating standing (`holdPlate`), a coin tossed into the
+ * fountain (`toss`), seed scattered from a bag on the lap for the birds
  * (`scatter`, the seated upper layer) and a cocktail shaken in both hands (`shake`).
  */
 
@@ -73,6 +74,12 @@ function holdCupPose(p: number): PoseSpec {
   return eatPose(p, [CUP_HELD[0], CUP_HELD[1] + b, CUP_HELD[2]], [2 * Math.sin(p * TAU * 2), 6 * Math.sin(p * TAU), 0], 0);
 }
 
+/** A plate held in front on the left palm between bites, eating standing (`ACTIONS.eat`), the right hand by it. */
+function holdPlatePose(p: number): PoseSpec {
+  const b = 0.005 * Math.sin(p * TAU);
+  return eatPose(p, [0.11, 1.03 + b, 0.27], [8 + 2 * Math.sin(p * TAU * 2), 5 * Math.sin(p * TAU), 0], 0);
+}
+
 export function propClips(): ClipDef[] {
   const s = TOSS_S;
   const low: Vec = [0.13, 1.0, 0.24];
@@ -92,6 +99,7 @@ export function propClips(): ClipDef[] {
       [1, () => tossPose(rest, 8, 0, 3, [14, 0, 0], 1), 'smooth'],
     ]),
     cycle('holdCup', { seconds: 2.5, loop: true }, holdCupPose),
+    cycle('holdPlate', { seconds: 3, loop: true }, holdPlatePose),
     cycle('scatter', { seconds: SCATTER_S, loop: true }, scatterPose),
     cycle('shake', { seconds: SHAKE_S, loop: true }, shakePose),
   ];

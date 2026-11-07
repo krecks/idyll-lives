@@ -121,6 +121,22 @@
       "title": "Dimensions.com, Exercise bicycles",
       "url": "https://www.dimensions.com/element/exercise-bicycles"
     },
+    "bikeInsightsCity": {
+      "title": "Bike Insights, 2017 Liv Alight City M geometry: 1763 mm long with tyres, 620 mm bars, 700C wheels",
+      "url": "https://bikeinsights.com/bike-geometries/693081232e0f8a001a14cc87-2017-liv-cycling-alight-city-m"
+    },
+    "argosKids14": {
+      "title": "Argos, Pedal Pals 14 in kids' bike with stabilisers: assembled H 71 x W 49 x L 99 cm",
+      "url": "https://www.argos.co.uk/product/8380368"
+    },
+    "nbcScooter": {
+      "title": "Notebookcheck, Xiaomi Mi Electric Scooter 3 review: 108 x 43.5 x 114 cm unfolded, 8.5 in wheels",
+      "url": "https://www.notebookcheck.net/Xiaomi-Mi-Electric-Scooter-3-in-review-Proven-e-scooter-with-two-points-of-criticism.690490.0.html"
+    },
+    "ldlcScooter4": {
+      "title": "LDLC, Xiaomi Electric Scooter 4: 1143 x 480 x 1170 mm unfolded, 10 in wheels",
+      "url": "https://ldlc.com/en/product/PB00552087.html"
+    },
     "dimPicnic": {
       "title": "Dimensions.com, Rectangular picnic table: 183 x 149 x 77 cm, bench 43 cm",
       "url": "https://www.dimensions.com/element/rectangular-picnic-table"
@@ -7997,6 +8013,85 @@
         "neufert"
       ]
     },
+    "cityBike": {
+      "label": "City bike (step-through, 28 in wheels, on its stand)",
+      "w": [
+        1.75,
+        1.95
+      ],
+      "h": [
+        1.0,
+        1.15
+      ],
+      "d": [
+        0.55,
+        0.7
+      ],
+      "uses": [
+        "ride to work or school",
+        "tune it up"
+      ],
+      "minutes": {
+        "tuneUp": [
+          15,
+          60
+        ]
+      },
+      "sources": [
+        "neufert",
+        "bikeInsightsCity"
+      ]
+    },
+    "kidsBike": {
+      "label": "Kids' bike with stabilisers (14 in wheels)",
+      "w": [
+        0.95,
+        1.05
+      ],
+      "h": [
+        0.56,
+        0.75
+      ],
+      "d": [
+        0.35,
+        0.6
+      ],
+      "uses": [
+        "ride to school",
+        "tune it up"
+      ],
+      "minutes": {
+        "tuneUp": [
+          15,
+          60
+        ]
+      },
+      "sources": [
+        "argosKids14"
+      ]
+    },
+    "eScooter": {
+      "label": "Electric kick scooter, unfolded",
+      "w": [
+        1.05,
+        1.15
+      ],
+      "h": [
+        1.1,
+        1.2
+      ],
+      "d": [
+        0.43,
+        0.6
+      ],
+      "uses": [
+        "ride to work or school"
+      ],
+      "sources": [
+        "nbcScooter",
+        "ldlcScooter4"
+      ]
+    },
     "planter": {
       "label": "Planter or raised bed (flowers, herbs)",
       "w": [
@@ -9033,8 +9128,8 @@
         "neufert"
       ]
     },
-    "busShelter": {
-      "label": "Bus shelter with bench",
+    "taxiShelter": {
+      "label": "Taxi rank shelter with bench",
       "w": [
         2.5,
         4
@@ -9052,8 +9147,8 @@
         0.5
       ],
       "uses": [
-        "wait for the bus",
-        "read the timetable"
+        "wait for a taxi",
+        "read the fares"
       ],
       "minutes": {
         "wait": [
@@ -9753,8 +9848,8 @@
         "neufert"
       ]
     },
-    "busStopSign": {
-      "label": "Bus stop flag on a pole",
+    "taxiRankSign": {
+      "label": "Taxi rank sign on a pole",
       "w": [
         0.3,
         0.6
@@ -9768,7 +9863,7 @@
         0.2
       ],
       "uses": [
-        "check the bus stop"
+        "find the taxi rank"
       ],
       "sources": [
         "neufert"
@@ -11803,6 +11898,9 @@
     "swingSet": "swingSet",
     "sandbox": "sandpit",
     "bikeRack": "bikeRack",
+    "bicycle": "cityBike",
+    "bicycleChild": "kidsBike",
+    "eScooter": "eScooter",
     "planterBox": "planter",
     "flowerbed": "planter",
     "garden.flowerBox": "planter",
@@ -11900,7 +11998,7 @@
     "street.streetlight": "streetLamp",
     "drinkingFountain": "drinkingFountain",
     "litterBin": "litterBin",
-    "busStop": "busShelter",
+    "busStop": "taxiShelter",
     "postBox": "postBox",
     "noticeBoard": "noticeBoard",
     "phoneBooth": "phoneBox",
@@ -11926,7 +12024,7 @@
     "street.hydrant": "hydrant",
     "street.bin": "wheelieBin",
     "model.street.sign": "streetSign",
-    "model.street.busSign": "busStopSign",
+    "model.street.taxiSign": "taxiRankSign",
     "model.street.pathLight": "pathLight",
     "farm.barn": "barn",
     "farm.silo": "silo",
@@ -12034,7 +12132,7 @@
     "scarecrow",
     "trough",
     "streetSign",
-    "busStopSign",
+    "taxiRankSign",
     "grassTuft",
     "wildflower",
     "treePlanter",

@@ -8,17 +8,15 @@
   import { aboutUs, storyIcon, storyText, storyTime, storyTone } from './story';
   import type { SocialEvent } from '../core/protocol';
 
-  /** The story so far, newest day first: what happened at home, to everyone, or just the big moments. */
-  type Filter = 'home' | 'town' | 'milestones';
+  /** The household's story so far, newest day first: all of it, or just its big moments. */
+  type Filter = 'home' | 'milestones';
   let filter = $state<Filter>('home');
   const filters: { value: Filter; label: string }[] = [
     { value: 'home', label: 'Our home' },
-    { value: 'town', label: 'Everyone' },
     { value: 'milestones', label: 'Milestones' },
   ];
 
-  const shown = (e: SocialEvent) =>
-    filter === 'milestones' ? e.importance >= 2 : filter === 'home' ? aboutUs(e) : e.importance >= 1 || aboutUs(e);
+  const shown = (e: SocialEvent) => aboutUs(e) && (filter === 'home' || e.importance >= 2);
 
   const days = $derived.by(() => {
     const out: { day: number; events: { event: SocialEvent; minute: number }[] }[] = [];

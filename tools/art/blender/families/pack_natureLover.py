@@ -369,8 +369,9 @@ def pottingBench():
         for k, (yy, d) in enumerate(((0.2125, 0.24), (0.3, 0.23), (0.385, 0.22))):
             _pot(F, f'stack_pot{k}', 0.55, yy, -0.12, d=d, h=0.15, soil=False)
     G.join(still, 'body', origin=(0, 0, 0))
-    # The seedling: a stem, two seed leaves and a tuft of true leaves, origin on the pot's soil: `seedling` grows it
-    # up. Plain satin: a foliage part would grow as well since the renderer's fixes (see the notes).
+    # The seedling: a stem, two seed leaves and a tuft of true leaves, on the pot's soil: `seedling` grows it up. Its
+    # origin is under the soil (and the pot's rolled rim), where it flattens out of sight: on the soil, its leaves
+    # lay flat over it. Plain satin: a foliage part would grow as well since the renderer's fixes (see the notes).
     sx, sz = SEEDLING
     sy = TOP + 0.106
     with G.new_parts() as seedling:
@@ -382,7 +383,7 @@ def pottingBench():
         for k in range(4):
             leaf(f'true_leaf{k}', F.at(sx + 0.01, sy + 0.15, sz), 45 + k * 90, 55, 0.05, 0.03, M.green, shape='lance',
                  droop=0.15, rows=2, ring=3)
-    seedling = G.join(seedling, 'seedling', origin=F.at(sx, sy, sz))
+    seedling = G.join(seedling, 'seedling', origin=F.at(sx, TOP + 0.09, sz))
     seedling.scale[2] = 0.001
     # The bouquet a skilled gardener ties: stems lying along the worktop's front, flower heads, a twine wrap.
     # Its origin is inside the worktop, flattened out of sight: `bouquet` grows it while it is tied.

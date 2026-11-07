@@ -111,7 +111,6 @@ fn a_v34_save_comes_through_v35_unchanged() {
     assert_eq!(w.travel.size, sim_core::travel::WorldSize::Cosy);
     assert!(!w.travel.open && w.travel.graph.is_empty());
     assert!(w.travel.file.is_empty());
-    assert!((0..w.exits.len()).all(|i| !w.travel.is_stop(i)));
     let json = w.save_json();
     let new: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(new["version"], sim_core::save::SAVE_VERSION);
@@ -147,4 +146,39 @@ fn a_v34_save_comes_through_v35_unchanged() {
     }
     assert_eq!(back.dirt, w.dirt);
     assert_eq!(back.save_json(), json, "saves the same again");
+}
+
+/// A game saved while the town had buses (0.7.0's development builds: its bus stops among the
+/// exits, `openWorld.stops` saying which, the content's `bus` timetable) loads with no bus: the
+/// stops are no ways out, nobody sets off for one, and it saves without them.
+#[test]
+fn a_game_saved_while_the_town_had_buses_loads_without_them() {
+    let content = common::content();
+    let h = common::hamlets::two_hamlets(&content, 21);
+    let w = World::from_json(&content, &common::hamlets::with_cars(&h), 21).unwrap();
+    let roads_out = w.exits.clone();
+    assert!(!roads_out.is_empty());
+    let mut save: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
+    // (A stop by the first street's middle, between the roads out, and the bus's own fields.)
+    let street = &w.travel.graph.roads[0];
+    let at = street.at(street.cum.last().copied().unwrap_or(0.0) / 2.0);
+    let exits = save["exits"].as_array_mut().unwrap();
+    exits.insert(0, serde_json::json!([at[0], at[1] + 2.5]));
+    let stop = 0;
+    save["openWorld"]["stops"] = serde_json::json!([stop]);
+    save["bus"] = serde_json::json!({"every": 20, "first": 6, "last": 23});
+    let mut c: serde_json::Value = serde_json::from_str(&content).unwrap();
+    c["bus"] = serde_json::json!({"every": 20, "first": 6, "last": 23});
+    let mut loaded = World::from_save_json(&c.to_string(), &save.to_string()).unwrap();
+    assert_eq!(loaded.exits, roads_out, "the stop is no way out");
+    let again: serde_json::Value = serde_json::from_str(&loaded.save_json()).unwrap();
+    assert!(again["openWorld"].get("stops").is_none());
+    assert_eq!(again["exits"].as_array().unwrap().len(), roads_out.len());
+    // (And plays on: off to work by the roads out.)
+    loaded.autonomy = true;
+    let end = loaded.tick + TICKS_PER_DAY;
+    while loaded.tick < end {
+        loaded.tick_once();
+    }
+    common::check(&loaded);
 }

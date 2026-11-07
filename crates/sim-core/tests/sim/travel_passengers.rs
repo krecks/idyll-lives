@@ -239,7 +239,9 @@ fn goes_in_one_car(driver_first: bool) {
     // Saved and loaded there: the car still parked out with who came in it.
     let mut w = common::reload(&w, &content);
     assert_eq!(w.cars[c].state, CarState::Out);
-    assert_eq!(w.cars[c].riders, riders);
+    let mut loaded = w.cars[c].riders.clone();
+    loaded.sort_unstable();
+    assert_eq!(loaded, riders);
 
     // One of them (not the driver) goes home: all three go back to the car and home in it.
     let rider = *riders.last().expect("riders");

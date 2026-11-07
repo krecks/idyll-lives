@@ -568,7 +568,10 @@
           "material": "rail",
           "label": "Rail"
         }
-      ]
+      ],
+      "accept": {
+        "footprint": "the rail runs past the window, its opening plus a gathered panel each side, so the open curtains stack on the wall beside the glass (decor.md, M-decor-02)"
+      }
     },
     "model.curtainsLong": {
       "type": "model",
@@ -593,7 +596,10 @@
           "material": "rail",
           "label": "Rail"
         }
-      ]
+      ],
+      "accept": {
+        "footprint": "the rail runs past the window, its opening plus a gathered panel each side, so the open curtains stack on the wall beside the glass (decor.md, M-decor-02)"
+      }
     },
     "model.rugRound": {
       "type": "model",
@@ -705,7 +711,10 @@
           "material": "rail",
           "label": "Rail"
         }
-      ]
+      ],
+      "accept": {
+        "footprint": "the rail runs past the window, its opening plus a gathered panel each side, so the open curtains stack on the wall beside the glass (decor.md, M-decor-02)"
+      }
     }
   }
 }

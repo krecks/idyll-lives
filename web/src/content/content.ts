@@ -260,6 +260,13 @@ export interface ObjectDef {
    * footprint's middle to its right and front (behind it: a negative front), and the hours it's open.
    */
   staff?: { at: [number, number]; hours: [number, number] };
+  /**
+   * Something to ride (sim-core `ride.rs`): a bike, sat on and pedalled, or an e-scooter, stood on; `speed` times
+   * as fast as walking, by those of `stages` (absent: everyone), for ways longer than `minRide` m; `roadsOnly`:
+   * keeps to the roads; `reach`: ridden, how far it reaches in front of its rider, behind them and out to each side
+   * (m, for keeping clear of cars). The renderer draws it under its rider (`shared/characters/vehicles.ts`).
+   */
+  vehicle?: { kind: 'bike' | 'scooter'; speed: number; stages?: string[]; minRide?: number; roadsOnly?: boolean; reach?: [number, number, number] };
   /** Can only be placed outdoors (trees, flower beds, ponds). */
   outdoors?: boolean;
   /** How far a tree's crown reaches out from its middle (m): no house wall may stand closer (sim-core `home.rs`, `game/housegen.ts`). */

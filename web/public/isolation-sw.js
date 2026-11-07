@@ -26,7 +26,7 @@ const CACHE = PREFIX + BUILD;
 /** Where the build puts its files; a name with Vite's 8-character hash is one of them. */
 const ASSETS = new URL('assets/', self.location.href).pathname;
 const HASHED = /^[^/]+-[\w-]{8}\.(?:js|css|wasm|woff2)$/;
-/** Kept by the voice's and language model's workers in caches of their own (ml/assets.ts). */
+/** Kept by the voice's and language model's workers in caches of their own (ml/assets.ts; the runtime in one they share). */
 const KEPT_ELSEWHERE = /^(?:ort-|voice_wasm_bg-)/;
 
 self.addEventListener('install', () => self.skipWaiting());

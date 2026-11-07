@@ -78,8 +78,8 @@ export const voiceStatus = $state({
   bench: readBench(),
 });
 
-/** The download, MB: the runtime's WebGPU build, our WASM and dictionary (about 30.2 MB), the model (185.2 MB: 16-bit weights, gzipped) and its voices and text files (3.2 MB). */
-export const DOWNLOAD_MB = 218.7;
+/** The download, MB: the runtime's WebGPU build, our WASM and dictionary (about 30.2 MB), the model (87.1 MB: 8-bit weights, gzipped) and its voices and text files (3.2 MB). */
+export const DOWNLOAD_MB = 120.6;
 const BENCH_LINES = [
   'Hello there!',
   "I'm so hungry, I could eat a whole pizza by myself.",

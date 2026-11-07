@@ -241,7 +241,7 @@ fn diners_pick_a_chair_at_a_table_then_a_dining_set_then_anywhere_comfy() {
     // From right next to the sofa, the chair at the table is still the best place to eat.
     let from = [8.5, 9.5];
     let pick = |candidates: &[u32]| {
-        dining_seat(&w.content, &w.objects, &links, candidates, from, 0).unwrap()
+        dining_seat(&w.content, &w.objects, &links, candidates, from, 0, &[]).unwrap()
     };
     let all = [table, chair, set, sofa, toilet];
     let best = pick(&all);
@@ -260,7 +260,16 @@ fn diners_pick_a_chair_at_a_table_then_a_dining_set_then_anywhere_comfy() {
     let last = pick(&[table, sofa, toilet]);
     assert_eq!((last.object, last.rank), (sofa, DiningRank::AnySeat));
     assert!(
-        dining_seat(&w.content, &w.objects, &links, &[table, toilet], from, 0).is_none(),
+        dining_seat(
+            &w.content,
+            &w.objects,
+            &links,
+            &[table, toilet],
+            from,
+            0,
+            &[]
+        )
+        .is_none(),
         "not on the toilet"
     );
 }
@@ -405,6 +414,12 @@ fn a_snack_is_eaten_sitting_at_the_table_if_there_is_one_else_standing() {
         } else {
             assert_eq!(seat, None, "nowhere to sit");
             assert_eq!(w.sims[0].pose, Pose::Stand);
+            let p = w.sims[0].pos;
+            assert_ne!(
+                (p[0].floor() as i32, p[1].floor() as i32),
+                (2, 3),
+                "stepped off the fridge's spot to eat, out of the next one's way"
+            );
             assert!(w.sims[0].held.is_some(), "the plate in hand");
             // The snack (a recipe made for the fridge's `eat`) is still food after a reload
             // (put down, as eating starts again from what's there).
@@ -441,4 +456,74 @@ fn a_snack_is_eaten_sitting_at_the_table_if_there_is_one_else_standing() {
         assert_eq!(dirty, 1, "a plate to wash up");
         common::check(&w);
     }
+}
+
+#[test]
+fn a_diner_takes_the_chair_whose_place_is_clear_over_one_with_a_dirty_plate_in_front() {
+    let mut w = world();
+    let table = buy(&mut w, "table", 2, 2, 0).unwrap();
+    // Two chairs at the table, the nearer one's place on it taken (a plate nobody cleared).
+    let near = buy(&mut w, "chair", 2, 1, 0).unwrap();
+    let far = buy(&mut w, "chair", 3, 3, 2).unwrap();
+    let links = Links::new(&w.content, &w.objects, &nav(&w));
+    let from = [2.5, 0.5];
+    let pick = |taken: &[([f32; 2], f32)]| {
+        dining_seat(
+            &w.content,
+            &w.objects,
+            &links,
+            &[table, near, far],
+            from,
+            0,
+            taken,
+        )
+        .unwrap()
+        .object
+    };
+    assert_eq!(pick(&[]), near, "the nearer one when both are clear");
+    let spot = spot_for_seat(&w.content, &w.objects, &links, near, 0, 0.13, &[])
+        .expect("a place in front of it");
+    let place = [
+        spot.x as f32 + 0.5 + f32::from(spot.offset[0]) / 100.0,
+        spot.z as f32 + 0.5 + f32::from(spot.offset[1]) / 100.0,
+    ];
+    assert_eq!(pick(&[(place, 0.13)]), far, "not beside the dirty plate");
+}
+
+#[test]
+fn a_plate_eaten_from_standing_with_nowhere_to_put_it_is_taken_away_not_left_on_the_floor() {
+    let (mut w, fridge, _) = kitchen(false);
+    buy(&mut w, "trashCan", 6, 2, 0).unwrap();
+    let hunger = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "hunger")
+        .unwrap();
+    w.sims[0].needs[hunger] = 0.3;
+    let snack = interaction(&w, fridge, "snack");
+    w.apply(Command::Use {
+        sim: 0,
+        object: fridge,
+        interaction: snack,
+    })
+    .unwrap();
+    let mut on_floor = false;
+    for _ in 0..12000 {
+        w.tick_once();
+        on_floor |= w
+            .items
+            .list
+            .iter()
+            .any(|it| matches!(it.at, sim_core::items::ItemAt::Floor { .. }));
+        if on_floor && w.sims[0].current().is_none() && w.sims[0].queue().next().is_none() {
+            break;
+        }
+    }
+    assert!(on_floor, "put down on the floor (no top anywhere)");
+    assert!(
+        w.items.list.is_empty(),
+        "picked up again and taken to the bin: {:?}",
+        w.items.list
+    );
 }

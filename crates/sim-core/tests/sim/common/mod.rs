@@ -38,6 +38,93 @@ pub fn look_at(w: &mut World, plot: u32) {
     w.set_view(Some([p.x, p.z, p.x + p.w, p.z + p.d]));
 }
 
+/// The renderer's watch for a camera on (`x`, `z`), as a big town's game sends it
+/// (`render/shared/focus.ts` `Roam`, `PlayCanvasRenderer.reportWatch`): the bounds of the 64 m
+/// chunks streamed in round the camera's target at the default zoom (24 m out, its first turn,
+/// a 16:9 view, the default preset's stream), clipped to the town (tiles).
+pub fn stream_watch(w: &World, x: f32, z: f32) -> [i32; 4] {
+    const CHUNK: f32 = 64.0;
+    let r = (24.0f32 * 1.2 + 80.0).clamp(120.0, 260.0);
+    let alpha = -std::f32::consts::PI * 0.62;
+    let fov = 2.0 * (0.35f32.tan() * 16.0 / 9.0).atan();
+    let reach = r * 1.5 + 32.0;
+    let (mut x0, mut z0, mut x1, mut z1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+    let span = |a: f32| ((a - reach) / CHUNK).floor() as i32..=((a + reach) / CHUNK).floor() as i32;
+    for cx in span(x) {
+        for cz in span(z) {
+            let (ax, az) = (cx as f32 * CHUNK, cz as f32 * CHUNK);
+            let d = (ax - x)
+                .max(x - ax - CHUNK)
+                .max(0.0)
+                .hypot((az - z).max(z - az - CHUNK).max(0.0));
+            // (Within the radius, or 1.5 times it inside the view's angle.)
+            let near = d <= r
+                || d <= r * 1.5 && {
+                    let (mx, mz) = (ax + CHUNK / 2.0 - x, az + CHUNK / 2.0 - z);
+                    let dist = mx.hypot(mz).max(1.0);
+                    let along = -(mx * alpha.cos() + mz * alpha.sin());
+                    (along / dist).clamp(-1.0, 1.0).acos()
+                        <= fov / 2.0 + (CHUNK * 0.71).atan2(dist) + 0.15
+                };
+            if near {
+                (x0, z0, x1, z1) = (
+                    x0.min(ax),
+                    z0.min(az),
+                    x1.max(ax + CHUNK),
+                    z1.max(az + CHUNK),
+                );
+            }
+        }
+    }
+    let (wd, dd) = (w.lot.width as f32, w.storey_depth() as f32);
+    [
+        x0.max(0.0) as i32,
+        z0.max(0.0) as i32,
+        x1.min(wd) as i32,
+        z1.min(dd) as i32,
+    ]
+}
+
+/// Looks at the player's home as a big town's game does at the start, the camera on it: the
+/// renderer's watch round it (`stream_watch`) simulated in full detail (`World::set_view`) and
+/// what's drawn (`World::set_watch`: cars out of it drive through each other). The watch.
+pub fn watch_home(w: &mut World) -> [i32; 4] {
+    let home = w
+        .households
+        .iter()
+        .find(|h| h.player)
+        .or(w.households.first())
+        .and_then(|h| h.plot);
+    let p = &w.plots[home.unwrap_or(0) as usize];
+    let at = [p.x as f32 + p.w as f32 / 2.0, p.z as f32 + p.d as f32 / 2.0];
+    let r = stream_watch(w, at[0], at[1]);
+    w.set_view(Some(r));
+    w.set_watch(Some(r));
+    r
+}
+
+/// Which cars are drawn with the watch `watch` (None: the whole town is): shown, not left out of
+/// the snapshot (`cars::hidden`: out of sight, or on top of one that is) and their middles in the
+/// watch (the renderer draws only what's in the chunks streamed in).
+pub fn drawn(w: &World, watch: Option<[i32; 4]>) -> Vec<bool> {
+    let hidden = sim_core::cars::hidden(&w.cars);
+    w.cars
+        .iter()
+        .zip(hidden)
+        .map(|(car, hidden)| {
+            !hidden
+                && car.shown.is_some_and(|(p, ..)| {
+                    watch.is_none_or(|[x0, z0, x1, z1]| {
+                        p[0] >= x0 as f32
+                            && p[0] < x1 as f32
+                            && p[1] >= z0 as f32
+                            && p[1] < z1 as f32
+                    })
+                })
+        })
+        .collect()
+}
+
 /// With `LOD=1` in the environment, looks at the player's home (to compare runs with lower
 /// detail for the rest of the town against full detail).
 pub fn lod_from_env(w: &mut World) {
@@ -478,7 +565,7 @@ pub fn check(w: &World) {
         }
     }
     // Every object slot holder is someone who is using or heading to that object (or talking
-    // from its seat, what they sat down to do held: `paused`).
+    // from its seat, what they sat down to do held: `paused`; or riding it, or off to it to ride).
     for o in &w.objects {
         for u in o.users() {
             let s = &w.sims[u as usize];
@@ -489,11 +576,15 @@ pub fn check(w: &World) {
                     station == Some(o.id)
                 }
                 TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat == Some(o.id),
-                // (Beside the crib, lifting the baby out of it.)
-                TaskKind::Carry { from, stage: 0, .. } => from == o.id,
+                // (Beside the crib, lifting the baby out of it; at the fridge, taking something
+                // out for a guest.)
+                TaskKind::Carry { from, stage: 0, .. } | TaskKind::Serve { from, stage: 0, .. } => {
+                    from == o.id
+                }
                 _ => false,
             }) || (s.use_seat == Some(o.id)
-                && doing.is_some_and(|a| matches!(a.task.kind, TaskKind::Use { .. })));
+                && doing.is_some_and(|a| matches!(a.task.kind, TaskKind::Use { .. })))
+                || s.bike() == Some(o.id);
             assert!(
                 ok,
                 "object {} is held by {} who isn't using it",
@@ -512,22 +603,14 @@ pub fn check(w: &World) {
             );
         }
     }
-    // Only cooks, people eating and washing up, and harvesters on their way to the fridge carry things
-    // (the rest put them down).
+    // Only cooks, people eating and washing up, harvesters on their way to the fridge, someone
+    // carrying in a parcel to set up and hosts bringing a guest something carry things (the rest
+    // put them down).
     for s in &w.sims {
         if s.held.is_some() {
-            let chain = |k: &TaskKind| {
-                matches!(
-                    k,
-                    TaskKind::Cook { .. }
-                        | TaskKind::Eat { .. }
-                        | TaskKind::Dishes { .. }
-                        | TaskKind::Carry { baby: None, .. }
-                )
-            };
             assert!(
                 match s.current() {
-                    Some(a) => chain(&a.task.kind),
+                    Some(a) => a.task.kind.carries_held(),
                     None => s
                         .queue()
                         .next()
@@ -540,6 +623,11 @@ pub fn check(w: &World) {
                 s.queue().map(|t| t.kind).collect::<Vec<_>>()
             );
         }
+    }
+    // Things waiting to be set up belong to a household and were asked for by a resident.
+    for st in &w.setups {
+        assert!((st.household as usize) < w.households.len());
+        assert!((st.sim as usize) < n && st.object < w.content.objects.len());
     }
     // Items are in id order, belong to a household, and stand somewhere on the lot.
     for pair in w.items.list.windows(2) {
@@ -640,6 +728,27 @@ fn task_refs(w: &World, i: usize, kind: &TaskKind, doing: &str) {
             baby.is_none_or(|b| (b as usize) < n && b as usize != i)
                 && object(Some(from))
                 && object(Some(to))
+        }
+        TaskKind::SetUp {
+            object, stand, at, ..
+        } => {
+            (object as usize) < c.objects.len()
+                && w.lot.in_bounds(stand.0, stand.1)
+                && at.iter().all(|v| v.is_finite())
+        }
+        // (What it's taken from matters only until it's in hand.)
+        TaskKind::Serve {
+            guest,
+            from,
+            interaction,
+            stage,
+        } => {
+            (guest as usize) < n
+                && guest as usize != i
+                && (stage > 0
+                    || w.objects
+                        .get(from as usize)
+                        .is_some_and(|o| interaction < c.objects[o.def].interactions.len()))
         }
     };
     assert!(
@@ -787,6 +896,8 @@ fn doing(kind: &TaskKind) -> Doing {
         TaskKind::Dishes { stage, .. } => Doing(13, stage as u32, 0),
         TaskKind::Phone { action, .. } => Doing(14, action as u32, 0),
         TaskKind::Carry { to, stage, .. } => Doing(15, to, stage as u32),
+        TaskKind::SetUp { object, stage, .. } => Doing(16, object, stage as u32),
+        TaskKind::Serve { guest, stage, .. } => Doing(17, guest, stage as u32),
     }
 }
 
@@ -839,7 +950,9 @@ fn state(w: &World, s: &Sim) -> State {
         | Phase::Queued { .. }
         | Phase::Knocking { .. }
         | Phase::Boarding { .. }
-        | Phase::Alighting { .. } => State::Waiting(d),
+        | Phase::Alighting { .. }
+        // (At the kerb for the work taxi: `taxi.rs`.)
+        | Phase::AtKerb { .. } => State::Waiting(d),
     }
 }
 
@@ -876,7 +989,7 @@ fn describe(w: &World, st: State) -> String {
         Doing(k, a, b) => {
             let kinds = [
                 "Use", "MoveTo", "Social", "Join", "Work", "Visit", "GoHome", "Answer", "Clean",
-                "Repair", "Spot", "Cook", "Eat", "Dishes", "Phone", "Carry",
+                "Repair", "Spot", "Cook", "Eat", "Dishes", "Phone", "Carry", "Serve",
             ];
             format!("{} {a} {b}", kinds[k as usize])
         }
@@ -1800,6 +1913,11 @@ pub fn run_to(w: &mut World, day: u32, hour: f32) {
     while w.tick < target {
         w.tick_once();
     }
+}
+
+/// Applies the command `cmd` (as the game sends it) to `w`.
+pub fn apply(w: &mut World, cmd: Value) -> Result<(), sim_core::Error> {
+    w.apply(sim_core::Command::from_json(&cmd.to_string()).unwrap())
 }
 
 /// Metres between two points.

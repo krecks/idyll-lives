@@ -1,10 +1,11 @@
 /**
  * The town map's view (`ui/mapView.ts`): a point on screen to the ground under it when the map
- * fits a box of another shape (the "Bigger" map), and the place pill's words (`ui/place.ts`).
+ * fits a box of another shape (the "Bigger" map), and the place pill's words (`ui/place.ts`): where a
+ * resident is off to, on foot or riding.
  */
 import { describe, expect, test } from 'bun:test';
 import { mapScale, screenToMap } from '../src/ui/mapView';
-import { placeAt, tripText } from '../src/ui/place';
+import { placeAt, rideText, tripText, wayText } from '../src/ui/place';
 
 describe('town map view', () => {
   const view = { x: -6, z: -6, w: 412, d: 212 };
@@ -71,5 +72,35 @@ describe('place names', () => {
     // (The time only comes with a resident's details.)
     expect(tripText({ to: 1 }, 1, plots, households, time)).toBe('On the way home');
     expect(tripText({ to: 0 }, 1, plots, households, time)).toBe('On the way to the Smiths');
+  });
+
+  test('a resident riding: cycling or on the e-scooter, to work, to school or home', () => {
+    const time = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+    expect(rideText('bike', 'work')).toBe('Cycling to work');
+    expect(rideText('bike', 'school')).toBe('Cycling to school');
+    expect(rideText('scooter', 'work')).toBe('Riding the e-scooter to work');
+    expect(tripText({ to: 1, at: 17 * 60 + 40 }, 1, plots, households, time, { kind: 'bike', to: 'home' })).toBe('Cycling home · back about 17:40');
+    expect(tripText({ to: 1 }, 1, plots, households, time, { kind: 'scooter', to: 'home' })).toBe('Riding the e-scooter home');
+    expect(rideText('bike', 'out')).toBe('Cycling out');
+    expect(tripText({ to: 0 }, 1, plots, households, time, { kind: 'bike', to: 'out' })).toBe('Cycling to the Smiths');
+  });
+
+  test('a resident on their way: the trip, then the ride', () => {
+    const time = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+    const way = (s: Parameters<typeof wayText>[0]) => wayText(s, 1, plots, households, time);
+    const bike = { kind: 'bike', to: 'work' } as const;
+    expect(way({ trip: { to: 0 }, ride: bike })).toBe('On the way to the Smiths');
+    expect(way({ trip: { to: 1, at: 17 * 60 + 40 } })).toBe('On the way home · back about 17:40');
+    expect(way({ ride: bike })).toBe('Cycling to work');
+    expect(way({})).toBe('');
+  });
+
+  test('a resident and the work taxi: waiting at the kerb, in it to work or school, home in it', () => {
+    const time = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+    const way = (s: Parameters<typeof wayText>[0]) => wayText(s, 1, plots, households, time);
+    expect(way({ taxi: { state: 'wait' }, job: {} })).toBe('Waiting for the taxi');
+    expect(way({ taxi: { state: 'work', at: 8 * 60 + 40 }, job: {} })).toBe('Taxi to work · there about 8:40');
+    expect(way({ taxi: { state: 'work' }, job: null })).toBe('Taxi to school');
+    expect(way({ taxi: { state: 'home', at: 18 * 60 }, job: {}, trip: { to: 1 } })).toBe('Taxi home');
   });
 });

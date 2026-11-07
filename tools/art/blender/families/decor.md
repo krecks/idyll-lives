@@ -28,7 +28,8 @@ Each is built where the game places it (`F`, game axes):
   one edge, 1.76 m over two), so each pair's rail is the opening plus its two gathered panels: 1.22 m for `curtains`,
   2.38 m for `curtainsWide` (new: window length over two edges) and `curtainsLong`. Open, the panels stack on the wall
   beside the glass, not over it; the rails run 0.1–0.2 m past the footprint, as real rails run past the frame
-  (`check-glb` warns they reach over what hangs next to them). The window-length pairs hang to 0.85 m, just under
+  (each `Model` `accept`s the gate's `footprint` check with that reason, `CURTAINS_ACCEPT`: they reach over what
+  hangs next to them). The window-length pairs hang to 0.85 m, just under
   the sill (0.9), where they stopped 10 cm above it and left a strip of glass bare when drawn.
 - **The bronze horse** (2026-10-21, review M-decor-01): `bronze` is a golden cast bronze (`#A47B45`, metal) that
   catches the light on its edges, its mane and tail a dark green patina (`bronze_dark`); it was a dark brown that

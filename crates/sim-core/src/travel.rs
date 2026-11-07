@@ -10,8 +10,10 @@
 //!
 //! **The network.** The town's roads (the town file's top-level `roads`; else `meta.roads`, or
 //! the centre lines of `meta.streets`; none: no network) become a small graph: a node at each
-//! end of every road and wherever one road's end meets another (within `width / 2 + 1` m of its
-//! middle), and an edge for each stretch of road between two nodes, with its length and kind.
+//! end of every road, wherever one road's end meets another (within `width / 2 + 1` m of its
+//! middle) and wherever two roads for cars cross or touch away from their ends (their middle
+//! lines within `CROSS_NEAR`: a junction like any other, `crossings`), and an edge for each
+//! stretch of road between two nodes, with its length and kind.
 //! Trails are for people on foot only; country roads are where cars go fast.
 //!
 //! **Long walks.** A trip on foot shorter than `ROAD_TRIP_TILES` (or in a town with no network)
@@ -101,7 +103,8 @@ pub struct RoadRaw {
     pub area: Option<u32>,
 }
 
-/// A way out of town (`TownExit`): a road out, or a bus stop that only people on foot use.
+/// A way out of town (`TownExit`): a road out (older town files may list bus stops too, `Stop`:
+/// no longer ways out, dropped as the town loads).
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(untagged)]
 pub enum ExitRaw {
@@ -237,8 +240,9 @@ pub struct OpenWorld {
     pub terrain: Option<Terrain>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parking: Vec<Parking>,
-    /// Saves only: which of `World::exits` are bus stops (indices).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Older saves only: which of their exits were bus stops (indices), dropped from
+    /// `World::exits` as they load (no longer ways out). Never written.
+    #[serde(default, skip_serializing)]
     pub stops: Vec<u32>,
     /// Saves only: each plot's area and kind (`plots[].area/kind`), by plot index.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -385,7 +389,7 @@ impl Road {
         true
     }
 
-    fn drivable(&self) -> bool {
+    pub(crate) fn drivable(&self) -> bool {
         self.kind != RoadKind::Trail
     }
 }
@@ -435,6 +439,9 @@ pub struct Graph {
     cells: Vec<Vec<(u32, u32)>>,
     cols: usize,
     rows: usize,
+    /// Its junctions' boxes (`traffic::boxes`): their middles and how far round them they reach
+    /// (m). Cars take turns driving through them (`traffic.rs`).
+    pub boxes: Vec<([f32; 2], f32)>,
 }
 
 /// What a trip along the roads looks like: the points it passes (on the middle line), and how
@@ -443,10 +450,148 @@ pub struct Graph {
 pub struct RoadPath {
     /// (point, road width, kind) along the way, from the first road point to the last.
     pub pts: Vec<([f32; 2], f32, RoadKind)>,
+    /// The edges it goes along (`Graph::path_by` only).
+    pub edges: Vec<u32>,
     /// Cost (seconds for cars, metres for walkers).
     pub cost: f32,
     /// Its length (m).
     pub len: f32,
+}
+
+/// The way a trip along the roads sets off and the way it comes in: its first two points and its
+/// last two (as `Graph::path` has them). None for one of fewer than two points.
+pub type PathEnds = Option<([[f32; 2]; 2], [[f32; 2]; 2])>;
+
+/// Two roads' middle lines this near (m) away from their ends meet there (`crossings`): two cars
+/// in their lanes on them would touch.
+const CROSS_NEAR: f32 = 2.0;
+/// Two roads that near along no further than this (m) meet once, where they come nearest; along
+/// further (one laid on the other), where they come together and where they part (`crossings`).
+const CROSS_RUN: f32 = 20.0;
+/// A gap this long (m along the first road) between places where two roads are that near is
+/// two stretches.
+const CROSS_GAP: f32 = 4.0;
+
+/// Where two roads for cars (`Road::drivable`) cross, or their middle lines touch (`CROSS_NEAR`),
+/// away from either's ends (where `Graph::build` joins them already): the two roads, how far along
+/// each, and the place (between the two nearest points), in order. A crossing, or a touch along a
+/// short stretch, is one place (`CROSS_RUN`); a road laid on another for longer meets it where
+/// they come together and where they part. A town file's roads should meet at their ends; a
+/// country road laid across or along another meets it all the same.
+fn crossings(roads: &[Road]) -> Vec<(usize, usize, f32, f32, [f32; 2])> {
+    let bounds: Vec<[f32; 4]> = roads
+        .iter()
+        .map(|r| {
+            r.pts.iter().fold(
+                [
+                    f32::INFINITY,
+                    f32::INFINITY,
+                    f32::NEG_INFINITY,
+                    f32::NEG_INFINITY,
+                ],
+                |b, p| {
+                    [
+                        b[0].min(p[0]),
+                        b[1].min(p[1]),
+                        b[2].max(p[0]),
+                        b[3].max(p[1]),
+                    ]
+                },
+            )
+        })
+        .collect();
+    let mut out = Vec::new();
+    for r in 0..roads.len() {
+        for q in r + 1..roads.len() {
+            let (a, b) = (&roads[r], &roads[q]);
+            let (x, y) = (bounds[r], bounds[q]);
+            if !a.drivable()
+                || !b.drivable()
+                || x[2] + CROSS_NEAR < y[0]
+                || y[2] + CROSS_NEAR < x[0]
+                || x[3] + CROSS_NEAR < y[1]
+                || y[3] + CROSS_NEAR < x[1]
+            {
+                continue;
+            }
+            let snap = a.width.max(b.width) / 2.0 + 1.0;
+            let inside = |road: &Road, s: f32| s >= snap && s <= road.len() - snap;
+            // (The nearest places of each pair of segments within reach, by the stretches along `a`
+            // they make.)
+            let mut near: Vec<(f32, f32, f32, [f32; 2])> = Vec::new();
+            for i in 0..a.pts.len() - 1 {
+                for j in 0..b.pts.len() - 1 {
+                    let (ta, tb, d) =
+                        segments_nearest(a.pts[i], a.pts[i + 1], b.pts[j], b.pts[j + 1]);
+                    if d > CROSS_NEAR {
+                        continue;
+                    }
+                    let sa = a.cum[i] + (a.cum[i + 1] - a.cum[i]) * ta;
+                    let sb = b.cum[j] + (b.cum[j + 1] - b.cum[j]) * tb;
+                    if !inside(a, sa) || !inside(b, sb) {
+                        continue;
+                    }
+                    let (pa, pb) = (a.at(sa), b.at(sb));
+                    near.push((d, sa, sb, [(pa[0] + pb[0]) / 2.0, (pa[1] + pb[1]) / 2.0]));
+                }
+            }
+            near.sort_by(|m, n| m.1.total_cmp(&n.1).then(m.0.total_cmp(&n.0)));
+            let mut start = 0;
+            while start < near.len() {
+                let mut end = start + 1;
+                while end < near.len() && near[end].1 - near[end - 1].1 < CROSS_GAP {
+                    end += 1;
+                }
+                let run = &near[start..end];
+                let least = run.iter().map(|m| m.0).fold(f32::INFINITY, f32::min);
+                if run[run.len() - 1].1 - run[0].1 <= CROSS_RUN {
+                    let m = run.iter().find(|m| m.0 == least).expect("one is the least");
+                    out.push((r, q, m.1, m.2, m.3));
+                } else {
+                    // (Where they've come together, and the last place before they part.)
+                    let met = |m: &&(f32, f32, f32, [f32; 2])| m.0 <= least + 0.3;
+                    let first = run.iter().find(met).expect("one is the least");
+                    let last = run.iter().rev().find(met).expect("one is the least");
+                    out.push((r, q, first.1, first.2, first.3));
+                    out.push((r, q, last.1, last.2, last.3));
+                }
+                start = end;
+            }
+        }
+    }
+    out
+}
+
+/// The nearest points of segments `a0`–`a1` and `b0`–`b1`: how far along each (0 to 1), and how
+/// far apart they are (m).
+fn segments_nearest(a0: [f32; 2], a1: [f32; 2], b0: [f32; 2], b1: [f32; 2]) -> (f32, f32, f32) {
+    let (u, v) = (
+        [a1[0] - a0[0], a1[1] - a0[1]],
+        [b1[0] - b0[0], b1[1] - b0[1]],
+    );
+    let w0 = [a0[0] - b0[0], a0[1] - b0[1]];
+    let dot = |p: [f32; 2], q: [f32; 2]| p[0] * q[0] + p[1] * q[1];
+    let (aa, bb, cc, dd, ee) = (dot(u, u), dot(u, v), dot(v, v), dot(u, w0), dot(v, w0));
+    let den = aa * cc - bb * bb;
+    let mut s = if den > 1e-9 {
+        ((bb * ee - cc * dd) / den).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let mut t = if cc > 1e-9 {
+        ((bb * s + ee) / cc).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    if aa > 1e-9 {
+        s = ((bb * t - dd) / aa).clamp(0.0, 1.0);
+    }
+    if cc > 1e-9 {
+        t = ((bb * s + ee) / cc).clamp(0.0, 1.0);
+    }
+    let p = [a0[0] + u[0] * s, a0[1] + u[1] * s];
+    let q = [b0[0] + v[0] * t, b0[1] + v[1] * t];
+    (s, t, dist(p, q))
 }
 
 impl Graph {
@@ -533,6 +678,14 @@ impl Graph {
                 }
             }
         }
+        // Where two roads for cars cross or touch away from their ends: a node on both.
+        for (r, q, sr, sq, p) in crossings(&g.roads) {
+            let n = parent.len();
+            parent.push(n);
+            pos.push(p);
+            splits[r].push((sr, n));
+            splits[q].push((sq, n));
+        }
         // Splits along each road close together are one node.
         for list in &mut splits {
             list.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
@@ -580,6 +733,7 @@ impl Graph {
             }
         }
         g.index();
+        g.boxes = crate::traffic::boxes(&g);
         g
     }
 
@@ -664,7 +818,7 @@ impl Graph {
         let road = self.roads.iter().position(|r| r.source == source)? as u32;
         let s = s.clamp(0.0, self.roads[road as usize].len());
         Some(RoadPoint {
-            edge: self.edge_at(road, s),
+            edge: self.edge_at(road, s)?,
             road,
             s,
             off: 0.0,
@@ -707,14 +861,45 @@ impl Graph {
     }
 
     /// The edge of road `road` that `s` is on.
-    fn edge_at(&self, road: u32, s: f32) -> u32 {
-        let list = &self.road_edges[road as usize];
+    /// The edge of `road` that `s` m along it is on. None: a road too short for an edge (under
+    /// half a metre end to end, as an old save or a hand-built town may have): not in the
+    /// network.
+    fn edge_at(&self, road: u32, s: f32) -> Option<u32> {
+        let list = self.road_edges.get(road as usize)?;
         let i = list.partition_point(|&e| self.edges[e as usize].s1 < s);
-        list[i.min(list.len() - 1)]
+        list.get(i.min(list.len().checked_sub(1)?)).copied()
     }
 
     /// The nearest points on up to `n` different roads within `reach` m of `p` that `mode` may
     /// use, nearest first.
+    /// Whether network road `road` comes within `reach` of `p` somewhere else than about `s` along
+    /// it (more than `apart` further on or back): a road come back over itself, a hairpin's way
+    /// back beside its way out (`near` gives each road's nearest point only: there, `s` itself).
+    pub fn passes_again(&self, road: u32, s: f32, p: [f32; 2], reach: f32, apart: f32) -> bool {
+        if self.is_empty() {
+            return false;
+        }
+        let (x0, x1) = (
+            self.cell(p[0] - reach, self.cols),
+            self.cell(p[0] + reach, self.cols),
+        );
+        let (z0, z1) = (
+            self.cell(p[1] - reach, self.rows),
+            self.cell(p[1] + reach, self.rows),
+        );
+        (z0..=z1).any(|cz| {
+            (x0..=x1).any(|cx| {
+                self.cells[cz * self.cols + cx]
+                    .iter()
+                    .filter(|&&(r, _)| r == road)
+                    .any(|&(r, i)| {
+                        let (at, d) = self.roads[r as usize].project_segment(i as usize, p);
+                        d <= reach && (at - s).abs() > apart
+                    })
+            })
+        })
+    }
+
     pub fn near(&self, p: [f32; 2], reach: f32, n: usize, mode: Mode) -> Vec<RoadPoint> {
         if self.is_empty() {
             return Vec::new();
@@ -755,11 +940,10 @@ impl Graph {
                 }
             }
         }
+        // (Not a road too short for an edge: not in the network.)
+        best.retain_mut(|b| self.edge_at(b.road, b.s).map(|e| b.edge = e).is_some());
         best.sort_by(|a, b| a.off.total_cmp(&b.off).then(a.road.cmp(&b.road)));
         best.truncate(n);
-        for b in &mut best {
-            b.edge = self.edge_at(b.road, b.s);
-        }
         best
     }
 
@@ -793,17 +977,74 @@ impl Graph {
                 cost,
                 ..Default::default()
             };
-            for &(r, s0, s1) in pieces {
-                let road = &self.roads[r as usize];
-                for p in road.slice(s0, s1) {
-                    if out.pts.last().is_some_and(|q| dist(q.0, p) < 0.05) {
-                        continue;
-                    }
-                    out.pts.push((p, road.width, road.kind));
-                }
-            }
+            self.each_point(pieces, |p| out.pts.push(p));
             out
         })
+    }
+
+    /// `path`, setting off only towards `way.toward` and avoiding `way.avoid` (`Way`): a car turned
+    /// round to go another way (`cars::Detour`).
+    pub fn path_by(
+        &self,
+        from: RoadPoint,
+        to: RoadPoint,
+        mode: Mode,
+        country: f32,
+        way: Way,
+    ) -> Option<RoadPath> {
+        self.search_by(from, to, mode, country, way, |pieces| {
+            let (len, cost) = self.measure(pieces, mode, country);
+            let mut out = RoadPath {
+                len,
+                cost,
+                ..Default::default()
+            };
+            self.each_point(pieces, |p| out.pts.push(p));
+            out.edges = pieces
+                .iter()
+                .filter_map(|&(r, s0, s1)| self.edge_at(r, (s0 + s1) / 2.0))
+                .collect();
+            out
+        })
+    }
+
+    /// `path`'s cost, and the way it sets off and the way it comes in (`PathEnds`), without the
+    /// points between: to weigh many ways and lay out only the one taken.
+    pub fn path_ends(
+        &self,
+        from: RoadPoint,
+        to: RoadPoint,
+        mode: Mode,
+        country: f32,
+    ) -> Option<(f32, PathEnds)> {
+        self.search(from, to, mode, country, |pieces| {
+            let (_, cost) = self.measure(pieces, mode, country);
+            let (mut n, mut first, mut last) = (0, [[0.0; 2]; 2], [[0.0; 2]; 2]);
+            self.each_point(pieces, |(p, ..)| {
+                if n < 2 {
+                    first[n] = p;
+                }
+                last = [last[1], p];
+                n += 1;
+            });
+            (cost, (n >= 2).then_some((first, last)))
+        })
+    }
+
+    /// The points along the stretches of road `pieces`, one after another, as `path` has them
+    /// (one within 0.05 m of the one before left out), each with its road's width and kind.
+    fn each_point(&self, pieces: &[Piece], mut f: impl FnMut(([f32; 2], f32, RoadKind))) {
+        let mut last: Option<[f32; 2]> = None;
+        for &(r, s0, s1) in pieces {
+            let road = &self.roads[r as usize];
+            for p in road.slice(s0, s1) {
+                if last.is_some_and(|q| dist(q, p) < 0.05) {
+                    continue;
+                }
+                last = Some(p);
+                f((p, road.width, road.kind));
+            }
+        }
     }
 
     /// `path`'s length and cost only (as `path` gives them), without the points along it: for
@@ -840,6 +1081,20 @@ impl Graph {
         country: f32,
         found: impl FnOnce(&[Piece]) -> R,
     ) -> Option<R> {
+        self.search_by(from, to, mode, country, Way::default(), found)
+    }
+
+    /// `search`, setting off from `from` only towards `way.toward` (a node at an end of its edge),
+    /// and each edge of `way.avoid` costing that much more.
+    fn search_by<R>(
+        &self,
+        from: RoadPoint,
+        to: RoadPoint,
+        mode: Mode,
+        country: f32,
+        way: Way,
+        found: impl FnOnce(&[Piece]) -> R,
+    ) -> Option<R> {
         use std::cmp::Reverse;
         let allowed = |e: &Edge| {
             let r = &self.roads[e.road as usize];
@@ -854,10 +1109,16 @@ impl Graph {
             return None;
         }
         let kind = |e: &Edge| self.roads[e.road as usize].kind;
-        // The same stretch of road: straight along it.
-        if from.road == to.road && from.edge == to.edge {
+        // The same stretch of road: straight along it (the way it may set off).
+        let ahead = |s: f32| match way.toward {
+            Some(n) if n == fe.b => s >= from.s,
+            Some(n) if n == fe.a => s <= from.s,
+            _ => true,
+        };
+        if from.road == to.road && from.edge == to.edge && ahead(to.s) {
             return Some(found(&[(from.road, from.s, to.s)]));
         }
+        let extra = |e: u32| way.avoid.iter().find(|a| a.0 == e).map_or(0.0, |a| a.1);
         let top = match mode {
             Mode::Foot => 1.0,
             Mode::Car => country.max(TOWN_SPEED),
@@ -893,7 +1154,10 @@ impl Graph {
             let key = |v: f32| (v * 1000.0) as u64;
             // Off the start's stretch at either end.
             for (node, len) in [(fe.a, from.s - fe.s0), (fe.b, fe.s1 - from.s)] {
-                let c = Self::cost(kind(&fe), len.max(0.0), mode, country);
+                if way.toward.is_some_and(|n| n != node) {
+                    continue;
+                }
+                let c = Self::cost(kind(&fe), len.max(0.0), mode, country) + extra(from.edge);
                 if c < get(g, stamps, node as usize) {
                     g[node as usize] = c;
                     came[node as usize] = None;
@@ -910,7 +1174,9 @@ impl Graph {
                 // Onto the goal's stretch from here.
                 for (end, len) in [(te.a, to.s - te.s0), (te.b, te.s1 - to.s)] {
                     if end == u {
-                        let total = gu + Self::cost(kind(&te), len.max(0.0), mode, country);
+                        let total = gu
+                            + Self::cost(kind(&te), len.max(0.0), mode, country)
+                            + extra(to.edge);
                         if best_end.is_none_or(|(b, _)| total < b) {
                             best_end = Some((total, u));
                         }
@@ -925,7 +1191,7 @@ impl Graph {
                         continue;
                     }
                     let v = if edge.a == u { edge.b } else { edge.a };
-                    let c = gu + Self::cost(kind(edge), edge.len(), mode, country);
+                    let c = gu + Self::cost(kind(edge), edge.len(), mode, country) + extra(e);
                     if c < get(g, stamps, v as usize) {
                         g[v as usize] = c;
                         came[v as usize] = Some(e);
@@ -957,6 +1223,14 @@ impl Graph {
     }
 }
 
+/// How a way is searched for (`Graph::path_by`): setting off only towards this node (an end of the
+/// start's edge), and these edges costing this much more each.
+#[derive(Debug, Clone, Default)]
+pub struct Way {
+    pub toward: Option<u32>,
+    pub avoid: Vec<(u32, f32)>,
+}
+
 /// A stretch of a road: the road, and from and to how far along it (m).
 type Piece = (u32, f32, f32);
 
@@ -979,8 +1253,6 @@ pub struct Travel {
     /// The town file's open-world fields, as they came (saved).
     pub file: OpenWorld,
     pub graph: Graph,
-    /// Per exit (`World::exits`): a bus stop, for people on foot only.
-    pub stops: Vec<bool>,
     /// How big the world is (`OpenWorld::size`).
     pub size: WorldSize,
     /// The town is laid out for the open world (its `size` is `normal` or `big`): it has a road
@@ -994,6 +1266,16 @@ pub struct Travel {
     /// The tiles the town file's `terrain` masks (water, rock): blocked under everything, so a
     /// tile freed of what stood on it stays blocked (`World::set_travel`). Sorted tile indices.
     pub base_blocked: Vec<usize>,
+    /// The junctions with traffic lights (`traffic::Signal`, `traffic::settle`). Not saved: worked
+    /// out again on load.
+    pub signals: Vec<crate::traffic::Signal>,
+    /// Whether the junctions get traffic lights (`traffic::settle`): not yet in a game (off), only
+    /// where a test turns them on (`World::light_busy_junctions`).
+    pub lights_on: bool,
+    /// By public parking spot (`OpenWorld::parking`), whether a car parked there would stand where
+    /// a household's car turns into or out of its driveway, or on the driveway (`cars::settle_all`):
+    /// not parked at on a trip. Not saved: worked out again on load.
+    pub(crate) by_a_mouth: Vec<bool>,
     /// By plot, for the public places: their door and where it gets on the roads on foot and by
     /// car (`entry`), kept as each tick starts (`note_doors`): a resident weighing an outing asks
     /// how long the way to every one is. Not saved.
@@ -1005,7 +1287,7 @@ pub struct Travel {
 type Door = ([u32; 2], [Option<RoadPoint>; 2]);
 
 impl Travel {
-    pub fn new(file: OpenWorld, meta: &serde_json::Value, exits: usize) -> Self {
+    pub fn new(file: OpenWorld, meta: &serde_json::Value) -> Self {
         let size = file.size();
         let open = size != WorldSize::Cosy;
         let graph = if open {
@@ -1013,20 +1295,16 @@ impl Travel {
         } else {
             Graph::default()
         };
-        let mut stops = vec![false; exits];
-        for &i in &file.stops {
-            if let Some(s) = stops.get_mut(i as usize) {
-                *s = true;
-            }
-        }
         Self {
             file,
             graph,
-            stops,
             size,
             open,
             country_speed: COUNTRY_SPEED,
             base_blocked: Vec::new(),
+            lights_on: false,
+            by_a_mouth: Vec::new(),
+            signals: Vec::new(),
             doors: Vec::new(),
         }
     }
@@ -1076,11 +1354,6 @@ impl Travel {
     /// Whether tile `i` (`Lot::tile_index`) is blocked by the land itself (`base_blocked`).
     pub fn ground_blocked(&self, i: usize) -> bool {
         self.base_blocked.binary_search(&i).is_ok()
-    }
-
-    /// Whether exit `i` is a bus stop.
-    pub fn is_stop(&self, i: usize) -> bool {
-        self.stops.get(i).copied().unwrap_or(false)
     }
 
     /// The area a point is in, if any.
@@ -1194,10 +1467,14 @@ pub struct WalkPlan {
 
 /// How far to the right of a road's middle line people walk: on the pavement of a street (its
 /// width takes in the sidewalks), on the verge of a country road, down the middle of a trail.
-fn side_offset(width: f32, kind: RoadKind) -> f32 {
+/// Half a metre in from its edge, 2.5 m out at most: on a 6 m lane, a bike's handlebars clear a
+/// car going by (`cars::BESIDE`). Beside a country road there's open ground: half a metre out on
+/// the verge.
+pub(crate) fn side_offset(width: f32, kind: RoadKind) -> f32 {
     match kind {
         RoadKind::Trail => 0.0,
-        _ => (width / 2.0 - 1.0).clamp(0.0, 2.5),
+        RoadKind::Country => width / 2.0 + 0.5,
+        _ => (width / 2.0 - 0.5).clamp(0.0, 2.5),
     }
 }
 
@@ -1318,6 +1595,29 @@ mod tests {
     }
 
     #[test]
+    fn a_road_too_short_for_an_edge_is_left_out_not_a_panic() {
+        // (Half a metre or less end to end, as an old save or a hand-built town may have: on its
+        // own off the street, and as a stub from it.)
+        let g = Graph::build(&[
+            road(&line([0.0, 10.0], [100.0, 10.0]), 6.0, RoadKind::Street),
+            road(&[[50.0, 40.0], [50.3, 40.0]], 6.0, RoadKind::Lane),
+            road(&[[20.0, 10.0], [20.0, 10.4]], 6.0, RoadKind::Lane),
+        ]);
+        for (p, mode) in [
+            ([50.1, 40.0], Mode::Car),
+            ([50.1, 40.0], Mode::Foot),
+            ([20.0, 10.2], Mode::Car),
+        ] {
+            for q in g.near(p, 40.0, 3, mode) {
+                assert_eq!(g.roads[q.road as usize].source, 0, "{q:?}");
+            }
+        }
+        assert!(g.at_source(1, 0.1).is_none());
+        assert!(g.at_source(2, 0.2).is_none());
+        assert!(g.at_source(0, 50.0).is_some());
+    }
+
+    #[test]
     fn ends_and_joins_become_nodes() {
         // A street along x, a lane from its middle going +z (ending 2 m off its middle line,
         // within reach of its edge), and a trail on from the lane's far end.
@@ -1341,6 +1641,28 @@ mod tests {
         ]);
         assert_eq!(apart.networks(), 2);
         assert_eq!(Graph::default().networks(), 0);
+    }
+
+    #[test]
+    fn roads_crossing_or_touching_away_from_their_ends_meet_there() {
+        // A street along x; a country road across it, and another bending down to touch it (its
+        // middle line 0.3 m from the street's) and away again; a trail across it.
+        let mut touch = line([60.0, -30.0], [75.0, 9.7]);
+        touch.extend(line([75.0, 9.7], [90.0, -30.0]).into_iter().skip(1));
+        let g = Graph::build(&[
+            road(&line([0.0, 10.0], [100.0, 10.0]), 7.0, RoadKind::Street),
+            road(&line([30.0, -30.0], [30.0, 50.0]), 7.0, RoadKind::Country),
+            road(&touch, 7.0, RoadKind::Country),
+            road(&line([50.0, -30.0], [50.0, 50.0]), 2.0, RoadKind::Trail),
+        ]);
+        let junctions: Vec<[f32; 2]> = g.junctions().collect();
+        assert_eq!(junctions.len(), 2, "{junctions:?}");
+        assert!(junctions.iter().any(|&p| dist(p, [30.0, 10.0]) < 0.5));
+        assert!(junctions.iter().any(|&p| dist(p, [75.0, 9.85]) < 0.5));
+        // A box at each, for the cars to take turns there; the trail crosses as ever.
+        assert!(g.boxes.iter().any(|&(c, _)| dist(c, [30.0, 10.0]) < 0.5));
+        assert!(g.boxes.iter().any(|&(c, _)| dist(c, [75.0, 9.85]) < 0.5));
+        assert_eq!(g.networks(), 2, "the trail apart");
     }
 
     #[test]

@@ -54,8 +54,9 @@ import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
 import { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, withCutlery } from './actions';
+import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, biteOf, eatClip, SET_DOWN_SPOTS, spotOn, type StationSpot } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
+import { RIDE_BIKE, RIDE_BIKE_CHILD, RIDE_SCOOTER } from './clips/rides';
 import { FLOOR_SITS } from './clips/seated';
 import { HANDED } from './clips/serve';
 import { type BodyData, type CharacterSet, type Clip, loadCharacterSet, loadStage } from './data';
@@ -79,6 +80,7 @@ import { BLANKET_WIDTH, quiltGeometry, quiltTint } from './blanket';
 import { APPEARANCE_TEXELS, BONE_FLOATS, BONE_TEXELS, MORPH_TEXELS } from './layout';
 import type { TemplateCache } from '../templateCache';
 import { WALL_HEIGHT } from '../walls';
+import { MOST_CADENCE, MOUNT_SECONDS, MOUNTS, type Mount, mountNodes } from './vehicles';
 import type { ResidentProp, ResidentView } from './view';
 
 export { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
@@ -93,9 +95,35 @@ export type { Face } from './face';
  */
 export type CarRide = (frame: FrameState, x: number, z: number, yaw: number, aboard: boolean, out: { x: number; z: number; yaw: number }) => boolean;
 
+/** Where a bike or an e-scooter left out by a place stands (its middle) and which way it faces (rad, as a placement's turn). */
+export interface ParkedAt {
+  x: number;
+  z: number;
+  yaw: number;
+}
+
 /** How fast an upper-layer clip fades in over the one it replaces (per second; a quarter of a second, less when the
  * action runs fast: scaled by `animRate` like the lower fade). */
 const UPPER_FADE_RATE = 4;
+
+/** How far ahead of the feet (m, body scale) the work clips' hands are at a counter (`clips/work.ts` `COUNTER_Z`, leaning in). */
+const STATION_REACH = 0.5;
+/** The most (m) a cook steps in to a station's tool (the body clear of a cooker's front: `stationReach`). */
+const STATION_STEP_MAX = 0.45;
+/**
+ * The most (m) a cook steps along a station to its tool (`stationReach`): along a station only they can use (one slot),
+ * to its far end; where two can cook side by side, within their own half.
+ */
+const STATION_ALONG_MAX = 1.2;
+const STATION_ALONG_SHARED = 0.7;
+/** How far (m) in from the ends of a station's top a tool placed in front of the cook stays (`toolSpot`). */
+const TOOL_END_MARGIN = 0.2;
+
+/** How far (m) to `station`'s right of its middle Sim `rig` stands (in its own frame): the half of it they cook at. */
+function stationSide(rig: SimRig, station: PlacedObject): number {
+  const f = station.yaw;
+  return (rig.x - station.cx) * Math.cos(f) - (rig.z - station.cz) * Math.sin(f);
+}
 
 /**
  * Residents far off (in low detail: `faceDetail`'s `far`) are posed in full every this many frames, not every frame
@@ -242,10 +270,18 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** Per Sim row: what it holds of the object it uses (content `held`), in the left and the right hand (or both). */
   private readonly leftProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
   private readonly rightProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
+  /**
+   * Per Sim row, per node of the thing they ride (`mountNodes`: its frame, its wheels, its cranks): the prop drawn
+   * for it (`PlacedObject.ride`'s keys), under them while they ride and on the way between it and its place as they
+   * get on and off (`writeMount`).
+   */
+  private readonly mountProps: (string | null)[][] = Array.from({ length: 4 }, () => new Array<string | null>(MAX_CHARACTERS).fill(null));
   /** The slots above, which a pose carried along takes with it (`carryPose`). */
-  private readonly carriedProps = [this.heldProp, this.toolProp, this.leftProp, this.rightProp];
+  private readonly carriedProps = [this.heldProp, this.toolProp, this.leftProp, this.rightProp, ...this.mountProps];
   /** Per Sim row: the prop in their hand for what they do (`ACTIONS[tag].prop`: a book, a cup, a phone). */
   private readonly handProp: (string | null)[] = new Array(MAX_CHARACTERS).fill(null);
+  /** How many of the slots above hold each prop, kept by `writeProp` (none: not there): `showProp` looks it up. */
+  private readonly propUses = new Map<string, number>();
   /** Scratch for `writeHand`: the hands as just posed. */
   private readonly hands: Hands = { palms: new Float32Array(6), quats: new Float32Array(8), head: new Float32Array(3), yaw: 0, floorY: 0, scale: 1, size: 1 };
   /** Scratch for `writeHeld`: a frame's axes and origin (x, y, z each). */
@@ -287,6 +323,36 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   readonly visible = new Uint8Array(MAX_CHARACTERS);
   /** Per row: sat in a car that drives last frame (`setCarRide`; they stay with it till it has stopped where the snapshot has it). */
   private readonly inCar = new Uint8Array(MAX_CHARACTERS);
+  /**
+   * Per row, the thing they ride (a bike, an e-scooter: the snapshot's `ride`, `vehicles.ts`) as drawn: its stable id
+   * (-1: none), how far on it they are (`mountOn`: 0 at its place, 1 riding; `MOUNT_SECONDS` each way), and how far
+   * round its wheels and its cranks have gone (rad).
+   */
+  private readonly mountId = new Int32Array(MAX_CHARACTERS).fill(-1);
+  private readonly mountOn = new Float32Array(MAX_CHARACTERS);
+  private readonly wheelTurn = new Float32Array(MAX_CHARACTERS);
+  private readonly crankTurn = new Float32Array(MAX_CHARACTERS);
+  /** What the resident being posed rides now (`update`, for `choose`); null when they don't. */
+  private mounting: Mount | null = null;
+  /**
+   * The things ridden now (away at work too) or being got on or off (stable ids): not drawn where they stand
+   * (the renderer's `LotContents.hideRidden`). Changed only when they do (`riddenChanged`).
+   */
+  readonly ridden = new Set<number>();
+  riddenChanged = false;
+  private readonly riddenNow = new Set<number>();
+  /**
+   * The bikes and e-scooters left out by a place their riders are visiting (stable id: where it stands, which way it
+   * faces), once they're off them: for the renderer to draw there (`ParkedRides.setAway`). Changed only when they do
+   * (`parkedChanged`).
+   */
+  readonly parked = new Map<number, ParkedAt>();
+  parkedChanged = false;
+  private readonly parkedNow = new Map<number, ParkedAt>();
+  /** Per row, where the thing they ride was left out (the snapshot's `parkX`/`parkZ`/`parkYaw`), while getting off it there and on again: it slides between there and under them, not its place at home. */
+  private readonly parkAt: (ParkedAt | null)[] = new Array(MAX_CHARACTERS).fill(null);
+  /** Scratch for `writeMount`: matrices. */
+  private readonly mountM = [new Float32Array(16), new Float32Array(16), new Float32Array(16)];
   private lastNow = 0;
   /** Seconds of animation played: stands still while the game is paused (Sims hold their pose). */
   private clock = 0;
@@ -613,6 +679,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         lookYaw: 0,
         lookPitch: 0,
         approach: 0,
+        aside: 0,
         feetUp: false,
         feet: new Float32Array(4),
         bearing: new Float32Array(BEARING_FLOATS),
@@ -766,12 +833,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const lift = (o.tall ?? 0) / 100;
       const seat = seatOf(def, o.def);
       const stand = def?.stand ? { h: def.stand.height + lift, motion: def.stand.motion } : null;
-      const paint = def?.held ? colorsKey(paintColors(this.assets.get(def.model, 'model'), o.colors)) : '';
+      const mount = def?.vehicle ? MOUNTS[o.def] : undefined;
+      const paint = def?.held || mount ? colorsKey(paintColors(this.assets.get(def!.model, 'model'), o.colors)) : '';
       const held = def?.held ? { keys: [def.held.part].flat().map((part) => `${def.model}#${part}${paint ? `@${paint}` : ''}`), grip: def.held.grip } : null;
+      // (Ridden, drawn under its rider: `writeMount`.)
+      const ride = mount && def?.vehicle ? { mount, keys: mountNodes(mount).map((node) => `${def.model}#node:${node}${paint ? `@${paint}` : ''}`), speed: def.vehicle.speed, yaw: ((o.rot * 90 + (o.turn ?? 0)) * Math.PI) / 180 } : undefined;
       const stool = FOOTSTOOLS[o.def];
       const made = def?.footprint ?? [1, 1];
       const footstool = stool ? { hw: (stool[0] / 2) * (o.size ? o.size[0] / (made[0] * 100) : 1), hd: (stool[1] / 2) * (o.size ? o.size[1] / (made[1] * 100) : 1), yaw: ((o.rot * 90 + (o.turn ?? 0)) * Math.PI) / 180 } : null;
-      return { def: o.def, rot: o.rot, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, builtIn: !!def?.surface && seatsItself(def), quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, footstool, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
+      return { def: o.def, rot: o.rot, yaw: (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, builtIn: !!def?.surface && seatsItself(def), quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, footstool, ride, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
     this.footstools = this.objects.filter((o) => o.footstool);
     world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
@@ -944,9 +1014,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** Per frame: a prop nobody holds or works with isn't drawn (no draw call for its empty instances). */
   private readonly showProp = (p: P | null, key: string): void => {
     if (!p) return;
-    const used = this.heldProp.includes(key) || this.toolProp.includes(key) || this.leftProp.includes(key) || this.rightProp.includes(key) || this.handProp.includes(key);
     // (The `stress` ghosts' rigs are in `sims` already, in the rows after the residents'.)
-    this.view.showProp(p, used ? Math.min(this.sims.length, MAX_CHARACTERS) : 0);
+    this.view.showProp(p, this.propUses.has(key) ? Math.min(this.sims.length, MAX_CHARACTERS) : 0);
   };
 
   /**
@@ -1052,12 +1121,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   /**
    * The prop in a Sim's hand for what they do (`ACTIONS[tag].prop`: a book, a cup, a phone, a cue; `plate`: what they
-   * eat); none while walking, talking (`busy`), lying, sitting down or getting up.
+   * eat, `carried` in the hand); none while walking, talking (`busy`), lying, sitting down or getting up.
    */
-  private handPropOf(rig: SimRig, pose: number, busy: boolean, tag: string, plate: string): HandProp | null {
+  private handPropOf(rig: SimRig, pose: number, busy: boolean, tag: string, plate: string, carried: boolean): HandProp | null {
     const act = ACTIONS[tag]?.prop;
     const still = !busy && rig.tagKnown && rig.walkT < 0 && pose !== Pose.Lie && !RISING.has(rig.cur.key);
-    return still && act ? (typeof act === 'function' ? act(rig.useDef, plate, pose === Pose.Sit) : act) : null;
+    return still && act ? (typeof act === 'function' ? act(rig.useDef, plate, pose === Pose.Sit, carried) : act) : null;
   }
 
   /** Prop `p` (`handPropOf`) in Sim row `i`'s hand, placed by the hands as just posed; not outside the clips it is held in. */
@@ -1142,10 +1211,77 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     return p.during.some(([a, b]) => f >= a && f <= b);
   }
 
+  /**
+   * The thing Sim row `i` rides (`mountId`, `PlacedObject.ride`), drawn by its nodes: under them as they ride (its
+   * saddle under the hips, an e-scooter's deck under the feet), facing the way they go, its wheels turned by the way
+   * they've gone and a bike's cranks with its back wheel (`crankTurn`, the feet on its pedals: `pedalRide`); between
+   * its place and there as they get on or off (`mountOn`). `dt`: seconds since they were last posed.
+   */
+  private writeMount(rig: SimRig, i: number, dt: number): void {
+    const id = this.mountId[i];
+    const obj = id >= 0 ? this.objectById.get(id) : undefined;
+    const ride = obj?.ride;
+    const on = this.mountOn[i];
+    if (!obj || !ride || on <= 0) {
+      for (const slot of this.mountProps) this.writeProp(slot, i, null);
+      return;
+    }
+    const m = ride.mount;
+    // The way gone (m), and the cranks round with the back wheel (no quicker than `MOST_CADENCE`).
+    const way = this.mounting ? rig.speed * dt : 0;
+    this.wheelTurn[i] = (this.wheelTurn[i] + way) % 1e4;
+    const back = m.wheels[m.wheels.length - 1].r;
+    if (m.cranks) this.crankTurn[i] = (this.crankTurn[i] + Math.min(way / back / m.cranks.gear, MOST_CADENCE * Math.PI * 2 * dt)) % (Math.PI * 2);
+    // Its model's place: from where it stands to under the rider (its +x the way they face); left out by a place
+    // they're visiting, from where it was left.
+    const e = smooth(on);
+    const fx = Math.sin(rig.yaw);
+    const fz = Math.cos(rig.yaw);
+    const park = this.parkAt[i];
+    const x = lerp(park ? park.x : obj.cx, rig.x - fx * m.seat[0], e);
+    const z = lerp(park ? park.z : obj.cz, rig.z - fz * m.seat[0], e);
+    const yaw = lerpAngle(park ? park.yaw : ride.yaw, rig.yaw - Math.PI / 2, e);
+    const [base, turn, out] = this.mountM;
+    compose(1, 1, 1, 0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2), x, rig.floorY * e, z, base);
+    const nodes = ride.keys.length;
+    for (let k = 0; k < nodes; k++) {
+      const key = ride.keys[k];
+      const matrices = this.writeProp(this.mountProps[k], i, key);
+      const pivot = this.props.built(key)?.pivot;
+      if (!matrices || !pivot) continue;
+      // Each node turned about its axle (its pivot; the model's z, across it): the wheels forward as they roll,
+      // the cranks round from where the model has them to where the feet are (0: the right pedal at the bottom,
+      // then back).
+      const w = k - m.still.length;
+      const wheel = w >= 0 && w < m.wheels.length ? m.wheels[w] : null;
+      const angle = wheel ? -this.wheelTurn[i] / wheel.r : w === m.wheels.length && m.cranks ? -(m.cranks.rest + this.crankTurn[i]) : 0;
+      if (angle) {
+        // (Off its pivot, turned, back onto it, then the model's place: the node's x, y, z at rest are its pivot's.)
+        compose(1, 1, 1, 0, 0, Math.sin(angle / 2), Math.cos(angle / 2), 0, 0, 0, turn);
+        const [px, py, pz] = [pivot[12], pivot[13], pivot[14]];
+        // turn' = T(-p) · R · T(p): R's rotation, translation p - R p.
+        turn[12] = px - (turn[0] * px + turn[4] * py + turn[8] * pz);
+        turn[13] = py - (turn[1] * px + turn[5] * py + turn[9] * pz);
+        turn[14] = pz - (turn[2] * px + turn[6] * py + turn[10] * pz);
+        multiply(turn, base, out);
+        matrices.set(out, i * 16);
+      } else matrices.set(base, i * 16);
+    }
+    for (let k = nodes; k < this.mountProps.length; k++) this.writeProp(this.mountProps[k], i, null);
+  }
+
   /** Sim row `i` draws prop `key` (null: none) in `slot`; the old one's matrix is cleared. */
   private writeProp(slot: (string | null)[], i: number, key: string | null): Float32Array | null {
     const old = slot[i];
     if (old && old !== key) this.props.built(old)?.matrices.fill(0, i * 16, i * 16 + 16);
+    if (old !== key) {
+      if (old !== null) {
+        const n = (this.propUses.get(old) ?? 0) - 1;
+        if (n > 0) this.propUses.set(old, n);
+        else this.propUses.delete(old);
+      }
+      if (key !== null) this.propUses.set(key, (this.propUses.get(key) ?? 0) + 1);
+    }
     slot[i] = key;
     return key ? (this.prop(key)?.matrices ?? null) : null;
   }
@@ -1175,19 +1311,23 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   }
 
   /**
-   * What Sim row `i` carried in, put down on the station it works at (`SET_DOWN`; none: in the oven): on its top, to
-   * the side of the step's tool (`writeTool`) away from the station's middle, else of the middle.
+   * What Sim row `i` carried in, put down on the station it works at (`SET_DOWN`; none: in the oven): at its place
+   * there (`SET_DOWN_SPOTS`), else on its top to the side of the step's tool (`writeTool`) away from the station's
+   * middle, else of the middle.
    */
   private writeSetDown(rig: SimRig, i: number, item: ItemDef | undefined, tag: string, station: PlacedObject | null | undefined): void {
     const m = this.writeProp(this.heldProp, i, item && station ? (item.model ?? `item.${item.id}`) : null);
     if (!m || !station) return;
-    const f = (station.rot * Math.PI) / 2;
-    const spot = STATION_SPOTS[station.def]?.[tag];
-    const top = this.content?.object(station.def)?.surface?.height ?? spot?.[2] ?? this.content?.cooking.defaultSurfaceHeight ?? 0.9;
-    // (In the station's own frame: right of its middle, or of the tool's spot, by the side it isn't on.)
-    const x = spot ? spot[0] - Math.sign(spot[0] || 1) * SET_DOWN_SIDE : SET_DOWN_SIDE;
-    const z = spot ? spot[1] : 0;
-    placeProp(m, i, station.cx + x * Math.cos(f) + z * Math.sin(f), rig.floorY + top, station.cz - x * Math.sin(f) + z * Math.cos(f), (station.rot * Math.PI) / 2, 1);
+    const f = station.yaw;
+    const side = stationSide(rig, station);
+    const at = spotOn(SET_DOWN_SPOTS, station.def, tag, side);
+    const spot = this.toolSpot(rig, station, tag);
+    const top = at?.[2] ?? this.content?.object(station.def)?.surface?.height ?? spot?.[2] ?? this.content?.cooking.defaultSurfaceHeight ?? 0.9;
+    // (In the station's own frame: its place, else right of its middle, or beside the tool's spot on the side away from
+    // the middle: towards it, it stood on what the spot keeps clear of, a grill station's hood.)
+    const x = at ? at[0] : spot ? spot[0] + Math.sign(spot[0] || 1) * SET_DOWN_SIDE : SET_DOWN_SIDE;
+    const z = at ? at[1] : spot ? spot[1] : 0;
+    placeProp(m, i, station.cx + x * Math.cos(f) + z * Math.sin(f), rig.floorY + top, station.cz - x * Math.sin(f) + z * Math.cos(f), f, 1);
   }
 
   /**
@@ -1402,26 +1542,57 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   /**
    * The tool on the station Sim row `i` cooks at (a chopping board, a pan, food on the grill; by
-   * action tag): at its spot (`STATION_SPOTS`), else on its top, a little towards the cook.
+   * action tag): at its place (`toolSpot`; none where it's done inside).
    */
   private writeTool(rig: SimRig, i: number, tag: string, station: PlacedObject | null | undefined): void {
-    const key = station ? (STATION_PROPS[tag] ?? null) : null;
-    const m = this.writeProp(this.toolProp, i, key);
-    if (!m || !station) return;
-    const spot = STATION_SPOTS[station.def]?.[tag];
-    if (spot) {
-      const f = (station.rot * Math.PI) / 2;
-      const [x, z, y] = spot;
-      placeProp(m, i, station.cx + x * Math.cos(f) + z * Math.sin(f), rig.floorY + y, station.cz - x * Math.sin(f) + z * Math.cos(f), rig.yaw, 1);
-      return;
-    }
+    const spot = station && STATION_PROPS[tag] ? this.toolSpot(rig, station, tag) : null;
+    const m = this.writeProp(this.toolProp, i, spot ? STATION_PROPS[tag] : null);
+    if (!m || !station || !spot) return;
+    const f = station.yaw;
+    const [x, z, y] = spot;
+    placeProp(m, i, station.cx + x * Math.cos(f) + z * Math.sin(f), rig.floorY + y, station.cz - x * Math.sin(f) + z * Math.cos(f), rig.yaw, 1);
+  }
+
+  /**
+   * Where on `station` (its own frame) the tool of Sim `rig`'s step `tag` goes: its place (`STATION_SPOTS`, the one on
+   * the cook's half where it has one for each), else on its top straight in front of the cook (a board on a long island
+   * or a two-tile counter before whichever end they stand at, not at its middle), kept `TOOL_END_MARGIN` in from its
+   * ends, a little in from the middle towards them. Null: done inside it, not drawn.
+   */
+  private toolSpot(rig: SimRig, station: PlacedObject, tag: string): StationSpot | null {
+    const side = stationSide(rig, station);
+    const spot = spotOn(STATION_SPOTS, station.def, tag, side);
+    if (spot !== undefined) return spot;
     const def = this.content?.object(station.def);
     const top = def?.surface?.height ?? this.content?.cooking.defaultSurfaceHeight ?? 0.9;
-    const dx = rig.x - station.cx;
-    const dz = rig.z - station.cz;
-    const d = Math.hypot(dx, dz) || 1;
-    const toward = Math.min(0.15, d * 0.3);
-    placeProp(m, i, station.cx + (dx / d) * toward, rig.floorY + top + 0.005, station.cz + (dz / d) * toward, rig.yaw, 1);
+    const width = def?.surface?.size?.[0] ?? def?.footprint?.[0] ?? 1;
+    const mid = def?.surface?.at?.[0] ?? 0;
+    const half = Math.max(0, width / 2 - TOOL_END_MARGIN);
+    const f = station.yaw;
+    const ahead = (rig.x - station.cx) * Math.sin(f) + (rig.z - station.cz) * Math.cos(f);
+    return [Math.min(mid + half, Math.max(mid - half, side)), Math.sign(ahead) * Math.min(0.15, Math.abs(ahead) * 0.3), top + 0.005];
+  }
+
+  /**
+   * How far (m) Sim `rig` steps in from where it stands, and across (to the right of its facing), to work at the tool
+   * on `station` (`writeTool`: its spot, else a little in from the top's middle): the work clips' hands are
+   * `STATION_REACH` ahead of the feet and before the body, made for a counter's front edge straight ahead, and a pot on
+   * a cooker's front burner to one side or a board on a counter's middle is further. Never back; no more than
+   * `STATION_STEP_MAX` in or across.
+   */
+  private stationReach(rig: SimRig, station: PlacedObject, tag: string): [number, number] {
+    const spot = this.toolSpot(rig, station, tag);
+    if (!spot) return [0, 0];
+    const fx = Math.sin(rig.yaw);
+    const fz = Math.cos(rig.yaw);
+    const f = station.yaw;
+    const sx = station.cx + spot[0] * Math.cos(f) + spot[1] * Math.sin(f);
+    const sz = station.cz - spot[0] * Math.sin(f) + spot[1] * Math.cos(f);
+    const ahead = (sx - rig.x) * fx + (sz - rig.z) * fz;
+    const across = (sx - rig.x) * fz - (sz - rig.z) * fx;
+    // (Along a station only they cook at, to its far end; one two cook at side by side, within their half.)
+    const along = (this.content?.object(station.def)?.slots ?? 1) > 1 ? STATION_ALONG_SHARED : STATION_ALONG_MAX;
+    return [Math.min(STATION_STEP_MAX, Math.max(0, ahead - STATION_REACH * rig.scale)), Math.min(along, Math.max(-along, across))];
   }
 
   /** Head-top position of Sim `i` (false if not drawn). */
@@ -1453,6 +1624,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** `storey`: the storey in view; residents above it (or, viewing the basement, not in it) aren't drawn. */
   update(frame: FrameState, inView: (x: number, z: number) => boolean, shadows: Float32Array, storey = Infinity, doorHand?: Float32Array): void {
     this.restTaken.clear();
+    this.riddenNow.clear();
+    this.parkedNow.clear();
     this.seedCount = 0;
     const set = this.set;
     if (!set) return;
@@ -1541,10 +1714,28 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       let tz = cz;
       let th = ch;
       let tyaw = curr[o + k.yaw];
+      // On a bike or an e-scooter of theirs (the snapshot's `ride`, a stable id; `vehicles.ts`): drawn under them,
+      // not where it stands, away at work too (`ridden`).
+      const rideId = k.ride === undefined ? -1 : curr[o + k.ride] | 0;
+      const mounted = rideId >= 0 ? this.objectById.get(rideId) : undefined;
+      const mount = mounted?.ride ? mounted : null;
+      if (rideId >= 0) this.riddenNow.add(rideId);
+      // (Left out by a place they're visiting: not at its place either, but where it stands; got on there again, it
+      // slides from there.)
+      else if (rideId <= -2) {
+        const id = -2 - rideId;
+        this.riddenNow.add(id);
+        const at = k.parkX === undefined ? null : { x: curr[o + k.parkX], z: curr[o + k.parkZ!], yaw: curr[o + k.parkYaw!] };
+        if (at) {
+          this.parkAt[i] = at;
+          if (this.mountId[i] < 0) this.parkedNow.set(id, at);
+        }
+      }
       // A walk's first and last step: moving in one snapshot and standing in the other glides too,
       // or the start and the end of every walk jump at speeds 4-5 (a step is 2.25 m at speed 4).
+      // (Riding, as far as they ride between them.)
       const walking = curr[o + k.moving] > 0 || prev[o + k.moving] > 0;
-      if (walking ? Math.hypot(cx - prev[o + k.x], cz - pz) < reach : Math.abs(cx - prev[o + k.x]) + Math.abs(cz - pz) < SNAP_DISTANCE) {
+      if (walking ? Math.hypot(cx - prev[o + k.x], cz - pz) < reach * Math.max(1, mount?.ride?.speed ?? 1) : Math.abs(cx - prev[o + k.x]) + Math.abs(cz - pz) < SNAP_DISTANCE) {
         tx = prev[o + k.x] + (cx - prev[o + k.x]) * alpha;
         tz = pz + (cz - pz) * alpha;
         if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * alpha;
@@ -1572,6 +1763,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         this.writeProp(this.leftProp, i, null);
         this.writeProp(this.rightProp, i, null);
         this.writeProp(this.handProp, i, null);
+        for (const slot of this.mountProps) this.writeProp(slot, i, null);
+        // (Back in view on it, riding: no getting on.)
+        this.mountId[i] = mount ? rideId : -1;
+        this.mountOn[i] = mount ? 1 : 0;
+        if (mount) this.parkAt[i] = null;
+        else if (rideId <= -2 && this.parkAt[i]) this.parkedNow.set(-2 - rideId, this.parkAt[i]!);
         continue;
       }
       // Far off (in low detail), posed in full only every `FAR_EVERY` frames (staggered by row): between, the pose
@@ -1619,6 +1816,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
       // Position / speed / facing.
       const appeared = !rig.visible || stalled;
+      // Getting on or off what they ride: it goes from its place to under them, or back (`MOUNT_SECONDS`).
+      const mountStep = (dt * Math.max(1, animRate)) / MOUNT_SECONDS;
+      if (mount) this.mountId[i] = rideId;
+      this.mountOn[i] = appeared ? (mount ? 1 : 0) : mount ? Math.min(1, this.mountOn[i] + mountStep) : Math.max(0, this.mountOn[i] - mountStep);
+      if (this.mountOn[i] <= 0) this.mountId[i] = -1;
+      if (this.mountId[i] >= 0) this.riddenNow.add(this.mountId[i]);
+      // (On it again: from now on its place is home's.)
+      if (mount && this.mountOn[i] >= 1) this.parkAt[i] = null;
+      // (Off it where it was left: drawn there from now, by the renderer.)
+      if (rideId <= -2 && this.mountId[i] < 0 && this.parkAt[i]) this.parkedNow.set(-2 - rideId, this.parkAt[i]!);
+      this.mounting = mount?.ride?.mount ?? null;
       if (appeared) {
         rig.x = tx;
         rig.z = tz;
@@ -1645,7 +1853,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         const inst = dist / dt;
         rig.speed += (Math.min(inst, 20) - rig.speed) * (1 - Math.exp(-dt * 10));
       }
-      if (moving || riding || dist > SNAP_DISTANCE || appeared) {
+      if (moving || riding || this.mounting || dist > SNAP_DISTANCE || appeared) {
         rig.x = gx;
         rig.z = gz;
         rig.walkT = -1;
@@ -1818,6 +2026,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // Procedural layers.
       resetAdditive(this.add);
       this.procedural(rig, i, social, role, partnerRig, pose, moving, time, dt);
+      if (this.mounting?.cranks) this.pedalRide(rig, i, this.mounting.cranks, this.mounting.seat[0]);
       // A baby in someone's arms: knees drawn up a little (the baby's lying clips have them drawn up already).
       const holder = this.heldBy[i] >= 0 ? this.sims[this.heldBy[i]] : null;
       const inArms = holder?.visible ? smooth(holder.liftW) : 0;
@@ -1846,9 +2055,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       pl.qy = sy * cp;
       pl.qz = -sy * sp;
       pl.qw = cyw * cp;
-      pl.x = at.x + Math.sin(at.yaw) * rootFwd;
+      pl.x = at.x + Math.sin(at.yaw) * rootFwd + Math.cos(at.yaw) * rig.aside;
       pl.y = rootY + rig.floorY;
-      pl.z = at.z + Math.cos(at.yaw) * rootFwd;
+      pl.z = at.z + Math.cos(at.yaw) * rootFwd - Math.sin(at.yaw) * rig.aside;
       this.stepPlace(rig, pl, step);
       if (rig.walkT >= 0) this.walkPlace(rig, pl, at.x + Math.sin(rig.walkYaw) * rootFwd, at.z + Math.cos(rig.walkYaw) * rootFwd, step);
       if (pose === Pose.Sit) {
@@ -1878,10 +2087,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       if (inArms > 0) cradled(this.place, this.cradleQ, this.cradle, rig, this.sims[this.heldBy[i]]!, this.heldBy[i], inArms);
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp, true);
       this.writeSit(rig, i);
+      this.writeMount(rig, i, dt);
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) writeCradle(set.bone, this.scratch.worldT, this.cradle, i, rig);
       this.writeBlanket(rig, i, pose, dt, appeared);
-      // (A plate held while eating it with a fork: on the left palm, the fork in the right hand.)
-      const inHand = this.handPropOf(rig, pose, moving || !!social, tag, plate);
+      // (A plate held while eating it with a fork, or a bite of it by hand: on the left palm, the fork or the bite in the right hand.)
+      const inHand = this.handPropOf(rig, pose, moving || !!social, tag, plate, carry !== '');
       if (setDown) this.writeSetDown(rig, i, setDown === 'top' ? item : undefined, tag, useObj);
       else this.writeCarried(rig, i, handedYet(rig, tag) ? item : undefined, inHand?.grip === 'bite' && inHand.hand !== 'l' ? -1 : 1);
       this.writeHeld(rig, i, pose, moving);
@@ -1926,6 +2136,36 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       b.shown = b.drawn;
       this.view.quiltRows(b.quilt, b.drawn, true);
     }
+    // What's ridden changed: the renderer hides those where they stand.
+    let same = this.riddenNow.size === this.ridden.size;
+    if (same) {
+      for (const id of this.riddenNow) {
+        if (this.ridden.has(id)) continue;
+        same = false;
+        break;
+      }
+    }
+    if (!same) {
+      this.ridden.clear();
+      for (const id of this.riddenNow) this.ridden.add(id);
+      this.riddenChanged = true;
+    }
+    // Left out where: changed, the renderer draws them again.
+    let still = this.parkedNow.size === this.parked.size;
+    if (still) {
+      for (const [id, at] of this.parkedNow) {
+        const was = this.parked.get(id);
+        if (was && was.x === at.x && was.z === at.z && was.yaw === at.yaw) continue;
+        still = false;
+        break;
+      }
+    }
+    if (!still) {
+      this.parked.clear();
+      for (const [id, at] of this.parkedNow) this.parked.set(id, at);
+      this.parkedChanged = true;
+    }
+    this.mounting = null;
     this.props.forEachBuilt(this.showProp);
     this.pullChairs();
     this.upload();
@@ -1978,6 +2218,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // Step towards a partner (hugs, kisses, fights): eased towards `reach` at `reachRate`.
     let reach = 0;
     let reachRate = 4;
+    let aside = 0;
     // Using a thing from inside or up against it this frame (`stepIn`).
     let inside = false;
     // Placed in a frame of its own this frame (`Player.frame`: the bunk's ladder).
@@ -1985,6 +2226,24 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
     if (this.force) {
       key = this.force;
+    } else if (this.mounting) {
+      // On a bike, sat on its saddle (the root as on a seat over it), the feet on the pedals (`pedalRide`); on an
+      // e-scooter, stood on its deck; the hands on the grips. Getting on and off fades over as it slides under
+      // them (`writeMount`).
+      const m = this.mounting;
+      rig.useObj = null;
+      rig.useDef = '';
+      hands = HANDS.grip;
+      fade = MOUNT_SECONDS;
+      if (m.kind === 'bike') {
+        const sp = this.sitPelvis.get(rig.body.name)!;
+        key = this.sizedClip(rig, m.clip === 'rideBikeChild' ? RIDE_BIKE_CHILD : RIDE_BIKE);
+        rootY = m.seat[1] - sp.y * rig.scale;
+        rootFwd = -sp.z * rig.scale;
+      } else {
+        key = this.sizedClip(rig, RIDE_SCOOTER);
+        rootY = m.seat[1];
+      }
     } else if (pose === Pose.Lie) {
       const obj = (known ? useObj : null) ?? this.objectAt(rig.x, rig.z);
       const bed = (obj && BEDS[obj.def]) || DEFAULT_BED;
@@ -2092,9 +2351,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         const up = known ? (typeof act?.upper === 'function' ? act.upper(rig.useDef) : act?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
         // Eating / drinking now and then (between sips the cup held: `between`); holding a book or phone throughout.
         if (up === 'eat' || up === 'drink') {
-          // (With cutlery, the bite stops a fork's length off the mouth: `eatFork`.)
-          const bite = up === 'eat' && withCutlery(rig.plate) ? 'eatFork' : up;
-          upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? bite : known ? (act?.between ?? '') : '';
+          // (With cutlery or a bite in the hand, the bite stops a fork's length off the mouth: `eatFork`; a drink served
+          // as a plate is sipped from, the glass held between sips: `eatClip`.)
+          const bite = up === 'eat' ? eatClip(rig.plate, carry !== '') : up;
+          upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? bite : known ? (bite === 'drink' ? 'holdCup' : (act?.between ?? '')) : '';
         }
         else if (up) upper = up;
       }
@@ -2170,7 +2430,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
       // Used from inside or up against it (`STEP_IN`): the clip for their height.
-      // (With every lane taken by others, from where sim-core stood them: three at the bus stop's timetable.)
+      // (With every lane taken by others, from where sim-core stood them: three at the taxi rank's fares.)
       const entry = known && obj ? stepInFor(obj.def, tag) : undefined;
       const into = entry && obj && (rig.inside === entry || !Number.isNaN(this.freeLane(rig, entry, obj))) ? entry : undefined;
       const fitted = into && obj ? this.stepSeq(rig, into, obj) : undefined;
@@ -2208,6 +2468,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
           rig.stepTime = 0;
         }
         key = seq[rig.seq % seq.length];
+        // (Eating standing with cutlery or a bite in the hand, the plate on the left palm: the hand a fork's length off the
+        // mouth, as seated, not the plate to the face; between bites the plate held in front, not at the hip.)
+        if (tag === 'eat' && biteOf(rig.plate, carry !== '')) {
+          const bite = eatClip(rig.plate, carry !== '');
+          if (key === 'eat') key = bite;
+          else if (key === 'idle') key = bite === 'drink' ? 'holdCup' : 'holdPlate';
+        }
         repeat = true;
         // Up to the crib's rail to pick the baby up, back from it holding them (`cuddles`).
         // (Stepped in to a thing, `stepIn` places them: a reach as well would add to it, and walk them into the thing.)
@@ -2222,6 +2489,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         } else if (obj && HUGGED[obj.def]) {
           // Up to the teddy, to hug it.
           reach = HUGGED[obj.def].reach;
+        } else if (obj && STATION_PROPS[tag]) {
+          // Working at a station's tool: up to it and across to it, so the hands are at the pot, the board, the grill.
+          [reach, aside] = this.stationReach(rig, obj, tag);
         }
         const on = obj?.stand;
         // (Holding its grips: `GRIPPED`.)
@@ -2266,6 +2536,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       reach = rig.approach;
     }
     rig.approach += (reach - rig.approach) * Math.min(1, step * reachRate);
+    rig.aside += (aside - rig.aside) * Math.min(1, step * reachRate);
     const dir = rig.dir;
     if (dir?.clip) {
       key = dir.clip;
@@ -2310,11 +2581,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (key !== 'standUp') rig.fromBed = false;
     if (key !== up) rig.rising = false;
     if (pose !== Pose.Sit) rootFwd += this.tuckOut(rig, key, step);
-    // Carrying something while walking or standing about (not while using a station with it).
-    if (carry && pose === Pose.Stand && !upper && !dir?.clip && key !== up && (moving || !rig.useSeq) && social !== Anim.Hug && social !== Anim.Fight) {
-      upper = carry;
+    // Carrying something while walking or standing about (not while using a station with it), and while turning
+    // to what they'll use it at: still held, not dropped to the hips for the turn; turning to the table to serve it,
+    // already bending to put it down (the serve itself is short, a turn's worth).
+    const turning = !moving && isTurn(key);
+    if (carry && pose === Pose.Stand && !upper && !dir?.clip && !this.mounting && key !== up && (moving || !rig.useSeq || turning) && social !== Anim.Hug && social !== Anim.Fight) {
+      upper = turning && tag === 'serve' ? 'setDown' : carry;
       hands = HANDS.hold;
       if (key === 'foldArms') key = 'idle';
+    } else if (turning && tag === 'serve' && !carry && pose === Pose.Stand && !upper && !dir?.clip) {
+      // (Picking an armful up off the table, `serve` with nothing in hand yet: bending to it through the turn too.)
+      upper = 'setDown';
     }
     const fx = Math.sin(rig.yaw);
     const fz = Math.cos(rig.yaw);
@@ -2407,6 +2684,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       rig.upperFade = 1;
       rig.upperW = rig.upperTarget;
       rig.approach = reach;
+      rig.aside = aside;
       rig.hands = hands;
     }
   }
@@ -2693,6 +2971,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     free.head = 1;
     if (rig.dir || rig.body.stage === 'baby' || pose === Pose.Lie || this.force) free.head = 0;
     else if (pose === Pose.Sit) free.posture = key === 'sit' || key === 'sitTalk' ? 0.3 : 0;
+    // (Riding: the hands on the grips.)
+    else if (this.mounting) free.posture = 0.3;
     else if (!(
       social === Anim.Hug ||
       social === Anim.Kiss ||
@@ -2717,7 +2997,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
    * fight (those place the body themselves); a baby never.
    */
   private standsFree(rig: SimRig, i: number, pose: number, moving: boolean, social: number, useObj: PlacedObject | null | undefined, appeared: boolean): boolean {
-    if (pose !== Pose.Stand || moving || appeared || this.force || rig.body.stage === 'baby' || this.heldBy[i] >= 0) return false;
+    if (pose !== Pose.Stand || moving || appeared || this.force || this.mounting || rig.body.stage === 'baby' || this.heldBy[i] >= 0) return false;
     if (rig.walkT >= 0 || rig.inside || rig.outT >= 0 || useObj?.stand || rig.rising || rig.fromBed || rig.riseK < 1) return false;
     if (rig.cuddleT >= 0 || rig.liftW > 0 || !Number.isNaN(rig.faceX)) return false;
     if (social === Anim.Hug || social === Anim.Kiss || social === Anim.Fight) return false;
@@ -3363,15 +3643,30 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
    * the object's loop (the bike's `pedals_turn`; without one playing, at its pace from the use's start).
    */
   private pedal(rig: SimRig, pedals: NonNullable<Seat['pedals']>): void {
-    const fits = this.legFits.get(rig.body.name)?.get(rig.cur.key);
     const obj = rig.useObj;
-    if (!fits || !obj) return;
-    const B = this.set!.bone;
-    const s = rig.scale;
-    const w = smooth(rig.w);
+    if (!obj) return;
     // The axle ahead of the Sim (the object's middle, then the pedals' offset from it).
     const ahead = (obj.cx - rig.x) * Math.sin(rig.yaw) + (obj.cz - rig.z) * Math.cos(rig.yaw) + pedals.fwd;
     const phase = (rig.useId >= 0 ? this.loopOf?.(rig.useId) : null) ?? (rig.actTime / PEDAL.turn) % 1;
+    this.pedalAt(rig, pedals.h, ahead, pedals.crank, phase);
+  }
+
+  /** Riding a bike (`MOUNTS`): the feet on its pedals as its cranks have gone round (`crankTurn`, `writeMount`), `seat` its saddle's place along it. */
+  private pedalRide(rig: SimRig, i: number, cranks: NonNullable<Mount['cranks']>, seat: number): void {
+    this.pedalAt(rig, cranks.h, cranks.x - seat, cranks.len, this.crankTurn[i] / (Math.PI * 2));
+  }
+
+  /**
+   * The feet on pedals turning round an axle `h` m up and `ahead` m in front of the Sim, on cranks `crank` m long,
+   * `phase` of a turn round (0: the right pedal at the bottom).
+   */
+  private pedalAt(rig: SimRig, h: number, ahead: number, crank: number, phase: number): void {
+    const fits = this.legFits.get(rig.body.name)?.get(rig.cur.key);
+    if (!fits) return;
+    const B = this.set!.bone;
+    const s = rig.scale;
+    const w = smooth(rig.w);
+    const pedals = { h, crank };
     for (const [fit, thigh, calf, foot, half] of [
       [fits.l, B.thigh_l, B.calf_l, B.foot_l, 0.5],
       [fits.r, B.thigh_r, B.calf_r, B.foot_r, 0],

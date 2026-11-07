@@ -68,7 +68,8 @@
 //! `(0, 1), (0, 2), …, (1, 2), …`, as little-endian f32s) and relationships list only the pairs
 //! that aren't as new (no `chemistry` of their own), and the town file's open-world fields are
 //! kept as they came (`openWorld`, `travel::OpenWorld`: size, roads, areas, terrain masks,
-//! parking, which exits are bus stops, plots' areas and kinds; driveways keep their `road` and
+//! parking, plots' areas and kinds (and, written before the bus was dropped, which exits were bus
+//! stops); driveways keep their `road` and
 //! `s` in `drives`); a car on a trip between hamlets keeps it (`cars[].trip`, state `out` while
 //! it's parked there) and who rides with it (`cars[].riders`; absent: nobody, as in files written
 //! before passengers, so no new version). Absent: a `cosy` town, as before: no road network from
@@ -80,7 +81,22 @@
 //! when absent, so a game without a garage of the player's saves as it did. Still 35: a driveway
 //! running along x keeps the way it runs (`drives[].frontX`, ±1; absent: along z, `front`), so
 //! files without one save as they did; a cosy town's driveways with the road each meets
-//! (`drives[].road`) are what has its cars drive its roads (`cars::settle_all`).
+//! (`drives[].road`) are what has its cars drive its roads (`cars::settle_all`). Still 35: things
+//! a resident asked for, bought and waiting to be set up at home (`setups`: the household, who
+//! asked, the object by id, the tick it was bought and what was paid; `setup.rs`), left out when
+//! there are none, so an older file has none; setting one up isn't saved mid-way (the parcel is
+//! back at the front door after a load). Still 35: a file written while the town had buses (its
+//! bus stops among its exits, `openWorld.stops`) loads without them: the stops are no ways out,
+//! dropped from the exits as it loads, and nothing of the buses was ever saved. Still 35: the
+//! traffic lights (`traffic::Signal`, worked out again on load) are saved where they'd got to (`lights`: each lit junction's arm, its stage, the tick it began),
+//! left out where there are none; absent (an older file, or another number of lit junctions),
+//! they start over at their first arm's green.
+//! Still 35: a resident late for the shift they're at says so (`job.late`, left out when on
+//! time; an older file's are on time).
+//! Still 35: the story may tell of a host bringing a guest something (`served`, the item in `n`,
+//! by id in `refs.item`); older builds drop it, as any kind they don't know. A host's offer, or
+//! something on its way to a guest (`world::TaskKind::Serve`), isn't saved: what's in hand is put
+//! down after a load.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -170,9 +186,41 @@ pub struct SaveFile {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub chemistry: String,
     /// The town file's open-world fields (`travel::OpenWorld`): roads, areas, terrain, parking,
-    /// which exits are bus stops, plots' areas and kinds (absent: none).
+    /// plots' areas and kinds (absent: none).
     #[serde(default, skip_serializing_if = "crate::travel::OpenWorld::is_empty")]
     pub open_world: crate::travel::OpenWorld,
+    /// Things bought that wait to be set up at home (`setup.rs`; absent: none).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub setups: Vec<SetupSave>,
+    /// The traffic lights where they'd got to (`traffic::Light`, a lit junction's each; absent:
+    /// none, or they start over).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lights: Vec<LightSave>,
+    /// The work taxis' runs planned and under way, and who came to work by one (`taxi::Taxis`;
+    /// absent: none).
+    #[serde(default, skip_serializing_if = "crate::taxi::Taxis::is_empty")]
+    pub taxis: crate::taxi::Taxis,
+}
+
+/// A lit junction's lights (`traffic::Light`): whose turn it is (its arm), how far through it
+/// (0 green, 1 amber, 2 all red), and the tick that began.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct LightSave {
+    pub arm: u8,
+    pub stage: u8,
+    pub since: u64,
+}
+
+/// Something bought waiting to be set up (`setup::Setup`), its object by content id (unknown ones
+/// are dropped on load, the money given back).
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetupSave {
+    pub household: u32,
+    pub sim: u32,
+    pub object: String,
+    pub since: u64,
+    pub paid: i64,
 }
 
 /// Food or a dish somewhere, by content id (unknown ones are dropped on load).
@@ -594,6 +642,9 @@ pub struct JobSave {
     /// Mood when leaving for the current shift (absent before v8).
     #[serde(default)]
     pub shift_mood: Option<f32>,
+    /// Late for the current shift (`Job::late`; absent: on time).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub late: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -843,6 +894,7 @@ impl World {
                         shifts: j.shifts,
                         missed: j.missed,
                         shift_mood: some_finite(j.shift_mood),
+                        late: j.late,
                     }),
                     job_search_from: s.job_search_from,
                     nap_minutes: minutes_left(s.nap_until),
@@ -987,23 +1039,12 @@ impl World {
                 .collect(),
             next_event_id: self.events.last_id(),
             former: self.former.clone(),
-            cars: self.cars.clone(),
+            // (The households' cars: the work taxis' slots are the runs', `taxis`.)
+            cars: self.cars.iter().filter(|c| !c.taxi).cloned().collect(),
+            taxis: self.taxis.clone(),
             drives: self.drives.clone(),
             garages: self.garages.clone(),
-            open_world: {
-                let mut file = self.travel.file.clone();
-                // (Indices into the exits as saved: those that are numbers.)
-                file.stops = self
-                    .exits
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, e)| e.iter().all(|v| v.is_finite()))
-                    .enumerate()
-                    .filter(|&(_, (i, _))| self.travel.is_stop(i))
-                    .map(|(k, _)| k as u32)
-                    .collect();
-                file
-            },
+            open_world: self.travel.file.clone(),
             items: self
                 .items
                 .list
@@ -1032,6 +1073,31 @@ impl World {
                 })
                 .collect(),
             next_item: self.items.next_id,
+            setups: self
+                .setups
+                .iter()
+                .map(|s| SetupSave {
+                    household: s.household,
+                    sim: s.sim,
+                    object: content.objects[s.object].id.clone(),
+                    since: s.since,
+                    paid: s.paid,
+                })
+                .collect(),
+            lights: self
+                .traffic
+                .lights
+                .iter()
+                .map(|l| LightSave {
+                    arm: l.arm,
+                    stage: match l.stage {
+                        crate::traffic::Stage::Green => 0,
+                        crate::traffic::Stage::Amber => 1,
+                        crate::traffic::Stage::Clear => 2,
+                    },
+                    since: l.since,
+                })
+                .collect(),
         }
     }
 
@@ -1089,7 +1155,15 @@ impl World {
         world.lifespan = save.lifespan.unwrap_or(crate::lifecycle::Lifespan::Off);
         world.player_moves = save.player_moves.unwrap_or(true);
         world.meta = save.meta.clone();
-        world.exits = save.exits.clone();
+        world.note_paths();
+        // (Bus stops, in a file written while the town had buses, are no ways out.)
+        world.exits = save
+            .exits
+            .iter()
+            .enumerate()
+            .filter(|&(i, _)| !save.open_world.stops.contains(&(i as u32)))
+            .map(|(_, e)| *e)
+            .collect();
         world.set_travel(save.open_world.clone());
         world.plots = save
             .plots
@@ -1345,6 +1419,7 @@ impl World {
                 job.shifts = j.shifts;
                 job.missed = j.missed;
                 job.shift_mood = j.shift_mood.unwrap_or(job.shift_mood);
+                job.late = j.late;
                 Some(job)
             });
             sim.job_search_from = s.job_search_from;
@@ -1381,6 +1456,9 @@ impl World {
                     until: after(left.unwrap_or(content.visits.directed_hours * 60.0)),
                     idle: 0,
                     farewell: 0,
+                    offer_at: 0,
+                    arrived: 0,
+                    leaving: false,
                 })
             });
             for t in &s.tasks {
@@ -1618,9 +1696,44 @@ impl World {
             None => 0,
         };
         world.items.next_id = save.next_item.max(after_last);
+        for s in &save.setups {
+            let object = world.content.object_index(&s.object);
+            let Some(h) = world.households.get_mut(s.household as usize) else {
+                continue;
+            };
+            match object {
+                Some(object) if (s.sim as usize) < world.sims.len() => world.setups.push(
+                    crate::setup::Setup::new(s.household, s.sim, object, s.since, s.paid),
+                ),
+                // (Gone from the content: the money back.)
+                _ => h.funds += s.paid,
+            }
+        }
         world.make_storeys();
         world.refresh_rooms();
         crate::cars::load(&mut world, &save.cars, &save.drives, &save.garages);
+        // (Lights saved: the junctions have them.)
+        world.travel.lights_on = !save.lights.is_empty();
+        crate::traffic::settle(&mut world);
+        // (The lights where they'd got to, for the same lit junctions.)
+        if save.lights.len() == world.travel.signals.len() {
+            world.traffic.lights = save
+                .lights
+                .iter()
+                .map(|l| crate::traffic::Light {
+                    arm: l.arm,
+                    stage: match l.stage {
+                        1 => crate::traffic::Stage::Amber,
+                        2 => crate::traffic::Stage::Clear,
+                        _ => crate::traffic::Stage::Green,
+                    },
+                    since: l.since,
+                })
+                .collect();
+        }
+        // The work taxis' runs, their riders booked and the taxis under way where they were.
+        world.taxis = save.taxis.clone();
+        crate::taxi::settle(&mut world);
         // What someone was eating or washing up is put down (those don't go on after loading).
         crate::cooking::settle(&mut world);
         Ok(world)
@@ -1691,13 +1804,17 @@ impl World {
             },
             // (Eating and washing up start again from what's there after loading; a few minutes
             // on the phone are simply over, and so is listening in on a conversation.)
-            // (Nor is a carry: a baby is back in the crib after a load, a harvest put down.)
+            // (Nor is a carry: a baby is back in the crib after a load, a harvest put down; nor
+            // a host bringing a guest something, which is put down.)
             TaskKind::Answer { .. }
             | TaskKind::Eat { .. }
             | TaskKind::Dishes { .. }
             | TaskKind::Phone { .. }
             | TaskKind::Join { .. }
-            | TaskKind::Carry { .. } => return None,
+            | TaskKind::Carry { .. }
+            | TaskKind::Serve { .. } => return None,
+            // (Nor is setting something up: the parcel is back at the door, `setup.rs`.)
+            TaskKind::SetUp { .. } => return None,
         })
     }
 }
@@ -2288,6 +2405,7 @@ fn event_refs(
             "stage",
             n.and_then(|n| content.life.stages.get(n)).map(|d| &d.id),
         ),
+        Served => put("item", n.and_then(|n| content.items.get(n)).map(|d| &d.id)),
         _ => {}
     }
     put(
@@ -2342,6 +2460,7 @@ fn resolve_refs(
         find(refs, "object", content.objects.iter().map(|d| &d.id))?,
         find(refs, "accident", content.accidents.iter().map(|d| &d.id))?,
         find(refs, "stage", content.life.stages.iter().map(|d| &d.id))?,
+        find(refs, "item", content.items.iter().map(|d| &d.id))?,
     ];
     if let Some(i) = n.into_iter().flatten().next() {
         e.n = Some(i64::from(i));

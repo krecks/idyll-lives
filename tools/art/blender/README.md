@@ -30,7 +30,8 @@ here runs inside Blender (`gamekit/manifest.py` is plain Python, no bpy).
 3. **Build and look.** Run `cargo art <family> --preview`, then open the PNGs in `previews/<family>/` (you can read
    images). Iterate until it looks right from the front and each clip looks right open.
 4. **Export.** Run `cargo art <family>`, which exports, writes the pack and runs the gate
-   (`cargo check-glb`). It must say `0 failed`; read every warning.
+   (`cargo check-glb`). It must say `0 failed`; read every warning. A model that is right to fail a strict
+   check takes `accept={'<check>': '<why>'}` on its `Model` (tools/art/README.md, "The gate").
 5. **Validate.** Install the Khronos validator in a scratch directory (`npm i gltf-validator`), outside
    the repo, and run `validateBytes` on the file: 0 errors, 0 warnings.
 6. **Wire it in** outside this folder when the object is new (below). Run
@@ -311,8 +312,8 @@ How the parts work:
   ambient (`idle`), `night`, `open` and `growth` clips keep their own pace (a merry-go-round's round in
   3.5 s) and aren't checked; an ambient clip runs on game time and is off on Low. The clock is the
   residents' animation time. Clock hands are the exception: the game's time sets them, on every preset.
-- **Checks.** The build fails if `motions` names a clip the model doesn't have. `cargo check-glb` warns of
-  a clip that nothing plays, fails a `delay`, `hold`, `every`, `out` or `slot` that isn't one, and fails a loop
+- **Checks.** The build fails if `motions` names a clip the model doesn't have. `cargo check-glb` fails
+  a clip that nothing plays, a a `delay`, `hold`, `every`, `out` or `slot` that isn't one, and fails a loop
   (or `idle`, an `every` clip, a clock hand) that doesn't end where it starts; one that ends
   a whole fraction of a turn round (a four-bladed fan a quarter turn), or moved at an even speed (`G.scroll`), is
   a warning to check. A part a clip grows (darts, a pot thrown) is measured grown, not at rest; one flattened to
@@ -384,20 +385,21 @@ never one that's already running) and drive Playwright headless with full Chrome
 ## Traps (each of these happened)
 
 - **Wall face.** A model built on the tile's back edge sits inside the house wall. Wall faces are 7 cm in.
-  The gate warns of a model (indoors, or on the wall layer) whose back reaches over 1 cm past the face.
+  The gate fails a model (indoors, or on the wall layer) whose back reaches over 1 cm past the face.
 - **Against a wall, on the floor.** Centred on its tile, a counter or a fridge stands 3–13 cm off the wall
   and off its content `surface`. Give its `Model` a `centre` (`G.settle()` centres it there), as the kitchen
   families do: the back of a counter or a fridge is 0.43 m in from the middle of its tile. A failed size or
-  centre check prints the measured centre, to copy into `centre=`. The gate warns of a file over 2 cm off
+  centre check prints the measured centre, to copy into `centre=`. The gate fails a file over 2 cm off
   its `centre` (`centres.json`). No content fact says a thing stands against a wall (a counter and an
   island have the same top; `fillsWall` only keeps the wall over it clear), so the gate can't tell one
   standing off it: check by eye.
 - **Thin on the floor.** A house's floor is drawn 1 cm up and hides anything lower: a mat or a belt must
-  reach 1.2 cm. The gate warns of a floor model, or a moving part, whose top is lower.
+  reach 1.2 cm. The gate fails a floor model, or a moving part, whose top is lower (not a held tool,
+  `tool.*`, which is only ever drawn in a hand).
 - **Grown from nothing.** A part `G.grow`n from 0.001 along one axis keeps its other two, so at rest it
   lies flat where its origin is, and shows there: the dartboard's flights as crosses on its face, a flask's
   liquid as a disc through the glass. Put its origin inside something opaque (the board, the bench top),
-  so it flattens out of sight. The gate warns of a flat shape 3 cm across or more that shows.
+  so it flattens out of sight. The gate fails a flat shape 3 cm across or more that shows.
 - **Settle first.** Call `settle()` before `swing`/`slide`: clips key the rest pose where it is. It
   refuses after.
 - **Size check.** It counts everything at rest: knobs, handles, a folded bed's foot rail. Set `size` from
@@ -406,7 +408,7 @@ never one that's already running) and drive Playwright headless with full Chrome
 - **Lopsided turning parts.** `G.settle()` centres the model's box, which moves a part that goes round
   off the middle when it reaches farther one way (five fan blades: 3.3 cm), and it then sweeps past its
   tile. Build it with its axis on the middle, `G.settle(centre=False)`, and give the `Model` the box's
-  middle as its `centre` (`families/lighting.py` `ceilingFan`). The gate warns of a part a loop or ambient
+  middle as its `centre` (`families/lighting.py` `ceilingFan`). The gate fails a part a loop or ambient
   clip spins (G.spin) whose circle reaches over 1 cm past the footprint, indoors.
 - **Clicking.** An object is clicked by its drawn outline at rest, never past its tiles. An object held open
   is clicked by its whole tiles. The contact shadow is the model's own shape at rest, seen from above: darkest

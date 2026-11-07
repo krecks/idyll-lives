@@ -86,6 +86,8 @@ fn uses_object(t: &TaskKind, id: u32) -> bool {
         TaskKind::Cook { station, .. } | TaskKind::Dishes { station, .. } => station == Some(id),
         TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat == Some(id),
         TaskKind::Carry { from, to, .. } => from == id || to == id,
+        // (Once it's in hand, whatever it was taken from may go.)
+        TaskKind::Serve { from, stage: 0, .. } => from == id,
         _ => false,
     }
 }
@@ -117,6 +119,7 @@ fn shift_objects(t: &mut TaskKind, id: u32) {
             shift(from);
             shift(to);
         }
+        TaskKind::Serve { from, .. } => shift(from),
         _ => {}
     }
 }
@@ -273,7 +276,14 @@ impl World {
         self.object_plot = s.object_plot;
         self.blocked = s.blocked;
         self.garages = s.garages;
-        self.cars = s.cars;
+        // (The work taxis as they are now: the runs drive them, `taxi.rs`.)
+        let taxis: Vec<crate::cars::Car> = self.cars.iter().filter(|c| c.taxi).cloned().collect();
+        self.cars = s
+            .cars
+            .into_iter()
+            .filter(|c| !c.taxi)
+            .chain(taxis)
+            .collect();
         self.car_tiles = s.car_tiles;
         self.cars_parked = s.cars_parked;
         self.sync_tile_arrays();
@@ -929,7 +939,7 @@ impl World {
     /// Good free spots for `def` on the plot, best first: indoors (outdoors for garden things),
     /// back to a wall, away from doors. Things on a surface go on the first top with room for
     /// them, in the middle if it's free.
-    fn find_spot(&self, plot: u32, def: usize) -> Vec<(i32, i32, u8, [i8; 2])> {
+    pub(crate) fn find_spot(&self, plot: u32, def: usize) -> Vec<(i32, i32, u8, [i8; 2])> {
         if self.content.objects[def].layer == Layer::Surface {
             let radius = self.content.objects[def].radius;
             return self
@@ -1013,6 +1023,19 @@ impl World {
         colors: crate::world::Colors,
         layout: Layout,
     ) -> Result<u32, Error> {
+        self.buy_charging(household, def_id, at, colors, layout, true)
+    }
+
+    /// `buy_at`, paid for now (`charge`) or already (a parcel set up: `setup.rs`).
+    pub(crate) fn buy_charging(
+        &mut self,
+        household: u32,
+        def_id: &str,
+        at: Option<[i32; 3]>,
+        colors: crate::world::Colors,
+        layout: Layout,
+        charge: bool,
+    ) -> Result<u32, Error> {
         let (h, plot) = self.home_of(household)?;
         let def = self
             .content
@@ -1022,7 +1045,9 @@ impl World {
         let price = d
             .price
             .ok_or_else(|| Error::new(format!("{} isn't for sale", d.name)))?;
-        self.can_pay(h, price, || format!("not enough money for the {}", d.name))?;
+        if charge {
+            self.can_pay(h, price, || format!("not enough money for the {}", d.name))?;
+        }
         let on_top = d.layer == Layer::Surface;
         let id = match at {
             Some([x, z, rot]) => {
@@ -1049,7 +1074,9 @@ impl World {
             self.objects[id as usize].off = true;
             self.lights_version = self.lights_version.wrapping_add(1);
         }
-        self.pay(h, price);
+        if charge {
+            self.pay(h, price);
+        }
         Ok(id)
     }
 
@@ -1839,6 +1866,22 @@ impl World {
                     Some(if o > id { o - 1 } else { o })
                 }
             });
+            // A bike that goes (sold, moved) while they're off to it or on it: they walk.
+            for b in [&mut sim.riding, &mut sim.bound_for_bike] {
+                *b = match *b {
+                    Some(o) if o == id => None,
+                    Some(o) if o > id => Some(o - 1),
+                    other => other,
+                };
+            }
+            // Their way to work timed by it: worked out again; by another: ids shift down too.
+            if let Some(c) = sim.commute.as_mut() {
+                match c.bike {
+                    Some(o) if o == id => sim.commute = None,
+                    Some(o) if o > id => c.bike = Some(o - 1),
+                    _ => {}
+                }
+            }
             // A seat taken to use something else (content `seatNear`): ids shift down too, and
             // if the seat itself goes they stand up but may carry on with what they were using.
             match sim.use_seat {

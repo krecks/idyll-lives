@@ -586,12 +586,12 @@
         "height": 0.95,
         "kind": "counter",
         "size": [
-          1.0,
-          0.62
+          0.63,
+          0.38
         ],
         "at": [
-          0,
-          -0.1
+          0.185,
+          0.04
         ]
       },
       "interactions": [
@@ -647,7 +647,7 @@
       "price": 480,
       "category": "kitchen",
       "group": "appliances",
-      "description": "Built in under the worktop. The washing up goes in and waits; once it's full, or the washing up is done, it washes by itself, and someone puts the clean things away. Loading it is a quick, satisfying chore (the tidy love it).",
+      "description": "Built in under the worktop. The washing up goes in and waits; once it's full, or a third full with the washing up done, it washes by itself, and someone puts the clean things away. Loading it is a quick, satisfying chore (the tidy love it).",
       "sounds": {
         "clean": "crockery",
         "wash": "crockery"
@@ -1753,7 +1753,7 @@
       "price": 150,
       "category": "living",
       "group": "media",
-      "description": "An old television in a wooden console on legs, rabbit ears on top. It still works (mostly).",
+      "description": "A dark plastic portable television, a big tube under a thin mask and a stub aerial on top. It still works (mostly).",
       "interactions": [
         {
           "id": "watch",
@@ -4799,14 +4799,6 @@
       "freeRotation": true,
       "group": "cooking",
       "outdoors": true,
-      "surface": {
-        "height": 0.77,
-        "kind": "counter",
-        "size": [
-          0.56,
-          0.56
-        ]
-      },
       "description": "A kettle grill for the garden: dinner with smoke and a bit of fun. Trains Cooking.",
       "interactions": [
         {
@@ -4841,12 +4833,12 @@
         "height": 0.9,
         "kind": "counter",
         "size": [
-          0.7,
-          0.55
+          0.36,
+          0.66
         ],
         "at": [
-          0.55,
-          0.0
+          0.65,
+          -0.125
         ]
       },
       "footprint": [
@@ -5361,6 +5353,136 @@
           }
         }
       ]
+    },
+    {
+      "id": "bicycle",
+      "name": "City bike",
+      "model": "model.bicycle",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 260,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "rides",
+      "outdoors": true,
+      "vehicle": {
+        "kind": "bike",
+        "speed": 3,
+        "stages": [
+          "teen",
+          "youngAdult",
+          "adult",
+          "elder"
+        ],
+        "minRide": 60,
+        "reach": [
+          1.2,
+          0.6,
+          0.3
+        ]
+      },
+      "description": "A step-through city bike with mudguards, a bell and a basket. Whoever it fits rides it to work or school, three times as fast as walking.",
+      "interactions": [
+        {
+          "id": "tuneUp",
+          "label": "Tune up the bike",
+          "anim": "tinker",
+          "sound": "bikeTools",
+          "minutes": 20,
+          "effects": {
+            "fun": 0.06
+          },
+          "tags": [
+            "chores",
+            "outdoors"
+          ],
+          "skills": {
+            "handiness": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "id": "bicycleChild",
+      "name": "Kids' bike",
+      "model": "model.bicycleChild",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 120,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "rides",
+      "outdoors": true,
+      "vehicle": {
+        "kind": "bike",
+        "speed": 2.2,
+        "stages": [
+          "child"
+        ],
+        "minRide": 60,
+        "reach": [
+          0.65,
+          0.3,
+          0.25
+        ]
+      },
+      "description": "A small bike with stabilisers, a bell and streamers on the grips. A child rides it to school and back.",
+      "interactions": [
+        {
+          "id": "tuneUp",
+          "label": "Tune up the bike",
+          "anim": "tinker",
+          "sound": "bikeTools",
+          "minutes": 20,
+          "effects": {
+            "fun": 0.06
+          },
+          "tags": [
+            "chores",
+            "outdoors"
+          ],
+          "skills": {
+            "handiness": 0.08
+          }
+        }
+      ]
+    },
+    {
+      "id": "eScooter",
+      "name": "E-scooter",
+      "model": "model.eScooter",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 420,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "rides",
+      "outdoors": true,
+      "vehicle": {
+        "kind": "scooter",
+        "speed": 4,
+        "stages": [
+          "teen",
+          "youngAdult",
+          "adult",
+          "elder"
+        ],
+        "minRide": 60,
+        "roadsOnly": true,
+        "reach": [
+          0.5,
+          0.45,
+          0.3
+        ]
+      },
+      "description": "An electric scooter. Stood on, it hums along the roads to work or school four times as fast as walking.",
+      "interactions": []
     },
     {
       "id": "lampPost",

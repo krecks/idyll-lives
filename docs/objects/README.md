@@ -1,12 +1,14 @@
 # Objects
 
-Every object in the game, 543 of them, has a model built in Blender (`tools/art/blender`), exported as a `.glb`,
+Every object in the game, 551 of them (`cargo review uses`), has a model built in Blender (`tools/art/blender`), exported as a `.glb`,
 with the moving parts it can show. Blender is the only source: the primitive parts the models replaced are gone, and
-the keys never changed, so saves and content need no migration. All but the wide curtains, added 2026-10-21, and the empty
-vase, added 2026-10-30, were built and checked in play by 2026-10-17,
-as were the 36 models that aren't buyable: the 20 things residents carry and cook with (`families/held.py`), the 9 street props
+the keys never changed, so saves and content need no migration. All but the wide curtains, added 2026-10-21, the empty
+vase, added 2026-10-30, and the three rides, added 2026-11-03, were built and checked in play by 2026-10-17.
+Beside them are 99 models that aren't buyable: the 83 things residents carry and cook with (39 `item.*`, 44 `tool.*`;
+`families/held.py`, the `held` pack), the 9 street props
 (`families/street.py`), and the lawn's grass tufts and wildflowers, the woods' rocks and the selection marker
-(`families/ground.py`). Every model key in the manifests has a `.glb`.
+(`families/ground.py`). A 100th, the traffic light (`families/street_furniture.py`, drawn at the sim's lit junctions),
+was added 2026-11-05. Every model key in the manifests has a `.glb`.
 
 How to build an object is in [docs/design/objects.md](../design/objects.md) (the standard: scale, budgets,
 materials, moving parts, the gate) and [tools/art/blender/README.md](../../tools/art/blender/README.md) (the toolkit
@@ -29,7 +31,7 @@ what is still open.
 | Decor | [decor.md](decor.md) | 23 | D1 Wall art and clocks (6), D2 Ornaments (10), D3 Textiles (7) |
 | Tabletop | [tabletop.md](tabletop.md) | 40 | TT1 Kitchenware (11), TT2 Tableware (7), TT3 Books and small plants (8), TT4 Small ornaments (6), TT5 Bath, desk and toys (8) |
 | Lighting | [lighting.md](lighting.md) | 21 | LT1 Ceiling lights (7), LT2 Wall lights (3), LT3 Floor lamps (5), LT4 Table lamps (6) |
-| Outdoor | [outdoor.md](outdoor.md) | 43 | OU1 Patio seating and tables (11), OU2 Loungers, swings and the hot tub (5), OU3 Grills and fire (3), OU4 Play and yard (9), OU5 Pond, small garden things and lights (9), Garden decor (6) |
+| Outdoor | [outdoor.md](outdoor.md) | 46 | OU1 Patio seating and tables (11), OU2 Loungers, swings and the hot tub (5), OU3 Grills and fire (3), OU4 Play and yard (9), OU5 Pond, small garden things and lights (9), OU6 Rides (3), Garden decor (6) |
 | Garden plants and trees | [garden.md](garden.md) | 53 | G1 Houseplants (10), G2 Flowers (15), G3 Shrubs (11), G4 Edibles (5), G5 Trees (12) |
 | Community and farm | [community.md](community.md) | 36 | CM1 Playground (8), CM2 Street furniture (10), CM3 Food stalls and vending (5), CM4 Shops and café (5), CM5 Farm (8) |
 | Personality packs | [packs.md](packs.md) | 94 | P1–P16: one group per pack (bookworm … slob, and the example pack) |

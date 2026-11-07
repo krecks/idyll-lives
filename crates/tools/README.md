@@ -17,7 +17,7 @@ Every tool's `src/<name>.rs` opens with what it does and its arguments; this pag
 | `cargo decoders` | Refreshes `web/public/decoders/basis/`, PlayCanvas's Basis transcoder, which the cross-origin isolated page can't fetch from a CDN (was `tools/assets/decoders.mjs`). |
 | `cargo envconv` | The sky's lighting: downloads Poly Haven's CC0 HDRI "Belfast Open Field" (1k, pinned by its SHA-256) into `web/.assets/env/` and makes `web/public/assets/env/belfast_open_field.pcenv` of it (cube faces turned and mirrored into the PlayCanvas renderer's space, and the ambient as spherical harmonics, both as the game's look was calibrated on them). The output is committed; run it when the conversion changes. |
 | `cargo fetch-voice` | The voice model and the pronunciation dictionary into `web/public/voice/` (was `tools/voice/fetch.mjs`, `fp16.mjs`). |
-| `cargo fetch-llm` | The language model into `web/public/llm/` (was `tools/llm/fetch.mjs`). |
+| `cargo fetch-llm` | The language model into `web/public/llm/`, repacked smaller without changing what it computes (`llmslim.rs`; was `tools/llm/fetch.mjs`). |
 | `cargo review` | The authenticity review's first pass over every buyable object: `sizes`, `uses`. |
 | `cargo tex` | The texture scripts: `clouds`, `synth` (every surface map, generated in code), `materials` (was `tools/art/*.py`). |
 | `cargo release-version` | One version for the whole game. Prints it and fails if `web/package.json`, `Cargo.toml` and `Cargo.lock` differ (CI runs this); with an argument, sets all of them. Not `cargo version`: that is cargo's own. |
@@ -33,9 +33,9 @@ release builds, as the character build is slow otherwise.
 How to make a release is in the [README](../../README.md#versions-and-releasing): the version and the
 CHANGELOG section (its date set by hand), `git push origin main`, the dry run (watched by its run id),
 the tag, the live checks of the large files, and `gh release create … --verify-tag`. The workflow is
-`.github/workflows/pages.yml`. If a release goes wrong, fix forward or redeploy the last good 0.3.x:
-0.3.0 can't open 0.3.1's saves (format 32), 0.2.0 can't open 0.3.0's (format 29), and v0.1.0 can't
-open 0.2.0's saves database.
+`.github/workflows/pages.yml`. If a release goes wrong, fix forward or redeploy the last good build;
+which builds open which saves is in the README's "If a release goes wrong" (0.6.0 and 0.7.0 share
+save format 35, 0.5.x can't open it).
 
 What each release tool does, in more words than the table above:
 
@@ -66,8 +66,8 @@ Numbers to know:
 - The site (`web/dist`) was 489 MB in the first CI dry run (assets 56 MB, voice 181 MB, language
   model 248 MB; the largest file the language model's weights, 255,530,880 bytes). CI fails over
   900 MB, below Pages' limit of 1 GB.
-- The live checks after a release: `llm/lfm2.5-350m/model_q4.onnx_dataz` is 254,923,309 bytes and
-  `voice/supertonic-3/vector_estimator.onnxz` 119,556,677 bytes. (Both are gzipped by Rust's
+- The live checks after a release: `llm/lfm2.5-350m/model_q4.onnx_dataz` is 195,523,654 bytes and
+  `voice/supertonic-3/vector_estimator.onnxz` 55,258,368 bytes. (Both are gzipped by Rust's
   `flate2`, whose output is a little smaller than Node's zlib was, and the same on every platform.)
 
 CI keeps a WASM with function names as an artifact (`wasm-with-names-<commit>`) for 90 days: the

@@ -393,6 +393,12 @@ struct JobView<'a> {
     grade: Option<&'a str>,
     grade_label: Option<&'a str>,
     performance: f32,
+    /// What a shift adds to the bar at this pace (the mood they last left for work in), and how
+    /// many more it takes to fill it (none at the top of the career, or when shifts don't).
+    shift_performance: f32,
+    shifts_to_full_bar: Option<u32>,
+    /// The mood they last left for work in (0..1).
+    shift_mood: f32,
     /// Pay per shift on this Sim's schedule.
     pay: i64,
     pay_per_hour: f32,
@@ -677,6 +683,8 @@ struct SimSent {
     away_until: u64,
     visiting: u64,
     trip: u64,
+    ride: u64,
+    taxi: u64,
     job: u64,
     /// Reset when the details stop (the UI drops them).
     details: DetailsSent,
@@ -1020,6 +1028,9 @@ fn sim_patch(
     // (The time only with the details: it's a search along the roads, for a handful, not the town.)
     let trip = trip_view(world, s, riders, detail);
     o.changed_opt("trip", trip.as_ref(), &mut sent.trip);
+    o.changed_opt("ride", ride_view(world, s).as_ref(), &mut sent.ride);
+    // The work taxi: waiting for it, in it to work (and when they're there), or home in it.
+    o.changed_opt("taxi", taxi_view(world, s).as_ref(), &mut sent.taxi);
     o.changed("job", &job_view(content, s), &mut sent.job);
     if !detail {
         return;
@@ -1215,6 +1226,26 @@ fn task_view(
                 rest.map_or(1.0, |r| r.minutes),
             )
         }
+        // "Set up the new cookbook lectern".
+        TaskKind::SetUp { object, stage, .. } => {
+            let rules = &content.object_rules.set_up;
+            let name = content
+                .objects
+                .get(object as usize)
+                .map_or_else(String::new, |d| d.name.to_lowercase());
+            // (Picking the parcel up is the start of it: no progress yet.)
+            let minutes = if stage == 0 {
+                f32::INFINITY
+            } else {
+                rules.minutes
+            };
+            (
+                format!("{} the new {name}", rules.label),
+                None,
+                None,
+                minutes,
+            )
+        }
         TaskKind::Repair { object } => {
             let rules = &content.object_rules.repair;
             let name = &content.objects[world.objects[object as usize].def].name;
@@ -1332,6 +1363,36 @@ fn task_view(
                 crate::carry::STOW_MINUTES
             };
             (label, world.stable_of(to), baby, minutes)
+        }
+        // "Bring a snack" (the UI adds who): what they take out for a guest, or have in hand.
+        TaskKind::Serve {
+            guest,
+            from,
+            interaction,
+            stage,
+        } => {
+            let item = held.map(|h| h.def).or_else(|| {
+                let o = world.objects.get(from as usize)?;
+                crate::staff::handed(
+                    content,
+                    content.objects[o.def].interactions.get(interaction)?,
+                )
+            });
+            let what = item.map_or_else(
+                || "something".to_owned(),
+                |d| some_of(&content.items[d].label),
+            );
+            let minutes = if stage == 0 {
+                world
+                    .objects
+                    .get(from as usize)
+                    .and_then(|o| content.objects[o.def].interactions.get(interaction))
+                    .map_or(1.0, |i| i.minutes.max(0.5))
+            } else {
+                crate::hosting::HAND_MINUTES
+            };
+            let object = (stage == 0).then(|| world.stable_of(from)).flatten();
+            (format!("Bring {what}"), object, Some(guest), minutes)
         }
     };
     let progress = match phase {
@@ -1468,8 +1529,8 @@ struct TripView {
 const TRIP_STEP: f32 = 5.0;
 
 /// Where resident `s` is on their way to: a visit or home (until they're on that plot), or home
-/// from work in the household's car (back when the car is, `riders`: who is in one on the way
-/// home, sorted); with the time they're there, from `Travel::eta` (by car where they're bound
+/// from work in the household's car (back when it is, `riders`: who is in one on the way home,
+/// sorted); with the time they're there, from `Travel::eta` (by car where they're bound
 /// for it). Read only: nothing here changes the game.
 ///
 /// `timed` false: a visit or the way home without the time, which takes a search along the roads
@@ -1509,13 +1570,61 @@ fn trip_view(world: &World, s: &Sim, riders: &[u32], timed: bool) -> Option<Trip
     } else {
         crate::travel::Mode::Foot
     };
-    let walk = s.walk_per_minute(&world.content);
+    // (On a bike: as fast as it goes, `ride.rs`.)
+    let walk =
+        s.walk_per_minute(&world.content) * crate::ride::speed(&world.content, s, &world.objects);
     let minutes = crate::world::trip_minutes(world.travel.eta(from, door, mode, walk), car);
     let at = world.tick + (minutes.max(0.0) * crate::TICKS_PER_MINUTE as f32) as u64;
     Some(TripView {
         to,
         at: Some(step(at)),
     })
+}
+
+/// On a bike or an e-scooter of theirs (`SimView.ride`, `ride.rs`): what it is, and whether they're
+/// off to work, to school, out (a visit or an outing) or home on it.
+#[derive(Serialize)]
+struct RideView {
+    kind: crate::content::VehicleKind,
+    to: &'static str,
+}
+
+/// The work taxi (`SimView.taxi`, `taxi::status`): `state` `wait` (at their kerb), `work` (in it,
+/// `at` the minute of the day they're there) or `home` (on their way home in it, or waiting for it
+/// at work: `at` about when they're back).
+#[derive(Serialize)]
+struct TaxiView {
+    state: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    at: Option<f32>,
+}
+
+fn taxi_view(world: &World, s: &Sim) -> Option<TaxiView> {
+    let (state, at) = crate::taxi::status(world, s)?;
+    Some(TaxiView {
+        state,
+        at: at.map(|t| (clock::minute_of_day(t) / 5.0).round() * 5.0),
+    })
+}
+
+/// What resident `s` rides now, on their way (not while away at work with it).
+fn ride_view(world: &World, s: &Sim) -> Option<RideView> {
+    let bike = world.objects.get(s.riding? as usize)?;
+    let kind = world.content.objects[bike.def].vehicle?.kind;
+    if s.away_until.is_some() {
+        return None;
+    }
+    let task = s.current().map(|a| a.task.kind);
+    let home = matches!(task, Some(TaskKind::GoHome));
+    let out = matches!(task, Some(TaskKind::Visit { .. }));
+    let school = world.content.life.school.is_some() && s.job.is_none();
+    let to = match (home, out, school) {
+        (true, ..) => "home",
+        (false, true, _) => "out",
+        (false, false, true) => "school",
+        (false, false, false) => "work",
+    };
+    Some(RideView { kind, to })
 }
 
 fn job_view<'a>(content: &'a Content, s: &Sim) -> Option<JobView<'a>> {
@@ -1538,6 +1647,12 @@ fn job_view<'a>(content: &'a Content, s: &Sim) -> Option<JobView<'a>> {
         grade: grade.map(|g| g.id.as_str()),
         grade_label: grade.map(|g| g.label.as_str()),
         performance: j.performance,
+        shift_performance: round_to(
+            life::shift_performance(&content.career_rules, j.level, j.shift_mood, fit, false),
+            PERCENT,
+        ),
+        shifts_to_full_bar: life::shifts_to_full_bar(content, j, &s.skills),
+        shift_mood: round_to(j.shift_mood, PERCENT),
         pay: life::shift_pay(content, j, &s.skills),
         pay_per_hour: level.pay as f32 / level.hours,
         weekly_pay: level.pay * level.days.count_ones() as i64,
@@ -1613,6 +1728,43 @@ struct StructureView<'a> {
     /// Garages at the inner ends of driveways (`cars::Garage`); left out when there are none.
     #[serde(skip_serializing_if = "<[_]>::is_empty")]
     garages: &'a [crate::cars::Garage],
+    /// The streets where the kerbside furniture keeps back for cars to pass pulled over
+    /// (`cars::pull_over_streets`); left out when there are none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pull_over_streets: Vec<PullOverStreetView>,
+    /// Where the traffic lights' poles stand and which way their heads face (`traffic::SignalArm`:
+    /// x, z and yaw, in their snapshot rows' order): the kerbside furniture keeps clear of them;
+    /// left out when there are none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    light_poles: Vec<[f32; 3]>,
+}
+
+/// `StructureView::light_poles`.
+fn light_pole_views(world: &World) -> Vec<[f32; 3]> {
+    world
+        .travel
+        .signals
+        .iter()
+        .flat_map(|s| s.arms.iter().map(|a| [a.pole[0], a.pole[1], a.yaw]))
+        .take(crate::snapshot::MAX_LIGHTS)
+        .collect()
+}
+
+/// A street cars pull over on (`StructureView::pull_over_streets`): the town file's road
+/// (`meta.roads` index) and how far in from its edges its kerbside furniture may reach (m,
+/// `cars::kerbside`).
+#[derive(Serialize)]
+struct PullOverStreetView {
+    road: u32,
+    keep: f32,
+}
+
+/// `StructureView::pull_over_streets`.
+fn pull_over_street_views(world: &World) -> Vec<PullOverStreetView> {
+    crate::cars::pull_over_streets(&world.travel)
+        .into_iter()
+        .map(|(road, keep)| PullOverStreetView { road, keep })
+        .collect()
 }
 
 /// A household's car: where it's parked (its middle, its yaw) and its look.
@@ -2171,9 +2323,23 @@ struct ItemView<'a> {
     household: u32,
 }
 
-/// Every item: food and dishes on surfaces, on the floor and in fridges (JSON array, by id).
+/// Every item: food and dishes on surfaces, on the floor and in fridges (JSON array, by id), and
+/// the parcels of things bought waiting to be set up (`setup::parcels`, on the floor).
 pub fn items_json(world: &World) -> String {
     let content = &world.content;
+    let parcels = crate::setup::parcels(world)
+        .into_iter()
+        .map(|(id, def, [x, z], household)| ItemView {
+            id,
+            def: &content.items[def].id,
+            x: round_to(x, 100.0),
+            z: round_to(z, 100.0),
+            y: 0.0,
+            yaw: 0.0,
+            servings: 0,
+            state: "fresh",
+            household,
+        });
     let items: Vec<ItemView> = world
         .items
         .list
@@ -2208,6 +2374,7 @@ pub fn items_json(world: &World) -> String {
                 household: it.household,
             }
         })
+        .chain(parcels)
         .collect();
     serde_json::to_string(&items).expect("items serialize")
 }
@@ -2254,6 +2421,8 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
         staff: staff_views(world),
         cars: car_views(world),
         garages: &world.garages,
+        pull_over_streets: pull_over_street_views(world),
+        light_poles: light_pole_views(world),
     })
     .expect("structure serializes")
 }
@@ -2359,6 +2528,7 @@ fn car_views(world: &World) -> Option<Vec<CarView>> {
             .cars
             .iter()
             .take(crate::cars::MAX_CARS)
+            .filter(|c| !c.taxi)
             .map(|c| CarView {
                 plot: c.plot,
                 x: c.spot[0],
@@ -2437,6 +2607,10 @@ impl StructureSync {
         parts.part("staff", Some(&staff).filter(|s| !s.is_empty()));
         parts.part("cars", car_views(world).as_ref());
         parts.part("garages", Some(&world.garages).filter(|g| !g.is_empty()));
+        let streets = pull_over_street_views(world);
+        parts.part("pullOverStreets", Some(&streets).filter(|s| !s.is_empty()));
+        let poles = light_pole_views(world);
+        parts.part("lightPoles", Some(&poles).filter(|p| !p.is_empty()));
 
         // The things: those that changed, by index, while the list is the same things in the same
         // order (a door opened, a crop grown); else the whole list (one bought, sold or moved in).
@@ -2770,4 +2944,16 @@ pub fn catalog_json(content: &Content) -> String {
 
 fn is_level(tall: &i16) -> bool {
     *tall == 0
+}
+
+/// A thing named in a sentence: "a snack", "an ice cream", "some toast", "some noodles".
+pub fn some_of(label: &str) -> String {
+    let thing = label.to_lowercase();
+    if thing.ends_with('s') || ["toast", "takeout"].contains(&thing.as_str()) {
+        format!("some {thing}")
+    } else if thing.starts_with(['a', 'e', 'i', 'o', 'u']) {
+        format!("an {thing}")
+    } else {
+        format!("a {thing}")
+    }
 }
