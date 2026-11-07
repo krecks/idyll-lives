@@ -43,7 +43,7 @@ fn world() -> World {
 }
 
 fn minutes(w: &mut World, m: u32) {
-    for _ in 0..m * sim_core::TICKS_PER_SECOND {
+    for _ in 0..u64::from(m) * sim_core::TICKS_PER_MINUTE {
         w.tick_once();
     }
 }
@@ -96,7 +96,7 @@ fn autonomy_skips_what_the_household_cannot_afford() {
     w.autonomy = true;
     w.households[0].funds = 10;
     w.sims[0].needs[COMFORT] = 0.0;
-    for _ in 0..30 * sim_core::TICKS_PER_SECOND {
+    for _ in 0..sim_core::mins(30.0) {
         w.tick_once();
         assert!(
             !w.objects[TUB as usize].in_use(),

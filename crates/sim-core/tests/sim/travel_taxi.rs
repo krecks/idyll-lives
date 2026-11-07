@@ -3,6 +3,7 @@
 //! left; pupils go to school by one; a game saved mid-run goes on.
 
 use crate::common;
+use common::{TICKS_PER_MINUTE, hours, mins, secs};
 
 use sim_core::World;
 use sim_core::cars::CarState;
@@ -246,17 +247,21 @@ fn colleagues_a_long_way_out_share_one_taxi_there_on_time_and_one_home() {
     }
     // On time: at work by its start (within the late grace). (The game begins after they'd have
     // set off on foot, a walk of over five hours: on day 1 a late run, out sooner than on foot.)
-    let grace = w.content.career_rules.late_grace_minutes as i64 * 20;
+    let grace = w.content.career_rules.late_grace_minutes as i64 * TICKS_PER_MINUTE as i64;
     assert!(!w.taxis.arrivals.is_empty() && !w.taxis.late_arrivals.is_empty());
     for &(s, late) in &w.taxis.late_arrivals {
         assert!(
-            late < 4 * 60 * 20,
+            late < hours(4.0) as i64,
             "{s} at work {} min late by a late run",
-            late / 20
+            late / TICKS_PER_MINUTE as i64
         );
     }
     for &(s, late) in &w.taxis.arrivals {
-        assert!(late <= grace, "{s} at work {} min late", late / 20);
+        assert!(
+            late <= grace,
+            "{s} at work {} min late",
+            late / TICKS_PER_MINUTE as i64
+        );
     }
     // Home again, out of sight no longer, the taxi gone.
     run_to(&mut w, 3, 2.0);
@@ -451,7 +456,7 @@ fn drive(w: &mut World, c: usize, d: u32, home: bool) {
         car.done = vec![d];
         car.ready_at = w.tick;
     }
-    w.sims[d as usize].away_until = Some(w.tick + 100_000);
+    w.sims[d as usize].away_until = Some(w.tick + mins(5000.0));
 }
 
 #[test]
@@ -470,7 +475,7 @@ fn the_households_car_pulling_out_or_coming_home_as_the_taxi_stands_at_its_kerb_
             // (Away, coming home when the taxi stands there.)
             w.cars[0].state = CarState::Away;
             w.cars[0].aboard = vec![1];
-            w.sims[1].away_until = Some(w.tick + 100_000);
+            w.sims[1].away_until = Some(w.tick + mins(5000.0));
         }
         let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
         let mut sent = false;
@@ -539,7 +544,7 @@ fn street_with_standing_taxi(taxi_x: i32, more: &[i32]) -> (World, usize, Vec<us
     let others = (1..houses.len()).map(|k| car_of(&w, k)).collect();
     drive(&mut w, t, 0, false);
     let stop = taxi_x as f32 + 33.0;
-    for _ in 0..4000 {
+    for _ in 0..secs(200.0) {
         w.tick_once();
         if w.cars[t].shown.is_some_and(|s| s.0[0] >= stop) {
             break;
@@ -575,7 +580,7 @@ fn a_car_behind_a_taxi_standing_at_the_kerb_on_a_7_m_street_passes_it() {
     drive(&mut w, f, 1, false);
     let (mut out, mut past, mut least) = (false, None, f32::INFINITY);
     let start = w.tick;
-    while w.tick < start + 3000 && past.is_none() {
+    while w.tick < start + secs(150.0) && past.is_none() {
         w.tick_once();
         no_overlaps(&w);
         let car = &w.cars[f];
@@ -615,12 +620,12 @@ fn one_coming_the_other_way_waits_its_turn_short_of_a_taxi_standing_at_the_kerb(
         drive(&mut w, o, 2, true);
         let start = w.tick;
         let (mut sent, mut home, mut gone) = (false, false, false);
-        let mut still = (0.0f32, 0u32);
+        let mut still = (0.0f32, 0u64);
         let mut stood_out = false;
-        while w.tick < start + 6000 && !(home && gone) {
+        while w.tick < start + secs(300.0) && !(home && gone) {
             w.tick_once();
             no_overlaps(&w);
-            if !sent && w.tick >= start + 300 + 25 * k {
+            if !sent && w.tick >= start + secs(15.0) + secs(1.25) * k {
                 drive(&mut w, f, 1, false);
                 sent = true;
             }
@@ -641,11 +646,11 @@ fn one_coming_the_other_way_waits_its_turn_short_of_a_taxi_standing_at_the_kerb(
                 let east = oc
                     .shown
                     .is_some_and(|s| s.0[0] > taxi[0] + len / 2.0 + oc.len / 2.0);
-                if going_by && east && still.1 >= 10 {
+                if going_by && east && still.1 >= secs(0.5) {
                     stood_out = true;
                 }
             }
-            home |= oc.state == CarState::Parked && w.tick > start + 10;
+            home |= oc.state == CarState::Parked && w.tick > start + secs(0.5);
             gone |= sent && fc.state == CarState::Away;
         }
         assert!(home && gone, "case {k}: not both through ({home}, {gone})");
@@ -686,7 +691,7 @@ fn cars_round_a_standing_taxi(mut each: impl FnMut(&World, &[usize]) -> bool) ->
     for (k, &c) in cars.iter().enumerate().take(2) {
         w.cars[c].state = CarState::Away;
         w.cars[c].aboard = vec![k as u32 + 1];
-        w.sims[k + 1].away_until = Some(w.tick + 100_000);
+        w.sims[k + 1].away_until = Some(w.tick + mins(5000.0));
     }
     let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
     let (mut home, mut off) = (false, None);
@@ -697,7 +702,7 @@ fn cars_round_a_standing_taxi(mut each: impl FnMut(&World, &[usize]) -> bool) ->
             .find(|c| c.taxi && c.state == CarState::Arriving)
             .and_then(|c| c.shown)
     };
-    while w.tick < end && off.is_none_or(|t| w.tick < t + 4000) {
+    while w.tick < end && off.is_none_or(|t| w.tick < t + secs(200.0)) {
         w.tick_once();
         no_overlaps(&w);
         passed |= cars.iter().any(|&c| {
@@ -781,7 +786,7 @@ fn a_game_saved_with_a_car_part_way_round_a_standing_taxi_loads_with_it_where_it
     let (c, at, json) = saved.expect("nobody went out round the taxi");
     let mut l = World::from_save_json(&common::content(), &json).unwrap();
     let mut was = None;
-    for _ in 0..300 {
+    for _ in 0..secs(15.0) {
         l.tick_once();
         no_overlaps(&l);
         let Some(s) = l.cars[c].shown else { break };
@@ -814,7 +819,7 @@ fn a_car_held_up_by_a_crowd_crossing_in_front_of_it_gets_its_gap() {
     run_to(&mut w, 1, 9.0);
     // (Away, coming home now, along the street past the crowd.)
     drive(&mut w, 0, 0, true);
-    let end = w.tick + 4 * 60 * 20;
+    let end = w.tick + secs(240.0);
     let (mut k, mut reached) = (0, None);
     while w.cars[0].state != CarState::Parked && w.tick < end {
         // (From when it comes up to them: past them soon.)
@@ -829,7 +834,7 @@ fn a_car_held_up_by_a_crowd_crossing_in_front_of_it_gets_its_gap() {
         w.tick_once();
         no_overlaps(&w);
         // (Each of them off across the street again every so often, between x 240 and 280.)
-        if w.tick.is_multiple_of(40) {
+        if w.tick.is_multiple_of(secs(2.0)) {
             k += 1;
             let i = 1 + k % 7;
             let x = 240.5 + (k * 13 % 40) as f32;
@@ -846,8 +851,8 @@ fn a_car_held_up_by_a_crowd_crossing_in_front_of_it_gets_its_gap() {
         }
         if let Some(t) = reached {
             assert!(
-                x < 230.0 || w.tick < t + 20 * 20,
-                "the car still among them after 20 minutes: {:?}",
+                x < 230.0 || w.tick < t + secs(20.0),
+                "the car still among them after 20 s: {:?}",
                 w.cars[0].shown
             );
         }
@@ -1092,7 +1097,7 @@ fn a_taxi_due_in_through_a_jammed_junction_goes_round_it_or_waits_at_the_edge_of
             if !round
                 && let Some(run) = w.taxis.runs.iter().find(|r| !r.home)
                 && run.enter > 0
-                && w.tick >= run.enter + 15 * 20
+                && w.tick >= run.enter + mins(15.0)
             {
                 w.taxis.jams.clear();
             }
@@ -1112,14 +1117,14 @@ fn a_taxi_due_in_through_a_jammed_junction_goes_round_it_or_waits_at_the_edge_of
         let (enter, at) = entered.expect("no taxi came");
         if round {
             assert!(
-                at <= enter + 20,
+                at <= enter + mins(1.0),
                 "({round}) waited at the edge with a way round"
             );
         } else {
             assert!(
-                at >= enter + 15 * 20,
+                at >= enter + mins(15.0),
                 "({round}) came in at once: {} min",
-                (at - enter) / 20
+                (at - enter) / TICKS_PER_MINUTE
             );
         }
         assert!(came(&w) > 0, "({round}) A never rode");
@@ -1206,7 +1211,7 @@ fn a_riders_time_before_work_ends_when_the_taxi_comes_late_run_or_held_up() {
             continue;
         };
         let st = run.stops[b.stop as usize];
-        if run.car.is_none() && w.tick > run.enter + 5 * 20 && st.state == StopState::Booked {
+        if run.car.is_none() && w.tick > run.enter + mins(5.0) && st.state == StopState::Booked {
             let leave = w.taxi_leave(0).expect("a leave time");
             assert_eq!(
                 leave,
@@ -1358,9 +1363,9 @@ fn a_rider_called_to_the_taxi_who_doesnt_get_there_is_waited_for_the_walk_and_bo
     assert!(run.is_some(), "B was never called to the taxi");
     // (Five minutes for one on their way, the walk round to its door, and in.)
     assert!(
-        longest <= 5 * 20 + 6 * 20 + 3 * 20,
+        longest <= mins(5.0) + secs(6.0) + secs(3.0),
         "a taxi stood {} minutes",
-        longest / 20
+        longest / TICKS_PER_MINUTE
     );
     assert!(again, "B wasn't booked on another taxi");
 }
@@ -1402,7 +1407,7 @@ fn a_taxi_doesnt_go_hours_round_a_hold_up_it_could_wait_out() {
         w.tick_once();
         if let Some(run) = w.taxis.runs.iter().find(|r| !r.home)
             && run.enter > 0
-            && w.tick >= run.enter + 15 * 20
+            && w.tick >= run.enter + mins(15.0)
         {
             w.taxis.jams.clear();
         }
@@ -1747,7 +1752,7 @@ fn one_upstairs_booked_on_a_taxi_out_leaves_for_it_timed_from_over_the_ground() 
     assert!(up > 0.0, "no storey upstairs");
     w.sims[0].pos[1] += up;
     let _ = w.apply(sim_core::Command::Visit { sim: 0, plot: 1 });
-    let end = w.tick + 30 * 20;
+    let end = w.tick + mins(30.0);
     let mut stop = None;
     while w.tick < end && stop.is_none() {
         w.tick_once();
@@ -1761,7 +1766,7 @@ fn one_upstairs_booked_on_a_taxi_out_leaves_for_it_timed_from_over_the_ground() 
             .next();
     }
     let (due, leave) = stop.expect("A wasn't booked on a taxi there");
-    let early = due.saturating_sub(leave) / 20;
+    let early = due.saturating_sub(leave) / TICKS_PER_MINUTE;
     assert!(
         early <= 20,
         "A was to leave {early} min before the taxi's due"
@@ -1813,12 +1818,12 @@ fn a_cyclist_out_on_a_visit_when_work_calls_doesnt_ride_out_on_the_bike_their_wa
         w.tick_once();
         assert!(w.tick < end, "C never booked on a taxi to work");
         if let Some(l) = w.taxi_leave(0)
-            && l > w.tick + 10 * 20
+            && l > w.tick + mins(10.0)
         {
             break l;
         }
     };
-    while w.tick + 10 * 20 < leave {
+    while w.tick + mins(10.0) < leave {
         w.tick_once();
     }
     let _ = w.apply(sim_core::Command::Visit { sim: 0, plot: 1 });
@@ -1882,7 +1887,7 @@ fn a_visit_when_a_bike_commute_starts_is_over_and_the_ride_goes_out_of_town() {
     );
     // Again, out on a visit then.
     let mut w = make();
-    while w.tick + 15 * 20 < off {
+    while w.tick + mins(15.0) < off {
         w.tick_once();
     }
     w.apply(sim_core::Command::Visit { sim: 0, plot: 1 })
@@ -1914,8 +1919,8 @@ fn a_visit_when_a_bike_commute_starts_is_over_and_the_ride_goes_out_of_town() {
     assert!(set_off.is_some(), "C never set off for work");
     assert!(w.sims[0].away_until.is_some(), "C never got out of town");
     assert!(
-        longest < 2 * 60 * 20,
+        longest < hours(2.0),
         "C on the bike in town for {} min",
-        longest / 20
+        longest / TICKS_PER_MINUTE
     );
 }

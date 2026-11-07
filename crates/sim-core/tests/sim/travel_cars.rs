@@ -22,7 +22,7 @@ fn cars_keep_to_the_road_and_come_home_nose_in() {
     let mut drives = vec![0u32; w.cars.len()];
     let mut worst: f32 = 0.0;
     let mut moving_ticks = 0u64;
-    for _ in 0..(24 * 60 * 20) {
+    for _ in 0..common::TICKS_PER_DAY {
         w.tick_once();
         for (c, car) in w.cars.iter().enumerate() {
             let Some((at, _, moving, _)) = car.shown else {
@@ -90,7 +90,7 @@ fn a_car_coming_or_going_changes_walking_only_round_it() {
     let mut w = world(21);
     assert!(w.cars.len() >= 2);
     let mut checked = 0;
-    for _ in 0..(24 * 60 * 20) {
+    for _ in 0..common::TICKS_PER_DAY {
         let (seen, before) = (w.nav_version(), w.parked_tiles());
         let spots: Vec<[f32; 2]> = w.cars.iter().map(|c| c.spot).collect();
         w.tick_once();
@@ -177,11 +177,11 @@ fn a_car_never_drives_through_someone_with_nowhere_to_step_aside() {
     car.progress = 0.0;
     car.driver = Some(0);
     car.aboard = vec![0];
-    w.sims[0].away_until = Some(w.tick + 100_000);
+    w.sims[0].away_until = Some(w.tick + common::mins(5000.0));
     // ...and Bo stands in front of it between the boxes, with no room to step aside.
     w.sims[1].pos = [34.0, 6.5];
     let mut closest = f32::INFINITY;
-    for _ in 0..2000 {
+    for _ in 0..common::secs(100.0) {
         w.tick_once();
         if let Some(gap) = from_car(&w, 0, w.sims[1].pos) {
             closest = closest.min(gap);
@@ -266,7 +266,7 @@ fn set_off(w: &mut World, c: usize) {
     car.progress = 0.0;
     car.driver = Some(c as u32);
     car.aboard = vec![c as u32];
-    w.sims[c].away_until = Some(w.tick + 100_000);
+    w.sims[c].away_until = Some(w.tick + common::mins(5000.0));
 }
 
 /// Car `c`, away with its driver done at work, comes home now.
@@ -278,7 +278,7 @@ fn come_home(w: &mut World, c: usize) {
     car.aboard = vec![c as u32];
     car.done = vec![c as u32];
     car.ready_at = w.tick;
-    w.sims[c].away_until = Some(w.tick + 100_000);
+    w.sims[c].away_until = Some(w.tick + common::mins(5000.0));
 }
 
 /// How far two of `w`'s cars' bodies overlap at most where they're drawn, one of them on the move
@@ -351,7 +351,7 @@ fn two_cars_coming_in_by_the_same_way_at_the_same_tick_come_in_one_after_the_oth
     come_home(&mut w, 0);
     come_home(&mut w, 1);
     let mut first_seen = [None::<u64>; 2];
-    for _ in 0..4000 {
+    for _ in 0..common::secs(200.0) {
         w.tick_once();
         let (o, a, b) = cars_overlap(&w);
         assert!(o <= 0.0, "cars {a} and {b} overlap by {o:.2} m");
@@ -371,7 +371,7 @@ fn two_cars_coming_in_by_the_same_way_at_the_same_tick_come_in_one_after_the_oth
     let (a, b) = (first_seen[0].unwrap(), first_seen[1].unwrap());
     // (The second waits out of sight till the first is a car's length and the gap in front on.)
     assert!(
-        a.abs_diff(b) >= 10,
+        a.abs_diff(b) >= common::secs(0.5),
         "they came in {} ticks apart",
         a.abs_diff(b)
     );
@@ -386,7 +386,7 @@ fn two_cars_meeting_on_a_7_m_street_pass_each_other_in_their_lanes() {
     let mut met = false;
     let mut stood = vec![0u64; 2];
     let mut was = [None::<[f32; 2]>; 2];
-    for _ in 0..4000 {
+    for _ in 0..common::secs(200.0) {
         w.tick_once();
         let (o, a, b) = cars_overlap(&w);
         assert!(o <= 0.0, "cars {a} and {b} overlap by {o:.2} m");
@@ -410,7 +410,10 @@ fn two_cars_meeting_on_a_7_m_street_pass_each_other_in_their_lanes() {
     assert_eq!(w.cars[1].state, CarState::Parked, "the other got home");
     assert!(met, "they passed each other on the street");
     // (Where they meet, neither stops for the other: the street has room for both.)
-    assert!(stood.iter().all(|&s| s < 20), "they stood {stood:?} ticks");
+    assert!(
+        stood.iter().all(|&s| s < common::secs(1.0)),
+        "they stood {stood:?} ticks"
+    );
 }
 
 // ---- Taking turns where ways cross (`traffic.rs`) --------------------------------------------
@@ -527,7 +530,7 @@ fn line_pts(a: [f32; 2], b: [f32; 2]) -> String {
 /// them on the move); false if it never was.
 fn run_clear(
     w: &mut World,
-    ticks: u32,
+    ticks: u64,
     mut each: impl FnMut(&mut World),
     done: impl Fn(&World) -> bool,
 ) -> bool {
@@ -552,7 +555,7 @@ fn two_cars_meeting_on_a_6_m_lane_pass_each_other_pulled_over() {
     let mut pulled: f32 = 0.0;
     let done = run_clear(
         &mut w,
-        6000,
+        common::secs(300.0),
         |w| pulled = pulled.max(w.cars[0].shift.min(w.cars[1].shift)),
         |w| w.cars[0].state == CarState::Away && w.cars[1].state == CarState::Parked,
     );
@@ -624,7 +627,7 @@ const CAR_GAP: f32 = 0.149;
 /// Car 0 comes home along the street from its west end, car 1 sets off from its house further
 /// east `after` ticks on, west for the way out: both on their way within `ticks`, never nearer
 /// each other than `CAR_GAP`.
-fn turn_in_by_one_pulling_out(width: f32, houses: &[(f32, bool)], after: u32, ticks: u32) {
+fn turn_in_by_one_pulling_out(width: f32, houses: &[(f32, bool)], after: u64, ticks: u64) {
     let mut w = street(width, houses);
     come_home(&mut w, 0);
     for t in 0..ticks {
@@ -659,7 +662,7 @@ fn a_car_turning_in_home_across_one_pulling_out_next_door_keeps_its_distance() {
     // (On a 7 m street: the one coming home turns in across the other's lane as it comes by, the
     // one pulling out pulled over as far as it can: it waits for that one to pass, never nearer
     // than the cars keep. They came within a hair of each other.)
-    turn_in_by_one_pulling_out(7.0, &[(60.0, true), (100.0, true)], 0, 4000);
+    turn_in_by_one_pulling_out(7.0, &[(60.0, true), (100.0, true)], 0, common::secs(200.0));
 }
 
 #[test]
@@ -667,7 +670,12 @@ fn on_a_6_m_lane_a_car_passing_one_pulled_over_keeps_its_distance_or_waits() {
     // (Coming home to its house, about to turn in, it can't pull over itself; the one pulled
     // out next door and pulled over for it isn't over far enough for the gap the cars keep: it
     // waits for that one to pass.)
-    turn_in_by_one_pulling_out(6.0, &[(60.0, true), (70.0, true)], 100, 4000);
+    turn_in_by_one_pulling_out(
+        6.0,
+        &[(60.0, true), (70.0, true)],
+        common::secs(5.0),
+        common::secs(200.0),
+    );
 }
 
 #[test]
@@ -677,8 +685,13 @@ fn a_car_pulling_out_across_the_street_as_one_turns_in_gets_out() {
     // gap the cars keep of each other, the one coming home backs up to let it finish its turn
     // (and stays back while it waits its turn), and both get on their way. They waited for each
     // other for good, the one coming home backing up and coming back up to it by turns.)
-    turn_in_by_one_pulling_out(7.0, &[(60.0, true), (70.0, false)], 100, 4000);
-    turn_in_by_one_pulling_out(7.0, &[(60.0, true), (100.0, false)], 0, 4000);
+    turn_in_by_one_pulling_out(
+        7.0,
+        &[(60.0, true), (70.0, false)],
+        common::secs(5.0),
+        common::secs(200.0),
+    );
+    turn_in_by_one_pulling_out(7.0, &[(60.0, true), (100.0, false)], 0, common::secs(200.0));
 }
 
 #[test]
@@ -728,7 +741,7 @@ fn a_car_gets_past_someone_walking_ahead_of_it_along_its_lane() {
     set_off(&mut w, 0);
     let mut walking = None;
     let mut away = None;
-    for t in 0..4000u32 {
+    for t in 0..common::secs(200.0) {
         w.tick_once();
         let Some((at, yaw, true, _)) = w.cars[0].shown else {
             if w.cars[0].state == CarState::Away && walking.is_some() {
@@ -769,7 +782,7 @@ fn a_car_pulling_out_of_its_driveway_waits_for_one_coming_along() {
     let mut out = false;
     let done = run_clear(
         &mut w,
-        4000,
+        common::secs(200.0),
         |w| {
             if !out && w.cars[0].shown.is_some_and(|s| s.2 && s.0[0] < 170.0) {
                 set_off(w, 1);
@@ -831,7 +844,7 @@ fn a_car_turning_out_of_a_side_road_waits_for_one_coming_along_the_road() {
         let mut out = false;
         let done = run_clear(
             &mut w,
-            6000,
+            common::secs(300.0),
             |w| {
                 if !out && w.cars[1].shown.is_some_and(|s| s.2 && s.0[0] < trigger) {
                     set_off(w, 0);
@@ -880,7 +893,7 @@ fn one_turning_out_of_a_side_road_and_one_coming_home_past_it_both_get_through_i
         let mut least = f32::INFINITY;
         let done = run_clear(
             &mut w,
-            4000,
+            common::secs(200.0),
             |w| least = least.min(cars_gap(w).0),
             |w| w.cars[0].state == CarState::Parked && w.cars[1].state == CarState::Away,
         );
@@ -947,7 +960,7 @@ fn cars_from_every_arm_of_a_crossroads_at_once_all_get_through() {
     let mut ticks = 0;
     let done = run_clear(
         &mut w,
-        3 * 60 * 20,
+        common::secs(180.0),
         |_| ticks += 1,
         |w| {
             matches!(w.cars[0].state, CarState::Away)
@@ -966,7 +979,7 @@ fn cars_from_every_arm_of_a_crossroads_at_once_all_get_through() {
     );
     // (Through the junction one after another: none of them over a minute of game time waiting.)
     assert!(
-        ticks > 200,
+        ticks > common::secs(10.0),
         "through in {ticks} ticks: did they drive at all?"
     );
 }
@@ -1065,7 +1078,7 @@ fn a_lit_junctions_signal_heads_are_in_the_snapshot_one_an_arm_on_its_kerb() {
     assert_eq!(layout["light"]["states"]["green"], light::GREEN as f64);
     let mut buf = vec![0.0f32; snapshot::CAPACITY];
     common::run_to(&mut w, 2, 7.0);
-    let end = w.tick + 30 * 60 * 20;
+    let end = w.tick + common::secs(1800.0);
     let mut greens = std::collections::BTreeSet::new();
     while w.tick < end {
         keep_driving(&mut w);
@@ -1111,7 +1124,7 @@ fn a_game_saved_with_the_lights_part_way_loads_with_them_where_they_were() {
     };
     // (Some arm but the first's turn, or amber: not where they start over.)
     let first = states(&w, &mut buf);
-    let end = w.tick + 30 * 60 * 20;
+    let end = w.tick + common::secs(1800.0);
     while states(&w, &mut buf) == first && w.tick < end {
         keep_driving(&mut w);
         w.tick_once();
@@ -1170,7 +1183,7 @@ fn a_car_pulling_up_at_a_light_resting_on_another_arms_green_gets_its_turn_soon(
     w.light_busy_junctions();
     common::run_to(&mut w, 2, 7.0);
     // (Resting: a while with nobody at it.)
-    for _ in 0..20 * 20 {
+    for _ in 0..common::secs(20.0) {
         w.tick_once();
     }
     let mut buf = vec![0.0f32; snapshot::CAPACITY];
@@ -1180,7 +1193,7 @@ fn a_car_pulling_up_at_a_light_resting_on_another_arms_green_gets_its_turn_soon(
         .collect();
     set_off(&mut w, 0);
     let (start, mut through) = (w.tick, None);
-    while w.tick < start + 60 * 60 * 20 && through.is_none() {
+    while w.tick < start + common::secs(3600.0) && through.is_none() {
         w.tick_once();
         // (Past the junction's middle on its way out east or west.)
         if w.cars[0]
@@ -1195,9 +1208,9 @@ fn a_car_pulling_up_at_a_light_resting_on_another_arms_green_gets_its_turn_soon(
     // (Its drive out of its driveway and down the arm, and the wait for its turn: a minute or so
     // in all, the turn itself 50 s at most.)
     assert!(
-        through - start < 50 * 20 + 3 * 60 * 20,
+        through - start < common::secs(50.0) + common::secs(180.0),
         "through after {} s, the lights resting at {resting:?}",
-        (through - start) / 20
+        (through - start) / common::secs(1.0)
     );
 }
 
@@ -1264,12 +1277,12 @@ fn cars_holding_each_other_up_out_of_sight_go_on_at_once() {
     w.set_watch(Some([0, 0, 400, 400]));
     let mut held = 0;
     let mut cars = Vec::new();
-    for _ in 0..3 * 60 * 20 {
+    for _ in 0..common::secs(180.0) {
         keep_driving(&mut w);
         w.tick_once();
         let r = ring(&w);
         held = if r.is_empty() { 0 } else { held + 1 };
-        if held >= 10 {
+        if held >= common::secs(0.5) {
             cars = r;
             break;
         }
@@ -1281,9 +1294,9 @@ fn cars_holding_each_other_up_out_of_sight_go_on_at_once() {
     let at = |w: &World, k: u64| w.cars[(k & !(1 << 63)) as usize].progress;
     let from: Vec<f32> = cars.iter().map(|&k| at(&w, k)).collect();
     w.set_watch(Some(ELSEWHERE));
-    // Out of sight they drive through each other: in a couple of game minutes each has gone on
+    // Out of sight they drive through each other: in a couple of seconds each has gone on
     // well along its way, and nobody waits for anyone.
-    for t in 0..2 * 20 {
+    for t in 0..common::secs(2.0) {
         keep_driving(&mut w);
         w.tick_once();
         for c in 0..w.cars.len() {
@@ -1323,7 +1336,7 @@ fn a_car_coming_into_sight_never_overlaps_one_there() {
     come_home(&mut w, 1);
     let mut together = false;
     let mut waited = false;
-    for _ in 0..4000 {
+    for _ in 0..common::secs(200.0) {
         w.tick_once();
         let (a, b) = (w.cars[0].shown, w.cars[1].shown);
         together |= a.zip(b).is_some_and(|(a, b)| a.0 == b.0 && a.2);
@@ -1373,7 +1386,7 @@ fn the_camera_coming_to_two_cars_on_top_of_each_other_shows_them_apart() {
             .zip(w.cars[1].shown)
             .is_some_and(|(a, b)| a.0 == b.0 && a.2)
     };
-    for _ in 0..200 {
+    for _ in 0..common::secs(10.0) {
         w.tick_once();
         if together(&w) && w.cars[0].shown.is_some_and(|s| s.0[0] > 20.0) {
             break;
@@ -1398,7 +1411,7 @@ fn the_camera_coming_to_two_cars_on_top_of_each_other_shows_them_apart() {
     assert!(o <= -0.15, "cars {a} and {b} {:.2} m apart at most", -o);
     let done = run_clear(
         &mut w,
-        4000,
+        common::secs(200.0),
         |_| {},
         |w| w.cars.iter().all(|c| c.state == CarState::Parked),
     );
@@ -1411,7 +1424,7 @@ fn in_sight_the_cars_go_as_without_a_watch() {
     let mut a = crowded_crossroads();
     let mut b = crowded_crossroads();
     b.set_watch(Some([0, 0, 400, 400]));
-    for t in 0..2 * 60 * 20 {
+    for t in 0..common::secs(120.0) {
         keep_driving(&mut a);
         keep_driving(&mut b);
         a.tick_once();
@@ -1436,8 +1449,8 @@ fn with_the_same_watches_the_cars_go_the_same_way_and_none_in_sight_waits_for_on
     let run = || {
         let mut w = crowded_crossroads();
         let mut states = Vec::new();
-        for t in 0..3 * 60 * 20 {
-            let watch = watches[(t / 150) % watches.len()];
+        for t in 0..common::secs(180.0) {
+            let watch = watches[(t / common::secs(7.5)) as usize % watches.len()];
             w.set_watch(watch);
             keep_driving(&mut w);
             w.tick_once();
@@ -1482,7 +1495,7 @@ fn a_car_held_up_for_good_in_sight_backs_out_of_the_junction_and_goes_another_wa
     ]);
     set_off(&mut w, 0);
     let mut past = None;
-    for _ in 0..3000 {
+    for _ in 0..common::secs(150.0) {
         w.tick_once();
         if let Some((p, yaw, true, _)) = w.cars[0].shown
             && (p[0] - 200.0).abs() > 12.0
@@ -1508,7 +1521,7 @@ fn a_car_held_up_for_good_in_sight_backs_out_of_the_junction_and_goes_another_wa
     w.cars[1].yaw = 0.0;
     let went = run_clear(
         &mut w,
-        20 * 60 * 20,
+        common::secs(1200.0),
         |_| {},
         |w| w.cars[0].state == CarState::Away,
     );
@@ -1532,7 +1545,7 @@ fn a_car_held_up_with_no_room_behind_it_to_turn_round_is_counted_and_never_backs
     ]);
     set_off(&mut w, 0);
     let mut past = None;
-    for _ in 0..3000 {
+    for _ in 0..common::secs(150.0) {
         w.tick_once();
         if let Some((p, yaw, true, _)) = w.cars[0].shown
             && (p[0] - 200.0).abs() > 12.0
@@ -1551,7 +1564,7 @@ fn a_car_held_up_with_no_room_behind_it_to_turn_round_is_counted_and_never_backs
     w.cars[2].yaw = 0.0;
     let went = run_clear(
         &mut w,
-        20 * 60 * 20,
+        common::secs(1200.0),
         |_| {},
         |w| w.cars[0].state == CarState::Away,
     );

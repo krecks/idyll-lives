@@ -8,7 +8,7 @@ use common::interaction;
 
 use common::buy;
 use sim_core::world::{Phase, TaskKind};
-use sim_core::{Command, MINUTES_PER_TICK, World};
+use sim_core::{Command, World};
 
 /// An open 16×14 plot with five residents.
 const TOWN: &str = r#"{"width":16,"depth":16,
@@ -62,7 +62,7 @@ fn showering_bathing_washing_up_and_laundry_at_once() {
 
     // Within a few minutes all five are at it, each shown with the animation for it.
     let mut at_it = [false; 5];
-    for _ in 0..(10.0 / MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(10.0) {
         w.tick_once();
         for (i, &(object, interaction, anim)) in wanted.iter().enumerate() {
             let Some(a) = w.sims[i].current() else {

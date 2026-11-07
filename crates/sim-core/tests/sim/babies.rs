@@ -37,7 +37,7 @@ const TOWN: &str = r#"{"width":20,"depth":12,
     "relationships":[{"a":1,"b":0,"preset":"parent"}]}"#;
 
 fn minutes(w: &mut World, m: u32) {
-    for _ in 0..m * 20 {
+    for _ in 0..u64::from(m) * common::TICKS_PER_MINUTE {
         w.tick_once();
     }
 }
@@ -439,7 +439,7 @@ fn a_baby_stays_in_the_crib_needing_something_or_rested() {
         minutes(&mut w, 1);
         let mut lain = in_crib(&w).expect("Bea is in the crib");
         // Wet (or wide awake), for two hours: she lies there, the same stay all along.
-        for _ in 0..2 * 60 * 20 {
+        for _ in 0..common::hours(2.0) {
             w.sims[1].needs[need] = level;
             w.tick_once();
             lain = still_in_crib(&w, lain, &format!("need {need} at {level}"));
@@ -454,7 +454,7 @@ fn a_wet_baby_is_changed_in_the_crib() {
     let mut lain = in_crib(&w).expect("Bea is in the crib");
     w.sims[1].needs[2] = 0.05;
     let mut changed = false;
-    for _ in 0..90 * 20 {
+    for _ in 0..common::mins(90.0) {
         w.tick_once();
         changed |= w.sims[0].current().is_some_and(|a| {
             matches!(
@@ -621,7 +621,7 @@ fn woken_by_a_crying_baby_none_of_the_players_orders_are_dropped() {
     };
     assert_eq!(orders(&w), sim_core::world::MAX_QUEUE);
     let mut woken = false;
-    for _ in 0..20 * 5 {
+    for _ in 0..common::mins(5.0) {
         w.tick_once();
         woken |= w.sims[0].queue().any(|t| !t.directed) || feeding(&w, 0);
         if woken {
@@ -880,7 +880,7 @@ const KITCHEN: &str =
 
 /// On (Bea fed) until `done`; panics after two hours.
 fn until(w: &mut World, what: &str, done: impl Fn(&World) -> bool) {
-    let limit = w.tick + 2 * 60 * 20;
+    let limit = w.tick + common::hours(2.0);
     while !done(w) {
         w.sims[2].needs[0] = 1.0;
         w.tick_once();
@@ -943,7 +943,7 @@ fn a_parent_eating_at_night_leaves_her_plate_for_the_crying_baby_and_finishes_it
     night_until(&mut w, 4.0, None, |w| {
         assert!(w.sims[1].asleep(&w.content), "Ben woken at tick {}", w.tick);
         // (The first feed: she feeds Bea again before morning.)
-        if feeding(w, 0) && *fed_at.get_or_insert(w.tick) + 20 * 20 > w.tick {
+        if feeding(w, 0) && *fed_at.get_or_insert(w.tick) + common::mins(20.0) > w.tick {
             left &= w
                 .items
                 .get(plate)
@@ -1086,7 +1086,7 @@ fn a_baby_with_a_grown_up_at_home_is_cuddled_and_stays_comfortable() {
     // Two days, Ada at home (no job): she sees to Bea, cuddling her when she needs it.
     let (mut sum, mut lowest, mut n, mut cuddled) = (0.0, 1.0f32, 0, false);
     for _ in 0..2 * 24 * 4 {
-        for _ in 0..15 * 20 {
+        for _ in 0..common::mins(15.0) {
             w.tick_once();
             cuddled |= w.sims[0].current().is_some_and(|a| matches!(a.task.kind, sim_core::world::TaskKind::Use { object: 0, interaction } if interaction == cuddle));
         }

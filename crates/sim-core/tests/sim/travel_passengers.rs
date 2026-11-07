@@ -154,7 +154,7 @@ fn ride_there(driver_first: bool) -> There {
     // parking spot and walk on to the park.
     let mut most_aboard = 0;
     let mut there = None;
-    for t in 0..20 * 60 * 20 {
+    for t in 0..common::hours(20.0) {
         w.tick_once();
         let car = &w.cars[c];
         if car.state == CarState::Leaving {
@@ -249,7 +249,7 @@ fn goes_in_one_car(driver_first: bool) {
     let mut home_aboard = 0;
     let mut reloaded = false;
     let mut back = None;
-    for t in 0..20 * 60 * 20 {
+    for t in 0..common::hours(20.0) {
         w.tick_once();
         let car = &w.cars[c];
         if car.state == CarState::Arriving {
@@ -327,7 +327,7 @@ fn riders_waiting_for_a_driver_at_work_make_their_own_way_home() {
     let others: Vec<usize> = who.iter().copied().filter(|&i| i != driver).collect();
     let mut sat = 0;
     let mut home_by = None;
-    for t in 0..20 * 60 * 20 {
+    for t in 0..common::hours(20.0) {
         w.tick_once();
         sat = sat.max(w.cars[c].aboard.len());
         assert_eq!(

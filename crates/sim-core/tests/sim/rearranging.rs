@@ -129,11 +129,11 @@ fn rearranging_homes_for_a_day(seed: u64) {
         w.tick_once();
         // An edit every few game minutes, at a random tick (a follow-up or a conversation
         // may be pending).
-        if rng.below(30) == 0 {
+        if rng.below(common::mins(1.5) as usize) == 0 {
             edit(&mut w, &mut rng);
             edits += 1;
             common::check(&w);
-        } else if w.tick.is_multiple_of(20) {
+        } else if w.tick.is_multiple_of(common::TICKS_PER_MINUTE) {
             common::check(&w);
         }
     }
@@ -195,7 +195,7 @@ fn the_same_move_sent_twice_moves_nothing_else() {
         // (A refusal is fine: the turn may not fit twice.)
         let _ = w.apply(turn);
         assert_eq!(layout(&w, (x, z)), others, "something else moved");
-        for _ in 0..rng.below(40) {
+        for _ in 0..rng.below(common::mins(2.0) as usize) {
             w.tick_once();
         }
         common::check(&w);

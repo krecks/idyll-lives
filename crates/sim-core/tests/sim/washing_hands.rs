@@ -50,7 +50,7 @@ fn after_the_toilet(w: &mut World, toilet: u32) -> Option<(u32, usize, f32)> {
         interaction: use_it,
     })
     .unwrap();
-    let ticks = (60.0 / MINUTES_PER_TICK) as u32;
+    let ticks = common::mins(60.0);
     let mut on = false;
     for _ in 0..ticks {
         w.tick_once();
@@ -112,7 +112,7 @@ fn a_toilet_visit_given_up_at_once_has_no_hand_washing_after() {
     })
     .unwrap();
     let mut sat = 0;
-    for _ in 0..(10.0 / MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(10.0) {
         w.tick_once();
         sat += usize::from(using(&w).is_some_and(|(o, _)| o == toilet));
         assert!(

@@ -72,7 +72,7 @@ fn a_lonely_housemate_calls_another_over() {
 
     let (a_from, mut b_from) = (w.sims[a].pos, None);
     let mut heeded = false;
-    for _ in 0..(10.0 / sim_core::MINUTES_PER_TICK) as u64 {
+    for _ in 0..common::mins(10.0) {
         w.tick_once();
         let act = w.sims[a].current();
         if act.is_some_and(|act| matches!((act.task.kind, &act.phase), (TaskKind::Social { target, .. }, Phase::Calling { .. }) if target as usize == b)) {
@@ -142,7 +142,7 @@ fn someone_on_the_sofa_stays_sitting_when_called_and_is_walked_over_to() {
         {
             continue;
         }
-        for _ in 0..(10.0 / sim_core::MINUTES_PER_TICK) as u64 {
+        for _ in 0..common::mins(10.0) {
             w.tick_once();
             if common::apart(w.sims[a].pos, spot) < 0.3 {
                 there = true;
@@ -166,7 +166,7 @@ fn someone_on_the_sofa_stays_sitting_when_called_and_is_walked_over_to() {
     let from = w.sims[a].pos;
     w.autonomy = true;
     let mut talked = false;
-    for _ in 0..(10.0 / sim_core::MINUTES_PER_TICK) as u64 {
+    for _ in 0..common::mins(10.0) {
         w.tick_once();
         assert_eq!(w.sims[b].pose, Pose::Sit, "B got up");
         assert!(common::apart(w.sims[b].pos, seat) < 0.05, "B left the sofa");
@@ -189,7 +189,7 @@ fn someone_on_the_sofa_stays_sitting_when_called_and_is_walked_over_to() {
         "A didn't come over"
     );
     // The talk over, B is still on the sofa, at what they sat down to do.
-    for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u64 {
+    for _ in 0..common::mins(30.0) {
         w.tick_once();
         assert_eq!(w.sims[b].pose, Pose::Sit, "B got up");
         if w.sims[a].conversation(&w.content).is_none() {

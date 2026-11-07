@@ -30,7 +30,7 @@ fn play_a_day(file: &str) {
     let end = w.tick + TICKS_PER_DAY;
     while w.tick < end {
         w.tick_once();
-        if w.tick.is_multiple_of(600) {
+        if w.tick.is_multiple_of(common::mins(30.0)) {
             common::check(&w);
         }
     }
@@ -91,7 +91,7 @@ fn a_town_saved_as_v34_plays_on() {
     let end = w.tick + TICKS_PER_DAY;
     while w.tick < end {
         w.tick_once();
-        if w.tick.is_multiple_of(600) {
+        if w.tick.is_multiple_of(common::mins(30.0)) {
             common::check(&w);
         }
     }

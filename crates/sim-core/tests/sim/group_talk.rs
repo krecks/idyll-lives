@@ -42,7 +42,7 @@ fn two_on_the_sofa_talk_from_their_seats_and_a_third_walks_over_to_listen() {
     w.sims[c].needs[social] = before;
     // A word from the seat: one of them talks to the other, neither getting up.
     let mut talking = None;
-    for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u64 {
+    for _ in 0..common::mins(30.0) {
         w.tick_once();
         talking = [a, b].into_iter().find(|&x| {
             w.sims[x]
@@ -82,7 +82,7 @@ fn two_on_the_sofa_talk_from_their_seats_and_a_third_walks_over_to_listen() {
         {
             continue;
         }
-        for _ in 0..(10.0 / sim_core::MINUTES_PER_TICK) as u64 {
+        for _ in 0..common::mins(10.0) {
             w.tick_once();
             if apart(w.sims[c].pos, spot) < 0.3 {
                 there = true;
@@ -105,7 +105,7 @@ fn two_on_the_sofa_talk_from_their_seats_and_a_third_walks_over_to_listen() {
     let mut last = w.sims[c].pos;
     let mut stride: f32 = 0.0;
     let mut joined = false;
-    for _ in 0..(15.0 / sim_core::MINUTES_PER_TICK) as u64 {
+    for _ in 0..common::mins(15.0) {
         w.tick_once();
         for (x, seat) in [a, b].into_iter().zip(seats) {
             assert_eq!(w.sims[x].pose, Pose::Sit, "{x} got up to talk");
@@ -159,7 +159,7 @@ fn two_on_the_sofa_talk_from_their_seats_and_a_third_walks_over_to_listen() {
             && apart(w.sims[c].pos, w.sims[other].pos) < 2.6
     );
     // The talk over, the two on the sofa carry on sitting there.
-    for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u64 {
+    for _ in 0..common::mins(30.0) {
         w.tick_once();
         if w.sims[leader].conversation(&w.content).is_none() {
             break;
@@ -225,7 +225,7 @@ fn a_lonely_housemate_joins_a_chat_at_home() {
     let mut joined = false;
     // Over to the group on foot, into their place in it: never more than a step a tick.
     let (mut last, mut stride) = (w.sims[c].pos, 0.0f32);
-    for _ in 0..(15.0 / sim_core::MINUTES_PER_TICK) as u64 {
+    for _ in 0..common::mins(15.0) {
         w.tick_once();
         stride = stride.max(apart(last, w.sims[c].pos));
         last = w.sims[c].pos;
@@ -271,7 +271,7 @@ fn a_lonely_housemate_joins_a_chat_at_home() {
     })
     .unwrap();
     let hugging = |w: &World| matches!(w.sims[b].current().map(|act| (act.task.kind, &act.phase)), Some((TaskKind::Social { social, .. }, Phase::Conversing { .. })) if social == hug);
-    let started = (0..(5.0 / sim_core::MINUTES_PER_TICK) as u64).find(|_| {
+    let started = (0..common::mins(5.0)).find(|_| {
         w.tick_once();
         hugging(&w)
     });

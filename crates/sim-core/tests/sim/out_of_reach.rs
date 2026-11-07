@@ -26,7 +26,7 @@ fn a_mess_out_of_reach_doesnt_keep_them_from_the_one_they_can_get_to() {
     let (shut_in, open) = (w.lot.tile_index(3, 3), w.lot.tile_index(9, 7));
     w.dirt[shut_in] = 0.9;
     w.dirt[open] = 0.5;
-    for _ in 0..30 * 20 {
+    for _ in 0..sim_core::mins(30.0) {
         w.tick_once();
     }
     assert!(
@@ -46,7 +46,7 @@ fn a_visit_with_no_way_there_doesnt_make_them_a_guest() {
     })
     .unwrap();
     w.apply(Command::Visit { sim: 0, plot: 1 }).unwrap();
-    for _ in 0..20 {
+    for _ in 0..sim_core::TICKS_PER_MINUTE {
         w.tick_once();
     }
     assert!(w.sims[0].current().is_none(), "no way over");

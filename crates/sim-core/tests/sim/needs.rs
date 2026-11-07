@@ -69,7 +69,7 @@ fn using(w: &World) -> Option<(u32, String)> {
 
 /// Ticks until resident 0 uses `object` (any interaction), at most `hours`.
 fn until_using(w: &mut World, object: u32, hours: f32) -> Option<String> {
-    let end = w.tick + (hours * 60.0 / MINUTES_PER_TICK) as u64;
+    let end = w.tick + common::mins(hours * 60.0);
     while w.tick < end {
         w.tick_once();
         if let Some((_, id)) = using(w).filter(|(o, _)| *o == object) {
@@ -85,7 +85,7 @@ fn bladder_during_a_film(w: &mut World) -> (bool, f32) {
     let b = need(w, "bladder");
     w.sims[0].needs[b] = 0.12;
     let mut lowest = 1.0f32;
-    let end = w.tick + (3.0 * 60.0 / MINUTES_PER_TICK) as u64;
+    let end = w.tick + common::hours(3.0);
     let mut left = false;
     while w.tick < end {
         w.tick_once();
@@ -129,7 +129,7 @@ fn a_film_the_player_asked_for_goes_on() {
     until_using(&mut w, CINEMA, 0.5).expect("they sit down to the film");
     let b = need(&w, "bladder");
     w.sims[0].needs[b] = 0.12;
-    for _ in 0..(30.0 / MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(30.0) {
         w.tick_once();
         assert_eq!(
             using(&w).map(|(o, _)| o),
@@ -146,7 +146,7 @@ fn nobody_starts_a_two_hour_film_on_a_bladder_that_wont_last_it() {
             let mut w = world(seed, 14.0);
             full_but(&mut w, &[("fun", 0.0), ("bladder", 0.25)]);
             let b = need(&w, "bladder");
-            let end = w.tick + (2.0 * 60.0 / MINUTES_PER_TICK) as u64;
+            let end = w.tick + common::hours(2.0);
             while w.tick < end {
                 w.tick_once();
                 if using(&w).is_some_and(|(o, id)| o == CINEMA && id == "film") {
@@ -177,14 +177,14 @@ fn the_toilet_before_leaving_for_work() {
         life::shift_today(&w.content, &job, &w.sims[0].skills, w.tick).expect("a workday");
     // An hour before they leave, up and about with a bladder not quite full (breakfast over:
     // the toilet after a meal, `dayRhythm.habits` `meal`, isn't the one this is about).
-    let ready = (w.content.day_rhythm.ready_minutes / MINUTES_PER_TICK) as u64;
+    let ready = common::mins(w.content.day_rhythm.ready_minutes);
     let eating = |w: &World| {
         matches!(
             w.sims[0].current().map(|a| a.task.kind),
             Some(TaskKind::Eat { .. })
         )
     };
-    while w.tick < leave - ready - (15.0 / MINUTES_PER_TICK) as u64 || eating(&w) {
+    while w.tick < leave - ready - common::mins(15.0) || eating(&w) {
         w.tick_once();
     }
     assert!(
@@ -194,7 +194,7 @@ fn the_toilet_before_leaving_for_work() {
     full_but(&mut w, &[("bladder", 0.7), ("fun", 0.3)]);
     let b = need(&w, "bladder");
     let mut toilet_at = None;
-    while w.sims[0].away_until.is_none() && w.tick < leave + (60.0 / MINUTES_PER_TICK) as u64 {
+    while w.sims[0].away_until.is_none() && w.tick < leave + common::mins(60.0) {
         w.tick_once();
         if toilet_at.is_none() && using(&w).is_some_and(|(o, _)| o == TOILET) {
             toilet_at = Some(w.tick);
@@ -271,7 +271,7 @@ fn needs_stay_between_empty_and_full() {
         interaction: watch,
     })
     .unwrap();
-    for _ in 0..(60.0 / MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(60.0) {
         w.tick_once();
         let needs = &w.sims[0].needs[..w.content.needs.len()];
         assert!(

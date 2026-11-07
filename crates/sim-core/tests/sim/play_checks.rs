@@ -23,7 +23,7 @@ use crate::common;
 use common::run_to;
 
 use serde_json::json;
-use sim_core::{Command, MINUTES_PER_TICK, World};
+use sim_core::{Command, World};
 
 const FUNDS: i64 = 1_000_000;
 
@@ -43,7 +43,7 @@ fn free_up(w: &mut World, i: usize) {
             })
             .unwrap();
         }
-        for _ in 0..(2.0 / MINUTES_PER_TICK) as u32 {
+        for _ in 0..common::mins(2.0) {
             w.tick_once();
         }
     }

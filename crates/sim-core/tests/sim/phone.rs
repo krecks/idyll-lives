@@ -58,7 +58,7 @@ fn world(content: &str, bond: &str) -> World {
 }
 
 fn minutes(w: &mut World, m: f32) {
-    let end = w.tick + (m / sim_core::MINUTES_PER_TICK) as u64;
+    let end = w.tick + common::mins(m);
     while w.tick < end {
         w.tick_once();
     }
@@ -228,7 +228,7 @@ fn nobody_answers_in_their_sleep() {
     let before = *w.relationships.get(1, 0);
     let social = w.sims[1].needs[0];
     let mut answer = None;
-    for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(60.0) {
         w.tick_once();
         answer = answer.or(on_the_phone(&w, 0)
             .map(|p| p.2)
@@ -598,7 +598,7 @@ fn a_lonely_resident_calls_a_friend_from_home() {
     .unwrap();
     w.sims[0].needs[0] = 0.15;
     let mut phoned = None;
-    for _ in 0..(120.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(120.0) {
         w.tick_once();
         if let Some((a, Some(1), _)) = on_the_phone(&w, 0) {
             phoned = Some((a, plot_of(&w, 0)));
@@ -624,7 +624,7 @@ fn bored_with_nothing_to_do_they_scroll() {
     w.sims[0].needs = [1.0, 0.2, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0];
     let browse = action(&w, "browse");
     let mut scrolled = false;
-    for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(60.0) {
         w.tick_once();
         scrolled |= on_the_phone(&w, 0).is_some_and(|p| p.0 == browse);
     }
@@ -739,7 +739,9 @@ fn a_town_phones_each_other() {
             else {
                 continue;
             };
-            if !seen.insert((s.id, w.tick / 60)) || !matches!(act.phase, Phase::Using { .. }) {
+            if !seen.insert((s.id, w.tick / common::mins(3.0)))
+                || !matches!(act.phase, Phase::Using { .. })
+            {
                 continue;
             }
             match contact {

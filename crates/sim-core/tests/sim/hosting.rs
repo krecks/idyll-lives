@@ -65,7 +65,7 @@ fn hosting(content: &str) -> World {
     w.sims[1].pos = [15.5, 8.5];
     w.sims[1].visiting = Some(sim_core::life::Visit {
         plot: 0,
-        until: w.tick + (6.0 * 60.0 / sim_core::MINUTES_PER_TICK) as u64,
+        until: w.tick + common::hours(6.0),
         idle: 0,
         farewell: 0,
         offer_at: 0,
@@ -281,7 +281,7 @@ fn without_a_fridge_nobody_offers_anything() {
     w.sims[1].pos = [15.5, 8.5];
     w.sims[1].visiting = Some(sim_core::life::Visit {
         plot: 0,
-        until: w.tick + (6.0 * 60.0 / sim_core::MINUTES_PER_TICK) as u64,
+        until: w.tick + common::hours(6.0),
         idle: 0,
         farewell: 0,
         offer_at: 0,
@@ -442,7 +442,7 @@ fn a_guest_whose_need_about_to_run_out_is_seen_to_there_stays_their_least_stay()
         assert!(
             !going(&w),
             "still to go, the need seen to, with {} min of his 40 left",
-            (least - w.tick) / 20
+            (least - w.tick) / TICKS_PER_MINUTE
         );
         assert!(
             w.sims[1].visiting.is_some(),

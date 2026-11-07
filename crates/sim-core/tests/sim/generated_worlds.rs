@@ -262,7 +262,7 @@ fn generated_worlds_are_livable() {
         // unless a need is about to run out, it's late or they're off to work.)
         let mut there: Vec<Option<(u64, u32)>> = vec![None; w.sims.len()];
         let mut short = std::collections::BTreeSet::new();
-        let least = (w.content.visits.least_minutes * 20.0) as u64;
+        let least = common::mins(w.content.visits.least_minutes);
         let mut stuck = std::collections::BTreeSet::new();
         let mut failures_on_road = std::collections::BTreeSet::new();
         let mut in_view = std::collections::BTreeSet::new();
@@ -328,7 +328,7 @@ fn generated_worlds_are_livable() {
                                 short.insert(format!(
                                     "{} went home from plot {plot} {} min after getting there",
                                     sim.name,
-                                    (w.tick - t0) / 20
+                                    (w.tick - t0) / common::TICKS_PER_MINUTE
                                 ));
                             }
                         }
@@ -1110,7 +1110,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
                 let off = off_paving(&w, car, at, &paths, &caps);
                 // (CARS_TRACE=seed:plot: that car's way, a point every second.)
                 if trace == Some((world["seed"].as_u64().unwrap_or(0), car.plot))
-                    && w.tick % 20 == 0
+                    && w.tick.is_multiple_of(common::secs(1.0))
                 {
                     let (_, yaw, ..) = car.shown.unwrap();
                     eprintln!(

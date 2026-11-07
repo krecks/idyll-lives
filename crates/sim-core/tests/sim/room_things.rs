@@ -90,7 +90,7 @@ fn rescoring_for_things_matches_finding_the_rooms_again() {
             }
         }
         // A little time between edits: dirt, things used (the same in both, as they're the same).
-        for _ in 0..(rng.next() * 40.0) as usize {
+        for _ in 0..(rng.next() * common::mins(2.0) as f64) as u64 {
             a.tick_once();
             b.tick_once();
         }
