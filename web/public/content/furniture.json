@@ -1744,7 +1744,7 @@
       "provides": [
         "screen"
       ],
-      "name": "Console TV",
+      "name": "Portable TV",
       "model": "model.tvRetro",
       "footprint": [
         1,

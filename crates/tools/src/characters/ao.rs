@@ -5,16 +5,30 @@
 //! (tools/art/blender/gamekit/shade.py, which this follows: the same directions, twist, falloff and
 //! rule for buried vertices). Deterministic: fixed directions, no randomness.
 
+use std::collections::HashMap;
+
 use nalgebra::{Rotation3, Unit};
 
 use super::meshops::ray_hit;
 use super::{Mesh, V3, v3};
 
-/// Rays per vertex.
-const SAMPLES: usize = 48;
-/// How far a crease is looked for (m): the furniture's rule, a fifth of the model's largest side (a
-/// young adult's height).
+/// Rays per vertex on the skin and the shells, whose creases are narrow (a lip's edge, a fold of
+/// cloth, a sole's welt): at 48 their shade was noisy from vertex to vertex.
+pub const SAMPLES: usize = 96;
+/// Rays per vertex on the hair, whose shade is the depth into a broad volume (and has no relaxation
+/// after it to need a clean start): 48 resolve it, and the hair has the most vertices of any part.
+pub const SAMPLES_HAIR: usize = 48;
+/// How far a crease is looked for (m) on the hair, where the shade is the depth into the volume and
+/// so wants the whole of it: the furniture's rule, a fifth of the model's largest side (a young
+/// adult's height).
 pub const REACH: f64 = 0.34;
+/// The skin's reach (m): a crease of the body, not the shade of whatever stands across the chest. At
+/// a fifth of the body's height the chin and the arms reach the sternum, which a 12-column ring
+/// cannot resolve and so smears; a hand's width keeps the shade to the folds and the seams.
+pub const REACH_BODY: f64 = 0.12;
+/// The shells' reach (m): their own folds, and the body they are lifted off, which is close enough to
+/// graze them all over and darken the lot if the reach is long.
+pub const REACH_SHELL: f64 = 0.15;
 /// Rays start this far off the surface (m), so they don't hit their own face.
 const LIFT: f64 = 0.0015;
 /// Steps it is rounded to: neighbours share a value, which packs tightly.
@@ -156,12 +170,12 @@ impl Bvh {
 }
 
 /// Per vertex of `mesh`: how enclosed it is at rest by itself and `around`, 0 (open) to 1, from
-/// rays over the hemisphere about its normal, a hit counting less the farther it is (up to
+/// `samples` rays over the hemisphere about its normal, a hit counting less the farther it is (up to
 /// `reach`, m). A vertex buried in another part (most rays first meet a back face) stays open:
 /// shaded, it would darken the faces it shares.
-pub fn occlusion(mesh: &Mesh, around: &[&Mesh], reach: f64) -> Vec<f64> {
+pub fn occlusion(mesh: &Mesh, around: &[&Mesh], reach: f64, samples: usize) -> Vec<f64> {
     let bvh = Bvh::new(mesh, around);
-    let dirs = directions(SAMPLES);
+    let dirs = directions(samples);
     (0..mesh.len())
         .map(|i| vertex(&bvh, &dirs, mesh, i, reach))
         .collect()
@@ -190,10 +204,10 @@ fn enclosed(bvh: &Bvh, dirs: &[V3], p: V3, n: V3, i: usize, reach: f64) -> f64 {
             None => {}
         }
     }
-    if inside > SAMPLES / 2 {
+    if inside > dirs.len() / 2 {
         0.0
     } else {
-        blocked / SAMPLES as f64
+        blocked / dirs.len() as f64
     }
 }
 
@@ -206,11 +220,12 @@ pub fn occlusion_spread(
     mesh: &Mesh,
     around: &[&Mesh],
     reach: f64,
+    samples: usize,
     n: usize,
     over: &dyn Fn(V3) -> bool,
 ) -> Vec<f64> {
     let bvh = Bvh::new(mesh, around);
-    let dirs = directions(SAMPLES);
+    let dirs = directions(samples);
     let (mut num, mut den) = (vec![0.0; n], vec![0.0; n]);
     let mut k = 0;
     for t in mesh
@@ -243,7 +258,7 @@ pub fn occlusion_spread(
     (0..mesh.len())
         .map(|i| {
             if i < n && den[i] > 0.0 {
-                (num[i] / den[i] * LEVELS).round() / LEVELS
+                num[i] / den[i]
             } else {
                 vertex(&bvh, &dirs, mesh, i, reach)
             }
@@ -251,13 +266,80 @@ pub fn occlusion_spread(
         .collect()
 }
 
-/// Writes an occlusion (one per vertex) into `mesh`'s tone.w.
+/// Writes an occlusion (one per vertex) into `mesh`'s tone.w, rounded to `LEVELS` steps there (after
+/// `smooth`, so the relaxation does not undo the packing).
 pub fn bake(mesh: &mut Mesh, occ: Vec<f64>) {
     mesh.tone.resize(mesh.len(), [0.0; 4]);
     for (t, a) in mesh.tone.iter_mut().zip(occ) {
-        t[3] = a;
+        t[3] = (a * LEVELS).round() / LEVELS;
     }
 }
+
+/// `occ` relaxed over the mesh's edges, `passes` times, the vertices `keep` picks left as they are
+/// (the face's, whose creases are narrower than the triangles and which `occlusion_spread` has
+/// already spread): each vertex takes half its own shade and half the mean of its neighbours'.
+///
+/// The rays give the shade at a point and the cage gives 8 or 12 vertices round a limb, so a crease a
+/// finger wide lands on two or three of them and the rest of the ring carries it as a blotch. The
+/// relaxation moves it onto the vertices either side without losing it: a crease stays, its edge
+/// softens.
+///
+/// Vertices at one position (a seam's split copies: a sole's two rows where its bands meet, a normal
+/// or a UV split) are relaxed as one, over all their neighbours, and take the same shade: relaxed
+/// apart, each over its own side's, the shade would step across the seam. (A kept vertex keeps its
+/// own, its copies included.)
+pub fn smooth(mesh: &Mesh, occ: &[f64], passes: usize, keep: &dyn Fn(usize) -> bool) -> Vec<f64> {
+    if passes == 0 {
+        return occ.to_vec();
+    }
+    let n = mesh.len();
+    // The vertices welded by position: each vertex's group, and the groups' members.
+    let key = |p: &V3| [p.x, p.y, p.z].map(|c| (c / WELD).round() as i64);
+    let mut ids: HashMap<[i64; 3], usize> = HashMap::new();
+    let group: Vec<usize> = (0..n)
+        .map(|i| {
+            let next = ids.len();
+            *ids.entry(key(&mesh.pos[i])).or_insert(next)
+        })
+        .collect();
+    let mut members: Vec<Vec<usize>> = vec![Vec::new(); ids.len()];
+    for (i, &g) in group.iter().enumerate() {
+        members[g].push(i);
+    }
+    let mut nbr: Vec<Vec<usize>> = vec![Vec::new(); members.len()];
+    for t in mesh.idx.chunks(3) {
+        for k in 0..3 {
+            let (a, b) = (t[k], t[(k + 1) % 3]);
+            if a < n && b < n && group[a] != group[b] {
+                nbr[group[a]].push(group[b]);
+                nbr[group[b]].push(group[a]);
+            }
+        }
+    }
+    let kept: Vec<bool> = members.iter().map(|m| m.iter().any(|&i| keep(i))).collect();
+    let mean = |cur: &[f64], g: usize| {
+        members[g].iter().map(|&i| cur[i]).sum::<f64>() / members[g].len() as f64
+    };
+    let mut cur = occ.to_vec();
+    for _ in 0..passes {
+        let mut next = cur.clone();
+        for g in 0..members.len() {
+            if kept[g] || nbr[g].is_empty() {
+                continue;
+            }
+            let around = nbr[g].iter().map(|&h| mean(&cur, h)).sum::<f64>() / nbr[g].len() as f64;
+            let v = 0.5 * mean(&cur, g) + 0.5 * around;
+            for &i in &members[g] {
+                next[i] = v;
+            }
+        }
+        cur = next;
+    }
+    cur
+}
+
+/// Vertices closer than this (m) are one point to `smooth`.
+const WELD: f64 = 1e-6;
 
 #[cfg(test)]
 mod tests {
@@ -289,7 +371,11 @@ mod tests {
     fn open_covered_and_buried() {
         let floor = quad(0.0, false);
         // Nothing above: open.
-        assert!(occlusion(&floor, &[], 0.5).iter().all(|&a| a == 0.0));
+        assert!(
+            occlusion(&floor, &[], 0.5, SAMPLES)
+                .iter()
+                .all(|&a| a == 0.0)
+        );
         // A ceiling facing down 5 cm above the middle: enclosed (its front faces the floor).
         let ceiling = Mesh {
             pos: vec![
@@ -305,13 +391,42 @@ mod tests {
             nor: vec![v3(0.0, 0.0, 1.0)],
             ..Mesh::default()
         };
-        let a = occlusion(&mid, &[&ceiling], 0.5)[0];
+        let a = occlusion(&mid, &[&ceiling], 0.5, SAMPLES)[0];
         assert!(a > 0.8, "{a}");
         // The same seen from its back: buried, so open.
         let back = Mesh {
             idx: vec![0, 1, 2, 0, 2, 3],
             ..ceiling
         };
-        assert_eq!(occlusion(&mid, &[&back], 0.5)[0], 0.0);
+        assert_eq!(occlusion(&mid, &[&back], 0.5, SAMPLES)[0], 0.0);
+    }
+
+    /// A strip of two quads with its middle edge split (two copies of each of its vertices, no
+    /// triangle between them), dark on one side: relaxed, the copies take one shade, as if welded.
+    #[test]
+    fn smooth_welds_split_copies() {
+        let pos = vec![
+            v3(0.0, 0.0, 0.0),
+            v3(0.0, 1.0, 0.0),
+            v3(1.0, 0.0, 0.0),
+            v3(1.0, 1.0, 0.0),
+            v3(1.0, 0.0, 0.0),
+            v3(1.0, 1.0, 0.0),
+            v3(2.0, 0.0, 0.0),
+            v3(2.0, 1.0, 0.0),
+        ];
+        let idx = vec![0, 2, 3, 0, 3, 1, 4, 6, 7, 4, 7, 5];
+        let mesh = Mesh {
+            nor: vec![v3(0.0, 0.0, 1.0); 8],
+            pos,
+            idx,
+            ..Mesh::default()
+        };
+        let occ = [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0];
+        let out = smooth(&mesh, &occ, 2, &|_| false);
+        assert_eq!(out[2], out[4]);
+        assert_eq!(out[3], out[5]);
+        // And a dark side still darker than the light one.
+        assert!(out[0] > out[2] && out[2] > out[6], "{out:?}");
     }
 }

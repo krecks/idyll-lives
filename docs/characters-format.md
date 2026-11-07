@@ -130,10 +130,16 @@ Every body has:
 
 `hair.none` has no part: a bald resident's scalp keeps the skin colour (appearance texel 7 w = 0).
 
-Hair (`hair.rs`, up to 3,000 triangles a style, one draw) is closed shapes in locks, so it breaks
-its outline and shades in clumps:
+Hair (`hair.rs`, up to 7.4k triangles a style, one draw) is closed shapes in locks, so it breaks
+its outline and shades in clumps. Every style's layout is a shape, and it is cut at `DETAIL` (1.5)
+times the rows the layout asks for and its locks on `LOCK` (6) columns each, not 4 (the same locks,
+more finely cut): at 3k a cap was 40 columns and 8-16 rows, which read
+as plates with a polyline for a hem; at 5.2k the curtains were ribbons of six or nine, the width of a
+thumb at arm's length, so the layered styles now ask for ten locks over four rows and the cap of the
+short ones for 52 columns and 18 rows:
 
-- every style has a skull cap: rows from the crown to the hairline in locks 4 columns wide, which
+- every style has a skull cap: rows from the crown to the hairline in locks 4 of its layout's columns
+  wide (6 as built, `hair::LOCK`: the detail adds columns to a lock, not locks), which
   leave the crown in a whorl, the grooves between them deepening to the hairline (none over the
   ears); a parting where the style has one (short and side-swept at the side, long and buns in the
   middle) is a groove the columns turn onto; short locks past the hairline at the temples and nape;
@@ -206,7 +212,20 @@ stands out, so a closed lid is the face with the eye's round under it and no soc
 the lids meet on the eye's front at its corners, the upper has a crease above its edge. The lids'
 surface is the base stage's face as far from the eye in eye radii (`Face::lid_z`), so the channels,
 made on the base stage, close the lids over the eye at every stage. Full lips, tubes along the mouth,
-the upper with a cupid's bow over the philtrum; brows thickest at the inner end.
+the upper with a cupid's bow over the philtrum; brows thickest at the inner end, laid by the eye
+(`head.rs` `brow_layout`, in eye radii from its centre): from over its inner corner to a little past
+its outer one, on the brow bone (not round the temple); a man's lower, straighter and heavier, a
+woman's higher, thinner and arched further out, its tail dropping.
+
+Grown faces and bodies differ by family more than the shared shapes do, as far as the stage is grown
+(`rig::maturity`: none for babies and children, 0.6 for teens): a man's jaw wider and squarer, his
+chin broad, his nose larger, his brow ridge heavier, his neck and arms thicker, his chest and
+shoulders broader (shoulder joints at 0.136 of the height, a woman's 0.115) over narrower hips and
+thighs, his waist nearly as wide as his hips (0.83 of them across, a young adult's); a
+woman's jaw narrower, her cheekbones higher, her chin small and pointed, her nose smaller, her eyes a
+twentieth larger, her lips fuller (at every stage: `face.rs` `style`), her hips and thighs wider, her waist 0.6 of her hips across (a
+young adult's; the stages' own waists widen it with age), with a gentle
+bust (`head.rs` `grown`, `nose`, `brow`; `body.rs` `Shape::m`).
 
 The head interface (`head_frame(family, stage)`, `head.rs`): `sdf` is a smooth signed distance
 to the head and neck as drawn (the ears left out; about 1 mm near the surface), `surface_z` the
@@ -226,26 +245,37 @@ hairline and chin as before.
 ## Tone (4 per vertex)
 
 x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = shade drawn by hand (the
-line between the lips, the upper lids' crease, the teeth's sides, deep in the hair; the mouth plate is
-1), z = hair clump bands (0..1: light in a lock's middle, dark in the parting between two) and on the
+upper lids' crease, the teeth's sides, deep in the hair; the mouth plate is
+1), and on the lips its opposite sign: negative, how much of the lip's colour they take (up to 0.9,
+less at the mouth's corners and towards the line between them, which the occlusion bakes: the
+shader tints the skin red-rose by it and takes the gloss off, `character.ts` `LIP_MIX`), z = hair
+clump bands (0..1: light in a lock's middle, dark in the parting between two) and on the
 body the face's age folds (0..1: a soft line from beside
 each nose wing down past the mouth's corner, `HeadFrame::fold`, each vertex's the mean over its
 triangles weighted by its barycentric weight, as the triangles can show it; the shader darkens the
-skin by `0.3 z age`, appearance texel 4 g, so young adults show none), w = the baked ambient occlusion
+skin by `0.3 z age`, appearance texel 4 g, so young adults show none; on the lips instead, how far
+the lip turns down at rest, 0..1, which the shader shades by `LIP_SHADE`: baked, so it is the lip's shape
+whichever way the head faces), w = the baked ambient occlusion
 (below). On `body` the eyelids take the tone of the face they lie on (as it is without the socket, at
 their nearest point), w included (the upper lid keeps its crease), and its normals there, in every
 shape of the face (build.rs `lid_shading`); on `lod.body` the mean tone of the skin round them. Every
 stage uses the base stage's tone.
 
 w is how much of the sky a vertex does not see at rest, 0 (open) to 1 (enclosed), in 32 steps
-(`ao.rs`, after the furniture's `gamekit/shade.py`): 48 rays per vertex over the hemisphere about its
+(`ao.rs`, after the furniture's `gamekit/shade.py`): 96 rays per vertex (48 on the hair, whose shade is
+the depth into a broad volume) over the hemisphere about its
 normal (cosine-weighted, a Fibonacci spiral twisted by the vertex's index), started 1.5 mm off the
-surface; a hit counts `1 - (d / 0.34 m)^2`. A vertex whose rays mostly meet a back face first is
+surface; a hit counts `1 - (d / reach)^2`, the reach being 0.12 m on the skin (a fold, a seam, the
+crease beside the nose), 0.15 m on the shells and 0.34 m on the hair (a fifth of the body's height,
+where the shade is the depth into the volume). A vertex whose rays mostly meet a back face first is
 buried in another part and stays 0. On the head (from 0.1 hh under the chin up) a skin vertex takes
 instead the mean over its triangles (four points each, weighted by its barycentric weight), so a
 crease's shade narrower than the triangles (the skin against the lips, beside the nose) is not
 caught at a few vertices and spread in spikes; and the skin is baked as it is without the eye
-sockets (the lids cover them). What occludes what:
+sockets (the lids cover them). The shade then eases over the mesh twice (once on `lod.body`, not at
+all on the hair): a vertex takes half its own and half its neighbours' mean, the face's vertices
+left alone, so a crease that lands on two of a ring's eight vertices reads as a crease and not as a
+blotch. What occludes what:
 
 - `body`: itself (its lids and lips included) and the teeth and tongue, not the eyes;
 - `lod.body`: the same, its own bake;
@@ -307,8 +337,9 @@ moves with the foot; its edges the collar crosses are split, and every point lie
 skin. The collar runs round the ankle, low at the sides (a boot's up the shin; a dress shoe's low,
 with a throat down the instep), its lining a band turned in to the skin. The sole stands a few mm out
 round the upper, from the floor (as the old soles: the clips and the seat fit stand on it) to its
-top; heels are thicker, and a heel's arch is lifted off the floor. Laces are bars across the
-instep (fields w and x); a sole is dark, or a light midsole over a dark outsole; dress shoes are
+top; heels are thicker, and a heel's arch and the toe lift off the floor. Laces are bars across the
+instep (fields w and x); a sole is dark, or a thin dark welt over a light midsole over a dark outsole;
+dress shoes are
 polished. The low-detail copy is the low-detail body's skin, unsplit and unlined, on the same
 soles (fewer sides).
 
