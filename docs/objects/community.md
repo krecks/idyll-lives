@@ -5,6 +5,10 @@ families: `families/playground.py` (notes: `playground.md`), `families/street_fu
 `families/stalls.py` (`stalls.md`), `families/shops.py` (`shops.md`) and `families/farm.py` (`farm.md`). The street's
 dressing props (`model.street.*`, `families/street.py`) aren't buyable and aren't listed here.
 
+The five countryside things of a Big world (`content/countryside.json`: the fishing spot, the lookout bench, the
+picnic spot, the wild berries and the trailhead signpost) have no models of their own: they use the garden pond, the
+park bench, the picnic table, the bush and the notice board, listed on their pages.
+
 They stand on town lots (the park lots, `houses.json` `parks`; the farm things on farm lots, placed by id in
 `web/src/game/town.ts` `farmstead`). They are seen from far and by the hundred, so
 every model has a far version (E7): the model at rest, joined and decimated (`far=0.25`), or built by hand where that

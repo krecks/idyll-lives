@@ -21,8 +21,10 @@
   const sizeOptions = [
     { value: 'cosy' as const, label: 'Cosy' },
     { value: 'normal' as const, label: 'Normal' },
-    { value: 'big' as const, label: 'Big' },
+    { value: 'big' as const, label: 'Big (preview)' },
   ];
+  /** Big worlds are a preview in 0.7.0: traffic can still jam at a busy junction (finished in 0.7.1). */
+  const previewHint = 'Preview: at rush hour, traffic can still jam at a busy junction near the camera. Looking elsewhere clears it.';
   let name = $state(app.world?.name ?? '');
   /** The name was typed or rolled here (kept when the world is made again). */
   let named = $state(false);
@@ -200,6 +202,7 @@
             <span class="eyebrow">Size</span>
             <Segmented label="Size" value={size} options={sizeOptions} onchange={resize} />
             <span class="hint">{sizeHint}</span>
+            {#if size === 'big'}<span class="hint">{previewHint}</span>{/if}
           </div>
           <div class="control">
             <span class="eyebrow">Lifespan</span>

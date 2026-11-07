@@ -1,5 +1,5 @@
 # The living room's media (L4, notes: media.md): the television on its media unit, the flat-screen TV on the
-# wall, the console TV, the low TV bench with a TV lift, the home cinema, the stereo, the boombox and the
+# wall, the portable TV, the low TV bench with a TV lift, the home cinema, the stereo, the boombox and the
 # electric fireplace.
 #
 # Each is built where the game places it (`F`, game axes: x, height, depth; front +depth), its back on the
@@ -9,13 +9,12 @@
 # is down, while watched.
 #
 # What moves:
+#   tvRetro            the aerial lifts 25° off the case (`antenna`, for watch);
 #   tvStandLow         the TV rises 60 cm out of the bench's lift (`tv_up`, for watch, back down at the end);
 #   homeCinema         the projector screen unrolls from its case on the wall (`screen_down`, watch and film);
 #   stereo             the record turns on the turntable (`record`, a loop) and the woofers pulse (`pulse`, `every`);
 #   boombox            the cassette door tips open and shuts (`cassette`, hold 1.2 s);
 #   fireplaceElectric  the flames grow from the log bed (`flames`, for relax; gloss, glowing at night).
-#
-# The console TV (`tvRetro`) has no moving part: its screen lights while watched, as every screen's does.
 #
 # Run:  cargo art media [--only tvRetro] [--preview]
 import math
@@ -45,9 +44,10 @@ M = G.Palette(
     # the flat-screen TV on the wall
     wall_frame=('#2A2C30', 'satin'),    # Body
     wall_bar=('#3A3D41', 'satin'),      # the soundbar; Trim
-    # the console TV (the old portable TV's names, so players' colours carry over)
-    retro_wood=('#C49A6C', 'wood'),     # the console; Body
-    retro_bezel=('#2A2C30', 'satin'),   # the set's casing and stand, the streaming box; Trim
+    # the portable TV: a dark plastic case
+    retro_shell=('#43474E', 'satin'),   # Body
+    retro_bezel=('#141619', 'gloss'),   # the screen's surround, the controls, the feet; Trim
+    crt=('#26313D', 'gloss', {'glow': '#A8C8E0'}),
     # the low TV bench
     bench=('#F1F0EC', 'satin'),         # Bench (and the lift's lid, on the TV)
     bench_oak=('#CDB08A', 'wood'),      # top and legs
@@ -231,76 +231,66 @@ def tv_wall():
     G.settle(centre=False, floor=False)
 
 
-# --- the console TV (1x1): a thin-bezel flat screen on a pedestal, on a slim fluted media console ------------
-# The console stands on black steel sleds, its back on the wall face: two fluted oak doors on the left, an open
-# cubby on the right (a game console below, a streaming box and records above). On top the set, a smart
-# speaker and a small plant. The material names (`retro_wood`, `retro_bezel`) are the old set's, kept so the
-# colours players chose (Body, Trim) carry over.
-CON_W, CON_Z0, CON_Z1 = 0.92, WALL, -0.03   # the console's width, back and front
-CON_Y0, CON_Y1 = 0.16, 0.5                   # its carcass's foot and its top board's underside
-CUBBY_X = 0.14                               # the divider between the doors and the cubby
+# --- the portable TV (1x1): a dark plastic monobloc case, its CRT behind a thin rounded mask, on two pads -----
+# The set of the reference photo: one moulded shell, no cabinet and no legs, a big 4:3 tube under a slim rounded
+# mask, the controls and a stub aerial on the top right, the back on the wall face.
+PT_W, PT_H, PT_D = 0.86, 0.66, 0.40   # the case
+PT_BACK = WALL                        # its back, on the wall face
+PT_FRONT = PT_BACK + PT_D             # its front
+PT_MID = 0.095 + PT_H / 2             # its middle height: it stands on a base band and two pads
+PT_TOP = 0.095 + PT_H                 # its top
+PT_SC_Y = 0.44                        # the screen's middle height: a chin below it, a narrow brow above
+PT_SC_W, PT_SC_H, PT_BEZ = 0.68, 0.50, 0.02   # the glass, and the mask round it
+PT_AERIAL = (0.33, PT_TOP, PT_BACK + 0.13)    # the aerial's foot, on the case's top right
 
 
 def tv_retro():
-    zc, d = (CON_Z0 + CON_Z1) / 2, CON_Z1 - CON_Z0
-    h = CON_Y1 - CON_Y0
-    # the sleds: a steel post at each corner, a runner on the floor and a rail under the carcass on each side
-    for s in (-1, 1):
-        x = s * (CON_W / 2 - 0.05)
-        for z in (CON_Z0 + 0.04, CON_Z1 - 0.04):
-            _rbox(f'post{s}{z}', 0.016, CON_Y0, 0.016, (x, CON_Y0 / 2, z), M.black_metal, r=0.002)
-        for y in (0.008, CON_Y0 - 0.008):
-            _rbox(f'runner{s}{y}', 0.016, 0.016, d - 0.064, (x, y, zc), M.black_metal, r=0.002)
-    # the carcass: top, bottom, sides, back and the divider, all oak
-    F.soft('top', CON_W, 0.025, d + 0.01, (0, CON_Y1 + 0.0125, zc + 0.005), M.retro_wood, round=0.006, round_segments=2)
-    _rbox('bottom', CON_W, 0.02, d, (0, CON_Y0 + 0.01, zc), M.retro_wood, r=0.003)
-    for s in (-1, 1):
-        _rbox(f'side{s}', 0.02, h, d, (s * (CON_W / 2 - 0.01), CON_Y0 + h / 2, zc), M.retro_wood, r=0.003)
-    _rbox('back', CON_W - 0.04, h, 0.012, (0, CON_Y0 + h / 2, CON_Z0 + 0.006), M.retro_wood, r=0.002)
-    _rbox('divider', 0.018, h, d - 0.012, (CUBBY_X, CON_Y0 + h / 2, zc + 0.006), M.retro_wood, r=0.002)
-    # two fluted doors with a small black knob each, by the gap between them
-    x0, x1 = -CON_W / 2 + 0.02, CUBBY_X - 0.009
-    dw = (x1 - x0 - 0.006) / 2
-    dh = h - 0.03
-    for k in range(2):
-        cx = x0 + dw / 2 + k * (dw + 0.006)
-        _rbox(f'door{k}', dw, dh, 0.016, (cx, CON_Y0 + 0.02 + dh / 2, CON_Z1 - 0.008), M.retro_wood, r=0.002)
-        n = 17
-        for i in range(n):
-            fx = cx - dw / 2 + dw * (i + 0.5) / n
-            F.cyl(f'flute{k}_{i}', 0.0068, dh - 0.024, (fx, CON_Y0 + 0.02 + dh / 2, CON_Z1), M.retro_wood, verts=8)
-        _front_cyl(f'knob{k}', 0.011, 0.02, cx + (1 if k == 0 else -1) * (dw / 2 - 0.03), CON_Y0 + 0.02 + dh * 0.78,
-                   CON_Z1 + 0.012, M.black_metal, verts=14)
-    # the cubby: a shelf halfway up; a game console lying on the bottom, a streaming box and records above
-    cw = CON_W / 2 - 0.02 - CUBBY_X - 0.009
-    cx = CUBBY_X + 0.009 + cw / 2
-    shelf = CON_Y0 + 0.02 + (h - 0.02) / 2
-    _rbox('shelf', cw, 0.016, d - 0.02, (cx, shelf, zc + 0.004), M.retro_wood, r=0.002)
-    _rbox('console', 0.22, 0.045, 0.2, (cx - 0.01, CON_Y0 + 0.02 + 0.0225, CON_Z1 - 0.13), M.pebble, r=0.008, segs=2)
-    F.box('console_band', 0.22, 0.008, 0.002, (cx - 0.01, CON_Y0 + 0.042, CON_Z1 - 0.029), M.retro_bezel)
-    F.box('console_led', 0.012, 0.003, 0.002, (cx + 0.07, CON_Y0 + 0.055, CON_Z1 - 0.029), M.led)
-    _rbox('controller', 0.12, 0.022, 0.07, (cx - 0.01, CON_Y0 + 0.02 + 0.045 + 0.011, CON_Z1 - 0.12), M.retro_bezel,
-          r=0.01, segs=2, rot=(0, 0, 8))
-    _rbox('stream_box', 0.1, 0.025, 0.1, (cx - 0.06, shelf + 0.008 + 0.0125, CON_Z1 - 0.1), M.retro_bezel, r=0.006,
-          segs=2)
-    F.box('stream_led', 0.006, 0.003, 0.002, (cx - 0.06, shelf + 0.018, CON_Z1 - 0.0495), M.led)
-    for i, m in enumerate((M.rec_teal, M.rec_mustard, M.rec_rust, M.rec_cream)):
-        _rbox(f'record{i}', 0.008, 0.15, 0.15, (cx + 0.04 + i * 0.011, shelf + 0.008 + 0.075, CON_Z1 - 0.15), m, r=0.001)
-    # the set: a thin-bezel panel on a pedestal (its neck behind the panel), a status light under the screen
-    top = CON_Y1 + 0.025
-    sz = -0.25
-    F.extrude('stand', G.rounded_rect(0.3, 0.17, 0.03, corner=4), 0.012, (0, top, sz), M.retro_bezel, plane='top',
-              bevel=0.004, bevel_segments=1)
-    _rbox('neck', 0.07, 0.15, 0.018, (0, top + 0.012 + 0.075, sz - 0.035), M.retro_bezel, r=0.004, segs=2)
-    _flat_screen('', 0, top + 0.07 + 0.215, sz, 0.74, 0.43, M.retro_bezel, depth=0.022, back=(0.46, 0.26), chin=0.006)
-    F.box('led', 0.006, 0.002, 0.001, (0.33, top + 0.07 + 0.003, sz + 0.0115), M.led_red)
-    # a smart speaker on the right (its fabric round, a light ring on top), a small plant on the left
-    G.revolve('speaker', [(0, 0), (0.038, 0), (0.04, 0.008), (0.04, 0.085), (0.036, 0.095), (0, 0.095)],
-              at=F.at(0.405, top, -0.11), material=M.grille, segments=20)
-    F.cyl('speaker_ring', 0.026, 0.002, (0.405, top + 0.096, -0.11), M.display, verts=20)
-    _plant('plant', -0.4, top, -0.11, 0.035, 0.06, M.pot, M.plant, n=8, length=0.08)
-    G.join_all('tvRetro')
+    zc = (PT_BACK + PT_FRONT) / 2
+    with G.new_parts() as still:
+        # the shell: one soft case, its corners well rounded, on an inset base band
+        F.soft('case', PT_W, PT_H, PT_D, (0, PT_MID, zc), M.retro_shell, round=0.05, round_segments=3)
+        F.soft('base', PT_W - 0.06, 0.05, PT_D - 0.05, (0, 0.07, zc), M.retro_shell, round=0.014, round_segments=2)
+        # two pads at the front, a rail at the back
+        for s in (-1, 1):
+            F.soft(f'pad{s}', 0.11, 0.045, 0.08, (s * 0.28, 0.0225, PT_FRONT - 0.09), M.retro_bezel, round=0.012,
+                   round_segments=2)
+        F.soft('rail', 0.66, 0.045, 0.06, (0, 0.0225, PT_BACK + 0.09), M.retro_bezel, round=0.012, round_segments=2)
+        # the screen: a thin rounded mask proud of the case, the tube's glass domed out of it
+        hole = G.rounded_rect(PT_SC_W, PT_SC_H, 0.05, corner=4)
+        F.extrude('mask', G.rounded_rect(PT_SC_W + 2 * PT_BEZ, PT_SC_H + 2 * PT_BEZ, 0.055, corner=4), 0.028,
+                  (0, PT_SC_Y, PT_FRONT + 0.012), M.retro_bezel, holes=[hole], bevel=0.006, bevel_segments=2)
+        glass = PT_FRONT - 0.005
+        secs = []
+        for t, k in ((0.0, 1.015), (0.006, 1.015), (0.012, 1.0), (0.017, 0.94), (0.021, 0.80), (0.024, 0.45)):
+            secs.append([(-u * k, -(glass + t), PT_SC_Y + v * k) for u, v in hole])
+        G.loft('tube', secs, material=M.crt)
+        # the chin: a badge and the standby light
+        F.box('badge', 0.07, 0.012, 0.002, (0, 0.132, PT_FRONT + 0.0005), M.steel)
+        F.box('led', 0.006, 0.002, 0.0015, (0.29, 0.132, PT_FRONT + 0.0005), M.led_red)
+        # the controls on the right side: a turned knob over two buttons, on a pad
+        _rbox('ctl_pad', 0.012, 0.13, 0.11, (PT_W / 2 - 0.004, 0.58, -0.15), M.retro_bezel, r=0.006, segs=2)
+        F.cyl('knob', 0.024, 0.03, (PT_W / 2 + 0.008, 0.615, -0.155), M.retro_bezel, rot=(0, 90, 0), verts=16,
+              bevel=0.004)
+        F.box('knob_mark', 0.003, 0.03, 0.004, (PT_W / 2 + 0.024, 0.615, -0.155), M.steel)
+        for k, y in enumerate((0.555, 0.515)):
+            F.cyl(f'button{k}', 0.012, 0.014, (PT_W / 2 + 0.004, y, -0.15), M.retro_bezel, rot=(0, 90, 0), verts=12)
+        # the back: a cover with vents
+        F.soft('back', 0.70, 0.5, 0.02, (0, 0.42, PT_BACK + 0.012), M.retro_bezel, round=0.01, round_segments=2)
+        for k in range(5):
+            F.box(f'vent{k}', 0.5, 0.012, 0.004, (0, 0.3 + 0.055 * k, PT_BACK + 0.021), M.grille)
+        # the aerial's foot on the case's top right
+        F.sphere('aerial_foot', 0.022, PT_AERIAL, M.retro_bezel, scale=(1, 0.6, 1), segments=14, rings=8)
+    G.join(still, 'tvRetro', origin=(0, 0, 0))
+    # the aerial: a telescopic stub lying back along the case's top, its own part, lifted when watched
+    with G.new_parts() as aerial:
+        # a telescopic stub: a thick foot section, then the thin rod and its ball
+        knee = (PT_AERIAL[0] + 0.014, PT_AERIAL[1] + 0.008, PT_AERIAL[2] - 0.05)
+        tip = (PT_AERIAL[0] + 0.03, PT_AERIAL[1] + 0.022, PT_BACK + 0.025)
+        F.sweep('aerial_rod', [PT_AERIAL, knee, tip], 0.006, M.steel, verts=8, scale=[1.7, 1.7, 0.9, 0.9, 0.7, 0.7])
+        F.sphere('aerial_ball', 0.009, tip, M.steel, segments=10, rings=6)
+    aerial = G.join(aerial, 'aerial', origin=F.at(*PT_AERIAL))
     G.settle(centre=False)
+    G.swing(aerial, 'antenna', 35, seconds=0.9)
 
 
 # --- the low TV bench (2x1): a white bench on oak legs, a TV lift in a hood at its back -----------------------
@@ -703,8 +693,9 @@ FAMILY = G.Family(
              paint=[('tv_cabinet', 'Body'), ('tv_oak', 'Trim')]),
      G.Model('tvWall', tv_wall, key='model.tvWall', size=(1.24, 0.87, 0.102), centre=(0, -0.379), floor=False,
              paint=[('wall_frame', 'Body'), ('wall_bar', 'Trim')]),
-     G.Model('tvRetro', tv_retro, key='model.tvRetro', size=(0.92, 1.025, 0.422), centre=(0, -0.219),
-             paint=[('retro_wood', 'Body'), ('retro_bezel', 'Trim')]),
+     G.Model('tvRetro', tv_retro, key='model.tvRetro', size=(0.886, 0.786, 0.426), centre=(0.013, -0.217),
+             motions={'uses': {'watch': 'antenna'}},
+             paint=[('retro_shell', 'Body'), ('retro_bezel', 'Trim')]),
      G.Model('tvStandLow', tv_stand_low, key='model.tvStandLow', size=(1.82, 0.8, 0.464), centre=(0, -0.198),
              motions={'uses': {'watch': 'tv_up'}},
              paint=[('bench', 'Bench'), ('bench_tv', 'TV')]),

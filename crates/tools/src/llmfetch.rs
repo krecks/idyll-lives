@@ -7,6 +7,8 @@
 //!   to 4,096 positions): 228 MB of weights instead of 294.
 //! - The licence goes along (`LICENSE`, which the licence asks for): the export's repository has
 //!   none, so it comes from Liquid AI's own: https://huggingface.co/LiquidAI/LFM2.5-350M
+//! - A `NOTICE` says what the repack changed: the licence's section 4(b) asks that "any modified
+//!   files ... carry prominent notices stating that You changed the files".
 //!
 //! Everything is pinned to a revision and checked against its SHA-256, the repacked files too. The
 //! weights are stored gzipped (`model_q4.onnx_dataz`, about 14 % smaller; the browser unpacks
@@ -80,6 +82,22 @@ const DATA: (&str, &str) = (
     "3b7570c237498b56b6276ceae327a11dd7f3e96dee8a4eaa3dad27548ee6a9de",
 );
 
+/// What `NOTICE` says about the changed files (the licence's section 4(b) asks for changes to be
+/// marked).
+const NOTICE: &str =
+    "LFM2.5-350M (Liquid AI, Inc.), https://huggingface.co/LiquidAI/LFM2.5-350M, in its 4-bit ONNX
+export by onnx-community, https://huggingface.co/onnx-community/LFM2.5-350M-ONNX, revision 7dd49995.
+Licensed under the LFM Open License v1.0 (LICENSE.txt).
+
+Modified by Idyll Lives (cargo fetch-llm, crates/tools/src/llmslim.rs): model_q4.onnx and
+model_q4.onnx_data are repacked without changing what the model computes. The tied 4-bit
+embedding, which the export stores twice (for reading the tokens and for the output layer), is
+stored once, both pointing at the same bytes; and the rotary tables (cos_cache and sin_cache) keep
+their first 4,096 rows of 128,000, one per position, so the model takes at most 4,096 positions.
+The weights file is gzipped (model_q4.onnx_dataz). Nothing was retrained or requantised.
+tokenizer.json and tokenizer_config.json are unchanged.
+";
+
 /// Files earlier versions put into the site that are no longer used.
 const OBSOLETE: [&str; 9] = [
     "LICENSE",
@@ -133,6 +151,7 @@ fn run() -> Result<(), String> {
             fetch(file)?;
         }
     }
+    download::write(&out.join("NOTICE"), NOTICE.as_bytes())?;
     let packed = out.join(format!("{}z", DATA.0));
     if download::file_sha256(&out.join(GRAPH.0), false).as_deref() == Some(GRAPH.1)
         && download::file_sha256(&packed, true).as_deref() == Some(DATA.1)
@@ -188,5 +207,16 @@ mod tests {
         assert!(FILES.iter().chain(&EXPORT).all(|f| !f.out.contains('/')));
         // The export's files are cleaned up if a run stopped before it could.
         assert!(EXPORT.iter().all(|f| OBSOLETE.contains(&f.out)));
+    }
+
+    /// The notice the licence asks for names the files changed and the positions the repack keeps.
+    #[test]
+    fn the_notice_says_what_changed() {
+        let p = llmslim::POSITIONS;
+        let kept = format!("first {},{:03} rows", p / 1000, p % 1000);
+        assert!(NOTICE.contains(&kept), "NOTICE: {kept}");
+        assert!(NOTICE.contains(GRAPH.0) && NOTICE.contains(DATA.0));
+        assert!(NOTICE.contains("LICENSE.txt") && NOTICE.contains("revision 7dd49995"));
+        assert!(LFM.contains("7dd49995"));
     }
 }
