@@ -3436,6 +3436,22 @@ fn time_leisure(w: &World, run: &mut Run) -> bool {
     true
 }
 
+/// Whether `sim` waits at home for a leisure taxi out booked for them (`book_leisure`): they don't
+/// go off on another visit or an outing meanwhile (`world`'s choices); off on one, the taxi's
+/// time came while they were there, and it took them away twenty minutes in (Ottertarn).
+pub(crate) fn waiting_out(taxis: &Taxis, sim: &crate::world::Sim) -> bool {
+    sim.taxi.is_some_and(|b| {
+        taxis.runs.iter().any(|r| {
+            r.id == b.run
+                && r.place.is_some()
+                && !r.home
+                && r.stops
+                    .get(b.stop as usize)
+                    .is_some_and(|st| st.state == StopState::Booked)
+        })
+    })
+}
+
 /// Those booked on a leisure run whose time to go out to their kerb has come: off they go, there
 /// (their visit or outing, `world`'s way there: to the kerb, `kerb_for`) or home from the place,
 /// their stay over (the taxi back comes when the first of those sharing it is done, `book_back`).
@@ -3727,6 +3743,66 @@ mod leisure_leaving_tests {
         "households":[{"name":"Host","plot":0,"player":true},{"name":"Guest","plot":1}],
         "objects":[{"def":"chair","x":3,"z":2,"rot":0},{"def":"chair","x":24,"z":2,"rot":0}],
         "sims":[{"name":"Host","household":0,"x":5.5,"z":3.5},{"name":"Guest","household":1,"x":3.5,"z":3.5}]}"#;
+
+    /// The two houses, friends next door, and a park along the street.
+    const TOWN_PARK: &str = r#"{"width":60,"depth":14,"exits":[[0.5,7.5]],
+        "plots":[{"name":"West","x":0,"z":0,"w":20,"d":6,"entry":[5.5,5.5]},{"name":"East","x":20,"z":0,"w":20,"d":6,"entry":[25.5,5.5]},
+                 {"name":"Park","x":40,"z":0,"w":20,"d":6,"entry":[45.5,5.5],"public":true}],
+        "households":[{"name":"Host","plot":0,"player":true},{"name":"Guest","plot":1}],
+        "objects":[{"def":"chair","x":3,"z":2,"rot":0},{"def":"chair","x":24,"z":2,"rot":0}],
+        "sims":[{"name":"Host","household":0,"x":5.5,"z":3.5},{"name":"Guest","household":1,"x":25.5,"z":3.5}],
+        "relationships":[{"a":0,"b":1,"preset":"friends"}]}"#;
+
+    #[test]
+    fn one_waiting_at_home_for_a_taxi_out_doesnt_go_off_visiting_meanwhile() {
+        // The guest, at home, is booked on a taxi out to the park an hour and a half from now,
+        // and wants company: they wait at home for it, not go round to their friend's next
+        // door meanwhile. (Gone, the taxi's time came while they were there, and it took them
+        // away twenty minutes in, Ottertarn.)
+        let content = CONTENT.replace(
+            r#""economy""#,
+            r#""bondPresets":{"friends":{"friendship":80}},"economy""#,
+        );
+        let mut w = World::from_json(&content, TOWN_PARK, 1).unwrap();
+        let i = 1usize;
+        let tick = w.tick;
+        let out = tick + 90 * TICKS_PER_MINUTE;
+        w.taxis.runs.push(Run {
+            id: 9,
+            home: false,
+            place: Some(2),
+            directed: false,
+            group: (0, 0),
+            enter: out - 30 * TICKS_PER_MINUTE,
+            due_out: 0,
+            planned_out: 0,
+            depart: 0,
+            stops: vec![Stop {
+                sim: i as u32,
+                plot: 1,
+                due: out,
+                leave: out - 10 * TICKS_PER_MINUTE,
+                state: StopState::Booked,
+                halt: 0,
+            }],
+            next: 0,
+            progress: 0.0,
+            detour: None,
+            since: 0,
+            car: None,
+            at: Vec::new(),
+            kerbs: Vec::new(),
+        });
+        w.sims[i].taxi = Some(Booking { run: 9, stop: 0 });
+        for _ in 0..60 * TICKS_PER_MINUTE {
+            w.sims[i].needs[0] = 0.1;
+            w.tick_once();
+            assert!(
+                !w.sims[i].visiting.is_some_and(|v| v.plot == 0),
+                "off to their friend's while waiting for the taxi out"
+            );
+        }
+    }
 
     #[test]
     fn a_guest_off_to_the_taxi_home_mid_talk_from_a_seat_lets_go_of_the_seat() {

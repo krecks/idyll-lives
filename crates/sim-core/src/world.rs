@@ -7121,6 +7121,7 @@ fn pick_autonomous(
     let visits = &content.visits;
     if from_seat.is_none()
         && sim.visiting.is_none()
+        && !crate::taxi::waiting_out(ctx.taxis, sim)
         && here.is_some()
         && here == household.plot
         && !minding
