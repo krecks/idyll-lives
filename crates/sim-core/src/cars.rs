@@ -2385,7 +2385,8 @@ impl Legs {
 
 /// The car `sim` would take to work (or school) now, and their seat in it (0: they drive): an
 /// owner 18 or older takes their household's car from home when it's parked there; anyone else in
-/// the household rides along when an owner is about to drive off in it (or on their way to).
+/// the household rides along when an owner is about to drive off in it (or on their way to). Not
+/// one booked on a work taxi (`taxi.rs`): it comes for them as planned.
 pub(crate) fn seat(
     cars: &[Car],
     briefs: &[SimBrief],
@@ -2396,7 +2397,9 @@ pub(crate) fn seat(
 ) -> Option<(u32, usize)> {
     let me = briefs.get(sim.id as usize)?;
     let home = households.get(sim.household as usize)?.plot?;
-    if !sim.here() || me.baby {
+    // (Called to the household's car on their way out to the kerb, a rider left the taxi to
+    // come in for nobody, held up by that car and turned round into the next taxi's way.)
+    if !sim.here() || me.baby || sim.taxi.is_some() {
         return None;
     }
     if me.plot.is_none_or(|p| p == home)
