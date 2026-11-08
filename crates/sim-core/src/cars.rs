@@ -5543,10 +5543,11 @@ pub(crate) fn go_on(
             (d.ahead, d.behind)
         };
         // (Beside it, no nearer a tick on, clear of its body and the ground ahead: they wait for
-        // it. Never into anyone.)
+        // it. Never into anyone. Nearer by under a millimetre is only rounding, as it drives on
+        // alongside them: held up there a tick in two, it would keep pace with them.)
         let next = d.gap(body, s.pos);
         if !covers(d.at, turn, d.len, d.wid, body, s.pos, ahead, behind)
-            || next >= 0.0 && next >= now.gap(body, s.pos)
+            || next >= 0.0 && next >= now.gap(body, s.pos) - 1e-3
         {
             continue;
         }
