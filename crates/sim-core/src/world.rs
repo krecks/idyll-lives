@@ -2420,8 +2420,9 @@ impl World {
 
     /// Whether resident `i` would set off now to visit `plot` (an invitation over the phone):
     /// the way isn't too long, as they'd go (`leisure_way`), they'd be there in visiting hours
-    /// (`visit_fits`), and a household living there isn't all off to work or school before they
-    /// could stay `visits.leastMinutes` (`hosts_about_till`).
+    /// with time for the stay before they leave for work or school themselves (`visit_fits`,
+    /// `free_before_work`), and a household living there isn't all off to work or school before
+    /// they could stay `visits.leastMinutes` (`hosts_about_till`).
     pub(crate) fn visit_fits_now(&self, i: usize, plot: u32) -> bool {
         let (Some(sim), Some(p)) = (self.sims.get(i), self.plots.get(plot as usize)) else {
             return false;
@@ -2460,16 +2461,27 @@ impl World {
             &mut [None, None],
         );
         let stay = crate::mins(eta + self.content.visits.least_minutes);
-        visit_fits(
-            &self.content,
-            eta,
-            crate::clock::hour(self.tick),
-            f32::INFINITY,
-        ) && self
-            .households
-            .iter()
-            .find(|h| h.plot == Some(plot))
-            .is_none_or(|h| hosts_about_till(&self.briefs, h.id) >= self.tick + stay)
+        // (With time for it before they leave for work or school, as a visit they'd choose for
+        // themselves: invited round, a guest let in was off to work 39 minutes on, Brightton.)
+        let by_taxi = sim
+            .taxi
+            .and_then(|b| crate::taxi::booked_leave(&self.taxis, &self.cars, self.tick, b))
+            .map(|leave| {
+                leave.saturating_sub(crate::taxi::indoor_lead(
+                    &self.content,
+                    &self.stairs,
+                    &self.households,
+                    &self.plots,
+                    sim,
+                ))
+            });
+        let free = free_before(&self.content, sim, self.tick, by_taxi);
+        visit_fits(&self.content, eta, crate::clock::hour(self.tick), free)
+            && self
+                .households
+                .iter()
+                .find(|h| h.plot == Some(plot))
+                .is_none_or(|h| hosts_about_till(&self.briefs, h.id) >= self.tick + stay)
     }
 
     /// The plot a tile is on (on any storey).
@@ -9775,29 +9787,40 @@ fn reach(
 /// is still to start (a long walk's leave time gone by while they wait for a later taxi).
 /// Infinite with none today.
 fn free_before_work(sim: &Sim, ctx: &Ctx) -> f32 {
-    if let Some(leave) = sim
+    // (Sooner from further in than the run was timed with, `taxi::indoor_lead`.)
+    let by_taxi = sim
         .taxi
         .and_then(|b| crate::taxi::booked_leave(ctx.taxis, ctx.cars, ctx.tick, b))
-    {
-        // (Sooner from further in than the run was timed with, `taxi::indoor_lead`.)
-        let lead =
-            crate::taxi::indoor_lead(ctx.content, ctx.nav.stairs, ctx.households, ctx.plots, sim);
-        return leave.saturating_sub(ctx.tick + lead) as f32 * MINUTES_PER_TICK;
+        .map(|leave| {
+            leave.saturating_sub(crate::taxi::indoor_lead(
+                ctx.content,
+                ctx.nav.stairs,
+                ctx.households,
+                ctx.plots,
+                sim,
+            ))
+        });
+    free_before(ctx.content, sim, ctx.tick, by_taxi)
+}
+
+/// `free_before_work` with the work taxi's leave (`by_taxi`, from where they are) found already.
+fn free_before(content: &Content, sim: &Sim, tick: u64, by_taxi: Option<u64>) -> f32 {
+    if let Some(leave) = by_taxi {
+        return leave.saturating_sub(tick) as f32 * MINUTES_PER_TICK;
     }
-    let content = ctx.content;
     let Some((leave, start, _)) = sim
         .job
         .as_ref()
-        .and_then(|job| crate::life::shift_today(content, job, &sim.skills, ctx.tick))
-        .or_else(|| crate::life::school_today(content, sim, ctx.tick))
+        .and_then(|job| crate::life::shift_today(content, job, &sim.skills, tick))
+        .or_else(|| crate::life::school_today(content, sim, tick))
     else {
         return f32::INFINITY;
     };
-    if start <= ctx.tick {
+    if start <= tick {
         return f32::INFINITY;
     }
     let leave = crate::life::leave_for(sim, leave, start);
-    leave.saturating_sub(ctx.tick) as f32 * MINUTES_PER_TICK
+    leave.saturating_sub(tick) as f32 * MINUTES_PER_TICK
 }
 
 /// When they leave for work or school today (if they haven't yet).
