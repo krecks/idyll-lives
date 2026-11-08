@@ -376,7 +376,8 @@ fn group(w: &World, i: usize) -> Option<(u32, u32)> {
 }
 
 /// Where the taxi would stand for resident `i` at home (`kerb_at`), no other taxi about: as found
-/// by `warm_kerbs` (called first), else worked out.
+/// by `warm_kerbs`, for the same door, driveways and network (`kerb_stamp`); else worked out (not
+/// found yet, or found for a town since changed: whoever asks first, `warm_kerbs` or not).
 fn stop_for(w: &World, i: usize) -> Option<Kerb> {
     let plot = w.households.get(w.sims[i].household as usize)?.plot?;
     let door = w
@@ -384,8 +385,10 @@ fn stop_for(w: &World, i: usize) -> Option<Kerb> {
         .get(plot as usize)?
         .arrival_point()
         .map(f32::to_bits);
-    if let Some(Some((at, kerb))) = w.taxis.kerbs.plots.get(plot as usize)
+    let kerbs = &w.taxis.kerbs;
+    if let Some(Some((at, kerb))) = kerbs.plots.get(plot as usize)
         && *at == door
+        && kerbs.stamp == kerb_stamp(w)
     {
         return *kerb;
     }
@@ -4145,5 +4148,60 @@ mod leisure_leaving_tests {
             0,
             "the chair still held"
         );
+    }
+}
+
+#[cfg(test)]
+mod kerb_tests {
+    use super::*;
+
+    /// A street along the town, two houses north of it, their driveways onto it 48 m apart.
+    fn street() -> World {
+        let content = r#"{"needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],
+            "objects":[],"economy":{"startingFunds":500}}"#;
+        let points: Vec<String> = (0..200)
+            .map(|k| format!("[{},30]", 0.5 + k as f32))
+            .collect();
+        let town = format!(
+            r#"{{"width":200,"depth":60,
+            "exits":[{{"x":0.5,"z":30,"kind":"road"}},{{"x":199.5,"z":30,"kind":"road"}}],
+            "roads":[{{"points":[{}],"width":7,"kind":"street","ends":["out","out"]}}],
+            "plots":[{{"name":"H0","x":92,"z":8,"w":16,"d":18,"entry":[100.5,17.5]}},
+                     {{"name":"H1","x":140,"z":8,"w":16,"d":18,"entry":[148.5,17.5]}}],
+            "households":[{{"name":"F0","plot":0}},{{"name":"F1","plot":1}}],
+            "objects":[],
+            "sims":[{{"name":"A","household":0,"x":100.5,"z":17.5}},{{"name":"B","household":1,"x":148.5,"z":17.5}}],
+            "drives":[{{"plot":0,"x":100,"z":20.5,"front":1,"street":30,"road":0,"s":99.5}},
+                      {{"plot":1,"x":148,"z":20.5,"front":1,"street":30,"road":0,"s":147.5}}]}}"#,
+            points.join(",")
+        );
+        World::from_json(content, &town, 1).unwrap()
+    }
+
+    /// A house's stand as kept (`warm_kerbs`) is the one for the driveways as they are: one
+    /// moved since, it's worked out again, whoever asks (it once took `warm_kerbs` first).
+    #[test]
+    fn a_kept_stand_is_for_the_driveways_as_they_are() {
+        let mut w = street();
+        warm_kerbs(&mut w);
+        let kept = stop_for(&w, 0).expect("a stand by A's");
+        // B's driveway now meets the street just where A's taxi stood.
+        let d = w.drives.iter_mut().find(|d| d.plot == 1).unwrap();
+        d.s = Some(kept.s);
+        let fresh = kerb_at(
+            &w.travel,
+            &w.meta,
+            home_way(&w, 0).unwrap(),
+            &[],
+            &drive_mouths(&w),
+        )
+        .expect("a stand by A's still");
+        assert!((fresh.s - kept.s).abs() >= 1.0, "the stand moved clear");
+        let now = stop_for(&w, 0).expect("a stand");
+        assert_eq!((now.road, now.s), (fresh.road, fresh.s));
+        // Warmed again, the same.
+        warm_kerbs(&mut w);
+        let warm = stop_for(&w, 0).expect("a stand");
+        assert_eq!((warm.road, warm.s), (fresh.road, fresh.s));
     }
 }
