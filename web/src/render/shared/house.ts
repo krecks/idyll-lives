@@ -143,12 +143,6 @@ export interface HouseLooks {
   windows: readonly WindowStyleDef[];
   roofs?: readonly RoofStyleDef[];
   roofColors?: readonly RoofColorDef[];
-  /**
-   * Object kinds that make a room one the simulation may keep shut (sim-core `privacy.rs`): what
-   * makes it a bathroom, a double bed with a use done behind a shut door. Their rooms' doors
-   * swing (`DoorLeaf.shuts`). Absent: the bathroom things by id (`BATH`).
-   */
-  shuts?: ReadonlySet<string>;
 }
 
 /** A roof's shape: gable, hip or flat, and the pitch (rise per run) of pitched ones. */
@@ -166,9 +160,10 @@ const CLASSIC_WINDOW: WindowSpec = { panes: 'cross', sill: SILL, head: HEAD, ins
 const PANEL_DOOR: Pick<DoorStyleDef, 'leaf' | 'color'> = { leaf: 'panel' };
 /** Natural oak, light and golden, on the oak grain (the oak panelling's), for an oak leaf without a colour of its own. */
 const OAK = '#D4B48A';
-/** Door leaf size (m): width and thickness; it stands from 0.01 m to just under the head. */
-const LEAF_W = 0.8;
+/** A door leaf's thickness (m); it stands from 0.01 m to just under the head. */
 const LEAF_T = 0.045;
+/** A single door's leaf is as wide as its opening (m): it hangs 2 cm off its jamb and shuts 1 cm short of the other. */
+const FILL = 1 - 2 * T - 0.03;
 /**
  * A leaf that would open less than this much of its quarter turn slides into the wall instead
  * (see `doorway`): below 60 degrees a leaf hinged at a jamb reaches past the middle of the opening,
@@ -354,30 +349,25 @@ export interface HousePlan {
   shrubs: [number, number, number, number][];
   trees: [number, number, number, number][];
   surfaces: HouseSurfaces;
-  /** Door leaves that swing shut (front doors, the doors of rooms that can be kept shut); the rest stand open. */
+  /** Door leaves, every one of them: shut at rest, they swing (or slide) open for someone going through. */
   doors: DoorPlan[];
 }
 
 /**
- * A door leaf that swings, as a renderer has it (`M`: its meshes): drawn open (as every other
- * leaf), its meshes turn about the hinge (their pivot) by up to `close` radians to shut it. One
- * that slides is turned shut and moves by up to `slide`. Positions are in the storey's metres.
+ * A door leaf, as a renderer has it (`M`: its meshes): drawn open, its meshes turn about the hinge
+ * (their pivot) by up to `close` radians to shut it. One that slides is turned shut and moves by up
+ * to `slide`. Positions are in the storey's metres.
  */
 export interface DoorLeaf<M> {
   meshes: M[];
-  /** The middle of its doorway, in a wall along x (`axis` h) or z. */
+  /** The middle of its doorway, in a wall along x (`axis` h), along z (v) or along a diagonal (its unit direction, x and z). */
   centre: [number, number];
-  axis: 'h' | 'v';
+  axis: 'h' | 'v' | P2;
   /** Turn about y that shuts it, and how much of it back it swings open (1: all the way, against the wall). */
   close: number;
   opens: number;
-  /** A front door (outdoors on one side): shut unless someone comes through. */
+  /** A front door (outdoors on one side). */
   front: boolean;
-  /**
-   * The rooms either side the simulation may keep shut (a bathroom, a bedroom with a double bed;
-   * `HouseLooks.shuts`): shut while it keeps one shut (snapshot `shuts`: someone in the bathroom).
-   */
-  shuts: number[];
   /** A leaf that slides into the wall instead (it could swing only a little way open): how far, open. */
   slide?: [number, number];
 }
@@ -385,8 +375,8 @@ export interface DoorLeaf<M> {
 /** A door leaf that swings as planned: its parts (trim, wood, glass; empty ones too) and the point they turn about (`pivot`, x and z). */
 export type DoorPlan = Omit<DoorLeaf<never>, 'meshes'> & { parts: HousePart[]; pivot: [number, number] };
 
-/** What a doorway needs to know of a leaf that swings, before its meshes exist. */
-type SwingSpec = Omit<DoorLeaf<never>, 'meshes' | 'shuts'> & { hinge: [number, number]; rooms: [number, number] };
+/** What a doorway needs to know of its leaf, before its meshes exist: `room`, the one whose light its glass is in. */
+type SwingSpec = Omit<DoorLeaf<never>, 'meshes'> & { hinge: [number, number]; room: number };
 
 /**
  * Where coverings lie in the viewed house, for Build mode's previews: each wall face
@@ -472,19 +462,18 @@ const ROOM_KIND_DEFS = new Set([...BATH, ...KITCHEN, ...BEDROOM, ...LIVING]);
 
 /**
  * The objects `HousePlanner.build` depends on, as a key: room-kind furniture, and
- * the things that make a room one that can be kept shut (`shuts`: its doors swing), and
  * whatever stands on the lot's tree spots; on a lot that isn't the player's home (it gets a
  * garden border around its furniture) every object. Other objects can change without
  * rebuilding the house. Stairs (`stairs`) on any storey of the lot in view count too: their
  * stairwells open the floor above.
  */
-export function houseObjectKey(world: WorldStructure, view: ViewRect | null, stairs: (def: string) => boolean = () => false, shuts?: ReadonlySet<string>): string {
+export function houseObjectKey(world: WorldStructure, view: ViewRect | null, stairs: (def: string) => boolean = () => false): string {
   const D = world.storeyDepth ?? world.depth;
   const flights = world.objects.filter((o) => stairs(o.def) && (!view || (o.x >= view.x && o.z % D >= view.z && o.x < view.x + view.w && o.z % D < view.z + view.d)));
-  return `${houseObjectKeyOf(world, view, shuts)}|${flights.map((o) => `${o.x},${o.z},${o.rot}`).join(';')}`;
+  return `${houseObjectKeyOf(world, view)}|${flights.map((o) => `${o.x},${o.z},${o.rot}`).join(';')}`;
 }
 
-function houseObjectKeyOf(world: WorldStructure, view: ViewRect | null, shuts?: ReadonlySet<string>): string {
+function houseObjectKeyOf(world: WorldStructure, view: ViewRect | null): string {
   const inView = (x: number, z: number) => !view || (x >= view.x && z >= view.z && x < view.x + view.w && z < view.z + view.d);
   const homeId = world.households?.find((h) => h.player)?.plot;
   const home = homeId == null ? undefined : world.plots?.[homeId];
@@ -498,7 +487,7 @@ function houseObjectKeyOf(world: WorldStructure, view: ViewRect | null, shuts?: 
       ]
     : [];
   const matters = (o: WorldStructure['objects'][number]) =>
-    !isHome || ROOM_KIND_DEFS.has(o.def) || !!shuts?.has(o.def) || spots.some(([sx, sz]) => sx >= o.x && sx < o.x + o.w && sz >= o.z && sz < o.z + o.d);
+    !isHome || ROOM_KIND_DEFS.has(o.def) || spots.some(([sx, sz]) => sx >= o.x && sx < o.x + o.w && sz >= o.z && sz < o.z + o.d);
   return world.objects
     .filter((o) => inView(o.x, o.z) && matters(o))
     .map((o) => `${o.def}@${o.x},${o.z},${o.w},${o.d}`)
@@ -796,19 +785,16 @@ export class HousePlanner {
     // wood panelling.
     const covered = new Map<WallCoveringDef['finish'], Geo>((Object.keys(FINISH_MATERIALS) as WallCoveringDef['finish'][]).map((f) => [f, new Geo()]));
     const doorWood = covered.get('wood')!;
-    // Front doors move, and the doors of rooms the simulation may keep shut (a bathroom, a bedroom
-    // with a double bed; each leaf its own meshes; a preview draws them at rest); the others stand
-    // open.
-    const swinging: { spec: SwingSpec & { shuts: number[] }; trim: Geo; wood: Geo; glass: Geo }[] = [];
-    const shutDefs = this.looks.shuts;
-    const shuttable = (r: number) => !!r && (shutDefs ? [...(roomDefs.get(r) ?? [])].some((d) => shutDefs.has(d)) : kinds.get(r) === 'bath');
-    const shutsOf = (rooms: [number, number]) => rooms.filter(shuttable);
-    const moves = (front: boolean, rooms: [number, number]) => front || shutsOf(rooms).length > 0;
-    const swing = (spec: SwingSpec) => {
-      const leaf = { spec: { ...spec, shuts: shutsOf(spec.rooms) }, trim: new Geo().color(TRIM), wood: new Geo(), glass: new Geo() };
-      swinging.push(leaf);
-      return leaf;
-    };
+    // Every door leaf moves, each its own meshes: shut at rest, open for someone going through (a
+    // preview draws them at rest, shut, in the house's buckets).
+    const swinging: { spec: SwingSpec; trim: Geo; wood: Geo; glass: Geo }[] = [];
+    const swing = storey.preview
+      ? undefined
+      : (spec: SwingSpec) => {
+          const leaf = { spec, trim: new Geo().color(TRIM), wood: new Geo(), glass: new Geo() };
+          swinging.push(leaf);
+          return leaf;
+        };
     /** Every bucket a wall segment writes to (they share its cutaway data). */
     const wallGeos = [ext, int, wainscot, stone, trim, ao, ...covered.values()];
     /** The bucket for a covering (0: none, the automatic look), tinted. */
@@ -969,7 +955,7 @@ export class HousePlanner {
         const [px, , pz] = f.at(hinge + LEAF_T / 2, 0, into * (T + 0.01 + l));
         return [px, pz];
       };
-      return { into, hinge, line: [at(0), at(LEAF_W)] as [P2, P2] };
+      return { into, hinge, line: [at(0), at(FILL)] as [P2, P2] };
     };
     /** What a door leaf swinging into tile (x, z) keeps clear of: a diagonal wall, a diagonal door's open leaf (with its handles). */
     const obstaclesAt = (x: number, z: number): Obstacle[] | undefined => {
@@ -1037,7 +1023,7 @@ export class HousePlanner {
           const ahead = (into: number) => !!(axis === 'h' ? edges.get('h', x, z + into) : edges.get('v', x + into, z));
           // What a leaf swinging to the side `into` keeps clear of (none: no diagonal in front).
           const slant = (into: number) => obstaclesAt(...tileInFront(axis, x, z, into));
-          const geos = { wood: doorWood, glass, moves, swing: storey.preview ? undefined : swing, ahead, slant, pocket: (end: -1 | 1) => pocket(axis, x, z, run, end), flip: flipped(axis, x, z, run) };
+          const geos = { wood: doorWood, glass, swing, ahead, slant, pocket: (end: -1 | 1) => pocket(axis, x, z, run, end), flip: flipped(axis, x, z, run) };
           this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, geos, lookOf(axis, x, z).style, head, run);
         }
       }
@@ -1253,21 +1239,35 @@ export class HousePlanner {
           trim.cutting(Cut.Hide, mask);
           f.box(trim, o0 - 0.1, o1 + 0.1, DOOR_HEIGHT, DOOR_HEIGHT + 0.12, ...out(0.024));
         }
-        // The leaf, open 90° (see `diagLeaf`; accent colour on a painted front door), its glass the
-        // room it stands in (standing outdoors, the one it shuts).
+        // The leaf, drawn open 90° (see `diagLeaf`; accent colour on a painted front door), its glass
+        // the room it stands in (standing outdoors, the one it shuts). Shut, it lies in the doorway
+        // from its hinge's jamb, the middle of it on the wall's: a quarter turn about `pivot`, as a
+        // straight door's (`doorway`). It swings as they do (`swingDoors`); a preview draws it at
+        // rest, shut, in a frame turned about the pivot.
         const front = (d.rooms[0] === 0) !== (d.rooms[1] === 0);
         const { into, hinge } = diagLeaf(d);
         const at = (l: number) => into * (T + 0.01 + l);
-        const leafGlass = glass(d.rooms[into > 0 ? 1 : 0] || d.rooms[into > 0 ? 0 : 1]);
-        this.leaf(d.style, front, scheme, mask, DOOR_HEIGHT, { trim, wood: doorWood, glass: leafGlass }, {
-          box: (g, s0, s1, y0, y1, l0, l1) => f.box(g, hinge + s0, hinge + s1, y0, y1, Math.min(at(l0), at(l1)), Math.max(at(l0), at(l1))),
+        const room = d.rooms[into > 0 ? 1 : 0] || d.rooms[into > 0 ? 0 : 1];
+        const close = (into * Math.PI) / 2;
+        const flat = (a: number, across: number): [number, number] => {
+          const [px, , pz] = f.at(a, 0, across);
+          return [px, pz];
+        };
+        const pivot = turnAbout(flat(hinge + LEAF_T / 2, at(0)), flat(hinge, 0), close);
+        const own = swing?.({ hinge: pivot, centre: flat(L / 2, 0), axis: [f.ux, f.uz], close, opens: 1, front, room });
+        const leafGlass = own ? own.glass : glass(room);
+        const [ox, oz] = turnY([f.ox, f.oz], pivot, own ? 0 : close);
+        const [ux, uz] = turnY([f.ux, f.uz], [0, 0], own ? 0 : close);
+        const fr = new WallFrame(ox, oz, ox + ux, oz + uz);
+        this.leaf(d.style, front, scheme, mask, DOOR_HEIGHT, own ? { trim: own.trim, wood: own.wood, glass: leafGlass } : { trim, wood: doorWood, glass: leafGlass }, {
+          box: (g, s0, s1, y0, y1, l0, l1) => fr.box(g, hinge + s0, hinge + s1, y0, y1, Math.min(at(l0), at(l1)), Math.max(at(l0), at(l1))),
           pane: (y0, y1, l0, l1) => {
             const a = hinge + LEAF_T / 2;
-            const pts: V3[] = [f.at(a, y0, at(l0)), f.at(a, y0, at(l1)), f.at(a, y1, at(l1)), f.at(a, y1, at(l0))];
-            leafGlass.poly(pts, [f.ux, 0, f.uz]);
-            leafGlass.poly([...pts].reverse(), [-f.ux, 0, -f.uz]);
+            const pts: V3[] = [fr.at(a, y0, at(l0)), fr.at(a, y0, at(l1)), fr.at(a, y1, at(l1)), fr.at(a, y1, at(l0))];
+            leafGlass.poly(pts, [fr.ux, 0, fr.uz]);
+            leafGlass.poly([...pts].reverse(), [-fr.ux, 0, -fr.uz]);
           },
-        });
+        }, FILL);
       }
     }
 
@@ -1607,8 +1607,8 @@ export class HousePlanner {
     add(lid, 'ceilingShadow', M.trim, { cut: false, cast: true, shadowOnly: true });
     const doors: DoorPlan[] = [];
     for (const { spec, trim: t, wood: w, glass: g } of swinging) {
-      const { hinge, rooms, ...leaf } = spec;
-      const own = [add(t, 'doorLeaf', M.trim, { cast: true }), add(w, 'doorLeaf', M.panelling, { cast: true }), part(g, 'doorLeafGlass', { kind: 'glass', room: rooms[0] || rooms[1] })];
+      const { hinge, room, ...leaf } = spec;
+      const own = [add(t, 'doorLeaf', M.trim, { cast: true }), add(w, 'doorLeaf', M.panelling, { cast: true }), part(g, 'doorLeafGlass', { kind: 'glass', room })];
       doors.push({ ...leaf, parts: own, pivot: hinge });
     }
     return { parts, rooms: roomTiles, shrubs, trees, surfaces, doors };
@@ -1891,7 +1891,6 @@ export class HousePlanner {
     geos: {
       wood: Geo;
       glass: (room: number) => Geo;
-      moves?: (front: boolean, rooms: [number, number]) => boolean;
       swing?: (spec: SwingSpec) => { trim: Geo; wood: Geo; glass: Geo };
       ahead?: (into: number) => boolean;
       slant?: (into: number) => readonly Obstacle[] | undefined;
@@ -1916,20 +1915,16 @@ export class HousePlanner {
       trim.cutting(Cut.Hide, mask);
       trim.box(...span(axis, plane, n, first ? a0 - 0.1 : base, last ? a1 + 0.1 : base + 1, head, head + 0.12, 0.024));
     }
-    // An open door leaf hinged on one jamb, swung 90 degrees into the room (or the outdoor
-    // side's opposite for front doors), standing against the opening's edge.
+    // A door leaf hinged on one jamb, shut in the doorway; open, swung 90 degrees into the room (or
+    // the outdoor side's opposite for front doors), standing against the opening's edge.
     const outdoorA = axis === 'h' ? roomP(x + 0.5, z - 0.25) === 0 : roomP(x - 0.25, z + 0.5) === 0;
     const outdoorB = axis === 'h' ? roomP(x + 0.5, z + 0.25) === 0 : roomP(x + 0.25, z + 0.5) === 0;
     const front = outdoorA !== outdoorB;
     // Swing towards the indoor side (between rooms, towards -z or -x); the other way when the
     // run is to keep clear of diagonal walls in front (`geos.flip`).
     const usual = outdoorA ? 1 : -1;
-    const rooms: [number, number] = axis === 'h' ? [roomP(x + 0.5, z - 0.25), roomP(x + 0.5, z + 0.25)] : [roomP(x - 0.25, z + 0.5), roomP(x + 0.25, z + 0.5)];
-    const moves = !!geos.moves?.(front, rooms);
-    // A leaf that shuts fills its opening (a double door's up to the middle); one that stands
-    // open for good keeps the usual width.
-    const fill = run.len > 1 ? 1 - T - 0.025 : 1 - 2 * T - 0.03;
-    const width = moves ? fill : LEAF_W;
+    // It fills its opening (a double door's up to the middle).
+    const width = run.len > 1 ? 1 - T - 0.025 : FILL;
     // (Open, it reaches from T + 0.01 off its wall line; the wall ahead's face is 1 - T away.)
     const clear = 1 - T - (T + 0.01) - 0.01;
     /**
@@ -1953,7 +1948,7 @@ export class HousePlanner {
       const [from, to]: P2[] = axis === 'h' ? [[hinge + LEAF_T / 2, at(0)], [jamb, z]] : [[at(0), hinge + LEAF_T / 2], [x, jamb]];
       const pivot = turnAbout(from, to, close);
       const line = (l: number): P2 => (axis === 'h' ? [hinge + LEAF_T / 2, at(l)] : [at(l), hinge + LEAF_T / 2]);
-      const ahead = run.len > 1 && geos.ahead?.(into) ? Math.asin(Math.min(1, clear / fill)) / (Math.PI / 2) : 1;
+      const ahead = run.len > 1 && geos.ahead?.(into) ? Math.asin(Math.min(1, clear / width)) / (Math.PI / 2) : 1;
       const obstacles = geos.slant?.(into);
       const room = obstacles ? slantClear([line(SLANT_SKIP), line(width)], line(width - 0.095), pivot, close, obstacles) : 1;
       return { far, into, at, hinge, lo, hi, close, pivot, ahead, room };
@@ -1968,8 +1963,8 @@ export class HousePlanner {
       const other = hang(!usualFar, into);
       return other.room > hung.room ? other : hung;
     };
-    // How far each way lets it open (`ahead` matters only to a leaf as wide as the opening).
-    const reach = (h: ReturnType<typeof hang>) => (moves ? Math.min(h.ahead, h.room) : h.room);
+    // How far each way lets it open.
+    const reach = (h: ReturnType<typeof hang>) => Math.min(h.ahead, h.room);
     const sides = [best(geos.flip ? -usual : usual), best(geos.flip ? usual : -usual)];
     const [a, b] = sides.map(reach);
     // The way it opens furthest (the usual one when even). Short of `SLIDE_BELOW` either way (it
@@ -1999,18 +1994,13 @@ export class HousePlanner {
     // The leaf's glass belongs to the room it stands in (opening outdoors, the one it shuts).
     const roomOn = (side: number) => (axis === 'h' ? roomP(x + 0.5, z + side * 0.25) : roomP(x + side * 0.25, z + 0.5));
     const inside = roomOn(into) || roomOn(-into);
-    const own = moves ? geos.swing?.({ hinge: pivot, centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], axis, close, opens, front, rooms, slide }) : undefined;
+    const own = geos.swing?.({ hinge: pivot, centre: axis === 'h' ? [x + 0.5, z] : [x, z + 0.5], axis, close, opens, front, room: inside, slide });
     const glass = own ? own.glass : geos.glass(inside);
-    // One that moves is drawn open and turned (and slid) by `swingDoors`. One that doesn't (or
-    // any in a preview) is drawn at rest, as `swingDoors` would leave it: turned about the pivot
-    // in a frame across the leaf (`a`: its thickness from the hinge, `d`: out from the wall), as a
-    // diagonal door's leaf is. At rest a front door is shut, the others open: slid into the wall,
-    // or as far open as they go.
-    const shut = moves && front;
-    const turn = own ? 0 : shut || slide ? close : close * (1 - opens);
-    const [sx, sz] = slide && !own && !shut ? slide : [0, 0];
-    const [tx, tz] = turnY(axis === 'h' ? [hinge, z] : [x, hinge], pivot, turn);
-    const [ox, oz] = [tx + sx, tz + sz];
+    // It is drawn open, and turned (and slid) by `swingDoors`; in a preview, at rest: shut, turned
+    // about the pivot in a frame across the leaf (`a`: its thickness from the hinge, `d`: out from
+    // the wall), as a diagonal door's leaf is.
+    const turn = own ? 0 : close;
+    const [ox, oz] = turnY(axis === 'h' ? [hinge, z] : [x, hinge], pivot, turn);
     const [ux, uz] = turnY(axis === 'h' ? [1, 0] : [0, 1], [0, 0], turn);
     const f = new WallFrame(ox, oz, ox + ux, oz + uz);
     const out = (l: number) => (axis === 'h' ? into : -into) * (T + 0.01 + l);
@@ -2031,7 +2021,7 @@ export class HousePlanner {
   }
 
   /**
-   * A door leaf, open against its jamb, in a style: `panel` (painted: the style's colour, else the
+   * A door leaf, in a style: `panel` (painted: the style's colour, else the
    * house accent on front doors and off-white inside), `oak` (natural wood), `halfGlass` (solid
    * below, glazed above) or `glass` (a glazed frame), `width` wide. `put.box` draws in leaf space
    * (`s` across its thickness, `y` up, `l` from the hinge outwards); `put.pane` a glass pane through it.
@@ -2044,7 +2034,7 @@ export class HousePlanner {
     head: number,
     geos: { trim: Geo; wood: Geo; glass: Geo },
     put: { box: (g: Geo, s0: number, s1: number, y0: number, y1: number, l0: number, l1: number) => void; pane: (y0: number, y1: number, l0: number, l1: number) => void },
-    width = LEAF_W,
+    width: number,
   ): void {
     const def = this.looks.doors[style ?? 0] ?? PANEL_DOOR;
     const { trim, wood, glass } = geos;
