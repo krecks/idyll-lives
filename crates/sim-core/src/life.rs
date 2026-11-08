@@ -275,6 +275,12 @@ pub struct Commute {
     pub firm: bool,
 }
 
+/// For each resident (by index), the walk out of town `firm_leave` last timed (`Travel::eta`,
+/// minutes) and what from: where they were, the way out timed by, their pace and whether away
+/// from home. Only ever what those give (the roads and the ways out are the town's for good), so
+/// another resident in their place, or none kept (a load), comes to the same.
+pub(crate) type WalkMemo = Vec<Option<([u32; 6], f32)>>;
+
 /// This long before they'd set off, the walk is worked out again from where they are.
 const FIRM_UP_MINUTES: f32 = 6.0;
 
@@ -313,13 +319,34 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
             .get(i)
             .and_then(|b| b.plot)
             .is_some_and(|p| Some(p) != c.home);
-        let exit = if away {
-            crate::world::quickest_exit(&w.travel, &w.exits, from).map_or(exit, |k| w.exits[k])
-        } else {
-            exit
+        // (Worked out again only once they've moved: asked each tick, the same as last time
+        // while they stay put.)
+        let key = [
+            from[0].to_bits(),
+            from[1].to_bits(),
+            exit[0].to_bits(),
+            exit[1].to_bits(),
+            walk.to_bits(),
+            u32::from(away),
+        ];
+        let eta = match w.walk_memo.get(i) {
+            Some(&Some((k, eta))) if k == key => eta,
+            _ => {
+                let exit = if away {
+                    crate::world::quickest_exit(&w.travel, &w.exits, from)
+                        .map_or(exit, |k| w.exits[k])
+                } else {
+                    exit
+                };
+                let eta = w.travel.eta(from, exit, crate::travel::Mode::Foot, walk);
+                if w.walk_memo.len() <= i {
+                    w.walk_memo.resize(i + 1, None);
+                }
+                w.walk_memo[i] = Some((key, eta));
+                eta
+            }
         };
-        let minutes = w.travel.eta(from, exit, crate::travel::Mode::Foot, walk) * WALK_MARGIN
-            + OUT_OF_THE_HOUSE;
+        let minutes = eta * WALK_MARGIN + OUT_OF_THE_HOUSE;
         let total = ticks(minutes + w.content.career_rules.commute_minutes);
         if total > c.ticks
             && let Some(c) = w.sims[i].commute.as_mut()
@@ -1708,15 +1735,15 @@ fn end_visit_if_due(w: &mut World, i: usize, hour: f32) {
     give_up_farewell(w, i);
     // A guest left with nothing to do while the hosts are all off at work goes home (hosts
     // just out visiting come back; parks have no hosts).
-    let hosts: Vec<&crate::world::Sim> = w
-        .sims
-        .iter()
-        .filter(|s| s.here() && w.households[s.household as usize].plot == Some(visit.plot))
-        .collect();
-    let hosts_out = w.sims[i].current.is_none()
-        && !w.plots[visit.plot as usize].public
-        && !hosts.is_empty()
-        && hosts.iter().all(|s| s.away_until.is_some());
+    // (The hosts looked for only then: each tick for every guest, it was a good part of one.)
+    let hosts_out = w.sims[i].current.is_none() && !w.plots[visit.plot as usize].public && {
+        let mut hosts = w
+            .sims
+            .iter()
+            .filter(|s| s.here() && w.households[s.household as usize].plot == Some(visit.plot))
+            .peekable();
+        hosts.peek().is_some() && hosts.all(|s| s.away_until.is_some())
+    };
     // Left standing around with nothing to do (the hosts busy, nothing they may use) for long
     // enough, a guest with free will says it's time they went (without, they're the player's
     // to send home).
