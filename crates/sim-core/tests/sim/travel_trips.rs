@@ -6,36 +6,29 @@
 
 use crate::common;
 
-use common::hamlets::{Hamlets, Place, hamlets, with_cars};
-use serde_json::{Value, json};
+use common::hamlets::{Hamlets, Place, hamlets_with_parking, with_cars};
+use serde_json::Value;
 use sim_core::cars::CarState;
 use sim_core::travel::Mode;
 use sim_core::{Command, World};
 
-/// Two hamlets 330 m apart along the country road, cars on the driveways, and a parking spot
-/// on the second hamlet's street by its park.
+/// Two hamlets 330 m apart along the country road, cars on the driveways, and a parking bay
+/// off the second hamlet's street by its park (`hamlets::hamlets_with_parking`).
 fn world(seed: u64) -> (World, Hamlets, u32) {
     let content = common::content();
-    let h = hamlets(
+    let h = hamlets_with_parking(
         &content,
         seed,
         3,
         &[Place { x: 0, z: 0 }, Place { x: 330, z: 60 }],
         (512, 160),
+        Some(1),
     );
-    let mut town: Value = serde_json::from_str(&with_cars(&h)).unwrap();
+    let town: Value = serde_json::from_str(&with_cars(&h)).unwrap();
     let park = h.plots[1]
         .clone()
         .find(|&p| town["plots"][p]["public"].as_bool() == Some(true))
         .expect("a park in the second hamlet");
-    let p = &town["plots"][park];
-    let num = |k: &str| p[k].as_f64().unwrap();
-    let x = num("x") + num("w") / 2.0;
-    let (street, ..) = h.streets[1];
-    // At the street's edge on the park's side, along it.
-    let side = if num("z") > street { 1.0 } else { -1.0 };
-    town["parking"] =
-        json!([{"x": x, "z": street + side * 2.0, "rot": std::f64::consts::FRAC_PI_2, "area": 1}]);
     let mut w = World::from_json(&content, &town.to_string(), seed as u32).expect("the town loads");
     w.autonomy = false;
     for hh in 0..w.households.len() as u32 {
@@ -48,12 +41,23 @@ fn world(seed: u64) -> (World, Hamlets, u32) {
     (w, h, park as u32)
 }
 
+/// How far a car's middle may be from its trip's parking bay's (m) and be in it or turning into
+/// it off the road: half the bay's 6 m length, the half metre of verge between it and the road and
+/// some for the swing in.
+const IN_THE_BAY: f32 = 4.0;
+
 /// How far car `c`, moving, is off the middle of the road it's on (and half that road's width),
-/// unless it's on its own driveway.
+/// unless it's on its own driveway or in (or turning into or out of) its trip's parking bay.
 fn off_the_road(w: &World, c: usize) -> Option<(f32, f32)> {
     let car = &w.cars[c];
     let (at, _, moving, _) = car.shown?;
     if !moving || w.plot_at(at[0].floor() as i32, at[1].floor() as i32) == Some(car.plot) {
+        return None;
+    }
+    let bay = car
+        .trip
+        .map_or(f32::INFINITY, |t| sim_core::travel::dist(t.at, at));
+    if bay <= IN_THE_BAY {
         return None;
     }
     let p = *w.travel.graph.near(at, 20.0, 1, Mode::Car).first()?;
@@ -283,7 +287,8 @@ fn a_walk_past_a_car_parked_out_on_a_trip_goes_round_it() {
     }
     let trip = w.cars[c].trip.unwrap();
     let (len, wid) = (w.cars[c].len, w.cars[c].wid);
-    // Someone of the second hamlet walks along the road from one end of it to the other.
+    // Someone of the second hamlet walks past it from one end of it to the other: from the road
+    // across its bay (it's parked nose in, square to the road) to the ground behind.
     let j = h.plots[1]
         .clone()
         .find_map(|p| {

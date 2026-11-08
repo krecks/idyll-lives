@@ -7,35 +7,29 @@
 
 use crate::common;
 
-use common::hamlets::{Hamlets, Place, hamlets, with_cars};
-use serde_json::{Value, json};
+use common::hamlets::{Hamlets, Place, hamlets_with_parking, with_cars};
+use serde_json::Value;
 use sim_core::cars::CarState;
 use sim_core::travel::Mode;
 use sim_core::{Command, World};
 
-/// Two hamlets 330 m apart along the country road, cars on the driveways, and a parking spot on
+/// Two hamlets 330 m apart along the country road, cars on the driveways, and a parking bay off
 /// the second hamlet's street by its park (as `travel_trips.rs`).
 fn world(seed: u64) -> (World, Hamlets, u32) {
     let content = common::content();
-    let h = hamlets(
+    let h = hamlets_with_parking(
         &content,
         seed,
         3,
         &[Place { x: 0, z: 0 }, Place { x: 330, z: 60 }],
         (512, 160),
+        Some(1),
     );
-    let mut town: Value = serde_json::from_str(&with_cars(&h)).unwrap();
+    let town: Value = serde_json::from_str(&with_cars(&h)).unwrap();
     let park = h.plots[1]
         .clone()
         .find(|&p| town["plots"][p]["public"].as_bool() == Some(true))
         .expect("a park in the second hamlet");
-    let p = &town["plots"][park];
-    let num = |k: &str| p[k].as_f64().unwrap();
-    let x = num("x") + num("w") / 2.0;
-    let (street, ..) = h.streets[1];
-    let side = if num("z") > street { 1.0 } else { -1.0 };
-    town["parking"] =
-        json!([{"x": x, "z": street + side * 2.0, "rot": std::f64::consts::FRAC_PI_2, "area": 1}]);
     let mut w = World::from_json(&content, &town.to_string(), seed as u32).expect("the town loads");
     w.autonomy = false;
     for hh in 0..w.households.len() as u32 {

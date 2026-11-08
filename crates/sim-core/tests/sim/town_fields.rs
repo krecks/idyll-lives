@@ -25,7 +25,7 @@ fn open_world_fields_are_read_kept_and_saved() {
     town["areas"] = json!([{"name": "Main", "kind": "hamlet", "x": 0, "z": 0, "w": w, "d": d}]);
     town["exits"] = json!([[0.5, 30.0], {"x": 20.0, "z": 31.0, "kind": "stop"}]);
     town["terrain"] = json!({"water": [w * 2, 0, 3, 1]});
-    town["parking"] = json!([{"x": 10.0, "z": 32.0, "rot": 1.5, "area": 0}]);
+    town["parking"] = json!([{"x": 10.0, "z": 36.5, "rot": 0, "area": 0}]);
     town["plots"][0]["area"] = json!(0);
     town["plots"][0]["kind"] = json!("home");
     let mut world = World::from_json(&content, &town.to_string(), 5).unwrap();
