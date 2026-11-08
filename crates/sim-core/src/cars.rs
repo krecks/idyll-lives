@@ -212,6 +212,26 @@ pub(crate) const JUNCTION_SPEED: f32 = 3.5;
 pub(crate) const JUNCTION_REACH: f32 = 8.0;
 pub(crate) const ROUTE_STEP: f32 = 4.0;
 pub(crate) const ROUTE_TOLERANCE: f32 = 0.08;
+/// A lane's corners rounded (`round_corners`): where it turns sharper than `SHARP` (radians) at a
+/// point, or at a few within `CORNER_SPAN` m of each other (a junction, a street corner, where one
+/// road's end meets another's: their lanes cross or fall short there), an arc as tight as
+/// `RIGHT_TURN` turning right (round the near kerb) and `LEFT_TURN` turning left (across the
+/// junction, its middle on the inside) at most, ending in the lanes' lines; a gentler bend, an arc
+/// from the middle of the step before to the middle of the next (as wide as `BEND` at most). Each
+/// sampled a point every `ARC_STEP` radians of the turn: the car's nose, facing the way the points
+/// run on either side (`Legs::timed`), within half that of the way it goes.
+const SHARP: f32 = 0.44;
+const CORNER_SPAN: f32 = 3.0;
+const RIGHT_TURN: f32 = TURN;
+const LEFT_TURN: f32 = 4.0;
+const BEND: f32 = 30.0;
+const ARC_STEP: f32 = 0.1;
+/// How much longer than it's off a corner's line a lead into its curve (or out of it) from a point
+/// a little off it is (`round_corners`): the step turns no more than about `ARC_STEP`.
+const LEAD: f32 = 10.0;
+/// The most a car's way pulls it sideways turning (m/s², `Legs::timed`): round a junction's
+/// corner it slows to about 3 m/s.
+const SIDEWAYS: f32 = 4.0;
 /// A driveway meeting its road further from square than this (the cosine of its angle to the
 /// road's side) comes alongside it rather than onto it: its car stays parked (`Car::no_way`).
 const OBLIQUE: f32 = 0.5;
@@ -1495,11 +1515,11 @@ impl Route {
             centre.reverse();
             offs.reverse();
         }
-        let lane = crate::travel::thin_with(
+        let lane = round_corners(&crate::travel::thin_with(
             &offset_right_by(&centre, &offs),
             ROUTE_STEP,
             ROUTE_TOLERANCE,
-        );
+        ));
         if lane.len() < 2 {
             return None;
         }
@@ -1762,11 +1782,11 @@ impl Route {
             ));
             offs.push(offs[offs.len() - 1]);
         }
-        let lane = crate::travel::thin_with(
+        let lane = round_corners(&crate::travel::thin_with(
             &offset_right_by(&centre, &offs),
             ROUTE_STEP,
             ROUTE_TOLERANCE,
-        );
+        ));
         if lane.len() < 2 {
             return None;
         }
@@ -2172,6 +2192,258 @@ pub(crate) fn offset_right_by(pts: &[[f32; 2]], offs: &[f32]) -> Vec<[f32; 2]> {
         .collect()
 }
 
+/// `lane` (a lane's points, `thin_with`) with its corners rounded, its ends where they were: where
+/// it turns sharper than `SHARP` at a point or at a few close together (a junction, a street corner,
+/// where one road's end meets another's: the two lanes' lines cross there, or one goes on past the
+/// other's and the way doubles back on itself a little), an arc into the line out from the line in
+/// (`sharp_corners`); then at each other bend, an arc from the middle of the step before to the
+/// middle of the next (`gentle_bends`).
+pub(crate) fn round_corners(lane: &[[f32; 2]]) -> Vec<[f32; 2]> {
+    let (pts, fixed) = sharp_corners(lane);
+    let mut out = gentle_bends(&pts, &fixed);
+    out.dedup_by(|b, a| crate::travel::dist(*a, *b) < 1e-3);
+    out
+}
+
+fn sub2(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
+    [a[0] - b[0], a[1] - b[1]]
+}
+
+fn dot2(a: [f32; 2], b: [f32; 2]) -> f32 {
+    a[0] * b[0] + a[1] * b[1]
+}
+
+fn cross2(a: [f32; 2], b: [f32; 2]) -> f32 {
+    a[0] * b[1] - a[1] * b[0]
+}
+
+/// The way from `a` to `b`, a unit long.
+fn unit2(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
+    let l = crate::travel::dist(a, b).max(1e-6);
+    [(b[0] - a[0]) / l, (b[1] - a[1]) / l]
+}
+
+/// How far going `b` is turned from going `a` (radians, + to the right: the town's x runs right
+/// and z down).
+fn turned(a: [f32; 2], b: [f32; 2]) -> f32 {
+    cross2(a, b).atan2(dot2(a, b))
+}
+
+/// How far `p` is off the line through `c` going `d`.
+fn off_line(p: [f32; 2], c: [f32; 2], d: [f32; 2]) -> f32 {
+    cross2(d, sub2(p, c)).abs()
+}
+
+/// An arc of radius `r` from `from` going `din`, turning `theta` (`turned`): a point every
+/// `ARC_STEP` of it, its ends too, onto `out`.
+fn arc_onto(out: &mut Vec<[f32; 2]>, from: [f32; 2], din: [f32; 2], theta: f32, r: f32) {
+    // (About its middle, towards the inside of the turn square to the way in.)
+    let inside = if theta > 0.0 {
+        [-din[1], din[0]]
+    } else {
+        [din[1], -din[0]]
+    };
+    let centre = [from[0] + inside[0] * r, from[1] + inside[1] * r];
+    let v = sub2(from, centre);
+    let k = (theta.abs() / ARC_STEP).ceil().max(1.0) as usize;
+    for s in 0..=k {
+        let (sn, cs) = (theta * s as f32 / k as f32).sin_cos();
+        let p = [
+            centre[0] + v[0] * cs - v[1] * sn,
+            centre[1] + v[0] * sn + v[1] * cs,
+        ];
+        if out.last().is_none_or(|q| crate::travel::dist(*q, p) > 1e-3) {
+            out.push(p);
+        }
+    }
+}
+
+/// A curve from `from` to `to` round the corner `c` (a quadratic Bézier: along the lines from
+/// `from` to `c` and from `c` to `to` at its ends), a point every `ARC_STEP` it turns, onto `out`.
+fn curve_onto(out: &mut Vec<[f32; 2]>, from: [f32; 2], c: [f32; 2], to: [f32; 2]) {
+    const STEPS: usize = 128;
+    let (a, b) = (sub2(c, from), sub2(to, c));
+    let way = |s: f32| [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s];
+    let at = |s: f32| {
+        let (u, v, w) = ((1.0 - s) * (1.0 - s), 2.0 * s * (1.0 - s), s * s);
+        [
+            from[0] * u + c[0] * v + to[0] * w,
+            from[1] * u + c[1] * v + to[1] * w,
+        ]
+    };
+    if out
+        .last()
+        .is_none_or(|q| crate::travel::dist(*q, from) > 1e-3)
+    {
+        out.push(from);
+    }
+    let mut was = way(0.0);
+    for k in 1..=STEPS {
+        let s = k as f32 / STEPS as f32;
+        let d = way(s);
+        if k == STEPS || turned(was, d).abs() >= ARC_STEP {
+            out.push(at(s));
+            was = d;
+        }
+    }
+}
+
+/// `round_corners`' sharp corners: its points, and which stay as they are (`gentle_bends`): its
+/// ends and the arcs'.
+fn sharp_corners(lane: &[[f32; 2]]) -> (Vec<[f32; 2]>, Vec<bool>) {
+    use crate::travel::dist;
+    let n = lane.len();
+    if n < 3 {
+        return (lane.to_vec(), vec![true; n]);
+    }
+    let turn_at = |i: usize| turned(unit2(lane[i - 1], lane[i]), unit2(lane[i], lane[i + 1]));
+    let mut out: Vec<[f32; 2]> = vec![lane[0]];
+    let mut fixed = vec![true];
+    // (The points laid so far that stay: the start, and every arc.)
+    let mut locked = 1;
+    let mut i = 1;
+    while i + 1 < n {
+        if turn_at(i).abs() < SHARP {
+            out.push(lane[i]);
+            fixed.push(false);
+            i += 1;
+            continue;
+        }
+        // The corner: this point and the sharp ones close on after it.
+        let mut j = i;
+        while j + 2 < n && dist(lane[j], lane[j + 1]) < CORNER_SPAN && turn_at(j + 1).abs() >= SHARP
+        {
+            j += 1;
+        }
+        let din = unit2(lane[i - 1], lane[i]);
+        let dout = unit2(lane[j], lane[j + 1]);
+        let theta = turned(din, dout);
+        let mut keep = |out: &mut Vec<[f32; 2]>| {
+            out.extend_from_slice(&lane[i..=j]);
+            fixed.resize(out.len(), false);
+        };
+        // (A jog back to the line it was on: left out; to another line, or turning back on
+        // itself, as it is.)
+        if theta.abs() < 0.05 {
+            if j == i || off_line(lane[j + 1], lane[i - 1], din) > 0.3 {
+                keep(&mut out);
+            }
+            i = j + 1;
+            continue;
+        }
+        // Where its lines in and out cross.
+        let c = if j == i {
+            lane[i]
+        } else {
+            let u = cross2(sub2(lane[j], lane[i]), dout) / cross2(din, dout);
+            [lane[i][0] + din[0] * u, lane[i][1] + din[1] * u]
+        };
+        if theta.abs() > std::f32::consts::PI - 0.17
+            || dist(c, lane[i]) > 2.0 * CORNER_SPAN
+            || dist(c, lane[j]) > 2.0 * CORNER_SPAN
+        {
+            keep(&mut out);
+            i = j + 1;
+            continue;
+        }
+        // How far back along the line in it may begin (back over the points on that line, not
+        // into an arc), and how far on along the line out it may end (over the points on that line
+        // to where the lane turns again, half way there).
+        let mut m = out.len() - 1;
+        while m >= locked && off_line(out[m - 1], c, din) < 0.2 {
+            m -= 1;
+        }
+        // (Where it begins and ends, the steps from and to the points either side that stay
+        // turn little: those a little off its lines, a lead in or out long enough.)
+        let back = dot2(sub2(c, out[m]), din) - LEAD * off_line(out[m], c, din);
+        let mut q = j + 1;
+        while q + 1 < n && turn_at(q).abs() < 0.02 && off_line(lane[q + 1], c, dout) < 0.2 {
+            q += 1;
+        }
+        let ahead = dot2(sub2(lane[q], c), dout);
+        let share = if q + 1 < n { ahead / 2.0 } else { ahead };
+        let fwd = share.min(ahead - LEAD * off_line(lane[q], c, dout));
+        // (As far from the corner either way as an arc as wide as `most` takes, or as there's
+        // room for: short of it on one side, a curve wider on the other.)
+        let tan = (theta.abs() / 2.0).tan();
+        let most = if theta > 0.0 { RIGHT_TURN } else { LEFT_TURN };
+        let (into, outof) = ((most * tan).min(back - 0.01), (most * tan).min(fwd - 0.01));
+        if into.min(outof) < 0.02 {
+            keep(&mut out);
+            i = j + 1;
+            continue;
+        }
+        let from = [c[0] - din[0] * into, c[1] - din[1] * into];
+        let to = [c[0] + dout[0] * outof, c[1] + dout[1] * outof];
+        while out.len() > locked && dot2(sub2(*out.last().expect("one"), from), din) > -0.01 {
+            out.pop();
+            fixed.pop();
+        }
+        if (into - outof).abs() < 1e-3 {
+            arc_onto(&mut out, from, din, theta, into / tan);
+        } else {
+            curve_onto(&mut out, from, c, to);
+        }
+        fixed.resize(out.len(), true);
+        locked = out.len();
+        // On from the first point past its end.
+        i = j + 1;
+        while i + 1 < n && dot2(sub2(lane[i], to), dout) < 0.01 {
+            i += 1;
+        }
+    }
+    let last = lane[n - 1];
+    if out.last().is_none_or(|p| dist(*p, last) > 1e-3) {
+        out.push(last);
+        fixed.push(true);
+    }
+    if let Some(f) = fixed.last_mut() {
+        *f = true;
+    }
+    (out, fixed)
+}
+
+/// `round_corners`' gentler bends: at each of `pts`' points but the `fixed` ones, an arc as wide as
+/// `BEND` at most from the middle of the step before (or the point before, fixed or straight on) to
+/// the middle of the next (or the next point, likewise).
+fn gentle_bends(pts: &[[f32; 2]], fixed: &[bool]) -> Vec<[f32; 2]> {
+    use crate::travel::dist;
+    let n = pts.len();
+    if n < 3 {
+        return pts.to_vec();
+    }
+    let turn_at = |i: usize| turned(unit2(pts[i - 1], pts[i]), unit2(pts[i], pts[i + 1]));
+    let bends = |i: usize| {
+        !fixed[i] && i + 1 < n && {
+            let t = turn_at(i).abs();
+            t > 1e-3 && t < std::f32::consts::PI - 0.17
+        }
+    };
+    let mut out: Vec<[f32; 2]> = vec![pts[0]];
+    for i in 1..n - 1 {
+        if !bends(i) {
+            out.push(pts[i]);
+            continue;
+        }
+        let din = unit2(pts[i - 1], pts[i]);
+        let dout = unit2(pts[i], pts[i + 1]);
+        let theta = turned(din, dout);
+        let back = dist(*out.last().expect("one"), pts[i]);
+        let step = dist(pts[i], pts[i + 1]);
+        let fwd = if bends(i + 1) { step / 2.0 } else { step };
+        let tan = (theta.abs() / 2.0).tan();
+        let taken = (BEND * tan).min(back).min(fwd);
+        if taken < 0.01 {
+            out.push(pts[i]);
+            continue;
+        }
+        let from = [pts[i][0] - din[0] * taken, pts[i][1] - din[1] * taken];
+        arc_onto(&mut out, from, din, theta, taken / tan);
+    }
+    out.push(pts[n - 1]);
+    out
+}
+
 /// A turn at a driveway's mouth, in the frame of the road there (`Route::on_roads`): from going
 /// `din` to going `dout` round the corner where their lines cross, an arc as tight as `TURN` at
 /// most that begins no further back from the corner than `room` (the driveway's length to it).
@@ -2337,6 +2609,19 @@ impl Legs {
         if stop_end {
             v[n - 1] = 0.0;
         }
+        // (Round a bend, no faster than pulls it sideways `SIDEWAYS`: its curve, the way turned
+        // at a point over the steps either side.)
+        for i in 1..n - 1 {
+            if pts[i].1 == pts[i + 1].1 && ds[i - 1] > 1e-4 && ds[i] > 1e-4 {
+                let (a, b, c) = (pts[i - 1].0, pts[i].0, pts[i + 1].0);
+                let turned =
+                    wrap_angle((c[0] - b[0]).atan2(c[1] - b[1]) - (b[0] - a[0]).atan2(b[1] - a[1]));
+                let curve = turned.abs() / ((ds[i - 1] + ds[i]) / 2.0);
+                if curve > 1e-4 {
+                    v[i] = v[i].min((SIDEWAYS / curve).sqrt());
+                }
+            }
+        }
         for i in 1..n {
             v[i] = v[i].min((v[i - 1] * v[i - 1] + 2.0 * ACCEL * ds[i - 1]).sqrt());
         }
@@ -2344,24 +2629,41 @@ impl Legs {
             v[i] = v[i].min((v[i + 1] * v[i + 1] + 2.0 * ACCEL * ds[i]).sqrt());
         }
         let per_second = TICKS_PER_SECOND as f32;
+        // Facing along each step: the way it goes, turned round while it backs; along a step of
+        // none (where it changes between backing and driving on), as along the one before.
+        let mut facing: Vec<f32> = Vec::with_capacity(n - 1);
+        for i in 0..n - 1 {
+            let (a, b) = (pts[i].0, pts[i + 1].0);
+            let f = if ds[i] > 1e-4 || i == 0 {
+                let way = (b[0] - a[0]).atan2(b[1] - a[1]);
+                if pts[i + 1].1 {
+                    wrap_angle(way + std::f32::consts::PI)
+                } else {
+                    way
+                }
+            } else {
+                facing[i - 1]
+            };
+            facing.push(f);
+        }
         let mut t = 0.0;
         let mut points = Vec::with_capacity(n);
         for i in 0..n {
             if i > 0 {
                 t += ds[i - 1] / ((v[i - 1] + v[i]) / 2.0).max(0.3) * per_second;
             }
-            // Facing: the way to the next point (the last, from the one before).
-            let (a, b) = if i + 1 < n {
-                (pts[i].0, pts[i + 1].0)
-            } else {
-                (pts[i - 1].0, pts[i].0)
-            };
+            // Facing: along the step on (the last, the one before); between two it goes the same
+            // way (driving on, or backing), half way from the one to the other: along its curve,
+            // as a corner's arc is sampled (`round_corners`).
             let reverse = if i + 1 < n { pts[i + 1].1 } else { pts[i].1 };
-            let mut yaw = (b[0] - a[0]).atan2(b[1] - a[1]);
-            if reverse {
-                yaw = wrap_angle(yaw + std::f32::consts::PI);
-            }
-            points.push((pts[i].0, yaw, t, reverse));
+            let yaw = if i + 1 == n {
+                facing[n - 2]
+            } else if i > 0 && pts[i].1 == pts[i + 1].1 {
+                facing[i - 1] + wrap_angle(facing[i] - facing[i - 1]) / 2.0
+            } else {
+                facing[i]
+            };
+            points.push((pts[i].0, wrap_angle(yaw), t, reverse));
         }
         let at = |i: Option<usize>| i.map_or(t, |i| points[i.min(n - 1)].2);
         let mouths = self
@@ -8219,5 +8521,131 @@ mod tests {
             ..r
         };
         assert_eq!(guard(&body(shift), &on(body(shift)), them.iter()), None);
+    }
+
+    /// The way along `pts`: the turn at each point between its steps (radians), and whether any
+    /// step goes back against the one before.
+    fn turns(pts: &[[f32; 2]]) -> (f32, bool) {
+        let mut most = 0.0f32;
+        let mut back = false;
+        for w in pts.windows(3) {
+            let (a, b) = (unit2(w[0], w[1]), unit2(w[1], w[2]));
+            most = most.max(turned(a, b).abs());
+            back |= dot2(a, b) < 0.0;
+        }
+        (most, back)
+    }
+
+    #[test]
+    fn a_lane_turns_a_corner_on_an_arc() {
+        // Along x, then right (+z) at (12, 0): a street corner, a point every 4 m.
+        let lane = [
+            [0.0, 0.0],
+            [4.0, 0.0],
+            [8.0, 0.0],
+            [12.0, 0.0],
+            [12.0, 4.0],
+            [12.0, 8.0],
+            [12.0, 12.0],
+        ];
+        let round = round_corners(&lane);
+        assert_eq!(round.first(), lane.first());
+        assert_eq!(round.last(), lane.last());
+        let (most, back) = turns(&round);
+        assert!(!back);
+        assert!(most <= ARC_STEP + 1e-3, "turns {most} at a point");
+        // On an arc as wide as a right turn's, its middle in from the corner.
+        let r = RIGHT_TURN;
+        let mid = round
+            .iter()
+            .min_by(|a, b| {
+                crate::travel::dist(**a, [12.0, 0.0])
+                    .total_cmp(&crate::travel::dist(**b, [12.0, 0.0]))
+            })
+            .copied()
+            .unwrap();
+        let inset = crate::travel::dist(mid, [12.0, 0.0]);
+        assert!(
+            (inset - r * (std::f32::consts::SQRT_2 - 1.0)).abs() < 0.05,
+            "{inset}"
+        );
+        // Turning left, wider.
+        let left: Vec<[f32; 2]> = lane.iter().map(|p| [p[0], -p[1]]).collect();
+        let round = round_corners(&left);
+        let mid = round
+            .iter()
+            .min_by(|a, b| {
+                crate::travel::dist(**a, [12.0, 0.0])
+                    .total_cmp(&crate::travel::dist(**b, [12.0, 0.0]))
+            })
+            .copied()
+            .unwrap();
+        let inset = crate::travel::dist(mid, [12.0, 0.0]);
+        assert!(
+            (inset - LEFT_TURN * (std::f32::consts::SQRT_2 - 1.0)).abs() < 0.05,
+            "{inset}"
+        );
+    }
+
+    #[test]
+    fn a_lane_through_a_junction_where_it_doubles_back_turns_smoothly() {
+        // Two roads' lanes meeting at a junction: the one in goes on 0.8 m past the corner, the
+        // one out begins 0.6 m short of the line in, and the way doubles back between them.
+        let lane = [
+            [0.0, 0.0],
+            [4.0, 0.0],
+            [8.0, 0.0],
+            [12.8, 0.0],
+            [12.0, -0.6],
+            [12.0, 3.0],
+            [12.0, 7.0],
+            [12.0, 11.0],
+        ];
+        let round = round_corners(&lane);
+        let (most, back) = turns(&round);
+        assert!(!back, "{round:?}");
+        assert!(
+            most <= ARC_STEP + 1e-3,
+            "turns {most} at a point: {round:?}"
+        );
+        // On through the corner, no point further than the lines either side.
+        assert!(
+            round.iter().all(|p| p[0] <= 12.0 + 1e-3 && p[1] >= -1e-3),
+            "{round:?}"
+        );
+    }
+
+    #[test]
+    fn a_car_faces_the_way_it_goes_round_a_corner() {
+        let lane = round_corners(&[
+            [0.0, 0.0],
+            [4.0, 0.0],
+            [8.0, 0.0],
+            [12.0, 0.0],
+            [12.0, 4.0],
+            [12.0, 8.0],
+        ]);
+        let mut legs = Legs::default();
+        for p in lane {
+            legs.push_lane(p, FAST, 0.0, LANE);
+        }
+        let route = legs.timed(true, true);
+        let mut was = route.at(0.0).0;
+        let mut t = 1.0;
+        let mut worst = 0.0f32;
+        while t < route.ticks() {
+            let (p, yaw, _) = route.at(t);
+            let (dx, dz) = (p[0] - was[0], p[1] - was[1]);
+            if dx.hypot(dz) > 1e-3 {
+                worst = worst.max(wrap_angle(dx.atan2(dz) - yaw).abs());
+            }
+            was = p;
+            t += 1.0;
+        }
+        assert!(
+            worst.to_degrees() < 4.0,
+            "its nose {}° off the way it goes",
+            worst.to_degrees()
+        );
     }
 }

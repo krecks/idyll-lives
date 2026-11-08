@@ -318,10 +318,23 @@ fn generated_worlds_are_livable() {
                                 c.trip.is_some_and(|t| t.driver != sim.id)
                                     && c.riders.contains(&sim.id)
                             });
+                            // (Brought others in their car: they go when one of them must, a
+                            // need about to run out, say: `cars::call_party_home`.)
+                            let party = w.cars.iter().any(|c| {
+                                c.trip.is_some_and(|t| t.driver == sim.id)
+                                    && c.riders.iter().any(|&r| {
+                                        w.sims.get(r as usize).is_some_and(|o| {
+                                            o.current().is_some_and(|a| {
+                                                matches!(a.task.kind, TaskKind::GoHome)
+                                            })
+                                        })
+                                    })
+                            });
                             if w.tick < t0 + least
                                 && !critical
                                 && !work
                                 && !passenger
+                                && !party
                                 && (6.0..22.0).contains(&hour)
                                 && sim.here()
                             {
@@ -898,6 +911,95 @@ fn print_in_view(label: &str, in_view: &std::collections::BTreeSet<String>) {
     }
 }
 
+/// Where a car was shown on its way a tick, its yaw, and its slip (degrees: `Slips`).
+type SlipAt = ([f32; 2], f32, f32);
+
+/// How far each car on its way faces off the way it goes (`SLIP=1`: printed per world, not a
+/// check; `SLIP=trace`, the last few seconds up to the worst too): tick by tick, the angle between
+/// its yaw and the way it moved (either way: it backs up too), its pulling over to pass taken out
+/// (that moves it sideways, standing as it may be).
+#[derive(Default)]
+struct Slips {
+    /// Per car, where it was shown the last ticks on its way (up to 150), its yaw, and its slip
+    /// (degrees).
+    last: Vec<std::collections::VecDeque<SlipAt>>,
+    /// The worst, where and when, and the ticks before it.
+    worst: (f32, String, Vec<SlipAt>),
+    /// Ticks more than 5, 10, 20 and 40 degrees off.
+    over: [usize; 4],
+}
+
+impl Slips {
+    fn sample(&mut self, w: &World) {
+        use sim_core::world::wrap_angle;
+        self.last.resize(w.cars.len(), Default::default());
+        for (c, car) in w.cars.iter().enumerate() {
+            let h = &mut self.last[c];
+            let on_way = matches!(
+                car.state,
+                sim_core::cars::CarState::Leaving | sim_core::cars::CarState::Arriving
+            );
+            let Some((at, yaw, true, _)) = car.shown.filter(|_| on_way) else {
+                h.clear();
+                continue;
+            };
+            // (Back by its shift: `cars::shifted`.)
+            let at = [at[0] + yaw.cos() * car.shift, at[1] - yaw.sin() * car.shift];
+            let mut slip = 0.0;
+            if let Some(&(p, was, _)) = h.back() {
+                let (dx, dz) = (at[0] - p[0], at[1] - p[1]);
+                let len = dx.hypot(dz);
+                if len > 0.5 {
+                    h.clear();
+                } else if len > 0.002 {
+                    let off = wrap_angle(dx.atan2(dz) - was - wrap_angle(yaw - was) / 2.0).abs();
+                    slip = off.min(std::f32::consts::PI - off).to_degrees();
+                }
+            }
+            h.push_back((at, yaw, slip));
+            if h.len() > 150 {
+                h.pop_front();
+            }
+            for (k, most) in [5.0, 10.0, 20.0, 40.0].into_iter().enumerate() {
+                self.over[k] += usize::from(slip > most);
+            }
+            if slip > self.worst.0 {
+                self.worst = (
+                    slip,
+                    format!(
+                        "car {c} (plot {}{}) {:?} at {:.1},{:.1} day {} {:05.2}h",
+                        car.plot,
+                        if car.taxi { ", a taxi" } else { "" },
+                        car.state,
+                        at[0],
+                        at[1],
+                        sim_core::clock::day(w.tick),
+                        sim_core::clock::hour(w.tick)
+                    ),
+                    h.iter().copied().collect(),
+                );
+            }
+        }
+    }
+
+    fn print(&self, label: &str, trace: bool) {
+        eprintln!(
+            "  {label}: worst slip {:.1} deg, {}; ticks over 5/10/20/40 deg: {:?}",
+            self.worst.0, self.worst.1, self.over
+        );
+        if trace {
+            for &(p, yaw, slip) in &self.worst.2 {
+                eprintln!(
+                    "    {:.2},{:.2} yaw {:6.1} slip {slip:5.1}",
+                    p[0],
+                    p[1],
+                    yaw.to_degrees()
+                );
+            }
+        }
+    }
+}
+
 /// The households' cars of generated worlds (`town.ts` writes them where the street drew them,
 /// with the road each driveway meets): every one loads parked on its driveway on its lot, nothing
 /// built over it, and few stay parked for want of a way onto the road (`NO_WAY`, a driveway that
@@ -1032,6 +1134,8 @@ fn generated_worlds_cars_keep_to_the_roads() {
         // (A big world looked at as its game starts: `common::watch_home`.)
         let view = big.then(|| common::watch_home(&mut w));
         let mut taxi_faults = std::collections::BTreeSet::new();
+        let slip = std::env::var("SLIP").ok();
+        let mut slips = Slips::default();
         while w.tick < end {
             w.tick_once();
             watch.sample(&w);
@@ -1057,6 +1161,9 @@ fn generated_worlds_cars_keep_to_the_roads() {
                 held.2 = car.progress;
             }
             check_taxis(&w, view, &mut taxis, &mut taxi_faults);
+            if slip.is_some() {
+                slips.sample(&w);
+            }
             if w.tick % 4 != 0 {
                 continue;
             }
@@ -1225,6 +1332,9 @@ fn generated_worlds_cars_keep_to_the_roads() {
             for s in &watch.stuck {
                 failures.push(format!("{label}: {s}"));
             }
+        }
+        if let Some(how) = &slip {
+            slips.print(&label, how == "trace");
         }
         eprintln!(
             "  {label}: {} cars, worst {:.2} m off the paving, {} long stretches, {:.1} s",

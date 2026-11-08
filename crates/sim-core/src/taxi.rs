@@ -2911,6 +2911,7 @@ fn lay_route(
                 }
                 lane.remove(0);
             }
+            let lane = crate::cars::round_corners(&lane);
             let nearest = |p: [f32; 2]| {
                 (0..full.len())
                     .min_by(|&a, &b| dist(full[a], p).total_cmp(&dist(full[b], p)))
