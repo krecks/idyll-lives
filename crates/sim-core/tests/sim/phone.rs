@@ -291,6 +291,55 @@ fn an_invitation_brings_the_friend_over() {
     );
 }
 
+/// Ada invites Bo over at 11:00, Bo's shift at `start` o'clock: whether he comes.
+fn comes_before_work(start: f32) -> bool {
+    let content = CONTENT.replace(
+        r#""economy":{"startingFunds":500}"#,
+        &format!(
+            r#""careers":[{{"id":"shop","label":"Shop","levels":[
+                {{"title":"Clerk","pay":20,"start":{start},"hours":4,"days":[0,1,2,3,4,5,6]}}]}}],
+            "economy":{{"startingFunds":500}}"#
+        ),
+    );
+    let town = town("friends").replace(
+        r#"{"name":"Bo","household":1,"x":25.5,"z":5.5}"#,
+        r#"{"name":"Bo","household":1,"x":25.5,"z":5.5,"job":{"career":"shop","level":0}}"#,
+    );
+    let mut w = World::from_json(&content, &town, 7).unwrap();
+    w.autonomy = false;
+    while w.tick < clock::tick_at(1, 11.0 * 60.0).unwrap() {
+        w.tick_once();
+    }
+    assert!(w.sims[1].job.is_some() && w.sims[1].away_until.is_none());
+    w.apply(Command::Phone {
+        sim: 0,
+        action: action(&w, "invite"),
+        contact: Some(1),
+    })
+    .unwrap();
+    minutes(&mut w, 10.0);
+    let declined = w
+        .events
+        .iter()
+        .any(|e| e.kind == EventKind::Declined && (e.a, e.b) == (0, 1));
+    let invited = w
+        .events
+        .iter()
+        .any(|e| e.kind == EventKind::Invited && (e.a, e.b) == (0, 1));
+    assert_ne!(declined, invited, "the invitation is taken up or declined");
+    invited
+}
+
+/// Invited round, a friend comes only with time for the visit before they leave for work, as a
+/// visit they'd choose for themselves (`world::free_before_work`): not to be off to work again
+/// before `visits.leastMinutes` (a guest let in was off to work 39 minutes on, Brightton).
+#[test]
+fn an_invitation_is_declined_with_work_too_soon() {
+    // (Off at 11:30 for a shift at noon, `careerRules.commuteMinutes` before it.)
+    assert!(!comes_before_work(12.0), "no time for a visit before work");
+    assert!(comes_before_work(15.0), "with the afternoon free, he comes");
+}
+
 #[test]
 fn asking_to_come_over_sends_the_resident_to_the_friend() {
     let mut w = world(CONTENT, "friends");
