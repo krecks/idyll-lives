@@ -63,11 +63,12 @@ pub use world::World;
 //   through.
 // `secs` and `mins` turn either into ticks; never count ticks with a bare number.
 
-/// Fixed simulation rate in ticks per real second (at normal speed).
-pub const TICKS_PER_SECOND: u32 = 20;
-/// Ticks in a game minute. The clock counts these whole ticks (see `clock.rs`); `MINUTES_PER_TICK`
+/// Fixed simulation rate in ticks per real second (at normal speed; 20 before 0.7.0).
+pub const TICKS_PER_SECOND: u32 = 60;
+/// Ticks in a game minute (20 before 0.7.0): a game minute is a second and a quarter at normal
+/// speed, a game day 30 real minutes. The clock counts these whole ticks (see `clock.rs`); `MINUTES_PER_TICK`
 /// is only for durations.
-pub const TICKS_PER_MINUTE: u64 = 20;
+pub const TICKS_PER_MINUTE: u64 = 75;
 pub const MINUTES_PER_TICK: f32 = 1.0 / TICKS_PER_MINUTE as f32;
 /// Game minutes that pass in a real second at normal speed.
 pub const GAME_MINUTES_PER_SECOND: f32 = TICKS_PER_SECOND as f32 / TICKS_PER_MINUTE as f32;

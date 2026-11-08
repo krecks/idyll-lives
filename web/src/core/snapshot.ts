@@ -167,7 +167,7 @@ export function gameMinutesPerSecond(layout: Pick<SnapshotLayout, 'ticksPerSecon
  * layout to hand: the journal's times, a pasted state's day. Before the first game: sim-core's as of writing
  * (`tests/tickRates.test.ts` keeps them to its `lib.rs`).
  */
-export const tickRates: Pick<SnapshotLayout, 'ticksPerSecond' | 'ticksPerMinute'> = { ticksPerSecond: 20, ticksPerMinute: 20 };
+export const tickRates: Pick<SnapshotLayout, 'ticksPerSecond' | 'ticksPerMinute'> = { ticksPerSecond: 60, ticksPerMinute: 75 };
 
 /**
  * A layout's `sim` indices for the fields it writes: `simFields(['id', 'x'])` gives `{ id: 0, x: 1 }`. The names
