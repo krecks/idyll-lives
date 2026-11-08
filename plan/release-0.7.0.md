@@ -2,8 +2,8 @@
 
 - **Branch:** `release/0.7.0`, cut from `main` at `70280ee9` on 2026-11-03 (0.6.0 released, and #52's three sim fixes); to be merged into `main` by pull request; tag `v0.7.0` on the merge
 - **Base:** v0.6.0 at `f4482e7f`
-- **Status:** **in release**: everything below is merged into `release/0.7.0` (at `f5c9a1d9` when these notes were drafted). The bus is dropped (the owner's call, 2026-11-05): `fix/car-guard` takes it out, stops and all, and a shared work taxi takes its place; the cars keep what they learnt with it (taking turns where their ways cross or meet, pulling over on 6 m lanes). 0.6.1 (PR #53) was folded into 0.7.0 and closed.
-- **Release type:** features: getting about town (bikes and e-scooters, lifts, a shared work taxi), hosting, purchases set up at home, career pacing, visits; save format still 35
+- **Status:** **in release**: everything below is merged into `release/0.7.0` (at `f5c9a1d9` when these notes were drafted). The bus is dropped (the owner's call, 2026-11-05): `fix/car-guard` takes it out, stops and all, and a shared work taxi takes its place; the cars keep what they learnt with it (taking turns where their ways cross or meet, pulling over on 6 m lanes). 0.6.1 (PR #53) was folded into 0.7.0 and closed. PR #58 and PR #59 went into `main` on 2026-11-07; the owner held the tag to play it, and the 60 Hz sim, the 30-minute day and the play-test's fixes came after, in PR #60.
+- **Release type:** features: getting about town (bikes and e-scooters, lifts, a shared work taxi), hosting, purchases set up at home, career pacing, visits, a 60 Hz sim and a 30-minute day; save format 36
 
 ## 1. What ships
 
@@ -27,9 +27,13 @@ Player notes: the `## 0.7.0` section of [CHANGELOG.md](../CHANGELOG.md), also in
 | `simplify/sim-core`, `simplify/bus-hosting`, `simplify/web` (`d97f6d05`, `9da73623`, `6a44a4a8`) | `/simplify` passes over the branch |
 | `fix/riders-and-vehicles` (through `f5c9a1d9`, with `fix/commute-timing` and `fix/model-gate`) | The code review's fixes: bodies kept clear of cars, a car never driving through anyone, the bike or walk decided once, lateness by the way's due time, a guest's promised bite; the gate's strict checks as errors (`checkglb::STRICT`, `accept`); the armoire, party booth, shower stall, seedling and yoga mat; the monitor's radius |
 
+| on the branch (`feb08950`, `705983b5`) | The owner's play-test: a cake baked, not bought; a kitchen sink and bathroom basins apart; the floor's *Walk here*; outings home by 23:00 |
+| `feat/sixty-ticks` (PR #60) | 60 ticks a real second (from 20) and 75 a game minute: a game day lasts 30 real minutes at normal speed (from 24); real time (walking, cars, doors, lights) in `secs()`, game time (the clock, needs, schedules) in `mins()`; save format 36 rescales older saves' ticks; the fixes it brought out (outings and visits around work, breakfast before getting ready, the taxi back, a cyclist's way to work, a car backing out of a jam) |
+| `fix/doors-shut`, `fix/shader-unreachable`, `fix/junction-turns`, `fix/visit-short` (PR #60) | The owner's play-test at 60 Hz: every door shut at rest, swinging for whoever goes through; no WGSL "unreachable code" warning from the grass; cars turning at junctions on a curve instead of sliding round; a phoned invitation taken up only with time before work |
+
 `main` brought along #52 (a car's facing within a half turn, meeting halfway over the stairs, an adopted child beside a parent).
 
-- **Saves:** format 35, unchanged. 0.7.0's additions are optional fields (`setups`, `job.late`, the `served` story with `refs.item`), left out when empty; riding and a host's offer aren't saved (`save.rs`'s header); a save written while the bus was in (its stops among the exits) loads without them. 0.6.0 opens 0.7.0's saves (no `deny_unknown_fields`; the version check is `> 35`), without the bikes and e-scooters (unknown objects are dropped) and without a parcel still waiting to be set up (its money is gone with it). A monitor on a turned corner desk that no longer fits its 0.27 m radius is left out on load.
+- **Saves:** format 36, for the new clock: an older save's game ticks are rescaled by 75/20 and its cars' and taxis' route ticks by 60/20 as it loads (`save.rs`, `Rescale`), so it opens at the same day and minute, its cars where they were (`tests/saves/v035_normal.json`). 0.6.0 can't open 0.7.0's saves (the version check is `> 35`): it keeps them and lists only the ones it can open. 0.7.0's other additions are optional fields (`setups`, `job.late`, the `served` story with `refs.item`), left out when empty; riding and a host's offer aren't saved (`save.rs`'s header); a save written while the bus was in (its stops among the exits) loads without them. A monitor on a turned corner desk that no longer fits its 0.27 m radius is left out on load.
 - **Known:** see section 5.
 
 ## 2. Version
@@ -79,4 +83,5 @@ Run 2026-11-03/04 on CI's Bun 1.4.3: all green.
 - **Firefox:** the model-load fix (`6ada1144`) is not verified in Firefox.
 - **Parked-car tiles are coarse.**
 - `vehicle.roadsOnly` is read but not kept to: an e-scooter goes wherever the walk goes (`docs/content-packs.md`, `vehicle`).
+- **Parked for 0.7.1** (the owner's call, 2026-11-08): faster cars and bikes (`fix/vehicle-speeds`) and leaving for work at varied times (`feat/work-jitter`); both make big towns' jams in view worse or don't touch them (those are drives home after work). See PLAN.md's 0.7.1 row.
 - The ignored long soaks `a_big_town_with_a_busy_player_*` already fail on `main` (a stuck resident, nobody born); not caused by 0.7.0.
