@@ -1512,9 +1512,13 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
                     // (Not out yet: a moment for them to set off.)
                     busy = true;
                 } else {
-                    // Not there, nor coming: on without them, and they make their own way.
-                    w.taxis.runs[k].stops[s].state = StopState::Done;
+                    // Not there, nor coming: on without them, and they make their own way (a
+                    // leisure rider left is booked again once, `release`, which tells they were
+                    // left by their stop not yet done: so that comes after. Done first, a guest
+                    // eating a takeaway by the kerb as it came was never booked again, and walked
+                    // home 540 m.)
                     release(w, i);
+                    w.taxis.runs[k].stops[s].state = StopState::Done;
                 }
             }
             StopState::Boarding => {
@@ -1545,8 +1549,9 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
                 if going {
                     busy = true;
                 } else {
-                    w.taxis.runs[k].stops[s].state = StopState::Done;
+                    // (Booked again as above: `release` first.)
                     release(w, i);
+                    w.taxis.runs[k].stops[s].state = StopState::Done;
                 }
             }
             StopState::Aboard | StopState::Done => {}
