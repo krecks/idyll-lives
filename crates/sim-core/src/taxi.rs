@@ -137,6 +137,10 @@ pub struct Taxis {
     /// left again, they go their own way. Cleared each hour. Not saved.
     #[serde(skip)]
     left: Vec<(u32, u32)>,
+    /// Those off home early from a place, their taxi back brought forward (sim, the run they were
+    /// on: `bring_backs_forward`), once for each run. Cleared each hour. Not saved.
+    #[serde(skip)]
+    early: Vec<(u32, u32)>,
     /// Each house's stand with no other taxi about (`stop_for`), kept once found. Not saved.
     #[serde(skip)]
     kerbs: Kerbs,
@@ -436,10 +440,12 @@ pub(crate) fn update(w: &mut World) {
         plan(w);
         close_home_runs(w);
         leisure_leaving(w);
+        bring_backs_forward(w);
         book_backs(w);
         if w.tick.is_multiple_of(60 * TICKS_PER_MINUTE) {
             w.taxis.no_leisure.clear();
             w.taxis.left.clear();
+            w.taxis.early.clear();
         }
     }
     seat_riders(w);
@@ -3676,6 +3682,99 @@ fn leisure_leaving(w: &mut World) {
             directed,
             routine: false,
         });
+    }
+}
+
+/// Those booked on a taxi back from a place who've given their stay up early and are off home
+/// now (`life::end_visit_if_due`: a need the place can't see to, the hosts gone, bored): the taxi
+/// was booked for when their stay was to end, and they'd stand at the kerb till then (three hours
+/// and more, a visit to a house with nobody in). Off that run (still to come into town) and
+/// booked on one for now, shared as ever (`book_back`), if it's sooner; else as they were. Once
+/// for each run they're on (`Taxis::early`).
+fn bring_backs_forward(w: &mut World) {
+    let tick = w.tick;
+    let mut early: Vec<(usize, u32)> = Vec::new();
+    for r in &w.taxis.runs {
+        if !r.home || r.place.is_none() || r.car.is_some() {
+            continue;
+        }
+        for (s, st) in r.stops.iter().enumerate() {
+            let i = st.sim as usize;
+            let b = Booking {
+                run: r.id,
+                stop: s as u8,
+            };
+            let off = w.sims.get(i).is_some_and(|x| {
+                x.taxi == Some(b)
+                    && x.current()
+                        .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome))
+            });
+            // (Out to the kerb more than the few minutes early a rider is anyway.)
+            if off
+                && st.state == StopState::Booked
+                && st.leave > tick + KERB_EARLY
+                && !w.taxis.early.contains(&(st.sim, r.id))
+            {
+                early.push((i, r.id));
+            }
+        }
+    }
+    for (i, id) in early {
+        w.taxis.early.push((i as u32, id));
+        let Some(k) = w.taxis.runs.iter().position(|r| r.id == id) else {
+            continue;
+        };
+        let mut run = w.taxis.runs[k].clone();
+        let (Some(place), Some(s)) = (run.place, run.stop_of(i as u32)) else {
+            continue;
+        };
+        let was = run.stops.remove(s);
+        // (Theirs alone, their halt goes, those after it one on.)
+        if !run.stops.iter().any(|st| st.halt == was.halt) {
+            for st in &mut run.stops {
+                if st.halt > was.halt {
+                    st.halt -= 1;
+                }
+            }
+        }
+        // (The others' run timed again without them; it can't be: as they were.)
+        run.kerbs = Vec::new();
+        if !run.stops.is_empty() && !time_leisure(w, &mut run) {
+            continue;
+        }
+        let (runs, next_id) = (w.taxis.runs.clone(), w.taxis.next_id);
+        if run.stops.is_empty() {
+            w.taxis.runs.remove(k);
+        } else {
+            w.taxis.runs[k] = run;
+            rebook(w, id);
+        }
+        w.sims[i].taxi = None;
+        let due = |w: &World| {
+            let b = w.sims[i].taxi?;
+            let r = w.taxis.runs.iter().find(|r| r.id == b.run)?;
+            Some(r.stops.get(b.stop as usize)?.due)
+        };
+        if !(book_back(w, i, place, tick) && due(w).is_some_and(|d| d < was.due)) {
+            w.taxis.runs = runs;
+            w.taxis.next_id = next_id;
+            w.sims[i].taxi = None;
+            rebook(w, id);
+            continue;
+        }
+        // (On their way to the kerb: to the new run's, as it stands for them.)
+        let World {
+            sims,
+            content,
+            objects,
+            ..
+        } = &mut *w;
+        let sim = &mut sims[i];
+        if let Some(task) = sim.current().map(|a| a.task) {
+            crate::world::end_activity(sim, content, objects);
+            sim.current = None;
+            sim.queue.push_front(task);
+        }
     }
 }
 
