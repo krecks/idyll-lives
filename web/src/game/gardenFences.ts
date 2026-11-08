@@ -151,11 +151,29 @@ export function townFences(input: FenceInput): TownFence[] {
   const line = (ax: number, az: number, bx: number, bz: number, style: string) => {
     for (const [axis, x, z] of edgesOf(ax, az, bx, bz)) put(axis, x, z, style);
   };
-  /** A line with a gate in it, in the middle of what of it can stand. */
+  /** Whether a thing stands on tile (x, z). */
+  const standsOn = (x: number, z: number) => {
+    const tile: Rect = { x: x + 0.05, z: z + 0.05, w: 0.9, d: 0.9 };
+    return !!cells.get(`${Math.floor(x / 4)}:${Math.floor(z / 4)}`)?.some((b) => overlaps(tile, b));
+  };
+  /** Whether a gate on unit edge (axis, x, z) can be walked through: nothing standing on the tile either side of it. */
+  const passable = ([axis, x, z]: ['h' | 'v', number, number]) => !standsOn(x, z) && (axis === 'h' ? !standsOn(x, z - 1) : !standsOn(x - 1, z));
+  /**
+   * A line with a gate in it, in the middle of what of it can stand, else as near the middle as it
+   * can be walked through (not onto a rain barrel just behind it, say).
+   */
   const gated = (ax: number, az: number, bx: number, bz: number, style: string) => {
     const edges = edgesOf(ax, az, bx, bz).filter(([axis, x, z]) => allowed(axis, x, z));
     if (!edges.length) return;
-    const g = Math.floor((edges.length - 1) / 2);
+    const mid = Math.floor((edges.length - 1) / 2);
+    let g = mid;
+    for (let k = 0; k < edges.length * 2; k++) {
+      const i = mid + (k % 2 ? -1 : 1) * Math.ceil(k / 2);
+      if (i >= 0 && i < edges.length && passable(edges[i])) {
+        g = i;
+        break;
+      }
+    }
     edges.forEach(([axis, x, z], i) => put(axis, x, z, style, i === g ? 'gate' : 'fence'));
   };
 

@@ -31,11 +31,14 @@ import { CARS, CAR_PAINT, carDoor, carriedAlong, carRowIsTaxi, DOORS, inCar, pai
 import { lerpAngle } from '../shared/characters/rig';
 import { DOOR_SWING, ease } from '../shared/doors';
 import { Geo } from '../shared/geometry';
-import { GAME_RATE } from '../shared/gameSpeed';
+import { PLAYBACK_RATE } from '../shared/gameSpeed';
 import { compose, quatYawPitchRoll } from '../shared/math';
 import { Painter } from '../shared/street';
 
-/** How wide a door opens (degrees). It swings as a house's door does (`DOOR_SWING`, in game time: about 9 sim ticks, which getting in and out leave it, sim-core `cars::DOOR_OPENS`). */
+/**
+ * How wide a door opens (degrees). It swings as a house's door does, `DOOR_SWING` s of the sim's real time (9 ticks
+ * at 20 a second), which getting in and out leave it (sim-core `cars::DOOR_OPENS`, 0.5 s).
+ */
 const DOOR_OPEN = 62;
 
 /** A car's seat (sim-core `Car::seat_at`): lower than a chair's, so a grown-up's head stays under the roof. */
@@ -142,8 +145,8 @@ export class Cars extends Vehicles {
   update(frame: FrameState): void {
     const { curr, layout } = frame;
     const f = layout.car;
-    // (Doors swing in game time, as the sim has them: faster at higher speeds, still while paused.)
-    const rate = GAME_RATE[curr[layout.header.speed] | 0] ?? 1;
+    // (Doors swing in the sim's real time, as it has them: faster at higher speeds, still while paused.)
+    const rate = PLAYBACK_RATE[curr[layout.header.speed] | 0] ?? 1;
     const real = Math.min(0.1, Math.max(0, (frame.now - this.lastNow) / 1000));
     const dt = real * rate;
     this.lastNow = frame.now;

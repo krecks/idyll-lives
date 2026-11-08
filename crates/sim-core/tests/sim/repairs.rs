@@ -44,7 +44,7 @@ fn sit(w: &mut World) {
         interaction: 0,
     })
     .unwrap();
-    for _ in 0..30 * 20 {
+    for _ in 0..sim_core::mins(30.0) {
         w.tick_once();
     }
 }
@@ -63,7 +63,7 @@ fn a_chair_that_broke_on_the_way_isnt_sat_on() {
     assert!(w.sims[0].is_moving(), "on the way to the chair");
     // Someone else wears it out before they get there.
     w.objects[0].wear = 1.0;
-    for _ in 0..10 * 20 {
+    for _ in 0..sim_core::mins(10.0) {
         w.tick_once();
         assert_ne!(
             w.sims[0].pose,
@@ -132,7 +132,7 @@ fn things_wear_out_break_and_get_repaired() {
         household: None,
     })
     .unwrap();
-    for _ in 0..2 * 60 * 20 {
+    for _ in 0..sim_core::mins(120.0) {
         w.tick_once();
         if !w.objects[0].broken() {
             break;
@@ -170,7 +170,7 @@ fn one_resident_goes_to_repair_a_broken_chair_not_two() {
         )
     };
     let mut went = false;
-    for _ in 0..60 * 20 {
+    for _ in 0..sim_core::mins(60.0) {
         w.tick_once();
         assert!(
             !(repairing(&w, 0) && repairing(&w, 1)),

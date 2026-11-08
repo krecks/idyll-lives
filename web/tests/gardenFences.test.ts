@@ -112,6 +112,20 @@ describe('garden fences', async () => {
     expect(flat.some((f) => f.axis === 'h' && f.z === 12 && f.x >= 13 && f.x < 20)).toBe(true);
     // One fence on the shared side and the back, a gate in each cross fence (two each).
     expect(flat.filter((f) => f.kind === 'gate').length).toBe(4);
+    // A thing just behind a gate (a rain barrel, a statue: nothing residents use, which the fence may
+    // stand beside): the gate goes beside it, in the same fence, to be walked through.
+    const gates = flat.filter((f) => f.kind === 'gate');
+    // (The tile at a gate's (x, z) is the one behind it, the garden's, on a street along x.)
+    const behind = gates.map((g) => ({ x: g.x, z: g.z, w: 1, d: 1 }));
+    expect(gates.every((g) => g.axis === 'h')).toBe(true);
+    const moved = townFences({ plots: plotsOf(false), fields: [], walls: new Set(), blockers: behind, paths: [] }).filter((f) => f.kind === 'gate');
+    expect(moved.length).toBe(gates.length);
+    const taken = (x: number, z: number) => behind.some((b) => b.x === x && b.z === z);
+    for (const g of moved) {
+      expect(gates.some((o) => key(o) === key(g)), `${key(g)} where it was`).toBe(false);
+      expect(gates.some((o) => o.axis === g.axis && o.z === g.z && Math.abs(o.x - g.x) === 1), `${key(g)} beside where it was`).toBe(true);
+      expect(taken(g.x, g.z) || taken(g.x, g.z - 1), `${key(g)} by a thing`).toBe(false);
+    }
   });
 
   test('no land shut in between gardens, in a big world whose lots leave gaps between them', () => {

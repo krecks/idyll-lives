@@ -65,15 +65,20 @@ impl SimSet {
 pub const MAX_QUEUE: usize = 6;
 /// How many things a resident remembers they couldn't get to (`Sim::unreachable`).
 pub(crate) const UNREACHABLE: usize = 4;
-/// How long a resident remembers that someone was out of reach: people move, so not long.
-pub(crate) const PERSON_UNREACHABLE_TICKS: u64 = 10;
+/// How long a resident remembers that someone was out of reach: people move, so not long (half a
+/// real second: as long as the one they wanted takes to walk a little way).
+pub(crate) const PERSON_UNREACHABLE_TICKS: u64 = crate::secs(0.5);
 /// Walking speed in tiles per tick (1.5 m per real second at 1×).
 pub(crate) const WALK_SPEED: f32 = 1.5 / TICKS_PER_SECOND as f32;
-/// Idle time before a Sim picks something on its own.
-const AUTONOMY_DELAY_TICKS: u32 = TICKS_PER_SECOND;
+/// Idle time before a Sim picks something on its own: a beat seen standing there, a real second
+/// (counted in their steps, so a turn at lower detail covers it, `lod.rs`). Those listening in on a
+/// talk wait longer for its next social (`conversation::REGROUP_TICKS`).
+pub(crate) const AUTONOMY_DELAY_TICKS: u32 = crate::secs(1.0) as u32;
 /// Getting up from the upper bunk: the time to climb down its ladder (the renderer's `bunkDown`, 6.5 s), in
 /// which they do nothing else (`Sim::ladder_ticks`).
-pub(crate) const LADDER_DOWN_TICKS: u32 = 13 * TICKS_PER_SECOND / 2;
+pub(crate) const LADDER_DOWN_TICKS: u32 = crate::secs(6.5) as u32;
+/// Stepping aside out of a car's way (`cars::make_way`): at most this far in one step (m).
+const SIDESTEP_MOST: f32 = 0.3;
 const MIN_AUTONOMY_SCORE: f32 = 0.01;
 /// How much less a meal nobody at home would eat tempts free will (the cooking practice it
 /// gives aside): cooked only with nothing much else to do.
@@ -1391,7 +1396,7 @@ impl Sim {
 
     /// How many metres they walk in a minute (`walk_speed`), as `travel::Travel::eta` asks.
     pub(crate) fn walk_per_minute(&self, content: &Content) -> f32 {
-        WALK_SPEED * self.walk_speed(content) / MINUTES_PER_TICK
+        WALK_SPEED * self.walk_speed(content) * TICKS_PER_MINUTE as f32
     }
 
     /// Recomputes `mods` when the set of active feelings with effects has changed.
@@ -1789,6 +1794,10 @@ pub(crate) struct SimBrief {
     pub bike_spot: Option<[f32; 2]>,
     /// The plot they're a guest on (`Sim::visiting`).
     pub guest_at: Option<u32>,
+    /// When they leave home for work or school today at the latest (`leaves_for_work`): a
+    /// household all off to work before a guest could stay `visits.leastMinutes` isn't visited
+    /// (`hosts_about_till`).
+    pub leaves: Option<u64>,
     /// The seat they eat at, or are on their way to with something to eat (`cooking::company`).
     pub eats_at: Option<u32>,
 }
@@ -1968,6 +1977,9 @@ pub struct World {
     pub(crate) while_lit: Vec<u32>,
     /// Who serves at the town's stalls and counters (see `staff.rs`); not saved.
     pub staff: crate::staff::Staff,
+    /// The walk out of town last timed from where each resident was (`life::firm_leave`). Not
+    /// saved: a memo of what it's worked out from.
+    pub(crate) walk_memo: crate::life::WalkMemo,
 }
 
 /// Read-only context for one Sim's update.
@@ -2303,6 +2315,7 @@ impl World {
             light_watch: Default::default(),
             while_lit: Vec::new(),
             staff: Default::default(),
+            walk_memo: Vec::new(),
         }
     }
 
@@ -2406,8 +2419,9 @@ impl World {
     }
 
     /// Whether resident `i` would set off now to visit `plot` (an invitation over the phone):
-    /// the way isn't too long, as they'd go (`leisure_way`), and they'd be there in visiting hours
-    /// (`visit_fits`).
+    /// the way isn't too long, as they'd go (`leisure_way`), they'd be there in visiting hours
+    /// (`visit_fits`), and a household living there isn't all off to work or school before they
+    /// could stay `visits.leastMinutes` (`hosts_about_till`).
     pub(crate) fn visit_fits_now(&self, i: usize, plot: u32) -> bool {
         let (Some(sim), Some(p)) = (self.sims.get(i), self.plots.get(plot as usize)) else {
             return false;
@@ -2445,12 +2459,17 @@ impl World {
             taxi,
             &mut [None, None],
         );
+        let stay = crate::mins(eta + self.content.visits.least_minutes);
         visit_fits(
             &self.content,
             eta,
             crate::clock::hour(self.tick),
             f32::INFINITY,
-        )
+        ) && self
+            .households
+            .iter()
+            .find(|h| h.plot == Some(plot))
+            .is_none_or(|h| hosts_about_till(&self.briefs, h.id) >= self.tick + stay)
     }
 
     /// The plot a tile is on (on any storey).
@@ -4403,6 +4422,7 @@ impl World {
                 bike: s.commute.and_then(|c| c.bike),
                 bike_spot: s.bike_spot.map(|(at, _)| at),
                 guest_at: s.visiting.map(|v| v.plot),
+                leaves: leaves_for_work(s, &self.content, tick),
                 eats_at: match s.current().map(|a| a.task.kind) {
                     Some(TaskKind::Eat { seat, stage: 1, .. }) => seat,
                     _ => None,
@@ -6576,16 +6596,20 @@ fn pick_autonomous(
             .fold(0, |m, n| m | 1 << n),
         false,
     );
-    // How far away the nearest thing for each need is, and how long until they leave for work
-    // or school, or head home from where they're visiting (an outing ends in time to be home by
-    // `visits.outingHomeBy`) (minutes).
+    // How far away the nearest thing for each need is, how long until they leave for work or
+    // school, or head home from where they're visiting (an outing ends in time to be home by
+    // `visits.outingHomeBy`), and how long until they get ready to leave for work or school
+    // (`dayRhythm.readyMinutes` before it) (minutes).
     let reach = reach(sim, ctx, objects, usable, walk_per_minute);
     let visit_end = sim.visiting.filter(|v| v.arrived > 0).map(|v| v.until);
-    let until_leave = leave_today(sim, ctx)
+    let leave = leave_today(sim, ctx);
+    let until_leave = leave
         .into_iter()
         .chain(visit_end)
         .min()
         .map(|t| t.saturating_sub(ctx.tick) as f32 * MINUTES_PER_TICK);
+    let ready = social::minutes_to_ticks(content.day_rhythm.ready_minutes);
+    let until_ready = leave.map(|t| t.saturating_sub(ctx.tick + ready) as f32 * MINUTES_PER_TICK);
     // The last grown-up at home with a baby doesn't go out (`life::minding_baby`), unless for
     // an essential need about to run out that home has nothing for.
     let minding = crate::life::minding_baby(sim, ctx);
@@ -6765,8 +6789,11 @@ fn pick_autonomous(
                         .is_some_and(|p| Some(p) == ctx.households[sim.household as usize].plot);
                     // (Nobody starts on a long recipe that something would run out before it's
                     // done for, hunger too, as it's eaten only at the end; nor shortly before
-                    // leaving for work.)
-                    let minutes = r.minutes_with(stations);
+                    // leaving for work; nor one they couldn't get to, cook and eat before getting
+                    // ready to leave, as breakfast went on into getting ready. It takes all its
+                    // steps' time: those with no station here are done at one that is,
+                    // `cooking::extra_minutes`.)
+                    let minutes = r.minutes;
                     let urgent = runs_out(
                         sim,
                         content,
@@ -6776,7 +6803,8 @@ fn pick_autonomous(
                         &[0.0; MAX_NEEDS],
                         &reach,
                         low,
-                    ) || until_leave.is_some_and(|m| minutes > m);
+                    ) || until_leave.is_some_and(|m| minutes > m)
+                        || until_ready.is_some_and(|m| there + minutes + r.eat_minutes > m);
                     if urgent || !at_home || allowed != Access::Full || !r.possible(stations) {
                         continue;
                     }
@@ -7199,7 +7227,15 @@ fn pick_autonomous(
                 * crate::planner::visit_factor(content, sim, soon);
             // (The way there timed only for a visit worth making.)
             if score > MIN_AUTONOMY_SCORE {
-                let taxi = crate::taxi::leisure_eta(ctx.travel, ctx.exits, content, sim, pos, door);
+                let taxi = crate::taxi::leisure_eta_via(
+                    ctx.travel,
+                    ctx.exits,
+                    content,
+                    sim,
+                    pos,
+                    (Some(plot), door),
+                    &mut on,
+                );
                 let (_, eta) = leisure_way(
                     ctx.travel,
                     content,
@@ -7212,10 +7248,14 @@ fn pick_autonomous(
                     &mut on,
                 );
                 // (Nor with a need that would be low by the time they could leave, that the
-                // hosts' home has nothing a guest may use for: `lasts`.)
+                // hosts' home has nothing a guest may use for: `lasts`. Nor to hosts all off to
+                // work before they could stay that long: let in, the guest was gone again 23
+                // minutes on, Stillpool.)
                 let serves = place_serves(ctx, objects, sim, plot, true);
+                let stay = eta + visits.least_minutes;
                 if visit_fits(content, eta, ctx.hour, free)
-                    && lasts(content, sim, &serves, eta + visits.least_minutes)
+                    && hosts_about_till(ctx.briefs, other.id) >= ctx.tick + crate::mins(stay)
+                    && lasts(content, sim, &serves, stay)
                 {
                     candidates.push((score, Choice::Visit(plot)));
                 }
@@ -7234,7 +7274,15 @@ fn pick_autonomous(
                     continue;
                 }
                 // By the way they'd go (`leisure_way`).
-                let taxi = crate::taxi::leisure_eta(ctx.travel, ctx.exits, content, sim, pos, door);
+                let taxi = crate::taxi::leisure_eta_via(
+                    ctx.travel,
+                    ctx.exits,
+                    content,
+                    sim,
+                    pos,
+                    (Some(p.id), door),
+                    &mut on,
+                );
                 let (_, eta) = leisure_way(
                     ctx.travel,
                     content,
@@ -7448,11 +7496,19 @@ fn start_task(
         return;
     }
     // An outing of their own choosing weighed by car that they'd walk after all (the car taken
-    // meanwhile, say), too far for the way they'd go now: not now (`outing_fits_now`).
+    // meanwhile, say), too far for the way they'd go now: not now (`outing_fits_now`). Nor are
+    // they on it any more, set out for their car (`life::Transition::Visit`) and not there: else,
+    // still on it at home, they'd wander off to the place on foot after all, hours away.
     if let TaskKind::Visit { plot } = task.kind
         && !task.directed
         && !outing_fits_now(sim, ctx, objects, plot)
     {
+        if sim
+            .visiting
+            .is_some_and(|v| v.plot == plot && v.arrived == 0)
+        {
+            sim.visiting = None;
+        }
         return;
     }
     // Off somewhere else from where they left their bike out (`Sim::bike_parked`): to work, or
@@ -8510,6 +8566,8 @@ fn progress(
                 let (dx, dz) = (wp[0] - sim.pos[0], wp[1] - sim.pos[1]);
                 let dist = dx.hypot(dz);
                 // A car driving by: they wait for it (and after a while step aside, out of its way).
+                // (Looked for at least 5 cm on, however short this tick's step: a distance, not a
+                // pace, so slow walkers and more ticks a second see a car as soon.)
                 let step = budget.min(dist).max(0.05);
                 let to = [
                     sim.pos[0] + dx / dist.max(1e-4) * step,
@@ -8531,7 +8589,7 @@ fn progress(
                             yaw,
                             &ctx.nav,
                             sim.pos,
-                            (0.06 * ticks as f32).min(0.3),
+                            (crate::cars::STEP_ASIDE * ticks as f32).min(SIDESTEP_MOST),
                             |p| crate::cars::clear(&others, body, p),
                         )
                     {
@@ -8674,7 +8732,7 @@ fn progress(
                         at,
                         elapsed,
                         total,
-                        WALK_SPEED * walk / MINUTES_PER_TICK,
+                        WALK_SPEED * walk * TICKS_PER_MINUTE as f32,
                     ) {
                         sim.pos = p;
                         sim.yaw = yaw;
@@ -9295,7 +9353,7 @@ fn arrive(
             } else {
                 // There: the visit is from now, the way there doesn't count (a longer one the
                 // player asked for keeps its end); an outing ends in time to be home by
-                // `visits.outingHomeBy` (`outing_leave_by`).
+                // `visits.outingHomeBy` and before work or school (`outing_leave_by`).
                 let directed = act.task.directed;
                 let leave_by = (!directed)
                     .then(|| outing_leave_by(sim, ctx, objects, plot, sim.pos))
@@ -9745,6 +9803,23 @@ fn free_before_work(sim: &Sim, ctx: &Ctx) -> f32 {
 /// When they leave for work or school today (if they haven't yet).
 fn leave_today(sim: &Sim, ctx: &Ctx) -> Option<u64> {
     leave_at(sim, ctx.content, ctx.tick)
+}
+
+/// When `sim` leaves for work or school today at the latest: as their way is timed on foot
+/// (`life::leave_for`), or now, its time gone by with work still to start (off any moment, by car
+/// as `cars::lead_ticks` has it, say: a host past her walk's time drove off to her night shift an
+/// hour on). None: nothing still to go to today.
+fn leaves_for_work(sim: &Sim, content: &Content, tick: u64) -> Option<u64> {
+    let day = crate::clock::day(tick);
+    let (leave, start, _) = match &sim.job {
+        Some(job) if job.last_shift_day != day => {
+            crate::life::shift_today(content, job, &sim.skills, tick)?
+        }
+        Some(_) => return None,
+        None if sim.school_day != day => crate::life::school_today(content, sim, tick)?,
+        None => return None,
+    };
+    (start > tick).then(|| crate::life::leave_for(sim, leave, start).max(tick))
 }
 
 /// When they leave for work or school later today (`leave_today`).
@@ -10246,6 +10321,20 @@ fn park_walk(travel: &crate::travel::Travel, door: [f32; 2], walk: f32) -> f32 {
     })
 }
 
+/// Until when someone of household `h` is about to host a guest: the latest any of them not at
+/// work (at home, or out and coming back) leaves for work or school today (`SimBrief::leaves`;
+/// never, for one with none to go to). With them all gone a guest goes home
+/// (`life::end_visit_if_due`): let in, a guest was off home again 23 minutes on, the one host
+/// gone to her night shift (Stillpool).
+fn hosts_about_till(briefs: &[SimBrief], h: u32) -> u64 {
+    briefs
+        .iter()
+        .filter(|b| b.household == h && b.here && !b.away)
+        .map(|b| b.leaves.unwrap_or(u64::MAX))
+        .max()
+        .unwrap_or(0)
+}
+
 /// Whether a visit `eta` minutes away is one to make at `hour`, with `free` minutes before
 /// they must leave for something else: not a walk of hours, there before the end of visiting
 /// hours, and time to stay and get back.
@@ -10377,8 +10466,10 @@ fn leisure_ride(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], plot: u32) -> 
 }
 
 /// The tick a guest on an outing to `plot` (a public place in an open-world town) heads home by
-/// to be home by `visits.outingHomeBy` today: the way back from `pos` on foot (or by the taxi
-/// they came by), or for one whose car is parked out for them the walk back to it and the drive. None: not such an outing.
+/// to be home by `visits.outingHomeBy` today, and before they leave for work or school
+/// (`free_before_work`, as `outing_fits` gave them time for): the way back from `pos` on foot (or
+/// by the taxi they came by), or for one whose car is parked out for them the walk back to it and
+/// the drive. None: not such an outing.
 fn outing_leave_by(
     sim: &Sim,
     ctx: &Ctx,
@@ -10420,20 +10511,33 @@ fn outing_leave_by(
         (None, None) => crate::taxi::back_minutes(ctx, sim, plot, pos, door)
             .unwrap_or_else(|| travel.eta(pos, door, foot, walk)),
     };
-    let back = (minutes * TICKS_PER_MINUTE as f32) as u64;
+    let back = ((minutes + OUTING_LEAVING_MINUTES) * TICKS_PER_MINUTE as f32) as u64;
     let home_by = crate::clock::tick_at(ctx.day, content.visits.outing_home_by * 60.0)?;
+    // (Stayed on past it, they set off for work from the place: on a bike left there, a ride of
+    // two hours across a big world, Highholm.)
+    let free = free_before_work(sim, ctx);
+    let home_by = if free.is_finite() {
+        home_by.min(ctx.tick + crate::mins(free))
+    } else {
+        home_by
+    };
     Some(home_by.saturating_sub(back))
 }
+
+/// An outing's end: game minutes to get going home besides the way itself (up from where they
+/// sat, a word with whoever they were talking to), so they're home by the hour, not a few minutes
+/// past it.
+const OUTING_LEAVING_MINUTES: f32 = 10.0;
 
 /// An outing by car: minutes besides the drive, to the car and from it at either end.
 const CAR_TRIP_MINUTES: f32 = 10.0;
 const OUTING_K: f32 = 0.01;
 
 /// The game minutes a trip takes that `Travel::eta` says takes `eta` (by car, `car`): a drive's
-/// seconds are the game's minutes, and a few more to and from the car.
+/// minutes at 1× are `travel::DRIVE_MINUTES` of the game's each, and a few more to and from the car.
 pub(crate) fn trip_minutes(eta: f32, car: bool) -> f32 {
     if car {
-        eta * 60.0 + CAR_TRIP_MINUTES
+        eta * crate::travel::DRIVE_MINUTES + CAR_TRIP_MINUTES
     } else {
         eta
     }
@@ -10677,7 +10781,7 @@ mod tests {
         World::from_json(CONTENT, LOT, 7).unwrap()
     }
 
-    fn run_ticks(w: &mut World, n: u32) {
+    fn run_ticks(w: &mut World, n: u64) {
         for _ in 0..n {
             w.tick_once();
         }
@@ -10728,7 +10832,7 @@ mod tests {
         let mut w = world();
         w.sims[0].needs[0] = 0.05;
         w.sims[0].needs[1] = 1.0;
-        run_ticks(&mut w, TICKS_PER_SECOND * 60);
+        run_ticks(&mut w, crate::mins(60.0));
         assert!(
             w.sims[0].needs[0] > 0.3,
             "hunger was {}",
@@ -10746,7 +10850,7 @@ mod tests {
             interaction: 0,
         })
         .unwrap();
-        run_ticks(&mut w, TICKS_PER_SECOND * 30);
+        run_ticks(&mut w, crate::mins(30.0));
         let s = &w.sims[0];
         assert_eq!(s.pose, Pose::Lie);
         assert_eq!(w.objects[1].users().next(), Some(0));
@@ -10791,7 +10895,7 @@ mod tests {
             interaction: 0,
         })
         .unwrap();
-        run_ticks(&mut w, TICKS_PER_SECOND * 30);
+        run_ticks(&mut w, crate::secs(30.0));
         assert_eq!(w.sims[0].use_seat, Some(1), "sat on the sofa");
         assert_eq!(w.sims[0].pose, Pose::Sit);
         assert_eq!(w.objects[0].users().next(), Some(0));
@@ -10871,8 +10975,8 @@ mod tests {
     #[test]
     fn deterministic_for_same_seed() {
         let (mut a, mut b) = (world(), world());
-        run_ticks(&mut a, 2000);
-        run_ticks(&mut b, 2000);
+        run_ticks(&mut a, crate::mins(100.0));
+        run_ticks(&mut b, crate::mins(100.0));
         assert_eq!(a.sims[0].pos, b.sims[0].pos);
         assert_eq!(a.sims[0].needs, b.sims[0].needs);
     }
@@ -10886,7 +10990,7 @@ mod tests {
             "sims":[{"name":"Neighbour","household":1,"x":14.5,"z":4.5}]}"#;
         let mut w = World::from_json(CONTENT, lot, 1).unwrap();
         w.sims[0].needs[0] = 0.0;
-        run_ticks(&mut w, TICKS_PER_SECOND * 60);
+        run_ticks(&mut w, crate::mins(60.0));
         assert!(!w.objects[0].in_use());
         assert!(w.sims[0].pos[0] > 10.0, "stayed home");
     }
@@ -10914,7 +11018,7 @@ mod tests {
                 .current()
                 .is_some_and(|a| matches!(a.phase, Phase::Using { .. }))
         };
-        for _ in 0..TICKS_PER_SECOND * 60 {
+        for _ in 0..crate::secs(60.0) {
             if using(&w) {
                 break;
             }
@@ -10940,7 +11044,7 @@ mod tests {
         assert_eq!(loaded.sims[0].tile(), front);
 
         // Done: out where they stepped in from.
-        for _ in 0..TICKS_PER_SECOND * 600 {
+        for _ in 0..crate::mins(600.0) {
             if !using(&w) {
                 break;
             }

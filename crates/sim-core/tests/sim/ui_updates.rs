@@ -134,18 +134,21 @@ fn changes_add_up_to_the_whole_view() {
     let mut inspected = None;
     let mut events = Vec::new();
     let mut trips = (0, 0);
-    for step in 0..6000 {
+    // (Steps at speed 3 of a game played at 20 ticks a game minute: about 50 game hours, however
+    // many ticks a minute.)
+    let k = sim_core::TICKS_PER_MINUTE / 20;
+    for step in 0..6000 * k {
         w.advance();
         // The player looks at a neighbour for a while, then at one of theirs; the UI loses
         // track once.
-        match step {
+        match step / k {
             1000 => inspected = Some(neighbour),
             2500 => inspected = Some(0),
             4000 => inspected = None,
             _ => {}
         }
         sync.inspect(inspected);
-        if step == 3000 {
+        if step == 3000 * k {
             sync.resync();
         }
         if step % 2 == 0 {
@@ -153,10 +156,10 @@ fn changes_add_up_to_the_whole_view() {
             let ids = u["events"].as_array().cloned().unwrap_or_default();
             events.extend(ids.iter().map(|e| e["id"].as_u64().unwrap()));
         }
-        if step % 500 == 0 {
+        if step % (500 * k) == 0 {
             assert_eq!(ui, fresh(&w, inspected), "step {step}");
         }
-        if step % 50 == 0 {
+        if step % (50 * k) == 0 {
             let (with, without) = trip_times(&ui);
             trips.0 += with;
             trips.1 += without;

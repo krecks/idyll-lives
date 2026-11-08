@@ -112,7 +112,7 @@ fn world_with(objects: &str, sims: usize, autonomy: bool) -> World {
 }
 
 fn ticks(w: &mut World, minutes: f32) {
-    for _ in 0..(minutes / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(minutes) {
         w.tick_once();
         common::check(w);
     }
@@ -153,7 +153,7 @@ fn a_meal_goes_from_the_fridge_to_the_counter_to_the_stove_and_is_served() {
     order(&mut w, 0, STOVE, "cook");
     let mut stations = Vec::new();
     let mut held_between = Vec::new();
-    for _ in 0..(90.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(90.0) {
         w.tick_once();
         common::check(&w);
         let r = row(&w, 0);
@@ -222,7 +222,7 @@ fn clicking_one_of_two_stoves_starts_at_the_fridge_and_cooks_at_that_stove() {
     order(&mut w, 0, far, "cook");
     let mut first = None;
     let mut cooked_at = None;
-    for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(60.0) {
         w.tick_once();
         if let Some(a) = w.sims[0].current()
             && let TaskKind::Cook {
@@ -297,7 +297,7 @@ fn a_dishwasher_does_the_washing_up_too() {
     }
     let mut washing = false;
     let dishwasher = w.objects[SINK as usize].def as f32;
-    for _ in 0..(120.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(120.0) {
         w.tick_once();
         for (i, s) in w.sims.iter().enumerate() {
             if s.current().is_some_and(|a| {
@@ -342,7 +342,7 @@ fn a_step_has_its_own_animation_at_some_stations() {
         order(&mut w, 0, FRIDGE, "meal");
         let cooker = w.objects[2].stable as f32;
         let mut seen = Vec::new();
-        for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        for _ in 0..common::mins(60.0) {
             w.tick_once();
             let r = row(&w, 0);
             if r[snapshot::sim::OBJECT] == cooker
@@ -375,7 +375,7 @@ fn without_a_stove_a_gourmet_meal_is_never_made_but_a_simple_one_is() {
     for s in &mut w.sims {
         s.needs[0] = 0.1;
     }
-    for _ in 0..(180.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(180.0) {
         w.tick_once();
         for s in &w.sims {
             if let Some(TaskKind::Cook { recipe, .. }) = s.current().map(|a| a.task.kind) {
@@ -437,7 +437,7 @@ fn a_stove_without_a_fridge_is_no_food_at_home() {
     let mut w = World::from_json(&with_a_tv(), &town(kitchen, 1), 3).unwrap();
     w.sims[0].needs[..3].copy_from_slice(&[0.05, 0.2, 1.0]);
     let (mut since, mut cut_short) = (None, 0);
-    for _ in 0..(90.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(90.0) {
         w.tick_once();
         let watching = w.sims[0].current().is_some_and(|a| matches!((a.task.kind, &a.phase), (TaskKind::Use { object, .. }, Phase::Using { .. }) if object == tv));
         match (watching, since) {
@@ -503,7 +503,7 @@ fn a_busy_stove_means_waiting_or_the_other_stove() {
     ticks(&mut w, 1.0);
     order(&mut w, 0, FRIDGE, "meal");
     let mut used = None;
-    for _ in 0..(40.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(40.0) {
         w.tick_once();
         if let Some(TaskKind::Cook {
             step: 2,
@@ -523,7 +523,7 @@ fn a_busy_stove_means_waiting_or_the_other_stove() {
     ticks(&mut w, 1.0);
     order(&mut w, 0, FRIDGE, "meal");
     let mut queued = false;
-    for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(60.0) {
         w.tick_once();
         queued |= w.sims[0]
             .current()
@@ -543,7 +543,7 @@ fn a_cook_waiting_for_a_busy_counter_steps_aside_off_the_fridge() {
     // in front of any other station.
     let mut w = world_with(KITCHEN, 2, false);
     order(&mut w, 1, FRIDGE, "gourmet");
-    for _ in 0..(10.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(10.0) {
         w.tick_once();
         if matches!(
             w.sims[1].current().map(|a| a.task.kind),
@@ -559,7 +559,7 @@ fn a_cook_waiting_for_a_busy_counter_steps_aside_off_the_fridge() {
     order(&mut w, 0, FRIDGE, "meal");
     let fronts: Vec<(i32, i32)> = w.objects.iter().map(|o| o.front_tile(&w.content)).collect();
     let mut waited = 0;
-    for _ in 0..(15.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(15.0) {
         w.tick_once();
         common::check(&w);
         if w.sims[0]
@@ -585,7 +585,7 @@ fn a_recipe_given_up_after_paying_gives_the_money_back() {
     let funds = w.households[0].funds;
     order(&mut w, 0, FRIDGE, "gourmet");
     let mut paid = false;
-    for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(60.0) {
         w.tick_once();
         if let Some(TaskKind::Cook {
             step: 1, servings, ..
@@ -616,7 +616,7 @@ fn a_stove_that_broke_on_the_way_is_left_for_the_other_one() {
     let mut w = world_with(&kitchen, 1, false);
     order(&mut w, 0, FRIDGE, "meal");
     let (mut broke, mut used) = (None, None);
-    for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(60.0) {
         w.tick_once();
         let Some(a) = w.sims[0].current() else {
             continue;
@@ -692,7 +692,7 @@ fn food_goes_off_and_makes_a_mess() {
     let (x, z) = w.items.list[pot].at.tile();
     let dirt = w.dirt[w.lot.tile_index(x, z)];
     w.items.list[pot].made_at = 0;
-    w.tick = 9 * 60 * 20;
+    w.tick = common::hours(9.0);
     ticks(&mut w, 30.0);
     let it = &w.items.list[pot];
     assert!(it.spoiled && !it.edible(), "gone off: {it:?}");
@@ -843,7 +843,7 @@ fn cooking_is_deterministic() {
         for (i, s) in w.sims.iter_mut().enumerate() {
             s.needs[0] = 0.2 + 0.1 * i as f32;
         }
-        for _ in 0..(300.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        for _ in 0..common::mins(300.0) {
             w.tick_once();
         }
         w.save_json()
@@ -859,7 +859,7 @@ fn the_snapshot_says_what_is_carried_cooked_and_when_food_changes() {
     let version = buf[snapshot::header::ITEMS_VERSION];
     order(&mut w, 0, STOVE, "cook");
     let mut saw = (false, false);
-    for _ in 0..(50.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(50.0) {
         w.tick_once();
         let r = row(&w, 0);
         saw.0 |= r[snapshot::sim::HELD] == item_def(&w, "ingredients") as f32 + 1.0;
@@ -925,7 +925,7 @@ fn the_player_can_have_a_resident_eat_or_clear_away_food() {
 fn step_minutes(w: &mut World, object: u32, id: &str) -> Vec<(u8, u32, u16)> {
     order(w, 0, object, id);
     let mut steps: Vec<(u8, u32, u16)> = Vec::new();
-    for _ in 0..(90.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(90.0) {
         w.tick_once();
         common::check(w);
         if let Some(a) = w.sims[0].current()
@@ -1165,7 +1165,7 @@ fn the_dish_is_carried_to_the_table_put_down_there_and_eaten_at_it() {
         let r = row(&w, 0);
         put_down |= r[snapshot::sim::OBJECT] == w.objects[TABLE as usize].stable as f32
             && serve.is_some_and(|a| r[snapshot::sim::ACTION] == a as f32);
-        assert!(w.tick < 200 * 60 * 4, "never served");
+        assert!(w.tick < common::hours(40.0), "never served");
     }
     assert!(carried, "the pot is carried from the stove");
     assert!(put_down, "and put down at the table");
@@ -1187,7 +1187,7 @@ fn the_dish_is_carried_to_the_table_put_down_there_and_eaten_at_it() {
     }
     w.autonomy = true;
     let mut at_table = [false; 2];
-    for _ in 0..(40.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(40.0) {
         w.tick_once();
         for (i, seated) in at_table.iter_mut().enumerate() {
             *seated |= w.sims[i].current().is_some_and(|a| {
@@ -1214,7 +1214,7 @@ fn a_dish_on_its_way_to_the_table_survives_a_save_and_is_served_once() {
             .is_some_and(|h| h.def == item_def(&w, "mealPot")))
     {
         w.tick_once();
-        assert!(w.tick < 200 * 60 * 4, "never carried");
+        assert!(w.tick < common::hours(40.0), "never carried");
     }
     let json = w.save_json();
     let mut loaded = World::from_save_json(CONTENT, &json).unwrap();
@@ -1240,7 +1240,7 @@ fn a_household_that_has_eaten_cooks_no_meal_nobody_needs() {
     // (practising their cooking on food nobody would eat).
     let (mut w, home, _) = common::household_of_three();
     w.autonomy = true;
-    for _ in 0..(90.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(90.0) {
         w.tick_once();
         for &i in &home {
             assert!(
@@ -1323,7 +1323,7 @@ fn two_at_the_table_talk_over_the_meal_and_eat_up_after() {
             )
     };
     let mut seated = false;
-    for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(30.0) {
         w.tick_once();
         if eating(&w, 0) && eating(&w, 1) {
             seated = true;
@@ -1339,7 +1339,7 @@ fn two_at_the_table_talk_over_the_meal_and_eat_up_after() {
     w.sims[0].needs[social] = 0.25;
     let seats = [w.sims[0].pos, w.sims[1].pos];
     let mut talked = None;
-    for _ in 0..(45.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(45.0) {
         w.tick_once();
         common::check(&w);
         talked = (0..2).find_map(|x| {
@@ -1366,7 +1366,7 @@ fn two_at_the_table_talk_over_the_meal_and_eat_up_after() {
         w.content.socials[social].id, "chat",
         "nothing to get up from the meal for"
     );
-    for _ in 0..(5.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(5.0) {
         w.tick_once();
         for (sim, seat) in w.sims.iter().zip(&seats) {
             assert_eq!(

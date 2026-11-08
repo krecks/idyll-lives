@@ -90,12 +90,12 @@ fn house_templates_and_the_starter_lot_have_windows_in_their_walls() {
 #[test]
 fn starter_lot_runs_a_game_day_quickly() {
     let mut world = World::from_json(&content(), &starter_with_household(), 1).unwrap();
-    let ticks = 24 * 60 * sim_core::TICKS_PER_SECOND;
+    let ticks = sim_core::clock::TICKS_PER_DAY;
     let start = std::time::Instant::now();
     for _ in 0..ticks {
         world.tick_once();
     }
-    let per_tick = start.elapsed() / ticks;
+    let per_tick = start.elapsed() / ticks as u32;
     eprintln!("avg tick: {per_tick:?}");
     // Sims should have looked after themselves over a full day.
     for s in &world.sims {
@@ -396,8 +396,8 @@ fn gardening_feeds_the_household_and_trains_its_skill() {
             interaction: harvest,
         })
         .unwrap();
-    // An hour and a half of game time (one game minute per second of ticks).
-    for _ in 0..90 * sim_core::TICKS_PER_SECOND {
+    // An hour and a half of game time.
+    for _ in 0..sim_core::mins(90.0) {
         world.tick_once();
     }
     assert!(

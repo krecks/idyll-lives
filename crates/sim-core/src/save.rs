@@ -97,6 +97,13 @@
 //! by id in `refs.item`); older builds drop it, as any kind they don't know. A host's offer, or
 //! something on its way to a guest (`world::TaskKind::Serve`), isn't saved: what's in hand is put
 //! down after a load.
+//! 36 = ticks counted in this build's units, `TICKS_PER_SECOND` to a real second and
+//! `TICKS_PER_MINUTE` to a game minute (60 and 75 from 0.8.0: a game day of 30 real minutes); a
+//! file before it counted 20 and 20, and its ticks are rescaled as it loads (`Rescale`): the
+//! clock's (`tick`, and the ticks things began, were made, happened or are due at) by the game
+//! minute's, so it plays on at the same minute of the same day, and places along a car's or a
+//! taxi's way (`cars[].progress`, its detour's and its way round a taxi's, `taxis.runs[].progress`)
+//! by the real second's, as they're driven.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -110,9 +117,9 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::rng::Rng;
 use crate::social::{self, Relationship};
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
-use crate::{Error, MINUTES_PER_TICK, clock::MAX_SPEED};
+use crate::{Error, MINUTES_PER_TICK, TICKS_PER_MINUTE, TICKS_PER_SECOND, clock::MAX_SPEED};
 
-pub const SAVE_VERSION: u32 = 35;
+pub const SAVE_VERSION: u32 = 36;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1147,7 +1154,9 @@ impl World {
         }
         world.mode = save.mode;
         world.seed = save.seed;
-        world.tick = save.tick;
+        // (Before v36: ticks counted at 20 a real second and 20 a game minute.)
+        let ticks = Rescale::of(save.version);
+        world.tick = ticks.tick(save.tick);
         world.speed = save.speed.min(MAX_SPEED);
         // Before v8 the one free-will switch was the player's setting; now each household has one.
         let legacy_free_will = save.version < 8;
@@ -1434,11 +1443,11 @@ impl World {
                     def: content.item_index(&h.def)?,
                     servings: h.servings,
                     quality: h.quality,
-                    made_at: h.made_at,
+                    made_at: ticks.tick(h.made_at),
                     recipe: h.recipe.as_deref().and_then(|r| content.recipe_index(r)),
                 })
             });
-            sim.night_woken = s.night_woken;
+            sim.night_woken = ticks.tick(s.night_woken);
             // At work, or a pupil at school.
             let pupil = content
                 .life
@@ -1629,6 +1638,7 @@ impl World {
         let content = &world.content;
         let events = save.events.iter().filter_map(|v| {
             let mut e: social::SocialEvent = serde_json::from_value(v.clone()).ok()?;
+            e.tick = ticks.tick(e.tick);
             match v.get("refs") {
                 Some(refs) => resolve_refs(content, &mut e, refs)?,
                 None => migrate_refs(content, &mut e, save.version),
@@ -1680,7 +1690,7 @@ impl World {
                     at,
                     servings: it.servings,
                     quality: it.quality,
-                    made_at: it.made_at,
+                    made_at: ticks.tick(it.made_at),
                     household: it.household,
                     spoiled: it.spoiled,
                     recipe: it.recipe.as_deref().and_then(|r| content.recipe_index(r)),
@@ -1703,16 +1713,23 @@ impl World {
                 continue;
             };
             match object {
-                Some(object) if (s.sim as usize) < world.sims.len() => world.setups.push(
-                    crate::setup::Setup::new(s.household, s.sim, object, s.since, s.paid),
-                ),
+                Some(object) if (s.sim as usize) < world.sims.len() => {
+                    world.setups.push(crate::setup::Setup::new(
+                        s.household,
+                        s.sim,
+                        object,
+                        ticks.tick(s.since),
+                        s.paid,
+                    ))
+                }
                 // (Gone from the content: the money back.)
                 _ => h.funds += s.paid,
             }
         }
         world.make_storeys();
         world.refresh_rooms();
-        crate::cars::load(&mut world, &save.cars, &save.drives, &save.garages);
+        let cars = ticks.cars(&save.cars);
+        crate::cars::load(&mut world, &cars, &save.drives, &save.garages);
         // (Lights saved: the junctions have them.)
         world.travel.lights_on = !save.lights.is_empty();
         crate::traffic::settle(&mut world);
@@ -1728,12 +1745,13 @@ impl World {
                         2 => crate::traffic::Stage::Clear,
                         _ => crate::traffic::Stage::Green,
                     },
-                    since: l.since,
+                    since: ticks.tick(l.since),
                 })
                 .collect();
         }
         // The work taxis' runs, their riders booked and the taxis under way where they were.
         world.taxis = save.taxis.clone();
+        ticks.taxis(&mut world.taxis);
         crate::taxi::settle(&mut world);
         // What someone was eating or washing up is put down (those don't go on after loading).
         crate::cooking::settle(&mut world);
@@ -2485,6 +2503,107 @@ fn resolve_refs(
     Some(())
 }
 
+/// Ticks as files before v36 counted them: 20 to a real second and 20 to a game minute.
+const OLD_TICKS_PER_SECOND: u32 = 20;
+const OLD_TICKS_PER_MINUTE: u64 = 20;
+
+/// How a file's ticks become this build's (v36: before it, `OLD_TICKS_PER_SECOND` and
+/// `OLD_TICKS_PER_MINUTE`). The clock's ticks (`World::tick`, and the ticks things began, were
+/// made, happened or are due at) by the game minute's ticks, now over then: tick 0 is 08:00 on
+/// day 1 either way, so each is the same minute of the same day. Places along a car's or a taxi's
+/// way (ticks of its route, driven at real-time speeds) by the real second's. Nothing else is
+/// saved in ticks: what's left of a nap, a visit, a feeling or a machine's run is saved in game
+/// minutes, and the day things happened on in days.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Rescale {
+    /// Ticks in a game minute, now and in the file.
+    game: (u64, u64),
+    /// Ticks in a real second now over those in the file.
+    real: f32,
+}
+
+impl Rescale {
+    /// For a file of save version `version`.
+    fn of(version: u32) -> Self {
+        if version < 36 {
+            Self {
+                game: (TICKS_PER_MINUTE, OLD_TICKS_PER_MINUTE),
+                real: TICKS_PER_SECOND as f32 / OLD_TICKS_PER_SECOND as f32,
+            }
+        } else {
+            Self {
+                game: (1, 1),
+                real: 1.0,
+            }
+        }
+    }
+
+    /// A tick of the clock, to the nearest (0, never, stays 0; the same tick stays the same).
+    fn tick(self, t: u64) -> u64 {
+        let (now, then) = self.game;
+        if now == then {
+            return t;
+        }
+        let scaled = (u128::from(t) * u128::from(now) + u128::from(then / 2)) / u128::from(then);
+        u64::try_from(scaled).unwrap_or(u64::MAX)
+    }
+
+    /// A place along a way, in ticks of its route.
+    fn route(self, t: f32) -> f32 {
+        t * self.real
+    }
+
+    fn detour(self, d: &mut crate::cars::Detour) {
+        d.from = self.route(d.from);
+        d.back = self.route(d.back);
+    }
+
+    /// The households' cars: when their state began and when one away sets off back, where they
+    /// are along their way, and their way turned round or round a taxi.
+    fn cars<'a>(self, cars: &'a [crate::cars::Car]) -> std::borrow::Cow<'a, [crate::cars::Car]> {
+        if self.game.0 == self.game.1 && self.real == 1.0 {
+            return cars.into();
+        }
+        let mut cars = cars.to_vec();
+        for c in &mut cars {
+            c.since = self.tick(c.since);
+            c.ready_at = self.tick(c.ready_at);
+            c.progress = self.route(c.progress);
+            if let Some(d) = c.detour.as_mut() {
+                self.detour(d);
+            }
+            if let Some(p) = c.pass_by.as_mut() {
+                p.from = self.route(p.from);
+                p.out = self.route(p.out);
+                p.back = self.route(p.back);
+                p.to = self.route(p.to);
+            }
+        }
+        cars.into()
+    }
+
+    /// The work taxis' runs: when each comes in, is due out (and was planned to be), leaves work
+    /// and stands at its stop since, when each stop is due and its rider leaves home for it, and
+    /// where it is along its way.
+    fn taxis(self, taxis: &mut crate::taxi::Taxis) {
+        for r in &mut taxis.runs {
+            r.enter = self.tick(r.enter);
+            r.due_out = self.tick(r.due_out);
+            r.planned_out = self.tick(r.planned_out);
+            r.depart = self.tick(r.depart);
+            r.since = self.tick(r.since);
+            r.progress = self.route(r.progress);
+            if let Some(d) = r.detour.as_mut() {
+                self.detour(d);
+            }
+            for st in &mut r.stops {
+                st.due = self.tick(st.due);
+                st.leave = self.tick(st.leave);
+            }
+        }
+    }
+}
+
 /// Kinds whose footprint grew in save version 33: the home chess table, 1 × 1 to 2 × 1 (a chair
 /// at each end, M-hobbies-11).
 const GROWN_IN_33: [&str; 1] = ["chessTable"];
@@ -2613,7 +2732,8 @@ mod tests {
         })
         .unwrap();
         crate::social::add_feeling(&mut w.sims[0].feelings, 0, &w.content.feelings, w.tick);
-        for _ in 0..137 {
+        // (Seven game minutes less a few ticks: not on a whole minute.)
+        for _ in 0..crate::mins(7.0) - 3 {
             w.tick_once();
         }
         let json = w.save_json();
@@ -2681,7 +2801,7 @@ mod tests {
             interaction: 0,
         })
         .unwrap();
-        for _ in 0..20 * 40 {
+        for _ in 0..crate::secs(40.0) {
             w.tick_once();
         }
         assert_eq!(w.sims[0].pose, crate::content::Pose::Lie);
@@ -2904,6 +3024,126 @@ mod tests {
         assert_eq!(loaded.sims[0].needs[0], 0.75);
         assert_eq!(loaded.relationships.get(0, 1).friendship, 0.0);
         assert!(loaded.exits.is_empty());
+    }
+
+    /// v36: an older file's ticks are rescaled as it loads, from 20 to a real second and 20 to a
+    /// game minute (`Rescale`); at those rates still, a v35 file loads just as it was saved, a car
+    /// on its way and the story as they were.
+    #[test]
+    fn a_v35_file_loads_as_it_was_saved() {
+        const CONTENT: &str = r#"{
+            "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.02}],
+            "objects":[{"id":"chair","name":"Chair","interactions":[{"id":"sit","label":"Sit","minutes":30,"tags":["lounge"]}]}],
+            "careers":[{"id":"office","label":"Office","workEffects":{"hunger":-0.2},"levels":[
+                {"title":"Intern","pay":100,"start":9,"hours":4,"days":[0,1,2,3,4,5,6]}]}],
+            "economy":{"startingFunds":500}}"#;
+        // A house on a street, its car parked beside it; two grown-ups at the same office.
+        const TOWN: &str = r#"{"width":60,"depth":14,"exits":[[0.5,9.5],[59.5,9.5]],
+            "plots":[{"name":"Home","x":20,"z":0,"w":20,"d":8,"entry":[25.5,7.5]}],
+            "households":[{"name":"Ones","plot":0}],
+            "sims":[{"name":"Ada","household":0,"job":{"career":"office"},"x":25.5,"z":3.5},
+                    {"name":"Bo","household":0,"job":{"career":"office"},"x":26.5,"z":3.5}],
+            "cars":[{"plot":0,"x":34.0,"z":3.0,"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,"body":1,"paint":2}]}"#;
+        let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+        w.autonomy = false;
+        let by = crate::clock::tick_at(1, 10.0 * 60.0).unwrap();
+        while !(w.cars[0].state == crate::cars::CarState::Leaving && w.cars[0].progress > 0.0) {
+            w.tick_once();
+            assert!(w.tick < by, "the car never set off");
+        }
+        w.events
+            .push(w.tick - 7, crate::social::EventKind::Met, 0, 1, None);
+        let json = w.save_json();
+        let mut old: serde_json::Value = serde_json::from_str(&json).unwrap();
+        old["version"] = 35.into();
+        let loaded = World::from_save_json(CONTENT, &old.to_string()).unwrap();
+        // (As this build counts them: the same at 20 and 20.)
+        let r = super::Rescale::of(35);
+        assert_eq!(loaded.tick, r.tick(w.tick));
+        assert_eq!(loaded.cars[0].since, r.tick(w.cars[0].since));
+        assert_eq!(
+            loaded.cars[0].progress.to_bits(),
+            r.route(w.cars[0].progress).to_bits()
+        );
+        let ticks = |w: &World| w.events.iter().map(|e| e.tick).collect::<Vec<_>>();
+        assert_eq!(
+            ticks(&loaded),
+            ticks(&w).into_iter().map(|t| r.tick(t)).collect::<Vec<_>>()
+        );
+        if r == super::Rescale::of(super::SAVE_VERSION) {
+            assert_eq!(
+                loaded.save_json(),
+                World::from_save_json(CONTENT, &json).unwrap().save_json()
+            );
+        }
+    }
+
+    /// From 20 ticks a game minute to 75 (and 20 a real second to 60): each tick of the clock is
+    /// the same minute of the same day, the same tick stays the same and never stays never; places
+    /// along a way are three times the ticks.
+    #[test]
+    fn older_ticks_keep_their_minute_at_another_rate() {
+        let r = super::Rescale {
+            game: (75, 20),
+            real: 3.0,
+        };
+        // (The clock by hand: tick 0 is 08:00 on day 1.)
+        let at = |t: u64, per_minute: u64| {
+            let m = t + 8 * 60 * per_minute;
+            (
+                m / (1440 * per_minute),
+                m % (1440 * per_minute) / per_minute,
+            )
+        };
+        for t in [0, 1, 19, 20, 21, 1_199, 9_599, 9_600, 28_813, 123_456_789] {
+            assert_eq!(at(t, 20), at(r.tick(t), 75), "tick {t}");
+        }
+        assert_eq!(r.tick(0), 0);
+        assert_eq!(r.tick(1_000), 3_750);
+        let car: crate::cars::Car = serde_json::from_value(serde_json::json!({
+            "plot":0,"household":0,"spot":[34.0,3.0],"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,
+            "body":1,"paint":2,"owners":[0],"state":"leaving","since":1000,"readyAt":2000,
+            "progress":40.5,"detour":{"home":false,"from":30.0,"back":12.0,"avoid":3},
+            "passBy":{"home":false,"taxi":1,"from":50.0,"out":55.0,"back":70.0,"to":75.0,"off":-2.0,"at":[1.0,2.0]}}))
+        .unwrap();
+        let cars = r.cars(std::slice::from_ref(&car));
+        let c = &cars[0];
+        assert_eq!((c.since, c.ready_at), (3_750, 7_500));
+        assert_eq!(c.progress, 121.5);
+        let d = c.detour.unwrap();
+        assert_eq!((d.from, d.back, d.avoid), (90.0, 36.0, 3));
+        let p = c.pass_by.unwrap();
+        assert_eq!(
+            (p.from, p.out, p.back, p.to, p.off),
+            (150.0, 165.0, 210.0, 225.0, -2.0)
+        );
+        let mut taxis: crate::taxi::Taxis = serde_json::from_value(serde_json::json!({
+            "runs":[{"id":0,"group":[0,1],"enter":100,"dueOut":220,"plannedOut":200,"depart":0,
+                "stops":[{"sim":0,"plot":0,"due":160,"leave":140,"state":"booked"}],
+                "progress":12.0,"since":160}]}))
+        .unwrap();
+        r.taxis(&mut taxis);
+        let run = &taxis.runs[0];
+        assert_eq!(
+            (
+                run.enter,
+                run.due_out,
+                run.planned_out,
+                run.depart,
+                run.since
+            ),
+            (375, 825, 750, 0, 600)
+        );
+        assert_eq!((run.stops[0].due, run.stops[0].leave), (600, 525));
+        assert_eq!(run.progress, 36.0);
+        // Today's file needs nothing.
+        assert_eq!(
+            super::Rescale::of(super::SAVE_VERSION),
+            super::Rescale {
+                game: (1, 1),
+                real: 1.0
+            }
+        );
     }
 
     /// v23: the seed the game started from is kept (absent in older saves: 0, unknown).

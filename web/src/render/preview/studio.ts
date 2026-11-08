@@ -27,7 +27,7 @@ import { pageLook } from '../pc/post';
 import type { AssetRegistry } from '../../assets/registry';
 import type { FrameState } from '../../core/bridge';
 import type { SimInfo } from '../../core/protocol';
-import { simFields, type SnapshotLayout } from '../../core/snapshot';
+import { simFields, tickRates, type SnapshotLayout } from '../../core/snapshot';
 import type { SimLook } from '../types';
 
 export interface StudioDeps {
@@ -57,7 +57,7 @@ const LAYOUT: SnapshotLayout = {
   headerLen: HEADER_LEN,
   simStride: STRIDE,
   maxSims: MAX_CHARACTERS,
-  ticksPerSecond: 20,
+  ...tickRates,
   header: { tick: 0, day: 1, minute: 2, speed: 3, simCount: 4, structureVersion: 5 },
   sim: simFields(FIELDS),
   actions: [],

@@ -36,8 +36,8 @@ export function ease(t: number): number {
 
 /**
  * How far ahead of a doorway a leaf starts to swing, for a game running `rate` times as fast: far
- * enough that the swing (`DOOR_SWING` of game time) finishes as the walker arrives, and never less
- * than a hand's reach, so a slow walk opens the door at the hand.
+ * enough that the swing (`DOOR_SWING` of the sim's real time) finishes as the walker arrives, and
+ * never less than a hand's reach, so a slow walk opens the door at the hand.
  */
 export function doorLead(rate: number): number {
   return Math.max(DOOR_HAND, PACE * Math.max(rate, 1) * DOOR_SWING);

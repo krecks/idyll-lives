@@ -150,7 +150,7 @@ fn an_order_out_of_their_age_is_refused_and_never_starts() {
         w.sims.iter().all(|s| s.queue().next().is_none()),
         "nothing refused was queued"
     );
-    for _ in 0..600 {
+    for _ in 0..common::mins(30.0) {
         w.tick_once();
         for (sim, def, i) in uses(&w) {
             assert!(
@@ -176,7 +176,7 @@ fn free_will_never_picks_what_their_age_is_not_for() {
     let mut w = world();
     w.autonomy = true;
     let mut seen = Vec::new();
-    for _ in 0..6000 {
+    for _ in 0..common::mins(300.0) {
         for s in w.sims.iter_mut() {
             s.needs[0] = s.needs[0].min(0.2);
         }
@@ -265,7 +265,7 @@ fn nobody_starts_a_fight_with_a_child() {
             }
         }
     }
-    for _ in 0..6000 {
+    for _ in 0..common::mins(300.0) {
         for s in w.sims.iter_mut() {
             s.needs[2] = s.needs[2].min(0.2);
         }
@@ -287,7 +287,7 @@ fn an_elder_doesnt_climb_to_the_upper_bunk() {
     let mut w = world();
     let bunk = object(&w, "bunk", 0);
     order(&mut w, DEE, "bunk", 0).unwrap();
-    for _ in 0..2000 {
+    for _ in 0..common::mins(100.0) {
         if w.objects[bunk as usize].users().any(|u| u == DEE) {
             break;
         }
@@ -318,7 +318,7 @@ fn up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else() {
     for (sim, slot) in [(DEE, 0), (ADA, 1)] {
         w.sims[sim as usize].needs[energy] = 0.2;
         order(&mut w, sim, "bunk", 0).unwrap();
-        for _ in 0..2000 {
+        for _ in 0..common::mins(100.0) {
             if lying(&w, sim) {
                 break;
             }
@@ -333,7 +333,7 @@ fn up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else() {
     for sim in [DEE, ADA] {
         w.sims[sim as usize].needs[energy] = 1.0;
     }
-    for _ in 0..200 {
+    for _ in 0..common::mins(10.0) {
         if !lying(&w, DEE) && !lying(&w, ADA) {
             break;
         }
@@ -343,10 +343,10 @@ fn up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else() {
     order(&mut w, DEE, "rider", 0).unwrap();
     order(&mut w, ADA, "wine", 0).unwrap();
     let mut waited = 0;
-    while w.sims[ADA as usize].current().is_none() && waited < 400 {
+    while w.sims[ADA as usize].current().is_none() && waited < common::secs(20.0) {
         w.tick_once();
         waited += 1;
-        if waited == 10 {
+        if waited == common::secs(0.5) {
             assert!(
                 w.sims[DEE as usize].current().is_some(),
                 "Dee is on her way"
@@ -354,7 +354,7 @@ fn up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else() {
         }
     }
     assert!(
-        (110..=140).contains(&waited),
+        (common::secs(5.5)..=common::secs(7.0)).contains(&waited),
         "Ada was off the ladder after {waited} ticks"
     );
     // Woken by the player (the sleep cancelled) it's the same.
@@ -362,7 +362,7 @@ fn up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else() {
         w.apply(Command::Cancel { sim, index: 0 }).unwrap();
         w.sims[sim as usize].needs[energy] = 0.2;
         order(&mut w, sim, "bunk", 0).unwrap();
-        for _ in 0..2000 {
+        for _ in 0..common::mins(100.0) {
             if lying(&w, sim) {
                 break;
             }
@@ -375,13 +375,17 @@ fn up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else() {
     }
     w.apply(Command::Cancel { sim: ADA, index: 0 }).unwrap();
     order(&mut w, ADA, "wine", 0).unwrap();
+    // (Off the ladder, she takes up the order: someone else may have the wine by then.)
     let mut waited = 0;
-    while w.sims[ADA as usize].current().is_none() && waited < 400 {
+    while w.sims[ADA as usize].current().is_none()
+        && w.sims[ADA as usize].queue().next().is_some()
+        && waited < common::secs(20.0)
+    {
         w.tick_once();
         waited += 1;
     }
     assert!(
-        (110..=140).contains(&waited),
+        (common::secs(5.5)..=common::secs(7.0)).contains(&waited),
         "woken, Ada was off the ladder after {waited} ticks"
     );
 }

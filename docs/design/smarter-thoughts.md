@@ -135,7 +135,8 @@ What it means:
 
 - **The call rate is low, and the speed is what sets it.** 0.75 decisions with a shortlist per
   resident per game hour is a household of six worth asking about about four times an hour. A game
-  hour is 60 real seconds at speed 1, 20 at speed 2 and 6 at speed 3 (`TICKS_PER_STEP`), so that
+  hour was 60 real seconds at speed 1, 20 at speed 2 and 6 at speed 3 (`TICKS_PER_STEP`; since 0.7.0's
+  30-minute day 75, 25 and 7.5, so every rate below a fifth lower), so that
   household asks for a call about once every 13 s of play at speed 1, every 4 s at speed 2, and
   every 1.3 s at speed 3 — against the line writer's 3.5 s budget. A re-rank is affordable while
   the player watches at speed 1 or 2; at speed 3 it must be rate-limited to one call in flight for

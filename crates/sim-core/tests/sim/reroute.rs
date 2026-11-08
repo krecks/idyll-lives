@@ -36,7 +36,7 @@ fn walking() -> World {
     })
     .unwrap();
     // Far enough along to be well past the left end, short of the new wall.
-    for _ in 0..20 {
+    for _ in 0..sim_core::secs(1.0) {
         w.tick_once();
     }
     assert!(w.sims[0].current().is_some(), "should still be on the way");
@@ -65,7 +65,7 @@ fn a_wall_they_can_go_round_sends_them_round() {
         edits: wall(12, 0, 8),
     })
     .unwrap();
-    for _ in 0..600 {
+    for _ in 0..sim_core::secs(30.0) {
         w.tick_once();
         if w.sims[0].current().is_none() {
             break;
@@ -88,7 +88,7 @@ fn a_walker_nobody_watches_gives_up_on_their_next_turn() {
         z: 5.5,
     })
     .unwrap();
-    for _ in 0..21 {
+    for _ in 0..sim_core::secs(1.05) {
         w.tick_once();
     }
     assert!(w.sims[0].current().is_some(), "should still be on the way");
@@ -97,7 +97,7 @@ fn a_walker_nobody_watches_gives_up_on_their_next_turn() {
         edits: wall(12, 0, 10),
     })
     .unwrap();
-    for _ in 0..200 {
+    for _ in 0..sim_core::secs(10.0) {
         w.tick_once();
     }
     assert!(

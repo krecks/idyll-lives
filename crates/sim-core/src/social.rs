@@ -9,8 +9,8 @@ use std::collections::{HashMap, VecDeque};
 
 use serde::{Deserialize, Serialize};
 
+use crate::Error;
 use crate::content::{MAX_NEEDS, Modifiers, ModifiersRaw, StageMask, TagMask};
-use crate::{Error, MINUTES_PER_TICK};
 
 /// Animation names the renderer understands, in snapshot code order (code = index + 1).
 pub const ANIMATIONS: [&str; 8] = [
@@ -817,7 +817,7 @@ pub struct ActiveFeeling {
 }
 
 pub fn minutes_to_ticks(minutes: f32) -> u64 {
-    (minutes / MINUTES_PER_TICK).max(1.0) as u64
+    (minutes * crate::TICKS_PER_MINUTE as f32).max(1.0) as u64
 }
 
 /// Adds a feeling, or refreshes it if already active.

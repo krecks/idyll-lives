@@ -7,12 +7,13 @@
 
 use crate::common;
 
-use common::hamlets::{Hamlets, two_hamlets, with_cars};
-use serde_json::{Value, json};
+use common::hamlets::{two_hamlets, two_hamlets_with_parking, with_cars};
+use serde_json::Value;
+use sim_core::cars::CarState;
 use sim_core::taxi::StopState;
-use sim_core::{MINUTES_PER_TICK, World, clock, snapshot};
+use sim_core::{World, clock, snapshot};
 
-const TICKS_PER_MINUTE: u64 = (1.0 / MINUTES_PER_TICK) as u64;
+const TICKS_PER_MINUTE: u64 = common::TICKS_PER_MINUTE;
 
 /// Who is on an outing (visiting a public place out of `autonomy.reach` of home) and where.
 fn on_outings(w: &World) -> Vec<(u32, u32)> {
@@ -27,24 +28,6 @@ fn on_outings(w: &World) -> Vec<(u32, u32)> {
             (plot.public && sim_core::travel::dist(a, b) > reach).then_some((s.id, v.plot))
         })
         .collect()
-}
-
-/// `h` with a car on every driveway and a parking spot on the second hamlet's street by its park
-/// (as `travel_trips.rs`).
-fn with_cars_and_parking(h: &Hamlets) -> String {
-    let mut town: Value = serde_json::from_str(&with_cars(h)).unwrap();
-    let park = h.plots[1]
-        .clone()
-        .find(|&p| town["plots"][p]["public"].as_bool() == Some(true))
-        .expect("a park in the second hamlet");
-    let p = &town["plots"][park];
-    let num = |k: &str| p[k].as_f64().unwrap();
-    let x = num("x") + num("w") / 2.0;
-    let (street, ..) = h.streets[1];
-    let side = if num("z") > street { 1.0 } else { -1.0 };
-    town["parking"] =
-        json!([{"x": x, "z": street + side * 2.0, "rot": std::f64::consts::FRAC_PI_2, "area": 1}]);
-    town.to_string()
 }
 
 #[test]
@@ -92,41 +75,54 @@ fn with_no_car_nor_bike_an_outing_a_walk_of_hours_away_goes_by_taxi() {
 
 #[test]
 fn an_outing_by_car_in_reach_is_picked_and_theyre_home_by_the_hour() {
-    // The same hamlets with a car on every driveway and parking by the other's park: it's a
-    // short drive.
+    // The same hamlets with a car on every driveway and a parking bay by the other's park
+    // (`hamlets::two_hamlets_with_parking`): it's a short drive. Whoever drives there parks in
+    // the bay and walks on, and they and their car are home by the hour.
     let content = common::content();
-    let h = two_hamlets(&content, 31);
-    let mut w =
-        World::from_json(&content, &with_cars_and_parking(&h), 31).expect("the hamlets load");
+    let h = two_hamlets_with_parking(&content, 31);
+    let mut w = World::from_json(&content, &with_cars(&h), 31).expect("the hamlets load");
     let home_by = w.content.visits.outing_home_by;
     let end = w.tick + 3 * 24 * 60 * TICKS_PER_MINUTE;
     let mut outings = std::collections::BTreeSet::new();
     let mut out_late = std::collections::BTreeSet::new();
+    // (Who drove where, their car parked out there on the trip; cars still parked out late.)
     let mut drove = std::collections::BTreeSet::new();
+    let mut parked_late = std::collections::BTreeSet::new();
     while w.tick < end {
         w.tick_once();
         let now = on_outings(&w);
         outings.extend(now.iter().copied());
-        for &(s, _) in &now {
-            let a = w.sims[s as usize].current();
-            if a.is_some_and(|a| matches!(a.phase, sim_core::world::Phase::Driving)) {
-                drove.insert(s);
-            }
-        }
-        // Past the hour (and before the morning), nobody is still out on one.
+        let out: Vec<_> = (w.cars.iter().enumerate())
+            .filter_map(|(c, car)| {
+                let t = car.trip.filter(|_| car.state == CarState::Out)?;
+                Some((c, t.driver, t.plot))
+            })
+            .collect();
+        drove.extend(out.iter().map(|&(_, s, plot)| (s, plot)));
+        // Past the hour (and before the morning), nobody is still out on one, nor their car.
         let hour = clock::hour(w.tick);
         if hour >= home_by || hour < 6.0 {
             for (s, plot) in now {
                 out_late.insert((clock::day(w.tick), s, plot));
             }
+            for (c, ..) in out {
+                parked_late.insert((clock::day(w.tick), c));
+            }
         }
     }
-    eprintln!("outings (resident, place): {outings:?}, at the wheel or in the car: {drove:?}");
+    eprintln!("outings (resident, place): {outings:?}, driven to (driver, place): {drove:?}");
     assert!(!outings.is_empty(), "nobody went anywhere out of reach");
-    assert!(!drove.is_empty(), "nobody drove there");
+    assert!(
+        drove.iter().any(|d| outings.contains(d)),
+        "nobody drove there and parked"
+    );
     assert!(
         out_late.is_empty(),
         "out on an outing after {home_by}:00 (day, resident, place): {out_late:?}"
+    );
+    assert!(
+        parked_late.is_empty(),
+        "a car still parked out after {home_by}:00 (day, car): {parked_late:?}"
     );
 }
 
@@ -180,7 +176,7 @@ fn someone_with_a_bike_rides_to_a_place_beyond_walking_reach_and_is_home_by_the_
                 && sim.riding.is_none()
                 && sim.bike() == Some(bike as u32);
             parked |= off;
-            if off && w.tick.is_multiple_of(600) {
+            if off && w.tick.is_multiple_of(common::mins(30.0)) {
                 snapshot::write(&w, &mut buf);
                 let o = snapshot::HEADER_LEN + s as usize * snapshot::SIM_STRIDE;
                 if buf[o + snapshot::sim::RIDE] == -2.0 - stable {

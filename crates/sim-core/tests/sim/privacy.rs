@@ -134,8 +134,8 @@ fn row(w: &World, i: usize) -> Vec<f32> {
     out[o..o + snapshot::SIM_STRIDE].to_vec()
 }
 
-fn ticks(minutes: f32) -> u32 {
-    (minutes / MINUTES_PER_TICK) as u32
+fn ticks(minutes: f32) -> u64 {
+    common::mins(minutes)
 }
 
 #[test]

@@ -356,7 +356,7 @@ fn surroundings_follow_the_room_and_draw_residents_to_nicer_ones() {
         household: None,
     })
     .unwrap();
-    for _ in 0..4 * 60 * 20 {
+    for _ in 0..sim_core::mins(240.0) {
         w.tick_once();
     }
     let need = w.sims[0].needs[1];
@@ -370,7 +370,7 @@ fn surroundings_follow_the_room_and_draw_residents_to_nicer_ones() {
     for seed in 1..=60 {
         let mut w = two_rooms(seed);
         w.sims[0].needs = [0.05, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        for _ in 0..200 {
+        for _ in 0..sim_core::mins(10.0) {
             w.tick_once();
             // Heading for (or sitting on) a sofa holds a slot on it.
             if w.objects[0].users().any(|u| u == 0) {
@@ -418,7 +418,7 @@ fn using_things_makes_a_mess_and_residents_tidy_it_up() {
         interaction: 0,
     })
     .unwrap();
-    for _ in 0..45 * 20 {
+    for _ in 0..sim_core::mins(45.0) {
         w.tick_once();
     }
     let front = w.lot.tile_index(2, 2);
@@ -441,7 +441,7 @@ fn using_things_makes_a_mess_and_residents_tidy_it_up() {
     .unwrap();
     w.sims[0].needs[0] = 1.0;
     let mut tidied = false;
-    for _ in 0..3 * 60 * 20 {
+    for _ in 0..sim_core::mins(180.0) {
         w.tick_once();
         if w.dirt[front] < 0.05 {
             tidied = true;
@@ -474,7 +474,7 @@ fn two_tidy_residents_dont_both_go_for_the_same_mess() {
         Some(sim_core::world::TaskKind::Clean { x, z }) => Some((x, z)),
         _ => None,
     };
-    for _ in 0..60 * 20 {
+    for _ in 0..sim_core::mins(60.0) {
         w.tick_once();
         let (a, b) = (cleaning(&w, 0), cleaning(&w, 1));
         assert!(a.is_none() || a != b, "both went for the mess at {a:?}");

@@ -23,10 +23,10 @@
 use crate::world::World;
 
 /// Ticks between turns for residents nobody watches (a game minute).
-pub const LOD_TICKS: u64 = 20;
+pub const LOD_TICKS: u64 = crate::TICKS_PER_MINUTE;
 /// ...and for those farther than `FAR` m from the view (big worlds: in another hamlet, out in
 /// the country): three game minutes.
-pub const FAR_TICKS: u64 = 60;
+pub const FAR_TICKS: u64 = 3 * crate::TICKS_PER_MINUTE;
 pub const FAR: f32 = 300.0;
 /// Residents this close to the view (in tiles) are at full detail too: the renderer draws them
 /// a little past the lot's edge, and nobody should see them take turns or catch up.

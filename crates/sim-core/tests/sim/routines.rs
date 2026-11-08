@@ -22,7 +22,7 @@ use sim_core::world::{Phase, Sim, TaskKind};
 use sim_core::{MINUTES_PER_TICK, World, clock};
 
 const DAYS: u32 = 7;
-const TICKS_PER_MINUTE: u64 = (1.0 / MINUTES_PER_TICK) as u64;
+const TICKS_PER_MINUTE: u64 = common::TICKS_PER_MINUTE;
 /// Hands washed within this long after the toilet count as washed after it.
 const WASH_WITHIN_MINUTES: u64 = 10;
 /// A need this low is about to run out: residents should have done something before.

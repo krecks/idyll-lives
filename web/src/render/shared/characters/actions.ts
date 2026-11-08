@@ -22,6 +22,14 @@ export const BASE_HEIGHT: Record<string, number> = { male: 1.77, female: 1.67 };
 /** Larger jumps between frames snap instead of sliding. */
 export const SNAP_DISTANCE = 1.6;
 /**
+ * A placement that isn't a walk (sim-core putting a resident straight onto a bed or a seat, or off it, a settle, a
+ * turn on the spot, a small correction: under `SNAP_DISTANCE`) glides from where they're drawn to the snapshot's
+ * place over this long (s, real time), whatever the sim's tick rate: a snapshot step at 20 ticks a second, what it
+ * took when it glided over one step (at 60, a step is a single frame: 20 cm of a bed's 1.5 m in it, `blend.test.ts`).
+ * (Walkers glide over the step itself: `reach`.)
+ */
+export const GLIDE_SECONDS = 0.05;
+/**
  * A frame this long after the last (s): back from a hidden tab (it draws no frames) or a long stall.
  * The residents went on meanwhile, so each is drawn as if just come into view: one who sat down
  * meanwhile doesn't sit down again, and no walking speed is estimated over the gap (walkers would
@@ -31,11 +39,11 @@ export const STALL = 0.5;
 /**
  * Walkers glide from snapshot to snapshot as far as they can walk between them (at speeds 4 and 5
  * a step covers metres; cutting corners of their path is the price): metres walked per tick
- * (`world::WALK_SPEED`), the fastest walkers' trait, perk and emotion factors (1.15 x 1.2 x 1.08,
- * angry or energised, in the base game: 1.49) and some slack (packs' quicker walkers too). Further
- * than that, or not walking in both, is a jump.
+ * (`world::WALK_SPEED`: `doors.ts` `PACE` over the layout's `ticksPerSecond`), the fastest
+ * walkers' trait, perk and emotion factors (1.15 x 1.2 x 1.08, angry or energised, in the base
+ * game: 1.49) and some slack (packs' quicker walkers too). Further than that, or not walking in
+ * both, is a jump.
  */
-export const WALK_PER_TICK = 0.075;
 export const WALK_FASTEST = 1.5;
 export const WALK_SLACK = 1.2;
 /**

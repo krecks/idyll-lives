@@ -48,7 +48,7 @@ fn world() -> World {
 }
 
 fn hours(w: &mut World, h: f32) {
-    for _ in 0..(h * 60.0 * 20.0) as usize {
+    for _ in 0..sim_core::mins(h * 60.0) {
         w.tick_once();
     }
 }
@@ -172,7 +172,7 @@ fn a_bathroom_always_taken_brings_a_wish_for_another() {
     );
     // The next day, again.
     let start = w.tick;
-    while w.tick < start + 24 * 60 * 20 {
+    while w.tick < start + sim_core::clock::TICKS_PER_DAY {
         w.tick_once();
         if !w.objects[0].in_use() {
             w.apply(Command::Use {

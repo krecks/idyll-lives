@@ -197,7 +197,7 @@ const SPECIES: Species[] = [
 export const BIRD_MODELS: readonly string[] = SPECIES.map((sp) => `model.bird.${sp.id}`);
 
 /**
- * How much faster the birds' clock runs at each game speed (`GAME_RATE`'s index): they keep to the
+ * How much faster the birds' clock runs at each game speed (`PLAYBACK_RATE`'s index): they keep to the
  * game (still while it's paused) but don't go frantic in a time-lapse.
  */
 const RATE = [0, 1, 1.25, 1.5, 1.75, 1.75];
@@ -250,7 +250,7 @@ export interface BirdQuality {
 
 /** What `Birds.update` needs of a frame (the caller keeps one and fills it in). */
 export interface BirdFrame {
-  /** Real seconds since the last frame, and the game's speed (`GAME_RATE` index). */
+  /** Real seconds since the last frame, and the game's speed (`PLAYBACK_RATE` index). */
   dt: number;
   speed: number;
   hour: number;

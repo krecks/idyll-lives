@@ -10,7 +10,7 @@ use sim_core::travel::Mode;
 use sim_core::world::TaskKind;
 use sim_core::{MINUTES_PER_TICK, World, clock, life};
 
-const TICKS_PER_MINUTE: u64 = (1.0 / MINUTES_PER_TICK) as u64;
+const TICKS_PER_MINUTE: u64 = common::TICKS_PER_MINUTE;
 
 fn world(seed: u64) -> World {
     let content = common::content();
@@ -38,7 +38,7 @@ struct Day {
 #[test]
 fn residents_leave_by_their_walk_and_are_never_late() {
     let mut w = world(11);
-    let off_map = (w.content.career_rules.commute_minutes / MINUTES_PER_TICK) as u64;
+    let off_map = common::mins(w.content.career_rules.commute_minutes);
     let mut days: Vec<Day> = vec![Day::default(); w.sims.len()];
     let mut day = clock::day(w.tick);
     let (mut trips, mut on_plan, mut worst_leave, mut worst_late) = (0, 0, 0i64, i64::MIN);
@@ -145,7 +145,7 @@ fn the_walk_is_timed_to_the_quickest_way_out() {
         let name = &w.sims[i].name;
         assert_eq!(
             c.ticks,
-            ((c.walk + off_map) / MINUTES_PER_TICK) as u64,
+            ((c.walk + off_map) * TICKS_PER_MINUTE as f32) as u64,
             "{name}"
         );
         // To the quickest of the ways out.

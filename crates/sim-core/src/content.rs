@@ -4676,7 +4676,7 @@ impl Content {
                             "dayRhythm.babyWakes.cooldownMinutes",
                         )?
                         .max(0.0)
-                            / crate::MINUTES_PER_TICK)
+                            * crate::TICKS_PER_MINUTE as f32)
                             as u64,
                         finish_minutes: b.finish_minutes.unwrap_or(15.0).max(0.0),
                         feeling: feeling(&b.feeling, "dayRhythm.babyWakes")?,
@@ -4717,9 +4717,9 @@ impl Content {
                     dirt: a.dirt.clamp(0.0, 1.0),
                     feeling: feeling(&a.feeling, &ctx)?,
                     cost: a.cost.max(0),
-                    cooldown_ticks: (time(a.cooldown_hours.unwrap_or(2.0), &ctx)?.max(0.0) * 60.0 / crate::MINUTES_PER_TICK) as u64,
-                    grace_ticks: (time(a.grace_minutes.unwrap_or(30.0), &ctx)?.max(0.0) / crate::MINUTES_PER_TICK) as u64,
-                    crowded_grace_ticks: a.crowded_grace_minutes.map(|m| time(m, &ctx)).transpose()?.map(|m| (m.max(0.0) / crate::MINUTES_PER_TICK) as u64),
+                    cooldown_ticks: (time(a.cooldown_hours.unwrap_or(2.0), &ctx)?.max(0.0) * 60.0 * crate::TICKS_PER_MINUTE as f32) as u64,
+                    grace_ticks: (time(a.grace_minutes.unwrap_or(30.0), &ctx)?.max(0.0) * crate::TICKS_PER_MINUTE as f32) as u64,
+                    crowded_grace_ticks: a.crowded_grace_minutes.map(|m| time(m, &ctx)).transpose()?.map(|m| (m.max(0.0) * crate::TICKS_PER_MINUTE as f32) as u64),
                     another_room: a
                         .another_room
                         .as_ref()

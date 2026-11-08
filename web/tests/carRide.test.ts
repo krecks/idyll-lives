@@ -8,6 +8,7 @@
 // most, behind the car on every bend.)
 import { afterAll, describe, expect, test } from 'bun:test';
 import { readFileSync, existsSync } from 'node:fs';
+import { TICK_RATES, TICKS_PER_SECOND } from './snapshotLayout';
 
 const WEB = new URL('../', import.meta.url).pathname;
 
@@ -31,6 +32,7 @@ describe('riding in a car', async () => {
   const { Pose, simFields } = await import('../src/core/snapshot');
   const { CARS, carriedAlong } = await import('../src/render/shared/cars');
   const { lerpAngle, wrapAngle } = await import('../src/render/shared/characters/rig');
+  const { maxAlpha } = await import('../src/core/bridge');
   type View = import('../src/render/shared/characters/view').ResidentView<object, object, import('../src/render/shared/characters/view').ResidentProp>;
   type SnapshotLayout = import('../src/core/snapshot').SnapshotLayout;
   type FrameState = import('../src/core/bridge').FrameState;
@@ -83,7 +85,7 @@ describe('riding in a car', async () => {
     headerLen: 6,
     simStride: FIELDS.length,
     maxSims: MAX_CHARACTERS,
-    ticksPerSecond: 20,
+    ...TICK_RATES,
     header: { tick: 0, day: 1, minute: 2, speed: 3, simCount: 4, structureVersion: 5 },
     sim: simFields(FIELDS),
     actions: [...content.animations],
@@ -97,7 +99,7 @@ describe('riding in a car', async () => {
   /** Where the driver gets in and out (beside the front door, outside the car). */
   const DOOR = { along: 0.6, across: body.wid / 2 + 0.6 };
   /** Ticks a second, and the car's speed (m/s) as it drives round a bend (rad/s). */
-  const TICKS = 20;
+  const TICKS = TICKS_PER_SECOND;
   const SPEED = 6;
   const BEND = 0.5;
   /** The script (s): stood at the door, sat in, driving off and round, parked again, out. */
@@ -183,17 +185,17 @@ describe('riding in a car', async () => {
         let lastSeat = { x: NaN, z: NaN };
         for (let n = 0; n < END * FPS; n++) {
           const t = n / FPS;
-          // A snapshot every tick; with `late`, every fifth one comes a frame and a bit late (shown on past the newest).
+          // A snapshot every tick; with `late`, one every quarter of a second comes 15 ms late (shown on past the newest).
           const due = Math.floor(t * TICKS);
-          const held = late && due % 5 === 0 && t * TICKS - due < 0.3;
+          const held = late && due % (TICKS / 4) === 0 && t - due / TICKS < 0.015;
           while (tick < due && !held) {
             tick++;
             prev.set(curr);
             carPrev = carCurr;
             carCurr = write(curr, tick);
           }
-          // (Up to the bridge's `MAX_EXTRAPOLATION` past the newest.)
-          frame.alpha = Math.min(1.3, t * TICKS - tick);
+          // (Up to the bridge's `MAX_EXTRAPOLATION_MS` past the newest.)
+          frame.alpha = Math.min(maxAlpha(1000 / TICKS), t * TICKS - tick);
           now = t * 1000;
           frame.now = now;
           // As `pc/cars.ts` `pose` places it: on past the newest snapshot only while it drives in both.

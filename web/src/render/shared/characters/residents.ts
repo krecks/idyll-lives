@@ -48,13 +48,14 @@ import type { AssetRegistry } from '../../../assets/registry';
 import type { Content, ItemDef } from '../../../content/content';
 import type { FrameState } from '../../../core/bridge';
 import { type ObjectPlacement, type PartColors, type SimInfo, type WorldStructure, colorsKey, objectCentre, storeyShown } from '../../../core/protocol';
-import { Pose } from '../../../core/snapshot';
+import { gameMinutesPerSecond, Pose } from '../../../core/snapshot';
+import { PACE } from '../doors';
 import { seatsItself } from '../../../game/surfaces';
 import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
-import { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
+import { PLAYBACK_RATE, QUIET_SPEED } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_PER_TICK, WALK_SLACK, WALK_WAIT, biteOf, eatClip, SET_DOWN_SPOTS, spotOn, type StationSpot } from './actions';
+import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GLIDE_SECONDS, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_SLACK, WALK_WAIT, biteOf, eatClip, SET_DOWN_SPOTS, spotOn, type StationSpot } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { RIDE_BIKE, RIDE_BIKE_CHILD, RIDE_SCOOTER } from './clips/rides';
 import { FLOOR_SITS } from './clips/seated';
@@ -83,7 +84,7 @@ import { WALL_HEIGHT } from '../walls';
 import { MOST_CADENCE, MOUNT_SECONDS, MOUNTS, type Mount, mountNodes } from './vehicles';
 import type { ResidentProp, ResidentView } from './view';
 
-export { GAME_RATE, QUIET_SPEED } from '../gameSpeed';
+export { PLAYBACK_RATE, QUIET_SPEED } from '../gameSpeed';
 export { MAX_CHARACTERS } from './rig';
 export { EXPRESSIONS, FRIENDLY, STANCE, type StageDirection } from './expressions';
 export type { Face } from './face';
@@ -324,6 +325,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   readonly visible = new Uint8Array(MAX_CHARACTERS);
   /** Per row: sat in a car that drives last frame (`setCarRide`; they stay with it till it has stopped where the snapshot has it). */
   private readonly inCar = new Uint8Array(MAX_CHARACTERS);
+  /**
+   * Per row, a placement gliding (`GLIDE_SECONDS`): where from and where to (x, z, height, yaw: the snapshot's place, the
+   * newest seen), and how far along (0-1; 1 when there, and while walking, or snapped).
+   */
+  private readonly glideFrom = new Float64Array(MAX_CHARACTERS * 4);
+  private readonly glideTo = new Float64Array(MAX_CHARACTERS * 4).fill(NaN);
+  private readonly glideK = new Float64Array(MAX_CHARACTERS).fill(1);
   /**
    * Per row, the thing they ride (a bike, an e-scooter: the snapshot's `ride`, `vehicles.ts`) as drawn: its stable id
    * (-1: none), how far on it they are (`mountOn`: 0 at its place, 1 riding; `MOUNT_SECONDS` each way), and how far
@@ -1337,7 +1345,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
    * lets the baby settle back into the crib) and orders the rows so a held baby is posed after the
    * one holding them.
    */
-  private cuddles(frame: FrameState, count: number, dt: number, gameRate: number, animRate: number): void {
+  private cuddles(frame: FrameState, count: number, dt: number, playRate: number, animRate: number): void {
     const { curr, layout } = frame;
     const H = layout.headerLen;
     const S = layout.simStride;
@@ -1345,8 +1353,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const act = k.action !== undefined && k.object !== undefined ? this.cuddleAction : -1;
     const changing = k.action !== undefined && k.object !== undefined ? this.changeAction : -1;
     const step = dt * animRate;
-    // Seconds of animation per game minute at this speed.
-    const perMinute = gameRate > 0 ? animRate / gameRate : Infinity;
+    // Game minutes a real second at this speed, and seconds of animation a game minute.
+    const minutesPerSecond = playRate * gameMinutesPerSecond(layout);
+    const perMinute = minutesPerSecond > 0 ? animRate / minutesPerSecond : Infinity;
     this.heldBy.fill(-1);
     this.onPadOf.fill(null);
     for (let j = 0; j < count; j++) {
@@ -1421,7 +1430,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         }
         rig.cuddleBaby = changed;
         rig.changeT += step * rig.changeRate;
-        rig.changeMin += dt * gameRate;
+        rig.changeMin += dt * minutesPerSecond;
         if (rig.changeOut >= 0) rig.changeOut += step * rig.changeRate;
         else if (rig.changeT >= T && (minutes - rig.changeMin) * perMinute * rig.changeRate <= T) rig.changeOut = 0;
         // Out of the cot (into the arms), onto the pad, back off it (into the arms), into the cot.
@@ -1477,7 +1486,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         }
         rig.cuddleBaby = baby;
         rig.cuddleT += step * rig.cuddleRate;
-        rig.cuddleMin += dt * gameRate;
+        rig.cuddleMin += dt * minutesPerSecond;
         if (rig.cuddleOut >= 0) rig.cuddleOut += step * rig.cuddleRate;
         else if (rig.cuddleT >= CUDDLE.pick && (minutes - rig.cuddleMin) * perMinute * rig.cuddleRate <= CUDDLE.put) rig.cuddleOut = 0;
         const t = rig.cuddleT;
@@ -1641,12 +1650,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const speed = curr[layout.header.speed] | 0;
     const quiet = layout.header.calm !== undefined && curr[layout.header.calm] > 0;
     const gameSpeed = quiet ? Math.max(speed, QUIET_SPEED) : speed;
-    const gameRate = GAME_RATE[gameSpeed] ?? 1;
-    // How far a walker can get from `prev` to `curr` (at the faster of their speeds, over the steps between them).
+    const playRate = PLAYBACK_RATE[gameSpeed] ?? 1;
+    // How far a walker can get from `prev` to `curr` (at the faster of their speeds, over the steps between them):
+    // `world::WALK_SPEED` a tick, times the fastest walkers' factors and some slack.
     const prevSpeed = prev[layout.header.speed] | 0;
     const prevGameSpeed = layout.header.calm !== undefined && prev[layout.header.calm] > 0 ? Math.max(prevSpeed, QUIET_SPEED) : prevSpeed;
-    const reach = Math.max(SNAP_DISTANCE, WALK_PER_TICK * WALK_FASTEST * WALK_SLACK * Math.max(gameRate, GAME_RATE[prevGameSpeed] ?? 1) * frame.steps);
-    const animRate = this.debugRate ?? Math.min(gameRate, 2.5);
+    const reach = Math.max(SNAP_DISTANCE, (PACE / layout.ticksPerSecond) * WALK_FASTEST * WALK_SLACK * Math.max(playRate, PLAYBACK_RATE[prevGameSpeed] ?? 1) * frame.steps);
+    const animRate = this.debugRate ?? Math.min(playRate, 2.5);
     // Paused (the pause button, Buy and Build mode, menus): everyone freezes mid-motion, walk
     // cycles, breathing, blinks and glances included.
     if (gameSpeed === 0 && this.debugRate === null) dt = 0;
@@ -1698,7 +1708,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     }
 
     // Cuddles: who holds which baby (posed after them, in their arms).
-    this.cuddles(frame, count, dt, gameRate, animRate);
+    this.cuddles(frame, count, dt, playRate, animRate);
 
     for (const b of this.blankets.values()) b.drawn = 0;
     for (let oi = 0; oi < count; oi++) {
@@ -1733,15 +1743,36 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         }
       }
       // A walk's first and last step: moving in one snapshot and standing in the other glides too,
-      // or the start and the end of every walk jump at speeds 4-5 (a step is 2.25 m at speed 4).
+      // or the start and the end of every walk jump at speeds 4-5 (at speed 4 a walker covers 45 m a second: 2.25 m a step at 20 steps a second).
       // (Riding, as far as they ride between them.)
       const walking = curr[o + k.moving] > 0 || prev[o + k.moving] > 0;
-      if (walking ? Math.hypot(cx - prev[o + k.x], cz - pz) < reach * Math.max(1, mount?.ride?.speed ?? 1) : Math.abs(cx - prev[o + k.x]) + Math.abs(cz - pz) < SNAP_DISTANCE) {
-        tx = prev[o + k.x] + (cx - prev[o + k.x]) * alpha;
-        tz = pz + (cz - pz) * alpha;
-        if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * alpha;
-        tyaw = lerpAngle(prev[o + k.yaw], tyaw, alpha);
+      // Not walking (onto a bed or a seat, or off it, a settle, a turn on the spot), from where they're drawn to the
+      // snapshot's place over `GLIDE_SECONDS` whatever the tick rate, begun as the snapshot came (`alpha` into its step:
+      // at 20 ticks a second, just as it glided over the step); further than `SNAP_DISTANCE`, at once.
+      const [from, to, g] = [this.glideFrom, this.glideTo, i * 4];
+      if (walking) {
+        if (Math.hypot(cx - prev[o + k.x], cz - pz) < reach * Math.max(1, mount?.ride?.speed ?? 1)) {
+          tx = prev[o + k.x] + (cx - prev[o + k.x]) * alpha;
+          tz = pz + (cz - pz) * alpha;
+          if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * alpha;
+          tyaw = lerpAngle(prev[o + k.yaw], tyaw, alpha);
+        }
+        this.glideK[i] = 1;
+      } else {
+        const along = Math.min(1, this.glideK[i] + frameDt / GLIDE_SECONDS);
+        this.glideK[i] = along;
+        if (cx !== to[g] || cz !== to[g + 1] || ch !== to[g + 2] || tyaw !== to[g + 3]) {
+          // (From where the glide had got to: there, where it was going.)
+          if (along < 1) [from[g], from[g + 1], from[g + 2], from[g + 3]] = [lerp(from[g], to[g], along), lerp(from[g + 1], to[g + 1], along), lerp(from[g + 2], to[g + 2], along), lerpAngle(from[g + 3], to[g + 3], along)];
+          else [from[g], from[g + 1], from[g + 2], from[g + 3]] = [to[g], to[g + 1], to[g + 2], to[g + 3]];
+          if (Math.abs(cx - from[g]) + Math.abs(cz - from[g + 1]) < SNAP_DISTANCE) {
+            this.glideK[i] = Math.min(1, (alpha * frame.steps) / layout.ticksPerSecond / GLIDE_SECONDS);
+          } else this.glideK[i] = 1;
+        }
+        const at = this.glideK[i];
+        if (at < 1) [tx, tz, th, tyaw] = [lerp(from[g], cx, at), lerp(from[g + 1], cz, at), lerp(from[g + 2], ch, at), lerpAngle(from[g + 3], tyaw, at)];
       }
+      [to[g], to[g + 1], to[g + 2], to[g + 3]] = [cx, cz, ch, curr[o + k.yaw]];
       // Sat in a car that drives: in its seat where the car is drawn (`setCarRide`).
       const riding = curr[o + k.pose] === Pose.Sit && !!this.carRide?.(frame, cx, cz, curr[o + k.yaw], this.inCar[i] === 1, this.rideAt);
       this.inCar[i] = riding ? 1 : 0;
@@ -1933,7 +1964,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       }
       const dyaw = wrapAngle(faceYaw - rig.yaw);
       // Walkers turn as quickly as the game runs (up to 10x): sped up, the corners of their way come sooner.
-      const turn = moving ? clamp(gameRate, 1, 10) : 1;
+      const turn = moving ? clamp(playRate, 1, 10) : 1;
       const maxTurn = (moving ? 9 : 6) * dt * turn;
       // Standing free, a wide turn steps round (`turnOnSpot`): the yaw follows the turn clip's steps. (To the way the
       // snapshot turns them, not the way the frames between snapshots have got to: sized for the whole turn.)
@@ -2576,7 +2607,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       rig.rising = rig.lastPose === Pose.Sit;
       [rig.riseX, rig.riseZ] = [rig.sitX, rig.sitZ];
       [rig.riseViaX, rig.riseViaZ] = rig.rising && rig.useObj?.builtIn ? this.cornerOf(rig.useObj, rig.sitX, rig.sitZ, rig.yaw, rig.tx, rig.tz) : [NaN, NaN];
-    } else if (rig.cur.key === up && !moving && pose === Pose.Stand && rig.cur.time < rig.cur.clip!.duration - 0.25) {
+    } else if (rig.cur.key === up && !moving && pose === Pose.Stand && rig.cur.time < rig.cur.clip!.duration - 0.25 && !fresh) {
+      // (Not drawn afresh, back in view part way up: the rise went on meanwhile, and its clip, held as it was when they
+      // went out of view, would put them back on their way off the seat they left: `riseK`.)
       key = up;
     }
     if (key !== 'standUp') rig.fromBed = false;

@@ -64,7 +64,6 @@ pub fn minute_of_day(tick: u64) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::MINUTES_PER_TICK;
 
     #[test]
     fn starts_at_eight_on_day_one() {
@@ -85,7 +84,7 @@ mod tests {
 
     #[test]
     fn rolls_over_midnight() {
-        let ticks_to_midnight = (16.0 * 60.0 / MINUTES_PER_TICK) as u64;
+        let ticks_to_midnight = (16.0 * 60.0 * TICKS_PER_MINUTE as f32) as u64;
         assert_eq!(day(ticks_to_midnight), 2);
         assert!(minute_of_day(ticks_to_midnight) < 0.01);
     }

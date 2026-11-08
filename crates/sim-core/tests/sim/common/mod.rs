@@ -11,6 +11,19 @@ use sim_core::travel::Mode;
 use sim_core::world::{Phase, Sim, TaskKind};
 use sim_core::{MINUTES_PER_TICK, World, clock};
 
+// Ticks counted in the time they mean: real seconds (`secs`, walking and driving, doors, lights)
+// or game minutes (`mins`, `hours`, `TICKS_PER_DAY`: the clock, needs, schedules, waits).
+// (Not every test binary that includes this module uses them all.)
+#[allow(unused_imports)]
+pub use sim_core::clock::TICKS_PER_DAY;
+#[allow(unused_imports)]
+pub use sim_core::{TICKS_PER_MINUTE, TICKS_PER_SECOND, mins, secs};
+
+/// Ticks in `h` game hours.
+pub const fn hours(h: f32) -> u64 {
+    mins(h * 60.0)
+}
+
 fn content_dir() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/content")
 }
@@ -463,7 +476,7 @@ pub fn check(w: &World) {
         // check every tick.)
         if s.current().is_none()
             && s.here()
-            && w.tick.is_multiple_of(20)
+            && w.tick.is_multiple_of(TICKS_PER_MINUTE)
             && let Some(kind) = follow_up(s)
         {
             follow_up_refs(w, i, &kind);
@@ -1044,7 +1057,8 @@ struct Stretch {
 }
 
 impl Watch {
-    pub const EVERY: u64 = 20;
+    /// A game minute.
+    pub const EVERY: u64 = TICKS_PER_MINUTE;
 
     pub fn new() -> Self {
         let trace = std::env::var("WATCH")
@@ -1148,7 +1162,7 @@ impl Watch {
     }
 }
 
-pub const TICKS_PER_HOUR: u64 = (60.0 / MINUTES_PER_TICK) as u64;
+pub const TICKS_PER_HOUR: u64 = 60 * TICKS_PER_MINUTE;
 
 /// Keeps an eye on a long run: call `after` after every tick (or step). Every game hour it
 /// checks the world (`check`, which panics), and notes in `problems` anyone who didn't age
@@ -1844,7 +1858,7 @@ pub fn sit_on_the_sofa(w: World, content: &str, who: &[usize]) -> World {
                     .is_some_and(|a| matches!(a.phase, Phase::Using { .. }))
         })
     };
-    for _ in 0..(20.0 / MINUTES_PER_TICK) as u64 {
+    for _ in 0..mins(20.0) {
         if seated(&w) {
             break;
         }
@@ -1862,7 +1876,7 @@ pub fn sit_on_the_sofa(w: World, content: &str, who: &[usize]) -> World {
     }
     let mut w = World::from_save_json(content, &save.to_string()).unwrap();
     w.autonomy = false;
-    for _ in 0..(5.0 / MINUTES_PER_TICK) as u64 {
+    for _ in 0..mins(5.0) {
         if seated(&w) {
             break;
         }
@@ -1898,7 +1912,7 @@ pub fn interaction(w: &World, object: u32, id: &str) -> usize {
 
 /// Ticks `w` for up to `minutes`, until `done`; true if it got there.
 pub fn until(w: &mut World, minutes: u64, mut done: impl FnMut(&World) -> bool) -> bool {
-    for _ in 0..minutes * sim_core::TICKS_PER_MINUTE {
+    for _ in 0..minutes * TICKS_PER_MINUTE {
         if done(w) {
             return true;
         }

@@ -54,7 +54,7 @@ fn workday(w: &mut World) -> (f32, f32) {
     run_to(w, 2, 10.0);
     let (mut lowest, mut sum, mut n) = (1.0f32, 0.0, 0);
     while clock::hour(w.tick) < 16.0 {
-        for _ in 0..15 * 20 {
+        for _ in 0..common::mins(15.0) {
             w.tick_once();
         }
         for k in 0..2 {
@@ -231,7 +231,7 @@ fn lonely_day(w: &mut World) -> usize {
     let mut away = 0;
     while clock::hour(w.tick) < 21.0 {
         w.sims[0].needs[3] = w.sims[0].needs[3].min(0.3);
-        for _ in 0..15 * 20 {
+        for _ in 0..common::mins(15.0) {
             w.tick_once();
         }
         away += usize::from(out(w, 0));
@@ -244,7 +244,7 @@ fn lonely_day(w: &mut World) -> usize {
 fn while_out(w: &mut World) -> (f32, f32, bool) {
     let (mut lowest, mut sum, mut n, mut visited) = (1.0f32, 0.0, 0, false);
     while clock::hour(w.tick) < 14.0 {
-        for _ in 0..15 * 20 {
+        for _ in 0..common::mins(15.0) {
             w.tick_once();
         }
         visited |= w.sims[0].visiting.is_some_and(|v| v.plot == 2);
@@ -410,7 +410,7 @@ fn with_a_grandparent_at_home_nobody_books_a_babysitter_for_a_visit() {
 fn at_the_park_until(w: &mut World, hour: f32) -> bool {
     let mut seen = false;
     while clock::hour(w.tick) < hour {
-        for _ in 0..5 * 20 {
+        for _ in 0..common::mins(5.0) {
             w.tick_once();
         }
         let (x, z) = w.sims[0].tile();
@@ -564,7 +564,7 @@ fn without_money_two_quick_orders_out_leave_someone_home() {
     .unwrap_err();
     let mut visited = false;
     while clock::hour(w.tick) < 13.0 {
-        for _ in 0..5 * 20 {
+        for _ in 0..common::mins(5.0) {
             w.tick_once();
         }
         visited |= w.sims[0].visiting.is_some_and(|v| v.plot == 2);
@@ -651,7 +651,7 @@ fn with_money_both_go_out_and_a_babysitter_is_booked_once() {
     .unwrap();
     let (mut visited, mut park, mut both) = (false, false, false);
     while clock::hour(w.tick) < 12.0 {
-        for _ in 0..5 * 20 {
+        for _ in 0..common::mins(5.0) {
             w.tick_once();
         }
         visited |= w.sims[0].visiting.is_some_and(|v| v.plot == 2);

@@ -117,10 +117,10 @@ fn a_trip_between_hamlets_follows_the_roads_and_keeps_out_of_gardens() {
     eprintln!(
         "{} waypoints, {len:.0} m from {from:?} to {target:?} ({:.0} min on foot)",
         route.len(),
-        len / 1.5
+        len / 1.5 * sim_core::GAME_MINUTES_PER_SECOND
     );
     // And they get there, walking it.
-    let ticks = (len / 1.5 * 1.3 * 20.0) as u64;
+    let ticks = (len / 1.5 * 1.3 * common::TICKS_PER_SECOND as f32) as u64;
     for _ in 0..ticks {
         w.tick_once();
         if w.sims[i].current().is_none() {
@@ -178,7 +178,7 @@ fn a_far_away_change_does_not_reroute() {
     })
     .unwrap();
     // Some way along it.
-    for _ in 0..400 {
+    for _ in 0..common::secs(20.0) {
         w.tick_once();
     }
     let next = |w: &World| match w.sims[i].current().map(|a| &a.phase) {

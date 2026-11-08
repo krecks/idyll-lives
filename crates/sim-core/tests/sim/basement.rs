@@ -115,7 +115,7 @@ fn walk_to_sit(w: &mut World, chair: u32) -> Vec<f32> {
     .unwrap();
     let storey = w.storey_of(w.objects[w.index_of(chair).unwrap()].z);
     let mut heights = Vec::new();
-    for _ in 0..20 * 60 * 5 {
+    for _ in 0..common::hours(5.0) {
         w.tick_once();
         heights.push(height(w, 0));
         if w.sims[0].pose == Pose::Sit && w.storey_of(w.sims[0].tile().1) == storey {
@@ -533,7 +533,7 @@ fn a_shipped_house_gets_a_basement() {
         interaction: 0,
     })
     .unwrap();
-    for _ in 0..20 * 60 * 5 {
+    for _ in 0..common::hours(5.0) {
         w.tick_once();
         if w.sims[0]
             .current()

@@ -39,7 +39,7 @@ fn main() {
             }
         }
         let mut world = World::from_json(&c.to_string(), &lot.to_string(), 1).unwrap();
-        let ticks = 24 * 60 * sim_core::TICKS_PER_SECOND;
+        let ticks = sim_core::clock::TICKS_PER_DAY as u32;
         let start = Instant::now();
         for _ in 0..ticks {
             world.tick_once();

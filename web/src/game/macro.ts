@@ -108,6 +108,13 @@ const AREA_AIM = 230;
 const EDGE = 50;
 const BOX_GAP = 24;
 /**
+ * An area's road out of it ends this far inside the world's edge at least (m), where the country
+ * road on from it starts: an area's box keeps `EDGE` off it, but a lane out of it can reach further
+ * than that (a farm hamlet's fork, its box's depth long), past the edge, and a country road on
+ * from beyond the edge is cut off from it when the roads are cut to the world.
+ */
+const PORT_IN = EDGE / 2;
+/**
  * Every road in a big world, the country roads and every area's streets and lanes, is this wide at
  * least (m): two cars pass on it in their lanes (the sim's `cars::lane_on`), so all of them are laid
  * this wide before any lot is placed.
@@ -761,8 +768,15 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       spec,
       ports: [],
     };
+    /** Whether a point is `PORT_IN` or further inside the world. */
+    const inWorld = ([px, pz]: Pt) => Math.min(px, pz, W - px, D - pz) >= PORT_IN;
     laid.forEach((r, k) => {
-      const points = r.points.map(onto);
+      // (Each way out cut back from the world's edge.)
+      const all = r.points.map(onto);
+      let [from, to] = [0, all.length];
+      if (r.ends[1] === 'out') while (to - from > 2 && !inWorld(all[to - 1])) to--;
+      if (r.ends[0] === 'out') while (to - from > 2 && !inWorld(all[from])) from++;
+      const points = all.slice(from, to);
       const road: RoadPlan = { ...r, points, width: Math.max(r.width, ROAD_WIDTH), kind: k === 0 ? 'street' : 'lane', area: index, ...(r.lots && swap ? { lots: (-r.lots) as 1 | -1 } : {}) };
       const at = roads.push(road) - 1;
       plan.roads.push(at);
@@ -1526,6 +1540,12 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
 
   // ---- the lots: one ground over the world, each area's along its own roads -------------------
   const worldRoads = roads;
+  // No road out over the world's edge but by an end out of it (`PORT_IN`): cut to the world, it would come apart.
+  for (const r of roads) {
+    const off = r.points.map(([x, z]) => x < 0 || z < 0 || x > W || z > D);
+    const [first, last] = [off.indexOf(false), off.lastIndexOf(false)];
+    if (first < 0 || (first > 0 && r.ends[0] !== 'out') || (last < off.length - 1 && r.ends[1] !== 'out') || off.slice(first, last).includes(true)) failed.push(`${r.name ?? 'a road'} runs out over the edge of the world`);
+  }
   const allGreens = plans.flatMap((p) => p.greens);
   const ground = new Ground(W, D, worldRoads, allGreens);
   ground.block(waterMask);
