@@ -1522,12 +1522,12 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
                     busy = true;
                 } else {
                     // Not there, nor coming: on without them, and they make their own way (a
-                    // leisure rider left is booked again once, `release`, which tells they were
-                    // left by their stop not yet done: so that comes after. Done first, a guest
-                    // eating a takeaway by the kerb as it came was never booked again, and walked
-                    // home 540 m.)
-                    release(w, i);
+                    // leisure rider left is booked again once, `release`: told so, not by their
+                    // stop not yet done, which once was marked first, and a guest eating a
+                    // takeaway by the kerb as it came was never booked again, and walked home
+                    // 540 m).
                     w.taxis.runs[k].stops[s].state = StopState::Done;
+                    release(w, i, true);
                 }
             }
             StopState::Boarding => {
@@ -1558,9 +1558,9 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
                 if going {
                     busy = true;
                 } else {
-                    // (Booked again as above: `release` first.)
-                    release(w, i);
+                    // (Left, and booked again, as above.)
                     w.taxis.runs[k].stops[s].state = StopState::Done;
+                    release(w, i, true);
                 }
             }
             StopState::Aboard | StopState::Done => {}
@@ -1602,8 +1602,10 @@ const PASS_BY_MOST: u64 = crate::secs(3.0);
 
 /// Resident `i`, booked on a taxi, isn't riding it: unbooked, and on their way to work or school
 /// their own way (from the kerb, or wherever they've got to); planned once more for the same start
-/// (`Taxis::missed`), late as it may be, before they're left to it.
-pub(crate) fn release(w: &mut World, i: usize) {
+/// (`Taxis::missed`), late as it may be, before they're left to it. `left`: the taxi went on (or
+/// its run ended) without them, not yet in it: a leisure rider is booked again once
+/// (`Taxis::left`). Said by the caller, whatever their stop has been marked.
+pub(crate) fn release(w: &mut World, i: usize, left: bool) {
     let Some(sim) = w.sims.get_mut(i) else {
         return;
     };
@@ -1622,15 +1624,13 @@ pub(crate) fn release(w: &mut World, i: usize) {
     let mut leisure = None;
     let home = match w.taxis.runs.iter_mut().find(|r| r.id == b.run) {
         Some(run) => {
-            let mut left = false;
             if let Some(st) = run.stops.get_mut(b.stop as usize)
                 && st.state != StopState::Aboard
             {
-                left = st.state != StopState::Done;
                 st.state = StopState::Done;
-            }
-            if left && let Some(place) = run.place {
-                leisure = Some((place, run.home, run.directed));
+                if left && let Some(place) = run.place {
+                    leisure = Some((place, run.home, run.directed));
+                }
             }
             run.home || run.place.is_some()
         }
@@ -1710,8 +1710,9 @@ pub(crate) fn boarded(w: &mut World, i: usize, c: u32) {
         .iter()
         .position(|r| r.car == Some(c) && r.picks_up() && r.stop_of(me).is_some())
     else {
+        // (In a taxi with no stop of theirs: their own went on without them.)
         w.sims[i].bound_for_car = None;
-        release(w, i);
+        release(w, i, true);
         return;
     };
     let s = w.taxis.runs[k].stop_of(me).expect("just found");
@@ -1816,11 +1817,12 @@ fn finish(w: &mut World, k: usize) {
             }
             continue;
         }
+        // (Still booked on it, not yet in it: the run's over without them.)
         if w.sims
             .get(i)
             .is_some_and(|s| s.taxi.is_some_and(|b| b.run == run.id))
         {
-            release(w, i);
+            release(w, i, true);
         }
     }
 }
@@ -4148,6 +4150,41 @@ mod leisure_leaving_tests {
             0,
             "the chair still held"
         );
+    }
+
+    /// A leisure rider the taxi goes on without is booked again once (`Taxis::left`), as the
+    /// caller tells `release` (`left`), whether their stop is marked done before or after; one
+    /// let go otherwise isn't.
+    #[test]
+    fn a_rider_left_at_the_kerb_is_booked_again_whatever_the_stop_says() {
+        let content = CONTENT.replace(
+            r#""economy""#,
+            r#""bondPresets":{"friends":{"friendship":80}},"economy""#,
+        );
+        for (done_first, left) in [(true, true), (false, true), (true, false), (false, false)] {
+            let mut w = World::from_json(&content, TOWN_PARK, 1).unwrap();
+            let i = 1usize;
+            let tick = w.tick;
+            let run: Run = serde_json::from_value(serde_json::json!({"id":5,"place":2,
+                "group":[0,0],"enter":tick + 1000,"dueOut":0,"depart":0,
+                "stops":[{"sim":i,"plot":1,"due":tick + 100,"leave":tick,"state":"booked"}]}))
+            .unwrap();
+            w.taxis.runs.push(run);
+            w.sims[i].taxi = Some(Booking { run: 5, stop: 0 });
+            if done_first {
+                w.taxis.runs[0].stops[0].state = StopState::Done;
+            }
+            release(&mut w, i, left);
+            if !done_first {
+                w.taxis.runs[0].stops[0].state = StopState::Done;
+            }
+            assert_eq!(
+                w.taxis.left.contains(&(i as u32, 2)),
+                left,
+                "left {left}, the stop done first {done_first}"
+            );
+            assert_eq!(w.taxis.runs[0].stops[0].state, StopState::Done);
+        }
     }
 }
 
