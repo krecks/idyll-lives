@@ -120,7 +120,7 @@ The dev server also has pages of their own, not in the build: `/gallery.html` (e
 Main thread                                   Sim worker
 ┌───────────────────────────────┐            ┌──────────────────────────┐
 │ ui/      Svelte HUD (~10 Hz)  │◄─ ui ──────│ sim-wasm → sim-core      │
-│ game/    composition + input  │── cmds ───►│ fixed 20 Hz tick         │
+│ game/    composition + input  │── cmds ───►│ fixed 60 Hz tick         │
 │ render/  Renderer (GPU)       │◄─ shared ──│ snapshot (seqlock, SAB)  │
 │ assets/  manifest registry    │   memory   │ world geometry on change │
 └───────────────────────────────┘            └──────────────────────────┘

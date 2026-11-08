@@ -130,8 +130,8 @@ count and its top three scores: **1.21 decisions per resident per game hour**, b
 nothing to choose, so only **0.75 per resident per game hour** have a shortlist at all; 8 candidates at the median
 (61 at the p90); the top candidate taking 45 % of the top three's weight, the second more than 10 % behind in 79 %
 of the decisions that had one, and within 10 % in 223 (21 %). So a household of six asks for a call about once
-every 13 s of play at speed 1, every 4 s at speed 2 and every 1.3 s at speed 3 (a game hour is 60, 20 and 6 real
-seconds, `TICKS_PER_STEP`) — affordable while the player watches at 1 or 2, and rate-limited to one call in flight
+every 13 s of play at speed 1, every 4 s at speed 2 and every 1.3 s at speed 3 (a game hour was 60, 20 and 6 real
+seconds, `TICKS_PER_STEP`; 75, 25 and 7.5 since 0.7.0) — affordable while the player watches at 1 or 2, and rate-limited to one call in flight
 at 3 — while the choice is rarely close, so a re-rank has little to reorder beyond the fifth that are close and the
 odd dominant-but-implausible pick. The two findings that matter for what to do next: the re-rank is the expensive
 half for the least gain, and the 38 % of decisions with nothing to choose are a different problem (content,
