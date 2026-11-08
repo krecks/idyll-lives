@@ -594,10 +594,15 @@ fn feeding(w: &World, i: usize) -> bool {
 #[test]
 fn woken_by_a_crying_baby_none_of_the_players_orders_are_dropped() {
     let mut w = night();
-    // Ada was told to sleep, and has a full queue of orders for the morning; Ben is more tired.
+    // Ada was told to sleep (in the bed she's in), and has a full queue of orders for the
+    // morning; Ben is more tired.
+    let bed = match w.sims[0].current().map(|a| a.task.kind) {
+        Some(sim_core::world::TaskKind::Use { object, .. }) => object,
+        other => panic!("Ada in bed: {other:?}"),
+    };
     w.apply(Command::Use {
         sim: 0,
-        object: 1,
+        object: bed,
         interaction: 0,
     })
     .unwrap();

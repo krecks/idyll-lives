@@ -113,6 +113,10 @@ fn a_toilet_visit_given_up_at_once_has_no_hand_washing_after() {
     .unwrap();
     let mut sat = 0;
     for _ in 0..common::mins(10.0) {
+        // (Still nothing to go for when they get there: the walk doesn't make it a little.)
+        if sat == 0 {
+            w.sims[0].needs[bladder] = 1.0;
+        }
         w.tick_once();
         sat += usize::from(using(&w).is_some_and(|(o, _)| o == toilet));
         assert!(

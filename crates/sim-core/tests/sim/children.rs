@@ -97,14 +97,14 @@ fn children_and_teens_are_not_grown_ups() {
 fn babies_do_nothing_on_their_own() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
     w.sims[3].needs[0] = 0.0;
+    // (One thing to use in the house: the others take turns at it, so look all along.)
+    let mut others = false;
     for _ in 0..common::hours(2.0) {
         w.tick_once();
+        assert!(w.sims[3].current().is_none(), "the baby didn't go and play");
+        others |= w.sims[2].current().is_some() || w.sims[0].current().is_some();
     }
-    assert!(w.sims[3].current().is_none(), "the baby didn't go and play");
-    assert!(
-        w.sims[2].current().is_some() || w.sims[0].current().is_some(),
-        "the others did something"
-    );
+    assert!(others, "the others did something");
 }
 
 const SCHOOL: &str = r#"{
