@@ -122,8 +122,8 @@ export interface SnapshotLayout {
     plate?: number;
     /**
      * 1 while the room they're in is kept shut on their account (a bathroom they're in, the bedroom
-     * they try for a baby in; sim-core `privacy.rs`), else 0: its doors stay shut to anyone but
-     * whoever goes through them (missing in older layouts).
+     * they try for a baby in; sim-core `privacy.rs`), else 0 (missing in older layouts). The
+     * renderer doesn't need it: every door stays shut to anyone but whoever goes through it.
      */
     shuts?: number;
     /** Stable id of the thing they ride (a bike, an e-scooter), drawn under them and not at its place, or -1; left out by a place they're visiting, -2 less its stable id (not drawn at its place either). */
