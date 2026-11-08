@@ -544,10 +544,19 @@ fn a_goodbye_that_cannot_happen_soon_is_skipped() {
     })
     .unwrap();
     let mut waited = sim_core::MINUTES_PER_TICK;
+    // (Whether Ada was off to bed when Bo gave up: walked off from him, busy, she can't be
+    // followed for a goodbye.)
+    let mut abed = false;
     while w.sims[1].visiting.is_some() {
         w.tick_once();
         if saying_goodbye(&w) {
             waited += sim_core::MINUTES_PER_TICK;
+            abed = w.sims[0].current().is_some_and(|a| {
+                matches!(
+                    a.task.kind,
+                    sim_core::world::TaskKind::Use { object: BED, .. }
+                )
+            });
         }
         assert!(waited <= 4.1, "Bo hung around for a goodbye");
         assert!(
@@ -560,7 +569,12 @@ fn a_goodbye_that_cannot_happen_soon_is_skipped() {
         Some(1),
         "home"
     );
-    assert!(waited > 3.5, "Bo gave Ada a few minutes ({waited:.1})");
+    // Bo gave Ada a few minutes (`farewellMinutes`), or until she'd walked off from him to bed,
+    // as she does first when her walk takes fewer game minutes than that.
+    assert!(
+        waited > 3.5 || (abed && waited > 2.5),
+        "Bo gave Ada a few minutes ({waited:.1})"
+    );
     assert!(in_bed(&w), "Ada went to bed");
 }
 

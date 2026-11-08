@@ -375,8 +375,12 @@ fn up_from_the_upper_bunk_they_climb_down_its_ladder_before_anything_else() {
     }
     w.apply(Command::Cancel { sim: ADA, index: 0 }).unwrap();
     order(&mut w, ADA, "wine", 0).unwrap();
+    // (Off the ladder, she takes up the order: someone else may have the wine by then.)
     let mut waited = 0;
-    while w.sims[ADA as usize].current().is_none() && waited < common::secs(20.0) {
+    while w.sims[ADA as usize].current().is_none()
+        && w.sims[ADA as usize].queue().next().is_some()
+        && waited < common::secs(20.0)
+    {
         w.tick_once();
         waited += 1;
     }
