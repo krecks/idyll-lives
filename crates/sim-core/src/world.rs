@@ -7453,11 +7453,19 @@ fn start_task(
         return;
     }
     // An outing of their own choosing weighed by car that they'd walk after all (the car taken
-    // meanwhile, say), too far for the way they'd go now: not now (`outing_fits_now`).
+    // meanwhile, say), too far for the way they'd go now: not now (`outing_fits_now`). Nor are
+    // they on it any more, set out for their car (`life::Transition::Visit`) and not there: else,
+    // still on it at home, they'd wander off to the place on foot after all, hours away.
     if let TaskKind::Visit { plot } = task.kind
         && !task.directed
         && !outing_fits_now(sim, ctx, objects, plot)
     {
+        if sim
+            .visiting
+            .is_some_and(|v| v.plot == plot && v.arrived == 0)
+        {
+            sim.visiting = None;
+        }
         return;
     }
     // Off somewhere else from where they left their bike out (`Sim::bike_parked`): to work, or
