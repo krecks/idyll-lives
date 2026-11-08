@@ -10463,10 +10463,15 @@ fn outing_leave_by(
         (None, None) => crate::taxi::back_minutes(ctx, sim, plot, pos, door)
             .unwrap_or_else(|| travel.eta(pos, door, foot, walk)),
     };
-    let back = (minutes * TICKS_PER_MINUTE as f32) as u64;
+    let back = ((minutes + OUTING_LEAVING_MINUTES) * TICKS_PER_MINUTE as f32) as u64;
     let home_by = crate::clock::tick_at(ctx.day, content.visits.outing_home_by * 60.0)?;
     Some(home_by.saturating_sub(back))
 }
+
+/// An outing's end: game minutes to get going home besides the way itself (up from where they
+/// sat, a word with whoever they were talking to), so they're home by the hour, not a few minutes
+/// past it.
+const OUTING_LEAVING_MINUTES: f32 = 10.0;
 
 /// An outing by car: minutes besides the drive, to the car and from it at either end.
 const CAR_TRIP_MINUTES: f32 = 10.0;
