@@ -50,7 +50,29 @@ pub fn hamlets(
     seed: u64,
     columns: i64,
     places: &[Place],
+    size: (i64, i64),
+) -> Hamlets {
+    hamlets_with_parking(content, seed, columns, places, size, None)
+}
+
+/// How wide the gap `hamlets_with_parking` leaves beside a hamlet's park for its parking bay
+/// (m): the bay's 3 m and the metre and a half either side of it `macro.ts` keeps clear (it takes
+/// a metre round a bay).
+pub const BAY_GAP: i64 = 6;
+
+/// `hamlets`, with public parking in hamlet `bay` (if any) as a big world has it (`macro.ts`): a
+/// bay off the street, square to it beyond its verge, on free ground by the park: the plots of
+/// both rows east of the park moved on `BAY_GAP` m to leave it (the hamlet that much wider). The
+/// bay's middle is half the street's width, half a metre and half its 6 m length off the
+/// street's line on the park's side, its `rot` a facing (0-3) as `macro.ts` gives it: 0 a bay on
+/// the street's +z side, 2 on its -z side.
+pub fn hamlets_with_parking(
+    content: &str,
+    seed: u64,
+    columns: i64,
+    places: &[Place],
     (width, depth): (i64, i64),
+    bay: Option<usize>,
 ) -> Hamlets {
     let mut out = json!({
         "width": width, "depth": depth, "size": "big",
@@ -63,7 +85,7 @@ pub fn hamlets(
     let mut plots = Vec::new();
     let mut streets = Vec::new();
     for (k, at) in places.iter().enumerate() {
-        let block: Value = serde_json::from_str(&town_with(
+        let mut block: Value = serde_json::from_str(&town_with(
             content,
             seed + k as u64,
             if k == 0 { 2 } else { 0 },
@@ -75,6 +97,8 @@ pub fn hamlets(
             },
         ))
         .unwrap();
+        // (Where the bay goes, in the block: just east of its park; the park's middle (z).)
+        let parking = (bay == Some(k)).then(|| open_gap(&mut block));
         let (dx, dz) = (at.x, at.z);
         let bw = block["width"].as_i64().unwrap();
         let bd = block["depth"].as_i64().unwrap();
@@ -97,6 +121,15 @@ pub fn hamlets(
         let z = street_z() + dz as f64;
         let (x0, x1) = (dx as f64, (dx + bw) as f64);
         streets.push((z, x0, x1));
+        if let Some((cut, park_z)) = parking {
+            // (The street is 6 m wide.)
+            let side = if park_z + dz as f64 > z { 1.0 } else { -1.0 };
+            let off = 6.0 / 2.0 + 0.5 + 3.0;
+            out["parking"] = json!([{
+                "x": (dx + cut) as f64 + BAY_GAP as f64 / 2.0, "z": z + side * off,
+                "rot": if side > 0.0 { 0 } else { 2 }, "area": k,
+            }]);
+        }
         let pts = line([x0 + 0.5, z], [x1 - 0.5, z]);
         roads.push(
             json!({"points": pts, "width": 6, "ends": ["out", "out"], "kind": "street", "area": k}),
@@ -131,6 +164,45 @@ pub fn hamlets(
     }
 }
 
+/// Opens a gap of `BAY_GAP` m in `block` (a `town_with` town file of one street) just east of
+/// its park: everything of the plots east of it moved on that far, the block that much wider.
+/// Returns where the gap starts (x) and the park's middle (z).
+fn open_gap(block: &mut Value) -> (i64, f64) {
+    let park = block["plots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["public"].as_bool() == Some(true))
+        .expect("a park in the hamlet");
+    let num = |k: &str| park[k].as_f64().unwrap();
+    let (cut, park_z) = ((num("x") + num("w")) as i64, num("z") + num("d") / 2.0);
+    let past = |v: &Value| v.as_f64().unwrap() >= cut as f64;
+    let on = |v: &mut Value| {
+        *v = match v.as_i64() {
+            Some(n) => json!(n + BAY_GAP),
+            None => json!(v.as_f64().unwrap() + BAY_GAP as f64),
+        }
+    };
+    for w in block["walls"].as_array_mut().unwrap() {
+        if past(&w[0]) && past(&w[2]) {
+            on(&mut w[0]);
+            on(&mut w[2]);
+        }
+    }
+    for key in ["doors", "windows", "objects", "sims", "plots"] {
+        for v in block[key].as_array_mut().unwrap() {
+            if past(&v["x"]) {
+                on(&mut v["x"]);
+                if v["entry"].is_array() {
+                    on(&mut v["entry"][0]);
+                }
+            }
+        }
+    }
+    on(&mut block["width"]);
+    (cut, park_z)
+}
+
 /// Two hamlets of three plots a side, 160 m apart across open country.
 pub fn two_hamlets(content: &str, seed: u64) -> Hamlets {
     hamlets(
@@ -139,6 +211,19 @@ pub fn two_hamlets(content: &str, seed: u64) -> Hamlets {
         3,
         &[Place { x: 0, z: 0 }, Place { x: 162, z: 60 }],
         (256, 128),
+    )
+}
+
+/// `two_hamlets` with public parking in the second, a bay by its park (`hamlets_with_parking`;
+/// the world `BAY_GAP` m wider for it).
+pub fn two_hamlets_with_parking(content: &str, seed: u64) -> Hamlets {
+    hamlets_with_parking(
+        content,
+        seed,
+        3,
+        &[Place { x: 0, z: 0 }, Place { x: 162, z: 60 }],
+        (256 + BAY_GAP, 128),
+        Some(1),
     )
 }
 
