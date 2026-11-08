@@ -1272,6 +1272,68 @@ fn a_visit_out_of_walking_reach_goes_by_taxi_there_and_back() {
 }
 
 #[test]
+fn a_guest_leaving_a_visit_early_has_the_taxi_back_brought_forward() {
+    // A goes by taxi to visit B's house 540 m along the street, nobody home there: A gives the
+    // visit up hours before it was to end. The taxi back, booked for its end, is brought forward
+    // to when A is at the kerb now: a few minutes' wait there, not hours, and A is home before
+    // the visit was to have ended.
+    let mut w = town(
+        7,
+        &[
+            house(20, &[r#"{"name":"A","age":40,"traits":["cheerful"]}"#]),
+            house(560, &[r#"{"name":"B","age":40,"traits":["cheerful"]}"#]),
+        ],
+    );
+    run_to(&mut w, 1, 9.0);
+    let _ = w.apply(sim_core::Command::Visit { sim: 0, plot: 1 });
+    let end = sim_core::clock::tick_at(2, 12.0 * 60.0).unwrap();
+    let (mut left, mut until, mut home) = (None, 0, None);
+    let (mut kerb, mut longest) = (None::<u64>, 0);
+    while w.tick < end && home.is_none() {
+        w.tick_once();
+        let a = &w.sims[0];
+        let going = a
+            .current()
+            .is_some_and(|x| matches!(x.task.kind, sim_core::world::TaskKind::GoHome));
+        if let Some(v) = a.visiting.filter(|v| v.plot == 1 && v.arrived > 0) {
+            until = v.until;
+            if going && left.is_none() {
+                left = Some(w.tick);
+            }
+        }
+        let waiting = going
+            && a.current()
+                .is_some_and(|x| matches!(x.phase, Phase::AtKerb { .. }));
+        match (waiting, kerb) {
+            (true, None) => kerb = Some(w.tick),
+            (false, Some(s)) => {
+                longest = longest.max(w.tick - s);
+                kerb = None;
+            }
+            _ => {}
+        }
+        if left.is_some() && a.visiting.is_none() && a.pos[0] < 45.0 && w.taxi_booking(0).is_none()
+        {
+            home = Some(w.tick);
+        }
+    }
+    let left = left.expect("A never left B's");
+    assert!(until > left + hours(1.0), "A didn't leave early");
+    let home = home.expect("A never got home");
+    assert!(
+        longest <= mins(15.0),
+        "A waited {} minutes at the kerb",
+        longest / TICKS_PER_MINUTE
+    );
+    // (The ride itself, at a car's pace in real time, is an hour and more of game time.)
+    assert!(
+        home < until,
+        "A was home {} minutes after the visit was to end",
+        (home - until) / TICKS_PER_MINUTE
+    );
+}
+
+#[test]
 fn a_cyclist_with_a_ride_out_of_over_an_hour_and_a_half_takes_the_taxi() {
     // C's bike would take well over `BIKE_MOST` out of town from the street's far end: C rides
     // the work taxi instead.
