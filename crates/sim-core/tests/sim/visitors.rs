@@ -817,3 +817,78 @@ fn a_guest_sent_home_while_the_host_sleeps_just_goes() {
     }
     assert!(in_bed(&w), "Ada is still asleep");
 }
+
+/// Ada works from noon, her baby Cleo at home with her (and no babysitting in the content, so
+/// she goes all the same); Bo comes round in the morning.
+fn with_baby() -> World {
+    let content = CONTENT.replace(
+        r#""economy":{"startingFunds":500}"#,
+        r#""careers":[{"id":"office","label":"Office","levels":[
+                {"title":"Intern","pay":100,"start":12,"hours":4,"days":[0,1,2,3,4,5,6]}]}],
+            "life":{"daysPerYear":2,"stages":[
+                {"id":"baby","label":"Baby","from":0,"baby":true},
+                {"id":"adult","label":"Adult","from":18}]},
+            "economy":{"startingFunds":500}"#,
+    );
+    let town = town("friends")
+        .replace(
+            r#"{"name":"Ada","household":0,"x":4.5,"z":4.5}"#,
+            r#"{"name":"Ada","household":0,"x":4.5,"z":4.5,"age":30,"job":{"career":"office"}},
+               {"name":"Cleo","household":0,"x":6.5,"z":4.5,"age":0.5}"#,
+        )
+        .replace(
+            r#"{"name":"Bo","household":1,"x":25.5,"z":4.5}"#,
+            r#"{"name":"Bo","household":1,"x":25.5,"z":4.5,"age":30}"#,
+        )
+        .replace(r#"{"a":0,"b":1,"preset""#, r#"{"a":0,"b":2,"preset""#);
+    let mut w = World::from_json(&content, &town, 7).unwrap();
+    w.autonomy = false;
+    while w.tick < clock::tick_at(1, 9.0 * 60.0).unwrap() {
+        w.tick_once();
+    }
+    w
+}
+
+/// The hosts are the grown-ups, who let a guest in: with the one grown-up at home off to work, a
+/// guest with nothing to do goes home, the baby left at home no host to stay on with (counted as
+/// one, the baby kept Bo there all afternoon).
+#[test]
+fn a_guest_does_not_stay_on_with_only_the_baby() {
+    let mut w = with_baby();
+    w.apply(Command::Visit { sim: 2, plot: 0 }).unwrap();
+    while !w.events.iter().any(|e| e.kind == EventKind::Visited) {
+        w.tick_once();
+        assert!(
+            w.tick < clock::tick_at(1, 11.0 * 60.0).unwrap(),
+            "never let in"
+        );
+    }
+    w.autonomy = true;
+    // Ada off to work, gone from home.
+    while w.sims[0].away_until.is_none() {
+        w.tick_once();
+        assert!(
+            w.tick < clock::tick_at(1, 13.0 * 60.0).unwrap(),
+            "Ada never left for work"
+        );
+        assert!(
+            w.sims[2].visiting.is_some(),
+            "Bo went home with Ada still about"
+        );
+    }
+    let gone = w.tick;
+    let home = |w: &World| {
+        let s = &w.sims[2];
+        s.visiting.is_none()
+            || s.current()
+                .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome))
+            || s.queue().any(|t| matches!(t.kind, TaskKind::GoHome))
+    };
+    while !home(&w) {
+        w.tick_once();
+        assert!(
+            w.tick < gone + common::mins(30.0),
+            "Bo stayed on with only the baby"
+        );
+    }
+}

@@ -376,7 +376,8 @@ fn group(w: &World, i: usize) -> Option<(u32, u32)> {
 }
 
 /// Where the taxi would stand for resident `i` at home (`kerb_at`), no other taxi about: as found
-/// by `warm_kerbs` (called first), else worked out.
+/// by `warm_kerbs`, for the same door, driveways and network (`kerb_stamp`); else worked out (not
+/// found yet, or found for a town since changed: whoever asks first, `warm_kerbs` or not).
 fn stop_for(w: &World, i: usize) -> Option<Kerb> {
     let plot = w.households.get(w.sims[i].household as usize)?.plot?;
     let door = w
@@ -384,8 +385,10 @@ fn stop_for(w: &World, i: usize) -> Option<Kerb> {
         .get(plot as usize)?
         .arrival_point()
         .map(f32::to_bits);
-    if let Some(Some((at, kerb))) = w.taxis.kerbs.plots.get(plot as usize)
+    let kerbs = &w.taxis.kerbs;
+    if let Some(Some((at, kerb))) = kerbs.plots.get(plot as usize)
         && *at == door
+        && kerbs.stamp == kerb_stamp(w)
     {
         return *kerb;
     }
@@ -1519,12 +1522,12 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
                     busy = true;
                 } else {
                     // Not there, nor coming: on without them, and they make their own way (a
-                    // leisure rider left is booked again once, `release`, which tells they were
-                    // left by their stop not yet done: so that comes after. Done first, a guest
-                    // eating a takeaway by the kerb as it came was never booked again, and walked
-                    // home 540 m.)
-                    release(w, i);
+                    // leisure rider left is booked again once, `release`: told so, not by their
+                    // stop not yet done, which once was marked first, and a guest eating a
+                    // takeaway by the kerb as it came was never booked again, and walked home
+                    // 540 m).
                     w.taxis.runs[k].stops[s].state = StopState::Done;
+                    release(w, i, true);
                 }
             }
             StopState::Boarding => {
@@ -1555,9 +1558,9 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
                 if going {
                     busy = true;
                 } else {
-                    // (Booked again as above: `release` first.)
-                    release(w, i);
+                    // (Left, and booked again, as above.)
                     w.taxis.runs[k].stops[s].state = StopState::Done;
+                    release(w, i, true);
                 }
             }
             StopState::Aboard | StopState::Done => {}
@@ -1599,8 +1602,10 @@ const PASS_BY_MOST: u64 = crate::secs(3.0);
 
 /// Resident `i`, booked on a taxi, isn't riding it: unbooked, and on their way to work or school
 /// their own way (from the kerb, or wherever they've got to); planned once more for the same start
-/// (`Taxis::missed`), late as it may be, before they're left to it.
-pub(crate) fn release(w: &mut World, i: usize) {
+/// (`Taxis::missed`), late as it may be, before they're left to it. `left`: the taxi went on (or
+/// its run ended) without them, not yet in it: a leisure rider is booked again once
+/// (`Taxis::left`). Said by the caller, whatever their stop has been marked.
+pub(crate) fn release(w: &mut World, i: usize, left: bool) {
     let Some(sim) = w.sims.get_mut(i) else {
         return;
     };
@@ -1619,15 +1624,13 @@ pub(crate) fn release(w: &mut World, i: usize) {
     let mut leisure = None;
     let home = match w.taxis.runs.iter_mut().find(|r| r.id == b.run) {
         Some(run) => {
-            let mut left = false;
             if let Some(st) = run.stops.get_mut(b.stop as usize)
                 && st.state != StopState::Aboard
             {
-                left = st.state != StopState::Done;
                 st.state = StopState::Done;
-            }
-            if left && let Some(place) = run.place {
-                leisure = Some((place, run.home, run.directed));
+                if left && let Some(place) = run.place {
+                    leisure = Some((place, run.home, run.directed));
+                }
             }
             run.home || run.place.is_some()
         }
@@ -1707,8 +1710,9 @@ pub(crate) fn boarded(w: &mut World, i: usize, c: u32) {
         .iter()
         .position(|r| r.car == Some(c) && r.picks_up() && r.stop_of(me).is_some())
     else {
+        // (In a taxi with no stop of theirs: their own went on without them.)
         w.sims[i].bound_for_car = None;
-        release(w, i);
+        release(w, i, true);
         return;
     };
     let s = w.taxis.runs[k].stop_of(me).expect("just found");
@@ -1813,11 +1817,12 @@ fn finish(w: &mut World, k: usize) {
             }
             continue;
         }
+        // (Still booked on it, not yet in it: the run's over without them.)
         if w.sims
             .get(i)
             .is_some_and(|s| s.taxi.is_some_and(|b| b.run == run.id))
         {
-            release(w, i);
+            release(w, i, true);
         }
     }
 }
@@ -4145,5 +4150,95 @@ mod leisure_leaving_tests {
             0,
             "the chair still held"
         );
+    }
+
+    /// A leisure rider the taxi goes on without is booked again once (`Taxis::left`), as the
+    /// caller tells `release` (`left`), whether their stop is marked done before or after; one
+    /// let go otherwise isn't.
+    #[test]
+    fn a_rider_left_at_the_kerb_is_booked_again_whatever_the_stop_says() {
+        let content = CONTENT.replace(
+            r#""economy""#,
+            r#""bondPresets":{"friends":{"friendship":80}},"economy""#,
+        );
+        for (done_first, left) in [(true, true), (false, true), (true, false), (false, false)] {
+            let mut w = World::from_json(&content, TOWN_PARK, 1).unwrap();
+            let i = 1usize;
+            let tick = w.tick;
+            let run: Run = serde_json::from_value(serde_json::json!({"id":5,"place":2,
+                "group":[0,0],"enter":tick + 1000,"dueOut":0,"depart":0,
+                "stops":[{"sim":i,"plot":1,"due":tick + 100,"leave":tick,"state":"booked"}]}))
+            .unwrap();
+            w.taxis.runs.push(run);
+            w.sims[i].taxi = Some(Booking { run: 5, stop: 0 });
+            if done_first {
+                w.taxis.runs[0].stops[0].state = StopState::Done;
+            }
+            release(&mut w, i, left);
+            if !done_first {
+                w.taxis.runs[0].stops[0].state = StopState::Done;
+            }
+            assert_eq!(
+                w.taxis.left.contains(&(i as u32, 2)),
+                left,
+                "left {left}, the stop done first {done_first}"
+            );
+            assert_eq!(w.taxis.runs[0].stops[0].state, StopState::Done);
+        }
+    }
+}
+
+#[cfg(test)]
+mod kerb_tests {
+    use super::*;
+
+    /// A street along the town, two houses north of it, their driveways onto it 48 m apart.
+    fn street() -> World {
+        let content = r#"{"needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],
+            "objects":[],"economy":{"startingFunds":500}}"#;
+        let points: Vec<String> = (0..200)
+            .map(|k| format!("[{},30]", 0.5 + k as f32))
+            .collect();
+        let town = format!(
+            r#"{{"width":200,"depth":60,
+            "exits":[{{"x":0.5,"z":30,"kind":"road"}},{{"x":199.5,"z":30,"kind":"road"}}],
+            "roads":[{{"points":[{}],"width":7,"kind":"street","ends":["out","out"]}}],
+            "plots":[{{"name":"H0","x":92,"z":8,"w":16,"d":18,"entry":[100.5,17.5]}},
+                     {{"name":"H1","x":140,"z":8,"w":16,"d":18,"entry":[148.5,17.5]}}],
+            "households":[{{"name":"F0","plot":0}},{{"name":"F1","plot":1}}],
+            "objects":[],
+            "sims":[{{"name":"A","household":0,"x":100.5,"z":17.5}},{{"name":"B","household":1,"x":148.5,"z":17.5}}],
+            "drives":[{{"plot":0,"x":100,"z":20.5,"front":1,"street":30,"road":0,"s":99.5}},
+                      {{"plot":1,"x":148,"z":20.5,"front":1,"street":30,"road":0,"s":147.5}}]}}"#,
+            points.join(",")
+        );
+        World::from_json(content, &town, 1).unwrap()
+    }
+
+    /// A house's stand as kept (`warm_kerbs`) is the one for the driveways as they are: one
+    /// moved since, it's worked out again, whoever asks (it once took `warm_kerbs` first).
+    #[test]
+    fn a_kept_stand_is_for_the_driveways_as_they_are() {
+        let mut w = street();
+        warm_kerbs(&mut w);
+        let kept = stop_for(&w, 0).expect("a stand by A's");
+        // B's driveway now meets the street just where A's taxi stood.
+        let d = w.drives.iter_mut().find(|d| d.plot == 1).unwrap();
+        d.s = Some(kept.s);
+        let fresh = kerb_at(
+            &w.travel,
+            &w.meta,
+            home_way(&w, 0).unwrap(),
+            &[],
+            &drive_mouths(&w),
+        )
+        .expect("a stand by A's still");
+        assert!((fresh.s - kept.s).abs() >= 1.0, "the stand moved clear");
+        let now = stop_for(&w, 0).expect("a stand");
+        assert_eq!((now.road, now.s), (fresh.road, fresh.s));
+        // Warmed again, the same.
+        warm_kerbs(&mut w);
+        let warm = stop_for(&w, 0).expect("a stand");
+        assert_eq!((warm.road, warm.s), (fresh.road, fresh.s));
     }
 }

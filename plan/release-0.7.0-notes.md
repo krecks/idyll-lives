@@ -47,6 +47,7 @@ Getting about town: bikes and e-scooters, lifts from the neighbours and a shared
   - the doors between rooms, and those in diagonal walls, stand shut and swing open for whoever goes through, as the front door does (they stood wide open);
   - cars turn at junctions and street corners on a curve, nosing along it and slowing for it, instead of sliding round the corner sideways;
   - a friend phoned with an invitation comes over only with time for the visit before work, as when they choose a visit themselves (one went, was let in late and left for work 39 minutes later);
+  - a guest no longer stays on with only the baby or a child once the grown-ups of the house have left for work, and isn't asked round to a house where they soon would be;
   - no "code is unreachable" warning from the grass's shader in the browser's console (WebGPU).
 
 ### Also
