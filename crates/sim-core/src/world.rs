@@ -1794,6 +1794,10 @@ pub(crate) struct SimBrief {
     pub bike_spot: Option<[f32; 2]>,
     /// The plot they're a guest on (`Sim::visiting`).
     pub guest_at: Option<u32>,
+    /// When they leave home for work or school today at the latest (`leaves_for_work`): a
+    /// household all off to work before a guest could stay `visits.leastMinutes` isn't visited
+    /// (`hosts_about_till`).
+    pub leaves: Option<u64>,
     /// The seat they eat at, or are on their way to with something to eat (`cooking::company`).
     pub eats_at: Option<u32>,
 }
@@ -2415,8 +2419,9 @@ impl World {
     }
 
     /// Whether resident `i` would set off now to visit `plot` (an invitation over the phone):
-    /// the way isn't too long, as they'd go (`leisure_way`), and they'd be there in visiting hours
-    /// (`visit_fits`).
+    /// the way isn't too long, as they'd go (`leisure_way`), they'd be there in visiting hours
+    /// (`visit_fits`), and a household living there isn't all off to work or school before they
+    /// could stay `visits.leastMinutes` (`hosts_about_till`).
     pub(crate) fn visit_fits_now(&self, i: usize, plot: u32) -> bool {
         let (Some(sim), Some(p)) = (self.sims.get(i), self.plots.get(plot as usize)) else {
             return false;
@@ -2454,12 +2459,17 @@ impl World {
             taxi,
             &mut [None, None],
         );
+        let stay = crate::mins(eta + self.content.visits.least_minutes);
         visit_fits(
             &self.content,
             eta,
             crate::clock::hour(self.tick),
             f32::INFINITY,
-        )
+        ) && self
+            .households
+            .iter()
+            .find(|h| h.plot == Some(plot))
+            .is_none_or(|h| hosts_about_till(&self.briefs, h.id) >= self.tick + stay)
     }
 
     /// The plot a tile is on (on any storey).
@@ -4412,6 +4422,7 @@ impl World {
                 bike: s.commute.and_then(|c| c.bike),
                 bike_spot: s.bike_spot.map(|(at, _)| at),
                 guest_at: s.visiting.map(|v| v.plot),
+                leaves: leaves_for_work(s, &self.content, tick),
                 eats_at: match s.current().map(|a| a.task.kind) {
                     Some(TaskKind::Eat { seat, stage: 1, .. }) => seat,
                     _ => None,
@@ -7237,10 +7248,14 @@ fn pick_autonomous(
                     &mut on,
                 );
                 // (Nor with a need that would be low by the time they could leave, that the
-                // hosts' home has nothing a guest may use for: `lasts`.)
+                // hosts' home has nothing a guest may use for: `lasts`. Nor to hosts all off to
+                // work before they could stay that long: let in, the guest was gone again 23
+                // minutes on, Stillpool.)
                 let serves = place_serves(ctx, objects, sim, plot, true);
+                let stay = eta + visits.least_minutes;
                 if visit_fits(content, eta, ctx.hour, free)
-                    && lasts(content, sim, &serves, eta + visits.least_minutes)
+                    && hosts_about_till(ctx.briefs, other.id) >= ctx.tick + crate::mins(stay)
+                    && lasts(content, sim, &serves, stay)
                 {
                     candidates.push((score, Choice::Visit(plot)));
                 }
@@ -9338,7 +9353,7 @@ fn arrive(
             } else {
                 // There: the visit is from now, the way there doesn't count (a longer one the
                 // player asked for keeps its end); an outing ends in time to be home by
-                // `visits.outingHomeBy` (`outing_leave_by`).
+                // `visits.outingHomeBy` and before work or school (`outing_leave_by`).
                 let directed = act.task.directed;
                 let leave_by = (!directed)
                     .then(|| outing_leave_by(sim, ctx, objects, plot, sim.pos))
@@ -9788,6 +9803,23 @@ fn free_before_work(sim: &Sim, ctx: &Ctx) -> f32 {
 /// When they leave for work or school today (if they haven't yet).
 fn leave_today(sim: &Sim, ctx: &Ctx) -> Option<u64> {
     leave_at(sim, ctx.content, ctx.tick)
+}
+
+/// When `sim` leaves for work or school today at the latest: as their way is timed on foot
+/// (`life::leave_for`), or now, its time gone by with work still to start (off any moment, by car
+/// as `cars::lead_ticks` has it, say: a host past her walk's time drove off to her night shift an
+/// hour on). None: nothing still to go to today.
+fn leaves_for_work(sim: &Sim, content: &Content, tick: u64) -> Option<u64> {
+    let day = crate::clock::day(tick);
+    let (leave, start, _) = match &sim.job {
+        Some(job) if job.last_shift_day != day => {
+            crate::life::shift_today(content, job, &sim.skills, tick)?
+        }
+        Some(_) => return None,
+        None if sim.school_day != day => crate::life::school_today(content, sim, tick)?,
+        None => return None,
+    };
+    (start > tick).then(|| crate::life::leave_for(sim, leave, start).max(tick))
 }
 
 /// When they leave for work or school later today (`leave_today`).
@@ -10289,6 +10321,20 @@ fn park_walk(travel: &crate::travel::Travel, door: [f32; 2], walk: f32) -> f32 {
     })
 }
 
+/// Until when someone of household `h` is about to host a guest: the latest any of them not at
+/// work (at home, or out and coming back) leaves for work or school today (`SimBrief::leaves`;
+/// never, for one with none to go to). With them all gone a guest goes home
+/// (`life::end_visit_if_due`): let in, a guest was off home again 23 minutes on, the one host
+/// gone to her night shift (Stillpool).
+fn hosts_about_till(briefs: &[SimBrief], h: u32) -> u64 {
+    briefs
+        .iter()
+        .filter(|b| b.household == h && b.here && !b.away)
+        .map(|b| b.leaves.unwrap_or(u64::MAX))
+        .max()
+        .unwrap_or(0)
+}
+
 /// Whether a visit `eta` minutes away is one to make at `hour`, with `free` minutes before
 /// they must leave for something else: not a walk of hours, there before the end of visiting
 /// hours, and time to stay and get back.
@@ -10420,8 +10466,10 @@ fn leisure_ride(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], plot: u32) -> 
 }
 
 /// The tick a guest on an outing to `plot` (a public place in an open-world town) heads home by
-/// to be home by `visits.outingHomeBy` today: the way back from `pos` on foot (or by the taxi
-/// they came by), or for one whose car is parked out for them the walk back to it and the drive. None: not such an outing.
+/// to be home by `visits.outingHomeBy` today, and before they leave for work or school
+/// (`free_before_work`, as `outing_fits` gave them time for): the way back from `pos` on foot (or
+/// by the taxi they came by), or for one whose car is parked out for them the walk back to it and
+/// the drive. None: not such an outing.
 fn outing_leave_by(
     sim: &Sim,
     ctx: &Ctx,
@@ -10465,6 +10513,14 @@ fn outing_leave_by(
     };
     let back = ((minutes + OUTING_LEAVING_MINUTES) * TICKS_PER_MINUTE as f32) as u64;
     let home_by = crate::clock::tick_at(ctx.day, content.visits.outing_home_by * 60.0)?;
+    // (Stayed on past it, they set off for work from the place: on a bike left there, a ride of
+    // two hours across a big world, Highholm.)
+    let free = free_before_work(sim, ctx);
+    let home_by = if free.is_finite() {
+        home_by.min(ctx.tick + crate::mins(free))
+    } else {
+        home_by
+    };
     Some(home_by.saturating_sub(back))
 }
 

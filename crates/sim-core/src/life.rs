@@ -83,9 +83,9 @@ pub struct Visit {
     /// run out (`end_visit_if_due`): withdrawn once it no longer is (seen to there). Not saved.
     #[serde(skip)]
     pub leaving: bool,
-    /// An outing that ends in time to be home by `visits.outingHomeBy` (`world::outing_leave_by`):
-    /// its end comes forward as they wander further from the way home. Not saved: after a load it
-    /// keeps the end it has.
+    /// An outing that ends in time to be home by `visits.outingHomeBy` and before they leave for
+    /// work or school (`world::outing_leave_by`): its end comes forward as they wander further
+    /// from the way home. Not saved: after a load it keeps the end it has.
     #[serde(skip)]
     pub home_by: bool,
 }
@@ -306,7 +306,21 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
         && !heading_out(sim)
         && let Some(&exit) = w.exits.get(c.exit)
     {
-        let walk = sim.walk_per_minute(&w.content);
+        // At the pace they'd go from there: at home, on the bike their way is timed by
+        // (`refresh_commute`); out on one, on that; else on foot. (Timed on foot from home, a
+        // cyclist set off for work hours early, from an outing, and rode two hours across a big
+        // world to it, Ashfield.)
+        let here = w.briefs.get(i).and_then(|b| b.plot);
+        let bike = if here.is_some() && here == c.home {
+            c.bike
+        } else {
+            sim.riding
+                .or(sim.bound_for_bike.filter(|_| sim.bike_parked.is_some()))
+        };
+        let speed = bike
+            .and_then(|o| w.content.objects[w.objects.get(o as usize)?.def].vehicle)
+            .map_or(1.0, |v| v.speed);
+        let walk = sim.walk_per_minute(&w.content) * speed;
         // (From over the ground: a commute timed from bed upstairs had them setting off for
         // work in the middle of the night.)
         let from = w.stairs.ground_pos(sim.pos);
@@ -359,9 +373,10 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
     planned
 }
 
-/// The longest ride out of town on a bike or e-scooter (game minutes: on a 500 m street about an
-/// hour and a half; a big world's far roads out took four): longer, the way is ridden in the work
-/// taxi or walked (`refresh_commute`), and nobody rides two hours in town.
+/// The longest ride out of town on a bike or e-scooter (game minutes: a bike's 4.5 m a real second
+/// is about 5.6 m a game minute, so some 500 m of street; a big world's far roads out took over
+/// three hours): longer, the way is ridden in the work taxi or walked (`refresh_commute`), and
+/// nobody rides two hours in town.
 const BIKE_MOST: f32 = 90.0;
 
 /// Minutes added to the walk from the front door for getting out of the house to it, and a
