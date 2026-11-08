@@ -6585,16 +6585,20 @@ fn pick_autonomous(
             .fold(0, |m, n| m | 1 << n),
         false,
     );
-    // How far away the nearest thing for each need is, and how long until they leave for work
-    // or school, or head home from where they're visiting (an outing ends in time to be home by
-    // `visits.outingHomeBy`) (minutes).
+    // How far away the nearest thing for each need is, how long until they leave for work or
+    // school, or head home from where they're visiting (an outing ends in time to be home by
+    // `visits.outingHomeBy`), and how long until they get ready to leave for work or school
+    // (`dayRhythm.readyMinutes` before it) (minutes).
     let reach = reach(sim, ctx, objects, usable, walk_per_minute);
     let visit_end = sim.visiting.filter(|v| v.arrived > 0).map(|v| v.until);
-    let until_leave = leave_today(sim, ctx)
+    let leave = leave_today(sim, ctx);
+    let until_leave = leave
         .into_iter()
         .chain(visit_end)
         .min()
         .map(|t| t.saturating_sub(ctx.tick) as f32 * MINUTES_PER_TICK);
+    let ready = social::minutes_to_ticks(content.day_rhythm.ready_minutes);
+    let until_ready = leave.map(|t| t.saturating_sub(ctx.tick + ready) as f32 * MINUTES_PER_TICK);
     // The last grown-up at home with a baby doesn't go out (`life::minding_baby`), unless for
     // an essential need about to run out that home has nothing for.
     let minding = crate::life::minding_baby(sim, ctx);
@@ -6774,8 +6778,11 @@ fn pick_autonomous(
                         .is_some_and(|p| Some(p) == ctx.households[sim.household as usize].plot);
                     // (Nobody starts on a long recipe that something would run out before it's
                     // done for, hunger too, as it's eaten only at the end; nor shortly before
-                    // leaving for work.)
-                    let minutes = r.minutes_with(stations);
+                    // leaving for work; nor one they couldn't get to, cook and eat before getting
+                    // ready to leave, as breakfast went on into getting ready. It takes all its
+                    // steps' time: those with no station here are done at one that is,
+                    // `cooking::extra_minutes`.)
+                    let minutes = r.minutes;
                     let urgent = runs_out(
                         sim,
                         content,
@@ -6785,7 +6792,8 @@ fn pick_autonomous(
                         &[0.0; MAX_NEEDS],
                         &reach,
                         low,
-                    ) || until_leave.is_some_and(|m| minutes > m);
+                    ) || until_leave.is_some_and(|m| minutes > m)
+                        || until_ready.is_some_and(|m| there + minutes + r.eat_minutes > m);
                     if urgent || !at_home || allowed != Access::Full || !r.possible(stations) {
                         continue;
                     }
