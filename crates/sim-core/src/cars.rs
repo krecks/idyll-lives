@@ -3371,7 +3371,12 @@ fn back_off(w: &mut World, c: usize) -> bool {
     };
     let (t, shift, half) = (car.progress, car.shift, [car.len / 2.0, car.wid / 2.0]);
     let to = (t - 1.0).max(0.0);
-    if to >= t || route.at(to).2 != route.at(t).2 {
+    // (Turned round, still on the stretch it backs up along, its last fraction of a tick before it
+    // drives on: a tick back along it is forward, the way it backed, and there it's turning round
+    // again (`drive_on`), with no jam rule of its own: it'd neither back up nor say it can't, and
+    // the other would wait for it for good. It can back up no further: the other does.)
+    let turned = car.detour.is_some() && route.at(t).2;
+    if to >= t || route.at(to).2 != route.at(t).2 || turned {
         return false;
     }
     let body = |t: f32| {
