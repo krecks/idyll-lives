@@ -1749,15 +1749,18 @@ fn end_visit_if_due(w: &mut World, i: usize, hour: f32) {
     };
     give_up_farewell(w, i);
     // A guest left with nothing to do while the hosts are all off at work goes home (hosts
-    // just out visiting come back; parks have no hosts).
+    // just out visiting come back; parks have no hosts). The hosts are the grown-ups, who let a
+    // guest in (`opens_door`), as `world::hosts_about_till` has them: a baby or a child at home
+    // keeps no guest.
     // (The hosts looked for only then: each tick for every guest, it was a good part of one.)
     let hosts_out = w.sims[i].current.is_none() && !w.plots[visit.plot as usize].public && {
-        let mut hosts = w
+        let content = &w.content;
+        let mut household = w
             .sims
             .iter()
             .filter(|s| s.here() && w.households[s.household as usize].plot == Some(visit.plot))
             .peekable();
-        hosts.peek().is_some() && hosts.all(|s| s.away_until.is_some())
+        household.peek().is_some() && household.all(|s| s.away_until.is_some() || !s.adult(content))
     };
     // Left standing around with nothing to do (the hosts busy, nothing they may use) for long
     // enough, a guest with free will says it's time they went (without, they're the player's

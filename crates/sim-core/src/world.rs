@@ -10344,15 +10344,16 @@ fn park_walk(travel: &crate::travel::Travel, door: [f32; 2], walk: f32) -> f32 {
     })
 }
 
-/// Until when someone of household `h` is about to host a guest: the latest any of them not at
-/// work (at home, or out and coming back) leaves for work or school today (`SimBrief::leaves`;
-/// never, for one with none to go to). With them all gone a guest goes home
-/// (`life::end_visit_if_due`): let in, a guest was off home again 23 minutes on, the one host
-/// gone to her night shift (Stillpool).
+/// Until when someone of household `h` is about to host a guest: the latest any of its grown-ups
+/// (who let a guest in, `life::opens_door`) not at work (at home, or out and coming back) leaves
+/// for work or school today (`SimBrief::leaves`; never, for one with none to go to). With them all
+/// gone a guest goes home (`life::end_visit_if_due`): let in, a guest was off home again 23
+/// minutes on, the one host gone to her night shift (Stillpool). (A baby, or a child, home all day
+/// is no host: counted, a guest stayed on with the baby once the one grown-up left for work.)
 fn hosts_about_till(briefs: &[SimBrief], h: u32) -> u64 {
     briefs
         .iter()
-        .filter(|b| b.household == h && b.here && !b.away)
+        .filter(|b| b.household == h && b.here && !b.away && b.adult)
         .map(|b| b.leaves.unwrap_or(u64::MAX))
         .max()
         .unwrap_or(0)
