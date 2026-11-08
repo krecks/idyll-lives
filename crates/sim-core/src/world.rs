@@ -1973,6 +1973,9 @@ pub struct World {
     pub(crate) while_lit: Vec<u32>,
     /// Who serves at the town's stalls and counters (see `staff.rs`); not saved.
     pub staff: crate::staff::Staff,
+    /// The walk out of town last timed from where each resident was (`life::firm_leave`). Not
+    /// saved: a memo of what it's worked out from.
+    pub(crate) walk_memo: crate::life::WalkMemo,
 }
 
 /// Read-only context for one Sim's update.
@@ -2308,6 +2311,7 @@ impl World {
             light_watch: Default::default(),
             while_lit: Vec::new(),
             staff: Default::default(),
+            walk_memo: Vec::new(),
         }
     }
 
@@ -7204,7 +7208,15 @@ fn pick_autonomous(
                 * crate::planner::visit_factor(content, sim, soon);
             // (The way there timed only for a visit worth making.)
             if score > MIN_AUTONOMY_SCORE {
-                let taxi = crate::taxi::leisure_eta(ctx.travel, ctx.exits, content, sim, pos, door);
+                let taxi = crate::taxi::leisure_eta_via(
+                    ctx.travel,
+                    ctx.exits,
+                    content,
+                    sim,
+                    pos,
+                    (Some(plot), door),
+                    &mut on,
+                );
                 let (_, eta) = leisure_way(
                     ctx.travel,
                     content,
@@ -7239,7 +7251,15 @@ fn pick_autonomous(
                     continue;
                 }
                 // By the way they'd go (`leisure_way`).
-                let taxi = crate::taxi::leisure_eta(ctx.travel, ctx.exits, content, sim, pos, door);
+                let taxi = crate::taxi::leisure_eta_via(
+                    ctx.travel,
+                    ctx.exits,
+                    content,
+                    sim,
+                    pos,
+                    (Some(p.id), door),
+                    &mut on,
+                );
                 let (_, eta) = leisure_way(
                     ctx.travel,
                     content,
