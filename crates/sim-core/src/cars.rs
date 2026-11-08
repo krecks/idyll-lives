@@ -2883,38 +2883,88 @@ pub(crate) fn may_board(w: &World, i: usize, c: u32) -> bool {
 /// on to work. 0 without one, and for one who can't drive it unless someone who can starts about
 /// when they do (so they set off together: `seat`).
 pub(crate) fn lead_ticks(w: &World, i: usize, start: u64) -> u64 {
-    let s = &w.sims[i];
-    let me = i as u32;
-    let home = w.households.get(s.household as usize).and_then(|h| h.plot);
+    lead_by(
+        &w.content,
+        w.travel.open,
+        &w.cars,
+        &w.briefs,
+        &w.households,
+        &w.plots,
+        &w.relationships,
+        w.tick,
+        &w.sims[i],
+        |j| w.sims.get(j),
+        start,
+    )
+}
+
+/// `lead_ticks` for `s` in a resident's update (`s` that one, or another of `ctx.others`): those
+/// it doesn't have, the one being updated, drive nobody.
+pub(crate) fn lead_ticks_in(ctx: &crate::world::Ctx, s: &Sim, start: u64) -> u64 {
+    lead_by(
+        ctx.content,
+        ctx.travel.open,
+        ctx.cars,
+        ctx.briefs,
+        ctx.households,
+        ctx.plots,
+        ctx.rels,
+        ctx.tick,
+        s,
+        |j| ctx.others.get(j),
+        start,
+    )
+}
+
+/// `lead_ticks` for `s`, the others by index from `sim_of`.
+#[allow(clippy::too_many_arguments)]
+fn lead_by<'a>(
+    content: &crate::content::Content,
+    open: bool,
+    cars: &[Car],
+    briefs: &[SimBrief],
+    households: &[Household],
+    plots: &[Plot],
+    rels: &crate::social::Relationships,
+    tick: u64,
+    s: &Sim,
+    sim_of: impl Fn(usize) -> Option<&'a Sim>,
+    start: u64,
+) -> u64 {
+    let me = s.id;
+    let home = households.get(s.household as usize).and_then(|h| h.plot);
     let usable = |c: &&Car| c.at_home() && !c.blocked && !c.no_way;
     // An owner who drives it and starts about when they do.
     let sets_off = |car: &Car, j: u32| {
         j != me
-            && car.driven_by(&w.briefs, j)
-            && w.sims.get(j as usize).is_some_and(|o| o.here())
-            && starts_today(w, j as usize).is_some_and(|st| st.abs_diff(start) <= BOARD_WAIT_TICKS)
+            && car.driven_by(briefs, j)
+            && sim_of(j as usize).is_some_and(|o| {
+                o.here()
+                    && crate::life::start_on(content, o, tick)
+                        .is_some_and(|st| st.abs_diff(start) <= BOARD_WAIT_TICKS)
+            })
     };
-    let own = w
-        .cars
+    let own = cars
         .iter()
         .filter(usable)
         .find(|c| c.household == s.household && Some(c.plot) == home)
-        .filter(|car| car.driven_by(&w.briefs, me) || car.owners.iter().any(|&j| sets_off(car, j)));
+        .filter(|car| car.driven_by(briefs, me) || car.owners.iter().any(|&j| sets_off(car, j)));
     // Else a lift from a neighbour leaving with them (`lift_seat`).
-    let door = home.map(|p| w.plots[p as usize].arrival_point());
+    let door = home
+        .and_then(|p| plots.get(p as usize))
+        .map(|p| p.arrival_point());
     let car = own.or_else(|| {
         let door = door?;
-        let rels = &w.relationships;
-        w.cars.iter().filter(|c| c.at_home()).find(|c| {
-            c.owners.iter().any(|&j| {
-                lift_ok(c, &w.households, rels, door, me, s.household, j) && sets_off(c, j)
-            })
+        cars.iter().filter(|c| c.at_home()).find(|c| {
+            c.owners
+                .iter()
+                .any(|&j| lift_ok(c, households, rels, door, me, s.household, j) && sets_off(c, j))
         })
     });
     let Some(car) = car else {
         return 0;
     };
-    WALK_TO_CAR_TICKS + u64::from(GET_IN_TICKS) + drive_out_ticks(car) + off_map_ticks(w)
+    WALK_TO_CAR_TICKS + u64::from(GET_IN_TICKS) + drive_out_ticks(car) + off_map(content, open)
 }
 
 /// Once in `car` for work or school: the wait for it to go and the drive out of town.
@@ -2925,16 +2975,16 @@ pub(crate) fn drive_out_ticks(car: &Car) -> u64 {
 /// The drive between the end of town and work: in an open-world town `commuteMinutes` (the
 /// part of the way off the map), else `OFF_MAP_TICKS` as ever.
 pub(crate) fn off_map_ticks(w: &World) -> u64 {
-    if w.travel.open {
-        (w.content.career_rules.commute_minutes * crate::TICKS_PER_MINUTE as f32) as u64
+    off_map(&w.content, w.travel.open)
+}
+
+/// `off_map_ticks` for a town `open` or not.
+fn off_map(content: &crate::content::Content, open: bool) -> u64 {
+    if open {
+        (content.career_rules.commute_minutes * crate::TICKS_PER_MINUTE as f32) as u64
     } else {
         OFF_MAP_TICKS
     }
-}
-
-/// When `j`'s work (or school) starts today, if they have it.
-fn starts_today(w: &World, j: usize) -> Option<u64> {
-    crate::life::start_on(&w.content, &w.sims[j], w.tick)
 }
 
 /// `i` gets in (their shift is under way): the first owner in drives (someone in before them waits

@@ -2528,25 +2528,13 @@ impl World {
         let stay = crate::mins(eta + self.content.visits.least_minutes);
         // (With time for it before they leave for work or school, as a visit they'd choose for
         // themselves: invited round, a guest let in was off to work 39 minutes on, Brightton.)
-        let by_taxi = sim
-            .taxi
-            .and_then(|b| crate::taxi::booked_leave(&self.taxis, &self.cars, self.tick, b))
-            .map(|leave| {
-                leave.saturating_sub(crate::taxi::indoor_lead(
-                    &self.content,
-                    &self.stairs,
-                    &self.households,
-                    &self.plots,
-                    sim,
-                ))
-            });
-        let free = free_before(&self.content, sim, self.tick, by_taxi);
-        visit_fits(&self.content, eta, crate::clock::hour(self.tick), free)
+        let ctx = self.ctx();
+        visit_fits(&self.content, eta, ctx.hour, free_before_work(sim, &ctx))
             && self
                 .households
                 .iter()
                 .find(|h| h.plot == Some(plot))
-                .is_none_or(|h| hosts_about_till(&self.ctx(), h.id) >= self.tick + stay)
+                .is_none_or(|h| hosts_about_till(&ctx, h.id) >= self.tick + stay)
     }
 
     /// The plot a tile is on (on any storey).
@@ -9857,46 +9845,12 @@ fn reach(
     nearest.map(|m| if m.is_finite() { m } else { 0.0 })
 }
 
-/// Minutes before `sim` must leave for work or school today, for a visit or an outing to fit: at
-/// the work taxi's time for one booked on it, as late as it runs (`taxi::booked_leave`: a late run
-/// after work began too), else at their leave (`life::leave_for`); none once that's past and work
-/// is still to start (a long walk's leave time gone by while they wait for a later taxi).
-/// Infinite with none today.
+/// Minutes before `sim` must leave for work or school today, for a visit or an outing to fit
+/// (`leaves_for_work`). Infinite with none today.
 fn free_before_work(sim: &Sim, ctx: &Ctx) -> f32 {
-    // (Sooner from further in than the run was timed with, `taxi::indoor_lead`.)
-    let by_taxi = sim
-        .taxi
-        .and_then(|b| crate::taxi::booked_leave(ctx.taxis, ctx.cars, ctx.tick, b))
-        .map(|leave| {
-            leave.saturating_sub(crate::taxi::indoor_lead(
-                ctx.content,
-                ctx.nav.stairs,
-                ctx.households,
-                ctx.plots,
-                sim,
-            ))
-        });
-    free_before(ctx.content, sim, ctx.tick, by_taxi)
-}
-
-/// `free_before_work` with the work taxi's leave (`by_taxi`, from where they are) found already.
-fn free_before(content: &Content, sim: &Sim, tick: u64, by_taxi: Option<u64>) -> f32 {
-    if let Some(leave) = by_taxi {
-        return leave.saturating_sub(tick) as f32 * MINUTES_PER_TICK;
-    }
-    let Some((leave, start, _)) = sim
-        .job
-        .as_ref()
-        .and_then(|job| crate::life::shift_today(content, job, &sim.skills, tick))
-        .or_else(|| crate::life::school_today(content, sim, tick))
-    else {
-        return f32::INFINITY;
-    };
-    if start <= tick {
-        return f32::INFINITY;
-    }
-    let leave = crate::life::leave_for(sim, leave, start);
-    leave.saturating_sub(tick) as f32 * MINUTES_PER_TICK
+    leaves_for_work(sim, ctx).map_or(f32::INFINITY, |leave| {
+        leave.saturating_sub(ctx.tick) as f32 * MINUTES_PER_TICK
+    })
 }
 
 /// When they leave for work or school today (if they haven't yet).
@@ -9904,21 +9858,43 @@ fn leave_today(sim: &Sim, ctx: &Ctx) -> Option<u64> {
     leave_at(sim, ctx.content, ctx.tick)
 }
 
-/// When `sim` leaves for work or school today at the latest: as their way is timed on foot
-/// (`life::leave_for`), or now, its time gone by with work still to start (off any moment, by car
-/// as `cars::lead_ticks` has it, say: a host past her walk's time drove off to her night shift an
-/// hour on). None: nothing still to go to today.
-fn leaves_for_work(sim: &Sim, content: &Content, tick: u64) -> Option<u64> {
+/// When `sim` (the one being updated, or one of `ctx.others`) leaves home for work or school
+/// today at the latest, as things stand: the one answer for a visit's guest (`free_before_work`)
+/// and its hosts (`hosts_about_till`), as `life`'s leaving has it. On the work taxi they're booked
+/// on, at its time (`taxi::booked_leave`, as late as it runs), sooner from further in than the
+/// run was timed with (`taxi::indoor_lead`). Else as their way is timed on foot
+/// (`life::leave_for`), or by the drive's time if that's sooner (`cars::lead_ticks`: a driver
+/// sets off by it, later than on foot as a rule, so never before this). Or now, that time gone by
+/// with work still to start (off any moment: a host past her walk's time drove off to her night
+/// shift an hour on). None: nothing still to go to today (none, done, or a day stayed home).
+fn leaves_for_work(sim: &Sim, ctx: &Ctx) -> Option<u64> {
+    let tick = ctx.tick;
+    if let Some(leave) = sim
+        .taxi
+        .and_then(|b| crate::taxi::booked_leave(ctx.taxis, ctx.cars, tick, b))
+    {
+        let indoors =
+            crate::taxi::indoor_lead(ctx.content, ctx.nav.stairs, ctx.households, ctx.plots, sim);
+        return Some(leave.saturating_sub(indoors).max(tick));
+    }
     let day = crate::clock::day(tick);
     let (leave, start, _) = match &sim.job {
         Some(job) if job.last_shift_day != day => {
-            crate::life::shift_today(content, job, &sim.skills, tick)?
+            crate::life::shift_today(ctx.content, job, &sim.skills, tick)?
         }
         Some(_) => return None,
-        None if sim.school_day != day => crate::life::school_today(content, sim, tick)?,
+        None if sim.school_day != day => crate::life::school_today(ctx.content, sim, tick)?,
         None => return None,
     };
-    (start > tick).then(|| crate::life::leave_for(sim, leave, start).max(tick))
+    if start <= tick {
+        return None;
+    }
+    let walk = crate::life::leave_for(sim, leave, start);
+    let leave = match crate::cars::lead_ticks_in(ctx, sim, start) {
+        0 => walk,
+        lead => walk.min(start.saturating_sub(lead)),
+    };
+    Some(leave.max(tick))
 }
 
 /// When they leave for work or school later today (`leave_today`).
@@ -10433,7 +10409,7 @@ fn hosts_about_till(ctx: &Ctx, h: u32) -> u64 {
         .enumerate()
         .filter(|(_, b)| b.household == h && b.here && !b.away && b.adult)
         .filter_map(|(j, _)| ctx.others.get(j))
-        .map(|s| leaves_for_work(s, ctx.content, ctx.tick).unwrap_or(u64::MAX))
+        .map(|s| leaves_for_work(s, ctx).unwrap_or(u64::MAX))
         .max()
         .unwrap_or(0)
 }
@@ -11331,7 +11307,7 @@ mod tests {
         let mut w = World::from_json(CONTENT, &town("0.5"), 7).unwrap();
         w.autonomy = false;
         w.tick_once();
-        let ada = leaves_for_work(&w.sims[0], &w.content, w.tick).expect("Ada works today");
+        let ada = leaves_for_work(&w.sims[0], &w.ctx()).expect("Ada works today");
         assert_eq!(hosts_about_till(&w.ctx(), 0), ada, "the baby is no host");
         // A grown-up at home all day keeps them about.
         let mut w = World::from_json(CONTENT, &town("30"), 7).unwrap();
@@ -11343,6 +11319,37 @@ mod tests {
         w.sims[0].away_until = Some(w.tick + 1000);
         w.tick_once();
         assert_eq!(hosts_about_till(&w.ctx(), 0), 0);
+    }
+
+    /// When a host leaves for work is when she really goes, as for a guest (`leaves_for_work`):
+    /// booked on a work taxi, at the taxi's time, not her walk's.
+    #[test]
+    fn a_host_on_a_work_taxi_leaves_at_its_time() {
+        const CONTENT: &str = r#"{
+            "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],"objects":[],
+            "careers":[{"id":"office","label":"Office","levels":[
+                {"title":"Intern","pay":100,"start":12,"hours":4,"days":[0,1,2,3,4,5,6]}]}],
+            "economy":{"startingFunds":500}}"#;
+        const TOWN: &str = r#"{"width":40,"depth":14,
+            "plots":[{"name":"West","x":0,"z":0,"w":20,"d":10,"entry":[10.5,9.5]}],
+            "households":[{"name":"Host","plot":0}],
+            "sims":[{"name":"Ada","household":0,"x":9.5,"z":8.5,"job":{"career":"office"}}]}"#;
+        let mut w = World::from_json(CONTENT, TOWN, 7).unwrap();
+        w.autonomy = false;
+        w.tick_once();
+        let walk = leaves_for_work(&w.sims[0], &w.ctx()).expect("Ada works today");
+        assert_eq!(hosts_about_till(&w.ctx(), 0), walk);
+        // Out to the kerb an hour sooner, for the taxi.
+        let kerb = walk - crate::mins(60.0);
+        let run = serde_json::json!({"id":3,"group":[0,0],"enter":kerb + 10_000,"dueOut":0,
+            "depart":0,"stops":[{"sim":0,"plot":0,"due":kerb + 100,"leave":kerb,"state":"booked"}]});
+        w.taxis.runs.push(serde_json::from_value(run).unwrap());
+        w.sims[0].taxi = Some(crate::taxi::Booking { run: 3, stop: 0 });
+        let ctx = w.ctx();
+        assert_eq!(leaves_for_work(&w.sims[0], &ctx), Some(kerb));
+        assert_eq!(hosts_about_till(&ctx, 0), kerb);
+        let free = free_before_work(&w.sims[0], &ctx);
+        assert_eq!(free, (kerb - w.tick) as f32 * MINUTES_PER_TICK);
     }
 
     /// The residents but the one being stepped (`Others`): each other one by index.
