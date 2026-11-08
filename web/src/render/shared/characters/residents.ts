@@ -55,7 +55,7 @@ import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
 import { PLAYBACK_RATE, QUIET_SPEED } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_SLACK, WALK_WAIT, biteOf, eatClip, SET_DOWN_SPOTS, spotOn, type StationSpot } from './actions';
+import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GLIDE_SECONDS, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_SLACK, WALK_WAIT, biteOf, eatClip, SET_DOWN_SPOTS, spotOn, type StationSpot } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { RIDE_BIKE, RIDE_BIKE_CHILD, RIDE_SCOOTER } from './clips/rides';
 import { FLOOR_SITS } from './clips/seated';
@@ -325,6 +325,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   readonly visible = new Uint8Array(MAX_CHARACTERS);
   /** Per row: sat in a car that drives last frame (`setCarRide`; they stay with it till it has stopped where the snapshot has it). */
   private readonly inCar = new Uint8Array(MAX_CHARACTERS);
+  /**
+   * Per row, a placement gliding (`GLIDE_SECONDS`): where from and where to (x, z, height, yaw: the snapshot's place, the
+   * newest seen), and how far along (0-1; 1 when there, and while walking, or snapped).
+   */
+  private readonly glideFrom = new Float64Array(MAX_CHARACTERS * 4);
+  private readonly glideTo = new Float64Array(MAX_CHARACTERS * 4).fill(NaN);
+  private readonly glideK = new Float64Array(MAX_CHARACTERS).fill(1);
   /**
    * Per row, the thing they ride (a bike, an e-scooter: the snapshot's `ride`, `vehicles.ts`) as drawn: its stable id
    * (-1: none), how far on it they are (`mountOn`: 0 at its place, 1 riding; `MOUNT_SECONDS` each way), and how far
@@ -1739,12 +1746,33 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // or the start and the end of every walk jump at speeds 4-5 (at speed 4 a walker covers 45 m a second: 2.25 m a step at 20 steps a second).
       // (Riding, as far as they ride between them.)
       const walking = curr[o + k.moving] > 0 || prev[o + k.moving] > 0;
-      if (walking ? Math.hypot(cx - prev[o + k.x], cz - pz) < reach * Math.max(1, mount?.ride?.speed ?? 1) : Math.abs(cx - prev[o + k.x]) + Math.abs(cz - pz) < SNAP_DISTANCE) {
-        tx = prev[o + k.x] + (cx - prev[o + k.x]) * alpha;
-        tz = pz + (cz - pz) * alpha;
-        if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * alpha;
-        tyaw = lerpAngle(prev[o + k.yaw], tyaw, alpha);
+      // Not walking (onto a bed or a seat, or off it, a settle, a turn on the spot), from where they're drawn to the
+      // snapshot's place over `GLIDE_SECONDS` whatever the tick rate, begun as the snapshot came (`alpha` into its step:
+      // at 20 ticks a second, just as it glided over the step); further than `SNAP_DISTANCE`, at once.
+      const [from, to, g] = [this.glideFrom, this.glideTo, i * 4];
+      if (walking) {
+        if (Math.hypot(cx - prev[o + k.x], cz - pz) < reach * Math.max(1, mount?.ride?.speed ?? 1)) {
+          tx = prev[o + k.x] + (cx - prev[o + k.x]) * alpha;
+          tz = pz + (cz - pz) * alpha;
+          if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * alpha;
+          tyaw = lerpAngle(prev[o + k.yaw], tyaw, alpha);
+        }
+        this.glideK[i] = 1;
+      } else {
+        const along = Math.min(1, this.glideK[i] + frameDt / GLIDE_SECONDS);
+        this.glideK[i] = along;
+        if (cx !== to[g] || cz !== to[g + 1] || ch !== to[g + 2] || tyaw !== to[g + 3]) {
+          // (From where the glide had got to: there, where it was going.)
+          if (along < 1) [from[g], from[g + 1], from[g + 2], from[g + 3]] = [lerp(from[g], to[g], along), lerp(from[g + 1], to[g + 1], along), lerp(from[g + 2], to[g + 2], along), lerpAngle(from[g + 3], to[g + 3], along)];
+          else [from[g], from[g + 1], from[g + 2], from[g + 3]] = [to[g], to[g + 1], to[g + 2], to[g + 3]];
+          if (Math.abs(cx - from[g]) + Math.abs(cz - from[g + 1]) < SNAP_DISTANCE) {
+            this.glideK[i] = Math.min(1, (alpha * frame.steps) / layout.ticksPerSecond / GLIDE_SECONDS);
+          } else this.glideK[i] = 1;
+        }
+        const at = this.glideK[i];
+        if (at < 1) [tx, tz, th, tyaw] = [lerp(from[g], cx, at), lerp(from[g + 1], cz, at), lerp(from[g + 2], ch, at), lerpAngle(from[g + 3], tyaw, at)];
       }
+      [to[g], to[g + 1], to[g + 2], to[g + 3]] = [cx, cz, ch, curr[o + k.yaw]];
       // Sat in a car that drives: in its seat where the car is drawn (`setCarRide`).
       const riding = curr[o + k.pose] === Pose.Sit && !!this.carRide?.(frame, cx, cz, curr[o + k.yaw], this.inCar[i] === 1, this.rideAt);
       this.inCar[i] = riding ? 1 : 0;
@@ -2579,7 +2607,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       rig.rising = rig.lastPose === Pose.Sit;
       [rig.riseX, rig.riseZ] = [rig.sitX, rig.sitZ];
       [rig.riseViaX, rig.riseViaZ] = rig.rising && rig.useObj?.builtIn ? this.cornerOf(rig.useObj, rig.sitX, rig.sitZ, rig.yaw, rig.tx, rig.tz) : [NaN, NaN];
-    } else if (rig.cur.key === up && !moving && pose === Pose.Stand && rig.cur.time < rig.cur.clip!.duration - 0.25) {
+    } else if (rig.cur.key === up && !moving && pose === Pose.Stand && rig.cur.time < rig.cur.clip!.duration - 0.25 && !fresh) {
+      // (Not drawn afresh, back in view part way up: the rise went on meanwhile, and its clip, held as it was when they
+      // went out of view, would put them back on their way off the seat they left: `riseK`.)
       key = up;
     }
     if (key !== 'standUp') rig.fromBed = false;
