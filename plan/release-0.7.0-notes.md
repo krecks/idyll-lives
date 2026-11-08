@@ -42,7 +42,11 @@ Getting about town: bikes and e-scooters, lifts from the neighbours and a shared
   - whether to cycle or walk to work is decided once, when the way is timed (a child timed at bike pace walked, and was late); a walk to work from a neighbour's is timed to the way out taken from there; late for work is judged by when the way gets them there;
   - a guest promised a bite stops waiting for it once nothing is coming;
   - the armoire, the party booth and the shower stall no longer have faces turned inside out, and the potting bench's seedling and the rolled yoga mat no longer show flat before they grow; the monitor takes the room on a top its screen's corners need;
-  - someone out on a visit or an outing as their household's move comes round moves another day, instead of being taken from the host's home mid-visit.
+  - someone out on a visit or an outing as their household's move comes round moves another day, instead of being taken from the host's home mid-visit;
+  - the doors between rooms, and those in diagonal walls, stand shut and swing open for whoever goes through, as the front door does (they stood wide open);
+  - cars turn at junctions and street corners on a curve, nosing along it and slowing for it, instead of sliding round the corner sideways;
+  - a friend phoned with an invitation comes over only with time for the visit before work, as when they choose a visit themselves (one went, was let in late and left for work 39 minutes later);
+  - no "code is unreachable" warning from the grass's shader in the browser's console (WebGPU).
 
 ### Also
 - **A slower day, a finer clock:** a game day lasts 30 minutes at normal speed instead of 24 (a game minute is a second and a quarter), so a day goes by more calmly, and every faster speed is slowed alike. The simulation runs 60 times a second instead of 20, so residents and cars react within a sixtieth of a second, not a twentieth. Walking and driving keep their pace, so the same walk takes a little less of the day than before. A Big world keeps up at the fastest speed: planning that was worked out again every moment for what hadn't changed (a taxi's kerb, the way out of town) is kept.

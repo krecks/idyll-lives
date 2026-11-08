@@ -49,7 +49,11 @@ Getting about town: bikes and e-scooters, lifts from the neighbours and a shared
   - whether to cycle or walk to work is decided once, when the way is timed (a child timed at bike pace walked, and was late); a walk to work from a neighbour's is timed to the way out taken from there; late for work is judged by when the way gets them there;
   - a guest promised a bite stops waiting for it once nothing is coming;
   - the armoire, the party booth and the shower stall no longer have faces turned inside out, and the potting bench's seedling and the rolled yoga mat no longer show flat before they grow; the monitor takes the room on a top its screen's corners need;
-  - someone out on a visit or an outing as their household's move comes round moves another day, instead of being taken from the host's home mid-visit.
+  - someone out on a visit or an outing as their household's move comes round moves another day, instead of being taken from the host's home mid-visit;
+  - the doors between rooms, and those in diagonal walls, stand shut and swing open for whoever goes through, as the front door does (they stood wide open);
+  - cars turn at junctions and street corners on a curve, nosing along it and slowing for it, instead of sliding round the corner sideways;
+  - a friend phoned with an invitation comes over only with time for the visit before work, as when they choose a visit themselves (one went, was let in late and left for work 39 minutes later);
+  - no "code is unreachable" warning from the grass's shader in the browser's console (WebGPU).
 
 ### Also
 - **Saves:** format 36, for the new clock: a game saved by 0.6.0 opens at the same day and minute, its cars where they were; 0.6.0 can't open 0.7.0's saves (it keeps them and lists only the ones it can open). Riding and a host's offer aren't saved: after a load, the bikes are home. A monitor on a turned corner desk it no longer fits is left out on load.
