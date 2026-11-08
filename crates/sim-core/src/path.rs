@@ -274,6 +274,7 @@ impl Grounds<'_> {
 pub const NO_PLOT: u16 = u16::MAX;
 
 /// Read-only view of what is walkable: lot edges plus tiles blocked by objects, storeys and stairs.
+#[derive(Clone, Copy)]
 pub struct NavGrid<'a> {
     pub lot: &'a Lot,
     pub blocked: &'a [bool],
