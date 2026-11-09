@@ -103,11 +103,9 @@ describe('driveways', async () => {
   const { AssetRegistry } = await import('../src/assets/registry');
   const { randomHousehold } = await import('../src/game/household');
   const { assembleTown, generateWorld, populate, useTownContent, vacantSlots } = await import('../src/game/town');
-  const { WORLD_SIZES } = await import('../src/game/world');
   const { mulberry32 } = await import('../src/game/noise');
   type Templates = import('../src/game/town').Templates;
   type WorldKind = import('../src/game/world').WorldKind;
-  type WorldSize = import('../src/core/protocol').WorldSize;
 
   const content = await Content.load('http://localhost/content/base.json');
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json');
@@ -115,35 +113,39 @@ describe('driveways', async () => {
   const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
   const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
 
-  /** A world's town file as `tools/worlds/sample.ts` makes it (its households seeded by its seed and size, the player in the first empty house). */
-  const townFile = (kind: WorldKind, size: WorldSize, seed: number): TownFile => {
-    Math.random = mulberry32(seed * WORLD_SIZES.length + WORLD_SIZES.indexOf(size));
-    const town = populate(content, assets, t, generateWorld(content, t, kind, seed, undefined, size));
+  /** A world's town file as `tools/worlds/sample.ts` makes it (its households seeded by its seed, the player in the first empty house). */
+  const townFile = (kind: WorldKind, seed: number): TownFile => {
+    Math.random = mulberry32(seed);
+    const town = populate(content, assets, t, generateWorld(content, t, kind, seed));
     const home = vacantSlots(town)[0];
     return JSON.parse(assembleTown(content, t, town, randomHousehold(content, assets, 2), home.index)) as TownFile;
   };
 
-  // Seed base 14's cosy worlds whose cars had no way out: their driveways came alongside the road
+  // Seed base 14's worlds whose cars had no way out: their driveways came alongside the road
   // (Brackenshaw's by a loop bending away from the lot's corner, Kingfisher Lake's by a junction).
-  const cosy: [WorldKind, number][] = [
+  const noWayOut: [WorldKind, number][] = [
     ['forest', 425059],
     ['lakeside', 215603],
     ['forest', 320330],
     ['dense', 320329],
     ['seaside', 215602],
   ];
-  for (const [kind, seed] of cosy) {
-    test(`cosy ${kind} ${seed}: every car can turn out of its driveway onto its road`, () => {
-      const file = townFile(kind, 'big', seed);
-      expect(file.cars.length).toBeGreaterThan(0);
-      expect(wayOutProblems(file)).toEqual([]);
-    });
+  for (const [kind, seed] of noWayOut) {
+    test(
+      `${kind} ${seed}: every car can turn out of its driveway onto its road`,
+      () => {
+        const file = townFile(kind, seed);
+        expect(file.cars.length).toBeGreaterThan(0);
+        expect(wayOutProblems(file)).toEqual([]);
+      },
+      30_000,
+    );
   }
 
   // Seed base 13's Snowdale: the driveway of plot 112 stopped where its line crossed a trail, 16 m
   // short of the lane its car drives onto, and the car drove over the grass between.
-  test('big mountain 207684 (Snowdale): every driveway is paved all the way to its road, across a trail', () => {
-    const file = townFile('mountain', 'big', 207684);
+  test('mountain 207684 (Snowdale): every driveway is paved all the way to its road, across a trail', () => {
+    const file = townFile('mountain', 207684);
     expect(file.cars.some((c) => c.plot === 112)).toBe(true);
     expect(wayOutProblems(file)).toEqual([]);
   }, 30_000);

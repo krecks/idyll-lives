@@ -64,7 +64,7 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   (`BEND`), and an area's lots keep 18 m from its junctions and off its tight bends (`CORNER`,
   `TIGHT_BEND`), so cars turn in and out on the paving.
   The sim builds its graph from the polylines: endpoints, plus joins snapped within
-  `max(width) / 2 + 1` m of the other road's middle. A new world's roads (every size) are one
+  `max(width) / 2 + 1` m of the other road's middle. A world's roads are one
   network by that rule (`game/roads.ts` `connect`: lanes go on to another road; a court or two
   per area at most, none longer than 45 m), checked by `tools/worlds/sample.ts` and
   `generated_worlds.rs`.
@@ -84,7 +84,7 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   along its polyline (m): where the driveway's line, on across the verge, comes onto it.
   `drives[].frontX?: 1 | -1` — a driveway running along x (its house's street east or west of
   it; `front` then 0). Absent: along z, as before.
-- `drives` and `cars` in towns of every size (`game/town.ts`): every house's driveway, and the
+- `drives` and `cars` in towns (`game/town.ts`): every house's driveway, and the
   households' cars on them where the street drew its parked cars (`shared/cars.ts` `houseCar`:
   the same houses, about four in five, the same bodies and paints; the player's home always has
   one when its driveway reaches the road). The renderer draws the sim's cars and no others when
@@ -167,4 +167,4 @@ lot, the rest merged into the street's chunks, every gate by the game so it swin
 - New sim tests are separate files under `crates/sim-core/tests/`, written to move into
   `tests/sim/` unchanged once PR #43 lands.
 - Before merging, run every `ci.yml` step locally.
-- Big was behind the dev flag `?big=1` (UI) until all four branches were in; it is now offered on Create World.
+- Big was behind the dev flag `?big=1` (UI) until all four branches were in; it is the only size since 0.7.1.

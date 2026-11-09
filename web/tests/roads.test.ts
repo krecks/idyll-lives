@@ -45,7 +45,7 @@ describe('roads as drawn', () => {
     for (let i = 0; i < walk.pos.length; i += 3) {
       const [x, y, z] = [walk.pos[i], walk.pos[i + 1], walk.pos[i + 2]];
       // Along `a`'s north sidewalk (its band is `a`'s kerb in from its edge), not `b`'s.
-      if (Math.abs(y - WALK_Y) > 0.001 || z < 52.3 || z > 53.5 || x < 0 || x > 100) continue;
+      if (Math.abs(y - WALK_Y) > 0.001 || z < 52.15 || z > 53.5 || x < 0 || x > 100) continue;
       xs.push(x);
     }
     // West and east of the crossing, not cut off whole.

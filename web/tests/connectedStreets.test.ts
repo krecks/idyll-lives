@@ -1,6 +1,6 @@
 // A town's streets join up (`roads.ts` `connect`): a lane's dead end goes on to the road it can
 // reach, two dead ends facing each other become one lane, and every generated world (each kind,
-// each size, a few seeds) is one road network as the sim joins its roads (an end within half the
+// a few seeds) is one road network as the sim joins its roads (an end within half the
 // wider road's width and a metre of the other's middle; sim-core `travel.rs` `Graph::build`),
 // with no more courts than its areas may keep, none reaching more than `COURT` m.
 import { afterAll, describe, expect, test } from 'bun:test';
@@ -92,33 +92,31 @@ describe('generated worlds are one network', async () => {
   const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
   const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
 
-  for (const size of ['big'] as const) {
-    test(
-      `${size} worlds`,
-      () => {
-        for (const kind of WORLD_KINDS) {
-          for (const seed of [7, 3141, 271828]) {
-            const town = generateWorld(content, t, kind, seed, undefined, size);
-            const tag = `${kind} ${size} ${seed}`;
-            const { net, joins } = networks(town.roads);
-            expect(new Set(net).size, `${tag}: networks`).toBe(1);
-            expect(town.diagnostics?.roads ?? [], `${tag}: country roads with no way`).toEqual([]);
-            const courts = new Map<number, number>();
-            town.roads.forEach((r, i) => {
-              if (r.kind === 'trail') return;
-              const L = lengths(r.points).at(-1)!;
-              for (const e of [0, 1] as const) {
-                if (r.ends[e] !== 'dead') continue;
-                courts.set(r.area ?? 0, (courts.get(r.area ?? 0) ?? 0) + 1);
-                const stub = L - Math.max(0, ...joins[i].map((s) => (e === 1 ? s : L - s)));
-                expect(stub, `${tag}: ${r.name}'s court`).toBeLessThanOrEqual(COURT + 0.5);
-              }
-            });
-            for (const [area, n] of courts) expect(n, `${tag}: courts in area ${area}`).toBeLessThanOrEqual(size === 'big' && area === 0 ? BIG_COURTS : COURTS);
-          }
+  test(
+    'big worlds',
+    () => {
+      for (const kind of WORLD_KINDS) {
+        for (const seed of [7, 3141, 271828]) {
+          const town = generateWorld(content, t, kind, seed);
+          const tag = `${kind} ${seed}`;
+          const { net, joins } = networks(town.roads);
+          expect(new Set(net).size, `${tag}: networks`).toBe(1);
+          expect(town.diagnostics?.roads ?? [], `${tag}: country roads with no way`).toEqual([]);
+          const courts = new Map<number, number>();
+          town.roads.forEach((r, i) => {
+            if (r.kind === 'trail') return;
+            const L = lengths(r.points).at(-1)!;
+            for (const e of [0, 1] as const) {
+              if (r.ends[e] !== 'dead') continue;
+              courts.set(r.area ?? 0, (courts.get(r.area ?? 0) ?? 0) + 1);
+              const stub = L - Math.max(0, ...joins[i].map((s) => (e === 1 ? s : L - s)));
+              expect(stub, `${tag}: ${r.name}'s court`).toBeLessThanOrEqual(COURT + 0.5);
+            }
+          });
+          for (const [area, n] of courts) expect(n, `${tag}: courts in area ${area}`).toBeLessThanOrEqual(area === 0 ? BIG_COURTS : COURTS);
         }
-      },
-      size === 'big' ? 240_000 : 60_000,
-    );
-  }
+      }
+    },
+    240_000,
+  );
 });

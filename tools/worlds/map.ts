@@ -36,17 +36,16 @@ type Town = {
 };
 
 const [input = 'worlds.json', dir = 'maps', ...more] = process.argv.slice(2);
-const worlds = [input, ...more].flatMap((f) => JSON.parse(readFileSync(f, 'utf8')) as { kind: string; size?: string; seed: number; name: string; town: Town }[]);
+const worlds = [input, ...more].flatMap((f) => JSON.parse(readFileSync(f, 'utf8')) as { kind: string; seed: number; name: string; town: Town }[]);
 mkdirSync(dir, { recursive: true });
 const rect = (r: Rect, style: string) => `<rect x="${r.x}" y="${r.z}" width="${r.w}" height="${r.d}" ${style}/>`;
 const line = (pts: Pt[]) => pts.map((p) => p.join(',')).join(' ');
 const ZONE: Record<string, string> = { water: '#7fb2d9', woods: '#5d8a46', hill: '#b7c48a', meadow: '#c3d98f', fields: '#e2c86b', orchard: '#7fa653' };
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const cards: string[] = [];
-for (const { kind, size, seed, name, town } of worlds) {
-  const big = true;
-  // Big worlds at 1.5 px a metre (labels in pixels, whatever the scale); the others at 5.
-  const scale = big ? 1.5 : 5;
+for (const { kind, seed, name, town } of worlds) {
+  // 1.5 px a metre, labels in pixels whatever the scale.
+  const scale = 1.5;
   const px = (n: number) => n / scale;
   // Only the ground floor (the storeys above and the basement are on rows further down).
   const ground = (z: number) => z <= town.depth;
@@ -78,14 +77,14 @@ for (const { kind, size, seed, name, town } of worlds) {
     ...(town.parking ?? []).map((p) => `<rect x="${p.x - 1.5}" y="${p.z - 1.5}" width="3" height="3" fill="#3f6fb5"/>`),
     ...exits.map((e) => `<circle cx="${e.x}" cy="${e.z}" r="${Math.max(1.5, px(5))}" fill="#d33"/>`),
     // Outdoor places' and areas' names.
-    ...(big ? town.plots.filter((p) => p.kind === 'countryside').map((p) => `<text x="${p.x + p.w / 2}" y="${p.z - px(4)}" font-size="${px(11)}" text-anchor="middle" font-family="sans-serif" fill="#5a3a12">${esc(p.name)}</text>`) : []),
+    ...town.plots.filter((p) => p.kind === 'countryside').map((p) => `<text x="${p.x + p.w / 2}" y="${p.z - px(4)}" font-size="${px(11)}" text-anchor="middle" font-family="sans-serif" fill="#5a3a12">${esc(p.name)}</text>`),
     ...(town.meta?.areas ?? []).map((a) => `<text x="${a.x + a.w / 2}" y="${a.z + a.d / 2}" font-size="${px(18)}" font-weight="700" text-anchor="middle" font-family="sans-serif" fill="#1d2230" stroke="#fff" stroke-width="${px(3)}" paint-order="stroke">${esc(a.name)}</text>`),
-    `<text x="${px(8)}" y="${px(22)}" font-size="${big ? px(16) : 4}" font-family="sans-serif">${kind}${size ? ` ${size}` : ''} ${seed}: ${esc(name)} (${town.width}×${town.depth} m)</text>`,
+    `<text x="${px(8)}" y="${px(22)}" font-size="${px(16)}" font-family="sans-serif">${kind} ${seed}: ${esc(name)} (${town.width}×${town.depth} m)</text>`,
   ];
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${town.width} ${town.depth}" width="${Math.round(town.width * scale)}" height="${Math.round(town.depth * scale)}">${parts.join('')}</svg>`;
-  const file = `${kind}${size ? `-${size}` : ''}-${seed}.svg`;
+  const file = `${kind}-${seed}.svg`;
   writeFileSync(`${dir}/${file}`, svg);
-  cards.push(`<figure><a href="${file}"><img src="${file}" loading="lazy" alt="${esc(name)}"></a><figcaption>${kind} ${size ?? 'big'} ${seed}: ${esc(name)}, ${town.width}×${town.depth} m, ${town.plots.length} plots</figcaption></figure>`);
+  cards.push(`<figure><a href="${file}"><img src="${file}" loading="lazy" alt="${esc(name)}"></a><figcaption>${kind} ${seed}: ${esc(name)}, ${town.width}×${town.depth} m, ${town.plots.length} plots</figcaption></figure>`);
 }
 writeFileSync(
   `${dir}/index.html`,

@@ -33,12 +33,12 @@ describe('garden fences', async () => {
   const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
   const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
   const key = (f: { axis: string; x: number; z: number }) => `${f.axis}:${f.x}:${f.z}`;
-  const towns = (['medium', 'dense', 'farm'] as const).map((kind) => ({ kind, size: 'big' as const, town: generateWorld(content, t, kind, 4242) }));
+  const towns = (['medium', 'dense', 'farm'] as const).map((kind) => ({ kind, town: generateWorld(content, t, kind, 4242) }));
 
   test('on tile edges of the ground, never on a wall, across a path or driveway, or in a doorway', () => {
-    for (const { kind, size, town } of towns) {
+    for (const { kind, town } of towns) {
       const layout = layoutTown(content, t, town, null);
-      const label = `${kind} ${size}`;
+      const label = kind;
       expect(layout.fences.length, label).toBeGreaterThan(20);
       const walls = new Set<string>();
       for (const [x0, z0, x1, z1] of layout.walls) {
@@ -71,9 +71,9 @@ describe('garden fences', async () => {
   });
 
   test('the same whichever lot the player takes', () => {
-    for (const { kind, size, town } of towns) {
+    for (const { kind, town } of towns) {
       const base = layoutTown(content, t, town, null).fences.map(key).sort();
-      for (const slot of vacantSlots(town).slice(0, 2)) expect(layoutTown(content, t, town, slot.index).fences.map(key).sort(), `${kind} ${size} with the player at ${slot.index}`).toEqual(base);
+      for (const slot of vacantSlots(town).slice(0, 2)) expect(layoutTown(content, t, town, slot.index).fences.map(key).sort(), `${kind} with the player at ${slot.index}`).toEqual(base);
     }
   });
 
