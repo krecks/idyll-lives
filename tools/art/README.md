@@ -61,7 +61,13 @@ All three are deterministic: the same source makes the same output.
 
 To look at the models without starting a game, run `bun run dev` and open `/gallery.html` (dev only): it draws models in
 a grid with the game's loader, finishes and plant shader (`?filter=garden`, `?keys=model.tree,model.pine`, `?cols=`,
-`?gap=`, `?pack=`; drag to orbit).
+`?gap=`, `?pack=`; drag to orbit). To look at one model closely, open `/inspect.html?key=model.<id>` (or
+the main menu's "Inspect models", under Settings on the dev server): every model by
+family on the left; its content footprint, the wall's face, a top's disc, its box, axes, wireframe and a 1.75 m figure
+over it; its size, triangles, draw calls and meshes' finishes, and the gate's report on it (`cargo check-glb <key>`, a
+button) on the right; and a timeline that plays its clips as the game does, or scrubs one. When `cargo art` writes its
+file again the inspector rebuilds it in place, so it can stay open beside Blender; a `.glb` dropped onto the page is shown
+too (with its own materials). The keys and the URL options are in `web/src/debug/inspect.ts`.
 
 Blender flow (real glTF art): `cargo art <family>` (Blender 5.2 LTS; `--preview` renders
 instead of exporting). Each family script in `blender/families/` builds its models on `blender/gamekit/`, exports `.glb`
