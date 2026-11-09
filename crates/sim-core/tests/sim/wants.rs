@@ -584,7 +584,7 @@ fn reached_ideas_just_go_and_reached_goals_cant_be_added() {
         .iter()
         .filter(|e| e.kind == EventKind::GoalReached)
         .count();
-    for _ in 0..200 {
+    for _ in 0..common::mins(10.0) {
         w.tick_once();
     }
     assert!(w.sims[0].planner.suggestions.is_empty());
@@ -606,7 +606,7 @@ fn at_work_they_eat_use_the_toilet_and_pay_for_lunch() {
     let need = |w: &World, id: &str| w.content.needs.iter().position(|n| n.id == id).unwrap();
     let (hunger, bladder) = (need(&w, "hunger"), need(&w, "bladder"));
     // Off at work for a while.
-    w.sims[0].away_until = Some(w.tick + 1000);
+    w.sims[0].away_until = Some(w.tick + common::mins(50.0));
     w.sims[0].needs[hunger] = 0.2;
     w.sims[0].needs[bladder] = 0.1;
     let funds = w.households[h].funds;

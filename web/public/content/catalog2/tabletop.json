@@ -372,13 +372,12 @@
         1,
         1
       ],
-      "price": 35,
       "category": "tabletop",
       "group": "tableware",
       "layer": "surface",
       "decor": 0.4,
       "radius": 0.19,
-      "description": "A layer cake on a white stand, cherry on top. It stands on a table, counter, desk or shelf.",
+      "description": "A layer cake on a white stand, cherry on top. Not sold: a cake is baked at the oven (Bake a cake), and one left from before stays where it stands.",
       "interactions": []
     },
     {

@@ -99,7 +99,7 @@ fn put_on(w: &mut World, table: u32, def: &str, servings: u8, made_at: u64) -> u
 }
 
 fn ticks(w: &mut World, minutes: f32) {
-    for _ in 0..(minutes / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(minutes) {
         w.tick_once();
         common::check(w);
     }
@@ -109,7 +109,7 @@ fn ticks(w: &mut World, minutes: f32) {
 /// in order. They're done when they've stopped clearing away.
 fn clearing(w: &mut World, sim: usize, minutes: f32) -> Vec<(u8, u32)> {
     let mut steps: Vec<(u8, u32)> = Vec::new();
-    for _ in 0..(minutes / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(minutes) {
         w.tick_once();
         common::check(w);
         match w.sims[sim].current() {
@@ -204,7 +204,7 @@ fn full_food_leftovers_and_empty_plates_are_all_cleared_and_scraped_into_a_bin()
     .unwrap();
     let (mut scraped, mut scraps_by_trip) = (0.0, Vec::new());
     let mut steps = Vec::new();
-    for _ in 0..(120.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(120.0) {
         w.tick_once();
         common::check(&w);
         let Some(a) = w.sims[0].current() else {
@@ -328,7 +328,7 @@ fn with_no_sink_dirty_things_go_in_the_bin() {
     for _ in 0..3 {
         put_on(&mut w, at, "plateDirty", 0, 0);
     }
-    for _ in 0..(4.0 * 60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::hours(4.0) {
         w.tick_once();
         common::check(&w);
         if !w.items.list.iter().any(|it| it.to_clear(&w.content))
@@ -355,7 +355,7 @@ fn residents_clear_away_of_their_own_accord_the_same_way() {
         put_on(&mut w, table, "plateDirty", 0, 0);
     }
     let mut steps = Vec::new();
-    for _ in 0..(6.0 * 60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::hours(6.0) {
         w.tick_once();
         common::check(&w);
         for s in &w.sims {
@@ -489,7 +489,7 @@ fn an_armful_of_plates_is_a_stack_picked_up_bent_over_the_table() {
     .unwrap();
     // At the table a while (picking them up: `pickUpMinutes`), nothing in hand yet...
     let mut picking = 0;
-    for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(30.0) {
         w.tick_once();
         let s = &w.sims[0];
         match s.current().map(|a| (a.task.kind, &a.phase)) {
@@ -523,7 +523,7 @@ fn a_stack_of_plates_put_down_part_way_is_so_many_plates() {
         action: ItemAction::Clear,
     })
     .unwrap();
-    for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(30.0) {
         w.tick_once();
         if w.sims[0].held.is_some() {
             break;
@@ -532,7 +532,7 @@ fn a_stack_of_plates_put_down_part_way_is_so_many_plates() {
     assert!(w.sims[0].held.is_some(), "carrying the stack");
     // Called away with it in hand: put down where they are, as the plates it's a stack of.
     w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
-    for _ in 0..20 {
+    for _ in 0..common::TICKS_PER_MINUTE {
         w.tick_once();
     }
     assert_eq!(w.sims[0].held, None, "put down");
@@ -558,7 +558,7 @@ fn a_half_eaten_plate_is_carried_with_its_food_until_scraped_into_the_bin() {
     .unwrap();
     let id = |w: &World| w.sims[0].held.map(|h| w.content.items[h.def].id.clone());
     let (mut before, mut after) = (Vec::new(), Vec::new());
-    for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(60.0) {
         w.tick_once();
         let Some(a) = w.sims[0].current() else { break };
         if let TaskKind::Dishes { stage, .. } = a.task.kind
@@ -597,7 +597,7 @@ fn a_half_eaten_plate_put_down_part_way_is_a_dirty_plate() {
         action: ItemAction::Clear,
     })
     .unwrap();
-    for _ in 0..(30.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(30.0) {
         w.tick_once();
         if w.sims[0].held.is_some() {
             break;
@@ -605,7 +605,7 @@ fn a_half_eaten_plate_put_down_part_way_is_a_dirty_plate() {
     }
     assert!(w.sims[0].held.is_some(), "picked up");
     w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
-    for _ in 0..20 {
+    for _ in 0..common::TICKS_PER_MINUTE {
         w.tick_once();
     }
     let dirty = w.content.item_index("plateDirty").unwrap();

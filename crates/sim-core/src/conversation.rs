@@ -23,6 +23,7 @@
 //! each other talk, or listen in, from their seats (`from_seat`), without getting up. Only what
 //! takes them closer than talking does (a hug, a kiss, a fight: `SEATED_DISTANCE`) gets them up.
 
+use crate::MINUTES_PER_TICK;
 use crate::content::{Content, MAX_NEEDS, Pose, stage_in};
 use crate::lot::{DiagDir, Edge, Lot, OUTDOORS, Side};
 use crate::path::{Grounds, NavGrid, STOREY_WALK, StairMap};
@@ -31,11 +32,10 @@ use crate::social::{self, Effect, EventKind, EventLog, Relationships, SocialDef}
 use crate::world::{
     Activity, ObjectInstance, Phase, Sim, Task, TaskKind, World, end_activity, grounds, route,
 };
-use crate::{MINUTES_PER_TICK, TICKS_PER_SECOND};
 
 /// How long an actor waits for a busy target before giving up (in all: following them about
 /// counts too, see `follow`).
-const WAIT_LIMIT_TICKS: u32 = (10.0 / MINUTES_PER_TICK) as u32;
+const WAIT_LIMIT_TICKS: u32 = (10.0 * crate::TICKS_PER_MINUTE as f32) as u32;
 /// Re-route when the target is this far from the route's end. Routes end on a tile
 /// *next to* the target (up to ~1.6 m from them), so this must exceed that.
 const REPATH_DISTANCE: f32 = 2.4;
@@ -48,8 +48,14 @@ pub(crate) const MAX_GROUP: usize = 4;
 /// How far from the middle of a conversation someone joining in can take their place in it.
 const JOIN_RANGE: f32 = 2.6;
 /// How long someone listening in waits between two of the leader's socials (for the next one
-/// to start with someone there) before they go: long enough for the leader to choose again.
-const REGROUP_TICKS: u32 = crate::TICKS_PER_SECOND * 3;
+/// to start with someone there) before they go: long enough for the leader to choose again, three
+/// real seconds of standing by (seen, as `world::AUTONOMY_DELAY_TICKS` is), past the leader's
+/// pause before choosing and their next turn at lower detail (`lod::LOD_TICKS`).
+const REGROUP_TICKS: u32 = crate::secs(3.0) as u32;
+const _: () = assert!(
+    REGROUP_TICKS > crate::world::AUTONOMY_DELAY_TICKS
+        && REGROUP_TICKS as u64 > crate::lod::LOD_TICKS
+);
 /// How close together the people in a group stand at the least.
 const GROUP_SPACING: f32 = 0.6;
 /// How far a call carries (metres of open floor; see `within_earshot`): across a room, or a
@@ -58,10 +64,11 @@ const EARSHOT: f32 = 12.0;
 /// A doorway muffles a call as much as this much more open floor: the next room is within
 /// earshot near the door.
 const DOOR_MUFFLE: f32 = 6.0;
-/// How long after someone calls out the one called hears it and turns to them.
-const HEAR_TICKS: u32 = TICKS_PER_SECOND / 2;
-/// How long someone calling out stands there before the two walk over to meet.
-const CALL_TICKS: u32 = TICKS_PER_SECOND * 3 / 2;
+/// How long after someone calls out the one called hears it and turns to them (real time: it's
+/// seen).
+const HEAR_TICKS: u32 = crate::secs(0.5) as u32;
+/// How long someone calling out stands there before the two walk over to meet (real time).
+const CALL_TICKS: u32 = crate::secs(1.5) as u32;
 /// How far apart two people sitting can talk from their seats: along a sofa, across a table,
 /// from an armchair to the sofa beside it.
 pub(crate) const SEAT_RANGE: f32 = 2.5;
@@ -70,7 +77,7 @@ pub(crate) const SEAT_RANGE: f32 = 2.5;
 pub(crate) const SEATED_DISTANCE: f32 = 0.9;
 /// How often someone sitting thinks of a word with those sitting near them, and the chance
 /// they do, each time, if anything they'd say comes to mind (`from_seat`).
-pub(crate) const SEAT_TALK_TICKS: u32 = (5.0 / MINUTES_PER_TICK) as u32;
+pub(crate) const SEAT_TALK_TICKS: u32 = (5.0 * crate::TICKS_PER_MINUTE as f32) as u32;
 pub(crate) const SEAT_TALK_CHANCE: f32 = 0.5;
 /// Someone joining in this close to their place in the group settles into it; further off,
 /// they walk there (`take_place`).
@@ -1474,7 +1481,7 @@ mod tests {
         );
     }
     use crate::world::{Phase, TICKS_PER_DAY, Task, TaskKind};
-    use crate::{Command, TICKS_PER_SECOND, World};
+    use crate::{Command, World, mins, secs};
 
     const CONTENT: &str = r#"{
         "needs":[{"id":"social","label":"Social","decayPerHour":0.1},{"id":"fun","label":"Fun","decayPerHour":0.05}],
@@ -1584,7 +1591,7 @@ mod tests {
         })
         .unwrap();
         let mut talked = false;
-        for _ in 0..TICKS_PER_SECOND * 30 {
+        for _ in 0..secs(30.0) {
             w.tick_once();
             if w.sims[0].conversation(&w.content).is_some() {
                 talked = true;
@@ -1616,7 +1623,7 @@ mod tests {
         assert!(w.sims[0].conversation(&w.content).is_some());
         join(&mut w, 2, 0);
         let mut listened = false;
-        for _ in 0..TICKS_PER_SECOND * 10 {
+        for _ in 0..secs(10.0) {
             w.tick_once();
             if w.sims[2].listening_to() == Some(0) {
                 listened = true;
@@ -1655,7 +1662,7 @@ mod tests {
         w.sims[0].needs[0] = 0.1;
         w.sims[1].needs[0] = 0.1;
         let before = w.relationships.get(0, 1).friendship;
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 120);
+        ticks(&mut w, mins(120.0));
         assert!(
             w.relationships.get(0, 1).friendship > before,
             "they never talked"
@@ -1697,7 +1704,7 @@ mod tests {
         })
         .unwrap();
         let mut talked = false;
-        for _ in 0..TICKS_PER_SECOND * 30 {
+        for _ in 0..mins(30.0) {
             w.tick_once();
             if matches!(
                 w.sims[0].current.as_ref().map(|a| &a.phase),
@@ -1732,7 +1739,7 @@ mod tests {
             social: flirt,
         })
         .unwrap();
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 20);
+        ticks(&mut w, mins(20.0));
         assert!(
             w.events
                 .iter()
@@ -1746,7 +1753,7 @@ mod tests {
             social: ask,
         })
         .unwrap();
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 20);
+        ticks(&mut w, mins(20.0));
         assert!(w.relationships.get(0, 2).partners);
         assert!(!w.relationships.get(0, 1).partners);
         assert!(
@@ -1777,7 +1784,7 @@ mod tests {
             social: fight,
         })
         .unwrap();
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 20);
+        ticks(&mut w, mins(20.0));
         assert!(w.relationships.get(0, 1).friendship < before);
         let e = w
             .events
@@ -1821,7 +1828,7 @@ mod tests {
             social: chat,
         })
         .unwrap();
-        for _ in 0..TICKS_PER_SECOND * 5 {
+        for _ in 0..secs(5.0) {
             w.tick_once();
             if w.sims[0].conversation(&w.content).is_some() {
                 return w;
@@ -1857,7 +1864,7 @@ mod tests {
         // there is.
         w.autonomy = true;
         let mut joined = false;
-        for _ in 0..TICKS_PER_SECOND * 6 {
+        for _ in 0..secs(6.0) {
             w.tick_once();
             if w.sims[2].listening_to() == Some(0) {
                 joined = true;
@@ -1891,7 +1898,7 @@ mod tests {
             w.relationships.get(1, 2).friendship,
         );
         let mut ended = false;
-        for _ in 0..TICKS_PER_SECOND * 15 {
+        for _ in 0..mins(15.0) {
             w.tick_once();
             if w.sims[0].conversation(&w.content).is_none() {
                 ended = true;
@@ -1926,7 +1933,7 @@ mod tests {
     fn listeners_stay_for_the_next_social_with_the_group() {
         let mut w = chatting(r#",{"name":"C","x":9.5,"z":9.5}"#);
         join(&mut w, 2, 0);
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 5);
+        ticks(&mut w, secs(5.0));
         assert_eq!(listeners(&w, 0), 1);
         // The player has A chat with B again right after: C stays for it.
         let chat = w.content.social_index("chat").unwrap();
@@ -1937,7 +1944,7 @@ mod tests {
         })
         .unwrap();
         let mut gap = false;
-        for _ in 0..TICKS_PER_SECOND * 30 {
+        for _ in 0..mins(30.0) {
             w.tick_once();
             if w.sims[0].conversation(&w.content).is_none() {
                 gap = true;
@@ -1962,7 +1969,7 @@ mod tests {
         // The leader's conversation cancelled: the listener goes.
         let mut w = chatting(r#",{"name":"C","x":9.5,"z":9.5}"#);
         join(&mut w, 2, 0);
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 5);
+        ticks(&mut w, secs(5.0));
         assert_eq!(listeners(&w, 0), 1);
         w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
         ticks(&mut w, super::REGROUP_TICKS as u64 + 2);
@@ -1972,7 +1979,7 @@ mod tests {
         // The listener called away: the others talk on.
         let mut w = chatting(r#",{"name":"C","x":9.5,"z":9.5}"#);
         join(&mut w, 2, 0);
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 5);
+        ticks(&mut w, secs(5.0));
         assert_eq!(listeners(&w, 0), 1);
         w.apply(Command::Cancel { sim: 2, index: 0 }).unwrap();
         ticks(&mut w, 2);
@@ -1984,7 +1991,7 @@ mod tests {
         // The one who started it leaves town: nobody waits for them.
         let mut w = chatting(r#",{"name":"C","x":9.5,"z":9.5}"#);
         join(&mut w, 2, 0);
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 5);
+        ticks(&mut w, secs(5.0));
         assert_eq!(listeners(&w, 0), 1);
         w.depart(0, crate::world::GoneWhy::MovedAway);
         assert!(w.sims[2].current.is_none());
@@ -2000,7 +2007,7 @@ mod tests {
         for k in 2..5 {
             join(&mut w, k, 0);
         }
-        for _ in 0..TICKS_PER_SECOND * 6 {
+        for _ in 0..secs(6.0) {
             w.tick_once();
             assert!(listeners(&w, 0) <= 2);
         }
@@ -2051,7 +2058,7 @@ mod tests {
         );
 
         join(&mut w, 2, 0);
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 5);
+        ticks(&mut w, secs(5.0));
         assert_eq!(listeners(&w, 0), 1);
         let group = super::group(&w.sims, &w.content, 0);
         assert_eq!(group.len(), 3);
@@ -2094,7 +2101,7 @@ mod tests {
     fn listening_in_is_not_saved() {
         let mut w = chatting(r#",{"name":"C","x":9.5,"z":9.5}"#);
         join(&mut w, 2, 0);
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 5);
+        ticks(&mut w, secs(5.0));
         assert_eq!(listeners(&w, 0), 1);
         let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
         assert!(loaded.sims[2].current.is_none() && loaded.sims[2].queue.is_empty());
@@ -2125,7 +2132,7 @@ mod tests {
         })
         .unwrap();
         let mut seen = None;
-        for _ in 0..TICKS_PER_SECOND * 5 {
+        for _ in 0..secs(5.0) {
             w.tick_once();
             if let Some((_, _, success, progress)) = w.sims[0].conversation(&w.content) {
                 seen = Some((

@@ -348,7 +348,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   ten past ten is 610). The game holds each where the game's time has it, as state rather than motion:
   on every preset, set each game minute (each five on Low) for the clocks within the ambient range
   (30 m at least, and on Low), and not at all for the others until they come near. No second hand: at
-  normal speed a game minute is a real second.
+  normal speed a game minute is a second and a quarter.
   ```json
   "motions": { "clock": { "hour": "hour_hand", "minute": "minute_hand", "at": 610 } }
   ```

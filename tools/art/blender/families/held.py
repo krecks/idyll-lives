@@ -1422,6 +1422,29 @@ def pieDishDirty():
     return done('pieDishDirty')
 
 
+def cakeStandDirty():
+    """The cake stand emptied (the baked cake's, as `tabletop.py` `cakeStand` draws it: a turned foot, a knop on its
+    stem, the plate's raised edge): smears of icing and crumbs of sponge on the plate, the cherry's stalk and the
+    cake server left on it."""
+    top = 0.102
+    lathe('stand', [(0, 0), (0.078, 0.0), (0.08, 0.008), (0.03, 0.022), (0.02, 0.06), (0.026, 0.072), (0.02, 0.084),
+                    (0.13, 0.092), (0.14, 0.1), (0, top)], M.china, segments=16)
+    blob('icing', (0.02, top, 0.01), 0.07, 0.05, 0.0018, M.cake_icing, seed=1.1, yaw=15, n=10)
+    blob('icing_drip', (-0.07, top, -0.05), 0.022, 0.014, 0.0014, M.cake_icing, seed=3.4, yaw=-30)
+    for i, (x, z) in enumerate(((-0.05, 0.06), (0.06, -0.06), (0.09, 0.03), (-0.02, -0.08), (0.03, 0.09), (-0.09, 0.0),
+                                (0.07, 0.07))):
+        lump(f'crumb{i}', 0.005 + 0.0015 * (i % 3), (x, top, z), M.sponge_crumb, scale=(1.2, 0.7, 1), seed=0.9 * i)
+    G.sweep('cherry_stalk', [(-0.03, top + 0.001, 0.03), (-0.024, top + 0.002, 0.036), (-0.016, top + 0.001, 0.04)],
+            0.0018, material=M.stalk, verts=4)
+    blade = [(0.0, 0.0), (0.06, -0.028), (0.066, -0.026), (0.07, -0.012), (0.07, 0.012), (0.066, 0.026), (0.06, 0.028)]
+    F.extrude('server', [(u - 0.08, v) for u, v in blade], 0.0016, (0.0, top + 0.0018, -0.02), M.steel, plane='top',
+              rot=(0, 0, -20))
+    F.sweep('server_handle', [(-0.0094, top + 0.0024, -0.0166), (0.0235, top + 0.004, -0.0286),
+                              (0.094, top + 0.006, -0.0542)],
+            None, M.steel, profile=G.rounded_rect(0.003, 0.009, 0.0012, corner=1), scale=[0.6, 0.9, 1.1])
+    return done('cakeStandDirty')
+
+
 # --- tools: on the station while a resident cooks ---------------------------------------------------------------
 def board():
     """The chopping board: rounded corners, a juice groove round its face and a slot to hang it by; a carrot half
@@ -2224,6 +2247,7 @@ FAMILY = G.Family(
         I('boardDirty', boardDirty, (0.4, 0.04, 0.24), 'item.boardDirty'),
         I('pizzaBoardDirty', pizzaBoardDirty, (0.4, 0.038, 0.4), 'item.pizzaBoardDirty'),
         I('pieDishDirty', pieDishDirty, (0.26, 0.047, 0.26), 'item.pieDishDirty'),
+        I('cakeStandDirty', cakeStandDirty, (0.28, 0.114, 0.28), 'item.cakeStandDirty'),
         I('board', board, (0.34, 0.055, 0.24), 'tool.board'),
         # the handle reaches 2 cm further back than the old part's crossbar: the pan stays on its middle
         I('pan', pan, (0.28, 0.061, 0.395), 'tool.pan', centre=(0.0, 0.0575)),

@@ -9,6 +9,7 @@
 //! (`long_run_probe`: `DAYS=60 SEEDS=7,11` by default; `LOD=1` looks at the player's home).
 
 use crate::common;
+use common::{TICKS_PER_HOUR, TICKS_PER_MINUTE, hours, mins};
 
 use std::collections::{BTreeMap, VecDeque};
 
@@ -48,9 +49,9 @@ fn someone_too_tired_to_talk_leaves_others_be() {
     w.sims[1].needs[..3].copy_from_slice(&[1.0, 1.0, 0.2]);
     // Chats Bob is pulled into that end straight away (his reading dropped for nothing).
     let (mut cut_short, mut since) = (0, None);
-    for t in 0..20 * 30 {
+    for t in 0..mins(30.0) {
         w.tick_once();
-        if std::env::var("SHOW").is_ok() && t % 20 == 0 {
+        if std::env::var("SHOW").is_ok() && t.is_multiple_of(TICKS_PER_MINUTE) {
             eprintln!(
                 "{t}: Ann {:?} | Bob {:?} engaged {:?}",
                 w.sims[0]
@@ -99,7 +100,7 @@ fn told_to_chat_while_about_to_drop_they_leave_the_other_be() {
         interaction: 0,
     })
     .unwrap();
-    for _ in 0..20 * 3 {
+    for _ in 0..mins(3.0) {
         w.tick_once();
     }
     assert!(
@@ -115,7 +116,7 @@ fn told_to_chat_while_about_to_drop_they_leave_the_other_be() {
         social: 0,
     })
     .unwrap();
-    for _ in 0..20 * 5 {
+    for _ in 0..mins(5.0) {
         w.tick_once();
         assert!(
             w.sims[1].engaged_with.is_none(),
@@ -151,7 +152,7 @@ fn nobody_follows_someone_over_the_fence_for_a_chat() {
     w.sims[0].needs[..2].copy_from_slice(&[0.1, 1.0]);
     w.sims[1].needs[..2].copy_from_slice(&[1.0, 0.1]);
     let (mut went_after, mut talked) = (false, false);
-    for _ in 0..20 * 40 {
+    for _ in 0..mins(40.0) {
         w.tick_once();
         went_after |= matches!(
             w.sims[0].current().map(|a| a.task.kind),
@@ -179,7 +180,7 @@ fn someone_calls_a_housemate_and_they_meet_halfway() {
     w.sims[0].needs[..3].copy_from_slice(&[1.0, 0.1, 1.0]);
     w.sims[1].needs[..3].copy_from_slice(&[1.0, 1.0, 1.0]);
     let (mut called, mut heeded) = (false, false);
-    for _ in 0..20 * 30 {
+    for _ in 0..mins(30.0) {
         w.tick_once();
         let phase = w.sims[0]
             .current()
@@ -207,7 +208,7 @@ fn nobody_chats_with_someone_out_of_earshot() {
     );
     w.sims[0].needs[..3].copy_from_slice(&[1.0, 0.1, 1.0]);
     w.sims[1].needs[..3].copy_from_slice(&[1.0, 1.0, 1.0]);
-    for _ in 0..20 * 60 {
+    for _ in 0..mins(60.0) {
         w.tick_once();
         let social = matches!(
             w.sims[0].current().map(|a| a.task.kind),
@@ -235,7 +236,7 @@ fn told_to_chat_from_afar_they_walk_until_in_earshot() {
     })
     .unwrap();
     let phase = |w: &World| w.sims[0].current().map(|a| phase_name(&a.phase));
-    for _ in 0..20 * 60 {
+    for _ in 0..mins(60.0) {
         w.tick_once();
         if phase(&w) == Some("Calling") {
             break;
@@ -247,7 +248,7 @@ fn told_to_chat_from_afar_they_walk_until_in_earshot() {
         gap > 2.0 && w.within_earshot(w.sims[0].pos, w.sims[1].pos),
         "Ann called from {gap:.1} m"
     );
-    for _ in 0..20 * 60 {
+    for _ in 0..mins(60.0) {
         w.tick_once();
         if phase(&w) == Some("Conversing") {
             break;
@@ -272,7 +273,7 @@ fn nobody_follows_someone_across_town_for_a_chat() {
             Some(TaskKind::Social { target: 1, .. })
         )
     };
-    for _ in 0..20 * 10 {
+    for _ in 0..mins(10.0) {
         if chatting(&w) {
             break;
         }
@@ -286,7 +287,7 @@ fn nobody_follows_someone_across_town_for_a_chat() {
     }
     let mut minutes = 0;
     while chatting(&w) && minutes < 120 {
-        for _ in 0..20 {
+        for _ in 0..TICKS_PER_MINUTE {
             w.tick_once();
         }
         minutes += 1;
@@ -319,7 +320,7 @@ fn an_urgent_need_doesnt_choose_a_programme_it_would_stop_at_once() {
     // Bored and about to burst: the TV is tempting, but watching it would be cut off at once.
     w.sims[0].needs[..3].copy_from_slice(&[0.0, 0.05, 1.0]);
     let (mut tv_starts, mut toilet, mut was) = (0, false, false);
-    for _ in 0..20 * 30 {
+    for _ in 0..mins(30.0) {
         w.tick_once();
         let using_tv = matches!(
             w.sims[0].current().map(|a| (&a.task.kind, &a.phase)),
@@ -358,7 +359,7 @@ fn practising_with_nothing_else_to_do_doesnt_stutter() {
     let mut w = World::from_json(content, lot, 5).unwrap();
     w.sims[0].needs[0] = 1.0;
     let (mut starts, mut was) = (0, false);
-    for _ in 0..20 * 30 {
+    for _ in 0..mins(30.0) {
         w.tick_once();
         let now = matches!(
             w.sims[0].current().map(|a| &a.phase),
@@ -407,7 +408,7 @@ fn worn_out_with_every_bed_taken_they_still_finish_on_the_toilet() {
     .unwrap();
     w.sims[0].needs[..2].copy_from_slice(&[0.05, 0.3]);
     let mut on_toilet = 0;
-    for _ in 0..20 * 20 {
+    for _ in 0..mins(20.0) {
         w.tick_once();
         w.sims[0].needs[0] = 0.05;
         if matches!(w.sims[0].current(), Some(a) if matches!(a.task.kind, TaskKind::Use { object: 1, .. }) && matches!(a.phase, Phase::Using { .. }))
@@ -457,7 +458,7 @@ fn practice_lasts_its_time_while_the_skill_is_wanted() {
         })
         .unwrap();
         let mut using = 0;
-        for _ in 0..20 * 30 {
+        for _ in 0..mins(30.0) {
             w.tick_once();
             using += usize::from(matches!(
                 w.sims[0].current().map(|a| &a.phase),
@@ -528,7 +529,7 @@ fn an_order_holds_against_needs() {
         .unwrap();
         let (mut watched, mut other) = (0u64, None);
         // (Time for the walk home first: at noon with free will on they may be out in town.)
-        for _ in 0..150 * sim_core::TICKS_PER_MINUTE {
+        for _ in 0..mins(150.0) {
             w.tick_once();
             match w.sims[sim].current().map(|a| (a.task.kind, &a.phase)) {
                 Some((TaskKind::Use { object, .. }, Phase::Using { .. })) if object == tv_at => {
@@ -542,7 +543,7 @@ fn an_order_holds_against_needs() {
                 }
             }
         }
-        let minutes = watched / sim_core::TICKS_PER_MINUTE;
+        let minutes = watched / TICKS_PER_MINUTE;
         assert!(
             other.is_none(),
             "free will {free_will}: {other:?} after {minutes} minutes of television"
@@ -876,7 +877,7 @@ fn probe(days: u32, seed: u64) -> Probe {
     let mut tracks: Vec<Track> = Vec::new();
     let end = clock::tick_at(days + 1, 8.0 * 60.0).unwrap();
     let started = std::time::Instant::now();
-    let hour = (60.0 / sim_core::MINUTES_PER_TICK) as u64;
+    let hour = TICKS_PER_HOUR;
     while w.tick < end {
         w.tick_once();
         let tick = w.tick;
@@ -935,8 +936,8 @@ fn probe(days: u32, seed: u64) -> Probe {
                     // The same again right after a stretch of it that ended within a minute.
                     if let Some(&(x, from, to)) = d.last()
                         && x == k
-                        && tick - to <= 20
-                        && to - from <= 20
+                        && tick - to <= TICKS_PER_MINUTE
+                        && to - from <= TICKS_PER_MINUTE
                     {
                         note(&mut p.quick_redo, kind_name(&w, k));
                         t.redo_chain += 1;
@@ -1026,7 +1027,7 @@ fn probe(days: u32, seed: u64) -> Probe {
             if s.is_moving() {
                 match t.still_since {
                     Some((from, at)) if at == s.pos => {
-                        if tick - from == 100 {
+                        if tick - from == common::secs(5.0) {
                             p.stuck_walking += 1;
                         }
                     }
@@ -1133,7 +1134,7 @@ fn long_run_probe() {
             top(&p.short, 10)
         );
         eprintln!(
-            "most chases in one social: {:?}; longest engaged {:.1} min; walking without moving 100+ ticks: {}",
+            "most chases in one social: {:?}; longest engaged {:.1} min; walking without moving 5+ s: {}",
             p.most_chases,
             minutes(p.longest_engaged),
             p.stuck_walking
@@ -1250,7 +1251,7 @@ fn trace() {
             if let Ok(every) = std::env::var("WATCH")
                 && clock::day(tick) == days
                 && (window("FROM", 0.0)..window("TO", 1440.0)).contains(&clock::minute_of_day(tick))
-                && tick.is_multiple_of(every.parse().unwrap_or(20))
+                && tick.is_multiple_of(every.parse().unwrap_or(TICKS_PER_MINUTE))
             {
                 let target = match w.sims[i].current().map(|a| a.task.kind) {
                     Some(TaskKind::Social { target, .. } | TaskKind::Join { leader: target }) => {
@@ -1273,7 +1274,7 @@ fn trace() {
                         );
                     }
                     if !matches!(old, Key::Idle | Key::Away) {
-                        if name.contains(&pat) && tick - since <= 20 {
+                        if name.contains(&pat) && tick - since <= TICKS_PER_MINUTE {
                             eprintln!(
                                 "{when} SHORT {name} lasted {} ticks; the tick before: {}",
                                 tick - since,
@@ -1286,7 +1287,7 @@ fn trace() {
                     if !matches!(k, Key::Idle | Key::Away)
                         && let Some((x, from, to)) = ended[i]
                         && x == k
-                        && tick - to <= 20
+                        && tick - to <= TICKS_PER_MINUTE
                         && kind_name(&w, k).contains(&pat)
                     {
                         eprintln!(
@@ -1304,14 +1305,14 @@ fn trace() {
             }
             if let Some((k, since)) = last[i]
                 && !matches!(k, Key::Idle | Key::Away)
-                && (tick - since).is_multiple_of(3 * 60 * 20)
+                && (tick - since).is_multiple_of(hours(3.0))
                 && tick > since
                 && kind_name(&w, k).contains(&pat)
             {
                 eprintln!(
                     "{when} LONG {} for {} h: {}",
                     kind_name(&w, k),
-                    (tick - since) / 1200,
+                    (tick - since) / TICKS_PER_HOUR,
                     describe(&w, i)
                 );
                 printed += 1;

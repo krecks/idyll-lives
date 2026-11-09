@@ -138,7 +138,7 @@ fn urgent_needs_still_come_first() {
         .position(|n| n.id == "bladder")
         .unwrap();
     w.sims[0].needs[bladder] = 0.03;
-    for _ in 0..(20 * 60 * 2) {
+    for _ in 0..common::hours(2.0) {
         w.tick_once();
         if w.sims[0].needs[bladder] > 0.5 {
             return;

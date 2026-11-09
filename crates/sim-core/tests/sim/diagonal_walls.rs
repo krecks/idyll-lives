@@ -165,7 +165,7 @@ fn residents_walk_around_diagonal_walls_and_in_through_the_door() {
     })
     .unwrap();
     let mut via_door = false;
-    for _ in 0..4000 {
+    for _ in 0..sim_core::secs(200.0) {
         w.tick_once();
         let (x, z) = w.sims[0].tile();
         assert!(

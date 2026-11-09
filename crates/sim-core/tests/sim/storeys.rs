@@ -133,7 +133,7 @@ fn residents_climb_the_stairs_to_use_things_upstairs() {
     })
     .unwrap();
     let mut climbing = false;
-    for _ in 0..20 * 60 * 5 {
+    for _ in 0..sim_core::mins(300.0) {
         w.tick_once();
         let h = height(&w, 0);
         climbing |= h > 0.2 && h < 0.8;
@@ -275,7 +275,7 @@ fn a_neighbour_climbs_the_stairs_at_lower_detail() {
     };
     let sitting = |w: &World| w.sims[1].pose == sim_core::content::Pose::Sit;
     let mut lower = 0;
-    for t in 0..20 * 60 * 5 {
+    for t in 0..sim_core::mins(300.0) {
         w.tick_once();
         lower += usize::from(!w.full_detail(1));
         if sitting(&w) {

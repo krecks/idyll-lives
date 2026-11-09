@@ -274,6 +274,7 @@ impl Grounds<'_> {
 pub const NO_PLOT: u16 = u16::MAX;
 
 /// Read-only view of what is walkable: lot edges plus tiles blocked by objects, storeys and stairs.
+#[derive(Clone, Copy)]
 pub struct NavGrid<'a> {
     pub lot: &'a Lot,
     pub blocked: &'a [bool],
@@ -1025,8 +1026,9 @@ pub struct NavLog {
 
 /// Places `NavLog` keeps: at least as many ticks as a resident far from the view waits between
 /// turns (`lod::FAR_TICKS`), so one that keeps walking while cars come and go every tick still
-/// finds what changed since its last turn.
-pub const NAV_LOG: usize = 64;
+/// finds what changed since its last turn; rounded up to a power of two (64 for three game minutes
+/// of 20 ticks).
+pub const NAV_LOG: usize = (crate::lod::FAR_TICKS as usize).next_power_of_two();
 const _: () = assert!(NAV_LOG as u64 >= crate::lod::FAR_TICKS);
 
 /// The most separate patches one place in `NavLog` keeps (more: the two earlier ones whose box

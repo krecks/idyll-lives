@@ -204,7 +204,7 @@
       "rot": 3
     },
     {
-      "def": "sink",
+      "def": "sinkPedestal",
       "x": 15,
       "z": 4,
       "rot": 0

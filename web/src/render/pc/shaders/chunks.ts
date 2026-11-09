@@ -11,10 +11,12 @@
  *
  * - `vsDecl`, `vsEnd`: `litUserDeclarationVS`, `litUserMainEndVS`.
  * - `normalVS`: an instanced draw's normal corrected for uneven scale (`INSTANCE_NORMAL`).
- * - `vsNormal`: before that, in `normalVS`'s `getNormal`, a feature's own normal (it returns
- *   `normalize(dNormalMatrix * n)` with its local `n`; `getNormal` runs after `getLocalPosition`,
- *   so a normal worked out there can be kept in a variable of its own: the grass's blades). The
- *   first feature to return wins: one feature at most.
+ * - `vsNormal`: before that, in `normalVS`'s `getNormal`, a feature's own normal where its defines
+ *   are set (`when`; its `code` returns `normalize(dNormalMatrix * n)` with its local `n`;
+ *   `getNormal` runs after `getLocalPosition`, so a normal worked out there can be kept in a
+ *   variable of its own: the grass's blades). The features' normals, the instanced one and the
+ *   engine's are one `#if`/`#elif`/`#else` chain, so nothing follows a return (WGSL warns of
+ *   unreachable code); the first feature whose defines are set wins.
  * - `vsLocal`: the vertex's local (game-space) position, `localPos`, after morphing and before the
  *   model matrix, in `transformCoreVS`'s `getLocalPosition` (instanced draws too). Wind and
  *   blankets add their snippets here, or a `transformInstancingVS` of their own.
@@ -79,7 +81,7 @@ export function codeFor(lang: Language) {
 export interface FeatureCode {
   vsDecl?: string;
   vsLocal?: string;
-  vsNormal?: string;
+  vsNormal?: { when: string; code: string };
   vsEnd?: string;
   psDecl?: string;
   psStart?: string;
@@ -210,7 +212,7 @@ export function replaceOnce(code: string, name: string, anchor: string, replacem
   return code.slice(0, at) + replacement + code.slice(at + anchor.length);
 }
 
-function joined(lang: Language, slot: keyof Omit<FeatureCode, 'end'>): string {
+function joined(lang: Language, slot: keyof Omit<FeatureCode, 'end' | 'vsNormal'>): string {
   return features
     .map((f) => f[lang][slot])
     .filter((c): c is string => !!c)
@@ -255,7 +257,9 @@ function build(device: pc.GraphicsDevice, lang: Language): Record<string, string
   out.endPS = ends.length ? `#if ${ends.map((e) => e.when).join(' || ')}\n${ends.map((e) => e.code).join('\n')}\n#else\n${engineEnd}\n#endif\n` : engineEnd;
 
   // An instance's normal corrected for uneven scale (`INSTANCE_NORMAL`).
-  out.normalVS = replaceOnce(engineChunk(device, lang, 'normalVS'), 'normalVS', ANCHORS[lang].normalVS, `${joined(lang, 'vsNormal')}\n${INSTANCE_NORMAL[lang]}`);
+  const normals = [...features.map((f) => f[lang].vsNormal).filter((n) => !!n), { when: 'defined(GAME_LOOK) && defined(INSTANCING)', code: INSTANCE_NORMAL[lang] }];
+  const normal = `${normals.map((n, i) => `${i ? '#elif' : '#if'} ${n.when}\n${n.code}`).join('\n')}\n#else\n\t${ANCHORS[lang].normalVS}\n#endif`;
+  out.normalVS = replaceOnce(engineChunk(device, lang, 'normalVS'), 'normalVS', ANCHORS[lang].normalVS, normal);
 
   out.uv0VS = glsl ? UV0_GLSL : UV0_WGSL;
   // The game's haze (`fog.ts`).
@@ -277,7 +281,7 @@ function build(device: pc.GraphicsDevice, lang: Language): Record<string, string
 }
 
 /**
- * `normalVS`'s normal for an instanced draw of the game's lit materials:
+ * `normalVS`'s normal for an instanced draw of the game's lit materials (`GAME_LOOK` and `INSTANCING`):
  * `normalize(M · (n / (|M₀|², |M₁|², |M₂|²)))` with M the model matrix's 3 × 3 (PlayCanvas's normal
  * matrix for instanced draws), the inverse transpose for a matrix of axis scales and a rotation: an
  * instance scaled unevenly (a quilt fitted to its bed, a resized object) shades as it should. The
@@ -285,18 +289,10 @@ function build(device: pc.GraphicsDevice, lang: Language): Record<string, string
  * collapsed copy, all zeros, gets no normal; it draws nothing.)
  */
 const INSTANCE_NORMAL: Record<Language, string> = {
-  glsl: `#if defined(GAME_LOOK) && defined(INSTANCING)
-		vec3 gameScale2 = max(vec3(dot(dNormalMatrix[0], dNormalMatrix[0]), dot(dNormalMatrix[1], dNormalMatrix[1]), dot(dNormalMatrix[2], dNormalMatrix[2])), vec3(1e-20));
-		return normalize(dNormalMatrix * (localNormal / gameScale2));
-	#else
-		return normalize(dNormalMatrix * localNormal);
-	#endif`,
-  wgsl: `#if defined(GAME_LOOK) && defined(INSTANCING)
-		let gameScale2 = max(vec3f(dot(dNormalMatrix[0], dNormalMatrix[0]), dot(dNormalMatrix[1], dNormalMatrix[1]), dot(dNormalMatrix[2], dNormalMatrix[2])), vec3f(1e-20));
-		return normalize(dNormalMatrix * (localNormal / gameScale2));
-	#else
-		return normalize(dNormalMatrix * localNormal);
-	#endif`,
+  glsl: `\tvec3 gameScale2 = max(vec3(dot(dNormalMatrix[0], dNormalMatrix[0]), dot(dNormalMatrix[1], dNormalMatrix[1]), dot(dNormalMatrix[2], dNormalMatrix[2])), vec3(1e-20));
+	return normalize(dNormalMatrix * (localNormal / gameScale2));`,
+  wgsl: `\tlet gameScale2 = max(vec3f(dot(dNormalMatrix[0], dNormalMatrix[0]), dot(dNormalMatrix[1], dNormalMatrix[1]), dot(dNormalMatrix[2], dNormalMatrix[2])), vec3f(1e-20));
+	return normalize(dNormalMatrix * (localNormal / gameScale2));`,
 };
 
 /**

@@ -191,6 +191,10 @@ pub struct Interaction {
     /// through, the resident is in their next outfit (`Sim::outfit`), and the use lasts its
     /// time even with the needs it fills full.
     pub changes_outfit: bool,
+    /// Takes its time whatever it fills (content `lasts`): it goes on for its `minutes` even once
+    /// the needs it fills are full (the toilet: sat on for a while, not got up from the moment
+    /// the bladder is empty), unless there was nothing to fill at all or it's time to head home.
+    pub lasts: bool,
     /// A spare bed's night (content `spare`, on a `dayRhythm.sleepTags` use: a sofa bed pulled
     /// out for a guest): it doesn't make the room a bedroom (its tags aren't the object's
     /// `tags`, what the room is for), and residents sleep in it only with no other bed free for
@@ -2881,6 +2885,9 @@ struct InteractionRaw {
     /// Changing clothes (see `Interaction::changes_outfit`).
     #[serde(default)]
     changes_outfit: bool,
+    /// Takes its time whatever it fills (see `Interaction::lasts`).
+    #[serde(default)]
+    lasts: bool,
     /// A spare bed's night (see `Interaction::spare`).
     #[serde(default)]
     spare: bool,
@@ -3640,6 +3647,7 @@ impl Content {
                     gradual: it.gradual,
                     fetch: it.fetch.clone(),
                     changes_outfit: it.changes_outfit,
+                    lasts: it.lasts,
                     spare: it.spare,
                     tends: it.tends,
                     yields,
@@ -4668,7 +4676,7 @@ impl Content {
                             "dayRhythm.babyWakes.cooldownMinutes",
                         )?
                         .max(0.0)
-                            / crate::MINUTES_PER_TICK)
+                            * crate::TICKS_PER_MINUTE as f32)
                             as u64,
                         finish_minutes: b.finish_minutes.unwrap_or(15.0).max(0.0),
                         feeling: feeling(&b.feeling, "dayRhythm.babyWakes")?,
@@ -4709,9 +4717,9 @@ impl Content {
                     dirt: a.dirt.clamp(0.0, 1.0),
                     feeling: feeling(&a.feeling, &ctx)?,
                     cost: a.cost.max(0),
-                    cooldown_ticks: (time(a.cooldown_hours.unwrap_or(2.0), &ctx)?.max(0.0) * 60.0 / crate::MINUTES_PER_TICK) as u64,
-                    grace_ticks: (time(a.grace_minutes.unwrap_or(30.0), &ctx)?.max(0.0) / crate::MINUTES_PER_TICK) as u64,
-                    crowded_grace_ticks: a.crowded_grace_minutes.map(|m| time(m, &ctx)).transpose()?.map(|m| (m.max(0.0) / crate::MINUTES_PER_TICK) as u64),
+                    cooldown_ticks: (time(a.cooldown_hours.unwrap_or(2.0), &ctx)?.max(0.0) * 60.0 * crate::TICKS_PER_MINUTE as f32) as u64,
+                    grace_ticks: (time(a.grace_minutes.unwrap_or(30.0), &ctx)?.max(0.0) * crate::TICKS_PER_MINUTE as f32) as u64,
+                    crowded_grace_ticks: a.crowded_grace_minutes.map(|m| time(m, &ctx)).transpose()?.map(|m| (m.max(0.0) * crate::TICKS_PER_MINUTE as f32) as u64),
                     another_room: a
                         .another_room
                         .as_ref()

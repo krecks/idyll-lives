@@ -8,7 +8,7 @@ use common::hamlets::{POND, trail, two_hamlets, with_countryside};
 use sim_core::world::{Phase, TaskKind};
 use sim_core::{Command, MINUTES_PER_TICK, World};
 
-const TICKS_PER_MINUTE: u64 = (1.0 / MINUTES_PER_TICK) as u64;
+const TICKS_PER_MINUTE: u64 = common::TICKS_PER_MINUTE;
 
 fn world(seed: u64) -> World {
     let content = common::content();

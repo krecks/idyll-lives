@@ -4,7 +4,7 @@
  */
 
 import type { Catalog, Command, FromWorker, GameSource, ItemPlacement, SaveProblem, SimThreadStats, SocialEvent, SocialOption, ToWorker, UiUpdate, WorldStructure } from './protocol';
-import { SharedSnapshotReader, type SnapshotLayout } from './snapshot';
+import { SharedSnapshotReader, tickRates, type SnapshotLayout } from './snapshot';
 
 type WorldMessage = Extract<FromWorker, { type: 'world' }>;
 
@@ -44,7 +44,7 @@ export interface FrameState {
   curr: Float32Array;
   /** Progress from `prev` to `curr`: 0..1, slightly above 1 when a snapshot is late (extrapolates). */
   alpha: number;
-  /** Sim steps from `prev` to `curr`: 1, more when frames missed snapshots (a long frame, under 20 fps). */
+  /** Sim steps from `prev` to `curr`: 1, more when frames missed snapshots (a frame longer than a step: under 20 fps at 20 steps a second). */
   steps: number;
   layout: SnapshotLayout;
   now: number;
@@ -52,12 +52,28 @@ export interface FrameState {
 
 type Listener<T> = (value: T) => void;
 
-/** How quickly the frame clock follows snapshot arrivals (per arrival); small = smooth over jitter. */
+/**
+ * How quickly the frame clock follows snapshot arrivals: this share of an arrival's lateness per
+ * `CLOCK_GAIN_MS` of steps (per arrival at 20 steps a second; `clockGain` for another rate, the
+ * same pace in real time); small = smooth over jitter.
+ */
 const CLOCK_GAIN = 0.05;
-/** Arrivals further off than this many steps (hitch, hidden tab, backlog) restart the clock. */
-const CLOCK_RESET_STEPS = 2;
-/** How far past the newest snapshot motion may continue while waiting for a late one. */
-const MAX_EXTRAPOLATION = 1.3;
+const CLOCK_GAIN_MS = 50;
+/** Arrivals further off than this (ms: hitch, hidden tab, backlog) restart the clock. */
+const CLOCK_RESET_MS = 100;
+/** How far past the newest snapshot motion may continue while waiting for a late one (ms per step between them). */
+export const MAX_EXTRAPOLATION_MS = 15;
+
+/** The share of an arrival's lateness the frame clock takes up for steps `stepMs` long (`CLOCK_GAIN` at 50 ms). */
+export function clockGain(stepMs: number): number {
+  // (1 - (1 - CLOCK_GAIN) ^ (stepMs / CLOCK_GAIN_MS), exactly CLOCK_GAIN at CLOCK_GAIN_MS.)
+  return -Math.expm1(Math.log1p(-CLOCK_GAIN) * (stepMs / CLOCK_GAIN_MS));
+}
+
+/** The furthest `FrameState.alpha` goes past 1 while a snapshot is late, for steps `stepMs` long (1.3 at 50 ms). */
+export function maxAlpha(stepMs: number): number {
+  return 1 + MAX_EXTRAPOLATION_MS / stepMs;
+}
 /** Longest wait for the worker's answer to a request (a save, the journal…). */
 const REQUEST_LIMIT_MS = 15_000;
 /**
@@ -81,6 +97,9 @@ export class SimBridge {
   private readonly worker: Worker;
   private readonly reader: SharedSnapshotReader | null;
   private readonly stepMs: number;
+  /** `clockGain` and `maxAlpha` for `stepMs`. */
+  private readonly clockGain: number;
+  private readonly maxAlpha: number;
   /** The three newest snapshots, oldest first, and a buffer for the next one. */
   private prev2: Float32Array;
   private prev: Float32Array;
@@ -149,6 +168,10 @@ export class SimBridge {
     this.worker = worker;
     this.layout = layout;
     this.stepMs = 1000 / layout.ticksPerSecond;
+    this.clockGain = clockGain(this.stepMs);
+    this.maxAlpha = maxAlpha(this.stepMs);
+    tickRates.ticksPerSecond = layout.ticksPerSecond;
+    tickRates.ticksPerMinute = layout.ticksPerMinute;
     this.reader = shared ? new SharedSnapshotReader(shared, layout.capacity) : null;
     this.prev2 = new Float32Array(layout.capacity);
     this.prev = new Float32Array(layout.capacity);
@@ -406,11 +429,11 @@ export class SimBridge {
       this.hasData = true;
     }
     const late = now - (this.clockBase + step * this.stepMs);
-    if (!this.clocked || Math.abs(late) > CLOCK_RESET_STEPS * this.stepMs) {
+    if (!this.clocked || Math.abs(late) > CLOCK_RESET_MS) {
       this.clockBase = now - step * this.stepMs;
       this.clocked = true;
     } else {
-      this.clockBase += late * CLOCK_GAIN;
+      this.clockBase += late * this.clockGain;
     }
   }
 
@@ -429,7 +452,7 @@ export class SimBridge {
       f.prev = this.prev;
       f.curr = this.curr;
       f.steps = Math.max(1, this.step0 - this.step1);
-      f.alpha = Math.min((at - this.step1) / f.steps, MAX_EXTRAPOLATION);
+      f.alpha = Math.min((at - this.step1) / f.steps, this.maxAlpha);
     }
     f.now = now;
     return f;

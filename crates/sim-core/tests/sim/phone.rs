@@ -58,7 +58,7 @@ fn world(content: &str, bond: &str) -> World {
 }
 
 fn minutes(w: &mut World, m: f32) {
-    let end = w.tick + (m / sim_core::MINUTES_PER_TICK) as u64;
+    let end = w.tick + common::mins(m);
     while w.tick < end {
         w.tick_once();
     }
@@ -228,7 +228,7 @@ fn nobody_answers_in_their_sleep() {
     let before = *w.relationships.get(1, 0);
     let social = w.sims[1].needs[0];
     let mut answer = None;
-    for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(60.0) {
         w.tick_once();
         answer = answer.or(on_the_phone(&w, 0)
             .map(|p| p.2)
@@ -289,6 +289,55 @@ fn an_invitation_brings_the_friend_over() {
         phone::why_not(&w, 0, 1, action(&w, "text")),
         Some(phone::why::RIGHT_HERE)
     );
+}
+
+/// Ada invites Bo over at 11:00, Bo's shift at `start` o'clock: whether he comes.
+fn comes_before_work(start: f32) -> bool {
+    let content = CONTENT.replace(
+        r#""economy":{"startingFunds":500}"#,
+        &format!(
+            r#""careers":[{{"id":"shop","label":"Shop","levels":[
+                {{"title":"Clerk","pay":20,"start":{start},"hours":4,"days":[0,1,2,3,4,5,6]}}]}}],
+            "economy":{{"startingFunds":500}}"#
+        ),
+    );
+    let town = town("friends").replace(
+        r#"{"name":"Bo","household":1,"x":25.5,"z":5.5}"#,
+        r#"{"name":"Bo","household":1,"x":25.5,"z":5.5,"job":{"career":"shop","level":0}}"#,
+    );
+    let mut w = World::from_json(&content, &town, 7).unwrap();
+    w.autonomy = false;
+    while w.tick < clock::tick_at(1, 11.0 * 60.0).unwrap() {
+        w.tick_once();
+    }
+    assert!(w.sims[1].job.is_some() && w.sims[1].away_until.is_none());
+    w.apply(Command::Phone {
+        sim: 0,
+        action: action(&w, "invite"),
+        contact: Some(1),
+    })
+    .unwrap();
+    minutes(&mut w, 10.0);
+    let declined = w
+        .events
+        .iter()
+        .any(|e| e.kind == EventKind::Declined && (e.a, e.b) == (0, 1));
+    let invited = w
+        .events
+        .iter()
+        .any(|e| e.kind == EventKind::Invited && (e.a, e.b) == (0, 1));
+    assert_ne!(declined, invited, "the invitation is taken up or declined");
+    invited
+}
+
+/// Invited round, a friend comes only with time for the visit before they leave for work, as a
+/// visit they'd choose for themselves (`world::free_before_work`): not to be off to work again
+/// before `visits.leastMinutes` (a guest let in was off to work 39 minutes on, Brightton).
+#[test]
+fn an_invitation_is_declined_with_work_too_soon() {
+    // (Off at 11:30 for a shift at noon, `careerRules.commuteMinutes` before it.)
+    assert!(!comes_before_work(12.0), "no time for a visit before work");
+    assert!(comes_before_work(15.0), "with the afternoon free, he comes");
 }
 
 #[test]
@@ -598,7 +647,7 @@ fn a_lonely_resident_calls_a_friend_from_home() {
     .unwrap();
     w.sims[0].needs[0] = 0.15;
     let mut phoned = None;
-    for _ in 0..(120.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(120.0) {
         w.tick_once();
         if let Some((a, Some(1), _)) = on_the_phone(&w, 0) {
             phoned = Some((a, plot_of(&w, 0)));
@@ -624,7 +673,7 @@ fn bored_with_nothing_to_do_they_scroll() {
     w.sims[0].needs = [1.0, 0.2, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0];
     let browse = action(&w, "browse");
     let mut scrolled = false;
-    for _ in 0..(60.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(60.0) {
         w.tick_once();
         scrolled |= on_the_phone(&w, 0).is_some_and(|p| p.0 == browse);
     }
@@ -739,7 +788,9 @@ fn a_town_phones_each_other() {
             else {
                 continue;
             };
-            if !seen.insert((s.id, w.tick / 60)) || !matches!(act.phase, Phase::Using { .. }) {
+            if !seen.insert((s.id, w.tick / common::mins(3.0)))
+                || !matches!(act.phase, Phase::Using { .. })
+            {
                 continue;
             }
             match contact {

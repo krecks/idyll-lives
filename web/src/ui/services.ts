@@ -59,6 +59,8 @@ export interface GameControls {
   useObject(objectId: number, interaction: number): void;
   /** The selected Sim eats a serving of food (an item) or clears it away to the sink. */
   useItem(itemId: number, action: 'eat' | 'clear'): void;
+  /** Resident `sim` walks to a spot on the floor or the ground (the floor's "Walk here"). */
+  walkTo(sim: number, x: number, z: number): void;
   /** Switches a lamp on if it's off, off if it's on (at once: nobody walks over). */
   switchLamp(objectId: number): void;
   cancelAction(index: number): void;

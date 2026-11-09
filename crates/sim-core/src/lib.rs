@@ -56,9 +56,34 @@ pub use error::Error;
 pub use pack::merge_content;
 pub use world::World;
 
-/// Fixed simulation rate in ticks per real second (at 1× speed).
-pub const TICKS_PER_SECOND: u32 = 20;
-/// One game minute passes per real second at 1× speed. The clock counts these whole ticks (see
-/// `clock.rs`); `MINUTES_PER_TICK` is only for durations.
-pub const TICKS_PER_MINUTE: u64 = TICKS_PER_SECOND as u64;
-pub const MINUTES_PER_TICK: f32 = 1.0 / TICKS_PER_SECOND as f32;
+// Two units of time, kept apart:
+// - real time, `TICKS_PER_SECOND`: what is seen to move at its own pace whatever the clock does,
+//   such as walking and driving speeds, a car's route position, doors, traffic lights and jams;
+// - game time, `TICKS_PER_MINUTE`: the clock, needs, schedules and every duration a resident lives
+//   through.
+// `secs` and `mins` turn either into ticks; never count ticks with a bare number.
+
+/// Fixed simulation rate in ticks per real second (at normal speed; 20 before 0.7.0).
+pub const TICKS_PER_SECOND: u32 = 60;
+/// Ticks in a game minute (20 before 0.7.0): a game minute is a second and a quarter at normal
+/// speed, a game day 30 real minutes. The clock counts these whole ticks (see `clock.rs`); `MINUTES_PER_TICK`
+/// is only for durations.
+pub const TICKS_PER_MINUTE: u64 = 75;
+pub const MINUTES_PER_TICK: f32 = 1.0 / TICKS_PER_MINUTE as f32;
+/// Game minutes that pass in a real second at normal speed.
+pub const GAME_MINUTES_PER_SECOND: f32 = TICKS_PER_SECOND as f32 / TICKS_PER_MINUTE as f32;
+
+/// Ticks in `seconds` of real time (at normal speed), rounded, at least 0.
+pub const fn secs(seconds: f32) -> u64 {
+    let t = seconds * TICKS_PER_SECOND as f32;
+    if t <= 0.0 { 0 } else { (t + 0.5) as u64 }
+}
+
+/// Ticks in `minutes` of game time, rounded, at least 0.
+pub const fn mins(minutes: f32) -> u64 {
+    let t = minutes * TICKS_PER_MINUTE as f32;
+    if t <= 0.0 { 0 } else { (t + 0.5) as u64 }
+}
+
+// A quarter of a second is a whole number of ticks (the lights).
+const _: () = assert!(TICKS_PER_SECOND.is_multiple_of(4));

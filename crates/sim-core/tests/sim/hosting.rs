@@ -11,8 +11,9 @@ use sim_core::world::{Phase, TaskKind};
 use sim_core::{Command, TICKS_PER_MINUTE, World, clock};
 
 /// Hunger, fun, comfort and social; a fridge with a snack in it (not chosen on a whim: only
-/// when the test says), dining sets to sit at and a sofa; a chat, and the host's offer (a guest
-/// short of food says yes, a full one no).
+/// when the test says), dining sets to sit at (the kitchen's not sat at on a whim either, only to
+/// eat at) and a sofa; a chat, and the host's offer (a guest short of food says yes, a full one
+/// no).
 const CONTENT: &str = r#"{
     "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01},
              {"id":"fun","label":"Fun","decayPerHour":0.01},
@@ -27,6 +28,8 @@ const CONTENT: &str = r#"{
          "effects":{"hunger":0.4},"tags":["food"]}]},
       {"id":"table","name":"Dining set","price":300,"footprint":[2,1],"slots":2,"surface":{"height":0.75,"kind":"table"},
        "interactions":[{"id":"sit","label":"Sit at the table","minutes":120,"pose":"sit","effects":{"comfort":0.3},"tags":["food","lounge"]}]},
+      {"id":"kitchenTable","name":"Kitchen table","price":300,"footprint":[2,1],"slots":2,"surface":{"height":0.75,"kind":"table"},
+       "interactions":[{"id":"sit","label":"Sit at the table","minutes":120,"pose":"sit","autonomous":false,"effects":{"comfort":0.3},"tags":["food","lounge"]}]},
       {"id":"sofa","name":"Sofa","price":300,"footprint":[2,1],"slots":2,"interactions":[
         {"id":"relax","label":"Relax","minutes":30,"pose":"sit","autonomous":false,"effects":{"comfort":0.3},"tags":["lounge"]}]}],
     "socials":[
@@ -39,11 +42,11 @@ const CONTENT: &str = r#"{
     "economy":{"startingFunds":500}}"#;
 
 /// Two homes side by side, open (no walls): the host's (the west one) has the fridge in a
-/// corner, a dining set by it and another across the garden, and a sofa.
+/// corner, a kitchen table by it and a dining set across the garden, and a sofa.
 const TOWN: &str = r#"{"width":40,"depth":14,
     "plots":[{"name":"West","x":0,"z":0,"w":20,"d":12,"entry":[10.5,11.5]},{"name":"East","x":20,"z":0,"w":20,"d":12,"entry":[30.5,11.5]}],
     "households":[{"name":"Host","plot":0,"player":true},{"name":"Guest","plot":1}],
-    "objects":[{"def":"fridge","x":1,"z":1,"rot":0},{"def":"table","x":3,"z":3,"rot":0},
+    "objects":[{"def":"fridge","x":1,"z":1,"rot":0},{"def":"kitchenTable","x":3,"z":3,"rot":0},
                {"def":"table","x":14,"z":6,"rot":0},{"def":"sofa","x":9,"z":8,"rot":2}],
     "sims":[{"name":"Ada","household":0,"x":3.5,"z":6.5},{"name":"Bo","household":1,"x":25.5,"z":6.5}],
     "relationships":[{"a":0,"b":1,"preset":"friends"}]}"#;
@@ -65,12 +68,13 @@ fn hosting(content: &str) -> World {
     w.sims[1].pos = [15.5, 8.5];
     w.sims[1].visiting = Some(sim_core::life::Visit {
         plot: 0,
-        until: w.tick + (6.0 * 60.0 / sim_core::MINUTES_PER_TICK) as u64,
+        until: w.tick + common::hours(6.0),
         idle: 0,
         farewell: 0,
         offer_at: 0,
         arrived: 0,
         leaving: false,
+        home_by: false,
     });
     w
 }
@@ -114,7 +118,8 @@ fn a_host_who_eats_sits_beside_the_guest_and_they_talk_over_the_meal() {
     // No offers here: Ada gets her own snack. Bo, weary, sits down at the far table; then Ada,
     // hungry, has a snack from the fridge right by the near table, and sits down with it at
     // Bo's table, not the one by the fridge. Neither is lonely, but a guest keeps the hosts
-    // company (`visits.company`): a word from their seats over the meal.
+    // company (`visits.company`): a word from their seats over the meal. (The near table is
+    // one only to eat at: with two to sit at on a whim, Bo would pick either, by the roll.)
     let content = CONTENT
         .replace(
             r#","offer":{"social":"offer","afterMinutes":5,"againMinutes":240,"handAnim":"serve"}"#,
@@ -280,12 +285,13 @@ fn without_a_fridge_nobody_offers_anything() {
     w.sims[1].pos = [15.5, 8.5];
     w.sims[1].visiting = Some(sim_core::life::Visit {
         plot: 0,
-        until: w.tick + (6.0 * 60.0 / sim_core::MINUTES_PER_TICK) as u64,
+        until: w.tick + common::hours(6.0),
         idle: 0,
         farewell: 0,
         offer_at: 0,
         arrived: 0,
         leaving: false,
+        home_by: false,
     });
     let mut watch = common::Watch::new();
     for _ in 0..60 * TICKS_PER_MINUTE {
@@ -440,7 +446,7 @@ fn a_guest_whose_need_about_to_run_out_is_seen_to_there_stays_their_least_stay()
         assert!(
             !going(&w),
             "still to go, the need seen to, with {} min of his 40 left",
-            (least - w.tick) / 20
+            (least - w.tick) / TICKS_PER_MINUTE
         );
         assert!(
             w.sims[1].visiting.is_some(),

@@ -4,7 +4,7 @@
 import { describe, expect, test } from 'bun:test';
 import { FOLLOW_GAP, GameCameraRig, keepUp } from '../src/render/shared/cameraRig';
 
-/** A resident's walking speed (m/s) at each game speed (1.5 m/s times `GAME_RATE`). */
+/** A resident's walking speed (m/s) at each game speed (1.5 m/s times `PLAYBACK_RATE`). */
 const SPEEDS = [1.5, 4.5, 15, 45, 90];
 const DT = 1 / 60;
 

@@ -41,7 +41,7 @@ fn town(extra_sims: &str, relationships: &str) -> String {
 }
 
 fn days(w: &mut World, d: u32) {
-    for _ in 0..d * 24 * 60 * 20 {
+    for _ in 0..u64::from(d) * sim_core::clock::TICKS_PER_DAY {
         w.tick_once();
     }
 }
@@ -272,12 +272,13 @@ fn a_partner_out_on_a_visit_isnt_moved_from_under_it() {
     }
     let visit = sim_core::life::Visit {
         plot: 2,
-        until: w.tick + 60 * 20,
+        until: w.tick + sim_core::mins(60.0),
         idle: 0,
         farewell: 0,
         offer_at: 0,
         arrived: w.tick,
         leaving: false,
+        home_by: false,
     };
     w.sims[1].visiting = Some(visit);
     w.tick_once();

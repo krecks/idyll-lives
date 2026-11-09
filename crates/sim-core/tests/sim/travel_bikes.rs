@@ -8,7 +8,7 @@ use crate::common;
 
 use sim_core::snapshot;
 use sim_core::world::TaskKind;
-use sim_core::{MINUTES_PER_TICK, World, clock, life};
+use sim_core::{World, clock, life};
 
 const CONTENT: &str = r#"{
     "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],
@@ -223,7 +223,7 @@ struct Morning {
 
 fn mornings(w: &mut World) -> Vec<Morning> {
     common::run_to(w, 2, 0.0);
-    let off_map = (w.content.career_rules.commute_minutes / MINUTES_PER_TICK) as u64;
+    let off_map = common::mins(w.content.career_rules.commute_minutes);
     let mut days = vec![Morning::default(); w.sims.len()];
     let end = clock::tick_at(2, 14.0 * 60.0).unwrap();
     while w.tick < end && days.iter().any(|d| d.out.is_none()) {
@@ -253,7 +253,7 @@ fn mornings(w: &mut World) -> Vec<Morning> {
 
 /// Whether `a` and `b` set off within a minute of each other.
 fn same_time(a: Morning, b: Morning) -> bool {
-    let minute = (1.0 / MINUTES_PER_TICK) as u64;
+    let minute = common::TICKS_PER_MINUTE;
     a.left.unwrap().abs_diff(b.left.unwrap()) <= minute
 }
 
@@ -401,7 +401,7 @@ fn drive_off(w: &mut World) {
     car.progress = 0.0;
     car.driver = Some(1);
     car.aboard = vec![1];
-    w.sims[1].away_until = Some(w.tick + 100_000);
+    w.sims[1].away_until = Some(w.tick + common::mins(5000.0));
 }
 
 /// How far R's bike (its wheels and handlebars, facing the way R does) is from the car's body,
@@ -501,7 +501,7 @@ fn a_car_turning_tight_among_riders_beside_it_turns_and_they_ride_on() {
     let content = common::content();
     let town = include_str!("../towns/holly_clearing.json");
     let mut w = World::from_json(&content, town, 47).unwrap();
-    let end = w.tick + 3 * 60 * 20;
+    let end = w.tick + common::hours(3.0);
     let mut riding = vec![0u64; w.sims.len()];
     let mut still: Vec<(Option<[f32; 2]>, u64)> = vec![(None, 0); w.cars.len()];
     while w.tick < end {
@@ -514,7 +514,7 @@ fn a_car_turning_tight_among_riders_beside_it_turns_and_they_ride_on() {
                 0
             };
             assert!(
-                riding[i] < 60 * 20,
+                riding[i] < common::hours(1.0),
                 "{} on a bike in town for an hour, at {:?}",
                 s.name,
                 s.pos
@@ -529,7 +529,7 @@ fn a_car_turning_tight_among_riders_beside_it_turns_and_they_ride_on() {
                 (p, _) => (p, 0),
             };
             assert!(
-                still[c].1 < 30 * 20,
+                still[c].1 < common::mins(30.0),
                 "car {c} stood still half an hour on its way, at {at:?}"
             );
         }

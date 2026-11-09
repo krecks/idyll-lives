@@ -81,7 +81,7 @@ fn order(w: &mut World, def: &str, n: usize) -> Result<(), String> {
 
 /// Ticks until Ada is using `def` (or `minutes` pass): whether she got to it.
 fn until_using(w: &mut World, def: &str, minutes: f32) -> bool {
-    for _ in 0..(minutes / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(minutes) {
         w.tick_once();
         common::check(w);
         if using(w) == Some(def.to_string()) {
@@ -150,7 +150,7 @@ fn a_kettle_on_the_counter_is_used_standing_in_front_of_the_counter() {
         ada.yaw
     );
     let before = w.sims[0].needs[2];
-    for _ in 0..(10.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(10.0) {
         w.tick_once();
     }
     assert!(w.sims[0].needs[2] > before + 0.2, "the tea did her good");
@@ -206,7 +206,7 @@ fn a_laptop_on_a_desk_is_used_sitting_at_it_or_standing_without_a_chair() {
         w.objects[chair as usize].slot_position(&w.content, 0)
     );
     // Done: up off the chair, and the chair is free again.
-    for _ in 0..(50.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(50.0) {
         w.tick_once();
         common::check(&w);
     }
@@ -279,7 +279,7 @@ fn free_will_uses_things_on_tops() {
     w.autonomy = true;
     w.sims[0].needs[..3].copy_from_slice(&[1.0, 1.0, 0.2]);
     let mut kettle = false;
-    for _ in 0..(120.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(120.0) {
         w.tick_once();
         common::check(&w);
         kettle |= using(&w).as_deref() == Some("kettle");
@@ -383,7 +383,7 @@ fn free_will_stargazes_only_at_night() {
         .unwrap();
         w.sims[0].needs[..3].copy_from_slice(&[1.0, 0.1, 1.0]);
         let mut stargazed = None;
-        for _ in 0..(90.0 / sim_core::MINUTES_PER_TICK) as u32 {
+        for _ in 0..common::mins(90.0) {
             w.tick_once();
             common::check(&w);
             if using(&w).as_deref() == Some("telescope") {
@@ -472,7 +472,7 @@ fn the_laundry_is_washed_then_dried_and_piles_up_again() {
     assert!(until_using(&mut w, "dryer", 30.0));
     w.tick_once();
     assert_eq!(w.households[0].laundry[1], 0.0, "taken up to dry and fold");
-    for _ in 0..(25.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(25.0) {
         w.tick_once();
     }
     // ...and there's no more to fold until a wash.
@@ -497,13 +497,13 @@ fn the_laundry_is_washed_then_dried_and_piles_up_again() {
         dirty < 0.1 && washed == 0.0,
         "washed and taken up to dry: {dirty}, {washed}"
     );
-    for _ in 0..(25.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(25.0) {
         w.tick_once();
     }
     let err = order(&mut w, "washer", 0).unwrap_err();
     assert!(err.contains("no washing to do"), "{err}");
     // A day on, Ada (perDay 0.5) has half a load more; two days, a load to wash.
-    for _ in 0..(2.0 * 1440.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(2.0 * 1440.0) {
         w.tick_once();
     }
     assert!(
@@ -532,7 +532,7 @@ fn free_will_does_no_chore_with_nothing_to_work_on() {
     w.autonomy = true;
     w.households[0].laundry = [0.0, 0.0, 0.0];
     w.sims[0].needs[..3].copy_from_slice(&[1.0, 1.0, 0.3]);
-    for _ in 0..(240.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(240.0) {
         w.sims[0].needs[2] = w.sims[0].needs[2].min(0.3);
         w.tick_once();
         let u = using(&w);
@@ -544,7 +544,7 @@ fn free_will_does_no_chore_with_nothing_to_work_on() {
     // With washing to do, she does it.
     w.households[0].laundry = [2.0, 0.0, 0.0];
     let mut washed = false;
-    for _ in 0..(240.0 / sim_core::MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(240.0) {
         w.sims[0].needs[2] = w.sims[0].needs[2].min(0.3);
         w.tick_once();
         washed |= using(&w).as_deref() == Some("washer");

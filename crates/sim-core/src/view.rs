@@ -1180,7 +1180,7 @@ fn task_view(
                 inter.minutes_where(served),
             )
         }
-        TaskKind::MoveTo { .. } => ("Go here".to_owned(), None, None, 1.0),
+        TaskKind::MoveTo { .. } => ("Walk here".to_owned(), None, None, 1.0),
         TaskKind::Social { target, social } => {
             let s = &content.socials[social];
             let minutes = match phase {

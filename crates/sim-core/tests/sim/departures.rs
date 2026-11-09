@@ -38,7 +38,7 @@ fn spawn(name: &str) -> SimSpawn {
 }
 
 fn minutes(w: &mut World, m: u32) {
-    for _ in 0..m * 20 {
+    for _ in 0..u64::from(m) * sim_core::TICKS_PER_MINUTE {
         w.tick_once();
     }
 }
@@ -259,7 +259,7 @@ fn nobody_answers_the_door_to_or_stays_on_the_phone_with_someone_who_left() {
                 .any(|k| matches!(k, TaskKind::Answer { guest: 2 }))
         })
     };
-    for _ in 0..60 * 20 {
+    for _ in 0..sim_core::mins(60.0) {
         if answering(&w).is_some() {
             break;
         }
@@ -310,7 +310,7 @@ fn a_visitor_whose_host_left_waits_for_someone_else() {
         Some(Phase::Knocking { host, .. }) => *host,
         _ => None,
     };
-    for _ in 0..60 * 20 {
+    for _ in 0..sim_core::mins(60.0) {
         if host(&w).is_some() {
             break;
         }

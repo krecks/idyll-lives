@@ -1624,8 +1624,8 @@ function tableSet(f: Floor, r: Room, info: ObjectInfos, rng: () => number, set: 
 
 /**
  * Small things on tops in room `r`: each on the emptiest top of a kind it may go on (a table's
- * in its middle, elsewhere anywhere free; never a hob's or a sink's), facing about the way its
- * host does, listed right after its host (the simulation places it on a top that's already there).
+ * in its middle, elsewhere anywhere free; never a hob's or a sink's, nor one whose model brings its
+ * own things, `surface.dressed`), facing about the way its host does, listed right after its host (the simulation places it on a top that's already there).
  */
 function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () => number, slot: TopSlot): void {
   const count = slot.count ? between(rng, slot.count) : 1;
@@ -1639,7 +1639,7 @@ function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () =>
     if (thing?.layer !== 'surface') continue;
     const tops = f.objects
       .map((o) => topOf(shapes, o))
-      .filter((t): t is Top => !!t && inside(r, t.host.x, t.host.z) && slot.on.includes(t.kind) && !info(t.host.def)?.keepClear && (!slot.of || slot.of.includes(t.host.def)) && 2 * Math.min(t.hw, t.hd) >= (slot.minSide ?? 0));
+      .filter((t): t is Top => !!t && inside(r, t.host.x, t.host.z) && slot.on.includes(t.kind) && !info(t.host.def)?.keepClear && !info(t.host.def)?.surface?.dressed && (!slot.of || slot.of.includes(t.host.def)) && 2 * Math.min(t.hw, t.hd) >= (slot.minSide ?? 0));
     const riders = (top: Top) => f.objects.filter((o) => info(o.def)?.layer === 'surface' && covers(top, ...middleOf(shapes, o))).length;
     const order = tops.map((t) => ({ t, n: riders(t) + rng() })).sort((a, b) => a.n - b.n);
     for (const { t } of order) {

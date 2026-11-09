@@ -1683,6 +1683,27 @@
           "finish": "material.finish.satin"
         }
       }
+    },
+    "item.cakeStandDirty": {
+      "type": "model",
+      "url": "../../models/held/cakeStandDirty.glb",
+      "materials": {
+        "cake_icing": {
+          "finish": "material.finish.satin"
+        },
+        "china": {
+          "finish": "material.finish.gloss"
+        },
+        "sponge_crumb": {
+          "finish": "material.finish.matte"
+        },
+        "stalk": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      }
     }
   }
 }

@@ -209,6 +209,7 @@ mod tests {
             ripe: false,
             picks: false,
             changes_outfit: false,
+            lasts: false,
             spare: false,
             tends: 0.0,
             yields: None,

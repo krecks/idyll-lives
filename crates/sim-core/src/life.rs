@@ -83,6 +83,11 @@ pub struct Visit {
     /// run out (`end_visit_if_due`): withdrawn once it no longer is (seen to there). Not saved.
     #[serde(skip)]
     pub leaving: bool,
+    /// An outing that ends in time to be home by `visits.outingHomeBy` and before they leave for
+    /// work or school (`world::outing_leave_by`): its end comes forward as they wander further
+    /// from the way home. Not saved: after a load it keeps the end it has.
+    #[serde(skip)]
+    pub home_by: bool,
 }
 
 /// A change in where a Sim is (or what it finished), raised by tasks and handled by `life::update`.
@@ -242,7 +247,7 @@ pub fn shift_today(
 }
 
 fn ticks(minutes: f32) -> u64 {
-    (minutes / MINUTES_PER_TICK) as u64
+    (minutes * crate::TICKS_PER_MINUTE as f32) as u64
 }
 
 /// How long someone's way to work or school takes (`Sim::commute`): in an open-world town the
@@ -270,6 +275,12 @@ pub struct Commute {
     pub firm: bool,
 }
 
+/// For each resident (by index), the walk out of town `firm_leave` last timed (`Travel::eta`,
+/// minutes) and what from: where they were, the way out timed by, their pace and whether away
+/// from home. Only ever what those give (the roads and the ways out are the town's for good), so
+/// another resident in their place, or none kept (a load), comes to the same.
+pub(crate) type WalkMemo = Vec<Option<([u32; 6], f32)>>;
+
 /// This long before they'd set off, the walk is worked out again from where they are.
 const FIRM_UP_MINUTES: f32 = 6.0;
 
@@ -295,7 +306,21 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
         && !heading_out(sim)
         && let Some(&exit) = w.exits.get(c.exit)
     {
-        let walk = sim.walk_per_minute(&w.content);
+        // At the pace they'd go from there: at home, on the bike their way is timed by
+        // (`refresh_commute`); out on one, on that; else on foot. (Timed on foot from home, a
+        // cyclist set off for work hours early, from an outing, and rode two hours across a big
+        // world to it, Ashfield.)
+        let here = w.briefs.get(i).and_then(|b| b.plot);
+        let bike = if here.is_some() && here == c.home {
+            c.bike
+        } else {
+            sim.riding
+                .or(sim.bound_for_bike.filter(|_| sim.bike_parked.is_some()))
+        };
+        let speed = bike
+            .and_then(|o| w.content.objects[w.objects.get(o as usize)?.def].vehicle)
+            .map_or(1.0, |v| v.speed);
+        let walk = sim.walk_per_minute(&w.content) * speed;
         // (From over the ground: a commute timed from bed upstairs had them setting off for
         // work in the middle of the night.)
         let from = w.stairs.ground_pos(sim.pos);
@@ -308,13 +333,34 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
             .get(i)
             .and_then(|b| b.plot)
             .is_some_and(|p| Some(p) != c.home);
-        let exit = if away {
-            crate::world::quickest_exit(&w.travel, &w.exits, from).map_or(exit, |k| w.exits[k])
-        } else {
-            exit
+        // (Worked out again only once they've moved: asked each tick, the same as last time
+        // while they stay put.)
+        let key = [
+            from[0].to_bits(),
+            from[1].to_bits(),
+            exit[0].to_bits(),
+            exit[1].to_bits(),
+            walk.to_bits(),
+            u32::from(away),
+        ];
+        let eta = match w.walk_memo.get(i) {
+            Some(&Some((k, eta))) if k == key => eta,
+            _ => {
+                let exit = if away {
+                    crate::world::quickest_exit(&w.travel, &w.exits, from)
+                        .map_or(exit, |k| w.exits[k])
+                } else {
+                    exit
+                };
+                let eta = w.travel.eta(from, exit, crate::travel::Mode::Foot, walk);
+                if w.walk_memo.len() <= i {
+                    w.walk_memo.resize(i + 1, None);
+                }
+                w.walk_memo[i] = Some((key, eta));
+                eta
+            }
         };
-        let minutes = w.travel.eta(from, exit, crate::travel::Mode::Foot, walk) * WALK_MARGIN
-            + OUT_OF_THE_HOUSE;
+        let minutes = eta * WALK_MARGIN + OUT_OF_THE_HOUSE;
         let total = ticks(minutes + w.content.career_rules.commute_minutes);
         if total > c.ticks
             && let Some(c) = w.sims[i].commute.as_mut()
@@ -327,9 +373,10 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
     planned
 }
 
-/// The longest ride out of town on a bike or e-scooter (game minutes: on a 500 m street about an
-/// hour and a half; a big world's far roads out took four): longer, the way is ridden in the work
-/// taxi or walked (`refresh_commute`), and nobody rides two hours in town.
+/// The longest ride out of town on a bike or e-scooter (game minutes: a bike's 4.5 m a real second
+/// is about 5.6 m a game minute, so some 500 m of street; a big world's far roads out took over
+/// three hours): longer, the way is ridden in the work taxi or walked (`refresh_commute`), and
+/// nobody rides two hours in town.
 const BIKE_MOST: f32 = 90.0;
 
 /// Minutes added to the walk from the front door for getting out of the house to it, and a
@@ -1139,6 +1186,7 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
                 offer_at: 0,
                 arrived: 0,
                 leaving: false,
+                home_by: false,
             });
             // With door rules the story is told when they're let in (`answer`).
             if w.content.visits.door.is_some() && !w.plots[plot as usize].public {
@@ -1701,16 +1749,19 @@ fn end_visit_if_due(w: &mut World, i: usize, hour: f32) {
     };
     give_up_farewell(w, i);
     // A guest left with nothing to do while the hosts are all off at work goes home (hosts
-    // just out visiting come back; parks have no hosts).
-    let hosts: Vec<&crate::world::Sim> = w
-        .sims
-        .iter()
-        .filter(|s| s.here() && w.households[s.household as usize].plot == Some(visit.plot))
-        .collect();
-    let hosts_out = w.sims[i].current.is_none()
-        && !w.plots[visit.plot as usize].public
-        && !hosts.is_empty()
-        && hosts.iter().all(|s| s.away_until.is_some());
+    // just out visiting come back; parks have no hosts). The hosts are the grown-ups, who let a
+    // guest in (`opens_door`), as `world::hosts_about_till` has them: a baby or a child at home
+    // keeps no guest.
+    // (The hosts looked for only then: each tick for every guest, it was a good part of one.)
+    let hosts_out = w.sims[i].current.is_none() && !w.plots[visit.plot as usize].public && {
+        let content = &w.content;
+        let mut household = w
+            .sims
+            .iter()
+            .filter(|s| s.here() && w.households[s.household as usize].plot == Some(visit.plot))
+            .peekable();
+        household.peek().is_some() && household.all(|s| s.away_until.is_some() || !s.adult(content))
+    };
     // Left standing around with nothing to do (the hosts busy, nothing they may use) for long
     // enough, a guest with free will says it's time they went (without, they're the player's
     // to send home).
@@ -1887,7 +1938,7 @@ mod tests {
     use super::{doors, knocking};
     use crate::social::EventKind;
     use crate::world::{Activity, Phase, Task, TaskKind};
-    use crate::{Command, TICKS_PER_SECOND, World, clock};
+    use crate::{Command, World, clock, mins, secs};
 
     const CONTENT: &str = r#"{
         "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.02},{"id":"social","label":"Social","decayPerHour":0.02}],
@@ -1968,7 +2019,7 @@ mod tests {
         let mut w = World::from_json(CONTENT, TOWN, 3).unwrap();
         w.sims[0].job = None;
         w.sims[1].needs[1] = 0.1; // lonely guest
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 120);
+        ticks(&mut w, mins(120.0));
         assert!(
             w.events
                 .iter()
@@ -1976,7 +2027,7 @@ mod tests {
             "guest never visited"
         );
         // The visit lasts two hours; afterwards they head home.
-        ticks(&mut w, (3.0 * 60.0 / crate::MINUTES_PER_TICK) as u64);
+        ticks(&mut w, (3.0 * 60.0 * crate::TICKS_PER_MINUTE as f32) as u64);
         let (x, z) = w.sims[1].tile();
         assert_eq!(w.plot_at(x, z), Some(1), "guest went home");
         assert!(w.sims[1].visiting.is_none());
@@ -1988,9 +2039,10 @@ mod tests {
         w.sims[0].job = None;
         w.sims[0].needs[0] = 0.2; // hungry: the home chair... and nothing to eat anywhere
         w.apply(Command::Visit { sim: 0, plot: 1 }).unwrap();
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 30);
+        ticks(&mut w, secs(30.0));
+        // (An hour there, looked at each minute.)
         for _ in 0..60 {
-            ticks(&mut w, TICKS_PER_SECOND as u64);
+            ticks(&mut w, mins(1.0));
             let (x, z) = w.sims[0].tile();
             assert_eq!(
                 w.plot_at(x, z),
@@ -2005,10 +2057,10 @@ mod tests {
         let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
         w.sims[0].job = None;
         w.apply(Command::Visit { sim: 0, plot: 1 }).unwrap();
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 40);
+        ticks(&mut w, secs(40.0));
         assert_eq!(w.sims[0].visiting.map(|v| v.plot), Some(1));
         w.apply(Command::GoHome { sim: 0 }).unwrap();
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 40);
+        ticks(&mut w, secs(40.0));
         assert!(w.sims[0].visiting.is_none());
     }
 
@@ -2080,10 +2132,10 @@ mod tests {
         let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
         w.sims[0].job = None;
         w.apply(Command::Visit { sim: 0, plot: 1 }).unwrap();
-        ticks(&mut w, TICKS_PER_SECOND as u64 * 40);
+        ticks(&mut w, secs(40.0));
         assert_eq!(w.sims[0].visiting.map(|v| v.plot), Some(1));
         // Twice as long as a normal (2 h) visit, then home.
-        ticks(&mut w, (5.0 * 60.0 / crate::MINUTES_PER_TICK) as u64);
+        ticks(&mut w, (5.0 * 60.0 * crate::TICKS_PER_MINUTE as f32) as u64);
         assert!(w.sims[0].visiting.is_none());
     }
 
@@ -2183,7 +2235,7 @@ mod tests {
         assert!(
             until >= w.tick + ticks_of(119.0),
             "{} minutes left",
-            (until - w.tick) / 20
+            (until - w.tick) / crate::TICKS_PER_MINUTE
         );
     }
 
@@ -2210,7 +2262,7 @@ mod tests {
             let mut w = World::from_json(CONTENT, &town, 3).unwrap();
             w.sims[0].job = None;
             w.sims[1].needs[1] = 0.1; // lonely guest
-            ticks(&mut w, TICKS_PER_SECOND as u64 * 240);
+            ticks(&mut w, mins(240.0));
             let went = w
                 .events
                 .iter()
@@ -2221,6 +2273,6 @@ mod tests {
     }
 
     fn ticks_of(minutes: f32) -> u64 {
-        (minutes / crate::MINUTES_PER_TICK) as u64
+        (minutes * crate::TICKS_PER_MINUTE as f32) as u64
     }
 }

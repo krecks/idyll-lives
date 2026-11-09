@@ -531,6 +531,25 @@
             "creativity": 0.05
           },
           "skill": "cooking"
+        },
+        {
+          "id": "bakeCake",
+          "label": "Bake a cake",
+          "recipe": "cake",
+          "anim": "cook",
+          "effects": {
+            "fun": 0.1
+          },
+          "tags": [
+            "food",
+            "cooking",
+            "creative"
+          ],
+          "skills": {
+            "cooking": 0.15,
+            "creativity": 0.05
+          },
+          "skill": "cooking"
         }
       ]
     },
@@ -594,6 +613,25 @@
           "id": "bake",
           "label": "Bake treats",
           "recipe": "bakedTreats",
+          "anim": "cook",
+          "effects": {
+            "fun": 0.1
+          },
+          "tags": [
+            "food",
+            "cooking",
+            "creative"
+          ],
+          "skills": {
+            "cooking": 0.15,
+            "creativity": 0.05
+          },
+          "skill": "cooking"
+        },
+        {
+          "id": "bakeCake",
+          "label": "Bake a cake",
+          "recipe": "cake",
           "anim": "cook",
           "effects": {
             "fun": 0.1

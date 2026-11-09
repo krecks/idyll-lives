@@ -14,9 +14,9 @@ use serde_json::{Value, json};
 use sim_core::content::Approach;
 use sim_core::path::NavGrid;
 use sim_core::world::{Phase, TaskKind};
-use sim_core::{Command, MINUTES_PER_TICK, World};
+use sim_core::{Command, World};
 
-const TICKS_PER_MINUTE: u32 = (1.0 / MINUTES_PER_TICK) as u32;
+const TICKS_PER_MINUTE: u32 = common::TICKS_PER_MINUTE as u32;
 
 fn houses() -> Value {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/content");

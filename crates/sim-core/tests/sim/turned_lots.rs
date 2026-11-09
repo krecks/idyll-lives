@@ -164,7 +164,7 @@ fn on_a_turned_lot_they_get_into_bed_from_the_free_side() {
     .unwrap();
     // Where they last stood before lying down.
     let mut stood = None;
-    for _ in 0..20 * 60 {
+    for _ in 0..common::mins(60.0) {
         w.tick_once();
         if w.sims[0].pose == Pose::Lie {
             break;

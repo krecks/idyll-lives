@@ -1,9 +1,8 @@
 /**
  * Doors and gates that swing for residents going through them, engine-neutral (the renderers
  * turn the leaves and the resident puts a hand to the handle): whether a resident's way crosses a
- * doorway, how near they are to it, and which rooms' doors can be kept shut.
+ * doorway, and how near they are to it.
  */
-import type { ObjectDef, RoomKindDef } from '../../content/content';
 
 /**
  * Seconds a door or a gate takes to swing open or shut at speed 1 (quicker as the game runs
@@ -36,8 +35,8 @@ export function ease(t: number): number {
 
 /**
  * How far ahead of a doorway a leaf starts to swing, for a game running `rate` times as fast: far
- * enough that the swing (`DOOR_SWING` of game time) finishes as the walker arrives, and never less
- * than a hand's reach, so a slow walk opens the door at the hand.
+ * enough that the swing (`DOOR_SWING` of the sim's real time) finishes as the walker arrives, and
+ * never less than a hand's reach, so a slow walk opens the door at the hand.
  */
 export function doorLead(rate: number): number {
   return Math.max(DOOR_HAND, PACE * Math.max(rate, 1) * DOOR_SWING);
@@ -45,34 +44,42 @@ export function doorLead(rate: number): number {
 
 /**
  * Whether someone in `movers` (`MOVER` floats each) goes through the 1 m doorway whose middle is
- * `centre`, in a wall or fence along x (`axis` 'h') or z: their way crosses it before `lead`
+ * `centre`, in a wall or fence along x (`axis` 'h') or z ('v'), or a diagonal wall (`axis` its unit
+ * direction, x and z): their way crosses it before `lead`
  * metres on, or they're in it. Walking past, or up to it and away, isn't. One that stands `open`
  * also stays so while anyone on the move is still within `DOOR_CLEAR` of it (the leaf would sweep
  * through them shutting). Returns the way they go across (+1 towards +z of an 'h' edge or +x of a
- * 'v' one, -1 the other), 0 for nobody. `hand`: one float a resident, filled with how far out the
+ * 'v' one, or the side (-uz, ux) of a diagonal's direction (ux, uz); -1 the other), 0 for nobody. `hand`: one float a resident, filled with how far out the
  * hand reaches for the handle, 1 as they come to it and 0 further off (the leaf's swing is timed
  * to it; the furthest any doorway they're going through gets).
  */
 export function goingThrough(
   movers: readonly number[],
-  axis: 'h' | 'v',
+  axis: 'h' | 'v' | readonly [number, number],
   centre: readonly [number, number],
   open: boolean,
   lead: number,
   hand?: Float32Array,
 ): number {
-  // In the doorway's own terms: `a` along the edge from its middle, `n` across it.
-  const h = axis === 'h';
-  const [ca, cn] = h ? centre : [centre[1], centre[0]];
-  const [ia, iN] = h ? [0, 1] : [1, 0];
+  // In the doorway's own terms: `a` along the edge from its middle (direction (ax, az)), `n` across it (nx, nz).
+  const [ax, az] = axis === 'h' ? [1, 0] : axis === 'v' ? [0, 1] : axis;
+  const [nx, nz] = axis === 'h' ? [0, 1] : axis === 'v' ? [1, 0] : [-axis[1], axis[0]];
+  const [cx, cz] = centre;
+  // (Further off than `lead` and half the doorway, or than `DOOR_CLEAR`, nobody is going through it.)
+  const reach = Math.max(DOOR_CLEAR, lead + 0.5);
   let way = 0;
   for (let i = 0; i < movers.length; i += MOVER) {
-    const pa = movers[i + ia] - ca;
-    const pn = movers[i + iN] - cn;
+    const dx = movers[i] - cx;
+    const dz = movers[i + 1] - cz;
+    if (dx * dx + dz * dz > reach * reach) continue;
+    const pa = dx * ax + dz * az;
+    const pn = dx * nx + dz * nz;
     // Where their way is `lead` m on: along the direction the snapshot gives (its ahead point, which
     // follows the path round corners), never past it.
-    let wa = movers[i + 2 + ia] - ca;
-    let wn = movers[i + 2 + iN] - cn;
+    const ex = movers[i + 2] - cx;
+    const ez = movers[i + 3] - cz;
+    let wa = ex * ax + ez * az;
+    let wn = ex * nx + ez * nz;
     const far = Math.hypot(wa - pa, wn - pn);
     if (far > 0) {
       const f = Math.min(1, lead / far);
@@ -103,15 +110,4 @@ function handAt(dist: number, lead: number): number {
 function crosses(sa: number, sn: number, ea: number, en: number): number {
   if (sn * en > 0 || sn === en) return 0;
   return Math.abs(sa + ((ea - sa) * sn) / (sn - en)) <= 0.5 ? Math.sign(en - sn) : 0;
-}
-
-/**
- * Object kinds whose room the simulation may keep shut (sim-core `privacy.rs`): what makes a room
- * of a private kind (a toilet's `bathroom` tag: the bathroom), and a use done behind a shut door
- * (a double bed's *Try for a baby*). Their rooms' doors swing (`HouseLooks.shuts`).
- */
-export function shutDefs(content: { readonly objectList: readonly ObjectDef[]; readonly roomKinds: readonly RoomKindDef[] }): Set<string> {
-  const tags = new Set(content.roomKinds.filter((k) => k.private).flatMap((k) => k.tags));
-  const shuts = (def: ObjectDef) => def.interactions.some((i) => i.private || i.conceive || (i.tags ?? []).some((t) => tags.has(t)));
-  return new Set(content.objectList.filter(shuts).map((d) => d.id));
 }

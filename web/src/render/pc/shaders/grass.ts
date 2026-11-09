@@ -222,10 +222,7 @@ ${windDecl}
 	}
 #endif`;
 
-  const vsNormal = `
-#if defined(GAME_GRASS) && !defined(SHADOW_PASS)
-	return normalize(dNormalMatrix * gameGrassN);
-#endif`;
+  const vsNormal = { when: 'defined(GAME_GRASS) && !defined(SHADOW_PASS)', code: '\treturn normalize(dNormalMatrix * gameGrassN);' };
 
   const vsEnd = `
 #if defined(GAME_GRASS) && !defined(SHADOW_PASS)

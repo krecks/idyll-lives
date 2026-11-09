@@ -9,7 +9,7 @@ use common::interaction;
 
 use common::buy;
 use sim_core::world::{Phase, TaskKind};
-use sim_core::{Command, MINUTES_PER_TICK, World};
+use sim_core::{Command, World};
 
 /// An open 16×14 plot with one resident.
 const TOWN: &str = r#"{"width":16,"depth":16,
@@ -40,7 +40,7 @@ fn finish_on_the_toilet(w: &mut World, toilet: u32) {
     })
     .unwrap();
     let mut on = false;
-    for _ in 0..(60.0 / MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(60.0) {
         w.tick_once();
         let using = w.sims[0].current().is_some_and(|a| {
             matches!(a.phase, Phase::Using { .. })
@@ -77,7 +77,7 @@ fn selling_an_earlier_object_while_a_follow_up_is_pending_does_not_panic() {
         object: first,
     })
     .unwrap();
-    for _ in 0..40 {
+    for _ in 0..common::mins(2.0) {
         w.tick_once();
     }
     common::check(&w);
@@ -102,7 +102,7 @@ fn a_pending_follow_up_still_names_the_sink_after_an_earlier_sale() {
     .unwrap();
     let sink = sink - 1;
     let mut used = None;
-    for _ in 0..(30.0 / MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(30.0) {
         w.tick_once();
         if let Some(a) = w.sims[0].current()
             && let TaskKind::Use { object, .. } = a.task.kind
@@ -481,7 +481,7 @@ fn a_guests_order_goes_when_the_visit_does() {
     })
     .unwrap();
     w.apply(Command::Cancel { sim: 0, index: 0 }).unwrap();
-    for _ in 0..(30.0 / MINUTES_PER_TICK) as u32 {
+    for _ in 0..common::mins(30.0) {
         w.tick_once();
         let at_bos = w.sims[0].current().is_some_and(
             |a| matches!(a.task.kind, TaskKind::Use { object, .. } if object == bos_fridge),

@@ -9,6 +9,7 @@ import type { CameraPose } from '../render/types';
 import { writeSave, type SaveRecord } from '../persistence/saves';
 import { recentLog, type LogEntry } from './log';
 import { within } from '../core/async';
+import { minutesPerTick, tickRates } from '../core/snapshot';
 
 export interface DebugReport {
   /** What the report is about, typed by the player (may be empty). */
@@ -130,9 +131,6 @@ export async function loadDebugReport(name: string): Promise<string> {
   return record.id;
 }
 
-/** Game minutes per simulation tick (sim-core `MINUTES_PER_TICK`). */
-const MINUTES_PER_TICK = 1 / 20;
-
 /**
  * Puts a pasted game state into a save slot and returns its id: the simulation's own save
  * (`World::save_json`, what the tests write with `DUMP_STATES=1`) or a whole debug report.
@@ -151,7 +149,7 @@ export async function loadState(text: string, name = 'Pasted state'): Promise<st
     throw new Error("That isn't a game state (no tick, households and residents).");
   }
   const player = state.households.findIndex((h: { player: boolean }) => h.player);
-  const minutes = Math.floor(state.tick * MINUTES_PER_TICK);
+  const minutes = Math.floor(state.tick * minutesPerTick(tickRates));
   const record: SaveRecord = {
     id: 'debug-state',
     name: `Debug: ${name}`,
