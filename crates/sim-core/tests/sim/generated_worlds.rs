@@ -25,7 +25,7 @@ use sim_core::lot::{Edge, OUTDOORS};
 use sim_core::path::NavGrid;
 use sim_core::surface;
 use sim_core::travel::Graph;
-use sim_core::world::{MAX_SIMS, TaskKind};
+use sim_core::world::{MAX_SIMS, Plot, TaskKind};
 
 /// `check` for each of `items`, a few at a time (one per core, or `WORLD_THREADS` at most: each
 /// world plays on its own, and a path search's budget counts on its own thread), the results in
@@ -59,6 +59,116 @@ fn each_world<I: Sync, T: Send>(items: &[I], check: impl Fn(&I) -> T + Sync) -> 
     });
     out.sort_by_key(|&(k, _)| k);
     out.into_iter().map(|(_, t)| t).collect()
+}
+
+/// Where a resident can walk from a tile: one flood of the lot from each place asked about, kept
+/// for the next question. (`NavGrid::find_path` apiece would walk the lot again for each of a
+/// town's hundreds of things, a minute a world where this takes a second.)
+struct Walks<'a> {
+    nav: &'a NavGrid<'a>,
+    /// The tiles walked to, by where the walk started and how far round it may go.
+    seen: std::collections::HashMap<(Walk, Rect), Vec<bool>>,
+}
+
+/// A tile a walk starts at, and the ground (x and z, the tile past each) it may go round in.
+type Walk = (i32, i32);
+type Rect = (i32, i32, i32, i32);
+
+impl<'a> Walks<'a> {
+    fn new(nav: &'a NavGrid<'a>) -> Self {
+        Self {
+            nav,
+            seen: Default::default(),
+        }
+    }
+
+    /// Whether a resident can walk from `from` to `to`. (As `find_path` would find: the start may
+    /// be a blocked tile, a car's spot or a stair's landing, and the goal must be one to stand on.)
+    fn reaches(&mut self, from: Walk, to: Walk) -> bool {
+        let lot = self.nav.lot;
+        self.reaches_round(from, to, (0, 0, lot.width as i32, lot.depth as i32))
+    }
+
+    /// `reaches`, round the plot `plot` and a little of the street: a house's own door reaches
+    /// what is in it, and walking the whole lot for each of a town's houses would be a minute.
+    fn reaches_in(&mut self, from: Walk, to: Walk, plot: &Plot) -> bool {
+        let pad = 6;
+        self.reaches_round(
+            from,
+            to,
+            (
+                plot.x - pad,
+                plot.z - pad,
+                plot.x + plot.w + pad,
+                plot.z + plot.d + pad,
+            ),
+        )
+    }
+
+    fn reaches_round(&mut self, from: Walk, to: Walk, round: Rect) -> bool {
+        let nav = self.nav;
+        if !nav.lot.in_bounds(to.0, to.1) || !nav.tile_free(to.0, to.1) {
+            return false;
+        }
+        if from == to {
+            return true;
+        }
+        let seen = self
+            .seen
+            .entry((from, round))
+            .or_insert_with(|| flood(nav, from, round));
+        seen[nav.lot.tile_index(to.0, to.1)]
+    }
+}
+
+/// Every tile a resident can walk to from `start`, as `NavGrid::can_step` and the stairs allow.
+fn flood(nav: &NavGrid, start: Walk, round: Rect) -> Vec<bool> {
+    let mut seen = vec![false; nav.lot.tile_slots()];
+    if !nav.lot.in_bounds(start.0, start.1) {
+        return seen;
+    }
+    seen[nav.lot.tile_index(start.0, start.1)] = true;
+    let mut walk = vec![start];
+    while let Some((x, z)) = walk.pop() {
+        // (A stair's top and its landing are a step apart however far apart they are.)
+        let link = nav
+            .stairs
+            .link(x, z)
+            .filter(|&(lx, lz)| nav.tile_free(lx, lz));
+        let steps = [
+            (1, 0),
+            (-1, 0),
+            (0, 1),
+            (0, -1),
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1),
+        ]
+        .into_iter()
+        .chain(link.map(|(lx, lz)| (lx - x, lz - z)));
+        for (dx, dz) in steps {
+            let (nx, nz) = (x + dx, z + dz);
+            let linked = Some((nx, nz)) == link;
+            if !linked && ((dx.abs() > 1 || dz.abs() > 1) || !nav.can_step(x, z, nx, nz)) {
+                continue;
+            }
+            if !nav.lot.in_bounds(nx, nz) {
+                continue;
+            }
+            // (Rows of every storey, by the ground row they are over.)
+            let gz = nav.stairs.ground_z(nz);
+            if nx < round.0 || gz < round.1 || nx >= round.2 || gz >= round.3 {
+                continue;
+            }
+            let i = nav.lot.tile_index(nx, nz);
+            if !seen[i] {
+                seen[i] = true;
+                walk.push((nx, nz));
+            }
+        }
+    }
+    seen
 }
 
 #[test]
@@ -105,13 +215,14 @@ fn generated_worlds_are_livable() {
                 blocked: w.blocked(),
                 stairs: w.stair_map(),
             };
+            let mut walks = Walks::new(&nav);
             let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
             let exits: Vec<_> = w.exits.iter().map(|&e| tile(e)).collect();
             // Every lot from every way into town.
             for plot in &w.plots {
                 let entry = tile(plot.arrival_point());
                 for &exit in &exits {
-                    if nav.find_path(exit, entry).is_none() {
+                    if !walks.reaches(exit, entry) {
                         failures.push(format!(
                             "{label}: {} can't be reached from {exit:?}",
                             plot.name
@@ -172,7 +283,7 @@ fn generated_worlds_are_livable() {
                 }
                 if !surface::use_tiles(&w.content, &w.objects, &nav, o)
                     .into_iter()
-                    .any(|t| nav.find_path(start, t).is_some())
+                    .any(|t| walks.reaches(start, t))
                 {
                     failures.push(format!(
                         "{label}: can't reach the {} at {},{}",
@@ -184,7 +295,7 @@ fn generated_worlds_are_livable() {
             // use in the houses (upstairs, downstairs and in the basement), on lots facing either way.
             let door = |x: i32, z: i32| {
                 w.plot_at(x, z)
-                    .map(|p| tile(w.plots[p as usize].arrival_point()))
+                    .map(|p| (p, tile(w.plots[p as usize].arrival_point())))
             };
             let down = w.storey_row(-1);
             let mut seen = std::collections::HashSet::new();
@@ -194,14 +305,16 @@ fn generated_worlds_are_livable() {
                     if room == OUTDOORS || !nav.tile_free(x, z) || !seen.insert(room) {
                         continue;
                     }
-                    let Some(from) = door(x, z) else { continue };
+                    let Some((plot, from)) = door(x, z) else {
+                        continue;
+                    };
                     cellars += 1;
                     let walked = (z..down + w.storey_depth())
                         .flat_map(|tz| (0..w.lot.width as i32).map(move |tx| (tx, tz)));
                     if !walked
                         .filter(|&(tx, tz)| w.lot.room_at(tx, tz) == room && nav.tile_free(tx, tz))
                         .take(8)
-                        .any(|t| nav.find_path(from, t).is_some())
+                        .any(|t| walks.reaches_in(from, t, &w.plots[plot as usize]))
                     {
                         failures.push(format!(
                             "{label}: can't get into the basement room at {x},{z}"
@@ -213,10 +326,12 @@ fn generated_worlds_are_livable() {
                 !w.content.objects[o.def].interactions.is_empty()
                     && w.lot.room_at(o.x, o.z) != OUTDOORS
             }) {
-                let Some(from) = door(o.x, o.z) else { continue };
+                let Some((plot, from)) = door(o.x, o.z) else {
+                    continue;
+                };
                 if !surface::use_tiles(&w.content, &w.objects, &nav, o)
                     .into_iter()
-                    .any(|t| nav.find_path(from, t).is_some())
+                    .any(|t| walks.reaches_in(from, t, &w.plots[plot as usize]))
                 {
                     let at = match w.storey_of(o.z) {
                         -1 => "in the basement",
