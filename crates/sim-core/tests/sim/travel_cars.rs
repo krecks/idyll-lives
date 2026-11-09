@@ -1108,6 +1108,63 @@ fn a_lit_junctions_signal_heads_are_in_the_snapshot_one_an_arm_on_its_kerb() {
 }
 
 #[test]
+fn every_junction_is_in_the_structure_with_its_arms_crosswalks_and_stop_lines() {
+    // The renderer's layout of a junction (`junctions`, web `JunctionInfo`): its middle, and per
+    // arm its road, its way out, its width between the kerbs, its crosswalk and stop line out
+    // from the middle, and its signal head's row. A crossroads of 7 m streets: four arms, each a
+    // way out along x or z, 4.3 m between the kerbs.
+    let w = busy_crossroads();
+    let s: serde_json::Value = serde_json::from_str(&sim_core::view::structure_json(&w)).unwrap();
+    let junctions = s["junctions"].as_array().expect("junctions");
+    assert_eq!(junctions.len(), 1, "{junctions:?}");
+    let j = &junctions[0];
+    assert_eq!(
+        (j["x"].as_f64(), j["z"].as_f64()),
+        (Some(200.0), Some(200.0))
+    );
+    assert!(j.get("roundabout").is_none(), "not on a roundabout");
+    let arms = j["arms"].as_array().expect("arms");
+    assert_eq!(arms.len(), 4);
+    let mut rows = Vec::new();
+    let mut ways = Vec::new();
+    for a in arms {
+        let keys: std::collections::BTreeSet<&str> =
+            a.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(
+            keys,
+            [
+                "dir", "light", "road", "stop", "walkFrom", "walkTo", "width"
+            ]
+            .into_iter()
+            .collect(),
+        );
+        let f = |k: &str| a[k].as_f64().unwrap() as f32;
+        assert!(a["road"].as_u64().unwrap() < 4, "a road of the town's: {a}");
+        let dir = [a["dir"][0].as_f64().unwrap(), a["dir"][1].as_f64().unwrap()];
+        assert!(
+            (dir[0].hypot(dir[1]) - 1.0).abs() < 1e-3,
+            "a unit way out: {a}"
+        );
+        assert!(
+            dir[0].abs() < 1e-3 || dir[1].abs() < 1e-3,
+            "along x or z: {a}"
+        );
+        ways.push([dir[0].round() as i32, dir[1].round() as i32]);
+        assert!((f("width") - 4.3).abs() < 1e-3, "kerb to kerb: {a}");
+        // (The crosswalk from the corner, past the box's edge, 3 m wide; the stop line just past.)
+        assert!(f("walkFrom") >= 6.0 - 1e-3, "{a}");
+        assert!((f("walkTo") - f("walkFrom") - sim_core::traffic::CROSSWALK).abs() < 1e-3);
+        assert!((f("stop") - f("walkTo") - sim_core::traffic::STOP_GAP).abs() < 1e-3);
+        rows.push(a["light"].as_u64().expect("lit"));
+    }
+    ways.sort();
+    assert_eq!(ways, [[-1, 0], [0, -1], [0, 1], [1, 0]]);
+    assert_eq!(rows, [0, 1, 2, 3], "the heads' rows in order");
+    // (The poles too, for the kerbside furniture.)
+    assert_eq!(s["lightPoles"].as_array().map(Vec::len), Some(4));
+}
+
+#[test]
 fn a_game_saved_with_the_lights_part_way_loads_with_them_where_they_were() {
     use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
     let mut w = busy_crossroads();

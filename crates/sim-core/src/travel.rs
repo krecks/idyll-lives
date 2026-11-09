@@ -780,6 +780,11 @@ impl Graph {
         count
     }
 
+    /// How many stretches of road meet at node `n`.
+    pub(crate) fn degree(&self, n: usize) -> usize {
+        self.adj.get(n).map_or(0, Vec::len)
+    }
+
     /// Where three or more stretches of road meet.
     pub fn junctions(&self) -> impl Iterator<Item = [f32; 2]> + '_ {
         self.adj

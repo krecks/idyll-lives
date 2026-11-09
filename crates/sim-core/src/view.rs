@@ -1737,6 +1737,72 @@ struct StructureView<'a> {
     /// left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     light_poles: Vec<[f32; 3]>,
+    /// Every junction where `traffic::SIGNAL_ARMS` roads for cars or more meet (`traffic::Signal`),
+    /// for its pad and markings: its middle, whether it's on a roundabout, and its arms, each with
+    /// its crosswalk and stop line and its signal head's snapshot row; left out when there are none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    junctions: Vec<JunctionView>,
+}
+
+/// A junction (`StructureView::junctions`, `traffic::Signal`): its middle (m), on a roundabout's
+/// ring (`roundabout`: the renderer leaves its pad and markings out), and its arms.
+#[derive(Serialize)]
+struct JunctionView {
+    x: f32,
+    z: f32,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    roundabout: bool,
+    arms: Vec<JunctionArmView>,
+}
+
+/// A junction's arm (`traffic::SignalArm`): its road (`meta.roads` index), the way out along it
+/// from the middle (a unit vector, x and z), the road's width between its kerbs (m), its crosswalk
+/// (m out from the junction's middle, `walk_from` to `walk_to`), its stop line (m out, past the
+/// crosswalk: cars stop on red with their noses there) and its signal head's row in the snapshot
+/// (`snapshot::light`; none: not lit).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct JunctionArmView {
+    road: u32,
+    dir: [f32; 2],
+    width: f32,
+    walk_from: f32,
+    walk_to: f32,
+    stop: f32,
+    light: Option<u32>,
+}
+
+/// `StructureView::junctions`: the lit junctions in their heads' rows' order.
+fn junction_views(world: &World) -> Vec<JunctionView> {
+    let g = &world.travel.graph;
+    let mut head = 0u32;
+    world
+        .travel
+        .signals
+        .iter()
+        .map(|s| JunctionView {
+            x: s.at[0],
+            z: s.at[1],
+            roundabout: s.roundabout,
+            arms: s
+                .arms
+                .iter()
+                .map(|a| {
+                    let row = head;
+                    head += 1;
+                    JunctionArmView {
+                        road: g.roads.get(a.road as usize).map_or(a.road, |r| r.source),
+                        dir: a.way,
+                        width: 2.0 * a.kerb,
+                        walk_from: a.walk_from,
+                        walk_to: a.walk_to,
+                        stop: a.stop,
+                        light: ((row as usize) < crate::snapshot::MAX_LIGHTS).then_some(row),
+                    }
+                })
+                .collect(),
+        })
+        .collect()
 }
 
 /// `StructureView::light_poles`.
@@ -2423,6 +2489,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
         garages: &world.garages,
         pull_over_streets: pull_over_street_views(world),
         light_poles: light_pole_views(world),
+        junctions: junction_views(world),
     })
     .expect("structure serializes")
 }
@@ -2611,6 +2678,8 @@ impl StructureSync {
         parts.part("pullOverStreets", Some(&streets).filter(|s| !s.is_empty()));
         let poles = light_pole_views(world);
         parts.part("lightPoles", Some(&poles).filter(|p| !p.is_empty()));
+        let junctions = junction_views(world);
+        parts.part("junctions", Some(&junctions).filter(|j| !j.is_empty()));
 
         // The things: those that changed, by index, while the list is the same things in the same
         // order (a door opened, a crop grown); else the whole list (one bought, sold or moved in).

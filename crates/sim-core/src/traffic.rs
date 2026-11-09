@@ -408,25 +408,42 @@ pub fn boxes(g: &Graph) -> Vec<([f32; 2], f32)> {
     out
 }
 
-/// A junction with traffic lights (`Travel::signals`: where `SIGNAL_ARMS` roads or more meet,
-/// `settle`): its middle, and its arms. One arm
-/// at a time has green (`Light`); a group through it is asked for only on its arm's green
-/// (`Claim::gate`), at the stop line where its claim begins, and holding it, one goes on through
-/// on amber and red; the claims keep anyone from driving into another in the box as ever.
+/// A junction with traffic lights (`Travel::signals`: every junction where `SIGNAL_ARMS` roads or
+/// more meet, `settle`): its middle, and its arms, each with its phase (`SignalArm::phase`: two
+/// arms more than `OPPOSITE` apart go together, an arm with none across from it on its own). One
+/// phase at a time has green (`Light`); a group through it is asked for only on its arm's phase's
+/// green (`Claim::gate`), at the stop line where its claim begins, and holding it, one goes on
+/// through on amber and red; the claims keep anyone from driving into another in the box as ever.
+/// A roundabout's (`Signal::roundabout`) gives each arm a phase of its own.
 #[derive(Debug, Clone)]
 pub struct Signal {
     pub at: [f32; 2],
     pub arms: Vec<SignalArm>,
+    /// How many phases its arms make (`SignalArm::phase`, from 0).
+    pub phases: u8,
+    /// On a roundabout's ring (a road of it has an island: `meta.roads[].island`).
+    pub roundabout: bool,
 }
 
 /// An arm of a lit junction (`Signal`): the way out along it (a unit vector), and its signal head:
 /// the pole on the kerb to the right of the way in, a little out past the box, and which way it
-/// faces (as a resident's yaw: towards those coming in).
+/// faces (as a resident's yaw: towards those coming in). Its phase (`Signal::phases`), its road
+/// (`Graph::roads` index) and how far its kerbs are from the middle of it (m); its crosswalk, from
+/// `walk_from` to `walk_to` m out from the junction's middle (from the corner, where the kerb's
+/// return round from the next arm ends, `KERB_RETURN`, or the box's edge, whichever is further
+/// out: `CROSSWALK` wide), and its stop line `stop` m out (`STOP_GAP` past the crosswalk), where
+/// cars stop on red with their noses.
 #[derive(Debug, Clone, Copy)]
 pub struct SignalArm {
     pub way: [f32; 2],
     pub pole: [f32; 2],
     pub yaw: f32,
+    pub phase: u8,
+    pub road: u32,
+    pub kerb: f32,
+    pub walk_from: f32,
+    pub walk_to: f32,
+    pub stop: f32,
 }
 
 /// What a lit junction's lights show (`Light`): an arm's green, its amber, then all red while the
@@ -464,35 +481,52 @@ const GATE_REACH: f32 = BOX_MOST + 2.0;
 /// the road's edge) (m).
 const POLE_OUT: f32 = 1.0;
 const POLE_KERB: f32 = 0.4;
+/// Two arms of a junction whose ways out are further apart than 150° (the cosine) are across from
+/// each other: green together (`SignalArm::phase`).
+const OPPOSITE: f32 = -0.866;
+/// The radius of a junction's kerbs where they turn round from one arm to the next (m, the
+/// renderer's), how wide a crosswalk is along its arm, and how far out past it the stop line is
+/// (m, `SignalArm`).
+pub const KERB_RETURN: f32 = 3.0;
+pub const CROSSWALK: f32 = 3.0;
+pub const STOP_GAP: f32 = 0.5;
 
 /// An arm's road from its junction (`signal_at`): which, where along it and which way (+1, -1),
 /// and the stretch of it between its ends' nodes.
 type ArmRoad = (u32, f32, f32, f32, f32);
 
 /// The lights of the junction at node `n` of `g` (`Signal`): its arms for cars, each with its pole
-/// on the kerb to the right of the way in, just out past the box (`boxes`). None: fewer than
-/// `SIGNAL_ARMS` arms.
-pub(crate) fn signal_at(g: &Graph, n: usize) -> Option<Signal> {
+/// on the kerb to the right of the way in, just out past the box (`boxes`), its phase, crosswalk
+/// and stop line (`SignalArm`). `ring`: per road of `g`, whether it's a roundabout's. None: fewer
+/// than `SIGNAL_ARMS` arms.
+pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
     let p = g.nodes[n];
-    // (Each arm's way out, how far from its middle its kerb is, and its road from the node: which,
-    // where along it and which way.)
-    let mut arms: Vec<([f32; 2], f32, ArmRoad)> = Vec::new();
+    // (Each arm's way out, how far from its middle its kerb is, its road from the node: which,
+    // where along it and which way; and how far out along it the junction may reach: half way to
+    // the next junction, else its stretch's length.)
+    let mut arms: Vec<([f32; 2], f32, ArmRoad, f32)> = Vec::new();
     for e in g.edges.iter() {
         let road = &g.roads[e.road as usize];
         if !road.drivable() {
             continue;
         }
-        for (end, s, k) in [(e.a, e.s0, 1.0f32), (e.b, e.s1, -1.0)] {
+        for (end, s, k, far) in [(e.a, e.s0, 1.0f32, e.b), (e.b, e.s1, -1.0, e.a)] {
             if end as usize != n {
                 continue;
             }
             let q = road.at((s + k * ARM_LOOK.min(e.len())).clamp(e.s0, e.s1));
             let l = dist(p, q);
             if l > 0.1 {
+                let room = if g.degree(far as usize) >= SIGNAL_ARMS {
+                    e.len() / 2.0
+                } else {
+                    e.len()
+                };
                 arms.push((
                     [(q[0] - p[0]) / l, (q[1] - p[1]) / l],
                     crate::cars::kerb_of(road.width, road.kind),
                     (e.road, s, k, e.s0, e.s1),
+                    room,
                 ));
             }
         }
@@ -500,13 +534,34 @@ pub(crate) fn signal_at(g: &Graph, n: usize) -> Option<Signal> {
     if arms.len() < SIGNAL_ARMS {
         return None;
     }
+    let roundabout = arms
+        .iter()
+        .any(|a| ring.get(a.2.0 as usize).copied().unwrap_or(false));
     // (Arms by the way they go round, for the lights' turns.)
     arms.sort_by(|a, b| a.0[0].atan2(a.0[1]).total_cmp(&b.0[0].atan2(b.0[1])));
+    let dot = |a: [f32; 2], b: [f32; 2]| a[0] * b[0] + a[1] * b[1];
+    // (Phases in that order round: an arm, and the one furthest round from it past `OPPOSITE`
+    // not yet in one; on a roundabout, an arm each.)
+    let mut phase = vec![u8::MAX; arms.len()];
+    let mut phases = 0u8;
+    for i in 0..arms.len() {
+        if phase[i] != u8::MAX {
+            continue;
+        }
+        phase[i] = phases;
+        let across = (i + 1..arms.len())
+            .filter(|&j| phase[j] == u8::MAX && dot(arms[i].0, arms[j].0) < OPPOSITE)
+            .min_by(|&a, &b| dot(arms[i].0, arms[a].0).total_cmp(&dot(arms[i].0, arms[b].0)));
+        if let Some(j) = across.filter(|_| !roundabout) {
+            phase[j] = phases;
+        }
+        phases += 1;
+    }
     let reach = |a: [f32; 2]| {
         arms.iter()
             .filter(|b| b.0 != a)
             .map(|b| {
-                let cos = a[0] * b.0[0] + a[1] * b.0[1];
+                let cos = dot(a, b.0);
                 let sin = (1.0 - cos * cos).max(0.0).sqrt();
                 if cos > 0.0 {
                     ARMS_APART / sin.max(1e-3)
@@ -517,27 +572,67 @@ pub(crate) fn signal_at(g: &Graph, n: usize) -> Option<Signal> {
             .fold(BOX_LEAST, f32::max)
             .min(BOX_MOST)
     };
+    // (Where an arm's kerb turns round into the next's ends, out along it: where the two kerbs
+    // would meet, and on round the return's radius, `R / tan(θ / 2)`; none with an arm across.)
+    let corner = |a: usize| {
+        let (wa, ka) = (arms[a].0, arms[a].1);
+        arms.iter()
+            .enumerate()
+            .filter(|&(b, _)| b != a)
+            .map(|(_, &(wb, kb, ..))| {
+                let cos = dot(wa, wb).clamp(-1.0, 1.0);
+                if cos < OPPOSITE {
+                    return 0.0;
+                }
+                let sin = (1.0 - cos * cos).sqrt().max(1e-3);
+                (kb + ka * cos) / sin + KERB_RETURN * (1.0 + cos) / sin
+            })
+            .fold(0.0, f32::max)
+    };
     let arms = arms
         .iter()
-        .map(|&(way, kerb, (road, s, k, s0, s1))| {
+        .enumerate()
+        .map(|(i, &(way, kerb, (road, s, k, s0, s1), room))| {
+            // (The crosswalk from the corner or the box's edge, the stop line past it; no further
+            // out than the junction may reach along it, the box's edge at least.)
+            let edge = reach(way);
+            let walk_from = edge.max(corner(i)).min(BOX_MOST);
+            let mut walk_to = walk_from + CROSSWALK;
+            let mut stop = walk_to + STOP_GAP;
+            if stop > room {
+                stop = room.max(edge).min(stop);
+                walk_to = walk_to.min(stop - STOP_GAP);
+            }
+            let walk_from = walk_from.min(walk_to - CROSSWALK).max(0.0);
             // (Along its own road, round its bend: where that's out past the box, and the way
             // out there; coming in, its right is the way out's left. On the pavement, `POLE_KERB`
             // in from the kerb; on a country road, as far out on the verge.)
-            let road = &g.roads[road as usize];
-            let at = (s + k * (reach(way) + POLE_OUT)).clamp(s0, s1);
-            let t = road.tangent(at);
+            let r = &g.roads[road as usize];
+            let at = (s + k * (edge + POLE_OUT)).clamp(s0, s1);
+            let t = r.tangent(at);
             let out = [t[0] * k, t[1] * k];
             let right = [out[1], -out[0]];
-            let m = road.at(at);
+            let m = r.at(at);
             let side = kerb + POLE_KERB;
             SignalArm {
                 way,
                 pole: [m[0] + right[0] * side, m[1] + right[1] * side],
                 yaw: out[0].atan2(out[1]),
+                phase: phase[i],
+                road,
+                kerb,
+                walk_from,
+                walk_to,
+                stop,
             }
         })
         .collect();
-    Some(Signal { at: p, arms })
+    Some(Signal {
+        at: p,
+        arms,
+        phases,
+        roundabout,
+    })
 }
 
 /// The lights `claims`' groups go through (`Claim::gate`): of `signals`, the first each group
@@ -1468,15 +1563,32 @@ pub fn on_its_way(w: &World, key: u64) -> Option<f32> {
     .then_some(car.progress)
 }
 
+/// Per road of `g`, whether it's a roundabout's ring: the town file's road (`meta.roads`) has an
+/// island in the middle.
+fn rings(g: &Graph, meta: &serde_json::Value) -> Vec<bool> {
+    let roads = meta.get("roads").and_then(|r| r.as_array());
+    g.roads
+        .iter()
+        .map(|r| {
+            roads
+                .and_then(|list| list.get(r.source as usize))
+                .is_some_and(|m| m.get("island").is_some_and(|i| !i.is_null()))
+        })
+        .collect()
+}
+
 /// The junctions' traffic lights (`Travel::signals`: every junction where `SIGNAL_ARMS` roads or
 /// more meet, while their heads fit the snapshot's rows), and every car's claims worked out again
 /// with them (`Claim::gate`). Once the cars are made or loaded.
 pub(crate) fn settle(w: &mut World) {
     let g = &w.travel.graph;
+    let ring = rings(g, &w.meta);
     let mut signals: Vec<Signal> = Vec::new();
     let mut heads = 0;
     for n in 0..g.nodes.len() {
-        let Some(sig) = signal_at(g, n) else { continue };
+        let Some(sig) = signal_at(g, n, &ring) else {
+            continue;
+        };
         // (No junction lit without a head for each arm in the snapshot's rows.)
         if heads + sig.arms.len() > crate::snapshot::MAX_LIGHTS {
             break;
