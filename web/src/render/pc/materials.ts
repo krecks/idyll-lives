@@ -493,6 +493,25 @@ export class MaterialLibrary {
   }
 
   /**
+   * Road paint (the junctions' stop lines and crosswalks, `shared/roads.ts`): the plain finish, drawn
+   * over the road it lies a few millimetres above (pulled towards the eye, as the contact shadows
+   * are), however coarse the depth buffer is that far off.
+   */
+  roadPaint(): pc.StandardMaterial {
+    const id = 'finish|roadPaint';
+    let mat = this.cache.get(id);
+    if (!mat) {
+      mat = this.create('material.finish.roadPaint', { type: 'material', color: '#FFFFFF', roughness: 1, metallic: 0 }, { vertexColors: true });
+      mat.setDefine('GAME_PLAIN_FINISH', '');
+      mat.slopeDepthBias = -2;
+      mat.depthBias = -2;
+      mat.update();
+      this.cache.set(id, mat);
+    }
+    return mat;
+  }
+
+  /**
    * `material` for instanced draws with a per-instance colour (`INSTANCE_COLOR_SEMANTIC`, see
    * `instancing.ts`): a copy, kept per material, that multiplies its albedo by the instance's colour
    * (converted from sRGB where the material converts vertex colours).

@@ -2,6 +2,10 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+- **Junctions that look like junctions:** where roads meet, one surface of asphalt joins them, its corners rounded by a 3 m kerb return, and the sidewalks turn the corner with their kerb, where they used to stop square and leave a bare square of road at each corner. Every arm of a junction into a street or lane has a white zebra crosswalk across it just out past the junction and a stop line across the lane coming in, where cars wait on red; a country road's arm gets only the stop line, while its lights are lit. Town sidewalks stop at a country road's mouth instead of running across it. Each traffic light's pole has a small head for those on foot facing across the road: a red standing figure, and a green walking one while the junction's walk phase is on, when every car head shows red. Roundabouts look as before.
+
 ## 0.7.0 — 2026-11-09
 
 **Play it in your browser:** https://krecks.github.io/idyll-lives/

@@ -631,6 +631,37 @@ export interface WorldStructure {
    * head rows' order): the kerbside furniture keeps clear of them. Absent: none.
    */
   lightPoles?: [number, number, number][];
+  /**
+   * The junctions where roads for cars meet (sim-core `traffic::Signal`): each one's middle and its
+   * arms, for the renderer's pads, kerb returns, stop lines and crosswalks (`render/shared/junctions.ts`).
+   * Absent: the renderer works them out from the roads.
+   */
+  junctions?: Junction[];
+}
+
+/**
+ * A junction (`WorldStructure.junctions`): its middle (m), whether it's on a roundabout's ring (drawn
+ * as the roundabout, no pad or markings), and its arms.
+ */
+export interface Junction {
+  x: number;
+  z: number;
+  roundabout?: true;
+  arms: {
+    /** The arm's road (`meta.roads` index). */
+    road: number;
+    /** The way out along it from the middle (a unit vector: dx, dz). */
+    dir: [number, number];
+    /** Its carriageway, kerb to kerb (m). */
+    width: number;
+    /** Its crosswalk, from and to (m out from the middle). */
+    walkFrom: number;
+    walkTo: number;
+    /** Its stop line (m out from the middle, at least `walkTo`). */
+    stop: number;
+    /** Its signal head's snapshot light row, null if unlit. */
+    light: number | null;
+  }[];
 }
 
 /**

@@ -1,7 +1,7 @@
 /**
  * The neighbourhood around the viewed lot, as a lived-in street: the neighbour houses
- * (`HouseBuilder.silhouettes`, with porches, chimneys and garages), sidewalks with kerbs and
- * a dashed centre line, streetlights that light up at night (with pools of light on the
+ * (`HouseBuilder.silhouettes`, with porches, chimneys and garages), sidewalks with kerbs turning
+ * the junctions' corners, the junctions' stop lines and crosswalks (`roads.ts`), streetlights that light up at night (with pools of light on the
  * ground), mailboxes, hydrants and bins along the kerb, cars parked on neighbours' driveways,
  * the fences and hedges round gardens and fields, and flower beds along their house
  * fronts, with pots by the door and little lights along the garden path; the things standing in
@@ -53,7 +53,8 @@ import { placementVariation, type StandIn } from './modelEntry';
 import { writeFences } from './fences';
 import { shownFences } from './shownFences';
 import { centroid } from '../../game/roads';
-import { Kerb, KERB, roadIndex, roadMeshes, SIDEWALK, townRoads, WALK_Y, type RoadIndex } from './roads';
+import { Kerb, KERB, roadIndex, roadMeshes, SIDEWALK, townRoads, WALK_Y, walkStops, type RoadIndex } from './roads';
+import { JunctionCuts, junctionsOf, type JunctionPlan } from './junctions';
 
 /** Vertex-colour alpha for the plain finish, as the material libraries' `encodeFinish`: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. */
 function encodeFinish(roughness: number, metallic: number): number {
@@ -397,6 +398,8 @@ export interface GroundLayer {
   name: string;
   material: string;
   geo: Geo;
+  /** Road paint (the markings): vertex-coloured in the plain finish, drawn over the road (`MaterialLibrary.roadPaint`; `material` unused). */
+  paint?: boolean;
 }
 
 /** One stream chunk of the street (`shared/chunks.ts`), as planned for a focus lot: what `StreetPlan` holds, for its square. */
@@ -541,6 +544,11 @@ export class TownStreet {
   /** A big world's ways between its areas: country roads (a surface, no sidewalks) and trails (a narrow path). */
   private readonly ways: { country: RoadPlan[]; trail: RoadPlan[] };
   private readonly index: RoadIndex;
+  /** The roads that stop a sidewalk (`roads.ts` `walkStops`): the streets and lanes (`roads`, at the same indexes), then the country roads. */
+  private readonly walkStops: RoadIndex;
+  /** The junctions as drawn (`junctions.ts`), and where their corners stop the sidewalks. */
+  private readonly junctions: JunctionPlan[];
+  private readonly cuts: JunctionCuts;
   private readonly paths: Rect[];
   private readonly fields: Rect[];
   private readonly W: number;
@@ -575,7 +583,7 @@ export class TownStreet {
   private readonly fenceUnits = new Map<number, { hash: number; out: Parts }>();
 
   /** The street's own: sidewalks, the road's surface, fountains, the menus' parked cars (by chunk). */
-  private statics: Map<number, { parts: Parts; road: Geo; trail: Geo }> | null = null;
+  private statics: Map<number, { parts: Parts; road: Geo; trail: Geo; marks: Geo }> | null = null;
   /** Kerbs by road side, and which plots front each. */
   private readonly rows = new Map<string, number[]>();
   /**
@@ -600,6 +608,9 @@ export class TownStreet {
     this.roads = all.filter((r) => r.kind !== 'country' && r.kind !== 'trail');
     this.ways = { country: all.filter((r) => r.kind === 'country'), trail: all.filter((r) => r.kind === 'trail') };
     this.index = roadIndex(this.roads);
+    this.walkStops = roadIndex(walkStops(all));
+    this.junctions = junctionsOf(world, all);
+    this.cuts = JunctionCuts.of(this.junctions);
     this.paths = world.meta?.paths ?? [];
     this.fields = world.meta?.world?.fields ?? [];
     this.W = world.width;
@@ -690,7 +701,7 @@ export class TownStreet {
    * pavement, clear of the other roads, of every lot and of what stands there as the town was laid out.
    */
   private rankSpot(r: number, side: 1 | -1, rowIds: number[]): [number, number] | null {
-    const kerb = new Kerb(this.roads[r], r, side, this.index);
+    const kerb = new Kerb(this.roads[r], r, side, this.walkStops, this.cuts);
     const spans = rowIds.map((i) => {
       const { L, at } = this.fronting[i]!;
       const [a, b] = [kerb.along(...at(L.plot.x)), kerb.along(...at(L.plot.x + L.plot.w))];
@@ -744,6 +755,7 @@ export class TownStreet {
       mode === 'town' ? (world.cars ? keyOf(world.cars, () => JSON.stringify(world.cars)) : '-') : !!world.cars,
       world.pullOverStreets ? keyOf(world.pullOverStreets, () => JSON.stringify(world.pullOverStreets)) : '-',
       world.lightPoles ? keyOf(world.lightPoles, () => JSON.stringify(world.lightPoles)) : '-',
+      world.junctions ? keyOf(world.junctions, () => JSON.stringify(world.junctions)) : '-',
       keyOf(world.plots, () => JSON.stringify(world.plots.map((p) => [p.id, p.x, p.z, p.w, p.d, p.public, p.entry]))),
     ].join('|');
   }
@@ -1189,7 +1201,7 @@ export class TownStreet {
       return c.parts;
     };
     const free = (r: Rect, m = 0) => this.free(r, m, focus, out.touched, out.cells);
-    const kerb = new Kerb(road, r, side, index);
+    const kerb = new Kerb(road, r, side, this.walkStops, this.cuts);
     const along = (u: [number, number]) => kerb.along(u[0], u[1]);
     // The plots fronting this side, in order along it: their fronts (s0..s1), front doors and driveways.
     const row = rowIds
@@ -1415,22 +1427,24 @@ export class TownStreet {
   }
 
   /** Sidewalks and kerbs, the road's surface (the game's), the fountains on roundabouts, the menus' parked cars: by chunk, planned once. */
-  private staticParts(): Map<number, { parts: Parts; road: Geo; trail: Geo }> {
+  private staticParts(): Map<number, { parts: Parts; road: Geo; trail: Geo; marks: Geo }> {
     if (this.statics) return this.statics;
-    const out = new Map<number, { parts: Parts; road: Geo; trail: Geo }>();
+    const out = new Map<number, { parts: Parts; road: Geo; trail: Geo; marks: Geo }>();
     const at = (x: number, z: number) => {
       const id = chunkAt(x, z);
       let c = out.get(id);
-      if (!c) out.set(id, (c = { parts: new Parts(this.options.has), road: new Geo(), trail: new Geo() }));
+      if (!c) out.set(id, (c = { parts: new Parts(this.options.has), road: new Geo(), trail: new Geo(), marks: new Geo() }));
       return c;
     };
-    // Sidewalks, kerbs and the road, each piece in the chunk its middle is in.
+    // Sidewalks, kerbs and the road, the junctions' pads, corners and markings, each piece in the
+    // chunk its middle is in. (The streets' and lanes' sidewalks, stopped by the country roads too.)
     const walk = new RoutedGeo((x, z) => at(x, z).parts.walk);
     const shadows = new RoutedGeo((x, z) => at(x, z).parts.shadows).color('#000000');
-    roadMeshes(this.roads, null, 0, { walk, shadows }, 'sidewalks');
+    roadMeshes(this.walkStops.roads, null, 0, { walk, shadows }, 'sidewalks', this.junctions);
     if (this.options.ground) {
-      roadMeshes([...this.roads, ...this.ways.country], null, 0, { surface: new RoutedGeo((x, z) => at(x, z).road) }, 'surface');
-      roadMeshes(this.ways.trail, null, 0, { surface: new RoutedGeo((x, z) => at(x, z).trail) }, 'surface');
+      const [road, marks] = [new RoutedGeo((x, z) => at(x, z).road), new RoutedGeo((x, z) => at(x, z).marks)];
+      roadMeshes([...this.roads, ...this.ways.country], null, 0, { surface: road, marks }, 'surface', this.junctions);
+      roadMeshes(this.ways.trail, null, 0, { surface: new RoutedGeo((x, z) => at(x, z).trail) }, 'surface', []);
     }
     // A fountain in the middle of every roundabout, flowers round it.
     for (const road of this.roads) {
@@ -1515,6 +1529,8 @@ export class TownStreet {
       if (road && !road.empty) ground.push({ name: 'streets', material: 'material.road', geo: road });
       const trail = this.staticParts().get(id)?.trail;
       if (trail && !trail.empty) ground.push({ name: 'trails', material: 'material.path', geo: trail });
+      const marks = this.staticParts().get(id)?.marks;
+      if (marks && !marks.empty) ground.push({ name: 'roadMarks', material: 'paint', geo: marks, paint: true });
       for (const [name, all, material, y] of this.groundRects()) {
         const list = all.filter(mine);
         if (!list.length) continue;

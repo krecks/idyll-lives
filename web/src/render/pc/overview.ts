@@ -33,6 +33,7 @@ import type { RGB } from '../shared/environment';
 import { Geo, type V3 } from '../shared/geometry';
 import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
 import { placementVariation, standInOf } from '../shared/modelEntry';
+import { junctionsOf } from '../shared/junctions';
 import { roadMeshes, townRoads } from '../shared/roads';
 import { fieldLayers } from '../shared/street';
 
@@ -290,9 +291,18 @@ export class TownOverview {
   /** Road and garden paths / driveways and fields, one flat mesh each (hidden until the swap). */
   private async buildGround(world: WorldStructure, pace?: () => Promise<void>): Promise<pc.Entity[]> {
     const out: pc.Entity[] = [];
-    const road = meshFrom(this.device, roadMeshes(townRoads(world), null, 0, {}, 'surface').surface.meshData());
+    // (The junctions' pads with the road, their markings in the road paint over it.)
+    const roads = townRoads(world);
+    const { surface, marks } = roadMeshes(roads, null, 0, { marks: new Geo() }, 'surface', junctionsOf(world, roads));
+    const road = meshFrom(this.device, surface.meshData());
     if (road) {
       const entity = drawMesh(this.root, 'townStreets', road, this.lib.surface('material.road', { doubleSided: true }), { receiveShadows: true, layers: this.layers });
+      entity.enabled = false;
+      out.push(entity);
+    }
+    const paint = marks && !marks.empty ? meshFrom(this.device, marks.meshData({ colors: true })) : null;
+    if (paint) {
+      const entity = drawMesh(this.root, 'townMarks', paint, this.lib.roadPaint(), { receiveShadows: true, layers: this.layers });
       entity.enabled = false;
       out.push(entity);
     }
