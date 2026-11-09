@@ -11,10 +11,16 @@ export interface SnapshotLayout {
   /** Most servers' rows after the residents' (missing in older layouts). */
   maxStaff?: number;
   /**
-   * Ticks a real second at speed 1 (sim-core `TICKS_PER_SECOND`): what moves in real time (walking, cars, doors)
+   * Ticks a real second at speed 1 (sim-core `TICKS_PER_SECOND`): what moves in real time (walking, doors)
    * moves this many ticks a second, and the sim runs a step every 1 / `ticksPerSecond` s.
    */
   ticksPerSecond: number;
+  /**
+   * How many times as fast as real time vehicles go (sim-core `DRIVE_SCALE`, the traffic's clock): cars, the taxi,
+   * and bikes and e-scooters (their content `speed` times walking, times this). (`readLayout` fills in 1 for a sim
+   * that didn't send it.)
+   */
+  driveScale: number;
   /**
    * Ticks a game minute (sim-core `TICKS_PER_MINUTE`): the clock, needs and every duration a resident lives
    * through. (`readLayout` fills it in, `ticksPerSecond`, for a sim that didn't send it.)
@@ -143,10 +149,13 @@ export interface SnapshotLayout {
 
 export const Pose = { Stand: 0, Sit: 1, Lie: 2 } as const;
 
-/** The layout from sim-core's JSON (`Game::snapshot_layout`), `ticksPerMinute` filled in where it didn't send one (a game minute was a real second). */
+/**
+ * The layout from sim-core's JSON (`Game::snapshot_layout`), `ticksPerMinute` filled in where it didn't send one (a game
+ * minute was a real second), and `driveScale` (vehicles went at real time).
+ */
 export function readLayout(json: string): SnapshotLayout {
-  const layout = JSON.parse(json) as Omit<SnapshotLayout, 'ticksPerMinute'> & { ticksPerMinute?: number };
-  return { ...layout, ticksPerMinute: layout.ticksPerMinute ?? layout.ticksPerSecond };
+  const layout = JSON.parse(json) as Omit<SnapshotLayout, 'ticksPerMinute' | 'driveScale'> & { ticksPerMinute?: number; driveScale?: number };
+  return { ...layout, ticksPerMinute: layout.ticksPerMinute ?? layout.ticksPerSecond, driveScale: layout.driveScale ?? 1 };
 }
 
 /** Game minutes a tick (sim-core `MINUTES_PER_TICK`). */
@@ -167,7 +176,7 @@ export function gameMinutesPerSecond(layout: Pick<SnapshotLayout, 'ticksPerSecon
  * layout to hand: the journal's times, a pasted state's day. Before the first game: sim-core's as of writing
  * (`tests/tickRates.test.ts` keeps them to its `lib.rs`).
  */
-export const tickRates: Pick<SnapshotLayout, 'ticksPerSecond' | 'ticksPerMinute'> = { ticksPerSecond: 60, ticksPerMinute: 75 };
+export const tickRates: Pick<SnapshotLayout, 'ticksPerSecond' | 'ticksPerMinute' | 'driveScale'> = { ticksPerSecond: 60, ticksPerMinute: 75, driveScale: 4 };
 
 /**
  * A layout's `sim` indices for the fields it writes: `simFields(['id', 'x'])` gives `{ id: 0, x: 1 }`. The names

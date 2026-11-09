@@ -1655,7 +1655,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // `world::WALK_SPEED` a tick, times the fastest walkers' factors and some slack.
     const prevSpeed = prev[layout.header.speed] | 0;
     const prevGameSpeed = layout.header.calm !== undefined && prev[layout.header.calm] > 0 ? Math.max(prevSpeed, QUIET_SPEED) : prevSpeed;
-    const reach = Math.max(SNAP_DISTANCE, (PACE / layout.ticksPerSecond) * WALK_FASTEST * WALK_SLACK * Math.max(playRate, PLAYBACK_RATE[prevGameSpeed] ?? 1) * frame.steps);
+    const stride = (PACE / layout.ticksPerSecond) * WALK_FASTEST * WALK_SLACK * Math.max(playRate, PLAYBACK_RATE[prevGameSpeed] ?? 1) * frame.steps;
+    const reach = Math.max(SNAP_DISTANCE, stride);
     const animRate = this.debugRate ?? Math.min(playRate, 2.5);
     // Paused (the pause button, Buy and Build mode, menus): everyone freezes mid-motion, walk
     // cycles, breathing, blinks and glances included.
@@ -1751,7 +1752,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // at 20 ticks a second, just as it glided over the step); further than `SNAP_DISTANCE`, at once.
       const [from, to, g] = [this.glideFrom, this.glideTo, i * 4];
       if (walking) {
-        if (Math.hypot(cx - prev[o + k.x], cz - pz) < reach * Math.max(1, mount?.ride?.speed ?? 1)) {
+        // (Riding: its `speed` times walking, on the traffic's clock, `driveScale` times that a step.)
+        const speed = Math.max(1, mount?.ride?.speed ?? 1);
+        const far = mount?.ride ? Math.max(SNAP_DISTANCE * speed, stride * speed * layout.driveScale) : reach;
+        if (Math.hypot(cx - prev[o + k.x], cz - pz) < far) {
           tx = prev[o + k.x] + (cx - prev[o + k.x]) * alpha;
           tz = pz + (cz - pz) * alpha;
           if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * alpha;

@@ -133,10 +133,20 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
 
 ## Game feel
 
-Walking is 1.5 m per game minute (`WALK_SPEED`), so 1 km takes ~11 game hours on foot. A bike
-or an e-scooter is ridden at its content `vehicle.speed` times that (the city bike 3, the kids'
-bike 2.2, the e-scooter 4; `ride.rs`) along the same way as the walk, and the way to work is
-timed by the ride (`ride::commute_bike`).
+Walking is 1.5 m a real second (`WALK_SPEED`), about 1.9 m a game minute at the 48× game clock
+(a game minute is 1.25 real seconds), so 1 km takes about 9 game hours on foot. Vehicles go on
+the traffic's own clock (`DRIVE_SCALE`, 4): everything about how they move and take turns (their
+speeds and acceleration, bends, look-aheads, claims, jams, the traffic lights' timing, the taxi's
+way weighed in seconds) is timed in seconds of drive time, four to a real second, so it keeps its
+shape at four times the pace. Cars drive at 6 m a second of it in the hamlets (`TOWN_SPEED`) and
+16 on country roads (`COUNTRY_SPEED`, content `cars.countrySpeed`), 3.5 through a junction and
+slower round a bend: from a big world's road furthest south to its road furthest west (one to two
+km) in about half an hour of game time with the roads to itself, where it took two to five hours
+at real speeds (`generated_worlds`' drive across). Its etas follow (`travel::DRIVE_MINUTES`). A bike or an e-scooter is ridden at its content `vehicle.speed` times
+walking (the city bike 3, the kids' bike 2.2, the e-scooter 4) on the same clock, so four times
+that (`content::Vehicle::pace`, `ride.rs`), along the same way as the walk, and the way to work is
+timed by the ride (`ride::commute_bike`). Walking, getting in and out of a car, its doors and the
+taxi's stands for its riders stay real time, and schedules game time.
 
 - Areas are 170 m or more apart (best ~230 m from the nearest, every quarter of the world with
   one or with homes out in the country); trips between them are by car. The household setting off with

@@ -5,7 +5,7 @@
 
 use crate::Content;
 use crate::world::{Activity, MAX_SIMS, Phase, Sim, Task, TaskKind, World};
-use crate::{TICKS_PER_MINUTE, TICKS_PER_SECOND, clock};
+use crate::{DRIVE_SCALE, TICKS_PER_MINUTE, TICKS_PER_SECOND, clock};
 
 pub const HEADER_LEN: usize = 12;
 /// Floats per Sim (all 32 used).
@@ -1011,8 +1011,10 @@ pub fn layout_json(content: &Content) -> String {
         "recipes": content.recipes.iter().map(|r| &r.id).collect::<Vec<_>>(),
     });
     // (Apart: one `json!` this long would pass the macro's recursion limit.)
-    // Ticks in a game minute, beside `ticksPerSecond` in a real second.
+    // Ticks in a game minute, beside `ticksPerSecond` in a real second; and how many times as fast
+    // as real time vehicles go (`DRIVE_SCALE`: the traffic's clock).
     layout["ticksPerMinute"] = TICKS_PER_MINUTE.into();
+    layout["driveScale"] = DRIVE_SCALE.into();
     layout["sim"]["parkX"] = sim::PARK_X.into();
     layout["sim"]["parkZ"] = sim::PARK_Z.into();
     layout["sim"]["parkYaw"] = sim::PARK_YAW.into();

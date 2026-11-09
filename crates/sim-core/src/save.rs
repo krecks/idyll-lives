@@ -103,6 +103,12 @@
 //! minute's, so it plays on at the same minute of the same day, and places along a car's or a
 //! taxi's way (`cars[].progress`, its detour's and its way round a taxi's, `taxis.runs[].progress`)
 //! by the real second's, as they're driven.
+//! 37 = cars, the taxi, bikes and e-scooters go on the traffic's own clock, `DRIVE_SCALE` (4) times
+//! as fast as real time (`DRIVE_TICKS_PER_SECOND` ticks to a second of it): a file before it timed
+//! places along a car's or a taxi's way (`cars[].progress`, its detour's and its way round a
+//! taxi's, `taxis.runs[].progress`) and the tick a traffic light's stage began (`lights`) in real
+//! seconds, and they're rescaled as it loads (`Rescale::drive`): each place along its way is the
+//! same place, as its way is now timed, and each light as many seconds into its stage.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -116,9 +122,12 @@ use crate::planner::{BlockResult, Goal, HomeWish, Outcome, Planner, Reason, Rout
 use crate::rng::Rng;
 use crate::social::{self, Relationship};
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
-use crate::{Error, MINUTES_PER_TICK, TICKS_PER_MINUTE, TICKS_PER_SECOND, clock::MAX_SPEED};
+use crate::{
+    DRIVE_TICKS_PER_SECOND, Error, MINUTES_PER_TICK, TICKS_PER_MINUTE, TICKS_PER_SECOND,
+    clock::MAX_SPEED,
+};
 
-pub const SAVE_VERSION: u32 = 36;
+pub const SAVE_VERSION: u32 = 37;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1153,7 +1162,8 @@ impl World {
         }
         world.mode = save.mode;
         world.seed = save.seed;
-        // (Before v36: ticks counted at 20 a real second and 20 a game minute.)
+        // (Before v36: ticks counted at 20 a real second and 20 a game minute; before v37, cars
+        // timed in real seconds.)
         let ticks = Rescale::of(save.version);
         world.tick = ticks.tick(save.tick);
         world.speed = save.speed.min(MAX_SPEED);
@@ -1743,7 +1753,7 @@ impl World {
                         2 => crate::traffic::Stage::Clear,
                         _ => crate::traffic::Stage::Green,
                     },
-                    since: ticks.real_since(l.since, save.tick),
+                    since: ticks.drive_since(l.since, save.tick),
                 })
                 .collect();
         }
@@ -2506,38 +2516,43 @@ const OLD_TICKS_PER_SECOND: u32 = 20;
 const OLD_TICKS_PER_MINUTE: u64 = 20;
 
 /// How a file's ticks become this build's (v36: before it, `OLD_TICKS_PER_SECOND` and
-/// `OLD_TICKS_PER_MINUTE`). The clock's ticks (`World::tick`, and the ticks things began, were
-/// made, happened or are due at) by the game minute's ticks, now over then: tick 0 is 08:00 on
-/// day 1 either way, so each is the same minute of the same day. Places along a car's or a taxi's
-/// way (ticks of its route, driven at real-time speeds) by the real second's. The tick a traffic
-/// light's stage began (`traffic::Light`, timed in real seconds, `secs`) as long before the
-/// clock's tick in real seconds as it was (`real_since`). A car's state and a taxi standing at its
-/// stop began at a tick of the clock: what they wait for is game minutes (a car boarding
-/// `cars::BOARD_WAIT_TICKS`, a taxi `taxi.waitMinutes` and `taxi::COMING_WAIT`), and their
-/// seconds' floors and dwells (`BOARD_MIN_TICKS`, `DWELL`, `PASS_BY_MOST`) end within the second.
-/// Nothing else is saved in ticks: what's left of a nap, a visit, a feeling or a machine's run is
-/// saved in game minutes, and the day things happened on in days.
+/// `OLD_TICKS_PER_MINUTE`; v37: before it, cars timed in real seconds). The clock's ticks
+/// (`World::tick`, and the ticks things began, were made, happened or are due at) by the game
+/// minute's ticks, now over then: tick 0 is 08:00 on day 1 either way, so each is the same minute
+/// of the same day. Places along a car's or a taxi's way (ticks of its route, timed by its speeds)
+/// by a second of drive time's ticks (`DRIVE_TICKS_PER_SECOND`) over the file's (its real second's
+/// before v37: the same place along the same way). The tick a traffic light's stage began
+/// (`traffic::Light`, timed in drive time, `drive_secs`) as far into its stage as it was
+/// (`drive_since`). A car's state and a taxi standing at its stop began at a tick of the clock:
+/// what they wait for is game minutes (a car boarding `cars::BOARD_WAIT_TICKS`, a taxi
+/// `taxi.waitMinutes` and `taxi::COMING_WAIT`), and their seconds' floors and dwells
+/// (`BOARD_MIN_TICKS`, `DWELL`, `PASS_BY_MOST`) end within the second. Nothing else is saved in
+/// ticks: what's left of a nap, a visit, a feeling or a machine's run is saved in game minutes,
+/// and the day things happened on in days.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct Rescale {
     /// Ticks in a game minute, now and in the file.
     game: (u64, u64),
-    /// Ticks in a real second now over those in the file.
-    real: f32,
+    /// Ticks in a second of drive time now over those in the file (its real second's before v37).
+    drive: f32,
 }
 
 impl Rescale {
     /// For a file of save version `version`.
     fn of(version: u32) -> Self {
-        if version < 36 {
-            Self {
-                game: (TICKS_PER_MINUTE, OLD_TICKS_PER_MINUTE),
-                real: TICKS_PER_SECOND as f32 / OLD_TICKS_PER_SECOND as f32,
-            }
-        } else {
-            Self {
-                game: (1, 1),
-                real: 1.0,
-            }
+        // (Ticks to the second cars were timed in, in the file.)
+        let file_drive = match version {
+            ..36 => OLD_TICKS_PER_SECOND as f32,
+            36 => TICKS_PER_SECOND as f32,
+            _ => DRIVE_TICKS_PER_SECOND,
+        };
+        Self {
+            game: if version < 36 {
+                (TICKS_PER_MINUTE, OLD_TICKS_PER_MINUTE)
+            } else {
+                (1, 1)
+            },
+            drive: DRIVE_TICKS_PER_SECOND / file_drive,
         }
     }
 
@@ -2553,17 +2568,17 @@ impl Rescale {
 
     /// A place along a way, in ticks of its route.
     fn route(self, t: f32) -> f32 {
-        t * self.real
+        t * self.drive
     }
 
-    /// The tick something timed in real seconds began (`since`), the file's clock at `now`: as
-    /// many real seconds before the clock's tick (`tick`) as it was. (By the clock's ticks, a
-    /// traffic light green for 4 seconds was at it for 5.)
-    fn real_since(self, since: u64, now: u64) -> u64 {
+    /// The tick something timed in drive time began (`since`; in real time before v37), the
+    /// file's clock at `now`: as many of its seconds before the clock's tick (`tick`) as it was.
+    /// (By the clock's ticks, a traffic light green for 4 seconds was at it for 5.)
+    fn drive_since(self, since: u64, now: u64) -> u64 {
         if since >= now {
             return self.tick(since);
         }
-        let ago = ((now - since) as f64 * f64::from(self.real)).round() as u64;
+        let ago = ((now - since) as f64 * f64::from(self.drive)).round() as u64;
         self.tick(now).saturating_sub(ago)
     }
 
@@ -2575,7 +2590,7 @@ impl Rescale {
     /// The households' cars: when their state began and when one away sets off back, where they
     /// are along their way, and their way turned round or round a taxi.
     fn cars<'a>(self, cars: &'a [crate::cars::Car]) -> std::borrow::Cow<'a, [crate::cars::Car]> {
-        if self.game.0 == self.game.1 && self.real == 1.0 {
+        if self.game.0 == self.game.1 && self.drive == 1.0 {
             return cars.into();
         }
         let mut cars = cars.to_vec();
@@ -3099,7 +3114,7 @@ mod tests {
     fn older_ticks_keep_their_minute_at_another_rate() {
         let r = super::Rescale {
             game: (75, 20),
-            real: 3.0,
+            drive: 3.0,
         };
         // (The clock by hand: tick 0 is 08:00 on day 1.)
         let at = |t: u64, per_minute: u64| {
@@ -3116,9 +3131,9 @@ mod tests {
         assert_eq!(r.tick(1_000), 3_750);
         // A traffic light's stage, at it for 100 ticks (5 seconds) of the file's clock at 1000: 5
         // seconds before the clock's tick still (300 ticks, not the game minutes' 375).
-        assert_eq!(r.real_since(900, 1_000), 3_450);
-        assert_eq!(r.real_since(1_000, 1_000), 3_750);
-        assert_eq!(r.real_since(0, 10), 8);
+        assert_eq!(r.drive_since(900, 1_000), 3_450);
+        assert_eq!(r.drive_since(1_000, 1_000), 3_750);
+        assert_eq!(r.drive_since(0, 10), 8);
         let car: crate::cars::Car = serde_json::from_value(serde_json::json!({
             "plot":0,"household":0,"spot":[34.0,3.0],"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,
             "body":1,"paint":2,"owners":[0],"state":"leaving","since":1000,"readyAt":2000,
@@ -3157,13 +3172,26 @@ mod tests {
         assert_eq!(run.progress, 36.0);
         // Today's file needs nothing.
         let today = super::Rescale::of(super::SAVE_VERSION);
-        assert_eq!(today.real_since(900, 1_000), 900);
+        assert_eq!(today.drive_since(900, 1_000), 900);
         assert_eq!(
             super::Rescale::of(super::SAVE_VERSION),
             super::Rescale {
                 game: (1, 1),
-                real: 1.0
+                drive: 1.0
             }
+        );
+        // (A v36 file's cars timed in real seconds: a place along the way a quarter of the ticks
+        // on, the clock as it was; a v35 file's both.)
+        assert_eq!(
+            super::Rescale::of(36),
+            super::Rescale {
+                game: (1, 1),
+                drive: 1.0 / crate::DRIVE_SCALE
+            }
+        );
+        assert_eq!(
+            super::Rescale::of(35).drive,
+            crate::DRIVE_TICKS_PER_SECOND / super::OLD_TICKS_PER_SECOND as f32
         );
     }
 

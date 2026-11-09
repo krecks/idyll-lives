@@ -10449,11 +10449,11 @@ fn outing_fits_now(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], plot: u32) 
         .or(sim.bound_for_bike)
         .and_then(|b| objects.get(b as usize))
         .and_then(|b| content.objects[b.def].vehicle)
-        .map(|v| (v.speed, 0.0))
+        .map(|v| (v.pace, 0.0))
         .or_else(|| {
             leisure_ride(sim, ctx, objects, plot)
                 .and_then(|b| content.objects[objects[b as usize].def].vehicle)
-                .map(|v| (v.speed, 0.0))
+                .map(|v| (v.pace, 0.0))
         });
     let goer = Goer {
         drives: false,
@@ -10550,7 +10550,7 @@ fn outing_leave_by(
         .and_then(|(at, b)| {
             Some((
                 at,
-                content.objects[objects.get(b as usize)?.def].vehicle?.speed,
+                content.objects[objects.get(b as usize)?.def].vehicle?.pace,
             ))
         });
     let foot = crate::travel::Mode::Foot;

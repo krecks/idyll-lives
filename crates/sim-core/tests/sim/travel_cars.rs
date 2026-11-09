@@ -371,7 +371,7 @@ fn two_cars_coming_in_by_the_same_way_at_the_same_tick_come_in_one_after_the_oth
     let (a, b) = (first_seen[0].unwrap(), first_seen[1].unwrap());
     // (The second waits out of sight till the first is a car's length and the gap in front on.)
     assert!(
-        a.abs_diff(b) >= common::secs(0.5),
+        a.abs_diff(b) >= common::drive_secs(0.5),
         "they came in {} ticks apart",
         a.abs_diff(b)
     );
@@ -411,7 +411,7 @@ fn two_cars_meeting_on_a_7_m_street_pass_each_other_in_their_lanes() {
     assert!(met, "they passed each other on the street");
     // (Where they meet, neither stops for the other: the street has room for both.)
     assert!(
-        stood.iter().all(|&s| s < common::secs(1.0)),
+        stood.iter().all(|&s| s < common::drive_secs(1.0)),
         "they stood {stood:?} ticks"
     );
 }
@@ -673,7 +673,7 @@ fn on_a_6_m_lane_a_car_passing_one_pulled_over_keeps_its_distance_or_waits() {
     turn_in_by_one_pulling_out(
         6.0,
         &[(60.0, true), (70.0, true)],
-        common::secs(5.0),
+        common::drive_secs(5.0),
         common::secs(200.0),
     );
 }
@@ -688,7 +688,7 @@ fn a_car_pulling_out_across_the_street_as_one_turns_in_gets_out() {
     turn_in_by_one_pulling_out(
         7.0,
         &[(60.0, true), (70.0, false)],
-        common::secs(5.0),
+        common::drive_secs(5.0),
         common::secs(200.0),
     );
     turn_in_by_one_pulling_out(7.0, &[(60.0, true), (100.0, false)], 0, common::secs(200.0));
@@ -979,7 +979,7 @@ fn cars_from_every_arm_of_a_crossroads_at_once_all_get_through() {
     );
     // (Through the junction one after another: none of them over a minute of game time waiting.)
     assert!(
-        ticks > common::secs(10.0),
+        ticks > common::drive_secs(10.0),
         "through in {ticks} ticks: did they drive at all?"
     );
 }
@@ -1187,7 +1187,7 @@ fn junctions_past_the_snapshots_room_for_signal_heads_are_never_lit() {
 fn a_car_pulling_up_at_a_light_resting_on_another_arms_green_gets_its_turn_soon() {
     use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
     // The crossroads lit, nobody about: whichever arm rests on green. A car comes home along the
-    // north arm's dead end: its arm's green within the 50 s every turn comes round in.
+    // north arm's dead end: its arm's green within the 50 s (of drive time) every turn comes round in.
     let mut w = crossroads(&[crossroads_house(170.0, true)]);
     common::run_to(&mut w, 2, 7.0);
     // (Resting: a while with nobody at it.)
@@ -1216,9 +1216,9 @@ fn a_car_pulling_up_at_a_light_resting_on_another_arms_green_gets_its_turn_soon(
     // (Its drive out of its driveway and down the arm, and the wait for its turn: a minute or so
     // in all, the turn itself 50 s at most.)
     assert!(
-        through - start < common::secs(50.0) + common::secs(180.0),
+        through - start < common::drive_secs(50.0) + common::drive_secs(180.0),
         "through after {} s, the lights resting at {resting:?}",
-        (through - start) / common::secs(1.0)
+        (through - start) / common::drive_secs(1.0)
     );
 }
 
@@ -1290,7 +1290,7 @@ fn cars_holding_each_other_up_out_of_sight_go_on_at_once() {
         w.tick_once();
         let r = ring(&w);
         held = if r.is_empty() { 0 } else { held + 1 };
-        if held >= common::secs(0.5) {
+        if held >= common::drive_secs(0.5) {
             cars = r;
             break;
         }
@@ -1458,7 +1458,7 @@ fn with_the_same_watches_the_cars_go_the_same_way_and_none_in_sight_waits_for_on
         let mut w = crowded_crossroads();
         let mut states = Vec::new();
         for t in 0..common::secs(180.0) {
-            let watch = watches[(t / common::secs(7.5)) as usize % watches.len()];
+            let watch = watches[(t / common::drive_secs(7.5)) as usize % watches.len()];
             w.set_watch(watch);
             keep_driving(&mut w);
             w.tick_once();

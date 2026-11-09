@@ -2,8 +2,9 @@
 //! saved by v0.1.0 (save version 17), and by the build that was live on the site after it (d7c506e,
 //! version 19); the benchmark's village played two days by v0.4.2 (version 32, the last before 33's
 //! migration); a Normal open world saved by 0.7.0 at 20 ticks a second at rush hour on day 2, cars
-//! and a taxi on the road (version 35, the last before the 60-tick clock). Add one for each release
-//! (`tests/saves/`).
+//! and a taxi on the road (version 35, the last before the 60-tick clock); two hamlets with cars
+//! on their way out at eight in the morning, saved by the big-worlds build (eaeb02eb, version 36,
+//! the last before the traffic's own clock). Add one for each release (`tests/saves/`).
 
 use crate::common;
 
@@ -217,5 +218,55 @@ fn an_open_world_saved_by_0_7_0_plays_on() {
             common::check(&w);
         }
     }
+    common::reload(&w, &content);
+}
+
+/// Two hamlets saved by the build before the traffic's own clock (eaeb02eb, version 36: cars timed
+/// in real seconds) with three cars on their way out of town load with each where it was, the same
+/// place along its way a quarter of the ticks on (`DRIVE_SCALE`), and drive on.
+#[test]
+fn cars_on_their_way_in_a_v36_save_load_where_they_were() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves/v036_hamlets.json");
+    let json = std::fs::read_to_string(path).unwrap();
+    let old: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(old["version"], 36);
+    let content = common::content();
+    let mut w = World::from_save_json(&content, &json).unwrap();
+    // (Where that build had them, loading the file: `Car::pose_on`; two heading west, one east.)
+    use std::f32::consts::FRAC_PI_2;
+    const WHERE: [(usize, [f32; 2], f32); 3] = [
+        (2, [72.73458, 32.2], -FRAC_PI_2),
+        (4, [61.71669, 32.199997], -FRAC_PI_2),
+        (9, [230.42041, 93.8], FRAC_PI_2),
+    ];
+    for (i, at, yaw) in WHERE {
+        let car = &w.cars[i];
+        let saved = old["cars"][i]["progress"].as_f64().unwrap() as f32;
+        assert_eq!(car.progress, saved / sim_core::DRIVE_SCALE, "car {i}");
+        let (p, y, moving) = car
+            .clone()
+            .pose_on(&w.exits, Some(&w.travel))
+            .unwrap_or_else(|| panic!("car {i} is on its way"));
+        assert!(
+            (p[0] - at[0]).hypot(p[1] - at[1]) < 1e-3 && (y - yaw).abs() < 1e-4 && moving,
+            "car {i} at {p:?} facing {y}, not {at:?} facing {yaw}"
+        );
+    }
+    common::check(&w);
+    // And on they go: out of town within the minute (the drive's last stretch).
+    let was: Vec<f32> = WHERE.iter().map(|&(i, ..)| w.cars[i].progress).collect();
+    let end = w.tick + sim_core::TICKS_PER_MINUTE;
+    while w.tick < end {
+        w.tick_once();
+    }
+    for (k, &(i, ..)) in WHERE.iter().enumerate() {
+        let car = &w.cars[i];
+        assert!(
+            car.state != sim_core::cars::CarState::Leaving || car.progress > was[k],
+            "car {i} drove on"
+        );
+    }
+    common::check(&w);
     common::reload(&w, &content);
 }

@@ -1164,7 +1164,7 @@ fn route_via(
 
 /// The way in at `at` (a point of `World::exits`): how many cars wait out of sight to come in by
 /// it (`Car::waits_to_come_in_at`), and stand still on their way near it (`QUEUE_NEAR`, a second
-/// or more): a queue into its first junction.
+/// of drive time or more): a queue into its first junction.
 fn queued(w: &World, at: [f32; 2]) -> usize {
     let outside = w.cars.iter().filter(|c| c.waits_to_come_in_at(at)).count();
     let held = w
@@ -1173,7 +1173,7 @@ fn queued(w: &World, at: [f32; 2]) -> usize {
         .zip(&w.taxis.still)
         .filter(|(_, s)| {
             s.0.is_some_and(|p| crate::travel::dist(p, at) < QUEUE_NEAR)
-                && w.tick >= s.1 + crate::secs(1.0)
+                && w.tick >= s.1 + crate::drive_secs(1.0)
         })
         .count();
     outside + held
@@ -1595,9 +1595,9 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
 
 /// How near one going by a taxi ready to go on may be, besides `cars::PASSING` (m, either side),
 /// for it to wait till they're past, and how long it waits so at most since it stood (ticks of
-/// real time).
+/// drive time).
 const PASS_BY: f32 = 0.3;
-const PASS_BY_MOST: u64 = crate::secs(3.0);
+const PASS_BY_MOST: u64 = crate::drive_secs(3.0);
 
 /// Resident `i`, booked on a taxi, isn't riding it: unbooked, and on their way to work or school
 /// their own way (from the kerb, or wherever they've got to); planned once more for the same start
@@ -2143,10 +2143,12 @@ const TURNING: f32 = 2.4;
 const TURN_OVER: f32 = 0.3;
 const SWERVE: f32 = 2.0;
 const TURN_SPEED: f32 = crate::cars::JUNCTION_SPEED;
-/// What turning round costs the way it's weighed (s), on top of the drive, and standing for a
-/// rider on the far side of the road from their house (s: they cross it).
+/// What turning round costs the way it's weighed (s of drive time, as the drive's own:
+/// `travel::Graph::path`), on top of the drive, and standing for a rider on the far side of the
+/// road from their house (s: they cross it).
 const TURN_COST: f32 = 6.0;
-/// What turning round in a side street costs, the way it's weighed (s: slowly in and backing out).
+/// What turning round in a side street costs, the way it's weighed (s of drive time: slowly in and
+/// backing out).
 const SIDE_COST: f32 = 12.0;
 const FAR_SIDE: f32 = 8.0;
 /// Runs coming into town by the same way are planned this far apart at least (ticks, `time_run`),
@@ -2162,7 +2164,8 @@ const QUEUE_TRIES: usize = 3;
 /// The most a way round a hold-up may take over the straight way (ticks, `way_for`): about as
 /// long as a run waits one out (`JAM_WAIT`).
 const DETOUR_MOST: u64 = JAM_WAIT;
-/// A stretch through a place cars are held up now (`jammed`) as a run's way is weighed (s): driven
+/// A stretch through a place cars are held up now (`jammed`) as a run's way is weighed (s of drive
+/// time): driven
 /// only with no other way round, a way round no longer than `DETOUR_MOST` over the straight way
 /// (else that, `way_for`: a run came two hours late to its riders round a car stood still half an
 /// hour on its way).
@@ -3189,19 +3192,20 @@ fn u_turn(
 }
 
 /// How long two cars or more by a junction's box stand still on their way before it counts as
-/// jammed (ticks of real time, `jammed`), how far round its box they're by it (m), and how long a
+/// jammed (ticks of drive time, `jammed`), how far round its box they're by it (m), and how long a
 /// taxi due into town through one waits at the edge of town for it to clear at most (ticks of
-/// real time, as the cars clear it, `run_on`: a run to work, half its spare time at most).
-const JAM_STILL: u64 = crate::secs(5.0);
+/// drive time, as the cars clear it, `run_on`: a run to work, half its spare time at most).
+const JAM_STILL: u64 = crate::drive_secs(5.0);
 /// How long one car on its way stands still before the place counts as held up on its own (ticks
-/// of real time).
-const LONE_STILL: u64 = crate::secs(30.0);
+/// of drive time).
+const LONE_STILL: u64 = crate::drive_secs(30.0);
 const JAM_NEAR: f32 = 8.0;
-const JAM_WAIT: u64 = crate::secs(30.0);
+const JAM_WAIT: u64 = crate::drive_secs(30.0);
 /// A taxi stands clear of another's stand when it's there within this long of it, either way (ticks,
 /// `stand_window`): as each is timed, give or take its stand, a hold-up on its way and a wait at
-/// the edge of town (`JAM_WAIT`).
-const STAND_NEAR: u64 = JAM_WAIT;
+/// the edge of town (`JAM_WAIT`). Real time, not drive time: the stand is its riders' (getting
+/// in, `DWELL`, and coming out to it), which don't speed up with the traffic.
+const STAND_NEAR: u64 = crate::secs(30.0);
 /// A run whose stand another taxi has when it'd be there comes as much later as clears it, by
 /// `STAND_NEAR` at a time, this much at most (ticks, `stands_and_way`).
 const STAND_LATER: u64 = 3 * 60 * TICKS_PER_MINUTE;

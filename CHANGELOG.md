@@ -2,6 +2,10 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+- **Vehicles at the pace of the game:** cars, the work taxi, bikes, e-scooters and the kids' bike go on the traffic's own clock, four times as fast as real time: a drive across a big world takes about half an hour of game time instead of two hours and more, and a bike's ride reaches four times as far in the same game minutes. Everything about how they move and take turns keeps its shape (speeding up and slowing down, bends, how far ahead they look, turns at junctions, jams and the traffic lights' timing all run on the same clock), so a junction lets four times as many through as before and traffic flows as it did, only faster; walking, getting in and out and the taxi's stand for its riders keep their pace. Etas follow: the taxi beats a walk sooner, and visits and outings further off fit in the day by taxi or bike. Saves from before (format 36) load with every car and taxi where it was along its way (format 37).
+
 ## 0.7.0 — 2026-11-09
 
 **Play it in your browser:** https://krecks.github.io/idyll-lives/

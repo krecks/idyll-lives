@@ -1455,3 +1455,82 @@ fn generated_worlds_cars_keep_to_the_roads() {
     }
     assert!(failures.is_empty());
 }
+
+/// How long a drive across a world takes with the roads to itself, from its road furthest south
+/// to its road furthest west (some one to two km of road, most of it on country roads), on the
+/// traffic's own clock (`DRIVE_SCALE`): about half an hour of game time over the sample (the
+/// middle one at most `ACROSS_MINUTES`), none more than `ACROSS_MOST` (game minutes). At real
+/// speeds they took two to five game hours. (Slower than the roads' top speeds alone say, by
+/// some 40 %: a car slows to `cars::JUNCTION_SPEED` at every junction and round every bend.)
+const ACROSS_MINUTES: f32 = 35.0;
+const ACROSS_MOST: f32 = 80.0;
+
+#[test]
+#[ignore]
+fn generated_worlds_are_driven_across_in_about_half_an_hour() {
+    use sim_core::travel::Mode;
+    let path = std::env::var("WORLDS")
+        .expect("set WORLDS to a file made by `bun tools/worlds/sample.ts worlds.json`");
+    let worlds: Vec<serde_json::Value> =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let content = common::content();
+    let items: Vec<(usize, &serde_json::Value)> = worlds.iter().enumerate().collect();
+    let results = each_world(&items, |&(i, world)| {
+        let label = format!("{} {} ({})", world["kind"], world["seed"], world["name"]);
+        let w = match World::from_json(&content, &world["town"].to_string(), i as u32 + 1) {
+            Ok(w) => w,
+            Err(e) => return Err(format!("{label}: {e}")),
+        };
+        // (The junctions and ends of the roads cars drive on: x east, z south.)
+        let g = &w.travel.graph;
+        let nodes: Vec<[f32; 2]> = g
+            .nodes
+            .iter()
+            .copied()
+            .filter(|&p| !g.near(p, 1.0, 1, Mode::Car).is_empty())
+            .collect();
+        let south = nodes.iter().copied().max_by(|a, b| a[1].total_cmp(&b[1]));
+        let west = nodes.iter().copied().min_by(|a, b| a[0].total_cmp(&b[0]));
+        let (Some(south), Some(west)) = (south, west) else {
+            return Err(format!("{label}: no roads"));
+        };
+        let Some(ticks) = sim_core::cars::empty_drive_ticks(&w.travel, south, west) else {
+            return Err(format!(
+                "{label}: no way by road from {south:?} to {west:?}"
+            ));
+        };
+        let minutes = ticks / sim_core::TICKS_PER_MINUTE as f32;
+        eprintln!("  {label}: {south:?} to {west:?} in {minutes:.1} game minutes");
+        if minutes > ACROSS_MOST {
+            return Err(format!(
+                "{label}: the drive from {south:?} to {west:?} takes {minutes:.1} game minutes, more than {ACROSS_MOST}"
+            ));
+        }
+        Ok(minutes)
+    });
+    let mut failures: Vec<String> = results
+        .iter()
+        .filter_map(|r| r.as_ref().err().cloned())
+        .collect();
+    let mut minutes: Vec<f32> = results
+        .iter()
+        .filter_map(|r| r.as_ref().ok().copied())
+        .collect();
+    minutes.sort_by(f32::total_cmp);
+    if let Some(&middle) = minutes.get(minutes.len() / 2) {
+        eprintln!(
+            "{} worlds driven across in {middle:.1} game minutes (the middle one), {:.1} at most",
+            minutes.len(),
+            minutes.last().copied().unwrap_or(0.0)
+        );
+        if middle > ACROSS_MINUTES {
+            failures.push(format!(
+                "the middle drive across takes {middle:.1} game minutes, more than {ACROSS_MINUTES}"
+            ));
+        }
+    }
+    for f in &failures {
+        eprintln!("  {f}");
+    }
+    assert!(failures.is_empty());
+}

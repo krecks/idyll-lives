@@ -73,11 +73,11 @@ const SAME_WAY: f32 = 0.9;
 /// Bodies this near (m) are in each other's way (a body's corners between two samples too).
 const CLEAR: f32 = 0.25;
 /// One on the move, looked ahead this many ticks along its way (`Traffic::begin`: half a second,
-/// one, one and a half): it isn't made to stop short in front of one just granted.
+/// one, one and a half, of drive time): it isn't made to stop short in front of one just granted.
 pub(crate) const LOOK: [f32; 3] = [
-    crate::secs(0.5) as f32,
-    crate::secs(1.0) as f32,
-    crate::secs(1.5) as f32,
+    crate::drive_ticks(0.5),
+    crate::drive_ticks(1.0),
+    crate::drive_ticks(1.5),
 ];
 /// How far along its way a vehicle's ask is its own business with one right behind it (m,
 /// `behind`): that one can't get there first. Further on (its way round and back) it may.
@@ -165,8 +165,9 @@ fn reach(r: &Rect) -> f32 {
 /// way it faces, whether it's backing up, and how far along it it is (m).
 pub(crate) type Trace = Vec<(f32, [f32; 2], f32, bool, f32)>;
 
-/// How far apart (ticks: a fortieth of a second) `trace` looks along a route for its poses.
-const TRACE_STEP: f32 = 0.025 * crate::TICKS_PER_SECOND as f32;
+/// How far apart (ticks: a fortieth of a second of drive time, less than a tick: a car on a
+/// country road goes about a metre a tick) `trace` looks along a route for its poses.
+const TRACE_STEP: f32 = crate::drive_ticks(0.025);
 
 /// `Trace` of a route `ticks` long whose pose `t` ticks along is `at(t)`.
 pub(crate) fn trace(at: impl Fn(f32) -> ([f32; 2], f32, bool), ticks: f32) -> Trace {
@@ -451,13 +452,13 @@ pub struct Light {
 /// A junction where this many roads for cars meet may have traffic lights (`Signal`).
 pub(crate) const SIGNAL_ARMS: usize = 3;
 /// How long an arm's green lasts at least, its amber, and all red after while the box
-/// clears (ticks of real time: the lights are seen to change).
-const MIN_GREEN: u64 = crate::secs(5.0);
-/// Every arm's turn comes round in this long at most (ticks of real time): an arm's green lasts no
-/// longer than its share of it (`change_lights`).
-const CYCLE: u64 = crate::secs(50.0);
-const AMBER: u64 = crate::secs(2.0);
-const ALL_RED: u64 = crate::secs(4.0);
+/// clears (ticks of drive time, as the cars go through).
+const MIN_GREEN: u64 = crate::drive_secs(5.0);
+/// Every arm's turn comes round in this long at most (ticks of drive time): an arm's green lasts
+/// no longer than its share of it (`change_lights`).
+const CYCLE: u64 = crate::drive_secs(50.0);
+const AMBER: u64 = crate::drive_secs(2.0);
+const ALL_RED: u64 = crate::drive_secs(4.0);
 /// A route this near a lit junction's middle goes through its lights (m, `gate`).
 const GATE_REACH: f32 = BOX_MOST + 2.0;
 /// How far out past its arm's box a signal pole stands, and in from the kerb on the pavement (or
@@ -675,11 +676,11 @@ const STOP_SHORT: f32 = 3.0;
 /// An ask not asked again stands while its vehicle is no further short of its group than this
 /// (ticks along its route: backed up out of one's way, `cars::JAM_BACK`, and a little more,
 /// `Traffic::begin`).
-const KEPT_ASK: f32 = crate::secs(3.25) as f32;
+const KEPT_ASK: f32 = crate::drive_ticks(3.25);
 
-/// An ask this old (ticks of real time) yields only to those it waits for itself
+/// An ask this old (ticks of drive time) yields only to those it waits for itself
 /// (`Traffic::begin`, rule 2).
-const OLD_ASK: u64 = crate::secs(20.0);
+const OLD_ASK: u64 = crate::drive_secs(20.0);
 
 /// The claims held and asked for (see the module notes). Not saved.
 #[derive(Debug, Clone, Default)]

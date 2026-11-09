@@ -42,14 +42,15 @@ const THIN_STEP: f32 = 6.0;
 const THIN_TOLERANCE: f32 = 0.3;
 /// Walking, a detour factor over the straight line for the tile legs of an estimate.
 const DETOUR: f32 = 1.25;
-/// Cars: top speeds by kind of road (m/s at 1×); country roads come from content
-/// (`cars.countrySpeed`).
+/// Cars: top speeds by kind of road (m a second of drive time, `crate::DRIVE_SCALE` times that a
+/// real second at 1×); country roads come from content (`cars.countrySpeed`).
 pub const TOWN_SPEED: f32 = 6.0;
 pub const COUNTRY_SPEED: f32 = 16.0;
-/// Game minutes in a minute of `Travel::eta` by car: a car's speeds are real time (m/s at 1×), so
-/// the eta's minutes are a drive's real seconds over 60, each second `GAME_MINUTES_PER_SECOND` of
-/// the game's minutes (`world::trip_minutes`).
-pub const DRIVE_MINUTES: f32 = 60.0 * crate::GAME_MINUTES_PER_SECOND;
+/// Game minutes in a minute of `Travel::eta` by car: a car's speeds are drive time (m a second of
+/// it), so the eta's minutes are a drive's seconds of drive time over 60, each `DRIVE_SCALE` times
+/// shorter than a real second, which is `GAME_MINUTES_PER_SECOND` of the game's minutes
+/// (`world::trip_minutes`).
+pub const DRIVE_MINUTES: f32 = 60.0 * crate::GAME_MINUTES_PER_SECOND / crate::DRIVE_SCALE;
 /// Spatial cells for finding the road near a point (m).
 const CELL: f32 = 16.0;
 
@@ -429,7 +430,7 @@ pub struct RoadPath {
     pub pts: Vec<([f32; 2], f32, RoadKind)>,
     /// The edges it goes along (`Graph::path_by` only).
     pub edges: Vec<u32>,
-    /// Cost (seconds for cars, metres for walkers).
+    /// Cost (seconds of drive time for cars, metres for walkers).
     pub cost: f32,
     /// Its length (m).
     pub len: f32,
@@ -924,7 +925,8 @@ impl Graph {
         best
     }
 
-    /// Cost of `len` metres of a road of `kind` for `mode` (metres on foot, seconds by car).
+    /// Cost of `len` metres of a road of `kind` for `mode` (metres on foot, seconds of drive time by
+    /// car).
     fn cost(kind: RoadKind, len: f32, mode: Mode, country: f32) -> f32 {
         match mode {
             Mode::Foot => len,
@@ -1319,8 +1321,8 @@ impl Travel {
     }
 
     /// About how many minutes a trip from `from` to `to` takes: on foot at `walk` m a minute
-    /// (game minutes, as `walk` is), or by car (minutes of driving at 1×, real time: times
-    /// `DRIVE_MINUTES` in game minutes). No search of the tiles: the roads for long trips, the
+    /// (game minutes, as `walk` is), or by car (minutes of drive time: times `DRIVE_MINUTES` in
+    /// game minutes). No search of the tiles: the roads for long trips, the
     /// straight line (with a detour) for the rest.
     pub fn eta(&self, from: [f32; 2], to: [f32; 2], mode: Mode, walk: f32) -> f32 {
         self.eta_via(
@@ -1374,7 +1376,7 @@ impl Travel {
     }
 
     /// Along the roads from where a trip gets on them (`on`) to where it gets off: the metres on foot (tile legs with a detour), and the
-    /// seconds by car (`mode`).
+    /// seconds of drive time by car (`mode`).
     fn road_estimate(
         &self,
         on: impl FnOnce() -> Option<RoadPoint>,
