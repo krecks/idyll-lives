@@ -1319,7 +1319,7 @@ impl Route {
         }
         self.claims = crate::traffic::claims(&trace, &pass, len, wid, boxes, &more);
         if let Some(t) = travel {
-            crate::traffic::gate(&mut self.claims, &t.signals);
+            crate::traffic::gate(&mut self.claims, &t.signals, &trace, len);
         }
         self.pass = trace.iter().zip(&pass).map(|(s, &p)| (s.0, p)).collect();
     }

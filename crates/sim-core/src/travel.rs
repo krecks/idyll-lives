@@ -590,6 +590,10 @@ impl Graph {
         // a set (union-find).
         let mut parent: Vec<usize> = Vec::new();
         let mut pos: Vec<[f32; 2]> = Vec::new();
+        // (Where a road's end meets another part way along it, the place on that one's middle
+        // line: the node's, so that a T whose side road begins at the road's kerb has its box,
+        // lights and slow zone in the middle of the road, not off towards the side road.)
+        let mut on_road: Vec<Option<[f32; 2]>> = Vec::new();
         let mut splits: Vec<Vec<(f32, usize)>> = vec![Vec::new(); g.roads.len()];
         let mut ends: Vec<[usize; 2]> = Vec::with_capacity(g.roads.len());
         for (r, road) in g.roads.iter().enumerate() {
@@ -651,6 +655,10 @@ impl Graph {
                         union(&mut parent, end, e);
                     } else {
                         splits[q].push((s, end));
+                        if on_road.len() < parent.len() {
+                            on_road.resize(parent.len(), None);
+                        }
+                        on_road[end].get_or_insert(other.at(s));
                     }
                 }
             }
@@ -672,7 +680,9 @@ impl Graph {
                 }
             }
         }
-        // Number the sets in the order they first appear.
+        // Number the sets in the order they first appear; each where a road's end meets another
+        // part way along it, if one does (the first), else where its first member is.
+        on_road.resize(parent.len(), None);
         let mut id = vec![u32::MAX; parent.len()];
         for i in 0..parent.len() {
             let root = find(&mut parent, i);
@@ -681,6 +691,14 @@ impl Graph {
                 g.nodes.push(pos[root]);
             }
             id[i] = id[root];
+        }
+        let mut placed = vec![false; g.nodes.len()];
+        for i in 0..parent.len() {
+            let n = id[i] as usize;
+            if let Some(p) = on_road[i].filter(|_| !placed[n]) {
+                g.nodes[n] = p;
+                placed[n] = true;
+            }
         }
         g.adj = vec![Vec::new(); g.nodes.len()];
         g.road_edges = vec![Vec::new(); g.roads.len()];
@@ -1243,6 +1261,8 @@ pub struct Travel {
     /// The junctions with traffic lights (`traffic::Signal`, `traffic::settle`). Not saved: worked
     /// out again on load.
     pub signals: Vec<crate::traffic::Signal>,
+    /// The lit junctions' crosswalks by where they are (`traffic::kerb_stop`). Not saved.
+    pub(crate) crossings: crate::traffic::Crossings,
     /// By public parking spot (`OpenWorld::parking`), whether a car parked there would stand where
     /// a household's car turns into or out of its driveway, or on the driveway (`cars::settle_all`):
     /// not parked at on a trip. Not saved: worked out again on load.
@@ -1269,6 +1289,7 @@ impl Travel {
             base_blocked: Vec::new(),
             by_a_mouth: Vec::new(),
             signals: Vec::new(),
+            crossings: Default::default(),
             doors: Vec::new(),
         }
     }
@@ -1587,6 +1608,17 @@ mod tests {
         assert_eq!(g.edges.len(), 4);
         let degree: Vec<usize> = g.adj.iter().map(Vec::len).collect();
         assert_eq!(degree.iter().filter(|&&d| d == 3).count(), 1, "{degree:?}");
+        // (The T on the street's middle line, where the lane meets it, not at the lane's end 2 m
+        // off it: its box and lights in the middle of the road.)
+        let t = degree.iter().position(|&d| d == 3).unwrap();
+        assert!(dist(g.nodes[t], [50.0, 10.0]) < 1e-3, "{:?}", g.nodes[t]);
+        assert!(
+            g.boxes
+                .iter()
+                .any(|&(c, r)| dist(c, [50.0, 10.0]) < 1e-3 && r >= 6.0),
+            "{:?}",
+            g.boxes
+        );
         assert_eq!(g.networks(), 1);
         // A lane ending 5 m short of the street is a network of its own.
         let apart = Graph::build(&[

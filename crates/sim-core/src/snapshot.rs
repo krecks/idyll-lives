@@ -21,7 +21,7 @@ pub const LIGHT_BASE: usize = CAR_BASE + crate::cars::MAX_CARS * CAR_STRIDE;
 /// Floats per signal head.
 pub const LIGHT_STRIDE: usize = 5;
 /// Signal heads the snapshot has room for.
-pub const MAX_LIGHTS: usize = 256;
+pub const MAX_LIGHTS: usize = 512;
 /// The residents' rows, then the town's servers' (`header::STAFF_COUNT`, `staff.rs`), in the same
 /// layout; then the cars', and the traffic lights'.
 pub const CAPACITY: usize = LIGHT_BASE + MAX_LIGHTS * LIGHT_STRIDE;
@@ -862,9 +862,10 @@ fn write_lights(world: &World, out: &mut [f32]) {
         o[light::X] = arm.pole[0];
         o[light::Z] = arm.pole[1];
         o[light::YAW] = arm.yaw;
-        o[light::STATE] = match world.traffic.light(s, a) {
-            Some(crate::traffic::Stage::Green) => light::GREEN,
-            Some(crate::traffic::Stage::Amber) => light::AMBER,
+        o[light::STATE] = match world.traffic.light(&world.travel.signals, s, a) {
+            Some(crate::traffic::Head::Green) => light::GREEN,
+            Some(crate::traffic::Head::Amber) => light::AMBER,
+            Some(crate::traffic::Head::Walk) => light::WALK,
             _ => light::RED,
         };
         n = k + 1;
