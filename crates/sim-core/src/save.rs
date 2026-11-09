@@ -72,16 +72,15 @@
 //! stops); driveways keep their `road` and
 //! `s` in `drives`); a car on a trip between hamlets keeps it (`cars[].trip`, state `out` while
 //! it's parked there) and who rides with it (`cars[].riders`; absent: nobody, as in files written
-//! before passengers, so no new version). Absent: a `cosy` town, as before: no road network from
-//! the meta's roads (the open-world rules are for `normal` and `big` towns,
-//! `travel::Travel::open`). Still 35: a garage the player built (Build mode's Garage tool) keeps
+//! before passengers, so no new version). Absent: a town file without them, whose network is made
+//! from the meta's roads (`travel::Travel::from_json`). Still 35: a garage the player built (Build mode's Garage tool) keeps
 //! the way its door faces (`garages[].rot`, a thing's facing; absent: towards the street, as the
 //! town placed it), and a car parked in front of one where it parked before
 //! (`cars[].driveSpot`, `[x, z, yaw]`; absent: where it parks is its own spot). Both are left out
 //! when absent, so a game without a garage of the player's saves as it did. Still 35: a driveway
 //! running along x keeps the way it runs (`drives[].frontX`, ±1; absent: along z, `front`), so
-//! files without one save as they did; a cosy town's driveways with the road each meets
-//! (`drives[].road`) are what has its cars drive its roads (`cars::settle_all`). Still 35: things
+//! files without one save as they did; a driveway's road, where it meets one
+//! (`drives[].road`), is what has its cars drive the town's roads (`cars::settle_all`). Still 35: things
 //! a resident asked for, bought and waiting to be set up at home (`setups`: the household, who
 //! asked, the object by id, the tick it was bought and what was paid; `setup.rs`), left out when
 //! there are none, so an older file has none; setting one up isn't saved mid-way (the parcel is
@@ -1730,8 +1729,7 @@ impl World {
         world.refresh_rooms();
         let cars = ticks.cars(&save.cars);
         crate::cars::load(&mut world, &cars, &save.drives, &save.garages);
-        // (Lights saved: the junctions have them.)
-        world.travel.lights_on = !save.lights.is_empty();
+        // (The junctions lit are worked out again from the roads: `traffic::settle`.)
         crate::traffic::settle(&mut world);
         // (The lights where they'd got to, for the same lit junctions.)
         if save.lights.len() == world.travel.signals.len() {

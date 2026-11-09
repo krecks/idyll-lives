@@ -99,7 +99,7 @@ fn a_town_saved_as_v34_plays_on() {
 }
 
 /// A v34 save (dense edge strings, chemistry per pair, no open-world fields) loads, saves as
-/// v35 (run-length edges, chemistry packed, still a cosy town) and loads back the same.
+/// v35 (run-length edges, chemistry packed) and loads back the same.
 #[test]
 fn a_v34_save_comes_through_v35_unchanged() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves/v034_town.json");
@@ -108,10 +108,10 @@ fn a_v34_save_comes_through_v35_unchanged() {
     assert_eq!(old["version"], 34);
     let content = common::content();
     let w = World::from_save_json(&content, &old_json).unwrap();
-    // A cosy town, as it always was: no open-world fields, no road network (whatever roads its
-    // meta has), every exit a road out.
-    assert_eq!(w.travel.size, sim_core::travel::WorldSize::Cosy);
-    assert!(!w.travel.open && w.travel.graph.is_empty());
+    // A big world now (cosy and normal were dropped in 0.7.1): no open-world fields to read, so no
+    // road network (its meta is absent), every exit a road out.
+    assert_eq!(w.travel.size, sim_core::travel::WorldSize::Big);
+    assert!(w.travel.graph.is_empty());
     assert!(w.travel.file.is_empty());
     let json = w.save_json();
     let new: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -134,7 +134,7 @@ fn a_v34_save_comes_through_v35_unchanged() {
     let back = World::from_save_json(&content, &json).unwrap();
     assert_eq!(back.lot, w.lot);
     assert!(new.get("openWorld").is_none());
-    assert!(!back.travel.open && back.travel.file.is_empty());
+    assert!(back.travel.file.is_empty());
     let n = w.sims.len();
     for a in 0..n {
         for b in 0..n {
@@ -201,7 +201,7 @@ fn an_open_world_saved_by_0_7_0_plays_on() {
         (clock::day(w.tick), clock::minute_of_day(w.tick)),
         (2, 460.0)
     );
-    assert!(w.travel.open, "an open world");
+    assert!(!w.travel.graph.is_empty(), "an open world");
     assert!(
         w.cars
             .iter()

@@ -6,7 +6,7 @@ across four branches that merge into `feat/open-world` in this order:
 
 1. `feat/open-world-sim-grid` — chunked tile storage, incremental reachability, bounded A*, caps, save v35, wasm views by chunk.
 2. `feat/open-world-sim-travel` — road graph, router, ETA and commutes, cars on roads, nearby choices, outings, countryside content.
-3. `feat/open-world-worldgen` — sizes Cosy/Normal/Big, the Big macro layout, the town file fields below, the size option, the pan/zoom town map, sample/map tools.
+3. `feat/open-world-worldgen` — sizes Cosy/Normal/Big (Cosy and Normal were dropped in 0.7.1: every world is Big now), the Big macro layout, the town file fields below, the pan/zoom town map, sample/map tools.
 4. `feat/open-world-render` — view-independent chunked street, roaming camera, residents by distance, chunked terrain/woods/grass, streaming by distance.
 
 This file is the interface between them. Change it only together (through the coordinator).
@@ -31,8 +31,7 @@ ground storey. Row blocks for upper storeys and the basement keep today's stacke
 - `MAX_SIMS` 160, `MAX_STAFF` 48, `MAX_CARS` 128 (sim-grid). The renderer's `MAX_CHARACTERS`
   is the snapshot layout's maxSims + maxStaff (208, `render/shared/characters/rig.ts`); the speech
   bubbles follow the layout's `maxSims`.
-- Neighbours per size: `neighbourCap('cosy' | 'normal') = 48`, `neighbourCap('big') = 140` (a Big
-  world starts with ~120: `BIG_START`). Kept when Big worlds were filled (2026-11-02, about 2.5
+- Neighbours: `neighbourCap() = 140` in every world (a world starts with ~120: `BIG_START`). Kept when Big worlds were filled (2026-11-02, about 2.5
   times the homes: the rest are for sale). 240 residents were tried: the big-world bench at 1024 m
   (`SIZE=1024 RESIDENTS=240`, 4 game hours, 4 runs) ticks at 8,000–9,000 a second, p99 0.78–0.84
   ms, the slowest tick 3.9–4.0 ms, the heap 59 MB (160: 13,000 a second, p99 0.55 ms, 4.3 ms, 58
@@ -41,21 +40,19 @@ ground storey. Row blocks for upper storeys and the basement keep today's stacke
 
 ## Sizes
 
-| Size | Box | Lots | Sim change needed |
-|---|---|---|---|
-| `cosy` | today's recipe, unchanged | today's | none |
-| `normal` | ≤ 256 m, ~1.6× cosy's box area | ~1.6× | none |
-| `big` | 896–1024 m | main town (kind's shape, ~1.5× a Normal town's lots, its streets reaching all of its box) + 5–7 hamlets of 16–24 lots, farmsteads and cottages along the country roads, ~120 starting residents | all sim branches |
-
-Saves and towns without `size` are `cosy` and must look and behave exactly as before: every
-new land rule is gated on `size === 'big'`.
+One size now: `big`. Cosy and normal were dropped in 0.7.1 (Create World has no size option);
+a save or town file that still says `cosy` or `normal` reads as `big`. A world is 896–1024 m: a
+main town (the kind's shape, its streets reaching all of its box) + 5–7 hamlets of 16–24 lots,
+farmsteads and cottages along the country roads, ~120 starting residents, growing to `MAX_SIMS`.
+Every town has the open world's roads, outings, commutes timed by the walk, cars and taxis; a
+save without the open-world fields takes its network from its meta's roads, or its streets.
 
 ## Town file additions
 
 All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts`
 (`OpenWorldTownFields`, `RoadPlan`, `WorldMeta`); the sim reads them in `lot.rs` `LotFile`.
 
-- `size: 'cosy' | 'normal' | 'big'`
+- `size: 'big'` (cosy and normal read as `big`)
 - `roads: RoadPlan[]` (top level, for the sim; same objects as `meta.roads`). `RoadPlan.kind`:
   `'street'` (default) · `'lane'` · `'country'` (between areas) · `'trail'` (2 m, foot only).
   `RoadPlan.area`: index into `areas` (absent for country roads and trails between areas).
@@ -92,11 +89,8 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   the same houses, about four in five, the same bodies and paints; the player's home always has
   one when its driveway reaches the road). The renderer draws the sim's cars and no others when
   the structure has `cars`; towns and saves without them keep the street's parked ones.
-  Cars drive the road network in every such town: in `normal` and `big` ones as the open world
-  does, and in a `cosy` one too when its driveways say where they meet their roads
-  (`drives[].road`, only in towns made since) — the sim builds the graph for its cars only
-  (`cars::settle_all`; nobody walks it, commutes are timed as before). A cosy town or save
-  without it drives straight along x as ever. A driveway meeting its road more than 60° from
+  Cars drive the road network in every town, as the open world does: the sim builds the graph
+  for its cars too (`cars::settle_all`) where a town has none of its own. A driveway meeting its road more than 60° from
   square (alongside it rather than onto it) keeps its car parked (`Car::no_way`). Cars turn onto
   the road at the kerb, not across the sidewalk; a big world's parking bays are turned into nose
   first and backed out of like driveways. Garden fences keep a metre off every driveway's sides
@@ -132,7 +126,7 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   nothing (`cars::sight`, the owner's call for big towns); the snapshot leaves them out. A car
   the camera comes to on top of another is put clear along its way before it's drawn, and one
   held up out of the picture (8 m and more from the watch) with all it waits for is put on after
-  3 game minutes. Never sent (cosy and normal towns, drawn whole), every car is in sight.
+  3 game minutes. Never sent (drawn whole, as before), every car is in sight.
 - `rooms` is sent as a transferable `Uint16Array` (same indexing as today's `number[]`).
 - Structure is versioned per sim chunk; `structure_rect(x0, z0, x1, z1)` returns the walls,
   doors and objects inside a rectangle, and `chunk_versions()` lists the versions to diff.

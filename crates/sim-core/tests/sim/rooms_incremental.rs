@@ -5,9 +5,9 @@
 //! opened, diagonals put up, turned and taken down, several at once). And the rooms a town
 //! keeps up to date (found and scored again only round what was built, where things changed,
 //! for dirt where there was a mess) agree with finding and scoring them all again
-//! (`World::check_rooms`), over random build and buy edits in a cosy town, saved towns and a
-//! big world: walls, boxes, diagonals, things bought, sold and moved, paint, floors, undo and
-//! redo, and time passing.
+//! (`World::check_rooms`), over random build and buy edits in a town, saved towns and a big world:
+//! walls, boxes, diagonals, things bought, sold and moved, paint, floors, undo and redo, and time
+//! passing.
 
 use crate::common;
 
@@ -359,7 +359,7 @@ fn rooms_kept_up_to_date_agree_with_finding_them_all_in_a_town() {
     let content = common::content();
     let town = common::town(&content, 3, 2);
     let w = World::from_json(&content, &town, 3).unwrap();
-    edits_agree("a cosy town", w, 11, 600);
+    edits_agree("a town", w, 11, 600);
 }
 
 #[test]

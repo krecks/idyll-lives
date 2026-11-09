@@ -92,7 +92,7 @@ describe('generated worlds are one network', async () => {
   const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
   const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
 
-  for (const size of ['cosy', 'normal', 'big'] as const) {
+  for (const size of ['big'] as const) {
     test(
       `${size} worlds`,
       () => {

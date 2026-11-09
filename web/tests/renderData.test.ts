@@ -58,9 +58,9 @@ describe('render data worker', async () => {
   }
 
   const worlds = [
-    { kind: 'farm', seed: 5, size: 'cosy' },
-    { kind: 'mountain', seed: 77, size: 'cosy' },
-    { kind: 'seaside', seed: 2024, size: 'normal' },
+    { kind: 'farm', seed: 5, size: 'big' },
+    { kind: 'mountain', seed: 77, size: 'big' },
+    { kind: 'seaside', seed: 2024, size: 'big' },
     { kind: 'lakeside', seed: 31, size: 'big' },
   ] as const;
 

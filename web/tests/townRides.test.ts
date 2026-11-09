@@ -36,7 +36,7 @@ describe('town rides', async () => {
   const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
   const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
   const rides = new Set<string>(Object.values(RIDES));
-  const towns = (['medium', 'dense', 'farm'] as const).flatMap((kind) => (['cosy', 'normal'] as const).flatMap((size) => [4242, 77].map((seed) => ({ label: `${kind} ${size} ${seed}`, town: populate(content, assets, t, generateWorld(content, t, kind, seed, undefined, size)) }))));
+  const towns = (['medium', 'dense', 'farm'] as const).flatMap((kind) => (['big'] as const).flatMap((size) => [4242, 77].map((seed) => ({ label: `${kind} ${size} ${seed}`, town: populate(content, assets, t, generateWorld(content, t, kind, seed, undefined, size)) }))));
   const laid = towns.map(({ label, town }) => ({ label, town, layout: layoutTown(content, t, town, null) }));
   const size = (o: { def: string; rot: number }): [number, number] => {
     const [fw, fd] = content.object(o.def)?.footprint ?? [1, 1];

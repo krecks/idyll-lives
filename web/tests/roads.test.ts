@@ -36,6 +36,26 @@ describe('roads as drawn', () => {
     expect(new Kerb(lane, 1, 1, index).open(6)).toBe(true);
   });
 
+  test('a sidewalk runs up to a crossing on both sides of it', () => {
+    // Two long straight roads crossing: a point each end, so a segment spans the whole road.
+    const a: RoadPlan = { points: line(0, 50, 100, 50, 1), width: 7, ends: ['out', 'out'] };
+    const b: RoadPlan = { points: line(50, 0, 50, 100, 1), width: 7, ends: ['out', 'out'] };
+    const { walk } = roadMeshes([a, b]);
+    const xs: number[] = [];
+    for (let i = 0; i < walk.pos.length; i += 3) {
+      const [x, y, z] = [walk.pos[i], walk.pos[i + 1], walk.pos[i + 2]];
+      // Along `a`'s north sidewalk (its band is `a`'s kerb in from its edge), not `b`'s.
+      if (Math.abs(y - WALK_Y) > 0.001 || z < 52.3 || z > 53.5 || x < 0 || x > 100) continue;
+      xs.push(x);
+    }
+    // West and east of the crossing, not cut off whole.
+    expect(xs.some((x) => x < 46)).toBe(true);
+    expect(xs.some((x) => x > 54)).toBe(true);
+    // Up to the crossing road's edge on either side, not short of it.
+    expect(xs.some((x) => x > 45.8 && x < 46.6)).toBe(true);
+    expect(xs.some((x) => x > 53.4 && x < 54.2)).toBe(true);
+  });
+
   test('a dead end has a turning circle', () => {
     const kerb = new Kerb(lane, 1, 1, index);
     expect(kerb.inTurning(50, 90)).toBe(true);

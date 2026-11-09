@@ -7,7 +7,7 @@
  * woods, hills, meadows, fields, orchards), its country roads and trails (dashed), and its areas' names.
  * An index.html shows them all on one page.
  *
- * Run: bun tools/worlds/map.ts worlds.json out-dir [more.json ...]   (e.g. worlds-big.json from `sample.ts --sizes big`)
+ * Run: bun tools/worlds/map.ts worlds.json out-dir [more.json ...]
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -44,7 +44,7 @@ const ZONE: Record<string, string> = { water: '#7fb2d9', woods: '#5d8a46', hill:
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const cards: string[] = [];
 for (const { kind, size, seed, name, town } of worlds) {
-  const big = (size ?? town.size) === 'big';
+  const big = true;
   // Big worlds at 1.5 px a metre (labels in pixels, whatever the scale); the others at 5.
   const scale = big ? 1.5 : 5;
   const px = (n: number) => n / scale;
@@ -80,12 +80,12 @@ for (const { kind, size, seed, name, town } of worlds) {
     // Outdoor places' and areas' names.
     ...(big ? town.plots.filter((p) => p.kind === 'countryside').map((p) => `<text x="${p.x + p.w / 2}" y="${p.z - px(4)}" font-size="${px(11)}" text-anchor="middle" font-family="sans-serif" fill="#5a3a12">${esc(p.name)}</text>`) : []),
     ...(town.meta?.areas ?? []).map((a) => `<text x="${a.x + a.w / 2}" y="${a.z + a.d / 2}" font-size="${px(18)}" font-weight="700" text-anchor="middle" font-family="sans-serif" fill="#1d2230" stroke="#fff" stroke-width="${px(3)}" paint-order="stroke">${esc(a.name)}</text>`),
-    `<text x="${px(8)}" y="${px(22)}" font-size="${big ? px(16) : 4}" font-family="sans-serif">${kind}${size && size !== 'cosy' ? ` ${size}` : ''} ${seed}: ${esc(name)} (${town.width}×${town.depth} m)</text>`,
+    `<text x="${px(8)}" y="${px(22)}" font-size="${big ? px(16) : 4}" font-family="sans-serif">${kind}${size ? ` ${size}` : ''} ${seed}: ${esc(name)} (${town.width}×${town.depth} m)</text>`,
   ];
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${town.width} ${town.depth}" width="${Math.round(town.width * scale)}" height="${Math.round(town.depth * scale)}">${parts.join('')}</svg>`;
-  const file = `${kind}${size && size !== 'cosy' ? `-${size}` : ''}-${seed}.svg`;
+  const file = `${kind}${size ? `-${size}` : ''}-${seed}.svg`;
   writeFileSync(`${dir}/${file}`, svg);
-  cards.push(`<figure><a href="${file}"><img src="${file}" loading="lazy" alt="${esc(name)}"></a><figcaption>${kind} ${size ?? 'cosy'} ${seed}: ${esc(name)}, ${town.width}×${town.depth} m, ${town.plots.length} plots</figcaption></figure>`);
+  cards.push(`<figure><a href="${file}"><img src="${file}" loading="lazy" alt="${esc(name)}"></a><figcaption>${kind} ${size ?? 'big'} ${seed}: ${esc(name)}, ${town.width}×${town.depth} m, ${town.plots.length} plots</figcaption></figure>`);
 }
 writeFileSync(
   `${dir}/index.html`,

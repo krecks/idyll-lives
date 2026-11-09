@@ -302,7 +302,6 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
     // the walk from there looks.
     let sim = &w.sims[i];
     if let Some(c) = sim.commute
-        && w.travel.open
         && !heading_out(sim)
         && let Some(&exit) = w.exits.get(c.exit)
     {
@@ -409,7 +408,7 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
     let commutes = sim.job.is_some()
         || w.content.life.school.is_some()
             && w.content.life.stage_at(sim.age).is_some_and(|s| s.school);
-    if !w.travel.open || w.exits.is_empty() || !commutes {
+    if w.exits.is_empty() || !commutes {
         w.sims[i].commute = None;
         return;
     }
@@ -729,10 +728,9 @@ fn schedule_school(w: &mut World, i: usize, day: u32) {
     // kerb (`taxi::leave_at`).
     let leave = match crate::cars::lead_ticks(w, i, start) {
         0 => leave,
-        // (In an open-world town, by the drive's time, not the walk's: a way out on foot of hours
-        // had drivers off in the night.)
-        lead if w.travel.open => start.saturating_sub(lead),
-        lead => leave.min(start.saturating_sub(lead)),
+        // (By the drive's time, not the walk's: a way out on foot of hours had drivers off in the
+        // night.)
+        lead => start.saturating_sub(lead),
     };
     let by_taxi = crate::taxi::leave_at(w, i);
     let leave = by_taxi.unwrap_or(leave);
@@ -780,10 +778,9 @@ fn schedule_work(w: &mut World, i: usize, day: u32) {
     // kerb (`taxi::leave_at`).
     let leave = match crate::cars::lead_ticks(w, i, start) {
         0 => leave,
-        // (In an open-world town, by the drive's time, not the walk's: a way out on foot of hours
-        // had drivers off in the night.)
-        lead if w.travel.open => start.saturating_sub(lead),
-        lead => leave.min(start.saturating_sub(lead)),
+        // (By the drive's time, not the walk's: a way out on foot of hours had drivers off in the
+        // night.)
+        lead => start.saturating_sub(lead),
     };
     let by_taxi = crate::taxi::leave_at(w, i);
     let leave = by_taxi.unwrap_or(leave);
@@ -1152,15 +1149,10 @@ pub(crate) fn start_taxi_shift(w: &mut World, i: usize, rest: u64) {
     start_shift(w, i, rest);
 }
 
-/// What's left of the way to work once they're off (`start_shift`), as their way was timed: in
-/// an open-world town the part off the map (`cars::off_map_ticks`) and, before it, `out` (the
-/// drive out of town). A cosy town's way is all before work starts, as ever.
+/// What's left of the way to work once they're off (`start_shift`), as their way was timed: the
+/// part off the map (`cars::off_map_ticks`) and, before it, `out` (the drive out of town).
 fn still_to_go(w: &World, out: u64) -> u64 {
-    if w.travel.open {
-        out + crate::cars::off_map_ticks(w)
-    } else {
-        0
-    }
+    out + crate::cars::off_map_ticks(w)
 }
 
 fn apply_transition(w: &mut World, i: usize, transition: Transition) {

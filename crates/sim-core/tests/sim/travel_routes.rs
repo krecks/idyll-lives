@@ -57,7 +57,6 @@ fn the_network_joins_the_hamlets() {
     // road meets the streets shared.
     assert_eq!(g.roads.len(), 3);
     assert_eq!(g.nodes.len(), 4, "{:?}", g.nodes);
-    assert!(w.travel.open);
 }
 
 #[test]

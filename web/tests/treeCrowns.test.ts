@@ -44,7 +44,7 @@ describe('tree crowns', async () => {
   test("no town tree's crown grows into a house", () => {
     let trees = 0;
     for (const kind of ['small', 'medium', 'dense', 'farm', 'seaside', 'mountain', 'lakeside', 'forest'] as const) {
-      for (const size of ['cosy', 'normal'] as const) {
+      for (const size of ['big'] as const) {
         for (const seed of [11, 4242, 90210]) {
           const town = generateWorld(content, t, kind, seed, undefined, size);
           const layout = layoutTown(content, t, town, null);

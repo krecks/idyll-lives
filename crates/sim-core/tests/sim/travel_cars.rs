@@ -201,9 +201,9 @@ fn a_car_never_drives_through_someone_with_nowhere_to_step_aside() {
 /// The widest and longest of the renderer's cars (m).
 const CAR: (f32, f32) = (4.6, 1.88);
 
-/// A cosy town 200 m long with a street `width` m wide along x (its middle at z = 30, a way out at
-/// either end) and a house at each of `houses` (its driveway's x, and whether it's north of the
-/// street), with its driveway onto the street and a car on it, and its driver at home.
+/// A town 200 m long with a street `width` m wide along x (its middle at z = 30, a way out at either
+/// end) and a house at each of `houses` (its driveway's x, and whether it's north of the street),
+/// with its driveway onto the street and a car on it, and its driver at home.
 fn street(width: f32, houses: &[(f32, bool)]) -> World {
     let content = r#"{
         "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],
@@ -431,8 +431,8 @@ struct House {
     s: f32,
 }
 
-/// A cosy town 200 by 60 m with `roads` (JSON, `kind` street) and `exits` (JSON) and a car at each
-/// of `houses`, its driver at home.
+/// A town 200 by 60 m with `roads` (JSON, `kind` street) and `exits` (JSON) and a car at each of
+/// `houses`, its driver at home.
 fn roads_town(roads: &str, exits: &str, houses: &[House]) -> World {
     let content = r#"{
         "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],
@@ -1057,8 +1057,6 @@ fn keep_driving(w: &mut World) {
 fn a_lit_junctions_signal_heads_are_in_the_snapshot_one_an_arm_on_its_kerb() {
     use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, header, light};
     let mut w = busy_crossroads();
-    assert!(w.travel.signals.is_empty(), "no lights in a game yet");
-    w.light_busy_junctions();
     assert_eq!(w.travel.signals.len(), 1, "the crossroads is lit");
     let layout: serde_json::Value =
         serde_json::from_str(&snapshot::layout_json(&w.content)).unwrap();
@@ -1113,7 +1111,6 @@ fn a_lit_junctions_signal_heads_are_in_the_snapshot_one_an_arm_on_its_kerb() {
 fn a_game_saved_with_the_lights_part_way_loads_with_them_where_they_were() {
     use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
     let mut w = busy_crossroads();
-    w.light_busy_junctions();
     common::run_to(&mut w, 2, 7.0);
     let mut buf = vec![0.0f32; snapshot::CAPACITY];
     let states = |w: &World, buf: &mut Vec<f32>| {
@@ -1133,6 +1130,20 @@ fn a_game_saved_with_the_lights_part_way_loads_with_them_where_they_were() {
     assert_ne!(was, first, "the lights never changed");
     let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     assert_eq!(states(&loaded, &mut buf), was);
+}
+
+#[test]
+fn a_game_saved_before_lights_were_lit_loads_with_them_on() {
+    use sim_core::snapshot::{self, header};
+    // A save from before the junctions were lit has no lights in it: the roads still light them.
+    let w = busy_crossroads();
+    let mut save: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
+    save.as_object_mut().unwrap().remove("lights");
+    let loaded = World::from_save_json(CONTENT, &save.to_string()).unwrap();
+    assert_eq!(loaded.travel.signals.len(), 1, "the crossroads is lit");
+    let mut buf = vec![0.0f32; snapshot::CAPACITY];
+    snapshot::write(&loaded, &mut buf);
+    assert_eq!(buf[header::LIGHT_COUNT], 4.0, "a head an arm");
 }
 
 #[test]
@@ -1158,9 +1169,7 @@ fn junctions_past_the_snapshots_room_for_signal_heads_are_never_lit() {
     let exits = r#"[{"x":0.5,"z":40,"kind":"road"}]"#;
     let more = r#","size":"big","walls":[],"doors":[],"windows":[],"relationships":[],
         "areas":[{"name":"Grid","kind":"hamlet","x":0,"z":0,"w":400,"d":400}]"#;
-    let mut w = town_of(CONTENT, more, 400, 400, &roads, exits, &[]);
-    assert!(w.travel.signals.is_empty(), "nothing lit in a game");
-    w.light_busy_junctions();
+    let w = town_of(CONTENT, more, 400, 400, &roads, exits, &[]);
     let heads: usize = w.travel.signals.iter().map(|s| s.arms.len()).sum();
     assert!(!w.travel.signals.is_empty());
     assert!(heads <= sim_core::snapshot::MAX_LIGHTS, "{heads} heads");
@@ -1180,7 +1189,6 @@ fn a_car_pulling_up_at_a_light_resting_on_another_arms_green_gets_its_turn_soon(
     // The crossroads lit, nobody about: whichever arm rests on green. A car comes home along the
     // north arm's dead end: its arm's green within the 50 s every turn comes round in.
     let mut w = crossroads(&[crossroads_house(170.0, true)]);
-    w.light_busy_junctions();
     common::run_to(&mut w, 2, 7.0);
     // (Resting: a while with nobody at it.)
     for _ in 0..common::secs(20.0) {

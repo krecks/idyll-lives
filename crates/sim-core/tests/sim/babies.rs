@@ -1165,7 +1165,7 @@ fn a_baby_loaded_from_a_save_lies_back_in_the_crib() {
     }
 }
 
-/// A town as full as it grows (`TOWN_SIMS`, a town without a size): partners don't keep trying
+/// A town as full as it grows (`MAX_SIMS`): partners don't keep trying
 /// for a baby that can't come.
 #[test]
 fn partners_in_a_full_town_dont_keep_trying_for_a_baby() {
@@ -1221,10 +1221,10 @@ fn partners_in_a_full_town_dont_keep_trying_for_a_baby() {
         }
         tries
     };
-    // (Both towns at once: each is a crowd of 63 or 64 to simulate.)
+    // (Both towns at once: each is a crowd of 159 or 160 to simulate.)
     let (room, full) = std::thread::scope(|s| {
-        let room = s.spawn(|| tries(sim_core::world::TOWN_SIMS - 1, true));
-        let full = s.spawn(|| tries(sim_core::world::TOWN_SIMS, false));
+        let room = s.spawn(|| tries(sim_core::world::MAX_SIMS - 1, true));
+        let full = s.spawn(|| tries(sim_core::world::MAX_SIMS, false));
         (room.join().unwrap(), full.join().unwrap())
     });
     assert!(room > 0, "with room in town they do");

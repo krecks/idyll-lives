@@ -40,9 +40,9 @@ describe('town jobs', async () => {
   const inWorker = (job: TownJob) => structuredClone(runTownJob(content, t, structuredClone(job)));
 
   const worlds = [
-    { kind: 'medium', seed: 7, size: 'cosy' },
-    { kind: 'farm', seed: 3141, size: 'normal' },
-    { kind: 'seaside', seed: 271828, size: 'normal', name: 'Typed In' },
+    { kind: 'medium', seed: 7, size: 'big' },
+    { kind: 'farm', seed: 3141, size: 'big' },
+    { kind: 'seaside', seed: 271828, size: 'big', name: 'Typed In' },
     { kind: 'forest', seed: 99, size: 'big' },
   ] as const;
 
@@ -66,7 +66,7 @@ describe('town jobs', async () => {
   }
 
   test('the worker\'s town file is the page\'s, its dice from the job\'s seed', () => {
-    const town = populate(content, assets, t, generateWorld(content, t, 'small', 4242, undefined, 'cosy'));
+    const town = populate(content, assets, t, generateWorld(content, t, 'small', 4242, undefined, 'big'));
     const player = randomHousehold(content, assets, 2);
     const job: TownJob = { kind: 'assemble', town, player, slot: vacantSlots(town)[0].index, options: { mode: 'living', lifespan: 'normal' }, random: 12345 };
     const a = inWorker(job);

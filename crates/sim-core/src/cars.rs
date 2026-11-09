@@ -50,11 +50,10 @@
 //! The route is worked out from the car's spot, the street it faces and the town's exits, the
 //! same way each time, so it isn't saved; the snapshot gives the renderer the car's pose along
 //! it, and which doors are open, each tick (`snapshot::car`). In a town with a road network
-//! (`Travel::graph`: normal and big ones, and cosy ones made since cars drive winding roads,
-//! `settle_all`) it goes along its driveway (`Drive::way`), turns onto the road where the
-//! driveway meets it and along the lanes (`Route::on_roads`); a car whose driveway comes
-//! alongside its road rather than onto it (`OBLIQUE`), or has no way out by road, stays parked
-//! (`Car::no_way`). Older towns drive straight along x (`Route::legacy`).
+//! (`Travel::graph`: every town has one, `settle_all`) it goes along its driveway (`Drive::way`),
+//! turns onto the road where the driveway meets it and along the lanes (`Route::on_roads`); a car
+//! whose driveway comes alongside its road rather than onto it (`OBLIQUE`), or has no way out by
+//! road, stays parked (`Car::no_way`). Older towns drive straight along x (`Route::legacy`).
 //!
 //! **Among the traffic.** A car drives in its lane, `LANE` right of the road's middle where the
 //! road has room for two to pass clear of each other (a 7 m street, a country road), `TIGHT_LANE`
@@ -88,8 +87,7 @@
 //! has seen it yet) on top of or touching one in it is put back along its way, or on, to the
 //! nearest place clear of them (`moved_clear`) and comes into sight there: no car is drawn on top
 //! of another, and none the player sees is hidden (`hidden`, `snapshot::car`, leaves out those out
-//! of sight and any touching one). Without a watch (cosy and normal towns, drawn whole; headless
-//! runs) every car is seen.
+//! of sight and any touching one). Without a watch (headless runs) every car is seen.
 
 use serde::{Deserialize, Serialize};
 
@@ -592,9 +590,8 @@ pub struct Drive {
     #[serde(rename = "frontX", default, skip_serializing_if = "is_zero_f32")]
     pub front_x: f32,
     pub street: f32,
-    /// The road (`roads` index) the driveway meets and how far along it (m): open-world towns,
-    /// and any town made since cars drive winding roads (in a cosy one, the sign that its cars
-    /// drive its roads: `settle_all`).
+    /// The road (`roads` index) the driveway meets and how far along it (m): the sign that its
+    /// cars drive the town's roads (`settle_all`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub road: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2885,7 +2882,6 @@ pub(crate) fn may_board(w: &World, i: usize, c: u32) -> bool {
 pub(crate) fn lead_ticks(w: &World, i: usize, start: u64) -> u64 {
     lead_by(
         &w.content,
-        w.travel.open,
         &w.cars,
         &w.briefs,
         &w.households,
@@ -2903,7 +2899,6 @@ pub(crate) fn lead_ticks(w: &World, i: usize, start: u64) -> u64 {
 pub(crate) fn lead_ticks_in(ctx: &crate::world::Ctx, s: &Sim, start: u64) -> u64 {
     lead_by(
         ctx.content,
-        ctx.travel.open,
         ctx.cars,
         ctx.briefs,
         ctx.households,
@@ -2920,7 +2915,6 @@ pub(crate) fn lead_ticks_in(ctx: &crate::world::Ctx, s: &Sim, start: u64) -> u64
 #[allow(clippy::too_many_arguments)]
 fn lead_by<'a>(
     content: &crate::content::Content,
-    open: bool,
     cars: &[Car],
     briefs: &[SimBrief],
     households: &[Household],
@@ -2964,7 +2958,7 @@ fn lead_by<'a>(
     let Some(car) = car else {
         return 0;
     };
-    WALK_TO_CAR_TICKS + u64::from(GET_IN_TICKS) + drive_out_ticks(car) + off_map(content, open)
+    WALK_TO_CAR_TICKS + u64::from(GET_IN_TICKS) + drive_out_ticks(car) + off_map(content)
 }
 
 /// Once in `car` for work or school: the wait for it to go and the drive out of town.
@@ -2972,19 +2966,14 @@ pub(crate) fn drive_out_ticks(car: &Car) -> u64 {
     BOARD_MIN_TICKS + car.out_ticks.ceil() as u64
 }
 
-/// The drive between the end of town and work: in an open-world town `commuteMinutes` (the
-/// part of the way off the map), else `OFF_MAP_TICKS` as ever.
+/// The drive between the end of town and work: `commuteMinutes` (the part of the way off the
+/// map).
 pub(crate) fn off_map_ticks(w: &World) -> u64 {
-    off_map(&w.content, w.travel.open)
+    off_map(&w.content)
 }
 
-/// `off_map_ticks` for a town `open` or not.
-fn off_map(content: &crate::content::Content, open: bool) -> u64 {
-    if open {
-        (content.career_rules.commute_minutes * crate::TICKS_PER_MINUTE as f32) as u64
-    } else {
-        OFF_MAP_TICKS
-    }
+fn off_map(content: &crate::content::Content) -> u64 {
+    (content.career_rules.commute_minutes * crate::TICKS_PER_MINUTE as f32) as u64
 }
 
 /// `i` gets in (their shift is under way): the first owner in drives (someone in before them waits
@@ -5361,7 +5350,7 @@ fn trip_seen(w: &World, c: usize) -> bool {
 }
 
 /// Whether `p` is in the picture or near it (within `UNSEEN` of the watch, `World::set_watch`).
-/// Without a watch nothing is, as before: a cosy or normal town keeps what it always did.
+/// Without a watch nothing is: every car is seen, as in a headless run.
 fn in_picture(w: &World, p: [f32; 2]) -> bool {
     w.watch.is_some_and(|[x0, z0, x1, z1]| {
         let dx = (x0 as f32 - p[0]).max(p[0] - x1 as f32).max(0.0);
@@ -6908,10 +6897,9 @@ pub(crate) fn from_file(w: &mut World, raw: &[CarRaw], drives: &[Drive], garages
 /// After the cars were made or loaded: their routes' lengths, what's built over, the tiles they
 /// take up, where they are.
 fn settle_all(w: &mut World) {
-    // A cosy town made since cars drive winding roads (its driveways say where they meet them,
-    // `Drive::road`): the road network, for its cars only (nobody walks it: `Travel::by_road`).
-    // Older ones drive along x as ever.
-    if !w.travel.open && w.travel.graph.is_empty() && w.drives.iter().any(|d| d.road.is_some()) {
+    // A save or town without a network of its own (its driveways say where they meet their roads,
+    // `Drive::road`): built from the town file's roads, or its meta's.
+    if w.travel.graph.is_empty() && w.drives.iter().any(|d| d.road.is_some()) {
         w.travel.graph = crate::travel::Graph::from_town(&w.travel.file, &w.meta);
     }
     let World {
@@ -7051,8 +7039,7 @@ pub(crate) fn can_drive(
     let Some(home) = households.get(sim.household as usize).and_then(|h| h.plot) else {
         return false;
     };
-    travel.open
-        && !travel.file.parking.is_empty()
+    !travel.file.parking.is_empty()
         && sim.visiting.is_none()
         && briefs
             .get(sim.id as usize)
@@ -7089,7 +7076,7 @@ pub(crate) fn trip_car(
     plot: u32,
 ) -> Option<(u32, usize, [f32; 2])> {
     let travel = ctx.travel;
-    if !travel.open || travel.file.parking.is_empty() || sim.visiting.is_some() {
+    if travel.file.parking.is_empty() || sim.visiting.is_some() {
         return None;
     }
     let me = ctx.briefs.get(sim.id as usize)?;
@@ -7640,10 +7627,7 @@ pub(crate) fn trip_ride(
 ) -> Option<(u32, usize, usize, [f32; 2])> {
     let travel = ctx.travel;
     // (A guest there already as they set off from home: `Transition::Visit`.)
-    if !travel.open
-        || travel.file.parking.is_empty()
-        || sim.visiting.is_some_and(|v| v.plot != plot)
-    {
+    if travel.file.parking.is_empty() || sim.visiting.is_some_and(|v| v.plot != plot) {
         return None;
     }
     let me = ctx.briefs.get(sim.id as usize)?;
@@ -8180,6 +8164,8 @@ mod tests {
             w.cars[0].driver = Some(0);
             w.cars[0].aboard = vec![0];
             w.sims[0].away_until = Some(w.tick + 100_000);
+            // (No shift of Bo's to set off for in the while: his way there ends where it's told.)
+            w.sims[1].job = None;
             // Bo, just in front of it, on his way along the front of the house...
             w.sims[1].pos = [34.5, 8.5];
             let _ = w.apply(crate::Command::MoveTo {

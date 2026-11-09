@@ -9,10 +9,8 @@
  * home's price (web/src/game/wealth.ts, price.ts); per kind of house, how old its owners are and
  * how high up they work. Problems are listed (and the exit code is 1).
  *
- * Sizes (docs/design/open-world.md): `--sizes cosy,normal,big` (default cosy). Big worlds don't load
- * in the simulation until the open-world sim branches are in, so they're written to a file of
- * their own (`--big-out`, default worlds-big.json beside the output), `--big-per-kind` of each
- * (default 1). Besides the checks above, for every size: the roads (country roads and trails too)
+ * Sizes (docs/design/open-world.md): every world is a Big one now (cosy and normal were dropped
+ * in 0.7.1). For every world: the roads (country roads and trails too)
  * one network as the sim joins them (an end within half the wider road's width and a metre of the
  * other's middle), every way out on it, no more courts (dead ends) than an area keeps, none
  * reaching more than 45 m past the last road it meets, and no country road the layout found no
@@ -31,7 +29,7 @@
  * `--seed-base n` (or WORLDS_SEED_BASE; default 0, the worlds CI checks) draws other worlds: the
  * release gate runs the checks over five (`tools/ci-local.sh`, SEED_BASE).
  *
- * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--sizes cosy,normal,big] [--big-out file] [--big-per-kind n] [--kinds farm,forest] [--seed-base n]
+ * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--kinds farm,forest] [--seed-base n]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -66,7 +64,7 @@ type Pt = [number, number];
 type Road = { points: Pt[]; width: number; ends: [string, string]; name?: string; kind?: string; area?: number };
 type Exit = Pt | { x: number; z: number; kind: 'road' };
 type TownFile = {
-  size?: 'cosy' | 'normal' | 'big';
+  size?: 'big';
   width: number;
   depth: number;
   plots: (Rect & { public: boolean; area?: number; kind?: string })[];
@@ -329,10 +327,7 @@ const flag = (name: string) => {
   const i = process.argv.indexOf(name);
   return i < 0 ? undefined : process.argv.splice(i, 2)[1];
 };
-const sizes = (flag('--sizes') ?? 'cosy').split(',') as (typeof WORLD_SIZES)[number][];
-for (const size of sizes) if (!WORLD_SIZES.includes(size)) throw new Error(`no size ${size}`);
-const bigOutFlag = flag('--big-out');
-const bigPerKind = Number(flag('--big-per-kind') ?? 1);
+const sizes = ['big'] as const;
 /** Which worlds of each kind (0: CI's); each world's seed moves on `SEED_STEP` per one. */
 const seedBase = Number(flag('--seed-base') ?? process.env.WORLDS_SEED_BASE ?? 0);
 if (!Number.isInteger(seedBase) || seedBase < 0) throw new Error(`no seed base ${seedBase}`);
@@ -340,10 +335,8 @@ const SEED_STEP = 7919;
 const kinds = (flag('--kinds')?.split(',') ?? [...WORLD_KINDS]) as (typeof WORLD_KINDS)[number][];
 for (const kind of kinds) if (!WORLD_KINDS.includes(kind)) throw new Error(`no kind ${kind}`);
 const out = process.argv[2] ?? 'worlds.json';
-const bigOut = bigOutFlag ?? out.replace(/(\.json)?$/, '-big.json');
 const perKind = Number(process.argv[3] ?? 3);
 const worlds: unknown[] = [];
-const bigWorlds: unknown[] = [];
 /** The slowest of each size (ms): the layout (without houses), the houses, the file. */
 const slowest: Record<string, [number, number, number]> = {};
 /** The house classes, smallest first (`housegen.json` `classes`, by the label houses carry as `class`). */
@@ -358,9 +351,9 @@ const forSale: Record<string, number> = {};
 const courtsOf: Record<string, [number, number, number]> = {};
 for (const size of sizes) {
   for (const kind of WORLD_KINDS.filter((k) => kinds.includes(k))) {
-    for (let i = 1; i <= (size === 'big' ? bigPerKind : perKind); i++) {
+    for (let i = 1; i <= perKind; i++) {
       const seed = i * 104729 + kind.length + seedBase * SEED_STEP;
-      const tag = `${kind}${size === 'cosy' ? '' : ` ${size}`} ${seed}`;
+      const tag = `${kind} ${size} ${seed}`;
       // (The households, the player's and the neighbours', drawn with `Math.random`: seeded here
       // by the world's seed and size, the same seeds make the same files, so a failure in a
       // check of them can be run again.)
@@ -382,8 +375,8 @@ for (const size of sizes) {
       [worst[0], worst[1], worst[2]] = [Math.max(worst[0], layout), Math.max(worst[1], houses), Math.max(worst[2], assemble)];
       for (const p of [...layoutProblems(file), ...(world.diagnostics?.roads ?? [])]) problems.push(`${tag}: ${p}`);
       if (text.length > MAX_FILE) problems.push(`${tag}: the town file is ${(text.length / 1e6).toFixed(1)} MB`);
-      if (size === 'big' && layout > LAYOUT_BUDGET * 2) problems.push(`${tag}: laid out in ${layout.toFixed(0)} ms (budget ${LAYOUT_BUDGET})`);
-      if (size === 'big' && assemble > ASSEMBLE_BUDGET * 2) problems.push(`${tag}: assembled in ${assemble.toFixed(0)} ms (budget ${ASSEMBLE_BUDGET})`);
+      if (layout > LAYOUT_BUDGET * 2) problems.push(`${tag}: laid out in ${layout.toFixed(0)} ms (budget ${LAYOUT_BUDGET})`);
+      if (assemble > ASSEMBLE_BUDGET * 2) problems.push(`${tag}: assembled in ${assemble.toFixed(0)} ms (budget ${ASSEMBLE_BUDGET})`);
       for (const { household, slot } of town.households) {
         const s = town.slots[slot];
         const price = homePrice(content, templates, s);
@@ -407,7 +400,7 @@ for (const size of sizes) {
         const cls = house?.class ?? house?.name ?? s.template;
         forSale[cls] = (forSale[cls] ?? 0) + 1;
       }
-      (size === 'big' ? bigWorlds : worlds).push({ kind, size, seed, name: town.name, town: file });
+      worlds.push({ kind, size, seed, name: town.name, town: file });
       const farms = town.slots.filter((s) => s.lot === 'farm').length;
       const basements = town.slots.filter((s) => s.kind === 'house' && houseTemplate(templates, s.template)?.basement).length;
       const spots = town.slots.filter((s) => s.kind === 'outdoor').length;
@@ -439,10 +432,6 @@ for (const [size, [n, all, most]] of Object.entries(courtsOf)) console.log(`Cour
 for (const [size, [layout, houses, assemble]] of Object.entries(slowest)) console.log(`Slowest ${size}: layout ${layout.toFixed(0)} ms, houses ${houses.toFixed(0)} ms, file ${assemble.toFixed(0)} ms`);
 writeFileSync(out, JSON.stringify(worlds));
 console.log(`${worlds.length} worlds → ${out}`);
-if (bigWorlds.length) {
-  writeFileSync(bigOut, JSON.stringify(bigWorlds));
-  console.log(`${bigWorlds.length} big worlds → ${bigOut}`);
-}
 if (problems.length) {
   console.log(`${problems.length} problems:`);
   for (const p of problems.slice(0, 60)) console.log(`  ${p}`);

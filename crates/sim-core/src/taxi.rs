@@ -6,8 +6,8 @@
 //! **Who rides.** A resident whose way out of town on foot (`life::Commute::walk`) takes longer
 //! than `taxi.minWalkMinutes`, and whom the taxi gets out of town sooner than the walk, its wait at
 //! the kerb included (`time_run`). Not someone with a seat in a car to go in (`cars::lead_ticks`)
-//! or a bike to ride (`Commute::bike`); nobody in a cosy town (no `Commute`: its way out is all
-//! `commuteMinutes`). With or without a driveway (`home_way`: else by the front path).
+//! or a bike to ride (`Commute::bike`). With or without a driveway (`home_way`: else by the front
+//! path).
 //!
 //! **Shared.** Those who leave town by the same way out, whatever their work (or school), and
 //! whose work starts within `taxi.window` minutes of the first's share one (`group`), up to
@@ -420,8 +420,7 @@ fn would_ride(w: &World, i: usize, start: u64) -> Option<Kerb> {
     let s = &w.sims[i];
     let c = s.commute?;
     let home = w.households.get(s.household as usize)?.plot;
-    if !w.travel.open
-        || !s.here()
+    if !s.here()
         || c.home != home
         || c.bike.is_some()
         || c.walk - crate::life::OUT_OF_THE_HOUSE <= w.content.taxi.min_walk
@@ -435,7 +434,7 @@ fn would_ride(w: &World, i: usize, start: u64) -> Option<Kerb> {
 /// Once a tick (after the cars): plans the runs due (`plan`), drives those under way, the riders
 /// in and out at their stops, and frees a taxi done with its run.
 pub(crate) fn update(w: &mut World) {
-    if !w.travel.open || w.travel.graph.is_empty() {
+    if w.travel.graph.is_empty() {
         return;
     }
     note_still(w);
@@ -1831,9 +1830,7 @@ fn finish(w: &mut World, k: usize) {
 /// walk home (`homeward`), they wait there for one home (true), with the others of their group
 /// done about when they are (`Run::depart`).
 pub(crate) fn off_work(w: &mut World, i: usize) -> bool {
-    if w.travel.open {
-        warm_kerbs(w);
-    }
+    warm_kerbs(w);
     let me = i as u32;
     let g = match w.taxis.rode.iter().position(|r| r.0 == me) {
         Some(p) => w.taxis.rode.remove(p).1,
@@ -1920,8 +1917,7 @@ fn homeward(w: &World, i: usize) -> Option<(u32, u32)> {
     let s = &w.sims[i];
     let c = s.commute?;
     let home = w.households.get(s.household as usize)?.plot;
-    if !w.travel.open
-        || c.home != home
+    if c.home != home
         || c.bike.is_some()
         || c.walk - crate::life::OUT_OF_THE_HOUSE <= w.content.taxi.min_walk
     {
@@ -3354,8 +3350,7 @@ pub(crate) fn leisure_eta_via(
     on: &mut [Option<Option<crate::travel::RoadPoint>>; 2],
 ) -> Option<f32> {
     use crate::travel::Mode;
-    if !travel.open || exits.is_empty() || crate::travel::dist(from, door) <= content.autonomy.reach
-    {
+    if exits.is_empty() || crate::travel::dist(from, door) <= content.autonomy.reach {
         return None;
     }
     let mut on_at = |mode: Mode| *on[mode as usize].get_or_insert_with(|| travel.entry(from, mode));

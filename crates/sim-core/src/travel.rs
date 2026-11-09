@@ -1,12 +1,10 @@
 //! Getting about a big world: the road network, long trips on foot along it, how long a trip
 //! takes, and the open-world fields of the town file (docs/design/open-world.md).
 //!
-//! **Which towns.** Only towns laid out for the open world, `normal` and `big` ones (`size`,
-//! `Travel::open`), have a network, time commutes by the walk, go on outings and keep public
-//! things in cells. A town or save without a size is `cosy` and plays exactly as it always did,
-//! roads in its meta or not; only its cars drive the network, in a cosy town made since they
-//! drive winding roads (its driveways say where they meet them: `cars::settle_all`), and nobody
-//! walks it (`Travel::by_road`).
+//! **Which towns.** Every town is laid out for the open world now (`size` is always `big`, cosy
+//! and normal were dropped in 0.7.1): it has a network, times commutes by the walk, goes on
+//! outings and keeps public things in cells. A town or save without open-world fields uses its
+//! meta's roads, or the centre lines of its streets, as the network.
 //!
 //! **The network.** The town's roads (the town file's top-level `roads`; else `meta.roads`, or
 //! the centre lines of `meta.streets`; none: no network) become a small graph: a node at each
@@ -55,23 +53,17 @@ pub const DRIVE_MINUTES: f32 = 60.0 * crate::GAME_MINUTES_PER_SECOND;
 /// Spatial cells for finding the road near a point (m).
 const CELL: f32 = 16.0;
 
-/// How big a world is (`size`; docs/design/open-world.md). A town or save without one, or with
-/// one this build doesn't know, is `cosy`.
+/// How big a world is (`size`; docs/design/open-world.md). Every world is `Big` now (cosy and
+/// normal were dropped in 0.7.1); a save that still says so reads as `big`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum WorldSize {
     #[default]
-    Cosy,
-    Normal,
     Big,
 }
 
 impl WorldSize {
-    pub fn parse(size: Option<&str>) -> Self {
-        match size {
-            Some("normal") => WorldSize::Normal,
-            Some("big") => WorldSize::Big,
-            _ => WorldSize::Cosy,
-        }
+    pub fn parse(_size: Option<&str>) -> Self {
+        WorldSize::Big
     }
 }
 
@@ -256,7 +248,7 @@ pub struct OpenWorld {
 }
 
 impl OpenWorld {
-    /// How big the world is (absent: `cosy`).
+    /// How big the world is (always `big` now; cosy and normal were dropped in 0.7.1).
     pub fn size(&self) -> WorldSize {
         WorldSize::parse(self.size.as_deref())
     }
@@ -1259,12 +1251,6 @@ pub struct Travel {
     pub graph: Graph,
     /// How big the world is (`OpenWorld::size`).
     pub size: WorldSize,
-    /// The town is laid out for the open world (its `size` is `normal` or `big`): it has a road
-    /// network, commutes are timed by the walk (`commuteMinutes` is only the part off the map),
-    /// residents go on outings. Cosy towns, and towns and saves without a size, play as before
-    /// (no network, even with roads in their meta; but for their cars in towns made since cars
-    /// drive winding roads, `cars::settle_all`).
-    pub open: bool,
     /// Cars' top speed on country roads (m/s; content `cars.countrySpeed`).
     pub country_speed: f32,
     /// The tiles the town file's `terrain` masks (water, rock): blocked under everything, so a
@@ -1273,9 +1259,6 @@ pub struct Travel {
     /// The junctions with traffic lights (`traffic::Signal`, `traffic::settle`). Not saved: worked
     /// out again on load.
     pub signals: Vec<crate::traffic::Signal>,
-    /// Whether the junctions get traffic lights (`traffic::settle`): not yet in a game (off), only
-    /// where a test turns them on (`World::light_busy_junctions`).
-    pub lights_on: bool,
     /// By public parking spot (`OpenWorld::parking`), whether a car parked there would stand where
     /// a household's car turns into or out of its driveway, or on the driveway (`cars::settle_all`):
     /// not parked at on a trip. Not saved: worked out again on load.
@@ -1293,20 +1276,15 @@ type Door = ([u32; 2], [Option<RoadPoint>; 2]);
 impl Travel {
     pub fn new(file: OpenWorld, meta: &serde_json::Value) -> Self {
         let size = file.size();
-        let open = size != WorldSize::Cosy;
-        let graph = if open {
-            Graph::from_town(&file, meta)
-        } else {
-            Graph::default()
-        };
+        // Every town is one (cosy and normal were dropped in 0.7.1): a town without open-world
+        // fields takes its meta's roads, or its streets, as the network.
+        let graph = Graph::from_town(&file, meta);
         Self {
             file,
             graph,
             size,
-            open,
             country_speed: COUNTRY_SPEED,
             base_blocked: Vec::new(),
-            lights_on: false,
             by_a_mouth: Vec::new(),
             signals: Vec::new(),
             doors: Vec::new(),
@@ -1322,9 +1300,6 @@ impl Travel {
     /// Notes the public places' doors and where they get on the roads (`doors`), again only for
     /// a door that moved.
     pub(crate) fn note_doors(&mut self, plots: &[crate::world::Plot]) {
-        if !self.open {
-            return;
-        }
         self.doors.resize(plots.len(), None);
         for (i, p) in plots.iter().enumerate() {
             let door = p.arrival_point();
@@ -1347,12 +1322,10 @@ impl Travel {
         }
     }
 
-    /// The most residents the town grows to (`World::population_cap`).
+    /// The most residents the town grows to (`World::population_cap`): `MAX_SIMS` in every world
+    /// (cosy and normal were dropped in 0.7.1).
     pub fn population_cap(&self) -> usize {
-        match self.size {
-            WorldSize::Big => crate::world::MAX_SIMS,
-            WorldSize::Cosy | WorldSize::Normal => crate::world::TOWN_SIMS,
-        }
+        crate::world::MAX_SIMS
     }
 
     /// Whether tile `i` (`Lot::tile_index`) is blocked by the land itself (`base_blocked`).
@@ -1371,7 +1344,7 @@ impl Travel {
 
     /// Whether a trip from `a` to `b` on foot goes by road.
     pub fn by_road(&self, a: [f32; 2], b: [f32; 2]) -> bool {
-        self.open && !self.graph.is_empty() && octile(a, b) >= ROAD_TRIP_TILES
+        !self.graph.is_empty() && octile(a, b) >= ROAD_TRIP_TILES
     }
 
     /// About how many minutes a trip from `from` to `to` takes: on foot at `walk` m a minute

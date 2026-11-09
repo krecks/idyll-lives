@@ -1,19 +1,18 @@
-//! Generated worlds (web/src/game/world.ts and town.ts: towns of three sizes, farms, seaside,
-//! mountain, lakeside and forest worlds) checked by the simulation: each loads with no more
-//! residents than a town holds, its roads make one network (as the sim joins them), every lot can
-//! be reached from the ends of every street and back,
+//! Generated worlds (web/src/game/world.ts and town.ts: farms, seaside, mountain, lakeside and
+//! forest worlds, every one a big one: cosy and normal were dropped in 0.7.1) checked by the
+//! simulation: each loads with no more residents than a town holds, its roads make one network (as
+//! the sim joins them), every lot can be reached from the ends of every street and back,
 //! everything outdoors that residents use (a farm's crops, a park's benches) can be reached, as
 //! can the houses' basements from their front doors and everything residents use in the houses
-//! (on lots facing either way), and the town keeps going for half a day: in a cosy or a normal
-//! town with bikes at homes without a car someone rides one to work or school, and nobody is stuck
-//! on one in town; no two cars stand or drive on top of each other, nor is one held up for good.
+//! (on lots facing either way), and the town keeps going for half a day: in a town with bikes at
+//! homes without a car someone rides one to work or school, and nobody is stuck on one in town; no
+//! two cars stand or drive on top of each other, nor is one held up for good.
 //!
-//! A big world is looked at as its game starts, the camera on the player's home: what the
-//! renderer streams in round it is simulated in full detail and drawn (`common::watch_home`).
-//! Out of that and a margin round it cars drive through each other (`cars::sight`: the owner's
-//! call, off-camera traffic simplified), so two cars on top of each other or passing too near
-//! count only where one of them is drawn (`common::drawn`); a car held up for good counts
-//! anywhere. A cosy or a normal town is drawn whole: every car counts.
+//! A world is looked at as its game starts, the camera on the player's home: what the renderer
+//! streams in round it is simulated in full detail and drawn (`common::watch_home`). Out of that
+//! and a margin round it cars drive through each other (`cars::sight`: the owner's call,
+//! off-camera traffic simplified), so two cars on top of each other or passing too near count only
+//! where one of them is drawn (`common::drawn`); a car held up for good counts anywhere.
 //!
 //! Make the worlds first: `bun tools/worlds/sample.ts worlds.json`,
 //! then `WORLDS=worlds.json cargo test --release -p sim-core --test sim generated_worlds:: -- --ignored --nocapture`.
@@ -71,8 +70,8 @@ fn generated_worlds_are_livable() {
         serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     let content = common::content();
     let items: Vec<(usize, &serde_json::Value)> = worlds.iter().enumerate().collect();
-    // Each world's problems, and (a cosy or a normal one with bikes at homes without a car) whether
-    // someone rode one.
+    // Each world's problems, and (a town with bikes at homes without a car) whether someone rode
+    // one.
     let checked: Vec<(Vec<String>, Option<bool>)> = each_world(&items, |&(i, world)| {
         let mut failures = Vec::new();
         let label = format!("{} {} ({})", world["kind"], world["seed"], world["name"]);
@@ -92,8 +91,7 @@ fn generated_worlds_are_livable() {
         if w.exits.is_empty() {
             failures.push(format!("{label}: no way out of town"));
         }
-        // The town's roads one network as the sim joins them (built here for a cosy town too,
-        // which plays without one).
+        // The town's roads one network as the sim joins them.
         let networks = Graph::from_town(&w.travel.file, &world["town"]["meta"]).networks();
         if networks != 1 {
             failures.push(format!(
@@ -234,9 +232,9 @@ fn generated_worlds_are_livable() {
         }
         common::check(&w);
         // Half a day of everyone's free will. Those with a bike of their own ride it to work or
-        // school (`ride.rs`), and out on a visit or an outing: someone does, in a cosy or a normal
-        // town, and nobody is on one in town for longer than a ride takes (stuck on it), one way
-        // (a ride out to a café and straight back home is two).
+        // school (`ride.rs`), and out on a visit or an outing: someone does, and nobody is on one
+        // in town for longer than a ride takes (stuck on it), one way (a ride out to a café and
+        // straight back home is two).
         // (A household with a car at home drives: those without one ride.)
         let carless = |plot: u32| {
             w.households.iter().enumerate().any(|(h, hh)| {
@@ -267,9 +265,8 @@ fn generated_worlds_are_livable() {
         let mut failures_on_road = std::collections::BTreeSet::new();
         let mut in_view = std::collections::BTreeSet::new();
         let mut stacked: Stacked = Default::default();
-        // (A big world looked at as its game starts: `common::watch_home`.)
-        let watch =
-            (world["town"]["size"].as_str() == Some("big")).then(|| common::watch_home(&mut w));
+        // (The world looked at as its game starts: `common::watch_home`.)
+        let watch = Some(common::watch_home(&mut w));
         let mut standing: Standing = Default::default();
         for hour in 0..12 {
             for t in 0..TICKS_PER_HOUR {
@@ -378,8 +375,7 @@ fn generated_worlds_are_livable() {
                 .map(|f| format!("{label}: {f}")),
         );
         print_in_view(&label, &in_view);
-        let small = matches!(world["size"].as_str(), Some("cosy" | "normal") | None);
-        let ridden = (small && carless_bikes > 0).then_some(!rode.is_empty());
+        let ridden = (carless_bikes > 0).then_some(!rode.is_empty());
         eprintln!(
             "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements, {bikes} bikes, {} rode",
             w.lot.width,
@@ -396,7 +392,7 @@ fn generated_worlds_are_livable() {
     let ridden = checked.iter().filter(|(_, r)| *r == Some(true)).count();
     if ridden * 2 < towns {
         failures.push(format!(
-            "someone rode a bike to work or school in {ridden} of {towns} cosy and normal towns with bikes at homes without a car"
+            "someone rode a bike to work or school in {ridden} of {towns} towns with bikes at homes without a car"
         ));
     }
     eprintln!(
@@ -420,9 +416,6 @@ const BIG_TAXI_LATE: f32 = 6.0;
 /// or home takes minutes).
 const RIDE_HOURS: u64 = 2;
 
-/// Cosy and normal worlds of the file whose cars are driven (each for a day), the first of each
-/// size; every big one is (for two days).
-const CAR_WORLDS: usize = 99;
 /// Hours a resident may be sat in a car standing parked, or bound for one but not on their way, at
 /// most (a trip's driver waits up to two hours for the others: `cars::TRIP_WAIT_TICKS`).
 const CAR_HOURS: u64 = 4;
@@ -1007,8 +1000,7 @@ impl Slips {
 /// cars on the move keep to the paving (`OFF_PAVING`), some drive to work (and in a big world some
 /// go on trips to another hamlet), and at three in the morning every car is parked at home, parked
 /// out at a public spot, or away with someone at work in it; nobody waits for a car for hours
-/// (`CAR_HOURS`), and in a cosy or normal town nobody is stuck at all (`common::Watch`; a big
-/// world's long stretches away or walking are about as many without cars). In a big world, a
+/// (`CAR_HOURS`; a world's long stretches away or walking are about as many without cars). A
 /// preview in 0.7.0 (the owner's decision, 2026-11-07), a car held up in the seen area is counted,
 /// not a failure: in-view jams are to be finished in 0.7.1 (`BIG_PREVIEW`).
 #[test]
@@ -1027,16 +1019,15 @@ fn generated_worlds_cars_keep_to_the_roads() {
     });
     // Per size: worlds driven, cars, cars with no way out, drives to work, trips to another hamlet.
     let mut sizes: std::collections::BTreeMap<String, [usize; 7]> = Default::default();
-    // (The first `CAR_WORLDS` of each size, every big one.)
-    let mut picked: std::collections::BTreeMap<String, usize> = Default::default();
     let items: Vec<(usize, String, &serde_json::Value)> = worlds
         .iter()
         .enumerate()
-        .filter_map(|(i, world)| {
-            let size = world["town"]["size"].as_str().unwrap_or("cosy");
-            let n = picked.entry(size.to_string()).or_default();
-            *n += 1;
-            (size == "big" || *n <= CAR_WORLDS).then(|| (i, size.to_string(), world))
+        .map(|(i, world)| {
+            (
+                i,
+                world["town"]["size"].as_str().unwrap_or("big").to_string(),
+                world,
+            )
         })
         .collect();
     let results = each_world(&items, |(i, size, world)| {
@@ -1109,9 +1100,9 @@ fn generated_worlds_cars_keep_to_the_roads() {
             })
             .unwrap_or_default();
         let caps = turning_circles(&world["town"]);
-        // (A normal town is 256 m across, a big world 1 km: walks across them take hours.)
-        let mut watch = common::Watch::new().routing_hours(if size == "cosy" { 4.0 } else { 8.0 });
-        let days = if big { 2 } else { 1 };
+        // (A world is about 1 km across: walks across it take hours.)
+        let mut watch = common::Watch::new().routing_hours(8.0);
+        let days = 2;
         let end = clock::tick_at(clock::day(w.tick) + days, 3.0 * 60.0).unwrap();
         let mut was: Vec<CarState> = w.cars.iter().map(|c| c.state).collect();
         // Per resident: since when they've been on their way to a car, or sat in one standing
@@ -1326,13 +1317,8 @@ fn generated_worlds_cars_keep_to_the_roads() {
             .iter()
             .map(|a| a.1.max(0) as usize)
             .sum::<usize>();
-        // (A big world's residents away or walking for long are about as many with cars as
-        // without: only those waiting for a car count there, above.)
-        if !big {
-            for s in &watch.stuck {
-                failures.push(format!("{label}: {s}"));
-            }
-        }
+        // (A world's residents away or walking for long are about as many with cars as without:
+        // only those waiting for a car count, above.)
         if let Some(how) = &slip {
             slips.print(&label, how == "trace");
         }
@@ -1358,18 +1344,13 @@ fn generated_worlds_cars_keep_to_the_roads() {
         eprintln!(
             "{size}: {n} worlds, {cars} cars ({stay} with no way out or no door to open), {commutes} drives to work, {trips} trips, {taxi} at work by taxi ({mean_late:.2} min late on average)"
         );
-        // Some of a big world's residents a long way out of town ride the work taxi, about on
-        // time (`taxi.rs`); a cosy or a normal town's may have none.
-        if size == "big" && *n > 0 && *taxi == 0 {
+        // Some residents a long way out of town ride the work taxi, about on time (`taxi.rs`).
+        if *n > 0 && *taxi == 0 {
             failures.push(format!("{size}: nobody went to work by taxi"));
         }
         // (A big town's taxis held up in a jam in view come late: counted, not failing, but past
         // `BIG_TAXI_LATE`, `BIG_PREVIEW`.)
-        let (bar, preview) = if size == "big" {
-            (BIG_TAXI_LATE, mean_late > TAXI_LATE)
-        } else {
-            (TAXI_LATE, false)
-        };
+        let (bar, preview) = (BIG_TAXI_LATE, mean_late > TAXI_LATE);
         if mean_late > bar {
             failures.push(format!(
                 "{size}: taxi riders {mean_late:.2} min late on average, more than {bar}"
@@ -1387,7 +1368,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
         if *n > 0 && *commutes == 0 {
             failures.push(format!("{size}: nobody drove to work"));
         }
-        if size == "big" && *n > 0 && *trips == 0 {
+        if *n > 0 && *trips == 0 {
             failures.push(format!("{size}: nobody drove to another hamlet"));
         }
     }

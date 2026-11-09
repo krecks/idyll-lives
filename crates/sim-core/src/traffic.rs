@@ -1451,17 +1451,14 @@ pub fn on_its_way(w: &World, key: u64) -> Option<f32> {
     .then_some(car.progress)
 }
 
-/// The junctions' traffic lights (`Travel::signals`: none in a game, `Travel::lights_on`; where a
-/// test turns them on, every junction where `SIGNAL_ARMS` roads or more meet, while their heads fit
-/// the snapshot's rows), and every car's claims worked out again with them (`Claim::gate`). Once
-/// the cars are made or loaded. (The busiest junction of the sample worlds has about 10 cars an
-/// hour: not lit for 0.7.0.)
+/// The junctions' traffic lights (`Travel::signals`: every junction where `SIGNAL_ARMS` roads or
+/// more meet, while their heads fit the snapshot's rows), and every car's claims worked out again
+/// with them (`Claim::gate`). Once the cars are made or loaded.
 pub(crate) fn settle(w: &mut World) {
     let g = &w.travel.graph;
     let mut signals: Vec<Signal> = Vec::new();
     let mut heads = 0;
-    // (Not lit in a game: only where a test turns them on, `Travel::lights_on`.)
-    for n in (0..g.nodes.len()).filter(|_| w.travel.lights_on) {
+    for n in 0..g.nodes.len() {
         let Some(sig) = signal_at(g, n) else { continue };
         // (No junction lit without a head for each arm in the snapshot's rows.)
         if heads + sig.arms.len() > crate::snapshot::MAX_LIGHTS {
@@ -1471,17 +1468,20 @@ pub(crate) fn settle(w: &mut World) {
         signals.push(sig);
     }
     w.travel.signals = signals;
+    // (Green on the first arm before the first tick changes them: `change_lights`.)
+    w.traffic
+        .lights
+        .resize(w.travel.signals.len(), Light::default());
     for car in &mut w.cars {
         car.reclaim(&w.travel);
     }
 }
 
 impl World {
-    /// For tests: traffic lights at the junctions (`traffic::Signal`; not yet in a game:
-    /// `Travel::lights_on`), the cars' claims worked out again with them.
+    /// The junctions' traffic lights worked out again (`traffic::settle`), and the cars' claims
+    /// with them: for a test that changes the roads after the world is made.
     #[doc(hidden)]
-    pub fn light_busy_junctions(&mut self) {
-        self.travel.lights_on = true;
+    pub fn settle_lights(&mut self) {
         settle(self);
     }
 }

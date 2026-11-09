@@ -134,7 +134,7 @@ describe('driveways', async () => {
   ];
   for (const [kind, seed] of cosy) {
     test(`cosy ${kind} ${seed}: every car can turn out of its driveway onto its road`, () => {
-      const file = townFile(kind, 'cosy', seed);
+      const file = townFile(kind, 'big', seed);
       expect(file.cars.length).toBeGreaterThan(0);
       expect(wayOutProblems(file)).toEqual([]);
     });

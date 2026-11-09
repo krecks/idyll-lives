@@ -231,25 +231,69 @@ export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, 
       for (const side of withSidewalks ? ([1, -1] as const) : []) {
         // Offsets from the middle: the sidewalk's outer edge, the kerb's top, the road's edge, the gutter.
         const [edge, walkIn, kerb, gutter] = [half, half - (SIDEWALK - KERB), half - SIDEWALK, half - SIDEWALK - 0.4].map((o) => o * side);
-        const [cx, cz] = [mx + frames[i].n[0] * (edge + walkIn) / 2, mz + frames[i].n[1] * (edge + walkIn) / 2];
-        // Not across another road, nor round a turning circle.
-        if (index.onRoad(cx, cz, 0.2, ri) || ends.some(([ex, ez, r]) => Math.hypot(cx - ex, cz - ez) < r + SIDEWALK)) continue;
         const out: V3 = [frames[i].n[0] * side, 0, frames[i].n[1] * side];
         const inward: V3 = [-out[0], 0, -out[2]];
-        // The quad between two offsets (`alpha`: the shade's at the first, fading to none at the second).
-        const strip = (g: Geo, a: number, ya: number, b: number, yb: number, n: V3, alpha?: number) =>
-          g.poly([P(i, a, ya), P(i + 1, a, ya), P(i + 1, b, yb), P(i, b, yb)], n, undefined, alpha === undefined ? undefined : [alpha, alpha, 0, 0]);
-        walk.color('#E6E6E6');
-        strip(walk, edge, WALK_Y, walkIn, WALK_Y, up);
-        walk.color('#FFFFFF');
-        strip(walk, walkIn, KERB_Y, kerb, KERB_Y, up);
-        // Kerb faces: the step up from the walk and the drop to the road; the walk's own edge.
-        strip(walk, walkIn, WALK_Y, walkIn, KERB_Y, out);
-        strip(walk, kerb, KERB_Y, kerb, ROAD_Y, inward);
-        walk.color('#E6E6E6');
-        strip(walk, edge, WALK_Y, edge, 0, out);
-        // Gutter: the road darkens along the kerb.
-        strip(shadows, kerb, ROAD_Y + 0.003, gutter, ROAD_Y + 0.003, up, 0.3);
+        /** The point `off` m from the middle, `t` of the way from frame `i` to `i + 1` (`y` up). */
+        const Q = (t: number, off: number, y: number): V3 => {
+          const [a, b] = [frames[i], frames[i + 1]];
+          const [nx, nz] = [a.n[0] + (b.n[0] - a.n[0]) * t, a.n[1] + (b.n[1] - a.n[1]) * t];
+          const l = Math.hypot(nx, nz) || 1;
+          return [a.p[0] + (b.p[0] - a.p[0]) * t + (nx / l) * off, y, a.p[1] + (b.p[1] - a.p[1]) * t + (nz / l) * off];
+        };
+        // Where the sidewalk's middle would be across another road, or in a turning circle: it stops
+        // there (a road it meets cuts it, square to its own kerb, not a ragged corner).
+        const off = (edge + walkIn) / 2;
+        const cut = (t: number): boolean => {
+          const [x, , z] = Q(t, off, 0);
+          return index.onRoad(x, z, 0.2, ri) || ends.some(([ex, ez, r]) => Math.hypot(x - ex, z - ez) < r + SIDEWALK);
+        };
+        // The stretch of the segment the sidewalk runs (`t0`..`t1`), its ends worked out where it's
+        // cut: sampled every 0.5 m, then the boundary found between a clear and a cut sample.
+        const runs: [number, number][] = [];
+        const steps = Math.max(1, Math.ceil(Math.hypot(frames[i + 1].p[0] - frames[i].p[0], frames[i + 1].p[1] - frames[i].p[1]) / 0.5));
+        /** The boundary between a `blocked` sample and a `clear` one, worked out by halving. */
+        const bound = (blocked: number, clear: number): number => {
+          let [b, c] = [blocked, clear];
+          for (let it = 0; it < 12; it++) {
+            const m = (b + c) / 2;
+            if (cut(m)) b = m;
+            else c = m;
+          }
+          return b;
+        };
+        let from: number | null = cut(0) ? null : 0;
+        let [clear, blocked] = [0, 0];
+        for (let k = 1; k <= steps; k++) {
+          const t = k / steps;
+          if (cut(t)) {
+            if (from !== null) {
+              runs.push([from, bound(t, clear)]);
+              from = null;
+            }
+            blocked = t;
+          } else {
+            if (from === null) from = bound(blocked, t);
+            clear = t;
+          }
+        }
+        if (from !== null) runs.push([from, 1]);
+        if (runs.length === 0) continue;
+        // The quad between two offsets over `t0`..`t1` (`alpha`: the shade's at the first, fading to none at the second).
+        const strip = (g: Geo, t0: number, t1: number, a: number, ya: number, b: number, yb: number, n: V3, alpha?: number) =>
+          g.poly([Q(t0, a, ya), Q(t1, a, ya), Q(t1, b, yb), Q(t0, b, yb)], n, undefined, alpha === undefined ? undefined : [alpha, alpha, 0, 0]);
+        for (const [t0, t1] of runs) {
+          walk.color('#E6E6E6');
+          strip(walk, t0, t1, edge, WALK_Y, walkIn, WALK_Y, up);
+          walk.color('#FFFFFF');
+          strip(walk, t0, t1, walkIn, KERB_Y, kerb, KERB_Y, up);
+          // Kerb faces: the step up from the walk and the drop to the road; the walk's own edge.
+          strip(walk, t0, t1, walkIn, WALK_Y, walkIn, KERB_Y, out);
+          strip(walk, t0, t1, kerb, KERB_Y, kerb, ROAD_Y, inward);
+          walk.color('#E6E6E6');
+          strip(walk, t0, t1, edge, WALK_Y, edge, 0, out);
+          // Gutter: the road darkens along the kerb.
+          strip(shadows, t0, t1, kerb, ROAD_Y + 0.003, gutter, ROAD_Y + 0.003, up, 0.3);
+        }
       }
     }
     // Turning circles: road to the kerb, the sidewalk round it but where the lane comes in.

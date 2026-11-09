@@ -399,8 +399,8 @@ export interface RoadPlan {
 /** `street` (default) · `lane` · `country` (between areas) · `trail` (2 m, on foot only). */
 export type RoadKind = 'street' | 'lane' | 'country' | 'trail';
 
-/** How big a world is (docs/design/open-world.md); towns without one are `cosy`. */
-export type WorldSize = 'cosy' | 'normal' | 'big';
+/** How big a world is: every world is a Big one (cosy and normal were dropped in 0.7.1; a save that still says so reads as `big`). */
+export type WorldSize = 'big';
 
 /** Run-length mask over the ground grid, row-major from tile (0, 0): `[run, value(0|1), run, value, ...]`. */
 export type Rle = number[];
@@ -471,7 +471,7 @@ export interface WorldMeta {
 /** The world a town stands in (`game/world.ts`): its kind, its land, and farm fields in town. */
 export interface WorldLook {
   kind: string;
-  /** How big the world is (missing: `cosy`). */
+  /** How big the world is (always `big` now). */
   size?: WorldSize;
   landscape: LandscapeParams;
   /** Tilled fields on farm lots (town tiles): drawn as soil, fenced in. */
