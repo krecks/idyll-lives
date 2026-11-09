@@ -64,6 +64,13 @@ Run 2026-11-03/04 on CI's Bun 1.4.3: all green.
 - `generated` over seed bases 16–25, under the Big preview rule: all green. Bases 16–18 failed first (two country roads laid side by side, a guest taken from a visit by her booked taxi) and were fixed, so 21–25 were the unseen gate; the worldgen fix's author checked only their layouts.
 - Played (headless Chromium, the dev server): new Cosy (WebGPU), Normal (WebGL2) and Big games (WebGPU, and a dense one on WebGL2) at 60 fps, with taxis standing at the kerb and riders getting in, the ranks, a bike ridden to an outing, *Big (preview)* and its line on Create World; a 0.6.0 save (format 35) continued and played; a 0.7.0 game saved and continued. No console errors.
 
+**Final run for PR #60, 2026-11-09, on `release/0.7.0`** (the 60 Hz sim and 30-minute day, the play-test's fixes and the release review's fixes, `fix/review-070`):
+- A `/code-review` of PR #60: 8 findings, 5 fixed (hosts are the house's grown-ups, so a guest doesn't stay on with only the baby; one leave-for-work time for guest and hosts, a work taxi's or the drive's; a traffic light's `since` rescaled as real time; the taxi kerb cache checked against the town; a rider left behind said so to `release`), 1 partly (cars' and taxis' saved times were right as game time), 2 left for 0.7.1 (the junction arc's maths beside `Turn::round`; speed 5 on an M1, measured below).
+- `tools/ci-local.sh`, every step: all green (sim 169 + 769). `grid_identity` unchanged by the review's fixes.
+- `generated` over seed bases 16–33 and 35: all green. 31–35 were the unseen gate; 34 fails in the sampler on two roads side by side in one dense Big world (known, for 0.7.1).
+- `check:voice` matches the golden samples; the production build 509 MB; tickbench about 0.84 µs a tick; a Big world (Rowan Hollow) 6 game hours at speed 5 in 3.7 s natively.
+- Played (headless Chromium, the dev server): a new Big game (WebGPU) and a new Normal game (WebGL2) at 60 fps, no console errors or shader warnings; the clock at 0.8 game minutes a real second at speed 1 and 48 at speed 5 (a Big world 47.3, and 42.4 at a 2× CPU slow-down: speed 5 keeps up on a slower machine but for a Big world at about 88 %; Normal 48 either way).
+
 ## 4. Release steps
 
 1. Merge `fix/offview-traffic` (the bus out, the work taxi in, the cars' turns, big towns' traffic), `feat/lights-render` and `docs/release-prep` (`cargo release-version 0.7.0`, the CHANGELOG's date) into the release branch.
