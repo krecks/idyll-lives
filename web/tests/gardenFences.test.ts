@@ -33,7 +33,7 @@ describe('garden fences', async () => {
   const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
   const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
   const key = (f: { axis: string; x: number; z: number }) => `${f.axis}:${f.x}:${f.z}`;
-  const towns = (['medium', 'dense', 'farm'] as const).flatMap((kind) => (['big'] as const).map((size) => ({ kind, size, town: generateWorld(content, t, kind, 4242, undefined, size) })));
+  const towns = (['medium', 'dense', 'farm'] as const).map((kind) => ({ kind, size: 'big' as const, town: generateWorld(content, t, kind, 4242) }));
 
   test('on tile edges of the ground, never on a wall, across a path or driveway, or in a doorway', () => {
     for (const { kind, size, town } of towns) {

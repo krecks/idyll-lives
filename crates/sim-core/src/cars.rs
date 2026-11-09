@@ -2972,6 +2972,7 @@ pub(crate) fn off_map_ticks(w: &World) -> u64 {
     off_map(&w.content)
 }
 
+/// `off_map_ticks` for a content alone (`lead_by` has no world to hand).
 fn off_map(content: &crate::content::Content) -> u64 {
     (content.career_rules.commute_minutes * crate::TICKS_PER_MINUTE as f32) as u64
 }

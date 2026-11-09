@@ -53,8 +53,8 @@ pub const DRIVE_MINUTES: f32 = 60.0 * crate::GAME_MINUTES_PER_SECOND;
 /// Spatial cells for finding the road near a point (m).
 const CELL: f32 = 16.0;
 
-/// How big a world is (`size`; docs/design/open-world.md). Every world is `Big` now (cosy and
-/// normal were dropped in 0.7.1); a save that still says so reads as `big`.
+/// How big a world is (`size`; docs/design/open-world.md): every world is `Big` now (cosy and
+/// normal were dropped in 0.7.1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum WorldSize {
     #[default]
@@ -62,8 +62,10 @@ pub enum WorldSize {
 }
 
 impl WorldSize {
+    /// The size a town file or save says (`size`): every one is `Big` now, so a save that still
+    /// says `cosy` or `normal` reads as `big`.
     pub fn parse(_size: Option<&str>) -> Self {
-        WorldSize::Big
+        Self::Big
     }
 }
 

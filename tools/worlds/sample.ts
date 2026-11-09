@@ -277,7 +277,7 @@ function openProblems(town: TownFile): string[] {
   // Neighbours within the cap (the player's household aside).
   const player = town.households.findIndex((h) => h.player);
   const neighbours = town.sims.filter((s) => s.household !== player).length;
-  if (neighbours > neighbourCap(town.size)) out.push(`${neighbours} neighbours (the cap is ${neighbourCap(town.size)})`);
+  if (neighbours > neighbourCap()) out.push(`${neighbours} neighbours (the cap is ${neighbourCap()})`);
   return out;
 }
 

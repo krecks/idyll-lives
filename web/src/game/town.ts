@@ -232,7 +232,6 @@ export interface TownMeta {
 
 /** Open land round a town's lots (m). */
 const MARGIN = 8;
-/** Tiles a town may measure each way (sim-core `Lot::from_file`). */
 /** Grass between a road's sidewalk and the lots along it (m). */
 const VERGE = 0.5;
 
@@ -593,7 +592,7 @@ export function withLot(town: NeighbourhoodDraft, slot: number, template: string
  * Residents the neighbours number at most (docs/design/open-world.md: the sim holds 160 Sims in
  * a big world; room left for the player's household and babies).
  */
-export function neighbourCap(_size?: WorldSize): number {
+export function neighbourCap(): number {
   return 140;
 }
 

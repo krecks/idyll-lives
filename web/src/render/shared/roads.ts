@@ -240,11 +240,11 @@ export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, 
           const l = Math.hypot(nx, nz) || 1;
           return [a.p[0] + (b.p[0] - a.p[0]) * t + (nx / l) * off, y, a.p[1] + (b.p[1] - a.p[1]) * t + (nz / l) * off];
         };
-        // Where the sidewalk's middle would be across another road, or in a turning circle: it stops
-        // there (a road it meets cuts it, square to its own kerb, not a ragged corner).
-        const off = (edge + walkIn) / 2;
+        // A road it meets cuts the sidewalk square to its own kerb, not a ragged corner: its middle
+        // is across another road there, or in a turning circle.
+        const mid = (edge + walkIn) / 2;
         const cut = (t: number): boolean => {
-          const [x, , z] = Q(t, off, 0);
+          const [x, , z] = Q(t, mid, 0);
           return index.onRoad(x, z, 0.2, ri) || ends.some(([ex, ez, r]) => Math.hypot(x - ex, z - ez) < r + SIDEWALK);
         };
         // The stretch of the segment the sidewalk runs (`t0`..`t1`), its ends worked out where it's
@@ -266,10 +266,8 @@ export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, 
         for (let k = 1; k <= steps; k++) {
           const t = k / steps;
           if (cut(t)) {
-            if (from !== null) {
-              runs.push([from, bound(t, clear)]);
-              from = null;
-            }
+            if (from !== null) runs.push([from, bound(t, clear)]);
+            from = null;
             blocked = t;
           } else {
             if (from === null) from = bound(blocked, t);

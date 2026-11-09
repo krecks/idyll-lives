@@ -3789,26 +3789,24 @@ impl World {
     /// Rebuilds the objects-by-plot index if objects were added, removed or changed since.
     pub(crate) fn refresh_index(&mut self) {
         if self.object_index.version != self.objects_version {
-            self.object_index = {
-                let centres: Vec<[f32; 2]> = self
-                    .objects
-                    .iter()
-                    .map(|o| o.centre(&self.content))
-                    .collect();
-                let ground = if self.stairs.depth > 0 {
-                    self.stairs.depth as usize
-                } else {
-                    self.lot.depth
-                };
-                let size = [self.lot.width as f32, ground as f32];
-                ObjectIndex::open(
-                    &self.object_plot,
-                    &self.plots,
-                    &centres,
-                    size,
-                    self.objects_version,
-                )
+            let centres: Vec<[f32; 2]> = self
+                .objects
+                .iter()
+                .map(|o| o.centre(&self.content))
+                .collect();
+            let ground = if self.stairs.depth > 0 {
+                self.stairs.depth as usize
+            } else {
+                self.lot.depth
             };
+            let size = [self.lot.width as f32, ground as f32];
+            self.object_index = ObjectIndex::open(
+                &self.object_plot,
+                &self.plots,
+                &centres,
+                size,
+                self.objects_version,
+            );
             let nav = NavGrid {
                 lot: &self.lot,
                 blocked: &self.blocked,

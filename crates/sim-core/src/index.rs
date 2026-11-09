@@ -30,7 +30,7 @@ pub(crate) struct ObjectIndex {
     pub links: crate::surface::Links,
     /// The `World::objects_version` it was built for.
     pub version: u32,
-    /// Open-world towns: `shared` by `CELL` m cell (row-major, `cols` a row), each in id order;
+    /// Public and off-plot objects by `CELL` m cell (row-major, `cols` a row), each in id order;
     /// `usable` then holds only each plot's own.
     cells: Vec<Vec<u32>>,
     cols: usize,
