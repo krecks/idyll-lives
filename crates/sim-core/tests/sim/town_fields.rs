@@ -8,7 +8,7 @@ use crate::common;
 
 use serde_json::json;
 use sim_core::World;
-use sim_core::travel::{AreaKind, PlotKind, RoadKind, Terrain, WorldSize};
+use sim_core::travel::{AreaKind, PlotKind, RoadKind, Terrain};
 
 #[test]
 fn open_world_fields_are_read_kept_and_saved() {
@@ -31,7 +31,6 @@ fn open_world_fields_are_read_kept_and_saved() {
     town["plots"][0]["kind"] = json!("home");
     let mut world = World::from_json(&content, &town.to_string(), 5).unwrap();
     let t = &world.travel;
-    assert_eq!(t.size, WorldSize::Big);
     let f = &t.file;
     assert_eq!(f.roads.len(), 2);
     assert_eq!(f.roads[0].kind, RoadKind::Street);
@@ -54,7 +53,6 @@ fn open_world_fields_are_read_kept_and_saved() {
     let back = World::from_save_json(&content, &world.save_json()).unwrap();
     let json = |w: &World| serde_json::to_value(&w.travel.file).unwrap();
     assert_eq!(json(&back), json(&world));
-    assert_eq!(back.travel.size, WorldSize::Big);
     assert_eq!(back.exits, world.exits);
     assert_eq!(back.travel.graph.roads.len(), 2);
 }
@@ -67,7 +65,6 @@ fn a_town_without_them_is_big_and_uses_its_metas_roads() {
         "roads": [{"points": [[0, 33], [80, 33]], "width": 6}]});
     let world = World::from_json(&content, &town.to_string(), 5).unwrap();
     let t = &world.travel;
-    assert_eq!(t.size, WorldSize::Big);
     assert_eq!(t.graph.roads.len(), 1, "the meta's road is the network");
     assert!(t.file.is_empty(), "no open-world fields of its own");
     // Saved without them (its network made again from its meta), and still open after a load.

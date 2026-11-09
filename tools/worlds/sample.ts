@@ -51,7 +51,7 @@ const { Content } = await import('../../web/src/content/content.ts');
 const { AssetRegistry } = await import('../../web/src/assets/registry.ts');
 const { objectInfos } = await import('../../web/src/game/housegen.ts');
 const { randomHousehold } = await import('../../web/src/game/household.ts');
-const { assembleTown, BIG_COURTS, COURTS, generateStats, generateWorld, houseTemplate, neighbourCap, populate, turner, vacantSlots } = await import('../../web/src/game/town.ts');
+const { assembleTown, BIG_COURTS, COURTS, generateStats, generateWorld, houseTemplate, NEIGHBOUR_CAP, populate, turner, vacantSlots } = await import('../../web/src/game/town.ts');
 const { WORLD_KINDS } = await import('../../web/src/game/world.ts');
 const { AREA_APART, COUNTRY_TURN, unrle } = await import('../../web/src/game/macro.ts');
 const { homePrice } = await import('../../web/src/game/price.ts');
@@ -271,10 +271,11 @@ function openProblems(town: TownFile): string[] {
     if (k > 0 && lots < 4) out.push(`hamlet ${a.name} has ${lots} lots`);
   });
   const homes = town.plots.filter((p) => p.kind === 'home' || p.kind === 'farm');
-  if (homes.length < 70) out.push(`${homes.length} homes (a big world has 70 or more)`);  // Neighbours within the cap (the player's household aside).
+  if (homes.length < 70) out.push(`${homes.length} homes (a big world has 70 or more)`);
+  // Neighbours within the cap (the player's household aside).
   const player = town.households.findIndex((h) => h.player);
   const neighbours = town.sims.filter((s) => s.household !== player).length;
-  if (neighbours > neighbourCap()) out.push(`${neighbours} neighbours (the cap is ${neighbourCap()})`);
+  if (neighbours > NEIGHBOUR_CAP) out.push(`${neighbours} neighbours (the cap is ${NEIGHBOUR_CAP})`);
   return out;
 }
 

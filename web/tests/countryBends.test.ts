@@ -41,7 +41,7 @@ describe('country road bends', async () => {
     test(
       `big ${kind} ${seed} (${name}): no country road turns further than ${deg(COUNTRY_TURN)}° over 40 m (${road} did)`,
       () => {
-        const town = generateWorld(content, t, kind, seed, undefined, 'big');
+        const town = generateWorld(content, t, kind, seed);
         expect(town.name).toBe(name);
         expect(town.roads.some((r) => r.name === road)).toBe(true);
         const sharp = town.roads.filter((r) => r.kind === 'country').flatMap((r) => {

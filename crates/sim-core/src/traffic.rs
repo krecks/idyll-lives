@@ -720,6 +720,9 @@ pub struct Traffic {
     /// Each car on its way round a standing taxi (`cars::PassBy`), and the taxi's key: it keeps
     /// clear of the taxi's claim as it goes by.
     pub(crate) passing: Vec<(u64, u64)>,
+    /// Per lit junction, the arms anyone waits at and comes through (`change_lights`'s own,
+    /// kept so it isn't made anew every tick).
+    lit_arms: Vec<[u64; 2]>,
 }
 
 /// Claim `k` of a route tagged `route` (`Place`).
@@ -1009,18 +1012,31 @@ impl Traffic {
     /// anywhere, it stays green where it is.
     fn change_lights(&mut self, tick: u64, signals: &[Signal]) {
         self.lights.resize(signals.len(), Light::default());
+        // (Per lit junction, the arms anyone waits at and comes through, bit `arm` of each: one
+        // pass over the asks and the holds for every junction, not one per junction and arm.)
+        let bit = |arm: u8| 1u64.checked_shl(u32::from(arm)).unwrap_or(0);
+        let mut arms = std::mem::take(&mut self.lit_arms);
+        arms.clear();
+        arms.resize(signals.len(), [0, 0]);
+        for a in &self.asks {
+            if a.seen + 1 >= tick
+                && let Some((s, arm)) = a.parts.first().and_then(|p| p.1.gate)
+                && let Some(m) = arms.get_mut(usize::from(s))
+            {
+                m[0] |= bit(arm);
+            }
+        }
+        for h in &self.holds {
+            if h.at < h.claim.from + 1.0
+                && let Some((s, arm)) = h.claim.gate
+                && let Some(m) = arms.get_mut(usize::from(s))
+            {
+                m[1] |= bit(arm);
+            }
+        }
         for (i, sig) in signals.iter().enumerate() {
-            let waits = |arm: u8| {
-                self.asks.iter().any(|a| {
-                    a.seen + 1 >= tick
-                        && a.parts.first().and_then(|p| p.1.gate) == Some((i as u16, arm))
-                })
-            };
-            let coming = |arm: u8| {
-                self.holds
-                    .iter()
-                    .any(|h| h.claim.gate == Some((i as u16, arm)) && h.at < h.claim.from + 1.0)
-            };
+            let waits = |arm: u8| arms[i][0] & bit(arm) != 0;
+            let coming = |arm: u8| arms[i][1] & bit(arm) != 0;
             let n = sig.arms.len() as u8;
             let l = self.lights[i];
             let on = tick.saturating_sub(l.since);
@@ -1054,6 +1070,7 @@ impl Traffic {
                 _ => l,
             };
         }
+        self.lit_arms = arms;
     }
 
     /// The tick's claims (before the cars go on): the vehicles on the road

@@ -246,7 +246,8 @@ pub fn shift_today(
     Some((leave, start, start + ticks(level.hours * 60.0)))
 }
 
-fn ticks(minutes: f32) -> u64 {
+/// Game minutes as ticks (rounded down).
+pub(crate) fn ticks(minutes: f32) -> u64 {
     (minutes * crate::TICKS_PER_MINUTE as f32) as u64
 }
 

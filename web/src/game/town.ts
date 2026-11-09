@@ -189,7 +189,7 @@ export interface NeighbourhoodDraft {
   seed?: number;
   /** The world the town is in (missing in drafts from older code: the classic valley). */
   world?: WorldInfo;
-  /** A big world's hamlets, land and parking (`macro.ts`); missing in a cosy or normal one. */
+  /** The world's hamlets, land and parking (`macro.ts`); missing in drafts from older code. */
   open?: OpenWorldDraft;
   /**
    * What the layout couldn't do: lots that found no room along the roads (left out of the town),
@@ -201,7 +201,7 @@ export interface NeighbourhoodDraft {
 /** What kind of world a town is in, one line about it, and how its land looks. */
 export interface WorldInfo {
   kind: WorldKind;
-  /** How big the world is (missing in drafts from older code: `cosy`). */
+  /** How big the world is (always `big`; missing in drafts from older code). */
   size?: WorldSize;
   tagline: string;
   landscape: LandscapeParams;
@@ -592,9 +592,7 @@ export function withLot(town: NeighbourhoodDraft, slot: number, template: string
  * Residents the neighbours number at most (docs/design/open-world.md: the sim holds 160 Sims in
  * a big world; room left for the player's household and babies).
  */
-export function neighbourCap(): number {
-  return 140;
-}
+export const NEIGHBOUR_CAP = 140;
 
 /** Neighbours a big world starts with when nobody asks for a number (docs/design/open-world.md: ~120 residents). */
 const BIG_START = 118;
@@ -609,9 +607,9 @@ export const generateStats = { houseMs: 0 };
  * public places round the town's middle, farms out on its edge, the houses from the middle out,
  * each turned to face its road, with a gap or a stretch of meadow between some. The town is cut
  * to the land its lots and roads take. Nobody lives there yet (see `populate`). Every world is a
- * Big one (cosy and normal were dropped in 0.7.1; `size` is kept for callers and saves).
+ * Big one (cosy and normal were dropped in 0.7.1).
  */
-export function generateWorld(content: Content, t: Templates, kind: WorldKind, seed = (Math.random() * 2 ** 31) >>> 0, name?: string, _size: WorldSize = 'big'): NeighbourhoodDraft {
+export function generateWorld(content: Content, t: Templates, kind: WorldKind, seed = (Math.random() * 2 ** 31) >>> 0, name?: string): NeighbourhoodDraft {
   return generateBigWorld(content, t, kind, seed, name);
 }
 
@@ -831,7 +829,7 @@ const RICH_FOR = 4;
  */
 export function populate(content: Content, assets: AssetRegistry, t: Templates, town: NeighbourhoodDraft, count?: number): NeighbourhoodDraft {
   // (A big world starts with about 120 residents unless asked for more, up to its cap.)
-  const MAX_NEIGHBOURS = count === undefined ? BIG_START : neighbourCap();
+  const MAX_NEIGHBOURS = count === undefined ? BIG_START : NEIGHBOUR_CAP;
   const houses = town.slots.filter((s) => s.kind === 'house');
   const wanted = Math.max(0, Math.min(count ?? houses.length - 2, houses.length - 1));
   const price = new Map(houses.map((s) => [s.index, homePrice(content, t, s)]));
@@ -896,7 +894,7 @@ function householdFor(
 export function rehouse(content: Content, assets: AssetRegistry, t: Templates, town: NeighbourhoodDraft, slot: number, size: number, avoidNames: readonly string[]): HouseholdDraft {
   const s = town.slots[slot];
   const bedrooms = (s && houseTemplate(t, s.template)?.bedrooms) ?? 1;
-  return (s && householdFor(content, assets, bedrooms, homePrice(content, t, s), neighbourCap(), avoidNames)) ?? randomHousehold(content, assets, size, avoidNames);
+  return (s && householdFor(content, assets, bedrooms, homePrice(content, t, s), NEIGHBOUR_CAP, avoidNames)) ?? randomHousehold(content, assets, size, avoidNames);
 }
 
 /** A town of one of the older sizes with its neighbours (a large one is a dense town now). */
@@ -1546,11 +1544,10 @@ function nearestRoad(list: readonly RoadPlan[], roads: ReturnType<typeof roadInd
 type PlotKind = 'home' | 'farm' | 'public' | 'shop' | 'countryside';
 
 /**
- * The town file's open-world fields (docs/design/open-world.md): its areas (a cosy or normal town
- * is one), every house's driveway with where it meets its road and the households' cars on them
- * (sim-core `cars.rs`: they drive the roads, in a cosy town too), and in a big world its typed
- * exits (the roads out), the water, public parking, and the zones, pads and areas
- * for the renderer.
+ * The town file's open-world fields (docs/design/open-world.md): its areas, every house's driveway
+ * with where it meets its road and the households' cars on them (sim-core `cars.rs`: they drive
+ * the roads), its typed exits (the roads out), the water, public parking, and the zones, pads and
+ * areas for the renderer.
  */
 function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'], cars: TownLayout['cars']) {
   const areas: TownArea[] = town.open?.areas ?? [{ name: town.name, kind: 'hamlet', x: 0, z: 0, w: town.width, d: town.depth }];

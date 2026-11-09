@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { menuScene } from '../../game/menuScene';
-  import { loadTemplates, neighbourCap, type NeighbourhoodDraft, type Templates } from '../../game/town';
+  import { loadTemplates, NEIGHBOUR_CAP, type NeighbourhoodDraft, type Templates } from '../../game/town';
   import { keepHouses, Superseded, townJob } from '../../game/townJobs';
   import { WORLD_KINDS, WORLDS, worldName, type WorldKind } from '../../game/world';
   import { app } from '../app.svelte';
@@ -16,8 +16,6 @@
   let templates = $state.raw<Templates | null>(null);
   let world = $state.raw<NeighbourhoodDraft | null>(app.world);
   let kind = $state<WorldKind>(app.world?.world?.kind ?? 'medium');
-  /** How big a world (docs/design/open-world.md): always Big now (cosy and normal were dropped). */
-  const size = 'big' as const;
   let name = $state(app.world?.name ?? '');
   /** The name was typed or rolled here (kept when the world is made again). */
   let named = $state(false);
@@ -30,7 +28,7 @@
   const roadCount = $derived(world ? world.roads.length : 0);
   const hamlets = $derived(world?.open ? world.open.areas.length - 1 : 0);
   /** The world in a line: homes, land, how many residents it holds. */
-  const sizeHint = $derived(world ? `${homes} homes${hamlets ? ` in a town and ${hamlets} hamlets` : ''} · ${world.width} × ${world.depth} m · up to ${neighbourCap()} neighbours` : '');
+  const sizeHint = $derived(world ? `${homes} homes${hamlets ? ` in a town and ${hamlets} hamlets` : ''} · ${world.width} × ${world.depth} m · up to ${NEIGHBOUR_CAP} neighbours` : '');
 
   // Public places and farms have their names on them; plain houses are left untagged (the town reads better).
   const labels = $derived<LotLabel[]>(
@@ -51,7 +49,7 @@
     making = true;
     const typed = named && name.trim() ? name.trim() : undefined;
     try {
-      const made = await townJob(content, { kind: 'world', world: kind, seed: (Math.random() * 2 ** 31) >>> 0, name: typed, size }, control.signal);
+      const made = await townJob(content, { kind: 'world', world: kind, seed: (Math.random() * 2 ** 31) >>> 0, name: typed }, control.signal);
       if (job !== control) return;
       // Its houses and preview come with it: the menu draws it without making them again.
       keepHouses(made);

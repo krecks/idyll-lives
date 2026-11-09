@@ -1,5 +1,5 @@
 /**
- * Kinds of world a new game can be set in: towns of three sizes, a farm, a seaside village, a
+ * Kinds of world a new game can be set in: towns of three kinds, a farm, a seaside village, a
  * mountain hamlet, a lakeside town and a clearing in the woods. A recipe says how the town is laid
  * out (its roads, how many lots, public places, farms; `generateWorld` in `town.ts` lays it out)
  * and what the land round it is like; the world's seed rolls the rest, so no two worlds of a kind
@@ -7,12 +7,9 @@
  */
 
 import type { Content, WorldNames } from '../content/content';
-import { DEFAULT_LANDSCAPE, type LandscapeParams, type WorldSize } from '../core/protocol';
+import { DEFAULT_LANDSCAPE, type LandscapeParams } from '../core/protocol';
 import type { GardenSize } from './housegen';
 import { branch, centroid, clearOf, crossing, crossStreet, cutAround, inside, lane, leftOf, lengths, loop, nearest, pointAt, range, ring, RoadIndex, roomAt, roundabout, through, type Box, type Pt, type RoadPlan } from './roads';
-
-export type { WorldSize };
-export const WORLD_SIZES: readonly WorldSize[] = ['big'];
 
 export type WorldKind = 'small' | 'medium' | 'dense' | 'farm' | 'seaside' | 'mountain' | 'lakeside' | 'forest';
 export const WORLD_KINDS: readonly WorldKind[] = ['small', 'medium', 'dense', 'farm', 'seaside', 'mountain', 'lakeside', 'forest'];
@@ -54,8 +51,8 @@ export interface SizeSpec {
 export interface WorldRecipe {
   label: string;
   blurb: string;
-  /** The world's main town (only `big`: cosy and normal were dropped). */
-  sizes: Record<WorldSize, SizeSpec>;
+  /** The world's main town. */
+  town: SizeSpec;
   /** Chances of a gap of a metre or two after a lot, and of a stretch of meadow. */
   gaps: [number, number];
   /** The town's roads (`scale`: as `SizeSpec.scale`). */
@@ -378,14 +375,11 @@ export function fill(rand: Rand, roads: readonly RoadPlan[], box: Box, count: nu
   return out;
 }
 
-/** The world's main town: every world is a Big one (cosy and normal were dropped in 0.7.1). */
-const sizes = (big: SizeSpec): Record<WorldSize, SizeSpec> => ({ big });
-
 export const WORLDS: Record<WorldKind, WorldRecipe> = {
   small: {
     label: 'Small town',
     blurb: 'Homes along one winding street, a park and a shop or two.',
-    sizes: sizes({ box: { w: 330, d: 256 }, lots: 70, scale: 1.5, extend: 5, fill: 4, places: [2, 3] }),
+    town: { box: { w: 330, d: 256 }, lots: 70, scale: 1.5, extend: 5, fill: 4, places: [2, 3] },
     gaps: [0.4, 0.1],
     roads: highStreet,
     small: 0.25,
@@ -397,7 +391,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   medium: {
     label: 'Medium town',
     blurb: 'A crescent of homes round the village green, lanes off the main road.',
-    sizes: sizes({ box: { w: 366, d: 340 }, lots: 82, scale: 1.45, extend: 6, fill: 5, places: [4, 4] }),
+    town: { box: { w: 366, d: 340 }, lots: 82, scale: 1.45, extend: 6, fill: 5, places: [4, 4] },
     gaps: [0.35, 0.08],
     roads: crescentTown,
     small: 0.25,
@@ -409,7 +403,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   dense: {
     label: 'Dense town',
     blurb: 'A crossroads and crooked lanes of small lots, shops on every corner.',
-    sizes: sizes({ box: { w: 390, d: 390 }, lots: 110, scale: 1.3, extend: 7, fill: 6, places: [6, 6] }),
+    town: { box: { w: 390, d: 390 }, lots: 110, scale: 1.3, extend: 7, fill: 6, places: [6, 6] },
     gaps: [0.12, 0.02],
     roads: crossroads,
     small: 0.6,
@@ -422,7 +416,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   farm: {
     label: 'Farm',
     blurb: 'A country road, farmsteads with fields and barns, open land all round.',
-    sizes: sizes({ box: { w: 330, d: 330 }, lots: 60, scale: 1.15, extend: 5, fill: 4, places: [2, 3], farms: [0, 0] }),
+    town: { box: { w: 330, d: 330 }, lots: 60, scale: 1.15, extend: 5, fill: 4, places: [2, 3], farms: [0, 0] },
     gaps: [0.5, 0.3],
     roads: countryLane,
     small: 0.1,
@@ -445,7 +439,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   seaside: {
     label: 'Seaside village',
     blurb: 'Homes above a sandy shore, a café and the smell of the sea.',
-    sizes: sizes({ box: { w: 410, d: 280 }, lots: 82, scale: 1.45, extend: 8, fill: 4, places: [4, 4] }),
+    town: { box: { w: 410, d: 280 }, lots: 82, scale: 1.45, extend: 8, fill: 4, places: [4, 4] },
     gaps: [0.3, 0.08],
     roads: shoreRoad,
     small: 0.4,
@@ -466,7 +460,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   mountain: {
     label: 'Mountain hamlet',
     blurb: 'A few big gardens in a high valley, pines on steep slopes all round.',
-    sizes: sizes({ box: { w: 354, d: 305 }, lots: 72, scale: 1.45, extend: 8, fill: 4, places: [2, 3] }),
+    town: { box: { w: 354, d: 305 }, lots: 72, scale: 1.45, extend: 8, fill: 4, places: [2, 3] },
     gaps: [0.45, 0.25],
     roads: switchback,
     small: 0.05,
@@ -491,7 +485,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   lakeside: {
     label: 'Lakeside',
     blurb: 'A town by still water, reeds and a sandy bank, gentle hills.',
-    sizes: sizes({ box: { w: 390, d: 316 }, lots: 84, scale: 1.4, extend: 8, fill: 5, places: [3, 4] }),
+    town: { box: { w: 390, d: 316 }, lots: 84, scale: 1.4, extend: 8, fill: 5, places: [3, 4] },
     gaps: [0.35, 0.1],
     roads: lakeRoad,
     small: 0.2,
@@ -512,7 +506,7 @@ export const WORLDS: Record<WorldKind, WorldRecipe> = {
   forest: {
     label: 'Forest clearing',
     blurb: 'A clearing in deep woods: big gardens, few neighbours, birdsong.',
-    sizes: sizes({ box: { w: 340, d: 305 }, lots: 66, scale: 1.4, extend: 8, fill: 4, places: [2, 2] }),
+    town: { box: { w: 340, d: 305 }, lots: 66, scale: 1.4, extend: 8, fill: 4, places: [2, 2] },
     gaps: [0.45, 0.2],
     roads: clearing,
     small: 0,

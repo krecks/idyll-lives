@@ -110,7 +110,6 @@ fn a_v34_save_comes_through_v35_unchanged() {
     let w = World::from_save_json(&content, &old_json).unwrap();
     // A big world now (cosy and normal were dropped in 0.7.1): no open-world fields to read, so no
     // road network (its meta is absent), every exit a road out.
-    assert_eq!(w.travel.size, sim_core::travel::WorldSize::Big);
     assert!(w.travel.graph.is_empty());
     assert!(w.travel.file.is_empty());
     let json = w.save_json();

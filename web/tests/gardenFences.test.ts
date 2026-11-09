@@ -33,11 +33,14 @@ describe('garden fences', async () => {
   const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
   const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
   const key = (f: { axis: string; x: number; z: number }) => `${f.axis}:${f.x}:${f.z}`;
-  const towns = (['medium', 'dense', 'farm'] as const).map((kind) => ({ kind, town: generateWorld(content, t, kind, 4242) }));
+  // (Each laid out once with nobody's lot the player's: the tests below share it.)
+  const towns = (['medium', 'dense', 'farm'] as const).map((kind) => {
+    const town = generateWorld(content, t, kind, 4242);
+    return { kind, town, layout: layoutTown(content, t, town, null) };
+  });
 
   test('on tile edges of the ground, never on a wall, across a path or driveway, or in a doorway', () => {
-    for (const { kind, town } of towns) {
-      const layout = layoutTown(content, t, town, null);
+    for (const { kind, town, layout } of towns) {
       const label = kind;
       expect(layout.fences.length, label).toBeGreaterThan(20);
       const walls = new Set<string>();
@@ -71,8 +74,8 @@ describe('garden fences', async () => {
   });
 
   test('the same whichever lot the player takes', () => {
-    for (const { kind, town } of towns) {
-      const base = layoutTown(content, t, town, null).fences.map(key).sort();
+    for (const { kind, town, layout } of towns) {
+      const base = layout.fences.map(key).sort();
       for (const slot of vacantSlots(town).slice(0, 2)) expect(layoutTown(content, t, town, slot.index).fences.map(key).sort(), `${kind} with the player at ${slot.index}`).toEqual(base);
     }
   });
@@ -130,7 +133,7 @@ describe('garden fences', async () => {
 
   test('no land shut in between gardens, in a big world whose lots leave gaps between them', () => {
     // (A big small town: its lots kept off junctions and bends left 90 tiles between four gardens.)
-    const town = generateWorld(content, t, 'small', 314192, undefined, 'big');
+    const town = generateWorld(content, t, 'small', 314192);
     const layout = layoutTown(content, t, town, null);
     const W = town.width;
     const D = town.depth;
@@ -159,7 +162,7 @@ describe('garden fences', async () => {
   }, 120_000);
 
   test('written into the town file as runs', () => {
-    const layout = layoutTown(content, t, towns[0].town, null);
+    const { layout } = towns[0];
     const runs = fenceRuns(layout.fences);
     expect(runs.length).toBeLessThan(layout.fences.length);
     const edges = runs.flatMap(({ line: [x0, z0, x1, z1], style, gate }) => {

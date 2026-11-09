@@ -53,22 +53,6 @@ pub const DRIVE_MINUTES: f32 = 60.0 * crate::GAME_MINUTES_PER_SECOND;
 /// Spatial cells for finding the road near a point (m).
 const CELL: f32 = 16.0;
 
-/// How big a world is (`size`; docs/design/open-world.md): every world is `Big` now (cosy and
-/// normal were dropped in 0.7.1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum WorldSize {
-    #[default]
-    Big,
-}
-
-impl WorldSize {
-    /// The size a town file or save says (`size`): every one is `Big` now, so a save that still
-    /// says `cosy` or `normal` reads as `big`.
-    pub fn parse(_size: Option<&str>) -> Self {
-        Self::Big
-    }
-}
-
 /// What kind of way a road is (`RoadPlan.kind`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -250,11 +234,6 @@ pub struct OpenWorld {
 }
 
 impl OpenWorld {
-    /// How big the world is (always `big` now; cosy and normal were dropped in 0.7.1).
-    pub fn size(&self) -> WorldSize {
-        WorldSize::parse(self.size.as_deref())
-    }
-
     pub fn is_empty(&self) -> bool {
         self.size.is_none()
             && self.roads.is_empty()
@@ -1251,8 +1230,6 @@ pub struct Travel {
     /// The town file's open-world fields, as they came (saved).
     pub file: OpenWorld,
     pub graph: Graph,
-    /// How big the world is (`OpenWorld::size`).
-    pub size: WorldSize,
     /// Cars' top speed on country roads (m/s; content `cars.countrySpeed`).
     pub country_speed: f32,
     /// The tiles the town file's `terrain` masks (water, rock): blocked under everything, so a
@@ -1277,14 +1254,12 @@ type Door = ([u32; 2], [Option<RoadPoint>; 2]);
 
 impl Travel {
     pub fn new(file: OpenWorld, meta: &serde_json::Value) -> Self {
-        let size = file.size();
         // Every town is one (cosy and normal were dropped in 0.7.1): a town without open-world
         // fields takes its meta's roads, or its streets, as the network.
         let graph = Graph::from_town(&file, meta);
         Self {
             file,
             graph,
-            size,
             country_speed: COUNTRY_SPEED,
             base_blocked: Vec::new(),
             by_a_mouth: Vec::new(),
@@ -1322,12 +1297,6 @@ impl Travel {
             Some(Some((at, entries))) if *at == door.map(f32::to_bits) => entries[mode as usize],
             _ => self.entry(door, mode),
         }
-    }
-
-    /// The most residents the town grows to (`World::population_cap`): `MAX_SIMS` in every world
-    /// (cosy and normal were dropped in 0.7.1).
-    pub fn population_cap(&self) -> usize {
-        crate::world::MAX_SIMS
     }
 
     /// Whether tile `i` (`Lot::tile_index`) is blocked by the land itself (`base_blocked`).

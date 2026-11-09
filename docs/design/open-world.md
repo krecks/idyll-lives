@@ -31,7 +31,7 @@ ground storey. Row blocks for upper storeys and the basement keep today's stacke
 - `MAX_SIMS` 160, `MAX_STAFF` 48, `MAX_CARS` 128 (sim-grid). The renderer's `MAX_CHARACTERS`
   is the snapshot layout's maxSims + maxStaff (208, `render/shared/characters/rig.ts`); the speech
   bubbles follow the layout's `maxSims`.
-- Neighbours: `neighbourCap() = 140` in every world (a world starts with ~120: `BIG_START`). Kept when Big worlds were filled (2026-11-02, about 2.5
+- Neighbours: `NEIGHBOUR_CAP = 140` in every world (a world starts with ~120: `BIG_START`). Kept when Big worlds were filled (2026-11-02, about 2.5
   times the homes: the rest are for sale). 240 residents were tried: the big-world bench at 1024 m
   (`SIZE=1024 RESIDENTS=240`, 4 game hours, 4 runs) ticks at 8,000–9,000 a second, p99 0.78–0.84
   ms, the slowest tick 3.9–4.0 ms, the heap 59 MB (160: 13,000 a second, p99 0.55 ms, 4.3 ms, 58

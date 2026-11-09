@@ -700,7 +700,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   }
 
   // ---- the main town: its roads first (which side its water is on), then where it goes -------
-  const mainSpec = recipe.sizes.big;
+  const mainSpec = recipe.town;
   const mainShape = ch.main ?? recipe.roads;
   const layout = mainShape(rand, mainSpec.box, mainSpec.scale);
   const mainRoads = settleRoads(joinUp(rand, layout, mainSpec, BIG_COURTS), mainSpec.box);

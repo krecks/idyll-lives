@@ -128,6 +128,8 @@ function framesOf(road: RoadPlan): Frame[] {
 export class Kerb {
   readonly length: number;
   private readonly frames: Frame[];
+  /** The road's turning circles (`deadEnds`). */
+  private readonly ends: [number, number, number][];
 
   constructor(
     readonly road: RoadPlan,
@@ -137,6 +139,7 @@ export class Kerb {
     private readonly others: RoadIndex,
   ) {
     this.frames = framesOf(road);
+    this.ends = deadEnds(road);
     this.length = this.frames[this.frames.length - 1].s;
   }
 
@@ -180,13 +183,23 @@ export class Kerb {
   /** Whether the sidewalk runs at `s` (not cut by a road it meets, not in a turning circle). */
   open(s: number): boolean {
     const [x, z] = this.at(s, (SIDEWALK - KERB) / 2);
-    return !this.others.onRoad(x, z, 0.2, this.index) && !this.inTurning(x, z);
+    return !sidewalkCut(this.others, this.index, this.ends, x, z);
   }
 
   /** Whether a point is in the turning circle at a dead end of this road. */
   inTurning(x: number, z: number): boolean {
-    return deadEnds(this.road).some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r + SIDEWALK);
+    return inTurning(this.ends, x, z);
   }
+}
+
+/** Whether a point is in one of a road's turning circles (`deadEnds`), sidewalk and all (and `grow` m round). */
+function inTurning(ends: readonly [number, number, number][], x: number, z: number, grow = 0): boolean {
+  return ends.some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r + SIDEWALK + grow);
+}
+
+/** Whether road `ri`'s sidewalk is cut at a point across its middle: another road runs there, or it is in one of the road's turning circles (`ends`). */
+function sidewalkCut(index: RoadIndex, ri: number, ends: readonly [number, number, number][], x: number, z: number): boolean {
+  return index.onRoad(x, z, 0.2, ri) || inTurning(ends, x, z);
 }
 
 /** A road's turning circles: their middles and radii (to the kerb). */
@@ -245,12 +258,17 @@ export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, 
         const mid = (edge + walkIn) / 2;
         const cut = (t: number): boolean => {
           const [x, , z] = Q(t, mid, 0);
-          return index.onRoad(x, z, 0.2, ri) || ends.some(([ex, ez, r]) => Math.hypot(x - ex, z - ez) < r + SIDEWALK);
+          return sidewalkCut(index, ri, ends, x, z);
         };
         // The stretch of the segment the sidewalk runs (`t0`..`t1`), its ends worked out where it's
         // cut: sampled every 0.5 m, then the boundary found between a clear and a cut sample.
         const runs: [number, number][] = [];
         const steps = Math.max(1, Math.ceil(Math.hypot(frames[i + 1].p[0] - frames[i].p[0], frames[i + 1].p[1] - frames[i].p[1]) / 0.5));
+        // (Most of a sidewalk has no road near: one look round the segment's middle (`reach`, past
+        // its ends with room for the bend) tells it runs the whole way, sparing the samples.)
+        const [[ax, , az], [cx, , cz], [bx, , bz]] = [Q(0, mid, 0), Q(0.5, mid, 0), Q(1, mid, 0)];
+        const reach = Math.max(Math.hypot(ax - cx, az - cz), Math.hypot(bx - cx, bz - cz)) + 0.5;
+        const free = !index.onRoad(cx, cz, 0.2 + reach, ri) && !inTurning(ends, cx, cz, reach);
         /** The boundary between a `blocked` sample and a `clear` one, worked out by halving. */
         const bound = (blocked: number, clear: number): number => {
           let [b, c] = [blocked, clear];
@@ -261,17 +279,14 @@ export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, 
           }
           return b;
         };
-        let from: number | null = cut(0) ? null : 0;
-        let [clear, blocked] = [0, 0];
-        for (let k = 1; k <= steps; k++) {
-          const t = k / steps;
+        let from: number | null = free || !cut(0) ? 0 : null;
+        for (let k = 1; k <= (free ? 0 : steps); k++) {
+          const [prev, t] = [(k - 1) / steps, k / steps];
           if (cut(t)) {
-            if (from !== null) runs.push([from, bound(t, clear)]);
+            if (from !== null) runs.push([from, bound(t, prev)]);
             from = null;
-            blocked = t;
-          } else {
-            if (from === null) from = bound(blocked, t);
-            clear = t;
+          } else if (from === null) {
+            from = bound(prev, t);
           }
         }
         if (from !== null) runs.push([from, 1]);

@@ -3,7 +3,7 @@
   import { lookAtAge, randomHousehold } from '../../game/household';
   import { reducedMotion } from '../../game/host';
   import { menuScene } from '../../game/menuScene';
-  import { loadTemplates, neighbourCap, populate, rehouse, vacantSlots, type NeighbourhoodDraft, type Templates } from '../../game/town';
+  import { loadTemplates, NEIGHBOUR_CAP, populate, rehouse, vacantSlots, type NeighbourhoodDraft, type Templates } from '../../game/town';
   import { app } from '../app.svelte';
   import Icon from '../Icon.svelte';
   import SimPreview from '../kit/SimPreview.svelte';
@@ -19,8 +19,8 @@
   let list = $state<HTMLElement>();
 
   const houseCount = $derived(town ? town.slots.filter((s) => s.kind === 'house').length : 0);
-  /** Households at most: a house for each but one, and no more than the world's neighbours (`neighbourCap`). */
-  const mostHouseholds = $derived(Math.max(0, Math.min(houseCount - 1, neighbourCap())));
+  /** Households at most: a house for each but one, and no more than the world's neighbours (`NEIGHBOUR_CAP`). */
+  const mostHouseholds = $derived(Math.max(0, Math.min(houseCount - 1, NEIGHBOUR_CAP)));
   const vacant = $derived(town ? vacantSlots(town).map((s) => s.index) : []);
   const population = $derived(town?.households.reduce((n, h) => n + h.household.members.length, 0) ?? 0);
 

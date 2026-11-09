@@ -2974,7 +2974,7 @@ pub(crate) fn off_map_ticks(w: &World) -> u64 {
 
 /// `off_map_ticks` for a content alone (`lead_by` has no world to hand).
 fn off_map(content: &crate::content::Content) -> u64 {
-    (content.career_rules.commute_minutes * crate::TICKS_PER_MINUTE as f32) as u64
+    crate::life::ticks(content.career_rules.commute_minutes)
 }
 
 /// `i` gets in (their shift is under way): the first owner in drives (someone in before them waits
@@ -6898,11 +6898,6 @@ pub(crate) fn from_file(w: &mut World, raw: &[CarRaw], drives: &[Drive], garages
 /// After the cars were made or loaded: their routes' lengths, what's built over, the tiles they
 /// take up, where they are.
 fn settle_all(w: &mut World) {
-    // A save or town without a network of its own (its driveways say where they meet their roads,
-    // `Drive::road`): built from the town file's roads, or its meta's.
-    if w.travel.graph.is_empty() && w.drives.iter().any(|d| d.road.is_some()) {
-        w.travel.graph = crate::travel::Graph::from_town(&w.travel.file, &w.meta);
-    }
     let World {
         cars,
         exits,

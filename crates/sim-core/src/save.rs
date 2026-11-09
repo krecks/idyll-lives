@@ -73,7 +73,7 @@
 //! it (`cars[].trip`, state `out` while it's parked there) and who rides with it
 //! (`cars[].riders`; absent: nobody, as in files written before passengers, so no new version).
 //! Absent: a town file without them, whose network is made from the meta's roads
-//! (`travel::Travel::from_json`). Still 35: a garage the player built (Build mode's Garage tool)
+//! (`travel::Travel::new`). Still 35: a garage the player built (Build mode's Garage tool)
 //! keeps the way its door faces (`garages[].rot`, a thing's facing; absent: towards the street, as
 //! the town placed it), and a car parked in front of one where it parked before
 //! (`cars[].driveSpot`, `[x, z, yaw]`; absent: where it parks is its own spot). Both are left out

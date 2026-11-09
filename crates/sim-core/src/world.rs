@@ -3305,7 +3305,7 @@ impl World {
                 "at most {most} residents per household"
             )));
         }
-        let cap = self.population_cap();
+        let cap = MAX_SIMS;
         if self.sims.iter().filter(|s| s.here()).count() + sims.len() > cap {
             return Err(Error::new(format!("at most {cap} residents in this town")));
         }
@@ -3834,12 +3834,6 @@ impl World {
     /// wait for the next tick does (residents' turns, the day's commutes worked out again).
     pub(crate) fn over_search_budget(&self) -> bool {
         crate::path::nodes_searched() - self.search_mark > self.search_budget
-    }
-
-    /// The most residents this town grows to by births and newcomers: `MAX_SIMS` in every world
-    /// (cosy and normal were dropped in 0.7.1).
-    pub fn population_cap(&self) -> usize {
-        self.travel.population_cap()
     }
 
     /// The navigation version: bumped whenever something walkers can or can't step through
@@ -10741,7 +10735,7 @@ fn could_conceive(ctx: &Ctx, a: usize, b: usize) -> bool {
         && y.household == x.household
         && ctx.households[h].expecting.is_none()
         && members < ctx.content.rules.max_household
-        && ctx.briefs.iter().filter(|s| s.here).count() < ctx.travel.population_cap()
+        && ctx.briefs.iter().filter(|s| s.here).count() < MAX_SIMS
 }
 
 /// The colours a player gives an object's parts, 0xRRGGBB by the name of the model's material

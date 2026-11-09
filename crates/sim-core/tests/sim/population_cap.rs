@@ -1,4 +1,4 @@
-//! How many residents a town grows to (`World::population_cap`): births and newcomers stop at
+//! How many residents a town grows to: births and newcomers stop at
 //! `MAX_SIMS` (160) in every town now (cosy and normal were dropped in 0.7.1), which every town
 //! can hold.
 
@@ -48,8 +48,6 @@ fn moves_in(size: Option<&str>, people: usize) -> bool {
 #[test]
 fn every_town_grows_to_160() {
     for size in [None, Some("cosy"), Some("normal"), Some("big")] {
-        let w = World::from_json(CONTENT, &town(size, 2), 1).unwrap();
-        assert_eq!(w.population_cap(), MAX_SIMS, "{size:?}");
         assert!(moves_in(size, MAX_SIMS - 1), "{size:?}: room for one more");
         assert!(!moves_in(size, MAX_SIMS), "{size:?}: full at {MAX_SIMS}");
     }
