@@ -935,7 +935,14 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal], trace: &Trace, len:
             (i, arm)
         };
         let gate = through.first().map(arm_of);
-        let gate2 = through.get(1).map(arm_of);
+        // (Not round a roundabout, its junctions lit as ever: its cars wait at the box's edge,
+        // with no crosswalks to wait on, and its ring through the next's box. Asked for on two of
+        // its junctions' greens at once, cars round one waited for hours, Bridgegate.)
+        let ring = |&(i, _): &(usize, usize)| signals[i].roundabout;
+        let gate2 = through
+            .get(1)
+            .map(arm_of)
+            .filter(|g| !ring(g) && !gate.as_ref().is_some_and(ring));
         // (Through a second, where its nose comes to that one's stop line.)
         let stop2 = gate2.and_then(|(i, arm)| {
             let (at, out) = (signals[i].at, signals[i].arms[arm].stop + len / 2.0);
@@ -1010,7 +1017,11 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal], trace: &Trace, len:
                 before.filter(|&(first, _)| short && claims[first].gate.is_some())
             {
                 let (group, gate) = (claims[first].group, claims[first].gate);
-                let this = claims[k].gate;
+                // (Back into the same lit junction by another arm, a loop round from it too short
+                // to wait on: through it on the green it came in on. Asked for on two of its
+                // phases' greens at once, never both, one waited at its stop line for good,
+                // Willowbrook.)
+                let this = claims[k].gate.filter(|t| gate.is_none_or(|g| g.0 != t.0));
                 for c in &mut claims[first..k] {
                     c.gate2 = c.gate2.or(this);
                     c.stop2 = from;

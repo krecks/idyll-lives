@@ -113,14 +113,18 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   crosswalks (`traffic::settle`: its zone out to their far side), so nobody drives onto one without
   room to clear it beyond ("don't block the box"). Where a car can't wait between two lit
   junctions (the second's stop line before it's out of the first's box), the way through both is
-  one group, asked for at the first's stop line on both greens (`Claim::gate2`). Of the two, the
+  one group, asked for at the first's stop line on both greens (`Claim::gate2`); not round a
+  roundabout, whose junctions are lit as ever (on two of their greens at once, cars round one
+  waited for hours). Of the two, the
   one listed first leads and the other follows: the leader on its green for one waiting through
   both holds it, and the follower's phase that one needs is wanted there (it keeps that green,
   ends another after `MIN_GREEN`, and turns to it next, but not twice running). Each light holding
   its green for one waiting at the other's red, two in step kept two cars crossing each other's
   way at red for hours (Hollyglade). A hold lasts `CYCLE` at most from when it began, and the
   second's green is held for those granted till they're past its stop line; one is granted only
-  with `GREEN_HELD` 10 s of the hold still to come. A light whose stop
+  with `GREEN_HELD` 10 s of the hold still to come. A way that comes back into the same lit
+  junction by another arm too soon to wait between is through it on the green it came in on (asked
+  for on two of its phases' greens at once, never both, it waited for good). A light whose stop
   line a car is past already (in its box, asking again for the rest of its way through after a
   taxi's stand there) neither holds it nor is called by it (`Claim::lights`): it waited in the box
   at red for good while the light was held for one waiting for the box to clear. Each
