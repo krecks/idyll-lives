@@ -11,8 +11,9 @@ export interface Settings {
   /** The graphics preset (`render/quality.ts`): Medium unless chosen. */
   graphics: GraphicsPreset;
   /**
-   * How lit surfaces are drawn (`render/pc/shaders/softLook.ts`): `soft`, the game's painterly
-   * shading; or `classic`, the PBR shading it replaced. Applies live.
+   * How lit surfaces are drawn (`render/pc/shaders/softLook.ts`): `classic`, physically based shading (the
+   * default since 0.7.1: skin, grass and wood keep their own colours); or `soft`, the painterly shading that
+   * was the default before. Applies live.
    */
   shading: Shading;
   /** `auto`: the screen's own resolution up to about 1920×1080 pixels; or a share of it along each side, 0.5..1 (`render/shared/resolution.ts`). */
@@ -85,7 +86,7 @@ const STORAGE_KEY = 'open-sims-wasm.settings';
 
 export const DEFAULT_SETTINGS: Settings = {
   graphics: 'medium',
-  shading: 'soft',
+  shading: 'classic',
   resolution: 'auto',
   fpsCap: 60,
   renderer: 'auto',
@@ -140,7 +141,7 @@ export function migrateGraphics(old: OldGraphics): GraphicsPreset {
 }
 
 /** The version of the stored settings (`settingsVersion`); bump it when a migration is added. */
-const SETTINGS_VERSION = 2;
+const SETTINGS_VERSION = 3;
 
 /**
  * Ordered migrations: `MIGRATIONS[n]` takes settings at version `n` to `n + 1`. Settings saved
@@ -155,6 +156,11 @@ const MIGRATIONS: readonly ((s: Record<string, unknown>) => void)[] = [
   // 1 → 2: Babble's language codes (0.14–0.19) became the one language there is.
   (s) => {
     if (s.voiceLanguage !== 'en') s.voiceLanguage = DEFAULT_SETTINGS.voiceLanguage;
+  },
+  // 2 → 3: classic shading became the default. A stored `soft` was the old default, not a choice (settings are
+  // stored whole), so everyone starts on classic; Soft is still in Settings.
+  (s) => {
+    s.shading = DEFAULT_SETTINGS.shading;
   },
 ];
 

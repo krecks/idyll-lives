@@ -7,14 +7,16 @@ from the woods, the street or the residents and the street's far models on Low, 
 reflecting every frame on High), listed in
 [graphics.md](graphics.md).*
 
-The world has one look: soft, painterly shading with golden-hour light and blue moonlit nights.
-All art is original or CC0.
+The world is drawn in physically based shading (**Classic**, the default since 2026-11-10, the owner's
+decision: the residents and the models should look real, and skin, grass and wood keep their own colours
+in it) with golden-hour light and blue moonlit nights. The soft, painterly shading that was the default
+until then (**Soft**) is still in Settings. All art is original or CC0.
 
 Code: `web/src/render/look.ts` holds the look as data, in the units it was tuned in up to 0.3.2 (a
 sun or a lamp of strength 1 lights a white surface to 1/π); `web/src/render/pc/*` applies it on
 PlayCanvas (its units converted in `lightUnits.ts`, see [graphics.md](graphics.md#the-renderer)),
-and `shaders/softLook.ts` draws every lit surface in the soft shading below (Settings, Performance,
-Shading; the `classic` option brings back the PBR shading it replaced).
+and `shaders/softLook.ts` holds the game's light for both shadings and, with Soft chosen, redraws every
+lit surface in the soft shading below (Settings, Performance, Shading).
 
 ## Goals
 
@@ -31,9 +33,10 @@ Shading; the `classic` option brings back the PBR shading it replaced).
   (grass alone would otherwise read dark green) while lamps and lit windows stay warm.
 - **Readable at a glance.** The dollhouse view has to show who is where and what they are doing,
   so clarity beats extra effects. There is no bloom or tilt-shift blur.
-- **Soft, painted surfaces.** Light falls off widely and gently, shade takes the sky's tint instead
-  of going black, and a quiet rim keeps silhouettes readable: closer to a hand-painted illustration
-  than a photograph, without turning flat or cel-shaded.
+- **Real surfaces by default, painted ones by choice.** Classic lights a surface as light falls on it.
+  With Soft, light falls off widely and gently, shade takes the sky's tint instead of going black, and a
+  quiet rim keeps silhouettes readable: closer to a hand-painted illustration than a photograph, without
+  turning flat or cel-shaded.
 
 ## Light and grading
 
@@ -47,7 +50,7 @@ Shading; the `classic` option brings back the PBR shading it replaced).
 
 ## Shading
 
-Every lit PBR surface is drawn with the **soft look** (`render/pc/shaders/softLook.ts`, a shader
+With **Soft** chosen, every lit PBR surface is drawn with the **soft look** (`render/pc/shaders/softLook.ts`, a shader
 feature of the game's materials in GLSL and WGSL, for WebGPU and WebGL2). It keeps the light PBR computed — the sun and the lamps, with their cast
 shadows — and redraws it as a wide, soft ramp in the light's own colour, so golden hour stays
 golden, lamps stay warm and night stays dark. The environment (the sky, with its occlusion) fills
@@ -61,8 +64,8 @@ Metals shade in their base colour (PBR gives them no diffuse colour); unlit mate
 look. Water, the sky and glass panes that keep their reflections keep their own materials on
 purpose.
 
-It is the default (Settings, Performance, **Shading**). **Classic** draws the PBR shading it
-replaced, and switching is live: every lit material (the game's and the preview studios') gets the
+**Classic**, the default (Settings, Performance, **Shading**), draws the PBR shading as it is computed;
+switching is live: every lit material (the game's and the preview studios') gets the
 other define and its shaders compile again (`MaterialLibrary.setShading`). The item pictures in Furnish and the portraits are drawn in the chosen
 shading and cached per shading; Furnish keeps its pictures between visits per app version, so a
 change to the look's code bumps the picture store's version in `preview/items.ts`. On the dev
