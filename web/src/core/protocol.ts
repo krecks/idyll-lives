@@ -671,6 +671,9 @@ export interface JunctionArmInfo {
   light: number | null;
 }
 
+/** A junction, as the renderer's pads and markings take it (`render/shared/junctions.ts`). */
+export type Junction = JunctionInfo;
+
 /**
  * A lane cars pull over on (`WorldStructure.pullOverStreets`): the town's road (`meta.roads`
  * index) and how far in from its edges (m, either side) its kerbside furniture may reach (sim-core

@@ -2,13 +2,14 @@
  * The traffic lights' signal-head rows as the renderer reads them (`render/shared/signals.ts`
  * `SignalRows`, drawn by `render/pc/signals.ts`): laid out as sim-core's snapshot writes them
  * (`snapshot.rs` `LIGHT_*`, `header::LIGHT_COUNT`, `light::*`, read from its source: `snapshotLayout.ts`), the rows
- * shown, where each pole stands and which way it faces, the lamp each shows, and what changed from
- * one read to the next.
+ * shown, where each pole stands and which way it faces, the lamp each shows to traffic and whether
+ * its pedestrians' head shows walk, and what changed from one read to the next; the pedestrians' head
+ * as drawn.
  */
 
 import { describe, expect, test } from 'bun:test';
 import type { SnapshotLayout } from '../src/core/snapshot';
-import { AMBER, GREEN, lampOf, RED, SignalRows } from '../src/render/shared/signals';
+import { AMBER, GREEN, lampOf, pedestrianHead, RED, SignalRows, walkOf } from '../src/render/shared/signals';
 import { BASES, constant, layout, LAYOUT, SNAPSHOT_RS } from './snapshotLayout';
 
 /** The light rows' part of the layout, as sim-core's `layout_json` writes it (worked out from snapshot.rs: `snapshotLayout.ts`). */
@@ -66,12 +67,49 @@ describe('signal-head rows', () => {
     expect([...rows.lamp.subarray(0, 4)]).toEqual([GREEN, RED, RED, RED]);
   });
 
-  test('shows red for walk and for a state it does not know, amber and green as they are', () => {
+  test('shows traffic red for walk and for a state it does not know, amber and green as they are', () => {
     expect(lampOf(S.red, S)).toBe(RED);
     expect(lampOf(S.amber, S)).toBe(AMBER);
     expect(lampOf(S.green, S)).toBe(GREEN);
     expect(lampOf(S.walk, S)).toBe(RED);
     expect(lampOf(7, S)).toBe(RED);
+  });
+
+  test('shows those on foot walk only for walk, else do not walk', () => {
+    expect(walkOf(S.walk, S)).toBe(true);
+    for (const state of [S.red, S.amber, S.green, 7]) expect(walkOf(state, S)).toBe(false);
+  });
+
+  test('reads the walk phase: every head red to traffic and walk to those on foot, and back', () => {
+    const rows = new SignalRows();
+    const snap = snapshot(JUNCTION);
+    rows.read(snap, layout);
+    expect([...rows.walk.subarray(0, 4)]).toEqual([0, 0, 0, 0]);
+    for (let k = 0; k < 4; k++) snap[BASE + k * STRIDE + F.state] = S.walk;
+    expect(rows.read(snap, layout)).toEqual({ placed: false, lit: true });
+    expect([...rows.lamp.subarray(0, 4)]).toEqual([RED, RED, RED, RED]);
+    expect([...rows.walk.subarray(0, 4)]).toEqual([1, 1, 1, 1]);
+    // From walk to all red: traffic's lamps the same, those on foot's changed.
+    for (let k = 0; k < 4; k++) snap[BASE + k * STRIDE + F.state] = S.red;
+    expect(rows.read(snap, layout)).toEqual({ placed: false, lit: true });
+    expect([...rows.walk.subarray(0, 4)]).toEqual([0, 0, 0, 0]);
+  });
+
+  test("the pedestrians' head hangs on the pole below the traffic head, its figures facing across the road", () => {
+    const { housing, walk, dontWalk } = pedestrianHead();
+    for (const g of [housing, walk, dontWalk]) {
+      expect(g.empty).toBe(false);
+      for (let i = 0; i < g.pos.length; i += 3) {
+        // To the -x side of the pole (towards the road's middle), under the traffic head (its board from 1.97 m up).
+        expect(g.pos[i]).toBeLessThanOrEqual(0);
+        expect(g.pos[i + 1]).toBeGreaterThan(1.3);
+        expect(g.pos[i + 1]).toBeLessThan(1.96);
+      }
+    }
+    // The figures face -x, don't walk above walk.
+    for (const g of [walk, dontWalk]) for (let i = 0; i < g.nor.length; i += 3) expect(g.nor[i]).toBe(-1);
+    const top = (g: typeof walk) => Math.max(...g.pos.filter((_, i) => i % 3 === 1));
+    expect(top(dontWalk)).toBeGreaterThan(top(walk));
   });
 
   test('leaves out the rows not shown', () => {
