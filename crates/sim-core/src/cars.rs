@@ -3512,6 +3512,18 @@ fn drive_on(w: &mut World, c: usize) {
         traffic,
         ..
     } = w;
+    // (Those waiting for it, their bodies or claims in its way: it goes on by into the ground one
+    // of them turning round still backs up over.)
+    let waiting: Vec<u64> = traffic
+        .turning
+        .iter()
+        .map(|t| t.0)
+        .filter(|&k| {
+            cars.get((k & !(1 << 63)) as usize)
+                .is_some_and(|o| o.waits_for == Some(key))
+                || traffic.waits_for(k).contains(&key)
+        })
+        .collect();
     let car = &mut cars[c];
     let shift = car.shift;
     // Where it would be a tick on, its body and the ground in front of it (behind it while it
@@ -3596,9 +3608,13 @@ fn drive_on(w: &mut World, c: usize) {
         car.waits_for = Some(o.first);
         return;
     }
-    // Nor into the ground one turning round still backs up over (`unjam`): it has the way.
+    // Nor into the ground one turning round still backs up over (`unjam`): it has the way; but
+    // for one waiting for this one (its body in that one's way), which goes on by, never nearer
+    // than `GAP` (each kept off the other, one backing up and one it had turned round for or
+    // turning round itself stood there for good: Elm Park, Willowbrook).
     if let Some(k) = traffic.turning.iter().find_map(|(k, path)| {
         (*k != key
+            && !waiting.contains(k)
             && path.iter().any(|r| {
                 crate::travel::dist(r.at, body_next.at) < r.half[0] + body_next.half[0] + 1.0 && {
                     // (Kept `TURN_KEEP` off it, so the one backing up comes by clear.)
